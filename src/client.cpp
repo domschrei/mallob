@@ -34,7 +34,7 @@ void readAllInstances(Client* client) {
 void Client::init() {
 
     int internalRank = MyMpi::rank(comm);
-    std::string filename = "scenarios/scenario001_10." + std::to_string(internalRank);
+    std::string filename = "scenarios/scenario004_1." + std::to_string(internalRank);
     readInstanceList(filename);
     MyMpi::log("Started client main thread to introduce instances.");
 
