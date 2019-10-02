@@ -9,7 +9,7 @@ OBJS =		$(HORDE)/HordeLib.o $(wildcard $(HORDE)/utilities/*.o) $(wildcard $(HORD
 SRCS =		$(wildcard src/*.cpp)
 LIBS =		-lz -L$(HORDESOLVERS)/minisat/build/release/lib -lminisat -L$(HORDESOLVERS)/lingeling/ -llgl -lpthread
 
-TARGET =	balancer
+TARGET =	mallob
 CXX =		mpic++
 
 $(TARGET):	$(HORDE)/HordeLib.o
