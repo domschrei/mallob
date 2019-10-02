@@ -1,5 +1,8 @@
-instances/*.cnf
+instances/large/
 *.o
 *.a
 *.so
 logs/*
+src/hordesat/minisat
+src/hordesat/lingeling
+src/hordesat/*.zip
