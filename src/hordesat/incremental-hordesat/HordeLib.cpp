@@ -330,6 +330,7 @@ std::vector<int> HordeLib::prepareSharing(int size) {
     if (sharingManager != NULL) {
         log(0, "Collecting clauses on this node ... \n");
 				std::vector<int> clauses = sharingManager->prepareSharing(size);
+
 				std::vector<int> plainClauses = clauseBufferToPlainClauses(clauses);
 				std::string out = "";
 				for (int i = 0; i < plainClauses.size(); i++) {
@@ -337,7 +338,9 @@ std::vector<int> HordeLib::prepareSharing(int size) {
 						out += "\n";
 					out += std::to_string(plainClauses[i]) + " ";
 				}
+				out += "\n";
 				log(0, out.c_str());
+
 				return clauses;
     } else {
         log(0, "No sharing manager found!\n");
@@ -346,6 +349,17 @@ std::vector<int> HordeLib::prepareSharing(int size) {
 
 void HordeLib::digestSharing(const std::vector<int>& result) {
     if (sharingManager != NULL) {
+
+			std::vector<int> plainClauses = clauseBufferToPlainClauses(result);
+			std::string out = "";
+			for (int i = 0; i < plainClauses.size(); i++) {
+				if (plainClauses[i] == 0)
+				out += "\n";
+				out += std::to_string(plainClauses[i]) + " ";
+			}
+			out += "\n";
+			log(0, out.c_str());
+
         sharingManager->digestSharing(result);
     }
 }
@@ -353,7 +367,6 @@ void HordeLib::digestSharing(const std::vector<int>& result) {
 std::vector<int> HordeLib::clauseBufferToPlainClauses(const vector<int>& buffer) {
 	std::vector<int> clauses;
 	int clauseLength = 1;
-	int pos = 0;
 	int pos = 0;
 	while (pos < buffer.size()) {
 		int numClausesOfLength = buffer[pos];

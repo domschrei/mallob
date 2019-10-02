@@ -5,6 +5,7 @@ if [ ! -d minisat ]; then
   mv minisat-master minisat
   patch minisat/minisat/core/Solver.h < minisat.h.patch
   patch minisat/minisat/core/Solver.cc < minisat.cc.patch
+  patch minisat/Makefile < minisat-makefile.patch
 fi
 
 # make minisat

@@ -18,7 +18,7 @@ $(TARGET):	$(HORDE)/HordeLib.o
 all:	$(TARGET)
 
 $(HORDE)/HordeLib.o:
-	make -C $(HORDE)
+	make -C $(HORDE) libhordesat.a
 
 clean:
 	rm -f $(OBJS) $(TARGET)
