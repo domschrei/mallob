@@ -34,7 +34,7 @@ void readAllInstances(Client* client) {
 void Client::init() {
 
     int internalRank = MyMpi::rank(comm);
-    std::string filename = "scenarios/scenario004_1." + std::to_string(internalRank);
+    std::string filename = params.getFilename() + "." + std::to_string(internalRank);
     readInstanceList(filename);
     MyMpi::log("Started client main thread to introduce instances.");
 
@@ -116,7 +116,6 @@ void Client::readInstanceList(std::string& filename) {
 
 void Client::readFormula(std::string& filename, Job& job) {
 
-    MyMpi::log("Reading instance " + filename);
     std::fstream file;
     file.open(filename, std::ios::in);
     if (file.is_open()) {
@@ -143,7 +142,6 @@ void Client::readFormula(std::string& filename, Job& job) {
         }
         job.setFormula(formula);
 
-        MyMpi::log("Read instance " + filename + ".");
     } else {
         MyMpi::log("ERROR: File " + filename + " could not be opened. Skipping job #"
                    + std::to_string(job.getId()));

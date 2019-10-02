@@ -7,12 +7,14 @@
 
 #include "mpi.h"
 #include "job.h"
+#include "params.h"
 
 class Client {
 
 private:
     MPI_Comm comm;
     int worldRank;
+    Parameters& params;
 
     std::map<float, Job> jobsByArrival;
     std::map<int, std::string> jobInstances;
@@ -24,8 +26,8 @@ private:
     std::thread instanceReaderThread;
 
 public:
-    Client(MPI_Comm comm, std::set<int> clientRanks)
-        : comm(comm), clientRanks(clientRanks) {
+    Client(MPI_Comm comm, Parameters& params, std::set<int> clientRanks)
+        : comm(comm), params(params), clientRanks(clientRanks) {
         this->worldRank = MyMpi::rank(MPI_COMM_WORLD);
     };
     ~Client();

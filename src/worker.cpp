@@ -679,7 +679,7 @@ void Worker::updateDemand(int jobId, int demand) {
 }
 
 bool Worker::isTimeForRebalancing() {
-    return elapsed_time() - lastRebalancing >= 5.0f;
+    return elapsed_time() - lastRebalancing >= params.getFloatParam("p", 5.0f);
 }
 
 bool Worker::isTimeForClauseSharing() {

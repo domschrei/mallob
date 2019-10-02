@@ -13,6 +13,7 @@
 #include "job.h"
 #include "job_transfer.h"
 #include "job_image.h"
+#include "params.h"
 
 class Worker {
 
@@ -20,6 +21,7 @@ private:
     MPI_Comm comm;
     int worldRank;
     std::set<int> clientNodes;
+    Parameters& params;
 
     float loadFactor = 0.95;
 
@@ -32,8 +34,8 @@ private:
     bool exchangedClausesThisRound;
 
 public:
-    Worker(MPI_Comm comm, const std::set<int>& clientNodes) :
-        comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), iteration(0)
+    Worker(MPI_Comm comm, Parameters& params, const std::set<int>& clientNodes) :
+        comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), iteration(0)
         {}
 
     void init();

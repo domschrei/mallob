@@ -6,17 +6,18 @@
 #include "worker.h"
 #include "client.h"
 #include "random.h"
+#include "params.h"
 
-void doExternalClientProgram(MPI_Comm commClients, const std::set<int>& clientRanks) {
+void doExternalClientProgram(MPI_Comm commClients, Parameters& params, const std::set<int>& clientRanks) {
 
-    Client client(commClients, clientRanks);
+    Client client(commClients, params, clientRanks);
     client.init();
     client.mainProgram();
 }
 
-void doWorkerNodeProgram(MPI_Comm commWorkers, const std::set<int>& clientRanks) {
+void doWorkerNodeProgram(MPI_Comm commWorkers, Parameters& params, const std::set<int>& clientRanks) {
 
-    Worker worker(commWorkers, clientRanks);
+    Worker worker(commWorkers, params, clientRanks);
     worker.init();
     worker.mainProgram();
 }
@@ -26,6 +27,9 @@ int main(int argc, char *argv[]) {
     MyMpi::init(argc, argv);
 
     MyMpi::log("Launching.");
+
+    Parameters params;
+    params.init(argc, argv);
 
     int numNodes = MyMpi::size(MPI_COMM_WORLD);
     int rank = MyMpi::rank(MPI_COMM_WORLD);
@@ -53,9 +57,9 @@ int main(int argc, char *argv[]) {
     MPI_Comm_split(MPI_COMM_WORLD, color, rank, &newComm);
 
     if (isExternalClient) {
-        doExternalClientProgram(newComm, externalClientRanks);
+        doExternalClientProgram(newComm, params, externalClientRanks);
     } else {
-        doWorkerNodeProgram(newComm, externalClientRanks);
+        doWorkerNodeProgram(newComm, params, externalClientRanks);
     }
 
     MPI_Finalize();
