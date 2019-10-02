@@ -3,10 +3,9 @@
 #include <thread>
 
 #include "worker.h"
-#include "mpi.h"
-#include "timer.h"
-#include "console.h"
-#include "random.h"
+#include "util/timer.h"
+#include "util/console.h"
+#include "util/random.h"
 
 void Worker::init() {
 

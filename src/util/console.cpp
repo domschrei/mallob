@@ -4,6 +4,8 @@
 #include "console.h"
 #include "timer.h"
 
+int Console::rank;
+
 void Console::init(int rank) {
     Console::rank = rank;
 }

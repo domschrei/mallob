@@ -9,11 +9,11 @@
 
 #include "HordeLib.h"
 
-#include "mpi.h"
-#include "job.h"
-#include "job_transfer.h"
-#include "job_image.h"
-#include "params.h"
+#include "util/mpi.h"
+#include "util/params.h"
+#include "data/job.h"
+#include "data/job_transfer.h"
+#include "data/job_image.h"
 
 class Worker {
 

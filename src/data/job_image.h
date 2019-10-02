@@ -7,9 +7,11 @@
 
 #include "HordeLib.h"
 
-#include "job.h"
-#include "job_transfer.h"
-#include "permutation.h"
+#include "util/permutation.h"
+#include "data/job.h"
+#include "data/job_transfer.h"
+
+#define BROADCAST_CLAUSE_INTS_PER_NODE 1500
 
 /**
  * Internal state of the job's image on this node.

@@ -6,7 +6,7 @@ CXXFLAGS =	-O3 -g -Wall -fmessage-length=0 -Isrc/ -I$(HORDE)/ -D __STDC_LIMIT_MA
 
 OBJS =		$(HORDE)/HordeLib.o $(wildcard $(HORDE)/utilities/*.o) $(wildcard $(HORDE)/sharing/*.o) $(wildcard $(HORDE)/solvers/*.o)
 #OBJS =		$(HORDE)/HordeLib.o
-SRCS =		$(wildcard src/*.cpp)
+SRCS =		$(wildcard src/util/*.cpp) $(wildcard src/data/*.cpp) $(wildcard src/*.cpp) 
 LIBS =		-lz -L$(HORDESOLVERS)/minisat/build/release/lib -lminisat -L$(HORDESOLVERS)/lingeling/ -llgl -lpthread
 
 TARGET =	mallob

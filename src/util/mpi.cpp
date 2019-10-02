@@ -7,6 +7,7 @@
 #include "mpi.h"
 #include "random.h"
 #include "timer.h"
+#include "data/job_image.h"
 
 std::set<MessageHandlePtr> MyMpi::handles;
 std::set<MessageHandlePtr> MyMpi::sentHandles;
@@ -15,15 +16,6 @@ int MyMpi::maxMsgLength;
 void MyMpi::init(int argc, char *argv[])
 {
     MPI_Init(&argc, &argv);
-
-    /*
-    int provided;
-    MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
-    if (provided != MPI_THREAD_SERIALIZED) {
-        std::cout << "ERROR: MPI Implementation does not support serialized threading." << std::endl;
-        exit(1);
-    }*/
-
     maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * (BROADCAST_CLAUSE_INTS_PER_NODE + 1);
 }
 

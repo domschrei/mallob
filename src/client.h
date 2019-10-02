@@ -5,9 +5,9 @@
 #include <string>
 #include <mutex>
 
-#include "mpi.h"
-#include "job.h"
-#include "params.h"
+#include "util/mpi.h"
+#include "util/params.h"
+#include "data/job.h"
 
 class Client {
 

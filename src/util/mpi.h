@@ -8,9 +8,7 @@
 #include <assert.h>
 #include <openmpi/mpi.h>
 
-#include "serializable.h"
-
-#define BROADCAST_CLAUSE_INTS_PER_NODE 1500
+#include "data/serializable.h"
 
 struct MessageHandle {
     MPI_Request request;

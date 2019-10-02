@@ -1,9 +1,9 @@
 
 #include <map>
 
-#include "job_image.h"
 #include "assert.h"
-#include "console.h"
+#include "util/console.h"
+#include "data/job_image.h"
 
 JobImage::JobImage(int commSize, int worldRank, int jobId) :
             commSize(commSize), worldRank(worldRank), jobId(jobId),
@@ -41,7 +41,7 @@ void JobImage::initialize() {
     params["c"] = "2"; // solvers count on this node
     params["d"] = "7"; // sparse random + native diversification
     params["mpirank"] = std::to_string(index); // mpi_rank
-    params["mpisize"] = std::to_string(MyMpi::size(MPI_COMM_WORLD)); // mpi_size
+    params["mpisize"] = std::to_string(commSize); // mpi_size
     params["jobstr"] = toStr();
 
     solver = std::unique_ptr<HordeLib>(new HordeLib(params));
@@ -121,7 +121,7 @@ void JobImage::setRightChild(int rank) {
 }
 
 std::vector<int> JobImage::collectClausesFromSolvers() {
-    return solver->prepareSharing( MyMpi::size(MPI_COMM_WORLD) /*job.getVolume()*/);
+    return solver->prepareSharing( commSize /*job.getVolume()*/);
 }
 void JobImage::insertIntoClauseBuffer(std::vector<int>& vec) {
 

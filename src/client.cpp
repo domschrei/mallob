@@ -6,11 +6,10 @@
 #include <thread>
 
 #include "client.h"
-#include "mpi.h"
-#include "timer.h"
-#include "console.h"
-#include "permutation.h"
-#include "job_transfer.h"
+#include "util/timer.h"
+#include "util/console.h"
+#include "util/permutation.h"
+#include "data/job_transfer.h"
 
 void readAllInstances(Client* client) {
 

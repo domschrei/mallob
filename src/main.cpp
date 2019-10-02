@@ -2,13 +2,13 @@
 #include <iostream>
 #include <set>
 
-#include "timer.h"
-#include "mpi.h"
-#include "console.h"
+#include "util/timer.h"
+#include "util/mpi.h"
+#include "util/console.h"
+#include "util/random.h"
+#include "util/params.h"
 #include "worker.h"
 #include "client.h"
-#include "random.h"
-#include "params.h"
 
 void doExternalClientProgram(MPI_Comm commClients, Parameters& params, const std::set<int>& clientRanks) {
 
