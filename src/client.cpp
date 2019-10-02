@@ -90,27 +90,31 @@ void Client::readInstanceList(std::string& filename) {
     MyMpi::log("Reading instances from file " + filename);
     std::fstream file;
     file.open(filename, std::ios::in);
-    if (file.is_open()) {
-        std::string line;
-        while(std::getline(file, line)) {
-            if (line.substr(0, 1) == std::string("#")) {
-                continue;
-            }
-            int id; float arrival; float priority; std::string instanceFilename;
-            int pos = 0, next = 0;
-            next = line.find(" "); id = std::stoi(line.substr(pos, next-pos)); line = line.substr(next+1);
-            next = line.find(" "); arrival = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1);
-            next = line.find(" "); priority = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1);
-            next = line.find(" "); instanceFilename = line.substr(pos, next-pos); line = line.substr(next+1);
-            Job job(id, priority);
-            while (jobsByArrival.count(arrival)) {
-                arrival += 0.00001f;
-            }
-            jobsByArrival[arrival] = job;
-            jobInstances[id] = instanceFilename;
-        }
-        file.close();
+    if (!file.is_open()) {
+        MyMpi::log("ERROR: Could not open instance file! Will stay idle.");
+        return;
     }
+
+    std::string line;
+    while(std::getline(file, line)) {
+        if (line.substr(0, 1) == std::string("#")) {
+            continue;
+        }
+        int id; float arrival; float priority; std::string instanceFilename;
+        int pos = 0, next = 0;
+        next = line.find(" "); id = std::stoi(line.substr(pos, next-pos)); line = line.substr(next+1);
+        next = line.find(" "); arrival = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1);
+        next = line.find(" "); priority = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1);
+        next = line.find(" "); instanceFilename = line.substr(pos, next-pos); line = line.substr(next+1);
+        Job job(id, priority);
+        while (jobsByArrival.count(arrival)) {
+            arrival += 0.00001f;
+        }
+        jobsByArrival[arrival] = job;
+        jobInstances[id] = instanceFilename;
+    }
+    file.close();
+
     MyMpi::log("Read " + std::to_string(jobsByArrival.size()) + " job instances from file " + filename);
 }
 

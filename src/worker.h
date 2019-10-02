@@ -23,11 +23,11 @@ private:
     std::set<int> clientNodes;
     Parameters& params;
 
-    float loadFactor = 0.95;
+    float loadFactor;
 
     std::map<int, JobImage*> jobs;
     std::map<int, JobRequest> jobCommitments;
-    int load = 0;
+    int load;
 
     int iteration;
     float lastRebalancing;
@@ -36,7 +36,11 @@ private:
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& clientNodes) :
         comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), iteration(0)
-        {}
+        {
+            loadFactor = params.getFloatParam("l", 0.95);
+            assert(0 < loadFactor && loadFactor < 1.0);
+            load = 0;
+        }
 
     void init();
     void mainProgram();
