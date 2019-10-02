@@ -7,4 +7,4 @@ else
     echo "Launching with 9 nodes."
 fi
 
-mpirun -np "$NP" ./balancer | tee logs/log.`date +%s`
+mpirun -np "$NP" ./mallob | tee logs/log.`date +%s`
