@@ -14,7 +14,7 @@ echo "# ID Arv Prio File"
 while read -r filename; do
 
     arrival=`rand $arrival`
-    echo "$id $arrival 1 instances/$filename"
+    echo "$id $arrival 1 $filename"
     id=$((id+1))
 
 done < selection
