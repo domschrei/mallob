@@ -4,12 +4,14 @@
 
 #include "worker.h"
 #include "mpi.h"
+#include "timer.h"
+#include "console.h"
 #include "random.h"
 
 void Worker::init() {
 
     // Initialize synchronized rebalancing clock
-    lastRebalancing = elapsed_time();
+    lastRebalancing = Timer::elapsedSeconds();
     exchangedClausesThisRound = false;
 
     // Begin listening to an incoming message
@@ -18,7 +20,7 @@ void Worker::init() {
 
 void Worker::mainProgram() {
 
-    MyMpi::log("Worker node set up.");
+    Console::log("Worker node set up.");
 
     while (true) {
 
@@ -32,7 +34,7 @@ void Worker::mainProgram() {
             if (result >= 0) {
                 // Solver done!
                 int jobRootRank = job.getRootNodeRank();
-                MyMpi::log_send("Found result " + std::string(result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN") + " on " + job.toStr(), jobRootRank);
+                Console::log_send("Found result " + std::string(result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN") + " on " + job.toStr(), jobRootRank);
                 std::vector<int> payload;
                 payload.push_back(jobId); payload.push_back(result);
                 MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_WORKER_FOUND_RESULT, payload);
@@ -58,7 +60,7 @@ void Worker::mainProgram() {
             iteration++;
             int numOccupiedNodes = allReduce(isIdle() ? 0.0f : 1.0f);
             if (MyMpi::rank(comm) == 0) {
-                MyMpi::log("Before rebalancing: " + std::to_string(numOccupiedNodes) + " occupied nodes");
+                Console::log("Before rebalancing: " + std::to_string(numOccupiedNodes) + " occupied nodes");
             }
             rebalance();
             exchangedClausesThisRound = false;
@@ -163,13 +165,13 @@ void Worker::handleIntroduceJob(MessageHandlePtr& handle) {
 
     if (isIdle() && !hasJobCommitments()) {
         // Accept and initialize the job
-        MyMpi::log_recv("Job #" + std::to_string(job.getId()) + " introduced. Beginning to compute as root node", jobHandle->source);
+        Console::log_recv("Job #" + std::to_string(job.getId()) + " introduced. Beginning to compute as root node", jobHandle->source);
         img->initialize(/*index=*/0, /*rootRank=*/worldRank, /*parentRank=*/handle->source);
         load = 1;
 
     } else {
         // Trigger a node finding procedure
-        MyMpi::log_recv("Job #" + std::to_string(job.getId()) + " introduced. Bouncing ...", handle->source);
+        Console::log_recv("Job #" + std::to_string(job.getId()) + " introduced. Bouncing ...", handle->source);
         JobRequest request(job.getId(), worldRank, worldRank, 0, iteration, -1);
         bounceJobRequest(request);
     }
@@ -180,20 +182,20 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
     JobRequest req; req.deserialize(handle->recvData);
 
     if (req.iteration != iteration) {
-        MyMpi::log_recv("Discarding a job request from a previous iteration", handle->source);
+        Console::log_recv("Discarding a job request from a previous iteration", handle->source);
         return;
     }
 
     if (hasJobImage(req.jobId) && jobs[req.jobId]->getState() == JobState::PAST) {
         // This job already finished!
-        MyMpi::log("Consuming request " + jobStr(req.jobId, req.requestedNodeIndex)
+        Console::log("Consuming request " + jobStr(req.jobId, req.requestedNodeIndex)
                    + " as it already finished");
         return;
     }
 
     if (isIdle() && !hasJobCommitments()) {
 
-        MyMpi::log_recv("Willing to adopt " + jobStr(req.jobId, req.requestedNodeIndex)
+        Console::log_recv("Willing to adopt " + jobStr(req.jobId, req.requestedNodeIndex)
                         + " after " + std::to_string(req.numHops) + " bounces", handle->source);
 
         // Commit on the job, send a request to the parent
@@ -210,14 +212,14 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
 
     } else {
         // Continue job finding procedure
-        MyMpi::log_recv("Bouncing " + jobStr(req.jobId, req.requestedNodeIndex), handle->source);
+        Console::log_recv("Bouncing " + jobStr(req.jobId, req.requestedNodeIndex), handle->source);
         bounceJobRequest(req);
     }
 }
 
 void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
 
-    MyMpi::log_recv("Request to become parent", handle->source);
+    Console::log_recv("Request to become parent", handle->source);
     JobRequest req; req.deserialize(handle->recvData);
 
     // Retrieve concerned job
@@ -227,13 +229,13 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
     bool reject = false;
     if (req.iteration != iteration) {
 
-        MyMpi::log_send("Request " + img.toStr() + " is from a previous iteration -- rejecting", handle->source);
+        Console::log_send("Request " + img.toStr() + " is from a previous iteration -- rejecting", handle->source);
         reject = true;
 
     } else if (img.getState() != JobState::ACTIVE && img.getState() != JobState::STORED) {
 
-        MyMpi::log_send(img.toStr() + " is not active and not stored (any more) -- rejecting", handle->source);
-        MyMpi::log("My job state: " + img.jobStateToStr());
+        Console::log_send(img.toStr() + " is not active and not stored (any more) -- rejecting", handle->source);
+        Console::log("My job state: " + img.jobStateToStr());
         reject = true;
 
     } else {
@@ -247,9 +249,9 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
         // If req.fullTransfer, then wait for the child to acknowledge having received the signature
         // Else:
         if (req.fullTransfer == 1) {
-            MyMpi::log_send("Sending " + jobStr(req.jobId, req.requestedNodeIndex), handle->source);
+            Console::log_send("Sending " + jobStr(req.jobId, req.requestedNodeIndex), handle->source);
         } else {
-            MyMpi::log_send("Resuming child " + jobStr(req.jobId, req.requestedNodeIndex), handle->source);
+            Console::log_send("Resuming child " + jobStr(req.jobId, req.requestedNodeIndex), handle->source);
 
             // Immediately mark new node as one of the node's children, if applicable
             if (req.requestedNodeIndex == jobs[req.jobId]->getLeftChildIndex()) {
@@ -271,7 +273,7 @@ void Worker::handleRejectBecomeChild(MessageHandlePtr& handle) {
     JobImage &img = getJobImage(req.jobId);
     assert(img.getState() == JobState::COMMITTED);
 
-    MyMpi::log_recv("Cancelling commitment to " + img.toStr(), handle->source);
+    Console::log_recv("Cancelling commitment to " + img.toStr(), handle->source);
     jobCommitments.erase(req.jobId);
     img.uncommit(req);
 }
@@ -291,9 +293,9 @@ void Worker::handleAcceptBecomeChild(MessageHandlePtr& handle) {
         assert(hasJobImage(req.jobId));
         JobImage& img = getJobImage(req.jobId);
         if (img.getState() == JobState::PAST) {
-            MyMpi::log("WARN: " + img.toStr() + " already finished, so it will not be re-initialized");
+            Console::log("WARN: " + img.toStr() + " already finished, so it will not be re-initialized");
         } else {
-            MyMpi::log_recv("Starting or resuming " + jobStr(req.jobId, req.requestedNodeIndex), handle->source);
+            Console::log_recv("Starting or resuming " + jobStr(req.jobId, req.requestedNodeIndex), handle->source);
             img.reinitialize(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
             load = 1;
         }
@@ -336,7 +338,7 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
 
 void Worker::handleSendJob(MessageHandlePtr& handle) {
     Job job; job.deserialize(handle->recvData);
-    //MyMpi::log("Received " + std::to_string(job.getId()));
+    //Console::log("Received " + std::to_string(job.getId()));
     jobs[job.getId()]->store(job);
     jobs[job.getId()]->initialize();
     load = 1;
@@ -374,7 +376,7 @@ void Worker::handleTerminate(MessageHandlePtr& handle) {
             MyMpi::isend(MPI_COMM_WORLD, jobs[jobId]->getRightChildNodeRank(), MSG_TERMINATE, handle->recvData);
 
         // Terminate
-        MyMpi::log("Terminating " + jobs[jobId]->toStr());
+        Console::log("Terminating " + jobs[jobId]->toStr());
         jobs[jobId]->withdraw();
         load = 0;
     }
@@ -404,14 +406,14 @@ void Worker::beginClauseGathering(int jobId) {
     std::vector<int> clauses = img.collectClausesFromSolvers();
     if (img.isRoot()) {
         // There are no other nodes computing on this job
-        MyMpi::log("Not self-broadcasting clauses");
+        Console::log("Not self-broadcasting clauses");
         //img.learnClausesFromAbove(clauses);
         return;
     }
 
     clauses.push_back(jobId);
     int parentRank = img.getParentNodeRank();
-    MyMpi::log_send("Sending clause vector of effective size " + std::to_string(clauses.size()-1)
+    Console::log_send("Sending clause vector of effective size " + std::to_string(clauses.size()-1)
                     + " from " + img.toStr(), parentRank);
     MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_GATHER_CLAUSES, clauses);
 }
@@ -421,11 +423,11 @@ void Worker::collectAndGatherClauses(std::vector<int>& clausesFromAChild) {
     int jobId = clausesFromAChild[clausesFromAChild.size()-1];
     clausesFromAChild.resize(clausesFromAChild.size() - 1);
 
-    MyMpi::log("Received clauses from below of effective size " + std::to_string(clausesFromAChild.size())
+    Console::log("Received clauses from below of effective size " + std::to_string(clausesFromAChild.size())
                     + " about #" + std::to_string(jobId));
 
     if (!hasJobImage(jobId)) {
-        MyMpi::log("WARN: I don't know that job.");
+        Console::log("WARN: I don't know that job.");
         return;
     }
     JobImage& img = getJobImage(jobId);
@@ -438,11 +440,11 @@ void Worker::collectAndGatherClauses(std::vector<int>& clausesFromAChild) {
         std::vector<int> clausesToShare = img.shareCollectedClauses();
         clausesToShare.push_back(jobId);
         if (img.isRoot()) {
-            MyMpi::log("Switching clause exchange from gather to broadcast");
+            Console::log("Switching clause exchange from gather to broadcast");
             learnAndDistributeClausesDownwards(clausesToShare);
         } else {
             int parentRank = img.getParentNodeRank();
-            MyMpi::log_send("Gathering clauses about " + img.toStr(), parentRank);
+            Console::log_send("Gathering clauses about " + img.toStr(), parentRank);
             MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_GATHER_CLAUSES, clausesToShare);
         }
     }
@@ -452,12 +454,12 @@ void Worker::learnAndDistributeClausesDownwards(std::vector<int>& clauses) {
 
     int jobId = clauses[clauses.size()-1];
     clauses.resize(clauses.size() - 1);
-    MyMpi::log(std::to_string(clauses.size()) + " clauses");
+    Console::log(std::to_string(clauses.size()) + " clauses");
     assert(clauses.size() % BROADCAST_CLAUSE_INTS_PER_NODE == 0);
 
     if (!hasJobImage(jobId)) {
         // TODO ERROR 2: For some reason, this happens
-        MyMpi::log("WARN: Received clauses from above about #" + std::to_string(jobId) + ", but I don't know it.");
+        Console::log("WARN: Received clauses from above about #" + std::to_string(jobId) + ", but I don't know it.");
         return;
     }
     JobImage& img = getJobImage(jobId);
@@ -471,7 +473,7 @@ void Worker::learnAndDistributeClausesDownwards(std::vector<int>& clauses) {
     int childRank;
     if (img.hasLeftChild()) {
         childRank = img.getLeftChildNodeRank();
-        MyMpi::log_send("Broadcasting clauses about " + img.toStr(), childRank);
+        Console::log_send("Broadcasting clauses about " + img.toStr(), childRank);
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_DISTRIBUTE_CLAUSES, clauses);
     }
     if (img.hasRightChild()) {
@@ -483,7 +485,7 @@ void Worker::learnAndDistributeClausesDownwards(std::vector<int>& clauses) {
 void Worker::rebalance() {
 
     if (MyMpi::rank(comm) == 0)
-        MyMpi::log("Rebalancing ...");
+        Console::log("Rebalancing ...");
 
     std::vector<Job> activeJobs;
     std::vector<Job> involvedJobs;
@@ -491,7 +493,7 @@ void Worker::rebalance() {
     for (auto it = jobs.begin(); it != jobs.end(); ++it) {
         JobImage &img = *it->second;
         if ((img.getState() == JobState::ACTIVE) && img.isRoot()) {
-            //MyMpi::log("Participating with " + img.toStr() + ", ID " + std::to_string(img.getJob()->getId()));
+            //Console::log("Participating with " + img.toStr() + ", ID " + std::to_string(img.getJob()->getId()));
             const Job& job = img.getJob();
 
             assert(job.getTemperature() > 0);
@@ -531,11 +533,11 @@ void Worker::rebalance() {
         float unusedVolume = 0;
         pressure = calculatePressure(involvedJobs, remainingVolume);
         if (pressure == 0) break;
-        //if (MyMpi::rank(comm) == 0) MyMpi::log("Pressure: " + std::to_string(pressure));
+        //if (MyMpi::rank(comm) == 0) Console::log("Pressure: " + std::to_string(pressure));
         for (unsigned int i = 0; i < involvedJobs.size(); i++) {
             Job *job = &involvedJobs[i];
             float addition = 1/pressure * job->getTemperature() * job->getPriority();
-            //MyMpi::log(std::to_string(pressure) + "," + std::to_string(job->getTemperature()) + "," + std::to_string(job->getPriority()));
+            //Console::log(std::to_string(pressure) + "," + std::to_string(job->getTemperature()) + "," + std::to_string(job->getPriority()));
             float upperBound = (float) std::min((double) fullVolume, (double) loadFactor*fullVolume);
             upperBound = (float) std::min((double) upperBound, (double) 2*job->getVolume()+1);
             float demand = demands[job->getId()];
@@ -553,7 +555,7 @@ void Worker::rebalance() {
         iteration++;
     }
     if (MyMpi::rank(comm) == 0)
-        MyMpi::log("Did " + std::to_string(iteration) + " rebalancing iterations");
+        Console::log("Did " + std::to_string(iteration) + " rebalancing iterations");
 
     // Weigh remaining volume against shrinkage
     float shrink = 0;
@@ -601,16 +603,16 @@ void Worker::rebalance() {
     allDemands = reduce((float) allDemands, 0);
 
     // All collective operations are done; reset synchronized timer
-    lastRebalancing = elapsed_time();
+    lastRebalancing = Timer::elapsedSeconds();
 
     if (MyMpi::rank(comm) == 0)
-        MyMpi::log("Sum of all demands: " + std::to_string(allDemands));
+        Console::log("Sum of all demands: " + std::to_string(allDemands));
 }
 
 void Worker::updateDemand(int jobId, int demand) {
 
     if (!hasJobImage(jobId)) {
-        MyMpi::log("WARN: Received a volume update about #"
+        Console::log("WARN: Received a volume update about #"
                 + std::to_string(jobId) + ", which is unknown to me.");
         return;
     }
@@ -633,7 +635,7 @@ void Worker::updateDemand(int jobId, int demand) {
     // Root node update message
     int thisIndex = img.getIndex();
     if (thisIndex == 0) {
-        MyMpi::log("Updating demand of #" + std::to_string(jobId) + " to " + std::to_string(demand));
+        Console::log("Updating demand of #" + std::to_string(jobId) + " to " + std::to_string(demand));
     }
 
     // Left child
@@ -643,7 +645,7 @@ void Worker::updateDemand(int jobId, int demand) {
         MyMpi::isend(MPI_COMM_WORLD, img.getLeftChildNodeRank(), MSG_UPDATE_DEMAND, payload);
         if (nextIndex >= demand) {
             // Prune child
-            MyMpi::log_send("Pruning left child " + img.toStr(), img.getLeftChildNodeRank());
+            Console::log_send("Pruning left child " + img.toStr(), img.getLeftChildNodeRank());
             img.unsetLeftChild();
         }
     } else if (nextIndex < demand) {
@@ -660,7 +662,7 @@ void Worker::updateDemand(int jobId, int demand) {
         MyMpi::isend(MPI_COMM_WORLD, img.getRightChildNodeRank(), MSG_UPDATE_DEMAND, payload);
         if (nextIndex >= demand) {
             // Prune child
-            MyMpi::log_send("Pruning right child " + img.toStr(), img.getRightChildNodeRank());
+            Console::log_send("Pruning right child " + img.toStr(), img.getRightChildNodeRank());
             img.unsetRightChild();
         }
     } else if (nextIndex < demand) {
@@ -679,11 +681,11 @@ void Worker::updateDemand(int jobId, int demand) {
 }
 
 bool Worker::isTimeForRebalancing() {
-    return elapsed_time() - lastRebalancing >= params.getFloatParam("p", 5.0f);
+    return Timer::elapsedSeconds() - lastRebalancing >= params.getFloatParam("p", 5.0f);
 }
 
 bool Worker::isTimeForClauseSharing() {
-    return !exchangedClausesThisRound && elapsed_time() - lastRebalancing >= 2.5f;
+    return !exchangedClausesThisRound && Timer::elapsedSeconds() - lastRebalancing >= 2.5f;
 }
 
 float Worker::calculatePressure(const std::vector<Job>& involvedJobs, float volume) const {

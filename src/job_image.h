@@ -7,7 +7,6 @@
 
 #include "HordeLib.h"
 
-#include "mpi.h"
 #include "job.h"
 #include "job_transfer.h"
 #include "permutation.h"
@@ -76,7 +75,6 @@ private:
 
 public:
 
-    //inline JobImage() {};
     JobImage(int commSize, int worldRank, int jobId);
     void store(Job job);
     void commit(const JobRequest& req);

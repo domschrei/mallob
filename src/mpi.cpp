@@ -6,25 +6,14 @@
 
 #include "mpi.h"
 #include "random.h"
+#include "timer.h"
 
 std::set<MessageHandlePtr> MyMpi::handles;
 std::set<MessageHandlePtr> MyMpi::sentHandles;
 int MyMpi::maxMsgLength;
 
-using namespace std::chrono;
-std::chrono::high_resolution_clock::time_point startTime;
-/**
- * Returns elapsed time since program start (since MyMpi::init) in seconds.
- */
-float elapsed_time() {
-    std::chrono::high_resolution_clock::time_point nowTime = high_resolution_clock::now();
-    duration<double, std::milli> time_span = nowTime - startTime;
-    return time_span.count() / 1000;
-}
-
 void MyMpi::init(int argc, char *argv[])
 {
-    startTime = high_resolution_clock::now();
     MPI_Init(&argc, &argv);
 
     /*
@@ -191,27 +180,4 @@ int MyMpi::random_other_node(MPI_Comm comm, const std::set<int>& excludedNodes)
     }
 
     return node;
-}
-
-void MyMpi::log(const char* str)
-{
-    int rank = -1;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    printf("[%3.3f] ", elapsed_time());
-    std::cout << "[" << rank << "] " << str << std::endl;
-}
-
-void MyMpi::log(std::string str)
-{
-    log(str.c_str());
-}
-
-void MyMpi::log_send(std::string str, int destRank)
-{
-    log(str + " => [" + std::to_string(destRank) + "]");
-}
-
-void MyMpi::log_recv(std::string str, int sourceRank)
-{
-    log(str + " <= [" + std::to_string(sourceRank) + "]");
 }

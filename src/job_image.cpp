@@ -3,6 +3,7 @@
 
 #include "job_image.h"
 #include "assert.h"
+#include "console.h"
 
 JobImage::JobImage(int commSize, int worldRank, int jobId) :
             commSize(commSize), worldRank(worldRank), jobId(jobId),
@@ -65,7 +66,7 @@ void JobImage::reinitialize(int index, int rootRank, int parentRank) {
             updateJobNode(index/2, parentRank);
             assert(solver != NULL);
 
-            MyMpi::log("Resuming Hordesat solving threads of " + toStr());
+            Console::log("Resuming Hordesat solving threads of " + toStr());
             resume();
 
         } else {
@@ -77,7 +78,7 @@ void JobImage::reinitialize(int index, int rootRank, int parentRank) {
             updateJobNode(index/2, parentRank);
             updateJobNode(index, worldRank);
 
-            MyMpi::log("Restarting Hordesat instance of " + toStr());
+            Console::log("Restarting Hordesat instance of " + toStr());
             solver->beginSolving();
 
             state = JobState::ACTIVE;
@@ -166,13 +167,13 @@ void JobImage::suspend() {
     assert(state == JobState::ACTIVE);
     state = JobState::SUSPENDED;
     solver->setPaused();
-    MyMpi::log("Suspended Hordesat solving threads of " + toStr());
+    Console::log("Suspended Hordesat solving threads of " + toStr());
 }
 
 void JobImage::resume() {
     assert(solver->isRunning());
     solver->unsetPaused();
-    MyMpi::log("Resumed Hordesat solving threads of " + toStr());
+    Console::log("Resumed Hordesat solving threads of " + toStr());
     state = JobState::ACTIVE;
 }
 

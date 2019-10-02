@@ -47,8 +47,6 @@ const int MSG_DISTRIBUTE_CLAUSES = 18;
 
 typedef std::shared_ptr<MessageHandle> MessageHandlePtr;
 
-float elapsed_time();
-
 class MyMpi {
 
 private:
@@ -74,11 +72,6 @@ public:
     static int size(MPI_Comm comm);
     static int rank(MPI_Comm comm);
     static int random_other_node(MPI_Comm comm, const std::set<int>& excludedNodes);
-
-    static void log(const char* str);
-    static void log(std::string str);
-    static void log_send(std::string str, int destRank);
-    static void log_recv(std::string str, int sourceRank);
 
     static void init(int argc, char *argv[]);
 
