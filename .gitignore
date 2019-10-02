@@ -1,0 +1,5 @@
+instances/*.cnf
+*.o
+*.a
+*.so
+logs/*
