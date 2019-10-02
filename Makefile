@@ -2,7 +2,7 @@
 HORDE = 	src/hordesat/incremental-hordesat
 HORDESOLVERS =	src/hordesat
 
-CXXFLAGS =	-O3 -Wall -fmessage-length=0 -Isrc/ -I$(HORDE)/ -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS
+CXXFLAGS =	-O3 -g -Wall -fmessage-length=0 -Isrc/ -I$(HORDE)/ -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS
 
 OBJS =		$(HORDE)/HordeLib.o $(wildcard $(HORDE)/utilities/*.o) $(wildcard $(HORDE)/sharing/*.o) $(wildcard $(HORDE)/solvers/*.o)
 #OBJS =		$(HORDE)/HordeLib.o

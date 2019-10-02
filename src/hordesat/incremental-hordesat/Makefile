@@ -1,6 +1,6 @@
 WSPACE = 	..
 
-CXXFLAGS =	-O3 -c -Wall -fpermissive -fmessage-length=0 -I$(WSPACE)/minisat -I$(WSPACE)/lingeling -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS
+CXXFLAGS =	-O3 -g -Wall -fpermissive -fmessage-length=0 -I$(WSPACE)/minisat -I$(WSPACE)/lingeling -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS
 #CXXFLAGS =	-O0 -g -Wall -fmessage-length=0 -I$(WSPACE)/minisat -I$(WSPACE)/lingeling -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS
 
 #OBJS =		hordesat.o

@@ -377,6 +377,7 @@ std::vector<int> HordeLib::clauseBufferToPlainClauses(const vector<int>& buffer)
 			clauses.push_back(0);
 		}
 		clauseLength++;
+		pos++;
 	}
 	return clauses;
 }
