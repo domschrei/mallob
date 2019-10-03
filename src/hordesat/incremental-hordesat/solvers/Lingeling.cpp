@@ -237,6 +237,21 @@ void Lingeling::addClauses(vector<vector<int> >& clauses) {
 	clauseAddMutex.unlock();
 }
 
+void Lingeling::addClauses(const vector<int>& clauses) {
+	clauseAddMutex.lock();
+	vector<int> clause;
+	for (int i = 0; i < clauses.size(); i++) {
+		int lit = clauses[i];
+		if (lit == 0) {
+			clausesToAdd.push_back(clause);
+			clause.clear();
+		} else {
+			clause.push_back(lit);	
+		}
+	}
+	clauseAddMutex.unlock();
+}
+
 void Lingeling::addLiteral(int lit) {
 	if (lit != 0) {
 		lglfreeze(solver, lit);
@@ -254,6 +269,14 @@ void Lingeling::addInitialClauses(vector<vector<int> >& clauses) {
 			lgladd(solver, lit);
 		}
 		lgladd(solver, 0);
+	}
+}
+
+void Lingeling::addInitialClauses(const vector<int>& clauses) {
+	for (size_t i = 0; i < clauses.size(); i++) {
+		int lit = clauses[i];
+		if (abs(lit) > maxvar) maxvar = abs(lit);
+		lgladd(solver, lit);
 	}
 }
 

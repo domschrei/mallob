@@ -143,6 +143,13 @@ void MiniSat::addClauses(vector<vector<int> >& clauses) {
 	setSolverInterrupt();
 }
 
+void MiniSat::addClauses(const vector<int>& clauses) {
+	clauseAddingLock.lock();
+	addInitialClauses(clauses);
+	clauseAddingLock.unlock();
+	setSolverInterrupt();
+}
+
 void MiniSat::addInitialClauses(vector<vector<int> >& clauses) {
 	for (size_t ind = 0; ind < clauses.size(); ind++) {
 		vec<Lit> mcls;
@@ -156,6 +163,25 @@ void MiniSat::addInitialClauses(vector<vector<int> >& clauses) {
 		}
 		if (!solver->addClause(mcls)) {
 			printf("unsat when adding initial cls\n");
+		}
+	}
+}
+
+void MiniSat::addInitialClauses(const vector<int>& clauses) {
+	vec<Lit> mcls;
+	for (size_t ind = 0; ind < clauses.size(); ind++) {
+		int lit = clauses[ind];
+		if (lit != 0) {
+			int var = abs(lit);
+			while (solver->nVars() < var) {
+				solver->newVar();
+			}
+			mcls.push(MINI_LIT(lit));
+		} else {
+			if (!solver->addClause(mcls)) {
+				printf("unsat when adding initial cls\n");
+			}
+			mcls.clear();
 		}
 	}
 }

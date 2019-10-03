@@ -457,14 +457,10 @@ bool HordeLib::readFormula(const char* filename) {
 
 // NEW 2019-09 TODO do more efficiently
 bool HordeLib::setFormula(const std::vector<int>& formula) {
-    litsAdded = 0;
-    int numClauses = 0;
-    for (int c = 0; c < formula.size(); c++) {
-        int lit = formula.at(c);
-        addLit(lit);
-        if (lit == 0) numClauses++;
-    }
-    log(0, "Received formula with %i clauses with a total of %i literals\n", numClauses, litsAdded);
+	for (int i = 0; i < solversCount; i++) {
+		solvers[i]->addClauses(formula);
+	}
+    //log(0, "Received formula with %i clauses with a total of %i literals\n", numClauses, litsAdded);
     return true;
 }
 

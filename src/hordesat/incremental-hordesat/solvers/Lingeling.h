@@ -75,6 +75,8 @@ public:
 	void addClause(vector<int>& clause);
 	void addClauses(vector<vector<int> >& clauses);
 	void addInitialClauses(vector<vector<int> >& clauses);
+	void addClauses(const vector<int>& clauses);
+	void addInitialClauses(const vector<int>& clauses);
 
 	// Add a (list of) learned clause(s) to the formula
 	// The learned clauses might be added later or possibly never
