@@ -22,6 +22,8 @@ private:
 public:
 	Parameters() = default;
 	void init(int argc, char** argv);
+	void printUsage();
+	void setDefaults();
 	string getFilename();
 	void printParams();
 	void setParam(const char* name);
@@ -31,6 +33,8 @@ public:
 	string getParam(const string& name);
 	int getIntParam(const string& name, int defaultValue);
 	float getFloatParam(const string& name, float defaultValue);
+	int getIntParam(const string& name);
+	float getFloatParam(const string& name);
 };
 
 #endif /* PARAMETERPROCESSOR_H_ */

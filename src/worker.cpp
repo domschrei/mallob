@@ -158,7 +158,7 @@ void Worker::handleIntroduceJob(MessageHandlePtr& handle) {
     Job job; job.deserialize(jobHandle->recvData);
 
     assert(!hasJobImage(job.getId()));
-    JobImage *img = new JobImage(MyMpi::size(comm), worldRank, job.getId());
+    JobImage *img = new JobImage(params, MyMpi::size(comm), worldRank, job.getId());
     jobs[job.getId()] = img;
     img->store(job);
 
@@ -201,7 +201,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
         bool fullTransfer = false;
         if (!hasJobImage(req.jobId)) {
             // Job is not known yet
-            jobs[req.jobId] = new JobImage(MyMpi::size(comm), worldRank, req.jobId);
+            jobs[req.jobId] = new JobImage(params, MyMpi::size(comm), worldRank, req.jobId);
             fullTransfer = true;
         }
         req.fullTransfer = fullTransfer ? 1 : 0;
@@ -680,7 +680,7 @@ void Worker::updateDemand(int jobId, int demand) {
 }
 
 bool Worker::isTimeForRebalancing() {
-    return Timer::elapsedSeconds() - lastRebalancing >= params.getFloatParam("p", 5.0f);
+    return Timer::elapsedSeconds() - lastRebalancing >= params.getFloatParam("p");
 }
 
 bool Worker::isTimeForClauseSharing() {

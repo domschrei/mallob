@@ -24,17 +24,6 @@ void doWorkerNodeProgram(MPI_Comm commWorkers, Parameters& params, const std::se
     worker.mainProgram();
 }
 
-void printUsage() {
-
-    Console::log("Usage: mallob [-p=<rebalance-period>] [-l=<load-factor>] [-c=<num-clients>] <scenario>");
-    Console::log("<scenario>            File path and name prefix for client scenario(s);");
-    Console::log("                      will parse <name>.0 for one client, ");
-    Console::log("                      <name>.0 and <name>.1 for two clients, ...");
-    Console::log("<rebalance-period>    Do global rebalancing every r seconds (r > 0)");
-    Console::log("<load-factor>         Load factor to be aimed at (0 < l < 1)");
-    Console::log("<num-clients>         Amount of client nodes (int c >= 1)");
-}
-
 int main(int argc, char *argv[]) {
 
     Timer::init();
@@ -45,17 +34,16 @@ int main(int argc, char *argv[]) {
 
     Console::init(rank);
 
+    Parameters params;
     if (argc <= 1) {
         if (rank == 0)
-            printUsage();
+            params.printUsage();
         MPI_Finalize();
         exit(0);
     }
+    params.init(argc, argv);
 
     Console::log("Launching.");
-
-    Parameters params;
-    params.init(argc, argv);
 
     if (numNodes < 2) {
         Console::log("At least two threads / nodes are necessary in order to run this application.");
@@ -65,13 +53,14 @@ int main(int argc, char *argv[]) {
 
     Random::init(rank);
 
+    // Find client ranks
     std::set<int> externalClientRanks;
-    int numClients = params.getIntParam("c", 1);
+    int numClients = params.getIntParam("c");
     for (int i = 1; i <= numClients; i++)
         externalClientRanks.insert(numNodes-i);
-
     bool isExternalClient = (externalClientRanks.find(rank) != externalClientRanks.end());
 
+    // Create two disjunct communicators: Clients and workers
     int color = -1;
     if (isExternalClient) {
         // External client node
@@ -83,6 +72,7 @@ int main(int argc, char *argv[]) {
     MPI_Comm newComm;
     MPI_Comm_split(MPI_COMM_WORLD, color, rank, &newComm);
 
+    // Launch node's main program
     if (isExternalClient) {
         doExternalClientProgram(newComm, params, externalClientRanks);
     } else {

@@ -5,9 +5,9 @@
 #include "util/console.h"
 #include "data/job_image.h"
 
-JobImage::JobImage(int commSize, int worldRank, int jobId) :
-            commSize(commSize), worldRank(worldRank), jobId(jobId),
-            hasDescription(false), initialized(false),
+JobImage::JobImage(Parameters& params, int commSize, int worldRank, int jobId) :
+            params(params), commSize(commSize), worldRank(worldRank), 
+            jobId(jobId), hasDescription(false), initialized(false),
             jobNodeRanks(commSize, jobId) {}
 
 void JobImage::store(Job job) {
@@ -38,7 +38,7 @@ void JobImage::initialize() {
 
     std::map<std::string, std::string> params;
     params["e"] = "1"; // exchange mode: 0 = nothing, 1 = alltoall, 2 = log, 3 = asyncrumor
-    params["c"] = "2"; // solvers count on this node
+    params["c"] = this->params.getIntParam("t"); // solver threads on this node
     params["d"] = "7"; // sparse random + native diversification
     params["mpirank"] = std::to_string(index); // mpi_rank
     params["mpisize"] = std::to_string(commSize); // mpi_size

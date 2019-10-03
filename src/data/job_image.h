@@ -7,6 +7,7 @@
 
 #include "HordeLib.h"
 
+#include "util/params.h"
 #include "util/permutation.h"
 #include "data/job.h"
 #include "data/job_transfer.h"
@@ -57,6 +58,7 @@ class JobImage {
 private:
     int commSize;
     int worldRank;
+    Parameters& params;
 
     int jobId;
     int index;
@@ -77,7 +79,7 @@ private:
 
 public:
 
-    JobImage(int commSize, int worldRank, int jobId);
+    JobImage(Parameters& params, int commSize, int worldRank, int jobId);
     void store(Job job);
     void commit(const JobRequest& req);
     void uncommit(const JobRequest& req);

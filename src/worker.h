@@ -37,7 +37,7 @@ public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& clientNodes) :
         comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), iteration(0)
         {
-            loadFactor = params.getFloatParam("l", 0.95);
+            loadFactor = params.getFloatParam("l");
             assert(0 < loadFactor && loadFactor < 1.0);
             load = 0;
         }

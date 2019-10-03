@@ -12,7 +12,6 @@
 #include "utilities/Threading.h"
 #include "solvers/MiniSat.h"
 #include "solvers/Lingeling.h"
-#include "solvers/DepQBF.h"
 #include "sharing/AllToAllSharingManager.h"
 #include "sharing/LogSharingManager.h"
 #include "sharing/AsyncRumorSharingManager.h"
