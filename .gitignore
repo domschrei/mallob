@@ -7,3 +7,5 @@ src/hordesat/minisat
 src/hordesat/lingeling
 src/hordesat/*.zip
 mallob
+.sconsign.dblite
+.vscode/
