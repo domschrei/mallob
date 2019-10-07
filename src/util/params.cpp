@@ -5,6 +5,7 @@
 #include "console.h"
 
 void Parameters::init(int argc, char** argv) {
+  setDefaults();
   for (int i = 1; i < argc; i++) {
     char* arg = argv[i];
     if (arg[0] != '-') {

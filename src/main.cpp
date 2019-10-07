@@ -42,6 +42,7 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     params.init(argc, argv);
+    params.printParams();
 
     Console::log("Launching.");
 
