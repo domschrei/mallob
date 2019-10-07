@@ -38,6 +38,7 @@ std::vector<int> AllToAllSharingManager::prepareSharing(int size) {
 	}
 	int selectedCount;
 	int used = cdb.giveSelection(outBuffer, COMM_BUFFER_SIZE, &selectedCount);
+	log(0, "Prepared %i clauses in a buffer of size %i\n", selectedCount, used);
 	stats.sharedClauses += selectedCount;
 	int usedPercent = (100*used)/COMM_BUFFER_SIZE;
 	if (usedPercent < 80) {
@@ -46,7 +47,7 @@ std::vector<int> AllToAllSharingManager::prepareSharing(int size) {
 		log(0, "Node %d production increase for %d. time, core %d will increase.\n", rank, prodInc++, increaser);
 	}
 	log(0, "Node %d filled %d%% of its learned clause buffer\n", rank, usedPercent);
-    std::vector<int> clauseVec(outBuffer, outBuffer + used / sizeof outBuffer[0]);
+    std::vector<int> clauseVec(outBuffer, outBuffer + COMM_BUFFER_SIZE);
 
     /*
     std::string out;

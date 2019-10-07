@@ -48,6 +48,7 @@
 #include <csignal>
 #include <unistd.h>
 #include <sched.h>
+#include <assert.h>
 
 
 // =========================
@@ -329,19 +330,22 @@ int HordeLib::solveLoop() {
 std::vector<int> HordeLib::prepareSharing(int size) {
     if (sharingManager != NULL) {
         log(0, "Collecting clauses on this node ... \n");
-				std::vector<int> clauses = sharingManager->prepareSharing(size);
+		std::vector<int> clauses = sharingManager->prepareSharing(size);
 
-				std::vector<int> plainClauses = clauseBufferToPlainClauses(clauses);
-				std::string out = "";
-				for (int i = 0; i < plainClauses.size(); i++) {
-					if (plainClauses[i] == 0)
-						out += "\n";
-					out += std::to_string(plainClauses[i]) + " ";
-				}
+		/*
+		std::vector<int> plainClauses = clauseBufferToPlainClauses(clauses);
+		std::string out = "";
+		for (int i = 0; i < plainClauses.size(); i++) {
+			if (plainClauses[i] == 0)
 				out += "\n";
-				log(0, out.c_str());
-
-				return clauses;
+			else
+				out += std::to_string(plainClauses[i]) + " ";
+		}
+		out += "\n";
+		//log(0, out.c_str());
+		*/
+	
+		return clauses;
     } else {
         log(0, "No sharing manager found!\n");
     }
@@ -350,15 +354,18 @@ std::vector<int> HordeLib::prepareSharing(int size) {
 void HordeLib::digestSharing(const std::vector<int>& result) {
     if (sharingManager != NULL) {
 
-			std::vector<int> plainClauses = clauseBufferToPlainClauses(result);
-			std::string out = "";
-			for (int i = 0; i < plainClauses.size(); i++) {
-				if (plainClauses[i] == 0)
+		/*
+		std::vector<int> plainClauses = clauseBufferToPlainClauses(result);
+		std::string out = "";
+		for (int i = 0; i < plainClauses.size(); i++) {
+			if (plainClauses[i] == 0)
 				out += "\n";
+			else
 				out += std::to_string(plainClauses[i]) + " ";
-			}
-			out += "\n";
-			log(0, out.c_str());
+		}
+		out += "\n";
+		//log(0, out.c_str());
+		*/
 
         sharingManager->digestSharing(result);
     }
@@ -366,19 +373,49 @@ void HordeLib::digestSharing(const std::vector<int>& result) {
 
 std::vector<int> HordeLib::clauseBufferToPlainClauses(const vector<int>& buffer) {
 	std::vector<int> clauses;
-	int clauseLength = 1;
+
 	int pos = 0;
-	while (pos < buffer.size()) {
-		int numClausesOfLength = buffer[pos];
-		for (int n = 0; n < numClausesOfLength; n++) {
-			for (int i = 0; i < clauseLength; i++) {
-				clauses.push_back(buffer[pos++]);
+	while (pos + COMM_BUFFER_SIZE < buffer.size()) {
+		int bufIdx = pos % COMM_BUFFER_SIZE;
+
+		//for (int i = 0; i < buffer.size(); i++) std::cout << buffer[i] << " ";
+		//std::cout << "\n";
+
+		if (buffer.size() == 0) return clauses;
+
+		int numVipClauses = buffer[pos++];
+		//log(0, "%i vip clauses\n", numVipClauses);
+		while (numVipClauses > 0) {
+			int lit = buffer[pos++];
+			clauses.push_back(lit);
+			//std::cout << lit << " ";
+			if (lit == 0) {
+				numVipClauses--;
+				//std::cout << "\n";
 			}
-			clauses.push_back(0);
 		}
-		clauseLength++;
-		pos++;
+
+		int clauseLength = 1;
+		while (pos % COMM_BUFFER_SIZE == bufIdx) {
+			int numClausesOfLength = buffer[pos++];
+			if (numClausesOfLength > 0)
+				//log(0, "%i clauses of length %i:\n  ", numClausesOfLength, clauseLength);
+			for (int n = 0; n < numClausesOfLength; n++) {
+				for (int i = 0; i < clauseLength; i++) {
+					int lit = buffer[pos++];
+					assert(lit != 0);
+					clauses.push_back(lit);
+					//std::cout << lit << " ";
+				}
+				clauses.push_back(0);
+				//std::cout << "\n";
+			}
+			clauseLength++;
+		}
+
+		pos = (bufIdx + 1) * COMM_BUFFER_SIZE;
 	}
+	
 	return clauses;
 }
 

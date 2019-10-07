@@ -318,11 +318,14 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
     } else {
 
         // Mark new node as one of the node's children, if applicable
-        if (req.requestedNodeIndex == jobs[req.jobId]->getLeftChildIndex()) {
-            jobs[req.jobId]->setLeftChild(handle->source);
-        } else if (req.requestedNodeIndex == jobs[req.jobId]->getRightChildIndex()) {
-            jobs[req.jobId]->setRightChild(handle->source);
-        } else assert(req.requestedNodeIndex == 0);
+        if (img.isInitialized()) {
+            int requestedIndex = req.requestedNodeIndex;
+            if (req.requestedNodeIndex == img.getLeftChildIndex()) {
+                img.setLeftChild(handle->source);
+            } else if (req.requestedNodeIndex == img.getRightChildIndex()) {
+                img.setRightChild(handle->source);
+            } else assert(req.requestedNodeIndex == 0);
+        }
 
         // Send current volume / initial demand update
         if (img.getState() == JobState::ACTIVE) {

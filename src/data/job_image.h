@@ -118,6 +118,7 @@ public:
     const Job& getJob() const {return job;};
     Job& getJob() {return job;};
     int getIndex() const {return index;};
+    bool isInitialized() const {return initialized;};
 
     bool isRoot() const {return index == 0;};
     int getRootNodeRank() const {return jobNodeRanks[0];};
