@@ -280,9 +280,13 @@ int HordeLib::solve() {
 
 int HordeLib::beginSolving() {
 
-    //setStartTime(); // Logger.h : Set start time
-
 	solvingDoneLocal = false;
+
+	maxSeconds = params.getIntParam("t", 0);
+	maxRounds = params.getIntParam("r", 0);
+	round = 1;
+    running = true;
+
 	for (int i = 0; i < solversCount; i++) {
         //log(1, "initializing solver %i.\n", i);
 		threadArgs* arg = new threadArgs();
@@ -291,14 +295,8 @@ int HordeLib::beginSolving() {
 		solverThreads[i] = new Thread(solverRunningThread, arg);
         //log(1, "initialized solver %i.\n", i);
 	}
-
 	startSolving = getTime() - startSolving;
-	log(1, "Node %d started its solvers, initialization took %.2f seconds.\n", mpi_rank, startSolving);
-
-	maxSeconds = params.getIntParam("t", 0);
-	maxRounds = params.getIntParam("r", 0);
-	round = 1;
-    running = true;
+	log(1, "Node %d started its solvers, initialization took %.3f seconds.\n", mpi_rank, startSolving);
 }
 
 int HordeLib::solveLoop() {
@@ -317,8 +315,10 @@ int HordeLib::solveLoop() {
         sharingManager->doSharing();
     }
     */
-    if (round == maxRounds || (maxSeconds != 0 && timeNow > maxSeconds)) {
+
+    if ((maxRounds != 0 && round == maxRounds) || (maxSeconds != 0 && timeNow > maxSeconds)) {
         //endingFunction = getGlobalEnding;
+		log(0, "round %i, time %3.3f\n", round, timeNow);
         solvingDoneLocal = true;
     }
     fflush(stdout);
@@ -344,7 +344,7 @@ std::vector<int> HordeLib::prepareSharing(int size) {
 		out += "\n";
 		//log(0, out.c_str());
 		*/
-	
+
 		return clauses;
     } else {
         log(0, "No sharing manager found!\n");

@@ -40,6 +40,7 @@ void JobImage::initialize() {
     params["e"] = "1"; // exchange mode: 0 = nothing, 1 = alltoall, 2 = log, 3 = asyncrumor
     params["c"] = this->params.getParam("t"); // solver threads on this node
     params["d"] = "7"; // sparse random + native diversification
+    params["i"] = "0"; // #microseconds to sleep during solve loop
     params["mpirank"] = std::to_string(index); // mpi_rank
     params["mpisize"] = std::to_string(commSize); // mpi_size
     params["jobstr"] = toStr();

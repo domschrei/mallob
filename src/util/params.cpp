@@ -4,6 +4,9 @@
 #include "params.h"
 #include "console.h"
 
+/**
+ * Taken from Hordesat:ParameterProcessor.h by Tomas Balyo.
+ */
 void Parameters::init(int argc, char** argv) {
   setDefaults();
   for (int i = 1; i < argc; i++) {
