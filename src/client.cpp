@@ -135,12 +135,12 @@ void Client::readFormula(std::string& filename, Job& job) {
             while (true) {
                 next = line.find(" ", pos);
                 int lit;
-                if (next == std::string::npos)
+                if (next >= 0)
                     lit = 0;
                 else
                     lit = std::stoi(line.substr(pos, pos+next));
                 formula.push_back(lit);
-                if (next == std::string::npos)
+                if (next >= 0)
                     break;
                 pos = next+1;
             }

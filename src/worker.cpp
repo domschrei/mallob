@@ -1,6 +1,7 @@
 
 #include <math.h>
 #include <thread>
+#include <unistd.h>
 
 #include "worker.h"
 #include "util/timer.h"
@@ -147,6 +148,7 @@ void Worker::mainProgram() {
         }
 
         // TODO Sleep for a bit
+        usleep(1000); // 1000 = 1 millisecond
     }
 }
 
@@ -319,7 +321,6 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
 
         // Mark new node as one of the node's children, if applicable
         if (img.isInitialized()) {
-            int requestedIndex = req.requestedNodeIndex;
             if (req.requestedNodeIndex == img.getLeftChildIndex()) {
                 img.setLeftChild(handle->source);
             } else if (req.requestedNodeIndex == img.getRightChildIndex()) {
@@ -363,23 +364,24 @@ void Worker::handleDistributeClauses(MessageHandlePtr& handle) {
 void Worker::handleTerminate(MessageHandlePtr& handle) {
 
     int jobId = handle->recvData[0];
+    JobImage& img = getJobImage(jobId);
 
     // Either this job is still running, or it has been shut down by a previous termination message / rebalancing procedure
-    assert(jobs[jobId]->getState() == JobState::ACTIVE
-        || jobs[jobId]->getState() == JobState::PAST
-        || jobs[jobId]->getState() == JobState::SUSPENDED);
+    assert(img.getState() == JobState::ACTIVE
+        || img.getState() == JobState::PAST
+        || img.getState() == JobState::SUSPENDED);
 
-    if (jobs[jobId]->getState() == JobState::ACTIVE) {
+    if (img.getState() == JobState::ACTIVE) {
 
         // Propagate termination message down the job tree
-        if (jobs[jobId]->hasLeftChild())
-            MyMpi::isend(MPI_COMM_WORLD, jobs[jobId]->getLeftChildNodeRank(), MSG_TERMINATE, handle->recvData);
-        if (jobs[jobId]->hasRightChild())
-            MyMpi::isend(MPI_COMM_WORLD, jobs[jobId]->getRightChildNodeRank(), MSG_TERMINATE, handle->recvData);
+        if (img.hasLeftChild())
+            MyMpi::isend(MPI_COMM_WORLD, img.getLeftChildNodeRank(), MSG_TERMINATE, handle->recvData);
+        if (img.hasRightChild())
+            MyMpi::isend(MPI_COMM_WORLD, img.getRightChildNodeRank(), MSG_TERMINATE, handle->recvData);
 
         // Terminate
-        Console::log("Terminating " + jobs[jobId]->toStr());
-        jobs[jobId]->withdraw();
+        Console::log("Terminating " + img.toStr());
+        img.withdraw();
         load = 0;
     }
 }

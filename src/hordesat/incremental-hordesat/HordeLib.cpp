@@ -278,7 +278,7 @@ int HordeLib::solve() {
     return result;
 }
 
-int HordeLib::beginSolving() {
+void HordeLib::beginSolving() {
 
 	solvingDoneLocal = false;
 
@@ -348,6 +348,7 @@ std::vector<int> HordeLib::prepareSharing(int size) {
 		return clauses;
     } else {
         log(0, "No sharing manager found!\n");
+		return std::vector<int>();
     }
 }
 
@@ -375,7 +376,7 @@ std::vector<int> HordeLib::clauseBufferToPlainClauses(const vector<int>& buffer)
 	std::vector<int> clauses;
 
 	int pos = 0;
-	while (pos + COMM_BUFFER_SIZE < buffer.size()) {
+	while (pos + COMM_BUFFER_SIZE < (int) buffer.size()) {
 		int bufIdx = pos % COMM_BUFFER_SIZE;
 
 		//for (int i = 0; i < buffer.size(); i++) std::cout << buffer[i] << " ";

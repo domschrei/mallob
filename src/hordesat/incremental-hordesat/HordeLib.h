@@ -83,7 +83,7 @@ public:
 	void addLit(int lit);
 	void assume(int lit);
 
-    int beginSolving();
+    void beginSolving();
     int solveLoop();
 
     std::vector<int> prepareSharing(int size);

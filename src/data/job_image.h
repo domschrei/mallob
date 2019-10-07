@@ -56,9 +56,9 @@ const int RESULT_UNSAT = 20;
 class JobImage {
 
 private:
+    Parameters& params;
     int commSize;
     int worldRank;
-    Parameters& params;
 
     int jobId;
     int index;
