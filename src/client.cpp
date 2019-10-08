@@ -59,10 +59,10 @@ void Client::mainProgram() {
 
         // Wait until job is ready to be sent
         while (true) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             std::unique_lock<std::mutex> lock(jobReadyLock);
             if (jobReady[jobId])
                 break;
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
 
         if (job.getFormulaSize() == 1) {
@@ -135,17 +135,18 @@ void Client::readFormula(std::string& filename, Job& job) {
             while (true) {
                 next = line.find(" ", pos);
                 int lit;
-                if (next >= 0)
+                if (next < 0)
                     lit = 0;
                 else
                     lit = std::stoi(line.substr(pos, pos+next));
                 formula.push_back(lit);
-                if (next >= 0)
+                if (next < 0)
                     break;
                 pos = next+1;
             }
         }
         job.setFormula(formula);
+        Console::log(std::to_string(formula.size()) + " literals including separation zeros");
 
     } else {
         Console::log("ERROR: File " + filename + " could not be opened. Skipping job #"

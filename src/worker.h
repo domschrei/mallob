@@ -6,6 +6,7 @@
 #include <chrono>
 #include <string>
 #include <thread>
+#include <memory>
 
 #include "HordeLib.h"
 
@@ -14,6 +15,7 @@
 #include "data/job.h"
 #include "data/job_transfer.h"
 #include "data/job_image.h"
+#include "balancing/balancer.h"
 
 class Worker {
 
@@ -29,6 +31,7 @@ private:
     std::map<int, JobRequest> jobCommitments;
     int load;
 
+    std::unique_ptr<Balancer> balancer;
     int iteration;
     float lastRebalancing;
     bool exchangedClausesThisRound;
@@ -46,6 +49,8 @@ public:
     void mainProgram();
 
 private:
+
+    void checkTerminate();
 
     void handleIntroduceJob(MessageHandlePtr& handle);
     void handleFindNode(MessageHandlePtr& handle);
@@ -66,7 +71,6 @@ private:
     void learnAndDistributeClausesDownwards(std::vector<int>& clauses);
 
     void rebalance();
-    float calculatePressure(const std::vector<Job>& involvedJobs, float volume) const;
     float reduce(float contribution, int rootRank) const;
     float allReduce(float contribution) const;
 

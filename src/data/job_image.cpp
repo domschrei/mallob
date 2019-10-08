@@ -1,5 +1,6 @@
 
 #include <map>
+#include <thread>
 
 #include "assert.h"
 #include "util/console.h"
@@ -12,8 +13,8 @@ JobImage::JobImage(Parameters& params, int commSize, int worldRank, int jobId) :
 
 void JobImage::store(Job job) {
     this->job = job;
-    if (state == JobState::NONE) {
-        state = JobState::STORED;
+    if (state == NONE) {
+        state = STORED;
     }
     hasDescription = true;
 }
@@ -24,17 +25,12 @@ void JobImage::initialize(int index, int rootRank, int parentRank) {
     updateJobNode(0, rootRank);
     updateJobNode(index/2, parentRank);
     updateJobNode(index, worldRank);
-
     initialize();
 }
 
 void JobImage::initialize() {
 
     assert(hasDescription);
-    assert(state != JobState::ACTIVE && state != JobState::PAST);
-
-    job.setVolume(1);
-    job.setTemperature(100);
 
     std::map<std::string, std::string> params;
     params["e"] = "1"; // exchange mode: 0 = nothing, 1 = alltoall, 2 = log, 3 = asyncrumor
@@ -44,13 +40,35 @@ void JobImage::initialize() {
     params["mpirank"] = std::to_string(index); // mpi_rank
     params["mpisize"] = std::to_string(commSize); // mpi_size
     params["jobstr"] = toStr();
-
     solver = std::unique_ptr<HordeLib>(new HordeLib(params));
-    solver->setFormula(job.getFormula());
+    doSolverInitialization();
+}
 
-    state = JobState::ACTIVE;
+void JobImage::doSolverInitialization() {
+
+    assert(solver != NULL);
+
+    /*
+    Console::log("Beginning to give formula to solvers");
+    const std::vector<int>& formula = job.getFormula();
+    int bulkSize = 1000;
+    int start = 0;
+    Console::log("Entering loop");
+    while (start < formula.size()) {
+        if (cancelInit) {
+            Console::log("Initialization cancelled");
+            return;
+        }
+        solver->addToFormula(formula, start, bulkSize);
+        start += bulkSize;
+    }
+    Console::log("Finished giving formula to solvers");
     solver->beginSolving();
+    */
+
+    solver->beginSolving(job.getFormula());
     initialized = true;
+    state = ACTIVE;
 }
 
 void JobImage::reinitialize(int index, int rootRank, int parentRank) {
@@ -82,16 +100,16 @@ void JobImage::reinitialize(int index, int rootRank, int parentRank) {
             Console::log("Restarting Hordesat instance of " + toStr());
             solver->beginSolving();
 
-            state = JobState::ACTIVE;
+            state = ACTIVE;
         }
     }
 }
 
 void JobImage::commit(const JobRequest& req) {
 
-    assert(state != JobState::ACTIVE && state != JobState::COMMITTED);
+    assert(state != ACTIVE && state != COMMITTED);
 
-    state = JobState::COMMITTED;
+    state = COMMITTED;
     index = req.requestedNodeIndex;
     updateJobNode(0, req.rootRank);
     updateJobNode((index-1)/2, req.requestingNodeRank);
@@ -100,14 +118,14 @@ void JobImage::commit(const JobRequest& req) {
 
 void JobImage::uncommit(const JobRequest& req) {
 
-    assert(state == JobState::COMMITTED);
+    assert(state == COMMITTED);
 
     if (initialized) {
-        state = JobState::SUSPENDED;
+        state = SUSPENDED;
     } else if (hasDescription) {
-        state = JobState::STORED;
+        state = STORED;
     } else {
-        state = JobState::NONE;
+        state = NONE;
     }
     jobNodeRanks.clear();
 }
@@ -122,6 +140,9 @@ void JobImage::setRightChild(int rank) {
 }
 
 std::vector<int> JobImage::collectClausesFromSolvers() {
+    if (!solver->isFullyInitialized()) {
+        return std::vector<int>(BROADCAST_CLAUSE_INTS_PER_NODE, 0);
+    }
     return solver->prepareSharing( commSize /*job.getVolume()*/);
 }
 void JobImage::insertIntoClauseBuffer(std::vector<int>& vec) {
@@ -145,6 +166,7 @@ void JobImage::collectClausesFromBelow(std::vector<int>& clauses) {
     sharedClauseSources++;
 }
 bool JobImage::canShareCollectedClauses() {
+
     int numChildren = 0;
     // Must have received clauses from both children,
     // except if one / both of them cannot exist according to volume
@@ -153,6 +175,7 @@ bool JobImage::canShareCollectedClauses() {
     return numChildren == sharedClauseSources;
 }
 std::vector<int> JobImage::shareCollectedClauses() {
+
     std::vector<int> selfClauses = collectClausesFromSolvers();
     insertIntoClauseBuffer(selfClauses);
     std::vector<int> vec = clausesToShare;
@@ -161,32 +184,40 @@ std::vector<int> JobImage::shareCollectedClauses() {
     return vec;
 }
 void JobImage::learnClausesFromAbove(std::vector<int>& clauses) {
+    if (!solver->isFullyInitialized())
+        return; // discard clauses TODO keep?
+    Console::log("Digesting clauses ...");
     solver->digestSharing(clauses);
+    Console::log("Digested clauses.");
 }
 
 void JobImage::suspend() {
-    assert(state == JobState::ACTIVE);
-    state = JobState::SUSPENDED;
+    assert(state == ACTIVE);
     solver->setPaused();
+    state = SUSPENDED;
     Console::log("Suspended Hordesat solving threads of " + toStr());
 }
 
 void JobImage::resume() {
-    assert(solver->isRunning());
-    solver->unsetPaused();
-    Console::log("Resumed Hordesat solving threads of " + toStr());
-    state = JobState::ACTIVE;
+    
+    if (!initialized) {
+        initialize(index, getRootNodeRank(), getParentNodeRank());
+    } else {
+        solver->unsetPaused();
+        Console::log("Resumed Hordesat solving threads of " + toStr());
+        state = ACTIVE;
+    }
 }
 
 void JobImage::withdraw() {
 
-    assert(state == JobState::ACTIVE || state == JobState::SUSPENDED);
+    assert(state == ACTIVE || state == SUSPENDED);
 
     solver->setTerminate(); // sets the "solvingDoneLocal" flag in the solver
     solver->unsetPaused(); // if solver threads are suspended, wake them up to recognize termination
     solver->finishSolving(); // joins threads and concludes solving process
 
-    state = JobState::PAST;
+    state = PAST;
     leftChild = false;
     rightChild = false;
     doneLocally = false;
@@ -196,12 +227,12 @@ int JobImage::solveLoop() {
 
     int result = -1;
 
+    // Already reported the actual result, or still initializing
     if (doneLocally) {
-        // Already reported the actual result; solver sleeps
         return result;
     }
 
-    if (state == JobState::ACTIVE) {
+    if (state == ACTIVE) {
         // if result is found, stops all solvers
         // but does not call finishSolving()
         result = solver->solveLoop();

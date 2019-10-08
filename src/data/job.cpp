@@ -1,12 +1,6 @@
 
 #include "job.h"
 
-void Job::coolDown() {
-    float room = 20;
-    float temperatureDecay = 0.01;
-    temperature -= temperatureDecay * (temperature - room);
-};
-
 std::vector<int> Job::serialize() const {
     std::vector<int> packed;
 

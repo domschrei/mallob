@@ -34,8 +34,10 @@ private:
 	bool solvingDoneLocal;
 	SharingManagerInterface* sharingManager;
 	vector<PortfolioSolverInterface*> solvers;
+	vector<int> solversRunning;
     bool running;
 
+	const std::vector<int>* formula;
 	SatResult finalResult;
 	vector<int> assumptions;
 	vector<int> truthValues;
@@ -60,6 +62,7 @@ private:
 	Mutex interruptLock;
     ConditionVariable interruptCond;
     bool solversInterrupted = false;
+	Mutex solutionLock;
 
 public:
 
@@ -80,15 +83,19 @@ public:
 	// sat/qbf solving
 	bool readFormula(const char* filename);
     bool setFormula(const std::vector<int>& formula); // NEW 2019-09
+	bool addToFormula(const std::vector<int>& formula, int start, int numLits);
 	void addLit(int lit);
 	void assume(int lit);
 
     void beginSolving();
+    void beginSolving(const std::vector<int>& formula);
+    void beginSolving(bool readFormulaFromHlib);
+	bool isFullyInitialized();
     int solveLoop();
 
     std::vector<int> prepareSharing(int size);
     void digestSharing(const std::vector<int>& result);
-		std::vector<int> clauseBufferToPlainClauses(const std::vector<int>& buffer);
+	std::vector<int> clauseBufferToPlainClauses(const std::vector<int>& buffer);
 
     int finishSolving();
     void interrupt();
@@ -97,9 +104,6 @@ public:
     void unsetPaused();
     void waitUntilResumed();
     void setTerminate();
-
-    // old
-    int solve();
 
 	int value(int lit);
 	int failed(int lit);

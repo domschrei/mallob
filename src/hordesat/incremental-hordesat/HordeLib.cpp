@@ -149,6 +149,7 @@ void pinThread(int solversCount) {
 struct threadArgs {
 	int solverId;
 	HordeLib* hlib;
+	bool readFormulaFromHlib;
 };
 
 void* solverRunningThread(void* arg) {
@@ -156,12 +157,24 @@ void* solverRunningThread(void* arg) {
 	threadArgs* targs = (threadArgs*)arg;
 	HordeLib* hlib = targs->hlib;
 	PortfolioSolverInterface* solver = hlib->solvers[targs->solverId];
+	int localId = targs->solverId;
+	bool readFormula = targs->readFormulaFromHlib;
 	delete targs;
 	if (hlib->params.isSet("pin")) {
 		hlib->interruptLock.lock();
 		pinThread(hlib->params.getIntParam("c", 1));
 		hlib->interruptLock.unlock();
 	}
+	if (readFormula) {
+		log(1, "Solver %i importing clauses ...\n", solver->solverId);
+		// TODO Do in batches, check if interrupted / suspended periodically
+		// TODO Don't load formula into "addToClauses" in Lingeling (blocks during clause learning)
+		solver->addClauses(*hlib->formula); 
+		log(1, "Solver %i imported clauses.\n", solver->solverId);
+	}
+	log(1, "Solver %i (local id %i) initialized.\n", solver->solverId, localId);
+	hlib->solversRunning[localId] = 1;
+
     //log(1, "solverRunningThread, beginning main loop\n");
 	while (true) {
 
@@ -191,18 +204,21 @@ void* solverRunningThread(void* arg) {
 		litsAdded = 0;
 		hlib->finalResult = UNKNOWN;
 		SatResult res = solver->solve(hlib->assumptions);
-        // TODO lock for setting the solution
+        
 		if (res == SAT) {
-			hlib->solvingDoneLocal = true;
-			log(0,"Solved by solver ID %d\n", solver->solverId);
+			log(0,"Found result SAT on solver %d\n", solver->solverId);
+			hlib->solutionLock.lock();
 			hlib->finalResult = SAT;
 			hlib->truthValues = solver->getSolution();
-		}
-		if (res == UNSAT) {
 			hlib->solvingDoneLocal = true;
-			log(0,"Solved by solver ID %d\n", solver->solverId);
+			hlib->solutionLock.unlock();
+		} else if (res == UNSAT) {
+			log(0,"Found result UNSAT on solver %d\n", solver->solverId);
+			hlib->solutionLock.lock();
 			hlib->finalResult = UNSAT;
 			hlib->failedAssumptions = solver->getFailedAssumptions();
+			hlib->solvingDoneLocal = true;
+			hlib->solutionLock.unlock();
 		}
 	}
 	return NULL;
@@ -267,18 +283,16 @@ void HordeLib::binValueDiversification(int mpi_size, int mpi_rank) {
     }
 }
 
-int HordeLib::solve() {
-    beginSolving();
-    int result = -1;
-    while (result < 0) {
-        result = solveLoop();
-        usleep(1);
-    }
-    finishSolving();
-    return result;
+void HordeLib::beginSolving() {
+	beginSolving(/*readFormulaFromHlib=*/false);
 }
 
-void HordeLib::beginSolving() {
+void HordeLib::beginSolving(const std::vector<int>& formula) {
+	this->formula = &formula;
+	beginSolving(/*readFormulaFromHlib=*/true);
+}
+
+void HordeLib::beginSolving(bool readFormulaFromHlib) {
 
 	solvingDoneLocal = false;
 
@@ -292,11 +306,20 @@ void HordeLib::beginSolving() {
 		threadArgs* arg = new threadArgs();
 		arg->hlib = this;
 		arg->solverId = i;
+		arg->readFormulaFromHlib = readFormulaFromHlib;
 		solverThreads[i] = new Thread(solverRunningThread, arg);
         //log(1, "initialized solver %i.\n", i);
 	}
 	startSolving = getTime() - startSolving;
 	log(1, "Node %d started its solvers, initialization took %.3f seconds.\n", mpi_rank, startSolving);
+}
+
+bool HordeLib::isFullyInitialized() {
+	for (int i = 0; i < solversRunning.size(); i++) {
+		if (solversRunning[i] == 0)
+			return false;
+	}
+	return true;
 }
 
 int HordeLib::solveLoop() {
@@ -328,48 +351,43 @@ int HordeLib::solveLoop() {
 }
 
 std::vector<int> HordeLib::prepareSharing(int size) {
-    if (sharingManager != NULL) {
-        log(0, "Collecting clauses on this node ... \n");
-		std::vector<int> clauses = sharingManager->prepareSharing(size);
+    assert(sharingManager != NULL);
+	log(2, "Collecting clauses on this node ... \n");
+	std::vector<int> clauses = sharingManager->prepareSharing(size);
 
-		/*
-		std::vector<int> plainClauses = clauseBufferToPlainClauses(clauses);
-		std::string out = "";
-		for (int i = 0; i < plainClauses.size(); i++) {
-			if (plainClauses[i] == 0)
-				out += "\n";
-			else
-				out += std::to_string(plainClauses[i]) + " ";
-		}
-		out += "\n";
-		//log(0, out.c_str());
-		*/
+	/*
+	std::vector<int> plainClauses = clauseBufferToPlainClauses(clauses);
+	std::string out = "";
+	for (int i = 0; i < plainClauses.size(); i++) {
+		if (plainClauses[i] == 0)
+			out += "\n";
+		else
+			out += std::to_string(plainClauses[i]) + " ";
+	}
+	out += "\n";
+	//log(0, out.c_str());
+	*/
 
-		return clauses;
-    } else {
-        log(0, "No sharing manager found!\n");
-		return std::vector<int>();
-    }
+	return clauses;
 }
 
 void HordeLib::digestSharing(const std::vector<int>& result) {
-    if (sharingManager != NULL) {
+    assert(sharingManager != NULL);
 
-		/*
-		std::vector<int> plainClauses = clauseBufferToPlainClauses(result);
-		std::string out = "";
-		for (int i = 0; i < plainClauses.size(); i++) {
-			if (plainClauses[i] == 0)
-				out += "\n";
-			else
-				out += std::to_string(plainClauses[i]) + " ";
-		}
-		out += "\n";
-		//log(0, out.c_str());
-		*/
+	/*
+	std::vector<int> plainClauses = clauseBufferToPlainClauses(result);
+	std::string out = "";
+	for (int i = 0; i < plainClauses.size(); i++) {
+		if (plainClauses[i] == 0)
+			out += "\n";
+		else
+			out += std::to_string(plainClauses[i]) + " ";
+	}
+	out += "\n";
+	//log(0, out.c_str());
+	*/
 
-        sharingManager->digestSharing(result);
-    }
+	sharingManager->digestSharing(result);
 }
 
 std::vector<int> HordeLib::clauseBufferToPlainClauses(const vector<int>& buffer) {
@@ -425,7 +443,7 @@ int HordeLib::finishSolving() {
     running = false;
 
     double searchTime = getTime() - startSolving;
-	log(0, "node %d finished, joining solver threads\n", mpi_rank);
+	log(0, "Joining solver threads of index %d\n", mpi_rank);
 	for (int i = 0; i < solversCount; i++) {
 		solverThreads[i]->join();
 	}
@@ -502,6 +520,16 @@ bool HordeLib::setFormula(const std::vector<int>& formula) {
     return true;
 }
 
+bool HordeLib::addToFormula(const std::vector<int>& formula, int start, int numLits) {
+	int limit = std::min(start+numLits, (int) formula.size());
+	for (int i = start; i < limit; i++) {
+		for (int solver = 0; solver < solversCount; solver++) {
+			solvers[solver]->addLiteral(formula[i]);
+		}
+	}
+	return true;
+}
+
 // incremental iface
 void HordeLib::addLit(int lit) {
 	litsAdded++;
@@ -548,6 +576,7 @@ void HordeLib::init() {
     running = false;
     interruptLock = Mutex();
     interruptCond = ConditionVariable();
+	solutionLock = Mutex();
 
     // Set MPI size and rank by params or otherwise by MPI calls
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
@@ -570,18 +599,22 @@ void HordeLib::init() {
 	for (int i = 0; i < solversCount; i++) {
 		if (params.getParam("s") == "minisat") {
 			solvers.push_back(new MiniSat());
+			solversRunning.push_back(0);
 			log(1, "Running MiniSat on core %d of node %d/%d\n", i, mpi_rank, mpi_size);
 		} else if (params.getParam("s") == "combo") {
 			if ((mpi_rank + i) % 2 == 0) {
 				solvers.push_back(new MiniSat());
+				solversRunning.push_back(0);
 				log(1, "Running MiniSat on core %d of node %d/%d\n", i, mpi_rank, mpi_size);
 			} else {
 				solvers.push_back(new Lingeling());
+				solversRunning.push_back(0);
 				log(1, "Running Lingeling on core %d of node %d/%d\n", i, mpi_rank, mpi_size);
 			}
 		} else {
             Lingeling *lgl = new Lingeling();
 			solvers.push_back(lgl);
+			solversRunning.push_back(0);
 			log(1, "Running Lingeling on core %d of node %d/%d\n", i, mpi_rank, mpi_size);
 		}
 		// set solver id

@@ -32,6 +32,7 @@ void Parameters::setDefaults() {
   setParam("l", "0.95"); // load factor
   setParam("c", "1"); // num clients
   setParam("t", "2"); // num threads per node
+  setParam("td", "0.01"); // temperature decay for thermodyn. balancing
 }
 
 void Parameters::printUsage() {

@@ -2,11 +2,15 @@
 #include <math.h>
 #include <thread>
 #include <unistd.h>
+#include <iostream>
+#include <fstream>
 
 #include "worker.h"
 #include "util/timer.h"
 #include "util/console.h"
 #include "util/random.h"
+#include "balancing/thermodynamic_balancer.h"
+#include "balancing/simple_priority_balancer.h"
 
 void Worker::init() {
 
@@ -14,8 +18,24 @@ void Worker::init() {
     lastRebalancing = Timer::elapsedSeconds();
     exchangedClausesThisRound = false;
 
+    // Initialize balancer
+    //balancer = std::unique_ptr<Balancer>(new ThermodynamicBalancer(comm, params));
+    balancer = std::unique_ptr<Balancer>(new SimplePriorityBalancer(comm, params));
+    
     // Begin listening to an incoming message
     MyMpi::irecv(MPI_COMM_WORLD);
+}
+
+void Worker::checkTerminate() {
+
+    bool exitNow = false;
+    std::fstream file;
+    file.open("TERMINATE_GLOBALLY_NOW", std::ios::in);
+    if (file.is_open()) {
+        file.close();
+        Console::log("Acknowledged TERMINATE_GLOBALLY_NOW. Exiting.");
+        exit(0);
+    }
 }
 
 void Worker::mainProgram() {
@@ -47,7 +67,8 @@ void Worker::mainProgram() {
             for (auto it = jobs.begin(); it != jobs.end(); ++it) {
                 int jobId = it->first;
                 JobImage& img = *it->second;
-                if (img.getState() == JobState::ACTIVE && !img.hasLeftChild() && !img.hasRightChild()) {
+                if ((img.getState() == JobState::ACTIVE) 
+                    && !img.hasLeftChild() && !img.hasRightChild()) {
                     beginClauseGathering(jobId);
                 }
             }
@@ -57,6 +78,7 @@ void Worker::mainProgram() {
         if (isTimeForRebalancing()) {
 
             // Rebalancing
+            Console::log("Entering rebalancing");
             iteration++;
             int numOccupiedNodes = allReduce(isIdle() ? 0.0f : 1.0f);
             if (MyMpi::rank(comm) == 0) {
@@ -147,6 +169,8 @@ void Worker::mainProgram() {
                 MyMpi::irecv(MPI_COMM_WORLD);
         }
 
+        checkTerminate();
+
         // TODO Sleep for a bit
         usleep(1000); // 1000 = 1 millisecond
     }
@@ -233,7 +257,8 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
         Console::log_send("Request " + img.toStr() + " is from a previous iteration -- rejecting", handle->source);
         reject = true;
 
-    } else if (img.getState() != JobState::ACTIVE && img.getState() != JobState::STORED) {
+    } else if (img.getState() != JobState::ACTIVE 
+            && img.getState() != JobState::STORED) {
 
         Console::log_send(img.toStr() + " is not active and not stored (any more) -- rejecting", handle->source);
         Console::log("My job state: " + img.jobStateToStr());
@@ -330,10 +355,12 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
 
         // Send current volume / initial demand update
         if (img.getState() == JobState::ACTIVE) {
-            assert(img.getJob().getVolume() >= 1);
+            int volume = balancer->getVolume(req.jobId);
+            assert(volume >= 1);
+            Console::log_send("Propagating volume " + std::to_string(volume) + " to new child", handle->source);
             std::vector<int> jobIdAndDemand;
             jobIdAndDemand.push_back(req.jobId);
-            jobIdAndDemand.push_back(img.getJob().getVolume());
+            jobIdAndDemand.push_back(volume);
             MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_UPDATE_DEMAND, jobIdAndDemand);
         }
     }
@@ -410,8 +437,8 @@ void Worker::beginClauseGathering(int jobId) {
     std::vector<int> clauses = img.collectClausesFromSolvers();
     if (img.isRoot()) {
         // There are no other nodes computing on this job
-        Console::log("Not self-broadcasting clauses");
-        //img.learnClausesFromAbove(clauses);
+        //Console::log("Self-broadcasting clauses");
+        img.learnClausesFromAbove(clauses);
         return;
     }
 
@@ -462,7 +489,6 @@ void Worker::learnAndDistributeClausesDownwards(std::vector<int>& clauses) {
     assert(clauses.size() % BROADCAST_CLAUSE_INTS_PER_NODE == 0);
 
     if (!hasJobImage(jobId)) {
-        // TODO ERROR 2: For some reason, this happens
         Console::log("WARN: Received clauses from above about #" + std::to_string(jobId) + ", but I don't know it.");
         return;
     }
@@ -470,7 +496,6 @@ void Worker::learnAndDistributeClausesDownwards(std::vector<int>& clauses) {
     if (img.getState() != JobState::ACTIVE)
         return;
 
-    // TODO ERROR 1: This probably leads to segfault
     img.learnClausesFromAbove(clauses);
 
     clauses.push_back(jobId);
@@ -491,126 +516,13 @@ void Worker::rebalance() {
     if (MyMpi::rank(comm) == 0)
         Console::log("Rebalancing ...");
 
-    std::vector<Job> activeJobs;
-    std::vector<Job> involvedJobs;
-    std::map<int, float> demands;
-    for (auto it = jobs.begin(); it != jobs.end(); ++it) {
-        JobImage &img = *it->second;
-        if ((img.getState() == JobState::ACTIVE) && img.isRoot()) {
-            //Console::log("Participating with " + img.toStr() + ", ID " + std::to_string(img.getJob()->getId()));
-            const Job& job = img.getJob();
-
-            assert(job.getTemperature() > 0);
-            assert(job.getPriority() > 0);
-
-            activeJobs.push_back(job);
-            involvedJobs.push_back(job);
-            demands[job.getId()] = 0;
-        }
+    std::map<int, int> volumes = balancer->balance(jobs);
+    for (auto it = volumes.begin(); it != volumes.end(); ++it) {
+        updateDemand(it->first, it->second);
     }
-
-    int fullVolume = MyMpi::size(comm);
-
-    // Initial pressure, filtering out micro-jobs
-    float remainingVolume = fullVolume * loadFactor;
-    assert(remainingVolume > 0);
-    float pressure = calculatePressure(involvedJobs, remainingVolume);
-    assert(pressure >= 0);
-    float microJobDiscount = 0;
-    for (unsigned int i = 0; i < involvedJobs.size(); i++) {
-        const Job& job = involvedJobs[i];
-        float demand = 1/pressure * job.getTemperature() * job.getPriority();
-        if (demand < 1) {
-            // Micro job!
-            microJobDiscount++;
-            demands[job.getId()] = 1;
-            involvedJobs.erase(involvedJobs.begin() + i);
-            i--;
-        }
-    }
-    remainingVolume -= allReduce(microJobDiscount);
-    assert(remainingVolume >= 0);
-
-    // Main iterations for computing exact job demands
-    int iteration = 0;
-    while (remainingVolume >= 1 && iteration <= 10) {
-        float unusedVolume = 0;
-        pressure = calculatePressure(involvedJobs, remainingVolume);
-        if (pressure == 0) break;
-        //if (MyMpi::rank(comm) == 0) Console::log("Pressure: " + std::to_string(pressure));
-        for (unsigned int i = 0; i < involvedJobs.size(); i++) {
-            Job *job = &involvedJobs[i];
-            float addition = 1/pressure * job->getTemperature() * job->getPriority();
-            //Console::log(std::to_string(pressure) + "," + std::to_string(job->getTemperature()) + "," + std::to_string(job->getPriority()));
-            float upperBound = (float) std::min((double) fullVolume, (double) loadFactor*fullVolume);
-            upperBound = (float) std::min((double) upperBound, (double) 2*job->getVolume()+1);
-            float demand = demands[job->getId()];
-            if (demand + addition >= upperBound) {
-                // Upper bound hit
-                unusedVolume += (demand + addition) - upperBound;
-                addition = upperBound - demand;
-                involvedJobs.erase(involvedJobs.begin() + i);
-                i--;
-            }
-            assert(addition >= 0);
-            demands[job->getId()] += addition;
-        }
-        remainingVolume = allReduce(unusedVolume);
-        iteration++;
-    }
-    if (MyMpi::rank(comm) == 0)
-        Console::log("Did " + std::to_string(iteration) + " rebalancing iterations");
-
-    // Weigh remaining volume against shrinkage
-    float shrink = 0;
-    for (auto it = activeJobs.begin(); it != activeJobs.end(); ++it) {
-        Job job = *it;
-        assert(demands[job.getId()] >= 0);
-        if (job.getVolume() - demands[job.getId()] > 0) {
-            shrink += job.getVolume() - demands[job.getId()];
-        }
-    }
-    float shrinkage = allReduce(shrink);
-    float shrinkageFactor;
-    if (shrinkage == 0) {
-        shrinkageFactor = 0;
-    } else {
-        shrinkageFactor = (shrinkage - remainingVolume) / shrinkage;
-    }
-    assert(shrinkageFactor >= 0);
-    assert(shrinkageFactor <= 1);
-
-    // Round and apply volume updates
-    int allDemands = 0;
-    for (auto it = activeJobs.begin(); it != activeJobs.end(); ++it) {
-
-        Job job = *it;
-        float delta = demands[job.getId()] - job.getVolume();
-
-        if (delta < 0) {
-            delta = delta * shrinkageFactor;
-        }
-        // Probabilistic rounding
-        /*
-        float random = Random::rand();
-        if (random < delta - std::floor(delta)) {
-            delta = std::ceil(delta);
-        } else {*/
-            delta = std::floor(delta);
-        //}
-
-        updateDemand(job.getId(), job.getVolume() + delta);
-        allDemands += job.getVolume();
-
-        job.coolDown(); // TODO check if actually done
-    }
-    allDemands = reduce((float) allDemands, 0);
 
     // All collective operations are done; reset synchronized timer
     lastRebalancing = Timer::elapsedSeconds();
-
-    if (MyMpi::rank(comm) == 0)
-        Console::log("Sum of all demands: " + std::to_string(allDemands));
 }
 
 void Worker::updateDemand(int jobId, int demand) {
@@ -622,9 +534,6 @@ void Worker::updateDemand(int jobId, int demand) {
     }
 
     JobImage &img = getJobImage(jobId);
-
-    // Update volume
-    img.getJob().setVolume(demand);
 
     if (img.getState() != JobState::ACTIVE) {
         // Job is not active right now
@@ -649,7 +558,7 @@ void Worker::updateDemand(int jobId, int demand) {
         MyMpi::isend(MPI_COMM_WORLD, img.getLeftChildNodeRank(), MSG_UPDATE_DEMAND, payload);
         if (nextIndex >= demand) {
             // Prune child
-            Console::log_send("Pruning left child " + img.toStr(), img.getLeftChildNodeRank());
+            Console::log_send("Pruning left child of " + img.toStr(), img.getLeftChildNodeRank());
             img.unsetLeftChild();
         }
     } else if (nextIndex < demand) {
@@ -666,7 +575,7 @@ void Worker::updateDemand(int jobId, int demand) {
         MyMpi::isend(MPI_COMM_WORLD, img.getRightChildNodeRank(), MSG_UPDATE_DEMAND, payload);
         if (nextIndex >= demand) {
             // Prune child
-            Console::log_send("Pruning right child " + img.toStr(), img.getRightChildNodeRank());
+            Console::log_send("Pruning right child of " + img.toStr(), img.getRightChildNodeRank());
             img.unsetRightChild();
         }
     } else if (nextIndex < demand) {
@@ -690,18 +599,6 @@ bool Worker::isTimeForRebalancing() {
 
 bool Worker::isTimeForClauseSharing() {
     return !exchangedClausesThisRound && Timer::elapsedSeconds() - lastRebalancing >= 2.5f;
-}
-
-float Worker::calculatePressure(const std::vector<Job>& involvedJobs, float volume) const {
-
-    float contribution = 0;
-    for (auto it = involvedJobs.begin(); it != involvedJobs.end(); ++it) {
-        const Job& job = *it;
-        contribution += job.getTemperature() * job.getPriority();
-    }
-    float allContributions = allReduce(contribution);
-    float pressure = allContributions / volume;
-    return pressure;
 }
 
 float Worker::allReduce(float contribution) const {

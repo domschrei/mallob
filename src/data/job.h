@@ -17,8 +17,6 @@ private:
     int id;
     int rootRank;
     float priority;
-    int volume;
-    float temperature;
 
     // Payload (logic to solve)
     std::vector<int> formula; // if non-incremental / first job in stream
@@ -26,14 +24,12 @@ private:
 
 public:
 
-    Job() : id(-1), rootRank(-1), priority(-1), volume(-1), temperature(-1) {}
-    Job(int id, float priority) : id(id), rootRank(-1), priority(priority), volume(-1), temperature(-1) {}
+    Job() : id(-1), rootRank(-1), priority(-1) {}
+    Job(int id, float priority) : id(id), rootRank(-1), priority(priority) {}
 
     int getId() const {return id;};
     int getRootRank() const {return rootRank;};
     float getPriority() const {return priority;};
-    int getVolume() const {return volume;};
-    float getTemperature() const {return temperature;};
     int getFormulaSize() const {
         return formula.size() + 1;
     };
@@ -43,11 +39,8 @@ public:
     }
 
     void setRootRank(int rootRank) {this->rootRank = rootRank;}
-    void setVolume(int volume) {this->volume = volume;};
-    void setTemperature(float temperature) {this->temperature = temperature;};
     void setFormula(const std::vector<int>& formula) {this->formula = formula;};
 
-    void coolDown();
     void deserialize(const std::vector<int>& packed) override;
     std::vector<int> serialize() const override;
 };

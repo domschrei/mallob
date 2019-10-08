@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if [ -f TERMINATE_GLOBALLY_NOW ]; then
+    rm TERMINATE_GLOBALLY_NOW
+fi
+
 cmd=""
 if [ x"$1" == x"valgrind" ]; then
     cmd="valgrind"
@@ -16,9 +20,9 @@ else
 fi
 
 # Resource scheduling / get tokens for mpi processes
-if command -v nonexclusive ; then
-    cmd="$cmd nonexclusive"
-fi
+#if command -v nonexclusive ; then
+#    cmd="$cmd nonexclusive"
+#fi
 
 # Logging directory
 mkdir -p logs

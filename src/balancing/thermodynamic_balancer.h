@@ -1,0 +1,29 @@
+
+#include "balancer.h"
+
+class ThermodynamicBalancer : public Balancer {
+
+public:
+    ThermodynamicBalancer(MPI_Comm& comm, Parameters params) : Balancer(comm, params) {
+        
+    }
+    std::map<int, int> balance(std::map<int, JobImage*>& jobs) override;
+
+private:
+    float calculatePressure(const std::vector<Job*>& involvedJobs, float volume);
+
+    float getTemperature(int jobId) {
+        if (temperatures.count(jobId)) {
+            temperatures[jobId] = 100.0;
+        }
+        return temperatures[jobId];
+    }
+    float coolDown(int jobId) {
+        float room = 20.0; 
+        float decay = params.getFloatParam("td");
+        float previous = getTemperature(jobId);
+        temperatures[jobId] = previous - decay * (previous - room);
+    }
+
+    std::map<int, float> temperatures;
+};

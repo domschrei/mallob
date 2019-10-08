@@ -4,6 +4,7 @@
 
 #include <string>
 #include <memory>
+#include <thread>
 
 #include "HordeLib.h"
 
@@ -47,7 +48,7 @@ enum JobState {
      */
     PAST
 };
-static const char * jobStateStrings[] = { "none", "stored", "committed", "active", "suspended", "past" };
+static const char * jobStateStrings[] = { "none", "stored", "committed", "initializing", "active", "suspended", "past" };
 
 const int RESULT_UNKNOWN = 0;
 const int RESULT_SAT = 10;
@@ -66,6 +67,8 @@ private:
     JobState state = JobState::NONE;
     bool hasDescription;
     bool initialized;
+    std::shared_ptr<std::thread> initializerThread;
+    bool cancelInit;
 
     AdjustablePermutation jobNodeRanks;
     bool leftChild = false;
@@ -86,6 +89,7 @@ public:
     void initialize(int index, int rootRank, int parentRank);
     void initialize();
     void reinitialize(int index, int rootRank, int parentRank);
+    void doSolverInitialization();
 
     /**
      * Get clauses to share from the solvers, in order to propagate it to the parents.
