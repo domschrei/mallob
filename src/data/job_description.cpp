@@ -1,7 +1,7 @@
 
-#include "job.h"
+#include "job_description.h"
 
-std::vector<int> Job::serialize() const {
+std::vector<int> JobDescription::serialize() const {
     std::vector<int> packed;
 
     // Basic data
@@ -26,7 +26,7 @@ std::vector<int> Job::serialize() const {
     return packed;
 }
 
-void Job::deserialize(const std::vector<int>& packed) {
+void JobDescription::deserialize(const std::vector<int>& packed) {
 
     int i = 0;
     id = packed[i++];

@@ -165,15 +165,29 @@ void* solverRunningThread(void* arg) {
 		pinThread(hlib->params.getIntParam("c", 1));
 		hlib->interruptLock.unlock();
 	}
-	if (readFormula) {
+	if (readFormula && (hlib->solversInitialized[localId] == 0)) {
 		log(1, "Solver %i importing clauses ...\n", solver->solverId);
-		// TODO Do in batches, check if interrupted / suspended periodically
-		// TODO Don't load formula into "addToClauses" in Lingeling (blocks during clause learning)
-		solver->addClauses(*hlib->formula); 
+
+		int batchSize = 10000;
+		const std::vector<int>& formula = *hlib->formula;
+		for (int start = 0; start < (int) formula.size(); start++) {
+			
+			if (hlib->solvingDoneLocal)
+            	break;
+			hlib->waitUntilResumed();
+			if (hlib->solvingDoneLocal)
+            	break;
+
+			int limit = std::min(start+batchSize, (int) formula.size());
+			for (int i = start; i < limit; i++) {
+				solver->addLiteral(formula[i]);
+			}
+		}
+
 		log(1, "Solver %i imported clauses.\n", solver->solverId);
 	}
 	log(1, "Solver %i (local id %i) initialized.\n", solver->solverId, localId);
-	hlib->solversRunning[localId] = 1;
+	hlib->solversInitialized[localId] = 1;
 
     //log(1, "solverRunningThread, beginning main loop\n");
 	while (true) {
@@ -315,8 +329,8 @@ void HordeLib::beginSolving(bool readFormulaFromHlib) {
 }
 
 bool HordeLib::isFullyInitialized() {
-	for (int i = 0; i < solversRunning.size(); i++) {
-		if (solversRunning[i] == 0)
+	for (int i = 0; i < solversInitialized.size(); i++) {
+		if (solversInitialized[i] == 0)
 			return false;
 	}
 	return true;
@@ -599,22 +613,22 @@ void HordeLib::init() {
 	for (int i = 0; i < solversCount; i++) {
 		if (params.getParam("s") == "minisat") {
 			solvers.push_back(new MiniSat());
-			solversRunning.push_back(0);
+			solversInitialized.push_back(0);
 			log(1, "Running MiniSat on core %d of node %d/%d\n", i, mpi_rank, mpi_size);
 		} else if (params.getParam("s") == "combo") {
 			if ((mpi_rank + i) % 2 == 0) {
 				solvers.push_back(new MiniSat());
-				solversRunning.push_back(0);
+				solversInitialized.push_back(0);
 				log(1, "Running MiniSat on core %d of node %d/%d\n", i, mpi_rank, mpi_size);
 			} else {
 				solvers.push_back(new Lingeling());
-				solversRunning.push_back(0);
+				solversInitialized.push_back(0);
 				log(1, "Running Lingeling on core %d of node %d/%d\n", i, mpi_rank, mpi_size);
 			}
 		} else {
             Lingeling *lgl = new Lingeling();
 			solvers.push_back(lgl);
-			solversRunning.push_back(0);
+			solversInitialized.push_back(0);
 			log(1, "Running Lingeling on core %d of node %d/%d\n", i, mpi_rank, mpi_size);
 		}
 		// set solver id

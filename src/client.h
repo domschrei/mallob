@@ -7,7 +7,7 @@
 
 #include "util/mpi.h"
 #include "util/params.h"
-#include "data/job.h"
+#include "data/job_description.h"
 
 class Client {
 
@@ -16,7 +16,7 @@ private:
     int worldRank;
     Parameters& params;
 
-    std::map<float, Job> jobsByArrival;
+    std::map<float, JobDescription> jobsByArrival;
     std::map<int, std::string> jobInstances;
     std::map<int, bool> jobReady;
     std::mutex jobReadyLock;
@@ -36,7 +36,7 @@ public:
 
 private:
     void readInstanceList(std::string& filename);
-    void readFormula(std::string& filename, Job& job);
+    void readFormula(std::string& filename, JobDescription& job);
     friend void readAllInstances(Client* client);
 };
 

@@ -10,7 +10,7 @@
 
 #include "util/params.h"
 #include "util/permutation.h"
-#include "data/job.h"
+#include "data/job_description.h"
 #include "data/job_transfer.h"
 
 #define BROADCAST_CLAUSE_INTS_PER_NODE 1500
@@ -63,7 +63,7 @@ private:
 
     int jobId;
     int index;
-    Job job;
+    JobDescription job;
     JobState state = JobState::NONE;
     bool hasDescription;
     bool initialized;
@@ -83,7 +83,7 @@ private:
 public:
 
     JobImage(Parameters& params, int commSize, int worldRank, int jobId);
-    void store(Job job);
+    void store(JobDescription job);
     void commit(const JobRequest& req);
     void uncommit(const JobRequest& req);
     void initialize(int index, int rootRank, int parentRank);
@@ -119,8 +119,8 @@ public:
     int solveLoop();
 
     JobState getState() const {return state;};
-    const Job& getJob() const {return job;};
-    Job& getJob() {return job;};
+    const JobDescription& getJob() const {return job;};
+    JobDescription& getJob() {return job;};
     int getIndex() const {return index;};
     bool isInitialized() const {return initialized;};
 

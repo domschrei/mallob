@@ -11,7 +11,7 @@ JobImage::JobImage(Parameters& params, int commSize, int worldRank, int jobId) :
             jobId(jobId), hasDescription(false), initialized(false),
             jobNodeRanks(commSize, jobId) {}
 
-void JobImage::store(Job job) {
+void JobImage::store(JobDescription job) {
     this->job = job;
     if (state == NONE) {
         state = STORED;
@@ -47,24 +47,6 @@ void JobImage::initialize() {
 void JobImage::doSolverInitialization() {
 
     assert(solver != NULL);
-
-    /*
-    Console::log("Beginning to give formula to solvers");
-    const std::vector<int>& formula = job.getFormula();
-    int bulkSize = 1000;
-    int start = 0;
-    Console::log("Entering loop");
-    while (start < formula.size()) {
-        if (cancelInit) {
-            Console::log("Initialization cancelled");
-            return;
-        }
-        solver->addToFormula(formula, start, bulkSize);
-        start += bulkSize;
-    }
-    Console::log("Finished giving formula to solvers");
-    solver->beginSolving();
-    */
 
     solver->beginSolving(job.getFormula());
     initialized = true;

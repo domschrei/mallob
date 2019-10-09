@@ -114,8 +114,8 @@ void Worker::mainProgram() {
             else if (handle->tag == MSG_SEND_JOB)
                 handleSendJob(handle);
 
-            else if (handle->tag == MSG_UPDATE_DEMAND)
-                handleUpdateDemand(handle);
+            else if (handle->tag == MSG_UPDATE_VOLUME)
+                handleUpdateVolume(handle);
 
             else if (handle->tag == MSG_GATHER_CLAUSES)
                 handleGatherClauses(handle);
@@ -181,7 +181,7 @@ void Worker::handleIntroduceJob(MessageHandlePtr& handle) {
     // Receive job signature and then the actual job
     JobSignature sig; sig.deserialize(handle->recvData);
     MessageHandlePtr jobHandle = MyMpi::recv(MPI_COMM_WORLD, MSG_SEND_JOB, sig.getTransferSize()); // BLOCKING
-    Job job; job.deserialize(jobHandle->recvData);
+    JobDescription job; job.deserialize(jobHandle->recvData);
 
     assert(!hasJobImage(job.getId()));
     JobImage *img = new JobImage(params, MyMpi::size(comm), worldRank, job.getId());
@@ -266,7 +266,7 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
 
     } else {
 
-        const Job& job = getJobImage(req.jobId).getJob();
+        const JobDescription& job = getJobImage(req.jobId).getJob();
 
         // Send job signature
         JobSignature sig(req.jobId, req.rootRank, job.getFormulaSize(), job.getAssumptionsSize());
@@ -336,7 +336,7 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
     // Retrieve and send concerned job
     assert(hasJobImage(req.jobId));
     JobImage& img = getJobImage(req.jobId);
-    const Job &job = img.getJob();
+    const JobDescription &job = img.getJob();
     MyMpi::send(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB, job);
 
     if (img.getState() == JobState::PAST) {
@@ -358,26 +358,27 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
             int volume = balancer->getVolume(req.jobId);
             assert(volume >= 1);
             Console::log_send("Propagating volume " + std::to_string(volume) + " to new child", handle->source);
-            std::vector<int> jobIdAndDemand;
-            jobIdAndDemand.push_back(req.jobId);
-            jobIdAndDemand.push_back(volume);
-            MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_UPDATE_DEMAND, jobIdAndDemand);
+            std::vector<int> jobIdAndVolume;
+            jobIdAndVolume.push_back(req.jobId);
+            jobIdAndVolume.push_back(volume);
+            MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_UPDATE_VOLUME, jobIdAndVolume);
         }
     }
 }
 
 void Worker::handleSendJob(MessageHandlePtr& handle) {
-    Job job; job.deserialize(handle->recvData);
+    JobDescription job; job.deserialize(handle->recvData);
     //Console::log("Received " + std::to_string(job.getId()));
     jobs[job.getId()]->store(job);
     jobs[job.getId()]->initialize();
     load = 1;
 }
 
-void Worker::handleUpdateDemand(MessageHandlePtr& handle) {
+void Worker::handleUpdateVolume(MessageHandlePtr& handle) {
     int jobId = handle->recvData[0];
-    int demand = handle->recvData[1];
-    updateDemand(jobId, demand);
+    int volume = handle->recvData[1];
+    balancer->updateVolume(jobId, volume);
+    updateVolume(jobId, volume);
 }
 
 void Worker::handleGatherClauses(MessageHandlePtr& handle) {
@@ -518,14 +519,15 @@ void Worker::rebalance() {
 
     std::map<int, int> volumes = balancer->balance(jobs);
     for (auto it = volumes.begin(); it != volumes.end(); ++it) {
-        updateDemand(it->first, it->second);
+        Console::log("Post-rebalancing: Job #" + std::to_string(it->first) + " : new volume " + std::to_string(it->second));
+        updateVolume(it->first, it->second);
     }
 
     // All collective operations are done; reset synchronized timer
     lastRebalancing = Timer::elapsedSeconds();
 }
 
-void Worker::updateDemand(int jobId, int demand) {
+void Worker::updateVolume(int jobId, int volume) {
 
     if (!hasJobImage(jobId)) {
         Console::log("WARN: Received a volume update about #"
@@ -540,28 +542,28 @@ void Worker::updateDemand(int jobId, int demand) {
         return;
     }
 
-    // Prepare demand update to propagate down the job tree
+    // Prepare volume update to propagate down the job tree
     std::vector<int> payload;
     payload.push_back(jobId);
-    payload.push_back(demand);
+    payload.push_back(volume);
 
     // Root node update message
     int thisIndex = img.getIndex();
     if (thisIndex == 0) {
-        Console::log("Updating demand of #" + std::to_string(jobId) + " to " + std::to_string(demand));
+        Console::log("Updating volume of " + img.toStr() + " to " + std::to_string(volume));
     }
 
     // Left child
     int nextIndex = img.getLeftChildIndex();
     if (img.hasLeftChild()) {
         // Propagate left
-        MyMpi::isend(MPI_COMM_WORLD, img.getLeftChildNodeRank(), MSG_UPDATE_DEMAND, payload);
-        if (nextIndex >= demand) {
+        MyMpi::isend(MPI_COMM_WORLD, img.getLeftChildNodeRank(), MSG_UPDATE_VOLUME, payload);
+        if (nextIndex >= volume) {
             // Prune child
             Console::log_send("Pruning left child of " + img.toStr(), img.getLeftChildNodeRank());
             img.unsetLeftChild();
         }
-    } else if (nextIndex < demand) {
+    } else if (nextIndex < volume) {
         // Grow left
         JobRequest req(jobId, img.getRootNodeRank(), worldRank, nextIndex, iteration, 0);
         int nextNodeRank = img.getLeftChildNodeRank();
@@ -572,22 +574,21 @@ void Worker::updateDemand(int jobId, int demand) {
     nextIndex = img.getRightChildIndex();
     if (img.hasRightChild()) {
         // Propagate right
-        MyMpi::isend(MPI_COMM_WORLD, img.getRightChildNodeRank(), MSG_UPDATE_DEMAND, payload);
-        if (nextIndex >= demand) {
+        MyMpi::isend(MPI_COMM_WORLD, img.getRightChildNodeRank(), MSG_UPDATE_VOLUME, payload);
+        if (nextIndex >= volume) {
             // Prune child
             Console::log_send("Pruning right child of " + img.toStr(), img.getRightChildNodeRank());
             img.unsetRightChild();
         }
-    } else if (nextIndex < demand) {
+    } else if (nextIndex < volume) {
         // Grow right
         JobRequest req(jobId, img.getRootNodeRank(), worldRank, nextIndex, iteration, 0);
         int nextNodeRank = img.getRightChildNodeRank();
         MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, MSG_FIND_NODE, req);
     }
-    // TODO Propagate MSG_UPDATE_DEMAND to grown children as soon as they are established (growing by more than one layer)
 
     // Shrink (and pause solving) if necessary
-    if (thisIndex > 0 && thisIndex >= demand) {
+    if (thisIndex > 0 && thisIndex >= volume) {
         jobs[jobId]->suspend();
         load = 0;
     }

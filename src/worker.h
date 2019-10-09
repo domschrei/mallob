@@ -12,7 +12,7 @@
 
 #include "util/mpi.h"
 #include "util/params.h"
-#include "data/job.h"
+#include "data/job_description.h"
 #include "data/job_transfer.h"
 #include "data/job_image.h"
 #include "balancing/balancer.h"
@@ -59,13 +59,13 @@ private:
     void handleAcceptBecomeChild(MessageHandlePtr& handle);
     void handleAckAcceptBecomeChild(MessageHandlePtr& handle);
     void handleSendJob(MessageHandlePtr& handle);
-    void handleUpdateDemand(MessageHandlePtr& handle);
+    void handleUpdateVolume(MessageHandlePtr& handle);
     void handleGatherClauses(MessageHandlePtr& handle);
     void handleDistributeClauses(MessageHandlePtr& handle);
     void handleTerminate(MessageHandlePtr& handle);
 
     void bounceJobRequest(JobRequest& request);
-    void updateDemand(int jobId, int demand);
+    void updateVolume(int jobId, int demand);
     void beginClauseGathering(int jobId);
     void collectAndGatherClauses(std::vector<int>& clausesFromAChild);
     void learnAndDistributeClausesDownwards(std::vector<int>& clauses);

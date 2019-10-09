@@ -1,5 +1,8 @@
 
-#include "balancer.h"
+#ifndef DOMPASCH_BALANCER_THERMODYNAMIC_H
+#define DOMPASCH_BALANCER_THERMODYNAMIC_H
+
+#include "balancing/balancer.h"
 
 class ThermodynamicBalancer : public Balancer {
 
@@ -10,7 +13,7 @@ public:
     std::map<int, int> balance(std::map<int, JobImage*>& jobs) override;
 
 private:
-    float calculatePressure(const std::vector<Job*>& involvedJobs, float volume);
+    float calculatePressure(const std::vector<JobDescription*>& involvedJobs, float volume);
 
     float getTemperature(int jobId) {
         if (temperatures.count(jobId)) {
@@ -27,3 +30,5 @@ private:
 
     std::map<int, float> temperatures;
 };
+
+#endif

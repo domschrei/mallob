@@ -18,7 +18,7 @@ void readAllInstances(Client* client) {
     Client& c = *client;
     for (auto it = c.jobsByArrival.begin(); it != c.jobsByArrival.end(); ++it) {
 
-        Job &job = it->second;
+        JobDescription &job = it->second;
         int jobId = job.getId();
 
         Console::log("Reading \"" + c.jobInstances[jobId] + "\" (#" + std::to_string(jobId) + ") ...");
@@ -54,7 +54,7 @@ void Client::mainProgram() {
         int timeMillis = (int) (1000 * (arrival - Timer::elapsedSeconds()));
         std::this_thread::sleep_for(std::chrono::milliseconds(timeMillis));
 
-        Job& job = it->second;
+        JobDescription& job = it->second;
         int jobId = job.getId();
 
         // Wait until job is ready to be sent
@@ -107,7 +107,7 @@ void Client::readInstanceList(std::string& filename) {
         next = line.find(" "); arrival = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1);
         next = line.find(" "); priority = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1);
         next = line.find(" "); instanceFilename = line.substr(pos, next-pos); line = line.substr(next+1);
-        Job job(id, priority);
+        JobDescription job(id, priority);
         while (jobsByArrival.count(arrival)) {
             arrival += 0.00001f;
         }
@@ -119,7 +119,7 @@ void Client::readInstanceList(std::string& filename) {
     Console::log("Read " + std::to_string(jobsByArrival.size()) + " job instances from file " + filename);
 }
 
-void Client::readFormula(std::string& filename, Job& job) {
+void Client::readFormula(std::string& filename, JobDescription& job) {
 
     std::fstream file;
     file.open(filename, std::ios::in);

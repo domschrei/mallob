@@ -34,7 +34,7 @@ private:
 	bool solvingDoneLocal;
 	SharingManagerInterface* sharingManager;
 	vector<PortfolioSolverInterface*> solvers;
-	vector<int> solversRunning;
+	vector<int> solversInitialized;
     bool running;
 
 	const std::vector<int>* formula;

@@ -9,7 +9,7 @@ std::map<int, int> SimpleBalancer::balance(std::map<int, JobImage*>& jobs) {
         JobImage &img = *it->second;
         if ((img.getState() == JobState::ACTIVE) && img.isRoot()) {
             //Console::log("Participating with " + img.toStr() + ", ID " + std::to_string(img.getJob()->getId()));
-            Job& job = img.getJob();
+            JobDescription& job = img.getJob();
             localJobs.insert(job.getId());
         }
     }
@@ -17,7 +17,7 @@ std::map<int, int> SimpleBalancer::balance(std::map<int, JobImage*>& jobs) {
     int localSumOfDemands = 0;
     for (auto it = localJobs.begin(); it != localJobs.end(); ++it) {
         int jobId = *it;
-        localSumOfDemands += getDemand(jobs[jobId]->getJob());
+        localSumOfDemands += getDemand(*jobs[jobId]);
     }
 
     int globalSumOfAllDemands = allReduce(localSumOfDemands);
@@ -25,7 +25,7 @@ std::map<int, int> SimpleBalancer::balance(std::map<int, JobImage*>& jobs) {
     
     for (auto it = localJobs.begin(); it != localJobs.end(); ++it) {
         int jobId = *it;
-        float volumeFloat = (float) totalVolume / globalSumOfAllDemands * getDemand(jobs[jobId]->getJob()); 
+        float volumeFloat = (float) totalVolume / globalSumOfAllDemands * getDemand(*jobs[jobId]); 
         volumes[jobId] = std::max(1, (int) std::floor(volumeFloat));
     }
 

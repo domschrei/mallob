@@ -9,7 +9,7 @@
 /**
  * The actual job structure, containing the full description.
  */
-class Job : public Serializable {
+class JobDescription : public Serializable {
 
 private:
 
@@ -24,8 +24,8 @@ private:
 
 public:
 
-    Job() : id(-1), rootRank(-1), priority(-1) {}
-    Job(int id, float priority) : id(id), rootRank(-1), priority(priority) {}
+    JobDescription() : id(-1), rootRank(-1), priority(-1) {}
+    JobDescription(int id, float priority) : id(id), rootRank(-1), priority(priority) {}
 
     int getId() const {return id;};
     int getRootRank() const {return rootRank;};
