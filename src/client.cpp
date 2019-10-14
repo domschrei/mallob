@@ -13,7 +13,7 @@
 
 void readAllInstances(Client* client) {
 
-    Console::log("Started client I/O thread to read instances.");
+    Console::log(Console::VERB, "Started client I/O thread to read instances.");
 
     Client& c = *client;
     for (auto it = c.jobsByArrival.begin(); it != c.jobsByArrival.end(); ++it) {
@@ -21,10 +21,10 @@ void readAllInstances(Client* client) {
         JobDescription &job = it->second;
         int jobId = job.getId();
 
-        Console::log("Reading \"" + c.jobInstances[jobId] + "\" (#" + std::to_string(jobId) + ") ...");
+        Console::log(Console::VERB, "Reading \"" + c.jobInstances[jobId] + "\" (#" + std::to_string(jobId) + ") ...");
         c.readFormula(c.jobInstances[jobId], job);
         if (job.getFormulaSize() > 1)
-            Console::log("Read \"" + c.jobInstances[jobId] + "\" (#" + std::to_string(jobId) + ").");
+            Console::log(Console::VERB, "Read \"" + c.jobInstances[jobId] + "\" (#" + std::to_string(jobId) + ").");
 
         std::unique_lock<std::mutex> lock(c.jobReadyLock);
         c.jobReady[jobId] = true;
@@ -37,7 +37,7 @@ void Client::init() {
     int internalRank = MyMpi::rank(comm);
     std::string filename = params.getFilename() + "." + std::to_string(internalRank);
     readInstanceList(filename);
-    Console::log("Started client main thread to introduce instances.");
+    Console::log(Console::INFO, "Started client main thread to introduce instances.");
 
     instanceReaderThread = std::thread(readAllInstances, this);
 }
@@ -67,32 +67,31 @@ void Client::mainProgram() {
 
         if (job.getFormulaSize() == 1) {
             // Some I/O error kept the instance from being read
-            Console::log("Skipping job #" + std::to_string(jobId) + " due to previous I/O error");
+            Console::log(Console::WARN, "Skipping job #" + std::to_string(jobId) + " due to previous I/O error");
             continue;
         }
 
         // Find the job's canonical initial node
         int n = MyMpi::size(MPI_COMM_WORLD) - MyMpi::size(comm);
-        Console::log("Creating permutation of size " + std::to_string(n) + " ...");
+        Console::log(Console::VERB, "Creating permutation of size " + std::to_string(n) + " ...");
         AdjustablePermutation p(n, jobId);
         int nodeRank = p.get(0);
 
         const JobSignature sig(jobId, nodeRank, job.getFormulaSize(), job.getAssumptionsSize());
 
-        Console::log_send("Introducing job #" + std::to_string(jobId), nodeRank);
-        MyMpi::send(MPI_COMM_WORLD, nodeRank, MSG_INTRODUCE_JOB, sig);
-        Console::log_send("Sending job #" + std::to_string(jobId), nodeRank);
+        Console::log_send(Console::INFO, "Introducing job #" + std::to_string(jobId), nodeRank);
+        MyMpi::send(MPI_COMM_WORLD, nodeRank, MSG_INTRODUCE_JOB, sig); // TODO async?
         MyMpi::send(MPI_COMM_WORLD, nodeRank, MSG_SEND_JOB, job);
     }
 }
 
 void Client::readInstanceList(std::string& filename) {
 
-    Console::log("Reading instances from file " + filename);
+    Console::log(Console::INFO, "Reading instances from file " + filename);
     std::fstream file;
     file.open(filename, std::ios::in);
     if (!file.is_open()) {
-        Console::log("ERROR: Could not open instance file! Will stay idle.");
+        Console::log(Console::CRIT, "ERROR: Could not open instance file! Will stay idle.");
         return;
     }
 
@@ -116,7 +115,7 @@ void Client::readInstanceList(std::string& filename) {
     }
     file.close();
 
-    Console::log("Read " + std::to_string(jobsByArrival.size()) + " job instances from file " + filename);
+    Console::log(Console::INFO, "Read " + std::to_string(jobsByArrival.size()) + " job instances from file " + filename);
 }
 
 void Client::readFormula(std::string& filename, JobDescription& job) {
@@ -146,10 +145,10 @@ void Client::readFormula(std::string& filename, JobDescription& job) {
             }
         }
         job.setFormula(formula);
-        Console::log(std::to_string(formula.size()) + " literals including separation zeros");
+        Console::log(Console::VERB, std::to_string(formula.size()) + " literals including separation zeros");
 
     } else {
-        Console::log("ERROR: File " + filename + " could not be opened. Skipping job #"
+        Console::log(Console::CRIT, "ERROR: File " + filename + " could not be opened. Skipping job #"
                    + std::to_string(job.getId()));
     }
 }

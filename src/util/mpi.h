@@ -42,6 +42,7 @@ const int MSG_WORKER_FOUND_RESULT = 15;
 const int MSG_TERMINATE = 16;
 const int MSG_GATHER_CLAUSES = 17;
 const int MSG_DISTRIBUTE_CLAUSES = 18;
+const int MSG_REDUCE_RESOURCES_INFO = 19;
 
 typedef std::shared_ptr<MessageHandle> MessageHandlePtr;
 
@@ -61,10 +62,12 @@ public:
     static MessageHandlePtr irecv(MPI_Comm communicator);
     static MessageHandlePtr irecv(MPI_Comm communicator, int tag);
     static MessageHandlePtr irecv(MPI_Comm communicator, int source, int tag, int size);
-    static MessageHandlePtr recv(MPI_Comm communicator, int tag, int size);
+    static MessageHandlePtr  recv(MPI_Comm communicator, int tag, int size);
+    static MessageHandlePtr  recv(MPI_Comm communicator, int tag);
 
     static MessageHandlePtr poll();
     static inline bool hasActiveHandles() {return handles.size() > 0;};
+    static void deferHandle(MessageHandlePtr handle);
     static void cleanSentHandles();
 
     static int size(MPI_Comm comm);

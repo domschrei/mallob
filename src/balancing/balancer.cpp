@@ -25,5 +25,5 @@ float Balancer::reduce(float contribution, int rootRank) const {
 int Balancer::getDemand(const JobImage& job) {
     // Twice as much (+1) than previous volume, 
     // at most the amount of workers
-    return std::min(2 * getVolume(job.getJob().getId()) + 1, MyMpi::size(comm));
+    return job.getDemand();
 }

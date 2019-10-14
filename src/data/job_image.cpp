@@ -4,14 +4,16 @@
 
 #include "assert.h"
 #include "util/console.h"
+#include "util/timer.h"
 #include "data/job_image.h"
 
-JobImage::JobImage(Parameters& params, int commSize, int worldRank, int jobId) :
+JobImage::JobImage(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) :
             params(params), commSize(commSize), worldRank(worldRank), 
-            jobId(jobId), hasDescription(false), initialized(false),
-            jobNodeRanks(commSize, jobId) {}
+            jobId(jobId), epochCounter(epochCounter), epochOfArrival(epochCounter.get()), 
+            elapsedSecondsOfArrival(Timer::elapsedSeconds()), 
+            hasDescription(false), initialized(false), jobNodeRanks(commSize, jobId) {}
 
-void JobImage::store(JobDescription job) {
+void JobImage::store(JobDescription& job) {
     this->job = job;
     if (state == NONE) {
         state = STORED;
@@ -37,6 +39,7 @@ void JobImage::initialize() {
     params["c"] = this->params.getParam("t"); // solver threads on this node
     params["d"] = "7"; // sparse random + native diversification
     params["i"] = "0"; // #microseconds to sleep during solve loop
+    params["v"] = (this->params.getIntParam("v") >= 3 ? "1" : "0"); // verbosity
     params["mpirank"] = std::to_string(index); // mpi_rank
     params["mpisize"] = std::to_string(commSize); // mpi_size
     params["jobstr"] = toStr();
@@ -67,7 +70,7 @@ void JobImage::reinitialize(int index, int rootRank, int parentRank) {
             updateJobNode(index/2, parentRank);
             assert(solver != NULL);
 
-            Console::log("Resuming Hordesat solving threads of " + toStr());
+            Console::log(Console::INFO, "Resuming Hordesat solving threads of " + toStr());
             resume();
 
         } else {
@@ -79,7 +82,7 @@ void JobImage::reinitialize(int index, int rootRank, int parentRank) {
             updateJobNode(index/2, parentRank);
             updateJobNode(index, worldRank);
 
-            Console::log("Restarting Hordesat instance of " + toStr());
+            Console::log(Console::INFO, "Restarting Hordesat instance of " + toStr());
             solver->beginSolving();
 
             state = ACTIVE;
@@ -168,16 +171,16 @@ std::vector<int> JobImage::shareCollectedClauses() {
 void JobImage::learnClausesFromAbove(std::vector<int>& clauses) {
     if (!solver->isFullyInitialized())
         return; // discard clauses TODO keep?
-    Console::log("Digesting clauses ...");
+    Console::log(Console::VERB, "Digesting clauses ...");
     solver->digestSharing(clauses);
-    Console::log("Digested clauses.");
+    Console::log(Console::VERB, "Digested clauses.");
 }
 
 void JobImage::suspend() {
     assert(state == ACTIVE);
     solver->setPaused();
     state = SUSPENDED;
-    Console::log("Suspended Hordesat solving threads of " + toStr());
+    Console::log(Console::INFO, "Suspended Hordesat solving threads of " + toStr());
 }
 
 void JobImage::resume() {
@@ -186,7 +189,7 @@ void JobImage::resume() {
         initialize(index, getRootNodeRank(), getParentNodeRank());
     } else {
         solver->unsetPaused();
-        Console::log("Resumed Hordesat solving threads of " + toStr());
+        Console::log(Console::INFO, "Resumed Hordesat solving threads of " + toStr());
         state = ACTIVE;
     }
 }
@@ -223,4 +226,8 @@ int JobImage::solveLoop() {
         doneLocally = true;
     }
     return result;
+}
+
+int JobImage::getDemand() const {   
+    return std::min(commSize, (int) std::pow(2, epochCounter.get() - epochOfArrival + 1) - 1);
 }

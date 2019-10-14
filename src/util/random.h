@@ -18,6 +18,15 @@ public:
     static float rand() {
         return dist(rng);
     }
+    static int roundProbabilistically(float x) {
+        float random = rand();
+        float remainder = x - (int) x;
+        if (random < remainder) {
+            return std::ceil(x);
+        } else {
+            return std::floor(x);
+        }
+    }
 };
 
 #endif

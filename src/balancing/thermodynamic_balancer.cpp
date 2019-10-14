@@ -23,8 +23,6 @@ std::map<int, int> ThermodynamicBalancer::balance(std::map<int, JobImage*>& jobs
     }
 
     int fullVolume = MyMpi::size(comm);
-    Console::log(std::to_string(fullVolume));
-    Console::log(std::to_string(loadFactor));
 
     // Initial pressure, filtering out micro-jobs
     float remainingVolume = fullVolume * loadFactor;
@@ -73,7 +71,7 @@ std::map<int, int> ThermodynamicBalancer::balance(std::map<int, JobImage*>& jobs
         iteration++;
     }
     if (MyMpi::rank(comm) == 0)
-        Console::log("Did " + std::to_string(iteration) + " rebalancing iterations");
+        Console::log(Console::VERB, "Did " + std::to_string(iteration) + " rebalancing iterations");
 
     // Weigh remaining volume against shrinkage
     float shrink = 0;

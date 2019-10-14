@@ -46,8 +46,7 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
 }
 
 MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const Serializable& object) {
-    std::vector<int> vec = object.serialize();
-    return send(communicator, recvRank, tag, vec);
+    return send(communicator, recvRank, tag, object.serialize());
 }
 
 MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const std::vector<int>& object) {
@@ -91,6 +90,10 @@ MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag, int size) {
     return handle;
 }
 
+MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag) {
+    return recv(communicator, tag, maxMsgLength);
+}
+
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag, int size) {
     MessageHandlePtr handle(new MessageHandle());
     handle->tag = tag;
@@ -131,6 +134,10 @@ MessageHandlePtr MyMpi::poll() {
         handles.erase(handle);
     }
     return handle;
+}
+
+void MyMpi::deferHandle(MessageHandlePtr handle) {
+    handles.insert(handle);
 }
 
 void MyMpi::cleanSentHandles() {

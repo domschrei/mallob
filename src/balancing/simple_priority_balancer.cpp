@@ -9,7 +9,7 @@ std::map<int, int> SimplePriorityBalancer::balance(std::map<int, JobImage*>& job
     for (auto it = jobs.begin(); it != jobs.end(); ++it) {
         JobImage &img = *it->second;
         if ((img.getState() == JobState::ACTIVE) && img.isRoot()) {
-            //Console::log("Participating with " + img.toStr() + ", ID " + std::to_string(img.getJob()->getId()));
+            Console::log(Console::VVERB, "Participating with " + img.toStr() + ", ID " + std::to_string(img.getJob().getId()));
             JobDescription& job = img.getJob();
             localJobs.insert(job.getId());
         }
@@ -19,7 +19,7 @@ std::map<int, int> SimplePriorityBalancer::balance(std::map<int, JobImage*>& job
     for (auto it = localJobs.begin(); it != localJobs.end(); ++it) {
         int jobId = *it;
         int demand = getDemand(*jobs[jobId]);
-        Console::log("Demand of #" + std::to_string(jobId) + ": " + std::to_string(demand));
+        Console::log(Console::VVERB, "Demand of #" + std::to_string(jobId) + ": " + std::to_string(demand));
         localSumOfDemands += demand;
     }
     int globalSumOfAllDemands = allReduce(localSumOfDemands);

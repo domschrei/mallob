@@ -5,21 +5,25 @@
 #include "timer.h"
 
 int Console::rank;
+int Console::verbosity;
 
-void Console::init(int rank) {
+void Console::init(int rank, int verbosity) {
     Console::rank = rank;
+    Console::verbosity = verbosity;
 }
 
-void Console::log(const char* str) {
+void Console::log(int verbosity, const char* str) {
+    if (verbosity > Console::verbosity)
+        return;
     printf("[%3.3f] ", Timer::elapsedSeconds());
     std::cout << "[" << rank << "] " << str << std::endl;
 }
-void Console::log(std::string str) {
-    log(str.c_str());
+void Console::log(int verbosity, std::string str) {
+    log(verbosity, str.c_str());
 }
-void Console::log_send(std::string str, int destRank) {
-    log(str + " => [" + std::to_string(destRank) + "]");
+void Console::log_send(int verbosity, std::string str, int destRank) {
+    log(verbosity, str + " => [" + std::to_string(destRank) + "]");
 }
-void Console::log_recv(std::string str, int sourceRank) {
-    log(str + " <= [" + std::to_string(sourceRank) + "]");
+void Console::log_recv(int verbosity, std::string str, int sourceRank) {
+    log(verbosity, str + " <= [" + std::to_string(sourceRank) + "]");
 }

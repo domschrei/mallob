@@ -46,7 +46,7 @@ std::vector<int> AllToAllSharingManager::prepareSharing(int size) {
 		solvers[increaser]->increaseClauseProduction();
 		log(2, "Node %d production increase for %d. time, core %d will increase.\n", rank, prodInc++, increaser);
 	}
-	log(0, "Node %d filled %d%% of its learned clause buffer\n", rank, usedPercent);
+	log(1, "Node %d filled %d%% of its learned clause buffer\n", rank, usedPercent);
     std::vector<int> clauseVec(outBuffer, outBuffer + COMM_BUFFER_SIZE);
 
     /*

@@ -6,15 +6,23 @@
 
 class Console {
 
+public:
+    static const int CRIT = 0;
+    static const int WARN = 1;
+    static const int INFO = 2;
+    static const int VERB = 3;
+    static const int VVERB = 4;
+    static const int VVVERB = 5;
+
 private:
     static int rank;
-
+    static int verbosity;
 public:
-    static void init(int rank);
-    static void log(const char* str);
-    static void log(std::string str);
-    static void log_send(std::string str, int destRank);
-    static void log_recv(std::string str, int sourceRank);
+    static void init(int rank, int verbosity);
+    static void log(int verbosity, const char* str);
+    static void log(int verbosity, std::string str);
+    static void log_send(int verbosity, std::string str, int destRank);
+    static void log_recv(int verbosity, std::string str, int sourceRank);
 
 };
 

@@ -32,8 +32,6 @@ int main(int argc, char *argv[]) {
     int numNodes = MyMpi::size(MPI_COMM_WORLD);
     int rank = MyMpi::rank(MPI_COMM_WORLD);
 
-    Console::init(rank);
-
     Parameters params;
     if (argc <= 1) {
         if (rank == 0)
@@ -42,12 +40,13 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     params.init(argc, argv);
+
+    Console::init(rank, params.getIntParam("v"));
+    Console::log(Console::VERB, "Launching.");
     params.printParams();
 
-    Console::log("Launching.");
-
     if (numNodes < 2) {
-        Console::log("At least two threads / nodes are necessary in order to run this application.");
+        Console::log(Console::CRIT, "At least two threads / nodes are necessary in order to run this application.");
         MPI_Finalize();
         exit(0);
     }

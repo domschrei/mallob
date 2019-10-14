@@ -32,20 +32,24 @@ void Parameters::setDefaults() {
   setParam("l", "0.95"); // load factor
   setParam("c", "1"); // num clients
   setParam("t", "2"); // num threads per node
+  setParam("v", "2"); // verbosity 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...
+  setParam("vhorde", "0"); // hordesat verbosity
   setParam("td", "0.01"); // temperature decay for thermodyn. balancing
 }
 
 void Parameters::printUsage() {
 
-    Console::log("Usage: mallob [options] <scenario>");
-    Console::log("<scenario> : File path and name prefix for client scenario(s);");
-    Console::log("             will parse <name>.0 for one client, ");
-    Console::log("             <name>.0 and <name>.1 for two clients, ...");
-    Console::log("Options:");
-    Console::log("-p=<rebalance-period> Do global rebalancing every r seconds (r > 0)");
-    Console::log("-l=<load-factor>      Load factor to be aimed at (0 < l < 1)");
-    Console::log("-c=<num-clients>      Amount of client nodes (int c >= 1)");
-    Console::log("-t=<num-threads>      Amount of worker threads per node (int t >= 1)");
+    Console::log(Console::CRIT, "Usage: mallob [options] <scenario>");
+    Console::log(Console::CRIT, "<scenario> : File path and name prefix for client scenario(s);");
+    Console::log(Console::CRIT, "             will parse <name>.0 for one client, ");
+    Console::log(Console::CRIT, "             <name>.0 and <name>.1 for two clients, ...");
+    Console::log(Console::CRIT, "Options:");
+    Console::log(Console::CRIT, "-p=<rebalance-period> Do global rebalancing every r seconds (r > 0)");
+    Console::log(Console::CRIT, "-l=<load-factor>      Load factor to be aimed at (0 < l < 1)");
+    Console::log(Console::CRIT, "-c=<num-clients>      Amount of client nodes (int c >= 1)");
+    Console::log(Console::CRIT, "-t=<num-threads>      Amount of worker threads per node (int t >= 1)");
+    Console::log(Console::CRIT, "-v=<verb-num>         Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...");
+    Console::log(Console::CRIT, "-vhorde=<verb-num>    Logging verbosity of hordesat components");
 }
 
 string Parameters::getFilename() {

@@ -168,9 +168,9 @@ void* solverRunningThread(void* arg) {
 	if (readFormula && (hlib->solversInitialized[localId] == 0)) {
 		log(1, "Solver %i importing clauses ...\n", solver->solverId);
 
-		int batchSize = 10000;
+		int batchSize = 100000;
 		const std::vector<int>& formula = *hlib->formula;
-		for (int start = 0; start < (int) formula.size(); start++) {
+		for (int start = 0; start < (int) formula.size(); start += batchSize) {
 			
 			if (hlib->solvingDoneLocal)
             	break;
@@ -219,19 +219,28 @@ void* solverRunningThread(void* arg) {
 		hlib->finalResult = UNKNOWN;
 		SatResult res = solver->solve(hlib->assumptions);
         
+		// If interrupted externally
+		if (hlib->solvingDoneLocal)
+			return NULL;
+		
+		// Else, report result, if present
 		if (res == SAT) {
-			log(0,"Found result SAT on solver %d\n", solver->solverId);
 			hlib->solutionLock.lock();
-			hlib->finalResult = SAT;
-			hlib->truthValues = solver->getSolution();
-			hlib->solvingDoneLocal = true;
+			if (!hlib->solvingDoneLocal) {
+				log(0,"Found result SAT on solver %d\n", solver->solverId);
+				hlib->finalResult = SAT;
+				hlib->truthValues = solver->getSolution();
+				hlib->solvingDoneLocal = true;
+			}
 			hlib->solutionLock.unlock();
 		} else if (res == UNSAT) {
-			log(0,"Found result UNSAT on solver %d\n", solver->solverId);
 			hlib->solutionLock.lock();
-			hlib->finalResult = UNSAT;
-			hlib->failedAssumptions = solver->getFailedAssumptions();
-			hlib->solvingDoneLocal = true;
+			if (!hlib->solvingDoneLocal) {
+				log(0,"Found result UNSAT on solver %d\n", solver->solverId);
+				hlib->finalResult = UNSAT;
+				hlib->failedAssumptions = solver->getFailedAssumptions();
+				hlib->solvingDoneLocal = true;
+			}
 			hlib->solutionLock.unlock();
 		}
 	}
@@ -355,7 +364,7 @@ int HordeLib::solveLoop() {
 
     if ((maxRounds != 0 && round == maxRounds) || (maxSeconds != 0 && timeNow > maxSeconds)) {
         //endingFunction = getGlobalEnding;
-		log(0, "round %i, time %3.3f\n", round, timeNow);
+		log(0, "Aborting: round %i, time %3.3f\n", round, timeNow);
         solvingDoneLocal = true;
     }
     fflush(stdout);

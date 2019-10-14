@@ -12,6 +12,7 @@
 #include "util/permutation.h"
 #include "data/job_description.h"
 #include "data/job_transfer.h"
+#include "data/epoch_counter.h"
 
 #define BROADCAST_CLAUSE_INTS_PER_NODE 1500
 
@@ -64,10 +65,14 @@ private:
     int jobId;
     int index;
     JobDescription job;
+    EpochCounter& epochCounter;
+    int epochOfArrival;
+    float elapsedSecondsOfArrival;
+
     JobState state = JobState::NONE;
     bool hasDescription;
     bool initialized;
-    std::shared_ptr<std::thread> initializerThread;
+    std::unique_ptr<std::thread> initializerThread;
     bool cancelInit;
 
     AdjustablePermutation jobNodeRanks;
@@ -82,8 +87,8 @@ private:
 
 public:
 
-    JobImage(Parameters& params, int commSize, int worldRank, int jobId);
-    void store(JobDescription job);
+    JobImage(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
+    void store(JobDescription& job);
     void commit(const JobRequest& req);
     void uncommit(const JobRequest& req);
     void initialize(int index, int rootRank, int parentRank);
@@ -123,6 +128,7 @@ public:
     JobDescription& getJob() {return job;};
     int getIndex() const {return index;};
     bool isInitialized() const {return initialized;};
+    int getDemand() const;
 
     bool isRoot() const {return index == 0;};
     int getRootNodeRank() const {return jobNodeRanks[0];};

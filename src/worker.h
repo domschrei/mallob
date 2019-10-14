@@ -15,6 +15,7 @@
 #include "data/job_description.h"
 #include "data/job_transfer.h"
 #include "data/job_image.h"
+#include "data/epoch_counter.h"
 #include "balancing/balancer.h"
 
 class Worker {
@@ -32,13 +33,13 @@ private:
     int load;
 
     std::unique_ptr<Balancer> balancer;
-    int iteration;
+    EpochCounter epochCounter;
     float lastRebalancing;
     bool exchangedClausesThisRound;
 
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& clientNodes) :
-        comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), iteration(0)
+        comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), epochCounter()
         {
             loadFactor = params.getFloatParam("l");
             assert(0 < loadFactor && loadFactor < 1.0);
