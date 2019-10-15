@@ -1,6 +1,11 @@
 
 import os
 import subprocess
+import hashlib
+import re
+import os.path
+import fileinput
+import time
 
 # Compile flags
 flags = "-g -O3 -Wall -fmessage-length=0"
@@ -29,6 +34,13 @@ hordelib = hordeenv.Library("horde",
         LIBPATH=[hordesolvers + "/minisat/build/release/lib", hordesolvers + "/lingeling"],
         LIBS=["pthread", "minisat", "lgl", "z"])
 
+# Increment mallob revision number
+def update_revision(target, source, env):
+    revision = "#define MALLOB_REVISION \"" + time.strftime("%Y-%m-%d_%H:%M:%S") + "\""
+    with open("src/revision.c", "w") as f:
+        f.write(str(revision))
+    print revision
+
 # Build mallob
 mallobenv = get_default_env()
 mallob = mallobenv.Program('mallob', 
@@ -36,3 +48,9 @@ mallob = mallobenv.Program('mallob',
         CPPPATH=['src', horde], 
         LIBPATH=[".", hordesolvers + "/minisat/build/release/lib", hordesolvers + "/lingeling"],
         LIBS=["horde", "pthread", "minisat", "lgl", "z"])
+
+version = Command("version", [], update_revision)
+for src in mallob_sources:
+    Depends(src, version)
+
+Default(mallob)
