@@ -13,6 +13,7 @@
 #include "revision.c"
 
 void doExternalClientProgram(MPI_Comm commClients, Parameters& params, const std::set<int>& clientRanks) {
+    
     Client client(commClients, params, clientRanks);
     client.init();
     client.mainProgram();
