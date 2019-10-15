@@ -22,7 +22,7 @@ float Balancer::reduce(float contribution, int rootRank) const {
     return result;
 }
 
-int Balancer::getDemand(const JobImage& job) {
+int Balancer::getDemand(const Job& job) {
     // Twice as much (+1) than previous volume, 
     // at most the amount of workers
     return job.getDemand();

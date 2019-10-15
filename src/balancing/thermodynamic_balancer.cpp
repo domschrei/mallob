@@ -2,16 +2,16 @@
 #include "thermodynamic_balancer.h"
 #include "util/console.h"
 
-std::map<int, int> ThermodynamicBalancer::balance(std::map<int, JobImage*>& jobs) {
+std::map<int, int> ThermodynamicBalancer::balance(std::map<int, Job*>& jobs) {
 
     std::vector<JobDescription*> activeJobs;
     std::vector<JobDescription*> involvedJobs;
     std::map<int, float> newVolumes;
     for (auto it = jobs.begin(); it != jobs.end(); ++it) {
-        JobImage &img = *it->second;
+        Job &img = *it->second;
         if ((img.getState() == JobState::ACTIVE) && img.isRoot()) {
             //Console::log("Participating with " + img.toStr() + ", ID " + std::to_string(img.getJob()->getId()));
-            JobDescription& job = img.getJob();
+            JobDescription& job = img.getDescription();
 
             assert(getTemperature(job.getId()) > 0);
             assert(job.getPriority() > 0);
@@ -31,12 +31,12 @@ std::map<int, int> ThermodynamicBalancer::balance(std::map<int, JobImage*>& jobs
     assert(pressure >= 0);
     float microJobDiscount = 0;
     for (unsigned int i = 0; i < involvedJobs.size(); i++) {
-        const JobDescription& job = *involvedJobs[i];
-        float demand = 1/pressure * getTemperature(job.getId()) * job.getPriority();
+        const JobDescription& desc = *involvedJobs[i];
+        float demand = 1/pressure * getTemperature(desc.getId()) * desc.getPriority();
         if (demand < 1) {
             // Micro job!
             microJobDiscount++;
-            newVolumes[job.getId()] = 1;
+            newVolumes[desc.getId()] = 1;
             involvedJobs.erase(involvedJobs.begin() + i);
             i--;
         }
@@ -52,11 +52,11 @@ std::map<int, int> ThermodynamicBalancer::balance(std::map<int, JobImage*>& jobs
         if (pressure == 0) break;
         //if (MyMpi::rank(comm) == 0) Console::log("Pressure: " + std::to_string(pressure));
         for (unsigned int i = 0; i < involvedJobs.size(); i++) {
-            JobDescription& job = *involvedJobs[i];
-            float addition = 1/pressure * getTemperature(job.getId()) * job.getPriority();
+            JobDescription& desc = *involvedJobs[i];
+            float addition = 1/pressure * getTemperature(desc.getId()) * desc.getPriority();
             //Console::log(std::to_string(pressure) + "," + std::to_string(job->getTemperature()) + "," + std::to_string(job->getPriority()));
-            float upperBound = getDemand(*jobs[job.getId()]);
-            float demand = newVolumes[job.getId()];
+            float upperBound = getDemand(*jobs[desc.getId()]);
+            float demand = newVolumes[desc.getId()];
             if (demand + addition >= upperBound) {
                 // Upper bound hit
                 unusedVolume += (demand + addition) - upperBound;
@@ -65,7 +65,7 @@ std::map<int, int> ThermodynamicBalancer::balance(std::map<int, JobImage*>& jobs
                 i--;
             }
             assert(addition >= 0);
-            newVolumes[job.getId()] += addition;
+            newVolumes[desc.getId()] += addition;
         }
         remainingVolume = allReduce(unusedVolume);
         iteration++;

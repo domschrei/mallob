@@ -10,8 +10,12 @@
 #include "worker.h"
 #include "client.h"
 
-void doExternalClientProgram(MPI_Comm commClients, Parameters& params, const std::set<int>& clientRanks) {
+#include "../.revision"
+#ifndef MALLOB_REVISION
+#define MALLOB_REVISION "?"
+#endif
 
+void doExternalClientProgram(MPI_Comm commClients, Parameters& params, const std::set<int>& clientRanks) {
     Client client(commClients, params, clientRanks);
     client.init();
     client.mainProgram();
@@ -33,17 +37,20 @@ int main(int argc, char *argv[]) {
     int rank = MyMpi::rank(MPI_COMM_WORLD);
 
     Parameters params;
-    if (argc <= 1) {
-        if (rank == 0)
+    params.init(argc, argv);
+    Console::init(rank, params.getIntParam("v"), params.isSet("colors"));
+    
+    if (rank == 0)
+        params.printParams();
+    if (params.isSet("h") || params.isSet("help") || params.getFilename().size() == 0) {
+        if (rank == 0) {
             params.printUsage();
+        }
         MPI_Finalize();
         exit(0);
     }
-    params.init(argc, argv);
 
-    Console::init(rank, params.getIntParam("v"));
-    Console::log(Console::VERB, "Launching.");
-    params.printParams();
+    Console::log(Console::VERB, "Launching mallob, revision " + std::string(MALLOB_REVISION));
 
     if (numNodes < 2) {
         Console::log(Console::CRIT, "At least two threads / nodes are necessary in order to run this application.");

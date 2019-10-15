@@ -10,7 +10,7 @@ public:
     ThermodynamicBalancer(MPI_Comm& comm, Parameters params) : Balancer(comm, params) {
         
     }
-    std::map<int, int> balance(std::map<int, JobImage*>& jobs) override;
+    std::map<int, int> balance(std::map<int, Job*>& jobs) override;
 
 private:
     float calculatePressure(const std::vector<JobDescription*>& involvedJobs, float volume);

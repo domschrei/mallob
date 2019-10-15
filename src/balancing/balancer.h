@@ -4,7 +4,7 @@
 
 #include <map>
 
-#include "data/job_image.h"
+#include "data/job.h"
 #include "util/mpi.h"
 #include "util/params.h"
 
@@ -14,14 +14,14 @@ public:
     Balancer(MPI_Comm& comm, Parameters params) : 
     comm(comm), params(params), loadFactor(params.getFloatParam("l")) {}
     
-    virtual std::map<int, int> balance(std::map<int, JobImage*>& jobs) = 0;
+    virtual std::map<int, int> balance(std::map<int, Job*>& jobs) = 0;
     int getVolume(int jobId);
     void updateVolume(int jobId, int volume);
 
 protected:
     float allReduce(float contribution) const;
     float reduce(float contribution, int rootRank) const;
-    int getDemand(const JobImage& job);
+    int getDemand(const Job& job);
 
 protected:
     MPI_Comm& comm;

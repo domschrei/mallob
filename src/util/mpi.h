@@ -10,6 +10,8 @@
 
 #include "data/serializable.h"
 
+#define MAX_JOB_MESSAGE_PAYLOAD_PER_NODE 1500
+
 struct MessageHandle {
     MPI_Request request;
     int tag;
@@ -40,9 +42,10 @@ const int MSG_CONFIRM_NODE_PERMUTATION = 13;
 const int MSG_ADJUST_NODE_PERMUTATION = 14;
 const int MSG_WORKER_FOUND_RESULT = 15;
 const int MSG_TERMINATE = 16;
-const int MSG_GATHER_CLAUSES = 17;
-const int MSG_DISTRIBUTE_CLAUSES = 18;
 const int MSG_REDUCE_RESOURCES_INFO = 19;
+const int MSG_JOB_COMMUNICATION = 400;
+const int MSG_GATHER_CLAUSES = 417;
+const int MSG_DISTRIBUTE_CLAUSES = 418;
 
 typedef std::shared_ptr<MessageHandle> MessageHandlePtr;
 

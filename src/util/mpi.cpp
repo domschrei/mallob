@@ -7,7 +7,6 @@
 #include "mpi.h"
 #include "random.h"
 #include "timer.h"
-#include "data/job_image.h"
 
 std::set<MessageHandlePtr> MyMpi::handles;
 std::set<MessageHandlePtr> MyMpi::sentHandles;
@@ -16,7 +15,7 @@ int MyMpi::maxMsgLength;
 void MyMpi::init(int argc, char *argv[])
 {
     MPI_Init(&argc, &argv);
-    maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * (BROADCAST_CLAUSE_INTS_PER_NODE + 1);
+    maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
 }
 
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, int object) {

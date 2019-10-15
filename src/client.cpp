@@ -23,7 +23,7 @@ void readAllInstances(Client* client) {
 
         Console::log(Console::VERB, "Reading \"" + c.jobInstances[jobId] + "\" (#" + std::to_string(jobId) + ") ...");
         c.readFormula(c.jobInstances[jobId], job);
-        if (job.getFormulaSize() > 1)
+        if (job.getPayloadSize() > 1)
             Console::log(Console::VERB, "Read \"" + c.jobInstances[jobId] + "\" (#" + std::to_string(jobId) + ").");
 
         std::unique_lock<std::mutex> lock(c.jobReadyLock);
@@ -65,7 +65,7 @@ void Client::mainProgram() {
                 break;
         }
 
-        if (job.getFormulaSize() == 1) {
+        if (job.getPayloadSize() == 1) {
             // Some I/O error kept the instance from being read
             Console::log(Console::WARN, "Skipping job #" + std::to_string(jobId) + " due to previous I/O error");
             continue;
@@ -77,7 +77,7 @@ void Client::mainProgram() {
         AdjustablePermutation p(n, jobId);
         int nodeRank = p.get(0);
 
-        const JobSignature sig(jobId, nodeRank, job.getFormulaSize(), job.getAssumptionsSize());
+        const JobSignature sig(jobId, nodeRank, job.getPayloadSize());
 
         Console::log_send(Console::INFO, "Introducing job #" + std::to_string(jobId), nodeRank);
         MyMpi::send(MPI_COMM_WORLD, nodeRank, MSG_INTRODUCE_JOB, sig); // TODO async?
@@ -144,7 +144,7 @@ void Client::readFormula(std::string& filename, JobDescription& job) {
                 pos = next+1;
             }
         }
-        job.setFormula(formula);
+        job.setPayload(formula);
         Console::log(Console::VERB, std::to_string(formula.size()) + " literals including separation zeros");
 
     } else {

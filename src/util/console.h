@@ -17,8 +17,9 @@ public:
 private:
     static int rank;
     static int verbosity;
+    static bool coloredOutput;
 public:
-    static void init(int rank, int verbosity);
+    static void init(int rank, int verbosity, bool coloredOutput);
     static void log(int verbosity, const char* str);
     static void log(int verbosity, std::string str);
     static void log_send(int verbosity, std::string str, int destRank);

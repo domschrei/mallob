@@ -12,9 +12,9 @@
 
 #include "util/mpi.h"
 #include "util/params.h"
+#include "data/job.h"
 #include "data/job_description.h"
 #include "data/job_transfer.h"
-#include "data/job_image.h"
 #include "data/epoch_counter.h"
 #include "balancing/balancer.h"
 
@@ -28,14 +28,12 @@ private:
 
     float loadFactor;
 
-    std::map<int, JobImage*> jobs;
+    std::map<int, Job*> jobs;
     std::map<int, JobRequest> jobCommitments;
     int load;
 
     std::unique_ptr<Balancer> balancer;
     EpochCounter epochCounter;
-    float lastRebalancing;
-    bool exchangedClausesThisRound;
 
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& clientNodes) :
@@ -61,16 +59,12 @@ private:
     void handleAckAcceptBecomeChild(MessageHandlePtr& handle);
     void handleSendJob(MessageHandlePtr& handle);
     void handleUpdateVolume(MessageHandlePtr& handle);
-    void handleGatherClauses(MessageHandlePtr& handle);
-    void handleDistributeClauses(MessageHandlePtr& handle);
+    void handleJobCommunication(MessageHandlePtr& handle);
     void handleTerminate(MessageHandlePtr& handle);
 
     void bounceJobRequest(JobRequest& request);
     void updateVolume(int jobId, int demand);
-    void beginClauseGathering(int jobId);
-    void collectAndGatherClauses(std::vector<int>& clausesFromAChild);
-    void learnAndDistributeClausesDownwards(std::vector<int>& clauses);
-
+    
     void rebalance();
     float reduce(float contribution, int rootRank) const;
     float allReduce(float contribution) const;
@@ -80,12 +74,11 @@ private:
     bool hasJobCommitments() const {return jobCommitments.size() > 0;};
     int getRandomWorkerNode();
     bool isTimeForRebalancing();
-    bool isTimeForClauseSharing();
 
-    bool hasJobImage(int id) const {
+    bool hasJob(int id) const {
         return jobs.count(id) > 0;
     }
-    JobImage& getJobImage(int id) const {
+    Job& getJob(int id) const {
         return *jobs.at(id);
     };
 

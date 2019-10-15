@@ -64,29 +64,26 @@ struct JobSignature : public Serializable {
 
     int jobId;
     int rootRank;
-    int formulaSize;
-    int assumptionsSize;
+    int payloadSize;
 
 public:
     JobSignature() = default;
 
-    JobSignature(int jobId, int rootRank, int formulaSize, int assumptionsSize) :
+    JobSignature(int jobId, int rootRank, int formulaSize) :
         jobId(jobId),
         rootRank(rootRank),
-        formulaSize(formulaSize),
-        assumptionsSize(assumptionsSize) {}
+        payloadSize(formulaSize) {}
 
     int getTransferSize() const {
-        // 3 meta data ints, formula size, separator, assumptions, closing zero
-        return 3 + formulaSize + 1 + assumptionsSize + 1;
+        // 3 meta data ints, payload size, closing zero
+        return 3 + payloadSize + 1;
     }
 
     std::vector<int> serialize() const override {
         std::vector<int> packed;
         packed.push_back(jobId);
         packed.push_back(rootRank);
-        packed.push_back(formulaSize);
-        packed.push_back(assumptionsSize);
+        packed.push_back(payloadSize);
         return packed;
     }
 
@@ -94,9 +91,35 @@ public:
         int i = 0;
         jobId = packed[i++];
         rootRank = packed[i++];
-        formulaSize = packed[i++];
-        assumptionsSize = packed[i++];
+        payloadSize = packed[i++];
     }
+};
+
+struct JobMessage : public Serializable {
+
+    int jobId;
+    int tag;
+    int epoch;
+    std::vector<int> payload;
+
+public:
+    std::vector<int> serialize() const override {
+        std::vector<int> packed;
+        packed.push_back(jobId);
+        packed.push_back(tag);
+        packed.push_back(epoch);
+        packed.insert(packed.end(), payload.begin(), payload.end());
+        return packed;
+    }
+
+    void deserialize(const std::vector<int>& packed) override {
+        int i = 0;
+        jobId = packed[i++];
+        tag = packed[i++];
+        epoch = packed[i++];
+        payload.insert(payload.end(), packed.begin()+i, packed.end());
+    }
+
 };
 
 #endif

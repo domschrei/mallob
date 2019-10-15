@@ -10,15 +10,7 @@ std::vector<int> JobDescription::serialize() const {
     packed.push_back((int) (1000 * priority));
 
     // Clauses
-    packed.insert(packed.begin() + 3, formula.begin(), formula.end());
-
-    // Separator (additional zero)
-    packed.push_back(0);
-
-    // Assumptions
-    for (unsigned int i = 0; i < assumptions.size(); i++) {
-        packed.push_back(assumptions[i]);
-    }
+    packed.insert(packed.begin() + 3, payload.begin(), payload.end());
 
     // Closing zero
     packed.push_back(0);
@@ -36,16 +28,10 @@ void JobDescription::deserialize(const std::vector<int>& packed) {
     // Clauses
     for (unsigned int pos = i; pos+1 < packed.size(); pos++) {
         if (packed[pos] == 0 && packed[pos+1] == 0) {
-            formula.insert(formula.begin(), packed.begin()+i, packed.begin()+(pos+1));
+            payload.insert(payload.begin(), packed.begin()+i, packed.begin()+(pos+1));
             i = pos+1;
             break;
         }
         if (packed[pos+1] != 0) pos++;
-    }
-    // Assumptions
-    for (unsigned int pos = i; pos < packed.size(); pos++) {
-        if (packed[pos] == 0)
-            break;
-        assumptions.push_back(packed[pos]);
     }
 }

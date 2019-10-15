@@ -6,16 +6,16 @@
 #include "util/random.h"
 #include "util/console.h"
 
-std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, JobImage*>& jobs) {
+std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
 
     // Identify jobs to balance
     std::set<int, PriorityComparator> localJobs = std::set<int, PriorityComparator>(PriorityComparator(jobs));
     for (auto it = jobs.begin(); it != jobs.end(); ++it) {
-        JobImage &img = *it->second;
-        if ((img.getState() == JobState::ACTIVE) && img.isRoot()) {
+        Job &job = *it->second;
+        if ((job.getState() == JobState::ACTIVE) && job.isRoot()) {
             //Console::log(Console::VVERB, "Participating with " + img.toStr() + ", ID " + std::to_string(img.getJob()->getId()));
-            JobDescription& job = img.getJob();
-            localJobs.insert(job.getId());
+            JobDescription& desc = job.getDescription();
+            localJobs.insert(desc.getId());
         }
     }
 
@@ -24,7 +24,7 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, JobImage*>& job
     for (auto it = localJobs.begin(); it != localJobs.end(); ++it) {
         int jobId = *it;
         int demand = getDemand(*jobs[jobId]);
-        aggregatedDemand += demand * jobs[jobId]->getJob().getPriority();
+        aggregatedDemand += demand * jobs[jobId]->getDescription().getPriority();
         Console::log(Console::VERB, "Job #" + std::to_string(jobId) + " : demand " + std::to_string(demand));
     }
     aggregatedDemand = allReduce(aggregatedDemand);
@@ -34,7 +34,7 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, JobImage*>& job
     std::map<int, float> assignments;
     for (auto it = localJobs.begin(); it != localJobs.end(); ++it) {
         int jobId = *it;
-        float initialMetRatio = totalVolume * jobs[jobId]->getJob().getPriority() / aggregatedDemand;
+        float initialMetRatio = totalVolume * jobs[jobId]->getDescription().getPriority() / aggregatedDemand;
         assignments[jobId] = std::min(1.0f, initialMetRatio) * getDemand(*jobs[jobId]);
         Console::log(Console::VERB, "Initial assignment for #" + std::to_string(jobId) + " : " + std::to_string(assignments[jobId]));
     }
@@ -46,7 +46,7 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, JobImage*>& job
     for (auto it = localJobs.begin(); it != localJobs.end(); ++it) {
         int jobId = *it;
         resourcesInfo.assignedResources += assignments[jobId];
-        resourcesInfo.priorities.push_back(jobs[jobId]->getJob().getPriority());
+        resourcesInfo.priorities.push_back(jobs[jobId]->getDescription().getPriority());
         resourcesInfo.demandedResources.push_back( getDemand(*jobs[jobId]) - assignments[jobId] );
     }
     // Reduce information
@@ -91,7 +91,7 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, JobImage*>& job
     for (auto it = localJobs.begin(); it != localJobs.end(); ++it) {
         int jobId = *it;
         float demand = getDemand(*jobs[jobId]);
-        float priority = 0.001f * ((int) (1000 * jobs[jobId]->getJob().getPriority()));
+        float priority = 0.001f * ((int) (1000 * jobs[jobId]->getDescription().getPriority()));
         std::vector<float>& priorities = resourcesInfo.priorities;
         std::vector<float>& demandedResources = resourcesInfo.demandedResources;
         std::vector<float>::iterator itPrio = std::find(priorities.begin(), priorities.end(), priority);
@@ -130,7 +130,7 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, JobImage*>& job
         updateVolume(it->first, it->second);
     }
 
-    MPI_Barrier(comm);
+    //MPI_Barrier(comm);
 
     return volumes;
 }

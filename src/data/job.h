@@ -1,20 +1,17 @@
 
-#ifndef DOMPASCH_JOB_IMAGE_H
-#define DOMPASCH_JOB_IMAGE_H
+#ifndef DOMPASCH_BALANCER_JOB_BASE_H
+#define DOMPASCH_BALANCER_JOB_BASE_H
 
 #include <string>
 #include <memory>
 #include <thread>
-
-#include "HordeLib.h"
+#include <initializer_list>
 
 #include "util/params.h"
 #include "util/permutation.h"
 #include "data/job_description.h"
 #include "data/job_transfer.h"
 #include "data/epoch_counter.h"
-
-#define BROADCAST_CLAUSE_INTS_PER_NODE 1500
 
 /**
  * Internal state of the job's image on this node.
@@ -51,13 +48,9 @@ enum JobState {
 };
 static const char * jobStateStrings[] = { "none", "stored", "committed", "initializing", "active", "suspended", "past" };
 
-const int RESULT_UNKNOWN = 0;
-const int RESULT_SAT = 10;
-const int RESULT_UNSAT = 20;
+class Job {
 
-class JobImage {
-
-private:
+protected:
     Parameters& params;
     int commSize;
     int worldRank;
@@ -65,70 +58,59 @@ private:
     int jobId;
     int index;
     JobDescription job;
+
+    float elapsedSecondsOfArrival;
     EpochCounter& epochCounter;
     int epochOfArrival;
-    float elapsedSecondsOfArrival;
+    int epochOfLastCommunication = -1; 
 
     JobState state = JobState::NONE;
     bool hasDescription;
     bool initialized;
     std::unique_ptr<std::thread> initializerThread;
-    bool cancelInit;
-
+    bool doneLocally = false;
+    
     AdjustablePermutation jobNodeRanks;
     bool leftChild = false;
     bool rightChild = false;
 
-    std::unique_ptr<HordeLib> solver;
-    bool doneLocally = false;
-
-    std::vector<int> clausesToShare;
-    int sharedClauseSources = 0;
-
 public:
 
-    JobImage(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
+    Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
     void store(JobDescription& job);
     void commit(const JobRequest& req);
     void uncommit(const JobRequest& req);
     void initialize(int index, int rootRank, int parentRank);
-    void initialize();
     void reinitialize(int index, int rootRank, int parentRank);
-    void doSolverInitialization();
-
-    /**
-     * Get clauses to share from the solvers, in order to propagate it to the parents.
-     */
-    std::vector<int> collectClausesFromSolvers();
-    /**
-     * Store clauses from a child node in order to propagate it upwards later.
-     */
-    void collectClausesFromBelow(std::vector<int>& clauses);
-    /**
-     * Returns all clauses that have been added by addClausesFromBelow(·),
-     * plus the clauses from an additional call to collectClausesToShare(·).
-     */
-    std::vector<int> shareCollectedClauses();
-
-    bool canShareCollectedClauses();
-
-    /**
-     * Give a collection of learned clauses that came from a parent node
-     * to the solvers.
-     */
-    void learnClausesFromAbove(std::vector<int>& clauses);
-
     void suspend();
     void resume();
     void withdraw();
-    int solveLoop();
+
+    // Control methods (must be implemented)
+    virtual void beginSolving() = 0;
+    virtual int solveLoop() = 0;
+    virtual void pause() = 0;
+    virtual void unpause() = 0;
+    virtual void terminate() = 0;
+    // may be re-implemented IF CALLING BASE METHOD
+    virtual void initialize();
+    
+    // Intra-job communication methods (must be implemented)
+    virtual void beginCommunication() = 0;
+    virtual void communicate(int source, JobMessage& msg) = 0;
+    
+    // Querying and communication methods (may be re-implemented partially)
+    virtual int getDemand() const;
+    virtual bool wantsToCommunicate() const;
+    void communicate();
 
     JobState getState() const {return state;};
+    bool isInState(std::initializer_list<JobState> list) const;
+    bool isNotInState(std::initializer_list<JobState> list) const;
     const JobDescription& getJob() const {return job;};
-    JobDescription& getJob() {return job;};
+    JobDescription& getDescription() {return job;};
     int getIndex() const {return index;};
     bool isInitialized() const {return initialized;};
-    int getDemand() const;
 
     bool isRoot() const {return index == 0;};
     int getRootNodeRank() const {return jobNodeRanks[0];};
@@ -153,13 +135,6 @@ public:
     void updateJobNode(int index, int newRank) {
         jobNodeRanks.adjust(index, newRank);
     }
-
-private:
-    void insertIntoClauseBuffer(std::vector<int>& vec);
 };
-
-
-
-
 
 #endif

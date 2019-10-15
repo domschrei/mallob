@@ -10,11 +10,11 @@
 
 class PriorityComparator {
 private:
-    std::map<int, JobImage*>& jobs;
+    std::map<int, Job*>& jobs;
 public:
-    PriorityComparator(std::map<int, JobImage*>& jobs) : jobs(jobs) {}
+    PriorityComparator(std::map<int, Job*>& jobs) : jobs(jobs) {}
     bool operator() (const int& lhs, const int& rhs) const {
-        return jobs[lhs]->getJob().getPriority() > jobs[rhs]->getJob().getPriority();
+        return jobs[lhs]->getDescription().getPriority() > jobs[rhs]->getDescription().getPriority();
     }
 };
 
@@ -78,7 +78,7 @@ public:
     CutoffPriorityBalancer(MPI_Comm& comm, Parameters params) : Balancer(comm, params) {
         
     }
-    std::map<int, int> balance(std::map<int, JobImage*>& jobs) override;
+    std::map<int, int> balance(std::map<int, Job*>& jobs) override;
 
 };
 

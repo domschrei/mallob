@@ -19,8 +19,7 @@ private:
     float priority;
 
     // Payload (logic to solve)
-    std::vector<int> formula; // if non-incremental / first job in stream
-    std::vector<int> assumptions; // optional
+    std::vector<int> payload; 
 
 public:
 
@@ -30,16 +29,13 @@ public:
     int getId() const {return id;};
     int getRootRank() const {return rootRank;};
     float getPriority() const {return priority;};
-    int getFormulaSize() const {
-        return formula.size() + 1;
+    int getPayloadSize() const {
+        return payload.size() + 1;
     };
-    const std::vector<int>& getFormula() const {return formula;};
-    int getAssumptionsSize() const {
-        return assumptions.size();
-    }
+    const std::vector<int>& getPayload() const {return payload;};
 
     void setRootRank(int rootRank) {this->rootRank = rootRank;}
-    void setFormula(const std::vector<int>& formula) {this->formula = formula;};
+    void setPayload(const std::vector<int>& payload) {this->payload = payload;};
 
     void deserialize(const std::vector<int>& packed) override;
     std::vector<int> serialize() const override;
