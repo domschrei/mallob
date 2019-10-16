@@ -28,5 +28,10 @@ fi
 mkdir -p logs
 
 # Execute program
-echo 'mpirun -np "'$NP'" '$cmd' ./mallob '$@' | tee logs/log.'`date +%s`
-mpirun -np "$NP" $cmd ./mallob $@ | tee logs/log.`date +%s`
+logfile="logs/log.`date +%s`"
+executable="build/mallob"
+echo 'mpirun -np "'$NP'" '$cmd' '$executable' '$@' | tee '$logfile
+mpirun -np "$NP" $cmd $executable $@ | tee logs/log.`date +%s`
+
+esc=$(printf '\033')
+sed -i 's/'$esc'[[0-9]\+m//g' $logfile
