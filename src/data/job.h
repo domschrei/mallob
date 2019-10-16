@@ -70,9 +70,13 @@ protected:
     std::unique_ptr<std::thread> initializerThread;
     bool doneLocally = false;
     
+    int resultCode;
+    JobResult result;
+    
     AdjustablePermutation jobNodeRanks;
     bool leftChild = false;
     bool rightChild = false;
+    int clientRank;
 
 public:
 
@@ -104,6 +108,7 @@ public:
     virtual bool wantsToCommunicate() const;
     void communicate();
 
+
     JobState getState() const {return state;};
     bool isInState(std::initializer_list<JobState> list) const;
     bool isNotInState(std::initializer_list<JobState> list) const;
@@ -114,7 +119,7 @@ public:
 
     bool isRoot() const {return index == 0;};
     int getRootNodeRank() const {return jobNodeRanks[0];};
-    int getParentNodeRank() const {return jobNodeRanks[getParentIndex()];};
+    int getParentNodeRank() const {return isRoot() ? clientRank : jobNodeRanks[getParentIndex()];};
     int getLeftChildNodeRank() const {return jobNodeRanks[getLeftChildIndex()];};
     int getRightChildNodeRank() const {return jobNodeRanks[getRightChildIndex()];};
 
@@ -128,12 +133,22 @@ public:
     int getLeftChildIndex() const {return 2*(index+1)-1;};
     int getRightChildIndex() const {return 2*(index+1);};
     int getParentIndex() const {return (index-1)/2;};
+    const JobResult& getResult() {return result;};
 
     std::string toStr() const {return "#" + std::to_string(jobId) + ":" + std::to_string(index);};
     std::string jobStateToStr() const {return std::string(jobStateStrings[(int)state]);};
 
     void updateJobNode(int index, int newRank) {
         jobNodeRanks.adjust(index, newRank);
+    }
+    void updateParentNodeRank(int newRank) {
+        if (isRoot()) {
+            // Root worker node!
+            clientRank = newRank;
+        } else {
+            // Inner node / leaf worker
+            updateJobNode(getParentIndex(), newRank);
+        }
     }
 };
 

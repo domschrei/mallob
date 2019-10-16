@@ -35,6 +35,9 @@ public:
     void mainProgram();
 
 private:
+    void handleJobDone(MessageHandlePtr handle);
+    void handleSendJobResult(MessageHandlePtr handle);
+
     void readInstanceList(std::string& filename);
     void readFormula(std::string& filename, JobDescription& job);
     friend void readAllInstances(Client* client);

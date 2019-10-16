@@ -29,7 +29,7 @@ void Job::initialize() {
 void Job::initialize(int index, int rootRank, int parentRank) {
     this->index = index;
     updateJobNode(0, rootRank);
-    updateJobNode(index/2, parentRank);
+    updateParentNodeRank(parentRank);
     updateJobNode(index, worldRank);
     initialize();
 }
@@ -45,7 +45,7 @@ void Job::reinitialize(int index, int rootRank, int parentRank) {
         if (index == this->index) {
 
             // Resume the exact same work that you already did
-            updateJobNode(index/2, parentRank);
+            updateParentNodeRank(parentRank);
 
             Console::log(Console::INFO, "Resuming solvers of " + toStr());
             resume();
@@ -56,7 +56,7 @@ void Job::reinitialize(int index, int rootRank, int parentRank) {
             // Restart clean permutation
             jobNodeRanks.clear();
             updateJobNode(0, rootRank);
-            updateJobNode(index/2, parentRank);
+            updateParentNodeRank(parentRank);
             updateJobNode(index, worldRank);
 
             Console::log(Console::INFO, "Restarting solvers of " + toStr());
@@ -74,7 +74,7 @@ void Job::commit(const JobRequest& req) {
     state = COMMITTED;
     index = req.requestedNodeIndex;
     updateJobNode(0, req.rootRank);
-    updateJobNode((index-1)/2, req.requestingNodeRank);
+    updateParentNodeRank(req.requestingNodeRank);
     updateJobNode(index, worldRank);
 }
 

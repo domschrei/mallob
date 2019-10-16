@@ -45,6 +45,8 @@ public:
     void communicate(int source, JobMessage& msg) override;
 
 private:
+    void extractResult();
+
     bool canShareCollectedClauses();
     void learnAndDistributeClausesDownwards(std::vector<int>& clauses);
     /**

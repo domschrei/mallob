@@ -61,8 +61,12 @@ private:
     void handleUpdateVolume(MessageHandlePtr& handle);
     void handleJobCommunication(MessageHandlePtr& handle);
     void handleTerminate(MessageHandlePtr& handle);
+    void handleWorkerFoundResult(MessageHandlePtr& handle);
+    void handleQueryJobResult(MessageHandlePtr& handle);
+    void handleForwardClientRank(MessageHandlePtr& handle);
 
     void bounceJobRequest(JobRequest& request);
+    void informClient(int jobId, int clientRank);
     void updateVolume(int jobId, int demand);
     
     void rebalance();

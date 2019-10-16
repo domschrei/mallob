@@ -41,4 +41,21 @@ public:
     std::vector<int> serialize() const override;
 };
 
+struct JobResult : public Serializable {
+
+    int id;
+    int result;
+    std::vector<int> solution;
+
+public:
+    JobResult() : id(-1), result(0), solution(std::vector<int>()) {}
+    JobResult(int id, int result, std::vector<int> solution) : id(id), result(result), solution(solution) {}
+
+    int getTransferSize() const {return 2 + solution.size();};
+
+    void deserialize(const std::vector<int>& packed) override;
+    std::vector<int> serialize() const override;
+
+};
+
 #endif /* end of include guard: DOMPASCH_CUCKOO_REBALANCER_JOB */

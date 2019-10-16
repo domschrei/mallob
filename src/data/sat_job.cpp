@@ -46,6 +46,18 @@ void SatJob::terminate() {
     solver->finishSolving(); // joins threads and concludes solving process
 }
 
+void SatJob::extractResult() {
+    result.id = getDescription().getId();
+    result.result = resultCode;
+    result.solution.clear();
+    if (resultCode == SAT) {
+        result.solution = solver->getTruthValues();
+    } else if (resultCode == UNSAT) {
+        std::set<int>& assumptions = solver->getFailedAssumptions();
+        std::copy(assumptions.begin(), assumptions.end(), std::back_inserter(result.solution));
+    }
+}
+
 void SatJob::beginCommunication() {
 
     JobMessage msg;
@@ -198,9 +210,11 @@ int SatJob::solveLoop() {
     }
     if (result >= 0) {
         doneLocally = true;
+        this->resultCode = result;
         Console::log_send(Console::INFO, "Found result " 
                         + std::string(result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN") 
                         + " on " + toStr(), getRootNodeRank());
+        extractResult();
     }
     return result;
 }

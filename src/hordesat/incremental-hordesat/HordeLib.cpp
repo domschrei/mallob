@@ -334,7 +334,7 @@ void HordeLib::beginSolving(bool readFormulaFromHlib) {
         //log(1, "initialized solver %i.\n", i);
 	}
 	startSolving = getTime() - startSolving;
-	log(1, "Node %d started its solvers, initialization took %.3f seconds.\n", mpi_rank, startSolving);
+	log(1, "Node %d started its solvers, initialization took %.3f seconds\n", mpi_rank, startSolving);
 }
 
 bool HordeLib::isFullyInitialized() {

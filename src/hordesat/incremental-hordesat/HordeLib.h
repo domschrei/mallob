@@ -107,6 +107,13 @@ public:
 
 	int value(int lit);
 	int failed(int lit);
+	std::vector<int>& getTruthValues() {
+		return truthValues;
+	}
+	std::set<int>& getFailedAssumptions() {
+		return failedAssumptions;
+	}
+	
 	ParameterProcessor& getParams() {
 		return params;
 	}

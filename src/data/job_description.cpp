@@ -35,3 +35,18 @@ void JobDescription::deserialize(const std::vector<int>& packed) {
         if (packed[pos+1] != 0) pos++;
     }
 }
+
+std::vector<int> JobResult::serialize() const {
+    std::vector<int> packed;
+    packed.push_back(id);
+    packed.push_back(result);
+    packed.insert(packed.begin()+2, solution.begin(), solution.end());
+    return packed;
+}
+
+void JobResult::deserialize(const std::vector<int>& packed) {
+    int i = 0;
+    id = packed[i++];
+    result = packed[i++];
+    solution.insert(solution.begin(), packed.begin()+i, packed.end());
+}

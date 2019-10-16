@@ -4,6 +4,7 @@
 #include <string>
 #include <chrono>
 #include <thread>
+#include <unistd.h>
 
 #include "client.h"
 #include "util/timer.h"
@@ -40,6 +41,9 @@ void Client::init() {
     Console::log(Console::INFO, "Started client main thread to introduce instances.");
 
     instanceReaderThread = std::thread(readAllInstances, this);
+
+    // Begin listening to incoming messages
+    MyMpi::irecv(MPI_COMM_WORLD);
 }
 
 Client::~Client() {
@@ -48,41 +52,86 @@ Client::~Client() {
 
 void Client::mainProgram() {
 
-    //std::chrono::high_resolution_clock::time_point now = std::chrono::high_resolution_clock::now();
-    for (auto it = jobsByArrival.begin(); it != jobsByArrival.end(); ++it) {
-        float arrival = it->first;
-        int timeMillis = (int) (1000 * (arrival - Timer::elapsedSeconds()));
-        std::this_thread::sleep_for(std::chrono::milliseconds(timeMillis));
+    auto it = jobsByArrival.begin();
+    while (true) {
 
-        JobDescription& job = it->second;
-        int jobId = job.getId();
+        // Introduce next job, if applicable
+        if (it != jobsByArrival.end() && it->first <= Timer::elapsedSeconds()) {
+        
+            // Introduce job
+            JobDescription& job = it->second;
+            int jobId = job.getId();
 
-        // Wait until job is ready to be sent
-        while (true) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            std::unique_lock<std::mutex> lock(jobReadyLock);
-            if (jobReady[jobId])
-                break;
+            // Wait until job is ready to be sent
+            while (true) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                std::unique_lock<std::mutex> lock(jobReadyLock);
+                if (jobReady[jobId])
+                    break;
+            }
+            it++;
+
+            if (job.getPayloadSize() == 1) {
+                // Some I/O error kept the instance from being read
+                Console::log(Console::WARN, "Skipping job #" + std::to_string(jobId) + " due to previous I/O error");
+                continue;
+            }
+
+            // Find the job's canonical initial node
+            int n = MyMpi::size(MPI_COMM_WORLD) - MyMpi::size(comm);
+            Console::log(Console::VERB, "Creating permutation of size " + std::to_string(n) + " ...");
+            AdjustablePermutation p(n, jobId);
+            int nodeRank = p.get(0);
+
+            const JobSignature sig(jobId, nodeRank, job.getPayloadSize());
+
+            Console::log_send(Console::INFO, "Introducing job #" + std::to_string(jobId), nodeRank);
+            MyMpi::send(MPI_COMM_WORLD, nodeRank, MSG_INTRODUCE_JOB, sig); // TODO async?
+            MyMpi::isend(MPI_COMM_WORLD, nodeRank, MSG_SEND_JOB, job);
         }
 
-        if (job.getPayloadSize() == 1) {
-            // Some I/O error kept the instance from being read
-            Console::log(Console::WARN, "Skipping job #" + std::to_string(jobId) + " due to previous I/O error");
-            continue;
+        // Poll messages, if present
+        MessageHandlePtr handle;
+        if ((handle = MyMpi::poll()) != NULL) {
+            // Process message
+            Console::log_recv(Console::VVERB, "Processing message of tag " + std::to_string(handle->tag), handle->source);
+
+            if (handle->tag == MSG_JOB_DONE) {
+                handleJobDone(handle);
+            } else if (handle->tag == MSG_SEND_JOB_RESULT) {
+                handleSendJobResult(handle);
+            } else {
+                Console::log_recv(Console::WARN, "Unknown message tag " + std::to_string(handle->tag) + "!", handle->source);
+            }
         }
 
-        // Find the job's canonical initial node
-        int n = MyMpi::size(MPI_COMM_WORLD) - MyMpi::size(comm);
-        Console::log(Console::VERB, "Creating permutation of size " + std::to_string(n) + " ...");
-        AdjustablePermutation p(n, jobId);
-        int nodeRank = p.get(0);
+        // Listen to another message, if no listener is active
+        if (!MyMpi::hasActiveHandles())
+            MyMpi::irecv(MPI_COMM_WORLD);
 
-        const JobSignature sig(jobId, nodeRank, job.getPayloadSize());
-
-        Console::log_send(Console::INFO, "Introducing job #" + std::to_string(jobId), nodeRank);
-        MyMpi::send(MPI_COMM_WORLD, nodeRank, MSG_INTRODUCE_JOB, sig); // TODO async?
-        MyMpi::send(MPI_COMM_WORLD, nodeRank, MSG_SEND_JOB, job);
+        // Sleep for a bit
+        usleep(1000); // 1000 = 1 millisecond
     }
+}
+
+void Client::handleJobDone(MessageHandlePtr handle) {
+
+    int jobId = handle->recvData[0];
+    int resultSize = handle->recvData[1];
+    Console::log_recv(Console::VERB, "Preparing to receive job result of length " + std::to_string(resultSize) 
+            + " for job #" + std::to_string(jobId), handle->source);
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_QUERY_JOB_RESULT, handle->recvData);
+    MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_RESULT, resultSize);
+}
+
+void Client::handleSendJobResult(MessageHandlePtr handle) {
+
+    JobResult jobResult; jobResult.deserialize(handle->recvData);
+    int jobId = jobResult.id;
+    int resultCode = jobResult.result;
+
+    Console::log_recv(Console::INFO, "Received result of job #" + std::to_string(jobId) 
+                + ", code: " + std::to_string(resultCode), handle->source);
 }
 
 void Client::readInstanceList(std::string& filename) {

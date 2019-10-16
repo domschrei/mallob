@@ -75,6 +75,7 @@ void Worker::mainProgram() {
                 int jobRootRank = job.getRootNodeRank();
                 std::vector<int> payload;
                 payload.push_back(jobId); payload.push_back(result);
+                Console::log_send(Console::VERB, "Sending finished info", jobRootRank);
                 MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_WORKER_FOUND_RESULT, payload);
             }
         }
@@ -115,8 +116,16 @@ void Worker::mainProgram() {
             else if (handle->tag == MSG_JOB_COMMUNICATION)
                 handleJobCommunication(handle);
 
-            else if (handle->tag == MSG_WORKER_FOUND_RESULT
-                     || handle->tag == MSG_TERMINATE)
+            else if (handle->tag == MSG_WORKER_FOUND_RESULT)
+                handleWorkerFoundResult(handle);
+
+            else if (handle->tag == MSG_FORWARD_CLIENT_RANK)
+                handleForwardClientRank(handle);
+            
+            else if (handle->tag == MSG_QUERY_JOB_RESULT)
+                handleQueryJobResult(handle);
+
+            else if (handle->tag == MSG_TERMINATE)
                 handleTerminate(handle);
             
             else {
@@ -188,7 +197,7 @@ void Worker::handleIntroduceJob(MessageHandlePtr& handle) {
     } else {
         // Trigger a node finding procedure
         Console::log_recv(Console::INFO, "Job #" + std::to_string(desc.getId()) + " introduced. Bouncing ...", handle->source);
-        JobRequest request(desc.getId(), worldRank, worldRank, 0, epochCounter.getEpoch(), -1);
+        JobRequest request(desc.getId(), worldRank, handle->source, 0, epochCounter.getEpoch(), -1);
         bounceJobRequest(request);
     }
 }
@@ -224,7 +233,8 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
         req.fullTransfer = fullTransfer ? 1 : 0;
         jobs[req.jobId]->commit(req);
         jobCommitments[req.jobId] = req;
-        MyMpi::isend(MPI_COMM_WORLD, req.requestingNodeRank, MSG_REQUEST_BECOME_CHILD, jobCommitments[req.jobId]);
+        MyMpi::isend(MPI_COMM_WORLD, (req.requestedNodeIndex == 0 ? req.rootRank : req.requestingNodeRank), 
+            MSG_REQUEST_BECOME_CHILD, jobCommitments[req.jobId]);
 
     } else {
         // Continue job finding procedure
@@ -390,6 +400,60 @@ void Worker::handleJobCommunication(MessageHandlePtr& handle) {
     }
     Job& job = getJob(jobId);
     job.communicate(handle->source, msg);
+}
+
+void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
+
+    int jobId = handle->recvData[0];
+    assert(hasJob(jobId) && getJob(jobId).isRoot());
+    std::vector<int> payload;
+    payload.push_back(jobId);
+    payload.push_back(getJob(jobId).getParentNodeRank());
+    Console::log_recv(Console::VERB, "Result has been found for job #" + std::to_string(jobId), handle->source);
+
+    if (getJob(jobId).isRoot()) {
+        // Directly send termination message to client
+        informClient(payload[0], payload[1]);
+    } else {
+        // Send rank of client node to the worker which finished,
+        // such that the worker can directly inform the client
+        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_FORWARD_CLIENT_RANK, payload);
+        Console::log_send(Console::VERB, "Sending client rank (" 
+                + std::to_string(payload[1]) + ")", handle->source);
+    }
+
+    handleTerminate(handle);
+}
+
+void Worker::handleForwardClientRank(MessageHandlePtr& handle) {
+
+    // Receive rank of the job's client
+    int jobId = handle->recvData[0];
+    int clientRank = handle->recvData[1];
+    assert(hasJob(jobId));
+    informClient(jobId, clientRank);    
+}
+
+void Worker::informClient(int jobId, int clientRank) {
+    const JobResult& result = getJob(jobId).getResult();
+
+    // Send "Job done!" with advertised result size to client
+    Console::log_send(Console::VERB, "Sending JOB_DONE to client", clientRank);
+    std::vector<int> payload;
+    payload.push_back(jobId);
+    payload.push_back(result.getTransferSize());
+    MyMpi::isend(MPI_COMM_WORLD, clientRank, MSG_JOB_DONE, payload);
+}
+
+void Worker::handleQueryJobResult(MessageHandlePtr& handle) {
+
+    // Receive acknowledgement that the client received the advertised result size
+    // and wishes to receive the full job result
+    int jobId = handle->recvData[0];
+    assert(hasJob(jobId));
+    const JobResult& result = getJob(jobId).getResult();
+    Console::log_send(Console::VERB, "Sending full job result to client", handle->source);
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_RESULT, result);
 }
 
 void Worker::handleTerminate(MessageHandlePtr& handle) {
