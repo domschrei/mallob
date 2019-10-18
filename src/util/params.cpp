@@ -35,6 +35,7 @@ void Parameters::setDefaults() {
     setParam("v", "2"); // verbosity 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...
     setParam("vhorde", "0"); // hordesat verbosity
     setParam("td", "0.01"); // temperature decay for thermodyn. balancing
+    setParam("log", "."); // logging directory
     //setParam("colors"); // colored terminal output
     //setParam("h"); setParam("help"); // print usage
 }
@@ -50,6 +51,7 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "-colors               Colored terminal output based on messages' verbosity");
     Console::log(Console::INFO, "-h|-help              Print usage");
     Console::log(Console::INFO, "-l=<load-factor>      Load factor to be aimed at (0 < l < 1)");
+    Console::log(Console::INFO, "-log=<log-dir>        Directory to save logs in (default: .)");
     Console::log(Console::INFO, "-p=<rebalance-period> Do global rebalancing every r seconds (r > 0)");
     Console::log(Console::INFO, "-t=<num-threads>      Amount of worker threads per node (int t >= 1)");
     Console::log(Console::INFO, "-v=<verb-num>         Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...");
@@ -70,7 +72,7 @@ void Parameters::printParams() {
         }
     }
     out = out.substr(0, out.size()-2);
-    Console::log(Console::INFO, "Called with parameters: " + out);
+    Console::log(Console::INFO, "Called with parameters: %s", out.c_str());
 }
 
 void Parameters::setParam(const char* name) {

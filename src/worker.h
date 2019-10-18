@@ -16,6 +16,7 @@
 #include "data/job_description.h"
 #include "data/job_transfer.h"
 #include "data/epoch_counter.h"
+#include "data/statistics.h"
 #include "balancing/balancer.h"
 
 class Worker {
@@ -31,21 +32,25 @@ private:
     std::map<int, Job*> jobs;
     std::map<int, JobRequest> jobCommitments;
     int load;
+    float lastLoadChange;
 
     std::unique_ptr<Balancer> balancer;
     EpochCounter epochCounter;
+    Statistics stats;
 
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& clientNodes) :
-        comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), epochCounter()
+        comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), epochCounter(), stats(epochCounter)
         {
             loadFactor = params.getFloatParam("l");
             assert(0 < loadFactor && loadFactor < 1.0);
             load = 0;
+            lastLoadChange = Timer::elapsedSeconds();
         }
 
     void init();
     void mainProgram();
+    void dumpStats() {stats.dump();};
 
 private:
 
@@ -70,10 +75,11 @@ private:
     void updateVolume(int jobId, int demand);
     
     void rebalance();
-    float reduce(float contribution, int rootRank) const;
-    float allReduce(float contribution) const;
+    float reduce(float contribution, int rootRank);
+    float allReduce(float contribution);
 
     int getLoad() const {return load;};
+    void setLoad(int load);
     bool isIdle() const {return load == 0;};
     bool hasJobCommitments() const {return jobCommitments.size() > 0;};
     int getRandomWorkerNode();
@@ -86,7 +92,7 @@ private:
         return *jobs.at(id);
     };
 
-    std::string jobStr(int j, int idx) const {return "#" + std::to_string(j) + ":" + std::to_string(idx);};
+    const char* jobStr(int j, int idx) const {return ("#" + std::to_string(j) + ":" + std::to_string(idx)).c_str();};
 };
 
 #endif

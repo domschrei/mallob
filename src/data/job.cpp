@@ -16,14 +16,15 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
 void Job::store(JobDescription& job) {
     this->job = job;
     if (state == NONE) {
-        state = STORED;
+        this->index = -1;
+        switchState(STORED);
     }
     hasDescription = true;
 }
 
 void Job::initialize() {
     initialized = true;
-    state = ACTIVE;
+    switchState(ACTIVE);
 }
 
 void Job::initialize(int index, int rootRank, int parentRank) {
@@ -47,7 +48,7 @@ void Job::reinitialize(int index, int rootRank, int parentRank) {
             // Resume the exact same work that you already did
             updateParentNodeRank(parentRank);
 
-            Console::log(Console::INFO, "Resuming solvers of " + toStr());
+            Console::log(Console::INFO, "Resuming solvers of %s", toStr());
             resume();
 
         } else {
@@ -59,10 +60,10 @@ void Job::reinitialize(int index, int rootRank, int parentRank) {
             updateParentNodeRank(parentRank);
             updateJobNode(index, worldRank);
 
-            Console::log(Console::INFO, "Restarting solvers of " + toStr());
+            Console::log(Console::INFO, "Restarting solvers of %s", toStr());
             beginSolving();
 
-            state = ACTIVE;
+            switchState(ACTIVE);
         }
     }
 }
@@ -71,11 +72,13 @@ void Job::commit(const JobRequest& req) {
 
     assert(state != ACTIVE && state != COMMITTED);
 
-    state = COMMITTED;
     index = req.requestedNodeIndex;
-    updateJobNode(0, req.rootRank);
-    updateParentNodeRank(req.requestingNodeRank);
     updateJobNode(index, worldRank);
+    if (index > 0) {
+        updateJobNode(0, req.rootRank);
+    }
+    updateParentNodeRank(req.requestingNodeRank);
+    switchState(COMMITTED);
 }
 
 void Job::uncommit(const JobRequest& req) {
@@ -83,11 +86,11 @@ void Job::uncommit(const JobRequest& req) {
     assert(state == COMMITTED);
 
     if (initialized) {
-        state = SUSPENDED;
+        switchState(SUSPENDED);
     } else if (hasDescription) {
-        state = STORED;
+        switchState(STORED);
     } else {
-        state = NONE;
+        switchState(NONE);
     }
     jobNodeRanks.clear();
 }
@@ -103,9 +106,9 @@ void Job::setRightChild(int rank) {
 
 void Job::suspend() {
     assert(state == ACTIVE);
-    state = SUSPENDED;
     pause();
-    Console::log(Console::INFO, "Suspended solving threads of " + toStr());
+    switchState(SUSPENDED);
+    Console::log(Console::INFO, "Suspended solving threads of %s", toStr());
 }
 
 void Job::resume() {
@@ -114,8 +117,8 @@ void Job::resume() {
         initialize(index, getRootNodeRank(), getParentNodeRank());
     } else {
         unpause();
-        Console::log(Console::INFO, "Resumed solving threads of " + toStr());
-        state = ACTIVE;
+        switchState(ACTIVE);
+        Console::log(Console::INFO, "Resumed solving threads of %s", toStr());
     }
 }
 
@@ -125,14 +128,19 @@ void Job::withdraw() {
 
     terminate();
 
-    state = PAST;
     leftChild = false;
     rightChild = false;
     doneLocally = false;
+    switchState(PAST);
 }
 
 int Job::getDemand() const {   
     return std::min(commSize, (int) std::pow(2, epochCounter.getEpoch() - epochOfArrival + 1) - 1);
+}
+
+const JobResult& Job::getResult() const {
+    assert(result.id >= 0); 
+    return result;
 }
 
 bool Job::wantsToCommunicate() const {
@@ -159,4 +167,9 @@ bool Job::isNotInState(std::initializer_list<JobState> list) const {
             return false;
     }
     return true;
+}
+
+void Job::switchState(JobState state) {
+    this->state = state;
+    Console::log(Console::VERB, "%s : state \"%s\"", toStr(), jobStateStrings[state]); 
 }

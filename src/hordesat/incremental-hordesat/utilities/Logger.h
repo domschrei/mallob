@@ -9,14 +9,13 @@
 #define LOGGER_H_
 
 #include <string>
+#include <memory>
+
+#include "default_logging_interface.h"
 
 double getTime();
-double getAbsoluteTimeLP();
-void setStartTime();
-void setIdentifierString(std::string str);
-void setVerbosityLevel(int level);
-void log(int verbosityLevel, const char* fmt ...);
-void exitError(const char* fmt ...);
-
+void setLoggingInterface(std::shared_ptr<LoggingInterface> interface);
+void log(int verbosityLevel, const char* fmt, ...);
+void exitError(const char* fmt, ...);
 
 #endif /* LOGGER_H_ */

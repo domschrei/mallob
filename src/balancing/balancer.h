@@ -5,14 +5,15 @@
 #include <map>
 
 #include "data/job.h"
+#include "data/statistics.h"
 #include "util/mpi.h"
 #include "util/params.h"
 
 class Balancer {
 
 public:
-    Balancer(MPI_Comm& comm, Parameters params) : 
-    comm(comm), params(params), loadFactor(params.getFloatParam("l")) {}
+    Balancer(MPI_Comm& comm, Parameters& params, Statistics& stats) : 
+    comm(comm), params(params), stats(stats), loadFactor(params.getFloatParam("l")) {}
     
     virtual std::map<int, int> balance(std::map<int, Job*>& jobs) = 0;
     int getVolume(int jobId);
@@ -26,6 +27,7 @@ protected:
 protected:
     MPI_Comm& comm;
     Parameters& params;
+    Statistics& stats;
     float loadFactor;
 
     std::map<int, int> volumes;

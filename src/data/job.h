@@ -46,7 +46,7 @@ enum JobState {
      */
     PAST
 };
-static const char * jobStateStrings[] = { "none", "stored", "committed", "initializing", "active", "suspended", "past" };
+static const char * jobStateStrings[] = { "none", "stored", "committed", "active", "suspended", "past" };
 
 class Job {
 
@@ -133,10 +133,10 @@ public:
     int getLeftChildIndex() const {return 2*(index+1)-1;};
     int getRightChildIndex() const {return 2*(index+1);};
     int getParentIndex() const {return (index-1)/2;};
-    const JobResult& getResult() {return result;};
+    const JobResult& getResult() const;
 
-    std::string toStr() const {return "#" + std::to_string(jobId) + ":" + std::to_string(index);};
-    std::string jobStateToStr() const {return std::string(jobStateStrings[(int)state]);};
+    const char* toStr() const {return ("#" + std::to_string(jobId) + ":" + (index >= 0 ? std::to_string(index) : std::string("?"))).c_str();};
+    const char* jobStateToStr() const {return jobStateStrings[(int)state];};
 
     void updateJobNode(int index, int newRank) {
         jobNodeRanks.adjust(index, newRank);
@@ -150,6 +150,7 @@ public:
             updateJobNode(getParentIndex(), newRank);
         }
     }
+    void switchState(JobState state);
 };
 
 #endif

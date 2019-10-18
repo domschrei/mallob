@@ -1,6 +1,10 @@
 
 #include <iostream>
 #include <ostream>
+#include <ctime>
+#include <iomanip>
+#include <cstring>
+#include <cmath>
 
 #include "console.h"
 #include "timer.h"
@@ -42,17 +46,35 @@ public:
 int Console::rank;
 int Console::verbosity;
 bool Console::coloredOutput;
+std::string Console::logFilename;
+FILE* Console::logFile;
+bool Console::beganLine;
+std::mutex Console::logMutex;
 
-void Console::init(int rank, int verbosity, bool coloredOutput) {
+void Console::init(int rank, int verbosity, bool coloredOutput, std::string logDir) {
     Console::rank = rank;
     Console::verbosity = verbosity;
     Console::coloredOutput = coloredOutput;
+    beganLine = false;
+    
+    logFilename = logDir + "/log_" + std::to_string(std::time(nullptr)) + std::string(".") + std::to_string(rank);
+    logFile = fopen(logFilename.c_str(), "a");
+    if (logFile == NULL) {
+        log(CRIT, "Error while trying to open log file \"%s\"!", logFilename.c_str());
+    }
+    /*
+    if (logFile.is_open()) {
+        logFile << std::fixed << std::setprecision(3);
+    }
+    std::cout << std::fixed << std::setprecision(3);*/
 }
 
-void Console::log(int verbosity, const char* str) {
+void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list args) {
+
     if (verbosity > Console::verbosity)
         return;
 
+    // Colored output, if applicable
     if (coloredOutput) {
         if (verbosity == Console::CRIT) {
             std::cout << Modifier(Code::FG_LIGHT_RED);
@@ -65,21 +87,84 @@ void Console::log(int verbosity, const char* str) {
         }
     }
 
-    printf("[%3.3f] ", Timer::elapsedSeconds());
-    std::cout << "[" << rank << "] " << str ;
-    
+    // Timestamp and node rank
+    if (!beganLine) {
+        float elapsed = Timer::elapsedSeconds();
+        printf("[%.3f] [%i] ", elapsed, rank);
+        if (logFile != NULL) fprintf(logFile, "[%.3f] [%i] ", elapsed, rank);
+        
+        beganLine = true;
+    }
+
+    // logging message
+    va_list argsCopy; va_copy(argsCopy, args); // retrieve copy of "args"
+    vprintf(str, args); // consume original args
+    if (logFile != NULL) {
+        vfprintf(logFile, str, argsCopy); // consume copied args
+    }
+    va_end(argsCopy); // destroy copy
+
+    // Reset terminal colors
     if (coloredOutput) {
         std::cout << Modifier(Code::FG_DEFAULT);
     }
 
-    std::cout << std::endl;
+    // New line, if applicable
+    if (endline) {
+        if (strlen(str) == 0 || str[strlen(str)-1] != '\n') {
+            printf("\n"); 
+            if (logFile != NULL) fprintf(logFile, "\n");
+        }
+        beganLine = false;
+    }
+
+    fflush(stdout);
+    if (logFile != NULL) fflush(logFile);
 }
-void Console::log(int verbosity, std::string str) {
-    log(verbosity, str.c_str());
+
+void Console::log(int verbosity, const char* str, bool endline, va_list args) {
+    logMutex.lock();
+    logUnsafe(verbosity, str, endline, args);
+    logMutex.unlock();
 }
-void Console::log_send(int verbosity, std::string str, int destRank) {
-    log(verbosity, str + " => [" + std::to_string(destRank) + "]");
+
+void Console::log(int verbosity, const char* str, ...) {
+    va_list vl;
+    va_start(vl, str);
+    log(verbosity, str, true, vl);
+    va_end(vl);
 }
-void Console::log_recv(int verbosity, std::string str, int sourceRank) {
-    log(verbosity, str + " <= [" + std::to_string(sourceRank) + "]");
+
+void Console::logUnsafe(int verbosity, const char* str, ...) {
+    va_list vl;
+    va_start(vl, str);
+    logUnsafe(verbosity, str, true, vl);
+    va_end(vl);
+}
+
+void Console::append(int verbosity, const char* str, ...) {
+    va_list vl;
+    va_start(vl, str);
+    log(verbosity, str, false, vl);
+    va_end(vl);
+}
+
+void Console::appendUnsafe(int verbosity, const char* str, ...) {
+    va_list vl;
+    va_start(vl, str);
+    logUnsafe(verbosity, str, false, vl);
+    va_end(vl);
+}
+
+void Console::log_send(int verbosity, int destRank, const char* str, ...) {
+    va_list vl;
+    va_start(vl, str);
+    log(verbosity, (std::string(str) + " => [" + std::to_string(destRank) + "]").c_str(), true, vl);
+    va_end(vl);
+}
+void Console::log_recv(int verbosity, int sourceRank, const char* str, ...) {
+    va_list vl;
+    va_start(vl, str);
+    log(verbosity, (std::string(str) + " <= [" + std::to_string(sourceRank) + "]").c_str(), true, vl);
+    va_end(vl);
 }

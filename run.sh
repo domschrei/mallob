@@ -25,13 +25,16 @@ fi
 #fi
 
 # Logging directory
-mkdir -p logs
+logdir=logs/`date +%s`
+mkdir -p $logdir
 
 # Execute program
-logfile="logs/log.`date +%s`"
 executable="build/mallob"
-echo 'mpirun -np "'$NP'" '$cmd' '$executable' '$@' | tee '$logfile
-mpirun -np "$NP" $cmd $executable $@ | tee logs/log.`date +%s`
+echo 'mpirun -np "'$NP'" '$cmd' '$executable' '$@' -log='$logdir
+mpirun -np "$NP" $cmd $executable $@ -log=$logdir
 
-esc=$(printf '\033')
-sed -i 's/'$esc'[[0-9]\+m//g' $logfile
+# Post-execution: Gather logs
+cat $logdir/* | sed 's/^\[//g' | LC_ALL=C sort -g | awk '{print "["$0}'  > $logdir/log
+for i in {1..10}; do
+    cat $logdir/log | grep -E "#${i}:|#${i} " > $logdir/log#$i
+done

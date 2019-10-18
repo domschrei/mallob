@@ -1,6 +1,7 @@
 
 #include <iostream>
 #include <set>
+#include <exception>
 
 #include "util/timer.h"
 #include "util/mpi.h"
@@ -12,18 +13,28 @@
 
 #include "revision.c"
 
+Client* client;
+Worker* worker;
+
 void doExternalClientProgram(MPI_Comm commClients, Parameters& params, const std::set<int>& clientRanks) {
     
-    Client client(commClients, params, clientRanks);
-    client.init();
-    client.mainProgram();
+    client = new Client(commClients, params, clientRanks);
+    client->init();
+    client->mainProgram();
 }
 
 void doWorkerNodeProgram(MPI_Comm commWorkers, Parameters& params, const std::set<int>& clientRanks) {
 
-    Worker worker(commWorkers, params, clientRanks);
-    worker.init();
-    worker.mainProgram();
+    worker = new Worker(commWorkers, params, clientRanks);
+    worker->init();
+    worker->mainProgram();
+}
+
+void dumpStats() {
+    std::cout << "dumping stats" << std::endl;
+    if (worker != NULL) {
+        worker->dumpStats();
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -36,7 +47,7 @@ int main(int argc, char *argv[]) {
 
     Parameters params;
     params.init(argc, argv);
-    Console::init(rank, params.getIntParam("v"), params.isSet("colors"));
+    Console::init(rank, params.getIntParam("v"), params.isSet("colors"), params.getParam("log"));
     
     if (rank == 0)
         params.printParams();
@@ -48,7 +59,7 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    Console::log(Console::VERB, "Launching mallob, revision " + std::string(MALLOB_REVISION));
+    Console::log(Console::VERB, "Launching mallob, revision %s", MALLOB_REVISION);
 
     if (numNodes < 2) {
         Console::log(Console::CRIT, "At least two threads / nodes are necessary in order to run this application.");
@@ -76,6 +87,8 @@ int main(int argc, char *argv[]) {
     }
     MPI_Comm newComm;
     MPI_Comm_split(MPI_COMM_WORLD, color, rank, &newComm);
+
+    std::set_terminate(dumpStats);
 
     // Launch node's main program
     if (isExternalClient) {

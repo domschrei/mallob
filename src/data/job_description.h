@@ -18,6 +18,8 @@ private:
     int rootRank;
     float priority;
 
+    float arrival; // only for introducing a job
+
     // Payload (logic to solve)
     std::vector<int> payload; 
 
@@ -33,9 +35,11 @@ public:
         return payload.size() + 1;
     };
     const std::vector<int>& getPayload() const {return payload;};
+    float getArrival() const {return arrival;};
 
     void setRootRank(int rootRank) {this->rootRank = rootRank;}
     void setPayload(const std::vector<int>& payload) {this->payload = payload;};
+    void setArrival(float arrival) {this->arrival = arrival;};
 
     void deserialize(const std::vector<int>& packed) override;
     std::vector<int> serialize() const override;

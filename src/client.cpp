@@ -17,15 +17,15 @@ void readAllInstances(Client* client) {
     Console::log(Console::VERB, "Started client I/O thread to read instances.");
 
     Client& c = *client;
-    for (auto it = c.jobsByArrival.begin(); it != c.jobsByArrival.end(); ++it) {
+    for (int i = 0; i < c.jobs.size(); i++) {
 
-        JobDescription &job = it->second;
+        JobDescription &job = c.jobs[i];
         int jobId = job.getId();
 
-        Console::log(Console::VERB, "Reading \"" + c.jobInstances[jobId] + "\" (#" + std::to_string(jobId) + ") ...");
+        Console::log(Console::VERB, "Reading \"%s\" (#%i) ...", c.jobInstances[jobId].c_str(), jobId);
         c.readFormula(c.jobInstances[jobId], job);
         if (job.getPayloadSize() > 1)
-            Console::log(Console::VERB, "Read \"" + c.jobInstances[jobId] + "\" (#" + std::to_string(jobId) + ").");
+            Console::log(Console::VERB, "Read \"%s\" (#%i).", c.jobInstances[jobId].c_str(), jobId);
 
         std::unique_lock<std::mutex> lock(c.jobReadyLock);
         c.jobReady[jobId] = true;
@@ -52,14 +52,14 @@ Client::~Client() {
 
 void Client::mainProgram() {
 
-    auto it = jobsByArrival.begin();
+    int i = 0;
     while (true) {
 
-        // Introduce next job, if applicable
-        if (it != jobsByArrival.end() && it->first <= Timer::elapsedSeconds()) {
+        // Introduce next job(s), if applicable
+        while (i < jobs.size() && jobs[i].getArrival() <= Timer::elapsedSeconds()) {
         
             // Introduce job
-            JobDescription& job = it->second;
+            JobDescription& job = jobs[i++];
             int jobId = job.getId();
 
             // Wait until job is ready to be sent
@@ -69,39 +69,43 @@ void Client::mainProgram() {
                 if (jobReady[jobId])
                     break;
             }
-            it++;
 
             if (job.getPayloadSize() == 1) {
                 // Some I/O error kept the instance from being read
-                Console::log(Console::WARN, "Skipping job #" + std::to_string(jobId) + " due to previous I/O error");
+                Console::log(Console::WARN, "Skipping job #%i due to previous I/O error", jobId);
                 continue;
             }
 
             // Find the job's canonical initial node
             int n = MyMpi::size(MPI_COMM_WORLD) - MyMpi::size(comm);
-            Console::log(Console::VERB, "Creating permutation of size " + std::to_string(n) + " ...");
+            Console::log(Console::VERB, "Creating permutation of size %i ...", n);
             AdjustablePermutation p(n, jobId);
             int nodeRank = p.get(0);
 
-            const JobSignature sig(jobId, nodeRank, job.getPayloadSize());
+            const JobRequest req(jobId, /*rootRank=*/-1, /*requestingNodeRank=*/worldRank, 
+                /*requestedNodeIndex=*/0, /*epoch=*/-1, /*numHops=*/0);
 
-            Console::log_send(Console::INFO, "Introducing job #" + std::to_string(jobId), nodeRank);
-            MyMpi::send(MPI_COMM_WORLD, nodeRank, MSG_INTRODUCE_JOB, sig); // TODO async?
-            MyMpi::isend(MPI_COMM_WORLD, nodeRank, MSG_SEND_JOB, job);
+            Console::log_send(Console::INFO, nodeRank, "Introducing job #%i", jobId);
+            MyMpi::isend(MPI_COMM_WORLD, nodeRank, MSG_FIND_NODE, req);
+            introducedJobs[jobId] = &job;
         }
 
         // Poll messages, if present
         MessageHandlePtr handle;
         if ((handle = MyMpi::poll()) != NULL) {
             // Process message
-            Console::log_recv(Console::VVERB, "Processing message of tag " + std::to_string(handle->tag), handle->source);
+            Console::log_recv(Console::VVERB, handle->source, "Processing message of tag %i", handle->tag);
 
             if (handle->tag == MSG_JOB_DONE) {
                 handleJobDone(handle);
             } else if (handle->tag == MSG_SEND_JOB_RESULT) {
                 handleSendJobResult(handle);
+            } else if (handle->tag == MSG_REQUEST_BECOME_CHILD) {
+                handleRequestBecomeChild(handle);
+            } else if (handle->tag == MSG_ACK_ACCEPT_BECOME_CHILD) {
+                handleAckAcceptBecomeChild(handle);
             } else {
-                Console::log_recv(Console::WARN, "Unknown message tag " + std::to_string(handle->tag) + "!", handle->source);
+                Console::log_recv(Console::WARN, handle->source, "Unknown message tag %i", handle->tag);
             }
         }
 
@@ -114,12 +118,27 @@ void Client::mainProgram() {
     }
 }
 
+void Client::handleRequestBecomeChild(MessageHandlePtr handle) {
+    JobRequest req; req.deserialize(handle->recvData);
+    const JobDescription& desc = *introducedJobs[req.jobId];
+
+    // Send job signature
+    JobSignature sig(req.jobId, /*rootRank=*/handle->source, desc.getPayloadSize());
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACCEPT_BECOME_CHILD, sig);
+    stats.increment("sentMessages");
+}
+
+void Client::handleAckAcceptBecomeChild(MessageHandlePtr handle) {
+    JobRequest req; req.deserialize(handle->recvData);
+    const JobDescription& desc = *introducedJobs[req.jobId];
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB, desc);
+}
+
 void Client::handleJobDone(MessageHandlePtr handle) {
 
     int jobId = handle->recvData[0];
     int resultSize = handle->recvData[1];
-    Console::log_recv(Console::VERB, "Preparing to receive job result of length " + std::to_string(resultSize) 
-            + " for job #" + std::to_string(jobId), handle->source);
+    Console::log_recv(Console::VERB, handle->source, "Preparing to receive job result of length %i for job #%i", resultSize, jobId);
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_QUERY_JOB_RESULT, handle->recvData);
     MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_RESULT, resultSize);
 }
@@ -130,13 +149,12 @@ void Client::handleSendJobResult(MessageHandlePtr handle) {
     int jobId = jobResult.id;
     int resultCode = jobResult.result;
 
-    Console::log_recv(Console::INFO, "Received result of job #" + std::to_string(jobId) 
-                + ", code: " + std::to_string(resultCode), handle->source);
+    Console::log_recv(Console::INFO, handle->source, "Received result of job #%i, code: %i", jobId, resultCode);
 }
 
 void Client::readInstanceList(std::string& filename) {
 
-    Console::log(Console::INFO, "Reading instances from file " + filename);
+    Console::log(Console::INFO, "Reading instances from file %s", filename.c_str());
     std::fstream file;
     file.open(filename, std::ios::in);
     if (!file.is_open()) {
@@ -156,15 +174,14 @@ void Client::readInstanceList(std::string& filename) {
         next = line.find(" "); priority = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1);
         next = line.find(" "); instanceFilename = line.substr(pos, next-pos); line = line.substr(next+1);
         JobDescription job(id, priority);
-        while (jobsByArrival.count(arrival)) {
-            arrival += 0.00001f;
-        }
-        jobsByArrival[arrival] = job;
+        job.setArrival(arrival);
+        jobs.push_back(job);
         jobInstances[id] = instanceFilename;
     }
     file.close();
 
-    Console::log(Console::INFO, "Read " + std::to_string(jobsByArrival.size()) + " job instances from file " + filename);
+    Console::log(Console::INFO, "Read %i job instances from file %s", jobs.size(), filename.c_str());
+    std::sort(jobs.begin(), jobs.end(), JobByArrivalComparator());
 }
 
 void Client::readFormula(std::string& filename, JobDescription& job) {
@@ -194,10 +211,9 @@ void Client::readFormula(std::string& filename, JobDescription& job) {
             }
         }
         job.setPayload(formula);
-        Console::log(Console::VERB, std::to_string(formula.size()) + " literals including separation zeros");
+        Console::log(Console::VERB, "%i literals including separation zeros", formula.size());
 
     } else {
-        Console::log(Console::CRIT, "ERROR: File " + filename + " could not be opened. Skipping job #"
-                   + std::to_string(job.getId()));
+        Console::log(Console::CRIT, "ERROR: File %s could not be opened. Skipping job #%i", filename.c_str(), job.getId());
     }
 }

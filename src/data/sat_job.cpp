@@ -7,6 +7,7 @@
 #include "util/timer.h"
 #include "util/mpi.h"
 #include "data/sat_job.h"
+#include "util/console_horde_interface.h"
 
 void SatJob::initialize() {
 
@@ -22,8 +23,10 @@ void SatJob::initialize() {
     params["v"] = (this->params.getIntParam("v") >= 3 ? "1" : "0"); // verbosity
     params["mpirank"] = std::to_string(index); // mpi_rank
     params["mpisize"] = std::to_string(commSize); // mpi_size
-    params["jobstr"] = toStr();
-    solver = std::unique_ptr<HordeLib>(new HordeLib(params));
+    std::string identifier = std::string(toStr());
+    params["jobstr"] = identifier;
+    solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(identifier))));
+    
     assert(solver != NULL);
     solver->beginSolving(job.getPayload());
 }
@@ -72,8 +75,7 @@ void SatJob::beginCommunication() {
     msg.epoch = epochCounter.getEpoch();
     msg.tag = MSG_GATHER_CLAUSES;
     int parentRank = getParentNodeRank();
-    Console::log_send(Console::VERB, "Sending clauses of effective size " + std::to_string(msg.payload.size())
-                    + " from " + toStr(), parentRank);
+    Console::log_send(Console::VERB, parentRank, "Sending clauses of effective size %i from %s", msg.payload.size(), toStr());
     MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
 }
 
@@ -92,7 +94,7 @@ void SatJob::communicate(int source, JobMessage& msg) {
 
     if (msg.tag == MSG_GATHER_CLAUSES) {
 
-        Console::log(Console::VERB, toStr() + " received clauses from below of effective size " + std::to_string(clauses.size()));
+        Console::log(Console::VERB, "%s received clauses from below of effective size %i", toStr(), clauses.size());
 
         collectClausesFromBelow(clauses);
 
@@ -107,7 +109,7 @@ void SatJob::communicate(int source, JobMessage& msg) {
                 msg.jobId = jobId;
                 msg.epoch = epochCounter.getEpoch();
                 msg.tag = MSG_GATHER_CLAUSES;
-                Console::log_send(Console::VERB, "Gathering clauses upwards from " + toStr(), parentRank);
+                Console::log_send(Console::VERB, parentRank, "Gathering clauses upwards from %s", toStr());
                 MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
             }
         }
@@ -119,7 +121,7 @@ void SatJob::communicate(int source, JobMessage& msg) {
 
 void SatJob::learnAndDistributeClausesDownwards(std::vector<int>& clauses) {
 
-    Console::log(Console::VVERB, std::to_string(clauses.size()) + " clauses broadcasted");
+    Console::log(Console::VVERB, "%s received %i broadcast clauses", toStr(), clauses.size());
     assert(clauses.size() % BROADCAST_CLAUSE_INTS_PER_NODE == 0);
 
     learnClausesFromAbove(clauses);
@@ -132,12 +134,12 @@ void SatJob::learnAndDistributeClausesDownwards(std::vector<int>& clauses) {
     int childRank;
     if (hasLeftChild()) {
         childRank = getLeftChildNodeRank();
-        Console::log_send(Console::VERB, "Broadcasting clauses downwards from " + toStr(), childRank);
+        Console::log_send(Console::VERB, childRank, "%s broadcasting clauses downwards", toStr());
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_JOB_COMMUNICATION, msg);
     }
     if (hasRightChild()) {
         childRank = getRightChildNodeRank();
-        Console::log_send(Console::VERB, "Broadcasting clauses downwards from " + toStr(), childRank);
+        Console::log_send(Console::VERB, childRank, "%s broadcasting clauses downwards", toStr());
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_JOB_COMMUNICATION, msg);
     }
 }
@@ -211,9 +213,8 @@ int SatJob::solveLoop() {
     if (result >= 0) {
         doneLocally = true;
         this->resultCode = result;
-        Console::log_send(Console::INFO, "Found result " 
-                        + std::string(result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN") 
-                        + " on " + toStr(), getRootNodeRank());
+        Console::log_send(Console::INFO, getRootNodeRank(), "%s found result %s", toStr(), 
+                            result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN");
         extractResult();
     }
     return result;

@@ -41,6 +41,7 @@
 #include "utilities/DebugUtils.h"
 #include "utilities/mympi.h"
 #include "utilities/Logger.h"
+#include "utilities/default_logging_interface.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -466,10 +467,11 @@ int HordeLib::finishSolving() {
     running = false;
 
     double searchTime = getTime() - startSolving;
+	/*
 	log(0, "Joining solver threads of index %d\n", mpi_rank);
 	for (int i = 0; i < solversCount; i++) {
 		solverThreads[i]->join();
-	}
+	}*/
 	// MPI_Barrier(MPI_COMM_WORLD); // TODO
 
 	if (params.isSet("stats")) {
@@ -580,7 +582,11 @@ HordeLib::HordeLib(int argc, char** argv) {
     init();
 }
 
-HordeLib::HordeLib(const std::map<std::string, std::string>& map) {
+HordeLib::HordeLib(const std::map<std::string, std::string>& map, std::shared_ptr<LoggingInterface> loggingInterface) {
+	
+	if (loggingInterface != NULL) {
+		setLogger(loggingInterface);
+	}
 
     for (auto it = map.begin(); it != map.end(); ++it) {
         params.setParam(it->first.c_str(), it->second.c_str());
@@ -590,8 +596,14 @@ HordeLib::HordeLib(const std::map<std::string, std::string>& map) {
 
 void HordeLib::init() {
 
+	if (logger == NULL) {
+		std::shared_ptr<LoggingInterface> logInterface = std::shared_ptr<LoggingInterface>(
+			new DefaultLoggingInterface(params.getIntParam("v", 1), std::string(params.getParam("jobstr", "")))
+		);
+		setLoggingInterface(logInterface);
+	}
+
     startSolving = getTime();
-    setIdentifierString(params.getParam("jobstr", ""));
 
     solverThreads = NULL;
 	endingFunction = NULL;
@@ -607,7 +619,6 @@ void HordeLib::init() {
     mpi_rank = params.getIntParam("mpirank", mpi_rank);
     mpi_size = params.getIntParam("mpisize", mpi_size);
 
-	setVerbosityLevel(params.getIntParam("v", 1));
 	//if (mpi_rank == 0) setVerbosityLevel(3);
 
 	char hostname[1024];
@@ -740,6 +751,11 @@ HordeLib::~HordeLib() {
 	delete sharingManager;
 }
 
+void HordeLib::setLogger(std::shared_ptr<LoggingInterface> loggingInterface) {
+	this->logger = loggingInterface;
+	setLoggingInterface(loggingInterface);
+}
+
 void HordeLib::setPaused() {
     //log(0, "Setting paused\n");
 
@@ -776,7 +792,8 @@ void HordeLib::unsetPaused() {
 
     //log(0, "Unset paused.\n");
 
-    setIdentifierString(params.getParam("jobstr", ""));
+	// Overwrite static logging variable which may now belong to another HordeLib instance
+    setLogger(logger);
 }
 void HordeLib::waitUntilResumed() {
     //log(0, "Checking paused\n");

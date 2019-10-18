@@ -7,7 +7,7 @@
 class ThermodynamicBalancer : public Balancer {
 
 public:
-    ThermodynamicBalancer(MPI_Comm& comm, Parameters params) : Balancer(comm, params) {
+    ThermodynamicBalancer(MPI_Comm& comm, Parameters& params, Statistics& stats) : Balancer(comm, params, stats) {
         
     }
     std::map<int, int> balance(std::map<int, Job*>& jobs) override;

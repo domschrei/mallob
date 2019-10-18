@@ -6,7 +6,8 @@
 #include <utility>
 
 #include "balancing/balancer.h"
-#include "data/serializable.h"
+#include "data/reduceable.h"
+#include "util/console.h"
 
 class PriorityComparator {
 private:
@@ -18,7 +19,8 @@ public:
     }
 };
 
-struct ResourcesInfo : public Serializable {
+struct ResourcesInfo : public Reduceable {
+
 float assignedResources;
 std::vector<float> priorities;
 std::vector<float> demandedResources;
@@ -28,11 +30,12 @@ ResourcesInfo() :
     priorities(std::vector<float>()), 
     demandedResources(std::vector<float>()) {}
 
-void merge(const ResourcesInfo& other) {
-    assignedResources += other.assignedResources;
-    for (int i = 0; i < other.priorities.size(); i++) {
+void merge(const Reduceable& other) override {
+    const ResourcesInfo& info = (ResourcesInfo&) other;
+    assignedResources += info.assignedResources;
+    for (int i = 0; i < info.priorities.size(); i++) {
 
-        float prioToInsert = other.priorities[i];
+        float prioToInsert = info.priorities[i];
 
         // Find insertion point
         int idx = 0;
@@ -45,8 +48,12 @@ void merge(const ResourcesInfo& other) {
             demandedResources.insert(demandedResources.begin()+idx, 0);
         }
         // Update demanded resources
-        demandedResources[idx] += other.demandedResources[i];
+        demandedResources[idx] += info.demandedResources[i];
     }
+}
+
+bool isEmpty() override {
+    return assignedResources < 0.0001f && priorities.empty() && demandedResources.empty();
 }
 
 std::vector<int> serialize() const override {
@@ -70,12 +77,17 @@ void deserialize(const std::vector<int>& packed) override {
         demandedResources.push_back(0.001f * packed[1+i+size]);
     }
 }
+std::unique_ptr<Reduceable> getDeserialized(const std::vector<int>& packed) const override {
+    std::unique_ptr<Reduceable> out(new ResourcesInfo());
+    out->deserialize(packed);
+    return out;
+}
 };
 
 class CutoffPriorityBalancer : public Balancer {
 
 public:
-    CutoffPriorityBalancer(MPI_Comm& comm, Parameters params) : Balancer(comm, params) {
+    CutoffPriorityBalancer(MPI_Comm& comm, Parameters& params, Statistics& stats) : Balancer(comm, params, stats) {
         
     }
     std::map<int, int> balance(std::map<int, Job*>& jobs) override;

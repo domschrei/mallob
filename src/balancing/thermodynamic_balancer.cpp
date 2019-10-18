@@ -71,7 +71,7 @@ std::map<int, int> ThermodynamicBalancer::balance(std::map<int, Job*>& jobs) {
         iteration++;
     }
     if (MyMpi::rank(comm) == 0)
-        Console::log(Console::VERB, "Did " + std::to_string(iteration) + " rebalancing iterations");
+        Console::log(Console::VERB, "Did %i rebalancing iterations", iteration);
 
     // Weigh remaining volume against shrinkage
     float shrink = 0;

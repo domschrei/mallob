@@ -10,6 +10,7 @@
 
 #include "utilities/ParameterProcessor.h"
 #include "utilities/Threading.h"
+#include "utilities/logging_interface.h"
 #include "solvers/MiniSat.h"
 #include "solvers/Lingeling.h"
 #include "sharing/AllToAllSharingManager.h"
@@ -18,6 +19,7 @@
 
 #include <pthread.h>
 #include <vector>
+#include <memory>
 #include <set>
 #include <map>
 
@@ -48,6 +50,16 @@ private:
 	size_t maxRounds;
 	size_t round;
 
+	std::shared_ptr<LoggingInterface> logger;
+
+	Mutex interruptLock;
+    ConditionVariable interruptCond;
+    bool solversInterrupted = false;
+	Mutex solutionLock;
+	
+	// settings
+	ParameterProcessor params;
+
 	//void stopAllSolvers();
 
 	// diversifications
@@ -59,22 +71,16 @@ private:
 
     void init();
 
-	Mutex interruptLock;
-    ConditionVariable interruptCond;
-    bool solversInterrupted = false;
-	Mutex solutionLock;
-
 public:
 
 	friend void* solverRunningThread(void*);
 
-	// settings
-	ParameterProcessor params;
-
 	// methods
 	HordeLib(int argc, char** argv);
-    HordeLib(const std::map<std::string, std::string>& params);
+    HordeLib(const std::map<std::string, std::string>& params, std::shared_ptr<LoggingInterface> loggingInterface = NULL);
 	virtual ~HordeLib();
+
+	void setLogger(std::shared_ptr<LoggingInterface> loggingInterface);
 
 	// dismspec solving
 	bool readDimspecFile(const char* filename);
@@ -82,7 +88,7 @@ public:
 
 	// sat/qbf solving
 	bool readFormula(const char* filename);
-    bool setFormula(const std::vector<int>& formula); // NEW 2019-09
+    bool setFormula(const std::vector<int>& formula);
 	bool addToFormula(const std::vector<int>& formula, int start, int numLits);
 	void addLit(int lit);
 	void assume(int lit);

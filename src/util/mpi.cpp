@@ -86,6 +86,11 @@ MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag, int size) {
     handle->recvData.resize(size);
     MPI_Recv(handle->recvData.data(), size, MPI_INT, MPI_ANY_SOURCE, tag, communicator, &handle->status);
     handle->source = handle->status.MPI_SOURCE;
+    int count = 0;
+    MPI_Get_count(&handle->status, MPI_INT, &count);
+    if (count < size) {
+        handle->recvData.resize(count);
+    }
     return handle;
 }
 

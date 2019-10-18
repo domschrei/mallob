@@ -3,6 +3,9 @@
 #define DOMPASCH_CONSOLE_H
 
 #include <string>
+#include <fstream>
+#include <stdarg.h>
+#include <mutex>
 
 class Console {
 
@@ -15,16 +18,33 @@ public:
     static const int VVVERB = 5;
 
 private:
+    static std::string logDir;
+    static std::string logFilename;
+    static FILE* logFile;
     static int rank;
     static int verbosity;
     static bool coloredOutput;
-public:
-    static void init(int rank, int verbosity, bool coloredOutput);
-    static void log(int verbosity, const char* str);
-    static void log(int verbosity, std::string str);
-    static void log_send(int verbosity, std::string str, int destRank);
-    static void log_recv(int verbosity, std::string str, int sourceRank);
 
+    static bool beganLine;
+
+    static std::mutex logMutex;
+
+public:
+    static void init(int rank, int verbosity, bool coloredOutput, std::string logDir=".");
+
+    static void log(int verbosity, const char* str, ...);
+    static void append(int verbosity, const char* str, ...);
+    static void log_send(int verbosity, int destRank, const char* str, ...);
+    static void log_recv(int verbosity, int sourceRank, const char* str, ...);
+
+    static void logUnsafe(int verbosity, const char* str, ...);
+    static void appendUnsafe(int verbosity, const char* str, ...);
+    static void logUnsafe(int verbosity, const char* str, bool endline, va_list args);
+
+    static void log(int verbosity, const char* str, bool endline, va_list args);
+
+    static void getLock() {logMutex.lock(); };
+    static void releaseLock() {logMutex.unlock();};
 };
 
 #endif

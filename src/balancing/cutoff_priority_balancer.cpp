@@ -25,7 +25,7 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
         int jobId = *it;
         int demand = getDemand(*jobs[jobId]);
         aggregatedDemand += demand * jobs[jobId]->getDescription().getPriority();
-        Console::log(Console::VERB, "Job #" + std::to_string(jobId) + " : demand " + std::to_string(demand));
+        Console::log(Console::VERB, "Job #%i : demand %i", jobId, demand);
     }
     aggregatedDemand = allReduce(aggregatedDemand);
 
@@ -36,7 +36,7 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
         int jobId = *it;
         float initialMetRatio = totalVolume * jobs[jobId]->getDescription().getPriority() / aggregatedDemand;
         assignments[jobId] = std::min(1.0f, initialMetRatio) * getDemand(*jobs[jobId]);
-        Console::log(Console::VERB, "Initial assignment for #" + std::to_string(jobId) + " : " + std::to_string(assignments[jobId]));
+        Console::log(Console::VERB, "Job #%i : initial assignment", jobId, assignments[jobId]);
     }
 
     // All-Reduce resources information
@@ -49,44 +49,23 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
         resourcesInfo.priorities.push_back(jobs[jobId]->getDescription().getPriority());
         resourcesInfo.demandedResources.push_back( getDemand(*jobs[jobId]) - assignments[jobId] );
     }
-    // Reduce information
-    int myRank = MyMpi::rank(comm);
-    int highestPower = 2 << (int)std::ceil(std::log2(MyMpi::size(comm)));
-    for (int k = 2; k <= highestPower; k *= 2) {
-        if (myRank % k == 0 && myRank+k/2 < MyMpi::size(comm)) {
-            // Receive
-            //Console::log(Console::VVERB, "k=" + std::to_string(k) + " : Receiving");
-            MessageHandlePtr handle = MyMpi::recv(comm, MSG_REDUCE_RESOURCES_INFO);
-            ResourcesInfo info; info.deserialize(handle->recvData);
-            resourcesInfo.merge(info); // reduce into local object
-        } else if (myRank % k == k/2) {
-            // Send
-            //Console::log_send(Console::VVERB, "k=" + std::to_string(k) + " : Sending", myRank-k/2);
-            MessageHandlePtr handle = MyMpi::send(comm, myRank-k/2, MSG_REDUCE_RESOURCES_INFO, resourcesInfo);
-        }
-    }
-    // Broadcast information
-    for (int k = highestPower; k >= 2; k /= 2) {
-        if (myRank % k == 0 && myRank+k/2 < MyMpi::size(comm)) {
-            // Send
-            //Console::log_send(Console::VVERB, "k=" + std::to_string(k) + " : Sending", myRank+k/2);
-            MessageHandlePtr handle = MyMpi::send(comm, myRank+k/2, MSG_REDUCE_RESOURCES_INFO, resourcesInfo);
-        } else if (myRank % k == k/2) {
-            // Receive
-            //Console::log(Console::VVERB, "k=" + std::to_string(k) + " : Receiving");
-            MessageHandlePtr handle = MyMpi::recv(comm, MSG_REDUCE_RESOURCES_INFO);
-            resourcesInfo.deserialize(handle->recvData); // overwrite local object
-        }
-    }
+    // AllReduce
+    std::set<int> excludedNodes = resourcesInfo.allReduce(comm);
+    stats.increment("reductions"); stats.increment("broadcasts");
     // "resourcesInfo" now contains global data from all concerned jobs
-    Console::log(Console::VERB, "Ended all-reduction phase.");
+    if (excludedNodes.count(MyMpi::rank(comm))) {
+        Console::log(Console::VERB, "Ended all-reduction phase. Balancing phase finished.");
+        return std::map<int, int>();
+    } else {
+        Console::log(Console::VERB, "Ended all-reduction phase. Calculating final job demands ...");
+    }
 
     // Assign correct (final) floating-point resources
     float remainingResources = totalVolume - resourcesInfo.assignedResources;
     if (remainingResources < 0.1) remainingResources = 0;
 
     if (MyMpi::rank(comm) == 0)
-        Console::log(Console::VERB, "Remaining resources: " + std::to_string(remainingResources));
+        Console::log(Console::VERB, "Remaining resources: %.3f", remainingResources);
     
     for (auto it = localJobs.begin(); it != localJobs.end(); ++it) {
         int jobId = *it;
@@ -115,7 +94,6 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
                 assignments[jobId] += ratio * (demand - assignments[jobId]);
             }
         }
-        Console::log(Console::VERB, "Final assignment for #" + std::to_string(jobId) + " : " + std::to_string(assignments[jobId]));
     }
 
     // Convert float assignments into actual integer volumes, store and return them
@@ -125,6 +103,7 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
         float assignment = std::max(1.0f, it->second);
         int intAssignment = Random::roundProbabilistically(assignment);
         volumes[jobId] = intAssignment;
+        Console::log(Console::VERB, "Job #%i: final assignment %.3f => adjusted to %i", jobId, assignments[jobId], intAssignment);
     }
     for (auto it = volumes.begin(); it != volumes.end(); ++it) {
         updateVolume(it->first, it->second);
