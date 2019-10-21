@@ -35,6 +35,9 @@ mpirun -np "$NP" $cmd $executable $@ -log=$logdir
 
 # Post-execution: Gather logs
 cat $logdir/* | sed 's/^\[//g' | LC_ALL=C sort -g | awk '{print "["$0}'  > $logdir/log
-for i in {1..10}; do
-    cat $logdir/log | grep -E "#${i}:|#${i} " > $logdir/log#$i
+
+jobs=`cat $logdir/log | grep -oE "#[0-9]+:0" | grep -oE "#[0-9]+"|sort -u|tr '\n' ' '`
+echo $jobs
+for job in $jobs; do
+    cat $logdir/log | grep -E "${job}:|${job} |${job}," > $logdir/log$job
 done

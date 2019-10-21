@@ -11,10 +11,10 @@
 
 void SatJob::initialize() {
 
-    Job::initialize();
-
+    assert(isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_PAST}));
     assert(hasDescription);
 
+    Console::log(Console::VERB, "preparing params");
     std::map<std::string, std::string> params;
     params["e"] = "1"; // exchange mode: 0 = nothing, 1 = alltoall, 2 = log, 3 = asyncrumor
     params["c"] = this->params.getParam("t"); // solver threads on this node
@@ -25,10 +25,14 @@ void SatJob::initialize() {
     params["mpisize"] = std::to_string(commSize); // mpi_size
     std::string identifier = std::string(toStr());
     params["jobstr"] = identifier;
+    Console::log(Console::VERB, "creating horde instance");
     solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(identifier))));
     
     assert(solver != NULL);
+
+    Console::log(Console::VERB, "beginning to solve");
     solver->beginSolving(job.getPayload());
+    Console::log(Console::VERB, "finished initialization");
 }
 
 void SatJob::beginSolving() {
@@ -81,16 +85,17 @@ void SatJob::beginCommunication() {
 
 void SatJob::communicate(int source, JobMessage& msg) {
 
+    if (isNotInState({JobState::ACTIVE}))
+        return;
+
     int jobId = msg.jobId;
     int epoch = msg.epoch;
     std::vector<int>& clauses = msg.payload;
 
-    if (epoch != epochCounter.getEpoch()) {
+    if (epoch != (int)epochCounter.getEpoch()) {
         Console::log(Console::VERB, "Discarding job message from a previous epoch.");
         return;
     }
-    if (isNotInState({JobState::ACTIVE}))
-        return;
 
     if (msg.tag == MSG_GATHER_CLAUSES) {
 
@@ -209,7 +214,20 @@ int SatJob::solveLoop() {
         // if result is found, stops all solvers
         // but does not call finishSolving()
         result = solver->solveLoop();
+
+    } else if (isInState({INITIALIZING_TO_PAST, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_ACTIVE})) {
+        if (solver == NULL || !solver->isRunning() || !solver->isFullyInitialized())
+            return result;
+        JobState oldState = state;
+        switchState(ACTIVE);
+        if (oldState == INITIALIZING_TO_PAST) {
+            terminate();
+        } else if (oldState == INITIALIZING_TO_SUSPENDED) {
+            suspend();
+        }
+        return result;
     }
+
     if (result >= 0) {
         doneLocally = true;
         this->resultCode = result;

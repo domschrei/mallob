@@ -25,29 +25,84 @@ struct MessageHandle {
     MessageHandle(const std::vector<int>& data) : sendData(data) {}
 };
 
+/*
+ * The receiver is queried to begin working as the i-th node of job j.
+ * Data type: JobRequest
+ */
 const int MSG_FIND_NODE = 3;
+/*
+ * The sender asks the receiver to become the sender's parent for some job j
+ * of which a corresponding child position was advertised.
+ * Data type: JobRequest
+ */
 const int MSG_REQUEST_BECOME_CHILD = 4;
+/*
+ * The senders confirms that the receiver may become the sender's child
+ * with respect to the job and index specified in the signature.
+ * Data type: JobSignature
+ */
 const int MSG_ACCEPT_BECOME_CHILD = 5;
+/*
+ * The sender rejects the receiver to become the sender's child
+ * with respect to the job and index specified in the signature.
+ * Data type: JobRequest
+ */
 const int MSG_REJECT_BECOME_CHILD = 6;
+/*
+ * The sender acknowledges that it received the receiver's previous
+ * MSG_ACCEPT_BECOME_CHILD message.
+ * Data type: JobRequest
+ */
 const int MSG_ACK_ACCEPT_BECOME_CHILD = 7;
+/*
+ * The sender propagates a job's volume update to the receiver.
+ * Data type: [jobId, volume]
+ */
 const int MSG_UPDATE_VOLUME = 8;
-const int MSG_TERMINATED = 9;
-const int MSG_RESULT = 10;
+/*
+ * The sender transfers a full job description to the receiver.
+ * Data type: JobDescription
+ * Warning: Length may exceed the default maximum message length.
+ */
 const int MSG_SEND_JOB = 11;
-const int MSG_INTRODUCE_JOB = 12;
-const int MSG_CHECK_NODE_PERMUTATION = 13;
-const int MSG_CONFIRM_NODE_PERMUTATION = 14;
-const int MSG_ADJUST_NODE_PERMUTATION = 15;
+/*
+ * The sender informs the receiver that a solution was found for the job
+ * of the specified ID.
+ * Data type: [jobId, resultCode]
+ */
 const int MSG_WORKER_FOUND_RESULT = 16;
+/*
+ * The sender provides the global rank of the client node which initiated
+ * a certain job.
+ * Data type: [jobId, clientRank]
+ */
 const int MSG_FORWARD_CLIENT_RANK = 17;
+/*
+ * A signal to terminate a job is propagated.
+ * Data type: [jobId]
+ */
 const int MSG_TERMINATE = 18;
+/*
+ * The sender informs the receiver (a client) that a job has been finished,
+ * and also provides the size of the upcoming job result message.
+ * Data type: [jobId, sizeOfResult]
+ */
 const int MSG_JOB_DONE = 19;
+/*
+ * The sender (a client) acknowledges that it received the receiver's MSG_JOB_DONE
+ * message and signals that it wishes to receive the full job result.
+ * Data type: [jobId, sizeOfResult]
+ */
 const int MSG_QUERY_JOB_RESULT = 20;
+/*
+ * The sender provides a job's full result to the receiver (a client).
+ * Data type: JobResult
+ * Warning: Length may exceed the default maximum message length.
+ */
 const int MSG_SEND_JOB_RESULT = 21;
-const int MSG_REDUCE_RESOURCES_INFO = 22;
+
+const int MSG_COLLECTIVES = 300;
 const int MSG_JOB_COMMUNICATION = 400;
-const int MSG_GATHER_CLAUSES = 417;
-const int MSG_DISTRIBUTE_CLAUSES = 418;
 
 typedef std::shared_ptr<MessageHandle> MessageHandlePtr;
 

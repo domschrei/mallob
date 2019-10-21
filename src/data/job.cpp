@@ -23,6 +23,15 @@ void Job::store(JobDescription& job) {
 }
 
 void Job::initialize() {
+    beginInitialization();
+    endInitialization();
+}
+
+void Job::beginInitialization() {
+    switchState(INITIALIZING_TO_ACTIVE);
+}
+
+void Job::endInitialization() {
     initialized = true;
     switchState(ACTIVE);
 }
@@ -38,7 +47,8 @@ void Job::initialize(int index, int rootRank, int parentRank) {
 void Job::reinitialize(int index, int rootRank, int parentRank) {
 
     if (!initialized) {
-
+        
+        beginInitialization();
         initialize(index, rootRank, parentRank);
 
     } else {
@@ -105,6 +115,10 @@ void Job::setRightChild(int rank) {
 }
 
 void Job::suspend() {
+    if (isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_SUSPENDED})) {
+        switchState(INITIALIZING_TO_SUSPENDED);
+        return;
+    }
     assert(state == ACTIVE);
     pause();
     switchState(SUSPENDED);
@@ -112,7 +126,10 @@ void Job::suspend() {
 }
 
 void Job::resume() {
-    
+    if (isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_SUSPENDED})) {
+        switchState(INITIALIZING_TO_ACTIVE);
+        return;
+    }
     if (!initialized) {
         initialize(index, getRootNodeRank(), getParentNodeRank());
     } else {
@@ -124,7 +141,12 @@ void Job::resume() {
 
 void Job::withdraw() {
 
-    assert(state == ACTIVE || state == SUSPENDED);
+    if (isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_SUSPENDED})) {
+        switchState(INITIALIZING_TO_PAST);
+        return;
+    } else {
+        assert(state == ACTIVE || state == SUSPENDED);
+    }
 
     terminate();
 
@@ -145,7 +167,7 @@ const JobResult& Job::getResult() const {
 
 bool Job::wantsToCommunicate() const {
     return isInState({ACTIVE}) && !hasLeftChild() && !hasRightChild() 
-            && epochOfLastCommunication < epochCounter.getEpoch() 
+            && epochOfLastCommunication < (int)epochCounter.getEpoch() 
             && epochCounter.getSecondsSinceLastSync() >= 2.5f;
 }
 

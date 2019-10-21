@@ -17,7 +17,7 @@ void readAllInstances(Client* client) {
     Console::log(Console::VERB, "Started client I/O thread to read instances.");
 
     Client& c = *client;
-    for (int i = 0; i < c.jobs.size(); i++) {
+    for (size_t i = 0; i < c.jobs.size(); i++) {
 
         JobDescription &job = c.jobs[i];
         int jobId = job.getId();
@@ -52,7 +52,7 @@ Client::~Client() {
 
 void Client::mainProgram() {
 
-    int i = 0;
+    size_t i = 0;
     while (true) {
 
         // Introduce next job(s), if applicable
@@ -114,7 +114,7 @@ void Client::mainProgram() {
             MyMpi::irecv(MPI_COMM_WORLD);
 
         // Sleep for a bit
-        usleep(1000); // 1000 = 1 millisecond
+        usleep(100); // 1000 = 1 millisecond
     }
 }
 
@@ -150,6 +150,7 @@ void Client::handleSendJobResult(MessageHandlePtr handle) {
     int resultCode = jobResult.result;
 
     Console::log_recv(Console::INFO, handle->source, "Received result of job #%i, code: %i", jobId, resultCode);
+    Console::log(Console::INFO, "RESPONSE_TIME #%i %.6f", jobId, Timer::elapsedSeconds() - introducedJobs[jobId]->getArrival());
 }
 
 void Client::readInstanceList(std::string& filename) {

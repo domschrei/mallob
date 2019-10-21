@@ -240,7 +240,7 @@ void Lingeling::addClauses(vector<vector<int> >& clauses) {
 void Lingeling::addClauses(const vector<int>& clauses) {
 	clauseAddMutex.lock();
 	vector<int> clause;
-	for (int i = 0; i < clauses.size(); i++) {
+	for (size_t i = 0; i < clauses.size(); i++) {
 		int lit = clauses[i];
 		if (lit == 0) {
 			clausesToAdd.push_back(clause);

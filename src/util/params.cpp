@@ -28,16 +28,15 @@ void Parameters::init(int argc, char** argv) {
 }
 
 void Parameters::setDefaults() {
-    setParam("p", "5.0"); // rebalance period (seconds)
-    setParam("l", "0.95"); // load factor
     setParam("c", "1"); // num clients
-    setParam("t", "2"); // num threads per node
-    setParam("v", "2"); // verbosity 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...
-    setParam("vhorde", "0"); // hordesat verbosity
-    setParam("td", "0.01"); // temperature decay for thermodyn. balancing
-    setParam("log", "."); // logging directory
     //setParam("colors"); // colored terminal output
     //setParam("h"); setParam("help"); // print usage
+    setParam("l", "0.95"); // load factor
+    setParam("log", "."); // logging directory
+    setParam("p", "5.0"); // rebalance period (seconds)
+    setParam("t", "2"); // num threads per node
+    setParam("v", "2"); // verbosity 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...
+    setParam("td", "0.01"); // temperature decay for thermodyn. balancing
 }
 
 void Parameters::printUsage() {
@@ -55,7 +54,6 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "-p=<rebalance-period> Do global rebalancing every r seconds (r > 0)");
     Console::log(Console::INFO, "-t=<num-threads>      Amount of worker threads per node (int t >= 1)");
     Console::log(Console::INFO, "-v=<verb-num>         Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...");
-    Console::log(Console::INFO, "-vhorde=<verb-num>    Logging verbosity of hordesat components");
 }
 
 string Parameters::getFilename() {

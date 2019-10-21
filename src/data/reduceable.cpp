@@ -24,7 +24,7 @@ std::set<int> Reduceable::reduceToRankZero(MPI_Comm& comm) {
         if (myRank % k == 0 && myRank+k/2 < MyMpi::size(comm)) {
             // Receive
             Console::log(Console::VVERB, "Red. k=%i : Receiving", k);
-            MessageHandlePtr handle = MyMpi::recv(comm, MSG_REDUCE_RESOURCES_INFO);
+            MessageHandlePtr handle = MyMpi::recv(comm, MSG_COLLECTIVES);
             std::unique_ptr<Reduceable> received = getDeserialized(handle->recvData);
             if (received->isEmpty()) {
                 excludedNodes.insert(handle->source);
@@ -34,7 +34,7 @@ std::set<int> Reduceable::reduceToRankZero(MPI_Comm& comm) {
         } else if (myRank % k == k/2) {
             // Send
             Console::log_send(Console::VVERB, myRank-k/2, "Red. k=%i : Sending", k);
-            MessageHandlePtr handle = MyMpi::send(comm, myRank-k/2, MSG_REDUCE_RESOURCES_INFO, *this);
+            MessageHandlePtr handle = MyMpi::send(comm, myRank-k/2, MSG_COLLECTIVES, *this);
         }
     }
     if (isEmpty()) {
@@ -56,11 +56,11 @@ void Reduceable::broadcastFromRankZero(MPI_Comm& comm, std::set<int> excludedRan
                 continue;
             }
             Console::log_send(Console::VVERB, myRank+k/2, "Brc. k=%i : Sending", k);
-            MessageHandlePtr handle = MyMpi::send(comm, myRank+k/2, MSG_REDUCE_RESOURCES_INFO, *this);
+            MessageHandlePtr handle = MyMpi::send(comm, myRank+k/2, MSG_COLLECTIVES, *this);
         } else if (myRank % k == k/2) {
             // Receive
             Console::log(Console::VVERB, "Brc. k=%i : Receiving", k);
-            MessageHandlePtr handle = MyMpi::recv(comm, MSG_REDUCE_RESOURCES_INFO);
+            MessageHandlePtr handle = MyMpi::recv(comm, MSG_COLLECTIVES);
             deserialize(handle->recvData); // overwrite local object
         }
     }

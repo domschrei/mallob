@@ -323,7 +323,6 @@ void HordeLib::beginSolving(bool readFormulaFromHlib) {
 	maxSeconds = params.getIntParam("t", 0);
 	maxRounds = params.getIntParam("r", 0);
 	round = 1;
-    running = true;
 
 	for (int i = 0; i < solversCount; i++) {
         //log(1, "initializing solver %i.\n", i);
@@ -336,10 +335,11 @@ void HordeLib::beginSolving(bool readFormulaFromHlib) {
 	}
 	startSolving = getTime() - startSolving;
 	log(1, "Node %d started its solvers, initialization took %.3f seconds\n", mpi_rank, startSolving);
+    running = true;
 }
 
 bool HordeLib::isFullyInitialized() {
-	for (int i = 0; i < solversInitialized.size(); i++) {
+	for (size_t i = 0; i < solversInitialized.size(); i++) {
 		if (solversInitialized[i] == 0)
 			return false;
 	}

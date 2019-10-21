@@ -38,6 +38,8 @@ private:
     EpochCounter epochCounter;
     Statistics stats;
 
+    std::map<int, std::thread> initializerThreads;
+
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& clientNodes) :
         comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), epochCounter(), stats(epochCounter)
@@ -73,6 +75,7 @@ private:
     void bounceJobRequest(JobRequest& request);
     void informClient(int jobId, int clientRank);
     void updateVolume(int jobId, int demand);
+    void initJob(JobDescription job);
     
     void rebalance();
     float reduce(float contribution, int rootRank);

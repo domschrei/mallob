@@ -33,6 +33,12 @@ enum JobState {
      */
     COMMITTED,
     /**
+     * The job is currently being initialized (by a separate thread).
+     */
+    INITIALIZING_TO_ACTIVE,
+    INITIALIZING_TO_SUSPENDED,
+    INITIALIZING_TO_PAST,
+    /**
      * There are threads actively computing on the job.
      */
     ACTIVE,
@@ -46,7 +52,7 @@ enum JobState {
      */
     PAST
 };
-static const char * jobStateStrings[] = { "none", "stored", "committed", "active", "suspended", "past" };
+static const char * jobStateStrings[] = { "none", "stored", "committed", "initializingToActive", "initializingToSuspended", "initializingToPast", "active", "suspended", "past" };
 
 class Job {
 
@@ -59,9 +65,9 @@ protected:
     int index;
     JobDescription job;
 
-    float elapsedSecondsOfArrival;
     EpochCounter& epochCounter;
     int epochOfArrival;
+    float elapsedSecondsOfArrival;
     int epochOfLastCommunication = -1; 
 
     JobState state = JobState::NONE;
@@ -96,8 +102,10 @@ public:
     virtual void pause() = 0;
     virtual void unpause() = 0;
     virtual void terminate() = 0;
-    // may be re-implemented IF CALLING BASE METHOD
+
     virtual void initialize();
+    void beginInitialization();
+    void endInitialization();
     
     // Intra-job communication methods (must be implemented)
     virtual void beginCommunication() = 0;

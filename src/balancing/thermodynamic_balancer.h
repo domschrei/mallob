@@ -21,7 +21,7 @@ private:
         }
         return temperatures[jobId];
     }
-    float coolDown(int jobId) {
+    void coolDown(int jobId) {
         float room = 20.0; 
         float decay = params.getFloatParam("td");
         float previous = getTemperature(jobId);

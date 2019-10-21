@@ -13,6 +13,8 @@
 #include <string>
 #include <iostream>
 #include "stdlib.h"
+#include "Logger.h"
+
 using namespace std;
 
 
@@ -48,14 +50,15 @@ public:
 	}
 
 	void printParams() {
+		std::string out = "";
 		for (map<string,string>::iterator it = params.begin(); it != params.end(); it++) {
 			if (it->second.empty()) {
-				cout << it->first << ", ";
+				out.append(it->first + " ");
 			} else {
-				cout << it->first << "=" << it->second << ", ";
+				out.append(it->first + "=" + it->second + " ");
 			}
 		}
-		cout << "\n";
+		log(0, out.c_str());
 	}
 
 	void setParam(const char* name) {

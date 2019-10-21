@@ -36,8 +36,6 @@ void Worker::checkTerminate() {
 
 void Worker::mainProgram() {
 
-    Console::log(Console::INFO, "Worker node set up.");
-
     while (true) {
 
         if (isTimeForRebalancing()) {
@@ -65,7 +63,6 @@ void Worker::mainProgram() {
 
         // Clause sharing
         for (auto it : jobs) {
-            int jobId = it.first;
             Job& job = *it.second;
             if (job.wantsToCommunicate()) {
                 Console::log(Console::VERB, "%s wants to communicate", job.toStr());
@@ -77,8 +74,6 @@ void Worker::mainProgram() {
         for (auto it : jobs) {
             int jobId = it.first;
             Job &job = *it.second;
-            if (job.getState() != JobState::ACTIVE)
-                continue;
             int result = job.solveLoop();
             if (result >= 0) {
                 // Solver done!
@@ -93,7 +88,7 @@ void Worker::mainProgram() {
         }
 
         // Sleep for a bit
-        usleep(1000); // 1000 = 1 millisecond
+        usleep(100); // 1000 = 1 millisecond
 
         // Poll messages, if present
         MessageHandlePtr handle;
@@ -190,7 +185,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
 
     JobRequest req; req.deserialize(handle->recvData);
 
-    if (req.iteration != epochCounter.getEpoch() && req.requestedNodeIndex > 0) {
+    if (req.iteration != (int)epochCounter.getEpoch() && req.requestedNodeIndex > 0) {
         Console::log_recv(Console::INFO, handle->source, "Discarding a job request from a previous iteration");
         return;
     }
@@ -235,21 +230,20 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
     assert(hasJob(req.jobId));
     Job &job = getJob(req.jobId);
 
-    if (req.iteration != epochCounter.getEpoch() && req.requestedNodeIndex == 0) {
+    if (req.iteration != (int)epochCounter.getEpoch() && req.requestedNodeIndex == 0) {
         // Looking for a root node => Does not become obsolet
         Console::log(Console::INFO, "Updating epoch of root job request #%i:0", req.jobId);
         req.iteration = epochCounter.getEpoch();
     }
 
     bool reject = false;
-    if (req.iteration != epochCounter.getEpoch()) {
+    if (req.iteration != (int)epochCounter.getEpoch()) {
 
         Console::log_recv(Console::INFO, handle->source, "Discarding request %s from epoch %i (now is epoch %i)", 
                             job.toStr(), req.iteration, epochCounter.getEpoch());
         reject = true;
 
-    } else if (job.getState() != JobState::ACTIVE 
-            && job.getState() != JobState::STORED) {
+    } else if (job.isNotInState({ACTIVE, STORED, INITIALIZING_TO_ACTIVE})) {
 
         Console::log_recv(Console::INFO, handle->source, "%s is not active and not stored (any more) -- discarding", job.toStr());
         Console::log(Console::VERB, "Actual job state: %s", job.jobStateToStr());
@@ -343,16 +337,14 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
     } else {
 
         // Mark new node as one of the node's children, if applicable
-        if (job.isInitialized()) {
-            if (req.requestedNodeIndex == job.getLeftChildIndex()) {
-                job.setLeftChild(handle->source);
-            } else if (req.requestedNodeIndex == job.getRightChildIndex()) {
-                job.setRightChild(handle->source);
-            } else assert(req.requestedNodeIndex == 0);
-        }
+        if (req.requestedNodeIndex == job.getLeftChildIndex()) {
+            job.setLeftChild(handle->source);
+        } else if (req.requestedNodeIndex == job.getRightChildIndex()) {
+            job.setRightChild(handle->source);
+        } else assert(req.requestedNodeIndex == 0);
 
         // Send current volume / initial demand update
-        if (job.getState() == JobState::ACTIVE) {
+        if (job.isInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
             int volume = balancer->getVolume(req.jobId);
             assert(volume >= 1);
             Console::log_send(Console::VERB, handle->source, "Propagating volume %i to new child", volume);
@@ -366,13 +358,19 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
 }
 
 void Worker::handleSendJob(MessageHandlePtr& handle) {
+    Console::log_recv(Console::VERB, handle->source, "Deserializing job ...");
     JobDescription desc; desc.deserialize(handle->recvData);
+    setLoad(1);
     assert(hasJob(desc.getId()));
     Job& job = getJob(desc.getId());
-    Console::log_recv(Console::VERB, handle->source, "Received full job description of %s", job.toStr());
+    Console::log(Console::VERB, "Received full job description of %s. Initializing ...", job.toStr());
     job.store(desc);
-    setLoad(1);
-    job.initialize();
+    job.beginInitialization();
+    initializerThreads[desc.getId()] = std::thread(&Worker::initJob, this, desc); // TODO call by reference / pointer
+}
+
+void Worker::initJob(JobDescription desc) {
+    getJob(desc.getId()).initialize();
 }
 
 void Worker::handleUpdateVolume(MessageHandlePtr& handle) {
@@ -463,12 +461,7 @@ void Worker::handleTerminate(MessageHandlePtr& handle) {
         MyMpi::deferHandle(handle); // do not consume this message while job state is "COMMITTED"
     }
 
-    // Either this job is still running, or it has been shut down by a previous termination message / rebalancing procedure
-    assert(job.getState() == JobState::ACTIVE
-        || job.getState() == JobState::PAST
-        || job.getState() == JobState::SUSPENDED);
-
-    if (job.getState() == JobState::ACTIVE) {
+    if (job.isInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
 
         // Propagate termination message down the job tree
         if (job.hasLeftChild()) {
@@ -533,7 +526,7 @@ void Worker::updateVolume(int jobId, int volume) {
 
     Job &job = getJob(jobId);
 
-    if (job.getState() != JobState::ACTIVE) {
+    if (job.isNotInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
         // Job is not active right now
         return;
     }

@@ -61,11 +61,11 @@ void Statistics::dump() {
     dump(0, epochCounter.getEpoch(), true);
 }
 
-void Statistics::dump(int epoch) {
+void Statistics::dump(uint epoch) {
     dump(epoch, epoch, false);
 }
 
-void Statistics::dump(int minEpoch, int maxEpoch, bool dumpGlobalStats) {
+void Statistics::dump(uint minEpoch, uint maxEpoch, bool dumpGlobalStats) {
     
     Console::getLock();
 
@@ -76,7 +76,7 @@ void Statistics::dump(int minEpoch, int maxEpoch, bool dumpGlobalStats) {
         Console::logUnsafe(Console::INFO, ""); // new line
     }
 
-    for (int epoch = minEpoch; epoch <= maxEpoch; epoch++) {
+    for (size_t epoch = minEpoch; epoch <= maxEpoch; epoch++) {
         Console::appendUnsafe(Console::INFO, "EPOCH_%i ", epoch);
         if (epoch >= epochAtomics.size()) 
             epochAtomics.push_back(initAtomics());

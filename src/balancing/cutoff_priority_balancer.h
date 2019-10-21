@@ -33,12 +33,12 @@ ResourcesInfo() :
 void merge(const Reduceable& other) override {
     const ResourcesInfo& info = (ResourcesInfo&) other;
     assignedResources += info.assignedResources;
-    for (int i = 0; i < info.priorities.size(); i++) {
+    for (size_t i = 0; i < info.priorities.size(); i++) {
 
         float prioToInsert = info.priorities[i];
 
         // Find insertion point
-        int idx = 0;
+        size_t idx = 0;
         while (idx < priorities.size() && priorities[idx] > prioToInsert) idx++;
 
         // If this priority did not exist before, 
@@ -59,10 +59,10 @@ bool isEmpty() override {
 std::vector<int> serialize() const override {
     std::vector<int> data;
     data.push_back((int) (assignedResources * 1000));
-    for (int i = 0; i < priorities.size(); i++) {
+    for (size_t i = 0; i < priorities.size(); i++) {
         data.push_back((int) (priorities[i] * 1000));
     }
-    for (int i = 0; i < demandedResources.size(); i++) {
+    for (size_t i = 0; i < demandedResources.size(); i++) {
         data.push_back((int) (demandedResources[i] * 1000));
     }
     return data;

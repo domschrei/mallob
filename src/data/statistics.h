@@ -35,8 +35,8 @@ public:
     void push_back(const char* tag, float num);
 
     void dump();
-    void dump(int epoch);
-    void dump(int minEpoch, int maxEpoch, bool dumpGlobalStats);
+    void dump(uint epoch);
+    void dump(uint minEpoch, uint maxEpoch, bool dumpGlobalStats);
 
 private:
     AtomicStatisticsMap& currentAtomics();
