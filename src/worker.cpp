@@ -90,7 +90,7 @@ void Worker::mainProgram() {
         }
 
         // Sleep for a bit
-        usleep(100); // 1000 = 1 millisecond
+        //usleep(100); // 1000 = 1 millisecond
 
         // Poll messages, if present
         MessageHandlePtr handle;
@@ -334,8 +334,8 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
 }
 
 void Worker::initJob(MessageHandlePtr handle) {
-    Console::log_recv(Console::VERB, handle->source, "Deserializing job ...");
     int jobId = handle->recvData[0];
+    Console::log_recv(Console::VERB, handle->source, "Deserializing job #%i ...", jobId);
     Job& job = getJob(jobId);
     job.setDescription(handle->recvData);
     job.beginInitialization();
