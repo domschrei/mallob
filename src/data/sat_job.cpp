@@ -15,7 +15,7 @@ void SatJob::initialize() {
     assert(hasDescription);
 
     assert(solver == NULL);
-    Console::log(Console::VERB, "preparing params");
+    Console::log(Console::VERB, "%s : preparing params", toStr());
     std::map<std::string, std::string> params;
     params["e"] = "1"; // exchange mode: 0 = nothing, 1 = alltoall, 2 = log, 3 = asyncrumor
     params["c"] = this->params.getParam("t"); // solver threads on this node
@@ -26,13 +26,13 @@ void SatJob::initialize() {
     params["mpisize"] = std::to_string(commSize); // mpi_size
     std::string identifier = std::string(toStr());
     params["jobstr"] = identifier;
-    Console::log(Console::VERB, "creating horde instance");
+    Console::log(Console::VERB, "%s : creating horde instance", toStr());
     solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(identifier))));
     assert(solver != NULL);
 
-    Console::log(Console::VERB, "beginning to solve");
+    Console::log(Console::VERB, "%s : beginning to solve", toStr());
     solver->beginSolving(job.getPayload());
-    Console::log(Console::VERB, "finished initialization");
+    Console::log(Console::VERB, "%s : finished concurrent HordeLib instance initialization", toStr());
     endInitialization();
 }
 
@@ -100,14 +100,14 @@ void SatJob::communicate(int source, JobMessage& msg) {
 
     if (msg.tag == MSG_GATHER_CLAUSES) {
 
-        Console::log(Console::VERB, "%s received clauses from below of effective size %i", toStr(), clauses.size());
+        Console::log(Console::VERB, "%s : received clauses from below of effective size %i", toStr(), clauses.size());
 
         collectClausesFromBelow(clauses);
 
         if (canShareCollectedClauses()) {
             std::vector<int> clausesToShare = shareCollectedClauses();
             if (isRoot()) {
-                Console::log(Console::VERB, "Switching clause exchange from gather to broadcast");
+                Console::log(Console::VERB, "%s : switching clause exchange from gather to broadcast", toStr());
                 learnAndDistributeClausesDownwards(clausesToShare);
             } else {
                 int parentRank = getParentNodeRank();
@@ -115,7 +115,7 @@ void SatJob::communicate(int source, JobMessage& msg) {
                 msg.jobId = jobId;
                 msg.epoch = epochCounter.getEpoch();
                 msg.tag = MSG_GATHER_CLAUSES;
-                Console::log_send(Console::VERB, parentRank, "Gathering clauses upwards from %s", toStr());
+                Console::log_send(Console::VERB, parentRank, "%s : gathering clauses upwards", toStr());
                 MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
             }
         }
@@ -127,7 +127,7 @@ void SatJob::communicate(int source, JobMessage& msg) {
 
 void SatJob::learnAndDistributeClausesDownwards(std::vector<int>& clauses) {
 
-    Console::log(Console::VVERB, "%s received %i broadcast clauses", toStr(), clauses.size());
+    Console::log(Console::VVERB, "%s : received %i broadcast clauses", toStr(), clauses.size());
     assert(clauses.size() % BROADCAST_CLAUSE_INTS_PER_NODE == 0);
 
     learnClausesFromAbove(clauses);
@@ -140,12 +140,12 @@ void SatJob::learnAndDistributeClausesDownwards(std::vector<int>& clauses) {
     int childRank;
     if (hasLeftChild()) {
         childRank = getLeftChildNodeRank();
-        Console::log_send(Console::VERB, childRank, "%s broadcasting clauses downwards", toStr());
+        Console::log_send(Console::VERB, childRank, "%s : broadcasting clauses downwards", toStr());
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_JOB_COMMUNICATION, msg);
     }
     if (hasRightChild()) {
         childRank = getRightChildNodeRank();
-        Console::log_send(Console::VERB, childRank, "%s broadcasting clauses downwards", toStr());
+        Console::log_send(Console::VERB, childRank, "%s : broadcasting clauses downwards", toStr());
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_JOB_COMMUNICATION, msg);
     }
 }
@@ -197,9 +197,9 @@ std::vector<int> SatJob::shareCollectedClauses() {
 void SatJob::learnClausesFromAbove(std::vector<int>& clauses) {
     if (!solver->isFullyInitialized())
         return; // discard clauses TODO keep?
-    Console::log(Console::VERB, "Digesting clauses ...");
+    Console::log(Console::VVERB, "%s : digesting clauses ...", toStr());
     solver->digestSharing(clauses);
-    Console::log(Console::VERB, "Digested clauses.");
+    Console::log(Console::VVERB, "%s : digested clauses.", toStr());
 }
 
 int SatJob::solveLoop() {
@@ -233,7 +233,7 @@ int SatJob::solveLoop() {
     if (result >= 0) {
         doneLocally = true;
         this->resultCode = result;
-        Console::log_send(Console::INFO, getRootNodeRank(), "%s found result %s", toStr(), 
+        Console::log_send(Console::INFO, getRootNodeRank(), "%s : found result %s", toStr(), 
                             result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN");
         extractResult();
     }
