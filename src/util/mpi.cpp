@@ -7,6 +7,7 @@
 #include "mpi.h"
 #include "random.h"
 #include "timer.h"
+#include "console.h"
 
 std::set<MessageHandlePtr> MyMpi::handles;
 std::set<MessageHandlePtr> MyMpi::sentHandles;
@@ -15,8 +16,7 @@ int MyMpi::maxMsgLength;
 void MyMpi::init(int argc, char *argv[])
 {
     MPI_Init(&argc, &argv);
-    maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
-}
+    maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;}
 
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, int object) {
     std::vector<int> vec;
@@ -80,6 +80,15 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int tag) {
     return handle;
 }
 
+MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
+    MessageHandlePtr handle(new MessageHandle());
+    handle->tag = tag;
+    handle->recvData.resize(maxMsgLength);
+    MPI_Irecv(handle->recvData.data(), maxMsgLength, MPI_INT, source, tag, communicator, &handle->request);
+    handles.insert(handle);
+    return handle;
+}
+
 MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag, int size) {
     MessageHandlePtr handle(new MessageHandle());
     handle->tag = tag;
@@ -100,9 +109,11 @@ MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag) {
 
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag, int size) {
     MessageHandlePtr handle(new MessageHandle());
+    handle->source = source;
     handle->tag = tag;
     handle->recvData.resize(size);
-    MPI_Irecv(handle->recvData.data(), size, MPI_INT, MPI_ANY_SOURCE, tag, communicator, &handle->request);
+    handle->critical = true;
+    MPI_Irecv(handle->recvData.data(), size, MPI_INT, source, tag, communicator, &handle->request);
     handles.insert(handle);
     return handle;
 }
@@ -138,6 +149,38 @@ MessageHandlePtr MyMpi::poll() {
         handles.erase(handle);
     }
     return handle;
+}
+
+bool MyMpi::hasCriticalHandles() {
+    bool critical = false;
+    for (auto it : handles) {
+        if (it->critical) {
+            critical = true;
+            Console::log(Console::VVERB, "Has handle of tag %i (critical: %s)", it->tag, it->critical ? "yes" : "no");
+        }
+    }
+
+    if (handles.size() > 1) {
+        for (auto it : handles) {
+            Console::log(Console::VVERB, " -- tag %i", it->tag);
+        }
+    }
+
+    return critical;
+}
+
+void MyMpi::listen() {
+    bool critical = false;
+    bool nonCritical = false;
+    for (auto it : handles) {
+        if (it->critical) {
+            critical = true;
+        } else {
+            nonCritical = true;
+        }
+    }
+    if (!critical && !nonCritical)
+        MyMpi::irecv(MPI_COMM_WORLD); // add a non-critical 
 }
 
 void MyMpi::deferHandle(MessageHandlePtr handle) {

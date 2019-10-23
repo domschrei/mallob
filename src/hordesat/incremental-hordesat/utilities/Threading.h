@@ -11,8 +11,11 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <execinfo.h>
+#include <unistd.h>
+#include <signal.h>
 
-#define TESTRUN(cmd, msg) int res = cmd; if (res != 0) { printf(msg,res); exit(res); }
+#define TESTRUN(cmd, msg) int res = cmd; if (res != 0) {  printf(msg,res); kill(getpid(), SIGSEGV); }
 
 class Mutex {
 private:

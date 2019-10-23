@@ -13,17 +13,22 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             elapsedSecondsOfArrival(Timer::elapsedSeconds()), 
             hasDescription(false), initialized(false), jobNodeRanks(commSize, jobId) {}
 
-void Job::store(JobDescription& job) {
-    this->job = job;
+void Job::store(std::vector<int>& data) {
+    setDescription(data);
     if (state == NONE) {
         this->index = -1;
         switchState(STORED);
     }
+}
+
+void Job::setDescription(std::vector<int>& data) {
+    this->serializedDescription = data;
+    this->job = JobDescription();
+    this->job.deserialize(data);
     hasDescription = true;
 }
 
 void Job::initialize() {
-    beginInitialization();
     endInitialization();
 }
 

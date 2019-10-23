@@ -75,9 +75,10 @@ private:
     void bounceJobRequest(JobRequest& request);
     void informClient(int jobId, int clientRank);
     void updateVolume(int jobId, int demand);
-    void initJob(JobDescription job);
+    void initJob(MessageHandlePtr handle);
     
     void rebalance();
+    void finishBalancing();
     float reduce(float contribution, int rootRank);
     float allReduce(float contribution);
 

@@ -69,7 +69,7 @@ void Console::init(int rank, int verbosity, bool coloredOutput, std::string logD
     std::cout << std::fixed << std::setprecision(3);*/
 }
 
-void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list args) {
+void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list& args) {
 
     if (verbosity > Console::verbosity)
         return;
@@ -112,7 +112,7 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list ar
     // New line, if applicable
     if (endline) {
         if (strlen(str) == 0 || str[strlen(str)-1] != '\n') {
-            printf("\n"); 
+            printf("\n");
             if (logFile != NULL) fprintf(logFile, "\n");
         }
         beganLine = false;
@@ -122,7 +122,7 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list ar
     if (logFile != NULL) fflush(logFile);
 }
 
-void Console::log(int verbosity, const char* str, bool endline, va_list args) {
+void Console::log(int verbosity, const char* str, bool endline, va_list& args) {
     logMutex.lock();
     logUnsafe(verbosity, str, endline, args);
     logMutex.unlock();
@@ -167,4 +167,12 @@ void Console::log_recv(int verbosity, int sourceRank, const char* str, ...) {
     va_start(vl, str);
     log(verbosity, (std::string(str) + " <= [" + std::to_string(sourceRank) + "]").c_str(), true, vl);
     va_end(vl);
+}
+
+bool Console::fail(const char* str, ...) {
+    va_list vl;
+    va_start(vl, str);
+    log(CRIT, str, true, vl);
+    va_end(vl);
+    return false;
 }

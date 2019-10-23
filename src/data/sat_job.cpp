@@ -14,6 +14,7 @@ void SatJob::initialize() {
     assert(isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_PAST}));
     assert(hasDescription);
 
+    assert(solver == NULL);
     Console::log(Console::VERB, "preparing params");
     std::map<std::string, std::string> params;
     params["e"] = "1"; // exchange mode: 0 = nothing, 1 = alltoall, 2 = log, 3 = asyncrumor
@@ -27,12 +28,12 @@ void SatJob::initialize() {
     params["jobstr"] = identifier;
     Console::log(Console::VERB, "creating horde instance");
     solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(identifier))));
-    
     assert(solver != NULL);
 
     Console::log(Console::VERB, "beginning to solve");
     solver->beginSolving(job.getPayload());
     Console::log(Console::VERB, "finished initialization");
+    endInitialization();
 }
 
 void SatJob::beginSolving() {
@@ -219,6 +220,7 @@ int SatJob::solveLoop() {
         if (solver == NULL || !solver->isRunning() || !solver->isFullyInitialized())
             return result;
         JobState oldState = state;
+        Console::log(Console::VERB, "Solver threads of %s are fully initialized by now", toStr());
         switchState(ACTIVE);
         if (oldState == INITIALIZING_TO_PAST) {
             terminate();

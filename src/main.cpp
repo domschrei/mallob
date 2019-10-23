@@ -2,6 +2,10 @@
 #include <iostream>
 #include <set>
 #include <exception>
+#include <execinfo.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #include "util/timer.h"
 #include "util/mpi.h"
@@ -15,6 +19,19 @@
 
 Client* client;
 Worker* worker;
+
+void handler(int sig) {
+  void *array[10];
+  size_t size;
+
+  // get void*'s for all entries on the stack
+  size = backtrace(array, 10);
+
+  // print out all the frames to stderr
+  fprintf(stderr, "Error: signal %d:\n", sig);
+  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  exit(1);
+}
 
 void doExternalClientProgram(MPI_Comm commClients, Parameters& params, const std::set<int>& clientRanks) {
     
@@ -38,6 +55,7 @@ void dumpStats() {
 }
 
 int main(int argc, char *argv[]) {
+    signal(SIGSEGV, handler);
 
     Timer::init();
     MyMpi::init(argc, argv);

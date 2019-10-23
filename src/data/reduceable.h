@@ -8,6 +8,7 @@
 #include "serializable.h"
 
 class Reduceable : public Serializable {
+
 public:
     virtual std::vector<int> serialize() const override = 0;
     virtual void deserialize(const std::vector<int>& packed) override = 0;
@@ -18,6 +19,21 @@ public:
     std::set<int> allReduce(MPI_Comm& comm);
     std::set<int> reduceToRankZero(MPI_Comm& comm);
     void broadcastFromRankZero(MPI_Comm& comm, std::set<int> excludedRanks = std::set<int>());
+
+    bool startReduction(MPI_Comm& comm);
+    bool advanceReduction(MessageHandlePtr handle);
+    std::set<int>& getExcludedRanks() {return excludedRanks;}
+
+    bool startBroadcast(MPI_Comm& comm, std::set<int>& excludedRanks);
+    bool advanceBroadcast(MessageHandlePtr handle);
+
+protected:
+    MPI_Comm comm;
+    int myRank;
+    std::set<int> excludedRanks;
+    int power;
+    int highestPower;
+    MessageHandlePtr handle;
 };
 
 #endif

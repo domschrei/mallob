@@ -20,6 +20,7 @@ struct MessageHandle {
     std::vector<int> recvData;
     MPI_Status status;
     bool selfMessage = false;
+    bool critical = false;
 
     MessageHandle() {}
     MessageHandle(const std::vector<int>& data) : sendData(data) {}
@@ -121,12 +122,17 @@ public:
     static MessageHandlePtr  send(MPI_Comm communicator, int recvRank, int tag, const std::vector<int>& object);
     static MessageHandlePtr irecv(MPI_Comm communicator);
     static MessageHandlePtr irecv(MPI_Comm communicator, int tag);
+    static MessageHandlePtr irecv(MPI_Comm communicator, int source, int tag);
     static MessageHandlePtr irecv(MPI_Comm communicator, int source, int tag, int size);
     static MessageHandlePtr  recv(MPI_Comm communicator, int tag, int size);
     static MessageHandlePtr  recv(MPI_Comm communicator, int tag);
 
     static MessageHandlePtr poll();
-    static inline bool hasActiveHandles() {return handles.size() > 0;};
+    static inline bool hasActiveHandles() {
+        return handles.size() > 0;
+    }
+    static bool hasCriticalHandles();
+    static void listen();
     static void deferHandle(MessageHandlePtr handle);
     static void cleanSentHandles();
 

@@ -39,9 +39,11 @@ public:
 
     static void logUnsafe(int verbosity, const char* str, ...);
     static void appendUnsafe(int verbosity, const char* str, ...);
-    static void logUnsafe(int verbosity, const char* str, bool endline, va_list args);
+    static void logUnsafe(int verbosity, const char* str, bool endline, va_list& args);
 
-    static void log(int verbosity, const char* str, bool endline, va_list args);
+    static void log(int verbosity, const char* str, bool endline, va_list& args);
+
+    static bool fail(const char* str, ...);
 
     static void getLock() {logMutex.lock(); };
     static void releaseLock() {logMutex.unlock();};

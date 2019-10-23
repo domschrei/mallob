@@ -43,7 +43,7 @@ void Client::init() {
     instanceReaderThread = std::thread(readAllInstances, this);
 
     // Begin listening to incoming messages
-    MyMpi::irecv(MPI_COMM_WORLD);
+    MyMpi::listen();
 }
 
 Client::~Client() {
@@ -110,11 +110,10 @@ void Client::mainProgram() {
         }
 
         // Listen to another message, if no listener is active
-        if (!MyMpi::hasActiveHandles())
-            MyMpi::irecv(MPI_COMM_WORLD);
+        MyMpi::listen();
 
         // Sleep for a bit
-        usleep(100); // 1000 = 1 millisecond
+        usleep(1000); // 1000 = 1 millisecond
     }
 }
 
@@ -131,6 +130,7 @@ void Client::handleRequestBecomeChild(MessageHandlePtr handle) {
 void Client::handleAckAcceptBecomeChild(MessageHandlePtr handle) {
     JobRequest req; req.deserialize(handle->recvData);
     const JobDescription& desc = *introducedJobs[req.jobId];
+    Console::log_send(Console::VERB, handle->source, "Sending job description of #%i of size %i", desc.getId(), desc.getPayloadSize());
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB, desc);
 }
 

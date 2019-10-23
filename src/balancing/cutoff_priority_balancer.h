@@ -84,14 +84,31 @@ std::unique_ptr<Reduceable> getDeserialized(const std::vector<int>& packed) cons
 }
 };
 
+enum BalancingStage {
+    INITIAL_DEMAND, REDUCE_RESOURCES, BROADCAST_RESOURCES, GLOBAL_ROUNDING
+};
+
 class CutoffPriorityBalancer : public Balancer {
 
 public:
-    CutoffPriorityBalancer(MPI_Comm& comm, Parameters& params, Statistics& stats) : Balancer(comm, params, stats) {
+    CutoffPriorityBalancer(MPI_Comm& comm, Parameters& params, Statistics& stats) : Balancer(comm, params, stats), localJobs(NULL) {
         
     }
     std::map<int, int> balance(std::map<int, Job*>& jobs) override;
 
+    bool beginBalancing(std::map<int, Job*>& jobs) override;
+    bool canContinueBalancing() override;
+    bool continueBalancing() override;
+    bool handleMessage(MessageHandlePtr handle) override;
+    std::map<int, int> getBalancingResult() override;
+
+private:
+    std::set<int, PriorityComparator>* localJobs;
+    BalancingStage stage;
+    ResourcesInfo resourcesInfo;
+    int totalVolume;
+    std::map<int, float> assignments;
+    
 };
 
 #endif

@@ -20,7 +20,7 @@ void Worker::init() {
     balancer = std::unique_ptr<Balancer>(new CutoffPriorityBalancer(comm, params, stats));
     
     // Begin listening to an incoming message
-    MyMpi::irecv(MPI_COMM_WORLD);
+    MyMpi::listen();
 }
 
 void Worker::checkTerminate() {
@@ -38,8 +38,8 @@ void Worker::mainProgram() {
 
     while (true) {
 
-        if (isTimeForRebalancing()) {
-
+        if (!balancer->isBalancing() && isTimeForRebalancing()) {
+            
             checkTerminate();
 
             // Dump stats and advance epoch
@@ -47,18 +47,20 @@ void Worker::mainProgram() {
             lastLoadChange = Timer::elapsedSeconds();
             int epoch = epochCounter.getEpoch();
             stats.dump(epoch);
-            epochCounter.increment();
 
             // Rebalancing
             Console::log(MyMpi::rank(comm) == 0 ? Console::INFO : Console::VERB, "Entering rebalancing of epoch %i", epoch);
-            int numOccupiedNodes = allReduce(isIdle() ? 0.0f : 1.0f);
+            /*int numOccupiedNodes = allReduce(isIdle() ? 0.0f : 1.0f);
             if (MyMpi::rank(comm) == 0) {
                 Console::log(Console::INFO, "Before rebalancing: %i occupied nodes", numOccupiedNodes);
-            }
+            }*/
             rebalance();
 
-            // All collective operations are done; reset synchronized timer
-            epochCounter.resetLastSync();
+        } else if (balancer->isBalancing()) {
+            if (balancer->canContinueBalancing()) {
+                bool done = balancer->continueBalancing();
+                if (done) finishBalancing();
+            }
         }
 
         // Clause sharing
@@ -94,7 +96,7 @@ void Worker::mainProgram() {
         MessageHandlePtr handle;
         if ((handle = MyMpi::poll()) != NULL) {
             // Process message
-            Console::log_recv(Console::VVERB, handle->source, "Processing message of tag %i", handle->tag);
+            Console::log_recv(Console::VVVERB, handle->source, "Processing message of tag %i", handle->tag);
             stats.increment("receivedMessages");
 
             if (handle->tag == MSG_FIND_NODE)
@@ -133,50 +135,16 @@ void Worker::mainProgram() {
             else if (handle->tag == MSG_TERMINATE)
                 handleTerminate(handle);
             
-            else {
+            else if (handle->tag == MSG_COLLECTIVES) {
+                bool done = balancer->handleMessage(handle);
+                if (done) finishBalancing();
+
+            } else {
                 Console::log_recv(Console::WARN, handle->source, "Unknown message tag %i", handle->tag);
             }
 
-            /*
-            // Adjustments of node permutations
-            if (handle->tag == MSG_CHECK_NODE_PERMUTATION) {
-                int jobId = handle->recvData[0];
-                int index = handle->recvData[1];
-                // Check if #jobId:index if and where bounced off from here
-                if (computes(jobId) && jobIndices[jobId] == index) {
-                    // Permutation is correct - this is the node
-                    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_CONFIRM_NODE_PERMUTATION, handle->recvData);
-                } else {
-                    // Job bounced off or never was there - link to other node
-                    if (!jobNodes.count(jobId)) {
-                        jobNodes[jobId] = AdjustablePermutation(MyMpi::size(comm), jobId);
-                    }
-                    handle->recvData.push_back(jobNodes[jobId].get(index));
-                    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ADJUST_NODE_PERMUTATION, handle->recvData);
-                }
-            }
-            if (handle->tag == MSG_ADJUST_NODE_PERMUTATION) {
-                int jobId = handle->recvData[0];
-                int index = handle->recvData[1];
-                int actualNode = handle->recvData[2];
-                if (!jobNodes.count(jobId)) {
-                    jobNodes[jobId] = AdjustablePermutation(MyMpi::size(comm), jobId);
-                }
-                jobNodes[jobId].adjust(index, actualNode);
-                if (actualNode == handle->source) {
-                    // TODO Job is not on the called node right now, but should / might be later
-                }
-            }
-            if (handle->tag == MSG_CONFIRM_NODE_PERMUTATION) {
-                int jobId = handle->recvData[0];
-                int prevIndex = handle->recvData[1];
-                // TODO "check off" this index
-            }
-            */
-
-            // Listen to another message, if no listener is active
-            if (!MyMpi::hasActiveHandles())
-                MyMpi::irecv(MPI_COMM_WORLD);
+            // Listen to another message, if no critical listener is active
+            MyMpi::listen();
         }
     }
 }
@@ -198,7 +166,8 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
 
     if (isIdle() && !hasJobCommitments()) {
 
-        Console::log_recv(Console::INFO, handle->source, "Willing to adopt %s after %i bounces", jobStr(req.jobId, req.requestedNodeIndex), req.numHops);
+        const char* jobstr = jobStr(req.jobId, req.requestedNodeIndex);
+        Console::log_recv(Console::INFO, handle->source, "Willing to adopt %s after %i bounces", jobstr, req.numHops);
         stats.push_back("bounces", req.numHops);
 
         // Commit on the job, send a request to the parent
@@ -298,19 +267,19 @@ void Worker::handleAcceptBecomeChild(MessageHandlePtr& handle) {
     JobRequest& req = jobCommitments[sig.jobId];
 
     if (req.fullTransfer == 1) {
+        Console::log(Console::VERB, "Receiving job description of #%i of size %i", req.jobId, sig.getTransferSize());
         MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACK_ACCEPT_BECOME_CHILD, req);
         stats.increment("sentMessages");
         MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB, sig.getTransferSize()); // to be received later
         stats.increment("receivedMessages");
-        // At this point, the node listens to nothing else except for the job transfer!
-        // TODO check possible deadlocks
+
     } else {
         assert(hasJob(req.jobId));
         Job& job = getJob(req.jobId);
         if (job.getState() == JobState::PAST) {
             Console::log(Console::WARN, "%s already finished, so it will not be re-initialized", job.toStr());
         } else {
-            Console::log_recv(Console::INFO, handle->source, "Starting or resuming %s", jobStr(req.jobId, req.requestedNodeIndex));
+            Console::log_recv(Console::INFO, handle->source, "Starting or resuming %s (state: %s)", jobStr(req.jobId, req.requestedNodeIndex), job.jobStateToStr());
             setLoad(1);
             job.reinitialize(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
         }
@@ -325,8 +294,7 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
     // Retrieve and send concerned job
     assert(hasJob(req.jobId));
     Job& job = getJob(req.jobId);
-    const JobDescription &desc = job.getDescription();
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB, desc);
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB, job.getSerializedDescription());
     stats.increment("sentMessages");
     Console::log_send(Console::VERB, handle->source, "Sent full job description of %s", job.toStr());
 
@@ -358,19 +326,20 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
 }
 
 void Worker::handleSendJob(MessageHandlePtr& handle) {
-    Console::log_recv(Console::VERB, handle->source, "Deserializing job ...");
-    JobDescription desc; desc.deserialize(handle->recvData);
+    int jobId = handle->recvData[0];
     setLoad(1);
-    assert(hasJob(desc.getId()));
-    Job& job = getJob(desc.getId());
-    Console::log(Console::VERB, "Received full job description of %s. Initializing ...", job.toStr());
-    job.store(desc);
-    job.beginInitialization();
-    initializerThreads[desc.getId()] = std::thread(&Worker::initJob, this, desc); // TODO call by reference / pointer
+    assert(hasJob(jobId));
+    Console::log(Console::VERB, "Received full job description of #%i. Initializing ...", jobId);
+    initializerThreads[jobId] = std::thread(&Worker::initJob, this, handle);
 }
 
-void Worker::initJob(JobDescription desc) {
-    getJob(desc.getId()).initialize();
+void Worker::initJob(MessageHandlePtr handle) {
+    Console::log_recv(Console::VERB, handle->source, "Deserializing job ...");
+    int jobId = handle->recvData[0];
+    Job& job = getJob(jobId);
+    job.setDescription(handle->recvData);
+    job.beginInitialization();
+    job.initialize();
 }
 
 void Worker::handleUpdateVolume(MessageHandlePtr& handle) {
@@ -510,16 +479,27 @@ void Worker::bounceJobRequest(JobRequest& request) {
 }
 
 void Worker::rebalance() {
+    bool done = balancer->beginBalancing(jobs);
+    if (done) finishBalancing();
+}
 
-    std::map<int, int> volumes = balancer->balance(jobs);
+void Worker::finishBalancing() {
+    Console::log(Console::VERB, "Finishing balancing ...");
+    std::map<int, int> volumes = balancer->getBalancingResult();
 
     if (MyMpi::rank(comm) == 0)
         Console::log(Console::INFO, "Rebalancing completed.");
 
+    epochCounter.increment();
+    Console::log(Console::VERB, "Entering epoch %i", epochCounter.getEpoch());
+    
     for (auto it = volumes.begin(); it != volumes.end(); ++it) {
         Console::log(Console::INFO, "Job #%i : new volume %i", it->first, it->second);
         updateVolume(it->first, it->second);
     }
+
+    // All collective operations are done; reset synchronized timer
+    epochCounter.resetLastSync();
 }
 
 void Worker::updateVolume(int jobId, int volume) {
