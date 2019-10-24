@@ -262,7 +262,7 @@ std::map<int, int> CutoffPriorityBalancer::getBalancingResult() {
         std::vector<float>& priorities = resourcesInfo.priorities;
         std::vector<float>& demandedResources = resourcesInfo.demandedResources;
         std::vector<float>::iterator itPrio = std::find(priorities.begin(), priorities.end(), priority);
-        assert(itPrio != priorities.end());
+        assert(itPrio != priorities.end() || Console::fail("Priority %.3f not found in histogram!", priority));
         int prioIndex = std::distance(priorities.begin(), itPrio);
 
         if (assignments[jobId] == demand 

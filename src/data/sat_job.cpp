@@ -11,10 +11,10 @@
 
 void SatJob::initialize() {
 
-    assert(isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_PAST}));
+    assert(isInitializing());
     assert(hasDescription);
 
-    assert(solver == NULL);
+    assert(solver == NULL || Console::fail("Solver is not NULL! State of %s : %s", toStr(), jobStateToStr()));
     Console::log(Console::VERB, "%s : preparing params", toStr());
     std::map<std::string, std::string> params;
     params["e"] = "1"; // exchange mode: 0 = nothing, 1 = alltoall, 2 = log, 3 = asyncrumor
@@ -33,7 +33,6 @@ void SatJob::initialize() {
     Console::log(Console::VERB, "%s : beginning to solve", toStr());
     solver->beginSolving(job.getPayload());
     Console::log(Console::VERB, "%s : finished concurrent HordeLib instance initialization", toStr());
-    endInitialization();
 }
 
 void SatJob::beginSolving() {
@@ -216,12 +215,12 @@ int SatJob::solveLoop() {
         // but does not call finishSolving()
         result = solver->solveLoop();
 
-    } else if (isInState({INITIALIZING_TO_PAST, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_ACTIVE})) {
+    } else if (isInitializing()) {
         if (solver == NULL || !solver->isRunning() || !solver->isFullyInitialized())
             return result;
         JobState oldState = state;
-        Console::log(Console::VERB, "Solver threads of %s are fully initialized by now", toStr());
-        switchState(ACTIVE);
+        endInitialization();
+        Console::log(Console::VERB, "%s : solver threads have been fully initialized by now", toStr());
         if (oldState == INITIALIZING_TO_PAST) {
             terminate();
         } else if (oldState == INITIALIZING_TO_SUSPENDED) {

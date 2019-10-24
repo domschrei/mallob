@@ -101,6 +101,12 @@ const int MSG_QUERY_JOB_RESULT = 20;
  * Warning: Length may exceed the default maximum message length.
  */
 const int MSG_SEND_JOB_RESULT = 21;
+/**
+ * The sender (a worker node) informs the receiver (the job's root node) that 
+ * the sender is defecting to another job.
+ * Data type: [jobId, index]
+ */
+const int MSG_WORKER_DEFECTING = 22;
 
 const int MSG_COLLECTIVES = 300;
 const int MSG_JOB_COMMUNICATION = 400;

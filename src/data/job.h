@@ -38,6 +38,7 @@ enum JobState {
     INITIALIZING_TO_ACTIVE,
     INITIALIZING_TO_SUSPENDED,
     INITIALIZING_TO_PAST,
+    INITIALIZING_TO_COMMITTED,
     /**
      * There are threads actively computing on the job.
      */
@@ -52,7 +53,8 @@ enum JobState {
      */
     PAST
 };
-static const char * jobStateStrings[] = { "none", "stored", "committed", "initializingToActive", "initializingToSuspended", "initializingToPast", "active", "suspended", "past" };
+static const char * jobStateStrings[] = { "none", "stored", "committed", "initializingToActive", 
+    "initializingToSuspended", "initializingToPast", "initializingToCommitted", "active", "suspended", "past" };
 
 class Job {
 
@@ -126,6 +128,7 @@ public:
     std::vector<int>& getSerializedDescription() {return serializedDescription;};
     int getIndex() const {return index;};
     bool isInitialized() const {return initialized;};
+    bool isInitializing() const {return isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_PAST, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_COMMITTED});};
 
     bool isRoot() const {return index == 0;};
     int getRootNodeRank() const {return jobNodeRanks[0];};

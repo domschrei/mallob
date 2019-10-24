@@ -71,6 +71,7 @@ private:
     void handleWorkerFoundResult(MessageHandlePtr& handle);
     void handleQueryJobResult(MessageHandlePtr& handle);
     void handleForwardClientRank(MessageHandlePtr& handle);
+    void handleWorkerDefecting(MessageHandlePtr& handle);
 
     void bounceJobRequest(JobRequest& request);
     void informClient(int jobId, int clientRank);
@@ -97,6 +98,10 @@ private:
     };
 
     const char* jobStr(int j, int idx) const {return ("#" + std::to_string(j) + ":" + std::to_string(idx)).c_str();};
+
+    int maxJobHops() {
+        return MyMpi::size(comm) * 2;
+    }
 };
 
 #endif

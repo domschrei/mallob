@@ -134,6 +134,9 @@ void Worker::mainProgram() {
 
             else if (handle->tag == MSG_TERMINATE)
                 handleTerminate(handle);
+
+            else if (handle->tag == MSG_WORKER_DEFECTING)
+                handleWorkerDefecting(handle);
             
             else if (handle->tag == MSG_COLLECTIVES) {
                 bool done = balancer->handleMessage(handle);
@@ -164,10 +167,45 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
         return;
     }
 
+    bool adopts = false;
     if (isIdle() && !hasJobCommitments()) {
+        // Voluntary commitment to the job 
+        adopts = true;
 
+    } else if (!hasJobCommitments() && req.numHops > maxJobHops()) {
+        // Max #hops exceeded: Possibly "involuntary" emergency adoption of the job
+
+        // If this node already computes on this job, don't adopt it
+        if (!hasJob(req.jobId) || getJob(req.jobId).isNotInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
+
+            // Look for an active job that can be suspended
+            for (auto it : jobs) {
+                Job& job = *it.second;
+                if (job.isInState({ACTIVE, INITIALIZING_TO_ACTIVE}) 
+                    && !job.isRoot() && !job.hasLeftChild() && !job.hasRightChild()) {
+                    // Not the same index of same job!
+                    assert(job.getDescription().getId() != req.jobId || job.getIndex() != req.requestedNodeIndex);
+                    // Suspend this leaf node and inform root  
+                    std::vector<int> payload;
+                    payload.push_back(it.first);
+                    payload.push_back(job.getIndex());
+                    Console::log(Console::VERB, "Suspending %s ...", job.toStr());
+                    Console::log(Console::VERB, "... in order to adopt starving job %s", jobStr(req.jobId, req.requestedNodeIndex));  
+                    MyMpi::isend(MPI_COMM_WORLD, it.second->getParentNodeRank(), MSG_WORKER_DEFECTING, payload);
+                    stats.increment("sentMessages");
+                    job.suspend();
+                    setLoad(0);
+                    adopts = true;
+                    break;
+                }
+            }
+        }
+    } 
+    
+    if (adopts) {
         const char* jobstr = jobStr(req.jobId, req.requestedNodeIndex);
         Console::log_recv(Console::INFO, handle->source, "Willing to adopt %s after %i bounces", jobstr, req.numHops);
+        assert(isIdle() || Console::fail("Adopting a job, but not idle!"));
         stats.push_back("bounces", req.numHops);
 
         // Commit on the job, send a request to the parent
@@ -449,6 +487,29 @@ void Worker::handleTerminate(MessageHandlePtr& handle) {
     }
 }
 
+void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
+
+    int jobId = handle->recvData[0];
+    int index = handle->recvData[1];
+    assert(hasJob(jobId));
+    Job& job = getJob(jobId);
+    if (job.getLeftChildIndex() == index) {
+        // Prune left child
+        job.unsetLeftChild();
+    } else if (job.getRightChildIndex() == index) {
+        // Prune right child
+        job.unsetRightChild();
+    } else {
+        Console::fail("A unknown child of %s is defecting to another node", job.toStr());
+    }
+    int nextNodeRank = getRandomWorkerNode();
+
+    Console::log(Console::VERB, "%s : trying to find a new child replacing defected node %s", job.toStr(), jobStr(jobId, index));
+    JobRequest req(jobId, job.getRootNodeRank(), worldRank, index, epochCounter.getEpoch(), 0);
+    MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, MSG_FIND_NODE, req);
+    stats.increment("sentMessages");
+}
+
 void Worker::setLoad(int load) {
     assert(load + this->load == 1);
     this->load = load;
@@ -562,8 +623,8 @@ void Worker::updateVolume(int jobId, int volume) {
 
     // Shrink (and pause solving) if necessary
     if (thisIndex > 0 && thisIndex >= volume) {
-        setLoad(0);
         jobs[jobId]->suspend();
+        setLoad(0);
     }
 }
 

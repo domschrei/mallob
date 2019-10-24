@@ -51,7 +51,7 @@ void Job::initialize(int index, int rootRank, int parentRank) {
 
 void Job::reinitialize(int index, int rootRank, int parentRank) {
 
-    if (!initialized) {
+    if (!initialized && !isInitializing()) {
         
         beginInitialization();
         initialize(index, rootRank, parentRank);
@@ -75,17 +75,22 @@ void Job::reinitialize(int index, int rootRank, int parentRank) {
             updateParentNodeRank(parentRank);
             updateJobNode(index, worldRank);
 
-            Console::log(Console::INFO, "Restarting solvers of %s", toStr());
-            beginSolving();
+            if (initialized) {
+                Console::log(Console::INFO, "Restarting solvers of %s", toStr());
+                switchState(ACTIVE);
+                beginSolving();
+            } else {
+                switchState(INITIALIZING_TO_ACTIVE);
+            }
 
-            switchState(ACTIVE);
         }
     }
 }
 
 void Job::commit(const JobRequest& req) {
 
-    assert(state != ACTIVE && state != COMMITTED);
+    assert((state != ACTIVE && state != COMMITTED) 
+        || Console::fail("State of %s : %s", toStr(), jobStateToStr()));
 
     index = req.requestedNodeIndex;
     updateJobNode(index, worldRank);
@@ -93,15 +98,21 @@ void Job::commit(const JobRequest& req) {
         updateJobNode(0, req.rootRank);
     }
     updateParentNodeRank(req.requestingNodeRank);
-    switchState(COMMITTED);
+
+    if (isInitializing())
+        switchState(INITIALIZING_TO_COMMITTED);
+    else
+        switchState(COMMITTED);
 }
 
 void Job::uncommit(const JobRequest& req) {
 
-    assert(state == COMMITTED);
+    assert(isInState({COMMITTED, INITIALIZING_TO_COMMITTED}));
 
     if (initialized) {
         switchState(SUSPENDED);
+    } else if (isInitializing()) {
+        switchState(INITIALIZING_TO_SUSPENDED);
     } else if (hasDescription) {
         switchState(STORED);
     } else {
@@ -120,18 +131,18 @@ void Job::setRightChild(int rank) {
 }
 
 void Job::suspend() {
-    if (isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_SUSPENDED})) {
+    if (isInitializing()) {
         switchState(INITIALIZING_TO_SUSPENDED);
         return;
     }
     assert(state == ACTIVE);
     pause();
     switchState(SUSPENDED);
-    Console::log(Console::INFO, "Suspended solving threads of %s", toStr());
+    Console::log(Console::INFO, "%s : suspended solver", toStr());
 }
 
 void Job::resume() {
-    if (isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_SUSPENDED})) {
+    if (isInitializing()) {
         switchState(INITIALIZING_TO_ACTIVE);
         return;
     }
@@ -146,7 +157,7 @@ void Job::resume() {
 
 void Job::withdraw() {
 
-    if (isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_SUSPENDED})) {
+    if (isInitializing()) {
         switchState(INITIALIZING_TO_PAST);
         return;
     } else {
@@ -197,6 +208,8 @@ bool Job::isNotInState(std::initializer_list<JobState> list) const {
 }
 
 void Job::switchState(JobState state) {
+    JobState oldState = this->state;
     this->state = state;
-    Console::log(Console::VERB, "%s : state \"%s\"", toStr(), jobStateStrings[state]); 
+    Console::log(Console::VERB, "%s : state transition \"%s\" => \"%s\"", toStr(), 
+        jobStateStrings[oldState], jobStateStrings[state]); 
 }
