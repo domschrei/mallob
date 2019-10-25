@@ -17,19 +17,19 @@ struct JobRequest : public Serializable  {
     int requestingNodeRank;
     int requestedNodeIndex;
     int fullTransfer;
-    int iteration;
+    int epoch;
     int numHops;
 
 public:
     JobRequest() = default;
 
-    JobRequest(int jobId, int rootRank, int requestingNodeRank, int requestedNodeIndex, int iteration, int numHops) :
+    JobRequest(int jobId, int rootRank, int requestingNodeRank, int requestedNodeIndex, int epoch, int numHops) :
         jobId(jobId),
         rootRank(rootRank),
         requestingNodeRank(requestingNodeRank),
         requestedNodeIndex(requestedNodeIndex),
         fullTransfer(1),
-        iteration(iteration),
+        epoch(epoch),
         numHops(numHops) {}
 
     std::vector<int> serialize() const override {
@@ -39,7 +39,7 @@ public:
         packed.push_back(requestingNodeRank);
         packed.push_back(requestedNodeIndex);
         packed.push_back(fullTransfer);
-        packed.push_back(iteration);
+        packed.push_back(epoch);
         packed.push_back(numHops);
         return packed;
     }
@@ -51,7 +51,7 @@ public:
         requestingNodeRank = packed[i++];
         requestedNodeIndex = packed[i++];
         fullTransfer = packed[i++];
-        iteration = packed[i++];
+        epoch = packed[i++];
         numHops = packed[i++];
     }
 };

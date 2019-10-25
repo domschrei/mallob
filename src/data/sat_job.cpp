@@ -70,8 +70,8 @@ void SatJob::beginCommunication() {
     JobMessage msg;
     msg.payload = collectClausesFromSolvers();
     if (isRoot()) {
-        // There are no other nodes computing on this job
-        //Console::log("Self-broadcasting clauses");
+        // There are no other nodes computing on this job:
+        // internally learn collected clauses
         learnClausesFromAbove(msg.payload);
         return;
     }
@@ -81,6 +81,7 @@ void SatJob::beginCommunication() {
     int parentRank = getParentNodeRank();
     Console::log_send(Console::VERB, parentRank, "Sending clauses of effective size %i from %s", msg.payload.size(), toStr());
     MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
+    // TODO stats.increase("sentMessages");
 }
 
 void SatJob::communicate(int source, JobMessage& msg) {
@@ -88,31 +89,38 @@ void SatJob::communicate(int source, JobMessage& msg) {
     if (isNotInState({JobState::ACTIVE}))
         return;
 
+    // Unpack job message
     int jobId = msg.jobId;
     int epoch = msg.epoch;
     std::vector<int>& clauses = msg.payload;
 
-    if (epoch != (int)epochCounter.getEpoch()) {
+    // Old epoch?
+    if (epoch < (int)epochCounter.getEpoch()) {
         Console::log(Console::VERB, "Discarding job message from a previous epoch.");
         return;
     }
 
     if (msg.tag == MSG_GATHER_CLAUSES) {
-
+        // Gather received clauses, send to parent
         Console::log(Console::VERB, "%s : received clauses from below of effective size %i", toStr(), clauses.size());
 
+        // Add received clauses to local set of collected clauses
         collectClausesFromBelow(clauses);
 
+        // Ready to share the clauses?
         if (canShareCollectedClauses()) {
+
             std::vector<int> clausesToShare = shareCollectedClauses();
             if (isRoot()) {
+                // Share complete set of clauses to children
                 Console::log(Console::VERB, "%s : switching clause exchange from gather to broadcast", toStr());
                 learnAndDistributeClausesDownwards(clausesToShare);
             } else {
+                // Send set of clauses to parent
                 int parentRank = getParentNodeRank();
                 JobMessage msg;
                 msg.jobId = jobId;
-                msg.epoch = epochCounter.getEpoch();
+                msg.epoch = epoch;
                 msg.tag = MSG_GATHER_CLAUSES;
                 Console::log_send(Console::VERB, parentRank, "%s : gathering clauses upwards", toStr());
                 MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
@@ -120,6 +128,7 @@ void SatJob::communicate(int source, JobMessage& msg) {
         }
 
     } else if (msg.tag == MSG_DISTRIBUTE_CLAUSES) {
+        // Learn received clauses, send them to children
         learnAndDistributeClausesDownwards(clauses);
     }
 }
@@ -129,8 +138,10 @@ void SatJob::learnAndDistributeClausesDownwards(std::vector<int>& clauses) {
     Console::log(Console::VVERB, "%s : received %i broadcast clauses", toStr(), clauses.size());
     assert(clauses.size() % BROADCAST_CLAUSE_INTS_PER_NODE == 0);
 
+    // Locally learn clauses
     learnClausesFromAbove(clauses);
 
+    // Send clauses to children
     JobMessage msg;
     msg.jobId = jobId;
     msg.epoch = epochCounter.getEpoch();
@@ -150,24 +161,26 @@ void SatJob::learnAndDistributeClausesDownwards(std::vector<int>& clauses) {
 }
 
 std::vector<int> SatJob::collectClausesFromSolvers() {
+
+    // If not fully initialized yet, broadcast an empty set of clauses
     if (!solver->isFullyInitialized()) {
         return std::vector<int>(BROADCAST_CLAUSE_INTS_PER_NODE, 0);
     }
+    // Else, retrieve clauses from solvers
     return solver->prepareSharing( commSize /*job.getVolume()*/);
 }
 void SatJob::insertIntoClauseBuffer(std::vector<int>& vec) {
 
+    // Insert clauses into local clause buffer for later sharing
     clausesToShare.insert(clausesToShare.end(), vec.begin(), vec.end());
 
+    // Resize to multiple of #clause-ints per node
     int prevSize = clausesToShare.size();
     int remainder = prevSize % BROADCAST_CLAUSE_INTS_PER_NODE;
     if (remainder != 0) {
         clausesToShare.resize(prevSize + BROADCAST_CLAUSE_INTS_PER_NODE-remainder);
-        for (unsigned int i = prevSize; i < clausesToShare.size(); i++) {
-            clausesToShare[i] = 0;
-        }
+        std::fill(clausesToShare.begin()+prevSize, clausesToShare.end(), 0);
     }
-
     assert(clausesToShare.size() % BROADCAST_CLAUSE_INTS_PER_NODE == 0);
 }
 void SatJob::collectClausesFromBelow(std::vector<int>& clauses) {
@@ -186,16 +199,23 @@ bool SatJob::canShareCollectedClauses() {
 }
 std::vector<int> SatJob::shareCollectedClauses() {
 
+    // Locally collect clauses from solvers
     std::vector<int> selfClauses = collectClausesFromSolvers();
     insertIntoClauseBuffer(selfClauses);
     std::vector<int> vec = clausesToShare;
+
+    // Reset clause buffer
     sharedClauseSources = 0;
     clausesToShare.resize(0);
     return vec;
 }
 void SatJob::learnClausesFromAbove(std::vector<int>& clauses) {
+
+    // If not fully initialized yet: discard clauses
     if (!solver->isFullyInitialized())
-        return; // discard clauses TODO keep?
+        return;
+
+    // Locally digest clauses
     Console::log(Console::VVERB, "%s : digesting clauses ...", toStr());
     solver->digestSharing(clauses);
     Console::log(Console::VVERB, "%s : digested clauses.", toStr());
@@ -211,24 +231,22 @@ int SatJob::solveLoop() {
     }
 
     if (isInState({ACTIVE})) {
-        // if result is found, stops all solvers
+        // If result is found here, stops all solvers
         // but does not call finishSolving()
         result = solver->solveLoop();
 
     } else if (isInitializing()) {
+        // Still initializing?
         if (solver == NULL || !solver->isRunning() || !solver->isFullyInitialized())
+            // Yes, some stuff still is not initialized
             return result;
-        JobState oldState = state;
-        endInitialization();
+        // Else: end initialization
         Console::log(Console::VERB, "%s : solver threads have been fully initialized by now", toStr());
-        if (oldState == INITIALIZING_TO_PAST) {
-            terminate();
-        } else if (oldState == INITIALIZING_TO_SUSPENDED) {
-            suspend();
-        }
+        endInitialization();
         return result;
     }
 
+    // Did a solver find a result?
     if (result >= 0) {
         doneLocally = true;
         this->resultCode = result;

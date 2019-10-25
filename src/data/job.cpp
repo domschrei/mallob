@@ -22,6 +22,8 @@ void Job::store(std::vector<int>& data) {
 }
 
 void Job::setDescription(std::vector<int>& data) {
+    // Explicitly store serialized data s.t. it can be forwarded later
+    // without the need to re-serialize the job description
     this->serializedDescription = data;
     this->job = JobDescription();
     this->job.deserialize(data);
@@ -38,7 +40,15 @@ void Job::beginInitialization() {
 
 void Job::endInitialization() {
     initialized = true;
-    switchState(ACTIVE);
+    if (state == INITIALIZING_TO_PAST) {
+        terminate();
+    } else if (state == INITIALIZING_TO_SUSPENDED) {
+        suspend();
+    } else if (state == INITIALIZING_TO_COMMITTED) {
+        switchState(COMMITTED);
+    } else {
+        switchState(ACTIVE);
+    }
 }
 
 void Job::initialize(int index, int rootRank, int parentRank) {
@@ -60,9 +70,8 @@ void Job::reinitialize(int index, int rootRank, int parentRank) {
 
         if (index == this->index) {
 
-            // Resume the exact same work that you already did
+            // Job of same index as before is resumed
             updateParentNodeRank(parentRank);
-
             Console::log(Console::INFO, "Resuming solvers of %s", toStr());
             resume();
 

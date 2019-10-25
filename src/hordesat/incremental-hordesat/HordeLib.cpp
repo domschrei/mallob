@@ -348,21 +348,16 @@ bool HordeLib::isFullyInitialized() {
 
 int HordeLib::solveLoop() {
 
+	// Sleeping?
     double timeNow = getTime();
     if (sleepInt > 0) {
         usleep(sleepInt);
-        //log(0, "Node %d entering round %d (%.2f seconds solving, %.2f rounds/sec)\n", mpi_rank, round,
-                //timeNow - startSolving, round/(timeNow - startSolving));
     }
-    if (endingFunction(mpi_size, mpi_rank, solvingDoneLocal)) {
+    // Any result found?
+	if (endingFunction(mpi_size, mpi_rank, solvingDoneLocal)) {
         return finalResult;
     }
-    /*
-    if (sharingManager != NULL) {
-        sharingManager->doSharing();
-    }
-    */
-
+	// Resources exhausted?
     if ((maxRounds != 0 && round == maxRounds) || (maxSeconds != 0 && timeNow > maxSeconds)) {
         //endingFunction = getGlobalEnding;
 		log(0, "Aborting: round %i, time %3.3f\n", round, timeNow);
@@ -378,39 +373,11 @@ std::vector<int> HordeLib::prepareSharing(int size) {
     assert(sharingManager != NULL);
 	log(2, "Collecting clauses on this node ... \n");
 	std::vector<int> clauses = sharingManager->prepareSharing(size);
-
-	/*
-	std::vector<int> plainClauses = clauseBufferToPlainClauses(clauses);
-	std::string out = "";
-	for (int i = 0; i < plainClauses.size(); i++) {
-		if (plainClauses[i] == 0)
-			out += "\n";
-		else
-			out += std::to_string(plainClauses[i]) + " ";
-	}
-	out += "\n";
-	//log(0, out.c_str());
-	*/
-
 	return clauses;
 }
 
 void HordeLib::digestSharing(const std::vector<int>& result) {
     assert(sharingManager != NULL);
-
-	/*
-	std::vector<int> plainClauses = clauseBufferToPlainClauses(result);
-	std::string out = "";
-	for (int i = 0; i < plainClauses.size(); i++) {
-		if (plainClauses[i] == 0)
-			out += "\n";
-		else
-			out += std::to_string(plainClauses[i]) + " ";
-	}
-	out += "\n";
-	//log(0, out.c_str());
-	*/
-
 	sharingManager->digestSharing(result);
 }
 
@@ -421,20 +388,14 @@ std::vector<int> HordeLib::clauseBufferToPlainClauses(const vector<int>& buffer)
 	while (pos + COMM_BUFFER_SIZE < (int) buffer.size()) {
 		int bufIdx = pos % COMM_BUFFER_SIZE;
 
-		//for (int i = 0; i < buffer.size(); i++) std::cout << buffer[i] << " ";
-		//std::cout << "\n";
-
 		if (buffer.size() == 0) return clauses;
 
 		int numVipClauses = buffer[pos++];
-		//log(0, "%i vip clauses\n", numVipClauses);
 		while (numVipClauses > 0) {
 			int lit = buffer[pos++];
 			clauses.push_back(lit);
-			//std::cout << lit << " ";
 			if (lit == 0) {
 				numVipClauses--;
-				//std::cout << "\n";
 			}
 		}
 
@@ -442,16 +403,13 @@ std::vector<int> HordeLib::clauseBufferToPlainClauses(const vector<int>& buffer)
 		while (pos % COMM_BUFFER_SIZE == bufIdx) {
 			int numClausesOfLength = buffer[pos++];
 			if (numClausesOfLength > 0)
-				//log(0, "%i clauses of length %i:\n  ", numClausesOfLength, clauseLength);
 			for (int n = 0; n < numClausesOfLength; n++) {
 				for (int i = 0; i < clauseLength; i++) {
 					int lit = buffer[pos++];
 					assert(lit != 0);
 					clauses.push_back(lit);
-					//std::cout << lit << " ";
 				}
 				clauses.push_back(0);
-				//std::cout << "\n";
 			}
 			clauseLength++;
 		}
@@ -468,11 +426,11 @@ int HordeLib::finishSolving() {
 
     double searchTime = getTime() - startSolving;
 	/*
+	// TODO join solver threads?
 	log(0, "Joining solver threads of index %d\n", mpi_rank);
 	for (int i = 0; i < solversCount; i++) {
 		solverThreads[i]->join();
 	}*/
-	// MPI_Barrier(MPI_COMM_WORLD); // TODO
 
 	if (params.isSet("stats")) {
 		// Statistics gathering
@@ -536,7 +494,6 @@ bool HordeLib::readFormula(const char* filename) {
 	return true;
 }
 
-// NEW 2019-09 TODO do more efficiently
 bool HordeLib::setFormula(const std::vector<int>& formula) {
 	for (int i = 0; i < solversCount; i++) {
 		solvers[i]->addClauses(formula);
