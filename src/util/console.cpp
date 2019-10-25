@@ -90,7 +90,7 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list& a
     // Timestamp and node rank
     if (!beganLine) {
         float elapsed = Timer::elapsedSeconds();
-        printf("[%.3f] [%i] ", elapsed, rank);
+        printf("[%.6f] [%i] ", elapsed, rank);
         if (logFile != NULL) fprintf(logFile, "[%.3f] [%i] ", elapsed, rank);
         
         beganLine = true;
