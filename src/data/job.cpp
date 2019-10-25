@@ -40,14 +40,14 @@ void Job::beginInitialization() {
 
 void Job::endInitialization() {
     initialized = true;
+    switchState(ACTIVE);
+    
     if (state == INITIALIZING_TO_PAST) {
         terminate();
     } else if (state == INITIALIZING_TO_SUSPENDED) {
         suspend();
     } else if (state == INITIALIZING_TO_COMMITTED) {
         switchState(COMMITTED);
-    } else {
-        switchState(ACTIVE);
     }
 }
 
