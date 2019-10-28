@@ -34,6 +34,8 @@ public:
     // vector statistics
     void push_back(const char* tag, float num);
 
+    void addResourceUsage();
+
     void dump();
     void dump(int epoch);
     void dump(int minEpoch, int maxEpoch, bool dumpGlobalStats);

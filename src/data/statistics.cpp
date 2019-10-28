@@ -1,6 +1,9 @@
 
-#include "statistics.h"
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <errno.h>
 
+#include "statistics.h"
 #include "util/console.h"
 
 AtomicStatisticsMap Statistics::initAtomics() {
@@ -12,6 +15,9 @@ AtomicStatisticsMap Statistics::initAtomics() {
     atomics["bouncedJobs"] = 0;
     atomics["reductions"] = 0;
     atomics["broadcasts"] = 0;
+    atomics["maxRss"] = 0;
+    atomics["voluntaryContextSwitches"] = 0;
+    atomics["involuntaryContextSwitches"] = 0;
     return atomics;
 }
 
@@ -55,6 +61,15 @@ void Statistics::push_back(const char* tag, float num) {
     assert(globalVectors.count(tag));
     globalVectors[tag].push_back(num);
     currentVectors()[tag].push_back(num);
+}
+
+void Statistics::addResourceUsage() {
+    rusage usage;
+    int err = getrusage(RUSAGE_SELF, &usage);
+    assert(!err || Console::fail("rusage syscall returned errorcode %i", errno));
+    set("maxRss", usage.ru_maxrss);
+    set("voluntaryContextSwitches", usage.ru_nvcsw);
+    set("involuntaryContextSwitches", usage.ru_nivcsw);
 }
 
 void Statistics::dump() {

@@ -608,6 +608,7 @@ void Worker::finishBalancing() {
     lastLoadChange = Timer::elapsedSeconds();
 
     // Dump stats and advance to next epoch
+    stats.addResourceUsage();
     stats.dump(epochCounter.getEpoch());
     epochCounter.increment();
     Console::log(Console::VERB, "Advancing to epoch %i", epochCounter.getEpoch());
