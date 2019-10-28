@@ -55,7 +55,7 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
     // "resourcesInfo" now contains global data from all concerned jobs
     if (excludedNodes.count(MyMpi::rank(comm))) {
         Console::log(Console::VERB, "Ended all-reduction phase. Balancing phase finished.");
-        return std::map<int, int>();
+        return std::map<int,int>();
     } else {
         Console::log(Console::VERB, "Ended all-reduction phase. Calculating final job demands ...");
     }
@@ -70,7 +70,7 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
     for (auto it = localJobs.begin(); it != localJobs.end(); ++it) {
         int jobId = *it;
         float demand = getDemand(*jobs[jobId]);
-        float priority = 0.001f * ((int) (1000 * jobs[jobId]->getDescription().getPriority()));
+        float priority = jobs[jobId]->getDescription().getPriority();
         std::vector<float>& priorities = resourcesInfo.priorities;
         std::vector<float>& demandedResources = resourcesInfo.demandedResources;
         std::vector<float>::iterator itPrio = std::find(priorities.begin(), priorities.end(), priority);
@@ -136,10 +136,10 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
     assert(localJobs == NULL || Console::fail("Found localJobs instance of size %i", localJobs->size()));
     localJobs = new std::set<int, PriorityComparator>(PriorityComparator(jobs));
     for (auto it : jobs) {
-        if (it.second->isInState({JobState::ACTIVE, JobState::INITIALIZING_TO_ACTIVE}) && it.second->isRoot()) {
+        Console::log(Console::VVERB, "job #%i", it.first);
+        if (it.second->isInState({JobState::ACTIVE/*, JobState::INITIALIZING_TO_ACTIVE*/}) && it.second->isRoot()) {
             jobsBeingBalanced[it.first] = it.second;
-            JobDescription& desc = it.second->getDescription();
-            localJobs->insert(desc.getId());
+            localJobs->insert(it.first);
         }
     }
 
@@ -258,7 +258,7 @@ std::map<int, int> CutoffPriorityBalancer::getBalancingResult() {
         int jobId = it.first;
 
         float demand = demands[jobId];
-        float priority = 0.001f * ((int) (1000 * priorities[jobId]));
+        float priority = priorities[jobId];
         std::vector<float>& priorities = resourcesInfo.priorities;
         std::vector<float>& demandedResources = resourcesInfo.demandedResources;
         std::vector<float>::iterator itPrio = std::find(priorities.begin(), priorities.end(), priority);

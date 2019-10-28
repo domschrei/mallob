@@ -77,12 +77,11 @@ void Worker::mainProgram() {
 
                 // Solver done!
                 int jobRootRank = job.getRootNodeRank();
-                std::vector<int> payload;
-                payload.push_back(jobId); payload.push_back(result);
+                IntPair pair(jobId, (int) result);
 
                 // Signal termination to root -- may be a self message
                 Console::log_send(Console::VERB, jobRootRank, "Sending finished info");
-                MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_WORKER_FOUND_RESULT, payload);
+                MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_WORKER_FOUND_RESULT, pair);
                 stats.increment("sentMessages");
             }
         }
@@ -157,7 +156,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
 
     // Discard request if it originates from current epoch
     // (except if it is a request for a root node)
-    if (req.epoch != (int)epochCounter.getEpoch() && req.requestedNodeIndex > 0) {
+    if (req.epoch != epochCounter.getEpoch() && req.requestedNodeIndex > 0) {
         Console::log_recv(Console::INFO, handle->source, "Discarding request %s from epoch %i (I am in epoch %i)", 
                     jobStr(req.jobId, req.requestedNodeIndex), req.epoch, epochCounter.getEpoch());
         return;
@@ -193,10 +192,8 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
                     Console::log(Console::VERB, "Suspending %s ...", job.toStr());
                     Console::log(Console::VERB, "... in order to adopt starving job %s", 
                                     jobStr(req.jobId, req.requestedNodeIndex));  
-                    std::vector<int> payload;
-                    payload.push_back(it.first);
-                    payload.push_back(job.getIndex());
-                    MyMpi::isend(MPI_COMM_WORLD, it.second->getParentNodeRank(), MSG_WORKER_DEFECTING, payload);
+                    IntPair pair(it.first, job.getIndex());
+                    MyMpi::isend(MPI_COMM_WORLD, it.second->getParentNodeRank(), MSG_WORKER_DEFECTING, pair);
                     stats.increment("sentMessages");
 
                     // Suspend this job
@@ -247,14 +244,14 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
     Job &job = getJob(req.jobId);
 
     // If request is for a root node, bump its epoch -- does not become obsolete
-    if (req.epoch < (int)epochCounter.getEpoch() && req.requestedNodeIndex == 0) {
+    if (req.epoch < epochCounter.getEpoch() && req.requestedNodeIndex == 0) {
         Console::log(Console::INFO, "Bumping epoch of root job request #%i:0", req.jobId);
         req.epoch = epochCounter.getEpoch();
     }
 
     // Check if node should be adopted or rejected
     bool reject = false;
-    if (req.epoch < (int)epochCounter.getEpoch()) {
+    if (req.epoch < epochCounter.getEpoch()) {
         // Wrong (old) epoch
         Console::log_recv(Console::INFO, handle->source, "Discarding request %s from epoch %i (now is epoch %i)", 
                             job.toStr(), req.epoch, epochCounter.getEpoch());
@@ -272,7 +269,7 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
         const JobDescription& desc = job.getDescription();
 
         // Send job signature
-        JobSignature sig(req.jobId, req.rootRank, desc.getPayloadSize());
+        JobSignature sig(req.jobId, req.rootRank, desc.getTransferSize());
         MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACCEPT_BECOME_CHILD, sig);
         stats.increment("sentMessages");
 
@@ -356,7 +353,8 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
 
     if (job.getState() == JobState::PAST) {
         // Job already terminated -- send termination signal
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_TERMINATE, req.jobId);
+        IntPair pair(req.jobId, req.requestedNodeIndex);
+        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_TERMINATE, pair);
         stats.increment("sentMessages");
     } else {
 
@@ -372,9 +370,7 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
             int volume = balancer->getVolume(req.jobId);
             assert(volume >= 1);
             Console::log_send(Console::VERB, handle->source, "Propagating volume %i to new child", volume);
-            std::vector<int> jobIdAndVolume;
-            jobIdAndVolume.push_back(req.jobId);
-            jobIdAndVolume.push_back(volume);
+            IntPair jobIdAndVolume(req.jobId, volume);
             MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_UPDATE_VOLUME, jobIdAndVolume);
             stats.increment("sentMessages");
         }
@@ -382,21 +378,22 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
 }
 
 void Worker::handleSendJob(MessageHandlePtr& handle) {
-    int jobId = handle->recvData[0];
-    assert(hasJob(jobId));
+    int jobId; memcpy(&jobId, handle->recvData.data(), sizeof(int));
+    assert(hasJob(jobId) || Console::fail("I don't know job #%i !", jobId));
 
     // Initialize job inside a separate thread
     setLoad(1);
     getJob(jobId).beginInitialization();
     Console::log(Console::VERB, "Received full job description of #%i. Initializing ...", jobId);
+
     initializerThreads[jobId] = std::thread(&Worker::initJob, this, handle);
 }
 
 void Worker::initJob(MessageHandlePtr handle) {
     
     // Deserialize job description
-    int jobId = handle->recvData[0];
-    Console::log_recv(Console::VERB, handle->source, "Deserializing job #%i ...", jobId);
+    int jobId; memcpy(&jobId, handle->recvData.data(), sizeof(int));
+    Console::log_recv(Console::VERB, handle->source, "Deserializing job #%i , description has size %i ...", jobId, handle->recvData.size());
     Job& job = getJob(jobId);
     job.setDescription(handle->recvData);
     
@@ -405,8 +402,9 @@ void Worker::initJob(MessageHandlePtr handle) {
 }
 
 void Worker::handleUpdateVolume(MessageHandlePtr& handle) {
-    int jobId = handle->recvData[0];
-    int volume = handle->recvData[1];
+    IntPair recv(handle->recvData);
+    int jobId = recv.first;
+    int volume = recv.second;
     if (!hasJob(jobId)) {
         Console::log(Console::WARN, "WARN: Received a volume update about #%i, which is unknown to me", jobId);
         return;
@@ -435,23 +433,21 @@ void Worker::handleJobCommunication(MessageHandlePtr& handle) {
 void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
 
     // Retrieve job
-    int jobId = handle->recvData[0];
+    int jobId; memcpy(&jobId, handle->recvData.data(), sizeof(int));
     assert(hasJob(jobId) && getJob(jobId).isRoot());
     Console::log_recv(Console::VERB, handle->source, "Result has been found for job #%i", jobId);
 
     // Redirect termination signal
-    std::vector<int> payload;
-    payload.push_back(jobId);
-    payload.push_back(getJob(jobId).getParentNodeRank());
+    IntPair payload(jobId, getJob(jobId).getParentNodeRank());
     if (handle->source == worldRank) {
         // Self-message of root node: Directly send termination message to client
-        informClient(payload[0], payload[1]);
+        informClient(payload.first, payload.second);
     } else {
         // Send rank of client node to the finished worker,
         // such that the worker can inform the client of the result
         MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_FORWARD_CLIENT_RANK, payload);
         stats.increment("sentMessages");
-        Console::log_send(Console::VERB, handle->source, "Sending client rank (%i)", payload[1]); 
+        Console::log_send(Console::VERB, handle->source, "Sending client rank (%i)", payload.second); 
     }
 
     // Terminate job and propagate termination message
@@ -461,8 +457,9 @@ void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
 void Worker::handleForwardClientRank(MessageHandlePtr& handle) {
 
     // Receive rank of the job's client
-    int jobId = handle->recvData[0];
-    int clientRank = handle->recvData[1];
+    IntPair recv(handle->recvData);
+    int jobId = recv.first;
+    int clientRank = recv.second;
     assert(hasJob(jobId));
 
     // Inform client of the found job result
@@ -473,7 +470,7 @@ void Worker::handleQueryJobResult(MessageHandlePtr& handle) {
 
     // Receive acknowledgement that the client received the advertised result size
     // and wishes to receive the full job result
-    int jobId = handle->recvData[0];
+    int jobId; memcpy(&jobId, handle->recvData.data(), sizeof(int));
     assert(hasJob(jobId));
     const JobResult& result = getJob(jobId).getResult();
     Console::log_send(Console::VERB, handle->source, "Sending full job result to client");
@@ -483,7 +480,7 @@ void Worker::handleQueryJobResult(MessageHandlePtr& handle) {
 
 void Worker::handleTerminate(MessageHandlePtr& handle) {
 
-    int jobId = handle->recvData[0];
+    int jobId; memcpy(&jobId, handle->recvData.data(), sizeof(int));
     Job& job = getJob(jobId);
 
     if (job.isInState({COMMITTED})) {
@@ -513,8 +510,9 @@ void Worker::handleTerminate(MessageHandlePtr& handle) {
 void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
 
     // Retrieve job
-    int jobId = handle->recvData[0];
-    int index = handle->recvData[1];
+    IntPair recv(handle->recvData);
+    int jobId = recv.first;
+    int index = recv.second;
     assert(hasJob(jobId));
     Job& job = getJob(jobId);
 
@@ -543,9 +541,7 @@ void Worker::informClient(int jobId, int clientRank) {
 
     // Send "Job done!" with advertised result size to client
     Console::log_send(Console::VERB, clientRank, "Sending JOB_DONE to client");
-    std::vector<int> payload;
-    payload.push_back(jobId);
-    payload.push_back(result.getTransferSize());
+    IntPair payload(jobId, result.getTransferSize());
     MyMpi::isend(MPI_COMM_WORLD, clientRank, MSG_JOB_DONE, payload);
     stats.increment("sentMessages");
 }
@@ -633,9 +629,7 @@ void Worker::updateVolume(int jobId, int volume) {
     }
 
     // Prepare volume update to propagate down the job tree
-    std::vector<int> payload;
-    payload.push_back(jobId);
-    payload.push_back(volume);
+    IntPair payload(jobId, volume);
 
     // Root node update message
     int thisIndex = job.getIndex();
@@ -654,7 +648,7 @@ void Worker::updateVolume(int jobId, int volume) {
             Console::log_send(Console::VERB, job.getLeftChildNodeRank(), "Pruning left child of %s", job.toStr());
             job.unsetLeftChild();
         }
-    } else if (nextIndex < volume) {
+    } else if (job.isInitialized() && nextIndex < volume) {
         // Grow left
         JobRequest req(jobId, job.getRootNodeRank(), worldRank, nextIndex, epochCounter.getEpoch(), 0);
         int nextNodeRank = job.getLeftChildNodeRank();
@@ -673,7 +667,7 @@ void Worker::updateVolume(int jobId, int volume) {
             Console::log_send(Console::VERB, job.getRightChildNodeRank(), "Pruning right child of %s", job.toStr());
             job.unsetRightChild();
         }
-    } else if (nextIndex < volume) {
+    } else if (job.isInitialized() && nextIndex < volume) {
         // Grow right
         JobRequest req(jobId, job.getRootNodeRank(), worldRank, nextIndex, epochCounter.getEpoch(), 0);
         int nextNodeRank = job.getRightChildNodeRank();

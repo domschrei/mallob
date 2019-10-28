@@ -61,11 +61,11 @@ void Statistics::dump() {
     dump(0, epochCounter.getEpoch(), true);
 }
 
-void Statistics::dump(uint epoch) {
+void Statistics::dump(int epoch) {
     dump(epoch, epoch, false);
 }
 
-void Statistics::dump(uint minEpoch, uint maxEpoch, bool dumpGlobalStats) {
+void Statistics::dump(int minEpoch, int maxEpoch, bool dumpGlobalStats) {
     
     Console::getLock();
 

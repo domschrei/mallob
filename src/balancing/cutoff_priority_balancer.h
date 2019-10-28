@@ -56,28 +56,27 @@ bool isEmpty() override {
     return assignedResources < 0.0001f && priorities.empty() && demandedResources.empty();
 }
 
-std::vector<int> serialize() const override {
-    std::vector<int> data;
-    data.push_back((int) (assignedResources * 1000));
-    for (size_t i = 0; i < priorities.size(); i++) {
-        data.push_back((int) (priorities[i] * 1000));
-    }
-    for (size_t i = 0; i < demandedResources.size(); i++) {
-        data.push_back((int) (demandedResources[i] * 1000));
-    }
+std::vector<uint8_t> serialize() const override {
+    std::vector<uint8_t> data(sizeof(float)+priorities.size()*sizeof(float)+demandedResources.size()*sizeof(float));
+
+    int i = 0, n;
+    n = sizeof(float); memcpy(data.data()+i, &assignedResources, n); i += n;
+    n = priorities.size() * sizeof(float); memcpy(data.data()+i, priorities.data(), n); i += n;
+    n = demandedResources.size() * sizeof(float); memcpy(data.data()+i, demandedResources.data(), n); i += n;
     return data;
 }
-void deserialize(const std::vector<int>& packed) override {
-    assignedResources = 0.001f * packed[0];
-    priorities.clear();
-    demandedResources.clear();
-    int size = (packed.size() - 1) / 2;
-    for (int i = 0; i < size; i++) {
-        priorities.push_back(0.001f * packed[1+i]);
-        demandedResources.push_back(0.001f * packed[1+i+size]);
-    }
+void deserialize(const std::vector<uint8_t>& packed) override {
+    
+    int i = 0, n;
+    n = sizeof(float); memcpy(&assignedResources, packed.data()+i, n); i += n;
+    int size = (packed.size() - i) / 2;
+    assert(size >= 0);
+    priorities.clear(); priorities.resize(size / sizeof(float));
+    n = size; memcpy(priorities.data(), packed.data()+i, n); i += n;
+    demandedResources.clear(); demandedResources.resize(size / sizeof(float));
+    n = size; memcpy(demandedResources.data(), packed.data()+i, n); i += n;
 }
-std::unique_ptr<Reduceable> getDeserialized(const std::vector<int>& packed) const override {
+std::unique_ptr<Reduceable> getDeserialized(const std::vector<uint8_t>& packed) const override {
     std::unique_ptr<Reduceable> out(new ResourcesInfo());
     out->deserialize(packed);
     return out;

@@ -13,7 +13,7 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             elapsedSecondsOfArrival(Timer::elapsedSeconds()), 
             hasDescription(false), initialized(false), jobNodeRanks(commSize, jobId) {}
 
-void Job::store(std::vector<int>& data) {
+void Job::store(std::vector<uint8_t>& data) {
     setDescription(data);
     if (state == NONE) {
         this->index = -1;
@@ -21,12 +21,13 @@ void Job::store(std::vector<int>& data) {
     }
 }
 
-void Job::setDescription(std::vector<int>& data) {
+void Job::setDescription(std::vector<uint8_t>& data) {
     // Explicitly store serialized data s.t. it can be forwarded later
     // without the need to re-serialize the job description
+    assert(data.size() > 0);
     this->serializedDescription = data;
     this->job = JobDescription();
-    this->job.deserialize(data);
+    this->job.deserialize(this->serializedDescription);
     hasDescription = true;
 }
 
@@ -181,8 +182,8 @@ void Job::withdraw() {
     switchState(PAST);
 }
 
-int Job::getDemand() const {   
-    return std::min(commSize, (int) std::pow(2, epochCounter.getEpoch() - epochOfArrival + 1) - 1);
+int Job::getDemand() const {
+    return std::min(commSize, (int)std::pow(2U, epochCounter.getEpoch() - epochOfArrival + 1) - 1);
 }
 
 const JobResult& Job::getResult() const {

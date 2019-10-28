@@ -10,20 +10,20 @@
 
 #include "data/serializable.h"
 
-#define MAX_JOB_MESSAGE_PAYLOAD_PER_NODE 1500
+#define MAX_JOB_MESSAGE_PAYLOAD_PER_NODE 1500*sizeof(int)
 
 struct MessageHandle {
     MPI_Request request;
     int tag;
     int source;
-    std::vector<int> sendData;
-    std::vector<int> recvData;
+    std::vector<uint8_t> sendData;
+    std::vector<uint8_t> recvData;
     MPI_Status status;
     bool selfMessage = false;
     bool critical = false;
 
     MessageHandle() {}
-    MessageHandle(const std::vector<int>& data) : sendData(data) {}
+    MessageHandle(const std::vector<uint8_t>& data) : sendData(data) {}
 };
 
 /*
@@ -122,10 +122,9 @@ private:
 public:
 
     static MessageHandlePtr isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object);
-    static MessageHandlePtr isend(MPI_Comm communicator, int recvRank, int tag, int object);
-    static MessageHandlePtr isend(MPI_Comm communicator, int recvRank, int tag, const std::vector<int>& object);
+    static MessageHandlePtr isend(MPI_Comm communicator, int recvRank, int tag, const std::vector<uint8_t>& object);
     static MessageHandlePtr  send(MPI_Comm communicator, int recvRank, int tag, const Serializable& object);
-    static MessageHandlePtr  send(MPI_Comm communicator, int recvRank, int tag, const std::vector<int>& object);
+    static MessageHandlePtr  send(MPI_Comm communicator, int recvRank, int tag, const std::vector<uint8_t>& object);
     static MessageHandlePtr irecv(MPI_Comm communicator);
     static MessageHandlePtr irecv(MPI_Comm communicator, int tag);
     static MessageHandlePtr irecv(MPI_Comm communicator, int source, int tag);

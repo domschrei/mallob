@@ -24,7 +24,7 @@ void readAllInstances(Client* client) {
 
         Console::log(Console::VERB, "Reading \"%s\" (#%i) ...", c.jobInstances[jobId].c_str(), jobId);
         c.readFormula(c.jobInstances[jobId], job);
-        if (job.getPayloadSize() > 1)
+        if (job.getPayload().size() > 1)
             Console::log(Console::VERB, "Read \"%s\" (#%i).", c.jobInstances[jobId].c_str(), jobId);
 
         std::unique_lock<std::mutex> lock(c.jobReadyLock);
@@ -70,7 +70,7 @@ void Client::mainProgram() {
                     break;
             }
 
-            if (job.getPayloadSize() == 1) {
+            if (job.getPayload().size() <= 1) {
                 // Some I/O error kept the instance from being read
                 Console::log(Console::WARN, "Skipping job #%i due to previous I/O error", jobId);
                 continue;
@@ -122,7 +122,7 @@ void Client::handleRequestBecomeChild(MessageHandlePtr handle) {
     const JobDescription& desc = *introducedJobs[req.jobId];
 
     // Send job signature
-    JobSignature sig(req.jobId, /*rootRank=*/handle->source, desc.getPayloadSize());
+    JobSignature sig(req.jobId, /*rootRank=*/handle->source, desc.getTransferSize());
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACCEPT_BECOME_CHILD, sig);
     stats.increment("sentMessages");
 }
@@ -130,14 +130,14 @@ void Client::handleRequestBecomeChild(MessageHandlePtr handle) {
 void Client::handleAckAcceptBecomeChild(MessageHandlePtr handle) {
     JobRequest req; req.deserialize(handle->recvData);
     const JobDescription& desc = *introducedJobs[req.jobId];
-    Console::log_send(Console::VERB, handle->source, "Sending job description of #%i of size %i", desc.getId(), desc.getPayloadSize());
+    Console::log_send(Console::VERB, handle->source, "Sending job description of #%i of size %i", desc.getId(), desc.getTransferSize());
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB, desc);
 }
 
 void Client::handleJobDone(MessageHandlePtr handle) {
-
-    int jobId = handle->recvData[0];
-    int resultSize = handle->recvData[1];
+    IntPair recv(handle->recvData);
+    int jobId = recv.first;
+    int resultSize = recv.second;
     Console::log_recv(Console::VERB, handle->source, "Preparing to receive job result of length %i for job #%i", resultSize, jobId);
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_QUERY_JOB_RESULT, handle->recvData);
     MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_RESULT, resultSize);

@@ -10,7 +10,7 @@
 /**
  * Sent around during the search of a node to adopt the job.
  */
-struct JobRequest : public Serializable  {
+struct JobRequest : public Serializable {
 
     int jobId;
     int rootRank;
@@ -32,27 +32,29 @@ public:
         epoch(epoch),
         numHops(numHops) {}
 
-    std::vector<int> serialize() const override {
-        std::vector<int> packed;
-        packed.push_back(jobId);
-        packed.push_back(rootRank);
-        packed.push_back(requestingNodeRank);
-        packed.push_back(requestedNodeIndex);
-        packed.push_back(fullTransfer);
-        packed.push_back(epoch);
-        packed.push_back(numHops);
+    std::vector<uint8_t> serialize() const override {
+        std::vector<uint8_t> packed(7*sizeof(int));
+
+        int i = 0, n;
+        n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &rootRank, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &requestingNodeRank, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &requestedNodeIndex, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &fullTransfer, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &epoch, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &numHops, n); i += n;
         return packed;
     }
 
-    void deserialize(const std::vector<int> &packed) override {
-        int i = 0;
-        jobId = packed[i++];
-        rootRank = packed[i++];
-        requestingNodeRank = packed[i++];
-        requestedNodeIndex = packed[i++];
-        fullTransfer = packed[i++];
-        epoch = packed[i++];
-        numHops = packed[i++];
+    void deserialize(const std::vector<uint8_t> &packed) override {
+        int i = 0, n;
+        n = sizeof(int); memcpy(&jobId, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&rootRank, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&requestingNodeRank, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&requestedNodeIndex, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&fullTransfer, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&epoch, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&numHops, packed.data()+i, n); i += n;
     }
 };
 
@@ -64,34 +66,35 @@ struct JobSignature : public Serializable {
 
     int jobId;
     int rootRank;
-    int payloadSize;
+    size_t transferSize;
 
 public:
     JobSignature() = default;
 
-    JobSignature(int jobId, int rootRank, int formulaSize) :
+    JobSignature(int jobId, int rootRank, size_t transferSize) :
         jobId(jobId),
         rootRank(rootRank),
-        payloadSize(formulaSize) {}
+        transferSize(transferSize) {}
 
     int getTransferSize() const {
-        // 3 meta data ints, payload size, closing zero
-        return 3 + payloadSize + 1;
+        return transferSize;
     }
 
-    std::vector<int> serialize() const override {
-        std::vector<int> packed;
-        packed.push_back(jobId);
-        packed.push_back(rootRank);
-        packed.push_back(payloadSize);
+    std::vector<uint8_t> serialize() const override {
+        std::vector<uint8_t> packed(2*sizeof(int) + sizeof(size_t));
+
+        int i = 0, n;
+        n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &rootRank, n); i += n;
+        n = sizeof(size_t); memcpy(packed.data()+i, &transferSize, n); i += n;
         return packed;
     }
 
-    void deserialize(const std::vector<int>& packed) override {
-        int i = 0;
-        jobId = packed[i++];
-        rootRank = packed[i++];
-        payloadSize = packed[i++];
+    void deserialize(const std::vector<uint8_t>& packed) override {
+        int i = 0, n;
+        n = sizeof(int); memcpy(&jobId, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&rootRank, packed.data()+i, n); i += n;
+        n = sizeof(size_t); memcpy(&transferSize, packed.data()+i, n); i += n;
     }
 };
 
@@ -103,23 +106,52 @@ struct JobMessage : public Serializable {
     std::vector<int> payload;
 
 public:
-    std::vector<int> serialize() const override {
-        std::vector<int> packed;
-        packed.push_back(jobId);
-        packed.push_back(tag);
-        packed.push_back(epoch);
-        packed.insert(packed.end(), payload.begin(), payload.end());
+    std::vector<uint8_t> serialize() const override {
+        std::vector<uint8_t> packed(3*sizeof(int) + payload.size()*sizeof(int));
+
+        int i = 0, n;
+        n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &tag, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &epoch, n); i += n;
+        n = payload.size()*sizeof(int); memcpy(packed.data()+i, payload.data(), n); i += n;
         return packed;
     }
 
-    void deserialize(const std::vector<int>& packed) override {
-        int i = 0;
-        jobId = packed[i++];
-        tag = packed[i++];
-        epoch = packed[i++];
-        payload.insert(payload.end(), packed.begin()+i, packed.end());
+    void deserialize(const std::vector<uint8_t>& packed) override {
+        int i = 0, n;
+        n = sizeof(int); memcpy(&jobId, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&tag, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&epoch, packed.data()+i, n); i += n;
+        n = packed.size()-i; payload.resize(n/sizeof(int)); 
+        memcpy(payload.data(), packed.data()+i, n); i += n;
+    }
+};
+
+struct IntPair : public Serializable {
+
+    int first;
+    int second;
+
+public:
+    IntPair(int first, int second) : first(first), second(second) {}
+
+    IntPair(std::vector<uint8_t>& packed) {
+        deserialize(packed);
     }
 
+    std::vector<uint8_t> serialize() const override {
+        std::vector<uint8_t> packed(2*sizeof(int));
+        int i = 0, n;
+        n = sizeof(int); memcpy(packed.data()+i, &first, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &second, n); i += n;
+        return packed;
+    }
+
+    void deserialize(const std::vector<uint8_t>& packed) override {
+        int i = 0, n;
+        n = sizeof(int); memcpy(&first, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&second, packed.data()+i, n); i += n;
+    }
 };
 
 #endif

@@ -7,13 +7,13 @@
 class EpochCounter {
 
 private:
-    uint epoch;
+    int epoch;
     float lastSync;
 
 public:
     EpochCounter() : epoch(0), lastSync(0) {};
 
-    uint getEpoch() const {return epoch;}
+    int getEpoch() const {return epoch;}
     int getSecondsSinceLastSync() const {return Timer::elapsedSeconds() - lastSync;};
 
     void increment() {epoch++;}

@@ -55,7 +55,7 @@ void dumpStats() {
 }
 
 int main(int argc, char *argv[]) {
-    signal(SIGSEGV, handler);
+    //signal(SIGSEGV, handler);
 
     Timer::init();
     MyMpi::init(argc, argv);
@@ -90,6 +90,7 @@ int main(int argc, char *argv[]) {
     // Find client ranks
     std::set<int> externalClientRanks;
     int numClients = params.getIntParam("c");
+    assert((int)numNodes-numClients > 0 || Console::fail("Need at least one worker node!"));
     for (int i = 1; i <= numClients; i++)
         externalClientRanks.insert(numNodes-i);
     bool isExternalClient = (externalClientRanks.find(rank) != externalClientRanks.end());

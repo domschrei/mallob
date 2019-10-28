@@ -1,52 +1,61 @@
 
 #include "job_description.h"
 
-std::vector<int> JobDescription::serialize() const {
-    std::vector<int> packed;
+#include "util/console.h"
+
+int JobDescription::getTransferSize() const {
+    return 2*sizeof(int)
+            +sizeof(float)
+            +payload.size()*sizeof(int);
+}
+
+std::vector<uint8_t> JobDescription::serialize() const {
+
+    std::vector<uint8_t> packed(getTransferSize());
 
     // Basic data
-    packed.push_back(id);
-    packed.push_back(rootRank);
-    packed.push_back((int) (1000 * priority));
+    int i = 0, n;
+    n = sizeof(int); memcpy(packed.data()+i, &id, n); i += n;
+    n = sizeof(int); memcpy(packed.data()+i, &rootRank, n); i += n;
+    n = sizeof(float); memcpy(packed.data()+i, &priority, n); i += n;
 
     // Clauses
-    packed.insert(packed.begin() + 3, payload.begin(), payload.end());
-
-    // Closing zero
-    packed.push_back(0);
+    n = payload.size()*sizeof(int); memcpy(packed.data()+i, payload.data(), n); i += n;
 
     return packed;
 }
 
-void JobDescription::deserialize(const std::vector<int>& packed) {
+void JobDescription::deserialize(const std::vector<uint8_t>& packed) {
 
-    int i = 0;
-    id = packed[i++];
-    rootRank = packed[i++];
-    priority = 0.001f * packed[i++];
+    int i = 0, n;
+
+    // Basic data
+    n = sizeof(int); memcpy(&id, packed.data()+i, n); i += n;
+    n = sizeof(int); memcpy(&rootRank, packed.data()+i, n); i += n;
+    n = sizeof(float); memcpy(&priority, packed.data()+i, n); i += n;
 
     // Clauses
-    for (unsigned int pos = i; pos+1 < packed.size(); pos++) {
-        if (packed[pos] == 0 && packed[pos+1] == 0) {
-            payload.insert(payload.begin(), packed.begin()+i, packed.begin()+(pos+1));
-            i = pos+1;
-            break;
-        }
-        if (packed[pos+1] != 0) pos++;
-    }
+    n = packed.size()-i; payload.resize(n/sizeof(int)); 
+    Console::log(Console::VVVERB, "%i %i %i", i, n, payload.size());
+    memcpy(payload.data(), packed.data()+i, n); i += n;
 }
 
-std::vector<int> JobResult::serialize() const {
-    std::vector<int> packed;
-    packed.push_back(id);
-    packed.push_back(result);
-    packed.insert(packed.begin()+2, solution.begin(), solution.end());
+std::vector<uint8_t> JobResult::serialize() const {
+
+    std::vector<uint8_t> packed(2*sizeof(int) + solution.size()*sizeof(int));
+
+    int i = 0, n;
+    n = sizeof(int); memcpy(packed.data()+i, &id, n); i += n;
+    n = sizeof(int); memcpy(packed.data()+i, &result, n); i += n;
+    n = solution.size() * sizeof(int); memcpy(packed.data()+i, solution.data(), n); i += n;
     return packed;
 }
 
-void JobResult::deserialize(const std::vector<int>& packed) {
-    int i = 0;
-    id = packed[i++];
-    result = packed[i++];
-    solution.insert(solution.begin(), packed.begin()+i, packed.end());
+void JobResult::deserialize(const std::vector<uint8_t>& packed) {
+
+    int i = 0, n;
+    n = sizeof(int); memcpy(&id, packed.data()+i, n); i += n;
+    n = sizeof(int); memcpy(&result, packed.data()+i, n); i += n;
+    n = packed.size()-i; solution.resize(n/sizeof(int));
+    memcpy(solution.data(), packed.data()+i, n); i += n;
 }

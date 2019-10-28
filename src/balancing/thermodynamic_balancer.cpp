@@ -30,7 +30,7 @@ std::map<int, int> ThermodynamicBalancer::balance(std::map<int, Job*>& jobs) {
     float pressure = calculatePressure(involvedJobs, remainingVolume);
     assert(pressure >= 0);
     float microJobDiscount = 0;
-    for (unsigned int i = 0; i < involvedJobs.size(); i++) {
+    for (int i = 0; i < involvedJobs.size(); i++) {
         const JobDescription& desc = *involvedJobs[i];
         float demand = 1/pressure * getTemperature(desc.getId()) * desc.getPriority();
         if (demand < 1) {
@@ -51,7 +51,7 @@ std::map<int, int> ThermodynamicBalancer::balance(std::map<int, Job*>& jobs) {
         pressure = calculatePressure(involvedJobs, remainingVolume);
         if (pressure == 0) break;
         //if (MyMpi::rank(comm) == 0) Console::log("Pressure: " + std::to_string(pressure));
-        for (unsigned int i = 0; i < involvedJobs.size(); i++) {
+        for (int i = 0; i < involvedJobs.size(); i++) {
             JobDescription& desc = *involvedJobs[i];
             float addition = 1/pressure * getTemperature(desc.getId()) * desc.getPriority();
             //Console::log(std::to_string(pressure) + "," + std::to_string(job->getTemperature()) + "," + std::to_string(job->getPriority()));

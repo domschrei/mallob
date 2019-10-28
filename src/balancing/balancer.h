@@ -20,7 +20,6 @@ public:
     void updateVolume(int jobId, int volume);
 
 
-
     // Asynchronous rebalancing
 
     /**
