@@ -47,6 +47,8 @@ public:
     void beginCommunication() override;
     void communicate(int source, JobMessage& msg) override;
 
+    void dumpStats() override;
+
 private:
     void extractResult();
 

@@ -22,10 +22,10 @@ std::map<int, int> ThermodynamicBalancer::balance(std::map<int, Job*>& jobs) {
         }
     }
 
-    int fullVolume = MyMpi::size(comm);
+    int fullVolume = MyMpi::size(_comm);
 
     // Initial pressure, filtering out micro-jobs
-    float remainingVolume = fullVolume * loadFactor;
+    float remainingVolume = fullVolume * _load_factor;
     assert(remainingVolume > 0);
     float pressure = calculatePressure(involvedJobs, remainingVolume);
     assert(pressure >= 0);
@@ -70,7 +70,7 @@ std::map<int, int> ThermodynamicBalancer::balance(std::map<int, Job*>& jobs) {
         remainingVolume = allReduce(unusedVolume);
         iteration++;
     }
-    if (MyMpi::rank(comm) == 0)
+    if (MyMpi::rank(_comm) == 0)
         Console::log(Console::VERB, "Did %i rebalancing iterations", iteration);
 
     // Weigh remaining volume against shrinkage
@@ -111,11 +111,11 @@ std::map<int, int> ThermodynamicBalancer::balance(std::map<int, Job*>& jobs) {
             delta = std::floor(delta);
         //}
 
-        volumes[job.getId()] = getVolume(job.getId()) + delta;
-        allDemands += volumes[job.getId()];
+        _volumes[job.getId()] = getVolume(job.getId()) + delta;
+        allDemands += _volumes[job.getId()];
     }
 
-    return volumes;
+    return _volumes;
 }
 
 float ThermodynamicBalancer::calculatePressure(const std::vector<JobDescription*>& involvedJobs, float volume) {

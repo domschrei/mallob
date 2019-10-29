@@ -11,11 +11,11 @@
 
 class PriorityComparator {
 private:
-    std::map<int, Job*>& jobs;
+    std::map<int, Job*>& _jobs;
 public:
-    PriorityComparator(std::map<int, Job*>& jobs) : jobs(jobs) {}
+    PriorityComparator(std::map<int, Job*>& jobs) : _jobs(jobs) {}
     bool operator() (const int& lhs, const int& rhs) const {
-        return jobs[lhs]->getDescription().getPriority() > jobs[rhs]->getDescription().getPriority();
+        return _jobs[lhs]->getDescription().getPriority() > _jobs[rhs]->getDescription().getPriority();
     }
 };
 
@@ -25,9 +25,9 @@ float assignedResources;
 std::vector<float> priorities;
 std::vector<float> demandedResources;
 
-ResourcesInfo() : 
-    assignedResources(0), 
-    priorities(std::vector<float>()), 
+ResourcesInfo() :
+    assignedResources(0),
+    priorities(std::vector<float>()),
     demandedResources(std::vector<float>()) {}
 
 void merge(const Reduceable& other) override {
@@ -41,7 +41,7 @@ void merge(const Reduceable& other) override {
         size_t idx = 0;
         while (idx < priorities.size() && priorities[idx] > prioToInsert) idx++;
 
-        // If this priority did not exist before, 
+        // If this priority did not exist before,
         // insert an element into both structures
         if (idx >= priorities.size() || priorities[idx] != prioToInsert) {
             priorities.insert(priorities.begin()+idx, prioToInsert);
@@ -66,7 +66,7 @@ std::vector<uint8_t> serialize() const override {
     return data;
 }
 void deserialize(const std::vector<uint8_t>& packed) override {
-    
+
     int i = 0, n;
     n = sizeof(float); memcpy(&assignedResources, packed.data()+i, n); i += n;
     int size = (packed.size() - i) / 2;
@@ -90,8 +90,8 @@ enum BalancingStage {
 class CutoffPriorityBalancer : public Balancer {
 
 public:
-    CutoffPriorityBalancer(MPI_Comm& comm, Parameters& params, Statistics& stats) : Balancer(comm, params, stats), localJobs(NULL) {
-        
+    CutoffPriorityBalancer(MPI_Comm& comm, Parameters& params, Statistics& stats) : Balancer(comm, params, stats), _local_jobs(NULL) {
+
     }
     std::map<int, int> balance(std::map<int, Job*>& jobs) override;
 
@@ -102,12 +102,12 @@ public:
     std::map<int, int> getBalancingResult() override;
 
 private:
-    std::set<int, PriorityComparator>* localJobs;
-    BalancingStage stage;
-    ResourcesInfo resourcesInfo;
-    int totalVolume;
-    std::map<int, float> assignments;
-    
+    std::set<int, PriorityComparator>* _local_jobs;
+    BalancingStage _stage;
+    ResourcesInfo _resources_info;
+    int _total_volume;
+    std::map<int, float> _assignments;
+
 };
 
 #endif

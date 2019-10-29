@@ -2,40 +2,40 @@
 #include "balancer.h"
 
 int Balancer::getVolume(int jobId) {
-    if (!volumes.count(jobId))
-        volumes[jobId] = 1;
-    return volumes[jobId];
+    if (!_volumes.count(jobId))
+        _volumes[jobId] = 1;
+    return _volumes[jobId];
 }
 
 void Balancer::updateVolume(int jobId, int volume) {
-    volumes[jobId] = volume;
+    _volumes[jobId] = volume;
 }
 
 float Balancer::allReduce(float contribution) const {
     float result;
-    MPI_Allreduce(&contribution, &result, 1, MPI_FLOAT, MPI_SUM, comm);
-    stats.increment("reductions");
-    stats.increment("broadcasts");
+    MPI_Allreduce(&contribution, &result, 1, MPI_FLOAT, MPI_SUM, _comm);
+    _stats.increment("reductions");
+    _stats.increment("broadcasts");
     return result;
 }
 void Balancer::iAllReduce(float contribution) {
-    reduceResult = contribution;
-    reduceRequest = MPI_Request();
-    MPI_Iallreduce(&reduceResult, &reduceResult, 1, MPI_FLOAT, MPI_SUM, comm, &reduceRequest);
-    stats.increment("reductions");
-    stats.increment("broadcasts");
+    _reduce_result = contribution;
+    _reduce_request = MPI_Request();
+    MPI_Iallreduce(&_reduce_result, &_reduce_result, 1, MPI_FLOAT, MPI_SUM, _comm, &_reduce_request);
+    _stats.increment("reductions");
+    _stats.increment("broadcasts");
 }
 float Balancer::reduce(float contribution, int rootRank) const {
     float result;
-    MPI_Reduce(&contribution, &result, 1, MPI_FLOAT, MPI_SUM, rootRank, comm);
-    stats.increment("reductions");
+    MPI_Reduce(&contribution, &result, 1, MPI_FLOAT, MPI_SUM, rootRank, _comm);
+    _stats.increment("reductions");
     return result;
 }
 void Balancer::iReduce(float contribution, int rootRank) {
-    reduceResult = 0;
-    reduceRequest = MPI_Request();
-    MPI_Ireduce(&contribution, &reduceResult, 1, MPI_FLOAT, MPI_SUM, rootRank, comm, &reduceRequest);
-    stats.increment("reductions");
+    _reduce_result = 0;
+    _reduce_request = MPI_Request();
+    MPI_Ireduce(&contribution, &_reduce_result, 1, MPI_FLOAT, MPI_SUM, rootRank, _comm, &_reduce_request);
+    _stats.increment("reductions");
 }
 
 int Balancer::getDemand(const Job& job) {

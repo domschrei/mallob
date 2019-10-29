@@ -78,6 +78,7 @@ void Worker::mainProgram() {
                 // Solver done!
                 int jobRootRank = job.getRootNodeRank();
                 IntPair pair(jobId, (int) result);
+                job.dumpStats();
 
                 // Signal termination to root -- may be a self message
                 Console::log_send(Console::VERB, jobRootRank, "Sending finished info");
@@ -175,8 +176,8 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
         // Node is idle and not committed to another job: OK
         adopts = true;
 
-    } else if (!hasJobCommitments() && req.numHops > maxJobHops()) {
-        // Request exceeded max #hops: Possibly adopt the job while dismissing the active job
+    } else if (req.requestedNodeIndex == 0 && !hasJobCommitments() && req.numHops > maxJobHops()) {
+        // Request for a root node exceeded max #hops: Possibly adopt the job while dismissing the active job
 
         // If this node already computes on _this_ job, don't adopt it
         if (!hasJob(req.jobId) || getJob(req.jobId).isNotInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
@@ -219,6 +220,9 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
         if (!hasJob(req.jobId)) {
             // Job is not known yet: create instance, request full transfer
             jobs[req.jobId] = new SatJob(params, MyMpi::size(comm), worldRank, req.jobId, epochCounter);
+            fullTransfer = true;
+        } else if (!getJob(req.jobId).hasJobDescription()) {
+            // Job is known, but never received full description; request full transfer
             fullTransfer = true;
         }
         req.fullTransfer = fullTransfer ? 1 : 0;
@@ -291,6 +295,7 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
 
     // If rejected: Send message to rejected child node
     if (reject) {
+        Console::log_send(Console::VERB, handle->source, "Rejecting potential child %s", jobStr(req.jobId, req.requestedNodeIndex));
         MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_REJECT_BECOME_CHILD, req);
         stats.increment("sentMessages");
     }
@@ -610,6 +615,9 @@ void Worker::finishBalancing() {
     // Dump stats and advance to next epoch
     stats.addResourceUsage();
     stats.dump(epochCounter.getEpoch());
+    for (auto it : jobs) {
+        it.second->dumpStats();
+    }
     epochCounter.increment();
     Console::log(Console::VERB, "Advancing to epoch %i", epochCounter.getEpoch());
     

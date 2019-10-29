@@ -120,6 +120,8 @@ public:
     virtual bool wantsToCommunicate() const;
     void communicate();
 
+    // Information and logging
+    virtual void dumpStats() = 0;
 
     JobState getState() const {return state;};
     bool isInState(std::initializer_list<JobState> list) const;
@@ -129,6 +131,7 @@ public:
     int getIndex() const {return index;};
     bool isInitialized() const {return initialized;};
     bool isInitializing() const {return isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_PAST, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_COMMITTED});};
+    bool hasJobDescription() const {return hasDescription;};
 
     bool isRoot() const {return index == 0;};
     int getRootNodeRank() const {return jobNodeRanks[0];};

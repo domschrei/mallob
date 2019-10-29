@@ -483,6 +483,28 @@ int HordeLib::finishSolving() {
 	return finalResult;
 }
 
+void HordeLib::dumpStats() {
+	// Local statistics
+	SolvingStatistics locSolveStats;
+	for (int i = 0; i < solversCount; i++) {
+		SolvingStatistics st = solvers[i]->getStatistics();
+		log(1, "thread-stats node:%d/%d thread:%d/%d props:%lu decs:%lu confs:%lu mem:%0.2f\n",
+				mpi_rank, mpi_size, i, solversCount, st.propagations, st.decisions, st.conflicts, st.memPeak);
+		locSolveStats.conflicts += st.conflicts;
+		locSolveStats.decisions += st.decisions;
+		locSolveStats.memPeak += st.memPeak;
+		locSolveStats.propagations += st.propagations;
+		locSolveStats.restarts += st.restarts;
+	}
+	SharingStatistics locShareStats;
+	if (sharingManager != NULL) {
+		locShareStats = sharingManager->getStatistics();
+	}
+	log(1, "node-stats node:%d/%d solved:%d res:%d props:%lu decs:%lu confs:%lu mem:%0.2f shared:%lu filtered:%lu\n",
+			mpi_rank, mpi_size, finalResult != 0, finalResult, locSolveStats.propagations, locSolveStats.decisions,
+			locSolveStats.conflicts, locSolveStats.memPeak, locShareStats.sharedClauses, locShareStats.filteredClauses);
+}
+
 bool HordeLib::readFormula(const char* filename) {
 	if (params.isSet("qbf")) {
 		for (size_t i = 0; i < solvers.size(); i++) {

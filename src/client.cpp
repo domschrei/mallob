@@ -150,7 +150,16 @@ void Client::handleSendJobResult(MessageHandlePtr handle) {
     int resultCode = jobResult.result;
 
     Console::log_recv(Console::INFO, handle->source, "Received result of job #%i, code: %i", jobId, resultCode);
+
+    // Output response time and solution
     Console::log(Console::INFO, "RESPONSE_TIME #%i %.6f", jobId, Timer::elapsedSeconds() - introducedJobs[jobId]->getArrival());
+    Console::getLock();
+    Console::appendUnsafe(Console::VERB, "SOLUTION #%i ", jobId);
+    for (auto it : jobResult.solution) {
+        Console::appendUnsafe(Console::VERB, "%i ", it);
+    }
+    Console::logUnsafe(Console::VERB, "");
+    Console::releaseLock();
 }
 
 void Client::readInstanceList(std::string& filename) {

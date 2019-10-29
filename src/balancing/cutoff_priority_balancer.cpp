@@ -30,7 +30,7 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
     aggregatedDemand = allReduce(aggregatedDemand);
 
     // Calculate local initial assignments
-    int totalVolume = (int) (MyMpi::size(comm) * loadFactor);
+    int totalVolume = (int) (MyMpi::size(_comm) * _load_factor);
     std::map<int, float> assignments;
     for (auto it = localJobs.begin(); it != localJobs.end(); ++it) {
         int jobId = *it;
@@ -50,10 +50,10 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
         resourcesInfo.demandedResources.push_back( getDemand(*jobs[jobId]) - assignments[jobId] );
     }
     // AllReduce
-    std::set<int> excludedNodes = resourcesInfo.allReduce(comm);
-    stats.increment("reductions"); stats.increment("broadcasts");
+    std::set<int> excludedNodes = resourcesInfo.allReduce(_comm);
+    _stats.increment("reductions"); _stats.increment("broadcasts");
     // "resourcesInfo" now contains global data from all concerned jobs
-    if (excludedNodes.count(MyMpi::rank(comm))) {
+    if (excludedNodes.count(MyMpi::rank(_comm))) {
         Console::log(Console::VERB, "Ended all-reduction phase. Balancing phase finished.");
         return std::map<int,int>();
     } else {
@@ -64,9 +64,9 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
     float remainingResources = totalVolume - resourcesInfo.assignedResources;
     if (remainingResources < 0.1) remainingResources = 0;
 
-    if (MyMpi::rank(comm) == 0)
+    if (MyMpi::rank(_comm) == 0)
         Console::log(Console::VERB, "Remaining resources: %.3f", remainingResources);
-    
+
     for (auto it = localJobs.begin(); it != localJobs.end(); ++it) {
         int jobId = *it;
         float demand = getDemand(*jobs[jobId]);
@@ -77,7 +77,7 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
         assert(itPrio != priorities.end());
         int prioIndex = std::distance(priorities.begin(), itPrio);
 
-        if (assignments[jobId] == demand 
+        if (assignments[jobId] == demand
             || priorities[prioIndex] <= remainingResources) {
             // Case 1: Assign full demand
             assignments[jobId] = demand;
@@ -87,7 +87,7 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
             } else {
                 // Case 3: Evenly distribute ratio of remaining resources
                 assert(remainingResources >= 0);
-                float ratio = (remainingResources - demandedResources[prioIndex-1]) 
+                float ratio = (remainingResources - demandedResources[prioIndex-1])
                             / (demandedResources[prioIndex] - demandedResources[prioIndex-1]);
                 assert(ratio > 0);
                 assert(ratio <= 1);
@@ -122,35 +122,34 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
 
 
 bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
-    
+
     // Initialize
-    assignments.clear();
-    priorities.clear();
-    demands.clear();
-    resourcesInfo = ResourcesInfo();
-    stage = INITIAL_DEMAND;
-    balancing = true;
+    _assignments.clear();
+    _priorities.clear();
+    _demands.clear();
+    _resources_info = ResourcesInfo();
+    _stage = INITIAL_DEMAND;
+    _balancing = true;
 
     // Identify jobs to balance
-    jobsBeingBalanced = std::map<int, Job*>();
-    assert(localJobs == NULL || Console::fail("Found localJobs instance of size %i", localJobs->size()));
-    localJobs = new std::set<int, PriorityComparator>(PriorityComparator(jobs));
+    _jobs_being_balanced = std::map<int, Job*>();
+    assert(_local_jobs == NULL || Console::fail("Found localJobs instance of size %i", _local_jobs->size()));
+    _local_jobs = new std::set<int, PriorityComparator>(PriorityComparator(jobs));
     for (auto it : jobs) {
-        Console::log(Console::VVERB, "job #%i", it.first);
         if (it.second->isInState({JobState::ACTIVE/*, JobState::INITIALIZING_TO_ACTIVE*/}) && it.second->isRoot()) {
-            jobsBeingBalanced[it.first] = it.second;
-            localJobs->insert(it.first);
+            _jobs_being_balanced[it.first] = it.second;
+            _local_jobs->insert(it.first);
         }
     }
 
     // Find global aggregation of demands
     float aggregatedDemand = 0;
-    for (auto it : *localJobs) {
+    for (auto it : *_local_jobs) {
         int jobId = it;
-        demands[jobId] = getDemand(*jobsBeingBalanced[jobId]);
-        priorities[jobId] = jobsBeingBalanced[jobId]->getDescription().getPriority();
-        aggregatedDemand += demands[jobId] * priorities[jobId];
-        Console::log(Console::VERB, "Job #%i : demand %i", jobId, demands[jobId]);
+        _demands[jobId] = getDemand(*_jobs_being_balanced[jobId]);
+        _priorities[jobId] = _jobs_being_balanced[jobId]->getDescription().getPriority();
+        aggregatedDemand += _demands[jobId] * _priorities[jobId];
+        Console::log(Console::VERB, "Job #%i : demand %i", jobId, _demands[jobId]);
     }
     Console::log(Console::VERB, "Local aggregated demand: %.3f", aggregatedDemand);
     iAllReduce(aggregatedDemand);
@@ -159,49 +158,49 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
 }
 
 bool CutoffPriorityBalancer::canContinueBalancing() {
-    if (stage == INITIAL_DEMAND) {
+    if (_stage == INITIAL_DEMAND) {
         // Check if reduction is done
         int flag = 0;
         MPI_Status status;
-        MPI_Test(&reduceRequest, &flag, &status);
+        MPI_Test(&_reduce_request, &flag, &status);
         return flag;
     }
-    if (stage == REDUCE_RESOURCES || stage == BROADCAST_RESOURCES) {
+    if (_stage == REDUCE_RESOURCES || _stage == BROADCAST_RESOURCES) {
         return false; // balancing is terminated by an individual message
     }
     return false;
 }
 
 bool CutoffPriorityBalancer::continueBalancing() {
-    if (stage == INITIAL_DEMAND) {
+    if (_stage == INITIAL_DEMAND) {
 
         // Finish up initial reduction
-        float aggregatedDemand = reduceResult;
+        float aggregatedDemand = _reduce_result;
         Console::log(Console::VVERB, "Aggregation of demands: %.3f", aggregatedDemand);
 
-        stage = REDUCE_RESOURCES;
+        _stage = REDUCE_RESOURCES;
 
         // Calculate local initial assignments
-        totalVolume = (int) (MyMpi::size(comm) * loadFactor);
-        for (auto it : *localJobs) {
+        _total_volume = (int) (MyMpi::size(_comm) * _load_factor);
+        for (auto it : *_local_jobs) {
             int jobId = it;
-            float initialMetRatio = totalVolume * priorities[jobId] / aggregatedDemand;
-            assignments[jobId] = std::min(1.0f, initialMetRatio) * demands[jobId];
-            Console::log(Console::VVERB, "Job #%i : initial assignment %.3f", jobId, assignments[jobId]);
+            float initialMetRatio = _total_volume * _priorities[jobId] / aggregatedDemand;
+            _assignments[jobId] = std::min(1.0f, initialMetRatio) * _demands[jobId];
+            Console::log(Console::VVERB, "Job #%i : initial assignment %.3f", jobId, _assignments[jobId]);
         }
 
         // Create ResourceInfo instance with local data
-        for (auto it : *localJobs) {
+        for (auto it : *_local_jobs) {
             int jobId = it;
-            resourcesInfo.assignedResources += assignments[jobId];
-            resourcesInfo.priorities.push_back(priorities[jobId]);
-            resourcesInfo.demandedResources.push_back( demands[jobId] - assignments[jobId] );
+            _resources_info.assignedResources += _assignments[jobId];
+            _resources_info.priorities.push_back(_priorities[jobId]);
+            _resources_info.demandedResources.push_back( _demands[jobId] - _assignments[jobId] );
         }
         // AllReduce
-        bool done = resourcesInfo.startReduction(comm);
+        bool done = _resources_info.startReduction(_comm);
         if (done) {
-            stage = BROADCAST_RESOURCES;
-            done = resourcesInfo.startBroadcast(comm, resourcesInfo.getExcludedRanks());
+            _stage = BROADCAST_RESOURCES;
+            done = _resources_info.startBroadcast(_comm, _resources_info.getExcludedRanks());
             if (done) {
                 return true;
             }
@@ -213,17 +212,17 @@ bool CutoffPriorityBalancer::continueBalancing() {
 
 bool CutoffPriorityBalancer::handleMessage(MessageHandlePtr handle) {
     bool done;
-    if (stage == REDUCE_RESOURCES) {
-        done = resourcesInfo.advanceReduction(handle);
+    if (_stage == REDUCE_RESOURCES) {
+        done = _resources_info.advanceReduction(handle);
         if (done) {
-            stage = BROADCAST_RESOURCES;
-            done = resourcesInfo.startBroadcast(comm, resourcesInfo.getExcludedRanks());
+            _stage = BROADCAST_RESOURCES;
+            done = _resources_info.startBroadcast(_comm, _resources_info.getExcludedRanks());
             if (done) {
                 return true;
             }
         }
-    } else if (stage == BROADCAST_RESOURCES) {
-        done = resourcesInfo.advanceBroadcast(handle);
+    } else if (_stage == BROADCAST_RESOURCES) {
+        done = _resources_info.advanceBroadcast(handle);
         if (done) {
             return true;
         }
@@ -233,72 +232,72 @@ bool CutoffPriorityBalancer::handleMessage(MessageHandlePtr handle) {
 
 std::map<int, int> CutoffPriorityBalancer::getBalancingResult() {
 
-    stats.increment("reductions"); stats.increment("broadcasts");
+    _stats.increment("reductions"); _stats.increment("broadcasts");
 
     // "resourcesInfo" now contains global data from all concerned jobs
-    if (resourcesInfo.getExcludedRanks().count(MyMpi::rank(comm))) {
+    if (_resources_info.getExcludedRanks().count(MyMpi::rank(_comm))) {
         Console::log(Console::VERB, "Ended all-reduction phase. Balancing phase finished.");
-        balancing = false;
-        delete localJobs;
-        localJobs = NULL;
+        _balancing = false;
+        delete _local_jobs;
+        _local_jobs = NULL;
         return std::map<int, int>();
     } else {
         Console::log(Console::VERB, "Ended all-reduction phase. Calculating final job demands ...");
     }
 
     // Assign correct (final) floating-point resources
-    Console::log(Console::VVERB, "Initially assigned resources: %.3f", resourcesInfo.assignedResources);
-    float remainingResources = totalVolume - resourcesInfo.assignedResources;
+    Console::log(Console::VVERB, "Initially assigned resources: %.3f", _resources_info.assignedResources);
+    float remainingResources = _total_volume - _resources_info.assignedResources;
     if (remainingResources < 0.1) remainingResources = 0;
 
-    if (MyMpi::rank(comm) == 0)
+    if (MyMpi::rank(_comm) == 0)
         Console::log(Console::VERB, "Remaining resources: %.3f", remainingResources);
-    
-    for (auto it : jobsBeingBalanced) {
+
+    for (auto it : _jobs_being_balanced) {
         int jobId = it.first;
 
-        float demand = demands[jobId];
-        float priority = priorities[jobId];
-        std::vector<float>& priorities = resourcesInfo.priorities;
-        std::vector<float>& demandedResources = resourcesInfo.demandedResources;
+        float demand = _demands[jobId];
+        float priority = _priorities[jobId];
+        std::vector<float>& priorities = _resources_info.priorities;
+        std::vector<float>& demandedResources = _resources_info.demandedResources;
         std::vector<float>::iterator itPrio = std::find(priorities.begin(), priorities.end(), priority);
         assert(itPrio != priorities.end() || Console::fail("Priority %.3f not found in histogram!", priority));
         int prioIndex = std::distance(priorities.begin(), itPrio);
 
-        if (assignments[jobId] == demand 
+        if (_assignments[jobId] == demand
             || priorities[prioIndex] <= remainingResources) {
             // Case 1: Assign full demand
-            assignments[jobId] = demand;
+            _assignments[jobId] = demand;
         } else {
             if (prioIndex == 0 || demandedResources[prioIndex-1] >= remainingResources) {
                 // Case 2: No additional resources assigned
             } else {
                 // Case 3: Evenly distribute ratio of remaining resources
                 assert(remainingResources >= 0);
-                float ratio = (remainingResources - demandedResources[prioIndex-1]) 
+                float ratio = (remainingResources - demandedResources[prioIndex-1])
                             / (demandedResources[prioIndex] - demandedResources[prioIndex-1]);
                 assert(ratio > 0);
                 assert(ratio <= 1);
-                assignments[jobId] += ratio * (demand - assignments[jobId]);
+                _assignments[jobId] += ratio * (demand - _assignments[jobId]);
             }
         }
     }
 
     // Convert float assignments into actual integer volumes, store and return them
     std::map<int, int> volumes;
-    for (auto it = assignments.begin(); it != assignments.end(); ++it) {
+    for (auto it = _assignments.begin(); it != _assignments.end(); ++it) {
         int jobId = it->first;
         float assignment = std::max(1.0f, it->second);
         int intAssignment = Random::roundProbabilistically(assignment);
         volumes[jobId] = intAssignment;
-        Console::log(Console::VERB, "Job #%i: final assignment %.3f => adjusted to %i", jobId, assignments[jobId], intAssignment);
+        Console::log(Console::VERB, "Job #%i: final assignment %.3f => adjusted to %i", jobId, _assignments[jobId], intAssignment);
     }
     for (auto it = volumes.begin(); it != volumes.end(); ++it) {
         updateVolume(it->first, it->second);
     }
 
-    balancing = false;
-    delete localJobs;
-    localJobs = NULL;
+    _balancing = false;
+    delete _local_jobs;
+    _local_jobs = NULL;
     return volumes;
 }

@@ -256,3 +256,9 @@ int SatJob::solveLoop() {
     }
     return result;
 }
+
+void SatJob::dumpStats() {
+    if (isInState({ACTIVE})) {
+        solver->dumpStats();
+    }
+}

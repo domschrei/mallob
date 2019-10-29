@@ -36,7 +36,6 @@ void JobDescription::deserialize(const std::vector<uint8_t>& packed) {
 
     // Clauses
     n = packed.size()-i; payload.resize(n/sizeof(int)); 
-    Console::log(Console::VVVERB, "%i %i %i", i, n, payload.size());
     memcpy(payload.data(), packed.data()+i, n); i += n;
 }
 

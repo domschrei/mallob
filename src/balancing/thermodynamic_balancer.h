@@ -16,19 +16,19 @@ private:
     float calculatePressure(const std::vector<JobDescription*>& involvedJobs, float volume);
 
     float getTemperature(int jobId) {
-        if (temperatures.count(jobId)) {
-            temperatures[jobId] = 100.0;
+        if (_temperatures.count(jobId)) {
+            _temperatures[jobId] = 100.0;
         }
-        return temperatures[jobId];
+        return _temperatures[jobId];
     }
     void coolDown(int jobId) {
         float room = 20.0; 
-        float decay = params.getFloatParam("td");
+        float decay = _params.getFloatParam("td");
         float previous = getTemperature(jobId);
-        temperatures[jobId] = previous - decay * (previous - room);
+        _temperatures[jobId] = previous - decay * (previous - room);
     }
 
-    std::map<int, float> temperatures;
+    std::map<int, float> _temperatures;
 };
 
 #endif

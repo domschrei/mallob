@@ -111,6 +111,8 @@ public:
     void waitUntilResumed();
     void setTerminate();
 
+	void dumpStats();
+
 	int value(int lit);
 	int failed(int lit);
 	std::vector<int>& getTruthValues() {

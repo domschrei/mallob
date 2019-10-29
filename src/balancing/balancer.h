@@ -12,9 +12,9 @@
 class Balancer {
 
 public:
-    Balancer(MPI_Comm& comm, Parameters& params, Statistics& stats) : 
-    comm(comm), params(params), stats(stats), loadFactor(params.getFloatParam("l")), balancing(false) {}
-    
+    Balancer(MPI_Comm& comm, Parameters& params, Statistics& stats) :
+    _comm(comm), _params(params), _stats(stats), _load_factor(params.getFloatParam("l")), _balancing(false) {}
+
     virtual std::map<int, int> balance(std::map<int, Job*>& jobs) = 0;
     int getVolume(int jobId);
     void updateVolume(int jobId, int volume);
@@ -23,9 +23,9 @@ public:
     // Asynchronous rebalancing
 
     /**
-     * Returns whether balancing is currently being done. 
+     * Returns whether balancing is currently being done.
      */
-    bool isBalancing() {return balancing;};
+    bool isBalancing() {return _balancing;};
 
     /**
      * Do first part of balancing procedure, until finished or until some synchronization is necessary.
@@ -59,19 +59,19 @@ protected:
     int getDemand(const Job& job);
 
 protected:
-    MPI_Comm& comm;
-    Parameters& params;
-    Statistics& stats;
-    float loadFactor;
-    bool balancing;
+    MPI_Comm& _comm;
+    Parameters& _params;
+    Statistics& _stats;
+    float _load_factor;
+    bool _balancing;
 
-    std::map<int, Job*> jobsBeingBalanced; 
-    std::map<int, int> volumes;
-    std::map<int, float> priorities;
-    std::map<int, int> demands;
+    std::map<int, Job*> _jobs_being_balanced;
+    std::map<int, int> _volumes;
+    std::map<int, float> _priorities;
+    std::map<int, int> _demands;
 
-    MPI_Request reduceRequest;
-    float reduceResult;
+    MPI_Request _reduce_request;
+    float _reduce_result;
 };
 
 #endif
