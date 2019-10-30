@@ -59,33 +59,33 @@ static const char * jobStateStrings[] = { "none", "stored", "committed", "initia
 class Job {
 
 protected:
-    Parameters& params;
-    int commSize;
-    int worldRank;
+    Parameters& _params;
+    int _comm_size;
+    int _world_rank;
 
-    int jobId;
-    int index;
-    JobDescription job;
-    std::vector<uint8_t> serializedDescription;
+    int _id;
+    int _index;
+    JobDescription _description;
+    std::vector<uint8_t> _serialized_description;
 
-    EpochCounter& epochCounter;
-    int epochOfArrival;
-    float elapsedSecondsOfArrival;
-    int epochOfLastCommunication = -1; 
+    EpochCounter& _epoch_counter;
+    int _epoch_of_arrival;
+    float _elapsed_seconds_since_arrival;
+    int _epoch_of_last_communication = -1; 
 
-    JobState state = JobState::NONE;
-    bool hasDescription;
-    bool initialized;
-    std::unique_ptr<std::thread> initializerThread;
-    bool doneLocally = false;
+    JobState _state;
+    bool _has_description;
+    bool _initialized;
+    std::unique_ptr<std::thread> _initializer_thread;
+    bool _done_locally;
     
-    int resultCode;
-    JobResult result;
+    int _result_code;
+    JobResult _result;
     
-    AdjustablePermutation jobNodeRanks;
-    bool leftChild = false;
-    bool rightChild = false;
-    int clientRank;
+    AdjustablePermutation _job_node_ranks;
+    bool _has_left_child;
+    bool _has_right_child;
+    int _client_rank;
 
 public:
 
@@ -106,61 +106,59 @@ public:
     virtual void pause() = 0;
     virtual void unpause() = 0;
     virtual void terminate() = 0;
+    virtual void dumpStats() = 0;
+    // Intra-job communication methods (must be implemented)
+    virtual void beginCommunication() = 0;
+    virtual void communicate(int source, JobMessage& msg) = 0;
 
     virtual void initialize();
     void beginInitialization();
     void endInitialization();
-    
-    // Intra-job communication methods (must be implemented)
-    virtual void beginCommunication() = 0;
-    virtual void communicate(int source, JobMessage& msg) = 0;
     
     // Querying and communication methods (may be re-implemented partially)
     virtual int getDemand() const;
     virtual bool wantsToCommunicate() const;
     void communicate();
 
-    // Information and logging
-    virtual void dumpStats() = 0;
-
-    JobState getState() const {return state;};
+    JobState getState() const {return _state;};
     bool isInState(std::initializer_list<JobState> list) const;
     bool isNotInState(std::initializer_list<JobState> list) const;
-    JobDescription& getDescription() {return job;};
-    std::vector<uint8_t>& getSerializedDescription() {return serializedDescription;};
-    int getIndex() const {return index;};
-    bool isInitialized() const {return initialized;};
+    JobDescription& getDescription() {return _description;};
+    std::vector<uint8_t>& getSerializedDescription() {return _serialized_description;};
+    int getId() const {return _id;};
+    int getIndex() const {return _index;};
+    bool isInitialized() const {return _initialized;};
     bool isInitializing() const {return isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_PAST, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_COMMITTED});};
-    bool hasJobDescription() const {return hasDescription;};
+    bool hasJobDescription() const {return _has_description;};
 
-    bool isRoot() const {return index == 0;};
-    int getRootNodeRank() const {return jobNodeRanks[0];};
-    int getParentNodeRank() const {return isRoot() ? clientRank : jobNodeRanks[getParentIndex()];};
-    int getLeftChildNodeRank() const {return jobNodeRanks[getLeftChildIndex()];};
-    int getRightChildNodeRank() const {return jobNodeRanks[getRightChildIndex()];};
+    bool isRoot() const {return _index == 0;};
+    int getRootNodeRank() const {return _job_node_ranks[0];};
+    int getParentNodeRank() const {return isRoot() ? _client_rank : _job_node_ranks[getParentIndex()];};
+    int getLeftChildNodeRank() const {return _job_node_ranks[getLeftChildIndex()];};
+    int getRightChildNodeRank() const {return _job_node_ranks[getRightChildIndex()];};
 
-    bool hasLeftChild() const {return leftChild;};
-    bool hasRightChild() const {return rightChild;};
+    bool hasLeftChild() const {return _has_left_child;};
+    bool hasRightChild() const {return _has_right_child;};
     void setLeftChild(int rank);
     void setRightChild(int rank);
-    void unsetLeftChild() {leftChild = false;};
-    void unsetRightChild() {rightChild = false;};
+    void unsetLeftChild() {_has_left_child = false;};
+    void unsetRightChild() {_has_right_child = false;};
 
-    int getLeftChildIndex() const {return 2*(index+1)-1;};
-    int getRightChildIndex() const {return 2*(index+1);};
-    int getParentIndex() const {return (index-1)/2;};
+    int getLeftChildIndex() const {return 2*(_index+1)-1;};
+    int getRightChildIndex() const {return 2*(_index+1);};
+    int getParentIndex() const {return (_index-1)/2;};
     const JobResult& getResult() const;
 
-    const char* toStr() const {return ("#" + std::to_string(jobId) + ":" + (index >= 0 ? std::to_string(index) : std::string("?"))).c_str();};
-    const char* jobStateToStr() const {return jobStateStrings[(int)state];};
+    const char* toStr() const {return ("#" + std::to_string(_id) + ":" + (_index >= 0 ? std::to_string(_index) : std::string("?"))).c_str();};
+    const char* jobStateToStr() const {return jobStateStrings[(int)_state];};
 
     void updateJobNode(int index, int newRank) {
-        jobNodeRanks.adjust(index, newRank);
+        _job_node_ranks.adjust(index, newRank);
     }
     void updateParentNodeRank(int newRank) {
         if (isRoot()) {
             // Root worker node!
-            clientRank = newRank;
+            _client_rank = newRank;
         } else {
             // Inner node / leaf worker
             updateJobNode(getParentIndex(), newRank);

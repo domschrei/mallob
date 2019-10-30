@@ -111,6 +111,29 @@ const int MSG_WORKER_DEFECTING = 22;
 const int MSG_COLLECTIVES = 300;
 const int MSG_JOB_COMMUNICATION = 400;
 
+/**
+ * All types of messages which can be receivable by a worker node at any time 
+ * by a generic irecv method and within the maximum message length.
+ */
+const int ANYTIME_WORKER_RECV_TAGS[] = {MSG_FIND_NODE, MSG_REQUEST_BECOME_CHILD, MSG_REJECT_BECOME_CHILD, 
+            MSG_ACCEPT_BECOME_CHILD, MSG_ACK_ACCEPT_BECOME_CHILD, MSG_UPDATE_VOLUME, MSG_WORKER_FOUND_RESULT, 
+            MSG_WORKER_DEFECTING, MSG_FORWARD_CLIENT_RANK, MSG_TERMINATE, MSG_QUERY_JOB_RESULT, 
+            MSG_COLLECTIVES, MSG_JOB_COMMUNICATION};
+/**
+ * All types of messages which can be receivable by a client node at any time 
+ * by a generic irecv method and within the maximum message length.
+ */
+const int ANYTIME_CLIENT_RECV_TAGS[] = {MSG_JOB_DONE, MSG_REQUEST_BECOME_CHILD, MSG_ACK_ACCEPT_BECOME_CHILD};
+
+/**
+ * Which types of messages the MPI node should listen to. 
+ */
+enum ListenerMode {CLIENT, WORKER};
+
+/**
+ * A std::shared_ptr around a MessageHandle instance which captures all relevant information
+ * on a specific MPI message.
+ */
 typedef std::shared_ptr<MessageHandle> MessageHandlePtr;
 
 class MyMpi {
@@ -120,6 +143,10 @@ private:
     static std::set<MessageHandlePtr> sentHandles;
 
 public:
+
+    static void init(int argc, char *argv[]);
+    static void beginListening(const ListenerMode& mode);
+    static void resetListenerIfNecessary(const ListenerMode& mode, int tag);
 
     static MessageHandlePtr isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object);
     static MessageHandlePtr isend(MPI_Comm communicator, int recvRank, int tag, const std::vector<uint8_t>& object);
@@ -137,7 +164,6 @@ public:
         return handles.size() > 0;
     }
     static bool hasCriticalHandles();
-    static void listen();
     static void deferHandle(MessageHandlePtr handle);
     static void cleanSentHandles();
 
@@ -145,7 +171,6 @@ public:
     static int rank(MPI_Comm comm);
     static int random_other_node(MPI_Comm comm, const std::set<int>& excludedNodes);
 
-    static void init(int argc, char *argv[]);
 
     static int maxMsgLength;
 };

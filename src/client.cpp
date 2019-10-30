@@ -43,7 +43,7 @@ void Client::init() {
     instanceReaderThread = std::thread(readAllInstances, this);
 
     // Begin listening to incoming messages
-    MyMpi::listen();
+    MyMpi::beginListening(CLIENT);
 }
 
 Client::~Client() {
@@ -107,10 +107,10 @@ void Client::mainProgram() {
             } else {
                 Console::log_recv(Console::WARN, handle->source, "Unknown message tag %i", handle->tag);
             }
-        }
 
-        // Listen to another message, if no listener is active
-        MyMpi::listen();
+            // Re-listen to message tag as necessary
+            MyMpi::resetListenerIfNecessary(CLIENT, handle->tag);
+        }
 
         // Sleep for a bit
         usleep(1000); // 1000 = 1 millisecond

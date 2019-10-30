@@ -28,14 +28,14 @@ class SatJob : public Job {
 
 private:
     
-    std::unique_ptr<HordeLib> solver;
-    std::vector<int> clausesToShare;
-    int sharedClauseSources = 0;
+    std::unique_ptr<HordeLib> _solver;
+    std::vector<int> _clause_buffer;
+    int _num_clause_sources;
 
 public:
 
     SatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) : 
-        Job(params, commSize, worldRank, jobId, epochCounter) {}
+        Job(params, commSize, worldRank, jobId, epochCounter), _num_clause_sources(0) {}
 
     void initialize() override;
     void beginSolving() override;

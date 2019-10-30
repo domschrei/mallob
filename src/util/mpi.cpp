@@ -16,7 +16,36 @@ int MyMpi::maxMsgLength;
 void MyMpi::init(int argc, char *argv[])
 {
     MPI_Init(&argc, &argv);
-    maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;}
+    maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
+}
+
+void MyMpi::beginListening(const ListenerMode& mode) {
+    if (mode == CLIENT) {
+        for (int tag : ANYTIME_CLIENT_RECV_TAGS)
+            MyMpi::irecv(MPI_COMM_WORLD, tag);
+    }
+    if (mode == WORKER) {
+        for (int tag : ANYTIME_WORKER_RECV_TAGS)
+            MyMpi::irecv(MPI_COMM_WORLD, tag);
+    }
+}
+
+void MyMpi::resetListenerIfNecessary(const ListenerMode& mode, int tag) {
+    if (mode == CLIENT) {
+        for (int t : ANYTIME_CLIENT_RECV_TAGS)
+            if (tag == t) {
+                MyMpi::irecv(MPI_COMM_WORLD, tag);
+                break;
+            }
+    }
+    if (mode == WORKER) {
+        for (int t : ANYTIME_WORKER_RECV_TAGS)
+            if (tag == t) {
+                MyMpi::irecv(MPI_COMM_WORLD, tag);
+                break;
+            }
+    }
+}
 
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object) {
     const std::vector<uint8_t> vec = object.serialize();
@@ -162,20 +191,6 @@ bool MyMpi::hasCriticalHandles() {
     }
 
     return critical;
-}
-
-void MyMpi::listen() {
-    bool critical = false;
-    bool nonCritical = false;
-    for (auto it : handles) {
-        if (it->critical) {
-            critical = true;
-        } else {
-            nonCritical = true;
-        }
-    }
-    if (!critical && !nonCritical)
-        MyMpi::irecv(MPI_COMM_WORLD); // add a non-critical 
 }
 
 void MyMpi::deferHandle(MessageHandlePtr handle) {

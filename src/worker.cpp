@@ -20,7 +20,7 @@ void Worker::init() {
     balancer = std::unique_ptr<Balancer>(new CutoffPriorityBalancer(comm, params, stats));
     
     // Begin listening to an incoming message
-    MyMpi::listen();
+    MyMpi::beginListening(WORKER);
 }
 
 void Worker::checkTerminate() {
@@ -145,8 +145,8 @@ void Worker::mainProgram() {
                 Console::log_recv(Console::WARN, handle->source, "Unknown message tag %i", handle->tag);
             }
 
-            // Listen to another message, if no critical listener is active
-            MyMpi::listen();
+            // Listen to message tag again as necessary
+            MyMpi::resetListenerIfNecessary(WORKER, handle->tag);
         }
     }
 }
@@ -341,9 +341,9 @@ void Worker::handleAcceptBecomeChild(MessageHandlePtr& handle) {
             setLoad(1);
             job.reinitialize(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
         }
+        // Erase job commitment
+        jobCommitments.erase(sig.jobId);
     }
-    // Erase job commitment
-    jobCommitments.erase(sig.jobId);
 }
 
 void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
@@ -385,6 +385,10 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
 void Worker::handleSendJob(MessageHandlePtr& handle) {
     int jobId; memcpy(&jobId, handle->recvData.data(), sizeof(int));
     assert(hasJob(jobId) || Console::fail("I don't know job #%i !", jobId));
+
+    // Erase job commitment
+    if (jobCommitments.count(jobId))
+        jobCommitments.erase(jobId);
 
     // Initialize job inside a separate thread
     setLoad(1);

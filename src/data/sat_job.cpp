@@ -12,56 +12,57 @@
 void SatJob::initialize() {
 
     assert(isInitializing());
-    assert(hasDescription);
+    assert(_has_description);
 
-    assert(solver == NULL || Console::fail("Solver is not NULL! State of %s : %s", toStr(), jobStateToStr()));
+    // Initialize Hordesat instance
+    assert(_solver == NULL || Console::fail("Solver is not NULL! State of %s : %s", toStr(), jobStateToStr()));
     Console::log(Console::VERB, "%s : preparing params", toStr());
     std::map<std::string, std::string> params;
     params["e"] = "1"; // exchange mode: 0 = nothing, 1 = alltoall, 2 = log, 3 = asyncrumor
-    params["c"] = this->params.getParam("t"); // solver threads on this node
+    params["c"] = this->_params.getParam("t"); // solver threads on this node
     params["d"] = "7"; // sparse random + native diversification
     params["i"] = "0"; // #microseconds to sleep during solve loop
-    params["v"] = (this->params.getIntParam("v") >= 3 ? "1" : "0"); // verbosity
-    params["mpirank"] = std::to_string(index); // mpi_rank
-    params["mpisize"] = std::to_string(commSize); // mpi_size
+    params["v"] = (this->_params.getIntParam("v") >= 3 ? "1" : "0"); // verbosity
+    params["mpirank"] = std::to_string(_index); // mpi_rank
+    params["mpisize"] = std::to_string(_comm_size); // mpi_size
     std::string identifier = std::string(toStr());
     params["jobstr"] = identifier;
     Console::log(Console::VERB, "%s : creating horde instance", toStr());
-    solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(identifier))));
-    assert(solver != NULL);
+    _solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(identifier))));
+    assert(_solver != NULL);
 
     Console::log(Console::VERB, "%s : beginning to solve", toStr());
-    solver->beginSolving(job.getPayload());
+    _solver->beginSolving(_description.getPayload());
     Console::log(Console::VERB, "%s : finished concurrent HordeLib instance initialization", toStr());
 }
 
 void SatJob::beginSolving() {
-    solver->beginSolving();
+    _solver->beginSolving();
 }
 
 void SatJob::pause() {
-    solver->setPaused();
+    _solver->setPaused();
 }
 
 void SatJob::unpause() {
-    solver->unsetPaused();
+    _solver->unsetPaused();
 }
 
 void SatJob::terminate() {
-    solver->setTerminate(); // sets the "solvingDoneLocal" flag in the solver
-    solver->unsetPaused(); // if solver threads are suspended, wake them up to recognize termination
-    solver->finishSolving(); // joins threads and concludes solving process
+    _solver->setTerminate(); // sets the "solvingDoneLocal" flag in the solver
+    _solver->unsetPaused(); // if solver threads are suspended, wake them up to recognize termination
+    _solver->finishSolving(); // joins threads and concludes solving process
 }
 
 void SatJob::extractResult() {
-    result.id = getDescription().getId();
-    result.result = resultCode;
-    result.solution.clear();
-    if (resultCode == SAT) {
-        result.solution = solver->getTruthValues();
-    } else if (resultCode == UNSAT) {
-        std::set<int>& assumptions = solver->getFailedAssumptions();
-        std::copy(assumptions.begin(), assumptions.end(), std::back_inserter(result.solution));
+    _result.id = getId();
+    _result.result = _result_code;
+    _result.solution.clear();
+    if (_result_code == SAT) {
+        _result.solution = _solver->getTruthValues();
+    } else if (_result_code == UNSAT) {
+        std::set<int>& assumptions = _solver->getFailedAssumptions();
+        std::copy(assumptions.begin(), assumptions.end(), std::back_inserter(_result.solution));
     }
 }
 
@@ -75,8 +76,8 @@ void SatJob::beginCommunication() {
         learnClausesFromAbove(msg.payload);
         return;
     }
-    msg.jobId = jobId;
-    msg.epoch = epochCounter.getEpoch();
+    msg.jobId = _id;
+    msg.epoch = _epoch_counter.getEpoch();
     msg.tag = MSG_GATHER_CLAUSES;
     int parentRank = getParentNodeRank();
     Console::log_send(Console::VERB, parentRank, "Sending clauses of effective size %i from %s", msg.payload.size(), toStr());
@@ -95,7 +96,7 @@ void SatJob::communicate(int source, JobMessage& msg) {
     std::vector<int>& clauses = msg.payload;
 
     // Old epoch?
-    if (epoch < (int)epochCounter.getEpoch()) {
+    if (epoch < (int)_epoch_counter.getEpoch()) {
         Console::log(Console::VERB, "Discarding job message from a previous epoch.");
         return;
     }
@@ -143,8 +144,8 @@ void SatJob::learnAndDistributeClausesDownwards(std::vector<int>& clauses) {
 
     // Send clauses to children
     JobMessage msg;
-    msg.jobId = jobId;
-    msg.epoch = epochCounter.getEpoch();
+    msg.jobId = _id;
+    msg.epoch = _epoch_counter.getEpoch();
     msg.tag = MSG_DISTRIBUTE_CLAUSES;
     msg.payload = clauses;
     int childRank;
@@ -163,30 +164,30 @@ void SatJob::learnAndDistributeClausesDownwards(std::vector<int>& clauses) {
 std::vector<int> SatJob::collectClausesFromSolvers() {
 
     // If not fully initialized yet, broadcast an empty set of clauses
-    if (!solver->isFullyInitialized()) {
+    if (!_solver->isFullyInitialized()) {
         return std::vector<int>(BROADCAST_CLAUSE_INTS_PER_NODE, 0);
     }
     // Else, retrieve clauses from solvers
-    return solver->prepareSharing( commSize /*job.getVolume()*/);
+    return _solver->prepareSharing( _comm_size /*job.getVolume()*/);
 }
 void SatJob::insertIntoClauseBuffer(std::vector<int>& vec) {
 
     // Insert clauses into local clause buffer for later sharing
-    clausesToShare.insert(clausesToShare.end(), vec.begin(), vec.end());
+    _clause_buffer.insert(_clause_buffer.end(), vec.begin(), vec.end());
 
     // Resize to multiple of #clause-ints per node
-    int prevSize = clausesToShare.size();
+    int prevSize = _clause_buffer.size();
     int remainder = prevSize % BROADCAST_CLAUSE_INTS_PER_NODE;
     if (remainder != 0) {
-        clausesToShare.resize(prevSize + BROADCAST_CLAUSE_INTS_PER_NODE-remainder);
-        std::fill(clausesToShare.begin()+prevSize, clausesToShare.end(), 0);
+        _clause_buffer.resize(prevSize + BROADCAST_CLAUSE_INTS_PER_NODE-remainder);
+        std::fill(_clause_buffer.begin()+prevSize, _clause_buffer.end(), 0);
     }
-    assert(clausesToShare.size() % BROADCAST_CLAUSE_INTS_PER_NODE == 0);
+    assert(_clause_buffer.size() % BROADCAST_CLAUSE_INTS_PER_NODE == 0);
 }
 void SatJob::collectClausesFromBelow(std::vector<int>& clauses) {
 
     insertIntoClauseBuffer(clauses);
-    sharedClauseSources++;
+    _num_clause_sources++;
 }
 bool SatJob::canShareCollectedClauses() {
 
@@ -195,29 +196,29 @@ bool SatJob::canShareCollectedClauses() {
     // except if one / both of them cannot exist according to volume
     if (hasLeftChild()) numChildren++;
     if (hasRightChild()) numChildren++;
-    return numChildren == sharedClauseSources;
+    return numChildren == _num_clause_sources;
 }
 std::vector<int> SatJob::shareCollectedClauses() {
 
     // Locally collect clauses from solvers
     std::vector<int> selfClauses = collectClausesFromSolvers();
     insertIntoClauseBuffer(selfClauses);
-    std::vector<int> vec = clausesToShare;
+    std::vector<int> vec = _clause_buffer;
 
     // Reset clause buffer
-    sharedClauseSources = 0;
-    clausesToShare.resize(0);
+    _num_clause_sources = 0;
+    _clause_buffer.resize(0);
     return vec;
 }
 void SatJob::learnClausesFromAbove(std::vector<int>& clauses) {
 
     // If not fully initialized yet: discard clauses
-    if (!solver->isFullyInitialized())
+    if (!_solver->isFullyInitialized())
         return;
 
     // Locally digest clauses
     Console::log(Console::VVERB, "%s : digesting clauses ...", toStr());
-    solver->digestSharing(clauses);
+    _solver->digestSharing(clauses);
     Console::log(Console::VVERB, "%s : digested clauses.", toStr());
 }
 
@@ -226,18 +227,18 @@ int SatJob::solveLoop() {
     int result = -1;
 
     // Already reported the actual result, or still initializing
-    if (doneLocally) {
+    if (_done_locally) {
         return result;
     }
 
     if (isInState({ACTIVE})) {
         // If result is found here, stops all solvers
         // but does not call finishSolving()
-        result = solver->solveLoop();
+        result = _solver->solveLoop();
 
     } else if (isInitializing()) {
         // Still initializing?
-        if (solver == NULL || !solver->isRunning() || !solver->isFullyInitialized())
+        if (_solver == NULL || !_solver->isRunning() || !_solver->isFullyInitialized())
             // Yes, some stuff still is not initialized
             return result;
         // Else: end initialization
@@ -248,8 +249,8 @@ int SatJob::solveLoop() {
 
     // Did a solver find a result?
     if (result >= 0) {
-        doneLocally = true;
-        this->resultCode = result;
+        _done_locally = true;
+        this->_result_code = result;
         Console::log_send(Console::INFO, getRootNodeRank(), "%s : found result %s", toStr(), 
                             result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN");
         extractResult();
@@ -259,6 +260,6 @@ int SatJob::solveLoop() {
 
 void SatJob::dumpStats() {
     if (isInState({ACTIVE})) {
-        solver->dumpStats();
+        _solver->dumpStats();
     }
 }
