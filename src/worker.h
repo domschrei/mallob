@@ -84,7 +84,7 @@ private:
     float allReduce(float contribution);
 
     int getLoad() const {return load;};
-    void setLoad(int load);
+    void setLoad(int load, int whichJobId);
     bool isIdle() const {return load == 0;};
     bool hasJobCommitments() const {return jobCommitments.size() > 0;};
     int getRandomWorkerNode();

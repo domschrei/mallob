@@ -168,7 +168,7 @@ std::vector<int> SatJob::collectClausesFromSolvers() {
         return std::vector<int>(BROADCAST_CLAUSE_INTS_PER_NODE, 0);
     }
     // Else, retrieve clauses from solvers
-    return _solver->prepareSharing( _comm_size /*job.getVolume()*/);
+    return _solver->prepareSharing();
 }
 void SatJob::insertIntoClauseBuffer(std::vector<int>& vec) {
 

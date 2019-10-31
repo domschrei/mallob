@@ -5,15 +5,16 @@
  *      Author: balyo
  */
 
+#include <assert.h>
+
 #include "AllToAllSharingManager.h"
 #include "../utilities/mympi.h"
 #include "../utilities/Logger.h"
 
 
-AllToAllSharingManager::AllToAllSharingManager(int mpi_size, int mpi_rank,
-		vector<PortfolioSolverInterface*> solvers, ParameterProcessor& params)
-	:size(mpi_size),rank(mpi_rank),solvers(solvers),params(params),incommingBuffer(NULL),callback(*this) {
-	init(size);
+DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
+		vector<PortfolioSolverInterface*>& solvers, ParameterProcessor& params)
+	:size(mpi_size),rank(mpi_rank),solvers(solvers),params(params),callback(*this) {
     for (size_t i = 0; i < solvers.size(); i++) {
 		solvers[i]->setLearnedClauseCallback(&callback, i);
 		if (solvers.size() > 1) {
@@ -22,15 +23,9 @@ AllToAllSharingManager::AllToAllSharingManager(int mpi_size, int mpi_rank,
 	}
 }
 
-void AllToAllSharingManager::init(int size) {
-    this->size = size;
-    incommingBuffer = new int[(COMM_BUFFER_SIZE)*size];
-}
+std::vector<int> DefaultSharingManager::prepareSharing() {
 
-std::vector<int> AllToAllSharingManager::prepareSharing(int size) {
-
-    log(2, "Sharing clauses among %i nodes\n", size);
-    init(size);
+    //log(2, "Sharing clauses among %i nodes\n", size);
     static int prodInc = 1;
 	static int lastInc = 0;
 	if (!params.isSet("fd")) {
@@ -49,56 +44,22 @@ std::vector<int> AllToAllSharingManager::prepareSharing(int size) {
 	log(1, "Node %d filled %d%% of its learned clause buffer\n", rank, usedPercent);
     std::vector<int> clauseVec(outBuffer, outBuffer + COMM_BUFFER_SIZE);
 
-    /*
-    std::string out;
-    for (int i = 0; i < clauseVec.size(); i++) {
-        out += std::to_string(i) + " ";
-    }
-    log(0, out + "\n");
-    */
-
     return clauseVec;
 }
 
-void AllToAllSharingManager::doSharing() {
+void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 
-    prepareSharing(size);
-
-	double barrierStart = getTime();
-	if (params.isSet("barrier")) {
-		MPI_Barrier(MPI_COMM_WORLD);
-	}
-	double barrierDone = getTime();
-	double commStart = getTime();
-
-	MPI_Allgather(outBuffer, COMM_BUFFER_SIZE, MPI_INT, incommingBuffer, COMM_BUFFER_SIZE, MPI_INT, MPI_COMM_WORLD);
-	log(2, "Node %d allGather %.3f\n", rank, getTime() - commStart);
-
-	if (params.isSet("barrier")) {
-		MPI_Barrier(MPI_COMM_WORLD);
-		log(2, "Node %d first barrier %.3f second barrier %.3f\n", rank, getTime() - barrierStart, getTime() - barrierDone);
-	}
-
-	digestSharing();
-}
-
-void AllToAllSharingManager::digestSharing(const std::vector<int>& result) {
-
-    int newsize = result.size() / COMM_BUFFER_SIZE;
-    init(newsize);
-
-    std::memcpy(incommingBuffer, result.data(), result.size()*sizeof(int));
-    digestSharing();
-}
-
-void AllToAllSharingManager::digestSharing() {
-
+	assert(result.size() % COMM_BUFFER_SIZE == 0);
+    size = result.size() / COMM_BUFFER_SIZE;
+    
+    //std::memcpy(incommingBuffer, result.data(), result.size()*sizeof(int));
+    
 	if (solvers.size() > 1) {
 		// get all the clauses
-		cdb.setIncomingBuffer(incommingBuffer, COMM_BUFFER_SIZE, size, -1);
+		cdb.setIncomingBuffer(result.data(), COMM_BUFFER_SIZE, size, -1);
 	} else {
 		// get all the clauses except for those that this node sent
-		cdb.setIncomingBuffer(incommingBuffer, COMM_BUFFER_SIZE, size, rank);
+		cdb.setIncomingBuffer(result.data(), COMM_BUFFER_SIZE, size, rank);
 	}
 	vector<int> cl;
 	int passedFilter = 0;
@@ -137,21 +98,20 @@ void AllToAllSharingManager::digestSharing() {
 	stats.filteredClauses += failedFilter;
 	stats.importedClauses += passedFilter;
 	if (total > 0) {
-		log(2, "filter blocked %d%% (%d/%d) of incomming clauses, avg len %.2f\n",
+		log(2, "filter blocked %d%% (%d/%d) of incoming clauses, avg len %.2f\n",
 				100*failedFilter/total,
 				failedFilter, total, totalLen/(float)total);
 	}
 
 }
 
-SharingStatistics AllToAllSharingManager::getStatistics() {
+SharingStatistics DefaultSharingManager::getStatistics() {
 	return stats;
 }
 
-AllToAllSharingManager::~AllToAllSharingManager() {
+DefaultSharingManager::~DefaultSharingManager() {
 	for (size_t i = 0; i < solverFilters.size(); i++) {
 		delete solverFilters[i];
 	}
-	delete[] incommingBuffer;
 }
 

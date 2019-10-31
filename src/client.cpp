@@ -44,6 +44,10 @@ void Client::init() {
 
     // Begin listening to incoming messages
     MyMpi::beginListening(CLIENT);
+
+    Console::log(Console::VERB, "Global initialization barrier ...");
+    MPI_Barrier(MPI_COMM_WORLD);
+    Console::log(Console::VERB, "Passed global initialization barrier.");
 }
 
 Client::~Client() {

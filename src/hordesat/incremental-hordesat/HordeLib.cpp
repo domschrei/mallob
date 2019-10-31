@@ -69,32 +69,13 @@ void HordeLib::stopAllSolvers() {
 	interruptLock.unlock();
 }*/
 
-bool getNeverEnding(int mpi_size, int mpi_rank, bool solvingDoneLocal) {
+bool getNeverEnding(int mpi_rank, bool solvingDoneLocal) {
 	return false;
 }
 
-bool getSingleProcessEnding(int mpi_size, int mpi_rank, bool solvingDoneLocal) {
+bool getSingleProcessEnding(int mpi_rank, bool solvingDoneLocal) {
 	if (solvingDoneLocal) {
 		return true;
-	}
-	return false;
-}
-
-// Return true if the solver should stop.
-bool getGlobalEnding(int mpi_size, int mpi_rank, bool solvingDoneLocal) {
-	static int* endingBuffer = NULL;
-	if (endingBuffer == NULL) {
-		endingBuffer = new int[mpi_size];
-	}
-	int sendMsg = 0;
-	if (solvingDoneLocal) {
-		sendMsg = SOLVING_DONE;
-	}
-	MPI_Allgather(&sendMsg, 1, MPI_INT, endingBuffer, 1, MPI_INT, MPI_COMM_WORLD);
-	for (int r = 0; r < mpi_size; r++) {
-		if (endingBuffer[r] == SOLVING_DONE) {
-			return true;
-		}
 	}
 	return false;
 }
@@ -354,7 +335,7 @@ int HordeLib::solveLoop() {
         usleep(sleepInt);
     }
     // Any result found?
-	if (endingFunction(mpi_size, mpi_rank, solvingDoneLocal)) {
+	if (endingFunction(mpi_rank, solvingDoneLocal)) {
         return finalResult;
     }
 	// Resources exhausted?
@@ -369,10 +350,10 @@ int HordeLib::solveLoop() {
     return -1; // no result yet
 }
 
-std::vector<int> HordeLib::prepareSharing(int size) {
+std::vector<int> HordeLib::prepareSharing() {
     assert(sharingManager != NULL);
 	log(2, "Collecting clauses on this node ... \n");
-	std::vector<int> clauses = sharingManager->prepareSharing(size);
+	std::vector<int> clauses = sharingManager->prepareSharing();
 	return clauses;
 }
 
@@ -613,22 +594,22 @@ void HordeLib::init() {
 		if (params.getParam("s") == "minisat") {
 			solvers.push_back(new MiniSat());
 			solversInitialized.push_back(0);
-			log(1, "Running MiniSat on core %d of node %d/%d\n", i, mpi_rank, mpi_size);
+			log(1, "Running MiniSat on core %d\n", i, mpi_rank, mpi_size);
 		} else if (params.getParam("s") == "combo") {
 			if ((mpi_rank + i) % 2 == 0) {
 				solvers.push_back(new MiniSat());
 				solversInitialized.push_back(0);
-				log(1, "Running MiniSat on core %d of node %d/%d\n", i, mpi_rank, mpi_size);
+				log(1, "Running MiniSat on core %d\n", i, mpi_rank, mpi_size);
 			} else {
 				solvers.push_back(new Lingeling());
 				solversInitialized.push_back(0);
-				log(1, "Running Lingeling on core %d of node %d/%d\n", i, mpi_rank, mpi_size);
+				log(1, "Running Lingeling on core %d\n", i, mpi_rank, mpi_size);
 			}
 		} else {
             Lingeling *lgl = new Lingeling();
 			solvers.push_back(lgl);
 			solversInitialized.push_back(0);
-			log(1, "Running Lingeling on core %d of node %d/%d\n", i, mpi_rank, mpi_size);
+			log(1, "Running Lingeling on core %d\n", i, mpi_rank, mpi_size);
 		}
 		// set solver id
 		solvers[i]->solverId = i + solversCount * mpi_rank;
@@ -653,21 +634,12 @@ void HordeLib::init() {
 	} else if (mpi_size > 1 || solversCount > 1) {
 		switch (exchangeMode) {
 		case 1:
-			sharingManager = new AllToAllSharingManager(mpi_size, mpi_rank, solvers, params);
+			sharingManager = new DefaultSharingManager(mpi_size, mpi_rank, solvers, params);
 			log(1, "Initialized all-to-all clause sharing.\n");
 			break;
-		case 2:
-			sharingManager = new LogSharingManager(mpi_size, mpi_rank, solvers, params);
-			log(1, "Initialized log-partners clause sharing.\n");
-			break;
-		case 3:
-			sharingManager = new AsyncRumorSharingManager(mpi_size, mpi_rank, solvers, params);
-			if (!params.isSet("i")) {
-				sleepInt = 50*1000;
-			}
-			endingFunction = getGlobalEndingAsynchronous;
-			log(1, "Initialized Asynchronous clause sharing.\n");
-			break;
+		default:
+			log(0, "ERROR: Unsupported exchange mode %i.\n", exchangeMode);
+			exit(1);
 		}
 	}
 
@@ -676,10 +648,6 @@ void HordeLib::init() {
 	}
 
 	int diversification = params.getIntParam("d", 1);
-	if (params.isSet("qbf")) {
-		diversification = 4;
-	}
-
 	switch (diversification) {
 	case 1:
 		sparseDiversification(mpi_size, mpi_rank);

@@ -136,7 +136,13 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
     assert(_local_jobs == NULL || Console::fail("Found localJobs instance of size %i", _local_jobs->size()));
     _local_jobs = new std::set<int, PriorityComparator>(PriorityComparator(jobs));
     for (auto it : jobs) {
-        if (it.second->isInState({JobState::ACTIVE/*, JobState::INITIALIZING_TO_ACTIVE*/}) && it.second->isRoot()) {
+        // Node must be root node to participate
+        bool participates = it.second->isRoot();
+        // Job must be active, or must be initializing and already having the description
+        participates &= it.second->isInState({JobState::ACTIVE}) 
+                        || (it.second->isInState({JobState::INITIALIZING_TO_ACTIVE}) 
+                            && it.second->hasJobDescription());
+        if (participates) {
             _jobs_being_balanced[it.first] = it.second;
             _local_jobs->insert(it.first);
         }

@@ -14,8 +14,6 @@
 #include "solvers/MiniSat.h"
 #include "solvers/Lingeling.h"
 #include "sharing/AllToAllSharingManager.h"
-#include "sharing/LogSharingManager.h"
-#include "sharing/AsyncRumorSharingManager.h"
 
 #include <pthread.h>
 #include <vector>
@@ -30,7 +28,7 @@ private:
 	int mpi_size;
 	int mpi_rank;
 	Thread** solverThreads;
-	bool(*endingFunction)(int,int,bool);
+	bool(*endingFunction)(int,bool);
 	size_t sleepInt;
 	int solversCount;
 	bool solvingDoneLocal;
@@ -99,7 +97,7 @@ public:
 	bool isFullyInitialized();
     int solveLoop();
 
-    std::vector<int> prepareSharing(int size);
+    std::vector<int> prepareSharing();
     void digestSharing(const std::vector<int>& result);
 	std::vector<int> clauseBufferToPlainClauses(const std::vector<int>& buffer);
 

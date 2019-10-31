@@ -21,6 +21,10 @@ void Worker::init() {
     
     // Begin listening to an incoming message
     MyMpi::beginListening(WORKER);
+
+    Console::log(Console::VERB, "Global initialization barrier ...");
+    MPI_Barrier(MPI_COMM_WORLD);
+    Console::log(Console::VERB, "Passed global initialization barrier.");
 }
 
 void Worker::checkTerminate() {
@@ -199,7 +203,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
 
                     // Suspend this job
                     job.suspend();
-                    setLoad(0);
+                    setLoad(0, job.getId());
 
                     adopts = true;
                     break;
@@ -338,7 +342,7 @@ void Worker::handleAcceptBecomeChild(MessageHandlePtr& handle) {
         if (job.getState() != JobState::PAST) {
             Console::log_recv(Console::INFO, handle->source, "Starting or resuming %s (state: %s)", 
                         jobStr(req.jobId, req.requestedNodeIndex), job.jobStateToStr());
-            setLoad(1);
+            setLoad(1, req.jobId);
             job.reinitialize(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
         }
         // Erase job commitment
@@ -391,7 +395,7 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
         jobCommitments.erase(jobId);
 
     // Initialize job inside a separate thread
-    setLoad(1);
+    setLoad(1, jobId);
     getJob(jobId).beginInitialization();
     Console::log(Console::VERB, "Received full job description of #%i. Initializing ...", jobId);
 
@@ -511,7 +515,7 @@ void Worker::handleTerminate(MessageHandlePtr& handle) {
 
         // Terminate
         Console::log(Console::INFO, "Terminating %s", job.toStr());
-        setLoad(0);
+        setLoad(0, job.getId());
         job.withdraw();
     }
 }
@@ -555,7 +559,7 @@ void Worker::informClient(int jobId, int clientRank) {
     stats.increment("sentMessages");
 }
 
-void Worker::setLoad(int load) {
+void Worker::setLoad(int load, int whichJobId) {
     assert(load + this->load == 1); // (load WAS 1) XOR (load BECOMES 1)
     this->load = load;
 
@@ -563,6 +567,11 @@ void Worker::setLoad(int load) {
     float now = Timer::elapsedSeconds();
     stats.add((load == 0 ? "busyTime" : "idleTime"), now - lastLoadChange);
     lastLoadChange = now;
+    assert(hasJob(whichJobId));
+    if (load == 1)
+        Console::log(Console::VERB, "LOAD 1 (+%s)", getJob(whichJobId).toStr());
+    if (load == 0)
+        Console::log(Console::VERB, "LOAD 0 (-%s)", getJob(whichJobId).toStr());
 }
 
 int Worker::getRandomWorkerNode() {
@@ -661,7 +670,7 @@ void Worker::updateVolume(int jobId, int volume) {
             Console::log_send(Console::VERB, job.getLeftChildNodeRank(), "Pruning left child of %s", job.toStr());
             job.unsetLeftChild();
         }
-    } else if (job.isInitialized() && nextIndex < volume) {
+    } else if (job.hasJobDescription() && nextIndex < volume) {
         // Grow left
         JobRequest req(jobId, job.getRootNodeRank(), worldRank, nextIndex, epochCounter.getEpoch(), 0);
         int nextNodeRank = job.getLeftChildNodeRank();
@@ -680,7 +689,7 @@ void Worker::updateVolume(int jobId, int volume) {
             Console::log_send(Console::VERB, job.getRightChildNodeRank(), "Pruning right child of %s", job.toStr());
             job.unsetRightChild();
         }
-    } else if (job.isInitialized() && nextIndex < volume) {
+    } else if (job.hasJobDescription() && nextIndex < volume) {
         // Grow right
         JobRequest req(jobId, job.getRootNodeRank(), worldRank, nextIndex, epochCounter.getEpoch(), 0);
         int nextNodeRank = job.getRightChildNodeRank();
@@ -691,7 +700,7 @@ void Worker::updateVolume(int jobId, int volume) {
     // Shrink (and pause solving) if necessary
     if (thisIndex > 0 && thisIndex >= volume) {
         jobs[jobId]->suspend();
-        setLoad(0);
+        setLoad(0, jobId);
     }
 }
 

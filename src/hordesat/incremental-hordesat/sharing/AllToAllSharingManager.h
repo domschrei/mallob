@@ -17,7 +17,7 @@
 
 #define COMM_BUFFER_SIZE 1500
 
-class AllToAllSharingManager : public SharingManagerInterface {
+class DefaultSharingManager : public SharingManagerInterface {
 
 protected:
 	// MPI paramaters
@@ -31,12 +31,11 @@ protected:
 	ClauseDatabase cdb;
 	ClauseFilter nodeFilter;
 	int outBuffer[COMM_BUFFER_SIZE];
-	int* incommingBuffer;
 
 	class Callback : public LearnedClauseCallback {
 	public:
-		AllToAllSharingManager& parent;
-		Callback(AllToAllSharingManager& parent):parent(parent) {
+		DefaultSharingManager& parent;
+		Callback(DefaultSharingManager& parent):parent(parent) {
 		}
 		void processClause(vector<int>& cls, int solverId) {
 			if (parent.solvers.size() > 1) {
@@ -57,15 +56,12 @@ protected:
 	SharingStatistics stats;
 
 public:
-	AllToAllSharingManager(int mpi_size, int mpi_rank, vector<PortfolioSolverInterface*> solvers,
+	DefaultSharingManager(int mpi_size, int mpi_rank, vector<PortfolioSolverInterface*>& solvers,
 			ParameterProcessor& params);
-	void init(int size);
-    void doSharing();
-    std::vector<int> prepareSharing(int size);
-    void digestSharing();
+    std::vector<int> prepareSharing();
     void digestSharing(const std::vector<int>& result);
 	SharingStatistics getStatistics();
-	~AllToAllSharingManager();
+	~DefaultSharingManager();
 };
 
 #endif /* SHARING_ALLTOALLSHARINGMANAGER_H_ */
