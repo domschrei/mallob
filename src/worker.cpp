@@ -449,6 +449,10 @@ void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
     int jobId; memcpy(&jobId, handle->recvData.data(), sizeof(int));
     assert(hasJob(jobId) && getJob(jobId).isRoot());
     Console::log_recv(Console::VERB, handle->source, "Result has been found for job #%i", jobId);
+    if (getJob(jobId).isInState({PAST, INITIALIZING_TO_PAST})) {
+        Console::log_recv(Console::VERB, handle->source, "Discarding excess result for job #%i", jobId);
+        return;
+    }
 
     // Redirect termination signal
     IntPair payload(jobId, getJob(jobId).getParentNodeRank());

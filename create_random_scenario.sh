@@ -9,7 +9,7 @@ function rand_priority() {
 
 numjobs="$1"
 
-ls /home/schreiber/Software/LB/instances/*.cnf | shuf | head -$numjobs > selection
+ls /global_data/schreiber/sat_instances/*.cnf | shuf | head -$numjobs > selection
 
 id=1
 arrival=0

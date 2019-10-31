@@ -56,6 +56,7 @@ void Job::endInitialization() {
     switchState(ACTIVE);
     if (oldState == INITIALIZING_TO_PAST) {
         terminate();
+        switchState(PAST);
     } else if (oldState == INITIALIZING_TO_SUSPENDED) {
         suspend();
     } else if (oldState == INITIALIZING_TO_COMMITTED) {
