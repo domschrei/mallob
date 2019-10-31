@@ -162,7 +162,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
     // Discard request if it originates from current epoch
     // (except if it is a request for a root node)
     if (req.epoch != epochCounter.getEpoch() && req.requestedNodeIndex > 0) {
-        Console::log_recv(Console::INFO, handle->source, "Discarding request %s from epoch %i (I am in epoch %i)", 
+        Console::log_recv(Console::INFO, handle->source, "Discarding job request %s from obsolete epoch %i (I am in epoch %i)", 
                     jobStr(req.jobId, req.requestedNodeIndex), req.epoch, epochCounter.getEpoch());
         return;
     }
@@ -180,7 +180,13 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
         // Node is idle and not committed to another job: OK
         adopts = true;
 
-    } else if (req.requestedNodeIndex == 0 && !hasJobCommitments() && req.numHops > maxJobHops()) {
+    } else if (req.numHops > maxJobHops() && req.requestedNodeIndex > 0) {
+        // Discard job request
+        Console::log(Console::INFO, "Discarding job request %s which exceeded %i hops", 
+                        jobStr(req.jobId, req.requestedNodeIndex), maxJobHops());
+        return;
+    
+    } else if (req.numHops > maxJobHops() && req.requestedNodeIndex == 0 && !hasJobCommitments()) {
         // Request for a root node exceeded max #hops: Possibly adopt the job while dismissing the active job
 
         // If this node already computes on _this_ job, don't adopt it
@@ -601,10 +607,22 @@ void Worker::bounceJobRequest(JobRequest& request) {
         Console::log(Console::WARN, "%s bouncing for the %i. time", jobStr(request.jobId, request.requestedNodeIndex), num);
     }
 
+    // Generate pseudorandom permutation of this request
+    int n = MyMpi::size(comm);
+    AdjustablePermutation perm(n, 3 * request.jobId + 7 * request.requestedNodeIndex + 11 * request.requestingNodeRank);
+    // Fetch next index of permutation based on number of hops
+    int permIdx = request.numHops % n;
+    int nextRank = perm.get(permIdx);
+    // (while skipping yourself and the requesting node)
+    while (nextRank == worldRank || nextRank == request.requestingNodeRank) {
+        permIdx = (permIdx+1) % n;
+        nextRank = perm.get(permIdx);
+    }
+
     // Send request to a random other worker node
-    int randomOtherNodeRank = getRandomWorkerNode();
-    Console::log_send(Console::VVVERB, randomOtherNodeRank, "Bouncing %s", jobStr(request.jobId, request.requestedNodeIndex));
-    MyMpi::isend(MPI_COMM_WORLD, randomOtherNodeRank, MSG_FIND_NODE, request);
+    //int nextRank = getRandomWorkerNode();
+    Console::log_send(Console::VVVERB, nextRank, "Bouncing %s", jobStr(request.jobId, request.requestedNodeIndex));
+    MyMpi::isend(MPI_COMM_WORLD, nextRank, MSG_FIND_NODE, request);
     stats.increment("sentMessages");
 }
 

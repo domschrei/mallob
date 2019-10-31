@@ -8,14 +8,13 @@ AdjustablePermutation::AdjustablePermutation(int n, int seed) {
 
     root_n = std::ceil(sqrt((float) n));
 
-    for (int f = 1; f <= 4; f++) {
+    for (int f = 1; f <= 3; f++) {
         std::vector<int> feistel;
+        feistel.reserve(root_n);
         for (int i = 0; i < root_n; i++) feistel.push_back(i);
         std::shuffle(std::begin(feistel), std::end(feistel), rng);
         feistels.push_back(feistel);
     }
-
-    for (int x = 0; x < n; x++) get(x);
 };
 
 int AdjustablePermutation::get(int x) const {
