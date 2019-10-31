@@ -207,9 +207,10 @@ void Client::readFormula(std::string& filename, JobDescription& job) {
         std::vector<int> formula;
         std::string line;
         while(std::getline(file, line)) {
-            int next = 0; int pos = 0;
-            while (line[pos++] == ' ');
-            if (pos+1 > line.length() || line.substr(pos, pos+1) == std::string("c") 
+            int pos = 0;
+            int next = 0; 
+            while (pos < line.length() && line[pos] == ' ') pos++;
+            if (pos >= line.length() || line.substr(pos, pos+1) == std::string("c") 
                     || line.substr(pos, pos+1) == std::string("p")) {
                 continue;
             }
