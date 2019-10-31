@@ -159,10 +159,10 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
 
     JobRequest req; req.deserialize(handle->recvData);
 
-    // Discard request if it originates from current epoch
+    // Discard request if it originates from past epoch
     // (except if it is a request for a root node)
-    if (req.epoch != epochCounter.getEpoch() && req.requestedNodeIndex > 0) {
-        Console::log_recv(Console::INFO, handle->source, "Discarding job request %s from obsolete epoch %i (I am in epoch %i)", 
+    if (req.epoch < epochCounter.getEpoch() && req.requestedNodeIndex > 0) {
+        Console::log_recv(Console::INFO, handle->source, "Discarding job request %s from past epoch %i (I am in epoch %i)", 
                     jobStr(req.jobId, req.requestedNodeIndex), req.epoch, epochCounter.getEpoch());
         return;
     }
