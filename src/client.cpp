@@ -128,7 +128,7 @@ void Client::handleRequestBecomeChild(MessageHandlePtr handle) {
     // Send job signature
     JobSignature sig(req.jobId, /*rootRank=*/handle->source, desc.getTransferSize());
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACCEPT_BECOME_CHILD, sig);
-    stats.increment("sentMessages");
+    //stats.increment("sentMessages");
 }
 
 void Client::handleAckAcceptBecomeChild(MessageHandlePtr handle) {

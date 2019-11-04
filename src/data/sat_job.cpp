@@ -82,7 +82,7 @@ void SatJob::beginCommunication() {
     int parentRank = getParentNodeRank();
     Console::log_send(Console::VERB, parentRank, "Sending clauses of effective size %i from %s", msg.payload.size(), toStr());
     MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
-    // TODO stats.increase("sentMessages");
+    // TODO //stats.increase("sentMessages");
 }
 
 void SatJob::communicate(int source, JobMessage& msg) {

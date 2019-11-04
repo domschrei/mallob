@@ -54,7 +54,8 @@ public:
 
     void init();
     void mainProgram();
-    void dumpStats() {stats.dump();};
+    void dumpStats() {//stats.dump();
+    };
 
 private:
 
