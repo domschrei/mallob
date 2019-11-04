@@ -100,7 +100,9 @@ private:
         return *jobs.at(id);
     };
 
-    const char* jobStr(int j, int idx) const {return ("#" + std::to_string(j) + ":" + std::to_string(idx)).c_str();};
+    const char* jobStr(int j, int idx) const {
+        return ("#" + std::to_string(j) + ":" + std::to_string(idx)).c_str();
+    };
 
     int maxJobHops() {
         return MyMpi::size(comm) * 2;

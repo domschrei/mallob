@@ -153,8 +153,9 @@ void Worker::mainProgram() {
 
 void Worker::handleFindNode(MessageHandlePtr& handle) {
 
+    Console::log(Console::VVVERB, "Find node ...");
     JobRequest req; req.deserialize(*handle->recvData);
-    Console::log(Console::VVVERB, "Find node for %s", jobStr(req.jobId, req.requestedNodeIndex));
+    Console::log(Console::VVVERB, "... for %s", jobStr(req.jobId, req.requestedNodeIndex));
 
     // Discard request if it originates from past epoch
     // (except if it is a request for a root node)
