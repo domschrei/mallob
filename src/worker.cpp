@@ -154,6 +154,7 @@ void Worker::mainProgram() {
 void Worker::handleFindNode(MessageHandlePtr& handle) {
 
     JobRequest req; req.deserialize(*handle->recvData);
+    Console::log(Console::VVVERB, "Find node for %s", jobStr(req.jobId, req.requestedNodeIndex));
 
     // Discard request if it originates from past epoch
     // (except if it is a request for a root node)
@@ -243,6 +244,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
 }
 
 void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
+
 
     JobRequest req; req.deserialize(*handle->recvData);
     Console::log_recv(Console::VERB, handle->source, "Request to become parent of %s", 
