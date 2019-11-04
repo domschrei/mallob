@@ -24,13 +24,14 @@ private:
     static int rank;
     static int verbosity;
     static bool coloredOutput;
+    static bool threadsafeOutput;
 
     static bool beganLine;
 
     static std::mutex logMutex;
 
 public:
-    static void init(int rank, int verbosity, bool coloredOutput, std::string logDir=".");
+    static void init(int rank, int verbosity, bool coloredOutput, bool threadsafeOutput, std::string logDir=".");
 
     static void log(int verbosity, const char* str, ...);
     static void append(int verbosity, const char* str, ...);
@@ -45,8 +46,14 @@ public:
 
     static bool fail(const char* str, ...);
 
-    static void getLock() {logMutex.lock(); };
-    static void releaseLock() {logMutex.unlock();};
+    static void getLock() {
+        if (threadsafeOutput)
+            logMutex.lock(); 
+    };
+    static void releaseLock() {
+        if (threadsafeOutput)
+            logMutex.unlock();
+    };
 };
 
 #endif

@@ -88,7 +88,7 @@ void Worker::mainProgram() {
         }
 
         // Sleep for a bit
-        //usleep(10); // 1000 = 1 millisecond
+        usleep(10); // 1000 = 1 millisecond
 
         // Poll messages, if present
         MessageHandlePtr handle;

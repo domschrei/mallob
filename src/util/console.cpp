@@ -46,15 +46,17 @@ public:
 int Console::rank;
 int Console::verbosity;
 bool Console::coloredOutput;
+bool Console::threadsafeOutput;
 std::string Console::logFilename;
 FILE* Console::logFile;
 bool Console::beganLine;
 std::mutex Console::logMutex;
 
-void Console::init(int rank, int verbosity, bool coloredOutput, std::string logDir) {
+void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeOutput, std::string logDir) {
     Console::rank = rank;
     Console::verbosity = verbosity;
     Console::coloredOutput = coloredOutput;
+    Console::threadsafeOutput = threadsafeOutput;
     beganLine = false;
     
     logFilename = logDir + "/log_" + std::to_string(std::time(nullptr)) + std::string(".") + std::to_string(rank);
@@ -123,9 +125,9 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list& a
 }
 
 void Console::log(int verbosity, const char* str, bool endline, va_list& args) {
-    logMutex.lock();
+    getLock();
     logUnsafe(verbosity, str, endline, args);
-    logMutex.unlock();
+    releaseLock();
 }
 
 void Console::log(int verbosity, const char* str, ...) {
