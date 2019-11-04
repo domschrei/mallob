@@ -23,7 +23,7 @@ std::set<int> Reduceable::reduceToRankZero(MPI_Comm& comm) {
             // Receive
             Console::log(Console::VVERB, "Red. k=%i : Receiving", k);
             MessageHandlePtr handle = MyMpi::recv(comm, MSG_COLLECTIVES);
-            std::unique_ptr<Reduceable> received = getDeserialized(handle->recvData);
+            std::unique_ptr<Reduceable> received = getDeserialized(*handle->recvData);
             if (received->isEmpty()) {
                 excludedNodes.insert(handle->source);
                 Console::log(Console::VVERB, "-- empty!");
@@ -59,7 +59,7 @@ void Reduceable::broadcastFromRankZero(MPI_Comm& comm, std::set<int> excludedRan
             // Receive
             Console::log(Console::VVERB, "Brc. k=%i : Receiving", k);
             MessageHandlePtr handle = MyMpi::recv(comm, MSG_COLLECTIVES);
-            deserialize(handle->recvData); // overwrite local object
+            deserialize(*handle->recvData); // overwrite local object
         }
     }
 }
@@ -106,7 +106,7 @@ bool Reduceable::startReduction(MPI_Comm& comm) {
 
 bool Reduceable::advanceReduction(MessageHandlePtr handle) {
 
-    std::unique_ptr<Reduceable> received = getDeserialized(handle->recvData);
+    std::unique_ptr<Reduceable> received = getDeserialized(*handle->recvData);
     if (received->isEmpty()) {
         excludedRanks.insert(handle->source);
         Console::log(Console::VVERB, "-- empty!");
@@ -168,7 +168,7 @@ bool Reduceable::startBroadcast(MPI_Comm& comm, std::set<int>& excludedRanks) {
 }
 
 bool Reduceable::advanceBroadcast(MessageHandlePtr handle) {
-    deserialize(handle->recvData); // overwrite local data
+    deserialize(*handle->recvData); // overwrite local data
 
     power /= 2;
     for (; power >= 2; power /= 2) {

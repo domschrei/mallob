@@ -24,7 +24,7 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             _has_right_child(false)
              {}
 
-void Job::store(std::vector<uint8_t>& data) {
+void Job::store(std::shared_ptr<std::vector<uint8_t>>& data) {
     setDescription(data);
     if (isInState({NONE})) {
         _index = -1;
@@ -32,13 +32,13 @@ void Job::store(std::vector<uint8_t>& data) {
     }
 }
 
-void Job::setDescription(std::vector<uint8_t>& data) {
+void Job::setDescription(std::shared_ptr<std::vector<uint8_t>>& data) {
     // Explicitly store serialized data s.t. it can be forwarded later
     // without the need to re-serialize the job description
-    assert(data.size() > 0);
+    assert(data != NULL && data->size() > 0);
     _serialized_description = data;
     _description = JobDescription();
-    _description.deserialize(_serialized_description);
+    _description.deserialize(*_serialized_description);
     _has_description = true;
 }
 

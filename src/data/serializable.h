@@ -4,11 +4,12 @@
 
 #include <vector>
 #include <cstdint>
+#include <memory>
 
 class Serializable {
 
 public:
-    virtual std::vector<uint8_t> serialize() const = 0;
+    virtual std::shared_ptr<std::vector<uint8_t>> serialize() const = 0;
     virtual void deserialize(const std::vector<uint8_t>& packed) = 0;
 };
 

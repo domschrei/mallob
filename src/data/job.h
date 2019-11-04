@@ -66,7 +66,7 @@ protected:
     int _id;
     int _index;
     JobDescription _description;
-    std::vector<uint8_t> _serialized_description;
+    std::shared_ptr<std::vector<uint8_t>> _serialized_description;
 
     EpochCounter& _epoch_counter;
     int _epoch_of_arrival;
@@ -90,8 +90,8 @@ protected:
 public:
 
     Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
-    void store(std::vector<uint8_t>& data);
-    void setDescription(std::vector<uint8_t>& data);
+    void store(std::shared_ptr<std::vector<uint8_t>>& data);
+    void setDescription(std::shared_ptr<std::vector<uint8_t>>& data);
     void commit(const JobRequest& req);
     void uncommit(const JobRequest& req);
     void initialize(int index, int rootRank, int parentRank);
@@ -124,7 +124,7 @@ public:
     bool isInState(std::initializer_list<JobState> list) const;
     bool isNotInState(std::initializer_list<JobState> list) const;
     JobDescription& getDescription() {return _description;};
-    std::vector<uint8_t>& getSerializedDescription() {return _serialized_description;};
+    std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription() {return _serialized_description;};
     int getId() const {return _id;};
     int getIndex() const {return _index;};
     bool isInitialized() const {return _initialized;};

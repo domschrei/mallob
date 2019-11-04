@@ -56,17 +56,16 @@ bool isEmpty() override {
     return assignedResources < 0.0001f && priorities.empty() && demandedResources.empty();
 }
 
-std::vector<uint8_t> serialize() const override {
-    std::vector<uint8_t> data(sizeof(float)+priorities.size()*sizeof(float)+demandedResources.size()*sizeof(float));
-
+std::shared_ptr<std::vector<uint8_t>> serialize() const override {
+    int size = (sizeof(float)+priorities.size()*sizeof(float)+demandedResources.size()*sizeof(float));
+    std::shared_ptr<std::vector<uint8_t>> data = std::make_shared<std::vector<uint8_t>>(size);
     int i = 0, n;
-    n = sizeof(float); memcpy(data.data()+i, &assignedResources, n); i += n;
-    n = priorities.size() * sizeof(float); memcpy(data.data()+i, priorities.data(), n); i += n;
-    n = demandedResources.size() * sizeof(float); memcpy(data.data()+i, demandedResources.data(), n); i += n;
+    n = sizeof(float); memcpy(data->data()+i, &assignedResources, n); i += n;
+    n = priorities.size() * sizeof(float); memcpy(data->data()+i, priorities.data(), n); i += n;
+    n = demandedResources.size() * sizeof(float); memcpy(data->data()+i, demandedResources.data(), n); i += n;
     return data;
 }
 void deserialize(const std::vector<uint8_t>& packed) override {
-
     int i = 0, n;
     n = sizeof(float); memcpy(&assignedResources, packed.data()+i, n); i += n;
     int size = (packed.size() - i) / 2;

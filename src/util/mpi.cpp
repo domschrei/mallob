@@ -73,11 +73,11 @@ void MyMpi::resetListenerIfNecessary(const ListenerMode& mode, int tag) {
 }
 
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object) {
-    const std::vector<uint8_t> vec = object.serialize();
+    std::shared_ptr<std::vector<uint8_t>> vec = object.serialize();
     return isend(communicator, recvRank, tag, vec);
 }
 
-MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::vector<uint8_t>& object) {
+MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object) {
     MessageHandlePtr handle(new MessageHandle(object));
     if (rank(communicator) == recvRank) {
         handle->recvData = handle->sendData;
@@ -86,7 +86,7 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
         handle->selfMessage = true;
         handles.insert(handle);
     } else {
-        MPI_Isend(handle->sendData.data(), handle->sendData.size(), MPI_BYTE, recvRank, tag, communicator, &handle->request);
+        MPI_Isend(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator, &handle->request);
         sentHandles.insert(handle);
     }
     return handle;
@@ -96,7 +96,7 @@ MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const
     return send(communicator, recvRank, tag, object.serialize());
 }
 
-MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const std::vector<uint8_t>& object) {
+MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object) {
     MessageHandlePtr handle(new MessageHandle(object));
     if (rank(communicator) == recvRank) {
         handle->recvData = handle->sendData;
@@ -105,7 +105,7 @@ MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const
         handle->selfMessage = true;
         handles.insert(handle);
     } else {
-        MPI_Send(handle->sendData.data(), handle->sendData.size(), MPI_BYTE, recvRank, tag, communicator);
+        MPI_Send(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator);
     }
     return handle;
 }
@@ -113,8 +113,8 @@ MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator) {
     MessageHandlePtr handle(new MessageHandle());
     handle->tag = 0;
-    handle->recvData.resize(maxMsgLength);
-    MPI_Irecv(handle->recvData.data(), maxMsgLength, MPI_BYTE, MPI_ANY_SOURCE, MPI_ANY_TAG, communicator, &handle->request);
+    handle->recvData->resize(maxMsgLength);
+    MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, MPI_ANY_SOURCE, MPI_ANY_TAG, communicator, &handle->request);
     handles.insert(handle);
     return handle;
 }
@@ -122,8 +122,8 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator) {
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int tag) {
     MessageHandlePtr handle(new MessageHandle());
     handle->tag = tag;
-    handle->recvData.resize(maxMsgLength);
-    MPI_Irecv(handle->recvData.data(), maxMsgLength, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->request);
+    handle->recvData->resize(maxMsgLength);
+    MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->request);
     handles.insert(handle);
     return handle;
 }
@@ -131,8 +131,8 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int tag) {
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
     MessageHandlePtr handle(new MessageHandle());
     handle->tag = tag;
-    handle->recvData.resize(maxMsgLength);
-    MPI_Irecv(handle->recvData.data(), maxMsgLength, MPI_BYTE, source, tag, communicator, &handle->request);
+    handle->recvData->resize(maxMsgLength);
+    MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, source, tag, communicator, &handle->request);
     handles.insert(handle);
     return handle;
 }
@@ -140,13 +140,13 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
 MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag, int size) {
     MessageHandlePtr handle(new MessageHandle());
     handle->tag = tag;
-    handle->recvData.resize(size);
-    MPI_Recv(handle->recvData.data(), size, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->status);
+    handle->recvData->resize(size);
+    MPI_Recv(handle->recvData->data(), size, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->status);
     handle->source = handle->status.MPI_SOURCE;
     int count = 0;
     MPI_Get_count(&handle->status, MPI_BYTE, &count);
     if (count < size) {
-        handle->recvData.resize(count);
+        handle->recvData->resize(count);
     }
     return handle;
 }
@@ -160,9 +160,9 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag, int si
     assert(source >= 0);
     handle->source = source;
     handle->tag = tag;
-    handle->recvData.resize(size);
+    handle->recvData->resize(size);
     handle->critical = true;
-    MPI_Irecv(handle->recvData.data(), size, MPI_BYTE, source, tag, communicator, &handle->request);
+    MPI_Irecv(handle->recvData->data(), size, MPI_BYTE, source, tag, communicator, &handle->request);
     handles.insert(handle);
     return handle;
 }
@@ -235,7 +235,7 @@ MessageHandlePtr MyMpi::poll() {
         int count = 0;
         MPI_Get_count(&handle->status, MPI_BYTE, &count);
         if (count > 0) {
-            handle->recvData.resize(count);
+            handle->recvData->resize(count);
         }
     }
     if (handle != NULL) handles.erase(handle);

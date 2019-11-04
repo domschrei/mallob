@@ -122,7 +122,7 @@ void Client::mainProgram() {
 }
 
 void Client::handleRequestBecomeChild(MessageHandlePtr handle) {
-    JobRequest req; req.deserialize(handle->recvData);
+    JobRequest req; req.deserialize(*handle->recvData);
     const JobDescription& desc = *introducedJobs[req.jobId];
 
     // Send job signature
@@ -132,14 +132,14 @@ void Client::handleRequestBecomeChild(MessageHandlePtr handle) {
 }
 
 void Client::handleAckAcceptBecomeChild(MessageHandlePtr handle) {
-    JobRequest req; req.deserialize(handle->recvData);
+    JobRequest req; req.deserialize(*handle->recvData);
     const JobDescription& desc = *introducedJobs[req.jobId];
     Console::log_send(Console::VERB, handle->source, "Sending job description of #%i of size %i", desc.getId(), desc.getTransferSize());
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB, desc);
 }
 
 void Client::handleJobDone(MessageHandlePtr handle) {
-    IntPair recv(handle->recvData);
+    IntPair recv(*handle->recvData);
     int jobId = recv.first;
     int resultSize = recv.second;
     Console::log_recv(Console::VERB, handle->source, "Preparing to receive job result of length %i for job #%i", resultSize, jobId);
@@ -149,7 +149,7 @@ void Client::handleJobDone(MessageHandlePtr handle) {
 
 void Client::handleSendJobResult(MessageHandlePtr handle) {
 
-    JobResult jobResult; jobResult.deserialize(handle->recvData);
+    JobResult jobResult; jobResult.deserialize(*handle->recvData);
     int jobId = jobResult.id;
     int resultCode = jobResult.result;
 

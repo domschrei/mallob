@@ -157,7 +157,7 @@ void Worker::mainProgram() {
 
 void Worker::handleFindNode(MessageHandlePtr& handle) {
 
-    JobRequest req; req.deserialize(handle->recvData);
+    JobRequest req; req.deserialize(*handle->recvData);
 
     // Discard request if it originates from past epoch
     // (except if it is a request for a root node)
@@ -249,7 +249,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
 
 void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
 
-    JobRequest req; req.deserialize(handle->recvData);
+    JobRequest req; req.deserialize(*handle->recvData);
     Console::log_recv(Console::VERB, handle->source, "Request to become parent of %s", 
                     jobStr(req.jobId, req.requestedNodeIndex));
 
@@ -314,7 +314,7 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
 void Worker::handleRejectBecomeChild(MessageHandlePtr& handle) {
 
     // Retrieve committed job
-    JobRequest req; req.deserialize(handle->recvData);
+    JobRequest req; req.deserialize(*handle->recvData);
     assert(hasJob(req.jobId));
     Job &job = getJob(req.jobId);
     assert(job.getState() == JobState::COMMITTED);
@@ -328,7 +328,7 @@ void Worker::handleRejectBecomeChild(MessageHandlePtr& handle) {
 void Worker::handleAcceptBecomeChild(MessageHandlePtr& handle) {
 
     // Retrieve according job commitment
-    JobSignature sig; sig.deserialize(handle->recvData);
+    JobSignature sig; sig.deserialize(*handle->recvData);
     assert(jobCommitments.count(sig.jobId));
     JobRequest& req = jobCommitments[sig.jobId];
 
@@ -357,7 +357,7 @@ void Worker::handleAcceptBecomeChild(MessageHandlePtr& handle) {
 }
 
 void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
-    JobRequest req; req.deserialize(handle->recvData);
+    JobRequest req; req.deserialize(*handle->recvData);
 
     // Retrieve and send concerned job description
     assert(hasJob(req.jobId));
@@ -393,7 +393,7 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
 }
 
 void Worker::handleSendJob(MessageHandlePtr& handle) {
-    int jobId; memcpy(&jobId, handle->recvData.data(), sizeof(int));
+    int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
     assert(hasJob(jobId) || Console::fail("I don't know job #%i !", jobId));
 
     // Erase job commitment
@@ -411,8 +411,8 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
 void Worker::initJob(MessageHandlePtr handle) {
     
     // Deserialize job description
-    int jobId; memcpy(&jobId, handle->recvData.data(), sizeof(int));
-    Console::log_recv(Console::VERB, handle->source, "Deserializing job #%i , description has size %i ...", jobId, handle->recvData.size());
+    int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
+    Console::log_recv(Console::VERB, handle->source, "Deserializing job #%i , description has size %i ...", jobId, handle->recvData->size());
     Job& job = getJob(jobId);
     job.setDescription(handle->recvData);
     
@@ -421,7 +421,7 @@ void Worker::initJob(MessageHandlePtr handle) {
 }
 
 void Worker::handleUpdateVolume(MessageHandlePtr& handle) {
-    IntPair recv(handle->recvData);
+    IntPair recv(*handle->recvData);
     int jobId = recv.first;
     int volume = recv.second;
     if (!hasJob(jobId)) {
@@ -438,7 +438,7 @@ void Worker::handleUpdateVolume(MessageHandlePtr& handle) {
 void Worker::handleJobCommunication(MessageHandlePtr& handle) {
 
     // Deserialize job-specific message
-    JobMessage msg; msg.deserialize(handle->recvData);
+    JobMessage msg; msg.deserialize(*handle->recvData);
     int jobId = msg.jobId;
     if (!hasJob(jobId)) {
         Console::log(Console::WARN, "Job message from unknown job #%i", jobId);
@@ -452,7 +452,7 @@ void Worker::handleJobCommunication(MessageHandlePtr& handle) {
 void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
 
     // Retrieve job
-    int jobId; memcpy(&jobId, handle->recvData.data(), sizeof(int));
+    int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
     assert(hasJob(jobId) && getJob(jobId).isRoot());
     Console::log_recv(Console::VERB, handle->source, "Result has been found for job #%i", jobId);
     if (getJob(jobId).isInState({PAST, INITIALIZING_TO_PAST})) {
@@ -480,7 +480,7 @@ void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
 void Worker::handleForwardClientRank(MessageHandlePtr& handle) {
 
     // Receive rank of the job's client
-    IntPair recv(handle->recvData);
+    IntPair recv(*handle->recvData);
     int jobId = recv.first;
     int clientRank = recv.second;
     assert(hasJob(jobId));
@@ -493,7 +493,7 @@ void Worker::handleQueryJobResult(MessageHandlePtr& handle) {
 
     // Receive acknowledgement that the client received the advertised result size
     // and wishes to receive the full job result
-    int jobId; memcpy(&jobId, handle->recvData.data(), sizeof(int));
+    int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
     assert(hasJob(jobId));
     const JobResult& result = getJob(jobId).getResult();
     Console::log_send(Console::VERB, handle->source, "Sending full job result to client");
@@ -503,7 +503,7 @@ void Worker::handleQueryJobResult(MessageHandlePtr& handle) {
 
 void Worker::handleTerminate(MessageHandlePtr& handle) {
 
-    int jobId; memcpy(&jobId, handle->recvData.data(), sizeof(int));
+    int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
     Job& job = getJob(jobId);
 
     if (job.isInState({COMMITTED})) {
@@ -533,7 +533,7 @@ void Worker::handleTerminate(MessageHandlePtr& handle) {
 void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
 
     // Retrieve job
-    IntPair recv(handle->recvData);
+    IntPair recv(*handle->recvData);
     int jobId = recv.first;
     int index = recv.second;
     assert(hasJob(jobId));

@@ -40,7 +40,7 @@ public:
     void setArrival(float arrival) {this->arrival = arrival;};
 
     void deserialize(const std::vector<uint8_t>& packed) override;
-    std::vector<uint8_t> serialize() const override;
+    std::shared_ptr<std::vector<uint8_t>> serialize() const override;
 };
 
 struct JobResult : public Serializable {
@@ -56,7 +56,7 @@ public:
     int getTransferSize() const {return sizeof(int) + sizeof(int) + sizeof(int)*solution.size();};
 
     void deserialize(const std::vector<uint8_t>& packed) override;
-    std::vector<uint8_t> serialize() const override;
+    std::shared_ptr<std::vector<uint8_t>> serialize() const override;
 
 };
 

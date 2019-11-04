@@ -9,18 +9,18 @@ int JobDescription::getTransferSize() const {
             +payload.size()*sizeof(int);
 }
 
-std::vector<uint8_t> JobDescription::serialize() const {
+std::shared_ptr<std::vector<uint8_t>> JobDescription::serialize() const {
 
-    std::vector<uint8_t> packed(getTransferSize());
+    std::shared_ptr<std::vector<uint8_t>> packed = std::make_shared<std::vector<uint8_t>>(getTransferSize());
 
     // Basic data
     int i = 0, n;
-    n = sizeof(int); memcpy(packed.data()+i, &id, n); i += n;
-    n = sizeof(int); memcpy(packed.data()+i, &rootRank, n); i += n;
-    n = sizeof(float); memcpy(packed.data()+i, &priority, n); i += n;
+    n = sizeof(int); memcpy(packed->data()+i, &id, n); i += n;
+    n = sizeof(int); memcpy(packed->data()+i, &rootRank, n); i += n;
+    n = sizeof(float); memcpy(packed->data()+i, &priority, n); i += n;
 
     // Clauses
-    n = payload.size()*sizeof(int); memcpy(packed.data()+i, payload.data(), n); i += n;
+    n = payload.size()*sizeof(int); memcpy(packed->data()+i, payload.data(), n); i += n;
 
     return packed;
 }
@@ -39,14 +39,14 @@ void JobDescription::deserialize(const std::vector<uint8_t>& packed) {
     memcpy(payload.data(), packed.data()+i, n); i += n;
 }
 
-std::vector<uint8_t> JobResult::serialize() const {
-
-    std::vector<uint8_t> packed(2*sizeof(int) + solution.size()*sizeof(int));
+std::shared_ptr<std::vector<uint8_t>> JobResult::serialize() const {
+    int size = 2*sizeof(int) + solution.size()*sizeof(int);
+    std::shared_ptr<std::vector<uint8_t>> packed = std::make_shared<std::vector<uint8_t>>(size);
 
     int i = 0, n;
-    n = sizeof(int); memcpy(packed.data()+i, &id, n); i += n;
-    n = sizeof(int); memcpy(packed.data()+i, &result, n); i += n;
-    n = solution.size() * sizeof(int); memcpy(packed.data()+i, solution.data(), n); i += n;
+    n = sizeof(int); memcpy(packed->data()+i, &id, n); i += n;
+    n = sizeof(int); memcpy(packed->data()+i, &result, n); i += n;
+    n = solution.size() * sizeof(int); memcpy(packed->data()+i, solution.data(), n); i += n;
     return packed;
 }
 

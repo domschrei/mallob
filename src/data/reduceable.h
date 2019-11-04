@@ -10,7 +10,7 @@
 class Reduceable : public Serializable {
 
 public:
-    virtual std::vector<uint8_t> serialize() const override = 0;
+    virtual std::shared_ptr<std::vector<uint8_t>> serialize() const override = 0;
     virtual void deserialize(const std::vector<uint8_t>& packed) override = 0;
     virtual void merge(const Reduceable& other) = 0;
     virtual std::unique_ptr<Reduceable> getDeserialized(const std::vector<uint8_t>& packed) const = 0;

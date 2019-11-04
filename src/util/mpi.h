@@ -17,14 +17,21 @@ struct MessageHandle {
     MPI_Request request;
     int tag;
     int source;
-    std::vector<uint8_t> sendData;
-    std::vector<uint8_t> recvData;
+    std::shared_ptr<std::vector<uint8_t>> sendData;
+    std::shared_ptr<std::vector<uint8_t>> recvData;
     MPI_Status status;
     bool selfMessage = false;
     bool critical = false;
 
-    MessageHandle() {status.MPI_SOURCE = -1; status.MPI_TAG = -1;}
-    MessageHandle(const std::vector<uint8_t>& data) : sendData(data) {}
+    MessageHandle() {
+        status.MPI_SOURCE = -1; 
+        status.MPI_TAG = -1; 
+        sendData = std::make_shared<std::vector<uint8_t>>();
+        recvData = std::make_shared<std::vector<uint8_t>>();
+    }
+    MessageHandle(const std::shared_ptr<std::vector<uint8_t>>& data) : sendData(data) {
+        recvData = std::make_shared<std::vector<uint8_t>>();
+    }
 };
 
 /*
@@ -163,9 +170,9 @@ public:
     static void resetListenerIfNecessary(const ListenerMode& mode, int tag);
 
     static MessageHandlePtr isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object);
-    static MessageHandlePtr isend(MPI_Comm communicator, int recvRank, int tag, const std::vector<uint8_t>& object);
+    static MessageHandlePtr isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object);
     static MessageHandlePtr  send(MPI_Comm communicator, int recvRank, int tag, const Serializable& object);
-    static MessageHandlePtr  send(MPI_Comm communicator, int recvRank, int tag, const std::vector<uint8_t>& object);
+    static MessageHandlePtr  send(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object);
     static MessageHandlePtr irecv(MPI_Comm communicator);
     static MessageHandlePtr irecv(MPI_Comm communicator, int tag);
     static MessageHandlePtr irecv(MPI_Comm communicator, int source, int tag);

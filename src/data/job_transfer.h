@@ -32,17 +32,17 @@ public:
         epoch(epoch),
         numHops(numHops) {}
 
-    std::vector<uint8_t> serialize() const override {
-        std::vector<uint8_t> packed(7*sizeof(int));
-
+    std::shared_ptr<std::vector<uint8_t>> serialize() const override {
+        int size = (7*sizeof(int));
+        std::shared_ptr<std::vector<uint8_t>> packed = std::make_shared<std::vector<uint8_t>>(size);
         int i = 0, n;
-        n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;
-        n = sizeof(int); memcpy(packed.data()+i, &rootRank, n); i += n;
-        n = sizeof(int); memcpy(packed.data()+i, &requestingNodeRank, n); i += n;
-        n = sizeof(int); memcpy(packed.data()+i, &requestedNodeIndex, n); i += n;
-        n = sizeof(int); memcpy(packed.data()+i, &fullTransfer, n); i += n;
-        n = sizeof(int); memcpy(packed.data()+i, &epoch, n); i += n;
-        n = sizeof(int); memcpy(packed.data()+i, &numHops, n); i += n;
+        n = sizeof(int); memcpy(packed->data()+i, &jobId, n); i += n;
+        n = sizeof(int); memcpy(packed->data()+i, &rootRank, n); i += n;
+        n = sizeof(int); memcpy(packed->data()+i, &requestingNodeRank, n); i += n;
+        n = sizeof(int); memcpy(packed->data()+i, &requestedNodeIndex, n); i += n;
+        n = sizeof(int); memcpy(packed->data()+i, &fullTransfer, n); i += n;
+        n = sizeof(int); memcpy(packed->data()+i, &epoch, n); i += n;
+        n = sizeof(int); memcpy(packed->data()+i, &numHops, n); i += n;
         return packed;
     }
 
@@ -80,20 +80,21 @@ public:
         return transferSize;
     }
 
-    std::vector<uint8_t> serialize() const override {
-        std::vector<uint8_t> packed(2*sizeof(int) + sizeof(size_t));
+    std::shared_ptr<std::vector<uint8_t>> serialize() const override {
+        int size = (2*sizeof(int) + sizeof(size_t));
+        std::shared_ptr<std::vector<uint8_t>> packed = std::make_shared<std::vector<uint8_t>>(size);
 
         int i = 0, n;
-        n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;
-        n = sizeof(int); memcpy(packed.data()+i, &rootRank, n); i += n;
-        n = sizeof(size_t); memcpy(packed.data()+i, &transferSize, n); i += n;
+        n = sizeof(int);    memcpy(packed->data()+i, &jobId, n); i += n;
+        n = sizeof(int);    memcpy(packed->data()+i, &rootRank, n); i += n;
+        n = sizeof(size_t); memcpy(packed->data()+i, &transferSize, n); i += n;
         return packed;
     }
 
     void deserialize(const std::vector<uint8_t>& packed) override {
         int i = 0, n;
-        n = sizeof(int); memcpy(&jobId, packed.data()+i, n); i += n;
-        n = sizeof(int); memcpy(&rootRank, packed.data()+i, n); i += n;
+        n = sizeof(int);    memcpy(&jobId, packed.data()+i, n); i += n;
+        n = sizeof(int);    memcpy(&rootRank, packed.data()+i, n); i += n;
         n = sizeof(size_t); memcpy(&transferSize, packed.data()+i, n); i += n;
     }
 };
@@ -106,14 +107,15 @@ struct JobMessage : public Serializable {
     std::vector<int> payload;
 
 public:
-    std::vector<uint8_t> serialize() const override {
-        std::vector<uint8_t> packed(3*sizeof(int) + payload.size()*sizeof(int));
+    std::shared_ptr<std::vector<uint8_t>> serialize() const override {
+        int size = 3*sizeof(int) + payload.size()*sizeof(int);
+        std::shared_ptr<std::vector<uint8_t>> packed = std::make_shared<std::vector<uint8_t>>(size);
 
         int i = 0, n;
-        n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;
-        n = sizeof(int); memcpy(packed.data()+i, &tag, n); i += n;
-        n = sizeof(int); memcpy(packed.data()+i, &epoch, n); i += n;
-        n = payload.size()*sizeof(int); memcpy(packed.data()+i, payload.data(), n); i += n;
+        n = sizeof(int); memcpy(packed->data()+i, &jobId, n); i += n;
+        n = sizeof(int); memcpy(packed->data()+i, &tag, n); i += n;
+        n = sizeof(int); memcpy(packed->data()+i, &epoch, n); i += n;
+        n = payload.size()*sizeof(int); memcpy(packed->data()+i, payload.data(), n); i += n;
         return packed;
     }
 
@@ -139,11 +141,12 @@ public:
         deserialize(packed);
     }
 
-    std::vector<uint8_t> serialize() const override {
-        std::vector<uint8_t> packed(2*sizeof(int));
+    std::shared_ptr<std::vector<uint8_t>> serialize() const override {
+        int size = (2*sizeof(int));
+        std::shared_ptr<std::vector<uint8_t>> packed = std::make_shared<std::vector<uint8_t>>(size);
         int i = 0, n;
-        n = sizeof(int); memcpy(packed.data()+i, &first, n); i += n;
-        n = sizeof(int); memcpy(packed.data()+i, &second, n); i += n;
+        n = sizeof(int); memcpy(packed->data()+i, &first, n); i += n;
+        n = sizeof(int); memcpy(packed->data()+i, &second, n); i += n;
         return packed;
     }
 
