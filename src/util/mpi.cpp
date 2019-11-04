@@ -12,11 +12,36 @@
 std::set<MessageHandlePtr> MyMpi::handles;
 std::set<MessageHandlePtr> MyMpi::sentHandles;
 int MyMpi::maxMsgLength;
+std::map<int, int> MyMpi::tagPriority;
 
 void MyMpi::init(int argc, char *argv[])
 {
     MPI_Init(&argc, &argv);
     maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
+
+    // Very quick messages, and such which are critical for overall system performance
+    tagPriority[MSG_FIND_NODE] = 1;
+    tagPriority[MSG_WORKER_FOUND_RESULT] = 1;
+    tagPriority[MSG_FORWARD_CLIENT_RANK] = 1;
+    tagPriority[MSG_JOB_DONE] = 1;
+    tagPriority[MSG_COLLECTIVES] = 1;
+    
+    // Job-internal management messages
+    tagPriority[MSG_REQUEST_BECOME_CHILD] = 2;
+    tagPriority[MSG_ACCEPT_BECOME_CHILD] = 2;
+    tagPriority[MSG_REJECT_BECOME_CHILD] = 2;
+    tagPriority[MSG_TERMINATE] = 2;
+    tagPriority[MSG_UPDATE_VOLUME] = 2;
+    tagPriority[MSG_WORKER_DEFECTING] = 2;
+
+    // Messages inducing bulky amounts of work
+    tagPriority[MSG_ACK_ACCEPT_BECOME_CHILD] = 2; // sending a job desc.
+    tagPriority[MSG_SEND_JOB] = 2; // receiving a job desc.
+    tagPriority[MSG_QUERY_JOB_RESULT] = 2; // sending a job result
+    tagPriority[MSG_SEND_JOB_RESULT] = 2; // receiving a job result
+
+    // Job-specific communication: not critical for balancing 
+    tagPriority[MSG_JOB_COMMUNICATION] = 4;
 }
 
 void MyMpi::beginListening(const ListenerMode& mode) {
@@ -132,6 +157,7 @@ MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag) {
 
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag, int size) {
     MessageHandlePtr handle(new MessageHandle());
+    assert(source >= 0);
     handle->source = source;
     handle->tag = tag;
     handle->recvData.resize(size);
@@ -144,6 +170,7 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag, int si
 MessageHandlePtr MyMpi::poll() {
     cleanSentHandles();
 
+    /*
     MessageHandlePtr handle = NULL;
     for (auto it = handles.begin(); it != handles.end(); ++it) {
         MessageHandlePtr h = *it;
@@ -172,6 +199,46 @@ MessageHandlePtr MyMpi::poll() {
     if (handle != NULL) {
         handles.erase(handle);
     }
+    return handle;
+    */
+
+    MessageHandlePtr bestPrioHandle = NULL;
+    int bestPrio = 9999999;
+
+    // Find ready handle of best priority
+    for (auto it = handles.begin(); it != handles.end(); ++it) {
+        MessageHandlePtr h = *it;
+        bool consider = false;
+        if (h->selfMessage || h->status.MPI_TAG > 0) {
+            consider = true;
+        } else {
+            int flag = -1;
+            int err = MPI_Test(&h->request, &flag, &h->status);
+            assert(err == 0 || Console::fail("MPI ERROR: %i", err));
+            if (flag) {
+                consider = true;
+                h->tag = h->status.MPI_TAG;
+                assert(h->status.MPI_SOURCE >= 0 || Console::fail("MPI_SOURCE = %i", h->status.MPI_SOURCE));
+                h->source = h->status.MPI_SOURCE;
+            }
+        }
+        if (consider && tagPriority[h->tag] < bestPrio) {
+            bestPrio = tagPriority[h->tag];
+            bestPrioHandle = h;
+        }
+    }
+
+    // Process found handle
+    MessageHandlePtr handle = bestPrioHandle;
+    if (handle != NULL && !handle->selfMessage) {
+        // Resize received data vector to actual received size
+        int count = 0;
+        MPI_Get_count(&handle->status, MPI_BYTE, &count);
+        if (count > 0) {
+            handle->recvData.resize(count);
+        }
+    }
+    if (handle != NULL) handles.erase(handle);
     return handle;
 }
 

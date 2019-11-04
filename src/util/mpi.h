@@ -9,6 +9,7 @@
 #include <openmpi/mpi.h>
 
 #include "data/serializable.h"
+#include "util/console.h"
 
 #define MAX_JOB_MESSAGE_PAYLOAD_PER_NODE 1500*sizeof(int)
 
@@ -22,7 +23,7 @@ struct MessageHandle {
     bool selfMessage = false;
     bool critical = false;
 
-    MessageHandle() {}
+    MessageHandle() {status.MPI_SOURCE = -1; status.MPI_TAG = -1;}
     MessageHandle(const std::vector<uint8_t>& data) : sendData(data) {}
 };
 
@@ -138,9 +139,22 @@ typedef std::shared_ptr<MessageHandle> MessageHandlePtr;
 
 class MyMpi {
 
+public:
+    struct HandleComparator {
+        bool operator()(const MessageHandlePtr& a, const MessageHandlePtr& b) const {
+            assert(MyMpi::tagPriority.count(a->tag) || Console::fail("Tag %i has no priority assigned to it", a->tag));
+            assert(MyMpi::tagPriority.count(b->tag) || Console::fail("Tag %i has no priority assigned to it", b->tag));
+            if (MyMpi::tagPriority[a->tag] != MyMpi::tagPriority[b->tag])
+            return MyMpi::tagPriority[a->tag] < MyMpi::tagPriority[b->tag];
+            if (a->tag != b->tag) return a->tag < b->tag;
+            return false;
+        }
+    };
+
 private:
     static std::set<MessageHandlePtr> handles;
     static std::set<MessageHandlePtr> sentHandles;
+    static std::map<int, int> tagPriority;
 
 public:
 
@@ -170,7 +184,6 @@ public:
     static int size(MPI_Comm comm);
     static int rank(MPI_Comm comm);
     static int random_other_node(MPI_Comm comm, const std::set<int>& excludedNodes);
-
 
     static int maxMsgLength;
 };
