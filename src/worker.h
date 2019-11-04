@@ -31,6 +31,7 @@ private:
 
     std::map<int, Job*> jobs;
     std::map<int, JobRequest> jobCommitments;
+    Job* currentJob;
     int load;
     float lastLoadChange;
 
@@ -48,6 +49,7 @@ public:
             assert(0 < loadFactor && loadFactor < 1.0);
             load = 0;
             lastLoadChange = Timer::elapsedSeconds();
+            currentJob = NULL;
         }
 
     void init();

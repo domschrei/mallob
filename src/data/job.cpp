@@ -195,7 +195,7 @@ void Job::withdraw() {
 }
 
 int Job::getDemand() const {
-    return std::min(_comm_size, (int)std::pow(2U, _epoch_counter.getEpoch() - _epoch_of_arrival + 1) - 1);
+    return std::min(_comm_size, (int)std::pow(2, _epoch_counter.getEpoch() - _epoch_of_arrival + 1) - 1);
 }
 
 const JobResult& Job::getResult() const {
@@ -205,7 +205,7 @@ const JobResult& Job::getResult() const {
 
 bool Job::wantsToCommunicate() const {
     return isInState({ACTIVE}) && !hasLeftChild() && !hasRightChild() 
-            && _epoch_of_last_communication < (int)_epoch_counter.getEpoch() 
+            && _epoch_of_last_communication < _epoch_counter.getEpoch() 
             && _epoch_counter.getSecondsSinceLastSync() >= 2.5f;
 }
 

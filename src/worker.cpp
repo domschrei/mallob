@@ -46,7 +46,7 @@ void Worker::mainProgram() {
         if (!balancer->isBalancing() && isTimeForRebalancing()) {
             
             // Check if termination signal file exists
-            checkTerminate();
+            //checkTerminate();
 
             // Rebalancing
             Console::log(MyMpi::rank(comm) == 0 ? Console::INFO : Console::VERB, 
@@ -55,7 +55,7 @@ void Worker::mainProgram() {
 
         } else if (balancer->isBalancing()) {
 
-            // Advance balancing if possible (e.g. an ireduce finished)
+            // Advance balancing if possible (e.g. an iallreduce finished)
             if (balancer->canContinueBalancing()) {
                 bool done = balancer->continueBalancing();
                 if (done) finishBalancing();
@@ -63,25 +63,21 @@ void Worker::mainProgram() {
         }
 
         // Job communication (e.g. clause sharing)
-        for (auto it : jobs) {
-            Job& job = *it.second;
-            if (job.wantsToCommunicate()) {
-                Console::log(Console::VERB, "%s wants to communicate", job.toStr());
-                job.communicate();
-            }
+        if (currentJob != NULL && currentJob->wantsToCommunicate()) {
+            Console::log(Console::VERB, "%s wants to communicate", currentJob->toStr());
+            currentJob->communicate();
         }
 
-        // Solve loops for each active HordeLib instance
-        for (auto it : jobs) {
-            int jobId = it.first;
-            Job &job = *it.second;
+        // Solve loop for active HordeLib instance
+        if (currentJob != NULL) {
+            Job &job = *currentJob;
 
             int result = job.solveLoop();
             if (result >= 0) {
 
                 // Solver done!
                 int jobRootRank = job.getRootNodeRank();
-                IntPair pair(jobId, (int) result);
+                IntPair pair(job.getId(), result);
                 job.dumpStats();
 
                 // Signal termination to root -- may be a self message
@@ -92,7 +88,7 @@ void Worker::mainProgram() {
         }
 
         // Sleep for a bit
-        usleep(10); // 1000 = 1 millisecond
+        //usleep(10); // 1000 = 1 millisecond
 
         // Poll messages, if present
         MessageHandlePtr handle;
@@ -193,8 +189,8 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
         if (!hasJob(req.jobId) || getJob(req.jobId).isNotInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
 
             // Look for an active job that can be suspended
-            for (auto it : jobs) {
-                Job& job = *it.second;
+            if (currentJob != NULL) {
+                Job& job = *currentJob;
                 // Job must be active and a non-root leaf node
                 if (job.isInState({ACTIVE, INITIALIZING_TO_ACTIVE}) 
                     && !job.isRoot() && !job.hasLeftChild() && !job.hasRightChild()) {
@@ -203,8 +199,8 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
                     Console::log(Console::VERB, "Suspending %s ...", job.toStr());
                     Console::log(Console::VERB, "... in order to adopt starving job %s", 
                                     jobStr(req.jobId, req.requestedNodeIndex));  
-                    IntPair pair(it.first, job.getIndex());
-                    MyMpi::isend(MPI_COMM_WORLD, it.second->getParentNodeRank(), MSG_WORKER_DEFECTING, pair);
+                    IntPair pair(job.getId(), job.getIndex());
+                    MyMpi::isend(MPI_COMM_WORLD, job.getParentNodeRank(), MSG_WORKER_DEFECTING, pair);
                     stats.increment("sentMessages");
 
                     // Suspend this job
@@ -212,7 +208,6 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
                     setLoad(0, job.getId());
 
                     adopts = true;
-                    break;
                 }
             }
         }
@@ -578,10 +573,16 @@ void Worker::setLoad(int load, int whichJobId) {
     stats.add((load == 0 ? "busyTime" : "idleTime"), now - lastLoadChange);
     lastLoadChange = now;
     assert(hasJob(whichJobId));
-    if (load == 1)
+    if (load == 1) {
+        assert(currentJob == NULL);
         Console::log(Console::VERB, "LOAD 1 (+%s)", getJob(whichJobId).toStr());
-    if (load == 0)
+        currentJob = &getJob(whichJobId);
+    }
+    if (load == 0) {
+        assert(currentJob != NULL);
         Console::log(Console::VERB, "LOAD 0 (-%s)", getJob(whichJobId).toStr());
+        currentJob = NULL;
+    }
 }
 
 int Worker::getRandomWorkerNode() {
@@ -650,8 +651,8 @@ void Worker::finishBalancing() {
     // Dump stats and advance to next epoch
     stats.addResourceUsage();
     stats.dump(epochCounter.getEpoch());
-    for (auto it : jobs) {
-        it.second->dumpStats();
+    if (currentJob != NULL) {
+        currentJob->dumpStats();
     }
     epochCounter.increment();
     Console::log(Console::VERB, "Advancing to epoch %i", epochCounter.getEpoch());
