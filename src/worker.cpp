@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <fstream>
+#include <initializer_list>
 
 #include "worker.h"
 #include "data/sat_job.h"
@@ -12,6 +13,7 @@
 #include "util/random.h"
 #include "balancing/thermodynamic_balancer.h"
 #include "balancing/cutoff_priority_balancer.h"
+#include "data/job_description.h"
 
 void Worker::init() {
 
@@ -77,12 +79,12 @@ void Worker::mainProgram() {
 
                 // Solver done!
                 int jobRootRank = job.getRootNodeRank();
-                IntPair pair(job.getId(), result);
+                IntVec payload({job.getId(), job.getRevision(), result});
                 job.dumpStats();
 
                 // Signal termination to root -- may be a self message
                 Console::log_send(Console::VERB, jobRootRank, "Sending finished info");
-                MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_WORKER_FOUND_RESULT, pair);
+                MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_WORKER_FOUND_RESULT, payload);
                 //stats.increment("sentMessages");
             }
         }
@@ -90,17 +92,17 @@ void Worker::mainProgram() {
         // Sleep for a bit
         usleep(10); // 1000 = 1 millisecond
 
-        // Poll messages, if present
+        // Poll a message, if present
         MessageHandlePtr handle;
         if ((handle = MyMpi::poll()) != NULL) {
             // Process message
             Console::log_recv(Console::VVVERB, handle->source, "Processing message of tag %i", handle->tag);
             //stats.increment("receivedMessages");
 
-            if (handle->tag == MSG_FIND_NODE)
+            if (handle->tag == MSG_FIND_NODE) {
                 handleFindNode(handle);
 
-            else if (handle->tag == MSG_REQUEST_BECOME_CHILD)
+            } else if (handle->tag == MSG_REQUEST_BECOME_CHILD)
                 handleRequestBecomeChild(handle);
 
             else if (handle->tag == MSG_REJECT_BECOME_CHILD)
@@ -112,7 +114,7 @@ void Worker::mainProgram() {
             else if (handle->tag == MSG_ACK_ACCEPT_BECOME_CHILD)
                 handleAckAcceptBecomeChild(handle);
 
-            else if (handle->tag == MSG_SEND_JOB)
+            else if (handle->tag == MSG_SEND_JOB_DESCRIPTION)
                 handleSendJob(handle);
 
             else if (handle->tag == MSG_UPDATE_VOLUME)
@@ -135,6 +137,21 @@ void Worker::mainProgram() {
 
             else if (handle->tag == MSG_WORKER_DEFECTING)
                 handleWorkerDefecting(handle);
+
+            else if (handle->tag == MSG_NOTIFY_JOB_REVISION)
+                handleNotifyJobRevision(handle);
+            
+            else if (handle->tag == MSG_QUERY_JOB_REVISION_DETAILS)
+                handleQueryJobRevisionDetails(handle);
+            
+            else if (handle->tag == MSG_SEND_JOB_REVISION_DETAILS)
+                handleSendJobRevisionDetails(handle);
+            
+            else if (handle->tag == MSG_ACK_JOB_REVISION_DETAILS)
+                handleAckJobRevisionDetails(handle);
+            
+            else if (handle->tag == MSG_SEND_JOB_REVISION_DATA)
+                handleSendJobRevisionData(handle);
             
             else if (handle->tag == MSG_COLLECTIVES) {
                 // "Collectives" messages are currently handled only in balancer
@@ -153,7 +170,6 @@ void Worker::mainProgram() {
 
 void Worker::handleFindNode(MessageHandlePtr& handle) {
 
-    Console::log(Console::VVVERB, "Find node ...");
     JobRequest req; req.deserialize(*handle->recvData);
     Console::log(Console::VVVERB, "... for %s", jobStr(req.jobId, req.requestedNodeIndex));
 
@@ -246,7 +262,6 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
 
 void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
 
-
     JobRequest req; req.deserialize(*handle->recvData);
     Console::log_recv(Console::VERB, handle->source, "Request to become parent of %s", 
                     jobStr(req.jobId, req.requestedNodeIndex));
@@ -281,7 +296,7 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
         const JobDescription& desc = job.getDescription();
 
         // Send job signature
-        JobSignature sig(req.jobId, req.rootRank, desc.getTransferSize());
+        JobSignature sig(req.jobId, req.rootRank, req.revision, desc.getTransferSize(true));
         MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACCEPT_BECOME_CHILD, sig);
         //stats.increment("sentMessages");
 
@@ -336,7 +351,7 @@ void Worker::handleAcceptBecomeChild(MessageHandlePtr& handle) {
         Console::log(Console::VERB, "Receiving job description of #%i of size %i", req.jobId, sig.getTransferSize());
         MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACK_ACCEPT_BECOME_CHILD, req);
         //stats.increment("sentMessages");
-        MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB, sig.getTransferSize()); // to be received later
+        MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, sig.getTransferSize()); // to be received later
         //stats.increment("receivedMessages");
 
     } else {
@@ -360,7 +375,7 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
     // Retrieve and send concerned job description
     assert(hasJob(req.jobId));
     Job& job = getJob(req.jobId);
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB, job.getSerializedDescription());
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, job.getSerializedDescription());
     //stats.increment("sentMessages");
     Console::log_send(Console::VERB, handle->source, "Sent full job description of %s", job.toStr());
 
@@ -450,11 +465,17 @@ void Worker::handleJobCommunication(MessageHandlePtr& handle) {
 void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
 
     // Retrieve job
-    int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
+    IntVec res(*handle->recvData);
+    int jobId = res[0];
+    int revision = res[1];
     assert(hasJob(jobId) && getJob(jobId).isRoot());
     Console::log_recv(Console::VERB, handle->source, "Result has been found for job #%i", jobId);
     if (getJob(jobId).isInState({PAST, INITIALIZING_TO_PAST})) {
         Console::log_recv(Console::VERB, handle->source, "Discarding excess result for job #%i", jobId);
+        return;
+    }
+    if (getJob(jobId).getRevision() > revision) {
+        Console::log_recv(Console::VERB, handle->source, "Discarding obsolete result for job #%i rev. %i", jobId, revision);
         return;
     }
 
@@ -472,7 +493,11 @@ void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
     }
 
     // Terminate job and propagate termination message
-    handleTerminate(handle);
+    if (getJob(jobId).getDescription().isIncremental()) {
+        handleInterrupt(handle);
+    } else {
+        handleTerminate(handle);
+    }
 }
 
 void Worker::handleForwardClientRank(MessageHandlePtr& handle) {
@@ -502,31 +527,15 @@ void Worker::handleQueryJobResult(MessageHandlePtr& handle) {
 void Worker::handleTerminate(MessageHandlePtr& handle) {
 
     int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
-    Job& job = getJob(jobId);
-
-    if (job.isInState({COMMITTED})) {
-        Console::log(Console::INFO, "Deferring termination handle, as job description did not arrive yet");
-        MyMpi::deferHandle(handle); // do not consume this message while job state is "COMMITTED"
-    }
-
-    if (job.isInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
-
-        // Propagate termination message down the job tree
-        if (job.hasLeftChild()) {
-            MyMpi::isend(MPI_COMM_WORLD, job.getLeftChildNodeRank(), MSG_TERMINATE, handle->recvData);
-            //stats.increment("sentMessages");
-        }
-        if (job.hasRightChild()) {
-            MyMpi::isend(MPI_COMM_WORLD, job.getRightChildNodeRank(), MSG_TERMINATE, handle->recvData);
-            //stats.increment("sentMessages");
-        }
-
-        // Terminate
-        Console::log(Console::INFO, "Terminating %s", job.toStr());
-        setLoad(0, job.getId());
-        job.withdraw();
-    }
+    interruptJob(handle, jobId, true);
 }
+
+void Worker::handleInterrupt(MessageHandlePtr& handle) {
+
+    int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
+    interruptJob(handle, jobId, false);
+}
+
 
 void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
 
@@ -555,6 +564,122 @@ void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
     JobRequest req(jobId, job.getRootNodeRank(), worldRank, index, epochCounter.getEpoch(), 0);
     MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, MSG_FIND_NODE, req);
     //stats.increment("sentMessages");
+}
+
+void Worker::handleNotifyJobRevision(MessageHandlePtr& handle) {
+    IntVec payload(*handle->recvData);
+    int jobId = payload[0];
+    int revision = payload[1];
+
+    assert(hasJob(jobId));
+    assert(getJob(jobId).isInState({STANDBY}) || Console::fail("%s : state %s", 
+            getJob(jobId).toStr(), jobStateStrings[getJob(jobId).getState()]));
+
+    // No other job running on this node
+    assert(load == 1 && currentJob->getId() == jobId);
+
+    // Request receiving information on revision size
+    Job& job = getJob(jobId);
+    int lastKnownRevision = job.getRevision();
+    if (revision > lastKnownRevision) {
+        Console::log(Console::VERB, "Received revision update #%i rev. %i (I am at rev. %i)", jobId, revision, lastKnownRevision);
+        IntVec request({jobId, lastKnownRevision+1, revision});
+        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_QUERY_JOB_REVISION_DETAILS, request);
+    } else {
+        // TODO ???
+        Console::log(Console::WARN, "Useless revision update #%i rev. %i (I am already at rev. %i)", jobId, revision, lastKnownRevision);
+    }
+}
+
+void Worker::handleQueryJobRevisionDetails(MessageHandlePtr& handle) {
+    IntVec request(*handle->recvData);
+    int jobId = request[0];
+    int firstRevision = request[1];
+    int lastRevision = request[2];
+
+    assert(hasJob(jobId));
+
+    JobDescription& desc = getJob(jobId).getDescription();
+    IntVec response({jobId, firstRevision, lastRevision, desc.getTransferSize(firstRevision, lastRevision)});
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DETAILS, response);
+}
+
+void Worker::handleSendJobRevisionDetails(MessageHandlePtr& handle) {
+    IntVec response(*handle->recvData);
+    int jobId = response[0];
+    int transferSize = response[3];
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACK_JOB_REVISION_DETAILS, handle->recvData);
+    MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DATA, transferSize);
+}
+
+void Worker::handleAckJobRevisionDetails(MessageHandlePtr& handle) {
+    IntVec response(*handle->recvData);
+    int jobId = response[0];
+    int firstRevision = response[1];
+    int lastRevision = response[2];
+    int transferSize = response[3];
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DATA, 
+                getJob(jobId).getDescription().serialize(firstRevision, lastRevision));
+}
+
+void Worker::handleSendJobRevisionData(MessageHandlePtr& handle) {
+    int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
+    assert(hasJob(jobId) && getJob(jobId).isInState({STANDBY}));
+
+    // TODO in separate thread
+    Job& job = getJob(jobId);
+    job.addAmendment(handle->recvData);
+    int revision = job.getDescription().getRevision();
+    Console::log(Console::INFO, "%s : computing on #%i rev. %i", job.toStr(), jobId, revision);
+    
+    // Propagate to children
+    if (job.hasLeftChild()) {
+        IntVec payload({jobId, revision});
+        MyMpi::isend(MPI_COMM_WORLD, job.getLeftChildNodeRank(), MSG_NOTIFY_JOB_REVISION, payload);
+    }
+    if (job.hasRightChild()) {
+        IntVec payload({jobId, revision});
+        MyMpi::isend(MPI_COMM_WORLD, job.getRightChildNodeRank(), MSG_NOTIFY_JOB_REVISION, payload);
+    }
+}
+
+void Worker::handleIncrementalJobFinished(MessageHandlePtr& handle) {
+    int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
+    interruptJob(handle, jobId, true);
+}
+
+
+void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate) {
+
+    Job& job = getJob(jobId);
+
+    if (job.isInState({COMMITTED})) {
+        Console::log(Console::INFO, "Deferring interruption/termination handle, as job description did not arrive yet");
+        MyMpi::deferHandle(handle); // do not consume this message while job state is "COMMITTED"
+    }
+
+    if (job.isInState({ACTIVE, INITIALIZING_TO_ACTIVE, STANDBY})) {
+
+        // Propagate message down the job tree
+        if (job.hasLeftChild()) {
+            MyMpi::isend(MPI_COMM_WORLD, job.getLeftChildNodeRank(), terminate ? MSG_TERMINATE : MSG_INTERRUPT, handle->recvData);
+            //stats.increment("sentMessages");
+        }
+        if (job.hasRightChild()) {
+            MyMpi::isend(MPI_COMM_WORLD, job.getRightChildNodeRank(), terminate ? MSG_TERMINATE : MSG_INTERRUPT, handle->recvData);
+            //stats.increment("sentMessages");
+        }
+
+        // Stop / terminate
+        Console::log(Console::INFO, "Interrupting %s", job.toStr());
+        job.stop(); // Solvers are interrupted, not suspended!
+        Console::log(Console::INFO, "%s : interrupted", job.toStr());
+        if (terminate) {
+            setLoad(0, job.getId());
+            job.terminate();
+            Console::log(Console::INFO, "%s : terminated", job.toStr());
+        } 
+    }
 }
 
 void Worker::informClient(int jobId, int clientRank) {

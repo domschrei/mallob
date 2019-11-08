@@ -51,10 +51,15 @@ enum JobState {
     /**
      * The job has been finished or terminated in some sense.
      */
-    PAST
+    PAST,
+    /*
+     * The job has been finished and is waiting for a directive from its parent
+     * and/or the external client.
+     */
+    STANDBY
 };
 static const char * jobStateStrings[] = { "none", "stored", "committed", "initializingToActive", 
-    "initializingToSuspended", "initializingToPast", "initializingToCommitted", "active", "suspended", "past" };
+    "initializingToSuspended", "initializingToPast", "initializingToCommitted", "active", "suspended", "past", "standby" };
 
 class Job {
 
@@ -92,20 +97,24 @@ public:
     Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
     void store(std::shared_ptr<std::vector<uint8_t>>& data);
     void setDescription(std::shared_ptr<std::vector<uint8_t>>& data);
+    void addAmendment(std::shared_ptr<std::vector<uint8_t>>& data);
     void commit(const JobRequest& req);
     void uncommit(const JobRequest& req);
     void initialize(int index, int rootRank, int parentRank);
     void reinitialize(int index, int rootRank, int parentRank);
     void suspend();
     void resume();
-    void withdraw();
+    void stop();
+    void terminate();
 
     // Control methods (must be implemented)
-    virtual void beginSolving() = 0;
+    virtual void updateRole() = 0;
+    virtual void updateDescription(int fromRevision) = 0;
     virtual int solveLoop() = 0;
     virtual void pause() = 0;
     virtual void unpause() = 0;
-    virtual void terminate() = 0;
+    virtual void interrupt() = 0;
+    virtual void withdraw() = 0;
     virtual void dumpStats() = 0;
     // Intra-job communication methods (must be implemented)
     virtual void beginCommunication() = 0;
@@ -116,7 +125,7 @@ public:
     void endInitialization();
     
     // Querying and communication methods (may be re-implemented partially)
-    virtual int getDemand() const;
+    virtual int getDemand(int prevVolume) const;
     virtual bool wantsToCommunicate() const;
     void communicate();
 
@@ -130,6 +139,7 @@ public:
     bool isInitialized() const {return _initialized;};
     bool isInitializing() const {return isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_PAST, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_COMMITTED});};
     bool hasJobDescription() const {return _has_description;};
+    int getRevision() const {return _description.getRevision();};
 
     bool isRoot() const {return _index == 0;};
     int getRootNodeRank() const {return _job_node_ranks[0];};

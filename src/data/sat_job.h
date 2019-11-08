@@ -38,10 +38,12 @@ public:
         Job(params, commSize, worldRank, jobId, epochCounter), _num_clause_sources(0) {}
 
     void initialize() override;
-    void beginSolving() override;
+    void updateRole() override;
+    void updateDescription(int fromRevision) override;
     void pause() override;
     void unpause() override;
-    void terminate() override;
+    void interrupt() override;
+    void withdraw() override;
     int solveLoop() override;
 
     void beginCommunication() override;

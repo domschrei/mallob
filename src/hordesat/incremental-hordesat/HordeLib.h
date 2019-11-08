@@ -14,6 +14,8 @@
 #include "solvers/MiniSat.h"
 #include "solvers/Lingeling.h"
 #include "sharing/AllToAllSharingManager.h"
+#include "solvers/solver_thread.h"
+#include "solvers/solving_state.h"
 
 #include <pthread.h>
 #include <vector>
@@ -23,23 +25,28 @@
 
 using namespace std;
 
+struct thread_args {
+	int solverId;
+	HordeLib* hlib;
+	bool readFormulaFromHlib;
+};
+
 class HordeLib {
 private:
 	int mpi_size;
 	int mpi_rank;
 	Thread** solverThreads;
-	bool(*endingFunction)(int,bool);
 	size_t sleepInt;
 	int solversCount;
-	bool solvingDoneLocal;
 	SharingManagerInterface* sharingManager;
 	vector<PortfolioSolverInterface*> solvers;
 	vector<int> solversInitialized;
-    bool running;
+	SolvingStates::SolvingState solvingState;
 
-	const std::vector<int>* formula;
+	std::vector<std::shared_ptr<std::vector<int>>> formulae;
+	std::shared_ptr<vector<int>> assumptions;
+
 	SatResult finalResult;
-	vector<int> assumptions;
 	vector<int> truthValues;
 	set<int> failedAssumptions;
 
@@ -50,28 +57,15 @@ private:
 
 	std::shared_ptr<LoggingInterface> logger;
 
-	Mutex interruptLock;
-    ConditionVariable interruptCond;
-    bool solversInterrupted = false;
 	Mutex solutionLock;
+	Mutex solvingStateLock;
+	ConditionVariable stateChangeCond;
 	
 	// settings
 	ParameterProcessor params;
 
-	//void stopAllSolvers();
-
-	// diversifications
-	void sparseDiversification(int mpi_size, int mpi_rank);
-	void randomDiversification(unsigned int seed);
-	void sparseRandomDiversification(unsigned int seed, int mpi_size);
-	void nativeDiversification(int mpi_rank, int mpi_size);
-	void binValueDiversification(int mpi_size, int mpi_rank);
-
-    void init();
-
 public:
-
-	friend void* solverRunningThread(void*);
+	friend class SolverThread;
 
 	// methods
 	HordeLib(int argc, char** argv);
@@ -79,35 +73,24 @@ public:
 	virtual ~HordeLib();
 
 	void setLogger(std::shared_ptr<LoggingInterface> loggingInterface);
+	ParameterProcessor& getParams() {return params;}
 
-	// dismspec solving
-	bool readDimspecFile(const char* filename);
-	int solveDimspec();
-
-	// sat/qbf solving
-	bool readFormula(const char* filename);
-    bool setFormula(const std::vector<int>& formula);
-	bool addToFormula(const std::vector<int>& formula, int start, int numLits);
-	void addLit(int lit);
-	void assume(int lit);
-
-    void beginSolving();
-    void beginSolving(const std::vector<int>& formula);
-    void beginSolving(bool readFormulaFromHlib);
+	void diversify(int rank, int size);
+    void beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
+							const std::shared_ptr<std::vector<int>>& assumptions);
+	void continueSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
+							const std::shared_ptr<std::vector<int>>& assumptions);
 	bool isFullyInitialized();
     int solveLoop();
 
     std::vector<int> prepareSharing();
     void digestSharing(const std::vector<int>& result);
-	std::vector<int> clauseBufferToPlainClauses(const std::vector<int>& buffer);
 
     int finishSolving();
     void interrupt();
-    inline bool isRunning() {return running;};
+	void setSolvingState(SolvingStates::SolvingState state);
     void setPaused();
     void unsetPaused();
-    void waitUntilResumed();
-    void setTerminate();
 
 	void dumpStats();
 
@@ -120,10 +103,18 @@ public:
 		return failedAssumptions;
 	}
 	
-	ParameterProcessor& getParams() {
-		return params;
-	}
 
+private:
+    void init();
+
+	// diversifications
+	void sparseDiversification(int mpi_size, int mpi_rank);
+	void randomDiversification(unsigned int seed);
+	void sparseRandomDiversification(unsigned int seed, int mpi_size);
+	void nativeDiversification(int mpi_rank, int mpi_size);
+	void binValueDiversification(int mpi_size, int mpi_rank);
+	
+	std::vector<int> clauseBufferToPlainClauses(const std::vector<int>& buffer);
 };
 
 #endif /* HORDELIB_H_ */

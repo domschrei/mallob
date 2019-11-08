@@ -73,7 +73,7 @@ const int MSG_UPDATE_VOLUME = 8;
  * Data type: JobDescription
  * Warning: Length may exceed the default maximum message length.
  */
-const int MSG_SEND_JOB = 11;
+const int MSG_SEND_JOB_DESCRIPTION = 11;
 /*
  * The sender informs the receiver that a solution was found for the job
  * of the specified ID.
@@ -116,6 +116,14 @@ const int MSG_SEND_JOB_RESULT = 21;
  */
 const int MSG_WORKER_DEFECTING = 22;
 
+const int MSG_NOTIFY_JOB_REVISION = 24;
+const int MSG_QUERY_JOB_REVISION_DETAILS = 25;
+const int MSG_SEND_JOB_REVISION_DETAILS = 26;
+const int MSG_ACK_JOB_REVISION_DETAILS = 27;
+const int MSG_SEND_JOB_REVISION_DATA = 28;
+const int MSG_INCREMENTAL_JOB_FINISHED = 29;
+const int MSG_INTERRUPT = 30;
+
 const int MSG_COLLECTIVES = 300;
 const int MSG_JOB_COMMUNICATION = 400;
 
@@ -126,12 +134,14 @@ const int MSG_JOB_COMMUNICATION = 400;
 const int ANYTIME_WORKER_RECV_TAGS[] = {MSG_FIND_NODE, MSG_REQUEST_BECOME_CHILD, MSG_REJECT_BECOME_CHILD, 
             MSG_ACCEPT_BECOME_CHILD, MSG_ACK_ACCEPT_BECOME_CHILD, MSG_UPDATE_VOLUME, MSG_WORKER_FOUND_RESULT, 
             MSG_WORKER_DEFECTING, MSG_FORWARD_CLIENT_RANK, MSG_TERMINATE, MSG_QUERY_JOB_RESULT, 
+            MSG_NOTIFY_JOB_REVISION, MSG_QUERY_JOB_REVISION_DETAILS, MSG_SEND_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS,
             MSG_COLLECTIVES, MSG_JOB_COMMUNICATION};
 /**
  * All types of messages which can be receivable by a client node at any time 
  * by a generic irecv method and within the maximum message length.
  */
-const int ANYTIME_CLIENT_RECV_TAGS[] = {MSG_JOB_DONE, MSG_REQUEST_BECOME_CHILD, MSG_ACK_ACCEPT_BECOME_CHILD};
+const int ANYTIME_CLIENT_RECV_TAGS[] = {MSG_JOB_DONE, MSG_REQUEST_BECOME_CHILD, MSG_ACK_ACCEPT_BECOME_CHILD, 
+            MSG_QUERY_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS};
 
 /**
  * Which types of messages the MPI node should listen to. 

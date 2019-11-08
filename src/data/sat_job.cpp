@@ -32,12 +32,18 @@ void SatJob::initialize() {
     assert(_solver != NULL);
 
     Console::log(Console::VERB, "%s : beginning to solve", toStr());
-    _solver->beginSolving(_description.getPayload());
+    _solver->beginSolving(_description.getPayloads(), _description.getAssumptions(_description.getRevision()));
     Console::log(Console::VERB, "%s : finished concurrent HordeLib instance initialization", toStr());
 }
 
-void SatJob::beginSolving() {
-    _solver->beginSolving();
+void SatJob::updateRole() {
+    _solver->diversify(_index, _comm_size);
+}
+
+void SatJob::updateDescription(int fromRevision) {
+    std::vector<VecPtr> formulaAmendments = _description.getPayloads(fromRevision, _description.getRevision());
+    _done_locally = false;
+    _solver->continueSolving(formulaAmendments, _description.getAssumptions(_description.getRevision()));
 }
 
 void SatJob::pause() {
@@ -48,15 +54,19 @@ void SatJob::unpause() {
     _solver->unsetPaused();
 }
 
-void SatJob::terminate() {
-    _solver->setTerminate(); // sets the "solvingDoneLocal" flag in the solver
-    _solver->unsetPaused(); // if solver threads are suspended, wake them up to recognize termination
-    _solver->finishSolving(); // joins threads and concludes solving process
+void SatJob::interrupt() {
+    _solver->interrupt(); // interrupt SAT solving (but keeps solver threads!)
+    _solver->finishSolving(); // concludes solving process
+}
+
+void SatJob::withdraw() {
+    //_solver = NULL; // TODO 
 }
 
 void SatJob::extractResult() {
     _result.id = getId();
     _result.result = _result_code;
+    _result.revision = _description.getRevision();
     _result.solution.clear();
     if (_result_code == SAT) {
         _result.solution = _solver->getTruthValues();
@@ -238,7 +248,7 @@ int SatJob::solveLoop() {
 
     } else if (isInitializing()) {
         // Still initializing?
-        if (_solver == NULL || !_solver->isRunning() || !_solver->isFullyInitialized())
+        if (_solver == NULL || !_solver->isFullyInitialized())
             // Yes, some stuff still is not initialized
             return result;
         // Else: end initialization

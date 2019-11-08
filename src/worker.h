@@ -71,15 +71,23 @@ private:
     void handleUpdateVolume(MessageHandlePtr& handle);
     void handleJobCommunication(MessageHandlePtr& handle);
     void handleTerminate(MessageHandlePtr& handle);
+    void handleInterrupt(MessageHandlePtr& handle);
     void handleWorkerFoundResult(MessageHandlePtr& handle);
     void handleQueryJobResult(MessageHandlePtr& handle);
     void handleForwardClientRank(MessageHandlePtr& handle);
     void handleWorkerDefecting(MessageHandlePtr& handle);
+    void handleNotifyJobRevision(MessageHandlePtr& handle);
+    void handleQueryJobRevisionDetails(MessageHandlePtr& handle);
+    void handleSendJobRevisionDetails(MessageHandlePtr& handle);
+    void handleAckJobRevisionDetails(MessageHandlePtr& handle);
+    void handleSendJobRevisionData(MessageHandlePtr& handle);
+    void handleIncrementalJobFinished(MessageHandlePtr& handle);
 
     void bounceJobRequest(JobRequest& request);
     void informClient(int jobId, int clientRank);
     void updateVolume(int jobId, int demand);
     void initJob(MessageHandlePtr handle);
+    void interruptJob(MessageHandlePtr& handle, int jobId, bool terminate);
     
     void rebalance();
     void finishBalancing();

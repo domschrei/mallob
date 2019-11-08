@@ -29,6 +29,7 @@ private:
     std::map<int, std::string> jobInstances;
     std::map<int, JobDescription*> introducedJobs; 
     std::map<int, bool> jobReady;
+    std::map<int, int> rootNodes;
     std::mutex jobReadyLock;
 
     std::set<int> clientRanks;
@@ -45,10 +46,12 @@ public:
     void mainProgram();
 
 private:
-    void handleRequestBecomeChild(MessageHandlePtr handle);
-    void handleJobDone(MessageHandlePtr handle);
-    void handleSendJobResult(MessageHandlePtr handle);
-    void handleAckAcceptBecomeChild(MessageHandlePtr handle);
+    void handleRequestBecomeChild(MessageHandlePtr& handle);
+    void handleJobDone(MessageHandlePtr& handle);
+    void handleSendJobResult(MessageHandlePtr& handle);
+    void handleAckAcceptBecomeChild(MessageHandlePtr& handle);
+    void handleQueryJobRevisionDetails(MessageHandlePtr& handle);
+    void handleAckJobRevisionDetails(MessageHandlePtr& handle);
 
     void readInstanceList(std::string& filename);
     void readFormula(std::string& filename, JobDescription& job);

@@ -21,11 +21,31 @@ void readAllInstances(Client* client) {
 
         JobDescription &job = c.jobs[i];
         int jobId = job.getId();
+        if (job.isIncremental()) {
+            Console::log(Console::VVERB, "Incremental job #%i", jobId);
+        }
 
         Console::log(Console::VERB, "Reading \"%s\" (#%i) ...", c.jobInstances[jobId].c_str(), jobId);
-        c.readFormula(c.jobInstances[jobId], job);
-        if (job.getPayload().size() > 1)
-            Console::log(Console::VERB, "Read \"%s\" (#%i).", c.jobInstances[jobId].c_str(), jobId);
+
+        if (job.isIncremental()) {
+            int revision = 0;
+            while (true) {
+                std::fstream file;
+                std::string filename = c.jobInstances[jobId] + "." + std::to_string(revision);
+                file.open(filename, std::ios::in);
+                if (file.is_open()) {
+                    c.readFormula(filename, job);
+                    job.setRevision(revision);
+                } else {
+                    break;
+                }
+                revision++;
+            }
+        } else {
+            c.readFormula(c.jobInstances[jobId], job);
+        }
+
+        Console::log(Console::VERB, "Read \"%s\" (#%i).", c.jobInstances[jobId].c_str(), jobId);
 
         std::unique_lock<std::mutex> lock(c.jobReadyLock);
         c.jobReady[jobId] = true;
@@ -74,7 +94,7 @@ void Client::mainProgram() {
                     break;
             }
 
-            if (job.getPayload().size() <= 1) {
+            if (job.getPayload(0)->size() <= 1) {
                 // Some I/O error kept the instance from being read
                 Console::log(Console::WARN, "Skipping job #%i due to previous I/O error", jobId);
                 continue;
@@ -108,6 +128,10 @@ void Client::mainProgram() {
                 handleRequestBecomeChild(handle);
             } else if (handle->tag == MSG_ACK_ACCEPT_BECOME_CHILD) {
                 handleAckAcceptBecomeChild(handle);
+            } else if (handle->tag == MSG_QUERY_JOB_REVISION_DETAILS) {
+                handleQueryJobRevisionDetails(handle);
+            } else if (handle->tag == MSG_ACK_JOB_REVISION_DETAILS) {
+                handleAckJobRevisionDetails(handle);
             } else {
                 Console::log_recv(Console::WARN, handle->source, "Unknown message tag %i", handle->tag);
             }
@@ -121,24 +145,25 @@ void Client::mainProgram() {
     }
 }
 
-void Client::handleRequestBecomeChild(MessageHandlePtr handle) {
+void Client::handleRequestBecomeChild(MessageHandlePtr& handle) {
     JobRequest req; req.deserialize(*handle->recvData);
     const JobDescription& desc = *introducedJobs[req.jobId];
 
     // Send job signature
-    JobSignature sig(req.jobId, /*rootRank=*/handle->source, desc.getTransferSize());
+    JobSignature sig(req.jobId, /*rootRank=*/handle->source, req.revision, desc.getTransferSize(false));
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACCEPT_BECOME_CHILD, sig);
     //stats.increment("sentMessages");
 }
 
-void Client::handleAckAcceptBecomeChild(MessageHandlePtr handle) {
+void Client::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
     JobRequest req; req.deserialize(*handle->recvData);
     const JobDescription& desc = *introducedJobs[req.jobId];
-    Console::log_send(Console::VERB, handle->source, "Sending job description of #%i of size %i", desc.getId(), desc.getTransferSize());
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB, desc);
+    Console::log_send(Console::VERB, handle->source, "Sending job description of #%i of size %i", desc.getId(), desc.getTransferSize(false));
+    rootNodes[req.jobId] = handle->source;
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, desc.serializeFirstRevision());
 }
 
-void Client::handleJobDone(MessageHandlePtr handle) {
+void Client::handleJobDone(MessageHandlePtr& handle) {
     IntPair recv(*handle->recvData);
     int jobId = recv.first;
     int resultSize = recv.second;
@@ -147,23 +172,65 @@ void Client::handleJobDone(MessageHandlePtr handle) {
     MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_RESULT, resultSize);
 }
 
-void Client::handleSendJobResult(MessageHandlePtr handle) {
+void Client::handleSendJobResult(MessageHandlePtr& handle) {
 
     JobResult jobResult; jobResult.deserialize(*handle->recvData);
     int jobId = jobResult.id;
     int resultCode = jobResult.result;
+    int revision = jobResult.revision;
 
-    Console::log_recv(Console::INFO, handle->source, "Received result of job #%i, code: %i", jobId, resultCode);
+    Console::log_recv(Console::INFO, handle->source, "Received result of job #%i rev. %i, code: %i", jobId, revision, resultCode);
+    JobDescription& desc = *introducedJobs[jobId];
 
     // Output response time and solution
-    Console::log(Console::INFO, "RESPONSE_TIME #%i %.6f", jobId, Timer::elapsedSeconds() - introducedJobs[jobId]->getArrival());
+    Console::log(Console::INFO, "RESPONSE_TIME #%i %.6f rev. %i", jobId, Timer::elapsedSeconds() - desc.getArrival(), revision);
     Console::getLock();
-    Console::appendUnsafe(Console::VERB, "SOLUTION #%i ", jobId);
+    Console::appendUnsafe(Console::VERB, "SOLUTION #%i rev. %i ", jobId, revision);
+    bool head = false;
     for (auto it : jobResult.solution) {
+        if (!head) {
+            Console::appendUnsafe(Console::VERB, "%s ", it == 0 ? "SAT" : "UNSAT");
+            head = true;
+            if (it == 0) continue;
+        }
         Console::appendUnsafe(Console::VERB, "%i ", it);
     }
     Console::logUnsafe(Console::VERB, "");
     Console::releaseLock();
+
+    if (introducedJobs[jobId]->isIncremental() && desc.getRevision() > revision) {
+        // Introduce next revision
+        revision++;
+        IntVec payload({jobId, revision});
+        Console::log_send(Console::INFO, rootNodes[jobId], "Introducing #%i rev. %i", jobId, revision);
+        MyMpi::isend(MPI_COMM_WORLD, rootNodes[jobId], MSG_NOTIFY_JOB_REVISION, payload);
+    } else {
+        IntVec payload({jobId});
+        MyMpi::isend(MPI_COMM_WORLD, rootNodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
+    }
+}
+
+void Client::handleQueryJobRevisionDetails(MessageHandlePtr& handle) {
+
+    IntVec request(*handle->recvData);
+    int jobId = request[0];
+    int firstRevision = request[1];
+    int lastRevision = request[2];
+
+    JobDescription& desc = *introducedJobs[jobId];
+    IntVec response({jobId, firstRevision, lastRevision, desc.getTransferSize(firstRevision, lastRevision)});
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DETAILS, response);
+}
+
+void Client::handleAckJobRevisionDetails(MessageHandlePtr& handle) {
+
+    IntVec response(*handle->recvData);
+    int jobId = response[0];
+    int firstRevision = response[1];
+    int lastRevision = response[2];
+    int transferSize = response[3];
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DATA, 
+                introducedJobs[jobId]->serialize(firstRevision, lastRevision));
 }
 
 void Client::readInstanceList(std::string& filename) {
@@ -181,13 +248,14 @@ void Client::readInstanceList(std::string& filename) {
         if (line.substr(0, 1) == std::string("#")) {
             continue;
         }
-        int id; float arrival; float priority; std::string instanceFilename;
+        int id; float arrival; float priority; std::string instanceFilename; bool incremental;
         int pos = 0, next = 0;
         next = line.find(" "); id = std::stoi(line.substr(pos, next-pos)); line = line.substr(next+1);
         next = line.find(" "); arrival = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1);
         next = line.find(" "); priority = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1);
         next = line.find(" "); instanceFilename = line.substr(pos, next-pos); line = line.substr(next+1);
-        JobDescription job(id, priority);
+        incremental = (line == "i");
+        JobDescription job(id, priority, incremental);
         job.setArrival(arrival);
         jobs.push_back(job);
         jobInstances[id] = instanceFilename;
@@ -204,7 +272,9 @@ void Client::readFormula(std::string& filename, JobDescription& job) {
     file.open(filename, std::ios::in);
     if (file.is_open()) {
 
-        std::vector<int> formula;
+        VecPtr formula = std::make_shared<std::vector<int>>();
+        VecPtr assumptions = std::make_shared<std::vector<int>>();
+
         std::string line;
         while(std::getline(file, line)) {
             int pos = 0;
@@ -216,19 +286,29 @@ void Client::readFormula(std::string& filename, JobDescription& job) {
             }
             while (true) {
                 next = line.find(" ", pos);
-                int lit;
-                if (next < 0)
-                    lit = 0;
-                else
-                    lit = std::stoi(line.substr(pos, pos+next));
-                formula.push_back(lit);
-                if (next < 0)
+                if (next < 0) {
+                    // clause ended
+                    formula->push_back(0);
                     break;
-                pos = next+1;
+                } else {
+                    int lit; int asmpt = 0;
+                    assert(line[next] == ' ');
+                    if (line[next-1] == '!') {
+                        asmpt = std::stoi(line.substr(pos, next-pos-1));
+                        assumptions->push_back(asmpt);
+                        break;
+                    } else {
+                        lit = std::stoi(line.substr(pos, next-pos));
+                        if (lit != 0) formula->push_back(lit);
+                        pos = next+1;
+                    }
+                }
             }
         }
-        job.setPayload(formula);
-        Console::log(Console::VERB, "%i literals including separation zeros", formula.size());
+        job.addPayload(formula);
+        job.addAssumptions(assumptions);
+
+        Console::log(Console::VERB, "%i literals including separation zeros, %i assumptions", formula->size(), assumptions->size());
 
     } else {
         Console::log(Console::CRIT, "ERROR: File %s could not be opened. Skipping job #%i", filename.c_str(), job.getId());

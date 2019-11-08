@@ -36,7 +36,7 @@ void MyMpi::init(int argc, char *argv[])
 
     // Messages inducing bulky amounts of work
     tagPriority[MSG_ACK_ACCEPT_BECOME_CHILD] = 2; // sending a job desc.
-    tagPriority[MSG_SEND_JOB] = 2; // receiving a job desc.
+    tagPriority[MSG_SEND_JOB_DESCRIPTION] = 2; // receiving a job desc.
     tagPriority[MSG_QUERY_JOB_RESULT] = 2; // sending a job result
     tagPriority[MSG_SEND_JOB_RESULT] = 2; // receiving a job result
 

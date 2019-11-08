@@ -11,7 +11,7 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             _params(params), 
             _comm_size(commSize), 
             _world_rank(worldRank), 
-            _id(jobId), 
+            _id(jobId),
             _epoch_counter(epochCounter), 
             _epoch_of_arrival(epochCounter.getEpoch()), 
             _elapsed_seconds_since_arrival(Timer::elapsedSeconds()), 
@@ -33,6 +33,7 @@ void Job::store(std::shared_ptr<std::vector<uint8_t>>& data) {
 }
 
 void Job::setDescription(std::shared_ptr<std::vector<uint8_t>>& data) {
+
     // Explicitly store serialized data s.t. it can be forwarded later
     // without the need to re-serialize the job description
     assert(data != NULL && data->size() > 0);
@@ -40,6 +41,13 @@ void Job::setDescription(std::shared_ptr<std::vector<uint8_t>>& data) {
     _description = JobDescription();
     _description.deserialize(*_serialized_description);
     _has_description = true;
+}
+
+void Job::addAmendment(std::shared_ptr<std::vector<uint8_t>>& data) {
+    int oldRevision = _description.getRevision();
+    _description.merge(*data);
+    updateDescription(oldRevision+1);
+    switchState(ACTIVE);
 }
 
 void Job::initialize() {
@@ -56,7 +64,6 @@ void Job::endInitialization() {
     switchState(ACTIVE);
     if (oldState == INITIALIZING_TO_PAST) {
         terminate();
-        switchState(PAST);
     } else if (oldState == INITIALIZING_TO_SUSPENDED) {
         suspend();
     } else if (oldState == INITIALIZING_TO_COMMITTED) {
@@ -99,8 +106,10 @@ void Job::reinitialize(int index, int rootRank, int parentRank) {
 
             if (_initialized) {
                 Console::log(Console::INFO, "Restarting solvers of %s", toStr());
+                suspend();
+                updateRole();
+                resume();
                 switchState(ACTIVE);
-                beginSolving();
             } else {
                 switchState(INITIALIZING_TO_ACTIVE);
             }
@@ -177,25 +186,38 @@ void Job::resume() {
     }
 }
 
-void Job::withdraw() {
-
+void Job::stop() {
     if (isInitializing()) {
         switchState(INITIALIZING_TO_PAST);
         return;
     } else {
         assert(isInState({ACTIVE, SUSPENDED}));
     }
+    interrupt();
+    switchState(STANDBY);
+}
 
-    terminate();
+void Job::terminate() {
 
-    _has_left_child = false;
-    _has_right_child = false;
-    _done_locally = false;
+    if (isInitializing()) {
+        switchState(INITIALIZING_TO_PAST);
+        return;
+    } else {
+        assert(isInState({ACTIVE, SUSPENDED, STANDBY}));
+    }
+
+    interrupt();
+    withdraw();
+
     switchState(PAST);
 }
 
-int Job::getDemand() const {
-    return std::min(_comm_size, (int)std::pow(2, _epoch_counter.getEpoch() - _epoch_of_arrival + 1) - 1);
+int Job::getDemand(int prevVolume) const {
+    if (isInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
+        return std::min(_comm_size, (int)std::pow(2, _epoch_counter.getEpoch() - _epoch_of_arrival + 1) - 1);
+    } else {
+        return prevVolume;
+    }
 }
 
 const JobResult& Job::getResult() const {

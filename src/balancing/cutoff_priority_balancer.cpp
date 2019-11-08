@@ -139,7 +139,7 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
         // Node must be root node to participate
         bool participates = it.second->isRoot();
         // Job must be active, or must be initializing and already having the description
-        participates &= it.second->isInState({JobState::ACTIVE}) 
+        participates &= it.second->isInState({JobState::ACTIVE, JobState::STANDBY})
                         || (it.second->isInState({JobState::INITIALIZING_TO_ACTIVE}) 
                             && it.second->hasJobDescription());
         if (participates) {

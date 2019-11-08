@@ -39,7 +39,5 @@ void Balancer::iReduce(float contribution, int rootRank) {
 }
 
 int Balancer::getDemand(const Job& job) {
-    // Twice as much (+1) than previous volume, 
-    // at most the amount of workers
-    return job.getDemand();
+    return job.getDemand(getVolume(job.getId()));
 }
