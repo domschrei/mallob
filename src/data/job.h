@@ -77,6 +77,8 @@ protected:
     int _epoch_of_arrival;
     float _elapsed_seconds_since_arrival;
     int _epoch_of_last_communication = -1; 
+    float _last_job_comm = 0;
+    float _time_of_initialization = 0;
 
     JobState _state;
     bool _has_description;

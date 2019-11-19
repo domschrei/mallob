@@ -160,7 +160,7 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
     Console::log(Console::VERB, "Local aggregated demand: %.3f", aggregatedDemand);
     iAllReduce(aggregatedDemand);
 
-    return false; // not finished yet
+    return false; // not finished yet: wait for end of iallreduce
 }
 
 bool CutoffPriorityBalancer::canContinueBalancing() {
@@ -172,7 +172,17 @@ bool CutoffPriorityBalancer::canContinueBalancing() {
         return flag;
     }
     if (_stage == REDUCE_RESOURCES || _stage == BROADCAST_RESOURCES) {
-        return false; // balancing is terminated by an individual message
+        return false; // balancing is advanced by an individual message
+    }
+    if (_stage == REDUCE_REMAINDERS || _stage == BROADCAST_REMAINDERS) {
+        return false; // balancing is advanced by an individual message
+    }
+    if (_stage == GLOBAL_ROUNDING) {
+        // Check if reduction is done
+        int flag = 0;
+        MPI_Status status;
+        MPI_Test(&_reduce_request, &flag, &status);
+        return flag;
     }
     return false;
 }
@@ -183,8 +193,6 @@ bool CutoffPriorityBalancer::continueBalancing() {
         // Finish up initial reduction
         float aggregatedDemand = _reduce_result;
         Console::log(Console::VVERB, "Aggregation of demands: %.3f", aggregatedDemand);
-
-        _stage = REDUCE_RESOURCES;
 
         // Calculate local initial assignments
         _total_volume = (int) (MyMpi::size(_comm) * _load_factor);
@@ -202,41 +210,70 @@ bool CutoffPriorityBalancer::continueBalancing() {
             _resources_info.priorities.push_back(_priorities[jobId]);
             _resources_info.demandedResources.push_back( _demands[jobId] - _assignments[jobId] );
         }
-        // AllReduce
-        bool done = _resources_info.startReduction(_comm);
-        if (done) {
-            _stage = BROADCAST_RESOURCES;
-            done = _resources_info.startBroadcast(_comm, _resources_info.getExcludedRanks());
-            if (done) {
-                return true;
-            }
-        }
-        return false;
+
+        // Continue
+        return continueBalancing(NULL);
+    }
+
+    if (_stage == GLOBAL_ROUNDING) {
+        return continueRoundingFromReduction();
     }
     return false;
 }
 
-bool CutoffPriorityBalancer::handleMessage(MessageHandlePtr handle) {
+bool CutoffPriorityBalancer::continueBalancing(MessageHandlePtr handle) {
     bool done;
+    BalancingStage stage = _stage;
+    if (_stage == INITIAL_DEMAND) {
+        _stage = REDUCE_RESOURCES;
+    }
     if (_stage == REDUCE_RESOURCES) {
-        done = _resources_info.advanceReduction(handle);
-        if (done) {
-            _stage = BROADCAST_RESOURCES;
+        if (handle == NULL || stage != REDUCE_RESOURCES) {
+            done = _resources_info.startReduction(_comm);
+        } else {
+            done = _resources_info.advanceReduction(handle);
+        }
+        if (done) _stage = BROADCAST_RESOURCES;
+    }
+    if (_stage == BROADCAST_RESOURCES) {
+        if (handle == NULL || stage != BROADCAST_RESOURCES) {
             done = _resources_info.startBroadcast(_comm, _resources_info.getExcludedRanks());
-            if (done) {
-                return true;
+        } else {
+            done = _resources_info.advanceBroadcast(handle);
+        }
+        if (done) {
+            if (ITERATIVE_ROUNDING)
+                _stage = REDUCE_REMAINDERS;
+            else {
+                return finishResourcesReduction();
             }
         }
-    } else if (_stage == BROADCAST_RESOURCES) {
-        done = _resources_info.advanceBroadcast(handle);
+    }
+    if (_stage == REDUCE_REMAINDERS) {
+        if (handle == NULL || stage != REDUCE_REMAINDERS) {
+            finishResourcesReduction();
+            done = _remainders.startReduction(_comm);
+        } else {
+            done = _remainders.advanceReduction(handle);
+        }
+        if (done) _stage = BROADCAST_REMAINDERS;
+    }
+    if (_stage == BROADCAST_REMAINDERS) {
+        if (handle == NULL || stage != BROADCAST_REMAINDERS) {
+            std::set<int> excluded;
+            done = _remainders.startBroadcast(_comm, excluded);
+        } else {
+            done = _remainders.advanceBroadcast(handle);
+        }
         if (done) {
-            return true;
+            finishRemaindersReduction();
+            _stage = GLOBAL_ROUNDING;
         }
     }
     return false;
 }
 
-std::map<int, int> CutoffPriorityBalancer::getBalancingResult() {
+bool CutoffPriorityBalancer::finishResourcesReduction() {
 
     _stats.increment("reductions"); _stats.increment("broadcasts");
 
@@ -246,7 +283,8 @@ std::map<int, int> CutoffPriorityBalancer::getBalancingResult() {
         _balancing = false;
         delete _local_jobs;
         _local_jobs = NULL;
-        return std::map<int, int>();
+        _assignments = std::map<int, float>();
+        return true;
     } else {
         Console::log(Console::VERB, "Ended all-reduction phase. Calculating final job demands ...");
     }
@@ -288,6 +326,76 @@ std::map<int, int> CutoffPriorityBalancer::getBalancingResult() {
             }
         }
     }
+
+    if (ITERATIVE_ROUNDING)  {
+        // Build object of remainders to be all-reduced
+        _remainders = SortedDoubleSequence();
+        for (auto it : _jobs_being_balanced) {
+            int jobId = it.first;
+            _remainders.add(_assignments[jobId]);
+        }
+
+        return continueBalancing(NULL);
+
+    } else return true;    
+}
+
+bool CutoffPriorityBalancer::finishRemaindersReduction() {
+    std::cout << "GLOBAL: ";
+    for (int i = 0; i < _remainders.size(); i++) std::cout << _remainders[i] << " ";
+    std::cout << std::endl;
+    continueRoundingUntilReduction(0, _remainders.size()-1);
+}
+
+bool CutoffPriorityBalancer::continueRoundingUntilReduction(int lower, int upper) {
+
+    _lower_remainder_idx = lower;
+    _upper_remainder_idx = upper;
+
+    int idx = (_lower_remainder_idx+_upper_remainder_idx)/2;
+    double remainder = _remainders[idx];
+    
+    _rounded_assignments.clear();
+    int localSum = 0;
+    for (auto it : _jobs_being_balanced) {
+        int jobId = it.first;
+        double r = _assignments[jobId] - (int)_assignments[jobId];
+        if (r < remainder) _rounded_assignments[jobId] = std::floor(_assignments[jobId]);
+        if (r >= remainder) _rounded_assignments[jobId] = std::ceil(_assignments[jobId]);
+        localSum += _rounded_assignments[jobId];
+    }
+
+    if (_lower_remainder_idx == _upper_remainder_idx) {
+        // Finished!
+        return true;
+    }
+
+    iAllReduce(localSum);
+    return false;
+}
+
+bool CutoffPriorityBalancer::continueRoundingFromReduction() {
+
+    float utilization = _reduce_result;
+    if (std::abs(utilization - _load_factor*MyMpi::size(_comm)) <= 1) {
+        // Finished!
+        return true;
+    }
+
+    int idx = (_lower_remainder_idx+_upper_remainder_idx)/2;
+    if (utilization < _load_factor*MyMpi::size(_comm)) {
+        // Too few resources utilized
+        _upper_remainder_idx = idx-1;
+    }
+    if (utilization > _load_factor*MyMpi::size(_comm)) {
+        // Too many resources utilized
+        _lower_remainder_idx = idx+1;
+    }
+    
+    return continueRoundingUntilReduction(_lower_remainder_idx, _upper_remainder_idx);
+}
+
+std::map<int, int> CutoffPriorityBalancer::getBalancingResult() {
 
     // Convert float assignments into actual integer volumes, store and return them
     std::map<int, int> volumes;

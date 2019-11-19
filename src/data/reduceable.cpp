@@ -142,6 +142,7 @@ bool Reduceable::startBroadcast(MPI_Comm& comm, std::set<int>& excludedRanks) {
     this->comm = comm;
     myRank = MyMpi::rank(comm);
     highestPower = 2 << (int)std::ceil(std::log2(MyMpi::size(comm)));
+    this->excludedRanks = excludedRanks;
 
     if (excludedRanks.count(myRank)) {
         Console::log(Console::VVERB, "Brc. : Not participating");

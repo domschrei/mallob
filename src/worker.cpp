@@ -74,7 +74,9 @@ void Worker::mainProgram() {
         if (currentJob != NULL) {
             Job &job = *currentJob;
 
+            bool initializing = job.isInitializing();
             int result = job.solveLoop();
+
             if (result >= 0) {
 
                 // Solver done!
@@ -86,6 +88,11 @@ void Worker::mainProgram() {
                 Console::log_send(Console::VERB, jobRootRank, "Sending finished info");
                 MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_WORKER_FOUND_RESULT, payload);
                 //stats.increment("sentMessages");
+
+            } else if (!job.isRoot() && initializing && !job.isInitializing()) {
+                // Non-root worker finished initialization
+                IntVec payload({job.getId()});
+                MyMpi::isend(MPI_COMM_WORLD, job.getParentNodeRank(), MSG_QUERY_VOLUME, payload);
             }
         }
 
@@ -102,6 +109,9 @@ void Worker::mainProgram() {
             if (handle->tag == MSG_FIND_NODE) {
                 handleFindNode(handle);
 
+            } else if (handle->tag == MSG_QUERY_VOLUME) {
+                handleQueryVolume(handle);
+            
             } else if (handle->tag == MSG_REQUEST_BECOME_CHILD)
                 handleRequestBecomeChild(handle);
 
@@ -155,7 +165,7 @@ void Worker::mainProgram() {
             
             else if (handle->tag == MSG_COLLECTIVES) {
                 // "Collectives" messages are currently handled only in balancer
-                bool done = balancer->handleMessage(handle);
+                bool done = balancer->continueBalancing(handle);
                 if (done) finishBalancing();
 
             } else {
@@ -166,6 +176,19 @@ void Worker::mainProgram() {
             MyMpi::resetListenerIfNecessary(WORKER, handle->tag);
         }
     }
+}
+
+void Worker::handleQueryVolume(MessageHandlePtr& handle) {
+
+    IntVec payload(*handle->recvData);
+    int jobId = payload[0];
+
+    assert(hasJob(jobId));
+    int volume = balancer->getVolume(jobId);
+    IntVec response({jobId, volume});
+
+    Console::log_send(Console::VERB, handle->source, "Responding to volume query for #%i with v=%i", jobId, volume);
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_UPDATE_VOLUME, response);
 }
 
 void Worker::handleFindNode(MessageHandlePtr& handle) {

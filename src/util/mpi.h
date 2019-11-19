@@ -35,6 +35,11 @@ struct MessageHandle {
 };
 
 /*
+ * The sender wishes to receive the current volume of job j from the receiver.
+ * Data type: 1 int (jobId)
+ */
+const int MSG_QUERY_VOLUME = 2;
+/*
  * The receiver is queried to begin working as the i-th node of job j.
  * Data type: JobRequest
  */
@@ -131,7 +136,7 @@ const int MSG_JOB_COMMUNICATION = 400;
  * All types of messages which can be receivable by a worker node at any time 
  * by a generic irecv method and within the maximum message length.
  */
-const int ANYTIME_WORKER_RECV_TAGS[] = {MSG_FIND_NODE, MSG_REQUEST_BECOME_CHILD, MSG_REJECT_BECOME_CHILD, 
+const int ANYTIME_WORKER_RECV_TAGS[] = {MSG_QUERY_VOLUME, MSG_FIND_NODE, MSG_REQUEST_BECOME_CHILD, MSG_REJECT_BECOME_CHILD, 
             MSG_ACCEPT_BECOME_CHILD, MSG_ACK_ACCEPT_BECOME_CHILD, MSG_UPDATE_VOLUME, MSG_WORKER_FOUND_RESULT, 
             MSG_WORKER_DEFECTING, MSG_FORWARD_CLIENT_RANK, MSG_TERMINATE, MSG_QUERY_JOB_RESULT, 
             MSG_NOTIFY_JOB_REVISION, MSG_QUERY_JOB_REVISION_DETAILS, MSG_SEND_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS,

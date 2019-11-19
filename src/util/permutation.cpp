@@ -6,14 +6,18 @@ AdjustablePermutation::AdjustablePermutation(int n, int seed) {
     this->n = n;
     rng = std::mt19937(seed);
 
+    // Create explicit permutations [0, sqrt(n)) -> [0, sqrt(n))
+    int feistelRounds = 3;
     root_n = std::ceil(sqrt((float) n));
+    feistels.reserve(feistelRounds);
+    for (int f = 1; f <= feistelRounds; f++) {
+        feistels.push_back(std::vector<int>());
+        std::vector<int>& feistel = feistels.back();
 
-    for (int f = 1; f <= 3; f++) {
-        std::vector<int> feistel;
+        // Generate and shuffle number sequence
         feistel.reserve(root_n);
         for (int i = 0; i < root_n; i++) feistel.push_back(i);
         std::shuffle(std::begin(feistel), std::end(feistel), rng);
-        feistels.push_back(feistel);
     }
 };
 

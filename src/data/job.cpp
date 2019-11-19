@@ -62,6 +62,8 @@ void Job::endInitialization() {
     _initialized = true;
     JobState oldState = _state;
     switchState(ACTIVE);
+    _last_job_comm = Timer::elapsedSeconds();
+    _time_of_initialization = Timer::elapsedSeconds();
     if (oldState == INITIALIZING_TO_PAST) {
         terminate();
     } else if (oldState == INITIALIZING_TO_SUSPENDED) {
@@ -214,8 +216,17 @@ void Job::terminate() {
 
 int Job::getDemand(int prevVolume) const {
     if (isInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
-        return std::min(_comm_size, (int)std::pow(2, _epoch_counter.getEpoch() - _epoch_of_arrival + 1) - 1);
+
+        float growthPeriod = _params.getFloatParam("g");
+        if (growthPeriod <= 0) {
+            // Immediate growth
+            return _comm_size;
+        }
+        int numGrowths = (int) ((Timer::elapsedSeconds()-_time_of_initialization) / growthPeriod);
+        return std::min(_comm_size, (int)std::pow(2, numGrowths + 1) - 1);
+        
     } else {
+        // "frozen"
         return prevVolume;
     }
 }
@@ -226,14 +237,20 @@ const JobResult& Job::getResult() const {
 }
 
 bool Job::wantsToCommunicate() const {
+    if (_params.getFloatParam("s") <= 0.0f) {
+        // No communication
+        return false;
+    }
+    // Active leaf node initiates communication if s seconds have passed since last one
     return isInState({ACTIVE}) && !hasLeftChild() && !hasRightChild() 
-            && _epoch_of_last_communication < _epoch_counter.getEpoch() 
-            && _epoch_counter.getSecondsSinceLastSync() >= 2.5f;
+            //&& _epoch_of_last_communication < _epoch_counter.getEpoch()
+            && (Timer::elapsedSeconds() - _last_job_comm) >= _params.getFloatParam("s");
 }
 
 void Job::communicate() {
-    beginCommunication();
+    _last_job_comm = Timer::elapsedSeconds();
     _epoch_of_last_communication = _epoch_counter.getEpoch();
+    beginCommunication();
 }
 
 bool Job::isInState(std::initializer_list<JobState> list) const {

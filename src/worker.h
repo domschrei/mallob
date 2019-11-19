@@ -62,6 +62,7 @@ private:
     void checkTerminate();
 
     void handleIntroduceJob(MessageHandlePtr& handle);
+    void handleQueryVolume(MessageHandlePtr& handle);
     void handleFindNode(MessageHandlePtr& handle);
     void handleRequestBecomeChild(MessageHandlePtr& handle);
     void handleRejectBecomeChild(MessageHandlePtr& handle);

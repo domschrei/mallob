@@ -7,17 +7,17 @@
 class EpochCounter {
 
 private:
-    int epoch;
-    float lastSync;
+    int _epoch;
+    float _last_sync;
 
 public:
-    EpochCounter() : epoch(0), lastSync(0) {};
+    EpochCounter() : _epoch(0), _last_sync(0) {}
 
-    int getEpoch() const {return epoch;}
-    int getSecondsSinceLastSync() const {return Timer::elapsedSeconds() - lastSync;};
+    int getEpoch() const {return _epoch;}
+    int getSecondsSinceLastSync() const {return Timer::elapsedSeconds() - _last_sync;}
 
-    void increment() {epoch++;}
-    void resetLastSync() {lastSync = Timer::elapsedSeconds();}; 
+    void increment() {_epoch++;}
+    void resetLastSync() {_last_sync = Timer::elapsedSeconds();}
 };
 
 #endif

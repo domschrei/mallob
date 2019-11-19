@@ -31,12 +31,14 @@ void Parameters::setDefaults() {
     setParam("c", "1"); // num clients
     //setParam("colors"); // colored terminal output
     //setParam("h"); setParam("help"); // print usage
+    setParam("g", "5.0"); // job demand growth interval
     setParam("l", "0.95"); // load factor
     setParam("log", "."); // logging directory
     setParam("p", "5.0"); // rebalance period (seconds)
+    setParam("s", "1.0"); // job communication period (seconds)
     setParam("t", "2"); // num threads per node
-    setParam("v", "2"); // verbosity 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...
     setParam("td", "0.01"); // temperature decay for thermodyn. balancing
+    setParam("v", "2"); // verbosity 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...
 }
 
 void Parameters::printUsage() {
@@ -48,10 +50,12 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "Options:");
     Console::log(Console::INFO, "-c=<num-clients>      Amount of client nodes (int c >= 1)");
     Console::log(Console::INFO, "-colors               Colored terminal output based on messages' verbosity");
+    Console::log(Console::INFO, "-g=<growth-period>    Grow job demand exponentially every t seconds (t >= 0; 0: immediate growth)");
     Console::log(Console::INFO, "-h|-help              Print usage");
     Console::log(Console::INFO, "-l=<load-factor>      Load factor to be aimed at (0 < l < 1)");
     Console::log(Console::INFO, "-log=<log-dir>        Directory to save logs in (default: .)");
-    Console::log(Console::INFO, "-p=<rebalance-period> Do global rebalancing every r seconds (r > 0)");
+    Console::log(Console::INFO, "-p=<rebalance-period> Do global rebalancing every t seconds (t > 0)");
+    Console::log(Console::INFO, "-s=<rebalance-period> Do job-internal communication every t seconds (t >= 0, 0: do not communicate)");
     Console::log(Console::INFO, "-t=<num-threads>      Amount of worker threads per node (int t >= 1)");
     Console::log(Console::INFO, "-v=<verb-num>         Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...");
 }
