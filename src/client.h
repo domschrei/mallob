@@ -31,6 +31,7 @@ private:
     std::map<int, bool> jobReady;
     std::map<int, int> rootNodes;
     std::mutex jobReadyLock;
+    int lastIntroducedJobIdx;
 
     std::set<int> clientRanks;
 
@@ -53,6 +54,7 @@ private:
     void handleQueryJobRevisionDetails(MessageHandlePtr& handle);
     void handleAckJobRevisionDetails(MessageHandlePtr& handle);
 
+    void introduceJob(JobDescription& job);
     void readInstanceList(std::string& filename);
     void readFormula(std::string& filename, JobDescription& job);
     friend void readAllInstances(Client* client);

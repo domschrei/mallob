@@ -55,6 +55,7 @@ void readAllInstances(Client* client) {
 
 void Client::init() {
 
+    lastIntroducedJobIdx = -1;
     int internalRank = MyMpi::rank(comm);
     std::string filename = params.getFilename() + "." + std::to_string(internalRank);
     readInstanceList(filename);
@@ -79,39 +80,18 @@ void Client::mainProgram() {
     size_t i = 0;
     while (true) {
 
-        // Introduce next job(s), if applicable
-        while (i < jobs.size() && jobs[i].getArrival() <= Timer::elapsedSeconds()) {
-        
-            // Introduce job
-            JobDescription& job = jobs[i++];
-            int jobId = job.getId();
-
-            // Wait until job is ready to be sent
-            while (true) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                std::unique_lock<std::mutex> lock(jobReadyLock);
-                if (jobReady[jobId])
-                    break;
+        // Introduce next job(s) as applicable
+        if (params.getIntParam("lbc") == 0) {
+            while (i < jobs.size() && jobs[i].getArrival() <= Timer::elapsedSeconds()) {
+                // Introduce job
+                JobDescription& job = jobs[i++];
+                introduceJob(job);
             }
-
-            if (job.getPayload(0)->size() <= 1) {
-                // Some I/O error kept the instance from being read
-                Console::log(Console::WARN, "Skipping job #%i due to previous I/O error", jobId);
-                continue;
+        } else {
+            while (params.getIntParam("lbc") > introducedJobs.size() && lastIntroducedJobIdx+1 < jobs.size()) {
+                // Introduce job
+                introduceJob(jobs[lastIntroducedJobIdx+1]);
             }
-
-            // Find the job's canonical initial node
-            int n = MyMpi::size(MPI_COMM_WORLD) - MyMpi::size(comm);
-            Console::log(Console::VERB, "Creating permutation of size %i ...", n);
-            AdjustablePermutation p(n, jobId);
-            int nodeRank = p.get(0);
-
-            const JobRequest req(jobId, /*rootRank=*/-1, /*requestingNodeRank=*/worldRank, 
-                /*requestedNodeIndex=*/0, /*epoch=*/-1, /*numHops=*/0);
-
-            Console::log_send(Console::INFO, nodeRank, "Introducing job #%i", jobId);
-            MyMpi::isend(MPI_COMM_WORLD, nodeRank, MSG_FIND_NODE, req);
-            introducedJobs[jobId] = &job;
         }
 
         // Poll messages, if present
@@ -143,6 +123,39 @@ void Client::mainProgram() {
         // Sleep for a bit
         usleep(1000); // 1000 = 1 millisecond
     }
+}
+
+void Client::introduceJob(JobDescription& job) {
+
+    int jobId = job.getId();
+
+    // Wait until job is ready to be sent
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::unique_lock<std::mutex> lock(jobReadyLock);
+        if (jobReady[jobId])
+            break;
+    }
+
+    if (job.getPayload(0)->size() <= 1) {
+        // Some I/O error kept the instance from being read
+        Console::log(Console::WARN, "Skipping job #%i due to previous I/O error", jobId);
+        return;
+    }
+
+    // Find the job's canonical initial node
+    int n = MyMpi::size(MPI_COMM_WORLD) - MyMpi::size(comm);
+    Console::log(Console::VERB, "Creating permutation of size %i ...", n);
+    AdjustablePermutation p(n, jobId);
+    int nodeRank = p.get(0);
+
+    const JobRequest req(jobId, /*rootRank=*/-1, /*requestingNodeRank=*/worldRank, 
+        /*requestedNodeIndex=*/0, /*epoch=*/-1, /*numHops=*/0);
+
+    Console::log_send(Console::INFO, nodeRank, "Introducing job #%i", jobId);
+    MyMpi::isend(MPI_COMM_WORLD, nodeRank, MSG_FIND_NODE, req);
+    introducedJobs[jobId] = &job;
+    lastIntroducedJobIdx++;
 }
 
 void Client::handleRequestBecomeChild(MessageHandlePtr& handle) {
@@ -205,8 +218,16 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
         Console::log_send(Console::INFO, rootNodes[jobId], "Introducing #%i rev. %i", jobId, revision);
         MyMpi::isend(MPI_COMM_WORLD, rootNodes[jobId], MSG_NOTIFY_JOB_REVISION, payload);
     } else {
+        // Job is completely done
         IntVec payload({jobId});
         MyMpi::isend(MPI_COMM_WORLD, rootNodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
+        introducedJobs.erase(jobId);
+
+        // Employ "leaky bucket"
+        while (params.getIntParam("lbc") > introducedJobs.size() && lastIntroducedJobIdx+1 < jobs.size()) {
+            // Introduce a new job
+            introduceJob(jobs[lastIntroducedJobIdx+1]);
+        }
     }
 }
 
