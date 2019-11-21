@@ -132,8 +132,8 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list& a
         beganLine = false;
     }
 
-    fflush(stdout);
-    if (logFile != NULL) fflush(logFile);
+    //fflush(stdout);
+    //if (logFile != NULL) fflush(logFile);
 }
 
 void Console::log(int verbosity, const char* str, bool endline, va_list& args) {
