@@ -825,11 +825,11 @@ void Worker::finishBalancing() {
         currentJob->dumpStats();
 
         if (currentJob->isRoot()) {
-            // Calculate CPU seconds: (volume during last epoch) * (effective time of last epoch) 
+            // Calculate CPU seconds: (volume during last epoch) * #threads * (effective time of last epoch) 
             int id = currentJob->getId();
-            float newCpuTime = (jobVolumes.count(id) ? jobVolumes[id] : 1) * lastSyncSeconds;
+            float newCpuTime = (jobVolumes.count(id) ? jobVolumes[id] : 1) * params.getIntParam("t") * lastSyncSeconds;
             jobCpuTimeUsed[id] += newCpuTime;
-            float limit = params.getFloatParam("tl")*3600;
+            float limit = params.getFloatParam("tl")*3600.f;
             bool hasLimit = limit > 0;
             if (hasLimit) {
                 Console::log(Console::INFO, "Job #%i spent %.3f/%.3f cpu seconds so far (%.3f in this epoch)", id, jobCpuTimeUsed[id], limit, newCpuTime);
