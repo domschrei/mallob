@@ -51,7 +51,7 @@ hordeenv.Append(CXXFLAGS = ["-fpermissive"])
 hordesat_objects = []
 for src in hordesat_sources:
     obj = hordeenv.Object("build/" + str(src).replace(".cpp",".o"), src,
-            CPPPATH=[horde, hordesolvers + "minisat", hordesolvers + "lingeling", hordeenv['ENV']['MPI_ROOT'] + "/include/"],
+            CPPPATH=[horde, hordesolvers + "minisat", hordesolvers + "lingeling", hordeenv['ENV']['MPI_ROOT']],
             LIBPATH=[hordesolvers + "/minisat/build/release/lib", hordesolvers + "/lingeling"],
             LIBS=["pthread", "minisat", "lgl", "z"])
     hordesat_objects += [obj]
@@ -61,7 +61,7 @@ mallobenv = get_default_env()
 mallob_objects = []
 for src in mallob_sources:
     obj = mallobenv.Object("build/" + str(src).replace(".cpp",".o"), src,
-            CPPPATH=['src', horde, mallobenv['ENV']['MPI_ROOT'] + "/include/"], 
+            CPPPATH=['src', horde, mallobenv['ENV']['MPI_ROOT']], 
             LIBPATH=[".", hordesolvers + "/minisat/build/release/lib", hordesolvers + "/lingeling"],
             LIBS=["horde", "pthread", "minisat", "lgl", "z"])
     mallob_objects += [obj]
@@ -71,14 +71,14 @@ hordeenv = get_default_env()
 hordeenv.Append(CXXFLAGS = ["-fpermissive"])
 hordelib = hordeenv.Library("build/horde", 
         hordesat_objects,
-        CPPPATH=[horde, hordesolvers + "minisat", hordesolvers + "lingeling", hordeenv['ENV']['MPI_ROOT']+"/include"],
+        CPPPATH=[horde, hordesolvers + "minisat", hordesolvers + "lingeling", hordeenv['ENV']['MPI_ROOT']],
         LIBPATH=[hordesolvers + "/minisat/build/release/lib", hordesolvers + "/lingeling"],
         LIBS=["pthread", "minisat", "lgl", "z"])
 
 # Build mallob from objects
 mallob = mallobenv.Program('build/mallob', 
         mallob_objects,
-        CPPPATH=['src', horde, mallobenv['ENV']['MPI_ROOT']+"/include"], 
+        CPPPATH=['src', horde, mallobenv['ENV']['MPI_ROOT']], 
         LIBPATH=["build/", hordesolvers + "/minisat/build/release/lib", hordesolvers + "/lingeling"],
         LIBS=["horde", "pthread", "minisat", "lgl", "z"])
 Depends(mallob, hordelib)

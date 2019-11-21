@@ -344,7 +344,7 @@ bool CutoffPriorityBalancer::finishRemaindersReduction() {
     std::cout << "GLOBAL: ";
     for (int i = 0; i < _remainders.size(); i++) std::cout << _remainders[i] << " ";
     std::cout << std::endl;
-    continueRoundingUntilReduction(0, _remainders.size()-1);
+    return continueRoundingUntilReduction(0, _remainders.size()-1);
 }
 
 bool CutoffPriorityBalancer::continueRoundingUntilReduction(int lower, int upper) {

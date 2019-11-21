@@ -3,7 +3,7 @@ instances/large/
 *.a
 *.so
 logs/*
-src/util/mpi.h
+src/include
 src/hordesat/minisat
 src/hordesat/lingeling
 src/hordesat/*.zip
