@@ -702,10 +702,12 @@ void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, b
         else msgTag = MSG_INTERRUPT;
         if (job.hasLeftChild()) {
             MyMpi::isend(MPI_COMM_WORLD, job.getLeftChildNodeRank(), msgTag, handle->recvData);
+            Console::log_send(Console::VERB, job.getLeftChildNodeRank(), "Propagating interruption of %s ...", job.toStr());
             //stats.increment("sentMessages");
         }
         if (job.hasRightChild()) {
             MyMpi::isend(MPI_COMM_WORLD, job.getRightChildNodeRank(), msgTag, handle->recvData);
+            Console::log_send(Console::VERB, job.getRightChildNodeRank(), "Propagating interruption of %s ...", job.toStr());
             //stats.increment("sentMessages");
         }
 
