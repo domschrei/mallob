@@ -1,6 +1,7 @@
 
 #include <map>
 #include <thread>
+#include <cmath>
 
 #include "assert.h"
 #include "data/job.h"
@@ -62,7 +63,8 @@ void Job::endInitialization() {
     _initialized = true;
     JobState oldState = _state;
     switchState(ACTIVE);
-    _last_job_comm = Timer::elapsedSeconds();
+    if (_params.getFloatParam("s") > 0)
+        _last_job_comm_remainder = (int)(Timer::elapsedSeconds() / _params.getFloatParam("s"));
     _time_of_initialization = Timer::elapsedSeconds();
     if (oldState == INITIALIZING_TO_PAST) {
         terminate();
@@ -244,13 +246,12 @@ bool Job::wantsToCommunicate() const {
     }
     // Active leaf node initiates communication if s seconds have passed since last one
     return isInState({ACTIVE}) && !hasLeftChild() && !hasRightChild() 
-            //&& _epoch_of_last_communication < _epoch_counter.getEpoch()
-            && (Timer::elapsedSeconds() - _last_job_comm) >= _params.getFloatParam("s");
+            && (int)(Timer::elapsedSeconds() / _params.getFloatParam("s")) > _last_job_comm_remainder;
 }
 
 void Job::communicate() {
-    _last_job_comm = Timer::elapsedSeconds();
-    _epoch_of_last_communication = _epoch_counter.getEpoch();
+    assert(_params.getFloatParam("s") > 0.0f);
+    _last_job_comm_remainder = (int)(Timer::elapsedSeconds() / _params.getFloatParam("s"));
     beginCommunication();
 }
 
