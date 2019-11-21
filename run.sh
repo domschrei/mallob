@@ -30,6 +30,9 @@ mkdir -p $logdir
 
 # Execute program
 executable="build/mallob"
+if [ "x$MPIRUN" == "x" ]; then
+    MPIRUN="mpirun"
+fi
 echo $MPIRUN' -np "'$NP'" '$cmd' '$executable' '$@' -log='$logdir
 $MPIRUN -np "$NP" $cmd $executable $@ -log=$logdir
 
