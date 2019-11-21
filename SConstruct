@@ -3,17 +3,21 @@ import os
 import subprocess
 import hashlib
 import re
+import os
 import os.path
 import fileinput
 import time
 
 # Compile flags
-flags = "-g -O3 -Wall -fmessage-length=0"
+flags = "-g -O3 -std=c++14 -Wall -fmessage-length=0"
 
 def get_default_env():
+    osenv = os.environ 
     env = Environment()
+    for key in osenv:
+        env['ENV'][key] = osenv[key]
     env['ENV']['TERM'] = os.environ['TERM'] # colored gcc output
-    env.Replace(CXX = "mpic++") # compile with mpic++
+    env.Replace(CXX = env['ENV']['MPICXX']) # compile with mpic++
     env.Append(CXXFLAGS = Split(flags)) # compile flags
     return env
 
@@ -38,7 +42,7 @@ hordeenv.Append(CXXFLAGS = ["-fpermissive"])
 hordesat_objects = []
 for src in hordesat_sources:
     obj = hordeenv.Object("build/" + str(src).replace(".cpp",".o"), src,
-            CPPPATH=[horde, hordesolvers + "minisat", hordesolvers + "lingeling"],
+            CPPPATH=[horde, hordesolvers + "minisat", hordesolvers + "lingeling", hordeenv['ENV']['MPI_ROOT'] + "/include/"],
             LIBPATH=[hordesolvers + "/minisat/build/release/lib", hordesolvers + "/lingeling"],
             LIBS=["pthread", "minisat", "lgl", "z"])
     hordesat_objects += [obj]
@@ -48,7 +52,7 @@ mallobenv = get_default_env()
 mallob_objects = []
 for src in mallob_sources:
     obj = mallobenv.Object("build/" + str(src).replace(".cpp",".o"), src,
-            CPPPATH=['src', horde], 
+            CPPPATH=['src', horde, mallobenv['ENV']['MPI_ROOT'] + "/include/"], 
             LIBPATH=[".", hordesolvers + "/minisat/build/release/lib", hordesolvers + "/lingeling"],
             LIBS=["horde", "pthread", "minisat", "lgl", "z"])
     mallob_objects += [obj]
@@ -58,14 +62,14 @@ hordeenv = get_default_env()
 hordeenv.Append(CXXFLAGS = ["-fpermissive"])
 hordelib = hordeenv.Library("build/horde", 
         hordesat_objects,
-        CPPPATH=[horde, hordesolvers + "minisat", hordesolvers + "lingeling"],
+        CPPPATH=[horde, hordesolvers + "minisat", hordesolvers + "lingeling", hordeenv['ENV']['MPI_ROOT']+"/include"],
         LIBPATH=[hordesolvers + "/minisat/build/release/lib", hordesolvers + "/lingeling"],
         LIBS=["pthread", "minisat", "lgl", "z"])
 
 # Build mallob from objects
 mallob = mallobenv.Program('build/mallob', 
         mallob_objects,
-        CPPPATH=['src', horde], 
+        CPPPATH=['src', horde, mallobenv['ENV']['MPI_ROOT']+"/include"], 
         LIBPATH=["build/", hordesolvers + "/minisat/build/release/lib", hordesolvers + "/lingeling"],
         LIBS=["horde", "pthread", "minisat", "lgl", "z"])
 Depends(mallob, hordelib)

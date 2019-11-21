@@ -30,8 +30,8 @@ mkdir -p $logdir
 
 # Execute program
 executable="build/mallob"
-echo 'mpirun -np "'$NP'" '$cmd' '$executable' '$@' -log='$logdir
-mpirun -np "$NP" $cmd $executable $@ -log=$logdir
+echo $MPIRUN' -np "'$NP'" '$cmd' '$executable' '$@' -log='$logdir
+$MPIRUN -np "$NP" $cmd $executable $@ -log=$logdir
 
 # Post-execution: Gather logs
 cat $logdir/* | sed 's/^\[//g' | LC_ALL=C sort -s -g | awk '{print "["$0}'  > $logdir/log
