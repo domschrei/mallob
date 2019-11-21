@@ -5,8 +5,9 @@
 #include <iostream>
 #include <memory>
 #include <set>
+#include <map>
 #include <assert.h>
-#include <openmpi/mpi.h>
+#include <mpi.h>
 
 #include "data/serializable.h"
 #include "util/console.h"
