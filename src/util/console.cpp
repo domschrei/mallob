@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <cstring>
 #include <cmath>
+#include <cstdlib>
 
 #include "console.h"
 #include "timer.h"
@@ -59,6 +60,10 @@ void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeO
     Console::threadsafeOutput = threadsafeOutput;
     beganLine = false;
     
+    // Create logging directory as necessary
+    system((std::string("mkdir -p ") + logDir).c_str());
+
+    // Open logging files
     logFilename = logDir + "/log_" + std::to_string(std::time(nullptr)) + std::string(".") + std::to_string(rank);
     logFile = fopen(logFilename.c_str(), "a");
     if (logFile == NULL) {

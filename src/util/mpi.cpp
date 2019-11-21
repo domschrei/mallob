@@ -30,7 +30,7 @@ void MyMpi::init(int argc, char *argv[])
     tagPriority[MSG_REQUEST_BECOME_CHILD] = 2;
     tagPriority[MSG_ACCEPT_BECOME_CHILD] = 2;
     tagPriority[MSG_REJECT_BECOME_CHILD] = 2;
-    tagPriority[MSG_TERMINATE] = 2;
+    tagPriority[MSG_QUERY_VOLUME] = 2;
     tagPriority[MSG_UPDATE_VOLUME] = 2;
     tagPriority[MSG_WORKER_DEFECTING] = 2;
 
@@ -39,6 +39,11 @@ void MyMpi::init(int argc, char *argv[])
     tagPriority[MSG_SEND_JOB_DESCRIPTION] = 2; // receiving a job desc.
     tagPriority[MSG_QUERY_JOB_RESULT] = 2; // sending a job result
     tagPriority[MSG_SEND_JOB_RESULT] = 2; // receiving a job result
+
+    // Termination and interruption
+    tagPriority[MSG_TERMINATE] = 3;
+    tagPriority[MSG_INTERRUPT] = 3;
+    tagPriority[MSG_ABORT] = 3;
 
     // Job-specific communication: not critical for balancing 
     tagPriority[MSG_JOB_COMMUNICATION] = 4;
