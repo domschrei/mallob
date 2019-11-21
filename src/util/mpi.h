@@ -1,1 +1,0 @@
-/usr/include/openmpi/mpi.h
