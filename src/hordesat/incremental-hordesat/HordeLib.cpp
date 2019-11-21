@@ -305,7 +305,7 @@ void HordeLib::continueSolving(const std::vector<std::shared_ptr<std::vector<int
 bool HordeLib::isFullyInitialized() {
 	if (solvingState == INITIALIZING) return false;
 	for (size_t i = 0; i < solversInitialized.size(); i++) {
-		if (solversInitialized[i] == 0)
+		if (solversInitialized[i] == 0) // TODO (not initialized) AND suspended!!
 			return false;
 	}
 	return true;
@@ -323,7 +323,10 @@ int HordeLib::solveLoop() {
 	solvingStateLock.lock();
 	bool standby = (solvingState == STANDBY);
 	solvingStateLock.unlock();
-	if (standby) return finalResult;
+	if (standby) {
+		log(0, "Returning result\n");
+		return finalResult;
+	} 
 
 	// Resources exhausted?
     if ((maxRounds != 0 && round == maxRounds) || (maxSeconds != 0 && timeNow > maxSeconds)) {
@@ -404,6 +407,12 @@ void HordeLib::unsetPaused() {
 void HordeLib::interrupt() {
 	solvingStateLock.lock();
 	if (solvingState != STANDBY) setSolvingState(STANDBY);
+	solvingStateLock.unlock();
+}
+
+void HordeLib::abort() {
+	solvingStateLock.lock();
+	if (solvingState != ABORTING) setSolvingState(ABORTING);
 	solvingStateLock.unlock();
 }
 

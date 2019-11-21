@@ -34,6 +34,10 @@ void SatJob::initialize() {
     Console::log(Console::VERB, "%s : beginning to solve", toStr());
     _solver->beginSolving(_description.getPayloads(), _description.getAssumptions(_description.getRevision()));
     Console::log(Console::VERB, "%s : finished concurrent HordeLib instance initialization", toStr());
+
+    if (_abort_after_initialization) {
+        endInitialization();
+    }
 }
 
 void SatJob::updateRole() {
@@ -60,6 +64,7 @@ void SatJob::interrupt() {
 }
 
 void SatJob::withdraw() {
+    _solver->abort();
     //_solver = NULL; // TODO 
 }
 
@@ -254,7 +259,13 @@ int SatJob::solveLoop() {
         // Else: end initialization
         Console::log(Console::VERB, "%s : solver threads have been fully initialized by now", toStr());
         endInitialization();
-        return result;
+
+        // If initialized and active now, do solve loop
+        if (isInState({ACTIVE})) {
+            result = _solver->solveLoop();
+        } else {
+            return result;
+        }
     }
 
     // Did a solver find a result?

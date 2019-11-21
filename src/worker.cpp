@@ -29,27 +29,21 @@ void Worker::init() {
     Console::log(Console::VERB, "Passed global initialization barrier.");
 }
 
-void Worker::checkTerminate() {
-
-    std::fstream file;
-    file.open("TERMINATE_GLOBALLY_NOW", std::ios::in);
-    if (file.is_open()) {
-        file.close();
-        Console::log(Console::WARN, "Acknowledged TERMINATE_GLOBALLY_NOW. Exiting.");
-        exit(0);
+bool Worker::checkTerminate() {
+    if (params.getFloatParam("T") > 0 && Timer::elapsedSeconds() > params.getFloatParam("T")) {
+        Console::log(Console::INFO, "Global timeout: terminating.");
+        return true;
     }
+    return false;
 }
 
 void Worker::mainProgram() {
 
-    while (true) {
+    while (!checkTerminate()) {
 
         // If it is time to do balancing (and it is not being done right now)
         if (!balancer->isBalancing() && isTimeForRebalancing()) {
             
-            // Check if termination signal file exists
-            //checkTerminate();
-
             // Rebalancing
             Console::log(MyMpi::rank(comm) == 0 ? Console::INFO : Console::VERB, 
                 "Entering rebalancing of epoch %i", epochCounter.getEpoch());
@@ -145,6 +139,9 @@ void Worker::mainProgram() {
             else if (handle->tag == MSG_TERMINATE)
                 handleTerminate(handle);
 
+            else if (handle->tag == MSG_ABORT)
+                handleAbort(handle);
+
             else if (handle->tag == MSG_WORKER_DEFECTING)
                 handleWorkerDefecting(handle);
 
@@ -213,17 +210,18 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
 
     // Decide whether job should be adopted or bounced to another node
     bool adopts = false;
+    int maxHops = maxJobHops(req.requestedNodeIndex == 0);
     if (isIdle() && !hasJobCommitments()) {
         // Node is idle and not committed to another job: OK
         adopts = true;
 
-    } else if (req.numHops > maxJobHops() && req.requestedNodeIndex > 0) {
+    } else if (req.numHops > maxHops && req.requestedNodeIndex > 0) {
         // Discard job request
         Console::log(Console::INFO, "Discarding job request %s which exceeded %i hops", 
-                        jobStr(req.jobId, req.requestedNodeIndex), maxJobHops());
+                        jobStr(req.jobId, req.requestedNodeIndex), maxHops);
         return;
     
-    } else if (req.numHops > maxJobHops() && req.requestedNodeIndex == 0 && !hasJobCommitments()) {
+    } else if (req.numHops > maxHops && req.requestedNodeIndex == 0 && !hasJobCommitments()) {
         // Request for a root node exceeded max #hops: Possibly adopt the job while dismissing the active job
 
         // If this node already computes on _this_ job, don't adopt it
@@ -353,7 +351,8 @@ void Worker::handleRejectBecomeChild(MessageHandlePtr& handle) {
     JobRequest req; req.deserialize(*handle->recvData);
     assert(hasJob(req.jobId));
     Job &job = getJob(req.jobId);
-    assert(job.getState() == JobState::COMMITTED);
+    assert(job.isInState({COMMITTED, INITIALIZING_TO_COMMITTED})
+            || Console::fail("Unexpected job state of %s : %s", job.toStr(), job.jobStateToStr()));
 
     // Erase commitment
     Console::log_recv(Console::INFO, handle->source, "Rejected to become %s : uncommitting", job.toStr());
@@ -451,7 +450,13 @@ void Worker::initJob(MessageHandlePtr handle) {
     Console::log_recv(Console::VERB, handle->source, "Deserializing job #%i , description has size %i ...", jobId, handle->recvData->size());
     Job& job = getJob(jobId);
     job.setDescription(handle->recvData);
-    
+
+    // Remember arrival and initialize used CPU time (if root node)
+    jobArrivals[jobId] = Timer::elapsedSeconds();
+    if (job.isRoot()) {
+        jobCpuTimeUsed[jobId] = 0;
+    }
+     
     // Initialize job
     job.initialize();
 }
@@ -550,15 +555,20 @@ void Worker::handleQueryJobResult(MessageHandlePtr& handle) {
 void Worker::handleTerminate(MessageHandlePtr& handle) {
 
     int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
-    interruptJob(handle, jobId, true);
+    interruptJob(handle, jobId, /*terminate=*/true, /*reckless=*/false);
 }
 
 void Worker::handleInterrupt(MessageHandlePtr& handle) {
 
     int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
-    interruptJob(handle, jobId, false);
+    interruptJob(handle, jobId, /*terminate=*/false, /*reckless=*/false);
 }
 
+void Worker::handleAbort(MessageHandlePtr& handle) {
+
+    int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
+    interruptJob(handle, jobId, /*terminate=*/true, /*reckless=*/true);
+}
 
 void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
 
@@ -668,15 +678,17 @@ void Worker::handleSendJobRevisionData(MessageHandlePtr& handle) {
 
 void Worker::handleIncrementalJobFinished(MessageHandlePtr& handle) {
     int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
-    interruptJob(handle, jobId, true);
+    interruptJob(handle, jobId, /*terminate=*/true, /*reckless=*/false);
 }
 
 
-void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate) {
+void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, bool reckless) {
 
     Job& job = getJob(jobId);
 
-    if (job.isInState({COMMITTED})) {
+    // Do not terminate yet if the job is still in a committed state, because the job description should still arrive
+    // (except if in reckless mode, where the description probably will never arrive from the parent)
+    if (!reckless && job.isInState({COMMITTED, INITIALIZING_TO_COMMITTED})) {
         Console::log(Console::INFO, "Deferring interruption/termination handle, as job description did not arrive yet");
         MyMpi::deferHandle(handle); // do not consume this message while job state is "COMMITTED"
     }
@@ -684,6 +696,10 @@ void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate) {
     if (job.isInState({ACTIVE, INITIALIZING_TO_ACTIVE, STANDBY})) {
 
         // Propagate message down the job tree
+        int msgTag;
+        if (terminate && reckless) msgTag = MSG_ABORT;
+        else if (terminate) msgTag = MSG_TERMINATE;
+        else msgTag = MSG_INTERRUPT;
         if (job.hasLeftChild()) {
             MyMpi::isend(MPI_COMM_WORLD, job.getLeftChildNodeRank(), terminate ? MSG_TERMINATE : MSG_INTERRUPT, handle->recvData);
             //stats.increment("sentMessages");
@@ -788,6 +804,7 @@ void Worker::rebalance() {
 
 void Worker::finishBalancing() {
     // All collective operations are done; reset synchronized timer
+    int lastSyncSeconds = epochCounter.getSecondsSinceLastSync();
     epochCounter.resetLastSync();
 
     // Retrieve balancing results
@@ -804,11 +821,33 @@ void Worker::finishBalancing() {
     //stats.dump(epochCounter.getEpoch());
     if (currentJob != NULL) {
         currentJob->dumpStats();
+
+        if (currentJob->isRoot()) {
+            // Calculate CPU seconds: (volume during last epoch) * (effective time of last epoch) 
+            int id = currentJob->getId();
+            float newCpuTime = (jobVolumes.count(id) ? jobVolumes[id] : 1) * lastSyncSeconds;
+            jobCpuTimeUsed[id] += newCpuTime;
+            float limit = params.getFloatParam("tl")*3600;
+            bool hasLimit = limit > 0;
+            if (hasLimit) {
+                Console::log(Console::INFO, "Job #%i spent %.3f/%.3f cpu seconds so far (%.3f in this epoch)", id, jobCpuTimeUsed[id], limit, newCpuTime);
+            } else {
+                Console::log(Console::INFO, "Job #%i spent %.3f cpu seconds so far (%.3f in this epoch)", id, jobCpuTimeUsed[id], newCpuTime);
+            }
+
+            if (hasLimit && jobCpuTimeUsed[id] > limit) {
+                // Job exceeded its time limit: send self message
+                Console::log(Console::INFO, "Job #%i CPU TIMEOUT: aborting", id);
+                IntVec payload({id, currentJob->getRevision()});
+                MyMpi::isend(MPI_COMM_WORLD, worldRank, MSG_ABORT, payload);
+            }
+        }
     }
     epochCounter.increment();
     Console::log(Console::VERB, "Advancing to epoch %i", epochCounter.getEpoch());
     
     // Update volumes found during balancing, and trigger job expansions / shrinkings
+    jobVolumes = volumes;
     for (auto it = volumes.begin(); it != volumes.end(); ++it) {
         Console::log(Console::INFO, "Job #%i : new volume %i", it->first, it->second);
         updateVolume(it->first, it->second);

@@ -203,6 +203,7 @@ void Job::terminate() {
 
     if (isInitializing()) {
         switchState(INITIALIZING_TO_PAST);
+        _abort_after_initialization = true;
         return;
     } else {
         assert(isInState({ACTIVE, SUSPENDED, STANDBY}));

@@ -83,6 +83,7 @@ protected:
     JobState _state;
     bool _has_description;
     bool _initialized;
+    bool _abort_after_initialization;
     std::unique_ptr<std::thread> _initializer_thread;
     bool _done_locally;
     

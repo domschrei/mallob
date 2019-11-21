@@ -37,8 +37,10 @@ void Parameters::setDefaults() {
     setParam("lbc", "0"); // leaky bucket client parameter (0 = no leaky bucket, jobs enter by time) 
     setParam("p", "5.0"); // rebalance period (seconds)
     setParam("s", "1.0"); // job communication period (seconds)
+    setParam("T", "0"); // total time to run the system (0 = no limit)
     setParam("t", "2"); // num threads per node
     setParam("td", "0.01"); // temperature decay for thermodyn. balancing
+    setParam("tl", "0"); // time limit per instance, in cpu hours (0 = no limit)
     setParam("v", "2"); // verbosity 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...
 }
 
@@ -58,7 +60,9 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "-log=<log-dir>        Directory to save logs in (default: .)");
     Console::log(Console::INFO, "-p=<rebalance-period> Do global rebalancing every t seconds (t > 0)");
     Console::log(Console::INFO, "-s=<rebalance-period> Do job-internal communication every t seconds (t >= 0, 0: do not communicate)");
+    Console::log(Console::INFO, "-T=<time-limit>       Run entire system for x seconds (x >= 0; 0: run indefinitely)");
     Console::log(Console::INFO, "-t=<num-threads>      Amount of worker threads per node (int t >= 1)");
+    Console::log(Console::INFO, "-tl=<time-limit>      Timeout an instance after x cpu hours (x >= 0; 0: no timeout");
     Console::log(Console::INFO, "-v=<verb-num>         Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...");
 }
 

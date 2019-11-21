@@ -75,10 +75,18 @@ Client::~Client() {
     instanceReaderThread.join();
 }
 
+bool Client::checkTerminate() {
+    if (params.getFloatParam("T") > 0 && Timer::elapsedSeconds() > params.getFloatParam("T")) {
+        Console::log(Console::INFO, "Global timeout: terminating.");
+        return true;
+    }
+    return false;
+}
+
 void Client::mainProgram() {
 
     size_t i = 0;
-    while (true) {
+    while (!checkTerminate()) {
 
         // Introduce next job(s) as applicable
         if (params.getIntParam("lbc") == 0) {

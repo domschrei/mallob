@@ -29,13 +29,16 @@ void* SolverThread::run() {
 
     init();
     waitWhile(INITIALIZING);
+    readFormula();
 
     while (!cancelThread()) {
     
-        readFormula();
         waitWhile(STANDBY);
         runOnce();
         waitWhile(STANDBY);
+        
+        if (cancelThread()) break;
+        readFormula();
     }
     log(2, "%i : exiting\n", _args->solverId);
     return NULL;
@@ -63,11 +66,13 @@ void SolverThread::readFormula() {
     int prevLits = importedLits;
     int begin = importedLits;
 
+    int i = 0;
     for (std::shared_ptr<std::vector<int>> f : hlib->formulae) {
         if (begin < f->size())
             read(*f, begin);
         begin -= f->size();
-        if (cancelRun()) return;
+        i++;
+        //if (i < hlib->formulae.size() && cancelRun()) return;
     }
 
     log(1, "Solver %i imported clauses: %i literals\n", solver->solverId, (importedLits-prevLits));
@@ -79,8 +84,8 @@ void SolverThread::read(const std::vector<int>& formula, int begin) {
     int batchSize = 100000;
     for (int start = std::max(0, begin); start < (int) formula.size(); start += batchSize) {
         
-        waitWhile(SUSPENDED);
-        if (cancelRun()) break;
+        //waitWhile(SUSPENDED);
+        //if (cancelRun()) break;
 
         int limit = std::min(start+batchSize, (int) formula.size());
         for (int i = start; i < limit; i++) {
@@ -129,6 +134,9 @@ bool SolverThread::cancelRun() {
     hlib->solvingStateLock.lock();
     bool cancel = hlib->solvingState == STANDBY || hlib->solvingState == ABORTING;
     hlib->solvingStateLock.unlock();
+    if (cancel) {
+        log(0, "Solver %i cancelling run\n", solver->solverId);
+    }
     return cancel;
 }
 

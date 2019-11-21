@@ -47,6 +47,8 @@ public:
     void mainProgram();
 
 private:
+    bool checkTerminate();
+
     void handleRequestBecomeChild(MessageHandlePtr& handle);
     void handleJobDone(MessageHandlePtr& handle);
     void handleSendJobResult(MessageHandlePtr& handle);

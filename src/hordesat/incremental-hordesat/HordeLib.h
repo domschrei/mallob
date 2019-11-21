@@ -91,6 +91,7 @@ public:
 	void setSolvingState(SolvingStates::SolvingState state);
     void setPaused();
     void unsetPaused();
+	void abort();
 
 	void dumpStats();
 

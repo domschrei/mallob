@@ -31,9 +31,12 @@ private:
 
     std::map<int, Job*> jobs;
     std::map<int, JobRequest> jobCommitments;
+    std::map<int, float> jobArrivals;
+    std::map<int, float> jobCpuTimeUsed;
     Job* currentJob;
     int load;
     float lastLoadChange;
+    std::map<int, int> jobVolumes;
 
     std::unique_ptr<Balancer> balancer;
     EpochCounter epochCounter;
@@ -59,7 +62,7 @@ public:
 
 private:
 
-    void checkTerminate();
+    bool checkTerminate();
 
     void handleIntroduceJob(MessageHandlePtr& handle);
     void handleQueryVolume(MessageHandlePtr& handle);
@@ -73,6 +76,7 @@ private:
     void handleJobCommunication(MessageHandlePtr& handle);
     void handleTerminate(MessageHandlePtr& handle);
     void handleInterrupt(MessageHandlePtr& handle);
+    void handleAbort(MessageHandlePtr& handle);
     void handleWorkerFoundResult(MessageHandlePtr& handle);
     void handleQueryJobResult(MessageHandlePtr& handle);
     void handleForwardClientRank(MessageHandlePtr& handle);
@@ -88,7 +92,7 @@ private:
     void informClient(int jobId, int clientRank);
     void updateVolume(int jobId, int demand);
     void initJob(MessageHandlePtr handle);
-    void interruptJob(MessageHandlePtr& handle, int jobId, bool terminate);
+    void interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, bool reckless);
     
     void rebalance();
     void finishBalancing();
@@ -113,7 +117,10 @@ private:
         return ("#" + std::to_string(j) + ":" + std::to_string(idx)).c_str();
     };
 
-    int maxJobHops() {
+    int maxJobHops(bool rootNode) {
+        if (rootNode) {
+            return MyMpi::size(comm) / 2;
+        }
         return MyMpi::size(comm) * 2;
     }
 };
