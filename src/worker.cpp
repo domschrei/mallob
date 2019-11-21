@@ -701,11 +701,11 @@ void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, b
         else if (terminate) msgTag = MSG_TERMINATE;
         else msgTag = MSG_INTERRUPT;
         if (job.hasLeftChild()) {
-            MyMpi::isend(MPI_COMM_WORLD, job.getLeftChildNodeRank(), terminate ? MSG_TERMINATE : MSG_INTERRUPT, handle->recvData);
+            MyMpi::isend(MPI_COMM_WORLD, job.getLeftChildNodeRank(), msgTag, handle->recvData);
             //stats.increment("sentMessages");
         }
         if (job.hasRightChild()) {
-            MyMpi::isend(MPI_COMM_WORLD, job.getRightChildNodeRank(), terminate ? MSG_TERMINATE : MSG_INTERRUPT, handle->recvData);
+            MyMpi::isend(MPI_COMM_WORLD, job.getRightChildNodeRank(), msgTag, handle->recvData);
             //stats.increment("sentMessages");
         }
 
