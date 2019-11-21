@@ -4,7 +4,7 @@
 #include <ctime>
 #include <algorithm>
 
-#include "mpi.h"
+#include "mympi.h"
 #include "random.h"
 #include "timer.h"
 #include "console.h"

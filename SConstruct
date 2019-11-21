@@ -16,8 +16,17 @@ def get_default_env():
     env = Environment()
     for key in osenv:
         env['ENV'][key] = osenv[key]
+    
     env['ENV']['TERM'] = os.environ['TERM'] # colored gcc output
-    env.Replace(CXX = env['ENV']['MPICXX']) # compile with mpic++
+    
+    if 'MPICXX' in env['ENV']:
+        env.Replace(CXX = env['ENV']['MPICXX']) # compile with mpic++
+    else:
+        env.Replace(CXX = 'mpic++')
+    
+    if 'MPI_ROOT' not in env['ENV']:
+        env['ENV']['MPI_ROOT'] = '/usr/include/mpi/'
+    
     env.Append(CXXFLAGS = Split(flags)) # compile flags
     return env
 

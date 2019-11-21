@@ -5,7 +5,7 @@
 #include <string>
 #include <mutex>
 
-#include "util/mpi.h"
+#include "util/mympi.h"
 #include "util/params.h"
 #include "data/job_description.h"
 #include "data/statistics.h"

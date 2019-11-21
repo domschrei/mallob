@@ -4,7 +4,7 @@
 
 #include <memory>
 
-#include "util/mpi.h"
+#include "util/mympi.h"
 #include "serializable.h"
 
 class Reduceable : public Serializable {

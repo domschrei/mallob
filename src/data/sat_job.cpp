@@ -5,7 +5,7 @@
 #include "assert.h"
 #include "util/console.h"
 #include "util/timer.h"
-#include "util/mpi.h"
+#include "util/mympi.h"
 #include "data/sat_job.h"
 #include "util/console_horde_interface.h"
 

@@ -8,7 +8,7 @@
 #include <unistd.h>
 
 #include "util/timer.h"
-#include "util/mpi.h"
+#include "util/mympi.h"
 #include "util/console.h"
 #include "util/random.h"
 #include "util/params.h"

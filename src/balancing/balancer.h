@@ -6,7 +6,7 @@
 
 #include "data/job.h"
 #include "data/statistics.h"
-#include "util/mpi.h"
+#include "util/mympi.h"
 #include "util/params.h"
 
 class Balancer {
