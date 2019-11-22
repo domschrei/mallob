@@ -142,6 +142,7 @@ public:
     bool isInitializing() const {return isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_PAST, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_COMMITTED});};
     bool hasJobDescription() const {return _has_description;};
     int getRevision() const {return _description.getRevision();};
+    float getAge() const {return Timer::elapsedSeconds() - _elapsed_seconds_since_arrival;}
 
     bool isRoot() const {return _index == 0;};
     int getRootNodeRank() const {return _job_node_ranks[0];};

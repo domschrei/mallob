@@ -56,6 +56,7 @@ void Job::initialize() {
 }
 
 void Job::beginInitialization() {
+    _elapsed_seconds_since_arrival = Timer::elapsedSeconds();
     switchState(INITIALIZING_TO_ACTIVE);
 }
 

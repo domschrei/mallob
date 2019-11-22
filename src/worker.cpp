@@ -91,7 +91,7 @@ void Worker::mainProgram() {
         }
 
         // Sleep for a bit
-        usleep(10); // 1000 = 1 millisecond
+        //usleep(10); // 1000 = 1 millisecond
 
         // Poll a message, if present
         MessageHandlePtr handle;
@@ -173,6 +173,8 @@ void Worker::mainProgram() {
             MyMpi::resetListenerIfNecessary(WORKER, handle->tag);
         }
     }
+
+    Console::flush();
 }
 
 void Worker::handleQueryVolume(MessageHandlePtr& handle) {
@@ -825,21 +827,31 @@ void Worker::finishBalancing() {
         currentJob->dumpStats();
 
         if (currentJob->isRoot()) {
-            // Calculate CPU seconds: (volume during last epoch) * #threads * (effective time of last epoch) 
             int id = currentJob->getId();
+            
+            // Calculate CPU seconds: (volume during last epoch) * #threads * (effective time of last epoch) 
             float newCpuTime = (jobVolumes.count(id) ? jobVolumes[id] : 1) * params.getIntParam("t") * lastSyncSeconds;
             jobCpuTimeUsed[id] += newCpuTime;
-            float limit = params.getFloatParam("tl")*3600.f;
+            float limit = params.getFloatParam("cpuh-per-instance")*3600.f;
             bool hasLimit = limit > 0;
             if (hasLimit) {
                 Console::log(Console::INFO, "Job #%i spent %.3f/%.3f cpu seconds so far (%.3f in this epoch)", id, jobCpuTimeUsed[id], limit, newCpuTime);
             } else {
                 Console::log(Console::INFO, "Job #%i spent %.3f cpu seconds so far (%.3f in this epoch)", id, jobCpuTimeUsed[id], newCpuTime);
             }
-
             if (hasLimit && jobCpuTimeUsed[id] > limit) {
-                // Job exceeded its time limit: send self message
+                // Job exceeded its cpu time limit: send self message
                 Console::log(Console::INFO, "Job #%i CPU TIMEOUT: aborting", id);
+                IntVec payload({id, currentJob->getRevision()});
+                MyMpi::isend(MPI_COMM_WORLD, worldRank, MSG_ABORT, payload);
+            }
+
+            // Calculate wall clock time
+            float jobAge = currentJob->getAge();
+            float timeLimit = params.getFloatParam("time-per-instance");
+            if (timeLimit > 0 && jobAge > timeLimit) {
+                // Job exceeded its wall clock time limit: send self message
+                Console::log(Console::INFO, "Job #%i WALLCLOCK TIMEOUT: aborting", id);
                 IntVec payload({id, currentJob->getRevision()});
                 MyMpi::isend(MPI_COMM_WORLD, worldRank, MSG_ABORT, payload);
             }

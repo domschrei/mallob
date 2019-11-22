@@ -230,6 +230,7 @@ MessageHandlePtr MyMpi::poll() {
         if (consider && tagPriority[h->tag] < bestPrio) {
             bestPrio = tagPriority[h->tag];
             bestPrioHandle = h;
+            if (bestPrio == MIN_PRIORITY) break; // handle of minimum priority found
         }
     }
 

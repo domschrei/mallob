@@ -13,6 +13,7 @@
 #include "util/console.h"
 
 #define MAX_JOB_MESSAGE_PAYLOAD_PER_NODE 1500*sizeof(int)
+#define MIN_PRIORITY 1
 
 struct MessageHandle {
     MPI_Request request;

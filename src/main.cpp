@@ -77,7 +77,9 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    Console::log(Console::VERB, "Launching mallob, revision %s", MALLOB_REVISION);
+    char hostname[1024];
+	gethostname(hostname, 1024);
+    Console::log(Console::VERB, "Launching mallob, revision %s, on %s", MALLOB_REVISION, hostname);
 
     if (numNodes < 2) {
         Console::log(Console::CRIT, "At least two threads / nodes are necessary in order to run this application.");
@@ -117,4 +119,5 @@ int main(int argc, char *argv[]) {
     }
 
     MPI_Finalize();
+    Console::log(Console::INFO, "Exiting normally.");
 }

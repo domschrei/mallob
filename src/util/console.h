@@ -44,6 +44,8 @@ public:
 
     static void log(int verbosity, const char* str, bool endline, va_list& args);
 
+    static void flush();
+
     static bool fail(const char* str, ...);
 
     static void getLock() {
