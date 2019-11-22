@@ -828,6 +828,7 @@ void Worker::finishBalancing() {
 
         if (currentJob->isRoot()) {
             int id = currentJob->getId();
+            bool abort = false;
             
             // Calculate CPU seconds: (volume during last epoch) * #threads * (effective time of last epoch) 
             float newCpuTime = (jobVolumes.count(id) ? jobVolumes[id] : 1) * params.getIntParam("t") * lastSyncSeconds;
@@ -840,20 +841,30 @@ void Worker::finishBalancing() {
                 Console::log(Console::INFO, "Job #%i spent %.3f cpu seconds so far (%.3f in this epoch)", id, jobCpuTimeUsed[id], newCpuTime);
             }
             if (hasLimit && jobCpuTimeUsed[id] > limit) {
-                // Job exceeded its cpu time limit: send self message
+                // Job exceeded its cpu time limit
                 Console::log(Console::INFO, "Job #%i CPU TIMEOUT: aborting", id);
-                IntVec payload({id, currentJob->getRevision()});
-                MyMpi::isend(MPI_COMM_WORLD, worldRank, MSG_ABORT, payload);
+                abort = true;
+
+            } else {
+
+                // Calculate wall clock time
+                float jobAge = currentJob->getAge();
+                float timeLimit = params.getFloatParam("time-per-instance");
+                if (timeLimit > 0 && jobAge > timeLimit) {
+                    // Job exceeded its wall clock time limit
+                    Console::log(Console::INFO, "Job #%i WALLCLOCK TIMEOUT: aborting", id);
+                    abort = true;
+                }
             }
 
-            // Calculate wall clock time
-            float jobAge = currentJob->getAge();
-            float timeLimit = params.getFloatParam("time-per-instance");
-            if (timeLimit > 0 && jobAge > timeLimit) {
-                // Job exceeded its wall clock time limit: send self message
-                Console::log(Console::INFO, "Job #%i WALLCLOCK TIMEOUT: aborting", id);
+            if (abort) {
+                // "Virtual self message" aborting the job
                 IntVec payload({id, currentJob->getRevision()});
-                MyMpi::isend(MPI_COMM_WORLD, worldRank, MSG_ABORT, payload);
+                MessageHandlePtr handle(new MessageHandle());
+                handle->source = worldRank;
+                handle->recvData = payload.serialize();
+                handle->tag = MSG_ABORT;
+                handleAbort(handle);
             }
         }
     }
