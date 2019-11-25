@@ -17,7 +17,7 @@ def plot_xy(X, Y, color, linewidth, linestyle, markersize, markerstyle):
 ranks = set()
 time_offsets = dict()
 min_time = -1
-max_time = 999999999
+max_time = 9223372036854775807
 
 balancing_starts = dict()
 balancing_ends = dict()
@@ -47,17 +47,19 @@ if len(sys.argv) > 2:
 time = 0
 for line in open(sys.argv[1], "r").readlines():
     line = line.replace("\n", "")
-    match = re.search(r'^\[([0-9]+\.[0-9]+)\] \[([0-9]+)\] (.*)$', line)
+    match = re.search(r'^\[([0-9]+\.[0-9]+) / ([0-9]+\.[0-9]+)\] \[([0-9]+)\] (.*)$', line)
     if not match:
         continue
     time = float(match.group(1))
-    rank = int(match.group(2))
-    msg = match.group(3)
+    reltime = float(match.group(2))
+    rank = int(match.group(3))
+    msg = match.group(4)
     
     ranks.add(rank)
     if min_time == -1:
         min_time = time
-    if time > max_time:
+        max_time += time
+    if reltime > max_time:
         break
     
     if "Passed global initialization barrier" in msg:
@@ -112,7 +114,7 @@ for line in open(sys.argv[1], "r").readlines():
             exit(1)
         bounce_messages += [[time-time_offsets[rank], rank, int(match.group(3))]]
 
-if max_time == 999999999:
+if max_time == 9223372036854775807:
     max_time = time
 
 print(str(len(messages)) + " messages")
@@ -123,7 +125,7 @@ print(str(len(bounce_messages)) + " bounce messages")
 
 # dashed horizontal lines for each rank
 for rank in ranks:
-    plot_xy([min_time, max_time], [rank, rank], 'gray', 1, 'dashed', 0, 'x')
+    plot_xy([0, max_time-min_time], [rank, rank], 'gray', 1, 'dashed', 0, 'x')
 
 for rank in balancing_starts:
     plot_xy(balancing_starts[rank], [rank for x in balancing_starts[rank]], 'blue', 0, 'none', 5, 'x')
@@ -183,4 +185,5 @@ for job_id in job_ends:
 
 # Show data
 #plt.savefig("out.pdf")
+plt.xlim(0, max_time-min_time+1)
 plt.show()

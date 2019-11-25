@@ -15,7 +15,7 @@ def plot_xy(X, Y, label, color, linewidth, linestyle, markersize, markerstyle):
 
 ranks = set()
 min_time = -1
-max_time = 999999999
+max_time = 9223372036854775807
 
 job_times = dict()
 job_volumes = dict()
@@ -41,17 +41,19 @@ if len(sys.argv) > 2:
 time = 0
 for line in open(sys.argv[1], "r").readlines():
     line = line.replace("\n", "")
-    match = re.search(r'^\[([0-9]+\.[0-9]+)\] \[([0-9]+)\] (.*)$', line)
+    match = re.search(r'^\[([0-9]+\.[0-9]+) / ([0-9]+\.[0-9]+)\] \[([0-9]+)\] (.*)$', line)
     if not match:
         continue
     time = float(match.group(1))
-    rank = int(match.group(2))
-    msg = match.group(3)
+    reltime = float(match.group(2))
+    rank = int(match.group(3))
+    msg = match.group(4)
     
     ranks.add(rank)
     if min_time == -1:
         min_time = time
-    if time > max_time+5:
+        max_time += time
+    if reltime > max_time:
         break
     
     if "Introducing job" in msg:
@@ -99,7 +101,7 @@ for line in open(sys.argv[1], "r").readlines():
         append(job_times, all_jobs_id, time)
         append(job_volumes, all_jobs_id, last_load-1)
 
-if max_time == 999999999:
+if max_time == 9223372036854775807:
     max_time = time
 
 
@@ -133,9 +135,9 @@ for job_id in job_times:
 plt.legend()
 plt.title("\\textit{mallob}: Volumes of concurrent jobs over time")
 plt.xlabel("Elapsed time / s")
-plt.xlim(0, max_time)
+plt.xlim(min_time, max_time)
 plt.ylabel("\# active nodes")
 plt.ylim(0, None)
 plt.tight_layout()
-#plt.show()
-plt.savefig("out.pdf")
+plt.show()
+#plt.savefig("out.pdf")
