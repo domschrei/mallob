@@ -51,6 +51,7 @@ private:
 
     void handleRequestBecomeChild(MessageHandlePtr& handle);
     void handleJobDone(MessageHandlePtr& handle);
+    void handleAbort(MessageHandlePtr& handle);
     void handleSendJobResult(MessageHandlePtr& handle);
     void handleAckAcceptBecomeChild(MessageHandlePtr& handle);
     void handleQueryJobRevisionDetails(MessageHandlePtr& handle);

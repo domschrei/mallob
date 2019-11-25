@@ -20,7 +20,7 @@ void MyMpi::init(int argc, char *argv[])
     maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
 
     // Very quick messages, and such which are critical for overall system performance
-    tagPriority[MSG_FIND_NODE] = 1;
+    tagPriority[MSG_FIND_NODE] = 0;
     tagPriority[MSG_WORKER_FOUND_RESULT] = 1;
     tagPriority[MSG_FORWARD_CLIENT_RANK] = 1;
     tagPriority[MSG_JOB_DONE] = 1;
@@ -32,21 +32,29 @@ void MyMpi::init(int argc, char *argv[])
     tagPriority[MSG_REJECT_BECOME_CHILD] = 2;
     tagPriority[MSG_QUERY_VOLUME] = 2;
     tagPriority[MSG_UPDATE_VOLUME] = 2;
-    tagPriority[MSG_WORKER_DEFECTING] = 2;
 
     // Messages inducing bulky amounts of work
-    tagPriority[MSG_ACK_ACCEPT_BECOME_CHILD] = 2; // sending a job desc.
-    tagPriority[MSG_SEND_JOB_DESCRIPTION] = 2; // receiving a job desc.
-    tagPriority[MSG_QUERY_JOB_RESULT] = 2; // sending a job result
-    tagPriority[MSG_SEND_JOB_RESULT] = 2; // receiving a job result
+    tagPriority[MSG_ACK_ACCEPT_BECOME_CHILD] = 3; // sending a job desc.
+    tagPriority[MSG_SEND_JOB_DESCRIPTION] = 3; // receiving a job desc.
+    tagPriority[MSG_QUERY_JOB_RESULT] = 3; // sending a job result
+    tagPriority[MSG_SEND_JOB_RESULT] = 3; // receiving a job result
 
     // Termination and interruption
-    tagPriority[MSG_TERMINATE] = 3;
-    tagPriority[MSG_INTERRUPT] = 3;
-    tagPriority[MSG_ABORT] = 3;
+    tagPriority[MSG_TERMINATE] = 4;
+    tagPriority[MSG_INTERRUPT] = 4;
+    tagPriority[MSG_ABORT] = 4;
+    tagPriority[MSG_WORKER_DEFECTING] = 4;
 
     // Job-specific communication: not critical for balancing 
-    tagPriority[MSG_JOB_COMMUNICATION] = 4;
+    tagPriority[MSG_JOB_COMMUNICATION] = 5;
+
+    /*
+    for (int tag : ANYTIME_WORKER_RECV_TAGS) {
+        msgBuffers[tag] = std::make_shared<std::vector<uint8_t>>(maxMsgLength);
+    }
+    for (int tag : ANYTIME_CLIENT_RECV_TAGS) {
+        msgBuffers[tag] = std::make_shared<std::vector<uint8_t>>(maxMsgLength);
+    }*/
 }
 
 void MyMpi::beginListening(const ListenerMode& mode) {
@@ -215,6 +223,7 @@ MessageHandlePtr MyMpi::poll() {
         MessageHandlePtr h = *it;
         bool consider = false;
         if (h->selfMessage || h->status.MPI_TAG > 0) {
+            // Message is already ready to be processed
             consider = true;
         } else {
             int flag = -1;

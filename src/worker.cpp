@@ -65,7 +65,9 @@ void Worker::mainProgram() {
         }
 
         // Solve loop for active HordeLib instance
+        float jobTime = 0;
         if (currentJob != NULL) {
+            jobTime = Timer::elapsedSeconds();
             Job &job = *currentJob;
 
             bool initializing = job.isInitializing();
@@ -88,6 +90,8 @@ void Worker::mainProgram() {
                 IntVec payload({job.getId()});
                 MyMpi::isend(MPI_COMM_WORLD, job.getParentNodeRank(), MSG_QUERY_VOLUME, payload);
             }
+
+            jobTime = Timer::elapsedSeconds() - jobTime;
         }
 
         // Sleep for a bit
@@ -95,9 +99,16 @@ void Worker::mainProgram() {
 
         // Poll a message, if present
         MessageHandlePtr handle;
+        float pollTime = Timer::elapsedSeconds();
         if ((handle = MyMpi::poll()) != NULL) {
+            pollTime = Timer::elapsedSeconds() - pollTime;
+            if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f secs", jobTime);
+            Console::log(Console::VVVERB, "poll time: %.6f secs", pollTime);
+
             // Process message
             Console::log_recv(Console::VVVERB, handle->source, "Processing message of tag %i", handle->tag);
+            float time = Timer::elapsedSeconds();
+
             //stats.increment("receivedMessages");
 
             if (handle->tag == MSG_FIND_NODE) {
@@ -171,6 +182,9 @@ void Worker::mainProgram() {
 
             // Listen to message tag again as necessary
             MyMpi::resetListenerIfNecessary(WORKER, handle->tag);
+
+            time = Timer::elapsedSeconds() - time;
+            Console::log(Console::VVVERB, "Processing the message took %.6f seconds.", time);
         }
     }
 
@@ -569,6 +583,12 @@ void Worker::handleInterrupt(MessageHandlePtr& handle) {
 void Worker::handleAbort(MessageHandlePtr& handle) {
 
     int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
+
+    // Forward information on aborted job to client
+    if (getJob(jobId).isRoot()) {
+        MyMpi::isend(MPI_COMM_WORLD, getJob(jobId).getParentNodeRank(), MSG_ABORT, handle->recvData);
+    }
+
     interruptJob(handle, jobId, /*terminate=*/true, /*reckless=*/true);
 }
 

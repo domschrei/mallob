@@ -34,6 +34,8 @@ struct MessageHandle {
     MessageHandle(const std::shared_ptr<std::vector<uint8_t>>& data) : sendData(data) {
         recvData = std::make_shared<std::vector<uint8_t>>();
     }
+    MessageHandle(const std::shared_ptr<std::vector<uint8_t>>& sendData, const std::shared_ptr<std::vector<uint8_t>>& recvData) : 
+        sendData(sendData), recvData(recvData) {}
 };
 
 /*
@@ -149,7 +151,7 @@ const int ANYTIME_WORKER_RECV_TAGS[] = {MSG_QUERY_VOLUME, MSG_FIND_NODE, MSG_REQ
  * by a generic irecv method and within the maximum message length.
  */
 const int ANYTIME_CLIENT_RECV_TAGS[] = {MSG_JOB_DONE, MSG_REQUEST_BECOME_CHILD, MSG_ACK_ACCEPT_BECOME_CHILD, 
-            MSG_QUERY_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS};
+            MSG_QUERY_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS, MSG_ABORT};
 
 /**
  * Which types of messages the MPI node should listen to. 
@@ -180,6 +182,7 @@ private:
     static std::set<MessageHandlePtr> handles;
     static std::set<MessageHandlePtr> sentHandles;
     static std::map<int, int> tagPriority;
+    static std::map<int, std::shared_ptr<std::vector<uint8_t>>> msgBuffers;
 
 public:
 

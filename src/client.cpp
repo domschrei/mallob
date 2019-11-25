@@ -112,6 +112,8 @@ void Client::mainProgram() {
                 handleJobDone(handle);
             } else if (handle->tag == MSG_SEND_JOB_RESULT) {
                 handleSendJobResult(handle);
+            } else if (handle->tag == MSG_ABORT) {
+                handleAbort(handle);
             } else if (handle->tag == MSG_REQUEST_BECOME_CHILD) {
                 handleRequestBecomeChild(handle);
             } else if (handle->tag == MSG_ACK_ACCEPT_BECOME_CHILD) {
@@ -238,6 +240,20 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
             // Introduce a new job
             introduceJob(jobs[lastIntroducedJobIdx+1]);
         }
+    }
+}
+
+void Client::handleAbort(MessageHandlePtr& handle) {
+
+    IntVec request(*handle->recvData);
+    int jobId = request[0];
+    
+    introducedJobs.erase(jobId);
+
+    // Employ "leaky bucket"
+    while (params.getIntParam("lbc") > introducedJobs.size() && lastIntroducedJobIdx+1 < jobs.size()) {
+        // Introduce a new job
+        introduceJob(jobs[lastIntroducedJobIdx+1]);
     }
 }
 
