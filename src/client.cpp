@@ -250,6 +250,7 @@ void Client::handleAbort(MessageHandlePtr& handle) {
     int jobId = request[0];
     
     introducedJobs.erase(jobId);
+    Console::log_recv(Console::VERB, handle->source, "Acknowledging timeout of #%i.", jobId);
 
     // Employ "leaky bucket"
     while (params.getIntParam("lbc") > introducedJobs.size() && lastIntroducedJobIdx+1 < jobs.size()) {
