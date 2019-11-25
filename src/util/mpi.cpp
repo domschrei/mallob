@@ -22,13 +22,15 @@ int MyMpi::nextHandleId() {
 
 void MyMpi::init(int argc, char *argv[])
 {
+    /*
     int provided = -1;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
     if (provided != MPI_THREAD_FUNNELED) {
         std::cout << "ERROR initializing MPI: wanted id=" << MPI_THREAD_FUNNELED 
                 << " (MPI_THREAD_FUNNELED), got id=" << provided << std::endl;
         exit(1);
-    }
+    }*/
+    MPI_Init(&argc, &argv);
 
     maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
     handleId = 1;

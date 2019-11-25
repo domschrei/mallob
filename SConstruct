@@ -21,11 +21,15 @@ def get_default_env():
     
     if 'MPICXX' in env['ENV']:
         env.Replace(CXX = env['ENV']['MPICXX']) # compile with mpic++
+	print("MPICXX=" + env['ENV']['MPICXX'])
     else:
         env.Replace(CXX = 'mpic++')
     
     if 'MPI_ROOT' not in env['ENV']:
         env['ENV']['MPI_ROOT'] = '/usr/include/mpi/'
+    elif 'intel/compilers_and_libraries_2019' in env['ENV']['MPI_ROOT']:
+	env['ENV']['MPI_ROOT'] += "/intel64/"
+	print("MPI_ROOT=" + env['ENV']['MPI_ROOT'])
     
     env.Append(CXXFLAGS = Split(flags)) # compile flags
     return env
