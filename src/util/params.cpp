@@ -36,6 +36,7 @@ void Parameters::setDefaults() {
     setParam("log", "."); // logging directory
     setParam("lbc", "0"); // leaky bucket client parameter (0 = no leaky bucket, jobs enter by time) 
     setParam("p", "5.0"); // rebalance period (seconds)
+    //setParam("q"); // no logging to stdout
     setParam("s", "1.0"); // job communication period (seconds)
     setParam("T", "0"); // total time to run the system (0 = no limit)
     setParam("t", "2"); // num threads per node
@@ -60,6 +61,7 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "-lbc=<num-jobs>       Make each client a leaky bucket with x active jobs at any given time (int x >= 0, 0: jobs arrive at individual times instead)");
     Console::log(Console::INFO, "-log=<log-dir>        Directory to save logs in (default: .)");
     Console::log(Console::INFO, "-p=<rebalance-period> Do global rebalancing every t seconds (t > 0)");
+    Console::log(Console::INFO, "-q                    Be quiet, do not log to stdout besides critical information");
     Console::log(Console::INFO, "-s=<comm-period>      Do job-internal communication every t seconds (t >= 0, 0: do not communicate)");
     Console::log(Console::INFO, "-T=<time-limit>       Run entire system for x seconds (x >= 0; 0: run indefinitely)");
     Console::log(Console::INFO, "-t=<num-threads>      Amount of worker threads per node (int t >= 1)");

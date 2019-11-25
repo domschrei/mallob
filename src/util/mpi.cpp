@@ -293,6 +293,7 @@ void MyMpi::cleanSentHandles() {
         MPI_Test(&h->request, &flag, &h->status);
         if (flag) {
             // Sending operation completed
+            Console::log(Console::VVVERB, "Message of tag %i successfully sent.", h->tag);
             it = sentHandles.erase(it);
         } else {
             it++;

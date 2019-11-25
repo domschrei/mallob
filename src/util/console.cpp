@@ -48,16 +48,18 @@ int Console::rank;
 int Console::verbosity;
 bool Console::coloredOutput;
 bool Console::threadsafeOutput;
+bool Console::quiet;
 std::string Console::logFilename;
 FILE* Console::logFile;
 bool Console::beganLine;
 std::mutex Console::logMutex;
 
-void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeOutput, std::string logDir) {
+void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeOutput, bool quiet, std::string logDir) {
     Console::rank = rank;
     Console::verbosity = verbosity;
     Console::coloredOutput = coloredOutput;
     Console::threadsafeOutput = threadsafeOutput;
+    Console::quiet = quiet;
     beganLine = false;
     
     // Create logging directory as necessary
@@ -82,7 +84,7 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list& a
         return;
 
     // Colored output, if applicable
-    if (coloredOutput) {
+    if (!quiet && coloredOutput) {
         if (verbosity == Console::CRIT) {
             std::cout << Modifier(Code::FG_LIGHT_RED);
         } else if (verbosity == Console::WARN) {
@@ -104,7 +106,7 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list& a
         elapsedAbs *= 0.001f;
         elapsedAbs *= 0.001f;
         
-        printf("[%.6f / %.6f] [%i] ", elapsedAbs, elapsedRel, rank);
+        if (!quiet) printf("[%.6f / %.6f] [%i] ", elapsedAbs, elapsedRel, rank);
         if (logFile != NULL) fprintf(logFile, "[%.6f / %.6f] [%i] ", elapsedAbs, elapsedRel, rank);
         
         beganLine = true;
@@ -112,21 +114,19 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list& a
 
     // logging message
     va_list argsCopy; va_copy(argsCopy, args); // retrieve copy of "args"
-    vprintf(str, args); // consume original args
-    if (logFile != NULL) {
-        vfprintf(logFile, str, argsCopy); // consume copied args
-    }
+    if (!quiet) vprintf(str, args); // consume original args
+    if (logFile != NULL) vfprintf(logFile, str, argsCopy); // consume copied args
     va_end(argsCopy); // destroy copy
 
     // Reset terminal colors
-    if (coloredOutput) {
+    if (!quiet && coloredOutput) {
         std::cout << Modifier(Code::FG_DEFAULT);
     }
 
     // New line, if applicable
     if (endline) {
         if (strlen(str) == 0 || str[strlen(str)-1] != '\n') {
-            printf("\n");
+            if (!quiet) printf("\n");
             if (logFile != NULL) fprintf(logFile, "\n");
         }
         beganLine = false;
@@ -134,7 +134,7 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list& a
 }
 
 void Console::flush() {
-    fflush(stdout);
+    if (!quiet) fflush(stdout);
     if (logFile != NULL) fflush(logFile);
 }
 

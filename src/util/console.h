@@ -25,13 +25,14 @@ private:
     static int verbosity;
     static bool coloredOutput;
     static bool threadsafeOutput;
+    static bool quiet;
 
     static bool beganLine;
 
     static std::mutex logMutex;
 
 public:
-    static void init(int rank, int verbosity, bool coloredOutput, bool threadsafeOutput, std::string logDir=".");
+    static void init(int rank, int verbosity, bool coloredOutput, bool threadsafeOutput, bool quiet, std::string logDir=".");
 
     static void log(int verbosity, const char* str, ...);
     static void append(int verbosity, const char* str, ...);
