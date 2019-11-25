@@ -16,7 +16,14 @@ std::map<int, int> MyMpi::tagPriority;
 
 void MyMpi::init(int argc, char *argv[])
 {
-    MPI_Init(&argc, &argv);
+    int provided = -1;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
+    if (provided != MPI_THREAD_FUNNELED) {
+        std::cout << "ERROR initializing MPI: wanted id=" << MPI_THREAD_FUNNELED 
+                << " (MPI_THREAD_FUNNELED), got id=" << provided << std::endl;
+        exit(1);
+    }
+
     maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
 
     // Very quick messages, and such which are critical for overall system performance
@@ -73,14 +80,14 @@ void MyMpi::resetListenerIfNecessary(const ListenerMode& mode, int tag) {
         for (int t : ANYTIME_CLIENT_RECV_TAGS)
             if (tag == t) {
                 MyMpi::irecv(MPI_COMM_WORLD, tag);
-                break;
+                return;
             }
     }
     if (mode == WORKER) {
         for (int t : ANYTIME_WORKER_RECV_TAGS)
             if (tag == t) {
                 MyMpi::irecv(MPI_COMM_WORLD, tag);
-                break;
+                return;
             }
     }
 }
