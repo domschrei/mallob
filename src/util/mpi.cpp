@@ -14,6 +14,12 @@ std::set<MessageHandlePtr> MyMpi::sentHandles;
 int MyMpi::maxMsgLength;
 std::map<int, int> MyMpi::tagPriority;
 
+int handleId;
+
+int MyMpi::nextHandleId() {
+    return handleId++;
+}
+
 void MyMpi::init(int argc, char *argv[])
 {
     int provided = -1;
@@ -25,6 +31,7 @@ void MyMpi::init(int argc, char *argv[])
     }
 
     maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
+    handleId = 1;
 
     // Very quick messages, and such which are critical for overall system performance
     tagPriority[MSG_FIND_NODE] = 0;
@@ -98,7 +105,7 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
 }
 
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object) {
-    MessageHandlePtr handle(new MessageHandle(object));
+    MessageHandlePtr handle(new MessageHandle(nextHandleId(), object));
     if (rank(communicator) == recvRank) {
         handle->recvData = handle->sendData;
         handle->tag = tag;
@@ -109,6 +116,7 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
         MPI_Isend(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator, &handle->request);
         sentHandles.insert(handle);
     }
+    Console::log(Console::VVVERB, "Msg ID=%i", handle->id);
     return handle;
 }
 
@@ -117,7 +125,7 @@ MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const
 }
 
 MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object) {
-    MessageHandlePtr handle(new MessageHandle(object));
+    MessageHandlePtr handle(new MessageHandle(nextHandleId(), object));
     if (rank(communicator) == recvRank) {
         handle->recvData = handle->sendData;
         handle->tag = tag;
@@ -127,11 +135,12 @@ MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const
     } else {
         MPI_Send(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator);
     }
+    Console::log(Console::VVVERB, "Msg ID=%i", handle->id);
     return handle;
 }
 
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator) {
-    MessageHandlePtr handle(new MessageHandle());
+    MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     handle->tag = 0;
     handle->recvData->resize(maxMsgLength);
     MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, MPI_ANY_SOURCE, MPI_ANY_TAG, communicator, &handle->request);
@@ -140,7 +149,7 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator) {
 }
 
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int tag) {
-    MessageHandlePtr handle(new MessageHandle());
+    MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     handle->tag = tag;
     handle->recvData->resize(maxMsgLength);
     MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->request);
@@ -149,7 +158,7 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int tag) {
 }
 
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
-    MessageHandlePtr handle(new MessageHandle());
+    MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     handle->tag = tag;
     handle->recvData->resize(maxMsgLength);
     MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, source, tag, communicator, &handle->request);
@@ -158,7 +167,7 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
 }
 
 MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag, int size) {
-    MessageHandlePtr handle(new MessageHandle());
+    MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     handle->tag = tag;
     handle->recvData->resize(size);
     MPI_Recv(handle->recvData->data(), size, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->status);
@@ -176,7 +185,7 @@ MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag) {
 }
 
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag, int size) {
-    MessageHandlePtr handle(new MessageHandle());
+    MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     assert(source >= 0);
     handle->source = source;
     handle->tag = tag;
@@ -293,7 +302,7 @@ void MyMpi::cleanSentHandles() {
         MPI_Test(&h->request, &flag, &h->status);
         if (flag) {
             // Sending operation completed
-            Console::log(Console::VVVERB, "Message of tag %i successfully sent.", h->tag);
+            Console::log(Console::VVVERB, "Message of ID %i successfully sent.", h->id);
             it = sentHandles.erase(it);
         } else {
             it++;

@@ -881,7 +881,7 @@ void Worker::finishBalancing() {
             if (abort) {
                 // "Virtual self message" aborting the job
                 IntVec payload({id, currentJob->getRevision()});
-                MessageHandlePtr handle(new MessageHandle());
+                MessageHandlePtr handle(new MessageHandle(MyMpi::nextHandleId()));
                 handle->source = worldRank;
                 handle->recvData = payload.serialize();
                 handle->tag = MSG_ABORT;

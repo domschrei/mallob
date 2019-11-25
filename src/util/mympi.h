@@ -17,6 +17,7 @@
 
 struct MessageHandle {
     MPI_Request request;
+    int id;
     int tag;
     int source;
     std::shared_ptr<std::vector<uint8_t>> sendData;
@@ -25,17 +26,17 @@ struct MessageHandle {
     bool selfMessage = false;
     bool critical = false;
 
-    MessageHandle() {
+    MessageHandle(int id) : id(id) {
         status.MPI_SOURCE = -1; 
         status.MPI_TAG = -1; 
         sendData = std::make_shared<std::vector<uint8_t>>();
         recvData = std::make_shared<std::vector<uint8_t>>();
     }
-    MessageHandle(const std::shared_ptr<std::vector<uint8_t>>& data) : sendData(data) {
+    MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& data) : sendData(data), id(id) {
         recvData = std::make_shared<std::vector<uint8_t>>();
     }
-    MessageHandle(const std::shared_ptr<std::vector<uint8_t>>& sendData, const std::shared_ptr<std::vector<uint8_t>>& recvData) : 
-        sendData(sendData), recvData(recvData) {}
+    MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& sendData, const std::shared_ptr<std::vector<uint8_t>>& recvData) : 
+        id(id), sendData(sendData), recvData(recvData) {}
 };
 
 /*
@@ -212,6 +213,8 @@ public:
     static int size(MPI_Comm comm);
     static int rank(MPI_Comm comm);
     static int random_other_node(MPI_Comm comm, const std::set<int>& excludedNodes);
+    
+    static int nextHandleId();
 
     static int maxMsgLength;
 };
