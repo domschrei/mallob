@@ -335,7 +335,7 @@ int HordeLib::solveLoop() {
         setSolvingState(STANDBY);
 		solvingStateLock.unlock();
     }
-    fflush(stdout);
+    //fflush(stdout);
     round++;
 
     return -1; // no result yet

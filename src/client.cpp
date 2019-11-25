@@ -131,10 +131,11 @@ void Client::mainProgram() {
         }
 
         // Sleep for a bit
-        usleep(1000); // 1000 = 1 millisecond
+        //usleep(1000); // 1000 = 1 millisecond
     }
 
     Console::flush();
+    fflush(stdout);
 }
 
 void Client::introduceJob(JobDescription& job) {

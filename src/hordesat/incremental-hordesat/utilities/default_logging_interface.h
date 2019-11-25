@@ -34,7 +34,7 @@ public:
             printf("[%.3f] ", getTime());
             printf("[%i] <horde-%s> ", rank, identifier.c_str());
             vprintf(fmt, args);
-            fflush(stdout);
+            //fflush(stdout);
         }
     }
 

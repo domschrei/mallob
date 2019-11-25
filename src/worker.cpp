@@ -189,6 +189,7 @@ void Worker::mainProgram() {
     }
 
     Console::flush();
+    fflush(stdout);
 }
 
 void Worker::handleQueryVolume(MessageHandlePtr& handle) {
