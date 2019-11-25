@@ -70,6 +70,7 @@ protected:
     std::map<int, float> _priorities;
     std::map<int, int> _demands;
 
+    float _reduce_contrib;
     MPI_Request _reduce_request;
     float _reduce_result;
 };

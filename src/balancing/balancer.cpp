@@ -19,9 +19,10 @@ float Balancer::allReduce(float contribution) const {
     return result;
 }
 void Balancer::iAllReduce(float contribution) {
+    _reduce_contrib = contribution;
     _reduce_result = contribution;
     _reduce_request = MPI_Request();
-    MPI_Iallreduce(&_reduce_result, &_reduce_result, 1, MPI_FLOAT, MPI_SUM, _comm, &_reduce_request);
+    MPI_Iallreduce(&_reduce_contrib, &_reduce_result, 1, MPI_FLOAT, MPI_SUM, _comm, &_reduce_request);
     _stats.increment("reductions");
     _stats.increment("broadcasts");
 }
