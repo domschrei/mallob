@@ -180,7 +180,7 @@ public:
     };
 
 private:
-    static std::set<MessageHandlePtr, HandleComparator> handles;
+    static std::set<MessageHandlePtr> handles;
     static std::set<MessageHandlePtr> sentHandles;
     static std::map<int, int> tagPriority;
     static std::map<int, std::shared_ptr<std::vector<uint8_t>>> msgBuffers;
