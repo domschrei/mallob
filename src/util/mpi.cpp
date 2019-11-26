@@ -9,7 +9,7 @@
 #include "timer.h"
 #include "console.h"
 
-std::set<MessageHandlePtr> MyMpi::handles;
+std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::handles;
 std::set<MessageHandlePtr> MyMpi::sentHandles;
 int MyMpi::maxMsgLength;
 std::map<int, int> MyMpi::tagPriority;
@@ -48,6 +48,10 @@ void MyMpi::init(int argc, char *argv[])
     tagPriority[MSG_REJECT_BECOME_CHILD] = 2;
     tagPriority[MSG_QUERY_VOLUME] = 2;
     tagPriority[MSG_UPDATE_VOLUME] = 2;
+    tagPriority[MSG_NOTIFY_JOB_REVISION] = 2;
+    tagPriority[MSG_QUERY_JOB_REVISION_DETAILS] = 2;
+    tagPriority[MSG_SEND_JOB_REVISION_DETAILS] = 2;
+    tagPriority[MSG_ACK_JOB_REVISION_DETAILS] = 2;
 
     // Messages inducing bulky amounts of work
     tagPriority[MSG_ACK_ACCEPT_BECOME_CHILD] = 3; // sending a job desc.
