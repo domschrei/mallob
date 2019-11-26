@@ -173,14 +173,14 @@ public:
             assert(MyMpi::tagPriority.count(a->tag) || Console::fail("Tag %i has no priority assigned to it", a->tag));
             assert(MyMpi::tagPriority.count(b->tag) || Console::fail("Tag %i has no priority assigned to it", b->tag));
             if (MyMpi::tagPriority[a->tag] != MyMpi::tagPriority[b->tag])
-            return MyMpi::tagPriority[a->tag] < MyMpi::tagPriority[b->tag];
+                return MyMpi::tagPriority[a->tag] < MyMpi::tagPriority[b->tag];
             if (a->tag != b->tag) return a->tag < b->tag;
             return false;
         }
     };
 
 private:
-    static std::set<MessageHandlePtr> handles;
+    static std::set<MessageHandlePtr, HandleComparator> handles;
     static std::set<MessageHandlePtr> sentHandles;
     static std::map<int, int> tagPriority;
     static std::map<int, std::shared_ptr<std::vector<uint8_t>>> msgBuffers;
