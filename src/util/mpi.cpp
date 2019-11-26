@@ -9,7 +9,7 @@
 #include "timer.h"
 #include "console.h"
 
-std::set<MessageHandlePtr> MyMpi::handles;
+std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::handles;
 std::set<MessageHandlePtr> MyMpi::sentHandles;
 int MyMpi::maxMsgLength;
 std::map<int, int> MyMpi::tagPriority;
