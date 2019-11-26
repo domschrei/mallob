@@ -9,7 +9,7 @@
 #include "timer.h"
 #include "console.h"
 
-std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::handles;
+std::set<MessageHandlePtr> MyMpi::handles;
 std::set<MessageHandlePtr> MyMpi::sentHandles;
 int MyMpi::maxMsgLength;
 std::map<int, int> MyMpi::tagPriority;
@@ -261,8 +261,8 @@ MessageHandlePtr MyMpi::poll() {
         if (consider && tagPriority[h->tag] < bestPrio) {
             bestPrio = tagPriority[h->tag];
             bestPrioHandle = h;
-            //if (bestPrio == MIN_PRIORITY) break; // handle of minimum priority found
-            break;
+            if (bestPrio == MIN_PRIORITY) break; // handle of minimum priority found
+            //break;
         }
     }
 
