@@ -58,11 +58,15 @@ void Worker::mainProgram() {
             }
         }
 
+        MyMpi::testSentHandles();
+
         // Job communication (e.g. clause sharing)
         if (currentJob != NULL && currentJob->wantsToCommunicate()) {
             Console::log(Console::VERB, "%s wants to communicate", currentJob->toStr());
             currentJob->communicate();
         }
+
+        MyMpi::testSentHandles();
 
         // Solve loop for active HordeLib instance
         float jobTime = 0;
@@ -180,6 +184,7 @@ void Worker::mainProgram() {
                 Console::log_recv(Console::WARN, handle->source, "Unknown message tag %i", handle->tag);
             }
 
+            MyMpi::testSentHandles();
             // Listen to message tag again as necessary
             MyMpi::resetListenerIfNecessary(WORKER, handle->tag);
 
@@ -208,7 +213,6 @@ void Worker::handleQueryVolume(MessageHandlePtr& handle) {
 void Worker::handleFindNode(MessageHandlePtr& handle) {
 
     JobRequest req; req.deserialize(*handle->recvData);
-    Console::log(Console::VVVERB, "... for %s", jobStr(req.jobId, req.requestedNodeIndex));
 
     // Discard request if it originates from past epoch
     // (except if it is a request for a root node)

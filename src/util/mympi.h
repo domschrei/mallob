@@ -208,7 +208,7 @@ public:
     }
     static bool hasCriticalHandles();
     static void deferHandle(MessageHandlePtr handle);
-    static void cleanSentHandles();
+    static void testSentHandles();
 
     static int size(MPI_Comm comm);
     static int rank(MPI_Comm comm);

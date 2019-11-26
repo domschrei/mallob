@@ -199,7 +199,7 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag, int si
 }
 
 MessageHandlePtr MyMpi::poll() {
-    cleanSentHandles();
+    testSentHandles();
 
     /*
     MessageHandlePtr handle = NULL;
@@ -297,7 +297,7 @@ void MyMpi::deferHandle(MessageHandlePtr handle) {
     handles.insert(handle);
 }
 
-void MyMpi::cleanSentHandles() {
+void MyMpi::testSentHandles() {
     for (auto it = sentHandles.begin(); it != sentHandles.end();) {
         MessageHandlePtr h = *it;
         int flag = -1;
