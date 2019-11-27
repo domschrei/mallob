@@ -141,7 +141,7 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
     (selfMessage ? handles : sentHandles).insert(handle);
     float timeInsertHandle = Timer::elapsedSeconds() - time;
 
-    Console::log(Console::VVVERB, "Msg ID=%i createHandleTime=%.6f sendTime=%.6f insertHandleTime=%.6f", handle->id, 
+    Console::log(Console::VVVERB, "Msg ID=%i dest=%i createHandleTime=%.6f sendTime=%.6f insertHandleTime=%.6f", handle->id, recvRank,
                 timeCreateHandle, timeSend, timeInsertHandle);
     return handle;
 }
@@ -369,7 +369,7 @@ void MyMpi::testSentHandles() {
         MPI_Test(&h->request, &flag, /*&h->status*/ MPI_STATUS_IGNORE);
         if (flag) {
             // Sending operation completed
-            Console::log(Console::VVVERB, "Message of ID %i successfully sent.", h->id);
+            Console::log(Console::VVVERB, "Message ID=%i isent", h->id);
             it = sentHandles.erase(it);
         } else {
             it++;
