@@ -9,7 +9,7 @@ import fileinput
 import time
 
 # Compile flags
-flags = "-g -O3 -std=c++14 -Wall -fmessage-length=0"
+flags = "-g -O3 -std=c++14 -Wall -Wno-sign-compare -fmessage-length=0"
 
 def get_default_env():
     osenv = os.environ 

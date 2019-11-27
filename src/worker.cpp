@@ -374,7 +374,7 @@ void Worker::handleRejectBecomeChild(MessageHandlePtr& handle) {
     // Erase commitment
     Console::log_recv(Console::INFO, handle->source, "Rejected to become %s : uncommitting", job.toStr());
     jobCommitments.erase(req.jobId);
-    job.uncommit(req);
+    job.uncommit();
 }
 
 void Worker::handleAcceptBecomeChild(MessageHandlePtr& handle) {
@@ -662,7 +662,7 @@ void Worker::handleQueryJobRevisionDetails(MessageHandlePtr& handle) {
 
 void Worker::handleSendJobRevisionDetails(MessageHandlePtr& handle) {
     IntVec response(*handle->recvData);
-    int jobId = response[0];
+    //int jobId = response[0];
     int transferSize = response[3];
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACK_JOB_REVISION_DETAILS, handle->recvData);
     MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DATA, transferSize);
@@ -673,7 +673,7 @@ void Worker::handleAckJobRevisionDetails(MessageHandlePtr& handle) {
     int jobId = response[0];
     int firstRevision = response[1];
     int lastRevision = response[2];
-    int transferSize = response[3];
+    //int transferSize = response[3];
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DATA, 
                 getJob(jobId).getDescription().serialize(firstRevision, lastRevision));
 }

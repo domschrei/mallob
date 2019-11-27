@@ -31,7 +31,7 @@ private:
 public:
 
     JobDescription() = default;
-    JobDescription(int id, float priority, bool incremental) : id(id), 
+    JobDescription(int id, float priority, bool incremental) : id(id), rootRank(-1),
                 priority(priority), incremental(incremental), revision(0) {}
 
     int getId() const {return id;}

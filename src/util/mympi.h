@@ -32,7 +32,7 @@ struct MessageHandle {
         sendData = std::make_shared<std::vector<uint8_t>>();
         recvData = std::make_shared<std::vector<uint8_t>>();
     }
-    MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& data) : sendData(data), id(id) {
+    MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& data) : id(id), sendData(data) {
         recvData = std::make_shared<std::vector<uint8_t>>();
     }
     MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& sendData, const std::shared_ptr<std::vector<uint8_t>>& recvData) : 
@@ -183,7 +183,6 @@ private:
     static std::set<MessageHandlePtr> handles;
     static std::set<MessageHandlePtr> sentHandles;
     static std::map<int, int> tagPriority;
-    static std::map<int, std::shared_ptr<std::vector<uint8_t>>> msgBuffers;
 
 public:
 
@@ -203,6 +202,7 @@ public:
     static MessageHandlePtr  recv(MPI_Comm communicator, int tag);
 
     static MessageHandlePtr poll();
+    //static MessageHandlePtr pollByProbing(const ListenerMode& mode);
     static inline bool hasActiveHandles() {
         return handles.size() > 0;
     }

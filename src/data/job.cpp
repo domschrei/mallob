@@ -141,7 +141,7 @@ void Job::commit(const JobRequest& req) {
         switchState(COMMITTED);
 }
 
-void Job::uncommit(const JobRequest& req) {
+void Job::uncommit() {
 
     assert(isInState({COMMITTED, INITIALIZING_TO_COMMITTED}));
 
