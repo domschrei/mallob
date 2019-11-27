@@ -173,7 +173,7 @@ public:
             assert(MyMpi::tagPriority.count(a->tag) || Console::fail("Tag %i has no priority assigned to it", a->tag));
             assert(MyMpi::tagPriority.count(b->tag) || Console::fail("Tag %i has no priority assigned to it", b->tag));
             if (MyMpi::tagPriority[a->tag] != MyMpi::tagPriority[b->tag])
-            return MyMpi::tagPriority[a->tag] < MyMpi::tagPriority[b->tag];
+                return MyMpi::tagPriority[a->tag] < MyMpi::tagPriority[b->tag];
             if (a->tag != b->tag) return a->tag < b->tag;
             return false;
         }
@@ -208,7 +208,7 @@ public:
     }
     static bool hasCriticalHandles();
     static void deferHandle(MessageHandlePtr handle);
-    static void cleanSentHandles();
+    static void testSentHandles();
 
     static int size(MPI_Comm comm);
     static int rank(MPI_Comm comm);
