@@ -122,6 +122,7 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object) {
 
     float time = Timer::elapsedSeconds();
+    float startTime = Timer::elapsedSeconds();
     MessageHandlePtr handle(new MessageHandle(nextHandleId(), object));
     float timeCreateHandle = Timer::elapsedSeconds() - time;
 
@@ -141,8 +142,8 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
     (selfMessage ? handles : sentHandles).insert(handle);
     float timeInsertHandle = Timer::elapsedSeconds() - time;
 
-    Console::log(Console::VVVERB, "Msg ID=%i dest=%i createHandleTime=%.6f sendTime=%.6f insertHandleTime=%.6f", handle->id, recvRank,
-                timeCreateHandle, timeSend, timeInsertHandle);
+    Console::log(Console::VVVERB, "Msg ID=%i dest=%i tag=%i starttime=%.6f createHandleTime=%.6f sendTime=%.6f insertHandleTime=%.6f", handle->id, 
+                recvRank, tag, startTime, timeCreateHandle, timeSend, timeInsertHandle);
     return handle;
 }
 
