@@ -39,6 +39,7 @@ bool Worker::checkTerminate() {
 
 void Worker::mainProgram() {
 
+    int iteration = 0;
     while (!checkTerminate()) {
 
         // If it is time to do balancing (and it is not being done right now)
@@ -106,6 +107,7 @@ void Worker::mainProgram() {
         float pollTime = Timer::elapsedSeconds();
         if ((handle = MyMpi::poll()) != NULL) {
             pollTime = Timer::elapsedSeconds() - pollTime;
+            Console::log(Console::VVVERB, "loop cycle %i", iteration);
             if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f secs", jobTime);
             Console::log(Console::VVVERB, "poll time: %.6f secs", pollTime);
 
@@ -191,6 +193,8 @@ void Worker::mainProgram() {
             time = Timer::elapsedSeconds() - time;
             Console::log(Console::VVVERB, "Processing the message took %.6f seconds.", time);
         }
+        
+        iteration++;
     }
 
     Console::flush();
