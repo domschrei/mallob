@@ -33,6 +33,35 @@ void handler(int sig) {
   exit(1);
 }
 
+void warmUpRun() {
+    
+    int worldRank = MyMpi::rank(MPI_COMM_WORLD);
+    int n = MyMpi::size(MPI_COMM_WORLD);
+
+    // Send
+    for (int r = 0; r < n; r++) {
+        if (worldRank == r) continue;
+        IntVec payload({1, 2, 3, 4, 5, 6, 7, 8});
+        MyMpi::isend(MPI_COMM_WORLD, r, MSG_WARMUP, payload);
+    }
+
+    // Test and receive
+    int received = 0;
+    MyMpi::irecv(MPI_COMM_WORLD, MSG_WARMUP);
+    while (true) {
+        MyMpi::testSentHandles();
+        MessageHandlePtr handle = MyMpi::poll();
+        if (handle != NULL && handle->tag == MSG_WARMUP) {
+            Console::log_recv(Console::VVVERB, handle->source, "Received warmup msg");
+            received++;
+            if (received == n-1) break;
+            else MyMpi::irecv(MPI_COMM_WORLD, MSG_WARMUP);
+        }
+    }
+
+    Console::log(Console::VERB, "Finished warmup run.");
+}
+
 void doExternalClientProgram(MPI_Comm commClients, Parameters& params, const std::set<int>& clientRanks) {
     
     client = new Client(commClients, params, clientRanks);
@@ -44,7 +73,6 @@ void doWorkerNodeProgram(MPI_Comm commWorkers, Parameters& params, const std::se
 
     worker = new Worker(commWorkers, params, clientRanks);
     worker->init();
-    worker->warmUpRun();
     worker->mainProgram();
 }
 
@@ -112,6 +140,10 @@ int main(int argc, char *argv[]) {
     MPI_Comm_split(MPI_COMM_WORLD, color, rank, &newComm);
 
     std::set_terminate(dumpStats);
+
+    if (params.isSet("warmup")) {
+        warmUpRun();
+    }
 
     // Launch node's main program
     if (isExternalClient) {

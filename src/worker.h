@@ -59,7 +59,6 @@ public:
         }
 
     void init();
-    void warmUpRun();
     void mainProgram();
     void dumpStats() {//stats.dump();
     };
