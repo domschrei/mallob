@@ -44,6 +44,7 @@ void doWorkerNodeProgram(MPI_Comm commWorkers, Parameters& params, const std::se
 
     worker = new Worker(commWorkers, params, clientRanks);
     worker->init();
+    worker->warmUpRun();
     worker->mainProgram();
 }
 

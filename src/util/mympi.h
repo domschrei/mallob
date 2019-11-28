@@ -39,6 +39,7 @@ struct MessageHandle {
         id(id), sendData(sendData), recvData(recvData) {}
 };
 
+const int MSG_WARMUP = 1;
 /*
  * The sender wishes to receive the current volume of job j from the receiver.
  * Data type: 1 int (jobId)

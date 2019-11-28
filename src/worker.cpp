@@ -37,6 +37,32 @@ bool Worker::checkTerminate() {
     return false;
 }
 
+void Worker::warmUpRun() {
+    
+    // Send
+    int n = MyMpi::size(comm);
+    for (int r = 0; r < n; r++) {
+        if (worldRank == r) continue;
+        IntVec payload({1, 2, 3, 4, 5, 6, 7, 8});
+        MyMpi::isend(MPI_COMM_WORLD, r, MSG_WARMUP, payload);
+    }
+
+    // Test and receive
+    MyMpi::irecv(MPI_COMM_WORLD, MSG_WARMUP);
+    int received = 0;
+    while (received < n-1) {
+        MyMpi::testSentHandles();
+        MessageHandlePtr handle = MyMpi::poll();
+        if (handle != NULL && handle->tag == MSG_WARMUP) {
+            Console::log_recv(Console::VVVERB, handle->source, "Received warmup msg");
+            received++;
+            MyMpi::irecv(MPI_COMM_WORLD, MSG_WARMUP);
+        }
+    }
+    
+    Console::log(Console::VERB, "Finished warmup run.");
+}
+
 void Worker::mainProgram() {
 
     int iteration = 0;
