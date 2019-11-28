@@ -101,7 +101,7 @@ public:
     void setDescription(std::shared_ptr<std::vector<uint8_t>>& data);
     void addAmendment(std::shared_ptr<std::vector<uint8_t>>& data);
     void commit(const JobRequest& req);
-    void uncommit(const JobRequest& req);
+    void uncommit();
     void initialize(int index, int rootRank, int parentRank);
     void reinitialize(int index, int rootRank, int parentRank);
     void suspend();

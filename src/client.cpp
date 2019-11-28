@@ -277,7 +277,7 @@ void Client::handleAckJobRevisionDetails(MessageHandlePtr& handle) {
     int jobId = response[0];
     int firstRevision = response[1];
     int lastRevision = response[2];
-    int transferSize = response[3];
+    //int transferSize = response[3];
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DATA, 
                 introducedJobs[jobId]->serialize(firstRevision, lastRevision));
 }

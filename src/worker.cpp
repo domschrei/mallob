@@ -39,6 +39,7 @@ bool Worker::checkTerminate() {
 
 void Worker::mainProgram() {
 
+    int iteration = 0;
     while (!checkTerminate()) {
 
         // If it is time to do balancing (and it is not being done right now)
@@ -106,6 +107,7 @@ void Worker::mainProgram() {
         float pollTime = Timer::elapsedSeconds();
         if ((handle = MyMpi::poll()) != NULL) {
             pollTime = Timer::elapsedSeconds() - pollTime;
+            Console::log(Console::VVVERB, "loop cycle %i", iteration);
             if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f secs", jobTime);
             Console::log(Console::VVVERB, "poll time: %.6f secs", pollTime);
 
@@ -191,6 +193,8 @@ void Worker::mainProgram() {
             time = Timer::elapsedSeconds() - time;
             Console::log(Console::VVVERB, "Processing the message took %.6f seconds.", time);
         }
+        
+        iteration++;
     }
 
     Console::flush();
@@ -378,7 +382,7 @@ void Worker::handleRejectBecomeChild(MessageHandlePtr& handle) {
     // Erase commitment
     Console::log_recv(Console::INFO, handle->source, "Rejected to become %s : uncommitting", job.toStr());
     jobCommitments.erase(req.jobId);
-    job.uncommit(req);
+    job.uncommit();
 }
 
 void Worker::handleAcceptBecomeChild(MessageHandlePtr& handle) {
@@ -666,7 +670,7 @@ void Worker::handleQueryJobRevisionDetails(MessageHandlePtr& handle) {
 
 void Worker::handleSendJobRevisionDetails(MessageHandlePtr& handle) {
     IntVec response(*handle->recvData);
-    int jobId = response[0];
+    //int jobId = response[0];
     int transferSize = response[3];
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACK_JOB_REVISION_DETAILS, handle->recvData);
     MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DATA, transferSize);
@@ -677,7 +681,7 @@ void Worker::handleAckJobRevisionDetails(MessageHandlePtr& handle) {
     int jobId = response[0];
     int firstRevision = response[1];
     int lastRevision = response[2];
-    int transferSize = response[3];
+    //int transferSize = response[3];
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DATA, 
                 getJob(jobId).getDescription().serialize(firstRevision, lastRevision));
 }

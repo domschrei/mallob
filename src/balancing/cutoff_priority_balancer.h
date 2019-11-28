@@ -97,7 +97,7 @@ int size() {return data.size();}
 double& operator[](int i) {return data[i];}
 void merge(const Reduceable& other) override {
     const SortedDoubleSequence& otherSet = (SortedDoubleSequence&) other;
-    int i = 0, j = 0, x = 0;
+    int i = 0, j = 0;
     std::vector<double> newData(data.size() + otherSet.data.size());
     for (int x = 0; x < data.size() + otherSet.data.size(); x++) {
         if (i < data.size() && (j >= otherSet.data.size() || data[i] <= otherSet.data[j]))

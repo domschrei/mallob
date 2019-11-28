@@ -106,23 +106,44 @@ void MyMpi::resetListenerIfNecessary(const ListenerMode& mode, int tag) {
 }
 
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object) {
+    
+    float time = Timer::elapsedSeconds();
     std::shared_ptr<std::vector<uint8_t>> vec = object.serialize();
-    return isend(communicator, recvRank, tag, vec);
+    float timeSerialize = Timer::elapsedSeconds() - time;
+
+    time = Timer::elapsedSeconds();
+    MessageHandlePtr handle = isend(communicator, recvRank, tag, vec);
+    float timeSend = Timer::elapsedSeconds() - time;
+
+    Console::log(Console::VVVERB, "Msg ID=%i serializeTime=%.6f totalSendTime=%.6f", handle->id, timeSerialize, timeSend);
+    return handle;
 }
 
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object) {
+
+    float time = Timer::elapsedSeconds();
+    float startTime = Timer::elapsedSeconds();
     MessageHandlePtr handle(new MessageHandle(nextHandleId(), object));
-    if (rank(communicator) == recvRank) {
+    float timeCreateHandle = Timer::elapsedSeconds() - time;
+
+    time = Timer::elapsedSeconds();
+    bool selfMessage = rank(communicator) == recvRank;
+    if (selfMessage) {
         handle->recvData = handle->sendData;
         handle->tag = tag;
         handle->source = recvRank;
         handle->selfMessage = true;
-        handles.insert(handle);
     } else {
         MPI_Isend(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator, &handle->request);
-        sentHandles.insert(handle);
     }
-    Console::log(Console::VVVERB, "Msg ID=%i", handle->id);
+    float timeSend = Timer::elapsedSeconds() - time;
+
+    time = Timer::elapsedSeconds();
+    (selfMessage ? handles : sentHandles).insert(handle);
+    float timeInsertHandle = Timer::elapsedSeconds() - time;
+
+    Console::log(Console::VVVERB, "Msg ID=%i dest=%i tag=%i starttime=%.6f createHandleTime=%.6f sendTime=%.6f insertHandleTime=%.6f", handle->id, 
+                recvRank, tag, startTime, timeCreateHandle, timeSend, timeInsertHandle);
     return handle;
 }
 
@@ -141,7 +162,7 @@ MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const
     } else {
         MPI_Send(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator);
     }
-    Console::log(Console::VVVERB, "Msg ID=%i", handle->id);
+    Console::log(Console::VVVERB, "Msg ID=%i sent.", handle->id);
     return handle;
 }
 
@@ -157,8 +178,16 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator) {
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int tag) {
     MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     handle->tag = tag;
-    handle->recvData->resize(maxMsgLength);
-    MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->request);
+
+    int msgSize;
+    if (tag == MSG_JOB_COMMUNICATION || tag == MSG_COLLECTIVES) {
+        msgSize = maxMsgLength;
+    } else {
+        msgSize = 100;
+    }
+
+    handle->recvData->resize(msgSize);
+    MPI_Irecv(handle->recvData->data(), msgSize, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->request);
     handles.insert(handle);
     return handle;
 }
@@ -280,6 +309,38 @@ MessageHandlePtr MyMpi::poll() {
     return handle;
 }
 
+/*
+template <class T, std::size_t N>
+constexpr std::size_t arrsize(const T (&array)[N]) noexcept
+{
+	return N;
+}
+
+MyMpi::pollByProbing(const ListenerMode& mode) {
+    cleanSentHandles();
+
+    MessageHandlePtr foundHandle = NULL;
+
+    // Get self message, if present
+    for (auto it = handles.begin(); it != handles.end(); ++it) {
+        MessageHandlePtr h = *it;
+        if (h->selfMessage) {
+            foundHandle = h;
+            break; // handle of minimum priority found
+        }
+    }
+
+    const int* tags = (mode == CLIENT ? ANYTIME_CLIENT_RECV_TAGS : ANYTIME_WORKER_RECV_TAGS);
+    int size;
+    if (mode == CLIENT) size = arrsize(ANYTIME_CLIENT_RECV_TAGS);
+    else size = arrsize(ANYTIME_WORKER_RECV_TAGS);
+
+    for (int i = 0; i < size; i++) {
+        int tag = tags[i];
+        MPI_Pro
+    }
+}*/
+
 bool MyMpi::hasCriticalHandles() {
     bool critical = false;
     for (auto it : handles) {
@@ -306,10 +367,10 @@ void MyMpi::testSentHandles() {
     for (auto it = sentHandles.begin(); it != sentHandles.end();) {
         MessageHandlePtr h = *it;
         int flag = -1;
-        MPI_Test(&h->request, &flag, &h->status);
+        MPI_Test(&h->request, &flag, /*&h->status*/ MPI_STATUS_IGNORE);
         if (flag) {
             // Sending operation completed
-            Console::log(Console::VVVERB, "Message of ID %i successfully sent.", h->id);
+            Console::log(Console::VVVERB, "Message ID=%i isent", h->id);
             it = sentHandles.erase(it);
         } else {
             it++;

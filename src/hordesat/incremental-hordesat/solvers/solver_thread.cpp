@@ -48,9 +48,8 @@ void SolverThread::init() {
 
     //log(1, "solverRunningThread, entering\n");
     hlib = _args->hlib;
-    solver = hlib->solvers[_args->solverId];
     int localId = _args->solverId;
-    bool readFormula = _args->readFormulaFromHlib;
+    solver = hlib->solvers[localId];
     if (hlib->params.isSet("pin")) {
         hlib->solvingStateLock.lock();
         pinThread(hlib->params.getIntParam("c", 1));
