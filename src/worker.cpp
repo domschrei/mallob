@@ -21,6 +21,12 @@ void Worker::init() {
     //balancer = std::unique_ptr<Balancer>(new ThermodynamicBalancer(comm, params));
     balancer = std::unique_ptr<Balancer>(new CutoffPriorityBalancer(comm, params, stats));
     
+    // Initialize pseudo-random order of nodes TODO DERANDOMIZATION
+    globalPermutation = AdjustablePermutation(MyMpi::size(comm), 1);
+    globalPermSelfIndex = 0;
+    while (globalPermutation.get(globalPermSelfIndex) != worldRank) 
+        globalPermSelfIndex++;
+
     // Begin listening to an incoming message
     MyMpi::beginListening(WORKER);
 
@@ -59,7 +65,7 @@ void Worker::warmUpRun() {
             MyMpi::irecv(MPI_COMM_WORLD, MSG_WARMUP);
         }
     }
-    
+
     Console::log(Console::VERB, "Finished warmup run.");
 }
 
@@ -646,7 +652,9 @@ void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
     } else {
         Console::fail("%s : unknown child %s is defecting to another node", job.toStr(), jobStr(jobId, index));
     }
-    int nextNodeRank = getRandomWorkerNode();
+    // TODO DERANDOMIZATION
+    //int nextNodeRank = getRandomWorkerNode();
+    int nextNodeRank = globalPermutation.get((globalPermSelfIndex+1) % MyMpi::size(comm));
 
     // Initiate search for a replacement for the defected child
     Console::log(Console::VERB, "%s : trying to find a new child replacing defected node %s", 
@@ -834,9 +842,10 @@ void Worker::bounceJobRequest(JobRequest& request) {
         Console::log(Console::WARN, "%s bouncing for the %i. time", jobStr(request.jobId, request.requestedNodeIndex), num);
     }
 
+    /*
     // Generate pseudorandom permutation of this request
     int n = MyMpi::size(comm);
-    AdjustablePermutation perm(n, 3 * request.jobId + 7 * request.requestedNodeIndex + 11 * request.requestingNodeRank);
+    AdjustablePermutation perm(n, 0); //3 * request.jobId + 7 * request.requestedNodeIndex + 11 * request.requestingNodeRank);
     // Fetch next index of permutation based on number of hops
     int permIdx = request.numHops % n;
     int nextRank = perm.get(permIdx);
@@ -844,10 +853,11 @@ void Worker::bounceJobRequest(JobRequest& request) {
     while (nextRank == worldRank || nextRank == request.requestingNodeRank) {
         permIdx = (permIdx+1) % n;
         nextRank = perm.get(permIdx);
-    }
+    }*/
+    // TODO DERANDOMIZATION
+    int nextRank = globalPermutation.get((globalPermSelfIndex+1) % MyMpi::size(comm));
 
-    // Send request to a random other worker node
-    //int nextRank = getRandomWorkerNode();
+    // Send request to "next" worker node
     Console::log_send(Console::VVVERB, nextRank, "Bouncing %s", jobStr(request.jobId, request.requestedNodeIndex));
     MyMpi::isend(MPI_COMM_WORLD, nextRank, MSG_FIND_NODE, request);
     //stats.increment("sentMessages");
