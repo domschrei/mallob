@@ -44,8 +44,7 @@ private:
 
     std::map<int, std::thread> initializerThreads;
 
-    AdjustablePermutation globalPermutation;
-    int globalPermSelfIndex;
+    std::vector<int> bounceAlternatives;
 
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& clientNodes) :

@@ -27,6 +27,9 @@ public:
             return std::floor(x);
         }
     }
+    static int choice(std::vector<int> vec) {
+        return vec[ (int) (vec.size()*rand()) ];
+    }
 };
 
 #endif

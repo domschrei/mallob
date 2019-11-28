@@ -23,10 +23,19 @@ void Worker::init() {
     
     // Initialize pseudo-random order of nodes
     if (params.isSet("derandomize")) {
-        globalPermutation = AdjustablePermutation(MyMpi::size(comm), 1);
-        globalPermSelfIndex = 0;
-        while (globalPermutation.get(globalPermSelfIndex) != worldRank) 
-            globalPermSelfIndex++;
+        // Pick fixed amount of bounce destinations
+        bounceAlternatives = std::vector<int>(params.getIntParam("ba"));
+        int numWorkers = MyMpi::size(comm);
+        std::string info = "";
+        for (int i = 0; i < bounceAlternatives.size(); i++) {
+            do {
+                bounceAlternatives[i] = (int) (numWorkers*Random::rand());
+            } while (bounceAlternatives[i] != worldRank && 
+                std::find(bounceAlternatives.begin(), bounceAlternatives.begin()+i, bounceAlternatives[i]) 
+                    == bounceAlternatives.end());
+            info += std::to_string(bounceAlternatives[i]) + " ";
+        }
+        Console::log(Console::VERB, "My bounce alternatives: %s", info.c_str());
     }
 
     Console::log(Console::VERB, "Global initialization barrier ...");
@@ -631,7 +640,7 @@ void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
     
     int nextNodeRank;
     if (params.isSet("derandomize")) {
-        nextNodeRank = globalPermutation.get((globalPermSelfIndex+1) % MyMpi::size(comm));
+        nextNodeRank = Random::choice(bounceAlternatives);
     } else {
         nextNodeRank = getRandomWorkerNode();
     }
@@ -824,7 +833,7 @@ void Worker::bounceJobRequest(JobRequest& request) {
 
     int nextRank;
     if (params.isSet("derandomize")) {
-        nextRank = globalPermutation.get((globalPermSelfIndex+1) % MyMpi::size(comm));
+        nextRank = Random::choice(bounceAlternatives);
     } else {
         // Generate pseudorandom permutation of this request
         int n = MyMpi::size(comm);

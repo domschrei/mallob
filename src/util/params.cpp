@@ -28,11 +28,12 @@ void Parameters::init(int argc, char** argv) {
 }
 
 void Parameters::setDefaults() {
+    setParam("ba", "4"); // num bounce alternatives (only relevant if -derandomize)
     setParam("c", "1"); // num clients
     //setParam("colors"); // colored terminal output
     //setParam("derandomize"); // derandomize job bouncing
-    //setParam("h"); setParam("help"); // print usage
     setParam("g", "5.0"); // job demand growth interval
+    //setParam("h"); setParam("help"); // print usage
     setParam("l", "0.95"); // load factor
     setParam("log", "."); // logging directory
     setParam("lbc", "0"); // leaky bucket client parameter (0 = no leaky bucket, jobs enter by time) 
@@ -55,6 +56,7 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "             will parse <name>.0 for one client, ");
     Console::log(Console::INFO, "             <name>.0 and <name>.1 for two clients, ...");
     Console::log(Console::INFO, "Options:");
+    Console::log(Console::INFO, "-ba=<num-ba>          Number of bounce alternatives per node (only relevant if -derandomize)");
     Console::log(Console::INFO, "-c=<num-clients>      Amount of client nodes (int c >= 1)");
     Console::log(Console::INFO, "-colors               Colored terminal output based on messages' verbosity");
     Console::log(Console::INFO, "-derandomize          Derandomize job bouncing");
