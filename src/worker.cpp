@@ -27,12 +27,17 @@ void Worker::init() {
         bounceAlternatives = std::vector<int>(params.getIntParam("ba"));
         int numWorkers = MyMpi::size(comm);
         std::string info = "";
-        for (int i = 0; i < bounceAlternatives.size(); i++) {
+        // First alternative: always rank+1 (to avoid k-cliques when -ba=k)
+        bounceAlternatives[0] = (worldRank+1) % numWorkers;
+        info += std::to_string(bounceAlternatives[0]) + " ";
+        // Subsequent alternatives
+        for (int i = 1; i < bounceAlternatives.size(); i++) {
+            // Repeat random drawing until a previously unchosen, non-self node is found 
             do {
                 bounceAlternatives[i] = (int) (numWorkers*Random::rand());
-            } while (bounceAlternatives[i] != worldRank && 
+            } while (bounceAlternatives[i] == worldRank ||
                 std::find(bounceAlternatives.begin(), bounceAlternatives.begin()+i, bounceAlternatives[i]) 
-                    == bounceAlternatives.end());
+                    != bounceAlternatives.begin()+i);
             info += std::to_string(bounceAlternatives[i]) + " ";
         }
         Console::log(Console::VERB, "My bounce alternatives: %s", info.c_str());
@@ -837,7 +842,7 @@ void Worker::bounceJobRequest(JobRequest& request) {
     } else {
         // Generate pseudorandom permutation of this request
         int n = MyMpi::size(comm);
-        AdjustablePermutation perm(n, 0); //3 * request.jobId + 7 * request.requestedNodeIndex + 11 * request.requestingNodeRank);
+        AdjustablePermutation perm(n, 3 * request.jobId + 7 * request.requestedNodeIndex + 11 * request.requestingNodeRank);
         // Fetch next index of permutation based on number of hops
         int permIdx = request.numHops % n;
         nextRank = perm.get(permIdx);
