@@ -19,6 +19,7 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             _state(NONE),
             _has_description(false), 
             _initialized(false), 
+            _abort_after_initialization(false),
             _done_locally(false), 
             _job_node_ranks(commSize, jobId),
             _has_left_child(false),
@@ -246,13 +247,13 @@ bool Job::wantsToCommunicate() const {
         return false;
     }
     // Active leaf node initiates communication if s seconds have passed since last one
-    return isInState({ACTIVE}) && !hasLeftChild() && !hasRightChild() 
-            && (int)(Timer::elapsedSeconds() / _params.getFloatParam("s")) > _last_job_comm_remainder;
+    return isInState({ACTIVE, INITIALIZING_TO_ACTIVE}) && !hasLeftChild() && !hasRightChild() 
+            && getJobCommEpoch() > _last_job_comm_remainder;
 }
 
 void Job::communicate() {
     assert(_params.getFloatParam("s") > 0.0f);
-    _last_job_comm_remainder = (int)(Timer::elapsedSeconds() / _params.getFloatParam("s"));
+    _last_job_comm_remainder = getJobCommEpoch();
     beginCommunication();
 }
 

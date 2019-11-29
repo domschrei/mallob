@@ -130,11 +130,11 @@ void Worker::mainProgram() {
         if ((handle = MyMpi::poll()) != NULL) {
             pollTime = Timer::elapsedSeconds() - pollTime;
             Console::log(Console::VVVERB, "loop cycle %i", iteration);
-            if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f secs", jobTime);
-            Console::log(Console::VVVERB, "poll time: %.6f secs", pollTime);
+            if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f s", jobTime);
+            Console::log(Console::VVVERB, "poll time: %.6f s", pollTime);
 
             // Process message
-            Console::log_recv(Console::VVVERB, handle->source, "Processing message of tag %i", handle->tag);
+            Console::log_recv(Console::VVVERB, handle->source, "Processing msg, tag %i", handle->tag);
             float time = Timer::elapsedSeconds();
 
             //stats.increment("receivedMessages");
@@ -213,7 +213,7 @@ void Worker::mainProgram() {
             MyMpi::resetListenerIfNecessary(WORKER, handle->tag);
 
             time = Timer::elapsedSeconds() - time;
-            Console::log(Console::VVVERB, "Processing the message took %.6f seconds.", time);
+            Console::log(Console::VVVERB, "Processing msg, tag %i took %.6f s", handle->tag, time);
         }
         
         iteration++;

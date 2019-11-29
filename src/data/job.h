@@ -143,6 +143,7 @@ public:
     bool hasJobDescription() const {return _has_description;};
     int getRevision() const {return _description.getRevision();};
     float getAge() const {return Timer::elapsedSeconds() - _elapsed_seconds_since_arrival;}
+    int getJobCommEpoch() const {return _params.getFloatParam("s") <= 0 ? -1 : (int)(Timer::elapsedSeconds() / _params.getFloatParam("s"));}
 
     bool isRoot() const {return _index == 0;};
     int getRootNodeRank() const {return _job_node_ranks[0];};
