@@ -68,6 +68,8 @@ void MyMpi::init(int argc, char *argv[])
     // Job-specific communication: not critical for balancing 
     tagPriority[MSG_JOB_COMMUNICATION] = 5;
 
+    tagPriority[MSG_WARMUP] = 6;
+
     /*
     for (int tag : ANYTIME_WORKER_RECV_TAGS) {
         msgBuffers[tag] = std::make_shared<std::vector<uint8_t>>(maxMsgLength);

@@ -141,7 +141,8 @@ int main(int argc, char *argv[]) {
 
     std::set_terminate(dumpStats);
 
-    if (params.isSet("warmup")) {
+    if (params.isSet("warmup") && !params.isSet("derandomize")) {
+        // Do global warmup run with explicit all-to-all message passing
         warmUpRun();
     }
 

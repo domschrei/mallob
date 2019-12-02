@@ -47,6 +47,18 @@ void Worker::init() {
     MPI_Barrier(MPI_COMM_WORLD);
     Console::log(Console::VERB, "Passed global initialization barrier.");
 
+    // Send warm-up messages with your pseudorandom bounce destinations
+    if (params.isSet("derandomize") && params.isSet("warmup")) {
+        IntVec payload({1, 2, 3, 4, 5, 6, 7, 8});
+        int numRuns = 5;
+        for (int run = 0; run < numRuns; run++) {
+            for (auto rank : bounceAlternatives) {
+                MyMpi::isend(MPI_COMM_WORLD, rank, MSG_WARMUP, payload);
+                Console::log_send(Console::VVERB, rank, "Warmup msg");
+            }
+        }
+    }
+
     // Begin listening to an incoming message
     MyMpi::beginListening(WORKER);
 }
@@ -203,6 +215,9 @@ void Worker::mainProgram() {
                 // "Collectives" messages are currently handled only in balancer
                 bool done = balancer->continueBalancing(handle);
                 if (done) finishBalancing();
+
+            } else if (handle->tag == MSG_WARMUP) {
+                Console::log_recv(Console::VVERB, handle->source, "Warmup msg");
 
             } else {
                 Console::log_recv(Console::WARN, handle->source, "Unknown message tag %i", handle->tag);
