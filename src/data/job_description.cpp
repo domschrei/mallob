@@ -4,6 +4,10 @@
 #include "job_description.h"
 #include "util/console.h"
 
+JobDescription::~JobDescription() {
+    clearPayload();
+}
+
 int JobDescription::getTransferSize(bool allRevisions) const {
     int size = 3*sizeof(int)
             +sizeof(float)
@@ -90,7 +94,18 @@ std::shared_ptr<std::vector<uint8_t>> JobDescription::serialize(bool allRevision
     return packed;
 }
 
-
+void JobDescription::clearPayload() {
+    for (auto vec : _payloads) {
+        vec.reset();
+        vec = NULL;
+    }
+    for (auto vec : _assumptions) {
+        vec.reset();
+        vec = NULL;
+    }
+    _payloads.clear();
+    _assumptions.clear();
+}
 
 void JobDescription::merge(const std::vector<uint8_t>& packed) {
 

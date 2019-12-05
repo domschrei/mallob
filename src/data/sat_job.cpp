@@ -9,9 +9,8 @@
 #include "data/sat_job.h"
 #include "util/console_horde_interface.h"
 
-void SatJob::initialize() {
+void SatJob::appl_initialize() {
 
-    assert(isInitializing());
     assert(_has_description);
 
     // Initialize Hordesat instance
@@ -27,45 +26,92 @@ void SatJob::initialize() {
     params["mpisize"] = std::to_string(_comm_size); // mpi_size
     std::string identifier = std::string(toStr());
     params["jobstr"] = identifier;
-    Console::log(Console::VERB, "%s : creating horde instance", toStr());
-    _solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(identifier))));
-    assert(_solver != NULL);
-
-    Console::log(Console::VERB, "%s : beginning to solve", toStr());
-    _solver->beginSolving(_description.getPayloads(), _description.getAssumptions(_description.getRevision()));
-    Console::log(Console::VERB, "%s : finished concurrent HordeLib instance initialization", toStr());
 
     if (_abort_after_initialization) {
         endInitialization();
+        appl_withdraw();
+        return;
+    }
+
+    hordeManipulationLock.lock();
+    Console::log(Console::VERB, "%s : creating horde instance", toStr());
+    _solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(identifier))));
+    hordeManipulationLock.unlock();
+
+    if (_abort_after_initialization) {
+        endInitialization();
+        appl_withdraw();
+        return;
+    }
+
+    hordeManipulationLock.lock();
+    if (_solver != NULL) {
+        Console::log(Console::VERB, "%s : beginning to solve", toStr());
+        _solver->beginSolving(_description.getPayloads(), _description.getAssumptions(_description.getRevision()));
+        Console::log(Console::VERB, "%s : finished concurrent HordeLib instance initialization", toStr());
+    }
+    hordeManipulationLock.unlock();
+
+    if (_abort_after_initialization) {
+        endInitialization();
+        appl_withdraw();
     }
 }
 
-void SatJob::updateRole() {
-    _solver->diversify(_index, _comm_size);
+void SatJob::appl_updateRole() {
+    if (_solver != NULL) _solver->diversify(_index, _comm_size);
 }
 
-void SatJob::updateDescription(int fromRevision) {
+void SatJob::appl_updateDescription(int fromRevision) {
+    hordeManipulationLock.lock();
     std::vector<VecPtr> formulaAmendments = _description.getPayloads(fromRevision, _description.getRevision());
     _done_locally = false;
     _solver->continueSolving(formulaAmendments, _description.getAssumptions(_description.getRevision()));
+    hordeManipulationLock.unlock();
 }
 
-void SatJob::pause() {
+void SatJob::appl_pause() {
     _solver->setPaused();
 }
 
-void SatJob::unpause() {
+void SatJob::appl_unpause() {
     _solver->unsetPaused();
 }
 
-void SatJob::interrupt() {
-    _solver->interrupt(); // interrupt SAT solving (but keeps solver threads!)
-    _solver->finishSolving(); // concludes solving process
+void SatJob::appl_interrupt() {
+    hordeManipulationLock.lock();
+    if (_solver != NULL) {
+        _solver->interrupt(); // interrupt SAT solving (but keeps solver threads!)
+        _solver->finishSolving(); // concludes solving process
+    }
+    hordeManipulationLock.unlock();
 }
 
-void SatJob::withdraw() {
-    _solver->abort();
-    //_solver = NULL; // TODO 
+void SatJob::setSolverNull() {
+    Console::log(Console::VERB, "Releasing solver ...");
+    hordeManipulationLock.lock();
+    if (_solver != NULL) {
+        _solver.reset();
+        _solver = NULL;
+        Console::log(Console::VERB, "Solver released.");
+    }
+    hordeManipulationLock.unlock();
+}
+
+void SatJob::appl_withdraw() {
+
+    hordeManipulationLock.lock();
+    if (isInitializing()) {
+        _abort_after_initialization = true;
+    }
+    if (_solver != NULL) {
+        _solver->abort();
+        hordeManipulationLock.unlock();
+        // Do cleanup of HordeLib and its threads in a separate thread to avoid blocking
+        bgThread = std::thread(&SatJob::setSolverNull, this);
+    } else {
+        hordeManipulationLock.unlock();
+    }
 }
 
 void SatJob::extractResult() {
@@ -81,28 +127,31 @@ void SatJob::extractResult() {
     }
 }
 
-void SatJob::beginCommunication() {
+void SatJob::appl_beginCommunication() {
 
     JobMessage msg;
-    msg.payload = collectClausesFromSolvers(); // empty if not ACTIVE
-    if (isInState({ACTIVE}) && isRoot()) {
+    if (isRoot()) {
         // There are no other nodes computing on this job:
-        // internally learn collected clauses
+        // internally learn collected clauses, if ACTIVE
         int jobCommEpoch = getJobCommEpoch();
-        learnClausesFromAbove(msg.payload, jobCommEpoch);
+        if (isInState({ACTIVE})) {
+            msg.payload = collectClausesFromSolvers();
+            learnClausesFromAbove(msg.payload, jobCommEpoch);
+        }
         _last_shared_job_comm = jobCommEpoch;
         return;
     }
     msg.jobId = _id;
     msg.epoch = getJobCommEpoch();
     msg.tag = MSG_GATHER_CLAUSES;
+    msg.payload = collectClausesFromSolvers();
     int parentRank = getParentNodeRank();
     Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) Sending clauses of effective size %i", toStr(), msg.epoch, msg.payload.size());
     MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
     // TODO //stats.increase("sentMessages");
 }
 
-void SatJob::communicate(int source, JobMessage& msg) {
+void SatJob::appl_communicate(int source, JobMessage& msg) {
 
     if (isNotInState({JobState::ACTIVE}))
         return;
@@ -179,8 +228,10 @@ void SatJob::learnAndDistributeClausesDownwards(std::vector<int>& clauses, int j
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_JOB_COMMUNICATION, msg);
     }
 
-    // Locally learn clauses
-    learnClausesFromAbove(clauses, jobCommEpoch);
+    if (clauses.size() > 0) {
+        // Locally learn clauses
+        learnClausesFromAbove(clauses, jobCommEpoch);
+    }
 }
 
 std::vector<int> SatJob::collectClausesFromSolvers() {
@@ -254,11 +305,13 @@ void SatJob::learnClausesFromAbove(std::vector<int>& clauses, int jobCommEpoch) 
 
     // Locally digest clauses
     Console::log(Console::VVERB, "%s : (JCE=%i) digesting clauses ...", toStr(), jobCommEpoch);
-    _solver->digestSharing(clauses);
+    hordeManipulationLock.lock();
+    if (_solver != NULL) _solver->digestSharing(clauses);
+    hordeManipulationLock.unlock();
     Console::log(Console::VVERB, "%s : (JCE=%i) digested clauses.", toStr(), jobCommEpoch);
 }
 
-int SatJob::solveLoop() {
+int SatJob::appl_solveLoop() {
 
     int result = -1;
 
@@ -300,8 +353,24 @@ int SatJob::solveLoop() {
     return result;
 }
 
-void SatJob::dumpStats() {
+void SatJob::appl_dumpStats() {
     if (isInState({ACTIVE})) {
         _solver->dumpStats();
     }
+}
+
+SatJob::~SatJob() {
+    if (bgThread.joinable()) bgThread.join(); // if already aborting
+    else {
+        hordeManipulationLock.lock();
+        if (_solver != NULL) {
+            appl_interrupt();
+            _solver->abort();
+            hordeManipulationLock.unlock();
+            setSolverNull();
+        } else {
+            hordeManipulationLock.unlock();
+        }
+    }
+    Console::log(Console::VERB, "Leaving SAT job destructor.");
 }

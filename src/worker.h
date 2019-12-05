@@ -57,6 +57,7 @@ public:
             currentJob = NULL;
         }
 
+    ~Worker();
     void init();
     void mainProgram();
     void dumpStats() {//stats.dump();

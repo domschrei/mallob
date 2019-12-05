@@ -7,9 +7,11 @@
 #include <unistd.h>
 
 #include "client.h"
+#include "util/sat_reader.h"
 #include "util/timer.h"
 #include "util/console.h"
 #include "util/permutation.h"
+#include "util/memusage.h"
 #include "data/job_transfer.h"
 
 void readAllInstances(Client* client) {
@@ -18,6 +20,11 @@ void readAllInstances(Client* client) {
 
     Client& c = *client;
     for (size_t i = 0; i < c.jobs.size(); i++) {
+
+        // Keep at most 10 full jobs in memory at any time 
+        while (i - c.lastIntroducedJobIdx > 10) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
 
         JobDescription &job = c.jobs[i];
         int jobId = job.getId();
@@ -71,10 +78,6 @@ void Client::init() {
     Console::log(Console::VERB, "Passed global initialization barrier.");
 }
 
-Client::~Client() {
-    instanceReaderThread.join();
-}
-
 bool Client::checkTerminate() {
     if (params.getFloatParam("T") > 0 && Timer::elapsedSeconds() > params.getFloatParam("T")) {
         Console::log(Console::INFO, "Global timeout: terminating.");
@@ -85,8 +88,20 @@ bool Client::checkTerminate() {
 
 void Client::mainProgram() {
 
+    float lastStatTime = Timer::elapsedSeconds();
+
     size_t i = 0;
     while (!checkTerminate()) {
+
+        // Print memory usage info
+        if (Timer::elapsedSeconds() - lastStatTime > 5) {
+            double vm_usage, resident_set;
+            process_mem_usage(vm_usage, resident_set);
+            vm_usage *= 0.001 * 0.001;
+            resident_set *= 0.001 * 0.001;
+            Console::log(Console::VERB, "vm_usage=%.6fGB resident_set=%.6fGB", vm_usage, resident_set);
+            lastStatTime = Timer::elapsedSeconds();
+        }
 
         // Introduce next job(s) as applicable
         if (params.getIntParam("lbc") == 0) {
@@ -146,7 +161,7 @@ void Client::introduceJob(JobDescription& job) {
     while (true) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         std::unique_lock<std::mutex> lock(jobReadyLock);
-        if (jobReady[jobId])
+        if (jobReady.count(jobId) && jobReady[jobId])
             break;
     }
 
@@ -183,10 +198,11 @@ void Client::handleRequestBecomeChild(MessageHandlePtr& handle) {
 
 void Client::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
     JobRequest req; req.deserialize(*handle->recvData);
-    const JobDescription& desc = *introducedJobs[req.jobId];
+    JobDescription& desc = *introducedJobs[req.jobId];
     Console::log_send(Console::VERB, handle->source, "Sending job description of #%i of size %i", desc.getId(), desc.getTransferSize(false));
     rootNodes[req.jobId] = handle->source;
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, desc.serializeFirstRevision());
+    desc.clearPayload();
 }
 
 void Client::handleJobDone(MessageHandlePtr& handle) {
@@ -317,6 +333,7 @@ void Client::readInstanceList(std::string& filename) {
 
 void Client::readFormula(std::string& filename, JobDescription& job) {
 
+    /*
     std::fstream file;
     file.open(filename, std::ios::in);
     if (file.is_open()) {
@@ -329,13 +346,23 @@ void Client::readFormula(std::string& filename, JobDescription& job) {
             int pos = 0;
             int next = 0; 
             while (pos < line.length() && line[pos] == ' ') pos++;
-            if (pos >= line.length() || line.substr(pos, pos+1) == std::string("c") 
-                    || line.substr(pos, pos+1) == std::string("p")) {
+            if (pos >= line.length() || line[pos] == 'c' 
+                    || line[pos] == 'p') {
                 continue;
             }
             while (true) {
-                next = line.find(" ", pos);
-                if (next < 0) {
+
+                // Find end position of next symbol
+                next = pos;
+                bool nonwhitespace = false;
+                while (next < line.length()) {
+                    if (nonwhitespace && line[next] == ' ')
+                        break;
+                    if (line[next] != ' ') nonwhitespace = true;
+                    next++;
+                }
+
+                if (next >= line.length()) {
                     // clause ended
                     formula->push_back(0);
                     break;
@@ -362,4 +389,20 @@ void Client::readFormula(std::string& filename, JobDescription& job) {
     } else {
         Console::log(Console::CRIT, "ERROR: File %s could not be opened. Skipping job #%i", filename.c_str(), job.getId());
     }
+    */
+
+    SatReader r(filename);
+    VecPtr formula = r.read();
+    VecPtr assumptions = std::make_shared<std::vector<int>>();
+    if (formula != NULL) {
+        job.addPayload(formula);
+        job.addAssumptions(assumptions);
+        Console::log(Console::VERB, "%i literals including separation zeros, %i assumptions", formula->size(), assumptions->size());
+    } else {
+        Console::log(Console::CRIT, "ERROR: File %s could not be opened. Skipping job #%i", filename.c_str(), job.getId());
+    }
+}
+
+Client::~Client() {
+    instanceReaderThread.join();
 }

@@ -34,28 +34,34 @@ private:
     int _job_comm_epoch_of_clause_buffer;
     int _last_shared_job_comm;
 
+    std::thread bgThread;
+    Mutex hordeManipulationLock;
+
 public:
 
     SatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) : 
         Job(params, commSize, worldRank, jobId, epochCounter), _num_clause_sources(0), 
         _job_comm_epoch_of_clause_buffer(-1), _last_shared_job_comm(-1) {}
+    ~SatJob() override;
 
-    void initialize() override;
-    void updateRole() override;
-    void updateDescription(int fromRevision) override;
-    void pause() override;
-    void unpause() override;
-    void interrupt() override;
-    void withdraw() override;
-    int solveLoop() override;
+    void appl_initialize() override;
+    void appl_updateRole() override;
+    void appl_updateDescription(int fromRevision) override;
+    void appl_pause() override;
+    void appl_unpause() override;
+    void appl_interrupt() override;
+    void appl_withdraw() override;
+    int appl_solveLoop() override;
 
-    void beginCommunication() override;
-    void communicate(int source, JobMessage& msg) override;
+    void appl_beginCommunication() override;
+    void appl_communicate(int source, JobMessage& msg) override;
 
-    void dumpStats() override;
+    void appl_dumpStats() override;
 
 private:
     void extractResult();
+
+    void setSolverNull();
 
     bool canShareCollectedClauses();
     void learnAndDistributeClausesDownwards(std::vector<int>& clauses, int jobCommEpoch);

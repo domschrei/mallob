@@ -72,6 +72,7 @@ void SolverThread::readFormula() {
         begin -= f->size();
         i++;
         //if (i < hlib->formulae.size() && cancelRun()) return;
+        if (i < hlib->formulae.size() && cancelThread()) return;
     }
 
     log(1, "Solver %i imported clauses: %i literals\n", solver->solverId, (importedLits-prevLits));
@@ -85,6 +86,7 @@ void SolverThread::read(const std::vector<int>& formula, int begin) {
         
         //waitWhile(SUSPENDED);
         //if (cancelRun()) break;
+        if (cancelThread()) break;
 
         int limit = std::min(start+batchSize, (int) formula.size());
         for (int i = start; i < limit; i++) {

@@ -27,21 +27,23 @@ private:
     // Payload (logic to solve)
     std::vector<VecPtr> _payloads;
     std::vector<VecPtr> _assumptions;
+    VecPtr nullVec = NULL;
 
 public:
 
     JobDescription() = default;
     JobDescription(int id, float priority, bool incremental) : id(id), rootRank(-1),
                 priority(priority), incremental(incremental), revision(0) {}
+    ~JobDescription();
 
     int getId() const {return id;}
     int getRootRank() const {return rootRank;}
     float getPriority() const {return priority;}
     int getRevision() const {return revision;}
-    const std::vector<VecPtr> getPayloads() const {return _payloads;}
-    const std::vector<VecPtr> getAssumptions() const {return _assumptions;}
-    const VecPtr& getPayload(int revision) const {return _payloads[revision];}
-    const VecPtr& getAssumptions(int revision) const {return _assumptions[revision];}
+    const std::vector<VecPtr>& getPayloads() const {return _payloads;}
+    const std::vector<VecPtr>& getAssumptions() const {return _assumptions;}
+    const VecPtr& getPayload(int revision) const {return revision >= _payloads.size() ? nullVec : _payloads[revision];}
+    const VecPtr& getAssumptions(int revision) const {return revision >= _assumptions.size() ? nullVec : _assumptions[revision];}
     float getArrival() const {return arrival;}
     bool isIncremental() const {return incremental;}
     int getTransferSize(bool allRevisions) const;
@@ -53,6 +55,7 @@ public:
     void addPayload(const VecPtr& payload) {_payloads.push_back(payload);}
     void addAssumptions(const VecPtr& assumptions) {_assumptions.push_back(assumptions);}
     void setArrival(float arrival) {this->arrival = arrival;};
+    void clearPayload();
 
     std::shared_ptr<std::vector<uint8_t>> serialize() const override;
     void deserialize(const std::vector<uint8_t>& packed) override;

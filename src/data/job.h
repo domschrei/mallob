@@ -6,7 +6,9 @@
 #include <memory>
 #include <thread>
 #include <initializer_list>
+#include <set>
 
+#include "utilities/Threading.h"
 #include "util/params.h"
 #include "util/permutation.h"
 #include "data/job_description.h"
@@ -85,6 +87,7 @@ protected:
     bool _abort_after_initialization;
     std::unique_ptr<std::thread> _initializer_thread;
     bool _done_locally;
+    Mutex jobManipulationLock;
     
     int _result_code;
     JobResult _result;
@@ -94,9 +97,12 @@ protected:
     bool _has_right_child;
     int _client_rank;
 
+    std::set<int> _past_children;
+
 public:
 
     Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
+    virtual ~Job();
     void store(std::shared_ptr<std::vector<uint8_t>>& data);
     void setDescription(std::shared_ptr<std::vector<uint8_t>>& data);
     void addAmendment(std::shared_ptr<std::vector<uint8_t>>& data);
@@ -110,21 +116,24 @@ public:
     void terminate();
 
     // Control methods (must be implemented)
-    virtual void updateRole() = 0;
-    virtual void updateDescription(int fromRevision) = 0;
-    virtual int solveLoop() = 0;
-    virtual void pause() = 0;
-    virtual void unpause() = 0;
-    virtual void interrupt() = 0;
-    virtual void withdraw() = 0;
-    virtual void dumpStats() = 0;
+    virtual void appl_initialize() = 0;
+    virtual void appl_updateRole() = 0;
+    virtual void appl_updateDescription(int fromRevision) = 0;
+    virtual int appl_solveLoop() = 0;
+    virtual void appl_pause() = 0;
+    virtual void appl_unpause() = 0;
+    virtual void appl_interrupt() = 0;
+    virtual void appl_withdraw() = 0;
+    virtual void appl_dumpStats() = 0;
     // Intra-job communication methods (must be implemented)
-    virtual void beginCommunication() = 0;
-    virtual void communicate(int source, JobMessage& msg) = 0;
+    virtual void appl_beginCommunication() = 0;
+    virtual void appl_communicate(int source, JobMessage& msg) = 0;
 
-    virtual void initialize();
     void beginInitialization();
     void endInitialization();
+
+    void lockJobManipulation();
+    void unlockJobManipulation();
     
     // Querying and communication methods (may be re-implemented partially)
     virtual int getDemand(int prevVolume) const;
@@ -150,13 +159,14 @@ public:
     int getParentNodeRank() const {return isRoot() ? _client_rank : _job_node_ranks[getParentIndex()];};
     int getLeftChildNodeRank() const {return _job_node_ranks[getLeftChildIndex()];};
     int getRightChildNodeRank() const {return _job_node_ranks[getRightChildIndex()];};
+    std::set<int>& getPastChildren() {return _past_children;}
 
     bool hasLeftChild() const {return _has_left_child;};
     bool hasRightChild() const {return _has_right_child;};
     void setLeftChild(int rank);
     void setRightChild(int rank);
-    void unsetLeftChild() {_has_left_child = false;};
-    void unsetRightChild() {_has_right_child = false;};
+    void unsetLeftChild() {_past_children.insert(getLeftChildNodeRank()); _has_left_child = false;};
+    void unsetRightChild() {_past_children.insert(getRightChildNodeRank()); _has_right_child = false;};
 
     int getLeftChildIndex() const {return 2*(_index+1)-1;};
     int getRightChildIndex() const {return 2*(_index+1);};

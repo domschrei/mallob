@@ -24,9 +24,9 @@ done < selection
 
 rm selection
 
-arrival=0
-for i in {1..1000}; do
-    arrival=`rand_arrival $arrival 2`
-    echo $(($id+100000))" $arrival "`rand_priority`" /global_data/schreiber/sat_instances/ridiculouslysimple_sat_1.cnf"
-    id=$((id+1))
-done
+#arrival=0
+#for i in {1..1000}; do
+#    arrival=`rand_arrival $arrival 2`
+#    echo $(($id+100000))" $arrival "`rand_priority`" /global_data/schreiber/sat_instances/#ridiculouslysimple_sat_1.cnf"
+#    id=$((id+1))
+#done

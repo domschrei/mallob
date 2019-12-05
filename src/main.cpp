@@ -17,9 +17,6 @@
 
 #include "revision.c"
 
-Client* client;
-Worker* worker;
-
 void handler(int sig) {
   void *array[10];
   size_t size;
@@ -64,23 +61,16 @@ void warmUpRun() {
 
 void doExternalClientProgram(MPI_Comm commClients, Parameters& params, const std::set<int>& clientRanks) {
     
-    client = new Client(commClients, params, clientRanks);
-    client->init();
-    client->mainProgram();
+    Client client(commClients, params, clientRanks);
+    client.init();
+    client.mainProgram();
 }
 
 void doWorkerNodeProgram(MPI_Comm commWorkers, Parameters& params, const std::set<int>& clientRanks) {
 
-    worker = new Worker(commWorkers, params, clientRanks);
-    worker->init();
-    worker->mainProgram();
-}
-
-void dumpStats() {
-    std::cout << "dumping stats" << std::endl;
-    if (worker != NULL) {
-        worker->dumpStats();
-    }
+    Worker worker(commWorkers, params, clientRanks);
+    worker.init();
+    worker.mainProgram();
 }
 
 int main(int argc, char *argv[]) {
@@ -139,7 +129,7 @@ int main(int argc, char *argv[]) {
     MPI_Comm newComm;
     MPI_Comm_split(MPI_COMM_WORLD, color, rank, &newComm);
 
-    std::set_terminate(dumpStats);
+    std::set_terminate(Console::flush);
 
     if (params.isSet("warmup") && !params.isSet("derandomize")) {
         // Do global warmup run with explicit all-to-all message passing
@@ -155,4 +145,5 @@ int main(int argc, char *argv[]) {
 
     MPI_Finalize();
     Console::log(Console::INFO, "Exiting normally.");
+    Console::flush();
 }
