@@ -171,6 +171,9 @@ void Client::introduceJob(JobDescription& job) {
         return;
     }
 
+    // Set job arrival
+    job.setArrival(Timer::elapsedSeconds());
+
     // Find the job's canonical initial node
     int n = MyMpi::size(MPI_COMM_WORLD) - MyMpi::size(comm);
     Console::log(Console::VERB, "Creating permutation of size %i ...", n);
