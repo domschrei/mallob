@@ -19,22 +19,36 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             _state(NONE),
             _has_description(false), 
             _initialized(false), 
+            _abort_after_initialization(false),
             _done_locally(false), 
             _job_node_ranks(commSize, jobId),
             _has_left_child(false),
             _has_right_child(false)
              {}
 
+void Job::lockJobManipulation() {
+    Console::log(Console::VVVERB, "%s : locking job manipulation ...", toStr());
+    jobManipulationLock.lock();
+    Console::log(Console::VVVERB, "%s : locked job manipulation", toStr());
+}
+void Job::unlockJobManipulation() {
+    jobManipulationLock.unlock();
+    Console::log(Console::VVVERB, "%s : unlocked job manipulation", toStr());
+}
+
 void Job::store(std::shared_ptr<std::vector<uint8_t>>& data) {
+    lockJobManipulation();
     setDescription(data);
     if (isInState({NONE})) {
         _index = -1;
         switchState(STORED);
     }
+    unlockJobManipulation();
 }
 
 void Job::setDescription(std::shared_ptr<std::vector<uint8_t>>& data) {
 
+    lockJobManipulation();
     // Explicitly store serialized data s.t. it can be forwarded later
     // without the need to re-serialize the job description
     assert(data != NULL && data->size() > 0);
@@ -42,25 +56,33 @@ void Job::setDescription(std::shared_ptr<std::vector<uint8_t>>& data) {
     _description = JobDescription();
     _description.deserialize(*_serialized_description);
     _has_description = true;
+    unlockJobManipulation();
 }
 
 void Job::addAmendment(std::shared_ptr<std::vector<uint8_t>>& data) {
+
+    lockJobManipulation();
     int oldRevision = _description.getRevision();
     _description.merge(*data);
-    updateDescription(oldRevision+1);
+    appl_updateDescription(oldRevision+1);
     switchState(ACTIVE);
-}
-
-void Job::initialize() {
-    endInitialization();
+    unlockJobManipulation();
 }
 
 void Job::beginInitialization() {
+    lockJobManipulation();
     _elapsed_seconds_since_arrival = Timer::elapsedSeconds();
     switchState(INITIALIZING_TO_ACTIVE);
+    unlockJobManipulation();
 }
 
 void Job::endInitialization() {
+
+    lockJobManipulation();
+    if (isInState({PAST})) {
+        unlockJobManipulation();
+        return;
+    }
     _initialized = true;
     JobState oldState = _state;
     switchState(ACTIVE);
@@ -68,20 +90,28 @@ void Job::endInitialization() {
         _last_job_comm_remainder = (int)(Timer::elapsedSeconds() / _params.getFloatParam("s"));
     _time_of_initialization = Timer::elapsedSeconds();
     if (oldState == INITIALIZING_TO_PAST) {
+        unlockJobManipulation();
         terminate();
     } else if (oldState == INITIALIZING_TO_SUSPENDED) {
+        unlockJobManipulation();
         suspend();
     } else if (oldState == INITIALIZING_TO_COMMITTED) {
         switchState(COMMITTED);
+        unlockJobManipulation();
+    } else {
+        unlockJobManipulation();
     }
 }
 
 void Job::initialize(int index, int rootRank, int parentRank) {
+
+    lockJobManipulation();
     _index = index;
     updateJobNode(0, rootRank);
     updateParentNodeRank(parentRank);
     updateJobNode(_index, _world_rank);
-    initialize();
+    appl_initialize();
+    unlockJobManipulation();
 }
 
 void Job::reinitialize(int index, int rootRank, int parentRank) {
@@ -93,11 +123,13 @@ void Job::reinitialize(int index, int rootRank, int parentRank) {
 
     } else {
 
+        lockJobManipulation();
         if (index == _index) {
 
             // Job of same index as before is resumed
             updateParentNodeRank(parentRank);
             Console::log(Console::INFO, "Resuming solvers of %s", toStr());
+            unlockJobManipulation();
             resume();
 
         } else {
@@ -111,20 +143,23 @@ void Job::reinitialize(int index, int rootRank, int parentRank) {
 
             if (_initialized) {
                 Console::log(Console::INFO, "Restarting solvers of %s", toStr());
+                unlockJobManipulation();
                 suspend();
-                updateRole();
+                appl_updateRole();
                 resume();
+                lockJobManipulation();
                 switchState(ACTIVE);
             } else {
                 switchState(INITIALIZING_TO_ACTIVE);
             }
-
+            unlockJobManipulation();
         }
     }
 }
 
 void Job::commit(const JobRequest& req) {
 
+    lockJobManipulation();
     assert(isNotInState({ACTIVE, COMMITTED}) 
         || Console::fail("State of %s : %s", toStr(), jobStateToStr()));
 
@@ -139,10 +174,13 @@ void Job::commit(const JobRequest& req) {
         switchState(INITIALIZING_TO_COMMITTED);
     else
         switchState(COMMITTED);
+    
+    unlockJobManipulation();
 }
 
 void Job::uncommit() {
 
+    lockJobManipulation();
     assert(isInState({COMMITTED, INITIALIZING_TO_COMMITTED}));
 
     if (_initialized) {
@@ -155,6 +193,7 @@ void Job::uncommit() {
         switchState(NONE);
     }
     _job_node_ranks.clear();
+    unlockJobManipulation();
 }
 
 void Job::setLeftChild(int rank) {
@@ -167,55 +206,74 @@ void Job::setRightChild(int rank) {
 }
 
 void Job::suspend() {
+    lockJobManipulation();
     if (isInitializing()) {
         switchState(INITIALIZING_TO_SUSPENDED);
+        unlockJobManipulation();
         return;
     }
     assert(isInState({ACTIVE}));
-    pause();
+    appl_pause();
     switchState(SUSPENDED);
+    unlockJobManipulation();
     Console::log(Console::INFO, "%s : suspended solver", toStr());
 }
 
 void Job::resume() {
+    lockJobManipulation();
     if (isInitializing()) {
         switchState(INITIALIZING_TO_ACTIVE);
+        unlockJobManipulation();        
         return;
     }
     if (!_initialized) {
+        unlockJobManipulation();
         initialize(_index, getRootNodeRank(), getParentNodeRank());
     } else {
-        unpause();
+        appl_unpause();
         switchState(ACTIVE);
+        unlockJobManipulation();
         Console::log(Console::INFO, "Resumed solving threads of %s", toStr());
     }
 }
 
 void Job::stop() {
+    lockJobManipulation();
     if (isInitializing()) {
         switchState(INITIALIZING_TO_PAST);
+        unlockJobManipulation();
         return;
-    } else {
-        assert(isInState({ACTIVE, SUSPENDED}));
     }
-    interrupt();
+    appl_interrupt();
     switchState(STANDBY);
+    unlockJobManipulation();
 }
 
 void Job::terminate() {
 
+    /*
     if (isInitializing()) {
         switchState(INITIALIZING_TO_PAST);
         _abort_after_initialization = true;
         return;
-    } else {
+    } /*else {
         assert(isInState({ACTIVE, SUSPENDED, STANDBY}));
-    }
+    }*/
 
-    interrupt();
-    withdraw();
+    lockJobManipulation();
+    appl_interrupt();
+    appl_withdraw();
+
+    // Free up memory
+    _description = JobDescription();
+    _serialized_description = std::make_shared<std::vector<uint8_t>>();
+    _serialized_description->resize(sizeof(int));
+    memcpy(_serialized_description->data(), &_id, sizeof(int));
 
     switchState(PAST);
+    unlockJobManipulation();
+
+    Console::log(Console::VERB, "Terminated %s and freed memory.", toStr());
 }
 
 int Job::getDemand(int prevVolume) const {
@@ -246,14 +304,14 @@ bool Job::wantsToCommunicate() const {
         return false;
     }
     // Active leaf node initiates communication if s seconds have passed since last one
-    return isInState({ACTIVE}) && !hasLeftChild() && !hasRightChild() 
-            && (int)(Timer::elapsedSeconds() / _params.getFloatParam("s")) > _last_job_comm_remainder;
+    return isInState({ACTIVE, INITIALIZING_TO_ACTIVE}) && !hasLeftChild() && !hasRightChild() 
+            && getJobCommEpoch() > _last_job_comm_remainder;
 }
 
 void Job::communicate() {
     assert(_params.getFloatParam("s") > 0.0f);
-    _last_job_comm_remainder = (int)(Timer::elapsedSeconds() / _params.getFloatParam("s"));
-    beginCommunication();
+    _last_job_comm_remainder = getJobCommEpoch();
+    appl_beginCommunication();
 }
 
 bool Job::isInState(std::initializer_list<JobState> list) const {
@@ -276,4 +334,22 @@ void Job::switchState(JobState state) {
     _state = state;
     Console::log(Console::VERB, "%s : state transition \"%s\" => \"%s\"", toStr(), 
         jobStateStrings[oldState], jobStateStrings[state]); 
+}
+
+Job::~Job() {
+    
+    lockJobManipulation();
+    
+    _serialized_description.reset();
+    _serialized_description = NULL;
+
+    if (_initializer_thread != NULL) {
+        _initializer_thread->join();
+        _initializer_thread.release();
+        _initializer_thread = NULL;
+    }
+
+    unlockJobManipulation();
+    
+    Console::log(Console::VERB, "Leaving destructor of %s.", toStr());
 }

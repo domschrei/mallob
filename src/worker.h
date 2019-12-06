@@ -44,6 +44,8 @@ private:
 
     std::map<int, std::thread> initializerThreads;
 
+    std::vector<int> bounceAlternatives;
+
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& clientNodes) :
         comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), epochCounter(), stats(epochCounter)
@@ -55,6 +57,7 @@ public:
             currentJob = NULL;
         }
 
+    ~Worker();
     void init();
     void mainProgram();
     void dumpStats() {//stats.dump();

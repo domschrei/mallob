@@ -262,9 +262,14 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 							const std::shared_ptr<std::vector<int>>& assumptions) {
 	
 	for (auto vec : formulae) {
+		if (vec == NULL) {
+			return;
+		}
 		this->formulae.push_back(vec);
 	}
-	this->assumptions = assumptions;
+	if (assumptions != NULL) {
+		this->assumptions = assumptions;
+	}
 
 	maxSeconds = params.getIntParam("t", 0);
 	maxRounds = params.getIntParam("r", 0);
@@ -424,12 +429,12 @@ void HordeLib::setSolvingState(SolvingState state) {
 	// Suspending solvers (stay inside solving procedure, but sleep)
 	if (oldState != SUSPENDED && state == SUSPENDED) {
 		for (int i = 0; i < solversCount; i++) {
-            solvers[i]->setSolverSuspend();
+			if (solvers[i] != NULL) solvers[i]->setSolverSuspend();
         }
 	}
 	if (oldState == SUSPENDED && state != SUSPENDED) {
 		for (int i = 0; i < solversCount; i++) {
-            solvers[i]->unsetSolverSuspend();
+            if (solvers[i] != NULL) solvers[i]->unsetSolverSuspend();
         }
 		// Overwrite static logging variable which may now belong to another HordeLib instance
 		setLogger(logger);
@@ -438,12 +443,12 @@ void HordeLib::setSolvingState(SolvingState state) {
 	// Interrupting solvers (jump out of solving procedure)
 	if (state == STANDBY || state == ABORTING) {
 		for (int i = 0; i < solversCount; i++) {
-            solvers[i]->setSolverInterrupt();
+            if (solvers[i] != NULL) solvers[i]->setSolverInterrupt();
         }
 	}
 	if (oldState == STANDBY && state != STANDBY) {
 		for (int i = 0; i < solversCount; i++) {
-            solvers[i]->unsetSolverInterrupt();
+            if (solvers[i] != NULL) solvers[i]->unsetSolverInterrupt();
         }
 	}
 
@@ -544,9 +549,9 @@ int HordeLib::failed(int lit) {
 	return failedAssumptions.find(lit) != failedAssumptions.end();
 }
 
-
-
 HordeLib::~HordeLib() {
+
+	log(0, "entering hordelib destructor ...\n");
 
 	// for any running threads left:
 	solvingStateLock.lock();
@@ -555,11 +560,43 @@ HordeLib::~HordeLib() {
 	
 	// join threads
 	for (int i = 0; i < solversCount; i++) {
-		solverThreads[i]->join();
-		delete solverThreads[i];
+		if (solverThreads[i] != NULL) {
+			solverThreads[i]->join();
+		}
+	}
+	log(0, "threads joined\n");
+	// delete threads
+	for (int i = 0; i < solversCount; i++) {
+		if (solverThreads[i] != NULL) {
+			delete solverThreads[i];
+			solverThreads[i] = NULL;
+		}
+	}
+	if (solversCount > 0) {
+		free(solverThreads);
+		solversCount = 0;
+	}
+	log(0, "threads deleted\n");
+
+	// delete solvers
+	for (int i = 0; i < solvers.size(); i++) {
+		if (solvers[i] != NULL) {
+			delete solvers[i];
+			solvers[i] = NULL;
+		}
+	}
+	log(0, "solvers deleted\n");
+
+	// delete sharing manager
+	if (sharingManager != NULL) {
+		delete sharingManager;
+		sharingManager = NULL;
 	}
 
-	// cleanup
-	free(solverThreads);
-	delete sharingManager;
+	// release formulae
+	for (auto f : formulae) {
+		f = NULL;
+	}
+
+	log(0, "leaving hordelib destructor\n");
 }

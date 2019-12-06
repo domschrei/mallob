@@ -31,14 +31,24 @@ struct MessageHandle {
         status.MPI_TAG = -1; 
         sendData = std::make_shared<std::vector<uint8_t>>();
         recvData = std::make_shared<std::vector<uint8_t>>();
+        Console::log(Console::VVVERB, "Msg ID=%i created", id);
     }
     MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& data) : id(id), sendData(data) {
         recvData = std::make_shared<std::vector<uint8_t>>();
+        Console::log(Console::VVVERB, "Msg ID=%i created", id);
     }
     MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& sendData, const std::shared_ptr<std::vector<uint8_t>>& recvData) : 
-        id(id), sendData(sendData), recvData(recvData) {}
+        id(id), sendData(sendData), recvData(recvData) {
+        Console::log(Console::VVVERB, "Msg ID=%i created", id);
+    }
+    ~MessageHandle() {
+        sendData = NULL;
+        recvData = NULL;
+        Console::log(Console::VVVERB, "Msg ID=%i deleted", id);
+    }
 };
 
+const int MSG_WARMUP = 1;
 /*
  * The sender wishes to receive the current volume of job j from the receiver.
  * Data type: 1 int (jobId)
@@ -146,7 +156,7 @@ const int ANYTIME_WORKER_RECV_TAGS[] = {MSG_QUERY_VOLUME, MSG_FIND_NODE, MSG_REQ
             MSG_ACCEPT_BECOME_CHILD, MSG_ACK_ACCEPT_BECOME_CHILD, MSG_UPDATE_VOLUME, MSG_WORKER_FOUND_RESULT, 
             MSG_WORKER_DEFECTING, MSG_FORWARD_CLIENT_RANK, MSG_TERMINATE, MSG_INTERRUPT, MSG_ABORT, MSG_QUERY_JOB_RESULT, 
             MSG_NOTIFY_JOB_REVISION, MSG_QUERY_JOB_REVISION_DETAILS, MSG_SEND_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS,
-            MSG_COLLECTIVES, MSG_JOB_COMMUNICATION};
+            MSG_JOB_COMMUNICATION, MSG_WARMUP};
 /**
  * All types of messages which can be receivable by a client node at any time 
  * by a generic irecv method and within the maximum message length.

@@ -10,6 +10,8 @@
 class Reduceable : public Serializable {
 
 public:
+    virtual ~Reduceable() = default;
+
     virtual std::shared_ptr<std::vector<uint8_t>> serialize() const override = 0;
     virtual void deserialize(const std::vector<uint8_t>& packed) override = 0;
     virtual void merge(const Reduceable& other) = 0;

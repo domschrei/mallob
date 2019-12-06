@@ -68,6 +68,8 @@ void MyMpi::init(int argc, char *argv[])
     // Job-specific communication: not critical for balancing 
     tagPriority[MSG_JOB_COMMUNICATION] = 5;
 
+    tagPriority[MSG_WARMUP] = 6;
+
     /*
     for (int tag : ANYTIME_WORKER_RECV_TAGS) {
         msgBuffers[tag] = std::make_shared<std::vector<uint8_t>>(maxMsgLength);
@@ -89,20 +91,27 @@ void MyMpi::beginListening(const ListenerMode& mode) {
 }
 
 void MyMpi::resetListenerIfNecessary(const ListenerMode& mode, int tag) {
+    // Check if tag should be listened to
+    bool listen = false;
     if (mode == CLIENT) {
         for (int t : ANYTIME_CLIENT_RECV_TAGS)
             if (tag == t) {
-                MyMpi::irecv(MPI_COMM_WORLD, tag);
-                return;
+                listen = true;
             }
     }
     if (mode == WORKER) {
         for (int t : ANYTIME_WORKER_RECV_TAGS)
             if (tag == t) {
-                MyMpi::irecv(MPI_COMM_WORLD, tag);
-                return;
+                listen = true;
             }
     }
+    if (!listen) return;
+    // Is the tag already being listened to?
+    for (auto handle : handles) {
+        if (handle->tag == tag) return;
+    }
+    // No: add listener
+    MyMpi::irecv(MPI_COMM_WORLD, tag);
 }
 
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object) {
@@ -123,6 +132,9 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
 
     float time = Timer::elapsedSeconds();
     float startTime = Timer::elapsedSeconds();
+    if (object->empty()) {
+        object->push_back(0);
+    }
     MessageHandlePtr handle(new MessageHandle(nextHandleId(), object));
     float timeCreateHandle = Timer::elapsedSeconds() - time;
 
@@ -270,8 +282,7 @@ MessageHandlePtr MyMpi::poll() {
     int bestPrio = 9999999;
 
     // Find ready handle of best priority
-    for (auto it = handles.begin(); it != handles.end(); ++it) {
-        MessageHandlePtr h = *it;
+    for (auto h : handles) {
         bool consider = false;
         if (h->selfMessage || h->status.MPI_TAG > 0) {
             // Message is already ready to be processed

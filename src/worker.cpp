@@ -11,6 +11,7 @@
 #include "util/timer.h"
 #include "util/console.h"
 #include "util/random.h"
+#include "util/memusage.h"
 #include "balancing/thermodynamic_balancer.h"
 #include "balancing/cutoff_priority_balancer.h"
 #include "data/job_description.h"
@@ -21,12 +22,46 @@ void Worker::init() {
     //balancer = std::unique_ptr<Balancer>(new ThermodynamicBalancer(comm, params));
     balancer = std::unique_ptr<Balancer>(new CutoffPriorityBalancer(comm, params, stats));
     
-    // Begin listening to an incoming message
-    MyMpi::beginListening(WORKER);
+    // Initialize pseudo-random order of nodes
+    if (params.isSet("derandomize")) {
+        // Pick fixed amount of bounce destinations
+        bounceAlternatives = std::vector<int>(params.getIntParam("ba"));
+        int numWorkers = MyMpi::size(comm);
+        std::string info = "";
+        // First alternative: always rank+1 (to avoid k-cliques when -ba=k)
+        bounceAlternatives[0] = (worldRank+1) % numWorkers;
+        info += std::to_string(bounceAlternatives[0]) + " ";
+        // Subsequent alternatives
+        for (int i = 1; i < bounceAlternatives.size(); i++) {
+            // Repeat random drawing until a previously unchosen, non-self node is found 
+            do {
+                bounceAlternatives[i] = (int) (numWorkers*Random::rand());
+            } while (bounceAlternatives[i] == worldRank ||
+                std::find(bounceAlternatives.begin(), bounceAlternatives.begin()+i, bounceAlternatives[i]) 
+                    != bounceAlternatives.begin()+i);
+            info += std::to_string(bounceAlternatives[i]) + " ";
+        }
+        Console::log(Console::VERB, "My bounce alternatives: %s", info.c_str());
+    }
 
     Console::log(Console::VERB, "Global initialization barrier ...");
     MPI_Barrier(MPI_COMM_WORLD);
     Console::log(Console::VERB, "Passed global initialization barrier.");
+
+    // Send warm-up messages with your pseudorandom bounce destinations
+    if (params.isSet("derandomize") && params.isSet("warmup")) {
+        IntVec payload({1, 2, 3, 4, 5, 6, 7, 8});
+        int numRuns = 5;
+        for (int run = 0; run < numRuns; run++) {
+            for (auto rank : bounceAlternatives) {
+                MyMpi::isend(MPI_COMM_WORLD, rank, MSG_WARMUP, payload);
+                Console::log_send(Console::VVERB, rank, "Warmup msg");
+            }
+        }
+    }
+
+    // Begin listening to an incoming message
+    MyMpi::beginListening(WORKER);
 }
 
 bool Worker::checkTerminate() {
@@ -42,9 +77,18 @@ void Worker::mainProgram() {
     int iteration = 0;
     while (!checkTerminate()) {
 
+        if (iteration % 1024 == 0) {
+            // Print memory usage info
+            double vm_usage, resident_set;
+            process_mem_usage(vm_usage, resident_set);
+            vm_usage *= 0.001 * 0.001;
+            resident_set *= 0.001 * 0.001;
+            Console::log(Console::VERB, "vm_usage=%.6fGB resident_set=%.6fGB", vm_usage, resident_set);
+        }
+
         // If it is time to do balancing (and it is not being done right now)
         if (!balancer->isBalancing() && isTimeForRebalancing()) {
-            
+
             // Rebalancing
             Console::log(MyMpi::rank(comm) == 0 ? Console::INFO : Console::VERB, 
                 "Entering rebalancing of epoch %i", epochCounter.getEpoch());
@@ -76,14 +120,14 @@ void Worker::mainProgram() {
             Job &job = *currentJob;
 
             bool initializing = job.isInitializing();
-            int result = job.solveLoop();
+            int result = job.appl_solveLoop();
 
             if (result >= 0) {
 
                 // Solver done!
                 int jobRootRank = job.getRootNodeRank();
                 IntVec payload({job.getId(), job.getRevision(), result});
-                job.dumpStats();
+                job.appl_dumpStats();
 
                 // Signal termination to root -- may be a self message
                 Console::log_send(Console::VERB, jobRootRank, "Sending finished info");
@@ -108,11 +152,11 @@ void Worker::mainProgram() {
         if ((handle = MyMpi::poll()) != NULL) {
             pollTime = Timer::elapsedSeconds() - pollTime;
             Console::log(Console::VVVERB, "loop cycle %i", iteration);
-            if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f secs", jobTime);
-            Console::log(Console::VVVERB, "poll time: %.6f secs", pollTime);
+            if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f s", jobTime);
+            Console::log(Console::VVVERB, "poll time: %.6f s", pollTime);
 
             // Process message
-            Console::log_recv(Console::VVVERB, handle->source, "Processing message of tag %i", handle->tag);
+            Console::log_recv(Console::VVVERB, handle->source, "Processing msg, tag %i", handle->tag);
             float time = Timer::elapsedSeconds();
 
             //stats.increment("receivedMessages");
@@ -182,6 +226,9 @@ void Worker::mainProgram() {
                 bool done = balancer->continueBalancing(handle);
                 if (done) finishBalancing();
 
+            } else if (handle->tag == MSG_WARMUP) {
+                Console::log_recv(Console::VVERB, handle->source, "Warmup msg");
+
             } else {
                 Console::log_recv(Console::WARN, handle->source, "Unknown message tag %i", handle->tag);
             }
@@ -191,7 +238,7 @@ void Worker::mainProgram() {
             MyMpi::resetListenerIfNecessary(WORKER, handle->tag);
 
             time = Timer::elapsedSeconds() - time;
-            Console::log(Console::VVVERB, "Processing the message took %.6f seconds.", time);
+            Console::log(Console::VVVERB, "Processing msg, tag %i took %.6f s", handle->tag, time);
         }
         
         iteration++;
@@ -335,6 +382,16 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
         Console::log_recv(Console::INFO, handle->source, "%s is not active (any more) -- discarding", job.toStr());
         Console::log(Console::VERB, "Actual job state: %s", job.jobStateToStr());
         reject = true;
+    
+    } else if (req.requestedNodeIndex == job.getLeftChildIndex() && job.hasLeftChild()) {
+        // Job already has a left child
+        Console::log_recv(Console::INFO, handle->source, "Discarding request: %s already has a left child", job.toStr());
+        reject = true;
+
+    } else if (req.requestedNodeIndex == job.getRightChildIndex() && job.hasRightChild()) {
+        // Job already has a right child
+        Console::log_recv(Console::INFO, handle->source, "Discarding request: %s already has a right child", job.toStr());
+        reject = true;
 
     } else {
         // Adopt the job
@@ -351,15 +408,14 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
             Console::log_send(Console::INFO, handle->source, "Sending %s", jobStr(req.jobId, req.requestedNodeIndex));
         } else {
             Console::log_send(Console::INFO, handle->source, "Resuming child %s", jobStr(req.jobId, req.requestedNodeIndex));
-
-            // No further communication required -- child will resume its job solvers
-            // Mark new node as one of the node's children
-            if (req.requestedNodeIndex == jobs[req.jobId]->getLeftChildIndex()) {
-                jobs[req.jobId]->setLeftChild(handle->source);
-            } else if (req.requestedNodeIndex == jobs[req.jobId]->getRightChildIndex()) {
-                jobs[req.jobId]->setRightChild(handle->source);
-            } else assert(req.requestedNodeIndex == 0);
         }
+        // Child *will* start / resume its job solvers
+        // Mark new node as one of the node's children
+        if (req.requestedNodeIndex == jobs[req.jobId]->getLeftChildIndex()) {
+            jobs[req.jobId]->setLeftChild(handle->source);
+        } else if (req.requestedNodeIndex == jobs[req.jobId]->getRightChildIndex()) {
+            jobs[req.jobId]->setRightChild(handle->source);
+        } else assert(req.requestedNodeIndex == 0);
     }
 
     // If rejected: Send message to rejected child node
@@ -422,6 +478,7 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
     // Retrieve and send concerned job description
     assert(hasJob(req.jobId));
     Job& job = getJob(req.jobId);
+    // If job already terminated, the description contains the job id ONLY
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, job.getSerializedDescription());
     //stats.increment("sentMessages");
     Console::log_send(Console::VERB, handle->source, "Sent full job description of %s", job.toStr());
@@ -460,6 +517,12 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
     if (jobCommitments.count(jobId))
         jobCommitments.erase(jobId);
 
+    if (handle->recvData->size() == sizeof(int)) {
+        // Empty job description!
+        Console::log(Console::VERB, "Received empty job description of #%i!", jobId);
+        return;
+    }
+
     // Initialize job inside a separate thread
     setLoad(1, jobId);
     getJob(jobId).beginInitialization();
@@ -481,9 +544,14 @@ void Worker::initJob(MessageHandlePtr handle) {
     if (job.isRoot()) {
         jobCpuTimeUsed[jobId] = 0;
     }
-     
-    // Initialize job
-    job.initialize();
+    
+    if (job.isInState({INITIALIZING_TO_PAST})) {
+        // Job was already aborted
+        job.terminate();
+    } else {
+        // Initialize job
+        job.appl_initialize();
+    }
 }
 
 void Worker::handleUpdateVolume(MessageHandlePtr& handle) {
@@ -512,7 +580,7 @@ void Worker::handleJobCommunication(MessageHandlePtr& handle) {
     }
     // Give message to corresponding job
     Job& job = getJob(jobId);
-    job.communicate(handle->source, msg);
+    job.appl_communicate(handle->source, msg);
 }
 
 void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
@@ -620,7 +688,13 @@ void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
     } else {
         Console::fail("%s : unknown child %s is defecting to another node", job.toStr(), jobStr(jobId, index));
     }
-    int nextNodeRank = getRandomWorkerNode();
+    
+    int nextNodeRank;
+    if (params.isSet("derandomize")) {
+        nextNodeRank = Random::choice(bounceAlternatives);
+    } else {
+        nextNodeRank = getRandomWorkerNode();
+    }
 
     // Initiate search for a replacement for the defected child
     Console::log(Console::VERB, "%s : trying to find a new child replacing defected node %s", 
@@ -724,7 +798,8 @@ void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, b
         MyMpi::deferHandle(handle); // do not consume this message while job state is "COMMITTED"
     }
 
-    if (job.isInState({ACTIVE, INITIALIZING_TO_ACTIVE, STANDBY})) {
+    bool acceptMessage = job.isNotInState({NONE, STORED, PAST});
+    if (acceptMessage) {
 
         // Propagate message down the job tree
         int msgTag;
@@ -741,16 +816,23 @@ void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, b
             Console::log_send(Console::VERB, job.getRightChildNodeRank(), "Propagating interruption of %s ...", job.toStr());
             //stats.increment("sentMessages");
         }
+        for (auto childRank : job.getPastChildren()) {
+            MyMpi::isend(MPI_COMM_WORLD, childRank, msgTag, handle->recvData);
+            Console::log_send(Console::VERB, childRank, "Propagating interruption of %s (past child) ...", job.toStr());
+        }
+        job.getPastChildren().clear();
 
         // Stop / terminate
-        Console::log(Console::INFO, "Interrupting %s", job.toStr());
-        job.stop(); // Solvers are interrupted, not suspended!
-        Console::log(Console::INFO, "%s : interrupted", job.toStr());
-        if (terminate) {
-            setLoad(0, job.getId());
-            job.terminate();
-            Console::log(Console::INFO, "%s : terminated", job.toStr());
-        } 
+        if (job.isInitializing() || job.isInState({ACTIVE, STANDBY, SUSPENDED})) {
+            Console::log(Console::INFO, "Interrupting %s (state: %s)", job.toStr(), job.jobStateToStr());
+            job.stop(); // Solvers are interrupted, not suspended!
+            Console::log(Console::INFO, "%s : interrupted", job.toStr());
+            if (terminate) {
+                if (getLoad() && currentJob->getId() == job.getId()) setLoad(0, job.getId());
+                job.terminate();
+                Console::log(Console::INFO, "%s : terminated", job.toStr());
+            } 
+        }
     }
 }
 
@@ -808,20 +890,24 @@ void Worker::bounceJobRequest(JobRequest& request) {
         Console::log(Console::WARN, "%s bouncing for the %i. time", jobStr(request.jobId, request.requestedNodeIndex), num);
     }
 
-    // Generate pseudorandom permutation of this request
-    int n = MyMpi::size(comm);
-    AdjustablePermutation perm(n, 3 * request.jobId + 7 * request.requestedNodeIndex + 11 * request.requestingNodeRank);
-    // Fetch next index of permutation based on number of hops
-    int permIdx = request.numHops % n;
-    int nextRank = perm.get(permIdx);
-    // (while skipping yourself and the requesting node)
-    while (nextRank == worldRank || nextRank == request.requestingNodeRank) {
-        permIdx = (permIdx+1) % n;
+    int nextRank;
+    if (params.isSet("derandomize")) {
+        nextRank = Random::choice(bounceAlternatives);
+    } else {
+        // Generate pseudorandom permutation of this request
+        int n = MyMpi::size(comm);
+        AdjustablePermutation perm(n, 3 * request.jobId + 7 * request.requestedNodeIndex + 11 * request.requestingNodeRank);
+        // Fetch next index of permutation based on number of hops
+        int permIdx = request.numHops % n;
         nextRank = perm.get(permIdx);
+        // (while skipping yourself and the requesting node)
+        while (nextRank == worldRank || nextRank == request.requestingNodeRank) {
+            permIdx = (permIdx+1) % n;
+            nextRank = perm.get(permIdx);
+        }
     }
 
-    // Send request to a random other worker node
-    //int nextRank = getRandomWorkerNode();
+    // Send request to "next" worker node
     Console::log_send(Console::VVVERB, nextRank, "Bouncing %s", jobStr(request.jobId, request.requestedNodeIndex));
     MyMpi::isend(MPI_COMM_WORLD, nextRank, MSG_FIND_NODE, request);
     //stats.increment("sentMessages");
@@ -853,7 +939,7 @@ void Worker::finishBalancing() {
     //stats.addResourceUsage();
     //stats.dump(epochCounter.getEpoch());
     if (currentJob != NULL) {
-        currentJob->dumpStats();
+        currentJob->appl_dumpStats();
 
         if (currentJob->isRoot()) {
             int id = currentJob->getId();
@@ -937,7 +1023,7 @@ void Worker::updateVolume(int jobId, int volume) {
             Console::log_send(Console::VERB, job.getLeftChildNodeRank(), "Pruning left child of %s", job.toStr());
             job.unsetLeftChild();
         }
-    } else if (job.hasJobDescription() && nextIndex < volume) {
+    } else if (job.hasJobDescription() && nextIndex < volume && !jobCommitments.count(jobId)) {
         // Grow left
         JobRequest req(jobId, job.getRootNodeRank(), worldRank, nextIndex, epochCounter.getEpoch(), 0);
         int nextNodeRank = job.getLeftChildNodeRank();
@@ -956,7 +1042,7 @@ void Worker::updateVolume(int jobId, int volume) {
             Console::log_send(Console::VERB, job.getRightChildNodeRank(), "Pruning right child of %s", job.toStr());
             job.unsetRightChild();
         }
-    } else if (job.hasJobDescription() && nextIndex < volume) {
+    } else if (job.hasJobDescription() && nextIndex < volume && !jobCommitments.count(jobId)) {
         // Grow right
         JobRequest req(jobId, job.getRootNodeRank(), worldRank, nextIndex, epochCounter.getEpoch(), 0);
         int nextNodeRank = job.getRightChildNodeRank();
@@ -988,4 +1074,26 @@ float Worker::reduce(float contribution, int rootRank) {
     MPI_Reduce(&contribution, &result, 1, MPI_FLOAT, MPI_SUM, rootRank, comm);
     //stats.increment("reductions");
     return result;
+}
+
+Worker::~Worker() {
+    for (auto idJobPair : jobs) {
+
+        int id = idJobPair.first;
+        Job* job = idJobPair.second;
+        Console::log(Console::VERB, "Cleaning up %s ...", job->toStr());
+
+        // Join and delete initializer thread
+        if (initializerThreads.count(id)) {
+            Console::log(Console::VERB, "Cleaning up init thread of %s ...", job->toStr());
+            if (initializerThreads[id].joinable()) {
+                initializerThreads[id].join();
+            }
+            initializerThreads.erase(id);
+        }
+        // Delete job and its solvers
+        delete job;
+    }
+
+    Console::log(Console::VERB, "Leaving destructor of worker environment.");
 }

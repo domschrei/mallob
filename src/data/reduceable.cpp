@@ -108,7 +108,8 @@ bool Reduceable::advanceReduction(MessageHandlePtr handle) {
 
     std::unique_ptr<Reduceable> received = getDeserialized(*handle->recvData);
     if (received->isEmpty()) {
-        excludedRanks.insert(handle->source);
+        int source = handle->source;
+        excludedRanks.insert(source);
         Console::log(Console::VVERB, "-- empty!");
     }
     merge(*received); // reduce into local object

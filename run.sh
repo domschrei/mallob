@@ -6,7 +6,7 @@ fi
 
 cmd=""
 if [ x"$1" == x"valgrind" ]; then
-    cmd="valgrind"
+    cmd="valgrind --leak-check=full"
     shift 1
 fi
 

@@ -174,6 +174,12 @@ for rank in load_one:
         else:
             t2 = max_time-time_offsets[rank]
         [t, job] = load_one[rank][i]
+        if job not in job_colors:
+            idx = len(job_colors)
+            job_colors[job] = colors[idx % len(colors)]
+            job_linestyles[job] = linestyles[idx % len(linestyles)]
+            job_linewidths[job] = linewidths[idx % len(linewidths)]
+        
         plot_xy([t, t2], [rank, rank], job_colors[job], job_linewidths[job], job_linestyles[job], 0, 'x')
 
 for job_id in job_starts:

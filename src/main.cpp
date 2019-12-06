@@ -17,9 +17,6 @@
 
 #include "revision.c"
 
-Client* client;
-Worker* worker;
-
 void handler(int sig) {
   void *array[10];
   size_t size;
@@ -33,25 +30,47 @@ void handler(int sig) {
   exit(1);
 }
 
+void warmUpRun() {
+    
+    int worldRank = MyMpi::rank(MPI_COMM_WORLD);
+    int n = MyMpi::size(MPI_COMM_WORLD);
+
+    // Send
+    for (int r = 0; r < n; r++) {
+        if (worldRank == r) continue;
+        IntVec payload({1, 2, 3, 4, 5, 6, 7, 8});
+        MyMpi::isend(MPI_COMM_WORLD, r, MSG_WARMUP, payload);
+    }
+
+    // Test and receive
+    int received = 0;
+    MyMpi::irecv(MPI_COMM_WORLD, MSG_WARMUP);
+    while (true) {
+        MyMpi::testSentHandles();
+        MessageHandlePtr handle = MyMpi::poll();
+        if (handle != NULL && handle->tag == MSG_WARMUP) {
+            Console::log_recv(Console::VVVERB, handle->source, "Received warmup msg");
+            received++;
+            if (received == n-1) break;
+            else MyMpi::irecv(MPI_COMM_WORLD, MSG_WARMUP);
+        }
+    }
+
+    Console::log(Console::VERB, "Finished warmup run.");
+}
+
 void doExternalClientProgram(MPI_Comm commClients, Parameters& params, const std::set<int>& clientRanks) {
     
-    client = new Client(commClients, params, clientRanks);
-    client->init();
-    client->mainProgram();
+    Client client(commClients, params, clientRanks);
+    client.init();
+    client.mainProgram();
 }
 
 void doWorkerNodeProgram(MPI_Comm commWorkers, Parameters& params, const std::set<int>& clientRanks) {
 
-    worker = new Worker(commWorkers, params, clientRanks);
-    worker->init();
-    worker->mainProgram();
-}
-
-void dumpStats() {
-    std::cout << "dumping stats" << std::endl;
-    if (worker != NULL) {
-        worker->dumpStats();
-    }
+    Worker worker(commWorkers, params, clientRanks);
+    worker.init();
+    worker.mainProgram();
 }
 
 int main(int argc, char *argv[]) {
@@ -110,7 +129,12 @@ int main(int argc, char *argv[]) {
     MPI_Comm newComm;
     MPI_Comm_split(MPI_COMM_WORLD, color, rank, &newComm);
 
-    std::set_terminate(dumpStats);
+    std::set_terminate(Console::flush);
+
+    if (params.isSet("warmup") && !params.isSet("derandomize")) {
+        // Do global warmup run with explicit all-to-all message passing
+        warmUpRun();
+    }
 
     // Launch node's main program
     if (isExternalClient) {
@@ -121,4 +145,5 @@ int main(int argc, char *argv[]) {
 
     MPI_Finalize();
     Console::log(Console::INFO, "Exiting normally.");
+    Console::flush();
 }
