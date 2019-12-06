@@ -75,15 +75,17 @@ bool Worker::checkTerminate() {
 void Worker::mainProgram() {
 
     int iteration = 0;
+    float lastMemLogTime = Timer::elapsedSeconds();
     while (!checkTerminate()) {
 
-        if (iteration % 1024 == 0) {
+        if (Timer::elapsedSeconds() - lastMemLogTime > 0.25) {
             // Print memory usage info
             double vm_usage, resident_set;
             process_mem_usage(vm_usage, resident_set);
             vm_usage *= 0.001 * 0.001;
             resident_set *= 0.001 * 0.001;
             Console::log(Console::VERB, "vm_usage=%.6fGB resident_set=%.6fGB", vm_usage, resident_set);
+            lastMemLogTime = Timer::elapsedSeconds();
         }
 
         // If it is time to do balancing (and it is not being done right now)

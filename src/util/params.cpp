@@ -37,6 +37,7 @@ void Parameters::setDefaults() {
     setParam("l", "0.95"); // load factor
     setParam("log", "."); // logging directory
     setParam("lbc", "0"); // leaky bucket client parameter (0 = no leaky bucket, jobs enter by time) 
+    setParam("md", "0"); // maximum demand per job (0 = no limit)
     setParam("p", "5.0"); // rebalance period (seconds)
     //setParam("q"); // no logging to stdout
     setParam("s", "1.0"); // job communication period (seconds)
@@ -65,6 +66,7 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "-l=<load-factor>      Load factor to be aimed at (0 < l < 1)");
     Console::log(Console::INFO, "-lbc=<num-jobs>       Make each client a leaky bucket with x active jobs at any given time (int x >= 0, 0: jobs arrive at individual times instead)");
     Console::log(Console::INFO, "-log=<log-dir>        Directory to save logs in (default: .)");
+    Console::log(Console::INFO, "-md=<max-demand>      Limit any job's demand to some maximum value (int x >= 0; 0: no limit)");
     Console::log(Console::INFO, "-p=<rebalance-period> Do global rebalancing every t seconds (t > 0)");
     Console::log(Console::INFO, "-q                    Be quiet, do not log to stdout besides critical information");
     Console::log(Console::INFO, "-s=<comm-period>      Do job-internal communication every t seconds (t >= 0, 0: do not communicate)");

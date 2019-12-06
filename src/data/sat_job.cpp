@@ -19,7 +19,12 @@ void SatJob::appl_initialize() {
     std::map<std::string, std::string> params;
     params["e"] = "1"; // exchange mode: 0 = nothing, 1 = alltoall, 2 = log, 3 = asyncrumor
     params["c"] = this->_params.getParam("t"); // solver threads on this node
-    params["d"] = "7"; // sparse random + native diversification
+    if (_params.getIntParam("md") <= 1 && _params.getIntParam("t") <= 1) {
+        // One thread on one node: do not diversify anything, but keep default solver settings
+        params["d"] = "0"; // no diversification
+    } else {
+        params["d"] = "7"; // sparse random + native diversification
+    }
     params["i"] = "0"; // #microseconds to sleep during solve loop
     params["v"] = (this->_params.getIntParam("v") >= 3 ? "1" : "0"); // verbosity
     params["mpirank"] = std::to_string(_index); // mpi_rank

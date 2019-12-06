@@ -279,13 +279,21 @@ void Job::terminate() {
 int Job::getDemand(int prevVolume) const {
     if (isInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
 
+        int demand;
         float growthPeriod = _params.getFloatParam("g");
         if (growthPeriod <= 0) {
             // Immediate growth
-            return _comm_size;
+            demand = _comm_size;
+        } else {
+            // Periodic growth, limited by total amount of worker nodes
+            int numGrowths = (int) ((Timer::elapsedSeconds()-_time_of_initialization) / growthPeriod);
+            demand = std::min(_comm_size, (int)std::pow(2, numGrowths + 1) - 1);
         }
-        int numGrowths = (int) ((Timer::elapsedSeconds()-_time_of_initialization) / growthPeriod);
-        return std::min(_comm_size, (int)std::pow(2, numGrowths + 1) - 1);
+        // Limit demand if desired
+        if (_params.getIntParam("md") > 0) {
+            demand = std::min(demand, _params.getIntParam("md"));
+        }
+        return demand;
         
     } else {
         // "frozen"

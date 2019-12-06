@@ -7,26 +7,15 @@ if [ "x$1" == "x" ]; then
 fi
 
 # Create a single log file, and a reduced one without mem conspt info
-> $logdir/tmp
-for f in $logdir/log_*.*; do
-    echo $f
-    while read -r line; do
-        if echo $line|grep -q "vm_usage"; then
-            echo $line >> $logdir/log_mem 
-        else
-            echo $line|sed 's/^\[//g' >> $logdir/tmp
-    done < $f
-done
-LC_ALL=C sort -s -g $logdir/tmp | awk '{print "["$0}' > $logdir/log
+cat $logdir/log_*.*|grep -v "vm_usage" > $logdir/tmp
+sed 's/^\[//g' $logdir/tmp | LC_ALL=C sort -s -g | awk '{print "["$0}' > $logdir/log
 rm $logdir/tmp
+
+jobs=`grep -E "Introducing.*#[0-9]+" $logdir/log|grep -oE "#[0-9]+"|tr '\n' ' '`
+echo $jobs
 
 # Go through reduced log file and write jobs info into separate files
 rm $logdir/log#* 2> /dev/null
-while read -r line; do
-    if echo $line|grep -qE "#[0-9]+"; then
-        job=`echo $line|grep -oE "#[0-9]+"`
-        if echo $line|grep -qE "${job}:|${job} |${job},|${job}."; then
-            echo $line >> $logdir/log$job
-        fi
-    fi
-done < $logdir/log
+for job in $jobs; do
+    grep -E "${job}:|${job} |${job},|${job}\." $logdir/log > $logdir/log$job
+done

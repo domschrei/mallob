@@ -424,8 +424,10 @@ void HordeLib::abort() {
 void HordeLib::setSolvingState(SolvingState state) {
 	SolvingState oldState = this->solvingState;
 	this->solvingState = state;
+	// Overwrite static logging variable which may now belong to another HordeLib instance
+	setLogger(logger);
 	log(2, "state transition %s -> %s\n", SolvingStateNames[oldState], SolvingStateNames[state]);
-
+	
 	// Suspending solvers (stay inside solving procedure, but sleep)
 	if (oldState != SUSPENDED && state == SUSPENDED) {
 		for (int i = 0; i < solversCount; i++) {
@@ -436,8 +438,6 @@ void HordeLib::setSolvingState(SolvingState state) {
 		for (int i = 0; i < solversCount; i++) {
             if (solvers[i] != NULL) solvers[i]->unsetSolverSuspend();
         }
-		// Overwrite static logging variable which may now belong to another HordeLib instance
-		setLogger(logger);
 	}
 
 	// Interrupting solvers (jump out of solving procedure)
