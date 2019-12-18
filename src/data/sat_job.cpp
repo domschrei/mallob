@@ -365,17 +365,20 @@ void SatJob::appl_dumpStats() {
 }
 
 SatJob::~SatJob() {
-    if (bgThread.joinable()) bgThread.join(); // if already aborting
-    else {
+    if (bgThread.joinable()) {
+        Console::log(Console::VVERB, "%s : joining background thread", toStr());
+        bgThread.join(); // if already aborting
+    } else {
         hordeManipulationLock.lock();
         if (_solver != NULL) {
+            Console::log(Console::VVERB, "%s : interrupting and deleting hordesat", toStr());
+            hordeManipulationLock.unlock();
             appl_interrupt();
             _solver->abort();
-            hordeManipulationLock.unlock();
             setSolverNull();
         } else {
             hordeManipulationLock.unlock();
         }
     }
-    Console::log(Console::VERB, "Leaving SAT job destructor.");
+    Console::log(Console::VVERB, "%s : leaving SAT job destructor", toStr());
 }

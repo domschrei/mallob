@@ -352,26 +352,12 @@ MyMpi::pollByProbing(const ListenerMode& mode) {
     }
 }*/
 
-bool MyMpi::hasCriticalHandles() {
-    bool critical = false;
-    for (auto it : handles) {
-        if (it->critical) {
-            critical = true;
-            Console::log(Console::VVERB, "Has handle of tag %i (critical: %s)", it->tag, it->critical ? "yes" : "no");
-        }
-    }
-
-    if (handles.size() > 1) {
-        for (auto it : handles) {
-            Console::log(Console::VVERB, " -- tag %i", it->tag);
-        }
-    }
-
-    return critical;
-}
-
 void MyMpi::deferHandle(MessageHandlePtr handle) {
     handles.insert(handle);
+}
+
+bool MyMpi::hasOpenSentHandles() {
+    return !sentHandles.empty();
 }
 
 void MyMpi::testSentHandles() {

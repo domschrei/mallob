@@ -65,6 +65,7 @@ void Worker::init() {
 }
 
 bool Worker::checkTerminate() {
+    if (exiting) return true;
     if (params.getFloatParam("T") > 0 && Timer::elapsedSeconds() > params.getFloatParam("T")) {
         Console::log(Console::INFO, "Global timeout: terminating.");
         return true;
@@ -84,7 +85,7 @@ void Worker::mainProgram() {
             process_mem_usage(vm_usage, resident_set);
             vm_usage *= 0.001 * 0.001;
             resident_set *= 0.001 * 0.001;
-            Console::log(Console::VERB, "vm_usage=%.6fGB resident_set=%.6fGB", vm_usage, resident_set);
+            Console::log(Console::VVERB, "vm_usage=%.6fGB resident_set=%.6fGB", vm_usage, resident_set);
             lastMemLogTime = Timer::elapsedSeconds();
         }
 
@@ -222,6 +223,9 @@ void Worker::mainProgram() {
             
             else if (handle->tag == MSG_SEND_JOB_REVISION_DATA)
                 handleSendJobRevisionData(handle);
+
+            else if (handle->tag == MSG_EXIT) 
+                handleExit(handle);
             
             else if (handle->tag == MSG_COLLECTIVES) {
                 // "Collectives" messages are currently handled only in balancer
@@ -788,6 +792,10 @@ void Worker::handleIncrementalJobFinished(MessageHandlePtr& handle) {
     interruptJob(handle, jobId, /*terminate=*/true, /*reckless=*/false);
 }
 
+void Worker::handleExit(MessageHandlePtr& handle) {
+    Console::log_recv(Console::VERB, handle->source, "Received signal to exit.");
+    exiting = true;
+}
 
 void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, bool reckless) {
 
@@ -1083,15 +1091,16 @@ Worker::~Worker() {
 
         int id = idJobPair.first;
         Job* job = idJobPair.second;
-        Console::log(Console::VERB, "Cleaning up %s ...", job->toStr());
+        Console::log(Console::VVERB, "Cleaning up %s ...", job->toStr());
 
         // Join and delete initializer thread
         if (initializerThreads.count(id)) {
-            Console::log(Console::VERB, "Cleaning up init thread of %s ...", job->toStr());
+            Console::log(Console::VVERB, "Cleaning up init thread of %s ...", job->toStr());
             if (initializerThreads[id].joinable()) {
                 initializerThreads[id].join();
             }
             initializerThreads.erase(id);
+            Console::log(Console::VVERB, "Cleaned up init thread of %s.", job->toStr());
         }
         // Delete job and its solvers
         delete job;

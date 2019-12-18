@@ -144,9 +144,12 @@ const int MSG_SEND_JOB_REVISION_DATA = 28;
 const int MSG_INCREMENTAL_JOB_FINISHED = 29;
 const int MSG_INTERRUPT = 30;
 const int MSG_ABORT = 31;
+const int MSG_CLIENT_FINISHED = 32;
+const int MSG_EXIT = 33;
 
 const int MSG_COLLECTIVES = 300;
 const int MSG_JOB_COMMUNICATION = 400;
+
 
 /**
  * All types of messages which can be receivable by a worker node at any time 
@@ -156,13 +159,13 @@ const int ANYTIME_WORKER_RECV_TAGS[] = {MSG_QUERY_VOLUME, MSG_FIND_NODE, MSG_REQ
             MSG_ACCEPT_BECOME_CHILD, MSG_ACK_ACCEPT_BECOME_CHILD, MSG_UPDATE_VOLUME, MSG_WORKER_FOUND_RESULT, 
             MSG_WORKER_DEFECTING, MSG_FORWARD_CLIENT_RANK, MSG_TERMINATE, MSG_INTERRUPT, MSG_ABORT, MSG_QUERY_JOB_RESULT, 
             MSG_NOTIFY_JOB_REVISION, MSG_QUERY_JOB_REVISION_DETAILS, MSG_SEND_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS,
-            MSG_JOB_COMMUNICATION, MSG_WARMUP};
+            MSG_JOB_COMMUNICATION, MSG_WARMUP, MSG_EXIT};
 /**
  * All types of messages which can be receivable by a client node at any time 
  * by a generic irecv method and within the maximum message length.
  */
 const int ANYTIME_CLIENT_RECV_TAGS[] = {MSG_JOB_DONE, MSG_REQUEST_BECOME_CHILD, MSG_ACK_ACCEPT_BECOME_CHILD, 
-            MSG_QUERY_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS, MSG_ABORT};
+            MSG_QUERY_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS, MSG_ABORT, MSG_CLIENT_FINISHED};
 
 /**
  * Which types of messages the MPI node should listen to. 
@@ -216,7 +219,7 @@ public:
     static inline bool hasActiveHandles() {
         return handles.size() > 0;
     }
-    static bool hasCriticalHandles();
+    static bool hasOpenSentHandles();
     static void deferHandle(MessageHandlePtr handle);
     static void testSentHandles();
 

@@ -46,6 +46,8 @@ private:
 
     std::vector<int> bounceAlternatives;
 
+    bool exiting;
+
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& clientNodes) :
         comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), epochCounter(), stats(epochCounter)
@@ -55,6 +57,7 @@ public:
             load = 0;
             lastLoadChange = Timer::elapsedSeconds();
             currentJob = NULL;
+            exiting = false;
         }
 
     ~Worker();
@@ -90,6 +93,7 @@ private:
     void handleAckJobRevisionDetails(MessageHandlePtr& handle);
     void handleSendJobRevisionData(MessageHandlePtr& handle);
     void handleIncrementalJobFinished(MessageHandlePtr& handle);
+    void handleExit(MessageHandlePtr& handle);
 
     void bounceJobRequest(JobRequest& request);
     void informClient(int jobId, int clientRank);

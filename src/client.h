@@ -37,10 +37,13 @@ private:
 
     std::thread instanceReaderThread;
 
+    int numAliveClients;
+
 public:
     Client(MPI_Comm comm, Parameters& params, std::set<int> clientRanks)
         : comm(comm), params(params), stats(EpochCounter()), clientRanks(clientRanks) {
         this->worldRank = MyMpi::rank(MPI_COMM_WORLD);
+        numAliveClients = MyMpi::size(comm);
     };
     ~Client();
     void init();
@@ -48,6 +51,7 @@ public:
 
 private:
     bool checkTerminate();
+    void checkFinished();
 
     void handleRequestBecomeChild(MessageHandlePtr& handle);
     void handleJobDone(MessageHandlePtr& handle);
@@ -56,6 +60,7 @@ private:
     void handleAckAcceptBecomeChild(MessageHandlePtr& handle);
     void handleQueryJobRevisionDetails(MessageHandlePtr& handle);
     void handleAckJobRevisionDetails(MessageHandlePtr& handle);
+    void handleClientFinished(MessageHandlePtr& handle);
 
     void introduceJob(JobDescription& job);
     void readInstanceList(std::string& filename);
