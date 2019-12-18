@@ -8,21 +8,54 @@ function rand_priority() {
 }
 
 numjobs="$1"
+shift 1
+if [ "x$1" == "x" ]; then
+    numclients="1"
+else
+    numclients="$1"
+    shift 1
+fi
+if [ "x$1" == "x" ]; then
+    output="SCENARIO"
+else
+    output="$1"
+    shift 1
+fi
+if [ "x$1" != "x" ]; then
+    for i in {1..1000}; do
+        echo $(($1+$i))" " >> randseed
+    done
+    shift 1
+else
+    for i in {1..1000}; do
+        echo "0 " >> randseed
+    done
+fi
 
-ls /global_data/schreiber/sat_instances/*.cnf | shuf | head -$numjobs > selection
+echo "$numjobs jobs, $numclients clients, output to $output"
 
 id=1
+ls /global_data/schreiber/sat_instances/*.cnf | shuf --random-source randseed | head -$numjobs > selection
+for client in `seq 0 $(($numclients-1))`; do
+    echo "# ID Arv Prio File" > $output.$client
+done
+
 arrival=0
-echo "# ID Arv Prio File"
+client=0
 while read -r filename; do
 
     arrival=`rand_arrival $arrival 10`
-    echo "$id $arrival `rand_priority` $filename"
+    echo "$id $arrival `rand_priority` $filename" >> $output.$client
     id=$((id+1))
+    client=$(($client+1))
+    if [ $client == $numclients ]; then
+        client=0
+    fi
 
 done < selection
 
 rm selection
+rm randseed
 
 #arrival=0
 #for i in {1..1000}; do
