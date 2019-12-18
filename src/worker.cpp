@@ -79,13 +79,13 @@ void Worker::mainProgram() {
     float lastMemLogTime = Timer::elapsedSeconds();
     while (!checkTerminate()) {
 
-        if (Timer::elapsedSeconds() - lastMemLogTime > 0.25) {
+        if (Timer::elapsedSeconds() - lastMemLogTime > 1.0) {
             // Print memory usage info
             double vm_usage, resident_set;
             process_mem_usage(vm_usage, resident_set);
             vm_usage *= 0.001 * 0.001;
             resident_set *= 0.001 * 0.001;
-            Console::log(Console::VVERB, "vm_usage=%.6fGB resident_set=%.6fGB", vm_usage, resident_set);
+            Console::log(Console::VVERB, "mem vm=%.4fGB rss=%.4fGB", vm_usage, resident_set);
             lastMemLogTime = Timer::elapsedSeconds();
         }
 

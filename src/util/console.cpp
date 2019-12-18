@@ -104,13 +104,15 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list& a
         // Relative time to program start
         float elapsedRel = Timer::elapsedSeconds();
         // Absolute time since epoch
+        /*
         std::chrono::duration<double, std::micro> time_span = std::chrono::high_resolution_clock::now().time_since_epoch();
         double elapsedAbs = time_span.count();
         elapsedAbs *= 0.001f;
         elapsedAbs *= 0.001f;
-        
-        if (!quiet) printf("[%.6f / %.6f] [%i] ", elapsedAbs, elapsedRel, rank);
-        if (logFile != NULL) fprintf(logFile, "[%.6f / %.6f] [%i] ", elapsedAbs, elapsedRel, rank);
+        */
+    
+        if (!quiet) printf("[%.6f] [%i] ", elapsedRel, rank);
+        if (logFile != NULL) fprintf(logFile, "[%.6f] [%i] ", elapsedRel, rank);
         
         beganLine = true;
     }
