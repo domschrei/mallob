@@ -28,6 +28,10 @@ void readAllInstances(Client* client) {
 
         // Keep at most 10 full jobs in memory at any time 
         while (i - c.lastIntroducedJobIdx > 10) {
+            if (c.checkTerminate()) {
+                Console::log(Console::VERB, "Stopping instance reader thread");
+                return;
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
