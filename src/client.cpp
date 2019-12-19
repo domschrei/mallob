@@ -21,6 +21,11 @@ void readAllInstances(Client* client) {
     Client& c = *client;
     for (size_t i = 0; i < c.jobs.size(); i++) {
 
+        if (c.checkTerminate()) {
+            Console::log(Console::VERB, "Stopping instance reader thread");
+            return;
+        }
+
         // Keep at most 10 full jobs in memory at any time 
         while (i - c.lastIntroducedJobIdx > 10) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -451,5 +456,7 @@ void Client::readFormula(std::string& filename, JobDescription& job) {
 }
 
 Client::~Client() {
-    instanceReaderThread.join();
+    if (instanceReaderThread.joinable())
+        instanceReaderThread.join();
+    Console::log(Console::VERB, "Leaving destructor of client environment.");
 }
