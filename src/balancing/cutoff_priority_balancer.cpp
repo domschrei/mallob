@@ -192,7 +192,10 @@ bool CutoffPriorityBalancer::continueBalancing() {
 
         // Finish up initial reduction
         float aggregatedDemand = _reduce_result;
-        Console::log(Console::VVERB, "Aggregation of demands: %.3f", aggregatedDemand);
+        if (MyMpi::rank(MPI_COMM_WORLD) == 0)
+            Console::log(Console::VVERB, "Aggregation of demands: %.3f", aggregatedDemand);
+        else
+            Console::log(Console::VVVERB, "Aggregation of demands: %.3f", aggregatedDemand);
 
         // Calculate local initial assignments
         _total_volume = (int) (MyMpi::size(_comm) * _load_factor);
@@ -290,7 +293,10 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
     }
 
     // Assign correct (final) floating-point resources
-    Console::log(Console::VVERB, "Initially assigned resources: %.3f", _resources_info.assignedResources);
+    if (MyMpi::rank(MPI_COMM_WORLD) == 0)
+        Console::log(Console::VVERB, "Initially assigned resources: %.3f", _resources_info.assignedResources);
+    else
+        Console::log(Console::VVVERB, "Initially assigned resources: %.3f", _resources_info.assignedResources);
     float remainingResources = _total_volume - _resources_info.assignedResources;
     if (remainingResources < 0.1) remainingResources = 0;
 

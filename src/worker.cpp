@@ -233,7 +233,7 @@ void Worker::mainProgram() {
                 if (done) finishBalancing();
 
             } else if (handle->tag == MSG_WARMUP) {
-                Console::log_recv(Console::VVERB, handle->source, "Warmup msg");
+                Console::log_recv(Console::VVVERB, handle->source, "Warmup msg");
 
             } else {
                 Console::log_recv(Console::WARN, handle->source, "Unknown message tag %i", handle->tag);
@@ -244,7 +244,7 @@ void Worker::mainProgram() {
             MyMpi::resetListenerIfNecessary(WORKER, handle->tag);
 
             time = Timer::elapsedSeconds() - time;
-            Console::log(Console::VVVERB, "Processing msg, tag %i took %.6f s", handle->tag, time);
+            Console::log(Console::VVVERB, "Processing msg, tag %i took %.4f s", handle->tag, time);
         }
         
         iteration++;
@@ -918,7 +918,7 @@ void Worker::bounceJobRequest(JobRequest& request) {
     }
 
     // Send request to "next" worker node
-    Console::log_send(Console::VVVERB, nextRank, "Bouncing %s", jobStr(request.jobId, request.requestedNodeIndex));
+    Console::log_send(Console::VVERB, nextRank, "Bouncing %s", jobStr(request.jobId, request.requestedNodeIndex));
     MyMpi::isend(MPI_COMM_WORLD, nextRank, MSG_FIND_NODE, request);
     //stats.increment("sentMessages");
 }
@@ -1106,5 +1106,5 @@ Worker::~Worker() {
         delete job;
     }
 
-    Console::log(Console::VERB, "Leaving destructor of worker environment.");
+    Console::log(Console::VVERB, "Leaving destructor of worker environment.");
 }

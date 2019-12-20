@@ -462,5 +462,5 @@ void Client::readFormula(std::string& filename, JobDescription& job) {
 Client::~Client() {
     if (instanceReaderThread.joinable())
         instanceReaderThread.join();
-    Console::log(Console::VERB, "Leaving destructor of client environment.");
+    Console::log(Console::VVERB, "Leaving destructor of client environment.");
 }
