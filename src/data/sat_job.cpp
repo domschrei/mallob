@@ -169,7 +169,7 @@ void SatJob::appl_communicate(int source, JobMessage& msg) {
     if (msg.tag == MSG_GATHER_CLAUSES) {
         // Gather received clauses, send to parent
         
-        Console::log(Console::VERB, "%s : (JCE=%i) received clauses from below of effective size %i", toStr(), epoch, clauses.size());
+        Console::log(Console::VERB, "%s : (JCE=%i) received gathered clauses of eff. size %i", toStr(), epoch, clauses.size());
 
         if (_last_shared_job_comm >= epoch) {
             // Already shared clauses upwards this job comm epoch!
@@ -188,7 +188,7 @@ void SatJob::appl_communicate(int source, JobMessage& msg) {
             std::vector<int> clausesToShare = shareCollectedClauses(epoch);
             if (isRoot()) {
                 // Share complete set of clauses to children
-                Console::log(Console::VERB, "%s : (JCE=%i) switching clause exchange from gather to broadcast", toStr(), epoch);
+                Console::log(Console::VERB, "%s : (JCE=%i) switching: gather => broadcast", toStr(), epoch);
                 learnAndDistributeClausesDownwards(clausesToShare, epoch);
             } else {
                 // Send set of clauses to parent
@@ -198,7 +198,7 @@ void SatJob::appl_communicate(int source, JobMessage& msg) {
                 msg.epoch = epoch;
                 msg.tag = MSG_GATHER_CLAUSES;
                 msg.payload = clausesToShare;
-                Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) gathering clauses upwards", toStr(), epoch);
+                Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) gathering clauses", toStr(), epoch);
                 MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
             }
             _last_shared_job_comm = epoch;
@@ -224,12 +224,12 @@ void SatJob::learnAndDistributeClausesDownwards(std::vector<int>& clauses, int j
     int childRank;
     if (hasLeftChild()) {
         childRank = getLeftChildNodeRank();
-        Console::log_send(Console::VERB, childRank, "%s : (JCE=%i) broadcasting downwards", toStr(), jobCommEpoch);
+        Console::log_send(Console::VERB, childRank, "%s : (JCE=%i) broadcasting", toStr(), jobCommEpoch);
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_JOB_COMMUNICATION, msg);
     }
     if (hasRightChild()) {
         childRank = getRightChildNodeRank();
-        Console::log_send(Console::VERB, childRank, "%s : (JCE=%i) broadcasting downwards", toStr(), jobCommEpoch);
+        Console::log_send(Console::VERB, childRank, "%s : (JCE=%i) broadcasting", toStr(), jobCommEpoch);
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_JOB_COMMUNICATION, msg);
     }
 
@@ -253,7 +253,7 @@ void SatJob::insertIntoClauseBuffer(std::vector<int>& vec, int jobCommEpoch) {
     // If there are clauses in the buffer which are from a previous job comm epoch:
     if (!_clause_buffer.empty() && _job_comm_epoch_of_clause_buffer != jobCommEpoch) {
         // Previous clauses came from an old epoch; reset clause buffer
-        Console::log(Console::VVERB, "(JCE=%i) Discarding clause buffer of size %i from old job comm epoch %i", 
+        Console::log(Console::VVERB, "(JCE=%i) Discarding buffer of size %i from old JCE %i", 
                 jobCommEpoch, _clause_buffer.size(), _job_comm_epoch_of_clause_buffer);
         _num_clause_sources = 0;
         _clause_buffer.resize(0);
@@ -309,11 +309,11 @@ void SatJob::learnClausesFromAbove(std::vector<int>& clauses, int jobCommEpoch) 
     }
 
     // Locally digest clauses
-    Console::log(Console::VVERB, "%s : (JCE=%i) digesting clauses ...", toStr(), jobCommEpoch);
+    Console::log(Console::VVERB, "%s : (JCE=%i) digesting ...", toStr(), jobCommEpoch);
     hordeManipulationLock.lock();
     if (_solver != NULL) _solver->digestSharing(clauses);
     hordeManipulationLock.unlock();
-    Console::log(Console::VVERB, "%s : (JCE=%i) digested clauses.", toStr(), jobCommEpoch);
+    Console::log(Console::VVERB, "%s : (JCE=%i) digested", toStr(), jobCommEpoch);
 }
 
 int SatJob::appl_solveLoop() {
