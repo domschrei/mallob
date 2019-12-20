@@ -113,9 +113,9 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 	addClauseLock.unlock();
 	int all = fitting + notFitting;
 	if (all > 0) {
-		log(2, "%d fit %d (%d%%) didn't \n", fitting, notFitting, notFitting*100/(all));
+		log(3, "%d fit %d (%d%%) didn't \n", fitting, notFitting, notFitting*100/(all));
 	} else {
-		log(2, "No clauses for export.\n");
+		log(3, "No clauses for export.\n");
 	}
 	if (selectedCount != NULL) {
 		*selectedCount = fitting;
