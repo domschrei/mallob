@@ -360,8 +360,8 @@ void Client::readInstanceList(std::string& filename) {
     std::fstream file;
     file.open(filename, std::ios::in);
     if (!file.is_open()) {
-        Console::log(Console::CRIT, "ERROR: Could not open instance file! Will stay idle.");
-        return;
+        Console::log(Console::CRIT, "ERROR: Could not open instance file! Exiting.");
+        exit(1);
     }
 
     std::string line;
