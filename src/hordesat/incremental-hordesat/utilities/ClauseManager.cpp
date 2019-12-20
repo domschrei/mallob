@@ -184,7 +184,7 @@ void ClauseManager::filterHot(int* exportClauses, const int* signature) {
 	}
 	exportClauses[0] = added;
 	clsLock.unlock();
-	log(2, "ClauseManager: round %lu all-clauses %lu warm %lu hot %lu, shared-clauses %d, avg len %f\n",
+	log(3, "ClauseManager: round %lu all-clauses %lu warm %lu hot %lu, shared-clauses %d, avg len %f\n",
 			currentRound, clausesCount, warms, hots, added, totalLength/(float)added);
 }
 

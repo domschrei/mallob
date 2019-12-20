@@ -25,7 +25,7 @@ DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
 
 std::vector<int> DefaultSharingManager::prepareSharing() {
 
-    //log(2, "Sharing clauses among %i nodes\n", size);
+    //log(3, "Sharing clauses among %i nodes\n", size);
     static int prodInc = 1;
 	static int lastInc = 0;
 	if (!params.isSet("fd")) {
@@ -33,15 +33,15 @@ std::vector<int> DefaultSharingManager::prepareSharing() {
 	}
 	int selectedCount;
 	int used = cdb.giveSelection(outBuffer, COMM_BUFFER_SIZE, &selectedCount);
-	log(2, "Prepared %i clauses in a buffer of size %i\n", selectedCount, used);
+	log(3, "Prepared %i clauses in a buffer of size %i\n", selectedCount, used);
 	stats.sharedClauses += selectedCount;
 	int usedPercent = (100*used)/COMM_BUFFER_SIZE;
 	if (usedPercent < 80) {
 		int increaser = lastInc++ % solvers.size();
 		solvers[increaser]->increaseClauseProduction();
-		log(2, "Node %d production increase for %d. time, core %d will increase.\n", rank, prodInc++, increaser);
+		log(3, "Node %d production increase for %d. time, core %d will increase.\n", rank, prodInc++, increaser);
 	}
-	log(1, "Node %d filled %d%% of its learned clause buffer\n", rank, usedPercent);
+	log(2, "Filled %d%% of clause buffer\n", usedPercent);
     std::vector<int> clauseVec(outBuffer, outBuffer + COMM_BUFFER_SIZE);
 
     return clauseVec;

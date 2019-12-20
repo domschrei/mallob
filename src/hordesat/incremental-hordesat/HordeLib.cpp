@@ -348,7 +348,7 @@ int HordeLib::solveLoop() {
 
 std::vector<int> HordeLib::prepareSharing() {
     assert(sharingManager != NULL);
-	log(2, "Collecting clauses on this node ... \n");
+	log(3, "Collecting clauses on this node ... \n");
 	std::vector<int> clauses = sharingManager->prepareSharing();
 	return clauses;
 }
