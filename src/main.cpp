@@ -136,11 +136,17 @@ int main(int argc, char *argv[]) {
         warmUpRun();
     }
 
-    // Launch node's main program
-    if (isExternalClient) {
-        doExternalClientProgram(newComm, params, externalClientRanks);
-    } else {
-        doWorkerNodeProgram(newComm, params, externalClientRanks);
+    try {
+        // Launch node's main program
+        if (isExternalClient) {
+            doExternalClientProgram(newComm, params, externalClientRanks);
+        } else {
+            doWorkerNodeProgram(newComm, params, externalClientRanks);
+        }
+    } catch (...) {
+        Console::log(Console::CRIT, "Unexpected ERROR! Aborting.");
+        Console::forceFlush();
+        exit(1);
     }
 
     MPI_Finalize();

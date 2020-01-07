@@ -46,6 +46,7 @@ public:
     static void log(int verbosity, const char* str, bool endline, va_list& args);
 
     static void flush();
+    static void forceFlush();
 
     static bool fail(const char* str, ...);
 

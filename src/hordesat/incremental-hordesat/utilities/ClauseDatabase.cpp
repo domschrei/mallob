@@ -64,12 +64,13 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 	memset(buffer, 0, sizeof(int)*size);
 	unsigned int used = 0;
 	// The first value is the total length of VIP clauses (with separators)
-	used++
+	used++;
 	// First add the VIP clauses
 	DEBUG(printf("adding the %d VIP clauses.\n", vipClauses.size()));
 	while (!vipClauses.empty()) {
 		vector<int>& vipCls = vipClauses.back();
 		int len = vipCls.size();
+		if (used+len+1 >= size) break; // stop if buffer is too small
 		for (int i = 0; i < len; i++) {
 			buffer[used++] = vipCls[i];
 		}
@@ -79,8 +80,10 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 	buffer[0] = used-1;
 
 	if (used >= size) {
-		printf("ERROR: vip clauses exceeded the buffer size.");
-		exit(99);
+		log(-1, "ERROR: vip clauses exceeded the buffer size.");
+		addClauseLock.unlock();
+		*selectedCount = 0;
+		return used;
 	}
 
 	int fitting = 0;

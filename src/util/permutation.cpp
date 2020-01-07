@@ -47,7 +47,6 @@ int AdjustablePermutation::get(int x) const {
         x = a + root_n * b;
 
         k++;
-        if (k == 50) exit(1);
 
     } while (x >= n);
 

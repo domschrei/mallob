@@ -106,6 +106,21 @@ void Worker::mainProgram() {
             }
         }
 
+        // Identify global stagnation of a rebalancing: Force abort
+        if (epochCounter.getSecondsSinceLastSync() > params.getFloatParam("p") + 20.0) {
+            // No rebalancing since t+20 seconds: Something is going wrong
+            Console::log(Console::CRIT, "DESYNCHRONIZATION DETECTED -- Aborting.");
+            Console::forceFlush();
+            if (worldRank == 0) {
+                for (int clientRank : clientNodes) {
+                    Console::log_send(Console::INFO, clientRank, "Terminating client ...");
+                    MyMpi::isend(MPI_COMM_WORLD, clientRank, MSG_EXIT, IntVec({0}));
+                }
+            }
+            Console::forceFlush();
+            exit(1);
+        }
+
         MyMpi::testSentHandles();
 
         // Job communication (e.g. clause sharing)

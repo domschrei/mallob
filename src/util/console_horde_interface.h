@@ -28,6 +28,11 @@ public:
         Console::log(verbosityLevel+2, str.c_str(), true, argsCopy);
         va_end(argsCopy);
     }
+    void abort() {
+        Console::log(Console::CRIT, "Aborting.");
+        Console::forceFlush();
+        exit(1);
+    }
 };
 
 #endif

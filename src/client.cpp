@@ -164,6 +164,8 @@ void Client::mainProgram() {
                 handleAckJobRevisionDetails(handle);
             } else if (handle->tag == MSG_CLIENT_FINISHED) {
                 handleClientFinished(handle);
+            }  else if (handle->tag == MSG_EXIT) {
+                handleExit(handle);
             } else {
                 Console::log_recv(Console::WARN, handle->source, "Unknown message tag %i", handle->tag);
             }
@@ -354,6 +356,11 @@ void Client::handleClientFinished(MessageHandlePtr& handle) {
     numAliveClients--;
 }
 
+void Client::handleExit(MessageHandlePtr& handle) {
+    Console::forceFlush();
+    exit(1);
+}
+
 void Client::readInstanceList(std::string& filename) {
 
     Console::log(Console::INFO, "Reading instances from file %s", filename.c_str());
@@ -361,6 +368,7 @@ void Client::readInstanceList(std::string& filename) {
     file.open(filename, std::ios::in);
     if (!file.is_open()) {
         Console::log(Console::CRIT, "ERROR: Could not open instance file! Exiting.");
+        Console::forceFlush();
         exit(1);
     }
 

@@ -36,7 +36,7 @@ void exitError(const char* fmt, ...) {
 	loggingInterface->log(-1, "Exiting due to critical error:", vl);
 	loggingInterface->log(-1, fmt, vl);
 	va_end(vl);
-	exit(1);
+	loggingInterface->abort();
 }
 
 

@@ -37,6 +37,9 @@ public:
             //fflush(stdout);
         }
     }
+    void abort() override {
+        exit(1);
+    }
 
 private:
     double getAbsoluteTimeLP() {

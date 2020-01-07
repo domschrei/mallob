@@ -61,6 +61,7 @@ private:
     void handleQueryJobRevisionDetails(MessageHandlePtr& handle);
     void handleAckJobRevisionDetails(MessageHandlePtr& handle);
     void handleClientFinished(MessageHandlePtr& handle);
+    void handleExit(MessageHandlePtr& handle);
 
     void introduceJob(JobDescription& job);
     void readInstanceList(std::string& filename);
