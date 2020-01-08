@@ -35,7 +35,7 @@ fi
 echo "$numjobs jobs, $numclients clients, output to $output"
 
 id=1
-ls /global_data/schreiber/sat_instances/*.cnf | shuf --random-source randseed | head -$numjobs > selection
+ls instances/*.cnf | shuf --random-source randseed | head -$numjobs > selection
 for client in `seq 0 $(($numclients-1))`; do
     echo "# ID Arv Prio File" > $output.$client
 done
@@ -45,7 +45,8 @@ client=0
 while read -r filename; do
 
     arrival=`rand_arrival $arrival 10`
-    echo "$id $arrival `rand_priority` $filename" >> $output.$client
+    #echo "$id $arrival `rand_priority` $filename" >> $output.$client
+    echo "$id $arrival 1 $filename" >> $output.$client
     id=$((id+1))
     client=$(($client+1))
     if [ $client == $numclients ]; then

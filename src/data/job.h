@@ -103,7 +103,6 @@ public:
 
     Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
     virtual ~Job();
-    void store(std::shared_ptr<std::vector<uint8_t>>& data);
     void setDescription(std::shared_ptr<std::vector<uint8_t>>& data);
     void addAmendment(std::shared_ptr<std::vector<uint8_t>>& data);
     void commit(const JobRequest& req);

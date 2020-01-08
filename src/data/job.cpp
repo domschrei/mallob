@@ -36,16 +36,6 @@ void Job::unlockJobManipulation() {
     Console::log(Console::VVVERB, "%s : unlocked job manipulation", toStr());
 }
 
-void Job::store(std::shared_ptr<std::vector<uint8_t>>& data) {
-    lockJobManipulation();
-    setDescription(data);
-    if (isInState({NONE})) {
-        _index = -1;
-        switchState(STORED);
-    }
-    unlockJobManipulation();
-}
-
 void Job::setDescription(std::shared_ptr<std::vector<uint8_t>>& data) {
 
     lockJobManipulation();
@@ -256,7 +246,7 @@ void Job::terminate() {
         switchState(INITIALIZING_TO_PAST);
         _abort_after_initialization = true;
         return;
-    } /*else {
+    } else {
         assert(isInState({ACTIVE, SUSPENDED, STANDBY}));
     }*/
 
