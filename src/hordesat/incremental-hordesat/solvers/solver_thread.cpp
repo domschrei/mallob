@@ -48,13 +48,13 @@ void SolverThread::init() {
 
     //log(1, "solverRunningThread, entering\n");
     hlib = _args->hlib;
+    hlib->solvingStateLock.lock();
     int localId = _args->solverId;
     solver = hlib->solvers[localId];
     if (hlib->params.isSet("pin")) {
-        hlib->solvingStateLock.lock();
         pinThread(hlib->params.getIntParam("c", 1));
-        hlib->solvingStateLock.unlock();
     }
+    hlib->solvingStateLock.unlock();
     importedLits = 0;
 }
 
@@ -132,9 +132,8 @@ void SolverThread::waitWhile(SolvingState state) {
 }
 
 bool SolverThread::cancelRun() {
-    hlib->solvingStateLock.lock();
-    bool cancel = hlib->solvingState == STANDBY || hlib->solvingState == ABORTING;
-    hlib->solvingStateLock.unlock();
+    SolvingState s = hlib->solvingState;
+    bool cancel = s == STANDBY || s == ABORTING;
     if (cancel) {
         log(0, "Solver %i cancelling run\n", solver->solverId);
     }
@@ -142,9 +141,8 @@ bool SolverThread::cancelRun() {
 }
 
 bool SolverThread::cancelThread() {
-    hlib->solvingStateLock.lock();
-    bool cancel = hlib->solvingState == ABORTING;
-    hlib->solvingStateLock.unlock();
+    SolvingState s = hlib->solvingState;
+    bool cancel = s == ABORTING;
     return cancel;
 }
 
