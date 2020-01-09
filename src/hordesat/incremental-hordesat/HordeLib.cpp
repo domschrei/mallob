@@ -513,9 +513,9 @@ HordeLib::~HordeLib() {
 	for (int i = 0; i < solverThreadsRunning.size(); i++) {
 		if (solverThreadsRunning[i]) {
 			solverThreads[i]->join();
-			delete solverThreads[i];
-			solverThreads[i] = NULL;
 		}
+		delete solverThreads[i];
+		solverThreads[i] = NULL;
 	}
 	log(0, "threads joined\n");
 	if (solversCount > 0) {
