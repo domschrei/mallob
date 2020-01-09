@@ -41,6 +41,7 @@ void* SolverThread::run() {
         readFormula();
     }
     log(2, "%s exiting\n", toStr());
+    hlib->solverThreadsRunning[_args->solverId] = false;
     return NULL;
 }
 
@@ -59,7 +60,7 @@ void SolverThread::init() {
 }
 
 void SolverThread::readFormula() {
-    hlib->solversInitialized[_args->solverId] = 0;
+    hlib->solverThreadsInitialized[_args->solverId] = false;
     log(1, "%s importing clauses\n", toStr());
 
     int prevLits = importedLits;
@@ -77,7 +78,7 @@ void SolverThread::readFormula() {
 
     log(1, "%s imported clauses (%i lits)\n", toStr(), (importedLits-prevLits));
     log(1, "%s initialized\n", toStr());
-    hlib->solversInitialized[_args->solverId] = 1;
+    hlib->solverThreadsInitialized[_args->solverId] = true;
 }
 
 void SolverThread::read(const std::vector<int>& formula, int begin) {

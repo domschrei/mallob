@@ -21,19 +21,17 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             _initialized(false), 
             _abort_after_initialization(false),
             _done_locally(false), 
+            _job_manipulation_lock(VerboseMutex((std::string("JobManip#") + std::to_string(_id)).c_str())),
             _job_node_ranks(commSize, jobId),
             _has_left_child(false),
             _has_right_child(false)
              {}
 
 void Job::lockJobManipulation() {
-    Console::log(Console::VVERB, "%s : lock job manip", toStr());
-    jobManipulationLock.lock();
-    Console::log(Console::VVERB, "%s : locked job manip", toStr());
+    _job_manipulation_lock.lock();
 }
 void Job::unlockJobManipulation() {
-    jobManipulationLock.unlock();
-    Console::log(Console::VVERB, "%s : unlocked job manip", toStr());
+    _job_manipulation_lock.unlock();
 }
 
 void Job::setDescription(std::shared_ptr<std::vector<uint8_t>>& data) {
@@ -342,7 +340,9 @@ Job::~Job() {
     _serialized_description = NULL;
 
     if (_initializer_thread != NULL) {
-        _initializer_thread->join();
+        if (_initializer_thread->joinable()) {
+            _initializer_thread->join();
+        }
         _initializer_thread.release();
         _initializer_thread = NULL;
     }

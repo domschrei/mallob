@@ -109,26 +109,25 @@ void HordeLib::init() {
 	for (int i = 0; i < solversCount; i++) {
 		if (params.getParam("s") == "minisat") {
 			solvers.push_back(new MiniSat());
-			solversInitialized.push_back(0);
 			log(3, "Running MiniSat on core %d\n", i, mpi_rank, mpi_size);
 		} else if (params.getParam("s") == "combo") {
 			if ((mpi_rank + i) % 2 == 0) {
 				solvers.push_back(new MiniSat());
-				solversInitialized.push_back(0);
 				log(3, "Running MiniSat on core %d\n", i, mpi_rank, mpi_size);
 			} else {
 				solvers.push_back(new Lingeling());
-				solversInitialized.push_back(0);
 				log(3, "Running Lingeling on core %d\n", i, mpi_rank, mpi_size);
 			}
 		} else {
             Lingeling *lgl = new Lingeling();
 			solvers.push_back(lgl);
-			solversInitialized.push_back(0);
 			log(3, "Running Lingeling on core %d\n", i, mpi_rank, mpi_size);
 		}
 		// set solver id
 		solvers[i]->solverId = i + solversCount * mpi_rank;
+		
+		solverThreadsInitialized.push_back(false);
+		solverThreadsRunning.push_back(false);
 	}
 
 	sleepInt = 1000 * params.getIntParam("i", 1000);
@@ -281,6 +280,7 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 		arg->hlib = this;
 		arg->solverId = i;
 		arg->readFormulaFromHlib = true;
+		solverThreadsRunning[i] = true;
 		solverThreads[i] = new Thread(solverRunningThread, arg);
         //log(1, "initialized solver %i.\n", i);
 	}
@@ -309,8 +309,8 @@ void HordeLib::continueSolving(const std::vector<std::shared_ptr<std::vector<int
 
 bool HordeLib::isFullyInitialized() {
 	if (solvingState == INITIALIZING) return false;
-	for (size_t i = 0; i < solversInitialized.size(); i++) {
-		if (solversInitialized[i] == 0) // TODO (not initialized) AND suspended!!
+	for (size_t i = 0; i < solverThreadsInitialized.size(); i++) {
+		if (!solverThreadsInitialized[i])
 			return false;
 	}
 	return true;
@@ -460,58 +460,9 @@ int HordeLib::finishSolving() {
 
 	assert(solvingState == STANDBY);
     double searchTime = getTime() - startSolving;
-	/*
-	// TODO join solver threads?
-	log(0, "Joining solver threads of index %d\n", mpi_rank);
-	for (int i = 0; i < solversCount; i++) {
-		solverThreads[i]->join();
-	}*/
 
 	if (params.isSet("stats")) {
-		// Statistics gathering
-		// Local statistics
-		SolvingStatistics locSolveStats;
-		for (int i = 0; i < solversCount; i++) {
-			SolvingStatistics st = solvers[i]->getStatistics();
-			log(1, "thread-stats node:%d/%d thread:%d/%d props:%lu decs:%lu confs:%lu mem:%0.2f\n",
-					mpi_rank, mpi_size, i, solversCount, st.propagations, st.decisions, st.conflicts, st.memPeak);
-			locSolveStats.conflicts += st.conflicts;
-			locSolveStats.decisions += st.decisions;
-			locSolveStats.memPeak += st.memPeak;
-			locSolveStats.propagations += st.propagations;
-			locSolveStats.restarts += st.restarts;
-		}
-		SharingStatistics locShareStats;
-		if (sharingManager != NULL) {
-			locShareStats = sharingManager->getStatistics();
-		}
-		log(1, "node-stats node:%d/%d solved:%d res:%d props:%lu decs:%lu confs:%lu mem:%0.2f shared:%lu filtered:%lu\n",
-				mpi_rank, mpi_size, finalResult != 0, finalResult, locSolveStats.propagations, locSolveStats.decisions,
-				locSolveStats.conflicts, locSolveStats.memPeak, locShareStats.sharedClauses, locShareStats.filteredClauses);
-		if (mpi_size > 1) {
-			// Global statistics
-			SatResult globalResult;
-			MPI_Reduce(&finalResult, &globalResult, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
-			SolvingStatistics globSolveStats;
-			MPI_Reduce(&locSolveStats.propagations, &globSolveStats.propagations, 1, MPI_UNSIGNED_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
-			MPI_Reduce(&locSolveStats.decisions, &globSolveStats.decisions, 1, MPI_UNSIGNED_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
-			MPI_Reduce(&locSolveStats.conflicts, &globSolveStats.conflicts, 1, MPI_UNSIGNED_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
-			MPI_Reduce(&locSolveStats.memPeak, &globSolveStats.memPeak, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-			SharingStatistics globShareStats;
-			MPI_Reduce(&locShareStats.sharedClauses, &globShareStats.sharedClauses, 1, MPI_UNSIGNED_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
-			MPI_Reduce(&locShareStats.importedClauses, &globShareStats.importedClauses, 1, MPI_UNSIGNED_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
-			MPI_Reduce(&locShareStats.filteredClauses, &globShareStats.filteredClauses, 1, MPI_UNSIGNED_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
-			MPI_Reduce(&locShareStats.dropped, &globShareStats.dropped, 1, MPI_UNSIGNED_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
-
-			if (mpi_rank == 0) {
-				log(0, "glob-stats nodes:%d threads:%d solved:%d res:%d rounds:%lu time:%.2f mem:%0.2f MB props:%.2f decs:%.2f confs:%.2f "
-					"shared:%.2f imported:%.2f filtered:%.2f dropped:%.2f\n",
-					mpi_size, solversCount, globalResult != 0, globalResult, round,
-					searchTime, globSolveStats.memPeak,
-					globSolveStats.propagations/searchTime, globSolveStats.decisions/searchTime, globSolveStats.conflicts/searchTime,
-					globShareStats.sharedClauses/searchTime, globShareStats.importedClauses/searchTime, globShareStats.filteredClauses/searchTime, globShareStats.dropped/searchTime);
-			}
-		}
+		dumpStats();
 	}
 	//log(0, "rank %d result:%d\n", mpi_rank, finalResult);
 
@@ -523,8 +474,8 @@ void HordeLib::dumpStats() {
 	SolvingStatistics locSolveStats;
 	for (int i = 0; i < solversCount; i++) {
 		SolvingStatistics st = solvers[i]->getStatistics();
-		log(1, "thread-stats node:%d/%d thread:%d/%d props:%lu decs:%lu confs:%lu mem:%0.2f\n",
-				mpi_rank, mpi_size, i, solversCount, st.propagations, st.decisions, st.conflicts, st.memPeak);
+		log(1, "S%d stats props:%lu decs:%lu confs:%lu mem:%0.2f\n",
+				solvers[i]->solverId, st.propagations, st.decisions, st.conflicts, st.memPeak);
 		locSolveStats.conflicts += st.conflicts;
 		locSolveStats.decisions += st.decisions;
 		locSolveStats.memPeak += st.memPeak;
@@ -535,8 +486,8 @@ void HordeLib::dumpStats() {
 	if (sharingManager != NULL) {
 		locShareStats = sharingManager->getStatistics();
 	}
-	log(1, "node-stats node:%d/%d solved:%d res:%d props:%lu decs:%lu confs:%lu mem:%0.2f shared:%lu filtered:%lu\n",
-			mpi_rank, mpi_size, finalResult != 0, finalResult, locSolveStats.propagations, locSolveStats.decisions,
+	log(1, "node-stats solved:%d res:%d props:%lu decs:%lu confs:%lu mem:%0.2f shared:%lu filtered:%lu\n",
+			finalResult != 0, finalResult, locSolveStats.propagations, locSolveStats.decisions,
 			locSolveStats.conflicts, locSolveStats.memPeak, locShareStats.sharedClauses, locShareStats.filteredClauses);
 }
 
@@ -559,19 +510,14 @@ HordeLib::~HordeLib() {
 	solvingStateLock.unlock();
 	
 	// join threads
-	for (int i = 0; i < solversCount; i++) {
-		if (solverThreads[i] != NULL) {
+	for (int i = 0; i < solverThreadsRunning.size(); i++) {
+		if (solverThreadsRunning[i]) {
 			solverThreads[i]->join();
-		}
-	}
-	log(0, "threads joined\n");
-	// delete threads
-	for (int i = 0; i < solversCount; i++) {
-		if (solverThreads[i] != NULL) {
 			delete solverThreads[i];
 			solverThreads[i] = NULL;
 		}
 	}
+	log(0, "threads joined\n");
 	if (solversCount > 0) {
 		free(solverThreads);
 		solversCount = 0;
