@@ -33,7 +33,7 @@ std::vector<int> DefaultSharingManager::prepareSharing() {
 	}
 	int selectedCount;
 	int used = cdb.giveSelection(outBuffer, COMM_BUFFER_SIZE, &selectedCount);
-	log(3, "Prepared %i clauses in a buffer of size %i\n", selectedCount, used);
+	log(3, "Prepared %i clauses, size %i\n", selectedCount, used);
 	stats.sharedClauses += selectedCount;
 	int usedPercent = (100*used)/COMM_BUFFER_SIZE;
 	if (usedPercent < 80) {
@@ -41,7 +41,7 @@ std::vector<int> DefaultSharingManager::prepareSharing() {
 		solvers[increaser]->increaseClauseProduction();
 		log(3, "Node %d production increase for %d. time, core %d will increase.\n", rank, prodInc++, increaser);
 	}
-	log(2, "Filled %d%% of clause buffer\n", usedPercent);
+	log(2, "Filled %d%% of buffer\n", usedPercent);
     std::vector<int> clauseVec(outBuffer, outBuffer + COMM_BUFFER_SIZE);
 
     return clauseVec;
@@ -98,7 +98,7 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 	stats.filteredClauses += failedFilter;
 	stats.importedClauses += passedFilter;
 	if (total > 0) {
-		log(2, "filter blocked %d%% (%d/%d) of incoming clauses, avg len %.2f\n",
+		log(2, "filter blocked %d%% (%d/%d), avg len %.2f\n",
 				100*failedFilter/total,
 				failedFilter, total, totalLen/(float)total);
 	}

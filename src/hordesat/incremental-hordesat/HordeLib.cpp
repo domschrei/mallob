@@ -290,7 +290,7 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 	solvingStateLock.unlock();
 
 	startSolving = getTime() - startSolving;
-	log(1, "Node %d started its solvers, initialization took %.3f seconds\n", mpi_rank, startSolving);
+	log(1, "Node %d started its solvers, took %.3f seconds\n", mpi_rank, startSolving);
 }
 
 void HordeLib::continueSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
@@ -348,7 +348,7 @@ int HordeLib::solveLoop() {
 
 std::vector<int> HordeLib::prepareSharing() {
     assert(sharingManager != NULL);
-	log(3, "Collecting clauses on this node ... \n");
+	log(3, "collecting clauses on this node ... \n");
 	std::vector<int> clauses = sharingManager->prepareSharing();
 	return clauses;
 }
@@ -551,7 +551,7 @@ int HordeLib::failed(int lit) {
 
 HordeLib::~HordeLib() {
 
-	log(0, "entering hordelib destructor ...\n");
+	log(0, "entering destructor ...\n");
 
 	// for any running threads left:
 	solvingStateLock.lock();
@@ -598,5 +598,5 @@ HordeLib::~HordeLib() {
 		f = NULL;
 	}
 
-	log(0, "leaving hordelib destructor\n");
+	log(0, "leaving destructor\n");
 }

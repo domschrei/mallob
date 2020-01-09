@@ -124,7 +124,7 @@ void Client::mainProgram() {
             process_mem_usage(vm_usage, resident_set);
             vm_usage *= 0.001 * 0.001;
             resident_set *= 0.001 * 0.001;
-            Console::log(Console::VERB, "vm_usage=%.6fGB resident_set=%.6fGB", vm_usage, resident_set);
+            Console::log(Console::VERB, "mem vm=%.4fGB rss=%.4fGB", vm_usage, resident_set);
             lastStatTime = Timer::elapsedSeconds();
         }
 
