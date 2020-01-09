@@ -27,13 +27,13 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
              {}
 
 void Job::lockJobManipulation() {
-    Console::log(Console::VVVERB, "%s : locking job manipulation ...", toStr());
+    Console::log(Console::VVERB, "%s : lock job manip ...", toStr());
     jobManipulationLock.lock();
-    Console::log(Console::VVVERB, "%s : locked job manipulation", toStr());
+    Console::log(Console::VVERB, "%s : locked job manip", toStr());
 }
 void Job::unlockJobManipulation() {
     jobManipulationLock.unlock();
-    Console::log(Console::VVVERB, "%s : unlocked job manipulation", toStr());
+    Console::log(Console::VVERB, "%s : unlocked job manip", toStr());
 }
 
 void Job::setDescription(std::shared_ptr<std::vector<uint8_t>>& data) {

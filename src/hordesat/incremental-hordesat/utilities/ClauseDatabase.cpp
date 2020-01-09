@@ -142,6 +142,7 @@ void ClauseDatabase::setIncomingBuffer(const int* buffer, int size, int nodes, i
 
 bool ClauseDatabase::getNextIncomingClause(vector<int>& cls) {
 	int offset = lastClsNode*size;
+	int loopIt = 0;
 	nodesCycle:
 	while (lastClsIndex + lastClsSize >= size || lastClsNode == thisNode) {
 		lastClsNode++;
@@ -153,14 +154,25 @@ bool ClauseDatabase::getNextIncomingClause(vector<int>& cls) {
 
 		lastClsIndex = incommingBuffer[offset] + 2; //nr. of VIP clauses + 1
 		lastClsCount = incommingBuffer[offset + incommingBuffer[offset] + 1];
+		loopIt++;
+		if (loopIt == 100000) {
+			log(-1, "Max loops in clause database exceeded!");
+			return false;
+		}
 	}
 	while (lastClsCount == 0) {
-			lastClsSize++;
-			if (lastClsIndex + lastClsSize >= size) {
-				goto nodesCycle;
-			}
-			lastClsCount = incommingBuffer[offset + lastClsIndex];
-			lastClsIndex++;
+		lastClsSize++;
+		if (lastClsIndex + lastClsSize >= size) {
+			goto nodesCycle;
+		}
+		lastClsCount = incommingBuffer[offset + lastClsIndex];
+		lastClsIndex++;
+
+		loopIt++;
+		if (loopIt == 100000) {
+			log(-1, "Max loops in clause database exceeded!");
+			return false;
+		}
 	}
 	if (lastClsIndex + lastClsSize <= size) {
 		cls.clear();

@@ -10,6 +10,7 @@
 #include <string.h>
 #include "Logger.h"
 #include "DebugUtils.h"
+#include <limits.h>
 
 // the number of bits in a size_t
 static const size_t width = sizeof(int) << 3;
@@ -100,7 +101,7 @@ int ClauseManager::importClauses(const int* clauseBuffer,
 	int addedClauses = 0;
 	vector<int> cls;
 	int i = 1;
-	while (seenClauses < clauses) {
+	while (seenClauses < clauses && i < INT_MAX) {
 		if (clauseBuffer[i] == 0) {
 			if (addClause(cls)) {
 				if (cls.size() < VIP_SIZE_LIMIT) {
