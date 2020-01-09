@@ -27,7 +27,7 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
              {}
 
 void Job::lockJobManipulation() {
-    Console::log(Console::VVERB, "%s : lock job manip ...", toStr());
+    Console::log(Console::VVERB, "%s : lock job manip", toStr());
     jobManipulationLock.lock();
     Console::log(Console::VVERB, "%s : locked job manip", toStr());
 }

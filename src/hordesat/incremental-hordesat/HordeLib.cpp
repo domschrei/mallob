@@ -110,22 +110,22 @@ void HordeLib::init() {
 		if (params.getParam("s") == "minisat") {
 			solvers.push_back(new MiniSat());
 			solversInitialized.push_back(0);
-			log(1, "Running MiniSat on core %d\n", i, mpi_rank, mpi_size);
+			log(3, "Running MiniSat on core %d\n", i, mpi_rank, mpi_size);
 		} else if (params.getParam("s") == "combo") {
 			if ((mpi_rank + i) % 2 == 0) {
 				solvers.push_back(new MiniSat());
 				solversInitialized.push_back(0);
-				log(1, "Running MiniSat on core %d\n", i, mpi_rank, mpi_size);
+				log(3, "Running MiniSat on core %d\n", i, mpi_rank, mpi_size);
 			} else {
 				solvers.push_back(new Lingeling());
 				solversInitialized.push_back(0);
-				log(1, "Running Lingeling on core %d\n", i, mpi_rank, mpi_size);
+				log(3, "Running Lingeling on core %d\n", i, mpi_rank, mpi_size);
 			}
 		} else {
             Lingeling *lgl = new Lingeling();
 			solvers.push_back(lgl);
 			solversInitialized.push_back(0);
-			log(1, "Running Lingeling on core %d\n", i, mpi_rank, mpi_size);
+			log(3, "Running Lingeling on core %d\n", i, mpi_rank, mpi_size);
 		}
 		// set solver id
 		solvers[i]->solverId = i + solversCount * mpi_rank;
@@ -136,10 +136,10 @@ void HordeLib::init() {
 	int exchangeMode = params.getIntParam("e", 1);
 	sharingManager = NULL;
 	if (exchangeMode == 0) {
-		log(1, "Clause sharing disabled.\n");
+		log(3, "Clause sharing disabled.\n");
 	} else {
 		sharingManager = new DefaultSharingManager(mpi_size, mpi_rank, solvers, params);
-		log(1, "Initialized all-to-all clause sharing.\n");
+		log(3, "Initialized all-to-all clause sharing.\n");
 	}
 
 	diversify(mpi_rank, mpi_size);
@@ -290,7 +290,7 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 	solvingStateLock.unlock();
 
 	startSolving = getTime() - startSolving;
-	log(1, "Node %d started its solvers, took %.3f seconds\n", mpi_rank, startSolving);
+	log(1, "started solver threads, took %.3f seconds\n", startSolving);
 }
 
 void HordeLib::continueSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
@@ -348,7 +348,7 @@ int HordeLib::solveLoop() {
 
 std::vector<int> HordeLib::prepareSharing() {
     assert(sharingManager != NULL);
-	log(3, "collecting clauses on this node ... \n");
+	log(3, "collecting clauses on this node\n");
 	std::vector<int> clauses = sharingManager->prepareSharing();
 	return clauses;
 }
@@ -551,7 +551,7 @@ int HordeLib::failed(int lit) {
 
 HordeLib::~HordeLib() {
 
-	log(0, "entering destructor ...\n");
+	log(0, "entering destructor\n");
 
 	// for any running threads left:
 	solvingStateLock.lock();

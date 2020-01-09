@@ -15,7 +15,6 @@ public:
     Balancer(MPI_Comm& comm, Parameters& params, Statistics& stats) :
     _comm(comm), _params(params), _stats(stats), _load_factor(params.getFloatParam("l")), _balancing(false) {}
 
-    virtual std::map<int, int> balance(std::map<int, Job*>& jobs) = 0;
     int getVolume(int jobId);
     void updateVolume(int jobId, int volume);
 
