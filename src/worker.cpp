@@ -12,7 +12,6 @@
 #include "util/console.h"
 #include "util/random.h"
 #include "util/memusage.h"
-#include "balancing/thermodynamic_balancer.h"
 #include "balancing/cutoff_priority_balancer.h"
 #include "data/job_description.h"
 
