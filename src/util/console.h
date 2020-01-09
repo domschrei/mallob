@@ -16,6 +16,7 @@ public:
     static const int VERB = 3;
     static const int VVERB = 4;
     static const int VVVERB = 5;
+    static const int VVVVERB = 6;
 
 private:
     static std::string logDir;

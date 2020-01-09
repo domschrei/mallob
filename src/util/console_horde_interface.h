@@ -21,7 +21,7 @@ public:
     void log(int verbosityLevel, const char* fmt, va_list args) {
 
         std::string str(fmt);
-        str = "<horde-" + identifier + "> " + str;
+        str = "<h-" + identifier + "> " + str;
 
         // Write content
         va_list argsCopy; va_copy(argsCopy, args);

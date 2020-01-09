@@ -111,8 +111,8 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list& a
         elapsedAbs *= 0.001f;
         */
     
-        if (!quiet) printf("[%.6f] [%i] ", elapsedRel, rank);
-        if (logFile != NULL) fprintf(logFile, "[%.6f] [%i] ", elapsedRel, rank);
+        if (!quiet) printf("%.4f [%i] ", elapsedRel, rank);
+        if (logFile != NULL) fprintf(logFile, "%.4f [%i] ", elapsedRel, rank);
         
         beganLine = true;
     }

@@ -32,7 +32,7 @@ public:
         if (verbosityLevel <= verbosity) {
             int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
             printf("[%.3f] ", getTime());
-            printf("[%i] <horde-%s> ", rank, identifier.c_str());
+            printf("[%i] <h-%s> ", rank, identifier.c_str());
             vprintf(fmt, args);
             //fflush(stdout);
         }

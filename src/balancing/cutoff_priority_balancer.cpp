@@ -54,10 +54,10 @@ std::map<int, int> CutoffPriorityBalancer::balance(std::map<int, Job*>& jobs) {
     _stats.increment("reductions"); _stats.increment("broadcasts");
     // "resourcesInfo" now contains global data from all concerned jobs
     if (excludedNodes.count(MyMpi::rank(_comm))) {
-        Console::log(Console::VERB, "Ended all-reduction phase. Balancing phase finished.");
+        Console::log(Console::VERB, "Ended all-reduction. Balancing finished.");
         return std::map<int,int>();
     } else {
-        Console::log(Console::VERB, "Ended all-reduction phase. Calculating final job demands ...");
+        Console::log(Console::VERB, "Ended all-reduction. Calculating final job demands");
     }
 
     // Assign correct (final) floating-point resources
@@ -282,14 +282,14 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
 
     // "resourcesInfo" now contains global data from all concerned jobs
     if (_resources_info.getExcludedRanks().count(MyMpi::rank(_comm))) {
-        Console::log(Console::VERB, "Ended all-reduction phase. Balancing phase finished.");
+        Console::log(Console::VERB, "Ended all-reduction. Balancing finished.");
         _balancing = false;
         delete _local_jobs;
         _local_jobs = NULL;
         _assignments = std::map<int, float>();
         return true;
     } else {
-        Console::log(Console::VERB, "Ended all-reduction phase. Calculating final job demands ...");
+        Console::log(Console::VERB, "Ended all-reduction. Calculating final job demands");
     }
 
     // Assign correct (final) floating-point resources
@@ -410,7 +410,7 @@ std::map<int, int> CutoffPriorityBalancer::getBalancingResult() {
         float assignment = std::max(1.0f, it->second);
         int intAssignment = Random::roundProbabilistically(assignment);
         volumes[jobId] = intAssignment;
-        Console::log(Console::VERB, "Job #%i: final assignment %.3f => adjusted to %i", jobId, _assignments[jobId], intAssignment);
+        Console::log(Console::VERB, " #%i : final assignment %.3f => adj. to %i", jobId, _assignments[jobId], intAssignment);
     }
     for (auto it = volumes.begin(); it != volumes.end(); ++it) {
         updateVolume(it->first, it->second);
