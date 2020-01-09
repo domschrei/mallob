@@ -37,6 +37,8 @@ private:
     bool cancelThread();
     void reportResult(int res);
 
+    const char* toStr();
+
 };
 
 #endif

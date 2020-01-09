@@ -135,10 +135,7 @@ enum BalancingStage {
 class CutoffPriorityBalancer : public Balancer {
 
 public:
-    CutoffPriorityBalancer(MPI_Comm& comm, Parameters& params, Statistics& stats) : Balancer(comm, params, stats), _local_jobs(NULL) {
-
-    }
-    std::map<int, int> balance(std::map<int, Job*>& jobs) override;
+    CutoffPriorityBalancer(MPI_Comm& comm, Parameters& params, Statistics& stats) : Balancer(comm, params, stats), _local_jobs(NULL) {}
 
     bool beginBalancing(std::map<int, Job*>& jobs) override;
     bool canContinueBalancing() override;

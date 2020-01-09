@@ -40,7 +40,7 @@ void* SolverThread::run() {
         if (cancelThread()) break;
         readFormula();
     }
-    log(2, "%i : exiting\n", _args->solverId);
+    log(2, "%s exiting\n", toStr());
     return NULL;
 }
 
@@ -60,7 +60,7 @@ void SolverThread::init() {
 
 void SolverThread::readFormula() {
     hlib->solversInitialized[_args->solverId] = 0;
-    log(1, "Solver %i importing clauses ...\n", solver->solverId);
+    log(1, "%s importing clauses\n", toStr());
 
     int prevLits = importedLits;
     int begin = importedLits;
@@ -75,8 +75,8 @@ void SolverThread::readFormula() {
         if (i < hlib->formulae.size() && cancelThread()) return;
     }
 
-    log(1, "Solver %i imported clauses: %i literals\n", solver->solverId, (importedLits-prevLits));
-    log(1, "Solver %i initialized.\n", _args->solverId);
+    log(1, "%s imported clauses (%i lits)\n", toStr(), (importedLits-prevLits));
+    log(1, "%s initialized\n", toStr());
     hlib->solversInitialized[_args->solverId] = 1;
 }
 
@@ -135,7 +135,7 @@ bool SolverThread::cancelRun() {
     SolvingState s = hlib->solvingState;
     bool cancel = s == STANDBY || s == ABORTING;
     if (cancel) {
-        log(0, "Solver %i cancelling run\n", solver->solverId);
+        log(0, "%s cancelling run\n", toStr());
     }
     return cancel;
 }
@@ -150,7 +150,7 @@ void SolverThread::reportResult(int res) {
     if (res == SAT || res == UNSAT) {
         hlib->solvingStateLock.lock();
         if (hlib->solvingState == ACTIVE) {
-            log(0,"Found result %s on solver %d\n", res==SAT?"SAT":"UNSAT", solver->solverId);
+            log(0,"%s found result %s\n", toStr(), res==SAT?"SAT":"UNSAT");
             hlib->finalResult = SatResult(res);
             if (res == SAT) hlib->truthValues = solver->getSolution();
             else hlib->failedAssumptions = solver->getFailedAssumptions();
@@ -162,4 +162,8 @@ void SolverThread::reportResult(int res) {
 
 SolverThread::~SolverThread() {
     delete _args;
+}
+
+const char* SolverThread::toStr() {
+    return ("S" + std::to_string(solver->solverId)).c_str();
 }
