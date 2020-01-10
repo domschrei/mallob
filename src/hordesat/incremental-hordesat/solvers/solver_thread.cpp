@@ -49,13 +49,13 @@ void SolverThread::init() {
 
     //log(1, "solverRunningThread, entering\n");
     hlib = _args->hlib;
-    hlib->solvingStateLock.lock();
+    //hlib->solvingStateLock.lock();
     int localId = _args->solverId;
     solver = hlib->solvers[localId];
     if (hlib->params.isSet("pin")) {
         pinThread(hlib->params.getIntParam("c", 1));
     }
-    hlib->solvingStateLock.unlock();
+    //hlib->solvingStateLock.unlock();
     importedLits = 0;
 }
 
@@ -112,7 +112,6 @@ void SolverThread::runOnce() {
         if (cancelRun()) break;
 
         //log(0, "rank %d starting solver with %d new lits, %d assumptions: %d\n", hlib->mpi_rank, litsAdded, hlib->assumptions.size(), hlib->assumptions[0]);
-        hlib->finalResult = UNKNOWN;
         SatResult res = solver->solve(*hlib->assumptions);
         
         // If interrupted externally
@@ -125,6 +124,7 @@ void SolverThread::runOnce() {
 
 void SolverThread::waitWhile(SolvingState state) {
 
+    if (hlib->solvingState != state) return;
     hlib->solvingStateLock.lock();
     while (hlib->solvingState == state) {
         pthread_cond_wait(hlib->stateChangeCond.get(), hlib->solvingStateLock.mutex());

@@ -8,6 +8,10 @@
 #include "util/console.h"
 #include "util/timer.h"
 
+void logMutex(const char* msg) {
+    Console::log(Console::VVVERB, msg);
+}
+
 Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) :
             _params(params), 
             _comm_size(commSize), 
@@ -21,7 +25,7 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             _initialized(false), 
             _abort_after_initialization(false),
             _done_locally(false), 
-            _job_manipulation_lock(VerboseMutex((std::string("JobManip#") + std::to_string(_id)).c_str())),
+            _job_manipulation_lock(VerboseMutex((std::string("JobManip#") + std::to_string(_id)).c_str(), &logMutex)),
             _job_node_ranks(commSize, jobId),
             _has_left_child(false),
             _has_right_child(false)

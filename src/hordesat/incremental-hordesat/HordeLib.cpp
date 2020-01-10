@@ -85,8 +85,8 @@ void HordeLib::init() {
     solverThreads = NULL;
 	sharingManager = NULL;
     solvingState = INITIALIZING;
-	solutionLock = Mutex();
-	solvingStateLock = Mutex();
+	solutionLock = VerboseMutex("solution", NULL);
+	solvingStateLock = VerboseMutex("solveState", NULL);
 	stateChangeCond = ConditionVariable();
 	
     // Set MPI size and rank by params or otherwise by MPI calls
@@ -270,6 +270,8 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 		this->assumptions = assumptions;
 	}
 
+	finalResult = UNKNOWN;
+
 	maxSeconds = params.getIntParam("t", 0);
 	maxRounds = params.getIntParam("r", 0);
 	round = 1;
@@ -300,6 +302,7 @@ void HordeLib::continueSolving(const std::vector<std::shared_ptr<std::vector<int
 		this->formulae.push_back(vec);
 	}
 	this->assumptions = assumptions;
+	finalResult = UNKNOWN;
 
 	// unset standby
 	solvingStateLock.lock();
@@ -318,16 +321,16 @@ bool HordeLib::isFullyInitialized() {
 
 int HordeLib::solveLoop() {
 
-	// Sleeping?
+	setLogger(logger);
+
     double timeNow = getTime();
+	// Sleeping?
     if (sleepInt > 0) {
         usleep(sleepInt);
     }
 
     // Solving done?
-	solvingStateLock.lock();
 	bool standby = (solvingState == STANDBY);
-	solvingStateLock.unlock();
 	if (standby) {
 		log(0, "Returning result\n");
 		return finalResult;

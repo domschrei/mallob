@@ -9,9 +9,9 @@
 #include <set>
 
 #include "utilities/Threading.h"
+#include "utilities/verbose_mutex.h"
 #include "util/params.h"
 #include "util/permutation.h"
-#include "util/verbose_mutex.h"
 #include "data/job_description.h"
 #include "data/job_transfer.h"
 #include "data/epoch_counter.h"

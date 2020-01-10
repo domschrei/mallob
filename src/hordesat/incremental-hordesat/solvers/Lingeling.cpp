@@ -125,7 +125,7 @@ Lingeling::Lingeling() {
 	myId = 0;
 
     suspendSolver = false;
-    //suspendMutex = Mutex();
+    suspendMutex = VerboseMutex("suspendLgl", NULL);
     //suspendCond = ConditionVariable();
     maxvar = 0;
 }

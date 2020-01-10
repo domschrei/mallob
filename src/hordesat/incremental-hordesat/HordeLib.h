@@ -10,6 +10,7 @@
 
 #include "utilities/ParameterProcessor.h"
 #include "utilities/Threading.h"
+#include "utilities/verbose_mutex.h"
 #include "utilities/logging_interface.h"
 #include "solvers/MiniSat.h"
 #include "solvers/Lingeling.h"
@@ -60,8 +61,8 @@ private:
 
 	std::shared_ptr<LoggingInterface> logger;
 
-	Mutex solutionLock;
-	Mutex solvingStateLock;
+	VerboseMutex solutionLock;
+	VerboseMutex solvingStateLock;
 	ConditionVariable stateChangeCond;
 	
 	// settings

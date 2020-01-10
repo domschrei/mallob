@@ -15,6 +15,8 @@
 #include <unistd.h>
 #include <signal.h>
 
+#include "utilities/Logger.h"
+
 #define TESTRUN(cmd, msg) int res = cmd; if (res != 0) {  printf(msg,res); kill(getpid(), SIGSEGV); }
 
 class Mutex {

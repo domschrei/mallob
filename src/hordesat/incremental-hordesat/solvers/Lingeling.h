@@ -11,6 +11,7 @@
 #include "../utilities/SatUtils.h"
 #include "PortfolioSolverInterface.h"
 #include "../utilities/Threading.h"
+#include "../utilities/verbose_mutex.h"
 
 struct LGL;
 
@@ -43,7 +44,7 @@ private:
 	size_t clsBufferSize;
     
     bool suspendSolver;
-    Mutex suspendMutex;
+    VerboseMutex suspendMutex;
     ConditionVariable suspendCond;
 
 public:

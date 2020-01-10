@@ -9,6 +9,10 @@
 #include "data/sat_job.h"
 #include "util/console_horde_interface.h"
 
+void logMutexSat(const char* msg) {
+    Console::log(Console::VVVERB, msg);
+}
+
 void SatJob::lockHordeManipulation() {
     _horde_manipulation_lock.lock();
 }
@@ -45,7 +49,7 @@ void SatJob::appl_initialize() {
         return;
     }
 
-    _horde_manipulation_lock = VerboseMutex((std::string("HordeManip") + toStr()).c_str());
+    _horde_manipulation_lock = VerboseMutex((std::string("HordeManip") + toStr()).c_str(), &logMutexSat);
     lockHordeManipulation();
     Console::log(Console::VERB, "%s : creating horde instance", toStr());
     _solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(identifier))));

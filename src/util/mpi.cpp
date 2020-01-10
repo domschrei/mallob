@@ -367,7 +367,7 @@ void MyMpi::testSentHandles() {
         MPI_Test(&h->request, &flag, /*&h->status*/ MPI_STATUS_IGNORE);
         if (flag) {
             // Sending operation completed
-            Console::log(Console::VVVERB, "Message ID=%i isent", h->id);
+            Console::log(Console::VVVERB, "Msg ID=%i isent", h->id);
             it = sentHandles.erase(it);
         } else {
             it++;
