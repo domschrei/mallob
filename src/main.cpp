@@ -129,7 +129,7 @@ int main(int argc, char *argv[]) {
     MPI_Comm newComm;
     MPI_Comm_split(MPI_COMM_WORLD, color, rank, &newComm);
 
-    std::set_terminate(Console::forceFlush);
+    //std::set_terminate(Console::forceFlush);
 
     if (params.isSet("warmup") && !params.isSet("derandomize")) {
         // Do global warmup run with explicit all-to-all message passing

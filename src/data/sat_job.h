@@ -34,14 +34,15 @@ private:
     int _job_comm_epoch_of_clause_buffer;
     int _last_shared_job_comm;
 
-    std::thread bgThread;
-    Mutex hordeManipulationLock;
+    std::thread _bg_thread;
+    bool _bg_thread_running;
+    VerboseMutex _horde_manipulation_lock;
 
 public:
 
     SatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) : 
         Job(params, commSize, worldRank, jobId, epochCounter), _num_clause_sources(0), 
-        _job_comm_epoch_of_clause_buffer(-1), _last_shared_job_comm(-1) {}
+        _job_comm_epoch_of_clause_buffer(-1), _last_shared_job_comm(-1), _bg_thread_running(false) {}
     ~SatJob() override;
 
     void appl_initialize() override;
@@ -59,8 +60,12 @@ public:
     void appl_dumpStats() override;
 
 private:
+    void lockHordeManipulation();
+    void unlockHordeManipulation();
+
     void extractResult();
 
+    void setSolverNullThread();
     void setSolverNull();
 
     bool canShareCollectedClauses();

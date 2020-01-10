@@ -39,9 +39,12 @@ private:
 	size_t sleepInt;
 	int solversCount;
 	SharingManagerInterface* sharingManager;
-	vector<PortfolioSolverInterface*> solvers;
-	vector<int> solversInitialized;
+	
 	SolvingStates::SolvingState solvingState;
+	
+	vector<PortfolioSolverInterface*> solvers;
+	vector<bool> solverThreadsRunning;
+	vector<bool> solverThreadsInitialized;
 
 	std::vector<std::shared_ptr<std::vector<int>>> formulae;
 	std::shared_ptr<vector<int>> assumptions;

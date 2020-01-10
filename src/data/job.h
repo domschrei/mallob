@@ -11,6 +11,7 @@
 #include "utilities/Threading.h"
 #include "util/params.h"
 #include "util/permutation.h"
+#include "util/verbose_mutex.h"
 #include "data/job_description.h"
 #include "data/job_transfer.h"
 #include "data/epoch_counter.h"
@@ -87,7 +88,7 @@ protected:
     bool _abort_after_initialization;
     std::unique_ptr<std::thread> _initializer_thread;
     bool _done_locally;
-    Mutex jobManipulationLock;
+    VerboseMutex _job_manipulation_lock;
     
     int _result_code;
     JobResult _result;

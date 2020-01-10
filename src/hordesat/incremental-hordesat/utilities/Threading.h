@@ -28,10 +28,10 @@ public:
 	virtual ~Mutex() {
 		TESTRUN(pthread_mutex_destroy(&mtx), "Mutex destroy failed with msg %d\n")
 	}
-	void lock() {
+	virtual void lock() {
 		TESTRUN(pthread_mutex_lock(&mtx), "Mutex lock failed with msg %d\n")
 	}
-	void unlock() {
+	virtual void unlock() {
 		TESTRUN(pthread_mutex_unlock(&mtx), "Mutex unlock failed with msg %d\n")
 	}
 	bool tryLock() {
