@@ -25,6 +25,7 @@ private:
 	Mutex clauseAddMutex;
 	int myId;
 	int maxvar;
+	double lastTermCallbackTime;
     
 	// callback friends
 	friend int termCallback(void* solverPtr);
