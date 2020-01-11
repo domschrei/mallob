@@ -15,9 +15,21 @@ int MyMpi::maxMsgLength;
 std::map<int, int> MyMpi::tagPriority;
 
 int handleId;
+double doingMpiTasksTime;
 
 int MyMpi::nextHandleId() {
     return handleId++;
+}
+
+double MyMpi::currentCallStart() {
+    return doingMpiTasksTime;
+}
+
+void chkerr(int err) {
+    if (err != 0) {
+        Console::log(Console::CRIT, "MPI ERROR errcode=%i", err);
+        abort();
+    }
 }
 
 void MyMpi::init(int argc, char *argv[])
@@ -30,7 +42,8 @@ void MyMpi::init(int argc, char *argv[])
                 << " (MPI_THREAD_FUNNELED), got id=" << provided << std::endl;
         exit(1);
     }*/
-    MPI_Init(&argc, &argv);
+    int err = MPI_Init(&argc, &argv);
+    chkerr(err);
 
     maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
     handleId = 1;
@@ -77,9 +90,12 @@ void MyMpi::init(int argc, char *argv[])
     for (int tag : ANYTIME_CLIENT_RECV_TAGS) {
         msgBuffers[tag] = std::make_shared<std::vector<uint8_t>>(maxMsgLength);
     }*/
+
+    doingMpiTasksTime = 0;
 }
 
 void MyMpi::beginListening(const ListenerMode& mode) {
+    doingMpiTasksTime = Timer::elapsedSeconds();
     if (mode == CLIENT) {
         for (int tag : ANYTIME_CLIENT_RECV_TAGS)
             MyMpi::irecv(MPI_COMM_WORLD, tag);
@@ -88,9 +104,11 @@ void MyMpi::beginListening(const ListenerMode& mode) {
         for (int tag : ANYTIME_WORKER_RECV_TAGS)
             MyMpi::irecv(MPI_COMM_WORLD, tag);
     }
+    doingMpiTasksTime = 0;
 }
 
 void MyMpi::resetListenerIfNecessary(const ListenerMode& mode, int tag) {
+    doingMpiTasksTime = Timer::elapsedSeconds();
     // Check if tag should be listened to
     bool listen = false;
     if (mode == CLIENT) {
@@ -112,10 +130,12 @@ void MyMpi::resetListenerIfNecessary(const ListenerMode& mode, int tag) {
     }
     // No: add listener
     MyMpi::irecv(MPI_COMM_WORLD, tag);
+    doingMpiTasksTime = 0;
 }
 
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object) {
     
+    doingMpiTasksTime = Timer::elapsedSeconds();
     float time = Timer::elapsedSeconds();
     std::shared_ptr<std::vector<uint8_t>> vec = object.serialize();
     float timeSerialize = Timer::elapsedSeconds() - time;
@@ -125,11 +145,13 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
     float timeSend = Timer::elapsedSeconds() - time;
 
     Console::log(Console::VVVERB, "Msg ID=%i serializeTime=%.6f totalSendTime=%.6f", handle->id, timeSerialize, timeSend);
+    doingMpiTasksTime = 0;
     return handle;
 }
 
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object) {
 
+    doingMpiTasksTime = Timer::elapsedSeconds();
     float time = Timer::elapsedSeconds();
     float startTime = Timer::elapsedSeconds();
     if (object->empty()) {
@@ -146,7 +168,8 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
         handle->source = recvRank;
         handle->selfMessage = true;
     } else {
-        MPI_Isend(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator, &handle->request);
+        int err = MPI_Isend(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator, &handle->request);
+        chkerr(err);
     }
     float timeSend = Timer::elapsedSeconds() - time;
 
@@ -156,6 +179,7 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
 
     Console::log(Console::VVVERB, "Msg ID=%i dest=%i tag=%i starttime=%.6f createHandleTime=%.6f sendTime=%.6f insertHandleTime=%.6f", handle->id, 
                 recvRank, tag, startTime, timeCreateHandle, timeSend, timeInsertHandle);
+    doingMpiTasksTime = 0;
     return handle;
 }
 
@@ -164,6 +188,7 @@ MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const
 }
 
 MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object) {
+    doingMpiTasksTime = Timer::elapsedSeconds();
     MessageHandlePtr handle(new MessageHandle(nextHandleId(), object));
     if (rank(communicator) == recvRank) {
         handle->recvData = handle->sendData;
@@ -172,22 +197,28 @@ MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const
         handle->selfMessage = true;
         handles.insert(handle);
     } else {
-        MPI_Send(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator);
+        int err = MPI_Send(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator);
+        chkerr(err);
     }
     Console::log(Console::VVVERB, "Msg ID=%i sent.", handle->id);
+    doingMpiTasksTime = 0;
     return handle;
 }
 
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator) {
+    doingMpiTasksTime = Timer::elapsedSeconds();
     MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     handle->tag = 0;
     handle->recvData->resize(maxMsgLength);
-    MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, MPI_ANY_SOURCE, MPI_ANY_TAG, communicator, &handle->request);
+    int err = MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, MPI_ANY_SOURCE, MPI_ANY_TAG, communicator, &handle->request);
+    chkerr(err);
     handles.insert(handle);
+    doingMpiTasksTime = 0;
     return handle;
 }
 
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int tag) {
+    doingMpiTasksTime = Timer::elapsedSeconds();
     MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     handle->tag = tag;
 
@@ -199,31 +230,40 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int tag) {
     }
 
     handle->recvData->resize(msgSize);
-    MPI_Irecv(handle->recvData->data(), msgSize, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->request);
+    int err = MPI_Irecv(handle->recvData->data(), msgSize, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->request);
+    chkerr(err);
     handles.insert(handle);
+    doingMpiTasksTime = 0;
     return handle;
 }
 
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
+    doingMpiTasksTime = Timer::elapsedSeconds();
     MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     handle->tag = tag;
     handle->recvData->resize(maxMsgLength);
-    MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, source, tag, communicator, &handle->request);
+    int err = MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, source, tag, communicator, &handle->request);
+    chkerr(err);
     handles.insert(handle);
+    doingMpiTasksTime = 0;
     return handle;
 }
 
 MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag, int size) {
+    doingMpiTasksTime = Timer::elapsedSeconds();
     MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     handle->tag = tag;
     handle->recvData->resize(size);
-    MPI_Recv(handle->recvData->data(), size, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->status);
+    int err = MPI_Recv(handle->recvData->data(), size, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->status);
+    chkerr(err);
     handle->source = handle->status.MPI_SOURCE;
     int count = 0;
-    MPI_Get_count(&handle->status, MPI_BYTE, &count);
+    err = MPI_Get_count(&handle->status, MPI_BYTE, &count);
+    chkerr(err);
     if (count < size) {
         handle->recvData->resize(count);
     }
+    doingMpiTasksTime = 0;
     return handle;
 }
 
@@ -232,14 +272,17 @@ MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag) {
 }
 
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag, int size) {
+    doingMpiTasksTime = Timer::elapsedSeconds();
     MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     assert(source >= 0);
     handle->source = source;
     handle->tag = tag;
     handle->recvData->resize(size);
     handle->critical = true;
-    MPI_Irecv(handle->recvData->data(), size, MPI_BYTE, source, tag, communicator, &handle->request);
+    int err = MPI_Irecv(handle->recvData->data(), size, MPI_BYTE, source, tag, communicator, &handle->request);
+    chkerr(err);
     handles.insert(handle);
+    doingMpiTasksTime = 0;
     return handle;
 }
 
@@ -278,6 +321,7 @@ MessageHandlePtr MyMpi::poll() {
     return handle;
     */
 
+    doingMpiTasksTime = Timer::elapsedSeconds();
     MessageHandlePtr bestPrioHandle = NULL;
     int bestPrio = 9999999;
 
@@ -290,7 +334,7 @@ MessageHandlePtr MyMpi::poll() {
         } else {
             int flag = -1;
             int err = MPI_Test(&h->request, &flag, &h->status);
-            assert(err == 0 || Console::fail("MPI ERROR: %i", err));
+            chkerr(err);
             if (flag) {
                 consider = true;
                 h->tag = h->status.MPI_TAG;
@@ -311,12 +355,14 @@ MessageHandlePtr MyMpi::poll() {
     if (handle != NULL && !handle->selfMessage) {
         // Resize received data vector to actual received size
         int count = 0;
-        MPI_Get_count(&handle->status, MPI_BYTE, &count);
+        int err = MPI_Get_count(&handle->status, MPI_BYTE, &count);
+        chkerr(err);
         if (count > 0) {
             handle->recvData->resize(count);
         }
     }
     if (handle != NULL) handles.erase(handle);
+    doingMpiTasksTime = 0;
     return handle;
 }
 
@@ -361,10 +407,12 @@ bool MyMpi::hasOpenSentHandles() {
 }
 
 void MyMpi::testSentHandles() {
+    doingMpiTasksTime = Timer::elapsedSeconds();
     for (auto it = sentHandles.begin(); it != sentHandles.end();) {
         MessageHandlePtr h = *it;
         int flag = -1;
-        MPI_Test(&h->request, &flag, /*&h->status*/ MPI_STATUS_IGNORE);
+        int err = MPI_Test(&h->request, &flag, /*&h->status*/ MPI_STATUS_IGNORE);
+        chkerr(err);
         if (flag) {
             // Sending operation completed
             Console::log(Console::VVVERB, "Msg ID=%i isent", h->id);
@@ -373,17 +421,20 @@ void MyMpi::testSentHandles() {
             it++;
         }
     }
+    doingMpiTasksTime = 0;
 }
 
 int MyMpi::size(MPI_Comm comm) {
     int size = 0;
-    MPI_Comm_size(comm, &size);
+    int err = MPI_Comm_size(comm, &size);
+    chkerr(err);
     return size;
 }
 
 int MyMpi::rank(MPI_Comm comm) {
     int rank = -1;
-    MPI_Comm_rank(comm, &rank);
+    int err = MPI_Comm_rank(comm, &rank);
+    chkerr(err);
     return rank;
 }
 

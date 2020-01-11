@@ -15,6 +15,20 @@
 #include "balancing/cutoff_priority_balancer.h"
 #include "data/job_description.h"
 
+void mpiMonitor() {
+    while (true) {
+        double callStart = MyMpi::currentCallStart();
+        if (callStart < 0.00001) {
+            Console::log(Console::VERB, "MONITOR_MPI Not inside MPI call.");
+        } else {
+            double elapsed = getTime() - callStart;
+            Console::log(Console::VERB, "MONITOR_MPI Inside MPI call since %.4fs", elapsed);
+        }
+        usleep(1000 * 1000); // 1s
+    }
+}
+std::thread *mpiMonitorThread;
+
 void Worker::init() {
 
     // Initialize balancer
@@ -61,6 +75,8 @@ void Worker::init() {
 
     // Begin listening to an incoming message
     MyMpi::beginListening(WORKER);
+
+    mpiMonitorThread = new std::thread(mpiMonitor);
 }
 
 bool Worker::checkTerminate() {
