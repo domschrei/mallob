@@ -46,6 +46,7 @@ private:
 
     std::vector<int> bounceAlternatives;
 
+    std::thread mpiMonitorThread;
     bool exiting;
 
 public:

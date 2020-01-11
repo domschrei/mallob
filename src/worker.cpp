@@ -27,7 +27,6 @@ void mpiMonitor() {
         usleep(1000 * 1000); // 1s
     }
 }
-std::thread *mpiMonitorThread;
 
 void Worker::init() {
 
@@ -76,7 +75,7 @@ void Worker::init() {
     // Begin listening to an incoming message
     MyMpi::beginListening(WORKER);
 
-    mpiMonitorThread = new std::thread(mpiMonitor);
+    mpiMonitorThread = std::thread(mpiMonitor);
 }
 
 bool Worker::checkTerminate() {
