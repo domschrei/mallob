@@ -21,7 +21,7 @@ void mpiMonitor() {
         if (callStart < 0.00001) {
             Console::log(Console::VERB, "MONITOR_MPI Not inside MPI call.");
         } else {
-            double elapsed = getTime() - callStart;
+            double elapsed = Timer::elapsedSeconds() - callStart;
             Console::log(Console::VERB, "MONITOR_MPI Inside MPI call since %.4fs", elapsed);
         }
         usleep(1000 * 1000); // 1s

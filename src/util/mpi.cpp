@@ -123,10 +123,16 @@ void MyMpi::resetListenerIfNecessary(const ListenerMode& mode, int tag) {
                 listen = true;
             }
     }
-    if (!listen) return;
+    if (!listen) {
+        doingMpiTasksTime = 0;
+        return;
+    } 
     // Is the tag already being listened to?
     for (auto handle : handles) {
-        if (handle->tag == tag) return;
+        if (handle->tag == tag) {
+            doingMpiTasksTime = 0;
+            return;
+        }
     }
     // No: add listener
     MyMpi::irecv(MPI_COMM_WORLD, tag);
