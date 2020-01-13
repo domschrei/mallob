@@ -4,6 +4,7 @@
 #include <ctime>
 #include <algorithm>
 
+#include "utilities/Threading.h"
 #include "mympi.h"
 #include "random.h"
 #include "timer.h"
@@ -15,19 +16,28 @@ int MyMpi::maxMsgLength;
 std::map<int, int> MyMpi::tagPriority;
 
 int handleId;
+Mutex callLock;
 double doingMpiTasksTime;
 std::string currentOp;
 
 void initcall(const char* op) {
+    callLock.lock();
     currentOp = op;
     doingMpiTasksTime = Timer::elapsedSeconds();
+    callLock.unlock();
 }
 void endcall() {
+    callLock.lock();
     doingMpiTasksTime = 0;
     currentOp = "";
+    callLock.unlock();
 }
-double MyMpi::currentCallStart() {
-    return doingMpiTasksTime;
+std::string MyMpi::currentCall(double* callStart) {
+    callLock.lock();
+    *callStart = doingMpiTasksTime;
+    std::string op = currentOp;
+    callLock.unlock();
+    return op;
 }
 std::string MyMpi::currentOpName() {
     if (doingMpiTasksTime > 0) return currentOp;

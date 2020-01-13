@@ -230,8 +230,7 @@ public:
     static int random_other_node(MPI_Comm comm, const std::set<int>& excludedNodes);
     
     static int nextHandleId();
-    static double currentCallStart();
-    static std::string currentOpName();
+    static std::string currentCall(double* callStart);
 
     static int maxMsgLength;
 };

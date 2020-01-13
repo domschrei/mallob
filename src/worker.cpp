@@ -17,8 +17,8 @@
 
 void mpiMonitor() {
     while (true) {
-        double callStart = MyMpi::currentCallStart();
-        std::string opName = MyMpi::currentOpName();
+        double callStart = 0;
+        std::string opName = MyMpi::currentCall(&callStart);
         if (callStart < 0.00001 || opName == "") {
             Console::log(Console::VERB, "MONITOR_MPI Not inside MPI call.");
         } else {
