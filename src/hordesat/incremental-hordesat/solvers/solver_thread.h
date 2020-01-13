@@ -16,6 +16,7 @@ class SolverThread {
 
 private:
     thread_args* _args;
+    std::string _name;
     PortfolioSolverInterface* solver;
     HordeLib* hlib;
     int importedLits;

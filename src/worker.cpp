@@ -57,10 +57,6 @@ void Worker::init() {
         Console::log(Console::VERB, "My bounce alternatives: %s", info.c_str());
     }
 
-    Console::log(Console::VERB, "Global initialization barrier ...");
-    MPI_Barrier(MPI_COMM_WORLD);
-    Console::log(Console::VERB, "Passed global initialization barrier.");
-
     // Send warm-up messages with your pseudorandom bounce destinations
     if (params.isSet("derandomize") && params.isSet("warmup")) {
         IntVec payload({1, 2, 3, 4, 5, 6, 7, 8});
@@ -72,6 +68,10 @@ void Worker::init() {
             }
         }
     }
+
+    Console::log(Console::VERB, "Global initialization barrier ...");
+    MPI_Barrier(MPI_COMM_WORLD);
+    Console::log(Console::VERB, "Passed global initialization barrier.");
 
     // Begin listening to an incoming message
     MyMpi::beginListening(WORKER);
@@ -278,6 +278,7 @@ void Worker::mainProgram() {
         }
         
         iteration++;
+        usleep(10); // in microsecs
     }
 
     Console::flush();
@@ -305,14 +306,14 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
     // (except if it is a request for a root node)
     if (req.epoch < epochCounter.getEpoch() && req.requestedNodeIndex > 0) {
         Console::log_recv(Console::INFO, handle->source, "Discarding job request %s from past epoch %i (I am in epoch %i)", 
-                    jobStr(req.jobId, req.requestedNodeIndex), req.epoch, epochCounter.getEpoch());
+                    jobStr(req.jobId, req.requestedNodeIndex).c_str(), req.epoch, epochCounter.getEpoch());
         return;
     }
 
     // Discard request if this job already finished to this node's knowledge
     if (hasJob(req.jobId) && jobs[req.jobId]->getState() == JobState::PAST) {
         Console::log(Console::INFO, "Discarding request %s as it already finished", 
-                jobStr(req.jobId, req.requestedNodeIndex));
+                jobStr(req.jobId, req.requestedNodeIndex).c_str());
         return;
     }
 
@@ -326,7 +327,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
     } else if (req.numHops > maxHops && req.requestedNodeIndex > 0) {
         // Discard job request
         Console::log(Console::INFO, "Discarding job request %s which exceeded %i hops", 
-                        jobStr(req.jobId, req.requestedNodeIndex), maxHops);
+                        jobStr(req.jobId, req.requestedNodeIndex).c_str(), maxHops);
         return;
     
     } else if (req.numHops > maxHops && req.requestedNodeIndex == 0 && !hasJobCommitments()) {
@@ -345,7 +346,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
                     // Inform parent node of the original job  
                     Console::log(Console::VERB, "Suspending %s ...", job.toStr());
                     Console::log(Console::VERB, "... in order to adopt starving job %s", 
-                                    jobStr(req.jobId, req.requestedNodeIndex));  
+                                    jobStr(req.jobId, req.requestedNodeIndex).c_str());  
                     IntPair pair(job.getId(), job.getIndex());
                     MyMpi::isend(MPI_COMM_WORLD, job.getParentNodeRank(), MSG_WORKER_DEFECTING, pair);
                     //stats.increment("sentMessages");
@@ -362,8 +363,8 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
     
     if (adopts) {
         // Adoption takes place
-        const char* jobstr = jobStr(req.jobId, req.requestedNodeIndex);
-        Console::log_recv(Console::INFO, handle->source, "Willing to adopt %s after %i bounces", jobstr, req.numHops);
+        std::string jobstr = jobStr(req.jobId, req.requestedNodeIndex);
+        Console::log_recv(Console::INFO, handle->source, "Willing to adopt %s after %i bounces", jobstr.c_str(), req.numHops);
         assert(isIdle() || Console::fail("Adopting a job, but not idle!"));
         //stats.push_back("bounces", req.numHops);
 
@@ -393,7 +394,7 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
 
     JobRequest req; req.deserialize(*handle->recvData);
     Console::log_recv(Console::VERB, handle->source, "Request to become parent of %s", 
-                    jobStr(req.jobId, req.requestedNodeIndex));
+                    jobStr(req.jobId, req.requestedNodeIndex).c_str());
 
     // Retrieve concerned job
     assert(hasJob(req.jobId));
@@ -441,9 +442,9 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
 
         // If req.fullTransfer, then wait for the child to acknowledge having received the signature
         if (req.fullTransfer == 1) {
-            Console::log_send(Console::INFO, handle->source, "Sending %s", jobStr(req.jobId, req.requestedNodeIndex));
+            Console::log_send(Console::INFO, handle->source, "Sending %s", jobStr(req.jobId, req.requestedNodeIndex).c_str());
         } else {
-            Console::log_send(Console::INFO, handle->source, "Resuming child %s", jobStr(req.jobId, req.requestedNodeIndex));
+            Console::log_send(Console::INFO, handle->source, "Resuming child %s", jobStr(req.jobId, req.requestedNodeIndex).c_str());
         }
         // Child *will* start / resume its job solvers
         // Mark new node as one of the node's children
@@ -456,7 +457,7 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
 
     // If rejected: Send message to rejected child node
     if (reject) {
-        Console::log_send(Console::VERB, handle->source, "Rejecting potential child %s", jobStr(req.jobId, req.requestedNodeIndex));
+        Console::log_send(Console::VERB, handle->source, "Rejecting potential child %s", jobStr(req.jobId, req.requestedNodeIndex).c_str());
         MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_REJECT_BECOME_CHILD, req);
         //stats.increment("sentMessages");
     }
@@ -499,7 +500,7 @@ void Worker::handleAcceptBecomeChild(MessageHandlePtr& handle) {
         Job& job = getJob(req.jobId);
         if (job.getState() != JobState::PAST) {
             Console::log_recv(Console::INFO, handle->source, "Starting or resuming %s (state: %s)", 
-                        jobStr(req.jobId, req.requestedNodeIndex), job.jobStateToStr());
+                        jobStr(req.jobId, req.requestedNodeIndex).c_str(), job.jobStateToStr());
             setLoad(1, req.jobId);
             job.reinitialize(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
         }
@@ -722,7 +723,7 @@ void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
         // Prune right child
         job.unsetRightChild();
     } else {
-        Console::fail("%s : unknown child %s is defecting to another node", job.toStr(), jobStr(jobId, index));
+        Console::fail("%s : unknown child %s is defecting to another node", job.toStr(), jobStr(jobId, index).c_str());
     }
     
     int nextNodeRank;
@@ -734,7 +735,7 @@ void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
 
     // Initiate search for a replacement for the defected child
     Console::log(Console::VERB, "%s : trying to find a new child replacing defected node %s", 
-                    job.toStr(), jobStr(jobId, index));
+                    job.toStr(), jobStr(jobId, index).c_str());
     JobRequest req(jobId, job.getRootNodeRank(), worldRank, index, epochCounter.getEpoch(), 0);
     MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, MSG_FIND_NODE, req);
     //stats.increment("sentMessages");
@@ -927,7 +928,7 @@ void Worker::bounceJobRequest(JobRequest& request) {
 
     // Show warning if #hops is a large power of two
     if ((num >= 512) && ((num & (num - 1)) == 0)) {
-        Console::log(Console::WARN, "%s bouncing for the %i. time", jobStr(request.jobId, request.requestedNodeIndex), num);
+        Console::log(Console::WARN, "%s bouncing for the %i. time", jobStr(request.jobId, request.requestedNodeIndex).c_str(), num);
     }
 
     int nextRank;
@@ -948,7 +949,7 @@ void Worker::bounceJobRequest(JobRequest& request) {
     }
 
     // Send request to "next" worker node
-    Console::log_send(Console::VVERB, nextRank, "Bouncing %s", jobStr(request.jobId, request.requestedNodeIndex));
+    Console::log_send(Console::VVERB, nextRank, "Bouncing %s", jobStr(request.jobId, request.requestedNodeIndex).c_str());
     MyMpi::isend(MPI_COMM_WORLD, nextRank, MSG_FIND_NODE, request);
     //stats.increment("sentMessages");
 }

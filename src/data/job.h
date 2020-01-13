@@ -75,6 +75,8 @@ protected:
     int _index;
     JobDescription _description;
     std::shared_ptr<std::vector<uint8_t>> _serialized_description;
+    std::string _name;
+    Mutex _name_change_lock;
 
     EpochCounter& _epoch_counter;
     int _epoch_of_arrival;
@@ -173,7 +175,12 @@ public:
     int getParentIndex() const {return (_index-1)/2;};
     const JobResult& getResult() const;
 
-    const char* toStr() const {return ("#" + std::to_string(_id) + ":" + (_index >= 0 ? std::to_string(_index) : std::string("?"))).c_str();};
+    const char* toStr() {
+        _name_change_lock.lock();
+        _name = "#" + std::to_string(_id) + ":" + (_index >= 0 ? std::to_string(_index) : std::string("?"));
+        _name_change_lock.unlock();
+        return _name.c_str();
+    };
     const char* jobStateToStr() const {return jobStateStrings[(int)_state];};
 
     void updateJobNode(int index, int newRank) {

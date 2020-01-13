@@ -63,6 +63,7 @@ private:
     void handleClientFinished(MessageHandlePtr& handle);
     void handleExit(MessageHandlePtr& handle);
 
+    bool isJobReady(int jobId);
     void introduceJob(JobDescription& job);
     void readInstanceList(std::string& filename);
     void readFormula(std::string& filename, JobDescription& job);

@@ -188,13 +188,15 @@ void Console::appendUnsafe(int verbosity, const char* str, ...) {
 void Console::log_send(int verbosity, int destRank, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
-    log(verbosity, (std::string(str) + " => [" + std::to_string(destRank) + "]").c_str(), true, vl);
+    std::string output = std::string(str) + " => [" + std::to_string(destRank) + "]";
+    log(verbosity, output.c_str(), true, vl);
     va_end(vl);
 }
 void Console::log_recv(int verbosity, int sourceRank, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
-    log(verbosity, (std::string(str) + " <= [" + std::to_string(sourceRank) + "]").c_str(), true, vl);
+    std::string output = std::string(str) + " <= [" + std::to_string(sourceRank) + "]";
+    log(verbosity, output.c_str(), true, vl);
     va_end(vl);
 }
 

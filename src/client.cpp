@@ -128,17 +128,23 @@ void Client::mainProgram() {
             lastStatTime = Timer::elapsedSeconds();
         }
 
-        // Introduce next job(s) as applicable
+        // Introduce next job(s) as applicable:
+        // Only one job at a time to react better
+        // to outside events without too much latency!
         if (params.getIntParam("lbc") == 0) {
-            while (i < jobs.size() && jobs[i].getArrival() <= Timer::elapsedSeconds()) {
-                // Introduce job
-                JobDescription& job = jobs[i++];
-                introduceJob(job);
+            if (i < jobs.size() && jobs[i].getArrival() <= Timer::elapsedSeconds()) {
+                // Introduce job, if ready
+                if (isJobReady(jobs[i].getId())) {
+                    JobDescription& job = jobs[i++];
+                    introduceJob(job);
+                }
             }
         } else {
-            while (params.getIntParam("lbc") > introducedJobs.size() && lastIntroducedJobIdx+1 < jobs.size()) {
-                // Introduce job
-                introduceJob(jobs[lastIntroducedJobIdx+1]);
+            if (params.getIntParam("lbc") > introducedJobs.size() && lastIntroducedJobIdx+1 < jobs.size()) {
+                // Introduce job, if ready
+                if (isJobReady(jobs[i].getId())) {
+                    introduceJob(jobs[lastIntroducedJobIdx+1]);
+                }
             }
         }
 
@@ -180,6 +186,11 @@ void Client::mainProgram() {
 
     Console::flush();
     fflush(stdout);
+}
+
+bool Client::isJobReady(int jobId) {
+    std::unique_lock<std::mutex> lock(jobReadyLock);
+    return jobReady.count(jobId) && jobReady[jobId];
 }
 
 void Client::introduceJob(JobDescription& job) {
