@@ -15,6 +15,20 @@
 #include "balancing/cutoff_priority_balancer.h"
 #include "data/job_description.h"
 
+void mpiMonitor() {
+    while (true) {
+        double callStart = MyMpi::currentCallStart();
+        if (callStart < 0.00001) {
+            Console::log(Console::VERB, "MONITOR_MPI Not inside MPI call.");
+        } else {
+            double elapsed = Timer::elapsedSeconds() - callStart;
+            std::string opName = MyMpi::currentOpName();
+            Console::log(Console::VERB, "MONITOR_MPI Inside MPI call \"%s\" since %.4fs", opName.c_str(), elapsed);
+        }
+        usleep(1000 * 1000); // 1s
+    }
+}
+
 void Worker::init() {
 
     // Initialize balancer
@@ -61,6 +75,8 @@ void Worker::init() {
 
     // Begin listening to an incoming message
     MyMpi::beginListening(WORKER);
+
+    mpiMonitorThread = std::thread(mpiMonitor);
 }
 
 bool Worker::checkTerminate() {
@@ -1083,21 +1099,6 @@ void Worker::updateVolume(int jobId, int volume) {
 
 bool Worker::isTimeForRebalancing() {
     return epochCounter.getSecondsSinceLastSync() >= params.getFloatParam("p");
-}
-
-float Worker::allReduce(float contribution) {
-    float result;
-    MPI_Allreduce(&contribution, &result, 1, MPI_FLOAT, MPI_SUM, comm);
-    //stats.increment("reductions");
-    //stats.increment("broadcasts");
-    return result;
-}
-
-float Worker::reduce(float contribution, int rootRank) {
-    float result;
-    MPI_Reduce(&contribution, &result, 1, MPI_FLOAT, MPI_SUM, rootRank, comm);
-    //stats.increment("reductions");
-    return result;
 }
 
 Worker::~Worker() {

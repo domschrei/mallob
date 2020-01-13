@@ -213,6 +213,8 @@ public:
     static MessageHandlePtr irecv(MPI_Comm communicator, int source, int tag, int size);
     static MessageHandlePtr  recv(MPI_Comm communicator, int tag, int size);
     static MessageHandlePtr  recv(MPI_Comm communicator, int tag);
+    static MPI_Request    ireduce(MPI_Comm communicator, float* contribution, float* result, int rootRank);
+    static MPI_Request iallreduce(MPI_Comm communicator, float* contribution, float* result);
 
     static MessageHandlePtr poll();
     //static MessageHandlePtr pollByProbing(const ListenerMode& mode);
@@ -228,6 +230,8 @@ public:
     static int random_other_node(MPI_Comm comm, const std::set<int>& excludedNodes);
     
     static int nextHandleId();
+    static double currentCallStart();
+    static std::string currentOpName();
 
     static int maxMsgLength;
 };

@@ -15,6 +15,31 @@ int MyMpi::maxMsgLength;
 std::map<int, int> MyMpi::tagPriority;
 
 int handleId;
+double doingMpiTasksTime;
+std::string currentOp;
+
+void initcall(const char* op) {
+    currentOp = op;
+    doingMpiTasksTime = Timer::elapsedSeconds();
+}
+void endcall() {
+    doingMpiTasksTime = 0;
+    currentOp = "";
+}
+double MyMpi::currentCallStart() {
+    return doingMpiTasksTime;
+}
+std::string MyMpi::currentOpName() {
+    if (doingMpiTasksTime > 0) return currentOp;
+    else return "";
+}
+
+void chkerr(int err) {
+    if (err != 0) {
+        Console::log(Console::CRIT, "MPI ERROR errcode=%i", err);
+        abort();
+    }
+}
 
 int MyMpi::nextHandleId() {
     return handleId++;
@@ -30,7 +55,11 @@ void MyMpi::init(int argc, char *argv[])
                 << " (MPI_THREAD_FUNNELED), got id=" << provided << std::endl;
         exit(1);
     }*/
-    MPI_Init(&argc, &argv);
+    initcall("init");
+    int err = MPI_Init(&argc, &argv);
+    endcall();
+    chkerr(err);
+
 
     maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
     handleId = 1;
@@ -105,10 +134,14 @@ void MyMpi::resetListenerIfNecessary(const ListenerMode& mode, int tag) {
                 listen = true;
             }
     }
-    if (!listen) return;
+    if (!listen) {
+        return;
+    } 
     // Is the tag already being listened to?
     for (auto handle : handles) {
-        if (handle->tag == tag) return;
+        if (handle->tag == tag) {
+            return;
+        }
     }
     // No: add listener
     MyMpi::irecv(MPI_COMM_WORLD, tag);
@@ -146,7 +179,10 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
         handle->source = recvRank;
         handle->selfMessage = true;
     } else {
-        MPI_Isend(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator, &handle->request);
+        initcall("isend");
+        int err = MPI_Isend(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator, &handle->request);
+        endcall();
+        chkerr(err);
     }
     float timeSend = Timer::elapsedSeconds() - time;
 
@@ -172,7 +208,10 @@ MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const
         handle->selfMessage = true;
         handles.insert(handle);
     } else {
-        MPI_Send(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator);
+        initcall("send");
+        int err = MPI_Send(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator);
+        endcall();
+        chkerr(err);
     }
     Console::log(Console::VVVERB, "Msg ID=%i sent.", handle->id);
     return handle;
@@ -182,7 +221,10 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator) {
     MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     handle->tag = 0;
     handle->recvData->resize(maxMsgLength);
-    MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, MPI_ANY_SOURCE, MPI_ANY_TAG, communicator, &handle->request);
+    initcall("irecv");
+    int err = MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, MPI_ANY_SOURCE, MPI_ANY_TAG, communicator, &handle->request);
+    endcall();
+    chkerr(err);
     handles.insert(handle);
     return handle;
 }
@@ -199,7 +241,10 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int tag) {
     }
 
     handle->recvData->resize(msgSize);
-    MPI_Irecv(handle->recvData->data(), msgSize, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->request);
+    initcall("irecv");
+    int err = MPI_Irecv(handle->recvData->data(), msgSize, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->request);
+    endcall();
+    chkerr(err);
     handles.insert(handle);
     return handle;
 }
@@ -208,7 +253,10 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
     MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     handle->tag = tag;
     handle->recvData->resize(maxMsgLength);
-    MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, source, tag, communicator, &handle->request);
+    initcall("irecv");
+    int err = MPI_Irecv(handle->recvData->data(), maxMsgLength, MPI_BYTE, source, tag, communicator, &handle->request);
+    endcall();
+    chkerr(err);
     handles.insert(handle);
     return handle;
 }
@@ -217,10 +265,14 @@ MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag, int size) {
     MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     handle->tag = tag;
     handle->recvData->resize(size);
-    MPI_Recv(handle->recvData->data(), size, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->status);
+    initcall("recv");
+    int err = MPI_Recv(handle->recvData->data(), size, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->status);
+    endcall();
+    chkerr(err);
     handle->source = handle->status.MPI_SOURCE;
     int count = 0;
-    MPI_Get_count(&handle->status, MPI_BYTE, &count);
+    err = MPI_Get_count(&handle->status, MPI_BYTE, &count);
+    chkerr(err);
     if (count < size) {
         handle->recvData->resize(count);
     }
@@ -238,9 +290,28 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag, int si
     handle->tag = tag;
     handle->recvData->resize(size);
     handle->critical = true;
-    MPI_Irecv(handle->recvData->data(), size, MPI_BYTE, source, tag, communicator, &handle->request);
+    initcall("irecv");
+    int err = MPI_Irecv(handle->recvData->data(), size, MPI_BYTE, source, tag, communicator, &handle->request);
+    endcall();
+    chkerr(err);
     handles.insert(handle);
     return handle;
+}
+
+MPI_Request MyMpi::iallreduce(MPI_Comm communicator, float* contribution, float* result) {
+    MPI_Request req;
+    initcall("iallreduce");
+    MPI_Iallreduce(contribution, result, 1, MPI_FLOAT, MPI_SUM, communicator, &req);
+    endcall();
+    return req;
+}
+
+MPI_Request MyMpi::ireduce(MPI_Comm communicator, float* contribution, float* result, int rootRank) {
+    MPI_Request req;
+    initcall("ireduce");
+    MPI_Ireduce(contribution, result, 1, MPI_FLOAT, MPI_SUM, rootRank, communicator, &req);
+    endcall();
+    return req;
 }
 
 MessageHandlePtr MyMpi::poll() {
@@ -289,8 +360,10 @@ MessageHandlePtr MyMpi::poll() {
             consider = true;
         } else {
             int flag = -1;
+            initcall("test");
             int err = MPI_Test(&h->request, &flag, &h->status);
-            assert(err == 0 || Console::fail("MPI ERROR: %i", err));
+            endcall();
+            chkerr(err);
             if (flag) {
                 consider = true;
                 h->tag = h->status.MPI_TAG;
@@ -311,7 +384,10 @@ MessageHandlePtr MyMpi::poll() {
     if (handle != NULL && !handle->selfMessage) {
         // Resize received data vector to actual received size
         int count = 0;
-        MPI_Get_count(&handle->status, MPI_BYTE, &count);
+        initcall("getCount");
+        int err = MPI_Get_count(&handle->status, MPI_BYTE, &count);
+        endcall();
+        chkerr(err);
         if (count > 0) {
             handle->recvData->resize(count);
         }
@@ -364,7 +440,10 @@ void MyMpi::testSentHandles() {
     for (auto it = sentHandles.begin(); it != sentHandles.end();) {
         MessageHandlePtr h = *it;
         int flag = -1;
-        MPI_Test(&h->request, &flag, /*&h->status*/ MPI_STATUS_IGNORE);
+        initcall("test");
+        int err = MPI_Test(&h->request, &flag, /*&h->status*/ MPI_STATUS_IGNORE);
+        endcall();
+        chkerr(err);
         if (flag) {
             // Sending operation completed
             Console::log(Console::VVVERB, "Msg ID=%i isent", h->id);
@@ -377,13 +456,19 @@ void MyMpi::testSentHandles() {
 
 int MyMpi::size(MPI_Comm comm) {
     int size = 0;
-    MPI_Comm_size(comm, &size);
+    initcall("commSize");
+    int err = MPI_Comm_size(comm, &size);
+    endcall();
+    chkerr(err);
     return size;
 }
 
 int MyMpi::rank(MPI_Comm comm) {
     int rank = -1;
-    MPI_Comm_rank(comm, &rank);
+    initcall("commRank");
+    int err = MPI_Comm_rank(comm, &rank);
+    endcall();
+    chkerr(err);
     return rank;
 }
 
