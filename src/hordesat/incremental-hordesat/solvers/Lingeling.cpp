@@ -16,7 +16,9 @@ extern "C" {
 
 int termCallback(void* solverPtr) {
 	Lingeling* lp = (Lingeling*)solverPtr;
-    
+
+	if (lp->stopSolver) return 1;
+
     if (lp->suspendSolver) {
         // Stay inside this function call as long as solver is suspended
         lp->suspendMutex.lock();
@@ -25,8 +27,8 @@ int termCallback(void* solverPtr) {
         }
         lp->suspendMutex.unlock();
     }
-    
-    return lp->stopSolver;
+
+	return 0;
 }
 
 void produceUnit(void* sp, int lit) {
@@ -113,6 +115,7 @@ Lingeling::Lingeling() {
 	//lglsetopt(solver, "verbose", 10);
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
 	lglsetopt(solver, "bca", 0);
+	//lglsetopt(solver, "termint", 0); // call terminate callback every X steps
 
 	stopSolver = 0;
 	callback = NULL;

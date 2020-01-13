@@ -505,6 +505,8 @@ int HordeLib::failed(int lit) {
 
 HordeLib::~HordeLib() {
 
+	double time = getTime();
+
 	log(0, "entering destructor\n");
 
 	// for any running threads left:
@@ -547,5 +549,6 @@ HordeLib::~HordeLib() {
 		f = NULL;
 	}
 
-	log(0, "leaving destructor\n");
+	time = getTime() - time;
+	log(0, "leaving destructor, took %.3f s\n", time);
 }
