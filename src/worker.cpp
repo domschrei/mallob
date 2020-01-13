@@ -37,21 +37,33 @@ void Worker::init() {
     
     // Initialize pseudo-random order of nodes
     if (params.isSet("derandomize")) {
-        // Pick fixed amount of bounce destinations
-        bounceAlternatives = std::vector<int>(params.getIntParam("ba"));
+        // Pick fixed number k of bounce destinations
+        int numBounceAlternatives = params.getIntParam("ba");
+        assert(numBounceAlternatives % 2 == 0 || 
+            Console::fail("ERROR: Parameter bounceAlternatives must be even (for theoretical reasons)."));
+        bounceAlternatives = std::vector<int>();
         int numWorkers = MyMpi::size(comm);
+
+        // Generate global permutation over all worker ranks
+        AdjustablePermutation p(numWorkers, /*random seed = */1);
+        // Find the position where <worldRank> occurs in the permutation
+        int i = 0;
+        int x = p.get(i);
+        while (x != worldRank) x = p.get(++i);
+        Console::log(Console::VVERB, "My pos. in global permutation: %i", i);
+        // Add left and right k/2 neighbors in the permutation
+        // to the node's bounce alternatives
+        for (int j = i-(numBounceAlternatives/2); j < i; j++) {
+            bounceAlternatives.push_back(p.get((j+numWorkers) % numWorkers));
+        }
+        for (int j = i+1; j <= i+(numBounceAlternatives/2); j++) {
+            bounceAlternatives.push_back(p.get((j+numWorkers) % numWorkers));
+        }
+        assert(bounceAlternatives.size() == numBounceAlternatives);
+
+        // Output found bounce alternatives
         std::string info = "";
-        // First alternative: always rank+1 (to avoid k-cliques when -ba=k)
-        bounceAlternatives[0] = (worldRank+1) % numWorkers;
-        info += std::to_string(bounceAlternatives[0]) + " ";
-        // Subsequent alternatives
-        for (int i = 1; i < bounceAlternatives.size(); i++) {
-            // Repeat random drawing until a previously unchosen, non-self node is found 
-            do {
-                bounceAlternatives[i] = (int) (numWorkers*Random::rand());
-            } while (bounceAlternatives[i] == worldRank ||
-                std::find(bounceAlternatives.begin(), bounceAlternatives.begin()+i, bounceAlternatives[i]) 
-                    != bounceAlternatives.begin()+i);
+        for (int i = 0; i < bounceAlternatives.size(); i++) {
             info += std::to_string(bounceAlternatives[i]) + " ";
         }
         Console::log(Console::VERB, "My bounce alternatives: %s", info.c_str());
