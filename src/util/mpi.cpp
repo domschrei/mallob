@@ -39,10 +39,6 @@ std::string MyMpi::currentCall(double* callStart) {
     callLock.unlock();
     return op;
 }
-std::string MyMpi::currentOpName() {
-    if (doingMpiTasksTime > 0) return currentOp;
-    else return "";
-}
 
 void chkerr(int err) {
     if (err != 0) {
