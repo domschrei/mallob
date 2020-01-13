@@ -68,6 +68,7 @@ public:
     };
 
 private:
+    friend void mpiMonitor(Worker* worker);
 
     bool checkTerminate();
 

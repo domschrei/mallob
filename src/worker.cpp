@@ -15,8 +15,8 @@
 #include "balancing/cutoff_priority_balancer.h"
 #include "data/job_description.h"
 
-void mpiMonitor() {
-    while (true) {
+void mpiMonitor(Worker* worker) {
+    while (!worker->exiting) {
         double callStart = 0;
         std::string opName = MyMpi::currentCall(&callStart);
         if (callStart < 0.00001 || opName == "") {
@@ -76,7 +76,7 @@ void Worker::init() {
     // Begin listening to an incoming message
     MyMpi::beginListening(WORKER);
 
-    mpiMonitorThread = std::thread(mpiMonitor);
+    mpiMonitorThread = std::thread(mpiMonitor, this);
 }
 
 bool Worker::checkTerminate() {
@@ -1103,6 +1103,9 @@ bool Worker::isTimeForRebalancing() {
 }
 
 Worker::~Worker() {
+
+    exiting = true;
+
     for (auto idJobPair : jobs) {
 
         int id = idJobPair.first;
@@ -1121,6 +1124,9 @@ Worker::~Worker() {
         // Delete job and its solvers
         delete job;
     }
+
+    if (mpiMonitorThread.joinable())
+        mpiMonitorThread.join();
 
     Console::log(Console::VVERB, "Leaving destructor of worker environment.");
 }
