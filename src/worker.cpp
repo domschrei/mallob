@@ -18,11 +18,11 @@
 void mpiMonitor() {
     while (true) {
         double callStart = MyMpi::currentCallStart();
-        if (callStart < 0.00001) {
+        std::string opName = MyMpi::currentOpName();
+        if (callStart < 0.00001 || opName == "") {
             Console::log(Console::VERB, "MONITOR_MPI Not inside MPI call.");
         } else {
             double elapsed = Timer::elapsedSeconds() - callStart;
-            std::string opName = MyMpi::currentOpName();
             Console::log(Console::VERB, "MONITOR_MPI Inside MPI call \"%s\" since %.4fs", opName.c_str(), elapsed);
         }
         usleep(1000 * 1000); // 1s
