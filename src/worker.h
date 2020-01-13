@@ -46,6 +46,7 @@ private:
 
     std::vector<int> bounceAlternatives;
 
+    std::thread mpiMonitorThread;
     bool exiting;
 
 public:
@@ -120,8 +121,8 @@ private:
         return *jobs.at(id);
     };
 
-    const char* jobStr(int j, int idx) const {
-        return ("#" + std::to_string(j) + ":" + std::to_string(idx)).c_str();
+    std::string jobStr(int j, int idx) const {
+        return "#" + std::to_string(j) + ":" + std::to_string(idx);
     };
 
     int maxJobHops(bool rootNode) {

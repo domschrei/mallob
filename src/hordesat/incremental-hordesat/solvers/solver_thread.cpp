@@ -166,5 +166,6 @@ SolverThread::~SolverThread() {
 }
 
 const char* SolverThread::toStr() {
-    return ("S" + std::to_string(solver->solverId)).c_str();
+    _name = "S" + std::to_string(solver->solverId);
+    return _name.c_str();
 }

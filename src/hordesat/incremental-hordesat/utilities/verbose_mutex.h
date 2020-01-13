@@ -15,8 +15,8 @@ public:
         this->name = "UNDEFINED";
         this->logCallback = NULL;
     }
-    VerboseMutex(const char* name, void (*logCallback)(const char*)) : Mutex() {
-        this->name = std::string(name);
+    VerboseMutex(std::string name, void (*logCallback)(const char*)) : Mutex() {
+        this->name = name;
         this->logCallback = logCallback;
     }
 

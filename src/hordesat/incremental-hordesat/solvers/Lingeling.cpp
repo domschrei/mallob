@@ -16,6 +16,7 @@ extern "C" {
 
 int termCallback(void* solverPtr) {
 	Lingeling* lp = (Lingeling*)solverPtr;
+
 	double elapsed = getTime() - lp->lastTermCallbackTime;
 	lp->lastTermCallbackTime = getTime();
     
@@ -118,7 +119,7 @@ Lingeling::Lingeling() {
 	//lglsetopt(solver, "verbose", 10);
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
 	lglsetopt(solver, "bca", 0);
-	lglsetopt(solver, "termint", 0);
+	lglsetopt(solver, "termint", -1);
 	lastTermCallbackTime = getTime();
 
 	stopSolver = 0;

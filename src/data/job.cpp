@@ -17,6 +17,7 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             _comm_size(commSize), 
             _world_rank(worldRank), 
             _id(jobId),
+            _name("#" + std::to_string(jobId)),
             _epoch_counter(epochCounter), 
             _epoch_of_arrival(epochCounter.getEpoch()), 
             _elapsed_seconds_since_arrival(Timer::elapsedSeconds()), 
@@ -25,7 +26,7 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             _initialized(false), 
             _abort_after_initialization(false),
             _done_locally(false), 
-            _job_manipulation_lock(VerboseMutex((std::string("JobManip#") + std::to_string(_id)).c_str(), &logMutex)),
+            _job_manipulation_lock(VerboseMutex("JobManip#" + std::to_string(_id), &logMutex)),
             _job_node_ranks(commSize, jobId),
             _has_left_child(false),
             _has_right_child(false)
