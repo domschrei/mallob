@@ -431,27 +431,35 @@ void HordeLib::setSolvingState(SolvingState state) {
 	setLogger(logger);
 	log(2, "state transition %s -> %s\n", SolvingStateNames[oldState], SolvingStateNames[state]);
 	
-	// Suspending solvers (stay inside solving procedure, but sleep)
-	if (oldState != SUSPENDED && state == SUSPENDED) {
-		for (int i = 0; i < solversCount; i++) {
-			if (solvers[i] != NULL) solvers[i]->setSolverSuspend();
-        }
-	}
-	if (oldState == SUSPENDED && state != SUSPENDED) {
-		for (int i = 0; i < solversCount; i++) {
-            if (solvers[i] != NULL) solvers[i]->unsetSolverSuspend();
-        }
-	}
+	// (1) and (4) may co-occur when STANDBY -> ABORTING: 
+	// Must set interruption signal _before_ waking up solvers!
 
-	// Interrupting solvers (jump out of solving procedure)
+	// (1) To STANDBY|ABORTING : Interrupt solvers
+	// (set signal to jump out of solving procedure)
 	if (state == STANDBY || state == ABORTING) {
 		for (int i = 0; i < solversCount; i++) {
             if (solvers[i] != NULL) solvers[i]->setSolverInterrupt();
         }
 	}
-	if (oldState == STANDBY && state != STANDBY) {
+	// (2) From STANDBY to !STANDBY : Restart solvers
+	else if (oldState == STANDBY && state != STANDBY) {
 		for (int i = 0; i < solversCount; i++) {
             if (solvers[i] != NULL) solvers[i]->unsetSolverInterrupt();
+        }
+	}
+
+	// (3) From !SUSPENDED to SUSPENDED : Suspend solvers 
+	// (set signal to sleep inside solving procedure)
+	if (oldState != SUSPENDED && state == SUSPENDED) {
+		for (int i = 0; i < solversCount; i++) {
+			if (solvers[i] != NULL) solvers[i]->setSolverSuspend();
+        }
+	}
+	// (4) From SUSPENDED to !SUSPENDED : Resume solvers
+	// (set signal to wake up and resume solving procedure)
+	if (oldState == SUSPENDED && state != SUSPENDED) {
+		for (int i = 0; i < solversCount; i++) {
+            if (solvers[i] != NULL) solvers[i]->unsetSolverSuspend();
         }
 	}
 
