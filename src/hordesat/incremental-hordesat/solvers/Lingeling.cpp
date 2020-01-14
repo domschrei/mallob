@@ -27,11 +27,13 @@ int termCallback(void* solverPtr) {
 
     if (lp->suspendSolver) {
         // Stay inside this function call as long as solver is suspended
+		log(0, "SUSPENDING solver (%.4fs since last term callback)", elapsed);
         lp->suspendMutex.lock();
         while (lp->suspendSolver) {
             pthread_cond_wait(lp->suspendCond.get(), lp->suspendMutex.mutex());
         }
         lp->suspendMutex.unlock();
+		log(0, "RESUMING solver");
     }
     
     return 0;
