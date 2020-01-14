@@ -34,6 +34,11 @@ int termCallback(void* solverPtr) {
         }
         lp->suspendMutex.unlock();
 		log(0, "RESUMING solver");
+
+		if (lp->stopSolver) {
+			log(0, "STOPPING solver after suspension", elapsed);
+			return 1;
+		}
     }
     
     return 0;

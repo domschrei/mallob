@@ -987,7 +987,7 @@ void Worker::finishBalancing() {
     epochCounter.resetLastSync();
 
     // Retrieve balancing results
-    Console::log(Console::VERB, "Finishing balancing ...");
+    Console::log(Console::VVVERB, "Finishing balancing ...");
     std::map<int, int> volumes = balancer->getBalancingResult();
     Console::log(MyMpi::rank(comm) == 0 ? Console::INFO : Console::VERB, "Rebalancing completed.");
 
