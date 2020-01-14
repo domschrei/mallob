@@ -39,10 +39,12 @@ void Worker::init() {
     if (params.isSet("derandomize")) {
         // Pick fixed number k of bounce destinations
         int numBounceAlternatives = params.getIntParam("ba");
+        int numWorkers = MyMpi::size(comm);
         assert(numBounceAlternatives % 2 == 0 || 
             Console::fail("ERROR: Parameter bounceAlternatives must be even (for theoretical reasons)."));
+        assert(numBounceAlternatives < numWorkers || 
+            Console::fail("ERROR: There must be more worker nodes than there are bounce alternatives per worker."));
         bounceAlternatives = std::vector<int>();
-        int numWorkers = MyMpi::size(comm);
 
         // Generate global permutation over all worker ranks
         AdjustablePermutation p(numWorkers, /*random seed = */1);
@@ -51,7 +53,7 @@ void Worker::init() {
         int x = p.get(i);
         while (x != worldRank) x = p.get(++i);
         Console::log(Console::VVERB, "My pos. in global permutation: %i", i);
-        // Add left and right k/2 neighbors in the permutation
+        // Add neighbors in the permutation
         // to the node's bounce alternatives
         for (int j = i-(numBounceAlternatives/2); j < i; j++) {
             bounceAlternatives.push_back(p.get((j+numWorkers) % numWorkers));
@@ -398,7 +400,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
 
     } else {
         // Continue job finding procedure somewhere else
-        bounceJobRequest(req);
+        bounceJobRequest(req, handle->source);
     }
 }
 
@@ -931,7 +933,7 @@ int Worker::getRandomWorkerNode() {
     return randomOtherNodeRank;
 }
 
-void Worker::bounceJobRequest(JobRequest& request) {
+void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
 
     // Increment #hops
     request.numHops++;
@@ -945,7 +947,12 @@ void Worker::bounceJobRequest(JobRequest& request) {
 
     int nextRank;
     if (params.isSet("derandomize")) {
+        // Get random choice from bounce alternatives
         nextRank = Random::choice(bounceAlternatives);
+        // while skipping the requesting node and the sender
+        while (nextRank == request.requestingNodeRank || nextRank == senderRank) {
+            nextRank = Random::choice(bounceAlternatives);
+        }
     } else {
         // Generate pseudorandom permutation of this request
         int n = MyMpi::size(comm);
@@ -953,8 +960,8 @@ void Worker::bounceJobRequest(JobRequest& request) {
         // Fetch next index of permutation based on number of hops
         int permIdx = request.numHops % n;
         nextRank = perm.get(permIdx);
-        // (while skipping yourself and the requesting node)
-        while (nextRank == worldRank || nextRank == request.requestingNodeRank) {
+        // (while skipping yourself, the requesting node, and the sender)
+        while (nextRank == worldRank || nextRank == request.requestingNodeRank || nextRank == senderRank) {
             permIdx = (permIdx+1) % n;
             nextRank = perm.get(permIdx);
         }

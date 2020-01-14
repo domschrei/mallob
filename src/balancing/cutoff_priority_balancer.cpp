@@ -18,6 +18,7 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
     _balancing = true;
 
     // Identify jobs to balance
+    bool isWorkerBusy = false;
     _jobs_being_balanced = std::map<int, Job*>();
     assert(_local_jobs == NULL || Console::fail("Found localJobs instance of size %i", _local_jobs->size()));
     _local_jobs = new std::set<int, PriorityComparator>(PriorityComparator(jobs));
@@ -32,9 +33,13 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
             _jobs_being_balanced[it.first] = it.second;
             _local_jobs->insert(it.first);
         }
+        // Set "busy" flag of this worker node to true, if applicable
+        if (it.second->isInState({JobState::ACTIVE, JobState::INITIALIZING_TO_ACTIVE})) {
+            isWorkerBusy = true;
+        }
     }
 
-    // Find global aggregation of demands
+    // Find global aggregation of demands and amount of busy nodes
     float aggregatedDemand = 0;
     for (auto it : *_local_jobs) {
         int jobId = it;
@@ -44,7 +49,11 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
         Console::log(Console::VERB, "Job #%i : demand %i", jobId, _demands[jobId]);
     }
     Console::log(Console::VERB, "Local aggregated demand: %.3f", aggregatedDemand);
-    iAllReduce(aggregatedDemand);
+    _demand_and_busy_nodes_contrib[0] = aggregatedDemand;
+    _demand_and_busy_nodes_contrib[1] = (isWorkerBusy ? 1 : 0);
+    _demand_and_busy_nodes_result[0] = 0;
+    _demand_and_busy_nodes_result[1] = 0;
+    _reduce_request = MyMpi::iallreduce(_comm, _demand_and_busy_nodes_contrib, _demand_and_busy_nodes_result, 2);
 
     return false; // not finished yet: wait for end of iallreduce
 }
@@ -77,11 +86,14 @@ bool CutoffPriorityBalancer::continueBalancing() {
     if (_stage == INITIAL_DEMAND) {
 
         // Finish up initial reduction
-        float aggregatedDemand = _reduce_result;
-        if (MyMpi::rank(MPI_COMM_WORLD) == 0)
-            Console::log(Console::VVERB, "Aggregation of demands: %.3f", aggregatedDemand);
-        else
-            Console::log(Console::VVVERB, "Aggregation of demands: %.3f", aggregatedDemand);
+        float aggregatedDemand = _demand_and_busy_nodes_result[0];
+        int busyNodes = _demand_and_busy_nodes_result[1];
+        bool rankZero = MyMpi::rank(MPI_COMM_WORLD) == 0;
+        Console::log(rankZero ? Console::VVERB : Console::VVVVERB, 
+            "%i/%i nodes (%.2f\%) are busy", (int)busyNodes, MyMpi::size(_comm), 
+            ((float)100*busyNodes)/MyMpi::size(_comm));
+        Console::log(rankZero ? Console::VVERB : Console::VVVVERB, 
+            "Aggregation of demands: %.3f", aggregatedDemand);
 
         // Calculate local initial assignments
         _total_volume = (int) (MyMpi::size(_comm) * _load_factor);
@@ -182,7 +194,7 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
     if (MyMpi::rank(MPI_COMM_WORLD) == 0)
         Console::log(Console::VVERB, "Initially assigned resources: %.3f", _resources_info.assignedResources);
     else
-        Console::log(Console::VVVERB, "Initially assigned resources: %.3f", _resources_info.assignedResources);
+        Console::log(Console::VVVVERB, "Initially assigned resources: %.3f", _resources_info.assignedResources);
     float remainingResources = _total_volume - _resources_info.assignedResources;
     if (remainingResources < 0.1) remainingResources = 0;
 

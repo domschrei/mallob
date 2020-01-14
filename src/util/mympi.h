@@ -215,6 +215,7 @@ public:
     static MessageHandlePtr  recv(MPI_Comm communicator, int tag);
     static MPI_Request    ireduce(MPI_Comm communicator, float* contribution, float* result, int rootRank);
     static MPI_Request iallreduce(MPI_Comm communicator, float* contribution, float* result);
+    static MPI_Request iallreduce(MPI_Comm communicator, float* contribution, float* result, int numFloats);
 
     static MessageHandlePtr poll();
     //static MessageHandlePtr pollByProbing(const ListenerMode& mode);

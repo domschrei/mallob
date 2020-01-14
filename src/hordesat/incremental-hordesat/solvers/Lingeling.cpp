@@ -20,6 +20,11 @@ int termCallback(void* solverPtr) {
 	double elapsed = getTime() - lp->lastTermCallbackTime;
 	lp->lastTermCallbackTime = getTime();
     
+	if (lp->stopSolver) {
+		log(0, "STOPPING solver (%.4fs since last term callback)", elapsed);
+		return 1;
+	}
+
     if (lp->suspendSolver) {
         // Stay inside this function call as long as solver is suspended
         lp->suspendMutex.lock();
@@ -29,10 +34,7 @@ int termCallback(void* solverPtr) {
         lp->suspendMutex.unlock();
     }
     
-	if (lp->stopSolver) {
-		log(0, "STOPPING solver (%.4fs since last term callback)", elapsed);
-	}
-    return lp->stopSolver;
+    return 0;
 }
 
 void produceUnit(void* sp, int lit) {

@@ -312,6 +312,14 @@ MPI_Request MyMpi::iallreduce(MPI_Comm communicator, float* contribution, float*
     return req;
 }
 
+MPI_Request MyMpi::iallreduce(MPI_Comm communicator, float* contribution, float* result, int numFloats) {
+    MPI_Request req;
+    initcall("iallreduce");
+    MPI_Iallreduce(contribution, result, numFloats, MPI_FLOAT, MPI_SUM, communicator, &req);
+    endcall();
+    return req;
+}
+
 MPI_Request MyMpi::ireduce(MPI_Comm communicator, float* contribution, float* result, int rootRank) {
     MPI_Request req;
     initcall("ireduce");

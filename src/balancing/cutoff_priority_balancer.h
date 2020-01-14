@@ -153,6 +153,9 @@ private:
     std::set<int, PriorityComparator>* _local_jobs;
     BalancingStage _stage;
 
+    float _demand_and_busy_nodes_contrib[2];
+    float _demand_and_busy_nodes_result[2];
+
     ResourcesInfo _resources_info;
     SortedDoubleSequence _remainders;
     int _lower_remainder_idx;

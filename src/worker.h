@@ -97,7 +97,7 @@ private:
     void handleIncrementalJobFinished(MessageHandlePtr& handle);
     void handleExit(MessageHandlePtr& handle);
 
-    void bounceJobRequest(JobRequest& request);
+    void bounceJobRequest(JobRequest& request, int senderRank);
     void informClient(int jobId, int clientRank);
     void updateVolume(int jobId, int demand);
     void initJob(MessageHandlePtr handle);
