@@ -41,6 +41,10 @@ public:
 class PortfolioSolverInterface {
 public:
 	int solverId;
+	std::string _global_name;
+
+	void setName(std::string name) {_global_name = name;}
+
 
 	// Load formula from a given dimacs file, return false if failed
 	virtual bool loadFormula(const char* filename) = 0;

@@ -30,6 +30,13 @@ void log(int verbosityLevel, const char* fmt, ...) {
 	va_end(vl);
 }
 
+void log_va_list(int verbosityLevel, const char* fmt, va_list vl) {
+	va_list copy;
+	va_copy(copy, vl);
+	loggingInterface->log(verbosityLevel, fmt, copy);
+	va_end(copy);
+}
+
 void exitError(const char* fmt, ...) {
 	va_list vl;
 	va_start(vl, fmt);

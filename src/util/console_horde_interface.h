@@ -21,7 +21,11 @@ public:
     void log(int verbosityLevel, const char* fmt, va_list args) {
 
         std::string str(fmt);
-        str = "<h-" + identifier + "> " + str;
+        
+        // Prefix horde instance name, if not already present
+        if (str.rfind("<h-", 0) != 0) {
+            str = "<h-" + identifier + "> " + str;
+        }
 
         // Write content
         va_list argsCopy; va_copy(argsCopy, args);

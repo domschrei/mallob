@@ -99,7 +99,7 @@ void HordeLib::init() {
 
 	char hostname[1024];
 	gethostname(hostname, 1024);
-	log(0, "Initializing HordeSat ($Revision: 160$) on host %s on job %s with parameters: ",
+	hlog(0, "Initializing HordeSat ($Revision: 160$) on host %s on job %s with parameters: ",
 			hostname, params.getParam("jobstr").c_str());
 	params.printParams();
 
@@ -109,19 +109,19 @@ void HordeLib::init() {
 	for (int i = 0; i < solversCount; i++) {
 		if (params.getParam("s") == "minisat") {
 			solvers.push_back(new MiniSat());
-			log(3, "Running MiniSat on core %d\n", i, mpi_rank, mpi_size);
+			hlog(3, "Running MiniSat on core %d\n", i, mpi_rank, mpi_size);
 		} else if (params.getParam("s") == "combo") {
 			if ((mpi_rank + i) % 2 == 0) {
 				solvers.push_back(new MiniSat());
-				log(3, "Running MiniSat on core %d\n", i, mpi_rank, mpi_size);
+				hlog(3, "Running MiniSat on core %d\n", i, mpi_rank, mpi_size);
 			} else {
 				solvers.push_back(new Lingeling());
-				log(3, "Running Lingeling on core %d\n", i, mpi_rank, mpi_size);
+				hlog(3, "Running Lingeling on core %d\n", i, mpi_rank, mpi_size);
 			}
 		} else {
             Lingeling *lgl = new Lingeling();
 			solvers.push_back(lgl);
-			log(3, "Running Lingeling on core %d\n", i, mpi_rank, mpi_size);
+			hlog(3, "Running Lingeling on core %d\n", i, mpi_rank, mpi_size);
 		}
 		// set solver id
 		solvers[i]->solverId = i + solversCount * mpi_rank;
@@ -135,17 +135,17 @@ void HordeLib::init() {
 	int exchangeMode = params.getIntParam("e", 1);
 	sharingManager = NULL;
 	if (exchangeMode == 0) {
-		log(3, "Clause sharing disabled.\n");
+		hlog(3, "Clause sharing disabled.\n");
 	} else {
 		sharingManager = new DefaultSharingManager(mpi_size, mpi_rank, solvers, params);
-		log(3, "Initialized all-to-all clause sharing.\n");
+		hlog(3, "Initialized all-to-all clause sharing.\n");
 	}
 
 	diversify(mpi_rank, mpi_size);
 
 	solverThreads = (Thread**) malloc (solversCount*sizeof(Thread*));
 
-    log(1, "allocated solver threads\n");
+    hlog(1, "allocated solver threads\n");
 }
 
 void HordeLib::setLogger(std::shared_ptr<LoggingInterface> loggingInterface) {
@@ -159,36 +159,36 @@ void HordeLib::diversify(int rank, int size) {
 	switch (diversification) {
 	case 1:
 		sparseDiversification(mpi_size, mpi_rank);
-		log(1, "doing sparse diversification\n");
+		hlog(1, "doing sparse diversification\n");
 		break;
 	case 2:
 		binValueDiversification(mpi_size, mpi_rank);
-		log(1, "doing binary value based diversification\n");
+		hlog(1, "doing binary value based diversification\n");
 		break;
 	case 3:
 		randomDiversification(2015);
-		log(1, "doing random diversification\n");
+		hlog(1, "doing random diversification\n");
 		break;
 	case 4:
 		nativeDiversification(mpi_rank, mpi_size);
-		log(1, "doing native diversification (plingeling)\n");
+		hlog(1, "doing native diversification (plingeling)\n");
 		break;
 	case 5:
 		sparseDiversification(mpi_size, mpi_rank);
 		nativeDiversification(mpi_rank, mpi_size);
-		log(1, "doing sparse + native diversification\n");
+		hlog(1, "doing sparse + native diversification\n");
 		break;
 	case 6:
 		sparseRandomDiversification(mpi_rank, mpi_size);
-		log(1, "doing sparse random diversification\n");
+		hlog(1, "doing sparse random diversification\n");
 		break;
 	case 7:
 		sparseRandomDiversification(mpi_rank, mpi_size);
 		nativeDiversification(mpi_rank, mpi_size);
-		log(1, "doing random sparse + native diversification (plingeling)\n");
+		hlog(1, "doing random sparse + native diversification (plingeling)\n");
 		break;
 	case 0:
-		log(1, "no diversification\n");
+		hlog(1, "no diversification\n");
 		break;
 	}
 }
@@ -277,14 +277,14 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 	round = 1;
 
 	for (int i = 0; i < solversCount; i++) {
-        //log(1, "initializing solver %i.\n", i);
+        //hlog(1, "initializing solver %i.\n", i);
 		thread_args* arg = new thread_args();
 		arg->hlib = this;
 		arg->solverId = i;
 		arg->readFormulaFromHlib = true;
 		solverThreadsRunning[i] = true;
 		solverThreads[i] = new Thread(solverRunningThread, arg);
-        //log(1, "initialized solver %i.\n", i);
+        //hlog(1, "initialized solver %i.\n", i);
 	}
 
 	solvingStateLock.lock();
@@ -292,7 +292,7 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 	solvingStateLock.unlock();
 
 	startSolving = getTime() - startSolving;
-	log(1, "started solver threads, took %.3f seconds\n", startSolving);
+	hlog(1, "started solver threads, took %.3f seconds\n", startSolving);
 }
 
 void HordeLib::continueSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
@@ -332,13 +332,13 @@ int HordeLib::solveLoop() {
     // Solving done?
 	bool standby = (solvingState == STANDBY);
 	if (standby) {
-		log(0, "Returning result\n");
+		hlog(0, "Returning result\n");
 		return finalResult;
 	} 
 
 	// Resources exhausted?
     if ((maxRounds != 0 && round == maxRounds) || (maxSeconds != 0 && timeNow > maxSeconds)) {
-		log(0, "Aborting: round %i, time %3.3f\n", round, timeNow);
+		hlog(0, "Aborting: round %i, time %3.3f\n", round, timeNow);
 		solvingStateLock.lock();
         setSolvingState(STANDBY);
 		solvingStateLock.unlock();
@@ -351,7 +351,7 @@ int HordeLib::solveLoop() {
 
 std::vector<int> HordeLib::prepareSharing() {
     assert(sharingManager != NULL);
-	log(3, "collecting clauses on this node\n");
+	hlog(3, "collecting clauses on this node\n");
 	std::vector<int> clauses = sharingManager->prepareSharing();
 	return clauses;
 }
@@ -427,9 +427,9 @@ void HordeLib::abort() {
 void HordeLib::setSolvingState(SolvingState state) {
 	SolvingState oldState = this->solvingState;
 	this->solvingState = state;
-	// Overwrite static logging variable which may now belong to another HordeLib instance
 	setLogger(logger);
-	log(2, "state transition %s -> %s\n", SolvingStateNames[oldState], SolvingStateNames[state]);
+
+	hlog(2, "state transition %s -> %s\n", SolvingStateNames[oldState], SolvingStateNames[state]);
 	
 	// (1) and (4) may co-occur when STANDBY -> ABORTING: 
 	// Must set interruption signal _before_ waking up solvers!
@@ -475,7 +475,7 @@ int HordeLib::finishSolving() {
 	if (params.isSet("stats")) {
 		dumpStats();
 	}
-	//log(0, "rank %d result:%d\n", mpi_rank, finalResult);
+	//hlog(0, "rank %d result:%d\n", mpi_rank, finalResult);
 
 	return finalResult;
 }
@@ -485,7 +485,7 @@ void HordeLib::dumpStats() {
 	SolvingStatistics locSolveStats;
 	for (int i = 0; i < solversCount; i++) {
 		SolvingStatistics st = solvers[i]->getStatistics();
-		log(1, "S%d stats props:%lu decs:%lu confs:%lu mem:%0.2f\n",
+		hlog(1, "S%d stats props:%lu decs:%lu confs:%lu mem:%0.2f\n",
 				solvers[i]->solverId, st.propagations, st.decisions, st.conflicts, st.memPeak);
 		locSolveStats.conflicts += st.conflicts;
 		locSolveStats.decisions += st.decisions;
@@ -497,7 +497,7 @@ void HordeLib::dumpStats() {
 	if (sharingManager != NULL) {
 		locShareStats = sharingManager->getStatistics();
 	}
-	log(1, "node-stats solved:%d res:%d props:%lu decs:%lu confs:%lu mem:%0.2f shared:%lu filtered:%lu\n",
+	hlog(1, "node-stats solved:%d res:%d props:%lu decs:%lu confs:%lu mem:%0.2f shared:%lu filtered:%lu\n",
 			finalResult != 0, finalResult, locSolveStats.propagations, locSolveStats.decisions,
 			locSolveStats.conflicts, locSolveStats.memPeak, locShareStats.sharedClauses, locShareStats.filteredClauses);
 }
@@ -511,11 +511,18 @@ int HordeLib::failed(int lit) {
 	return failedAssumptions.find(lit) != failedAssumptions.end();
 }
 
+void HordeLib::hlog(int verbosityLevel, const char* fmt, ...) {
+	va_list vl;
+    va_start(vl, fmt);
+	logger->log(verbosityLevel, fmt, vl);
+	va_end(vl);
+}
+
 HordeLib::~HordeLib() {
 
 	double time = getTime();
 
-	log(0, "entering destructor\n");
+	hlog(0, "entering destructor\n");
 
 	// for any running threads left:
 	solvingStateLock.lock();
@@ -530,12 +537,12 @@ HordeLib::~HordeLib() {
 		delete solverThreads[i];
 		solverThreads[i] = NULL;
 	}
-	log(0, "threads joined\n");
+	hlog(0, "threads joined\n");
 	if (solversCount > 0) {
 		free(solverThreads);
 		solversCount = 0;
 	}
-	log(0, "threads deleted\n");
+	hlog(0, "threads deleted\n");
 
 	// delete solvers
 	for (int i = 0; i < solvers.size(); i++) {
@@ -544,7 +551,7 @@ HordeLib::~HordeLib() {
 			solvers[i] = NULL;
 		}
 	}
-	log(0, "solvers deleted\n");
+	hlog(0, "solvers deleted\n");
 
 	// delete sharing manager
 	if (sharingManager != NULL) {
@@ -558,5 +565,6 @@ HordeLib::~HordeLib() {
 	}
 
 	time = getTime() - time;
-	log(0, "leaving destructor, took %.3f s\n", time);
+	setLogger(logger);
+	hlog(0, "leaving destructor, took %.3f s\n", time);
 }

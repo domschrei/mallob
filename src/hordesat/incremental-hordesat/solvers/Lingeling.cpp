@@ -14,6 +14,15 @@ extern "C" {
 	#include "lglib.h"
 }
 
+void slog(Lingeling* lgl, int verbosityLevel, const char* fmt, ...) {
+	std::string msg = lgl->_global_name + " ";
+	msg += fmt;
+	va_list vl;
+	va_start(vl, fmt);
+	log_va_list(verbosityLevel, msg.c_str(), vl);
+	va_end(vl);
+}
+
 int termCallback(void* solverPtr) {
 	Lingeling* lp = (Lingeling*)solverPtr;
 
@@ -21,22 +30,22 @@ int termCallback(void* solverPtr) {
 	lp->lastTermCallbackTime = getTime();
     
 	if (lp->stopSolver) {
-		log(0, "STOPPING solver (%.4fs since last term callback)", elapsed);
+		slog(lp, 0, "STOPPING (%.4fs since last term callback)", elapsed);
 		return 1;
 	}
 
     if (lp->suspendSolver) {
         // Stay inside this function call as long as solver is suspended
-		log(0, "SUSPENDING solver (%.4fs since last term callback)", elapsed);
+		slog(lp, 0, "SUSPENDING (%.4fs since last term callback)", elapsed);
         lp->suspendMutex.lock();
         while (lp->suspendSolver) {
             pthread_cond_wait(lp->suspendCond.get(), lp->suspendMutex.mutex());
         }
         lp->suspendMutex.unlock();
-		log(0, "RESUMING solver");
+		slog(lp, 0, "RESUMING");
 
 		if (lp->stopSolver) {
-			log(0, "STOPPING solver after suspension", elapsed);
+			slog(lp, 0, "STOPPING after suspension", elapsed);
 			return 1;
 		}
     }

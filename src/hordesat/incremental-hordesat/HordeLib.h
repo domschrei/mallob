@@ -107,6 +107,8 @@ public:
 	std::set<int>& getFailedAssumptions() {
 		return failedAssumptions;
 	}
+
+	void hlog(int verbosityLevel, const char* fmt, ...);
 	
 
 private:

@@ -19,6 +19,7 @@ class Lingeling: public PortfolioSolverInterface {
 
 private:
 	LGL* solver;
+	std::string name;
 	int stopSolver;
 	LearnedClauseCallback* callback;
 	int glueLimit;

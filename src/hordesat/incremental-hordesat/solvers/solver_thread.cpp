@@ -4,19 +4,19 @@
 
 using namespace SolvingStates;
 
-void pinThread(int solversCount) {
+void pinThread(HordeLib* hlib, int solversCount) {
 	static int lastCpu = 0;
 	int numCores = sysconf(_SC_NPROCESSORS_ONLN);
 	int localRank = 0;
 	const char* lranks = getenv("OMPI_COMM_WORLD_LOCAL_RANK");
 	if (lranks == NULL) {
-		log(0, "WARNING: local rank was not determined.\n");
+		hlib->hlog(0, "WARNING: local rank was not determined.\n");
 	} else {
 		localRank = atoi(lranks);
 	}
 	int desiredCpu = lastCpu + localRank*solversCount;
 	lastCpu++;
-	log(0, "Pinning thread to proc %d of %d, local rank is %d\n",
+	hlib->hlog(0, "Pinning thread to proc %d of %d, local rank is %d\n",
 			desiredCpu, numCores, localRank);
 
 	cpu_set_t cpuSet;
@@ -40,28 +40,30 @@ void* SolverThread::run() {
         if (cancelThread()) break;
         readFormula();
     }
-    log(2, "%s exiting\n", toStr());
+    hlib->hlog(2, "%s exiting\n", toStr());
     hlib->solverThreadsRunning[_args->solverId] = false;
     return NULL;
 }
 
 void SolverThread::init() {
 
-    //log(1, "solverRunningThread, entering\n");
     hlib = _args->hlib;
+    //hlib->hlog(1, "solverRunningThread, entering\n");
     //hlib->solvingStateLock.lock();
     int localId = _args->solverId;
     solver = hlib->solvers[localId];
     if (hlib->params.isSet("pin")) {
-        pinThread(hlib->params.getIntParam("c", 1));
+        pinThread(hlib, hlib->params.getIntParam("c", 1));
     }
+    std::string globalName = "<h-" + hlib->params.getParam("jobstr") + "> " + std::string(toStr());
+    solver->setName(globalName);
     //hlib->solvingStateLock.unlock();
     importedLits = 0;
 }
 
 void SolverThread::readFormula() {
     hlib->solverThreadsInitialized[_args->solverId] = false;
-    log(1, "%s importing clauses\n", toStr());
+    hlib->hlog(1, "%s importing clauses\n", toStr());
 
     int prevLits = importedLits;
     int begin = importedLits;
@@ -76,8 +78,8 @@ void SolverThread::readFormula() {
         if (i < hlib->formulae.size() && cancelThread()) return;
     }
 
-    log(1, "%s imported clauses (%i lits)\n", toStr(), (importedLits-prevLits));
-    log(1, "%s initialized\n", toStr());
+    hlib->hlog(1, "%s imported clauses (%i lits)\n", toStr(), (importedLits-prevLits));
+    hlib->hlog(1, "%s initialized\n", toStr());
     hlib->solverThreadsInitialized[_args->solverId] = true;
 }
 
@@ -99,7 +101,7 @@ void SolverThread::read(const std::vector<int>& formula, int begin) {
 
 void SolverThread::runOnce() {
 
-    //log(1, "solverRunningThread, beginning main loop\n");
+    //hlib->hlog(1, "solverRunningThread, beginning main loop\n");
     while (true) {
 
         // Solving has just been done -> finish
@@ -111,7 +113,7 @@ void SolverThread::runOnce() {
         // Solving has been done now -> finish
         if (cancelRun()) break;
 
-        //log(0, "rank %d starting solver with %d new lits, %d assumptions: %d\n", hlib->mpi_rank, litsAdded, hlib->assumptions.size(), hlib->assumptions[0]);
+        //hlib->hlog(0, "rank %d starting solver with %d new lits, %d assumptions: %d\n", hlib->mpi_rank, litsAdded, hlib->assumptions.size(), hlib->assumptions[0]);
         SatResult res = solver->solve(*hlib->assumptions);
         
         // If interrupted externally
@@ -136,7 +138,7 @@ bool SolverThread::cancelRun() {
     SolvingState s = hlib->solvingState;
     bool cancel = s == STANDBY || s == ABORTING;
     if (cancel) {
-        log(0, "%s cancelling run\n", toStr());
+        hlib->hlog(0, "%s cancelling run\n", toStr());
     }
     return cancel;
 }
@@ -151,7 +153,7 @@ void SolverThread::reportResult(int res) {
     if (res == SAT || res == UNSAT) {
         hlib->solvingStateLock.lock();
         if (hlib->solvingState == ACTIVE) {
-            log(0,"%s found result %s\n", toStr(), res==SAT?"SAT":"UNSAT");
+            hlib->hlog(0,"%s found result %s\n", toStr(), res==SAT?"SAT":"UNSAT");
             hlib->finalResult = SatResult(res);
             if (res == SAT) hlib->truthValues = solver->getSolution();
             else hlib->failedAssumptions = solver->getFailedAssumptions();

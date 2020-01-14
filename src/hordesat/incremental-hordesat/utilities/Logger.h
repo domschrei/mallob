@@ -16,6 +16,7 @@
 double getTime();
 void setLoggingInterface(std::shared_ptr<LoggingInterface> interface);
 void log(int verbosityLevel, const char* fmt, ...);
+void log_va_list(int verbosityLevel, const char* fmt, va_list vl);
 void exitError(const char* fmt, ...);
 
 #endif /* LOGGER_H_ */
