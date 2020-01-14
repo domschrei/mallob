@@ -353,10 +353,9 @@ SolvingStatistics Lingeling::getStatistics() {
 
 void Lingeling::diversify(int rank, int size) {
 	// This method is copied from Plingeling
-	// UPDATE: Throwing out case 11 because of infrequent termination callback calling
 	lglsetopt(solver, "seed", rank);
 	lglsetopt(solver, "flipping", 0);
-    switch (rank % 15 /*originally : 16*/) {
+    switch (rank % 16) {
 		case 0: default: break;
 		case 1: lglsetopt (solver, "plain", 1); break;
 		case 2: lglsetopt (solver, "agilelim", 100); break;
@@ -372,12 +371,11 @@ void Lingeling::diversify(int rank, int size) {
 			lglsetopt (solver, "elmrtc", 1);
 			break;
 		case 10: lglsetopt (solver, "phase", -1); break;
-		//case 11: lglsetopt (solver, "prbsimplertc", 1); break;
-		// these are originally cases 12-15
-		case 11: lglsetopt (solver, "gluescale", 1); break;
-		case 12: lglsetopt (solver, "gluescale", 3); break;
-		case 13: lglsetopt (solver, "move", 1); break;
-		case 14: lglsetopt(solver, "flipping", 1); break;
+		case 11: lglsetopt (solver, "prbsimplertc", 1); break;
+		case 12: lglsetopt (solver, "gluescale", 1); break;
+		case 13: lglsetopt (solver, "gluescale", 3); break;
+		case 14: lglsetopt (solver, "move", 1); break;
+		case 15: lglsetopt(solver, "flipping", 1); break;
 	}
 }
 
