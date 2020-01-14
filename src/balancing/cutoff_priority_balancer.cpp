@@ -90,7 +90,7 @@ bool CutoffPriorityBalancer::continueBalancing() {
         int busyNodes = _demand_and_busy_nodes_result[1];
         bool rankZero = MyMpi::rank(MPI_COMM_WORLD) == 0;
         Console::log(rankZero ? Console::VVERB : Console::VVVVERB, 
-            "%i/%i nodes (%.2f\%) are busy", (int)busyNodes, MyMpi::size(_comm), 
+            "%i/%i nodes (%.2f%%) are busy", (int)busyNodes, MyMpi::size(_comm), 
             ((float)100*busyNodes)/MyMpi::size(_comm));
         Console::log(rankZero ? Console::VVERB : Console::VVVVERB, 
             "Aggregation of demands: %.3f", aggregatedDemand);
