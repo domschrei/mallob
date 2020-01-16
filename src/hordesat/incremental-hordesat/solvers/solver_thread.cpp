@@ -1,9 +1,11 @@
 
 #include "solvers/solver_thread.h"
-#include "HordeLib.h"
+
+#include <functional>
 
 using namespace SolvingStates;
 
+/*
 void pinThread(HordeLib* hlib, int solversCount) {
 	static int lastCpu = 0;
 	int numCores = sysconf(_SC_NPROCESSORS_ONLN);
@@ -23,64 +25,67 @@ void pinThread(HordeLib* hlib, int solversCount) {
 	CPU_ZERO(&cpuSet);
 	CPU_SET(desiredCpu, &cpuSet);
 	sched_setaffinity(0, sizeof(cpuSet), &cpuSet);
-}
+}*/
 
 void* SolverThread::run() {
 
     init();
-    waitWhile(INITIALIZING);
+    //waitWhile(INITIALIZING);
     readFormula();
 
     while (!cancelThread()) {
     
-        waitWhile(STANDBY);
+        //waitWhile(STANDBY);
         runOnce();
-        waitWhile(STANDBY);
+        //waitWhile(STANDBY);
         
         if (cancelThread()) break;
         readFormula();
     }
-    hlib->hlog(2, "%s exiting\n", toStr());
-    hlib->solverThreadsRunning[_args->solverId] = false;
+
+    pause();
+
+    //log(1, "-THREAD\n");
+    _info->running = false;
     return NULL;
 }
 
 void SolverThread::init() {
 
-    hlib = _args->hlib;
-    //hlib->hlog(1, "solverRunningThread, entering\n");
+    //register_termination_handler(SIGCHLD, std::bind(terminateSolverThread, this));
+
+    //log(1, "+THREAD\n");
     //hlib->solvingStateLock.lock();
-    int localId = _args->solverId;
-    solver = hlib->solvers[localId];
-    if (hlib->params.isSet("pin")) {
-        pinThread(hlib, hlib->params.getIntParam("c", 1));
-    }
-    std::string globalName = "<h-" + hlib->params.getParam("jobstr") + "> " + std::string(toStr());
-    solver->setName(globalName);
+    int localId = _info->id;
+    solver = _info->solver;
+    //if (hlib->params.isSet("pin")) {
+    //    pinThread(hlib, hlib->params.getIntParam("c", 1));
+    //}
     //hlib->solvingStateLock.unlock();
+
     importedLits = 0;
 }
 
 void SolverThread::readFormula() {
-    hlib->solverThreadsInitialized[_args->solverId] = false;
-    hlib->hlog(1, "%s importing clauses\n", toStr());
+    //hlib->hlog(1, "%s importing clauses\n", toStr());
 
     int prevLits = importedLits;
     int begin = importedLits;
 
     int i = 0;
-    for (std::shared_ptr<std::vector<int>> f : hlib->formulae) {
+    for (std::shared_ptr<std::vector<int>> f : _info->formulae) {
         if (begin < f->size())
             read(*f, begin);
         begin -= f->size();
         i++;
         //if (i < hlib->formulae.size() && cancelRun()) return;
-        if (i < hlib->formulae.size() && cancelThread()) return;
+        if (i < _info->formulae.size() && cancelThread()) return;
     }
 
-    hlib->hlog(1, "%s imported clauses (%i lits)\n", toStr(), (importedLits-prevLits));
-    hlib->hlog(1, "%s initialized\n", toStr());
-    hlib->solverThreadsInitialized[_args->solverId] = true;
+    //hlib->hlog(1, "%s imported clauses (%i lits)\n", toStr(), (importedLits-prevLits));
+    //hlib->hlog(1, "%s initialized\n", toStr());
+    //hlib->solverThreadsInitialized[_args->solverId] = true;
+    _info->initializing = false;
 }
 
 void SolverThread::read(const std::vector<int>& formula, int begin) {
@@ -108,13 +113,13 @@ void SolverThread::runOnce() {
         if (cancelRun()) break;
 
         // Wait as long as the thread is interrupted
-        waitWhile(SUSPENDED);
+        //waitWhile(SUSPENDED);
 
         // Solving has been done now -> finish
         if (cancelRun()) break;
 
         //hlib->hlog(0, "rank %d starting solver with %d new lits, %d assumptions: %d\n", hlib->mpi_rank, litsAdded, hlib->assumptions.size(), hlib->assumptions[0]);
-        SatResult res = solver->solve(*hlib->assumptions);
+        SatResult res = solver->solve(*_info->assumptions);
         
         // If interrupted externally
         if (cancelRun()) break;
@@ -124,6 +129,7 @@ void SolverThread::runOnce() {
     }
 }
 
+/*
 void SolverThread::waitWhile(SolvingState state) {
 
     if (hlib->solvingState != state) return;
@@ -133,38 +139,29 @@ void SolverThread::waitWhile(SolvingState state) {
     }
     hlib->solvingStateLock.unlock();
 }
+*/
 
 bool SolverThread::cancelRun() {
-    SolvingState s = hlib->solvingState;
-    bool cancel = s == STANDBY || s == ABORTING;
-    if (cancel) {
-        hlib->hlog(0, "%s cancelling run\n", toStr());
-    }
-    return cancel;
+    return _info->interruptionSignal;
 }
 
 bool SolverThread::cancelThread() {
-    SolvingState s = hlib->solvingState;
-    bool cancel = s == ABORTING;
-    return cancel;
+    return _info->interruptionSignal;
 }
 
 void SolverThread::reportResult(int res) {
     if (res == SAT || res == UNSAT) {
-        hlib->solvingStateLock.lock();
-        if (hlib->solvingState == ACTIVE) {
-            hlib->hlog(0,"%s found result %s\n", toStr(), res==SAT?"SAT":"UNSAT");
-            hlib->finalResult = SatResult(res);
-            if (res == SAT) hlib->truthValues = solver->getSolution();
-            else hlib->failedAssumptions = solver->getFailedAssumptions();
-            hlib->setSolvingState(STANDBY);
-        }
-        hlib->solvingStateLock.unlock();
+        //hlib->hlog(0,"%s found result %s\n", toStr(), res==SAT?"SAT":"UNSAT");
+        SolverResult& solution = _info->result;
+        solution.finalResult = SatResult(res);
+        if (res == SAT) solution.truthValues = solver->getSolution();
+        else solution.failedAssumptions = solver->getFailedAssumptions();
+        _info->finished = true;
+        //hlib->setSolvingState(STANDBY);
     }
 }
 
 SolverThread::~SolverThread() {
-    delete _args;
 }
 
 const char* SolverThread::toStr() {

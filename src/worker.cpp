@@ -31,6 +31,8 @@ void mpiMonitor(Worker* worker) {
 
 void Worker::init() {
 
+    //register_signal_ignore(SIGUSR1);
+
     // Initialize balancer
     //balancer = std::unique_ptr<Balancer>(new ThermodynamicBalancer(comm, params));
     balancer = std::unique_ptr<Balancer>(new CutoffPriorityBalancer(comm, params, stats));

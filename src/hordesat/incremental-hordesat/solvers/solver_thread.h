@@ -8,22 +8,47 @@
 #include "solvers/PortfolioSolverInterface.h"
 #include "solvers/solving_state.h"
 
-// Forward declarations
-class HordeLib;
-struct thread_args;
+struct SolverResult {
+    SatResult finalResult = UNKNOWN;
+	vector<int> truthValues;
+	set<int> failedAssumptions;
+};
+
+struct ThreadInfo {
+    int id;
+    
+    PortfolioSolverInterface* solver;
+    std::vector<std::shared_ptr<std::vector<int>>> formulae;
+    std::shared_ptr<vector<int>> assumptions;
+
+    // Set by thread, read-only by parent
+    bool running = true;
+    bool initializing = true;
+    bool suspended = false;
+    bool interrupted = false;
+    bool finished = false;
+    SolverResult result;
+
+    // Set by parent, read-only by thread
+    bool suspensionSignal = false;
+    bool unsuspensionSignal = false;
+    bool interruptionSignal = false;
+
+    Mutex suspendMutex;
+    ConditionVariable suspendVar;
+};
 
 class SolverThread {
 
 private:
-    thread_args* _args;
+    ThreadInfo* _info;
     std::string _name;
     PortfolioSolverInterface* solver;
-    HordeLib* hlib;
     int importedLits;
 
 public:
     SolverThread(void* args) {
-        _args = (thread_args*)args;
+        _info = (ThreadInfo*) args;
     }
     ~SolverThread();
     void* run();
@@ -37,7 +62,7 @@ private:
     bool cancelRun();
     bool cancelThread();
     void reportResult(int res);
-
+    
     const char* toStr();
 
 };

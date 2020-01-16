@@ -17,6 +17,7 @@
 #include "sharing/AllToAllSharingManager.h"
 #include "solvers/solver_thread.h"
 #include "solvers/solving_state.h"
+#include "solvers/solver_thread_pool.h"
 
 #include <pthread.h>
 #include <vector>
@@ -26,17 +27,10 @@
 
 using namespace std;
 
-struct thread_args {
-	int solverId;
-	HordeLib* hlib;
-	bool readFormulaFromHlib;
-};
-
 class HordeLib {
 private:
 	int mpi_size;
 	int mpi_rank;
-	Thread** solverThreads;
 	size_t sleepInt;
 	int solversCount;
 	SharingManagerInterface* sharingManager;
@@ -44,15 +38,11 @@ private:
 	SolvingStates::SolvingState solvingState;
 	
 	vector<PortfolioSolverInterface*> solvers;
-	vector<bool> solverThreadsRunning;
-	vector<bool> solverThreadsInitialized;
+	SolverThreadPool* threadPool;
+	SolverResult* result;
 
 	std::vector<std::shared_ptr<std::vector<int>>> formulae;
 	std::shared_ptr<vector<int>> assumptions;
-
-	SatResult finalResult;
-	vector<int> truthValues;
-	set<int> failedAssumptions;
 
     double startSolving;
     int maxSeconds;
@@ -61,10 +51,6 @@ private:
 
 	std::shared_ptr<LoggingInterface> logger;
 
-	VerboseMutex solutionLock;
-	VerboseMutex solvingStateLock;
-	ConditionVariable stateChangeCond;
-	
 	// settings
 	ParameterProcessor params;
 
@@ -101,12 +87,8 @@ public:
 
 	int value(int lit);
 	int failed(int lit);
-	std::vector<int>& getTruthValues() {
-		return truthValues;
-	}
-	std::set<int>& getFailedAssumptions() {
-		return failedAssumptions;
-	}
+	std::vector<int>& getTruthValues();
+	std::set<int>& getFailedAssumptions();
 
 	void hlog(int verbosityLevel, const char* fmt, ...);
 	
