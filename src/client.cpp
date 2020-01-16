@@ -19,7 +19,7 @@ void readAllInstances(Client* client) {
     Console::log(Console::VERB, "Started client I/O thread to read instances.");
 
     Client& c = *client;
-    for (size_t i = 0; i < c.jobs.size(); i++) {
+    for (size_t i = 0; i < c.orderedJobIds.size(); i++) {
 
         if (c.checkTerminate()) {
             Console::log(Console::VERB, "Stopping instance reader thread");
@@ -35,8 +35,8 @@ void readAllInstances(Client* client) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
-        JobDescription &job = *c.jobs[i];
-        int jobId = job.getId();
+        int jobId = c.orderedJobIds[i];
+        JobDescription& job = *c.jobs[jobId];
         if (job.isIncremental()) {
             Console::log(Console::VVERB, "Incremental job #%i", jobId);
         }
@@ -132,17 +132,18 @@ void Client::mainProgram() {
         // Only one job at a time to react better
         // to outside events without too much latency!
         if (params.getIntParam("lbc") == 0) {
-            if (i < jobs.size() && jobs[i]->getArrival() <= Timer::elapsedSeconds()) {
+            if (i < orderedJobIds.size() && jobs[orderedJobIds[i]]->getArrival() <= Timer::elapsedSeconds()) {
                 // Introduce job, if ready
-                if (isJobReady(jobs[i]->getId())) {
-                    introduceJob(jobs[i++]);
+                if (isJobReady(orderedJobIds[i])) {
+                    introduceJob(jobs[orderedJobIds[i++]]);
                 }
             }
         } else {
-            if (params.getIntParam("lbc") > introducedJobs.size() && lastIntroducedJobIdx+1 < jobs.size()) {
+            if (params.getIntParam("lbc") > introducedJobIds.size() && lastIntroducedJobIdx+1 < orderedJobIds.size()) {
                 // Introduce job, if ready
-                if (isJobReady(jobs[i]->getId())) {
-                    introduceJob(jobs[lastIntroducedJobIdx+1]);
+                int jobId = orderedJobIds[lastIntroducedJobIdx+1];
+                if (isJobReady(jobId)) {
+                    introduceJob(jobs[jobId]);
                 }
             }
         }
@@ -225,15 +226,15 @@ void Client::introduceJob(std::shared_ptr<JobDescription>& jobPtr) {
 
     Console::log_send(Console::INFO, nodeRank, "Introducing job #%i", jobId);
     MyMpi::isend(MPI_COMM_WORLD, nodeRank, MSG_FIND_NODE, req);
-    introducedJobs[jobId] = jobPtr;
+    introducedJobIds.insert(jobId);
     lastIntroducedJobIdx++;
 }
 
 void Client::checkFinished() {
     
-    bool jobQueueEmpty = lastIntroducedJobIdx+1 >= jobs.size();
+    bool jobQueueEmpty = lastIntroducedJobIdx+1 >= orderedJobIds.size();
 
-    if (params.getIntParam("lbc") > 0 && jobQueueEmpty && introducedJobs.empty()) {
+    if (params.getIntParam("lbc") > 0 && jobQueueEmpty && introducedJobIds.empty()) {
         // All jobs are done
         Console::log(Console::INFO, "All of my jobs have been terminated.");
         int myRank = MyMpi::rank(MPI_COMM_WORLD);
@@ -248,7 +249,7 @@ void Client::checkFinished() {
 
 void Client::handleRequestBecomeChild(MessageHandlePtr& handle) {
     JobRequest req; req.deserialize(*handle->recvData);
-    const JobDescription& desc = *introducedJobs[req.jobId];
+    const JobDescription& desc = *jobs[req.jobId];
 
     // Send job signature
     JobSignature sig(req.jobId, /*rootRank=*/handle->source, req.revision, desc.getTransferSize(false));
@@ -258,7 +259,7 @@ void Client::handleRequestBecomeChild(MessageHandlePtr& handle) {
 
 void Client::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
     JobRequest req; req.deserialize(*handle->recvData);
-    JobDescription& desc = *introducedJobs[req.jobId];
+    JobDescription& desc = *jobs[req.jobId];
     Console::log_send(Console::VERB, handle->source, "Sending job description of #%i of size %i", desc.getId(), desc.getTransferSize(false));
     rootNodes[req.jobId] = handle->source;
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, desc.serializeFirstRevision());
@@ -282,7 +283,7 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
     int revision = jobResult.revision;
 
     Console::log_recv(Console::INFO, handle->source, "Received result of job #%i rev. %i, code: %i", jobId, revision, resultCode);
-    JobDescription& desc = *introducedJobs[jobId];
+    JobDescription& desc = *jobs[jobId];
 
     // Output response time and solution
     Console::log(Console::INFO, "RESPONSE_TIME #%i %.6f rev. %i", jobId, Timer::elapsedSeconds() - desc.getArrival(), revision);
@@ -300,7 +301,7 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
     Console::logUnsafe(Console::VERB, "");
     Console::releaseLock();
 
-    if (introducedJobs[jobId]->isIncremental() && desc.getRevision() > revision) {
+    if (jobs[jobId]->isIncremental() && desc.getRevision() > revision) {
         // Introduce next revision
         revision++;
         IntVec payload({jobId, revision});
@@ -310,14 +311,15 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
         // Job is completely done
         IntVec payload({jobId});
         MyMpi::isend(MPI_COMM_WORLD, rootNodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
-        introducedJobs.erase(jobId);
+        introducedJobIds.erase(jobId);
+        jobs.erase(jobId);
 
         checkFinished();
 
         // Employ "leaky bucket"
-        while (params.getIntParam("lbc") > introducedJobs.size() && lastIntroducedJobIdx+1 < jobs.size()) {
+        while (params.getIntParam("lbc") > introducedJobIds.size() && lastIntroducedJobIdx+1 < orderedJobIds.size()) {
             // Introduce a new job
-            introduceJob(jobs[lastIntroducedJobIdx+1]);
+            introduceJob(jobs[orderedJobIds[lastIntroducedJobIdx+1]]);
         }
     }
 }
@@ -328,15 +330,16 @@ void Client::handleAbort(MessageHandlePtr& handle) {
     int jobId = request[0];
     
     Console::log_recv(Console::VERB, handle->source, "Acknowledging timeout of #%i.", jobId);
-    Console::log(Console::INFO, "TIMEOUT #%i %.6f", jobId, Timer::elapsedSeconds() - introducedJobs[jobId]->getArrival());
-    introducedJobs.erase(jobId);
+    Console::log(Console::INFO, "TIMEOUT #%i %.6f", jobId, Timer::elapsedSeconds() - jobs[jobId]->getArrival());
+    introducedJobIds.erase(jobId);
+    jobs.erase(jobId);
 
     checkFinished();
 
     // Employ "leaky bucket"
-    while (params.getIntParam("lbc") > introducedJobs.size() && lastIntroducedJobIdx+1 < jobs.size()) {
+    while (params.getIntParam("lbc") > introducedJobIds.size() && lastIntroducedJobIdx+1 < orderedJobIds.size()) {
         // Introduce a new job
-        introduceJob(jobs[lastIntroducedJobIdx+1]);
+        introduceJob(jobs[orderedJobIds[lastIntroducedJobIdx+1]]);
     }
 }
 
@@ -347,7 +350,7 @@ void Client::handleQueryJobRevisionDetails(MessageHandlePtr& handle) {
     int firstRevision = request[1];
     int lastRevision = request[2];
 
-    JobDescription& desc = *introducedJobs[jobId];
+    JobDescription& desc = *jobs[jobId];
     IntVec response({jobId, firstRevision, lastRevision, desc.getTransferSize(firstRevision, lastRevision)});
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DETAILS, response);
 }
@@ -360,7 +363,7 @@ void Client::handleAckJobRevisionDetails(MessageHandlePtr& handle) {
     int lastRevision = response[2];
     //int transferSize = response[3];
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DATA, 
-                introducedJobs[jobId]->serialize(firstRevision, lastRevision));
+                jobs[jobId]->serialize(firstRevision, lastRevision));
 }
 
 void Client::handleClientFinished(MessageHandlePtr& handle) {
@@ -397,8 +400,8 @@ void Client::readInstanceList(std::string& filename) {
         incremental = (line == "i");
         std::shared_ptr<JobDescription> job = std::make_shared<JobDescription>(id, priority, incremental);
         job->setArrival(arrival);
-        jobs.push_back(job);
-
+        jobs[id] = job;
+        orderedJobIds.push_back(id);
         jobInstances[id] = instanceFilename;
     }
     file.close();
@@ -482,5 +485,6 @@ void Client::readFormula(std::string& filename, JobDescription& job) {
 Client::~Client() {
     if (instanceReaderThread.joinable())
         instanceReaderThread.join();
+
     Console::log(Console::VVERB, "Leaving destructor of client environment.");
 }

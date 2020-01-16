@@ -4,6 +4,7 @@
 
 #include <string>
 #include <mutex>
+#include <set>
 
 #include "util/mympi.h"
 #include "util/params.h"
@@ -25,9 +26,10 @@ private:
     Parameters& params;
     Statistics stats;
 
-    std::vector<std::shared_ptr<JobDescription>> jobs;
+    std::vector<int> orderedJobIds;
     std::map<int, std::string> jobInstances;
-    std::map<int, std::shared_ptr<JobDescription>> introducedJobs; 
+    std::map<int, std::shared_ptr<JobDescription>> jobs; 
+    std::set<int> introducedJobIds; 
     std::map<int, bool> jobReady;
     std::map<int, int> rootNodes;
     std::mutex jobReadyLock;
