@@ -25,9 +25,9 @@ private:
     Parameters& params;
     Statistics stats;
 
-    std::vector<JobDescription> jobs;
+    std::vector<std::shared_ptr<JobDescription>> jobs;
     std::map<int, std::string> jobInstances;
-    std::map<int, JobDescription*> introducedJobs; 
+    std::map<int, std::shared_ptr<JobDescription>> introducedJobs; 
     std::map<int, bool> jobReady;
     std::map<int, int> rootNodes;
     std::mutex jobReadyLock;
@@ -64,7 +64,7 @@ private:
     void handleExit(MessageHandlePtr& handle);
 
     bool isJobReady(int jobId);
-    void introduceJob(JobDescription& job);
+    void introduceJob(std::shared_ptr<JobDescription>& jobPtr);
     void readInstanceList(std::string& filename);
     void readFormula(std::string& filename, JobDescription& job);
     friend void readAllInstances(Client* client);

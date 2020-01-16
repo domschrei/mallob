@@ -35,7 +35,7 @@ void readAllInstances(Client* client) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
-        JobDescription &job = c.jobs[i];
+        JobDescription &job = *c.jobs[i];
         int jobId = job.getId();
         if (job.isIncremental()) {
             Console::log(Console::VVERB, "Incremental job #%i", jobId);
@@ -132,17 +132,16 @@ void Client::mainProgram() {
         // Only one job at a time to react better
         // to outside events without too much latency!
         if (params.getIntParam("lbc") == 0) {
-            if (i < jobs.size() && jobs[i].getArrival() <= Timer::elapsedSeconds()) {
+            if (i < jobs.size() && jobs[i]->getArrival() <= Timer::elapsedSeconds()) {
                 // Introduce job, if ready
-                if (isJobReady(jobs[i].getId())) {
-                    JobDescription& job = jobs[i++];
-                    introduceJob(job);
+                if (isJobReady(jobs[i]->getId())) {
+                    introduceJob(jobs[i++]);
                 }
             }
         } else {
             if (params.getIntParam("lbc") > introducedJobs.size() && lastIntroducedJobIdx+1 < jobs.size()) {
                 // Introduce job, if ready
-                if (isJobReady(jobs[i].getId())) {
+                if (isJobReady(jobs[i]->getId())) {
                     introduceJob(jobs[lastIntroducedJobIdx+1]);
                 }
             }
@@ -193,8 +192,9 @@ bool Client::isJobReady(int jobId) {
     return jobReady.count(jobId) && jobReady[jobId];
 }
 
-void Client::introduceJob(JobDescription& job) {
+void Client::introduceJob(std::shared_ptr<JobDescription>& jobPtr) {
 
+    JobDescription& job = *jobPtr;
     int jobId = job.getId();
 
     // Wait until job is ready to be sent
@@ -225,7 +225,7 @@ void Client::introduceJob(JobDescription& job) {
 
     Console::log_send(Console::INFO, nodeRank, "Introducing job #%i", jobId);
     MyMpi::isend(MPI_COMM_WORLD, nodeRank, MSG_FIND_NODE, req);
-    introducedJobs[jobId] = &job;
+    introducedJobs[jobId] = jobPtr;
     lastIntroducedJobIdx++;
 }
 
@@ -395,15 +395,16 @@ void Client::readInstanceList(std::string& filename) {
         next = line.find(" "); priority = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1);
         next = line.find(" "); instanceFilename = line.substr(pos, next-pos); line = line.substr(next+1);
         incremental = (line == "i");
-        JobDescription job(id, priority, incremental);
-        job.setArrival(arrival);
+        std::shared_ptr<JobDescription> job = std::make_shared<JobDescription>(id, priority, incremental);
+        job->setArrival(arrival);
         jobs.push_back(job);
+
         jobInstances[id] = instanceFilename;
     }
     file.close();
 
     Console::log(Console::INFO, "Read %i job instances from file %s", jobs.size(), filename.c_str());
-    std::sort(jobs.begin(), jobs.end(), JobByArrivalComparator());
+    //std::sort(jobs.begin(), jobs.end(), JobByArrivalComparator());
 }
 
 void Client::readFormula(std::string& filename, JobDescription& job) {
