@@ -270,6 +270,7 @@ void Client::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
     assert(jobId == req.jobId || Console::fail("Something went wrong with serializing #%i ; now #%i ??", req.jobId, jobId));
     
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, data);
+    Console::log_send(Console::VERB, handle->source, "Sent job description of #%i of size %i", jobId, data->size());
 }
 
 void Client::handleJobDone(MessageHandlePtr& handle) {
