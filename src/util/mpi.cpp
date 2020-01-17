@@ -380,7 +380,6 @@ MessageHandlePtr MyMpi::poll() {
             chkerr(err);
             if (flag) {
                 consider = true;
-                Console::log(Console::VVVERB, "msg id=%i : %i", h->id, h->recvData->at(0));
                 h->tag = h->status.MPI_TAG;
                 assert(h->status.MPI_SOURCE >= 0 || Console::fail("MPI_SOURCE = %i", h->status.MPI_SOURCE));
                 h->source = h->status.MPI_SOURCE;
@@ -460,7 +459,7 @@ void MyMpi::testSentHandles() {
         chkerr(err);
         if (flag) {
             // Sending operation completed
-            Console::log(Console::VVVERB, "Msg ID=%i isent : %i", h->id, h->sendData->at(0));
+            Console::log(Console::VVVERB, "Msg ID=%i isent", h->id);
             finishedHandles.insert(h);
         }
     }

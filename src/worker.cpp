@@ -203,7 +203,7 @@ void Worker::mainProgram() {
             Console::log(Console::VVVERB, "poll time: %.6f s", pollTime);
 
             // Process message
-            Console::log_recv(Console::VVVERB, handle->source, "process msg, tag %i : %i", handle->tag, handle->recvData->at(0));
+            Console::log_recv(Console::VVVERB, handle->source, "process msg id=%i, tag %i", handle->id, handle->tag);
             float time = Timer::elapsedSeconds();
 
             //stats.increment("receivedMessages");
