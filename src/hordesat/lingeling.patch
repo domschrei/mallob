@@ -1,0 +1,106 @@
+--- lingeling/lglib.c	2014-04-29 19:15:05.000000000 +0200
++++ lingeling_patched/lglib.c	2020-01-15 16:05:34.259879372 +0100
+@@ -8568,6 +8568,8 @@
+   ASSERT (!lgl->mt);
+ }
+ 
++static int lglterminate (LGL * lgl); // NEW for mallob
++
+ static void lglcutwidth (LGL * lgl) {
+   int lidx, res, l4, r4, b4, l10, r10, b10, m, oldbias;
+   int idx, sign, lit, blit, tag, red, other, other2;
+@@ -8595,6 +8597,7 @@
+   assert (2 <= l10 && l10 <= r10 && r10 <= lgl->nvars);
+   b4 = b10 = 0;
+   for (idx = 2; idx < lgl->nvars; idx++) {
++    if (lglterminate(lgl)) goto DONE; // NEW for mallob
+     for (sign = -1; sign <= 1; sign += 2) {
+       lit = idx * sign;
+       hts = lglhts (lgl, lit);
+@@ -9679,6 +9682,7 @@
+   NEW (lgl->dis, 1);
+   for (idx = 2; idx < lgl->nvars; idx++)
+     for (sign = -1; sign <= 1; sign += 2) {
++      if (lglterminate(lgl)) return; // NEW for mallob
+       lit = sign * idx;
+       hts = lglhts (lgl, lit);
+       if (!hts->offset) continue;
+@@ -9866,6 +9870,7 @@
+   int glue, old, rounds = 0;
+   Stk * lir;
+   do {
++    if (lglterminate(lgl)) break; // NEW for mallob
+     rounds++;
+     old = lgl->stats->fixed.current;
+     lgldcpclnstk (lgl, 0, &lgl->irr);
+@@ -10050,6 +10055,7 @@
+   res = 1;
+   for (idx = 2; idx < lgl->nvars; idx++) {
+     for (sign = -1; sign <= 1; sign += 2) {
++      if (lglterminate(lgl)) return 0; // NEW for mallob
+       lit = sign * idx;
+       ulit = lglulit (lit);
+       tmp = dfsimap[ulit];
+@@ -16694,6 +16700,7 @@
+   if (!lglsyncunits (lgl)) goto DONE;
+   lglgc (lgl);
+   if (lgl->mt) goto DONE;
++  if (lglterminate(lgl)) goto DONE; // NEW for mallob
+   if (!lgltarjan (lgl)) goto DONE;
+   if (!lglsynceqs (lgl)) goto DONE;
+   lglchkred (lgl);
+@@ -16703,10 +16710,12 @@
+   lglcompact (lgl);
+   lglmap (lgl);
+   if (lgl->mt) goto DONE;
++  if (lglterminate(lgl)) goto DONE; // NEW for mallob
+   if (!lglbcp (lgl)) { if (!lgl->mt) lgl->mt = 1; goto DONE; }
+   lglcount (lgl);
+   lglgc (lgl);
+   if (lgl->mt) goto DONE;
++  if (lglterminate(lgl)) goto DONE; // NEW for mallob
+   if (!lgl->mt) { lglpicosatchkall (lgl); lglpicosatrestart (lgl); }
+   res = 1;
+ DONE:
+@@ -20675,13 +20684,19 @@
+   maxrounds = lgl->opts->unhdroundlim.val;
+   lglsetunhdlim (lgl);
+   oldunits = lglunhdunits (lgl);
++  if (lglterminate(lgl)) return 0; // NEW for mallob
+   oldfailed = lglunhdfailed (lgl);
++  if (lglterminate(lgl)) return 0; // NEW for mallob
+   oldtauts = lglunhdtauts (lgl);
++  if (lglterminate(lgl)) return 0; // NEW for mallob
+   oldhbrs = lglunhdhbrs (lgl);
++  if (lglterminate(lgl)) return 0; // NEW for mallob
+   oldstrd = lglunhdstrd (lgl);
++  if (lglterminate(lgl)) return 0; // NEW for mallob
+   noprgssrounds = round = 0;
+   while (!lgl->mt) {
+     if (round >= maxrounds) break;
++    if (lglterminate(lgl)) break; // NEW for mallob
+     if (round > 0 &&
+         roundprgss == lgl->stats->prgss &&
+ 	noprgssrounds++ == lgl->opts->unhdlnpr.val) {
+@@ -20693,6 +20708,7 @@
+     lgl->stats->unhd.rounds++;
+     lglgc (lgl);
+     if (!lgl->nvars || lgl->mt) break;
++    if (lglterminate(lgl)) break; // NEW for mallob
+     assert (!dfpr);
+     dfpr = lglstampall (lgl, irronly);
+     if (!dfpr) break;
+@@ -20987,9 +21003,13 @@
+   if (lgl->level) lglbacktrack (lgl, 0);
+   lglgc (lgl);
+   if (lgl->mt) return;
++  if (lglterminate(lgl)) return; // NEW for mallob
+   lgldense (lgl, 1);
++  if (lglterminate(lgl)) return; // NEW for mallob
+   extracted = lglgaussextractsmall (lgl);
++  if (lglterminate(lgl)) return; // NEW for mallob
+   extracted += lglgaussextractlarge (lgl);
++  if (lglterminate(lgl)) return; // NEW for mallob
+   lits = lglcntstk (&lgl->gauss->xors) - extracted;
+   lglprt (lgl, 1,
+     "[gauss-%d] extracted %d xors of average arity %.1f",
