@@ -42,7 +42,7 @@ private:
 	int solversCount;
 	SharingManagerInterface* sharingManager;
 	
-	SolvingStates::SolvingState solvingState;
+	volatile SolvingStates::SolvingState solvingState;
 	
 	vector<PortfolioSolverInterface*> solvers;
 	vector<bool> solverThreadsRunning;

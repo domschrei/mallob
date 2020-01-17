@@ -45,7 +45,7 @@ private:
 	int* clsBuffer;
 	size_t clsBufferSize;
     
-    bool suspendSolver;
+    volatile bool suspendSolver;
     VerboseMutex suspendMutex;
     ConditionVariable suspendCond;
 

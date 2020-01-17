@@ -374,13 +374,9 @@ void HordeLib::setSolvingState(SolvingState state) {
 int HordeLib::finishSolving() {
 
 	assert(solvingState == STANDBY);
-    double searchTime = getTime() - startSolving;
-
 	if (params.isSet("stats")) {
 		dumpStats();
 	}
-	//hlog(0, "rank %d result:%d\n", mpi_rank, finalResult);
-
 	return finalResult;
 }
 

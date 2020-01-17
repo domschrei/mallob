@@ -47,7 +47,7 @@ private:
     std::vector<int> bounceAlternatives;
 
     std::thread mpiMonitorThread;
-    bool exiting;
+    volatile bool exiting;
 
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& clientNodes) :

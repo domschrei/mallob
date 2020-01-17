@@ -47,6 +47,60 @@ void chkerr(int err) {
     }
 }
 
+
+
+bool MessageHandle::testSent() {
+    if (finished) return true;
+    int flag = 0;
+    initcall("test");
+    int err = MPI_Test(&request, &flag, &status);
+    endcall();
+    chkerr(err);
+    if (flag) finished = true;
+    return finished;
+}
+
+bool MessageHandle::testReceived() {
+
+    // Already finished at some earlier point?
+    if (finished) return true;
+
+    // Check if message was received
+    if (selfMessage || status.MPI_TAG > 0) {
+        // Self message / fabricated message is invariantly ready to be processed
+        finished = true;
+    } else {
+        // MPI_Test message
+        int flag = -1;
+        initcall("test");
+        int err = MPI_Test(&request, &flag, &status);
+        endcall();
+        chkerr(err);
+        if (flag) {
+            finished = true;
+            tag = status.MPI_TAG;
+            assert(status.MPI_SOURCE >= 0 || Console::fail("MPI_SOURCE = %i", status.MPI_SOURCE));
+            source = status.MPI_SOURCE;
+        }
+    }
+
+    // Resize received data vector to actual received size
+    if (finished && !selfMessage) {
+        int count = 0;
+        initcall("getCount");
+        int err = MPI_Get_count(&status, MPI_BYTE, &count);
+        endcall();
+        chkerr(err);
+        if (count > 0 && count < recvData->size()) {
+            recvData->resize(count);
+        }
+    }
+
+    return finished;
+}
+
+
+
 int MyMpi::nextHandleId() {
     return handleId++;
 }
@@ -104,14 +158,6 @@ void MyMpi::init(int argc, char *argv[])
     tagPriority[MSG_JOB_COMMUNICATION] = 5;
 
     tagPriority[MSG_WARMUP] = 6;
-
-    /*
-    for (int tag : ANYTIME_WORKER_RECV_TAGS) {
-        msgBuffers[tag] = std::make_shared<std::vector<uint8_t>>(maxMsgLength);
-    }
-    for (int tag : ANYTIME_CLIENT_RECV_TAGS) {
-        msgBuffers[tag] = std::make_shared<std::vector<uint8_t>>(maxMsgLength);
-    }*/
 }
 
 void MyMpi::beginListening(const ListenerMode& mode) {
@@ -295,7 +341,6 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag, int si
     handle->source = source;
     handle->tag = tag;
     handle->recvData->resize(size);
-    handle->critical = true;
     initcall("irecv");
     int err = MPI_Irecv(handle->recvData->data(), size, MPI_BYTE, source, tag, communicator, &handle->request);
     endcall();
@@ -331,115 +376,22 @@ MPI_Request MyMpi::ireduce(MPI_Comm communicator, float* contribution, float* re
 MessageHandlePtr MyMpi::poll() {
     testSentHandles();
 
-    /*
-    MessageHandlePtr handle = NULL;
-    for (auto it = handles.begin(); it != handles.end(); ++it) {
-        MessageHandlePtr h = *it;
-        if (h->selfMessage) {
-            handle = h;
-            break;
-        }
-        int flag = -1;
-        MPI_Test(&h->request, &flag, &h->status);
-        if (flag) {
-            handle = h;
-            handle->tag = handle->status.MPI_TAG;
-            assert(handle->status.MPI_SOURCE >= 0);
-            handle->source = handle->status.MPI_SOURCE;
-
-            // Resize received data vector to actual received size
-            int count = 0;
-            MPI_Get_count(&handle->status, MPI_BYTE, &count);
-            if (count > 0) {
-                handle->recvData.resize(count);
-            }
-
-            break;
-        }
-    }
-    if (handle != NULL) {
-        handles.erase(handle);
-    }
-    return handle;
-    */
-
     MessageHandlePtr bestPrioHandle = NULL;
     int bestPrio = 9999999;
 
     // Find ready handle of best priority
     for (auto h : handles) {
-        bool consider = false;
-        if (h->selfMessage || h->status.MPI_TAG > 0) {
-            // Message is already ready to be processed
-            consider = true;
-        } else {
-            int flag = -1;
-            initcall("test");
-            int err = MPI_Test(&h->request, &flag, &h->status);
-            endcall();
-            chkerr(err);
-            if (flag) {
-                consider = true;
-                h->tag = h->status.MPI_TAG;
-                assert(h->status.MPI_SOURCE >= 0 || Console::fail("MPI_SOURCE = %i", h->status.MPI_SOURCE));
-                h->source = h->status.MPI_SOURCE;
-            }
-        }
-        if (consider && tagPriority[h->tag] < bestPrio) {
+        if (h->testReceived() && tagPriority[h->tag] < bestPrio) {
             bestPrio = tagPriority[h->tag];
             bestPrioHandle = h;
             if (bestPrio == MIN_PRIORITY) break; // handle of minimum priority found
         }
     }
 
-    // Process found handle
-    MessageHandlePtr handle = bestPrioHandle;
-    if (handle != NULL && !handle->selfMessage) {
-        // Resize received data vector to actual received size
-        int count = 0;
-        initcall("getCount");
-        int err = MPI_Get_count(&handle->status, MPI_BYTE, &count);
-        endcall();
-        chkerr(err);
-        if (count > 0 && count < handle->recvData->size()) {
-            handle->recvData->resize(count);
-        }
-    }
-    if (handle != NULL) handles.erase(handle);
-    return handle;
+    // Remove and return found handle
+    if (bestPrioHandle != NULL) handles.erase(bestPrioHandle);
+    return bestPrioHandle;
 }
-
-/*
-template <class T, std::size_t N>
-constexpr std::size_t arrsize(const T (&array)[N]) noexcept
-{
-	return N;
-}
-
-MyMpi::pollByProbing(const ListenerMode& mode) {
-    cleanSentHandles();
-
-    MessageHandlePtr foundHandle = NULL;
-
-    // Get self message, if present
-    for (auto it = handles.begin(); it != handles.end(); ++it) {
-        MessageHandlePtr h = *it;
-        if (h->selfMessage) {
-            foundHandle = h;
-            break; // handle of minimum priority found
-        }
-    }
-
-    const int* tags = (mode == CLIENT ? ANYTIME_CLIENT_RECV_TAGS : ANYTIME_WORKER_RECV_TAGS);
-    int size;
-    if (mode == CLIENT) size = arrsize(ANYTIME_CLIENT_RECV_TAGS);
-    else size = arrsize(ANYTIME_WORKER_RECV_TAGS);
-
-    for (int i = 0; i < size; i++) {
-        int tag = tags[i];
-        MPI_Pro
-    }
-}*/
 
 void MyMpi::deferHandle(MessageHandlePtr handle) {
     handles.insert(handle);
@@ -452,12 +404,7 @@ bool MyMpi::hasOpenSentHandles() {
 void MyMpi::testSentHandles() {
     std::set<MessageHandlePtr> finishedHandles;
     for (auto h : sentHandles) {
-        int flag = -1;
-        initcall("test");
-        int err = MPI_Test(&h->request, &flag, &h->status);
-        endcall();
-        chkerr(err);
-        if (flag) {
+        if (h->testSent()) {
             // Sending operation completed
             Console::log(Console::VVVERB, "Msg ID=%i isent", h->id);
             finishedHandles.insert(h);

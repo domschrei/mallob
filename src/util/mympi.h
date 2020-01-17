@@ -22,7 +22,7 @@ struct MessageHandle {
     std::shared_ptr<std::vector<uint8_t>> sendData;
     std::shared_ptr<std::vector<uint8_t>> recvData;
     bool selfMessage = false;
-    bool critical = false;
+    bool finished = false;
     MPI_Request request;
     MPI_Status status;
 
@@ -34,18 +34,26 @@ struct MessageHandle {
         Console::log(Console::VVVVERB, "Msg ID=%i created", id);
     }
     MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& data) : id(id), sendData(data) {
+        status.MPI_SOURCE = -1; 
+        status.MPI_TAG = -1; 
         recvData = std::make_shared<std::vector<uint8_t>>();
         Console::log(Console::VVVVERB, "Msg ID=%i created", id);
     }
     MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& sendData, const std::shared_ptr<std::vector<uint8_t>>& recvData) : 
         id(id), sendData(sendData), recvData(recvData) {
+        status.MPI_SOURCE = -1; 
+        status.MPI_TAG = -1; 
         Console::log(Console::VVVVERB, "Msg ID=%i created", id);
     }
+
     ~MessageHandle() {
         sendData = NULL;
         recvData = NULL;
         Console::log(Console::VVVVERB, "Msg ID=%i deleted", id);
     }
+
+    bool testSent();
+    bool testReceived();
 };
 
 const int MSG_WARMUP = 1;
