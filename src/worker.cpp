@@ -561,7 +561,9 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
 }
 
 void Worker::handleSendJob(MessageHandlePtr& handle) {
-    int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
+    auto data = handle->recvData;
+    Console::log_recv(Console::VVVERB, handle->source, "Receiving job data of size %i", data->size());
+    int jobId; memcpy(&jobId, data->data(), sizeof(int));
     assert(hasJob(jobId) || Console::fail("I don't know job #%i !", jobId));
 
     // Erase job commitment
