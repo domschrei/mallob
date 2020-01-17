@@ -260,10 +260,15 @@ void Client::handleRequestBecomeChild(MessageHandlePtr& handle) {
 void Client::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
     JobRequest req; req.deserialize(*handle->recvData);
     JobDescription& desc = *jobs[req.jobId];
+    assert(desc.getId() == req.jobId || Console::fail("%i != %i", desc.getId(), req.jobId));
     Console::log_send(Console::VERB, handle->source, "Sending job description of #%i of size %i", desc.getId(), desc.getTransferSize(false));
     rootNodes[req.jobId] = handle->source;
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, desc.serializeFirstRevision());
-    desc.clearPayload();
+    auto data = desc.serializeFirstRevision();
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, data);
+
+    // Check serialized description for sanity
+    int jobId; memcpy(&jobId, data->data(), sizeof(int));
+    assert(jobId == req.jobId || Console::fail("Something went wrong with serializing #%i ; now #%i ??", req.jobId, jobId));
 }
 
 void Client::handleJobDone(MessageHandlePtr& handle) {
