@@ -141,8 +141,6 @@ void HordeLib::init() {
 		hlog(3, "Initialized all-to-all clause sharing.\n");
 	}
 
-	diversify(mpi_rank, mpi_size);
-
 	solverThreads = (Thread**) malloc (solversCount*sizeof(Thread*));
 
     hlog(1, "allocated solver threads\n");
@@ -151,105 +149,6 @@ void HordeLib::init() {
 void HordeLib::setLogger(std::shared_ptr<LoggingInterface> loggingInterface) {
 	this->logger = loggingInterface;
 	setLoggingInterface(loggingInterface);
-}
-
-void HordeLib::diversify(int rank, int size) {
-
-	int diversification = params.getIntParam("d", 1);
-	switch (diversification) {
-	case 1:
-		sparseDiversification(mpi_size, mpi_rank);
-		hlog(1, "doing sparse diversification\n");
-		break;
-	case 2:
-		binValueDiversification(mpi_size, mpi_rank);
-		hlog(1, "doing binary value based diversification\n");
-		break;
-	case 3:
-		randomDiversification(2015);
-		hlog(1, "doing random diversification\n");
-		break;
-	case 4:
-		nativeDiversification(mpi_rank, mpi_size);
-		hlog(1, "doing native diversification (plingeling)\n");
-		break;
-	case 5:
-		sparseDiversification(mpi_size, mpi_rank);
-		nativeDiversification(mpi_rank, mpi_size);
-		hlog(1, "doing sparse + native diversification\n");
-		break;
-	case 6:
-		sparseRandomDiversification(mpi_rank, mpi_size);
-		hlog(1, "doing sparse random diversification\n");
-		break;
-	case 7:
-		sparseRandomDiversification(mpi_rank, mpi_size);
-		nativeDiversification(mpi_rank, mpi_size);
-		hlog(1, "doing random sparse + native diversification (plingeling)\n");
-		break;
-	case 0:
-		hlog(1, "no diversification\n");
-		break;
-	}
-}
-
-void HordeLib::sparseDiversification(int mpi_size, int mpi_rank) {
-	int totalSolvers = mpi_size * solversCount;
-    int vars = solvers[0]->getVariablesCount();
-    for (int sid = 0; sid < solversCount; sid++) {
-    	int shift = (mpi_rank * solversCount) + sid;
-		for (int var = 1; var + totalSolvers < vars; var += totalSolvers) {
-			solvers[sid]->setPhase(var + shift, true);
-		}
-    }
-}
-
-void HordeLib::randomDiversification(unsigned int seed) {
-	srand(seed);
-    int vars = solvers[0]->getVariablesCount();
-    for (int sid = 0; sid < solversCount; sid++) {
-		for (int var = 1; var <= vars; var++) {
-			solvers[sid]->setPhase(var, rand()%2 == 1);
-		}
-    }
-}
-
-void HordeLib::sparseRandomDiversification(unsigned int seed, int mpi_size) {
-	srand(seed);
-	int totalSolvers = solversCount * mpi_size;
-    int vars = solvers[0]->getVariablesCount();
-    for (int sid = 0; sid < solversCount; sid++) {
-		for (int var = 1; var <= vars; var++) {
-			if (rand() % totalSolvers == 0) {
-				solvers[sid]->setPhase(var, rand() % 2 == 1);
-			}
-		}
-    }
-}
-
-void HordeLib::nativeDiversification(int mpi_rank, int mpi_size) {
-    for (int sid = 0; sid < solversCount; sid++) {
-    	solvers[sid]->diversify(solvers[sid]->solverId, mpi_size*solversCount);
-    }
-}
-
-void HordeLib::binValueDiversification(int mpi_size, int mpi_rank) {
-	int totalSolvers = mpi_size * solversCount;
-	int tmp = totalSolvers;
-	int log = 0;
-	while (tmp) {
-		tmp >>= 1;
-		log++;
-	}
-    int vars = solvers[0]->getVariablesCount();
-    for (int sid = 0; sid < solversCount; sid++) {
-    	int num = mpi_rank * sid;
-		for (int var = 1; var < vars; var++) {
-			int bit = var % log;
-			bool phase = (num >> bit) & 1 ? true : false;
-			solvers[sid]->setPhase(var, phase);
-		}
-    }
 }
 
 void* solverRunningThread(void* arg) {
@@ -308,6 +207,11 @@ void HordeLib::continueSolving(const std::vector<std::shared_ptr<std::vector<int
 	solvingStateLock.lock();
 	setSolvingState(ACTIVE);
 	solvingStateLock.unlock();
+}
+
+void HordeLib::updateRole(int rank, int numNodes) {
+	mpi_rank = rank;
+	mpi_size = numNodes;
 }
 
 bool HordeLib::isFullyInitialized() {

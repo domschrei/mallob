@@ -289,16 +289,12 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
     Console::log(Console::INFO, "RESPONSE_TIME #%i %.6f rev. %i", jobId, Timer::elapsedSeconds() - desc.getArrival(), revision);
     Console::getLock();
     Console::appendUnsafe(Console::VERB, "SOLUTION #%i rev. %i ", jobId, revision);
-    bool head = false;
+    Console::appendUnsafe(Console::VERB, "%s ", resultCode == 10 ? "SAT" : "UNSAT");
     for (auto it : jobResult.solution) {
-        if (!head) {
-            Console::appendUnsafe(Console::VERB, "%s ", it == 0 ? "SAT" : "UNSAT");
-            head = true;
-            if (it == 0) continue;
-        }
+        if (it == 0) continue;
         Console::appendUnsafe(Console::VERB, "%i ", it);
     }
-    Console::logUnsafe(Console::VERB, "");
+    Console::logUnsafe(Console::VERB, ""); // line break
     Console::releaseLock();
 
     if (jobs[jobId]->isIncremental() && desc.getRevision() > revision) {

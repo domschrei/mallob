@@ -30,6 +30,7 @@ void* SolverThread::run() {
     init();
     waitWhile(INITIALIZING);
     readFormula();
+    diversify();
 
     while (!cancelThread()) {
     
@@ -39,6 +40,7 @@ void* SolverThread::run() {
         
         if (cancelThread()) break;
         readFormula();
+        diversify();
     }
     hlib->hlog(2, "%s exiting\n", toStr());
     hlib->solverThreadsRunning[_args->solverId] = false;
@@ -96,6 +98,99 @@ void SolverThread::read(const std::vector<int>& formula, int begin) {
             solver->addLiteral(formula[i]);
             importedLits++;
         }
+    }
+}
+
+void SolverThread::diversify() {
+
+	int diversification = hlib->params.getIntParam("d", 1);
+    int mpi_size = hlib->mpi_size;
+    int mpi_rank = hlib->mpi_rank;
+	switch (diversification) {
+	case 1:
+		sparseDiversification(mpi_size, mpi_rank);
+		hlib->hlog(1, "doing sparse diversification\n");
+		break;
+	case 2:
+		binValueDiversification(mpi_size, mpi_rank);
+		hlib->hlog(1, "doing binary value based diversification\n");
+		break;
+	case 3:
+		randomDiversification(2015);
+		hlib->hlog(1, "doing random diversification\n");
+		break;
+	case 4:
+		nativeDiversification(mpi_rank, mpi_size);
+		hlib->hlog(1, "doing native diversification (plingeling)\n");
+		break;
+	case 5:
+		sparseDiversification(mpi_size, mpi_rank);
+		nativeDiversification(mpi_rank, mpi_size);
+		hlib->hlog(1, "doing sparse + native diversification\n");
+		break;
+	case 6:
+		sparseRandomDiversification(mpi_rank, mpi_size);
+		hlib->hlog(1, "doing sparse random diversification\n");
+		break;
+	case 7:
+		sparseRandomDiversification(mpi_rank, mpi_size);
+		nativeDiversification(mpi_rank, mpi_size);
+		hlib->hlog(1, "doing random sparse + native diversification (plingeling)\n");
+		break;
+	case 0:
+		hlib->hlog(1, "no diversification\n");
+		break;
+	}
+}
+
+void SolverThread::sparseDiversification(int mpi_size, int mpi_rank) {
+	int totalSolvers = mpi_size * hlib->solversCount;
+    int vars = solver->getVariablesCount();
+
+    int sid = _args->solverId;
+    int shift = (mpi_rank * hlib->solversCount) + sid;
+    for (int var = 1; var + totalSolvers < vars; var += totalSolvers) {
+        solver->setPhase(var + shift, true);
+    }
+}
+
+void SolverThread::randomDiversification(unsigned int seed) {
+	srand(seed);
+    int vars = solver->getVariablesCount();
+    for (int var = 1; var <= vars; var++) {
+        solver->setPhase(var, rand()%2 == 1);
+    }
+}
+
+void SolverThread::sparseRandomDiversification(unsigned int seed, int mpi_size) {
+	srand(seed);
+	int totalSolvers = hlib->solversCount * mpi_size;
+    int vars = solver->getVariablesCount();
+    for (int var = 1; var <= vars; var++) {
+        if (rand() % totalSolvers == 0) {
+            solver->setPhase(var, rand() % 2 == 1);
+        }
+    }
+}
+
+void SolverThread::nativeDiversification(int mpi_rank, int mpi_size) {
+    solver->diversify(solver->solverId, mpi_size*hlib->solversCount);
+}
+
+void SolverThread::binValueDiversification(int mpi_size, int mpi_rank) {
+	int totalSolvers = mpi_size * hlib->solversCount;
+	int tmp = totalSolvers;
+	int log = 0;
+	while (tmp) {
+		tmp >>= 1;
+		log++;
+	}
+    int vars = solver->getVariablesCount();
+    int num = mpi_rank * _args->solverId;
+    for (int var = 1; var < vars; var++) {
+        int bit = var % log;
+        bool phase = (num >> bit) & 1 ? true : false;
+        solver->setPhase(var, phase);
     }
 }
 

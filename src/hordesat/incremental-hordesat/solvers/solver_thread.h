@@ -30,8 +30,17 @@ public:
 
 private:
     void init();
+    
     void readFormula();
     void read(const std::vector<int>& formula, int begin);
+
+    void diversify();
+    void sparseDiversification(int mpi_size, int mpi_rank);
+	void randomDiversification(unsigned int seed);
+	void sparseRandomDiversification(unsigned int seed, int mpi_size);
+	void nativeDiversification(int mpi_rank, int mpi_size);
+	void binValueDiversification(int mpi_size, int mpi_rank);
+
     void runOnce();
     void waitWhile(SolvingStates::SolvingState state);
     bool cancelRun();

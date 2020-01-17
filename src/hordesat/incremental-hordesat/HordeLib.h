@@ -30,6 +30,7 @@ struct thread_args {
 	int solverId;
 	HordeLib* hlib;
 	bool readFormulaFromHlib;
+	int diversificationMode;
 };
 
 class HordeLib {
@@ -79,11 +80,11 @@ public:
 	void setLogger(std::shared_ptr<LoggingInterface> loggingInterface);
 	ParameterProcessor& getParams() {return params;}
 
-	void diversify(int rank, int size);
     void beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
 							const std::shared_ptr<std::vector<int>>& assumptions);
 	void continueSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
 							const std::shared_ptr<std::vector<int>>& assumptions);
+	void updateRole(int rank, int numNodes);
 	bool isFullyInitialized();
     int solveLoop();
 
@@ -112,15 +113,7 @@ public:
 	
 
 private:
-    void init();
-
-	// diversifications
-	void sparseDiversification(int mpi_size, int mpi_rank);
-	void randomDiversification(unsigned int seed);
-	void sparseRandomDiversification(unsigned int seed, int mpi_size);
-	void nativeDiversification(int mpi_rank, int mpi_size);
-	void binValueDiversification(int mpi_size, int mpi_rank);
-	
+    void init();	
 	std::vector<int> clauseBufferToPlainClauses(const std::vector<int>& buffer);
 };
 

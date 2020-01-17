@@ -76,7 +76,7 @@ void SatJob::appl_initialize() {
 }
 
 void SatJob::appl_updateRole() {
-    if (_solver != NULL) _solver->diversify(_index, _comm_size);
+    if (_solver != NULL) _solver->updateRole(_index, _comm_size);
 }
 
 void SatJob::appl_updateDescription(int fromRevision) {
