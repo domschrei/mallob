@@ -271,6 +271,15 @@ void Client::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
     
     MyMpi::send(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, data);
     Console::log_send(Console::VERB, handle->source, "Sent job description of #%i of size %i", jobId, data->size());
+
+    Console::log(Console::VVVERB, "%i", data->at(0));
+    Console::log(Console::VVVERB, "%i", data->at(1));
+    Console::log(Console::VVVERB, "%i", data->at(2));
+    Console::log(Console::VVVERB, "%i", data->at(3));
+    Console::log(Console::VVVERB, "%i", data->at(4));
+    Console::log(Console::VVVERB, "%i", data->at(5));
+    Console::log(Console::VVVERB, "%i", data->at(6));
+    Console::log(Console::VVVERB, "%i", data->at(7));
 }
 
 void Client::handleJobDone(MessageHandlePtr& handle) {
