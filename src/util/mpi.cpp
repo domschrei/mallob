@@ -389,7 +389,6 @@ MessageHandlePtr MyMpi::poll() {
             bestPrio = tagPriority[h->tag];
             bestPrioHandle = h;
             if (bestPrio == MIN_PRIORITY) break; // handle of minimum priority found
-            //break;
         }
     }
 
@@ -402,7 +401,7 @@ MessageHandlePtr MyMpi::poll() {
         int err = MPI_Get_count(&handle->status, MPI_BYTE, &count);
         endcall();
         chkerr(err);
-        if (count > 0) {
+        if (count > 0 && count < handle->recvData->size()) {
             handle->recvData->resize(count);
         }
     }
