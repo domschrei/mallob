@@ -460,7 +460,7 @@ void MyMpi::testSentHandles() {
         chkerr(err);
         if (flag) {
             // Sending operation completed
-            Console::log(Console::VVVERB, "Msg ID=%i isent", h->id);
+            Console::log(Console::VVVERB, "Msg ID=%i isent : %i", h->id, h->sendData->at(0));
             it = sentHandles.erase(it);
         } else {
             it++;

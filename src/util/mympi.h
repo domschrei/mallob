@@ -16,15 +16,15 @@
 #define MIN_PRIORITY 0
 
 struct MessageHandle {
-    MPI_Request request;
     int id;
     int tag;
     int source;
     std::shared_ptr<std::vector<uint8_t>> sendData;
     std::shared_ptr<std::vector<uint8_t>> recvData;
-    MPI_Status status;
     bool selfMessage = false;
     bool critical = false;
+    MPI_Request request;
+    MPI_Status status;
 
     MessageHandle(int id) : id(id) {
         status.MPI_SOURCE = -1; 

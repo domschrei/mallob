@@ -203,7 +203,7 @@ void Worker::mainProgram() {
             Console::log(Console::VVVERB, "poll time: %.6f s", pollTime);
 
             // Process message
-            Console::log_recv(Console::VVVERB, handle->source, "process msg, tag %i", handle->tag);
+            Console::log_recv(Console::VVVERB, handle->source, "process msg, tag %i : %i", handle->tag, handle->recvData->at(0));
             float time = Timer::elapsedSeconds();
 
             //stats.increment("receivedMessages");
@@ -563,14 +563,6 @@ void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
 void Worker::handleSendJob(MessageHandlePtr& handle) {
     auto data = handle->recvData;
     Console::log_recv(Console::VVVERB, handle->source, "Receiving job data of size %i", data->size());
-    Console::log(Console::VVVERB, "%i", data->at(0));
-    Console::log(Console::VVVERB, "%i", data->at(1));
-    Console::log(Console::VVVERB, "%i", data->at(2));
-    Console::log(Console::VVVERB, "%i", data->at(3));
-    Console::log(Console::VVVERB, "%i", data->at(4));
-    Console::log(Console::VVVERB, "%i", data->at(5));
-    Console::log(Console::VVVERB, "%i", data->at(6));
-    Console::log(Console::VVVERB, "%i", data->at(7));
     int jobId; memcpy(&jobId, data->data(), sizeof(int));
     assert(hasJob(jobId) || Console::fail("I don't know job #%i !", jobId));
 
