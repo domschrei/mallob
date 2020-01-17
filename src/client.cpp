@@ -201,7 +201,6 @@ void Client::introduceJob(std::shared_ptr<JobDescription>& jobPtr) {
     // Wait until job is ready to be sent
     while (true) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        std::unique_lock<std::mutex> lock(jobReadyLock);
         if (isJobReady(jobId))
             break;
     }
