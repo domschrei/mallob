@@ -34,7 +34,7 @@ if [ ! -d lingeling ]; then
     mv *.txt code/
     rm build.sh
     mv code lingeling
-    patch lingeling/lglib.c < lingeling.patch
+    #patch lingeling/lglib.c < lingeling.patch
     
     # Option 2: SAT 2018 MIT-licenced lingeling
     #git clone https://github.com/arminbiere/lingeling.git
