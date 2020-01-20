@@ -196,7 +196,7 @@ void Worker::mainProgram() {
         // Poll a message, if present
         MessageHandlePtr handle;
         float pollTime = Timer::elapsedSeconds();
-        if ((handle = MyMpi::poll()) != NULL) {
+        if ((handle = MyMpi::poll(ListenerMode::WORKER)) != NULL) {
             pollTime = Timer::elapsedSeconds() - pollTime;
             Console::log(Console::VVVERB, "loop cycle %i", iteration);
             if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f s", jobTime);
@@ -284,8 +284,6 @@ void Worker::mainProgram() {
             }
 
             MyMpi::testSentHandles();
-            // Listen to message tag again as necessary
-            MyMpi::resetListenerIfNecessary(WORKER, handle->tag);
 
             time = Timer::elapsedSeconds() - time;
             Console::log(Console::VVVERB, "processing msg, tag %i took %.4f s", handle->tag, time);
@@ -1041,6 +1039,7 @@ void Worker::finishBalancing() {
                 handle->source = worldRank;
                 handle->recvData = payload.serialize();
                 handle->tag = MSG_ABORT;
+                handle->finished = true;
                 handleAbort(handle);
             }
         }

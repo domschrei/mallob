@@ -13,6 +13,7 @@
 #include "util/console.h"
 
 #define MAX_JOB_MESSAGE_PAYLOAD_PER_NODE 1500*sizeof(int)
+#define MAX_ANYTIME_MESSAGE_SIZE 1024
 #define MIN_PRIORITY 0
 
 struct MessageHandle {
@@ -209,7 +210,6 @@ public:
 
     static void init(int argc, char *argv[]);
     static void beginListening(const ListenerMode& mode);
-    static void resetListenerIfNecessary(const ListenerMode& mode, int tag);
 
     static MessageHandlePtr isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object);
     static MessageHandlePtr isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object);
@@ -225,8 +225,7 @@ public:
     static MPI_Request iallreduce(MPI_Comm communicator, float* contribution, float* result);
     static MPI_Request iallreduce(MPI_Comm communicator, float* contribution, float* result, int numFloats);
 
-    static MessageHandlePtr poll();
-    //static MessageHandlePtr pollByProbing(const ListenerMode& mode);
+    static MessageHandlePtr poll(const ListenerMode& mode);
     static inline bool hasActiveHandles() {
         return handles.size() > 0;
     }
@@ -238,8 +237,12 @@ public:
     static int rank(MPI_Comm comm);
     static int random_other_node(MPI_Comm comm, const std::set<int>& excludedNodes);
     
-    static int nextHandleId();
     static std::string currentCall(double* callStart);
+    static int nextHandleId();
+
+private:
+    static void resetListenerIfNecessary(const ListenerMode& mode, int tag);
+    static bool isAnytimeTag(const ListenerMode& mode, int tag);
 
     static int maxMsgLength;
 };

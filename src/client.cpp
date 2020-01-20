@@ -150,7 +150,7 @@ void Client::mainProgram() {
 
         // Poll messages, if present
         MessageHandlePtr handle;
-        if ((handle = MyMpi::poll()) != NULL) {
+        if ((handle = MyMpi::poll(ListenerMode::CLIENT)) != NULL) {
             // Process message
             Console::log_recv(Console::VVERB, handle->source, "Processing message of tag %i", handle->tag);
 
@@ -175,9 +175,6 @@ void Client::mainProgram() {
             } else {
                 Console::log_recv(Console::WARN, handle->source, "Unknown message tag %i", handle->tag);
             }
-
-            // Re-listen to message tag as necessary
-            MyMpi::resetListenerIfNecessary(CLIENT, handle->tag);
         }
 
         // Sleep for a bit
