@@ -33,6 +33,9 @@ void SatJob::appl_initialize() {
     if (_params.getIntParam("md") <= 1 && _params.getIntParam("t") <= 1) {
         // One thread on one node: do not diversify anything, but keep default solver settings
         params["d"] = "0"; // no diversification
+    } else if (this->_params.isSet("nophase")) {
+        // Do not do sparse random ("phase") diversification
+        params["d"] = "4"; // native diversification only
     } else {
         params["d"] = "7"; // sparse random + native diversification
     }
