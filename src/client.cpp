@@ -177,6 +177,8 @@ void Client::mainProgram() {
             }
         }
 
+        MyMpi::testSentHandles();
+
         // Sleep for a bit
         //usleep(1000); // 1000 = 1 millisecond
     }
@@ -310,9 +312,10 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
         // Job is completely done
         IntVec payload({jobId});
         MyMpi::isend(MPI_COMM_WORLD, rootNodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
+        
         introducedJobIds.erase(jobId);
+        jobs[jobId].reset();
         jobs.erase(jobId);
-
         checkFinished();
 
         // Employ "leaky bucket"
@@ -330,9 +333,10 @@ void Client::handleAbort(MessageHandlePtr& handle) {
     
     Console::log_recv(Console::VERB, handle->source, "Acknowledging timeout of #%i.", jobId);
     Console::log(Console::INFO, "TIMEOUT #%i %.6f", jobId, Timer::elapsedSeconds() - jobs[jobId]->getArrival());
+    
     introducedJobIds.erase(jobId);
+    jobs[jobId].reset();
     jobs.erase(jobId);
-
     checkFinished();
 
     // Employ "leaky bucket"
