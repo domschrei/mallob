@@ -17,8 +17,8 @@ using namespace std;
 
 class Parameters {
 private:
-	map<string, string> params;
-	string filename;
+	map<string, string> _params;
+	string _filename;
 public:
 	Parameters() = default;
 	void init(int argc, char** argv);

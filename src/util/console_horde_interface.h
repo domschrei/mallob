@@ -9,10 +9,10 @@
 class ConsoleHordeInterface : public LoggingInterface {
 
 private:
-    std::string identifier;
+    std::string _identifier;
 
 public:
-    ConsoleHordeInterface(std::string identifier) : identifier(identifier) {
+    ConsoleHordeInterface(std::string identifier) : _identifier(identifier) {
     }
 
     double getTime() {
@@ -24,7 +24,7 @@ public:
         
         // Prefix horde instance name, if not already present
         if (str.rfind("<h-", 0) != 0) {
-            str = "<h-" + identifier + "> " + str;
+            str = "<h-" + _identifier + "> " + str;
         }
 
         // Write content

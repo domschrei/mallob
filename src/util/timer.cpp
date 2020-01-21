@@ -18,3 +18,7 @@ float Timer::elapsedSeconds() {
     duration<double, std::milli> time_span = nowTime - startTime;
     return time_span.count() / 1000;
 }
+
+bool Timer::globalTimelimReached(Parameters& params) {
+    return params.getFloatParam("T") > 0 && elapsedSeconds() > params.getFloatParam("T");
+}

@@ -13,6 +13,7 @@
 #include "util/params.h"
 #include "util/permutation.h"
 #include "data/job_description.h"
+#include "data/job_result.h"
 #include "data/job_transfer.h"
 #include "data/epoch_counter.h"
 

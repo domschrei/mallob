@@ -12,17 +12,17 @@ void Parameters::init(int argc, char** argv) {
     for (int i = 1; i < argc; i++) {
         char* arg = argv[i];
         if (arg[0] != '-') {
-            filename = std::string(arg);
+            _filename = std::string(arg);
             continue;
         }
         char* eq = strchr(arg, '=');
         if (eq == NULL) {
-            params[arg+1];
+            _params[arg+1];
         } else {
             *eq = 0;
             char* left = arg+1;
             char* right = eq+1;
-            params[left] = right;
+            _params[left] = right;
         }
     }
 }
@@ -81,12 +81,12 @@ void Parameters::printUsage() {
 }
 
 string Parameters::getFilename() {
-  return filename;
+  return _filename;
 }
 
 void Parameters::printParams() {
     std::string out = "";
-    for (map<string,string>::iterator it = params.begin(); it != params.end(); it++) {
+    for (map<string,string>::iterator it = _params.begin(); it != _params.end(); it++) {
         if (it->second.empty()) {
             out += it->first + ", ";
         } else {
@@ -98,20 +98,20 @@ void Parameters::printParams() {
 }
 
 void Parameters::setParam(const char* name) {
-    params[name];
+    _params[name];
 }
 
 void Parameters::setParam(const char* name, const char* value) {
-    params[name] = value;
+    _params[name] = value;
 }
 
 bool Parameters::isSet(const string& name) {
-    return params.find(name) != params.end();
+    return _params.find(name) != _params.end();
 }
 
 string Parameters::getParam(const string& name, const string& defaultValue) {
     if (isSet(name)) {
-        return params[name];
+        return _params[name];
     } else {
         return defaultValue;
     }
@@ -123,7 +123,7 @@ string Parameters::getParam(const string& name) {
 
 int Parameters::getIntParam(const string& name, int defaultValue) {
     if (isSet(name)) {
-        return atoi(params[name].c_str());
+        return atoi(_params[name].c_str());
     } else {
         return defaultValue;
     }
@@ -131,12 +131,12 @@ int Parameters::getIntParam(const string& name, int defaultValue) {
 
 int Parameters::getIntParam(const string& name) {
     assert(isSet(name));
-    return atoi(params[name].c_str());
+    return atoi(_params[name].c_str());
 }
 
 float Parameters::getFloatParam(const string& name, float defaultValue) {
     if (isSet(name)) {
-        return atof(params[name].c_str());
+        return atof(_params[name].c_str());
     } else {
         return defaultValue;
     }
@@ -144,5 +144,5 @@ float Parameters::getFloatParam(const string& name, float defaultValue) {
 
 float Parameters::getFloatParam(const string& name) {
     assert(isSet(name));
-    return atof(params[name].c_str());
+    return atof(_params[name].c_str());
 }

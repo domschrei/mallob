@@ -192,21 +192,22 @@ class MyMpi {
 public:
     struct HandleComparator {
         bool operator()(const MessageHandlePtr& a, const MessageHandlePtr& b) const {
-            assert(MyMpi::tagPriority.count(a->tag) || Console::fail("Tag %i has no priority assigned to it", a->tag));
-            assert(MyMpi::tagPriority.count(b->tag) || Console::fail("Tag %i has no priority assigned to it", b->tag));
-            if (MyMpi::tagPriority[a->tag] != MyMpi::tagPriority[b->tag])
-                return MyMpi::tagPriority[a->tag] < MyMpi::tagPriority[b->tag];
+            assert(MyMpi::_tag_priority.count(a->tag) || Console::fail("Tag %i has no priority assigned to it", a->tag));
+            assert(MyMpi::_tag_priority.count(b->tag) || Console::fail("Tag %i has no priority assigned to it", b->tag));
+            if (MyMpi::_tag_priority[a->tag] != MyMpi::_tag_priority[b->tag])
+                return MyMpi::_tag_priority[a->tag] < MyMpi::_tag_priority[b->tag];
             if (a->tag != b->tag) return a->tag < b->tag;
             return false;
         }
     };
 
 private:
-    static std::set<MessageHandlePtr> handles;
-    static std::set<MessageHandlePtr> sentHandles;
-    static std::map<int, int> tagPriority;
+    static std::set<MessageHandlePtr> _handles;
+    static std::set<MessageHandlePtr> _sentHandles;
+    static std::map<int, int> _tag_priority;
 
 public:
+    static int _max_msg_length;
 
     static void init(int argc, char *argv[]);
     static void beginListening(const ListenerMode& mode);
@@ -227,7 +228,7 @@ public:
 
     static MessageHandlePtr poll(const ListenerMode& mode);
     static inline bool hasActiveHandles() {
-        return handles.size() > 0;
+        return _handles.size() > 0;
     }
     static bool hasOpenSentHandles();
     static void deferHandle(MessageHandlePtr handle);
@@ -244,7 +245,6 @@ private:
     static void resetListenerIfNecessary(const ListenerMode& mode, int tag);
     static bool isAnytimeTag(const ListenerMode& mode, int tag);
 
-    static int maxMsgLength;
 };
 
 #endif

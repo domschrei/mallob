@@ -9,7 +9,6 @@
 #include <string>
 
 // https://stackoverflow.com/a/671389
-//////////////////////////////////////////////////////////////////////////////
 //
 // process_mem_usage(double &, double &) - takes two doubles by reference,
 // attempts to read the system-dependent data for a process' virtual memory

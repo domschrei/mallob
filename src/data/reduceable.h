@@ -24,18 +24,17 @@ public:
 
     bool startReduction(MPI_Comm& comm);
     bool advanceReduction(MessageHandlePtr handle);
-    std::set<int>& getExcludedRanks() {return excludedRanks;}
+    std::set<int>& getExcludedRanks() {return _excluded_ranks;}
 
     bool startBroadcast(MPI_Comm& comm, std::set<int>& excludedRanks);
     bool advanceBroadcast(MessageHandlePtr handle);
 
 protected:
-    MPI_Comm comm;
-    int myRank;
-    std::set<int> excludedRanks;
-    int power;
-    int highestPower;
-    MessageHandlePtr handle;
+    MPI_Comm _comm;
+    int _my_rank;
+    std::set<int> _excluded_ranks;
+    int _power;
+    int _highest_power;
 };
 
 #endif

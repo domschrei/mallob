@@ -10,13 +10,13 @@
 class AdjustablePermutation {
 
 private:
-    int n; // size of permutation: [0, n-1]
-    int root_n;
+    int _n; // size of permutation: [0, n-1]
+    int _root_n;
 
-    std::mt19937 rng;
-    std::vector<std::vector<int>> feistels;
+    std::mt19937 _rng;
+    std::vector<std::vector<int>> _feistels;
 
-    std::unordered_map<int, int> adjustedValues;
+    std::unordered_map<int, int> _adjusted_values;
 
 public:
     AdjustablePermutation() = default;

@@ -4,44 +4,17 @@
 #include <ctime>
 #include <algorithm>
 
-#include "utilities/Threading.h"
 #include "mympi.h"
 #include "random.h"
 #include "timer.h"
 #include "console.h"
 
-std::set<MessageHandlePtr> MyMpi::handles;
-std::set<MessageHandlePtr> MyMpi::sentHandles;
-int MyMpi::maxMsgLength;
-std::map<int, int> MyMpi::tagPriority;
+#include "util/mpi_monitor.h"
 
-
-
-
-int handleId;
-Mutex callLock;
-double doingMpiTasksTime;
-std::string currentOp;
-
-void initcall(const char* op) {
-    callLock.lock();
-    currentOp = op;
-    doingMpiTasksTime = Timer::elapsedSeconds();
-    callLock.unlock();
-}
-void endcall() {
-    callLock.lock();
-    doingMpiTasksTime = 0;
-    currentOp = "";
-    callLock.unlock();
-}
-std::string MyMpi::currentCall(double* callStart) {
-    callLock.lock();
-    *callStart = doingMpiTasksTime;
-    std::string op = currentOp;
-    callLock.unlock();
-    return op;
-}
+int MyMpi::_max_msg_length;
+std::set<MessageHandlePtr> MyMpi::_handles;
+std::set<MessageHandlePtr> MyMpi::_sentHandles;
+std::map<int, int> MyMpi::_tag_priority;
 
 void chkerr(int err) {
     if (err != 0) {
@@ -49,8 +22,6 @@ void chkerr(int err) {
         abort();
     }
 }
-
-
 
 bool MessageHandle::testSent() {
     assert(!selfMessage || Console::fail("Attempting to MPI_Test a self message!"));
@@ -129,44 +100,44 @@ void MyMpi::init(int argc, char *argv[])
     
     endcall();
 
-    maxMsgLength = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
+    _max_msg_length = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
     handleId = 1;
 
     // Very quick messages, and such which are critical for overall system performance
-    tagPriority[MSG_FIND_NODE] = 0;
+    _tag_priority[MSG_FIND_NODE] = 0;
 
-    tagPriority[MSG_WORKER_FOUND_RESULT] = 1;
-    tagPriority[MSG_FORWARD_CLIENT_RANK] = 1;
-    tagPriority[MSG_JOB_DONE] = 1;
-    tagPriority[MSG_COLLECTIVES] = 1;
+    _tag_priority[MSG_WORKER_FOUND_RESULT] = 1;
+    _tag_priority[MSG_FORWARD_CLIENT_RANK] = 1;
+    _tag_priority[MSG_JOB_DONE] = 1;
+    _tag_priority[MSG_COLLECTIVES] = 1;
     
     // Job-internal management messages
-    tagPriority[MSG_REQUEST_BECOME_CHILD] = 2;
-    tagPriority[MSG_ACCEPT_BECOME_CHILD] = 2;
-    tagPriority[MSG_REJECT_BECOME_CHILD] = 2;
-    tagPriority[MSG_QUERY_VOLUME] = 2;
-    tagPriority[MSG_UPDATE_VOLUME] = 2;
-    tagPriority[MSG_NOTIFY_JOB_REVISION] = 2;
-    tagPriority[MSG_QUERY_JOB_REVISION_DETAILS] = 2;
-    tagPriority[MSG_SEND_JOB_REVISION_DETAILS] = 2;
-    tagPriority[MSG_ACK_JOB_REVISION_DETAILS] = 2;
+    _tag_priority[MSG_REQUEST_BECOME_CHILD] = 2;
+    _tag_priority[MSG_ACCEPT_BECOME_CHILD] = 2;
+    _tag_priority[MSG_REJECT_BECOME_CHILD] = 2;
+    _tag_priority[MSG_QUERY_VOLUME] = 2;
+    _tag_priority[MSG_UPDATE_VOLUME] = 2;
+    _tag_priority[MSG_NOTIFY_JOB_REVISION] = 2;
+    _tag_priority[MSG_QUERY_JOB_REVISION_DETAILS] = 2;
+    _tag_priority[MSG_SEND_JOB_REVISION_DETAILS] = 2;
+    _tag_priority[MSG_ACK_JOB_REVISION_DETAILS] = 2;
 
     // Messages inducing bulky amounts of work
-    tagPriority[MSG_ACK_ACCEPT_BECOME_CHILD] = 3; // sending a job desc.
-    tagPriority[MSG_SEND_JOB_DESCRIPTION] = 3; // receiving a job desc.
-    tagPriority[MSG_QUERY_JOB_RESULT] = 3; // sending a job result
-    tagPriority[MSG_SEND_JOB_RESULT] = 3; // receiving a job result
+    _tag_priority[MSG_ACK_ACCEPT_BECOME_CHILD] = 3; // sending a job desc.
+    _tag_priority[MSG_SEND_JOB_DESCRIPTION] = 3; // receiving a job desc.
+    _tag_priority[MSG_QUERY_JOB_RESULT] = 3; // sending a job result
+    _tag_priority[MSG_SEND_JOB_RESULT] = 3; // receiving a job result
 
     // Termination and interruption
-    tagPriority[MSG_TERMINATE] = 4;
-    tagPriority[MSG_INTERRUPT] = 4;
-    tagPriority[MSG_ABORT] = 4;
-    tagPriority[MSG_WORKER_DEFECTING] = 4;
+    _tag_priority[MSG_TERMINATE] = 4;
+    _tag_priority[MSG_INTERRUPT] = 4;
+    _tag_priority[MSG_ABORT] = 4;
+    _tag_priority[MSG_WORKER_DEFECTING] = 4;
 
     // Job-specific communication: not critical for balancing 
-    tagPriority[MSG_JOB_COMMUNICATION] = 5;
+    _tag_priority[MSG_JOB_COMMUNICATION] = 5;
 
-    tagPriority[MSG_WARMUP] = 6;
+    _tag_priority[MSG_WARMUP] = 6;
 }
 
 void MyMpi::beginListening(const ListenerMode& mode) {
@@ -236,7 +207,7 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
         chkerr(err);
     }
 
-    (selfMessage ? handles : sentHandles).insert(handle);
+    (selfMessage ? _handles : _sentHandles).insert(handle);
     
     Console::log(Console::VVVERB, "Msg ID=%i dest=%i tag=%i size=%i", handle->id, 
                 recvRank, tag, handle->sendData->size());
@@ -254,7 +225,7 @@ MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const
         handle->tag = tag;
         handle->source = recvRank;
         handle->selfMessage = true;
-        handles.insert(handle);
+        _handles.insert(handle);
     } else {
         initcall("send");
         int err = MPI_Send(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator);
@@ -279,7 +250,7 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
 
     int msgSize;
     if (tag == MSG_JOB_COMMUNICATION || tag == MSG_COLLECTIVES || tag == MPI_ANY_TAG) {
-        msgSize = maxMsgLength;
+        msgSize = _max_msg_length;
     } else {
         msgSize = MAX_ANYTIME_MESSAGE_SIZE;
     }
@@ -289,7 +260,7 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
     int err = MPI_Irecv(handle->recvData->data(), msgSize, MPI_BYTE, source, tag, communicator, &handle->request);
     endcall();
     chkerr(err);
-    handles.insert(handle);
+    _handles.insert(handle);
     return handle;
 }
 
@@ -303,7 +274,7 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag, int si
     int err = MPI_Irecv(handle->recvData->data(), size, MPI_BYTE, source, tag, communicator, &handle->request);
     endcall();
     chkerr(err);
-    handles.insert(handle);
+    _handles.insert(handle);
     return handle;
 }
 
@@ -326,7 +297,7 @@ MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag, int size) {
 }
 
 MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag) {
-    return recv(communicator, tag, maxMsgLength);
+    return recv(communicator, tag, _max_msg_length);
 }
 
 MPI_Request MyMpi::iallreduce(MPI_Comm communicator, float* contribution, float* result) {
@@ -359,9 +330,9 @@ MessageHandlePtr MyMpi::poll(const ListenerMode& mode) {
     int bestPrio = 9999999;
 
     // Find ready handle of best priority
-    for (auto h : handles) {
-        if (h->testReceived() && tagPriority[h->tag] < bestPrio) {
-            bestPrio = tagPriority[h->tag];
+    for (auto h : _handles) {
+        if (h->testReceived() && _tag_priority[h->tag] < bestPrio) {
+            bestPrio = _tag_priority[h->tag];
             bestPrioHandle = h;
             if (bestPrio == MIN_PRIORITY) break; // handle of minimum priority found
         }
@@ -369,23 +340,23 @@ MessageHandlePtr MyMpi::poll(const ListenerMode& mode) {
 
     // Remove and return found handle
     if (bestPrioHandle != NULL) {
-        handles.erase(bestPrioHandle);
+        _handles.erase(bestPrioHandle);
         resetListenerIfNecessary(mode, bestPrioHandle->tag);
     } 
     return bestPrioHandle;
 }
 
 void MyMpi::deferHandle(MessageHandlePtr handle) {
-    handles.insert(handle);
+    _handles.insert(handle);
 }
 
 bool MyMpi::hasOpenSentHandles() {
-    return !sentHandles.empty();
+    return !_sentHandles.empty();
 }
 
 void MyMpi::testSentHandles() {
     std::set<MessageHandlePtr> finishedHandles;
-    for (auto h : sentHandles) {
+    for (auto h : _sentHandles) {
         if (h->testSent()) {
             // Sending operation completed
             Console::log(Console::VVVERB, "Msg ID=%i isent", h->id);
@@ -393,7 +364,7 @@ void MyMpi::testSentHandles() {
         }
     }
     for (auto h : finishedHandles) {
-        sentHandles.erase(h);
+        _sentHandles.erase(h);
     }
 }
 

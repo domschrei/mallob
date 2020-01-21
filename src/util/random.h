@@ -7,16 +7,16 @@
 
 class Random {
 public:
-    static std::mt19937 rng;
-    static std::uniform_real_distribution<float> dist;
+    static std::mt19937 _rng;
+    static std::uniform_real_distribution<float> _dist;
 
     static void init(int seed) {
-        rng = std::mt19937(seed);
-        dist = std::uniform_real_distribution<float>(0, 1);
+        _rng = std::mt19937(seed);
+        _dist = std::uniform_real_distribution<float>(0, 1);
     }
 
     static float rand() {
-        return dist(rng);
+        return _dist(_rng);
     }
     static int roundProbabilistically(float x) {
         float random = rand();
