@@ -314,7 +314,6 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
         MyMpi::isend(MPI_COMM_WORLD, rootNodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
         
         introducedJobIds.erase(jobId);
-        jobs[jobId].reset();
         jobs.erase(jobId);
         checkFinished();
 
@@ -335,7 +334,6 @@ void Client::handleAbort(MessageHandlePtr& handle) {
     Console::log(Console::INFO, "TIMEOUT #%i %.6f", jobId, Timer::elapsedSeconds() - jobs[jobId]->getArrival());
     
     introducedJobIds.erase(jobId);
-    jobs[jobId].reset();
     jobs.erase(jobId);
     checkFinished();
 
