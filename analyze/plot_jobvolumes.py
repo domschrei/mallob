@@ -13,7 +13,6 @@ def append(d, key, entry):
 def plot_xy(X, Y, label, color, linewidth, linestyle, markersize, markerstyle):
     plt.plot(X, Y, label=label, color=color, linestyle=linestyle, linewidth=linewidth, markersize=markersize, marker=markerstyle)
 
-ranks = set()
 min_time = -1
 max_time = 9223372036854775807
 
@@ -41,69 +40,41 @@ if len(sys.argv) > 2:
 time = 0
 for line in open(sys.argv[1], "r").readlines():
     line = line.replace("\n", "")
-    match = re.search(r'^\[([0-9]+\.[0-9]+) / ([0-9]+\.[0-9]+)\] \[([0-9]+)\] (.*)$', line)
-    if not match:
-        continue
-    time = float(match.group(1))
-    reltime = float(match.group(2))
-    rank = int(match.group(3))
-    msg = match.group(4)
     
-    ranks.add(rank)
-    if min_time == -1:
-        min_time = time
-        max_time += time
-    if reltime > max_time:
-        break
+    match = re.search(r'^([0-9]+\.[0-9]+) \[([0-9]+)\] (.*)$', line)
+    if match:
+        time = float(match.group(1))
+        if min_time == -1:
+            min_time = time
+        if time > max_time:
+            break
     
-    if "Introducing job" in msg:
-        match = re.search(r'\#([0-9]+)', msg)
-        if not match:
-            print("No match in " + msg)
-            exit(1)
-        job_id = match.group(1)
-        job_times[job_id] = [time]
-        job_volumes[job_id] = [0]
-    if "LOAD 1" in msg or "LOAD 0" in msg:
-        match = re.search(r'\#([0-9]+):([0-9]+)', msg)
-        if not match:
-            print("No match in " + msg)
-            exit(1)
-        job_id = match.group(1)
-        last_load = job_volumes[job_id][-1]
-        append(job_times, job_id, time-epsilon)
-        append(job_volumes, job_id, last_load)
-        last_load = job_volumes[all_jobs_id][-1]
-        append(job_times, all_jobs_id, time-epsilon)
-        append(job_volumes, all_jobs_id, last_load)
-    if "LOAD 1" in msg:
-        match = re.search(r'\(\+\#([0-9]+):([0-9]+)\)', msg)
-        if not match:
-            print("No match in " + msg)
-            exit(1)
-        job_id = match.group(1)
-        last_load = job_volumes[job_id][-1]
-        append(job_times, job_id, time)
-        append(job_volumes, job_id, last_load+1)
-        last_load = job_volumes[all_jobs_id][-1]
-        append(job_times, all_jobs_id, time)
-        append(job_volumes, all_jobs_id, last_load+1)
-    if "LOAD 0" in msg:
-        match = re.search(r'\(-\#([0-9]+):([0-9]+)\)', msg)
-        if not match:
-            print("No match in " + msg)
-            exit(1)
-        job_id = match.group(1)
-        last_load = job_volumes[job_id][-1]
-        append(job_times, job_id, time)
-        append(job_volumes, job_id, last_load-1)
-        last_load = job_volumes[all_jobs_id][-1]
-        append(job_times, all_jobs_id, time)
-        append(job_volumes, all_jobs_id, last_load-1)
+    match = re.search(r'LOAD ([01]) \([+-]\#([0-9]+):([0-9]+)\)', line)
+    if match:
+        newload = int(match.group(1))
+        job_id = match.group(2)
+        
+        if job_id not in job_times:
+            job_times[job_id] = [time]
+            job_volumes[job_id] = [0]
+        
+        for i in [job_id, all_jobs_id]:
+        
+            last_load = job_volumes[i][-1]
+            append(job_times, i, time-epsilon)
+            append(job_volumes, i, last_load)
+            
+            if newload == 1:
+                append(job_times, i, time)
+                append(job_volumes, i, last_load+1)
+                print(str(i) + " +1")
+            else:
+                append(job_times, i, time)
+                append(job_volumes, i, last_load-1)
+                print(str(i) + " -1")
 
 if max_time == 9223372036854775807:
     max_time = time
-
 
 
 # Plot data
@@ -111,18 +82,20 @@ plt.figure(figsize=(4.5,3.5))
 
 # Assign colors and shapes to occurring jobs
 for job in job_times:
-    if job not in job_colors:
-        idx = len(job_colors)
-        job_colors[job] = colors[idx % len(colors)]
-        job_linestyles[job] = linestyles[idx % len(linestyles)]
-        job_linewidths[job] = linewidths[idx % len(linewidths)]
+    if len(job_times[job]) > 1:
+        if job not in job_colors:
+            idx = len(job_colors)
+            job_colors[job] = colors[idx % len(colors)]
+            job_linestyles[job] = linestyles[idx % len(linestyles)]
+            job_linewidths[job] = linewidths[idx % len(linewidths)]
 
 # Plot volume graph for aggregation of all jobs
-times = job_times[all_jobs_id]
-volumes = job_volumes[all_jobs_id]
-plot_xy(times, volumes, all_jobs_id, "black", 1, "--", 0, "+")
+#times = job_times[all_jobs_id]
+#volumes = job_volumes[all_jobs_id]
+#plot_xy(times, volumes, all_jobs_id, "black", 1, "--", 0, "+")
+
 # Plot volume graph for each job
-for job_id in job_times:
+for job_id in job_colors:
     if job_id == all_jobs_id:
         continue
     times = job_times[job_id]

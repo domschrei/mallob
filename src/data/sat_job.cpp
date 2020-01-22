@@ -8,6 +8,7 @@
 #include "util/mympi.h"
 #include "data/sat_job.h"
 #include "util/console_horde_interface.h"
+#include "data/sat_clause_communicator.h"
 
 void logMutexSat(const char* msg) {
     Console::log(Console::VVVERB, msg);
@@ -18,6 +19,15 @@ void SatJob::lockHordeManipulation() {
 }
 void SatJob::unlockHordeManipulation() {
     _horde_manipulation_lock.unlock();
+}
+
+bool SatJob::mustAbortInitialization() {
+    if (_abort_after_initialization) {
+        endInitialization();
+        appl_withdraw();
+        return true;
+    }
+    return false;
 }
 
 void SatJob::appl_initialize() {
@@ -46,23 +56,16 @@ void SatJob::appl_initialize() {
     std::string identifier = std::string(toStr());
     params["jobstr"] = identifier;
 
-    if (_abort_after_initialization) {
-        endInitialization();
-        appl_withdraw();
-        return;
-    }
+    if (mustAbortInitialization()) return;
 
     _horde_manipulation_lock = VerboseMutex(std::string("HordeManip") + toStr(), &logMutexSat);
     lockHordeManipulation();
     Console::log(Console::VERB, "%s : creating horde instance", toStr());
     _solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(identifier))));
+    _clause_comm = (void*) new SatClauseCommunicator(_params, this);
     unlockHordeManipulation();
 
-    if (_abort_after_initialization) {
-        endInitialization();
-        appl_withdraw();
-        return;
-    }
+    if (mustAbortInitialization()) return;
 
     lockHordeManipulation();
     if (_solver != NULL) {
@@ -72,10 +75,7 @@ void SatJob::appl_initialize() {
     }
     unlockHordeManipulation();
 
-    if (_abort_after_initialization) {
-        endInitialization();
-        appl_withdraw();
-    }
+    if (mustAbortInitialization()) return;
 }
 
 void SatJob::appl_updateRole() {
@@ -153,193 +153,6 @@ void SatJob::extractResult() {
     }
 }
 
-void SatJob::appl_beginCommunication() {
-
-    JobMessage msg;
-    if (isRoot()) {
-        // There are no other nodes computing on this job:
-        // internally learn collected clauses, if ACTIVE
-        int jobCommEpoch = getJobCommEpoch();
-        if (isInState({ACTIVE})) {
-            msg.payload = collectClausesFromSolvers();
-            learnClausesFromAbove(msg.payload, jobCommEpoch);
-        }
-        _last_shared_job_comm = jobCommEpoch;
-        return;
-    }
-    msg.jobId = _id;
-    msg.epoch = getJobCommEpoch();
-    msg.tag = MSG_GATHER_CLAUSES;
-    msg.payload = collectClausesFromSolvers();
-    int parentRank = getParentNodeRank();
-    Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) sending, size %i", toStr(), msg.epoch, msg.payload.size());
-    MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
-    // TODO //stats.increase("sentMessages");
-}
-
-void SatJob::appl_communicate(int source, JobMessage& msg) {
-
-    if (isNotInState({JobState::ACTIVE}))
-        return;
-
-    // Unpack job message
-    int jobId = msg.jobId;
-    int epoch = msg.epoch;
-    std::vector<int>& clauses = msg.payload;
-
-    if (msg.tag == MSG_GATHER_CLAUSES) {
-        // Gather received clauses, send to parent
-        
-        Console::log(Console::VERB, "%s : (JCE=%i) received, size %i", toStr(), epoch, clauses.size());
-
-        if (_last_shared_job_comm >= epoch) {
-            // Already shared clauses upwards this job comm epoch!
-            Console::log(Console::VERB, "%s : (JCE=%i) ending: already did sharing this JCE", toStr(), epoch);
-            Console::log(Console::VERB, "%s : (JCE=%i) learning and broadcasting down", toStr(), epoch);
-            learnAndDistributeClausesDownwards(clauses, epoch);
-            return;
-        }
-        
-        // Add received clauses to local set of collected clauses
-        collectClausesFromBelow(clauses, epoch);
-
-        // Ready to share the clauses?
-        if (canShareCollectedClauses()) {
-
-            std::vector<int> clausesToShare = shareCollectedClauses(epoch);
-            if (isRoot()) {
-                // Share complete set of clauses to children
-                Console::log(Console::VERB, "%s : (JCE=%i) switching: gather => broadcast", toStr(), epoch); 
-                learnAndDistributeClausesDownwards(clausesToShare, epoch);
-            } else {
-                // Send set of clauses to parent
-                int parentRank = getParentNodeRank();
-                JobMessage msg;
-                msg.jobId = jobId;
-                msg.epoch = epoch;
-                msg.tag = MSG_GATHER_CLAUSES;
-                msg.payload = clausesToShare;
-                Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) gathering", toStr(), epoch);
-                MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
-            }
-            _last_shared_job_comm = epoch;
-        }
-
-    } else if (msg.tag == MSG_DISTRIBUTE_CLAUSES) {
-        // Learn received clauses, send them to children
-        learnAndDistributeClausesDownwards(clauses, epoch);
-    }
-}
-
-void SatJob::learnAndDistributeClausesDownwards(std::vector<int>& clauses, int jobCommEpoch) {
-
-    Console::log(Console::VVERB, "%s : (JCE=%i) learning, size %i", toStr(), jobCommEpoch, clauses.size());
-    assert(clauses.size() % BROADCAST_CLAUSE_INTS_PER_NODE == 0);
-
-    // Send clauses to children
-    JobMessage msg;
-    msg.jobId = _id;
-    msg.epoch = jobCommEpoch;
-    msg.tag = MSG_DISTRIBUTE_CLAUSES;
-    msg.payload = clauses;
-    int childRank;
-    if (hasLeftChild()) {
-        childRank = getLeftChildNodeRank();
-        Console::log_send(Console::VERB, childRank, "%s : (JCE=%i) broadcasting", toStr(), jobCommEpoch);
-        MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_JOB_COMMUNICATION, msg);
-    }
-    if (hasRightChild()) {
-        childRank = getRightChildNodeRank();
-        Console::log_send(Console::VERB, childRank, "%s : (JCE=%i) broadcasting", toStr(), jobCommEpoch);
-        MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_JOB_COMMUNICATION, msg);
-    }
-
-    if (clauses.size() > 0) {
-        // Locally learn clauses
-        learnClausesFromAbove(clauses, jobCommEpoch);
-    }
-}
-
-std::vector<int> SatJob::collectClausesFromSolvers() {
-
-    // If not fully initialized yet, broadcast an empty set of clauses
-    if (isNotInState({ACTIVE}) || !_solver->isFullyInitialized()) {
-        return std::vector<int>(BROADCAST_CLAUSE_INTS_PER_NODE, 0);
-    }
-    // Else, retrieve clauses from solvers
-    return _solver->prepareSharing();
-}
-void SatJob::insertIntoClauseBuffer(std::vector<int>& vec, int jobCommEpoch) {
-
-    // If there are clauses in the buffer which are from a previous job comm epoch:
-    if (!_clause_buffer.empty() && _job_comm_epoch_of_clause_buffer != jobCommEpoch) {
-        // Previous clauses came from an old epoch; reset clause buffer
-        Console::log(Console::VVERB, "(JCE=%i) Discarding buffer, size %i, from old JCE %i", 
-                jobCommEpoch, _clause_buffer.size(), _job_comm_epoch_of_clause_buffer);
-        _num_clause_sources = 0;
-        _clause_buffer.resize(0);
-    }
-    // Update epoch of current clause buffer
-    _job_comm_epoch_of_clause_buffer = jobCommEpoch;
-
-    // Insert clauses into local clause buffer for later sharing
-    _clause_buffer.insert(_clause_buffer.end(), vec.begin(), vec.end());
-
-    // Resize to multiple of #clause-ints per node
-    int prevSize = _clause_buffer.size();
-    int remainder = prevSize % BROADCAST_CLAUSE_INTS_PER_NODE;
-    if (remainder != 0) {
-        _clause_buffer.resize(prevSize + BROADCAST_CLAUSE_INTS_PER_NODE-remainder);
-        std::fill(_clause_buffer.begin()+prevSize, _clause_buffer.end(), 0);
-    }
-    assert(_clause_buffer.size() % BROADCAST_CLAUSE_INTS_PER_NODE == 0);
-}
-void SatJob::collectClausesFromBelow(std::vector<int>& clauses, int jobCommEpoch) {
-
-    insertIntoClauseBuffer(clauses, jobCommEpoch);
-    _num_clause_sources++;
-}
-bool SatJob::canShareCollectedClauses() {
-
-    int numChildren = 0;
-    // Must have received clauses from both children,
-    // except if one / both of them cannot exist according to volume
-    if (hasLeftChild()) numChildren++;
-    if (hasRightChild()) numChildren++;
-    return numChildren == _num_clause_sources;
-}
-std::vector<int> SatJob::shareCollectedClauses(int jobCommEpoch) {
-
-    // Locally collect clauses from own solvers, add to clause buffer
-    std::vector<int> selfClauses = collectClausesFromSolvers();
-    insertIntoClauseBuffer(selfClauses, jobCommEpoch);
-    std::vector<int> vec = _clause_buffer;
-
-    // Reset clause buffer
-    _num_clause_sources = 0;
-    _clause_buffer.resize(0);
-    return vec;
-}
-void SatJob::learnClausesFromAbove(std::vector<int>& clauses, int jobCommEpoch) {
-
-    // If not active or not fully initialized yet: discard clauses
-    if (isNotInState({ACTIVE}) || !_solver->isFullyInitialized()) {
-        Console::log(Console::VVERB, "%s : (JCE=%i) discarded because job is not (yet?) active", 
-                toStr(), jobCommEpoch);
-        return;
-    }
-
-    // Locally digest clauses
-    Console::log(Console::VVERB, "%s : (JCE=%i) digesting ...", toStr(), jobCommEpoch);
-    lockHordeManipulation();
-    if (_solver != NULL) _solver->digestSharing(clauses);
-    unlockHordeManipulation();
-    Console::log(Console::VVERB, "%s : (JCE=%i) digested", toStr(), jobCommEpoch);
-    /*} else {
-        Console::log(Console::VVERB, "%s : (JCE=%i) discarded because job is being manipulated", 
-            toStr(), jobCommEpoch);
-    }*/
-}
 
 int SatJob::appl_solveLoop() {
 
@@ -387,6 +200,16 @@ void SatJob::appl_dumpStats() {
     if (isInState({ACTIVE})) {
         _solver->dumpStats();
     }
+}
+
+void SatJob::appl_beginCommunication() {
+    if (_clause_comm != NULL)
+        ((SatClauseCommunicator*) _clause_comm)->initiateCommunication();
+}
+
+void SatJob::appl_communicate(int source, JobMessage& msg) {
+    if (_clause_comm != NULL)
+        ((SatClauseCommunicator*) _clause_comm)->continueCommunication(source, msg);
 }
 
 SatJob::~SatJob() {

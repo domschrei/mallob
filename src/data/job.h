@@ -197,6 +197,7 @@ public:
         }
     }
     void switchState(JobState state);
+
 };
 
 #endif
