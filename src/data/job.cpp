@@ -25,7 +25,6 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             _has_description(false), 
             _initialized(false), 
             _abort_after_initialization(false),
-            _done_locally(false), 
             _job_manipulation_lock(VerboseMutex("JobManip#" + std::to_string(_id), &logMutex)),
             _job_node_ranks(commSize, jobId),
             _has_left_child(false),
@@ -37,6 +36,15 @@ void Job::lockJobManipulation() {
 }
 void Job::unlockJobManipulation() {
     _job_manipulation_lock.unlock();
+}
+
+bool Job::mustAbortInitialization() {
+    if (_abort_after_initialization) {
+        endInitialization();
+        appl_withdraw();
+        return true;
+    }
+    return false;
 }
 
 void Job::setDescription(std::shared_ptr<std::vector<uint8_t>>& data) {

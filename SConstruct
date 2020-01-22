@@ -50,7 +50,7 @@ hordesolvers = "src/hordesat/"
 
 # Source files
 hordesat_sources = Glob(horde + "*.cpp") + Glob(horde + "utilities/*.cpp") + Glob(horde + "solvers/*.cpp") + Glob(horde + "sharing/*.cpp")
-mallob_sources = Glob("src/*.cpp") + Glob("src/util/*.cpp") + Glob("src/data/*.cpp") + Glob("src/balancing/*.cpp")
+mallob_sources = Glob("src/app/*.cpp") + Glob("src/*.cpp") + Glob("src/util/*.cpp") + Glob("src/data/*.cpp") + Glob("src/balancing/*.cpp")
 
 # Build an object (.o) for each .cpp file of horde sources
 hordeenv = get_default_env()

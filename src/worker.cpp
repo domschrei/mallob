@@ -7,7 +7,7 @@
 #include <initializer_list>
 
 #include "worker.h"
-#include "data/sat_job.h"
+#include "app/sat_job.h"
 #include "util/timer.h"
 #include "util/console.h"
 #include "util/random.h"
