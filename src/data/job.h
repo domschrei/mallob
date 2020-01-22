@@ -68,17 +68,30 @@ static const char * jobStateStrings[] = { "none", "stored", "committed", "initia
 class Job {
 
 protected:
+    /*
+    The parameters the application was started with.
+    */
     Parameters& _params;
-    int _comm_size;
-    int _world_rank;
-
-    int _result_code;
+    /*
+    The amount of worker processes (a.k.a. MPI instances, a.k.a. logical "nodes") 
+    within this application.
+    */
+    const int _comm_size;
+    /*
+    The rank of this process (a.k.a. MPI instance, a.k.a. logical "node") 
+    within the set of all processes.
+    */
+    const int _world_rank;
+    /*
+    If applicable, the result that was found during the solving process
+    of this job instance. 
+    */
     JobResult _result;
     
 private:
 
     int _id;
-    int _index;
+    int _index = -1;
     JobDescription _description;
     std::shared_ptr<std::vector<uint8_t>> _serialized_description;
     std::string _name;
@@ -93,10 +106,8 @@ private:
     JobState _state;
     bool _has_description;
     bool _initialized;
-    bool _abort_after_initialization;
     std::unique_ptr<std::thread> _initializer_thread;
     VerboseMutex _job_manipulation_lock;
-    
     
     AdjustablePermutation _job_node_ranks;
     bool _has_left_child;
@@ -114,6 +125,7 @@ public:
     void uncommit();
     void initialize(int index, int rootRank, int parentRank);
     void reinitialize(int index, int rootRank, int parentRank);
+    void initialize();
     void suspend();
     void resume();
     void stop();
@@ -125,10 +137,10 @@ public:
     Is called inside a thread separated from the main thread,
     so thread safety must be guaranteed w.r.t. other method calls.
 
-    Should call Job::mustAbortInitialization() at possible interruption points
-    and cancel its initialization if the method returns true.
+    Return true if initialization was successful.
+    Return false if initialization was cancelled during execution of the method.
     */
-    virtual void appl_initialize() = 0;
+    virtual bool appl_initialize() = 0;
     /*
     Callback for the case where the job instance has changed
     its internal index, i.e. from "2nd node of job #5" to "7th node of job #5".
@@ -143,6 +155,7 @@ public:
     /*
     Do one cycle of checking whether any solution was already found.
     Return the result if applicable, or -1 otherwise.
+    If a solution was found, write it into the inherited field Job::_result .
     */
     virtual int appl_solveLoop() = 0;
     /*

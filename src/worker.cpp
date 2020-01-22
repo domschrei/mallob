@@ -601,7 +601,7 @@ void Worker::initJob(MessageHandlePtr handle) {
         job.terminate();
     } else {
         // Initialize job
-        job.appl_initialize();
+        job.initialize();
     }
 }
 

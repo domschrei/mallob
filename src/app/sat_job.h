@@ -22,10 +22,12 @@ const int RESULT_UNSAT = 20;
 class SatJob : public Job {
 
 private:
-    
+    bool _abort_after_initialization = false;
+
     std::unique_ptr<HordeLib> _solver;
+    void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
+
     bool _done_locally;
-    void* _clause_comm = NULL;
 
     std::thread _bg_thread;
     bool _bg_thread_running;
@@ -33,12 +35,10 @@ private:
 
 public:
 
-    SatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) : 
-        Job(params, commSize, worldRank, jobId, epochCounter), _done_locally(false), 
-        _bg_thread_running(false) {}
+    SatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
     ~SatJob() override;
 
-    void appl_initialize() override;
+    bool appl_initialize() override;
     void appl_updateRole() override;
     void appl_updateDescription(int fromRevision) override;
     void appl_pause() override;
@@ -62,7 +62,7 @@ public:
     void unlockHordeManipulation();
 
 private:
-    void extractResult();
+    void extractResult(int resultCode);
     void setSolverNullThread();
     void setSolverNull();
 };

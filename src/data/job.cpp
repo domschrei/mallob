@@ -24,7 +24,6 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             _state(NONE),
             _has_description(false), 
             _initialized(false), 
-            _abort_after_initialization(false),
             _job_manipulation_lock(VerboseMutex("JobManip#" + std::to_string(_id), &logMutex)),
             _job_node_ranks(commSize, jobId),
             _has_left_child(false),
@@ -36,15 +35,6 @@ void Job::lockJobManipulation() {
 }
 void Job::unlockJobManipulation() {
     _job_manipulation_lock.unlock();
-}
-
-bool Job::mustAbortInitialization() {
-    if (_abort_after_initialization) {
-        endInitialization();
-        appl_withdraw();
-        return true;
-    }
-    return false;
 }
 
 void Job::setDescription(std::shared_ptr<std::vector<uint8_t>>& data) {
@@ -104,6 +94,14 @@ void Job::endInitialization() {
     }
 }
 
+void Job::initialize() {
+    bool success = appl_initialize();
+    if (!success) {
+        endInitialization();
+        appl_withdraw();
+    }
+}
+
 void Job::initialize(int index, int rootRank, int parentRank) {
 
     lockJobManipulation();
@@ -111,7 +109,7 @@ void Job::initialize(int index, int rootRank, int parentRank) {
     updateJobNode(0, rootRank);
     updateParentNodeRank(parentRank);
     updateJobNode(_index, _world_rank);
-    appl_initialize();
+    initialize();
     unlockJobManipulation();
 }
 
@@ -251,15 +249,6 @@ void Job::stop() {
 }
 
 void Job::terminate() {
-
-    /*
-    if (isInitializing()) {
-        switchState(INITIALIZING_TO_PAST);
-        _abort_after_initialization = true;
-        return;
-    } else {
-        assert(isInState({ACTIVE, SUSPENDED, STANDBY}));
-    }*/
 
     lockJobManipulation();
     appl_interrupt();

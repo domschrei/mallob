@@ -14,6 +14,13 @@ void logMutexSat(const char* msg) {
     Console::log(Console::VVVERB, msg);
 }
 
+SatJob::SatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) : 
+        Job(params, commSize, worldRank, jobId, epochCounter), _done_locally(false), 
+        _bg_thread_running(false) {
+            
+    _horde_manipulation_lock = VerboseMutex(std::string("HordeManip") + toStr(), &logMutexSat);
+}
+
 void SatJob::lockHordeManipulation() {
     _horde_manipulation_lock.lock();
 }
@@ -21,9 +28,10 @@ void SatJob::unlockHordeManipulation() {
     _horde_manipulation_lock.unlock();
 }
 
-void SatJob::appl_initialize() {
+bool SatJob::appl_initialize() {
 
     assert(hasJobDescription());
+    _horde_manipulation_lock.updateName(std::string("HordeManip") + toStr());
 
     // Initialize Hordesat instance
     assert(_solver == NULL || Console::fail("Solver is not NULL! State of %s : %s", toStr(), jobStateToStr()));
@@ -47,16 +55,15 @@ void SatJob::appl_initialize() {
     std::string identifier = std::string(toStr());
     params["jobstr"] = identifier;
 
-    if (mustAbortInitialization()) return;
+    if (_abort_after_initialization) return false;
 
-    _horde_manipulation_lock = VerboseMutex(std::string("HordeManip") + toStr(), &logMutexSat);
     lockHordeManipulation();
     Console::log(Console::VERB, "%s : creating horde instance", toStr());
     _solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(identifier))));
     _clause_comm = (void*) new SatClauseCommunicator(_params, this);
     unlockHordeManipulation();
 
-    if (mustAbortInitialization()) return;
+    if (_abort_after_initialization) return false;
 
     lockHordeManipulation();
     if (_solver != NULL) {
@@ -67,7 +74,7 @@ void SatJob::appl_initialize() {
     }
     unlockHordeManipulation();
 
-    if (mustAbortInitialization()) return;
+    return !_abort_after_initialization;
 }
 
 void SatJob::appl_updateRole() {
@@ -133,19 +140,18 @@ void SatJob::appl_withdraw() {
     }
 }
 
-void SatJob::extractResult() {
+void SatJob::extractResult(int resultCode) {
     _result.id = getId();
-    _result.result = _result_code;
+    _result.result = resultCode;
     _result.revision = getDescription().getRevision();
     _result.solution.clear();
-    if (_result_code == SAT) {
+    if (resultCode == SAT) {
         _result.solution = _solver->getTruthValues();
-    } else if (_result_code == UNSAT) {
+    } else if (resultCode == UNSAT) {
         std::set<int>& assumptions = _solver->getFailedAssumptions();
         std::copy(assumptions.begin(), assumptions.end(), std::back_inserter(_result.solution));
     }
 }
-
 
 int SatJob::appl_solveLoop() {
 
@@ -181,10 +187,9 @@ int SatJob::appl_solveLoop() {
     // Did a solver find a result?
     if (result >= 0) {
         _done_locally = true;
-        this->_result_code = result;
         Console::log_send(Console::INFO, getRootNodeRank(), "%s : found result %s", toStr(), 
                             result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN");
-        extractResult();
+        extractResult(result);
     }
     return result;
 }

@@ -20,6 +20,10 @@ public:
         this->logCallback = logCallback;
     }
 
+    void updateName(std::string name) {
+        this->name = name;
+    }
+
     void lock() override {
         int microsecs = 10;
         bool locked = tryLock();
