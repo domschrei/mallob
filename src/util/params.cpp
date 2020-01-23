@@ -42,6 +42,7 @@ void Parameters::setDefaults() {
     //setParam("nophase"); // Do not do phase-based diversification (native only)
     setParam("p", "5.0"); // rebalance period (seconds)
     //setParam("q"); // no logging to stdout
+    setParam("r", ROUNDING_BISECTION); // rounding of assignments (prob = probabilistic, bisec = iterative bisection)
     setParam("s", "1.0"); // job communication period (seconds)
     setParam("T", "0"); // total time to run the system (0 = no limit)
     setParam("t", "2"); // num threads per node
@@ -62,7 +63,7 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "-ba=<num-ba>          Number of bounce alternatives per node (only relevant if -derandomize)");
     Console::log(Console::INFO, "-c=<num-clients>      Amount of client nodes (int c >= 1)");
     Console::log(Console::INFO, "-colors               Colored terminal output based on messages' verbosity");
-    Console::log(Console::INFO, "-cpuh-per-instance=<time-limit> Timeout an instance after x cpu hours (x >= 0; 0: no timeout");
+    Console::log(Console::INFO, "-cpuh-per-instance=<time-limit> Timeout an instance after x cpu hours (x >= 0; 0: no timeout)");
     Console::log(Console::INFO, "-derandomize          Derandomize job bouncing");
     Console::log(Console::INFO, "-g=<growth-period>    Grow job demand exponentially every t seconds (t >= 0; 0: immediate growth)");
     Console::log(Console::INFO, "-h|-help              Print usage");
@@ -74,10 +75,13 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "-nophase              Do not diversify solvers based on phase; native diversification only");
     Console::log(Console::INFO, "-p=<rebalance-period> Do global rebalancing every t seconds (t > 0)");
     Console::log(Console::INFO, "-q                    Be quiet, do not log to stdout besides critical information");
+    Console::log(Console::INFO, "-r=<round-mode>       Mode of rounding of assignments in balancing:");
+    Console::log(Console::INFO, "                      \"prob\" - simple probabilistic rounding");
+    Console::log(Console::INFO, "                      \"bisec\" (default) - iterative bisection to find optimal cutoff point");
     Console::log(Console::INFO, "-s=<comm-period>      Do job-internal communication every t seconds (t >= 0, 0: do not communicate)");
     Console::log(Console::INFO, "-T=<time-limit>       Run entire system for x seconds (x >= 0; 0: run indefinitely)");
     Console::log(Console::INFO, "-t=<num-threads>      Amount of worker threads per node (int t >= 1)");
-    Console::log(Console::INFO, "-time-per-instance=<time-limit> Timeout an instance after x seconds wall clock time (x >= 0; 0: no timeout");
+    Console::log(Console::INFO, "-time-per-instance=<time-limit> Timeout an instance after x seconds wall clock time (x >= 0; 0: no timeout)");
     Console::log(Console::INFO, "-v=<verb-num>         Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...");
     Console::log(Console::INFO, "-warmup               Do one explicit All-To-All warmup among all nodes in the beginning");
 }

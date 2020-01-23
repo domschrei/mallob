@@ -15,6 +15,9 @@
 #include "stdlib.h"
 using namespace std;
 
+#define ROUNDING_BISECTION "bisec"
+#define ROUNDING_PROBABILISTIC "prob"
+
 class Parameters {
 private:
 	map<string, string> _params;

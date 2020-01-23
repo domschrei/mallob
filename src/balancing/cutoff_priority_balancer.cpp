@@ -175,7 +175,8 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
     _stats.increment("reductions"); _stats.increment("broadcasts");
 
     // "resourcesInfo" now contains global data from all concerned jobs
-    if (_resources_info.getExcludedRanks().count(MyMpi::rank(_comm)) && !ITERATIVE_ROUNDING) {
+    if (_resources_info.getExcludedRanks().count(MyMpi::rank(_comm)) 
+                && _params.getParam("r") == ROUNDING_PROBABILISTIC) {
         Console::log(Console::VVERB, "Ended all-reduction. Balancing finished.");
         _balancing = false;
         delete _local_jobs;
@@ -226,7 +227,7 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
         }
     }
 
-    if (ITERATIVE_ROUNDING)  {
+    if (_params.getParam("r") == ROUNDING_BISECTION)  {
         // Build contribution to all-reduction of non-zero remainders
         _remainders = SortedDoubleSequence();
         for (auto it : _jobs_being_balanced) {
