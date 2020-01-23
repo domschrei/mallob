@@ -143,17 +143,13 @@ bool CutoffPriorityBalancer::continueBalancing(MessageHandlePtr handle) {
             done = _resources_info.advanceBroadcast(handle);
         }
         if (done) {
-            if (ITERATIVE_ROUNDING)
-                _stage = REDUCE_REMAINDERS;
-            else {
-                return finishResourcesReduction();
-            }
+            return finishResourcesReduction();
         }
     }
+
     if (_stage == REDUCE_REMAINDERS) {
         if (handle == NULL || stage != REDUCE_REMAINDERS) {
-            finishResourcesReduction();
-            done = _remainders.startReduction(_comm);
+            done = _remainders.startReduction(_comm, _resources_info.getExcludedRanks());
         } else {
             done = _remainders.advanceReduction(handle);
         }
@@ -161,14 +157,14 @@ bool CutoffPriorityBalancer::continueBalancing(MessageHandlePtr handle) {
     }
     if (_stage == BROADCAST_REMAINDERS) {
         if (handle == NULL || stage != BROADCAST_REMAINDERS) {
-            std::set<int> excluded;
-            done = _remainders.startBroadcast(_comm, excluded);
+            done = _remainders.startBroadcast(_comm, _remainders.getExcludedRanks());
         } else {
             done = _remainders.advanceBroadcast(handle);
         }
         if (done) {
-            finishRemaindersReduction();
+            done = finishRemaindersReduction();
             _stage = GLOBAL_ROUNDING;
+            return done;
         }
     }
     return false;
@@ -179,27 +175,26 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
     _stats.increment("reductions"); _stats.increment("broadcasts");
 
     // "resourcesInfo" now contains global data from all concerned jobs
-    if (_resources_info.getExcludedRanks().count(MyMpi::rank(_comm))) {
-        Console::log(Console::VERB, "Ended all-reduction. Balancing finished.");
+    if (_resources_info.getExcludedRanks().count(MyMpi::rank(_comm)) && !ITERATIVE_ROUNDING) {
+        Console::log(Console::VVERB, "Ended all-reduction. Balancing finished.");
         _balancing = false;
         delete _local_jobs;
         _local_jobs = NULL;
         _assignments = std::map<int, float>();
         return true;
     } else {
-        Console::log(Console::VERB, "Ended all-reduction. Calculating final job demands");
+        Console::log(Console::VVERB, "Ended all-reduction. Calculating final job demands");
     }
 
     // Assign correct (final) floating-point resources
-    if (MyMpi::rank(MPI_COMM_WORLD) == 0)
-        Console::log(Console::VVERB, "Initially assigned resources: %.3f", _resources_info.assignedResources);
-    else
-        Console::log(Console::VVVVERB, "Initially assigned resources: %.3f", _resources_info.assignedResources);
+    int rank = MyMpi::rank(MPI_COMM_WORLD);
+    Console::log(!rank ? Console::VVERB : Console::VVVVERB, "Initially assigned resources: %.3f", 
+        _resources_info.assignedResources);
+    
     float remainingResources = _total_volume - _resources_info.assignedResources;
     if (remainingResources < 0.1) remainingResources = 0;
 
-    if (MyMpi::rank(_comm) == 0)
-        Console::log(Console::VERB, "Remaining resources: %.3f", remainingResources);
+    Console::log(!rank ? Console::VVERB : Console::VVVVERB, "Remaining resources: %.3f", remainingResources);
 
     for (auto it : _jobs_being_balanced) {
         int jobId = it.first;
@@ -232,23 +227,49 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
     }
 
     if (ITERATIVE_ROUNDING)  {
-        // Build object of remainders to be all-reduced
+        // Build contribution to all-reduction of non-zero remainders
         _remainders = SortedDoubleSequence();
         for (auto it : _jobs_being_balanced) {
             int jobId = it.first;
-            _remainders.add(_assignments[jobId]);
+            if (_assignments[jobId] < 1) continue;
+            double remainder = _assignments[jobId] - (int)_assignments[jobId];
+            if (remainder > 0 && remainder < 1) _remainders.add(remainder);
         }
+        _last_utilization = 0;
+        _best_remainder_idx = -1;
 
+        _stage = REDUCE_REMAINDERS;
         return continueBalancing(NULL);
 
     } else return true;    
 }
 
 bool CutoffPriorityBalancer::finishRemaindersReduction() {
-    std::cout << "GLOBAL: ";
-    for (int i = 0; i < _remainders.size(); i++) std::cout << _remainders[i] << " ";
-    std::cout << std::endl;
-    return continueRoundingUntilReduction(0, _remainders.size()-1);
+    if (!_remainders.isEmpty()) {
+        Console::getLock();
+        Console::appendUnsafe(Console::VVVERB, "Seq. of remainders: ");
+        for (int i = 0; i < _remainders.size(); i++) Console::appendUnsafe(Console::VVVERB, "%.3f ", _remainders[i]);
+        Console::logUnsafe(Console::VVVERB, "");
+        Console::releaseLock();
+    }
+    return continueRoundingUntilReduction(0, _remainders.size());
+}
+
+std::map<int, int> getRoundedAssignments(std::map<int, float>& assignments, double remainder, int& sum) {
+    std::map<int, int> roundedAssignments;
+    for (auto it : assignments) {
+        if (it.second <= 1) {
+            // special treatment for atomic jobs
+            roundedAssignments[it.first] = 1;
+            sum++;
+            continue;
+        } 
+        double r = it.second - (int)it.second;
+        if (r < remainder) roundedAssignments[it.first] = std::floor(it.second);
+        if (r >= remainder) roundedAssignments[it.first] = std::ceil(it.second);
+        sum += roundedAssignments[it.first];
+    }
+    return roundedAssignments;
 }
 
 bool CutoffPriorityBalancer::continueRoundingUntilReduction(int lower, int upper) {
@@ -257,21 +278,14 @@ bool CutoffPriorityBalancer::continueRoundingUntilReduction(int lower, int upper
     _upper_remainder_idx = upper;
 
     int idx = (_lower_remainder_idx+_upper_remainder_idx)/2;
-    double remainder = _remainders[idx];
     
-    _rounded_assignments.clear();
     int localSum = 0;
-    for (auto it : _jobs_being_balanced) {
-        int jobId = it.first;
-        double r = _assignments[jobId] - (int)_assignments[jobId];
-        if (r < remainder) _rounded_assignments[jobId] = std::floor(_assignments[jobId]);
-        if (r >= remainder) _rounded_assignments[jobId] = std::ceil(_assignments[jobId]);
-        localSum += _rounded_assignments[jobId];
-    }
-
-    if (_lower_remainder_idx == _upper_remainder_idx) {
-        // Finished!
-        return true;
+    if (idx <= _remainders.size()) {
+        // Remainder is either one of the remainders from the reduced sequence
+        // or the right-hand limit 1.0
+        double remainder = (idx < _remainders.size() ? _remainders[idx] : 1.0);
+        // Round your local assignments and calculate utilization sum
+        _rounded_assignments = getRoundedAssignments(_assignments, remainder, localSum);
     }
 
     iAllReduce(localSum);
@@ -280,20 +294,68 @@ bool CutoffPriorityBalancer::continueRoundingUntilReduction(int lower, int upper
 
 bool CutoffPriorityBalancer::continueRoundingFromReduction() {
 
+    int rank = MyMpi::rank(MPI_COMM_WORLD);
+    _rounding_iterations++;
+
     float utilization = _reduce_result;
-    if (std::abs(utilization - _load_factor*MyMpi::size(_comm)) <= 1) {
-        // Finished!
-        return true;
-    }
+    float diffToOptimum = _load_factor*MyMpi::size(_comm) - utilization;
 
     int idx = (_lower_remainder_idx+_upper_remainder_idx)/2;
-    if (utilization < _load_factor*MyMpi::size(_comm)) {
-        // Too few resources utilized
-        _upper_remainder_idx = idx-1;
+
+    // Store result, if it is the best one so far
+    if (_best_remainder_idx == -1 || std::abs(diffToOptimum) < std::abs(_best_utilization_diff)) {
+        _best_utilization_diff = diffToOptimum;
+        _best_remainder_idx = idx;
+        _best_utilization = utilization;
     }
-    if (utilization > _load_factor*MyMpi::size(_comm)) {
-        // Too many resources utilized
-        _lower_remainder_idx = idx+1;
+
+    // Termination?
+    if (utilization == _last_utilization) { // Utilization unchanged?
+        // Finished!
+        if (!_remainders.isEmpty() && _best_remainder_idx <= _remainders.size()) {
+            // Remainders are known to this node: apply and report
+            int sum = 0;
+            double remainder = (_best_remainder_idx < _remainders.size() ? _remainders[_best_remainder_idx] : 1.0);
+            _rounded_assignments = getRoundedAssignments(_assignments, remainder, sum);
+            for (auto it : _rounded_assignments) {
+                _assignments[it.first] = it.second;
+            }
+            Console::log(Console::VVERB, 
+                        "ROUNDING DONE its=%i rmd=%.3f util=%.2f err=%.2f", 
+                        _rounding_iterations, remainder, _best_utilization, _best_utilization_diff);
+        } else {
+            // Remainders are unknown to this node (not needed)
+            Console::log(Console::VVVVERB, 
+                        "ROUNDING DONE its=%i err=%.2f", 
+                        _rounding_iterations, _best_utilization_diff);
+        }
+        // reset to original state
+        _best_remainder_idx = -1;
+        _rounding_iterations = 0; 
+        return true; // Balancing completely done
+
+    } else {
+        // Log iteration
+        if (!_remainders.isEmpty() && idx <= _remainders.size()) {
+            double remainder = (_best_remainder_idx < _remainders.size() ? _remainders[_best_remainder_idx] : 1.0);
+            Console::log(Console::VVERB, "ROUNDING it=%i rmd=%.3f util=%.2f err=%.2f", 
+                            _rounding_iterations, remainder, utilization, diffToOptimum);
+        } else {
+            Console::log(Console::VVVVERB, "ROUNDING it=%i rmd=? util=%.2f err=%.2f", 
+                            _rounding_iterations, utilization, diffToOptimum);
+        }
+        _last_utilization = utilization;
+    }
+
+    if (_lower_remainder_idx < _upper_remainder_idx) {
+        if (utilization < _load_factor*MyMpi::size(_comm)) {
+            // Too few resources utilized
+            _upper_remainder_idx = idx-1;
+        }
+        if (utilization > _load_factor*MyMpi::size(_comm)) {
+            // Too many resources utilized
+            _lower_remainder_idx = idx+1;
+        }
     }
     
     return continueRoundingUntilReduction(_lower_remainder_idx, _upper_remainder_idx);
@@ -308,7 +370,11 @@ std::map<int, int> CutoffPriorityBalancer::getBalancingResult() {
         float assignment = std::max(1.0f, it->second);
         int intAssignment = Random::roundProbabilistically(assignment);
         volumes[jobId] = intAssignment;
-        Console::log(Console::VERB, " #%i : final assignment %.3f => adj. to %i", jobId, _assignments[jobId], intAssignment);
+        if (intAssignment != (int)assignment) {
+            Console::log(Console::VVERB, " #%i : final assignment %.3f ~> %i", jobId, _assignments[jobId], intAssignment);
+        } else {
+            Console::log(Console::VVERB, " #%i : final assignment %i", jobId, intAssignment);
+        }
     }
     for (auto it = volumes.begin(); it != volumes.end(); ++it) {
         updateVolume(it->first, it->second);

@@ -9,6 +9,13 @@
 
 class Reduceable : public Serializable {
 
+protected:
+    MPI_Comm _comm;
+    int _my_rank;
+    std::set<int> _excluded_ranks;
+    int _power;
+    int _highest_power;
+
 public:
     virtual ~Reduceable() = default;
 
@@ -22,19 +29,12 @@ public:
     std::set<int> reduceToRankZero(MPI_Comm& comm);
     void broadcastFromRankZero(MPI_Comm& comm, std::set<int> excludedRanks = std::set<int>());
 
-    bool startReduction(MPI_Comm& comm);
+    bool startReduction(MPI_Comm& comm, std::set<int> excludedRanks = std::set<int>());
     bool advanceReduction(MessageHandlePtr handle);
     std::set<int>& getExcludedRanks() {return _excluded_ranks;}
 
     bool startBroadcast(MPI_Comm& comm, std::set<int>& excludedRanks);
     bool advanceBroadcast(MessageHandlePtr handle);
-
-protected:
-    MPI_Comm _comm;
-    int _my_rank;
-    std::set<int> _excluded_ranks;
-    int _power;
-    int _highest_power;
 };
 
 #endif

@@ -5,21 +5,26 @@
 #include "util/console.h"
 
 
-bool Reduceable::startReduction(MPI_Comm& comm) {
-    Console::log(Console::VERB, "Starting reduction");
+bool Reduceable::startReduction(MPI_Comm& comm, std::set<int> excludedRanks) {
+    Console::log(Console::VVVVERB, "Starting reduction");
     _comm = comm;
-    _excluded_ranks.clear();
+    _excluded_ranks = excludedRanks;
     _my_rank = MyMpi::rank(comm);
+    if (_excluded_ranks.count(_my_rank)) {
+        return true; // not participating -- finished
+    }
     _highest_power = 2 << (int)std::ceil(std::log2(MyMpi::size(comm)));
 
     for (_power = 2; _power <= _highest_power; _power *= 2) {
         if (_my_rank % _power == 0 && _my_rank+_power/2 < MyMpi::size(comm)) {
             // Receive
+            if (_excluded_ranks.count(_my_rank+_power/2)) continue;
             Console::log(Console::VVVVERB, "Red. k=%i : Receiving", _power);
             MyMpi::irecv(comm, _my_rank+_power/2, MSG_COLLECTIVES);
             return false;
         } else if (_my_rank % _power == _power/2) {
             // Send
+            if (_excluded_ranks.count(_my_rank-_power/2)) continue;
             Console::log_send(Console::VVVVERB, _my_rank-_power/2, "Red. k=%i : Sending", _power);
             MyMpi::isend(comm, _my_rank-_power/2, MSG_COLLECTIVES, *this);
         }
@@ -48,13 +53,17 @@ bool Reduceable::advanceReduction(MessageHandlePtr handle) {
     while (_power <= _highest_power) {
         if (_my_rank % _power == 0 && _my_rank+_power/2 < MyMpi::size(_comm)) {
             // Receive
-            Console::log(Console::VVVVERB, "Red. k=%i : Receiving", _power);
-            MyMpi::irecv(_comm, _my_rank+_power/2, MSG_COLLECTIVES);
-            return false;
+            if (_excluded_ranks.count(_my_rank+_power/2) == 0) {
+                Console::log(Console::VVVVERB, "Red. k=%i : Receiving", _power);
+                MyMpi::irecv(_comm, _my_rank+_power/2, MSG_COLLECTIVES);
+                return false;
+            } 
         } else if (_my_rank % _power == _power/2) {
             // Send
-            Console::log_send(Console::VVVVERB, _my_rank-_power/2, "Red. k=%i : Sending", _power);
-            MyMpi::isend(_comm, _my_rank-_power/2, MSG_COLLECTIVES, *this);
+            if (_excluded_ranks.count(_my_rank-_power/2) == 0) {
+                Console::log_send(Console::VVVVERB, _my_rank-_power/2, "Red. k=%i : Sending", _power);
+                MyMpi::isend(_comm, _my_rank-_power/2, MSG_COLLECTIVES, *this);
+            }
         }
         _power *= 2;
     }
