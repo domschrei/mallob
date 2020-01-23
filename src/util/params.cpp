@@ -34,6 +34,7 @@ void Parameters::setDefaults() {
     //setParam("derandomize"); // derandomize job bouncing
     setParam("g", "5.0"); // job demand growth interval
     //setParam("h"); setParam("help"); // print usage
+    //setParam("jjp"); // jitter job priorities
     setParam("l", "0.95"); // load factor
     setParam("log", "."); // logging directory
     setParam("lbc", "0"); // leaky bucket client parameter (0 = no leaky bucket, jobs enter by time) 
@@ -65,6 +66,7 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "-derandomize          Derandomize job bouncing");
     Console::log(Console::INFO, "-g=<growth-period>    Grow job demand exponentially every t seconds (t >= 0; 0: immediate growth)");
     Console::log(Console::INFO, "-h|-help              Print usage");
+    Console::log(Console::INFO, "-jjp                  Jitter job priorities to break ties during rebalancing");
     Console::log(Console::INFO, "-l=<load-factor>      Load factor to be aimed at (0 < l < 1)");
     Console::log(Console::INFO, "-lbc=<num-jobs>       Make each client a leaky bucket with x active jobs at any given time (int x >= 0, 0: jobs arrive at individual times instead)");
     Console::log(Console::INFO, "-log=<log-dir>        Directory to save logs in (default: .)");

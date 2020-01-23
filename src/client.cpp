@@ -14,6 +14,7 @@
 #include "util/memusage.h"
 #include "data/job_transfer.h"
 #include "data/job_result.h"
+#include "util/random.h"
 
 // Executed by a separate worker thread
 void Client::readAllInstances() {
@@ -406,6 +407,12 @@ void Client::readInstanceList(std::string& filename) {
         next = line.find(" "); priority = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1);
         next = line.find(" "); instanceFilename = line.substr(pos, next-pos); line = line.substr(next+1);
         incremental = (line == "i");
+
+        // Jitter job priority
+        if (_params.isSet("jjp")) {
+            priority *= 0.99 + 0.01 * Random::rand();
+        }
+
         std::shared_ptr<JobDescription> job = std::make_shared<JobDescription>(id, priority, incremental);
         job->setArrival(arrival);
         _jobs[id] = job;
