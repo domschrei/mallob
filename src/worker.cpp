@@ -844,6 +844,7 @@ void Worker::handleExit(MessageHandlePtr& handle) {
 
 void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, bool reckless) {
 
+    assert(hasJob(jobId));
     Job& job = getJob(jobId);
 
     // Do not terminate yet if the job is still in a committed state, because the job description should still arrive
@@ -854,29 +855,29 @@ void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, b
     }
 
     bool acceptMessage = job.isNotInState({NONE, STORED, PAST});
+
+    // Propagate message down the job tree
+    int msgTag;
+    if (terminate && reckless) msgTag = MSG_ABORT;
+    else if (terminate) msgTag = MSG_TERMINATE;
+    else msgTag = MSG_INTERRUPT;
+    if (acceptMessage && job.hasLeftChild()) {
+        MyMpi::isend(MPI_COMM_WORLD, job.getLeftChildNodeRank(), msgTag, handle->recvData);
+        Console::log_send(Console::VERB, job.getLeftChildNodeRank(), "Propagating interruption of %s ...", job.toStr());
+        //stats.increment("sentMessages");
+    }
+    if (acceptMessage && job.hasRightChild()) {
+        MyMpi::isend(MPI_COMM_WORLD, job.getRightChildNodeRank(), msgTag, handle->recvData);
+        Console::log_send(Console::VERB, job.getRightChildNodeRank(), "Propagating interruption of %s ...", job.toStr());
+        //stats.increment("sentMessages");
+    }
+    for (auto childRank : job.getPastChildren()) {
+        MyMpi::isend(MPI_COMM_WORLD, childRank, msgTag, handle->recvData);
+        Console::log_send(Console::VERB, childRank, "Propagating interruption of %s (past child) ...", job.toStr());
+    }
+    job.getPastChildren().clear();
+
     if (acceptMessage) {
-
-        // Propagate message down the job tree
-        int msgTag;
-        if (terminate && reckless) msgTag = MSG_ABORT;
-        else if (terminate) msgTag = MSG_TERMINATE;
-        else msgTag = MSG_INTERRUPT;
-        if (job.hasLeftChild()) {
-            MyMpi::isend(MPI_COMM_WORLD, job.getLeftChildNodeRank(), msgTag, handle->recvData);
-            Console::log_send(Console::VERB, job.getLeftChildNodeRank(), "Propagating interruption of %s ...", job.toStr());
-            //stats.increment("sentMessages");
-        }
-        if (job.hasRightChild()) {
-            MyMpi::isend(MPI_COMM_WORLD, job.getRightChildNodeRank(), msgTag, handle->recvData);
-            Console::log_send(Console::VERB, job.getRightChildNodeRank(), "Propagating interruption of %s ...", job.toStr());
-            //stats.increment("sentMessages");
-        }
-        for (auto childRank : job.getPastChildren()) {
-            MyMpi::isend(MPI_COMM_WORLD, childRank, msgTag, handle->recvData);
-            Console::log_send(Console::VERB, childRank, "Propagating interruption of %s (past child) ...", job.toStr());
-        }
-        job.getPastChildren().clear();
-
         // Stop / terminate
         if (job.isInitializing() || job.isInState({ACTIVE, STANDBY, SUSPENDED})) {
             Console::log(Console::INFO, "Interrupting %s (state: %s)", job.toStr(), job.jobStateToStr());
