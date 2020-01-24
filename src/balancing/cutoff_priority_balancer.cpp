@@ -41,19 +41,27 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
 
     // Find global aggregation of demands and amount of busy nodes
     float aggregatedDemand = 0;
+    int numAtomicJobs = 0;
     for (auto it : *_local_jobs) {
         int jobId = it;
         _demands[jobId] = getDemand(*_jobs_being_balanced[jobId]);
         _priorities[jobId] = _jobs_being_balanced[jobId]->getDescription().getPriority();
-        aggregatedDemand += _demands[jobId] * _priorities[jobId];
+        if (_demands[jobId] == 1) {
+            numAtomicJobs++;
+        } else {
+            aggregatedDemand += _demands[jobId] * _priorities[jobId];
+        }
         Console::log(Console::VERB, "Job #%i : demand %i", jobId, _demands[jobId]);
     }
+
     Console::log(Console::VERB, "Local aggregated demand: %.3f", aggregatedDemand);
     _demand_and_busy_nodes_contrib[0] = aggregatedDemand;
     _demand_and_busy_nodes_contrib[1] = (isWorkerBusy ? 1 : 0);
+    _demand_and_busy_nodes_contrib[2] = numAtomicJobs;
     _demand_and_busy_nodes_result[0] = 0;
     _demand_and_busy_nodes_result[1] = 0;
-    _reduce_request = MyMpi::iallreduce(_comm, _demand_and_busy_nodes_contrib, _demand_and_busy_nodes_result, 2);
+    _demand_and_busy_nodes_result[2] = 0;
+    _reduce_request = MyMpi::iallreduce(_comm, _demand_and_busy_nodes_contrib, _demand_and_busy_nodes_result, 3);
 
     return false; // not finished yet: wait for end of iallreduce
 }
@@ -88,25 +96,34 @@ bool CutoffPriorityBalancer::continueBalancing() {
         // Finish up initial reduction
         float aggregatedDemand = _demand_and_busy_nodes_result[0];
         int busyNodes = _demand_and_busy_nodes_result[1];
+        int atomicJobs = _demand_and_busy_nodes_result[2];
         bool rankZero = MyMpi::rank(MPI_COMM_WORLD) == 0;
         Console::log(rankZero ? Console::VVERB : Console::VVVVERB, 
             "%i/%i nodes (%.2f%%) are busy", (int)busyNodes, MyMpi::size(_comm), 
             ((float)100*busyNodes)/MyMpi::size(_comm));
         Console::log(rankZero ? Console::VVERB : Console::VVVVERB, 
             "Aggregation of demands: %.3f", aggregatedDemand);
+        Console::log(rankZero ? Console::VVERB : Console::VVVVERB, 
+            "%i jobs of unit demand", atomicJobs);
 
         // Calculate local initial assignments
-        _total_volume = (int) (MyMpi::size(_comm) * _load_factor);
+        _total_volume = MyMpi::size(_comm) * _load_factor - atomicJobs;
         for (auto it : *_local_jobs) {
             int jobId = it;
-            float initialMetRatio = _total_volume * _priorities[jobId] / aggregatedDemand;
-            _assignments[jobId] = std::min(1.0f, initialMetRatio) * _demands[jobId];
-            Console::log(Console::VVERB, "Job #%i : initial assignment %.3f", jobId, _assignments[jobId]);
+            if (_demands[jobId] == 1) {
+                _assignments[jobId] = 1;
+                Console::log(Console::VVERB, "Job #%i : atomic => assignment %.3f", jobId, _assignments[jobId]);
+            } else {
+                float initialMetRatio = _total_volume * _priorities[jobId] / aggregatedDemand;
+                _assignments[jobId] = std::min(1.0f, initialMetRatio) * _demands[jobId];
+                Console::log(Console::VVERB, "Job #%i : initial assignment %.3f", jobId, _assignments[jobId]);
+            }
         }
 
         // Create ResourceInfo instance with local data
         for (auto it : *_local_jobs) {
             int jobId = it;
+            if (_demands[jobId] == 1) continue;
             _resources_info.assignedResources += _assignments[jobId];
             _resources_info.priorities.push_back(_priorities[jobId]);
             _resources_info.demandedResources.push_back( _demands[jobId] - _assignments[jobId] );
@@ -199,6 +216,7 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
 
     for (auto it : _jobs_being_balanced) {
         int jobId = it.first;
+        if (_demands[jobId] == 1) continue;
 
         float demand = _demands[jobId];
         float priority = _priorities[jobId];
@@ -232,7 +250,6 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
         _remainders = SortedDoubleSequence();
         for (auto it : _jobs_being_balanced) {
             int jobId = it.first;
-            if (_assignments[jobId] < 1) continue;
             double remainder = _assignments[jobId] - (int)_assignments[jobId];
             if (remainder > 0 && remainder < 1) _remainders.add(remainder);
         }
@@ -256,11 +273,11 @@ bool CutoffPriorityBalancer::finishRemaindersReduction() {
     return continueRoundingUntilReduction(0, _remainders.size());
 }
 
-std::map<int, int> getRoundedAssignments(std::map<int, float>& assignments, double remainder, int& sum) {
+std::map<int, int> CutoffPriorityBalancer::getRoundedAssignments(std::map<int, float>& assignments, double remainder, int& sum) {
     std::map<int, int> roundedAssignments;
     for (auto it : assignments) {
         if (it.second <= 1) {
-            // special treatment for atomic jobs
+            // special treatment for jobs that get (less than) a single node
             roundedAssignments[it.first] = 1;
             sum++;
             continue;
@@ -299,7 +316,7 @@ bool CutoffPriorityBalancer::continueRoundingFromReduction() {
     _rounding_iterations++;
 
     float utilization = _reduce_result;
-    float diffToOptimum = _load_factor*MyMpi::size(_comm) - utilization;
+    float diffToOptimum = (MyMpi::size(_comm) * _load_factor) - utilization;
 
     int idx = (_lower_remainder_idx+_upper_remainder_idx)/2;
 

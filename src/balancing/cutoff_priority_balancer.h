@@ -153,7 +153,7 @@ std::unique_ptr<Reduceable> getDeserialized(const std::vector<uint8_t>& packed) 
 };
 
 enum BalancingStage {
-    INITIAL_DEMAND, REDUCE_RESOURCES, BROADCAST_RESOURCES, REDUCE_REMAINDERS, BROADCAST_REMAINDERS, GLOBAL_ROUNDING
+    INITIAL_DEMAND, ADJUSTED_DEMAND, REDUCE_RESOURCES, BROADCAST_RESOURCES, REDUCE_REMAINDERS, BROADCAST_REMAINDERS, GLOBAL_ROUNDING
 };
 
 class CutoffPriorityBalancer : public Balancer {
@@ -173,19 +173,21 @@ public:
     bool continueRoundingFromReduction();
     bool finishRounding();
 
+    std::map<int, int> getRoundedAssignments(std::map<int, float>& assignments, double remainder, int& sum);
+
 private:
     std::set<int, PriorityComparator>* _local_jobs;
     BalancingStage _stage;
 
-    float _demand_and_busy_nodes_contrib[2];
-    float _demand_and_busy_nodes_result[2];
+    float _demand_and_busy_nodes_contrib[3];
+    float _demand_and_busy_nodes_result[3];
 
     ResourcesInfo _resources_info;
     SortedDoubleSequence _remainders;
     int _lower_remainder_idx;
     int _upper_remainder_idx;
 
-    int _total_volume;
+    float _total_volume;
     std::map<int, float> _assignments;
     std::map<int, int> _rounded_assignments;
 
