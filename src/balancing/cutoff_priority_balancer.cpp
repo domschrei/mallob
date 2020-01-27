@@ -250,7 +250,7 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
 bool CutoffPriorityBalancer::finishRemaindersReduction() {
     if (!_remainders.isEmpty()) {
         Console::getLock();
-        Console::appendUnsafe(Console::VVVERB, "Seq. of remainders: ");
+        Console::appendUnsafe(Console::VVVERB, "ROUNDING remainders: ");
         for (int i = 0; i < _remainders.size(); i++) Console::appendUnsafe(Console::VVVERB, "%.3f ", _remainders[i]);
         Console::logUnsafe(Console::VVVERB, "");
         Console::releaseLock();
@@ -258,9 +258,13 @@ bool CutoffPriorityBalancer::finishRemaindersReduction() {
     return continueRoundingUntilReduction(0, _remainders.size());
 }
 
-std::map<int, int> CutoffPriorityBalancer::getRoundedAssignments(std::map<int, float>& assignments, double remainder, int& sum) {
+std::map<int, int> CutoffPriorityBalancer::getRoundedAssignments(int remainderIdx, int& sum) {
+
+    double remainder = remainderIdx < _remainders.size() ? _remainders[remainderIdx] : 1.0;
+    //int occurrences =  remainderIdx < _remainders.size() ? _remainders.getOccurrences(remainderIdx) : 0;
+
     std::map<int, int> roundedAssignments;
-    for (auto it : assignments) {
+    for (auto it : _assignments) {
         if (it.second <= 1) {
             // special treatment for jobs that get (less than) a single node
             roundedAssignments[it.first] = 1;
@@ -268,8 +272,12 @@ std::map<int, int> CutoffPriorityBalancer::getRoundedAssignments(std::map<int, f
             continue;
         } 
         double r = it.second - (int)it.second;
-        if (r < remainder) roundedAssignments[it.first] = std::floor(it.second);
-        if (r >= remainder) roundedAssignments[it.first] = std::ceil(it.second);
+        
+        if (r < remainder) 
+            roundedAssignments[it.first] = std::floor(it.second);
+        else 
+            roundedAssignments[it.first] = std::ceil(it.second);
+        
         sum += roundedAssignments[it.first];
     }
     return roundedAssignments;
@@ -288,7 +296,7 @@ bool CutoffPriorityBalancer::continueRoundingUntilReduction(int lower, int upper
         // or the right-hand limit 1.0
         double remainder = (idx < _remainders.size() ? _remainders[idx] : 1.0);
         // Round your local assignments and calculate utilization sum
-        _rounded_assignments = getRoundedAssignments(_assignments, remainder, localSum);
+        _rounded_assignments = getRoundedAssignments(idx, localSum);
     }
 
     iAllReduce(localSum);
@@ -305,11 +313,27 @@ bool CutoffPriorityBalancer::continueRoundingFromReduction() {
 
     int idx = (_lower_remainder_idx+_upper_remainder_idx)/2;
 
-    // Store result, if it is the best one so far
-    if (_best_remainder_idx == -1 || std::abs(diffToOptimum) < std::abs(_best_utilization_diff)) {
+    // Store result, if it is the best one so far:
+    // either the first result, or
+    // the first not-oversubscribing result, or
+    // another oversubscribing result that is better than previous result, or
+    // a not-oversubscribing result with lower absolute diff than previous non-oversubscribing result
+    if (_best_remainder_idx == -1
+            || (diffToOptimum > -1 && _best_utilization_diff <= -1)
+            || (diffToOptimum <= -1 && _best_utilization_diff <= -1 && diffToOptimum > _best_utilization_diff)
+            || (diffToOptimum > -1 && std::abs(diffToOptimum) < std::abs(_best_utilization_diff))
+        ) {
         _best_utilization_diff = diffToOptimum;
         _best_remainder_idx = idx;
         _best_utilization = utilization;
+    }
+
+    // Log iteration
+    if (!_remainders.isEmpty() && idx <= _remainders.size()) {
+        double remainder = (idx < _remainders.size() ? _remainders[idx] : 1.0);
+        Console::log(Console::VVERB, "ROUNDING it=%i [%i,%i]=>%i rmd=%.3f util=%.2f err=%.2f", 
+                        _rounding_iterations, _lower_remainder_idx, _upper_remainder_idx, idx,
+                        remainder, utilization, diffToOptimum);
     }
 
     // Termination?
@@ -318,36 +342,19 @@ bool CutoffPriorityBalancer::continueRoundingFromReduction() {
         if (!_remainders.isEmpty() && _best_remainder_idx <= _remainders.size()) {
             // Remainders are known to this node: apply and report
             int sum = 0;
-            double remainder = (_best_remainder_idx < _remainders.size() ? _remainders[_best_remainder_idx] : 1.0);
-            _rounded_assignments = getRoundedAssignments(_assignments, remainder, sum);
+            _rounded_assignments = getRoundedAssignments(_best_remainder_idx, sum);
             for (auto it : _rounded_assignments) {
                 _assignments[it.first] = it.second;
             }
+            double remainder = (_best_remainder_idx < _remainders.size() ? _remainders[_best_remainder_idx] : 1.0);
             Console::log(Console::VVERB, 
                         "ROUNDING DONE its=%i rmd=%.3f util=%.2f err=%.2f", 
                         _rounding_iterations, remainder, _best_utilization, _best_utilization_diff);
-        } else {
-            // Remainders are unknown to this node (not needed)
-            Console::log(Console::VVVVERB, 
-                        "ROUNDING DONE its=%i err=%.2f", 
-                        _rounding_iterations, _best_utilization_diff);
         }
         // reset to original state
         _best_remainder_idx = -1;
         _rounding_iterations = 0; 
         return true; // Balancing completely done
-
-    } else {
-        // Log iteration
-        if (!_remainders.isEmpty() && idx <= _remainders.size()) {
-            double remainder = (_best_remainder_idx < _remainders.size() ? _remainders[_best_remainder_idx] : 1.0);
-            Console::log(Console::VVERB, "ROUNDING it=%i rmd=%.3f util=%.2f err=%.2f", 
-                            _rounding_iterations, remainder, utilization, diffToOptimum);
-        } else {
-            Console::log(Console::VVVVERB, "ROUNDING it=%i rmd=? util=%.2f err=%.2f", 
-                            _rounding_iterations, utilization, diffToOptimum);
-        }
-        _last_utilization = utilization;
     }
 
     if (_lower_remainder_idx < _upper_remainder_idx) {
@@ -361,6 +368,7 @@ bool CutoffPriorityBalancer::continueRoundingFromReduction() {
         }
     }
     
+    _last_utilization = utilization;
     return continueRoundingUntilReduction(_lower_remainder_idx, _upper_remainder_idx);
 }
 

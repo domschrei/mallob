@@ -173,7 +173,7 @@ public:
     bool continueRoundingFromReduction();
     bool finishRounding();
 
-    std::map<int, int> getRoundedAssignments(std::map<int, float>& assignments, double remainder, int& sum);
+    std::map<int, int> getRoundedAssignments(int remainderIdx, int& sum);
 
 private:
     std::set<int, PriorityComparator>* _local_jobs;

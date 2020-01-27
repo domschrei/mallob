@@ -19,13 +19,7 @@ public:
         return _dist(_rng);
     }
     static int roundProbabilistically(float x) {
-        float random = rand();
-        float remainder = x - (int) x;
-        if (random < remainder) {
-            return std::ceil(x);
-        } else {
-            return std::floor(x);
-        }
+        return rand() < x-(int)x ? std::ceil(x) : std::floor(x);
     }
     static int choice(std::vector<int> vec) {
         return vec[ (int) (vec.size()*rand()) ];
