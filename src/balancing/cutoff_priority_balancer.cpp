@@ -67,25 +67,10 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
 }
 
 bool CutoffPriorityBalancer::canContinueBalancing() {
-    if (_stage == INITIAL_DEMAND) {
+    if (_stage == INITIAL_DEMAND || _stage == GLOBAL_ROUNDING) {
         // Check if reduction is done
-        int flag = 0;
         MPI_Status status;
-        MPI_Test(&_reduce_request, &flag, &status);
-        return flag;
-    }
-    if (_stage == REDUCE_RESOURCES || _stage == BROADCAST_RESOURCES) {
-        return false; // balancing is advanced by an individual message
-    }
-    if (_stage == REDUCE_REMAINDERS || _stage == BROADCAST_REMAINDERS) {
-        return false; // balancing is advanced by an individual message
-    }
-    if (_stage == GLOBAL_ROUNDING) {
-        // Check if reduction is done
-        int flag = 0;
-        MPI_Status status;
-        MPI_Test(&_reduce_request, &flag, &status);
-        return flag;
+        return MyMpi::test(_reduce_request, status);
     }
     return false;
 }

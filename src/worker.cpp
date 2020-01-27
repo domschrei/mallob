@@ -23,7 +23,12 @@ void mpiMonitor(Worker* worker) {
             Console::log(Console::VERB, "MONITOR_MPI Not inside MPI call.");
         } else {
             double elapsed = Timer::elapsedSeconds() - callStart;
-            Console::log(Console::VERB, "MONITOR_MPI Inside MPI call \"%s\" since %.4fs", opName.c_str(), elapsed);
+            Console::log(Console::VERB, "MONITOR_MPI Inside MPI call \"%s\" for %.4fs", opName.c_str(), elapsed);
+            if (elapsed > 60.0) {
+                // Inside some MPI call for a minute
+                Console::fail("MPI call takes too long -- aborting.");
+                exit(1);
+            }
         }
         usleep(1000 * 1000); // 1s
     }
@@ -136,8 +141,8 @@ void Worker::mainProgram() {
         }
 
         // Identify global stagnation of a rebalancing: Force abort
-        if (epochCounter.getSecondsSinceLastSync() > params.getFloatParam("p") + 20.0) {
-            // No rebalancing since t+20 seconds: Something is going wrong
+        if (epochCounter.getSecondsSinceLastSync() > params.getFloatParam("p") + 300.0) {
+            // No rebalancing since t+300 seconds: Something is going wrong
             Console::log(Console::CRIT, "DESYNCHRONIZATION DETECTED -- Aborting.");
             Console::forceFlush();
             if (worldRank == 0) {

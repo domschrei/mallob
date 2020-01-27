@@ -324,6 +324,15 @@ MPI_Request MyMpi::ireduce(MPI_Comm communicator, float* contribution, float* re
     return req;
 }
 
+bool MyMpi::test(MPI_Request& request, MPI_Status& status) {
+    int flag = 0;
+    initcall("test");
+    int err = MPI_Test(&request, &flag, &status);
+    chkerr(err);
+    endcall();
+    return flag;
+}
+
 MessageHandlePtr MyMpi::poll(const ListenerMode& mode) {
 
     MessageHandlePtr bestPrioHandle = NULL;

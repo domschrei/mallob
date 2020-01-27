@@ -225,6 +225,7 @@ public:
     static MPI_Request    ireduce(MPI_Comm communicator, float* contribution, float* result, int rootRank);
     static MPI_Request iallreduce(MPI_Comm communicator, float* contribution, float* result);
     static MPI_Request iallreduce(MPI_Comm communicator, float* contribution, float* result, int numFloats);
+    static bool test(MPI_Request& request, MPI_Status& status);
 
     static MessageHandlePtr poll(const ListenerMode& mode);
     static inline bool hasActiveHandles() {
