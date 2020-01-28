@@ -1,8 +1,10 @@
 
+#include <sched.h>
+
 #include "memusage.h"
 
 // https://stackoverflow.com/a/671389
-void process_mem_usage(double& vm_usage, double& resident_set)
+void process_mem_usage(int& cpu, double& vm_usage, double& resident_set)
 {
    using std::ios_base;
    using std::ifstream;
@@ -37,4 +39,6 @@ void process_mem_usage(double& vm_usage, double& resident_set)
    long page_size_kb = sysconf(_SC_PAGE_SIZE) / 1024; // in case x86-64 is configured to use 2MB pages
    vm_usage     = vsize / 1024.0;
    resident_set = rss * page_size_kb;
+
+   cpu = sched_getcpu();
 }

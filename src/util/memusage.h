@@ -15,6 +15,6 @@
 // size and resident set size, and return the results in KB.
 //
 // On failure, returns 0.0, 0.0
-void process_mem_usage(double& vm_usage, double& resident_set);
+void process_mem_usage(int& cpu, double& vm_usage, double& resident_set);
 
 #endif
