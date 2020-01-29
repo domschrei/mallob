@@ -203,6 +203,8 @@ public:
     This method has a valid default implementation, so it must not be re-implemented.
     */
     virtual int getDemand(int prevVolume) const;
+    
+    virtual float getTemperature() const;
     /*
     Signal if this job instance would like to initiate a new job communication phase.
     This method has a valid default implementation, so it must not be re-implemented.

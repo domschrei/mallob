@@ -13,6 +13,7 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
     _assignments.clear();
     _priorities.clear();
     _demands.clear();
+    _temperatures.clear();
     _resources_info = ResourcesInfo();
     _stage = INITIAL_DEMAND;
     _balancing = true;
@@ -56,7 +57,8 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
         int jobId = it;
         _demands[jobId] = getDemand(*_jobs_being_balanced[jobId]);
         _priorities[jobId] = _jobs_being_balanced[jobId]->getDescription().getPriority();
-        aggregatedDemand += (_demands[jobId]-1) * _priorities[jobId];
+        _temperatures[jobId] = _jobs_being_balanced[jobId]->getTemperature();
+        aggregatedDemand += (_demands[jobId]-1) * _priorities[jobId] * _temperatures[jobId];
         
         Console::log(Console::VERB, "Job #%i : demand %i", jobId, _demands[jobId]);
     }
@@ -104,7 +106,7 @@ bool CutoffPriorityBalancer::continueBalancing() {
         // Calculate local initial assignments
         for (auto it : *_local_jobs) {
             int jobId = it;
-            float initialMetRatio = _total_avail_volume * _priorities[jobId] / aggregatedDemand;
+            float initialMetRatio = _total_avail_volume * _priorities[jobId] * _temperatures[jobId] / aggregatedDemand;
             // job demand minus "atomic" demand that is met by default
             int remainingDemand = _demands[jobId] - 1;
             // assignment: atomic node plus fair share of reduced aggregation

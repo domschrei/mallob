@@ -68,6 +68,7 @@ protected:
     std::map<int, int> _volumes;
     std::map<int, float> _priorities;
     std::map<int, int> _demands;
+    std::map<int, float> _temperatures;
 
     float _reduce_contrib;
     MPI_Request _reduce_request;

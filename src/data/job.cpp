@@ -291,6 +291,12 @@ int Job::getDemand(int prevVolume) const {
     }
 }
 
+float Job::getTemperature() const {
+    int age = (int) (Timer::elapsedSeconds()-_time_of_initialization);
+    // Initially 1.0, cools down exponentially towards 0.95
+    return 0.95f + 0.05f * std::pow(0.99f, age);
+}
+
 const JobResult& Job::getResult() const {
     assert(_result.id >= 0); 
     return _result;
