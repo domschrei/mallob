@@ -19,10 +19,13 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
 
     // Identify jobs to balance
     bool isWorkerBusy = false;
+    int numActiveJobs = 0;
     _jobs_being_balanced = std::map<int, Job*>();
     assert(_local_jobs == NULL || Console::fail("Found localJobs instance of size %i", _local_jobs->size()));
     _local_jobs = new std::set<int, PriorityComparator>(PriorityComparator(jobs));
     for (auto it : jobs) {
+        bool isActiveRoot = it.second->isRoot() && it.second->isNotInState({INITIALIZING_TO_PAST}) 
+                            && (it.second->isInState({ACTIVE, STANDBY}) || it.second->isInitializing());
         // Node must be root node to participate
         bool participates = it.second->isRoot();
         // Job must be active, or must be initializing and already having the description
@@ -30,8 +33,16 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
                         || (it.second->isInState({JobState::INITIALIZING_TO_ACTIVE}) 
                             && it.second->hasJobDescription());
         if (participates) {
+            // Job participates
             _jobs_being_balanced[it.first] = it.second;
             _local_jobs->insert(it.first);
+            numActiveJobs++;
+        } else if (isActiveRoot) {
+            // Root process cannot participate at balancing yet
+            // => automatically assign an implicit demand of one, but
+            // do not let the job be an actual participant of the procedure
+            Console::log(Console::VERB, "Job #%i : demand 1, final assignment 1 (implicit)", it.first);
+            numActiveJobs++;
         }
         // Set "busy" flag of this worker node to true, if applicable
         if (it.second->isInState({JobState::ACTIVE, JobState::INITIALIZING_TO_ACTIVE})) {
@@ -41,10 +52,8 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
 
     // Find global aggregation of demands and amount of busy nodes
     float aggregatedDemand = 0;
-    int numJobs = 0;
     for (auto it : *_local_jobs) {
         int jobId = it;
-        numJobs++;
         _demands[jobId] = getDemand(*_jobs_being_balanced[jobId]);
         _priorities[jobId] = _jobs_being_balanced[jobId]->getDescription().getPriority();
         aggregatedDemand += (_demands[jobId]-1) * _priorities[jobId];
@@ -55,7 +64,7 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
     Console::log(Console::VERB, "Local aggregated demand: %.3f", aggregatedDemand);
     _demand_and_busy_nodes_contrib[0] = aggregatedDemand;
     _demand_and_busy_nodes_contrib[1] = (isWorkerBusy ? 1 : 0);
-    _demand_and_busy_nodes_contrib[2] = numJobs;
+    _demand_and_busy_nodes_contrib[2] = numActiveJobs;
     _demand_and_busy_nodes_result[0] = 0;
     _demand_and_busy_nodes_result[1] = 0;
     _demand_and_busy_nodes_result[2] = 0;
@@ -88,20 +97,26 @@ bool CutoffPriorityBalancer::continueBalancing() {
             "Aggregation of demands: %.3f", aggregatedDemand);
         Console::log(rankZero ? Console::VVERB : Console::VVVVERB, 
             "%i jobs being balanced", numJobs);
+        
+        // The total available volume where the "atomic" demand of each job is already subtracted
+        _total_avail_volume = MyMpi::size(_comm) * _load_factor - numJobs;
 
         // Calculate local initial assignments
-        _total_volume = MyMpi::size(_comm) * _load_factor - numJobs;
         for (auto it : *_local_jobs) {
             int jobId = it;
-            float initialMetRatio = _total_volume * _priorities[jobId] / aggregatedDemand;
-            _assignments[jobId] = 1 + std::min(1.0f, initialMetRatio) * (_demands[jobId]-1);
+            float initialMetRatio = _total_avail_volume * _priorities[jobId] / aggregatedDemand;
+            // job demand minus "atomic" demand that is met by default
+            int remainingDemand = _demands[jobId] - 1;
+            // assignment: atomic node plus fair share of reduced aggregation
+            _assignments[jobId] = 1 + std::min(1.0f, initialMetRatio) * remainingDemand;
             Console::log(Console::VVERB, "Job #%i : initial assignment %.3f", jobId, _assignments[jobId]);
         }
 
         // Create ResourceInfo instance with local data
         for (auto it : *_local_jobs) {
             int jobId = it;
-            _resources_info.assignedResources += _assignments[jobId];
+            _resources_info.assignedResources += _assignments[jobId]-1;
+            // Note: jobs are sorted descendingly by priority!
             _resources_info.priorities.push_back(_priorities[jobId]);
             _resources_info.demandedResources.push_back( _demands[jobId] - _assignments[jobId] );
         }
@@ -186,8 +201,10 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
     Console::log(!rank ? Console::VVERB : Console::VVVVERB, "Initially assigned resources: %.3f", 
         _resources_info.assignedResources);
     
-    float remainingResources = _total_volume - _resources_info.assignedResources;
-    if (remainingResources < 0.1) remainingResources = 0;
+    // Atomic job assignments are already subtracted from _total_avail_volume
+    // and are not part of the all-reduced assignedResources either
+    float remainingResources = _total_avail_volume - _resources_info.assignedResources;
+    if (remainingResources < 0.1) remainingResources = 0; // too low a remainder to make a difference
 
     Console::log(!rank ? Console::VVERB : Console::VVVVERB, "Remaining resources: %.3f", remainingResources);
 

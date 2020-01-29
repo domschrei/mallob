@@ -187,7 +187,7 @@ private:
     int _lower_remainder_idx;
     int _upper_remainder_idx;
 
-    float _total_volume;
+    float _total_avail_volume;
     std::map<int, float> _assignments;
     std::map<int, int> _rounded_assignments;
 
