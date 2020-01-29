@@ -111,6 +111,9 @@ void Worker::mainProgram() {
 
     int iteration = 0;
     float lastMemLogTime = Timer::elapsedSeconds();
+    float lastJobCheckTime = Timer::elapsedSeconds();
+    float sleepMicrosecs = 0;
+
     while (!checkTerminate()) {
 
         if (Timer::elapsedSeconds() - lastMemLogTime > 1.0) {
@@ -144,18 +147,8 @@ void Worker::mainProgram() {
         if (epochCounter.getSecondsSinceLastSync() > params.getFloatParam("p") + 300.0) {
             // No rebalancing since t+300 seconds: Something is going wrong
             Console::log(Console::CRIT, "DESYNCHRONIZATION DETECTED -- Aborting.");
-            Console::forceFlush();
-            if (worldRank == 0) {
-                for (int clientRank : clientNodes) {
-                    Console::log_send(Console::INFO, clientRank, "Terminating client ...");
-                    MyMpi::isend(MPI_COMM_WORLD, clientRank, MSG_EXIT, IntVec({0}));
-                }
-            }
-            Console::forceFlush();
             exit(1);
         }
-
-        MyMpi::testSentHandles();
 
         // Job communication (e.g. clause sharing)
         if (currentJob != NULL && currentJob->wantsToCommunicate()) {
@@ -163,19 +156,17 @@ void Worker::mainProgram() {
             currentJob->communicate();
         }
 
-        MyMpi::testSentHandles();
-
         // Solve loop for active HordeLib instance
         float jobTime = 0;
-        if (currentJob != NULL) {
+        if (currentJob != NULL && Timer::elapsedSeconds()-lastJobCheckTime >= 0.01) {
             jobTime = Timer::elapsedSeconds();
-            Job &job = *currentJob;
+            lastJobCheckTime = jobTime;
 
+            Job &job = *currentJob;
             bool initializing = job.isInitializing();
             int result = job.appl_solveLoop();
 
             if (result >= 0) {
-
                 // Solver done!
                 int jobRootRank = job.getRootNodeRank();
                 IntVec payload({job.getId(), job.getRevision(), result});
@@ -195,14 +186,12 @@ void Worker::mainProgram() {
             jobTime = Timer::elapsedSeconds() - jobTime;
         }
 
-        // Sleep for a bit
-        //usleep(10); // 1000 = 1 millisecond
-
         // Poll a message, if present
         MessageHandlePtr handle;
         float pollTime = Timer::elapsedSeconds();
         if ((handle = MyMpi::poll(ListenerMode::WORKER)) != NULL) {
             pollTime = Timer::elapsedSeconds() - pollTime;
+
             Console::log(Console::VVVERB, "loop cycle %i", iteration);
             if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f s", jobTime);
             Console::log(Console::VVVERB, "poll time: %.6f s", pollTime);
@@ -210,8 +199,6 @@ void Worker::mainProgram() {
             // Process message
             Console::log_recv(Console::VVVERB, handle->source, "process msg id=%i, tag %i", handle->id, handle->tag);
             float time = Timer::elapsedSeconds();
-
-            //stats.increment("receivedMessages");
 
             if (handle->tag == MSG_FIND_NODE) {
                 handleFindNode(handle);
@@ -281,21 +268,25 @@ void Worker::mainProgram() {
                 bool done = balancer->continueBalancing(handle);
                 if (done) finishBalancing();
 
-            } else if (handle->tag == MSG_WARMUP) {
+            } else if (handle->tag == MSG_WARMUP) 
                 Console::log_recv(Console::VVVERB, handle->source, "Warmup msg");
-
-            } else {
+            else
                 Console::log_recv(Console::WARN, handle->source, "Unknown message tag %i", handle->tag);
-            }
-
-            MyMpi::testSentHandles();
 
             time = Timer::elapsedSeconds() - time;
             Console::log(Console::VVVERB, "processing msg, tag %i took %.4f s", handle->tag, time);
+            sleepMicrosecs = 0;
+
+        } else {
+           // No message: increase sleep duration
+           sleepMicrosecs += 100;
         }
         
+        MyMpi::testSentHandles();
+
         iteration++;
-        usleep(10); // in microsecs
+        if ((int)sleepMicrosecs > 0)
+            usleep(std::min(10*1000, (int)sleepMicrosecs)); // in microsecs
     }
 
     Console::flush();

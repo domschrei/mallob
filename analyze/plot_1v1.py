@@ -5,11 +5,11 @@ import math
 import sys
 
 lim = 3600
-out = 3600
+out = 4000
 border_lo = 0.001
 border_hi = 5000
 
-msize = 10
+msize = 6
 pltsize = 5
 
 files = []
@@ -25,8 +25,8 @@ for arg in sys.argv[1:]:
         heading = arg[2:]
     elif arg.startswith("-T"):
         lim = int(arg[2:])
-        out = lim
-        border_hi = lim * 1.6
+        out = lim * 1.35
+        border_hi = lim * 1.8
         min_val = lim
     else:
         files += [arg]
@@ -78,6 +78,9 @@ plt.plot([border_lo, lim], [lim, lim], 'blue', alpha=0.3, label=str(timeouts_y) 
 plt.plot([lim, lim], [border_lo, lim], 'red', alpha=0.3, label=str(timeouts_x) + " timeouts of BOTTOM")
 plt.plot(X, Y, 'x', color="black", markersize=msize)
 
+plt.fill_between([border_lo, lim], [lim, lim], [border_hi, border_hi], alpha=0.2, color='blue')
+plt.fill_between([lim, border_hi], [border_lo, border_lo], [lim, lim], alpha=0.2, color='red')
+
 if heading:
     plt.title(heading)
 plt.xlabel(labels[0] + ' / s')
@@ -86,6 +89,7 @@ plt.ylim(min_val, border_hi)
 plt.xlim(min_val, border_hi)
 plt.xscale("log")
 plt.yscale("log")
+plt.grid(color='#dddddd', linestyle='-', linewidth=1)
 plt.legend()
 plt.tight_layout()
 #plt.savefig(iA + '_' + iB + '.pdf')

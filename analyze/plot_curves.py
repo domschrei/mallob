@@ -67,37 +67,55 @@ for arg in sys.argv[1:]:
     else:
         files += [arg]
 
-for arg in files:
+
+def process_line(line, X, Y, lc):
+    
+    words = line.rstrip().split(" ")
+        
+    if not Y:
+        if explicit_xvals:
+            for i in range(1, len(words)):
+                Y += [[]]
+        else:
+            for i in range(len(words)):
+                Y += [[]]
+    
+    # X value
+    if explicit_xvals:
+        X += [float(words[0])]
+        words = words[1:]
+    else:
+        X += [lc]
+        
+    # Y values
+    for i in range(len(words)):
+        Y[i] += [float(words[i])]
+
+
+if not files:
+    # Read from stdin
     X = []
     Y = []
     lc = 0
-    for line in open(arg, 'r').readlines():
-        words = line.rstrip().split(" ")
-        
-        if not Y:
-            if explicit_xvals:
-                for i in range(1, len(words)):
-                    Y += [[]]
-            else:
-                for i in range(len(words)):
-                    Y += [[]]
-        
-        # X value
-        if explicit_xvals:
-            X += [float(words[0])]
-            words = words[1:]
-        else:
-            X += [lc]
-            
-        # Y values
-        for i in range(len(words)):
-            Y[i] += [float(words[i])]
-        
+    for line in sys.stdin:
+        process_line(line, X, Y, lc)
         lc += 1
-        
-    print(arg,":",str(len(X)),"vals")
+    print("stdin:",str(len(X)),"vals")
     for vals in Y:
         data += [[X, vals]]
+    
+else:
+    for arg in files:
+        X = []
+        Y = []
+        lc = 0
+        for line in open(arg, 'r').readlines():
+            process_line(line, X, Y, lc)
+            lc += 1
+            
+        print(arg,":",str(len(X)),"vals")
+        for vals in Y:
+            data += [[X, vals]]
 
 plt.figure(figsize=(pltsize,pltsize))
 i = 0
