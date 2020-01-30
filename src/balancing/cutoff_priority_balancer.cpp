@@ -17,6 +17,7 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
     _resources_info = ResourcesInfo();
     _stage = INITIAL_DEMAND;
     _balancing = true;
+    _balancing_epoch++;
 
     // Identify jobs to balance
     bool isWorkerBusy = false;
@@ -42,7 +43,7 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
             // Root process cannot participate at balancing yet
             // => automatically assign an implicit demand of one, but
             // do not let the job be an actual participant of the procedure
-            Console::log(Console::VERB, "Job #%i : demand 1, final assignment 1 (implicit)", it.first);
+            Console::log(Console::VERB, "BLC e=%i #%i : demand 1, final assignment 1 (implicit)", _balancing_epoch, it.first);
             numActiveJobs++;
         }
         // Set "busy" flag of this worker node to true, if applicable
@@ -60,10 +61,10 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
         _temperatures[jobId] = _jobs_being_balanced[jobId]->getTemperature();
         aggregatedDemand += (_demands[jobId]-1) * _priorities[jobId] * _temperatures[jobId];
         
-        Console::log(Console::VERB, "Job #%i : demand %i", jobId, _demands[jobId]);
+        Console::log(Console::VERB, "BLC e=%i #%i demand=%i", _balancing_epoch, jobId, _demands[jobId]);
     }
 
-    Console::log(Console::VERB, "Local aggregated demand: %.3f", aggregatedDemand);
+    Console::log(Console::VERB, "BLC e=%i local_aggregation=%.3f", _balancing_epoch, aggregatedDemand);
     _demand_and_busy_nodes_contrib[0] = aggregatedDemand;
     _demand_and_busy_nodes_contrib[1] = (isWorkerBusy ? 1 : 0);
     _demand_and_busy_nodes_contrib[2] = numActiveJobs;
@@ -93,12 +94,12 @@ bool CutoffPriorityBalancer::continueBalancing() {
         int numJobs = _demand_and_busy_nodes_result[2];
         bool rankZero = MyMpi::rank(MPI_COMM_WORLD) == 0;
         Console::log(rankZero ? Console::VVERB : Console::VVVVERB, 
-            "%i/%i nodes (%.2f%%) are busy", (int)busyNodes, MyMpi::size(_comm), 
+            "BLC e=%i %i/%i nodes (%.2f%%) are busy", _balancing_epoch, (int)busyNodes, MyMpi::size(_comm), 
             ((float)100*busyNodes)/MyMpi::size(_comm));
         Console::log(rankZero ? Console::VVERB : Console::VVVVERB, 
-            "Aggregation of demands: %.3f", aggregatedDemand);
+            "BLC e=%i global_aggregation=%.3f", _balancing_epoch, aggregatedDemand);
         Console::log(rankZero ? Console::VVERB : Console::VVVVERB, 
-            "%i jobs being balanced", numJobs);
+            "BLC e=%i jobs_being_balanced=%i", _balancing_epoch, numJobs);
         
         // The total available volume where the "atomic" demand of each job is already subtracted
         _total_avail_volume = MyMpi::size(_comm) * _load_factor - numJobs;
@@ -111,7 +112,7 @@ bool CutoffPriorityBalancer::continueBalancing() {
             int remainingDemand = _demands[jobId] - 1;
             // assignment: atomic node plus fair share of reduced aggregation
             _assignments[jobId] = 1 + std::min(1.0, initialMetRatio) * remainingDemand;
-            Console::log(Console::VVERB, "Job #%i : initial assignment %.3f", jobId, _assignments[jobId]);
+            Console::log(Console::VVERB, "BLC e=%i #%i init_assignment=%.3f", _balancing_epoch, jobId, _assignments[jobId]);
         }
 
         // Create ResourceInfo instance with local data
@@ -200,15 +201,15 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
 
     // Assign correct (final) floating-point resources
     int rank = MyMpi::rank(MPI_COMM_WORLD);
-    Console::log(!rank ? Console::VVERB : Console::VVVVERB, "Initially assigned resources: %.3f", 
-        _resources_info.assignedResources);
+    Console::log(!rank ? Console::VVERB : Console::VVVVERB, "BLC e=%i init_assigned_resources=%.3f", 
+        _balancing_epoch, _resources_info.assignedResources);
     
     // Atomic job assignments are already subtracted from _total_avail_volume
     // and are not part of the all-reduced assignedResources either
     float remainingResources = _total_avail_volume - _resources_info.assignedResources;
     if (remainingResources < 0.1) remainingResources = 0; // too low a remainder to make a difference
 
-    Console::log(!rank ? Console::VVERB : Console::VVVVERB, "Remaining resources: %.3f", remainingResources);
+    Console::log(!rank ? Console::VVERB : Console::VVVVERB, "BLC e=%i remaining_resources=%.3f", _balancing_epoch, remainingResources);
 
     for (auto it : _jobs_being_balanced) {
         int jobId = it.first;
@@ -240,7 +241,7 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
             }
         }
         
-        Console::log(Console::VVERB, "Job #%i : adjusted assignment %.3f", jobId, _assignments[jobId]);
+        Console::log(Console::VVERB, "BLC e=%i #%i adj_assignment=%.3f", _balancing_epoch, jobId, _assignments[jobId]);
     }
 
     if (_params.getParam("r") == ROUNDING_BISECTION)  {
@@ -263,7 +264,7 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
 bool CutoffPriorityBalancer::finishRemaindersReduction() {
     if (!_remainders.isEmpty()) {
         Console::getLock();
-        Console::appendUnsafe(Console::VVVERB, "ROUNDING remainders: ");
+        Console::appendUnsafe(Console::VVVERB, "BLC e=%i ROUNDING remainders: ", _balancing_epoch);
         for (int i = 0; i < _remainders.size(); i++) Console::appendUnsafe(Console::VVVERB, "%.3f ", _remainders[i]);
         Console::logUnsafe(Console::VVVERB, "");
         Console::releaseLock();
@@ -339,8 +340,8 @@ bool CutoffPriorityBalancer::continueRoundingFromReduction() {
     // Log iteration
     if (!_remainders.isEmpty() && idx <= _remainders.size()) {
         double remainder = (idx < _remainders.size() ? _remainders[idx] : 1.0);
-        Console::log(Console::VVERB, "ROUNDING it=%i [%i,%i]=>%i rmd=%.3f util=%.2f err=%.2f", 
-                        _rounding_iterations, _lower_remainder_idx, _upper_remainder_idx, idx,
+        Console::log(Console::VVERB, "BLC e=%i ROUNDING it=%i [%i,%i]=>%i rmd=%.3f util=%.2f err=%.2f", 
+                        _balancing_epoch, _rounding_iterations, _lower_remainder_idx, _upper_remainder_idx, idx,
                         remainder, utilization, diffToOptimum);
     }
 
@@ -356,8 +357,8 @@ bool CutoffPriorityBalancer::continueRoundingFromReduction() {
             }
             double remainder = (_best_remainder_idx < _remainders.size() ? _remainders[_best_remainder_idx] : 1.0);
             Console::log(Console::VVERB, 
-                        "ROUNDING DONE its=%i rmd=%.3f util=%.2f err=%.2f", 
-                        _rounding_iterations, remainder, _best_utilization, _best_utilization_diff);
+                        "BLC e=%i ROUNDING_DONE its=%i rmd=%.3f util=%.2f err=%.2f", 
+                        _balancing_epoch, _rounding_iterations, remainder, _best_utilization, _best_utilization_diff);
         }
         // reset to original state
         _best_remainder_idx = -1;
@@ -390,9 +391,9 @@ std::map<int, int> CutoffPriorityBalancer::getBalancingResult() {
         int intAssignment = Random::roundProbabilistically(assignment);
         volumes[jobId] = intAssignment;
         if (intAssignment != (int)assignment) {
-            Console::log(Console::VVERB, " #%i : final assignment %.3f ~> %i", jobId, _assignments[jobId], intAssignment);
+            Console::log(Console::VVERB, "BLC e=%i #%i final_assignment=%i <~ %.3f", _balancing_epoch, jobId, intAssignment, _assignments[jobId]);
         } else {
-            Console::log(Console::VVERB, " #%i : final assignment %i", jobId, intAssignment);
+            Console::log(Console::VVERB, "BLC e=%i #%i final_assignment=%i", _balancing_epoch, jobId, intAssignment);
         }
     }
     for (auto it = volumes.begin(); it != volumes.end(); ++it) {

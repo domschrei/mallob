@@ -63,6 +63,7 @@ protected:
     Statistics& _stats;
     float _load_factor;
     bool _balancing;
+    int _balancing_epoch = 0;
 
     std::map<int, Job*> _jobs_being_balanced;
     std::map<int, int> _volumes;
