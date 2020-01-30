@@ -2,6 +2,7 @@
 #include <map>
 #include <thread>
 #include <cmath>
+#include <limits>
 
 #include "assert.h"
 #include "data/job.h"
@@ -291,10 +292,30 @@ int Job::getDemand(int prevVolume) const {
     }
 }
 
-float Job::getTemperature() const {
+double Job::getTemperature() const {
+
+    double baseTemp = 0.95;
+    double decay = 0.99; // higher means slower convergence
+
     int age = (int) (Timer::elapsedSeconds()-_time_of_initialization);
-    // Initially 1.0, cools down exponentially towards 0.95
-    return 0.95f + 0.05f * std::pow(0.99f, age);
+    double eps = 2*std::numeric_limits<double>::epsilon();
+
+    // Start with temperature 1.0, exponentially converge towards baseTemp 
+    double temp = baseTemp + (1-baseTemp) * std::pow(decay, age+1);
+    
+    // Check if machine precision range is reached, if not reached yet
+    if (_age_of_const_cooldown < 0 && _last_temperature - temp <= eps) {
+        _age_of_const_cooldown = age;
+    }
+    // Was limit already reached?
+    if (_age_of_const_cooldown >= 0) {
+        // indefinitely cool down job by machine precision epsilon
+        return baseTemp + (1-baseTemp) * std::pow(decay, _age_of_const_cooldown+1) - (age-_age_of_const_cooldown+1)*eps;
+    } else {
+        // Use normal calculated temperature
+        _last_temperature = temp;
+        return temp;
+    }
 }
 
 const JobResult& Job::getResult() const {

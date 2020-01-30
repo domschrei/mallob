@@ -106,11 +106,11 @@ bool CutoffPriorityBalancer::continueBalancing() {
         // Calculate local initial assignments
         for (auto it : *_local_jobs) {
             int jobId = it;
-            float initialMetRatio = _total_avail_volume * _priorities[jobId] * _temperatures[jobId] / aggregatedDemand;
+            double initialMetRatio = _total_avail_volume * _priorities[jobId] * _temperatures[jobId] / aggregatedDemand;
             // job demand minus "atomic" demand that is met by default
             int remainingDemand = _demands[jobId] - 1;
             // assignment: atomic node plus fair share of reduced aggregation
-            _assignments[jobId] = 1 + std::min(1.0f, initialMetRatio) * remainingDemand;
+            _assignments[jobId] = 1 + std::min(1.0, initialMetRatio) * remainingDemand;
             Console::log(Console::VVERB, "Job #%i : initial assignment %.3f", jobId, _assignments[jobId]);
         }
 
@@ -192,7 +192,7 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
         _balancing = false;
         delete _local_jobs;
         _local_jobs = NULL;
-        _assignments = std::map<int, float>();
+        _assignments = std::map<int, double>();
         return true;
     } else {
         Console::log(Console::VVERB, "Ended all-reduction. Calculating final job demands");
@@ -214,7 +214,7 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
         int jobId = it.first;
         if (_demands[jobId] == 1) continue;
 
-        float demand = _demands[jobId];
+        int demand = _demands[jobId];
         float priority = _priorities[jobId];
         std::vector<float>& priorities = _resources_info.priorities;
         std::vector<float>& demandedResources = _resources_info.demandedResources;
@@ -222,7 +222,7 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
         assert(itPrio != priorities.end() || Console::fail("Priority %.3f not found in histogram!", priority));
         int prioIndex = std::distance(priorities.begin(), itPrio);
 
-        if (_assignments[jobId] == demand
+        if (_assignments[jobId] >= demand
             || priorities[prioIndex] <= remainingResources) {
             // Case 1: Assign full demand
             _assignments[jobId] = demand;
@@ -232,7 +232,7 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
             } else {
                 // Case 3: Evenly distribute ratio of remaining resources
                 assert(remainingResources >= 0);
-                float ratio = (remainingResources - demandedResources[prioIndex-1])
+                double ratio = (remainingResources - demandedResources[prioIndex-1])
                             / (demandedResources[prioIndex] - demandedResources[prioIndex-1]);
                 assert(ratio > 0);
                 assert(ratio <= 1);
@@ -386,7 +386,7 @@ std::map<int, int> CutoffPriorityBalancer::getBalancingResult() {
     std::map<int, int> volumes;
     for (auto it = _assignments.begin(); it != _assignments.end(); ++it) {
         int jobId = it->first;
-        float assignment = std::max(1.0f, it->second);
+        double assignment = std::max(1.0, it->second);
         int intAssignment = Random::roundProbabilistically(assignment);
         volumes[jobId] = intAssignment;
         if (intAssignment != (int)assignment) {

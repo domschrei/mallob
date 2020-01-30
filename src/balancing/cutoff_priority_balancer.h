@@ -188,7 +188,7 @@ private:
     int _upper_remainder_idx;
 
     float _total_avail_volume;
-    std::map<int, float> _assignments;
+    std::map<int, double> _assignments;
     std::map<int, int> _rounded_assignments;
 
     int _rounding_iterations = 0;

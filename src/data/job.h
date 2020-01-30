@@ -109,6 +109,9 @@ private:
     std::unique_ptr<std::thread> _initializer_thread;
     VerboseMutex _job_manipulation_lock;
     
+    mutable double _last_temperature = 1.0;
+    mutable int _age_of_const_cooldown = -1;
+
     AdjustablePermutation _job_node_ranks;
     bool _has_left_child;
     bool _has_right_child;
@@ -204,7 +207,7 @@ public:
     */
     virtual int getDemand(int prevVolume) const;
     
-    virtual float getTemperature() const;
+    virtual double getTemperature() const;
     /*
     Signal if this job instance would like to initiate a new job communication phase.
     This method has a valid default implementation, so it must not be re-implemented.
