@@ -193,7 +193,7 @@ private:
 
     int _rounding_iterations = 0;
     int _best_remainder_idx = -1;
-    float _best_utilization_diff;
+    float _best_penalty;
     float _best_utilization;
     float _last_utilization;
 

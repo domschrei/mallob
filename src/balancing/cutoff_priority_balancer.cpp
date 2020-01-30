@@ -45,6 +45,7 @@ bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
             // do not let the job be an actual participant of the procedure
             Console::log(Console::VERB, "BLC e=%i #%i : demand 1, final assignment 1 (implicit)", _balancing_epoch, it.first);
             numActiveJobs++;
+            _assignments[it.first] = 1;
         }
         // Set "busy" flag of this worker node to true, if applicable
         if (it.second->isInState({JobState::ACTIVE, JobState::INITIALIZING_TO_ACTIVE})) {
@@ -312,27 +313,27 @@ bool CutoffPriorityBalancer::continueRoundingUntilReduction(int lower, int upper
     return false;
 }
 
+float penalty(float utilization, float loadFactor) {
+    float l = loadFactor;
+    float u = utilization;
+
+    float lowPenalty = -1/l * u + 1;
+    float highPenalty = 1/(1-l) * u - l/(1-l);
+    return std::max(lowPenalty, highPenalty);
+}
+
 bool CutoffPriorityBalancer::continueRoundingFromReduction() {
 
     int rank = MyMpi::rank(MPI_COMM_WORLD);
     _rounding_iterations++;
 
     float utilization = _reduce_result;
-    float diffToOptimum = (MyMpi::size(_comm) * _load_factor) - utilization;
-
     int idx = (_lower_remainder_idx+_upper_remainder_idx)/2;
 
-    // Store result, if it is the best one so far:
-    // either the first result, or
-    // the first not-oversubscribing result, or
-    // another oversubscribing result that is better than previous result, or
-    // a not-oversubscribing result with lower absolute diff than previous non-oversubscribing result
-    if (_best_remainder_idx == -1
-            || (diffToOptimum > -1 && _best_utilization_diff <= -1)
-            || (diffToOptimum <= -1 && _best_utilization_diff <= -1 && diffToOptimum > _best_utilization_diff)
-            || (diffToOptimum > -1 && std::abs(diffToOptimum) < std::abs(_best_utilization_diff))
-        ) {
-        _best_utilization_diff = diffToOptimum;
+    // Store result, if it is the best one so far
+    float p = penalty(utilization / MyMpi::size(_comm), _load_factor);
+    if (_best_remainder_idx == -1 || p < _best_penalty) {
+        _best_penalty = p;
         _best_remainder_idx = idx;
         _best_utilization = utilization;
     }
@@ -340,9 +341,9 @@ bool CutoffPriorityBalancer::continueRoundingFromReduction() {
     // Log iteration
     if (!_remainders.isEmpty() && idx <= _remainders.size()) {
         double remainder = (idx < _remainders.size() ? _remainders[idx] : 1.0);
-        Console::log(Console::VVERB, "BLC e=%i ROUNDING it=%i [%i,%i]=>%i rmd=%.3f util=%.2f err=%.2f", 
+        Console::log(Console::VVERB, "BLC e=%i ROUNDING it=%i [%i,%i]=>%i rmd=%.3f util=%.2f pen=%.2f", 
                         _balancing_epoch, _rounding_iterations, _lower_remainder_idx, _upper_remainder_idx, idx,
-                        remainder, utilization, diffToOptimum);
+                        remainder, utilization, p);
     }
 
     // Termination?
@@ -357,8 +358,8 @@ bool CutoffPriorityBalancer::continueRoundingFromReduction() {
             }
             double remainder = (_best_remainder_idx < _remainders.size() ? _remainders[_best_remainder_idx] : 1.0);
             Console::log(Console::VVERB, 
-                        "BLC e=%i ROUNDING_DONE its=%i rmd=%.3f util=%.2f err=%.2f", 
-                        _balancing_epoch, _rounding_iterations, remainder, _best_utilization, _best_utilization_diff);
+                        "BLC e=%i ROUNDING_DONE its=%i rmd=%.3f util=%.2f pen=%.2f", 
+                        _balancing_epoch, _rounding_iterations, remainder, _best_utilization, _best_penalty);
         }
         // reset to original state
         _best_remainder_idx = -1;
