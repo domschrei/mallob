@@ -12,6 +12,9 @@ indices = [0 for x in range(num_competitors)]
 
 runtimes = []
 speedups = [[] for x in range(num_competitors)]
+total_runtimes = [0 for x in range(num_competitors)]
+total_seq_runtimes = [0 for x in range(num_competitors)]
+
 
 job_id = 1
 while True:
@@ -31,6 +34,8 @@ while True:
     for i in range(1, num_competitors):
         if runtime[0] >= 0 and runtime[i] >= 0:
             speedups[i] += [runtime[0] / runtime[i]]
+            total_runtimes[i] += runtime[i]
+            total_seq_runtimes[i] += runtime[0]
     
     job_id += 1
     if job_id > 400:
@@ -43,8 +48,9 @@ for i in range(1, num_competitors):
     speedup.sort()
     mean_speedup = sum(speedup) / len(speedup)
     median_speedup = speedup[int(len(speedup)/2)]
+    total_speedup = float(total_seq_runtimes[i]) / total_runtimes[i]
     
-    print(runtime_files[i] + " : mean speedup=" + str(mean_speedup) + ", median speedup=" + str(median_speedup))
+    print(runtime_files[i] + " : mean speedup=" + str(mean_speedup) + ", median speedup=" + str(median_speedup) + ", total speedup=" + str(total_speedup))
     
     with open(runtime_files[i] + "_speedups", 'w') as f:
         for s in speedup:

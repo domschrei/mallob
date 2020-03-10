@@ -17,6 +17,7 @@ using namespace std;
 
 #define ROUNDING_BISECTION "bisec"
 #define ROUNDING_PROBABILISTIC "prob"
+#define ROUNDING_FLOOR "floor"
 
 class Parameters {
 private:

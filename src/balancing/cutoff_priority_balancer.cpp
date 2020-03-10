@@ -389,7 +389,11 @@ std::map<int, int> CutoffPriorityBalancer::getBalancingResult() {
     for (auto it = _assignments.begin(); it != _assignments.end(); ++it) {
         int jobId = it->first;
         double assignment = std::max(1.0, it->second);
-        int intAssignment = Random::roundProbabilistically(assignment);
+        int intAssignment;
+        if (_params.getParam("r") == ROUNDING_PROBABILISTIC)
+            intAssignment = Random::roundProbabilistically(assignment);
+        else
+            intAssignment = std::floor(assignment);
         volumes[jobId] = intAssignment;
         if (intAssignment != (int)assignment) {
             Console::log(Console::VVERB, "BLC e=%i #%i final_assignment=%i <~ %.3f", _balancing_epoch, jobId, intAssignment, _assignments[jobId]);
