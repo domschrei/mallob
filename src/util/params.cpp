@@ -80,6 +80,7 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "                      \"bisec\" (default) - iterative bisection to find optimal cutoff point");
     Console::log(Console::INFO, "                      \"floor\" - always round down");
     Console::log(Console::INFO, "-s=<comm-period>      Do job-internal communication every t seconds (t >= 0, 0: do not communicate)");
+    Console::log(Console::INFO, "-sleep                Sleep in between polls of new messages");
     Console::log(Console::INFO, "-T=<time-limit>       Run entire system for x seconds (x >= 0; 0: run indefinitely)");
     Console::log(Console::INFO, "-t=<num-threads>      Amount of worker threads per node (int t >= 1)");
     Console::log(Console::INFO, "-time-per-instance=<time-limit> Timeout an instance after x seconds wall clock time (x >= 0; 0: no timeout)");

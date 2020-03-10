@@ -277,9 +277,9 @@ void Worker::mainProgram() {
             Console::log(Console::VVVERB, "processing msg, tag %i took %.4f s", handle->tag, time);
             sleepMicrosecs = 0;
 
-        } else {
-           // No message: increase sleep duration
-           sleepMicrosecs += 100;
+        } else if (params.isSet("sleep")) {
+            // No message: increase sleep duration
+            sleepMicrosecs += 100;
         }
         
         MyMpi::testSentHandles();
