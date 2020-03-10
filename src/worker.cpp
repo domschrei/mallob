@@ -980,7 +980,7 @@ void Worker::rebalance() {
 
 void Worker::finishBalancing() {
     // All collective operations are done; reset synchronized timer
-    int lastSyncSeconds = epochCounter.getSecondsSinceLastSync();
+    float lastSyncSeconds = epochCounter.getSecondsSinceLastSync();
     epochCounter.resetLastSync();
 
     // Retrieve balancing results

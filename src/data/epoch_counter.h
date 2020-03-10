@@ -14,7 +14,7 @@ public:
     EpochCounter() : _epoch(0), _last_sync(0) {}
 
     int getEpoch() const {return _epoch;}
-    int getSecondsSinceLastSync() const {return Timer::elapsedSeconds() - _last_sync;}
+    float getSecondsSinceLastSync() const {return Timer::elapsedSeconds() - _last_sync;}
 
     void increment() {_epoch++;}
     void resetLastSync() {_last_sync = Timer::elapsedSeconds();}
