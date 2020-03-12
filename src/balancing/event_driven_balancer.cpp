@@ -173,7 +173,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
     // 2. Calculate initial assignments and remaining demanded resources
     std::map<int, float> assignments;
     float assignedResources = 0;
-    std::map<float, float, std::greater<float>> demandedResources;
+    std::map<float, float> demandedResources;
     for (const auto& entry : _states.getEntries()) {
         const Event& ev = entry.second;
         if (ev.demand == 0) continue;
