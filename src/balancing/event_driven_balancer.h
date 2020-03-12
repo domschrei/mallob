@@ -234,6 +234,7 @@ private:
             
             // Send to other root
             MyMpi::isend(MPI_COMM_WORLD, getRootRank(!reversedTree), MSG_ANYTIME_REDUCTION, data);
+            Console::log_send(Console::VERB, getRootRank(!reversedTree), "RED");
             
             // Broadcast and digest
             broadcast(data, reversedTree);
@@ -243,6 +244,7 @@ private:
 
             // Send to actual parent
             MyMpi::isend(MPI_COMM_WORLD, parent, MSG_ANYTIME_REDUCTION, data);
+            Console::log_send(Console::VERB, parent, "RED");
         }
 
         return done;     
@@ -254,6 +256,7 @@ private:
         if (child != MyMpi::rank(MPI_COMM_WORLD)) {
             // Send to actual child
             MyMpi::isend(MPI_COMM_WORLD, getChildRank(reversedTree), MSG_ANYTIME_BROADCAST, data);
+            Console::log_send(Console::VERB, getChildRank(reversedTree), "BRC");
         }
     }
 

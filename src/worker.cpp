@@ -132,8 +132,8 @@ void Worker::mainProgram() {
         if (!balancer->isBalancing() && isTimeForRebalancing()) {
 
             // Rebalancing
-            Console::log(MyMpi::rank(comm) == 0 ? Console::INFO : Console::VERB, 
-                "Entering rebalancing of epoch %i", epochCounter.getEpoch());
+            //Console::log(MyMpi::rank(comm) == 0 ? Console::INFO : Console::VERB, 
+            //    "Entering rebalancing of epoch %i", epochCounter.getEpoch());
             rebalance();
 
         } else if (balancer->isBalancing()) {
