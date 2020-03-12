@@ -78,11 +78,10 @@ bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
 
 void EventDrivenBalancer::broadcast(const EventMap& data, bool reversedTree) {
 
-    int child = getChildRank(reversedTree);
-    if (child != MyMpi::rank(MPI_COMM_WORLD)) {
+    for (int child : getChildRanks(reversedTree)) {
         // Send to actual child
-        MyMpi::isend(MPI_COMM_WORLD, getChildRank(reversedTree), MSG_ANYTIME_BROADCAST, data);
-        Console::log_send(Console::VERB, getChildRank(reversedTree), "BRC");
+        MyMpi::isend(MPI_COMM_WORLD, child, MSG_ANYTIME_BROADCAST, data);
+        Console::log_send(Console::VERB, child, "BRC");
     }
 }
 
@@ -129,22 +128,23 @@ int EventDrivenBalancer::getParentRank(bool reversedTree) {
     if (reversedTree) parent = MyMpi::size(_comm)-1 - parent;
     return parent;
 }
-int EventDrivenBalancer::getChildRank(bool reversedTree) {
+std::vector<int> EventDrivenBalancer::getChildRanks(bool reversedTree) {
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
     if (reversedTree) myRank = MyMpi::size(_comm)-1 - myRank;
     
-    int child;
+    std::vector<int> children;
     int exp = MyMpi::size(_comm);
     while (true) {
         if (myRank % exp == 0) {
-            child = myRank + exp/2;
-            break;
+            int child = myRank + exp/2;
+            if (reversedTree) child = MyMpi::size(_comm)-1 - child;
+            children.push_back(child);
         }
         exp /= 2;
+        if (exp == 1) break;
     }
 
-    if (reversedTree) child = MyMpi::size(_comm)-1 - child;
-    return child;
+    return children;
 }
 bool EventDrivenBalancer::isRoot(int rank, bool reversedTree) {
     return rank == getRootRank(reversedTree);

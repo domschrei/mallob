@@ -224,7 +224,7 @@ private:
 
     int getRootRank(bool reversedTree);
     int getParentRank(bool reversedTree);
-    int getChildRank(bool reversedTree);
+    std::vector<int> getChildRanks(bool reversedTree);
     bool isRoot(int rank, bool reversedTree);
     bool isLeaf(int rank, bool reversedTree);
 
