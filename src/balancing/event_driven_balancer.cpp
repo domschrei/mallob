@@ -113,7 +113,7 @@ int EventDrivenBalancer::getRootRank(bool reversedTree) {
 }
 int EventDrivenBalancer::getParentRank(bool reversedTree) {
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
-    if (reversedTree) myRank = MyMpi::size(_comm) - myRank;
+    if (reversedTree) myRank = MyMpi::size(_comm)-1 - myRank;
     
     int parent;
     int exp = 2;
@@ -126,12 +126,12 @@ int EventDrivenBalancer::getParentRank(bool reversedTree) {
         exp *= 2;
     }
 
-    if (reversedTree) parent = MyMpi::size(_comm) - parent;
+    if (reversedTree) parent = MyMpi::size(_comm)-1 - parent;
     return parent;
 }
 int EventDrivenBalancer::getChildRank(bool reversedTree) {
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
-    if (reversedTree) myRank = MyMpi::size(_comm) - myRank;
+    if (reversedTree) myRank = MyMpi::size(_comm)-1 - myRank;
     
     int child;
     int exp = 2;
@@ -145,7 +145,7 @@ int EventDrivenBalancer::getChildRank(bool reversedTree) {
         exp *= 2;
     }
 
-    if (reversedTree) child = MyMpi::size(_comm) - child;
+    if (reversedTree) child = MyMpi::size(_comm)-1 - child;
     return child;
 }
 bool EventDrivenBalancer::isRoot(int rank, bool reversedTree) {
