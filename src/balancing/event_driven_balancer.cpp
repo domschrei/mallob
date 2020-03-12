@@ -162,6 +162,8 @@ void EventDrivenBalancer::calculateBalancingResult() {
         const Event& ev = entry.second; 
         if (ev.demand == 0) continue;
 
+        _demands[ev.jobId] = ev.demand;
+        _priorities[ev.jobId] = ev.priority;
         aggregatedDemand += (ev.demand-1) * ev.priority;
         Console::log(Console::VERB, "BLC e=%i #%i demand=%i", _balancing_epoch, ev.jobId, ev.demand);
     }
