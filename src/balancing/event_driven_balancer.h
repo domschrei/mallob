@@ -183,6 +183,7 @@ public:
                     if (!_diffs.getEntries().count(it.first) || _diffs.getEntries().at(it.first).demand != demand) {
                         bool inserted = _diffs.insertIfNovel(ev);
                         if (inserted) _job_epochs[it.first]++;
+                        Console::log(Console::INFO, "JOB_EVENT %i d=%i", ev.jobId, ev.demand);
                     }
                 }
 
