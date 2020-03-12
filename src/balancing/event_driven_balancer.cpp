@@ -7,7 +7,7 @@ bool EventDrivenBalancer::handle(const MessageHandlePtr& handle) {
     EventMap data; data.deserialize(*(handle->recvData));
     bool done = false;
 
-    Console::log(Console::VERB, "BLC MSG");
+    //Console::log(Console::VERB, "BLC MSG");
     if (handle->tag == MSG_ANYTIME_REDUCTION) {
 
         bool reversedTree = sender < myRank;
@@ -60,7 +60,7 @@ bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
         
         // Send to other root
         MyMpi::isend(MPI_COMM_WORLD, getRootRank(!reversedTree), MSG_ANYTIME_REDUCTION, data);
-        Console::log_send(Console::VERB, getRootRank(!reversedTree), "RED");
+        Console::log_send(Console::VERB, getRootRank(!reversedTree), "ROOT_HANDSHAKE");
         
         // Broadcast and digest
         broadcast(data, reversedTree);
@@ -70,7 +70,7 @@ bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
 
         // Send to actual parent
         MyMpi::isend(MPI_COMM_WORLD, parent, MSG_ANYTIME_REDUCTION, data);
-        Console::log_send(Console::VERB, parent, "RED");
+        //Console::log_send(Console::VERB, parent, "RED");
     }
 
     return done;     
@@ -82,7 +82,7 @@ void EventDrivenBalancer::broadcast(const EventMap& data, bool reversedTree) {
     if (child != MyMpi::rank(MPI_COMM_WORLD)) {
         // Send to actual child
         MyMpi::isend(MPI_COMM_WORLD, getChildRank(reversedTree), MSG_ANYTIME_BROADCAST, data);
-        Console::log_send(Console::VERB, getChildRank(reversedTree), "BRC");
+        //Console::log_send(Console::VERB, getChildRank(reversedTree), "BRC");
     }
 }
 
