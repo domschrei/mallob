@@ -13,6 +13,7 @@
 #include "util/random.h"
 #include "util/memusage.h"
 #include "balancing/cutoff_priority_balancer.h"
+#include "balancing/event_driven_balancer.h"
 #include "data/job_description.h"
 
 void mpiMonitor(Worker* worker) {
@@ -38,7 +39,8 @@ void Worker::init() {
 
     // Initialize balancer
     //balancer = std::unique_ptr<Balancer>(new ThermodynamicBalancer(comm, params));
-    balancer = std::unique_ptr<Balancer>(new CutoffPriorityBalancer(comm, params, stats));
+    //balancer = std::unique_ptr<Balancer>(new CutoffPriorityBalancer(comm, params, stats));
+    balancer = std::unique_ptr<Balancer>(new EventDrivenBalancer(comm, params, stats));
     
     // Initialize pseudo-random order of nodes
     if (params.isSet("derandomize")) {
@@ -263,7 +265,9 @@ void Worker::mainProgram() {
             else if (handle->tag == MSG_EXIT) 
                 handleExit(handle);
             
-            else if (handle->tag == MSG_COLLECTIVES) {
+            else if (handle->tag == MSG_COLLECTIVES || 
+                    handle->tag == MSG_ANYTIME_REDUCTION || 
+                    handle->tag == MSG_ANYTIME_BROADCAST) {
                 // "Collectives" messages are currently handled only in balancer
                 bool done = balancer->continueBalancing(handle);
                 if (done) finishBalancing();

@@ -41,78 +41,79 @@ job_linestyles = dict()
 job_linewidths = dict()
 
 if len(sys.argv) > 2:
-    max_time = float(sys.argv[2])
+    max_time = float(sys.argv[-1])
 
 # Collect data
-time = 0
-for line in open(sys.argv[1], "r").readlines():
-    line = line.replace("\n", "")
-    match = re.search(r'^\[([0-9]+\.[0-9]+) / ([0-9]+\.[0-9]+)\] \[([0-9]+)\] (.*)$', line)
-    if not match:
-        continue
-    time = float(match.group(1))
-    reltime = float(match.group(2))
-    rank = int(match.group(3))
-    msg = match.group(4)
-    
-    ranks.add(rank)
-    if min_time == -1:
-        min_time = time
-        max_time += time
-    if reltime > max_time:
-        break
-    
-    if "Passed global initialization barrier" in msg:
-        time_offsets[rank] = time
-    if "Entering rebalancing" in msg:
-        append(balancing_starts, rank, time-time_offsets[rank])
-    if "Rebalancing completed" in msg:
-        append(balancing_ends, rank, time-time_offsets[rank])
-    if "Collecting clauses on this node" in msg:
-        append(communication_starts, rank, time-time_offsets[rank])
-    if "digested clauses" in msg:
-        append(communication_ends, rank, time-time_offsets[rank])
-    if "Processing message of tag" in msg:
-        if "of tag 3" in msg:
+for filename in sys.argv[1:-1]:
+    time = 0
+    for line in open(filename, "r").readlines():
+        line = line.replace("\n", "")
+        match = re.search(r'^([0-9]+\.[0-9]+) \[([0-9]+)\] (.*)$', line)
+        if not match:
             continue
-        match = re.search(r'<= \[([0-9]+)\]$', msg)
-        if match:
-            messages += [[time-time_offsets[rank], int(match.group(1)), rank]]
-    if ("Red. " in msg or "Brc. " in msg) and "Sending" in msg:
-        match = re.search(r'=> \[([0-9]+)\]$', msg)
-        if match:
-            balance_messages += [[time-time_offsets[rank], rank, int(match.group(1))]]
-    if "LOAD 1" in msg:
-        match = re.search(r'\(\+\#([0-9]+):([0-9]+)\)', msg)
-        if not match:
-            print("No match in " + msg)
-            exit(1)
-        job_id = match.group(1)
-        append(load_one, rank, [time-time_offsets[rank], job_id])
-    if "LOAD 0" in msg:
-        append(load_zero, rank, time-time_offsets[rank])
-    if "Introducing job" in msg or "RESPONSE_TIME" in msg:
-        match = re.search(r'\#([0-9]+)', msg)
-        if not match:
-            print("No match in " + msg)
-            exit(1)
-        job_id = match.group(1)
-        if "Introducing job" in msg:
-            job_starts[job_id] = time-time_offsets[rank]
-            job_clients[job_id] = rank
-            match = re.search(r' => \[([0-9]+)\]', msg)
+        time = float(match.group(1))
+        rank = int(match.group(2))
+        msg = match.group(3)
+        
+        ranks.add(rank)
+        if min_time == -1:
+            min_time = time
+            max_time += time
+        if time > max_time:
+            break
+        
+        if "Passed global initialization barrier" in msg:
+            #time_offsets[rank] = 0
+            time_offsets[rank] = time
+        if "Entering rebalancing" in msg:
+            append(balancing_starts, rank, time-time_offsets[rank])
+        if "Rebalancing completed" in msg:
+            append(balancing_ends, rank, time-time_offsets[rank])
+        if "Collecting clauses on this node" in msg:
+            append(communication_starts, rank, time-time_offsets[rank])
+        if "digested clauses" in msg:
+            append(communication_ends, rank, time-time_offsets[rank])
+        if "Processing message of tag" in msg:
+            if "of tag 3" in msg:
+                continue
+            match = re.search(r'<= \[([0-9]+)\]$', msg)
+            if match:
+                messages += [[time-time_offsets[rank], int(match.group(1)), rank]]
+        if ("Red. " in msg or "Brc. " in msg) and "Sending" in msg:
+            match = re.search(r'=> \[([0-9]+)\]$', msg)
+            if match:
+                balance_messages += [[time-time_offsets[rank], rank, int(match.group(1))]]
+        if "LOAD 1" in msg:
+            match = re.search(r'\(\+\#([0-9]+):([0-9]+)\)', msg)
             if not match:
                 print("No match in " + msg)
                 exit(1)
-            bounce_messages += [[time-time_offsets[rank], rank, int(match.group(1))]]
-        else:
-            job_ends[job_id] = time-time_offsets[rank]
-    if "Bouncing #" in msg:
-        match = re.search(r'Bouncing \#([0-9]+):([0-9]+) => \[([0-9]+)\]', msg)
-        if not match:
-            print("No match in " + msg)
-            exit(1)
-        bounce_messages += [[time-time_offsets[rank], rank, int(match.group(3))]]
+            job_id = match.group(1)
+            append(load_one, rank, [time-time_offsets[rank], job_id])
+        if "LOAD 0" in msg:
+            append(load_zero, rank, time-time_offsets[rank])
+        if "Introducing job" in msg or "RESPONSE_TIME" in msg:
+            match = re.search(r'\#([0-9]+)', msg)
+            if not match:
+                print("No match in " + msg)
+                exit(1)
+            job_id = match.group(1)
+            if "Introducing job" in msg:
+                job_starts[job_id] = time-time_offsets[rank]
+                job_clients[job_id] = rank
+                match = re.search(r' => \[([0-9]+)\]', msg)
+                if not match:
+                    print("No match in " + msg)
+                    exit(1)
+                bounce_messages += [[time-time_offsets[rank], rank, int(match.group(1))]]
+            else:
+                job_ends[job_id] = time-time_offsets[rank]
+        if "Bouncing #" in msg:
+            match = re.search(r'Bouncing \#([0-9]+):([0-9]+) => \[([0-9]+)\]', msg)
+            if not match:
+                print("No match in " + msg)
+                exit(1)
+            bounce_messages += [[time-time_offsets[rank], rank, int(match.group(3))]]
 
 if max_time == 9223372036854775807:
     max_time = time
@@ -167,6 +168,7 @@ for job in job_starts:
         job_linestyles[job] = linestyles[idx % len(linestyles)]
         job_linewidths[job] = linewidths[idx % len(linewidths)]
 
+"""
 for rank in load_one:
     for i in range(len(load_one[rank])):
         if rank in load_zero and i < len(load_zero[rank]):
@@ -181,6 +183,7 @@ for rank in load_one:
             job_linewidths[job] = linewidths[idx % len(linewidths)]
         
         plot_xy([t, t2], [rank, rank], job_colors[job], job_linewidths[job], job_linestyles[job], 0, 'x')
+"""
 
 for job_id in job_starts:
     rank = job_clients[job_id]
