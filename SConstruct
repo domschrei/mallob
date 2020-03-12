@@ -21,7 +21,7 @@ def get_default_env():
     
     if 'MPICXX' in env['ENV']:
         env.Replace(CXX = env['ENV']['MPICXX']) # compile with mpic++
-	print("MPICXX=" + env['ENV']['MPICXX'])
+        print("MPICXX=" + env['ENV']['MPICXX'])
     else:
         env.Replace(CXX = 'mpic++')
     
@@ -31,8 +31,8 @@ def get_default_env():
         else:
             env['ENV']['MPI_ROOT'] = '/usr/lib/x86_64-linux-gnu/openmpi/'
     elif 'intel/compilers_and_libraries_2019' in env['ENV']['MPI_ROOT']:
-	env['ENV']['MPI_ROOT'] += "/intel64/"
-	print("MPI_ROOT=" + env['ENV']['MPI_ROOT'])
+        env['ENV']['MPI_ROOT'] += "/intel64/"
+        print("MPI_ROOT=" + env['ENV']['MPI_ROOT'])
     
     env.Append(CXXFLAGS = Split(flags)) # compile flags
     return env
@@ -42,7 +42,7 @@ def update_revision(target, source, env):
     revision = "#define MALLOB_REVISION \"" + time.strftime("%Y-%m-%d_%H:%M:%S") + "\""
     with open("src/revision.c", "w") as f:
         f.write(str(revision))
-    print revision
+    print(revision)
 
 # Directories of hordesat
 horde = "src/hordesat/incremental-hordesat/"
