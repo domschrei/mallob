@@ -160,7 +160,7 @@ public:
         int numActiveJobs = 0;
 
         _jobs_being_balanced = std::map<int, Job*>();
-        for (auto it : jobs) {
+        for (const auto& it : jobs) {
             bool isActiveRoot = it.second->isRoot() && it.second->isNotInState({INITIALIZING_TO_PAST}) 
                                 && (it.second->isInState({ACTIVE, STANDBY}) || it.second->isInitializing());
             // Node must be root node to participate
@@ -174,16 +174,22 @@ public:
                 _jobs_being_balanced[it.first] = it.second;
 
                 // Insert this job as an event, if there is something novel about it
-                if (!_job_epochs.count(it.first)) _job_epochs[it.first] = 1;
+                if (!_job_epochs.count(it.first)) {
+                    // Completely new!
+                    _job_epochs[it.first] = 1;
+                    _demands[it.first] = 1;
+                    _volumes[it.first] = 1;
+                    _priorities[it.first] = it.second->getDescription().getPriority();
+                } 
                 int epoch = _job_epochs[it.first];
-                int demand = getDemand(*_jobs_being_balanced[it.first]);
-                Event ev({it.first, epoch, demand, _jobs_being_balanced[it.first]->getDescription().getPriority()});
+                int demand = getDemand(*it.second);
+                Event ev({it.first, epoch, demand, _priorities[it.first]});
                 if (!_states.getEntries().count(it.first) || _states.getEntries().at(it.first).demand != demand) {
                     // Not contained yet in state: try to insert into diffs map
                     if (!_diffs.getEntries().count(it.first) || _diffs.getEntries().at(it.first).demand != demand) {
                         bool inserted = _diffs.insertIfNovel(ev);
                         if (inserted) _job_epochs[it.first]++;
-                        Console::log(Console::INFO, "JOB_EVENT %i d=%i", ev.jobId, ev.demand);
+                        Console::log(Console::INFO, "JOB_EVENT #%i d=%i", ev.jobId, ev.demand);
                     }
                 }
 
