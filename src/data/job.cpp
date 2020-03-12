@@ -277,7 +277,9 @@ int Job::getDemand(int prevVolume) const {
             demand = _comm_size;
         } else {
             // Periodic growth, limited by total amount of worker nodes
-            int numGrowths = (int) ((Timer::elapsedSeconds()-_time_of_initialization) / growthPeriod);
+            int numGrowths = 0;
+            if (_time_of_initialization > 0) 
+                numGrowths = (int) ((Timer::elapsedSeconds()-_time_of_initialization) / growthPeriod);
             demand = std::min(_comm_size, (int)std::pow(2, numGrowths + 1) - 1);
         }
         // Limit demand if desired
