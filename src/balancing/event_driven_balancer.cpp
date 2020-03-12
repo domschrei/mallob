@@ -82,7 +82,7 @@ void EventDrivenBalancer::broadcast(const EventMap& data, bool reversedTree) {
     if (child != MyMpi::rank(MPI_COMM_WORLD)) {
         // Send to actual child
         MyMpi::isend(MPI_COMM_WORLD, getChildRank(reversedTree), MSG_ANYTIME_BROADCAST, data);
-        //Console::log_send(Console::VERB, getChildRank(reversedTree), "BRC");
+        Console::log_send(Console::VERB, getChildRank(reversedTree), "BRC");
     }
 }
 
