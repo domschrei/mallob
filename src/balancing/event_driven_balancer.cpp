@@ -5,7 +5,7 @@ bool EventDrivenBalancer::handle(const MessageHandlePtr& handle) {
     int sender = handle->source;
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
     EventMap data; data.deserialize(*(handle->recvData));
-    bool done;
+    bool done = false;
 
     Console::log(Console::VERB, "BLC MSG");
     if (handle->tag == MSG_ANYTIME_REDUCTION) {
@@ -135,7 +135,8 @@ int EventDrivenBalancer::getChildRank(bool reversedTree) {
     
     int child;
     int exp = 2;
-    if (myRank % exp == 1) child = myRank;
+    if (myRank == 0) child = 1;
+    else if (myRank % exp == 1) child = myRank;
     else while (true) {
         if (myRank % (2*exp) == exp) {
             child = myRank + exp/2;
