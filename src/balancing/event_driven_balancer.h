@@ -179,10 +179,10 @@ public:
                     _job_epochs[it.first] = 1;
                     _demands[it.first] = 1;
                     _volumes[it.first] = 1;
-                    _priorities[it.first] = it.second->getDescription().getPriority();
                 } 
                 int epoch = _job_epochs[it.first];
                 int demand = getDemand(*it.second);
+                _priorities[it.first] = it.second->getDescription().getPriority();
                 Event ev({it.first, epoch, demand, _priorities[it.first]});
                 if (!_states.getEntries().count(it.first) || _states.getEntries().at(it.first).demand != demand) {
                     // Not contained yet in state: try to insert into diffs map
