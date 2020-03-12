@@ -206,9 +206,9 @@ private:
 
     bool reduceIfApplicable(int which) {
         // Have anything to reduce?
-        if (_diffs.isEmpty()) return;
+        if (_diffs.isEmpty()) return false;
         // Enough time passed since last balancing?
-        if (Timer::elapsedSeconds() - _last_balancing < _params.getFloatParam("p")) return;
+        if (Timer::elapsedSeconds() - _last_balancing < _params.getFloatParam("p")) return false;
 
         // Send to according parents.
         bool done = false;
