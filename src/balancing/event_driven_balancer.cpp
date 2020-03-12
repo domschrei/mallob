@@ -7,6 +7,7 @@ bool EventDrivenBalancer::handle(const MessageHandlePtr& handle) {
     EventMap data; data.deserialize(*(handle->recvData));
     bool done;
 
+    Console::log(Console::VERB, "BLC MSG");
     if (handle->tag == MSG_ANYTIME_REDUCTION) {
 
         bool reversedTree = sender < myRank;
