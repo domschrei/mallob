@@ -134,15 +134,14 @@ int EventDrivenBalancer::getChildRank(bool reversedTree) {
     if (reversedTree) myRank = MyMpi::size(_comm)-1 - myRank;
     
     int child;
-    int exp = 2;
+    int exp = MyMpi::size(_comm);
     if (myRank == 0) child = 1;
-    else if (myRank % exp == 1) child = myRank;
     else while (true) {
-        if (myRank % (2*exp) == exp) {
+        if (myRank % exp == 0) {
             child = myRank + exp/2;
             break;
         }
-        exp *= 2;
+        exp /= 2;
     }
 
     if (reversedTree) child = MyMpi::size(_comm)-1 - child;
