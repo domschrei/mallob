@@ -180,8 +180,10 @@ public:
                 Event ev({it.first, epoch, demand, _jobs_being_balanced[it.first]->getDescription().getPriority()});
                 if (!_states.getEntries().count(it.first) || _states.getEntries().at(it.first).demand != demand) {
                     // Not contained yet in state: try to insert into diffs map
-                    bool inserted = _diffs.insertIfNovel(ev);
-                    if (inserted) _job_epochs[it.first]++;
+                    if (!_diffs.getEntries().count(it.first) || _diffs.getEntries().at(it.first).demand != demand) {
+                        bool inserted = _diffs.insertIfNovel(ev);
+                        if (inserted) _job_epochs[it.first]++;
+                    }
                 }
 
                 numActiveJobs++;
