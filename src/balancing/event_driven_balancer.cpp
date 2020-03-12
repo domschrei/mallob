@@ -162,6 +162,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
         const Event& ev = entry.second; 
         if (ev.demand == 0) continue;
 
+        numJobs++;
         _demands[ev.jobId] = ev.demand;
         _priorities[ev.jobId] = ev.priority;
         aggregatedDemand += (ev.demand-1) * ev.priority;
@@ -182,8 +183,8 @@ void EventDrivenBalancer::calculateBalancingResult() {
         int remainingDemand = ev.demand - 1;
         // assignment: atomic node plus fair share of reduced aggregation
         assignments[ev.jobId] = 1 + std::min(1.0, initialMetRatio) * remainingDemand;
-        assignedResources += assignments[ev.jobId];
-        demandedResources[ev.priority];
+        assignedResources += assignments[ev.jobId] - 1;
+        if (!demandedResources.count(ev.priority)) demandedResources[ev.priority] = 0;
         demandedResources[ev.priority] += ev.demand - assignments[ev.jobId];
         Console::log(Console::VVERB, "BLC e=%i #%i init_assignment=%.3f", _balancing_epoch, ev.jobId, assignments[ev.jobId]);
     }
