@@ -188,10 +188,11 @@ public:
 
         // initiate a balancing, if applicable
         reduceIfApplicable(BOTH);
+        return false;
     }
     bool canContinueBalancing() override {return false;}
-    bool continueBalancing() override {}
-    bool continueBalancing(MessageHandlePtr handle) override {this->handle(handle);}
+    bool continueBalancing() override {return false;}
+    bool continueBalancing(MessageHandlePtr handle) override {return this->handle(handle);}
     std::map<int, int> getBalancingResult() override {return _balancing_result;}
 
 private:
