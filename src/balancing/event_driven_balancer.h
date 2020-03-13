@@ -34,8 +34,9 @@ public:
         return result;
     }
     virtual void deserialize(const std::vector<uint8_t>& packed) override {
-        assert(packed.empty() || packed.size() % _size_per_event == 0);
         _map.clear();
+        if (packed.size() <= sizeof(int)) return;
+        assert(packed.empty() || packed.size() % _size_per_event == 0);
         int numEvents = packed.size() / _size_per_event;
         int i = 0, n;
         for (int ev = 0; ev < numEvents; ev++) {

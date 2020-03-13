@@ -2,6 +2,9 @@
 #include "event_driven_balancer.h"
 
 bool EventDrivenBalancer::handle(const MessageHandlePtr& handle) {
+    if (handle->tag != MSG_ANYTIME_BROADCAST && handle->tag != MSG_ANYTIME_REDUCTION)
+        return false;
+
     int sender = handle->source;
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
     EventMap data; data.deserialize(*(handle->recvData));
