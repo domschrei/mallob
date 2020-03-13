@@ -173,7 +173,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
     // 2. Calculate initial assignments and remaining demanded resources
     std::map<int, float> assignments;
     float assignedResources = 0;
-    std::map<float, float> demandedResources;
+    std::map<float, float, std::less<float>> demandedResources;
     for (const auto& entry : _states.getEntries()) {
         const Event& ev = entry.second;
         if (ev.demand == 0) continue;
@@ -208,10 +208,10 @@ void EventDrivenBalancer::calculateBalancingResult() {
 
         int demand = _demands[jobId];
         float priority = _priorities[jobId];
-        int prioIndex = 0;
+        float prevPriority = -1;
         for (const auto& entry : demandedResources) {
             if (entry.first == priority) break;
-            prioIndex++;
+            prevPriority = entry.first;
         }
 
         if (assignments[jobId] >= demand
@@ -219,13 +219,13 @@ void EventDrivenBalancer::calculateBalancingResult() {
             // Case 1: Assign full demand
             assignments[jobId] = demand;
         } else {
-            if (prioIndex == 0 || demandedResources[prioIndex-1] >= remainingResources) {
+            if (prevPriority == -1 || demandedResources[prevPriority] >= remainingResources) {
                 // Case 2: No additional resources assigned
             } else {
                 // Case 3: Evenly distribute ratio of remaining resources
                 assert(remainingResources >= 0);
-                double ratio = (remainingResources - demandedResources[prioIndex-1])
-                            / (demandedResources[prioIndex] - demandedResources[prioIndex-1]);
+                double ratio = (remainingResources - demandedResources[prevPriority])
+                            / (demandedResources[priority] - demandedResources[prevPriority]);
                 assert(ratio > 0);
                 assert(ratio <= 1);
                 assignments[jobId] += ratio * (demand - assignments[jobId]);
