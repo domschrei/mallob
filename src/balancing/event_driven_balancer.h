@@ -205,15 +205,13 @@ public:
     bool canContinueBalancing() override {return false;}
     bool continueBalancing() override {return false;}
     bool continueBalancing(MessageHandlePtr handle) override {return this->handle(handle);}
-    std::map<int, int> getBalancingResult() override {return _balancing_result;}
+    std::map<int, int> getBalancingResult() override {return _volumes;}
 
 private:
     EventMap _states;
     EventMap _diffs;
     std::map<int, int> _job_epochs;
     float _last_balancing;
-
-    std::map<int, int> _balancing_result;
 
     const int NORMAL_TREE = 1, REVERSED_TREE = 2, BOTH = 3;
 

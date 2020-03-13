@@ -204,7 +204,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
     if (remainingResources < 0.1) remainingResources = 0; // too low a remainder to make a difference
     Console::log(!rank ? Console::VVERB : Console::VVVVERB, "BLC e=%i remaining_resources=%.3f", _balancing_epoch, remainingResources);
 
-    _balancing_result.clear();
+    _volumes.clear();
     for (auto it : _jobs_being_balanced) {
         int jobId = it.first;
         if (_demands[jobId] == 1) continue;
@@ -236,7 +236,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
         }
 
         // Round by flooring
-        _balancing_result[jobId] = std::floor(assignments[jobId]);
+        _volumes[jobId] = std::floor(assignments[jobId]);
         
         Console::log(Console::VVERB, "BLC e=%i #%i adj_assignment=%.3f", _balancing_epoch, jobId, assignments[jobId]);
     }
