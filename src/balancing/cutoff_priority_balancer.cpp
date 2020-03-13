@@ -6,7 +6,6 @@
 #include "util/random.h"
 #include "util/console.h"
 
-
 bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
 
     // Initialize
@@ -273,26 +272,6 @@ bool CutoffPriorityBalancer::finishRemaindersReduction() {
     return continueRoundingUntilReduction(0, _remainders.size());
 }
 
-std::map<int, int> CutoffPriorityBalancer::getRoundedAssignments(int remainderIdx, int& sum) {
-
-    double remainder = remainderIdx < _remainders.size() ? _remainders[remainderIdx] : 1.0;
-    //int occurrences =  remainderIdx < _remainders.size() ? _remainders.getOccurrences(remainderIdx) : 0;
-
-    std::map<int, int> roundedAssignments;
-    for (auto it : _assignments) {
-
-        double r = it.second - (int)it.second;
-        
-        if (r < remainder) 
-            roundedAssignments[it.first] = std::floor(it.second);
-        else 
-            roundedAssignments[it.first] = std::ceil(it.second);
-        
-        sum += roundedAssignments[it.first];
-    }
-    return roundedAssignments;
-}
-
 bool CutoffPriorityBalancer::continueRoundingUntilReduction(int lower, int upper) {
 
     _lower_remainder_idx = lower;
@@ -306,20 +285,11 @@ bool CutoffPriorityBalancer::continueRoundingUntilReduction(int lower, int upper
         // or the right-hand limit 1.0
         double remainder = (idx < _remainders.size() ? _remainders[idx] : 1.0);
         // Round your local assignments and calculate utilization sum
-        _rounded_assignments = getRoundedAssignments(idx, localSum);
+        _rounded_assignments = Rounding::getRoundedAssignments(idx, localSum, _remainders, _assignments);
     }
 
     iAllReduce(localSum);
     return false;
-}
-
-float penalty(float utilization, float loadFactor) {
-    float l = loadFactor;
-    float u = utilization;
-
-    float lowPenalty = -1/l * u + 1;
-    float highPenalty = 1/(1-l) * u - l/(1-l);
-    return std::max(lowPenalty, highPenalty);
 }
 
 bool CutoffPriorityBalancer::continueRoundingFromReduction() {
@@ -331,7 +301,7 @@ bool CutoffPriorityBalancer::continueRoundingFromReduction() {
     int idx = (_lower_remainder_idx+_upper_remainder_idx)/2;
 
     // Store result, if it is the best one so far
-    float p = penalty(utilization / MyMpi::size(_comm), _load_factor);
+    float p = Rounding::penalty(utilization / MyMpi::size(_comm), _load_factor);
     if (_best_remainder_idx == -1 || p < _best_penalty) {
         _best_penalty = p;
         _best_remainder_idx = idx;

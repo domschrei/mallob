@@ -33,7 +33,10 @@ private:
     std::map<int, Job*> jobs;
     std::map<int, JobRequest> jobCommitments;
     std::map<int, float> jobArrivals;
+
     std::map<int, float> jobCpuTimeUsed;
+    std::map<int, float> lastLimitCheck;
+
     Job* currentJob;
     int load;
     float lastLoadChange;
@@ -103,9 +106,12 @@ private:
     void updateVolume(int jobId, int demand);
     void initJob(MessageHandlePtr handle);
     void interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, bool reckless);
+    void timeoutJob(int jobId);
     
     void rebalance();
     void finishBalancing();
+    bool checkComputationLimits(int jobId);
+
     float reduce(float contribution, int rootRank);
     float allReduce(float contribution);
 

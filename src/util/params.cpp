@@ -32,6 +32,7 @@ void Parameters::setDefaults() {
     setParam("c", "1"); // num clients
     //setParam("colors"); // colored terminal output
     //setParam("derandomize"); // derandomize job bouncing
+    setParam("bm", "ed"); // event-driven balancing (ed = event-driven, fp = fixed-period)
     setParam("g", "5.0"); // job demand growth interval
     //setParam("h"); setParam("help"); // print usage
     //setParam("jjp"); // jitter job priorities
@@ -65,6 +66,9 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "-colors               Colored terminal output based on messages' verbosity");
     Console::log(Console::INFO, "-cpuh-per-instance=<time-limit> Timeout an instance after x cpu hours (x >= 0; 0: no timeout)");
     Console::log(Console::INFO, "-derandomize          Derandomize job bouncing");
+    Console::log(Console::INFO, "-bm=<balance-mode>    Balancing mode:");
+    Console::log(Console::INFO, "                      \"fp\" - fixed-period");
+    Console::log(Console::INFO, "                      \"ed\" (default) - event-driven");
     Console::log(Console::INFO, "-g=<growth-period>    Grow job demand exponentially every t seconds (t >= 0; 0: immediate growth)");
     Console::log(Console::INFO, "-h|-help              Print usage");
     Console::log(Console::INFO, "-jjp                  Jitter job priorities to break ties during rebalancing");
@@ -73,7 +77,7 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "-log=<log-dir>        Directory to save logs in (default: .)");
     Console::log(Console::INFO, "-md=<max-demand>      Limit any job's demand to some maximum value (int x >= 0; 0: no limit)");
     Console::log(Console::INFO, "-nophase              Do not diversify solvers based on phase; native diversification only");
-    Console::log(Console::INFO, "-p=<rebalance-period> Do global rebalancing every t seconds (t > 0)");
+    Console::log(Console::INFO, "-p=<rebalance-period> Do balancing every t seconds (t > 0). With -edb : minimum delay between balancings");
     Console::log(Console::INFO, "-q                    Be quiet, do not log to stdout besides critical information");
     Console::log(Console::INFO, "-r=<round-mode>       Mode of rounding of assignments in balancing:");
     Console::log(Console::INFO, "                      \"prob\" - simple probabilistic rounding");

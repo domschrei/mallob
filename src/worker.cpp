@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <initializer_list>
+#include <limits>
 
 #include "worker.h"
 #include "app/sat_job.h"
@@ -39,8 +40,13 @@ void Worker::init() {
 
     // Initialize balancer
     //balancer = std::unique_ptr<Balancer>(new ThermodynamicBalancer(comm, params));
-    //balancer = std::unique_ptr<Balancer>(new CutoffPriorityBalancer(comm, params, stats));
-    balancer = std::unique_ptr<Balancer>(new EventDrivenBalancer(comm, params, stats));
+    if (params.getParam("bm") == "ed") {
+        // Event-driven balancing
+        balancer = std::unique_ptr<Balancer>(new EventDrivenBalancer(comm, params, stats));
+    } else {
+        // Fixed-period balancing
+        balancer = std::unique_ptr<Balancer>(new CutoffPriorityBalancer(comm, params, stats));
+    }
     
     // Initialize pseudo-random order of nodes
     if (params.isSet("derandomize")) {
@@ -146,11 +152,12 @@ void Worker::mainProgram() {
         }
 
         // Identify global stagnation of a rebalancing: Force abort
+        /*
         if (epochCounter.getSecondsSinceLastSync() > params.getFloatParam("p") + 300.0) {
             // No rebalancing since t+300 seconds: Something is going wrong
             Console::log(Console::CRIT, "DESYNCHRONIZATION DETECTED -- Aborting.");
             exit(1);
-        }
+        }*/
 
         // Job communication (e.g. clause sharing)
         if (currentJob != NULL && currentJob->wantsToCommunicate()) {
@@ -165,24 +172,34 @@ void Worker::mainProgram() {
             lastJobCheckTime = jobTime;
 
             Job &job = *currentJob;
-            bool initializing = job.isInitializing();
-            int result = job.appl_solveLoop();
 
-            if (result >= 0) {
-                // Solver done!
-                int jobRootRank = job.getRootNodeRank();
-                IntVec payload({job.getId(), job.getRevision(), result});
-                job.appl_dumpStats();
+            int id = job.getId();
+            bool abort = checkComputationLimits(id);
+            if (abort) {
+                timeoutJob(id);
+                lastJobCheckTime = std::numeric_limits<float>::infinity();
 
-                // Signal termination to root -- may be a self message
-                Console::log_send(Console::VERB, jobRootRank, "Sending finished info");
-                MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_WORKER_FOUND_RESULT, payload);
-                //stats.increment("sentMessages");
+            } else {
 
-            } else if (!job.isRoot() && initializing && !job.isInitializing()) {
-                // Non-root worker finished initialization
-                IntVec payload({job.getId()});
-                MyMpi::isend(MPI_COMM_WORLD, job.getParentNodeRank(), MSG_QUERY_VOLUME, payload);
+                bool initializing = job.isInitializing();
+                int result = job.appl_solveLoop();
+
+                if (result >= 0) {
+                    // Solver done!
+                    int jobRootRank = job.getRootNodeRank();
+                    IntVec payload({job.getId(), job.getRevision(), result});
+                    job.appl_dumpStats();
+
+                    // Signal termination to root -- may be a self message
+                    Console::log_send(Console::VERB, jobRootRank, "Sending finished info");
+                    MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_WORKER_FOUND_RESULT, payload);
+                    //stats.increment("sentMessages");
+
+                } else if (!job.isRoot() && initializing && !job.isInitializing()) {
+                    // Non-root worker finished initialization
+                    IntVec payload({job.getId()});
+                    MyMpi::isend(MPI_COMM_WORLD, job.getParentNodeRank(), MSG_QUERY_VOLUME, payload);
+                }
             }
 
             jobTime = Timer::elapsedSeconds() - jobTime;
@@ -238,13 +255,15 @@ void Worker::mainProgram() {
             else if (handle->tag == MSG_QUERY_JOB_RESULT)
                 handleQueryJobResult(handle);
 
-            else if (handle->tag == MSG_TERMINATE)
+            else if (handle->tag == MSG_TERMINATE) {
                 handleTerminate(handle);
+                lastJobCheckTime = Timer::elapsedSeconds();
 
-            else if (handle->tag == MSG_ABORT)
+            } else if (handle->tag == MSG_ABORT) {
                 handleAbort(handle);
+                lastJobCheckTime = Timer::elapsedSeconds();
 
-            else if (handle->tag == MSG_WORKER_DEFECTING)
+            } else if (handle->tag == MSG_WORKER_DEFECTING)
                 handleWorkerDefecting(handle);
 
             else if (handle->tag == MSG_NOTIFY_JOB_REVISION)
@@ -984,7 +1003,6 @@ void Worker::rebalance() {
 
 void Worker::finishBalancing() {
     // All collective operations are done; reset synchronized timer
-    float lastSyncSeconds = epochCounter.getSecondsSinceLastSync();
     epochCounter.resetLastSync();
 
     // Retrieve balancing results
@@ -1004,45 +1022,8 @@ void Worker::finishBalancing() {
 
         if (currentJob->isRoot()) {
             int id = currentJob->getId();
-            bool abort = false;
-            
-            // Calculate CPU seconds: (volume during last epoch) * #threads * (effective time of last epoch) 
-            float newCpuTime = (jobVolumes.count(id) ? jobVolumes[id] : 1) * params.getIntParam("t") * lastSyncSeconds;
-            jobCpuTimeUsed[id] += newCpuTime;
-            float limit = params.getFloatParam("cpuh-per-instance")*3600.f;
-            bool hasLimit = limit > 0;
-            if (hasLimit) {
-                Console::log(Console::INFO, "Job #%i spent %.3f/%.3f cpu seconds so far (%.3f in this epoch)", id, jobCpuTimeUsed[id], limit, newCpuTime);
-            } else {
-                Console::log(Console::INFO, "Job #%i spent %.3f cpu seconds so far (%.3f in this epoch)", id, jobCpuTimeUsed[id], newCpuTime);
-            }
-            if (hasLimit && jobCpuTimeUsed[id] > limit) {
-                // Job exceeded its cpu time limit
-                Console::log(Console::INFO, "Job #%i CPU TIMEOUT: aborting", id);
-                abort = true;
-
-            } else {
-
-                // Calculate wall clock time
-                float jobAge = currentJob->getAge();
-                float timeLimit = params.getFloatParam("time-per-instance");
-                if (timeLimit > 0 && jobAge > timeLimit) {
-                    // Job exceeded its wall clock time limit
-                    Console::log(Console::INFO, "Job #%i WALLCLOCK TIMEOUT: aborting", id);
-                    abort = true;
-                }
-            }
-
-            if (abort) {
-                // "Virtual self message" aborting the job
-                IntVec payload({id, currentJob->getRevision()});
-                MessageHandlePtr handle(new MessageHandle(MyMpi::nextHandleId()));
-                handle->source = worldRank;
-                handle->recvData = payload.serialize();
-                handle->tag = MSG_ABORT;
-                handle->finished = true;
-                handleAbort(handle);
-            }
+            bool abort = checkComputationLimits(id);
+            if (abort) timeoutJob(id);
         }
     }
     epochCounter.increment();
@@ -1054,6 +1035,56 @@ void Worker::finishBalancing() {
         Console::log(Console::INFO, "Job #%i : new volume %i", it->first, it->second);
         updateVolume(it->first, it->second);
     }
+}
+
+void Worker::timeoutJob(int jobId) {
+    // "Virtual self message" aborting the job
+    IntVec payload({jobId, currentJob->getRevision()});
+    MessageHandlePtr handle(new MessageHandle(MyMpi::nextHandleId()));
+    handle->source = worldRank;
+    handle->recvData = payload.serialize();
+    handle->tag = MSG_ABORT;
+    handle->finished = true;
+    handleAbort(handle);
+}
+
+bool Worker::checkComputationLimits(int jobId) {
+
+    if (!lastLimitCheck.count(jobId)) lastLimitCheck[jobId] = 0;
+    float elapsedTime = Timer::elapsedSeconds() - lastLimitCheck[jobId];
+    bool terminate = false;
+
+    // Calculate CPU seconds: (volume during last epoch) * #threads * (effective time of last epoch) 
+    float newCpuTime = (jobVolumes.count(jobId) ? jobVolumes[jobId] : 1) * params.getIntParam("t") * elapsedTime;
+    jobCpuTimeUsed[jobId] += newCpuTime;
+    float cpuLimit = params.getFloatParam("cpuh-per-instance")*3600.f;
+    bool hasCpuLimit = cpuLimit > 0;
+    if (hasCpuLimit) {
+        Console::log(Console::INFO, "Job #%i spent %.3f/%.3f cpu seconds so far (%.3f in this epoch)", 
+                jobId, jobCpuTimeUsed[jobId], cpuLimit, newCpuTime);
+    } else {
+        Console::log(Console::INFO, "Job #%i spent %.3f cpu seconds so far (%.3f in this epoch)", 
+                jobId, jobCpuTimeUsed[jobId], newCpuTime);
+    }
+    if (hasCpuLimit && jobCpuTimeUsed[jobId] > cpuLimit) {
+        // Job exceeded its cpu time limit
+        Console::log(Console::INFO, "Job #%i CPU TIMEOUT: aborting", jobId);
+        terminate = true;
+
+    } else {
+
+        // Calculate wall clock time
+        float jobAge = currentJob->getAge();
+        float timeLimit = params.getFloatParam("time-per-instance");
+        if (timeLimit > 0 && jobAge > timeLimit) {
+            // Job exceeded its wall clock time limit
+            Console::log(Console::INFO, "Job #%i WALLCLOCK TIMEOUT: aborting", jobId);
+            terminate = true;
+        }
+    }
+    
+    lastLimitCheck[jobId] = Timer::elapsedSeconds();
+    return terminate;
 }
 
 void Worker::updateVolume(int jobId, int volume) {

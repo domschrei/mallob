@@ -1,5 +1,7 @@
 
 #include "event_driven_balancer.h"
+#include "util/random.h"
+#include "balancing/rounding.h"
 
 bool EventDrivenBalancer::handle(const MessageHandlePtr& handle) {
     if (handle->tag != MSG_ANYTIME_BROADCAST && handle->tag != MSG_ANYTIME_REDUCTION)
@@ -174,7 +176,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
     float totalAvailVolume = MyMpi::size(_comm) * _load_factor - numJobs;
 
     // 2. Calculate initial assignments and remaining demanded resources
-    std::map<int, float> assignments;
+    std::map<int, double> assignments;
     float assignedResources = 0;
     std::map<float, float, std::less<float>> demandedResources;
     for (const auto& entry : _states.getEntries()) {
@@ -192,7 +194,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
         Console::log(Console::VVERB, "BLC e=%i #%i init_assignment=%.3f", _balancing_epoch, ev.jobId, assignments[ev.jobId]);
     }
 
-    // 3. Calculate final assignments for all LOCAL jobs
+    // 3. Calculate final floating-point assignments for all jobs
 
     int rank = MyMpi::rank(MPI_COMM_WORLD);
     Console::log(!rank ? Console::VVERB : Console::VVVVERB, "BLC e=%i init_assigned_resources=%.3f", 
@@ -204,11 +206,12 @@ void EventDrivenBalancer::calculateBalancingResult() {
     if (remainingResources < 0.1) remainingResources = 0; // too low a remainder to make a difference
     Console::log(!rank ? Console::VVERB : Console::VVVVERB, "BLC e=%i remaining_resources=%.3f", _balancing_epoch, remainingResources);
 
-    _volumes.clear();
-    for (auto it : _jobs_being_balanced) {
-        int jobId = it.first;
-        if (_demands[jobId] == 1) continue;
+    std::map<int, int> allVolumes;
+    for (const auto& entry : _states.getEntries()) {
+        const Event& ev = entry.second;
+        if (ev.demand <= 1) continue;
 
+        int jobId = ev.jobId;
         int demand = _demands[jobId];
         float priority = _priorities[jobId];
         float prevPriority = -1;
@@ -235,9 +238,98 @@ void EventDrivenBalancer::calculateBalancingResult() {
             }
         }
 
-        // Round by flooring
-        _volumes[jobId] = std::floor(assignments[jobId]);
-        
         Console::log(Console::VVERB, "BLC e=%i #%i adj_assignment=%.3f", _balancing_epoch, jobId, assignments[jobId]);
+    }
+
+    // 4. Round job assignments
+
+    if (_params.getParam("r") == ROUNDING_FLOOR) {
+        // Round by flooring
+        for (const auto& entry : _states.getEntries()) {
+            allVolumes[entry.first] = std::floor(assignments[entry.first]);
+        }
+    } else if (_params.getParam("r") == ROUNDING_PROBABILISTIC) {
+        // Round probabilistically
+        for (const auto& entry : _states.getEntries()) {
+            allVolumes[entry.first] = Random::roundProbabilistically(assignments[entry.first]);
+        }
+    } else if (_params.getParam("r") == ROUNDING_BISECTION) {
+
+        // Calculate optimal rounding by bisection
+
+        SortedDoubleSequence remainders;
+        for (const auto& entry : _states.getEntries()) {
+            double remainder = assignments[entry.first] - (int)assignments[entry.first];
+            if (remainder > 0 && remainder < 1) remainders.add(remainder);
+        }
+        int lower = 0, upper = remainders.size();
+        int idx = (lower+upper)/2;
+        int iterations = 0;
+        float lastUtilization;
+
+        int bestRemainderIdx = -1;
+        float bestPenalty;
+        float bestUtilization;
+
+        while (true) {
+            int utilization = 0;
+            if (idx <= remainders.size()) {
+                // Remainder is either one of the remainders from the reduced sequence
+                // or the right-hand limit 1.0
+                double remainder = (idx < remainders.size() ? remainders[idx] : 1.0);
+                // Round your local assignments and calculate utilization sum
+                _volumes = Rounding::getRoundedAssignments(idx, utilization, remainders, assignments);
+            }
+
+            // Store result, if it is the best one so far
+            float p = Rounding::penalty((float)utilization / MyMpi::size(_comm), _load_factor);
+            if (bestRemainderIdx == -1 || p < bestPenalty) {
+                bestPenalty = p;
+                bestRemainderIdx = idx;
+                bestUtilization = utilization;
+            }
+
+            // Log iteration
+            if (!remainders.isEmpty() && idx <= remainders.size()) {
+                double remainder = (idx < remainders.size() ? remainders[idx] : 1.0);
+                Console::log(Console::VVERB, "BLC e=%i ROUNDING it=%i [%i,%i]=>%i rmd=%.3f util=%.2f pen=%.2f", 
+                                _balancing_epoch, iterations, lower, upper, idx,
+                                remainder, (float)utilization, p);
+            }
+
+            // Termination?
+            if (utilization == lastUtilization) { // Utilization unchanged?
+                // Finished!
+                if (!remainders.isEmpty() && bestRemainderIdx <= remainders.size()) {
+                    // Remainders are known to this node: apply and report
+                    int sum = 0;
+                    allVolumes = Rounding::getRoundedAssignments(bestRemainderIdx, sum, remainders, assignments);
+
+                    double remainder = (bestRemainderIdx < remainders.size() ? remainders[bestRemainderIdx] : 1.0);
+                    Console::log(Console::VVERB, 
+                                "BLC e=%i ROUNDING_DONE its=%i rmd=%.3f util=%.2f pen=%.2f", 
+                                _balancing_epoch, iterations, remainder, bestUtilization, bestPenalty);
+                }
+                break;
+
+            } else if (lower < upper) {
+                if (utilization < _load_factor*MyMpi::size(_comm)) {
+                    // Too few resources utilized
+                    upper = idx-1;
+                }
+                if (utilization > _load_factor*MyMpi::size(_comm)) {
+                    // Too many resources utilized
+                    lower = idx+1;
+                }
+            }
+            
+            lastUtilization = utilization;
+        }
+    }
+
+    // 5. Only remember job assignments that are of a local job
+    _volumes.clear();
+    for (const auto& pair : _jobs_being_balanced) {
+        _volumes[pair.first] = allVolumes[pair.first];
     }
 }
