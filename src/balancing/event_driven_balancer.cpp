@@ -330,6 +330,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
     // 5. Only remember job assignments that are of a local job
     _volumes.clear();
     for (const auto& pair : _jobs_being_balanced) {
-        _volumes[pair.first] = allVolumes[pair.first];
+        if (allVolumes[pair.first] >= 1)
+            _volumes[pair.first] = allVolumes[pair.first];
     }
 }

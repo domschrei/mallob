@@ -5,6 +5,7 @@
 #include "cutoff_priority_balancer.h"
 #include "util/random.h"
 #include "util/console.h"
+#include "balancing/rounding.h"
 
 bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
 
@@ -322,7 +323,7 @@ bool CutoffPriorityBalancer::continueRoundingFromReduction() {
         if (!_remainders.isEmpty() && _best_remainder_idx <= _remainders.size()) {
             // Remainders are known to this node: apply and report
             int sum = 0;
-            _rounded_assignments = getRoundedAssignments(_best_remainder_idx, sum);
+            _rounded_assignments = Rounding::getRoundedAssignments(_best_remainder_idx, sum, _remainders, _assignments);
             for (auto it : _rounded_assignments) {
                 _assignments[it.first] = it.second;
             }

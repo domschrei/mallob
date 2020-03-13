@@ -174,10 +174,10 @@ void Worker::mainProgram() {
             Job &job = *currentJob;
 
             int id = job.getId();
-            bool abort = checkComputationLimits(id);
+            bool abort = false;
+            if (job.isRoot()) abort = checkComputationLimits(id);
             if (abort) {
                 timeoutJob(id);
-                lastJobCheckTime = std::numeric_limits<float>::infinity();
 
             } else {
 
@@ -255,15 +255,13 @@ void Worker::mainProgram() {
             else if (handle->tag == MSG_QUERY_JOB_RESULT)
                 handleQueryJobResult(handle);
 
-            else if (handle->tag == MSG_TERMINATE) {
+            else if (handle->tag == MSG_TERMINATE)
                 handleTerminate(handle);
-                lastJobCheckTime = Timer::elapsedSeconds();
 
-            } else if (handle->tag == MSG_ABORT) {
+            else if (handle->tag == MSG_ABORT)
                 handleAbort(handle);
-                lastJobCheckTime = Timer::elapsedSeconds();
-
-            } else if (handle->tag == MSG_WORKER_DEFECTING)
+                
+            else if (handle->tag == MSG_WORKER_DEFECTING)
                 handleWorkerDefecting(handle);
 
             else if (handle->tag == MSG_NOTIFY_JOB_REVISION)
@@ -611,9 +609,6 @@ void Worker::initJob(MessageHandlePtr handle) {
 
     // Remember arrival and initialize used CPU time (if root node)
     jobArrivals[jobId] = Timer::elapsedSeconds();
-    if (job.isRoot()) {
-        jobCpuTimeUsed[jobId] = 0;
-    }
     
     if (job.isInState({INITIALIZING_TO_PAST})) {
         // Job was already aborted
@@ -731,9 +726,11 @@ void Worker::handleAbort(MessageHandlePtr& handle) {
 
     int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
 
-    // Forward information on aborted job to client
     if (getJob(jobId).isRoot()) {
+        // Forward information on aborted job to client
         MyMpi::isend(MPI_COMM_WORLD, getJob(jobId).getParentNodeRank(), MSG_ABORT, handle->recvData);
+
+
     }
 
     interruptJob(handle, jobId, /*terminate=*/true, /*reckless=*/true);
@@ -1039,7 +1036,7 @@ void Worker::finishBalancing() {
 
 void Worker::timeoutJob(int jobId) {
     // "Virtual self message" aborting the job
-    IntVec payload({jobId, currentJob->getRevision()});
+    IntVec payload({jobId, getJob(jobId).getRevision()});
     MessageHandlePtr handle(new MessageHandle(MyMpi::nextHandleId()));
     handle->source = worldRank;
     handle->recvData = payload.serialize();
@@ -1050,15 +1047,27 @@ void Worker::timeoutJob(int jobId) {
 
 bool Worker::checkComputationLimits(int jobId) {
 
-    if (!lastLimitCheck.count(jobId)) lastLimitCheck[jobId] = 0;
+    if (!getJob(jobId).isRoot()) return false;
+
+    if (!lastLimitCheck.count(jobId) || !jobCpuTimeUsed.count(jobId)) {
+        // Job is new
+        lastLimitCheck[jobId] = Timer::elapsedSeconds();
+        jobCpuTimeUsed[jobId] = 0;
+        return false;
+    }
+
     float elapsedTime = Timer::elapsedSeconds() - lastLimitCheck[jobId];
     bool terminate = false;
+    assert(elapsedTime >= 0);
 
     // Calculate CPU seconds: (volume during last epoch) * #threads * (effective time of last epoch) 
     float newCpuTime = (jobVolumes.count(jobId) ? jobVolumes[jobId] : 1) * params.getIntParam("t") * elapsedTime;
+    assert(newCpuTime >= 0);
     jobCpuTimeUsed[jobId] += newCpuTime;
     float cpuLimit = params.getFloatParam("cpuh-per-instance")*3600.f;
     bool hasCpuLimit = cpuLimit > 0;
+    
+    /*
     if (hasCpuLimit) {
         Console::log(Console::INFO, "Job #%i spent %.3f/%.3f cpu seconds so far (%.3f in this epoch)", 
                 jobId, jobCpuTimeUsed[jobId], cpuLimit, newCpuTime);
@@ -1066,6 +1075,7 @@ bool Worker::checkComputationLimits(int jobId) {
         Console::log(Console::INFO, "Job #%i spent %.3f cpu seconds so far (%.3f in this epoch)", 
                 jobId, jobCpuTimeUsed[jobId], newCpuTime);
     }
+    */
     if (hasCpuLimit && jobCpuTimeUsed[jobId] > cpuLimit) {
         // Job exceeded its cpu time limit
         Console::log(Console::INFO, "Job #%i CPU TIMEOUT: aborting", jobId);
@@ -1083,7 +1093,9 @@ bool Worker::checkComputationLimits(int jobId) {
         }
     }
     
-    lastLimitCheck[jobId] = Timer::elapsedSeconds();
+    if (terminate) lastLimitCheck.erase(jobId);
+    else lastLimitCheck[jobId] = Timer::elapsedSeconds();
+    
     return terminate;
 }
 
