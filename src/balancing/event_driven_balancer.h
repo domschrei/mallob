@@ -192,32 +192,34 @@ public:
                 if (!_job_epochs.count(it.first)) {
                     // Completely new!
                     _job_epochs[it.first] = 1;
-                    _demands[it.first] = 1;
                     _volumes[it.first] = 1;
                 } 
                 int epoch = _job_epochs[it.first];
                 int demand = getDemand(*it.second);
+                _demands[it.first] = demand;
                 _priorities[it.first] = it.second->getDescription().getPriority();
                 Event ev({it.first, epoch, demand, _priorities[it.first]});
-                if (!_states.getEntries().count(it.first) || _states.getEntries().at(it.first).demand != demand) {
+                if (!_states.getEntries().count(it.first) || ev.dominates(_states.getEntries().at(it.first))) {
                     // Not contained yet in state: try to insert into diffs map
-                    if (!_diffs.getEntries().count(it.first) || _diffs.getEntries().at(it.first).demand != demand) {
+                    bool inserted = _diffs.insertIfNovel(ev);
+                    if (inserted) {
                         Console::log(Console::INFO, "JOB_EVENT #%i d=%i (je=%i)", ev.jobId, ev.demand, epoch);
-                        bool inserted = _diffs.insertIfNovel(ev);
-                        if (inserted) _job_epochs[it.first]++;
-                    }
+                        _job_epochs[it.first]++;
+                    } 
                 }
 
                 numActiveJobs++;
             } else if (it.second->isRoot() && _volumes.count(it.first)) {
                 // Job used to be active, but not any more
-                if (!_states.getEntries().count(it.first) || _states.getEntries().at(it.first).demand != 0) {
-                    if (!_diffs.getEntries().count(it.first) || _diffs.getEntries().at(it.first).demand != 0) {
-                        Event ev({it.first, _job_epochs[it.first], 0, _priorities[it.first]});
+                _demands[it.first] = 0;
+                Event ev({it.first, _job_epochs[it.first], 0, _priorities[it.first]});
+                if (!_states.getEntries().count(it.first) || ev.dominates(_states.getEntries().at(it.first))) {
+                    // Not contained yet in state: try to insert into diffs map
+                    bool inserted = _diffs.insertIfNovel(ev);
+                    if (inserted) {
                         Console::log(Console::INFO, "JOB_EVENT #%i d=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[it.first]);
-                        bool inserted = _diffs.insertIfNovel(ev);
-                        if (inserted) _job_epochs[it.first]++;
-                    }   
+                        _job_epochs[it.first]++;
+                    }    
                 }
             }
         }
