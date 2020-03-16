@@ -331,11 +331,10 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
 
     JobRequest req; req.deserialize(*handle->recvData);
 
-    // Discard request if it originates from past epoch
-    // (except if it is a request for a root node)
-    if (req.epoch < epochCounter.getEpoch() && req.requestedNodeIndex > 0) {
-        Console::log_recv(Console::INFO, handle->source, "Discarding job request %s from past epoch %i (I am in epoch %i)", 
-                    jobStr(req.jobId, req.requestedNodeIndex).c_str(), req.epoch, epochCounter.getEpoch());
+    // Discard request if it has become obsolete
+    if (isRequestObsolete(req)) {
+        Console::log_recv(Console::INFO, handle->source, "Discarding job request %s from time %.2f", 
+                    jobStr(req.jobId, req.requestedNodeIndex).c_str(), req.timeOfBirth);
         return;
     }
 
@@ -429,18 +428,12 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
     assert(hasJob(req.jobId));
     Job &job = getJob(req.jobId);
 
-    // If request is for a root node, bump its epoch -- does not become obsolete
-    if (req.epoch < epochCounter.getEpoch() && req.requestedNodeIndex == 0) {
-        Console::log(Console::INFO, "Bumping epoch of root job request #%i:0", req.jobId);
-        req.epoch = epochCounter.getEpoch();
-    }
-
     // Check if node should be adopted or rejected
     bool reject = false;
-    if (req.epoch < epochCounter.getEpoch()) {
+    if (isRequestObsolete(req)) {
         // Wrong (old) epoch
-        Console::log_recv(Console::INFO, handle->source, "Discarding request %s from epoch %i (now is epoch %i)", 
-                            job.toStr(), req.epoch, epochCounter.getEpoch());
+        Console::log_recv(Console::INFO, handle->source, "Discarding request %s from time %.2f", 
+                            job.toStr(), req.timeOfBirth);
         reject = true;
 
     } else if (job.isNotInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
@@ -764,7 +757,7 @@ void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
     // Initiate search for a replacement for the defected child
     Console::log(Console::VERB, "%s : trying to find a new child replacing defected node %s", 
                     job.toStr(), jobStr(jobId, index).c_str());
-    JobRequest req(jobId, job.getRootNodeRank(), worldRank, index, epochCounter.getEpoch(), 0);
+    JobRequest req(jobId, job.getRootNodeRank(), worldRank, index, Timer::elapsedSeconds(), 0);
     MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, MSG_FIND_NODE, req);
     //stats.increment("sentMessages");
 }
@@ -1128,7 +1121,7 @@ void Worker::updateVolume(int jobId, int volume) {
         }
     } else if (job.hasJobDescription() && nextIndex < volume && !jobCommitments.count(jobId)) {
         // Grow left
-        JobRequest req(jobId, job.getRootNodeRank(), worldRank, nextIndex, epochCounter.getEpoch(), 0);
+        JobRequest req(jobId, job.getRootNodeRank(), worldRank, nextIndex, Timer::elapsedSeconds(), 0);
         int nextNodeRank = job.getLeftChildNodeRank();
         MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, MSG_FIND_NODE, req);
         //stats.increment("sentMessages");
@@ -1147,7 +1140,7 @@ void Worker::updateVolume(int jobId, int volume) {
         }
     } else if (job.hasJobDescription() && nextIndex < volume && !jobCommitments.count(jobId)) {
         // Grow right
-        JobRequest req(jobId, job.getRootNodeRank(), worldRank, nextIndex, epochCounter.getEpoch(), 0);
+        JobRequest req(jobId, job.getRootNodeRank(), worldRank, nextIndex, Timer::elapsedSeconds(), 0);
         int nextNodeRank = job.getRightChildNodeRank();
         MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, MSG_FIND_NODE, req);
         //stats.increment("sentMessages");

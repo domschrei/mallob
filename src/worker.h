@@ -139,6 +139,14 @@ private:
         }
         return MyMpi::size(comm) * 2;
     }
+
+    bool isRequestObsolete(const JobRequest& req) {
+
+        // Requests for a job root never become obsolete
+        if (req.requestedNodeIndex == 0) return false;
+
+        return Timer::elapsedSeconds() - req.timeOfBirth >= 0.25 + 2 * params.getFloatParam("p"); 
+    }
 };
 
 #endif
