@@ -4,6 +4,14 @@
 **Mal**leable **Lo**ad **B**alancer.  
 **M**ultitasking **A**gi**l**e **Lo**gic **B**lackbox.
 
+## Overview
+
+mallob is a platform for massively parallel processing of malleable jobs. Malleability means that the CPU resources of a job may vary _during its execution_ depending on the system's overall load. In its current orientation, mallob features multi-user, massively parallel, on-demand SAT solving as an application. 
+
+The system is fully decentralized and features highly randomized dynamic malleable load balancing. When a new job arrives in the system, it will randomly bounce through the system (corresponding to a random walk) until an idle process adopts it and becomes the job's initial "root" process. Then, with the job dynamically updating its demand, the job may receive additional nodes which form a binary tree rooted at the initial process as their central means of communication.
+
+Each root node in the system carries basic information on their job's meta data, such as its current demand, its current volume (= #processes) or its priority. A balancing phase consisting of one or multiple All-Reduction operations will be carried out either periodically or whenever the necessity rises. From the globally aggregated measures, each job can compute its new volume and can act accordingly by growing or shrinking its job tree.
+
 ## Building
 
 You need [SCons](www.scons.org) as a build tool.
