@@ -273,9 +273,6 @@ void EventDrivenBalancer::calculateBalancingResult() {
         while (true) {
             int utilization = 0;
             if (idx <= remainders.size()) {
-                // Remainder is either one of the remainders from the reduced sequence
-                // or the right-hand limit 1.0
-                double remainder = (idx < remainders.size() ? remainders[idx] : 1.0);
                 // Round your local assignments and calculate utilization sum
                 _volumes = Rounding::getRoundedAssignments(idx, utilization, remainders, assignments);
             }
@@ -299,16 +296,13 @@ void EventDrivenBalancer::calculateBalancingResult() {
             // Termination?
             if (utilization == lastUtilization) { // Utilization unchanged?
                 // Finished!
-                if (!remainders.isEmpty() && bestRemainderIdx <= remainders.size()) {
-                    // Remainders are known to this node: apply and report
-                    int sum = 0;
-                    allVolumes = Rounding::getRoundedAssignments(bestRemainderIdx, sum, remainders, assignments);
+                int sum = 0;
+                allVolumes = Rounding::getRoundedAssignments(bestRemainderIdx, sum, remainders, assignments);
 
-                    double remainder = (bestRemainderIdx < remainders.size() ? remainders[bestRemainderIdx] : 1.0);
-                    Console::log(Console::VVERB, 
-                                "BLC e=%i ROUNDING_DONE its=%i rmd=%.3f util=%.2f pen=%.2f", 
-                                _balancing_epoch, iterations, remainder, bestUtilization, bestPenalty);
-                }
+                double remainder = (bestRemainderIdx < remainders.size() ? remainders[bestRemainderIdx] : 1.0);
+                Console::log(Console::VVERB, 
+                            "BLC e=%i ROUNDING_DONE its=%i rmd=%.3f util=%.2f pen=%.2f", 
+                            _balancing_epoch, iterations, remainder, bestUtilization, bestPenalty);
                 break;
 
             } else if (lower < upper) {
