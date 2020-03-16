@@ -195,7 +195,7 @@ public:
                 }
 
                 numActiveJobs++;
-            } else if (_volumes.count(it.first)) {
+            } else if (it.second->isRoot() && _volumes.count(it.first)) {
                 // Job used to be active, but not any more
                 if (!_states.getEntries().count(it.first) || _states.getEntries().at(it.first).demand != 0) {
                     if (!_diffs.getEntries().count(it.first) || _diffs.getEntries().at(it.first).demand != 0) {
