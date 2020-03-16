@@ -25,7 +25,7 @@ struct Event {
     }
 
     bool dominates(const Event& other) const {
-        return epoch > other.epoch || (epoch == other.epoch && *this != other);
+        return epoch > other.epoch;
     }
 };
 
