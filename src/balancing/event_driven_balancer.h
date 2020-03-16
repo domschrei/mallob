@@ -113,7 +113,7 @@ public:
 
     bool insertIfNovel(const Event& ev) {
         // Update map if no such job entry yet or existing entry is older
-        if (!_map.count(ev.jobId) || ev.dominates(_map[ev.jobId])) {
+        if (!_map.count(ev.jobId) || (ev.dominates(_map[ev.jobId]) && ev.demand != _map[ev.jobId].demand)) {
             _map[ev.jobId] = ev;
             return true;
         }
@@ -199,10 +199,9 @@ public:
                 _demands[it.first] = demand;
                 _priorities[it.first] = it.second->getDescription().getPriority();
                 Event ev({it.first, epoch, demand, _priorities[it.first]});
-                if (!_states.getEntries().count(it.first)) {
+                if (!_states.getEntries().count(it.first) || ev.demand != _states.getEntries().at(it.first).demand) {
                     // Not contained yet in state: try to insert into diffs map
-                    const Event& prev = _states.getEntries().at(it.first);
-                    bool inserted = ev.demand != prev.demand && _diffs.insertIfNovel(ev);
+                    bool inserted = _diffs.insertIfNovel(ev);
                     if (inserted) {
                         Console::log(Console::INFO, "JOB_EVENT #%i d=%i (je=%i)", ev.jobId, ev.demand, epoch);
                         _job_epochs[it.first]++;
@@ -214,10 +213,9 @@ public:
                 // Job used to be active, but not any more
                 _demands[it.first] = 0;
                 Event ev({it.first, _job_epochs[it.first], 0, _priorities[it.first]});
-                if (!_states.getEntries().count(it.first) || ev.dominates(_states.getEntries().at(it.first))) {
+                if (!_states.getEntries().count(it.first) || ev.demand != _states.getEntries().at(it.first).demand) {
                     // Not contained yet in state: try to insert into diffs map
-                    const Event& prev = _states.getEntries().at(it.first);
-                    bool inserted = prev.demand > 0 && _diffs.insertIfNovel(ev);
+                    bool inserted = _diffs.insertIfNovel(ev);
                     if (inserted) {
                         Console::log(Console::INFO, "JOB_EVENT #%i d=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[it.first]);
                         _job_epochs[it.first]++;
