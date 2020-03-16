@@ -110,6 +110,8 @@ void MyMpi::init(int argc, char *argv[])
     _tag_priority[MSG_FORWARD_CLIENT_RANK] = 1;
     _tag_priority[MSG_JOB_DONE] = 1;
     _tag_priority[MSG_COLLECTIVES] = 1;
+    _tag_priority[MSG_ANYTIME_REDUCTION] = 1;
+    _tag_priority[MSG_ANYTIME_BROADCAST] = 1;
     
     // Job-internal management messages
     _tag_priority[MSG_REQUEST_BECOME_CHILD] = 2;

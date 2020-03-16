@@ -99,9 +99,6 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
     
     if (anyChange) {
         
-        // Remove old jobs which have a demand of zero
-        _states.removeOldZeros();
-
         // Calculate and publish new assignments.
         calculateBalancingResult();
 

@@ -14,6 +14,19 @@ struct Event {
     int epoch;
     int demand;
     float priority;
+
+    bool operator==(const Event& other) const {
+        return jobId == other.jobId && epoch == other.epoch 
+                && demand == other.demand && priority == other.priority;
+    }
+
+    bool operator!=(const Event& other) const {
+        return !(*this == other);
+    }
+
+    bool dominates(const Event& other) const {
+        return epoch > other.epoch || (epoch == other.epoch && *this != other);
+    }
 };
 
 class EventMap : public Reduceable {
@@ -64,7 +77,7 @@ public:
                 const auto& otherPair = *otherIt;
                 if (pair.first == otherPair.first) {
                     // Same ID -- take newer event, forget other one
-                    newMap[pair.first] = (pair.second.epoch >= otherPair.second.epoch ? pair.second : otherPair.second);
+                    newMap[pair.first] = (pair.second.dominates(otherPair.second) ? pair.second : otherPair.second);
                     it++; otherIt++;
                 } else {
                     // Different ID -- insert lower one
@@ -100,7 +113,7 @@ public:
 
     bool insertIfNovel(const Event& ev) {
         // Update map if no such job entry yet or existing entry is older
-        if (!_map.count(ev.jobId) || _map[ev.jobId].epoch < ev.epoch) {
+        if (!_map.count(ev.jobId) || ev.dominates(_map[ev.jobId])) {
             _map[ev.jobId] = ev;
             return true;
         }
@@ -113,7 +126,7 @@ public:
         std::vector<int> keysToErase;
         for (const auto& entry : _map) {
             if (otherMap.getEntries().count(entry.first) 
-                && otherMap.getEntries().at(entry.first).epoch >= entry.second.epoch) {
+                && otherMap.getEntries().at(entry.first).dominates(entry.second)) {
                 // Filtered out
                 keysToErase.push_back(entry.first);
             }
@@ -162,6 +175,7 @@ public:
 
         _jobs_being_balanced = std::map<int, Job*>();
         for (const auto& it : jobs) {
+
             bool isActiveRoot = it.second->isRoot() && it.second->isNotInState({INITIALIZING_TO_PAST}) 
                                 && (it.second->isInState({ACTIVE, STANDBY}) || it.second->isInitializing());
             // Node must be root node to participate
@@ -188,9 +202,9 @@ public:
                 if (!_states.getEntries().count(it.first) || _states.getEntries().at(it.first).demand != demand) {
                     // Not contained yet in state: try to insert into diffs map
                     if (!_diffs.getEntries().count(it.first) || _diffs.getEntries().at(it.first).demand != demand) {
+                        Console::log(Console::INFO, "JOB_EVENT #%i d=%i (je=%i)", ev.jobId, ev.demand, epoch);
                         bool inserted = _diffs.insertIfNovel(ev);
                         if (inserted) _job_epochs[it.first]++;
-                        Console::log(Console::INFO, "JOB_EVENT #%i d=%i", ev.jobId, ev.demand);
                     }
                 }
 
@@ -200,9 +214,9 @@ public:
                 if (!_states.getEntries().count(it.first) || _states.getEntries().at(it.first).demand != 0) {
                     if (!_diffs.getEntries().count(it.first) || _diffs.getEntries().at(it.first).demand != 0) {
                         Event ev({it.first, _job_epochs[it.first], 0, _priorities[it.first]});
+                        Console::log(Console::INFO, "JOB_EVENT #%i d=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[it.first]);
                         bool inserted = _diffs.insertIfNovel(ev);
                         if (inserted) _job_epochs[it.first]++;
-                        Console::log(Console::INFO, "JOB_EVENT #%i d=%i", ev.jobId, ev.demand);
                     }   
                 }
             }
