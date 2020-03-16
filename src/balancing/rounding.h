@@ -6,6 +6,7 @@
 #include <map>
 #include <set>
 #include <vector>
+#include <cstring>
 
 #include "data/reduceable.h"
 
