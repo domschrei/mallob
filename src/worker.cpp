@@ -729,8 +729,6 @@ void Worker::handleAbort(MessageHandlePtr& handle) {
     if (getJob(jobId).isRoot()) {
         // Forward information on aborted job to client
         MyMpi::isend(MPI_COMM_WORLD, getJob(jobId).getParentNodeRank(), MSG_ABORT, handle->recvData);
-
-
     }
 
     interruptJob(handle, jobId, /*terminate=*/true, /*reckless=*/true);
@@ -903,6 +901,7 @@ void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, b
                 if (getLoad() && currentJob->getId() == job.getId()) setLoad(0, job.getId());
                 job.terminate();
                 Console::log(Console::INFO, "%s : terminated", job.toStr());
+                balancer->updateVolume(jobId, 0);
             } 
         }
     }
@@ -1004,7 +1003,7 @@ void Worker::finishBalancing() {
 
     // Retrieve balancing results
     Console::log(Console::VVVERB, "Finishing balancing ...");
-    std::map<int, int> volumes = balancer->getBalancingResult();
+    jobVolumes = balancer->getBalancingResult();
     Console::log(MyMpi::rank(comm) == 0 ? Console::INFO : Console::VERB, "Rebalancing completed.");
 
     // Add last slice of idle/busy time 
@@ -1027,8 +1026,7 @@ void Worker::finishBalancing() {
     Console::log(Console::VERB, "Advancing to epoch %i", epochCounter.getEpoch());
     
     // Update volumes found during balancing, and trigger job expansions / shrinkings
-    jobVolumes = volumes;
-    for (auto it = volumes.begin(); it != volumes.end(); ++it) {
+    for (auto it = jobVolumes.begin(); it != jobVolumes.end(); ++it) {
         Console::log(Console::INFO, "Job #%i : new volume %i", it->first, it->second);
         updateVolume(it->first, it->second);
     }
