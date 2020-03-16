@@ -18,7 +18,7 @@ private:
     // Global meta data
     int id;
     int rootRank;
-    float priority;
+    float priority = 1.0;
     bool incremental;
     int revision;
 

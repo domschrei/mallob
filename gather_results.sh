@@ -8,7 +8,7 @@ fi
 
 # Create a single log file, and a reduced one without mem conspt info
 cat $logdir/log_*.*|grep -v "vm_usage" > $logdir/tmp
-sed 's/^\[//g' $logdir/tmp | LC_ALL=C sort -s -g | awk '{print "["$0}' > $logdir/log
+cat $logdir/tmp | LC_ALL=C sort -s -g | awk '{print $0}' > $logdir/log
 rm $logdir/tmp
 
 jobs=`grep -E "Introducing.*#[0-9]+" $logdir/log|grep -oE "#[0-9]+"|tr '\n' ' '`

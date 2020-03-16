@@ -145,7 +145,6 @@ for [time, sender, receiver] in bounce_messages:
     plt.annotate("", xy=(time, receiver), xytext=(time, sender), arrowprops=dict(arrowstyle="->", color="#999999"))
 for [time, sender, receiver] in balance_messages:
     plt.annotate("", xy=(time, receiver), xytext=(time, sender), arrowprops=dict(arrowstyle="->"))
-"""
 
 for [time, sender, receiver] in bounce_messages:
     plot_xy([time, time], [sender, receiver], "#999999", 1, '-', 0, 'x')
@@ -159,6 +158,7 @@ for [time, sender, receiver] in balance_messages:
         plot_xy([time], [receiver], "#000000", 0, '-', 5, 'v')
     else:
         plot_xy([time], [receiver], "#000000", 0, '-', 5, '^')
+"""
 
 # Assign colors and shapes to occurring jobs
 for job in job_starts:

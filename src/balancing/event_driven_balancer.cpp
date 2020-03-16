@@ -44,7 +44,7 @@ bool EventDrivenBalancer::reduceIfApplicable(int which) {
     // Enough time passed since last balancing?
     if (Timer::elapsedSeconds() - _last_balancing < _params.getFloatParam("p")) return false;
 
-    if (which == BOTH) Console::log(Console::INFO, "INITIATE_BALANCING (%i diffs)", _diffs.getEntries().size());
+    if (which == BOTH) Console::log(Console::VVERB, "INITIATE_BALANCING (%i diffs)", _diffs.getEntries().size());
 
     // Send to according parents.
     bool done = false;
@@ -88,7 +88,7 @@ void EventDrivenBalancer::broadcast(const EventMap& data, bool reversedTree) {
     for (int child : getChildRanks(reversedTree)) {
         // Send to actual child
         MyMpi::isend(MPI_COMM_WORLD, child, MSG_ANYTIME_BROADCAST, data);
-        Console::log_send(Console::VERB, child, "BRC");
+        //Console::log_send(Console::VERB, child, "BRC");
     }
 }
 
@@ -159,6 +159,9 @@ bool EventDrivenBalancer::isLeaf(int rank, bool reversedTree) {
 
 void EventDrivenBalancer::calculateBalancingResult() {
 
+    int rank = MyMpi::rank(MPI_COMM_WORLD);
+    int verb = rank == 0 ? Console::VVERB : Console::VVVVERB;  
+
     // 1. Calculate aggregated demand of all jobs
     float aggregatedDemand = 0;
     int numJobs = 0;
@@ -170,7 +173,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
         if (ev.demand == 0) continue;
         numJobs++;
         aggregatedDemand += (ev.demand-1) * ev.priority;
-        Console::log(Console::VERB, "BLC e=%i #%i demand=%i", _balancing_epoch, ev.jobId, ev.demand);
+        Console::log(verb, "BLC e=%i #%i demand=%i", _balancing_epoch, ev.jobId, ev.demand);
     }
     float totalAvailVolume = MyMpi::size(_comm) * _load_factor - numJobs;
 
@@ -190,20 +193,19 @@ void EventDrivenBalancer::calculateBalancingResult() {
         assignedResources += assignments[ev.jobId] - 1;
         if (!demandedResources.count(ev.priority)) demandedResources[ev.priority] = 0;
         demandedResources[ev.priority] += ev.demand - assignments[ev.jobId];
-        Console::log(Console::VVERB, "BLC e=%i #%i init_assignment=%.3f", _balancing_epoch, ev.jobId, assignments[ev.jobId]);
+        Console::log(verb, "BLC e=%i #%i init_assignment=%.3f", _balancing_epoch, ev.jobId, assignments[ev.jobId]);
     }
 
     // 3. Calculate final floating-point assignments for all jobs
 
-    int rank = MyMpi::rank(MPI_COMM_WORLD);
-    Console::log(!rank ? Console::VVERB : Console::VVVVERB, "BLC e=%i init_assigned_resources=%.3f", 
+    Console::log(verb, "BLC e=%i init_assigned_resources=%.3f", 
         _balancing_epoch, assignedResources);
     
     // Atomic job assignments are already subtracted from _total_avail_volume
     // and are not part of the all-reduced assignedResources either
     float remainingResources = totalAvailVolume - assignedResources;
     if (remainingResources < 0.1) remainingResources = 0; // too low a remainder to make a difference
-    Console::log(!rank ? Console::VVERB : Console::VVVVERB, "BLC e=%i remaining_resources=%.3f", _balancing_epoch, remainingResources);
+    Console::log(verb, "BLC e=%i remaining_resources=%.3f", _balancing_epoch, remainingResources);
 
     std::map<int, int> allVolumes;
     for (const auto& entry : _states.getEntries()) {
@@ -237,7 +239,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
             }
         }
 
-        Console::log(Console::VVERB, "BLC e=%i #%i adj_assignment=%.3f", _balancing_epoch, jobId, assignments[jobId]);
+        Console::log(verb, "BLC e=%i #%i adj_assignment=%.3f", _balancing_epoch, jobId, assignments[jobId]);
     }
 
     // 4. Round job assignments
@@ -264,7 +266,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
         int lower = 0, upper = remainders.size();
         int idx = (lower+upper)/2;
         int iterations = 0;
-        float lastUtilization;
+        float lastUtilization = -1;
 
         int bestRemainderIdx = -1;
         float bestPenalty;
@@ -288,7 +290,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
             // Log iteration
             if (!remainders.isEmpty() && idx <= remainders.size()) {
                 double remainder = (idx < remainders.size() ? remainders[idx] : 1.0);
-                Console::log(Console::VVERB, "BLC e=%i ROUNDING it=%i [%i,%i]=>%i rmd=%.3f util=%.2f pen=%.2f", 
+                Console::log(verb, "BLC e=%i ROUNDING it=%i [%i,%i]=>%i rmd=%.3f util=%.2f pen=%.2f", 
                                 _balancing_epoch, iterations, lower, upper, idx,
                                 remainder, (float)utilization, p);
             }
@@ -300,8 +302,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
                 allVolumes = Rounding::getRoundedAssignments(bestRemainderIdx, sum, remainders, assignments);
 
                 double remainder = (bestRemainderIdx < remainders.size() ? remainders[bestRemainderIdx] : 1.0);
-                Console::log(Console::VVERB, 
-                            "BLC e=%i ROUNDING_DONE its=%i rmd=%.3f util=%.2f pen=%.2f", 
+                Console::log(verb, "BLC e=%i ROUNDING_DONE its=%i rmd=%.3f util=%.2f pen=%.2f", 
                             _balancing_epoch, iterations, remainder, bestUtilization, bestPenalty);
                 break;
 

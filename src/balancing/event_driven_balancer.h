@@ -175,16 +175,16 @@ public:
 
         _jobs_being_balanced = std::map<int, Job*>();
         for (const auto& it : jobs) {
+            // Must be root of this job in order to be considered
+            if (!it.second->isRoot()) continue;
 
-            bool isActiveRoot = it.second->isRoot() && it.second->isNotInState({INITIALIZING_TO_PAST}) 
+            bool isActive = it.second->isNotInState({INITIALIZING_TO_PAST}) 
                                 && (it.second->isInState({ACTIVE, STANDBY}) || it.second->isInitializing());
-            // Node must be root node to participate
-            bool participates = it.second->isRoot();
             // Job must be active, or must be initializing and already having the description
-            participates &= it.second->isInState({JobState::ACTIVE, JobState::STANDBY})
+            bool participates = it.second->isInState({JobState::ACTIVE, JobState::STANDBY})
                             || (it.second->isInState({JobState::INITIALIZING_TO_ACTIVE}) 
                                 && it.second->hasJobDescription());
-            if (participates || isActiveRoot) {
+            if (participates || isActive) {
                 // Job participates
                 _jobs_being_balanced[it.first] = it.second;
 
@@ -203,13 +203,14 @@ public:
                     // Not contained yet in state: try to insert into diffs map
                     bool inserted = _diffs.insertIfNovel(ev);
                     if (inserted) {
-                        Console::log(Console::INFO, "JOB_EVENT #%i d=%i (je=%i)", ev.jobId, ev.demand, epoch);
+                        Console::log(Console::VERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, epoch);
                         _job_epochs[it.first]++;
                     } 
                 }
 
                 numActiveJobs++;
-            } else if (it.second->isRoot() && _volumes.count(it.first)) {
+                
+            } else if (_volumes.count(it.first)) {
                 // Job used to be active, but not any more
                 _demands[it.first] = 0;
                 Event ev({it.first, _job_epochs[it.first], 0, _priorities[it.first]});
@@ -217,7 +218,7 @@ public:
                     // Not contained yet in state: try to insert into diffs map
                     bool inserted = _diffs.insertIfNovel(ev);
                     if (inserted) {
-                        Console::log(Console::INFO, "JOB_EVENT #%i d=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[it.first]);
+                        Console::log(Console::VERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[it.first]);
                         _job_epochs[it.first]++;
                     }    
                 }
