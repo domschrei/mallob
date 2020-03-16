@@ -126,7 +126,7 @@ public:
         std::vector<int> keysToErase;
         for (const auto& entry : _map) {
             if (otherMap.getEntries().count(entry.first) 
-                && otherMap.getEntries().at(entry.first).dominates(entry.second)) {
+                && otherMap.getEntries().at(entry.first).epoch >= entry.second.epoch) {
                 // Filtered out
                 keysToErase.push_back(entry.first);
             }
