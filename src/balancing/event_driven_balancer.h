@@ -197,8 +197,8 @@ public:
                 numActiveJobs++;
             } else if (_volumes.count(it.first)) {
                 // Job used to be active, but not any more
-                if (_states.getEntries().count(it.first) && _states.getEntries().at(it.first).demand > 0) {
-                    if (_diffs.getEntries().count(it.first) && _diffs.getEntries().at(it.first).demand > 0) {
+                if (!_states.getEntries().count(it.first) || _states.getEntries().at(it.first).demand != 0) {
+                    if (!_diffs.getEntries().count(it.first) || _diffs.getEntries().at(it.first).demand != 0) {
                         Event ev({it.first, _job_epochs[it.first], 0, _priorities[it.first]});
                         bool inserted = _diffs.insertIfNovel(ev);
                         if (inserted) _job_epochs[it.first]++;
