@@ -44,6 +44,8 @@ bool EventDrivenBalancer::reduceIfApplicable(int which) {
     // Enough time passed since last balancing?
     if (Timer::elapsedSeconds() - _last_balancing < _params.getFloatParam("p")) return false;
 
+    if (which == BOTH) Console::log(Console::INFO, "INITIATE_BALANCING (%i diffs)", _diffs.getEntries().size());
+
     // Send to according parents.
     bool done = false;
     if (which == NORMAL_TREE   || which == BOTH) done |= reduce(_diffs, false);
