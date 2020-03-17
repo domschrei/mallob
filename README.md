@@ -6,15 +6,17 @@
 
 ## Overview
 
-mallob is a platform for massively parallel processing of malleable jobs. Malleability means that the CPU resources of a job may vary _during its execution_ depending on the system's overall load. In its current orientation, mallob features multi-user, massively parallel, on-demand SAT solving as an application. 
+mallob is a platform for the massively parallel and distributed (up to around 1k nodes, 10k cores) processing of malleable jobs. Malleability means that the CPU resources of a job may vary _during its execution_ depending on the system's overall load. In its current orientation, mallob features multi-user, massively parallel, on-demand SAT solving as an application.
 
-The system is fully decentralized and features highly randomized dynamic malleable load balancing. When a new job arrives in the system, it will randomly bounce through the system (corresponding to a random walk) until an idle process adopts it and becomes the job's initial "root" process. Then, with the job dynamically updating its demand, the job may receive additional nodes which form a binary tree rooted at the initial process as their central means of communication.
+The system is fully decentralized and features highly randomized dynamic malleable load balancing realized over message passing (MPI). When a new job arrives in the system, it will randomly bounce through the system (corresponding to a random walk) until an idle process adopts it and becomes the job's initial "root" process. Then, with the job dynamically updating its demand, the job may receive additional nodes which form a binary tree rooted at the initial process as their central means of communication.
 
-Each root node in the system carries basic information on their job's meta data, such as its current demand, its current volume (= #processes) or its priority. A balancing phase consisting of one or multiple All-Reduction operations will be carried out either periodically or whenever the necessity rises. From the globally aggregated measures, each job can compute its new volume and can act accordingly by growing or shrinking its job tree.
+Each root node in the system carries basic information on their job's meta data, such as its current demand, its current volume (= #processes) or its priority. A balancing phase consisting of one or multiple All-Reduction operations that will be carried out either periodically or whenever the necessity arises. From the globally aggregated measures, each job can compute its new volume and can act accordingly by growing or shrinking its job tree.
+
+In its current early evaluation stage, mallob features a number of _simulated client processes_ which spawn jobs, introduce them to the system, and receive a response from the system when a solution was found or a timeout was hit. In the future, we intend to replace simulated client processes with interfaces "from the outer world", e.g. TCP/HTTP/..., to easily connect external applications to mallob.
 
 ## Building
 
-You need [SCons](www.scons.org) as a build tool.
+You need [SCons](www.scons.org) as a build tool. Additionally, a valid MPI installation is required (e.g. OpenMPI, Intel MPI, MPICH, ...).
 
 Go into the directory `src/hordesat` and execute `bash fetch_and_build_solvers.sh`.
 
