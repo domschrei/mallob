@@ -10,3 +10,4 @@ src/hordesat/*.zip
 mallob
 .sconsign.dblite
 .vscode/
+.ccls-cache

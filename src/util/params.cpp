@@ -30,6 +30,7 @@ void Parameters::init(int argc, char** argv) {
 void Parameters::setDefaults() {
     setParam("ba", "4"); // num bounce alternatives (only relevant if -derandomize)
     setParam("c", "1"); // num clients
+    //setParam("cg"); // continuous growth
     //setParam("colors"); // colored terminal output
     //setParam("derandomize"); // derandomize job bouncing
     setParam("bm", "ed"); // event-driven balancing (ed = event-driven, fp = fixed-period)
@@ -63,6 +64,8 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "Options:");
     Console::log(Console::INFO, "-ba=<num-ba>          Number of bounce alternatives per node (only relevant if -derandomize)");
     Console::log(Console::INFO, "-c=<num-clients>      Amount of client nodes (int c >= 1)");
+    Console::log(Console::INFO, "-cg                   Continuous growth of job demands: make job demands increase more finely grained"); 
+    Console::log(Console::INFO, "                      (node by node instead of layer by layer)");
     Console::log(Console::INFO, "-colors               Colored terminal output based on messages' verbosity");
     Console::log(Console::INFO, "-cpuh-per-instance=<time-limit> Timeout an instance after x cpu hours (x >= 0; 0: no timeout)");
     Console::log(Console::INFO, "-derandomize          Derandomize job bouncing");
@@ -73,7 +76,8 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "-h|-help              Print usage");
     Console::log(Console::INFO, "-jjp                  Jitter job priorities to break ties during rebalancing");
     Console::log(Console::INFO, "-l=<load-factor>      Load factor to be aimed at (0 < l < 1)");
-    Console::log(Console::INFO, "-lbc=<num-jobs>       Make each client a leaky bucket with x active jobs at any given time (int x >= 0, 0: jobs arrive at individual times instead)");
+    Console::log(Console::INFO, "-lbc=<num-jobs>       Make each client a leaky bucket with x active jobs at any given time");
+    Console::log(Console::INFO, "                      (int x >= 0, 0: jobs arrive at individual times instead)");
     Console::log(Console::INFO, "-log=<log-dir>        Directory to save logs in (default: .)");
     Console::log(Console::INFO, "-md=<max-demand>      Limit any job's demand to some maximum value (int x >= 0; 0: no limit)");
     Console::log(Console::INFO, "-nophase              Do not diversify solvers based on phase; native diversification only");
