@@ -66,7 +66,7 @@ bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
         // No parent / I AM ROOT. 
         
         // Send to other root
-        MyMpi::isend(MPI_COMM_WORLD, getRootRank(!reversedTree), MSG_ANYTIME_REDUCTION, data);
+        MyMpi::isend(MPI_COMM_WORLD, getRootRank(!reversedTree), MSG_ANYTIME_BROADCAST, data);
         Console::log_send(Console::VERB, getRootRank(!reversedTree), "ROOT_HANDSHAKE");
         
         // Broadcast and digest

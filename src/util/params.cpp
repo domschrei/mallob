@@ -53,6 +53,7 @@ void Parameters::setDefaults() {
     setParam("time-per-instance", "0"); // time limit per instance, in seconds wall clock time (0 = no limit)
     setParam("v", "2"); // verbosity 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...
     //setParam("warmup"); // warmup run
+    //setParam("yield"); // yield manager thread when no new messages
 }
 
 void Parameters::printUsage() {
@@ -94,6 +95,7 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "-time-per-instance=<time-limit> Timeout an instance after x seconds wall clock time (x >= 0; 0: no timeout)");
     Console::log(Console::INFO, "-v=<verb-num>         Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...");
     Console::log(Console::INFO, "-warmup               Do one explicit All-To-All warmup among all nodes in the beginning");
+    Console::log(Console::INFO, "-yield                Yield manager thread whenever there are no new messages");
 }
 
 string Parameters::getFilename() {

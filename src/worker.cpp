@@ -122,6 +122,9 @@ void Worker::mainProgram() {
     float lastJobCheckTime = Timer::elapsedSeconds();
     float sleepMicrosecs = 0;
 
+    bool doSleep = params.isSet("sleep");
+    bool doYield = params.isSet("yield");
+
     while (!checkTerminate()) {
 
         if (Timer::elapsedSeconds() - lastMemLogTime > 1.0) {
@@ -297,17 +300,25 @@ void Worker::mainProgram() {
             time = Timer::elapsedSeconds() - time;
             Console::log(Console::VVVERB, "processing msg, tag %i took %.4f s", handle->tag, time);
             sleepMicrosecs = 0;
-
-        } else if (params.isSet("sleep")) {
-            // No message: increase sleep duration
-            sleepMicrosecs += 100;
         }
         
         MyMpi::testSentHandles();
 
+        if (handle == NULL) {
+            // Did not process any incoming message: sleep and/or yield
+            if (doSleep) {
+                // Increase sleep duration, do sleep
+                sleepMicrosecs += 100;
+                if ((int)sleepMicrosecs > 0)
+                    usleep(std::min(10*1000, (int)sleepMicrosecs)); // in microsecs
+            }
+            if (doYield) {
+                // Yield thread, e.g. for some SAT thread
+                std::this_thread::yield();
+            }
+        }
+
         iteration++;
-        if ((int)sleepMicrosecs > 0)
-            usleep(std::min(10*1000, (int)sleepMicrosecs)); // in microsecs
     }
 
     Console::flush();
