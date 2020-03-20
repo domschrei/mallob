@@ -55,10 +55,11 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
     
     //std::memcpy(incommingBuffer, result.data(), result.size()*sizeof(int));
     
-	if (solvers.size() > 1) {
+	//if (solvers.size() > 1) {
 		// get all the clauses
 		cdb.setIncomingBuffer(result.data(), result.size());
-	}/* else {
+	//}
+	/* else {
 		// get all the clauses except for those that this node sent
 		cdb.setIncomingBuffer(result.data(), COMM_BUFFER_SIZE, size, rank);
 	}*/
