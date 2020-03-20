@@ -203,8 +203,9 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
     std::vector<int> nvips(buffers.size());
     int totalNumVips = 0;
     for (int i = 0; i < buffers.size(); i++) {
-        nvips[i] = (buffers[i]->size() > 0) ? buffers[i]->at(positions[i]++) : 0;
+        nvips[i] = (buffers[i]->size() > 0) ? buffers[i]->at(positions[i]) : 0;
         totalNumVips += nvips[i];
+        positions[i]++;
     } 
 
     // Store number of VIP clauses of resulting buffer here
@@ -251,13 +252,15 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
         int allclsoflen = 0;
         for (int i = 0; i < buffers.size(); i++) {
             nclsoflen[i] = positions[i] < buffers[i]->size() ? 
-                            buffers[i]->at(positions[i]++) : 0;
+                            buffers[i]->at(positions[i]) : 0;
             if (positions[i] < buffers[i]->size()) anyLeft = true;
             allclsoflen += nclsoflen[i];
+            positions[i]++;
         }
 
-        // Store number of clauses of clauseLength in result
-        result.push_back(allclsoflen);
+        // Store number of inserted clauses of clauseLength in result
+        result.push_back(0);
+        int& insclsoflen = result[result.size()-1];
         
         // Read clauses from buffers in a cyclic manner
         int picked = -1;
@@ -278,6 +281,7 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
             pos += clauseLength;
             nclsoflen[picked]--;
             allclsoflen--;
+            insclsoflen++;
         }
 
         clauseLength++;
