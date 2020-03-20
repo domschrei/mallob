@@ -232,6 +232,7 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
 
             cls.clear();
             nvips[picked]--;
+            totalNumVips--;
         }
     }
 
@@ -260,12 +261,13 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
             // Limit reached?
             if (result.size() + clauseLength > maxSize) return result;
 
-            do picked = (picked+1) % nvips.size(); while (nvips[picked] == 0);
+            do picked = (picked+1) % nvips.size(); while (nclsoflen[picked] == 0);
             const std::vector<int>& vec = *buffers[picked];
             int& pos = positions[picked];
 
             result.insert(result.end(), vec.begin()+pos, vec.begin()+pos+clauseLength);
             pos += clauseLength;
+            nclsoflen[picked]--;
             allclsoflen--;
         }
 
