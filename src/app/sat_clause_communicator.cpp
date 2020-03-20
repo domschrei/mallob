@@ -230,6 +230,7 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
             result.insert(result.end(), cls.begin(), cls.end());
             resvips++;
 
+            Console::append(Console::VVVERB, "VIP ");
             for (int l : cls) Console::append(Console::VVVERB, "%i ", l);
             Console::log(Console::VVVERB, "");
 
