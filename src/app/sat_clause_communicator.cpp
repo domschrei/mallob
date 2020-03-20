@@ -120,6 +120,7 @@ std::vector<int> SatClauseCommunicator::collectClausesFromSolvers(int maxSize) {
         return std::vector<int>();
     }
     // Else, retrieve clauses from solvers
+
     return _job->getSolver()->prepareSharing(maxSize);
 }
 void SatClauseCommunicator::insertIntoClauseBuffer(std::vector<int>& vec, int jobCommEpoch) {
@@ -140,7 +141,8 @@ void SatClauseCommunicator::insertIntoClauseBuffer(std::vector<int>& vec, int jo
 
 }
 void SatClauseCommunicator::collectClausesFromBelow(std::vector<int>& clauses, int jobCommEpoch) {
-
+    Console::log(Console::VVERB, "%s : (JCE=%i) local clause export", 
+                _job->toStr(), jobCommEpoch);
     insertIntoClauseBuffer(clauses, jobCommEpoch);
     _num_clause_sources++;
 }
@@ -162,6 +164,8 @@ std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch, 
     insertIntoClauseBuffer(selfClauses, jobCommEpoch);
 
     // Merge all collected buffer into a single buffer
+    Console::log(Console::VVERB, "%s : (JCE=%i) merging %i buffers", 
+                _job->toStr(), jobCommEpoch, _clause_buffers.size());
     std::vector<std::vector<int>*> buffers;
     for (auto& buf : _clause_buffers) buffers.push_back(&buf);
     std::vector<int> vec = merge(buffers, maxSize * CLAUSE_EXCHANGE_MULTIPLIER);
