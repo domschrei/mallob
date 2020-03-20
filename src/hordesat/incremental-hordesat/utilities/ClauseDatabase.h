@@ -38,16 +38,10 @@ public:
 	 */
 	unsigned int giveSelection(int* buffer, unsigned int size, int* selectedCount = NULL);
 	/**
-	 * Set the pointer for the buffer containing the incoming shared clauses which
-	 * is a concatenation of the data returned by the giveSelection method for all the
-	 * nodes. Each part has "size" integers.
+	 * Set the pointer for the buffer of <size> containing the incoming shared clauses 
+	 * which has the same shape as the data returned by the giveSelection method.
 	 */
-	void setIncomingBuffer(const int* buffer, int size, int nodes, int thisNode);
-	/**
-	 * Fill the given clause with the literals of the next VIP clause.
-	 * Return false if no more VIP clauses.
-	 */
-	bool getNextIncomingVIPClause(vector<int>& clause);
+	void setIncomingBuffer(const int* buffer, int size);
 	/**
 	 * Fill the given clause with the literals of the next incomming clause.
 	 * Return false if no more clauses.
@@ -56,13 +50,19 @@ public:
 
 private:
 	Mutex addClauseLock;
-	const int* incommingBuffer;
-	unsigned int size, nodes, thisNode;
-	unsigned int lastVipClsIndex, lastVipNode;
-	unsigned int lastClsSize, lastClsIndex, lastClsNode, lastClsCount;
 
+	// Structures for EXPORTING
 	vector<Bucket*> buckets;
 	vector<vector<int> > vipClauses;
+
+	// Structures for IMPORTING	
+	const int* incomingBuffer;
+	unsigned int bufferSize;
+	int currentPos;
+	int currentSize; // 0 for VIP clauses
+	int remainingVipLits;
+	int remainingClsOfCurrentSize;
+
 };
 
 #endif /* CLAUSEDATABASE_H_ */

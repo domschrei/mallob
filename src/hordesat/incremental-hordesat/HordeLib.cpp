@@ -253,10 +253,10 @@ int HordeLib::solveLoop() {
     return -1; // no result yet
 }
 
-std::vector<int> HordeLib::prepareSharing() {
+std::vector<int> HordeLib::prepareSharing(int maxSize) {
     assert(sharingManager != NULL);
 	hlog(3, "collecting clauses on this node\n");
-	std::vector<int> clauses = sharingManager->prepareSharing();
+	std::vector<int> clauses = sharingManager->prepareSharing(maxSize);
 	return clauses;
 }
 

@@ -88,7 +88,7 @@ public:
 	bool isFullyInitialized();
     int solveLoop();
 
-    std::vector<int> prepareSharing();
+    std::vector<int> prepareSharing(int maxSize);
     void digestSharing(const std::vector<int>& result);
 
     int finishSolving();

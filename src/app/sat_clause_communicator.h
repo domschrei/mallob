@@ -7,8 +7,8 @@
 #include "data/job.h"
 #include "app/sat_job.h"
 
-
-#define BROADCAST_CLAUSE_INTS_PER_NODE (MAX_JOB_MESSAGE_PAYLOAD_PER_NODE/sizeof(int))
+#define CLAUSE_EXCHANGE_INITIAL_SIZE 1500
+#define CLAUSE_EXCHANGE_MULTIPLIER 2
 
 const int MSG_GATHER_CLAUSES = 417;
 const int MSG_DISTRIBUTE_CLAUSES = 418;
@@ -20,7 +20,7 @@ private:
     Parameters& _params;
     SatJob* _job = NULL;
 
-    std::vector<int> _clause_buffer;
+    std::vector<std::vector<int>> _clause_buffers;
     int _num_clause_sources;
     int _job_comm_epoch_of_clause_buffer;
     int _last_shared_job_comm;
@@ -38,7 +38,7 @@ private:
     /**
      * Get clauses to share from the solvers, in order to propagate it to the parents.
      */
-    std::vector<int> collectClausesFromSolvers();
+    std::vector<int> collectClausesFromSolvers(int maxSize);
     /**
      * Store clauses from a child node in order to propagate it upwards later.
      */
@@ -47,13 +47,15 @@ private:
      * Returns all clauses that have been added by addClausesFromBelow(·),
      * plus the clauses from an additional call to collectClausesToShare(·).
      */
-    std::vector<int> shareCollectedClauses(int jobCommEpoch);
+    std::vector<int> shareCollectedClauses(int jobCommEpoch, int passedLayers);
     /**
      * Give a collection of learned clauses that came from a parent node
      * to the solvers.
      */
     void learnClausesFromAbove(std::vector<int>& clauses, int jobCommEpoch);
     void insertIntoClauseBuffer(std::vector<int>& vec, int jobCommEpoch);
+
+    std::vector<int> merge(const std::vector<std::vector<int>*>& buffers, int maxSize);
 
 };
 

@@ -12,7 +12,7 @@ void SatClauseCommunicator::initiateCommunication() {
         // internally learn collected clauses, if ACTIVE
         int jobCommEpoch = _job->getJobCommEpoch();
         if (_job->isInState({ACTIVE})) {
-            msg.payload = collectClausesFromSolvers();
+            msg.payload = collectClausesFromSolvers(CLAUSE_EXCHANGE_INITIAL_SIZE);
             learnClausesFromAbove(msg.payload, jobCommEpoch);
         }
         _last_shared_job_comm = jobCommEpoch;
@@ -21,7 +21,8 @@ void SatClauseCommunicator::initiateCommunication() {
     msg.jobId = _job->getId();
     msg.epoch = _job->getJobCommEpoch();
     msg.tag = MSG_GATHER_CLAUSES;
-    msg.payload = collectClausesFromSolvers();
+    msg.payload = collectClausesFromSolvers(CLAUSE_EXCHANGE_INITIAL_SIZE);
+    msg.payload.push_back(0); // last int: depth the clause buffer traversed through the job tree so far.
     int parentRank = _job->getParentNodeRank();
     Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) sending, size %i", _job->toStr(), msg.epoch, msg.payload.size());
     MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
@@ -36,6 +37,8 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
     // Unpack job message
     int jobId = msg.jobId;
     int epoch = msg.epoch;
+    int passedLayers = msg.payload.back();
+    msg.payload.pop_back();
     std::vector<int>& clauses = msg.payload;
 
     if (msg.tag == MSG_GATHER_CLAUSES) {
@@ -57,7 +60,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
         // Ready to share the clauses?
         if (canShareCollectedClauses()) {
 
-            std::vector<int> clausesToShare = shareCollectedClauses(epoch);
+            std::vector<int> clausesToShare = shareCollectedClauses(epoch, passedLayers);
             if (_job->isRoot()) {
                 // Share complete set of clauses to children
                 Console::log(Console::VERB, "%s : (JCE=%i) switching: gather => broadcast", _job->toStr(), epoch); 
@@ -85,7 +88,6 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
 void SatClauseCommunicator::learnAndDistributeClausesDownwards(std::vector<int>& clauses, int jobCommEpoch) {
 
     Console::log(Console::VVERB, "%s : (JCE=%i) learning, size %i", _job->toStr(), jobCommEpoch, clauses.size());
-    assert(clauses.size() % BROADCAST_CLAUSE_INTS_PER_NODE == 0);
 
     // Send clauses to children
     JobMessage msg;
@@ -111,39 +113,31 @@ void SatClauseCommunicator::learnAndDistributeClausesDownwards(std::vector<int>&
     }
 }
 
-std::vector<int> SatClauseCommunicator::collectClausesFromSolvers() {
+std::vector<int> SatClauseCommunicator::collectClausesFromSolvers(int maxSize) {
 
     // If not fully initialized yet, broadcast an empty set of clauses
     if (_job->isNotInState({ACTIVE}) || !_job->getSolver()->isFullyInitialized()) {
-        return std::vector<int>(BROADCAST_CLAUSE_INTS_PER_NODE, 0);
+        return std::vector<int>();
     }
     // Else, retrieve clauses from solvers
-    return _job->getSolver()->prepareSharing();
+    return _job->getSolver()->prepareSharing(maxSize);
 }
 void SatClauseCommunicator::insertIntoClauseBuffer(std::vector<int>& vec, int jobCommEpoch) {
 
     // If there are clauses in the buffer which are from a previous job comm epoch:
-    if (!_clause_buffer.empty() && _job_comm_epoch_of_clause_buffer != jobCommEpoch) {
+    if (!_clause_buffers.empty() && _job_comm_epoch_of_clause_buffer != jobCommEpoch) {
         // Previous clauses came from an old epoch; reset clause buffer
-        Console::log(Console::VVERB, "(JCE=%i) Discarding buffer, size %i, from old JCE %i", 
-                jobCommEpoch, _clause_buffer.size(), _job_comm_epoch_of_clause_buffer);
+        Console::log(Console::VVERB, "(JCE=%i) Discarding buffers from old JCE %i", 
+                jobCommEpoch, _job_comm_epoch_of_clause_buffer);
         _num_clause_sources = 0;
-        _clause_buffer.resize(0);
+        _clause_buffers.clear();
     }
     // Update epoch of current clause buffer
     _job_comm_epoch_of_clause_buffer = jobCommEpoch;
 
     // Insert clauses into local clause buffer for later sharing
-    _clause_buffer.insert(_clause_buffer.end(), vec.begin(), vec.end());
+    _clause_buffers.push_back(vec);
 
-    // Resize to multiple of #clause-ints per node
-    int prevSize = _clause_buffer.size();
-    int remainder = prevSize % BROADCAST_CLAUSE_INTS_PER_NODE;
-    if (remainder != 0) {
-        _clause_buffer.resize(prevSize + BROADCAST_CLAUSE_INTS_PER_NODE-remainder);
-        std::fill(_clause_buffer.begin()+prevSize, _clause_buffer.end(), 0);
-    }
-    assert(_clause_buffer.size() % BROADCAST_CLAUSE_INTS_PER_NODE == 0);
 }
 void SatClauseCommunicator::collectClausesFromBelow(std::vector<int>& clauses, int jobCommEpoch) {
 
@@ -159,16 +153,23 @@ bool SatClauseCommunicator::canShareCollectedClauses() {
     if (_job->hasRightChild()) numChildren++;
     return numChildren == _num_clause_sources;
 }
-std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch) {
+std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch, int passedLayers) {
+
+    int maxSize = CLAUSE_EXCHANGE_INITIAL_SIZE * std::pow(CLAUSE_EXCHANGE_MULTIPLIER, passedLayers);
 
     // Locally collect clauses from own solvers, add to clause buffer
-    std::vector<int> selfClauses = collectClausesFromSolvers();
+    std::vector<int> selfClauses = collectClausesFromSolvers(maxSize);
     insertIntoClauseBuffer(selfClauses, jobCommEpoch);
-    std::vector<int> vec = _clause_buffer;
 
-    // Reset clause buffer
+    // Merge all collected buffer into a single buffer
+    std::vector<std::vector<int>*> buffers;
+    for (auto& buf : _clause_buffers) buffers.push_back(&buf);
+    std::vector<int> vec = merge(buffers, maxSize * CLAUSE_EXCHANGE_MULTIPLIER);
+
+    // Reset clause buffers
     _num_clause_sources = 0;
-    _clause_buffer.resize(0);
+    _clause_buffers.clear();
+
     return vec;
 }
 void SatClauseCommunicator::learnClausesFromAbove(std::vector<int>& clauses, int jobCommEpoch) {
@@ -186,8 +187,86 @@ void SatClauseCommunicator::learnClausesFromAbove(std::vector<int>& clauses, int
     if (_job->getSolver() != NULL) _job->getSolver()->digestSharing(clauses);
     _job->unlockHordeManipulation();
     Console::log(Console::VVERB, "%s : (JCE=%i) digested", _job->toStr(), jobCommEpoch);
-    /*} else {
-        Console::log(Console::VVERB, "%s : (JCE=%i) discarded because job is being manipulated", 
-            toStr(), jobCommEpoch);
-    }*/
+}
+
+std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>*>& buffers, int maxSize) {
+    std::vector<int> result;
+
+    // Position counter for each buffer
+    std::vector<int> positions(buffers.size(), 0);
+
+    // How many VIP clauses in each buffer?
+    std::vector<int> nvips(buffers.size());
+    int totalNumVips = 0;
+    for (int i = 0; i < buffers.size(); i++) {
+        nvips[i] = (buffers[i]->size() > 0) ? buffers[i]->at(positions[i]++) : 0;
+        totalNumVips += nvips[i];
+    } 
+
+    // Store number of VIP clauses of resulting buffer here
+    result.push_back(0);
+    int& resvips = result[0];
+
+    std::vector<int> cls;
+    int picked = -1;
+    while (totalNumVips > 0) {
+        do picked = (picked+1) % nvips.size(); while (nvips[picked] == 0);
+        int& pos = positions[picked];
+        int lit = buffers[picked]->at(pos++);
+        // Append to clause
+        cls.push_back(lit);
+        if (lit == 0) {
+            // Clause finished
+
+            // Clause buffer size limit reached?
+            if (result.size() + cls.size() > maxSize)
+                return result;
+
+            // Insert clause into result clause buffer
+            result.insert(result.end(), cls.begin(), cls.end());
+            resvips++;
+
+            cls.clear();
+            nvips[picked]--;
+        }
+    }
+
+    int clauseLength = 1;
+    bool anyLeft = true;
+    while (anyLeft) {
+        anyLeft = false;
+
+        // Get number of clauses of clauseLength for each buffer
+        // and also the sum over all these numbers
+        std::vector<int> nclsoflen(buffers.size());
+        int allclsoflen = 0;
+        for (int i = 0; i < buffers.size(); i++) {
+            nclsoflen[i] = positions[i] < buffers[i]->size() ? 
+                            buffers[i]->at(positions[i]++) : 0;
+            if (positions[i] < buffers[i]->size()) anyLeft = true;
+            allclsoflen += nclsoflen[i];
+        }
+
+        // Store number of clauses of clauseLength in result
+        result.push_back(allclsoflen);
+        
+        // Read clauses from buffers in a cyclic manner
+        int picked = -1;
+        while (allclsoflen > 0) {
+            // Limit reached?
+            if (result.size() + clauseLength > maxSize) return result;
+
+            do picked = (picked+1) % nvips.size(); while (nvips[picked] == 0);
+            const std::vector<int>& vec = *buffers[picked];
+            int& pos = positions[picked];
+
+            result.insert(result.end(), vec.begin()+pos, vec.begin()+pos+clauseLength);
+            pos += clauseLength;
+            allclsoflen--;
+        }
+
+        clauseLength++;
+    }
+
+    return result;
 }

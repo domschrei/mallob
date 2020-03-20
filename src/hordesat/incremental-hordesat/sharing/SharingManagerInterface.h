@@ -21,7 +21,7 @@ struct SharingStatistics {
 class SharingManagerInterface {
 
 public:
-	virtual std::vector<int> prepareSharing() = 0;
+	virtual std::vector<int> prepareSharing(int maxSize) = 0;
     virtual void digestSharing(const std::vector<int>& result) = 0;
 
     virtual SharingStatistics getStatistics() = 0;

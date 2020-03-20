@@ -5,12 +5,13 @@
  *      Author: balyo
  */
 
-#include "ClauseDatabase.h"
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
+
+#include "ClauseDatabase.h"
 #include "DebugUtils.h"
 #include "Logger.h"
-
 
 void ClauseDatabase::addVIPClause(vector<int>& clause) {
 	addClauseLock.lock();
@@ -126,88 +127,51 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 	return used;
 }
 
-void ClauseDatabase::setIncomingBuffer(const int* buffer, int size, int nodes, int thisNode) {
-	incommingBuffer = buffer;
-	this->size = size;
-	this->nodes = nodes;
-	this->thisNode = thisNode;
-	lastVipClsIndex = 1;
-	lastVipNode = 0;
-
-	lastClsNode = 0;
-	lastClsSize = 1;
-	lastClsIndex = buffer[0]+2;
-	lastClsCount = buffer[buffer[0]+1];
+void ClauseDatabase::setIncomingBuffer(const int* buffer, int size) {
+	incomingBuffer = buffer;
+	bufferSize = size;
+	currentPos = 1;
+	currentSize = 0; // magic number for vip clauses
+	remainingClsOfCurrentSize = 0;
+	remainingVipLits = buffer[0]; // # VIP literals including separators
 }
 
 bool ClauseDatabase::getNextIncomingClause(vector<int>& cls) {
-	int offset = lastClsNode*size;
-	int loopIt = 0;
-	nodesCycle:
-	while (lastClsIndex + lastClsSize >= size || lastClsNode == thisNode) {
-		lastClsNode++;
-		if (lastClsNode >= nodes) {
-			return false;
-		}
-		offset += size;
-		lastClsSize = 1;
 
-		lastClsIndex = incommingBuffer[offset] + 2; //nr. of VIP clauses + 1
-		lastClsCount = incommingBuffer[offset + incommingBuffer[offset] + 1];
-		loopIt++;
-		if (loopIt == 100000) {
-			log(-1, "Max loops in clause database exceeded!");
-			return false;
-		}
-	}
-	while (lastClsCount == 0) {
-		lastClsSize++;
-		if (lastClsIndex + lastClsSize >= size) {
-			goto nodesCycle;
-		}
-		lastClsCount = incommingBuffer[offset + lastClsIndex];
-		lastClsIndex++;
-
-		loopIt++;
-		if (loopIt == 100000) {
-			log(-1, "Max loops in clause database exceeded!");
-			return false;
-		}
-	}
-	if (lastClsIndex + lastClsSize <= size) {
-		cls.clear();
-		for (unsigned int i = 0; i < lastClsSize; i++) {
-			cls.push_back(incommingBuffer[offset + lastClsIndex]);
-			lastClsIndex++;
-		}
-		lastClsCount--;
+	if (remainingVipLits > 0) {
+		// VIP clause
+		int start = currentPos++;
+		while (incomingBuffer[currentPos] != 0) currentPos++;
+		// currentPos is now at separator-"0" after the clause to export
+		cls.insert(cls.end(), incomingBuffer+start, incomingBuffer+currentPos);
+		// Move currentPos pointer to begin of next clause
+		currentPos++;
+		remainingVipLits--;
 		return true;
-	} else {
-		return false;
 	}
-}
 
-bool ClauseDatabase::getNextIncomingVIPClause(vector<int>& cls) {
-	unsigned int offset = lastVipNode*size;
-	unsigned int vipsHere = incommingBuffer[offset];
-	while (lastVipClsIndex > vipsHere) {
-		lastVipNode++;
-		offset = lastVipNode*size;
-		vipsHere = incommingBuffer[offset];
-		lastVipClsIndex = 1;
-		if (lastVipNode >= nodes) {
-			return false;
-		}
+	// Find appropriate clause size
+	while (remainingClsOfCurrentSize == 0) {
+		
+		// No more clauses?
+		if (currentPos >= bufferSize) return false;
+
+		// Go to next clause size
+		currentSize++;
+		remainingClsOfCurrentSize = incomingBuffer[currentPos++];
 	}
-	cls.clear();
-	while (incommingBuffer[offset + lastVipClsIndex] != 0) {
-		cls.push_back(incommingBuffer[offset + lastVipClsIndex]);
-		lastVipClsIndex++;
-	}
-	lastVipClsIndex++;
+	assert(remainingClsOfCurrentSize > 0);
+
+	// Get start and stop index of next clause
+	int start = currentPos;
+	int stop = start + currentSize;
+	currentPos = stop;
+	remainingClsOfCurrentSize--;
+
+	// Insert clause literals
+	cls.insert(cls.end(), incomingBuffer+start, incomingBuffer+stop);
 	return true;
 }
-
 
 ClauseDatabase::~ClauseDatabase() {
 	for (unsigned int i = 0; i < buckets.size(); i++) {
