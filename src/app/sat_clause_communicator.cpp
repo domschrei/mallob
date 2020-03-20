@@ -230,6 +230,9 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
             result.insert(result.end(), cls.begin(), cls.end());
             resvips++;
 
+            for (int l : cls) Console::append(Console::VVVERB, "%i ", l);
+            Console::log(Console::VVVERB, "");
+
             cls.clear();
             nvips[picked]--;
             totalNumVips--;
@@ -264,6 +267,10 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
             do picked = (picked+1) % nvips.size(); while (nclsoflen[picked] == 0);
             const std::vector<int>& vec = *buffers[picked];
             int& pos = positions[picked];
+
+            for (int i = pos; i < pos+clauseLength; i++) 
+                Console::append(Console::VVVERB, "%i ", vec[i]);
+            Console::log(Console::VVVERB, "");
 
             result.insert(result.end(), vec.begin()+pos, vec.begin()+pos+clauseLength);
             pos += clauseLength;
