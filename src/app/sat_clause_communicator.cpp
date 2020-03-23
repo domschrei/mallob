@@ -170,6 +170,7 @@ std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch, 
     int totalSize = selfSize;
     totalSize += _num_clause_sources * std::pow(_clause_buf_discount_factor, passedLayers+1) * (std::pow(2, passedLayers)-1) * _clause_buf_base_size;
     // std::pow(CLAUSE_EXCHANGE_MULTIPLIER, passedLayers);
+    Console::log(Console::VVVERB, "traversed_layers=%i max_total_size=%i", passedLayers, totalSize);
 
     // Locally collect clauses from own solvers, add to clause buffer
     std::vector<int> selfClauses = collectClausesFromSolvers(selfSize, jobCommEpoch);
