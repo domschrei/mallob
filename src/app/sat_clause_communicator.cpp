@@ -301,8 +301,7 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
 bool SatClauseCommunicator::testConsistency(std::vector<int>& buffer) {
     if (buffer.empty()) return true;
 
-    bool consistent = true;
-
+    int consistent = 0;
     int pos = 0;
 
     int numVips = buffer[pos++];
@@ -310,11 +309,11 @@ bool SatClauseCommunicator::testConsistency(std::vector<int>& buffer) {
     int clslength = 0;
     while (countedVips < numVips) {
         if (pos >= buffer.size()) {
-            consistent = false; break;
+            consistent = 1; break;
         }
         if (buffer[pos++] == 0) {
             if (clslength <= 0) {
-                consistent = false; break;
+                consistent = 2; break;
             }
             countedVips++;
             clslength = 0;
@@ -322,35 +321,35 @@ bool SatClauseCommunicator::testConsistency(std::vector<int>& buffer) {
         else clslength++;
     }
     if (countedVips != numVips) {
-        consistent = false;
+        consistent = 3;
     }
 
     int length = 1;
-    while (consistent && pos < buffer.size()) {
+    while (consistent == 0 && pos < buffer.size()) {
         int numCls = buffer[pos++];
         if (numCls < 0) {
-            consistent = false; break;
+            consistent = 4; break;
         }
         int endPos = (pos-1) + numCls * length;
         while (pos < endPos) {
             if (pos >= buffer.size()) {
-                consistent = false; break;
+                consistent = 5; break;
             }
             int lit = buffer[pos++];
             if (lit == 0) {
-                consistent = false; break;
+                consistent = 6; break;
             }
         }
         length++;
     }
 
-    if (!consistent) {
-        Console::log(Console::CRIT, "Consistency error in clause buffer at position %i", pos);
+    if (consistent > 0) {
+        Console::log(Console::CRIT, "Consistency error %i in clause buffer at position %i", consistent, pos);
         for (int p = 0; p <= pos && p < buffer.size(); p++) {
             Console::append(Console::CRIT, "%i ", buffer[p]);
         }
         Console::append(Console::CRIT, "\n");
         abort();
     }
-    return consistent;
+    return consistent == 0;
 }
