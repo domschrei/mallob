@@ -502,8 +502,8 @@ void Worker::handleRejectBecomeChild(MessageHandlePtr& handle) {
     JobRequest req; req.deserialize(*handle->recvData);
     assert(hasJob(req.jobId));
     Job &job = getJob(req.jobId);
-    assert(job.isInState({COMMITTED, INITIALIZING_TO_COMMITTED})
-            || Console::fail("Unexpected job state of %s : %s", job.toStr(), job.jobStateToStr()));
+    if (job.isNotInState({COMMITTED, INITIALIZING_TO_COMMITTED}))
+        return; // Commitment was already erased
 
     // Erase commitment
     Console::log_recv(Console::INFO, handle->source, "Rejected to become %s : uncommitting", job.toStr());
