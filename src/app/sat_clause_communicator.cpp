@@ -136,16 +136,16 @@ std::vector<int> SatClauseCommunicator::collectClausesFromSolvers(int maxSize, i
 void SatClauseCommunicator::insertIntoClauseBuffer(std::vector<int>& vec, int jobCommEpoch) {
 
     // If there are clauses in the buffer which are from a previous job comm epoch:
-    /*
     if (!_clause_buffers.empty() && _job_comm_epoch_of_clause_buffer != jobCommEpoch) {
         // Previous clauses came from an old epoch; reset clause buffer
         Console::log(Console::VVERB, "(JCE=%i) Discarding buffers from old JCE %i", 
                 jobCommEpoch, _job_comm_epoch_of_clause_buffer);
         _num_clause_sources = 0;
         _clause_buffers.clear();
-    }*/
+    }
     // Update epoch of current clause buffer
-    _job_comm_epoch_of_clause_buffer = std::max(_job_comm_epoch_of_clause_buffer, jobCommEpoch);
+    //_job_comm_epoch_of_clause_buffer = std::max(_job_comm_epoch_of_clause_buffer, jobCommEpoch);
+    _job_comm_epoch_of_clause_buffer = jobCommEpoch;
 
     // Insert clauses into local clause buffer for later sharing
     _clause_buffers.push_back(vec);
