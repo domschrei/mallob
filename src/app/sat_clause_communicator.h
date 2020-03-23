@@ -8,7 +8,7 @@
 #include "app/sat_job.h"
 
 #define CLAUSE_EXCHANGE_INITIAL_SIZE 1500
-#define CLAUSE_EXCHANGE_MULTIPLIER 3
+#define CLAUSE_EXCHANGE_MULTIPLIER 1.0
 
 const int MSG_GATHER_CLAUSES = 417;
 const int MSG_DISTRIBUTE_CLAUSES = 418;
@@ -38,7 +38,7 @@ private:
     /**
      * Get clauses to share from the solvers, in order to propagate it to the parents.
      */
-    std::vector<int> collectClausesFromSolvers(int maxSize);
+    std::vector<int> collectClausesFromSolvers(int maxSize, int jobCommEpoch);
     /**
      * Store clauses from a child node in order to propagate it upwards later.
      */
