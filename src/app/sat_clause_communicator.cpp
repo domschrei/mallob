@@ -163,7 +163,12 @@ bool SatClauseCommunicator::canShareCollectedClauses() {
     // except if one / both of them cannot exist according to volume
     if (_job->hasLeftChild()) numChildren++;
     if (_job->hasRightChild()) numChildren++;
-    return numChildren == _clause_buffers.size();
+    bool can = numChildren == _clause_buffers.size();
+    if (!can) {
+        Console::log(Console::VVERB, "%s : (JCE=?) cannot share yet -- %i/%i buffers arrived", 
+                _job->toStr(), _clause_buffers.size(), numChildren);
+    }
+    return can;
 }
 std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch, int passedLayers) {
 
