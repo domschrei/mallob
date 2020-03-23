@@ -326,20 +326,20 @@ bool SatClauseCommunicator::testConsistency(std::vector<int>& buffer) {
 
     int length = 1;
     while (consistent == 0 && pos < buffer.size()) {
-        int numCls = buffer[pos++];
+        int numCls = buffer[pos];
         if (numCls < 0) {
             consistent = 4; break;
         }
-        int endPos = (pos-1) + numCls * length;
-        while (pos < endPos) {
-            if (pos >= buffer.size()) {
+        for (int offset = 1; offset <= numCls * length; offset++) {
+            if (pos+offset >= buffer.size()) {
                 consistent = 5; break;
             }
-            int lit = buffer[pos++];
+            int lit = buffer[pos+offset];
             if (lit == 0) {
                 consistent = 6; break;
             }
         }
+        pos += numCls * length;
         length++;
     }
 
