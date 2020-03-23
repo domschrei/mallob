@@ -18,6 +18,8 @@
 #include "revision.c"
 
 void handler(int sig) {
+  Console::forceFlush();
+
   void *array[10];
   size_t size;
 
@@ -45,7 +47,7 @@ void doWorkerNodeProgram(MPI_Comm commWorkers, Parameters& params, const std::se
 }
 
 int main(int argc, char *argv[]) {
-    //signal(SIGSEGV, handler);
+    signal(SIGABRT, handler);
 
     Timer::init();
     MyMpi::init(argc, argv);
