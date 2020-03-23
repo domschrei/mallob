@@ -26,12 +26,17 @@ private:
     int _job_comm_epoch_of_clause_buffer;
     int _last_shared_job_comm;
 
+    bool _initialized = false;
+
 public:
     SatClauseCommunicator(Parameters& params, SatJob* job) : _params(params), _job(job), 
         _clause_buf_base_size(_params.getIntParam("cbbs")), 
         _clause_buf_discount_factor(_params.getFloatParam("cbdf")),
         _num_clause_sources(0), 
-        _job_comm_epoch_of_clause_buffer(-1), _last_shared_job_comm(-1) {} 
+        _job_comm_epoch_of_clause_buffer(-1), _last_shared_job_comm(-1) {
+
+        _initialized = true;
+    } 
     bool wantsToInitiateCommunication();
     void initiateCommunication();
     void continueCommunication(int source, JobMessage& msg);

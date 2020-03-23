@@ -5,6 +5,7 @@
 #include "util/mympi.h"
 
 void SatClauseCommunicator::initiateCommunication() {
+    if (!_initialized) return;
 
     JobMessage msg;
     if (_job->isRoot()) {
@@ -32,7 +33,7 @@ void SatClauseCommunicator::initiateCommunication() {
 
 void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
 
-    if (_job->isNotInState({JobState::ACTIVE}))
+    if (!_initialized || _job->isNotInState({JobState::ACTIVE}))
         return;
 
     // Unpack job message
