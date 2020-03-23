@@ -169,6 +169,7 @@ bool ClauseDatabase::getNextIncomingClause(vector<int>& cls) {
 	remainingClsOfCurrentSize--;
 
 	// Insert clause literals
+	cls.clear();
 	cls.insert(cls.end(), incomingBuffer+start, incomingBuffer+stop);
 	return true;
 }
