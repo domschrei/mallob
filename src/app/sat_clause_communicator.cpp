@@ -288,10 +288,11 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
             const std::vector<int>& vec = *buffers[picked];
             int pos = positions[picked];
 
+            /*
             Console::append(Console::VVVERB, "CLS ");
             for (int i = pos; i < pos+clauseLength; i++) 
                 Console::append(Console::VVVERB, "%i ", vec[i]);
-            Console::log(Console::VVVERB, "");
+            Console::log(Console::VVVERB, "");*/
 
             result.insert(result.end(), vec.begin()+pos, vec.begin()+pos+clauseLength);
             positions[picked] += clauseLength;
