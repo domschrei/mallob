@@ -349,6 +349,17 @@ MessageHandlePtr MyMpi::poll(const ListenerMode& mode) {
         }
     }
 
+    // If necessary, pick a deferred handle (if there is one)
+    if (bestPrioHandle == NULL) {
+        for (auto h : _deferred_handles) {
+            if (h->testReceived() && _tag_priority[h->tag] < bestPrio) {
+                bestPrio = _tag_priority[h->tag];
+                bestPrioHandle = h;
+                if (bestPrio == MIN_PRIORITY) break; // handle of minimum priority found
+            }
+        }   
+    }
+
     // Remove and return found handle
     if (bestPrioHandle != NULL) {
         _handles.erase(bestPrioHandle);
@@ -358,7 +369,7 @@ MessageHandlePtr MyMpi::poll(const ListenerMode& mode) {
 }
 
 void MyMpi::deferHandle(MessageHandlePtr handle) {
-    _handles.insert(handle);
+    _deferred_handles.insert(handle);
 }
 
 bool MyMpi::hasOpenSentHandles() {
