@@ -48,6 +48,7 @@ void doWorkerNodeProgram(MPI_Comm commWorkers, Parameters& params, const std::se
 
 int main(int argc, char *argv[]) {
     signal(SIGABRT, handler);
+    signal(SIGSEGV, handler);
 
     Timer::init();
     MyMpi::init(argc, argv);
