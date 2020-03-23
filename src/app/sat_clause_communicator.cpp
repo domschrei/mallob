@@ -12,7 +12,7 @@ void SatClauseCommunicator::initiateCommunication() {
         // internally learn collected clauses, if ACTIVE
         int jobCommEpoch = _job->getJobCommEpoch();
         if (_job->isInState({ACTIVE})) {
-            msg.payload = collectClausesFromSolvers(CLAUSE_EXCHANGE_MULTIPLIER * CLAUSE_EXCHANGE_INITIAL_SIZE);
+            msg.payload = collectClausesFromSolvers(CLAUSE_EXCHANGE_MULTIPLIER * CLAUSE_EXCHANGE_INITIAL_SIZE, jobCommEpoch);
             learnClausesFromAbove(msg.payload, jobCommEpoch);
         }
         _last_shared_job_comm = jobCommEpoch;
@@ -21,7 +21,7 @@ void SatClauseCommunicator::initiateCommunication() {
     msg.jobId = _job->getId();
     msg.epoch = _job->getJobCommEpoch();
     msg.tag = MSG_GATHER_CLAUSES;
-    msg.payload = collectClausesFromSolvers(CLAUSE_EXCHANGE_MULTIPLIER * CLAUSE_EXCHANGE_INITIAL_SIZE);
+    msg.payload = collectClausesFromSolvers(CLAUSE_EXCHANGE_MULTIPLIER * CLAUSE_EXCHANGE_INITIAL_SIZE, msg.epoch);
     msg.payload.push_back(0); // last int: depth the clause buffer traversed through the job tree so far.
     int parentRank = _job->getParentNodeRank();
     Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) sending, size %i", _job->toStr(), msg.epoch, msg.payload.size());
@@ -164,7 +164,7 @@ std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch, 
     // std::pow(CLAUSE_EXCHANGE_MULTIPLIER, passedLayers);
 
     // Locally collect clauses from own solvers, add to clause buffer
-    std::vector<int> selfClauses = collectClausesFromSolvers(selfSize);
+    std::vector<int> selfClauses = collectClausesFromSolvers(selfSize, jobCommEpoch);
     insertIntoClauseBuffer(selfClauses, jobCommEpoch);
 
     // Merge all collected buffer into a single buffer
