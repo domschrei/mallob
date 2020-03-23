@@ -293,3 +293,60 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
 
     return result;
 }
+
+bool SatClauseCommunicator::testConsistency(std::vector<int>& buffer) {
+    if (buffer.empty()) return true;
+
+    bool consistent = true;
+
+    int pos = 0;
+
+    int numVips = buffer[pos++];
+    int countedVips = 0;
+    int clslength = 0;
+    while (countedVips < numVips) {
+        if (pos >= buffer.size()) {
+            consistent = false; break;
+        }
+        if (buffer[pos++] == 0) {
+            if (clslength <= 0) {
+                consistent = false; break;
+            }
+            countedVips++;
+            clslength = 0;
+        }
+        else clslength++;
+    }
+    if (countedVips != numVips) {
+        consistent = false;
+    }
+
+    int length = 1;
+    while (consistent && pos < buffer.size()) {
+        int numCls = buffer[pos++];
+        if (numCls < 0) {
+            consistent = false; break;
+        }
+        int endPos = (pos-1) + numCls * length;
+        while (pos < endPos) {
+            if (pos >= buffer.size()) {
+                consistent = false; break;
+            }
+            int lit = buffer[pos++];
+            if (lit == 0) {
+                consistent = false; break;
+            }
+        }
+        length++;
+    }
+
+    if (!consistent) {
+        Console::log(Console::CRIT, "Consistency error in clause buffer at position %i", pos);
+        for (int p = 0; p <= pos && p < buffer.size(); p++) {
+            Console::append(Console::CRIT, "%i ", buffer[p]);
+        }
+        Console::append(Console::CRIT, "\n");
+        abort();
+    }
+    return consistent;
+}

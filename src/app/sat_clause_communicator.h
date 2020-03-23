@@ -57,6 +57,8 @@ private:
 
     std::vector<int> merge(const std::vector<std::vector<int>*>& buffers, int maxSize);
 
+    bool testConsistency(std::vector<int>& buffer);
+
 };
 
 #endif
