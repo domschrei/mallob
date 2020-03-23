@@ -268,7 +268,8 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
 
         // Store number of inserted clauses of clauseLength in result
         result.push_back(0);
-        int& insclsoflen = result[result.size()-1];
+        int numpos = result.size()-1;
+        int& insclsoflen = result[numpos];
         
         // Read clauses from buffers in a cyclic manner
         int picked = -1;
@@ -278,7 +279,7 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
 
             do picked = (picked+1) % nvips.size(); while (nclsoflen[picked] == 0);
             const std::vector<int>& vec = *buffers[picked];
-            int& pos = positions[picked];
+            int pos = positions[picked];
 
             Console::append(Console::VVVERB, "CLS ");
             for (int i = pos; i < pos+clauseLength; i++) 
@@ -286,7 +287,7 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
             Console::log(Console::VVVERB, "");
 
             result.insert(result.end(), vec.begin()+pos, vec.begin()+pos+clauseLength);
-            pos += clauseLength;
+            positions[picked] += clauseLength;
             nclsoflen[picked]--;
             allclsoflen--;
             insclsoflen++;
