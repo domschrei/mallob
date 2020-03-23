@@ -413,8 +413,9 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
             // Job is not known yet: create instance, request full transfer
             jobs[req.jobId] = new SatJob(params, MyMpi::size(comm), worldRank, req.jobId, epochCounter);
             fullTransfer = true;
-        } else if (!getJob(req.jobId).hasJobDescription()) {
-            // Job is known, but never received full description; request full transfer
+        } else if (!getJob(req.jobId).hasJobDescription() && !initializerThreads.count(req.jobId)) {
+            // Job is known, but never received full description, and no initializer thread is preparing it:
+            // request full transfer
             fullTransfer = true;
         }
         req.fullTransfer = fullTransfer ? 1 : 0;
@@ -603,6 +604,7 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
     getJob(jobId).beginInitialization();
     Console::log(Console::VERB, "Received full job description of #%i. Initializing ...", jobId);
 
+    assert(!initializerThreads.count(jobId));
     initializerThreads[jobId] = std::thread(&Worker::initJob, this, handle);
 }
 
