@@ -339,7 +339,7 @@ bool SatClauseCommunicator::testConsistency(std::vector<int>& buffer) {
                 consistent = 6; break;
             }
         }
-        pos += numCls * length;
+        pos += numCls * length + 1;
         length++;
     }
 
