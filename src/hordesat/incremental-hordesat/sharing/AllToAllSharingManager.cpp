@@ -77,25 +77,6 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 			failedFilter++;
 		}
 	}
-	for (size_t sid = 0; sid < solvers.size(); sid++) {
-		solvers[sid]->addLearnedClauses(clausesToAdd);
-	}
-	/*
-	if (solvers.size() > 1) {
-		for (size_t sid = 0; sid < solvers.size(); sid++) {
-			for (size_t cid = 0; cid < clausesToAdd.size(); cid++) {
-				if (solverFilters[sid]->registerClause(clausesToAdd[cid])) {
-					solvers[sid]->addLearnedClause(clausesToAdd[cid]);
-				}
-			}
-			if (!params.isSet("fd")) {
-				solverFilters[sid]->clear();
-			}
-		}
-	} else {
-		solvers[0]->addLearnedClauses(clausesToAdd);
-	}
-	*/
 	int total = passedFilter + failedFilter;
 	stats.filteredClauses += failedFilter;
 	stats.importedClauses += passedFilter;
@@ -104,7 +85,9 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 				100*failedFilter/total,
 				failedFilter, total, totalLen/(float)total);
 	}
-
+	for (size_t sid = 0; sid < solvers.size(); sid++) {
+		solvers[sid]->addLearnedClauses(clausesToAdd);
+	}
 }
 
 SharingStatistics DefaultSharingManager::getStatistics() {
