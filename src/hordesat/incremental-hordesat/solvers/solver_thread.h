@@ -25,7 +25,7 @@ public:
     SolverThread(void* args) {
         _args = (thread_args*)args;
     }
-    ~SolverThread() {}
+    ~SolverThread();
     void* run();
 
 private:
