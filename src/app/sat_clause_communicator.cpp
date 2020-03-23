@@ -38,13 +38,14 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
     // Unpack job message
     int jobId = msg.jobId;
     int epoch = msg.epoch;
-    int passedLayers = msg.payload.back();
-    msg.payload.pop_back();
-    std::vector<int>& clauses = msg.payload;
-    testConsistency(clauses);
 
     if (msg.tag == MSG_GATHER_CLAUSES) {
         // Gather received clauses, send to parent
+
+        int passedLayers = msg.payload.back();
+        msg.payload.pop_back();
+        std::vector<int>& clauses = msg.payload;
+        testConsistency(clauses);
         
         Console::log(Console::VERB, "%s : (JCE=%i) received, size %i", _job->toStr(), epoch, clauses.size());
 
@@ -75,6 +76,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
                 msg.epoch = epoch;
                 msg.tag = MSG_GATHER_CLAUSES;
                 msg.payload = clausesToShare;
+                msg.payload.push_back(passedLayers+1);
                 Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) gathering", _job->toStr(), epoch);
                 MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
             }
@@ -83,6 +85,10 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
 
     } else if (msg.tag == MSG_DISTRIBUTE_CLAUSES) {
         // Learn received clauses, send them to children
+
+        std::vector<int>& clauses = msg.payload;
+        testConsistency(clauses);
+
         learnAndDistributeClausesDownwards(clauses, epoch);
     }
 }
