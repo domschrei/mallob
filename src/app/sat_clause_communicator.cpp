@@ -42,7 +42,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
     if (msg.tag == MSG_GATHER_CLAUSES) {
         // Gather received clauses, send to parent
 
-        int passedLayers = msg.payload.back();
+        int passedLayers = msg.payload.back() + 1;
         msg.payload.pop_back();
         std::vector<int>& clauses = msg.payload;
         testConsistency(clauses);
@@ -76,7 +76,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
                 msg.epoch = epoch;
                 msg.tag = MSG_GATHER_CLAUSES;
                 msg.payload = clausesToShare;
-                msg.payload.push_back(passedLayers+1);
+                msg.payload.push_back(passedLayers);
                 Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) gathering", _job->toStr(), epoch);
                 MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
             }
