@@ -269,7 +269,6 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
         // Store number of inserted clauses of clauseLength in result
         result.push_back(0);
         int numpos = result.size()-1;
-        int& insclsoflen = result[numpos];
         
         // Read clauses from buffers in a cyclic manner
         int picked = -1;
@@ -290,7 +289,7 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
             positions[picked] += clauseLength;
             nclsoflen[picked]--;
             allclsoflen--;
-            insclsoflen++;
+            result[numpos]++;
         }
 
         clauseLength++;
@@ -346,8 +345,9 @@ bool SatClauseCommunicator::testConsistency(std::vector<int>& buffer) {
 
     if (consistent > 0) {
         Console::log(Console::CRIT, "Consistency error %i in clause buffer at position %i", consistent, pos);
-        for (int p = 0; p <= pos && p < buffer.size(); p++) {
-            Console::append(Console::CRIT, "%i ", buffer[p]);
+        for (int p = 0; p < buffer.size(); p++) {
+            if (p == pos) Console::append(Console::CRIT, "(%i) ", buffer[p]);
+            else          Console::append(Console::CRIT, "%i ", buffer[p]);
         }
         Console::append(Console::CRIT, "\n");
         abort();
