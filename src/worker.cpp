@@ -592,6 +592,9 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
     if (handle->recvData->size() == sizeof(int)) {
         // Empty job description!
         Console::log(Console::VERB, "Received empty job description of #%i!", jobId);
+        if (getJob(jobId).isInState({COMMITTED, INITIALIZING_TO_COMMITTED})) {
+            getJob(jobId).uncommit();
+        }
         return;
     }
 
