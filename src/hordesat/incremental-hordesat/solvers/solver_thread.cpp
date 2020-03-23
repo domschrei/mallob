@@ -28,9 +28,12 @@ void pinThread(HordeLib* hlib, int solversCount) {
 void* SolverThread::run() {
 
     init();
-    waitWhile(INITIALIZING);
-    readFormula();
-    diversify();
+    if (!cancelThread())
+        waitWhile(INITIALIZING);
+    if (!cancelThread())
+        readFormula();
+    if (!cancelThread())
+        diversify();
 
     while (!cancelThread()) {
     
