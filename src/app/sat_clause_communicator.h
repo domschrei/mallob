@@ -2,6 +2,8 @@
 #ifndef DOMPASCH_MALLOB_SAT_CLAUSE_COMMUNICATOR_H
 #define DOMPASCH_MALLOB_SAT_CLAUSE_COMMUNICATOR_H
 
+#include <map>
+
 #include "util/params.h"
 #include "data/job_transfer.h"
 #include "data/job.h"
@@ -21,8 +23,7 @@ private:
     const int _clause_buf_base_size;
     const float _clause_buf_discount_factor;
 
-    std::vector<std::vector<int>> _clause_buffers;
-    int _num_clause_sources;
+    std::map<int, std::vector<int>> _clause_buffers;
     int _job_comm_epoch_of_clause_buffer;
     int _last_shared_job_comm;
 
@@ -32,7 +33,6 @@ public:
     SatClauseCommunicator(Parameters& params, SatJob* job) : _params(params), _job(job), 
         _clause_buf_base_size(_params.getIntParam("cbbs")), 
         _clause_buf_discount_factor(_params.getFloatParam("cbdf")),
-        _num_clause_sources(0), 
         _job_comm_epoch_of_clause_buffer(-1), _last_shared_job_comm(-1) {
 
         _initialized = true;
@@ -51,7 +51,7 @@ private:
     /**
      * Store clauses from a child node in order to propagate it upwards later.
      */
-    void collectClausesFromBelow(std::vector<int>& clauses, int jobCommEpoch);
+    void collectClausesFromBelow(std::vector<int>& clauses, int jobCommEpoch, int origin);
     /**
      * Returns all clauses that have been added by addClausesFromBelow(·),
      * plus the clauses from an additional call to collectClausesToShare(·).
@@ -62,7 +62,7 @@ private:
      * to the solvers.
      */
     void learnClausesFromAbove(std::vector<int>& clauses, int jobCommEpoch);
-    void insertIntoClauseBuffer(std::vector<int>& vec, int jobCommEpoch);
+    void insertIntoClauseBuffer(std::vector<int>& vec, int jobCommEpoch, int origin);
 
     std::vector<int> merge(const std::vector<std::vector<int>*>& buffers, int maxSize);
 
