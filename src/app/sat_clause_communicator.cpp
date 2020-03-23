@@ -123,7 +123,7 @@ std::vector<int> SatClauseCommunicator::collectClausesFromSolvers(int maxSize, i
     }
     // Else, retrieve clauses from solvers
     Console::log(Console::VVERB, "%s : (JCE=%i) Collecting local clauses, max. size %i", 
-                _job->toStr(), jobCommEpoch, _clause_buffers.size(), maxSize);
+                _job->toStr(), jobCommEpoch, maxSize);
     return _job->getSolver()->prepareSharing(maxSize);
 }
 void SatClauseCommunicator::insertIntoClauseBuffer(std::vector<int>& vec, int jobCommEpoch) {
