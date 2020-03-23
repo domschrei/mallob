@@ -30,6 +30,8 @@ void Parameters::init(int argc, char** argv) {
 void Parameters::setDefaults() {
     setParam("ba", "4"); // num bounce alternatives (only relevant if -derandomize)
     setParam("c", "1"); // num clients
+    setParam("cbbs", "1500"); // clause buffer base size
+    setParam("cbdf", "1.0"); // clause buffer discount factor
     //setParam("cg"); // continuous growth
     //setParam("colors"); // colored terminal output
     //setParam("derandomize"); // derandomize job bouncing
@@ -65,6 +67,9 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "Options:");
     Console::log(Console::INFO, "-ba=<num-ba>          Number of bounce alternatives per node (only relevant if -derandomize)");
     Console::log(Console::INFO, "-c=<num-clients>      Amount of client nodes (int c >= 1)");
+    Console::log(Console::INFO, "-cbbs=<size>          Clause buffer base size in integers (default: 1500)");
+    Console::log(Console::INFO, "-cbdf=<factor>        Clause buffer discount factor: reduce buffer size per node by <factor> each depth");
+    Console::log(Console::INFO, "                      (0 < factor <= 1.0; default: 1.0)");
     Console::log(Console::INFO, "-cg                   Continuous growth of job demands: make job demands increase more finely grained"); 
     Console::log(Console::INFO, "                      (node by node instead of layer by layer)");
     Console::log(Console::INFO, "-colors               Colored terminal output based on messages' verbosity");

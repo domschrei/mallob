@@ -12,7 +12,7 @@ void SatClauseCommunicator::initiateCommunication() {
         // internally learn collected clauses, if ACTIVE
         int jobCommEpoch = _job->getJobCommEpoch();
         if (_job->isInState({ACTIVE})) {
-            msg.payload = collectClausesFromSolvers(CLAUSE_EXCHANGE_MULTIPLIER * CLAUSE_EXCHANGE_INITIAL_SIZE, jobCommEpoch);
+            msg.payload = collectClausesFromSolvers(std::ceil(_clause_buf_discount_factor * _clause_buf_base_size), jobCommEpoch);
             learnClausesFromAbove(msg.payload, jobCommEpoch);
         }
         _last_shared_job_comm = jobCommEpoch;
@@ -21,7 +21,7 @@ void SatClauseCommunicator::initiateCommunication() {
     msg.jobId = _job->getId();
     msg.epoch = _job->getJobCommEpoch();
     msg.tag = MSG_GATHER_CLAUSES;
-    msg.payload = collectClausesFromSolvers(CLAUSE_EXCHANGE_MULTIPLIER * CLAUSE_EXCHANGE_INITIAL_SIZE, msg.epoch);
+    msg.payload = collectClausesFromSolvers(std::ceil(_clause_buf_discount_factor * _clause_buf_base_size), msg.epoch);
     testConsistency(msg.payload);
     msg.payload.push_back(0); // last int: depth the clause buffer traversed through the job tree so far.
     int parentRank = _job->getParentNodeRank();
@@ -166,9 +166,9 @@ bool SatClauseCommunicator::canShareCollectedClauses() {
 }
 std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch, int passedLayers) {
 
-    int selfSize = CLAUSE_EXCHANGE_INITIAL_SIZE * std::pow(CLAUSE_EXCHANGE_MULTIPLIER, passedLayers+1);
+    int selfSize = std::ceil(_clause_buf_base_size * std::pow(_clause_buf_discount_factor, passedLayers+1));
     int totalSize = selfSize;
-    totalSize += _num_clause_sources * std::pow(CLAUSE_EXCHANGE_MULTIPLIER, passedLayers+1) * (std::pow(2, passedLayers)-1) * CLAUSE_EXCHANGE_INITIAL_SIZE;
+    totalSize += _num_clause_sources * std::pow(_clause_buf_discount_factor, passedLayers+1) * (std::pow(2, passedLayers)-1) * _clause_buf_base_size;
     // std::pow(CLAUSE_EXCHANGE_MULTIPLIER, passedLayers);
 
     // Locally collect clauses from own solvers, add to clause buffer

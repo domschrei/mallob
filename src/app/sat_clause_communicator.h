@@ -7,8 +7,6 @@
 #include "data/job.h"
 #include "app/sat_job.h"
 
-#define CLAUSE_EXCHANGE_INITIAL_SIZE 1500
-#define CLAUSE_EXCHANGE_MULTIPLIER 1.0
 
 const int MSG_GATHER_CLAUSES = 417;
 const int MSG_DISTRIBUTE_CLAUSES = 418;
@@ -20,13 +18,19 @@ private:
     Parameters& _params;
     SatJob* _job = NULL;
 
+    const int _clause_buf_base_size;
+    const float _clause_buf_discount_factor;
+
     std::vector<std::vector<int>> _clause_buffers;
     int _num_clause_sources;
     int _job_comm_epoch_of_clause_buffer;
     int _last_shared_job_comm;
 
 public:
-    SatClauseCommunicator(Parameters& params, SatJob* job) : _params(params), _job(job), _num_clause_sources(0), 
+    SatClauseCommunicator(Parameters& params, SatJob* job) : _params(params), _job(job), 
+        _clause_buf_base_size(_params.getIntParam("cbbs")), 
+        _clause_buf_discount_factor(_params.getFloatParam("cbdf")),
+        _num_clause_sources(0), 
         _job_comm_epoch_of_clause_buffer(-1), _last_shared_job_comm(-1) {} 
     bool wantsToInitiateCommunication();
     void initiateCommunication();
