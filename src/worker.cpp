@@ -606,6 +606,7 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
 void Worker::initJob(MessageHandlePtr handle) {
     
     // Deserialize job description
+    assert(handle->recvData->size() >= sizeof(int));
     int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
     Console::log_recv(Console::VERB, handle->source, "Deserializing job #%i , description has size %i ...", jobId, handle->recvData->size());
     Job& job = getJob(jobId);
