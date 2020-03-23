@@ -331,6 +331,10 @@ void Worker::handleQueryVolume(MessageHandlePtr& handle) {
     int jobId = payload[0];
 
     assert(hasJob(jobId));
+    
+    // No volume of this job (yet?) -- ignore.
+    if (!balancer->hasVolume(jobId)) return;
+
     int volume = balancer->getVolume(jobId);
     IntVec response({jobId, volume});
 

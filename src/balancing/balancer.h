@@ -16,6 +16,7 @@ public:
     _comm(comm), _params(params), _stats(stats), _load_factor(params.getFloatParam("l")), _balancing(false) {}
 
     int getVolume(int jobId);
+    bool hasVolume(int jobId);
     void updateVolume(int jobId, int volume);
 
 

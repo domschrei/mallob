@@ -3,8 +3,12 @@
 
 int Balancer::getVolume(int jobId) {
     if (!_volumes.count(jobId))
-        _volumes[jobId] = 1;
+        return 1;
     return _volumes[jobId];
+}
+
+bool Balancer::hasVolume(int jobId) {
+    return _volumes.count(jobId);
 }
 
 void Balancer::updateVolume(int jobId, int volume) {
