@@ -25,10 +25,7 @@ public:
     SolverThread(void* args) {
         _args = (thread_args*)args;
     }
-    ~SolverThread() {
-        if (hlib != NULL && _args != NULL)        
-            hlib->solverThreadsRunning[_args->solverId] = false;
-    }
+    ~SolverThread() {}
     void* run();
 
 private:
