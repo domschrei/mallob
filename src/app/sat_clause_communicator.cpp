@@ -22,6 +22,7 @@ void SatClauseCommunicator::initiateCommunication() {
     msg.epoch = _job->getJobCommEpoch();
     msg.tag = MSG_GATHER_CLAUSES;
     msg.payload = collectClausesFromSolvers(CLAUSE_EXCHANGE_MULTIPLIER * CLAUSE_EXCHANGE_INITIAL_SIZE, msg.epoch);
+    testConsistency(msg.payload);
     msg.payload.push_back(0); // last int: depth the clause buffer traversed through the job tree so far.
     int parentRank = _job->getParentNodeRank();
     Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) sending, size %i", _job->toStr(), msg.epoch, msg.payload.size());
@@ -40,6 +41,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
     int passedLayers = msg.payload.back();
     msg.payload.pop_back();
     std::vector<int>& clauses = msg.payload;
+    testConsistency(clauses);
 
     if (msg.tag == MSG_GATHER_CLAUSES) {
         // Gather received clauses, send to parent
@@ -165,6 +167,7 @@ std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch, 
 
     // Locally collect clauses from own solvers, add to clause buffer
     std::vector<int> selfClauses = collectClausesFromSolvers(selfSize, jobCommEpoch);
+    testConsistency(selfClauses);
     insertIntoClauseBuffer(selfClauses, jobCommEpoch);
 
     // Merge all collected buffer into a single buffer
@@ -173,6 +176,7 @@ std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch, 
     std::vector<std::vector<int>*> buffers;
     for (auto& buf : _clause_buffers) buffers.push_back(&buf);
     std::vector<int> vec = merge(buffers, totalSize);
+    testConsistency(vec);
 
     // Reset clause buffers
     _num_clause_sources = 0;
