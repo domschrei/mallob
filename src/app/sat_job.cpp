@@ -48,6 +48,7 @@ bool SatJob::appl_initialize() {
     } else {
         params["d"] = "7"; // sparse random + native diversification
     }
+    params["fd"]; // filter duplicate clauses
     params["i"] = "0"; // #microseconds to sleep during solve loop
     params["v"] = (this->_params.getIntParam("v") >= 3 ? "1" : "0"); // verbosity
     params["mpirank"] = std::to_string(getIndex()); // mpi_rank
@@ -55,17 +56,23 @@ bool SatJob::appl_initialize() {
     std::string identifier = std::string(toStr());
     params["jobstr"] = identifier;
 
-    if (_abort_after_initialization) return false;
-
     lockHordeManipulation();
+    if (_abort_after_initialization) {
+        unlockHordeManipulation();
+        return false;
+    }
+
     Console::log(Console::VERB, "%s : creating horde instance", toStr());
     _solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(identifier))));
     _clause_comm = (void*) new SatClauseCommunicator(_params, this);
     unlockHordeManipulation();
 
-    if (_abort_after_initialization) return false;
-
     lockHordeManipulation();
+    if (_abort_after_initialization) {
+        unlockHordeManipulation();
+        return false;
+    }
+
     if (_solver != NULL) {
         Console::log(Console::VERB, "%s : beginning to solve", toStr());
         JobDescription& desc = getDescription();
