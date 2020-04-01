@@ -24,7 +24,7 @@ void SatClauseCommunicator::initiateCommunication() {
     msg.tag = MSG_GATHER_CLAUSES;
     msg.payload = collectClausesFromSolvers(std::ceil(_clause_buf_discount_factor * _clause_buf_base_size), msg.epoch);
     testConsistency(msg.payload);
-    msg.payload.push_back(0); // last int: depth the clause buffer traversed through the job tree so far.
+    msg.payload.push_back(1); // last int: depth the clause buffer traversed through the job tree so far.
     int parentRank = _job->getParentNodeRank();
     Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) sending, size %i", _job->toStr(), msg.epoch, msg.payload.size());
     MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
