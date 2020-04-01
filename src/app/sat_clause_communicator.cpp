@@ -174,8 +174,9 @@ bool SatClauseCommunicator::canShareCollectedClauses() {
 std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch, int numAggregated) {
 
     assert(numAggregated > 0);
-    int totalSize = std::ceil(numAggregated * _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(numAggregated)));
-    int selfSize = std::ceil((float)totalSize / numAggregated);
+    float s = _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(numAggregated+1));
+    int totalSize = std::ceil(numAggregated * s);
+    int selfSize = std::ceil(s);
     // std::pow(CLAUSE_EXCHANGE_MULTIPLIER, passedLayers);
     Console::log(Console::VVVERB, "num_aggregated=%i max_total_size=%i", numAggregated, totalSize);
 
