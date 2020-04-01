@@ -198,10 +198,15 @@ void Worker::mainProgram() {
                     MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_WORKER_FOUND_RESULT, payload);
                     //stats.increment("sentMessages");
 
-                } else if (!job.isRoot() && initializing && !job.isInitializing()) {
-                    // Non-root worker finished initialization
-                    IntVec payload({job.getId()});
-                    MyMpi::isend(MPI_COMM_WORLD, job.getParentNodeRank(), MSG_QUERY_VOLUME, payload);
+                } else if (initializing && !job.isInitializing()) {
+                    if (job.isRoot()) {
+                        // Root worker finished initialization: begin growing if applicable
+                        if (balancer->hasVolume(id)) updateVolume(id, balancer->getVolume(id));
+                    } else {
+                        // Non-root worker finished initialization
+                        IntVec payload({job.getId()});
+                        MyMpi::isend(MPI_COMM_WORLD, job.getParentNodeRank(), MSG_QUERY_VOLUME, payload);
+                    }
                 }
             }
 
