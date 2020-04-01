@@ -108,7 +108,7 @@ void Worker::init() {
 
 bool Worker::checkTerminate() {
     if (exiting) return true;
-    if (params.getFloatParam("T") > 0 && Timer::elapsedSeconds() > params.getFloatParam("T")) {
+    if (globalTimeout > 0 && Timer::elapsedSeconds() > globalTimeout) {
         Console::log(Console::INFO, "Global timeout: terminating.");
         return true;
     }
@@ -216,7 +216,7 @@ void Worker::mainProgram() {
         // Poll a message, if present
         MessageHandlePtr handle;
         float pollTime = Timer::elapsedSeconds();
-        if ((handle = MyMpi::poll(ListenerMode::WORKER)) != NULL) {
+        while ((handle = MyMpi::poll(ListenerMode::WORKER)) != NULL) {
             pollTime = Timer::elapsedSeconds() - pollTime;
 
             Console::log(Console::VVVERB, "loop cycle %i", iteration);
@@ -305,6 +305,7 @@ void Worker::mainProgram() {
             time = Timer::elapsedSeconds() - time;
             Console::log(Console::VVVERB, "processing msg, tag %i took %.4f s", handle->tag, time);
             sleepMicrosecs = 0;
+            pollTime = Timer::elapsedSeconds();
         }
         
         MyMpi::testSentHandles();
