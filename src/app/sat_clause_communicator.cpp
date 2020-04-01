@@ -43,7 +43,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
     if (msg.tag == MSG_GATHER_CLAUSES) {
         // Gather received clauses, send to parent
 
-        int passedLayers = msg.payload.back() + 1;
+        int numAggregated = msg.payload.back() + 1 + _num_clause_sources;
         msg.payload.pop_back();
         std::vector<int>& clauses = msg.payload;
         testConsistency(clauses);
@@ -64,7 +64,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
         // Ready to share the clauses?
         if (canShareCollectedClauses()) {
 
-            std::vector<int> clausesToShare = shareCollectedClauses(epoch, passedLayers);
+            std::vector<int> clausesToShare = shareCollectedClauses(epoch, numAggregated);
             if (_job->isRoot()) {
                 // Share complete set of clauses to children
                 Console::log(Console::VERB, "%s : (JCE=%i) switching: gather => broadcast", _job->toStr(), epoch); 
@@ -77,7 +77,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
                 msg.epoch = epoch;
                 msg.tag = MSG_GATHER_CLAUSES;
                 msg.payload = clausesToShare;
-                msg.payload.push_back(passedLayers);
+                msg.payload.push_back(numAggregated);
                 Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) gathering", _job->toStr(), epoch);
                 MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
             }
@@ -171,13 +171,13 @@ bool SatClauseCommunicator::canShareCollectedClauses() {
     if (_job->hasRightChild()) numChildren++;
     return _num_clause_sources >= numChildren;
 }
-std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch, int passedLayers) {
+std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch, int numAggregated) {
 
-    int selfSize = std::ceil(_clause_buf_base_size * std::pow(_clause_buf_discount_factor, passedLayers+1));
-    int totalSize = selfSize;
-    totalSize += _num_clause_sources * std::pow(_clause_buf_discount_factor, passedLayers+1) * (std::pow(2, passedLayers)-1) * _clause_buf_base_size;
+    assert(numAggregated > 0);
+    int totalSize = std::ceil(numAggregated * _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(numAggregated)));
+    int selfSize = std::ceil((float)totalSize / numAggregated);
     // std::pow(CLAUSE_EXCHANGE_MULTIPLIER, passedLayers);
-    Console::log(Console::VVVERB, "traversed_layers=%i max_total_size=%i", passedLayers, totalSize);
+    Console::log(Console::VVVERB, "num_aggregated=%i max_total_size=%i", numAggregated, totalSize);
 
     // Locally collect clauses from own solvers, add to clause buffer
     std::vector<int> selfClauses = collectClausesFromSolvers(selfSize, jobCommEpoch);

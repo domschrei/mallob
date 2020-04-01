@@ -12,19 +12,24 @@ import time
 flags = "-g -O3 -std=c++14 -Wall -Wno-sign-compare -fmessage-length=0"
 
 def get_default_env():
+    
+    # Load current environment
     osenv = os.environ 
     env = Environment()
     for key in osenv:
         env['ENV'][key] = osenv[key]
     
-    env['ENV']['TERM'] = os.environ['TERM'] # colored gcc output
+    # Enable colored gcc output
+    env['ENV']['TERM'] = os.environ['TERM'] 
     
+    # MPI compiler
     if 'MPICXX' in env['ENV']:
         env.Replace(CXX = env['ENV']['MPICXX']) # compile with mpic++
-        print("MPICXX=" + env['ENV']['MPICXX'])
     else:
         env.Replace(CXX = 'mpic++')
+    print("CXX=" + env['ENV']['MPICXX'])
     
+    # MPI include path
     if 'MPI_ROOT' not in env['ENV']:
         if os.path.isdir('/usr/include/mpi/'):
             env['ENV']['MPI_ROOT'] = '/usr/include/mpi/'
@@ -32,10 +37,13 @@ def get_default_env():
             env['ENV']['MPI_ROOT'] = '/usr/lib/x86_64-linux-gnu/openmpi/'
     elif 'intel/compilers_and_libraries_2019' in env['ENV']['MPI_ROOT']:
         env['ENV']['MPI_ROOT'] += "/intel64/"
-        print("MPI_ROOT=" + env['ENV']['MPI_ROOT'])
+    print("MPI_ROOT=" + env['ENV']['MPI_ROOT'])
     
-    env.Append(CXXFLAGS = Split(flags)) # compile flags
+    # Append compile flags
+    env.Append(CXXFLAGS = Split(flags))
+    
     return env
+
 
 # Increment mallob revision number
 def update_revision(target, source, env):

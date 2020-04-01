@@ -56,7 +56,7 @@ private:
      * Returns all clauses that have been added by addClausesFromBelow(·),
      * plus the clauses from an additional call to collectClausesToShare(·).
      */
-    std::vector<int> shareCollectedClauses(int jobCommEpoch, int passedLayers);
+    std::vector<int> shareCollectedClauses(int jobCommEpoch, int numAggregated);
     /**
      * Give a collection of learned clauses that came from a parent node
      * to the solvers.
