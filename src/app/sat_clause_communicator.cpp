@@ -182,7 +182,8 @@ std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch) 
     float s = _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(_num_aggregated_nodes+1));
     int totalSize = std::ceil(_num_aggregated_nodes * s);
     int selfSize = std::ceil(s);
-    Console::log(Console::VVVERB, "num_aggregated=%i max_self_size=%i max_total_size=%i", _num_aggregated_nodes, selfSize, totalSize);
+    Console::log(Console::VVVERB, "%s : (JCE=%i) num_aggregated=%i max_self_size=%i max_total_size=%i", _job->toStr(), jobCommEpoch, 
+            _num_aggregated_nodes, selfSize, totalSize);
 
     // Locally collect clauses from own solvers, add to clause buffer
     std::vector<int> selfClauses = collectClausesFromSolvers(selfSize, jobCommEpoch);
