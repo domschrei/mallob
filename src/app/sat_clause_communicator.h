@@ -23,6 +23,8 @@ private:
 
     std::vector<std::vector<int>> _clause_buffers;
     int _num_clause_sources;
+    int _num_aggregated_nodes;
+
     int _job_comm_epoch_of_clause_buffer;
     int _last_shared_job_comm;
 
@@ -32,7 +34,7 @@ public:
     SatClauseCommunicator(Parameters& params, SatJob* job) : _params(params), _job(job), 
         _clause_buf_base_size(_params.getIntParam("cbbs")), 
         _clause_buf_discount_factor(_params.getFloatParam("cbdf")),
-        _num_clause_sources(0), 
+        _num_clause_sources(0), _num_aggregated_nodes(0),
         _job_comm_epoch_of_clause_buffer(-1), _last_shared_job_comm(-1) {
 
         _initialized = true;
@@ -56,7 +58,7 @@ private:
      * Returns all clauses that have been added by addClausesFromBelow(·),
      * plus the clauses from an additional call to collectClausesToShare(·).
      */
-    std::vector<int> shareCollectedClauses(int jobCommEpoch, int numAggregated);
+    std::vector<int> shareCollectedClauses(int jobCommEpoch);
     /**
      * Give a collection of learned clauses that came from a parent node
      * to the solvers.

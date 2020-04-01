@@ -42,8 +42,8 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
 
     if (msg.tag == MSG_GATHER_CLAUSES) {
         // Gather received clauses, send to parent
-
-        int numAggregated = msg.payload.back() + 1 + _num_clause_sources;
+        // TODO count each child only once
+        int numAggregated = msg.payload.back();
         msg.payload.pop_back();
         std::vector<int>& clauses = msg.payload;
         testConsistency(clauses);
@@ -60,11 +60,12 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
         
         // Add received clauses to local set of collected clauses
         collectClausesFromBelow(clauses, epoch);
+        _num_aggregated_nodes += numAggregated;
 
         // Ready to share the clauses?
         if (canShareCollectedClauses()) {
 
-            std::vector<int> clausesToShare = shareCollectedClauses(epoch, numAggregated);
+            std::vector<int> clausesToShare = shareCollectedClauses(epoch);
             if (_job->isRoot()) {
                 // Share complete set of clauses to children
                 Console::log(Console::VERB, "%s : (JCE=%i) switching: gather => broadcast", _job->toStr(), epoch); 
@@ -77,11 +78,12 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
                 msg.epoch = epoch;
                 msg.tag = MSG_GATHER_CLAUSES;
                 msg.payload = clausesToShare;
-                msg.payload.push_back(numAggregated);
+                msg.payload.push_back(_num_aggregated_nodes);
                 Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) gathering", _job->toStr(), epoch);
                 MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
             }
             _last_shared_job_comm = epoch;
+            _num_aggregated_nodes = 0;
         }
 
     } else if (msg.tag == MSG_DISTRIBUTE_CLAUSES) {
@@ -171,14 +173,16 @@ bool SatClauseCommunicator::canShareCollectedClauses() {
     if (_job->hasRightChild()) numChildren++;
     return _num_clause_sources >= numChildren;
 }
-std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch, int numAggregated) {
+std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch) {
 
-    assert(numAggregated > 0);
-    float s = _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(numAggregated+1));
-    int totalSize = std::ceil(numAggregated * s);
+    // +1 for local clauses
+    _num_aggregated_nodes++;
+
+    assert(_num_aggregated_nodes > 0);
+    float s = _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(_num_aggregated_nodes+1));
+    int totalSize = std::ceil(_num_aggregated_nodes * s);
     int selfSize = std::ceil(s);
-    // std::pow(CLAUSE_EXCHANGE_MULTIPLIER, passedLayers);
-    Console::log(Console::VVVERB, "num_aggregated=%i max_total_size=%i", numAggregated, totalSize);
+    Console::log(Console::VVVERB, "num_aggregated=%i max_self_size=%i max_total_size=%i", _num_aggregated_nodes, selfSize, totalSize);
 
     // Locally collect clauses from own solvers, add to clause buffer
     std::vector<int> selfClauses = collectClausesFromSolvers(selfSize, jobCommEpoch);
