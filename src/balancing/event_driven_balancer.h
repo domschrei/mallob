@@ -4,6 +4,7 @@
 
 #include <utility>
 #include <map>
+#include <list>
 
 #include "balancing/balancer.h"
 #include "data/reduceable.h"
@@ -156,6 +157,12 @@ public:
             if (latestEpoch - _map[key].epoch >= epochDiff) _map.erase(key);
         }
     }
+    const bool operator==(const EventMap& other) const {
+        return getEntries() == other.getEntries();
+    }
+    const bool operator!=(const EventMap& other) const {
+        return !(*this == other);
+    }
 };
 
 class EventDrivenBalancer : public Balancer {
@@ -163,82 +170,23 @@ class EventDrivenBalancer : public Balancer {
 public:
     EventDrivenBalancer(MPI_Comm& comm, Parameters& params, Statistics& stats);
 
-    bool beginBalancing(std::map<int, Job*>& jobs) override {
-        // Initialize
-        //_balancing = true;
-        _balancing_epoch++;
-
-        // Identify jobs to balance
-        int numActiveJobs = 0;
-
-        _jobs_being_balanced = std::map<int, Job*>();
-        for (const auto& it : jobs) {
-            // Must be root of this job in order to be considered
-            if (!it.second->isRoot()) continue;
-
-            bool isActive = it.second->isNotInState({INITIALIZING_TO_PAST}) 
-                                && (it.second->isInState({ACTIVE, STANDBY}) || it.second->isInitializing());
-            // Job must be active, or must be initializing and already having the description
-            bool participates = it.second->isInState({JobState::ACTIVE, JobState::STANDBY})
-                            || (it.second->isInState({JobState::INITIALIZING_TO_ACTIVE}) 
-                                && it.second->hasJobDescription());
-            if (participates || isActive) {
-                // Job participates
-                _jobs_being_balanced[it.first] = it.second;
-
-                // Insert this job as an event, if there is something novel about it
-                if (!_job_epochs.count(it.first)) {
-                    // Completely new!
-                    _job_epochs[it.first] = 1;
-                    _volumes[it.first] = 1;
-                } 
-                int epoch = _job_epochs[it.first];
-                int demand = getDemand(*it.second);
-                _demands[it.first] = demand;
-                _priorities[it.first] = it.second->getDescription().getPriority();
-                Event ev({it.first, epoch, demand, _priorities[it.first]});
-                if (!_states.getEntries().count(it.first) || ev.demand != _states.getEntries().at(it.first).demand) {
-                    // Not contained yet in state: try to insert into diffs map
-                    bool inserted = _diffs.insertIfNovel(ev);
-                    if (inserted) {
-                        Console::log(Console::VERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, epoch);
-                        _job_epochs[it.first]++;
-                    } 
-                }
-
-                numActiveJobs++;
-                
-            } else if (_volumes.count(it.first)) {
-                // Job used to be active, but not any more
-                _demands[it.first] = 0;
-                Event ev({it.first, _job_epochs[it.first], 0, _priorities[it.first]});
-                if (!_states.getEntries().count(it.first) || ev.demand != _states.getEntries().at(it.first).demand) {
-                    // Not contained yet in state: try to insert into diffs map
-                    bool inserted = _diffs.insertIfNovel(ev);
-                    if (inserted) {
-                        Console::log(Console::VERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[it.first]);
-                        _job_epochs[it.first]++;
-                    }    
-                }
-            }
-        }
-
-        // initiate a balancing, if applicable
-        reduceIfApplicable(BOTH);
-        return false;
-    }
+    bool beginBalancing(std::map<int, Job*>& jobs) override;
     bool canContinueBalancing() override {return false;}
     bool continueBalancing() override {return false;}
     bool continueBalancing(MessageHandlePtr handle) override {return this->handle(handle);}
     std::map<int, int> getBalancingResult() override {return _volumes;}
 
 private:
+    const int NORMAL_TREE = 1, REVERSED_TREE = 2, BOTH = 3;
+    const int RECENT_BROADCAST_MEMORY = 3;
+
     EventMap _states;
     EventMap _diffs;
     std::map<int, int> _job_epochs;
     float _last_balancing;
 
-    const int NORMAL_TREE = 1, REVERSED_TREE = 2, BOTH = 3;
+    std::list<EventMap> _recent_broadcasts_normal;
+    std::list<EventMap> _recent_broadcasts_reversed;
 
     bool handle(const MessageHandlePtr& handle);
     bool reduce(const EventMap& data, bool reversedTree);

@@ -10,7 +10,7 @@ void pinThread(HordeLib* hlib, int solversCount) {
 	int localRank = 0;
 	const char* lranks = getenv("OMPI_COMM_WORLD_LOCAL_RANK");
 	if (lranks == NULL) {
-		hlib->hlog(0, "WARNING: local rank was not determined.\n");
+		hlib->hlog(0, "WARNING: local rank was not determined\n");
 	} else {
 		localRank = atoi(lranks);
 	}

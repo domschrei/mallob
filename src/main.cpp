@@ -32,14 +32,14 @@ void handler(int sig) {
   exit(1);
 }
 
-void doExternalClientProgram(MPI_Comm commClients, Parameters& params, const std::set<int>& clientRanks) {
+void doExternalClientProgram(MPI_Comm& commClients, Parameters& params, const std::set<int>& clientRanks) {
     
     Client client(commClients, params, clientRanks);
     client.init();
     client.mainProgram();
 }
 
-void doWorkerNodeProgram(MPI_Comm commWorkers, Parameters& params, const std::set<int>& clientRanks) {
+void doWorkerNodeProgram(MPI_Comm& commWorkers, Parameters& params, const std::set<int>& clientRanks) {
 
     Worker worker(commWorkers, params, clientRanks);
     worker.init();
@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
     Console::log(Console::VERB, "Launching mallob, revision %s, on %s", MALLOB_REVISION, hostname);
 
     if (numNodes < 2) {
-        Console::log(Console::CRIT, "At least two threads / nodes are necessary in order to run this application.");
+        Console::log(Console::CRIT, "ERROR: At least 2 processes are needed to run this application");
         MPI_Finalize();
         exit(0);
     }
@@ -86,7 +86,10 @@ int main(int argc, char *argv[]) {
     // Find client ranks
     std::set<int> externalClientRanks;
     int numClients = params.getIntParam("c");
-    assert((int)numNodes-numClients > 0 || Console::fail("Need at least one worker node!"));
+    int numWorkers = numNodes - numClients;
+    assert(numWorkers > 0 || Console::fail("Need at least one worker node!"));
+    assert(numWorkers % 2 == 0 || params.getParam("bm") != "ed" 
+                || Console::fail("Need an even number of worker nodes for event-driven balancing!"));
     for (int i = 1; i <= numClients; i++)
         externalClientRanks.insert(numNodes-i);
     bool isExternalClient = (externalClientRanks.find(rank) != externalClientRanks.end());
@@ -113,12 +116,12 @@ int main(int argc, char *argv[]) {
             doWorkerNodeProgram(newComm, params, externalClientRanks);
         }
     } catch (...) {
-        Console::log(Console::CRIT, "Unexpected ERROR! Aborting.");
+        Console::log(Console::CRIT, "Unexpected ERROR - aborting");
         Console::forceFlush();
         exit(1);
     }
 
     MPI_Finalize();
-    Console::log(Console::INFO, "Exiting normally.");
+    Console::log(Console::INFO, "Exiting happily");
     Console::flush();
 }

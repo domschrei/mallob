@@ -35,7 +35,7 @@ bool SatJob::appl_initialize() {
 
     // Initialize Hordesat instance
     assert(_solver == NULL || Console::fail("Solver is not NULL! State of %s : %s", toStr(), jobStateToStr()));
-    Console::log(Console::VERB, "%s : preparing params", toStr());
+    Console::log(Console::VVVERB, "%s : preparing params", toStr());
     std::map<std::string, std::string> params;
     params["e"] = "1"; // exchange mode: 0 = nothing, 1 = alltoall, 2 = log, 3 = asyncrumor
     params["c"] = this->_params.getParam("t"); // solver threads on this node
@@ -74,10 +74,10 @@ bool SatJob::appl_initialize() {
     }
 
     if (_solver != NULL) {
-        Console::log(Console::VERB, "%s : beginning to solve", toStr());
+        Console::log(Console::VVVERB, "%s : beginning to solve", toStr());
         JobDescription& desc = getDescription();
         _solver->beginSolving(desc.getPayloads(), desc.getAssumptions(desc.getRevision()));
-        Console::log(Console::VERB, "%s : finished HordeLib instance initialization", toStr());
+        Console::log(Console::VERB, "%s : finished horde initialization", toStr());
     }
     unlockHordeManipulation();
 
@@ -180,7 +180,7 @@ int SatJob::appl_solveLoop() {
             // Yes, some stuff still is not initialized
             return result;
         // Else: end initialization
-        Console::log(Console::VERB, "%s : solver threads have been fully initialized by now", toStr());
+        Console::log(Console::VERB, "%s : threads fully initialized", toStr());
         endInitialization();
 
         // If initialized and active now, do solve loop

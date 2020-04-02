@@ -5,7 +5,6 @@
 #include "util/console.h"
 
 JobDescription::~JobDescription() {
-    Console::log(Console::VVERB, "JobDescription destructor of #%i", id);
     clearPayload();
 }
 

@@ -26,6 +26,7 @@ void SatClauseCommunicator::initiateCommunication() {
     testConsistency(msg.payload);
     msg.payload.push_back(1); // last int: depth the clause buffer traversed through the job tree so far.
     int parentRank = _job->getParentNodeRank();
+    Console::log(Console::VERB, "%s : (JCE=%i) initiating exchange", _job->toStr(), msg.epoch);
     Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) sending, size %i", _job->toStr(), msg.epoch, msg.payload.size());
     MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
     // TODO //stats.increase("sentMessages");
@@ -135,7 +136,7 @@ std::vector<int> SatClauseCommunicator::collectClausesFromSolvers(int maxSize, i
         return std::vector<int>();
     }
     // Else, retrieve clauses from solvers
-    Console::log(Console::VVERB, "%s : (JCE=%i) Collecting local clauses, max. size %i", 
+    Console::log(Console::VVERB, "%s : (JCE=%i) collecting local clauses, max. size %i", 
                 _job->toStr(), jobCommEpoch, maxSize);
     return _job->getSolver()->prepareSharing(maxSize);
 }
@@ -159,8 +160,6 @@ void SatClauseCommunicator::insertIntoClauseBuffer(std::vector<int>& vec, int jo
 
 }
 void SatClauseCommunicator::collectClausesFromBelow(std::vector<int>& clauses, int jobCommEpoch) {
-    Console::log(Console::VVERB, "%s : (JCE=%i) local clause export", 
-                _job->toStr(), jobCommEpoch);
     insertIntoClauseBuffer(clauses, jobCommEpoch);
     _num_clause_sources++;
 }
@@ -182,7 +181,7 @@ std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch) 
     float s = _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(_num_aggregated_nodes+1));
     int totalSize = std::ceil(_num_aggregated_nodes * s);
     int selfSize = std::ceil(s);
-    Console::log(Console::VVVERB, "%s : (JCE=%i) num_aggregated=%i max_self_size=%i max_total_size=%i", _job->toStr(), jobCommEpoch, 
+    Console::log(Console::VVVERB, "%s : (JCE=%i) aggregated=%i max_self=%i max_total=%i", _job->toStr(), jobCommEpoch, 
             _num_aggregated_nodes, selfSize, totalSize);
 
     // Locally collect clauses from own solvers, add to clause buffer
@@ -208,7 +207,7 @@ void SatClauseCommunicator::learnClausesFromAbove(std::vector<int>& clauses, int
 
     // If not active or not fully initialized yet: discard clauses
     if (_job->isNotInState({ACTIVE}) || !_job->getSolver()->isFullyInitialized()) {
-        Console::log(Console::VVERB, "%s : (JCE=%i) discarded because job is not (yet?) active", 
+        Console::log(Console::VVERB, "%s : (JCE=%i) buffer discarded because job is not (yet?) active", 
                 _job->toStr(), jobCommEpoch);
         return;
     }
@@ -259,9 +258,10 @@ std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>
             result.insert(result.end(), cls.begin(), cls.end());
             resvips++;
 
+            /*
             Console::append(Console::VVVERB, "VIP ");
             for (int l : cls) Console::append(Console::VVVERB, "%i ", l);
-            Console::log(Console::VVVERB, "");
+            Console::log(Console::VVVERB, "");*/
 
             cls.clear();
             nvips[picked]--;
@@ -365,7 +365,7 @@ bool SatClauseCommunicator::testConsistency(std::vector<int>& buffer) {
     }
 
     if (consistent > 0) {
-        Console::log(Console::CRIT, "Consistency error %i in clause buffer at position %i", consistent, pos);
+        Console::log(Console::CRIT, "Consistency ERROR %i in clause buffer at position %i", consistent, pos);
         for (int p = 0; p < buffer.size(); p++) {
             if (p == pos) Console::append(Console::CRIT, "(%i) ", buffer[p]);
             else          Console::append(Console::CRIT, "%i ", buffer[p]);

@@ -128,7 +128,7 @@ void Job::reinitialize(int index, int rootRank, int parentRank) {
 
             // Job of same index as before is resumed
             updateParentNodeRank(parentRank);
-            Console::log(Console::INFO, "Resuming solvers of %s", toStr());
+            Console::log(Console::INFO, "%s : resuming solvers", toStr());
             unlockJobManipulation();
             resume();
 
@@ -142,7 +142,7 @@ void Job::reinitialize(int index, int rootRank, int parentRank) {
             updateJobNode(index, _world_rank);
 
             if (_initialized) {
-                Console::log(Console::INFO, "Restarting solvers of %s", toStr());
+                Console::log(Console::INFO, "%s : restarting solvers", toStr());
                 unlockJobManipulation();
                 suspend();
                 appl_updateRole();
@@ -233,7 +233,7 @@ void Job::resume() {
         appl_unpause();
         switchState(ACTIVE);
         unlockJobManipulation();
-        Console::log(Console::INFO, "Resumed solving threads of %s", toStr());
+        Console::log(Console::INFO, "%s : resumed solving threads", toStr());
     }
 }
 
@@ -264,7 +264,7 @@ void Job::terminate() {
     switchState(PAST);
     unlockJobManipulation();
 
-    Console::log(Console::VERB, "Terminated %s and freed memory.", toStr());
+    Console::log(Console::VERB, "%s : terminated, memory freed", toStr());
 }
 
 int Job::getDemand(int prevVolume) const {
@@ -389,5 +389,5 @@ Job::~Job() {
 
     unlockJobManipulation();
     
-    Console::log(Console::VERB, "Leaving destructor of %s.", toStr());
+    Console::log(Console::VERB, "Leaving destructor of %s", toStr());
 }

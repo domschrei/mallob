@@ -33,7 +33,7 @@ public:
         va_end(argsCopy);
     }
     void abort() {
-        Console::log(Console::CRIT, "Aborting.");
+        Console::log(Console::CRIT, "ERROR - aborting");
         Console::forceFlush();
         exit(1);
     }

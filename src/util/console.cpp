@@ -65,14 +65,14 @@ void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeO
     // Create logging directory as necessary
     int status = system((std::string("mkdir -p ") + logDir).c_str());
     if (status != 0) {
-        log(CRIT, "Error while trying to create / access log directory \"%s\"!", logDir.c_str());
+        log(CRIT, "ERROR while trying to create / access log directory \"%s\"", logDir.c_str());
     }
 
     // Open logging files
     logFilename = logDir + "/log_" + std::to_string(std::time(nullptr)) + std::string(".") + std::to_string(rank);
     logFile = fopen(logFilename.c_str(), "a");
     if (logFile == NULL) {
-        log(CRIT, "Error while trying to open log file \"%s\"!", logFilename.c_str());
+        log(CRIT, "ERROR while trying to open log file \"%s\"", logFilename.c_str());
     }
     /*
     if (logFile.is_open()) {

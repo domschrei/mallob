@@ -48,6 +48,7 @@ void Parameters::setDefaults() {
     //setParam("q"); // no logging to stdout
     setParam("r", ROUNDING_BISECTION); // rounding of assignments (prob = probabilistic, bisec = iterative bisection)
     setParam("s", "1.0"); // job communication period (seconds)
+    setParam("s2f", ""); // write solutions to file (file path, or empty string for no writing)
     setParam("T", "0"); // total time to run the system (0 = no limit)
     setParam("t", "2"); // num threads per node
     setParam("td", "0.01"); // temperature decay for thermodyn. balancing
@@ -94,6 +95,7 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "                      \"bisec\" (default) - iterative bisection to find optimal cutoff point");
     Console::log(Console::INFO, "                      \"floor\" - always round down");
     Console::log(Console::INFO, "-s=<comm-period>      Do job-internal communication every t seconds (t >= 0, 0: do not communicate)");
+    Console::log(Console::INFO, "-s2f=<file-basename>  Write solutions to file with provided base name + job ID");
     Console::log(Console::INFO, "-sleep                Sleep in between polls of new messages");
     Console::log(Console::INFO, "-T=<time-limit>       Run entire system for x seconds (x >= 0; 0: run indefinitely)");
     Console::log(Console::INFO, "-t=<num-threads>      Amount of worker threads per node (int t >= 1)");

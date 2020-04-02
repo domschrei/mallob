@@ -17,6 +17,71 @@ EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params, Sta
     Console::log(Console::VVERB, ".");
 }
 
+bool EventDrivenBalancer::beginBalancing(std::map<int, Job*>& jobs) {
+    // Initialize
+    //_balancing = true;
+    _balancing_epoch++;
+
+    // Identify jobs to balance
+    int numActiveJobs = 0;
+
+    _jobs_being_balanced = std::map<int, Job*>();
+    for (const auto& it : jobs) {
+        // Must be root of this job in order to be considered
+        if (!it.second->isRoot()) continue;
+
+        bool isActive = it.second->isNotInState({INITIALIZING_TO_PAST}) 
+                            && (it.second->isInState({ACTIVE, STANDBY}) || it.second->isInitializing());
+        // Job must be active, or must be initializing and already having the description
+        bool participates = it.second->isInState({JobState::ACTIVE, JobState::STANDBY})
+                        || (it.second->isInState({JobState::INITIALIZING_TO_ACTIVE}) 
+                            && it.second->hasJobDescription());
+        if (participates || isActive) {
+            // Job participates
+            _jobs_being_balanced[it.first] = it.second;
+
+            // Insert this job as an event, if there is something novel about it
+            if (!_job_epochs.count(it.first)) {
+                // Completely new!
+                _job_epochs[it.first] = 1;
+                _volumes[it.first] = 1;
+            } 
+            int epoch = _job_epochs[it.first];
+            int demand = getDemand(*it.second);
+            _demands[it.first] = demand;
+            _priorities[it.first] = it.second->getDescription().getPriority();
+            Event ev({it.first, epoch, demand, _priorities[it.first]});
+            if (!_states.getEntries().count(it.first) || ev.demand != _states.getEntries().at(it.first).demand) {
+                // Not contained yet in state: try to insert into diffs map
+                bool inserted = _diffs.insertIfNovel(ev);
+                if (inserted) {
+                    Console::log(Console::VERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, epoch);
+                    _job_epochs[it.first]++;
+                } 
+            }
+
+            numActiveJobs++;
+            
+        } else if (_volumes.count(it.first)) {
+            // Job used to be active, but not any more
+            _demands[it.first] = 0;
+            Event ev({it.first, _job_epochs[it.first], 0, _priorities[it.first]});
+            if (!_states.getEntries().count(it.first) || ev.demand != _states.getEntries().at(it.first).demand) {
+                // Not contained yet in state: try to insert into diffs map
+                bool inserted = _diffs.insertIfNovel(ev);
+                if (inserted) {
+                    Console::log(Console::VERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[it.first]);
+                    _job_epochs[it.first]++;
+                }    
+            }
+        }
+    }
+
+    // initiate a balancing, if applicable
+    reduceIfApplicable(BOTH);
+    return false;
+}
+
 // TODO: Handle non-power of two number of workers.
 // E.g. handle any even number of workers.
 
@@ -61,7 +126,7 @@ bool EventDrivenBalancer::reduceIfApplicable(int which) {
     // Enough time passed since last balancing?
     if (Timer::elapsedSeconds() - _last_balancing < _params.getFloatParam("p")) return false;
 
-    if (which == BOTH) Console::log(Console::VVERB, "INITIATE_BALANCING (%i diffs)", _diffs.getEntries().size());
+    if (which == BOTH) Console::log(Console::VVERB, "Initiate balancing (%i diffs)", _diffs.getEntries().size());
 
     // Send to according parents.
     bool done = false;
@@ -84,7 +149,7 @@ bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
         
         // Send to other root
         MyMpi::isend(MPI_COMM_WORLD, getRootRank(!reversedTree), MSG_ANYTIME_BROADCAST, data);
-        Console::log_send(Console::VERB, getRootRank(!reversedTree), "ROOT_HANDSHAKE");
+        Console::log_send(Console::VERB, getRootRank(!reversedTree), "BLC root handshake");
         
         // Broadcast and digest
         broadcast(data, reversedTree);
@@ -102,6 +167,25 @@ bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
 
 void EventDrivenBalancer::broadcast(const EventMap& data, bool reversedTree) {
 
+    // List of recently broadcast event maps
+    std::list<EventMap>& recentBroadcasts = (reversedTree ? _recent_broadcasts_reversed : _recent_broadcasts_normal);
+
+    // Check that the current event map was not recently sent
+    bool doSend = true;
+    for (const EventMap& recentMap : recentBroadcasts) {
+        if (recentMap == data) {
+            doSend = false;
+            break;
+        }
+    }
+    if (!doSend) return;
+
+    // Add current event map to currently broadcast maps
+    recentBroadcasts.push_front(data);
+    if (recentBroadcasts.size() > RECENT_BROADCAST_MEMORY) 
+        recentBroadcasts.resize(RECENT_BROADCAST_MEMORY);
+
+    // Do broadcast
     for (int child : getChildRanks(reversedTree)) {
         // Send to actual child
         MyMpi::isend(MPI_COMM_WORLD, child, MSG_ANYTIME_BROADCAST, data);
@@ -155,7 +239,7 @@ std::vector<int> EventDrivenBalancer::getChildRanks(bool reversedTree) {
     if (reversedTree) myRank = MyMpi::size(_comm)-1 - myRank;
     
     std::vector<int> children;
-    int exp = 1; while (exp+1 < MyMpi::size(_comm)) exp *= 2;
+    int exp = 1; while (exp < MyMpi::size(_comm)) exp *= 2;
     while (true) {
         if (myRank % exp == 0) {
             int child = myRank + exp/2;
@@ -335,6 +419,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
                     // Too many resources utilized
                     lower = idx+1;
                 }
+                idx = (lower+upper)/2;
             }
             
             lastUtilization = utilization;
