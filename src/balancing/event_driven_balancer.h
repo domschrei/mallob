@@ -161,9 +161,7 @@ public:
 class EventDrivenBalancer : public Balancer {
 
 public:
-    EventDrivenBalancer(MPI_Comm& comm, Parameters& params, Statistics& stats) : Balancer(comm, params, stats) {
-        _last_balancing = 0;
-    }
+    EventDrivenBalancer(MPI_Comm& comm, Parameters& params, Statistics& stats) : Balancer(comm, params, stats);
 
     bool beginBalancing(std::map<int, Job*>& jobs) override {
         // Initialize
