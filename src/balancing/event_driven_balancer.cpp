@@ -3,6 +3,15 @@
 #include "util/random.h"
 #include "balancing/rounding.h"
 
+EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params, Statistics& stats) : Balancer(comm, params, stats) {
+    _last_balancing = 0;
+
+    Console::log(Console::VVERB, "BLC_TREE parent: %i", getParentRank(false));
+    Console::append(Console::VVERB, "BLC_TREE children: ");
+    for (int child : getChildRanks(false)) Console::append(Console::VVERB, "%i ", child);
+    Console::log(Console::VVERB, ".");
+}
+
 // TODO: Handle non-power of two number of workers.
 // E.g. handle any even number of workers.
 
