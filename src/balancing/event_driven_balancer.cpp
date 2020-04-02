@@ -155,7 +155,7 @@ std::vector<int> EventDrivenBalancer::getChildRanks(bool reversedTree) {
     if (reversedTree) myRank = MyMpi::size(_comm)-1 - myRank;
     
     std::vector<int> children;
-    int exp = MyMpi::size(_comm) * 2;
+    int exp = 1; while (exp+1 < MyMpi::size(_comm)) exp *= 2;
     while (true) {
         if (myRank % exp == 0) {
             int child = myRank + exp/2;
