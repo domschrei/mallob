@@ -3,6 +3,9 @@
 #include "util/random.h"
 #include "balancing/rounding.h"
 
+// TODO: Handle non-power of two number of workers.
+// E.g. handle any even number of workers.
+
 bool EventDrivenBalancer::handle(const MessageHandlePtr& handle) {
     if (handle->tag != MSG_ANYTIME_BROADCAST && handle->tag != MSG_ANYTIME_REDUCTION)
         return false;
@@ -122,7 +125,8 @@ int EventDrivenBalancer::getParentRank(bool reversedTree) {
     int exp = 2;
     if (myRank == 0) parent = 0;
     else while (true) {
-        if (myRank % exp == exp/2) {
+        if (myRank % exp == exp/2 
+                && myRank - exp/2 >= 0) {
             parent = myRank - exp/2;
             break;
         }
@@ -137,10 +141,11 @@ std::vector<int> EventDrivenBalancer::getChildRanks(bool reversedTree) {
     if (reversedTree) myRank = MyMpi::size(_comm)-1 - myRank;
     
     std::vector<int> children;
-    int exp = MyMpi::size(_comm);
+    int exp = MyMpi::size(_comm) * 2;
     while (true) {
         if (myRank % exp == 0) {
             int child = myRank + exp/2;
+            if (child >= MyMpi::size(_comm)) continue;
             if (reversedTree) child = MyMpi::size(_comm)-1 - child;
             children.push_back(child);
         }
