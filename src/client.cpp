@@ -308,7 +308,7 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
         if (!file.is_open()) {
             Console::log(Console::CRIT, "ERROR: Could not open solution file");
         } else {
-            file << "c SOLUTION #" << jobId << "rev. " << revision << " ";
+            file << "c SOLUTION #" << jobId << " rev. " << revision << " ";
             file << (resultCode == 10 ? "SAT" : resultCode == 20 ? "UNSAT" : "UNKNOWN") << "\n"; 
             for (auto lit : jobResult.solution) {
                 if (lit == 0) continue;
