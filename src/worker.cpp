@@ -147,7 +147,7 @@ void Worker::mainProgram() {
             double perc_cpu;
             bool success = thread_cpuratio(syscall(__NR_gettid), Timer::elapsedSeconds(), perc_cpu);
             if (success) {
-                Console::log(Console::VERB, "meta_thread : %.2f%% CPU since appl. start", perc_cpu);
+                Console::log(Console::VERB, "main thread : %.2f%% CPU", perc_cpu);
             }
 
             // For the current job
@@ -323,7 +323,7 @@ void Worker::mainProgram() {
                 // Increase sleep duration, do sleep
                 sleepMicrosecs += 100;
                 if ((int)sleepMicrosecs > 0)
-                    usleep(std::min(10*1000, (int)sleepMicrosecs)); // in microsecs
+                    usleep(std::min(1000, (int)sleepMicrosecs)); // in microsecs
             }
             if (doYield) {
                 // Yield thread, e.g. for some SAT thread

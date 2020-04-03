@@ -199,7 +199,7 @@ void SatJob::appl_dumpStats() {
             if (threadTids[i] < 0) continue;
             double cpuRatio;
             thread_cpuratio(threadTids[i], age, cpuRatio);
-            Console::log(Console::VERB, "%s : thread %i : %.2f%% CPU since solvestart", toStr(), threadTids[i], cpuRatio);
+            Console::log(Console::VERB, "%s thread %i : %.2f%% CPU", toStr(), threadTids[i], cpuRatio);
         }
     }
 }
