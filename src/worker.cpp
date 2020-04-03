@@ -150,7 +150,7 @@ void Worker::mainProgram() {
                 cpu_time = (0.001 * 0.001 * cpu_time);
                 double perc_cpu = 100 * cpu_time / Timer::elapsedSeconds();
                 double perc_voluntary = 100 * (double)v_ctxswitches / (v_ctxswitches+inv_ctxswitches);
-                Console::log(Console::VERB, "meta_thread cpu=%.3f%% voluntary_switches=%.3f%%", 
+                Console::log(Console::VERB, "meta_thread cpu=%.2f%% voluntary_switches=%.2f%%", 
                         perc_cpu, perc_voluntary);
             }
 
