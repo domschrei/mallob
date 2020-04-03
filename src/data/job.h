@@ -109,6 +109,7 @@ private:
     std::unique_ptr<std::thread> _initializer_thread;
     mutable Mutex _job_manipulation_lock;
     
+    int _last_volume = 0;
     mutable double _last_temperature = 1.0;
     mutable int _age_of_const_cooldown = -1;
 
@@ -208,6 +209,8 @@ public:
     virtual int getDemand(int prevVolume) const;
     
     virtual double getTemperature() const;
+
+
     /*
     Signal if this job instance would like to initiate a new job communication phase.
     This method has a valid default implementation, so it must not be re-implemented.
@@ -222,6 +225,13 @@ public:
     void unlockJobManipulation();
     
     void communicate();
+
+    int getLastVolume() const {
+        return _last_volume;
+    }
+    void setLastVolume(int lastVolume) {
+        _last_volume = lastVolume;
+    }
 
     JobState getState() const {return _state;};
     bool isInState(std::initializer_list<JobState> list) const;

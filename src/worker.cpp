@@ -1035,11 +1035,15 @@ void Worker::finishBalancing() {
         }
     }
     epochCounter.increment();
-    Console::log(Console::VERB, "Advancing to epoch %i", epochCounter.getEpoch());
+    Console::log(Console::VVERB, "Advancing to epoch %i", epochCounter.getEpoch());
     
     // Update volumes found during balancing, and trigger job expansions / shrinkings
     for (auto it = jobVolumes.begin(); it != jobVolumes.end(); ++it) {
-        Console::log(Console::INFO, "#%i : new volume %i", it->first, it->second);
+        int jobId = it->first;
+        int volume = it->second;
+        if (hasJob(jobId) && getJob(jobId).getLastVolume() != volume) {
+            Console::log(Console::INFO, "#%i : update v=%i", it->first, it->second);
+        }
         updateVolume(it->first, it->second);
     }
 }
@@ -1103,6 +1107,7 @@ bool Worker::checkComputationLimits(int jobId) {
 void Worker::updateVolume(int jobId, int volume) {
 
     Job &job = getJob(jobId);
+    job.setLastVolume(volume);
 
     if (job.isNotInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
         // Job is not active right now
@@ -1173,7 +1178,7 @@ void Worker::checkMemoryBounds(float rssGb) {
     if (rssGb > 0.9 * maxMem) {
         int jobId = pickJobToForget();
         if (jobId < 0) return;
-        
+
     }
 }
 
