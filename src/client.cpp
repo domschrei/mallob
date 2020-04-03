@@ -67,7 +67,6 @@ void Client::readAllInstances() {
 
         std::unique_lock<std::mutex> lock(_job_ready_lock);
         _job_ready[jobId] = true;
-        lock.unlock();
     }
 }
 

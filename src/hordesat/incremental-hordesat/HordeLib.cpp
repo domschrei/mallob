@@ -194,10 +194,10 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
         //hlog(1, "initialized solver %i.\n", i);
 	}
 
-	solvingStateLock.lock();
-	setSolvingState(ACTIVE);
-	solvingStateLock.unlock();
-
+	{
+		auto lock = solvingStateLock.getLock();
+		setSolvingState(ACTIVE);
+	}
 	startSolving = getTime() - startSolving;
 	hlog(1, "started solver threads, took %.3f seconds\n", startSolving);
 }
@@ -212,9 +212,8 @@ void HordeLib::continueSolving(const std::vector<std::shared_ptr<std::vector<int
 	finalResult = UNKNOWN;
 
 	// unset standby
-	solvingStateLock.lock();
+	auto lock = solvingStateLock.getLock();
 	setSolvingState(ACTIVE);
-	solvingStateLock.unlock();
 }
 
 void HordeLib::updateRole(int rank, int numNodes) {
@@ -251,9 +250,8 @@ int HordeLib::solveLoop() {
 	// Resources exhausted?
     if ((maxRounds != 0 && round == maxRounds) || (maxSeconds != 0 && timeNow > maxSeconds)) {
 		hlog(0, "Aborting: round %i, time %3.3f\n", round, timeNow);
-		solvingStateLock.lock();
+		auto lock = solvingStateLock.getLock();
         setSolvingState(STANDBY);
-		solvingStateLock.unlock();
     }
     //fflush(stdout);
     round++;
@@ -313,27 +311,23 @@ std::vector<int> HordeLib::clauseBufferToPlainClauses(const vector<int>& buffer)
 }
 
 void HordeLib::setPaused() {
-    solvingStateLock.lock();
+    auto lock = solvingStateLock.getLock();
 	if (solvingState == ACTIVE)	setSolvingState(SUSPENDED);
-	solvingStateLock.unlock();
 }
 
 void HordeLib::unsetPaused() {
-    solvingStateLock.lock();
+    auto lock = solvingStateLock.getLock();
 	if (solvingState == SUSPENDED) setSolvingState(ACTIVE);
-	solvingStateLock.unlock();
 }
 
 void HordeLib::interrupt() {
-	solvingStateLock.lock();
+	auto lock = solvingStateLock.getLock();
 	if (solvingState != STANDBY) setSolvingState(STANDBY);
-	solvingStateLock.unlock();
 }
 
 void HordeLib::abort() {
-	solvingStateLock.lock();
+	auto lock = solvingStateLock.getLock();
 	if (solvingState != ABORTING) setSolvingState(ABORTING);
-	solvingStateLock.unlock();
 }
 
 void HordeLib::setSolvingState(SolvingState state) {

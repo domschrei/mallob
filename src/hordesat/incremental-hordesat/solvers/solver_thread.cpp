@@ -244,7 +244,7 @@ bool SolverThread::cancelThread() {
 
 void SolverThread::reportResult(int res) {
     if (res == SAT || res == UNSAT) {
-        hlib->solvingStateLock.lock();
+        auto lock = hlib->solvingStateLock.getLock();
         if (hlib->solvingState == ACTIVE) {
             hlib->hlog(0,"%s found result %s\n", toStr(), res==SAT?"SAT":"UNSAT");
             hlib->finalResult = SatResult(res);
@@ -252,7 +252,6 @@ void SolverThread::reportResult(int res) {
             else hlib->failedAssumptions = solver->getFailedAssumptions();
             hlib->setSolvingState(STANDBY);
         }
-        hlib->solvingStateLock.unlock();
     }
 }
 

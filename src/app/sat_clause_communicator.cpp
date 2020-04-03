@@ -27,7 +27,7 @@ void SatClauseCommunicator::initiateCommunication() {
     msg.payload.push_back(1); // last int: depth the clause buffer traversed through the job tree so far.
     int parentRank = _job->getParentNodeRank();
     Console::log(Console::VVERB, "%s : (JCE=%i) initiating exchange", _job->toStr(), msg.epoch);
-    Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) sending, size %i", _job->toStr(), msg.epoch, msg.payload.size());
+    Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) sending, size %i", _job->toStr(), msg.epoch, msg.payload.size()-1);
     MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
     // TODO //stats.increase("sentMessages");
 }

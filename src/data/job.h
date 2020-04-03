@@ -107,7 +107,7 @@ private:
     bool _has_description;
     bool _initialized;
     std::unique_ptr<std::thread> _initializer_thread;
-    Mutex _job_manipulation_lock;
+    mutable Mutex _job_manipulation_lock;
     
     mutable double _last_temperature = 1.0;
     mutable int _age_of_const_cooldown = -1;
@@ -226,6 +226,8 @@ public:
     JobState getState() const {return _state;};
     bool isInState(std::initializer_list<JobState> list) const;
     bool isNotInState(std::initializer_list<JobState> list) const;
+    bool isInStateUnsafe(std::initializer_list<JobState> list) const;
+    bool isNotInStateUnsafe(std::initializer_list<JobState> list) const;
 
     JobDescription& getDescription() {return _description;};
     std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription() {return _serialized_description;};
@@ -233,6 +235,7 @@ public:
     int getIndex() const {return _index;};
     bool isInitialized() const {return _initialized;};
     bool isInitializing() const {return isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_PAST, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_COMMITTED});};
+    bool isInitializingUnsafe() const {return isInStateUnsafe({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_PAST, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_COMMITTED});};
     bool hasJobDescription() const {return _has_description;};
     int getRevision() const {return _description.getRevision();};
     float getAge() const {return Timer::elapsedSeconds() - _elapsed_seconds_since_arrival;}
