@@ -37,11 +37,8 @@ int termCallback(void* solverPtr) {
     if (lp->suspendSolver) {
         // Stay inside this function call as long as solver is suspended
 		slog(lp, 0, "SUSPENDING (%.4fs since last term callback)", elapsed);
-        lp->suspendMutex.lock();
-        while (lp->suspendSolver) {
-            pthread_cond_wait(lp->suspendCond.get(), lp->suspendMutex.mutex());
-        }
-        lp->suspendMutex.unlock();
+
+		lp->suspendCond.wait(lp->suspendMutex, [&]{return !lp->suspendSolver;});
 		slog(lp, 0, "RESUMING");
 
 		if (lp->stopSolver) {
@@ -151,7 +148,7 @@ Lingeling::Lingeling() {
 	myId = 0;
 
     suspendSolver = false;
-    suspendMutex = VerboseMutex("suspendLgl", NULL);
+    //suspendMutex = VerboseMutex("suspendLgl", NULL);
     //suspendCond = ConditionVariable();
     maxvar = 0;
 }
@@ -189,7 +186,7 @@ void Lingeling::setSolverSuspend() {
 }
 void Lingeling::unsetSolverSuspend() {
     suspendSolver = false;
-    pthread_cond_broadcast(suspendCond.get());
+	suspendCond.notify();
 }
 
 // Solve the formula with a given set of assumptions

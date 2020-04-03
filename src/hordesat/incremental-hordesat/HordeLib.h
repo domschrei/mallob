@@ -62,8 +62,8 @@ private:
 
 	std::shared_ptr<LoggingInterface> logger;
 
-	VerboseMutex solutionLock;
-	VerboseMutex solvingStateLock;
+	Mutex solutionLock;
+	Mutex solvingStateLock;
 	ConditionVariable stateChangeCond;
 	
 	// settings
@@ -90,6 +90,9 @@ public:
 
     std::vector<int> prepareSharing(int maxSize);
     void digestSharing(const std::vector<int>& result);
+
+	void markRunning(int solverId);
+	void unmarkRunning(int solverId);
 
     int finishSolving();
     void interrupt();

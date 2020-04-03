@@ -31,7 +31,7 @@ private:
 
     std::thread _bg_thread;
     bool _bg_thread_running;
-    VerboseMutex _horde_manipulation_lock;
+    Mutex _horde_manipulation_lock;
 
 public:
 

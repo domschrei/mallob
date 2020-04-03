@@ -85,9 +85,6 @@ void HordeLib::init() {
     solverThreads = NULL;
 	sharingManager = NULL;
     solvingState = INITIALIZING;
-	solutionLock = VerboseMutex("solution", NULL);
-	solvingStateLock = VerboseMutex("solveState", NULL);
-	stateChangeCond = ConditionVariable();
 	
     // Set MPI size and rank by params or otherwise by MPI calls
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
@@ -152,8 +149,18 @@ void HordeLib::setLogger(std::shared_ptr<LoggingInterface> loggingInterface) {
 }
 
 void* solverRunningThread(void* arg) {
+	thread_args* targs = (thread_args*) arg;
     SolverThread thread(arg);
-	return thread.run();
+	thread.run();
+	targs->hlib->unmarkRunning(targs->solverId); 
+}
+
+void HordeLib::markRunning(int solverId) {
+	solverThreadsRunning[solverId] = true;
+}
+
+void HordeLib::unmarkRunning(int solverId) {
+	solverThreadsRunning[solverId] = false;
 }
 
 void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
@@ -181,7 +188,7 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 		arg->hlib = this;
 		arg->solverId = i;
 		arg->readFormulaFromHlib = true;
-		solverThreadsRunning[i] = true;
+		markRunning(i);
 		solverThreads[i] = new Thread(solverRunningThread, arg);
         //hlog(1, "initialized solver %i.\n", i);
 	}
@@ -368,7 +375,8 @@ void HordeLib::setSolvingState(SolvingState state) {
 	}
 
 	// Signal state change
-	pthread_cond_broadcast(stateChangeCond.get());
+	stateChangeCond.notify();
+	//pthread_cond_broadcast(stateChangeCond.get());
 }
 
 int HordeLib::finishSolving() {

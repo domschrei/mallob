@@ -46,7 +46,6 @@ void* SolverThread::run() {
         diversify();
     }
     hlib->hlog(2, "%s exiting\n", toStr());
-    hlib->solverThreadsRunning[_args->solverId] = false;
     return NULL;
 }
 
@@ -225,11 +224,7 @@ void SolverThread::runOnce() {
 void SolverThread::waitWhile(SolvingState state) {
 
     if (hlib->solvingState != state) return;
-    hlib->solvingStateLock.lock();
-    while (hlib->solvingState == state) {
-        pthread_cond_wait(hlib->stateChangeCond.get(), hlib->solvingStateLock.mutex());
-    }
-    hlib->solvingStateLock.unlock();
+    hlib->stateChangeCond.wait(hlib->solvingStateLock, [&]{return this->hlib->solvingState != state;});
 }
 
 bool SolverThread::cancelRun() {

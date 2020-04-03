@@ -10,15 +10,9 @@
 #include "app/sat_job.h"
 #include "app/sat_clause_communicator.h"
 
-void logMutexSat(const char* msg) {
-    Console::log(Console::VVVERB, msg);
-}
-
 SatJob::SatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) : 
         Job(params, commSize, worldRank, jobId, epochCounter), _done_locally(false), 
         _bg_thread_running(false) {
-            
-    _horde_manipulation_lock = VerboseMutex(std::string("HordeManip") + toStr(), &logMutexSat);
 }
 
 void SatJob::lockHordeManipulation() {
@@ -31,7 +25,7 @@ void SatJob::unlockHordeManipulation() {
 bool SatJob::appl_initialize() {
 
     assert(hasJobDescription());
-    _horde_manipulation_lock.updateName(std::string("HordeManip") + toStr());
+    //_horde_manipulation_lock.updateName(std::string("HordeManip") + toStr());
 
     // Initialize Hordesat instance
     assert(_solver == NULL || Console::fail("Solver is not NULL! State of %s : %s", toStr(), jobStateToStr()));

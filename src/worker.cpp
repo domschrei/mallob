@@ -635,7 +635,7 @@ void Worker::handleUpdateVolume(MessageHandlePtr& handle) {
     int jobId = recv.first;
     int volume = recv.second;
     if (!hasJob(jobId)) {
-        Console::log(Console::WARN, "Received volume update about unknown #%i", jobId);
+        Console::log(Console::WARN, "Got volume update for unknown #%i", jobId);
         return;
     }
 
