@@ -146,10 +146,12 @@ void Worker::mainProgram() {
             // For this "management" thread
             double cpu_time;
             long v_ctxswitches, inv_ctxswitches;
-            thread_rusage(cpu_time, v_ctxswitches, inv_ctxswitches);
-            cpu_time = (0.001 * 0.001 * cpu_time);
-            Console::log(Console::VERB, "meta_thread cpu=%.3f%% ctxswt volun=%l invol=%l", 
-                    cpu_time / elapsedSecs, v_ctxswitches, inv_ctxswitches);
+            bool success = thread_rusage(cpu_time, v_ctxswitches, inv_ctxswitches);
+            if (success) {
+                cpu_time = (0.001 * 0.001 * cpu_time);
+                Console::log(Console::VERB, "meta_thread cpu=%.3f%% ctxswt volun=%ul invol=%ul", 
+                        100 * cpu_time / elapsedSecs, v_ctxswitches, inv_ctxswitches);
+            }
 
             lastMemCheckTime = Timer::elapsedSeconds();
         }
