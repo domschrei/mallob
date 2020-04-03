@@ -42,3 +42,14 @@ void process_mem_usage(int& cpu, double& vm_usage, double& resident_set)
 
    cpu = sched_getcpu();
 }
+
+bool thread_rusage(double& cpuTimeMicros, long& voluntaryCtxSwitches, long& involuntaryCtxSwitches) {
+   rusage usage;
+   int result = getrusage(RUSAGE_THREAD, &usage);
+   if (result < 0) return false;
+   cpuTimeMicros = 0.001 * 0.001 * (usage.ru_utime.tv_sec + usage.ru_stime.tv_sec);
+   cpuTimeMicros += usage.ru_utime.tv_usec + usage.ru_stime.tv_usec;
+   voluntaryCtxSwitches = usage.ru_nvcsw;
+   involuntaryCtxSwitches = usage.ru_nivcsw;
+   return true;
+}

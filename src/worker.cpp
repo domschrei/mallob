@@ -131,13 +131,26 @@ void Worker::mainProgram() {
     while (!checkTerminate()) {
 
         if (Timer::elapsedSeconds() - lastMemCheckTime > memCheckPeriod) {
+
             // Print memory usage info
+            double elapsedSecs = Timer::elapsedSeconds() - lastMemCheckTime;
+
+            // For the entire process
             double vm_usage, resident_set; int cpu;
             process_mem_usage(cpu, vm_usage, resident_set);
             vm_usage *= 0.001 * 0.001;
             resident_set *= 0.001 * 0.001;
             Console::log(Console::VERB, "mem cpu=%i vm=%.4fGB rss=%.4fGB", cpu, vm_usage, resident_set);
             checkMemoryBounds(resident_set);
+
+            // For this "management" thread
+            double cpu_time;
+            long v_ctxswitches, inv_ctxswitches;
+            thread_rusage(cpu_time, v_ctxswitches, inv_ctxswitches);
+            cpu_time = (0.001 * 0.001 * cpu_time);
+            Console::log(Console::VERB, "meta_thread cpu=%.3f%% ctxswt volun=%l invol=%l", 
+                    cpu_time / elapsedSecs, v_ctxswitches, inv_ctxswitches);
+
             lastMemCheckTime = Timer::elapsedSeconds();
         }
 
@@ -1178,7 +1191,6 @@ void Worker::checkMemoryBounds(float rssGb) {
     if (rssGb > 0.9 * maxMem) {
         int jobId = pickJobToForget();
         if (jobId < 0) return;
-
     }
 }
 
