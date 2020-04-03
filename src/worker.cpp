@@ -6,6 +6,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <limits>
+#include <sys/syscall.h>
 
 #include "worker.h"
 #include "app/sat_job.h"
@@ -143,15 +144,10 @@ void Worker::mainProgram() {
             checkMemoryBounds(resident_set);
 
             // For this "management" thread
-            double cpu_time;
-            long v_ctxswitches, inv_ctxswitches;
-            bool success = thread_rusage(cpu_time, v_ctxswitches, inv_ctxswitches);
+            double perc_cpu;
+            bool success = thread_cpuratio(syscall(__NR_gettid), Timer::elapsedSeconds(), perc_cpu);
             if (success) {
-                cpu_time = (0.001 * 0.001 * cpu_time);
-                double perc_cpu = 100 * cpu_time / Timer::elapsedSeconds();
-                double perc_voluntary = 100 * (double)v_ctxswitches / (v_ctxswitches+inv_ctxswitches);
-                Console::log(Console::VERB, "meta_thread cpu=%.2f%% voluntary_switches=%.2f%%", 
-                        perc_cpu, perc_voluntary);
+                Console::log(Console::VERB, "meta_thread : %.2f%% CPU since appl. start", perc_cpu);
             }
 
             // For the current job
