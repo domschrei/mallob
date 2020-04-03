@@ -205,9 +205,9 @@ public:
     };
 
 private:
-    static std::set<MessageHandlePtr> _handles;
-    static std::set<MessageHandlePtr> _deferred_handles;
-    static std::set<MessageHandlePtr> _sentHandles;
+    static std::set<MessageHandlePtr, HandleComparator> _handles;
+    static std::set<MessageHandlePtr, HandleComparator> _deferred_handles;
+    static std::set<MessageHandlePtr, HandleComparator> _sentHandles;
     static std::map<int, int> _tag_priority;
 
 public:

@@ -12,9 +12,9 @@
 #include "util/mpi_monitor.h"
 
 int MyMpi::_max_msg_length;
-std::set<MessageHandlePtr> MyMpi::_handles;
-std::set<MessageHandlePtr> MyMpi::_sentHandles;
-std::set<MessageHandlePtr> MyMpi::_deferred_handles;
+std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_handles;
+std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_sentHandles;
+std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_deferred_handles;
 std::map<int, int> MyMpi::_tag_priority;
 
 void chkerr(int err) {
@@ -113,6 +113,8 @@ void MyMpi::init(int argc, char *argv[])
     _tag_priority[MSG_COLLECTIVES] = 1;
     _tag_priority[MSG_ANYTIME_REDUCTION] = 1;
     _tag_priority[MSG_ANYTIME_BROADCAST] = 1;
+    _tag_priority[MSG_CLIENT_FINISHED] = 1;
+    _tag_priority[MSG_INCREMENTAL_JOB_FINISHED] = 1;
     
     // Job-internal management messages
     _tag_priority[MSG_REQUEST_BECOME_CHILD] = 2;
@@ -130,6 +132,7 @@ void MyMpi::init(int argc, char *argv[])
     _tag_priority[MSG_SEND_JOB_DESCRIPTION] = 3; // receiving a job desc.
     _tag_priority[MSG_QUERY_JOB_RESULT] = 3; // sending a job result
     _tag_priority[MSG_SEND_JOB_RESULT] = 3; // receiving a job result
+    _tag_priority[MSG_SEND_JOB_REVISION_DATA] = 3;
 
     // Termination and interruption
     _tag_priority[MSG_TERMINATE] = 4;
@@ -141,6 +144,8 @@ void MyMpi::init(int argc, char *argv[])
     _tag_priority[MSG_JOB_COMMUNICATION] = 5;
 
     _tag_priority[MSG_WARMUP] = 6;
+    _tag_priority[MSG_EXIT] = 6;
+
 }
 
 void MyMpi::beginListening(const ListenerMode& mode) {
@@ -347,7 +352,7 @@ MessageHandlePtr MyMpi::poll(const ListenerMode& mode) {
         if (h->testReceived() && _tag_priority[h->tag] < bestPrio) {
             bestPrio = _tag_priority[h->tag];
             bestPrioHandle = h;
-            if (bestPrio == MIN_PRIORITY) break; // handle of minimum priority found
+            /*if (bestPrio == MIN_PRIORITY)*/ break; // handle of minimum priority found
         }
     }
 
@@ -358,7 +363,7 @@ MessageHandlePtr MyMpi::poll(const ListenerMode& mode) {
             if (h->testReceived() && _tag_priority[h->tag] < bestPrio) {
                 bestPrio = _tag_priority[h->tag];
                 bestPrioHandle = h;
-                if (bestPrio == MIN_PRIORITY) break; // handle of minimum priority found
+                /*if (bestPrio == MIN_PRIORITY)*/ break; // handle of minimum priority found
             }
         }   
     }
