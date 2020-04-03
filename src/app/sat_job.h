@@ -33,6 +33,8 @@ private:
     bool _bg_thread_running;
     Mutex _horde_manipulation_lock;
 
+    float _time_of_start_solving = 0;
+
 public:
 
     SatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);

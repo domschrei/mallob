@@ -70,6 +70,7 @@ bool SatJob::appl_initialize() {
         JobDescription& desc = getDescription();
         _solver->beginSolving(desc.getPayloads(), desc.getAssumptions(desc.getRevision()));
         Console::log(Console::VERB, "%s : finished horde initialization", toStr());
+        _time_of_start_solving = Timer::elapsedSeconds();
     }
 
     return !_abort_after_initialization;
@@ -188,12 +189,16 @@ int SatJob::appl_solveLoop() {
 
 void SatJob::appl_dumpStats() {
     if (isInState({ACTIVE})) {
+
         _solver->dumpStats();
+        if (_time_of_start_solving <= 0) return;
+        float age = Timer::elapsedSeconds() - _time_of_start_solving;
+
         const std::vector<long>& threadTids = _solver->getSolverTids();
         for (int i = 0; i < threadTids.size(); i++) {
             if (threadTids[i] < 0) continue;
             double cpuRatio;
-            thread_cpuratio(threadTids[i], getAgeSinceInitialized(), cpuRatio);
+            thread_cpuratio(threadTids[i], age, cpuRatio);
             Console::log(Console::VERB, "%s : thread %i : %.2f%% CPU", toStr(), threadTids[i], cpuRatio);
         }
     }
