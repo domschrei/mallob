@@ -132,9 +132,9 @@ void Worker::mainProgram() {
 
         if (Timer::elapsedSeconds() - lastMemCheckTime > memCheckPeriod) {
 
-            // Print memory usage info
+            // Print stats
 
-            // For the entire process
+            // For the this process
             double vm_usage, resident_set; int cpu;
             process_mem_usage(cpu, vm_usage, resident_set);
             vm_usage *= 0.001 * 0.001;
@@ -153,6 +153,9 @@ void Worker::mainProgram() {
                 Console::log(Console::VERB, "meta_thread cpu=%.2f%% voluntary_switches=%.2f%%", 
                         perc_cpu, perc_voluntary);
             }
+
+            // For the current job
+            if (currentJob != NULL) currentJob->appl_dumpStats();
 
             lastMemCheckTime = Timer::elapsedSeconds();
         }
@@ -1038,18 +1041,7 @@ void Worker::finishBalancing() {
     //stats.add((load == 1 ? "busyTime" : "idleTime"), Timer::elapsedSeconds() - lastLoadChange);
     lastLoadChange = Timer::elapsedSeconds();
 
-    // Dump stats and advance to next epoch
-    //stats.addResourceUsage();
-    //stats.dump(epochCounter.getEpoch());
-    if (currentJob != NULL) {
-        currentJob->appl_dumpStats();
-
-        if (currentJob->isRoot()) {
-            int id = currentJob->getId();
-            bool abort = checkComputationLimits(id);
-            if (abort) timeoutJob(id);
-        }
-    }
+    // Advance to next epoch
     epochCounter.increment();
     Console::log(Console::VVERB, "Advancing to epoch %i", epochCounter.getEpoch());
     
