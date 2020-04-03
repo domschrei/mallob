@@ -152,7 +152,8 @@ void* solverRunningThread(void* arg) {
 	thread_args* targs = (thread_args*) arg;
     SolverThread thread(arg);
 	thread.run();
-	targs->hlib->unmarkRunning(targs->solverId); 
+	targs->hlib->unmarkRunning(targs->solverId);
+	return NULL; 
 }
 
 void HordeLib::markRunning(int solverId) {
