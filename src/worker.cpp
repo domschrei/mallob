@@ -149,8 +149,10 @@ void Worker::mainProgram() {
             bool success = thread_rusage(cpu_time, v_ctxswitches, inv_ctxswitches);
             if (success) {
                 cpu_time = (0.001 * 0.001 * cpu_time);
-                Console::log(Console::VERB, "meta_thread cpu=%.3f%% ctxswt volun=%ul invol=%ul", 
-                        100 * cpu_time / elapsedSecs, v_ctxswitches, inv_ctxswitches);
+                double perc_cpu = 100 * cpu_time / elapsedSecs;
+                double perc_voluntary = 100 * (double)v_ctxswitches / (v_ctxswitches+inv_ctxswitches);
+                Console::log(Console::VERB, "meta_thread cpu=%.3f%% voluntary_switches=%.3f%%", 
+                        perc_cpu, perc_voluntary);
             }
 
             lastMemCheckTime = Timer::elapsedSeconds();
