@@ -323,7 +323,7 @@ void Worker::mainProgram() {
                 // Increase sleep duration, do sleep
                 sleepMicrosecs += 100;
                 if ((int)sleepMicrosecs > 0)
-                    usleep(std::min(1000, (int)sleepMicrosecs)); // in microsecs
+                    usleep(std::min(100, (int)sleepMicrosecs)); // in microsecs
             }
             if (doYield) {
                 // Yield thread, e.g. for some SAT thread
