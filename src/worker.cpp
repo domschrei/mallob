@@ -133,7 +133,6 @@ void Worker::mainProgram() {
         if (Timer::elapsedSeconds() - lastMemCheckTime > memCheckPeriod) {
 
             // Print memory usage info
-            double elapsedSecs = Timer::elapsedSeconds() - lastMemCheckTime;
 
             // For the entire process
             double vm_usage, resident_set; int cpu;
@@ -149,7 +148,7 @@ void Worker::mainProgram() {
             bool success = thread_rusage(cpu_time, v_ctxswitches, inv_ctxswitches);
             if (success) {
                 cpu_time = (0.001 * 0.001 * cpu_time);
-                double perc_cpu = 100 * cpu_time / elapsedSecs;
+                double perc_cpu = 100 * cpu_time / Timer::elapsedSeconds();
                 double perc_voluntary = 100 * (double)v_ctxswitches / (v_ctxswitches+inv_ctxswitches);
                 Console::log(Console::VERB, "meta_thread cpu=%.3f%% voluntary_switches=%.3f%%", 
                         perc_cpu, perc_voluntary);
