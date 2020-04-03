@@ -118,11 +118,11 @@ bool Worker::checkTerminate() {
 void Worker::mainProgram() {
 
     int iteration = 0;
-    float lastMemLogTime = Timer::elapsedSeconds();
+    float lastMemCheckTime = Timer::elapsedSeconds();
     float lastJobCheckTime = Timer::elapsedSeconds();
     float sleepMicrosecs = 0;
 
-    float memLogPeriod = 1.0;
+    float memCheckPeriod = 1.0;
     float jobCheckPeriod = 0.05;
 
     bool doSleep = params.isSet("sleep");
@@ -130,14 +130,15 @@ void Worker::mainProgram() {
 
     while (!checkTerminate()) {
 
-        if (Timer::elapsedSeconds() - lastMemLogTime > memLogPeriod) {
+        if (Timer::elapsedSeconds() - lastMemCheckTime > memCheckPeriod) {
             // Print memory usage info
             double vm_usage, resident_set; int cpu;
             process_mem_usage(cpu, vm_usage, resident_set);
             vm_usage *= 0.001 * 0.001;
             resident_set *= 0.001 * 0.001;
             Console::log(Console::VERB, "mem cpu=%i vm=%.4fGB rss=%.4fGB", cpu, vm_usage, resident_set);
-            lastMemLogTime = Timer::elapsedSeconds();
+            checkMemoryBounds(resident_set);
+            lastMemCheckTime = Timer::elapsedSeconds();
         }
 
         // If it is time to do balancing (and it is not being done right now)
@@ -1164,6 +1165,53 @@ void Worker::updateVolume(int jobId, int volume) {
 
 bool Worker::isTimeForRebalancing() {
     return epochCounter.getSecondsSinceLastSync() >= params.getFloatParam("p");
+}
+
+void Worker::checkMemoryBounds(float rssGb) {
+    if (!params.isSet("mem")) return;
+    float maxMem = params.getFloatParam("mem");
+    if (rssGb > 0.9 * maxMem) {
+        int jobId = pickJobToForget();
+        if (jobId < 0) return;
+        
+    }
+}
+
+int Worker::pickJobToForget() {
+
+    // Try to pick an inactive non-root leaf job of maximum description size
+    int maxSize = 0;
+    int jobId;
+    for (auto idJobPair : jobs) {
+        int id = idJobPair.first;
+        Job& job = *idJobPair.second;
+
+        if (job.isNotInState({SUSPENDED, INITIALIZING_TO_SUSPENDED, PAST, INITIALIZING_TO_PAST}))
+            continue;
+        if (!job.hasJobDescription()) continue;
+        if (job.isRoot()) continue;
+        if (job.hasLeftChild() || job.hasRightChild()) continue;
+
+        int size = job.getSerializedDescription()->size();
+        if (size > maxSize) {
+            maxSize = size;
+            jobId = id;
+        }
+    }
+    if (maxSize > 0) {
+        return jobId;
+    }
+
+    // If there is a current job: pick if non-root leaf
+    if (currentJob != NULL) {
+        Job& job = *currentJob;
+        if (!job.isRoot() && !job.hasLeftChild() && !job.hasRightChild()) {
+            return job.getId();
+        }
+    }
+
+    // No job found that can be forgotten
+    return -1;
 }
 
 Worker::~Worker() {

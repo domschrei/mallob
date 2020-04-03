@@ -77,6 +77,8 @@ private:
     friend void mpiMonitor(Worker* worker);
 
     bool checkTerminate();
+    void checkMemoryBounds(float rssGb);
+    int pickJobToForget();
 
     void handleIntroduceJob(MessageHandlePtr& handle);
     void handleQueryVolume(MessageHandlePtr& handle);
