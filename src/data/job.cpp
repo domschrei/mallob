@@ -333,14 +333,20 @@ void Job::communicate() {
 
 bool Job::isInState(std::initializer_list<JobState> list) const {
     auto lock = _job_manipulation_lock.getLock();
+    return isInStateUnsafe(list);
+}
+bool Job::isNotInState(std::initializer_list<JobState> list) const {
+    auto lock = _job_manipulation_lock.getLock();
+    return isNotInStateUnsafe(list);
+}
+bool Job::isInStateUnsafe(std::initializer_list<JobState> list) const {
     for (JobState state : list) {
         if (state == _state)
             return true;
     }
     return false;
 }
-bool Job::isNotInState(std::initializer_list<JobState> list) const {
-    auto lock = _job_manipulation_lock.getLock();
+bool Job::isNotInStateUnsafe(std::initializer_list<JobState> list) const {
     for (JobState state : list) {
         if (state == _state)
             return false;
