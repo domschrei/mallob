@@ -26,6 +26,7 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             _has_description(false), 
             _initialized(false), 
             //_job_manipulation_lock(VerboseMutex("JobManip#" + std::to_string(_id), &logMutex)),
+            _job_comm_period(params.getFloatParam("s")),
             _job_node_ranks(commSize, jobId),
             _has_left_child(false),
             _has_right_child(false)
@@ -74,8 +75,8 @@ void Job::endInitialization() {
     _initialized = true;
     JobState oldState = _state;
     switchState(ACTIVE);
-    if (_params.getFloatParam("s") > 0)
-        _last_job_comm_remainder = (int)(Timer::elapsedSeconds() / _params.getFloatParam("s"));
+    if (_job_comm_period > 0)
+        _last_job_comm_remainder = (int)(Timer::elapsedSeconds() / _job_comm_period);
     _time_of_initialization = Timer::elapsedSeconds();
     if (oldState == INITIALIZING_TO_PAST) {
         lock.release();
@@ -316,7 +317,7 @@ const JobResult& Job::getResult() const {
 }
 
 bool Job::wantsToCommunicate() const {
-    if (_params.getFloatParam("s") <= 0.0f) {
+    if (_job_comm_period <= 0.0f) {
         // No communication
         return false;
     }
@@ -326,7 +327,7 @@ bool Job::wantsToCommunicate() const {
 }
 
 void Job::communicate() {
-    assert(_params.getFloatParam("s") > 0.0f);
+    assert(_job_comm_period > 0.0f);
     _last_job_comm_remainder = getJobCommEpoch();
     appl_beginCommunication();
 }

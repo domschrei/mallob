@@ -30,6 +30,7 @@ private:
 
     float loadFactor;
     float globalTimeout;
+    float balancePeriod;
 
     std::map<int, Job*> jobs;
     std::map<int, JobRequest> jobCommitments;
@@ -61,6 +62,7 @@ public:
             loadFactor = params.getFloatParam("l");
             assert(0 < loadFactor && loadFactor < 1.0);
             globalTimeout = params.getFloatParam("T");
+            balancePeriod = params.getFloatParam("p");
             load = 0;
             lastLoadChange = Timer::elapsedSeconds();
             currentJob = NULL;

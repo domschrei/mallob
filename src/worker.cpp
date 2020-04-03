@@ -124,7 +124,7 @@ void Worker::mainProgram() {
     float sleepMicrosecs = 0;
 
     float memCheckPeriod = 1.0;
-    float jobCheckPeriod = 0.05;
+    float jobCheckPeriod = 0.1;
 
     bool doSleep = params.isSet("sleep");
     bool doYield = params.isSet("yield");
@@ -317,18 +317,15 @@ void Worker::mainProgram() {
         
         MyMpi::testSentHandles();
 
-        if (handle == NULL) {
-            // Did not process any incoming message: sleep and/or yield
-            if (doSleep) {
-                // Increase sleep duration, do sleep
-                sleepMicrosecs += 100;
-                if ((int)sleepMicrosecs > 0)
-                    usleep(std::min(100, (int)sleepMicrosecs)); // in microsecs
-            }
-            if (doYield) {
-                // Yield thread, e.g. for some SAT thread
-                std::this_thread::yield();
-            }
+        if (doSleep) {
+            // Increase sleep duration, do sleep
+            sleepMicrosecs += 100;
+            if ((int)sleepMicrosecs > 0)
+                usleep(std::min(100, (int)sleepMicrosecs)); // in microsecs
+        }
+        if (doYield) {
+            // Yield thread, e.g. for some SAT thread
+            std::this_thread::yield();
         }
 
         iteration++;
@@ -1173,7 +1170,7 @@ void Worker::updateVolume(int jobId, int volume) {
 }
 
 bool Worker::isTimeForRebalancing() {
-    return epochCounter.getSecondsSinceLastSync() >= params.getFloatParam("p");
+    return epochCounter.getSecondsSinceLastSync() >= balancePeriod;
 }
 
 void Worker::checkMemoryBounds(float rssGb) {

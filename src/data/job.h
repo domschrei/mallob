@@ -112,6 +112,7 @@ private:
     int _last_volume = 0;
     mutable double _last_temperature = 1.0;
     mutable int _age_of_const_cooldown = -1;
+    float _job_comm_period;
 
     AdjustablePermutation _job_node_ranks;
     bool _has_left_child;
