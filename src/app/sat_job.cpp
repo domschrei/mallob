@@ -191,9 +191,10 @@ void SatJob::appl_dumpStats() {
         _solver->dumpStats();
         const std::vector<long>& threadTids = _solver->getSolverTids();
         for (int i = 0; i < threadTids.size(); i++) {
+            if (threadTids[i] < 0) continue;
             double cpuRatio;
             thread_cpuratio(threadTids[i], getAge(), cpuRatio);
-            Console::log(Console::VERB, "%s : thread %i : %.2%% CPU", toStr(), i, cpuRatio);
+            Console::log(Console::VERB, "%s : thread %i : %.2f%% CPU", toStr(), i, cpuRatio);
         }
     }
 }

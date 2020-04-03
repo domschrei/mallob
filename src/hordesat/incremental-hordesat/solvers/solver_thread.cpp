@@ -25,6 +25,10 @@ void pinThread(HordeLib* hlib, int solversCount) {
 	sched_setaffinity(0, sizeof(cpuSet), &cpuSet);
 }
 
+SolverThread::SolverThread(void* args) {
+    _args = (thread_args*)args;
+}
+
 void* SolverThread::run() {
 
     init();
@@ -52,6 +56,7 @@ void* SolverThread::run() {
 void SolverThread::init() {
 
     hlib = _args->hlib;
+    hlib->solverTids[_args->solverId] = syscall(__NR_gettid);
     //hlib->hlog(1, "solverRunningThread, entering\n");
     //hlib->solvingStateLock.lock();
     int localId = _args->solverId;

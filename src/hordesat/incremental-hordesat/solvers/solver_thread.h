@@ -27,10 +27,7 @@ private:
     int importedLits;
 
 public:
-    SolverThread(void* args) {
-        _args = (thread_args*)args;
-        hlib->solverTids[_args->solverId] = syscall(__NR_gettid);
-    }
+    SolverThread(void* args);
     ~SolverThread();
     void* run();
 
