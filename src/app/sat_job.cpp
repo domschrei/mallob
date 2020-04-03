@@ -193,8 +193,8 @@ void SatJob::appl_dumpStats() {
         for (int i = 0; i < threadTids.size(); i++) {
             if (threadTids[i] < 0) continue;
             double cpuRatio;
-            thread_cpuratio(threadTids[i], getAge(), cpuRatio);
-            Console::log(Console::VERB, "%s : thread %i : %.2f%% CPU", toStr(), i, cpuRatio);
+            thread_cpuratio(threadTids[i], getAgeSinceInitialized(), cpuRatio);
+            Console::log(Console::VERB, "%s : thread %i : %.2f%% CPU", toStr(), threadTids[i], cpuRatio);
         }
     }
 }
