@@ -119,10 +119,10 @@ void SatJob::setSolverNullThread() {
 
 void SatJob::appl_withdraw() {
 
-    if (isInitializing()) {
+    auto lock = _horde_manipulation_lock.getLock();
+    if (isInitializingUnsafe()) {
         _abort_after_initialization = true;
     }
-    auto lock = _horde_manipulation_lock.getLock();
     if (_solver != NULL) {
         _solver->abort();
         // Do cleanup of HordeLib and its threads in a separate thread to avoid blocking
