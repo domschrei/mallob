@@ -46,7 +46,7 @@ private:
 	size_t clsBufferSize;
     
     volatile bool suspendSolver;
-    VerboseMutex suspendMutex;
+    Mutex suspendMutex;
     ConditionVariable suspendCond;
 
 public:

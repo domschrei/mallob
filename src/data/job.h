@@ -107,7 +107,7 @@ private:
     bool _has_description;
     bool _initialized;
     std::unique_ptr<std::thread> _initializer_thread;
-    VerboseMutex _job_manipulation_lock;
+    Mutex _job_manipulation_lock;
     
     mutable double _last_temperature = 1.0;
     mutable int _age_of_const_cooldown = -1;

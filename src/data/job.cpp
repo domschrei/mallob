@@ -25,7 +25,7 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             _state(NONE),
             _has_description(false), 
             _initialized(false), 
-            _job_manipulation_lock(VerboseMutex("JobManip#" + std::to_string(_id), &logMutex)),
+            //_job_manipulation_lock(VerboseMutex("JobManip#" + std::to_string(_id), &logMutex)),
             _job_node_ranks(commSize, jobId),
             _has_left_child(false),
             _has_right_child(false)
