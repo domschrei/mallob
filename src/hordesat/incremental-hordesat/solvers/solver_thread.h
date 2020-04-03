@@ -2,11 +2,16 @@
 #ifndef HORDE_MALLOB_SOLVER_THREAD_H
 #define HORDE_MALLOB_SOLVER_THREAD_H
 
+#include <sys/types.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+
 #include "utilities/ParameterProcessor.h"
 #include "utilities/Threading.h"
 #include "utilities/logging_interface.h"
 #include "solvers/PortfolioSolverInterface.h"
 #include "solvers/solving_state.h"
+
 
 // Forward declarations
 class HordeLib;
@@ -24,6 +29,7 @@ private:
 public:
     SolverThread(void* args) {
         _args = (thread_args*)args;
+        hlib->solverTids[_args->solverId] = syscall(__NR_gettid);
     }
     ~SolverThread();
     void* run();

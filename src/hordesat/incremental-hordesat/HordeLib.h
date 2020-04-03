@@ -47,6 +47,7 @@ private:
 	vector<PortfolioSolverInterface*> solvers;
 	vector<bool> solverThreadsRunning;
 	vector<bool> solverThreadsInitialized;
+	vector<long> solverTids;
 
 	std::vector<std::shared_ptr<std::vector<int>>> formulae;
 	std::shared_ptr<vector<int>> assumptions;
@@ -102,6 +103,9 @@ public:
 	void abort();
 
 	void dumpStats();
+	const std::vector<long>& getSolverTids() {
+		return solverTids;
+	}
 
 	int value(int lit);
 	int failed(int lit);

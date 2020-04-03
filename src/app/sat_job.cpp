@@ -9,6 +9,7 @@
 #include "util/console_horde_interface.h"
 #include "app/sat_job.h"
 #include "app/sat_clause_communicator.h"
+#include "util/memusage.h"
 
 SatJob::SatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) : 
         Job(params, commSize, worldRank, jobId, epochCounter), _done_locally(false), 
@@ -188,6 +189,12 @@ int SatJob::appl_solveLoop() {
 void SatJob::appl_dumpStats() {
     if (isInState({ACTIVE})) {
         _solver->dumpStats();
+        const std::vector<long>& threadTids = _solver->getSolverTids();
+        for (int i = 0; i < threadTids.size(); i++) {
+            double cpuRatio;
+            thread_cpuratio(threadTids[i], getAge(), cpuRatio);
+            Console::log(Console::VERB, "%s : thread %i : %.2%% CPU", toStr(), i, cpuRatio);
+        }
     }
 }
 

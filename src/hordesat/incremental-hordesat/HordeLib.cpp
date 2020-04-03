@@ -125,6 +125,7 @@ void HordeLib::init() {
 		
 		solverThreadsInitialized.push_back(false);
 		solverThreadsRunning.push_back(false);
+		solverTids.push_back(-1);
 	}
 
 	sleepInt = 1000 * params.getIntParam("i", 1000);

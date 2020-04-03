@@ -21,8 +21,8 @@
 // On failure, returns 0.0, 0.0
 void process_mem_usage(int& cpu, double& vm_usage, double& resident_set);
 
-
 bool thread_rusage(double& cpuTimeMicros, long& voluntaryCtxSwitches, long& involuntaryCtxSwitches);
 
+bool thread_cpuratio(int tid, float age, double& cpuRatio);
 
 #endif
