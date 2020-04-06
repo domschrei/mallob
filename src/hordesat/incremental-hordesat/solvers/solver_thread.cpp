@@ -130,9 +130,9 @@ void SolverThread::diversify() {
     int size = std::get<1>(_diversification_seed);
     int time = std::get<2>(_diversification_seed);
     size_t seed = 42;
-    hash_combine<int>(seed, time);
-    hash_combine<int>(seed, size);
-    hash_combine<int>(seed, rank);        
+    hash_combine<unsigned int>(seed, time);
+    hash_combine<unsigned int>(seed, size);
+    hash_combine<unsigned int>(seed, rank);        
     srand(seed);    
 
 	switch (diversificationMode) {
@@ -146,7 +146,7 @@ void SolverThread::diversify() {
 		break;
 	case 3:
 		randomDiversification();
-		hlib->hlog(3, "random diversification, s=%i\n", seed);
+		hlib->hlog(3, "random diversification, s=%lu\n", seed);
 		break;
 	case 4:
 		nativeDiversification(mpi_rank, mpi_size);
@@ -159,12 +159,12 @@ void SolverThread::diversify() {
 		break;
 	case 6:
 		sparseRandomDiversification(mpi_size);
-		hlib->hlog(3, "sparse random diversification, s=%i\n", seed);
+		hlib->hlog(3, "sparse random diversification, s=%lu\n", seed);
 		break;
 	case 7:
 		sparseRandomDiversification(mpi_size);
 		nativeDiversification(mpi_rank, mpi_size);
-		hlib->hlog(3, "random sparse + native diversification (plingeling), s=%i\n", seed);
+		hlib->hlog(3, "random sparse + native diversification (plingeling), s=%lu\n", seed);
 		break;
 	case 0:
 		hlib->hlog(3, "no diversification\n");
