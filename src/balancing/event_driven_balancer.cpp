@@ -178,9 +178,6 @@ void EventDrivenBalancer::broadcast(const EventMap& data, bool reversedTree) {
     }
     if (!doSend) return;
 
-    // Successful broadcast: Bump epoch of balancing
-    _balancing_epoch++;
-
     // Add current event map to currently broadcast maps
     recentBroadcasts.push_front(data);
     if (recentBroadcasts.size() > RECENT_BROADCAST_MEMORY) 
@@ -202,7 +199,9 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
     _diffs.filterBy(_states);
     
     if (anyChange) {
-        
+        // Successful balancing: Bump epoch
+        _balancing_epoch++;
+
         // Calculate and publish new assignments.
         calculateBalancingResult();
 
