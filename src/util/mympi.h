@@ -260,9 +260,13 @@ public:
     };
 
 private:
+    static std::set<MessageHandlePtr> _handles;
+    static std::set<MessageHandlePtr> _deferred_handles;
+    static std::set<MessageHandlePtr> _sent_handles;
+    /*
     static std::set<MessageHandlePtr, HandleComparator> _handles;
     static std::set<MessageHandlePtr, HandleComparator> _deferred_handles;
-    static std::set<MessageHandlePtr, HandleComparator> _sent_handles;
+    static std::set<MessageHandlePtr, HandleComparator> _sent_handles;*/
     static std::map<int, int> _msg_priority;
     static ListenerMode _mode;
 

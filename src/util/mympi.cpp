@@ -12,9 +12,13 @@
 #include "util/mpi_monitor.h"
 
 int MyMpi::_max_msg_length;
+std::set<MessageHandlePtr> MyMpi::_handles;
+std::set<MessageHandlePtr> MyMpi::_sent_handles;
+std::set<MessageHandlePtr> MyMpi::_deferred_handles;
+/*
 std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_handles;
 std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_sent_handles;
-std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_deferred_handles;
+std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_deferred_handles;*/
 ListenerMode MyMpi::_mode;
 std::map<int, int> MyMpi::_msg_priority;
 
