@@ -181,7 +181,7 @@ std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch) 
     float s = _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(_num_aggregated_nodes+1));
     int totalSize = std::ceil(_num_aggregated_nodes * s);
     int selfSize = std::ceil(s);
-    Console::log(Console::VVERB, "%s : (JCE=%i) aggregated=%i max_self=%i max_total=%i", _job->toStr(), jobCommEpoch, 
+    Console::log(Console::VVVERB, "%s : (JCE=%i) aggregated=%i max_self=%i max_total=%i", _job->toStr(), jobCommEpoch, 
             _num_aggregated_nodes, selfSize, totalSize);
 
     // Locally collect clauses from own solvers, add to clause buffer
@@ -190,7 +190,7 @@ std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch) 
     insertIntoClauseBuffer(selfClauses, jobCommEpoch);
 
     // Merge all collected buffer into a single buffer
-    Console::log(Console::VVERB, "%s : (JCE=%i) merging %i buffers into total size %i", 
+    Console::log(Console::VVVERB, "%s : (JCE=%i) merging %i buffers into total size %i", 
                 _job->toStr(), jobCommEpoch, _clause_buffers.size(), totalSize);
     std::vector<std::vector<int>*> buffers;
     for (auto& buf : _clause_buffers) buffers.push_back(&buf);

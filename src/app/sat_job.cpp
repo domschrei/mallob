@@ -105,12 +105,12 @@ void SatJob::appl_interrupt() {
 }
 
 void SatJob::setSolverNull() {
-    Console::log(Console::VVERB, "Releasing solver ...");
+    Console::log(Console::VVERB, "release solver");
     auto lock = _horde_manipulation_lock.getLock();
     if (_solver != NULL) {
         _solver.reset();
         _solver = NULL;
-        Console::log(Console::VVERB, "Solver released.");
+        Console::log(Console::VVERB, "solver released");
     }
 }
 
@@ -199,7 +199,7 @@ void SatJob::appl_dumpStats() {
             if (threadTids[i] < 0) continue;
             double cpuRatio;
             thread_cpuratio(threadTids[i], age, cpuRatio);
-            Console::log(Console::VERB, "%s thread %i : %.2f%% CPU", toStr(), threadTids[i], cpuRatio);
+            Console::log(Console::VERB, "%s td.%i : %.2f%% CPU", toStr(), threadTids[i], cpuRatio);
         }
     }
 }
@@ -222,7 +222,7 @@ SatJob::~SatJob() {
     }
 
     if (_solver != NULL) {
-        Console::log(Console::VVERB, "%s : destructing hordesat", toStr());
+        Console::log(Console::VVERB, "%s : destruct hordesat", toStr());
         appl_interrupt();
         _solver->abort();
         setSolverNull();

@@ -123,7 +123,7 @@ void Worker::mainProgram() {
     float lastJobCheckTime = Timer::elapsedSeconds();
     float sleepMicrosecs = 0;
 
-    float memCheckPeriod = 1.0;
+    float memCheckPeriod = 3.0;
     float jobCheckPeriod = 0.1;
 
     bool doSleep = params.isSet("sleep");
