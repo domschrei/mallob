@@ -96,7 +96,7 @@ void HordeLib::init() {
 
 	char hostname[1024];
 	gethostname(hostname, 1024);
-	hlog(0, "Initializing HordeSat ($Revision: 160$) on host %s on job %s with parameters: ",
+	hlog(0, "HordeSat ($Revision: 160$) on host %s, job %s, params: ",
 			hostname, params.getParam("jobstr").c_str());
 	params.printParams();
 
@@ -141,7 +141,7 @@ void HordeLib::init() {
 
 	solverThreads = (Thread**) malloc (solversCount*sizeof(Thread*));
 
-    hlog(1, "allocated solver threads\n");
+    hlog(3, "allocated solver threads\n");
 }
 
 void HordeLib::setLogger(std::shared_ptr<LoggingInterface> loggingInterface) {
@@ -200,7 +200,7 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 		setSolvingState(ACTIVE);
 	}
 	startSolving = getTime() - startSolving;
-	hlog(1, "started solver threads, took %.3f seconds\n", startSolving);
+	hlog(3, "started solver threads, took %.3f seconds\n", startSolving);
 }
 
 void HordeLib::continueSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
@@ -426,7 +426,7 @@ HordeLib::~HordeLib() {
 
 	double time = getTime();
 
-	hlog(0, "entering destructor\n");
+	hlog(3, "entering destructor\n");
 
 	// for any running threads left:
 	solvingStateLock.lock();
@@ -441,12 +441,12 @@ HordeLib::~HordeLib() {
 		delete solverThreads[i];
 		solverThreads[i] = NULL;
 	}
-	hlog(0, "threads joined\n");
+	hlog(3, "threads joined\n");
 	if (solversCount > 0) {
 		free(solverThreads);
 		solversCount = 0;
 	}
-	hlog(0, "threads deleted\n");
+	hlog(3, "threads deleted\n");
 
 	// delete solvers
 	for (int i = 0; i < solvers.size(); i++) {
@@ -455,7 +455,7 @@ HordeLib::~HordeLib() {
 			solvers[i] = NULL;
 		}
 	}
-	hlog(0, "solvers deleted\n");
+	hlog(3, "solvers deleted\n");
 
 	// delete sharing manager
 	if (sharingManager != NULL) {

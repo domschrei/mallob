@@ -72,7 +72,7 @@ void SolverThread::init() {
 
 void SolverThread::readFormula() {
     hlib->solverThreadsInitialized[_args->solverId] = false;
-    hlib->hlog(1, "%s importing clauses\n", toStr());
+    hlib->hlog(3, "%s importing clauses\n", toStr());
 
     int prevLits = importedLits;
     int begin = importedLits;
@@ -87,7 +87,7 @@ void SolverThread::readFormula() {
         if (i < hlib->formulae.size() && cancelThread()) return;
     }
 
-    hlib->hlog(1, "%s imported clauses (%i lits)\n", toStr(), (importedLits-prevLits));
+    hlib->hlog(2, "%s imported clauses (%i lits)\n", toStr(), (importedLits-prevLits));
     hlib->hlog(1, "%s initialized\n", toStr());
     hlib->solverThreadsInitialized[_args->solverId] = true;
 }
@@ -116,36 +116,36 @@ void SolverThread::diversify() {
 	switch (diversification) {
 	case 1:
 		sparseDiversification(mpi_size, mpi_rank);
-		hlib->hlog(1, "doing sparse diversification\n");
+		hlib->hlog(3, "doing sparse diversification\n");
 		break;
 	case 2:
 		binValueDiversification(mpi_size, mpi_rank);
-		hlib->hlog(1, "doing binary value based diversification\n");
+		hlib->hlog(3, "doing binary value based diversification\n");
 		break;
 	case 3:
 		randomDiversification(2015);
-		hlib->hlog(1, "doing random diversification\n");
+		hlib->hlog(3, "doing random diversification\n");
 		break;
 	case 4:
 		nativeDiversification(mpi_rank, mpi_size);
-		hlib->hlog(1, "doing native diversification (plingeling)\n");
+		hlib->hlog(3, "doing native diversification (plingeling)\n");
 		break;
 	case 5:
 		sparseDiversification(mpi_size, mpi_rank);
 		nativeDiversification(mpi_rank, mpi_size);
-		hlib->hlog(1, "doing sparse + native diversification\n");
+		hlib->hlog(3, "doing sparse + native diversification\n");
 		break;
 	case 6:
 		sparseRandomDiversification(mpi_rank, mpi_size);
-		hlib->hlog(1, "doing sparse random diversification\n");
+		hlib->hlog(3, "doing sparse random diversification\n");
 		break;
 	case 7:
 		sparseRandomDiversification(mpi_rank, mpi_size);
 		nativeDiversification(mpi_rank, mpi_size);
-		hlib->hlog(1, "doing random sparse + native diversification (plingeling)\n");
+		hlib->hlog(3, "doing random sparse + native diversification (plingeling)\n");
 		break;
 	case 0:
-		hlib->hlog(1, "no diversification\n");
+		hlib->hlog(3, "no diversification\n");
 		break;
 	}
 }
@@ -203,7 +203,7 @@ void SolverThread::binValueDiversification(int mpi_size, int mpi_rank) {
 
 void SolverThread::runOnce() {
 
-    //hlib->hlog(1, "solverRunningThread, beginning main loop\n");
+    //hlib->hlog(3, "solverRunningThread, beginning main loop\n");
     while (true) {
 
         // Solving has just been done -> finish
@@ -236,7 +236,7 @@ bool SolverThread::cancelRun() {
     SolvingState s = hlib->solvingState;
     bool cancel = s == STANDBY || s == ABORTING;
     if (cancel) {
-        hlib->hlog(0, "%s cancelling run\n", toStr());
+        hlib->hlog(1, "%s cancelling run\n", toStr());
     }
     return cancel;
 }
