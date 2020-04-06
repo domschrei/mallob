@@ -1028,7 +1028,7 @@ void Worker::finishBalancing() {
     // Retrieve balancing results
     Console::log(Console::VVVERB, "Finishing balancing ...");
     jobVolumes = balancer->getBalancingResult();
-    Console::log(MyMpi::rank(comm) == 0 ? Console::VERB : Console::VVERB, "Balancing completed.");
+    Console::log(MyMpi::rank(comm) == 0 ? Console::VERB : Console::VVVERB, "Balancing completed.");
 
     // Add last slice of idle/busy time 
     //stats.add((load == 1 ? "busyTime" : "idleTime"), Timer::elapsedSeconds() - lastLoadChange);
@@ -1036,7 +1036,7 @@ void Worker::finishBalancing() {
 
     // Advance to next epoch
     epochCounter.increment();
-    Console::log(Console::VVERB, "Advancing to epoch %i", epochCounter.getEpoch());
+    Console::log(Console::VVVERB, "Advancing to epoch %i", epochCounter.getEpoch());
     
     // Update volumes found during balancing, and trigger job expansions / shrinkings
     for (auto it = jobVolumes.begin(); it != jobVolumes.end(); ++it) {
