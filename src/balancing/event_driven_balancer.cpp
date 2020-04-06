@@ -149,7 +149,7 @@ bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
         
         // Send to other root
         MyMpi::isend(MPI_COMM_WORLD, getRootRank(!reversedTree), MSG_ANYTIME_BROADCAST, data);
-        Console::log_send(Console::VERB, getRootRank(!reversedTree), "BLC root handshake");
+        Console::log_send(Console::VVERB, getRootRank(!reversedTree), "BLC root handshake");
         
         // Broadcast and digest
         broadcast(data, reversedTree);
@@ -406,7 +406,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
                 allVolumes = Rounding::getRoundedAssignments(bestRemainderIdx, sum, remainders, assignments);
 
                 double remainder = (bestRemainderIdx < remainders.size() ? remainders[bestRemainderIdx] : 1.0);
-                Console::log(verb, "BLC e=%i ROUNDING_DONE its=%i rmd=%.3f util=%.2f pen=%.2f", 
+                Console::log(verb-1, "BLC e=%i DONE its=%i rmd=%.3f util=%.2f pen=%.2f", 
                             _balancing_epoch, iterations, remainder, bestUtilization, bestPenalty);
                 break;
 
@@ -423,6 +423,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
             }
             
             lastUtilization = utilization;
+            iterations++;
         }
     }
 
