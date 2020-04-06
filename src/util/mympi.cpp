@@ -18,8 +18,6 @@ std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_deferred_handles;
 ListenerMode MyMpi::_mode;
 std::map<int, int> MyMpi::_msg_priority;
 
-// TODO fix priorities. Avoid scanning entire list of handles at each poll.
-
 void chkerr(int err) {
     if (err != 0) {
         Console::log(Console::CRIT, "MPI ERROR errcode=%i", err);

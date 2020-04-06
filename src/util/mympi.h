@@ -253,8 +253,8 @@ class MyMpi {
 public:
     struct HandleComparator {
         bool operator()(const MessageHandlePtr& left, const MessageHandlePtr& right) const {
-            assert(MyMpi::_msg_priority.count(left->tag));
-            assert(MyMpi::_msg_priority.count(right->tag));
+            assert(MyMpi::_msg_priority.count(left->tag) || Console::fail("%i", left->tag));
+            assert(MyMpi::_msg_priority.count(right->tag) || Console::fail("%i", right->tag));
             return MyMpi::_msg_priority[left->tag] < MyMpi::_msg_priority[right->tag];
         }
     };
