@@ -85,6 +85,9 @@ void Worker::init() {
         Console::log(Console::VERB, "My bounce alternatives: %s", info.c_str());
     }
 
+    // Begin listening to an incoming message
+    MyMpi::beginListening(WORKER);
+
     // Send warm-up messages with your pseudorandom bounce destinations
     if (params.isSet("derandomize") && params.isSet("warmup")) {
         IntVec payload({1, 2, 3, 4, 5, 6, 7, 8});
@@ -100,9 +103,6 @@ void Worker::init() {
     Console::log(Console::VERB, "Global init barrier ...");
     MPI_Barrier(MPI_COMM_WORLD);
     Console::log(Console::VERB, "Passed global init barrier");
-
-    // Begin listening to an incoming message
-    MyMpi::beginListening(WORKER);
 
     mpiMonitorThread = std::thread(mpiMonitor, this);
 }
