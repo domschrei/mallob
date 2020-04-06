@@ -167,11 +167,11 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
         object->push_back(0);
     }
     MessageHandlePtr handle(new MessageHandle(nextHandleId(), object));
-
+    handle->tag = tag;
+    
     bool selfMessage = rank(communicator) == recvRank;
     if (selfMessage) {
         handle->recvData = handle->sendData;
-        handle->tag = tag;
         handle->source = recvRank;
         handle->selfMessage = true;
     } else {
