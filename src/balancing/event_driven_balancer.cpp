@@ -77,11 +77,7 @@ bool EventDrivenBalancer::beginBalancing(std::map<int, Job*>& jobs) {
     }
 
     // initiate a balancing, if applicable
-    if (!_diffs.isEmpty()) {
-        _balancing_epoch++;
-        return reduceIfApplicable(BOTH);
-    } 
-    return false;
+    return reduceIfApplicable(BOTH);
 }
 
 // TODO: Handle non-power of two number of workers.
@@ -181,6 +177,9 @@ void EventDrivenBalancer::broadcast(const EventMap& data, bool reversedTree) {
         }
     }
     if (!doSend) return;
+
+    // Successful broadcast: Bump epoch of balancing
+    _balancing_epoch++;
 
     // Add current event map to currently broadcast maps
     recentBroadcasts.push_front(data);
