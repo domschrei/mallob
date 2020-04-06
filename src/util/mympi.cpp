@@ -12,10 +12,13 @@
 #include "util/mpi_monitor.h"
 
 int MyMpi::_max_msg_length;
-std::set<MessageHandlePtr> MyMpi::_handles;
-std::set<MessageHandlePtr> MyMpi::_sentHandles;
-std::set<MessageHandlePtr> MyMpi::_deferred_handles;
-std::map<int, int> MyMpi::_tag_priority;
+std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_handles;
+std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_sent_handles;
+std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_deferred_handles;
+ListenerMode MyMpi::_mode;
+std::map<int, int> MyMpi::_msg_priority;
+
+// TODO fix priorities. Avoid scanning entire list of handles at each poll.
 
 void chkerr(int err) {
     if (err != 0) {
@@ -103,59 +106,24 @@ void MyMpi::init(int argc, char *argv[])
 
     _max_msg_length = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
     handleId = 1;
-
-    // Very quick messages, and such which are critical for overall system performance
-    _tag_priority[MSG_FIND_NODE] = 0;
-
-    _tag_priority[MSG_WORKER_FOUND_RESULT] = 1;
-    _tag_priority[MSG_FORWARD_CLIENT_RANK] = 1;
-    _tag_priority[MSG_JOB_DONE] = 1;
-    _tag_priority[MSG_COLLECTIVES] = 1;
-    _tag_priority[MSG_ANYTIME_REDUCTION] = 1;
-    _tag_priority[MSG_ANYTIME_BROADCAST] = 1;
-    _tag_priority[MSG_CLIENT_FINISHED] = 1;
-    _tag_priority[MSG_INCREMENTAL_JOB_FINISHED] = 1;
-    
-    // Job-internal management messages
-    _tag_priority[MSG_REQUEST_BECOME_CHILD] = 2;
-    _tag_priority[MSG_ACCEPT_BECOME_CHILD] = 2;
-    _tag_priority[MSG_REJECT_BECOME_CHILD] = 2;
-    _tag_priority[MSG_QUERY_VOLUME] = 2;
-    _tag_priority[MSG_UPDATE_VOLUME] = 2;
-    _tag_priority[MSG_NOTIFY_JOB_REVISION] = 2;
-    _tag_priority[MSG_QUERY_JOB_REVISION_DETAILS] = 2;
-    _tag_priority[MSG_SEND_JOB_REVISION_DETAILS] = 2;
-    _tag_priority[MSG_ACK_JOB_REVISION_DETAILS] = 2;
-
-    // Messages inducing bulky amounts of work
-    _tag_priority[MSG_ACK_ACCEPT_BECOME_CHILD] = 3; // sending a job desc.
-    _tag_priority[MSG_SEND_JOB_DESCRIPTION] = 3; // receiving a job desc.
-    _tag_priority[MSG_QUERY_JOB_RESULT] = 3; // sending a job result
-    _tag_priority[MSG_SEND_JOB_RESULT] = 3; // receiving a job result
-    _tag_priority[MSG_SEND_JOB_REVISION_DATA] = 3;
-
-    // Termination and interruption
-    _tag_priority[MSG_TERMINATE] = 4;
-    _tag_priority[MSG_INTERRUPT] = 4;
-    _tag_priority[MSG_ABORT] = 4;
-    _tag_priority[MSG_WORKER_DEFECTING] = 4;
-
-    // Job-specific communication: not critical for balancing 
-    _tag_priority[MSG_JOB_COMMUNICATION] = 5;
-
-    _tag_priority[MSG_WARMUP] = 6;
-    _tag_priority[MSG_EXIT] = 6;
-
 }
 
 void MyMpi::beginListening(const ListenerMode& mode) {
-    if (mode == CLIENT) {
+
+    _mode = mode;
+
+    int i = 0;
+    for (int tag : ALL_TAGS) {
+        _msg_priority[tag] = i++;
+    }
+
+    if (_mode == CLIENT) {
         for (int tag : ANYTIME_CLIENT_RECV_TAGS) {
             MessageHandlePtr handle = MyMpi::irecv(MPI_COMM_WORLD, tag);
             Console::log(Console::VVVERB, "Msg ID=%i : listening to tag %i", handle->id, tag);
         }
     }
-    if (mode == WORKER) {
+    if (_mode == WORKER) {
         for (int tag : ANYTIME_WORKER_RECV_TAGS) {
             MessageHandlePtr handle = MyMpi::irecv(MPI_COMM_WORLD, tag);
             Console::log(Console::VVVERB, "Msg ID=%i : listening to tag %i", handle->id, tag);
@@ -163,19 +131,19 @@ void MyMpi::beginListening(const ListenerMode& mode) {
     }
 }
 
-void MyMpi::resetListenerIfNecessary(const ListenerMode& mode, int tag) {
+void MyMpi::resetListenerIfNecessary(int tag) {
     // Check if tag should be listened to
-    if (!isAnytimeTag(mode, tag)) return;
+    if (!isAnytimeTag(tag)) return;
     // add listener
     MessageHandlePtr handle = MyMpi::irecv(MPI_COMM_WORLD, tag);
     Console::log(Console::VVVERB, "Msg ID=%i : listening to tag %i", handle->id, tag);
 }
 
-bool MyMpi::isAnytimeTag(const ListenerMode& mode, int tag) {
-    if (mode == CLIENT)
+bool MyMpi::isAnytimeTag(int tag) {
+    if (_mode == CLIENT)
         for (int t : ANYTIME_CLIENT_RECV_TAGS)
             if (tag == t) return true;
-    if (mode == WORKER) 
+    if (_mode == WORKER) 
         for (int t : ANYTIME_WORKER_RECV_TAGS)
             if (tag == t) return true;
     return false;
@@ -215,7 +183,7 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
         chkerr(err);
     }
 
-    (selfMessage ? _handles : _sentHandles).insert(handle);
+    (selfMessage ? _handles : _sent_handles).insert(handle);
     
     Console::log(Console::VVVERB, "Msg ID=%i dest=%i tag=%i size=%i", handle->id, 
                 recvRank, tag, handle->sendData->size());
@@ -341,39 +309,36 @@ bool MyMpi::test(MPI_Request& request, MPI_Status& status) {
     return flag;
 }
 
-MessageHandlePtr MyMpi::poll(const ListenerMode& mode) {
+MessageHandlePtr MyMpi::poll() {
 
-    MessageHandlePtr bestPrioHandle = NULL;
-    int bestPrio = 9999999;
+    MessageHandlePtr foundHandle = NULL;
     bool deferred = false;
 
     // Find ready handle of best priority
     for (auto h : _handles) {
-        if (h->testReceived() && _tag_priority[h->tag] < bestPrio) {
-            bestPrio = _tag_priority[h->tag];
-            bestPrioHandle = h;
-            /*if (bestPrio == MIN_PRIORITY)*/ break; // handle of minimum priority found
+        if (h->testReceived()) {
+            foundHandle = h;
+            break; // handle found
         }
     }
 
     // If necessary, pick a deferred handle (if there is one)
-    if (bestPrioHandle == NULL) {
+    if (foundHandle == NULL) {
         deferred = true;
         for (auto h : _deferred_handles) {
-            if (h->testReceived() && _tag_priority[h->tag] < bestPrio) {
-                bestPrio = _tag_priority[h->tag];
-                bestPrioHandle = h;
-                /*if (bestPrio == MIN_PRIORITY)*/ break; // handle of minimum priority found
+            if (h->testReceived()) {
+                foundHandle = h;
+                break; // handle found
             }
         }   
     }
 
     // Remove and return found handle
-    if (bestPrioHandle != NULL) {
-        (deferred ? _deferred_handles : _handles).erase(bestPrioHandle);
-        resetListenerIfNecessary(mode, bestPrioHandle->tag);
+    if (foundHandle != NULL) {
+        (deferred ? _deferred_handles : _handles).erase(foundHandle);
+        resetListenerIfNecessary(foundHandle->tag);
     } 
-    return bestPrioHandle;
+    return foundHandle;
 }
 
 void MyMpi::deferHandle(MessageHandlePtr handle) {
@@ -381,12 +346,12 @@ void MyMpi::deferHandle(MessageHandlePtr handle) {
 }
 
 bool MyMpi::hasOpenSentHandles() {
-    return !_sentHandles.empty();
+    return !_sent_handles.empty();
 }
 
 void MyMpi::testSentHandles() {
     std::set<MessageHandlePtr> finishedHandles;
-    for (auto h : _sentHandles) {
+    for (auto h : _sent_handles) {
         if (h->testSent()) {
             // Sending operation completed
             Console::log(Console::VVVERB, "Msg ID=%i isent", h->id);
@@ -394,7 +359,7 @@ void MyMpi::testSentHandles() {
         }
     }
     for (auto h : finishedHandles) {
-        _sentHandles.erase(h);
+        _sent_handles.erase(h);
     }
 }
 

@@ -223,7 +223,7 @@ void Worker::mainProgram() {
         // Poll a message, if present
         MessageHandlePtr handle;
         float pollTime = Timer::elapsedSeconds();
-        while ((handle = MyMpi::poll(ListenerMode::WORKER)) != NULL) {
+        while ((handle = MyMpi::poll()) != NULL) {
             pollTime = Timer::elapsedSeconds() - pollTime;
 
             Console::log(Console::VVVERB, "loop cycle %i", iteration);

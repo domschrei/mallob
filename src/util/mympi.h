@@ -144,40 +144,98 @@ const int MSG_SEND_JOB_RESULT = 21;
  * Data type: [jobId, index]
  */
 const int MSG_WORKER_DEFECTING = 22;
-
+/* For incremental jobs. Unsupported as of now */
 const int MSG_NOTIFY_JOB_REVISION = 24;
+/* For incremental jobs. Unsupported as of now */
 const int MSG_QUERY_JOB_REVISION_DETAILS = 25;
+/* For incremental jobs. Unsupported as of now */
 const int MSG_SEND_JOB_REVISION_DETAILS = 26;
+/* For incremental jobs. Unsupported as of now */
 const int MSG_ACK_JOB_REVISION_DETAILS = 27;
+/* For incremental jobs. Unsupported as of now */
 const int MSG_SEND_JOB_REVISION_DATA = 28;
+/* For incremental jobs. Unsupported as of now */
 const int MSG_INCREMENTAL_JOB_FINISHED = 29;
+/**
+ * The sender informs the receiver that the receiver should interrupt 
+ * the specified job it currently computes on (leaving the possibility 
+ * to continue computation at some later point). Possibly self message.
+ * Data type: [jobId, index]
+ */
 const int MSG_INTERRUPT = 30;
+/**
+ * The sender informs the receiver that the receiver should abort, i.e., 
+ * terminate the specified job it currently computes on. Possibly self message.
+ * Data type: [jobId, index]
+ */
 const int MSG_ABORT = 31;
-const int MSG_CLIENT_FINISHED = 32;
-const int MSG_EXIT = 33;
-
+/**
+ * A message that tells some node (worker or client) to immediately exit the application.
+ */
+const int MSG_EXIT = 32;
+/**
+ * A client tells another client that the sender is now out of jobs to introduce to the system.
+ * Used to detect early termination.
+ */
+const int MSG_CLIENT_FINISHED = 33;
+/**
+ * Some data is being reduced or broadcast via a custom operation.
+ */
 const int MSG_COLLECTIVES = 300;
+/**
+ * Some data is being reduced via a custom operation.
+ */
 const int MSG_ANYTIME_REDUCTION = 301;
+/**
+ * Some data is being broadcast via a custom operation.
+ */
 const int MSG_ANYTIME_BROADCAST = 302;
-
+/**
+ * Tag for the job-internal, application-specific communication inside a job.
+ * The payload should contain another job-internal message tag.
+ */
 const int MSG_JOB_COMMUNICATION = 400;
 
+/**
+ * All message tags, sorted by the rough priority according to which
+ * they should be processed.
+ */
+const int ALL_TAGS[] = {
+    MSG_FIND_NODE, MSG_WORKER_FOUND_RESULT, MSG_FORWARD_CLIENT_RANK, MSG_JOB_DONE, 
+    MSG_ANYTIME_REDUCTION, MSG_ANYTIME_BROADCAST, MSG_COLLECTIVES,
+    MSG_CLIENT_FINISHED, MSG_INCREMENTAL_JOB_FINISHED,
+    MSG_REQUEST_BECOME_CHILD, MSG_ACCEPT_BECOME_CHILD, MSG_REJECT_BECOME_CHILD, 
+    MSG_QUERY_VOLUME, MSG_UPDATE_VOLUME, 
+    MSG_NOTIFY_JOB_REVISION, MSG_QUERY_JOB_REVISION_DETAILS, 
+    MSG_SEND_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS,
+    MSG_ACK_ACCEPT_BECOME_CHILD, MSG_SEND_JOB_DESCRIPTION, 
+    MSG_QUERY_JOB_RESULT, MSG_SEND_JOB_RESULT, 
+    MSG_SEND_JOB_REVISION_DATA,
+    MSG_TERMINATE, MSG_INTERRUPT, MSG_ABORT, MSG_WORKER_DEFECTING, 
+    MSG_JOB_COMMUNICATION, 
+    MSG_WARMUP, MSG_EXIT
+};
 
 /**
- * All types of messages which can be receivable by a worker node at any time 
- * by a generic irecv method and within the maximum message length.
+ * All types of messages which should be receivable by a worker node at any time 
+ * by a "blanco" irecv method and within the maximum message length.
  */
-const int ANYTIME_WORKER_RECV_TAGS[] = {MSG_QUERY_VOLUME, MSG_FIND_NODE, MSG_REQUEST_BECOME_CHILD, MSG_REJECT_BECOME_CHILD, 
-            MSG_ACCEPT_BECOME_CHILD, MSG_ACK_ACCEPT_BECOME_CHILD, MSG_UPDATE_VOLUME, MSG_WORKER_FOUND_RESULT, 
-            MSG_WORKER_DEFECTING, MSG_FORWARD_CLIENT_RANK, MSG_TERMINATE, MSG_INTERRUPT, MSG_ABORT, MSG_QUERY_JOB_RESULT, 
-            MSG_NOTIFY_JOB_REVISION, MSG_QUERY_JOB_REVISION_DETAILS, MSG_SEND_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS,
-            MSG_ANYTIME_REDUCTION, MSG_ANYTIME_BROADCAST, MSG_JOB_COMMUNICATION, MSG_WARMUP, MSG_EXIT};
+const int ANYTIME_WORKER_RECV_TAGS[] = {MSG_FIND_NODE, MSG_WORKER_FOUND_RESULT, 
+            MSG_FORWARD_CLIENT_RANK, MSG_ANYTIME_REDUCTION, MSG_ANYTIME_BROADCAST, 
+            MSG_REQUEST_BECOME_CHILD, MSG_ACCEPT_BECOME_CHILD, MSG_REJECT_BECOME_CHILD, 
+            MSG_QUERY_VOLUME, MSG_UPDATE_VOLUME, 
+            MSG_NOTIFY_JOB_REVISION, MSG_QUERY_JOB_REVISION_DETAILS, 
+            MSG_SEND_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS,
+            MSG_ACK_ACCEPT_BECOME_CHILD, MSG_QUERY_JOB_RESULT, 
+            MSG_TERMINATE, MSG_INTERRUPT, MSG_ABORT, MSG_WORKER_DEFECTING, 
+            MSG_JOB_COMMUNICATION, MSG_WARMUP, MSG_EXIT};
 /**
- * All types of messages which can be receivable by a client node at any time 
- * by a generic irecv method and within the maximum message length.
+ * All types of messages which should be receivable by a client node at any time 
+ * by a "blanco" irecv method and within the maximum message length.
  */
-const int ANYTIME_CLIENT_RECV_TAGS[] = {MSG_JOB_DONE, MSG_REQUEST_BECOME_CHILD, MSG_ACK_ACCEPT_BECOME_CHILD, 
-            MSG_QUERY_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS, MSG_ABORT, MSG_CLIENT_FINISHED, MSG_EXIT};
+const int ANYTIME_CLIENT_RECV_TAGS[] = {MSG_JOB_DONE, MSG_CLIENT_FINISHED,
+            MSG_REQUEST_BECOME_CHILD, MSG_ACK_ACCEPT_BECOME_CHILD, 
+            MSG_QUERY_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS, MSG_ABORT, MSG_EXIT};
 
 /**
  * Which types of messages the MPI node should listen to. 
@@ -194,21 +252,19 @@ class MyMpi {
 
 public:
     struct HandleComparator {
-        bool operator()(const MessageHandlePtr& a, const MessageHandlePtr& b) const {
-            assert(MyMpi::_tag_priority.count(a->tag) || Console::fail("Tag %i has no priority assigned to it", a->tag));
-            assert(MyMpi::_tag_priority.count(b->tag) || Console::fail("Tag %i has no priority assigned to it", b->tag));
-            if (MyMpi::_tag_priority[a->tag] != MyMpi::_tag_priority[b->tag])
-                return MyMpi::_tag_priority[a->tag] < MyMpi::_tag_priority[b->tag];
-            if (a->tag != b->tag) return a->tag < b->tag;
-            return false;
+        bool operator()(const MessageHandlePtr& left, const MessageHandlePtr& right) const {
+            assert(MyMpi::_msg_priority.count(left->tag));
+            assert(MyMpi::_msg_priority.count(right->tag));
+            return MyMpi::_msg_priority[left->tag] < MyMpi::_msg_priority[right->tag];
         }
     };
 
 private:
-    static std::set<MessageHandlePtr> _handles;
-    static std::set<MessageHandlePtr> _deferred_handles;
-    static std::set<MessageHandlePtr> _sentHandles;
-    static std::map<int, int> _tag_priority;
+    static std::set<MessageHandlePtr, HandleComparator> _handles;
+    static std::set<MessageHandlePtr, HandleComparator> _deferred_handles;
+    static std::set<MessageHandlePtr, HandleComparator> _sent_handles;
+    static std::map<int, int> _msg_priority;
+    static ListenerMode _mode;
 
 public:
     static int _max_msg_length;
@@ -231,7 +287,7 @@ public:
     static MPI_Request iallreduce(MPI_Comm communicator, float* contribution, float* result, int numFloats);
     static bool test(MPI_Request& request, MPI_Status& status);
 
-    static MessageHandlePtr poll(const ListenerMode& mode);
+    static MessageHandlePtr poll();
     static inline bool hasActiveHandles() {
         return _handles.size() > 0;
     }
@@ -247,8 +303,8 @@ public:
     static int nextHandleId();
 
 private:
-    static void resetListenerIfNecessary(const ListenerMode& mode, int tag);
-    static bool isAnytimeTag(const ListenerMode& mode, int tag);
+    static void resetListenerIfNecessary(int tag);
+    static bool isAnytimeTag(int tag);
 
 };
 

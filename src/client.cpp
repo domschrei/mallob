@@ -156,7 +156,7 @@ void Client::mainProgram() {
 
         // Poll messages, if present
         MessageHandlePtr handle;
-        if ((handle = MyMpi::poll(ListenerMode::CLIENT)) != NULL) {
+        if ((handle = MyMpi::poll()) != NULL) {
             // Process message
             Console::log_recv(Console::VVERB, handle->source, "Processing msg, tag %i", handle->tag);
 
