@@ -20,7 +20,6 @@ EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params, Sta
 bool EventDrivenBalancer::beginBalancing(std::map<int, Job*>& jobs) {
     // Initialize
     //_balancing = true;
-    _balancing_epoch++;
 
     // Identify jobs to balance
     int numActiveJobs = 0;
@@ -78,7 +77,10 @@ bool EventDrivenBalancer::beginBalancing(std::map<int, Job*>& jobs) {
     }
 
     // initiate a balancing, if applicable
-    reduceIfApplicable(BOTH);
+    if (!_diffs.isEmpty()) {
+        _balancing_epoch++;
+        return reduceIfApplicable(BOTH);
+    } 
     return false;
 }
 
