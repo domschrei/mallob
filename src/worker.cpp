@@ -1108,21 +1108,21 @@ bool Worker::checkComputationLimits(int jobId) {
 void Worker::updateVolume(int jobId, int volume) {
 
     Job &job = getJob(jobId);
-    job.setLastVolume(volume);
 
     if (job.isNotInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
         // Job is not active right now
         return;
     }
 
-    // Prepare volume update to propagate down the job tree
-    IntPair payload(jobId, volume);
-
     // Root node update message
     int thisIndex = job.getIndex();
-    if (thisIndex == 0) {
-        Console::log(Console::VERB, "%s : update volume to %i", job.toStr(), volume);
+    if (thisIndex == 0 && job.getLastVolume() != volume) {
+        Console::log(Console::VERB, "%s : update v=%i", job.toStr(), volume);
     }
+    job.setLastVolume(volume);
+
+    // Prepare volume update to propagate down the job tree
+    IntPair payload(jobId, volume);
 
     // Left child
     int nextIndex = job.getLeftChildIndex();
