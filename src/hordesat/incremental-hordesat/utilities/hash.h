@@ -3,10 +3,10 @@
 #define DOMPASCH_MALLOB_HORDE_HASH
 
 template <class T>
-inline void hash_combine(std::size_t & s, const T & v)
+inline void hash_combine(unsigned int & s, const T & v)
 {
   std::hash<T> h;
-  s ^= h(v) + 0x9e3779b9 + (s<< 6) + (s>> 2);
+  s ^= h(v) + 0x003779b9 + (s<< 6) + (s>> 2);
 };
 
 #endif
