@@ -377,5 +377,5 @@ Job::~Job() {
         _initializer_thread = NULL;
     }
     
-    Console::log(Console::VERB, "Leaving destructor of %s", toStr());
+    Console::log(Console::VERB, "destructed %s", toStr());
 }

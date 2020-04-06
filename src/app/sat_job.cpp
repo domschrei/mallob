@@ -105,12 +105,12 @@ void SatJob::appl_interrupt() {
 }
 
 void SatJob::setSolverNull() {
-    Console::log(Console::VERB, "Releasing solver ...");
+    Console::log(Console::VVERB, "Releasing solver ...");
     auto lock = _horde_manipulation_lock.getLock();
     if (_solver != NULL) {
         _solver.reset();
         _solver = NULL;
-        Console::log(Console::VERB, "Solver released.");
+        Console::log(Console::VVERB, "Solver released.");
     }
 }
 
@@ -166,7 +166,7 @@ int SatJob::appl_solveLoop() {
             // Yes, some stuff still is not initialized
             return result;
         // Else: end initialization
-        Console::log(Console::VERB, "%s : threads fully initialized", toStr());
+        Console::log(Console::VERB, "%s : threads initialized", toStr());
         endInitialization();
 
         // If initialized and active now, do solve loop
@@ -222,10 +222,10 @@ SatJob::~SatJob() {
     }
 
     if (_solver != NULL) {
-        Console::log(Console::VVERB, "%s : interrupting and deleting hordesat", toStr());
+        Console::log(Console::VVERB, "%s : destructing hordesat", toStr());
         appl_interrupt();
         _solver->abort();
         setSolverNull();
     }
-    Console::log(Console::VVERB, "%s : leaving SAT job destructor", toStr());
+    Console::log(Console::VVERB, "%s : destructed SAT job", toStr());
 }

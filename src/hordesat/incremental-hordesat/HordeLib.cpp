@@ -389,7 +389,7 @@ void HordeLib::dumpStats() {
 	SolvingStatistics locSolveStats;
 	for (int i = 0; i < solversCount; i++) {
 		SolvingStatistics st = solvers[i]->getStatistics();
-		hlog(1, "S%d stats props:%lu decs:%lu confs:%lu mem:%0.2f\n",
+		hlog(1, "S%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f\n",
 				solvers[i]->solverId, st.propagations, st.decisions, st.conflicts, st.memPeak);
 		locSolveStats.conflicts += st.conflicts;
 		locSolveStats.decisions += st.decisions;
@@ -401,7 +401,7 @@ void HordeLib::dumpStats() {
 	if (sharingManager != NULL) {
 		locShareStats = sharingManager->getStatistics();
 	}
-	hlog(1, "node-stats solved:%d res:%d props:%lu decs:%lu confs:%lu mem:%0.2f shared:%lu filtered:%lu\n",
+	hlog(1, "slv:%d res:%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f shrd:%lu fltd:%lu\n",
 			finalResult != 0, finalResult, locSolveStats.propagations, locSolveStats.decisions,
 			locSolveStats.conflicts, locSolveStats.memPeak, locShareStats.sharedClauses, locShareStats.filteredClauses);
 }

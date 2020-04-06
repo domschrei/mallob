@@ -41,7 +41,7 @@ std::vector<int> DefaultSharingManager::prepareSharing(int maxSize) {
 		solvers[increaser]->increaseClauseProduction();
 		log(3, "Node %d production increase for %d. time, core %d will increase.\n", rank, prodInc++, increaser);
 	}
-	log(2, "Filled %d%% of buffer\n", usedPercent);
+	log(3, "Filled %d%% of buffer\n", usedPercent);
     std::vector<int> clauseVec(outBuffer, outBuffer + used);
 
     return clauseVec;

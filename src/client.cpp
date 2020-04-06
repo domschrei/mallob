@@ -158,7 +158,7 @@ void Client::mainProgram() {
         std::vector<MessageHandlePtr> handles = MyMpi::poll();
         for (MessageHandlePtr& handle : handles) {
             // Process message
-            Console::log_recv(Console::VVERB, handle->source, "Processing msg, tag %i", handle->tag);
+            Console::log_recv(Console::VVVERB, handle->source, "Processing msg, tag %i", handle->tag);
 
             if (handle->tag == MSG_JOB_DONE) {
                 handleJobDone(handle);
