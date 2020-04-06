@@ -265,7 +265,7 @@ bool CutoffPriorityBalancer::finishResourcesReduction() {
 bool CutoffPriorityBalancer::finishRemaindersReduction() {
     if (!_remainders.isEmpty()) {
         Console::getLock();
-        Console::appendUnsafe(Console::VVVERB, "BLC e=%i ROUNDING remainders: ", _balancing_epoch);
+        Console::appendUnsafe(Console::VVVERB, "BLC e=%i RND remainders: ", _balancing_epoch);
         for (int i = 0; i < _remainders.size(); i++) Console::appendUnsafe(Console::VVVERB, "%.3f ", _remainders[i]);
         Console::logUnsafe(Console::VVVERB, "");
         Console::releaseLock();
@@ -312,7 +312,7 @@ bool CutoffPriorityBalancer::continueRoundingFromReduction() {
     // Log iteration
     if (!_remainders.isEmpty() && idx <= _remainders.size()) {
         double remainder = (idx < _remainders.size() ? _remainders[idx] : 1.0);
-        Console::log(Console::VVERB, "BLC e=%i ROUNDING it=%i [%i,%i]=>%i rmd=%.3f util=%.2f pen=%.2f", 
+        Console::log(Console::VVERB, "BLC e=%i RND it=%i [%i,%i]=>%i rmd=%.3f util=%.2f pen=%.2f", 
                         _balancing_epoch, _rounding_iterations, _lower_remainder_idx, _upper_remainder_idx, idx,
                         remainder, utilization, p);
     }
@@ -329,7 +329,7 @@ bool CutoffPriorityBalancer::continueRoundingFromReduction() {
             }
             double remainder = (_best_remainder_idx < _remainders.size() ? _remainders[_best_remainder_idx] : 1.0);
             Console::log(Console::VVERB, 
-                        "BLC e=%i ROUNDING_DONE its=%i rmd=%.3f util=%.2f pen=%.2f", 
+                        "BLC e=%i RND DONE its=%i rmd=%.3f util=%.2f pen=%.2f", 
                         _balancing_epoch, _rounding_iterations, remainder, _best_utilization, _best_penalty);
         }
         // reset to original state

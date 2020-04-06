@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include <utility>
 
 #include "utilities/ParameterProcessor.h"
 #include "utilities/Threading.h"
@@ -22,6 +23,8 @@ class SolverThread {
 private:
     thread_args* _args;
     std::string _name;
+    std::tuple<int, int, int> _diversification_seed;
+
     PortfolioSolverInterface* solver;
     HordeLib* hlib;
     int importedLits;
@@ -39,8 +42,8 @@ private:
 
     void diversify();
     void sparseDiversification(int mpi_size, int mpi_rank);
-	void randomDiversification(unsigned int seed);
-	void sparseRandomDiversification(unsigned int seed, int mpi_size);
+	void randomDiversification();
+	void sparseRandomDiversification(int mpi_size);
 	void nativeDiversification(int mpi_rank, int mpi_size);
 	void binValueDiversification(int mpi_size, int mpi_rank);
 

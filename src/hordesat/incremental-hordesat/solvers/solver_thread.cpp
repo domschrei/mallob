@@ -1,6 +1,7 @@
 
 #include "solvers/solver_thread.h"
 #include "HordeLib.h"
+#include "utilities/hash.h"
 
 using namespace SolvingStates;
 
@@ -68,6 +69,7 @@ void SolverThread::init() {
     solver->setName(globalName);
     //hlib->solvingStateLock.unlock();
     importedLits = 0;
+    _diversification_seed = std::tuple<int, int, int>(0, 0, 0);
 }
 
 void SolverThread::readFormula() {
@@ -87,7 +89,7 @@ void SolverThread::readFormula() {
         if (i < hlib->formulae.size() && cancelThread()) return;
     }
 
-    hlib->hlog(2, "%s imported clauses (%i lits)\n", toStr(), (importedLits-prevLits));
+    hlib->hlog(2, "%s imported cnf (%i lits)\n", toStr(), (importedLits-prevLits));
     hlib->hlog(1, "%s initialized\n", toStr());
     hlib->solverThreadsInitialized[_args->solverId] = true;
 }
@@ -110,39 +112,59 @@ void SolverThread::read(const std::vector<int>& formula, int begin) {
 
 void SolverThread::diversify() {
 
-	int diversification = hlib->params.getIntParam("d", 1);
+	int diversificationMode = hlib->params.getIntParam("d", 1);
     int mpi_size = hlib->mpi_size;
     int mpi_rank = hlib->mpi_rank;
-	switch (diversification) {
+
+    auto newDiversificationSeed = std::tuple<int, int, int>(mpi_rank, mpi_size, (int)(100*getTime()));
+    if (std::get<0>(newDiversificationSeed) != std::get<0>(_diversification_seed) ||
+        std::get<1>(newDiversificationSeed) != std::get<1>(_diversification_seed)) {
+        
+        // Rank or size changed: New diversification needed
+        _diversification_seed = newDiversificationSeed;
+    }
+
+    // Random seed: will be the same whenever rank and size stay the same,
+    // changes to something completely new when rank or size change. 
+    int rank = std::get<0>(_diversification_seed);
+    int size = std::get<1>(_diversification_seed);
+    int time = std::get<2>(_diversification_seed);
+    size_t seed = 42;
+    hash_combine<int>(seed, time);
+    hash_combine<int>(seed, size);
+    hash_combine<int>(seed, rank);        
+    srand(seed);    
+
+	switch (diversificationMode) {
 	case 1:
 		sparseDiversification(mpi_size, mpi_rank);
-		hlib->hlog(3, "doing sparse diversification\n");
+		hlib->hlog(3, "sparse diversification\n");
 		break;
 	case 2:
 		binValueDiversification(mpi_size, mpi_rank);
-		hlib->hlog(3, "doing binary value based diversification\n");
+		hlib->hlog(3, "binary value based diversification\n");
 		break;
 	case 3:
-		randomDiversification(2015);
-		hlib->hlog(3, "doing random diversification\n");
+		randomDiversification();
+		hlib->hlog(3, "random diversification, s=%i\n", seed);
 		break;
 	case 4:
 		nativeDiversification(mpi_rank, mpi_size);
-		hlib->hlog(3, "doing native diversification (plingeling)\n");
+		hlib->hlog(3, "native diversification (plingeling)\n");
 		break;
 	case 5:
 		sparseDiversification(mpi_size, mpi_rank);
 		nativeDiversification(mpi_rank, mpi_size);
-		hlib->hlog(3, "doing sparse + native diversification\n");
+		hlib->hlog(3, "sparse + native diversification\n");
 		break;
 	case 6:
-		sparseRandomDiversification(mpi_rank, mpi_size);
-		hlib->hlog(3, "doing sparse random diversification\n");
+		sparseRandomDiversification(mpi_size);
+		hlib->hlog(3, "sparse random diversification, s=%i\n", seed);
 		break;
 	case 7:
-		sparseRandomDiversification(mpi_rank, mpi_size);
+		sparseRandomDiversification(mpi_size);
 		nativeDiversification(mpi_rank, mpi_size);
-		hlib->hlog(3, "doing random sparse + native diversification (plingeling)\n");
+		hlib->hlog(3, "random sparse + native diversification (plingeling), s=%i\n", seed);
 		break;
 	case 0:
 		hlib->hlog(3, "no diversification\n");
@@ -161,16 +183,14 @@ void SolverThread::sparseDiversification(int mpi_size, int mpi_rank) {
     }
 }
 
-void SolverThread::randomDiversification(unsigned int seed) {
-	srand(seed);
+void SolverThread::randomDiversification() {
     int vars = solver->getVariablesCount();
     for (int var = 1; var <= vars; var++) {
         solver->setPhase(var, rand()%2 == 1);
     }
 }
 
-void SolverThread::sparseRandomDiversification(unsigned int seed, int mpi_size) {
-	srand(seed);
+void SolverThread::sparseRandomDiversification(int mpi_size) {
 	int totalSolvers = hlib->solversCount * mpi_size;
     int vars = solver->getVariablesCount();
     for (int var = 1; var <= vars; var++) {
