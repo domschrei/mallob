@@ -220,17 +220,17 @@ void Worker::mainProgram() {
             jobTime = Timer::elapsedSeconds() - jobTime;
         }
 
-        // Poll a message, if present
-        MessageHandlePtr handle;
+        // Poll messages
         float pollTime = Timer::elapsedSeconds();
-        while ((handle = MyMpi::poll()) != NULL) {
-            pollTime = Timer::elapsedSeconds() - pollTime;
+        std::vector<MessageHandlePtr> handles = MyMpi::poll();
+        pollTime = Timer::elapsedSeconds() - pollTime;
+        
+        Console::log(Console::VVVERB, "loop cycle %i", iteration);
+        if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f s", jobTime);
+        Console::log(Console::VVVERB, "poll time: %.6f s", pollTime);
 
-            Console::log(Console::VVVERB, "loop cycle %i", iteration);
-            if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f s", jobTime);
-            Console::log(Console::VVVERB, "poll time: %.6f s", pollTime);
-
-            // Process message
+        // Process new messages
+        for (MessageHandlePtr& handle : handles) {
             Console::log_recv(Console::VVVERB, handle->source, "Process msg id=%i, tag %i", handle->id, handle->tag);
             float time = Timer::elapsedSeconds();
 

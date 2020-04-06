@@ -311,36 +311,35 @@ bool MyMpi::test(MPI_Request& request, MPI_Status& status) {
     return flag;
 }
 
-MessageHandlePtr MyMpi::poll() {
+std::vector<MessageHandlePtr> MyMpi::poll() {
 
-    MessageHandlePtr foundHandle = NULL;
-    bool deferred = false;
+    std::vector<MessageHandlePtr> foundHandles;
+    std::vector<bool> handlesDeferred;
 
     // Find ready handle of best priority
     for (auto h : _handles) {
         if (h->testReceived()) {
-            foundHandle = h;
-            break; // handle found
+            foundHandles.push_back(h);
+            handlesDeferred.push_back(false);
         }
     }
 
     // If necessary, pick a deferred handle (if there is one)
-    if (foundHandle == NULL) {
-        deferred = true;
+    if (foundHandles.empty()) {
         for (auto h : _deferred_handles) {
             if (h->testReceived()) {
-                foundHandle = h;
-                break; // handle found
+                foundHandles.push_back(h);
+                handlesDeferred.push_back(true);
             }
         }   
     }
 
     // Remove and return found handle
-    if (foundHandle != NULL) {
-        (deferred ? _deferred_handles : _handles).erase(foundHandle);
-        resetListenerIfNecessary(foundHandle->tag);
+    for (int i = 0; i < foundHandles.size(); i++) {
+        (handlesDeferred[i] ? _deferred_handles : _handles).erase(foundHandles[i]);
+        resetListenerIfNecessary(foundHandles[i]->tag);
     } 
-    return foundHandle;
+    return foundHandles;
 }
 
 void MyMpi::deferHandle(MessageHandlePtr handle) {

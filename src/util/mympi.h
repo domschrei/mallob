@@ -291,7 +291,7 @@ public:
     static MPI_Request iallreduce(MPI_Comm communicator, float* contribution, float* result, int numFloats);
     static bool test(MPI_Request& request, MPI_Status& status);
 
-    static MessageHandlePtr poll();
+    static std::vector<MessageHandlePtr> poll();
     static inline bool hasActiveHandles() {
         return _handles.size() > 0;
     }

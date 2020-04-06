@@ -155,8 +155,8 @@ void Client::mainProgram() {
         }
 
         // Poll messages, if present
-        MessageHandlePtr handle;
-        if ((handle = MyMpi::poll()) != NULL) {
+        std::vector<MessageHandlePtr> handles = MyMpi::poll();
+        for (MessageHandlePtr& handle : handles) {
             // Process message
             Console::log_recv(Console::VVERB, handle->source, "Processing msg, tag %i", handle->tag);
 
@@ -186,7 +186,7 @@ void Client::mainProgram() {
         MyMpi::testSentHandles();
 
         // Sleep for a bit
-        //usleep(1000); // 1000 = 1 millisecond
+        usleep(1000); // 1000 = 1 millisecond
     }
 
     Console::flush();
