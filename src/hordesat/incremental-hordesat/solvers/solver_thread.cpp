@@ -116,12 +116,11 @@ void SolverThread::diversify() {
     int mpi_size = hlib->mpi_size;
     int mpi_rank = hlib->mpi_rank;
 
-    auto newDiversificationSeed = std::tuple<int, int, int>(mpi_rank, mpi_size, (int)(100*getTime()));
-    if (std::get<0>(newDiversificationSeed) != std::get<0>(_diversification_seed) ||
-        std::get<1>(newDiversificationSeed) != std::get<1>(_diversification_seed)) {
+    if (mpi_rank != std::get<0>(_diversification_seed) ||
+        mpi_size != std::get<1>(_diversification_seed)) {
         
         // Rank or size changed: New diversification needed
-        _diversification_seed = newDiversificationSeed;
+        _diversification_seed = std::tuple<int, int, int>(mpi_rank, mpi_size, (int)(100*getTime()));
     }
 
     // Random seed: will be the same whenever rank and size stay the same,
@@ -129,10 +128,12 @@ void SolverThread::diversify() {
     int rank = std::get<0>(_diversification_seed);
     int size = std::get<1>(_diversification_seed);
     int time = std::get<2>(_diversification_seed);
+    int sno = _args->solverId; // between 0 and <num-threads>-1
     size_t seed = 42;
     hash_combine<unsigned int>(seed, time);
+    hash_combine<unsigned int>(seed, sno);        
     hash_combine<unsigned int>(seed, size);
-    hash_combine<unsigned int>(seed, rank);        
+    hash_combine<unsigned int>(seed, rank);  
     srand(seed);    
 
 	switch (diversificationMode) {
