@@ -297,19 +297,19 @@ void EventDrivenBalancer::calculateBalancingResult() {
         assignedResources += assignments[ev.jobId] - 1;
         if (!demandedResources.count(ev.priority)) demandedResources[ev.priority] = 0;
         demandedResources[ev.priority] += ev.demand - assignments[ev.jobId];
-        Console::log(verb, "BLC e=%i #%i init_assignment=%.3f", _balancing_epoch, ev.jobId, assignments[ev.jobId]);
+        Console::log(verb, "BLC e=%i #%i init_assign=%.3f", _balancing_epoch, ev.jobId, assignments[ev.jobId]);
     }
 
     // 3. Calculate final floating-point assignments for all jobs
 
-    Console::log(verb, "BLC e=%i init_assigned_resources=%.3f", 
+    Console::log(verb, "BLC e=%i init_assigned=%.3f", 
         _balancing_epoch, assignedResources);
     
     // Atomic job assignments are already subtracted from _total_avail_volume
     // and are not part of the all-reduced assignedResources either
     float remainingResources = totalAvailVolume - assignedResources;
     if (remainingResources < 0.1) remainingResources = 0; // too low a remainder to make a difference
-    Console::log(verb, "BLC e=%i remaining_resources=%.3f", _balancing_epoch, remainingResources);
+    Console::log(verb, "BLC e=%i remaining=%.3f", _balancing_epoch, remainingResources);
 
     std::map<int, int> allVolumes;
     for (const auto& entry : _states.getEntries()) {
@@ -343,7 +343,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
             }
         }
 
-        Console::log(verb, "BLC e=%i #%i adj_assignment=%.3f", _balancing_epoch, jobId, assignments[jobId]);
+        Console::log(verb, "BLC e=%i #%i adj_assign=%.3f", _balancing_epoch, jobId, assignments[jobId]);
     }
 
     // 4. Round job assignments
@@ -394,7 +394,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
             // Log iteration
             if (!remainders.isEmpty() && idx <= remainders.size()) {
                 double remainder = (idx < remainders.size() ? remainders[idx] : 1.0);
-                Console::log(verb, "BLC e=%i ROUNDING it=%i [%i,%i]=>%i rmd=%.3f util=%.2f pen=%.2f", 
+                Console::log(verb, "BLC e=%i RND it=%i [%i,%i]=>%i rmd=%.3f util=%.2f pen=%.2f", 
                                 _balancing_epoch, iterations, lower, upper, idx,
                                 remainder, (float)utilization, p);
             }
