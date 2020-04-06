@@ -168,7 +168,7 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
     }
     MessageHandlePtr handle(new MessageHandle(nextHandleId(), object));
     handle->tag = tag;
-    
+
     bool selfMessage = rank(communicator) == recvRank;
     if (selfMessage) {
         handle->recvData = handle->sendData;

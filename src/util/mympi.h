@@ -102,99 +102,99 @@ const int MSG_UPDATE_VOLUME = 8;
  * Data type: JobDescription
  * Warning: Length may exceed the default maximum message length.
  */
-const int MSG_SEND_JOB_DESCRIPTION = 11;
+const int MSG_SEND_JOB_DESCRIPTION = 9;
 /*
  * The sender informs the receiver that a solution was found for the job
  * of the specified ID.
  * Data type: [jobId, resultCode]
  */
-const int MSG_WORKER_FOUND_RESULT = 16;
+const int MSG_WORKER_FOUND_RESULT = 10;
 /*
  * The sender provides the global rank of the client node which initiated
  * a certain job.
  * Data type: [jobId, clientRank]
  */
-const int MSG_FORWARD_CLIENT_RANK = 17;
+const int MSG_FORWARD_CLIENT_RANK = 11;
 /*
  * A signal to terminate a job is propagated.
  * Data type: [jobId]
  */
-const int MSG_TERMINATE = 18;
+const int MSG_TERMINATE = 12;
 /*
  * The sender informs the receiver (a client) that a job has been finished,
  * and also provides the size of the upcoming job result message.
  * Data type: [jobId, sizeOfResult]
  */
-const int MSG_JOB_DONE = 19;
+const int MSG_JOB_DONE = 13;
 /*
  * The sender (a client) acknowledges that it received the receiver's MSG_JOB_DONE
  * message and signals that it wishes to receive the full job result.
  * Data type: [jobId, sizeOfResult]
  */
-const int MSG_QUERY_JOB_RESULT = 20;
+const int MSG_QUERY_JOB_RESULT = 14;
 /*
  * The sender provides a job's full result to the receiver (a client).
  * Data type: JobResult
  * Warning: Length may exceed the default maximum message length.
  */
-const int MSG_SEND_JOB_RESULT = 21;
+const int MSG_SEND_JOB_RESULT = 15;
 /**
  * The sender (a worker node) informs the receiver (the job's root node) that 
  * the sender is defecting to another job.
  * Data type: [jobId, index]
  */
-const int MSG_WORKER_DEFECTING = 22;
+const int MSG_WORKER_DEFECTING = 16;
 /* For incremental jobs. Unsupported as of now */
-const int MSG_NOTIFY_JOB_REVISION = 24;
+const int MSG_NOTIFY_JOB_REVISION = 17;
 /* For incremental jobs. Unsupported as of now */
-const int MSG_QUERY_JOB_REVISION_DETAILS = 25;
+const int MSG_QUERY_JOB_REVISION_DETAILS = 18;
 /* For incremental jobs. Unsupported as of now */
-const int MSG_SEND_JOB_REVISION_DETAILS = 26;
+const int MSG_SEND_JOB_REVISION_DETAILS = 19;
 /* For incremental jobs. Unsupported as of now */
-const int MSG_ACK_JOB_REVISION_DETAILS = 27;
+const int MSG_ACK_JOB_REVISION_DETAILS = 20;
 /* For incremental jobs. Unsupported as of now */
-const int MSG_SEND_JOB_REVISION_DATA = 28;
+const int MSG_SEND_JOB_REVISION_DATA = 21;
 /* For incremental jobs. Unsupported as of now */
-const int MSG_INCREMENTAL_JOB_FINISHED = 29;
+const int MSG_INCREMENTAL_JOB_FINISHED = 22;
 /**
  * The sender informs the receiver that the receiver should interrupt 
  * the specified job it currently computes on (leaving the possibility 
  * to continue computation at some later point). Possibly self message.
  * Data type: [jobId, index]
  */
-const int MSG_INTERRUPT = 30;
+const int MSG_INTERRUPT = 23;
 /**
  * The sender informs the receiver that the receiver should abort, i.e., 
  * terminate the specified job it currently computes on. Possibly self message.
  * Data type: [jobId, index]
  */
-const int MSG_ABORT = 31;
+const int MSG_ABORT = 24;
 /**
  * A message that tells some node (worker or client) to immediately exit the application.
  */
-const int MSG_EXIT = 32;
+const int MSG_EXIT = 25;
 /**
  * A client tells another client that the sender is now out of jobs to introduce to the system.
  * Used to detect early termination.
  */
-const int MSG_CLIENT_FINISHED = 33;
+const int MSG_CLIENT_FINISHED = 26;
 /**
  * Some data is being reduced or broadcast via a custom operation.
  */
-const int MSG_COLLECTIVES = 300;
+const int MSG_COLLECTIVES = 27;
 /**
  * Some data is being reduced via a custom operation.
  */
-const int MSG_ANYTIME_REDUCTION = 301;
+const int MSG_ANYTIME_REDUCTION = 28;
 /**
  * Some data is being broadcast via a custom operation.
  */
-const int MSG_ANYTIME_BROADCAST = 302;
+const int MSG_ANYTIME_BROADCAST = 29;
 /**
  * Tag for the job-internal, application-specific communication inside a job.
  * The payload should contain another job-internal message tag.
  */
-const int MSG_JOB_COMMUNICATION = 400;
+const int MSG_JOB_COMMUNICATION = 30;
 
 /**
  * All message tags, sorted by the rough priority according to which
