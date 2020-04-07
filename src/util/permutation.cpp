@@ -18,8 +18,9 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
         AdjustablePermutation pInit(n, /*seed=*/n-1);
         int myPos = -1;
         for (int pos = 0; pos < n; pos++) {
-            intrinsicPartners[pos] = pInit.get(pos+1 % n);
-            if (myPos < 0 && pInit.get(pos) == myRank) myPos = pos; 
+            int val = pInit.get(pos);
+            intrinsicPartners[(pos-1 + n) % n] = val;
+            if (myPos < 0 && val == myRank) myPos = pos; 
         }
         outgoingEdges.push_back(intrinsicPartners[myPos]);
     }
@@ -102,7 +103,7 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
     }
 
     // Clean up
-    for (int i = 1; i < permutations.size(); i++) {
+    for (int i = 0; i < permutations.size(); i++) {
         delete permutations[i];
     }
 
