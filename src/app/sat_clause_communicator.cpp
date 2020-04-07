@@ -69,7 +69,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
             std::vector<int> clausesToShare = shareCollectedClauses(epoch);
             if (_job->isRoot()) {
                 // Share complete set of clauses to children
-                Console::log(Console::VVERB, "%s : switching: gather => broadcast", _job->toStr()); 
+                Console::log(Console::VVERB, "%s : switch gather => broadcast", _job->toStr()); 
                 learnAndDistributeClausesDownwards(clausesToShare, epoch);
             } else {
                 // Send set of clauses to parent
@@ -80,7 +80,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
                 msg.tag = MSG_GATHER_CLAUSES;
                 msg.payload = clausesToShare;
                 msg.payload.push_back(_num_aggregated_nodes);
-                Console::log_send(Console::VERB, parentRank, "%s : gathering", _job->toStr());
+                Console::log_send(Console::VERB, parentRank, "%s : gather", _job->toStr());
                 MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
             }
             _last_shared_job_comm = epoch;
@@ -99,7 +99,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
 
 void SatClauseCommunicator::learnAndDistributeClausesDownwards(std::vector<int>& clauses, int jobCommEpoch) {
 
-    Console::log(Console::VERB, "%s : learning, size %i", _job->toStr(), clauses.size());
+    Console::log(Console::VERB, "%s : learn, size %i", _job->toStr(), clauses.size());
 
     // Send clauses to children
     JobMessage msg;
@@ -181,7 +181,7 @@ std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch) 
     insertIntoClauseBuffer(selfClauses, jobCommEpoch);
 
     // Merge all collected buffer into a single buffer
-    Console::log(Console::VVVERB, "%s : merging %i buffers into total size %i", 
+    Console::log(Console::VVVERB, "%s : merge %i buffers into total size %i", 
                 _job->toStr(), _clause_buffers.size(), totalSize);
     std::vector<std::vector<int>*> buffers;
     for (auto& buf : _clause_buffers) buffers.push_back(&buf);
