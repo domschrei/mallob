@@ -26,8 +26,8 @@ void SatClauseCommunicator::initiateCommunication() {
     testConsistency(msg.payload);
     msg.payload.push_back(1); // last int: depth the clause buffer traversed through the job tree so far.
     int parentRank = _job->getParentNodeRank();
-    Console::log(Console::VVERB, "%s : (JCE=%i) initiating exchange", _job->toStr(), msg.epoch);
-    Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) sending, size %i", _job->toStr(), msg.epoch, msg.payload.size()-1);
+    Console::log(Console::VVERB, "%s : initiating exchange", _job->toStr());
+    Console::log_send(Console::VERB, parentRank, "%s : sending, size %i", _job->toStr(), msg.payload.size()-1);
     MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
     // TODO //stats.increase("sentMessages");
 }
@@ -49,12 +49,12 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
         std::vector<int>& clauses = msg.payload;
         testConsistency(clauses);
         
-        Console::log(Console::VVVERB, "%s : (JCE=%i) received, size %i", _job->toStr(), epoch, clauses.size());
+        Console::log(Console::VVVERB, "%s : received, size %i", _job->toStr(), clauses.size());
 
         if (_last_shared_job_comm >= epoch) {
             // Already shared clauses upwards this job comm epoch!
-            Console::log(Console::VVERB, "%s : (JCE=%i) ending: already did sharing this JCE", _job->toStr(), epoch);
-            Console::log(Console::VVERB, "%s : (JCE=%i) learning and broadcasting down", _job->toStr(), epoch);
+            Console::log(Console::VVERB, "%s : ending: already did sharing this JCE", _job->toStr());
+            Console::log(Console::VVERB, "%s : learning and broadcasting down", _job->toStr());
             learnAndDistributeClausesDownwards(clauses, epoch);
             return;
         }
@@ -69,7 +69,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
             std::vector<int> clausesToShare = shareCollectedClauses(epoch);
             if (_job->isRoot()) {
                 // Share complete set of clauses to children
-                Console::log(Console::VVERB, "%s : (JCE=%i) switching: gather => broadcast", _job->toStr(), epoch); 
+                Console::log(Console::VVERB, "%s : switching: gather => broadcast", _job->toStr()); 
                 learnAndDistributeClausesDownwards(clausesToShare, epoch);
             } else {
                 // Send set of clauses to parent
@@ -80,7 +80,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
                 msg.tag = MSG_GATHER_CLAUSES;
                 msg.payload = clausesToShare;
                 msg.payload.push_back(_num_aggregated_nodes);
-                Console::log_send(Console::VERB, parentRank, "%s : (JCE=%i) gathering", _job->toStr(), epoch);
+                Console::log_send(Console::VERB, parentRank, "%s : gathering", _job->toStr());
                 MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
             }
             _last_shared_job_comm = epoch;
@@ -99,7 +99,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
 
 void SatClauseCommunicator::learnAndDistributeClausesDownwards(std::vector<int>& clauses, int jobCommEpoch) {
 
-    Console::log(Console::VERB, "%s : (JCE=%i) learning, size %i", _job->toStr(), jobCommEpoch, clauses.size());
+    Console::log(Console::VERB, "%s : learning, size %i", _job->toStr(), clauses.size());
 
     // Send clauses to children
     JobMessage msg;
@@ -110,12 +110,12 @@ void SatClauseCommunicator::learnAndDistributeClausesDownwards(std::vector<int>&
     int childRank;
     if (_job->hasLeftChild()) {
         childRank = _job->getLeftChildNodeRank();
-        Console::log_send(Console::VVERB, childRank, "%s : (JCE=%i) broadcasting", _job->toStr(), jobCommEpoch);
+        Console::log_send(Console::VVERB, childRank, "%s : broadcast", _job->toStr());
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_JOB_COMMUNICATION, msg);
     }
     if (_job->hasRightChild()) {
         childRank = _job->getRightChildNodeRank();
-        Console::log_send(Console::VVERB, childRank, "%s : (JCE=%i) broadcasting", _job->toStr(), jobCommEpoch);
+        Console::log_send(Console::VVERB, childRank, "%s : broadcast", _job->toStr());
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_JOB_COMMUNICATION, msg);
     }
 
@@ -136,21 +136,12 @@ std::vector<int> SatClauseCommunicator::collectClausesFromSolvers(int maxSize, i
         return std::vector<int>();
     }
     // Else, retrieve clauses from solvers
-    Console::log(Console::VVERB, "%s : (JCE=%i) collecting local clauses, max. size %i", 
-                _job->toStr(), jobCommEpoch, maxSize);
+    Console::log(Console::VVERB, "%s : collect local cls, max. size %i", 
+                _job->toStr(), maxSize);
     return _job->getSolver()->prepareSharing(maxSize);
 }
 void SatClauseCommunicator::insertIntoClauseBuffer(std::vector<int>& vec, int jobCommEpoch) {
 
-    /*
-    // If there are clauses in the buffer which are from a previous job comm epoch:
-    if (!_clause_buffers.empty() && _job_comm_epoch_of_clause_buffer != jobCommEpoch) {
-        // Previous clauses came from an old epoch; reset clause buffer
-        Console::log(Console::VVERB, "(JCE=%i) Discarding buffers from old JCE %i", 
-                jobCommEpoch, _job_comm_epoch_of_clause_buffer);
-        _num_clause_sources = 0;
-        _clause_buffers.clear();
-    }*/
     // Update epoch of current clause buffer
     _job_comm_epoch_of_clause_buffer = std::max(_job_comm_epoch_of_clause_buffer, jobCommEpoch);
     //_job_comm_epoch_of_clause_buffer = jobCommEpoch;
@@ -181,7 +172,7 @@ std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch) 
     float s = _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(_num_aggregated_nodes+1));
     int totalSize = std::ceil(_num_aggregated_nodes * s);
     int selfSize = std::ceil(s);
-    Console::log(Console::VVVERB, "%s : (JCE=%i) aggregated=%i max_self=%i max_total=%i", _job->toStr(), jobCommEpoch, 
+    Console::log(Console::VVVERB, "%s : aggregated=%i max_self=%i max_total=%i", _job->toStr(), 
             _num_aggregated_nodes, selfSize, totalSize);
 
     // Locally collect clauses from own solvers, add to clause buffer
@@ -190,8 +181,8 @@ std::vector<int> SatClauseCommunicator::shareCollectedClauses(int jobCommEpoch) 
     insertIntoClauseBuffer(selfClauses, jobCommEpoch);
 
     // Merge all collected buffer into a single buffer
-    Console::log(Console::VVVERB, "%s : (JCE=%i) merging %i buffers into total size %i", 
-                _job->toStr(), jobCommEpoch, _clause_buffers.size(), totalSize);
+    Console::log(Console::VVVERB, "%s : merging %i buffers into total size %i", 
+                _job->toStr(), _clause_buffers.size(), totalSize);
     std::vector<std::vector<int>*> buffers;
     for (auto& buf : _clause_buffers) buffers.push_back(&buf);
     std::vector<int> vec = merge(buffers, totalSize);
@@ -207,17 +198,17 @@ void SatClauseCommunicator::learnClausesFromAbove(std::vector<int>& clauses, int
 
     // If not active or not fully initialized yet: discard clauses
     if (_job->isNotInState({ACTIVE}) || !_job->getSolver()->isFullyInitialized()) {
-        Console::log(Console::VVERB, "%s : (JCE=%i) buffer discarded because job is not (yet?) active", 
-                _job->toStr(), jobCommEpoch);
+        Console::log(Console::VVERB, "%s : discard buffer, job is not (yet?) active", 
+                _job->toStr());
         return;
     }
 
     // Locally digest clauses
-    Console::log(Console::VVERB, "%s : (JCE=%i) digesting ...", _job->toStr(), jobCommEpoch);
+    Console::log(Console::VVERB, "%s : digest", _job->toStr());
     _job->lockHordeManipulation();
     if (_job->getSolver() != NULL) _job->getSolver()->digestSharing(clauses);
     _job->unlockHordeManipulation();
-    Console::log(Console::VERB, "%s : (JCE=%i) digested", _job->toStr(), jobCommEpoch);
+    Console::log(Console::VERB, "%s : digested", _job->toStr());
 }
 
 std::vector<int> SatClauseCommunicator::merge(const std::vector<std::vector<int>*>& buffers, int maxSize) {
