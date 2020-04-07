@@ -18,10 +18,12 @@ private:
 
     std::unordered_map<int, int> _adjusted_values;
 
-    bool _identity_disallowed;
+    bool _identity_disallowed = false;
     std::vector<AdjustablePermutation*> _disallowed_permutations;
 
 public:
+    static std::vector<int> createExpanderGraph(int n, int r, int myRank);
+
     AdjustablePermutation() = default;
     AdjustablePermutation(int n, int seed);
 

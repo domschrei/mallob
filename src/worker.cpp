@@ -87,86 +87,8 @@ void Worker::createExpanderGraph() {
     assert(numBounceAlternatives < numWorkers || 
         Console::fail("ERROR: There must be more worker nodes than there are bounce alternatives per worker"));
 
-    bounceAlternatives = std::vector<int>();
-
-    std::vector<AdjustablePermutation*> permutations;
-
-    // Blackbox checker whether some value at some position of a new permutation
-    // is valid w.r.t. previous permutations
-    auto isValid = [&permutations](int pos, int val) {
-        if (pos == val) return false; // no identity!
-        for (auto& perm : permutations) {
-            if (perm->get(pos) == val) return false;
-        }
-        return true;
-    };
-
-    // For each permutation
-    for (int r = 0; r < numBounceAlternatives; r++) {
-
-        // Generate global permutation over all worker ranks
-        // disallowing identity and previous permutations
-        AdjustablePermutation* p = new AdjustablePermutation(numWorkers, r);
-        
-        if (worldRank == 0) {
-            Console::append(Console::INFO, "Permutation %i  : ", r);
-            for (int pos = 0; pos < numWorkers; pos++) {
-                Console::append(Console::INFO, "%i ", p->get(pos));
-            }
-            Console::log(Console::INFO, "");
-        }
-
-        // For each position of the permutation, left to right
-        for (int pos = 0; pos < numWorkers; pos++) {
-            int val = p->get(pos);
-            if (!isValid(pos, val)) {
-                // Value at this position is not valid
-
-                // Find a position of this permutation to swap values
-                int swapPos;
-                int swapVal;
-                bool successfulSwap = false;
-                while (!successfulSwap) {
-                    // Draw a random swap position that is NOT the current position,
-                    // get the according swap value
-                    swapPos = (int) (Random::rand()*(numWorkers-1));
-                    if (swapPos >= pos) swapPos++;
-                    swapVal = p->get(swapPos);
-
-                    // Check if it can be swapped:
-                    // swap value is valid at current position AND
-                    // (either destination was not scanned yet
-                    // OR current value at swap position is valid too)
-                    if (isValid(pos, swapVal) && (swapPos >= pos || isValid(swapPos, val)))
-                        successfulSwap = true;
-                }
-
-                // Adjust permutation
-                p->adjust(pos, swapVal);
-                p->adjust(swapPos, val);
-                if (worldRank == 0) Console::log(Console::INFO, "SWAP %i@%i <-> %i@%i", swapVal, swapPos, val, pos);
-            }
-        }
-        
-        if (worldRank == 0) {
-            Console::append(Console::INFO, "Permutation %i' : ", r);
-            for (int pos = 0; pos < numWorkers; pos++) {
-                Console::append(Console::INFO, "%i ", p->get(pos));
-            }
-            Console::log(Console::INFO, "");
-        }
-
-        int numIngoing = 0;
-        for (int pos = 0; pos < numWorkers; pos++) {
-            if (p->get(pos) == worldRank) numIngoing++;
-        }
-        assert(numIngoing == 1 || Console::fail("Rank %i : %i ingoing edges!", worldRank, numIngoing));
-
-        permutations.push_back(p);
-        bounceAlternatives.push_back(p->get(worldRank));
-    }
-
-    // TODO delete permutations
+    // Create graph, get outgoing edges from this node
+    bounceAlternatives = AdjustablePermutation::createExpanderGraph(numWorkers, numBounceAlternatives, worldRank);
     assert(bounceAlternatives.size() == numBounceAlternatives);
 
     // Output found bounce alternatives

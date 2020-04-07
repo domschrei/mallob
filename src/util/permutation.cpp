@@ -1,5 +1,98 @@
 
+#include <assert.h>
+
 #include "permutation.h"
+#include "util/console.h"
+#include "util/random.h"
+
+std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, int myRank) {
+
+    std::vector<int> outgoingEdges;
+    std::vector<AdjustablePermutation*> permutations;
+
+    // Blackbox checker whether some value at some position of a new permutation
+    // is valid w.r.t. previous permutations
+    auto isValid = [&permutations](int pos, int val) {
+        if (pos == val) return false; // no identity!
+        for (auto& perm : permutations) {
+            if (perm->get(pos) == val) return false;
+        }
+        return true;
+    };
+
+    // For each permutation
+    for (int r = 0; r < degree; r++) {
+
+        // Generate global permutation over all worker ranks
+        // disallowing identity and previous permutations
+        AdjustablePermutation* p = new AdjustablePermutation(n, n*r);
+        
+        if (myRank == 0) {
+            Console::append(Console::INFO, "Permutation %i  : ", r);
+            for (int pos = 0; pos < n; pos++) {
+                Console::append(Console::INFO, "%i ", p->get(pos));
+            }
+            Console::log(Console::INFO, "");
+        }
+
+        // For each position of the permutation, left to right
+        for (int pos = 0; pos < n; pos++) {
+            int val = p->get(pos);
+            if (!isValid(pos, val)) {
+                // Value at this position is not valid
+
+                // Find a position of this permutation to swap values
+                int swapPos;
+                int swapVal;
+                bool successfulSwap = false;
+                while (!successfulSwap) {
+                    // Draw a random swap position that is NOT the current position,
+                    // get the according swap value
+                    swapPos = (int) (Random::rand()*(n-1));
+                    if (swapPos >= pos) swapPos++;
+                    swapVal = p->get(swapPos);
+
+                    // Check if it can be swapped:
+                    // swap value is valid at current position AND
+                    // (either current value at swap position is valid too
+                    // OR destination was not scanned yet)
+                    if (isValid(pos, swapVal) && isValid(swapPos, val))
+                        successfulSwap = true;
+                }
+
+                // Adjust permutation
+                p->adjust(pos, swapVal);
+                p->adjust(swapPos, val);
+                if (myRank == 0) Console::log(Console::INFO, "SWAP %i@%i <-> %i@%i", swapVal, swapPos, val, pos);
+            }
+        }
+        
+        if (myRank == 0) {
+            Console::append(Console::INFO, "Permutation %i' : ", r);
+            for (int pos = 0; pos < n; pos++) {
+                Console::append(Console::INFO, "%i ", p->get(pos));
+            }
+            Console::log(Console::INFO, "");
+        }
+
+        // Check that the amount of incoming edges to this node is correct
+        int numIncoming = 0;
+        for (int pos = 0; pos < n; pos++) {
+            if (p->get(pos) == myRank) numIncoming++;
+        }
+        assert(numIncoming == 1 || Console::fail("Rank %i : %i incoming edges!", myRank, numIncoming));
+
+        permutations.push_back(p);
+        outgoingEdges.push_back(p->get(myRank));
+    }
+
+    // Clean up
+    for (int i = 0; i < permutations.size(); i++) {
+        delete permutations[i];
+    }
+
+    return outgoingEdges;
+}
 
 AdjustablePermutation::AdjustablePermutation(int n, int seed) {
 
