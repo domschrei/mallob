@@ -10,16 +10,25 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
     std::vector<int> outgoingEdges;
     std::vector<AdjustablePermutation*> permutations;
 
-    // First outgoing edge:
-    AdjustablePermutation pInit(n, /*seed=*/n-1);
-    int myPos = 0; while (pInit.get(myPos) != myRank) myPos++;
-    outgoingEdges.push_back(pInit.get(myPos+1 % n));
-    permutations.push_back(&pInit);
+    // First outgoing edges:
+    // form a cycle of all nodes through some first permutation
+    // (prevents possibility of disconnected graph)
+    std::vector<int> intrinsicPartners(n);
+    {
+        AdjustablePermutation pInit(n, /*seed=*/n-1);
+        int myPos = -1;
+        for (int pos = 0; pos < n; pos++) {
+            intrinsicPartners[pos] = pInit.get(pos+1 % n);
+            if (myPos < 0 && pInit.get(pos) == myRank) myPos = pos; 
+        }
+        outgoingEdges.push_back(intrinsicPartners[myPos]);
+    }
 
     // Blackbox checker whether some value at some position of a new permutation
     // is valid w.r.t. previous permutations
-    auto isValid = [&permutations](int pos, int val) {
+    auto isValid = [&permutations, &intrinsicPartners](int pos, int val) {
         if (pos == val) return false; // no identity!
+        if (intrinsicPartners[pos] == val) return false; // not the intrinsic partner!
         for (auto& perm : permutations) {
             if (perm->get(pos) == val) return false;
         }
