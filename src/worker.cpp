@@ -156,6 +156,12 @@ void Worker::createExpanderGraph() {
             Console::log(Console::INFO, "");
         }
 
+        int numIngoing = 0;
+        for (int pos = 0; pos < numWorkers; pos++) {
+            if (p->get(pos) == worldRank) numIngoing++;
+        }
+        assert(numIngoing == 1 || Console::fail("Rank %i : %i ingoing edges!", worldRank, numIngoing));
+
         permutations.push_back(p);
         bounceAlternatives.push_back(p->get(worldRank));
     }
