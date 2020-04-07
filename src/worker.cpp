@@ -167,19 +167,6 @@ void Worker::createExpanderGraph() {
     }
 
     // TODO delete permutations
-
-    /*
-    auto rng = std::default_random_engine {};
-    std::vector<int> p(numWorkers);
-    for (int i = 0; i < p.size(); i++) p[i] = i;
-
-    for (int r = 0; r < numBounceAlternatives; r++) {
-        std::shuffle(std::begin(p), std::end(p), rng);
-        for (int i = 0; i < p.size(); i++) {
-             
-        }
-    }*/
-
     assert(bounceAlternatives.size() == numBounceAlternatives);
 
     // Output found bounce alternatives
