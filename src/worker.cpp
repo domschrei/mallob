@@ -7,6 +7,7 @@
 #include <initializer_list>
 #include <limits>
 #include <sys/syscall.h>
+#include <algorithm>
 
 #include "worker.h"
 #include "app/sat_job.h"
@@ -87,24 +88,75 @@ void Worker::createExpanderGraph() {
         Console::fail("ERROR: There must be more worker nodes than there are bounce alternatives per worker"));
 
     bounceAlternatives = std::vector<int>();
+
     std::vector<AdjustablePermutation*> permutations;
 
+    // Blackbox checker whether some value at some position of a new permutation
+    // is valid w.r.t. previous permutations
+    auto isValid = [&permutations](int pos, int val) {
+        if (pos == val) return false; // no identity!
+        for (auto& perm : permutations) {
+            if (perm->get(pos) == val) return false;
+        }
+        return true;
+    };
+
+    // For each permutation
     for (int r = 0; r < numBounceAlternatives; r++) {
 
         // Generate global permutation over all worker ranks
         // disallowing identity and previous permutations
-        AdjustablePermutation* p = new AdjustablePermutation(numWorkers, /*random seed = */r);
-        for (auto& perm : permutations) p->addDisallowedPermutation(perm);
-        p->setIdentityDisallowed(true);
+        AdjustablePermutation* p = new AdjustablePermutation(numWorkers, r);
+        
+        // For each position of the permutation, left to right
+        for (int pos = 0; pos < numWorkers; pos++) {
+            int val = p->get(pos);
+            if (!isValid(pos, val)) {
+                // Value at this position is not valid
 
-        // Get the permutation's value at <worldRank>
-        int x = p->get(worldRank);
-        assert(x != worldRank);
-        for (int a : bounceAlternatives) assert(x != a);
+                // Find a position of this permutation to swap values
+                int swapPos;
+                int swapVal;
+                bool successfulSwap = false;
+                while (!successfulSwap) {
+                    // Draw a random swap position that is NOT the current position,
+                    // get the according swap value
+                    swapPos = (int) (Random::rand()*(numWorkers-1));
+                    if (swapPos >= pos) swapPos++;
+                    swapVal = p->get(swapPos);
 
-        bounceAlternatives.push_back(x);
+                    // Check if it can be swapped:
+                    // swap value is valid at current position AND
+                    // (either destination was not scanned yet
+                    // OR current value at swap position is valid too)
+                    if (isValid(pos, swapVal) && (swapPos >= pos || isValid(swapPos, val)))
+                        successfulSwap = true;
+                }
+
+                // Adjust permutation
+                p->adjust(pos, swapVal);
+                p->adjust(swapPos, val);
+            }
+        }
+
         permutations.push_back(p);
+        bounceAlternatives.push_back(p->get(worldRank));
     }
+
+    // TODO delete permutations
+
+    /*
+    auto rng = std::default_random_engine {};
+    std::vector<int> p(numWorkers);
+    for (int i = 0; i < p.size(); i++) p[i] = i;
+
+    for (int r = 0; r < numBounceAlternatives; r++) {
+        std::shuffle(std::begin(p), std::end(p), rng);
+        for (int i = 0; i < p.size(); i++) {
+             
+        }
+    }*/
+
     assert(bounceAlternatives.size() == numBounceAlternatives);
 
     // Output found bounce alternatives
