@@ -27,9 +27,10 @@ int AdjustablePermutation::get(int x) const {
         return _adjusted_values.at(x);
     }
 
+    int input = x;
     int k = 0;
 
-    do {
+    while (true) {
         // Conversion
         // x = b · n + a
         int b = x / _root_n;
@@ -48,7 +49,21 @@ int AdjustablePermutation::get(int x) const {
 
         k++;
 
-    } while (x >= _n);
+        // Prerequisite 1: must be in valid domain [0, n)
+        if (x >= _n) continue;
+        // Prerequisite 2: must not map to identity
+        if (_identity_disallowed && x == input) continue;
+        // Prerequisite 3: must not map to the according value 
+        // of some of the disallowed permutations
+        bool accept = true;
+        for (const auto& p : _disallowed_permutations) {
+            if (x == p->get(input)) {
+                accept = false;
+                break;
+            }
+        }
+        if (accept) break;
+    }
 
     return x;
 }
@@ -60,4 +75,12 @@ void AdjustablePermutation::adjust(int x, int new_x) {
 
 void AdjustablePermutation::clear() {
     _adjusted_values.clear();
+}
+
+void AdjustablePermutation::setIdentityDisallowed(const bool& disallow) {
+    _identity_disallowed = disallow;
+}
+
+void AdjustablePermutation::addDisallowedPermutation(AdjustablePermutation* p) {
+    _disallowed_permutations.push_back(p);
 }

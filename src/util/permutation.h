@@ -18,6 +18,9 @@ private:
 
     std::unordered_map<int, int> _adjusted_values;
 
+    bool _identity_disallowed;
+    std::vector<AdjustablePermutation*> _disallowed_permutations;
+
 public:
     AdjustablePermutation() = default;
     AdjustablePermutation(int n, int seed);
@@ -26,6 +29,9 @@ public:
     void adjust(int x, int new_x);
     int operator[](int x) const { return get(x); };
     void clear();
+
+    void setIdentityDisallowed(const bool& disallow);
+    void addDisallowedPermutation(AdjustablePermutation* p);
 };
 
 #endif

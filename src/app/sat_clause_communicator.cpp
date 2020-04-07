@@ -49,7 +49,7 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
         std::vector<int>& clauses = msg.payload;
         testConsistency(clauses);
         
-        Console::log(Console::VERB, "%s : (JCE=%i) received, size %i", _job->toStr(), epoch, clauses.size());
+        Console::log(Console::VVVERB, "%s : (JCE=%i) received, size %i", _job->toStr(), epoch, clauses.size());
 
         if (_last_shared_job_comm >= epoch) {
             // Already shared clauses upwards this job comm epoch!

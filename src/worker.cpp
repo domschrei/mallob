@@ -51,38 +51,7 @@ void Worker::init() {
     
     // Initialize pseudo-random order of nodes
     if (params.isSet("derandomize")) {
-        // Pick fixed number k of bounce destinations
-        int numBounceAlternatives = params.getIntParam("ba");
-        int numWorkers = MyMpi::size(comm);
-        assert(numBounceAlternatives % 2 == 0 || 
-            Console::fail("ERROR: Parameter bounceAlternatives must be even (for theoretical reasons)"));
-        assert(numBounceAlternatives < numWorkers || 
-            Console::fail("ERROR: There must be more worker nodes than there are bounce alternatives per worker"));
-        bounceAlternatives = std::vector<int>();
-
-        // Generate global permutation over all worker ranks
-        AdjustablePermutation p(numWorkers, /*random seed = */1);
-        // Find the position where <worldRank> occurs in the permutation
-        int i = 0;
-        int x = p.get(i);
-        while (x != worldRank) x = p.get(++i);
-        Console::log(Console::VVERB, "My pos. in global permutation: %i", i);
-        // Add neighbors in the permutation
-        // to the node's bounce alternatives
-        for (int j = i-(numBounceAlternatives/2); j < i; j++) {
-            bounceAlternatives.push_back(p.get((j+numWorkers) % numWorkers));
-        }
-        for (int j = i+1; j <= i+(numBounceAlternatives/2); j++) {
-            bounceAlternatives.push_back(p.get((j+numWorkers) % numWorkers));
-        }
-        assert(bounceAlternatives.size() == numBounceAlternatives);
-
-        // Output found bounce alternatives
-        std::string info = "";
-        for (int i = 0; i < bounceAlternatives.size(); i++) {
-            info += std::to_string(bounceAlternatives[i]) + " ";
-        }
-        Console::log(Console::VERB, "My bounce alternatives: %s", info.c_str());
+        createExpanderGraph();
     }
 
     // Begin listening to an incoming message
@@ -105,6 +74,45 @@ void Worker::init() {
     Console::log(Console::VERB, "Passed global init barrier");
 
     mpiMonitorThread = std::thread(mpiMonitor, this);
+}
+
+void Worker::createExpanderGraph() {
+
+    // Pick fixed number k of bounce destinations
+    int numBounceAlternatives = params.getIntParam("ba");
+    int numWorkers = MyMpi::size(comm);
+    assert(numBounceAlternatives % 2 == 0 || 
+        Console::fail("ERROR: Parameter bounceAlternatives must be even (for theoretical reasons)"));
+    assert(numBounceAlternatives < numWorkers || 
+        Console::fail("ERROR: There must be more worker nodes than there are bounce alternatives per worker"));
+
+    bounceAlternatives = std::vector<int>();
+    std::vector<AdjustablePermutation*> permutations;
+
+    for (int r = 0; r < numBounceAlternatives; r++) {
+
+        // Generate global permutation over all worker ranks
+        // disallowing identity and previous permutations
+        AdjustablePermutation* p = new AdjustablePermutation(numWorkers, /*random seed = */r);
+        for (auto& perm : permutations) p->addDisallowedPermutation(perm);
+        p->setIdentityDisallowed(true);
+
+        // Get the permutation's value at <worldRank>
+        int x = p->get(worldRank);
+        assert(x != worldRank);
+        for (int a : bounceAlternatives) assert(x != a);
+
+        bounceAlternatives.push_back(x);
+        permutations.push_back(p);
+    }
+    assert(bounceAlternatives.size() == numBounceAlternatives);
+
+    // Output found bounce alternatives
+    std::string info = "";
+    for (int i = 0; i < bounceAlternatives.size(); i++) {
+        info += std::to_string(bounceAlternatives[i]) + " ";
+    }
+    Console::log(Console::VERB, "My bounce alternatives: %s", info.c_str());
 }
 
 bool Worker::checkTerminate() {

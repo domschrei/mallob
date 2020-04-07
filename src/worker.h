@@ -78,6 +78,8 @@ public:
 private:
     friend void mpiMonitor(Worker* worker);
 
+    void createExpanderGraph();
+
     bool checkTerminate();
     void checkMemoryBounds(float rssGb);
     int pickJobToForget();
