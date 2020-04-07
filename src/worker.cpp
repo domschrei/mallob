@@ -144,7 +144,7 @@ void Worker::createExpanderGraph() {
                 // Adjust permutation
                 p->adjust(pos, swapVal);
                 p->adjust(swapPos, val);
-                if (worldRank == 0) Console::log(Console::INFO, "SWAP %i@%i <-> %i@%i", swapVal, pos, val, pos);
+                if (worldRank == 0) Console::log(Console::INFO, "SWAP %i@%i <-> %i@%i", swapVal, swapPos, val, pos);
             }
         }
         
