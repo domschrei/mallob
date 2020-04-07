@@ -82,10 +82,13 @@ void Worker::createExpanderGraph() {
     // Pick fixed number k of bounce destinations
     int numBounceAlternatives = params.getIntParam("ba");
     int numWorkers = MyMpi::size(comm);
-    assert(numBounceAlternatives % 2 == 0 || 
-        Console::fail("ERROR: Parameter bounceAlternatives must be even (for theoretical reasons)"));
-    assert(numBounceAlternatives < numWorkers || 
-        Console::fail("ERROR: There must be more worker nodes than there are bounce alternatives per worker"));
+
+    // Check validity of num bounce alternatives
+    if (2*numBounceAlternatives > numWorkers) {
+        numBounceAlternatives = numWorkers / 2;
+        Console::log(Console::WARN, "ERROR: Num bounce alternatives must be at most half the number of workers!");
+        Console::log(Console::WARN, "Falling back to safe value r=%i.", numBounceAlternatives);
+    }  
 
     // Create graph, get outgoing edges from this node
     bounceAlternatives = AdjustablePermutation::createExpanderGraph(numWorkers, numBounceAlternatives, worldRank);

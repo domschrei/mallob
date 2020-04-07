@@ -16,13 +16,13 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
     std::vector<int> intrinsicPartners(n);
     {
         AdjustablePermutation pInit(n, /*seed=*/n-1);
-        int myPos = -1;
         for (int pos = 0; pos < n; pos++) {
             int val = pInit.get(pos);
-            intrinsicPartners[(pos-1 + n) % n] = val;
-            if (myPos < 0 && val == myRank) myPos = pos; 
+            int nextVal = pInit.get((pos+1) % n);
+            intrinsicPartners[val] = nextVal;
+            //Console::log(Console::INFO, "%i => %i", val, nextVal);
         }
-        outgoingEdges.push_back(intrinsicPartners[myPos]);
+        outgoingEdges.push_back(intrinsicPartners[myRank]);
     }
 
     // Blackbox checker whether some value at some position of a new permutation
@@ -69,9 +69,8 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
                     swapVal = p->get(swapPos);
 
                     // Check if it can be swapped:
-                    // swap value is valid at current position AND
-                    // (either current value at swap position is valid too
-                    // OR destination was not scanned yet)
+                    // swap value is valid at current position
+                    // AND current value is valid at swap position
                     if (isValid(pos, swapVal) && isValid(swapPos, val))
                         successfulSwap = true;
                 }

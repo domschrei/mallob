@@ -19,7 +19,7 @@ int main() {
     Console::init(0, Console::VVVVERB, false, false, false, "/dev/null");
 
     std::vector<int> ns({8, 10, 12, 14, 16, 18, 20, 30, 32, 34, 48, 64, 128, 256, 512, 1024});
-    std::vector<int> rs({4, 8, 16});
+    std::vector<int> rs({1, 2, 3, 4, 5, 8, 16});
 
     for (int r : rs) {
         for (int n : ns) {
@@ -34,6 +34,7 @@ int main() {
                 assert(outgoingEdges.size() == r);
                 std::set<int> seenEdges;
                 for (int edge : outgoingEdges) {
+                    //printf("  %i\n", edge);
                     assert(edge != rank);
                     assert(!seenEdges.count(edge));
                     seenEdges.insert(edge);
