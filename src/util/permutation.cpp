@@ -10,6 +10,12 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
     std::vector<int> outgoingEdges;
     std::vector<AdjustablePermutation*> permutations;
 
+    // First outgoing edge:
+    AdjustablePermutation pInit(n, /*seed=*/n-1);
+    int myPos = 0; while (pInit.get(myPos) != myRank) myPos++;
+    outgoingEdges.push_back(pInit.get(myPos+1 % n));
+    permutations.push_back(&pInit);
+
     // Blackbox checker whether some value at some position of a new permutation
     // is valid w.r.t. previous permutations
     auto isValid = [&permutations](int pos, int val) {
@@ -20,12 +26,12 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
         return true;
     };
 
-    // For each permutation
-    for (int r = 0; r < degree; r++) {
+    // Do r-1 times (as the first edge is already identified)
+    for (int r = 1; r < degree; r++) {
 
         // Generate global permutation over all worker ranks
         // disallowing identity and previous permutations
-        AdjustablePermutation* p = new AdjustablePermutation(n, n*r);
+        AdjustablePermutation* p = new AdjustablePermutation(n, n*(r+1));
         
         if (myRank == 0) {
             Console::append(Console::INFO, "Permutation %i  : ", r);
@@ -87,7 +93,7 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
     }
 
     // Clean up
-    for (int i = 0; i < permutations.size(); i++) {
+    for (int i = 1; i < permutations.size(); i++) {
         delete permutations[i];
     }
 
