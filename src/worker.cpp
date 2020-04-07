@@ -108,7 +108,15 @@ void Worker::createExpanderGraph() {
         // disallowing identity and previous permutations
         AdjustablePermutation* p = new AdjustablePermutation(numWorkers, r);
         
-        if (worldRank == 0) Console::append(Console::INFO, "Permutation %i : ", r);
+        if (worldRank == 0) {
+            Console::append(Console::INFO, "Permutation %i  : ", r);
+            for (int pos = 0; pos < numWorkers; pos++) {
+                Console::append(Console::INFO, "%i ", p->get(pos));
+            }
+            Console::log(Console::INFO, "");
+        }
+
+        if (worldRank == 0) Console::append(Console::INFO, "Permutation %i' : ", r);
 
         // For each position of the permutation, left to right
         for (int pos = 0; pos < numWorkers; pos++) {
