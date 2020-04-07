@@ -49,12 +49,12 @@ void SatClauseCommunicator::continueCommunication(int source, JobMessage& msg) {
         std::vector<int>& clauses = msg.payload;
         testConsistency(clauses);
         
-        Console::log(Console::VVVERB, "%s : received, size %i", _job->toStr(), clauses.size());
+        Console::log(Console::VVVERB, "%s : receive, size %i", _job->toStr(), clauses.size());
 
         if (_last_shared_job_comm >= epoch) {
             // Already shared clauses upwards this job comm epoch!
-            Console::log(Console::VVERB, "%s : ending: already did sharing this JCE", _job->toStr());
-            Console::log(Console::VVERB, "%s : learning and broadcasting down", _job->toStr());
+            Console::log(Console::VVERB, "%s : already did sharing this JCE", _job->toStr());
+            Console::log(Console::VVERB, "%s : learn and broadcast down", _job->toStr());
             learnAndDistributeClausesDownwards(clauses, epoch);
             return;
         }
