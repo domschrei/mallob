@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    Random::init(rank);
+    Random::init(numNodes);
 
     // Find client ranks
     std::set<int> externalClientRanks;
