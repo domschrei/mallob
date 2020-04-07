@@ -81,7 +81,9 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    Random::init(numNodes);
+    // Global and local seed, such that all nodes have access to a synchronized randomness
+    // as well as to an individual randomness that differs among nodes
+    Random::init(numNodes, rank);
 
     // Find client ranks
     std::set<int> externalClientRanks;

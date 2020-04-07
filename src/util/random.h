@@ -8,13 +8,27 @@
 class Random {
 public:
     static std::mt19937 _rng;
+    static std::mt19937 _global_rng;
     static std::uniform_real_distribution<float> _dist;
 
-    static void init(int seed) {
-        _rng = std::mt19937(seed);
+    static void init(int globalSeed, int localSeed) {
+        _global_rng = std::mt19937(globalSeed);
+        _rng = std::mt19937(localSeed);
         _dist = std::uniform_real_distribution<float>(0, 1);
     }
 
+    /*
+    Draw a random float in [0,1) from the RNG that is seeded
+    GLOBALLY, i.e., the i-th call of this method
+    will return the same value on no matter which node.
+    */
+    static float global_rand() {
+        return _dist(_global_rng);
+    }
+
+    /*
+    Draw a random float in [0,1) from the locally seeded RNG.
+    */
     static float rand() {
         return _dist(_rng);
     }

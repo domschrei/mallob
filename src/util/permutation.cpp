@@ -48,7 +48,7 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
                 while (!successfulSwap) {
                     // Draw a random swap position that is NOT the current position,
                     // get the according swap value
-                    swapPos = (int) (Random::rand()*(n-1));
+                    swapPos = (int) (Random::global_rand()*(n-1));
                     if (swapPos >= pos) swapPos++;
                     swapVal = p->get(swapPos);
 

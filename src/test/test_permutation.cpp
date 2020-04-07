@@ -15,7 +15,7 @@ g++ -g -Isrc src/test/test_permutation.cpp src/util/{random,console,permutation,
 int main() {
 
     Timer::init();
-    Random::init(rand());
+    Random::init(rand(), rand());
     Console::init(0, Console::VVVVERB, false, false, false, "/dev/null");
 
     std::vector<int> ns({8, 10, 12, 14, 16, 18, 20, 30, 32, 34, 48, 64, 128, 256, 512, 1024});
