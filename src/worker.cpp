@@ -1254,9 +1254,10 @@ Worker::~Worker() {
 
     exiting = true;
 
-    for (auto idJobPair : jobs) {
-        deleteJob(idJobPair.first);
-    }
+    // Delete each job (iterating over "jobs" invalid as entries are deleted)
+    std::vector<int> jobIds;
+    for (auto idJobPair : jobs) jobIds.push_back(idJobPair.first);
+    for (int jobId : jobIds) deleteJob(jobId);
 
     if (mpiMonitorThread.joinable())
         mpiMonitorThread.join();
