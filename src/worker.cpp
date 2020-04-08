@@ -202,6 +202,7 @@ void Worker::mainProgram() {
                     // Signal termination to root -- may be a self message
                     Console::log_send(Console::VERB, jobRootRank, "%s : sending finished info", job.toStr());
                     MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_WORKER_FOUND_RESULT, payload);
+                    job.setResultTransferPending(true);
                     //stats.increment("sentMessages");
 
                 } else if (initializing && !job.isInitializing()) {
@@ -450,57 +451,62 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
     Console::log_recv(Console::VERB, handle->source, "Request to join job tree as %s", 
                     jobStr(req.jobId, req.requestedNodeIndex).c_str());
 
-    // Retrieve concerned job
-    assert(hasJob(req.jobId));
-    Job &job = getJob(req.jobId);
-
-    // Check if node should be adopted or rejected
     bool reject = false;
-    if (isRequestObsolete(req)) {
-        // Wrong (old) epoch
-        Console::log_recv(Console::VERB, handle->source, "Reject req. %s : obsolete, from time %.2f", 
-                            job.toStr(), req.timeOfBirth);
-        reject = true;
-
-    } else if (job.isNotInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
-        // Job is not active
-        Console::log_recv(Console::VERB, handle->source, "Reject req. %s : not active", job.toStr());
-        Console::log(Console::VERB, "Actual job state: %s", job.jobStateToStr());
-        reject = true;
-    
-    } else if (req.requestedNodeIndex == job.getLeftChildIndex() && job.hasLeftChild()) {
-        // Job already has a left child
-        Console::log_recv(Console::VERB, handle->source, "Reject req. %s : already has left child", job.toStr());
-        reject = true;
-
-    } else if (req.requestedNodeIndex == job.getRightChildIndex() && job.hasRightChild()) {
-        // Job already has a right child
-        Console::log_recv(Console::VERB, handle->source, "Reject req. %s : already has right child", job.toStr());
+    if (!hasJob(req.jobId)) {
         reject = true;
 
     } else {
-        // Adopt the job
-        // TODO Check if this node already has the full description!
-        const JobDescription& desc = job.getDescription();
+        // Retrieve concerned job
+        Job &job = getJob(req.jobId);
 
-        // Send job signature
-        JobSignature sig(req.jobId, req.rootRank, req.revision, desc.getTransferSize(true));
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACCEPT_BECOME_CHILD, sig);
-        //stats.increment("sentMessages");
+        // Check if node should be adopted or rejected
 
-        // If req.fullTransfer, then wait for the child to acknowledge having received the signature
-        if (req.fullTransfer == 1) {
-            Console::log_send(Console::VERB, handle->source, "Will send desc. of %s", jobStr(req.jobId, req.requestedNodeIndex).c_str());
+        if (isRequestObsolete(req)) {
+            // Wrong (old) epoch
+            Console::log_recv(Console::VERB, handle->source, "Reject req. %s : obsolete, from time %.2f", 
+                                job.toStr(), req.timeOfBirth);
+            reject = true;
+
+        } else if (job.isNotInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
+            // Job is not active
+            Console::log_recv(Console::VERB, handle->source, "Reject req. %s : not active", job.toStr());
+            Console::log(Console::VERB, "Actual job state: %s", job.jobStateToStr());
+            reject = true;
+        
+        } else if (req.requestedNodeIndex == job.getLeftChildIndex() && job.hasLeftChild()) {
+            // Job already has a left child
+            Console::log_recv(Console::VERB, handle->source, "Reject req. %s : already has left child", job.toStr());
+            reject = true;
+
+        } else if (req.requestedNodeIndex == job.getRightChildIndex() && job.hasRightChild()) {
+            // Job already has a right child
+            Console::log_recv(Console::VERB, handle->source, "Reject req. %s : already has right child", job.toStr());
+            reject = true;
+
         } else {
-            Console::log_send(Console::VERB, handle->source, "Resume child %s", jobStr(req.jobId, req.requestedNodeIndex).c_str());
+            // Adopt the job
+            // TODO Check if this node already has the full description!
+            const JobDescription& desc = job.getDescription();
+
+            // Send job signature
+            JobSignature sig(req.jobId, req.rootRank, req.revision, desc.getTransferSize(true));
+            MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACCEPT_BECOME_CHILD, sig);
+            //stats.increment("sentMessages");
+
+            // If req.fullTransfer, then wait for the child to acknowledge having received the signature
+            if (req.fullTransfer == 1) {
+                Console::log_send(Console::VERB, handle->source, "Will send desc. of %s", jobStr(req.jobId, req.requestedNodeIndex).c_str());
+            } else {
+                Console::log_send(Console::VERB, handle->source, "Resume child %s", jobStr(req.jobId, req.requestedNodeIndex).c_str());
+            }
+            // Child *will* start / resume its job solvers
+            // Mark new node as one of the node's children
+            if (req.requestedNodeIndex == jobs[req.jobId]->getLeftChildIndex()) {
+                jobs[req.jobId]->setLeftChild(handle->source);
+            } else if (req.requestedNodeIndex == jobs[req.jobId]->getRightChildIndex()) {
+                jobs[req.jobId]->setRightChild(handle->source);
+            } else assert(req.requestedNodeIndex == 0);
         }
-        // Child *will* start / resume its job solvers
-        // Mark new node as one of the node's children
-        if (req.requestedNodeIndex == jobs[req.jobId]->getLeftChildIndex()) {
-            jobs[req.jobId]->setLeftChild(handle->source);
-        } else if (req.requestedNodeIndex == jobs[req.jobId]->getRightChildIndex()) {
-            jobs[req.jobId]->setRightChild(handle->source);
-        } else assert(req.requestedNodeIndex == 0);
     }
 
     // If rejected: Send message to rejected child node
@@ -514,7 +520,7 @@ void Worker::handleRejectBecomeChild(MessageHandlePtr& handle) {
 
     // Retrieve committed job
     JobRequest req; req.deserialize(*handle->recvData);
-    assert(hasJob(req.jobId));
+    if (!hasJob(req.jobId)) return;
     Job &job = getJob(req.jobId);
     if (job.isNotInState({COMMITTED, INITIALIZING_TO_COMMITTED}))
         return; // Commitment was already erased
@@ -597,21 +603,18 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
     auto data = handle->recvData;
     Console::log_recv(Console::VVVERB, handle->source, "Receiving some desc. of size %i", data->size());
     int jobId; memcpy(&jobId, data->data(), sizeof(int));
-    assert(hasJob(jobId) || Console::fail("I don't know job #%i !", jobId));
+
+    if (!hasJob(jobId) || getJob(jobId).isInState({PAST})) {
+        Console::fail("I don't know job #%i : discard desc.", jobId);
+        return;
+    }
 
     // Erase job commitment
     if (jobCommitments.count(jobId))
         jobCommitments.erase(jobId);
 
-    Job& job = getJob(jobId);
-    if (job.isInState({PAST})) {
-        // Job was terminated before this node got the description
-        Console::log(Console::VERB, "Discard desc. of %s - already terminated", job.toStr());
-        return;
-    }
-
+    // Empty job description
     if (handle->recvData->size() == sizeof(int)) {
-        // Empty job description!
         Console::log(Console::VERB, "Received empty desc. of #%i - uncommit", jobId);
         if (getJob(jobId).isInState({COMMITTED, INITIALIZING_TO_COMMITTED})) {
             getJob(jobId).uncommit();
@@ -621,7 +624,7 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
 
     // Initialize job inside a separate thread
     setLoad(1, jobId);
-    job.beginInitialization();
+    getJob(jobId).beginInitialization();
     Console::log(Console::VERB, "Received desc. of #%i - initializing", jobId);
 
     assert(!initializerThreads.count(jobId));
@@ -684,7 +687,11 @@ void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
     IntVec res(*handle->recvData);
     int jobId = res[0];
     int revision = res[1];
-    assert(hasJob(jobId) && getJob(jobId).isRoot());
+    if (!hasJob(jobId) || !getJob(jobId).isRoot()) {
+        Console::log(Console::WARN, "Invalid adressee for job result of #%i", jobId);
+        return;
+    }
+
     Console::log_recv(Console::VERB, handle->source, "Result found for job #%i", jobId);
     if (getJob(jobId).isInState({PAST, INITIALIZING_TO_PAST})) {
         Console::log_recv(Console::VERB, handle->source, "Discard obsolete result for job #%i", jobId);
@@ -737,6 +744,7 @@ void Worker::handleQueryJobResult(MessageHandlePtr& handle) {
     const JobResult& result = getJob(jobId).getResult();
     Console::log_send(Console::VERB, handle->source, "Send full result to client");
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_RESULT, result);
+    getJob(jobId).setResultTransferPending(false);
     //stats.increment("sentMessages");
 }
 
@@ -755,6 +763,7 @@ void Worker::handleInterrupt(MessageHandlePtr& handle) {
 void Worker::handleAbort(MessageHandlePtr& handle) {
 
     int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
+    if (!hasJob(jobId)) return;
 
     if (getJob(jobId).isRoot()) {
         // Forward information on aborted job to client
@@ -770,7 +779,7 @@ void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
     IntPair recv(*handle->recvData);
     int jobId = recv.first;
     int index = recv.second;
-    assert(hasJob(jobId));
+    if (!hasJob(jobId)) return;
     Job& job = getJob(jobId);
 
     // Which child is defecting?
@@ -888,7 +897,7 @@ void Worker::handleExit(MessageHandlePtr& handle) {
 
 void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, bool reckless) {
 
-    assert(hasJob(jobId));
+    if (!hasJob(jobId)) return;
     Job& job = getJob(jobId);
 
     bool acceptMessage = job.isNotInState({NONE, STORED, PAST});
@@ -1111,6 +1120,7 @@ bool Worker::checkComputationLimits(int jobId) {
 
 void Worker::updateVolume(int jobId, int volume) {
 
+    if (!hasJob(jobId)) return;
     Job &job = getJob(jobId);
 
     if (job.isNotInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
@@ -1204,6 +1214,9 @@ void Worker::forgetOldJobs() {
             // If job is past, it must have been so for at least 60 seconds
             if (job.getAgeSinceAbort() < 60)
                 continue;
+            // If the node found a result, it must have been already transferred
+            if (job.isResultTransferPending())
+                continue;
             jobsToForget.push_back(id);
         }
     }
@@ -1233,6 +1246,7 @@ void Worker::forgetJob(int jobId) {
 
 void Worker::deleteJob(int jobId) {
 
+    if (!hasJob(jobId)) return;
     Job& job = getJob(jobId);
     Console::log(Console::VVERB, "Delete %s", job.toStr());
 

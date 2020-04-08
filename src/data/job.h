@@ -119,6 +119,7 @@ private:
     bool _has_left_child;
     bool _has_right_child;
     int _client_rank;
+    bool _result_transfer_pending = false;
 
     std::set<int> _past_children;
 
@@ -272,6 +273,13 @@ public:
     int getLeftChildIndex() const {return 2*(_index+1)-1;};
     int getRightChildIndex() const {return 2*(_index+1);};
     int getParentIndex() const {return (_index-1)/2;};
+
+    void setResultTransferPending(bool pending) {
+        _result_transfer_pending = pending;
+    }
+    bool isResultTransferPending() {
+        return _result_transfer_pending;
+    }
     const JobResult& getResult() const;
 
     const char* toStr() {
