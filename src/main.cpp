@@ -117,6 +117,10 @@ int main(int argc, char *argv[]) {
         } else {
             doWorkerNodeProgram(newComm, params, externalClientRanks);
         }
+    } catch (const std::exception &ex) {
+        Console::log(Console::CRIT, "Unexpected ERROR: \"%s\" - aborting", ex.what());
+        Console::forceFlush();
+        exit(1);
     } catch (...) {
         Console::log(Console::CRIT, "Unexpected ERROR - aborting");
         Console::forceFlush();

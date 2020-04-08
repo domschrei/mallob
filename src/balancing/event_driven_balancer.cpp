@@ -212,12 +212,26 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
 }
 
 int EventDrivenBalancer::getRootRank(bool reversedTree) {
-    if (reversedTree) return MyMpi::size(_comm)-1;
+    if (reversedTree) {
+        int size = MyMpi::size(_comm);
+        if (size % 2 == 1) return size-2;
+        else return size-1;
+    }
     return 0;
 }
 int EventDrivenBalancer::getParentRank(bool reversedTree) {
+
+    int size = MyMpi::size(_comm);
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
-    if (reversedTree) myRank = MyMpi::size(_comm)-1 - myRank;
+
+    // Offset tree by one when total number of nodes is odd
+    if (reversedTree && size % 2 == 1) {
+        size--;
+        // rightmost node
+        if (myRank == size) return size-1;
+    }
+
+    if (reversedTree) myRank = size-1 - myRank;
     
     int parent;
     int exp = 2;
@@ -231,20 +245,32 @@ int EventDrivenBalancer::getParentRank(bool reversedTree) {
         exp *= 2;
     }
 
-    if (reversedTree) parent = MyMpi::size(_comm)-1 - parent;
+    if (reversedTree) parent = size-1 - parent;
     return parent;
 }
 std::vector<int> EventDrivenBalancer::getChildRanks(bool reversedTree) {
+
+    int size = MyMpi::size(_comm);
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
-    if (reversedTree) myRank = MyMpi::size(_comm)-1 - myRank;
-    
     std::vector<int> children;
-    int exp = 1; while (exp < MyMpi::size(_comm)) exp *= 2;
+
+    // Offset tree by one when total number of nodes is odd
+    if (reversedTree && size % 2 == 1) {
+        size--;
+        // rightmost node. No children
+        if (myRank == size) return std::vector<int>();
+        // left to rightmost node: root. One additional child
+        if (myRank == size-1) children.push_back(size);
+    }
+
+    if (reversedTree) myRank = size-1 - myRank;
+    
+    int exp = 1; while (exp < size) exp *= 2;
     while (true) {
         if (myRank % exp == 0) {
             int child = myRank + exp/2;
-            if (child < MyMpi::size(_comm)) {
-                if (reversedTree) child = MyMpi::size(_comm)-1 - child;
+            if (child < size) {
+                if (reversedTree) child = size-1 - child;
                 children.push_back(child);
             } 
         }
