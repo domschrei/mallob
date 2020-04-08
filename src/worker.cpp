@@ -603,9 +603,16 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
     if (jobCommitments.count(jobId))
         jobCommitments.erase(jobId);
 
+    Job& job = getJob(jobId);
+    if (job.isInState({PAST})) {
+        // Job was terminated before this node got the description
+        Console::log(Console::VERB, "Discard desc. of %s - already terminated", job.toStr());
+        return;
+    }
+
     if (handle->recvData->size() == sizeof(int)) {
         // Empty job description!
-        Console::log(Console::VERB, "Received empty desc. of #%i - uncommitting", jobId);
+        Console::log(Console::VERB, "Received empty desc. of #%i - uncommit", jobId);
         if (getJob(jobId).isInState({COMMITTED, INITIALIZING_TO_COMMITTED})) {
             getJob(jobId).uncommit();
         }
@@ -614,7 +621,6 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
 
     // Initialize job inside a separate thread
     setLoad(1, jobId);
-    Job& job = getJob(jobId);
     job.beginInitialization();
     Console::log(Console::VERB, "Received desc. of #%i - initializing", jobId);
 
@@ -885,13 +891,6 @@ void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, b
     assert(hasJob(jobId));
     Job& job = getJob(jobId);
 
-    // Do not terminate yet if the job is still in a committed state, because the job description should still arrive
-    // (except if in reckless mode, where the description probably will never arrive from the parent)
-    if (!reckless && job.isInState({COMMITTED, INITIALIZING_TO_COMMITTED})) {
-        Console::log(Console::INFO, "%s : defer interruption/termination : desc. did not arrive yet", job.toStr());
-        MyMpi::deferHandle(handle); // do not consume this message while job state is "COMMITTED"
-    }
-
     bool acceptMessage = job.isNotInState({NONE, STORED, PAST});
 
     // Propagate message down the job tree
@@ -927,6 +926,11 @@ void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, b
                 Console::log(Console::INFO, "%s : terminated", job.toStr());
                 balancer->updateVolume(jobId, 0);
             } 
+        }
+        // Mark committed job as "PAST"
+        if (job.isInState({COMMITTED, INITIALIZING_TO_COMMITTED}) && terminate) {
+            job.uncommit();
+            job.terminate();
         }
     }
 }
