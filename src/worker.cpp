@@ -367,7 +367,15 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
     // Decide whether job should be adopted or bounced to another node
     bool adopts = false;
     int maxHops = maxJobHops(/*rootNode=*/req.requestedNodeIndex == 0);
-    if (isIdle() && !hasJobCommitments()) {
+
+    if (hasJob(req.jobId) && getJob(req.jobId).isInState({PAST})) {
+        // This node knows the job, and it is in PAST state.
+        // Can mean that the job finished in the meantime or that
+        // it is in the process of being cleaned up.
+        Console::log(Console::VERB, "Reject req. %s : PAST", 
+                        jobStr(req.jobId, req.requestedNodeIndex).c_str());
+
+    } else if (isIdle() && !hasJobCommitments()) {
         // Node is idle and not committed to another job: OK
         adopts = true;
 
