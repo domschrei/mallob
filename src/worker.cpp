@@ -1221,8 +1221,8 @@ void Worker::forgetJob(int jobId) {
     Console::log(Console::VVERB, "Forget %s", job.toStr());
     if (job.isInState({SUSPENDED})) {
         job.stop();
+        job.terminate();
     }
-    job.terminate();
     deleteJob(jobId);
 }
 
