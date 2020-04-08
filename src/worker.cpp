@@ -1222,13 +1222,13 @@ void Worker::forgetOldJobs() {
 
 void Worker::forgetJob(int jobId) {
     Job& job = getJob(jobId);
-    Console::log(Console::VVERB, "Forget %s", job.toStr());
+    Console::log(Console::VVVERB, "Forget %s", job.toStr());
     if (job.isInState({SUSPENDED})) {
         job.stop();
         job.terminate();
     }
     deleteJob(jobId);
-    Console::log(Console::VVERB, "Forgot #%i", jobId);
+    Console::log(Console::VVVERB, "Forgot #%i", jobId);
 }
 
 void Worker::deleteJob(int jobId) {
@@ -1238,7 +1238,7 @@ void Worker::deleteJob(int jobId) {
 
     // Join and delete initializer thread
     if (initializerThreads.count(jobId)) {
-        Console::log(Console::VVERB, "Delete init thread of %s", job.toStr());
+        Console::log(Console::VVVERB, "Delete init thread of %s", job.toStr());
         if (initializerThreads[jobId].joinable()) {
             initializerThreads[jobId].join();
         }
