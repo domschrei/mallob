@@ -223,10 +223,11 @@ void Worker::mainProgram() {
         float pollTime = Timer::elapsedSeconds();
         std::vector<MessageHandlePtr> handles = MyMpi::poll();
         pollTime = Timer::elapsedSeconds() - pollTime;
-        
-        Console::log(Console::VVVERB, "loop cycle %i", iteration);
-        if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f s", jobTime);
-        Console::log(Console::VVVERB, "poll time: %.6f s", pollTime);
+        if (handles.size() > 0) {
+            Console::log(Console::VVVERB, "loop cycle %i", iteration);
+            if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f s", jobTime);
+            Console::log(Console::VVVERB, "poll time: %.6f s", pollTime);
+        }
 
         // Process new messages
         for (MessageHandlePtr& handle : handles) {
