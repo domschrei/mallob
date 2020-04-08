@@ -81,8 +81,10 @@ private:
     void createExpanderGraph();
 
     bool checkTerminate();
-    void checkMemoryBounds(float rssGb);
-    int pickJobToForget();
+    
+    void forgetOldJobs();
+    void forgetJob(int jobId);
+    void deleteJob(int jobId);
 
     void handleIntroduceJob(MessageHandlePtr& handle);
     void handleQueryVolume(MessageHandlePtr& handle);

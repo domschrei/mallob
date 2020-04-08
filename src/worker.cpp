@@ -8,6 +8,8 @@
 #include <limits>
 #include <sys/syscall.h>
 #include <algorithm>
+#include <queue>
+#include <utility>
 
 #include "worker.h"
 #include "app/sat_job.h"
@@ -136,7 +138,6 @@ void Worker::mainProgram() {
             vm_usage *= 0.001 * 0.001;
             resident_set *= 0.001 * 0.001;
             Console::log(Console::VERB, "mem cpu=%i vm=%.4fGB rss=%.4fGB", cpu, vm_usage, resident_set);
-            checkMemoryBounds(resident_set);
 
             // For this "management" thread
             double perc_cpu;
@@ -149,6 +150,9 @@ void Worker::mainProgram() {
             if (currentJob != NULL) currentJob->appl_dumpStats();
 
             lastMemCheckTime = Timer::elapsedSeconds();
+
+            // Forget jobs that are old or wasting memory
+            forgetOldJobs();
         }
 
         // If it is time to do balancing (and it is not being done right now)
@@ -1168,50 +1172,75 @@ bool Worker::isTimeForRebalancing() {
     return epochCounter.getSecondsSinceLastSync() >= balancePeriod;
 }
 
-void Worker::checkMemoryBounds(float rssGb) {
-    if (!params.isSet("mem")) return;
-    float maxMem = params.getFloatParam("mem");
-    if (rssGb > 0.9 * maxMem) {
-        int jobId = pickJobToForget();
-        if (jobId < 0) return;
-    }
-}
+struct SuspendedJobComparator {
+    bool operator()(const std::pair<int, float>& left, const std::pair<int, float>& right) {
+        return left.second < right.second;
+    };
+};
 
-int Worker::pickJobToForget() {
+void Worker::forgetOldJobs() {
 
-    // Try to pick an inactive non-root leaf job of maximum description size
-    int maxSize = 0;
-    int jobId;
+    std::vector<int> jobsToForget;
+    int jobCacheSize = params.getIntParam("jc");
+
+    // Scan jobs for being forgettable
+    std::priority_queue<std::pair<int, float>, std::vector<std::pair<int, float>>, SuspendedJobComparator> suspendedQueue;
     for (auto idJobPair : jobs) {
         int id = idJobPair.first;
         Job& job = *idJobPair.second;
-
-        if (job.isNotInState({SUSPENDED, INITIALIZING_TO_SUSPENDED, PAST, INITIALIZING_TO_PAST}))
-            continue;
-        if (!job.hasJobDescription()) continue;
-        if (job.isRoot()) continue;
-        if (job.hasLeftChild() || job.hasRightChild()) continue;
-
-        int size = job.getSerializedDescription()->size();
-        if (size > maxSize) {
-            maxSize = size;
-            jobId = id;
+        if (jobCacheSize > 0 && job.isInState({SUSPENDED})) {
+            // Job must not be rooted here
+            if (job.isRoot()) continue;
+            // Insert job into PQ according to its age 
+            float age = job.getAgeSinceInitialized();
+            suspendedQueue.emplace(id, age);
         }
-    }
-    if (maxSize > 0) {
-        return jobId;
-    }
-
-    // If there is a current job: pick if non-root leaf
-    if (currentJob != NULL) {
-        Job& job = *currentJob;
-        if (!job.isRoot() && !job.hasLeftChild() && !job.hasRightChild()) {
-            return job.getId();
+        if (job.isInState({PAST})) {
+            // If job is past, it must have been so for at least 60 seconds
+            if (job.getAgeSinceAbort() < 60)
+                continue;
+            jobsToForget.push_back(id);
         }
     }
 
-    // No job found that can be forgotten
-    return -1;
+    // Mark jobs as forgettable as long as job cache is exceeded
+    while (suspendedQueue.size() > jobCacheSize) {
+        jobsToForget.push_back(suspendedQueue.top().first);
+        suspendedQueue.pop();
+    }
+
+    // Perform forgetting of jobs
+    for (int jobId : jobsToForget) {
+        forgetJob(jobId);
+    }
+}
+
+void Worker::forgetJob(int jobId) {
+    Job& job = getJob(jobId);
+    Console::log(Console::VVERB, "Forget %s", job.toStr());
+    if (job.isInState({SUSPENDED})) {
+        job.stop();
+    }
+    job.terminate();
+    deleteJob(jobId);
+}
+
+void Worker::deleteJob(int jobId) {
+
+    Job& job = getJob(jobId);
+    Console::log(Console::VVERB, "Delete %s", job.toStr());
+
+    // Join and delete initializer thread
+    if (initializerThreads.count(jobId)) {
+        Console::log(Console::VVERB, "Delete init thread of %s", job.toStr());
+        if (initializerThreads[jobId].joinable()) {
+            initializerThreads[jobId].join();
+        }
+        initializerThreads.erase(jobId);
+    }
+
+    // Delete job and its solvers
+    delete &job;
 }
 
 Worker::~Worker() {
@@ -1219,26 +1248,11 @@ Worker::~Worker() {
     exiting = true;
 
     for (auto idJobPair : jobs) {
-
-        int id = idJobPair.first;
-        Job* job = idJobPair.second;
-        Console::log(Console::VVERB, "Clean up %s ...", job->toStr());
-
-        // Join and delete initializer thread
-        if (initializerThreads.count(id)) {
-            Console::log(Console::VVERB, "Clean up init thread of %s ...", job->toStr());
-            if (initializerThreads[id].joinable()) {
-                initializerThreads[id].join();
-            }
-            initializerThreads.erase(id);
-            Console::log(Console::VVERB, "Cleaned up init thread of %s.", job->toStr());
-        }
-        // Delete job and its solvers
-        delete job;
+        deleteJob(idJobPair.first);
     }
 
     if (mpiMonitorThread.joinable())
         mpiMonitorThread.join();
 
-    Console::log(Console::VVERB, "Leaving worker destructor");
+    Console::log(Console::VVERB, "Destruct worker");
 }

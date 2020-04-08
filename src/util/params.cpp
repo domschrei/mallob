@@ -29,15 +29,16 @@ void Parameters::init(int argc, char** argv) {
 
 void Parameters::setDefaults() {
     setParam("ba", "4"); // num bounce alternatives (only relevant if -derandomize)
+    setParam("bm", "ed"); // event-driven balancing (ed = event-driven, fp = fixed-period)
     setParam("c", "1"); // num clients
     setParam("cbbs", "1500"); // clause buffer base size
     setParam("cbdf", "1.0"); // clause buffer discount factor
     //setParam("cg"); // continuous growth
     //setParam("colors"); // colored terminal output
     //setParam("derandomize"); // derandomize job bouncing
-    setParam("bm", "ed"); // event-driven balancing (ed = event-driven, fp = fixed-period)
     setParam("g", "5.0"); // job demand growth interval
     //setParam("h"); setParam("help"); // print usage
+    setParam("jc", "0"); // job cache
     //setParam("jjp"); // jitter job priorities
     setParam("l", "0.95"); // load factor
     setParam("log", "."); // logging directory
@@ -67,6 +68,9 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "             <name>.0 and <name>.1 for two clients, ...");
     Console::log(Console::INFO, "Options:");
     Console::log(Console::INFO, "-ba=<num-ba>          Number of bounce alternatives per node (only relevant if -derandomize)");
+    Console::log(Console::INFO, "-bm=<balance-mode>    Balancing mode:");
+    Console::log(Console::INFO, "                      \"fp\" - fixed-period");
+    Console::log(Console::INFO, "                      \"ed\" (default) - event-driven");
     Console::log(Console::INFO, "-c=<num-clients>      Amount of client nodes (int c >= 1)");
     Console::log(Console::INFO, "-cbbs=<size>          Clause buffer base size in integers (default: 1500)");
     Console::log(Console::INFO, "-cbdf=<factor>        Clause buffer discount factor: reduce buffer size per node by <factor> each depth");
@@ -76,11 +80,9 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "-colors               Colored terminal output based on messages' verbosity");
     Console::log(Console::INFO, "-cpuh-per-instance=<time-limit> Timeout an instance after x cpu hours (x >= 0; 0: no timeout)");
     Console::log(Console::INFO, "-derandomize          Derandomize job bouncing");
-    Console::log(Console::INFO, "-bm=<balance-mode>    Balancing mode:");
-    Console::log(Console::INFO, "                      \"fp\" - fixed-period");
-    Console::log(Console::INFO, "                      \"ed\" (default) - event-driven");
     Console::log(Console::INFO, "-g=<growth-period>    Grow job demand exponentially every t seconds (t >= 0; 0: immediate growth)");
     Console::log(Console::INFO, "-h|-help              Print usage");
+    Console::log(Console::INFO, "-jc=<size>            Size of job cache for suspended, yet unfinished jobs (int x >= 0; 0: no limit)");
     Console::log(Console::INFO, "-jjp                  Jitter job priorities to break ties during rebalancing");
     Console::log(Console::INFO, "-l=<load-factor>      Load factor to be aimed at (0 < l < 1)");
     Console::log(Console::INFO, "-lbc=<num-jobs>       Make each client a leaky bucket with x active jobs at any given time");

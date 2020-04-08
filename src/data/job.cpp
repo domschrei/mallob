@@ -244,6 +244,7 @@ void Job::terminate() {
     _serialized_description = std::make_shared<std::vector<uint8_t>>();
     _serialized_description->resize(sizeof(int));
     memcpy(_serialized_description->data(), &_id, sizeof(int));
+    _time_of_abort = Timer::elapsedSeconds();
 
     switchState(PAST);
     Console::log(Console::VERB, "%s : terminated, memory freed", toStr());

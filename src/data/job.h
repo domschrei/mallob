@@ -102,6 +102,7 @@ private:
     float _elapsed_seconds_since_arrival;
     float _last_job_comm_remainder = 0;
     float _time_of_initialization = 0;
+    float _time_of_abort = 0;
 
     JobState _state;
     bool _has_description;
@@ -251,6 +252,7 @@ public:
     int getRevision() const {return _description.getRevision();};
     float getAge() const {return Timer::elapsedSeconds() - _elapsed_seconds_since_arrival;}
     float getAgeSinceInitialized() const {return Timer::elapsedSeconds() - _time_of_initialization;}
+    float getAgeSinceAbort() const {return Timer::elapsedSeconds() - _time_of_abort;}
     int getJobCommEpoch() const {return _params.getFloatParam("s") <= 0 ? -1 : (int)(Timer::elapsedSeconds() / _params.getFloatParam("s"));}
 
     bool isRoot() const {return _index == 0;};
