@@ -1202,7 +1202,7 @@ void Worker::forgetOldJobs() {
         }
         if (job.isInState({PAST})) {
             // If job is past, it must have been so for at least 60 seconds
-            if (job.getAgeSinceAbort() < 10)
+            if (job.getAgeSinceAbort() < 60)
                 continue;
             jobsToForget.push_back(id);
         }
