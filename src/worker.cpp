@@ -1224,6 +1224,7 @@ void Worker::forgetJob(int jobId) {
         job.terminate();
     }
     deleteJob(jobId);
+    Console::log(Console::VVERB, "Forgot #%i", jobId);
 }
 
 void Worker::deleteJob(int jobId) {
@@ -1241,6 +1242,7 @@ void Worker::deleteJob(int jobId) {
     }
 
     // Delete job and its solvers
+    jobs.erase(jobId);
     delete &job;
 }
 
