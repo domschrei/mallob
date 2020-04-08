@@ -364,16 +364,9 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
         return;
     }
 
-    // Discard request if this job already finished to this node's knowledge
-    if (hasJob(req.jobId) && jobs[req.jobId]->getState() == JobState::PAST) {
-        Console::log(Console::VERB, "Discard req. %s : already finished", 
-                jobStr(req.jobId, req.requestedNodeIndex).c_str());
-        return;
-    }
-
     // Decide whether job should be adopted or bounced to another node
     bool adopts = false;
-    int maxHops = maxJobHops(req.requestedNodeIndex == 0);
+    int maxHops = maxJobHops(/*rootNode=*/req.requestedNodeIndex == 0);
     if (isIdle() && !hasJobCommitments()) {
         // Node is idle and not committed to another job: OK
         adopts = true;
@@ -1197,6 +1190,8 @@ void Worker::forgetOldJobs() {
 
     std::vector<int> jobsToForget;
     int jobCacheSize = params.getIntParam("jc");
+
+    if (jobCacheSize == 0) return;
 
     // Scan jobs for being forgettable
     std::priority_queue<std::pair<int, float>, std::vector<std::pair<int, float>>, SuspendedJobComparator> suspendedQueue;
