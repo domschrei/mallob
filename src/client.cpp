@@ -296,7 +296,7 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
 
     // Output response time and solution header
     Console::log(Console::INFO, "RESPONSE_TIME #%i %.6f rev. %i", jobId, Timer::elapsedSeconds() - desc.getArrival(), revision);
-    Console::log(Console::INFO, "SOLUTION #%i %s rev. %i", jobId, revision, resultCode == 10 ? "SAT" : "UNSAT");
+    Console::log(Console::INFO, "SOLUTION #%i %s rev. %i", jobId, resultCode == 10 ? "SAT" : "UNSAT", revision);
 
     // Write full solution to file, if desired
     std::string baseFilename = _params.getParam("s2f");
