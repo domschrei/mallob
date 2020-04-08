@@ -53,6 +53,7 @@ public:
     void appl_communicate(int source, JobMessage& msg) override;
 
     void appl_dumpStats() override;
+    bool appl_isDestructible() override;
 
     // Methods that are not overridden, but use the default implementation:
     // int getDemand(int prevVolume) const override;

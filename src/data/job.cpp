@@ -250,6 +250,10 @@ void Job::terminate() {
     Console::log(Console::VERB, "%s : terminated, memory freed", toStr());
 }
 
+bool Job::isDestructible() {
+    return !isInitializing() && appl_isDestructible();
+}
+
 int Job::getDemand(int prevVolume) const {
     if (isInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
 

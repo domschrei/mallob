@@ -1235,13 +1235,16 @@ void Worker::forgetOldJobs() {
 
 void Worker::forgetJob(int jobId) {
     Job& job = getJob(jobId);
-    Console::log(Console::VVVERB, "Forget %s", job.toStr());
+    Console::log(Console::VVVERB, "Terminate %s to forget", job.toStr());
     if (job.isInState({SUSPENDED})) {
         job.stop();
         job.terminate();
     }
-    deleteJob(jobId);
-    Console::log(Console::VVVERB, "Forgot #%i", jobId);
+    // Check if the job can be destructed
+    if (job.isDestructible()) {
+        deleteJob(jobId);
+        Console::log(Console::VVVERB, "Forgot #%i", jobId);
+    }
 }
 
 void Worker::deleteJob(int jobId) {

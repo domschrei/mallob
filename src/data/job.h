@@ -198,6 +198,11 @@ public:
     Advance a job communication phase by processing the given message.
     */
     virtual void appl_communicate(int source, JobMessage& msg) = 0;
+    /*
+    Return true iff the instance can be quickly deleted without any errors
+    (i.e., no running concurrent thread depends on the instance).
+    */
+    virtual bool appl_isDestructible() = 0;
 
     /*
     Free up any resources that are still occupied by this job instance.
@@ -213,16 +218,17 @@ public:
     
     virtual double getTemperature() const;
 
-
     /*
     Signal if this job instance would like to initiate a new job communication phase.
     This method has a valid default implementation, so it must not be re-implemented.
     */
     virtual bool wantsToCommunicate() const;
+
     
     void beginInitialization();
     void endInitialization();
     bool mustAbortInitialization();
+    bool isDestructible();
 
     void lockJobManipulation();
     void unlockJobManipulation();

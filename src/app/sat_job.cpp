@@ -125,7 +125,7 @@ void SatJob::appl_withdraw() {
     if (isInitializingUnsafe()) {
         _abort_after_initialization = true;
     }
-    if (_solver != NULL) {
+    if (_solver != NULL && !_bg_thread_running) {
         _solver->abort();
         // Do cleanup of HordeLib and its threads in a separate thread to avoid blocking
         _bg_thread_running = true;
@@ -202,6 +202,10 @@ void SatJob::appl_dumpStats() {
             Console::log(Console::VERB, "%s td.%i : %.2f%% CPU", toStr(), threadTids[i], cpuRatio);
         }
     }
+}
+
+bool SatJob::appl_isDestructible() {
+    return !_bg_thread_running && _solver == NULL;
 }
 
 void SatJob::appl_beginCommunication() {
