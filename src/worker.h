@@ -136,11 +136,7 @@ private:
         return jobs.count(id) > 0;
     }
     Job& getJob(int id) const {
-        if (!jobs.count(id)) {
-            int ptr = (int) (3.0/0);
-            Job& job = *((Job*) (void*) ptr);
-            return job;
-        }
+        assert(jobs.count(id));
         return *jobs.at(id);
     };
 
