@@ -139,36 +139,36 @@ void SolverThread::diversify() {
 	switch (diversificationMode) {
 	case 1:
 		sparseDiversification(mpi_size, mpi_rank);
-		hlib->hlog(3, "sparse diversification\n");
+		hlib->hlog(3, "dv: sparse\n");
 		break;
 	case 2:
 		binValueDiversification(mpi_size, mpi_rank);
-		hlib->hlog(3, "binary value based diversification\n");
+		hlib->hlog(3, "dv: bin\n");
 		break;
 	case 3:
 		randomDiversification();
-		hlib->hlog(3, "random diversification, s=%u\n", seed);
+		hlib->hlog(3, "dv: rand, s=%u\n", seed);
 		break;
 	case 4:
 		nativeDiversification(mpi_rank, mpi_size);
-		hlib->hlog(3, "native diversification (plingeling)\n");
+		hlib->hlog(3, "dv: native\n");
 		break;
 	case 5:
 		sparseDiversification(mpi_size, mpi_rank);
 		nativeDiversification(mpi_rank, mpi_size);
-		hlib->hlog(3, "sparse + native diversification\n");
+		hlib->hlog(3, "dv: sparse, native\n");
 		break;
 	case 6:
 		sparseRandomDiversification(mpi_size);
-		hlib->hlog(3, "sparse random diversification, s=%u\n", seed);
+		hlib->hlog(3, "dv: sparse, random, s=%u\n", seed);
 		break;
 	case 7:
 		sparseRandomDiversification(mpi_size);
 		nativeDiversification(mpi_rank, mpi_size);
-		hlib->hlog(3, "random sparse + native diversification (plingeling), s=%u\n", seed);
+		hlib->hlog(3, "dv: sparse, random, native, s=%u\n", seed);
 		break;
 	case 0:
-		hlib->hlog(3, "no diversification\n");
+		hlib->hlog(3, "dv: none\n");
 		break;
 	}
 }
