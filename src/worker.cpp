@@ -205,7 +205,7 @@ void Worker::mainProgram() {
                     job.setResultTransferPending(true);
                     //stats.increment("sentMessages");
 
-                } else if (initializing && !job.isInitializing()) {
+                } else if (params.getParam("bm") == "ed" && initializing && !job.isInitializing()) {
                     if (job.isRoot()) {
                         // Root worker finished initialization: begin growing if applicable
                         if (balancer->hasVolume(id)) updateVolume(id, balancer->getVolume(id));

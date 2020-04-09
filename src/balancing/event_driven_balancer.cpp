@@ -18,59 +18,52 @@ EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params, Sta
 }
 
 bool EventDrivenBalancer::beginBalancing(std::map<int, Job*>& jobs) {
-    // Initialize
-    //_balancing = true;
 
     // Identify jobs to balance
-    int numActiveJobs = 0;
-
     _jobs_being_balanced = std::map<int, Job*>();
     for (const auto& it : jobs) {
-        // Must be root of this job in order to be considered
-        if (!it.second->isRoot()) continue;
+        int id = it.first;
+        Job& job = *it.second;
 
-        bool isActive = it.second->isNotInState({INITIALIZING_TO_PAST}) 
-                            && (it.second->isInState({ACTIVE, STANDBY}) || it.second->isInitializing());
-        // Job must be active, or must be initializing and already having the description
-        bool participates = it.second->isInState({JobState::ACTIVE, JobState::STANDBY})
-                        || (it.second->isInState({JobState::INITIALIZING_TO_ACTIVE}) 
-                            && it.second->hasJobDescription());
-        if (participates || isActive) {
+        // Must be root of this job in order to be considered
+        if (!job.isRoot()) continue;
+
+        bool participate = !job.isPast() && !job.isForgetting() && job.isActive();
+
+        if (participate) {
             // Job participates
-            _jobs_being_balanced[it.first] = it.second;
+            _jobs_being_balanced[id] = it.second;
 
             // Insert this job as an event, if there is something novel about it
-            if (!_job_epochs.count(it.first)) {
+            if (!_job_epochs.count(id)) {
                 // Completely new!
-                _job_epochs[it.first] = 1;
-                _volumes[it.first] = 1;
+                _job_epochs[id] = 1;
+                _volumes[id] = 1;
             } 
-            int epoch = _job_epochs[it.first];
+            int epoch = _job_epochs[id];
             int demand = getDemand(*it.second);
-            _demands[it.first] = demand;
-            _priorities[it.first] = it.second->getDescription().getPriority();
-            Event ev({it.first, epoch, demand, _priorities[it.first]});
-            if (!_states.getEntries().count(it.first) || ev.demand != _states.getEntries().at(it.first).demand) {
+            _demands[id] = demand;
+            _priorities[id] = it.second->getDescription().getPriority();
+            Event ev({id, epoch, demand, _priorities[id]});
+            if (!_states.getEntries().count(id) || ev.demand != _states.getEntries().at(id).demand) {
                 // Not contained yet in state: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
                     Console::log(Console::VERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, epoch);
-                    _job_epochs[it.first]++;
+                    _job_epochs[id]++;
                 } 
             }
-
-            numActiveJobs++;
             
-        } else if (_volumes.count(it.first)) {
+        } else if (_volumes.count(id)) {
             // Job used to be active, but not any more
-            _demands[it.first] = 0;
-            Event ev({it.first, _job_epochs[it.first], 0, _priorities[it.first]});
-            if (!_states.getEntries().count(it.first) || ev.demand != _states.getEntries().at(it.first).demand) {
+            _demands[id] = 0;
+            Event ev({id, _job_epochs[id], 0, _priorities[id]});
+            if (!_states.getEntries().count(id) || ev.demand != _states.getEntries().at(id).demand) {
                 // Not contained yet in state: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
-                    Console::log(Console::VERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[it.first]);
-                    _job_epochs[it.first]++;
+                    Console::log(Console::VERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[id]);
+                    _job_epochs[id]++;
                 }    
             }
         }
