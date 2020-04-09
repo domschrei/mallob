@@ -205,9 +205,7 @@ void SatClauseCommunicator::learnClausesFromAbove(std::vector<int>& clauses, int
 
     // Locally digest clauses
     Console::log(Console::VVERB, "%s : digest", _job->toStr());
-    _job->lockHordeManipulation();
     if (_job->getSolver() != NULL) _job->getSolver()->digestSharing(clauses);
-    _job->unlockHordeManipulation();
     Console::log(Console::VERB, "%s : digested", _job->toStr());
 }
 
