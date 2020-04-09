@@ -372,7 +372,7 @@ void Job::switchState(JobState state) {
 
 void Job::setForgetting() {
     auto lock = _job_manipulation_lock.getLock();
-    if (!isForgetting()) switchState(FORGETTING);
+    if (!isInStateUnsafe({FORGETTING})) switchState(FORGETTING);
 }
 
 Job::~Job() {
