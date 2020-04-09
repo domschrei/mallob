@@ -126,7 +126,7 @@ void SatJob::appl_withdraw() {
         _abort_after_initialization = true;
     }
     if (_clause_comm != NULL) {
-        delete _clause_comm;
+        delete (SatClauseCommunicator*)_clause_comm;
         _clause_comm = NULL;
     }
     if (_solver != NULL && !_bg_thread_running) {
@@ -225,7 +225,7 @@ void SatJob::appl_communicate(int source, JobMessage& msg) {
 SatJob::~SatJob() {
 
     if (_clause_comm != NULL) {
-        delete _clause_comm;
+        delete (SatClauseCommunicator*)_clause_comm;
         _clause_comm = NULL;
     }
 
