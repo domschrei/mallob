@@ -5,6 +5,7 @@
 #include <string>
 #include <memory>
 #include <thread>
+#include <assert.h>
 
 #include "HordeLib.h"
 
@@ -58,7 +59,10 @@ public:
     // int getDemand(int prevVolume) const override;
     // bool wantsToCommunicate() const override;
 
-    std::unique_ptr<HordeLib>& getSolver() {return _solver;}
+    std::unique_ptr<HordeLib>& getSolver() {
+        assert(_solver != NULL);
+        return _solver;
+    }
 
     void lockHordeManipulation();
     void unlockHordeManipulation();
@@ -71,10 +75,6 @@ private:
     void setSolverNullThread();
     void setSolverNull();
 
-    std::unique_ptr<HordeLib>& getSolver() {
-        assert(_solver != NULL);
-        return _solver;
-    }
     bool solverNotNull() {
         return _solver != NULL;
     }
