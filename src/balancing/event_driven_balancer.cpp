@@ -79,6 +79,8 @@ bool EventDrivenBalancer::beginBalancing(std::map<int, Job*>& jobs) {
 bool EventDrivenBalancer::handle(const MessageHandlePtr& handle) {
     if (handle->tag != MSG_ANYTIME_BROADCAST && handle->tag != MSG_ANYTIME_REDUCTION)
         return false;
+    
+    Console::log(Console::VVVERB, "BLC: handle");
 
     int sender = handle->source;
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
@@ -281,6 +283,8 @@ bool EventDrivenBalancer::isLeaf(int rank, bool reversedTree) {
 }
 
 void EventDrivenBalancer::calculateBalancingResult() {
+
+    Console::log(Console::VVVERB, "BLC: calc result");
 
     int rank = MyMpi::rank(MPI_COMM_WORLD);
     int verb = rank == 0 ? Console::VVERB : Console::VVVVERB;  

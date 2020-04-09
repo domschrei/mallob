@@ -145,7 +145,6 @@ void HordeLib::setLogger(std::shared_ptr<LoggingInterface> loggingInterface) {
 }
 
 void* solverRunningThread(void* arg) {
-	thread_args* targs = (thread_args*) arg;
     SolverThread thread(arg);
 	thread.run();
 	return NULL; 
