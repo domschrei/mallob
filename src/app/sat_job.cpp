@@ -121,6 +121,7 @@ void SatJob::setSolverNullThread() {
     auto lock = _horde_manipulation_lock.getLock();
     setSolverNull();
     _bg_thread_running = false;
+    Console::log(Console::VVERB, "cleanup thread done");
 }
 
 void SatJob::appl_withdraw() {
@@ -217,6 +218,7 @@ bool SatJob::appl_isDestructible() {
 }
 
 void SatJob::appl_beginCommunication() {
+    Console::log(Console::VVVVERB, "begincomm");
     if (_clause_comm == NULL) return;
     auto lock = _horde_manipulation_lock.getLock();
     if (_clause_comm != NULL) 
@@ -224,6 +226,7 @@ void SatJob::appl_beginCommunication() {
 }
 
 void SatJob::appl_communicate(int source, JobMessage& msg) {
+    Console::log(Console::VVVVERB, "comm");
     if (_clause_comm == NULL) return;
     auto lock = _horde_manipulation_lock.getLock();
     if (_clause_comm != NULL)
