@@ -82,7 +82,6 @@ void HordeLib::init() {
 
     startSolving = getTime();
 
-    solverThreads = NULL;
 	sharingManager = NULL;
     solvingState = INITIALIZING;
 	
@@ -125,6 +124,7 @@ void HordeLib::init() {
 		
 		solverThreadsInitialized.push_back(false);
 		solverThreadsRunning.push_back(false);
+		solverThreads.push_back(NULL);
 		solverTids.push_back(-1);
 	}
 
@@ -138,10 +138,6 @@ void HordeLib::init() {
 		sharingManager = new DefaultSharingManager(mpi_size, mpi_rank, solvers, params);
 		hlog(3, "Initialized all-to-all clause sharing.\n");
 	}
-
-	solverThreads = (Thread**) malloc (solversCount*sizeof(Thread*));
-
-    hlog(3, "allocated solver threads\n");
 }
 
 void HordeLib::setLogger(std::shared_ptr<LoggingInterface> loggingInterface) {
@@ -435,17 +431,16 @@ HordeLib::~HordeLib() {
 	
 	// join threads
 	for (int i = 0; i < solverThreadsRunning.size(); i++) {
-		if (solverThreadsRunning[i]) {
-			solverThreads[i]->join();
+		if (solverThreads[i] != NULL) {
+			if (solverThreadsRunning[i]) {
+				solverThreads[i]->join();
+			}
+			delete solverThreads[i];
+			solverThreads[i] = NULL;
 		}
-		delete solverThreads[i];
-		solverThreads[i] = NULL;
 	}
 	hlog(3, "threads joined\n");
-	if (solversCount > 0) {
-		free(solverThreads);
-		solversCount = 0;
-	}
+	solversCount = 0;
 	hlog(3, "threads deleted\n");
 
 	// delete solvers

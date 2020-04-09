@@ -76,6 +76,7 @@ class Thread {
 private:
 	pthread_t thread;
 public:
+	Thread() {}
 	Thread(void*(*method)(void*), void* arg) {
 		pthread_create(&thread, NULL, method, arg);
 	}

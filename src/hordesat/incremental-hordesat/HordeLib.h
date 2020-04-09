@@ -37,7 +37,7 @@ class HordeLib {
 private:
 	int mpi_size;
 	int mpi_rank;
-	Thread** solverThreads;
+	std::vector<Thread*> solverThreads;
 	size_t sleepInt;
 	int solversCount;
 	SharingManagerInterface* sharingManager;
