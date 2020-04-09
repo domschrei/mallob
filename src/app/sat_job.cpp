@@ -135,7 +135,7 @@ void SatJob::appl_withdraw() {
         delete (SatClauseCommunicator*)_clause_comm;
         _clause_comm = NULL;
     }
-    if (solverNotNull() && !_bg_thread.joinable()) {
+    if (solverNotNull()) {
         getSolver()->abort();
         // Do cleanup of HordeLib and its threads in a separate thread to avoid blocking
         _bg_thread = std::thread(&SatJob::setSolverNullThread, this);
@@ -215,7 +215,7 @@ void SatJob::appl_dumpStats() {
 }
 
 bool SatJob::appl_isDestructible() {
-    return !_bg_thread.joinable() && _solver == NULL;
+    return _solver == NULL;
 }
 
 void SatJob::appl_beginCommunication() {
