@@ -66,6 +66,9 @@ public:
 
 private:
     void extractResult(int resultCode);
+
+    void appl_interrupt_unsafe();
+
     void setSolverNullThread();
     void setSolverNull();
 };

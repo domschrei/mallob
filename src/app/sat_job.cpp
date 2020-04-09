@@ -98,6 +98,10 @@ void SatJob::appl_unpause() {
 
 void SatJob::appl_interrupt() {
     auto lock = _horde_manipulation_lock.getLock();
+    appl_interrupt_unsafe();
+}
+
+void SatJob::appl_interrupt_unsafe() {
     if (_solver != NULL) {
         _solver->interrupt(); // interrupt SAT solving (but keeps solver threads!)
         _solver->finishSolving(); // concludes solving process
@@ -106,7 +110,6 @@ void SatJob::appl_interrupt() {
 
 void SatJob::setSolverNull() {
     Console::log(Console::VVERB, "release solver");
-    auto lock = _horde_manipulation_lock.getLock();
     if (_solver != NULL) {
         _solver.reset();
         _solver = NULL;
@@ -115,6 +118,7 @@ void SatJob::setSolverNull() {
 }
 
 void SatJob::setSolverNullThread() {
+    auto lock = _horde_manipulation_lock.getLock();
     setSolverNull();
     _bg_thread_running = false;
 }
@@ -224,6 +228,8 @@ void SatJob::appl_communicate(int source, JobMessage& msg) {
 
 SatJob::~SatJob() {
 
+    auto lock = _horde_manipulation_lock.getLock();
+
     if (_clause_comm != NULL) {
         delete (SatClauseCommunicator*)_clause_comm;
         _clause_comm = NULL;
@@ -236,7 +242,7 @@ SatJob::~SatJob() {
 
     if (_solver != NULL) {
         Console::log(Console::VVERB, "%s : destruct hordesat", toStr());
-        appl_interrupt();
+        appl_interrupt_unsafe();
         _solver->abort();
         setSolverNull();
     }
