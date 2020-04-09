@@ -341,10 +341,8 @@ void Worker::handleQueryVolume(MessageHandlePtr& handle) {
     IntVec payload(*handle->recvData);
     int jobId = payload[0];
 
-    assert(hasJob(jobId));
-    
     // No volume of this job (yet?) -- ignore.
-    if (!balancer->hasVolume(jobId)) return;
+    if (!hasJob(jobId) || !balancer->hasVolume(jobId)) return;
 
     int volume = balancer->getVolume(jobId);
     IntVec response({jobId, volume});
@@ -527,7 +525,11 @@ void Worker::handleAcceptAdoptionOffer(MessageHandlePtr& handle) {
 
     // Retrieve according job commitment
     JobSignature sig; sig.deserialize(*handle->recvData);
-    assert(jobCommitments.count(sig.jobId));
+    if (!jobCommitments.count(sig.jobId)) {
+        Console::log(Console::WARN, "Job commitment for #%i not present despite adoption accept msg", sig.jobId);
+        return;
+    }
+
     JobRequest& req = jobCommitments[sig.jobId];
 
     if (req.fullTransfer == 1) {
@@ -617,7 +619,7 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
     getJob(jobId).beginInitialization();
     Console::log(Console::VERB, "Received desc. of #%i - initializing", jobId);
 
-    assert(!initializerThreads.count(jobId));
+    assert(!initializerThreads.count(jobId) || Console::fail("%s already has an initializer thread!", getJob(jobId).toStr()));
     initializerThreads[jobId] = std::thread(&Worker::initJob, this, handle);
 }
 
