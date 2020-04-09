@@ -39,6 +39,8 @@ void* SolverThread::run() {
         readFormula();
     if (!cancelThread())
         diversify();
+    
+    hlib->solverThreadsInitialized[_args->solverId] = true;
 
     while (!cancelThread()) {
     
@@ -91,7 +93,6 @@ void SolverThread::readFormula() {
 
     hlib->hlog(2, "%s imported cnf (%i lits)\n", toStr(), (importedLits-prevLits));
     hlib->hlog(1, "%s initialized\n", toStr());
-    hlib->solverThreadsInitialized[_args->solverId] = true;
 }
 
 void SolverThread::read(const std::vector<int>& formula, int begin) {

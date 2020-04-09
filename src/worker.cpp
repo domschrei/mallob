@@ -634,7 +634,7 @@ void Worker::initJob(MessageHandlePtr handle) {
 
     // Remember arrival and initialize used CPU time (if root node)
     jobArrivals[jobId] = Timer::elapsedSeconds();
-    
+        
     if (job.isPast()) {
         // Job was already aborted
         job.terminate();
@@ -642,6 +642,8 @@ void Worker::initJob(MessageHandlePtr handle) {
         // Initialize job
         job.initialize();
     }
+
+    Console::log(Console::VVVVERB, "%s : init thread done", job.toStr());
 }
 
 void Worker::handleUpdateVolume(MessageHandlePtr& handle) {
