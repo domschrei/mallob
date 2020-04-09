@@ -283,7 +283,7 @@ void SolverThread::reportResult(int res) {
 
 SolverThread::~SolverThread() {
     delete _args;
-    hlib->solverTids[_args->solverId] = -1;
+    //hlib->solverTids[_args->solverId] = -1;
 }
 
 const char* SolverThread::toStr() {
