@@ -330,7 +330,7 @@ bool Job::wantsToCommunicate() const {
         return false;
     }
     // Active leaf node initiates communication if s seconds have passed since last one
-    return isInState({ACTIVE, INITIALIZING_TO_ACTIVE}) && !hasLeftChild() && !hasRightChild() 
+    return isActive() && !hasLeftChild() && !hasRightChild() 
             && getJobCommEpoch() > _last_job_comm_remainder;
 }
 

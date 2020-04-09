@@ -146,8 +146,7 @@ void HordeLib::setLogger(std::shared_ptr<LoggingInterface> loggingInterface) {
 
 void* solverRunningThread(void* arg) {
     SolverThread thread(arg);
-	thread.run();
-	return NULL; 
+	return thread.run();
 }
 
 void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 

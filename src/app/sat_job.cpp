@@ -12,8 +12,7 @@
 #include "util/memusage.h"
 
 SatJob::SatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) : 
-        Job(params, commSize, worldRank, jobId, epochCounter), _done_locally(false), 
-        _bg_thread_running(false) {
+        Job(params, commSize, worldRank, jobId, epochCounter), _done_locally(false) {
 }
 
 void SatJob::lockHordeManipulation() {
@@ -77,6 +76,7 @@ bool SatJob::appl_initialize() {
 }
 
 void SatJob::appl_updateRole() {
+    auto lock = _horde_manipulation_lock.getLock();
     if (_solver != NULL) _solver->updateRole(getIndex(), _comm_size);
 }
 
@@ -89,10 +89,12 @@ void SatJob::appl_updateDescription(int fromRevision) {
 }
 
 void SatJob::appl_pause() {
+    auto lock = _horde_manipulation_lock.getLock();
     if (_solver != NULL) _solver->setPaused();
 }
 
 void SatJob::appl_unpause() {
+    auto lock = _horde_manipulation_lock.getLock();
     if (_solver != NULL) _solver->unsetPaused();
 }
 
@@ -120,7 +122,6 @@ void SatJob::setSolverNull() {
 void SatJob::setSolverNullThread() {
     auto lock = _horde_manipulation_lock.getLock();
     setSolverNull();
-    _bg_thread_running = false;
     Console::log(Console::VVERB, "cleanup thread done");
 }
 
@@ -134,15 +135,15 @@ void SatJob::appl_withdraw() {
         delete (SatClauseCommunicator*)_clause_comm;
         _clause_comm = NULL;
     }
-    if (_solver != NULL && !_bg_thread_running) {
+    if (_solver != NULL && !_bg_thread.joinable()) {
         _solver->abort();
         // Do cleanup of HordeLib and its threads in a separate thread to avoid blocking
-        _bg_thread_running = true;
         _bg_thread = std::thread(&SatJob::setSolverNullThread, this);
     }
 }
 
 void SatJob::extractResult(int resultCode) {
+    auto lock = _horde_manipulation_lock.getLock();
     _result.id = getId();
     _result.result = resultCode;
     _result.revision = getDescription().getRevision();
@@ -214,7 +215,7 @@ void SatJob::appl_dumpStats() {
 }
 
 bool SatJob::appl_isDestructible() {
-    return !_bg_thread_running && _solver == NULL;
+    return !_bg_thread.joinable() && _solver == NULL;
 }
 
 void SatJob::appl_beginCommunication() {
@@ -235,6 +236,7 @@ void SatJob::appl_communicate(int source, JobMessage& msg) {
 
 SatJob::~SatJob() {
 
+    Console::log(Console::VVERB, "%s : enter destructor", toStr());
     auto lock = _horde_manipulation_lock.getLock();
 
     if (_clause_comm != NULL) {
