@@ -88,8 +88,8 @@ void Worker::createExpanderGraph() {
     // Check validity of num bounce alternatives
     if (2*numBounceAlternatives > numWorkers) {
         numBounceAlternatives = numWorkers / 2;
-        Console::log(Console::WARN, "ERROR: Num bounce alternatives must be at most half the number of workers!");
-        Console::log(Console::WARN, "Falling back to safe value r=%i.", numBounceAlternatives);
+        Console::log(Console::WARN, "[WARN] Num bounce alternatives must be at most half the number of workers!");
+        Console::log(Console::WARN, "[WARN] Falling back to safe value r=%i.", numBounceAlternatives);
     }  
 
     // Create graph, get outgoing edges from this node
@@ -308,7 +308,7 @@ void Worker::mainProgram() {
             } else if (handle->tag == MSG_WARMUP) 
                 Console::log_recv(Console::VVVERB, handle->source, "Warmup msg");
             else
-                Console::log_recv(Console::WARN, handle->source, "Unknown message tag %i", handle->tag);
+                Console::log_recv(Console::WARN, handle->source, "[WARN] Unknown message tag %i", handle->tag);
 
             time = Timer::elapsedSeconds() - time;
             Console::log(Console::VVVERB, "Processing msg, tag %i took %.4f s", handle->tag, time);
@@ -526,7 +526,7 @@ void Worker::handleAcceptAdoptionOffer(MessageHandlePtr& handle) {
     // Retrieve according job commitment
     JobSignature sig; sig.deserialize(*handle->recvData);
     if (!jobCommitments.count(sig.jobId)) {
-        Console::log(Console::WARN, "Job commitment for #%i not present despite adoption accept msg", sig.jobId);
+        Console::log(Console::WARN, "[WARN] Job commitment for #%i not present despite adoption accept msg", sig.jobId);
         return;
     }
 
@@ -649,7 +649,7 @@ void Worker::handleUpdateVolume(MessageHandlePtr& handle) {
     int jobId = recv.first;
     int volume = recv.second;
     if (!hasJob(jobId)) {
-        Console::log(Console::WARN, "Volume update for unknown #%i", jobId);
+        Console::log(Console::WARN, "[WARN] Volume update for unknown #%i", jobId);
         return;
     }
 
@@ -665,7 +665,7 @@ void Worker::handleJobCommunication(MessageHandlePtr& handle) {
     JobMessage msg; msg.deserialize(*handle->recvData);
     int jobId = msg.jobId;
     if (!hasJob(jobId)) {
-        Console::log(Console::WARN, "Job message from unknown job #%i", jobId);
+        Console::log(Console::WARN, "[WARN] Job message from unknown job #%i", jobId);
         return;
     }
     // Give message to corresponding job
@@ -680,7 +680,7 @@ void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
     int jobId = res[0];
     int revision = res[1];
     if (!hasJob(jobId) || !getJob(jobId).isRoot()) {
-        Console::log(Console::WARN, "Invalid adressee for job result of #%i", jobId);
+        Console::log(Console::WARN, "[WARN] Invalid adressee for job result of #%i", jobId);
         return;
     }
 
@@ -821,7 +821,7 @@ void Worker::handleNotifyJobRevision(MessageHandlePtr& handle) {
         MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_QUERY_JOB_REVISION_DETAILS, request);
     } else {
         // TODO ???
-        Console::log(Console::WARN, "Useless revision update #%i rev. %i (I am already at rev. %i)", jobId, revision, lastKnownRevision);
+        Console::log(Console::WARN, "[WARN] Useless revision update #%i rev. %i (I am already at rev. %i)", jobId, revision, lastKnownRevision);
     }
 }
 
@@ -984,7 +984,7 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
 
     // Show warning if #hops is a large power of two
     if ((num >= 512) && ((num & (num - 1)) == 0)) {
-        Console::log(Console::WARN, "Hop no. %i for %s", num, jobStr(request.jobId, request.requestedNodeIndex).c_str());
+        Console::log(Console::WARN, "[WARN] Hop no. %i for %s", num, jobStr(request.jobId, request.requestedNodeIndex).c_str());
     }
 
     int nextRank;
