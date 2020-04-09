@@ -239,6 +239,9 @@ void Job::terminate() {
     appl_interrupt();
     appl_withdraw();
 
+    unsetLeftChild();
+    unsetRightChild();
+
     // Free up memory
     _description = JobDescription();
     _serialized_description = std::make_shared<std::vector<uint8_t>>();
@@ -365,6 +368,11 @@ void Job::switchState(JobState state) {
     _state = state;
     Console::log(Console::VERB, "%s : state transition \"%s\" => \"%s\"", toStr(), 
         jobStateStrings[oldState], jobStateStrings[state]); 
+}
+
+void Job::setForgetting() {
+    auto lock = _job_manipulation_lock.getLock();
+    switchState(FORGETTING);
 }
 
 Job::~Job() {

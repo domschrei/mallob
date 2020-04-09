@@ -60,10 +60,14 @@ enum JobState {
      * The job has been finished and is waiting for a directive from its parent
      * and/or the external client.
      */
-    STANDBY
+    STANDBY,
+    /*
+     * The job is being destructed in the moment and will then transition into state PAST.
+     */
+    FORGETTING
 };
 static const char * jobStateStrings[] = { "none", "stored", "committed", "initializingToActive", 
-    "initializingToSuspended", "initializingToPast", "initializingToCommitted", "active", "suspended", "past", "standby" };
+    "initializingToSuspended", "initializingToPast", "initializingToCommitted", "active", "suspended", "past", "standby", "forgetting" };
 
 class Job {
 
@@ -229,6 +233,7 @@ public:
     void endInitialization();
     bool mustAbortInitialization();
     bool isDestructible();
+    void setForgetting();
 
     void lockJobManipulation();
     void unlockJobManipulation();
@@ -248,13 +253,19 @@ public:
     bool isInStateUnsafe(std::initializer_list<JobState> list) const;
     bool isNotInStateUnsafe(std::initializer_list<JobState> list) const;
 
+    bool isInitializing() const {return isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_PAST, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_COMMITTED});};
+    bool isInitializingUnsafe() const {return isInStateUnsafe({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_PAST, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_COMMITTED});};
+    bool isActive() const {return isInState({ACTIVE, INITIALIZING_TO_ACTIVE});}
+    bool isCommitted() const {return isInState({COMMITTED, INITIALIZING_TO_COMMITTED});}
+    bool isSuspended() const {return isInState({SUSPENDED, INITIALIZING_TO_SUSPENDED});}
+    bool isPast() const {return isInState({PAST, INITIALIZING_TO_PAST});}
+    bool isForgetting() const {return isInState({FORGETTING});}
+
     JobDescription& getDescription() {return _description;};
     std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription() {return _serialized_description;};
     int getId() const {return _id;};
     int getIndex() const {return _index;};
     bool isInitialized() const {return _initialized;};
-    bool isInitializing() const {return isInState({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_PAST, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_COMMITTED});};
-    bool isInitializingUnsafe() const {return isInStateUnsafe({INITIALIZING_TO_ACTIVE, INITIALIZING_TO_PAST, INITIALIZING_TO_SUSPENDED, INITIALIZING_TO_COMMITTED});};
     bool hasJobDescription() const {return _has_description;};
     int getRevision() const {return _description.getRevision();};
     float getAge() const {return Timer::elapsedSeconds() - _elapsed_seconds_since_arrival;}
@@ -269,12 +280,13 @@ public:
     int getRightChildNodeRank() const {return _job_node_ranks[getRightChildIndex()];};
     std::set<int>& getPastChildren() {return _past_children;}
 
+    bool isLeaf() const {return !_has_left_child && !_has_right_child;}
     bool hasLeftChild() const {return _has_left_child;};
     bool hasRightChild() const {return _has_right_child;};
     void setLeftChild(int rank);
     void setRightChild(int rank);
-    void unsetLeftChild() {_past_children.insert(getLeftChildNodeRank()); _has_left_child = false;};
-    void unsetRightChild() {_past_children.insert(getRightChildNodeRank()); _has_right_child = false;};
+    void unsetLeftChild() {if (_has_left_child) _past_children.insert(getLeftChildNodeRank()); _has_left_child = false;};
+    void unsetRightChild() {if (_has_right_child) _past_children.insert(getRightChildNodeRank()); _has_right_child = false;};
 
     int getLeftChildIndex() const {return 2*(_index+1)-1;};
     int getRightChildIndex() const {return 2*(_index+1);};

@@ -166,9 +166,9 @@ void Client::mainProgram() {
                 handleSendJobResult(handle);
             } else if (handle->tag == MSG_ABORT) {
                 handleAbort(handle);
-            } else if (handle->tag == MSG_REQUEST_BECOME_CHILD) {
+            } else if (handle->tag == MSG_OFFER_ADOPTION) {
                 handleRequestBecomeChild(handle);
-            } else if (handle->tag == MSG_ACK_ACCEPT_BECOME_CHILD) {
+            } else if (handle->tag == MSG_CONFIRM_ADOPTION) {
                 handleAckAcceptBecomeChild(handle);
             } else if (handle->tag == MSG_QUERY_JOB_REVISION_DETAILS) {
                 handleQueryJobRevisionDetails(handle);
@@ -258,7 +258,7 @@ void Client::handleRequestBecomeChild(MessageHandlePtr& handle) {
 
     // Send job signature
     JobSignature sig(req.jobId, /*rootRank=*/handle->source, req.revision, desc.getTransferSize(false));
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACCEPT_BECOME_CHILD, sig);
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACCEPT_ADOPTION_OFFER, sig);
     //stats.increment("sentMessages");
 }
 

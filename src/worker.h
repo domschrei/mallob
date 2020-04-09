@@ -89,10 +89,10 @@ private:
     void handleIntroduceJob(MessageHandlePtr& handle);
     void handleQueryVolume(MessageHandlePtr& handle);
     void handleFindNode(MessageHandlePtr& handle);
-    void handleRequestBecomeChild(MessageHandlePtr& handle);
-    void handleRejectBecomeChild(MessageHandlePtr& handle);
-    void handleAcceptBecomeChild(MessageHandlePtr& handle);
-    void handleAckAcceptBecomeChild(MessageHandlePtr& handle);
+    void handleOfferAdoption(MessageHandlePtr& handle);
+    void handleRejectAdoptionOffer(MessageHandlePtr& handle);
+    void handleAcceptAdoptionOffer(MessageHandlePtr& handle);
+    void handleConfirmAdoption(MessageHandlePtr& handle);
     void handleSendJob(MessageHandlePtr& handle);
     void handleUpdateVolume(MessageHandlePtr& handle);
     void handleJobCommunication(MessageHandlePtr& handle);

@@ -241,17 +241,17 @@ void Worker::mainProgram() {
             } else if (handle->tag == MSG_QUERY_VOLUME) {
                 handleQueryVolume(handle);
             
-            } else if (handle->tag == MSG_REQUEST_BECOME_CHILD)
-                handleRequestBecomeChild(handle);
+            } else if (handle->tag == MSG_OFFER_ADOPTION)
+                handleOfferAdoption(handle);
 
-            else if (handle->tag == MSG_REJECT_BECOME_CHILD)
-                handleRejectBecomeChild(handle);
+            else if (handle->tag == MSG_REJECT_ADOPTION_OFFER)
+                handleRejectAdoptionOffer(handle);
 
-            else if (handle->tag == MSG_ACCEPT_BECOME_CHILD)
-                handleAcceptBecomeChild(handle);
+            else if (handle->tag == MSG_ACCEPT_ADOPTION_OFFER)
+                handleAcceptAdoptionOffer(handle);
 
-            else if (handle->tag == MSG_ACK_ACCEPT_BECOME_CHILD)
-                handleAckAcceptBecomeChild(handle);
+            else if (handle->tag == MSG_CONFIRM_ADOPTION)
+                handleConfirmAdoption(handle);
 
             else if (handle->tag == MSG_SEND_JOB_DESCRIPTION)
                 handleSendJob(handle);
@@ -368,35 +368,27 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
     bool adopts = false;
     int maxHops = maxJobHops(/*rootNode=*/req.requestedNodeIndex == 0);
 
-    if (hasJob(req.jobId) && getJob(req.jobId).isInState({PAST})) {
-        // This node knows the job, and it is in PAST state.
+    if (hasJob(req.jobId) && (getJob(req.jobId).isPast() || getJob(req.jobId).isForgetting())) {
         // Can mean that the job finished in the meantime or that
         // it is in the process of being cleaned up.
-        Console::log(Console::VERB, "Reject req. %s : PAST", 
+        Console::log(Console::VERB, "Reject req. %s : PAST/FORGETTING", 
                         jobStr(req.jobId, req.requestedNodeIndex).c_str());
 
     } else if (isIdle() && !hasJobCommitments()) {
         // Node is idle and not committed to another job: OK
         adopts = true;
 
-    } else if (req.numHops > maxHops && req.requestedNodeIndex > 0) {
-        // Discard job request
-        Console::log(Console::VERB, "Discard req. %s : > %i hops", 
-                        jobStr(req.jobId, req.requestedNodeIndex).c_str(), maxHops);
-        return;
-    
     } else if (req.numHops > maxHops && req.requestedNodeIndex == 0 && !hasJobCommitments()) {
         // Request for a root node exceeded max #hops: Possibly adopt the job while dismissing the active job
 
-        // If this node already computes on _this_ job, don't adopt it
-        if (!hasJob(req.jobId) || getJob(req.jobId).isNotInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
+        // Consider adoption only if that job is unknown or inactive 
+        if (!hasJob(req.jobId) || !getJob(req.jobId).isActive()) {
 
             // Look for an active job that can be suspended
             if (currentJob != NULL) {
                 Job& job = *currentJob;
                 // Job must be active and a non-root leaf node
-                if (job.isInState({ACTIVE, INITIALIZING_TO_ACTIVE}) 
-                    && !job.isRoot() && !job.hasLeftChild() && !job.hasRightChild()) {
+                if (job.isActive() && !job.isRoot() && job.isLeaf()) {
                     
                     // Inform parent node of the original job  
                     Console::log(Console::VERB, "Suspend %s ...", job.toStr());
@@ -437,7 +429,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
         req.fullTransfer = fullTransfer ? 1 : 0;
         jobs[req.jobId]->commit(req);
         jobCommitments[req.jobId] = req;
-        MyMpi::isend(MPI_COMM_WORLD, req.requestingNodeRank, MSG_REQUEST_BECOME_CHILD, jobCommitments[req.jobId]);
+        MyMpi::isend(MPI_COMM_WORLD, req.requestingNodeRank, MSG_OFFER_ADOPTION, jobCommitments[req.jobId]);
         //stats.increment("sentMessages");
 
     } else {
@@ -446,7 +438,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
     }
 }
 
-void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
+void Worker::handleOfferAdoption(MessageHandlePtr& handle) {
 
     JobRequest req; req.deserialize(*handle->recvData);
     Console::log_recv(Console::VERB, handle->source, "Request to join job tree as %s", 
@@ -468,7 +460,7 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
                                 job.toStr(), req.timeOfBirth);
             reject = true;
 
-        } else if (job.isNotInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
+        } else if (!job.isActive()) {
             // Job is not active
             Console::log_recv(Console::VERB, handle->source, "Reject req. %s : not active", job.toStr());
             Console::log(Console::VERB, "Actual job state: %s", job.jobStateToStr());
@@ -491,7 +483,7 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
 
             // Send job signature
             JobSignature sig(req.jobId, req.rootRank, req.revision, desc.getTransferSize(true));
-            MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACCEPT_BECOME_CHILD, sig);
+            MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACCEPT_ADOPTION_OFFER, sig);
             //stats.increment("sentMessages");
 
             // If req.fullTransfer, then wait for the child to acknowledge having received the signature
@@ -512,19 +504,18 @@ void Worker::handleRequestBecomeChild(MessageHandlePtr& handle) {
 
     // If rejected: Send message to rejected child node
     if (reject) {
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_REJECT_BECOME_CHILD, req);
+        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_REJECT_ADOPTION_OFFER, req);
         //stats.increment("sentMessages");
     }
 }
 
-void Worker::handleRejectBecomeChild(MessageHandlePtr& handle) {
+void Worker::handleRejectAdoptionOffer(MessageHandlePtr& handle) {
 
     // Retrieve committed job
     JobRequest req; req.deserialize(*handle->recvData);
     if (!hasJob(req.jobId)) return;
     Job &job = getJob(req.jobId);
-    if (job.isNotInState({COMMITTED, INITIALIZING_TO_COMMITTED}))
-        return; // Commitment was already erased
+    if (!job.isCommitted()) return; // Commitment was already erased
 
     // Erase commitment
     Console::log_recv(Console::VERB, handle->source, "Rejected to become %s : uncommitting", job.toStr());
@@ -532,7 +523,7 @@ void Worker::handleRejectBecomeChild(MessageHandlePtr& handle) {
     job.uncommit();
 }
 
-void Worker::handleAcceptBecomeChild(MessageHandlePtr& handle) {
+void Worker::handleAcceptAdoptionOffer(MessageHandlePtr& handle) {
 
     // Retrieve according job commitment
     JobSignature sig; sig.deserialize(*handle->recvData);
@@ -543,7 +534,7 @@ void Worker::handleAcceptBecomeChild(MessageHandlePtr& handle) {
         // Full transfer of job description is required:
         // Send ACK to parent and receive full job description
         Console::log(Console::VERB, "Will receive desc. of #%i, size %i", req.jobId, sig.getTransferSize());
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACK_ACCEPT_BECOME_CHILD, req);
+        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_CONFIRM_ADOPTION, req);
         //stats.increment("sentMessages");
         MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, sig.getTransferSize()); // to be received later
         //stats.increment("receivedMessages");
@@ -552,7 +543,9 @@ void Worker::handleAcceptBecomeChild(MessageHandlePtr& handle) {
         // Already has job description: Directly resume job (if not terminated yet)
         assert(hasJob(req.jobId));
         Job& job = getJob(req.jobId);
-        if (job.getState() != JobState::PAST) {
+        assert(job.hasJobDescription() || Console::fail("%s has no job description although no full transfer was requested!", 
+                job.toStr()));
+        if (!job.isPast()) {
             Console::log_recv(Console::INFO, handle->source, "Start or resume %s (state: %s)", 
                         jobStr(req.jobId, req.requestedNodeIndex).c_str(), job.jobStateToStr());
             setLoad(1, req.jobId);
@@ -563,40 +556,39 @@ void Worker::handleAcceptBecomeChild(MessageHandlePtr& handle) {
     }
 }
 
-void Worker::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
+void Worker::handleConfirmAdoption(MessageHandlePtr& handle) {
     JobRequest req; req.deserialize(*handle->recvData);
 
-    // Retrieve and send concerned job description
-    assert(hasJob(req.jobId));
-    Job& job = getJob(req.jobId);
     // If job already terminated, the description contains the job id ONLY
+    if (!hasJob(req.jobId)) {
+        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, IntVec({req.jobId}));
+        return;
+    }
+    Job& job = getJob(req.jobId);
+    if (job.isPast() || job.isForgetting()) {
+        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, IntVec({req.jobId}));
+        return;
+    }
+
+    // Retrieve and send concerned job description
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, job.getSerializedDescription());
     //stats.increment("sentMessages");
     Console::log_send(Console::VERB, handle->source, "Sent job desc. of %s", job.toStr());
 
-    if (job.getState() == JobState::PAST) {
-        // Job already terminated -- send termination signal
-        IntPair pair(req.jobId, req.requestedNodeIndex);
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_TERMINATE, pair);
+    // Mark new node as one of the node's children
+    if (req.requestedNodeIndex == job.getLeftChildIndex()) {
+        job.setLeftChild(handle->source);
+    } else if (req.requestedNodeIndex == job.getRightChildIndex()) {
+        job.setRightChild(handle->source);
+    } else assert(req.requestedNodeIndex == 0);
+
+    // Send current volume / initial demand update
+    if (job.isActive()) {
+        int volume = balancer->getVolume(req.jobId);
+        assert(volume >= 1);
+        Console::log_send(Console::VERB, handle->source, "Propagate v=%i to new child", volume);
+        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_UPDATE_VOLUME, IntPair(req.jobId, volume));
         //stats.increment("sentMessages");
-    } else {
-
-        // Mark new node as one of the node's children
-        if (req.requestedNodeIndex == job.getLeftChildIndex()) {
-            job.setLeftChild(handle->source);
-        } else if (req.requestedNodeIndex == job.getRightChildIndex()) {
-            job.setRightChild(handle->source);
-        } else assert(req.requestedNodeIndex == 0);
-
-        // Send current volume / initial demand update
-        if (job.isInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
-            int volume = balancer->getVolume(req.jobId);
-            assert(volume >= 1);
-            Console::log_send(Console::VERB, handle->source, "Propagate v=%i to new child", volume);
-            IntPair jobIdAndVolume(req.jobId, volume);
-            MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_UPDATE_VOLUME, jobIdAndVolume);
-            //stats.increment("sentMessages");
-        }
     }
 }
 
@@ -605,21 +597,18 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
     Console::log_recv(Console::VVVERB, handle->source, "Receiving some desc. of size %i", data->size());
     int jobId; memcpy(&jobId, data->data(), sizeof(int));
 
-    if (!hasJob(jobId) || getJob(jobId).isInState({PAST})) {
+    if (!hasJob(jobId) || getJob(jobId).isPast()) {
         Console::fail("I don't know job #%i : discard desc.", jobId);
         return;
     }
 
     // Erase job commitment
-    if (jobCommitments.count(jobId))
-        jobCommitments.erase(jobId);
+    if (jobCommitments.count(jobId)) jobCommitments.erase(jobId);
 
     // Empty job description
     if (handle->recvData->size() == sizeof(int)) {
         Console::log(Console::VERB, "Received empty desc. of #%i - uncommit", jobId);
-        if (getJob(jobId).isInState({COMMITTED, INITIALIZING_TO_COMMITTED})) {
-            getJob(jobId).uncommit();
-        }
+        if (getJob(jobId).isCommitted()) getJob(jobId).uncommit();
         return;
     }
 
@@ -644,10 +633,10 @@ void Worker::initJob(MessageHandlePtr handle) {
     // Remember arrival and initialize used CPU time (if root node)
     jobArrivals[jobId] = Timer::elapsedSeconds();
     
-    if (job.isInState({INITIALIZING_TO_PAST})) {
+    if (job.isPast()) {
         // Job was already aborted
         job.terminate();
-    } else {
+    } else if (!job.isForgetting()) {
         // Initialize job
         job.initialize();
     }
@@ -694,7 +683,7 @@ void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
     }
 
     Console::log_recv(Console::VERB, handle->source, "Result found for job #%i", jobId);
-    if (getJob(jobId).isInState({PAST, INITIALIZING_TO_PAST})) {
+    if (getJob(jobId).isPast()) {
         Console::log_recv(Console::VERB, handle->source, "Discard obsolete result for job #%i", jobId);
         return;
     }
@@ -901,19 +890,17 @@ void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, b
     if (!hasJob(jobId)) return;
     Job& job = getJob(jobId);
 
-    bool acceptMessage = job.isNotInState({NONE, STORED, PAST});
-
     // Propagate message down the job tree
     int msgTag;
     if (terminate && reckless) msgTag = MSG_ABORT;
     else if (terminate) msgTag = MSG_TERMINATE;
     else msgTag = MSG_INTERRUPT;
-    if (acceptMessage && job.hasLeftChild()) {
+    if (job.hasLeftChild()) {
         MyMpi::isend(MPI_COMM_WORLD, job.getLeftChildNodeRank(), msgTag, handle->recvData);
         Console::log_send(Console::VERB, job.getLeftChildNodeRank(), "Propagate interruption of %s ...", job.toStr());
         //stats.increment("sentMessages");
     }
-    if (acceptMessage && job.hasRightChild()) {
+    if (job.hasRightChild()) {
         MyMpi::isend(MPI_COMM_WORLD, job.getRightChildNodeRank(), msgTag, handle->recvData);
         Console::log_send(Console::VERB, job.getRightChildNodeRank(), "Propagate interruption of %s ...", job.toStr());
         //stats.increment("sentMessages");
@@ -924,24 +911,23 @@ void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, b
     }
     job.getPastChildren().clear();
 
-    if (acceptMessage) {
-        // Stop / terminate
-        if (job.isInitializing() || job.isInState({ACTIVE, STANDBY, SUSPENDED})) {
-            Console::log(Console::INFO, "%s : interrupt (state: %s)", job.toStr(), job.jobStateToStr());
-            job.stop(); // Solvers are interrupted, not suspended!
-            Console::log(Console::VERB, "%s : interrupted", job.toStr());
-            if (terminate) {
-                if (getLoad() && currentJob->getId() == job.getId()) setLoad(0, job.getId());
-                job.terminate();
-                Console::log(Console::INFO, "%s : terminated", job.toStr());
-                balancer->updateVolume(jobId, 0);
-            } 
-        }
-        // Mark committed job as "PAST"
-        if (job.isInState({COMMITTED, INITIALIZING_TO_COMMITTED}) && terminate) {
-            job.uncommit();
+    // Stop / terminate
+    if (job.isInitializing() || job.isActive() || job.isSuspended()) {
+        Console::log(Console::INFO, "%s : interrupt (state: %s)", job.toStr(), job.jobStateToStr());
+        job.stop(); // Solvers are interrupted, not suspended!
+        Console::log(Console::VERB, "%s : interrupted", job.toStr());
+        if (terminate) {
+            if (getLoad() && currentJob->getId() == job.getId()) setLoad(0, job.getId());
             job.terminate();
-        }
+            Console::log(Console::INFO, "%s : terminated", job.toStr());
+            balancer->updateVolume(jobId, 0);
+        } 
+    }
+    // Mark committed job as "PAST"
+    if (job.isCommitted() && terminate) {
+        if (jobCommitments.count(jobId)) jobCommitments.erase(jobId);
+        job.uncommit();
+        job.terminate();
     }
 }
 
@@ -1124,7 +1110,7 @@ void Worker::updateVolume(int jobId, int volume) {
     if (!hasJob(jobId)) return;
     Job &job = getJob(jobId);
 
-    if (job.isNotInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
+    if (!job.isActive()) {
         // Job is not active right now
         return;
     }
@@ -1179,7 +1165,7 @@ void Worker::updateVolume(int jobId, int volume) {
 
     // Shrink (and pause solving) if necessary
     if (thisIndex > 0 && thisIndex >= volume) {
-        jobs[jobId]->suspend();
+        job.suspend();
         setLoad(0, jobId);
     }
 }
@@ -1199,27 +1185,25 @@ void Worker::forgetOldJobs() {
     std::vector<int> jobsToForget;
     int jobCacheSize = params.getIntParam("jc");
 
-    if (jobCacheSize == 0) return;
-
     // Scan jobs for being forgettable
     std::priority_queue<std::pair<int, float>, std::vector<std::pair<int, float>>, SuspendedJobComparator> suspendedQueue;
     for (auto idJobPair : jobs) {
         int id = idJobPair.first;
         Job& job = *idJobPair.second;
-        if (jobCacheSize > 0 && job.isInState({SUSPENDED})) {
+        // Job must be finished initializing
+        if (job.isInitializing()) continue;
+        if (jobCacheSize > 0 && job.isSuspended()) {
             // Job must not be rooted here
             if (job.isRoot()) continue;
             // Insert job into PQ according to its age 
             float age = job.getAgeSinceInitialized();
             suspendedQueue.emplace(id, age);
         }
-        if (job.isInState({PAST})) {
+        if (job.isPast() || job.isForgetting()) {
             // If job is past, it must have been so for at least 60 seconds
-            if (job.getAgeSinceAbort() < 60)
-                continue;
+            if (job.getAgeSinceAbort() < 60) continue;
             // If the node found a result, it must have been already transferred
-            if (job.isResultTransferPending())
-                continue;
+            if (job.isResultTransferPending()) continue;
             jobsToForget.push_back(id);
         }
     }
@@ -1238,8 +1222,9 @@ void Worker::forgetOldJobs() {
 
 void Worker::forgetJob(int jobId) {
     Job& job = getJob(jobId);
+    job.setForgetting();
     Console::log(Console::VVVERB, "Terminate %s to forget", job.toStr());
-    if (job.isInState({SUSPENDED})) {
+    if (job.isSuspended()) {
         job.stop();
         job.terminate();
     }

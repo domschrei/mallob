@@ -125,6 +125,10 @@ void SatJob::appl_withdraw() {
     if (isInitializingUnsafe()) {
         _abort_after_initialization = true;
     }
+    if (_clause_comm != NULL) {
+        delete _clause_comm;
+        _clause_comm = NULL;
+    }
     if (_solver != NULL && !_bg_thread_running) {
         _solver->abort();
         // Do cleanup of HordeLib and its threads in a separate thread to avoid blocking
@@ -219,6 +223,11 @@ void SatJob::appl_communicate(int source, JobMessage& msg) {
 }
 
 SatJob::~SatJob() {
+
+    if (_clause_comm != NULL) {
+        delete _clause_comm;
+        _clause_comm = NULL;
+    }
 
     if (_bg_thread.joinable()) {
         Console::log(Console::VVERB, "%s : joining bg thread", toStr());

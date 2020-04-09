@@ -73,25 +73,25 @@ const int MSG_FIND_NODE = 3;
  * of which a corresponding child position was advertised.
  * Data type: JobRequest
  */
-const int MSG_REQUEST_BECOME_CHILD = 4;
+const int MSG_OFFER_ADOPTION = 4;
 /*
  * The senders confirms that the receiver may become the sender's child
  * with respect to the job and index specified in the signature.
  * Data type: JobSignature
  */
-const int MSG_ACCEPT_BECOME_CHILD = 5;
+const int MSG_ACCEPT_ADOPTION_OFFER = 5;
 /*
  * The sender rejects the receiver to become the sender's child
  * with respect to the job and index specified in the signature.
  * Data type: JobRequest
  */
-const int MSG_REJECT_BECOME_CHILD = 6;
+const int MSG_REJECT_ADOPTION_OFFER = 6;
 /*
  * The sender acknowledges that it received the receiver's previous
- * MSG_ACCEPT_BECOME_CHILD message.
+ * MSG_ACCEPT_ADOPTION_OFFER message.
  * Data type: JobRequest
  */
-const int MSG_ACK_ACCEPT_BECOME_CHILD = 7;
+const int MSG_CONFIRM_ADOPTION = 7;
 /*
  * The sender propagates a job's volume update to the receiver.
  * Data type: [jobId, volume]
@@ -204,11 +204,11 @@ const int ALL_TAGS[] = {
     MSG_FIND_NODE, MSG_WORKER_FOUND_RESULT, MSG_FORWARD_CLIENT_RANK, MSG_JOB_DONE, 
     MSG_ANYTIME_REDUCTION, MSG_ANYTIME_BROADCAST, MSG_COLLECTIVES,
     MSG_CLIENT_FINISHED, MSG_INCREMENTAL_JOB_FINISHED,
-    MSG_REQUEST_BECOME_CHILD, MSG_ACCEPT_BECOME_CHILD, MSG_REJECT_BECOME_CHILD, 
+    MSG_OFFER_ADOPTION, MSG_ACCEPT_ADOPTION_OFFER, MSG_REJECT_ADOPTION_OFFER, 
     MSG_QUERY_VOLUME, MSG_UPDATE_VOLUME, 
     MSG_NOTIFY_JOB_REVISION, MSG_QUERY_JOB_REVISION_DETAILS, 
     MSG_SEND_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS,
-    MSG_ACK_ACCEPT_BECOME_CHILD, MSG_SEND_JOB_DESCRIPTION, 
+    MSG_CONFIRM_ADOPTION, MSG_SEND_JOB_DESCRIPTION, 
     MSG_QUERY_JOB_RESULT, MSG_SEND_JOB_RESULT, 
     MSG_SEND_JOB_REVISION_DATA,
     MSG_TERMINATE, MSG_INTERRUPT, MSG_ABORT, MSG_WORKER_DEFECTING, 
@@ -222,11 +222,11 @@ const int ALL_TAGS[] = {
  */
 const int ANYTIME_WORKER_RECV_TAGS[] = {MSG_FIND_NODE, MSG_WORKER_FOUND_RESULT, 
             MSG_FORWARD_CLIENT_RANK, MSG_ANYTIME_REDUCTION, MSG_ANYTIME_BROADCAST, 
-            MSG_REQUEST_BECOME_CHILD, MSG_ACCEPT_BECOME_CHILD, MSG_REJECT_BECOME_CHILD, 
+            MSG_OFFER_ADOPTION, MSG_ACCEPT_ADOPTION_OFFER, MSG_REJECT_ADOPTION_OFFER, 
             MSG_QUERY_VOLUME, MSG_UPDATE_VOLUME, 
             MSG_NOTIFY_JOB_REVISION, MSG_QUERY_JOB_REVISION_DETAILS, 
             MSG_SEND_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS,
-            MSG_ACK_ACCEPT_BECOME_CHILD, MSG_QUERY_JOB_RESULT, 
+            MSG_CONFIRM_ADOPTION, MSG_QUERY_JOB_RESULT, 
             MSG_TERMINATE, MSG_INTERRUPT, MSG_ABORT, MSG_WORKER_DEFECTING, 
             MSG_JOB_COMMUNICATION, MSG_WARMUP, MSG_EXIT};
 /**
@@ -234,7 +234,7 @@ const int ANYTIME_WORKER_RECV_TAGS[] = {MSG_FIND_NODE, MSG_WORKER_FOUND_RESULT,
  * by a "blanco" irecv method and within the maximum message length.
  */
 const int ANYTIME_CLIENT_RECV_TAGS[] = {MSG_JOB_DONE, MSG_CLIENT_FINISHED,
-            MSG_REQUEST_BECOME_CHILD, MSG_ACK_ACCEPT_BECOME_CHILD, 
+            MSG_OFFER_ADOPTION, MSG_CONFIRM_ADOPTION, 
             MSG_QUERY_JOB_REVISION_DETAILS, MSG_ACK_JOB_REVISION_DETAILS, MSG_ABORT, MSG_EXIT};
 
 /**
