@@ -177,7 +177,6 @@ void Worker::mainProgram() {
         // Solve loop for active HordeLib instance
         float jobTime = 0;
         if (currentJob != NULL && Timer::elapsedSeconds()-lastJobCheckTime >= jobCheckPeriod) {
-            Console::log(Console::VVVVERB, "jobloop");
             jobTime = Timer::elapsedSeconds();
             lastJobCheckTime = jobTime;
 
@@ -219,7 +218,6 @@ void Worker::mainProgram() {
             }
 
             jobTime = Timer::elapsedSeconds() - jobTime;
-            Console::log(Console::VVVVERB, "end_jobloop");
         }
 
         // Poll messages
