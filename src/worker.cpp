@@ -543,8 +543,8 @@ void Worker::handleAcceptAdoptionOffer(MessageHandlePtr& handle) {
         // Already has job description: Directly resume job (if not terminated yet)
         assert(hasJob(req.jobId));
         Job& job = getJob(req.jobId);
-        assert(job.hasJobDescription() || Console::fail("%s has no job description although no full transfer was requested!", 
-                job.toStr()));
+        assert(job.hasJobDescription() || job.isInitializing() || 
+            Console::fail("%s has no job description although no full transfer was requested!", job.toStr()));
         if (!job.isPast()) {
             Console::log_recv(Console::INFO, handle->source, "Start or resume %s (state: %s)", 
                         jobStr(req.jobId, req.requestedNodeIndex).c_str(), job.jobStateToStr());
