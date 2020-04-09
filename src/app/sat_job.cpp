@@ -45,7 +45,7 @@ bool SatJob::appl_initialize() {
     }
     params["fd"]; // filter duplicate clauses
     params["i"] = "0"; // #microseconds to sleep during solve loop
-    params["v"] = this->_params.getIntParam("v")-2; // (this->_params.getIntParam("v") >= 3 ? "1" : "0"); // verbosity
+    params["v"] = 99; // (this->_params.getIntParam("v") >= 3 ? "1" : "0"); // verbosity
     params["mpirank"] = std::to_string(getIndex()); // mpi_rank
     params["mpisize"] = std::to_string(_comm_size); // mpi_size
     std::string identifier = std::string(toStr());

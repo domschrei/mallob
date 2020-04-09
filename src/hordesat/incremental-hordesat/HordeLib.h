@@ -18,7 +18,7 @@
 #include "solvers/solver_thread.h"
 #include "solvers/solving_state.h"
 
-#include <pthread.h>
+#include <thread>
 #include <vector>
 #include <memory>
 #include <set>
@@ -37,7 +37,7 @@ class HordeLib {
 private:
 	int mpi_size;
 	int mpi_rank;
-	std::vector<Thread*> solverThreads;
+	std::vector<std::thread> solverThreads;
 	size_t sleepInt;
 	int solversCount;
 	SharingManagerInterface* sharingManager;
@@ -45,7 +45,6 @@ private:
 	volatile SolvingStates::SolvingState solvingState;
 	
 	vector<PortfolioSolverInterface*> solvers;
-	vector<bool> solverThreadsRunning;
 	vector<bool> solverThreadsInitialized;
 	vector<long> solverTids;
 
@@ -91,9 +90,6 @@ public:
 
     std::vector<int> prepareSharing(int maxSize);
     void digestSharing(const std::vector<int>& result);
-
-	void markRunning(int solverId);
-	void unmarkRunning(int solverId);
 
     int finishSolving();
     void interrupt();

@@ -100,6 +100,7 @@ void HordeLib::init() {
 	params.printParams();
 
 	solversCount = params.getIntParam("c", 1);
+	solverThreads.resize(solversCount);
 	//printf("solvers is %d", solversCount);
 
 	for (int i = 0; i < solversCount; i++) {
@@ -123,8 +124,6 @@ void HordeLib::init() {
 		solvers[i]->solverId = i + solversCount * mpi_rank;
 		
 		solverThreadsInitialized.push_back(false);
-		solverThreadsRunning.push_back(false);
-		solverThreads.push_back(NULL);
 		solverTids.push_back(-1);
 	}
 
@@ -149,16 +148,7 @@ void* solverRunningThread(void* arg) {
 	thread_args* targs = (thread_args*) arg;
     SolverThread thread(arg);
 	thread.run();
-	targs->hlib->unmarkRunning(targs->solverId);
 	return NULL; 
-}
-
-void HordeLib::markRunning(int solverId) {
-	solverThreadsRunning[solverId] = true;
-}
-
-void HordeLib::unmarkRunning(int solverId) {
-	solverThreadsRunning[solverId] = false;
 }
 
 void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
@@ -186,8 +176,7 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 		arg->hlib = this;
 		arg->solverId = i;
 		arg->readFormulaFromHlib = true;
-		markRunning(i);
-		solverThreads[i] = new Thread(solverRunningThread, arg);
+		solverThreads[i] = std::thread(solverRunningThread, arg);
         //hlog(1, "initialized solver %i.\n", i);
 	}
 
@@ -430,18 +419,13 @@ HordeLib::~HordeLib() {
 	solvingStateLock.unlock();
 	
 	// join threads
-	for (int i = 0; i < solverThreadsRunning.size(); i++) {
-		if (solverThreads[i] != NULL) {
-			if (solverThreadsRunning[i]) {
-				solverThreads[i]->join();
-			}
-			delete solverThreads[i];
-			solverThreads[i] = NULL;
+	for (int i = 0; i < solverThreads.size(); i++) {
+		if (solverThreads[i].joinable()) {
+			solverThreads[i].join();
 		}
 	}
 	hlog(3, "threads joined\n");
 	solversCount = 0;
-	hlog(3, "threads deleted\n");
 
 	// delete solvers
 	for (int i = 0; i < solvers.size(); i++) {
