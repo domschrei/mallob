@@ -64,10 +64,10 @@ bool SatJob::appl_initialize() {
         return false;
     }
 
-    if (_solver != NULL) {
+    if (solverNotNull()) {
         Console::log(Console::VVVERB, "%s : beginning to solve", toStr());
         JobDescription& desc = getDescription();
-        _solver->beginSolving(desc.getPayloads(), desc.getAssumptions(desc.getRevision()));
+        getSolver()->beginSolving(desc.getPayloads(), desc.getAssumptions(desc.getRevision()));
         Console::log(Console::VERB, "%s : finished horde initialization", toStr());
         _time_of_start_solving = Timer::elapsedSeconds();
     }
@@ -77,7 +77,7 @@ bool SatJob::appl_initialize() {
 
 void SatJob::appl_updateRole() {
     auto lock = _horde_manipulation_lock.getLock();
-    if (_solver != NULL) _solver->updateRole(getIndex(), _comm_size);
+    if (solverNotNull()) getSolver()->updateRole(getIndex(), _comm_size);
 }
 
 void SatJob::appl_updateDescription(int fromRevision) {
@@ -85,17 +85,17 @@ void SatJob::appl_updateDescription(int fromRevision) {
     JobDescription& desc = getDescription();
     std::vector<VecPtr> formulaAmendments = desc.getPayloads(fromRevision, desc.getRevision());
     _done_locally = false;
-    if (_solver != NULL) _solver->continueSolving(formulaAmendments, desc.getAssumptions(desc.getRevision()));
+    if (solverNotNull()) getSolver()->continueSolving(formulaAmendments, desc.getAssumptions(desc.getRevision()));
 }
 
 void SatJob::appl_pause() {
     auto lock = _horde_manipulation_lock.getLock();
-    if (_solver != NULL) _solver->setPaused();
+    if (solverNotNull()) getSolver()->setPaused();
 }
 
 void SatJob::appl_unpause() {
     auto lock = _horde_manipulation_lock.getLock();
-    if (_solver != NULL) _solver->unsetPaused();
+    if (solverNotNull()) getSolver()->unsetPaused();
 }
 
 void SatJob::appl_interrupt() {
@@ -104,7 +104,7 @@ void SatJob::appl_interrupt() {
 }
 
 void SatJob::appl_interrupt_unsafe() {
-    if (_solver != NULL) {
+    if (solverNotNull()) {
         _solver->interrupt(); // interrupt SAT solving (but keeps solver threads!)
         _solver->finishSolving(); // concludes solving process
     }
@@ -112,7 +112,7 @@ void SatJob::appl_interrupt_unsafe() {
 
 void SatJob::setSolverNull() {
     Console::log(Console::VVERB, "release solver");
-    if (_solver != NULL) {
+    if (solverNotNull()) {
         _solver.reset();
         _solver = NULL;
         Console::log(Console::VVERB, "solver released");
@@ -135,8 +135,8 @@ void SatJob::appl_withdraw() {
         delete (SatClauseCommunicator*)_clause_comm;
         _clause_comm = NULL;
     }
-    if (_solver != NULL && !_bg_thread.joinable()) {
-        _solver->abort();
+    if (solverNotNull() && !_bg_thread.joinable()) {
+        getSolver()->abort();
         // Do cleanup of HordeLib and its threads in a separate thread to avoid blocking
         _bg_thread = std::thread(&SatJob::setSolverNullThread, this);
     }
@@ -149,9 +149,9 @@ void SatJob::extractResult(int resultCode) {
     _result.revision = getDescription().getRevision();
     _result.solution.clear();
     if (resultCode == SAT) {
-        _result.solution = _solver->getTruthValues();
+        _result.solution = getSolver()->getTruthValues();
     } else if (resultCode == UNSAT) {
-        std::set<int>& assumptions = _solver->getFailedAssumptions();
+        std::set<int>& assumptions = getSolver()->getFailedAssumptions();
         std::copy(assumptions.begin(), assumptions.end(), std::back_inserter(_result.solution));
     }
 }
@@ -168,11 +168,11 @@ int SatJob::appl_solveLoop() {
     if (isInState({ACTIVE})) {
         // If result is found here, stops all solvers
         // but does not call finishSolving()
-        result = _solver->solveLoop();
+        result = getSolver()->solveLoop();
 
     } else if (isInitializing()) {
         // Still initializing?
-        if (_solver == NULL || !_solver->isFullyInitialized())
+        if (_solver == NULL || !getSolver()->isFullyInitialized())
             // Yes, some stuff still is not initialized
             return result;
         // Else: end initialization
@@ -181,7 +181,7 @@ int SatJob::appl_solveLoop() {
 
         // If initialized and active now, do solve loop
         if (isInState({ACTIVE})) {
-            result = _solver->solveLoop();
+            result = getSolver()->solveLoop();
         } else {
             return result;
         }
@@ -200,11 +200,11 @@ int SatJob::appl_solveLoop() {
 void SatJob::appl_dumpStats() {
     if (isInState({ACTIVE})) {
 
-        _solver->dumpStats();
+        getSolver()->dumpStats();
         if (_time_of_start_solving <= 0) return;
         float age = Timer::elapsedSeconds() - _time_of_start_solving;
 
-        const std::vector<long>& threadTids = _solver->getSolverTids();
+        const std::vector<long>& threadTids = getSolver()->getSolverTids();
         for (int i = 0; i < threadTids.size(); i++) {
             if (threadTids[i] < 0) continue;
             double cpuRatio;
@@ -249,7 +249,7 @@ SatJob::~SatJob() {
         _bg_thread.join(); // if already aborting
     }
 
-    if (_solver != NULL) {
+    if (solverNotNull()) {
         Console::log(Console::VVERB, "%s : destruct hordesat", toStr());
         appl_interrupt_unsafe();
         _solver->abort();

@@ -70,6 +70,14 @@ private:
 
     void setSolverNullThread();
     void setSolverNull();
+
+    std::unique_ptr<HordeLib>& getSolver() {
+        assert(_solver != NULL);
+        return _solver;
+    }
+    bool solverNotNull() {
+        return _solver != NULL;
+    }
 };
 
 
