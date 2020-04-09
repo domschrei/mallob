@@ -76,6 +76,7 @@ bool SatJob::appl_initialize() {
 }
 
 void SatJob::appl_updateRole() {
+    if (!solverNotNull()) return;
     auto lock = _horde_manipulation_lock.getLock();
     if (solverNotNull()) getSolver()->updateRole(getIndex(), _comm_size);
 }
@@ -89,16 +90,19 @@ void SatJob::appl_updateDescription(int fromRevision) {
 }
 
 void SatJob::appl_pause() {
+    if (!solverNotNull()) return;
     auto lock = _horde_manipulation_lock.getLock();
     if (solverNotNull()) getSolver()->setPaused();
 }
 
 void SatJob::appl_unpause() {
+    if (!solverNotNull()) return;
     auto lock = _horde_manipulation_lock.getLock();
     if (solverNotNull()) getSolver()->unsetPaused();
 }
 
 void SatJob::appl_interrupt() {
+    if (!solverNotNull()) return;
     auto lock = _horde_manipulation_lock.getLock();
     appl_interrupt_unsafe();
 }
