@@ -217,11 +217,15 @@ bool SatJob::appl_isDestructible() {
 }
 
 void SatJob::appl_beginCommunication() {
-    if (_clause_comm != NULL)
+    if (_clause_comm == NULL) return;
+    auto lock = _horde_manipulation_lock.getLock();
+    if (_clause_comm != NULL) 
         ((SatClauseCommunicator*) _clause_comm)->initiateCommunication();
 }
 
 void SatJob::appl_communicate(int source, JobMessage& msg) {
+    if (_clause_comm == NULL) return;
+    auto lock = _horde_manipulation_lock.getLock();
     if (_clause_comm != NULL)
         ((SatClauseCommunicator*) _clause_comm)->continueCommunication(source, msg);
 }
