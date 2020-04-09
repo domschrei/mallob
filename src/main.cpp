@@ -90,8 +90,6 @@ int main(int argc, char *argv[]) {
     int numClients = params.getIntParam("c");
     int numWorkers = numNodes - numClients;
     assert(numWorkers > 0 || Console::fail("Need at least one worker node!"));
-    assert(numWorkers % 2 == 0 || params.getParam("bm") != "ed" 
-                || Console::fail("Need an even number of worker nodes for event-driven balancing!"));
     for (int i = 1; i <= numClients; i++)
         externalClientRanks.insert(numNodes-i);
     bool isExternalClient = (externalClientRanks.find(rank) != externalClientRanks.end());
