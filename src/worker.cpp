@@ -26,10 +26,10 @@ void mpiMonitor(Worker* worker) {
         double callStart = 0;
         std::string opName = MyMpi::currentCall(&callStart);
         if (callStart < 0.00001 || opName == "") {
-            Console::log(Console::VVVERB, "MONITOR_MPI Not inside MPI call.");
+            //Console::log(Console::VVVERB, "MONITOR_MPI Not inside MPI call.");
         } else {
             double elapsed = Timer::elapsedSeconds() - callStart;
-            Console::log(Console::VERB, "MONITOR_MPI Inside \"%s\" for %.4fs", opName.c_str(), elapsed);
+            Console::log(Console::VERB, "MONITOR_MPI In \"%s\" for %.4fs", opName.c_str(), elapsed);
             if (elapsed > 60.0) {
                 // Inside some MPI call for a minute
                 Console::fail("MPI call takes too long - aborting");

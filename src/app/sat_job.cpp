@@ -124,6 +124,7 @@ void SatJob::setSolverNull() {
 }
 
 void SatJob::setSolverNullThread() {
+    Console::log(Console::VVERB, "cleanup thread start");
     auto lock = _horde_manipulation_lock.getLock();
     setSolverNull();
     Console::log(Console::VVERB, "cleanup thread done");
