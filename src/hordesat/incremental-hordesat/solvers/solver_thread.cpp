@@ -59,7 +59,11 @@ void* SolverThread::run() {
 void SolverThread::init() {
 
     hlib = _args->hlib;
-    hlib->solverTids[_args->solverId] = syscall(SYS_gettid);
+
+    long tid = syscall(SYS_gettid);
+    hlib->solverTids[_args->solverId] = tid;
+    hlib->hlog(3, "%s : tid %ld\n", toStr(), tid);
+    
     //hlib->hlog(1, "solverRunningThread, entering\n");
     //hlib->solvingStateLock.lock();
     int localId = _args->solverId;

@@ -317,7 +317,7 @@ std::vector<MessageHandlePtr> MyMpi::poll() {
     std::vector<bool> handlesDeferred;
 
     // Find ready handle of best priority
-    for (auto h : _handles) {
+    for (auto& h : _handles) {
         if (h->testReceived()) {
             foundHandles.push_back(h);
             handlesDeferred.push_back(false);
@@ -326,7 +326,7 @@ std::vector<MessageHandlePtr> MyMpi::poll() {
 
     // If necessary, pick a deferred handle (if there is one)
     if (foundHandles.empty()) {
-        for (auto h : _deferred_handles) {
+        for (auto& h : _deferred_handles) {
             if (h->testReceived()) {
                 foundHandles.push_back(h);
                 handlesDeferred.push_back(true);
