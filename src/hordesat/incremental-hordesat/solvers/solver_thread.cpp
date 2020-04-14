@@ -60,12 +60,6 @@ void SolverThread::init() {
 
     hlib = _args->hlib;
 
-    long tid = syscall(SYS_gettid);
-    hlib->solverTids[_args->solverId] = tid;
-    hlib->hlog(3, "%s : tid %ld\n", toStr(), tid);
-    
-    //hlib->hlog(1, "solverRunningThread, entering\n");
-    //hlib->solvingStateLock.lock();
     int localId = _args->solverId;
     solver = hlib->solvers[localId];
     if (hlib->params.isSet("pin")) {
@@ -73,6 +67,13 @@ void SolverThread::init() {
     }
     std::string globalName = "<h-" + hlib->params.getParam("jobstr") + "> " + std::string(toStr());
     solver->setName(globalName);
+    
+    long tid = syscall(SYS_gettid);
+    hlib->solverTids[_args->solverId] = tid;
+    hlib->hlog(3, "%s : tid %ld\n", toStr(), tid);
+    
+    //hlib->hlog(1, "solverRunningThread, entering\n");
+    //hlib->solvingStateLock.lock();
     //hlib->solvingStateLock.unlock();
     importedLits = 0;
     _diversification_seed = std::tuple<int, int, int>(0, 0, 0);
@@ -287,11 +288,12 @@ void SolverThread::reportResult(int res) {
 }
 
 SolverThread::~SolverThread() {
-    hlib->solverTids[_args->solverId] = -1;
-    delete _args;
+    if (hlib != NULL && _args != NULL)
+        hlib->solverTids[_args->solverId] = -1;
+    if (_args != NULL) delete _args;
 }
 
 const char* SolverThread::toStr() {
-    _name = "S" + std::to_string(solver->solverId);
+    _name = "S" + (solver == NULL ? std::string("?") : std::to_string(solver->solverId));
     return _name.c_str();
 }
