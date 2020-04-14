@@ -59,7 +59,7 @@ void* SolverThread::run() {
 void SolverThread::init() {
 
     hlib = _args->hlib;
-    hlib->solverTids[_args->solverId] = syscall(__NR_gettid);
+    hlib->solverTids[_args->solverId] = syscall(SYS_gettid);
     //hlib->hlog(1, "solverRunningThread, entering\n");
     //hlib->solvingStateLock.lock();
     int localId = _args->solverId;
@@ -283,8 +283,8 @@ void SolverThread::reportResult(int res) {
 }
 
 SolverThread::~SolverThread() {
+    hlib->solverTids[_args->solverId] = -1;
     delete _args;
-    //hlib->solverTids[_args->solverId] = -1;
 }
 
 const char* SolverThread::toStr() {

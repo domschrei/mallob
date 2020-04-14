@@ -161,6 +161,7 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 	if (assumptions != NULL) {
 		this->assumptions = assumptions;
 	}
+	assert(this->assumptions != NULL);
 
 	finalResult = UNKNOWN;
 

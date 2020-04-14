@@ -99,8 +99,12 @@ public:
 	void abort();
 
 	void dumpStats();
-	const std::vector<long>& getSolverTids() {
-		return solverTids;
+	std::vector<long> getSolverTids() {
+		std::vector<long> tids;
+		for (int i = 0; i < solverThreadsInitialized.size(); i++) {
+			if (solverThreadsInitialized[i]) tids.push_back(solverTids[i]);
+		}
+		return tids;
 	}
 
 	int value(int lit);
