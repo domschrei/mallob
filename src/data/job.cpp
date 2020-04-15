@@ -80,10 +80,10 @@ void Job::endInitialization() {
         _last_job_comm_remainder = (int)(Timer::elapsedSeconds() / _job_comm_period);
     _time_of_initialization = Timer::elapsedSeconds();
     if (oldState == INITIALIZING_TO_PAST) {
-        lock.release();
+        lock.unlock();
         terminate();
     } else if (oldState == INITIALIZING_TO_SUSPENDED) {
-        lock.release();
+        lock.unlock();
         suspend();
     } else if (oldState == INITIALIZING_TO_COMMITTED) {
         switchState(COMMITTED);
@@ -219,7 +219,7 @@ void Job::resume() {
         return;
     }
     if (!_initialized) {
-        lock.release();
+        lock.unlock();
         initialize(_index, getRootNodeRank(), getParentNodeRank());
     } else {
         appl_unpause();
