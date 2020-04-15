@@ -216,14 +216,6 @@ void Worker::mainProgram() {
                 }
             }
 
-            // Little loop to get initializing non-active jobs out of initialization
-            for (auto& it : jobs) {
-                int id = it.first;
-                Job& job = *it.second;
-                if (job.isInitializing() && job.isDoneInitializing())
-                    job.endInitialization();
-            }
-
             jobTime = Timer::elapsedSeconds() - jobTime;
         }
 
@@ -1202,7 +1194,11 @@ void Worker::forgetOldJobs() {
         int id = idJobPair.first;
         Job& job = *idJobPair.second;
         // Job must be finished initializing
-        if (job.isInitializing()) continue;
+        if (job.isInitializing()) {
+            // Check end of initialization for inactive jobs
+            if (!job.isActive() && job.isDoneInitializing()) job.endInitialization();
+            continue;
+        }
         if (jobCacheSize > 0 && job.isSuspended()) {
             // Job must not be rooted here
             if (job.isRoot()) continue;
