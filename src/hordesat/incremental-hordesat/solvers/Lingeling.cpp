@@ -185,6 +185,10 @@ void Lingeling::setSolverInterrupt() {
 }
 void Lingeling::unsetSolverInterrupt() {
 	stopSolver = 0;
+	lglsetopt(solver, "clim", -1);
+	lglsetopt(solver, "dlim", -1);
+	lglsetopt(solver, "memlim", -1);
+	lglsetopt(solver, "plim", -1);
 }
 void Lingeling::setSolverSuspend() {
     suspendSolver = true;

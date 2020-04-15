@@ -216,6 +216,14 @@ void Worker::mainProgram() {
                 }
             }
 
+            // Little loop to get initializing non-active jobs out of initialization
+            for (auto& it : jobs) {
+                int id = it.first;
+                Job& job = *it.second;
+                if (job.isInitializing() && job.isDoneInitializing())
+                    job.endInitialization();
+            }
+
             jobTime = Timer::elapsedSeconds() - jobTime;
         }
 
