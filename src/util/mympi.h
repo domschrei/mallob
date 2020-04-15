@@ -32,25 +32,25 @@ struct MessageHandle {
         status.MPI_TAG = -1; 
         sendData = std::make_shared<std::vector<uint8_t>>();
         recvData = std::make_shared<std::vector<uint8_t>>();
-        Console::log(Console::VVVVERB, "Msg ID=%i created", id);
+        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
     }
     MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& data) : id(id), sendData(data) {
         status.MPI_SOURCE = -1; 
         status.MPI_TAG = -1; 
         recvData = std::make_shared<std::vector<uint8_t>>();
-        Console::log(Console::VVVVERB, "Msg ID=%i created", id);
+        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
     }
     MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& sendData, const std::shared_ptr<std::vector<uint8_t>>& recvData) : 
         id(id), sendData(sendData), recvData(recvData) {
         status.MPI_SOURCE = -1; 
         status.MPI_TAG = -1; 
-        Console::log(Console::VVVVERB, "Msg ID=%i created", id);
+        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
     }
 
     ~MessageHandle() {
         sendData = NULL;
         recvData = NULL;
-        Console::log(Console::VVVVERB, "Msg ID=%i deleted", id);
+        //Console::log(Console::VVVVERB, "Msg ID=%i deleted", id);
     }
 
     bool testSent();

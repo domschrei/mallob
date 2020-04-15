@@ -243,8 +243,10 @@ void SolverThread::runOnce() {
         if (cancelRun()) break;
 
         //hlib->hlog(0, "rank %d starting solver with %d new lits, %d assumptions: %d\n", hlib->mpi_rank, litsAdded, hlib->assumptions.size(), hlib->assumptions[0]);
+        hlib->hlog(3, "%s BEGSOL\n", toStr());
         SatResult res = solver->solve(*hlib->assumptions);
-        
+        hlib->hlog(3, "%s ENDSOL\n", toStr());
+
         // If interrupted externally
         if (cancelRun()) break;
         
@@ -275,6 +277,7 @@ bool SolverThread::cancelThread() {
 }
 
 void SolverThread::reportResult(int res) {
+    hlib->hlog(3,"%s found result\n", toStr());
     if (res == SAT || res == UNSAT) {
         auto lock = hlib->solvingStateLock.getLock();
         if (hlib->solvingState == ACTIVE) {
