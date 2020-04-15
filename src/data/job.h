@@ -339,8 +339,8 @@ public:
 
     // ... of various meta data
 
-    void setForgetting();
     void setResultTransferPending(bool pending) {_result_transfer_pending = pending;}
+    void setForgetting();
 
 
     // toString methods

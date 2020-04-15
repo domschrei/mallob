@@ -177,6 +177,11 @@ void Lingeling::setPhase(const int var, const bool phase) {
 // Interrupt the SAT solving, so it can be started again with new assumptions
 void Lingeling::setSolverInterrupt() {
 	stopSolver = 1;
+	// Set all the computational limits of LGL to zero to make it terminate faster
+	lglsetopt(solver, "clim", 0);
+	lglsetopt(solver, "dlim", 0);
+	lglsetopt(solver, "memlim", 0);
+	lglsetopt(solver, "plim", 0);
 }
 void Lingeling::unsetSolverInterrupt() {
 	stopSolver = 0;

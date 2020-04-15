@@ -75,6 +75,7 @@ void Job::endInitialization() {
     _initialized = true;
     JobState oldState = _state;
     switchState(ACTIVE);
+    Console::log(Console::INFO, "%s : initialization done", toStr());
     if (_job_comm_period > 0)
         _last_job_comm_remainder = (int)(Timer::elapsedSeconds() / _job_comm_period);
     _time_of_initialization = Timer::elapsedSeconds();
