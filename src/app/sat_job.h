@@ -41,6 +41,7 @@ public:
     ~SatJob() override;
 
     bool appl_initialize() override;
+    bool appl_doneInitializing() override;
     void appl_updateRole() override;
     void appl_updateDescription(int fromRevision) override;
     void appl_pause() override;

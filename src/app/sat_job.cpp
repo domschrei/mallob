@@ -75,6 +75,10 @@ bool SatJob::appl_initialize() {
     return !_abort_after_initialization;
 }
 
+bool SatJob::appl_doneInitializing() {
+    return _solver != NULL && getSolver()->isFullyInitialized();
+}
+
 void SatJob::appl_updateRole() {
     if (!solverNotNull()) return;
     auto lock = _horde_manipulation_lock.getLock();
@@ -170,27 +174,8 @@ int SatJob::appl_solveLoop() {
         return result;
     }
 
-    if (isInState({ACTIVE})) {
-        // If result is found here, stops all solvers
-        // but does not call finishSolving()
-        result = getSolver()->solveLoop();
-
-    } else if (isInitializing()) {
-        // Still initializing?
-        if (_solver == NULL || !getSolver()->isFullyInitialized())
-            // Yes, some stuff still is not initialized
-            return result;
-        // Else: end initialization
-        Console::log(Console::VERB, "%s : threads initialized", toStr());
-        endInitialization();
-
-        // If initialized and active now, do solve loop
-        if (isInState({ACTIVE})) {
-            result = getSolver()->solveLoop();
-        } else {
-            return result;
-        }
-    }
+    if (isInState({ACTIVE})) result = getSolver()->solveLoop();
+    else return result;
 
     // Did a solver find a result?
     if (result >= 0) {

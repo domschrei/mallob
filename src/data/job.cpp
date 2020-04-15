@@ -107,7 +107,11 @@ void Job::initialize(int index, int rootRank, int parentRank) {
     initialize();
 }
 
-void Job::reinitialize(int index, int rootRank, int parentRank) {
+bool Job::isDoneInitializing() {
+    return isInitializing() && appl_doneInitializing();
+}
+
+void Job::reactivate(int index, int rootRank, int parentRank) {
 
     if (!_initialized && !isInitializing()) {
         
@@ -319,7 +323,7 @@ double Job::getTemperature() const {
     }
 }
 
-const JobResult& Job::getResult() const {
+const JobResult& Job::getResult() const { 
     assert(_result.id >= 0); 
     return _result;
 }

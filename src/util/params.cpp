@@ -60,7 +60,7 @@ void Parameters::setDefaults() {
     //setParam("yield"); // yield manager thread when no new messages
 }
 
-void Parameters::printUsage() {
+void Parameters::printUsage() const {
 
     Console::log(Console::INFO, "Usage: mallob [options] <scenario>");
     Console::log(Console::INFO, "<scenario> : File path and name prefix for client scenario(s);");
@@ -107,17 +107,17 @@ void Parameters::printUsage() {
     Console::log(Console::INFO, "-yield                Yield manager thread whenever there are no new messages");
 }
 
-string Parameters::getFilename() {
+string Parameters::getFilename() const {
   return _filename;
 }
 
-void Parameters::printParams() {
+void Parameters::printParams() const {
     std::string out = "";
-    for (map<string,string>::iterator it = _params.begin(); it != _params.end(); it++) {
-        if (it->second.empty()) {
-            out += it->first + ", ";
+    for (const auto& it : _params) {
+        if (it.second.empty()) {
+            out += it.first + ", ";
         } else {
-            out += it->first + "=" + it->second + ", ";
+            out += it.first + "=" + it.second + ", ";
         }
     }
     out = out.substr(0, out.size()-2);
@@ -132,44 +132,44 @@ void Parameters::setParam(const char* name, const char* value) {
     _params[name] = value;
 }
 
-bool Parameters::isSet(const string& name) {
+bool Parameters::isSet(const string& name) const {
     return _params.find(name) != _params.end();
 }
 
-string Parameters::getParam(const string& name, const string& defaultValue) {
+string Parameters::getParam(const string& name, const string& defaultValue) const {
     if (isSet(name)) {
-        return _params[name];
+        return _params.at(name);
     } else {
         return defaultValue;
     }
 }
 
-string Parameters::getParam(const string& name) {
+string Parameters::getParam(const string& name) const {
     return getParam(name, "ndef");
 }
 
-int Parameters::getIntParam(const string& name, int defaultValue) {
+int Parameters::getIntParam(const string& name, int defaultValue) const {
     if (isSet(name)) {
-        return atoi(_params[name].c_str());
+        return atoi(_params.at(name).c_str());
     } else {
         return defaultValue;
     }
 }
 
-int Parameters::getIntParam(const string& name) {
+int Parameters::getIntParam(const string& name) const {
     assert(isSet(name));
-    return atoi(_params[name].c_str());
+    return atoi(_params.at(name).c_str());
 }
 
-float Parameters::getFloatParam(const string& name, float defaultValue) {
+float Parameters::getFloatParam(const string& name, float defaultValue) const {
     if (isSet(name)) {
-        return atof(_params[name].c_str());
+        return atof(_params.at(name).c_str());
     } else {
         return defaultValue;
     }
 }
 
-float Parameters::getFloatParam(const string& name) {
+float Parameters::getFloatParam(const string& name) const {
     assert(isSet(name));
-    return atof(_params[name].c_str());
+    return atof(_params.at(name).c_str());
 }

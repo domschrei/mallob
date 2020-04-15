@@ -26,19 +26,21 @@ private:
 public:
 	Parameters() = default;
 	void init(int argc, char** argv);
-	void printUsage();
+	void printUsage() const;
 	void setDefaults();
-	string getFilename();
-	void printParams();
+	string getFilename() const;
+	void printParams() const;
+	
 	void setParam(const char* name);
 	void setParam(const char* name, const char* value);
-	bool isSet(const string& name);
-	string getParam(const string& name, const string& defaultValue);
-	string getParam(const string& name);
-	int getIntParam(const string& name, int defaultValue);
-	float getFloatParam(const string& name, float defaultValue);
-	int getIntParam(const string& name);
-	float getFloatParam(const string& name);
+
+	bool isSet(const string& name) const;
+	string getParam(const string& name, const string& defaultValue) const;
+	string getParam(const string& name) const;
+	int getIntParam(const string& name, int defaultValue) const;
+	float getFloatParam(const string& name, float defaultValue) const;
+	int getIntParam(const string& name) const;
+	float getFloatParam(const string& name) const;
 };
 
 #endif /* PARAMETERPROCESSOR_H_ */

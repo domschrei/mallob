@@ -187,12 +187,21 @@ void Worker::mainProgram() {
             if (job.isRoot()) abort = checkComputationLimits(id);
             if (abort) {
                 timeoutJob(id);
-
             } else {
 
-                bool initializing = job.isInitializing();
-                int result = job.appl_solveLoop();
+                if (job.isDoneInitializing()) {
+                    job.endInitialization();
+                    if (job.isRoot()) {
+                        // Root worker finished initialization: begin growing if applicable
+                        if (balancer->hasVolume(id)) updateVolume(id, balancer->getVolume(id));
+                    } else {
+                        // Non-root worker finished initialization
+                        IntVec payload({job.getId()});
+                        MyMpi::isend(MPI_COMM_WORLD, job.getParentNodeRank(), MSG_QUERY_VOLUME, payload);
+                    }
+                }
 
+                int result = job.appl_solveLoop();
                 if (result >= 0) {
                     // Solver done!
                     int jobRootRank = job.getRootNodeRank();
@@ -204,16 +213,6 @@ void Worker::mainProgram() {
                     MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_WORKER_FOUND_RESULT, payload);
                     job.setResultTransferPending(true);
                     //stats.increment("sentMessages");
-
-                } else if (params.getParam("bm") == "ed" && initializing && !job.isInitializing()) {
-                    if (job.isRoot()) {
-                        // Root worker finished initialization: begin growing if applicable
-                        if (balancer->hasVolume(id)) updateVolume(id, balancer->getVolume(id));
-                    } else {
-                        // Non-root worker finished initialization
-                        IntVec payload({job.getId()});
-                        MyMpi::isend(MPI_COMM_WORLD, job.getParentNodeRank(), MSG_QUERY_VOLUME, payload);
-                    }
                 }
             }
 
@@ -548,10 +547,10 @@ void Worker::handleAcceptAdoptionOffer(MessageHandlePtr& handle) {
         if (!job.hasJobDescription() && !job.isInitializing()) {
             Console::log(Console::WARN, "[WARN] %s has no desc. although full transfer was not requested", job.toStr());
         } else if (!job.isPast()) {
-            Console::log_recv(Console::INFO, handle->source, "Start or resume %s (state: %s)", 
+            Console::log_recv(Console::INFO, handle->source, "Reactivate %s (state: %s)", 
                         jobStr(req.jobId, req.requestedNodeIndex).c_str(), job.jobStateToStr());
             setLoad(1, req.jobId);
-            job.reinitialize(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
+            job.reactivate(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
         }
         // Erase job commitment
         jobCommitments.erase(sig.jobId);
