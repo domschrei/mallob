@@ -137,6 +137,7 @@ void Worker::mainProgram() {
             vm_usage *= 0.001 * 0.001;
             resident_set *= 0.001 * 0.001;
             Console::log(Console::VERB, "mem cpu=%i vm=%.4fGB rss=%.4fGB", cpu, vm_usage, resident_set);
+            myState[2] = resident_set;
 
             // For this "management" thread
             double perc_cpu;
@@ -1116,8 +1117,9 @@ void Worker::allreduceSystemState() {
         myState[0] = isIdle() ? 0.0f : 1.0f;
         myState[1] = currentJob != NULL && currentJob->isRoot() ? 1.0f : 0.0f;
         systemState[0] = 0.0f;
-        systemState[1] = 1.0f;
-        systemStateReq = MyMpi::iallreduce(comm, myState, systemState, 2);
+        systemState[1] = 0.0f;
+        systemState[2] = 0.0f;
+        systemStateReq = MyMpi::iallreduce(comm, myState, systemState, 3);
         reducingSystemState = true;
     } else if (reducingSystemState) {
         MPI_Status status;
@@ -1125,7 +1127,7 @@ void Worker::allreduceSystemState() {
         if (done) {
             reducingSystemState = false;
             int verb = (worldRank == 0 ? Console::INFO : Console::VVVVERB);
-            Console::log(verb, "sysstate busy=%.2f%% jobs=%i", 100*systemState[0]/MyMpi::size(comm), (int)systemState[1]);
+            Console::log(verb, "sysstate busy=%.2f%% jobs=%i accmem=%.2fGB", 100*systemState[0]/MyMpi::size(comm), (int)systemState[1], systemState[2]);
         } else if (lastSystemStateReduce > 0 && timeSinceLast > 10) {
             Console::log(Console::CRIT, "Unresponsive node(s) since 10 seconds! Aborting");
             abort();
