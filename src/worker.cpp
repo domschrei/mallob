@@ -626,13 +626,14 @@ void Worker::handleConfirmAdoption(MessageHandlePtr& handle) {
     } else assert(req.requestedNodeIndex == 0);
 
     // Send current volume / initial demand update
+    /*
     if (job.isActive()) {
         int volume = balancer->getVolume(req.jobId);
         assert(volume >= 1);
         Console::log_send(Console::VERB, handle->source, "Propagate v=%i to new child", volume);
         MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_UPDATE_VOLUME, IntPair(req.jobId, volume));
         //stats.increment("sentMessages");
-    }
+    }*/
 }
 
 void Worker::handleSendJob(MessageHandlePtr& handle) {
