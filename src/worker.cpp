@@ -129,7 +129,6 @@ void Worker::mainProgram() {
     while (!checkTerminate()) {
 
         if (Timer::elapsedSeconds() - lastMemCheckTime > memCheckPeriod) {
-
             // Print stats
 
             // For the this process
@@ -220,6 +219,9 @@ void Worker::mainProgram() {
 
             jobTime = Timer::elapsedSeconds() - jobTime;
         }
+
+        // Advance an all-reduction of the current system state
+        allreduceSystemState();
 
         // Poll messages
         float pollTime = Timer::elapsedSeconds();
@@ -1101,6 +1103,31 @@ void Worker::finishBalancing() {
     }
 }
 
+void Worker::allreduceSystemState() {
+
+    float timeSinceLast = Timer::elapsedSeconds()-lastSystemStateReduce;
+    if (!reducingSystemState && timeSinceLast >= 1.0) {
+        reducingSystemState = true;
+        lastSystemStateReduce = Timer::elapsedSeconds();
+        float myState[2] = {
+            isIdle() ? 0 : 1,
+            currentJob != NULL && currentJob->isRoot() ? 1 : 0
+        };
+        systemStateReq = MyMpi::iallreduce(comm, myState, systemState, 3);
+    } else if (reducingSystemState) {
+        MPI_Status status;
+        bool done = MyMpi::test(systemStateReq, status);
+        if (done) {
+            reducingSystemState = false;
+            int verb = (worldRank == 0 ? Console::INFO : Console::VVVVERB);
+            Console::log(verb, "sysstate busy=%.2f%% jobs=%i", systemState[0]/MyMpi::size(comm), (int)systemState[1]);
+        } else if (timeSinceLast > 10) {
+            Console::log(Console::CRIT, "Unresponsive node(s) since 10 seconds! Aborting");
+            abort();
+        }
+    }
+}
+
 void Worker::timeoutJob(int jobId) {
     // "Virtual self message" aborting the job
     IntVec payload({jobId, getJob(jobId).getRevision()});
@@ -1162,10 +1189,12 @@ void Worker::updateVolume(int jobId, int volume) {
     if (!hasJob(jobId)) return;
     Job &job = getJob(jobId);
 
+    Console::log(Console::VVVVERB, "Active?");
     if (!job.isActive()) {
         // Job is not active right now
         return;
     }
+    Console::log(Console::VVVVERB, "-- yes");
 
     // Root node update message
     int thisIndex = job.getIndex();
@@ -1177,6 +1206,7 @@ void Worker::updateVolume(int jobId, int volume) {
     // Prepare volume update to propagate down the job tree
     IntPair payload(jobId, volume);
 
+    Console::log(Console::VVVVERB, "Get dormant children");
     std::set<int> dormantChildren = job.getDormantChildren();
 
     // For each potential child (left, right):
@@ -1184,6 +1214,7 @@ void Worker::updateVolume(int jobId, int volume) {
     int ranks[2] = {job.getLeftChildNodeRank(), job.getRightChildNodeRank()};
     int indices[2] = {job.getLeftChildIndex(), job.getRightChildIndex()};
     for (int i = 0; i < 2; i++) {
+        Console::log(Console::VVVVERB, "Child %i", i);
         int nextIndex = indices[i];
         if (has[i]) {
             // Propagate volume update
@@ -1225,6 +1256,43 @@ void Worker::updateVolume(int jobId, int volume) {
 
 bool Worker::isTimeForRebalancing() {
     return epochCounter.getSecondsSinceLastSync() >= balancePeriod;
+}
+
+bool Worker::isRequestObsolete(const JobRequest& req) {
+
+    // Requests for a job root never become obsolete
+    if (req.requestedNodeIndex == 0) return false;
+
+    return Timer::elapsedSeconds() - req.timeOfBirth >= 0.25 + 2 * params.getFloatParam("p"); 
+}
+
+bool Worker::isAdoptionOfferObsolete(const JobRequest& req) {
+
+    // Requests for a job root never become obsolete
+    if (req.requestedNodeIndex == 0) return false;
+
+    // Job not known anymore: obsolete
+    if (!hasJob(req.jobId)) return true;
+
+    Job& job = getJob(req.jobId);
+    if (!job.isActive()) {
+        // Job is not active
+        Console::log(Console::VERB, "Req. %s : not active", job.toStr());
+        Console::log(Console::VERB, "Actual job state: %s", job.jobStateToStr());
+        return true;
+    
+    } else if (req.requestedNodeIndex == job.getLeftChildIndex() && job.hasLeftChild()) {
+        // Job already has a left child
+        Console::log(Console::VERB, "Req. %s : already has left child", job.toStr());
+        return true;
+
+    } else if (req.requestedNodeIndex == job.getRightChildIndex() && job.hasRightChild()) {
+        // Job already has a right child
+        Console::log(Console::VERB, "Req. %s : already has right child", job.toStr());
+        return true;
+    }
+
+    return false;
 }
 
 struct SuspendedJobComparator {

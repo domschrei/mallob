@@ -48,6 +48,11 @@ private:
     EpochCounter epochCounter;
     Statistics stats;
 
+    float systemState[2];
+    MPI_Request systemStateReq;
+    bool reducingSystemState = false;
+    float lastSystemStateReduce = 0;
+
     std::map<int, std::thread> initializerThreads;
 
     std::vector<int> bounceAlternatives;
@@ -122,17 +127,17 @@ private:
     
     void rebalance();
     void finishBalancing();
+    void allreduceSystemState();
+
     bool checkComputationLimits(int jobId);
-
-    float reduce(float contribution, int rootRank);
-    float allReduce(float contribution);
-
     int getLoad() const {return load;};
     void setLoad(int load, int whichJobId);
     bool isIdle() const {return load == 0;};
     bool hasJobCommitments() const {return jobCommitments.size() > 0;};
     int getRandomWorkerNode();
     bool isTimeForRebalancing();
+    bool isRequestObsolete(const JobRequest& req);
+    bool isAdoptionOfferObsolete(const JobRequest& req);
 
     bool hasJob(int id) const {
         return jobs.count(id) > 0;
@@ -151,43 +156,6 @@ private:
             return MyMpi::size(comm) / 2;
         }
         return MyMpi::size(comm) * 2;
-    }
-
-    bool isRequestObsolete(const JobRequest& req) {
-
-        // Requests for a job root never become obsolete
-        if (req.requestedNodeIndex == 0) return false;
-
-        return Timer::elapsedSeconds() - req.timeOfBirth >= 0.25 + 2 * params.getFloatParam("p"); 
-    }
-
-    bool isAdoptionOfferObsolete(const JobRequest& req) {
-
-        // Requests for a job root never become obsolete
-        if (req.requestedNodeIndex == 0) return false;
-
-        // Job not known anymore: obsolete
-        if (!hasJob(req.jobId)) return true;
-
-        Job& job = getJob(req.jobId);
-        if (!job.isActive()) {
-            // Job is not active
-            Console::log(Console::VERB, "Req. %s : not active", job.toStr());
-            Console::log(Console::VERB, "Actual job state: %s", job.jobStateToStr());
-            return true;
-        
-        } else if (req.requestedNodeIndex == job.getLeftChildIndex() && job.hasLeftChild()) {
-            // Job already has a left child
-            Console::log(Console::VERB, "Req. %s : already has left child", job.toStr());
-            return true;
-
-        } else if (req.requestedNodeIndex == job.getRightChildIndex() && job.hasRightChild()) {
-            // Job already has a right child
-            Console::log(Console::VERB, "Req. %s : already has right child", job.toStr());
-            return true;
-        }
-
-        return false;
     }
 };
 
