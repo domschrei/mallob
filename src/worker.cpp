@@ -1212,8 +1212,11 @@ void Worker::updateVolume(int jobId, int volume) {
     // For each potential child (left, right):
     Console::log(Console::VVVVERB, "Collect children data");
     bool has[2] = {job.hasLeftChild(), job.hasRightChild()};
+    Console::log(Console::VVVVERB, "%i %i", has[0], has[1]);
     int indices[2] = {job.getLeftChildIndex(), job.getRightChildIndex()};
+    Console::log(Console::VVVVERB, "%i %i", indices[0], indices[1]);
     int ranks[2] = {job.getLeftChildNodeRank(), job.getRightChildNodeRank()};
+    Console::log(Console::VVVVERB, "%i %i", ranks[0], ranks[1]);
     Console::log(Console::VVVVERB, "loop di loop");
     for (int i = 0; i < 2; i++) {
         Console::log(Console::VVVVERB, "Child %i", i);
