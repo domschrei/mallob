@@ -23,7 +23,7 @@ const int RESULT_UNSAT = 20;
 class SatJob : public Job {
 
 private:
-    bool _abort_after_initialization = false;
+    volatile bool _abort_after_initialization = false;
 
     std::unique_ptr<HordeLib> _solver;
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
@@ -76,7 +76,7 @@ private:
     void setSolverNullThread();
     void setSolverNull();
 
-    bool solverNotNull() {
+    volatile bool solverNotNull() {
         return _solver != NULL;
     }
 };

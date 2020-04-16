@@ -118,20 +118,20 @@ void SatJob::appl_interrupt_unsafe() {
     }
 }
 
+void SatJob::setSolverNullThread() {
+    Console::log(Console::VVERB, "%s : cleanup thread start", toStr());
+    auto lock = _horde_manipulation_lock.getLock();
+    setSolverNull();
+    Console::log(Console::VVERB, "%s : cleanup thread done", toStr());
+}
+
 void SatJob::setSolverNull() {
-    Console::log(Console::VVERB, "release solver");
+    Console::log(Console::VVERB, "%s : release solver", toStr());
     if (solverNotNull()) {
         _solver.reset();
         _solver = NULL;
-        Console::log(Console::VVERB, "solver released");
+        Console::log(Console::VVERB, "%s : solver released", toStr());
     }
-}
-
-void SatJob::setSolverNullThread() {
-    Console::log(Console::VVERB, "cleanup thread start");
-    auto lock = _horde_manipulation_lock.getLock();
-    setSolverNull();
-    Console::log(Console::VVERB, "cleanup thread done");
 }
 
 void SatJob::appl_withdraw() {
@@ -205,7 +205,10 @@ void SatJob::appl_dumpStats() {
 }
 
 bool SatJob::appl_isDestructible() {
-    return _solver == NULL;
+    if (_solver != NULL) return false;
+    bool canLock = _horde_manipulation_lock.tryLock();
+    if (canLock) _horde_manipulation_lock.unlock();
+    return canLock;
 }
 
 void SatJob::appl_beginCommunication() {
