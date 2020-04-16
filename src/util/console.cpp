@@ -207,3 +207,11 @@ bool Console::fail(const char* str, ...) {
     va_end(vl);
     return false;
 }
+
+std::string Console::floatToStr(double num, int precision) {
+    std::ostringstream oss;
+    oss << std::fixed;
+    oss << std::setprecision(precision);
+    oss << num;
+    return oss.str();
+}

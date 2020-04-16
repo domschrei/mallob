@@ -59,6 +59,8 @@ public:
         if (threadsafeOutput)
             logMutex.unlock();
     };
+
+    static std::string floatToStr(double num, int precision);
 };
 
 #endif

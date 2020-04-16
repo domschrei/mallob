@@ -290,6 +290,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
     int verb = rank == 0 ? Console::VVERB : Console::VVVVERB;  
 
     // 1. Calculate aggregated demand of all jobs
+    std::string assignMsg = "";
     float aggregatedDemand = 0;
     int numJobs = 0;
     for (const auto& entry : _states.getEntries()) {
@@ -300,8 +301,9 @@ void EventDrivenBalancer::calculateBalancingResult() {
         if (ev.demand == 0) continue;
         numJobs++;
         aggregatedDemand += (ev.demand-1) * ev.priority;
-        Console::log(verb, "BLC e=%i #%i demand=%i", _balancing_epoch, ev.jobId, ev.demand);
+        assignMsg += "#" + std::to_string(ev.jobId) + "=" + Console::floatToStr(ev.demand, 2) + " ";
     }
+    Console::log(verb, "BLC e=%i demand={%s}", _balancing_epoch, assignMsg.c_str());
     float totalAvailVolume = MyMpi::size(_comm) * _load_factor - numJobs;
 
     // 2. Calculate initial assignments and remaining demanded resources
@@ -322,10 +324,9 @@ void EventDrivenBalancer::calculateBalancingResult() {
         demandedResources[ev.priority] += ev.demand - assignments[ev.jobId];
         
     }
-    std::string assignMsg = " ";
+    assignMsg = " ";
     for (const auto& e : assignments) {
-        assignMsg += std::string("#") + std::to_string(e.first) + std::string("=") 
-                    + std::to_string(0.01*(int)(100*e.second)) + std::string(" ");
+        assignMsg += "#" + std::to_string(e.first) + "=" + Console::floatToStr(e.second, 2) + " ";
     }
     Console::log(verb, "BLC e=%i init_assign={%s}", _balancing_epoch, assignMsg.c_str());
 
@@ -373,8 +374,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
     }
     assignMsg = " ";
     for (const auto& e : assignments) {
-        assignMsg += std::string("#") + std::to_string(e.first) + std::string("=") 
-            + std::to_string(0.01*(int)(100*e.second)) + std::string(" ");
+        assignMsg += "#" + std::to_string(e.first) + "=" + Console::floatToStr(e.second, 2) + " ";
     }
     Console::log(verb, "BLC e=%i adj_assign={%s}", _balancing_epoch, assignMsg.c_str());
 
