@@ -44,7 +44,7 @@ void Parameters::setDefaults() {
     setParam("log", "."); // logging directory
     setParam("lbc", "0"); // leaky bucket client parameter (0 = no leaky bucket, jobs enter by time) 
     setParam("md", "0"); // maximum demand per job (0 = no limit)
-    setParam("mmpi"); // monitor MPI
+    //setParam("mmpi"); // monitor MPI
     //setParam("nophase"); // Do not do phase-based diversification (native only)
     setParam("p", "5.0"); // rebalance period (seconds)
     //setParam("q"); // no logging to stdout
