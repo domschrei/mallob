@@ -134,6 +134,8 @@ AdjustablePermutation::AdjustablePermutation(int n, int seed) {
 
 int AdjustablePermutation::get(int x) const {
 
+    assert(x >= 0 && x < _n);
+
     if (_adjusted_values.count(x)) {
         return _adjusted_values.at(x);
     }

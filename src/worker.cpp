@@ -1189,12 +1189,10 @@ void Worker::updateVolume(int jobId, int volume) {
     if (!hasJob(jobId)) return;
     Job &job = getJob(jobId);
 
-    Console::log(Console::VVVVERB, "Active?");
     if (!job.isActive()) {
         // Job is not active right now
         return;
     }
-    Console::log(Console::VVVVERB, "-- yes");
 
     // Root node update message
     int thisIndex = job.getIndex();
@@ -1206,22 +1204,16 @@ void Worker::updateVolume(int jobId, int volume) {
     // Prepare volume update to propagate down the job tree
     IntPair payload(jobId, volume);
 
-    Console::log(Console::VVVVERB, "Get dormant children");
     std::set<int> dormantChildren = job.getDormantChildren();
 
     // For each potential child (left, right):
-    Console::log(Console::VVVVERB, "Collect children data");
     bool has[2] = {job.hasLeftChild(), job.hasRightChild()};
-    Console::log(Console::VVVVERB, "%i %i", has[0], has[1]);
     int indices[2] = {job.getLeftChildIndex(), job.getRightChildIndex()};
-    Console::log(Console::VVVVERB, "%i %i", indices[0], indices[1]);
-    int ranks[2] = {job.getLeftChildNodeRank(), job.getRightChildNodeRank()};
-    Console::log(Console::VVVVERB, "%i %i", ranks[0], ranks[1]);
-    Console::log(Console::VVVVERB, "loop di loop");
+    int ranks[2] = {-1, -1};
     for (int i = 0; i < 2; i++) {
-        Console::log(Console::VVVVERB, "Child %i", i);
         int nextIndex = indices[i];
         if (has[i]) {
+            ranks[i] = i == 0 ? job.getLeftChildNodeRank() : job.getRightChildNodeRank();
             // Propagate volume update
             MyMpi::isend(MPI_COMM_WORLD, ranks[i], MSG_UPDATE_VOLUME, payload);
             //stats.increment("sentMessages");
@@ -1239,6 +1231,7 @@ void Worker::updateVolume(int jobId, int volume) {
             int nextNodeRank, tag;
             if (dormantChildren.empty()) {
                 tag = MSG_FIND_NODE;
+                ranks[i] = i == 0 ? job.getLeftChildNodeRank() : job.getRightChildNodeRank();
                 nextNodeRank = ranks[i];
             } else {
                 tag = MSG_FIND_NODE_ONESHOT;
