@@ -4,6 +4,8 @@
 
 #include <random>
 #include <functional>
+#include <set>
+#include <vector>
 
 class Random {
 public:
@@ -37,6 +39,19 @@ public:
     }
     static int choice(std::vector<int> vec) {
         return vec[ (int) (vec.size()*rand()) ];
+    }
+    static int choice(std::set<int> set) {
+        assert(!set.empty());
+        int picked = rand() * set.size();
+        assert(picked >= 0 && picked < set.size());
+        int i = 0;
+        for (const int& entry : set) {
+            if (i == picked) {
+                return entry;
+                break;
+            } 
+            i++;
+        }
     }
 };
 

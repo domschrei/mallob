@@ -181,7 +181,7 @@ private:
     bool _result_transfer_pending = false;
 
     std::set<int> _past_children;
-
+    std::map<int, int> _dormant_children_num_fails;
 
 // Public methods.
 public:
@@ -303,7 +303,6 @@ public:
     int getRootNodeRank() const {return _job_node_ranks[0];};
     int getLeftChildNodeRank() const {return _job_node_ranks[getLeftChildIndex()];};
     int getRightChildNodeRank() const {return _job_node_ranks[getRightChildIndex()];};
-    std::set<int>& getPastChildren() {return _past_children;}
     bool isLeaf() const {return !_has_left_child && !_has_right_child;}
     bool hasLeftChild() const {return _has_left_child;};
     bool hasRightChild() const {return _has_right_child;};
@@ -311,6 +310,18 @@ public:
     int getRightChildIndex() const {return 2*(_index+1);};
     int getParentNodeRank() const {return isRoot() ? _client_rank : _job_node_ranks[getParentIndex()];};
     int getParentIndex() const {return (_index-1)/2;};
+    std::set<int>& getPastChildren() {return _past_children;}
+    std::set<int> getDormantChildren() const {
+        std::set<int> c;
+        for (const auto& entry : _dormant_children_num_fails) {
+            c.insert(entry.first);
+        }
+        return c;
+    }
+    int getNumFailsOfDormantChild(int rank) const {
+        assert(_dormant_children_num_fails.count(rank));
+        return _dormant_children_num_fails.at(rank);
+    }
 
 
     // Setter methods and simple manipulations
@@ -324,8 +335,22 @@ public:
     void setLastVolume(int lastVolume) {_last_volume = lastVolume;} // size of tree being aimed at
     void setLeftChild(int rank);
     void setRightChild(int rank);
-    void unsetLeftChild() {if (_has_left_child) _past_children.insert(getLeftChildNodeRank()); _has_left_child = false;};
-    void unsetRightChild() {if (_has_right_child) _past_children.insert(getRightChildNodeRank()); _has_right_child = false;};
+    void unsetLeftChild() {
+        int rank = getLeftChildNodeRank();
+        if (_has_left_child) {
+            _past_children.insert(rank);
+            addDormantChild(rank);
+            _has_left_child = false;
+        }
+    }
+    void unsetRightChild() {
+        int rank = getRightChildNodeRank();
+        if (_has_right_child) {
+            _past_children.insert(rank); 
+            addDormantChild(rank);
+            _has_right_child = false;
+        }
+    }
     void updateJobNode(int index, int newRank) {_job_node_ranks.adjust(index, newRank);}
     void updateParentNodeRank(int newRank) {
         if (isRoot()) {
@@ -335,6 +360,15 @@ public:
             // Inner node / leaf worker
             updateJobNode(getParentIndex(), newRank);
         }
+    }
+    void addDormantChild(int rank) {
+        _dormant_children_num_fails[rank] = 0;
+    }
+    void addFailToDormantChild(int rank) {
+        if (!_dormant_children_num_fails.count(rank)) return;
+        _dormant_children_num_fails[rank]++;
+        if (_dormant_children_num_fails[rank] >= 3)
+            _dormant_children_num_fails.erase(rank);
     }
 
     // ... of various meta data

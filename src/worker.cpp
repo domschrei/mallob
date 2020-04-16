@@ -234,13 +234,16 @@ void Worker::mainProgram() {
             Console::log_recv(Console::VVVERB, handle->source, "Process msg id=%i, tag %i", handle->id, handle->tag);
             float time = Timer::elapsedSeconds();
 
-            if (handle->tag == MSG_FIND_NODE) {
-                handleFindNode(handle);
+            if (handle->tag == MSG_FIND_NODE_ONESHOT)
+                handleFindNode(handle, /*oneshot=*/true);
 
-            } else if (handle->tag == MSG_QUERY_VOLUME) {
+            if (handle->tag == MSG_FIND_NODE)
+                handleFindNode(handle, /*oneshot=*/false);
+
+            else if (handle->tag == MSG_QUERY_VOLUME)
                 handleQueryVolume(handle);
             
-            } else if (handle->tag == MSG_OFFER_ADOPTION)
+            else if (handle->tag == MSG_OFFER_ADOPTION)
                 handleOfferAdoption(handle);
 
             else if (handle->tag == MSG_REJECT_ADOPTION_OFFER)
@@ -263,6 +266,9 @@ void Worker::mainProgram() {
 
             else if (handle->tag == MSG_WORKER_FOUND_RESULT)
                 handleWorkerFoundResult(handle);
+            
+            else if (handle->tag == MSG_RESULT_OBSOLETE)
+                handleResultObsolete(handle);
 
             else if (handle->tag == MSG_FORWARD_CLIENT_RANK)
                 handleForwardClientRank(handle);
@@ -350,7 +356,7 @@ void Worker::handleQueryVolume(MessageHandlePtr& handle) {
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_UPDATE_VOLUME, response);
 }
 
-void Worker::handleFindNode(MessageHandlePtr& handle) {
+void Worker::handleFindNode(MessageHandlePtr& handle, bool oneshot) {
 
     JobRequest req; req.deserialize(*handle->recvData);
 
@@ -373,7 +379,10 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
 
     } else if (isIdle() && !hasJobCommitments()) {
         // Node is idle and not committed to another job: OK
-        adopts = true;
+
+        if (oneshot) {
+            adopts = getJob(req.jobId).isSuspended();
+        } else adopts = true;
 
     } else if (req.numHops > maxHops && req.requestedNodeIndex == 0 && !hasJobCommitments()) {
         // Request for a root node exceeded max #hops: Possibly adopt the job while dismissing the active job
@@ -430,7 +439,49 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
         //stats.increment("sentMessages");
 
     } else {
-        // Continue job finding procedure somewhere else
+        if (oneshot) {
+            MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ONESHOT_DECLINED, handle->recvData);
+        } else {
+            // Continue job finding procedure somewhere else
+            bounceJobRequest(req, handle->source);
+        }
+    }
+}
+
+void Worker::handleDeclineOneshot(MessageHandlePtr& handle) {
+    JobRequest req; req.deserialize(*handle->recvData);
+    Console::log_recv(Console::VVVERB, handle->source, 
+        "%s : dormant child delined", jobStr(req.jobId, req.requestedNodeIndex).c_str());
+
+    if (isAdoptionOfferObsolete(req)) return;
+
+    Job& job = getJob(req.jobId);
+    job.addFailToDormantChild(handle->source);
+
+    bool doNormalHopping = false;
+    if (req.numHops > std::max(params.getIntParam("jc"), 2)) {
+        // Oneshot node finding exceeded
+        doNormalHopping = true;
+    } else {
+        // Attempt another oneshot request
+        req.numHops++;
+        // Get dormant children without the node that just declined
+        std::set<int> dormantChildren = job.getDormantChildren();
+        if (dormantChildren.count(handle->source)) dormantChildren.erase(handle->source);
+        if (dormantChildren.empty()) {
+            // No fitting dormant children left
+            doNormalHopping = true;
+        } else {
+            // Pick a dormant child, forward request
+            int rank = Random::choice(dormantChildren);
+            MyMpi::isend(MPI_COMM_WORLD, rank, MSG_FIND_NODE_ONESHOT, req);
+            Console::log_send(Console::VERB, rank, "%s : query dormant child", job.toStr());
+        }
+    }
+
+    if (doNormalHopping) {
+        Console::log(Console::VERB, "%s : switch to normal hops", job.toStr());
+        req.numHops = -1;
         bounceJobRequest(req, handle->source);
     }
 }
@@ -438,7 +489,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle) {
 void Worker::handleOfferAdoption(MessageHandlePtr& handle) {
 
     JobRequest req; req.deserialize(*handle->recvData);
-    Console::log_recv(Console::VERB, handle->source, "Request to join job tree as %s", 
+    Console::log_recv(Console::VERB, handle->source, "Adoption offer for %s", 
                     jobStr(req.jobId, req.requestedNodeIndex).c_str());
 
     bool reject = false;
@@ -450,27 +501,10 @@ void Worker::handleOfferAdoption(MessageHandlePtr& handle) {
         Job &job = getJob(req.jobId);
 
         // Check if node should be adopted or rejected
-
-        if (isRequestObsolete(req)) {
-            // Wrong (old) epoch
-            Console::log_recv(Console::VERB, handle->source, "Reject req. %s : obsolete, from time %.2f", 
+        if (isAdoptionOfferObsolete(req)) {
+            // Obsolete request
+            Console::log_recv(Console::VERB, handle->source, "Reject offer %s from time %.2f", 
                                 job.toStr(), req.timeOfBirth);
-            reject = true;
-
-        } else if (!job.isActive()) {
-            // Job is not active
-            Console::log_recv(Console::VERB, handle->source, "Reject req. %s : not active", job.toStr());
-            Console::log(Console::VERB, "Actual job state: %s", job.jobStateToStr());
-            reject = true;
-        
-        } else if (req.requestedNodeIndex == job.getLeftChildIndex() && job.hasLeftChild()) {
-            // Job already has a left child
-            Console::log_recv(Console::VERB, handle->source, "Reject req. %s : already has left child", job.toStr());
-            reject = true;
-
-        } else if (req.requestedNodeIndex == job.getRightChildIndex() && job.hasRightChild()) {
-            // Job already has a right child
-            Console::log_recv(Console::VERB, handle->source, "Reject req. %s : already has right child", job.toStr());
             reject = true;
 
         } else {
@@ -682,18 +716,21 @@ void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
     int revision = res[1];
     if (!hasJob(jobId) || !getJob(jobId).isRoot()) {
         Console::log(Console::WARN, "[WARN] Invalid adressee for job result of #%i", jobId);
+        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_RESULT_OBSOLETE, handle->recvData);
         return;
     }
-
-    Console::log_recv(Console::VERB, handle->source, "Result found for job #%i", jobId);
     if (getJob(jobId).isPast()) {
         Console::log_recv(Console::VERB, handle->source, "Discard obsolete result for job #%i", jobId);
+        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_RESULT_OBSOLETE, handle->recvData);
         return;
     }
     if (getJob(jobId).getRevision() > revision) {
         Console::log_recv(Console::VERB, handle->source, "Discard obsolete result for job #%i rev. %i", jobId, revision);
+        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_RESULT_OBSOLETE, handle->recvData);
         return;
     }
+    
+    Console::log_recv(Console::VERB, handle->source, "Result found for job #%i", jobId);
 
     // Redirect termination signal
     IntPair payload(jobId, getJob(jobId).getParentNodeRank());
@@ -714,6 +751,16 @@ void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
     } else {
         handleTerminate(handle);
     }
+}
+
+void Worker::handleResultObsolete(MessageHandlePtr& handle) {
+
+    IntVec res(*handle->recvData);
+    int jobId = res[0];
+    int revision = res[1];
+    if (!hasJob(jobId)) return;
+    Console::log_recv(Console::VERB, handle->source, "job result for %s unwanted", getJob(jobId).toStr());
+    getJob(jobId).setResultTransferPending(false);
 }
 
 void Worker::handleForwardClientRank(MessageHandlePtr& handle) {
@@ -1128,42 +1175,40 @@ void Worker::updateVolume(int jobId, int volume) {
     // Prepare volume update to propagate down the job tree
     IntPair payload(jobId, volume);
 
-    // Left child
-    int nextIndex = job.getLeftChildIndex();
-    if (job.hasLeftChild()) {
-        // Propagate left
-        MyMpi::isend(MPI_COMM_WORLD, job.getLeftChildNodeRank(), MSG_UPDATE_VOLUME, payload);
-        //stats.increment("sentMessages");
-        if (nextIndex >= volume) {
-            // Prune child
-            Console::log_send(Console::VERB, job.getLeftChildNodeRank(), "%s : Prune left child", job.toStr());
-            job.unsetLeftChild();
-        }
-    } else if (job.hasJobDescription() && nextIndex < volume && !jobCommitments.count(jobId)) {
-        // Grow left
-        JobRequest req(jobId, job.getRootNodeRank(), worldRank, nextIndex, Timer::elapsedSeconds(), 0);
-        int nextNodeRank = job.getLeftChildNodeRank();
-        MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, MSG_FIND_NODE, req);
-        //stats.increment("sentMessages");
-    }
+    std::set<int> dormantChildren = job.getDormantChildren();
 
-    // Right child
-    nextIndex = job.getRightChildIndex();
-    if (job.hasRightChild()) {
-        // Propagate right
-        MyMpi::isend(MPI_COMM_WORLD, job.getRightChildNodeRank(), MSG_UPDATE_VOLUME, payload);
-        //stats.increment("sentMessages");
-        if (nextIndex >= volume) {
-            // Prune child
-            Console::log_send(Console::VERB, job.getRightChildNodeRank(), "%s : Prune right child", job.toStr());
-            job.unsetRightChild();
+    // For each potential child (left, right):
+    int ranks[2] = {job.hasLeftChild() ? job.getLeftChildNodeRank() : -1, 
+                    job.hasRightChild() ? job.getRightChildNodeRank() : -1};
+    int indices[2] = {job.getLeftChildIndex(), job.getRightChildIndex()};
+    for (int i = 0; i < 2; i++) {
+        int nextIndex = indices[i];
+        if (ranks[i] >= 0) {
+            // Propagate volume update
+            MyMpi::isend(MPI_COMM_WORLD, ranks[i], MSG_UPDATE_VOLUME, payload);
+            //stats.increment("sentMessages");
+            if (nextIndex >= volume) {
+                // Prune child
+                Console::log_send(Console::VERB, ranks[i], "%s : Prune child %s", 
+                        job.toStr(), jobStr(job.getId(), nextIndex).c_str());
+                if (i == 0) job.unsetLeftChild();
+                if (i == 1) job.unsetRightChild();
+            }
+        } else if (job.hasJobDescription() && nextIndex < volume && !jobCommitments.count(jobId)) {
+            // Grow
+            JobRequest req(jobId, job.getRootNodeRank(), worldRank, nextIndex, Timer::elapsedSeconds(), 0);
+            int nextNodeRank, tag;
+            if (dormantChildren.empty()) {
+                tag = MSG_FIND_NODE;
+                nextNodeRank = ranks[i];
+            } else {
+                tag = MSG_FIND_NODE_ONESHOT;
+                nextNodeRank = Random::choice(dormantChildren);
+                dormantChildren.erase(nextNodeRank);
+            }
+            MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, tag, req);
+            //stats.increment("sentMessages");
         }
-    } else if (job.hasJobDescription() && nextIndex < volume && !jobCommitments.count(jobId)) {
-        // Grow right
-        JobRequest req(jobId, job.getRootNodeRank(), worldRank, nextIndex, Timer::elapsedSeconds(), 0);
-        int nextNodeRank = job.getRightChildNodeRank();
-        MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, MSG_FIND_NODE, req);
-        //stats.increment("sentMessages");
     }
 
     // Shrink (and pause solving) if necessary

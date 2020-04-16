@@ -88,7 +88,8 @@ private:
 
     void handleIntroduceJob(MessageHandlePtr& handle);
     void handleQueryVolume(MessageHandlePtr& handle);
-    void handleFindNode(MessageHandlePtr& handle);
+    void handleFindNode(MessageHandlePtr& handle, bool oneshot);
+    void handleDeclineOneshot(MessageHandlePtr& handle);
     void handleOfferAdoption(MessageHandlePtr& handle);
     void handleRejectAdoptionOffer(MessageHandlePtr& handle);
     void handleAcceptAdoptionOffer(MessageHandlePtr& handle);
@@ -100,6 +101,7 @@ private:
     void handleInterrupt(MessageHandlePtr& handle);
     void handleAbort(MessageHandlePtr& handle);
     void handleWorkerFoundResult(MessageHandlePtr& handle);
+    void handleResultObsolete(MessageHandlePtr& handle);
     void handleQueryJobResult(MessageHandlePtr& handle);
     void handleForwardClientRank(MessageHandlePtr& handle);
     void handleWorkerDefecting(MessageHandlePtr& handle);
@@ -157,6 +159,35 @@ private:
         if (req.requestedNodeIndex == 0) return false;
 
         return Timer::elapsedSeconds() - req.timeOfBirth >= 0.25 + 2 * params.getFloatParam("p"); 
+    }
+
+    bool isAdoptionOfferObsolete(const JobRequest& req) {
+
+        // Requests for a job root never become obsolete
+        if (req.requestedNodeIndex == 0) return false;
+
+        // Job not known anymore: obsolete
+        if (!hasJob(req.jobId)) return true;
+
+        Job& job = getJob(req.jobId);
+        if (!job.isActive()) {
+            // Job is not active
+            Console::log(Console::VERB, "Req. %s : not active", job.toStr());
+            Console::log(Console::VERB, "Actual job state: %s", job.jobStateToStr());
+            return true;
+        
+        } else if (req.requestedNodeIndex == job.getLeftChildIndex() && job.hasLeftChild()) {
+            // Job already has a left child
+            Console::log(Console::VERB, "Req. %s : already has left child", job.toStr());
+            return true;
+
+        } else if (req.requestedNodeIndex == job.getRightChildIndex() && job.hasRightChild()) {
+            // Job already has a right child
+            Console::log(Console::VERB, "Req. %s : already has right child", job.toStr());
+            return true;
+        }
+
+        return false;
     }
 };
 
