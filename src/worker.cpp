@@ -1210,9 +1210,11 @@ void Worker::updateVolume(int jobId, int volume) {
     std::set<int> dormantChildren = job.getDormantChildren();
 
     // For each potential child (left, right):
+    Console::log(Console::VVVVERB, "Collect children data");
     bool has[2] = {job.hasLeftChild(), job.hasRightChild()};
-    int ranks[2] = {job.getLeftChildNodeRank(), job.getRightChildNodeRank()};
     int indices[2] = {job.getLeftChildIndex(), job.getRightChildIndex()};
+    int ranks[2] = {job.getLeftChildNodeRank(), job.getRightChildNodeRank()};
+    Console::log(Console::VVVVERB, "loop di loop");
     for (int i = 0; i < 2; i++) {
         Console::log(Console::VVVVERB, "Child %i", i);
         int nextIndex = indices[i];
