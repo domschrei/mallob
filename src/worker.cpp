@@ -1107,13 +1107,11 @@ void Worker::allreduceSystemState() {
 
     float timeSinceLast = Timer::elapsedSeconds()-lastSystemStateReduce;
     if (!reducingSystemState && timeSinceLast >= 1.0) {
-        reducingSystemState = true;
         lastSystemStateReduce = Timer::elapsedSeconds();
-        float myState[2] {
-            isIdle() ? 0.0f : 1.0f,
-            currentJob != NULL && currentJob->isRoot() ? 1.0f : 0.0f
-        };
+        myState[0] = isIdle() ? 0.0f : 1.0f;
+        myState[1] = currentJob != NULL && currentJob->isRoot() ? 1.0f : 0.0f;
         systemStateReq = MyMpi::iallreduce(comm, myState, systemState, 3);
+        reducingSystemState = true;
     } else if (reducingSystemState) {
         MPI_Status status;
         bool done = MyMpi::test(systemStateReq, status);

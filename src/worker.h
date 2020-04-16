@@ -48,6 +48,7 @@ private:
     EpochCounter epochCounter;
     Statistics stats;
 
+    float myState[2];
     float systemState[2];
     MPI_Request systemStateReq;
     bool reducingSystemState = false;
