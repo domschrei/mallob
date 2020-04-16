@@ -444,6 +444,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle, bool oneshot) {
 
     } else {
         if (oneshot) {
+            Console::log_send(Console::VVVERB, handle->source, "decline oneshot request for %s", jobStr(req.jobId, req.requestedNodeIndex).c_str());
             MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ONESHOT_DECLINED, handle->recvData);
         } else {
             // Continue job finding procedure somewhere else
@@ -455,7 +456,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle, bool oneshot) {
 void Worker::handleDeclineOneshot(MessageHandlePtr& handle) {
     JobRequest req; req.deserialize(*handle->recvData);
     Console::log_recv(Console::VVVERB, handle->source, 
-        "%s : dormant child delined", jobStr(req.jobId, req.requestedNodeIndex).c_str());
+        "%s : dormant child declined", jobStr(req.jobId, req.requestedNodeIndex).c_str());
 
     if (isAdoptionOfferObsolete(req)) return;
 
@@ -1120,7 +1121,7 @@ void Worker::allreduceSystemState() {
         if (done) {
             reducingSystemState = false;
             int verb = (worldRank == 0 ? Console::INFO : Console::VVVVERB);
-            Console::log(verb, "sysstate busy=%.2f%% jobs=%i", systemState[0]/MyMpi::size(comm), (int)systemState[1]);
+            Console::log(verb, "sysstate busy=%.2f%% jobs=%i", 100*systemState[0]/MyMpi::size(comm), (int)systemState[1]);
         } else if (lastSystemStateReduce > 0 && timeSinceLast > 10) {
             Console::log(Console::CRIT, "Unresponsive node(s) since 10 seconds! Aborting");
             abort();
