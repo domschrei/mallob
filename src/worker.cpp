@@ -1110,7 +1110,9 @@ void Worker::allreduceSystemState() {
         lastSystemStateReduce = Timer::elapsedSeconds();
         myState[0] = isIdle() ? 0.0f : 1.0f;
         myState[1] = currentJob != NULL && currentJob->isRoot() ? 1.0f : 0.0f;
-        systemStateReq = MyMpi::iallreduce(comm, myState, systemState, 3);
+        systemState[0] = 0.0f;
+        systemState[1] = 1.0f;
+        systemStateReq = MyMpi::iallreduce(comm, myState, systemState, 2);
         reducingSystemState = true;
     } else if (reducingSystemState) {
         MPI_Status status;
