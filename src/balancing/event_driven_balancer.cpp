@@ -320,8 +320,14 @@ void EventDrivenBalancer::calculateBalancingResult() {
         assignedResources += assignments[ev.jobId] - 1;
         if (!demandedResources.count(ev.priority)) demandedResources[ev.priority] = 0;
         demandedResources[ev.priority] += ev.demand - assignments[ev.jobId];
-        Console::log(verb, "BLC e=%i #%i init_assign=%.3f", _balancing_epoch, ev.jobId, assignments[ev.jobId]);
+        
     }
+    std::string assignMsg = " ";
+    for (const auto& e : assignments) {
+        assignMsg += std::string("#") + std::to_string(e.first) + std::string("=") 
+                    + std::to_string(0.01*(int)(100*e.second)) + std::string(" ");
+    }
+    Console::log(verb, "BLC e=%i init_assign={%s}", _balancing_epoch, assignMsg.c_str());
 
     // 3. Calculate final floating-point assignments for all jobs
 
@@ -334,7 +340,6 @@ void EventDrivenBalancer::calculateBalancingResult() {
     if (remainingResources < 0.1) remainingResources = 0; // too low a remainder to make a difference
     Console::log(verb, "BLC e=%i remaining=%.3f", _balancing_epoch, remainingResources);
 
-    std::map<int, int> allVolumes;
     for (const auto& entry : _states.getEntries()) {
         const Event& ev = entry.second;
         if (ev.demand <= 1) continue;
@@ -365,12 +370,16 @@ void EventDrivenBalancer::calculateBalancingResult() {
                 assignments[jobId] += ratio * (demand - assignments[jobId]);
             }
         }
-
-        Console::log(verb, "BLC e=%i #%i adj_assign=%.3f", _balancing_epoch, jobId, assignments[jobId]);
     }
+    assignMsg = " ";
+    for (const auto& e : assignments) {
+        assignMsg += std::string("#") + std::to_string(e.first) + std::string("=") 
+            + std::to_string(0.01*(int)(100*e.second)) + std::string(" ");
+    }
+    Console::log(verb, "BLC e=%i adj_assign={%s}", _balancing_epoch, assignMsg.c_str());
 
     // 4. Round job assignments
-
+    std::map<int, int> allVolumes;
     if (_params.getParam("r") == ROUNDING_FLOOR) {
         // Round by flooring
         for (const auto& entry : _states.getEntries()) {
