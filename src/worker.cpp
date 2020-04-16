@@ -1178,18 +1178,18 @@ void Worker::updateVolume(int jobId, int volume) {
     std::set<int> dormantChildren = job.getDormantChildren();
 
     // For each potential child (left, right):
-    int ranks[2] = {job.hasLeftChild() ? job.getLeftChildNodeRank() : -1, 
-                    job.hasRightChild() ? job.getRightChildNodeRank() : -1};
+    bool has[2] = {job.hasLeftChild(), job.hasRightChild()};
+    int ranks[2] = {job.getLeftChildNodeRank(), job.getRightChildNodeRank()};
     int indices[2] = {job.getLeftChildIndex(), job.getRightChildIndex()};
     for (int i = 0; i < 2; i++) {
         int nextIndex = indices[i];
-        if (ranks[i] >= 0) {
+        if (has[i]) {
             // Propagate volume update
             MyMpi::isend(MPI_COMM_WORLD, ranks[i], MSG_UPDATE_VOLUME, payload);
             //stats.increment("sentMessages");
             if (nextIndex >= volume) {
                 // Prune child
-                Console::log_send(Console::VERB, ranks[i], "%s : Prune child %s", 
+                Console::log_send(Console::VERB, ranks[i], "%s : prune child %s", 
                         job.toStr(), jobStr(job.getId(), nextIndex).c_str());
                 if (i == 0) job.unsetLeftChild();
                 if (i == 1) job.unsetRightChild();
@@ -1206,6 +1206,8 @@ void Worker::updateVolume(int jobId, int volume) {
                 nextNodeRank = Random::choice(dormantChildren);
                 dormantChildren.erase(nextNodeRank);
             }
+            Console::log_send(Console::VERB, nextNodeRank, "%s : initiate growth by %s", 
+                        job.toStr(), jobStr(job.getId(), nextIndex).c_str());
             MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, tag, req);
             //stats.increment("sentMessages");
         }
