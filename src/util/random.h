@@ -50,6 +50,7 @@ public:
             if (i == picked) return entry;
             i++;
         }
+        assert(false);
     }
 };
 

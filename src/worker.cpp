@@ -121,7 +121,7 @@ void Worker::mainProgram() {
     float sleepMicrosecs = 0;
 
     float memCheckPeriod = 3.0;
-    float jobCheckPeriod = 0.1;
+    float jobCheckPeriod = 0.01;
 
     bool doSleep = params.isSet("sleep");
     bool doYield = params.isSet("yield");
@@ -169,11 +169,6 @@ void Worker::mainProgram() {
             }
         }
 
-        // Job communication (e.g. clause sharing)
-        if (currentJob != NULL && currentJob->wantsToCommunicate()) {
-            currentJob->communicate();
-        }
-
         // Solve loop for active HordeLib instance
         float jobTime = 0;
         if (currentJob != NULL && Timer::elapsedSeconds()-lastJobCheckTime >= jobCheckPeriod) {
@@ -186,9 +181,10 @@ void Worker::mainProgram() {
             bool abort = false;
             if (job.isRoot()) abort = checkComputationLimits(id);
             if (abort) {
+                // Timeout (CPUh or wallclock time) hit
                 timeoutJob(id);
             } else {
-
+                // Finish initialization as needed
                 if (job.isDoneInitializing()) {
                     job.endInitialization();
                     if (job.isRoot()) {
@@ -201,6 +197,7 @@ void Worker::mainProgram() {
                     }
                 }
 
+                // Check if a result was found
                 int result = job.appl_solveLoop();
                 if (result >= 0) {
                     // Solver done!
@@ -214,6 +211,11 @@ void Worker::mainProgram() {
                     job.setResultTransferPending(true);
                     //stats.increment("sentMessages");
                 }
+            }
+
+            // Job communication (e.g. clause sharing)
+            if (job.wantsToCommunicate()) {
+                job.communicate();
             }
 
             jobTime = Timer::elapsedSeconds() - jobTime;
@@ -1196,6 +1198,7 @@ void Worker::updateVolume(int jobId, int volume) {
             }
         } else if (job.hasJobDescription() && nextIndex < volume && !jobCommitments.count(jobId)) {
             // Grow
+            Console::log(Console::VVVERB, "%s : grow", job.toStr());
             JobRequest req(jobId, job.getRootNodeRank(), worldRank, nextIndex, Timer::elapsedSeconds(), 0);
             int nextNodeRank, tag;
             if (dormantChildren.empty()) {

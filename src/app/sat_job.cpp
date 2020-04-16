@@ -174,7 +174,7 @@ int SatJob::appl_solveLoop() {
         return result;
     }
 
-    if (isInState({ACTIVE})) result = getSolver()->solveLoop();
+    if (getState() == ACTIVE) result = getSolver()->solveLoop();
     else return result;
 
     // Did a solver find a result?
