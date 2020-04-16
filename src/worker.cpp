@@ -1109,9 +1109,9 @@ void Worker::allreduceSystemState() {
     if (!reducingSystemState && timeSinceLast >= 1.0) {
         reducingSystemState = true;
         lastSystemStateReduce = Timer::elapsedSeconds();
-        float myState[2] = {
-            isIdle() ? 0 : 1,
-            currentJob != NULL && currentJob->isRoot() ? 1 : 0
+        float myState[2] {
+            isIdle() ? 0.0f : 1.0f,
+            currentJob != NULL && currentJob->isRoot() ? 1.0f : 0.0f
         };
         systemStateReq = MyMpi::iallreduce(comm, myState, systemState, 3);
     } else if (reducingSystemState) {
@@ -1121,7 +1121,7 @@ void Worker::allreduceSystemState() {
             reducingSystemState = false;
             int verb = (worldRank == 0 ? Console::INFO : Console::VVVVERB);
             Console::log(verb, "sysstate busy=%.2f%% jobs=%i", systemState[0]/MyMpi::size(comm), (int)systemState[1]);
-        } else if (timeSinceLast > 10) {
+        } else if (lastSystemStateReduce > 0 && timeSinceLast > 10) {
             Console::log(Console::CRIT, "Unresponsive node(s) since 10 seconds! Aborting");
             abort();
         }
