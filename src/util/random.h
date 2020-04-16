@@ -6,6 +6,7 @@
 #include <functional>
 #include <set>
 #include <vector>
+#include <assert.h>
 
 class Random {
 public:
@@ -46,10 +47,7 @@ public:
         assert(picked >= 0 && picked < set.size());
         int i = 0;
         for (const int& entry : set) {
-            if (i == picked) {
-                return entry;
-                break;
-            } 
+            if (i == picked) return entry;
             i++;
         }
     }
