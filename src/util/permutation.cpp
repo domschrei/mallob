@@ -133,8 +133,11 @@ AdjustablePermutation::AdjustablePermutation(int n, int seed) {
 };
 
 int AdjustablePermutation::get(int x) const {
-
-    assert(x >= 0 && x < _n);
+    if (x < 0 || x >= _n) {
+        Console::log(Console::WARN, "Invalid input for adj.perm. [0,%i) : %i", _n, x);
+        while (x < 0) x += 100*_n;
+        x = x % _n;
+    }
 
     if (_adjusted_values.count(x)) {
         return _adjusted_values.at(x);
@@ -182,8 +185,12 @@ int AdjustablePermutation::get(int x) const {
 }
 
 void AdjustablePermutation::adjust(int x, int new_x) {
-    if (get(x) != new_x)
-        _adjusted_values[x] = new_x;
+    if (x < 0 || x >= _n) {
+        Console::log(Console::WARN, "Invalid input for adj.perm. [0,%i) : %i", _n, x);
+        while (x < 0) x += 100*_n;
+        x = x % _n;
+    }
+    if (get(x) != new_x) _adjusted_values[x] = new_x;
 }
 
 void AdjustablePermutation::clear() {
