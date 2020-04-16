@@ -244,6 +244,9 @@ void Worker::mainProgram() {
             if (handle->tag == MSG_FIND_NODE)
                 handleFindNode(handle, /*oneshot=*/false);
 
+            if (handle->tag == MSG_ONESHOT_DECLINED)
+                handleDeclineOneshot(handle);
+
             else if (handle->tag == MSG_QUERY_VOLUME)
                 handleQueryVolume(handle);
             
