@@ -311,16 +311,13 @@ public:
     int getParentNodeRank() const {return isRoot() ? _client_rank : _job_node_ranks[getParentIndex()];};
     int getParentIndex() const {return (_index-1)/2;};
     std::set<int>& getPastChildren() {return _past_children;}
+    int getNumFailsOfDormantChild(int rank) const;
     std::set<int> getDormantChildren() const {
         std::set<int> c;
         for (const auto& entry : _dormant_children_num_fails) {
             c.insert(entry.first);
         }
         return c;
-    }
-    int getNumFailsOfDormantChild(int rank) const {
-        assert(_dormant_children_num_fails.count(rank));
-        return _dormant_children_num_fails.at(rank);
     }
 
 

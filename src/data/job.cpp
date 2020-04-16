@@ -380,6 +380,11 @@ void Job::setForgetting() {
     if (!isInStateUnsafe({FORGETTING})) switchState(FORGETTING);
 }
 
+int Job::getNumFailsOfDormantChild(int rank) const {
+    assert(_dormant_children_num_fails.count(rank));
+    return _dormant_children_num_fails.at(rank);
+}
+
 Job::~Job() {
     
     auto lock = _job_manipulation_lock.getLock();
