@@ -290,7 +290,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
     int verb = rank == 0 ? Console::VVERB : Console::VVVVERB;  
 
     // 1. Calculate aggregated demand of all jobs
-    std::string assignMsg = "";
+    std::string assignMsg = " ";
     float aggregatedDemand = 0;
     int numJobs = 0;
     for (const auto& entry : _states.getEntries()) {
@@ -301,7 +301,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
         if (ev.demand == 0) continue;
         numJobs++;
         aggregatedDemand += (ev.demand-1) * ev.priority;
-        assignMsg += "#" + std::to_string(ev.jobId) + "=" + Console::floatToStr(ev.demand, 2) + " ";
+        assignMsg += "#" + std::to_string(ev.jobId) + "=" + std::to_string(ev.demand) + " ";
     }
     Console::log(verb, "BLC e=%i demand={%s}", _balancing_epoch, assignMsg.c_str());
     float totalAvailVolume = MyMpi::size(_comm) * _load_factor - numJobs;

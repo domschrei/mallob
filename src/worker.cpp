@@ -76,7 +76,7 @@ void Worker::init() {
     MPI_Barrier(MPI_COMM_WORLD);
     Console::log(Console::VERB, "Passed global init barrier");
 
-    mpiMonitorThread = std::thread(mpiMonitor, this);
+    if (params.isSet("mmpi")) mpiMonitorThread = std::thread(mpiMonitor, this);
 }
 
 void Worker::createExpanderGraph() {
