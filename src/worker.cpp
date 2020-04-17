@@ -646,7 +646,7 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
     int jobId; memcpy(&jobId, data->data(), sizeof(int));
 
     if (!hasJob(jobId) || getJob(jobId).isPast()) {
-        Console::fail("I don't know job #%i : discard desc.", jobId);
+        Console::log(Console::WARN, "[WARN] I don't know job #%i : discard desc.", jobId);
         return;
     }
 
@@ -836,29 +836,45 @@ void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
     Job& job = getJob(jobId);
 
     // Which child is defecting?
-    if (job.getLeftChildIndex() == index) {
+    if (job.hasLeftChild() && job.getLeftChildIndex() == index && job.getLeftChildNodeRank() == handle->source) {
         // Prune left child
         job.unsetLeftChild();
-    } else if (job.getRightChildIndex() == index) {
+    } else if (job.hasRightChild() && job.getRightChildIndex() == index && job.getRightChildNodeRank() == handle->source) {
         // Prune right child
         job.unsetRightChild();
     } else {
-        Console::fail("%s : unknown child %s defecting to another node", job.toStr(), jobStr(jobId, index).c_str());
-    }
-    
-    int nextNodeRank;
-    if (params.isSet("derandomize")) {
-        nextNodeRank = Random::choice(bounceAlternatives);
-    } else {
-        nextNodeRank = getRandomWorkerNode();
+        Console::log(Console::VERB, "%s : unknown child %s defecting", job.toStr(), jobStr(jobId, index).c_str());
     }
 
-    // Initiate search for a replacement for the defected child
-    Console::log(Console::VERB, "%s : trying to find child replacing defected %s", 
-                    job.toStr(), jobStr(jobId, index).c_str());
-    JobRequest req(jobId, job.getRootNodeRank(), worldRank, index, Timer::elapsedSeconds(), 0);
-    MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, MSG_FIND_NODE, req);
-    //stats.increment("sentMessages");
+    // If necessary, find replacement
+    if (index < job.getLastVolume()) {
+
+        int nextNodeRank = -1;
+        int tag = MSG_FIND_NODE;
+
+        // Try to find a dormant child that is not the message source
+        std::set<int> dormantChildren = job.getDormantChildren();
+        for (int child : dormantChildren) {
+            if (child != handle->source) {
+                nextNodeRank = child;
+                tag = MSG_FIND_NODE_ONESHOT;
+                break;
+            }
+        }
+        // Otherwise, pick a random node
+        if (nextNodeRank == -1 && params.isSet("derandomize")) {
+            nextNodeRank = Random::choice(bounceAlternatives);
+        } else if (nextNodeRank == -1) {
+            nextNodeRank = getRandomWorkerNode();
+        }
+
+        // Initiate search for a replacement for the defected child
+        JobRequest req(jobId, job.getRootNodeRank(), worldRank, index, Timer::elapsedSeconds(), 0);
+        Console::log_send(Console::VERB, nextNodeRank, "%s : try to find child replacing defected %s", 
+                        job.toStr(), jobStr(jobId, index).c_str());
+        MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, tag, req);
+        //stats.increment("sentMessages");
+    }
 }
 
 void Worker::handleNotifyJobRevision(MessageHandlePtr& handle) {
@@ -1231,13 +1247,17 @@ void Worker::updateVolume(int jobId, int volume) {
             // Propagate volume update
             MyMpi::isend(MPI_COMM_WORLD, ranks[i], MSG_UPDATE_VOLUME, payload);
             //stats.increment("sentMessages");
+
+            // Done over MSG_WORKER_DEFECTING now
+            /* 
             if (nextIndex >= volume) {
                 // Prune child
                 Console::log_send(Console::VERB, ranks[i], "%s : prune child %s", 
                         job.toStr(), jobStr(job.getId(), nextIndex).c_str());
                 if (i == 0) job.unsetLeftChild();
                 if (i == 1) job.unsetRightChild();
-            }
+            }*/
+
         } else if (job.hasJobDescription() && nextIndex < volume && !jobCommitments.count(jobId)) {
             // Grow
             Console::log(Console::VVVERB, "%s : grow", job.toStr());
@@ -1261,6 +1281,7 @@ void Worker::updateVolume(int jobId, int volume) {
 
     // Shrink (and pause solving) if necessary
     if (thisIndex > 0 && thisIndex >= volume) {
+        MyMpi::isend(MPI_COMM_WORLD, job.getParentNodeRank(), MSG_WORKER_DEFECTING, IntPair(jobId, thisIndex));
         job.suspend();
         setLoad(0, jobId);
     }
