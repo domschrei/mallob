@@ -5,8 +5,9 @@
  *      Author: balyo
  */
 
-#include "Lingeling.h"
 #include <ctype.h>
+
+#include "Lingeling.h"
 #include "../utilities/DebugUtils.h"
 
 extern "C" {

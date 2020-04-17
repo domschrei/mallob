@@ -18,7 +18,13 @@ public:
     double getTime() {
         return Timer::elapsedSeconds();
     }
-    void log(int verbosityLevel, const char* fmt, va_list args) {
+    void log(int verbosityLevel, const char* fmt, ...) override {
+        va_list args;
+        va_start(args, fmt);
+        log_va_list(verbosityLevel, fmt, args);
+        va_end(args);
+    }
+    void log_va_list(int verbosityLevel, const char* fmt, va_list args) override {
 
         std::string str(fmt);
         
@@ -32,7 +38,15 @@ public:
         Console::log(verbosityLevel+2, str.c_str(), true, argsCopy);
         va_end(argsCopy);
     }
-    void abort() {
+    void exitError(const char* fmt, ...) override {
+        va_list vl;
+        va_start(vl, fmt);
+        log_va_list(-2, "Exiting due to critical error:", vl);
+        log_va_list(-2, fmt, vl);
+        va_end(vl);
+        this->abort();
+    }
+    void abort() override {
         Console::log(Console::CRIT, "ERROR - aborting");
         Console::forceFlush();
         exit(1);
