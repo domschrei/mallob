@@ -112,12 +112,11 @@ void HordeLib::init() {
 				solvers.push_back(new MiniSat());
 				hlog(3, "MiniSat @ %d\n", i, mpi_rank, mpi_size);
 			} else {
-				solvers.push_back(new Lingeling());
+				solvers.push_back(new Lingeling(*logger));
 				hlog(3, "Lingeling @ %d\n", i, mpi_rank, mpi_size);
 			}
 		} else {
-            Lingeling *lgl = new Lingeling();
-			solvers.push_back(lgl);
+			solvers.push_back(new Lingeling(*logger));
 			hlog(3, "Lingeling @ %d\n", i, mpi_rank, mpi_size);
 		}
 		// set solver id
