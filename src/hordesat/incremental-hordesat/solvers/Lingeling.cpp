@@ -6,6 +6,7 @@
  */
 
 #include <ctype.h>
+#include <stdarg.h>
 
 #include "Lingeling.h"
 #include "../utilities/DebugUtils.h"
@@ -19,15 +20,15 @@ void slog(Lingeling* lgl, int verbosityLevel, const char* fmt, ...) {
 	msg += fmt;
 	va_list vl;
 	va_start(vl, fmt);
-	log_va_list(verbosityLevel, msg.c_str(), vl);
+	lgl->logger.log_va_list(verbosityLevel, msg.c_str(), vl);
 	va_end(vl);
 }
 
 int termCallback(void* solverPtr) {
 	Lingeling* lp = (Lingeling*)solverPtr;
 
-	double elapsed = getTime() - lp->lastTermCallbackTime;
-	lp->lastTermCallbackTime = getTime();
+	double elapsed = lp->logger.getTime() - lp->lastTermCallbackTime;
+	lp->lastTermCallbackTime = lp->logger.getTime();
     
 	if (lp->stopSolver) {
 		slog(lp, 2, "STOP (%.4fs since last cb)", elapsed);
@@ -129,13 +130,13 @@ void consumeCls(void* sp, int** clause, int* glue) {
 	lp->clauseAddMutex.unlock();
 }
 
-Lingeling::Lingeling() {
+Lingeling::Lingeling(LoggingInterface& logger) : logger(logger) {
 	solver = lglinit();
 	//lglsetopt(solver, "verbose", 1);
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
 	lglsetopt(solver, "bca", 0);
 	lglsetopt(solver, "termint", -1);
-	lastTermCallbackTime = getTime();
+	lastTermCallbackTime = logger.getTime();
 
 	stopSolver = 0;
 	callback = NULL;

@@ -11,12 +11,14 @@
 #include "../utilities/SatUtils.h"
 #include "PortfolioSolverInterface.h"
 #include "../utilities/Threading.h"
+#include "../utilities/logging_interface.h"
 
 struct LGL;
 
 class Lingeling: public PortfolioSolverInterface {
 
 private:
+	LoggingInterface& logger;
 	LGL* solver;
 	std::string name;
 	int stopSolver;
@@ -33,6 +35,7 @@ private:
 	friend void produceUnit(void* sp, int lit);
 	friend void consumeUnits(void* sp, int** start, int** end);
 	friend void consumeCls(void* sp, int** clause, int* glue);
+	friend void slog(Lingeling* lgl, int verbosityLevel, const char* fmt, ...);
 
 	// clause addition
 	vector<vector<int> > clausesToAdd;
@@ -100,7 +103,7 @@ public:
 	void setSolverInterrupt();
 	void unsetSolverInterrupt();
     
-	Lingeling();
+	Lingeling(LoggingInterface& logger);
 	 ~Lingeling();
 };
 
