@@ -93,7 +93,7 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "-mmpi                 Monitor MPI: Launch an additional thread per process checking when the main thread");
     Console::log(Console::INFO, "                      is inside some MPI call");
     Console::log(Console::INFO, "-nophase              Do not diversify solvers based on phase; native diversification only");
-    Console::log(Console::INFO, "-p=<rebalance-period> Do balancing every t seconds (t > 0). With -edb : minimum delay between balancings");
+    Console::log(Console::INFO, "-p=<rebalance-period> Do balancing every t seconds (t > 0). With -bm=ed : minimum delay between balancings");
     Console::log(Console::INFO, "-q                    Be quiet, do not log to stdout besides critical information");
     Console::log(Console::INFO, "-r=<round-mode>       Mode of rounding of assignments in balancing:");
     Console::log(Console::INFO, "                      \"prob\" - simple probabilistic rounding");

@@ -26,8 +26,8 @@ void SatClauseCommunicator::initiateCommunication() {
     testConsistency(msg.payload);
     msg.payload.push_back(1); // last int: depth the clause buffer traversed through the job tree so far.
     int parentRank = _job->getParentNodeRank();
-    Console::log(Console::VVERB, "%s : initiating exchange", _job->toStr());
-    Console::log_send(Console::VERB, parentRank, "%s : sending, size %i", _job->toStr(), msg.payload.size()-1);
+    Console::log(Console::VVERB, "%s : initiate exchange", _job->toStr());
+    Console::log_send(Console::VERB, parentRank, "%s : send, size %i", _job->toStr(), msg.payload.size()-1);
     MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
     // TODO //stats.increase("sentMessages");
 }

@@ -1287,8 +1287,7 @@ bool Worker::isAdoptionOfferObsolete(const JobRequest& req) {
     Job& job = getJob(req.jobId);
     if (!job.isActive()) {
         // Job is not active
-        Console::log(Console::VERB, "Req. %s : not active", job.toStr());
-        Console::log(Console::VERB, "Actual job state: %s", job.jobStateToStr());
+        Console::log(Console::VERB, "Req. %s : job inactive (%s)", job.toStr(), job.jobStateToStr());
         return true;
     
     } else if (req.requestedNodeIndex == job.getLeftChildIndex() && job.hasLeftChild()) {
@@ -1388,6 +1387,8 @@ void Worker::deleteJob(int jobId) {
     // Delete job and its solvers
     jobs.erase(jobId);
     delete &job;
+
+    Console::log(Console::VERB, "Deleted %s", job.toStr());
 }
 
 Worker::~Worker() {

@@ -142,7 +142,7 @@ bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
         
         // Send to other root
         MyMpi::isend(MPI_COMM_WORLD, getRootRank(!reversedTree), MSG_ANYTIME_BROADCAST, data);
-        Console::log_send(Console::VVERB, getRootRank(!reversedTree), "BLC root handshake");
+        Console::log_send(Console::VVVERB, getRootRank(!reversedTree), "BLC root handshake");
         
         // Broadcast and digest
         broadcast(data, reversedTree);
