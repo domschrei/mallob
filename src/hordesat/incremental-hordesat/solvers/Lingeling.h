@@ -11,7 +11,6 @@
 #include "../utilities/SatUtils.h"
 #include "PortfolioSolverInterface.h"
 #include "../utilities/Threading.h"
-#include "../utilities/verbose_mutex.h"
 
 struct LGL;
 

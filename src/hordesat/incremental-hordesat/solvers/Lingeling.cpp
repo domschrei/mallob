@@ -8,7 +8,6 @@
 #include "Lingeling.h"
 #include <ctype.h>
 #include "../utilities/DebugUtils.h"
-#include "../utilities/Logger.h"
 
 extern "C" {
 	#include "lglib.h"
