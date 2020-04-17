@@ -23,6 +23,7 @@ std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_sent_handles;
 std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_deferred_handles;*/
 ListenerMode MyMpi::_mode;
 std::map<int, int> MyMpi::_msg_priority;
+bool MyMpi::_monitor_off;
 
 void chkerr(int err) {
     if (err != 0) {
