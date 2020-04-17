@@ -8,26 +8,27 @@
 #include "DimspecUtils.h"
 #include <stdio.h>
 #include <ctype.h>
-#include "Logger.h"
 #include "DebugUtils.h"
+#include "default_logging_interface.h"
+
+DefaultLoggingInterface dli;
 
 bool checkDimspecValidity(const DimspecFormula& f) {
 	if (f.init.variables != f.goal.variables || f.init.variables != f.universal.variables ||
 			2*f.init.variables != f.transition.variables) {
-		exitError("Variable numbers inconsistent in I,G,U,T = %d, %d, %d, %d\n",
+		dli.exitError("Variable numbers inconsistent in I,G,U,T = %d, %d, %d, %d\n",
 				f.init.variables, f.goal.variables, f.universal.variables, f.transition.variables);
 	}
-	log(0, "Formula loaded, it has %d variables, number of clauses in I,G,U,T is %d, %d, %d, %d\n",
+	dli.log(0, "Formula loaded, it has %d variables, number of clauses in I,G,U,T is %d, %d, %d, %d\n",
 			f.init.variables, f.init.clauses.size(), f.goal.clauses.size(), f.universal.clauses.size(),
 			f.transition.clauses.size());
 	return true;
 }
 
-
 DimspecFormula readDimspecProblem(const char* filename) {
 	FILE* f = fopen(filename, "r");
 	if (f == NULL) {
-		exitError("Failed to open input file (%s)\n", filename);
+		dli.exitError("Failed to open input file (%s)\n", filename);
 	}
 	DimspecFormula fla;
 	CnfFormula* cf = NULL;
@@ -51,7 +52,7 @@ DimspecFormula readDimspecProblem(const char* filename) {
 			}
 			pline[i] = 0;
 			if (3 != sscanf(pline, "%c cnf %d %d", &kar, &vars, &cls)) {
-				exitError("Failed to parse the problem definition line (%s)\n", pline);
+				dli.exitError("Failed to parse the problem definition line (%s)\n", pline);
 			}
 			switch(kar) {
 			case 'i': cf = &fla.init;
@@ -63,7 +64,7 @@ DimspecFormula readDimspecProblem(const char* filename) {
 			case 't': cf = &fla.transition;
 			break;
 			default:
-				exitError("Invalid formula identifier (%s)\n", pline);
+				dli.exitError("Invalid formula identifier (%s)\n", pline);
 			}
 			cf->variables = vars;
 			continue;
@@ -156,19 +157,19 @@ bool checkTransitionClauses(const vector<vector<int> >& clauses, const vector<in
 
 bool checkDimspecSolution(const DimspecFormula& f, const DimspecSolution& s) {
 	if (!checkClauses(f.init.clauses, s.values[0])) {
-		exitError("Wrong solution: Initial conditions unsat\n");
+		dli.exitError("Wrong solution: Initial conditions unsat\n");
 	}
 	if (!checkClauses(f.goal.clauses, s.values[s.values.size() - 1])) {
-		exitError("Wrong solution: Goal conditions unsat\n");
+		dli.exitError("Wrong solution: Goal conditions unsat\n");
 	}
 	for (size_t step = 0; step < s.values.size(); step++) {
 		if (!checkClauses(f.universal.clauses, s.values[step])) {
-			exitError("Wrong solution, universal clauses do not hold in step %d\n", step);
+			dli.exitError("Wrong solution, universal clauses do not hold in step %d\n", step);
 		}
 	}
 	for (size_t step = 0; step+1 < s.values.size(); step++) {
 		if (!checkTransitionClauses(f.transition.clauses, s.values[step], s.values[step+1])) {
-			exitError("Wrong solution, transitional clauses do not hold between steps %d and %d\n", step, step+1);
+			dli.exitError("Wrong solution, transitional clauses do not hold between steps %d and %d\n", step, step+1);
 		}
 	}
 	return true;
