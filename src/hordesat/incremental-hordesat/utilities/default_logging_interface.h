@@ -12,9 +12,9 @@
 
 class DefaultLoggingInterface : public LoggingInterface {
 private:
-    int verbosity;
-    std::string identifier;
-    double start;
+    int verbosity = 0;
+    std::string identifier = "";
+    double start = 0;
 
 public:
     DefaultLoggingInterface() = default;

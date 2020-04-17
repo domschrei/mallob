@@ -12,7 +12,7 @@
 
 DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
 		vector<PortfolioSolverInterface*>& solvers, ParameterProcessor& params)
-	:size(mpi_size),rank(mpi_rank),solvers(solvers),params(params),callback(*this),
+	:size(mpi_size),rank(mpi_rank),solvers(solvers),params(params),cdb(logger),callback(*this),
 	logger(params.getLogger()) {
     for (size_t i = 0; i < solvers.size(); i++) {
 		solvers[i]->setLearnedClauseCallback(&callback, i);

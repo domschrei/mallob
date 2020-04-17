@@ -9,7 +9,10 @@
 #define CLAUSEDATABASE_H_
 
 #include <vector>
+
 #include "Threading.h"
+#include "logging_interface.h"
+#include "default_logging_interface.h"
 
 using namespace std;
 
@@ -22,6 +25,8 @@ struct Bucket {
 
 class ClauseDatabase {
 public:
+	ClauseDatabase() : logger(dli) {}
+	ClauseDatabase(LoggingInterface& logger) : logger(logger) {}
 	virtual ~ClauseDatabase();
 
 	/**
@@ -49,6 +54,8 @@ public:
 	bool getNextIncomingClause(vector<int>& clause);
 
 private:
+	static DefaultLoggingInterface dli;
+	LoggingInterface& logger;
 	Mutex addClauseLock;
 
 	// Structures for EXPORTING

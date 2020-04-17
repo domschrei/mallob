@@ -11,12 +11,12 @@
 
 #include "ClauseDatabase.h"
 #include "DebugUtils.h"
-#include "Logger.h"
+
+DefaultLoggingInterface ClauseDatabase::dli;
 
 void ClauseDatabase::addVIPClause(vector<int>& clause) {
-	addClauseLock.lock();
+	auto lock = addClauseLock.getLock();
 	vipClauses.push_back(clause);
-	addClauseLock.unlock();
 }
 
 int* ClauseDatabase::addClause(vector<int>& clause) {
@@ -81,7 +81,7 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 	buffer[0] = used-1;
 
 	if (used >= size) {
-		log(-1, "ERROR: vip clauses exceeded the buffer size.");
+		logger.log(-1, "ERROR: vip clauses exceeded the buffer size.");
 		addClauseLock.unlock();
 		*selectedCount = 0;
 		return used;
@@ -117,9 +117,9 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 	addClauseLock.unlock();
 	int all = fitting + notFitting;
 	if (all > 0) {
-		log(3, "%d fit %d (%d%%) didn't \n", fitting, notFitting, notFitting*100/(all));
+		logger.log(3, "%d fit %d (%d%%) didn't \n", fitting, notFitting, notFitting*100/(all));
 	} else {
-		log(3, "No clauses for export.\n");
+		logger.log(3, "No clauses for export.\n");
 	}
 	if (selectedCount != NULL) {
 		*selectedCount = fitting;
