@@ -6,7 +6,6 @@
  */
 
 #include "BufferManager.h"
-#include "Logger.h"
 
 BufferManager::BufferManager() {
 }
