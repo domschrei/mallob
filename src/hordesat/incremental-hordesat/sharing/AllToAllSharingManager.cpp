@@ -80,7 +80,7 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 	stats.filteredClauses += failedFilter;
 	stats.importedClauses += passedFilter;
 	if (total > 0) {
-		logger.log(2, "filtered %d%% (%d/%d), avg len %.2f\n",
+		logger.log(1, "filtered %d%% (%d/%d), avg len %.2f\n",
 				100*failedFilter/total,
 				failedFilter, total, totalLen/(float)total);
 	}
