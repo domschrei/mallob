@@ -11,7 +11,7 @@
 
 #include "util/mpi_monitor.h"
 
-#define MPICALL(cmd, str) if (!MyMpi::_monitor_off) {initcall((str).c_str());} int err = cmd; if (!MyMpi::_monitor_off) endcall(); chkerr(err);
+#define MPICALL(cmd, str) {if (!MyMpi::_monitor_off) {initcall((str).c_str());} int err = cmd; if (!MyMpi::_monitor_off) endcall(); chkerr(err);}
 
 int MyMpi::_max_msg_length;
 std::set<MessageHandlePtr> MyMpi::_handles;
