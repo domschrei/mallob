@@ -313,8 +313,12 @@ public:
     static int rank(MPI_Comm comm);
     static int random_other_node(MPI_Comm comm, const std::set<int>& excludedNodes);
     
-    static std::string currentCall(double* callStart);
     static int nextHandleId();
+
+    // defined in mpi_monitor.*
+    static std::string currentCall(double* callStart);
+    static void turnOffMonitor();
+
 
 private:
     static void resetListenerIfNecessary(int tag);
