@@ -351,15 +351,15 @@ bool MyMpi::hasOpenSentHandles() {
 }
 
 void MyMpi::testSentHandles() {
-    std::set<MessageHandlePtr> finishedHandles;
-    for (auto h : _sent_handles) {
+    std::vector<MessageHandlePtr> finishedHandles;
+    for (auto& h : _sent_handles) {
         if (h->testSent()) {
             // Sending operation completed
             Console::log(Console::VVVERB, "Msg ID=%i isent", h->id);
-            finishedHandles.insert(h);
+            finishedHandles.push_back(h);
         }
     }
-    for (auto h : finishedHandles) {
+    for (auto& h : finishedHandles) {
         _sent_handles.erase(h);
     }
 }

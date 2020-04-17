@@ -169,15 +169,15 @@ void Worker::mainProgram() {
             }
         }
 
-        // Solve loop for active HordeLib instance
+        // Check active HordeLib instance
         float jobTime = 0;
-        if (currentJob != NULL && Timer::elapsedSeconds()-lastJobCheckTime >= jobCheckPeriod) {
+        if (!isIdle() && Timer::elapsedSeconds()-lastJobCheckTime >= jobCheckPeriod) {
             jobTime = Timer::elapsedSeconds();
             lastJobCheckTime = jobTime;
 
             Job &job = *currentJob;
-
             int id = job.getId();
+
             bool abort = false;
             if (job.isRoot()) abort = checkComputationLimits(id);
             if (abort) {
@@ -1111,28 +1111,35 @@ void Worker::finishBalancing() {
 
 void Worker::allreduceSystemState() {
 
-    float timeSinceLast = Timer::elapsedSeconds()-lastSystemStateReduce;
-    if (!reducingSystemState && timeSinceLast >= 1.0) {
-        lastSystemStateReduce = Timer::elapsedSeconds();
-        myState[0] = isIdle() ? 0.0f : 1.0f;
-        myState[1] = currentJob != NULL && currentJob->isRoot() ? 1.0f : 0.0f;
-        systemState[0] = 0.0f;
-        systemState[1] = 0.0f;
-        systemState[2] = 0.0f;
-        systemStateReq = MyMpi::iallreduce(comm, myState, systemState, 3);
-        reducingSystemState = true;
-    } else if (reducingSystemState) {
-        MPI_Status status;
-        bool done = MyMpi::test(systemStateReq, status);
-        if (done) {
-            reducingSystemState = false;
-            int verb = (worldRank == 0 ? Console::INFO : Console::VVVVERB);
-            Console::log(verb, "sysstate busy=%.2f%% jobs=%i accmem=%.2fGB", 100*systemState[0]/MyMpi::size(comm), (int)systemState[1], systemState[2]);
-        } else if (lastSystemStateReduce > 0 && timeSinceLast > 10) {
-            Console::log(Console::CRIT, "Unresponsive node(s) since 10 seconds! Aborting");
-            abort();
+    static float lastCheck = 0;
+
+    float time = Timer::elapsedSeconds();
+    if (time-lastCheck > 0.1) {
+        lastCheck = time;
+        float timeSinceLast = time-lastSystemStateReduce;
+        if (!reducingSystemState && timeSinceLast >= 1.0) {
+            lastSystemStateReduce = time;
+            myState[0] = isIdle() ? 0.0f : 1.0f;
+            myState[1] = currentJob != NULL && currentJob->isRoot() ? 1.0f : 0.0f;
+            systemState[0] = 0.0f;
+            systemState[1] = 0.0f;
+            systemState[2] = 0.0f;
+            systemStateReq = MyMpi::iallreduce(comm, myState, systemState, 3);
+            reducingSystemState = true;
+        } else if (reducingSystemState) {
+            MPI_Status status;
+            bool done = MyMpi::test(systemStateReq, status);
+            if (done) {
+                reducingSystemState = false;
+                int verb = (worldRank == 0 ? Console::INFO : Console::VVVVERB);
+                Console::log(verb, "sysstate busy=%.2f%% jobs=%i accmem=%.2fGB", 100*systemState[0]/MyMpi::size(comm), (int)systemState[1], systemState[2]);
+            } else if (lastSystemStateReduce > 0 && timeSinceLast > 10) {
+                Console::log(Console::CRIT, "Unresponsive node(s) since 10 seconds! Aborting");
+                abort();
+            }
         }
     }
+
 }
 
 void Worker::timeoutJob(int jobId) {
@@ -1162,23 +1169,20 @@ bool Worker::checkComputationLimits(int jobId) {
     assert(elapsedTime >= 0);
 
     // Calculate CPU seconds: (volume during last epoch) * #threads * (effective time of last epoch) 
-    float newCpuTime = (jobVolumes.count(jobId) ? jobVolumes[jobId] : 1) * params.getIntParam("t") * elapsedTime;
+    float newCpuTime = (jobVolumes.count(jobId) ? jobVolumes[jobId] : 1) * numThreads * elapsedTime;
     assert(newCpuTime >= 0);
     jobCpuTimeUsed[jobId] += newCpuTime;
-    float cpuLimit = params.getFloatParam("cpuh-per-instance")*3600.f;
-    bool hasCpuLimit = cpuLimit > 0;
+    bool hasCpuLimit = cpuSecsPerInstance > 0;
     
-    if (hasCpuLimit && jobCpuTimeUsed[jobId] > cpuLimit) {
+    if (hasCpuLimit && jobCpuTimeUsed[jobId] > cpuSecsPerInstance) {
         // Job exceeded its cpu time limit
         Console::log(Console::INFO, "#%i CPU TIMEOUT: aborting", jobId);
         terminate = true;
 
     } else {
-
         // Calculate wall clock time
         float jobAge = currentJob->getAge();
-        float timeLimit = params.getFloatParam("time-per-instance");
-        if (timeLimit > 0 && jobAge > timeLimit) {
+        if (wcSecsPerInstance > 0 && jobAge > wcSecsPerInstance) {
             // Job exceeded its wall clock time limit
             Console::log(Console::INFO, "#%i WALLCLOCK TIMEOUT: aborting", jobId);
             terminate = true;

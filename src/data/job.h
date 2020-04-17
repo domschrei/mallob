@@ -284,7 +284,7 @@ public:
     int getRevision() const {return _description.getRevision();};
     const JobResult& getResult() const;
     // Returns -1 if no job communication is intended. Returns the current job comm epoch (by elapsed seconds) otherwise.
-    int getJobCommEpoch() const {return _params.getFloatParam("s") <= 0 ? -1 : (int)(Timer::elapsedSeconds() / _params.getFloatParam("s"));}
+    int getJobCommEpoch() const {return _job_comm_period <= 0 ? -1 : (int)(Timer::elapsedSeconds() / _job_comm_period);}
     // Elapsed seconds since the job's constructor call.
     float getAge() const {return Timer::elapsedSeconds() - _elapsed_seconds_since_arrival;}
     // Elapsed seconds since initialization was ended.

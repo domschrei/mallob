@@ -31,6 +31,9 @@ private:
     float loadFactor;
     float globalTimeout;
     float balancePeriod;
+    int numThreads;
+    float wcSecsPerInstance;
+    float cpuSecsPerInstance;
 
     std::map<int, Job*> jobs;
     std::map<int, JobRequest> jobCommitments;
@@ -69,6 +72,9 @@ public:
             assert(0 < loadFactor && loadFactor < 1.0);
             globalTimeout = params.getFloatParam("T");
             balancePeriod = params.getFloatParam("p");
+            numThreads = params.getIntParam("t");
+            wcSecsPerInstance = params.getFloatParam("time-per-instance");
+            cpuSecsPerInstance = 3600 * params.getFloatParam("cpuh-per-instance");
             load = 0;
             lastLoadChange = Timer::elapsedSeconds();
             currentJob = NULL;
