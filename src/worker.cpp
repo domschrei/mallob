@@ -595,6 +595,8 @@ void Worker::handleAcceptAdoptionOffer(MessageHandlePtr& handle) {
                         jobStr(req.jobId, req.requestedNodeIndex).c_str(), job.jobStateToStr());
             setLoad(1, req.jobId);
             job.reactivate(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
+            // Query volume of job
+            MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_QUERY_VOLUME, IntVec({req.jobId}));
         }
         // Erase job commitment
         jobCommitments.erase(sig.jobId);
