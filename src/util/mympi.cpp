@@ -36,7 +36,7 @@ bool MessageHandle::testSent() {
     assert(!selfMessage || Console::fail("Attempting to MPI_Test a self message!"));
     if (finished) return true;
     int flag = 0;
-    MPICALL(MPI_Test(&request, &flag, &status), "testsent-id" + std::to_string(id))
+    MPICALL(MPI_Test(&request, &flag, &status), "testsent" + std::to_string(id))
     if (flag) finished = true;
     return finished;
 }
@@ -53,7 +53,7 @@ bool MessageHandle::testReceived() {
     } else {
         // MPI_Test message
         int flag = -1;
-        MPICALL(MPI_Test(&request, &flag, &status), "testrecvd-id" + std::to_string(id))
+        MPICALL(MPI_Test(&request, &flag, &status), "testrecvd" + std::to_string(id))
         if (flag) {
             finished = true;
             tag = status.MPI_TAG;
@@ -65,7 +65,7 @@ bool MessageHandle::testReceived() {
     // Resize received data vector to actual received size
     if (finished && !selfMessage) {
         int count = 0;
-        MPICALL(MPI_Get_count(&status, MPI_BYTE, &count), "getCount-id" + std::to_string(id))
+        MPICALL(MPI_Get_count(&status, MPI_BYTE, &count), "getcount" + std::to_string(id))
         if (count > 0 && count < recvData->size()) {
             recvData->resize(count);
         }
@@ -163,7 +163,7 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
         handle->source = recvRank;
         handle->selfMessage = true;
     } else {
-        MPICALL(MPI_Isend(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator, &handle->request), std::string("isend"))
+        MPICALL(MPI_Isend(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator, &handle->request), "isend"+std::to_string(handle->id))
     }
 
     (selfMessage ? _handles : _sent_handles).insert(handle);
@@ -186,7 +186,7 @@ MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const
         handle->selfMessage = true;
         _handles.insert(handle);
     } else {
-        MPICALL(MPI_Send(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator), std::string("send"))
+        MPICALL(MPI_Send(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator), "send"+std::to_string(handle->id))
     }
     Console::log(Console::VVVERB, "Msg ID=%i sent.", handle->id);
     return handle;
@@ -212,7 +212,7 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
     }
 
     handle->recvData->resize(msgSize);
-    MPICALL(MPI_Irecv(handle->recvData->data(), msgSize, MPI_BYTE, source, tag, communicator, &handle->request), std::string("irecv"))
+    MPICALL(MPI_Irecv(handle->recvData->data(), msgSize, MPI_BYTE, source, tag, communicator, &handle->request), "irecv"+std::to_string(handle->id))
     _handles.insert(handle);
     return handle;
 }
@@ -223,7 +223,7 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag, int si
     handle->source = source;
     handle->tag = tag;
     handle->recvData->resize(size);
-    MPICALL(MPI_Irecv(handle->recvData->data(), size, MPI_BYTE, source, tag, communicator, &handle->request), std::string("irecv"))
+    MPICALL(MPI_Irecv(handle->recvData->data(), size, MPI_BYTE, source, tag, communicator, &handle->request), "irecv"+std::to_string(handle->id))
     _handles.insert(handle);
     return handle;
 }
@@ -232,10 +232,10 @@ MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag, int size) {
     MessageHandlePtr handle(new MessageHandle(nextHandleId()));
     handle->tag = tag;
     handle->recvData->resize(size);
-    MPICALL(MPI_Recv(handle->recvData->data(), size, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->status), std::string("recv"))
+    MPICALL(MPI_Recv(handle->recvData->data(), size, MPI_BYTE, MPI_ANY_SOURCE, tag, communicator, &handle->status), "recv"+std::to_string(handle->id))
     handle->source = handle->status.MPI_SOURCE;
     int count = 0;
-    MPICALL(MPI_Get_count(&handle->status, MPI_BYTE, &count), std::string("getcount"))
+    MPICALL(MPI_Get_count(&handle->status, MPI_BYTE, &count), "getcount"+std::to_string(handle->id))
     if (count < size) {
         handle->recvData->resize(count);
     }
