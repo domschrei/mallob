@@ -40,7 +40,6 @@
 
 #include "utilities/DebugUtils.h"
 #include "utilities/mympi.h"
-#include "utilities/Logger.h"
 #include "utilities/default_logging_interface.h"
 
 #include <stdio.h>
@@ -62,7 +61,8 @@ HordeLib::HordeLib(int argc, char** argv) {
 HordeLib::HordeLib(const std::map<std::string, std::string>& map, std::shared_ptr<LoggingInterface> loggingInterface) {
 	
 	if (loggingInterface != NULL) {
-		setLogger(loggingInterface);
+		this->logger = loggingInterface;
+		params.setLogger(this->logger);
 	}
 
     for (auto it = map.begin(); it != map.end(); ++it) {
@@ -74,13 +74,13 @@ HordeLib::HordeLib(const std::map<std::string, std::string>& map, std::shared_pt
 void HordeLib::init() {
 
 	if (logger == NULL) {
-		std::shared_ptr<LoggingInterface> logInterface = std::shared_ptr<LoggingInterface>(
+		logger = std::shared_ptr<LoggingInterface>(
 			new DefaultLoggingInterface(params.getIntParam("v", 1), std::string(params.getParam("jobstr", "")))
 		);
-		setLoggingInterface(logInterface);
+		params.setLogger(logger);
 	}
 
-    startSolving = getTime();
+    startSolving = logger->getTime();
 
 	sharingManager = NULL;
     solvingState = INITIALIZING;
@@ -95,7 +95,7 @@ void HordeLib::init() {
 
 	char hostname[1024];
 	gethostname(hostname, 1024);
-	hlog(0, "HordeSat ($Revision: 160$) on host %s, job %s, params: ",
+	hlog(0, "HorDSat on host %s, job %s, params: ",
 			hostname, params.getParam("jobstr").c_str());
 	params.printParams();
 
@@ -106,19 +106,19 @@ void HordeLib::init() {
 	for (int i = 0; i < solversCount; i++) {
 		if (params.getParam("s") == "minisat") {
 			solvers.push_back(new MiniSat());
-			hlog(3, "Running MiniSat on core %d\n", i, mpi_rank, mpi_size);
+			hlog(3, "MiniSat @ %d\n", i, mpi_rank, mpi_size);
 		} else if (params.getParam("s") == "combo") {
 			if ((mpi_rank + i) % 2 == 0) {
 				solvers.push_back(new MiniSat());
-				hlog(3, "Running MiniSat on core %d\n", i, mpi_rank, mpi_size);
+				hlog(3, "MiniSat @ %d\n", i, mpi_rank, mpi_size);
 			} else {
 				solvers.push_back(new Lingeling());
-				hlog(3, "Running Lingeling on core %d\n", i, mpi_rank, mpi_size);
+				hlog(3, "Lingeling @ %d\n", i, mpi_rank, mpi_size);
 			}
 		} else {
             Lingeling *lgl = new Lingeling();
 			solvers.push_back(lgl);
-			hlog(3, "Running Lingeling on core %d\n", i, mpi_rank, mpi_size);
+			hlog(3, "Lingeling @ %d\n", i, mpi_rank, mpi_size);
 		}
 		// set solver id
 		solvers[i]->solverId = i + solversCount * mpi_rank;
@@ -137,11 +137,6 @@ void HordeLib::init() {
 		sharingManager = new DefaultSharingManager(mpi_size, mpi_rank, solvers, params);
 		hlog(3, "Initialized all-to-all clause sharing.\n");
 	}
-}
-
-void HordeLib::setLogger(std::shared_ptr<LoggingInterface> loggingInterface) {
-	this->logger = loggingInterface;
-	setLoggingInterface(loggingInterface);
 }
 
 void* solverRunningThread(void* arg) {
@@ -183,7 +178,7 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 		auto lock = solvingStateLock.getLock();
 		setSolvingState(ACTIVE);
 	}
-	startSolving = getTime() - startSolving;
+	startSolving = logger->getTime() - startSolving;
 	hlog(3, "started solver threads, took %.3f seconds\n", startSolving);
 }
 
@@ -217,9 +212,7 @@ bool HordeLib::isFullyInitialized() {
 
 int HordeLib::solveLoop() {
 
-	setLogger(logger);
-
-    double timeNow = getTime();
+    double timeNow = logger->getTime();
 	// Sleeping?
     if (sleepInt > 0) {
         usleep(sleepInt);
@@ -318,7 +311,6 @@ void HordeLib::abort() {
 void HordeLib::setSolvingState(SolvingState state) {
 	SolvingState oldState = this->solvingState;
 	this->solvingState = state;
-	setLogger(logger);
 
 	hlog(2, "state transition %s -> %s\n", SolvingStateNames[oldState], SolvingStateNames[state]);
 	
@@ -408,7 +400,7 @@ void HordeLib::hlog(int verbosityLevel, const char* fmt, ...) {
 
 HordeLib::~HordeLib() {
 
-	double time = getTime();
+	double time = logger->getTime();
 
 	hlog(3, "entering destructor\n");
 
@@ -446,7 +438,6 @@ HordeLib::~HordeLib() {
 		f = NULL;
 	}
 
-	time = getTime() - time;
-	setLogger(logger);
+	time = logger->getTime() - time;
 	hlog(0, "leaving destructor, took %.3f s\n", time);
 }

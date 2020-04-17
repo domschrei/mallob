@@ -27,6 +27,7 @@ protected:
 	vector<ClauseFilter*> solverFilters;
 	// global parameters
 	ParameterProcessor& params;
+	LoggingInterface& logger;
 
 	ClauseDatabase cdb;
 	ClauseFilter nodeFilter;

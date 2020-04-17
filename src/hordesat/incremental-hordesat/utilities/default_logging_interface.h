@@ -28,7 +28,13 @@ public:
     double getTime() override {
         return getAbsoluteTimeLP() - start;
     }
-    void log(int verbosityLevel, const char* fmt, va_list args) override {
+    void log(int verbosityLevel, const char* fmt, ...) override {
+        va_list vl;
+        va_start(vl, fmt);
+        log_va_list(verbosityLevel, fmt, vl);
+        va_end(vl);
+    }
+    void log_va_list(int verbosityLevel, const char* fmt, va_list args) override {
         if (verbosityLevel <= verbosity) {
             int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
             printf("[%.3f] ", getTime());
@@ -36,6 +42,14 @@ public:
             vprintf(fmt, args);
             //fflush(stdout);
         }
+    }
+    void exitError(const char* fmt, ...) override {
+        va_list vl;
+        va_start(vl, fmt);
+        log_va_list(-1, "Exiting due to critical error:", vl);
+        log_va_list(-1, fmt, vl);
+        va_end(vl);
+        this->abort();
     }
     void abort() override {
         exit(1);

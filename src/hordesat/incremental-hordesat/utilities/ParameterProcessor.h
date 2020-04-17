@@ -9,11 +9,15 @@
 #define PARAMETERPROCESSOR_H_
 
 #include "string.h"
+#include "stdlib.h"
+
 #include <map>
 #include <string>
 #include <iostream>
-#include "stdlib.h"
-#include "Logger.h"
+#include <memory>
+#include <assert.h>
+
+#include "logging_interface.h"
 
 using namespace std;
 
@@ -22,6 +26,8 @@ class ParameterProcessor {
 private:
 	map<string, string> params;
 	char* filename;
+	std::shared_ptr<LoggingInterface> logger = NULL;
+
 public:
 	ParameterProcessor() {
 		filename = NULL;
@@ -45,6 +51,14 @@ public:
 		}
 	}
 
+	void setLogger(std::shared_ptr<LoggingInterface>& logger) {
+		this->logger = logger;
+	}
+	LoggingInterface& getLogger() {
+		assert(logger != NULL);
+		return *logger;
+	}
+
 	const char* getFilename() {
 		return filename;
 	}
@@ -58,7 +72,8 @@ public:
 				out.append(it->first + "=" + it->second + " ");
 			}
 		}
-		log(0, out.c_str());
+		assert(logger != NULL);
+		logger->log(0, out.c_str());
 	}
 
 	void setParam(const char* name) {

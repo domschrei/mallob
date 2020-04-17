@@ -77,7 +77,6 @@ public:
     HordeLib(const std::map<std::string, std::string>& params, std::shared_ptr<LoggingInterface> loggingInterface = NULL);
 	virtual ~HordeLib();
 
-	void setLogger(std::shared_ptr<LoggingInterface> loggingInterface);
 	ParameterProcessor& getParams() {return params;}
 
     void beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 

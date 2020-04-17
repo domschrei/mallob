@@ -126,7 +126,7 @@ void SolverThread::diversify() {
         mpi_size != std::get<1>(_diversification_seed)) {
         
         // Rank or size changed: New diversification needed
-        _diversification_seed = std::tuple<int, int, int>(mpi_rank, mpi_size, (int)(100*getTime()));
+        _diversification_seed = std::tuple<int, int, int>(mpi_rank, mpi_size, (int)(100*hlib->logger->getTime()));
     }
 
     // Random seed: will be the same whenever rank and size stay the same,

@@ -10,7 +10,9 @@
 
 #include <vector>
 #include <list>
+
 #include "Threading.h"
+#include "logging_interface.h"
 
 using namespace std;
 
@@ -30,6 +32,7 @@ size_t countDiffs(const int* arr1, const int* arr2, const size_t size);
 class ClauseManager {
 
 private:
+	LoggingInterface& logger;
 	const size_t hotRounds, warmRounds, signatureSize, signatureBits, clauseBufferSize;
 	int* signature;
 	size_t currentRound;
@@ -39,7 +42,7 @@ private:
 	Mutex clsLock;
 
 public:
-	ClauseManager(size_t hotRounds, size_t warmRounds, size_t signatureSize, size_t clauseBufferSize);
+	ClauseManager(LoggingInterface& logger, size_t hotRounds, size_t warmRounds, size_t signatureSize, size_t clauseBufferSize);
 	bool addClause(const vector<int>& cls);
 	int importClauses(const int* clauseBuffer, vector<vector<int> >& newClauses, vector<vector<int> >& vipClauses);
 	size_t getClauseCount();

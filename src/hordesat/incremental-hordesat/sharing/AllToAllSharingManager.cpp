@@ -9,12 +9,11 @@
 
 #include "AllToAllSharingManager.h"
 #include "../utilities/mympi.h"
-#include "../utilities/Logger.h"
-
 
 DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
 		vector<PortfolioSolverInterface*>& solvers, ParameterProcessor& params)
-	:size(mpi_size),rank(mpi_rank),solvers(solvers),params(params),callback(*this) {
+	:size(mpi_size),rank(mpi_rank),solvers(solvers),params(params),callback(*this),
+	logger(params.getLogger()) {
     for (size_t i = 0; i < solvers.size(); i++) {
 		solvers[i]->setLearnedClauseCallback(&callback, i);
 		if (solvers.size() > 1) {
@@ -33,15 +32,15 @@ std::vector<int> DefaultSharingManager::prepareSharing(int maxSize) {
 	}
 	int selectedCount;
 	int used = cdb.giveSelection(outBuffer, maxSize, &selectedCount);
-	log(3, "Prepared %i clauses, size %i\n", selectedCount, used);
+	logger.log(3, "Prepared %i clauses, size %i\n", selectedCount, used);
 	stats.sharedClauses += selectedCount;
 	int usedPercent = (100*used)/maxSize;
 	if (usedPercent < 80) {
 		int increaser = lastInc++ % solvers.size();
 		solvers[increaser]->increaseClauseProduction();
-		log(3, "Node %d production increase for %d. time, core %d will increase.\n", rank, prodInc++, increaser);
+		logger.log(3, "Node %d production increase for %d. time, core %d will increase.\n", rank, prodInc++, increaser);
 	}
-	log(3, "Filled %d%% of buffer\n", usedPercent);
+	logger.log(3, "Filled %d%% of buffer\n", usedPercent);
     std::vector<int> clauseVec(outBuffer, outBuffer + used);
 
     return clauseVec;
@@ -81,7 +80,7 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 	stats.filteredClauses += failedFilter;
 	stats.importedClauses += passedFilter;
 	if (total > 0) {
-		log(2, "filtered %d%% (%d/%d), avg len %.2f\n",
+		logger.log(2, "filtered %d%% (%d/%d), avg len %.2f\n",
 				100*failedFilter/total,
 				failedFilter, total, totalLen/(float)total);
 	}

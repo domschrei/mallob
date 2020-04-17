@@ -8,7 +8,6 @@
 #include "ClauseManager.h"
 #include "ClauseFilter.h"
 #include <string.h>
-#include "Logger.h"
 #include "DebugUtils.h"
 #include <limits.h>
 
@@ -44,13 +43,13 @@ size_t countDiffs(const int* arr1, const int* arr2, const size_t size) {
 }
 
 
-ClauseManager::ClauseManager(size_t hotRounds, size_t warmRounds, size_t signatureSize, size_t clauseBufferSize)
-	:hotRounds(hotRounds), warmRounds(warmRounds), signatureSize(signatureSize),
+ClauseManager::ClauseManager(LoggingInterface& logger, size_t hotRounds, size_t warmRounds, size_t signatureSize, size_t clauseBufferSize)
+	: logger(logger), hotRounds(hotRounds), warmRounds(warmRounds), signatureSize(signatureSize),
 	 signatureBits(signatureSize * (sizeof(int)<<3)), clauseBufferSize(clauseBufferSize),
 	 currentRound(0), clausesCount(0) {
 	signature = new int[signatureSize];
 	memset(signature, 0, sizeof(int)*signatureSize);
-	log(0, "Hot rounds limit %lu warm rounds limit %lu\n", hotRounds, warmRounds);
+	logger.log(0, "Hot rounds limit %lu warm rounds limit %lu\n", hotRounds, warmRounds);
 }
 
 size_t ClauseManager::getSignatureDiffCount(const int* signature) {
@@ -185,7 +184,7 @@ void ClauseManager::filterHot(int* exportClauses, const int* signature) {
 	}
 	exportClauses[0] = added;
 	clsLock.unlock();
-	log(3, "ClauseManager: round %lu all-clauses %lu warm %lu hot %lu, shared-clauses %d, avg len %f\n",
+	logger.log(3, "ClauseManager: round %lu all-clauses %lu warm %lu hot %lu, shared-clauses %d, avg len %f\n",
 			currentRound, clausesCount, warms, hots, added, totalLength/(float)added);
 }
 
