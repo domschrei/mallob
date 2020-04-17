@@ -282,6 +282,7 @@ private:
 
 public:
     static int _max_msg_length;
+    static bool _monitor_off;
 
     static void init(int argc, char *argv[]);
     static void beginListening(const ListenerMode& mode);
@@ -317,7 +318,6 @@ public:
 
     // defined in mpi_monitor.*
     static std::string currentCall(double* callStart);
-    static void turnOffMonitor();
 
 
 private:
