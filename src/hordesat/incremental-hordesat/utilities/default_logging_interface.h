@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <sys/time.h>
+#include <string>
 
 #include "logging_interface.h"
 #include "utilities/mympi.h"
