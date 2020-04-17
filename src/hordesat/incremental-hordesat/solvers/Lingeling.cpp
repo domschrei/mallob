@@ -38,7 +38,7 @@ int termCallback(void* solverPtr) {
         // Stay inside this function call as long as solver is suspended
 		slog(lp, 2, "SUSPEND (%.4fs since last cb)", elapsed);
 
-		lp->suspendCond.wait(lp->suspendMutex, [&]{return !lp->suspendSolver;});
+		lp->suspendCond.wait(lp->suspendMutex, [&lp]{return !lp->suspendSolver;});
 		slog(lp, 2, "RESUME");
 
 		if (lp->stopSolver) {
@@ -258,19 +258,17 @@ set<int> Lingeling::getFailedAssumptions() {
 
 // Add a permanent clause to the formula
 void Lingeling::addClause(vector<int>& clause) {
-	clauseAddMutex.lock();
+	auto lock = clauseAddMutex.getLock();
 	clausesToAdd.push_back(clause);
-	clauseAddMutex.unlock();
 }
 
 void Lingeling::addClauses(vector<vector<int> >& clauses) {
-	clauseAddMutex.lock();
+	auto lock = clauseAddMutex.getLock();
 	clausesToAdd.insert(clausesToAdd.end(), clauses.begin(), clauses.end());
-	clauseAddMutex.unlock();
 }
 
 void Lingeling::addClauses(const vector<int>& clauses) {
-	clauseAddMutex.lock();
+	auto lock = clauseAddMutex.getLock();
 	vector<int> clause;
 	for (size_t i = 0; i < clauses.size(); i++) {
 		int lit = clauses[i];
@@ -281,7 +279,6 @@ void Lingeling::addClauses(const vector<int>& clauses) {
 			clause.push_back(lit);	
 		}
 	}
-	clauseAddMutex.unlock();
 }
 
 void Lingeling::addLiteral(int lit) {
@@ -314,17 +311,16 @@ void Lingeling::addInitialClauses(const vector<int>& clauses) {
 
 // Add a learned clause to the formula
 void Lingeling::addLearnedClause(vector<int>& clause) {
-	clauseAddMutex.lock();
+	auto lock = clauseAddMutex.getLock();
 	if (clause.size() == 1) {
 		unitsToAdd.push_back(clause[0]);
 	} else {
 		learnedClausesToAdd.push_back(clause);
 	}
-	clauseAddMutex.unlock();
 }
 
 void Lingeling::addLearnedClauses(vector<vector<int> >& clauses) {
-	clauseAddMutex.lock();
+	auto lock = clauseAddMutex.getLock();
 	for (size_t i = 0; i < clauses.size(); i++) {
 		if (clauses[i].size() == 1) {
 			unitsToAdd.push_back(clauses[i][0]);
@@ -332,7 +328,6 @@ void Lingeling::addLearnedClauses(vector<vector<int> >& clauses) {
 			learnedClausesToAdd.push_back(clauses[i]);
 		}
 	}
-	clauseAddMutex.unlock();
 }
 
 void Lingeling::increaseClauseProduction() {

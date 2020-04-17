@@ -256,9 +256,8 @@ void SolverThread::runOnce() {
 }
 
 void SolverThread::waitWhile(SolvingState state) {
-
     if (hlib->solvingState != state) return;
-    hlib->stateChangeCond.wait(hlib->solvingStateLock, [&]{return this->hlib->solvingState != state;});
+    hlib->stateChangeCond.wait(hlib->solvingStateLock, [&]{return hlib->solvingState != state;});
 }
 
 bool SolverThread::cancelRun() {
