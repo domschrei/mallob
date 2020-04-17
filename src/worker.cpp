@@ -1396,6 +1396,7 @@ void Worker::deleteJob(int jobId) {
 
     if (!hasJob(jobId)) return;
     Job& job = getJob(jobId);
+    int index = job.getIndex();
     Console::log(Console::VVERB, "Delete %s", job.toStr());
 
     // Join and delete initializer thread
@@ -1411,7 +1412,7 @@ void Worker::deleteJob(int jobId) {
     jobs.erase(jobId);
     delete &job;
 
-    Console::log(Console::VERB, "Deleted %s", job.toStr());
+    Console::log(Console::VERB, "Deleted %s", jobStr(jobId, index).c_str());
 }
 
 Worker::~Worker() {
