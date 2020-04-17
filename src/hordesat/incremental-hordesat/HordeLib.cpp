@@ -393,7 +393,7 @@ int HordeLib::failed(int lit) {
 void HordeLib::hlog(int verbosityLevel, const char* fmt, ...) {
 	va_list vl;
     va_start(vl, fmt);
-	logger->log(verbosityLevel, fmt, vl);
+	logger->log_va_list(verbosityLevel, fmt, vl);
 	va_end(vl);
 }
 
