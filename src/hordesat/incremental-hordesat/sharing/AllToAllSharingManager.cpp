@@ -13,7 +13,7 @@
 DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
 		vector<PortfolioSolverInterface*>& solvers, ParameterProcessor& params)
 	:size(mpi_size),rank(mpi_rank),solvers(solvers),params(params),logger(params.getLogger()),
-	cdb(logger),nodeFilter(true),callback(*this) {
+	cdb(logger),nodeFilter(false),callback(*this) {
     for (size_t i = 0; i < solvers.size(); i++) {
 		if (solvers.size() > 1) {
 			solverFilters.push_back(new ClauseFilter());
