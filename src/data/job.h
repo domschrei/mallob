@@ -331,21 +331,19 @@ public:
     void setLeftChild(int rank);
     void setRightChild(int rank);
     void unsetLeftChild() {
+        if (!_has_left_child) return; 
         int rank = getLeftChildNodeRank();
-        if (_has_left_child) {
-            _past_children.insert(rank);
-            addDormantChild(rank);
-            _has_left_child = false;
-        }
+        _past_children.insert(rank);
+        addDormantChild(rank);
+        _has_left_child = false;
         if (wantsToCommunicate()) communicate();
     }
     void unsetRightChild() {
+        if (!_has_right_child) return;
         int rank = getRightChildNodeRank();
-        if (_has_right_child) {
-            _past_children.insert(rank); 
-            addDormantChild(rank);
-            _has_right_child = false;
-        }
+        _past_children.insert(rank); 
+        addDormantChild(rank);
+        _has_right_child = false;
         if (wantsToCommunicate()) communicate();
     }
     void updateJobNode(int index, int newRank) {_job_node_ranks.adjust(index, newRank);}
