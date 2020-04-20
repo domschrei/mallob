@@ -66,9 +66,13 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 	int passedFilter = 0;
 	int failedFilter = 0;
 	long totalLen = 0;
+	int minLen = result.size();
+	int maxLen = 0;
 	vector<vector<int> > clausesToAdd;
 	while (cdb.getNextIncomingClause(cl)) {
 		totalLen += cl.size();
+		minLen = std::min(minLen, (int)cl.size());
+		maxLen = std::max(maxLen, (int)cl.size());
 		if (nodeFilter.registerClause(cl)) {
 			clausesToAdd.push_back(cl);
 			passedFilter++;
@@ -80,9 +84,9 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 	stats.filteredClauses += failedFilter;
 	stats.importedClauses += passedFilter;
 	if (total > 0) {
-		logger.log(1, "filtered %d%% (%d/%d), avg len %.2f\n",
-				100*failedFilter/total,
-				failedFilter, total, totalLen/(float)total);
+		logger.log(1, "filtered %d%% (%d/%d), min/avg/max %d/%.2f/%d\n",
+				100*failedFilter/total, failedFilter, total, 
+				minLen, totalLen/(float)total, maxLen);
 	}
 	for (size_t sid = 0; sid < solvers.size(); sid++) {
 		solvers[sid]->addLearnedClauses(clausesToAdd);
