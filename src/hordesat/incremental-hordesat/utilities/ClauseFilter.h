@@ -10,6 +10,7 @@
 
 #include <vector>
 #include <bitset>
+#include <unordered_set>
 
 using namespace std;
 
@@ -42,6 +43,7 @@ public:
 
 private:
 	bitset<NUM_BITS>* s1;
+	std::unordered_set<int> units;
 
 };
 

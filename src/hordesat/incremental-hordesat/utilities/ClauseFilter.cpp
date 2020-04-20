@@ -46,8 +46,11 @@ ClauseFilter::~ClauseFilter() {
 }
 
 bool ClauseFilter::registerClause(const vector<int>& cls) {
-	// unit clauses always get in
+	
+	// unit clauses are checked explicitly
 	if (cls.size() == 1) {
+		if (units.count(cls[0])) return false;
+		units.insert(cls[0]);
 		return true;
 	}
 
