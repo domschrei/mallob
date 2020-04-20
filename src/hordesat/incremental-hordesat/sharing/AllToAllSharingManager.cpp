@@ -70,10 +70,6 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 	int maxLen = 0;
 	vector<vector<int> > clausesToAdd;
 	while (cdb.getNextIncomingClause(cl)) {
-		if (cl.empty()) logger.log(3, "EMPTY CLAUSE\n");
-		if (cl.size() == 1) {
-			logger.log(3, "UNIT CLAUSE %i\n", cl[0]);
-		}
 		totalLen += cl.size();
 		minLen = std::min(minLen, (int)cl.size());
 		maxLen = std::max(maxLen, (int)cl.size());
