@@ -21,6 +21,7 @@ using namespace std;
 class ClauseFilter {
 public:
 	ClauseFilter();
+	ClauseFilter(bool checkUnits) : checkUnits(checkUnits) {}
 	virtual ~ClauseFilter();
 	/**
 	 * Return false if the given clause has already been registered
@@ -44,6 +45,7 @@ public:
 
 private:
 	bitset<NUM_BITS>* s1;
+	bool checkUnits = false;
 	std::unordered_set<int> units;
 	std::mutex unitLock;
 };

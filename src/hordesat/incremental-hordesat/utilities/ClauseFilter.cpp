@@ -49,7 +49,7 @@ bool ClauseFilter::registerClause(const vector<int>& cls) {
 	// unit clauses are checked explicitly
 	if (cls.size() == 1) {
 		if (units.count(cls.at(0))) return false;
-		auto lock = std::unique_lock<std::mutex>(unitLock);
+		//auto lock = std::unique_lock<std::mutex>(unitLock);
 		units.insert(cls.at(0));
 		return true;
 	}
