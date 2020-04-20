@@ -11,6 +11,7 @@
 #include <vector>
 #include <bitset>
 #include <unordered_set>
+#include <mutex>
 
 using namespace std;
 
@@ -44,7 +45,7 @@ public:
 private:
 	bitset<NUM_BITS>* s1;
 	std::unordered_set<int> units;
-
+	std::mutex unitLock;
 };
 
 #endif /* CLAUSEFILTER_H_ */
