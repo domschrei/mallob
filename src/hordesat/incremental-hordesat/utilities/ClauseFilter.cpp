@@ -46,7 +46,7 @@ ClauseFilter::~ClauseFilter() {
 }
 
 bool ClauseFilter::registerClause(const vector<int>& cls) {
-	
+
 	// unit clauses are checked explicitly
 	if (cls.size() == 1) {
 		if (units.count(cls[0])) return false;
@@ -72,4 +72,5 @@ bool ClauseFilter::registerClause(const vector<int>& cls) {
 
 void ClauseFilter::clear() {
 	s1->reset();
+	units.clear();
 }
