@@ -1353,7 +1353,7 @@ void Worker::forgetOldJobs() {
             // Job must not be rooted here
             if (job.isRoot()) continue;
             // Insert job into PQ according to its age 
-            float age = job.getAgeSinceInitialized();
+            float age = job.getAgeSinceActivation();
             suspendedQueue.emplace(id, age);
         }
         if (job.isPast() || job.isForgetting()) {

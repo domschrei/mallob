@@ -116,7 +116,7 @@ public:
     This method has a valid default implementation based on system clock and the "s" arg value, 
     so it must not be re-implemented.
     */
-    virtual bool wantsToCommunicate() const;
+    virtual bool appl_wantsToBeginCommunication() const = 0;
     /*
     Begin a job communication phase from this node.
     */
@@ -137,7 +137,7 @@ public:
     Join all associated threads if any are left.
     */
     virtual ~Job();
-
+    
     /*
     Measure for the age of a job -- decreases with time.
     Do not reimplement for now.
@@ -158,10 +158,10 @@ private:
 
     EpochCounter& _epoch_counter;
     int _epoch_of_arrival;
-    float _elapsed_seconds_since_arrival;
-    float _last_job_comm_remainder = 0;
+    float _time_of_arrival;
     float _time_of_initialization = 0;
     float _time_of_abort = 0;
+    float _time_of_last_comm = 0;
 
     JobState _state;
     bool _has_description;
@@ -172,7 +172,6 @@ private:
     int _last_volume = 0;
     mutable double _last_temperature = 1.0;
     mutable int _age_of_const_cooldown = -1;
-    float _job_comm_period;
 
     AdjustablePermutation _job_node_ranks;
     bool _has_left_child;
@@ -224,6 +223,7 @@ public:
     // according to the job's internal state.
     void reactivate(int index, int rootRank, int parentRank);
 
+    bool wantsToCommunicate() const;
     // Initiate a communication with other nodes in the associated job tree.
     void communicate();
     
@@ -283,12 +283,10 @@ public:
     bool hasJobDescription() const {return _has_description;};
     int getRevision() const {return _description.getRevision();};
     const JobResult& getResult() const;
-    // Returns -1 if no job communication is intended. Returns the current job comm epoch (by elapsed seconds) otherwise.
-    int getJobCommEpoch() const {return _job_comm_period <= 0 ? -1 : (int)(Timer::elapsedSeconds() / _job_comm_period);}
     // Elapsed seconds since the job's constructor call.
-    float getAge() const {return Timer::elapsedSeconds() - _elapsed_seconds_since_arrival;}
+    float getAge() const {return Timer::elapsedSeconds() - _time_of_arrival;}
     // Elapsed seconds since initialization was ended.
-    float getAgeSinceInitialized() const {return Timer::elapsedSeconds() - _time_of_initialization;}
+    float getAgeSinceActivation() const {return Timer::elapsedSeconds() - _time_of_initialization;}
     // Elapsed seconds since termination of the job.
     float getAgeSinceAbort() const {return Timer::elapsedSeconds() - _time_of_abort;}
     // Return true iff this job instance has found a job result that it still needs to communicate.
@@ -339,6 +337,7 @@ public:
             addDormantChild(rank);
             _has_left_child = false;
         }
+        if (wantsToCommunicate()) communicate();
     }
     void unsetRightChild() {
         int rank = getRightChildNodeRank();
@@ -347,6 +346,7 @@ public:
             addDormantChild(rank);
             _has_right_child = false;
         }
+        if (wantsToCommunicate()) communicate();
     }
     void updateJobNode(int index, int newRank) {_job_node_ranks.adjust(index, newRank);}
     void updateParentNodeRank(int newRank) {

@@ -21,12 +21,10 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             _name("#" + std::to_string(jobId)),
             _epoch_counter(epochCounter), 
             _epoch_of_arrival(epochCounter.getEpoch()), 
-            _elapsed_seconds_since_arrival(Timer::elapsedSeconds()), 
+            _time_of_arrival(Timer::elapsedSeconds()), 
             _state(NONE),
             _has_description(false), 
             _initialized(false), 
-            //_job_manipulation_lock(VerboseMutex("JobManip#" + std::to_string(_id), &logMutex)),
-            _job_comm_period(params.getFloatParam("s")),
             _job_node_ranks(commSize, jobId),
             _has_left_child(false),
             _has_right_child(false)
@@ -62,7 +60,7 @@ void Job::addAmendment(std::shared_ptr<std::vector<uint8_t>>& data) {
 
 void Job::beginInitialization() {
     auto lock = _job_manipulation_lock.getLock();
-    _elapsed_seconds_since_arrival = Timer::elapsedSeconds();
+    _time_of_arrival = Timer::elapsedSeconds();
     switchState(INITIALIZING_TO_ACTIVE);
 }
 
@@ -76,8 +74,6 @@ void Job::endInitialization() {
     JobState oldState = _state;
     switchState(ACTIVE);
     Console::log(Console::INFO, "%s : initialization done", toStr());
-    if (_job_comm_period > 0)
-        _last_job_comm_remainder = (int)(Timer::elapsedSeconds() / _job_comm_period);
     _time_of_initialization = Timer::elapsedSeconds();
     if (oldState == INITIALIZING_TO_PAST) {
         lock.unlock();
@@ -120,6 +116,7 @@ void Job::reactivate(int index, int rootRank, int parentRank) {
         initialize(index, rootRank, parentRank);
 
     } else {
+        _time_of_initialization = Timer::elapsedSeconds();
 
         lockJobManipulation();
         if (index == _index) {
@@ -330,18 +327,11 @@ const JobResult& Job::getResult() const {
 }
 
 bool Job::wantsToCommunicate() const {
-    if (_job_comm_period <= 0.0f) {
-        // No communication
-        return false;
-    }
-    // Active leaf node initiates communication if s seconds have passed since last one
-    return isActive() && !hasLeftChild() && !hasRightChild() 
-            && getJobCommEpoch() > _last_job_comm_remainder;
+    if (!isActive()) return false;
+    return appl_wantsToBeginCommunication();
 }
 
 void Job::communicate() {
-    assert(_job_comm_period > 0.0f);
-    _last_job_comm_remainder = getJobCommEpoch();
     appl_beginCommunication();
 }
 

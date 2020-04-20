@@ -31,9 +31,11 @@ private:
     bool _done_locally;
 
     std::thread _bg_thread;
-    Mutex _horde_manipulation_lock;
+    mutable Mutex _horde_manipulation_lock;
 
     float _time_of_start_solving = 0;
+    float _time_of_last_comm = 0;
+    float _job_comm_period;
 
 public:
 
@@ -50,6 +52,7 @@ public:
     void appl_withdraw() override;
     int appl_solveLoop() override;
 
+    bool appl_wantsToBeginCommunication() const override;
     void appl_beginCommunication() override;
     void appl_communicate(int source, JobMessage& msg) override;
 

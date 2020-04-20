@@ -8,11 +8,11 @@
 #include "util/mympi.h"
 #include "util/console_horde_interface.h"
 #include "app/sat_job.h"
-#include "app/sat_clause_communicator.h"
+#include "app/anytime_sat_clause_communicator.h"
 #include "util/memusage.h"
 
 SatJob::SatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) : 
-        Job(params, commSize, worldRank, jobId, epochCounter), _done_locally(false) {
+        Job(params, commSize, worldRank, jobId, epochCounter), _done_locally(false), _job_comm_period(params.getFloatParam("s")) {
 }
 
 void SatJob::lockHordeManipulation() {
@@ -58,7 +58,7 @@ bool SatJob::appl_initialize() {
 
     Console::log(Console::VERB, "%s : creating horde instance", toStr());
     _solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(identifier))));
-    _clause_comm = (void*) new SatClauseCommunicator(_params, this);
+    _clause_comm = (void*) new AnytimeSatClauseCommunicator(_params, this);
 
     if (_abort_after_initialization) {
         return false;
@@ -141,7 +141,7 @@ void SatJob::appl_withdraw() {
         _abort_after_initialization = true;
     }
     if (_clause_comm != NULL) {
-        delete (SatClauseCommunicator*)_clause_comm;
+        delete (AnytimeSatClauseCommunicator*)_clause_comm;
         _clause_comm = NULL;
     }
     if (solverNotNull()) {
@@ -211,12 +211,26 @@ bool SatJob::appl_isDestructible() {
     return canLock;
 }
 
+ bool SatJob::appl_wantsToBeginCommunication() const {
+    if (_clause_comm == NULL) return false;
+    // Special "timed" conditions for leaf nodes:
+    if (isLeaf()) {
+        // At least half a second since initialization / reactivation
+        if (getAgeSinceActivation() < 0.5 * _job_comm_period) return false;
+        // At least params["s"] seconds since last communication 
+        if (Timer::elapsedSeconds()-_time_of_last_comm < _job_comm_period) return false;
+    }
+    auto lock = _horde_manipulation_lock.getLock();
+    return ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses(); 
+ }
+
 void SatJob::appl_beginCommunication() {
     Console::log(Console::VVVVERB, "begincomm");
     if (_clause_comm == NULL) return;
     auto lock = _horde_manipulation_lock.getLock();
     if (_clause_comm != NULL) 
-        ((SatClauseCommunicator*) _clause_comm)->initiateCommunication();
+        ((AnytimeSatClauseCommunicator*) _clause_comm)->sendClausesToParent();
+    if (isLeaf()) _time_of_last_comm = Timer::elapsedSeconds();
 }
 
 void SatJob::appl_communicate(int source, JobMessage& msg) {
@@ -224,7 +238,7 @@ void SatJob::appl_communicate(int source, JobMessage& msg) {
     if (_clause_comm == NULL) return;
     auto lock = _horde_manipulation_lock.getLock();
     if (_clause_comm != NULL)
-        ((SatClauseCommunicator*) _clause_comm)->continueCommunication(source, msg);
+        ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, msg);
 }
 
 SatJob::~SatJob() {
@@ -233,7 +247,7 @@ SatJob::~SatJob() {
     auto lock = _horde_manipulation_lock.getLock();
 
     if (_clause_comm != NULL) {
-        delete (SatClauseCommunicator*)_clause_comm;
+        delete (AnytimeSatClauseCommunicator*)_clause_comm;
         _clause_comm = NULL;
     }
 
