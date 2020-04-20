@@ -327,7 +327,7 @@ const JobResult& Job::getResult() const {
 }
 
 bool Job::wantsToCommunicate() const {
-    if (!isActive()) return false;
+    if (!isInStateUnsafe({ACTIVE, INITIALIZING_TO_ACTIVE})) return false;
     return appl_wantsToBeginCommunication();
 }
 
