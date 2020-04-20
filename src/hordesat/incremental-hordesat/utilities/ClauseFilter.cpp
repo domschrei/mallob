@@ -48,6 +48,7 @@ ClauseFilter::~ClauseFilter() {
 bool ClauseFilter::registerClause(const vector<int>& cls) {
 	// unit clauses are checked explicitly
 	if (cls.size() == 1) {
+		printf("CLS %i\n", cls[0]);
 		if (units.count(cls.at(0))) return false;
 		units.insert(cls.at(0));
 		return true;
