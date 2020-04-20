@@ -220,8 +220,11 @@ bool SatJob::appl_isDestructible() {
         // At least params["s"] seconds since last communication 
         if (Timer::elapsedSeconds()-_time_of_last_comm < _job_comm_period) return false;
     }
-    auto lock = _horde_manipulation_lock.getLock();
-    return ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses(); 
+    bool locked = _horde_manipulation_lock.tryLock();
+    if (!locked) return false;
+    bool wants = ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses();
+    _horde_manipulation_lock.unlock();
+    return wants; 
  }
 
 void SatJob::appl_beginCommunication() {
