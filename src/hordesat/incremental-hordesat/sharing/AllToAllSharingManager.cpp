@@ -83,11 +83,12 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 	int total = passedFilter + failedFilter;
 	stats.filteredClauses += failedFilter;
 	stats.importedClauses += passedFilter;
-	if (total > 0) {
-		logger.log(1, "fltrd %.2f%% (%d/%d), min/avg/max %d/%.2f/%d\n",
-				100*(float)failedFilter/total, failedFilter, total, 
-				minLen, totalLen/(float)total, maxLen);
-	}
+	
+	if (total == 0) return;
+
+	logger.log(1, "fltrd %.2f%% (%d/%d), min/avg/max %d/%.2f/%d\n",
+			100*(float)failedFilter/total, failedFilter, total, 
+			minLen, totalLen/(float)total, maxLen);
 
 	if (solvers.size() > 1) {
 		for (size_t sid = 0; sid < solvers.size(); sid++) {

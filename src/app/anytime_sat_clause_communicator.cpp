@@ -169,8 +169,6 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
     result.push_back(0);
     int& resvips = result[0];
 
-    ClauseFilter filter(/*checkUnits=*/true);
-
     std::vector<int> cls;
     int picked = -1;
     while (totalNumVips > 0) {
@@ -187,7 +185,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
                 return result;
 
             // Clause not seen yet?
-            if (filter.registerClause(cls)) {
+            if (_clause_filter.registerClause(cls)) {
                 // Insert clause into result clause buffer
                 result.insert(result.end(), cls.begin(), cls.end());
                 resvips++;
@@ -227,7 +225,8 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
         int numpos = result.size()-1;
         
         // Clear filter to only consider clauses of upcoming length
-        filter.clear();
+        // Actually, don't. Takes too much work.
+        //_clause_filter.clear();
 
         // Read clauses from buffers in a cyclic manner
         int picked = -1;
@@ -243,7 +242,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
             auto end = vec.begin()+pos+clauseLength;
 
             // Clause not included yet?
-            if (filter.registerClause(begin, end)) {
+            if (_clause_filter.registerClause(begin, end)) {
                 // Insert and increase corresponding counters
                 result.insert(result.end(), begin, end);
                 result[numpos]++;
@@ -263,7 +262,8 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
 
         clauseLength++;
     }
-
+    
+    _clause_filter.clear();
     return result;
 }
 
