@@ -40,12 +40,11 @@ size_t ClauseFilter::commutativeHashFunction(const vector<int>& cls, int which) 
 bool ClauseFilter::registerClause(const vector<int>& cls) {
 	// unit clauses are checked explicitly
 	if (cls.size() == 1) {
-		/*
 		if (checkUnits) {
 			if (units.count(cls.at(0))) return false;
 			auto lock = std::unique_lock<std::mutex>(unitLock);
 			units.insert(cls.at(0));
-		}*/
+		}
 		return true;
 	}
 
@@ -54,18 +53,18 @@ bool ClauseFilter::registerClause(const vector<int>& cls) {
 	size_t h3 = commutativeHashFunctionSkipFirst(cls, 3) % NUM_BITS;
 	size_t h4 = commutativeHashFunctionSkipFirst(cls, 4) % NUM_BITS;
 
-	if (s1->test(h1) && s1->test(h2) && s1->test(h3) && s1->test(h4)) {
+	if (s1.test(h1) && s1.test(h2) && s1.test(h3) && s1.test(h4)) {
 		return false;
 	} else {
-		s1->set(h1, true);
-		s1->set(h2, true);
-		s1->set(h3, true);
-		s1->set(h4, true);
+		s1.set(h1, true);
+		s1.set(h2, true);
+		s1.set(h3, true);
+		s1.set(h4, true);
 		return true;
 	}
 }
 
 void ClauseFilter::clear() {
-	s1->reset();
+	s1.reset();
 	units.clear();
 }
