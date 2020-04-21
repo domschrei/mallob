@@ -3,7 +3,7 @@
 
 #include "util/console.h"
 #include "util/mympi.h"
-
+#include "utilities/ClauseFilter.h"
 
 bool AnytimeSatClauseCommunicator::canSendClauses() {
     if (!_initialized) return false;
