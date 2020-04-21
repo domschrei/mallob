@@ -212,6 +212,7 @@ bool SatJob::appl_isDestructible() {
 }
 
  bool SatJob::appl_wantsToBeginCommunication() const {
+    if (_job_comm_period <= 0) return false;
     if (_clause_comm == NULL) return false;
     // Special "timed" conditions for leaf nodes:
     if (isLeaf()) {
