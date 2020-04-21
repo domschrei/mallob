@@ -65,7 +65,7 @@ bool ClauseManager::addClause(const vector<int>& cls) {
 		AgedClause ac;
 		ac.cls = cls;
 		ac.bornRound = currentRound;
-		size_t csig = ClauseFilter::commutativeHashFunction(cls, 1);
+		size_t csig = ClauseFilter::hash(cls, 1, false);
 		ac.signature = csig;
 		setBit(signature, csig % signatureBits);
 		vipClauses.push_back(ac);
@@ -77,7 +77,7 @@ bool ClauseManager::addClause(const vector<int>& cls) {
 	if (clsLock.tryLock() == false) {
 		return false;
 	}
-	size_t csig = ClauseFilter::commutativeHashFunction(cls, 1);
+	size_t csig = ClauseFilter::hash(cls, 1, false);
 	if (testBit(signature, csig % signatureBits)) {
 		clsLock.unlock();
 		return false;
