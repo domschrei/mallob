@@ -39,15 +39,20 @@ protected:
 		Callback(DefaultSharingManager& parent):parent(parent) {
 		}
 		void processClause(vector<int>& cls, int solverId) {
+			parent.logger.log(3, "process clause\n");
 			if (parent.solvers.size() > 1) {
+				parent.logger.log(3, "register clause in child\n");
 				parent.solverFilters[solverId]->registerClause(cls);
 			}
+			parent.logger.log(3, "register clause in parent\n");
 			if (parent.nodeFilter.registerClause(cls)) {
+				parent.logger.log(3, "registered successfully in parent\n");
 				int* res = parent.cdb.addClause(cls);
 				if (res == NULL) {
 					parent.stats.dropped++;
 				}
 			} else {
+				parent.logger.log(3, "not registered in parent\n");
 				parent.stats.filteredClauses++;
 			}
 		}
