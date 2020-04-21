@@ -75,5 +75,5 @@ bool ClauseFilter::registerClause(const vector<int>& cls) {
 
 void ClauseFilter::clear() {
 	s1->reset();
-	units.clear();
+	//units.clear();
 }
