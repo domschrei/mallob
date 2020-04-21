@@ -38,14 +38,13 @@ size_t ClauseFilter::commutativeHashFunction(const vector<int>& cls, int which) 
 }
 
 bool ClauseFilter::registerClause(const vector<int>& cls) {
-	
+
 	// unit clauses are checked explicitly
 	if (cls.size() == 1) {
 		if (checkUnits) {
 			// admit unit clause if a check is not possible right now
 			if (!unitLock.try_lock()) return true; 
 			
-			auto lock = std::unique_lock<std::mutex>(unitLock);
 			bool admit = !units.count(cls.at(0));
 			if (admit) units.insert(cls.at(0));
 
@@ -73,5 +72,6 @@ bool ClauseFilter::registerClause(const vector<int>& cls) {
 
 void ClauseFilter::clear() {
 	s1.reset();
+	auto lock = std::unique_lock<std::mutex>(unitLock);
 	units.clear();
 }
