@@ -37,14 +37,6 @@ size_t ClauseFilter::commutativeHashFunction(const vector<int>& cls, int which) 
 	return res;
 }
 
-ClauseFilter::ClauseFilter() {
-	s1 = new bitset<NUM_BITS>();
-}
-
-ClauseFilter::~ClauseFilter() {
-	delete s1;
-}
-
 bool ClauseFilter::registerClause(const vector<int>& cls) {
 	// unit clauses are checked explicitly
 	if (cls.size() == 1) {

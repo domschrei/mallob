@@ -20,9 +20,9 @@ using namespace std;
 
 class ClauseFilter {
 public:
-	ClauseFilter();
+	ClauseFilter() {}
 	ClauseFilter(bool checkUnits) : checkUnits(checkUnits) {}
-	virtual ~ClauseFilter();
+	virtual ~ClauseFilter() {}
 	/**
 	 * Return false if the given clause has already been registered
 	 * otherwise add it to the filter and return true.
@@ -44,7 +44,7 @@ public:
 	static size_t commutativeHashFunction(const vector<int>& cls, int which);
 
 private:
-	bitset<NUM_BITS>* s1;
+	bitset<NUM_BITS> s1;
 	bool checkUnits = false;
 	std::unordered_set<int> units;
 	std::mutex unitLock;
