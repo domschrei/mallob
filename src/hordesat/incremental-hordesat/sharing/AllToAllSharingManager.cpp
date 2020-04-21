@@ -98,7 +98,7 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 					added++;
 				}
 			}
-			logger.log(2, "S%d fltrd %.2f%%\n", sid, 100*((float)added)/clausesToAdd.size());
+			logger.log(2, "S%d fltrd %.2f%% (%d)\n", sid, 100*(1-((float)added/clausesToAdd.size())), clausesToAdd.size()-added);
 			if (!params.isSet("fd")) {
 				solverFilters[sid]->clear();
 			}
