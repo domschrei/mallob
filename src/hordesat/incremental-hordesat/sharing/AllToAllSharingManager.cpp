@@ -16,7 +16,7 @@ DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
 	cdb(logger),nodeFilter(/*checkUnits=*/true),callback(*this) {
     for (size_t i = 0; i < solvers.size(); i++) {
 		if (solvers.size() > 1) {
-			solverFilters.push_back(new ClauseFilter());
+			solverFilters.push_back(new ClauseFilter(/*checkUnits=*/true));
 		}
 		solvers[i]->setLearnedClauseCallback(&callback, i);
 	}
