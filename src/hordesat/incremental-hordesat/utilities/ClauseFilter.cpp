@@ -18,35 +18,40 @@ static unsigned const int primes [] = {2038072819, 2038073287,	2038073761,	20380
 		2038072847,	2038073341,	2038073789,	2038074329,
 		2038074751,	2038075231,	2038075751,	2038076267};
 
-size_t ClauseFilter::commutativeHashFunctionSkipFirst(const vector<int>& cls, int which) {
-	size_t res = 0;
-	// skip the first int
-	for (size_t j = 1; j < cls.size(); j++) {
-		int lit = cls[j];
-		res ^= lit * primes[abs((lit^which) & 15)];
-	}
-	return res;
+size_t ClauseFilter::hash(const vector<int>& cls, int which, bool skipFirst) {
+	return hash(cls.begin(), cls.end(), which, skipFirst);
 }
 
-size_t ClauseFilter::commutativeHashFunction(const vector<int>& cls, int which) {
+size_t ClauseFilter::hash(const vector<int>::const_iterator begin, const vector<int>::const_iterator end, int which, bool skipFirst) {
 	size_t res = 0;
-	for (size_t j = 0; j < cls.size(); j++) {
-		int lit = cls[j];
+	for (auto it = begin; it != end; it++) {
+		if (skipFirst) {
+			skipFirst = false;
+			continue;
+		}	
+		int lit = *it;
 		res ^= lit * primes[abs((lit^which) & 15)];
 	}
 	return res;
 }
 
 bool ClauseFilter::registerClause(const vector<int>& cls) {
+	return registerClause(cls.begin(), cls.end());
+}
+
+bool ClauseFilter::registerClause(std::vector<int>::const_iterator begin, std::vector<int>::const_iterator end) {
 
 	// unit clauses are checked explicitly
-	if (cls.size() == 1) {
+	auto it = begin;
+	if (it++ == end) { // Unit clause!
 		if (checkUnits) {
-			// admit unit clause if a check is not possible right now
+
+			// Always admit unit clause if a check is not possible right now
 			if (!unitLock.try_lock()) return true; 
 			
-			bool admit = !units.count(cls.at(0));
-			if (admit) units.insert(cls.at(0));
+			int firstLit = *begin;
+			bool admit = !units.count(firstLit);
+			if (admit) units.insert(firstLit);
 
 			unitLock.unlock();
 			return admit;
@@ -54,10 +59,10 @@ bool ClauseFilter::registerClause(const vector<int>& cls) {
 		return true;
 	}
 
-	size_t h1 = commutativeHashFunctionSkipFirst(cls, 1) % NUM_BITS;
-	size_t h2 = commutativeHashFunctionSkipFirst(cls, 2) % NUM_BITS;
-	size_t h3 = commutativeHashFunctionSkipFirst(cls, 3) % NUM_BITS;
-	size_t h4 = commutativeHashFunctionSkipFirst(cls, 4) % NUM_BITS;
+	size_t h1 = hash(begin, end, 1, true) % NUM_BITS;
+	size_t h2 = hash(begin, end, 2, true) % NUM_BITS;
+	size_t h3 = hash(begin, end, 3, true) % NUM_BITS;
+	size_t h4 = hash(begin, end, 4, true) % NUM_BITS;
 
 	if (s1.test(h1) && s1.test(h2) && s1.test(h3) && s1.test(h4)) {
 		return false;

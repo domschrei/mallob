@@ -169,6 +169,8 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
     result.push_back(0);
     int& resvips = result[0];
 
+    ClauseFilter filter(/*checkUnits=*/true);
+
     std::vector<int> cls;
     int picked = -1;
     while (totalNumVips > 0) {
@@ -184,15 +186,19 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
             if (result.size() + cls.size() > maxSize)
                 return result;
 
-            // Insert clause into result clause buffer
-            result.insert(result.end(), cls.begin(), cls.end());
-            resvips++;
+            // Clause not seen yet?
+            if (filter.registerClause(cls)) {
+                // Insert clause into result clause buffer
+                result.insert(result.end(), cls.begin(), cls.end());
+                resvips++;
+            }
 
             /*
             Console::append(Console::VVVERB, "VIP ");
             for (int l : cls) Console::append(Console::VVVERB, "%i ", l);
             Console::log(Console::VVVERB, "");*/
 
+            // Clear clause vector, update counters
             cls.clear();
             nvips[picked]--;
             totalNumVips--;
@@ -216,19 +222,32 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
             positions[i]++;
         }
 
-        // Store number of inserted clauses of clauseLength in result
+        // Store number of inserted clauses of clauseLength in result[numpos]
         result.push_back(0);
         int numpos = result.size()-1;
         
+        // Clear filter to only consider clauses of upcoming length
+        filter.clear();
+
         // Read clauses from buffers in a cyclic manner
         int picked = -1;
         while (allclsoflen > 0) {
             // Limit reached?
             if (result.size() + clauseLength > maxSize) return result;
 
+            // Identify next clause
             do picked = (picked+1) % nvips.size(); while (nclsoflen[picked] == 0);
             const std::vector<int>& vec = *buffers[picked];
             int pos = positions[picked];
+            auto begin = vec.begin()+pos;
+            auto end = vec.begin()+pos+clauseLength;
+
+            // Clause not included yet?
+            if (filter.registerClause(begin, end)) {
+                // Insert and increase corresponding counters
+                result.insert(result.end(), begin, end);
+                result[numpos]++;
+            }
 
             /*
             Console::append(Console::VVVERB, "CLS ");
@@ -236,11 +255,10 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
                 Console::append(Console::VVVERB, "%i ", vec[i]);
             Console::log(Console::VVVERB, "");*/
 
-            result.insert(result.end(), vec.begin()+pos, vec.begin()+pos+clauseLength);
+            // Update counters for remaining clauses 
             positions[picked] += clauseLength;
             nclsoflen[picked]--;
             allclsoflen--;
-            result[numpos]++;
         }
 
         clauseLength++;

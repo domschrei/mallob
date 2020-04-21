@@ -28,20 +28,18 @@ public:
 	 * otherwise add it to the filter and return true.
 	 */
 	bool registerClause(const vector<int>& cls);
+	bool registerClause(std::vector<int>::const_iterator first, std::vector<int>::const_iterator last);
+
 	/**
 	 * Clear the filter, i.e., return to its initial state.
 	 */
 	void clear();
 
 	/**
-	 * Hash function for clauses, order of literals is irrelevant, ignores first literal
-	 */
-	static size_t commutativeHashFunctionSkipFirst(const vector<int>& cls, int which);
-
-	/**
 	 * Hash function for clauses, order of literals is irrelevant
 	 */
-	static size_t commutativeHashFunction(const vector<int>& cls, int which);
+	static size_t hash(const vector<int>& cls, int which, bool skipFirst);
+	static size_t hash(const vector<int>::const_iterator first, const vector<int>::const_iterator second, int which, bool skipFirst);
 
 private:
 	bitset<NUM_BITS> s1;
