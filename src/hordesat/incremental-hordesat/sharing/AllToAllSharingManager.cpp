@@ -84,12 +84,27 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 	stats.filteredClauses += failedFilter;
 	stats.importedClauses += passedFilter;
 	if (total > 0) {
-		logger.log(1, "filtered %d%% (%d/%d), min/avg/max %d/%.2f/%d\n",
-				100*failedFilter/total, failedFilter, total, 
+		logger.log(1, "fltrd %.2f%% (%d/%d), min/avg/max %d/%.2f/%d\n",
+				100*(float)failedFilter/total, failedFilter, total, 
 				minLen, totalLen/(float)total, maxLen);
 	}
-	for (size_t sid = 0; sid < solvers.size(); sid++) {
-		solvers[sid]->addLearnedClauses(clausesToAdd);
+
+	if (solvers.size() > 1) {
+		for (size_t sid = 0; sid < solvers.size(); sid++) {
+			int added = 0;
+			for (size_t cid = 0; cid < clausesToAdd.size(); cid++) {
+				if (solverFilters[sid]->registerClause(clausesToAdd[cid])) {
+					solvers[sid]->addLearnedClause(clausesToAdd[cid]);
+					added++;
+				}
+			}
+			logger.log(2, "S%d fltrd %.2f%%\n", sid, 100*((float)added)/clausesToAdd.size());
+			if (!params.isSet("fd")) {
+				solverFilters[sid]->clear();
+			}
+		}
+	} else {
+		solvers[0]->addLearnedClauses(clausesToAdd);
 	}
 }
 
