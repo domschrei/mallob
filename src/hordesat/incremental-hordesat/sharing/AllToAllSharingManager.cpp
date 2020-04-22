@@ -34,13 +34,13 @@ std::vector<int> DefaultSharingManager::prepareSharing(int maxSize) {
 	int used = cdb.giveSelection(outBuffer, maxSize, &selectedCount);
 	logger.log(3, "Prepared %i clauses, size %i\n", selectedCount, used);
 	stats.sharedClauses += selectedCount;
-	int usedPercent = (100*used)/maxSize;
-	if (usedPercent < 80) {
+	float usedRatio = ((float)used)/maxSize;
+	if (usedRatio < params.isSet("icpr")) {
 		int increaser = lastInc++ % solvers.size();
 		solvers[increaser]->increaseClauseProduction();
-		logger.log(3, "Node %d production increase for %d. time, core %d will increase.\n", rank, prodInc++, increaser);
+		logger.log(3, "Node %d production increase for %d. time, sid %d will increase.\n", rank, prodInc++, increaser);
 	}
-	logger.log(3, "Filled %d%% of buffer\n", usedPercent);
+	logger.log(3, "Filled %.1f%% of buffer\n", 100*usedRatio);
     std::vector<int> clauseVec(outBuffer, outBuffer + used);
 
     return clauseVec;

@@ -43,6 +43,7 @@ bool SatJob::appl_initialize() {
         params["d"] = "7"; // sparse random + native diversification
     }
     params["fd"]; // filter duplicate clauses
+    params["icpr"] = _params.getFloatParam("icpr"); // increase clause production
     params["mcl"] = _params.getIntParam("mcl"); // max clause length
     params["i"] = "0"; // #microseconds to sleep during solve loop
     params["v"] = 99; // (this->_params.getIntParam("v") >= 3 ? "1" : "0"); // verbosity
