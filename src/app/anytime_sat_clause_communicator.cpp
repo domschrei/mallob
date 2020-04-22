@@ -242,7 +242,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
             auto end = vec.begin()+pos+clauseLength;
 
             // Clause not included yet?
-            if (_clause_filter.registerClause(begin, end)) {
+            if (_clause_filter.registerClause(begin, end, clauseLength)) {
                 // Insert and increase corresponding counters
                 result.insert(result.end(), begin, end);
                 result[numpos]++;
@@ -262,7 +262,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
 
         clauseLength++;
     }
-    
+
     _clause_filter.clear();
     return result;
 }

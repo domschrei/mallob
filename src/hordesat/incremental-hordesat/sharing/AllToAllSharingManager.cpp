@@ -13,10 +13,10 @@
 DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
 		vector<PortfolioSolverInterface*>& solvers, ParameterProcessor& params)
 	:size(mpi_size),rank(mpi_rank),solvers(solvers),params(params),logger(params.getLogger()),
-	cdb(logger),nodeFilter(/*checkUnits=*/true),callback(*this) {
+	cdb(logger),nodeFilter(/*maxClauseLen=*/params.getIntParam("mcl", 0),/*checkUnits=*/true),callback(*this) {
     for (size_t i = 0; i < solvers.size(); i++) {
 		if (solvers.size() > 1) {
-			solverFilters.push_back(new ClauseFilter(/*checkUnits=*/true));
+			solverFilters.push_back(new ClauseFilter(/*maxClauseLen=*/params.getIntParam("mcl", 0), /*checkUnits=*/true));
 		}
 		solvers[i]->setLearnedClauseCallback(&callback, i);
 	}

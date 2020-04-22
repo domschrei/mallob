@@ -36,14 +36,16 @@ size_t ClauseFilter::hash(const vector<int>::const_iterator begin, const vector<
 }
 
 bool ClauseFilter::registerClause(const vector<int>& cls) {
-	return registerClause(cls.begin(), cls.end());
+	return registerClause(cls.begin(), cls.end(), cls.size());
 }
 
-bool ClauseFilter::registerClause(std::vector<int>::const_iterator begin, std::vector<int>::const_iterator end) {
+bool ClauseFilter::registerClause(std::vector<int>::const_iterator begin, std::vector<int>::const_iterator end, int size) {
+
+	// Block clauses above maximum length
+	if (maxClauseLen > 0 && size > maxClauseLen) return false;
 
 	// unit clauses are checked explicitly
-	auto it = begin;
-	if (it++ == end) { // Unit clause!
+	if (size == 1) { // Unit clause!
 		if (checkUnits) {
 
 			// Always admit unit clause if a check is not possible right now

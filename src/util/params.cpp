@@ -43,6 +43,7 @@ void Parameters::setDefaults() {
     setParam("l", "0.95"); // load factor
     setParam("log", "."); // logging directory
     setParam("lbc", "0"); // leaky bucket client parameter (0 = no leaky bucket, jobs enter by time) 
+    setParam("mcl", "0"); // maximum clause length (0 = no limit)
     setParam("md", "0"); // maximum demand per job (0 = no limit)
     //setParam("mmpi"); // monitor MPI
     //setParam("nophase"); // Do not do phase-based diversification (native only)
@@ -89,6 +90,7 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "-lbc=<num-jobs>       Make each client a leaky bucket with x active jobs at any given time");
     Console::log(Console::INFO, "                      (int x >= 0, 0: jobs arrive at individual times instead)");
     Console::log(Console::INFO, "-log=<log-dir>        Directory to save logs in (default: .)");
+    Console::log(Console::INFO, "-mcl=<max-length>     Maximum clause length: Only share clauses up to some length (int x >= 0; 0: no limit)");
     Console::log(Console::INFO, "-md=<max-demand>      Limit any job's demand to some maximum value (int x >= 0; 0: no limit)");
     Console::log(Console::INFO, "-mmpi                 Monitor MPI: Launch an additional thread per process checking when the main thread");
     Console::log(Console::INFO, "                      is inside some MPI call");

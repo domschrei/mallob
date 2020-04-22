@@ -20,15 +20,14 @@ using namespace std;
 
 class ClauseFilter {
 public:
-	ClauseFilter() {}
-	ClauseFilter(bool checkUnits) : checkUnits(checkUnits) {}
+	ClauseFilter(int maxClauseLen, bool checkUnits) : maxClauseLen(maxClauseLen), checkUnits(checkUnits) {}
 	virtual ~ClauseFilter() {}
 	/**
 	 * Return false if the given clause has already been registered
 	 * otherwise add it to the filter and return true.
 	 */
 	bool registerClause(const vector<int>& cls);
-	bool registerClause(std::vector<int>::const_iterator first, std::vector<int>::const_iterator last);
+	bool registerClause(std::vector<int>::const_iterator first, std::vector<int>::const_iterator last, int size);
 
 	/**
 	 * Clear the filter, i.e., return to its initial state.
@@ -44,6 +43,8 @@ public:
 private:
 	bitset<NUM_BITS> s1;
 	bool checkUnits = false;
+	int maxClauseLen = 0;
+
 	std::unordered_set<int> units;
 	std::mutex unitLock;
 };

@@ -31,7 +31,7 @@ public:
     AnytimeSatClauseCommunicator(const Parameters& params, SatJob* job) : _params(params), _job(job), 
         _clause_buf_base_size(_params.getIntParam("cbbs")), 
         _clause_buf_discount_factor(_params.getFloatParam("cbdf")),
-        _clause_filter(/*checkUnits=*/true),
+        _clause_filter(/*maxClauseLen=*/_params.getIntParam("mcl"), /*checkUnits=*/true),
         _num_aggregated_nodes(0) {
 
         _initialized = true;
