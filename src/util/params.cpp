@@ -85,9 +85,9 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "-derandomize          Derandomize job bouncing");
     Console::log(Console::INFO, "-g=<growth-period>    Grow job demand exponentially every t seconds (t >= 0; 0: immediate growth)");
     Console::log(Console::INFO, "-h|-help              Print usage");
-    Console::log(Console::INFO, "-jc=<size>            Size of job cache for suspended, yet unfinished jobs (int x >= 0; 0: no limit)");
     Console::log(Console::INFO, "-icpr=<ratio>         Increase a solver's Clause Production when it fills less than <Ratio> of its buffer");
     Console::log(Console::INFO, "                      (0 <= x < 1; 0: never increase)");
+    Console::log(Console::INFO, "-jc=<size>            Size of job cache for suspended, yet unfinished jobs (int x >= 0; 0: no limit)");
     Console::log(Console::INFO, "-jjp                  Jitter job priorities to break ties during rebalancing");
     Console::log(Console::INFO, "-l=<load-factor>      Load factor to be aimed at (0 < l < 1)");
     Console::log(Console::INFO, "-lbc=<num-jobs>       Make each client a leaky bucket with x active jobs at any given time");
