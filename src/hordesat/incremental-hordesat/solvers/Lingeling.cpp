@@ -356,7 +356,6 @@ SolvingStatistics Lingeling::getStatistics() {
 	st.conflicts = lglgetconfs(solver);
 	st.decisions = lglgetdecs(solver);
 	st.propagations = lglgetprops(solver);
-	st.restarts = lglgetrestarts(solver);
 	st.memPeak = lglmaxmb(solver);
 	return st;
 }
