@@ -152,6 +152,13 @@ Lingeling::Lingeling(LoggingInterface& logger) : logger(logger) {
     //suspendMutex = VerboseMutex("suspendLgl", NULL);
     //suspendCond = ConditionVariable();
     maxvar = 0;
+
+	int restart = lglgetopt(solver, "restart");
+	int restartinit = lglgetopt(solver, "restartinit");
+	int restartint = lglgetopt(solver, "restartint");
+	int restartintscale = lglgetopt(solver, "restartintscale");
+	int rstinoutinc = lglgetopt(solver, "rstinoutinc");
+	//slog(this, 2, "restart vals: %i %i %i %i %i\n", restart, restartinit, restartint, restartintscale, rstinoutinc);
 }
 
 bool Lingeling::loadFormula(const char* filename) {
@@ -349,6 +356,7 @@ SolvingStatistics Lingeling::getStatistics() {
 	st.conflicts = lglgetconfs(solver);
 	st.decisions = lglgetdecs(solver);
 	st.propagations = lglgetprops(solver);
+	st.restarts = lglgetrestarts(solver);
 	st.memPeak = lglmaxmb(solver);
 	return st;
 }
