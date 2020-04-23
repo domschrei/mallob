@@ -76,7 +76,7 @@ void SolverThread::init() {
     //hlib->solvingStateLock.lock();
     //hlib->solvingStateLock.unlock();
     importedLits = 0;
-    _diversification_seed = std::tuple<int, int, int>(0, 0, 0);
+    _diversification_seed = std::tuple<int, int, int>(hlib->mpi_rank, hlib->mpi_size, 0);
 }
 
 void SolverThread::readFormula() {
@@ -125,7 +125,7 @@ void SolverThread::diversify() {
     if (mpi_rank != std::get<0>(_diversification_seed) ||
         mpi_size != std::get<1>(_diversification_seed)) {
         
-        // Rank or size changed: New diversification needed
+        // Rank or size changed: Change diversification
         _diversification_seed = std::tuple<int, int, int>(mpi_rank, mpi_size, (int)(100*hlib->logger->getTime()));
     }
 
