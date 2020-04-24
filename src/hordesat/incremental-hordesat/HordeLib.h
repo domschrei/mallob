@@ -25,13 +25,6 @@
 
 using namespace std;
 
-struct thread_args {
-	int solverId;
-	HordeLib* hlib;
-	bool readFormulaFromHlib;
-	int diversificationMode;
-};
-
 class HordeLib {
 private:
 	int mpi_size;
@@ -68,13 +61,15 @@ private:
 	// settings
 	ParameterProcessor params;
 
+	bool cleanedUp = false;
+
 public:
 	friend class SolverThread;
 
 	// methods
 	HordeLib(int argc, char** argv);
     HordeLib(const std::map<std::string, std::string>& params, std::shared_ptr<LoggingInterface> loggingInterface = NULL);
-	virtual ~HordeLib();
+	~HordeLib();
 
 	ParameterProcessor& getParams() {return params;}
 
@@ -115,6 +110,9 @@ public:
 	}
 
 	void hlog(int verbosityLevel, const char* fmt, ...);
+
+	void cleanUp();
+	bool isCleanedUp() {return cleanedUp;}
 	
 
 private:

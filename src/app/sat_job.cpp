@@ -120,20 +120,15 @@ void SatJob::appl_interrupt_unsafe() {
     }
 }
 
-void SatJob::setSolverNullThread() {
+void SatJob::cleanUpThread() {
     Console::log(Console::VVERB, "%s : cleanup thread start", toStr());
     auto lock = _horde_manipulation_lock.getLock();
-    setSolverNull();
+    cleanUp();
     Console::log(Console::VVERB, "%s : cleanup thread done", toStr());
 }
 
-void SatJob::setSolverNull() {
-    Console::log(Console::VVERB, "%s : release solver", toStr());
-    if (solverNotNull()) {
-        _solver.reset();
-        _solver = NULL;
-        Console::log(Console::VVERB, "%s : solver released", toStr());
-    }
+void SatJob::cleanUp() {
+    if (solverNotNull()) _solver->cleanUp();
 }
 
 void SatJob::appl_withdraw() {
@@ -149,7 +144,7 @@ void SatJob::appl_withdraw() {
     if (solverNotNull()) {
         getSolver()->abort();
         // Do cleanup of HordeLib and its threads in a separate thread to avoid blocking
-        _bg_thread = std::thread(&SatJob::setSolverNullThread, this);
+        _bg_thread = std::thread(&SatJob::cleanUpThread, this);
     }
 }
 
@@ -207,10 +202,7 @@ void SatJob::appl_dumpStats() {
 }
 
 bool SatJob::appl_isDestructible() {
-    if (_solver != NULL) return false;
-    bool canLock = _horde_manipulation_lock.tryLock();
-    if (canLock) _horde_manipulation_lock.unlock();
-    return canLock;
+    return _solver->isCleanedUp();
 }
 
  bool SatJob::appl_wantsToBeginCommunication() const {
@@ -266,7 +258,8 @@ SatJob::~SatJob() {
         Console::log(Console::VVERB, "%s : destruct hordesat", toStr());
         appl_interrupt_unsafe();
         _solver->abort();
-        setSolverNull();
+        cleanUp();
     }
+
     Console::log(Console::VVERB, "%s : destructed SAT job", toStr());
 }

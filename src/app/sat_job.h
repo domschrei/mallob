@@ -76,8 +76,8 @@ private:
 
     void appl_interrupt_unsafe();
 
-    void setSolverNullThread();
-    void setSolverNull();
+    void cleanUpThread();
+    void cleanUp();
 
     volatile bool solverNotNull() {
         return _solver != NULL;

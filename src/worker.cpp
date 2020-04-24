@@ -718,7 +718,7 @@ void Worker::handleJobCommunication(MessageHandlePtr& handle) {
     }
     // Give message to corresponding job
     Job& job = getJob(jobId);
-    job.appl_communicate(handle->source, msg);
+    if (job.isActive()) job.appl_communicate(handle->source, msg);
 }
 
 void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {

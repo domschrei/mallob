@@ -138,8 +138,8 @@ void HordeLib::init() {
 	}
 }
 
-void* solverRunningThread(void* arg) {
-    SolverThread thread(arg);
+void* solverRunningThread(HordeLib& hlib, PortfolioSolverInterface& solver, int localId) {
+    SolverThread thread(hlib, solver, localId);
 	return thread.run();
 }
 
@@ -165,14 +165,9 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 
 	for (int i = 0; i < solversCount; i++) {
         //hlog(1, "initializing solver %i.\n", i);
-		thread_args* arg = new thread_args();
-		arg->hlib = this;
-		arg->solverId = i;
-		arg->readFormulaFromHlib = true;
-		solverThreads[i] = std::thread(solverRunningThread, arg);
+		solverThreads[i] = std::thread(solverRunningThread, *this, solvers[i], i);
         //hlog(1, "initialized solver %i.\n", i);
 	}
-
 	{
 		auto lock = solvingStateLock.getLock();
 		setSolvingState(ACTIVE);
@@ -397,11 +392,10 @@ void HordeLib::hlog(int verbosityLevel, const char* fmt, ...) {
 	va_end(vl);
 }
 
-HordeLib::~HordeLib() {
-
+void HordeLib::cleanUp() {
 	double time = logger->getTime();
 
-	hlog(3, "entering destructor\n");
+	hlog(3, "[hlib-cleanup] enter\n");
 
 	// for any running threads left:
 	solvingStateLock.lock();
@@ -414,7 +408,7 @@ HordeLib::~HordeLib() {
 			solverThreads[i].join();
 		}
 	}
-	hlog(3, "threads joined\n");
+	hlog(3, "[hlib-cleanup] joined threads\n");
 	solversCount = 0;
 
 	// delete solvers
@@ -424,7 +418,7 @@ HordeLib::~HordeLib() {
 			solvers[i] = NULL;
 		}
 	}
-	hlog(3, "solvers deleted\n");
+	hlog(3, "[hlib-cleanup] deleted solvers\n");
 
 	// delete sharing manager
 	if (sharingManager != NULL) {
@@ -438,5 +432,11 @@ HordeLib::~HordeLib() {
 	}
 
 	time = logger->getTime() - time;
-	hlog(0, "leaving destructor, took %.3f s\n", time);
+	hlog(0, "[hlib-cleanup] done, took %.3f s\n", time);
+
+	cleanedUp = true;
+}
+
+HordeLib::~HordeLib() {
+	assert(cleanedUp);
 }

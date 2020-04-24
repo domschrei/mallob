@@ -16,21 +16,20 @@
 
 // Forward declarations
 class HordeLib;
-struct thread_args;
 
 class SolverThread {
 
 private:
-    thread_args* _args;
+    int _local_id;
     std::string _name;
     std::tuple<int, int, int> _diversification_seed;
 
-    PortfolioSolverInterface* solver;
-    HordeLib* hlib;
-    int importedLits;
+    HordeLib& _hlib;
+    PortfolioSolverInterface& _solver;
+    int _imported_lits;
 
 public:
-    SolverThread(void* args);
+    SolverThread(HordeLib& hlib, PortfolioSolverInterface& solver, int localId);
     ~SolverThread();
     void* run();
 
