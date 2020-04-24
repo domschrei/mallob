@@ -254,7 +254,7 @@ SatJob::~SatJob() {
         _bg_thread.join(); // if already aborting
     }
 
-    if (solverNotNull()) {
+    if (solverNotNull() && !_solver->isCleanedUp()) {
         Console::log(Console::VVERB, "%s : destruct hordesat", toStr());
         appl_interrupt_unsafe();
         _solver->abort();
