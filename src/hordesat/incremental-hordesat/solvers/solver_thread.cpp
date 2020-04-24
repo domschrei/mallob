@@ -26,8 +26,8 @@ void pinThread(HordeLib& hlib, int solversCount) {
 	sched_setaffinity(0, sizeof(cpuSet), &cpuSet);
 }
 
-SolverThread::SolverThread(HordeLib& hlib, PortfolioSolverInterface* solver, int localId) : 
-    _hlib(hlib), _solver(*solver), _local_id(localId) {}
+SolverThread::SolverThread(HordeLib* hlib, PortfolioSolverInterface* solver, int localId) : 
+    _hlib(*hlib), _solver(*solver), _local_id(localId) {}
 
 void* SolverThread::run() {
 

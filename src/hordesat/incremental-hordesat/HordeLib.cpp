@@ -138,7 +138,7 @@ void HordeLib::init() {
 	}
 }
 
-void* solverRunningThread(HordeLib& hlib, PortfolioSolverInterface* solver, int localId) {
+void* solverRunningThread(HordeLib* hlib, PortfolioSolverInterface* solver, int localId) {
     SolverThread thread(hlib, solver, localId);
 	return thread.run();
 }
@@ -165,7 +165,7 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 
 	for (int i = 0; i < solversCount; i++) {
         //hlog(1, "initializing solver %i.\n", i);
-		solverThreads[i] = std::thread(solverRunningThread, *this, solvers[i], i);
+		solverThreads[i] = std::thread(solverRunningThread, this, solvers[i], i);
         //hlog(1, "initialized solver %i.\n", i);
 	}
 	{

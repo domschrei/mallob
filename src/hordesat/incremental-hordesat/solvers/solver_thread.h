@@ -29,7 +29,7 @@ private:
     int _imported_lits;
 
 public:
-    SolverThread(HordeLib& hlib, PortfolioSolverInterface* solver, int localId);
+    SolverThread(HordeLib* hlib, PortfolioSolverInterface* solver, int localId);
     ~SolverThread();
     void* run();
 
