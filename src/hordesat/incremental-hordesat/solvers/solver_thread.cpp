@@ -29,7 +29,7 @@ void pinThread(int solversCount) {
 }
 
 SolverThread::SolverThread(ParameterProcessor& params, std::shared_ptr<PortfolioSolverInterface> solver, 
-        std::vector<std::shared_ptr<std::vector<int>>>& formulae, std::shared_ptr<vector<int>>& assumptions, 
+        const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<vector<int>>& assumptions, 
         int localId) : 
     _params(params), _solver_ptr(solver), _solver(*solver), _formulae(formulae), _assumptions(assumptions), 
     _local_id(localId) {

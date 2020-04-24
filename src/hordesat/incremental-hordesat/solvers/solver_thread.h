@@ -23,8 +23,8 @@ private:
     std::shared_ptr<PortfolioSolverInterface> _solver_ptr;
     PortfolioSolverInterface& _solver;
 
-    std::vector<std::shared_ptr<std::vector<int>>>& _formulae;
-    std::shared_ptr<vector<int>>& _assumptions;
+    const std::vector<std::shared_ptr<std::vector<int>>>& _formulae;
+    const std::shared_ptr<vector<int>>& _assumptions;
     
     int _local_id;
     std::string _name;
@@ -46,8 +46,8 @@ private:
 
 public:
     SolverThread(ParameterProcessor& params, std::shared_ptr<PortfolioSolverInterface> solver, 
-                std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
-                std::shared_ptr<vector<int>>& assumptions, int localId);
+                const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
+                const std::shared_ptr<vector<int>>& assumptions, int localId);
     ~SolverThread();
 
     void init();
