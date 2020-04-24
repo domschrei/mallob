@@ -66,14 +66,15 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 	int passedFilter = 0;
 	int failedFilter = 0;
 	long totalLen = 0;
-	int minLen = result.size();
-	int maxLen = 0;
+	std::vector<int> lens;
 	vector<vector<int> > clausesToAdd;
 	while (cdb.getNextIncomingClause(cl)) {
+		
 		int clauseLen = (cl.size() > 1 ? cl.size()-1 : cl.size()); // subtract "glue" int
 		totalLen += clauseLen;
-		minLen = std::min(minLen, clauseLen);
-		maxLen = std::max(maxLen, clauseLen);
+		while (clauseLen-1 >= lens.size()) lens.push_back(0);
+		lens[clauseLen-1]++;
+
 		if (nodeFilter.registerClause(cl)) {
 			clausesToAdd.push_back(cl);
 			passedFilter++;
@@ -87,9 +88,12 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 	
 	if (total == 0) return;
 
-	logger.log(1, "fltrd %.2f%% (%d/%d), min/avg/max %d/%.2f/%d\n",
+	std::string lensStr = "";
+	for (int len : lens) lensStr += std::to_string(len) + " ";
+
+	logger.log(1, "fltrd %.2f%% (%d/%d), lens %s\n",
 			100*(float)failedFilter/total, failedFilter, total, 
-			minLen, totalLen/(float)total, maxLen);
+			lensStr.c_str());
 
 	if (solvers.size() > 1) {
 		for (size_t sid = 0; sid < solvers.size(); sid++) {
