@@ -41,6 +41,8 @@ bool ClauseFilter::registerClause(const vector<int>& cls) {
 
 bool ClauseFilter::registerClause(std::vector<int>::const_iterator begin, std::vector<int>::const_iterator end, int size) {
 
+	if (size > 1) size--; // subtract "glue" int from total size
+
 	// Block clauses above maximum length
 	if (maxClauseLen > 0 && size > maxClauseLen) return false;
 

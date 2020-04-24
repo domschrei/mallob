@@ -152,13 +152,6 @@ Lingeling::Lingeling(LoggingInterface& logger) : logger(logger) {
     //suspendMutex = VerboseMutex("suspendLgl", NULL);
     //suspendCond = ConditionVariable();
     maxvar = 0;
-
-	int restart = lglgetopt(solver, "restart");
-	int restartinit = lglgetopt(solver, "restartinit");
-	int restartint = lglgetopt(solver, "restartint");
-	int restartintscale = lglgetopt(solver, "restartintscale");
-	int rstinoutinc = lglgetopt(solver, "rstinoutinc");
-	//slog(this, 2, "restart vals: %i %i %i %i %i\n", restart, restartinit, restartint, restartintscale, rstinoutinc);
 }
 
 bool Lingeling::loadFormula(const char* filename) {
@@ -185,18 +178,9 @@ void Lingeling::setPhase(const int var, const bool phase) {
 // Interrupt the SAT solving, so it can be started again with new assumptions
 void Lingeling::setSolverInterrupt() {
 	stopSolver = 1;
-	// Set all the computational limits of LGL to zero to make it terminate faster
-	lglsetopt(solver, "clim", 0);
-	lglsetopt(solver, "dlim", 0);
-	lglsetopt(solver, "memlim", 0);
-	lglsetopt(solver, "plim", 0);
 }
 void Lingeling::unsetSolverInterrupt() {
 	stopSolver = 0;
-	lglsetopt(solver, "clim", -1);
-	lglsetopt(solver, "dlim", -1);
-	lglsetopt(solver, "memlim", -1);
-	lglsetopt(solver, "plim", -1);
 }
 void Lingeling::setSolverSuspend() {
     suspendSolver = true;

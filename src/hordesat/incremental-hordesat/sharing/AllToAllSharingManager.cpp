@@ -70,9 +70,10 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 	int maxLen = 0;
 	vector<vector<int> > clausesToAdd;
 	while (cdb.getNextIncomingClause(cl)) {
-		totalLen += cl.size();
-		minLen = std::min(minLen, (int)cl.size());
-		maxLen = std::max(maxLen, (int)cl.size());
+		int clauseLen = (cl.size() > 1 ? cl.size()-1 : cl.size()); // subtract "glue" int
+		totalLen += clauseLen;
+		minLen = std::min(minLen, clauseLen);
+		maxLen = std::max(maxLen, clauseLen);
 		if (nodeFilter.registerClause(cl)) {
 			clausesToAdd.push_back(cl);
 			passedFilter++;
