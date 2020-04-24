@@ -135,9 +135,9 @@ void HordeLib::init() {
 	}
 }
 
-void* solverRunningThread(SolverThread& solver) {
-    solver.init();
-	return solver.run();
+void* solverRunningThread(SolverThread* solver) {
+    solver->init();
+	return solver->run();
 }
 
 void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
@@ -192,7 +192,7 @@ void HordeLib::updateRole(int rank, int numNodes) {
 bool HordeLib::isFullyInitialized() {
 	if (solvingState == INITIALIZING) return false;
 	for (size_t i = 0; i < solvers.size(); i++) {
-		if (!solvers[i].isInitialized()) return false;
+		if (!solvers[i]->isInitialized()) return false;
 	}
 	return true;
 }
@@ -209,13 +209,13 @@ int HordeLib::solveLoop() {
     // Solving done?
 	bool done = false;
 	for (int i = 0; i < solvers.size(); i++) {
-		if (solvers[i].getState() == STANDBY) {
+		if (solvers[i]->getState() == STANDBY) {
 			done = true;
-			finalResult = solvers[i].getSatResult();
+			finalResult = solvers[i]->getSatResult();
 			if (finalResult == SAT) {
-				truthValues = solvers[i].getSolution();
+				truthValues = solvers[i]->getSolution();
 			} else {
-				failedAssumptions = solvers[i].getFailedAssumptions();
+				failedAssumptions = solvers[i]->getFailedAssumptions();
 			}
 		}
 	}
@@ -296,7 +296,7 @@ void HordeLib::setSolvingState(SolvingState state) {
 	this->solvingState = state;
 
 	hlog(2, "state transition %s -> %s\n", SolvingStateNames[oldState], SolvingStateNames[state]);
-	for (auto& solver : solvers) solver.setState(state);
+	for (auto& solver : solvers) solver->setState(state);
 }
 
 int HordeLib::finishSolving() {

@@ -40,8 +40,8 @@ private:
 	std::shared_ptr<vector<int>> assumptions;
 	
 	std::vector<std::shared_ptr<PortfolioSolverInterface>> solverInterfaces;
+	std::vector<std::shared_ptr<SolverThread>> solvers;
 	std::vector<std::thread> solverThreads;
-	std::vector<SolverThread> solvers;
 	
 	SatResult finalResult;
 	vector<int> truthValues;
@@ -91,7 +91,7 @@ public:
 	std::vector<long> getSolverTids() {
 		std::vector<long> tids;
 		for (int i = 0; i < solvers.size(); i++) {
-			if (solvers[i].isInitialized()) tids.push_back(solvers[i].getTid());
+			if (solvers[i]->isInitialized()) tids.push_back(solvers[i]->getTid());
 		}
 		return tids;
 	}
