@@ -16,7 +16,7 @@ DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
 	cdb(logger),nodeFilter(/*maxClauseLen=*/params.getIntParam("mcl", 0),/*checkUnits=*/true),callback(*this) {
     for (size_t i = 0; i < solvers.size(); i++) {
 		if (solvers.size() > 1) {
-			solverFilters.push_back(new ClauseFilter(/*maxClauseLen=*/params.getIntParam("mcl", 0), /*checkUnits=*/true));
+			solverFilters.emplace_back(/*maxClauseLen=*/params.getIntParam("mcl", 0), /*checkUnits=*/true);
 		}
 		solvers[i]->setLearnedClauseCallback(&callback, i);
 	}
@@ -99,14 +99,14 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 		for (size_t sid = 0; sid < solvers.size(); sid++) {
 			int added = 0;
 			for (size_t cid = 0; cid < clausesToAdd.size(); cid++) {
-				if (solverFilters[sid]->registerClause(clausesToAdd[cid])) {
+				if (solverFilters[sid].registerClause(clausesToAdd[cid])) {
 					solvers[sid]->addLearnedClause(clausesToAdd[cid]);
 					added++;
 				}
 			}
 			logger.log(2, "S%d fltrd %.2f%% (%d)\n", sid, 100*(1-((float)added/clausesToAdd.size())), clausesToAdd.size()-added);
 			if (!params.isSet("fd")) {
-				solverFilters[sid]->clear();
+				solverFilters[sid].clear();
 			}
 		}
 	} else {
@@ -118,9 +118,5 @@ SharingStatistics DefaultSharingManager::getStatistics() {
 	return stats;
 }
 
-DefaultSharingManager::~DefaultSharingManager() {
-	for (int i = 0; i < solverFilters.size(); i++) {
-		delete solverFilters[i];
-	}
-}
+DefaultSharingManager::~DefaultSharingManager() {}
 

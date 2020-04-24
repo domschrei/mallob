@@ -59,7 +59,7 @@ private:
 	bool checkUnits = false;
 
 	std::unordered_set<int, UnitHasher> units;
-	std::mutex unitLock;
+	Mutex unitLock;
 };
 
 #endif /* CLAUSEFILTER_H_ */
