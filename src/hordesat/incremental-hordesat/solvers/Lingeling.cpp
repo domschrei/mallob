@@ -323,7 +323,7 @@ void Lingeling::addLearnedClauses(vector<vector<int> >& clauses) {
 }
 
 void Lingeling::increaseClauseProduction() {
-	glueLimit++;
+	if (glueLimit < 8) glueLimit++;
 }
 
 void Lingeling::setLearnedClauseCallback(LearnedClauseCallback* callback, int solverId) {

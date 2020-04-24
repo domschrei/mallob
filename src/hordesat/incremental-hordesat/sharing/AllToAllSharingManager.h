@@ -9,6 +9,7 @@
 #define SHARING_ALLTOALLSHARINGMANAGER_H_
 
 #include <cstring>
+#include <memory>
 
 #include "SharingManagerInterface.h"
 #include "../utilities/ClauseDatabase.h"
@@ -23,8 +24,8 @@ protected:
 	// MPI paramaters
 	int size, rank;
 	// associated solvers
-	vector<PortfolioSolverInterface*> solvers;
-	vector<ClauseFilter*> solverFilters;
+	vector<std::shared_ptr<PortfolioSolverInterface>>& solvers;
+	vector<ClauseFilter> solverFilters;
 	// global parameters
 	ParameterProcessor& params;
 	LoggingInterface& logger;
@@ -42,7 +43,7 @@ protected:
 			//parent.logger.log(3, "process clause\n");
 			if (parent.solvers.size() > 1) {
 				//parent.logger.log(3, "register clause in child\n");
-				parent.solverFilters[solverId]->registerClause(cls);
+				parent.solverFilters[solverId].registerClause(cls);
 			}
 			//parent.logger.log(3, "register clause in parent\n");
 			if (parent.nodeFilter.registerClause(cls)) {
@@ -62,7 +63,7 @@ protected:
 	SharingStatistics stats;
 
 public:
-	DefaultSharingManager(int mpi_size, int mpi_rank, vector<PortfolioSolverInterface*>& solvers,
+	DefaultSharingManager(int mpi_size, int mpi_rank, vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
 			ParameterProcessor& params);
     std::vector<int> prepareSharing(int maxSize);
     void digestSharing(const std::vector<int>& result);

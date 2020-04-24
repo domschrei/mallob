@@ -105,25 +105,22 @@ void HordeLib::init() {
 
 	for (int i = 0; i < solversCount; i++) {
 		if (params.getParam("s") == "minisat") {
-			solvers.push_back(new MiniSat());
+			solverInterfaces.emplace_back(new MiniSat());
 			hlog(3, "MiniSat @ %d\n", i, mpi_rank, mpi_size);
 		} else if (params.getParam("s") == "combo") {
 			if ((mpi_rank + i) % 2 == 0) {
-				solvers.push_back(new MiniSat());
+				solverInterfaces.emplace_back(new MiniSat());
 				hlog(3, "MiniSat @ %d\n", i, mpi_rank, mpi_size);
 			} else {
-				solvers.push_back(new Lingeling(*logger));
+				solverInterfaces.emplace_back(new Lingeling(*logger));
 				hlog(3, "Lingeling @ %d\n", i, mpi_rank, mpi_size);
 			}
 		} else {
-			solvers.push_back(new Lingeling(*logger));
+			solverInterfaces.emplace_back(new Lingeling(*logger));
 			hlog(3, "Lingeling @ %d\n", i, mpi_rank, mpi_size);
 		}
 		// set solver id
-		solvers[i]->solverId = i + solversCount * mpi_rank;
-		
-		solverThreadsInitialized.push_back(false);
-		solverTids.push_back(-1);
+		solverInterfaces[i]->solverId = i + solversCount * mpi_rank;		
 	}
 
 	sleepInt = 1000 * params.getIntParam("i", 1000);
@@ -133,14 +130,14 @@ void HordeLib::init() {
 	if (exchangeMode == 0) {
 		hlog(3, "Clause sharing disabled.\n");
 	} else {
-		sharingManager = new DefaultSharingManager(mpi_size, mpi_rank, solvers, params);
+		sharingManager.reset(new DefaultSharingManager(mpi_size, mpi_rank, solverInterfaces, params));
 		hlog(3, "Initialized all-to-all clause sharing.\n");
 	}
 }
 
-void* solverRunningThread(HordeLib* hlib, PortfolioSolverInterface* solver, int localId) {
-    SolverThread thread(hlib, solver, localId);
-	return thread.run();
+void* solverRunningThread(SolverThread& solver) {
+    solver.init();
+	return solver.run();
 }
 
 void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
@@ -165,13 +162,11 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 
 	for (int i = 0; i < solversCount; i++) {
         //hlog(1, "initializing solver %i.\n", i);
-		solverThreads[i] = std::thread(solverRunningThread, this, solvers[i], i);
+		solvers.emplace_back(params, solverInterfaces[i], formulae, assumptions, i);
+		solverThreads[i] = std::thread(solverRunningThread, solvers[i]);
         //hlog(1, "initialized solver %i.\n", i);
 	}
-	{
-		auto lock = solvingStateLock.getLock();
-		setSolvingState(ACTIVE);
-	}
+	setSolvingState(ACTIVE);
 	startSolving = logger->getTime() - startSolving;
 	hlog(3, "started solver threads, took %.3f seconds\n", startSolving);
 }
@@ -186,7 +181,6 @@ void HordeLib::continueSolving(const std::vector<std::shared_ptr<std::vector<int
 	finalResult = UNKNOWN;
 
 	// unset standby
-	auto lock = solvingStateLock.getLock();
 	setSolvingState(ACTIVE);
 }
 
@@ -197,9 +191,8 @@ void HordeLib::updateRole(int rank, int numNodes) {
 
 bool HordeLib::isFullyInitialized() {
 	if (solvingState == INITIALIZING) return false;
-	for (size_t i = 0; i < solverThreadsInitialized.size(); i++) {
-		if (!solverThreadsInitialized[i])
-			return false;
+	for (size_t i = 0; i < solvers.size(); i++) {
+		if (!solvers[i].isInitialized()) return false;
 	}
 	return true;
 }
@@ -214,8 +207,20 @@ int HordeLib::solveLoop() {
     }
 
     // Solving done?
-	bool standby = (solvingState == STANDBY);
-	if (standby) {
+	bool done = false;
+	for (int i = 0; i < solvers.size(); i++) {
+		if (solvers[i].getState() == STANDBY) {
+			done = true;
+			finalResult = solvers[i].getSatResult();
+			if (finalResult == SAT) {
+				truthValues = solvers[i].getSolution();
+			} else {
+				failedAssumptions = solvers[i].getFailedAssumptions();
+			}
+		}
+	}
+
+	if (done) {
 		hlog(0, "Returning result\n");
 		return finalResult;
 	} 
@@ -223,7 +228,6 @@ int HordeLib::solveLoop() {
 	// Resources exhausted?
     if ((maxRounds != 0 && round == maxRounds) || (maxSeconds != 0 && timeNow > maxSeconds)) {
 		hlog(0, "Aborting: round %i, time %3.3f\n", round, timeNow);
-		auto lock = solvingStateLock.getLock();
         setSolvingState(STANDBY);
     }
     //fflush(stdout);
@@ -241,93 +245,21 @@ std::vector<int> HordeLib::prepareSharing(int maxSize) {
 }
 
 void HordeLib::digestSharing(const std::vector<int>& result) {
-	if (isCleanedUp()) return std::vector<int>();
+	if (isCleanedUp()) return;
     assert(sharingManager != NULL);
 	sharingManager->digestSharing(result);
 }
 
-void HordeLib::setPaused() {
-    auto lock = solvingStateLock.getLock();
-	if (solvingState == ACTIVE)	setSolvingState(SUSPENDED);
-}
-
-void HordeLib::unsetPaused() {
-    auto lock = solvingStateLock.getLock();
-	if (solvingState == SUSPENDED) setSolvingState(ACTIVE);
-}
-
-void HordeLib::interrupt() {
-	auto lock = solvingStateLock.getLock();
-	if (solvingState != STANDBY) setSolvingState(STANDBY);
-}
-
-void HordeLib::abort() {
-	auto lock = solvingStateLock.getLock();
-	if (solvingState != ABORTING) setSolvingState(ABORTING);
-}
-
-void HordeLib::setSolvingState(SolvingState state) {
-	SolvingState oldState = this->solvingState;
-	this->solvingState = state;
-
-	hlog(2, "state transition %s -> %s\n", SolvingStateNames[oldState], SolvingStateNames[state]);
-	
-	// (1) and (4) may co-occur when STANDBY -> ABORTING: 
-	// Must set interruption signal _before_ waking up solvers!
-
-	// (1) To STANDBY|ABORTING : Interrupt solvers
-	// (set signal to jump out of solving procedure)
-	if (state == STANDBY || state == ABORTING) {
-		for (int i = 0; i < solversCount; i++) {
-            if (solvers[i] != NULL) solvers[i]->setSolverInterrupt();
-        }
-	}
-	// (2) From STANDBY to !STANDBY : Restart solvers
-	else if (oldState == STANDBY && state != STANDBY) {
-		for (int i = 0; i < solversCount; i++) {
-            if (solvers[i] != NULL) solvers[i]->unsetSolverInterrupt();
-        }
-	}
-
-	// (3) From !SUSPENDED to SUSPENDED : Suspend solvers 
-	// (set signal to sleep inside solving procedure)
-	if (oldState != SUSPENDED && state == SUSPENDED) {
-		for (int i = 0; i < solversCount; i++) {
-			if (solvers[i] != NULL) solvers[i]->setSolverSuspend();
-        }
-	}
-	// (4) From SUSPENDED to !SUSPENDED : Resume solvers
-	// (set signal to wake up and resume solving procedure)
-	if (oldState == SUSPENDED && state != SUSPENDED) {
-		for (int i = 0; i < solversCount; i++) {
-            if (solvers[i] != NULL) solvers[i]->unsetSolverSuspend();
-        }
-	}
-
-	// Signal state change
-	stateChangeCond.notify();
-	//pthread_cond_broadcast(stateChangeCond.get());
-}
-
-int HordeLib::finishSolving() {
-
-	assert(solvingState == STANDBY);
-	if (params.isSet("stats")) {
-		dumpStats();
-	}
-	return finalResult;
-}
-
 void HordeLib::dumpStats() {
-	if (isCleanedUp()) return;
+	if (isCleanedUp() || !isFullyInitialized()) return;
 
 	// Local statistics
 	SolvingStatistics locSolveStats;
 	for (int i = 0; i < solversCount; i++) {
-		if (solvers[i] == NULL) continue;
-		SolvingStatistics st = solvers[i]->getStatistics();
+		if (solverInterfaces[i] == NULL) continue;
+		SolvingStatistics st = solverInterfaces[i]->getStatistics();
 		hlog(1, "S%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f\n",
-				solvers[i]->solverId, st.propagations, st.decisions, st.conflicts, st.memPeak);
+				solverInterfaces[i]->solverId, st.propagations, st.decisions, st.conflicts, st.memPeak);
 		locSolveStats.conflicts += st.conflicts;
 		locSolveStats.decisions += st.decisions;
 		locSolveStats.memPeak += st.memPeak;
@@ -343,6 +275,38 @@ void HordeLib::dumpStats() {
 			locSolveStats.conflicts, locSolveStats.memPeak, locShareStats.sharedClauses, locShareStats.filteredClauses);
 }
 
+void HordeLib::setPaused() {
+	if (solvingState == ACTIVE)	setSolvingState(SUSPENDED);
+}
+
+void HordeLib::unsetPaused() {
+	if (solvingState == SUSPENDED) setSolvingState(ACTIVE);
+}
+
+void HordeLib::interrupt() {
+	if (solvingState != STANDBY) setSolvingState(STANDBY);
+}
+
+void HordeLib::abort() {
+	if (solvingState != ABORTING) setSolvingState(ABORTING);
+}
+
+void HordeLib::setSolvingState(SolvingState state) {
+	SolvingState oldState = this->solvingState;
+	this->solvingState = state;
+
+	hlog(2, "state transition %s -> %s\n", SolvingStateNames[oldState], SolvingStateNames[state]);
+	for (auto& solver : solvers) solver.setState(state);
+}
+
+int HordeLib::finishSolving() {
+
+	assert(solvingState == STANDBY);
+	if (params.isSet("stats")) {
+		dumpStats();
+	}
+	return finalResult;
+}
 
 int HordeLib::value(int lit) {
 	return truthValues[abs(lit)];
@@ -365,9 +329,7 @@ void HordeLib::cleanUp() {
 	hlog(3, "[hlib-cleanup] enter\n");
 
 	// for any running threads left:
-	solvingStateLock.lock();
 	setSolvingState(ABORTING);
-	solvingStateLock.unlock();
 	
 	// join threads
 	for (int i = 0; i < solverThreads.size(); i++) {
@@ -375,27 +337,21 @@ void HordeLib::cleanUp() {
 			solverThreads[i].join();
 		}
 	}
+	solverThreads.clear();
+
 	hlog(3, "[hlib-cleanup] joined threads\n");
-	solversCount = 0;
 
 	// delete solvers
-	for (int i = 0; i < solvers.size(); i++) {
-		if (solvers[i] != NULL) {
-			delete solvers[i];
-			solvers[i] = NULL;
-		}
+	solversCount = 0;
+	for (int i = 0; i < solverInterfaces.size(); i++) {
+		solverInterfaces[i].reset();
 	}
-	hlog(3, "[hlib-cleanup] deleted solvers\n");
-
-	// delete sharing manager
-	if (sharingManager != NULL) {
-		delete sharingManager;
-		sharingManager = NULL;
-	}
+	solvers.clear();
+	hlog(3, "[hlib-cleanup] cleared solvers\n");
 
 	// release formulae
 	for (auto f : formulae) {
-		f = NULL;
+		f.reset();
 	}
 
 	time = logger->getTime() - time;

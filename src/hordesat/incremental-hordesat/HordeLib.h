@@ -29,20 +29,20 @@ class HordeLib {
 private:
 	int mpi_size;
 	int mpi_rank;
-	std::vector<std::thread> solverThreads;
+
 	size_t sleepInt;
 	int solversCount;
-	SharingManagerInterface* sharingManager;
+	std::unique_ptr<SharingManagerInterface> sharingManager;
 	
 	volatile SolvingStates::SolvingState solvingState;
 	
-	vector<PortfolioSolverInterface*> solvers;
-	vector<bool> solverThreadsInitialized;
-	vector<long> solverTids;
-
 	std::vector<std::shared_ptr<std::vector<int>>> formulae;
 	std::shared_ptr<vector<int>> assumptions;
-
+	
+	std::vector<std::shared_ptr<PortfolioSolverInterface>> solverInterfaces;
+	std::vector<std::thread> solverThreads;
+	std::vector<SolverThread> solvers;
+	
 	SatResult finalResult;
 	vector<int> truthValues;
 	set<int> failedAssumptions;
@@ -53,10 +53,6 @@ private:
 	size_t round;
 
 	std::shared_ptr<LoggingInterface> logger;
-
-	Mutex solutionLock;
-	Mutex solvingStateLock;
-	ConditionVariable stateChangeCond;
 	
 	// settings
 	ParameterProcessor params;
@@ -94,8 +90,8 @@ public:
 	void dumpStats();
 	std::vector<long> getSolverTids() {
 		std::vector<long> tids;
-		for (int i = 0; i < solverThreadsInitialized.size(); i++) {
-			if (solverThreadsInitialized[i]) tids.push_back(solverTids[i]);
+		for (int i = 0; i < solvers.size(); i++) {
+			if (solvers[i].isInitialized()) tids.push_back(solvers[i].getTid());
 		}
 		return tids;
 	}
@@ -114,7 +110,6 @@ public:
 	void cleanUp();
 	bool isCleanedUp() {return cleanedUp;}
 	
-
 private:
     void init();	
 };

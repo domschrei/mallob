@@ -28,7 +28,7 @@ private:
     std::unique_ptr<HordeLib> _solver;
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
 
-    bool _done_locally;
+    volatile bool _done_locally;
 
     std::thread _bg_thread;
     mutable Mutex _horde_manipulation_lock;
