@@ -20,6 +20,7 @@ using namespace std;
 
 class ClauseFilter {
 public:
+	ClauseFilter() : maxClauseLen(0), checkUnits(false) {}
 	ClauseFilter(int maxClauseLen, bool checkUnits) : maxClauseLen(maxClauseLen), checkUnits(checkUnits) {}
 	virtual ~ClauseFilter() {}
 	/**
