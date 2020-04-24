@@ -31,7 +31,7 @@ private:
     int _portfolio_rank;
     int _portfolio_size;
 
-    volatile SolvingState _state;
+    volatile SolvingStates::SolvingState _state;
     Mutex _state_mutex;
     ConditionVariable _state_cond;
 
@@ -55,8 +55,8 @@ public:
 
     bool isInitialized() {return _initialized;}
     int getTid() {return _tid;}
-    void setState(SolvingState state);
-    SolvingState getState() {
+    void setState(SolvingStates::SolvingState state);
+    SolvingStates::SolvingState getState() {
         auto lock = _state_mutex.getLock();
         return _state;
     }
