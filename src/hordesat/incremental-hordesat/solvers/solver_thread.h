@@ -13,7 +13,6 @@
 #include "solvers/PortfolioSolverInterface.h"
 #include "solvers/solving_state.h"
 
-
 // Forward declarations
 class HordeLib;
 
@@ -56,37 +55,7 @@ public:
 
     bool isInitialized() {return _initialized;}
     int getTid() {return _tid;}
-    void setState(SolvingState state) {
-
-        _state_mutex.lock();
-        SolvingState oldState = _state;
-
-        // (1) To STANDBY|ABORTING : Interrupt solver
-        // (set signal to jump out of solving procedure)
-        if (state == STANDBY || state == ABORTING) {
-            _solver.setSolverInterrupt();
-        }
-        // (2) From STANDBY to !STANDBY : Restart solver
-        else if (oldState == STANDBY && state != STANDBY) {
-            _solver.unsetSolverInterrupt();
-        }
-
-        // (3) From !SUSPENDED to SUSPENDED : Suspend solvers 
-        // (set signal to sleep inside solving procedure)
-        if (oldState != SUSPENDED && state == SUSPENDED) {
-            _solver.setSolverSuspend();
-        }
-        // (4) From SUSPENDED to !SUSPENDED : Resume solvers
-        // (set signal to wake up and resume solving procedure)
-        if (oldState == SUSPENDED && state != SUSPENDED) {
-            _solver.unsetSolverSuspend();
-        }
-
-        _state = state; 
-
-        _state_mutex.unlock();
-        _state_cond.notify();
-    }
+    void setState(SolvingState state);
     SolvingState getState() {
         auto lock = _state_mutex.getLock();
         return _state;
