@@ -16,7 +16,7 @@ DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
 	cdb(logger),nodeFilter(/*maxClauseLen=*/params.getIntParam("mcl", 0),/*checkUnits=*/true),callback(*this) {
     for (size_t i = 0; i < solvers.size(); i++) {
 		if (solvers.size() > 1) {
-			solverFilters.emplace_back(/*maxClauseLen=*/params.getIntParam("mcl", 0), /*checkUnits=*/true);
+			solverFilters.push_back(new ClauseFilter(/*maxClauseLen=*/params.getIntParam("mcl", 0), /*checkUnits=*/true));
 		}
 		solvers[i]->setLearnedClauseCallback(&callback, i);
 	}
@@ -118,5 +118,9 @@ SharingStatistics DefaultSharingManager::getStatistics() {
 	return stats;
 }
 
-DefaultSharingManager::~DefaultSharingManager() {}
+DefaultSharingManager::~DefaultSharingManager() {
+	for (int i = 0; i < solverFilters.size(); i++) {
+		delete solverFilters[i];
+	}
+}
 
