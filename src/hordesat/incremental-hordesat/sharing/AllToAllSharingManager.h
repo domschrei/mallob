@@ -25,7 +25,7 @@ protected:
 	int size, rank;
 	// associated solvers
 	vector<std::shared_ptr<PortfolioSolverInterface>>& solvers;
-	vector<ClauseFilter> solverFilters;
+	vector<ClauseFilter*> solverFilters;
 	// global parameters
 	ParameterProcessor& params;
 	LoggingInterface& logger;
@@ -43,7 +43,7 @@ protected:
 			//parent.logger.log(3, "process clause\n");
 			if (parent.solvers.size() > 1) {
 				//parent.logger.log(3, "register clause in child\n");
-				parent.solverFilters[solverId].registerClause(cls);
+				parent.solverFilters[solverId]->registerClause(cls);
 			}
 			//parent.logger.log(3, "register clause in parent\n");
 			if (parent.nodeFilter.registerClause(cls)) {
