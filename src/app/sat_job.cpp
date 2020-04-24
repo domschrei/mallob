@@ -202,7 +202,7 @@ void SatJob::appl_dumpStats() {
 }
 
 bool SatJob::appl_isDestructible() {
-    return _solver->isCleanedUp();
+    return !solverNotNull() || _solver->isCleanedUp();
 }
 
  bool SatJob::appl_wantsToBeginCommunication() const {
