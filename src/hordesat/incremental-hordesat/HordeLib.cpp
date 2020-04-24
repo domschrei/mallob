@@ -205,6 +205,7 @@ bool HordeLib::isFullyInitialized() {
 }
 
 int HordeLib::solveLoop() {
+	if (isCleanedUp()) return -1;
 
     double timeNow = logger->getTime();
 	// Sleeping?
@@ -232,6 +233,7 @@ int HordeLib::solveLoop() {
 }
 
 std::vector<int> HordeLib::prepareSharing(int maxSize) {
+	if (isCleanedUp()) return std::vector<int>();
     assert(sharingManager != NULL);
 	hlog(3, "collecting clauses on this node\n");
 	std::vector<int> clauses = sharingManager->prepareSharing(maxSize);
@@ -239,47 +241,9 @@ std::vector<int> HordeLib::prepareSharing(int maxSize) {
 }
 
 void HordeLib::digestSharing(const std::vector<int>& result) {
+	if (isCleanedUp()) return std::vector<int>();
     assert(sharingManager != NULL);
 	sharingManager->digestSharing(result);
-}
-
-std::vector<int> HordeLib::clauseBufferToPlainClauses(const vector<int>& buffer) {
-	std::vector<int> clauses;
-
-	int pos = 0;
-	while (pos + COMM_BUFFER_SIZE < (int) buffer.size()) {
-		int bufIdx = pos % COMM_BUFFER_SIZE;
-
-		if (buffer.size() == 0) return clauses;
-
-		int numVipClauses = buffer[pos++];
-		while (numVipClauses > 0) {
-			int lit = buffer[pos++];
-			clauses.push_back(lit);
-			if (lit == 0) {
-				numVipClauses--;
-			}
-		}
-
-		int clauseLength = 1;
-		while (pos % COMM_BUFFER_SIZE == bufIdx) {
-			int numClausesOfLength = buffer[pos++];
-			if (numClausesOfLength > 0)
-			for (int n = 0; n < numClausesOfLength; n++) {
-				for (int i = 0; i < clauseLength; i++) {
-					int lit = buffer[pos++];
-					assert(lit != 0);
-					clauses.push_back(lit);
-				}
-				clauses.push_back(0);
-			}
-			clauseLength++;
-		}
-
-		pos = (bufIdx + 1) * COMM_BUFFER_SIZE;
-	}
-	
-	return clauses;
 }
 
 void HordeLib::setPaused() {
@@ -355,9 +319,12 @@ int HordeLib::finishSolving() {
 }
 
 void HordeLib::dumpStats() {
+	if (isCleanedUp()) return;
+
 	// Local statistics
 	SolvingStatistics locSolveStats;
 	for (int i = 0; i < solversCount; i++) {
+		if (solvers[i] == NULL) continue;
 		SolvingStatistics st = solvers[i]->getStatistics();
 		hlog(1, "S%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f\n",
 				solvers[i]->solverId, st.propagations, st.decisions, st.conflicts, st.memPeak);

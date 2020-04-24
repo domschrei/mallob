@@ -117,7 +117,6 @@ public:
 
 private:
     void init();	
-	std::vector<int> clauseBufferToPlainClauses(const std::vector<int>& buffer);
 };
 
 #endif /* HORDELIB_H_ */
