@@ -51,7 +51,7 @@ bool ClauseFilter::registerClause(std::vector<int>::const_iterator begin, std::v
 		if (checkUnits) {
 
 			// Always admit unit clause if a check is not possible right now
-			if (!unitLock.try_lock()) return true; 
+			if (!unitLock.tryLock()) return true; 
 			
 			int firstLit = *begin;
 			bool admit = !units.count(firstLit);
@@ -81,6 +81,6 @@ bool ClauseFilter::registerClause(std::vector<int>::const_iterator begin, std::v
 
 void ClauseFilter::clear() {
 	s1.reset();
-	auto lock = std::unique_lock<std::mutex>(unitLock);
+	auto lock = unitLock.getLock();
 	units.clear();
 }
