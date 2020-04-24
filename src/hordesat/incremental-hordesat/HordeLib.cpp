@@ -163,7 +163,7 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 	for (int i = 0; i < solversCount; i++) {
         //hlog(1, "initializing solver %i.\n", i);
 		solvers.emplace_back(new SolverThread(params, solverInterfaces[i], formulae, assumptions, i));
-		solverThreads[i] = std::thread(solverRunningThread, solvers[i]);
+		solverThreads[i] = std::thread(solverRunningThread, solvers[i].get());
         //hlog(1, "initialized solver %i.\n", i);
 	}
 	setSolvingState(ACTIVE);
