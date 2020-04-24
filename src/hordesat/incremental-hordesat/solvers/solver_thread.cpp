@@ -26,8 +26,8 @@ void pinThread(HordeLib& hlib, int solversCount) {
 	sched_setaffinity(0, sizeof(cpuSet), &cpuSet);
 }
 
-SolverThread::SolverThread(HordeLib& hlib, PortfolioSolverInterface& solver, int localId) : 
-    _hlib(hlib), _solver(solver), _local_id(localId) {}
+SolverThread::SolverThread(HordeLib& hlib, PortfolioSolverInterface* solver, int localId) : 
+    _hlib(hlib), _solver(*solver), _local_id(localId) {}
 
 void* SolverThread::run() {
 
@@ -221,7 +221,7 @@ void SolverThread::binValueDiversification(int mpi_size, int mpi_rank) {
 	}
     int vars = _solver.getVariablesCount();
     int num = mpi_rank * _local_id;
-    
+
     for (int var = 1; var < vars; var++) {
         int bit = var % log;
         bool phase = (num >> bit) & 1 ? true : false;
