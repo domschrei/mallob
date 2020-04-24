@@ -10,8 +10,8 @@
 class Reduceable : public Serializable {
 
 protected:
-    MPI_Comm _comm;
-    int _my_rank;
+    MPI_Comm _comm = NULL;
+    int _my_rank = -1;
     std::set<int> _excluded_ranks;
     int _power;
     int _highest_power;

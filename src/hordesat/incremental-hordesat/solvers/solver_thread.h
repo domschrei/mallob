@@ -20,12 +20,13 @@ class HordeLib;
 class SolverThread {
 
 private:
+    HordeLib& _hlib;
+    PortfolioSolverInterface& _solver;
+    
     int _local_id;
     std::string _name;
     std::tuple<int, int, int> _diversification_seed;
 
-    HordeLib& _hlib;
-    PortfolioSolverInterface& _solver;
     int _imported_lits;
 
 public:

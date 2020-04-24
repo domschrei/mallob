@@ -284,7 +284,7 @@ bool CutoffPriorityBalancer::continueRoundingUntilReduction(int lower, int upper
     if (idx <= _remainders.size()) {
         // Remainder is either one of the remainders from the reduced sequence
         // or the right-hand limit 1.0
-        double remainder = (idx < _remainders.size() ? _remainders[idx] : 1.0);
+        //double remainder = (idx < _remainders.size() ? _remainders[idx] : 1.0);
         // Round your local assignments and calculate utilization sum
         _rounded_assignments = Rounding::getRoundedAssignments(idx, localSum, _remainders, _assignments);
     }
@@ -295,7 +295,6 @@ bool CutoffPriorityBalancer::continueRoundingUntilReduction(int lower, int upper
 
 bool CutoffPriorityBalancer::continueRoundingFromReduction() {
 
-    int rank = MyMpi::rank(MPI_COMM_WORLD);
     _rounding_iterations++;
 
     float utilization = _reduce_result;

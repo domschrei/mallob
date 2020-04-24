@@ -54,8 +54,8 @@ public:
 
 private:
 	bitset<NUM_BITS> s1;
-	bool checkUnits = false;
 	int maxClauseLen = 0;
+	bool checkUnits = false;
 
 	std::unordered_set<int, UnitHasher> units;
 	std::mutex unitLock;

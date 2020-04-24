@@ -45,7 +45,6 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
     if (!_initialized || _job->isNotInState({JobState::ACTIVE}))
         return;
 
-    int jobId = msg.jobId;
     if (msg.tag == MSG_GATHER_CLAUSES) {
         // Gather received clauses, send to parent
         // TODO count each child only once

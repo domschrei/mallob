@@ -770,7 +770,7 @@ void Worker::handleResultObsolete(MessageHandlePtr& handle) {
 
     IntVec res(*handle->recvData);
     int jobId = res[0];
-    int revision = res[1];
+    //int revision = res[1];
     if (!hasJob(jobId)) return;
     Console::log_recv(Console::VERB, handle->source, "job result for %s unwanted", getJob(jobId).toStr());
     getJob(jobId).setResultTransferPending(false);
