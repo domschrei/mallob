@@ -135,9 +135,9 @@ void HordeLib::init() {
 	}
 }
 
-void* solverRunningThread(SolverThread* solver) {
-    solver->init();
-	return solver->run();
+void* solverRunningThread(void* solver) {
+    ((SolverThread*)solver)->init();
+	return ((SolverThread*)solver)->run();
 }
 
 void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
