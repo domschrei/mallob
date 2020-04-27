@@ -31,7 +31,7 @@ SolverThread::SolverThread(ParameterProcessor& params, std::shared_ptr<Portfolio
 
 void SolverThread::init() {
     _tid = syscall(SYS_gettid);
-    log(3, "%s : tid %ld\n", toStr(), _tid);
+    log(3, "tid %ld\n", _tid);
     if (_params.isSet("pin")) pin();
 }
 
@@ -79,13 +79,13 @@ void* SolverThread::run() {
         readFormula();
         diversify();
     }
-    log(2, "%s exiting\n", toStr());
+    log(2, "exiting\n");
     return NULL;
 }
 
 void SolverThread::readFormula() {
     _initialized = false;
-    log(3, "%s importing clauses\n", toStr());
+    log(3, "importing clauses\n");
 
     int prevLits = _imported_lits;
     int begin = _imported_lits;
@@ -100,8 +100,8 @@ void SolverThread::readFormula() {
         if (i < _formulae.size() && cancelThread()) return;
     }
 
-    log(2, "%s imported cnf (%i lits)\n", toStr(), (_imported_lits-prevLits));
-    log(1, "%s initialized\n", toStr());
+    log(2, "imported cnf (%i lits)\n", _imported_lits-prevLits);
+    log(1, "initialized\n");
 }
 
 void SolverThread::read(const std::vector<int>& formula, int begin) {
@@ -244,9 +244,9 @@ void SolverThread::runOnce() {
         if (cancelRun()) break;
 
         //hlib->hlog(0, "rank %d starting solver with %d new lits, %d assumptions: %d\n", hlib->mpi_rank, litsAdded, hlib->assumptions.size(), hlib->assumptions[0]);
-        log(3, "%s BEGSOL\n", toStr());
+        log(3, "BEGSOL\n");
         SatResult res = _solver.solve(*_assumptions);
-        log(3, "%s ENDSOL\n", toStr());
+        log(3, "ENDSOL\n");
 
         // If interrupted externally
         if (cancelRun()) break;
@@ -265,7 +265,7 @@ bool SolverThread::cancelRun() {
     SolvingState s = _state;
     bool cancel = s == STANDBY || s == ABORTING;
     if (cancel) {
-        log(1, "%s cancelling run\n", toStr());
+        log(1, "cancelling run\n");
     }
     return cancel;
 }
@@ -277,10 +277,10 @@ bool SolverThread::cancelThread() {
 }
 
 void SolverThread::reportResult(int res) {
-    log(3,"%s found result\n", toStr());
+    log(3, "found result\n");
     if (res == SAT || res == UNSAT) {
         if (_state == ACTIVE) {
-            log(0,"%s found result %s\n", toStr(), res==SAT?"SAT":"UNSAT");
+            log(0, "found result %s\n", res==SAT?"SAT":"UNSAT");
             _result = SatResult(res);
             if (res == SAT) { 
                 _solution = _solver.getSolution();
