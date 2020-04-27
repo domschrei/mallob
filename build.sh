@@ -19,11 +19,16 @@ elif [ -d /usr/lib/x86_64-linux-gnu/openmpi/ ]; then
 else
     nompi
 fi
+echo mpiroot: $mpiroot
 
-mpiinclude=${mpiroot}include/
-if [ ! -d $mpiinclude ]; then
+if [ -f ${mpiroot}include/mpi.h ]; then
+    mpiinclude=${mpiroot}include/
+elif [ -f $mpiroot/mpi.h ]; then
+    mpiinclude=$mpiroot
+else
     nompi
 fi
+echo mpiinclude: $mpiinclude
 
 (cd src/hordesat && bash fetch_and_build_solvers.sh)
 

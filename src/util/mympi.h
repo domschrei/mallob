@@ -7,7 +7,7 @@
 #include <set>
 #include <map>
 #include <assert.h>
-#include <include/mpi.h>
+#include <mpi.h>
 
 #include "data/serializable.h"
 #include "util/console.h"
