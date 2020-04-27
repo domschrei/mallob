@@ -25,9 +25,12 @@ private:
 	string _filename;
 public:
 	Parameters() = default;
+
 	void init(int argc, char** argv);
-	void printUsage() const;
 	void setDefaults();
+	void expand();
+
+	void printUsage() const;
 	string getFilename() const;
 	void printParams() const;
 	

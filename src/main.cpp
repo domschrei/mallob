@@ -75,12 +75,6 @@ int main(int argc, char *argv[]) {
 	gethostname(hostname, 1024);
     Console::log(Console::VERB, "Launching mallob, revision %s, on %s", MALLOB_REVISION, hostname);
 
-    if (numNodes < 2) {
-        Console::log(Console::CRIT, "ERROR: At least 2 processes are needed to run this application");
-        MPI_Finalize();
-        exit(0);
-    }
-
     // Global and local seed, such that all nodes have access to a synchronized randomness
     // as well as to an individual randomness that differs among nodes
     Random::init(numNodes, rank);
@@ -92,7 +86,7 @@ int main(int argc, char *argv[]) {
     assert(numWorkers > 0 || Console::fail("Need at least one worker node!"));
     for (int i = 1; i <= numClients; i++)
         externalClientRanks.insert(numNodes-i);
-    bool isExternalClient = (externalClientRanks.find(rank) != externalClientRanks.end());
+    bool isExternalClient = rank >= numWorkers;
 
     // Create two disjunct communicators: Clients and workers
     int color = -1;

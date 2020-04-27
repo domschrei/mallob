@@ -51,6 +51,10 @@ bool SatJob::appl_initialize() {
     params["mpisize"] = std::to_string(_comm_size); // mpi_size
     std::string identifier = std::string(toStr());
     params["jobstr"] = identifier;
+    if (_params.isSet("sinst")) {
+        // Single instance filename
+        params["sinst"] = _params.getParam("sinst");
+    }
 
     auto lock = _horde_manipulation_lock.getLock();
 

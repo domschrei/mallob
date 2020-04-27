@@ -25,6 +25,7 @@ void Parameters::init(int argc, char** argv) {
             _params[left] = right;
         }
     }
+    expand();
 }
 
 void Parameters::setDefaults() {
@@ -53,6 +54,7 @@ void Parameters::setDefaults() {
     setParam("r", ROUNDING_BISECTION); // rounding of assignments (prob = probabilistic, bisec = iterative bisection)
     setParam("s", "1.0"); // job communication period (seconds)
     setParam("s2f", ""); // write solutions to file (file path, or empty string for no writing)
+    setParam("sleep", "100"); // microsecs to sleep in between worker main loop cycles
     setParam("T", "0"); // total time to run the system (0 = no limit)
     setParam("t", "2"); // num threads per node
     setParam("td", "0.01"); // temperature decay for thermodyn. balancing
@@ -61,6 +63,16 @@ void Parameters::setDefaults() {
     setParam("v", "2"); // verbosity 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...
     //setParam("warmup"); // warmup run
     //setParam("yield"); // yield manager thread when no new messages
+}
+
+void Parameters::expand() {
+    if (isSet("sinst")) {
+        // Single instance solving
+        setParam("c", "0"); // no clients
+        setParam("g", "0.0"); // instantaneous growth of job demand
+        setParam("l", "1.0"); // full load factor
+        setParam("md", "0"); // no limit of max. demand
+    }
 }
 
 void Parameters::printUsage() const {
@@ -106,7 +118,9 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "                      \"floor\" - always round down");
     Console::log(Console::INFO, "-s=<comm-period>      Do job-internal communication every t seconds (t >= 0, 0: do not communicate)");
     Console::log(Console::INFO, "-s2f=<file-basename>  Write solutions to file with provided base name + job ID");
-    Console::log(Console::INFO, "-sleep                Sleep in between polls of new messages");
+    Console::log(Console::INFO, "-sinst=<filename>     Single instance: Solve the provided CNF instance with full power, then exit.");
+    Console::log(Console::INFO, "                      NOTE: Overrides options -c=1 g=0 l=1 md=0");
+    Console::log(Console::INFO, "-sleep=<micros>       Sleep provided number of microseconds between loop cycles of worker main thread");
     Console::log(Console::INFO, "-T=<time-limit>       Run entire system for x seconds (x >= 0; 0: run indefinitely)");
     Console::log(Console::INFO, "-t=<num-threads>      Amount of worker threads per node (int t >= 1)");
     Console::log(Console::INFO, "-time-per-instance=<time-limit> Timeout an instance after x seconds wall clock time (x >= 0; 0: no timeout)");
@@ -129,7 +143,7 @@ void Parameters::printParams() const {
         }
     }
     out = out.substr(0, out.size()-2);
-    Console::log(Console::INFO, "Called with parameters: %s", out.c_str());
+    Console::log(Console::INFO, "Program options: %s", out.c_str());
 }
 
 void Parameters::setParam(const char* name) {

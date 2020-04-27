@@ -17,6 +17,7 @@
 #include "util/console.h"
 #include "util/random.h"
 #include "util/memusage.h"
+#include "util/sat_reader.h"
 #include "balancing/cutoff_priority_balancer.h"
 #include "balancing/event_driven_balancer.h"
 #include "data/job_description.h"
@@ -78,6 +79,30 @@ void Worker::init() {
 
     if (params.isSet("mmpi")) mpiMonitorThread = std::thread(mpiMonitor, this);
     else MyMpi::_monitor_off = true;
+
+    // Initiate single instance solving as the "root node"
+    if (params.isSet("sinst") && worldRank == 0) {
+
+        std::string instanceFilename = params.getParam("sinst");
+        Console::log(Console::INFO, "Initiate solving of single instance \"%s\"", instanceFilename.c_str());
+
+        // Create job description with formula
+        int jobId = 1;
+        JobDescription desc(jobId, /*prio=*/1, /*incremental=*/false);
+        auto formula = SatReader(instanceFilename).read();
+        desc.addPayload(formula);
+
+        // Add as a new local SAT job image
+        jobs[jobId] = new SatJob(params, MyMpi::size(comm), worldRank, jobId, epochCounter);
+        setLoad(1, jobId);
+        getJob(jobId).beginInitialization();
+
+        // Initialize job in separate thread
+        initializerThreads[jobId] = std::thread([&]{
+            jobArrivals[jobId] = Timer::elapsedSeconds();
+            jobs[jobId]->initialize();
+        });
+    }
 }
 
 void Worker::createExpanderGraph() {
@@ -119,12 +144,11 @@ void Worker::mainProgram() {
     int iteration = 0;
     float lastMemCheckTime = Timer::elapsedSeconds();
     float lastJobCheckTime = Timer::elapsedSeconds();
-    float sleepMicrosecs = 0;
+    float sleepMicrosecs = params.getFloatParam("sleep");
 
     float memCheckPeriod = 3.0;
     float jobCheckPeriod = 0.01;
 
-    bool doSleep = params.isSet("sleep");
     bool doYield = params.isSet("yield");
 
     while (!checkTerminate()) {
@@ -202,11 +226,19 @@ void Worker::mainProgram() {
                 int result = job.appl_solveLoop();
                 if (result >= 0) {
                     // Solver done!
-                    int jobRootRank = job.getRootNodeRank();
-                    IntVec payload({job.getId(), job.getRevision(), result});
                     job.appl_dumpStats();
 
+                    // Directly output solution if single instance solving
+                    if (params.isSet("sinst")) {
+                        const JobResult& result = job.getResult();
+                        std::string output = "v " + std::string(result.result == 10 ? "SAT" : result.result == 20 ? "UNSAT" : "UNKNOWN");
+                        if (result.result == 10) for (int i : result.solution) output += std::to_string(i) + " ";
+                        Console::append(Console::INFO, output.c_str());
+                    }
+
                     // Signal termination to root -- may be a self message
+                    int jobRootRank = job.getRootNodeRank();
+                    IntVec payload({job.getId(), job.getRevision(), result});
                     Console::log_send(Console::VERB, jobRootRank, "%s : sending finished info", job.toStr());
                     MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_WORKER_FOUND_RESULT, payload);
                     job.setResultTransferPending(true);
@@ -326,17 +358,14 @@ void Worker::mainProgram() {
 
             time = Timer::elapsedSeconds() - time;
             Console::log(Console::VVVERB, "Processing msg, tag %i took %.4f s", handle->tag, time);
-            sleepMicrosecs = 0;
             pollTime = Timer::elapsedSeconds();
         }
         
         MyMpi::testSentHandles();
 
-        if (doSleep) {
-            // Increase sleep duration, do sleep
-            sleepMicrosecs += 100;
-            if ((int)sleepMicrosecs > 0)
-                usleep(std::min(100, (int)sleepMicrosecs)); // in microsecs
+        if (sleepMicrosecs > 0) {
+            // Sleep
+            usleep(sleepMicrosecs);
         }
         if (doYield) {
             // Yield thread, e.g. for some SAT thread
@@ -1007,6 +1036,11 @@ void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, b
         if (jobCommitments.count(jobId)) jobCommitments.erase(jobId);
         job.uncommit();
         job.terminate();
+    }
+
+    if (terminate && params.isSet("sinst")) {
+        // Single instance solving is done: exit
+        exiting = true;
     }
 }
 
