@@ -15,7 +15,8 @@ void SolverThread::log(int verb, const char* fmt, ...) {
 SolverThread::SolverThread(ParameterProcessor& params, std::shared_ptr<PortfolioSolverInterface> solver, 
         const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<vector<int>>& assumptions, 
         int localId) : 
-    _params(params), _solver_ptr(solver), _solver(*solver), _logger(params.getLogger().copy(toStr())), 
+    _params(params), _solver_ptr(solver), _solver(*solver), 
+    _logger(params.getLogger().copy("S"+std::to_string(_solver.solverId))), 
     _formulae(formulae), _assumptions(assumptions), 
     _local_id(localId) {
     
