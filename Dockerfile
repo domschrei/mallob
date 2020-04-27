@@ -37,6 +37,7 @@ RUN apt-get install openmpi-bin openmpi-common libopenmpi-dev iputils-ping -y
 
 ADD src src
 ADD build.sh .
+ADD makefile .
 ADD mpi-run.sh supervised-scripts/mpi-run.sh
 ADD make_combined_hostfile.py supervised-scripts/make_combined_hostfile.py
 ADD test.cnf supervised-scripts/test.cnf
