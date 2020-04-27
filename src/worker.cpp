@@ -241,7 +241,7 @@ void Worker::mainProgram() {
                         const JobResult& result = job.getResult();
                         std::string output = "v " + std::string(result.result == 10 ? "SAT" : result.result == 20 ? "UNSAT" : "UNKNOWN");
                         if (result.result == 10) for (int i : result.solution) output += std::to_string(i) + " ";
-                        Console::append(Console::INFO, output.c_str());
+                        Console::log(Console::INFO, output.c_str());
                     }
 
                     // Signal termination to root -- may be a self message
@@ -383,6 +383,7 @@ void Worker::mainProgram() {
         iteration++;
     }
 
+    while (MyMpi::hasOpenSentHandles()) MyMpi::testSentHandles();
     Console::flush();
     fflush(stdout);
 }
