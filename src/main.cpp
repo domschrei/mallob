@@ -63,7 +63,9 @@ int main(int argc, char *argv[]) {
     
     if (rank == 0)
         params.printParams();
-    if (params.isSet("h") || params.isSet("help") || params.getFilename().size() == 0) {
+    if (params.isSet("h") || params.isSet("help") 
+            || (!params.isSet("sinst") && params.getFilename().size() == 0)) {
+        // Help requested or no job input provided
         if (rank == 0) {
             params.printUsage();
         }
