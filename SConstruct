@@ -30,16 +30,27 @@ def get_default_env():
         env.Replace(CXX = 'mpic++')
     print("CXX=" + env['CXX'])
     
-    # MPI include path
+    # MPI root path and include path
+    mpi_root = ""
+    mpi_include = ""
     if 'MPI_ROOT' not in env['ENV']:
         if os.path.isdir('/usr/include/mpi/'):
-            env['ENV']['MPI_ROOT'] = '/usr/include/mpi/'
+            mpi_root = '/usr/include/mpi/'
         else:
-            env['ENV']['MPI_ROOT'] = '/usr/lib/x86_64-linux-gnu/openmpi/'
+            mpi_root = '/usr/lib/x86_64-linux-gnu/openmpi/'
     elif 'intel/compilers_and_libraries_2019' in env['ENV']['MPI_ROOT']:
-        env['ENV']['MPI_ROOT'] += "/intel64/"
-    print("MPI_ROOT=" + env['ENV']['MPI_ROOT'])
+        mpi_root = "/intel64/"
+    env['ENV']['MPI_ROOT'] = mpi_root
+    print("MPI_ROOT=" + mpi_root)
+     
+    if os.path.isfile(mpi_root + "/mpi.h"):
+        mpi_include = mpi_root + "/include"
+    else:
+        mpi_include = mpi_root
     
+    if not os.path.isfile(mpi_include + "/include/mpi.h"):
+        print("ERROR: Wrong MPI include path!")
+
     # Append compile flags
     env.Append(CXXFLAGS = Split(flags))
     

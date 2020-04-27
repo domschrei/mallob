@@ -31,22 +31,20 @@ RUN apt-get install wget -y
 RUN apt-get install unzip
 RUN apt-get install build-essential -y
 RUN apt-get install zlib1g-dev -y
-RUN DEBIAN_FRONTEND=noninteractive apt install -y iproute2 cmake python python-pip build-essential gfortran wget curl scons
+RUN DEBIAN_FRONTEND=noninteractive apt install -y iproute2 cmake python python-pip build-essential gfortran wget curl
 RUN pip install supervisor awscli
 RUN apt-get install openmpi-bin openmpi-common libopenmpi-dev iputils-ping -y
 
 ADD src src
-ADD SConstruct .
+ADD build.sh .
 ADD mpi-run.sh supervised-scripts/mpi-run.sh
 ADD make_combined_hostfile.py supervised-scripts/make_combined_hostfile.py
+ADD test.cnf supervised-scripts/test.cnf
 
-# Build hordesat solvers
-RUN cd src/hordesat && bash fetch_and_build_solvers.sh
 # Build mallob
-RUN scons
+RUN bash build.sh
 
 #ENV LD_LIBRARY_PATH=/usr/lib/openmpi/lib/:$LD_LIBRARY_PATH
-#ADD test.cnf supervised-scripts/test.cnf
 EXPOSE 22
 RUN chmod 755 supervised-scripts/mpi-run.sh
 
