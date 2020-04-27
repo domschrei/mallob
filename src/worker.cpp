@@ -87,17 +87,21 @@ void Worker::init() {
         Console::log(Console::INFO, "Initiate solving of single instance \"%s\"", instanceFilename.c_str());
 
         // Create job description with formula
+        Console::log(Console::VERB, "read instance");
         int jobId = 1;
         JobDescription desc(jobId, /*prio=*/1, /*incremental=*/false);
         auto formula = SatReader(instanceFilename).read();
         desc.addPayload(formula);
 
         // Add as a new local SAT job image
+
         jobs[jobId] = new SatJob(params, MyMpi::size(comm), worldRank, jobId, epochCounter);
         setLoad(1, jobId);
         getJob(jobId).beginInitialization();
+        Console::log(Console::VERB, "read SAT job image");
 
         // Initialize job in separate thread
+        Console::log(Console::VERB, "start init thread");
         initializerThreads[jobId] = std::thread([&]{
             jobArrivals[jobId] = Timer::elapsedSeconds();
             jobs[jobId]->initialize();
