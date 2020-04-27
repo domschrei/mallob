@@ -92,7 +92,7 @@ void Worker::init() {
         JobDescription desc(jobId, /*prio=*/1, /*incremental=*/false);
         auto formula = SatReader(instanceFilename).read();
         desc.addPayload(formula);
-        desc.addAssumptions(VecPtr());
+        desc.addAssumptions(VecPtr(new std::vector<int>()));
         desc.setRootRank(0);
 
         // Add as a new local SAT job image
