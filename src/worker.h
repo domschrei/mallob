@@ -79,6 +79,9 @@ public:
             lastLoadChange = Timer::elapsedSeconds();
             currentJob = NULL;
             exiting = false;
+            myState[0] = 0.0f;
+            myState[1] = 0.0f;
+            myState[2] = 0.0f;
         }
 
     ~Worker();
