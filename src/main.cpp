@@ -15,7 +15,9 @@
 #include "worker.h"
 #include "client.h"
 
-#include "revision.c"
+#ifndef MALLOB_VERSION
+#define MALLOB_VERSION "(dbg)"
+#endif
 
 void handler(int sig) {
   Console::forceFlush();
@@ -75,7 +77,7 @@ int main(int argc, char *argv[]) {
 
     char hostname[1024];
 	gethostname(hostname, 1024);
-    Console::log(Console::VERB, "Launching mallob, revision %s, on %s", MALLOB_REVISION, hostname);
+    Console::log(Console::VERB, "Launching mallob %s on host %s", MALLOB_VERSION, hostname);
 
     // Global and local seed, such that all nodes have access to a synchronized randomness
     // as well as to an individual randomness that differs among nodes

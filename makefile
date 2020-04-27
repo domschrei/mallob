@@ -1,7 +1,7 @@
 
 
 # Options: minisat220 lingeling glucose4
-MALLOB_VERSION?=dbg-$(shell date --iso-8601=seconds)-${IPASIRSOLVER}
+MALLOB_VERSION?=dbg-$(shell date --iso-8601=seconds)
 
 CXX=mpic++
 CWARN=-Wno-unused-parameter -Wno-sign-compare -Wno-format -Wno-format-security
