@@ -1,5 +1,5 @@
 
-#include <math.h>
+#include <cmath>
 #include <thread>
 #include <unistd.h>
 #include <iostream>

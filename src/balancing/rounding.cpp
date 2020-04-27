@@ -1,7 +1,7 @@
 
 #include "balancing/rounding.h"
 
-#include <math.h>
+#include <cmath>
 
 namespace Rounding {
 
