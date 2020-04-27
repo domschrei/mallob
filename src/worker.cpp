@@ -98,6 +98,8 @@ void Worker::init() {
         // Add as a new local SAT job image
         Console::log(Console::VERB, "init SAT job image");
         jobs[jobId] = new SatJob(params, MyMpi::size(comm), worldRank, jobId, epochCounter);
+        JobRequest req(jobId, 0, 0, 0, 0, 0);
+        jobs[jobId]->commit(req);
         jobArrivals[jobId] = Timer::elapsedSeconds();
         setLoad(1, jobId);
         jobs[jobId]->setDescription(desc);
