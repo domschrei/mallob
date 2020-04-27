@@ -49,6 +49,15 @@ void Job::setDescription(std::shared_ptr<std::vector<uint8_t>>& data) {
     _has_description = true;
 }
 
+void Job::setDescription(JobDescription& desc) {
+
+    auto lock = _job_manipulation_lock.getLock();
+    // Serialize data s.t. it can be forwarded later
+    _serialized_description = desc.serialize();
+    _description = desc;
+    _has_description = true;
+}
+
 void Job::addAmendment(std::shared_ptr<std::vector<uint8_t>>& data) {
 
     auto lock = _job_manipulation_lock.getLock();

@@ -98,6 +98,7 @@ void Worker::init() {
         jobs[jobId] = new SatJob(params, MyMpi::size(comm), worldRank, jobId, epochCounter);
         jobArrivals[jobId] = Timer::elapsedSeconds();
         setLoad(1, jobId);
+        jobs[jobId]->setDescription(desc);
         getJob(jobId).beginInitialization();
 
         // Initialize job in separate thread

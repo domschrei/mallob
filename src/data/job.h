@@ -193,6 +193,8 @@ public:
     
     // Equips the job instance with an initial job description in serialized form.
     void setDescription(std::shared_ptr<std::vector<uint8_t>>& data);
+
+    void setDescription(JobDescription& desc);
     // Adds an amendment to the job description in serialized form.
     void addAmendment(std::shared_ptr<std::vector<uint8_t>>& data);
     
