@@ -37,18 +37,18 @@ RUN apt-get install openmpi-bin openmpi-common libopenmpi-dev iputils-ping -y
 
 ADD src src
 ADD SConstruct .
+ADD mpi-run.sh supervised-scripts/mpi-run.sh
+ADD make_combined_hostfile.py supervised-scripts/make_combined_hostfile.py
 
 # Build hordesat solvers
-RUN cd src/hordesat/incremental-hordesat && bash fetch_and_build_solvers.sh
+RUN cd src/hordesat && bash fetch_and_build_solvers.sh
 # Build mallob
 RUN scons
 
 #ENV LD_LIBRARY_PATH=/usr/lib/openmpi/lib/:$LD_LIBRARY_PATH
 #ADD test.cnf supervised-scripts/test.cnf
-ADD mpi-run.sh supervised-scripts/mpi-run.sh
-ADD make_combined_hostfile.py supervised-scripts/make_combined_hostfile.py
-RUN chmod 755 supervised-scripts/mpi-run.sh
 EXPOSE 22
+RUN chmod 755 supervised-scripts/mpi-run.sh
 
 #CMD hordesat/hordesat
 CMD supervised-scripts/mpi-run.sh
