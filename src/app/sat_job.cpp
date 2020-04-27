@@ -255,7 +255,9 @@ SatJob::~SatJob() {
 
     if (_bg_thread.joinable()) {
         Console::log(Console::VVERB, "%s : joining bg thread", toStr());
+        lock.unlock();
         _bg_thread.join(); // if already aborting
+        lock.lock();
     }
 
     if (solverNotNull() && !_solver->isCleanedUp()) {
