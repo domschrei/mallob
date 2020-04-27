@@ -12,6 +12,8 @@ mpiinclude=""
 
 if [ -d /usr/include/mpi ]; then
     mpiroot="/usr/include/mpi"
+elif [ -d /usr/lib/openmpi ]; then
+    mpiroot="/usr/lib/openmpi"
 elif [ -d /usr/lib/x86_64-linux-gnu/openmpi/ ]; then
     mpiroot="/usr/lib/x86_64-linux-gnu/openmpi/"
 else
