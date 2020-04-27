@@ -94,17 +94,16 @@ void Worker::init() {
         desc.addPayload(formula);
 
         // Add as a new local SAT job image
-
+        Console::log(Console::VERB, "init SAT job image");
         jobs[jobId] = new SatJob(params, MyMpi::size(comm), worldRank, jobId, epochCounter);
+        jobArrivals[jobId] = Timer::elapsedSeconds();
         setLoad(1, jobId);
         getJob(jobId).beginInitialization();
-        Console::log(Console::VERB, "read SAT job image");
 
         // Initialize job in separate thread
         Console::log(Console::VERB, "start init thread");
-        initializerThreads[jobId] = std::thread([&]{
-            jobArrivals[jobId] = Timer::elapsedSeconds();
-            jobs[jobId]->initialize();
+        initializerThreads[jobId] = std::thread([this, jobId]{
+            this->jobs[jobId]->initialize();
         });
     }
 }
