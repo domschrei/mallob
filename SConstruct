@@ -20,7 +20,8 @@ def get_default_env():
         env['ENV'][key] = osenv[key]
     
     # Enable colored gcc output
-    env['ENV']['TERM'] = os.environ['TERM'] 
+    if 'TERM' in os.environ:
+        env['ENV']['TERM'] = os.environ['TERM'] 
     
     # MPI compiler
     if 'MPICXX' in env['ENV']:
