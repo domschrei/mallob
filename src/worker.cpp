@@ -236,8 +236,8 @@ void Worker::mainProgram() {
                     // Solver done!
                     job.appl_dumpStats();
 
-                    // Directly output solution if single instance solving
                     if (params.isSet("sinst")) {
+                        // Directly output solution if single instance solving
                         const JobResult& result = job.getResult();
                         std::string output = "v " + std::string(result.result == 10 ? "SAT" : result.result == 20 ? "UNSAT" : "UNKNOWN");
                         if (result.result == 10) for (int i : result.solution) output += std::to_string(i) + " ";
@@ -383,7 +383,7 @@ void Worker::mainProgram() {
         iteration++;
     }
 
-    while (MyMpi::hasOpenSentHandles()) MyMpi::testSentHandles();
+    //while (MyMpi::hasOpenSentHandles()) MyMpi::testSentHandles();
     Console::flush();
     fflush(stdout);
 }
