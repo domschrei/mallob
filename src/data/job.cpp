@@ -53,7 +53,7 @@ void Job::setDescription(JobDescription& desc) {
 
     auto lock = _job_manipulation_lock.getLock();
     // Serialize data s.t. it can be forwarded later
-    _serialized_description = desc.serialize();
+    _serialized_description = desc.serializeFirstRevision();
     _description = desc;
     _has_description = true;
 }

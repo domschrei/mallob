@@ -92,6 +92,7 @@ void Worker::init() {
         JobDescription desc(jobId, /*prio=*/1, /*incremental=*/false);
         auto formula = SatReader(instanceFilename).read();
         desc.addPayload(formula);
+        desc.setRootRank(0);
 
         // Add as a new local SAT job image
         Console::log(Console::VERB, "init SAT job image");
