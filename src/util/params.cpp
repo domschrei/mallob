@@ -72,6 +72,8 @@ void Parameters::expand() {
         setParam("g", "0.0"); // instantaneous growth of job demand
         setParam("l", "1.0"); // full load factor
         setParam("md", "0"); // no limit of max. demand
+        setParam("bm", "ed"); // event-driven balancing: do once, then never again
+        setParam("p", "0.01"); // low balancing delay to immediately get full demand
     }
 }
 
@@ -119,7 +121,7 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "-s=<comm-period>      Do job-internal communication every t seconds (t >= 0, 0: do not communicate)");
     Console::log(Console::INFO, "-s2f=<file-basename>  Write solutions to file with provided base name + job ID");
     Console::log(Console::INFO, "-sinst=<filename>     Single instance: Solve the provided CNF instance with full power, then exit.");
-    Console::log(Console::INFO, "                      NOTE: Overrides options -c=1 g=0 l=1 md=0");
+    Console::log(Console::INFO, "                      NOTE: Overrides options -bm=ed -c=1 -g=0 -l=1 -md=0 -p=0.01");
     Console::log(Console::INFO, "-sleep=<micros>       Sleep provided number of microseconds between loop cycles of worker main thread");
     Console::log(Console::INFO, "-T=<time-limit>       Run entire system for x seconds (x >= 0; 0: run indefinitely)");
     Console::log(Console::INFO, "-t=<num-threads>      Amount of worker threads per node (int t >= 1)");
