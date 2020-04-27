@@ -28,7 +28,7 @@ def get_default_env():
         env.Replace(CXX = env['ENV']['MPICXX']) # compile with mpic++
     else:
         env.Replace(CXX = 'mpic++')
-    print("CXX=" + env['ENV']['MPICXX'])
+    print("CXX=" + env['CXX'])
     
     # MPI include path
     if 'MPI_ROOT' not in env['ENV']:
