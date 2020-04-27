@@ -69,7 +69,7 @@ public:
         comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), epochCounter(), stats(epochCounter)
         {
             loadFactor = params.getFloatParam("l");
-            assert(0 < loadFactor && loadFactor < 1.0);
+            assert(0 < loadFactor && loadFactor <= 1.0);
             globalTimeout = params.getFloatParam("T");
             balancePeriod = params.getFloatParam("p");
             numThreads = params.getIntParam("t");
