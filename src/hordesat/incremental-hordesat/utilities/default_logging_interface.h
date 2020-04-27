@@ -29,6 +29,7 @@ public:
     double getTime() override {
         return getAbsoluteTimeLP() - start;
     }
+
     void log(int verbosityLevel, const char* fmt, ...) override {
         va_list vl;
         va_start(vl, fmt);
@@ -39,11 +40,15 @@ public:
         if (verbosityLevel <= verbosity) {
             int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
             printf("[%.3f] ", getTime());
-            printf("[%i] <h-%s> ", rank, identifier.c_str());
+            printf("[%i] %s ", rank, identifier.c_str());
             vprintf(fmt, args);
             //fflush(stdout);
         }
     }
+    std::shared_ptr<LoggingInterface> copy(std::string prefix) override {
+        return std::shared_ptr<LoggingInterface>(new DefaultLoggingInterface(verbosity, identifier + " " + prefix));
+    }
+
     void exitError(const char* fmt, ...) override {
         va_list vl;
         va_start(vl, fmt);

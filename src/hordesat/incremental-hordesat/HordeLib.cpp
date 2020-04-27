@@ -75,7 +75,7 @@ void HordeLib::init() {
 
 	if (logger == NULL) {
 		logger = std::shared_ptr<LoggingInterface>(
-			new DefaultLoggingInterface(params.getIntParam("v", 1), std::string(params.getParam("jobstr", "")))
+			new DefaultLoggingInterface(params.getIntParam("v", 1), "<h-" + std::string(params.getParam("jobstr", "")) + ">")
 		);
 		params.setLogger(logger);
 	}

@@ -5,9 +5,38 @@
 
 using namespace SolvingStates;
 
-void log(int verb, const char* fmt, ...) {}
+void SolverThread::log(int verb, const char* fmt, ...) {
+    va_list vl;
+    va_start(vl, fmt);
+    _logger->log_va_list(verb, fmt, vl);
+    va_end(vl);
+}
 
-void pinThread(int solversCount) {
+SolverThread::SolverThread(ParameterProcessor& params, std::shared_ptr<PortfolioSolverInterface> solver, 
+        const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<vector<int>>& assumptions, 
+        int localId) : 
+    _params(params), _solver_ptr(solver), _solver(*solver), _logger(params.getLogger().copy(toStr())), 
+    _formulae(formulae), _assumptions(assumptions), 
+    _local_id(localId) {
+    
+    _portfolio_rank = _params.getIntParam("mpirank", 0);
+    _portfolio_size = _params.getIntParam("mpisize", 1);
+
+    std::string globalName = "<h-" + _params.getParam("jobstr") + "> " + std::string(toStr());
+    _solver.setName(globalName);
+    _state = ACTIVE;
+    _result = SatResult(UNKNOWN);
+}
+
+void SolverThread::init() {
+    _tid = syscall(SYS_gettid);
+    log(3, "%s : tid %ld\n", toStr(), _tid);
+    if (_params.isSet("pin")) pin();
+}
+
+void SolverThread::pin() {
+    
+    int solversCount = _params.getIntParam("c", 1);
 	static int lastCpu = 0;
 	int numCores = sysconf(_SC_NPROCESSORS_ONLN);
 	int localRank = 0;
@@ -26,30 +55,6 @@ void pinThread(int solversCount) {
 	CPU_ZERO(&cpuSet);
 	CPU_SET(desiredCpu, &cpuSet);
 	sched_setaffinity(0, sizeof(cpuSet), &cpuSet);
-}
-
-SolverThread::SolverThread(ParameterProcessor& params, std::shared_ptr<PortfolioSolverInterface> solver, 
-        const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<vector<int>>& assumptions, 
-        int localId) : 
-    _params(params), _solver_ptr(solver), _solver(*solver), _formulae(formulae), _assumptions(assumptions), 
-    _local_id(localId) {
-    
-    _portfolio_rank = _params.getIntParam("mpirank", 0);
-    _portfolio_size = _params.getIntParam("mpisize", 1);
-
-    std::string globalName = "<h-" + _params.getParam("jobstr") + "> " + std::string(toStr());
-    _solver.setName(globalName);
-    _state = ACTIVE;
-    _result = SatResult(UNKNOWN);
-}
-
-void SolverThread::init() {
-    _tid = syscall(SYS_gettid);
-    log(3, "%s : tid %ld\n", toStr(), _tid);
-    
-    if (_params.isSet("pin")) {
-        pinThread(_params.getIntParam("c", 1));
-    }
 }
 
 void* SolverThread::run() {

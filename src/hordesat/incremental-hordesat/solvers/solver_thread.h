@@ -22,6 +22,7 @@ private:
     ParameterProcessor& _params;
     std::shared_ptr<PortfolioSolverInterface> _solver_ptr;
     PortfolioSolverInterface& _solver;
+    std::shared_ptr<LoggingInterface> _logger;
 
     const std::vector<std::shared_ptr<std::vector<int>>>& _formulae;
     const std::shared_ptr<vector<int>>& _assumptions;
@@ -72,6 +73,7 @@ public:
 
 private:
     
+    void pin();
     void readFormula();
     void read(const std::vector<int>& formula, int begin);
 
@@ -88,6 +90,7 @@ private:
     bool cancelThread();
     void reportResult(int res);
 
+    void log(int verb, const char* fmt, ...);
     const char* toStr();
 
 };

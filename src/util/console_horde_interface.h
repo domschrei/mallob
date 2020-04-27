@@ -18,6 +18,7 @@ public:
     double getTime() {
         return Timer::elapsedSeconds();
     }
+
     void log(int verbosityLevel, const char* fmt, ...) override {
         va_list args;
         va_start(args, fmt);
@@ -29,8 +30,8 @@ public:
         std::string str(fmt);
         
         // Prefix horde instance name, if not already present
-        if (str.rfind("<h-", 0) != 0) {
-            str = "<h-" + _identifier + "> " + str;
+        if (str.rfind(_identifier, 0) != 0) {
+            str = _identifier + " " + str;
         }
 
         // Write content
@@ -38,6 +39,10 @@ public:
         Console::log(verbosityLevel+2, str.c_str(), true, argsCopy);
         va_end(argsCopy);
     }
+    std::shared_ptr<LoggingInterface> copy(std::string prefix) override {
+        return std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(_identifier + " " + prefix));
+    }
+
     void exitError(const char* fmt, ...) override {
         va_list vl;
         va_start(vl, fmt);
