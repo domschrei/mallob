@@ -1,7 +1,5 @@
 
-
-# Options: minisat220 lingeling glucose4
-MALLOB_VERSION?=dbg-$(shell date --iso-8601=seconds)
+MALLOB_VERSION?=$(shell date --iso-8601=seconds)"@"$(hostname)
 
 CXX=mpic++
 CWARN=-Wno-unused-parameter -Wno-sign-compare -Wno-format -Wno-format-security

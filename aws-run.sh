@@ -11,8 +11,10 @@ HOST_FILE_PATH="/tmp/hostfile"
 #tar -xvf $SCRATCH_DIR/*.tar.gz -C $SCRATCH_DIR
 
 sleep 2
+echo reporting from $(hostname)
 echo main node: ${AWS_BATCH_JOB_MAIN_NODE_INDEX}
 echo this node: ${AWS_BATCH_JOB_NODE_INDEX}
+echo number of nodes: ${AWS_BATCH_JOB_NUM_NODES}
 echo Downloading problem from S3: ${COMP_S3_PROBLEM_PATH}
 
 if [[ "${COMP_S3_PROBLEM_PATH}" == *".xz" ]];
@@ -59,7 +61,7 @@ wait_for_nodes () {
   cat combined_hostfile
 
   # REPLACE THE FOLLOWING LINE WITH YOUR PARTICULAR SOLVER
-  time mpirun --mca btl_tcp_if_include eth0 --allow-run-as-root -np ${AWS_BATCH_JOB_NUM_NODES} --hostfile combined_hostfile /build/mallob -sinst=supervised-scripts/test.cnf -ba=4 -cbbs=1500 -cbdf=0.75 -cg -derandomize -icpr=0.8 -jc=0 -log=/dev/null -mcl=8 -s=1 -sleep=1000 -T=300 -t=4 -v=4 
+  time mpirun --mca btl_tcp_if_include eth0 --allow-run-as-root -np ${AWS_BATCH_JOB_NUM_NODES} --hostfile combined_hostfile /build/mallob -sinst=supervised-scripts/test.cnf -ba=4 -cbbs=1500 -cbdf=0.75 -cg -derandomize -icpr=0.8 -jc=0 -log=/dev/null -mcl=8 -s=1 -sleep=1000 -T=300 -t=4 -v=4
 }
 
 # Fetch and run a script
@@ -67,7 +69,6 @@ report_to_master () {
   # get own ip and num cpus
   #
   ip=$(/sbin/ip -o -4 addr list eth0 | awk '{print $4}' | cut -d/ -f1)
-
 
   availablecores=$(nproc)
 
