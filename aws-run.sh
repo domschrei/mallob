@@ -3,7 +3,7 @@
 
 get_num_local_procs() {
     availablecores=$(nproc)
-    echo $nproc / 4 | bc
+    echo $availablecores / 4 | bc
 }
 
 PATH="$PATH:/opt/openmpi/bin/"
@@ -67,7 +67,8 @@ wait_for_nodes () {
   # Add up all available slots from all nodes
   numproc=0
   while read -r line ; do
-      numproc=$(($numproc+$(echo $line|awk '{print $2}'|grep -oE "[0-9]+")))
+      p=$(echo $line|awk '{print $2}'|grep -oE "[0-9]+")
+      numproc=$((numproc+p))
   done < combined_hostfile
   echo "total of $numproc MPI processes"
   #np=${AWS_BATCH_JOB_NUM_NODES}
