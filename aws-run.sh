@@ -3,7 +3,7 @@
 
 get_num_local_procs() {
     availablecores=$(nproc)
-    expr ${availablecores}/4
+    expr ${availablecores} / 4
 }
 
 PATH="$PATH:/opt/openmpi/bin/"
