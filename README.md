@@ -2,7 +2,8 @@
 # mallob 
 
 **Mal**leable **Lo**ad **B**alancer.  
-**M**ultitasking **A**gi**l**e **Lo**gic **B**lackbox.
+**M**ultitasking **A**gi**l**e **Lo**gic **B**lackbox.  
+SAT Solving for the cloud.
 
 ## Overview
 
@@ -23,11 +24,12 @@ In the future, we intend to replace simulated client processes with interfaces "
 
 ## Building
 
-You need [SCons](www.scons.org) as a build tool. Additionally, a valid MPI installation is required (e.g. OpenMPI, Intel MPI, MPICH, ...).
+We use GNU Make as our build tool. Additionally, a valid MPI installation is required (e.g. OpenMPI, Intel MPI, MPICH, ...).
 
-Go into the directory `src/hordesat` and execute `bash fetch_and_build_solvers.sh`.
+Go into the directory `src/hordesat` and execute `bash build.sh` which will (a) attempt to find your MPI installation and (b) call `make` with the appropriate arguments.
+This generates the executable `build/mallob`.
 
-Then go back into mallob's root directory and execute `scons` to build mallob.
+Alternatively, you can run `mallob` in a virtualized manner using Docker. You will find a fitting `Dockerfile` in the root directory.
 
 ## Usage
 
