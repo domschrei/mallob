@@ -8,6 +8,6 @@ namespace SolvingStates {
 		INITIALIZING, ACTIVE, SUSPENDED, STANDBY, ABORTING
 	};
 	extern const char* SolvingStateNames[];
-};
+}
 
 #endif

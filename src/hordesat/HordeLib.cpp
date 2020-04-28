@@ -95,7 +95,7 @@ void HordeLib::init() {
 
 	char hostname[1024];
 	gethostname(hostname, 1024);
-	hlog(0, "HorDSat on host %s, job %s, params: ",
+	hlog(0, "Hlib engine on host %s, job %s, params: ",
 			hostname, params.getParam("jobstr").c_str());
 	params.printParams();
 
@@ -135,11 +135,6 @@ void HordeLib::init() {
 	}
 }
 
-void* solverRunningThread(void* solver) {
-    ((SolverThread*)solver)->init();
-	return ((SolverThread*)solver)->run();
-}
-
 void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
 							const std::shared_ptr<std::vector<int>>& assumptions) {
 	
@@ -162,9 +157,8 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 
 	for (int i = 0; i < solversCount; i++) {
         //hlog(1, "initializing solver %i.\n", i);
-		solvers.emplace_back(new SolverThread(params, solverInterfaces[i], formulae, assumptions, i));
-		solverThreads[i] = std::thread(solverRunningThread, solvers[i].get());
-        //hlog(1, "initialized solver %i.\n", i);
+		solverThreads.emplace_back(new SolverThread(params, solverInterfaces[i], formulae, assumptions, i));
+		//hlog(1, "initialized solver %i.\n", i);
 	}
 	setSolvingState(ACTIVE);
 	startSolving = logger->getTime() - startSolving;
@@ -191,8 +185,8 @@ void HordeLib::updateRole(int rank, int numNodes) {
 
 bool HordeLib::isFullyInitialized() {
 	if (solvingState == INITIALIZING) return false;
-	for (size_t i = 0; i < solvers.size(); i++) {
-		if (!solvers[i]->isInitialized()) return false;
+	for (size_t i = 0; i < solverThreads.size(); i++) {
+		if (!solverThreads[i]->isInitialized()) return false;
 	}
 	return true;
 }
@@ -208,14 +202,14 @@ int HordeLib::solveLoop() {
 
     // Solving done?
 	bool done = false;
-	for (int i = 0; i < solvers.size(); i++) {
-		if (solvers[i]->getState() == STANDBY) {
+	for (int i = 0; i < solverThreads.size(); i++) {
+		if (solverThreads[i]->getState() == STANDBY) {
 			done = true;
-			finalResult = solvers[i]->getSatResult();
+			finalResult = solverThreads[i]->getSatResult();
 			if (finalResult == SAT) {
-				truthValues = solvers[i]->getSolution();
+				truthValues = solverThreads[i]->getSolution();
 			} else {
-				failedAssumptions = solvers[i]->getFailedAssumptions();
+				failedAssumptions = solverThreads[i]->getFailedAssumptions();
 			}
 		}
 	}
@@ -296,7 +290,7 @@ void HordeLib::setSolvingState(SolvingState state) {
 	this->solvingState = state;
 
 	hlog(2, "state transition %s -> %s\n", SolvingStateNames[oldState], SolvingStateNames[state]);
-	for (auto& solver : solvers) solver->setState(state);
+	for (auto& solver : solverThreads) solver->setState(state);
 }
 
 int HordeLib::finishSolving() {
@@ -333,12 +327,9 @@ void HordeLib::cleanUp() {
 	
 	// join threads
 	for (int i = 0; i < solverThreads.size(); i++) {
-		if (solverThreads[i].joinable()) {
-			solverThreads[i].join();
-		}
+		solverThreads[i]->tryJoin();
 	}
 	solverThreads.clear();
-
 	hlog(3, "[hlib-cleanup] joined threads\n");
 
 	// delete solvers
@@ -346,7 +337,7 @@ void HordeLib::cleanUp() {
 	for (int i = 0; i < solverInterfaces.size(); i++) {
 		solverInterfaces[i].reset();
 	}
-	solvers.clear();
+	solverInterfaces.clear();
 	hlog(3, "[hlib-cleanup] cleared solvers\n");
 
 	// release formulae

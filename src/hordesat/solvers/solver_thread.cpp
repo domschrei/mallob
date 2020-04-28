@@ -35,6 +35,10 @@ void SolverThread::init() {
     if (_params.isSet("pin")) pin();
 }
 
+void SolverThread::start() {
+    _thread = std::thread([this]{return run();});
+}
+
 void SolverThread::pin() {
     
     int solversCount = _params.getIntParam("c", 1);
@@ -59,6 +63,8 @@ void SolverThread::pin() {
 }
 
 void* SolverThread::run() {
+
+    init();
 
     if (!cancelThread())
         waitWhile(INITIALIZING);

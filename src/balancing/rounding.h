@@ -83,6 +83,6 @@ namespace Rounding {
     std::map<int, int> getRoundedAssignments(int remainderIdx, int& sum, 
         const SortedDoubleSequence& remainders, const std::map<int, double>& assignments);
     float penalty(float utilization, float loadFactor);
-};
+}
 
 #endif

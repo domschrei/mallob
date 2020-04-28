@@ -6,6 +6,7 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <utility>
+#include <thread>
 
 #include "utilities/ParameterProcessor.h"
 #include "utilities/Threading.h"
@@ -23,6 +24,7 @@ private:
     std::shared_ptr<PortfolioSolverInterface> _solver_ptr;
     PortfolioSolverInterface& _solver;
     std::shared_ptr<LoggingInterface> _logger;
+    std::thread _thread;
 
     const std::vector<std::shared_ptr<std::vector<int>>>& _formulae;
     const std::shared_ptr<vector<int>>& _assumptions;
@@ -52,11 +54,12 @@ public:
     ~SolverThread();
 
     void init();
-    void* run();
+    void start();
+    void setState(SolvingStates::SolvingState state);
 
     bool isInitialized() {return _initialized;}
     int getTid() {return _tid;}
-    void setState(SolvingStates::SolvingState state);
+    void tryJoin() {if (_thread.joinable()) _thread.join();}
     SolvingStates::SolvingState getState() {
         auto lock = _state_mutex.getLock();
         return _state;
@@ -72,6 +75,7 @@ public:
     }
 
 private:
+    void* run();
     
     void pin();
     void readFormula();
