@@ -36,7 +36,10 @@ void SolverThread::init() {
 }
 
 void SolverThread::start() {
-    _thread = std::thread([this]{return run();});
+    _thread = std::thread([&] {
+        init();
+        run();
+    });
 }
 
 void SolverThread::pin() {
@@ -63,8 +66,6 @@ void SolverThread::pin() {
 }
 
 void* SolverThread::run() {
-
-    init();
 
     if (!cancelThread())
         waitWhile(INITIALIZING);
