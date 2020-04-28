@@ -1,6 +1,11 @@
 #!/bin/bash
 /usr/sbin/sshd -D &
 
+get_num_local_procs() {
+    availablecores=$(nproc)
+    echo $nproc / 4 | bc
+}
+
 PATH="$PATH:/opt/openmpi/bin/"
 BASENAME="${0##*/}"
 log () {
@@ -38,11 +43,11 @@ wait_for_nodes () {
 
   touch $HOST_FILE_PATH
   ip=$(/sbin/ip -o -4 addr list eth0 | awk '{print $4}' | cut -d/ -f1)
-
-  availablecores=$(nproc)
-  log "master details -> $ip:$availablecores"
-#  echo "$ip slots=$availablecores" >> $HOST_FILE_PATH
-  echo "$ip" >> $HOST_FILE_PATH
+  slots=$(get_num_local_procs)
+  
+  log "master details -> $ip:$slots"
+  echo "$ip slots=$slots" >> $HOST_FILE_PATH
+#  echo "$ip" >> $HOST_FILE_PATH
   lines=$(ls -dq /tmp/hostfile* | wc -l)
   while [ "${AWS_BATCH_JOB_NUM_NODES}" -gt "${lines}" ]
   do
@@ -54,14 +59,22 @@ wait_for_nodes () {
 #    lines=$(sort $HOST_FILE_PATH|uniq|wc -l)
   done
 
-
   # All of the hosts report their IP and number of processors. Combine all these
   # into one file with the following script:
   python supervised-scripts/make_combined_hostfile.py ${ip}
   cat combined_hostfile
-
+  
+  # Add up all available slots from all nodes
+  numproc=0
+  while read -r line ; do
+      numproc=$(($numproc+$(echo $line|awk '{print $2}'|grep -oE "[0-9]+")))
+  done < combined_hostfile
+  echo "total of $numproc MPI processes"
+  #np=${AWS_BATCH_JOB_NUM_NODES}
+  np=$numproc
+  
   # REPLACE THE FOLLOWING LINE WITH YOUR PARTICULAR SOLVER
-  time mpirun --mca btl_tcp_if_include eth0 --allow-run-as-root -np ${AWS_BATCH_JOB_NUM_NODES} --hostfile combined_hostfile /build/mallob -sinst=supervised-scripts/test.cnf -ba=4 -cbbs=1500 -cbdf=0.75 -cg -derandomize -icpr=0.8 -jc=0 -log=/dev/null -mcl=8 -s=1 -sleep=1000 -T=300 -t=4 -v=4
+  time mpirun --mca btl_tcp_if_include eth0 --allow-run-as-root -np $np --hostfile combined_hostfile /build/mallob -sinst=supervised-scripts/test.cnf -ba=4 -cbbs=1500 -cbdf=0.75 -cg -derandomize -icpr=0.8 -jc=0 -log=/dev/null -mcl=5 -s=1 -sleep=1000 -T=300 -t=4 -v=4
 }
 
 # Fetch and run a script
@@ -69,13 +82,12 @@ report_to_master () {
   # get own ip and num cpus
   #
   ip=$(/sbin/ip -o -4 addr list eth0 | awk '{print $4}' | cut -d/ -f1)
+  slots=$(get_num_local_procs)
+  
+  log "I am a child node -> $ip:$slots, reporting to the master node -> ${AWS_BATCH_JOB_MAIN_NODE_PRIVATE_IPV4_ADDRESS}"
 
-  availablecores=$(nproc)
-
-  log "I am a child node -> $ip:$availablecores, reporting to the master node -> ${AWS_BATCH_JOB_MAIN_NODE_PRIVATE_IPV4_ADDRESS}"
-
-#  echo "$ip slots=$availablecores" >> $HOST_FILE_PATH${AWS_BATCH_JOB_NODE_INDEX}
-  echo "$ip" >> $HOST_FILE_PATH${AWS_BATCH_JOB_NODE_INDEX}
+  echo "$ip slots=$slots" >> $HOST_FILE_PATH${AWS_BATCH_JOB_NODE_INDEX}
+#  echo "$ip" >> $HOST_FILE_PATH${AWS_BATCH_JOB_NODE_INDEX}
   ping -c 3 ${AWS_BATCH_JOB_MAIN_NODE_PRIVATE_IPV4_ADDRESS}
   until scp $HOST_FILE_PATH${AWS_BATCH_JOB_NODE_INDEX} ${AWS_BATCH_JOB_MAIN_NODE_PRIVATE_IPV4_ADDRESS}:$HOST_FILE_PATH${AWS_BATCH_JOB_NODE_INDEX}
   do
