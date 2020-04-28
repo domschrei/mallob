@@ -100,7 +100,6 @@ void HordeLib::init() {
 	params.printParams();
 
 	solversCount = params.getIntParam("c", 1);
-	solverThreads.resize(solversCount);
 	//printf("solvers is %d", solversCount);
 
 	for (int i = 0; i < solversCount; i++) {

@@ -29,17 +29,17 @@ SolverThread::SolverThread(ParameterProcessor& params, std::shared_ptr<Portfolio
     _result = SatResult(UNKNOWN);
 }
 
-void SolverThread::init() {
-    _tid = syscall(SYS_gettid);
-    log(3, "tid %ld\n", _tid);
-    if (_params.isSet("pin")) pin();
-}
-
 void SolverThread::start() {
     _thread = std::thread([&] {
         init();
         run();
     });
+}
+
+void SolverThread::init() {
+    _tid = syscall(SYS_gettid);
+    log(3, "tid %ld\n", _tid);
+    if (_params.isSet("pin")) pin();
 }
 
 void SolverThread::pin() {
