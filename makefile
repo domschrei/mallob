@@ -1,5 +1,5 @@
 
-MALLOB_VERSION?=$(shell date --iso-8601=seconds)"@"$(hostname)
+MALLOB_VERSION?=$(shell date --iso-8601=seconds)_$(shell whoami)@$(shell hostname)
 
 CXX=mpic++
 CWARN=-Wno-unused-parameter -Wno-sign-compare -Wno-format -Wno-format-security

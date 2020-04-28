@@ -29,7 +29,8 @@ We use GNU Make as our build tool. Additionally, a valid MPI installation is req
 Go into the directory `src/hordesat` and execute `bash build.sh` which will (a) attempt to find your MPI installation and (b) call `make` with the appropriate arguments.
 This generates the executable `build/mallob`.
 
-Alternatively, you can run `mallob` in a virtualized manner using Docker. You will find a fitting `Dockerfile` in the root directory.
+Alternatively, you can run `mallob` in a virtualized manner using Docker.
+Adjust the `CMD` statement in the `Dockerfile` and/or the execution script `aws-run.sh` to fit your particular infrastructure. 
 
 ## Usage
 
