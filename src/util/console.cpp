@@ -83,8 +83,7 @@ void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeO
 
 void Console::logUnsafe(int verbosity, const char* str, bool endline, bool prefix, va_list& args) {
 
-    if (verbosity > Console::verbosity)
-        return;
+    if (verbosity > Console::verbosity) return;
 
     // Colored output, if applicable
     if (!quiet && coloredOutput) {
@@ -153,6 +152,7 @@ void Console::forceFlush() {
 }
 
 void Console::log(int verbosity, const char* str, bool endline, bool prefix, va_list& args) {
+    if (verbosity > Console::verbosity) return;
     getLock();
     logUnsafe(verbosity, str, endline, prefix, args);
     releaseLock();
