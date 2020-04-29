@@ -341,6 +341,12 @@ void Worker::mainProgram() {
             else if (handle->tag == MSG_SEND_JOB_REVISION_DATA)
                 handleSendJobRevisionData(handle);
 
+            else if (handle->tag == MSG_JOB_DONE)
+                handleJobDone(handle);
+
+            else if (handle->tag == MSG_SEND_JOB_RESULT)
+                handleSendJobResult(handle);
+
             else if (handle->tag == MSG_EXIT) 
                 handleExit(handle);
             
