@@ -1,16 +1,24 @@
 #!/bin/bash
 /usr/sbin/sshd -D &
 
-get_num_local_procs() {
-    availablecores=$(nproc)
-    expr ${availablecores} / 4
-}
-
 PATH="$PATH:/opt/openmpi/bin/"
 BASENAME="${0##*/}"
 log () {
   echo "${BASENAME} - ${1}"
 }
+get_command() {
+    echo mpirun --mca btl_tcp_if_include eth0 --allow-run-as-root -np $1 --hostfile combined_hostfile /build/mallob -sinst=supervised-scripts/test.cnf -ba=4 -cbbs=1500 -cbdf=0.75 -cg -derandomize -icpr=0.8 -jc=0 -log=/dev/null -mcl=5 -s=1 -sleep=1000 -T=300 -t=4 -v=4
+}
+
+get_num_local_procs() {
+    availablecores=$(nproc)
+    nlp=$(expr ${availablecores} / 4)
+    if [ "$nlp" == "0" ]; then
+        nlp=1
+    fi
+    echo $nlp
+}
+
 HOST_FILE_PATH="/tmp/hostfile"
 #aws s3 cp $S3_INPUT $SCRATCH_DIR
 #tar -xvf $SCRATCH_DIR/*.tar.gz -C $SCRATCH_DIR
@@ -75,7 +83,7 @@ wait_for_nodes () {
   np=$numproc
   
   # REPLACE THE FOLLOWING LINE WITH YOUR PARTICULAR SOLVER
-  time mpirun --mca btl_tcp_if_include eth0 --allow-run-as-root -np $np --hostfile combined_hostfile /build/mallob -sinst=supervised-scripts/test.cnf -ba=4 -cbbs=1500 -cbdf=0.75 -cg -derandomize -icpr=0.8 -jc=0 -log=/dev/null -mcl=5 -s=1 -sleep=1000 -T=300 -t=4 -v=4
+  time $(get_command $np)
 }
 
 # Fetch and run a script
@@ -94,8 +102,8 @@ report_to_master () {
   do
     echo "Sleeping 5 seconds and trying again"
   done
-  log "done! goodbye"
-  ps -ef | grep sshd
+  log "done!"
+  ps -ef | grep sshd  
   tail -f /dev/null
 }
 ##
