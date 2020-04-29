@@ -61,7 +61,6 @@ public:
     int getTid() {return _tid;}
     void tryJoin() {if (_thread.joinable()) _thread.join();}
     SolvingStates::SolvingState getState() {
-        auto lock = _state_mutex.getLock();
         return _state;
     }
     SatResult getSatResult() {
