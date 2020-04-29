@@ -52,7 +52,6 @@ int termCallback(void* solverPtr) {
 }
 
 void produceUnit(void* sp, int lit) {
-	return;
 	vector<int> vcls;
 	vcls.push_back(lit);
 	Lingeling* lp = (Lingeling*)sp;
@@ -60,7 +59,6 @@ void produceUnit(void* sp, int lit) {
 }
 
 void produce(void* sp, int* cls, int glue) {
-	return;
 	// unit clause, call produceUnit
 	if (cls[1] == 0) {
 		produceUnit(sp, cls[0]);
@@ -137,7 +135,7 @@ Lingeling::Lingeling(LoggingInterface& logger) : logger(logger) {
 	//lglsetopt(solver, "verbose", 1);
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
 	lglsetopt(solver, "bca", 0);
-	lglsetopt(solver, "termint", -1);
+	lglsetopt(solver, "termint", 100);
 	lastTermCallbackTime = logger.getTime();
 
 	stopSolver = 0;
