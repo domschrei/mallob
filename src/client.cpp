@@ -98,6 +98,7 @@ bool Client::checkTerminate() {
         // Send exit message to part of workers
         Console::log(Console::VERB, "Clients done: sending EXIT to workers");
 
+        /*
         // Evaluate which portion of workers this client process should notify
         int numClients = MyMpi::size(_comm);
         int numWorkers = MyMpi::size(MPI_COMM_WORLD) - numClients;
@@ -109,7 +110,10 @@ bool Client::checkTerminate() {
         // Notify portion of workers
         for (int i = left; i < right; i++) {
             MyMpi::isend(MPI_COMM_WORLD, i, MSG_EXIT, IntVec({i}));
-        }
+        }*/
+
+        // Send MSG_EXIT to worker of rank 0, which will broadcast it
+        MyMpi::isend(MPI_COMM_WORLD, 0, MSG_EXIT, IntVec({0}));
 
         // Force sending all handles before exiting
         while (MyMpi::hasOpenSentHandles())

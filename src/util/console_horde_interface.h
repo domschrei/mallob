@@ -36,7 +36,7 @@ public:
 
         // Write content
         va_list argsCopy; va_copy(argsCopy, args);
-        Console::log(verbosityLevel+2, str.c_str(), true, argsCopy);
+        Console::log(verbosityLevel+2, str.c_str(), true, true, argsCopy);
         va_end(argsCopy);
     }
     std::shared_ptr<LoggingInterface> copy(std::string prefix) override {

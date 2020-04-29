@@ -81,7 +81,7 @@ void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeO
     std::cout << std::fixed << std::setprecision(3);*/
 }
 
-void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list& args) {
+void Console::logUnsafe(int verbosity, const char* str, bool endline, bool prefix, va_list& args) {
 
     if (verbosity > Console::verbosity)
         return;
@@ -111,9 +111,10 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, va_list& a
         elapsedAbs *= 0.001f;
         */
     
-        if (!quiet) printf("%.3f %i ", elapsedRel, rank);
-        if (logFile != NULL) fprintf(logFile, "%.3f %i ", elapsedRel, rank);
-        
+        if (prefix) {
+            if (!quiet) printf("%.3f %i ", elapsedRel, rank);
+            if (logFile != NULL) fprintf(logFile, "%.3f %i ", elapsedRel, rank);
+        }
         beganLine = true;
     }
 
@@ -151,37 +152,37 @@ void Console::forceFlush() {
     flush();
 }
 
-void Console::log(int verbosity, const char* str, bool endline, va_list& args) {
+void Console::log(int verbosity, const char* str, bool endline, bool prefix, va_list& args) {
     getLock();
-    logUnsafe(verbosity, str, endline, args);
+    logUnsafe(verbosity, str, endline, prefix, args);
     releaseLock();
 }
 
 void Console::log(int verbosity, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
-    log(verbosity, str, true, vl);
+    log(verbosity, str, true, true, vl);
     va_end(vl);
 }
 
 void Console::logUnsafe(int verbosity, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
-    logUnsafe(verbosity, str, true, vl);
+    logUnsafe(verbosity, str, true, true, vl);
     va_end(vl);
 }
 
 void Console::append(int verbosity, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
-    log(verbosity, str, false, vl);
+    log(verbosity, str, false, true, vl);
     va_end(vl);
 }
 
 void Console::appendUnsafe(int verbosity, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
-    logUnsafe(verbosity, str, false, vl);
+    logUnsafe(verbosity, str, false, true, vl);
     va_end(vl);
 }
 
@@ -189,21 +190,28 @@ void Console::log_send(int verbosity, int destRank, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
     std::string output = std::string(str) + " => [" + std::to_string(destRank) + "]";
-    log(verbosity, output.c_str(), true, vl);
+    log(verbosity, output.c_str(), true, true, vl);
     va_end(vl);
 }
 void Console::log_recv(int verbosity, int sourceRank, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
     std::string output = std::string(str) + " <= [" + std::to_string(sourceRank) + "]";
-    log(verbosity, output.c_str(), true, vl);
+    log(verbosity, output.c_str(), true, true, vl);
+    va_end(vl);
+}
+
+void Console::log_noprefix(int verbosity, const char* str, ...) {
+    va_list vl;
+    va_start(vl, str);
+    log(verbosity, str, true, false, vl);
     va_end(vl);
 }
 
 bool Console::fail(const char* str, ...) {
     va_list vl;
     va_start(vl, str);
-    log(CRIT, str, true, vl);
+    log(CRIT, str, true, true, vl);
     va_end(vl);
     return false;
 }

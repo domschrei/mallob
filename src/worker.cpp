@@ -236,14 +236,6 @@ void Worker::mainProgram() {
                     // Solver done!
                     job.appl_dumpStats();
 
-                    if (params.isSet("sinst")) {
-                        // Directly output solution if single instance solving
-                        const JobResult& result = job.getResult();
-                        std::string output = "v " + std::string(result.result == 10 ? "SAT" : result.result == 20 ? "UNSAT" : "UNKNOWN");
-                        if (result.result == 10) for (int i : result.solution) output += std::to_string(i) + " ";
-                        Console::log(Console::INFO, output.c_str());
-                    }
-
                     // Signal termination to root -- may be a self message
                     int jobRootRank = job.getRootNodeRank();
                     IntVec payload({job.getId(), job.getRevision(), result});
@@ -999,6 +991,14 @@ void Worker::handleIncrementalJobFinished(MessageHandlePtr& handle) {
 
 void Worker::handleExit(MessageHandlePtr& handle) {
     Console::log_recv(Console::VERB, handle->source, "Received exit signal");
+
+    // Forward exit signal
+    if (worldRank*2+1 < MyMpi::size(MPI_COMM_WORLD))
+        MyMpi::isend(MPI_COMM_WORLD, worldRank*2+1, MSG_EXIT, handle->recvData);
+    if (worldRank*2+2 < MyMpi::size(MPI_COMM_WORLD))
+        MyMpi::isend(MPI_COMM_WORLD, worldRank*2+2, MSG_EXIT, handle->recvData);
+    while (MyMpi::hasOpenSentHandles()) MyMpi::testSentHandles();
+
     exiting = true;
 }
 
@@ -1046,11 +1046,6 @@ void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, b
         job.uncommit();
         job.terminate();
     }
-
-    if (terminate && params.isSet("sinst")) {
-        // Single instance solving is done: exit
-        exiting = true;
-    }
 }
 
 void Worker::informClient(int jobId, int clientRank) {
@@ -1061,6 +1056,37 @@ void Worker::informClient(int jobId, int clientRank) {
     IntPair payload(jobId, result.getTransferSize());
     MyMpi::isend(MPI_COMM_WORLD, clientRank, MSG_JOB_DONE, payload);
     //stats.increment("sentMessages");
+}
+
+void Worker::handleJobDone(MessageHandlePtr& handle) {
+    IntPair recv(*handle->recvData);
+    int jobId = recv.first;
+    int resultSize = recv.second;
+    Console::log_recv(Console::VERB, handle->source, "Will receive job result, length %i, for job #%i", resultSize, jobId);
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_QUERY_JOB_RESULT, handle->recvData);
+    MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_RESULT, resultSize);
+}
+
+void Worker::handleSendJobResult(MessageHandlePtr& handle) {
+    JobResult jobResult; jobResult.deserialize(*handle->recvData);
+    int jobId = jobResult.id;
+    int resultCode = jobResult.result;
+    int revision = jobResult.revision;
+
+    Console::log_recv(Console::INFO, handle->source, "Received result of job #%i rev. %i, code: %i", jobId, revision, resultCode);
+    Console::log_noprefix(Console::CRIT, "s %s", resultCode == 10 ? "SAT" : resultCode == 20 ? "UNSAT" : "UNKNOWN");
+    if (resultCode == 10) {
+        std::string model = "";
+        for (int lit : jobResult.solution) {
+            model += std::to_string(lit) + " ";
+        }
+        Console::log_noprefix(Console::CRIT, "v %s", model.c_str());
+    }
+
+    if (params.isSet("sinst")) {
+        // Single instance solving is done: begin exit signal
+        MyMpi::isend(MPI_COMM_WORLD, 0, MSG_EXIT, IntVec({0}));
+    }
 }
 
 void Worker::setLoad(int load, int whichJobId) {

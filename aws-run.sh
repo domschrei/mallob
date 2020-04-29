@@ -28,8 +28,8 @@ echo reporting from $(hostname)
 echo main node: ${AWS_BATCH_JOB_MAIN_NODE_INDEX}
 echo this node: ${AWS_BATCH_JOB_NODE_INDEX}
 echo number of nodes: ${AWS_BATCH_JOB_NUM_NODES}
-echo Downloading problem from S3: ${COMP_S3_PROBLEM_PATH}
 
+echo Downloading problem from S3: ${COMP_S3_PROBLEM_PATH}
 if [[ "${COMP_S3_PROBLEM_PATH}" == *".xz" ]];
 then
   aws s3 cp s3://${S3_BKT}/${COMP_S3_PROBLEM_PATH} supervised-scripts/test.cnf.xz
@@ -78,7 +78,7 @@ wait_for_nodes () {
       p=$(echo $line|awk '{print $2}'|grep -oE "[0-9]+")
       numproc=$((numproc+p))
   done < combined_hostfile
-  echo "total of $numproc MPI processes"
+  log "total of $numproc MPI processes"
   #np=${AWS_BATCH_JOB_NUM_NODES}
   np=$numproc
   

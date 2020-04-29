@@ -39,12 +39,13 @@ public:
     static void append(int verbosity, const char* str, ...);
     static void log_send(int verbosity, int destRank, const char* str, ...);
     static void log_recv(int verbosity, int sourceRank, const char* str, ...);
+    static void log_noprefix(int verbosity, const char* str, ...);
 
     static void logUnsafe(int verbosity, const char* str, ...);
     static void appendUnsafe(int verbosity, const char* str, ...);
-    static void logUnsafe(int verbosity, const char* str, bool endline, va_list& args);
+    static void logUnsafe(int verbosity, const char* str, bool endline, bool prefix, va_list& args);
 
-    static void log(int verbosity, const char* str, bool endline, va_list& args);
+    static void log(int verbosity, const char* str, bool endline, bool prefix, va_list& args);
 
     static void flush();
     static void forceFlush();
