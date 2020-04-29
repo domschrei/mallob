@@ -1080,7 +1080,7 @@ void Worker::handleSendJobResult(MessageHandlePtr& handle) {
     int revision = jobResult.revision;
 
     Console::log_recv(Console::INFO, handle->source, "Received result of job #%i rev. %i, code: %i", jobId, revision, resultCode);
-    Console::log_noprefix(Console::CRIT, "s %s", resultCode == 10 ? "SAT" : resultCode == 20 ? "UNSAT" : "UNKNOWN");
+    Console::log_noprefix(Console::CRIT, "s %s", resultCode == 10 ? "SATISFIABLE" : resultCode == 20 ? "UNSATISFIABLE" : "UNKNOWN");
     if (resultCode == 10) {
         std::string model = "";
         for (int lit : jobResult.solution) {
