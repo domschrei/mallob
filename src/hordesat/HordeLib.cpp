@@ -346,7 +346,7 @@ void HordeLib::cleanUp() {
 	}
 
 	time = logger->getTime() - time;
-	hlog(0, "[hlib-cleanup] done, took %.3f s\n", time);
+	hlog(2, "[hlib-cleanup] done, took %.3f s\n", time);
 
 	cleanedUp = true;
 }

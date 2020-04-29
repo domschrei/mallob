@@ -6,10 +6,19 @@ BASENAME="${0##*/}"
 log () {
   echo "${BASENAME} - ${1}"
 }
+# The command launching my solver using the combined hostfile with specified slots.
 get_command() {
-    echo mpirun --mca btl_tcp_if_include eth0 --allow-run-as-root -np $1 --hostfile combined_hostfile /build/mallob -sinst=supervised-scripts/test.cnf -ba=4 -cbbs=1500 -cbdf=0.75 -cg -derandomize -icpr=0.8 -jc=0 -log=/dev/null -mcl=5 -s=1 -sleep=1000 -T=300 -t=4 -v=4
-}
 
+    global_num_procs=$1
+    input=supervised-scripts/test.cnf
+    timelim_secs=1000
+    threads_per_proc=4
+    
+    options="-sinst=$input -ba=4 -cbbs=1500 -cbdf=0.75 -cg -derandomize -icpr=0.8 -jc=0 -log=/dev/null -mcl=8 -s=1 -sleep=1000 -T=$timelim_secs -t=$threads_per_proc -v=3"
+    
+    echo mpirun --mca btl_tcp_if_include eth0 --allow-run-as-root -np $global_num_procs --hostfile combined_hostfile /build/mallob $options
+}
+# Evaluates how many instances of my solver can be run ON THIS NODE: available cores divided by four.
 get_num_local_procs() {
     availablecores=$(nproc)
     nlp=$(expr ${availablecores} / 4)
@@ -45,11 +54,12 @@ if [ "${AWS_BATCH_JOB_MAIN_NODE_INDEX}" == "${AWS_BATCH_JOB_NODE_INDEX}" ]; then
   NODE_TYPE="main"
 fi
 
-# wait for all nodes to report
+# Wait for all nodes to report, then launch solver
 wait_for_nodes () {
   log "Running as master node"
 
   touch $HOST_FILE_PATH
+  
   ip=$(/sbin/ip -o -4 addr list eth0 | awk '{print $4}' | cut -d/ -f1)
   slots=$(get_num_local_procs)
   
@@ -73,20 +83,21 @@ wait_for_nodes () {
   cat combined_hostfile
   
   # Add up all available slots from all nodes
+  # into the global number of launchable processes
   numproc=0
   while read -r line ; do
-      p=$(echo $line|awk '{print $2}'|grep -oE "[0-9]+")
+      p=$(echo $line|awk '{print $2}'|grep -oE "[0-9]+") # get num slots
       numproc=$((numproc+p))
   done < combined_hostfile
   log "total of $numproc MPI processes"
   #np=${AWS_BATCH_JOB_NUM_NODES}
   np=$numproc
   
-  # REPLACE THE FOLLOWING LINE WITH YOUR PARTICULAR SOLVER
+  # LAUNCH SOLVER
   time $(get_command $np)
 }
 
-# Fetch and run a script
+# Report IP and slots, then wait until termination
 report_to_master () {
   # get own ip and num cpus
   #
@@ -103,7 +114,10 @@ report_to_master () {
     echo "Sleeping 5 seconds and trying again"
   done
   log "done!"
-  ps -ef | grep sshd  
+  ps -ef | grep sshd
+  
+  # Wait until termination.
+  # MPI processes on this node are launched through the master node's mpirun call.
   tail -f /dev/null
 }
 ##

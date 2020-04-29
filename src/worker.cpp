@@ -462,7 +462,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle, bool oneshot) {
     if (adopts) {
         // Adoption takes place
         std::string jobstr = jobStr(req.jobId, req.requestedNodeIndex);
-        Console::log_recv(Console::INFO, handle->source, "Adopting %s after %i hops", jobstr.c_str(), req.numHops);
+        Console::log_recv(Console::VERB, handle->source, "Adopting %s after %i hops", jobstr.c_str(), req.numHops);
         assert(isIdle() || Console::fail("Adopting a job, but not idle!"));
         //stats.push_back("hops", req.numHops);
 

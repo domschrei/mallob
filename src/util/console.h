@@ -53,12 +53,10 @@ public:
     static bool fail(const char* str, ...);
 
     static void getLock() {
-        if (threadsafeOutput)
-            logMutex.lock(); 
+        if (threadsafeOutput) logMutex.lock(); 
     };
     static void releaseLock() {
-        if (threadsafeOutput)
-            logMutex.unlock();
+        if (threadsafeOutput) logMutex.unlock();
     };
 
     static std::string floatToStr(double num, int precision);
