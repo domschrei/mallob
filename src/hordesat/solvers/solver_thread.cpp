@@ -265,14 +265,16 @@ void SolverThread::runOnce() {
 
 void SolverThread::waitWhile(SolvingState state) {
     if (_state != state) return;
+    log(3, "wait while %s\n", SolvingStateNames[state]);
     _state_cond.wait(_state_mutex, [&]{return _state != state;});
+    log(3, "end wait\n");
 }
 
 bool SolverThread::cancelRun() {
     SolvingState s = _state;
     bool cancel = s == STANDBY || s == ABORTING;
     if (cancel) {
-        log(1, "cancelling run\n");
+        log(1, "cancel run\n");
     }
     return cancel;
 }

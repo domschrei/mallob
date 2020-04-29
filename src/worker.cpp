@@ -1227,8 +1227,8 @@ void Worker::allreduceSystemState() {
                 reducingSystemState = false;
                 int verb = (worldRank == 0 ? Console::INFO : Console::VVVVERB);
                 Console::log(verb, "sysstate busy=%.2f%% jobs=%i accmem=%.2fGB", 100*systemState[0]/MyMpi::size(comm), (int)systemState[1], systemState[2]);
-            } else if (lastSystemStateReduce > 0 && timeSinceLast > 10) {
-                Console::log(Console::CRIT, "Unresponsive node(s) since 10 seconds! Aborting");
+            } else if (lastSystemStateReduce > 0 && timeSinceLast > 300) {
+                Console::log(Console::CRIT, "Unresponsive node(s) since 300 seconds! Aborting");
                 abort();
             }
         }

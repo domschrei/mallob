@@ -20,9 +20,7 @@ void ClauseDatabase::addVIPClause(vector<int>& clause) {
 }
 
 int* ClauseDatabase::addClause(vector<int>& clause) {
-	if (addClauseLock.tryLock() == false) {
-		return NULL;
-	}
+	if (addClauseLock.tryLock() == false) return NULL;
 
 	unsigned int csize = clause.size();
 
