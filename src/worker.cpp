@@ -1371,6 +1371,18 @@ bool Worker::isRequestObsolete(const JobRequest& req) {
     // Requests for a job root never become obsolete
     if (req.requestedNodeIndex == 0) return false;
 
+    // Does this node KNOW that the request is already completed?
+    if (!isIdle() && req.jobId == currentJob->getId()) {
+        Job& job = getJob(req.jobId);
+        if (req.requestedNodeIndex == job.getIndex()
+        || (job.hasLeftChild() && req.requestedNodeIndex == job.getLeftChildIndex())
+        || (job.hasRightChild() && req.requestedNodeIndex == job.getRightChildIndex())) {
+            // Request completed!
+            Console::log(Console::VERB, "Req. %s : already completed", job.toStr());
+            return true;
+        }
+    }
+    
     float timelim = 0.25 + 2 * params.getFloatParam("p");
 
     // Make requests in single instance mode last for a long time
