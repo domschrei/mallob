@@ -51,6 +51,7 @@ int termCallback(void* solverPtr) {
     return 0;
 }
 
+Mutex Lingeling::timeCallbackLock;
 double timeSinceStart = -1;
 LoggingInterface* lgr;
 
