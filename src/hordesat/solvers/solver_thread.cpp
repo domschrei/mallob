@@ -168,7 +168,7 @@ void SolverThread::diversify() {
 		sparseRandomDiversification(_portfolio_size);
 		break;
 	case 7:
-        if (_portfolio_rank >= _solver.getNumOriginalDiversifications()) {
+        if (_solver.solverId >= _solver.getNumOriginalDiversifications()) {
 		    log(3, "dv: sparserand, native, s=%u\n", seed);
 		    sparseRandomDiversification(_portfolio_size);
         } else {
