@@ -97,4 +97,4 @@ The solving engine used in single instance solving mode was submitted to the Clo
 
 Many thanks to Armin Biere et al. for the SAT solvers Lingeling and YalSAT this system uses and to Tomáš Balyo for HordeSat, the portfolio solver this project's solver engine is built upon.
 
-You can use mallob under the terms of the General Public License (GPLv3). The used versions of Lingeling and YalSAT are MIT-licensed, as is HordeSat.
+You can use mallob under the terms of the Lesser General Public License (LGPLv3). The used versions of Lingeling and YalSAT are MIT-licensed, as is HordeSat.
