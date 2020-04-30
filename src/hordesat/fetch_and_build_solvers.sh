@@ -22,11 +22,27 @@ else
     echo "Assuming that a correct installation of minisat is present."
 fi
 
+if [ ! -d yalsat ]; then
+
+    # Get YalSAT
+    echo "Fetching YalSAT ..."
+    wget http://fmv.jku.at/yalsat/yalsat-03v.zip
+    unzip yalsat-03v.zip
+    mv yalsat-03v yalsat
+    
+    echo "Building YalSAT ..."
+    cd yalsat
+    ./configure.sh
+    make
+    cd ..
+else
+    echo "Assuming that a correct installation of YalSAT is present."
+fi
+
 if [ ! -d lingeling ]; then
     
-    echo "Fetching lingeling ..."
-    
     # get lingeling
+    echo "Fetching lingeling ..."
     
     # Option 1: Lingeling as used by original HordeSat
     #wget http://fmv.jku.at/lingeling/lingeling-ayv-86bf266-140429.zip
@@ -40,11 +56,8 @@ if [ ! -d lingeling ]; then
     tar xzvf lingeling-bcj-78ebb86-180517.tar.gz
     mv lingeling-bcj-78ebb86-180517 lingeling
     
-    #patch lingeling/lglib.c < lingeling.patch
-    
     echo "Building lingeling ..."
-    
-    #make lingeling
+    #patch lingeling/lglib.c < lingeling.patch
     cd lingeling
     ./configure.sh
     make

@@ -1,4 +1,6 @@
 
+#include <sys/resource.h>
+
 #include "solvers/solver_thread.h"
 #include "HordeLib.h"
 #include "utilities/hash.h"
@@ -310,10 +312,12 @@ void SolverThread::setState(SolvingState state) {
     // (set signal to jump out of solving procedure)
     if (state == STANDBY || state == ABORTING) {
         _solver.setSolverInterrupt();
+        if (_tid >= 0) setpriority(PRIO_PROCESS, _tid, 10); // nice up thread
     }
     // (2) From STANDBY to !STANDBY : Restart solver
     else if (oldState == STANDBY && state != STANDBY) {
         _solver.unsetSolverInterrupt();
+        if (_tid >= 0) setpriority(PRIO_PROCESS, _tid, 0); // nice down thread
     }
 
     // (3) From !SUSPENDED to SUSPENDED : Suspend solvers 
