@@ -374,7 +374,7 @@ SolvingStatistics Lingeling::getStatistics() {
 	return st;
 }
 
-#define LGL_NUM_DIVERSIFICATIONS 22
+#define LGL_NUM_DIVERSIFICATIONS 20
 
 int Lingeling::getNumOriginalDiversifications() {
 	return LGL_NUM_DIVERSIFICATIONS;
@@ -404,7 +404,7 @@ void Lingeling::diversify(int rank, int size) {
 		case 2: lglsetopt (solver, "restartint", 1000); break;
 		case 3: lglsetopt (solver, "elmresched", 7); break;
 		
-		// NEW: local search solver #1
+		// NEW: local search solver
 		case 4:
 			lglsetopt (solver, "plain", 0);
 			lglsetopt (solver, "locs", -1);
@@ -432,27 +432,18 @@ void Lingeling::diversify(int rank, int size) {
 		// OLD
 		case 14: lglsetopt (solver, "agilitylim", 100); break; // NEW from "agilelim"
 		//case X: lglsetopt (solver, "bias", -1); break; // option removed
-		case 15: lglsetopt (solver, "activity", 1); break; // NEW from "acts"
-		case 16: lglsetopt (solver, "activity", 2); break; // NEW from "acts", 0
+		//case X: lglsetopt (solver, "activity", 1); break; // omitting; NEW from "acts"
+		case 15: lglsetopt (solver, "activity", 2); break; // NEW from "acts", 0
 		//case X: lglsetopt (solver, "bias", 1); break; // option removed
-		case 17:
+		case 16:
 			lglsetopt (solver, "wait", 0);
 			lglsetopt (solver, "blkrtc", 1);
 			lglsetopt (solver, "elmrtc", 1);
 			break;
-		case 18: lglsetopt (solver, "prbsimplertc", 1); break;
+		case 17: lglsetopt (solver, "prbsimplertc", 1); break;
 		//case X: lglsetopt (solver, "gluescale", 1); break; // omitting
-		case 19: lglsetopt (solver, "gluescale", 5); break; // from 3 (value "ld" moved)
-		case 20: lglsetopt (solver, "move", 1); break;
-
-		// NEW: local search solver #2
-		case 21: 
-			lglsetopt (solver, "plain", 1);
-			lglsetopt (solver, "locs", -1);
-			lglsetopt (solver, "locsrtc", 1);
-			lglsetopt (solver, "locswait", 0);
-			lglsetopt (solver, "locsclim", (1<<24));
-			break;
+		case 18: lglsetopt (solver, "gluescale", 5); break; // from 3 (value "ld" moved)
+		case 19: lglsetopt (solver, "move", 1); break;
 	}
 }
 

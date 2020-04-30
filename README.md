@@ -92,9 +92,9 @@ After a complete run of mallob, you can run `bash calc_runtimes.sh <path/to/logd
 
 ## Remarks
 
-This system will be published in the near future by Peter Sanders and Dominik Schreiber in a conference paper or an academic journal article.
+This system will be published in the near future by Peter Sanders and Dominik Schreiber in a conference paper or in an academic journal article.
 The solving engine used in single instance solving mode was submitted to the Cloud track of the SAT Competition 2020.
 
-Many thanks to Armin Biere et al. for the SAT solver Lingeling this system uses and to Tomáš Balyo for HordeSat, the portfolio solver this project's solver engine is built upon.
+Many thanks to Armin Biere et al. for the SAT solvers Lingeling and YalSAT this system uses and to Tomáš Balyo for HordeSat, the portfolio solver this project's solver engine is built upon.
 
-You can use mallob under the terms of the General Public License (GPLv3).
+You can use mallob under the terms of the General Public License (GPLv3). The used versions of Lingeling and YalSAT are MIT-licensed, as is HordeSat.

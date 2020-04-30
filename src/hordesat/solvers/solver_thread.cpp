@@ -316,7 +316,7 @@ void SolverThread::setState(SolvingState state) {
     // (set signal to jump out of solving procedure)
     if (state == STANDBY || state == ABORTING) {
         _solver.setSolverInterrupt();
-        if (_tid >= 0) setpriority(PRIO_PROCESS, _tid, 10); // nice up thread
+        if (_tid >= 0) setpriority(PRIO_PROCESS, _tid, 15); // nice up thread
     }
     // (2) From STANDBY to !STANDBY : Restart solver
     else if (oldState == STANDBY && state != STANDBY) {
