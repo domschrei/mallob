@@ -82,6 +82,7 @@ public:
 
 	// Diversify
 	void diversify(int rank, int size);
+	int getNumOriginalDiversifications();
 
 	// constructor
 	MiniSat();

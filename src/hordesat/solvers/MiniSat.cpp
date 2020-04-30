@@ -234,6 +234,10 @@ void MiniSat::diversify(int rank, int size) {
 	solver->random_seed = rank;
 }
 
+int MiniSat::getNumOriginalDiversifications() {
+	return 0;
+}
+
 SolvingStatistics MiniSat::getStatistics() {
 	SolvingStatistics st;
 	st.conflicts = solver->conflicts;
