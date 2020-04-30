@@ -1371,10 +1371,10 @@ bool Worker::isRequestObsolete(const JobRequest& req) {
     // Requests for a job root never become obsolete
     if (req.requestedNodeIndex == 0) return false;
 
-    int timelim = 0.25 + 2 * params.getFloatParam("p");
+    float timelim = 0.25 + 2 * params.getFloatParam("p");
 
     // Make requests in single instance mode last for a long time
-    if (params.isSet("sinst")) timelim = std::max(timelim, 300);
+    if (params.isSet("sinst")) timelim = std::max(timelim, 300.0f);
 
     return Timer::elapsedSeconds() - req.timeOfBirth >= timelim; 
 }
