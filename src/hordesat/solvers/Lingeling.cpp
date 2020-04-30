@@ -21,20 +21,21 @@ using namespace std::chrono;
 Mutex timeCallbackLock;
 std::map<std::string, high_resolution_clock::time_point> times;
 std::string currentSolverName = "";
-high_resolution_clock::time_point startTime;
+high_resolution_clock::time_point lglSolverStartTime;
 
 void updateTimer(std::string solverName) {
 	auto lock = timeCallbackLock.getLock();
 	if (currentSolverName == solverName) return;
 	if (!times.count(solverName)) times[solverName] = high_resolution_clock::now();
-	startTime = times[solverName];
+	lglSolverStartTime = times[solverName];
 	currentSolverName = solverName;
 }
-
 double getTime() {
     high_resolution_clock::time_point nowTime = high_resolution_clock::now();
-    duration<double, std::milli> time_span = nowTime - startTime;
-    return time_span.count() / 1000;
+	timeCallbackLock.lock();
+    duration<double, std::milli> time_span = nowTime - lglSolverStartTime;
+    timeCallbackLock.unlock();
+	return time_span.count() / 1000;
 }
 
 void slog(Lingeling* lgl, int verbosityLevel, const char* fmt, ...) {
