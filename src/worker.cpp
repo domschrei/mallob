@@ -1499,13 +1499,16 @@ Worker::~Worker() {
 
     exiting = true;
 
-    // Delete each job (iterating over "jobs" invalid as entries are deleted)
-    std::vector<int> jobIds;
-    for (auto idJobPair : jobs) jobIds.push_back(idJobPair.first);
-    for (int jobId : jobIds) deleteJob(jobId);
+    // Only clean up properly if not in performance-critical single instance mode
+    if (!params.isSet("sinst")) {
+        // Delete each job (iterating over "jobs" invalid as entries are deleted)
+        std::vector<int> jobIds;
+        for (auto idJobPair : jobs) jobIds.push_back(idJobPair.first);
+        for (int jobId : jobIds) deleteJob(jobId);
 
-    if (mpiMonitorThread.joinable())
-        mpiMonitorThread.join();
+        if (mpiMonitorThread.joinable())
+            mpiMonitorThread.join();
+    }
 
     Console::log(Console::VVERB, "Destruct worker");
 }
