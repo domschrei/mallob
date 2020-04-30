@@ -223,7 +223,7 @@ bool SatJob::appl_wantsToBeginCommunication() const {
     if (!locked) return false;
     bool wants = ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses();
     _horde_manipulation_lock.unlock();
-    return wants; 
+    return wants;
 }
 
 void SatJob::appl_beginCommunication() {

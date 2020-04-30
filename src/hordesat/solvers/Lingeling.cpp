@@ -375,32 +375,77 @@ SolvingStatistics Lingeling::getStatistics() {
 }
 
 void Lingeling::diversify(int rank, int size) {
-	// This method is copied from Plingeling
+	
 	lglsetopt(solver, "seed", rank);
-	lglsetopt(solver, "flipping", 0);
-    switch (rank % 16) {
+	
+	// This method is based on Plingeling: OLD from ayv, NEW from bcj
+
+	lglsetopt(solver, "classify", 0); // NEW
+	//lglsetopt(solver, "flipping", 0); // OLD
+
+    switch (rank % 20) {
+		
 		case 0: default: break;
-		case 1: lglsetopt (solver, "plain", 1); break;
-		case 2: lglsetopt (solver, "agilelim", 100); break;
-		case 3: lglsetopt (solver, "block", 0), lglsetopt (solver, "cce", 0); break;
-		case 4: lglsetopt (solver, "bias", -1); break;
-		case 5: lglsetopt (solver, "acts", 0); break;
-		case 6: lglsetopt (solver, "phase", 1); break;
-		case 7: lglsetopt (solver, "acts", 1); break;
-		case 8: lglsetopt (solver, "bias", 1); break;
-		case 9:
+		case 1: 
+			lglsetopt (solver, "plain", 1);
+			lglsetopt (solver, "decompose", 1); // NEW 
+			break;
+
+		// NEW
+		case 2: lglsetopt (solver, "restartint", 1000); break;
+		case 3: lglsetopt (solver, "elmresched", 7); break;
+		case 4: lglsetopt (solver, "scincincmin", 250); break;
+		case 5: 
+			lglsetopt (solver, "block", 0); 
+			lglsetopt (solver, "cce", 0); 
+			break;
+		case 6: lglsetopt (solver, "scincinc", 50); break;
+		case 7: lglsetopt (solver, "phase", -1); break;
+		case 8: lglsetopt (solver, "phase", 1); break;
+		case 9: lglsetopt (solver, "sweeprtc", 1); break;
+		case 10: lglsetopt (solver, "restartint", 100); break;
+		case 11:
+			lglsetopt (solver, "reduceinit", 10000);
+			lglsetopt (solver, "reducefixed", 1);
+			break;
+		case 12: lglsetopt (solver, "restartint", 4); break;
+
+		// OLD
+		case 13: lglsetopt (solver, "agilitylim", 100); break; // NEW from "agilelim"
+		//case X: lglsetopt (solver, "bias", -1); break; // option removed
+		case 14: lglsetopt (solver, "activity", 1); break; // NEW from "acts"
+		case 15: lglsetopt (solver, "activity", 2); break; // NEW from "acts", 0
+		//case X: lglsetopt (solver, "bias", 1); break; // option removed
+		case 16:
 			lglsetopt (solver, "wait", 0);
 			lglsetopt (solver, "blkrtc", 1);
 			lglsetopt (solver, "elmrtc", 1);
 			break;
-		case 10: lglsetopt (solver, "phase", -1); break;
-		case 11: lglsetopt (solver, "prbsimplertc", 1); break;
-		case 12: lglsetopt (solver, "gluescale", 1); break;
-		case 13: lglsetopt (solver, "gluescale", 3); break;
-		case 14: lglsetopt (solver, "move", 1); break;
-		case 15: lglsetopt(solver, "flipping", 1); break;
+		case 17: lglsetopt (solver, "prbsimplertc", 1); break;
+		//case X: lglsetopt (solver, "gluescale", 1); break; // omitting
+		case 18: lglsetopt (solver, "gluescale", 5); break; // from 3 (value "ld" moved)
+		case 19: lglsetopt (solver, "move", 1); break;
 	}
 }
+
+
+/*
+case  1: setopt (i, lgl, "plain", 1),
+		setopt (i, lgl, "decompose", 1); break;
+case  2: setopt (i, lgl, "restartint", 1000); break;
+case  3: setopt (i, lgl, "elmresched", 7); break;
+case  4: setopt (i, lgl, "scincincmin", 250); break;
+case  5: setopt (i, lgl, "block", 0),
+		setopt (i, lgl, "cce", 0); break;
+case  6: setopt (i, lgl, "scincinc", 50); break;
+case  7: setopt (i, lgl, "phase", -1); break;
+case  8: setopt (i, lgl, "phase", 1); break;
+case  9: setopt (i, lgl, "sweeprtc", 1); break;
+case 10: setopt (i, lgl, "restartint", 100); break;
+case 11: setopt (i, lgl, "reduceinit", 10000);
+		setopt (i, lgl, "reducefixed", 1); break;
+case 12: setopt (i, lgl, "restartint", 4); break;
+*/
 
 
 
