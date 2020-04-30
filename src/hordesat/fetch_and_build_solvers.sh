@@ -29,15 +29,18 @@ if [ ! -d lingeling ]; then
     # get lingeling
     
     # Option 1: Lingeling as used by original HordeSat
-    wget http://fmv.jku.at/lingeling/lingeling-ayv-86bf266-140429.zip
-    unzip lingeling-ayv-86bf266-140429.zip
-    mv *.txt code/
-    rm build.sh
-    mv code lingeling
-    #patch lingeling/lglib.c < lingeling.patch
+    #wget http://fmv.jku.at/lingeling/lingeling-ayv-86bf266-140429.zip
+    #unzip lingeling-ayv-86bf266-140429.zip
+    #mv *.txt code/
+    #rm build.sh
+    #mv code lingeling
     
     # Option 2: SAT 2018 MIT-licenced lingeling
-    #git clone https://github.com/arminbiere/lingeling.git
+    wget http://fmv.jku.at/lingeling/lingeling-bcj-78ebb86-180517.tar.gz
+    tar xzvf lingeling-bcj-78ebb86-180517.tar.gz
+    mv lingeling-bcj-78ebb86-180517 lingeling
+    
+    #patch lingeling/lglib.c < lingeling.patch
     
     echo "Building lingeling ..."
     

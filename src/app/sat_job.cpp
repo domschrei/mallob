@@ -209,7 +209,7 @@ bool SatJob::appl_isDestructible() {
     return !solverNotNull() || _solver->isCleanedUp();
 }
 
- bool SatJob::appl_wantsToBeginCommunication() const {
+bool SatJob::appl_wantsToBeginCommunication() const {
     if (_job_comm_period <= 0) return false;
     if (_clause_comm == NULL) return false;
     // Special "timed" conditions for leaf nodes:
@@ -224,7 +224,7 @@ bool SatJob::appl_isDestructible() {
     bool wants = ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses();
     _horde_manipulation_lock.unlock();
     return wants; 
- }
+}
 
 void SatJob::appl_beginCommunication() {
     Console::log(Console::VVVVERB, "begincomm");

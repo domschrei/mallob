@@ -6,17 +6,17 @@ BASENAME="${0##*/}"
 log () {
   echo "${BASENAME} - ${1}"
 }
-# The command launching my solver using the combined hostfile with specified slots.
+# The command launching mallob-sinst using the combined hostfile with specified slots.
 get_command() {
 
     global_num_procs=$1
     input=supervised-scripts/test.cnf
     timelim_secs=1000
     threads_per_proc=4
-    # verbosity: default 3, higher values <= 6 for debugging
+    # verbosity: default 3, higher values 4/5/6 for debugging
     verbosity=3
     
-    options="-sinst=$input -ba=4 -cbbs=1500 -cbdf=0.75 -cg -derandomize -icpr=0.8 -jc=0 -log=/dev/null -mcl=8 -s=1 -sleep=1000 -T=$timelim_secs -t=$threads_per_proc -v=$verbosity"
+    options="-sinst=$input -ba=4 -cbbs=1500 -cbdf=0.75 -cg -derandomize -icpr=0.8 -jc=0 -log=/dev/null -mcl=5 -s=1 -sleep=1000 -T=$timelim_secs -t=$threads_per_proc -v=$verbosity"
     
     echo mpirun --mca btl_tcp_if_include eth0 --allow-run-as-root -np $global_num_procs --hostfile combined_hostfile /build/mallob $options
 }
