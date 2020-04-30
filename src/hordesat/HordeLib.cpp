@@ -103,6 +103,7 @@ void HordeLib::init() {
 	//printf("solvers is %d", solversCount);
 
 	for (int i = 0; i < solversCount; i++) {
+		int solverId = i + solversCount * mpi_rank;
 		if (params.getParam("s") == "minisat") {
 			solverInterfaces.emplace_back(new MiniSat());
 			hlog(3, "MiniSat @ %d\n", i, mpi_rank, mpi_size);
@@ -111,15 +112,15 @@ void HordeLib::init() {
 				solverInterfaces.emplace_back(new MiniSat());
 				hlog(3, "MiniSat @ %d\n", i, mpi_rank, mpi_size);
 			} else {
-				solverInterfaces.emplace_back(new Lingeling(*logger));
+				solverInterfaces.emplace_back(new Lingeling(*logger, i));
 				hlog(3, "Lingeling @ %d\n", i, mpi_rank, mpi_size);
 			}
 		} else {
-			solverInterfaces.emplace_back(new Lingeling(*logger));
+			solverInterfaces.emplace_back(new Lingeling(*logger, i));
 			hlog(3, "Lingeling @ %d\n", i, mpi_rank, mpi_size);
 		}
 		// set solver id
-		solverInterfaces[i]->solverId = i + solversCount * mpi_rank;		
+		solverInterfaces[i]->solverId = solverId;		
 	}
 
 	sleepInt = 1000 * params.getIntParam("i", 1000);

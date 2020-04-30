@@ -13,11 +13,15 @@
 #include "../utilities/Threading.h"
 #include "../utilities/logging_interface.h"
 
+#include <map>
+
 struct LGL;
 
 class Lingeling: public PortfolioSolverInterface {
 
 private:
+	static Mutex timeCallbackLock;
+
 	LoggingInterface& logger;
 	LGL* solver;
 	std::string name;
@@ -103,7 +107,7 @@ public:
 	void setSolverInterrupt();
 	void unsetSolverInterrupt();
     
-	Lingeling(LoggingInterface& logger);
+	Lingeling(LoggingInterface& logger, int solverId);
 	 ~Lingeling();
 };
 

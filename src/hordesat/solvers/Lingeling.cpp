@@ -51,6 +51,13 @@ int termCallback(void* solverPtr) {
     return 0;
 }
 
+double timeSinceStart = -1;
+LoggingInterface* lgr;
+
+double getTime() {
+	return std::max(0.0, lgr->getTime() - timeSinceStart);
+}
+
 void produceUnit(void* sp, int lit) {
 	vector<int> vcls;
 	vcls.push_back(lit);
@@ -130,23 +137,29 @@ void consumeCls(void* sp, int** clause, int* glue) {
 	lp->clauseAddMutex.unlock();
 }
 
-Lingeling::Lingeling(LoggingInterface& logger) : logger(logger) {
+Lingeling::Lingeling(LoggingInterface& logger, int solverId) : logger(logger), myId(solverId) {
 	solver = lglinit();
 	//lglsetopt(solver, "verbose", 1);
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
 	lglsetopt(solver, "bca", 0);
-	lglsetopt(solver, "termint", 100);
+	lglsetopt(solver, "termint", -1);
 	lastTermCallbackTime = logger.getTime();
 
 	stopSolver = 0;
 	callback = NULL;
+
+	timeCallbackLock.lock();
+	lgr = &this->logger;
+	timeSinceStart = lastTermCallbackTime;
+	timeCallbackLock.unlock();
+
+	lglsetime(solver, getTime);
 	lglseterm(solver, termCallback, this);
 	glueLimit = 2;
 
 	unitsBufferSize = clsBufferSize = 100;
 	unitsBuffer = (int*) malloc(unitsBufferSize*sizeof(int));
 	clsBuffer = (int*) malloc(clsBufferSize*sizeof(int));
-	myId = 0;
 
     suspendSolver = false;
     //suspendMutex = VerboseMutex("suspendLgl", NULL);
