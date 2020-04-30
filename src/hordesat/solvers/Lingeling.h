@@ -103,6 +103,7 @@ public:
 	SolvingStatistics getStatistics();
 
 	void diversify(int rank, int size);
+	int getNumOriginalDiversifications();
 
 	// Interrupt the SAT solving, so it can be started again with new assumptions and added clauses
 	void setSolverInterrupt();

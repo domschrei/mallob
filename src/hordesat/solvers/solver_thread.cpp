@@ -164,12 +164,16 @@ void SolverThread::diversify() {
 		nativeDiversification(_portfolio_rank, _portfolio_size);
 		break;
 	case 6:
-		log(3, "dv: sparse, random, s=%u\n", seed);
+		log(3, "dv: sparserand, s=%u\n", seed);
 		sparseRandomDiversification(_portfolio_size);
 		break;
 	case 7:
-		log(3, "dv: sparse, random, native, s=%u\n", seed);
-		sparseRandomDiversification(_portfolio_size);
+        if (_portfolio_rank >= _solver.getNumOriginalDiversifications()) {
+		    log(3, "dv: sparserand, native, s=%u\n", seed);
+		    sparseRandomDiversification(_portfolio_size);
+        } else {
+            log(3, "dv: native, s=%u\n", seed);
+        }
 		nativeDiversification(_portfolio_rank, _portfolio_size);
 		break;
 	case 0:

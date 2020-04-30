@@ -99,6 +99,8 @@ public:
 
 	// You are solver #rank of #size solvers, diversify your parameters (seeds, heuristics, etc.) accordingly.
 	virtual void diversify(int rank, int size) = 0;
+	// How many "true" different diversifications do you have?
+	virtual int getNumOriginalDiversifications() = 0;
 
     // Suspend the SAT solver DURING its execution, freeing up computational resources for other threads
     virtual void setSolverSuspend() = 0;
