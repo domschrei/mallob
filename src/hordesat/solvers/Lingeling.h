@@ -20,7 +20,6 @@ struct LGL;
 class Lingeling: public PortfolioSolverInterface {
 
 private:
-	static Mutex timeCallbackLock;
 
 	LoggingInterface& logger;
 	LGL* solver;
@@ -54,6 +53,8 @@ private:
     volatile bool suspendSolver;
     Mutex suspendMutex;
     ConditionVariable suspendCond;
+
+	std::string jobname;
 
 public:
 
@@ -107,7 +108,7 @@ public:
 	void setSolverInterrupt();
 	void unsetSolverInterrupt();
     
-	Lingeling(LoggingInterface& logger, int solverId);
+	Lingeling(LoggingInterface& logger, int solverId, std::string jobName);
 	 ~Lingeling();
 };
 

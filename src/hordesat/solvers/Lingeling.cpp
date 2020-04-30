@@ -7,12 +7,34 @@
 
 #include <ctype.h>
 #include <stdarg.h>
+#include <chrono>
 
 #include "Lingeling.h"
 #include "../utilities/DebugUtils.h"
 
 extern "C" {
 	#include "lglib.h"
+}
+
+using namespace std::chrono;
+
+Mutex timeCallbackLock;
+std::map<std::string, high_resolution_clock::time_point> times;
+std::string currentSolverName = "";
+high_resolution_clock::time_point startTime;
+
+void updateTimer(std::string solverName) {
+	auto lock = timeCallbackLock.getLock();
+	if (currentSolverName == solverName) return;
+	if (!times.count(solverName)) times[solverName] = high_resolution_clock::now();
+	startTime = times[solverName];
+	currentSolverName = solverName;
+}
+
+double getTime() {
+    high_resolution_clock::time_point nowTime = high_resolution_clock::now();
+    duration<double, std::milli> time_span = nowTime - startTime;
+    return time_span.count() / 1000;
 }
 
 void slog(Lingeling* lgl, int verbosityLevel, const char* fmt, ...) {
@@ -49,14 +71,6 @@ int termCallback(void* solverPtr) {
     }
     
     return 0;
-}
-
-Mutex Lingeling::timeCallbackLock;
-double timeSinceStart = -1;
-LoggingInterface* lgr;
-
-double getTime() {
-	return std::max(0.0, lgr->getTime() - timeSinceStart);
 }
 
 void produceUnit(void* sp, int lit) {
@@ -138,7 +152,7 @@ void consumeCls(void* sp, int** clause, int* glue) {
 	lp->clauseAddMutex.unlock();
 }
 
-Lingeling::Lingeling(LoggingInterface& logger, int solverId) : logger(logger), myId(solverId) {
+Lingeling::Lingeling(LoggingInterface& logger, int solverId, std::string jobname) : logger(logger), myId(solverId), jobname(jobname) {
 	solver = lglinit();
 	//lglsetopt(solver, "verbose", 1);
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
@@ -146,13 +160,10 @@ Lingeling::Lingeling(LoggingInterface& logger, int solverId) : logger(logger), m
 	lglsetopt(solver, "termint", -1);
 	lastTermCallbackTime = logger.getTime();
 
+	updateTimer(jobname);
+
 	stopSolver = 0;
 	callback = NULL;
-
-	timeCallbackLock.lock();
-	lgr = &this->logger;
-	timeSinceStart = lastTermCallbackTime;
-	timeCallbackLock.unlock();
 
 	lglsetime(solver, getTime);
 	lglseterm(solver, termCallback, this);
@@ -194,12 +205,14 @@ void Lingeling::setSolverInterrupt() {
 	stopSolver = 1;
 }
 void Lingeling::unsetSolverInterrupt() {
+	updateTimer(jobname);
 	stopSolver = 0;
 }
 void Lingeling::setSolverSuspend() {
     suspendSolver = true;
 }
 void Lingeling::unsetSolverSuspend() {
+	updateTimer(jobname);
     suspendSolver = false;
 	suspendCond.notify();
 }
@@ -207,6 +220,8 @@ void Lingeling::unsetSolverSuspend() {
 // Solve the formula with a given set of assumptions
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
 SatResult Lingeling::solve(const vector<int>& assumptions) {
+	updateTimer(jobname);
+
 	this->assumptions = assumptions;
 	// add the clauses
 	clauseAddMutex.lock();
