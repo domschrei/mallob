@@ -20,6 +20,7 @@ DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
 		}
 		solvers[i]->setLearnedClauseCallback(&callback, i);
 	}
+	lastBufferClear = logger.getTime();
 }
 
 std::vector<int> DefaultSharingManager::prepareSharing(int maxSize) {
@@ -111,6 +112,16 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 		}
 	} else {
 		solvers[0]->addLearnedClauses(clausesToAdd);
+	}
+
+	// Clear half of the clauses from the filter (probabilistically) if a clause filter half life is set
+	if (params.getIntParam("cfhl", 0) > 0 && logger.getTime() - lastBufferClear > params.getIntParam("cfhl", 0)) {
+		logger.log(1, "forget half of clauses in filter\n");
+		for (size_t sid = 0; sid < solverFilters.size(); sid++) {
+			solverFilters[sid]->clearHalf();
+		}
+		nodeFilter.clearHalf();
+		lastBufferClear = logger.getTime();
 	}
 }
 

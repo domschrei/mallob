@@ -36,6 +36,8 @@ public:
 	 */
 	void clear();
 
+	void clearHalf();
+
 	/**
 	 * Hash function for clauses, order of literals is irrelevant
 	 */

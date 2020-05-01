@@ -55,6 +55,8 @@ bool SatJob::appl_initialize() {
         // Single instance filename
         params["sinst"] = _params.getParam("sinst");
     }
+    params["cfhl"] = _params.getIntParam("cfhl");
+    if (_params.isSet("aod")) params["aod"];
 
     auto lock = _horde_manipulation_lock.getLock();
 

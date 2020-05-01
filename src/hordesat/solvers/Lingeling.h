@@ -55,6 +55,7 @@ private:
     ConditionVariable suspendCond;
 
 	std::string jobname;
+	int numDiversifications;
 
 public:
 
@@ -109,7 +110,7 @@ public:
 	void setSolverInterrupt();
 	void unsetSolverInterrupt();
     
-	Lingeling(LoggingInterface& logger, int solverId, std::string jobName);
+	Lingeling(LoggingInterface& logger, int solverId, std::string jobName, bool addOldDiversifications);
 	 ~Lingeling();
 };
 

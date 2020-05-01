@@ -153,7 +153,8 @@ void consumeCls(void* sp, int** clause, int* glue) {
 	lp->clauseAddMutex.unlock();
 }
 
-Lingeling::Lingeling(LoggingInterface& logger, int solverId, std::string jobname) : logger(logger), myId(solverId), jobname(jobname) {
+Lingeling::Lingeling(LoggingInterface& logger, int solverId, std::string jobname, 
+		bool addOldDiversifications) : logger(logger), myId(solverId), jobname(jobname) {
 	solver = lglinit();
 	//lglsetopt(solver, "verbose", 1);
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
@@ -178,6 +179,12 @@ Lingeling::Lingeling(LoggingInterface& logger, int solverId, std::string jobname
     //suspendMutex = VerboseMutex("suspendLgl", NULL);
     //suspendCond = ConditionVariable();
     maxvar = 0;
+
+	if (addOldDiversifications) {
+		numDiversifications = 20;
+	} else {
+		numDiversifications = 14;
+	}
 }
 
 bool Lingeling::loadFormula(const char* filename) {
@@ -374,10 +381,8 @@ SolvingStatistics Lingeling::getStatistics() {
 	return st;
 }
 
-#define LGL_NUM_DIVERSIFICATIONS 20
-
 int Lingeling::getNumOriginalDiversifications() {
-	return LGL_NUM_DIVERSIFICATIONS;
+	return numDiversifications;
 }
 
 void Lingeling::diversify(int rank, int size) {
@@ -389,7 +394,7 @@ void Lingeling::diversify(int rank, int size) {
 	lglsetopt(solver, "classify", 0); // NEW
 	//lglsetopt(solver, "flipping", 0); // OLD
 
-    switch (rank % LGL_NUM_DIVERSIFICATIONS) {
+    switch (rank % numDiversifications) {
 		
 		// Default solver
 		case 0: default: break;

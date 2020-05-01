@@ -49,17 +49,19 @@ int Console::verbosity;
 bool Console::coloredOutput;
 bool Console::threadsafeOutput;
 bool Console::quiet;
+bool Console::cPrefix;
 std::string Console::logFilename;
 FILE* Console::logFile;
 bool Console::beganLine;
 std::mutex Console::logMutex;
 
-void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeOutput, bool quiet, std::string logDir) {
+void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeOutput, bool quiet, bool cPrefix, std::string logDir) {
     Console::rank = rank;
     Console::verbosity = verbosity;
     Console::coloredOutput = coloredOutput;
     Console::threadsafeOutput = threadsafeOutput;
     Console::quiet = quiet;
+    Console::cPrefix = cPrefix;
     beganLine = false;
     
     // Create logging directory as necessary
@@ -110,6 +112,10 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, bool prefi
         elapsedAbs *= 0.001f;
         */
     
+        if (cPrefix) {
+            if (!quiet) printf("c ");
+            if (logFile != NULL) fprintf(logFile, "c ");
+        }
         if (prefix) {
             if (!quiet) printf("%.3f %i ", elapsedRel, rank);
             if (logFile != NULL) fprintf(logFile, "%.3f %i ", elapsedRel, rank);

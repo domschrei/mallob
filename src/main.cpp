@@ -61,7 +61,8 @@ int main(int argc, char *argv[]) {
     Parameters params;
     params.init(argc, argv);
     Console::init(rank, params.getIntParam("v"), params.isSet("colors"), 
-            /*threadsafeOutput=*/true, /*quiet=*/params.isSet("q"), params.getParam("log"));
+            /*threadsafeOutput=*/true, /*quiet=*/params.isSet("q"), 
+            /*cPrefix=*/params.isSet("sinst"), params.getParam("log"));
     
     if (rank == 0)
         params.printParams();

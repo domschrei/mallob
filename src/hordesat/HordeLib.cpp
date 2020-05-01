@@ -112,11 +112,11 @@ void HordeLib::init() {
 				solverInterfaces.emplace_back(new MiniSat());
 				hlog(3, "MiniSat @ %d\n", i, mpi_rank, mpi_size);
 			} else {
-				solverInterfaces.emplace_back(new Lingeling(*logger, i, params.getParam("jobstr")));
+				solverInterfaces.emplace_back(new Lingeling(*logger, i, params.getParam("jobstr"), params.isSet("aod")));
 				hlog(3, "Lingeling @ %d\n", i, mpi_rank, mpi_size);
 			}
 		} else {
-			solverInterfaces.emplace_back(new Lingeling(*logger, i, params.getParam("jobstr")));
+			solverInterfaces.emplace_back(new Lingeling(*logger, i, params.getParam("jobstr"), params.isSet("aod")));
 			hlog(3, "Lingeling @ %d\n", i, mpi_rank, mpi_size);
 		}
 		// set solver id

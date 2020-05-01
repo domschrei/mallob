@@ -29,11 +29,13 @@ void Parameters::init(int argc, char** argv) {
 }
 
 void Parameters::setDefaults() {
+    //setParam("aod"); // add old diversifiers (to lgl)
     setParam("ba", "4"); // num bounce alternatives (only relevant if -derandomize)
     setParam("bm", "ed"); // event-driven balancing (ed = event-driven, fp = fixed-period)
     setParam("c", "1"); // num clients
     setParam("cbbs", "1500"); // clause buffer base size
     setParam("cbdf", "1.0"); // clause buffer discount factor
+    setParam("cfhl", "0"); // clause buffer half life
     //setParam("cg"); // continuous growth
     //setParam("colors"); // colored terminal output
     //setParam("derandomize"); // derandomize job bouncing
@@ -84,6 +86,7 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "             will parse <name>.0 for one client, ");
     Console::log(Console::INFO, "             <name>.0 and <name>.1 for two clients, ...");
     Console::log(Console::INFO, "Options:");
+    Console::log(Console::INFO, "-aod                  Add additional old diversifiers to Lingeling");
     Console::log(Console::INFO, "-ba=<num-ba>          Number of bounce alternatives per node (only relevant if -derandomize)");
     Console::log(Console::INFO, "-bm=<balance-mode>    Balancing mode:");
     Console::log(Console::INFO, "                      \"fp\" - fixed-period");
@@ -92,6 +95,7 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "-cbbs=<size>          Clause buffer base size in integers (default: 1500)");
     Console::log(Console::INFO, "-cbdf=<factor>        Clause buffer discount factor: reduce buffer size per node by <factor> each depth");
     Console::log(Console::INFO, "                      (0 < factor <= 1.0; default: 1.0)");
+    Console::log(Console::INFO, "-cfhl=<secs>          Set clause filter half life of clauses until forgotten (integer; 0: no forgetting)"); 
     Console::log(Console::INFO, "-cg                   Continuous growth of job demands: make job demands increase more finely grained"); 
     Console::log(Console::INFO, "                      (node by node instead of layer by layer)");
     Console::log(Console::INFO, "-colors               Colored terminal output based on messages' verbosity");

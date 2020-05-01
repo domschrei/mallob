@@ -84,3 +84,14 @@ void ClauseFilter::clear() {
 	auto lock = unitLock.getLock();
 	units.clear();
 }
+
+void ClauseFilter::clearHalf() {
+
+	// The probability to delete a single bit is set to 0.1591 (or 1591/10000).
+	// => P(clause is deleted) = P(one of four bits is removed) = 1 - (1-pDelete)^4 = 0.5.
+	for (size_t i = s1._Find_first(); i < s1.size(); i = s1._Find_next(i)) {
+		if (rand() % 10000 < 1591) {
+			s1.set(i, false); // unset bit
+		}
+	}
+}

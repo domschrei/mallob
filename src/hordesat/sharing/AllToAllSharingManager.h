@@ -34,6 +34,8 @@ protected:
 	ClauseFilter nodeFilter;
 	int outBuffer[COMM_BUFFER_SIZE];
 
+	float lastBufferClear = 0;
+
 	class Callback : public LearnedClauseCallback {
 	public:
 		DefaultSharingManager& parent;
