@@ -397,7 +397,7 @@ void Lingeling::diversify(int rank, int size) {
     switch (rank % numDiversifications) {
 		
 		// Default solver
-		case 0: default: break;
+		case 0: break;
 
 		// Alternative default solver
 		case 1: 
@@ -449,6 +449,8 @@ void Lingeling::diversify(int rank, int size) {
 		//case X: lglsetopt (solver, "gluescale", 1); break; // omitting
 		case 18: lglsetopt (solver, "gluescale", 5); break; // from 3 (value "ld" moved)
 		case 19: lglsetopt (solver, "move", 1); break;
+
+		default: break;
 	}
 }
 
