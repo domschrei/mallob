@@ -43,8 +43,8 @@ bool SatJob::appl_initialize() {
         params["d"] = "7"; // sparse random + native diversification
     }
     params["fd"]; // filter duplicate clauses
-    params["icpr"] = _params.getFloatParam("icpr"); // increase clause production
-    params["mcl"] = _params.getIntParam("mcl"); // max clause length
+    params["icpr"] = _params.getParam("icpr"); // increase clause production
+    params["mcl"] = _params.getParam("mcl"); // max clause length
     params["i"] = "0"; // #microseconds to sleep during solve loop
     params["v"] = 99; // (this->_params.getIntParam("v") >= 3 ? "1" : "0"); // verbosity
     params["mpirank"] = std::to_string(getIndex()); // mpi_rank
@@ -55,7 +55,7 @@ bool SatJob::appl_initialize() {
         // Single instance filename
         params["sinst"] = _params.getParam("sinst");
     }
-    params["cfhl"] = _params.getIntParam("cfhl");
+    params["cfhl"] = _params.getParam("cfhl");
     if (_params.isSet("aod")) params["aod"];
 
     auto lock = _horde_manipulation_lock.getLock();
