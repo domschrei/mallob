@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    if (!params.isSet("sinst")) MPI_Finalize();
+    MPI_Finalize();
     Console::log(Console::INFO, "Exiting happily");
     Console::flush();
 }

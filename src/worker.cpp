@@ -1511,6 +1511,10 @@ Worker::~Worker() {
 
     exiting = true;
 
+    // Send termination signal to this process (quicker than normal terminate)
+    // (Workaround for idle times after finishing)
+    kill(getpid(), SIGTERM);
+
     // Delete each job (iterating over "jobs" invalid as entries are deleted)
     std::vector<int> jobIds;
     for (auto idJobPair : jobs) jobIds.push_back(idJobPair.first);

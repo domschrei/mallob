@@ -112,11 +112,11 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, bool prefi
         elapsedAbs *= 0.001f;
         */
     
-        if (cPrefix) {
-            if (!quiet) printf("c ");
-            if (logFile != NULL) fprintf(logFile, "c ");
-        }
         if (prefix) {
+            if (cPrefix) {
+                if (!quiet) printf("c ");
+                if (logFile != NULL) fprintf(logFile, "c ");
+            }
             if (!quiet) printf("%.3f %i ", elapsedRel, rank);
             if (logFile != NULL) fprintf(logFile, "%.3f %i ", elapsedRel, rank);
         }
