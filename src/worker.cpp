@@ -1083,8 +1083,8 @@ void Worker::handleSendJobResult(MessageHandlePtr& handle) {
     Console::log_noprefix(Console::CRIT, "s %s", resultCode == 10 ? "SATISFIABLE" : resultCode == 20 ? "UNSATISFIABLE" : "UNKNOWN");
     if (resultCode == 10) {
         std::string model = "";
-        for (int lit : jobResult.solution) {
-            model += std::to_string(lit) + " ";
+        for (int x = 1; x < jobResult.solution.size(); x++) {
+            model += std::to_string(jobResult.solution[x]) + " ";
         }
         Console::log_noprefix(Console::CRIT, "v %s", model.c_str());
     }
