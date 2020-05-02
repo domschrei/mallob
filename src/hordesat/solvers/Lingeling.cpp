@@ -411,7 +411,7 @@ void Lingeling::diversify(int rank, int size) {
 		
 		// NEW: local search solver
 		case 4:
-			lglsetopt (solver, "plain", 0);
+			lglsetopt (solver, "plain", rank % (2*numDiversifications) >= numDiversifications);
 			lglsetopt (solver, "locs", -1);
 			lglsetopt (solver, "locsrtc", 1);
 			lglsetopt (solver, "locswait", 0);
@@ -437,9 +437,9 @@ void Lingeling::diversify(int rank, int size) {
 		// OLD
 		case 14: lglsetopt (solver, "agilitylim", 100); break; // NEW from "agilelim"
 		//case X: lglsetopt (solver, "bias", -1); break; // option removed
+		//case X: lglsetopt (solver, "bias", 1); break; // option removed
 		//case X: lglsetopt (solver, "activity", 1); break; // omitting; NEW from "acts"
 		case 15: lglsetopt (solver, "activity", 2); break; // NEW from "acts", 0
-		//case X: lglsetopt (solver, "bias", 1); break; // option removed
 		case 16:
 			lglsetopt (solver, "wait", 0);
 			lglsetopt (solver, "blkrtc", 1);

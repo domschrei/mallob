@@ -29,6 +29,7 @@ std::vector<int> DefaultSharingManager::prepareSharing(int maxSize) {
     static int prodInc = 1;
 	static int lastInc = 0;
 	if (!params.isSet("fd")) {
+		logger.log(2, "clear node clsfltr\n");
 		nodeFilter.clear();
 	}
 	int selectedCount;
@@ -107,8 +108,9 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 			}
 			logger.log(2, "S%d fltrd %.2f%% (%d)\n", sid, 100*(1-((float)added/clausesToAdd.size())), clausesToAdd.size()-added);
 			if (!params.isSet("fd")) {
-				solverFilters[sid]->clear();
-			}
+				logger.log(2, "S%d clear clsfltr\n", sid);
+				solverFilters[sid]->clear();	
+			} 
 		}
 	} else {
 		solvers[0]->addLearnedClauses(clausesToAdd);
