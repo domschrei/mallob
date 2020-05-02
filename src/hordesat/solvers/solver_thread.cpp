@@ -295,7 +295,7 @@ void SolverThread::reportResult(int res) {
     log(3, "found result\n");
     if (res == SAT || res == UNSAT) {
         if (_state == ACTIVE) {
-            log(0, "found result %s\n", res==SAT?"SAT":"UNSAT");
+            log(-1, "found result %s\n", res==SAT?"SAT":"UNSAT");
             _result = SatResult(res);
             if (res == SAT) { 
                 _solution = _solver.getSolution();

@@ -94,4 +94,15 @@ void ClauseFilter::clearHalf() {
 			s1.set(i, false); // unset bit
 		}
 	}
+
+	// Remove half of all unit clauses
+	std::vector<int> unitsToDelete;
+	for (int unit : units) {
+		if (rand() % 2 == 0) {
+			unitsToDelete.push_back(unit);
+		}
+	}
+	for (int unit : unitsToDelete) {
+		units.erase(unit);
+	}
 }
