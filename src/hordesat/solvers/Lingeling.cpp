@@ -37,13 +37,14 @@ void updateTimer(std::string solverName, Lingeling* lgl) {
 double getTime() {
 	timeCallbackLock.lock();
 
+	/*
 	// Check if should terminate
 	if (lgls.count(currentSolverName) && lgls[currentSolverName]->isInterruptSet()) {
 		lglsetopt(lgls[currentSolverName]->getSolver(), "clim", 0);
 		lglsetopt(lgls[currentSolverName]->getSolver(), "plim", 0);
 		lglsetopt(lgls[currentSolverName]->getSolver(), "locsclim", 0);
 		// TODO reset these values on restarting (in incremental mode)!
-	}
+	}*/
 
     high_resolution_clock::time_point nowTime = high_resolution_clock::now();
     duration<double, std::milli> time_span = nowTime - lglSolverStartTime;
