@@ -54,13 +54,13 @@ int termCallback(void* solverPtr) {
 	lp->lastTermCallbackTime = lp->logger.getTime();
     
 	if (lp->stopSolver) {
-		slog(lp, 2, "STOP (%.4fs since last cb)", elapsed);
+		slog(lp, 1, "STOP (%.2fs since last cb)", elapsed);
 		return 1;
 	}
 
     if (lp->suspendSolver) {
         // Stay inside this function call as long as solver is suspended
-		slog(lp, 2, "SUSPEND (%.4fs since last cb)", elapsed);
+		slog(lp, 1, "SUSPEND (%.2fs since last cb)", elapsed);
 
 		lp->suspendCond.wait(lp->suspendMutex, [&lp]{return !lp->suspendSolver;});
 		slog(lp, 2, "RESUME");
