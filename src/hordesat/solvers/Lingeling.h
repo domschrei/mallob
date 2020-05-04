@@ -109,9 +109,6 @@ public:
 	// Interrupt the SAT solving, so it can be started again with new assumptions and added clauses
 	void setSolverInterrupt();
 	void unsetSolverInterrupt();
-	bool isInterruptSet();
-
-	LGL* getSolver() {return solver;}
     
 	Lingeling(LoggingInterface& logger, int solverId, std::string jobName, bool addOldDiversifications);
 	 ~Lingeling();
