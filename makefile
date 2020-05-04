@@ -1,7 +1,7 @@
 
 MALLOB_VERSION?=$(shell date --iso-8601=seconds)_$(shell whoami)@$(shell hostname)
 
-CXX=mpic++
+CXX=mpicxx
 CWARN=-Wno-unused-parameter -Wno-sign-compare -Wno-format -Wno-format-security
 CERROR=-fpermissive
 
