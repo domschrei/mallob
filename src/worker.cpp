@@ -26,11 +26,13 @@ void mpiMonitor(Worker* worker) {
     while (!worker->exiting) {
         double callStart = 0;
         std::string opName = MyMpi::currentCall(&callStart);
+        std::string report = "MMPI %i active handles";
         if (callStart < 0.00001 || opName == "") {
-            //Console::log(Console::VVVERB, "MONITOR_MPI Not inside MPI call.");
+            Console::log(Console::VERB, report.c_str(), MyMpi::getNumActiveHandles());
         } else {
             double elapsed = Timer::elapsedSeconds() - callStart;
-            Console::log(Console::VERB, "MONITOR_MPI In \"%s\" for %.4fs", opName.c_str(), elapsed);
+            report += ", in \"%s\" for %.3fs";
+            Console::log(Console::VERB, report.c_str(), MyMpi::getNumActiveHandles(), opName.c_str(), elapsed);
             if (elapsed > 60.0) {
                 // Inside some MPI call for a minute
                 Console::fail("MPI call takes too long - aborting");

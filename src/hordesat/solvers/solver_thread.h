@@ -56,20 +56,24 @@ public:
     void init();
     void start();
     void setState(SolvingStates::SolvingState state);
-
-    bool isInitialized() {return _initialized;}
-    int getTid() {return _tid;}
     void tryJoin() {if (_thread.joinable()) _thread.join();}
-    SolvingStates::SolvingState getState() {
+
+    bool isInitialized() const {
+        return _initialized;
+    }
+    int getTid() const {
+        return _tid;
+    }
+    SolvingStates::SolvingState getState() const {
         return _state;
     }
-    SatResult getSatResult() {
+    SatResult getSatResult() const {
         return _result;
     }
-    const std::vector<int>& getSolution() {
+    const std::vector<int>& getSolution() const {
         return _solution;
     }
-    const std::set<int>& getFailedAssumptions() {
+    const std::set<int>& getFailedAssumptions() const {
         return _failed_assumptions;
     }
 

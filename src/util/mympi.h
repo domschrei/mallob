@@ -11,51 +11,12 @@
 
 #include "data/serializable.h"
 #include "util/console.h"
+#include "util/timer.h"
 
 #define MAX_JOB_MESSAGE_PAYLOAD_PER_NODE 1500*sizeof(int)
 #define MAX_ANYTIME_MESSAGE_SIZE 1024
 #define MIN_PRIORITY 0
 
-struct MessageHandle {
-    int id;
-    int tag;
-    int source;
-    std::shared_ptr<std::vector<uint8_t>> sendData;
-    std::shared_ptr<std::vector<uint8_t>> recvData;
-    bool selfMessage = false;
-    bool finished = false;
-    MPI_Request request;
-    MPI_Status status;
-
-    MessageHandle(int id) : id(id) {
-        status.MPI_SOURCE = -1; 
-        status.MPI_TAG = -1; 
-        sendData = std::make_shared<std::vector<uint8_t>>();
-        recvData = std::make_shared<std::vector<uint8_t>>();
-        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
-    }
-    MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& data) : id(id), sendData(data) {
-        status.MPI_SOURCE = -1; 
-        status.MPI_TAG = -1; 
-        recvData = std::make_shared<std::vector<uint8_t>>();
-        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
-    }
-    MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& sendData, const std::shared_ptr<std::vector<uint8_t>>& recvData) : 
-        id(id), sendData(sendData), recvData(recvData) {
-        status.MPI_SOURCE = -1; 
-        status.MPI_TAG = -1; 
-        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
-    }
-
-    ~MessageHandle() {
-        sendData = NULL;
-        recvData = NULL;
-        //Console::log(Console::VVVVERB, "Msg ID=%i deleted", id);
-    }
-
-    bool testSent();
-    bool testReceived();
-};
 
 const int MSG_WARMUP = 1;
 /*
@@ -252,6 +213,53 @@ const int ANYTIME_CLIENT_RECV_TAGS[] = {MSG_JOB_DONE, MSG_CLIENT_FINISHED,
  */
 enum ListenerMode {CLIENT, WORKER};
 
+struct MessageHandle {
+    int id;
+    int tag;
+    int source;
+    std::shared_ptr<std::vector<uint8_t>> sendData;
+    std::shared_ptr<std::vector<uint8_t>> recvData;
+    bool selfMessage = false;
+    bool finished = false;
+    float creationTime;
+    MPI_Request request;
+    MPI_Status status;
+
+    MessageHandle(int id) : id(id) {
+        status.MPI_SOURCE = -1; 
+        status.MPI_TAG = -1; 
+        sendData = std::make_shared<std::vector<uint8_t>>();
+        recvData = std::make_shared<std::vector<uint8_t>>();
+        creationTime = Timer::elapsedSeconds();
+        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
+    }
+    MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& data) : id(id), sendData(data) {
+        status.MPI_SOURCE = -1; 
+        status.MPI_TAG = -1; 
+        recvData = std::make_shared<std::vector<uint8_t>>();
+        creationTime = Timer::elapsedSeconds();
+        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
+    }
+    MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& sendData, const std::shared_ptr<std::vector<uint8_t>>& recvData) : 
+        id(id), sendData(sendData), recvData(recvData) {
+        status.MPI_SOURCE = -1; 
+        status.MPI_TAG = -1;
+        creationTime = Timer::elapsedSeconds();
+        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
+    }
+
+    ~MessageHandle() {
+        sendData = NULL;
+        recvData = NULL;
+        //Console::log(Console::VVVVERB, "Msg ID=%i deleted", id);
+    }
+
+    bool testSent();
+    bool testReceived();
+    bool shouldCancel();
+    void cancel();
+};
+
 /**
  * A std::shared_ptr around a MessageHandle instance which captures all relevant information
  * on a specific MPI message.
@@ -273,6 +281,7 @@ private:
     static std::set<MessageHandlePtr> _handles;
     static std::set<MessageHandlePtr> _deferred_handles;
     static std::set<MessageHandlePtr> _sent_handles;
+
     /*
     static std::set<MessageHandlePtr, HandleComparator> _handles;
     static std::set<MessageHandlePtr, HandleComparator> _deferred_handles;
@@ -303,12 +312,13 @@ public:
     static bool test(MPI_Request& request, MPI_Status& status);
 
     static std::vector<MessageHandlePtr> poll();
-    static inline bool hasActiveHandles() {
-        return _handles.size() > 0;
+    static int getNumActiveHandles() {
+        return _handles.size() + _deferred_handles.size();
     }
     static bool hasOpenSentHandles();
     static void deferHandle(MessageHandlePtr handle);
     static void testSentHandles();
+    static bool isAnytimeTag(int tag);
 
     static int size(MPI_Comm comm);
     static int rank(MPI_Comm comm);
@@ -322,7 +332,6 @@ public:
 
 private:
     static void resetListenerIfNecessary(int tag);
-    static bool isAnytimeTag(int tag);
 
 };
 

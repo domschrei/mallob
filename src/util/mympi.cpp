@@ -74,6 +74,21 @@ bool MessageHandle::testReceived() {
     return finished;
 }
 
+bool MessageHandle::shouldCancel() {
+    // Non-finished, no self message, not an anytime tag
+    if (!finished && !selfMessage && !MyMpi::isAnytimeTag(tag)) {
+        // At least 2 minutes old
+        if (Timer::elapsedSeconds() - creationTime > 120.f) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void MessageHandle::cancel() {
+    MPICALL(MPI_Cancel(&request), "cancel" + std::to_string(id))
+}
+
 
 int MyMpi::nextHandleId() {
     return handleId++;
@@ -275,11 +290,17 @@ std::vector<MessageHandlePtr> MyMpi::poll() {
     std::vector<MessageHandlePtr> foundHandles;
     std::vector<bool> handlesDeferred;
 
+    std::vector<MessageHandlePtr> handlesToCancel;
+    std::vector<bool> cancelHandlesDeferred;
+
     // Find ready handle of best priority
     for (auto& h : _handles) {
         if (h->testReceived()) {
             foundHandles.push_back(h);
             handlesDeferred.push_back(false);
+        } else if (h->shouldCancel()) {
+            handlesToCancel.push_back(h);
+            cancelHandlesDeferred.push_back(false);
         }
     }
 
@@ -289,17 +310,28 @@ std::vector<MessageHandlePtr> MyMpi::poll() {
             if (h->testReceived()) {
                 foundHandles.push_back(h);
                 handlesDeferred.push_back(true);
+            } else if (h->shouldCancel()) {
+                handlesToCancel.push_back(h);
+                cancelHandlesDeferred.push_back(true);
             }
         }   
+    }
+
+    // Cancel obsolete handles
+    for (int i = 0; i < handlesToCancel.size(); i++) {
+        handlesToCancel[i]->cancel();
+        (cancelHandlesDeferred[i] ? _deferred_handles : _handles).erase(handlesToCancel[i]);
     }
 
     // Remove and return found handle
     for (int i = 0; i < foundHandles.size(); i++) {
         (handlesDeferred[i] ? _deferred_handles : _handles).erase(foundHandles[i]);
-        resetListenerIfNecessary(foundHandles[i]->tag);
+        if (!handlesDeferred[i]) resetListenerIfNecessary(foundHandles[i]->tag);
     } 
     return foundHandles;
 }
+
+
 
 void MyMpi::deferHandle(MessageHandlePtr handle) {
     _deferred_handles.insert(handle);

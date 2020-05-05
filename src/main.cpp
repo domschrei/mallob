@@ -12,6 +12,7 @@
 #include "util/console.h"
 #include "util/random.h"
 #include "util/params.h"
+#include "util/shared_memory.h"
 #include "worker.h"
 #include "client.h"
 
