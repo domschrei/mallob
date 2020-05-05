@@ -35,4 +35,4 @@ float penalty(float utilization, float loadFactor) {
     return std::max(lowPenalty, highPenalty);
 }
 
-};
+}

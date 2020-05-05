@@ -256,7 +256,7 @@ struct MessageHandle {
 
     bool testSent();
     bool testReceived();
-    bool shouldCancel();
+    bool shouldCancel(float elapsedTime);
     void cancel();
 };
 

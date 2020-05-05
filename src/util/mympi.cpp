@@ -72,11 +72,11 @@ bool MessageHandle::testReceived() {
     return finished;
 }
 
-bool MessageHandle::shouldCancel() {
+bool MessageHandle::shouldCancel(float elapsedTime) {
     // Non-finished, no self message, not an anytime tag
     if (!finished && !selfMessage && !MyMpi::isAnytimeTag(tag)) {
         // At least 2 minutes old
-        if (Timer::elapsedSeconds() - creationTime > 120.f) {
+        if (elapsedTime - creationTime > 120.f) {
             return true;
         }
     }
@@ -289,11 +289,13 @@ std::vector<MessageHandlePtr> MyMpi::poll() {
     std::vector<MessageHandlePtr> foundHandles;
     std::vector<MessageHandlePtr> handlesToCancel;
 
+    float elapsedTime = Timer::elapsedSeconds();
+
     // Find ready handle of best priority
     for (auto& h : _handles) {
         if (h->testReceived()) {
             foundHandles.push_back(h);
-        } else if (h->shouldCancel()) {
+        } else if (h->shouldCancel(elapsedTime)) {
             handlesToCancel.push_back(h);
         }
     }

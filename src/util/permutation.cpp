@@ -130,7 +130,7 @@ AdjustablePermutation::AdjustablePermutation(int n, int seed) {
         for (int i = 0; i < _root_n; i++) feistel.push_back(i);
         std::shuffle(std::begin(feistel), std::end(feistel), _rng);
     }
-};
+}
 
 int AdjustablePermutation::get(int x) const {
     if (x < 0 || x >= _n) {

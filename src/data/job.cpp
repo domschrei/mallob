@@ -27,8 +27,12 @@ Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounte
             _initialized(false), 
             _job_node_ranks(commSize, jobId),
             _has_left_child(false),
-            _has_right_child(false)
-             {}
+            _has_right_child(false) {
+    
+    _growth_period = _params.getFloatParam("g");
+    _continuous_growth = _params.isSet("cg");
+    _max_demand = _params.getIntParam("md");
+}
 
 void Job::lockJobManipulation() {
     _job_manipulation_lock.lock();
@@ -272,8 +276,7 @@ int Job::getDemand(int prevVolume) const {
     if (isInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
 
         int demand; 
-        float growthPeriod = _params.getFloatParam("g");
-        if (growthPeriod <= 0) {
+        if (_growth_period <= 0) {
             // Immediate growth
             demand = _comm_size;
         } else {
@@ -282,8 +285,8 @@ int Job::getDemand(int prevVolume) const {
                 float t = Timer::elapsedSeconds()-_time_of_initialization;
                 
                 // Continuous growth
-                float numPeriods = t/growthPeriod;
-                if (!_params.isSet("cg")) {
+                float numPeriods = t/_growth_period;
+                if (!_continuous_growth) {
                     // Discrete, periodic growth
                     numPeriods = std::floor(numPeriods);
                 }
@@ -293,8 +296,8 @@ int Job::getDemand(int prevVolume) const {
         }
 
         // Limit demand if desired
-        if (_params.getIntParam("md") > 0) {
-            demand = std::min(demand, _params.getIntParam("md"));
+        if (_max_demand > 0) {
+            demand = std::min(demand, _max_demand);
         }
         return demand;
         

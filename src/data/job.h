@@ -162,6 +162,10 @@ private:
     float _time_of_initialization = 0;
     float _time_of_abort = 0;
     float _time_of_last_comm = 0;
+    
+    float _growth_period;
+    bool _continuous_growth;
+    int _max_demand;
 
     JobState _state;
     bool _has_description;
