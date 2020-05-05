@@ -157,10 +157,10 @@ public:
             if (latestEpoch - _map[key].epoch >= epochDiff) _map.erase(key);
         }
     }
-    const bool operator==(const EventMap& other) const {
+    bool operator==(const EventMap& other) const {
         return getEntries() == other.getEntries();
     }
-    const bool operator!=(const EventMap& other) const {
+    bool operator!=(const EventMap& other) const {
         return !(*this == other);
     }
 };

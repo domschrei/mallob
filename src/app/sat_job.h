@@ -79,7 +79,7 @@ private:
     void cleanUpThread();
     void cleanUp();
 
-    volatile bool solverNotNull() {
+    bool solverNotNull() {
         return _solver != NULL;
     }
 };
