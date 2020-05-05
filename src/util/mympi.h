@@ -279,7 +279,6 @@ public:
 
 private:
     static std::set<MessageHandlePtr> _handles;
-    static std::set<MessageHandlePtr> _deferred_handles;
     static std::set<MessageHandlePtr> _sent_handles;
 
     /*
@@ -313,10 +312,9 @@ public:
 
     static std::vector<MessageHandlePtr> poll();
     static int getNumActiveHandles() {
-        return _handles.size() + _deferred_handles.size();
+        return _handles.size();
     }
     static bool hasOpenSentHandles();
-    static void deferHandle(MessageHandlePtr handle);
     static void testSentHandles();
     static bool isAnytimeTag(int tag);
 

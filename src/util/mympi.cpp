@@ -16,11 +16,9 @@
 int MyMpi::_max_msg_length;
 std::set<MessageHandlePtr> MyMpi::_handles;
 std::set<MessageHandlePtr> MyMpi::_sent_handles;
-std::set<MessageHandlePtr> MyMpi::_deferred_handles;
 /*
 std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_handles;
-std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_sent_handles;
-std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_deferred_handles;*/
+std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_sent_handles;*/
 ListenerMode MyMpi::_mode;
 std::map<int, int> MyMpi::_msg_priority;
 bool MyMpi::_monitor_off;
@@ -135,6 +133,7 @@ void MyMpi::beginListening(const ListenerMode& mode) {
 void MyMpi::resetListenerIfNecessary(int tag) {
     // Check if tag should be listened to
     if (!isAnytimeTag(tag)) return;
+    for (auto& handle : _handles) if (handle->tag == tag) return;
     // add listener
     MessageHandlePtr handle = MyMpi::irecv(MPI_COMM_WORLD, tag);
     Console::log(Console::VVVERB, "Msg ID=%i : listening to tag %i", handle->id, tag);
@@ -288,53 +287,30 @@ bool MyMpi::test(MPI_Request& request, MPI_Status& status) {
 std::vector<MessageHandlePtr> MyMpi::poll() {
 
     std::vector<MessageHandlePtr> foundHandles;
-    std::vector<bool> handlesDeferred;
-
     std::vector<MessageHandlePtr> handlesToCancel;
-    std::vector<bool> cancelHandlesDeferred;
 
     // Find ready handle of best priority
     for (auto& h : _handles) {
         if (h->testReceived()) {
             foundHandles.push_back(h);
-            handlesDeferred.push_back(false);
         } else if (h->shouldCancel()) {
             handlesToCancel.push_back(h);
-            cancelHandlesDeferred.push_back(false);
         }
-    }
-
-    // If necessary, pick a deferred handle (if there is one)
-    if (foundHandles.empty()) {
-        for (auto& h : _deferred_handles) {
-            if (h->testReceived()) {
-                foundHandles.push_back(h);
-                handlesDeferred.push_back(true);
-            } else if (h->shouldCancel()) {
-                handlesToCancel.push_back(h);
-                cancelHandlesDeferred.push_back(true);
-            }
-        }   
     }
 
     // Cancel obsolete handles
     for (int i = 0; i < handlesToCancel.size(); i++) {
+        _handles.erase(handlesToCancel[i]);
         handlesToCancel[i]->cancel();
-        (cancelHandlesDeferred[i] ? _deferred_handles : _handles).erase(handlesToCancel[i]);
     }
 
     // Remove and return found handle
     for (int i = 0; i < foundHandles.size(); i++) {
-        (handlesDeferred[i] ? _deferred_handles : _handles).erase(foundHandles[i]);
-        if (!handlesDeferred[i]) resetListenerIfNecessary(foundHandles[i]->tag);
+        _handles.erase(foundHandles[i]);
+        resetListenerIfNecessary(foundHandles[i]->tag);
     } 
+
     return foundHandles;
-}
-
-
-
-void MyMpi::deferHandle(MessageHandlePtr handle) {
-    _deferred_handles.insert(handle);
 }
 
 bool MyMpi::hasOpenSentHandles() {
