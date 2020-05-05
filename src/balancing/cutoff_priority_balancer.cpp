@@ -185,8 +185,6 @@ bool CutoffPriorityBalancer::continueBalancing(MessageHandlePtr handle) {
 
 bool CutoffPriorityBalancer::finishResourcesReduction() {
 
-    _stats.increment("reductions"); _stats.increment("broadcasts");
-
     // "resourcesInfo" now contains global data from all concerned jobs
     if (_resources_info.getExcludedRanks().count(MyMpi::rank(_comm)) 
                 && _params.getParam("r") == ROUNDING_PROBABILISTIC) {

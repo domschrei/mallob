@@ -3,7 +3,7 @@
 #include "util/random.h"
 #include "balancing/rounding.h"
 
-EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params, Statistics& stats) : Balancer(comm, params, stats) {
+EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params) : Balancer(comm, params) {
     _last_balancing = 0;
 
     Console::log(Console::VVERB, "BLC_TREE_NORMAL parent: %i", getParentRank(false));
@@ -465,4 +465,9 @@ void EventDrivenBalancer::calculateBalancingResult() {
         if (allVolumes[pair.first] >= 1)
             _volumes[pair.first] = allVolumes[pair.first];
     }
+}
+
+void EventDrivenBalancer::forget(int jobId) {
+    _job_epochs.erase(jobId);
+    Balancer::forget(jobId);
 }

@@ -168,13 +168,15 @@ public:
 class EventDrivenBalancer : public Balancer {
 
 public:
-    EventDrivenBalancer(MPI_Comm& comm, Parameters& params, Statistics& stats);
+    EventDrivenBalancer(MPI_Comm& comm, Parameters& params);
 
     bool beginBalancing(std::map<int, Job*>& jobs) override;
     bool canContinueBalancing() override {return false;}
     bool continueBalancing() override {return false;}
     bool continueBalancing(MessageHandlePtr handle) override {return this->handle(handle);}
     std::map<int, int> getBalancingResult() override {return _volumes;}
+
+    void forget(int jobId) override;
 
 private:
     const int NORMAL_TREE = 1, REVERSED_TREE = 2, BOTH = 3;

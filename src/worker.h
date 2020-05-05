@@ -38,18 +38,17 @@ private:
     std::map<int, Job*> jobs;
     std::map<int, JobRequest> jobCommitments;
     std::map<int, float> jobArrivals;
-
     std::map<int, float> jobCpuTimeUsed;
     std::map<int, float> lastLimitCheck;
+    std::map<int, int> jobVolumes;
+    std::map<int, std::thread> initializerThreads;
 
     Job* currentJob;
     int load;
     float lastLoadChange;
-    std::map<int, int> jobVolumes;
 
     std::unique_ptr<Balancer> balancer;
     EpochCounter epochCounter;
-    Statistics stats;
 
     float myState[3];
     float systemState[3];
@@ -57,7 +56,6 @@ private:
     bool reducingSystemState = false;
     float lastSystemStateReduce = 0;
 
-    std::map<int, std::thread> initializerThreads;
 
     std::vector<int> bounceAlternatives;
 
@@ -66,7 +64,7 @@ private:
 
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& clientNodes) :
-        comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), epochCounter(), stats(epochCounter)
+        comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), epochCounter()
         {
             loadFactor = params.getFloatParam("l");
             assert(0 < loadFactor && loadFactor <= 1.0);

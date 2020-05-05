@@ -12,13 +12,13 @@
 class Balancer {
 
 public:
-    Balancer(MPI_Comm& comm, Parameters& params, Statistics& stats) :
-    _comm(comm), _params(params), _stats(stats), _load_factor(params.getFloatParam("l")), _balancing(false) {}
+    Balancer(MPI_Comm& comm, Parameters& params) :
+    _comm(comm), _params(params), _load_factor(params.getFloatParam("l")), _balancing(false) {}
 
     int getVolume(int jobId);
     bool hasVolume(int jobId);
     void updateVolume(int jobId, int volume);
-
+    virtual void forget(int jobId);
 
     // Asynchronous rebalancing
 
@@ -61,7 +61,6 @@ protected:
 protected:
     MPI_Comm& _comm;
     Parameters& _params;
-    Statistics& _stats;
     float _load_factor;
     bool _balancing;
     int _balancing_epoch = 0;

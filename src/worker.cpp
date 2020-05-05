@@ -49,10 +49,10 @@ void Worker::init() {
     //balancer = std::unique_ptr<Balancer>(new ThermodynamicBalancer(comm, params));
     if (params.getParam("bm") == "ed") {
         // Event-driven balancing
-        balancer = std::unique_ptr<Balancer>(new EventDrivenBalancer(comm, params, stats));
+        balancer = std::unique_ptr<Balancer>(new EventDrivenBalancer(comm, params));
     } else {
         // Fixed-period balancing
-        balancer = std::unique_ptr<Balancer>(new CutoffPriorityBalancer(comm, params, stats));
+        balancer = std::unique_ptr<Balancer>(new CutoffPriorityBalancer(comm, params));
     }
     
     // Initialize pseudo-random order of nodes
@@ -1499,8 +1499,18 @@ void Worker::deleteJob(int jobId) {
         if (initializerThreads[jobId].joinable()) {
             initializerThreads[jobId].join();
         }
-        initializerThreads.erase(jobId);
     }
+
+    // Remove map entries
+    jobCommitments.erase(jobId);
+    jobArrivals.erase(jobId);
+    jobCpuTimeUsed.erase(jobId);  
+    lastLimitCheck.erase(jobId);      
+    jobVolumes.erase(jobId);  
+    initializerThreads.erase(jobId);
+
+    // Remove job meta data from balancer
+    balancer->forget(jobId);
 
     // Delete job and its solvers
     jobs.erase(jobId);

@@ -15,18 +15,23 @@ void Balancer::updateVolume(int jobId, int volume) {
     _volumes[jobId] = volume;
 }
 
+void Balancer::forget(int jobId) {
+    _jobs_being_balanced.erase(jobId);
+    _volumes.erase(jobId);
+    _priorities.erase(jobId);
+    _demands.erase(jobId);
+    _temperatures.erase(jobId);
+}
+
 void Balancer::iReduce(float contribution, int rootRank) {
     _reduce_contrib = contribution;
     _reduce_result = 0;
     _reduce_request = MyMpi::ireduce(_comm, &_reduce_contrib, &_reduce_result, rootRank);
-    _stats.increment("reductions");
 }
 void Balancer::iAllReduce(float contribution) {
     _reduce_contrib = contribution;
     _reduce_result = contribution;
     _reduce_request = MyMpi::iallreduce(_comm, &_reduce_contrib, &_reduce_result);
-    _stats.increment("reductions");
-    _stats.increment("broadcasts");
 }
 
 int Balancer::getDemand(const Job& job) {
