@@ -163,7 +163,9 @@ void Worker::mainProgram() {
 
     while (!checkTerminate()) {
 
-        if (Timer::elapsedSeconds() - lastMemCheckTime > memCheckPeriod) {
+        float time = Timer::elapsedSeconds();
+
+        if (time - lastMemCheckTime > memCheckPeriod) {
             // Print stats
 
             // For the this process
@@ -176,7 +178,7 @@ void Worker::mainProgram() {
 
             // For this "management" thread
             double perc_cpu;
-            bool success = thread_cpuratio(syscall(__NR_gettid), Timer::elapsedSeconds(), perc_cpu);
+            bool success = thread_cpuratio(syscall(__NR_gettid), time, perc_cpu);
             if (success) {
                 Console::log(Console::VERB, "main : %.2f%% CPU", perc_cpu);
             }
@@ -184,7 +186,7 @@ void Worker::mainProgram() {
             // For the current job
             if (currentJob != NULL) currentJob->appl_dumpStats();
 
-            lastMemCheckTime = Timer::elapsedSeconds();
+            lastMemCheckTime = time;
 
             // Forget jobs that are old or wasting memory
             forgetOldJobs();
@@ -205,10 +207,10 @@ void Worker::mainProgram() {
         }
 
         // Check active HordeLib instance
-        float jobTime = 0;
-        if (!isIdle() && Timer::elapsedSeconds()-lastJobCheckTime >= jobCheckPeriod) {
-            jobTime = Timer::elapsedSeconds();
-            lastJobCheckTime = jobTime;
+        //float jobTime = 0;
+        if (!isIdle() && time-lastJobCheckTime >= jobCheckPeriod) {
+            //jobTime = Timer::elapsedSeconds();
+            lastJobCheckTime = time; // jobTime;
 
             Job &job = *currentJob;
             int id = job.getId();
@@ -253,26 +255,27 @@ void Worker::mainProgram() {
                 job.communicate();
             }
 
-            jobTime = Timer::elapsedSeconds() - jobTime;
+            //jobTime = Timer::elapsedSeconds() - jobTime;
         }
 
         // Advance an all-reduction of the current system state
         allreduceSystemState();
 
         // Poll messages
-        float pollTime = Timer::elapsedSeconds();
+        //float pollTime = Timer::elapsedSeconds();
         std::vector<MessageHandlePtr> handles = MyMpi::poll();
+        /*
         pollTime = Timer::elapsedSeconds() - pollTime;
         if (handles.size() > 0) {
             Console::log(Console::VVVERB, "loop cycle %i", iteration);
             if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f s", jobTime);
             Console::log(Console::VVVERB, "poll time: %.6f s", pollTime);
-        }
+        }*/
 
         // Process new messages
         for (MessageHandlePtr& handle : handles) {
             Console::log_recv(Console::VVVERB, handle->source, "Process msg id=%i, tag %i", handle->id, handle->tag);
-            float time = Timer::elapsedSeconds();
+            //float time = Timer::elapsedSeconds();
 
             if (handle->tag == MSG_FIND_NODE_ONESHOT)
                 handleFindNode(handle, /*oneshot=*/true);
@@ -364,9 +367,9 @@ void Worker::mainProgram() {
             else
                 Console::log_recv(Console::WARN, handle->source, "[WARN] Unknown message tag %i", handle->tag);
 
-            time = Timer::elapsedSeconds() - time;
-            Console::log(Console::VVVERB, "Processing msg, tag %i took %.4f s", handle->tag, time);
-            pollTime = Timer::elapsedSeconds();
+            //time = Timer::elapsedSeconds() - time;
+            //Console::log(Console::VVVERB, "Processing msg, tag %i took %.4f s", handle->tag, time);
+            //pollTime = Timer::elapsedSeconds();
         }
         
         MyMpi::testSentHandles();
