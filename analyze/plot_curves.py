@@ -12,7 +12,8 @@ linestyles = ["-.", ":", "--", "-"]
 lim = -1
 
 msize = 10
-pltsize = 5
+pltxsize = 5
+pltysize = 5
 
 files = []
 data = []
@@ -46,24 +47,31 @@ for arg in sys.argv[1:]:
         do_lines = False
     elif arg.startswith("-xy") or arg.startswith("--xy"):
         explicit_xvals = True
-    elif arg.startswith("-l"):
-        labels += [arg[2:]]
-    elif arg.startswith("-xlabel"):
-        xlabel = arg[7:]
-    elif arg.startswith("-ylabel"):
-        ylabel = arg[7:]
-    elif arg.startswith("-xmin"):
-        xmin = float(arg[5:])
-    elif arg.startswith("-xmax"):
-        xmax = float(arg[5:])
-    elif arg.startswith("-ymin"):
-        ymin = float(arg[5:])
-    elif arg.startswith("-ymax"):
-        ymax = float(arg[5:])
-    elif arg.startswith("-h"):
-        heading = arg[2:]
-    elif arg.startswith("-o"):
-        outfile = arg[2:]
+    elif arg.startswith("-size="):
+        pltxsize = arg[6:]
+        pltysize = arg[6:]
+    elif arg.startswith("-xsize="):
+        pltxsize = arg[7:]
+    elif arg.startswith("-ysize="):
+        pltysize = arg[7:]
+    elif arg.startswith("-l="):
+        labels += [arg[3:]]
+    elif arg.startswith("-xlabel="):
+        xlabel = arg[8:]
+    elif arg.startswith("-ylabel="):
+        ylabel = arg[8:]
+    elif arg.startswith("-xmin="):
+        xmin = float(arg[6:])
+    elif arg.startswith("-xmax="):
+        xmax = float(arg[6:])
+    elif arg.startswith("-ymin="):
+        ymin = float(arg[6:])
+    elif arg.startswith("-ymax="):
+        ymax = float(arg[6:])
+    elif arg.startswith("-title="):
+        heading = arg[7:]
+    elif arg.startswith("-o="):
+        outfile = arg[3:]
     else:
         files += [arg]
 
@@ -117,7 +125,7 @@ else:
         for vals in Y:
             data += [[X, vals]]
 
-plt.figure(figsize=(pltsize,pltsize))
+plt.figure(figsize=(pltxsize,pltysize))
 i = 0
 for d in data:
     print(i)
