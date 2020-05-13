@@ -31,6 +31,8 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
     *_import_buffer_size = 0;
     _export_buffer_size = (int*) SharedMemory::create(sizeof(int));
     *_export_buffer_size = 0;
+    _solution_size = (int*) SharedMemory::create(sizeof(int));
+    *_solution_size = 0;
     _do_import = (bool*) SharedMemory::create(sizeof(bool));
     *_do_import = false;
     _do_export = (bool*) SharedMemory::create(sizeof(bool));
@@ -180,6 +182,7 @@ void HordeProcessAdapter::run() {
             *_solution_size = _solution_vec.size();
             if (*_solution_size == 0) *_did_write_solution = true;
             _mutex->unlock();
+            _log->log(3, "DONE read solution\n");
             continue;
         }
     }
