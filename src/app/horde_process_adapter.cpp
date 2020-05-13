@@ -85,11 +85,13 @@ void HordeProcessAdapter::run() {
 
         // Check initialization state
         if (!*_is_initialized && hlib.isFullyInitialized()) {
+            _log->log(3, "DO set initialized\n");
             *_is_initialized = true;
         }
 
         if (*_do_dump_stats) {
             // Dump stats
+            _log->log(3, "DO dump stats\n");
             float age = Timer::elapsedSeconds() - startTime;
             std::vector<long> threadTids = hlib.getSolverTids();
             for (int i = 0; i < threadTids.size(); i++) {
@@ -102,11 +104,13 @@ void HordeProcessAdapter::run() {
         }
 
         if (*_do_interrupt) {
+            _log->log(3, "DO interrupt\n");
             hlib.interrupt();
             *_do_interrupt = false;
         }
 
         if (*_do_update_role) {
+            _log->log(3, "DO update role\n");
             _mutex->lock();
             hlib.updateRole(*_portfolio_rank, *_portfolio_size);
             *_do_update_role = false;
@@ -117,6 +121,7 @@ void HordeProcessAdapter::run() {
 
         // Check if solution should be written into shared memory
         if (*_do_write_solution) {
+            _log->log(3, "DO write solution\n");
             _mutex->lock();
             _solution = (int*)*_solution;
             memcpy(_solution, _solution_vec.data(), _solution_vec.size()*sizeof(int));
@@ -128,6 +133,7 @@ void HordeProcessAdapter::run() {
 
         // Check if clauses should be exported
         if (*_do_export) {
+            _log->log(3, "DO export clauses\n");
             // Collect local clauses, put into shared memory
             // TODO do without copying all the data
             std::vector<int> clauses = hlib.prepareSharing(*_export_buffer_size);
@@ -142,6 +148,7 @@ void HordeProcessAdapter::run() {
 
         // Check if clauses should be imported
         if (*_do_import) {
+            _log->log(3, "DO import clauses\n");
             // Write imported clauses from shared memory into vector
             // TODO do without copying all the data
             _mutex->lock();
@@ -157,6 +164,7 @@ void HordeProcessAdapter::run() {
         if (*_result != UNKNOWN) continue;
         int result = hlib.solveLoop();
         if (result >= 0) {
+            _log->log(3, "DO read solution\n");
             // Solution found!
             _mutex->lock();
             if (result == 10) {
@@ -211,6 +219,7 @@ void HordeProcessAdapter::updateRole(int rank, int size) {
 }
 
 void HordeProcessAdapter::collectClauses(int maxSize) {
+    if (*_do_export) return; // already collecting
     _mutex->lock();
     *_export_buffer_size = maxSize;
     *_do_export = true;
