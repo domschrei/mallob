@@ -46,11 +46,13 @@ private:
     bool _initialized = false;
     long _tid = -1;
 
+    bool* _finished_flag;
+
 
 public:
     SolverThread(ParameterProcessor& params, std::shared_ptr<PortfolioSolverInterface> solver, 
                 const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
-                const std::shared_ptr<vector<int>>& assumptions, int localId);
+                const std::shared_ptr<vector<int>>& assumptions, int localId, bool* finished);
     ~SolverThread();
 
     void init();

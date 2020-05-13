@@ -5,6 +5,10 @@
 #include "util/mympi.h"
 #include "utilities/ClauseFilter.h"
 
+float AnytimeSatClauseCommunicator::getBufferLimit(int numAggregatedNodes) {
+    return _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(numAggregatedNodes+1));
+}
+
 bool AnytimeSatClauseCommunicator::canSendClauses() {
     if (!_initialized) return false;
 
@@ -12,7 +16,18 @@ bool AnytimeSatClauseCommunicator::canSendClauses() {
     // Must have received clauses from each existing children
     if (_job->hasLeftChild()) numChildren++;
     if (_job->hasRightChild()) numChildren++;
-    return _clause_buffers.size() >= numChildren;
+
+    if (_clause_buffers.size() >= numChildren) {
+        if (!_job->hasPreparedSharing()) {
+            int limit = std::ceil(getBufferLimit(_num_aggregated_nodes+1) / (_num_aggregated_nodes+1));
+            _job->prepareSharing(limit);
+        }
+        if (_job->hasPreparedSharing()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void AnytimeSatClauseCommunicator::sendClausesToParent() {
@@ -77,7 +92,7 @@ void AnytimeSatClauseCommunicator::learnClauses(const std::vector<int>& clauses)
         // Locally learn clauses
         
         // If not active or not fully initialized yet: discard clauses
-        if (_job->isNotInState({ACTIVE}) || !_job->getSolver()->isFullyInitialized()) {
+        if (_job->isNotInState({ACTIVE}) || !_job->isInitialized()) {
             Console::log(Console::VVERB, "%s : discard buffer, job is not (yet?) active", 
                     _job->toStr());
             return;
@@ -85,7 +100,7 @@ void AnytimeSatClauseCommunicator::learnClauses(const std::vector<int>& clauses)
 
         // Locally digest clauses
         Console::log(Console::VVERB, "%s : digest", _job->toStr());
-        if (_job->getSolver() != NULL) _job->getSolver()->digestSharing(clauses);
+        _job->digestSharing(clauses);
         Console::log(Console::VERB, "%s : digested", _job->toStr());
     }
 }
@@ -117,22 +132,23 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     _num_aggregated_nodes++;
 
     assert(_num_aggregated_nodes > 0);
-    float s = _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(_num_aggregated_nodes+1));
-    int totalSize = std::ceil(_num_aggregated_nodes * s);
-    int selfSize = std::ceil(s);
+    float s = getBufferLimit(_num_aggregated_nodes);
+    int totalSize = std::ceil(s);
+    int selfSize = std::ceil(s / _num_aggregated_nodes);
     Console::log(Console::VVVERB, "%s : aggregated=%i max_self=%i max_total=%i", _job->toStr(), 
             _num_aggregated_nodes, selfSize, totalSize);
 
     // Locally collect clauses from own solvers, add to clause buffer
     std::vector<int> selfClauses;
     // If not fully initialized yet, broadcast an empty set of clauses
-    if (_job->isNotInState({ACTIVE}) || !_job->getSolver()->isFullyInitialized()) {
+    if (_job->isNotInState({ACTIVE}) || !_job->isInitialized() || !_job->hasPreparedSharing()) {
         selfClauses = std::vector<int>();
     }
     // Else, retrieve clauses from solvers
     Console::log(Console::VVERB, "%s : collect local cls, max. size %i", 
                 _job->toStr(), selfSize);
-    selfClauses = _job->getSolver()->prepareSharing(selfSize);
+    assert(_job->hasPreparedSharing());
+    selfClauses = _job->getPreparedClauses();
     testConsistency(selfClauses);
     _clause_buffers.push_back(selfClauses);
 

@@ -5,18 +5,17 @@
 #include "util/params.h"
 #include "data/job_transfer.h"
 #include "data/job.h"
-#include "app/sat_job.h"
-
+#include "app/base_sat_job.h"
+#include "utilities/ClauseFilter.h"
 
 const int MSG_GATHER_CLAUSES = 417;
 const int MSG_DISTRIBUTE_CLAUSES = 418;
-
 
 class AnytimeSatClauseCommunicator {
 
 private:
     const Parameters& _params;
-    SatJob* _job = NULL;
+    BaseSatJob* _job = NULL;
 
     const int _clause_buf_base_size;
     const float _clause_buf_discount_factor;
@@ -28,7 +27,7 @@ private:
     bool _initialized = false;
 
 public:
-    AnytimeSatClauseCommunicator(const Parameters& params, SatJob* job) : _params(params), _job(job), 
+    AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : _params(params), _job(job), 
         _clause_buf_base_size(_params.getIntParam("cbbs")), 
         _clause_buf_discount_factor(_params.getFloatParam("cbdf")),
         _clause_filter(/*maxClauseLen=*/_params.getIntParam("mcl"), /*checkUnits=*/true),
@@ -42,6 +41,8 @@ public:
 
 private:
     
+    float getBufferLimit(int numAggregatedNodes);
+
     std::vector<int> prepareClauses(); 
     void learnClauses(const std::vector<int>& clauses);
     void sendClausesToChildren(const std::vector<int>& clauses);

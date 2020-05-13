@@ -13,6 +13,7 @@
 
 #include "worker.h"
 #include "app/sat_job.h"
+#include "app/child_proc_sat_job.h"
 #include "util/timer.h"
 #include "util/console.h"
 #include "util/random.h"
@@ -99,7 +100,7 @@ void Worker::init() {
 
         // Add as a new local SAT job image
         Console::log(Console::VERB, "init SAT job image");
-        jobs[jobId] = new SatJob(params, MyMpi::size(comm), worldRank, jobId, epochCounter);
+        jobs[jobId] = createJob(params, MyMpi::size(comm), worldRank, jobId, epochCounter);
         JobRequest req(jobId, 0, 0, 0, 0, 0);
         jobs[jobId]->commit(req);
         jobArrivals[jobId] = Timer::elapsedSeconds();
@@ -419,8 +420,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle, bool oneshot) {
 
     // Decide whether job should be adopted or bounced to another node
     bool adopts = false;
-    int maxHops = maxJobHops(/*rootNode=*/req.requestedNodeIndex == 0);
-
+    
     if (hasJob(req.jobId) && (getJob(req.jobId).isPast() || getJob(req.jobId).isForgetting())) {
         // Can mean that the job finished in the meantime or that
         // it is in the process of being cleaned up.
@@ -434,8 +434,11 @@ void Worker::handleFindNode(MessageHandlePtr& handle, bool oneshot) {
             adopts = getJob(req.jobId).isSuspended();
         } else adopts = true;
 
-    } else if (req.numHops > maxHops && req.requestedNodeIndex == 0 && !hasJobCommitments()) {
-        // Request for a root node exceeded max #hops: Possibly adopt the job while dismissing the active job
+    } else if (req.requestedNodeIndex == 0 
+            && req.numHops > 50 //std::max(50, MyMpi::size(comm)/2)
+            && !hasJobCommitments()) {
+        // Request for a root node exceeded max #hops: 
+        // Possibly adopt the job while dismissing the active job
 
         // Consider adoption only if that job is unknown or inactive 
         if (!hasJob(req.jobId) || !getJob(req.jobId).isActive()) {
@@ -475,7 +478,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle, bool oneshot) {
         bool fullTransfer = false;
         if (!hasJob(req.jobId)) {
             // Job is not known yet: create instance, request full transfer
-            jobs[req.jobId] = new SatJob(params, MyMpi::size(comm), worldRank, req.jobId, epochCounter);
+            jobs[req.jobId] = createJob(params, MyMpi::size(comm), worldRank, req.jobId, epochCounter);
             fullTransfer = true;
         } else if (!getJob(req.jobId).hasJobDescription() && !initializerThreads.count(req.jobId)) {
             // Job is known, but never received full description, and no initializer thread is preparing it:
@@ -1422,6 +1425,14 @@ bool Worker::isAdoptionOfferObsolete(const JobRequest& req) {
     }
 
     return false;
+}
+
+Job* Worker::createJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) {
+    if (params.getParam("appmode") == "fork") {
+        return new ForkedSatJob(params, commSize, worldRank, jobId, epochCounter);
+    } else {
+        return new ThreadedSatJob(params, commSize, worldRank, jobId, epochCounter);
+    }
 }
 
 struct SuspendedJobComparator {

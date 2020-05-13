@@ -11,18 +11,18 @@
 #include "app/anytime_sat_clause_communicator.h"
 #include "util/memusage.h"
 
-SatJob::SatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) : 
-        Job(params, commSize, worldRank, jobId, epochCounter), _done_locally(false), _job_comm_period(params.getFloatParam("s")) {
+ThreadedSatJob::ThreadedSatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) : 
+        BaseSatJob(params, commSize, worldRank, jobId, epochCounter), _done_locally(false), _job_comm_period(params.getFloatParam("s")) {
 }
 
-void SatJob::lockHordeManipulation() {
+void ThreadedSatJob::lockHordeManipulation() {
     _horde_manipulation_lock.lock();
 }
-void SatJob::unlockHordeManipulation() {
+void ThreadedSatJob::unlockHordeManipulation() {
     _horde_manipulation_lock.unlock();
 }
 
-bool SatJob::appl_initialize() {
+bool ThreadedSatJob::appl_initialize() {
 
     assert(hasJobDescription());
     //_horde_manipulation_lock.updateName(std::string("HordeManip") + toStr());
@@ -43,6 +43,7 @@ bool SatJob::appl_initialize() {
         params["d"] = "7"; // sparse random + native diversification
     }
     params["fd"]; // filter duplicate clauses
+    params["cbbs"] = _params.getParam("cbbs"); // clause buffer base size
     params["icpr"] = _params.getParam("icpr"); // increase clause production
     params["mcl"] = _params.getParam("mcl"); // max clause length
     params["i"] = "0"; // #microseconds to sleep during solve loop
@@ -83,17 +84,17 @@ bool SatJob::appl_initialize() {
     return !_abort_after_initialization;
 }
 
-bool SatJob::appl_doneInitializing() {
+bool ThreadedSatJob::appl_doneInitializing() {
     return _solver != NULL && getSolver()->isFullyInitialized();
 }
 
-void SatJob::appl_updateRole() {
+void ThreadedSatJob::appl_updateRole() {
     if (!solverNotNull()) return;
     auto lock = _horde_manipulation_lock.getLock();
     if (solverNotNull()) getSolver()->updateRole(getIndex(), _comm_size);
 }
 
-void SatJob::appl_updateDescription(int fromRevision) {
+void ThreadedSatJob::appl_updateDescription(int fromRevision) {
     auto lock = _horde_manipulation_lock.getLock();
     JobDescription& desc = getDescription();
     std::vector<VecPtr> formulaAmendments = desc.getPayloads(fromRevision, desc.getRevision());
@@ -101,43 +102,43 @@ void SatJob::appl_updateDescription(int fromRevision) {
     if (solverNotNull()) getSolver()->continueSolving(formulaAmendments, desc.getAssumptions(desc.getRevision()));
 }
 
-void SatJob::appl_pause() {
+void ThreadedSatJob::appl_pause() {
     if (!solverNotNull()) return;
     auto lock = _horde_manipulation_lock.getLock();
     if (solverNotNull()) getSolver()->setPaused();
 }
 
-void SatJob::appl_unpause() {
+void ThreadedSatJob::appl_unpause() {
     if (!solverNotNull()) return;
     auto lock = _horde_manipulation_lock.getLock();
     if (solverNotNull()) getSolver()->unsetPaused();
 }
 
-void SatJob::appl_interrupt() {
+void ThreadedSatJob::appl_interrupt() {
     if (!solverNotNull()) return;
     auto lock = _horde_manipulation_lock.getLock();
     appl_interrupt_unsafe();
 }
 
-void SatJob::appl_interrupt_unsafe() {
+void ThreadedSatJob::appl_interrupt_unsafe() {
     if (solverNotNull()) {
         _solver->interrupt(); // interrupt SAT solving (but keeps solver threads!)
         _solver->finishSolving(); // concludes solving process
     }
 }
 
-void SatJob::cleanUpThread() {
+void ThreadedSatJob::cleanUpThread() {
     Console::log(Console::VVERB, "%s : cleanup thread start", toStr());
     auto lock = _horde_manipulation_lock.getLock();
     cleanUp();
     Console::log(Console::VVERB, "%s : cleanup thread done", toStr());
 }
 
-void SatJob::cleanUp() {
+void ThreadedSatJob::cleanUp() {
     if (solverNotNull()) _solver->cleanUp();
 }
 
-void SatJob::appl_withdraw() {
+void ThreadedSatJob::appl_withdraw() {
 
     auto lock = _horde_manipulation_lock.getLock();
     if (isInitializingUnsafe()) {
@@ -150,11 +151,11 @@ void SatJob::appl_withdraw() {
     if (solverNotNull()) {
         getSolver()->abort();
         // Do cleanup of HordeLib and its threads in a separate thread to avoid blocking
-        _bg_thread = std::thread(&SatJob::cleanUpThread, this);
+        _bg_thread = std::thread(&ThreadedSatJob::cleanUpThread, this);
     }
 }
 
-void SatJob::extractResult(int resultCode) {
+void ThreadedSatJob::extractResult(int resultCode) {
     auto lock = _horde_manipulation_lock.getLock();
     _result.id = getId();
     _result.result = resultCode;
@@ -168,7 +169,7 @@ void SatJob::extractResult(int resultCode) {
     }
 }
 
-int SatJob::appl_solveLoop() {
+int ThreadedSatJob::appl_solveLoop() {
 
     int result = -1;
 
@@ -190,7 +191,7 @@ int SatJob::appl_solveLoop() {
     return result;
 }
 
-void SatJob::appl_dumpStats() {
+void ThreadedSatJob::appl_dumpStats() {
     if (isInState({ACTIVE})) {
 
         getSolver()->dumpStats();
@@ -207,11 +208,11 @@ void SatJob::appl_dumpStats() {
     }
 }
 
-bool SatJob::appl_isDestructible() {
+bool ThreadedSatJob::appl_isDestructible() {
     return !solverNotNull() || _solver->isCleanedUp();
 }
 
-bool SatJob::appl_wantsToBeginCommunication() const {
+bool ThreadedSatJob::appl_wantsToBeginCommunication() const {
     if (_job_comm_period <= 0) return false;
     if (_clause_comm == NULL) return false;
     // Special "timed" conditions for leaf nodes:
@@ -228,7 +229,7 @@ bool SatJob::appl_wantsToBeginCommunication() const {
     return wants;
 }
 
-void SatJob::appl_beginCommunication() {
+void ThreadedSatJob::appl_beginCommunication() {
     Console::log(Console::VVVVERB, "begincomm");
     if (_clause_comm == NULL) return;
     auto lock = _horde_manipulation_lock.getLock();
@@ -237,7 +238,7 @@ void SatJob::appl_beginCommunication() {
     if (isLeaf()) _time_of_last_comm = Timer::elapsedSeconds();
 }
 
-void SatJob::appl_communicate(int source, JobMessage& msg) {
+void ThreadedSatJob::appl_communicate(int source, JobMessage& msg) {
     Console::log(Console::VVVVERB, "comm");
     if (_clause_comm == NULL) return;
     auto lock = _horde_manipulation_lock.getLock();
@@ -245,7 +246,26 @@ void SatJob::appl_communicate(int source, JobMessage& msg) {
         ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, msg);
 }
 
-SatJob::~SatJob() {
+bool ThreadedSatJob::isInitialized() {
+    if (!solverNotNull()) return false;
+    return _solver->isFullyInitialized();
+}
+void ThreadedSatJob::prepareSharing(int maxSize) {
+    _clause_buffer = _solver->prepareSharing(maxSize);
+}
+bool ThreadedSatJob::hasPreparedSharing() {
+    return !_clause_buffer.empty();
+}
+std::vector<int> ThreadedSatJob::getPreparedClauses() {
+    std::vector<int> out = _clause_buffer;
+    _clause_buffer.clear();
+    return out;
+}
+void ThreadedSatJob::digestSharing(const std::vector<int>& clauses) {
+    _solver->digestSharing(clauses);
+}
+
+ThreadedSatJob::~ThreadedSatJob() {
 
     Console::log(Console::VVERB, "%s : enter destructor", toStr());
     auto lock = _horde_manipulation_lock.getLock();

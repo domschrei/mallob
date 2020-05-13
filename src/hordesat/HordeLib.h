@@ -50,6 +50,7 @@ private:
     int maxSeconds;
 	size_t maxRounds;
 	size_t round;
+	bool anySolutionFound = false;
 
 	std::shared_ptr<LoggingInterface> logger;
 	
@@ -74,6 +75,7 @@ public:
 							const std::shared_ptr<std::vector<int>>& assumptions);
 	void updateRole(int rank, int numNodes);
 	bool isFullyInitialized();
+	bool isAnySolutionFound() {return anySolutionFound;}
     int solveLoop();
 
     std::vector<int> prepareSharing(int maxSize);

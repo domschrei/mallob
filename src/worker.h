@@ -150,6 +150,7 @@ private:
     bool isRequestObsolete(const JobRequest& req);
     bool isAdoptionOfferObsolete(const JobRequest& req);
 
+    Job* createJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
     bool hasJob(int id) const {
         return jobs.count(id) > 0;
     }
@@ -161,13 +162,6 @@ private:
     std::string jobStr(int j, int idx) const {
         return "#" + std::to_string(j) + ":" + std::to_string(idx);
     };
-
-    int maxJobHops(bool rootNode) {
-        if (rootNode) {
-            return MyMpi::size(comm) / 2;
-        }
-        return MyMpi::size(comm) * 2;
-    }
 };
 
 #endif

@@ -1,6 +1,6 @@
 
-#ifndef DOMPASCH_JOB_IMAGE_H
-#define DOMPASCH_JOB_IMAGE_H
+#ifndef DOMPASCH_CHILD_PROCESS_JOB_IMAGE_H
+#define DOMPASCH_CHILD_PROCESS_JOB_IMAGE_H
 
 #include <string>
 #include <memory>
@@ -15,22 +15,19 @@
 #include "data/job_description.h"
 #include "data/job_transfer.h"
 #include "data/epoch_counter.h"
+#include "horde_process_adapter.h"
 #include "app/sat_constants.h"
 #include "app/base_sat_job.h"
 
-class ThreadedSatJob : public BaseSatJob {
+class ForkedSatJob : public BaseSatJob {
 
 private:
     volatile bool _abort_after_initialization = false;
 
-    std::unique_ptr<HordeLib> _solver;
+    std::unique_ptr<HordeProcessAdapter> _solver;
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
-    std::vector<int> _clause_buffer;
 
-    volatile bool _done_locally;
-
-    std::thread _bg_thread;
-    mutable Mutex _horde_manipulation_lock;
+    mutable Mutex _solver_lock;
 
     float _time_of_start_solving = 0;
     float _time_of_last_comm = 0;
@@ -38,8 +35,8 @@ private:
 
 public:
 
-    ThreadedSatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
-    ~ThreadedSatJob() override;
+    ForkedSatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
+    ~ForkedSatJob() override;
 
     bool appl_initialize() override;
     bool appl_doneInitializing() override;
@@ -61,7 +58,7 @@ public:
     // Methods that are not overridden, but use the default implementation:
     // int getDemand(int prevVolume) const override;
     // bool wantsToCommunicate() const override;
-
+    
     // Methods from BaseSatJob:
     bool isInitialized() override;
     void prepareSharing(int maxSize) override;
@@ -69,21 +66,12 @@ public:
     std::vector<int> getPreparedClauses() override;
     void digestSharing(const std::vector<int>& clauses) override;
 
-    std::unique_ptr<HordeLib>& getSolver() {
+private:
+
+    std::unique_ptr<HordeProcessAdapter>& getSolver() {
         assert(_solver != NULL);
         return _solver;
     }
-
-    void lockHordeManipulation();
-    void unlockHordeManipulation();
-
-private:
-    void extractResult(int resultCode);
-
-    void appl_interrupt_unsafe();
-
-    void cleanUpThread();
-    void cleanUp();
 
     bool solverNotNull() {
         return _solver != NULL;

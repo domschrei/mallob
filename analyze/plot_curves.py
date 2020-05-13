@@ -19,6 +19,7 @@ files = []
 data = []
 labels = []
 explicit_xvals = False
+colorvals = False
 do_markers = True
 do_lines = True
 do_linestyles = True
@@ -45,15 +46,18 @@ for arg in sys.argv[1:]:
         do_linestyles = False
     elif re.search(r'--?no-?lines?', arg):
         do_lines = False
+    elif arg.startswith("-xyc") or arg.startswith("--xyc"):
+        explicit_xvals = True
+        colorvals = True
     elif arg.startswith("-xy") or arg.startswith("--xy"):
         explicit_xvals = True
     elif arg.startswith("-size="):
-        pltxsize = arg[6:]
-        pltysize = arg[6:]
+        pltxsize = float(arg[6:])
+        pltysize = float(arg[6:])
     elif arg.startswith("-xsize="):
-        pltxsize = arg[7:]
+        pltxsize = float(arg[7:])
     elif arg.startswith("-ysize="):
-        pltysize = arg[7:]
+        pltysize = float(arg[7:])
     elif arg.startswith("-l="):
         labels += [arg[3:]]
     elif arg.startswith("-xlabel="):
@@ -76,22 +80,29 @@ for arg in sys.argv[1:]:
         files += [arg]
 
 
-def process_line(line, X, Y, lc):
+def process_line(line, X, Y, C, lc):
     
     words = line.rstrip().split(" ")
-        
+    
+    num_ys = len(words)
+    if colorvals:
+        num_ys -= 1
+    
     if not Y:
         if explicit_xvals:
-            for i in range(1, len(words)):
+            for i in range(1, num_ys):
                 Y += [[]]
         else:
-            for i in range(len(words)):
+            for i in range(num_ys):
                 Y += [[]]
-    
+        
     # X value
     if explicit_xvals:
         X += [float(words[0])]
         words = words[1:]
+        if colorvals:
+            C += [int(words[-1])]
+            words = words[0:-1]
     else:
         X += [lc]
         
@@ -104,26 +115,29 @@ if not files:
     # Read from stdin
     X = []
     Y = []
+    C = []
     lc = 0
     for line in sys.stdin:
-        process_line(line, X, Y, lc)
+        process_line(line, X, Y, C, lc)
         lc += 1
+        
     print("stdin:",str(len(X)),"vals")
     for vals in Y:
-        data += [[X, vals]]
+        data += [[X, vals, C]]
     
 else:
     for arg in files:
         X = []
         Y = []
+        C = []
         lc = 0
         for line in open(arg, 'r').readlines():
-            process_line(line, X, Y, lc)
+            process_line(line, X, Y, C, lc)
             lc += 1
             
         print(arg,":",str(len(X)),"vals")
         for vals in Y:
-            data += [[X, vals]]
+            data += [[X, vals, C]]
 
 plt.figure(figsize=(pltxsize,pltysize))
 i = 0
@@ -149,8 +163,15 @@ for d in data:
         lst = linestyles[i%len(markers)]
     else:
         lst = None
-        
-    plt.plot(d[0], d[1], label=l, color=colors[i%len(colors)], marker=m, linestyle=lst, lw=lw)
+    
+    if colorvals:
+        clr = [colors[x%len(colors)] for x in d[2]]
+        #if do_markers:
+        #    m = [markers[x%len(markers)] for x in d[2]]
+    else:
+        clr = colors[i%len(colors)]
+    
+    plt.scatter(d[0], d[1], label=l, color=clr, marker=m, linestyle=lst, lw=lw)
     i += 1
 
 if heading:

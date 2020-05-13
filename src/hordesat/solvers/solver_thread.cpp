@@ -16,11 +16,11 @@ void SolverThread::log(int verb, const char* fmt, ...) {
 
 SolverThread::SolverThread(ParameterProcessor& params, std::shared_ptr<PortfolioSolverInterface> solver, 
         const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<vector<int>>& assumptions, 
-        int localId) : 
+        int localId, bool* finished) : 
     _params(params), _solver_ptr(solver), _solver(*solver), 
     _logger(params.getLogger().copy("S"+std::to_string(_solver.solverId))), 
     _formulae(formulae), _assumptions(assumptions), 
-    _local_id(localId) {
+    _local_id(localId), _finished_flag(finished) {
     
     _portfolio_rank = _params.getIntParam("mpirank", 0);
     _portfolio_size = _params.getIntParam("mpisize", 1);
@@ -303,6 +303,7 @@ void SolverThread::reportResult(int res) {
                 _failed_assumptions = _solver.getFailedAssumptions();
             }
             _state = STANDBY;
+            *_finished_flag = true;
         }
     }
 }
