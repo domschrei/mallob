@@ -52,7 +52,7 @@ private:
     // Solution
     SatResult* _result = NULL;
 	int* _solution_size;
-    int** _solution;
+    void** _solution;
 
 
 public:
