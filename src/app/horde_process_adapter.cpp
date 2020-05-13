@@ -13,8 +13,10 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
             const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<std::vector<int>>& assumptions) :
                 _params(params), _log(loggingInterface), _formulae(formulae), _assumptions(assumptions) {
 
-    _mutex = new SharedMemMutex(SharedMemory::create(SharedMemMutex::getSharedMemorySize()));
-    _cond = new SharedMemConditionVariable(SharedMemory::create(SharedMemConditionVariable::getSharedMemorySize()));
+    _shmem_mutex = SharedMemory::create(SharedMemMutex::getSharedMemorySize());
+    _shmem_cond = SharedMemory::create(SharedMemConditionVariable::getSharedMemorySize());
+    _mutex = new SharedMemMutex(_shmem_mutex);
+    _cond = new SharedMemConditionVariable(_shmem_cond);
     
     _max_import_buffer_size = atoi(params.at("cbbs").c_str()) * sizeof(int) * atoi(params.at("mpisize").c_str());
     _max_export_buffer_size = atoi(params.at("cbbs").c_str()) * sizeof(int);
@@ -69,9 +71,11 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
 }
 
 HordeProcessAdapter::~HordeProcessAdapter() {
-    SharedMemory::free(_child_pid,          sizeof(pid_t));
-    SharedMemory::free(_mutex,              SharedMemMutex::getSharedMemorySize());
-    SharedMemory::free(_cond,               SharedMemConditionVariable::getSharedMemorySize());
+    delete _mutex;
+    delete _cond;
+    SharedMemory::free(_child_pid,          sizeof(long));
+    SharedMemory::free(_shmem_mutex,        SharedMemMutex::getSharedMemorySize());
+    SharedMemory::free(_shmem_cond,         SharedMemConditionVariable::getSharedMemorySize());
     SharedMemory::free(_state,              sizeof(SolvingStates::SolvingState));
     SharedMemory::free(_portfolio_rank,     sizeof(int));
     SharedMemory::free(_portfolio_size,     sizeof(int));

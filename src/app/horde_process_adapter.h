@@ -24,11 +24,13 @@ private:
     int _max_export_buffer_size;
     int _max_solution_size;
 
-    // SHARED MEMORY
-
-    pid_t* _child_pid;
     SharedMemMutex* _mutex;
     SharedMemConditionVariable* _cond;
+    
+    // SHARED MEMORY
+    void* _shmem_mutex;
+    void* _shmem_cond;
+    pid_t* _child_pid;
     SolvingStates::SolvingState* _state;
 
     int* _portfolio_rank;
