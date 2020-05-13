@@ -1,4 +1,6 @@
 
+#include <assert.h>
+
 #include "horde_process_adapter.h"
 
 #include "HordeLib.h"
@@ -126,6 +128,8 @@ void HordeProcessAdapter::run() {
         if (*_do_write_solution) {
             _log->log(3, "DO write solution\n");
             _mutex->lock();
+            _log->log(3, "%i %i\n", *_solution_size, _solution_vec.size());
+            assert(*_solution_size == _solution_vec.size());
             if (*_solution_size > 0) memcpy(*_solution, _solution_vec.data(), *_solution_size*sizeof(int));
             *_do_write_solution = false;
             *_did_write_solution = true;
