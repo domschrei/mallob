@@ -1,6 +1,7 @@
 
 #include <assert.h>
 #include <sys/types.h>
+#include <sys/syscall.h>
 
 #include "horde_process_adapter.h"
 
@@ -143,7 +144,7 @@ void HordeProcessAdapter::run() {
 
             // For this management thread
             double perc_cpu;
-            bool success = thread_cpuratio(gettid(), age, perc_cpu);
+            bool success = thread_cpuratio(syscall(__NR_gettid), age, perc_cpu);
             if (success) {
                 _log->log(0, "child_main : %.2f%% CPU", perc_cpu);
             }
