@@ -235,6 +235,7 @@ std::vector<int> HordeProcessAdapter::getCollectedClauses() {
     memcpy(clauses.data(), _export_buffer, clauses.size()*sizeof(int));
     *_did_export = false;
     _mutex->unlock();
+    return clauses;
 }
 
 void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses) {
