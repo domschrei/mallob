@@ -54,7 +54,7 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
 
 void HordeProcessAdapter::run() {
 
-    int res = fork();
+    pid_t res = fork();
     if (res > 0) {
         // [parent process] 
         // Success: write child PID, return to caller 
@@ -71,8 +71,10 @@ void HordeProcessAdapter::run() {
     hlib.beginSolving(_formulae, _assumptions);
     *_state = SolvingStates::ACTIVE;
 
-    // Wait for termination of one of the threads
+    // Main loop
     while (true) {
+
+        _log->log(0, "main loop\n");
 
         // Wait until something happens
         bool somethingHappened = _cond->timedWait(*_mutex, [&]() {
