@@ -126,7 +126,7 @@ void HordeProcessAdapter::run() {
         if (*_do_write_solution) {
             _log->log(3, "DO write solution\n");
             _mutex->lock();
-            memcpy(*_solution, _solution_vec.data(), _solution_vec.size()*sizeof(int));
+            if (*_solution_size > 0) memcpy(*_solution, _solution_vec.data(), *_solution_size*sizeof(int));
             *_do_write_solution = false;
             *_did_write_solution = true;
             _mutex->unlock();
@@ -170,11 +170,11 @@ void HordeProcessAdapter::run() {
             _log->log(3, "DO read solution\n");
             // Solution found!
             _mutex->lock();
-            if (result == 10) {
+            if (result == SatResult::SAT) {
                 // SAT
                 *_result = SAT;
                 _solution_vec = hlib.getTruthValues();
-            } else if (result == 20) {
+            } else if (result == SatResult::UNSAT) {
                 // UNSAT
                 *_result = UNSAT; 
                 std::set<int> fa = hlib.getFailedAssumptions();
