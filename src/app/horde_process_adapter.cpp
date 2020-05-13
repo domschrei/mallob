@@ -38,8 +38,6 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
     *_did_export = false;
     _is_initialized = (bool*) SharedMemory::create(sizeof(bool));
     *_is_initialized = false;
-    _is_running = (bool*) SharedMemory::create(sizeof(bool));
-    *_is_running = false;
     _do_write_solution = (bool*) SharedMemory::create(sizeof(bool));
     *_do_write_solution = false;
     _did_write_solution = (bool*) SharedMemory::create(sizeof(bool));
@@ -57,20 +55,16 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
 void HordeProcessAdapter::run() {
 
     int res = fork();
-    if (res == 0) {
-        // [parent process] Success: return to caller 
+    if (res > 0) {
+        // [parent process] 
+        // Success: write child PID, return to caller 
+        *_child_pid = res;
         return;
     }
 
     // [child process]
 
-    // Publish PID
-    _mutex->lock();
-    *_child_pid = res;
-    _mutex->unlock();
-
     float startTime = Timer::elapsedSeconds();
-    *_is_running = true;
 
     // Prepare solver
     HordeLib hlib(_params, _log);
@@ -199,8 +193,9 @@ void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
         kill(*_child_pid, SIGCONT); // Continue (resume) process.
         return;
     }
-
-    // TODO: standby state.
+    if (state == SolvingStates::STANDBY) {
+        *_do_interrupt = true;
+    }
 }
 
 void HordeProcessAdapter::updateRole(int rank, int size) {

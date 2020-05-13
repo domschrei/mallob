@@ -40,7 +40,6 @@ private:
 
     // Responses solver->main
     bool* _is_initialized;
-    bool* _is_running;
     bool* _did_export;
     bool* _did_write_solution;
     
