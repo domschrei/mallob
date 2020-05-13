@@ -6,18 +6,19 @@
 #include "fork.h"
 
 
-void propagateSignal(int signum) {
+void propagateSignalAndExit(int signum) {
     for (pid_t child : Fork::_children) {
         kill(child, signum);
     }
+    exit(0);
 }
 
 
 std::set<pid_t> Fork::_children;
 
 void Fork::init() {
-    signal(SIGTERM, propagateSignal);
-    signal(SIGINT, propagateSignal);
+    signal(SIGTERM, propagateSignalAndExit);
+    signal(SIGINT, propagateSignalAndExit);
 }
 
 pid_t Fork::createChild() {
