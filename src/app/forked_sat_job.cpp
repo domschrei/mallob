@@ -171,7 +171,10 @@ bool ForkedSatJob::appl_wantsToBeginCommunication() const {
         if (Timer::elapsedSeconds()-_time_of_last_comm < _job_comm_period) return false;
     }
     bool locked = _solver_lock.tryLock();
-    if (!locked) return false;
+    if (!locked) {
+        Console::log(Console::VVVVERB, "cannot lock: no comm");    
+        return false;
+    } 
     bool wants = ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses();
     _solver_lock.unlock();
     return wants;
