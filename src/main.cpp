@@ -13,6 +13,7 @@
 #include "util/random.h"
 #include "util/params.h"
 #include "util/shared_memory.h"
+#include "util/fork.h"
 #include "worker.h"
 #include "client.h"
 
@@ -84,6 +85,9 @@ int main(int argc, char *argv[]) {
     // Global and local seed, such that all nodes have access to a synchronized randomness
     // as well as to an individual randomness that differs among nodes
     Random::init(numNodes, rank);
+
+    // Initialize bookkeeping of child processes
+    Fork::init();
 
     // Find client ranks
     std::set<int> externalClientRanks;

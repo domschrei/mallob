@@ -5,6 +5,7 @@
 #include "util/shared_memory.h"
 #include "util/memusage.h"
 #include "util/timer.h"
+#include "util/fork.h"
 
 HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string>& params, std::shared_ptr<LoggingInterface> loggingInterface, 
             const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<std::vector<int>>& assumptions) :
@@ -54,7 +55,7 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
 
 void HordeProcessAdapter::run() {
 
-    pid_t res = fork();
+    pid_t res = Fork::createChild();
     if (res > 0) {
         // [parent process] 
         // Success: write child PID, return to caller 
@@ -74,7 +75,7 @@ void HordeProcessAdapter::run() {
     // Main loop
     while (true) {
 
-        _log->log(0, "main loop\n");
+        //_log->log(0, "main loop\n");
 
         // Wait until something happens
         bool somethingHappened = _cond->timedWait(*_mutex, [&]() {
@@ -184,15 +185,15 @@ void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
     if (state == *_state) return;
 
     if (state == SolvingStates::ABORTING) {
-        kill(*_child_pid, SIGTERM); // Terminate child process.
+        Fork::terminate(*_child_pid); // Terminate child process.
         return;
     }
     if (state == SolvingStates::SUSPENDED) {
-        kill(*_child_pid, SIGSTOP); // Stop (suspend) process.
+        Fork::suspend(*_child_pid); // Stop (suspend) process.
         return;
     }
     if (state == SolvingStates::ACTIVE) {
-        kill(*_child_pid, SIGCONT); // Continue (resume) process.
+        Fork::resume(*_child_pid); // Continue (resume) process.
         return;
     }
     if (state == SolvingStates::STANDBY) {
