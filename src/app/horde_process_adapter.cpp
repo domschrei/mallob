@@ -48,6 +48,8 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
     *_do_dump_stats = false;
     _do_interrupt = (bool*) SharedMemory::create(sizeof(bool));
     *_do_interrupt = false;
+    _do_update_role = (bool*) SharedMemory::create(sizeof(bool));
+    *_do_update_role = false;
     _result = (SatResult*) SharedMemory::create(sizeof(SatResult));
     *_result = UNKNOWN;
 }
