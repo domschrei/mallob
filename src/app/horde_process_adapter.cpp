@@ -16,9 +16,8 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
     _mutex = new SharedMemMutex(SharedMemory::create(SharedMemMutex::getSharedMemorySize()));
     _cond = new SharedMemConditionVariable(SharedMemory::create(SharedMemConditionVariable::getSharedMemorySize()));
     
-    _import_buffer = (int*) SharedMemory::create(atoi(params.at("cbbs").c_str()) * sizeof(int) * atoi(params.at("mpisize").c_str()));
-    _export_buffer = (int*) SharedMemory::create(atoi(params.at("cbbs").c_str()) * sizeof(int));
-
+    _max_import_buffer_size = atoi(params.at("cbbs").c_str()) * sizeof(int) * atoi(params.at("mpisize").c_str());
+    _max_export_buffer_size = atoi(params.at("cbbs").c_str()) * sizeof(int);
     // Find maximum size of a potential solution
     int maxVar = 0;
     int minVar = 0;
@@ -28,8 +27,11 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
             maxVar = std::max(maxVar, lit);
         }
     }
-    int maxSolutionSize = std::max(maxVar, -minVar)+2;
-    _solution = (int*) SharedMemory::create(maxSolutionSize * sizeof(int));
+    _max_solution_size = sizeof(int) * (std::max(maxVar, -minVar)+2);
+
+    _import_buffer = (int*) SharedMemory::create(_max_import_buffer_size);
+    _export_buffer = (int*) SharedMemory::create(_max_export_buffer_size);
+    _solution = (int*) SharedMemory::create(_max_solution_size);
     
     _child_pid = (pid_t*) SharedMemory::create(sizeof(long));
     *_child_pid = -1;
@@ -64,6 +66,30 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
     *_do_update_role = false;
     _result = (SatResult*) SharedMemory::create(sizeof(SatResult));
     *_result = UNKNOWN;
+}
+
+HordeProcessAdapter::~HordeProcessAdapter() {
+    SharedMemory::free(_child_pid,          sizeof(pid_t));
+    SharedMemory::free(_mutex,              SharedMemMutex::getSharedMemorySize());
+    SharedMemory::free(_cond,               SharedMemConditionVariable::getSharedMemorySize());
+    SharedMemory::free(_state,              sizeof(SolvingStates::SolvingState));
+    SharedMemory::free(_portfolio_rank,     sizeof(int));
+    SharedMemory::free(_portfolio_size,     sizeof(int));
+    SharedMemory::free(_do_export,          sizeof(bool));
+    SharedMemory::free(_do_import,          sizeof(bool));
+    SharedMemory::free(_do_dump_stats,      sizeof(bool));
+    SharedMemory::free(_do_update_role,     sizeof(bool));
+    SharedMemory::free(_do_interrupt,       sizeof(bool));
+    SharedMemory::free(_is_initialized,     sizeof(bool));
+    SharedMemory::free(_did_export,         sizeof(bool));
+    SharedMemory::free(_did_write_solution, sizeof(bool));
+    SharedMemory::free(_export_buffer_size, sizeof(int));
+    SharedMemory::free(_export_buffer,      _max_export_buffer_size);
+    SharedMemory::free(_import_buffer_size, sizeof(int));
+    SharedMemory::free(_import_buffer,      _max_import_buffer_size);
+    SharedMemory::free(_result,             sizeof(SatResult));
+	SharedMemory::free(_solution_size,      sizeof(int));
+    SharedMemory::free(_solution,           _max_solution_size);
 }
 
 void HordeProcessAdapter::run() {
@@ -197,6 +223,10 @@ void HordeProcessAdapter::run() {
 
 bool HordeProcessAdapter::isFullyInitialized() {
     return *_is_initialized;
+}
+
+pid_t HordeProcessAdapter::getPid() {
+    return *_child_pid;
 }
 
 void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {

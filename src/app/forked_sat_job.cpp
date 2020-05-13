@@ -10,6 +10,7 @@
 #include "app/forked_sat_job.h"
 #include "app/anytime_sat_clause_communicator.h"
 #include "util/memusage.h"
+#include "util/fork.h"
 
 ForkedSatJob::ForkedSatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) : 
         BaseSatJob(params, commSize, worldRank, jobId, epochCounter), _job_comm_period(params.getFloatParam("s")) {
@@ -159,7 +160,8 @@ void ForkedSatJob::appl_dumpStats() {
 }
 
 bool ForkedSatJob::appl_isDestructible() {
-    return true;
+    // Solver is NULL or child process terminated
+    return !solverNotNull() || Fork::getChildStatus(_solver->getPid()) > 0;
 }
 
 bool ForkedSatJob::appl_wantsToBeginCommunication() const {

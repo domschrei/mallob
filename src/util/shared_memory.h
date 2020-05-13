@@ -9,6 +9,7 @@
 namespace SharedMemory {
     // From https://stackoverflow.com/a/5656561
     void* create(size_t size);
+    void free(void* addr, size_t size);
 }
 
 #endif

@@ -15,6 +15,9 @@ public:
     static void suspend(int childpid);
     static void resume(int childpid);
 
+    /* 0: running, -1: error, childpid: exited */
+    static int getChildStatus(int childpid);
+
 };
 
 #endif

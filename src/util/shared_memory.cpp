@@ -17,4 +17,8 @@ namespace SharedMemory {
         // but the manpage for `mmap` explains their purpose.
         return mmap(NULL, size, protection, visibility, -1, 0);
     }
+
+    void free(void* addr, size_t size) {
+        munmap(addr, size);
+    }
 }

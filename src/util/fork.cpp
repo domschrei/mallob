@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <cstdlib>
+#include <sys/wait.h>
 
 #include "fork.h"
 
@@ -42,4 +43,9 @@ void Fork::suspend(pid_t childpid) {
 }
 void Fork::resume(pid_t childpid) {
     kill(childpid, SIGCONT);
+}
+int Fork::getChildStatus(pid_t childpid) {
+    int status;
+    pid_t result = waitpid(childpid, &status, WNOHANG);
+    return result;
 }

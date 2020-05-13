@@ -20,6 +20,10 @@ private:
 
     std::vector<int> _solution_vec;
 
+    int _max_import_buffer_size;
+    int _max_export_buffer_size;
+    int _max_solution_size;
+
     // SHARED MEMORY
 
     pid_t* _child_pid;
@@ -57,9 +61,11 @@ private:
 public:
     HordeProcessAdapter(const std::map<std::string, std::string>& params, std::shared_ptr<LoggingInterface> loggingInterface, 
             const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<std::vector<int>>& assumptions);
+    ~HordeProcessAdapter();
 
     void run();
     bool isFullyInitialized();
+    pid_t getPid();
 
     void setSolvingState(SolvingStates::SolvingState state);
     void updateRole(int rank, int size);
