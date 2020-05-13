@@ -138,6 +138,7 @@ public:
 	void wait(SharedMemMutex& mutex, std::function<bool()> condition) {
 		mutex.lock();
 		while (!condition()) pthread_cond_wait(pcond, mutex.getHandle());
+		mutex.unlock();
 	}
 	bool timedWait(SharedMemMutex& mutex, std::function<bool()> condition, long nsecs) {
 		mutex.lock();
@@ -146,6 +147,7 @@ public:
     	ts.tv_nsec += nsecs; 
 		int res = 0;
 		while (!condition() && res == 0) res = pthread_cond_timedwait(pcond, mutex.getHandle(), &ts);
+		mutex.unlock();
 		return res;
 	}
 	void notify() {
