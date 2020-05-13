@@ -18,8 +18,19 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
     
     _import_buffer = (int*) SharedMemory::create(atoi(params.at("cbbs").c_str()) * sizeof(int) * atoi(params.at("mpisize").c_str()));
     _export_buffer = (int*) SharedMemory::create(atoi(params.at("cbbs").c_str()) * sizeof(int));
-    _solution = (void**) SharedMemory::create(sizeof(void*));
 
+    // Find maximum size of a potential solution
+    int maxVar = 0;
+    int minVar = 0;
+    for (const auto& f : _formulae) {
+        for (const int& lit : *f) {
+            minVar = std::min(minVar, lit);
+            maxVar = std::max(maxVar, lit);
+        }
+    }
+    int maxSolutionSize = std::max(maxVar, -minVar)+2;
+    _solution = (int*) SharedMemory::create(maxSolutionSize * sizeof(int));
+    
     _child_pid = (pid_t*) SharedMemory::create(sizeof(long));
     *_child_pid = -1;
     _state = (SolvingStates::SolvingState*) SharedMemory::create(sizeof(SolvingStates::SolvingState));
@@ -43,8 +54,6 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
     *_did_export = false;
     _is_initialized = (bool*) SharedMemory::create(sizeof(bool));
     *_is_initialized = false;
-    _do_write_solution = (bool*) SharedMemory::create(sizeof(bool));
-    *_do_write_solution = false;
     _did_write_solution = (bool*) SharedMemory::create(sizeof(bool));
     *_did_write_solution = false;
     _do_dump_stats = (bool*) SharedMemory::create(sizeof(bool));
@@ -62,8 +71,10 @@ void HordeProcessAdapter::run() {
     pid_t res = Fork::createChild();
     if (res > 0) {
         // [parent process] 
-        // Success: write child PID, return to caller 
+
+        // Write child PID 
         *_child_pid = res;
+        
         return;
     }
 
@@ -85,7 +96,7 @@ void HordeProcessAdapter::run() {
         // Wait until something happens
         bool somethingHappened = _cond->timedWait(*_mutex, [&]() {
             // Done solving OR should {im|ex}port clauses OR should allocate shmem for solution
-            return hlib.isAnySolutionFound() || *_do_export || *_do_import || *_do_update_role || *_do_write_solution;
+            return hlib.isAnySolutionFound() || *_do_export || *_do_import || *_do_update_role;
         }, 1000 * 1000 /*1 millisecond*/);
 
         // Check initialization state
@@ -124,19 +135,6 @@ void HordeProcessAdapter::run() {
 
         //if (!somethingHappened) continue;
 
-        // Check if solution should be written into shared memory
-        if (*_do_write_solution) {
-            _log->log(3, "DO write solution\n");
-            _mutex->lock();
-            _log->log(3, "%i %i\n", *_solution_size, _solution_vec.size());
-            assert(*_solution_size == _solution_vec.size());
-            if (*_solution_size > 0) memcpy(*_solution, _solution_vec.data(), *_solution_size*sizeof(int));
-            *_do_write_solution = false;
-            *_did_write_solution = true;
-            _mutex->unlock();
-            continue;
-        }
-
         // Check if clauses should be exported
         if (*_do_export) {
             _log->log(3, "DO export clauses\n");
@@ -171,7 +169,7 @@ void HordeProcessAdapter::run() {
         int result = hlib.solveLoop();
         if (result >= 0) {
             solved = true;
-            _log->log(3, "DO read solution\n");
+            _log->log(3, "DO write solution\n");
             // Solution found!
             _mutex->lock();
             if (result == SatResult::SAT) {
@@ -186,9 +184,12 @@ void HordeProcessAdapter::run() {
             }
             // Write size of solution such that main thread can allocate shared mem for it
             *_solution_size = _solution_vec.size();
-            if (*_solution_size == 0) *_did_write_solution = true;
+            if (*_solution_size > 0) {
+                memcpy(_solution, _solution_vec.data(), *_solution_size*sizeof(int));
+            }
+            *_did_write_solution = true;
             _mutex->unlock();
-            _log->log(3, "DONE read solution\n");
+            _log->log(3, "DONE write solution\n");
             continue;
         }
     }
@@ -262,17 +263,7 @@ void HordeProcessAdapter::dumpStats() {
 }
 
 bool HordeProcessAdapter::hasSolution() {
-    if (*_result == SAT || *_result == UNSAT) {
-        if (*_did_write_solution) {
-            return true;
-        }
-        // Create shared memory block for solution
-        *_solution = (void*) SharedMemory::create(*_solution_size * sizeof(int));
-        *_do_write_solution = true;
-        _cond->notify();
-        return false;
-    }
-    return false;
+    return *_did_write_solution;
 }
 
 std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {

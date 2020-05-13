@@ -36,7 +36,6 @@ private:
     bool* _do_dump_stats;
     bool* _do_update_role;
     bool* _do_interrupt;
-    bool* _do_write_solution;
 
     // Responses solver->main
     bool* _is_initialized;
@@ -52,7 +51,7 @@ private:
     // Solution
     SatResult* _result = NULL;
 	int* _solution_size;
-    void** _solution;
+    int* _solution;
 
 
 public:
