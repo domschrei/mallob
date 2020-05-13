@@ -12,8 +12,8 @@
 #include <utility>
 
 #include "worker.h"
-#include "app/sat_job.h"
-#include "app/child_proc_sat_job.h"
+#include "app/threaded_sat_job.h"
+#include "app/forked_sat_job.h"
 #include "util/timer.h"
 #include "util/console.h"
 #include "util/random.h"
