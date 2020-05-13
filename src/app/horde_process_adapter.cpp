@@ -16,7 +16,7 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
     
     _import_buffer = (int*) SharedMemory::create(atoi(params.at("cbbs").c_str()) * sizeof(int) * atoi(params.at("mpisize").c_str()));
     _export_buffer = (int*) SharedMemory::create(atoi(params.at("cbbs").c_str()) * sizeof(int));
-    _solution = (int*) SharedMemory::create(sizeof(int));
+    _solution = (int**) SharedMemory::create(sizeof(int*));
 
     _child_pid = (pid_t*) SharedMemory::create(sizeof(long));
     *_child_pid = -1;
@@ -123,8 +123,7 @@ void HordeProcessAdapter::run() {
         if (*_do_write_solution) {
             _log->log(3, "DO write solution\n");
             _mutex->lock();
-            _solution = (int*)*_solution;
-            memcpy(_solution, _solution_vec.data(), _solution_vec.size()*sizeof(int));
+            memcpy(*_solution, _solution_vec.data(), _solution_vec.size()*sizeof(int));
             *_do_write_solution = false;
             *_did_write_solution = true;
             _mutex->unlock();
@@ -257,7 +256,7 @@ bool HordeProcessAdapter::hasSolution() {
             return true;
         }
         // Create shared memory block for solution
-        *_solution = (int) SharedMemory::create(*_solution_size);
+        *_solution = (int*) SharedMemory::create(*_solution_size * sizeof(int));
         *_do_write_solution = true;
         _cond->notify();
         return false;
