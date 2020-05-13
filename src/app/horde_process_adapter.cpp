@@ -68,6 +68,7 @@ void HordeProcessAdapter::run() {
     // [child process]
 
     float startTime = Timer::elapsedSeconds();
+    bool solved = false;
 
     // Prepare solver
     HordeLib hlib(_params, _log);
@@ -162,9 +163,10 @@ void HordeProcessAdapter::run() {
         }
 
         // Check solved state
-        if (*_result != UNKNOWN) continue;
+        if (solved) continue;
         int result = hlib.solveLoop();
         if (result >= 0) {
+            solved = true;
             _log->log(3, "DO read solution\n");
             // Solution found!
             _mutex->lock();

@@ -134,6 +134,7 @@ int ForkedSatJob::appl_solveLoop() {
 
     int result = -1;
     if (getState() != ACTIVE) return result;
+    if (_done_locally) return result;
 
     // Did a solver find a result?
     if (_solver->hasSolution()) {
@@ -146,6 +147,7 @@ int ForkedSatJob::appl_solveLoop() {
         _result.result = result;
         _result.revision = getDescription().getRevision();
         _result.solution = solution.second;
+        _done_locally = true;
     }
     return result;
 }

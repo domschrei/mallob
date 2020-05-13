@@ -33,6 +33,8 @@ private:
     float _time_of_last_comm = 0;
     float _job_comm_period;
 
+    bool _done_locally = false;
+
 public:
 
     ForkedSatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
