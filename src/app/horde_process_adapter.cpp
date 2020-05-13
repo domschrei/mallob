@@ -178,6 +178,7 @@ void HordeProcessAdapter::run() {
             }
             // Write size of solution such that main thread can allocate shared mem for it
             *_solution_size = _solution_vec.size();
+            if (*_solution_size == 0) *_did_write_solution = true;
             _mutex->unlock();
             continue;
         }
@@ -266,6 +267,7 @@ bool HordeProcessAdapter::hasSolution() {
 }
 
 std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
+    if (*_solution_size == 0) return std::pair<SatResult, std::vector<int>>(*_result, std::vector<int>()); 
     _mutex->lock();
     std::vector<int> solution(*_solution_size);
     memcpy(solution.data(), _solution, solution.size()*sizeof(int));
