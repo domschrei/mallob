@@ -139,6 +139,15 @@ void HordeProcessAdapter::run() {
             // Dump stats
             _log->log(3, "DO dump stats\n");
             float age = Timer::elapsedSeconds() - startTime;
+
+            // For this management thread
+            double perc_cpu;
+            bool success = thread_cpuratio(gettid(), age, perc_cpu);
+            if (success) {
+                _log->log(0, "child_main : %.2f%% CPU", perc_cpu);
+            }
+
+            // For each solver thread
             std::vector<long> threadTids = hlib.getSolverTids();
             for (int i = 0; i < threadTids.size(); i++) {
                 if (threadTids[i] < 0) continue;
