@@ -117,7 +117,7 @@ void HordeProcessAdapter::run() {
             _mutex->unlock();
         }
 
-        if (!somethingHappened) continue;
+        //if (!somethingHappened) continue;
 
         // Check if solution should be written into shared memory
         if (*_do_write_solution) {
