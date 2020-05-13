@@ -1,5 +1,6 @@
 
 #include <assert.h>
+#include <sys/types.h>
 
 #include "horde_process_adapter.h"
 
