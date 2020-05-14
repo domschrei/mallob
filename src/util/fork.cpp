@@ -16,12 +16,12 @@ void propagateSignalAndExit(int signum) {
 }
 
 void acknowledgeChildExit(int signum) {
-    atomic_fetch_add(&Fork::_pending_exiting_children, -1);
+    Fork::_pending_exiting_children--;
 }
 
 
 std::set<pid_t> Fork::_children;
-atomic_int Fork::_pending_exiting_children = 0;
+int Fork::_pending_exiting_children = 0;
 
 void Fork::init() {
     signal(SIGTERM, propagateSignalAndExit);
@@ -44,7 +44,7 @@ void Fork::terminate(pid_t childpid) {
     kill(childpid, SIGCONT);
     kill(childpid, SIGTERM);
     _children.erase(childpid);
-    atomic_fetch_add(&Fork::_pending_exiting_children, 1);
+    _pending_exiting_children++;
 }
 void Fork::suspend(pid_t childpid) {
     kill(childpid, SIGSTOP);
