@@ -71,10 +71,10 @@ void Fork::suspend(pid_t childpid) {
 void Fork::resume(pid_t childpid) {
     kill(childpid, SIGCONT);
 }
-int Fork::getChildStatus(pid_t childpid) {
+bool Fork::didChildExit(pid_t childpid) {
     int status;
     pid_t result = waitpid(childpid, &status, WNOHANG | WUNTRACED | WCONTINUED);
-    return result;
+    return WIFEXITED(status);
 }
 bool Fork::allChildrenSignalsArrived() {
     return _pending_exiting_children == 0;

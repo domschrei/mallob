@@ -161,7 +161,7 @@ void ForkedSatJob::appl_dumpStats() {
 
 bool ForkedSatJob::appl_isDestructible() {
     // Solver is NULL or child process terminated
-    return !solverNotNull() || Fork::getChildStatus(_solver->getPid()) > 0;
+    return !solverNotNull() || Fork::didChildExit(_solver->getPid());
 }
 
 bool ForkedSatJob::appl_wantsToBeginCommunication() const {
@@ -223,11 +223,13 @@ ForkedSatJob::~ForkedSatJob() {
     Console::log(Console::VVERB, "%s : enter destructor", toStr());
     auto lock = _solver_lock.getLock();
 
+    Console::log(Console::VVVVERB, "%s : destroy clause comm", toStr());
     if (_clause_comm != NULL) {
         delete (AnytimeSatClauseCommunicator*)_clause_comm;
         _clause_comm = NULL;
     }
 
+    Console::log(Console::VVVVERB, "%s : destroy solver env", toStr());
     if (solverNotNull()) {
         _solver = NULL;
     }

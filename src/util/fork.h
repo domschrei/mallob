@@ -18,7 +18,7 @@ public:
     static void resume(int childpid);
 
     /* 0: running, -1: error, childpid: exited */
-    static int getChildStatus(int childpid);
+    static bool didChildExit(int childpid);
     static bool allChildrenSignalsArrived();
 
 };
