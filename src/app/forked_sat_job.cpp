@@ -71,6 +71,7 @@ bool ForkedSatJob::appl_initialize() {
         Console::log(Console::VVVERB, "%s : beginning to solve", toStr());
         _solver->run();
         Console::log(Console::VERB, "%s : finished horde initialization", toStr());
+        _solver_pid = _solver->getPid();
         _time_of_start_solving = Timer::elapsedSeconds();
     }
 
@@ -161,7 +162,7 @@ void ForkedSatJob::appl_dumpStats() {
 
 bool ForkedSatJob::appl_isDestructible() {
     // Solver is NULL or child process terminated
-    return !solverNotNull() || Fork::didChildExit(_solver->getPid());
+    return _solver_pid == -1 || Fork::didChildExit(_solver_pid);
 }
 
 bool ForkedSatJob::appl_wantsToBeginCommunication() const {

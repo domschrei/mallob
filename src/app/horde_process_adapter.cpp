@@ -310,15 +310,12 @@ pid_t HordeProcessAdapter::getPid() {
 void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
     if (state == SolvingStates::ABORTING) {
         Fork::terminate(*_child_pid); // Terminate child process.
-        return;
     }
     if (state == SolvingStates::SUSPENDED) {
         Fork::suspend(*_child_pid); // Stop (suspend) process.
-        return;
     }
     if (state == SolvingStates::ACTIVE) {
         Fork::resume(*_child_pid); // Continue (resume) process.
-        return;
     }
     if (state == SolvingStates::STANDBY) {
         *_do_interrupt = true;

@@ -25,6 +25,7 @@ private:
     volatile bool _abort_after_initialization = false;
 
     std::unique_ptr<HordeProcessAdapter> _solver;
+    int _solver_pid = -1;
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
 
     mutable Mutex _solver_lock;
