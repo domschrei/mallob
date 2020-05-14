@@ -58,27 +58,27 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
 void HordeProcessAdapter::initSharedMemory() {
 
     // Initialize all needed chunks of shared memory
-    _fields.emplace_back(&_shmem_mutex,        SharedMemMutex::getSharedMemorySize());
-    _fields.emplace_back(&_shmem_cond,         SharedMemConditionVariable::getSharedMemorySize());
-    _fields.emplace_back(&_import_buffer,      _max_import_buffer_size);
-    _fields.emplace_back(&_export_buffer,      _max_export_buffer_size);
-    _fields.emplace_back(&_solution,           _max_solution_size);
-    _fields.emplace_back(&_child_pid,          sizeof(pid_t));
-    _fields.emplace_back(&_state,              sizeof(SolvingStates::SolvingState));
-    _fields.emplace_back(&_portfolio_rank,     sizeof(int));
-    _fields.emplace_back(&_portfolio_size,     sizeof(int));
-    _fields.emplace_back(&_import_buffer_size, sizeof(int));
-    _fields.emplace_back(&_export_buffer_size, sizeof(int));
-    _fields.emplace_back(&_solution_size,      sizeof(int));
-    _fields.emplace_back(&_do_import,          sizeof(bool));
-    _fields.emplace_back(&_do_export,          sizeof(bool));
-    _fields.emplace_back(&_did_export,         sizeof(bool));
-    _fields.emplace_back(&_is_initialized,     sizeof(bool));
-    _fields.emplace_back(&_did_write_solution, sizeof(bool));
-    _fields.emplace_back(&_do_dump_stats,      sizeof(bool));
-    _fields.emplace_back(&_do_interrupt,       sizeof(bool));
-    _fields.emplace_back(&_do_update_role,     sizeof(bool));
-    _fields.emplace_back(&_result,             sizeof(SatResult));
+    _fields.emplace_back((void**) &_shmem_mutex,        SharedMemMutex::getSharedMemorySize());
+    _fields.emplace_back((void**) &_shmem_cond,         SharedMemConditionVariable::getSharedMemorySize());
+    _fields.emplace_back((void**) &_import_buffer,      _max_import_buffer_size);
+    _fields.emplace_back((void**) &_export_buffer,      _max_export_buffer_size);
+    _fields.emplace_back((void**) &_solution,           _max_solution_size);
+    _fields.emplace_back((void**) &_child_pid,          sizeof(pid_t));
+    _fields.emplace_back((void**) &_state,              sizeof(SolvingStates::SolvingState));
+    _fields.emplace_back((void**) &_portfolio_rank,     sizeof(int));
+    _fields.emplace_back((void**) &_portfolio_size,     sizeof(int));
+    _fields.emplace_back((void**) &_import_buffer_size, sizeof(int));
+    _fields.emplace_back((void**) &_export_buffer_size, sizeof(int));
+    _fields.emplace_back((void**) &_solution_size,      sizeof(int));
+    _fields.emplace_back((void**) &_do_import,          sizeof(bool));
+    _fields.emplace_back((void**) &_do_export,          sizeof(bool));
+    _fields.emplace_back((void**) &_did_export,         sizeof(bool));
+    _fields.emplace_back((void**) &_is_initialized,     sizeof(bool));
+    _fields.emplace_back((void**) &_did_write_solution, sizeof(bool));
+    _fields.emplace_back((void**) &_do_dump_stats,      sizeof(bool));
+    _fields.emplace_back((void**) &_do_interrupt,       sizeof(bool));
+    _fields.emplace_back((void**) &_do_update_role,     sizeof(bool));
+    _fields.emplace_back((void**) &_result,             sizeof(SatResult));
 
     // Allocate one block of shared memory for all fields
     _shmem_size = 0;
