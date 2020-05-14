@@ -35,6 +35,7 @@ std::set<pid_t> Fork::_children;
 
 void Fork::init(int rank) {
     _rank = rank;
+    _children.clear();
     signal(SIGTERM, propagateSignalAndExit);
     signal(SIGINT, propagateSignalAndExit);
 }
