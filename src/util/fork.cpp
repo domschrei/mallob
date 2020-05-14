@@ -46,6 +46,6 @@ void Fork::resume(pid_t childpid) {
 }
 int Fork::getChildStatus(pid_t childpid) {
     int status;
-    pid_t result = waitpid(childpid, &status, WNOHANG);
+    pid_t result = waitpid(childpid, &status, WNOHANG | WUNTRACED | WCONTINUED);
     return result;
 }

@@ -15,11 +15,6 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
             const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<std::vector<int>>& assumptions) :
                 _params(params), _log(loggingInterface), _formulae(formulae), _assumptions(assumptions) {
 
-    _shmem_mutex = SharedMemory::create(SharedMemMutex::getSharedMemorySize());
-    _shmem_cond = SharedMemory::create(SharedMemConditionVariable::getSharedMemorySize());
-    _mutex = new SharedMemMutex(_shmem_mutex);
-    _cond = new SharedMemConditionVariable(_shmem_cond);
-    
     _max_import_buffer_size = atoi(params.at("cbbs").c_str()) * sizeof(int) * atoi(params.at("mpisize").c_str());
     _max_export_buffer_size = atoi(params.at("cbbs").c_str()) * sizeof(int);
     // Find maximum size of a potential solution
@@ -32,70 +27,73 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
         }
     }
     _max_solution_size = sizeof(int) * (std::max(maxVar, -minVar)+2);
-
-    _import_buffer = (int*) SharedMemory::create(_max_import_buffer_size);
-    _export_buffer = (int*) SharedMemory::create(_max_export_buffer_size);
-    _solution = (int*) SharedMemory::create(_max_solution_size);
     
-    _child_pid = (pid_t*) SharedMemory::create(sizeof(long));
+    _shmem_mutex        = (void*)                        SharedMemory::create(SharedMemMutex::getSharedMemorySize());
+    _shmem_cond         = (void*)                        SharedMemory::create(SharedMemConditionVariable::getSharedMemorySize());
+    _import_buffer      = (int*)                         SharedMemory::create(_max_import_buffer_size);
+    _export_buffer      = (int*)                         SharedMemory::create(_max_export_buffer_size);
+    _solution           = (int*)                         SharedMemory::create(_max_solution_size);
+    _child_pid          = (pid_t*)                       SharedMemory::create(sizeof(pid_t));
+    _state              = (SolvingStates::SolvingState*) SharedMemory::create(sizeof(SolvingStates::SolvingState));
+    _portfolio_rank     = (int*)                         SharedMemory::create(sizeof(int));
+    _portfolio_size     = (int*)                         SharedMemory::create(sizeof(int));
+    _import_buffer_size = (int*)                         SharedMemory::create(sizeof(int));
+    _export_buffer_size = (int*)                         SharedMemory::create(sizeof(int));
+    _solution_size      = (int*)                         SharedMemory::create(sizeof(int));
+    _do_import          = (bool*)                        SharedMemory::create(sizeof(bool));
+    _do_export          = (bool*)                        SharedMemory::create(sizeof(bool));
+    _did_export         = (bool*)                        SharedMemory::create(sizeof(bool));
+    _is_initialized     = (bool*)                        SharedMemory::create(sizeof(bool));
+    _did_write_solution = (bool*)                        SharedMemory::create(sizeof(bool));
+    _do_dump_stats      = (bool*)                        SharedMemory::create(sizeof(bool));
+    _do_interrupt       = (bool*)                        SharedMemory::create(sizeof(bool));
+    _do_update_role     = (bool*)                        SharedMemory::create(sizeof(bool));
+    _result             = (SatResult*)                   SharedMemory::create(sizeof(SatResult));
+    
+    _mutex = new SharedMemMutex(_shmem_mutex);
+    _cond = new SharedMemConditionVariable(_shmem_cond);
     *_child_pid = -1;
-    _state = (SolvingStates::SolvingState*) SharedMemory::create(sizeof(SolvingStates::SolvingState));
     *_state = SolvingStates::INITIALIZING;
-    _portfolio_rank = (int*) SharedMemory::create(sizeof(int));
     *_portfolio_rank = atoi(params.at("mpirank").c_str());
-    _portfolio_size = (int*) SharedMemory::create(sizeof(int));
     *_portfolio_size = atoi(params.at("mpisize").c_str());
-
-    _import_buffer_size = (int*) SharedMemory::create(sizeof(int));
     *_import_buffer_size = 0;
-    _export_buffer_size = (int*) SharedMemory::create(sizeof(int));
     *_export_buffer_size = 0;
-    _solution_size = (int*) SharedMemory::create(sizeof(int));
     *_solution_size = 0;
-    _do_import = (bool*) SharedMemory::create(sizeof(bool));
     *_do_import = false;
-    _do_export = (bool*) SharedMemory::create(sizeof(bool));
     *_do_export = false;
-    _did_export = (bool*) SharedMemory::create(sizeof(bool));
     *_did_export = false;
-    _is_initialized = (bool*) SharedMemory::create(sizeof(bool));
     *_is_initialized = false;
-    _did_write_solution = (bool*) SharedMemory::create(sizeof(bool));
     *_did_write_solution = false;
-    _do_dump_stats = (bool*) SharedMemory::create(sizeof(bool));
     *_do_dump_stats = false;
-    _do_interrupt = (bool*) SharedMemory::create(sizeof(bool));
     *_do_interrupt = false;
-    _do_update_role = (bool*) SharedMemory::create(sizeof(bool));
     *_do_update_role = false;
-    _result = (SatResult*) SharedMemory::create(sizeof(SatResult));
     *_result = UNKNOWN;
 }
 
 HordeProcessAdapter::~HordeProcessAdapter() {
     delete _mutex;
     delete _cond;
-    SharedMemory::free(_child_pid,          sizeof(long));
     SharedMemory::free(_shmem_mutex,        SharedMemMutex::getSharedMemorySize());
     SharedMemory::free(_shmem_cond,         SharedMemConditionVariable::getSharedMemorySize());
+    SharedMemory::free(_import_buffer,      _max_import_buffer_size);
+    SharedMemory::free(_export_buffer,      _max_export_buffer_size);
+    SharedMemory::free(_solution,           _max_solution_size);
+    SharedMemory::free(_child_pid,          sizeof(pid_t));
     SharedMemory::free(_state,              sizeof(SolvingStates::SolvingState));
     SharedMemory::free(_portfolio_rank,     sizeof(int));
     SharedMemory::free(_portfolio_size,     sizeof(int));
-    SharedMemory::free(_do_export,          sizeof(bool));
-    SharedMemory::free(_do_import,          sizeof(bool));
-    SharedMemory::free(_do_dump_stats,      sizeof(bool));
-    SharedMemory::free(_do_update_role,     sizeof(bool));
-    SharedMemory::free(_do_interrupt,       sizeof(bool));
-    SharedMemory::free(_is_initialized,     sizeof(bool));
-    SharedMemory::free(_did_export,         sizeof(bool));
-    SharedMemory::free(_did_write_solution, sizeof(bool));
-    SharedMemory::free(_export_buffer_size, sizeof(int));
-    SharedMemory::free(_export_buffer,      _max_export_buffer_size);
     SharedMemory::free(_import_buffer_size, sizeof(int));
-    SharedMemory::free(_import_buffer,      _max_import_buffer_size);
-    SharedMemory::free(_result,             sizeof(SatResult));
+    SharedMemory::free(_export_buffer_size, sizeof(int));
 	SharedMemory::free(_solution_size,      sizeof(int));
-    SharedMemory::free(_solution,           _max_solution_size);
+    SharedMemory::free(_do_import,          sizeof(bool));
+    SharedMemory::free(_do_export,          sizeof(bool));
+    SharedMemory::free(_did_export,         sizeof(bool));
+    SharedMemory::free(_is_initialized,     sizeof(bool));
+    SharedMemory::free(_did_write_solution, sizeof(bool));
+    SharedMemory::free(_do_dump_stats,      sizeof(bool));
+    SharedMemory::free(_do_interrupt,       sizeof(bool));
+    SharedMemory::free(_do_update_role,     sizeof(bool));
+    SharedMemory::free(_result,             sizeof(SatResult));
 }
 
 void HordeProcessAdapter::run() {
