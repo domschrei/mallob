@@ -23,45 +23,47 @@ private:
     int _max_import_buffer_size;
     int _max_export_buffer_size;
     int _max_solution_size;
-
-    SharedMemMutex* _mutex;
-    SharedMemConditionVariable* _cond;
     
-    // SHARED MEMORY
-
-    void* _shmem;
     size_t _shmem_size;
 
-    void* _shmem_mutex;
-    void* _shmem_cond;
-    pid_t* _child_pid;
-    SolvingStates::SolvingState* _state;
+    // SHARED MEMORY
 
+    // Meta data parent->child
+    void* _shmem;
+    pid_t* _child_pid;
     int* _portfolio_rank;
     int* _portfolio_size;
 
-    // Instructions main->solver
+    // Instructions parent->child
     bool* _do_export;
     bool* _do_import;
     bool* _do_dump_stats;
     bool* _do_update_role;
     bool* _do_interrupt;
 
-    // Responses solver->main
-    bool* _is_initialized;
+    // Responses child->parent
     bool* _did_export;
-    bool* _did_write_solution;
-    
-    // Clause buffers to be exchanged
-    int* _export_buffer_size;
-    int* _export_buffer;
-    int* _import_buffer_size;
-    int* _import_buffer;
+    bool* _did_import;
+    bool* _did_dump_stats;
+    bool* _did_update_role;
+    bool* _did_interrupt;
 
-    // Solution
+    // State alerts child->parent
+    bool* _is_initialized;
+    bool* _has_solution;
     SatResult* _result = NULL;
 	int* _solution_size;
     int* _solution;
+    
+    // Clause buffers: parent->child
+    int* _export_buffer_max_size;
+    int* _import_buffer_size;
+    int* _import_buffer;
+    
+    // Clause buffers: child->parent
+    int* _export_buffer_true_size;
+    int* _export_buffer;
+
 
 
 public:
@@ -83,7 +85,7 @@ public:
 
     void dumpStats();
     
-    bool hasSolution();
+    bool check();
     std::pair<SatResult, std::vector<int>> getSolution();
 
 private:

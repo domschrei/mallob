@@ -138,7 +138,7 @@ int ForkedSatJob::appl_solveLoop() {
     if (_done_locally) return result;
 
     // Did a solver find a result?
-    if (_solver->hasSolution()) {
+    if (_solver->check()) {
         auto solution = _solver->getSolution();
         result = solution.first;
         Console::log_send(Console::INFO, getRootNodeRank(), "%s : found result %s", toStr(), 

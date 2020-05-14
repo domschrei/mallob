@@ -58,29 +58,42 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
 void HordeProcessAdapter::initSharedMemory() {
 
     // Initialize all needed chunks of shared memory
+    
     std::vector<std::pair<void**, int>> fields;
-    fields.emplace_back((void**) &_shmem_mutex,        SharedMemMutex::getSharedMemorySize());
-    fields.emplace_back((void**) &_shmem_cond,         SharedMemConditionVariable::getSharedMemorySize());
-    fields.emplace_back((void**) &_import_buffer,      _max_import_buffer_size);
-    fields.emplace_back((void**) &_export_buffer,      _max_export_buffer_size);
-    fields.emplace_back((void**) &_solution,           _max_solution_size);
-    fields.emplace_back((void**) &_child_pid,          sizeof(pid_t));
-    fields.emplace_back((void**) &_state,              sizeof(SolvingStates::SolvingState));
-    fields.emplace_back((void**) &_portfolio_rank,     sizeof(int));
-    fields.emplace_back((void**) &_portfolio_size,     sizeof(int));
-    fields.emplace_back((void**) &_import_buffer_size, sizeof(int));
-    fields.emplace_back((void**) &_export_buffer_size, sizeof(int));
-    fields.emplace_back((void**) &_solution_size,      sizeof(int));
-    fields.emplace_back((void**) &_do_import,          sizeof(bool));
-    fields.emplace_back((void**) &_do_export,          sizeof(bool));
-    fields.emplace_back((void**) &_did_export,         sizeof(bool));
-    fields.emplace_back((void**) &_is_initialized,     sizeof(bool));
-    fields.emplace_back((void**) &_did_write_solution, sizeof(bool));
-    fields.emplace_back((void**) &_do_dump_stats,      sizeof(bool));
-    fields.emplace_back((void**) &_do_interrupt,       sizeof(bool));
-    fields.emplace_back((void**) &_do_update_role,     sizeof(bool));
-    fields.emplace_back((void**) &_result,             sizeof(SatResult));
+    
+    // a) R&W by parent, readonly by child
 
+    fields.emplace_back((void**) &_child_pid,               sizeof(pid_t));
+    fields.emplace_back((void**) &_portfolio_rank,          sizeof(int));
+    fields.emplace_back((void**) &_portfolio_size,          sizeof(int));
+
+    fields.emplace_back((void**) &_do_export,               sizeof(bool));
+    fields.emplace_back((void**) &_do_import,               sizeof(bool));
+    fields.emplace_back((void**) &_do_dump_stats,           sizeof(bool));
+    fields.emplace_back((void**) &_do_update_role,          sizeof(bool));
+    fields.emplace_back((void**) &_do_interrupt,            sizeof(bool));
+
+    fields.emplace_back((void**) &_export_buffer_max_size,  sizeof(int));
+    fields.emplace_back((void**) &_import_buffer_size,      sizeof(int));
+    fields.emplace_back((void**) &_import_buffer,           _max_import_buffer_size);
+
+    // b) R&W by child, readonly by parent
+
+    fields.emplace_back((void**) &_did_export,              sizeof(bool));
+    fields.emplace_back((void**) &_did_import,              sizeof(bool));
+    fields.emplace_back((void**) &_did_dump_stats,          sizeof(bool));
+    fields.emplace_back((void**) &_did_update_role,         sizeof(bool));
+    fields.emplace_back((void**) &_did_interrupt,           sizeof(bool));
+
+    fields.emplace_back((void**) &_is_initialized,          sizeof(bool));
+    fields.emplace_back((void**) &_has_solution,            sizeof(bool));
+    fields.emplace_back((void**) &_result,                  sizeof(SatResult));
+    fields.emplace_back((void**) &_solution_size,           sizeof(int));
+    fields.emplace_back((void**) &_solution,                _max_solution_size);
+    
+    fields.emplace_back((void**) &_export_buffer_true_size, sizeof(int));
+    fields.emplace_back((void**) &_export_buffer,           _max_export_buffer_size);
+    
     // Allocate one block of shared memory for all fields
     _shmem_size = 0;
     for (const auto& field : fields) {
@@ -98,31 +111,36 @@ void HordeProcessAdapter::initSharedMemory() {
     }
 
     // Initialize fields
-    _mutex = new SharedMemMutex(_shmem_mutex);
-    _cond = new SharedMemConditionVariable(_shmem_cond);
+    
     *_child_pid = -1;
-    *_state = SolvingStates::INITIALIZING;
     *_portfolio_rank = atoi(_params.at("mpirank").c_str());
     *_portfolio_size = atoi(_params.at("mpisize").c_str());
-    *_import_buffer_size = 0;
-    *_export_buffer_size = 0;
-    *_solution_size = 0;
-    *_do_import = false;
+
     *_do_export = false;
-    *_did_export = false;
-    *_is_initialized = false;
-    *_did_write_solution = false;
+    *_do_import = false;
     *_do_dump_stats = false;
-    *_do_interrupt = false;
     *_do_update_role = false;
+    *_do_interrupt = false;
+
+    *_export_buffer_max_size = 0;
+    *_import_buffer_size = 0;
+
+    *_did_export = false;
+    *_did_import = false;
+    *_did_dump_stats = false;
+    *_did_update_role = false;
+    *_did_interrupt = false;
+
+    *_is_initialized = false;
+    *_has_solution = false;
     *_result = UNKNOWN;
+    *_solution_size = 0;
+
+    *_export_buffer_true_size = 0;
 }
 
 HordeProcessAdapter::~HordeProcessAdapter() {
     
-    delete _mutex;
-    delete _cond;
-
     if (*_child_pid != getpid()) {
         // Parent process
         SharedMemory::free(_shmem, _shmem_size);
@@ -168,12 +186,10 @@ void HordeProcessAdapter::run() {
     // [child process]
 
     float startTime = Timer::elapsedSeconds();
-    bool solved = false;
 
     // Prepare solver
     HordeLib hlib(_params, _log);
     hlib.beginSolving(_formulae, _assumptions);
-    *_state = SolvingStates::ACTIVE;
 
     // Main loop
     while (true) {
@@ -181,10 +197,7 @@ void HordeProcessAdapter::run() {
         //_log->log(0, "main loop\n");
 
         // Wait until something happens
-        bool somethingHappened = _cond->timedWait(*_mutex, [&]() {
-            // Done solving OR should {im|ex}port clauses OR should allocate shmem for solution
-            return hlib.isAnySolutionFound() || *_do_export || *_do_import || *_do_update_role;
-        }, 1000 * 1000 /*1 millisecond*/);
+        usleep(1000 /*1 millisecond*/);
 
         // Check initialization state
         if (!*_is_initialized && hlib.isFullyInitialized()) {
@@ -192,8 +205,8 @@ void HordeProcessAdapter::run() {
             *_is_initialized = true;
         }
 
-        if (*_do_dump_stats) {
-            // Dump stats
+        // Dump stats
+        if (*_do_dump_stats && !*_did_dump_stats) {
             _log->log(3, "DO dump stats\n");
             float age = Timer::elapsedSeconds() - startTime;
 
@@ -212,62 +225,57 @@ void HordeProcessAdapter::run() {
                 thread_cpuratio(threadTids[i], age, cpuRatio);
                 _log->log(0, "td.%i : %.2f%% CPU", threadTids[i], cpuRatio);
             }
-            *_do_dump_stats = false;
-        }
 
-        if (*_do_interrupt) {
+            *_did_dump_stats = true;
+        }
+        if (!*_do_dump_stats) *_did_dump_stats = false;
+
+        // Interrupt solvers
+        if (*_do_interrupt && !*_did_interrupt) {
             _log->log(3, "DO interrupt\n");
             hlib.interrupt();
-            *_do_interrupt = false;
+            *_did_interrupt = true;
         }
+        if (!*_do_interrupt) *_did_interrupt = false;
 
-        if (*_do_update_role) {
+        // Update role
+        if (*_do_update_role && !*_did_update_role) {
             _log->log(3, "DO update role\n");
-            _mutex->lock();
             hlib.updateRole(*_portfolio_rank, *_portfolio_size);
-            *_do_update_role = false;
-            _mutex->unlock();
+            *_did_update_role = true;
         }
-
-        //if (!somethingHappened) continue;
+        if (!*_do_update_role) *_did_update_role = false;
 
         // Check if clauses should be exported
-        if (*_do_export) {
+        if (*_do_export && !*_did_export) {
             _log->log(3, "DO export clauses\n");
             // Collect local clauses, put into shared memory
             // TODO do without copying all the data
-            std::vector<int> clauses = hlib.prepareSharing(*_export_buffer_size);
-            _mutex->lock();
+            std::vector<int> clauses = hlib.prepareSharing(*_export_buffer_max_size);
             memcpy(_export_buffer, clauses.data(), clauses.size()*sizeof(int));
-            *_export_buffer_size = clauses.size();
-            *_do_export = false;
+            *_export_buffer_true_size = clauses.size();
             *_did_export = true;
-            _mutex->unlock();
-            continue;
         }
+        if (!*_do_export) *_did_export = false;
 
         // Check if clauses should be imported
-        if (*_do_import) {
+        if (*_do_import && !*_did_import) {
             _log->log(3, "DO import clauses\n");
             // Write imported clauses from shared memory into vector
             // TODO do without copying all the data
-            _mutex->lock();
             std::vector<int> clauses(*_import_buffer_size);
             memcpy(clauses.data(), _import_buffer, *_import_buffer_size*sizeof(int));
-            *_do_import = false;
-            _mutex->unlock();
+            *_did_import = true;
             hlib.digestSharing(clauses);
-            continue;
         }
+        if (!*_do_import) *_did_import = false;
 
         // Check solved state
-        if (solved) continue;
+        if (*_has_solution) continue;
         int result = hlib.solveLoop();
         if (result >= 0) {
-            solved = true;
             _log->log(3, "DO write solution\n");
             // Solution found!
-            _mutex->lock();
             if (result == SatResult::SAT) {
                 // SAT
                 *_result = SAT;
@@ -278,14 +286,13 @@ void HordeProcessAdapter::run() {
                 std::set<int> fa = hlib.getFailedAssumptions();
                 for (int x : fa) _solution_vec.push_back(x);
             }
-            // Write size of solution such that main thread can allocate shared mem for it
+            // Write solution
             *_solution_size = _solution_vec.size();
             if (*_solution_size > 0) {
                 memcpy(_solution, _solution_vec.data(), *_solution_size*sizeof(int));
             }
-            *_did_write_solution = true;
-            _mutex->unlock();
             _log->log(3, "DONE write solution\n");
+            *_has_solution = true;
             continue;
         }
     }
@@ -300,8 +307,6 @@ pid_t HordeProcessAdapter::getPid() {
 }
 
 void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
-    if (state == *_state) return;
-
     if (state == SolvingStates::ABORTING) {
         Fork::terminate(*_child_pid); // Terminate child process.
         return;
@@ -320,57 +325,46 @@ void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
 }
 
 void HordeProcessAdapter::updateRole(int rank, int size) {
-    _mutex->lock();
     *_portfolio_rank = rank;
     *_portfolio_size = size;
     *_do_update_role = true;
-    _mutex->unlock();
-    _cond->notify();
 }
 
 void HordeProcessAdapter::collectClauses(int maxSize) {
-    if (*_do_export) return; // already collecting
-    _mutex->lock();
-    *_export_buffer_size = maxSize;
+    *_export_buffer_max_size = maxSize;
     *_do_export = true;
-    *_did_export = false;
-    _mutex->unlock();
-    _cond->notify();
 }
 bool HordeProcessAdapter::hasCollectedClauses() {
     return *_did_export;
 }
 std::vector<int> HordeProcessAdapter::getCollectedClauses() {
-    _mutex->lock();
-    std::vector<int> clauses(*_export_buffer_size);
+    std::vector<int> clauses(*_export_buffer_true_size);
     memcpy(clauses.data(), _export_buffer, clauses.size()*sizeof(int));
-    *_did_export = false;
-    _mutex->unlock();
     return clauses;
 }
 
 void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses) {
-    _mutex->lock();
     *_import_buffer_size = clauses.size();
     memcpy(_import_buffer, clauses.data(), clauses.size()*sizeof(int));
     *_do_import = true;
-    _mutex->unlock();
-    _cond->notify();
 }
 
 void HordeProcessAdapter::dumpStats() {
     *_do_dump_stats = true;
 }
 
-bool HordeProcessAdapter::hasSolution() {
-    return *_did_write_solution;
+bool HordeProcessAdapter::check() {
+    if (*_did_export) *_do_export = false;
+    if (*_did_import) *_do_import = false;
+    if (*_did_update_role) *_do_update_role = false;
+    if (*_did_interrupt) *_do_interrupt = false;
+    if (*_did_dump_stats) *_do_dump_stats = false;
+    return *_has_solution;
 }
 
 std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
     if (*_solution_size == 0) return std::pair<SatResult, std::vector<int>>(*_result, std::vector<int>()); 
-    _mutex->lock();
     std::vector<int> solution(*_solution_size);
     memcpy(solution.data(), _solution, solution.size()*sizeof(int));
-    _mutex->unlock();
     return std::pair<SatResult, std::vector<int>>(*_result, solution);
 }
