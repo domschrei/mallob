@@ -186,6 +186,7 @@ void HordeProcessAdapter::run() {
 
     // [child process]
 
+    Fork::init(Fork::_rank);
     float startTime = Timer::elapsedSeconds();
 
     // Prepare solver

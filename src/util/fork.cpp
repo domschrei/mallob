@@ -74,5 +74,5 @@ void Fork::terminateAll() {
 bool Fork::didChildExit(pid_t childpid) {
     int status;
     pid_t result = waitpid(childpid, &status, WNOHANG /*| WUNTRACED | WCONTINUED*/);
-    return WIFEXITED(status);
+    return result > 0;
 }
