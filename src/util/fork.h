@@ -13,9 +13,10 @@ public:
     static void init(int rank);
     static int createChild();
     static void terminate(int childpid);
-    static void terminateAll();
+    static void hardkill(int childpid);
     static void suspend(int childpid);
     static void resume(int childpid);
+    static void terminateAll();
 
     /* 0: running, -1: error, childpid: exited */
     static bool didChildExit(int childpid);

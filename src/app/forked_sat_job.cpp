@@ -234,6 +234,10 @@ ForkedSatJob::~ForkedSatJob() {
     if (solverNotNull()) {
         _solver = NULL;
     }
+    if (_solver_pid != -1 && !Fork::didChildExit(_solver_pid)) {
+        Console::log(Console::VVVVERB, "%s : SIGKILLing child pid=%i", toStr(), _solver_pid);
+        Fork::hardkill(_solver_pid);
+    }
 
     Console::log(Console::VVERB, "%s : destructed SAT job", toStr());
 }
