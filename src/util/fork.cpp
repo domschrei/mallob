@@ -9,6 +9,7 @@
 
 
 void propagateSignalAndExit(int signum) {
+
     std::set<int> children = Fork::_children;
     
     // Propagate signal to children

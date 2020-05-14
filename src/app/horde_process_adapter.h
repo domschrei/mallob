@@ -20,6 +20,8 @@ private:
 
     std::vector<int> _solution_vec;
 
+    SolvingStates::SolvingState _state;
+
     int _max_import_buffer_size;
     int _max_export_buffer_size;
     int _max_solution_size;

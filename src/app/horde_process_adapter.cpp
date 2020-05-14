@@ -180,6 +180,7 @@ void HordeProcessAdapter::run() {
         // Write child PID 
         *_child_pid = res;
         _log->log(1, "Child pid=%i created\n", *_child_pid);
+        _state = SolvingStates::ACTIVE;
         
         return;
     }
@@ -309,6 +310,8 @@ pid_t HordeProcessAdapter::getPid() {
 }
 
 void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
+    if (state == _state) return;
+
     if (state == SolvingStates::ABORTING) {
         Fork::terminate(*_child_pid); // Terminate child process.
     }
@@ -321,6 +324,8 @@ void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
     if (state == SolvingStates::STANDBY) {
         *_do_interrupt = true;
     }
+
+    _state = state;
 }
 
 void HordeProcessAdapter::updateRole(int rank, int size) {
