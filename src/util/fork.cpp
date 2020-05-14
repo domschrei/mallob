@@ -9,8 +9,15 @@
 
 
 void propagateSignalAndExit(int signum) {
-    for (pid_t child : Fork::_children) {
+    std::set<int> children = Fork::_children;
+    // One second time for "soft" exit
+    for (pid_t child : children) {
         kill(child, signum);
+    }
+    usleep(1000 * 1000);
+    // Hard kill all remaining processes after 1 second
+    for (pid_t child : children) {
+        kill(child, SIGKILL);
     }
     exit(0);
 }
