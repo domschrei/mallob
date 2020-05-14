@@ -175,10 +175,11 @@ void HordeProcessAdapter::run() {
 
     pid_t res = Fork::createChild();
     if (res > 0) {
-        // [parent process] 
+        // [parent process]
 
         // Write child PID 
         *_child_pid = res;
+        _log->log(1, "Child pid=%i created\n", *_child_pid);
         
         return;
     }
