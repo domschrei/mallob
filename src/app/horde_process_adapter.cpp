@@ -120,10 +120,13 @@ void HordeProcessAdapter::initSharedMemory() {
 
 HordeProcessAdapter::~HordeProcessAdapter() {
     
-    //delete _mutex;
-    //delete _cond;
+    delete _mutex;
+    delete _cond;
 
-    SharedMemory::free(_shmem, _shmem_size);
+    if (*_child_pid != getpid()) {
+        // Parent process
+        SharedMemory::free(_shmem, _shmem_size);
+    }
 
     /*
     SharedMemory::free(_shmem_mutex,        SharedMemMutex::getSharedMemorySize());
