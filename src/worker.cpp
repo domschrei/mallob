@@ -1538,10 +1538,12 @@ Worker::~Worker() {
 
     exiting = true;
 
-    // Send termination signal to the entire process group (quicker than normal terminate)
-    // (Workaround for idle times after finishing)
+    // Send termination signal to the entire process group 
     Fork::terminateAll();
-    raise(SIGTERM);
+    
+    // -- quicker than normal terminate
+    // -- workaround for idle times after finishing
+    //raise(SIGTERM);
 
     // Delete each job (iterating over "jobs" invalid as entries are deleted)
     std::vector<int> jobIds;

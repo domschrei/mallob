@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
     Random::init(numNodes, rank);
 
     // Initialize bookkeeping of child processes
-    Fork::init();
+    Fork::init(rank);
 
     // Find client ranks
     std::set<int> externalClientRanks;

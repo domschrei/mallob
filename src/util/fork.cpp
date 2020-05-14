@@ -33,10 +33,12 @@ void acknowledgeChildExit(int signum) {
 }
 
 
+int Fork::_rank;
 std::set<pid_t> Fork::_children;
 int Fork::_pending_exiting_children = 0;
 
-void Fork::init() {
+void Fork::init(int rank) {
+    _rank = rank;
     signal(SIGTERM, propagateSignalAndExit);
     signal(SIGINT, propagateSignalAndExit);
     //signal(SIGCHLD, acknowledgeChildExit);

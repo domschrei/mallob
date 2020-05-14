@@ -7,10 +7,11 @@
 class Fork {
 
 public:
+    static int _rank;
     static std::set<int> _children;
     static int _pending_exiting_children;
 
-    static void init();
+    static void init(int rank);
     static int createChild();
     static void terminate(int childpid);
     static void terminateAll();
