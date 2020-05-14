@@ -19,6 +19,7 @@
 #include "util/random.h"
 #include "util/memusage.h"
 #include "util/sat_reader.h"
+#include "util/fork.h"
 #include "balancing/cutoff_priority_balancer.h"
 #include "balancing/event_driven_balancer.h"
 #include "data/job_description.h"
@@ -1537,9 +1538,10 @@ Worker::~Worker() {
 
     exiting = true;
 
-    // Send termination signal to this process (quicker than normal terminate)
+    // Send termination signal to the entire process group (quicker than normal terminate)
     // (Workaround for idle times after finishing)
-    kill(getpid(), SIGTERM);
+    Fork::terminateAll();
+    kill(0, SIGTERM);
 
     // Delete each job (iterating over "jobs" invalid as entries are deleted)
     std::vector<int> jobIds;

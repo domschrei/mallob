@@ -46,6 +46,12 @@ void Fork::terminate(pid_t childpid) {
     _children.erase(childpid);
     _pending_exiting_children++;
 }
+void Fork::terminateAll() {
+    std::set<int> children = _children;
+    for (int childpid : children) {
+        terminate(childpid);
+    }
+}
 void Fork::suspend(pid_t childpid) {
     kill(childpid, SIGSTOP);
 }

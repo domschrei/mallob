@@ -13,6 +13,7 @@ public:
     static void init();
     static int createChild();
     static void terminate(int childpid);
+    static void terminateAll();
     static void suspend(int childpid);
     static void resume(int childpid);
 
