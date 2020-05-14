@@ -10,15 +10,21 @@
 
 void propagateSignalAndExit(int signum) {
     std::set<int> children = Fork::_children;
-    // One second time for "soft" exit
+    
+    // Send "soft" exit to children
     for (pid_t child : children) {
         kill(child, signum);
     }
-    usleep(1000 * 1000);
+
+    /*
     // Hard kill all remaining processes after 1 second
+    usleep(1000 * 1000);
     for (pid_t child : children) {
         kill(child, SIGKILL);
     }
+    */
+
+    // Exit yourself
     exit(0);
 }
 
@@ -33,7 +39,7 @@ int Fork::_pending_exiting_children = 0;
 void Fork::init() {
     signal(SIGTERM, propagateSignalAndExit);
     signal(SIGINT, propagateSignalAndExit);
-    signal(SIGCHLD, acknowledgeChildExit);
+    //signal(SIGCHLD, acknowledgeChildExit);
 }
 
 pid_t Fork::createChild() {
@@ -51,7 +57,7 @@ void Fork::terminate(pid_t childpid) {
     kill(childpid, SIGCONT);
     kill(childpid, SIGTERM);
     _children.erase(childpid);
-    _pending_exiting_children++;
+    //_pending_exiting_children++;
 }
 void Fork::terminateAll() {
     std::set<int> children = _children;
@@ -60,7 +66,7 @@ void Fork::terminateAll() {
     }
 }
 void Fork::suspend(pid_t childpid) {
-    kill(childpid, SIGSTOP);
+    kill(childpid, SIGTSTP);
 }
 void Fork::resume(pid_t childpid) {
     kill(childpid, SIGCONT);

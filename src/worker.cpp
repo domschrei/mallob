@@ -1541,7 +1541,7 @@ Worker::~Worker() {
     // Send termination signal to the entire process group (quicker than normal terminate)
     // (Workaround for idle times after finishing)
     Fork::terminateAll();
-    kill(getpid(), SIGTERM);
+    raise(SIGTERM);
 
     // Delete each job (iterating over "jobs" invalid as entries are deleted)
     std::vector<int> jobIds;
