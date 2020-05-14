@@ -161,7 +161,7 @@ void ForkedSatJob::appl_dumpStats() {
 
 bool ForkedSatJob::appl_isDestructible() {
     // Solver is NULL or child process terminated
-    return !solverNotNull() || Fork::getChildStatus(_solver->getPid()) > 0;
+    return !solverNotNull() || Fork::allChildrenSignalsArrived();
 }
 
 bool ForkedSatJob::appl_wantsToBeginCommunication() const {

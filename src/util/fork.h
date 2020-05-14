@@ -2,12 +2,14 @@
 #ifndef DOMPASCH_MALLOB_FORK_H
 #define DOMPASCH_MALLOB_FORK_H
 
+#include <stdatomic.h>
 #include <set>
 
 class Fork {
 
 public:
     static std::set<int> _children;
+    static atomic_int _pending_exiting_children;
 
     static void init();
     static int createChild();
@@ -17,6 +19,7 @@ public:
 
     /* 0: running, -1: error, childpid: exited */
     static int getChildStatus(int childpid);
+    static bool allChildrenSignalsArrived();
 
 };
 
