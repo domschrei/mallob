@@ -340,6 +340,7 @@ bool HordeProcessAdapter::hasCollectedClauses() {
 std::vector<int> HordeProcessAdapter::getCollectedClauses() {
     std::vector<int> clauses(*_export_buffer_true_size);
     memcpy(clauses.data(), _export_buffer, clauses.size()*sizeof(int));
+    *_do_export = false;
     return clauses;
 }
 
@@ -354,7 +355,6 @@ void HordeProcessAdapter::dumpStats() {
 }
 
 bool HordeProcessAdapter::check() {
-    if (*_did_export) *_do_export = false;
     if (*_did_import) *_do_import = false;
     if (*_did_update_role) *_do_update_role = false;
     if (*_did_interrupt) *_do_interrupt = false;
