@@ -28,6 +28,11 @@ private:
     SharedMemConditionVariable* _cond;
     
     // SHARED MEMORY
+
+    std::vector<std::pair<void**, int>> _fields;
+    void* _shmem;
+    int _shmem_size;
+
     void* _shmem_mutex;
     void* _shmem_cond;
     pid_t* _child_pid;
@@ -81,6 +86,9 @@ public:
     
     bool hasSolution();
     std::pair<SatResult, std::vector<int>> getSolution();
+
+private:
+    void initSharedMemory();
 
 };
 
