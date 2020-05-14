@@ -92,7 +92,8 @@ void HordeProcessAdapter::initSharedMemory() {
     for (auto& field : _fields) {
         // Set the field's pointer to the next position in shared memory
         *(field.first) = memptr;
-        memptr = memptr + field.second;
+        // Advance memptr by <field.second> bytes
+        memptr = ((char*)memptr) + field.second;
     }
 
     // Initialize fields
