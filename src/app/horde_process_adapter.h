@@ -29,9 +29,8 @@ private:
     
     // SHARED MEMORY
 
-    std::vector<std::pair<void**, int>> _fields;
     void* _shmem;
-    int _shmem_size;
+    size_t _shmem_size;
 
     void* _shmem_mutex;
     void* _shmem_cond;

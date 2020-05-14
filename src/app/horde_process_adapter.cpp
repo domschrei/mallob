@@ -58,38 +58,39 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
 void HordeProcessAdapter::initSharedMemory() {
 
     // Initialize all needed chunks of shared memory
-    _fields.emplace_back((void**) &_shmem_mutex,        SharedMemMutex::getSharedMemorySize());
-    _fields.emplace_back((void**) &_shmem_cond,         SharedMemConditionVariable::getSharedMemorySize());
-    _fields.emplace_back((void**) &_import_buffer,      _max_import_buffer_size);
-    _fields.emplace_back((void**) &_export_buffer,      _max_export_buffer_size);
-    _fields.emplace_back((void**) &_solution,           _max_solution_size);
-    _fields.emplace_back((void**) &_child_pid,          sizeof(pid_t));
-    _fields.emplace_back((void**) &_state,              sizeof(SolvingStates::SolvingState));
-    _fields.emplace_back((void**) &_portfolio_rank,     sizeof(int));
-    _fields.emplace_back((void**) &_portfolio_size,     sizeof(int));
-    _fields.emplace_back((void**) &_import_buffer_size, sizeof(int));
-    _fields.emplace_back((void**) &_export_buffer_size, sizeof(int));
-    _fields.emplace_back((void**) &_solution_size,      sizeof(int));
-    _fields.emplace_back((void**) &_do_import,          sizeof(bool));
-    _fields.emplace_back((void**) &_do_export,          sizeof(bool));
-    _fields.emplace_back((void**) &_did_export,         sizeof(bool));
-    _fields.emplace_back((void**) &_is_initialized,     sizeof(bool));
-    _fields.emplace_back((void**) &_did_write_solution, sizeof(bool));
-    _fields.emplace_back((void**) &_do_dump_stats,      sizeof(bool));
-    _fields.emplace_back((void**) &_do_interrupt,       sizeof(bool));
-    _fields.emplace_back((void**) &_do_update_role,     sizeof(bool));
-    _fields.emplace_back((void**) &_result,             sizeof(SatResult));
+    std::vector<std::pair<void**, int>> fields;
+    fields.emplace_back((void**) &_shmem_mutex,        SharedMemMutex::getSharedMemorySize());
+    fields.emplace_back((void**) &_shmem_cond,         SharedMemConditionVariable::getSharedMemorySize());
+    fields.emplace_back((void**) &_import_buffer,      _max_import_buffer_size);
+    fields.emplace_back((void**) &_export_buffer,      _max_export_buffer_size);
+    fields.emplace_back((void**) &_solution,           _max_solution_size);
+    fields.emplace_back((void**) &_child_pid,          sizeof(pid_t));
+    fields.emplace_back((void**) &_state,              sizeof(SolvingStates::SolvingState));
+    fields.emplace_back((void**) &_portfolio_rank,     sizeof(int));
+    fields.emplace_back((void**) &_portfolio_size,     sizeof(int));
+    fields.emplace_back((void**) &_import_buffer_size, sizeof(int));
+    fields.emplace_back((void**) &_export_buffer_size, sizeof(int));
+    fields.emplace_back((void**) &_solution_size,      sizeof(int));
+    fields.emplace_back((void**) &_do_import,          sizeof(bool));
+    fields.emplace_back((void**) &_do_export,          sizeof(bool));
+    fields.emplace_back((void**) &_did_export,         sizeof(bool));
+    fields.emplace_back((void**) &_is_initialized,     sizeof(bool));
+    fields.emplace_back((void**) &_did_write_solution, sizeof(bool));
+    fields.emplace_back((void**) &_do_dump_stats,      sizeof(bool));
+    fields.emplace_back((void**) &_do_interrupt,       sizeof(bool));
+    fields.emplace_back((void**) &_do_update_role,     sizeof(bool));
+    fields.emplace_back((void**) &_result,             sizeof(SatResult));
 
     // Allocate one block of shared memory for all fields
     _shmem_size = 0;
-    for (const auto& field : _fields) {
+    for (const auto& field : fields) {
         _shmem_size += field.second;
     }
     _shmem = SharedMemory::create(_shmem_size);
 
     // Set all fields to their respective position in the shared memory block
     void* memptr = _shmem;
-    for (auto& field : _fields) {
+    for (auto& field : fields) {
         // Set the field's pointer to the next position in shared memory
         *(field.first) = memptr;
         // Advance memptr by <field.second> bytes
@@ -118,8 +119,9 @@ void HordeProcessAdapter::initSharedMemory() {
 }
 
 HordeProcessAdapter::~HordeProcessAdapter() {
-    delete _mutex;
-    delete _cond;
+    
+    //delete _mutex;
+    //delete _cond;
 
     SharedMemory::free(_shmem, _shmem_size);
 
