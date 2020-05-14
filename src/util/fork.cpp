@@ -70,6 +70,6 @@ void Fork::resume(pid_t childpid) {
 }
 bool Fork::didChildExit(pid_t childpid) {
     int status;
-    pid_t result = waitpid(childpid, &status, WNOHANG | WUNTRACED | WCONTINUED);
+    pid_t result = waitpid(childpid, &status, WNOHANG /*| WUNTRACED | WCONTINUED*/);
     return WIFEXITED(status);
 }
