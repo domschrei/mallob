@@ -300,12 +300,10 @@ bool MyMpi::test(MPI_Request& request, MPI_Status& status) {
     return flag;
 }
 
-std::vector<MessageHandlePtr> MyMpi::poll() {
+std::vector<MessageHandlePtr> MyMpi::poll(float elapsedTime) {
 
     std::vector<MessageHandlePtr> foundHandles;
     std::vector<MessageHandlePtr> handlesToCancel;
-
-    float elapsedTime = Timer::elapsedSeconds();
 
     // Find ready handle of best priority
     for (auto& h : _handles) {

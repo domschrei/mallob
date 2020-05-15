@@ -138,7 +138,7 @@ private:
     
     void rebalance();
     void finishBalancing();
-    void allreduceSystemState();
+    void allreduceSystemState(float elapsedTime = Timer::elapsedSeconds());
 
     bool checkComputationLimits(int jobId);
     int getLoad() const {return load;};

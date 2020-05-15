@@ -272,8 +272,8 @@ bool Job::isDestructible() {
     return !isInitializing() && appl_isDestructible();
 }
 
-int Job::getDemand(int prevVolume) const {
-    if (isInState({ACTIVE, INITIALIZING_TO_ACTIVE})) {
+int Job::getDemand(int prevVolume, float elapsedTime) const {
+    if (isInStateUnsafe({ACTIVE, INITIALIZING_TO_ACTIVE})) {
 
         int demand; 
         if (_growth_period <= 0) {
@@ -282,16 +282,18 @@ int Job::getDemand(int prevVolume) const {
         } else {
             if (_time_of_initialization <= 0) demand = 1;
             else {
-                float t = Timer::elapsedSeconds()-_time_of_initialization;
+                float t = elapsedTime-_time_of_initialization;
                 
                 // Continuous growth
                 float numPeriods = t/_growth_period;
                 if (!_continuous_growth) {
-                    // Discrete, periodic growth
+                    // Discrete periodic growth
                     numPeriods = std::floor(numPeriods);
+                    demand = std::min(_comm_size, 1 << (int)(numPeriods + 1) - 1);
+                } else {
+                    // d(0) := 1; d := 2d+1 every <growthPeriod> seconds
+                    demand = std::min(_comm_size, (int)std::pow(2, numPeriods + 1) - 1);
                 }
-                // d(0) := 1; d := 2d+1 every <growthPeriod> seconds
-                demand = std::min(_comm_size, (int)std::pow(2, numPeriods + 1) - 1);
             }
         }
 

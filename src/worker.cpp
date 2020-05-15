@@ -155,11 +155,13 @@ void Worker::mainProgram() {
 
     int iteration = 0;
     float lastMemCheckTime = Timer::elapsedSeconds();
-    float lastJobCheckTime = Timer::elapsedSeconds();
-    float sleepMicrosecs = params.getFloatParam("sleep");
+    float lastJobCheckTime = lastMemCheckTime;
+    float lastBalanceCheckTime = lastMemCheckTime;
 
+    float sleepMicrosecs = params.getFloatParam("sleep");
     float memCheckPeriod = 3.0;
     float jobCheckPeriod = 0.01;
+    float balanceCheckPeriod = 0.01;
 
     bool doYield = params.isSet("yield");
 
@@ -195,8 +197,11 @@ void Worker::mainProgram() {
         }
 
         // If it is time to do balancing (and it is not being done right now)
-        if (!balancer->isBalancing() && isTimeForRebalancing()) {
+        if (time - lastBalanceCheckTime > balanceCheckPeriod 
+                && !balancer->isBalancing() && isTimeForRebalancing()) {
+            
             // Rebalancing
+            lastBalanceCheckTime = time;
             rebalance();
 
         } else if (balancer->isBalancing()) {
@@ -261,117 +266,113 @@ void Worker::mainProgram() {
         }
 
         // Advance an all-reduction of the current system state
-        allreduceSystemState();
+        allreduceSystemState(time);
 
         // Poll messages
-        //float pollTime = Timer::elapsedSeconds();
-        std::vector<MessageHandlePtr> handles = MyMpi::poll();
-        /*
-        pollTime = Timer::elapsedSeconds() - pollTime;
-        if (handles.size() > 0) {
-            Console::log(Console::VVVERB, "loop cycle %i", iteration);
-            if (jobTime > 0) Console::log(Console::VVVERB, "job time: %.6f s", jobTime);
-            Console::log(Console::VVVERB, "poll time: %.6f s", pollTime);
-        }*/
+        std::vector<MessageHandlePtr> handles = MyMpi::poll(time);
+        while (!handles.empty()) {
 
-        // Process new messages
-        for (MessageHandlePtr& handle : handles) {
-            Console::log_recv(Console::VVVERB, handle->source, "Process msg id=%i, tag %i", handle->id, handle->tag);
-            //float time = Timer::elapsedSeconds();
+            // Process new messages
+            for (MessageHandlePtr& handle : handles) {
+                Console::log_recv(Console::VVVERB, handle->source, "Process msg id=%i, tag %i", handle->id, handle->tag);
+                //float time = Timer::elapsedSeconds();
 
-            if (handle->tag == MSG_FIND_NODE_ONESHOT)
-                handleFindNode(handle, /*oneshot=*/true);
+                if (handle->tag == MSG_FIND_NODE_ONESHOT)
+                    handleFindNode(handle, /*oneshot=*/true);
 
-            else if (handle->tag == MSG_FIND_NODE)
-                handleFindNode(handle, /*oneshot=*/false);
+                else if (handle->tag == MSG_FIND_NODE)
+                    handleFindNode(handle, /*oneshot=*/false);
 
-            else if (handle->tag == MSG_ONESHOT_DECLINED)
-                handleDeclineOneshot(handle);
+                else if (handle->tag == MSG_ONESHOT_DECLINED)
+                    handleDeclineOneshot(handle);
 
-            else if (handle->tag == MSG_QUERY_VOLUME)
-                handleQueryVolume(handle);
-            
-            else if (handle->tag == MSG_OFFER_ADOPTION)
-                handleOfferAdoption(handle);
-
-            else if (handle->tag == MSG_REJECT_ADOPTION_OFFER)
-                handleRejectAdoptionOffer(handle);
-
-            else if (handle->tag == MSG_ACCEPT_ADOPTION_OFFER)
-                handleAcceptAdoptionOffer(handle);
-
-            else if (handle->tag == MSG_CONFIRM_ADOPTION)
-                handleConfirmAdoption(handle);
-
-            else if (handle->tag == MSG_SEND_JOB_DESCRIPTION)
-                handleSendJob(handle);
-
-            else if (handle->tag == MSG_UPDATE_VOLUME)
-                handleUpdateVolume(handle);
-
-            else if (handle->tag == MSG_JOB_COMMUNICATION)
-                handleJobCommunication(handle);
-
-            else if (handle->tag == MSG_WORKER_FOUND_RESULT)
-                handleWorkerFoundResult(handle);
-            
-            else if (handle->tag == MSG_RESULT_OBSOLETE)
-                handleResultObsolete(handle);
-
-            else if (handle->tag == MSG_FORWARD_CLIENT_RANK)
-                handleForwardClientRank(handle);
-            
-            else if (handle->tag == MSG_QUERY_JOB_RESULT)
-                handleQueryJobResult(handle);
-
-            else if (handle->tag == MSG_TERMINATE)
-                handleTerminate(handle);
-
-            else if (handle->tag == MSG_ABORT)
-                handleAbort(handle);
+                else if (handle->tag == MSG_QUERY_VOLUME)
+                    handleQueryVolume(handle);
                 
-            else if (handle->tag == MSG_WORKER_DEFECTING)
-                handleWorkerDefecting(handle);
+                else if (handle->tag == MSG_OFFER_ADOPTION)
+                    handleOfferAdoption(handle);
 
-            else if (handle->tag == MSG_NOTIFY_JOB_REVISION)
-                handleNotifyJobRevision(handle);
-            
-            else if (handle->tag == MSG_QUERY_JOB_REVISION_DETAILS)
-                handleQueryJobRevisionDetails(handle);
-            
-            else if (handle->tag == MSG_SEND_JOB_REVISION_DETAILS)
-                handleSendJobRevisionDetails(handle);
-            
-            else if (handle->tag == MSG_ACK_JOB_REVISION_DETAILS)
-                handleAckJobRevisionDetails(handle);
-            
-            else if (handle->tag == MSG_SEND_JOB_REVISION_DATA)
-                handleSendJobRevisionData(handle);
+                else if (handle->tag == MSG_REJECT_ADOPTION_OFFER)
+                    handleRejectAdoptionOffer(handle);
 
-            else if (handle->tag == MSG_JOB_DONE)
-                handleJobDone(handle);
+                else if (handle->tag == MSG_ACCEPT_ADOPTION_OFFER)
+                    handleAcceptAdoptionOffer(handle);
 
-            else if (handle->tag == MSG_SEND_JOB_RESULT)
-                handleSendJobResult(handle);
+                else if (handle->tag == MSG_CONFIRM_ADOPTION)
+                    handleConfirmAdoption(handle);
 
-            else if (handle->tag == MSG_EXIT) 
-                handleExit(handle);
-            
-            else if (handle->tag == MSG_COLLECTIVES || 
-                    handle->tag == MSG_ANYTIME_REDUCTION || 
-                    handle->tag == MSG_ANYTIME_BROADCAST) {
-                // "Collectives" messages are currently handled only in balancer
-                bool done = balancer->continueBalancing(handle);
-                if (done) finishBalancing();
+                else if (handle->tag == MSG_SEND_JOB_DESCRIPTION)
+                    handleSendJob(handle);
 
-            } else if (handle->tag == MSG_WARMUP) 
-                Console::log_recv(Console::VVVERB, handle->source, "Warmup msg");
-            else
-                Console::log_recv(Console::WARN, handle->source, "[WARN] Unknown message tag %i", handle->tag);
+                else if (handle->tag == MSG_UPDATE_VOLUME)
+                    handleUpdateVolume(handle);
 
-            //time = Timer::elapsedSeconds() - time;
-            //Console::log(Console::VVVERB, "Processing msg, tag %i took %.4f s", handle->tag, time);
-            //pollTime = Timer::elapsedSeconds();
+                else if (handle->tag == MSG_JOB_COMMUNICATION)
+                    handleJobCommunication(handle);
+
+                else if (handle->tag == MSG_WORKER_FOUND_RESULT)
+                    handleWorkerFoundResult(handle);
+                
+                else if (handle->tag == MSG_RESULT_OBSOLETE)
+                    handleResultObsolete(handle);
+
+                else if (handle->tag == MSG_FORWARD_CLIENT_RANK)
+                    handleForwardClientRank(handle);
+                
+                else if (handle->tag == MSG_QUERY_JOB_RESULT)
+                    handleQueryJobResult(handle);
+
+                else if (handle->tag == MSG_TERMINATE)
+                    handleTerminate(handle);
+
+                else if (handle->tag == MSG_ABORT)
+                    handleAbort(handle);
+                    
+                else if (handle->tag == MSG_WORKER_DEFECTING)
+                    handleWorkerDefecting(handle);
+
+                else if (handle->tag == MSG_NOTIFY_JOB_REVISION)
+                    handleNotifyJobRevision(handle);
+                
+                else if (handle->tag == MSG_QUERY_JOB_REVISION_DETAILS)
+                    handleQueryJobRevisionDetails(handle);
+                
+                else if (handle->tag == MSG_SEND_JOB_REVISION_DETAILS)
+                    handleSendJobRevisionDetails(handle);
+                
+                else if (handle->tag == MSG_ACK_JOB_REVISION_DETAILS)
+                    handleAckJobRevisionDetails(handle);
+                
+                else if (handle->tag == MSG_SEND_JOB_REVISION_DATA)
+                    handleSendJobRevisionData(handle);
+
+                else if (handle->tag == MSG_JOB_DONE)
+                    handleJobDone(handle);
+
+                else if (handle->tag == MSG_SEND_JOB_RESULT)
+                    handleSendJobResult(handle);
+
+                else if (handle->tag == MSG_EXIT) 
+                    handleExit(handle);
+                
+                else if (handle->tag == MSG_COLLECTIVES || 
+                        handle->tag == MSG_ANYTIME_REDUCTION || 
+                        handle->tag == MSG_ANYTIME_BROADCAST) {
+                    // "Collectives" messages are currently handled only in balancer
+                    bool done = balancer->continueBalancing(handle);
+                    if (done) finishBalancing();
+
+                } else if (handle->tag == MSG_WARMUP) 
+                    Console::log_recv(Console::VVVERB, handle->source, "Warmup msg");
+                else
+                    Console::log_recv(Console::WARN, handle->source, "[WARN] Unknown message tag %i", handle->tag);
+
+                //time = Timer::elapsedSeconds() - time;
+                //Console::log(Console::VVVERB, "Processing msg, tag %i took %.4f s", handle->tag, time);
+                //pollTime = Timer::elapsedSeconds();
+            }
+
+            handles = MyMpi::poll(time);
         }
         
         MyMpi::testSentHandles();
@@ -1220,11 +1221,11 @@ void Worker::finishBalancing() {
     }
 }
 
-void Worker::allreduceSystemState() {
+void Worker::allreduceSystemState(float elapsedTime) {
 
     static float lastCheck = 0;
 
-    float time = Timer::elapsedSeconds();
+    float time = elapsedTime;
     if (time-lastCheck > 0.1) {
         lastCheck = time;
         float timeSinceLast = time-lastSystemStateReduce;

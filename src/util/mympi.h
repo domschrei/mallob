@@ -285,7 +285,7 @@ public:
 
     static bool test(MPI_Request& request, MPI_Status& status);
 
-    static std::vector<MessageHandlePtr> poll();
+    static std::vector<MessageHandlePtr> poll(float elapsedTime = Timer::elapsedSeconds());
     static int getNumActiveHandles() {
         return _handles.size();
     }
