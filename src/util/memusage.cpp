@@ -61,7 +61,7 @@ namespace Proc {
       cpu = sched_getcpu();
    }
 
-   bool getThreadCpuRatio(pid_t tid, double& cpuRatio, float& sysShare) {
+   bool getThreadCpuRatio(long tid, double& cpuRatio, float& sysShare) {
       
       using std::ios_base;
       using std::ifstream;
