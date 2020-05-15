@@ -204,7 +204,7 @@ void ThreadedSatJob::appl_dumpStats() {
             double cpuRatio; float sysShare;
             bool ok = Proc::getThreadCpuRatio(threadTids[i], cpuRatio, sysShare);
             if (ok)
-                Console::log(Console::VERB, "%s td.%ld : %.2f%% CPU, thereof %.2f%% systime", 
+                Console::log(Console::VERB, "%s td.%ld : %.2f%% CPU -> %.2f%% systime", 
                     toStr(), threadTids[i], cpuRatio, 100*sysShare);
         }
     }

@@ -260,11 +260,6 @@ typedef std::shared_ptr<MessageHandle> MessageHandlePtr;
 
 class MyMpi {
 
-private:
-    static std::set<MessageHandlePtr> _handles;
-    static std::set<MessageHandlePtr> _sent_handles;
-    static std::map<int, MsgTag> _tags;
-
 public:
     static int _max_msg_length;
     static bool _monitor_off;
@@ -306,8 +301,11 @@ public:
     // defined in mpi_monitor.*
     static std::string currentCall(double* callStart);
 
-
 private:
+    static std::set<MessageHandlePtr> _handles;
+    static std::set<MessageHandlePtr> _sent_handles;
+    static std::map<int, MsgTag> _tags;
+
     static void resetListenerIfNecessary(int tag);
 
 };

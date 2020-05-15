@@ -209,7 +209,7 @@ void HordeProcessAdapter::run() {
             double perc_cpu; float sysShare;
             bool success = Proc::getThreadCpuRatio(Proc::getTid(), perc_cpu, sysShare);
             if (success) {
-                _log->log(0, "child_main : %.2f%% CPU, thereof %.2f%% systime", perc_cpu, sysShare*100);
+                _log->log(0, "child_main : %.2f%% CPU -> %.2f%% systime", perc_cpu, sysShare*100);
             }
 
             // For each solver thread
@@ -219,7 +219,7 @@ void HordeProcessAdapter::run() {
                 
                 success = Proc::getThreadCpuRatio(threadTids[i], perc_cpu, sysShare);
                 if (success) {
-                    _log->log(0, "td.%ld : %.2f%% CPU, thereof %.2f%% systime", threadTids[i], perc_cpu, sysShare*100);
+                    _log->log(0, "td.%ld : %.2f%% CPU -> %.2f%% systime", threadTids[i], perc_cpu, sysShare*100);
                 }
             }
 

@@ -57,7 +57,7 @@ bool MessageHandle::testReceived() {
     }
 
     // Resize received data vector to actual received size
-    if (finished && !selfMessage) {
+    if (finished) {
         if (!selfMessage) {
             int count = 0;
             MPICALL(MPI_Get_count(&status, MPI_BYTE, &count), "getcount" + std::to_string(id))
@@ -69,7 +69,6 @@ bool MessageHandle::testReceived() {
             // Read msg tag of application layer and shrink data by its size
             memcpy(&tag, recvData->data()+recvData->size()-sizeof(int), sizeof(int));
             recvData->resize(recvData->size()-sizeof(int));
-            Console::log(Console::VVVERB, "TAG %i\n", tag);
         }
     }
 
@@ -149,7 +148,6 @@ void MyMpi::init(int argc, char *argv[])
 }
 
 void MyMpi::beginListening() {
-
     MessageHandlePtr handle = MyMpi::irecv(MPI_COMM_WORLD, MSG_ANYTIME);
     Console::log(Console::VVVERB, "Msg ID=%i : listening to tag %i", handle->id, MSG_ANYTIME);
 }

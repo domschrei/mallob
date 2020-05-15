@@ -182,7 +182,7 @@ void Worker::mainProgram() {
             double perc_cpu; float sysShare;
             bool success = Proc::getThreadCpuRatio(Proc::getTid(), perc_cpu, sysShare);
             if (success) {
-                Console::log(Console::VERB, "main : %.2f%% CPU, thereof %.2f%% systime", perc_cpu, 100*sysShare);
+                Console::log(Console::VERB, "main : %.2f%% CPU -> %.2f%% systime", perc_cpu, 100*sysShare);
             }
 
             // For the current job
