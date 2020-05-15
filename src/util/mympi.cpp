@@ -63,7 +63,7 @@ bool MessageHandle::testReceived() {
         if (count > 0 && count < recvData->size()) {
             if (tag == MSG_ANYTIME) {
                 // Read msg tag of application layer and shrink data by its size
-                memcpy(&tag, recvData->data()+count-sizeof(int), sizeof(int));
+                memcpy(&tag, recvData->data()+count-sizeof(int)-1, sizeof(int));
                 count -= sizeof(int);
             }
             recvData->resize(count);
