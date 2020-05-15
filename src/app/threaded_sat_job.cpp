@@ -196,8 +196,7 @@ void ThreadedSatJob::appl_dumpStats() {
 
         getSolver()->dumpStats();
         if (_time_of_start_solving <= 0) return;
-        float age = Timer::elapsedSeconds() - _time_of_start_solving;
-
+        
         std::vector<long> threadTids = getSolver()->getSolverTids();
         for (int i = 0; i < threadTids.size(); i++) {
             if (threadTids[i] < 0) continue;

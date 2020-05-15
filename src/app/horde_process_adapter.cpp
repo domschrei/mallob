@@ -203,8 +203,7 @@ void HordeProcessAdapter::run() {
         // Dump stats
         if (*_do_dump_stats && !*_did_dump_stats) {
             _log->log(3, "DO dump stats\n");
-            float age = Timer::elapsedSeconds() - startTime;
-
+            
             // For this management thread
             double perc_cpu; float sysShare;
             bool success = Proc::getThreadCpuRatio(Proc::getTid(), perc_cpu, sysShare);

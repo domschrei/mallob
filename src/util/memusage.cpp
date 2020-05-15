@@ -112,7 +112,7 @@ namespace Proc {
 
       // Compute result
       cpuRatio = 100 * (float(totalDiff) / hertz) / elapsedTime;
-      sysShare = float(stimeDiff) / totalDiff;
+      sysShare = totalDiff == 0 ? 0 : float(stimeDiff) / totalDiff;
 
       _tid_lastcall[tid] = age;
       _tid_utime[tid] = utime;
