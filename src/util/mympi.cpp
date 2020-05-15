@@ -162,6 +162,7 @@ void MyMpi::resetListenerIfNecessary(int tag) {
 }
 
 bool MyMpi::isAnytimeTag(int tag) {
+    if (tag == MSG_ANYTIME) return true;
     assert(_tags.count(tag) || Console::fail("Unknown tag %i\n", tag));
     return _tags[tag].anytime;
 }
