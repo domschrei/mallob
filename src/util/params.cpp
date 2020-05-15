@@ -55,6 +55,7 @@ void Parameters::setDefaults() {
     setParam("p", "5.0"); // rebalance period (seconds)
     //setParam("q"); // no logging to stdout
     setParam("r", ROUNDING_BISECTION); // rounding of assignments (prob = probabilistic, bisec = iterative bisection)
+    setParam("rto", "0"); // (job)requests timeout in seconds
     setParam("s", "1.0"); // job communication period (seconds)
     setParam("s2f", ""); // write solutions to file (file path, or empty string for no writing)
     setParam("sleep", "100"); // microsecs to sleep in between worker main loop cycles
@@ -124,6 +125,8 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "                      \"prob\" - simple probabilistic rounding");
     Console::log(Console::INFO, "                      \"bisec\" (default) - iterative bisection to find optimal cutoff point");
     Console::log(Console::INFO, "                      \"floor\" - always round down");
+    Console::log(Console::INFO, "-rto=<duration>       Request timeout: discard job requests when older than <duration> seconds");
+    Console::log(Console::INFO, "                      (0: no discarding)");
     Console::log(Console::INFO, "-s=<comm-period>      Do job-internal communication every t seconds (t >= 0, 0: do not communicate)");
     Console::log(Console::INFO, "-s2f=<file-basename>  Write solutions to file with provided base name + job ID");
     Console::log(Console::INFO, "-sinst=<filename>     Single instance: Solve the provided CNF instance with full power, then exit.");

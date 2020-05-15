@@ -29,9 +29,11 @@ private:
     size_t _shmem_size;
 
     // SHARED MEMORY
+    
+    // Pointer to entire block of shared memory
+    void* _shmem;
 
     // Meta data parent->child
-    void* _shmem;
     pid_t* _child_pid;
     int* _portfolio_rank;
     int* _portfolio_size;

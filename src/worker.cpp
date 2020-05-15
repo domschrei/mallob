@@ -1390,14 +1390,20 @@ bool Worker::isRequestObsolete(const JobRequest& req) {
             Console::log(Console::VERB, "Req. %s : already completed", job.toStr());
             return true;
         }
+        if (job.isPast()) {
+            // Job has already terminated!
+            Console::log(Console::VERB, "Req. %s : past job", job.toStr());
+            return true;
+        }
     }
     
-    float timelim = 0.25 + 2 * params.getFloatParam("p");
-
-    // Make requests in single instance mode last for a long time
-    if (params.isSet("sinst")) timelim = std::max(timelim, 300.0f);
-
-    return Timer::elapsedSeconds() - req.timeOfBirth >= timelim; 
+    float maxAge = params.getFloatParam("rto");
+    if (maxAge > 0) {
+        //float timelim = 0.25 + 2 * params.getFloatParam("p");
+        return Timer::elapsedSeconds() - req.timeOfBirth >= maxAge; 
+    } else {
+        return false; // not obsolete
+    }
 }
 
 bool Worker::isAdoptionOfferObsolete(const JobRequest& req) {
