@@ -161,7 +161,7 @@ Lingeling::Lingeling(LoggingInterface& logger, int solverId, std::string jobname
 	//lglsetopt(solver, "verbose", 1);
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
 	lglsetopt(solver, "bca", 0);
-	lglsetopt(solver, "termint", 10);
+	//lglsetopt(solver, "termint", 10);
 	lastTermCallbackTime = logger.getTime();
 
 	updateTimer(jobname);

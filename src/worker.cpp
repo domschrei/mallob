@@ -1132,8 +1132,16 @@ int Worker::getRandomWorkerNode() {
     // THIS node is also excluded from drawing
     excludedNodes.insert(worldRank);
     // Draw a node from the remaining nodes
-    int randomOtherNodeRank = MyMpi::random_other_node(MPI_COMM_WORLD, excludedNodes);
-    return randomOtherNodeRank;
+    int size = MyMpi::size(comm);
+
+    float r = Random::rand();
+    int node = (int) (r * size);
+    while (excludedNodes.find(node) != excludedNodes.end()) {
+        r = Random::rand();
+        node = (int) (r * size);
+    }
+
+    return node;
 }
 
 void Worker::bounceJobRequest(JobRequest& request, int senderRank) {

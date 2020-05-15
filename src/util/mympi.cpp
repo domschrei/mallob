@@ -238,13 +238,7 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int tag) {
 
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
 
-    int msgSize;
-    if (tag == MSG_JOB_COMMUNICATION || tag == MSG_COLLECTIVES || tag == MPI_ANY_TAG || tag == MSG_ANYTIME) {
-        msgSize = _max_msg_length;
-    } else {
-        msgSize = MAX_ANYTIME_MESSAGE_SIZE;
-    }
-
+    int msgSize = _max_msg_length;
     MessageHandlePtr handle(new MessageHandle(nextHandleId(), msgSize));
     handle->tag = tag;
 
@@ -367,19 +361,4 @@ int MyMpi::rank(MPI_Comm comm) {
     int rank = -1;
     MPICALL(MPI_Comm_rank(comm, &rank), std::string("commRank"))
     return rank;
-}
-
-int MyMpi::random_other_node(MPI_Comm comm, const std::set<int>& excludedNodes)
-{
-    int size = MyMpi::size(comm);
-
-    float r = Random::rand();
-    int node = (int) (r * size);
-
-    while (excludedNodes.find(node) != excludedNodes.end()) {
-        r = Random::rand();
-        node = (int) (r * size);
-    }
-
-    return node;
 }
