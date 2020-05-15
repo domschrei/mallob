@@ -169,6 +169,8 @@ const int MSG_ONESHOT_DECLINED = 33;
 struct MsgTag {
     int id;
     bool anytime;
+    MsgTag() {}
+    MsgTag(int id, bool anytime) : id(id), anytime(anytime) {}
 };
 
 struct MessageHandle {
