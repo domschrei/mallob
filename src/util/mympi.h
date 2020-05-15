@@ -221,7 +221,7 @@ struct MessageHandle {
     std::shared_ptr<std::vector<uint8_t>> recvData;
     bool selfMessage = false;
     bool finished = false;
-    float creationTime;
+    float creationTime = 0;
     MPI_Request request;
     MPI_Status status;
 
@@ -230,6 +230,14 @@ struct MessageHandle {
         status.MPI_TAG = -1; 
         sendData = std::make_shared<std::vector<uint8_t>>();
         recvData = std::make_shared<std::vector<uint8_t>>();
+        creationTime = Timer::elapsedSeconds();
+        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
+    }
+    MessageHandle(int id, int recvSize) : id(id) {
+        status.MPI_SOURCE = -1; 
+        status.MPI_TAG = -1; 
+        sendData = std::make_shared<std::vector<uint8_t>>();
+        recvData = std::make_shared<std::vector<uint8_t>>(recvSize);
         creationTime = Timer::elapsedSeconds();
         //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
     }
@@ -285,6 +293,7 @@ private:
     static std::set<MessageHandlePtr, HandleComparator> _handles;
     static std::set<MessageHandlePtr, HandleComparator> _deferred_handles;
     static std::set<MessageHandlePtr, HandleComparator> _sent_handles;*/
+    static std::set<int> _anytime_tags;
     static std::map<int, int> _msg_priority;
     static ListenerMode _mode;
 
