@@ -1,94 +1,122 @@
 
 #include <sched.h>
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <map>
 
 #include "memusage.h"
 #include "util/timer.h"
 
-// https://stackoverflow.com/a/671389
-void process_mem_usage(int& cpu, double& vm_usage, double& resident_set)
-{
-   using std::ios_base;
-   using std::ifstream;
-   using std::string;
+namespace Proc {
 
-   vm_usage     = 0.0;
-   resident_set = 0.0;
+   std::map<pid_t, float> _tid_lastcall;
+   std::map<pid_t, unsigned long> _tid_utime;
+   std::map<pid_t, unsigned long> _tid_stime;
 
-   // 'file' stat seems to give the most reliable results
-   //
-   ifstream stat_stream("/proc/self/stat", ios_base::in);
+   pid_t getPid() {
+      return getpid();
+   }
 
-   // dummy vars for leading entries in stat that we don't care about
-   //
-   string pid, comm, state, ppid, pgrp, session, tty_nr;
-   string tpgid, flags, minflt, cminflt, majflt, cmajflt;
-   string utime, stime, cutime, cstime, priority, nice;
-   string O, itrealvalue, starttime;
+   pid_t getTid() {
+      return syscall(SYS_gettid);
+   }
 
-   // the two fields we want
-   //
-   unsigned long vsize;
-   long rss;
+   // https://stackoverflow.com/a/671389
+   void getSelfMemAndSchedCpu(int& cpu, double& vm_usage, double& resident_set) {
 
-   stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
-               >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
-               >> utime >> stime >> cutime >> cstime >> priority >> nice
-               >> O >> itrealvalue >> starttime >> vsize >> rss; // don't care about the rest
+      using std::ios_base;
+      using std::ifstream;
+      using std::string;
 
-   stat_stream.close();
+      vm_usage     = 0.0;
+      resident_set = 0.0;
 
-   long page_size_kb = sysconf(_SC_PAGE_SIZE) / 1024; // in case x86-64 is configured to use 2MB pages
-   vm_usage     = vsize / 1024.0;
-   resident_set = rss * page_size_kb;
+      // 'file' stat seems to give the most reliable results
+      //
+      ifstream stat_stream("/proc/self/stat", ios_base::in);
 
-   cpu = sched_getcpu();
-}
+      // dummy vars for leading entries in stat that we don't care about
+      //
+      string pid, comm, state, ppid, pgrp, session, tty_nr;
+      string tpgid, flags, minflt, cminflt, majflt, cmajflt;
+      string utime, stime, cutime, cstime, priority, nice;
+      string O, itrealvalue, starttime;
 
-bool thread_rusage(double& cpuTimeMicros, long& voluntaryCtxSwitches, long& involuntaryCtxSwitches) {
-   rusage usage;
-   int result = getrusage(RUSAGE_THREAD, &usage);
-   if (result < 0) return false;
-   cpuTimeMicros = 0.001 * 0.001 * (usage.ru_utime.tv_sec + usage.ru_stime.tv_sec);
-   cpuTimeMicros += usage.ru_utime.tv_usec + usage.ru_stime.tv_usec;
-   voluntaryCtxSwitches = usage.ru_nvcsw;
-   involuntaryCtxSwitches = usage.ru_nivcsw;
-   return true;
-}
+      // the two fields we want
+      //
+      unsigned long vsize;
+      long rss;
 
-bool thread_cpuratio(int tid, float age, double& cpuRatio) {
-   
-   using std::ios_base;
-   using std::ifstream;
-   using std::string;
+      stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
+                  >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
+                  >> utime >> stime >> cutime >> cstime >> priority >> nice
+                  >> O >> itrealvalue >> starttime >> vsize >> rss; // don't care about the rest
 
-   // Get uptime in seconds
-   ifstream uptime_stream("/proc/uptime", ios_base::in);
-   unsigned long uptime;
-   uptime_stream >> uptime;
-   uptime_stream.close();
+      stat_stream.close();
 
-   // Get hertz
-   unsigned long hertz = sysconf(_SC_CLK_TCK);
+      long page_size_kb = sysconf(_SC_PAGE_SIZE) / 1024; // in case x86-64 is configured to use 2MB pages
+      vm_usage     = vsize / 1024.0;
+      resident_set = rss * page_size_kb;
 
-   // Get actual stats of interest
-   std::string filepath = "/proc/" + std::to_string(getpid()) + "/task/" + std::to_string(tid) + "/stat";
-   ifstream stat_stream(filepath, ios_base::in);
-   // dummy vars for leading entries in stat that we don't care about
-   string pid, comm, state, ppid, pgrp, session, tty_nr;
-   string tpgid, flags, minflt, cminflt, majflt, cmajflt;
-   string cutime, cstime, priority, nice;
-   string O, itrealvalue, starttime;
-   // the two fields we want
-   unsigned long utime;
-   unsigned long stime;
-   stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
-               >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
-               >> utime >> stime >> cutime >> cstime >> priority >> nice
-               >> O >> itrealvalue >> starttime;
-   stat_stream.close();
+      cpu = sched_getcpu();
+   }
 
-   // Compute result
-   cpuRatio = 100 * ((utime + stime) / hertz) / age;
+   bool getThreadCpuRatio(int tid, double& cpuRatio, float& sysShare) {
+      
+      using std::ios_base;
+      using std::ifstream;
+      using std::string;
 
-   return true;
+      /*
+      // Get uptime in seconds
+      ifstream uptime_stream("/proc/uptime", ios_base::in);
+      unsigned long uptime;
+      uptime_stream >> uptime;
+      uptime_stream.close();
+      */
+
+      // Get hertz
+      unsigned long hertz = sysconf(_SC_CLK_TCK);
+
+      // Get actual stats of interest
+      std::string filepath = "/proc/" + std::to_string(getPid()) + "/task/" + std::to_string(tid) + "/stat";
+      ifstream stat_stream(filepath, ios_base::in);
+      // dummy vars for leading entries in stat that we don't care about
+      string pid, comm, state, ppid, pgrp, session, tty_nr;
+      string tpgid, flags, minflt, cminflt, majflt, cmajflt;
+      string cutime, cstime, priority, nice;
+      string O, itrealvalue, starttime;
+      // the two fields we want
+      unsigned long utime;
+      unsigned long stime;
+      stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
+                  >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
+                  >> utime >> stime >> cutime >> cstime >> priority >> nice
+                  >> O >> itrealvalue >> starttime;
+      stat_stream.close();
+
+      if (!_tid_lastcall.count(tid)) {
+         _tid_lastcall[tid] = Timer::elapsedSeconds();
+         _tid_utime[tid] = utime;
+         _tid_stime[tid] = stime;
+         return false;
+      }
+
+      unsigned long utimeDiff = utime - _tid_utime[tid];
+      unsigned long stimeDiff = stime - _tid_stime[tid];
+      unsigned long totalDiff = utimeDiff + stimeDiff;
+      float age = Timer::elapsedSeconds();
+      float elapsedTime = age - _tid_lastcall[tid];
+
+      // Compute result
+      cpuRatio = 100 * (totalDiff / hertz) / elapsedTime;
+      sysShare = stimeDiff / float(totalDiff);
+
+      _tid_lastcall[tid] = Timer::elapsedSeconds();
+      _tid_utime[tid] = utime;
+      _tid_stime[tid] = stime;
+
+      return true;
+   }
+
 }

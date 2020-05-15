@@ -201,9 +201,11 @@ void ThreadedSatJob::appl_dumpStats() {
         std::vector<long> threadTids = getSolver()->getSolverTids();
         for (int i = 0; i < threadTids.size(); i++) {
             if (threadTids[i] < 0) continue;
-            double cpuRatio;
-            thread_cpuratio(threadTids[i], age, cpuRatio);
-            Console::log(Console::VERB, "%s td.%i : %.2f%% CPU", toStr(), threadTids[i], cpuRatio);
+            double cpuRatio; float sysShare;
+            bool ok = Proc::getThreadCpuRatio(threadTids[i], cpuRatio, sysShare);
+            if (ok)
+                Console::log(Console::VERB, "%s td.%i : %.2f%% CPU, thereof %.2f%% systime", 
+                    toStr(), threadTids[i], cpuRatio, 100*sysShare);
         }
     }
 }

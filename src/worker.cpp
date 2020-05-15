@@ -172,17 +172,17 @@ void Worker::mainProgram() {
 
             // For the this process
             double vm_usage, resident_set; int cpu;
-            process_mem_usage(cpu, vm_usage, resident_set);
+            Proc::getSelfMemAndSchedCpu(cpu, vm_usage, resident_set);
             vm_usage *= 0.001 * 0.001;
             resident_set *= 0.001 * 0.001;
             Console::log(Console::VERB, "mem cpu=%i vm=%.4fGB rss=%.4fGB", cpu, vm_usage, resident_set);
             myState[2] = resident_set;
 
             // For this "management" thread
-            double perc_cpu;
-            bool success = thread_cpuratio(syscall(__NR_gettid), time, perc_cpu);
+            double perc_cpu; float sysShare;
+            bool success = Proc::getThreadCpuRatio(Proc::getTid(), perc_cpu, sysShare);
             if (success) {
-                Console::log(Console::VERB, "main : %.2f%% CPU", perc_cpu);
+                Console::log(Console::VERB, "main : %.2f%% CPU, thereof %.2f%% systime", perc_cpu, 100*sysShare);
             }
 
             // For the current job

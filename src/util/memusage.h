@@ -11,18 +11,21 @@
 #include <fstream>
 #include <string>
 
+namespace Proc {
 
-// https://stackoverflow.com/a/671389
-//
-// process_mem_usage(double &, double &) - takes two doubles by reference,
-// attempts to read the system-dependent data for a process' virtual memory
-// size and resident set size, and return the results in KB.
-//
-// On failure, returns 0.0, 0.0
-void process_mem_usage(int& cpu, double& vm_usage, double& resident_set);
+    int getPid();
+    int getTid();
 
-bool thread_rusage(double& cpuTimeMicros, long& voluntaryCtxSwitches, long& involuntaryCtxSwitches);
+    // https://stackoverflow.com/a/671389
+    void getSelfMemAndSchedCpu(int& cpu, double& vm_usage, double& resident_set);
 
-bool thread_cpuratio(int tid, float age, double& cpuRatio);
+    /*
+    If successful, returns the used CPU ratio and the share of time it spent in kernel mode.
+    Measured SINCE the previous call to this method. The first call initializes
+    the measurement and is guaranteed to fail.
+    */
+    bool getThreadCpuRatio(pid_t tid, double& cpuRatio, float& sysShare);
+
+}
 
 #endif
