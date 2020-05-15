@@ -200,7 +200,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
                 return result;
 
             // Clause not seen yet?
-            if (_clause_filter.registerClause(cls)) {
+            if (_clause_filter.insert(cls).second) {
                 // Insert clause into result clause buffer
                 result.insert(result.end(), cls.begin(), cls.end());
                 resvips++;
@@ -257,7 +257,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
             auto end = vec.begin()+pos+clauseLength;
 
             // Clause not included yet?
-            if (_clause_filter.registerClause(begin, end, clauseLength)) {
+            if (_clause_filter.insert(std::vector<int>(begin, end)).second) {
                 // Insert and increase corresponding counters
                 result.insert(result.end(), begin, end);
                 result[numpos]++;

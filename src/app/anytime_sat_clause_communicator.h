@@ -21,7 +21,7 @@ private:
     const float _clause_buf_discount_factor;
 
     std::vector<std::vector<int>> _clause_buffers;
-    ClauseFilter _clause_filter;
+    std::unordered_set<std::vector<int>, ClauseFilter::ClauseHasher> _clause_filter;
     int _num_aggregated_nodes;
 
     bool _initialized = false;
@@ -30,7 +30,6 @@ public:
     AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : _params(params), _job(job), 
         _clause_buf_base_size(_params.getIntParam("cbbs")), 
         _clause_buf_discount_factor(_params.getFloatParam("cbdf")),
-        _clause_filter(/*maxClauseLen=*/_params.getIntParam("mcl"), /*checkUnits=*/true),
         _num_aggregated_nodes(0) {
 
         _initialized = true;

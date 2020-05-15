@@ -289,7 +289,7 @@ int Job::getDemand(int prevVolume, float elapsedTime) const {
                 if (!_continuous_growth) {
                     // Discrete periodic growth
                     numPeriods = std::floor(numPeriods);
-                    demand = std::min(_comm_size, 1 << (int)(numPeriods + 1) - 1);
+                    demand = std::min(_comm_size, (1 << (int)(numPeriods + 1)) - 1);
                 } else {
                     // d(0) := 1; d := 2d+1 every <growthPeriod> seconds
                     demand = std::min(_comm_size, (int)std::pow(2, numPeriods + 1) - 1);
