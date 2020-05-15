@@ -20,6 +20,7 @@ std::set<MessageHandlePtr> MyMpi::_sent_handles;
 std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_handles;
 std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_sent_handles;*/
 ListenerMode MyMpi::_mode;
+std::set<int> MyMpi::_anytime_tags;
 std::map<int, int> MyMpi::_msg_priority;
 bool MyMpi::_monitor_off;
 
