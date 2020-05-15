@@ -219,7 +219,7 @@ void HordeProcessAdapter::run() {
                 
                 success = Proc::getThreadCpuRatio(threadTids[i], perc_cpu, sysShare);
                 if (success) {
-                    _log->log(0, "td.%i : %.2f%% CPU, thereof %.2f%% systime", perc_cpu, sysShare*100);
+                    _log->log(0, "td.%ld : %.2f%% CPU, thereof %.2f%% systime", perc_cpu, sysShare*100);
                 }
             }
 
