@@ -13,8 +13,8 @@
 
 namespace Proc {
 
-    int getPid();
-    int getTid();
+    pid_t getPid();
+    pid_t getTid();
 
     // https://stackoverflow.com/a/671389
     void getSelfMemAndSchedCpu(int& cpu, double& vm_usage, double& resident_set);

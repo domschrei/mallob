@@ -61,7 +61,7 @@ namespace Proc {
       cpu = sched_getcpu();
    }
 
-   bool getThreadCpuRatio(int tid, double& cpuRatio, float& sysShare) {
+   bool getThreadCpuRatio(pid_t tid, double& cpuRatio, float& sysShare) {
       
       using std::ios_base;
       using std::ifstream;
@@ -77,6 +77,9 @@ namespace Proc {
 
       // Get hertz
       unsigned long hertz = sysconf(_SC_CLK_TCK);
+
+      // Get current relative time
+      float age = Timer::elapsedSeconds();
 
       // Get actual stats of interest
       std::string filepath = "/proc/" + std::to_string(getPid()) + "/task/" + std::to_string(tid) + "/stat";
@@ -105,14 +108,13 @@ namespace Proc {
       unsigned long utimeDiff = utime - _tid_utime[tid];
       unsigned long stimeDiff = stime - _tid_stime[tid];
       unsigned long totalDiff = utimeDiff + stimeDiff;
-      float age = Timer::elapsedSeconds();
       float elapsedTime = age - _tid_lastcall[tid];
 
       // Compute result
       cpuRatio = 100 * (totalDiff / hertz) / elapsedTime;
-      sysShare = stimeDiff / float(totalDiff);
+      sysShare = float(stimeDiff) / totalDiff;
 
-      _tid_lastcall[tid] = Timer::elapsedSeconds();
+      _tid_lastcall[tid] = age;
       _tid_utime[tid] = utime;
       _tid_stime[tid] = stime;
 
