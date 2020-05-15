@@ -105,7 +105,7 @@ void MyMpi::init(int argc, char *argv[])
         exit(1);
     }
 
-    _max_msg_length = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
+    _max_msg_length = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + MAX_ANYTIME_MESSAGE_SIZE;
     _monitor_off = false;
     handleId = 1;
 
