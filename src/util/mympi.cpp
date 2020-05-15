@@ -180,8 +180,9 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
     }
     if (isAnytimeTag(tag)) {
         // Append application layer msg tag to message
-        object->resize(object->size()+sizeof(int));
-        memcpy(object->data(), &tag, sizeof(int));
+        int prevSize = object->size();
+        object->resize(prevSize+sizeof(int));
+        memcpy(object->data()+prevSize, &tag, sizeof(int));
         tag = MSG_ANYTIME;
     }
     MessageHandlePtr handle(new MessageHandle(nextHandleId(), object));
