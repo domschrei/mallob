@@ -9,15 +9,15 @@
 
 namespace Proc {
 
-   std::map<pid_t, float> _tid_lastcall;
-   std::map<pid_t, unsigned long> _tid_utime;
-   std::map<pid_t, unsigned long> _tid_stime;
+   std::map<long, float> _tid_lastcall;
+   std::map<long, unsigned long> _tid_utime;
+   std::map<long, unsigned long> _tid_stime;
 
    pid_t getPid() {
       return getpid();
    }
 
-   pid_t getTid() {
+   long getTid() {
       return syscall(SYS_gettid);
    }
 

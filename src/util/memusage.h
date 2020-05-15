@@ -14,7 +14,7 @@
 namespace Proc {
 
     pid_t getPid();
-    pid_t getTid();
+    long getTid();
 
     // https://stackoverflow.com/a/671389
     void getSelfMemAndSchedCpu(int& cpu, double& vm_usage, double& resident_set);
@@ -24,7 +24,7 @@ namespace Proc {
     Measured SINCE the previous call to this method. The first call initializes
     the measurement and is guaranteed to fail.
     */
-    bool getThreadCpuRatio(pid_t tid, double& cpuRatio, float& sysShare);
+    bool getThreadCpuRatio(long tid, double& cpuRatio, float& sysShare);
 
 }
 
