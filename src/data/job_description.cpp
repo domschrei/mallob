@@ -9,10 +9,10 @@ JobDescription::~JobDescription() {
 }
 
 int JobDescription::getTransferSize(bool allRevisions) const {
-    int size = 3*sizeof(int)
+    int size = 4*sizeof(int)
             +sizeof(float)
             +sizeof(bool);
-    for (int x = 0; x <= revision; x++) {
+    for (int x = 0; x <= _revision; x++) {
         size += sizeof(int) * (1 + _payloads[x]->size());
         size += sizeof(int) * (1 + _assumptions[x]->size());
         if (!allRevisions) break;
@@ -38,14 +38,15 @@ void JobDescription::deserialize(const std::vector<uint8_t>& packed) {
     int i = 0, n;
 
     // Basic data
-    n = sizeof(int); memcpy(&id, packed.data()+i, n); i += n;
-    n = sizeof(int); memcpy(&rootRank, packed.data()+i, n); i += n;
-    n = sizeof(float); memcpy(&priority, packed.data()+i, n); i += n;
-    n = sizeof(bool); memcpy(&incremental, packed.data()+i, n); i += n;
-    n = sizeof(int); memcpy(&revision, packed.data()+i, n); i += n;
+    n = sizeof(int); memcpy(&_id, packed.data()+i, n); i += n;
+    n = sizeof(int); memcpy(&_root_rank, packed.data()+i, n); i += n;
+    n = sizeof(float); memcpy(&_priority, packed.data()+i, n); i += n;
+    n = sizeof(bool); memcpy(&_incremental, packed.data()+i, n); i += n;
+    n = sizeof(int); memcpy(&_num_vars, packed.data()+i, n); i += n;
+    n = sizeof(int); memcpy(&_revision, packed.data()+i, n); i += n;
 
     // Payload
-    for (int r = 0; r <= revision; r++) {
+    for (int r = 0; r <= _revision; r++) {
         readRevision(packed, i);
     }
 }
@@ -56,7 +57,7 @@ std::shared_ptr<std::vector<uint8_t>> JobDescription::serialize(int firstRevisio
             getTransferSize(firstRevision, lastRevision));
 
     int i = 0, n;
-    n = sizeof(int); memcpy(packed->data()+i, &id, n); i += n;
+    n = sizeof(int); memcpy(packed->data()+i, &_id, n); i += n;
     n = sizeof(int); memcpy(packed->data()+i, &firstRevision, n); i += n;
     n = sizeof(int); memcpy(packed->data()+i, &lastRevision, n); i += n;
 
@@ -78,15 +79,16 @@ std::shared_ptr<std::vector<uint8_t>> JobDescription::serialize(bool allRevision
 
     // Basic data
     int i = 0, n;
-    n = sizeof(int); memcpy(packed->data()+i, &id, n); i += n;
-    n = sizeof(int); memcpy(packed->data()+i, &rootRank, n); i += n;
-    n = sizeof(float); memcpy(packed->data()+i, &priority, n); i += n;
-    n = sizeof(bool); memcpy(packed->data()+i, &incremental, n); i += n;
-    int rev = allRevisions ? revision : 0;
+    n = sizeof(int); memcpy(packed->data()+i, &_id, n); i += n;
+    n = sizeof(int); memcpy(packed->data()+i, &_root_rank, n); i += n;
+    n = sizeof(float); memcpy(packed->data()+i, &_priority, n); i += n;
+    n = sizeof(bool); memcpy(packed->data()+i, &_incremental, n); i += n;
+    n = sizeof(int); memcpy(packed->data()+i, &_num_vars, n); i += n;
+    int rev = allRevisions ? _revision : 0;
     n = sizeof(int); memcpy(packed->data()+i, &rev, n); i += n;
 
     // Payload
-    for (int r = 0; r <= revision; r++) {
+    for (int r = 0; r <= _revision; r++) {
         writeRevision(r, *packed, i);
         if (!allRevisions) break;
     }
@@ -115,13 +117,13 @@ void JobDescription::merge(const std::vector<uint8_t>& packed) {
     n = sizeof(int); memcpy(&firstRevision, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&lastRevision, packed.data()+i, n); i += n;
 
-    assert(id == this->id);
-    assert(firstRevision == this->revision+1);
+    assert(id == _id);
+    assert(firstRevision == _revision+1);
 
     for (int r = firstRevision; r <= lastRevision; r++) {
         readRevision(packed, i);
     }
-    this->revision = lastRevision;
+    _revision = lastRevision;
 }
 
 void JobDescription::readRevision(const std::vector<uint8_t>& src, int& i) {

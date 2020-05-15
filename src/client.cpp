@@ -506,6 +506,7 @@ void Client::readFormula(std::string& filename, JobDescription& job) {
     if (formula != NULL) {
         job.addPayload(formula);
         job.addAssumptions(assumptions);
+        job.setNumVars(r.getNumVars());
         Console::log(Console::VERB, "%i literals including separation zeros, %i assumptions", formula->size(), assumptions->size());
     } else {
         Console::log(Console::WARN, "File %s could not be opened - skipping #%i", filename.c_str(), job.getId());

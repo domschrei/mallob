@@ -59,8 +59,15 @@ bool ForkedSatJob::appl_initialize() {
 
     auto lock = _solver_lock.getLock();
     Console::log(Console::VERB, "%s : creating horde instance", toStr());
-    _solver = std::unique_ptr<HordeProcessAdapter>(new HordeProcessAdapter(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface("<h-" + identifier + ">")), 
-                getDescription().getPayloads(), getDescription().getAssumptions(getDescription().getRevision())));
+    _solver = std::unique_ptr<HordeProcessAdapter>(
+        new HordeProcessAdapter(
+            params, 
+            std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface("<h-" + identifier + ">")), 
+            getDescription().getPayloads(), 
+            getDescription().getAssumptions(getDescription().getRevision()), 
+            getDescription().getNumVars()
+        )
+    );
     _clause_comm = (void*) new AnytimeSatClauseCommunicator(_params, this);
 
     if (_abort_after_initialization) {

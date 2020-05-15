@@ -16,15 +16,16 @@ class JobDescription : public Serializable {
 private:
 
     // Global meta data
-    int id;
-    int rootRank;
-    float priority = 1.0;
-    bool incremental;
-    int revision;
+    int _id;
+    int _root_rank;
+    float _priority = 1.0;
+    bool _incremental;
+    int _revision;
 
-    float arrival; // only for introducing a job
+    float _arrival; // only for introducing a job
 
     // Payload (logic to solve)
+    int _num_vars = -1;
     std::vector<VecPtr> _payloads;
     std::vector<VecPtr> _assumptions;
     VecPtr nullVec = NULL;
@@ -32,29 +33,31 @@ private:
 public:
 
     JobDescription() = default;
-    JobDescription(int id, float priority, bool incremental) : id(id), rootRank(-1),
-                priority(priority), incremental(incremental), revision(0) {}
+    JobDescription(int id, float priority, bool incremental) : _id(id), _root_rank(-1),
+                _priority(priority), _incremental(incremental), _revision(0) {}
     ~JobDescription();
 
-    int getId() const {return id;}
-    int getRootRank() const {return rootRank;}
-    float getPriority() const {return priority;}
-    int getRevision() const {return revision;}
+    int getId() const {return _id;}
+    int getRootRank() const {return _root_rank;}
+    float getPriority() const {return _priority;}
+    int getRevision() const {return _revision;}
     const std::vector<VecPtr>& getPayloads() const {return _payloads;}
     const std::vector<VecPtr>& getAssumptions() const {return _assumptions;}
     const VecPtr& getPayload(int revision) const {return revision >= _payloads.size() ? nullVec : _payloads[revision];}
     const VecPtr& getAssumptions(int revision) const {return revision >= _assumptions.size() ? nullVec : _assumptions[revision];}
-    float getArrival() const {return arrival;}
-    bool isIncremental() const {return incremental;}
+    float getArrival() const {return _arrival;}
+    bool isIncremental() const {return _incremental;}
     int getTransferSize(bool allRevisions) const;
     int getTransferSize(int firstRevision, int lastRevision) const;
     const std::vector<VecPtr> getPayloads(int firstRevision, int lastRevision) const;
+    int getNumVars() {return _num_vars;}
 
-    void setRootRank(int rootRank) {this->rootRank = rootRank;}
-    void setRevision(int revision) {this->revision = revision;}
+    void setRootRank(int rootRank) {_root_rank = rootRank;}
+    void setRevision(int revision) {_revision = revision;}
+    void setNumVars(int numVars) {_num_vars = numVars;}
     void addPayload(const VecPtr& payload) {_payloads.push_back(payload);}
     void addAssumptions(const VecPtr& assumptions) {_assumptions.push_back(assumptions);}
-    void setArrival(float arrival) {this->arrival = arrival;};
+    void setArrival(float arrival) {_arrival = arrival;};
     void clearPayload();
 
     std::shared_ptr<std::vector<uint8_t>> serialize() const override;

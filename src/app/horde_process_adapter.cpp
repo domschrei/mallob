@@ -12,21 +12,13 @@
 #include "util/fork.h"
 
 HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string>& params, std::shared_ptr<LoggingInterface> loggingInterface, 
-            const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<std::vector<int>>& assumptions) :
+            const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<std::vector<int>>& assumptions, 
+            int numVars) :
                 _params(params), _log(loggingInterface), _formulae(formulae), _assumptions(assumptions) {
 
     _max_import_buffer_size = atoi(params.at("cbbs").c_str()) * sizeof(int) * atoi(params.at("mpisize").c_str());
     _max_export_buffer_size = atoi(params.at("cbbs").c_str()) * sizeof(int);
-    // Find maximum size of a potential solution
-    int maxVar = 0;
-    int minVar = 0;
-    for (const auto& f : _formulae) {
-        for (const int& lit : *f) {
-            minVar = std::min(minVar, lit);
-            maxVar = std::max(maxVar, lit);
-        }
-    }
-    _max_solution_size = sizeof(int) * (std::max(maxVar, -minVar)+2);
+    _max_solution_size = sizeof(int) * (numVars+1);
     
     /*
     _shmem_mutex        = (void*)                        SharedMemory::create(SharedMemMutex::getSharedMemorySize());

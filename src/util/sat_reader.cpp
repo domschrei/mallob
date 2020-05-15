@@ -48,6 +48,7 @@ std::shared_ptr<std::vector<int>> SatReader::read() {
 				num = num*10 + (c-'0');
 				c = fgetc(f);
 			}
+			_num_vars = std::max(_num_vars, num);
 			if (neg) {
 				num *= -1;
 			}
