@@ -58,16 +58,18 @@ bool MessageHandle::testReceived() {
 
     // Resize received data vector to actual received size
     if (finished && !selfMessage) {
-        int count = 0;
-        MPICALL(MPI_Get_count(&status, MPI_BYTE, &count), "getcount" + std::to_string(id))
-        if (count > 0 && count < recvData->size()) {
-            if (tag == MSG_ANYTIME) {
-                // Read msg tag of application layer and shrink data by its size
-                memcpy(&tag, recvData->data()+count-sizeof(int), sizeof(int));
-                Console::log(Console::VVVERB, "TAG %i\n", tag);
-                count -= sizeof(int);
+        if (!selfMessage) {
+            int count = 0;
+            MPICALL(MPI_Get_count(&status, MPI_BYTE, &count), "getcount" + std::to_string(id))
+            if (count > 0 && count < recvData->size()) {
+                recvData->resize(count);
             }
-            recvData->resize(count);
+        }
+        if (tag == MSG_ANYTIME) {
+            // Read msg tag of application layer and shrink data by its size
+            memcpy(&tag, recvData->data()+recvData->size()-sizeof(int), sizeof(int));
+            recvData->resize(recvData->size()-sizeof(int));
+            Console::log(Console::VVVERB, "TAG %i\n", tag);
         }
     }
 
@@ -108,7 +110,7 @@ void MyMpi::init(int argc, char *argv[])
     handleId = 1;
 
     std::vector<MsgTag> tagList;
-    /*                   Tag name                         anytime  */
+    /*                   Tag name                          anytime  */
     tagList.emplace_back(MSG_ABORT,                        true); 
     tagList.emplace_back(MSG_ACCEPT_ADOPTION_OFFER,        true); 
     tagList.emplace_back(MSG_ACK_JOB_REVISION_DETAILS,     true);
