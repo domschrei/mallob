@@ -239,7 +239,7 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int tag) {
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
 
     int msgSize;
-    if (tag == MSG_JOB_COMMUNICATION || tag == MSG_COLLECTIVES || tag == MPI_ANY_TAG) {
+    if (tag == MSG_JOB_COMMUNICATION || tag == MSG_COLLECTIVES || tag == MPI_ANY_TAG || tag == MSG_ANYTIME) {
         msgSize = _max_msg_length;
     } else {
         msgSize = MAX_ANYTIME_MESSAGE_SIZE;
