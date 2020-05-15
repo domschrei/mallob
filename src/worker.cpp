@@ -63,7 +63,7 @@ void Worker::init() {
     }
 
     // Begin listening to an incoming message
-    MyMpi::beginListening(WORKER);
+    MyMpi::beginListening();
 
     // Send warm-up messages with your pseudorandom bounce destinations
     if (params.isSet("derandomize") && params.isSet("warmup")) {

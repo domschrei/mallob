@@ -81,7 +81,7 @@ void Client::init() {
     _instance_reader_thread = std::thread(&Client::readAllInstances, this);
 
     // Begin listening to incoming messages
-    MyMpi::beginListening(CLIENT);
+    MyMpi::beginListening();
 
     Console::log(Console::VERB, "Global init barrier ...");
     MPI_Barrier(MPI_COMM_WORLD);

@@ -16,12 +16,7 @@
 int MyMpi::_max_msg_length;
 std::set<MessageHandlePtr> MyMpi::_handles;
 std::set<MessageHandlePtr> MyMpi::_sent_handles;
-/*
-std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_handles;
-std::set<MessageHandlePtr, MyMpi::HandleComparator> MyMpi::_sent_handles;*/
-ListenerMode MyMpi::_mode;
-std::set<int> MyMpi::_anytime_tags;
-std::map<int, int> MyMpi::_msg_priority;
+std::map<int, MsgTag> MyMpi::_tags;
 bool MyMpi::_monitor_off;
 
 void chkerr(int err) {
@@ -66,6 +61,11 @@ bool MessageHandle::testReceived() {
         int count = 0;
         MPICALL(MPI_Get_count(&status, MPI_BYTE, &count), "getcount" + std::to_string(id))
         if (count > 0 && count < recvData->size()) {
+            if (tag == MSG_ANYTIME) {
+                // Read msg tag of application layer and shrink data by its size
+                memcpy(&tag, recvData->data()+count-sizeof(int), sizeof(int));
+                count -= sizeof(int);
+            }
             recvData->resize(count);
         }
     }
@@ -105,31 +105,50 @@ void MyMpi::init(int argc, char *argv[])
     _max_msg_length = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + 10;
     _monitor_off = false;
     handleId = 1;
+
+    std::vector<MsgTag> tagList;
+    /*                   Tag name                         anytime  */
+    tagList.emplace_back(MSG_ABORT,                       true); 
+    tagList.emplace_back(MSG_ACCEPT_ADOPTION_OFFER,       true); 
+    tagList.emplace_back(MSG_ACK_JOB_REVISION_DETAILS,    true);
+    tagList.emplace_back(MSG_ANYTIME_REDUCTION,           true);
+    tagList.emplace_back(MSG_ANYTIME_BROADCAST,           true);
+    tagList.emplace_back(MSG_COLLECTIVES,                 false);
+    tagList.emplace_back(MSG_CONFIRM_ADOPTION,            true); 
+    tagList.emplace_back(MSG_CLIENT_FINISHED,             true);
+    tagList.emplace_back(MSG_EXIT,                        true);   
+    tagList.emplace_back(MSG_FIND_NODE,                   true);
+    tagList.emplace_back(MSG_FIND_NODE_ONESHOT,           true);
+    tagList.emplace_back(MSG_FORWARD_CLIENT_RANK,         true);
+    tagList.emplace_back(MSG_INCREMENTAL_JOB_FINISHED,    true);
+    tagList.emplace_back(MSG_INTERRUPT,                   true); 
+    tagList.emplace_back(MSG_JOB_COMMUNICATION,           true); 
+    tagList.emplace_back(MSG_JOB_DONE,                    true);
+    tagList.emplace_back(MSG_NOTIFY_JOB_REVISION,         true); 
+    tagList.emplace_back(MSG_OFFER_ADOPTION,              true); 
+    tagList.emplace_back(MSG_ONESHOT_DECLINED,            true); 
+    tagList.emplace_back(MSG_QUERY_JOB_RESULT,            true); 
+    tagList.emplace_back(MSG_QUERY_JOB_REVISION_DETAILS,  true); 
+    tagList.emplace_back(MSG_QUERY_VOLUME,                true); 
+    tagList.emplace_back(MSG_REJECT_ADOPTION_OFFER,       true); 
+    tagList.emplace_back(MSG_RESULT_OBSOLETE,             true);
+    tagList.emplace_back(MSG_SEND_JOB_DESCRIPTION,        false); 
+    tagList.emplace_back(MSG_SEND_JOB_RESULT,             false); 
+    tagList.emplace_back(MSG_SEND_JOB_REVISION_DATA,      false);
+    tagList.emplace_back(MSG_SEND_JOB_REVISION_DETAILS,   true); 
+    tagList.emplace_back(MSG_TERMINATE,                   true); 
+    tagList.emplace_back(MSG_UPDATE_VOLUME,               true); 
+    tagList.emplace_back(MSG_WARMUP,                      true); 
+    tagList.emplace_back(MSG_WORKER_FOUND_RESULT,         true);
+    tagList.emplace_back(MSG_WORKER_DEFECTING,            true); 
+    
+    for (const auto& tag : tagList) _tags[tag.id] = tag;
 }
 
-void MyMpi::beginListening(const ListenerMode& mode) {
+void MyMpi::beginListening() {
 
-    _mode = mode;
-
-    int i = 0;
-    for (int tag : ALL_TAGS) {
-        _msg_priority[tag] = i++;
-    }
-
-    if (_mode == CLIENT) {
-        for (int tag : ANYTIME_CLIENT_RECV_TAGS) {
-            _anytime_tags.insert(tag);
-            MessageHandlePtr handle = MyMpi::irecv(MPI_COMM_WORLD, tag);
-            Console::log(Console::VVVERB, "Msg ID=%i : listening to tag %i", handle->id, tag);
-        }
-    }
-    if (_mode == WORKER) {
-        for (int tag : ANYTIME_WORKER_RECV_TAGS) {
-            _anytime_tags.insert(tag);
-            MessageHandlePtr handle = MyMpi::irecv(MPI_COMM_WORLD, tag);
-            Console::log(Console::VVVERB, "Msg ID=%i : listening to tag %i", handle->id, tag);
-        }
-    }
+    MessageHandlePtr handle = MyMpi::irecv(MPI_COMM_WORLD, MSG_ANYTIME);
+    Console::log(Console::VVVERB, "Msg ID=%i : listening to tag %i", handle->id, MSG_ANYTIME);
 }
 
 void MyMpi::resetListenerIfNecessary(int tag) {
@@ -137,26 +156,18 @@ void MyMpi::resetListenerIfNecessary(int tag) {
     if (!isAnytimeTag(tag)) return;
     for (auto& handle : _handles) if (handle->tag == tag) return;
     // add listener
-    MessageHandlePtr handle = MyMpi::irecv(MPI_COMM_WORLD, tag);
-    Console::log(Console::VVVERB, "Msg ID=%i : listening to tag %i", handle->id, tag);
+    MessageHandlePtr handle = MyMpi::irecv(MPI_COMM_WORLD, MSG_ANYTIME);
+    Console::log(Console::VVVERB, "Msg ID=%i : listening to tag %i", handle->id, MSG_ANYTIME);
 }
 
 bool MyMpi::isAnytimeTag(int tag) {
-    return _anytime_tags.count(tag);
+    return _tags[tag].anytime;
 }
 
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object) {
     
-    //float time = Timer::elapsedSeconds();
     std::shared_ptr<std::vector<uint8_t>> vec = object.serialize();
-    //float timeSerialize = Timer::elapsedSeconds() - time;
-
-    //time = Timer::elapsedSeconds();
     MessageHandlePtr handle = isend(communicator, recvRank, tag, vec);
-    //float timeSend = Timer::elapsedSeconds() - time;
-
-    Console::log(Console::VVVERB, "Msg ID=%i" /*serializeTime=%.4f totalIsendTime=%.4f"*/, 
-            handle->id /*, timeSerialize, timeSend*/);
     return handle;
 }
 
@@ -164,6 +175,12 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
 
     if (object->empty()) {
         object->push_back(0);
+    }
+    if (isAnytimeTag(tag)) {
+        // Append application layer msg tag to message
+        object->resize(object->size()+sizeof(int));
+        memcpy(object->data(), &tag, sizeof(int));
+        tag = MSG_ANYTIME;
     }
     MessageHandlePtr handle(new MessageHandle(nextHandleId(), object));
     handle->tag = tag;
@@ -184,6 +201,7 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
     return handle;
 }
 
+/*
 MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const Serializable& object) {
     return send(communicator, recvRank, tag, object.serialize());
 }
@@ -202,6 +220,7 @@ MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const
     Console::log(Console::VVVERB, "Msg ID=%i sent", handle->id);
     return handle;
 }
+*/
 
 MessageHandlePtr MyMpi::irecv(MPI_Comm communicator) {
     return irecv(communicator, MPI_ANY_TAG);
@@ -223,7 +242,8 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
     MessageHandlePtr handle(new MessageHandle(nextHandleId(), msgSize));
     handle->tag = tag;
 
-    MPICALL(MPI_Irecv(handle->recvData->data(), msgSize, MPI_BYTE, source, tag, communicator, &handle->request), "irecv"+std::to_string(handle->id))
+    MPICALL(MPI_Irecv(handle->recvData->data(), msgSize, MPI_BYTE, source, isAnytimeTag(tag) ? MSG_ANYTIME : tag, 
+                communicator, &handle->request), "irecv"+std::to_string(handle->id))
     _handles.insert(handle);
     return handle;
 }
@@ -233,11 +253,13 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag, int si
     assert(source >= 0);
     handle->source = source;
     handle->tag = tag;
-    MPICALL(MPI_Irecv(handle->recvData->data(), size, MPI_BYTE, source, tag, communicator, &handle->request), "irecv"+std::to_string(handle->id))
+    MPICALL(MPI_Irecv(handle->recvData->data(), size, MPI_BYTE, source, isAnytimeTag(tag) ? MSG_ANYTIME : tag, 
+                communicator, &handle->request), "irecv"+std::to_string(handle->id))
     _handles.insert(handle);
     return handle;
 }
 
+/*
 MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag, int size) {
     MessageHandlePtr handle(new MessageHandle(nextHandleId(), size));
     handle->tag = tag;
@@ -254,6 +276,7 @@ MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag, int size) {
 MessageHandlePtr MyMpi::recv(MPI_Comm communicator, int tag) {
     return recv(communicator, tag, _max_msg_length);
 }
+*/
 
 MPI_Request MyMpi::iallreduce(MPI_Comm communicator, float* contribution, float* result) {
     MPI_Request req;
