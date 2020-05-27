@@ -46,6 +46,7 @@ for arg in sys.argv[1:]:
         do_linestyles = False
     elif re.search(r'--?no-?lines?', arg):
         do_lines = False
+        do_linestyles = False
     elif arg.startswith("-xyc") or arg.startswith("--xyc"):
         explicit_xvals = True
         colorvals = True
@@ -160,7 +161,7 @@ for d in data:
         lw = None
         
     if do_linestyles:
-        lst = linestyles[i%len(markers)]
+        lst = linestyles[i%len(linestyles)]
     else:
         lst = None
     
@@ -171,7 +172,10 @@ for d in data:
     else:
         clr = colors[i%len(colors)]
     
-    plt.scatter(d[0], d[1], label=l, color=clr, marker=m, linestyle=lst, lw=lw)
+    if lst:
+        plt.scatter(d[0], d[1], label=l, color=clr, marker=m, linestyle=lst, lw=lw)
+    else:
+        plt.scatter(d[0], d[1], label=l, color=clr, marker=m, lw=lw)
     i += 1
 
 if heading:

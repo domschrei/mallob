@@ -47,12 +47,8 @@ function extract_client_info() {
     sort -n $logdir/qualified_runtimes -o $logdir/qualified_runtimes
 }
 
-function extract_hops() {
-    for f in $logdir/log_*.* ; do
-        grep "Adopting" $f >> hops
-    done
-    cat hops|grep -oE "after [0-9]+ hops"|grep -oE "[0-9]+" > $logdir/num_hops
-    rm hops
+function get_num_reactivations() {
+    cat $logdir/log_*.*|grep "Reactivate"|grep "state: committed"|wc -l
 }
 
 function extract_load_events() {
@@ -60,17 +56,68 @@ function extract_load_events() {
     for f in $logdir/log_*.* ; do
         grep "LOAD" $f >> ldev
     done
-    cat ldev|awk '{print $1,$2,$4,$5}'|sed 's.(\|)\|\+\|-\|#..g'|sed 's/:/ /g' > $logdir/loadevents
+    cat ldev|grep -oE "^[0-9\.]+ [0-9]+ LOAD [01] \([+-]#[0-9]+:[0-9]+\)"|awk '{print $1,$2,$4,$5}'|sed 's.(\|)\|\+\|-\|#..g'|sed 's/:/ /g' > $logdir/loadevents
     rm ldev
 }
 
-function extract_node_events() {
-    python3 calc_node_events.py $logdir/loadevents >ndev
+function extract_hop_events() {
+    >hpev
+    for f in $logdir/log_*.* ; do
+        grep "Adopting" $f >> hpev
+    done
+    sort -g hpev -o hpev
+    cat hpev|grep -oE "^[0-9\.]+ [0-9]+ Adopting #[0-9]+:[0-9]+ after [0-9]+ hops"|awk '{print $1,$2,$4,$6}'|sed 's.(\|)\|\+\|-\|#..g'|sed 's/:/ /g' > $logdir/hopevents
+    rm hpev
+}
+
+function document_node_events() {
+    python3 calc_node_events.py $logdir/loadevents $logdir/hopevents >ndev
     grep "NODES " ndev|awk '{$1=""; print $0}' > $logdir/nodes_per_job
     grep "CPUTIME " ndev|awk '{$1=""; print $0}' > $logdir/cpu_times
     grep "MAXNODES " ndev|awk '{$1=""; print $0}' > $logdir/max_nodes_per_job
     grep "CTXSWITCHES " ndev|awk '{$1=""; print $0}' > $logdir/ctxswitches
+    grep "HOPS " ndev|awk '{$1=""; print $0}' > $logdir/hopevents_successful
+    grep "HOPS " ndev|awk '{print $5}' > $logdir/num_hops
+    sort -g $logdir/num_hops -o $logdir/num_hops
+    cat $logdir/hopevents_successful|awk '{print $1,$4}' > $logdir/times_hops
+    cat $logdir/hopevents_successful|awk '{print $3,$4}' > $logdir/jobidxs_hops
 }
+
+function document_hops() {
+
+    nhops=0
+    nocc=0 #-$(get_num_reactivations)
+    totalocc=0
+    > $logdir/num_hops_occurrences
+    while read -r x; do
+        if [ x"$nhops" == x"$x" ]; then
+            nocc=$((nocc+1))
+        else
+            while [ x"$nhops" != x"$x" ]; do 
+                echo $nocc >> $logdir/num_hops_occurrences
+                totalocc=$((totalocc+nocc))
+                nocc=0
+                nhops=$((nhops+1))
+            done 
+            nocc=1
+        fi
+    done < $logdir/num_hops
+    echo $nocc >> $logdir/num_hops_occurrences
+    totalocc=$((totalocc+nocc))
+    
+    > $logdir/num_hops_density
+    while read -r nocc; do
+        echo $nocc / $totalocc|bc -l >> $logdir/num_hops_density
+    done < $logdir/num_hops_occurrences
+    
+    > $logdir/num_hops_cdf
+    cdf=0
+    while read -r x; do
+        cdf=$(echo $cdf + $x|bc -l)
+        echo $cdf >> $logdir/num_hops_cdf
+    done < $logdir/num_hops_density
+}
+
 
 function extract_succeeding_diversifiers() {
     cat $logdir/log_*.*|python3 calc_succeeding_diversifiers.py > $logdir/succeeding_diversifiers
@@ -92,8 +139,15 @@ if [ "x$1" == "x" ]; then
     exit 1
 fi
 
-extract_client_info
-extract_hops
-extract_load_events
-extract_node_events
-extract_runtime_cputime_mapping
+#extract_client_info
+
+#extract_load_events
+#extract_hop_events
+
+# Depends: extract_load_events extract_hop_events
+document_node_events
+
+# Depends: document_node_events
+#document_hops
+
+#extract_runtime_cputime_mapping
