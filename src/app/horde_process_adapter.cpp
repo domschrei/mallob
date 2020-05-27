@@ -167,13 +167,8 @@ void HordeProcessAdapter::run() {
         //_log->log(0, "main loop\n");
 
         // Wait until something happens
+        // (can be interrupted by Fork::wakeUp(*_child_pid))
         usleep(1000 /*1 millisecond*/);
-
-        // Check initialization state
-        if (!*_is_initialized && hlib.isFullyInitialized()) {
-            _log->log(3, "DO set initialized\n");
-            *_is_initialized = true;
-        }
 
         // Dump stats
         if (*_do_dump_stats && !*_did_dump_stats) {
@@ -234,6 +229,12 @@ void HordeProcessAdapter::run() {
             *_did_import = true;
         }
         if (!*_do_import) *_did_import = false;
+
+        // Check initialization state
+        if (!*_is_initialized && hlib.isFullyInitialized()) {
+            _log->log(3, "DO set initialized\n");
+            *_is_initialized = true;
+        }
 
         // Check solved state
         if (*_has_solution) continue;

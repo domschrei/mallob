@@ -33,7 +33,7 @@ void propagateSignalAndExit(int signum) {
 
 void doNothing(int signum) {
     // Do nothing, just return
-    std::cout << "WOKE_UP" << std::endl;
+    //std::cout << "WOKE_UP" << std::endl;
 }
 
 
@@ -45,7 +45,7 @@ void Fork::init(int rank) {
     _children.clear();
     signal(SIGTERM, propagateSignalAndExit);
     signal(SIGINT, propagateSignalAndExit);
-    signal(SIGUSR1, doNothing);
+    signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
 }
 
 pid_t Fork::createChild() {
