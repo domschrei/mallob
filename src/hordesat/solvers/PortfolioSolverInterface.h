@@ -12,6 +12,8 @@
 #include <set>
 #include <stdexcept>
 
+#include "../utilities/logging_interface.h"
+
 using namespace std;
 
 enum SatResult {
@@ -39,14 +41,21 @@ public:
  * Interface for solvers that can be used used in the portfolio
  */
 class PortfolioSolverInterface {
+
+protected:
+	LoggingInterface& _logger;
+
 public:
 	int solverId;
 	std::string _global_name;
 
-	void setName(std::string name) {_global_name = name;}
+	// constructor
+	PortfolioSolverInterface(LoggingInterface& logger) : _logger(logger) {}
 
-	// Load formula from a given dimacs file, return false if failed
-	virtual bool loadFormula(const char* filename) = 0;
+    // destructor
+	virtual ~PortfolioSolverInterface() {}
+
+	void setName(std::string name) {_global_name = name;}
 
 	// Get the number of variables of the formula
 	// NOT NECESSARY
@@ -57,7 +66,7 @@ public:
 	virtual int getSplittingVariable() = 0;
 
 	// Set initial phase for a given variable
-	// NOT NECESSARY used only for diversification of the portfolio
+	// NOT NECESSARY, used only for diversification of the portfolio
 	virtual void setPhase(const int var, const bool phase) = 0;
 
 	// Interrupt the SAT solving, solving cannot continue until interrupt is unset.
@@ -66,27 +75,24 @@ public:
 	// Remove the SAT solving interrupt request.
 	virtual void unsetSolverInterrupt() = 0;
 
-    
+    // Suspend the SAT solver DURING its execution, freeing up computational resources for other threads
+    virtual void setSolverSuspend() = 0;
+
+	// Remove the SAT solving suspend request
+    virtual void unsetSolverSuspend() = 0;
+
 	// Solve the formula with a given set of assumptions
 	virtual SatResult solve(const vector<int>& assumptions = vector<int>()) = 0;
 
 	virtual vector<int> getSolution() = 0;
 	virtual set<int> getFailedAssumptions() = 0;
 
-	// Add a (list of) permanent clause(s) to the formula
-	// NOT NECESSARY IF LOAD FORMULA IS IMPLEMENTED
+	// Add a permanent literal to the formula (zero for clause separator)
 	virtual void addLiteral(int lit) = 0;
-	virtual void addClause(vector<int>& clause) = 0;
-	virtual void addClauses(vector<vector<int> >& clauses) = 0;
-	virtual void addClauses(const vector<int>& clauses) = 0;
-	virtual void addInitialClauses(vector<vector<int> >& clauses) = 0;
-	virtual void addInitialClauses(const vector<int>& clauses) = 0;
 
-	// Add a (list of) learned clause(s) to the formula
+	// Add a learned clause to the formula
 	// The learned clauses might be added later or possibly never
-	virtual void addLearnedClause(vector<int>& clauses) = 0;
 	virtual void addLearnedClause(const int* begin, int size) = 0;
-	virtual void addLearnedClauses(vector<vector<int> >& clauses) = 0;
 
 	// Set a function that should be called for each learned clause
 	virtual void setLearnedClauseCallback(LearnedClauseCallback* callback, int solverId) = 0;
@@ -100,15 +106,17 @@ public:
 
 	// You are solver #rank of #size solvers, diversify your parameters (seeds, heuristics, etc.) accordingly.
 	virtual void diversify(int rank, int size) = 0;
+
 	// How many "true" different diversifications do you have?
+	// May be used to decide when to apply additional diversifications.
 	virtual int getNumOriginalDiversifications() = 0;
 
-    // Suspend the SAT solver DURING its execution, freeing up computational resources for other threads
-    virtual void setSolverSuspend() = 0;
-    virtual void unsetSolverSuspend() = 0;
-	
-    // destructor
-	virtual ~PortfolioSolverInterface() {}
+
+	friend void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ...);
 };
+
+void updateTimer(std::string solverName);
+double getTime();
+void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ...);
 
 #endif /* PORTFOLIOSOLVERINTERFACE_H_ */

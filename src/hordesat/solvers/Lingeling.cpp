@@ -16,44 +16,11 @@ extern "C" {
 	#include "lglib.h"
 }
 
-using namespace std::chrono;
-
-Mutex timeCallbackLock;
-std::map<std::string, high_resolution_clock::time_point> times;
-std::string currentSolverName = "";
-high_resolution_clock::time_point lglSolverStartTime;
-
-void updateTimer(std::string solverName) {
-	auto lock = timeCallbackLock.getLock();
-	if (currentSolverName == solverName) return;
-	if (!times.count(solverName)) {
-		times[solverName] = high_resolution_clock::now();
-	}
-	lglSolverStartTime = times[solverName];
-	currentSolverName = solverName;
-}
-double getTime() {
-    high_resolution_clock::time_point nowTime = high_resolution_clock::now();
-	timeCallbackLock.lock();
-    duration<double, std::milli> time_span = nowTime - lglSolverStartTime;    
-	timeCallbackLock.unlock();
-	return time_span.count() / 1000;
-}
-
-void slog(Lingeling* lgl, int verbosityLevel, const char* fmt, ...) {
-	std::string msg = lgl->_global_name + " ";
-	msg += fmt;
-	va_list vl;
-	va_start(vl, fmt);
-	lgl->logger.log_va_list(verbosityLevel, msg.c_str(), vl);
-	va_end(vl);
-}
-
 int termCallback(void* solverPtr) {
 	Lingeling* lp = (Lingeling*)solverPtr;
 
-	double elapsed = lp->logger.getTime() - lp->lastTermCallbackTime;
-	lp->lastTermCallbackTime = lp->logger.getTime();
+	double elapsed = lp->_logger.getTime() - lp->lastTermCallbackTime;
+	lp->lastTermCallbackTime = lp->_logger.getTime();
     
 	if (lp->stopSolver) {
 		slog(lp, 1, "STOP (%.2fs since last cb)", elapsed);
@@ -156,14 +123,18 @@ void consumeCls(void* sp, int** clause, int* glue) {
 }
 
 Lingeling::Lingeling(LoggingInterface& logger, int solverId, std::string jobname, 
-		bool addOldDiversifications) : logger(logger), myId(solverId), jobname(jobname) {
+		bool addOldDiversifications) : PortfolioSolverInterface(logger), myId(solverId), jobname(jobname) {
+
 	solver = lglinit();
+	
 	//lglsetopt(solver, "verbose", 1);
+	
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
 	lglsetopt(solver, "bca", 0);
+	
 	//lglsetopt(solver, "termint", 10);
+	
 	lastTermCallbackTime = logger.getTime();
-
 	updateTimer(jobname);
 
 	stopSolver = 0;
@@ -178,8 +149,6 @@ Lingeling::Lingeling(LoggingInterface& logger, int solverId, std::string jobname
 	clsBuffer = (int*) malloc(clsBufferSize*sizeof(int));
 
     suspendSolver = false;
-    //suspendMutex = VerboseMutex("suspendLgl", NULL);
-    //suspendCond = ConditionVariable();
     maxvar = 0;
 
 	if (addOldDiversifications) {
@@ -189,19 +158,12 @@ Lingeling::Lingeling(LoggingInterface& logger, int solverId, std::string jobname
 	}
 }
 
-bool Lingeling::loadFormula(const char* filename) {
-	vector<PortfolioSolverInterface*> solvers;
-	solvers.push_back(this);
-	return loadFormulaToSolvers(solvers, filename);
-}
-
 int Lingeling::getVariablesCount() {
 	return maxvar;
 }
 
 // Get a variable suitable for search splitting
 int Lingeling::getSplittingVariable() {
-	//TODO not sure what this is?
 	return lglookahead(solver);
 }
 
@@ -286,68 +248,13 @@ set<int> Lingeling::getFailedAssumptions() {
 	return result;
 }
 
-
-// Add a permanent clause to the formula
-void Lingeling::addClause(vector<int>& clause) {
-	auto lock = clauseAddMutex.getLock();
-	clausesToAdd.push_back(clause);
-}
-
-void Lingeling::addClauses(vector<vector<int> >& clauses) {
-	auto lock = clauseAddMutex.getLock();
-	clausesToAdd.insert(clausesToAdd.end(), clauses.begin(), clauses.end());
-}
-
-void Lingeling::addClauses(const vector<int>& clauses) {
-	auto lock = clauseAddMutex.getLock();
-	vector<int> clause;
-	for (size_t i = 0; i < clauses.size(); i++) {
-		int lit = clauses[i];
-		if (lit == 0) {
-			clausesToAdd.push_back(clause);
-			clause.clear();
-		} else {
-			clause.push_back(lit);	
-		}
-	}
-}
-
 void Lingeling::addLiteral(int lit) {
-	if (lit != 0) {
-		lglfreeze(solver, lit);
-	}
+	
+	// TODO required for incremental solving?
+	//if (lit != 0) lglfreeze(solver, lit);
+	
 	if (abs(lit) > maxvar) maxvar = abs(lit);
 	lgladd(solver, lit);
-}
-
-
-void Lingeling::addInitialClauses(vector<vector<int> >& clauses) {
-	for (size_t i = 0; i < clauses.size(); i++) {
-		for (size_t j = 0; j < clauses[i].size(); j++) {
-			int lit = clauses[i][j];
-			if (abs(lit) > maxvar) maxvar = abs(lit);
-			lgladd(solver, lit);
-		}
-		lgladd(solver, 0);
-	}
-}
-
-void Lingeling::addInitialClauses(const vector<int>& clauses) {
-	for (size_t i = 0; i < clauses.size(); i++) {
-		int lit = clauses[i];
-		if (abs(lit) > maxvar) maxvar = abs(lit);
-		lgladd(solver, lit);
-	}
-}
-
-// Add a learned clause to the formula
-void Lingeling::addLearnedClause(vector<int>& clause) {
-	auto lock = clauseAddMutex.getLock();
-	if (clause.size() == 1) {
-		unitsToAdd.push_back(clause[0]);
-	} else {
-		learnedClausesToAdd.push_back(clause);
-	}
 }
 
 void Lingeling::addLearnedClause(const int* begin, int size) {
@@ -356,17 +263,6 @@ void Lingeling::addLearnedClause(const int* begin, int size) {
 		unitsToAdd.push_back(*begin);
 	} else {
 		learnedClausesToAdd.emplace_back(begin, begin+size);
-	}
-}
-
-void Lingeling::addLearnedClauses(vector<vector<int> >& clauses) {
-	auto lock = clauseAddMutex.getLock();
-	for (size_t i = 0; i < clauses.size(); i++) {
-		if (clauses[i].size() == 1) {
-			unitsToAdd.push_back(clauses[i][0]);
-		} else {
-			learnedClausesToAdd.push_back(clauses[i]);
-		}
 	}
 }
 

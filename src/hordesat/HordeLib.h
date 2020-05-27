@@ -11,7 +11,6 @@
 #include "utilities/ParameterProcessor.h"
 #include "utilities/Threading.h"
 #include "utilities/logging_interface.h"
-#include "solvers/MiniSat.h"
 #include "solvers/Lingeling.h"
 #include "sharing/AllToAllSharingManager.h"
 #include "solvers/solver_thread.h"

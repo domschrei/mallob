@@ -1,25 +1,27 @@
 #!/bin/bash
 
-if [ ! -d minisat ]; then
+if false; then
+    if [ ! -d minisat ]; then
 
-    echo "Fetching minisat ..."
+        echo "Fetching minisat ..."
 
-    # get minisat and patch it
-    wget https://github.com/niklasso/minisat/archive/master.zip
-    unzip master.zip
-    mv minisat-master minisat
-    patch minisat/minisat/core/Solver.h < minisat.h.patch
-    patch minisat/minisat/core/Solver.cc < minisat.cc.patch
-    patch minisat/Makefile < minisat-makefile.patch
+        # get minisat and patch it
+        wget https://github.com/niklasso/minisat/archive/master.zip
+        unzip master.zip
+        mv minisat-master minisat
+        patch minisat/minisat/core/Solver.h < minisat.h.patch
+        patch minisat/minisat/core/Solver.cc < minisat.cc.patch
+        patch minisat/Makefile < minisat-makefile.patch
 
-    echo "Building minisat ..."
-    
-    # make minisat
-    cd minisat
-    make
-    cd ..
-else
-    echo "Assuming that a correct installation of minisat is present."
+        echo "Building minisat ..."
+        
+        # make minisat
+        cd minisat
+        make
+        cd ..
+    else
+        echo "Assuming that a correct installation of minisat is present."
+    fi
 fi
 
 if [ ! -d yalsat ]; then

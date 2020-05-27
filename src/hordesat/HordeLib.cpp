@@ -104,21 +104,11 @@ void HordeLib::init() {
 
 	for (int i = 0; i < solversCount; i++) {
 		int solverId = i + solversCount * mpi_rank;
-		if (params.getParam("s") == "minisat") {
-			solverInterfaces.emplace_back(new MiniSat());
-			hlog(3, "MiniSat @ %d\n", i, mpi_rank, mpi_size);
-		} else if (params.getParam("s") == "combo") {
-			if ((mpi_rank + i) % 2 == 0) {
-				solverInterfaces.emplace_back(new MiniSat());
-				hlog(3, "MiniSat @ %d\n", i, mpi_rank, mpi_size);
-			} else {
-				solverInterfaces.emplace_back(new Lingeling(*logger, i, params.getParam("jobstr"), params.isSet("aod")));
-				hlog(3, "Lingeling @ %d\n", i, mpi_rank, mpi_size);
-			}
-		} else {
-			solverInterfaces.emplace_back(new Lingeling(*logger, i, params.getParam("jobstr"), params.isSet("aod")));
-			hlog(3, "Lingeling @ %d\n", i, mpi_rank, mpi_size);
-		}
+		
+		// TODO When there are multiple solver implementations,
+		// allocate them here instead of / together with Lingeling
+		
+		solverInterfaces.emplace_back(new Lingeling(*logger, i, params.getParam("jobstr"), params.isSet("aod")));
 		// set solver id
 		solverInterfaces[i]->solverId = solverId;		
 	}

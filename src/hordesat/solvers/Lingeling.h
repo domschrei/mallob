@@ -8,7 +8,6 @@
 #ifndef LINGELING_H_
 #define LINGELING_H_
 
-#include "../utilities/SatUtils.h"
 #include "PortfolioSolverInterface.h"
 #include "../utilities/Threading.h"
 #include "../utilities/logging_interface.h"
@@ -20,8 +19,6 @@ struct LGL;
 class Lingeling: public PortfolioSolverInterface {
 
 private:
-
-	LoggingInterface& logger;
 	LGL* solver;
 	std::string name;
 	int stopSolver;
@@ -38,7 +35,7 @@ private:
 	friend void produceUnit(void* sp, int lit);
 	friend void consumeUnits(void* sp, int** start, int** end);
 	friend void consumeCls(void* sp, int** clause, int* glue);
-	friend void slog(Lingeling* lgl, int verbosityLevel, const char* fmt, ...);
+	friend void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ...);
 
 	// clause addition
 	vector<vector<int> > clausesToAdd;
@@ -58,9 +55,6 @@ private:
 	int numDiversifications;
 
 public:
-
-	// Load formula from a given dimacs file, return false if failed
-	bool loadFormula(const char* filename);
 
 	// Get the number of variables of the formula
 	int getVariablesCount();
@@ -83,17 +77,10 @@ public:
 
 	// Add a (list of) permanent clause(s) to the formula
 	void addLiteral(int lit);
-	void addClause(vector<int>& clause);
-	void addClauses(vector<vector<int> >& clauses);
-	void addInitialClauses(vector<vector<int> >& clauses);
-	void addClauses(const vector<int>& clauses);
-	void addInitialClauses(const vector<int>& clauses);
 
-	// Add a (list of) learned clause(s) to the formula
+	// Add a learned clause to the formula
 	// The learned clauses might be added later or possibly never
-	void addLearnedClause(vector<int>& clauses);
 	void addLearnedClause(const int* begin, int size);
-	void addLearnedClauses(vector<vector<int> >& clauses);
 
 	// Set a function that should be called for each learned clause
 	void setLearnedClauseCallback(LearnedClauseCallback* callback, int solverId);
