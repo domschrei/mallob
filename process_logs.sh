@@ -1,13 +1,14 @@
 #!/bin/bash
 
-function extract_client_info() {
-
+function get_client_nodes() {
     num_nodes=`ls $logdir/log_*.*|wc -l`
     num_clients=`head $logdir/log_*.0|grep -m1 "Program options"|grep -oE ", c=[0-9]+,"|grep -oE "[0-9]+"`
-    echo $num_clients clients
-
     startnode=$(($num_nodes-$num_clients))
     endnode=$(($num_nodes-1))
+    seq $startnode $endnode
+}
+
+function extract_client_info() {
 
     > $logdir/responses
     > $logdir/timeouts
@@ -16,7 +17,7 @@ function extract_client_info() {
     > $logdir/scheduling_times
 
     introduced_jobs=0
-    for n in `seq $startnode $endnode`; do
+    for n in $(get_client_nodes); do
 
         client_logfile=$logdir/log_*.$n
         echo $client_logfile
@@ -45,6 +46,76 @@ function extract_client_info() {
     sort -n $logdir/timeouts -o $logdir/timeouts
     sort -n $logdir/runtimes -o $logdir/runtimes
     sort -n $logdir/qualified_runtimes -o $logdir/qualified_runtimes
+}
+
+function extract_id_file_map() {
+    
+    >tmp
+    for n in $(get_client_nodes); do
+        client_logfile=$logdir/log_*.$n
+        grep "FILE_IO reading" $client_logfile|grep -oE "\".*\" \(#[0-9]+\)"|sed 's.[\"#)(]..g' >>tmp
+    done
+    
+    > $logdir/id_file_map
+    while read -r line; do
+        filename=$(echo $line|awk '{print $1}')
+        jobid=$(echo $line|awk '{print $2}')
+        echo "$jobid $(basename $filename)" >> $logdir/id_file_map 
+    done < tmp
+    rm tmp
+}
+
+function extract_found_results() {
+    
+    > $logdir/jobids_SAT
+    > $logdir/jobids_UNSAT
+    for n in $(get_client_nodes); do
+        client_logfile=$logdir/log_*.$n
+        grep -oE "SOLUTION #[0-9]+ SAT" $client_logfile|sed 's/#//g'|awk '{print "'$logdir'",$2}' >> $logdir/jobids_SAT
+        grep -oE "SOLUTION #[0-9]+ UNSAT" $client_logfile|sed 's/#//g'|awk '{print "'$logdir'",$2}' >> $logdir/jobids_UNSAT
+    done
+    
+    > $logdir/jobs_SAT
+    > $logdir/jobs_UNSAT
+    while read -r line; do
+        jobid=$(echo $line|awk '{print $2}'|sed 's/#//g')
+        filename=$(cat $logdir/id_file_map|awk '{if ($1 == "'$jobid'") {print $2}}')
+        echo "$logdir $filename" >> $logdir/jobs_SAT
+    done < $logdir/jobids_SAT
+    
+    while read -r line; do
+        jobid=$(echo $line|awk '{print $2}'|sed 's/#//g')
+        filename=$(cat $logdir/id_file_map|awk '{if ($1 == "'$jobid'") {print $2}}')
+        echo "$logdir $filename" >> $logdir/jobs_UNSAT
+    done < $logdir/jobids_UNSAT
+}
+
+# Takes 2 args: <path of global jobs_SAT> <path of global jobs_UNSAT>
+function check_found_results() {
+    global_sat="$1"
+    global_unsat="$2"
+    
+    while read -r line ; do
+        jobid=$(echo $line|awk '{print $2}')
+        if grep -qE " ${jobid}$" "$global_unsat"; then 
+            echo "ERROR!"
+            grep -E " ${jobid}$" "$global_unsat"
+            exit 1
+        else
+            echo "$logdir $jobid" >> $global_sat
+        fi
+    done < $logdir/jobs_SAT
+    
+    while read -r line ; do
+        jobid=$(echo $line|awk '{print $2}')
+        if grep -qE " ${jobid}$" "$global_sat"; then 
+            echo "ERROR!"
+            grep -E " ${jobid}$" "$global_sat"
+            exit 1
+        else
+            echo "$logdir $jobid" >> $global_unsat
+        fi
+    done < $logdir/jobs_UNSAT
 }
 
 function get_num_reactivations() {
@@ -118,7 +189,6 @@ function document_hops() {
     done < $logdir/num_hops_density
 }
 
-
 function extract_succeeding_diversifiers() {
     cat $logdir/log_*.*|python3 calc_succeeding_diversifiers.py > $logdir/succeeding_diversifiers
 }
@@ -139,15 +209,21 @@ if [ "x$1" == "x" ]; then
     exit 1
 fi
 
-extract_client_info
+#extract_client_info
 
-extract_load_events
-extract_hop_events
+#extract_load_events
+#extract_hop_events
 
 # Depends: extract_load_events extract_hop_events
-document_node_events
+#document_node_events
 
 # Depends: document_node_events
-document_hops
+#document_hops
 
-extract_runtime_cputime_mapping
+#extract_runtime_cputime_mapping
+
+# CHECK SOLUTIONS
+
+extract_id_file_map
+extract_found_results
+check_found_results logs/jobs_SAT logs/jobs_UNSAT
