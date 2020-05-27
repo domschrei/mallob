@@ -232,7 +232,7 @@ int HordeLib::solveLoop() {
 }
 
 int HordeLib::prepareSharing(int* begin, int maxSize) {
-	if (isCleanedUp()) return;
+	if (isCleanedUp()) return 0;
     assert(sharingManager != NULL);
 	hlog(3, "collecting clauses on this node\n");
 	return sharingManager->prepareSharing(begin, maxSize);

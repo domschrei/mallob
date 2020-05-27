@@ -16,6 +16,7 @@ public:
     static void hardkill(int childpid);
     static void suspend(int childpid);
     static void resume(int childpid);
+    static void wakeUp(int childpid);
     static void terminateAll();
 
     /* 0: running, -1: error, childpid: exited */

@@ -30,6 +30,10 @@ void propagateSignalAndExit(int signum) {
     exit(0);
 }
 
+void doNothing(int signum) {
+    // Do nothing, just return
+}
+
 
 int Fork::_rank;
 std::set<pid_t> Fork::_children;
@@ -39,6 +43,7 @@ void Fork::init(int rank) {
     _children.clear();
     signal(SIGTERM, propagateSignalAndExit);
     signal(SIGINT, propagateSignalAndExit);
+    signal(SIGUSR1, doNothing);
 }
 
 pid_t Fork::createChild() {
@@ -66,6 +71,9 @@ void Fork::suspend(pid_t childpid) {
 }
 void Fork::resume(pid_t childpid) {
     kill(childpid, SIGCONT);
+}
+void Fork::wakeUp(pid_t childpid) {
+    kill(childpid, SIGUSR1);
 }
 void Fork::terminateAll() {
     std::set<int> children = _children;

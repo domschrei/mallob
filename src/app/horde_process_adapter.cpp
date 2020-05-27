@@ -156,8 +156,7 @@ void HordeProcessAdapter::run() {
     // [child process]
 
     Fork::init(Fork::_rank);
-    float startTime = Timer::elapsedSeconds();
-
+    
     // Prepare solver
     HordeLib hlib(_params, _log);
     hlib.beginSolving(_formulae, _assumptions);
@@ -300,6 +299,7 @@ void HordeProcessAdapter::updateRole(int rank, int size) {
 void HordeProcessAdapter::collectClauses(int maxSize) {
     *_export_buffer_max_size = maxSize;
     *_do_export = true;
+    Fork::wakeUp(*_child_pid);
 }
 bool HordeProcessAdapter::hasCollectedClauses() {
     return *_did_export;
@@ -315,10 +315,12 @@ void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses) {
     *_import_buffer_size = clauses.size();
     memcpy(_import_buffer, clauses.data(), clauses.size()*sizeof(int));
     *_do_import = true;
+    Fork::wakeUp(*_child_pid);
 }
 
 void HordeProcessAdapter::dumpStats() {
     *_do_dump_stats = true;
+    // No hard need to wake up immediately
 }
 
 bool HordeProcessAdapter::check() {
