@@ -56,7 +56,7 @@ function extract_load_events() {
     for f in $logdir/log_*.* ; do
         grep "LOAD" $f >> ldev
     done
-    cat ldev|grep -oE "^[0-9\.]+ [0-9]+ LOAD [01] \([+-]#[0-9]+:[0-9]+\)"|awk '{print $1,$2,$4,$5}'|sed 's.(\|)\|\+\|-\|#..g'|sed 's/:/ /g' > $logdir/loadevents
+    cat ldev|grep -oE "^[0-9]+\.[0-9]+ [0-9]+ LOAD [01] \([+-]#[0-9]+:[0-9]+\)"|awk '{print $1,$2,$4,$5}'|sed 's.(\|)\|\+\|-\|#..g'|sed 's/:/ /g' > $logdir/loadevents
     rm ldev
 }
 
@@ -66,7 +66,7 @@ function extract_hop_events() {
         grep "Adopting" $f >> hpev
     done
     sort -g hpev -o hpev
-    cat hpev|grep -oE "^[0-9\.]+ [0-9]+ Adopting #[0-9]+:[0-9]+ after [0-9]+ hops"|awk '{print $1,$2,$4,$6}'|sed 's.(\|)\|\+\|-\|#..g'|sed 's/:/ /g' > $logdir/hopevents
+    cat hpev|grep -oE "^[0-9]+\.[0-9]+ [0-9]+ Adopting #[0-9]+:[0-9]+ after [0-9]+ hops"|awk '{print $1,$2,$4,$6}'|sed 's.(\|)\|\+\|-\|#..g'|sed 's/:/ /g' > $logdir/hopevents
     rm hpev
 }
 
@@ -139,15 +139,15 @@ if [ "x$1" == "x" ]; then
     exit 1
 fi
 
-#extract_client_info
+extract_client_info
 
-#extract_load_events
-#extract_hop_events
+extract_load_events
+extract_hop_events
 
 # Depends: extract_load_events extract_hop_events
 document_node_events
 
 # Depends: document_node_events
-#document_hops
+document_hops
 
-#extract_runtime_cputime_mapping
+extract_runtime_cputime_mapping
