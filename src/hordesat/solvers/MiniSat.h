@@ -69,6 +69,7 @@ public:
 	// Add a (list of) learned clause(s) to the formula
 	// The learned clauses might be added later or possibly never
 	void addLearnedClause(vector<int>& clauses);
+	void addLearnedClause(const int* begin, int size);
 	void addLearnedClauses(vector<vector<int> >& clauses);
 
 	// Set a function that should be called for each learned clause

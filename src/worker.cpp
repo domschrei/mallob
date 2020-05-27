@@ -791,6 +791,17 @@ void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
     
     Console::log_recv(Console::VERB, handle->source, "Result found for job #%i", jobId);
 
+    // Terminate job and propagate termination message
+    if (getJob(jobId).getDescription().isIncremental()) {
+        handleInterrupt(handle);
+    } else {
+        handleTerminate(handle);
+    }
+
+    // Try to send away termination message as fast as possible
+    // to make space for other expanding jobs
+    MyMpi::testSentHandles();
+
     // Redirect termination signal
     IntPair payload(jobId, getJob(jobId).getParentNodeRank());
     if (handle->source == worldRank) {
@@ -802,13 +813,6 @@ void Worker::handleWorkerFoundResult(MessageHandlePtr& handle) {
         MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_FORWARD_CLIENT_RANK, payload);
         //stats.increment("sentMessages");
         Console::log_send(Console::VERB, handle->source, "Forward rank of client (%i)", payload.second); 
-    }
-
-    // Terminate job and propagate termination message
-    if (getJob(jobId).getDescription().isIncremental()) {
-        handleInterrupt(handle);
-    } else {
-        handleTerminate(handle);
     }
 }
 
@@ -864,12 +868,12 @@ void Worker::handleAbort(MessageHandlePtr& handle) {
     int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
     if (!hasJob(jobId)) return;
 
+    interruptJob(handle, jobId, /*terminate=*/true, /*reckless=*/true);
+    
     if (getJob(jobId).isRoot()) {
         // Forward information on aborted job to client
         MyMpi::isend(MPI_COMM_WORLD, getJob(jobId).getParentNodeRank(), MSG_ABORT, handle->recvData);
     }
-
-    interruptJob(handle, jobId, /*terminate=*/true, /*reckless=*/true);
 }
 
 void Worker::handleWorkerDefecting(MessageHandlePtr& handle) {
@@ -1043,6 +1047,10 @@ void Worker::interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, b
         Console::log_send(Console::VERB, childRank, "Propagate interruption of %s (past child) ...", job.toStr());
     }
     job.getPastChildren().clear();
+
+    // Try to send away termination message as fast as possible
+    // to make space for other expanding jobs
+    MyMpi::testSentHandles();
 
     // Stop / terminate
     if (job.isInitializing() || job.isActive() || job.isSuspended()) {

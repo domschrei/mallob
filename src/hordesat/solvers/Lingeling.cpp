@@ -350,6 +350,15 @@ void Lingeling::addLearnedClause(vector<int>& clause) {
 	}
 }
 
+void Lingeling::addLearnedClause(const int* begin, int size) {
+	auto lock = clauseAddMutex.getLock();
+	if (size == 1) {
+		unitsToAdd.push_back(*begin);
+	} else {
+		learnedClausesToAdd.emplace_back(begin, begin+size);
+	}
+}
+
 void Lingeling::addLearnedClauses(vector<vector<int> >& clauses) {
 	auto lock = clauseAddMutex.getLock();
 	for (size_t i = 0; i < clauses.size(); i++) {

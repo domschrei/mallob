@@ -252,7 +252,9 @@ bool ThreadedSatJob::isInitialized() {
     return _solver->isFullyInitialized();
 }
 void ThreadedSatJob::prepareSharing(int maxSize) {
-    _clause_buffer = _solver->prepareSharing(maxSize);
+    _clause_buffer.resize(maxSize);
+    int actualSize = _solver->prepareSharing(_clause_buffer.data(), maxSize);
+    _clause_buffer.resize(actualSize);
 }
 bool ThreadedSatJob::hasPreparedSharing() {
     return !_clause_buffer.empty();

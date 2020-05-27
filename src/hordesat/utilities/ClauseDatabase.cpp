@@ -134,25 +134,28 @@ void ClauseDatabase::setIncomingBuffer(const int* buffer, int size) {
 	remainingVipLits = buffer[0]; // # VIP literals including separators
 }
 
-bool ClauseDatabase::getNextIncomingClause(vector<int>& cls) {
+const int* ClauseDatabase::getNextIncomingClause(int& size) {
 
 	if (remainingVipLits > 0) {
 		// VIP clause
 		int start = currentPos++;
 		while (incomingBuffer[currentPos] != 0) currentPos++;
 		// currentPos is now at separator-"0" after the clause to export
-		cls.insert(cls.end(), incomingBuffer+start, incomingBuffer+currentPos);
+		//cls.insert(cls.end(), incomingBuffer+start, incomingBuffer+currentPos);
+		const int* clsbegin = incomingBuffer+start;
+		size = currentPos-start;
+
 		// Move currentPos pointer to begin of next clause
 		currentPos++;
 		remainingVipLits--;
-		return true;
+		return clsbegin;
 	}
 
 	// Find appropriate clause size
 	while (remainingClsOfCurrentSize == 0) {
 		
 		// No more clauses?
-		if (currentPos >= bufferSize) return false;
+		if (currentPos >= bufferSize) return NULL;
 
 		// Go to next clause size
 		currentSize++;
@@ -167,9 +170,11 @@ bool ClauseDatabase::getNextIncomingClause(vector<int>& cls) {
 	remainingClsOfCurrentSize--;
 
 	// Insert clause literals
-	cls.clear();
-	cls.insert(cls.end(), incomingBuffer+start, incomingBuffer+stop);
-	return true;
+	//cls.clear();
+	//cls.insert(cls.end(), incomingBuffer+start, incomingBuffer+stop);
+	const int* clsbegin = incomingBuffer+start;
+	size = currentSize;
+	return clsbegin;
 }
 
 ClauseDatabase::~ClauseDatabase() {

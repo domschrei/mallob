@@ -67,8 +67,9 @@ protected:
 public:
 	DefaultSharingManager(int mpi_size, int mpi_rank, vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
 			ParameterProcessor& params);
-    std::vector<int> prepareSharing(int maxSize);
+    int prepareSharing(int* begin, int maxSize);
     void digestSharing(const std::vector<int>& result);
+	void digestSharing(const int* begin, int buflen);
 	SharingStatistics getStatistics();
 	~DefaultSharingManager();
 };

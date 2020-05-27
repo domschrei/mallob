@@ -51,7 +51,7 @@ public:
 	 * Fill the given clause with the literals of the next incomming clause.
 	 * Return false if no more clauses.
 	 */
-	bool getNextIncomingClause(vector<int>& clause);
+	const int* getNextIncomingClause(int& size);
 
 private:
 	static DefaultLoggingInterface dli;

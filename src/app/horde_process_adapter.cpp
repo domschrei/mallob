@@ -19,30 +19,6 @@ HordeProcessAdapter::HordeProcessAdapter(const std::map<std::string, std::string
     _max_import_buffer_size = atoi(params.at("cbbs").c_str()) * sizeof(int) * atoi(params.at("mpisize").c_str());
     _max_export_buffer_size = atoi(params.at("cbbs").c_str()) * sizeof(int);
     _max_solution_size = sizeof(int) * (numVars+1);
-    
-    /*
-    _shmem_mutex        = (void*)                        SharedMemory::create(SharedMemMutex::getSharedMemorySize());
-    _shmem_cond         = (void*)                        SharedMemory::create(SharedMemConditionVariable::getSharedMemorySize());
-    _import_buffer      = (int*)                         SharedMemory::create(_max_import_buffer_size);
-    _export_buffer      = (int*)                         SharedMemory::create(_max_export_buffer_size);
-    _solution           = (int*)                         SharedMemory::create(_max_solution_size);
-    _child_pid          = (pid_t*)                       SharedMemory::create(sizeof(pid_t));
-    _state              = (SolvingStates::SolvingState*) SharedMemory::create(sizeof(SolvingStates::SolvingState));
-    _portfolio_rank     = (int*)                         SharedMemory::create(sizeof(int));
-    _portfolio_size     = (int*)                         SharedMemory::create(sizeof(int));
-    _import_buffer_size = (int*)                         SharedMemory::create(sizeof(int));
-    _export_buffer_size = (int*)                         SharedMemory::create(sizeof(int));
-    _solution_size      = (int*)                         SharedMemory::create(sizeof(int));
-    _do_import          = (bool*)                        SharedMemory::create(sizeof(bool));
-    _do_export          = (bool*)                        SharedMemory::create(sizeof(bool));
-    _did_export         = (bool*)                        SharedMemory::create(sizeof(bool));
-    _is_initialized     = (bool*)                        SharedMemory::create(sizeof(bool));
-    _did_write_solution = (bool*)                        SharedMemory::create(sizeof(bool));
-    _do_dump_stats      = (bool*)                        SharedMemory::create(sizeof(bool));
-    _do_interrupt       = (bool*)                        SharedMemory::create(sizeof(bool));
-    _do_update_role     = (bool*)                        SharedMemory::create(sizeof(bool));
-    _result             = (SatResult*)                   SharedMemory::create(sizeof(SatResult));
-    */
 
     initSharedMemory();
 }
@@ -246,10 +222,7 @@ void HordeProcessAdapter::run() {
         if (*_do_export && !*_did_export) {
             _log->log(3, "DO export clauses\n");
             // Collect local clauses, put into shared memory
-            // TODO do without copying all the data
-            std::vector<int> clauses = hlib.prepareSharing(*_export_buffer_max_size);
-            memcpy(_export_buffer, clauses.data(), clauses.size()*sizeof(int));
-            *_export_buffer_true_size = clauses.size();
+            *_export_buffer_true_size = hlib.prepareSharing(_export_buffer, *_export_buffer_max_size);
             *_did_export = true;
         }
         if (!*_do_export) *_did_export = false;
@@ -258,11 +231,8 @@ void HordeProcessAdapter::run() {
         if (*_do_import && !*_did_import) {
             _log->log(3, "DO import clauses\n");
             // Write imported clauses from shared memory into vector
-            // TODO do without copying all the data
-            std::vector<int> clauses(*_import_buffer_size);
-            memcpy(clauses.data(), _import_buffer, *_import_buffer_size*sizeof(int));
+            hlib.digestSharing(_import_buffer, *_import_buffer_size);
             *_did_import = true;
-            hlib.digestSharing(clauses);
         }
         if (!*_do_import) *_did_import = false;
 

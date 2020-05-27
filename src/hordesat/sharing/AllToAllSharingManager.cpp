@@ -23,7 +23,7 @@ DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
 	lastBufferClear = logger.getTime();
 }
 
-std::vector<int> DefaultSharingManager::prepareSharing(int maxSize) {
+int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
 
     //log(3, "Sharing clauses among %i nodes\n", size);
     static int prodInc = 1;
@@ -33,7 +33,7 @@ std::vector<int> DefaultSharingManager::prepareSharing(int maxSize) {
 		nodeFilter.clear();
 	}
 	int selectedCount;
-	int used = cdb.giveSelection(outBuffer, maxSize, &selectedCount);
+	int used = cdb.giveSelection(begin, maxSize, &selectedCount);
 	logger.log(3, "Prepared %i clauses, size %i\n", selectedCount, used);
 	stats.sharedClauses += selectedCount;
 	float usedRatio = ((float)used)/maxSize;
@@ -43,13 +43,16 @@ std::vector<int> DefaultSharingManager::prepareSharing(int maxSize) {
 		logger.log(3, "Node %d production increase for %d. time, sid %d will increase.\n", rank, prodInc++, increaser);
 	}
 	logger.log(3, "Filled %.1f%% of buffer\n", 100*usedRatio);
-    std::vector<int> clauseVec(outBuffer, outBuffer + used);
-
-    return clauseVec;
+	return used;
 }
 
 void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 
+	digestSharing(result.data(), result.size());
+}
+
+void DefaultSharingManager::digestSharing(const int* begin, int buflen) {
+	
 	// "size" is the amount of buffers in the result: 
 	// always one, because buffers are merged into one big buffer
 	size = 1;
@@ -58,31 +61,45 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
     
 	//if (solvers.size() > 1) {
 		// get all the clauses
-		cdb.setIncomingBuffer(result.data(), result.size());
+		cdb.setIncomingBuffer(begin, buflen);
 	//}
 	/* else {
 		// get all the clauses except for those that this node sent
 		cdb.setIncomingBuffer(result.data(), COMM_BUFFER_SIZE, size, rank);
 	}*/
-	vector<int> cl;
 	int passedFilter = 0;
 	int failedFilter = 0;
-	long totalLen = 0;
 	std::vector<int> lens;
-	vector<vector<int> > clausesToAdd;
-	while (cdb.getNextIncomingClause(cl)) {
+	std::vector<int> added(solvers.size(), 0);
+
+	int size;
+	const int* clsbegin = cdb.getNextIncomingClause(size);
+	while (clsbegin != NULL) {
 		
-		int clauseLen = (cl.size() > 1 ? cl.size()-1 : cl.size()); // subtract "glue" int
-		totalLen += clauseLen;
+		int clauseLen = (size > 1 ? size-1 : size); // subtract "glue" int
 		while (clauseLen-1 >= lens.size()) lens.push_back(0);
 		lens[clauseLen-1]++;
 
-		if (nodeFilter.registerClause(cl)) {
-			clausesToAdd.push_back(cl);
+		if (nodeFilter.registerClause(clsbegin, size)) {
+			
+			// Add clause to solvers
+			if (solvers.size() > 1) {
+				for (size_t sid = 0; sid < solvers.size(); sid++) {
+					if (solverFilters[sid]->registerClause(clsbegin, size)) {
+						solvers[sid]->addLearnedClause(clsbegin, size);
+						added[sid]++;
+					}
+				}
+			} else {
+				solvers[0]->addLearnedClause(clsbegin, size);
+			}
+
 			passedFilter++;
 		} else {
 			failedFilter++;
 		}
+
+		clsbegin = cdb.getNextIncomingClause(size);
 	}
 	int total = passedFilter + failedFilter;
 	stats.filteredClauses += failedFilter;
@@ -90,30 +107,20 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 	
 	if (total == 0) return;
 
+	// Process-wide stats
 	std::string lensStr = "";
 	for (int len : lens) lensStr += std::to_string(len) + " ";
-
 	logger.log(1, "fltrd %.2f%% (%d/%d), lens %s\n",
 			100*(float)failedFilter/total, failedFilter, total, 
 			lensStr.c_str());
 
-	if (solvers.size() > 1) {
-		for (size_t sid = 0; sid < solvers.size(); sid++) {
-			int added = 0;
-			for (size_t cid = 0; cid < clausesToAdd.size(); cid++) {
-				if (solverFilters[sid]->registerClause(clausesToAdd[cid])) {
-					solvers[sid]->addLearnedClause(clausesToAdd[cid]);
-					added++;
-				}
-			}
-			logger.log(2, "S%d fltrd %.2f%% (%d)\n", sid, clausesToAdd.empty() ? 0 : 100*(1-((float)added/clausesToAdd.size())), clausesToAdd.size()-added);
-			if (!params.isSet("fd")) {
-				logger.log(2, "S%d clear clsfltr\n", sid);
-				solverFilters[sid]->clear();	
-			} 
-		}
-	} else {
-		solvers[0]->addLearnedClauses(clausesToAdd);
+	// Per-solver stats
+	for (size_t sid = 0; sid < solvers.size(); sid++) {
+		logger.log(2, "S%d fltrd %.2f%% (%d)\n", sid, passedFilter == 0 ? 0 : 100*(1-((float)added[sid]/passedFilter)), passedFilter-added[sid]);
+		if (!params.isSet("fd")) {
+			logger.log(2, "S%d clear clsfltr\n", sid);
+			solverFilters[sid]->clear();	
+		} 
 	}
 
 	// Clear half of the clauses from the filter (probabilistically) if a clause filter half life is set

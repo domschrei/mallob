@@ -136,6 +136,11 @@ void MiniSat::addLearnedClause(vector<int>& clause) {
 	}
 }
 
+void MiniSat::addLearnedClause(const int* begin, int size) {
+	std::vector<int> cls; cls.assign(begin, begin+size);
+	addLearnedClause(cls);
+}
+
 void MiniSat::addClauses(vector<vector<int> >& clauses) {
 	clauseAddingLock.lock();
 	clausesToAdd.insert(clausesToAdd.end(), clauses.begin(), clauses.end());

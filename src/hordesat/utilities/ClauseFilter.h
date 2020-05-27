@@ -29,7 +29,7 @@ public:
 	 * otherwise add it to the filter and return true.
 	 */
 	bool registerClause(const vector<int>& cls);
-	bool registerClause(std::vector<int>::const_iterator first, std::vector<int>::const_iterator last, int size);
+	bool registerClause(const int* first, int size);
 
 	/**
 	 * Clear the filter, i.e., return to its initial state.
@@ -42,7 +42,7 @@ public:
 	 * Hash function for clauses, order of literals is irrelevant
 	 */
 	static size_t hash(const vector<int>& cls, int which, bool skipFirst);
-	static size_t hash(const vector<int>::const_iterator first, const vector<int>::const_iterator second, int which, bool skipFirst);
+	static size_t hash(const int* first, int size, int which, bool skipFirst);
 
 	struct ClauseHasher {
 		std::size_t operator()(const std::vector<int>& cls) const {

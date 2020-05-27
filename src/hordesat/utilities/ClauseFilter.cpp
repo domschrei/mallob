@@ -19,12 +19,12 @@ static unsigned const int primes [] = {2038072819, 2038073287,	2038073761,	20380
 		2038074751,	2038075231,	2038075751,	2038076267};
 
 size_t ClauseFilter::hash(const vector<int>& cls, int which, bool skipFirst) {
-	return hash(cls.begin(), cls.end(), which, skipFirst);
+	return hash(cls.data(), cls.size(), which, skipFirst);
 }
 
-size_t ClauseFilter::hash(const vector<int>::const_iterator begin, const vector<int>::const_iterator end, int which, bool skipFirst) {
+size_t ClauseFilter::hash(const int* begin, int size, int which, bool skipFirst) {
 	size_t res = 0;
-	for (auto it = begin; it != end; it++) {
+	for (auto it = begin; it != begin+size; it++) {
 		if (skipFirst) {
 			skipFirst = false;
 			continue;
@@ -36,10 +36,10 @@ size_t ClauseFilter::hash(const vector<int>::const_iterator begin, const vector<
 }
 
 bool ClauseFilter::registerClause(const vector<int>& cls) {
-	return registerClause(cls.begin(), cls.end(), cls.size());
+	return registerClause(cls.data(), cls.size());
 }
 
-bool ClauseFilter::registerClause(std::vector<int>::const_iterator begin, std::vector<int>::const_iterator end, int size) {
+bool ClauseFilter::registerClause(const int* begin, int size) {
 
 	if (size > 1) size--; // subtract "glue" int from total size
 
@@ -63,10 +63,10 @@ bool ClauseFilter::registerClause(std::vector<int>::const_iterator begin, std::v
 		return true;
 	}
 
-	size_t h1 = hash(begin, end, 1, true) % NUM_BITS;
-	size_t h2 = hash(begin, end, 2, true) % NUM_BITS;
-	size_t h3 = hash(begin, end, 3, true) % NUM_BITS;
-	size_t h4 = hash(begin, end, 4, true) % NUM_BITS;
+	size_t h1 = hash(begin, size, 1, true) % NUM_BITS;
+	size_t h2 = hash(begin, size, 2, true) % NUM_BITS;
+	size_t h3 = hash(begin, size, 3, true) % NUM_BITS;
+	size_t h4 = hash(begin, size, 4, true) % NUM_BITS;
 
 	if (s1.test(h1) && s1.test(h2) && s1.test(h3) && s1.test(h4)) {
 		return false;
