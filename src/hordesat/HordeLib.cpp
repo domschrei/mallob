@@ -110,7 +110,7 @@ void HordeLib::init() {
 		
 		solverInterfaces.emplace_back(new Lingeling(*logger, i, params.getParam("jobstr"), params.isSet("aod")));
 		// set solver id
-		solverInterfaces[i]->solverId = solverId;		
+		solverInterfaces[i]->setSolverId(solverId);		
 	}
 
 	sleepInt = 1000 * params.getIntParam("i", 1000);
@@ -249,7 +249,7 @@ void HordeLib::dumpStats() {
 		if (solverInterfaces[i] == NULL) continue;
 		SolvingStatistics st = solverInterfaces[i]->getStatistics();
 		hlog(1, "S%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f\n",
-				solverInterfaces[i]->solverId, st.propagations, st.decisions, st.conflicts, st.memPeak);
+				solverInterfaces[i]->getSolverId(), st.propagations, st.decisions, st.conflicts, st.memPeak);
 		locSolveStats.conflicts += st.conflicts;
 		locSolveStats.decisions += st.decisions;
 		locSolveStats.memPeak += st.memPeak;

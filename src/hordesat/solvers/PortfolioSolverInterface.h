@@ -45,9 +45,8 @@ class PortfolioSolverInterface {
 protected:
 	LoggingInterface& _logger;
 
+// METHODS TO OVERRIDE
 public:
-	int solverId;
-	std::string _global_name;
 
 	// constructor
 	PortfolioSolverInterface(LoggingInterface& logger) : _logger(logger) {}
@@ -55,18 +54,15 @@ public:
     // destructor
 	virtual ~PortfolioSolverInterface() {}
 
-	void setName(std::string name) {_global_name = name;}
 
 	// Get the number of variables of the formula
-	// NOT NECESSARY
 	virtual int getVariablesCount() = 0;
 
 	// Get a variable suitable for search splitting
-	// NOT NECESSARY
 	virtual int getSplittingVariable() = 0;
 
 	// Set initial phase for a given variable
-	// NOT NECESSARY, used only for diversification of the portfolio
+	// Used only for diversification of the portfolio
 	virtual void setPhase(const int var, const bool phase) = 0;
 
 	// Interrupt the SAT solving, solving cannot continue until interrupt is unset.
@@ -84,7 +80,10 @@ public:
 	// Solve the formula with a given set of assumptions
 	virtual SatResult solve(const vector<int>& assumptions = vector<int>()) = 0;
 
+	// Get a solution vector containing lit or -lit for each lit in the model
 	virtual vector<int> getSolution() = 0;
+
+	// Get a set of failed assumptions
 	virtual set<int> getFailedAssumptions() = 0;
 
 	// Add a permanent literal to the formula (zero for clause separator)
@@ -101,7 +100,6 @@ public:
 	virtual void increaseClauseProduction() = 0;
 
 	// Get solver statistics
-	// NOT NECESSARY
 	virtual SolvingStatistics getStatistics() = 0;
 
 	// You are solver #rank of #size solvers, diversify your parameters (seeds, heuristics, etc.) accordingly.
@@ -112,8 +110,23 @@ public:
 	virtual int getNumOriginalDiversifications() = 0;
 
 
+	// Friend function implemented in .cpp
 	friend void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ...);
+
+
+// Other methods, can be used but not overridden
+public:
+	void setName(std::string name) {_global_name = name;}
+	int getSolverId() {return _solver_id;}
+	void setSolverId(int id) {_solver_id = id;}
+
+
+private:
+	std::string _global_name;
+	int _solver_id;
 };
+
+
 
 void updateTimer(std::string solverName);
 double getTime();
