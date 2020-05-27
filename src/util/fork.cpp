@@ -4,6 +4,7 @@
 #include <signal.h>
 #include <cstdlib>
 #include <sys/wait.h>
+#include <iostream>
 
 #include "fork.h"
 
@@ -32,6 +33,7 @@ void propagateSignalAndExit(int signum) {
 
 void doNothing(int signum) {
     // Do nothing, just return
+    std::cout << "WOKE_UP" << std::endl;
 }
 
 
