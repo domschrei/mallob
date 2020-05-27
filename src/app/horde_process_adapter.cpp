@@ -168,7 +168,10 @@ void HordeProcessAdapter::run() {
 
         // Wait until something happens
         // (can be interrupted by Fork::wakeUp(*_child_pid))
-        usleep(1000 /*1 millisecond*/);
+        float time = Timer::elapsedSeconds();
+        int sleepStatus = usleep(1000 /*1 millisecond*/);
+        time = Timer::elapsedSeconds() - time;
+        if (sleepStatus == EINTR) _log->log(3, "Interrupted; slept for %i millis\n", (int) (1000*time));
 
         // Dump stats
         if (*_do_dump_stats && !*_did_dump_stats) {
