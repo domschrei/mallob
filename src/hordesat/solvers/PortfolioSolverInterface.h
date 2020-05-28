@@ -40,7 +40,7 @@ public:
 void updateTimer(std::string jobName);
 
 /**
- * Interface for solvers that can be used used in the portfolio
+ * Interface for solvers that can be used in the portfolio.
  */
 class PortfolioSolverInterface {
 
@@ -53,11 +53,7 @@ protected:
 public:
 
 	// constructor
-	PortfolioSolverInterface(LoggingInterface& logger, int globalId, int localId, std::string jobname) : _logger(logger) {
-		updateTimer(jobname);
-		_global_name = "<h-" + jobname + "_S" + std::to_string(globalId) + ">";
-
-	}
+	PortfolioSolverInterface(LoggingInterface& logger, int globalId, int localId, std::string jobname);
 
     // destructor
 	virtual ~PortfolioSolverInterface() {}
@@ -119,10 +115,6 @@ protected:
     virtual void unsetSolverSuspend() = 0;
 
 // ************** END OF INTERFACE TO IMPLEMENT **************
-
-
-
-
 
 
 // Other methods

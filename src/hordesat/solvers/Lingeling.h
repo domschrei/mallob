@@ -16,7 +16,7 @@
 
 struct LGL;
 
-class Lingeling: public PortfolioSolverInterface {
+class Lingeling : public PortfolioSolverInterface {
 
 private:
 	LGL* solver;

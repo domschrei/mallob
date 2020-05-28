@@ -40,6 +40,12 @@ void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ..
 	va_end(vl);
 }
 
+PortfolioSolverInterface::PortfolioSolverInterface(LoggingInterface& logger, int globalId, int localId, std::string jobname) 
+		: _logger(logger), _global_id(globalId), _local_id(localId), _job_name(jobname) {
+	updateTimer(jobname);
+	_global_name = "<h-" + jobname + "_S" + std::to_string(globalId) + ">";
+}
+
 void PortfolioSolverInterface::interrupt() {
 	setSolverInterrupt();
 }
