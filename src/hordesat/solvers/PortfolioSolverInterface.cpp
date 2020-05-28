@@ -15,14 +15,14 @@ std::map<std::string, high_resolution_clock::time_point> times;
 std::string currentSolverName = "";
 high_resolution_clock::time_point lglSolverStartTime;
 
-void updateTimer(std::string solverName) {
+void updateTimer(std::string jobName) {
 	auto lock = timeCallbackLock.getLock();
-	if (currentSolverName == solverName) return;
-	if (!times.count(solverName)) {
-		times[solverName] = high_resolution_clock::now();
+	if (currentSolverName == jobName) return;
+	if (!times.count(jobName)) {
+		times[jobName] = high_resolution_clock::now();
 	}
-	lglSolverStartTime = times[solverName];
-	currentSolverName = solverName;
+	lglSolverStartTime = times[jobName];
+	currentSolverName = jobName;
 }
 double getTime() {
     high_resolution_clock::time_point nowTime = high_resolution_clock::now();
@@ -38,4 +38,19 @@ void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ..
 	va_start(vl, fmt);
 	slv->_logger.log_va_list(verbosityLevel, msg.c_str(), vl);
 	va_end(vl);
+}
+
+void PortfolioSolverInterface::interrupt() {
+	setSolverInterrupt();
+}
+void PortfolioSolverInterface::uninterrupt() {
+	updateTimer(_job_name);
+	unsetSolverInterrupt();
+}
+void PortfolioSolverInterface::suspend() {
+	setSolverSuspend();
+}
+void PortfolioSolverInterface::resume() {
+	updateTimer(_job_name);
+	unsetSolverSuspend();
 }

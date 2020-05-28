@@ -25,16 +25,15 @@ private:
 	LearnedClauseCallback* callback;
 	int glueLimit;
 	Mutex clauseAddMutex;
-	int myId;
 	int maxvar;
 	double lastTermCallbackTime;
     
-	// callback friends
-	friend int termCallback(void* solverPtr);
-	friend void produce(void* sp, int* cls, int glue);
-	friend void produceUnit(void* sp, int lit);
-	friend void consumeUnits(void* sp, int** start, int** end);
-	friend void consumeCls(void* sp, int** clause, int* glue);
+	// Friends: Callbacks for Lingeling and logging inside these callbacks
+	friend int cbCheckTerminate(void* solverPtr);
+	friend void cbProduce(void* sp, int* cls, int glue);
+	friend void cbProduceUnit(void* sp, int lit);
+	friend void cbConsumeUnits(void* sp, int** start, int** end);
+	friend void cbConsumeCls(void* sp, int** clause, int* glue);
 	friend void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ...);
 
 	// clause addition
@@ -51,55 +50,51 @@ private:
     Mutex suspendMutex;
     ConditionVariable suspendCond;
 
-	std::string jobname;
 	int numDiversifications;
 
 public:
-
-	// Get the number of variables of the formula
-	int getVariablesCount();
-
-	// Get a variable suitable for search splitting
-	int getSplittingVariable();
-
-	// Set initial phase for a given variable
-	void setPhase(const int var, const bool phase);
-
-    // Suspend the SAT solver DURING its execution, freeing up computational resources for other threads
-    void setSolverSuspend();
-    void unsetSolverSuspend();
-
-	// Solve the formula with a given set of assumptions
-	SatResult solve(const vector<int>& assumptions);
-
-	vector<int> getSolution();
-	set<int> getFailedAssumptions();
+	Lingeling(LoggingInterface& logger, int globalId, int localId, std::string jobName, bool addOldDiversifications);
+	 ~Lingeling() override;
 
 	// Add a (list of) permanent clause(s) to the formula
-	void addLiteral(int lit);
+	void addLiteral(int lit) override;
+
+	void diversify(int rank, int size) override;
+	void setPhase(const int var, const bool phase) override;
+
+	// Solve the formula with a given set of assumptions
+	SatResult solve(const vector<int>& assumptions) override;
+
+	void setSolverInterrupt() override;
+	void unsetSolverInterrupt() override;
+    void setSolverSuspend() override;
+    void unsetSolverSuspend() override;
+
+	vector<int> getSolution() override;
+	set<int> getFailedAssumptions() override;
 
 	// Add a learned clause to the formula
 	// The learned clauses might be added later or possibly never
-	void addLearnedClause(const int* begin, int size);
+	void addLearnedClause(const int* begin, int size) override;
 
 	// Set a function that should be called for each learned clause
-	void setLearnedClauseCallback(LearnedClauseCallback* callback, int solverId);
+	void setLearnedClauseCallback(LearnedClauseCallback* callback) override;
 
 	// Request the solver to produce more clauses
-	void increaseClauseProduction();
+	void increaseClauseProduction() override;
+	
+	// Get the number of variables of the formula
+	int getVariablesCount() override;
+
+	int getNumOriginalDiversifications() override;
+	
+	// Get a variable suitable for search splitting
+	int getSplittingVariable() override;
 
 	// Get solver statistics
-	SolvingStatistics getStatistics();
+	SolvingStatistics getStatistics() override;
 
-	void diversify(int rank, int size);
-	int getNumOriginalDiversifications();
-
-	// Interrupt the SAT solving, so it can be started again with new assumptions and added clauses
-	void setSolverInterrupt();
-	void unsetSolverInterrupt();
     
-	Lingeling(LoggingInterface& logger, int solverId, std::string jobName, bool addOldDiversifications);
-	 ~Lingeling();
 };
 
 #endif /* LINGELING_H_ */

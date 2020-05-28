@@ -7,7 +7,7 @@
 
 #include <assert.h>
 
-#include "AllToAllSharingManager.h"
+#include "DefaultSharingManager.h"
 #include "../utilities/mympi.h"
 
 DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
@@ -18,7 +18,7 @@ DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
 		if (solvers.size() > 1) {
 			solverFilters.push_back(new ClauseFilter(/*maxClauseLen=*/params.getIntParam("mcl", 0), /*checkUnits=*/true));
 		}
-		solvers[i]->setLearnedClauseCallback(&callback, i);
+		solvers[i]->setLearnedClauseCallback(&callback);
 	}
 	lastBufferClear = logger.getTime();
 }

@@ -12,7 +12,7 @@
 #include "utilities/Threading.h"
 #include "utilities/logging_interface.h"
 #include "solvers/Lingeling.h"
-#include "sharing/AllToAllSharingManager.h"
+#include "sharing/SharingManagerInterface.h"
 #include "solvers/solver_thread.h"
 #include "solvers/solving_state.h"
 

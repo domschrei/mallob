@@ -18,15 +18,13 @@ SolverThread::SolverThread(ParameterProcessor& params, std::shared_ptr<Portfolio
         const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<vector<int>>& assumptions, 
         int localId, bool* finished) : 
     _params(params), _solver_ptr(solver), _solver(*solver), 
-    _logger(params.getLogger().copy("S"+std::to_string(_solver.getSolverId()))), 
+    _logger(params.getLogger().copy("S"+std::to_string(_solver.getGlobalId()))), 
     _formulae(formulae), _assumptions(assumptions), 
     _local_id(localId), _finished_flag(finished) {
     
     _portfolio_rank = _params.getIntParam("mpirank", 0);
     _portfolio_size = _params.getIntParam("mpisize", 1);
 
-    std::string globalName = "<h-" + _params.getParam("jobstr") + "> " + std::string(toStr());
-    _solver.setName(globalName);
     _state = ACTIVE;
     _result = SatResult(UNKNOWN);
 }
@@ -168,7 +166,7 @@ void SolverThread::diversify() {
 		sparseRandomDiversification(_portfolio_size);
 		break;
 	case 7:
-        if (_solver.getSolverId() >= _solver.getNumOriginalDiversifications()) {
+        if (_solver.getGlobalId() >= _solver.getNumOriginalDiversifications()) {
 		    log(3, "dv: sparserand, native, s=%u\n", seed);
 		    sparseRandomDiversification(_portfolio_size);
         } else {
@@ -219,7 +217,7 @@ void SolverThread::sparseRandomDiversification(int mpi_size) {
 void SolverThread::nativeDiversification(int mpi_rank, int mpi_size) {
 
     int solversCount = _params.getIntParam("c", 1);
-    _solver.diversify(_solver.getSolverId(), mpi_size*solversCount);
+    _solver.diversify(_solver.getGlobalId(), mpi_size*solversCount);
 }
 
 void SolverThread::binValueDiversification(int mpi_size, int mpi_rank) {
@@ -316,24 +314,24 @@ void SolverThread::setState(SolvingState state) {
     // (1) To STANDBY|ABORTING : Interrupt solver
     // (set signal to jump out of solving procedure)
     if (state == STANDBY || state == ABORTING) {
-        _solver.setSolverInterrupt();
+        _solver.interrupt();
         if (_tid >= 0) setpriority(PRIO_PROCESS, _tid, 15); // nice up thread
     }
     // (2) From STANDBY to !STANDBY : Restart solver
     else if (oldState == STANDBY && state != STANDBY) {
-        _solver.unsetSolverInterrupt();
+        _solver.uninterrupt();
         if (_tid >= 0) setpriority(PRIO_PROCESS, _tid, 0); // nice down thread
     }
 
     // (3) From !SUSPENDED to SUSPENDED : Suspend solvers 
     // (set signal to sleep inside solving procedure)
     if (oldState != SUSPENDED && state == SUSPENDED) {
-        _solver.setSolverSuspend();
+        _solver.suspend();
     }
     // (4) From SUSPENDED to !SUSPENDED : Resume solvers
     // (set signal to wake up and resume solving procedure)
     if (oldState == SUSPENDED && state != SUSPENDED) {
-        _solver.unsetSolverSuspend();
+        _solver.resume();
     }
 
     _state = state; 
@@ -345,6 +343,6 @@ void SolverThread::setState(SolvingState state) {
 SolverThread::~SolverThread() {}
 
 const char* SolverThread::toStr() {
-    _name = "S" + std::to_string(_solver.getSolverId());
+    _name = "S" + std::to_string(_solver.getGlobalId());
     return _name.c_str();
 }

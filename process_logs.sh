@@ -209,18 +209,18 @@ if [ "x$1" == "x" ]; then
     exit 1
 fi
 
-#extract_client_info
+extract_client_info
 
-#extract_load_events
-#extract_hop_events
+extract_load_events
+extract_hop_events
 
 # Depends: extract_load_events extract_hop_events
-#document_node_events
+document_node_events
 
 # Depends: document_node_events
-#document_hops
+document_hops
 
-#extract_runtime_cputime_mapping
+extract_runtime_cputime_mapping
 
 # CHECK SOLUTIONS
 

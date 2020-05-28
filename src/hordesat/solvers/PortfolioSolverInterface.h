@@ -37,6 +37,8 @@ public:
 	virtual ~LearnedClauseCallback() {};
 };
 
+void updateTimer(std::string jobName);
+
 /**
  * Interface for solvers that can be used used in the portfolio
  */
@@ -45,15 +47,20 @@ class PortfolioSolverInterface {
 protected:
 	LoggingInterface& _logger;
 
-// METHODS TO OVERRIDE
+
+// ************** INTERFACE TO IMPLEMENT **************
+
 public:
 
 	// constructor
-	PortfolioSolverInterface(LoggingInterface& logger) : _logger(logger) {}
+	PortfolioSolverInterface(LoggingInterface& logger, int globalId, int localId, std::string jobname) : _logger(logger) {
+		updateTimer(jobname);
+		_global_name = "<h-" + jobname + "_S" + std::to_string(globalId) + ">";
+
+	}
 
     // destructor
 	virtual ~PortfolioSolverInterface() {}
-
 
 	// Get the number of variables of the formula
 	virtual int getVariablesCount() = 0;
@@ -64,18 +71,6 @@ public:
 	// Set initial phase for a given variable
 	// Used only for diversification of the portfolio
 	virtual void setPhase(const int var, const bool phase) = 0;
-
-	// Interrupt the SAT solving, solving cannot continue until interrupt is unset.
-	virtual void setSolverInterrupt() = 0;
-
-	// Remove the SAT solving interrupt request.
-	virtual void unsetSolverInterrupt() = 0;
-
-    // Suspend the SAT solver DURING its execution, freeing up computational resources for other threads
-    virtual void setSolverSuspend() = 0;
-
-	// Remove the SAT solving suspend request
-    virtual void unsetSolverSuspend() = 0;
 
 	// Solve the formula with a given set of assumptions
 	virtual SatResult solve(const vector<int>& assumptions = vector<int>()) = 0;
@@ -94,7 +89,7 @@ public:
 	virtual void addLearnedClause(const int* begin, int size) = 0;
 
 	// Set a function that should be called for each learned clause
-	virtual void setLearnedClauseCallback(LearnedClauseCallback* callback, int solverId) = 0;
+	virtual void setLearnedClauseCallback(LearnedClauseCallback* callback) = 0;
 
 	// Request the solver to produce more clauses
 	virtual void increaseClauseProduction() = 0;
@@ -109,27 +104,51 @@ public:
 	// May be used to decide when to apply additional diversifications.
 	virtual int getNumOriginalDiversifications() = 0;
 
+protected:
+	// Interrupt the SAT solving, solving cannot continue until interrupt is unset.
+	virtual void setSolverInterrupt() = 0;
+
+	// Resume SAT solving after it was interrupted.
+	virtual void unsetSolverInterrupt() = 0;
+
+    // Suspend the SAT solver DURING its execution (ASYNCHRONOUSLY), 
+	// temporarily freeing up CPU for other threads
+    virtual void setSolverSuspend() = 0;
+
+	// Resume SAT solving after it was suspended.
+    virtual void unsetSolverSuspend() = 0;
+
+// ************** END OF INTERFACE TO IMPLEMENT **************
+
+
+
+
+
+
+// Other methods
+
+public:
+	int getGlobalId() {return _global_id;}
+	int getLocalId() {return _local_id;}
+	
+	void interrupt();
+	void uninterrupt();
+	void suspend();
+	void resume();
 
 	// Friend function implemented in .cpp
 	friend void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ...);
 
-
-// Other methods, can be used but not overridden
-public:
-	void setName(std::string name) {_global_name = name;}
-	int getSolverId() {return _solver_id;}
-	void setSolverId(int id) {_solver_id = id;}
-
-
 private:
 	std::string _global_name;
-	int _solver_id;
+	std::string _job_name;
+	int _global_id;
+	int _local_id;
 };
 
-
-
-void updateTimer(std::string solverName);
+// Returns the elapsed time (seconds) since the currently registered solver's start time.
 double getTime();
+
 void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ...);
 
 #endif /* PORTFOLIOSOLVERINTERFACE_H_ */

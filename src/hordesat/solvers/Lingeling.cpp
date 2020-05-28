@@ -16,7 +16,7 @@ extern "C" {
 	#include "lglib.h"
 }
 
-int termCallback(void* solverPtr) {
+int cbCheckTerminate(void* solverPtr) {
 	Lingeling* lp = (Lingeling*)solverPtr;
 
 	double elapsed = lp->_logger.getTime() - lp->lastTermCallbackTime;
@@ -43,17 +43,17 @@ int termCallback(void* solverPtr) {
     return 0;
 }
 
-void produceUnit(void* sp, int lit) {
+void cbProduceUnit(void* sp, int lit) {
 	vector<int> vcls;
 	vcls.push_back(lit);
 	Lingeling* lp = (Lingeling*)sp;
-	lp->callback->processClause(vcls, lp->myId);
+	lp->callback->processClause(vcls, lp->getLocalId());
 }
 
-void produce(void* sp, int* cls, int glue) {
+void cbProduce(void* sp, int* cls, int glue) {
 	// unit clause, call produceUnit
 	if (cls[1] == 0) {
-		produceUnit(sp, cls[0]);
+		cbProduceUnit(sp, cls[0]);
 		return;
 	}
 	Lingeling* lp = (Lingeling*)sp;
@@ -69,10 +69,10 @@ void produce(void* sp, int* cls, int glue) {
 		i++;
 	}
 	//printf("glue = %d, size = %lu\n", glue, vcls.size());
-	lp->callback->processClause(vcls, lp->myId);
+	lp->callback->processClause(vcls, lp->getLocalId());
 }
 
-void consumeUnits(void* sp, int** start, int** end) {
+void cbConsumeUnits(void* sp, int** start, int** end) {
 	Lingeling* lp = (Lingeling*)sp;
 
 	if (lp->unitsToAdd.empty() || (lp->clauseAddMutex.tryLock() == false)) {
@@ -94,7 +94,7 @@ void consumeUnits(void* sp, int** start, int** end) {
 	lp->clauseAddMutex.unlock();
 }
 
-void consumeCls(void* sp, int** clause, int* glue) {
+void cbConsumeCls(void* sp, int** clause, int* glue) {
 	Lingeling* lp = (Lingeling*)sp;
 
 	if (lp->learnedClausesToAdd.empty()) {
@@ -122,26 +122,25 @@ void consumeCls(void* sp, int** clause, int* glue) {
 	lp->clauseAddMutex.unlock();
 }
 
-Lingeling::Lingeling(LoggingInterface& logger, int solverId, std::string jobname, 
-		bool addOldDiversifications) : PortfolioSolverInterface(logger), myId(solverId), jobname(jobname) {
+
+Lingeling::Lingeling(LoggingInterface& logger, int globalId, int localId, std::string jobname, 
+		bool addOldDiversifications) : PortfolioSolverInterface(logger, globalId, localId, jobname) {
 
 	solver = lglinit();
 	
 	//lglsetopt(solver, "verbose", 1);
+	//lglsetopt(solver, "termint", 10);
 	
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
 	lglsetopt(solver, "bca", 0);
 	
-	//lglsetopt(solver, "termint", 10);
-	
 	lastTermCallbackTime = logger.getTime();
-	updateTimer(jobname);
 
 	stopSolver = 0;
 	callback = NULL;
 
 	lglsetime(solver, getTime);
-	lglseterm(solver, termCallback, this);
+	lglseterm(solver, cbCheckTerminate, this);
 	glueLimit = 2;
 
 	unitsBufferSize = clsBufferSize = 100;
@@ -158,96 +157,6 @@ Lingeling::Lingeling(LoggingInterface& logger, int solverId, std::string jobname
 	}
 }
 
-int Lingeling::getVariablesCount() {
-	return maxvar;
-}
-
-// Get a variable suitable for search splitting
-int Lingeling::getSplittingVariable() {
-	return lglookahead(solver);
-}
-
-// Set initial phase for a given variable
-void Lingeling::setPhase(const int var, const bool phase) {
-	lglsetphase(solver, phase ? var : -var);
-}
-
-// Interrupt the SAT solving, so it can be started again with new assumptions
-void Lingeling::setSolverInterrupt() {
-	stopSolver = 1;
-}
-void Lingeling::unsetSolverInterrupt() {
-	updateTimer(jobname);
-	stopSolver = 0;
-}
-void Lingeling::setSolverSuspend() {
-    suspendSolver = true;
-}
-void Lingeling::unsetSolverSuspend() {
-	updateTimer(jobname);
-    suspendSolver = false;
-	suspendCond.notify();
-}
-
-// Solve the formula with a given set of assumptions
-// return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
-SatResult Lingeling::solve(const vector<int>& assumptions) {
-	updateTimer(jobname);
-
-	this->assumptions = assumptions;
-	// add the clauses
-	clauseAddMutex.lock();
-	for (size_t i = 0; i < clausesToAdd.size(); i++) {
-		for (size_t j = 0; j < clausesToAdd[i].size(); j++) {
-			int lit = clausesToAdd[i][j];
-			if (abs(lit) > maxvar) maxvar = abs(lit);
-			lgladd(solver, lit);
-		}
-		lgladd(solver, 0);
-	}
-	clausesToAdd.clear();
-	clauseAddMutex.unlock();
-
-	// set the assumptions
-	for (size_t i = 0; i < assumptions.size(); i++) {
-		// freezing problems
-		int lit = assumptions[i];
-		if (abs(lit) > maxvar) maxvar = abs(lit);
-		lglassume(solver, lit);
-	}
-	int res = lglsat(solver);
-	switch (res) {
-	case LGL_SATISFIABLE:
-		return SAT;
-	case LGL_UNSATISFIABLE:
-		return UNSAT;
-	}
-	return UNKNOWN;
-}
-
-vector<int> Lingeling::getSolution() {
-	vector<int> result;
-	result.push_back(0);
-	for (int i = 1; i <= maxvar; i++) {
-		if (lglderef(solver, i) > 0) {
-			result.push_back(i);
-		} else {
-			result.push_back(-i);
-		}
-	}
-	return result;
-}
-
-set<int> Lingeling::getFailedAssumptions() {
-	set<int> result;
-	for (size_t i = 0; i < assumptions.size(); i++) {
-		if (lglfailed(solver, assumptions[i])) {
-			result.insert(assumptions[i]);
-		}
-	}
-	return result;
-}
-
 void Lingeling::addLiteral(int lit) {
 	
 	// TODO required for incremental solving?
@@ -255,41 +164,6 @@ void Lingeling::addLiteral(int lit) {
 	
 	if (abs(lit) > maxvar) maxvar = abs(lit);
 	lgladd(solver, lit);
-}
-
-void Lingeling::addLearnedClause(const int* begin, int size) {
-	auto lock = clauseAddMutex.getLock();
-	if (size == 1) {
-		unitsToAdd.push_back(*begin);
-	} else {
-		learnedClausesToAdd.emplace_back(begin, begin+size);
-	}
-}
-
-void Lingeling::increaseClauseProduction() {
-	if (glueLimit < 8) glueLimit++;
-}
-
-void Lingeling::setLearnedClauseCallback(LearnedClauseCallback* callback, int solverId) {
-	this->callback = callback;
-	lglsetproducecls(solver, produce, this);
-	lglsetproduceunit(solver, produceUnit, this);
-	lglsetconsumeunits(solver, consumeUnits, this);
-	lglsetconsumecls(solver, consumeCls, this);
-	myId = solverId;
-}
-
-SolvingStatistics Lingeling::getStatistics() {
-	SolvingStatistics st;
-	st.conflicts = lglgetconfs(solver);
-	st.decisions = lglgetdecs(solver);
-	st.propagations = lglgetprops(solver);
-	st.memPeak = lglmaxmb(solver);
-	return st;
-}
-
-int Lingeling::getNumOriginalDiversifications() {
-	return numDiversifications;
 }
 
 void Lingeling::diversify(int rank, int size) {
@@ -361,30 +235,128 @@ void Lingeling::diversify(int rank, int size) {
 	}
 }
 
+// Set initial phase for a given variable
+void Lingeling::setPhase(const int var, const bool phase) {
+	lglsetphase(solver, phase ? var : -var);
+}
 
-/*
-case  1: setopt (i, lgl, "plain", 1),
-		setopt (i, lgl, "decompose", 1); break;
-case  2: setopt (i, lgl, "restartint", 1000); break;
-case  3: setopt (i, lgl, "elmresched", 7); break;
-case  4: setopt (i, lgl, "scincincmin", 250); break;
-case  5: setopt (i, lgl, "block", 0),
-		setopt (i, lgl, "cce", 0); break;
-case  6: setopt (i, lgl, "scincinc", 50); break;
-case  7: setopt (i, lgl, "phase", -1); break;
-case  8: setopt (i, lgl, "phase", 1); break;
-case  9: setopt (i, lgl, "sweeprtc", 1); break;
-case 10: setopt (i, lgl, "restartint", 100); break;
-case 11: setopt (i, lgl, "reduceinit", 10000);
-		setopt (i, lgl, "reducefixed", 1); break;
-case 12: setopt (i, lgl, "restartint", 4); break;
-*/
+// Solve the formula with a given set of assumptions
+// return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
+SatResult Lingeling::solve(const vector<int>& assumptions) {
+	
+	this->assumptions = assumptions;
+	// add the clauses
+	clauseAddMutex.lock();
+	for (size_t i = 0; i < clausesToAdd.size(); i++) {
+		for (size_t j = 0; j < clausesToAdd[i].size(); j++) {
+			int lit = clausesToAdd[i][j];
+			if (abs(lit) > maxvar) maxvar = abs(lit);
+			lgladd(solver, lit);
+		}
+		lgladd(solver, 0);
+	}
+	clausesToAdd.clear();
+	clauseAddMutex.unlock();
 
+	// set the assumptions
+	for (size_t i = 0; i < assumptions.size(); i++) {
+		// freezing problems
+		int lit = assumptions[i];
+		if (abs(lit) > maxvar) maxvar = abs(lit);
+		lglassume(solver, lit);
+	}
+	int res = lglsat(solver);
+	switch (res) {
+	case LGL_SATISFIABLE:
+		return SAT;
+	case LGL_UNSATISFIABLE:
+		return UNSAT;
+	}
+	return UNKNOWN;
+}
 
+void Lingeling::setSolverInterrupt() {
+	stopSolver = 1;
+}
+void Lingeling::unsetSolverInterrupt() {
+	stopSolver = 0;
+}
+void Lingeling::setSolverSuspend() {
+    suspendSolver = true;
+}
+void Lingeling::unsetSolverSuspend() {
+    suspendSolver = false;
+	suspendCond.notify();
+}
+
+vector<int> Lingeling::getSolution() {
+	vector<int> result;
+	result.push_back(0);
+	for (int i = 1; i <= maxvar; i++) {
+		if (lglderef(solver, i) > 0) {
+			result.push_back(i);
+		} else {
+			result.push_back(-i);
+		}
+	}
+	return result;
+}
+
+set<int> Lingeling::getFailedAssumptions() {
+	set<int> result;
+	for (size_t i = 0; i < assumptions.size(); i++) {
+		if (lglfailed(solver, assumptions[i])) {
+			result.insert(assumptions[i]);
+		}
+	}
+	return result;
+}
+
+void Lingeling::addLearnedClause(const int* begin, int size) {
+	auto lock = clauseAddMutex.getLock();
+	if (size == 1) {
+		unitsToAdd.push_back(*begin);
+	} else {
+		learnedClausesToAdd.emplace_back(begin, begin+size);
+	}
+}
+
+void Lingeling::setLearnedClauseCallback(LearnedClauseCallback* callback) {
+	this->callback = callback;
+	lglsetproducecls(solver, cbProduce, this);
+	lglsetproduceunit(solver, cbProduceUnit, this);
+	lglsetconsumeunits(solver, cbConsumeUnits, this);
+	lglsetconsumecls(solver, cbConsumeCls, this);
+}
+
+void Lingeling::increaseClauseProduction() {
+	if (glueLimit < 8) glueLimit++;
+}
+
+int Lingeling::getVariablesCount() {
+	return maxvar;
+}
+
+int Lingeling::getNumOriginalDiversifications() {
+	return numDiversifications;
+}
+
+// Get a variable suitable for search splitting
+int Lingeling::getSplittingVariable() {
+	return lglookahead(solver);
+}
+
+SolvingStatistics Lingeling::getStatistics() {
+	SolvingStatistics st;
+	st.conflicts = lglgetconfs(solver);
+	st.decisions = lglgetdecs(solver);
+	st.propagations = lglgetprops(solver);
+	st.memPeak = lglmaxmb(solver);
+	return st;
+}
 
 Lingeling::~Lingeling() {
 	lglrelease(solver);
 	free(unitsBuffer);
 	free(clsBuffer);
 }
-
