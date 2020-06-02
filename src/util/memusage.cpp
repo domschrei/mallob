@@ -84,6 +84,7 @@ namespace Proc {
       // Get actual stats of interest
       std::string filepath = "/proc/" + std::to_string(getPid()) + "/task/" + std::to_string(tid) + "/stat";
       ifstream stat_stream(filepath, ios_base::in);
+      if (!stat_stream.good()) return false;
       // dummy vars for leading entries in stat that we don't care about
       string pid, comm, state, ppid, pgrp, session, tty_nr;
       string tpgid, flags, minflt, cminflt, majflt, cmajflt;
