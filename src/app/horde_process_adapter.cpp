@@ -160,6 +160,7 @@ void HordeProcessAdapter::run() {
     // Prepare solver
     HordeLib hlib(_params, _log);
     hlib.beginSolving(_formulae, _assumptions);
+    bool interrupted = false;
 
     // Main loop
     while (true) {
@@ -173,8 +174,17 @@ void HordeProcessAdapter::run() {
         time = Timer::elapsedSeconds() - time;
         if (sleepStatus != 0) _log->log(3, "Interrupted; slept for %i us\n", (int) (1000*1000*time));
 
+        // Interrupt solvers
+        if (*_do_interrupt && !*_did_interrupt) {
+            _log->log(3, "DO interrupt\n");
+            hlib.interrupt();
+            *_did_interrupt = true;
+            interrupted = true;
+        }
+        if (!*_do_interrupt) *_did_interrupt = false;
+
         // Dump stats
-        if (*_do_dump_stats && !*_did_dump_stats) {
+        if (!interrupted && *_do_dump_stats && !*_did_dump_stats) {
             _log->log(3, "DO dump stats\n");
             
             // For this management thread
@@ -199,14 +209,6 @@ void HordeProcessAdapter::run() {
         }
         if (!*_do_dump_stats) *_did_dump_stats = false;
 
-        // Interrupt solvers
-        if (*_do_interrupt && !*_did_interrupt) {
-            _log->log(3, "DO interrupt\n");
-            hlib.interrupt();
-            *_did_interrupt = true;
-        }
-        if (!*_do_interrupt) *_did_interrupt = false;
-
         // Update role
         if (*_do_update_role && !*_did_update_role) {
             _log->log(3, "DO update role\n");
@@ -216,7 +218,7 @@ void HordeProcessAdapter::run() {
         if (!*_do_update_role) *_did_update_role = false;
 
         // Check if clauses should be exported
-        if (*_do_export && !*_did_export) {
+        if (!interrupted && *_do_export && !*_did_export) {
             _log->log(3, "DO export clauses\n");
             // Collect local clauses, put into shared memory
             *_export_buffer_true_size = hlib.prepareSharing(_export_buffer, *_export_buffer_max_size);
@@ -225,7 +227,7 @@ void HordeProcessAdapter::run() {
         if (!*_do_export) *_did_export = false;
 
         // Check if clauses should be imported
-        if (*_do_import && !*_did_import) {
+        if (!interrupted && *_do_import && !*_did_import) {
             _log->log(3, "DO import clauses\n");
             // Write imported clauses from shared memory into vector
             hlib.digestSharing(_import_buffer, *_import_buffer_size);
@@ -234,13 +236,13 @@ void HordeProcessAdapter::run() {
         if (!*_do_import) *_did_import = false;
 
         // Check initialization state
-        if (!*_is_initialized && hlib.isFullyInitialized()) {
+        if (!interrupted && !*_is_initialized && hlib.isFullyInitialized()) {
             _log->log(3, "DO set initialized\n");
             *_is_initialized = true;
         }
 
         // Check solved state
-        if (*_has_solution) continue;
+        if (interrupted || *_has_solution) continue;
         int result = hlib.solveLoop();
         if (result >= 0) {
             _log->log(3, "DO write solution\n");
