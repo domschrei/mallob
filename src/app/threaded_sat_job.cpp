@@ -66,7 +66,9 @@ bool ThreadedSatJob::appl_initialize() {
     }
 
     Console::log(Console::VERB, "%s : creating horde instance", toStr());
-    _solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface("<h-" + identifier + ">", "#" + getId()))));
+    _solver = std::unique_ptr<HordeLib>(new HordeLib(params, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(
+        "<h-" + std::string(identifier) + ">", "#" + std::to_string(getId())
+    ))));
     _clause_comm = (void*) new AnytimeSatClauseCommunicator(_params, this);
 
     if (_abort_after_initialization) {

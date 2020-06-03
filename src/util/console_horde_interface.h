@@ -13,7 +13,7 @@ private:
 
     std::string _logfile_suffix;
     std::string _logfile_name;
-    FILE* _logfile;
+    FILE* _logfile = NULL;
 
 public:
     ConsoleHordeInterface(std::string identifier, std::string logfileSuffix) : _identifier(identifier), _logfile_suffix(logfileSuffix) {
