@@ -83,7 +83,9 @@ void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeO
     std::cout << std::fixed << std::setprecision(3);*/
 }
 
-void Console::logUnsafe(int verbosity, const char* str, bool endline, bool prefix, va_list& args) {
+std::string Console::getLogFilename() {if (logFile != NULL) return logFilename; else return "";}
+
+void Console::logUnsafe(int verbosity, const char* str, bool endline, bool prefix, FILE* file, va_list& args) {
 
     if (verbosity > Console::verbosity) return;
 
@@ -115,10 +117,10 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, bool prefi
         if (prefix) {
             if (cPrefix) {
                 if (!quiet) printf("c ");
-                if (logFile != NULL) fprintf(logFile, "c ");
+                if (file != NULL) fprintf(file, "c ");
             }
             if (!quiet) printf("%.3f %i ", elapsedRel, rank);
-            if (logFile != NULL) fprintf(logFile, "%.3f %i ", elapsedRel, rank);
+            if (file != NULL) fprintf(file, "%.3f %i ", elapsedRel, rank);
         }
         beganLine = true;
     }
@@ -126,7 +128,7 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, bool prefi
     // logging message
     va_list argsCopy; va_copy(argsCopy, args); // retrieve copy of "args"
     if (!quiet) vprintf(str, args); // consume original args
-    if (logFile != NULL) vfprintf(logFile, str, argsCopy); // consume copied args
+    if (file != NULL) vfprintf(file, str, argsCopy); // consume copied args
     va_end(argsCopy); // destroy copy
 
     // Reset terminal colors
@@ -138,7 +140,7 @@ void Console::logUnsafe(int verbosity, const char* str, bool endline, bool prefi
     if (endline) {
         if (strlen(str) == 0 || str[strlen(str)-1] != '\n') {
             if (!quiet) printf("\n");
-            if (logFile != NULL) fprintf(logFile, "\n");
+            if (file != NULL) fprintf(file, "\n");
         }
         beganLine = false;
     }
@@ -157,38 +159,38 @@ void Console::forceFlush() {
     flush();
 }
 
-void Console::log(int verbosity, const char* str, bool endline, bool prefix, va_list& args) {
+void Console::log(int verbosity, const char* str, bool endline, bool prefix, FILE* file, va_list& args) {
     if (verbosity > Console::verbosity) return;
     getLock();
-    logUnsafe(verbosity, str, endline, prefix, args);
+    logUnsafe(verbosity, str, endline, prefix, file, args);
     releaseLock();
 }
 
 void Console::log(int verbosity, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
-    log(verbosity, str, true, true, vl);
+    log(verbosity, str, true, true, logFile, vl);
     va_end(vl);
 }
 
 void Console::logUnsafe(int verbosity, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
-    logUnsafe(verbosity, str, true, true, vl);
+    logUnsafe(verbosity, str, true, true, logFile, vl);
     va_end(vl);
 }
 
 void Console::append(int verbosity, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
-    log(verbosity, str, false, true, vl);
+    log(verbosity, str, false, true, logFile, vl);
     va_end(vl);
 }
 
 void Console::appendUnsafe(int verbosity, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
-    logUnsafe(verbosity, str, false, true, vl);
+    logUnsafe(verbosity, str, false, true, logFile, vl);
     va_end(vl);
 }
 
@@ -196,28 +198,28 @@ void Console::log_send(int verbosity, int destRank, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
     std::string output = std::string(str) + " => [" + std::to_string(destRank) + "]";
-    log(verbosity, output.c_str(), true, true, vl);
+    log(verbosity, output.c_str(), true, true, logFile, vl);
     va_end(vl);
 }
 void Console::log_recv(int verbosity, int sourceRank, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
     std::string output = std::string(str) + " <= [" + std::to_string(sourceRank) + "]";
-    log(verbosity, output.c_str(), true, true, vl);
+    log(verbosity, output.c_str(), true, true, logFile, vl);
     va_end(vl);
 }
 
 void Console::log_noprefix(int verbosity, const char* str, ...) {
     va_list vl;
     va_start(vl, str);
-    log(verbosity, str, true, false, vl);
+    log(verbosity, str, true, false, logFile, vl);
     va_end(vl);
 }
 
 bool Console::fail(const char* str, ...) {
     va_list vl;
     va_start(vl, str);
-    log(CRIT, str, true, true, vl);
+    log(CRIT, str, true, true, logFile, vl);
     va_end(vl);
     return false;
 }

@@ -11,8 +11,20 @@ class ConsoleHordeInterface : public LoggingInterface {
 private:
     std::string _identifier;
 
+    std::string _logfile_suffix;
+    std::string _logfile_name;
+    FILE* _logfile;
+
 public:
-    ConsoleHordeInterface(std::string identifier) : _identifier(identifier) {
+    ConsoleHordeInterface(std::string identifier, std::string logfileSuffix) : _identifier(identifier), _logfile_suffix(logfileSuffix) {
+        _logfile_name = Console::getLogFilename();
+        if (_logfile_name.size() > 0) {
+            _logfile_name += _logfile_suffix;
+            _logfile = fopen(_logfile_name.c_str(), "a");
+            if (_logfile == NULL) {
+                log(Console::CRIT, "ERROR while trying to open log file \"%s\"", _logfile_name.c_str());
+            }
+        }
     }
 
     double getTime() {
@@ -36,11 +48,11 @@ public:
 
         // Write content
         va_list argsCopy; va_copy(argsCopy, args);
-        Console::log(verbosityLevel+2, str.c_str(), true, true, argsCopy);
+        Console::log(verbosityLevel+2, str.c_str(), true, true, _logfile, argsCopy);
         va_end(argsCopy);
     }
-    std::shared_ptr<LoggingInterface> copy(std::string prefix) override {
-        return std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(_identifier + " " + prefix));
+    std::shared_ptr<LoggingInterface> copy(std::string suffix) override {
+        return std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(_identifier + suffix, _logfile_suffix + suffix));
     }
 
     void exitError(const char* fmt, ...) override {
