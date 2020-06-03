@@ -12,7 +12,7 @@ def prob_hit_atmost(nhits):
     return p
 
 probs = []
-for nhits in range(1000):
+for nhits in range(300):
     probs += [prob_hit_exactly(nhits)]
 
 #print(prob_hit_atmost(160))
@@ -20,4 +20,4 @@ for nhits in range(1000):
 cdf = 0.0
 for prob in probs:
     cdf += prob
-    print(cdf)
+    print("%.6f" % cdf)

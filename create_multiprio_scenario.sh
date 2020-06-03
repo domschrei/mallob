@@ -18,17 +18,19 @@ for rep in {1..10}; do
 done
 
 # Number of effective CPUs 
-busycpus=3884
+busycpus="150" #3884
 # CPUsec timeout per job
-maxcpusecs=$((10*3600))
+maxcpusecs=$((1*3600))
+totalnumjobs=$(cat priorized_instances|wc -l)
 
 # Calculate lambda
-lambda=$(echo $maxcpusecs / $busycpus|bc -l)
-echo "# lambda: $lambda"
+totalduration=$(echo "$totalnumjobs * $maxcpusecs / $busycpus"|bc -l)
+lambda=$(echo "$totalduration / $totalnumjobs"|bc -l)
+echo "# Total_duration: $totalduration   lambda: $lambda"
 
 # Sample from exponential distribution
 python3 -c "import numpy as np
-a = np.random.exponential($lambda, $(cat priorized_instances|wc -l))
+a = np.random.exponential($lambda, $totalnumjobs)
 t = 0.0
 c = 1
 for x in a:

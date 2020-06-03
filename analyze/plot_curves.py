@@ -5,8 +5,14 @@ import math
 import sys
 import re
 
+from matplotlib import rc
+#rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+## for Palatino and other serif fonts use:
+#rc('font',**{'family':'serif','serif':['Palatino']})
+rc('text', usetex=True)
+
 colors = ['#377eb8', '#ff7f00', '#e41a1c', '#f781bf', '#a65628', '#4daf4a', '#984ea3', '#999999', '#dede00', '#377eb8']
-markers = ['^', 's', 'o', '+', 'x', 's', '^', '*', 'o']
+markers = ['^', 's', 'o', '+', 'x', '*']
 linestyles = ["-.", ":", "--", "-"]
 
 lim = -1
@@ -23,6 +29,9 @@ colorvals = False
 do_markers = True
 do_lines = True
 do_linestyles = True
+do_legend = True
+do_xgrid = False
+do_ygrid = False
 logx = False
 logy = False
 xlabel = None
@@ -31,6 +40,7 @@ xmin = None
 xmax = None
 ymin = None
 ymax = None
+confidence_area = False
 
 outfile = None
 
@@ -47,6 +57,15 @@ for arg in sys.argv[1:]:
     elif re.search(r'--?no-?lines?', arg):
         do_lines = False
         do_linestyles = False
+    elif re.search(r'--?no-?legend', arg):
+        do_legend = False
+    elif re.search(r'--?xgrid', arg):
+        do_xgrid = True
+    elif re.search(r'--?ygrid', arg):
+        do_ygrid = True
+    elif re.search(r'--?grid', arg):
+        do_xgrid = True
+        do_ygrid = True
     elif arg.startswith("-xyc") or arg.startswith("--xyc"):
         explicit_xvals = True
         colorvals = True
@@ -77,6 +96,8 @@ for arg in sys.argv[1:]:
         heading = arg[7:]
     elif arg.startswith("-o="):
         outfile = arg[3:]
+    elif arg.startswith("-confidence") or arg.startswith("--confidence"):
+        confidence_area = True
     else:
         files += [arg]
 
@@ -140,42 +161,50 @@ else:
         for vals in Y:
             data += [[X, vals, C]]
 
+
 plt.figure(figsize=(pltxsize,pltysize))
+
+plt.axes(axisbelow=True)
+if do_xgrid and do_ygrid:
+    plt.grid(axis='both')
+elif do_xgrid:
+    plt.grid(axis='x')
+elif do_ygrid:
+    plt.grid(axis='y')
+
+if confidence_area:
+    plt.fill_between(data[1][0], data[1][1], data[2][1], color='#ccccff')
+
 i = 0
 for d in data:
     print(i)
     
-    if i < len(labels):
-        l = labels[i]
-    else:
-        l = None
-        
-    if do_markers:
-        m = markers[i%len(markers)]
-    else:
-        m = None
+    kwargs = dict()
     
-    if not do_lines:
-        lw = 0
-    else:
-        lw = None
-        
-    if do_linestyles:
-        lst = linestyles[i%len(linestyles)]
-    else:
-        lst = None
+    if i < len(labels):
+        kwargs['label'] = labels[i]
     
     if colorvals:
-        clr = [colors[x%len(colors)] for x in d[2]]
-        #if do_markers:
-        #    m = [markers[x%len(markers)] for x in d[2]]
+        kwargs['color'] = [colors[x%len(colors)] for x in d[2]]
     else:
-        clr = colors[i%len(colors)]
+        kwargs['color'] = colors[i%len(colors)]
+        
+    if do_markers:
+        kwargs['marker'] = markers[i%len(markers)]
+        if kwargs['marker'] in ['+', 'x']:
+            kwargs['markerfacecolor'] = kwargs['color']
+        else:
+            kwargs['markerfacecolor'] = 'none'
     
-    if lst:
-        plt.scatter(d[0], d[1], label=l, color=clr, marker=m, linestyle=lst, lw=lw)
+    if not do_lines:
+        kwargs['lw'] = 0
     else:
-        plt.scatter(d[0], d[1], label=l, color=clr, marker=m, lw=lw)
+        kwargs['lw'] = 1
+        
+    if do_linestyles:
+        kwargs['linestyle'] = linestyles[i%len(linestyles)]
+    
+    plt.plot(d[0], d[1], **kwargs)
     i += 1
 
 if heading:
@@ -190,7 +219,8 @@ if logx:
     plt.xscale("log")
 if logy:
     plt.yscale("log")
-plt.legend()
+if do_legend:
+    plt.legend()
 plt.tight_layout()
 if outfile:
     plt.savefig(outfile)

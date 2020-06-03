@@ -1,10 +1,10 @@
 #!/bin/bash
 
 function rand_arrival() {
-    awk -v n=1 -v seed="$RANDOM" 'BEGIN { srand(seed); for (i=0; i<n; ++i) printf("%.4f\n", '$2'*rand()+'$1') }'
+    awk -v seed="$RANDOM" 'BEGIN { srand(seed); printf("%.4f\n", '$2'*rand()+'$1') }'
 }
 function rand_priority() {
-    awk -v n=1 -v seed="$RANDOM" 'BEGIN { srand(seed); for (i=0; i<n; ++i) printf("%.4f\n", 0.998*rand()+0.001) }'
+    awk -v seed="$RANDOM" 'BEGIN { srand(seed); printf("%.4f\n", 0.998*rand()+0.001) }'
 }
 
 numjobs="$1"
