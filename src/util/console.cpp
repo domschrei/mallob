@@ -89,7 +89,7 @@ void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeO
 std::string Console::getLogFilename() {if (logFile != NULL) return logFilename; else return "";}
 
 void Console::mergeJobLogs(int jobId) {
-    int status = FileUtils::mergeFiles(logFilename + "#" + std::to_string(jobId) + ".*", logDir + "job#" + std::to_string(jobId), true);
+    int status = FileUtils::mergeFiles(logFilename + "#" + std::to_string(jobId) + ".*", logDir + "jobs." + std::to_string(rank), true);
     if (status != 0) {
         log(WARN, "WARN: Could not merge logs of job %i, exit code: %i\n", jobId, status);
     }

@@ -24,7 +24,7 @@ int FileUtils::mergeFiles(std::string globstr, std::string dest, bool removeOrig
         }
         status = files.size() == 0;
         if (status == 0) {
-            std::string cmd = "cat " + files + " > " + dest;
+            std::string cmd = "cat " + files + " >> " + dest;
             status = system(cmd.c_str());
             if (status == 0 && removeOriginals) {
                 cmd = "rm " + files;
