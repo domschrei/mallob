@@ -76,9 +76,9 @@ bool ForkedSatJob::appl_initialize() {
 
     if (solverNotNull()) {
         Console::log(Console::VVVERB, "%s : beginning to solve", toStr());
-        _solver->run();
+        _solver_pid = _solver->run();
+        Console::log(Console::VERB, "%s : spawned child pid=%i", toStr(), _solver_pid);
         Console::log(Console::VERB, "%s : finished horde initialization", toStr());
-        _solver_pid = _solver->getPid();
         _time_of_start_solving = Timer::elapsedSeconds();
     }
 

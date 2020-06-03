@@ -76,7 +76,10 @@ public:
             int numVars);
     ~HordeProcessAdapter();
 
-    void run();
+    /*
+    Returns the PID of the spawned child process.
+    */
+    pid_t run();
     bool isFullyInitialized();
     pid_t getPid();
 

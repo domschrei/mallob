@@ -139,7 +139,7 @@ HordeProcessAdapter::~HordeProcessAdapter() {
     */
 }
 
-void HordeProcessAdapter::run() {
+pid_t HordeProcessAdapter::run() {
 
     pid_t res = Fork::createChild();
     if (res > 0) {
@@ -147,10 +147,8 @@ void HordeProcessAdapter::run() {
 
         // Write child PID 
         *_child_pid = res;
-        _log->log(1, "Child pid=%i created\n", *_child_pid);
         _state = SolvingStates::ACTIVE;
-        
-        return;
+        return res;
     }
 
     // [child process]
