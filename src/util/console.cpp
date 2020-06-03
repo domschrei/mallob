@@ -71,7 +71,7 @@ void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeO
     }
 
     // Open logging files
-    logFilename = logDir + "/log_" + std::to_string(std::time(nullptr)) + std::string(".") + std::to_string(rank);
+    logFilename = logDir + "/" + std::to_string(rank) + "/log" + std::string(".") + std::to_string(rank);
     logFile = fopen(logFilename.c_str(), "a");
     if (logFile == NULL) {
         log(CRIT, "ERROR while trying to open log file \"%s\"", logFilename.c_str());
@@ -84,6 +84,15 @@ void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeO
 }
 
 std::string Console::getLogFilename() {if (logFile != NULL) return logFilename; else return "";}
+
+void Console::mergeJobLogs(int jobId) {
+    std::string joblog = logFilename + "#" + std::to_string(jobId);
+    std::string cmd = "cat \"" + joblog + "*\" > \"_" + joblog + "\"; rm \"" + joblog + "*\"";
+    int status = system(cmd.c_str());
+    if (status != 0) {
+        log(WARN, "WARN: Could not merge logs of job %i, exit code: %i\n", jobId, status);
+    }
+}
 
 void Console::logUnsafe(int verbosity, const char* str, bool endline, bool prefix, FILE* file, va_list& args) {
 

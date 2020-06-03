@@ -1555,6 +1555,7 @@ void Worker::deleteJob(int jobId) {
     delete &job;
 
     Console::log(Console::VERB, "Deleted %s", jobStr(jobId, index).c_str());
+    Console::mergeJobLogs(jobId);
 }
 
 Worker::~Worker() {

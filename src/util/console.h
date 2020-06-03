@@ -36,6 +36,7 @@ private:
 public:
     static void init(int rank, int verbosity, bool coloredOutput, bool threadsafeOutput, bool quiet, bool cPrefix, std::string logDir=".");
     static std::string getLogFilename();
+    static void mergeJobLogs(int jobId);
 
     static void log(int verbosity, const char* str, ...);
     static void append(int verbosity, const char* str, ...);
