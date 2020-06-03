@@ -67,7 +67,7 @@ void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeO
     beganLine = false;
     
     // Create logging directory as necessary
-    Console::logDir += "/" + std::to_string(rank) + "/";
+    Console::logDir = (logdir.size() == 0 ? "." : logdir) + "/" + std::to_string(rank) + "/";
     int status = FileUtils::mkdir(logDir);
     if (status != 0) {
         log(CRIT, "ERROR while trying to create / access log directory \"%s\"", logDir.c_str());
