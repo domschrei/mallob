@@ -155,7 +155,7 @@ void HordeProcessAdapter::run() {
 
     // [child process]
     assert(res == 0);
-    puts("HELLOFROMCHILD");
+    //puts("HELLOFROMCHILD");
     _log->log(1, "Hello from child\n");
     Fork::init(Fork::_rank);
     
