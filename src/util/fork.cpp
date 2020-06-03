@@ -41,11 +41,11 @@ int Fork::_rank;
 std::set<pid_t> Fork::_children;
 
 void Fork::init(int rank) {
-    _rank = rank;
-    _children.clear();
+    signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
     signal(SIGTERM, propagateSignalAndExit);
     signal(SIGINT, propagateSignalAndExit);
-    signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
+    _rank = rank;
+    _children.clear();
 }
 
 pid_t Fork::createChild() {
