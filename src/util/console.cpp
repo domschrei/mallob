@@ -87,7 +87,8 @@ std::string Console::getLogFilename() {if (logFile != NULL) return logFilename; 
 
 void Console::mergeJobLogs(int jobId) {
     std::string joblog = logFilename + "#" + std::to_string(jobId);
-    std::string cmd = "cat \"" + joblog + "*\" > \"_" + joblog + "\"; rm \"" + joblog + "*\"";
+    std::string cmd = "cat \"" + joblog + "*\" > \"" + joblog + "_\"; mv \"" + joblog + "_\" \"job#" + std::to_string(jobId) + "\"; rm \"" + joblog + "*\"";
+    Console::log(VVERB, cmd.c_str());
     int status = system(cmd.c_str());
     if (status != 0) {
         log(WARN, "WARN: Could not merge logs of job %i, exit code: %i\n", jobId, status);
