@@ -437,7 +437,7 @@ void Worker::handleFindNode(MessageHandlePtr& handle, bool oneshot) {
         } else adopts = true;
 
     } else if (req.requestedNodeIndex == 0 
-            && req.numHops > 50 //std::max(50, MyMpi::size(comm)/2)
+            && req.numHops > 32 //std::max(50, MyMpi::size(comm)/2)
             && !hasJobCommitments()) {
         // Request for a root node exceeded max #hops: 
         // Possibly adopt the job while dismissing the active job

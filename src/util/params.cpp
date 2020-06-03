@@ -79,6 +79,14 @@ void Parameters::expand() {
         setParam("bm", "ed"); // event-driven balancing: do once, then never again
         setParam("p", "0.01"); // low balancing delay to immediately get full demand
     }
+    // Expand global lbc definition to local lbc definitions where not overridden
+    if (isSet("lbc")) {
+        std::string lbc = getParam("lbc");
+        for (int c = 0; c < getIntParam("c"); c++) {
+            std::string key = ("lbc" + std::to_string(c));
+            if (!isSet(key)) setParam(key.c_str(), lbc.c_str());
+        }
+    }
 }
 
 void Parameters::printUsage() const {

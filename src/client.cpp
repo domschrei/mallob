@@ -98,20 +98,6 @@ bool Client::checkTerminate() {
         // Send exit message to part of workers
         Console::log(Console::VERB, "Clients done: sending EXIT to workers");
 
-        /*
-        // Evaluate which portion of workers this client process should notify
-        int numClients = MyMpi::size(_comm);
-        int numWorkers = MyMpi::size(MPI_COMM_WORLD) - numClients;
-        int workersPerClient = std::ceil(((float)numWorkers) / numClients);
-        int left = MyMpi::rank(_comm) * workersPerClient;
-        int right = std::min(left + workersPerClient, numWorkers);
-        assert(right <= numWorkers);
-
-        // Notify portion of workers
-        for (int i = left; i < right; i++) {
-            MyMpi::isend(MPI_COMM_WORLD, i, MSG_EXIT, IntVec({i}));
-        }*/
-
         // Send MSG_EXIT to worker of rank 0, which will broadcast it
         MyMpi::isend(MPI_COMM_WORLD, 0, MSG_EXIT, IntVec({0}));
 
@@ -142,21 +128,8 @@ void Client::mainProgram() {
         // Introduce next job(s) as applicable
         // (only one job at a time to react better
         // to outside events without too much latency)
-        if (_last_introduced_job_idx+1 < _ordered_job_ids.size()) {
-            int jobId = _ordered_job_ids[_last_introduced_job_idx+1];
-            
-            bool introduce = false;
-            if (_params.getIntParam("lbc") == 0) {
-                // Introduce jobs by individual arrivals
-                introduce = (_jobs[jobId]->getArrival() <= Timer::elapsedSeconds());
-            } else {
-                // Introduce jobs by a leaky bucket
-                introduce = _params.getIntParam("lbc") > _introduced_job_ids.size();
-            }
-            if (introduce && isJobReady(jobId)) {
-                introduceJob(_jobs[jobId]);
-            }
-        }
+        int nextId = getNextIntroduceableJob();
+        if (nextId >= 0) introduceJob(_jobs[nextId]);
 
         // Poll messages, if present
         std::vector<MessageHandlePtr> handles = MyMpi::poll();
@@ -197,6 +170,33 @@ void Client::mainProgram() {
     fflush(stdout);
 }
 
+int Client::getMaxNumParallelJobs() {
+    std::string query = "lbc" + std::to_string(MyMpi::rank(_comm));
+    return _params.getIntParam(query.c_str());
+}
+
+int Client::getNextIntroduceableJob() {
+    
+    // Are there any non-introduced jobs left?
+    if (_last_introduced_job_idx+1 >= _ordered_job_ids.size()) return -1;
+    
+    // -- yes
+    int jobId = _ordered_job_ids[_last_introduced_job_idx+1];
+    bool introduce = true;
+    
+    // Check if there is space for another active job in this client's "bucket"
+    int lbc = getMaxNumParallelJobs();
+    if (lbc > 0) introduce &= _introduced_job_ids.size() < lbc;
+    
+    // Check if job has already arrived
+    introduce &= (_jobs[jobId]->getArrival() <= Timer::elapsedSeconds());
+    
+    // Check if job was already read
+    introduce &= isJobReady(jobId);
+    
+    return introduce ? jobId : -1;
+}
+
 bool Client::isJobReady(int jobId) {
     std::unique_lock<std::mutex> lock(_job_ready_lock);
     return _job_ready.count(jobId) && _job_ready[jobId];
@@ -209,9 +209,8 @@ void Client::introduceJob(std::shared_ptr<JobDescription>& jobPtr) {
 
     // Wait until job is ready to be sent
     while (true) {
+        if (isJobReady(jobId)) break;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        if (isJobReady(jobId))
-            break;
     }
 
     if (job.getPayload(0)->size() <= 1) {
@@ -242,8 +241,8 @@ void Client::checkClientDone() {
     
     bool jobQueueEmpty = _last_introduced_job_idx+1 >= _ordered_job_ids.size();
 
-    // If (leaky bucket job spawning) and no jobs left and all introduced jobs done:
-    if (_params.getIntParam("lbc") > 0 && jobQueueEmpty && _introduced_job_ids.empty()) {
+    // If no jobs left and all introduced jobs done:
+    if (jobQueueEmpty && _introduced_job_ids.empty()) {
         // All jobs are done
         Console::log(Console::INFO, "All my jobs are terminated");
         int myRank = MyMpi::rank(MPI_COMM_WORLD);
@@ -358,11 +357,8 @@ void Client::finishJob(int jobId) {
     checkClientDone();
 
     // Employ "leaky bucket" as necessary
-    while (_params.getIntParam("lbc") > _introduced_job_ids.size() // are more active jobs allowed?
-            && _last_introduced_job_idx+1 < _ordered_job_ids.size()) { // are there any jobs left?
-        // Introduce a new job
-        introduceJob(_jobs[ _ordered_job_ids[_last_introduced_job_idx+1] ]);
-    }
+    int nextId = getNextIntroduceableJob();
+    if (nextId >= 0) introduceJob(_jobs[nextId]);
 }
 
 void Client::handleQueryJobRevisionDetails(MessageHandlePtr& handle) {
@@ -415,12 +411,14 @@ void Client::readInstanceList(std::string& filename) {
         if (line.substr(0, 1) == std::string("#")) {
             continue;
         }
-        int id; float arrival; float priority; std::string instanceFilename; bool incremental;
-        int pos = 0, next = 0;
-        next = line.find(" "); id = std::stoi(line.substr(pos, next-pos)); line = line.substr(next+1);
-        next = line.find(" "); arrival = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1);
-        next = line.find(" "); priority = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1);
-        next = line.find(" "); instanceFilename = line.substr(pos, next-pos); line = line.substr(next+1);
+        int id; float arrival; float priority; std::string instanceFilename;
+        bool incremental;
+        int pos = 0, next = line.find(" ");
+        
+        id = std::stoi(line.substr(pos, next-pos)); line = line.substr(next+1); next = line.find(" "); 
+        arrival = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1); next = line.find(" "); 
+        priority = std::stof(line.substr(pos, next-pos)); line = line.substr(next+1); next = line.find(" "); 
+        instanceFilename = line.substr(pos, next-pos); line = line.substr(next+1); next = line.find(" ");
         incremental = (line == "i");
 
         // Jitter job priority
@@ -441,64 +439,6 @@ void Client::readInstanceList(std::string& filename) {
 }
 
 void Client::readFormula(std::string& filename, JobDescription& job) {
-
-    /*
-    std::fstream file;
-    file.open(filename, std::ios::in);
-    if (file.is_open()) {
-
-        VecPtr formula = std::make_shared<std::vector<int>>();
-        VecPtr assumptions = std::make_shared<std::vector<int>>();
-
-        std::string line;
-        while(std::getline(file, line)) {
-            int pos = 0;
-            int next = 0; 
-            while (pos < line.length() && line[pos] == ' ') pos++;
-            if (pos >= line.length() || line[pos] == 'c' 
-                    || line[pos] == 'p') {
-                continue;
-            }
-            while (true) {
-
-                // Find end position of next symbol
-                next = pos;
-                bool nonwhitespace = false;
-                while (next < line.length()) {
-                    if (nonwhitespace && line[next] == ' ')
-                        break;
-                    if (line[next] != ' ') nonwhitespace = true;
-                    next++;
-                }
-
-                if (next >= line.length()) {
-                    // clause ended
-                    formula->push_back(0);
-                    break;
-                } else {
-                    int lit; int asmpt = 0;
-                    assert(line[next] == ' ');
-                    if (line[next-1] == '!') {
-                        asmpt = std::stoi(line.substr(pos, next-pos-1));
-                        assumptions->push_back(asmpt);
-                        break;
-                    } else {
-                        lit = std::stoi(line.substr(pos, next-pos));
-                        if (lit != 0) formula->push_back(lit);
-                        pos = next+1;
-                    }
-                }
-            }
-        }
-        job.addPayload(formula);
-        job.addAssumptions(assumptions);
-
-        Console::log(Console::VERB, "%i literals including separation zeros, %i assumptions", formula->size(), assumptions->size());
-
-    } else {
-        Console::log(Console::CRIT, "ERROR: File %s could not be opened. Skipping job #%i", filename.c_str(), job.getId());
-    }
-    */
 
     SatReader r(filename);
     VecPtr formula = r.read();

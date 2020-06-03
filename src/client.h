@@ -66,6 +66,8 @@ private:
     void handleClientFinished(MessageHandlePtr& handle);
     void handleExit(MessageHandlePtr& handle);
 
+    int getMaxNumParallelJobs();
+    int getNextIntroduceableJob();
     bool isJobReady(int jobId);
     void introduceJob(std::shared_ptr<JobDescription>& jobPtr);
     void finishJob(int jobId);
