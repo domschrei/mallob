@@ -18,7 +18,7 @@ SolverThread::SolverThread(ParameterProcessor& params, std::shared_ptr<Portfolio
         const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<vector<int>>& assumptions, 
         int localId, bool* finished) : 
     _params(params), _solver_ptr(solver), _solver(*solver), 
-    _logger(params.getLogger().copy(".S"+std::to_string(_solver.getGlobalId()))), 
+    _logger(params.getLogger().copy("S"+std::to_string(_solver.getGlobalId()))), 
     _formulae(formulae), _assumptions(assumptions), 
     _local_id(localId), _finished_flag(finished) {
     

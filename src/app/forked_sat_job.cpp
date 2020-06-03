@@ -62,7 +62,7 @@ bool ForkedSatJob::appl_initialize() {
     _solver = std::unique_ptr<HordeProcessAdapter>(
         new HordeProcessAdapter(
             params,
-            std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface("<h-" + std::string(identifier) + ">", "#" + std::to_string(getId()))), 
+            std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface("<h-" + std::string(identifier) + ">", "#" + std::to_string(getId()) + ".")), 
             getDescription().getPayloads(), 
             getDescription().getAssumptions(getDescription().getRevision()), 
             getDescription().getNumVars()
