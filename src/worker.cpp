@@ -752,14 +752,16 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
     getJob(jobId).beginInitialization();
     Console::log(Console::VERB, "Received desc. of #%i - initializing", jobId);
     assert(!initializerThreads.count(jobId) || Console::fail("%s already has an initializer thread!", getJob(jobId).toStr()));
-    std::vector<uint8_t>& packedData = *data;
-    initializerThreads[jobId] = std::thread([&]() {
+    
+    initializerThreads[jobId] = std::thread([this, handle, jobId]() {
 
         // Deserialize job description
-        assert(packedData.size() >= sizeof(int));
-        Console::log_recv(Console::VERB, handle->source, "Deserialize job #%i, desc. of size %i", jobId, packedData.size());
+        auto packedData = handle->recvData;
+        assert(packedData->size() >= sizeof(int));
+        Console::log_recv(Console::VERB, handle->source, 
+                "Deserialize job #%i, desc. of size %i", jobId, packedData->size());
         Job& job = getJob(jobId);
-        job.setDescription(data);
+        job.setDescription(packedData);
 
         // Remember arrival and initialize used CPU time (if root node)
         jobArrivals[jobId] = Timer::elapsedSeconds();
