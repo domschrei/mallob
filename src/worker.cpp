@@ -645,7 +645,7 @@ void Worker::handleOfferAdoption(MessageHandlePtr& handle) {
                 Console::log_send(Console::VERB, handle->source, "Resume child %s", 
                         jobStr(req.jobId, req.requestedNodeIndex).c_str());
             }
-            // Child *will* start / resume its job solvers
+            // Child *will* start / resume its job solvers.
             // Mark new node as one of the node's children
             if (req.requestedNodeIndex == jobs[req.jobId]->getLeftChildIndex()) {
                 jobs[req.jobId]->setLeftChild(handle->source);
@@ -1481,6 +1481,12 @@ bool Worker::isAdoptionOfferObsolete(const JobRequest& req) {
     } else if (req.requestedNodeIndex == job.getRightChildIndex() && job.hasRightChild()) {
         // Job already has a right child
         Console::log(Console::VERB, "Req. %s : already has right child", job.toStr());
+        return true;
+
+    } else if (req.requestedNodeIndex != job.getLeftChildIndex() 
+            && req.requestedNodeIndex != job.getRightChildIndex()) {
+        // Requested node index is not a valid child index for this job
+        Console::log(Console::VERB, "Req. %s : not a valid child index (any more)", job.toStr());
         return true;
     }
 
