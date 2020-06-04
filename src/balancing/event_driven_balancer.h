@@ -47,9 +47,9 @@ public:
         }
         return result;
     }
-    virtual void deserialize(const std::vector<uint8_t>& packed) override {
+    virtual EventMap& deserialize(const std::vector<uint8_t>& packed) override {
         _map.clear();
-        if (packed.size() <= sizeof(int)) return;
+        if (packed.size() <= sizeof(int)) return *this;
         assert(packed.empty() || packed.size() % _size_per_event == 0);
         int numEvents = packed.size() / _size_per_event;
         int i = 0, n;
@@ -61,6 +61,7 @@ public:
             n = sizeof(float); memcpy(&newEvent.priority, packed.data()+i, n); i += n;
             _map[newEvent.jobId] = newEvent;
         }
+        return *this;
     }
     virtual void merge(const Reduceable& other) {
 

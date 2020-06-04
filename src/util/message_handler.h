@@ -20,7 +20,7 @@ private:
 public:
     MessageHandler();
     void registerCallback(int tag, const MsgCallback& cb);
-    void pollMessages();
+    void pollMessages(float elapsedTime);
 
 };
 

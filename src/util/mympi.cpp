@@ -19,6 +19,8 @@ std::set<MessageHandlePtr> MyMpi::_sent_handles;
 std::map<int, MsgTag> MyMpi::_tags;
 bool MyMpi::_monitor_off;
 
+int handleId;
+
 void chkerr(int err) {
     if (err != 0) {
         Console::log(Console::CRIT, "MPI ERROR errcode=%i", err);

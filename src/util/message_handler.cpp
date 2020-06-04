@@ -11,8 +11,8 @@ void MessageHandler::registerCallback(int tag, const MsgCallback& cb) {
     _callbacks[tag] = cb;
 }
 
-void MessageHandler::pollMessages() {
-    std::vector<MessageHandlePtr> handles = MyMpi::poll();
+void MessageHandler::pollMessages(float elapsedTime) {
+    std::vector<MessageHandlePtr> handles = MyMpi::poll(elapsedTime);
     // Process new messages
     for (MessageHandlePtr& handle : handles) {
         if (_callbacks.count(handle->tag)) _callbacks[handle->tag](handle);

@@ -61,7 +61,7 @@ public:
     void clearPayload();
 
     std::shared_ptr<std::vector<uint8_t>> serialize() const override;
-    void deserialize(const std::vector<uint8_t>& packed) override;
+    JobDescription& deserialize(const std::vector<uint8_t>& packed) override;
 
     std::shared_ptr<std::vector<uint8_t>> serialize(int firstRevision, int lastRevision) const;
     void merge(const std::vector<uint8_t>& packed);

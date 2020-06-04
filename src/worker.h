@@ -63,6 +63,12 @@ private:
     std::thread mpiMonitorThread;
     volatile bool exiting;
 
+    struct SuspendedJobComparator {
+        bool operator()(const std::pair<int, float>& left, const std::pair<int, float>& right) {
+            return left.second < right.second;
+        };
+    };
+
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& clientNodes) :
         comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), epochCounter()
@@ -90,68 +96,64 @@ public:
     };
 
 private:
-    friend void mpiMonitor(Worker* worker);
-
-    void createExpanderGraph();
-
-    bool checkTerminate();
     
-    void forgetOldJobs();
+    void handleAbort(MessageHandlePtr& handle);
+    void handleAcceptAdoptionOffer(MessageHandlePtr& handle);
+    void handleAckJobRevisionDetails(MessageHandlePtr& handle);
+    void handleConfirmAdoption(MessageHandlePtr& handle);
+    void handleExit(MessageHandlePtr& handle);
+    void handleDeclineOneshot(MessageHandlePtr& handle);
+    void handleFindNode(MessageHandlePtr& handle, bool oneshot);
+    void handleForwardClientRank(MessageHandlePtr& handle);
+    void handleIncrementalJobFinished(MessageHandlePtr& handle);
+    void handleInterrupt(MessageHandlePtr& handle);
+    void handleJobCommunication(MessageHandlePtr& handle);
+    void handleJobDone(MessageHandlePtr& handle);
+    void handleNotifyJobRevision(MessageHandlePtr& handle);
+    void handleOfferAdoption(MessageHandlePtr& handle);
+    void handleQueryJobResult(MessageHandlePtr& handle);
+    void handleQueryJobRevisionDetails(MessageHandlePtr& handle);
+    void handleQueryVolume(MessageHandlePtr& handle);
+    void handleRejectAdoptionOffer(MessageHandlePtr& handle);
+    void handleResultObsolete(MessageHandlePtr& handle);
+    void handleSendJob(MessageHandlePtr& handle);
+    void handleSendJobResult(MessageHandlePtr& handle);
+    void handleSendJobRevisionData(MessageHandlePtr& handle);
+    void handleSendJobRevisionDetails(MessageHandlePtr& handle);
+    void handleTerminate(MessageHandlePtr& handle);
+    void handleUpdateVolume(MessageHandlePtr& handle);
+    void handleWorkerDefecting(MessageHandlePtr& handle);
+    void handleWorkerFoundResult(MessageHandlePtr& handle);
+    
+    Job* createJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
+    void bounceJobRequest(JobRequest& request, int senderRank);
+    void updateVolume(int jobId, int demand);
+    void interruptJob(int jobId, bool terminate, bool reckless);
+    void informClientJobIsDone(int jobId, int clientRank);
+    void timeoutJob(int jobId);
     void forgetJob(int jobId);
     void deleteJob(int jobId);
-
-    void handleIntroduceJob(MessageHandlePtr& handle);
-    void handleQueryVolume(MessageHandlePtr& handle);
-    void handleFindNode(MessageHandlePtr& handle, bool oneshot);
-    void handleDeclineOneshot(MessageHandlePtr& handle);
-    void handleOfferAdoption(MessageHandlePtr& handle);
-    void handleRejectAdoptionOffer(MessageHandlePtr& handle);
-    void handleAcceptAdoptionOffer(MessageHandlePtr& handle);
-    void handleConfirmAdoption(MessageHandlePtr& handle);
-    void handleSendJob(MessageHandlePtr& handle);
-    void handleUpdateVolume(MessageHandlePtr& handle);
-    void handleJobCommunication(MessageHandlePtr& handle);
-    void handleTerminate(MessageHandlePtr& handle);
-    void handleInterrupt(MessageHandlePtr& handle);
-    void handleAbort(MessageHandlePtr& handle);
-    void handleWorkerFoundResult(MessageHandlePtr& handle);
-    void handleResultObsolete(MessageHandlePtr& handle);
-    void handleQueryJobResult(MessageHandlePtr& handle);
-    void handleForwardClientRank(MessageHandlePtr& handle);
-    void handleWorkerDefecting(MessageHandlePtr& handle);
-    void handleNotifyJobRevision(MessageHandlePtr& handle);
-    void handleQueryJobRevisionDetails(MessageHandlePtr& handle);
-    void handleSendJobRevisionDetails(MessageHandlePtr& handle);
-    void handleAckJobRevisionDetails(MessageHandlePtr& handle);
-    void handleSendJobRevisionData(MessageHandlePtr& handle);
-    void handleIncrementalJobFinished(MessageHandlePtr& handle);
-    void handleExit(MessageHandlePtr& handle);
-
-    void handleJobDone(MessageHandlePtr& handle);
-    void handleSendJobResult(MessageHandlePtr& handle);
-
-    void bounceJobRequest(JobRequest& request, int senderRank);
-    void informClient(int jobId, int clientRank);
-    void updateVolume(int jobId, int demand);
-    void initJob(MessageHandlePtr handle);
-    void interruptJob(MessageHandlePtr& handle, int jobId, bool terminate, bool reckless);
-    void timeoutJob(int jobId);
+    bool checkComputationLimits(int jobId);
     
+    bool isTimeForRebalancing();
     void rebalance();
     void finishBalancing();
+    
+    bool checkTerminate();
+    void createExpanderGraph();
     void allreduceSystemState(float elapsedTime = Timer::elapsedSeconds());
+    void forgetOldJobs();
 
-    bool checkComputationLimits(int jobId);
     int getLoad() const {return load;};
     void setLoad(int load, int whichJobId);
     bool isIdle() const {return load == 0;};
     bool hasJobCommitments() const {return jobCommitments.size() > 0;};
-    int getRandomWorkerNode();
-    bool isTimeForRebalancing();
+    
+    int getRandomNonSelfWorkerNode();
+    
     bool isRequestObsolete(const JobRequest& req);
     bool isAdoptionOfferObsolete(const JobRequest& req);
 
-    Job* createJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
     bool hasJob(int id) const {
         return jobs.count(id) > 0;
     }
@@ -159,10 +161,11 @@ private:
         assert(jobs.count(id));
         return *jobs.at(id);
     };
-
     std::string jobStr(int j, int idx) const {
         return "#" + std::to_string(j) + ":" + std::to_string(idx);
     };
+
+    friend void mpiMonitor(Worker* worker);
 };
 
 #endif

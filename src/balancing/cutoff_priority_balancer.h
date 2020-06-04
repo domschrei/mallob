@@ -68,7 +68,7 @@ std::shared_ptr<std::vector<uint8_t>> serialize() const override {
     n = demandedResources.size() * sizeof(float); memcpy(data->data()+i, demandedResources.data(), n); i += n;
     return data;
 }
-void deserialize(const std::vector<uint8_t>& packed) override {
+ResourcesInfo& deserialize(const std::vector<uint8_t>& packed) override {
     int i = 0, n;
     n = sizeof(float); memcpy(&assignedResources, packed.data()+i, n); i += n;
     int size = (packed.size() - i) / 2;
@@ -77,6 +77,7 @@ void deserialize(const std::vector<uint8_t>& packed) override {
     n = size; memcpy(priorities.data(), packed.data()+i, n); i += n;
     demandedResources.clear(); demandedResources.resize(size / sizeof(float));
     n = size; memcpy(demandedResources.data(), packed.data()+i, n); i += n;
+    return *this;
 }
 std::unique_ptr<Reduceable> getDeserialized(const std::vector<uint8_t>& packed) const override {
     std::unique_ptr<Reduceable> out(new ResourcesInfo());

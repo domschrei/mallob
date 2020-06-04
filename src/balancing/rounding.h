@@ -60,15 +60,16 @@ std::shared_ptr<std::vector<uint8_t>> serialize() const override {
     return data;
 }
 
-void deserialize(const std::vector<uint8_t>& packed) override {
+SortedDoubleSequence& deserialize(const std::vector<uint8_t>& packed) override {
     if (packed.size() <= 1) {
         // Empty / stub object
-        return;
+        return *this;
     }
     assert(packed.size() % sizeof(double) == 0 || Console::fail("%i not a multiple of %i!", packed.size(), sizeof(double)));
     int size = packed.size() / sizeof(double);
     this->data.clear(); this->data.resize(size);
     memcpy(this->data.data(), packed.data(), packed.size());
+    return *this;
 }
 
 std::unique_ptr<Reduceable> getDeserialized(const std::vector<uint8_t>& packed) const override {

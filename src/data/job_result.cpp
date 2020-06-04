@@ -13,7 +13,7 @@ std::shared_ptr<std::vector<uint8_t>> JobResult::serialize() const {
     return packed;
 }
 
-void JobResult::deserialize(const std::vector<uint8_t>& packed) {
+JobResult& JobResult::deserialize(const std::vector<uint8_t>& packed) {
 
     int i = 0, n;
     n = sizeof(int); memcpy(&id, packed.data()+i, n); i += n;
@@ -21,4 +21,5 @@ void JobResult::deserialize(const std::vector<uint8_t>& packed) {
     n = sizeof(int); memcpy(&revision, packed.data()+i, n); i += n;
     n = packed.size()-i; solution.resize(n/sizeof(int));
     memcpy(solution.data(), packed.data()+i, n); i += n;
+    return *this;
 }

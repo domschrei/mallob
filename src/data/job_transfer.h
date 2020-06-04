@@ -49,7 +49,7 @@ public:
         return packed;
     }
 
-    void deserialize(const std::vector<uint8_t> &packed) override {
+    JobRequest& deserialize(const std::vector<uint8_t> &packed) override {
         int i = 0, n;
         n = sizeof(int); memcpy(&jobId, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&rootRank, packed.data()+i, n); i += n;
@@ -59,6 +59,7 @@ public:
         n = sizeof(int); memcpy(&revision, packed.data()+i, n); i += n;
         n = sizeof(float); memcpy(&timeOfBirth, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&numHops, packed.data()+i, n); i += n;
+        return *this;
     }
 };
 
@@ -98,12 +99,13 @@ public:
         return packed;
     }
 
-    void deserialize(const std::vector<uint8_t>& packed) override {
+    JobSignature& deserialize(const std::vector<uint8_t>& packed) override {
         int i = 0, n;
         n = sizeof(int);    memcpy(&jobId, packed.data()+i, n); i += n;
         n = sizeof(int);    memcpy(&rootRank, packed.data()+i, n); i += n;
         n = sizeof(int);    memcpy(&revision, packed.data()+i, n); i += n;
         n = sizeof(size_t); memcpy(&transferSize, packed.data()+i, n); i += n;
+        return *this;
     }
 };
 
@@ -127,13 +129,14 @@ public:
         return packed;
     }
 
-    void deserialize(const std::vector<uint8_t>& packed) override {
+    JobMessage& deserialize(const std::vector<uint8_t>& packed) override {
         int i = 0, n;
         n = sizeof(int); memcpy(&jobId, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&tag, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&epoch, packed.data()+i, n); i += n;
         n = packed.size()-i; payload.resize(n/sizeof(int)); 
         memcpy(payload.data(), packed.data()+i, n); i += n;
+        return *this;
     }
 };
 
@@ -158,10 +161,11 @@ public:
         return packed;
     }
 
-    void deserialize(const std::vector<uint8_t>& packed) override {
+    IntPair& deserialize(const std::vector<uint8_t>& packed) override {
         int i = 0, n;
         n = sizeof(int); memcpy(&first, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&second, packed.data()+i, n); i += n;
+        return *this;
     }
 };
 
@@ -183,9 +187,10 @@ public:
         return packed;
     }
 
-    void deserialize(const std::vector<uint8_t>& packed) override {
+    IntVec& deserialize(const std::vector<uint8_t>& packed) override {
         data.resize(packed.size() / sizeof(int));
         memcpy(data.data(), packed.data(), packed.size());
+        return *this;
     }
 
     int& operator[](const int pos) {

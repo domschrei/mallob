@@ -33,7 +33,7 @@ std::shared_ptr<std::vector<uint8_t>> JobDescription::serialize() const {
     return serialize(true);
 }
 
-void JobDescription::deserialize(const std::vector<uint8_t>& packed) {
+JobDescription& JobDescription::deserialize(const std::vector<uint8_t>& packed) {
 
     int i = 0, n;
 
@@ -49,6 +49,8 @@ void JobDescription::deserialize(const std::vector<uint8_t>& packed) {
     for (int r = 0; r <= _revision; r++) {
         readRevision(packed, i);
     }
+
+    return *this;
 }
 
 std::shared_ptr<std::vector<uint8_t>> JobDescription::serialize(int firstRevision, int lastRevision) const {
