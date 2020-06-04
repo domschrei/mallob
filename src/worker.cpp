@@ -830,8 +830,7 @@ void Worker::handleSendJobRevisionDetails(MessageHandlePtr& handle) {
 }
 
 void Worker::handleTerminate(MessageHandlePtr& handle) {
-    int jobId; memcpy(&jobId, handle->recvData->data(), sizeof(int));
-    interruptJob(jobId, /*terminate=*/true, /*reckless=*/false);
+    interruptJob(Serializable::get<int>(*handle->recvData), /*terminate=*/true, /*reckless=*/false);
 }
 
 void Worker::handleUpdateVolume(MessageHandlePtr& handle) {
@@ -1451,7 +1450,7 @@ bool Worker::isRequestObsolete(const JobRequest& req) {
         }
     }
     
-    float maxAge = params.getFloatParam("rto");
+    float maxAge = params.getFloatParam("rto"); // request time out
     if (maxAge > 0) {
         //float timelim = 0.25 + 2 * params.getFloatParam("p");
         return Timer::elapsedSeconds() - req.timeOfBirth >= maxAge; 
