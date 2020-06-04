@@ -82,7 +82,6 @@ void* SolverThread::run() {
 }
 
 void SolverThread::readFormula() {
-    _initialized = false;
     log(3, "importing clauses\n");
 
     int prevLits = _imported_lits;
@@ -99,7 +98,6 @@ void SolverThread::readFormula() {
     }
 
     log(2, "imported cnf (%i lits)\n", _imported_lits-prevLits);
-    log(1, "initialized\n");
 }
 
 void SolverThread::read(const std::vector<int>& formula, int begin) {
