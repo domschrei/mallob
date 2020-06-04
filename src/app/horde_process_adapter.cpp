@@ -53,6 +53,7 @@ void HordeProcessAdapter::initSharedMemory() {
     fields.emplace_back((void**) &_did_update_role,         sizeof(bool));
     fields.emplace_back((void**) &_did_interrupt,           sizeof(bool));
 
+    fields.emplace_back((void**) &_is_spawned,              sizeof(bool));
     fields.emplace_back((void**) &_is_initialized,          sizeof(bool));
     fields.emplace_back((void**) &_has_solution,            sizeof(bool));
     fields.emplace_back((void**) &_result,                  sizeof(SatResult));
@@ -99,6 +100,7 @@ void HordeProcessAdapter::initSharedMemory() {
     *_did_update_role = false;
     *_did_interrupt = false;
 
+    *_is_spawned = false;
     *_is_initialized = false;
     *_has_solution = false;
     *_result = UNKNOWN;
@@ -147,6 +149,7 @@ pid_t HordeProcessAdapter::run() {
 
         // Write child PID 
         *_child_pid = res;
+        while (!*_is_spawned) usleep(250 /* 1/4 milliseconds */);
         _state = SolvingStates::ACTIVE;
         return res;
     }
@@ -156,6 +159,7 @@ pid_t HordeProcessAdapter::run() {
     //puts("HELLOFROMCHILD");
     _log->log(1, "Hello from child\n");
     Fork::init(Fork::_rank);
+    *_is_spawned = true;
     
     // Prepare solver
     HordeLib hlib(_params, _log);
@@ -172,7 +176,7 @@ pid_t HordeProcessAdapter::run() {
         float time = Timer::elapsedSeconds();
         int sleepStatus = usleep(1000 /*1 millisecond*/);
         time = Timer::elapsedSeconds() - time;
-        if (sleepStatus != 0) _log->log(3, "Interrupted; slept for %i us\n", (int) (1000*1000*time));
+        if (sleepStatus != 0) _log->log(3, "Woken up after %i us\n", (int) (1000*1000*time));
 
         // Interrupt solvers
         if (*_do_interrupt && !*_did_interrupt) {

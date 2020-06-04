@@ -53,6 +53,7 @@ private:
     bool* _did_interrupt;
 
     // State alerts child->parent
+    bool* _is_spawned;
     bool* _is_initialized;
     bool* _has_solution;
     SatResult* _result = NULL;
