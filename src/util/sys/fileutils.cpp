@@ -11,6 +11,7 @@ int FileUtils::mkdir(std::string dir) {
 
 int errfunc(const char* epath, int eerrno) {
     // TODO handle
+    return 0;
 }
 
 int FileUtils::mergeFiles(std::string globstr, std::string dest, bool removeOriginals) {
