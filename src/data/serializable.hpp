@@ -6,6 +6,17 @@
 #include <cstdint>
 #include <memory>
 
+/*
+Generic interface for serializing and deserializing arbitrary data, mainly
+for the purpose of seamlessly sending it around via MPI.
+
+To serialize a Serializable object, call the serialize() method returning
+a shared_ptr to a byte vector.
+
+To deserialize a byte vector, call Serializable::get<T>(byteVector); thereby,
+T must be a fitting Serializable object or primitive data type.
+Alternatively, you can call deserialize(byteVector) on an "empty" Serializable object. 
+*/
 class Serializable {
 
 public:

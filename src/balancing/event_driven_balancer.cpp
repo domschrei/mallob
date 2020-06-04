@@ -84,7 +84,7 @@ bool EventDrivenBalancer::handle(const MessageHandlePtr& handle) {
 
     int sender = handle->source;
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
-    EventMap data; data.deserialize(*(handle->recvData));
+    EventMap data = Serializable::get<EventMap>(*handle->recvData);
     bool done = false;
 
     //Console::log(Console::VERB, "BLC MSG");

@@ -316,7 +316,7 @@ void Worker::handleAbort(MessageHandlePtr& handle) {
 void Worker::handleAcceptAdoptionOffer(MessageHandlePtr& handle) {
 
     // Retrieve according job commitment
-    JobSignature sig = JobSignature().deserialize(*handle->recvData);
+    JobSignature sig = Serializable::get<JobSignature>(*handle->recvData);
     if (!jobCommitments.count(sig.jobId)) {
         Console::log(Console::WARN, "[WARN] Job commitment for #%i not present despite adoption accept msg", sig.jobId);
         return;
@@ -363,7 +363,7 @@ void Worker::handleAckJobRevisionDetails(MessageHandlePtr& handle) {
 }
 
 void Worker::handleConfirmAdoption(MessageHandlePtr& handle) {
-    JobRequest req; req.deserialize(*handle->recvData);
+    JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
 
     // If job already terminated, the description contains the job id ONLY
     if (!hasJob(req.jobId)) {
@@ -405,7 +405,7 @@ void Worker::handleExit(MessageHandlePtr& handle) {
 
 
 void Worker::handleDeclineOneshot(MessageHandlePtr& handle) {
-    JobRequest req; req.deserialize(*handle->recvData);
+    JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
     Console::log_recv(Console::VVVERB, handle->source, 
         "%s : dormant child declined", jobStr(req.jobId, req.requestedNodeIndex).c_str());
 
@@ -445,7 +445,7 @@ void Worker::handleDeclineOneshot(MessageHandlePtr& handle) {
 
 void Worker::handleFindNode(MessageHandlePtr& handle, bool oneshot) {
 
-    JobRequest req; req.deserialize(*handle->recvData);
+    JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
 
     // Discard request if it has become obsolete
     if (isRequestObsolete(req)) {
@@ -608,7 +608,7 @@ void Worker::handleNotifyJobRevision(MessageHandlePtr& handle) {
 
 void Worker::handleOfferAdoption(MessageHandlePtr& handle) {
 
-    JobRequest req; req.deserialize(*handle->recvData);
+    JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
     Console::log_recv(Console::VERB, handle->source, "Adoption offer for %s", 
                     jobStr(req.jobId, req.requestedNodeIndex).c_str());
 

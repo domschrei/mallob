@@ -259,9 +259,7 @@ void Job::terminate() {
 
     // Free up memory
     _description = JobDescription();
-    _serialized_description = std::make_shared<std::vector<uint8_t>>();
-    _serialized_description->resize(sizeof(int));
-    memcpy(_serialized_description->data(), &_id, sizeof(int));
+    _serialized_description = IntVec({_id}).serialize();
     _time_of_abort = Timer::elapsedSeconds();
 
     switchState(PAST);

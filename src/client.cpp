@@ -256,7 +256,7 @@ void Client::checkClientDone() {
 }
 
 void Client::handleRequestBecomeChild(MessageHandlePtr& handle) {
-    JobRequest req; req.deserialize(*handle->recvData);
+    JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
     const JobDescription& desc = *_jobs[req.jobId];
 
     // Send job signature
@@ -266,14 +266,14 @@ void Client::handleRequestBecomeChild(MessageHandlePtr& handle) {
 }
 
 void Client::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
-    JobRequest req; req.deserialize(*handle->recvData);
+    JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
     JobDescription& desc = *_jobs[req.jobId];
     assert(desc.getId() == req.jobId || Console::fail("%i != %i", desc.getId(), req.jobId));
     Console::log_send(Console::VERB, handle->source, "Sending job desc. of #%i of size %i", desc.getId(), desc.getTransferSize(false));
     _root_nodes[req.jobId] = handle->source;
     auto data = desc.serializeFirstRevision();
 
-    int jobId; memcpy(&jobId, data->data(), sizeof(int));    
+    int jobId = Serializable::get<int>(*data);    
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, data);
     Console::log_send(Console::VERB, handle->source, "Sent job desc. of #%i of size %i", jobId, data->size());
 }
@@ -289,7 +289,7 @@ void Client::handleJobDone(MessageHandlePtr& handle) {
 
 void Client::handleSendJobResult(MessageHandlePtr& handle) {
 
-    JobResult jobResult; jobResult.deserialize(*handle->recvData);
+    JobResult jobResult = Serializable::get<JobResult>(*handle->recvData);
     int jobId = jobResult.id;
     int resultCode = jobResult.result;
     int revision = jobResult.revision;

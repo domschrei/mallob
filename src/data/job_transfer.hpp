@@ -148,7 +148,7 @@ struct IntPair : public Serializable {
 public:
     IntPair(int first, int second) : first(first), second(second) {}
 
-    IntPair(std::vector<uint8_t>& packed) {
+    IntPair(const std::vector<uint8_t>& packed) {
         deserialize(packed);
     }
 
@@ -174,9 +174,9 @@ struct IntVec : public Serializable {
     std::vector<int> data;
 
 public:
-    IntVec(std::vector<int>& data) : data(data) {}
-    IntVec(std::initializer_list<int> list) : data(list) {}
-    IntVec(std::vector<uint8_t>& packed) {
+    IntVec(const std::vector<int>& data) : data(data) {}
+    IntVec(const std::initializer_list<int>& list) : data(list) {}
+    IntVec(const std::vector<uint8_t>& packed) {
         deserialize(packed);
     }
 
