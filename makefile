@@ -1,18 +1,18 @@
 
-MALLOB_VERSION?=$(shell date --iso-8601=seconds)_$(shell whoami)@$(shell hostname)
+MALLOB_VERSION:=$(shell date --iso-8601=seconds)_$(shell whoami)@$(shell hostname)
 
 CXX=mpicxx
 CWARN=-Wno-unused-parameter -Wno-sign-compare -Wno-format -Wno-format-security
 CERROR=-fpermissive
 
 #-DNDEBUG
-COMPILEFLAGS=-O3 -g -pipe -Wall -Wextra -pedantic -std=c++17 $(CWARN) $(CERROR) -DMALLOB_VERSION=\"${MALLOB_VERSION}\"
+COMPILEFLAGS:=-O3 -g -pipe -Wall -Wextra -pedantic -std=c++17 $(CWARN) $(CERROR) -DMALLOB_VERSION=\"${MALLOB_VERSION}\"
 #COMPILEFLAGS=-O0 -ggdb -pipe -Wall -Wextra -pedantic -std=c++17 $(CWARN) $(CERROR)
 
-LINKERFLAG=-O3 -L${MPI_ROOT} -Lsrc/app/sat/hordesat/lingeling -Lsrc/app/sat/hordesat/yalsat -lm -lz -llgl -lyals -lpthread
+LINKERFLAG:=-O3 -L${MPI_ROOT} -Lsrc/app/sat/hordesat/lingeling -Lsrc/app/sat/hordesat/yalsat -lm -lz -llgl -lyals -lpthread
 #LINKERFLAG=-O0 -ggdb
 
-INCLUDES=-Isrc -I${MPI_INCLUDE}
+INCLUDES:=-Isrc -I${MPI_INCLUDE}
 
 #.PHONY = parser clean
 

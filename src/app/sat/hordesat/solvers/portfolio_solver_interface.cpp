@@ -41,7 +41,7 @@ void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ..
 }
 
 PortfolioSolverInterface::PortfolioSolverInterface(LoggingInterface& logger, int globalId, int localId, std::string jobname) 
-		: _logger(logger), _global_id(globalId), _local_id(localId), _job_name(jobname) {
+		: _logger(logger), _job_name(jobname), _global_id(globalId), _local_id(localId) {
 	updateTimer(jobname);
 	_global_name = "<h-" + jobname + "_S" + std::to_string(globalId) + ">";
 }
