@@ -19,6 +19,7 @@
 #include "data/epoch_counter.h"
 #include "data/statistics.h"
 #include "balancing/balancer.h"
+#include "util/message_handler.h"
 
 class Worker {
 
@@ -56,9 +57,9 @@ private:
     bool reducingSystemState = false;
     float lastSystemStateReduce = 0;
 
-
     std::vector<int> bounceAlternatives;
 
+    MessageHandler msgHandler;
     std::thread mpiMonitorThread;
     volatile bool exiting;
 
