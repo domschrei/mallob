@@ -40,6 +40,7 @@ void SolverThread::init() {
     _tid = syscall(SYS_gettid);
     log(3, "tid %ld\n", _tid);
     if (_params.isSet("pin")) pin();
+    _initialized = true;
 }
 
 void SolverThread::pin() {
@@ -66,25 +67,15 @@ void SolverThread::pin() {
 }
 
 void* SolverThread::run() {
-
-    if (!cancelThread())
-        waitWhile(INITIALIZING);
-    if (!cancelThread())
-        readFormula();
-    if (!cancelThread())
-        diversify();
-    
-    _initialized = true;
-
+        
     while (!cancelThread()) {
+        readFormula();
+        if (cancelThread()) break;
+        diversify();
     
         waitWhile(STANDBY);
         runOnce();
         waitWhile(STANDBY);
-        
-        if (cancelThread()) break;
-        readFormula();
-        diversify();
     }
     log(2, "exiting\n");
     return NULL;
