@@ -1,7 +1,7 @@
 
-#include "event_driven_balancer.h"
-#include "util/random.h"
-#include "balancing/rounding.h"
+#include "event_driven_balancer.hpp"
+#include "util/random.hpp"
+#include "balancing/rounding.hpp"
 
 EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params) : Balancer(comm, params) {
     _last_balancing = 0;

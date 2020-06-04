@@ -1,8 +1,8 @@
 
 #include <cmath>
 
-#include "reduceable.h"
-#include "util/console.h"
+#include "reduceable.hpp"
+#include "util/console.hpp"
 
 
 bool Reduceable::startReduction(MPI_Comm& comm, std::set<int> excludedRanks) {

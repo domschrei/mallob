@@ -1,5 +1,5 @@
 
-#include "balancer.h"
+#include "balancer.hpp"
 
 int Balancer::getVolume(int jobId) {
     if (!_volumes.count(jobId))

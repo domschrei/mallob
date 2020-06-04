@@ -1,5 +1,5 @@
 
-#include "job_result.h"
+#include "job_result.hpp"
 
 std::shared_ptr<std::vector<uint8_t>> JobResult::serialize() const {
     int size = 3*sizeof(int) + solution.size()*sizeof(int);

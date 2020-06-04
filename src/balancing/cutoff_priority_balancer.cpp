@@ -2,10 +2,10 @@
 #include <utility>
 #include <assert.h>
 
-#include "cutoff_priority_balancer.h"
-#include "util/random.h"
-#include "util/console.h"
-#include "balancing/rounding.h"
+#include "cutoff_priority_balancer.hpp"
+#include "util/random.hpp"
+#include "util/console.hpp"
+#include "balancing/rounding.hpp"
 
 bool CutoffPriorityBalancer::beginBalancing(std::map<int, Job*>& jobs) {
 

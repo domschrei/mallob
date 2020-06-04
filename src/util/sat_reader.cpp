@@ -9,7 +9,7 @@
 #include <ctype.h>
 #include <stdio.h>
 
-#include "sat_reader.h"
+#include "sat_reader.hpp"
 
 std::shared_ptr<std::vector<int>> SatReader::read() {
     FILE* f = fopen(_filename.c_str(), "r");

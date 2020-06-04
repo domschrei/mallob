@@ -1,8 +1,8 @@
 
 #include <assert.h>
 
-#include "job_description.h"
-#include "util/console.h"
+#include "job_description.hpp"
+#include "util/console.hpp"
 
 JobDescription::~JobDescription() {
     clearPayload();

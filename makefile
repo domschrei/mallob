@@ -9,25 +9,25 @@ CERROR=-fpermissive
 COMPILEFLAGS=-O3 -g -pipe -Wall -Wextra -pedantic -std=c++17 $(CWARN) $(CERROR) -DMALLOB_VERSION=\"${MALLOB_VERSION}\"
 #COMPILEFLAGS=-O0 -ggdb -pipe -Wall -Wextra -pedantic -std=c++17 $(CWARN) $(CERROR)
 
-LINKERFLAG=-O3 -L${MPI_ROOT} -Lsrc/hordesat/lingeling -Lsrc/hordesat/yalsat -lm -lz -llgl -lyals -lpthread
+LINKERFLAG=-O3 -L${MPI_ROOT} -Lsrc/app/sat/hordesat/lingeling -Lsrc/app/sat/hordesat/yalsat -lm -lz -llgl -lyals -lpthread
 #LINKERFLAG=-O0 -ggdb
 
-INCLUDES=-Isrc -Isrc/hordesat -Isrc/hordesat/lingeling -Isrc/hordesat/yalsat -I${MPI_INCLUDE}
+INCLUDES=-Isrc -I${MPI_INCLUDE}
 
 #.PHONY = parser clean
 
-build/mallob: $(patsubst src/%.cpp,build/%.o,\
-$(wildcard src/*.cpp src/app/*.cpp src/balancing/*.cpp src/data/*.cpp src/util/*.cpp \
-src/hordesat/sharing/*.cpp src/hordesat/solvers/*.cpp src/hordesat/utilities/*.cpp src/hordesat/*.cpp))
+SOURCES:=$(shell find src/ -name '*.cpp'|grep -v "/test/")
+
+build/mallob: $(patsubst src/%.cpp,build/%.o,${SOURCES})
 	${CXX} ${INCLUDES} $^ -o build/mallob ${LINKERFLAG}
 
 src/hordesat/yalsat/yalsat:
-	cd src/hordesat && bash fetch_and_build_solvers.sh
+	cd src/app/sat/hordesat && bash fetch_and_build_solvers.sh
 
 build/main.o: src/main.cpp
 	${CXX} ${COMPILEFLAGS} ${INCLUDES} -o $@ -c $<
 
-build/%.o: src/%.cpp src/%.h
+build/%.o: src/%.cpp src/%.hpp
 	mkdir -p $(@D)
 	${CXX} ${COMPILEFLAGS} ${INCLUDES} -o $@ -c $<
 

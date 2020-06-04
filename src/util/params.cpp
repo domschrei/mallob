@@ -1,8 +1,8 @@
 
 #include "assert.h"
 
-#include "params.h"
-#include "console.h"
+#include "params.hpp"
+#include "console.hpp"
 
 /**
  * Taken from Hordesat:ParameterProcessor.h by Tomas Balyo.

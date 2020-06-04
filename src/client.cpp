@@ -6,15 +6,15 @@
 #include <thread>
 #include <unistd.h>
 
-#include "client.h"
-#include "util/sat_reader.h"
-#include "util/timer.h"
-#include "util/console.h"
-#include "util/permutation.h"
-#include "util/memusage.h"
-#include "data/job_transfer.h"
-#include "data/job_result.h"
-#include "util/random.h"
+#include "client.hpp"
+#include "util/sat_reader.hpp"
+#include "util/sys/timer.hpp"
+#include "util/console.hpp"
+#include "util/permutation.hpp"
+#include "util/sys/proc.hpp"
+#include "data/job_transfer.hpp"
+#include "data/job_result.hpp"
+#include "util/random.hpp"
 
 // Executed by a separate worker thread
 void Client::readAllInstances() {

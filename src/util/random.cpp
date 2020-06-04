@@ -1,5 +1,5 @@
 
-#include "random.h"
+#include "random.hpp"
 
 std::mt19937 Random::_rng;
 std::mt19937 Random::_global_rng;

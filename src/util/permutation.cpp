@@ -1,9 +1,9 @@
 
 #include <assert.h>
 
-#include "permutation.h"
-#include "util/console.h"
-#include "util/random.h"
+#include "permutation.hpp"
+#include "util/console.hpp"
+#include "util/random.hpp"
 
 std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, int myRank) {
 

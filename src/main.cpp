@@ -7,15 +7,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "util/timer.h"
-#include "util/mympi.h"
-#include "util/console.h"
-#include "util/random.h"
-#include "util/params.h"
-#include "util/shared_memory.h"
-#include "util/fork.h"
-#include "worker.h"
-#include "client.h"
+#include "comm/mympi.hpp"
+#include "util/sys/timer.hpp"
+#include "util/console.hpp"
+#include "util/random.hpp"
+#include "util/params.hpp"
+#include "util/sys/shared_memory.hpp"
+#include "util/sys/fork.hpp"
+#include "util/sys/proc.hpp"
+#include "worker.hpp"
+#include "client.hpp"
 
 #ifndef MALLOB_VERSION
 #define MALLOB_VERSION "(dbg)"
@@ -31,7 +32,7 @@ void handler(int sig) {
   size = backtrace(array, 10);
 
   // print out all the frames to stderr
-  fprintf(stderr, "Error from tid %ld: signal %d:\n", syscall(SYS_gettid), sig);
+  fprintf(stderr, "Error from tid %ld: signal %d:\n", Proc::getTid(), sig);
   backtrace_symbols_fd(array, size, STDERR_FILENO);
   exit(1);
 }

@@ -7,9 +7,9 @@
 #include <cmath>
 #include <cstdlib>
 
-#include "console.h"
-#include "timer.h"
-#include "fileutils.h"
+#include "console.hpp"
+#include "util/sys/fileutils.hpp"
+#include "util/sys/timer.hpp"
 
 // Taken from https://stackoverflow.com/a/17469726
 enum Code {

@@ -11,20 +11,20 @@
 #include <queue>
 #include <utility>
 
-#include "worker.h"
-#include "app/threaded_sat_job.h"
-#include "app/forked_sat_job.h"
-#include "data/serializable.h"
-#include "util/timer.h"
-#include "util/console.h"
-#include "util/random.h"
-#include "util/memusage.h"
-#include "util/sat_reader.h"
-#include "util/fork.h"
-#include "util/mpi_monitor.h"
-#include "balancing/cutoff_priority_balancer.h"
-#include "balancing/event_driven_balancer.h"
-#include "data/job_description.h"
+#include "worker.hpp"
+#include "app/sat/threaded_sat_job.hpp"
+#include "app/sat/forked_sat_job.hpp"
+#include "data/serializable.hpp"
+#include "util/sys/timer.hpp"
+#include "util/console.hpp"
+#include "util/random.hpp"
+#include "util/sys/proc.hpp"
+#include "util/sat_reader.hpp"
+#include "util/sys/fork.hpp"
+#include "comm/mpi_monitor.hpp"
+#include "balancing/cutoff_priority_balancer.hpp"
+#include "balancing/event_driven_balancer.hpp"
+#include "data/job_description.hpp"
 
 
 void Worker::init() {

@@ -2,10 +2,10 @@
 #include <assert.h>
 #include <set>
 
-#include "util/random.h"
-#include "util/permutation.h"
-#include "util/console.h"
-#include "util/timer.h"
+#include "util/random.hpp"
+#include "util/permutation.hpp"
+#include "util/console.hpp"
+#include "util/timer.hpp"
 
 /*
 Compile with:
