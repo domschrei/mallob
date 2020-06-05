@@ -269,7 +269,7 @@ JobRequest& JobDatabase::getCommitment(int jobId) {
 
 void JobDatabase::uncommit(int jobId) {
     _commitments.erase(jobId);
-    if (has(jobId)) get(jobId).uncommit();
+    if (has(jobId) && get(jobId).isCommitted()) get(jobId).uncommit();
 }
 
 bool JobDatabase::tryAdopt(const JobRequest& req, bool oneshot, int& removedJob) {
