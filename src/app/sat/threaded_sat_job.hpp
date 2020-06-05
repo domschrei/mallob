@@ -38,7 +38,7 @@ private:
 
 public:
 
-    ThreadedSatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
+    ThreadedSatJob(Parameters& params, int commSize, int worldRank, int jobId);
     ~ThreadedSatJob() override;
 
     bool appl_initialize() override;

@@ -99,7 +99,7 @@ public:
     bool canContinueBalancing() override;
     bool continueBalancing() override;
     bool continueBalancing(MessageHandlePtr handle) override;
-    std::map<int, int> getBalancingResult() override;
+    const std::map<int, int>& getBalancingResult() override;
 
     bool finishResourcesReduction();
     bool finishRemaindersReduction();

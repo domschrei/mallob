@@ -13,14 +13,12 @@ void logMutex(const char* msg) {
     Console::log(Console::VVVERB, msg);
 }
 
-Job::Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) :
+Job::Job(Parameters& params, int commSize, int worldRank, int jobId) :
             _params(params), 
             _comm_size(commSize), 
             _world_rank(worldRank), 
             _id(jobId),
             _name("#" + std::to_string(jobId)),
-            _epoch_counter(epochCounter), 
-            _epoch_of_arrival(epochCounter.getEpoch()), 
             _time_of_arrival(Timer::elapsedSeconds()), 
             _state(NONE),
             _has_description(false), 

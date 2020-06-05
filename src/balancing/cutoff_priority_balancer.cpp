@@ -350,10 +350,10 @@ bool CutoffPriorityBalancer::continueRoundingFromReduction() {
     return continueRoundingUntilReduction(_lower_remainder_idx, _upper_remainder_idx);
 }
 
-std::map<int, int> CutoffPriorityBalancer::getBalancingResult() {
+const std::map<int, int>& CutoffPriorityBalancer::getBalancingResult() {
 
     // Convert float assignments into actual integer volumes, store and return them
-    std::map<int, int> volumes;
+    _volumes.clear();
     for (auto it = _assignments.begin(); it != _assignments.end(); ++it) {
         int jobId = it->first;
         double assignment = std::max(1.0, it->second);
@@ -362,19 +362,19 @@ std::map<int, int> CutoffPriorityBalancer::getBalancingResult() {
             intAssignment = Random::roundProbabilistically(assignment);
         else
             intAssignment = std::floor(assignment);
-        volumes[jobId] = intAssignment;
+        _volumes[jobId] = intAssignment;
         if (intAssignment != (int)assignment) {
             Console::log(Console::VVERB, "BLC e=%i #%i final_assignment=%i <~ %.3f", _balancing_epoch, jobId, intAssignment, _assignments[jobId]);
         } else {
             Console::log(Console::VVERB, "BLC e=%i #%i final_assignment=%i", _balancing_epoch, jobId, intAssignment);
         }
     }
-    for (auto it = volumes.begin(); it != volumes.end(); ++it) {
+    for (auto it = _volumes.begin(); it != _volumes.end(); ++it) {
         updateVolume(it->first, it->second);
     }
 
     _balancing = false;
     delete _local_jobs;
     _local_jobs = NULL;
-    return volumes;
+    return _volumes;
 }

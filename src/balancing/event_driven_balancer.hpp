@@ -175,7 +175,7 @@ public:
     bool canContinueBalancing() override {return false;}
     bool continueBalancing() override {return false;}
     bool continueBalancing(MessageHandlePtr handle) override {return this->handle(handle);}
-    std::map<int, int> getBalancingResult() override {return _volumes;}
+    const std::map<int, int>& getBalancingResult() override {return _volumes;}
 
     void forget(int jobId) override;
 

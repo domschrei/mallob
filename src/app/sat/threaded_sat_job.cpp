@@ -12,8 +12,8 @@
 #include "anytime_sat_clause_communicator.hpp"
 #include "util/sys/proc.hpp"
 
-ThreadedSatJob::ThreadedSatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) : 
-        BaseSatJob(params, commSize, worldRank, jobId, epochCounter), _done_locally(false), _job_comm_period(params.getFloatParam("s")) {
+ThreadedSatJob::ThreadedSatJob(Parameters& params, int commSize, int worldRank, int jobId) : 
+        BaseSatJob(params, commSize, worldRank, jobId), _done_locally(false), _job_comm_period(params.getFloatParam("s")) {
 }
 
 void ThreadedSatJob::lockHordeManipulation() {

@@ -156,8 +156,6 @@ private:
     std::string _name;
     Mutex _name_change_lock;
 
-    EpochCounter& _epoch_counter;
-    int _epoch_of_arrival;
     float _time_of_arrival;
     float _time_of_initialization = 0;
     float _time_of_abort = 0;
@@ -193,7 +191,7 @@ public:
     // (NOT to be called by your application code implementing above methods!)
 
     // Constructor
-    Job(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter);
+    Job(Parameters& params, int commSize, int worldRank, int jobId);
     
     // Equips the job instance with an initial job description in serialized form.
     void setDescription(std::shared_ptr<std::vector<uint8_t>>& data);

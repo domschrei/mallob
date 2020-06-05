@@ -239,10 +239,6 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
         result.push_back(0);
         int numpos = result.size()-1;
         
-        // Clear filter to only consider clauses of upcoming length
-        // Actually, don't. Takes too much work.
-        //_clause_filter.clear();
-
         // Read clauses from buffers in a cyclic manner
         int picked = -1;
         while (allclsoflen > 0) {

@@ -12,8 +12,8 @@
 #include "util/sys/proc.hpp"
 #include "util/sys/fork.hpp"
 
-ForkedSatJob::ForkedSatJob(Parameters& params, int commSize, int worldRank, int jobId, EpochCounter& epochCounter) : 
-        BaseSatJob(params, commSize, worldRank, jobId, epochCounter), _job_comm_period(params.getFloatParam("s")) {
+ForkedSatJob::ForkedSatJob(Parameters& params, int commSize, int worldRank, int jobId) : 
+        BaseSatJob(params, commSize, worldRank, jobId), _job_comm_period(params.getFloatParam("s")) {
 }
 
 bool ForkedSatJob::appl_initialize() {

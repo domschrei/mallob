@@ -48,7 +48,7 @@ public:
     /**
      * If balancing finished, returns the result.
      */
-    virtual std::map<int, int> getBalancingResult() = 0;
+    virtual const std::map<int, int>& getBalancingResult() = 0;
 
 protected:
     float allReduce(float contribution) const;
