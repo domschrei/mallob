@@ -69,7 +69,7 @@ void JobDatabase::init(int jobId, std::shared_ptr<std::vector<uint8_t>> descript
     Console::log(Console::VERB, "Received desc. of #%i - initializing", jobId);
     assert(!_initializer_threads.count(jobId) || Console::fail("%s already has an initializer thread!", get(jobId).toStr()));
 
-    _initializer_threads[jobId] = std::thread([this, &description, jobId, source]() {
+    _initializer_threads[jobId] = std::thread([this, description, jobId, source]() {
 
         // Deserialize job description
         assert(description->size() >= sizeof(int));

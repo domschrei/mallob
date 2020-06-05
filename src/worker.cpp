@@ -133,7 +133,7 @@ void Worker::init() {
 
         // Add as a new local SAT job image
         Console::log(Console::VERB, "init SAT job image");
-        Job& job = _job_db.createJob(MyMpi::size(comm), worldRank, jobId);
+        _job_db.createJob(MyMpi::size(comm), worldRank, jobId);
         JobRequest req(jobId, 0, 0, 0, 0, 0);
         _job_db.commit(req);
         _job_db.init(jobId, desc.serialize(), worldRank);

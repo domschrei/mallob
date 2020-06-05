@@ -39,7 +39,7 @@ void Job::unlockJobManipulation() {
     _job_manipulation_lock.unlock();
 }
 
-void Job::setDescription(std::shared_ptr<std::vector<uint8_t>>& data) {
+void Job::setDescription(std::shared_ptr<std::vector<uint8_t>> data) {
 
     auto lock = _job_manipulation_lock.getLock();
     // Explicitly store serialized data s.t. it can be forwarded later
