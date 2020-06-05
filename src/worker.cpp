@@ -350,7 +350,7 @@ void Worker::handleDoExit(MessageHandlePtr& handle) {
 void Worker::handleRejectOneshot(MessageHandlePtr& handle) {
     JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
     Console::log_recv(Console::VVVERB, handle->source, 
-        "%s : dormant child declined", _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
+        "%s rejected by dormant child", _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
 
     if (_job_db.isAdoptionOfferObsolete(req)) return;
 

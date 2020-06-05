@@ -162,9 +162,7 @@ int ForkedSatJob::appl_solveLoop() {
 }
 
 void ForkedSatJob::appl_dumpStats() {
-    if (isInState({ACTIVE})) {
-        getSolver()->dumpStats();
-    }
+    if (isInStateUnsafe({ACTIVE})) getSolver()->dumpStats();
 }
 
 bool ForkedSatJob::appl_isDestructible() {

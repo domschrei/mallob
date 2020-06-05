@@ -9,10 +9,6 @@
 #include "util/console.hpp"
 #include "util/sys/timer.hpp"
 
-void logMutex(const char* msg) {
-    Console::log(Console::VVVERB, msg);
-}
-
 Job::Job(Parameters& params, int commSize, int worldRank, int jobId) :
             _params(params), 
             _comm_size(commSize), 
@@ -109,6 +105,7 @@ void Job::initialize(int index, int rootRank, int parentRank) {
 
     auto lock = _job_manipulation_lock.getLock();
     _index = index;
+    _name = "#" + std::to_string(_id) + ":" + std::to_string(index);
     updateJobNode(0, rootRank);
     updateParentNodeRank(parentRank);
     updateJobNode(_index, _world_rank);
@@ -140,6 +137,7 @@ void Job::reactivate(int index, int rootRank, int parentRank) {
 
         } else {
             _index = index;
+            _name = "#" + std::to_string(_id) + ":" + std::to_string(index);
 
             // Restart clean permutation
             _job_node_ranks.clear();
@@ -170,6 +168,7 @@ void Job::commit(const JobRequest& req) {
         || Console::fail("State of %s : %s", toStr(), jobStateToStr()));
 
     _index = req.requestedNodeIndex;
+    _name = "#" + std::to_string(_id) + ":" + std::to_string(_index);
     updateJobNode(_index, _world_rank);
     if (_index > 0) {
         updateJobNode(0, req.rootRank);
@@ -257,7 +256,7 @@ void Job::terminate() {
 
     // Free up memory
     _description = JobDescription();
-    _serialized_description = IntVec({_id}).serialize();
+    _serialized_description = _description.serialize();
     _time_of_abort = Timer::elapsedSeconds();
 
     switchState(PAST);

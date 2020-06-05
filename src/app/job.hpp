@@ -154,7 +154,6 @@ private:
     JobDescription _description;
     std::shared_ptr<std::vector<uint8_t>> _serialized_description;
     std::string _name;
-    Mutex _name_change_lock;
 
     float _time_of_arrival;
     float _time_of_initialization = 0;
@@ -379,9 +378,6 @@ public:
     // toString methods
 
     const char* toStr() {
-        _name_change_lock.lock();
-        _name = "#" + std::to_string(_id) + ":" + (_index >= 0 ? std::to_string(_index) : std::string("?"));
-        _name_change_lock.unlock();
         return _name.c_str();
     };
     const char* jobStateToStr() const {return jobStateStrings[(int)_state];};

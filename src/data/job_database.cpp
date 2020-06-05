@@ -351,8 +351,7 @@ void JobDatabase::stop(int jobId, bool terminate) {
         job.stop(); // Solvers are interrupted, not suspended!
         Console::log(Console::VERB, "%s : interrupted", job.toStr());
         if (terminate) {
-            if (!isIdle() && getActive().getId() == jobId) 
-                setLoad(0, jobId);
+            if (!isIdle() && getActive().getId() == jobId) setLoad(0, jobId);
             job.terminate();
             Console::log(Console::INFO, "%s : terminated", job.toStr());
             overrideBalancerVolume(jobId, 0);

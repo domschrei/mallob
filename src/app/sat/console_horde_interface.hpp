@@ -26,6 +26,9 @@ public:
             }
         }
     }
+    ~ConsoleHordeInterface() {
+        if (_logfile != NULL) fclose(_logfile);
+    }
 
     double getTime() {
         return Timer::elapsedSeconds();

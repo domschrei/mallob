@@ -5,9 +5,12 @@
 #include <cstdlib>
 #include <sys/wait.h>
 #include <iostream>
+#include <exception>
+#include <execinfo.h>
+#include <signal.h>
 
 #include "fork.hpp"
-
+#include "proc.hpp"
 
 void propagateSignalAndExit(int signum) {
 
@@ -18,6 +21,8 @@ void propagateSignalAndExit(int signum) {
         kill(child, SIGTERM);
         kill(child, SIGCONT);
     }
+
+    fcloseall();
 
     /*
     // Hard kill all remaining processes after 1 second
@@ -36,14 +41,30 @@ void doNothing(int signum) {
     //std::cout << "WOKE_UP" << std::endl;
 }
 
+void handleAbort(int sig) {
+    void *array[20];
+    size_t size;
+
+    // get void*'s for all entries on the stack
+    size = backtrace(array, 20);
+
+    // print out all the frames to stderr
+    fprintf(stderr, "Error from pid=%ld tid=%ld: signal %d. Backtrace:\n", Proc::getPid(), Proc::getTid(), sig);
+    backtrace_symbols_fd(array, size, STDERR_FILENO);
+    exit(1);
+}
+
 
 int Fork::_rank;
 std::set<pid_t> Fork::_children;
 
 void Fork::init(int rank) {
+    signal(SIGABRT, handleAbort);
+    signal(SIGSEGV, handleAbort);
     signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
     signal(SIGTERM, propagateSignalAndExit);
     signal(SIGINT, propagateSignalAndExit);
+
     _rank = rank;
     _children.clear();
 }

@@ -1,9 +1,6 @@
 
 #include <iostream>
 #include <set>
-#include <exception>
-#include <execinfo.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -22,20 +19,6 @@
 #define MALLOB_VERSION "(dbg)"
 #endif
 
-void handler(int sig) {
-  Console::forceFlush();
-
-  void *array[10];
-  size_t size;
-
-  // get void*'s for all entries on the stack
-  size = backtrace(array, 10);
-
-  // print out all the frames to stderr
-  fprintf(stderr, "Error from tid %ld: signal %d:\n", Proc::getTid(), sig);
-  backtrace_symbols_fd(array, size, STDERR_FILENO);
-  exit(1);
-}
 
 void doExternalClientProgram(MPI_Comm& commClients, Parameters& params, const std::set<int>& clientRanks) {
     
@@ -52,9 +35,7 @@ void doWorkerNodeProgram(MPI_Comm& commWorkers, Parameters& params, const std::s
 }
 
 int main(int argc, char *argv[]) {
-    signal(SIGABRT, handler);
-    signal(SIGSEGV, handler);
-
+    
     Timer::init();
     MyMpi::init(argc, argv);
 
