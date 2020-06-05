@@ -30,7 +30,7 @@ std::string MyMpi::currentCall(double* callStart) {
 }
 
 void mpiMonitor(Worker* worker) {
-    while (!worker->exiting) {
+    while (!worker->_exiting) {
         double callStart = 0;
         std::string opName = MyMpi::currentCall(&callStart);
         std::string report = "MMPI %i active handles";
