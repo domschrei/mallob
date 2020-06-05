@@ -244,9 +244,7 @@ void Worker::mainProgram() {
             }
 
             // Job communication (e.g. clause sharing)
-            if (job.wantsToCommunicate()) {
-                job.communicate();
-            }
+            if (job.wantsToCommunicate()) job.communicate();
         }
 
         // Advance an all-reduction of the current system state
@@ -290,8 +288,8 @@ void Worker::handleAcceptAdoptionOffer(MessageHandlePtr& handle) {
         // Full transfer of job description is required:
         // Send ACK to parent and receive full job description
         Console::log(Console::VERB, "Will receive desc. of #%i, size %i", req.jobId, sig.getTransferSize());
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_CONFIRM_ADOPTION, req);
         MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, sig.getTransferSize()); // to be received later
+        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_CONFIRM_ADOPTION, req);
     } else {
         _job_db.reactivate(req, handle->source);
         if (!_job_db.isIdle() && _job_db.getActive().getId() == req.jobId) {
@@ -306,7 +304,6 @@ void Worker::handleConfirmJobRevisionDetails(MessageHandlePtr& handle) {
     int jobId = response[0];
     int firstRevision = response[1];
     int lastRevision = response[2];
-    //int transferSize = response[3];
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DATA, 
                 _job_db.get(jobId).getDescription().serialize(firstRevision, lastRevision));
 }
@@ -479,8 +476,8 @@ void Worker::handleNotifyJobDone(MessageHandlePtr& handle) {
     int jobId = recv.first;
     int resultSize = recv.second;
     Console::log_recv(Console::VERB, handle->source, "Will receive job result, length %i, for job #%i", resultSize, jobId);
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_QUERY_JOB_RESULT, handle->recvData);
     MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_RESULT, resultSize);
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_QUERY_JOB_RESULT, handle->recvData);
 }
 
 void Worker::handleNotifyJobRevision(MessageHandlePtr& handle) {
@@ -675,8 +672,8 @@ void Worker::handleSendJobRevisionData(MessageHandlePtr& handle) {
 void Worker::handleSendJobRevisionDetails(MessageHandlePtr& handle) {
     IntVec response(*handle->recvData);
     int transferSize = response[3];
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_CONFIRM_JOB_REVISION_DETAILS, handle->recvData);
     MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DATA, transferSize);
+    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_CONFIRM_JOB_REVISION_DETAILS, handle->recvData);
 }
 
 void Worker::handleNotifyJobTerminating(MessageHandlePtr& handle) {

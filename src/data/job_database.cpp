@@ -49,7 +49,7 @@ Job& JobDatabase::createJob(int commSize, int worldRank, int jobId) {
 void JobDatabase::init(int jobId, std::shared_ptr<std::vector<uint8_t>> description, int source) {
 
     if (!has(jobId) || get(jobId).isPast()) {
-        Console::log(Console::WARN, "[WARN] I don't know job #%i : discard desc.", jobId);
+        Console::log(Console::WARN, "[WARN] Unknown or past job #%i : discard desc.", jobId);
         return;
     }
 
