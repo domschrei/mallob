@@ -256,7 +256,7 @@ void Job::terminate() {
 
     // Free up memory
     _description = JobDescription();
-    _serialized_description = _description.serialize();
+    _serialized_description = IntVec({_id}).serialize();
     _time_of_abort = Timer::elapsedSeconds();
 
     switchState(PAST);
