@@ -204,47 +204,58 @@ void Worker::mainProgram() {
         } 
 
         // Check active job
-        if (!_job_db.isIdle() && time-lastJobCheckTime >= jobCheckPeriod) {
-            lastJobCheckTime = time; // jobTime;
-            Job &job = _job_db.getActive();
-            int id = job.getId();
+        if (time - lastJobCheckTime >= jobCheckPeriod) {
+            lastJobCheckTime = time;
 
-            bool abort = false;
-            if (job.isRoot()) abort = _job_db.checkComputationLimits(id);
-            if (abort) {
-                // Timeout (CPUh or wallclock time) hit
-                timeoutJob(id);
+            if (!_job_db.isIdle()) {
+                _sys_state.setLocal(0, 0.0f); // busy nodes
+                _sys_state.setLocal(1, 0.0f); // active jobs
+
             } else {
-                // Finish initialization as needed
-                if (job.isDoneInitializing()) {
-                    job.endInitialization();
-                    if (job.isRoot()) {
-                        // Root worker finished initialization: begin growing if applicable
-                        if (_job_db.hasVolume(id)) updateVolume(id, _job_db.getVolume(id));
-                    } else {
-                        // Non-root worker finished initialization
-                        IntVec payload({job.getId()});
-                        MyMpi::isend(MPI_COMM_WORLD, job.getParentNodeRank(), MSG_QUERY_VOLUME, payload);
+                Job &job = _job_db.getActive();
+                int id = job.getId();
+
+                _sys_state.setLocal(0, 1.0f); // busy nodes
+                _sys_state.setLocal(1, job.isRoot() ? 1.0f : 0.0f); // active jobs
+
+                bool abort = false;
+                if (job.isRoot()) abort = _job_db.checkComputationLimits(id);
+                if (abort) {
+                    // Timeout (CPUh or wallclock time) hit
+                    timeoutJob(id);
+                } else {
+                    // Finish initialization as needed
+                    if (job.isDoneInitializing()) {
+                        job.endInitialization();
+                        if (job.isRoot()) {
+                            // Root worker finished initialization: begin growing if applicable
+                            if (_job_db.hasVolume(id)) updateVolume(id, _job_db.getVolume(id));
+                        } else {
+                            // Non-root worker finished initialization
+                            IntVec payload({job.getId()});
+                            MyMpi::isend(MPI_COMM_WORLD, job.getParentNodeRank(), MSG_QUERY_VOLUME, payload);
+                        }
+                    }
+
+                    // Check if a result was found
+                    int result = job.appl_solveLoop();
+                    if (result >= 0) {
+                        // Solver done!
+                        job.appl_dumpStats();
+
+                        // Signal termination to root -- may be a self message
+                        int jobRootRank = job.getRootNodeRank();
+                        IntVec payload({job.getId(), job.getRevision(), result});
+                        Console::log_send(Console::VERB, jobRootRank, "%s : sending finished info", job.toStr());
+                        MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_NOTIFY_RESULT_FOUND, payload);
+                        job.setResultTransferPending(true);
                     }
                 }
 
-                // Check if a result was found
-                int result = job.appl_solveLoop();
-                if (result >= 0) {
-                    // Solver done!
-                    job.appl_dumpStats();
-
-                    // Signal termination to root -- may be a self message
-                    int jobRootRank = job.getRootNodeRank();
-                    IntVec payload({job.getId(), job.getRevision(), result});
-                    Console::log_send(Console::VERB, jobRootRank, "%s : sending finished info", job.toStr());
-                    MyMpi::isend(MPI_COMM_WORLD, jobRootRank, MSG_NOTIFY_RESULT_FOUND, payload);
-                    job.setResultTransferPending(true);
-                }
+                // Job communication (e.g. clause sharing)
+                if (job.wantsToCommunicate()) job.communicate();
             }
 
-            // Job communication (e.g. clause sharing)
-            if (job.wantsToCommunicate()) job.communicate();
         }
 
         // Advance an all-reduction of the current system state
