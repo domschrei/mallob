@@ -207,7 +207,7 @@ void Worker::mainProgram() {
         if (time - lastJobCheckTime >= jobCheckPeriod) {
             lastJobCheckTime = time;
 
-            if (!_job_db.isIdle()) {
+            if (_job_db.isIdle()) {
                 _sys_state.setLocal(0, 0.0f); // busy nodes
                 _sys_state.setLocal(1, 0.0f); // active jobs
 
