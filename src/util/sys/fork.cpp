@@ -11,6 +11,7 @@
 
 #include "fork.hpp"
 #include "proc.hpp"
+#include "util/console.hpp"
 
 void propagateSignalAndExit(int signum) {
 
@@ -48,9 +49,12 @@ void handleAbort(int sig) {
     // get void*'s for all entries on the stack
     size = backtrace(array, 20);
 
-    // print out all the frames to stderr
-    fprintf(stderr, "Error from pid=%ld tid=%ld: signal %d. Backtrace:\n", Proc::getPid(), Proc::getTid(), sig);
-    backtrace_symbols_fd(array, size, STDERR_FILENO);
+    // print out all the frames
+    Console::log(Console::CRIT, "Error from pid=%ld tid=%ld: signal %d. Backtrace:\n", Proc::getPid(), Proc::getTid(), sig);
+    char** bt = backtrace_symbols(array, size);
+    for (int i = 0; i < size; i++) {
+        Console::log(Console::CRIT, "- %s", bt[i]);
+    }
     exit(1);
 }
 
