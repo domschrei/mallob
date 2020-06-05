@@ -1,6 +1,24 @@
 #!/bin/bash
 
+function flatten_logs() {
+
+    n=0
+    while [ -d "$logdir/$n/" ]; do
+        for file in $logdir/$n/{jobs,log}.*; do
+            # Format butchered log lines to contain the most recent
+            # correctly formatted timestamp
+            awk 'BEGIN {time="0.000"} \
+            !/^[0-9]+\.[0-9]+ / {print time,$0} \
+            /^[0-9]+\.[0-9]+ / {time=$1; print $0}' $file > ${file}_CAT
+        done
+        cat $logdir/$n/*_CAT |sort -g > $logdir/log_cat.$n
+        rm $logdir/$n/*_CAT
+        n=$((n+1))
+    done
+}
+
 function get_client_nodes() {
+
     num_nodes=`ls $logdir/log_*.*|wc -l`
     num_clients=`head $logdir/log_*.0|grep -m1 "Program options"|grep -oE ", c=[0-9]+,"|grep -oE "[0-9]+"`
     startnode=$(($num_nodes-$num_clients))
@@ -209,6 +227,8 @@ if [ "x$1" == "x" ]; then
     exit 1
 fi
 
+#flatten_logs
+
 extract_client_info
 
 extract_load_events
@@ -220,10 +240,9 @@ document_node_events
 # Depends: document_node_events
 document_hops
 
-extract_runtime_cputime_mapping
+#extract_runtime_cputime_mapping
 
 # CHECK SOLUTIONS
-
-extract_id_file_map
-extract_found_results
-check_found_results logs/jobs_SAT logs/jobs_UNSAT
+#extract_id_file_map
+#extract_found_results
+#check_found_results logs/jobs_SAT logs/jobs_UNSAT

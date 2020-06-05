@@ -9,7 +9,12 @@ jobbegintime = dict()
 requesthops = dict()
 ctxswitches = []
 
-for i in range(1, 401):
+for i in range(1, 2001):
+    cputimes[i] = 0
+    nodes[i] = set()
+    maxnodes[i] = 0
+    lasteventtime[i] = 0
+for i in range(90000, 91000):
     cputimes[i] = 0
     nodes[i] = set()
     maxnodes[i] = 0
