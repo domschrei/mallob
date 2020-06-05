@@ -315,6 +315,9 @@ bool HordeProcessAdapter::hasCollectedClauses() {
     return *_did_export;
 }
 std::vector<int> HordeProcessAdapter::getCollectedClauses() {
+    if (!*_did_export) {
+        return std::vector<int>();
+    }
     std::vector<int> clauses(*_export_buffer_true_size);
     memcpy(clauses.data(), _export_buffer, clauses.size()*sizeof(int));
     *_do_export = false;

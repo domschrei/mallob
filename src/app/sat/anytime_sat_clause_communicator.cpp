@@ -143,13 +143,13 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     // If not fully initialized yet, broadcast an empty set of clauses
     if (_job->isNotInState({ACTIVE}) || !_job->isInitialized() || !_job->hasPreparedSharing()) {
         selfClauses = std::vector<int>();
+    } else {
+        // Else, retrieve clauses from solvers
+        Console::log(Console::VVERB, "%s : collect local cls, max. size %i", 
+                    _job->toStr(), selfSize);
+        selfClauses = _job->getPreparedClauses();
+        testConsistency(selfClauses);
     }
-    // Else, retrieve clauses from solvers
-    Console::log(Console::VVERB, "%s : collect local cls, max. size %i", 
-                _job->toStr(), selfSize);
-    assert(_job->hasPreparedSharing());
-    selfClauses = _job->getPreparedClauses();
-    testConsistency(selfClauses);
     _clause_buffers.push_back(selfClauses);
 
     // Merge all collected buffer into a single buffer
