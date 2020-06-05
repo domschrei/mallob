@@ -50,7 +50,7 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
         msg.payload = clausesToShare;
         msg.payload.push_back(_num_aggregated_nodes);
         Console::log_send(Console::VERB, parentRank, "%s : gather", _job->toStr());
-        MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_JOB_COMMUNICATION, msg);
+        MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
 
     _num_aggregated_nodes = 0;
@@ -117,12 +117,12 @@ void AnytimeSatClauseCommunicator::sendClausesToChildren(const std::vector<int>&
     if (_job->hasLeftChild()) {
         childRank = _job->getLeftChildNodeRank();
         Console::log_send(Console::VVERB, childRank, "%s : broadcast", _job->toStr());
-        MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_JOB_COMMUNICATION, msg);
+        MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
     if (_job->hasRightChild()) {
         childRank = _job->getRightChildNodeRank();
         Console::log_send(Console::VVERB, childRank, "%s : broadcast", _job->toStr());
-        MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_JOB_COMMUNICATION, msg);
+        MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
 }
 

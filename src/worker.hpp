@@ -18,80 +18,66 @@
 #include "balancing/balancer.hpp"
 #include "comm/message_handler.hpp"
 #include "data/job_database.hpp"
+#include "comm/sysstate.hpp"
 
 class Worker {
 
 private:
-    MPI_Comm comm;
-    int worldRank;
-    std::set<int> clientNodes;
-    Parameters& params;
-
-    float globalTimeout;
-    EpochCounter epochCounter;
+    MPI_Comm _comm;
+    int _world_rank;
+    std::set<int> _client_nodes;
+    Parameters& _params;
+    float _global_timeout;
 
     JobDatabase _job_db;
+    MessageHandler _msg_handler;
+    SysState<3> _sys_state;
 
-    float myState[3];
-    float systemState[3];
-    MPI_Request systemStateReq;
-    bool reducingSystemState = false;
-    float lastSystemStateReduce = 0;
+    std::vector<int> _hop_destinations;
 
-    std::vector<int> bounceAlternatives;
-
-    MessageHandler msgHandler;
-    std::thread mpiMonitorThread;
-    volatile bool exiting;
+    std::thread _mpi_monitor_thread;
+    volatile bool _exiting = false;
 
 public:
-    Worker(MPI_Comm comm, Parameters& params, const std::set<int>& clientNodes) :
-        comm(comm), worldRank(MyMpi::rank(MPI_COMM_WORLD)), clientNodes(clientNodes), params(params), epochCounter(),
-        _job_db(params, epochCounter, comm)
+    Worker(MPI_Comm comm, Parameters& params, const std::set<int>& _client_nodes) :
+        _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), _client_nodes(_client_nodes), 
+        _params(params), _job_db(_params, _comm), _sys_state(_comm)
         {
-            globalTimeout = params.getFloatParam("T");
-            
-            exiting = false;
-            myState[0] = 0.0f;
-            myState[1] = 0.0f;
-            myState[2] = 0.0f;
+            _global_timeout = _params.getFloatParam("T");
         }
 
     ~Worker();
     void init();
     void mainProgram();
-    void dumpStats() {//stats.dump();
-    };
 
 private:
-    
-    void handleAbort(MessageHandlePtr& handle);
+    void handleNotifyJobAborting(MessageHandlePtr& handle);
     void handleAcceptAdoptionOffer(MessageHandlePtr& handle);
-    void handleAckJobRevisionDetails(MessageHandlePtr& handle);
+    void handleConfirmJobRevisionDetails(MessageHandlePtr& handle);
     void handleConfirmAdoption(MessageHandlePtr& handle);
-    void handleExit(MessageHandlePtr& handle);
-    void handleDeclineOneshot(MessageHandlePtr& handle);
-    void handleFindNode(MessageHandlePtr& handle, bool oneshot);
-    void handleForwardClientRank(MessageHandlePtr& handle);
+    void handleDoExit(MessageHandlePtr& handle);
+    void handleRejectOneshot(MessageHandlePtr& handle);
+    void handleRequestNode(MessageHandlePtr& handle, bool oneshot);
+    void handleSendClientRank(MessageHandlePtr& handle);
     void handleIncrementalJobFinished(MessageHandlePtr& handle);
     void handleInterrupt(MessageHandlePtr& handle);
-    void handleJobCommunication(MessageHandlePtr& handle);
-    void handleJobDone(MessageHandlePtr& handle);
+    void handleSendApplicationMessage(MessageHandlePtr& handle);
+    void handleNotifyJobDone(MessageHandlePtr& handle);
     void handleNotifyJobRevision(MessageHandlePtr& handle);
     void handleOfferAdoption(MessageHandlePtr& handle);
     void handleQueryJobResult(MessageHandlePtr& handle);
     void handleQueryJobRevisionDetails(MessageHandlePtr& handle);
     void handleQueryVolume(MessageHandlePtr& handle);
     void handleRejectAdoptionOffer(MessageHandlePtr& handle);
-    void handleResultObsolete(MessageHandlePtr& handle);
+    void handleNotifyResultObsolete(MessageHandlePtr& handle);
     void handleSendJob(MessageHandlePtr& handle);
     void handleSendJobResult(MessageHandlePtr& handle);
     void handleSendJobRevisionData(MessageHandlePtr& handle);
     void handleSendJobRevisionDetails(MessageHandlePtr& handle);
-    void handleTerminate(MessageHandlePtr& handle);
-    void handleUpdateVolume(MessageHandlePtr& handle);
-    void handleWorkerDefecting(MessageHandlePtr& handle);
-    void handleWorkerFoundResult(MessageHandlePtr& handle);
+    void handleNotifyJobTerminating(MessageHandlePtr& handle);
+    void handleNotifyVolumeUpdate(MessageHandlePtr& handle);
+    void handleNotifyNodeLeavingJob(MessageHandlePtr& handle);
+    void handleNotifyResultFound(MessageHandlePtr& handle);
     
     void bounceJobRequest(JobRequest& request, int senderRank);
     void updateVolume(int jobId, int demand);
@@ -102,7 +88,6 @@ private:
     
     bool checkTerminate();
     void createExpanderGraph();
-    void allreduceSystemState(float elapsedTime = Timer::elapsedSeconds());
     int getRandomNonSelfWorkerNode();
 
     friend void mpiMonitor(Worker* worker);

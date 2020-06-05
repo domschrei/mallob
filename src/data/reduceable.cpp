@@ -20,13 +20,13 @@ bool Reduceable::startReduction(MPI_Comm& comm, std::set<int> excludedRanks) {
             // Receive
             if (_excluded_ranks.count(_my_rank+_power/2)) continue;
             Console::log(Console::VVVVERB, "Red. k=%i : Receiving", _power);
-            MyMpi::irecv(comm, _my_rank+_power/2, MSG_COLLECTIVES);
+            MyMpi::irecv(comm, _my_rank+_power/2, MSG_COLLECTIVE_OPERATION);
             return false;
         } else if (_my_rank % _power == _power/2) {
             // Send
             if (_excluded_ranks.count(_my_rank-_power/2)) continue;
             Console::log_send(Console::VVVVERB, _my_rank-_power/2, "Red. k=%i : Sending", _power);
-            MyMpi::isend(comm, _my_rank-_power/2, MSG_COLLECTIVES, *this);
+            MyMpi::isend(comm, _my_rank-_power/2, MSG_COLLECTIVE_OPERATION, *this);
         }
     }
 
@@ -55,14 +55,14 @@ bool Reduceable::advanceReduction(MessageHandlePtr handle) {
             // Receive
             if (_excluded_ranks.count(_my_rank+_power/2) == 0) {
                 Console::log(Console::VVVVERB, "Red. k=%i : Receiving", _power);
-                MyMpi::irecv(_comm, _my_rank+_power/2, MSG_COLLECTIVES);
+                MyMpi::irecv(_comm, _my_rank+_power/2, MSG_COLLECTIVE_OPERATION);
                 return false;
             } 
         } else if (_my_rank % _power == _power/2) {
             // Send
             if (_excluded_ranks.count(_my_rank-_power/2) == 0) {
                 Console::log_send(Console::VVVVERB, _my_rank-_power/2, "Red. k=%i : Sending", _power);
-                MyMpi::isend(_comm, _my_rank-_power/2, MSG_COLLECTIVES, *this);
+                MyMpi::isend(_comm, _my_rank-_power/2, MSG_COLLECTIVE_OPERATION, *this);
             }
         }
         _power *= 2;
@@ -96,12 +96,12 @@ bool Reduceable::startBroadcast(MPI_Comm& comm, std::set<int>& excludedRanks) {
                 continue;
             }
             Console::log_send(Console::VVVVERB, _my_rank+_power/2, "Brc. k=%i : Sending", _power);
-            MyMpi::isend(comm, _my_rank+_power/2, MSG_COLLECTIVES, *this);
+            MyMpi::isend(comm, _my_rank+_power/2, MSG_COLLECTIVE_OPERATION, *this);
 
         } else if (_my_rank % _power == _power/2) {
             // Receive
             Console::log(Console::VVVVERB, "Brc. k=%i : Receiving", _power);
-            MyMpi::irecv(comm, _my_rank-_power/2, MSG_COLLECTIVES);
+            MyMpi::irecv(comm, _my_rank-_power/2, MSG_COLLECTIVE_OPERATION);
             return false;
         }
     }
@@ -120,12 +120,12 @@ bool Reduceable::advanceBroadcast(MessageHandlePtr handle) {
                 continue;
             }
             Console::log_send(Console::VVVVERB, _my_rank+_power/2, "Brc. k=%i : Sending", _power);
-            MyMpi::isend(_comm, _my_rank+_power/2, MSG_COLLECTIVES, *this);
+            MyMpi::isend(_comm, _my_rank+_power/2, MSG_COLLECTIVE_OPERATION, *this);
 
         } else if (_my_rank % _power == _power/2) {
             // Receive
             Console::log(Console::VVVVERB, "Brc. k=%i : Receiving", _power);
-            MyMpi::irecv(_comm, _my_rank-_power/2, MSG_COLLECTIVES);
+            MyMpi::irecv(_comm, _my_rank-_power/2, MSG_COLLECTIVE_OPERATION);
             return false;
         }
     }

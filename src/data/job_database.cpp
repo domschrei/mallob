@@ -13,8 +13,8 @@
 #include "balancing/cutoff_priority_balancer.hpp"
 #include "balancing/event_driven_balancer.hpp"
 
-JobDatabase::JobDatabase(Parameters& params, EpochCounter& epochCounter, MPI_Comm& comm): 
-        _params(params), _epoch_counter(epochCounter), _comm(comm) {
+JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm): 
+        _params(params), _comm(comm) {
     _threads_per_job = params.getIntParam("t");
     _wcsecs_per_instance = params.getFloatParam("time-per-instance");
     _cpusecs_per_instance = 3600 * params.getFloatParam("cpuh-per-instance");
@@ -312,9 +312,7 @@ bool JobDatabase::tryAdopt(const JobRequest& req, bool oneshot, int& removedJob)
                                     toStr(req.jobId, req.requestedNodeIndex).c_str());
 
                     removedJob = job.getId();
-                    // Suspend this job
-                    job.suspend();
-                    setLoad(0, removedJob);
+                    suspend(removedJob);
                     adopts = true;
                 }
             }
@@ -322,6 +320,49 @@ bool JobDatabase::tryAdopt(const JobRequest& req, bool oneshot, int& removedJob)
     }
 
     return adopts;
+}
+
+void JobDatabase::reactivate(const JobRequest& req, int source) {
+    // Already has job description: Directly resume job (if not terminated yet)
+    assert(has(req.jobId));
+    Job& job = get(req.jobId);
+    if (!job.hasJobDescription() && !job.isInitializing()) {
+        Console::log(Console::WARN, "[WARN] %s has no desc. although full transfer was not requested", job.toStr());
+    } else if (!job.isPast()) {
+        Console::log_recv(Console::INFO, source, "Reactivate %s (state: %s)", 
+                    toStr(req.jobId, req.requestedNodeIndex).c_str(), job.jobStateToStr());
+        setLoad(1, req.jobId);
+        job.reactivate(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
+    }
+    // Erase job commitment
+    uncommit(req.jobId);
+}
+
+void JobDatabase::suspend(int jobId) {
+    assert(has(jobId) && !isIdle() && getActive().getId() == jobId);
+    get(jobId).suspend();
+    setLoad(0, jobId);
+}
+
+void JobDatabase::stop(int jobId, bool terminate) {
+    Job& job = get(jobId);
+    if (job.isInitializing() || job.isActive() || job.isSuspended()) {
+        Console::log(Console::INFO, "%s : interrupt (state: %s)", job.toStr(), job.jobStateToStr());
+        job.stop(); // Solvers are interrupted, not suspended!
+        Console::log(Console::VERB, "%s : interrupted", job.toStr());
+        if (terminate) {
+            if (!isIdle() && getActive().getId() == jobId) 
+                setLoad(0, jobId);
+            job.terminate();
+            Console::log(Console::INFO, "%s : terminated", job.toStr());
+            overrideBalancerVolume(jobId, 0);
+        } 
+    }
+    // Mark committed job as "PAST"
+    if (job.isCommitted() && terminate) {
+        uncommit(jobId);
+        job.terminate();
+    }
 }
 
 void JobDatabase::forgetOldJobs() {

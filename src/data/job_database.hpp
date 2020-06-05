@@ -19,7 +19,7 @@ private:
     float _load_factor;
     float _balance_period;
 
-    EpochCounter& _epoch_counter;
+    EpochCounter _epoch_counter;
     MPI_Comm& _comm;
     std::unique_ptr<Balancer> _balancer;
 
@@ -42,7 +42,7 @@ private:
     };
 
 public:
-    JobDatabase(Parameters& params, EpochCounter& epochCounter, MPI_Comm& comm);
+    JobDatabase(Parameters& params, MPI_Comm& comm);
     ~JobDatabase();
 
     Job& createJob(int commSize, int worldRank, int jobId);
@@ -60,6 +60,10 @@ public:
 
     bool tryAdopt(const JobRequest& req, bool oneshot, int& removedJob);
     
+    void reactivate(const JobRequest& req, int source);
+    void suspend(int jobId);
+    void stop(int jobId, bool terminate=false);
+
     void forgetOldJobs();
     void forget(int jobId);
     void free(int jobId);

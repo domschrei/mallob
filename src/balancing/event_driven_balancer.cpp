@@ -77,7 +77,7 @@ bool EventDrivenBalancer::beginBalancing(std::map<int, Job*>& jobs) {
 // E.g. handle any even number of workers.
 
 bool EventDrivenBalancer::handle(const MessageHandlePtr& handle) {
-    if (handle->tag != MSG_ANYTIME_BROADCAST && handle->tag != MSG_ANYTIME_REDUCTION)
+    if (handle->tag != MSG_BROADCAST_DATA && handle->tag != MSG_REDUCE_DATA)
         return false;
     
     Console::log(Console::VVVERB, "BLC: handle");
@@ -88,7 +88,7 @@ bool EventDrivenBalancer::handle(const MessageHandlePtr& handle) {
     bool done = false;
 
     //Console::log(Console::VERB, "BLC MSG");
-    if (handle->tag == MSG_ANYTIME_REDUCTION) {
+    if (handle->tag == MSG_REDUCE_DATA) {
 
         bool reversedTree = sender < myRank;
 
@@ -99,7 +99,7 @@ bool EventDrivenBalancer::handle(const MessageHandlePtr& handle) {
         // Forward reduction, switch to broadcast as necessary
         done = reduceIfApplicable(reversedTree ? REVERSED_TREE : NORMAL_TREE);
     }
-    if (handle->tag == MSG_ANYTIME_BROADCAST) {
+    if (handle->tag == MSG_BROADCAST_DATA) {
 
         bool reversedTree = sender > myRank;
 
@@ -141,7 +141,7 @@ bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
         // No parent / I AM ROOT. 
         
         // Send to other root
-        MyMpi::isend(MPI_COMM_WORLD, getRootRank(!reversedTree), MSG_ANYTIME_BROADCAST, data);
+        MyMpi::isend(MPI_COMM_WORLD, getRootRank(!reversedTree), MSG_BROADCAST_DATA, data);
         Console::log_send(Console::VVVERB, getRootRank(!reversedTree), "BLC root handshake");
         
         // Broadcast and digest
@@ -151,7 +151,7 @@ bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
     } else {
 
         // Send to actual parent
-        MyMpi::isend(MPI_COMM_WORLD, parent, MSG_ANYTIME_REDUCTION, data);
+        MyMpi::isend(MPI_COMM_WORLD, parent, MSG_REDUCE_DATA, data);
         //Console::log_send(Console::VERB, parent, "RED");
     }
 
@@ -181,7 +181,7 @@ void EventDrivenBalancer::broadcast(const EventMap& data, bool reversedTree) {
     // Do broadcast
     for (int child : getChildRanks(reversedTree)) {
         // Send to actual child
-        MyMpi::isend(MPI_COMM_WORLD, child, MSG_ANYTIME_BROADCAST, data);
+        MyMpi::isend(MPI_COMM_WORLD, child, MSG_BROADCAST_DATA, data);
         //Console::log_send(Console::VERB, child, "BRC");
     }
 }

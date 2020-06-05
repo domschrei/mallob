@@ -99,7 +99,7 @@ bool Client::checkTerminate() {
         Console::log(Console::VERB, "Clients done: sending EXIT to workers");
 
         // Send MSG_EXIT to worker of rank 0, which will broadcast it
-        MyMpi::isend(MPI_COMM_WORLD, 0, MSG_EXIT, IntVec({0}));
+        MyMpi::isend(MPI_COMM_WORLD, 0, MSG_DO_EXIT, IntVec({0}));
 
         // Force sending all handles before exiting
         while (MyMpi::hasOpenSentHandles())
@@ -137,11 +137,11 @@ void Client::mainProgram() {
             // Process message
             Console::log_recv(Console::VVVERB, handle->source, "Processing msg, tag %i", handle->tag);
 
-            if (handle->tag == MSG_JOB_DONE) {
+            if (handle->tag == MSG_NOTIFY_JOB_DONE) {
                 handleJobDone(handle);
             } else if (handle->tag == MSG_SEND_JOB_RESULT) {
                 handleSendJobResult(handle);
-            } else if (handle->tag == MSG_ABORT) {
+            } else if (handle->tag == MSG_NOTIFY_JOB_ABORTING) {
                 handleAbort(handle);
             } else if (handle->tag == MSG_OFFER_ADOPTION) {
                 handleRequestBecomeChild(handle);
@@ -149,11 +149,11 @@ void Client::mainProgram() {
                 handleAckAcceptBecomeChild(handle);
             } else if (handle->tag == MSG_QUERY_JOB_REVISION_DETAILS) {
                 handleQueryJobRevisionDetails(handle);
-            } else if (handle->tag == MSG_ACK_JOB_REVISION_DETAILS) {
+            } else if (handle->tag == MSG_CONFIRM_JOB_REVISION_DETAILS) {
                 handleAckJobRevisionDetails(handle);
             } else if (handle->tag == MSG_CLIENT_FINISHED) {
                 handleClientFinished(handle);
-            }  else if (handle->tag == MSG_EXIT) {
+            }  else if (handle->tag == MSG_DO_EXIT) {
                 handleExit(handle);
             } else {
                 Console::log_recv(Console::WARN, handle->source, "Unknown msg tag %i", handle->tag);
@@ -232,7 +232,7 @@ void Client::introduceJob(std::shared_ptr<JobDescription>& jobPtr) {
         /*requestedNodeIndex=*/0, /*epoch=*/-1, /*numHops=*/0);
 
     Console::log_send(Console::INFO, nodeRank, "Introducing job #%i", jobId);
-    MyMpi::isend(MPI_COMM_WORLD, nodeRank, MSG_FIND_NODE, req);
+    MyMpi::isend(MPI_COMM_WORLD, nodeRank, MSG_REQUEST_NODE, req);
     _introduced_job_ids.insert(jobId);
     _last_introduced_job_idx++;
 }
