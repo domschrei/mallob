@@ -55,7 +55,7 @@ void merge(const Reduceable& other) override {
     }
 }
 
-bool isEmpty() override {
+bool isEmpty() const override {
     return assignedResources < 0.0001f && priorities.empty() && demandedResources.empty();
 }
 

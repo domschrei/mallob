@@ -12,6 +12,7 @@
 #include "fork.hpp"
 #include "proc.hpp"
 #include "util/console.hpp"
+//#include "backtrace.hpp"
 
 void propagateSignalAndExit(int signum) {
 
@@ -22,8 +23,6 @@ void propagateSignalAndExit(int signum) {
         kill(child, SIGTERM);
         kill(child, SIGCONT);
     }
-
-    fcloseall();
 
     /*
     // Hard kill all remaining processes after 1 second
@@ -63,8 +62,19 @@ int Fork::_rank;
 std::set<pid_t> Fork::_children;
 
 void Fork::init(int rank) {
-    signal(SIGABRT, handleAbort);
+
+    /*
+    struct sigaction sa;
+    sa.sa_sigaction = (void*) bt_sighandler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART | SA_SIGINFO;
+
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGABRT, &sa, NULL);
+    */
+
     signal(SIGSEGV, handleAbort);
+    signal(SIGABRT, handleAbort);
     signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
     signal(SIGTERM, propagateSignalAndExit);
     signal(SIGINT, propagateSignalAndExit);

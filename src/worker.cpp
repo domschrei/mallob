@@ -22,6 +22,7 @@
 #include "balancing/cutoff_priority_balancer.hpp"
 #include "balancing/event_driven_balancer.hpp"
 #include "data/job_description.hpp"
+#include "util/sys/watchdog.hpp"
 
 void Worker::init() {
     
@@ -153,6 +154,8 @@ void Worker::mainProgram() {
     float balanceCheckPeriod = 0.01;
     bool doYield = _params.isSet("yield");
 
+    Watchdog watchdog(/*checkIntervMillis=*/60*1000);
+
     while (!checkTerminate()) {
 
         if (sleepMicrosecs > 0) usleep(sleepMicrosecs);
@@ -193,6 +196,9 @@ void Worker::mainProgram() {
 
             // Forget jobs that are old or wasting memory
             _job_db.forgetOldJobs();
+
+            // Reset watchdog
+            watchdog.reset(time);
         }
 
         // Advance load balancing operations
@@ -267,6 +273,7 @@ void Worker::mainProgram() {
         }
     }
 
+    watchdog.stop();
     Console::flush();
     fflush(stdout);
 }

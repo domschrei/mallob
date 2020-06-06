@@ -49,7 +49,7 @@ void merge(const Reduceable& other) override {
     this->data = newData;
 }
 
-bool isEmpty() override {
+bool isEmpty() const override {
     return data.empty();
 }
 

@@ -163,6 +163,9 @@ void EventDrivenBalancer::broadcast(const EventMap& data, bool reversedTree) {
     // List of recently broadcast event maps
     std::list<EventMap>& recentBroadcasts = (reversedTree ? _recent_broadcasts_reversed : _recent_broadcasts_normal);
 
+    // Do not send an empty event map
+    if (data.isEmpty()) return;
+
     // Check that the current event map was not recently sent
     bool doSend = true;
     for (const EventMap& recentMap : recentBroadcasts) {

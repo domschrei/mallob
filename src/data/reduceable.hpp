@@ -23,7 +23,7 @@ public:
     virtual Reduceable& deserialize(const std::vector<uint8_t>& packed) override = 0;
     virtual void merge(const Reduceable& other) = 0;
     virtual std::unique_ptr<Reduceable> getDeserialized(const std::vector<uint8_t>& packed) const = 0;
-    virtual bool isEmpty() = 0;
+    virtual bool isEmpty() const = 0;
 
     std::set<int> allReduce(MPI_Comm& comm);
     std::set<int> reduceToRankZero(MPI_Comm& comm);

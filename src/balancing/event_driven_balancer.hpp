@@ -109,7 +109,7 @@ public:
         result->deserialize(packed);
         return result;
     }
-    virtual bool isEmpty() {
+    virtual bool isEmpty() const {
         return _map.empty();
     }
 

@@ -170,10 +170,7 @@ bool MyMpi::isAnytimeTag(int tag) {
 }
 
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object) {
-    
-    std::shared_ptr<std::vector<uint8_t>> vec = object.serialize();
-    MessageHandlePtr handle = isend(communicator, recvRank, tag, vec);
-    return handle;
+    return isend(communicator, recvRank, tag, object.serialize());
 }
 
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object) {
