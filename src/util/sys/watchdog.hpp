@@ -13,7 +13,7 @@ private:
     std::thread _thread;
     bool _running = true;
     Mutex _reset_lock;
-    float _last_reset;
+    float _last_reset = 0.0f;
 
 public:
     Watchdog(long checkIntervMillis, float time = Timer::elapsedSeconds());

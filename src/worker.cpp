@@ -154,7 +154,7 @@ void Worker::mainProgram() {
     float balanceCheckPeriod = 0.01;
     bool doYield = _params.isSet("yield");
 
-    Watchdog watchdog(/*checkIntervMillis=*/60*1000);
+    Watchdog watchdog(/*checkIntervMillis=*/60*1000, lastMemCheckTime);
 
     while (!checkTerminate()) {
 

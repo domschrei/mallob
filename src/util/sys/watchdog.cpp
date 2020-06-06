@@ -6,7 +6,6 @@
 Watchdog::Watchdog(long checkIntervMillis, float time) {
 
     reset(time);
-
     float maxResetSecs = checkIntervMillis/1000.f;
 
     _thread = std::thread([&]() {
