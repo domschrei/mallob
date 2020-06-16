@@ -30,7 +30,7 @@ void Parameters::init(int argc, char** argv) {
 
 void Parameters::setDefaults() {
     //setParam("aod"); // add old diversifiers (to lgl)
-    setParam("appmode", "thread"); // application mode (fork or thread)
+    setParam("appmode", "fork"); // application mode (fork or thread)
     setParam("ba", "4"); // num bounce alternatives (only relevant if -derandomize)
     setParam("bm", "ed"); // event-driven balancing (ed = event-driven, fp = fixed-period)
     setParam("c", "1"); // num clients
