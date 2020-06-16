@@ -35,19 +35,17 @@ Adjust the `CMD` statement in the `Dockerfile` and/or the execution script `aws-
 
 ## Usage
 
-You can launch mallob in one of the following two ways:
+Launch mallob as follows:
 
 ```
-bash run.sh [valgrind] <num-processes> <options...>
-mpirun -np <num-processes> [valgrind] <options...>
+mpirun -np <num-processes> [more mpi options] build/mallob <mallob options>
 ```
-
-In both cases, the `valgrind` option is for debugging and detecting memory errors only.
 
 ### Normal mode
 
 mallob takes a single argument without a preceding dash, which is the name template for the _scenario file_(s). 
-Each scenario file must be formatted like this:  
+Each scenario file must be formatted like this:
+
 ```
 # ID Arv. Prio. Filename
 1 5.00 0.3 instances/easy.cnf
@@ -55,9 +53,8 @@ Each scenario file must be formatted like this:
 3 13.37 0.99 instances/important.cnf
 [...]
 ```
-The ID and priority as well as the filename are essential for all configurations of mallob. 
-Priorities must be greater than zero. 
-When using the `lbc` option (see below), the arrival times are meaningless and can be set arbitrarily.
+IDs must be positive integers. Priorities must be in the interval `(0,1]`; greater numbers denote a higher priority. 
+Arrival times denote the point in time since program start where a given job _may_ enter the system; but depending on the program configuration (see `lbc` option below), the actual introduction of the job may be deferred to a later point in time.
 
 ### Single instance solving mode
 
@@ -67,10 +64,12 @@ This option overrides a couple of options concerning balancing and job demands.
 
 ### More Options
 
-All command-line options of mallob can be seen by executing mallob without any parameters or with the `-h` option. Here is some explanation for the most important ones:
+All command-line options of mallob can be seen by executing mallob without any parameters or with the `-h` option.
+The exact options mallob uses, including all non-overridden default values, are printed out on program start at default verbosity.
+Here is some explanation for the most important ones:
 
 * `-c=<#clients>`: The amount of "external client" processes to simulate. When the provided scenario file is `path/to/file.txt`, then the program assumes the existence of separate scenario files `path/to/file.txt.0`, `path/to/file.txt.1`, ..., `path/to/file.txt.<#clients-1>`. Note that this number will be subtracted from the amount of actual worker processes within your program execution: `#processes = #workers + #clients`. 
-* `-lbc=<#jobs-per-client>`: Simulates "leaky bucket clients": each client process will strive to have exactly `<#jobs-per-client>` jobs in the system at any given time. As long as the amount of active jobs of this client is lower than this number, the client will introduce new jobs as possible. In other words, the provided number is the amount of parallel _streams of jobs_ that each client wishes to be solved.
+* `-lbc=<#jobs-per-client>`: Simulates "leaky bucket clients": each client process will strive to have exactly `<#jobs-per-client>` jobs in the system at any given time. As long as the amount of active jobs of this client is lower than this number, the client will introduce new jobs as possible. In other words, the provided number is the amount of _streams of jobs_ that each client wishes to be solved in parallel.
 * `-v=<verbosity>`: How verbose the output should be. `-v=5` is generally the highest supported verbosity and will generate very large log files (including a report for every single P2P message). Verbosity values of 3 or 4 are more moderate. For outputting to log files only and not to stdout, use the `-q` (quiet) option.
 * `-t=<#threads>`: Each mallob process will run `<#threads>` worker threads for each active job.
 * `-l=<load-factor>`: A float `l ∈ (0, 1]` that determines which system load (i.e. the ratio `#busy-nodes / #nodes`) will be aimed at in the balancing computations. A load factor very close (or equal) to one may cause performance degradation due to job requests bouncing through the system without finding an empty node. A load factor close to zero will keep the majority of processes idle. In single instance solving mode, this number is automatically set to 1.
@@ -89,6 +88,14 @@ All command-line options of mallob can be seen by executing mallob without any p
 ## Evaluation
 
 After a complete run of mallob, you can run `bash calc_runtimes.sh <path/to/logdir>` to create basic performance report files (e.g. `runtimes` and `qualified_runtimes` for the runtimes of all solved jobs, or `timeouts` for the response times of all _un_solved jobs).
+
+## Programming Interfaces
+
+The following "interfaces" are included and/or planned:
+
+* To extend mallob by adding another kind of job solving engine, a subclass of `Job` (see `src/app/job.hpp`) must be created and an additional case must be added to `JobDatabase::createJob` (see `src/data/job_database.cpp`). To make the job database acknowledge what kind of job is introduced in a program run with several kinds of jobs, the `JobDescription` structure should be extended by a corresponding flag (and be on either end of the serialization so that it can be read directly). Finally, the `Client` class must be extended to read and introduce this new kind of jobs.
+* To add another kind of SAT solving engine, instead of directly inheriting from `Job`, a subclass of `BaseSatJob` (see `src/app/sat/base_sat_job.hpp`) can be created that already incorporates a simple kind of clause sharing. Take a look at an implementation such as `ForkedSatJob` to see how the interface can be used.
+* To add a new SAT solver to be used in a SAT solver engine, implement the interface `PortfolioSolverInterface` (see `src/app/sat/hordesat/solvers/portfolio_solver_interface.hpp`); you can use the existing implementation for `Lingeling` (`lingeling.cpp`) and adapt it to your solver.
 
 ## Remarks
 

@@ -3,6 +3,10 @@
  *
  *  Created on: Oct 10, 2014
  *      Author: balyo
+ * 
+ * portfolio_solver_interface.hpp
+ * 
+ *  Modified by Dominik Schreiber, 2019-*
  */
 
 #ifndef PORTFOLIOSOLVERINTERFACE_H_
