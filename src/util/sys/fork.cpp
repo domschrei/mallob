@@ -33,7 +33,7 @@ void propagateSignalAndExit(int signum) {
     */
 
     // Exit yourself
-    exit(0);
+    exit(signum == SIGABRT || signum == SIGSEGV ? 1 : 0);
 }
 
 void doNothing(int signum) {
@@ -54,7 +54,9 @@ void handleAbort(int sig) {
     for (int i = 0; i < size; i++) {
         Console::log(Console::CRIT, "- %s", bt[i]);
     }
-    exit(1);
+
+    // Send exit signals to children and exit yourself
+    propagateSignalAndExit(sig);
 }
 
 
