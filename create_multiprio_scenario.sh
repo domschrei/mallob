@@ -18,9 +18,9 @@ for rep in {1..10}; do
 done
 
 # Number of effective CPUs 
-busycpus="150" #3884
+busycpus="1516" #3884
 # CPUsec timeout per job
-maxcpusecs=$((1*3600))
+maxcpusecs=$((10*3600))
 totalnumjobs=$(cat priorized_instances|wc -l)
 
 # Calculate lambda
