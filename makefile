@@ -11,7 +11,7 @@ CERROR=-fpermissive
 # Base compile flags, modified below by individual targets.
 COMPILEFLAGS:=-pipe -Wall -Wextra -pedantic -std=c++17 $(CWARN) $(CERROR) -DMALLOB_VERSION=\"${MALLOB_VERSION}\"
 # Base linker flags, modified below by individual targets.
-LINKERFLAGS:=-L${MPI_ROOT} -Lsrc/app/sat/hordesat/lingeling -Lsrc/app/sat/hordesat/yalsat -lm -lz -llgl -lyals -lpthread
+LINKERFLAGS:=-L${MPI_ROOT} -Lsrc/app/sat/hordesat/lingeling -Lsrc/app/sat/hordesat/yalsat -Lsrc/app/sat/hordesat/cadical -lm -lz -llgl -lyals -lpthread -lcadical
 # Include paths of the project.
 INCLUDES:=-Isrc -I${MPI_INCLUDE}
 
