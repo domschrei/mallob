@@ -9,17 +9,24 @@ CERROR=-fpermissive
 COMPILEFLAGS:=-O3 -g -pipe -Wall -Wextra -pedantic -std=c++17 $(CWARN) $(CERROR) -DMALLOB_VERSION=\"${MALLOB_VERSION}\"
 #COMPILEFLAGS=-O0 -ggdb -pipe -Wall -Wextra -pedantic -std=c++17 $(CWARN) $(CERROR)
 
-LINKERFLAG:=-O3 -L${MPI_ROOT} -Lsrc/app/sat/hordesat/lingeling -Lsrc/app/sat/hordesat/yalsat -lm -lz -llgl -lyals -lpthread
+LINKERFLAGS:=-O3 -L${MPI_ROOT} -Lsrc/app/sat/hordesat/lingeling -Lsrc/app/sat/hordesat/yalsat -lm -lz -llgl -lyals -lpthread
 #LINKERFLAG=-O0 -ggdb
 
 INCLUDES:=-Isrc -I${MPI_INCLUDE}
 
-#.PHONY = parser clean
-
 SOURCES:=$(shell find src/ -name '*.cpp'|grep -v "/test/")
 
+debug: COMPILEFLAGS += -DDEBUG -g -rdynamic
+debug: LINKERFLAGS += -g -rdynamic
+debug: build/mallob
+
+release: COMPILEFLAGS += -DNDEBUG
+release: build/mallob
+
+#.PHONY = parser clean
+
 build/mallob: $(patsubst src/%.cpp,build/%.o,${SOURCES})
-	${CXX} ${INCLUDES} $^ -o build/mallob ${LINKERFLAG}
+	${CXX} ${INCLUDES} $^ -o build/mallob ${LINKERFLAGS}
 
 src/hordesat/yalsat/yalsat:
 	cd src/app/sat/hordesat && bash fetch_and_build_solvers.sh
