@@ -12,64 +12,10 @@
 #include "app/sat/hordesat/solvers/cadical.hpp"
 #include "app/sat/hordesat/utilities/debug_utils.hpp"
 
-// void cbConsumeUnits(void* sp, int** start, int** end) {
-// 	Lingeling* lp = (Lingeling*)sp;
-
-// 	if (lp->unitsToAdd.empty() || (lp->clauseAddMutex.tryLock() == false)) {
-// 		*start = lp->unitsBuffer;
-// 		*end = lp->unitsBuffer;
-// 		return;
-// 	}
-// 	if (lp->unitsToAdd.size() >= lp->unitsBufferSize) {
-// 		lp->unitsBufferSize = 2*lp->unitsToAdd.size();
-// 		lp->unitsBuffer = (int*)realloc((void*)lp->unitsBuffer, lp->unitsBufferSize * sizeof(int));
-// 	}
-
-// 	for (size_t i = 0; i < lp->unitsToAdd.size(); i++) {
-// 		lp->unitsBuffer[i] = lp->unitsToAdd[i];
-// 	}
-
-// 	*start = lp->unitsBuffer;
-// 	*end = *start + lp->unitsToAdd.size();
-// 	lp->clauseAddMutex.unlock();
-// }
-
-// void cbConsumeCls(void* sp, int** clause, int* glue) {
-// 	Lingeling* lp = (Lingeling*)sp;
-
-// 	if (lp->learnedClausesToAdd.empty()) {
-// 		*clause = NULL;
-// 		return;
-// 	}
-// 	if (lp->clauseAddMutex.tryLock() == false) {
-// 		*clause = NULL;
-// 		return;
-// 	}
-// 	vector<int> cls = lp->learnedClausesToAdd.back();
-// 	lp->learnedClausesToAdd.pop_back();
-
-// 	if (cls.size()+1 >= lp->clsBufferSize) {
-// 		lp->clsBufferSize = 2*cls.size();
-// 		lp->clsBuffer = (int*)realloc((void*)lp->clsBuffer, lp->clsBufferSize * sizeof(int));
-// 	}
-// 	// to avoid zeros in the array, 1 was added to the glue
-// 	*glue = cls[0]-1;
-// 	for (size_t i = 1; i < cls.size(); i++) {
-// 		lp->clsBuffer[i-1] = cls[i];
-// 	}
-// 	lp->clsBuffer[cls.size()-1] = 0;
-// 	*clause = lp->clsBuffer;
-// 	lp->clauseAddMutex.unlock();
-// }
-
 Cadical::Cadical(LoggingInterface& logger, int globalId, int localId, std::string jobname, bool addOldDiversifications)
 	: PortfolioSolverInterface(logger, globalId, localId, jobname), solver(new CaDiCaL::Solver), terminator(logger), learner(*this)  {
 	
 	solver->connect_terminator(&terminator);
-
-	unitsBufferSize = clsBufferSize = 100;
-	unitsBuffer = (int*) malloc(unitsBufferSize*sizeof(int));
-	clsBuffer = (int*) malloc(clsBufferSize*sizeof(int));
 
 	if (addOldDiversifications) {
 		numDiversifications = 20;
@@ -98,16 +44,16 @@ SatResult Cadical::solve(const vector<int>& assumptions) {
 	// remember assumptions
 	this->assumptions = assumptions;
 
-	// add the clauses
-	clauseAddMutex.lock();
-	for (auto clauseToAdd : clausesToAdd) {
+	// add the learned clauses
+	learnMutex.lock();
+	for (auto clauseToAdd : learnedClauses) {
 		for (auto litToAdd : clauseToAdd) {
 			addLiteral(litToAdd);
 		}
 		addLiteral(0);
 	}
-	clausesToAdd.clear();
-	clauseAddMutex.unlock();
+	learnedClauses.clear();
+	learnMutex.unlock();
 
 	// set the assumptions
 	for (auto assumption : assumptions) {
@@ -163,14 +109,18 @@ set<int> Cadical::getFailedAssumptions() {
 }
 
 void Cadical::addLearnedClause(const int* begin, int size) {
-	//Not yet implemented
+	auto lock = learnMutex.getLock();
+	if (size == 1) {
+		learnedClauses.emplace_back(begin, begin + 1);
+	} else {
+		// Skip glue in front of array
+		learnedClauses.emplace_back(begin + 1, begin + (size - 1));
+	}
 }
 
 void Cadical::setLearnedClauseCallback(LearnedClauseCallback* callback) {
 	learner.setCallback(callback);
 	solver->connect_learner(&learner);
-	// lglsetconsumeunits(solver, cbConsumeUnits, this);
-	// lglsetconsumecls(solver, cbConsumeCls, this);
 }
 
 void Cadical::increaseClauseProduction() {
@@ -199,6 +149,4 @@ SolvingStatistics Cadical::getStatistics() {
 
 Cadical::~Cadical() {
 	solver.release();
-	free(unitsBuffer);
-	free(clsBuffer);
 }

@@ -24,17 +24,11 @@ private:
 	std::unique_ptr<CaDiCaL::Solver> solver;
 	std::string name;
 
-	Mutex clauseAddMutex;
+	Mutex learnMutex;
 
 	// clause addition
-	vector<vector<int> > clausesToAdd;
-	vector<vector<int> > learnedClausesToAdd;
-	vector<int> unitsToAdd;
+	vector<vector<int> > learnedClauses;
 	vector<int> assumptions;
-	int* unitsBuffer;
-	size_t unitsBufferSize;
-	int* clsBuffer;
-	size_t clsBufferSize;
 
 	int numDiversifications;
 
