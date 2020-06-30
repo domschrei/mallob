@@ -27,7 +27,7 @@ release: build/mallob
 SOURCES:=$(shell find src/ -name '*.cpp'|grep -v "/test/")
 
 build/mallob: $(patsubst src/%.cpp,build/%.o,${SOURCES})
-	${CXX} ${INCLUDES} $^ -o build/mallob ${LINKERFLAG}
+	${CXX} ${INCLUDES} $^ -o build/mallob ${LINKERFLAGS}
 
 src/hordesat/yalsat/yalsat:
 	cd src/app/sat/hordesat && bash fetch_and_build_solvers.sh
