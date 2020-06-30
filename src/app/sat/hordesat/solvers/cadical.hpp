@@ -38,9 +38,7 @@ private:
 
 	int numDiversifications;
 
-    HordeTerminator terminator;
-
-	const std::function<int()> _GET_SOLVER_ID = std::bind(&PortfolioSolverInterface::getLocalId, this);
+	HordeTerminator terminator;
     HordeLearner learner;
 
 public:

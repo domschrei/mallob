@@ -63,7 +63,7 @@
 // }
 
 Cadical::Cadical(LoggingInterface& logger, int globalId, int localId, std::string jobname, bool addOldDiversifications)
-	: PortfolioSolverInterface(logger, globalId, localId, jobname), solver(new CaDiCaL::Solver), terminator(logger), learner(_GET_SOLVER_ID)  {
+	: PortfolioSolverInterface(logger, globalId, localId, jobname), solver(new CaDiCaL::Solver), terminator(logger), learner(*this)  {
 	
 	solver->connect_terminator(&terminator);
 

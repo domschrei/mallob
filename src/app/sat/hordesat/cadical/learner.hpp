@@ -1,10 +1,8 @@
-#include <functional>
-
 #include "app/sat/hordesat/cadical/cadical.hpp"
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 
 struct HordeLearner : public CaDiCaL::Learner {
-	HordeLearner(std::function<int()> getSolverId) : _getSolverId(getSolverId) {};
+	HordeLearner(PortfolioSolverInterface &portfolio) : _portfolio(portfolio) {}
 	~HordeLearner() override {}
 
   	bool learning(int size) override {
@@ -24,7 +22,7 @@ struct HordeLearner : public CaDiCaL::Learner {
 			if (glue != 1)
 		        _currClause.insert(_currClause.begin(), glue + 1);
 
-			_callback->processClause(_currClause, _getSolverId());
+			_callback->processClause(_currClause, _portfolio.getLocalId());
 		}
 	}
 
@@ -41,7 +39,7 @@ struct HordeLearner : public CaDiCaL::Learner {
         
 		LearnedClauseCallback *_callback;
 
-        std::function<int()> _getSolverId;
+        PortfolioSolverInterface &_portfolio;
 
 		vector<int> _currClause;
 };
