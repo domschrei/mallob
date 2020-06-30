@@ -330,7 +330,10 @@ void Worker::handleConfirmAdoption(MessageHandlePtr& handle) {
     JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
 
     // If job offer is obsolete, the description contains the job id ONLY
-    if (_job_db.isAdoptionOfferObsolete(req)) {
+    if (_job_db.isAdoptionOfferObsolete(req, /*alreadyAccepted=*/true)) {
+        // Obsolete request
+        Console::log_recv(Console::VERB, handle->source, "Reject offer %s from time %.2f", 
+                            _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str(), req.timeOfBirth);
         MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, IntVec({req.jobId}));
         return;
     }
