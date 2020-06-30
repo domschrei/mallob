@@ -329,16 +329,12 @@ void Worker::handleConfirmJobRevisionDetails(MessageHandlePtr& handle) {
 void Worker::handleConfirmAdoption(MessageHandlePtr& handle) {
     JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
 
-    // If job already terminated, the description contains the job id ONLY
-    if (!_job_db.has(req.jobId)) {
+    // If job offer is obsolete, the description contains the job id ONLY
+    if (_job_db.isAdoptionOfferObsolete(req)) {
         MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, IntVec({req.jobId}));
         return;
     }
     Job& job = _job_db.get(req.jobId);
-    if (job.isPast() || job.isForgetting()) {
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, IntVec({req.jobId}));
-        return;
-    }
 
     // Retrieve and send concerned job description
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, job.getSerializedDescription());
