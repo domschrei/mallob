@@ -31,6 +31,7 @@ struct HordeTerminator : public CaDiCaL::Terminator {
                 return true;
             }
         }
+        return false;
     }
 
     void setInterrupt() {
