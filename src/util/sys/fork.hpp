@@ -10,7 +10,7 @@ public:
     static int _rank;
     static std::set<int> _children;
 
-    static void init(int rank);
+    static void init(int rank, bool leafProcess = false);
     static int createChild();
     static void terminate(int childpid);
     static void hardkill(int childpid);

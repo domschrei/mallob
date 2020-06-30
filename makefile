@@ -6,13 +6,21 @@ CWARN=-Wno-unused-parameter -Wno-sign-compare -Wno-format -Wno-format-security
 CERROR=-fpermissive
 
 #-DNDEBUG
-COMPILEFLAGS:=-O3 -g -pipe -Wall -Wextra -pedantic -std=c++17 $(CWARN) $(CERROR) -DMALLOB_VERSION=\"${MALLOB_VERSION}\"
-#COMPILEFLAGS=-O0 -ggdb -pipe -Wall -Wextra -pedantic -std=c++17 $(CWARN) $(CERROR)
+COMPILEFLAGS:=-pipe -Wall -Wextra -pedantic -std=c++17 $(CWARN) $(CERROR) -DMALLOB_VERSION=\"${MALLOB_VERSION}\"
 
-LINKERFLAG:=-O3 -L${MPI_ROOT} -Lsrc/app/sat/hordesat/lingeling -Lsrc/app/sat/hordesat/yalsat -lm -lz -llgl -lyals -lpthread
-#LINKERFLAG=-O0 -ggdb
+LINKERFLAGS:=-L${MPI_ROOT} -Lsrc/app/sat/hordesat/lingeling -Lsrc/app/sat/hordesat/yalsat -lm -lz -llgl -lyals -lpthread
 
 INCLUDES:=-Isrc -I${MPI_INCLUDE}
+
+SOURCES:=$(shell find src/ -name '*.cpp'|grep -v "/test/")
+
+debug: COMPILEFLAGS += -O0 -DDEBUG -g -rdynamic
+debug: LINKERFLAGS += -O0 -g -rdynamic
+debug: build/mallob
+
+release: COMPILEFLAGS += -O3 -DNDEBUG
+release: LINKERFLAGS += -O3
+release: build/mallob
 
 #.PHONY = parser clean
 

@@ -63,7 +63,7 @@ void handleAbort(int sig) {
 int Fork::_rank;
 std::set<pid_t> Fork::_children;
 
-void Fork::init(int rank) {
+void Fork::init(int rank, bool leafProcess) {
 
     /*
     struct sigaction sa;
@@ -75,11 +75,14 @@ void Fork::init(int rank) {
     sigaction(SIGABRT, &sa, NULL);
     */
 
+    signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
     signal(SIGSEGV, handleAbort);
     signal(SIGABRT, handleAbort);
-    signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
-    signal(SIGTERM, propagateSignalAndExit);
-    signal(SIGINT, propagateSignalAndExit);
+
+    if (!leafProcess) {
+        signal(SIGTERM, propagateSignalAndExit);
+        signal(SIGINT, propagateSignalAndExit);
+    }
 
     _rank = rank;
     _children.clear();
