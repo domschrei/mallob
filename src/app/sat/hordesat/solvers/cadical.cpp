@@ -12,17 +12,11 @@
 #include "app/sat/hordesat/solvers/cadical.hpp"
 #include "app/sat/hordesat/utilities/debug_utils.hpp"
 
-Cadical::Cadical(LoggingInterface& logger, int globalId, int localId, std::string jobname, bool addOldDiversifications)
-	: PortfolioSolverInterface(logger, globalId, localId, jobname), solver(new CaDiCaL::Solver), terminator(logger), learner(*this)  {
+Cadical::Cadical(LoggingInterface& logger, int globalId, int localId, std::string jobname)
+	: PortfolioSolverInterface(logger, globalId, localId, jobname), solver(new CaDiCaL::Solver), terminator(logger), learner(*this) {
 	
 	solver->connect_terminator(&terminator);
-
-	if (addOldDiversifications) {
-		numDiversifications = 20;
-	} else {
-		numDiversifications = 14;
 	}
-}
 
 void Cadical::addLiteral(int lit) {
 	solver->add(lit);
@@ -132,7 +126,7 @@ int Cadical::getVariablesCount() {
 }
 
 int Cadical::getNumOriginalDiversifications() {
-	return numDiversifications;
+	return 0;
 }
 
 int Cadical::getSplittingVariable() {

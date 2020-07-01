@@ -5,12 +5,13 @@
  *      Author: schick
  */
 
-#ifndef CADICAL_H_
-#define CADICAL_H_
+#ifndef MSCHICK_CADICAL_H_
+#define MSCHICK_CADICAL_H_
 
 #include <map>
 
 #include "portfolio_solver_interface.hpp"
+
 #include "util/sys/threading.hpp"
 #include "app/sat/hordesat/utilities/logging_interface.hpp"
 
@@ -22,21 +23,17 @@ class Cadical : public PortfolioSolverInterface {
 
 private:
 	std::unique_ptr<CaDiCaL::Solver> solver;
-	std::string name;
 
 	Mutex learnMutex;
 
-	// clause addition
 	vector<vector<int> > learnedClauses;
 	vector<int> assumptions;
-
-	int numDiversifications;
 
 	HordeTerminator terminator;
     HordeLearner learner;
 
 public:
-	Cadical(LoggingInterface& logger, int globalId, int localId, std::string jobName, bool addOldDiversifications);
+	Cadical(LoggingInterface& logger, int globalId, int localId, std::string jobName);
 	 ~Cadical();
 
 	// Add a (list of) permanent clause(s) to the formula
