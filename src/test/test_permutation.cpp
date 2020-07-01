@@ -5,7 +5,7 @@
 #include "util/random.hpp"
 #include "util/permutation.hpp"
 #include "util/console.hpp"
-#include "util/timer.hpp"
+#include "util/sys/timer.hpp"
 
 /*
 Compile with:

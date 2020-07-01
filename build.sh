@@ -34,6 +34,6 @@ echo mpiinclude: $mpiinclude
 
 (cd src/app/sat/hordesat && bash fetch_and_build_solvers.sh)
 
-cmd="MPI_ROOT=$mpiroot MPI_INCLUDE=$mpiinclude make"
+cmd="MPI_ROOT=$mpiroot MPI_INCLUDE=$mpiinclude make $@"
 echo $cmd
 bash -c "$cmd"
