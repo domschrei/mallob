@@ -44,8 +44,8 @@ namespace Proc {
 
       // the two fields we want
       //
-      unsigned long vsize;
-      long rss;
+      unsigned long vsize = 0;
+      long rss = 0;
 
       stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
                   >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
@@ -91,8 +91,8 @@ namespace Proc {
       string cutime, cstime, priority, nice;
       string O, itrealvalue, starttime;
       // the two fields we want
-      unsigned long utime;
-      unsigned long stime;
+      unsigned long utime = 0;
+      unsigned long stime = 0;
       stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
                   >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
                   >> utime >> stime >> cutime >> cstime >> priority >> nice
