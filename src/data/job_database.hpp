@@ -50,7 +50,7 @@ public:
     bool checkComputationLimits(int jobId);
 
     bool isRequestObsolete(const JobRequest& req);
-    bool isAdoptionOfferObsolete(const JobRequest& req);
+    bool isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAccepted = false);
 
     void commit(JobRequest& req);
     bool hasCommitments() const;

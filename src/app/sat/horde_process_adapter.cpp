@@ -115,30 +115,6 @@ HordeProcessAdapter::~HordeProcessAdapter() {
         // Parent process
         SharedMemory::free(_shmem, _shmem_size);
     }
-
-    /*
-    SharedMemory::free(_shmem_mutex,        SharedMemMutex::getSharedMemorySize());
-    SharedMemory::free(_shmem_cond,         SharedMemConditionVariable::getSharedMemorySize());
-    SharedMemory::free(_import_buffer,      _max_import_buffer_size);
-    SharedMemory::free(_export_buffer,      _max_export_buffer_size);
-    SharedMemory::free(_solution,           _max_solution_size);
-    SharedMemory::free(_child_pid,          sizeof(pid_t));
-    SharedMemory::free(_state,              sizeof(SolvingStates::SolvingState));
-    SharedMemory::free(_portfolio_rank,     sizeof(int));
-    SharedMemory::free(_portfolio_size,     sizeof(int));
-    SharedMemory::free(_import_buffer_size, sizeof(int));
-    SharedMemory::free(_export_buffer_size, sizeof(int));
-	SharedMemory::free(_solution_size,      sizeof(int));
-    SharedMemory::free(_do_import,          sizeof(bool));
-    SharedMemory::free(_do_export,          sizeof(bool));
-    SharedMemory::free(_did_export,         sizeof(bool));
-    SharedMemory::free(_is_initialized,     sizeof(bool));
-    SharedMemory::free(_did_write_solution, sizeof(bool));
-    SharedMemory::free(_do_dump_stats,      sizeof(bool));
-    SharedMemory::free(_do_interrupt,       sizeof(bool));
-    SharedMemory::free(_do_update_role,     sizeof(bool));
-    SharedMemory::free(_result,             sizeof(SatResult));
-    */
 }
 
 pid_t HordeProcessAdapter::run() {
@@ -158,7 +134,7 @@ pid_t HordeProcessAdapter::run() {
     assert(res == 0);
     //puts("HELLOFROMCHILD");
     _log->log(1, "Hello from child\n");
-    Fork::init(Fork::_rank);
+    Fork::init(Fork::_rank, /*leafProcess=*/true);
     *_is_spawned = true;
     
     // Prepare solver

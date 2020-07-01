@@ -8,10 +8,12 @@
 #include <exception>
 #include <execinfo.h>
 #include <signal.h>
+#include <assert.h>
 
 #include "fork.hpp"
 #include "proc.hpp"
 #include "util/console.hpp"
+
 //#include "backtrace.hpp"
 
 void propagateSignalAndExit(int signum) {
@@ -20,8 +22,8 @@ void propagateSignalAndExit(int signum) {
     
     // Propagate signal to children
     for (pid_t child : children) {
-        kill(child, SIGTERM);
-        kill(child, SIGCONT);
+        Fork::sendSignal(child, SIGTERM);
+        Fork::sendSignal(child, SIGCONT);
     }
 
     /*
@@ -63,7 +65,7 @@ void handleAbort(int sig) {
 int Fork::_rank;
 std::set<pid_t> Fork::_children;
 
-void Fork::init(int rank) {
+void Fork::init(int rank, bool leafProcess) {
 
     /*
     struct sigaction sa;
@@ -75,11 +77,14 @@ void Fork::init(int rank) {
     sigaction(SIGABRT, &sa, NULL);
     */
 
+    signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
     signal(SIGSEGV, handleAbort);
     signal(SIGABRT, handleAbort);
-    signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
-    signal(SIGTERM, propagateSignalAndExit);
-    signal(SIGINT, propagateSignalAndExit);
+
+    if (!leafProcess) {
+        signal(SIGTERM, propagateSignalAndExit);
+        signal(SIGINT, propagateSignalAndExit);
+    }
 
     _rank = rank;
     _children.clear();
@@ -93,26 +98,28 @@ pid_t Fork::createChild() {
     } else if (res == 0) {
         // child process
         _children.clear();
+    } else {
+        assert(res >= 0);
     }
     return res;
 }
 void Fork::terminate(pid_t childpid) {
-    kill(childpid, SIGTERM);
-    kill(childpid, SIGCONT);
+    sendSignal(childpid, SIGTERM);
+    sendSignal(childpid, SIGCONT);
     _children.erase(childpid);
     //_pending_exiting_children++;
 }
 void Fork::hardkill(pid_t childpid) {
-    kill(childpid, SIGKILL);
+    sendSignal(childpid, SIGKILL);
 }
 void Fork::suspend(pid_t childpid) {
-    kill(childpid, SIGTSTP);
+    sendSignal(childpid, SIGTSTP);
 }
 void Fork::resume(pid_t childpid) {
-    kill(childpid, SIGCONT);
+    sendSignal(childpid, SIGCONT);
 }
 void Fork::wakeUp(pid_t childpid) {
-    kill(childpid, SIGUSR1);
+    sendSignal(childpid, SIGUSR1);
 }
 void Fork::terminateAll() {
     std::set<int> children = _children;
@@ -123,5 +130,15 @@ void Fork::terminateAll() {
 bool Fork::didChildExit(pid_t childpid) {
     int status;
     pid_t result = waitpid(childpid, &status, WNOHANG /*| WUNTRACED | WCONTINUED*/);
+    if (result == -1) {
+        Console::log(Console::WARN, "[WARN] waitpid returned -1");
+    }
     return result > 0;
+}
+
+void Fork::sendSignal(int childpid, int signum) {
+    int result = kill(childpid, signum);
+    if (result == -1) {
+        Console::log(Console::WARN, "[WARN] kill -%i %i returned -1", signum, childpid);
+    }
 }

@@ -216,7 +216,7 @@ bool JobDatabase::isRequestObsolete(const JobRequest& req) {
     }
 }
 
-bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req) {
+bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAccepted) {
 
     // Requests for a job root never become obsolete
     if (req.requestedNodeIndex == 0) return false;
@@ -230,6 +230,9 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req) {
         Console::log(Console::VERB, "Req. %s : job inactive (%s)", job.toStr(), job.jobStateToStr());
         return true;
     
+    } else if (alreadyAccepted) {
+        return false;
+
     } else if (req.requestedNodeIndex == job.getLeftChildIndex() && job.hasLeftChild()) {
         // Job already has a left child
         Console::log(Console::VERB, "Req. %s : already has left child", job.toStr());

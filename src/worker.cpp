@@ -300,7 +300,7 @@ void Worker::handleAcceptAdoptionOffer(MessageHandlePtr& handle) {
         return;
     }
 
-    JobRequest& req = _job_db.getCommitment(sig.jobId);
+    JobRequest req = _job_db.getCommitment(sig.jobId);
 
     if (req.fullTransfer == 1) {
         // Full transfer of job description is required:
@@ -329,16 +329,15 @@ void Worker::handleConfirmJobRevisionDetails(MessageHandlePtr& handle) {
 void Worker::handleConfirmAdoption(MessageHandlePtr& handle) {
     JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
 
-    // If job already terminated, the description contains the job id ONLY
-    if (!_job_db.has(req.jobId)) {
+    // If job offer is obsolete, the description contains the job id ONLY
+    if (_job_db.isAdoptionOfferObsolete(req, /*alreadyAccepted=*/true)) {
+        // Obsolete request
+        Console::log_recv(Console::VERB, handle->source, "Reject offer %s from time %.2f", 
+                            _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str(), req.timeOfBirth);
         MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, IntVec({req.jobId}));
         return;
     }
     Job& job = _job_db.get(req.jobId);
-    if (job.isPast() || job.isForgetting()) {
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, IntVec({req.jobId}));
-        return;
-    }
 
     // Retrieve and send concerned job description
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, job.getSerializedDescription());
