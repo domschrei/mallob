@@ -300,7 +300,7 @@ void Worker::handleAcceptAdoptionOffer(MessageHandlePtr& handle) {
         return;
     }
 
-    JobRequest& req = _job_db.getCommitment(sig.jobId);
+    JobRequest req = _job_db.getCommitment(sig.jobId);
 
     if (req.fullTransfer == 1) {
         // Full transfer of job description is required:
