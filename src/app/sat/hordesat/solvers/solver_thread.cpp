@@ -4,6 +4,7 @@
 #include "app/sat/hordesat/solvers/solver_thread.hpp"
 #include "app/sat/hordesat/horde.hpp"
 #include "app/sat/hordesat/utilities/hash.hpp"
+#include "util/sys/proc.hpp"
 
 using namespace SolvingStates;
 
@@ -30,14 +31,14 @@ SolverThread::SolverThread(ParameterProcessor& params, std::shared_ptr<Portfolio
 }
 
 void SolverThread::start() {
-    _thread = std::thread([&] {
+    _thread = std::thread([this]() {
         init();
         run();
     });
 }
 
 void SolverThread::init() {
-    _tid = syscall(SYS_gettid);
+    _tid = Proc::getTid();
     log(3, "tid %ld\n", _tid);
     if (_params.isSet("pin")) pin();
     _initialized = true;

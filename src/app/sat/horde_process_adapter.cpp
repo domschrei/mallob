@@ -1,7 +1,6 @@
 
 #include <assert.h>
 #include <sys/types.h>
-#include <sys/syscall.h>
 
 #include "horde_process_adapter.hpp"
 

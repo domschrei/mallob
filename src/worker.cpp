@@ -6,7 +6,6 @@
 #include <fstream>
 #include <initializer_list>
 #include <limits>
-#include <sys/syscall.h>
 
 #include "worker.hpp"
 #include "app/sat/threaded_sat_job.hpp"

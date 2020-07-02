@@ -55,7 +55,7 @@ std::string Console::logDir;
 std::string Console::logFilename;
 FILE* Console::logFile;
 bool Console::beganLine;
-std::mutex Console::logMutex;
+Mutex Console::logMutex;
 
 void Console::init(int rank, int verbosity, bool coloredOutput, bool threadsafeOutput, bool quiet, bool cPrefix, std::string logdir) {
     Console::rank = rank;

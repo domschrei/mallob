@@ -3,7 +3,6 @@
 #define HORDE_MALLOB_SOLVER_THREAD_H
 
 #include <sys/types.h>
-#include <sys/syscall.h>
 #include <unistd.h>
 #include <utility>
 #include <thread>

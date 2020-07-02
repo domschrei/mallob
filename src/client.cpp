@@ -65,7 +65,7 @@ void Client::readAllInstances() {
 
         Console::log(Console::VERB, "FILE_IO read \"%s\" (#%i)", _job_instances[jobId].c_str(), jobId);
 
-        std::unique_lock<std::mutex> lock(_job_ready_lock);
+        auto lock = _job_ready_lock.getLock();
         _job_ready[jobId] = true;
     }
 }
@@ -198,7 +198,7 @@ int Client::getNextIntroduceableJob() {
 }
 
 bool Client::isJobReady(int jobId) {
-    std::unique_lock<std::mutex> lock(_job_ready_lock);
+    auto lock = _job_ready_lock.getLock();
     return _job_ready.count(jobId) && _job_ready[jobId];
 }
 

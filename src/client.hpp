@@ -3,13 +3,13 @@
 #define DOMPASCH_MALLOB_CLIENT
 
 #include <string>
-#include <mutex>
 #include <set>
 
 #include "comm/mympi.hpp"
 #include "util/params.hpp"
 #include "data/job_description.hpp"
 #include "data/epoch_counter.hpp"
+#include "util/sys/threading.hpp"
 
 struct JobByArrivalComparator {
     inline bool operator() (const JobDescription& struct1, const JobDescription& struct2) {
@@ -30,7 +30,7 @@ private:
     std::set<int> _introduced_job_ids; 
     std::map<int, bool> _job_ready;
     std::map<int, int> _root_nodes;
-    std::mutex _job_ready_lock;
+    Mutex _job_ready_lock;
     volatile int _last_introduced_job_idx;
 
     std::set<int> _client_ranks;
