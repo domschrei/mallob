@@ -36,6 +36,7 @@ public:
 	
 	void setParam(const char* name);
 	void setParam(const char* name, const char* value);
+	void setParam(const string& name, const string& value);
 
 	bool isSet(const string& name) const;
 	string getParam(const string& name, const string& defaultValue) const;
@@ -44,6 +45,8 @@ public:
 	float getFloatParam(const string& name, float defaultValue) const;
 	int getIntParam(const string& name) const;
 	float getFloatParam(const string& name) const;
+
+	const map<string, string>& getMap() const;
 };
 
 #endif /* PARAMETERPROCESSOR_H_ */

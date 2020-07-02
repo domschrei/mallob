@@ -103,6 +103,7 @@ pid_t Fork::createChild() {
     }
     return res;
 }
+
 void Fork::terminate(pid_t childpid) {
     sendSignal(childpid, SIGTERM);
     sendSignal(childpid, SIGCONT);

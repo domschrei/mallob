@@ -9,6 +9,7 @@
 #include "console_horde_interface.hpp"
 #include "forked_sat_job.hpp"
 #include "anytime_sat_clause_communicator.hpp"
+#include "horde_shared_memory.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/fork.hpp"
 
@@ -19,55 +20,19 @@ ForkedSatJob::ForkedSatJob(Parameters& params, int commSize, int worldRank, int 
 bool ForkedSatJob::appl_initialize() {
 
     assert(hasJobDescription());
-    //_horde_manipulation_lock.updateName(std::string("HordeManip") + toStr());
 
-    // Initialize Hordesat instance
-    assert(_solver == NULL || Console::fail("Solver is not NULL! State of %s : %s", toStr(), jobStateToStr()));
-    Console::log(Console::VVVERB, "%s : preparing params", toStr());
-    std::map<std::string, std::string> params;
-    params["e"] = "1"; // exchange mode: 0 = nothing, 1 = alltoall, 2 = log, 3 = asyncrumor
-    params["c"] = this->_params.getParam("t"); // solver threads on this node
-    if (_params.getIntParam("md") <= 1 && _params.getIntParam("t") <= 1) {
-        // One thread on one node: do not diversify anything, but keep default solver settings
-        params["d"] = "0"; // no diversification
-    } else if (this->_params.isSet("nophase")) {
-        // Do not do sparse random ("phase") diversification
-        params["d"] = "4"; // native diversification only
-    } else {
-        params["d"] = "7"; // sparse random + native diversification
-    }
-    params["fd"]; // filter duplicate clauses
-    params["cbbs"] = _params.getParam("cbbs"); // clause buffer base size
-    params["icpr"] = _params.getParam("icpr"); // increase clause production
-    params["mcl"] = _params.getParam("mcl"); // max clause length
-    params["i"] = "0"; // #microseconds to sleep during solve loop
-    params["v"] = 99; // (this->_params.getIntParam("v") >= 3 ? "1" : "0"); // verbosity
-    params["mpirank"] = std::to_string(getIndex()); // mpi_rank
-    params["mpisize"] = std::to_string(_comm_size); // mpi_size
-    std::string identifier = std::string(toStr());
-    params["jobstr"] = identifier;
-    if (_params.isSet("sinst")) {
-        // Single instance filename
-        params["sinst"] = _params.getParam("sinst");
-    }
-    params["cfhl"] = _params.getParam("cfhl");
-    if (_params.isSet("aod")) params["aod"];
+    Parameters slvParams(_params);
+    slvParams.setParam("mpirank", std::to_string(getIndex()));
+    slvParams.setParam("mpisize", std::to_string(_comm_size));
+    slvParams.setParam("rank", std::to_string(_world_rank));
+    slvParams.setParam("jobid", std::to_string(getId()));
+    slvParams.setParam("jobstr", std::string(toStr()));
 
-    if (_abort_after_initialization) {
-        return false;
-    }
-
-    auto lock = _solver_lock.getLock();
-    Console::log(Console::VERB, "%s : creating horde instance", toStr());
-    _solver = std::unique_ptr<HordeProcessAdapter>(
-        new HordeProcessAdapter(
-            params,
-            std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface("<h-" + std::string(identifier) + ">", "#" + std::to_string(getId()) + ".")), 
+    _solver.reset(new HordeProcessAdapter(_params, 
             getDescription().getPayloads(), 
-            getDescription().getAssumptions(getDescription().getRevision()), 
-            getDescription().getNumVars()
-        )
-    );
+            getDescription().getAssumptions(getDescription().getRevision())));
+    _solver->run();
+
     _clause_comm = (void*) new AnytimeSatClauseCommunicator(_params, this);
 
     if (_abort_after_initialization) {
