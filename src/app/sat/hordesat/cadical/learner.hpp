@@ -15,7 +15,6 @@ struct HordeLearner : public CaDiCaL::Learner {
 			_currClause.push_back(lit);
 		} else {
 			// Received a zero - clause is finished
-
 			int glue = _currClause.size();
 
 			// Add (glue + 1) to the front of the clause if not at unit
@@ -23,6 +22,7 @@ struct HordeLearner : public CaDiCaL::Learner {
 		        _currClause.insert(_currClause.begin(), glue + 1);
 
 			_callback->processClause(_currClause, _portfolio.getLocalId());
+			_currClause.clear();
 		}
 	}
 
