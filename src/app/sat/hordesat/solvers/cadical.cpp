@@ -108,7 +108,7 @@ void Cadical::addLearnedClause(const int* begin, int size) {
 		learnedClauses.emplace_back(begin, begin + 1);
 	} else {
 		// Skip glue in front of array
-		learnedClauses.emplace_back(begin + 1, begin + (size - 1));
+		learnedClauses.emplace_back(begin + 1, begin + size);
 	}
 }
 
