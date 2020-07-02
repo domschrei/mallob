@@ -10,22 +10,33 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <map>
 
-namespace Proc {
+#include "util/sys/threading.hpp"
 
-    pid_t getPid();
-    long getTid();
+class Proc {
+
+private:
+    static std::map<long, float> _tid_lastcall;
+    static std::map<long, unsigned long> _tid_utime;
+    static std::map<long, unsigned long> _tid_stime;
+
+    static Mutex _tid_lock;
+
+public:
+    static pid_t getPid();
+    static long getTid();
 
     // https://stackoverflow.com/a/671389
-    void getSelfMemAndSchedCpu(int& cpu, double& vm_usage, double& resident_set);
+    static void getSelfMemAndSchedCpu(int& cpu, double& vm_usage, double& resident_set);
 
     /*
     If successful, returns the used CPU ratio and the share of time it spent in kernel mode.
     Measured SINCE the previous call to this method. The first call initializes
     the measurement and is guaranteed to fail.
     */
-    bool getThreadCpuRatio(long tid, double& cpuRatio, float& sysShare);
+    static bool getThreadCpuRatio(long tid, double& cpuRatio, float& sysShare);
 
-}
+};
 
 #endif
