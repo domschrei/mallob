@@ -35,7 +35,7 @@ void doNothing(int signum) {
 }
 
 void handleAbort(int sig) {
-    int maxArraySize = 30;
+    const int maxArraySize = 30;
     void *array[maxArraySize];
     size_t size;
 
