@@ -8,24 +8,24 @@ class Fork {
 
 public:
     static int _rank;
-    static std::set<int> _children;
+    static std::set<pid_t> _children;
 
     static void init(int rank, bool leafProcess = false);
     
     static int createChild();
     
-    static void terminate(int childpid);
-    static void hardkill(int childpid);
-    static void suspend(int childpid);
-    static void resume(int childpid);
-    static void wakeUp(int childpid);
+    static void terminate(pid_t childpid);
+    static void hardkill(pid_t childpid);
+    static void suspend(pid_t childpid);
+    static void resume(pid_t childpid);
+    static void wakeUp(pid_t childpid);
 
     static void terminateAll();
 
-    static void sendSignal(int childpid, int signum);
+    static void sendSignal(pid_t childpid, int signum);
 
     /* 0: running, -1: error, childpid: exited */
-    static bool didChildExit(int childpid);
+    static bool didChildExit(pid_t childpid);
 };
 
 #endif

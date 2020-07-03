@@ -18,7 +18,7 @@
 
 void propagateSignalAndExit(int signum) {
 
-    std::set<int> children = Fork::_children;
+    std::set<pid_t> children = Fork::_children;
     
     // Propagate signal to children
     for (pid_t child : children) {
@@ -48,7 +48,7 @@ void handleAbort(int sig) {
     size_t size;
 
     // get void*'s for all entries on the stack
-    size = backtrace(array, 20);
+    size = backtrace(array, 30);
 
     // print out all the frames
     Console::log(Console::CRIT, "Error from pid=%ld tid=%ld: signal %d. Backtrace:\n", Proc::getPid(), Proc::getTid(), sig);
@@ -128,18 +128,19 @@ void Fork::terminateAll() {
         terminate(childpid);
     }
 }
-bool Fork::didChildExit(pid_t childpid) {
-    int status;
-    pid_t result = waitpid(childpid, &status, WNOHANG /*| WUNTRACED | WCONTINUED*/);
-    if (result == -1) {
-        Console::log(Console::WARN, "[WARN] waitpid returned -1");
-    }
-    return result > 0;
-}
 
-void Fork::sendSignal(int childpid, int signum) {
+void Fork::sendSignal(pid_t childpid, int signum) {
     int result = kill(childpid, signum);
     if (result == -1) {
         Console::log(Console::WARN, "[WARN] kill -%i %i returned -1", signum, childpid);
     }
+}
+
+bool Fork::didChildExit(pid_t childpid) {
+    int status;
+    pid_t result = waitpid(childpid, &status, WNOHANG /*| WUNTRACED | WCONTINUED*/);
+    if (result == -1) {
+        Console::log(Console::WARN, "[WARN] waitpid %i returned -1", childpid);
+    }
+    return result > 0;
 }
