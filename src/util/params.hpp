@@ -39,12 +39,18 @@ public:
 	void setParam(const string& name, const string& value);
 
 	bool isSet(const string& name) const;
-	string getParam(const string& name, const string& defaultValue) const;
+	
 	string getParam(const string& name) const;
-	int getIntParam(const string& name, int defaultValue) const;
-	float getFloatParam(const string& name, float defaultValue) const;
+	string getParam(const string& name, const string& defaultValue) const;
+
 	int getIntParam(const string& name) const;
+	int getIntParam(const string& name, int defaultValue) const;
+	
 	float getFloatParam(const string& name) const;
+	float getFloatParam(const string& name, float defaultValue) const;
+
+	double getDoubleParam(const string& name) const;
+	double getDoubleParam(const string& name, double defaultValue) const;
 
 	const map<string, string>& getMap() const;
 };

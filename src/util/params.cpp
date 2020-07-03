@@ -206,7 +206,7 @@ int Parameters::getIntParam(const string& name) const {
     return atoi(_params.at(name).c_str());
 }
 
-float Parameters::getFloatParam(const string& name, float defaultValue) const {
+double Parameters::getDoubleParam(const string& name, double defaultValue) const {
     if (isSet(name)) {
         return atof(_params.at(name).c_str());
     } else {
@@ -214,9 +214,16 @@ float Parameters::getFloatParam(const string& name, float defaultValue) const {
     }
 }
 
-float Parameters::getFloatParam(const string& name) const {
+double Parameters::getDoubleParam(const string& name) const {
     assert(isSet(name));
     return atof(_params.at(name).c_str());
+}
+
+float Parameters::getFloatParam(const string& name, float defaultValue) const {
+    return (float)getDoubleParam(name, defaultValue);
+}
+float Parameters::getFloatParam(const string& name) const {
+    return (float)getDoubleParam(name);
 }
 
 const std::map<std::string, std::string>& Parameters::getMap() const {

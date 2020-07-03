@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
     Parameters params;
     params.init(argc, argv);
     
-    Timer::init(params.getFloatParam("starttime"));
+    Timer::init(params.getDoubleParam("starttime"));
 
     int rankOfParent = params.getIntParam("rank");
 
