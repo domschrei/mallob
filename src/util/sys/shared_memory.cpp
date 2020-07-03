@@ -39,7 +39,7 @@ namespace SharedMemory {
             return nullptr;
         }
 
-        void *buffer = mmap(NULL, size, PROT_READ, MAP_SHARED, memFd, 0);
+        void *buffer = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, memFd, 0);
         if (buffer == NULL)
         {
             perror("Can't mmap");
