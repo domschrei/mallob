@@ -62,7 +62,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& p
     if (programParams.isSet("aod")) params["aod"];
     
     // Set up "management" block of shared memory created by the parent
-    std::string shmemId = "/edu.kit.mallob." + identifier;
+    std::string shmemId = "/edu.kit.iti.mallob." + std::to_string(Proc::getParentPid()) + "." + programParams.getParam("rank") + "." + identifier;
     log->log(Console::VERB, "Access base shmem: %s", shmemId.c_str());
     HordeSharedMemory* hsm = (HordeSharedMemory*) SharedMemory::access(shmemId, sizeof(HordeSharedMemory));
     assert(hsm != nullptr);

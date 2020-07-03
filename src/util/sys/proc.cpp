@@ -19,6 +19,10 @@ pid_t Proc::getPid() {
    return getpid();
 }
 
+pid_t Proc::getParentPid() {
+   return getppid();
+}
+
 long Proc::getTid() {
    return syscall(SYS_gettid);
 }
