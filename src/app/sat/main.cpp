@@ -75,8 +75,8 @@ void runSolverEngine(Parameters& programParams) {
         fIdx++;
     }
     std::shared_ptr<std::vector<int>> assumptions;
-    if (programParams.isSet("asmptbufsize" + std::to_string(fIdx))) {
-        int aSize = programParams.getIntParam("asmptbufsize" + std::to_string(fIdx));
+    if (programParams.isSet("asmptbufsize")) {
+        int aSize = programParams.getIntParam("asmptbufsize");
         int* aPtr = (int*) SharedMemory::access(shmemId + ".assumptions", aSize);
         assumptions.reset(new std::vector<int>(aPtr, aPtr+(aSize/sizeof(int))));
     }
