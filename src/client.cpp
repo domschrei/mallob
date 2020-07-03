@@ -213,7 +213,7 @@ void Client::introduceJob(std::shared_ptr<JobDescription>& jobPtr) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
-    if (job.getPayload(0)->size() <= 1) {
+    if (job.getPayload(0) == nullptr || job.getPayload(0)->size() <= 1) {
         // Some I/O error kept the instance from being read
         Console::log(Console::WARN, "Skipping job #%i due to previous I/O error", jobId);
         return;
