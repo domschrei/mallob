@@ -27,6 +27,7 @@ bool ForkedSatJob::appl_initialize() {
     slvParams.setParam("rank", std::to_string(_world_rank));
     slvParams.setParam("jobid", std::to_string(getId()));
     slvParams.setParam("jobstr", std::string(toStr()));
+    slvParams.setParam("starttime", std::to_string((float)Timer::getStartTime()));
 
     _solver.reset(new HordeProcessAdapter(slvParams, 
             getDescription().getPayloads(), 

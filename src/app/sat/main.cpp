@@ -213,10 +213,11 @@ void runSolverEngine(Parameters& programParams) {
 
 int main(int argc, char *argv[]) {
     
-    Timer::init();
 
     Parameters params;
     params.init(argc, argv);
+    
+    Timer::init(params.getFloatParam("starttime"));
 
     int rankOfParent = params.getIntParam("rank");
 

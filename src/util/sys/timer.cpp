@@ -4,19 +4,21 @@
 #include "timer.hpp"
 
 using namespace std::chrono;
-high_resolution_clock::time_point startTime;
+double startTime;
 
-void Timer::init() {
-    startTime = high_resolution_clock::now();
+double Timer::now() {
+    return 0.001 * 0.001 * 0.001 * system_clock::now().time_since_epoch().count();
+}
+
+void Timer::init(double start) {
+    startTime = start == -1 ? now() : start;
 }
 
 /**
  * Returns elapsed time since program start (since MyMpi::init) in seconds.
  */
 float Timer::elapsedSeconds() {
-    high_resolution_clock::time_point nowTime = high_resolution_clock::now();
-    duration<double, std::milli> time_span = nowTime - startTime;
-    return time_span.count() / 1000;
+    return now() - startTime;
 }
 
 bool Timer::globalTimelimReached(Parameters& params) {

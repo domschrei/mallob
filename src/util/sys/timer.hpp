@@ -7,7 +7,7 @@
 class Timer {
 
 public:
-    static void init();
+    static void init(double start = -1);
 
     /**
      * Returns elapsed time since program start (since MyMpi::init) in seconds.
@@ -15,6 +15,12 @@ public:
     static float elapsedSeconds();
 
     static bool globalTimelimReached(Parameters& params);
+
+    static double getStartTime();
+
+private:
+    static double now();
+
 };
 
 #endif
