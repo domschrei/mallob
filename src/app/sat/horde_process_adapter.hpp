@@ -7,7 +7,6 @@
 #include "hordesat/utilities/logging_interface.hpp"
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
-#include "util/sys/pipe.hpp"
 #include "hordesat/solvers/solving_state.hpp"
 #include "hordesat/solvers/portfolio_solver_interface.hpp"
 #include "horde_shared_memory.hpp"
