@@ -24,3 +24,7 @@ float Timer::elapsedSeconds() {
 bool Timer::globalTimelimReached(Parameters& params) {
     return params.getFloatParam("T") > 0 && elapsedSeconds() > params.getFloatParam("T");
 }
+
+double Timer::getStartTime() {
+    return startTime;
+}
