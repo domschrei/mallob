@@ -23,7 +23,6 @@
 #define MALLOB_VERSION "(dbg)"
 #endif
 
-
 std::shared_ptr<LoggingInterface> getLog(Parameters& params) {
     return std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(
             "<h-" + params.getParam("jobstr") + ">", "#" + params.getParam("jobid") + "."));
@@ -99,7 +98,6 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& p
     hlib.beginSolving(formulae, assumptions);
     bool interrupted = false;
     std::vector<int> solutionVec;
-    int* solutionShmem;
 
     // Main loop
     while (true) {
@@ -197,8 +195,10 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& p
             // Write solution
             hsm->solutionSize = solutionVec.size();
             if (hsm->solutionSize > 0) {
-                solutionShmem = (int*) SharedMemory::create(shmemId + ".solution", hsm->solutionSize*sizeof(int));
-                memcpy(solutionShmem, solutionVec.data(), hsm->solutionSize*sizeof(int));
+                std::string solutionShmemId = shmemId + ".solution";
+                int solutionShmemSize =  hsm->solutionSize*sizeof(int);
+                int* solutionShmem = (int*) SharedMemory::create(solutionShmemId, solutionShmemSize);
+                memcpy(solutionShmem, solutionVec.data(), solutionShmemSize);
             }
             log->log(3, "DONE write solution\n");
             hsm->hasSolution = true;
@@ -211,7 +211,6 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& p
 
 int main(int argc, char *argv[]) {
     
-
     Parameters params;
     params.init(argc, argv);
     

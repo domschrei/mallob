@@ -115,6 +115,7 @@ pid_t HordeProcessAdapter::run() {
         _child_pid = res;
         //while (!_hsm->isSpawned) usleep(250 /* 1/4 milliseconds */);
         _state = SolvingStates::ACTIVE;
+        delete* argv;
         return res;
     }
 
@@ -199,7 +200,12 @@ bool HordeProcessAdapter::check() {
 std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
     if (_hsm->solutionSize == 0) return std::pair<SatResult, std::vector<int>>(_hsm->result, std::vector<int>()); 
     std::vector<int> solution(_hsm->solutionSize);
+
+    // ACCESS the existing shared memory segment to the solution vector
+    // and remember to clean it up later when destructing the adapter
     int* shmemSolution = (int*) SharedMemory::access(_shmem_id + ".solution", solution.size()*sizeof(int));
     memcpy(solution.data(), shmemSolution, solution.size()*sizeof(int));
+    _shmem.push_back(std::tuple<std::string, void*, int>(_shmem_id + ".solution", shmemSolution, solution.size()*sizeof(int)));
+    
     return std::pair<SatResult, std::vector<int>>(_hsm->result, solution);
 }
