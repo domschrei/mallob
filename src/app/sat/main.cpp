@@ -63,6 +63,7 @@ void runSolverEngine(Parameters& programParams) {
     std::string shmemId = "/edu.kit.mallob." + identifier;
     Console::log(Console::VERB, "Access base shmem: %s", shmemId.c_str());
     HordeSharedMemory* hsm = (HordeSharedMemory*) SharedMemory::access(shmemId, sizeof(HordeSharedMemory));
+    assert(hsm != nullptr);
 
     // Read formulae and assumptions from other individual blocks of shared memory
     std::vector<std::shared_ptr<std::vector<int>>> formulae;

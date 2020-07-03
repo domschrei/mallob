@@ -92,12 +92,12 @@ pid_t HordeProcessAdapter::run() {
 
     // Assemble c-style program arguments
     const char* execname = "mallob_sat_process";
-    const char** argv = new const char*[_params.getMap().size()+1];
+    const char** argv = new const char*[_params.getMap().size()+2];
     std::string argstr = "";
     argv[0] = execname;
     int i = 1;
     for (const auto& param : _params.getMap()) {
-        _params.setParam(param.first, "-" + param.first + "=" + param.second);
+        _params.setParam(param.first, "-" + param.first + (param.second.empty() ? std::string() : "=" + param.second));
         argv[i] = _params.getMap().at(param.first).c_str();
         argstr += " " + std::string(argv[i]);
         i++;
