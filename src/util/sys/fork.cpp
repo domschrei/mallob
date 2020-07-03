@@ -120,7 +120,7 @@ void Fork::resume(pid_t childpid) {
     sendSignal(childpid, SIGCONT);
 }
 void Fork::wakeUp(pid_t childpid) {
-    //sendSignal(childpid, SIGUSR1);
+    sendSignal(childpid, SIGUSR1);
 }
 void Fork::terminateAll() {
     std::set<int> children = _children;

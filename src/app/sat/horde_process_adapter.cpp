@@ -23,7 +23,7 @@ void HordeProcessAdapter::initSharedMemory() {
 
     // Initialize "management" shared memory
     _shmem_id = "/edu.kit.mallob." + _params.getParam("jobstr");
-    Console::log(Console::VERB, "Setup base shmem: %s", _shmem_id.c_str());
+    Console::log(Console::VVERB, "Setup base shmem: %s", _shmem_id.c_str());
     void* mainShmem = SharedMemory::create(_shmem_id, sizeof(HordeSharedMemory));
     _shmem.push_back(std::tuple<std::string, void*, int>(_shmem_id, mainShmem, sizeof(HordeSharedMemory)));
     _hsm = new ((char*)mainShmem) HordeSharedMemory();
@@ -106,7 +106,7 @@ pid_t HordeProcessAdapter::run() {
 
     setenv("PATH", ("build/app/sat:" + std::string((const char*) getenv("PATH"))).c_str(), /*overwrite=*/1);
 
-    Console::log(Console::VERB, "Invoke fork(); %s %s\n", execname, argstr.c_str());
+    Console::log(Console::VVERB, "EXEC %s%s\n", execname, argstr.c_str());
 
     // FORK: Create a child process
     pid_t res = Fork::createChild();

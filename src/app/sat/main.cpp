@@ -24,10 +24,12 @@
 #endif
 
 
+std::shared_ptr<LoggingInterface> getLog(Parameters& params) {
+    return std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(
+            "<h-" + params.getParam("jobstr") + ">", "#" + params.getParam("jobid") + "."));
+}
 
-
-
-void runSolverEngine(Parameters& programParams) {
+void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& programParams) {
 
     // Set up parameters for Horde
     std::map<std::string, std::string> params;
@@ -61,7 +63,7 @@ void runSolverEngine(Parameters& programParams) {
     
     // Set up "management" block of shared memory created by the parent
     std::string shmemId = "/edu.kit.mallob." + identifier;
-    Console::log(Console::VERB, "Access base shmem: %s", shmemId.c_str());
+    log->log(Console::VERB, "Access base shmem: %s", shmemId.c_str());
     HordeSharedMemory* hsm = (HordeSharedMemory*) SharedMemory::access(shmemId, sizeof(HordeSharedMemory));
     assert(hsm != nullptr);
 
@@ -225,21 +227,22 @@ int main(int argc, char *argv[]) {
             /*threadsafeOutput=*/false, /*quiet=*/params.isSet("q"), 
             /*cPrefix=*/params.isSet("sinst"), params.getParam("log"));
     
-    Console::log(Console::VERB, "Launching SAT engine %s", MALLOB_VERSION);
+    auto log = getLog(params);
+    log->log(Console::VERB, "Launching SAT engine %s", MALLOB_VERSION);
 
     // Initialize bookkeeping of child processes
     Fork::init(rankOfParent);
 
     try {
         // Launch program
-        runSolverEngine(params);
+        runSolverEngine(log, params);
 
     } catch (const std::exception &ex) {
-        Console::log(Console::CRIT, "Unexpected ERROR: \"%s\" - aborting", ex.what());
+        log->log(Console::CRIT, "Unexpected ERROR: \"%s\" - aborting", ex.what());
         Console::forceFlush();
         exit(1);
     } catch (...) {
-        Console::log(Console::CRIT, "Unexpected ERROR - aborting");
+        log->log(Console::CRIT, "Unexpected ERROR - aborting");
         Console::forceFlush();
         exit(1);
     }
