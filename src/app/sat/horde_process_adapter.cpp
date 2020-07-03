@@ -20,10 +20,10 @@ HordeProcessAdapter::HordeProcessAdapter(const Parameters& params,
 void HordeProcessAdapter::initSharedMemory() {
 
     // Initialize "management" shared memory
-    _shmem_id = "edu.kit.mallob/" + _params.getParam("jobname");
+    _shmem_id = "/edu.kit.mallob." + _params.getParam("jobname");
     void* mainShmem = SharedMemory::create(_shmem_id, sizeof(HordeSharedMemory));
     _shmem.push_back(std::tuple<std::string, void*, int>(_shmem_id, mainShmem, sizeof(HordeSharedMemory)));
-    _hsm = new (mainShmem) HordeSharedMemory();
+    _hsm = new ((char*)mainShmem) HordeSharedMemory();
     _hsm->portfolioRank = _params.getIntParam("mpirank");
     _hsm->portfolioSize = _params.getIntParam("mpisize");
     _hsm->doExport = false;
@@ -49,7 +49,7 @@ void HordeProcessAdapter::initSharedMemory() {
     int fIdx = 0;
     for (const auto& f : _formulae) {
         int size = sizeof(int) * f->size();
-        std::string fShmemId = _shmem_id + "/formulae/" + std::to_string(fIdx);
+        std::string fShmemId = _shmem_id + ".formulae." + std::to_string(fIdx);
         void* fShmem = SharedMemory::create(fShmemId, size);
         _shmem.push_back(std::tuple<std::string, void*, int>(fShmemId, fShmem, size));
         memcpy((int*)fShmem, f->data(), size);
@@ -58,7 +58,7 @@ void HordeProcessAdapter::initSharedMemory() {
 
     // Put assumptions into their own block of shared memory
     int size = sizeof(int) * _assumptions->size();
-    std::string aShmemId = _shmem_id + "/assumptions";
+    std::string aShmemId = _shmem_id + ".assumptions";
     void* aShmem = SharedMemory::create(aShmemId, size);
     _shmem.push_back(std::tuple<std::string, void*, int>(aShmemId, aShmem, size));
     memcpy((int*)aShmem, _assumptions->data(), size);
@@ -66,14 +66,14 @@ void HordeProcessAdapter::initSharedMemory() {
 
     // Create block of shared memory for clause export
     int maxExportBufferSize = _params.getIntParam("cbbs") * sizeof(int);
-    std::string exportShmemId = _shmem_id + "/clauseexport";
+    std::string exportShmemId = _shmem_id + ".clauseexport";
     _export_buffer = (int*) SharedMemory::create(exportShmemId, maxExportBufferSize);
     _shmem.push_back(std::tuple<std::string, void*, int>(exportShmemId, _export_buffer, maxExportBufferSize));
     memset(_export_buffer, 0, maxExportBufferSize);
 
     // Create block of shared memory for clause import
     int maxImportBufferSize = _params.getIntParam("cbbs") * sizeof(int) * _params.getIntParam("mpisize");
-    std::string importShmemId = _shmem_id + "/clauseimport";
+    std::string importShmemId = _shmem_id + ".clauseimport";
     _import_buffer = (int*) SharedMemory::create(importShmemId, maxImportBufferSize);
     _shmem.push_back(std::tuple<std::string, void*, int>(importShmemId, _import_buffer, maxImportBufferSize));
     memset(_import_buffer, 0, maxImportBufferSize);
@@ -185,7 +185,7 @@ bool HordeProcessAdapter::check() {
 std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
     if (_hsm->solutionSize == 0) return std::pair<SatResult, std::vector<int>>(_hsm->result, std::vector<int>()); 
     std::vector<int> solution(_hsm->solutionSize);
-    int* shmemSolution = (int*) SharedMemory::access((_shmem_id + "/solution").c_str(), solution.size());
+    int* shmemSolution = (int*) SharedMemory::access((_shmem_id + ".solution").c_str(), solution.size());
     memcpy(solution.data(), shmemSolution, solution.size()*sizeof(int));
     return std::pair<SatResult, std::vector<int>>(_hsm->result, solution);
 }

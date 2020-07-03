@@ -60,7 +60,7 @@ void runSolverEngine(Parameters& programParams) {
     if (programParams.isSet("aod")) params["aod"];
     
     // Set up "management" block of shared memory created by the parent
-    std::string shmemId = "edu.kit.mallob/" + identifier;
+    std::string shmemId = "/edu.kit.mallob." + identifier;
     HordeSharedMemory* hsm = (HordeSharedMemory*) SharedMemory::access(shmemId, sizeof(HordeSharedMemory));
 
     // Read formulae and assumptions from other individual blocks of shared memory
@@ -68,22 +68,22 @@ void runSolverEngine(Parameters& programParams) {
     int fIdx = 0;
     while (programParams.isSet("fbufsize" + std::to_string(fIdx))) {
         int fSize = programParams.getIntParam("fbufsize" + std::to_string(fIdx));
-        int* fPtr = (int*) SharedMemory::access(shmemId + "/formulae/" + std::to_string(fIdx), fSize);
+        int* fPtr = (int*) SharedMemory::access(shmemId + ".formulae." + std::to_string(fIdx), fSize);
         formulae.emplace_back(new std::vector<int>(fPtr, fPtr+(fSize/sizeof(int))));
         fIdx++;
     }
     std::shared_ptr<std::vector<int>> assumptions;
     if (programParams.isSet("asmptbufsize" + std::to_string(fIdx))) {
         int aSize = programParams.getIntParam("asmptbufsize" + std::to_string(fIdx));
-        int* aPtr = (int*) SharedMemory::access(shmemId + "/assumptions", aSize);
+        int* aPtr = (int*) SharedMemory::access(shmemId + ".assumptions", aSize);
         assumptions.reset(new std::vector<int>(aPtr, aPtr+(aSize/sizeof(int))));
     }
 
     // Set up export and import buffers for clause exchanges
     int maxExportBufferSize = programParams.getIntParam("cbbs") * sizeof(int);
-    int* exportBuffer = (int*) SharedMemory::access(shmemId + "/clauseexport", maxExportBufferSize);
+    int* exportBuffer = (int*) SharedMemory::access(shmemId + ".clauseexport", maxExportBufferSize);
     int maxImportBufferSize = programParams.getIntParam("cbbs") * sizeof(int) * programParams.getIntParam("mpisize");
-    int* importBuffer = (int*) SharedMemory::access(shmemId + "/clauseimport", maxImportBufferSize);
+    int* importBuffer = (int*) SharedMemory::access(shmemId + ".clauseimport", maxImportBufferSize);
 
     // Set up logging interface
     auto log = std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(
@@ -197,7 +197,7 @@ void runSolverEngine(Parameters& programParams) {
             // Write solution
             hsm->solutionSize = solutionVec.size();
             if (hsm->solutionSize > 0) {
-                solutionShmem = (int*) SharedMemory::create(shmemId + "/solution", hsm->solutionSize*sizeof(int));
+                solutionShmem = (int*) SharedMemory::create(shmemId + ".solution", hsm->solutionSize*sizeof(int));
                 memcpy(solutionShmem, solutionVec.data(), hsm->solutionSize*sizeof(int));
             }
             log->log(3, "DONE write solution\n");
