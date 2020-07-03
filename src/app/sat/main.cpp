@@ -89,10 +89,6 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& p
     int maxImportBufferSize = programParams.getIntParam("cbbs") * sizeof(int) * programParams.getIntParam("mpisize");
     int* importBuffer = (int*) SharedMemory::access(shmemId + ".clauseimport", maxImportBufferSize);
 
-    // Set up logging interface
-    auto log = std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(
-            "<h-" + std::string(identifier) + ">", "#" + programParams.getParam("jobid") + "."));
-
     // Signal initialization to parent
     pid_t pid = Proc::getPid();
     log->log(1, "Hello from child\n");
