@@ -31,7 +31,6 @@ bool ForkedSatJob::appl_initialize() {
     _solver.reset(new HordeProcessAdapter(slvParams, 
             getDescription().getPayloads(), 
             getDescription().getAssumptions(getDescription().getRevision())));
-    _solver->run();
 
     _clause_comm = (void*) new AnytimeSatClauseCommunicator(_params, this);
 

@@ -1,6 +1,7 @@
 
 #include <assert.h>
 #include <sys/types.h>
+#include <stdlib.h>
 
 #include "horde_process_adapter.hpp"
 
@@ -9,6 +10,7 @@
 #include "util/sys/proc.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/fork.hpp"
+#include "util/console.hpp"
 
 HordeProcessAdapter::HordeProcessAdapter(const Parameters& params,
             const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<std::vector<int>>& assumptions) :
@@ -88,13 +90,21 @@ HordeProcessAdapter::~HordeProcessAdapter() {
 pid_t HordeProcessAdapter::run() {
 
     // Assemble c-style program arguments
-    const char* argv[_params.getMap().size()+1];
+    const char** argv = new const char*[_params.getMap().size()+1];
+    std::string argstr = "";
     int i = 0;
     for (const auto& param : _params.getMap()) {
         _params.setParam(param.first, "-" + param.first + "=" + param.second);
-        argv[i++] = _params.getMap().at(param.first).c_str();
+        argv[i] = _params.getMap().at(param.first).c_str();
+        argstr += " " + std::string(argv[i]);
+        i++;
     }
     argv[i] = nullptr;
+    const char* execname = "mallob_sat_process";
+
+    setenv("PATH", ("build/app/sat:" + std::string((const char*) getenv("PATH"))).c_str(), /*overwrite=*/1);
+
+    Console::log(Console::VERB, "Invoke fork(); %s %s\n", execname, argstr.c_str());
 
     // FORK: Create a child process
     pid_t res = Fork::createChild();
@@ -108,7 +118,9 @@ pid_t HordeProcessAdapter::run() {
 
     // [child process]
     // Execute the SAT process.
-    execvp("mallob_sat_process", (char* const*)argv);
+    execvp(execname, (char* const*)argv);
+
+    abort(); // if this is reached, something went wrong with execvp
 }
 
 bool HordeProcessAdapter::isFullyInitialized() {
