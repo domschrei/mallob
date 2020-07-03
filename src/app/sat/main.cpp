@@ -61,6 +61,7 @@ void runSolverEngine(Parameters& programParams) {
     
     // Set up "management" block of shared memory created by the parent
     std::string shmemId = "/edu.kit.mallob." + identifier;
+    Console::log(Console::VERB, "Access base shmem: %s", shmemId.c_str());
     HordeSharedMemory* hsm = (HordeSharedMemory*) SharedMemory::access(shmemId, sizeof(HordeSharedMemory));
 
     // Read formulae and assumptions from other individual blocks of shared memory

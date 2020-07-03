@@ -22,7 +22,8 @@ HordeProcessAdapter::HordeProcessAdapter(const Parameters& params,
 void HordeProcessAdapter::initSharedMemory() {
 
     // Initialize "management" shared memory
-    _shmem_id = "/edu.kit.mallob." + _params.getParam("jobname");
+    _shmem_id = "/edu.kit.mallob." + _params.getParam("jobstr");
+    Console::log(Console::VERB, "Setup base shmem: %s", _shmem_id.c_str());
     void* mainShmem = SharedMemory::create(_shmem_id, sizeof(HordeSharedMemory));
     _shmem.push_back(std::tuple<std::string, void*, int>(_shmem_id, mainShmem, sizeof(HordeSharedMemory)));
     _hsm = new ((char*)mainShmem) HordeSharedMemory();
@@ -90,9 +91,11 @@ HordeProcessAdapter::~HordeProcessAdapter() {
 pid_t HordeProcessAdapter::run() {
 
     // Assemble c-style program arguments
+    const char* execname = "mallob_sat_process";
     const char** argv = new const char*[_params.getMap().size()+1];
     std::string argstr = "";
-    int i = 0;
+    argv[0] = execname;
+    int i = 1;
     for (const auto& param : _params.getMap()) {
         _params.setParam(param.first, "-" + param.first + "=" + param.second);
         argv[i] = _params.getMap().at(param.first).c_str();
@@ -100,7 +103,6 @@ pid_t HordeProcessAdapter::run() {
         i++;
     }
     argv[i] = nullptr;
-    const char* execname = "mallob_sat_process";
 
     setenv("PATH", ("build/app/sat:" + std::string((const char*) getenv("PATH"))).c_str(), /*overwrite=*/1);
 
