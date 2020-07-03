@@ -4,11 +4,14 @@
 
 #include <set>
 
+#include "util/sys/threading.hpp"
+
 class Fork {
 
 public:
     static int _rank;
     static std::set<pid_t> _children;
+    static bool _modifying_children;
 
     static void init(int rank, bool leafProcess = false);
     
