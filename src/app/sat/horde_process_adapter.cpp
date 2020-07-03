@@ -104,8 +104,6 @@ pid_t HordeProcessAdapter::run() {
     }
     argv[i] = nullptr;
 
-    setenv("PATH", ("build/app/sat:" + std::string((const char*) getenv("PATH"))).c_str(), /*overwrite=*/1);
-
     Console::log(Console::VVERB, "EXEC %s%s\n", execname, argstr.c_str());
 
     // FORK: Create a child process

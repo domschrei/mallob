@@ -80,6 +80,8 @@ void Fork::init(int rank, bool leafProcess) {
 
     _rank = rank;
     _modifying_children = false;
+
+    setenv("PATH", ("build/app/sat:" + std::string((const char*) getenv("PATH"))).c_str(), /*overwrite=*/1);
 }
 
 pid_t Fork::createChild() {
