@@ -199,7 +199,7 @@ bool HordeProcessAdapter::check() {
 std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
     if (_hsm->solutionSize == 0) return std::pair<SatResult, std::vector<int>>(_hsm->result, std::vector<int>()); 
     std::vector<int> solution(_hsm->solutionSize);
-    int* shmemSolution = (int*) SharedMemory::access((_shmem_id + ".solution").c_str(), solution.size());
+    int* shmemSolution = (int*) SharedMemory::access(_shmem_id + ".solution", solution.size()*sizeof(int));
     memcpy(solution.data(), shmemSolution, solution.size()*sizeof(int));
     return std::pair<SatResult, std::vector<int>>(_hsm->result, solution);
 }
