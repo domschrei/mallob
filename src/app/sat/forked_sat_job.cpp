@@ -28,7 +28,7 @@ bool ForkedSatJob::appl_initialize() {
     slvParams.setParam("jobid", std::to_string(getId()));
     slvParams.setParam("jobstr", std::string(toStr()));
 
-    _solver.reset(new HordeProcessAdapter(_params, 
+    _solver.reset(new HordeProcessAdapter(slvParams, 
             getDescription().getPayloads(), 
             getDescription().getAssumptions(getDescription().getRevision())));
     _solver->run();
