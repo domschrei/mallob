@@ -29,10 +29,11 @@ bool ForkedSatJob::appl_initialize() {
     slvParams.setParam("jobstr", std::string(toStr()));
     slvParams.setParam("starttime", std::to_string(Timer::getStartTime()));
 
+    auto lock = _solver_lock.getLock();
+
     _solver.reset(new HordeProcessAdapter(slvParams, 
             getDescription().getPayloads(), 
             getDescription().getAssumptions(getDescription().getRevision())));
-
     _clause_comm = (void*) new AnytimeSatClauseCommunicator(_params, this);
 
     if (_abort_after_initialization) {
@@ -55,7 +56,6 @@ bool ForkedSatJob::appl_doneInitializing() {
 }
 
 void ForkedSatJob::appl_updateRole() {
-    if (!solverNotNull()) return;
     auto lock = _solver_lock.getLock();
     if (solverNotNull()) getSolver()->updateRole(getIndex(), _comm_size);
 }
@@ -69,19 +69,16 @@ void ForkedSatJob::appl_updateDescription(int fromRevision) {
 }
 
 void ForkedSatJob::appl_pause() {
-    if (!solverNotNull()) return;
     auto lock = _solver_lock.getLock();
     if (solverNotNull()) getSolver()->setSolvingState(SolvingStates::SUSPENDED);
 }
 
 void ForkedSatJob::appl_unpause() {
-    if (!solverNotNull()) return;
     auto lock = _solver_lock.getLock();
     if (solverNotNull()) getSolver()->setSolvingState(SolvingStates::ACTIVE);
 }
 
 void ForkedSatJob::appl_interrupt() {
-    if (!solverNotNull()) return;
     auto lock = _solver_lock.getLock();
     if (solverNotNull()) {
         _solver->setSolvingState(SolvingStates::STANDBY); // interrupt SAT solving (but keeps solver threads!)
