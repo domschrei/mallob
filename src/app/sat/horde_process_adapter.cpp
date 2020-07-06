@@ -34,6 +34,7 @@ void HordeProcessAdapter::initSharedMemory() {
     _hsm->doDumpStats = false;
     _hsm->doUpdateRole = false;
     _hsm->doInterrupt = false;
+    _hsm->doTerminate = false;
     _hsm->exportBufferMaxSize = 0;
     _hsm->importBufferSize = 0;
     _hsm->didExport = false;
@@ -41,6 +42,7 @@ void HordeProcessAdapter::initSharedMemory() {
     _hsm->didDumpStats = false;
     _hsm->didUpdateRole = false;
     _hsm->didInterrupt = false;
+    _hsm->didTerminate = false;
     _hsm->isSpawned = false;
     _hsm->isInitialized = false;
     _hsm->hasSolution = false;
@@ -136,7 +138,8 @@ void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
     if (state == _state) return;
 
     if (state == SolvingStates::ABORTING) {
-        Fork::terminate(_child_pid); // Terminate child process.
+        //Fork::terminate(_child_pid); // Terminate child process by signal.
+        _hsm->doTerminate = true; // Kindly ask child process to terminate.
     }
     if (state == SolvingStates::SUSPENDED) {
         Fork::suspend(_child_pid); // Stop (suspend) process.

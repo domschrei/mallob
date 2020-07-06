@@ -18,6 +18,7 @@ struct HordeSharedMemory {
     bool doDumpStats;
     bool doUpdateRole;
     bool doInterrupt;
+    bool doTerminate;
 
     // Responses child->parent
     bool didExport;
@@ -25,6 +26,7 @@ struct HordeSharedMemory {
     bool didDumpStats;
     bool didUpdateRole;
     bool didInterrupt;
+    bool didTerminate;
 
     // State alerts child->parent
     bool isSpawned;

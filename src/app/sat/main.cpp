@@ -103,6 +103,10 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& p
     bool interrupted = false;
     std::vector<int> solutionVec;
 
+    std::string solutionShmemId = "";
+    char* solutionShmem;
+    int solutionShmemSize;
+
     // Main loop
     while (true) {
 
@@ -112,6 +116,12 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& p
         int sleepStatus = usleep(1000 /*1 millisecond*/);
         time = Timer::elapsedSeconds() - time;
         if (sleepStatus != 0) log->log(3, "Woken up after %i us\n", (int) (1000*1000*time));
+
+        // Terminate
+        if (hsm->doTerminate) {
+            log->log(3, "DO terminate\n");
+            break;
+        }
 
         // Interrupt solvers
         if (hsm->doInterrupt && !hsm->didInterrupt) {
@@ -199,9 +209,9 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& p
             // Write solution
             hsm->solutionSize = solutionVec.size();
             if (hsm->solutionSize > 0) {
-                std::string solutionShmemId = shmemId + ".solution";
-                int solutionShmemSize =  hsm->solutionSize*sizeof(int);
-                int* solutionShmem = (int*) SharedMemory::create(solutionShmemId, solutionShmemSize);
+                solutionShmemId = shmemId + ".solution";
+                solutionShmemSize =  hsm->solutionSize*sizeof(int);
+                solutionShmem = (char*) SharedMemory::create(solutionShmemId, solutionShmemSize);
                 memcpy(solutionShmem, solutionVec.data(), solutionShmemSize);
             }
             log->log(3, "DONE write solution\n");
@@ -209,6 +219,12 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& p
             continue;
         }
     }
+
+    SharedMemory::free(shmemId + ".clauseexport", (char*)exportBuffer, maxExportBufferSize);
+    SharedMemory::free(shmemId + ".clauseimport", (char*)importBuffer, maxImportBufferSize);
+    if (!solutionShmemId.empty()) SharedMemory::free(solutionShmemId, solutionShmem, solutionShmemSize);
+    hsm->didTerminate = true;
+    SharedMemory::free(shmemId, (char*)hsm, sizeof(HordeSharedMemory));
 }
 
 
@@ -229,7 +245,7 @@ int main(int argc, char *argv[]) {
     auto log = getLog(params);
     log->log(Console::VERB, "Launching SAT engine %s", MALLOB_VERSION);
 
-    // Initialize bookkeeping of child processes
+    // Initialize signal handlers
     Fork::init(rankOfParent);
 
     try {
