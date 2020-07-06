@@ -71,15 +71,19 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& p
     int fIdx = 0;
     while (programParams.isSet("fbufsize" + std::to_string(fIdx))) {
         int fSize = programParams.getIntParam("fbufsize" + std::to_string(fIdx));
-        int* fPtr = (int*) SharedMemory::access(shmemId + ".formulae." + std::to_string(fIdx), fSize);
+        std::string fId = shmemId + ".formulae." + std::to_string(fIdx);
+        int* fPtr = (int*) SharedMemory::access(fId, fSize);
         formulae.emplace_back(new std::vector<int>(fPtr, fPtr+(fSize/sizeof(int))));
+        SharedMemory::free(fId, (char*)fPtr, fSize);
         fIdx++;
     }
     std::shared_ptr<std::vector<int>> assumptions;
     if (programParams.isSet("asmptbufsize")) {
         int aSize = programParams.getIntParam("asmptbufsize");
-        int* aPtr = (int*) SharedMemory::access(shmemId + ".assumptions", aSize);
+        std::string aId = shmemId + ".assumptions";
+        int* aPtr = (int*) SharedMemory::access(aId, aSize);
         assumptions.reset(new std::vector<int>(aPtr, aPtr+(aSize/sizeof(int))));
+        SharedMemory::free(aId, (char*)aPtr, aSize);
     }
 
     // Set up export and import buffers for clause exchanges
