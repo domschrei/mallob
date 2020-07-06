@@ -22,7 +22,7 @@ HordeProcessAdapter::HordeProcessAdapter(const Parameters& params,
 void HordeProcessAdapter::initSharedMemory() {
 
     // Initialize "management" shared memory
-    _shmem_id = "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + "." + _params.getParam("rank") + "." + _params.getParam("jobstr");
+    _shmem_id = "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + "." + _params.getParam("rank") + ".#" + _params.getParam("jobid");
     Console::log(Console::VVERB, "Setup base shmem: %s", _shmem_id.c_str());
     void* mainShmem = SharedMemory::create(_shmem_id, sizeof(HordeSharedMemory));
     _shmem.push_back(std::tuple<std::string, void*, int>(_shmem_id, mainShmem, sizeof(HordeSharedMemory)));

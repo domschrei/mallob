@@ -51,8 +51,8 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& p
     params["v"] = "99"; // (this->_params.getIntParam("v") >= 3 ? "1" : "0"); // verbosity
     params["mpirank"] = programParams.getParam("mpirank"); // mpi_rank
     params["mpisize"] = programParams.getParam("mpisize"); // mpi_size
-    std::string identifier = programParams.getParam("jobstr");
-    params["jobstr"] = identifier;
+    std::string identifier = "#" + programParams.getParam("jobid");
+    params["jobstr"] = programParams.getParam("jobstr");
     if (programParams.isSet("sinst")) {
         // Single instance filename
         params["sinst"] = programParams.getParam("sinst");
