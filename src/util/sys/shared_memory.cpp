@@ -5,28 +5,20 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <assert.h>
 
 namespace SharedMemory {
 
     void* create(const std::string& specifier, size_t size) {
 
         int memFd = shm_open(specifier.c_str(), O_CREAT | O_RDWR, S_IRWXU);
-        if (memFd == -1) {
-            perror("Can't open file");
-            return nullptr;
-        }
+        assert(memFd != -1);
 
         int res = ftruncate(memFd, size);
-        if (res == -1) {
-            perror("Can't truncate file");
-            return nullptr;
-        }
+        assert(res != -1);
 
         void *buffer = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, memFd, 0);
-        if (buffer == NULL) {
-            perror("Can't mmap");
-            return nullptr;
-        }
+        assert(buffer != nullptr);
 
         return buffer;
     }

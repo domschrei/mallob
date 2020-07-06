@@ -383,6 +383,11 @@ void JobDatabase::forgetOldJobs() {
             if (!job.isActive() && job.isDoneInitializing()) job.endInitialization();
             continue;
         }
+        // Jobs that were never active
+        if (job.isInState({NONE}) && job.getAge() >= 60) {
+            jobsToForget.push_back(id);
+            continue;
+        }
         // Suspended jobs: Forget w.r.t. age, but only if there is a limit on the job cache
         if (jobCacheSize > 0 && job.isSuspended()) {
             // Job must not be rooted here
@@ -390,10 +395,6 @@ void JobDatabase::forgetOldJobs() {
             // Insert job into PQ according to its age 
             float age = job.getAgeSinceActivation();
             suspendedQueue.emplace(id, age);
-        }
-        // Jobs that were never active
-        if (job.isInState({NONE}) && job.getAge() >= 60) {
-            jobsToForget.push_back(id);
         }
         // Past jobs
         if (job.isPast() || job.isForgetting()) {
