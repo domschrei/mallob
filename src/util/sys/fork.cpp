@@ -101,7 +101,6 @@ pid_t Fork::createChild() {
 
 void Fork::terminate(pid_t childpid) {
     sendSignal(childpid, SIGTERM);
-    sendSignal(childpid, SIGCONT);
 }
 void Fork::hardkill(pid_t childpid) {
     sendSignal(childpid, SIGKILL);
@@ -119,6 +118,7 @@ void Fork::terminateAll() {
     std::set<int> children = _children;
     for (int childpid : children) {
         terminate(childpid);
+        resume(childpid);
     }
 }
 

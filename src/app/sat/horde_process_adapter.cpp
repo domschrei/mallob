@@ -140,6 +140,7 @@ void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
     if (state == SolvingStates::ABORTING) {
         //Fork::terminate(_child_pid); // Terminate child process by signal.
         _hsm->doTerminate = true; // Kindly ask child process to terminate.
+        Fork::resume(_child_pid); // Continue (resume) process.
     }
     if (state == SolvingStates::SUSPENDED) {
         Fork::suspend(_child_pid); // Stop (suspend) process.
