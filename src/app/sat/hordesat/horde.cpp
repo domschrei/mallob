@@ -41,6 +41,8 @@
 #include "utilities/debug_utils.hpp"
 #include "utilities/default_logging_interface.hpp"
 #include "sharing/default_sharing_manager.hpp"
+#include "solvers/cadical.hpp"
+#include "solvers/lingeling.hpp"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -90,13 +92,28 @@ void HordeLib::init() {
 	solversCount = params.getIntParam("t", 1);
 	//printf("solvers is %d", solversCount);
 
+	int which = params.getIntParam("satsolver", 1);
 	for (int i = 0; i < solversCount; i++) {
 		int solverId = i + solversCount * mpi_rank;
 		
 		// TODO When there are multiple solver implementations,
 		// allocate them here instead of / together with Lingeling
-		
-		solverInterfaces.emplace_back(new Lingeling(*logger, solverId, i, params.getParam("jobstr"), params.isSet("aod")));	
+		switch (which) {
+		case 1:
+			// Lingeling
+			solverInterfaces.emplace_back(new Lingeling(*logger, solverId, i, params.getParam("jobstr"), params.isSet("aod")));
+			break;
+		case 2:
+			// Cadical
+			solverInterfaces.emplace_back(new Cadical(*logger, solverId, i, params.getParam("jobstr")));
+			break;
+		default:
+			// Alternate between available solvers
+			solverInterfaces.emplace_back(i % 2 == 0 ? 
+				(PortfolioSolverInterface*) new Lingeling(*logger, solverId, i, params.getParam("jobstr"), params.isSet("aod")) :  
+				(PortfolioSolverInterface*) new Cadical(*logger, solverId, i, params.getParam("jobstr")));
+			break;
+		}
 	}
 
 	sleepInt = 1000 * params.getIntParam("i", 1000);
