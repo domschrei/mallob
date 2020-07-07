@@ -32,6 +32,8 @@ private:
 	HordeTerminator terminator;
     HordeLearner learner;
 
+	bool seedSet = false;
+
 public:
 	Cadical(LoggingInterface& logger, int globalId, int localId, std::string jobName);
 	 ~Cadical();

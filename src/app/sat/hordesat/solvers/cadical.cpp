@@ -25,7 +25,13 @@ void Cadical::addLiteral(int lit) {
 }
 
 void Cadical::diversify(int rank, int size) {
-	solver->set("seed", rank);
+
+	// Options may only be set in the initialization phase, so the seed cannot be re-set
+	if (!seedSet) {
+		solver->set("seed", rank);
+		seedSet = true;
+	}
+	
 	// TODO: More diversification
 }
 
