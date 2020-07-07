@@ -227,7 +227,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& p
     SharedMemory::free(shmemId, (char*)hsm, sizeof(HordeSharedMemory));
     
     // Exit normally, but avoid calling destructors (some threads may be unresponsive)
-    exit(0);
+    raise(SIGTERM);
 }
 
 
