@@ -207,7 +207,7 @@ const string& Parameters::operator[](const string& key) const {
 }
 
 string& Parameters::operator[](const string& key) {
-    return _params.at(key);
+    return _params[key];
 }
 
 int Parameters::getIntParam(const string& name) const {
