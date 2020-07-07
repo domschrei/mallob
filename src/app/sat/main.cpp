@@ -225,6 +225,9 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& p
     if (!solutionShmemId.empty()) SharedMemory::free(solutionShmemId, solutionShmem, solutionShmemSize);
     hsm->didTerminate = true;
     SharedMemory::free(shmemId, (char*)hsm, sizeof(HordeSharedMemory));
+    
+    // Exit normally, but avoid calling destructors (some threads may be unresponsive)
+    exit(0);
 }
 
 
