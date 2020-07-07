@@ -25,6 +25,7 @@ private:
 
 public:
     static pid_t getPid();
+    static pid_t getParentPid();
     static long getTid();
 
     // https://stackoverflow.com/a/671389
