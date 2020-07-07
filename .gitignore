@@ -6,6 +6,7 @@ logs/*
 src/include
 src/hordesat/minisat
 src/hordesat/lingeling
+src/hordesat/cadical
 src/hordesat/*.zip
 mallob
 .sconsign.dblite
