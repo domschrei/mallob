@@ -246,12 +246,12 @@ char* const* Parameters::asCArgs(const std::string& execName) const {
     int i = 1;
     for (const auto& param : _params) {
 
-        char* arg = (char*) malloc((1 + param.first.size() + (!param.second.empty() ? 1 + param.second.size() : 0)) * sizeof(char));
+        char* arg = (char*) malloc((2 + param.first.size() + (!param.second.empty() ? 1 + param.second.size() : 0)) * sizeof(char));
         strcpy(arg, "-");
         strcpy(arg+1, param.first.c_str());
         if (!param.second.empty()) {
-            strcpy(arg+1+param.first.size(), "=");
-            strcpy(arg+1+param.first.size()+1, param.second.c_str());
+            strcpy(arg+(1+param.first.size()), "=");
+            strcpy(arg+(1+param.first.size()+1), param.second.c_str());
         }
 
         argv[i] = arg;
