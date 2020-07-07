@@ -104,7 +104,7 @@ pid_t HordeProcessAdapter::run() {
         //while (!_hsm->isSpawned) usleep(250 /* 1/4 milliseconds */);
         _state = SolvingStates::ACTIVE;
 
-        int i = 0;
+        int i = 1;
         while (argv[i] != nullptr) free(argv[i++]);
         delete[] argv;
         
