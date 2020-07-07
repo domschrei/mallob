@@ -4,9 +4,9 @@ instances/large/
 *.so
 logs/*
 src/include
-src/hordesat/minisat
-src/hordesat/lingeling
-src/hordesat/cadical
+src/app/sat/hordesat/minisat
+src/app/sat/hordesat/lingeling
+src/app/sat/hordesat/cadical
 src/hordesat/*.zip
 mallob
 .sconsign.dblite

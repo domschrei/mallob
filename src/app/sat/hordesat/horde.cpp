@@ -121,8 +121,8 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 
 	finalResult = UNKNOWN;
 
-	maxSeconds = params.getIntParam("t", 0);
-	maxRounds = params.getIntParam("r", 0);
+	maxSeconds = params.getIntParam("hmaxsecs", 0);
+	maxRounds = params.getIntParam("hmaxrounds", 0);
 	round = 1;
 
 	for (int i = 0; i < solversCount; i++) {
