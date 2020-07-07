@@ -17,9 +17,11 @@ LINKERFLAGS:=-L${MPI_ROOT} -Lsrc/app/sat/hordesat/lingeling -Lsrc/app/sat/hordes
 INCLUDES:=-Isrc -I${MPI_INCLUDE}
 
 
-# All non-test .cpp sources of the project except for main.cpp 
-# (so that SOURCES can be used together with other main methods as well).
-SOURCES:=$(shell find src/ -name '*.cpp'|grep -vE "src/test/|/main.cpp")
+# All .cpp sources of the project except for 
+# - test files
+# - solver sources that are built separately and just included / linked
+# - any "main.cpp" files.
+SOURCES:=$(shell find src/ -name '*.cpp'|grep -vE "src/test/|src/app/sat/hordesat/(cadical|lingeling|yalsat)|/main.cpp")
 
 # Test sources: all .cpp files in src/test.
 TESTSOURCES:=$(shell find src/test/ -name '*.cpp')

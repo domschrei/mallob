@@ -1,4 +1,5 @@
-#include "app/sat/hordesat/cadical/cadical.hpp"
+
+#include "app/sat/hordesat/solvers/cadical_interface.hpp"
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 
 struct HordeLearner : public CaDiCaL::Learner {

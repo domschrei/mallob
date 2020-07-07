@@ -15,9 +15,9 @@
 #include "util/sys/threading.hpp"
 #include "app/sat/hordesat/utilities/logging_interface.hpp"
 
-#include "app/sat/hordesat/cadical/cadical.hpp"
-#include "app/sat/hordesat/cadical/terminator.hpp"
-#include "app/sat/hordesat/cadical/learner.hpp"
+#include "app/sat/hordesat/solvers/cadical_interface.hpp"
+#include "app/sat/hordesat/solvers/cadical_terminator.hpp"
+#include "app/sat/hordesat/solvers/cadical_learner.hpp"
 
 class Cadical : public PortfolioSolverInterface {
 

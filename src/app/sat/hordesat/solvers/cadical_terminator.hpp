@@ -1,8 +1,8 @@
+
 #include "app/sat/hordesat/utilities/logging_interface.hpp"
 #include "util/sys/threading.hpp"
 
-#include "app/sat/hordesat/cadical/cadical.hpp"
-#include "app/sat/hordesat/solvers/cadical.hpp"
+#include "app/sat/hordesat/solvers/cadical_interface.hpp"
 
 struct HordeTerminator : public CaDiCaL::Terminator {
     HordeTerminator(LoggingInterface &logger) : _logger(logger) {
