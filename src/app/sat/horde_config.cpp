@@ -16,7 +16,6 @@ void HordeConfig::applyDefault(Parameters& params, const Job& job) {
     }
     params["fd"]; // filter duplicate clauses
     params["i"] = "0"; // #microseconds to sleep during solve loop
-    params["v"] = "99"; // (this->_params.getIntParam("v") >= 3 ? "1" : "0"); // verbosity
     params["apprank"] = std::to_string(job.getIndex()); // rank within application
     params["mpisize"] = std::to_string(job.getGlobalNumWorkers()); // size of worker comm
     std::string identifier = std::string(job.toStr());
