@@ -9,7 +9,7 @@
 #include "util/console.hpp"
 #include "util/sys/timer.hpp"
 
-Job::Job(Parameters& params, int commSize, int worldRank, int jobId) :
+Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
             _params(params), 
             _comm_size(commSize), 
             _world_rank(worldRank), 

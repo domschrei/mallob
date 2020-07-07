@@ -22,13 +22,13 @@ HordeProcessAdapter::HordeProcessAdapter(const Parameters& params,
 void HordeProcessAdapter::initSharedMemory() {
 
     // Initialize "management" shared memory
-    _shmem_id = "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + "." + _params.getParam("rank") + ".#" + _params.getParam("jobid");
+    _shmem_id = "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + "." + _params["mpirank"] + ".#" + _params["jobid"];
     Console::log(Console::VVERB, "Setup base shmem: %s", _shmem_id.c_str());
     void* mainShmem = SharedMemory::create(_shmem_id, sizeof(HordeSharedMemory));
     _shmem.push_back(std::tuple<std::string, void*, int>(_shmem_id, mainShmem, sizeof(HordeSharedMemory)));
     _hsm = new ((char*)mainShmem) HordeSharedMemory();
-    _hsm->portfolioRank = _params.getIntParam("mpirank");
-    _hsm->portfolioSize = _params.getIntParam("mpisize");
+    _hsm->portfolioRank = atoi(_params["apprank"].c_str());
+    _hsm->portfolioSize = atoi(_params["mpisize"].c_str());
     _hsm->doExport = false;
     _hsm->doImport = false;
     _hsm->doDumpStats = false;
@@ -93,20 +93,8 @@ HordeProcessAdapter::~HordeProcessAdapter() {
 pid_t HordeProcessAdapter::run() {
 
     // Assemble c-style program arguments
-    const char* execname = "mallob_sat_process";
-    const char** argv = new const char*[_params.getMap().size()+2];
-    std::string argstr = "";
-    argv[0] = execname;
-    int i = 1;
-    for (const auto& param : _params.getMap()) {
-        _params.setParam(param.first, "-" + param.first + (param.second.empty() ? std::string() : "=" + param.second));
-        argv[i] = _params.getMap().at(param.first).c_str();
-        argstr += " " + std::string(argv[i]);
-        i++;
-    }
-    argv[i] = nullptr;
-
-    Console::log(Console::VVERB, "EXEC %s%s\n", execname, argstr.c_str());
+    char* const* argv = _params.asCArgs("mallob_sat_process");
+    Console::log(Console::VVERB, "EXEC child\n");
 
     // FORK: Create a child process
     pid_t res = Fork::createChild();
@@ -115,13 +103,17 @@ pid_t HordeProcessAdapter::run() {
         _child_pid = res;
         //while (!_hsm->isSpawned) usleep(250 /* 1/4 milliseconds */);
         _state = SolvingStates::ACTIVE;
+
+        int i = 0;
+        while (argv[i] != nullptr) free(argv[i++]);
         delete[] argv;
+        
         return res;
     }
 
     // [child process]
     // Execute the SAT process.
-    execvp(execname, (char* const*)argv);
+    execvp("mallob_sat_process", argv);
 
     abort(); // if this is reached, something went wrong with execvp
 }

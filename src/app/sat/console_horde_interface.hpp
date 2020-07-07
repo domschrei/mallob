@@ -30,17 +30,17 @@ public:
         if (_logfile != NULL) fclose(_logfile);
     }
 
-    double getTime() {
+    double getTime() const {
         return Timer::elapsedSeconds();
     }
 
-    void log(int verbosityLevel, const char* fmt, ...) override {
+    void log(int verbosityLevel, const char* fmt, ...) const override {
         va_list args;
         va_start(args, fmt);
         log_va_list(verbosityLevel, fmt, args);
         va_end(args);
     }
-    void log_va_list(int verbosityLevel, const char* fmt, va_list args) override {
+    void log_va_list(int verbosityLevel, const char* fmt, va_list args) const override {
 
         std::string str(fmt);
         
@@ -54,11 +54,11 @@ public:
         Console::log(verbosityLevel+2, str.c_str(), true, true, _logfile, argsCopy);
         va_end(argsCopy);
     }
-    std::shared_ptr<LoggingInterface> copy(std::string suffix) override {
+    std::shared_ptr<LoggingInterface> copy(std::string suffix) const override {
         return std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(_identifier + suffix, _logfile_suffix + suffix));
     }
 
-    void exitError(const char* fmt, ...) override {
+    void exitError(const char* fmt, ...) const override {
         va_list vl;
         va_start(vl, fmt);
         log_va_list(-2, "Exiting due to critical error:", vl);
@@ -66,7 +66,7 @@ public:
         va_end(vl);
         this->abort();
     }
-    void abort() override {
+    void abort() const override {
         Console::log(Console::CRIT, "ERROR - aborting");
         Console::forceFlush();
         exit(1);

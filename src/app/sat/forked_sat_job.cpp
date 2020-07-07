@@ -12,8 +12,9 @@
 #include "horde_shared_memory.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/fork.hpp"
+#include "horde_config.hpp"
 
-ForkedSatJob::ForkedSatJob(Parameters& params, int commSize, int worldRank, int jobId) : 
+ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId) : 
         BaseSatJob(params, commSize, worldRank, jobId), _job_comm_period(params.getFloatParam("s")) {
 }
 
@@ -21,20 +22,15 @@ bool ForkedSatJob::appl_initialize() {
 
     assert(hasJobDescription());
 
-    Parameters slvParams(_params);
-    slvParams.setParam("mpirank", std::to_string(getIndex()));
-    slvParams.setParam("mpisize", std::to_string(_comm_size));
-    slvParams.setParam("rank", std::to_string(_world_rank));
-    slvParams.setParam("jobid", std::to_string(getId()));
-    slvParams.setParam("jobstr", std::string(toStr()));
-    slvParams.setParam("starttime", std::to_string(Timer::getStartTime()));
-
     auto lock = _solver_lock.getLock();
 
-    _solver.reset(new HordeProcessAdapter(slvParams, 
+    Parameters hParams(_params);
+    HordeConfig::applyDefault(hParams, *this);
+
+    _solver.reset(new HordeProcessAdapter(hParams,
             getDescription().getPayloads(), 
             getDescription().getAssumptions(getDescription().getRevision())));
-    _clause_comm = (void*) new AnytimeSatClauseCommunicator(_params, this);
+    _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
 
     if (_abort_after_initialization) {
         return false;

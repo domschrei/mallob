@@ -31,7 +31,7 @@ private:
     SolvingStates::SolvingState _state;
 
 public:
-    HordeProcessAdapter(const Parameters& params,
+    HordeProcessAdapter(const Parameters& params, 
             const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<std::vector<int>>& assumptions);
     ~HordeProcessAdapter();
 

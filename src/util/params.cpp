@@ -201,6 +201,15 @@ int Parameters::getIntParam(const string& name, int defaultValue) const {
     }
 }
 
+const string& Parameters::operator[](const string& key) const {
+    assert(isSet(key));
+    return _params.at(key);
+}
+
+string& Parameters::operator[](const string& key) {
+    return _params.at(key);
+}
+
 int Parameters::getIntParam(const string& name) const {
     assert(isSet(name));
     return atoi(_params.at(name).c_str());
@@ -228,4 +237,26 @@ float Parameters::getFloatParam(const string& name) const {
 
 const std::map<std::string, std::string>& Parameters::getMap() const {
     return _params;
+}
+
+char* const* Parameters::asCArgs(const std::string& execName) const {
+
+    const char** argv = new const char*[_params.size()+2];
+    argv[0] = execName.c_str();
+    int i = 1;
+    for (const auto& param : _params) {
+
+        char* arg = (char*) malloc((1 + param.first.size() + (!param.second.empty() ? 1 + param.second.size() : 0)) * sizeof(char));
+        strcpy(arg, "-");
+        strcpy(arg+1, param.first.c_str());
+        if (!param.second.empty()) {
+            strcpy(arg+1+param.first.size(), "=");
+            strcpy(arg+1+param.first.size()+1, param.second.c_str());
+        }
+
+        argv[i] = arg;
+        i++;
+    }
+    argv[i] = nullptr;
+    return (char* const*) argv;
 }

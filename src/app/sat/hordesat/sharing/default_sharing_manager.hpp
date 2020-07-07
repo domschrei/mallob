@@ -14,7 +14,7 @@
 #include "app/sat/hordesat/sharing/sharing_manager_interface.hpp"
 #include "app/sat/hordesat/utilities/clause_database.hpp"
 #include "app/sat/hordesat/utilities/clause_filter.hpp"
-#include "app/sat/hordesat/utilities/parameter_processor.hpp"
+#include "util/params.hpp"
 
 #define COMM_BUFFER_SIZE 1500
 
@@ -26,9 +26,10 @@ protected:
 	// associated solvers
 	vector<std::shared_ptr<PortfolioSolverInterface>>& solvers;
 	vector<ClauseFilter*> solverFilters;
+	
 	// global parameters
-	ParameterProcessor& params;
-	LoggingInterface& logger;
+	const Parameters& params;
+	const LoggingInterface& logger;
 
 	ClauseDatabase cdb;
 	ClauseFilter nodeFilter;
@@ -66,7 +67,7 @@ protected:
 
 public:
 	DefaultSharingManager(int mpi_size, int mpi_rank, vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
-			ParameterProcessor& params);
+			const Parameters& params, const LoggingInterface& logger);
     int prepareSharing(int* begin, int maxSize);
     void digestSharing(const std::vector<int>& result);
 	void digestSharing(const int* begin, int buflen);

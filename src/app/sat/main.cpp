@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <assert.h>
 
 #include "util/sys/timer.hpp"
 #include "util/console.hpp"
@@ -23,45 +24,15 @@
 #define MALLOB_VERSION "(dbg)"
 #endif
 
-std::shared_ptr<LoggingInterface> getLog(Parameters& params) {
+std::shared_ptr<LoggingInterface> getLog(const Parameters& params) {
     return std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(
             "<h-" + params.getParam("jobstr") + ">", "#" + params.getParam("jobid") + "."));
 }
 
-void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& programParams) {
-
-    // Set up parameters for Horde
-    std::map<std::string, std::string> params;
-    params["e"] = "1"; // exchange mode: 0 = nothing, 1 = alltoall, 2 = log, 3 = asyncrumor
-    params["c"] = programParams.getParam("t"); // solver threads on this node
-    if (programParams.getIntParam("md") <= 1 && programParams.getIntParam("t") <= 1) {
-        // One thread on one node: do not diversify anything, but keep default solver settings
-        params["d"] = "0"; // no diversification
-    } else if (programParams.isSet("nophase")) {
-        // Do not do sparse random ("phase") diversification
-        params["d"] = "4"; // native diversification only
-    } else {
-        params["d"] = "7"; // sparse random + native diversification
-    }
-    params["fd"]; // filter duplicate clauses
-    params["cbbs"] = programParams.getParam("cbbs"); // clause buffer base size
-    params["icpr"] = programParams.getParam("icpr"); // increase clause production
-    params["mcl"] = programParams.getParam("mcl"); // max clause length
-    params["i"] = "0"; // #microseconds to sleep during solve loop
-    params["v"] = "99"; // (this->_params.getIntParam("v") >= 3 ? "1" : "0"); // verbosity
-    params["mpirank"] = programParams.getParam("mpirank"); // mpi_rank
-    params["mpisize"] = programParams.getParam("mpisize"); // mpi_size
-    std::string identifier = "#" + programParams.getParam("jobid");
-    params["jobstr"] = programParams.getParam("jobstr");
-    if (programParams.isSet("sinst")) {
-        // Single instance filename
-        params["sinst"] = programParams.getParam("sinst");
-    }
-    params["cfhl"] = programParams.getParam("cfhl");
-    if (programParams.isSet("aod")) params["aod"];
+void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Parameters& programParams) {
     
     // Set up "management" block of shared memory created by the parent
-    std::string shmemId = "/edu.kit.iti.mallob." + std::to_string(Proc::getParentPid()) + "." + programParams.getParam("rank") + "." + identifier;
+    std::string shmemId = "/edu.kit.iti.mallob." + std::to_string(Proc::getParentPid()) + "." + programParams.getParam("mpirank") + ".#" + programParams.getParam("jobid");
     log->log(Console::VERB, "Access base shmem: %s", shmemId.c_str());
     HordeSharedMemory* hsm = (HordeSharedMemory*) SharedMemory::access(shmemId, sizeof(HordeSharedMemory));
     assert(hsm != nullptr);
@@ -98,7 +69,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, Parameters& p
     hsm->isSpawned = true;
     
     // Prepare solver
-    HordeLib hlib(params, log);
+    HordeLib hlib(programParams, log);
     hlib.beginSolving(formulae, assumptions);
     bool interrupted = false;
     std::vector<int> solutionVec;
@@ -239,7 +210,7 @@ int main(int argc, char *argv[]) {
     
     Timer::init(params.getDoubleParam("starttime"));
 
-    int rankOfParent = params.getIntParam("rank");
+    int rankOfParent = params.getIntParam("mpirank");
 
     Console::init(rankOfParent, params.getIntParam("v"), params.isSet("colors"), 
             /*threadsafeOutput=*/false, /*quiet=*/params.isSet("q"), 

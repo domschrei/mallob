@@ -15,15 +15,16 @@ void SolverThread::log(int verb, const char* fmt, ...) {
     va_end(vl);
 }
 
-SolverThread::SolverThread(ParameterProcessor& params, std::shared_ptr<PortfolioSolverInterface> solver, 
+SolverThread::SolverThread(const Parameters& params, const LoggingInterface& logger,
+         std::shared_ptr<PortfolioSolverInterface> solver, 
         const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<vector<int>>& assumptions, 
         int localId, bool* finished) : 
     _params(params), _solver_ptr(solver), _solver(*solver), 
-    _logger(params.getLogger().copy("S"+std::to_string(_solver.getGlobalId()))), 
+    _logger(logger.copy("S"+std::to_string(_solver.getGlobalId()))), 
     _formulae(formulae), _assumptions(assumptions), 
     _local_id(localId), _finished_flag(finished) {
     
-    _portfolio_rank = _params.getIntParam("mpirank", 0);
+    _portfolio_rank = _params.getIntParam("apprank", 0);
     _portfolio_size = _params.getIntParam("mpisize", 1);
 
     _state = ACTIVE;
@@ -46,7 +47,7 @@ void SolverThread::init() {
 
 void SolverThread::pin() {
     
-    int solversCount = _params.getIntParam("c", 1);
+    int solversCount = _params.getIntParam("t", 1);
 	static int lastCpu = 0;
 	int numCores = sysconf(_SC_NPROCESSORS_ONLN);
 	int localRank = 0;
@@ -119,7 +120,7 @@ void SolverThread::read(const std::vector<int>& formula, int begin) {
 
 void SolverThread::diversify() {
 
-	int diversificationMode = _params.getIntParam("d", 1);
+	int diversificationMode = _params.getIntParam("diversify", 1);
 
     // Random seed: will be the same whenever rank and size stay the same,
     // changes to something completely new when rank or size change. 
@@ -172,7 +173,7 @@ void SolverThread::diversify() {
 
 void SolverThread::sparseDiversification(int mpi_size, int mpi_rank) {
 
-    int solversCount = _params.getIntParam("c", 1);
+    int solversCount = _params.getIntParam("t", 1);
     int totalSolvers = mpi_size * solversCount;
     int vars = _solver.getVariablesCount();
     int shift = (mpi_rank * solversCount) + _local_id;
@@ -193,7 +194,7 @@ void SolverThread::randomDiversification() {
 
 void SolverThread::sparseRandomDiversification(int mpi_size) {
 
-    int solversCount = _params.getIntParam("c", 1);
+    int solversCount = _params.getIntParam("t", 1);
 	int totalSolvers = solversCount * mpi_size;
     int vars = _solver.getVariablesCount();
 
@@ -206,13 +207,13 @@ void SolverThread::sparseRandomDiversification(int mpi_size) {
 
 void SolverThread::nativeDiversification(int mpi_rank, int mpi_size) {
 
-    int solversCount = _params.getIntParam("c", 1);
+    int solversCount = _params.getIntParam("t", 1);
     _solver.diversify(_solver.getGlobalId(), mpi_size*solversCount);
 }
 
 void SolverThread::binValueDiversification(int mpi_size, int mpi_rank) {
 
-    int solversCount = _params.getIntParam("c", 1);
+    int solversCount = _params.getIntParam("t", 1);
 	int totalSolvers = mpi_size * solversCount;
 	int tmp = totalSolvers;
 	int log = 0;

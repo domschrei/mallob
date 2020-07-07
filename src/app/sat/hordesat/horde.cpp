@@ -52,22 +52,12 @@
 
 using namespace SolvingStates;
 
-HordeLib::HordeLib(int argc, char** argv) {
-
-    params.init(argc, argv);
-    init();
-}
-
-HordeLib::HordeLib(const std::map<std::string, std::string>& map, std::shared_ptr<LoggingInterface> loggingInterface) {
+HordeLib::HordeLib(const Parameters& params, std::shared_ptr<LoggingInterface> loggingInterface) : params(params) {
 	
 	if (loggingInterface != NULL) {
 		this->logger = loggingInterface;
-		params.setLogger(this->logger);
+		// TODO set logger
 	}
-
-    for (auto it = map.begin(); it != map.end(); ++it) {
-        params.setParam(it->first.c_str(), it->second.c_str());
-    }
     init();
 }
 
@@ -77,7 +67,7 @@ void HordeLib::init() {
 		logger = std::shared_ptr<LoggingInterface>(
 			new DefaultLoggingInterface(params.getIntParam("v", 1), "<h-" + std::string(params.getParam("jobstr", "")) + ">")
 		);
-		params.setLogger(logger);
+		// TODO set logger
 	}
 
     startSolving = logger->getTime();
@@ -86,7 +76,7 @@ void HordeLib::init() {
     solvingState = INITIALIZING;
 	
     // Set MPI size and rank by params
-    mpi_rank = params.getIntParam("mpirank", mpi_rank);
+    mpi_rank = params.getIntParam("apprank", mpi_rank);
     mpi_size = params.getIntParam("mpisize", mpi_size);
 
 	//if (mpi_rank == 0) setVerbosityLevel(3);
@@ -97,7 +87,7 @@ void HordeLib::init() {
 			hostname, params.getParam("jobstr").c_str());
 	params.printParams();
 
-	solversCount = params.getIntParam("c", 1);
+	solversCount = params.getIntParam("t", 1);
 	//printf("solvers is %d", solversCount);
 
 	for (int i = 0; i < solversCount; i++) {
@@ -111,14 +101,8 @@ void HordeLib::init() {
 
 	sleepInt = 1000 * params.getIntParam("i", 1000);
 
-	int exchangeMode = params.getIntParam("e", 1);
-	sharingManager = NULL;
-	if (exchangeMode == 0) {
-		hlog(3, "Clause sharing disabled.\n");
-	} else {
-		sharingManager.reset(new DefaultSharingManager(mpi_size, mpi_rank, solverInterfaces, params));
-		hlog(3, "Initialized all-to-all clause sharing.\n");
-	}
+	sharingManager.reset(new DefaultSharingManager(mpi_size, mpi_rank, solverInterfaces, params, *logger));
+	hlog(3, "Initialized all-to-all clause sharing.\n");
 }
 
 void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
@@ -143,7 +127,7 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 
 	for (int i = 0; i < solversCount; i++) {
         //hlog(1, "initializing solver %i.\n", i);
-		solverThreads.emplace_back(new SolverThread(params, solverInterfaces[i], formulae, assumptions, i, &anySolutionFound));
+		solverThreads.emplace_back(new SolverThread(params, *logger, solverInterfaces[i], formulae, assumptions, i, &anySolutionFound));
 		solverThreads.back()->start();
 		//hlog(1, "initialized solver %i.\n", i);
 	}

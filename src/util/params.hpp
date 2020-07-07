@@ -42,6 +42,8 @@ public:
 	
 	string getParam(const string& name) const;
 	string getParam(const string& name, const string& defaultValue) const;
+	const string& operator[](const string& key) const;
+	string& operator[](const string& key);
 
 	int getIntParam(const string& name) const;
 	int getIntParam(const string& name, int defaultValue) const;
@@ -53,6 +55,7 @@ public:
 	double getDoubleParam(const string& name, double defaultValue) const;
 
 	const map<string, string>& getMap() const;
+	char* const* asCArgs(const std::string& execName) const;
 };
 
 #endif /* PARAMETERPROCESSOR_H_ */
