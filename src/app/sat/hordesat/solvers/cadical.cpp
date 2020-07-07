@@ -12,11 +12,13 @@
 #include "app/sat/hordesat/solvers/cadical.hpp"
 #include "app/sat/hordesat/utilities/debug_utils.hpp"
 
+const int CLAUSE_LEARN_INTERRUPT_THRESHOLD = 10000;
+
 Cadical::Cadical(LoggingInterface& logger, int globalId, int localId, std::string jobname)
 	: PortfolioSolverInterface(logger, globalId, localId, jobname), solver(new CaDiCaL::Solver), terminator(logger), learner(*this) {
 	
 	solver->connect_terminator(&terminator);
-	}
+}
 
 void Cadical::addLiteral(int lit) {
 	solver->add(lit);
@@ -109,6 +111,9 @@ void Cadical::addLearnedClause(const int* begin, int size) {
 	} else {
 		// Skip glue in front of array
 		learnedClauses.emplace_back(begin + 1, begin + size);
+	}
+	if (learnedClauses.size() > CLAUSE_LEARN_INTERRUPT_THRESHOLD) {
+		setSolverInterrupt();
 	}
 }
 
