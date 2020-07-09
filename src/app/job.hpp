@@ -190,7 +190,7 @@ public:
     // (NOT to be called by your application code implementing above methods!)
 
     // Constructor
-    Job(Parameters& params, int commSize, int worldRank, int jobId);
+    Job(const Parameters& params, int commSize, int worldRank, int jobId);
     
     // Equips the job instance with an initial job description in serialized form.
     void setDescription(std::shared_ptr<std::vector<uint8_t>> data);
@@ -293,10 +293,12 @@ public:
     // Elapsed seconds since termination of the job.
     float getAgeSinceAbort() const {return Timer::elapsedSeconds() - _time_of_abort;}
     // Return true iff this job instance has found a job result that it still needs to communicate.
-    bool isResultTransferPending() {return _result_transfer_pending;}
+    bool isResultTransferPending() const {return _result_transfer_pending;}
     // Returns whether the job is easily and quickly destructible as of now. 
     // (calls appl_isDestructible())
     bool isDestructible();
+    int getGlobalNumWorkers() const {return _comm_size;}
+    int getMyMpiRank() const {return _world_rank;}
 
     // ... for the job's affiliated job tree
 
@@ -377,7 +379,7 @@ public:
 
     // toString methods
 
-    const char* toStr() {
+    const char* toStr() const {
         return _name.c_str();
     };
     const char* jobStateToStr() const {return jobStateStrings[(int)_state];};

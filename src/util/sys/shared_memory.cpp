@@ -1,24 +1,49 @@
 
 #include "shared_memory.hpp"
 
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <assert.h>
+
 namespace SharedMemory {
 
-    // From https://stackoverflow.com/a/5656561
-    void* create(size_t size) {
-        // Our memory buffer will be readable and writable:
-        int protection = PROT_READ | PROT_WRITE;
+    void* create(const std::string& specifier, size_t size) {
 
-        // The buffer will be shared (meaning other processes can access it), but
-        // anonymous (meaning third-party processes cannot obtain an address for it),
-        // so only this process and its children will be able to use it:
-        int visibility = MAP_SHARED | MAP_ANONYMOUS;
+        int memFd = shm_open(specifier.c_str(), O_CREAT | O_RDWR, S_IRWXU);
+        assert(memFd != -1);
 
-        // The remaining parameters to `mmap()` are not important for this use case,
-        // but the manpage for `mmap` explains their purpose.
-        return mmap(NULL, size, protection, visibility, -1, 0);
+        int res = ftruncate(memFd, size);
+        assert(res != -1);
+
+        void *buffer = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, memFd, 0);
+        assert(buffer != nullptr);
+        close(memFd);
+
+        return buffer;
     }
 
-    void free(void* addr, size_t size) {
+    void* access(const std::string& specifier, size_t size) {
+
+        int memFd = shm_open(specifier.c_str(), O_RDWR, 0);
+        if (memFd == -1) {
+            perror("Can't open file");
+            return nullptr;
+        }
+
+        void *buffer = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, memFd, 0);
+        if (buffer == NULL) {
+            perror("Can't mmap");
+            return nullptr;
+        }
+        close(memFd);
+
+        return buffer;
+    }
+
+    void free(const std::string& specifier, char* addr, size_t size) {
         munmap(addr, size);
+        shm_unlink(specifier.c_str());
     }
 }

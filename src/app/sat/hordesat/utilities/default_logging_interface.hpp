@@ -26,17 +26,17 @@ public:
         this->identifier = identifier;
         this->start = getAbsoluteTimeLP();
     }
-    double getTime() override {
+    double getTime() const override {
         return getAbsoluteTimeLP() - start;
     }
 
-    void log(int verbosityLevel, const char* fmt, ...) override {
+    void log(int verbosityLevel, const char* fmt, ...) const override {
         va_list vl;
         va_start(vl, fmt);
         log_va_list(verbosityLevel, fmt, vl);
         va_end(vl);
     }
-    void log_va_list(int verbosityLevel, const char* fmt, va_list args) override {
+    void log_va_list(int verbosityLevel, const char* fmt, va_list args) const override {
         if (verbosityLevel <= verbosity) {
             int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
             printf("[%.3f] ", getTime());
@@ -45,11 +45,11 @@ public:
             //fflush(stdout);
         }
     }
-    std::shared_ptr<LoggingInterface> copy(std::string prefix) override {
+    std::shared_ptr<LoggingInterface> copy(std::string prefix) const override {
         return std::shared_ptr<LoggingInterface>(new DefaultLoggingInterface(verbosity, identifier + " " + prefix));
     }
 
-    void exitError(const char* fmt, ...) override {
+    void exitError(const char* fmt, ...) const override {
         va_list vl;
         va_start(vl, fmt);
         log_va_list(-1, "Exiting due to critical error:", vl);
@@ -57,12 +57,12 @@ public:
         va_end(vl);
         this->abort();
     }
-    void abort() override {
+    void abort() const override {
         exit(1);
     }
 
 private:
-    double getAbsoluteTimeLP() {
+    double getAbsoluteTimeLP() const {
         timeval time;
         gettimeofday(&time, NULL);
         return (double)time.tv_sec + (double)time.tv_usec * .000001;

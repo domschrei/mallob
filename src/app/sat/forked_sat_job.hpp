@@ -38,7 +38,7 @@ private:
 
 public:
 
-    ForkedSatJob(Parameters& params, int commSize, int worldRank, int jobId);
+    ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId);
     ~ForkedSatJob() override;
 
     bool appl_initialize() override;

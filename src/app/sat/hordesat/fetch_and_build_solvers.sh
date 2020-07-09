@@ -67,3 +67,18 @@ if [ ! -d lingeling ]; then
 else
     echo "Assuming that a correct installation of lingeling is present."
 fi
+
+if [ ! -d cadical ]; then
+
+    # get cadical
+    echo "Fetching CaDiCaL ..."
+    git clone https://github.com/arminbiere/cadical
+    cd cadical
+    ./configure
+    make
+    cp build/libcadical.a .
+    cd ..
+
+else
+    echo "Assuming that a correct installation of cadical is present."
+fi

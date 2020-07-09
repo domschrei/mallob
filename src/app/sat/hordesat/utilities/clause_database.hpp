@@ -26,7 +26,7 @@ struct Bucket {
 class ClauseDatabase {
 public:
 	ClauseDatabase() : logger(dli) {}
-	ClauseDatabase(LoggingInterface& logger) : logger(logger) {}
+	ClauseDatabase(const LoggingInterface& logger) : logger(logger) {}
 	virtual ~ClauseDatabase();
 
 	/**
@@ -55,7 +55,7 @@ public:
 
 private:
 	static DefaultLoggingInterface dli;
-	LoggingInterface& logger;
+	const LoggingInterface& logger;
 	Mutex addClauseLock;
 
 	// Structures for EXPORTING

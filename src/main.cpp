@@ -46,12 +46,12 @@ int main(int argc, char *argv[]) {
     params.init(argc, argv);
     Console::init(rank, params.getIntParam("v"), params.isSet("colors"), 
             /*threadsafeOutput=*/false, /*quiet=*/params.isSet("q"), 
-            /*cPrefix=*/params.isSet("sinst"), params.getParam("log"));
+            /*cPrefix=*/params.isSet("mono"), params.getParam("log"));
     
     if (rank == 0)
         params.printParams();
     if (params.isSet("h") || params.isSet("help") 
-            || (!params.isSet("sinst") && params.getFilename().size() == 0)) {
+            || (!params.isSet("mono") && params.getFilename().size() == 0)) {
         // Help requested or no job input provided
         if (rank == 0) {
             params.printUsage();

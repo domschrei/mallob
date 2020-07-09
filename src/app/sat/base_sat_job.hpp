@@ -7,7 +7,7 @@
 class BaseSatJob : public Job {
 
 public:
-    BaseSatJob(Parameters& params, int commSize, int worldRank, int jobId) : 
+    BaseSatJob(const Parameters& params, int commSize, int worldRank, int jobId) : 
         Job(params, commSize, worldRank, jobId) {}
     virtual ~BaseSatJob() {}
 

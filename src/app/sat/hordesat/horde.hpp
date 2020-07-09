@@ -9,12 +9,12 @@
 #define HORDELIB_H_
 
 #include "util/sys/threading.hpp"
-#include "utilities/parameter_processor.hpp"
 #include "utilities/logging_interface.hpp"
 #include "solvers/lingeling.hpp"
 #include "sharing/sharing_manager_interface.hpp"
 #include "solvers/solver_thread.hpp"
 #include "solvers/solving_state.hpp"
+#include "util/params.hpp"
 
 #include <thread>
 #include <vector>
@@ -54,7 +54,7 @@ private:
 	std::shared_ptr<LoggingInterface> logger;
 	
 	// settings
-	ParameterProcessor params;
+	Parameters params;
 
 	bool cleanedUp = false;
 
@@ -63,10 +63,10 @@ public:
 
 	// methods
 	HordeLib(int argc, char** argv);
-    HordeLib(const std::map<std::string, std::string>& params, std::shared_ptr<LoggingInterface> loggingInterface = NULL);
+    HordeLib(const Parameters& params, std::shared_ptr<LoggingInterface> loggingInterface = NULL);
 	~HordeLib();
 
-	ParameterProcessor& getParams() {return params;}
+	const Parameters& getParams() {return params;}
 
     void beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
 							const std::shared_ptr<std::vector<int>>& assumptions);

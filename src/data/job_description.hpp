@@ -28,7 +28,7 @@ private:
     int _num_vars = -1;
     std::vector<VecPtr> _payloads;
     std::vector<VecPtr> _assumptions;
-    VecPtr nullVec = NULL;
+    VecPtr nullVec = nullptr;
 
 public:
 

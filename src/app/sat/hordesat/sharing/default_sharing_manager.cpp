@@ -10,9 +10,11 @@
 #include "default_sharing_manager.hpp"
 
 DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
-		vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, ParameterProcessor& params)
-	:size(mpi_size),rank(mpi_rank),solvers(solvers),params(params),logger(params.getLogger()),
+		vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, 
+		const Parameters& params, const LoggingInterface& logger)
+	:size(mpi_size),rank(mpi_rank),solvers(solvers),params(params),logger(logger),
 	cdb(logger),nodeFilter(/*maxClauseLen=*/params.getIntParam("mcl", 0),/*checkUnits=*/true),callback(*this) {
+
     for (size_t i = 0; i < solvers.size(); i++) {
 		if (solvers.size() > 1) {
 			solverFilters.push_back(new ClauseFilter(/*maxClauseLen=*/params.getIntParam("mcl", 0), /*checkUnits=*/true));

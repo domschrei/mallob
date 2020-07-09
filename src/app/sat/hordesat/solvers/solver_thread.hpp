@@ -3,12 +3,11 @@
 #define HORDE_MALLOB_SOLVER_THREAD_H
 
 #include <sys/types.h>
-#include <sys/syscall.h>
 #include <unistd.h>
 #include <utility>
 #include <thread>
 
-#include "app/sat/hordesat/utilities/parameter_processor.hpp"
+#include "util/params.hpp"
 #include "util/sys/threading.hpp"
 #include "app/sat/hordesat/utilities/logging_interface.hpp"
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
@@ -20,7 +19,7 @@ class HordeLib;
 class SolverThread {
 
 private:
-    ParameterProcessor& _params;
+    const Parameters& _params;
     std::shared_ptr<PortfolioSolverInterface> _solver_ptr;
     PortfolioSolverInterface& _solver;
     std::shared_ptr<LoggingInterface> _logger;
@@ -50,9 +49,11 @@ private:
 
 
 public:
-    SolverThread(ParameterProcessor& params, std::shared_ptr<PortfolioSolverInterface> solver, 
+    SolverThread(const Parameters& params, const LoggingInterface& logger,
+                std::shared_ptr<PortfolioSolverInterface> solver, 
                 const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
-                const std::shared_ptr<vector<int>>& assumptions, int localId, bool* finished);
+                const std::shared_ptr<vector<int>>& assumptions, 
+                int localId, bool* finished);
     ~SolverThread();
 
     void init();

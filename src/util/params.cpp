@@ -58,6 +58,7 @@ void Parameters::setDefaults() {
     setParam("rto", "0"); // (job)requests timeout in seconds
     setParam("s", "1.0"); // job communication period (seconds)
     setParam("s2f", ""); // write solutions to file (file path, or empty string for no writing)
+    setParam("satsolver", "1"); // use lingeling as default SAT solver
     setParam("sleep", "100"); // microsecs to sleep in between worker main loop cycles
     setParam("T", "0"); // total time to run the system (0 = no limit)
     setParam("t", "2"); // num threads per node
@@ -70,7 +71,7 @@ void Parameters::setDefaults() {
 }
 
 void Parameters::expand() {
-    if (isSet("sinst")) {
+    if (isSet("mono")) {
         // Single instance solving
         setParam("c", "0"); // no clients
         setParam("g", "0.0"); // instantaneous growth of job demand
@@ -137,7 +138,8 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "                      (0: no discarding)");
     Console::log(Console::INFO, "-s=<comm-period>      Do job-internal communication every t seconds (t >= 0, 0: do not communicate)");
     Console::log(Console::INFO, "-s2f=<file-basename>  Write solutions to file with provided base name + job ID");
-    Console::log(Console::INFO, "-sinst=<filename>     Single instance: Solve the provided CNF instance with full power, then exit.");
+    Console::log(Console::INFO, "-satsolver=<id>       SAT solver to use: 1=lingeling 2=cadical 3=mix");
+    Console::log(Console::INFO, "-mono=<filename>      Mono instance: Solve the provided CNF instance with full power, then exit.");
     Console::log(Console::INFO, "                      NOTE: Overrides options -bm=ed -c=1 -g=0 -l=1 -md=0 -p=0.01");
     Console::log(Console::INFO, "-sleep=<micros>       Sleep provided number of microseconds between loop cycles of worker main thread");
     Console::log(Console::INFO, "-T=<time-limit>       Run entire system for x seconds (x >= 0; 0: run indefinitely)");
@@ -173,6 +175,10 @@ void Parameters::setParam(const char* name, const char* value) {
     _params[name] = value;
 }
 
+void Parameters::setParam(const std::string& name, const std::string& value) {
+    _params[name] = value;
+}
+
 bool Parameters::isSet(const string& name) const {
     return _params.find(name) != _params.end();
 }
@@ -197,12 +203,21 @@ int Parameters::getIntParam(const string& name, int defaultValue) const {
     }
 }
 
+const string& Parameters::operator[](const string& key) const {
+    assert(isSet(key));
+    return _params.at(key);
+}
+
+string& Parameters::operator[](const string& key) {
+    return _params[key];
+}
+
 int Parameters::getIntParam(const string& name) const {
     assert(isSet(name));
     return atoi(_params.at(name).c_str());
 }
 
-float Parameters::getFloatParam(const string& name, float defaultValue) const {
+double Parameters::getDoubleParam(const string& name, double defaultValue) const {
     if (isSet(name)) {
         return atof(_params.at(name).c_str());
     } else {
@@ -210,7 +225,40 @@ float Parameters::getFloatParam(const string& name, float defaultValue) const {
     }
 }
 
-float Parameters::getFloatParam(const string& name) const {
+double Parameters::getDoubleParam(const string& name) const {
     assert(isSet(name));
     return atof(_params.at(name).c_str());
+}
+
+float Parameters::getFloatParam(const string& name, float defaultValue) const {
+    return (float)getDoubleParam(name, defaultValue);
+}
+float Parameters::getFloatParam(const string& name) const {
+    return (float)getDoubleParam(name);
+}
+
+const std::map<std::string, std::string>& Parameters::getMap() const {
+    return _params;
+}
+
+char* const* Parameters::asCArgs(const std::string& execName) const {
+
+    const char** argv = new const char*[_params.size()+2];
+    argv[0] = execName.c_str();
+    int i = 1;
+    for (const auto& param : _params) {
+
+        char* arg = (char*) malloc((2 + param.first.size() + (!param.second.empty() ? 1 + param.second.size() : 0)) * sizeof(char));
+        strcpy(arg, "-");
+        strcpy(arg+1, param.first.c_str());
+        if (!param.second.empty()) {
+            strcpy(arg+(1+param.first.size()), "=");
+            strcpy(arg+(1+param.first.size()+1), param.second.c_str());
+        }
+
+        argv[i] = arg;
+        i++;
+    }
+    argv[i] = nullptr;
+    return (char* const*) argv;
 }

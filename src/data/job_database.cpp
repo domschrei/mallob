@@ -291,7 +291,8 @@ bool JobDatabase::tryAdopt(const JobRequest& req, bool oneshot, int& removedJob)
         // Node is idle and not committed to another job: OK
 
         if (oneshot) {
-            adopts = get(req.jobId).isSuspended();
+            // Oneshot request: Job must be present and suspended
+            adopts = has(req.jobId) && get(req.jobId).isSuspended();
         } else adopts = true;
 
     } else if (req.requestedNodeIndex == 0 
@@ -383,6 +384,12 @@ void JobDatabase::forgetOldJobs() {
             if (!job.isActive() && job.isDoneInitializing()) job.endInitialization();
             continue;
         }
+        // Jobs that were never active
+        if (job.isInState({NONE}) && job.getAge() >= 60) {
+            jobsToForget.push_back(id);
+            continue;
+        }
+        // Suspended jobs: Forget w.r.t. age, but only if there is a limit on the job cache
         if (jobCacheSize > 0 && job.isSuspended()) {
             // Job must not be rooted here
             if (job.isRoot()) continue;
@@ -390,6 +397,7 @@ void JobDatabase::forgetOldJobs() {
             float age = job.getAgeSinceActivation();
             suspendedQueue.emplace(id, age);
         }
+        // Past jobs
         if (job.isPast() || job.isForgetting()) {
             // If job is past, it must have been so for at least 60 seconds
             if (job.getAgeSinceAbort() < 60) continue;

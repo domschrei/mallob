@@ -5,7 +5,8 @@
 #include <string>
 #include <fstream>
 #include <stdarg.h>
-#include <mutex>
+
+#include "util/sys/threading.hpp"
 
 class Console {
 
@@ -31,7 +32,7 @@ private:
 
     static bool beganLine;
 
-    static std::mutex logMutex;
+    static Mutex logMutex;
 
 public:
     static void init(int rank, int verbosity, bool coloredOutput, bool threadsafeOutput, bool quiet, bool cPrefix, std::string logDir=".");

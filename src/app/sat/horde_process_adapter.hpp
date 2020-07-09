@@ -6,75 +6,33 @@
 
 #include "hordesat/utilities/logging_interface.hpp"
 #include "util/sys/threading.hpp"
+#include "util/params.hpp"
 #include "hordesat/solvers/solving_state.hpp"
 #include "hordesat/solvers/portfolio_solver_interface.hpp"
+#include "horde_shared_memory.hpp"
 
 class HordeProcessAdapter {
 
 private:
-    const std::map<std::string, std::string>& _params;
+    Parameters _params;
     std::shared_ptr<LoggingInterface> _log;
 
     const std::vector<std::shared_ptr<std::vector<int>>>& _formulae; 
     const std::shared_ptr<std::vector<int>>& _assumptions;
 
-    std::vector<int> _solution_vec;
+    std::vector<std::tuple<std::string, void*, int>> _shmem;
+    std::string _shmem_id;
+    HordeSharedMemory* _hsm;
 
+    int* _export_buffer;
+    int* _import_buffer;
+
+    pid_t _child_pid;
     SolvingStates::SolvingState _state;
 
-    int _max_import_buffer_size;
-    int _max_export_buffer_size;
-    int _max_solution_size;
-    
-    size_t _shmem_size;
-
-    // SHARED MEMORY
-    
-    // Pointer to entire block of shared memory
-    void* _shmem;
-
-    // Meta data parent->child
-    pid_t* _child_pid;
-    int* _portfolio_rank;
-    int* _portfolio_size;
-
-    // Instructions parent->child
-    bool* _do_export;
-    bool* _do_import;
-    bool* _do_dump_stats;
-    bool* _do_update_role;
-    bool* _do_interrupt;
-
-    // Responses child->parent
-    bool* _did_export;
-    bool* _did_import;
-    bool* _did_dump_stats;
-    bool* _did_update_role;
-    bool* _did_interrupt;
-
-    // State alerts child->parent
-    bool* _is_spawned;
-    bool* _is_initialized;
-    bool* _has_solution;
-    SatResult* _result = NULL;
-	int* _solution_size;
-    int* _solution;
-    
-    // Clause buffers: parent->child
-    int* _export_buffer_max_size;
-    int* _import_buffer_size;
-    int* _import_buffer;
-    
-    // Clause buffers: child->parent
-    int* _export_buffer_true_size;
-    int* _export_buffer;
-
-
-
 public:
-    HordeProcessAdapter(const std::map<std::string, std::string>& params, std::shared_ptr<LoggingInterface> loggingInterface, 
-            const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<std::vector<int>>& assumptions,
-            int numVars);
+    HordeProcessAdapter(const Parameters& params, 
+            const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<std::vector<int>>& assumptions);
     ~HordeProcessAdapter();
 
     /*

@@ -65,7 +65,7 @@ void Client::readAllInstances() {
 
         Console::log(Console::VERB, "FILE_IO read \"%s\" (#%i)", _job_instances[jobId].c_str(), jobId);
 
-        std::unique_lock<std::mutex> lock(_job_ready_lock);
+        auto lock = _job_ready_lock.getLock();
         _job_ready[jobId] = true;
     }
 }
@@ -198,7 +198,7 @@ int Client::getNextIntroduceableJob() {
 }
 
 bool Client::isJobReady(int jobId) {
-    std::unique_lock<std::mutex> lock(_job_ready_lock);
+    auto lock = _job_ready_lock.getLock();
     return _job_ready.count(jobId) && _job_ready[jobId];
 }
 
@@ -213,7 +213,7 @@ void Client::introduceJob(std::shared_ptr<JobDescription>& jobPtr) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
-    if (job.getPayload(0)->size() <= 1) {
+    if (job.getPayload(0) == nullptr || job.getPayload(0)->size() <= 1) {
         // Some I/O error kept the instance from being read
         Console::log(Console::WARN, "Skipping job #%i due to previous I/O error", jobId);
         return;
