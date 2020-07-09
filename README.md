@@ -11,19 +11,34 @@ mallob is a platform for massively parallel and distributed processing of mallea
 Malleability means that the CPU resources allotted to a job may vary _during its execution_ depending on the system's overall load.
 Its current principal (and only) application is massively parallel and distributed multi-tasking SAT solving "on demand".
 
+### Job Scheduling and Load Balancing
+
 The system is fully decentralized and features randomized dynamic malleable load balancing realized over message passing (MPI). 
 When a new job arrives in the system, it will randomly bounce through the system (corresponding to a random walk) until an idle process adopts it and becomes the job's initial "root" process. 
-Then, with the job dynamically updating its demand, the job may receive additional nodes which form a binary tree rooted at the initial process as their central means of communication.
+Then, with the job dynamically updating its demand, the job may receive additional nodes which form a _job tree_, a binary tree rooted at the initial process, as their central means of communication.
 
 Each root node in the system carries basic information on its job's meta data, such as its current demand, its current volume (= #processes) or its priority. 
 A _balancing phase_ consists of one or multiple aggregations (all-reduce collective operations) of this meta data that will be carried out whenever the necessity arises.
 From the globally aggregated measures, each job can compute its new volume and can act accordingly by growing or shrinking its job tree.
 
+### SAT Solving Engine
+
+The SAT solving engine of mallob is based on [HordeSat](https://baldur.iti.kit.edu/hordesat/) (Balyo and Sanders 2015) which we adapted to handle malleability.
+We employ portfolio solving using Lingeling-bcj and YalSAT as primary SAT solving backends but are in the process of integrating additional solvers such as CaDiCaL.
+Diversification is done over random seeds, sparse random setting of phase variables, and native diversification of solvers based on Plingeling-ayv and -bcj.
+
+All communication has been made completely asynchronous and now happens along the job tree.
+We modified HordeSat's clause exchange and made it much more careful, sharing fewer clauses of higher importance saving lots of bandwidth and computation time. 
+The clause filters now forget some portion of registered clauses per time interval allowing for clauses to be re-shared after some time.
+We also did additional miscellaneous performance improvements with a significant impact such as the reduction of unnecessary syscalls.
+
+### Utilization
+
 In its current evaluation stage, mallob features a number of _simulated client processes_ which read SAT formulae according to "scenario" text files, introduce them to the system as individual jobs, and receive a response from the system when a solution was found or a timeout was hit.
 In the future, we intend to replace simulated client processes with interfaces "from the outer world", e.g. TCP/HTTP/..., to easily connect external applications to mallob.
 
-mallob also features a single instance mode (`mallob-mono`) where only a single provided SAT formula is solved on the entire set of available cores.
-Using this configuration on 1600 hardware threads in parallel in an AWS environment, mallob [scored the first place](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf#page=36) of the first Cloud Track of the international [SAT Competition 2020](https://satcompetition.github.io/2020/). mallob significantly outperformed the competitors and was the only solver in the whole competition exceeding 300 solved instances (out of 400).
+mallob also features a single instance mode, _mallob-mono_, where only a single provided SAT formula is solved on the entire set of available cores.
+Using this configuration on 1600 hardware threads in parallel in an AWS environment, mallob [scored the first place](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf#page=36) of the first Cloud Track of the international [SAT Competition 2020](https://satcompetition.github.io/2020/). mallob significantly outperformed the competitors and was the only solver in the competition exceeding 300 solved instances (out of 400).
 
 ## Building
 
@@ -72,9 +87,9 @@ Here is some explanation for the most important ones:
 
 * `-c=<#clients>`: The amount of "external client" processes to simulate. When the provided scenario file is `path/to/file.txt`, then the program assumes the existence of separate scenario files `path/to/file.txt.0`, `path/to/file.txt.1`, ..., `path/to/file.txt.<#clients-1>`. Note that this number will be subtracted from the amount of actual worker processes within your program execution: `#processes = #workers + #clients`. 
 * `-lbc=<#jobs-per-client>`: Simulates "leaky bucket clients": each client process will strive to have exactly `<#jobs-per-client>` jobs in the system at any given time. As long as the amount of active jobs of this client is lower than this number, the client will introduce new jobs as possible. In other words, the provided number is the amount of _streams of jobs_ that each client wishes to be solved in parallel.
-* `-v=<verbosity>`: How verbose the output should be. `-v=5` is generally the highest supported verbosity and will generate very large log files (including a report for every single P2P message). Verbosity values of 3 or 4 are more moderate. For outputting to log files only and not to stdout, use the `-q` (quiet) option.
+* `-v=<verbosity>`: How verbose the output should be. `-v=6` is generally the highest supported verbosity and will generate very large log files (including a report for every single P2P message). Verbosity values of 3 or 4 are more moderate. For outputting to log files only and not to stdout, use the `-q` (quiet) option.
 * `-t=<#threads>`: Each mallob process will run `<#threads>` worker threads for each active job.
-* `-l=<load-factor>`: A float `l ∈ (0, 1]` that determines which system load (i.e. the ratio `#busy-nodes / #nodes`) will be aimed at in the balancing computations. A load factor very close (or equal) to one may cause performance degradation due to job requests bouncing through the system without finding an empty node. A load factor close to zero will keep the majority of processes idle. In single instance solving mode, this number is automatically set to 1.
+* `-l=<load-factor>`: A float `l ∈ (0, 1]` that determines which system load (i.e. the ratio `#busy-nodes / #nodes`) will be aimed at in the balancing computations. A load factor very close (or equal) to one may cause performance degradation due to job requests bouncing through the system without finding an empty node. A load factor close to zero will keep the majority of processes idle. In single instance solving mode, this number is automatically set to 1: in this case, there are as many job requests as there are processes and every job request will be successful at its very first hop.
 * `-T=<time-limit>`: Run the entire system for the specified amount of seconds.
 * `-cpuh-per-instance=<limit>, -time-per-instance=<limit>`: Sets the per-job resource limits before a job is timeouted. Due to some conformity issues, the CPUh `<limit>` is provided in hours whereas the wallclock time `<limit>` is provided in seconds. CPUh are measured as the theoretical _worker thread resources_ a job would have according to the balancing results assuming instant migrations.
 * `-md=<max-demand>`: Limits the maximum possible demand any single job may have to `<max-demand>`.
