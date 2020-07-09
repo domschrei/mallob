@@ -3,15 +3,15 @@
 
 **Mal**leable **Lo**ad **B**alancer.  
 **M**ultitasking **A**gi**l**e **Lo**gic **B**lackbox.  
-SAT Solving for the cloud.
+Award-winning SAT Solving for the cloud.
 
 ## Overview
 
-mallob is a platform for the massively parallel and distributed processing of malleable jobs. 
+mallob is a platform for massively parallel and distributed processing of malleable jobs, handling their scheduling and load balancing.
 Malleability means that the CPU resources allotted to a job may vary _during its execution_ depending on the system's overall load.
-In its current orientation, mallob features multitasking massively parallel SAT solving "on demand" as an application.
+Its current principal (and only) application is massively parallel and distributed multi-tasking SAT solving "on demand".
 
-The system is fully decentralized and features highly randomized dynamic malleable load balancing realized over message passing (MPI). 
+The system is fully decentralized and features randomized dynamic malleable load balancing realized over message passing (MPI). 
 When a new job arrives in the system, it will randomly bounce through the system (corresponding to a random walk) until an idle process adopts it and becomes the job's initial "root" process. 
 Then, with the job dynamically updating its demand, the job may receive additional nodes which form a binary tree rooted at the initial process as their central means of communication.
 
@@ -19,9 +19,11 @@ Each root node in the system carries basic information on its job's meta data, s
 A _balancing phase_ consists of one or multiple aggregations (all-reduce collective operations) of this meta data that will be carried out whenever the necessity arises.
 From the globally aggregated measures, each job can compute its new volume and can act accordingly by growing or shrinking its job tree.
 
-In its current evaluation stage, mallob features a number of _simulated client processes_ which read SAT formulae, introduce them to the system as individual jobs, and receive a response from the system when a solution was found or a timeout was hit.
-Alternatively, mallob features a single instance mode (`mallob-sinst`) where only a single provided SAT formula is solved on the entire set of available cores.
+In its current evaluation stage, mallob features a number of _simulated client processes_ which read SAT formulae according to "scenario" text files, introduce them to the system as individual jobs, and receive a response from the system when a solution was found or a timeout was hit.
 In the future, we intend to replace simulated client processes with interfaces "from the outer world", e.g. TCP/HTTP/..., to easily connect external applications to mallob.
+
+mallob also features a single instance mode (`mallob-mono`) where only a single provided SAT formula is solved on the entire set of available cores.
+Using this configuration on 1600 hardware threads in parallel in an AWS environment, mallob [scored the first place](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf#page=36) of the first Cloud Track of the international [SAT Competition 2020](https://satcompetition.github.io/2020/). mallob significantly outperformed the competitors and was the only solver in the whole competition exceeding 300 solved instances (out of 400).
 
 ## Building
 
@@ -30,8 +32,8 @@ We use GNU Make as our build tool. Additionally, a valid MPI installation is req
 Go into the directory `src/hordesat` and execute `bash build.sh` which will (a) attempt to find your MPI installation, (b) fetch and build the necessary SAT solving backends, and (c) call mallob's `make` with the appropriate arguments.
 This generates the executable `build/mallob`.
 
-Alternatively, you can run `mallob` in a virtualized manner using Docker.
-Adjust the `CMD` statement in the `Dockerfile` and/or the execution script `aws-run.sh` to fit your particular infrastructure. 
+Alternatively, you can run mallob in a virtualized manner using Docker, which was successfully done for the SAT Competition 2020.
+Adjust the `CMD` statement in the `Dockerfile` and edit the execution script `aws-run.sh` to fit your particular infrastructure. 
 
 ## Usage
 
@@ -59,9 +61,9 @@ The ID and priority as well as the filename are essential for all configurations
 Priorities must be greater than zero. 
 When using the `lbc` option (see below), the arrival times are meaningless and can be set arbitrarily.
 
-### Single instance solving mode
+### Mono instance solving mode
 
-mallob can be called without a scenario file if the option `-sinst=<filename>` is set.
+mallob can be called without a scenario file if the option `-mono=<filename>` is set.
 In that case, mallob runs in single instance solving mode on the provided CNF formula file.
 This option overrides a couple of options concerning balancing and job demands.
 
@@ -92,8 +94,7 @@ After a complete run of mallob, you can run `bash calc_runtimes.sh <path/to/logd
 
 ## Remarks
 
-This system will be published in the near future by Peter Sanders and Dominik Schreiber in a conference paper or in an academic journal article.
-The solving engine used in single instance solving mode was submitted to the Cloud track of the SAT Competition 2020.
+This system will be published in the near future by Peter Sanders and Dominik Schreiber in an academic journal article.
 
 Many thanks to Armin Biere et al. for the SAT solvers Lingeling and YalSAT this system uses and to Tomáš Balyo for HordeSat, the portfolio solver this project's solver engine is built upon.
 

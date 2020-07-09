@@ -214,7 +214,7 @@ int main(int argc, char *argv[]) {
 
     Console::init(rankOfParent, params.getIntParam("v"), params.isSet("colors"), 
             /*threadsafeOutput=*/false, /*quiet=*/params.isSet("q"), 
-            /*cPrefix=*/params.isSet("sinst"), params.getParam("log"));
+            /*cPrefix=*/params.isSet("mono"), params.getParam("log"));
     
     auto log = getLog(params);
     log->log(Console::VERB, "Launching SAT engine %s", MALLOB_VERSION);

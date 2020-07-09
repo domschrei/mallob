@@ -117,10 +117,10 @@ void Worker::init() {
     else MyMpi::_monitor_off = true;
 
     // Initiate single instance solving as the "root node"
-    if (_params.isSet("sinst") && _world_rank == 0) {
+    if (_params.isSet("mono") && _world_rank == 0) {
 
-        std::string instanceFilename = _params.getParam("sinst");
-        Console::log(Console::INFO, "Initiate solving of single instance \"%s\"", instanceFilename.c_str());
+        std::string instanceFilename = _params.getParam("mono");
+        Console::log(Console::INFO, "Initiate solving of mono instance \"%s\"", instanceFilename.c_str());
 
         // Create job description with formula
         Console::log(Console::VERB, "read instance");
@@ -658,7 +658,7 @@ void Worker::handleSendJobResult(MessageHandlePtr& handle) {
         Console::log_noprefix(Console::CRIT, "v %s", model.c_str());
     }
 
-    if (_params.isSet("sinst")) {
+    if (_params.isSet("mono")) {
         // Single instance solving is done: begin exit signal
         MyMpi::isend(MPI_COMM_WORLD, 0, MSG_DO_EXIT, IntVec({0}));
     }
