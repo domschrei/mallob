@@ -117,6 +117,9 @@ The following "interfaces" are included and/or planned:
 ## Remarks
 
 This system will be published in the near future by Peter Sanders and Dominik Schreiber in an academic journal article.
+If you want to cite the system's SAT solving engine, please cite: 
+
+Schreiber, Dominik (2020): **Engineering HordeSat Towards Malleability: mallob-mono in the SAT 2020 Cloud Track.** Proceedings of SAT Competition 2020, to appear. Preprint: http://algo2.iti.kit.edu/download/SAT_Comp_2020.pdf
 
 Many thanks to Armin Biere et al. for the SAT solvers Lingeling and YalSAT this system uses and to Tomáš Balyo for HordeSat, the portfolio solver this project's solver engine is built upon.
 
