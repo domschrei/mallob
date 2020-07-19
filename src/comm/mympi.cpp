@@ -188,6 +188,9 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
     MessageHandlePtr handle(new MessageHandle(nextHandleId(), object));
     handle->tag = tag;
 
+    Console::log(Console::VVVERB, "Msg ID=%i dest=%i tag=%i size=%i", handle->id, 
+                recvRank, tag, handle->sendData->size());
+    
     bool selfMessage = rank(communicator) == recvRank;
     if (selfMessage) {
         handle->recvData = handle->sendData;
@@ -199,8 +202,6 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
 
     (selfMessage ? _handles : _sent_handles).insert(handle);
     
-    Console::log(Console::VVVERB, "Msg ID=%i dest=%i tag=%i size=%i", handle->id, 
-                recvRank, tag, handle->sendData->size());
     return handle;
 }
 
