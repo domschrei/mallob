@@ -10,7 +10,8 @@ Watchdog::Watchdog(long checkIntervMillis, float time) {
 
     _thread = std::thread([&, checkIntervMillis, maxResetSecs]() {
         while (_running) {
-            usleep(1000 * checkIntervMillis);
+            usleep(1000 * 1000 /*1 second*/);
+            if (!_running) break;
             auto lock = _reset_lock.getLock();
             if (Timer::elapsedSeconds() - _last_reset > maxResetSecs) {
                 Console::log(Console::CRIT, "Watchdog: Timeout detected -- aborting");
