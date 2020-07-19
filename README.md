@@ -79,6 +79,11 @@ mallob can be called without a scenario file if the option `-mono=<filename>` is
 In that case, mallob runs in single instance solving mode on the provided CNF formula file.
 This option overrides a couple of options concerning balancing and job demands.
 
+The winning configuration for the SAT 2020 Cloud Track basically corresponds to the following parameter combination for the current version:
+```
+-mono=$input -appmode=thread -cbbs=1500 -cbdf=0.75 -cfhl=300 -cg -derandomize -icpr=0.8 -jc=0 -log=/dev/null -mcl=5 -s=1 -sleep=1000 -T=$timelim_secs -t=$threads_per_proc -v=3"
+```
+
 ### More Options
 
 All command-line options of mallob can be seen by executing mallob without any parameters or with the `-h` option.
