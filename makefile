@@ -37,7 +37,7 @@ debug: build/app/sat/mallob_sat_process
 release: COMPILEFLAGS += -O3 -DNDEBUG
 release: LINKERFLAGS += -O3
 release: build/mallob
-release: build/sat/mallob_sat_process
+release: build/app/sat/mallob_sat_process
 
 # Target "tests"
 tests: COMPILEFLAGS += -O0 -DDEBUG -g -rdynamic
