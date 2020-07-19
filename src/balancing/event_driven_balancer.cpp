@@ -135,15 +135,19 @@ bool EventDrivenBalancer::reduceIfApplicable(int which) {
 bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
     bool done = false;
 
+    if (MyMpi::size(_comm) == 1) {
+        // Only a single node -- locally digest
+        return digest(data);
+    }
+
     int parent = getParentRank(reversedTree);
     if (parent == MyMpi::rank(MPI_COMM_WORLD)) {
-
         // No parent / I AM ROOT. 
         
         // Send to other root
         MyMpi::isend(MPI_COMM_WORLD, getRootRank(!reversedTree), MSG_BROADCAST_DATA, data);
         Console::log_send(Console::VVVERB, getRootRank(!reversedTree), "BLC root handshake");
-        
+            
         // Broadcast and digest
         broadcast(data, reversedTree);
         done = digest(data);
@@ -251,6 +255,8 @@ std::vector<int> EventDrivenBalancer::getChildRanks(bool reversedTree) {
     int size = MyMpi::size(_comm);
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
     std::vector<int> children;
+
+    if (size == 1) return children;
 
     // Offset tree by one when total number of nodes is odd
     if (reversedTree && size % 2 == 1) {
