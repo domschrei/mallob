@@ -81,7 +81,7 @@ This option overrides a couple of options concerning balancing and job demands.
 
 The mallob-mono configuration for the SAT 2020 Cloud Track essentially corresponds to the following parameter combination for the current version:
 ```
--mono=<input_cnf> -log=<logdir> -T=<timelim_secs> -appmode=thread -cbdf=0.75 -cfhl=300 -cg -derandomize -mcl=5 -sleep=1000 -t=4 -v=3
+-mono=<input_cnf> -log=<logdir> -T=<timelim_secs> -appmode=thread -cbdf=0.75 -cfhl=300 -mcl=5 -sleep=1000 -t=4 -v=3
 ```
 This runs four solver threads for each MPI process and writes all output to stdout as well as to the specified log directory, with moderate verbosity.
 
