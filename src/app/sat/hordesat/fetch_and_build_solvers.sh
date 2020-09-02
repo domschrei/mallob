@@ -24,6 +24,28 @@ if false; then
     fi
 fi
 
+if [ ! -d glucose ]; then
+
+    echo "Fetching Glucose ..."
+
+    # Get Glucose and patch it
+    wget www.labri.fr/perso/lsimon/downloads/softwares/glucose-syrup-4.1.tgz
+    tar xzvf glucose-syrup-4.1.tgz
+    mv glucose-syrup-4.1 glucose
+    #patch glucose/core/Solver.h < Solver.h.patch
+    #patch glucose/core/Solver.cc < Solver.cc.patch
+    
+    echo "Building Glucose ..."
+    
+    # Make Glucose
+    cd glucose/simp
+    make rs libr
+    cp lib.a ../libglucose.a
+    cd ../..
+else
+    echo "Assuming that a correct installation of Glucose is present."
+fi
+
 if [ ! -d yalsat ]; then
 
     # Get YalSAT
