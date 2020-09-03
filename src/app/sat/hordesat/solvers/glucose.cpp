@@ -16,6 +16,7 @@ MGlucose::MGlucose(LoggingInterface& logger, int globalId, int localId, std::str
 	
 	verbosity = -1;
 	verbEveryConflicts = 100000;
+	parsing = 0;
 
 	stopSolver = 0;
 	learnedClauseCallback = NULL;

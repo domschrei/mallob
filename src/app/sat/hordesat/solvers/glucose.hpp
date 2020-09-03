@@ -25,13 +25,13 @@ private:
 	unsigned int glueLimit;
 	Mutex clauseAddMutex;
 
-	int maxvar;
 	Glucose::vec<Glucose::Lit> clause;
 	Glucose::vec<Glucose::Lit> assumptions;
-	int szfmap; 
-	unsigned char * fmap; 
-	bool nomodel;
-	unsigned long long calls;
+	int maxvar = 0;
+	int szfmap = 0;
+	unsigned char * fmap = 0; 
+	bool nomodel = true;
+	unsigned long long calls = 0;
     
 	// Friends: Callbacks for Lingeling and logging inside these callbacks
 	friend void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ...);

@@ -232,7 +232,7 @@ int EventDrivenBalancer::getParentRank(bool reversedTree) {
         // rightmost node
         if (myRank == size) return size-1;
     }
-
+    // Reverse tree
     if (reversedTree) myRank = size-1 - myRank;
     
     int parent;
@@ -247,6 +247,7 @@ int EventDrivenBalancer::getParentRank(bool reversedTree) {
         exp *= 2;
     }
 
+    // Un-reverse tree
     if (reversedTree) parent = size-1 - parent;
     return parent;
 }

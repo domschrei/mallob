@@ -39,8 +39,8 @@ TESTSOURCES:=$(shell find src/test/ -name '*.cpp')
 
 
 # Target "debug"
-debug: COMPILEFLAGS += -O0 -DDEBUG -g -rdynamic
-debug: LINKERFLAGS += -O0 -g -rdynamic
+debug: COMPILEFLAGS += -O0 -DDEBUG -g -rdynamic -ggdb
+debug: LINKERFLAGS += -O0 -g -rdynamic -ggdb
 debug: build/mallob
 debug: build/app/sat/mallob_sat_process
 

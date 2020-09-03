@@ -824,9 +824,11 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
     if (_params.isSet("derandomize")) {
         // Get random choice from bounce alternatives
         nextRank = Random::choice(_hop_destinations);
-        // while skipping the requesting node and the sender
-        while (nextRank == request.requestingNodeRank || nextRank == senderRank) {
-            nextRank = Random::choice(_hop_destinations);
+        if (_hop_destinations.size() > 2) {
+            // ... if possible while skipping the requesting node and the sender
+            while (nextRank == request.requestingNodeRank || nextRank == senderRank) {
+                nextRank = Random::choice(_hop_destinations);
+            }
         }
     } else {
         // Generate pseudorandom permutation of this request
@@ -835,10 +837,12 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
         // Fetch next index of permutation based on number of hops
         int permIdx = request.numHops % n;
         nextRank = perm.get(permIdx);
-        // (while skipping yourself, the requesting node, and the sender)
-        while (nextRank == _world_rank || nextRank == request.requestingNodeRank || nextRank == senderRank) {
-            permIdx = (permIdx+1) % n;
-            nextRank = perm.get(permIdx);
+        if (n > 3) {
+            // ... if possible while skipping yourself, the requesting node, and the sender
+            while (nextRank == _world_rank || nextRank == request.requestingNodeRank || nextRank == senderRank) {
+                permIdx = (permIdx+1) % n;
+                nextRank = perm.get(permIdx);
+            }
         }
     }
 
@@ -867,9 +871,11 @@ void Worker::updateVolume(int jobId, int volume) {
     // Prepare volume update to propagate down the job tree
     IntPair payload(jobId, volume);
 
-    std::set<int> dormantChildren = job.getDormantChildren();
+    // Mono instance mode: Set job tree permutation to identity
+    bool mono = _params.isSet("mono");
 
     // For each potential child (left, right):
+    std::set<int> dormantChildren = job.getDormantChildren();
     bool has[2] = {job.hasLeftChild(), job.hasRightChild()};
     int indices[2] = {job.getLeftChildIndex(), job.getRightChildIndex()};
     int ranks[2] = {-1, -1};
@@ -883,6 +889,7 @@ void Worker::updateVolume(int jobId, int volume) {
         } else if (job.hasJobDescription() && nextIndex < volume) {
             // Grow
             Console::log(Console::VVVERB, "%s : grow", job.toStr());
+            if (mono) job.updateJobNode(indices[i], indices[i]);
             JobRequest req(jobId, job.getRootNodeRank(), _world_rank, nextIndex, Timer::elapsedSeconds(), 0);
             int nextNodeRank, tag;
             if (dormantChildren.empty()) {
