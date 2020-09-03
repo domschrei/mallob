@@ -30,7 +30,7 @@ MGlucose::MGlucose(LoggingInterface& logger, int globalId, int localId, std::str
 	suspendSolver = false;
 	maxvar = 0;
 
-	numDiversifications = 1; // TODO
+	numDiversifications = 10; // TODO
 }
 
 void MGlucose::addLiteral(int lit) {
@@ -47,7 +47,56 @@ void MGlucose::addLiteral(int lit) {
 
 void MGlucose::diversify(int rank, int size) {
 	random_seed = rank;
-	// TODO
+	adaptStrategies = false;
+
+	switch (rank % numDiversifications) {
+	case 0:
+		// Normal mode
+		adaptStrategies = true;
+		break;
+	case 1:
+		// Plain mode without any simplification
+		use_simplification = false;
+		break;
+	case 2:
+		// Shrink clauses by asymmetric branching
+		use_asymm = true;
+		break;
+	case 3:
+		// Perform no variable elimination
+		use_elim = false;
+		break;
+	case 4:
+		// No restarts
+		luby_restart = false;
+		break;
+	case 5:
+		// Do some random variable decisions
+		random_var_freq = 0.2;
+		break;
+	case 6:
+		// Do not perform phase saving
+		phase_saving = 0;
+		break;
+	case 7:
+		// Use lower decay factors -> more "short-term" memory for activity
+		max_var_decay = 0.9;
+		clause_decay = 0.99;
+		break;
+	case 8:
+		// Randomize phase at first branch after a restart
+		randomize_on_restarts = 1;
+		break;
+	case 9:
+		// Very frequent restarts
+		luby_restart_factor = 10;
+		break;
+
+	case 10:
+		// Check if clauses are already logically implied
+		use_rcheck = true;
+		break;
+	}
 }
 
 // Set initial phase for a given variable
