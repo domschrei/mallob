@@ -103,14 +103,14 @@ private:
 
 	bool parallelJobIsFinished() override;
 
-    void parallelImportUnaryClauses() override;
-    bool parallelImportClauses() override; // true if the empty clause was received
+	void parallelImportUnaryClauses() override;
+	bool parallelImportClauses() override; // true if the empty clause was received
 
 	void parallelImportClauseDuringConflictAnalysis(Glucose::Clause &c, Glucose::CRef confl) override;
-    
+
 	void parallelExportUnaryClause(Glucose::Lit p) override;
-    void parallelExportClauseDuringSearch(Glucose::Clause &c) override;
-    
+	void parallelExportClauseDuringSearch(Glucose::Clause &c) override;
+
 };
 
 #endif /* LINGELING_H_ */
