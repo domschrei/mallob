@@ -249,9 +249,7 @@ void MGlucose::parallelExportClauseDuringSearch(Glucose::Clause &c) {
  */
 bool MGlucose::parallelImportClauses() {
 
-	if (!clauseAddMutex.tryLock()) {
-		return false;
-	}
+	if (!clauseAddMutex.tryLock()) return false;
 
 	for (const auto& importedClause : learnedClausesToAdd) {
 
@@ -305,13 +303,25 @@ bool MGlucose::parallelImportClauses() {
 		}
 		assert(ca[cr].learnt());
 	}
+	learnedClausesToAdd.clear();
 
 	clauseAddMutex.unlock();
 	return false;
 }
 
 void MGlucose::parallelImportUnaryClauses() {
-	// This is already covered in parallelImportClauses().
+
+	if (!clauseAddMutex.tryLock()) return;
+	
+	for (int lit : unitsToAdd) {
+		Glucose::Lit l = encodeLit(lit);
+		if (value(var(l)) == l_Undef) {
+			uncheckedEnqueue(l);
+		}
+	}
+	unitsToAdd.clear();
+
+	clauseAddMutex.unlock();
 }
 
 void MGlucose::parallelImportClauseDuringConflictAnalysis(Glucose::Clause &c, Glucose::CRef confl) {
