@@ -58,21 +58,15 @@ void DefaultSharingManager::digestSharing(const int* begin, int buflen) {
 	// always one, because buffers are merged into one big buffer
 	size = 1;
     
-    //std::memcpy(incommingBuffer, result.data(), result.size()*sizeof(int));
-    
-	//if (solvers.size() > 1) {
-		// get all the clauses
-		cdb.setIncomingBuffer(begin, buflen);
-	//}
-	/* else {
-		// get all the clauses except for those that this node sent
-		cdb.setIncomingBuffer(result.data(), COMM_BUFFER_SIZE, size, rank);
-	}*/
+	// Get all clauses
+	cdb.setIncomingBuffer(begin, buflen);
+	
 	int passedFilter = 0;
 	int failedFilter = 0;
 	std::vector<int> lens;
 	std::vector<int> added(solvers.size(), 0);
 
+	// For each incoming clause:
 	int size;
 	const int* clsbegin = cdb.getNextIncomingClause(size);
 	while (clsbegin != NULL) {
@@ -81,23 +75,29 @@ void DefaultSharingManager::digestSharing(const int* begin, int buflen) {
 		while (clauseLen-1 >= lens.size()) lens.push_back(0);
 		lens[clauseLen-1]++;
 
-		if (nodeFilter.registerClause(clsbegin, size)) {
-			
-			// Add clause to solvers
-			if (solvers.size() > 1) {
-				for (size_t sid = 0; sid < solvers.size(); sid++) {
-					if (solverFilters[sid]->registerClause(clsbegin, size)) {
-						solvers[sid]->addLearnedClause(clsbegin, size);
-						added[sid]++;
-					}
+		if (solvers.size() > 1) {
+			// Multiple solvers: Employing the node filter here would prevent 
+			// local sharing, i.e., if solver 0 on node n learns a clause
+			// then solvers 1..k on node n will never receive it.
+			// So only use the per-solver filters.
+			bool anyPassed = false;
+			for (size_t sid = 0; sid < solvers.size(); sid++) {
+				if (solverFilters[sid]->registerClause(clsbegin, size)) {
+					solvers[sid]->addLearnedClause(clsbegin, size);
+					added[sid]++;
+					anyPassed = true;
 				}
-			} else {
-				solvers[0]->addLearnedClause(clsbegin, size);
 			}
-
-			passedFilter++;
+			if (anyPassed) passedFilter++;
 		} else {
-			failedFilter++;
+			// Only one solver on this node: No per-solver filtering.
+			// Use the node filter in this case to prevent redundant learning.
+			if (nodeFilter.registerClause(clsbegin, size)) {
+				solvers[0]->addLearnedClause(clsbegin, size);
+				passedFilter++;
+			} else {
+				failedFilter++;
+			}
 		}
 
 		clsbegin = cdb.getNextIncomingClause(size);
@@ -116,17 +116,19 @@ void DefaultSharingManager::digestSharing(const int* begin, int buflen) {
 			lensStr.c_str());
 
 	// Per-solver stats
-	for (size_t sid = 0; sid < solvers.size(); sid++) {
-		logger.log(2, "S%d fltrd %.2f%% (%d)\n", sid, passedFilter == 0 ? 0 : 100*(1-((float)added[sid]/passedFilter)), passedFilter-added[sid]);
-		if (!params.isSet("fd")) {
-			logger.log(2, "S%d clear clsfltr\n", sid);
-			solverFilters[sid]->clear();	
-		} 
+	if (solvers.size() > 1) {
+		for (size_t sid = 0; sid < solvers.size(); sid++) {
+			logger.log(2, "S%d fltrd %.2f%% (%d)\n", sid, passedFilter == 0 ? 0 : 100*(1-((float)added[sid]/passedFilter)), passedFilter-added[sid]);
+			if (!params.isSet("fd")) {
+				logger.log(2, "S%d clear clsfltr\n", sid);
+				solverFilters[sid]->clear();	
+			} 
+		}
 	}
 
 	// Clear half of the clauses from the filter (probabilistically) if a clause filter half life is set
 	if (params.getIntParam("cfhl", 0) > 0 && logger.getTime() - lastBufferClear > params.getIntParam("cfhl", 0)) {
-		logger.log(1, "forget half of clauses in filter\n");
+		logger.log(1, "forget half of clauses in filters\n");
 		for (size_t sid = 0; sid < solverFilters.size(); sid++) {
 			solverFilters[sid]->clearHalf();
 		}

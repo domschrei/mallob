@@ -40,23 +40,27 @@ protected:
 	class Callback : public LearnedClauseCallback {
 	public:
 		DefaultSharingManager& parent;
+		bool hasSolverFilters;
 		Callback(DefaultSharingManager& parent):parent(parent) {
+			hasSolverFilters = parent.solvers.size() > 1;
 		}
 		void processClause(vector<int>& cls, int solverId) {
-			//parent.logger.log(3, "process clause\n");
-			if (parent.solvers.size() > 1) {
-				//parent.logger.log(3, "register clause in child\n");
+
+			// If applicable, register clause in child filter
+			// such that it will not be re-imported to this solver.
+			if (hasSolverFilters) {
 				parent.solverFilters[solverId]->registerClause(cls);
 			}
-			//parent.logger.log(3, "register clause in parent\n");
+
+			// Check parent filter if this clause is admissible for export.
+			// (If a clause is already registered, then we assume that it was, 
+			// or will be, globally shared to everyone.)
 			if (parent.nodeFilter.registerClause(cls)) {
-				//parent.logger.log(3, "registered successfully in parent\n");
 				int* res = parent.cdb.addClause(cls);
 				if (res == NULL) {
 					parent.stats.dropped++;
 				}
 			} else {
-				//parent.logger.log(3, "not registered in parent\n");
 				parent.stats.filteredClauses++;
 			}
 		}
