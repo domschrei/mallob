@@ -26,20 +26,20 @@ MGlucose::MGlucose(LoggingInterface& logger, int globalId, int localId, std::str
 	unitsBuffer = (int*) malloc(unitsBufferSize*sizeof(int));
 	clsBuffer = (int*) malloc(clsBufferSize*sizeof(int));
 
-    suspendSolver = false;
-    maxvar = 0;
+	suspendSolver = false;
+	maxvar = 0;
 
 	numDiversifications = 1; // TODO
 }
 
 void MGlucose::addLiteral(int lit) {
 	resetMaps();
-    nomodel = true;
-    if (lit != 0) { 
+	nomodel = true;
+	if (lit != 0) { 
 		clause.push(encodeLit(lit));
 		maxvar = std::max(maxvar, abs(lit));
 	} else {
-    	addClause(clause);
+		addClause(clause);
 		clause.clear();
 	}
 }
@@ -62,8 +62,8 @@ SatResult MGlucose::solve(const vector<int>& asmpt) {
 	for (int lit : asmpt) assumptions.push(encodeLit(lit));
 
 	calls++;
-    resetMaps();
-    clearInterrupt();
+	resetMaps();
+	clearInterrupt();
 
 	// add the clauses
 	clauseAddMutex.lock();
@@ -78,9 +78,9 @@ SatResult MGlucose::solve(const vector<int>& asmpt) {
 	clausesToAdd.clear();
 	clauseAddMutex.unlock();
 
-    Glucose::lbool res = solveLimited(assumptions);
-    nomodel = (res != l_True);
-    return (res == l_Undef) ? UNKNOWN : (res == l_True ? SAT : UNSAT);
+	Glucose::lbool res = solveLimited(assumptions);
+	nomodel = (res != l_True);
+	return (res == l_Undef) ? UNKNOWN : (res == l_True ? SAT : UNSAT);
 }
 
 void MGlucose::setSolverInterrupt() {
@@ -90,10 +90,10 @@ void MGlucose::unsetSolverInterrupt() {
 	asynch_interrupt = false;
 }
 void MGlucose::setSolverSuspend() {
-    suspendSolver = true;
+	suspendSolver = true;
 }
 void MGlucose::unsetSolverSuspend() {
-    suspendSolver = false;
+	suspendSolver = false;
 	suspendCond.notify();
 }
 
@@ -165,7 +165,7 @@ MGlucose::~MGlucose() {
 
 Glucose::Lit MGlucose::encodeLit(int lit) {
 	while (std::abs(lit) > nVars()) newVar();
-    return Glucose::mkLit(Glucose::Var(std::abs(lit) - 1), (lit < 0));
+	return Glucose::mkLit(Glucose::Var(std::abs(lit) - 1), (lit < 0));
 }
 
 int MGlucose::decodeLit(Glucose::Lit lit) {
@@ -181,26 +181,26 @@ void MGlucose::resetMaps() {
 }
 
 int MGlucose::solvedValue(int lit) {
-    if (nomodel) return 0;
-    Glucose::lbool res = modelValue(encodeLit(lit));
-    return (res == l_True) ? lit : -lit;
+	if (nomodel) return 0;
+	Glucose::lbool res = modelValue(encodeLit(lit));
+	return (res == l_True) ? lit : -lit;
 }
 
 bool MGlucose::failed(Glucose::Lit lit) {
 	if (!fmap) buildFailedMap();
-    int tmp = var(lit);
-    assert (0 <= tmp && tmp < nVars());
-    return fmap[tmp] != 0;
+	int tmp = var(lit);
+	assert (0 <= tmp && tmp < nVars());
+	return fmap[tmp] != 0;
 }
 
 void MGlucose::buildFailedMap() {
 	fmap = new unsigned char[szfmap = nVars()];
-    memset (fmap, 0, szfmap);
-    for (int i = 0; i < conflict.size (); i++) {
-      int tmp = var (conflict[i]);
-      assert (0 <= tmp && tmp < szfmap);
-      fmap[tmp] = 1;
-    }
+	memset (fmap, 0, szfmap);
+	for (int i = 0; i < conflict.size (); i++) {
+		int tmp = var (conflict[i]);
+		assert (0 <= tmp && tmp < szfmap);
+		fmap[tmp] = 1;
+	}
 }
 
 bool MGlucose::parallelJobIsFinished() {
