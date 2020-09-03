@@ -30,7 +30,7 @@ MGlucose::MGlucose(LoggingInterface& logger, int globalId, int localId, std::str
 	suspendSolver = false;
 	maxvar = 0;
 
-	numDiversifications = 10; // TODO
+	numDiversifications = 10;
 }
 
 void MGlucose::addLiteral(int lit) {
@@ -51,24 +51,21 @@ void MGlucose::diversify(int rank, int size) {
 
 	switch (rank % numDiversifications) {
 	case 0:
-		// Normal mode
+	case 1:
+		// Normal mode with strategy adaptation
 		adaptStrategies = true;
 		break;
-	case 1:
+	case 2:
 		// Plain mode without any simplification
 		use_simplification = false;
 		break;
-	case 2:
+	case 3:
 		// Shrink clauses by asymmetric branching
 		use_asymm = true;
 		break;
-	case 3:
+	case 4:
 		// Perform no variable elimination
 		use_elim = false;
-		break;
-	case 4:
-		// No restarts
-		luby_restart = false;
 		break;
 	case 5:
 		// Do some random variable decisions
@@ -90,11 +87,6 @@ void MGlucose::diversify(int rank, int size) {
 	case 9:
 		// Very frequent restarts
 		luby_restart_factor = 10;
-		break;
-
-	case 10:
-		// Check if clauses are already logically implied
-		use_rcheck = true;
 		break;
 	}
 }
