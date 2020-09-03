@@ -33,7 +33,7 @@ if [ ! -d glucose ]; then
     tar xzvf glucose-syrup-4.1.tgz
     mv glucose-syrup-4.1 glucose
     #patch glucose/core/Solver.h < Solver.h.patch
-    #patch glucose/core/Solver.cc < Solver.cc.patch
+    patch glucose/core/Solver.cc < Solver.cc.patch
     
     echo "Building Glucose ..."
     

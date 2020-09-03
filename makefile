@@ -16,12 +16,23 @@ LINKERFLAGS:=-L${MPI_ROOT} -Lsrc/app/sat/hordesat/lingeling -Lsrc/app/sat/hordes
 # Include paths of the project.
 INCLUDES:=-Isrc -I${MPI_INCLUDE}
 
+# Additional flag, library and includes when using restricted software
+ifdef MALLOB_USE_RESTRICTED
+	COMPILEFLAGS+=-DMALLOB_USE_RESTRICTED
+	LINKERFLAGS+=-Lsrc/app/sat/hordesat/glucose -lglucose
+	INCLUDES+=-Isrc/app/sat/hordesat/glucose
+endif
+
 
 # All .cpp sources of the project except for 
 # - test files
 # - solver sources that are built separately and just included / linked
 # - any "main.cpp" files.
-SOURCES:=$(shell find src/ -name '*.cpp'|grep -vE "src/test/|src/app/sat/hordesat/(cadical|lingeling|yalsat)|/main.cpp")
+SOURCES:=$(shell find src/ -name '*.cpp'|grep -vE "src/test/|src/app/sat/hordesat/(cadical|lingeling|yalsat|glucose)|/main.cpp")
+ifndef MALLOB_USE_RESTRICTED
+	# Explicitly exclude glucose 
+	SOURCES:=$(shell find src/ -name '*.cpp'|grep -vE "glucose.cpp|src/test/|src/app/sat/hordesat/(cadical|lingeling|yalsat|glucose)|/main.cpp")
+endif
 
 # Test sources: all .cpp files in src/test.
 TESTSOURCES:=$(shell find src/test/ -name '*.cpp')

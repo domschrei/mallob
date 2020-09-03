@@ -43,6 +43,9 @@
 #include "sharing/default_sharing_manager.hpp"
 #include "solvers/cadical.hpp"
 #include "solvers/lingeling.hpp"
+#ifdef MALLOB_USE_RESTRICTED
+#include "solvers/glucose.hpp"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -107,12 +110,26 @@ void HordeLib::init() {
 			// Cadical
 			solverInterfaces.emplace_back(new Cadical(*logger, solverId, i, params.getParam("jobstr")));
 			break;
+#ifdef MALLOB_USE_RESTRICTED
+		case 3:
+			// Glucose
+			solverInterfaces.emplace_back(new MGlucose(*logger, solverId, i, params.getParam("jobstr")));
+			break;
+#endif
 		default:
 			// Alternate between available solvers
-			solverInterfaces.emplace_back(i % 2 == 0 ? 
-				(PortfolioSolverInterface*) new Lingeling(*logger, solverId, i, params.getParam("jobstr"), params.isSet("aod")) :  
-				(PortfolioSolverInterface*) new Cadical(*logger, solverId, i, params.getParam("jobstr")));
-			break;
+#ifdef MALLOB_USE_RESTRICTED
+			int cycle = 3;
+#else
+			int cycle = 2;
+#endif
+			switch (i % 3) {
+			case 0: solverInterfaces.emplace_back(new Lingeling(*logger, solverId, i, params.getParam("jobstr"), params.isSet("aod"))); break;
+			case 1: solverInterfaces.emplace_back(new Cadical(*logger, solverId, i, params.getParam("jobstr"))); break;
+#ifdef MALLOB_USE_RESTRICTED
+			case 2: solverInterfaces.emplace_back(new MGlucose(*logger, solverId, i, params.getParam("jobstr"))); break;
+#endif
+			}
 		}
 	}
 

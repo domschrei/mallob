@@ -10,7 +10,6 @@
 
 #include "util/sys/threading.hpp"
 #include "utilities/logging_interface.hpp"
-#include "solvers/lingeling.hpp"
 #include "sharing/sharing_manager_interface.hpp"
 #include "solvers/solver_thread.hpp"
 #include "solvers/solving_state.hpp"

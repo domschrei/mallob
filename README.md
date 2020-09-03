@@ -120,6 +120,14 @@ The following "interfaces" are included and/or planned:
 * To add another kind of SAT solving engine, instead of directly inheriting from `Job`, a subclass of `BaseSatJob` (see `src/app/sat/base_sat_job.hpp`) can be created that already incorporates a simple kind of clause sharing. Take a look at an implementation such as `ForkedSatJob` to see how the interface can be used.
 * To add a new SAT solver to be used in a SAT solver engine, implement the interface `PortfolioSolverInterface` (see `src/app/sat/hordesat/solvers/portfolio_solver_interface.hpp`); you can use the existing implementation for `Lingeling` (`lingeling.cpp`) and adapt it to your solver.
 
+## Licensing
+
+In its default configuration, the source code of mallob can be used, changed and redistributed under the terms of the Lesser General Public License (LGPLv3), one notable exception being the source file `src/app/sat/hordesat/solvers/glucose.cpp` (see below).
+The used versions of Lingeling and YalSAT are MIT-licensed, as is HordeSat.
+
+The Glucose interface of mallob, unfortunately, is non-free software due to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE).
+Notably, its usage in competitive events is restricted. So when compiling mallob with `MALLOB_USE_RESTRICTED=1` make sure that you have read and understood these restrictions.
+
 ## Remarks
 
 This system will be published in the near future by Peter Sanders and Dominik Schreiber in an academic journal article.
@@ -129,4 +137,3 @@ Schreiber, Dominik (2020): **Engineering HordeSat Towards Malleability: mallob-m
 
 Many thanks to Armin Biere et al. for the SAT solvers Lingeling and YalSAT this system uses and to Tomáš Balyo for HordeSat, the portfolio solver this project's solver engine is built upon.
 
-You can use mallob under the terms of the Lesser General Public License (LGPLv3). The used versions of Lingeling and YalSAT are MIT-licensed, as is HordeSat.
