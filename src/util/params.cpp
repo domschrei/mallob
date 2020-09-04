@@ -58,7 +58,7 @@ void Parameters::setDefaults() {
     setParam("rto", "0"); // (job)requests timeout in seconds
     setParam("s", "1.0"); // job communication period (seconds)
     setParam("s2f", ""); // write solutions to file (file path, or empty string for no writing)
-    setParam("satsolver", "1"); // use lingeling as default SAT solver
+    setParam("satsolver", "l"); // which SAT solvers to cycle through
     setParam("sleep", "100"); // microsecs to sleep in between worker main loop cycles
     setParam("T", "0"); // total time to run the system (0 = no limit)
     setParam("t", "2"); // num threads per node
@@ -138,7 +138,12 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "                      (0: no discarding)");
     Console::log(Console::INFO, "-s=<comm-period>      Do job-internal communication every t seconds (t >= 0, 0: do not communicate)");
     Console::log(Console::INFO, "-s2f=<file-basename>  Write solutions to file with provided base name + job ID");
-    Console::log(Console::INFO, "-satsolver=<id>       SAT solver to use: 1=lingeling 2=cadical 3=mix");
+    Console::log(Console::INFO, "-satsolver=<seq>      Sequence of SAT solvers to cycle through for each job, one character per solver:\n");
+#ifdef MALLOB_USE_RESTRICTED
+    Console::log(Console::INFO, "                      l=lingeling c=cadical g=glucose\n");
+#else
+    Console::log(Console::INFO, "                      l=lingeling c=cadical\n");
+#endif
     Console::log(Console::INFO, "-mono=<filename>      Mono instance: Solve the provided CNF instance with full power, then exit.");
     Console::log(Console::INFO, "                      NOTE: Overrides options -bm=ed -c=1 -g=0 -l=1 -md=0 -p=0.01");
     Console::log(Console::INFO, "-sleep=<micros>       Sleep provided number of microseconds between loop cycles of worker main thread");
