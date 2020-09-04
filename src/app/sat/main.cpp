@@ -76,7 +76,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
 
     std::string solutionShmemId = "";
     char* solutionShmem;
-    int solutionShmemSize;
+    int solutionShmemSize = 0;
 
     // Main loop
     while (true) {

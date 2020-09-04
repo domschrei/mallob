@@ -75,7 +75,7 @@ void Parameters::setDefaults() {
 }
 
 void Parameters::expand() {
-    if (isSet("mono")) {
+    if (isNotNull("mono")) {
         // Single instance solving
         setParam("c", "0"); // no clients
         setParam("g", "0.0"); // instantaneous growth of job demand
