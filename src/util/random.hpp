@@ -43,9 +43,9 @@ public:
     }
     static int choice(std::set<int> set) {
         assert(!set.empty());
-        int picked = rand() * set.size();
+        size_t picked = rand() * set.size();
         assert(picked >= 0 && picked < set.size());
-        int i = 0;
+        size_t i = 0;
         for (const int& entry : set) {
             if (i == picked) return entry;
             i++;
