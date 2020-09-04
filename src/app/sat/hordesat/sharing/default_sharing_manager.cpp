@@ -72,7 +72,7 @@ void DefaultSharingManager::digestSharing(const int* begin, int buflen) {
 	while (clsbegin != NULL) {
 		
 		int clauseLen = (size > 1 ? size-1 : size); // subtract "glue" int
-		while (clauseLen-1 >= lens.size()) lens.push_back(0);
+		while (clauseLen-1 >= (int)lens.size()) lens.push_back(0);
 		lens[clauseLen-1]++;
 
 		if (solvers.size() > 1) {
@@ -142,7 +142,7 @@ SharingStatistics DefaultSharingManager::getStatistics() {
 }
 
 DefaultSharingManager::~DefaultSharingManager() {
-	for (int i = 0; i < solverFilters.size(); i++) {
+	for (size_t i = 0; i < solverFilters.size(); i++) {
 		delete solverFilters[i];
 	}
 }

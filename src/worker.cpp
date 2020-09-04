@@ -652,7 +652,7 @@ void Worker::handleSendJobResult(MessageHandlePtr& handle) {
     Console::log_noprefix(Console::CRIT, "s %s", resultCode == 10 ? "SATISFIABLE" : resultCode == 20 ? "UNSATISFIABLE" : "UNKNOWN");
     if (resultCode == 10) {
         std::string model = "";
-        for (int x = 1; x < jobResult.solution.size(); x++) {
+        for (size_t x = 1; x < jobResult.solution.size(); x++) {
             model += std::to_string(jobResult.solution[x]) + " ";
         }
         Console::log_noprefix(Console::CRIT, "v %s", model.c_str());
@@ -1003,11 +1003,11 @@ void Worker::createExpanderGraph() {
 
     // Create graph, get outgoing edges from this node
     _hop_destinations = AdjustablePermutation::createExpanderGraph(numWorkers, numBounceAlternatives, _world_rank);
-    assert(_hop_destinations.size() == numBounceAlternatives);
+    assert((int)_hop_destinations.size() == numBounceAlternatives);
 
     // Output found bounce alternatives
     std::string info = "";
-    for (int i = 0; i < _hop_destinations.size(); i++) {
+    for (size_t i = 0; i < _hop_destinations.size(); i++) {
         info += std::to_string(_hop_destinations[i]) + " ";
     }
     Console::log(Console::VERB, "My bounce alternatives: %s", info.c_str());

@@ -9,8 +9,8 @@
 using namespace std;
 
 //DEBUG MACROS
-//#define DEBUG(X) X
-#define DEBUG(X)
+//#define HORDE_DBG(X) X
+#define HORDE_DBG(X)
 
 /**
  * Print array of a given length

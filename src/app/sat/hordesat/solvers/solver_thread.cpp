@@ -86,10 +86,10 @@ void* SolverThread::run() {
 void SolverThread::readFormula() {
     log(3, "importing clauses\n");
 
-    int prevLits = _imported_lits;
-    int begin = _imported_lits;
+    size_t prevLits = _imported_lits;
+    size_t begin = _imported_lits;
 
-    int i = 0;
+    size_t i = 0;
     for (std::shared_ptr<std::vector<int>> f : _formulae) {
         if (begin < f->size())
             read(*f, begin);

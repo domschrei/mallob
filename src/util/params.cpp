@@ -267,10 +267,10 @@ char* const* Parameters::asCArgs(const char* execName) const {
 
         size_t argsize = 1 + param.first.size() + (!param.second.empty() ? 1 + param.second.size() : 0) + 1;
         char* arg = (char*) malloc(argsize * sizeof(char));
-        strncpy(arg, "-", 1);
+        arg[0] = '-';
         strncpy(arg+1, param.first.c_str(), param.first.size());
         if (!param.second.empty()) {
-            strncpy(arg+(1+param.first.size()), "=", 1);
+            arg[1+param.first.size()] = '=';
             strncpy(arg+(1+param.first.size()+1), param.second.c_str(), param.second.size());
         }
         arg[argsize-1] = '\0';

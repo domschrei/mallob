@@ -181,7 +181,7 @@ public:
 
 private:
     const int NORMAL_TREE = 1, REVERSED_TREE = 2, BOTH = 3;
-    const int RECENT_BROADCAST_MEMORY = 3;
+    const size_t RECENT_BROADCAST_MEMORY = 3;
 
     EventMap _states;
     EventMap _diffs;

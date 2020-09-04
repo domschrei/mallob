@@ -176,7 +176,7 @@ void ThreadedSatJob::appl_dumpStats() {
         if (_time_of_start_solving <= 0) return;
         
         std::vector<long> threadTids = getSolver()->getSolverTids();
-        for (int i = 0; i < threadTids.size(); i++) {
+        for (size_t i = 0; i < threadTids.size(); i++) {
             if (threadTids[i] < 0) continue;
             double cpuRatio; float sysShare;
             bool ok = Proc::getThreadCpuRatio(threadTids[i], cpuRatio, sysShare);

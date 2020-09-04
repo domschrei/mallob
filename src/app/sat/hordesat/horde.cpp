@@ -108,7 +108,7 @@ void HordeLib::init() {
 	// and from the begun cycle on the previous rank
 	int numFullCycles = (mpi_rank * solversCount) / solverChoices.size();
 	int begunCyclePos = (mpi_rank * solversCount) % solverChoices.size();
-	for (int i = 0; i < solverChoices.size(); i++) {
+	for (size_t i = 0; i < solverChoices.size(); i++) {
 		int* solverToAdd;
 		switch (solverChoices[i]) {
 		case 'l': solverToAdd = &numLgl; break;
@@ -225,7 +225,7 @@ int HordeLib::solveLoop() {
 
     // Solving done?
 	bool done = false;
-	for (int i = 0; i < solverThreads.size(); i++) {
+	for (size_t i = 0; i < solverThreads.size(); i++) {
 		if (solverThreads[i]->getState() == STANDBY) {
 			done = true;
 			finalResult = solverThreads[i]->getSatResult();
@@ -354,7 +354,7 @@ void HordeLib::cleanUp() {
 	setSolvingState(ABORTING);
 	
 	// join threads
-	for (int i = 0; i < solverThreads.size(); i++) {
+	for (size_t i = 0; i < solverThreads.size(); i++) {
 		solverThreads[i]->tryJoin();
 	}
 	solverThreads.clear();
@@ -362,7 +362,7 @@ void HordeLib::cleanUp() {
 
 	// delete solvers
 	solversCount = 0;
-	for (int i = 0; i < solverInterfaces.size(); i++) {
+	for (size_t i = 0; i < solverInterfaces.size(); i++) {
 		solverInterfaces[i].reset();
 	}
 	solverInterfaces.clear();

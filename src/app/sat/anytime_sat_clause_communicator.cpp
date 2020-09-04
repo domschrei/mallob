@@ -12,7 +12,7 @@ float AnytimeSatClauseCommunicator::getBufferLimit(int numAggregatedNodes) {
 bool AnytimeSatClauseCommunicator::canSendClauses() {
     if (!_initialized) return false;
 
-    int numChildren = 0;
+    size_t numChildren = 0;
     // Must have received clauses from each existing children
     if (_job->hasLeftChild()) numChildren++;
     if (_job->hasRightChild()) numChildren++;
@@ -165,7 +165,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     return vec;
 }
 
-std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vector<int>*>& buffers, int maxSize) {
+std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vector<int>*>& buffers, size_t maxSize) {
     std::vector<int> result;
 
     // Position counter for each buffer
@@ -174,7 +174,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
     // How many VIP clauses in each buffer?
     std::vector<int> nvips(buffers.size());
     int totalNumVips = 0;
-    for (int i = 0; i < buffers.size(); i++) {
+    for (size_t i = 0; i < buffers.size(); i++) {
         nvips[i] = (buffers[i]->size() > 0) ? buffers[i]->at(positions[i]) : 0;
         totalNumVips += nvips[i];
         positions[i]++;
@@ -227,10 +227,10 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
         // and also the sum over all these numbers
         std::vector<int> nclsoflen(buffers.size());
         int allclsoflen = 0;
-        for (int i = 0; i < buffers.size(); i++) {
-            nclsoflen[i] = positions[i] < buffers[i]->size() ? 
+        for (size_t i = 0; i < buffers.size(); i++) {
+            nclsoflen[i] = positions[i] < (int)buffers[i]->size() ? 
                             buffers[i]->at(positions[i]) : 0;
-            if (positions[i] < buffers[i]->size()) anyLeft = true;
+            if (positions[i] < (int)buffers[i]->size()) anyLeft = true;
             allclsoflen += nclsoflen[i];
             positions[i]++;
         }
@@ -282,7 +282,7 @@ bool AnytimeSatClauseCommunicator::testConsistency(const std::vector<int>& buffe
     if (buffer.empty()) return true;
 
     int consistent = 0;
-    int pos = 0;
+    size_t pos = 0;
 
     int numVips = buffer[pos++];
     int countedVips = 0;
@@ -325,7 +325,7 @@ bool AnytimeSatClauseCommunicator::testConsistency(const std::vector<int>& buffe
 
     if (consistent > 0) {
         Console::log(Console::CRIT, "Consistency ERROR %i in clause buffer at position %i", consistent, pos);
-        for (int p = 0; p < buffer.size(); p++) {
+        for (size_t p = 0; p < buffer.size(); p++) {
             if (p == pos) Console::append(Console::CRIT, "(%i) ", buffer[p]);
             else          Console::append(Console::CRIT, "%i ", buffer[p]);
         }

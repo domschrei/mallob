@@ -16,7 +16,7 @@ struct SortedDoubleSequence : public Reduceable {
 SortedDoubleSequence() : data() {}
 
 void add(double x) {
-    int i = 0;
+    size_t i = 0;
     while (i < data.size() && data[i] < x) i++;
     // Only insert unique elements
     if (i >= data.size() || x != data[i])
@@ -29,9 +29,9 @@ const double& operator[](int i) const {return data[i];}
 
 void merge(const Reduceable& other) override {
     const SortedDoubleSequence& otherSet = (SortedDoubleSequence&) other;
-    int i = 0, j = 0;
+    size_t i = 0, j = 0;
     std::vector<double> newData;
-    for (int x = 0; x < data.size()+otherSet.data.size(); x++) {
+    for (size_t x = 0; x < data.size()+otherSet.data.size(); x++) {
         
         // Identify correct element to insert next
         double newElem;

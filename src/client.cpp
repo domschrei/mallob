@@ -178,14 +178,14 @@ int Client::getMaxNumParallelJobs() {
 int Client::getNextIntroduceableJob() {
     
     // Are there any non-introduced jobs left?
-    if (_last_introduced_job_idx+1 >= _ordered_job_ids.size()) return -1;
+    if (_last_introduced_job_idx+1 >= (int)_ordered_job_ids.size()) return -1;
     
     // -- yes
     int jobId = _ordered_job_ids[_last_introduced_job_idx+1];
     bool introduce = true;
     
     // Check if there is space for another active job in this client's "bucket"
-    int lbc = getMaxNumParallelJobs();
+    size_t lbc = getMaxNumParallelJobs();
     if (lbc > 0) introduce &= _introduced_job_ids.size() < lbc;
     
     // Check if job has already arrived
@@ -239,7 +239,7 @@ void Client::introduceJob(std::shared_ptr<JobDescription>& jobPtr) {
 
 void Client::checkClientDone() {
     
-    bool jobQueueEmpty = _last_introduced_job_idx+1 >= _ordered_job_ids.size();
+    bool jobQueueEmpty = _last_introduced_job_idx+1 >= (int)_ordered_job_ids.size();
 
     // If no jobs left and all introduced jobs done:
     if (jobQueueEmpty && _introduced_job_ids.empty()) {

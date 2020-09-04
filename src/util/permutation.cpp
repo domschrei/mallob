@@ -105,7 +105,7 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
     }
 
     // Clean up
-    for (int i = 0; i < permutations.size(); i++) {
+    for (size_t i = 0; i < permutations.size(); i++) {
         delete permutations[i];
     }
 

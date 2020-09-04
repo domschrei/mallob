@@ -43,8 +43,8 @@ public:
     int getRevision() const {return _revision;}
     const std::vector<VecPtr>& getPayloads() const {return _payloads;}
     const std::vector<VecPtr>& getAssumptions() const {return _assumptions;}
-    const VecPtr& getPayload(int revision) const {return revision >= _payloads.size() ? nullVec : _payloads[revision];}
-    const VecPtr& getAssumptions(int revision) const {return revision >= _assumptions.size() ? nullVec : _assumptions[revision];}
+    const VecPtr& getPayload(size_t revision) const {return revision >= _payloads.size() ? nullVec : _payloads[revision];}
+    const VecPtr& getAssumptions(size_t revision) const {return revision >= _assumptions.size() ? nullVec : _assumptions[revision];}
     float getArrival() const {return _arrival;}
     bool isIncremental() const {return _incremental;}
     int getTransferSize(bool allRevisions) const;

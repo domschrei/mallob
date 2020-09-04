@@ -64,9 +64,9 @@ private:
 
 	// Structures for IMPORTING	
 	const int* incomingBuffer;
-	unsigned int bufferSize;
-	int currentPos;
-	int currentSize; // 0 for VIP clauses
+	size_t bufferSize;
+	size_t currentPos;
+	size_t currentSize; // 0 for VIP clauses
 	int remainingVipLits;
 	int remainingClsOfCurrentSize;
 

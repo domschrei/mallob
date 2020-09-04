@@ -37,7 +37,7 @@ int FileUtils::mergeFiles(std::string globstr, std::string dest, bool removeOrig
     }
 
     // For each file matched
-    for (int i = 0; i < result.gl_pathc; i++) {
+    for (size_t i = 0; i < result.gl_pathc; i++) {
         std::string file = std::string(result.gl_pathv[i]);
         status = append(file, dest);
         if (status != 0) {

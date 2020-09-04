@@ -90,7 +90,7 @@ public:
 	void dumpStats();
 	std::vector<long> getSolverTids() {
 		std::vector<long> tids;
-		for (int i = 0; i < solverThreads.size(); i++) {
+		for (size_t i = 0; i < solverThreads.size(); i++) {
 			if (solverThreads[i]->isInitialized()) tids.push_back(solverThreads[i]->getTid());
 		}
 		return tids;

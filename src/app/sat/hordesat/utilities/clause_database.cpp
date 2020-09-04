@@ -65,7 +65,7 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 	// The first value is the total length of VIP clauses (with separators)
 	used++;
 	// First add the VIP clauses
-	DEBUG(printf("adding the %d VIP clauses.\n", vipClauses.size()));
+	HORDE_DBG(printf("adding the %d VIP clauses.\n", vipClauses.size()));
 	while (!vipClauses.empty()) {
 		vector<int>& vipCls = vipClauses.back();
 		int len = vipCls.size();
@@ -94,7 +94,7 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 		unsigned int left = size - used;
 		if (b->top < left) {
 			// Bucket nr. s has clauses of length s+1
-			DEBUG(printf("will copy all %d cls of length %d\n", b->top/(s+1), s+1);)
+			HORDE_DBG(printf("will copy all %d cls of length %d\n", b->top/(s+1), s+1);)
 			fitting += b->top/(s+1);
 			buffer[used++] = b->top/(s+1);
 			memcpy(buffer + used, b->data, sizeof(int)*b->top);
@@ -104,7 +104,7 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 			// Bucket nr. s has clauses of length s+1
 			int copy = ((left-1)/(s+1))*(s+1);
 			buffer[used++] = copy/(s+1);
-			DEBUG(printf("will copy %d cls of length %d\n", copy / (s+1), s+1);)
+			HORDE_DBG(printf("will copy %d cls of length %d\n", copy / (s+1), s+1);)
 			memcpy(buffer + used, b->data, sizeof(int)*copy);
 			used += copy;
 			fitting += copy/(s+1);
@@ -155,7 +155,7 @@ const int* ClauseDatabase::getNextIncomingClause(int& size) {
 	while (remainingClsOfCurrentSize == 0) {
 		
 		// No more clauses?
-		if (currentPos >= bufferSize) return NULL;
+		if (currentPos >= bufferSize) return nullptr;
 
 		// Go to next clause size
 		currentSize++;

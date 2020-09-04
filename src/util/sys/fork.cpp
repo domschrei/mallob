@@ -45,7 +45,7 @@ void handleAbort(int sig) {
     // print out all the frames
     Console::log(Console::CRIT, "Error from pid=%ld tid=%ld signal=%d - Backtrace:\n", Proc::getPid(), Proc::getTid(), sig);
     char** bt = backtrace_symbols(array, size);
-    for (int i = 0; i < size; i++) {
+    for (size_t i = 0; i < size; i++) {
         Console::log(Console::CRIT, "- %s", bt[i]);
     }
 

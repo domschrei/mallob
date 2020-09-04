@@ -4,7 +4,7 @@ MALLOB_VERSION:=$(shell date --iso-8601=seconds)_$(shell whoami)@$(shell hostnam
 
 # Compiler, warning and error settings
 CXX=mpicxx
-CWARN=-Wno-unused-parameter -Wno-sign-compare -Wno-format -Wno-format-security
+CWARN=-Wno-unused-parameter
 CERROR=-fpermissive
 
 

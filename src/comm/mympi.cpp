@@ -63,7 +63,7 @@ bool MessageHandle::testReceived() {
         if (!selfMessage) {
             int count = 0;
             MPICALL(MPI_Get_count(&status, MPI_BYTE, &count), "getcount" + std::to_string(id))
-            if (count > 0 && count < recvData->size()) {
+            if (count > 0 && count < (int)recvData->size()) {
                 recvData->resize(count);
             }
         }
@@ -315,13 +315,13 @@ std::vector<MessageHandlePtr> MyMpi::poll(float elapsedTime) {
     }
 
     // Cancel obsolete handles
-    for (int i = 0; i < handlesToCancel.size(); i++) {
+    for (size_t i = 0; i < handlesToCancel.size(); i++) {
         _handles.erase(handlesToCancel[i]);
         handlesToCancel[i]->cancel();
     }
 
     // Remove and return found handle
-    for (int i = 0; i < foundHandles.size(); i++) {
+    for (size_t i = 0; i < foundHandles.size(); i++) {
         _handles.erase(foundHandles[i]);
         resetListenerIfNecessary(foundHandles[i]->tag);
     } 

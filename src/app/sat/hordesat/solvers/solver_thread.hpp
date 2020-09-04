@@ -41,7 +41,7 @@ private:
     std::vector<int> _solution;
     std::set<int> _failed_assumptions;
 
-    int _imported_lits = 0;
+    size_t _imported_lits = 0;
     bool _initialized = false;
     long _tid = -1;
 

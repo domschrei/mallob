@@ -408,7 +408,7 @@ void JobDatabase::forgetOldJobs() {
     }
 
     // Mark jobs as forgettable as long as job cache is exceeded
-    while (suspendedQueue.size() > jobCacheSize) {
+    while ((int)suspendedQueue.size() > jobCacheSize) {
         jobsToForget.push_back(suspendedQueue.top().first);
         suspendedQueue.pop();
     }
