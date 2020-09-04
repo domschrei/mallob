@@ -46,6 +46,7 @@ We use GNU Make as our build tool. Additionally, a valid MPI installation is req
 
 Go into the directory `src/hordesat` and execute `bash build.sh` which will (a) attempt to find your MPI installation, (b) fetch and build the necessary SAT solving backends, and (c) call mallob's `make` with the appropriate arguments.
 This generates the executable `build/mallob`.
+If you want to make use of Glucose as a SAT solver, execute `MALLOB_USE_RESTRICTED=1 bash build.sh` instead (after having read the Licensing section below).
 
 Alternatively, you can run mallob in a virtualized manner using Docker, which was successfully done for the SAT Competition 2020.
 Adjust the `CMD` statement in the `Dockerfile` and edit the execution script `aws-run.sh` to fit your particular infrastructure. 
@@ -71,7 +72,7 @@ Each scenario file must be formatted like this:
 [...]
 ```
 IDs must be positive integers. Priorities must be in the interval `(0,1]`; greater numbers denote a higher priority. 
-Arrival times denote the point in time since program start where a given job _may_ enter the system; but depending on the program configuration (see `lbc` option below), the actual introduction of the job may be deferred to a later point in time.
+Arrival times denote the point in time since program start where a given job _may_ enter the system; but depending on the program configuration (see `lbc` option below) the actual introduction of the job may be deferred to a later point in time.
 
 ### Mono instance solving mode
 
@@ -81,7 +82,7 @@ This option overrides a couple of options concerning balancing and job demands.
 
 The mallob-mono configuration for the SAT 2020 Cloud Track essentially corresponds to the following parameter combination for the current version:
 ```
--mono=<input_cnf> -log=<logdir> -T=<timelim_secs> -appmode=thread -cbdf=0.75 -cfhl=300 -mcl=5 -sleep=1000 -t=4 -v=3
+-mono=<input_cnf> -log=<logdir> -T=<timelim_secs> -appmode=thread -cbdf=0.75 -cfhl=300 -mcl=5 -sleep=1000 -t=4 -v=3 -satsolver=l
 ```
 This runs four solver threads for each MPI process and writes all output to stdout as well as to the specified log directory, with moderate verbosity.
 
@@ -95,6 +96,7 @@ Here is some explanation for the most important ones:
 * `-lbc=<#jobs-per-client>`: Simulates "leaky bucket clients": each client process will strive to have exactly `<#jobs-per-client>` jobs in the system at any given time. As long as the amount of active jobs of this client is lower than this number, the client will introduce new jobs as possible. In other words, the provided number is the amount of _streams of jobs_ that each client wishes to be solved in parallel.
 * `-v=<verbosity>`: How verbose the output should be. `-v=6` is generally the highest supported verbosity and will generate very large log files (including a report for every single P2P message). Verbosity values of 3 or 4 are more moderate. For outputting to log files only and not to stdout, use the `-q` (quiet) option.
 * `-t=<#threads>`: Each mallob process will run `<#threads>` worker threads for each active job.
+* `-satsolver=<seq>`: A sequence of SAT solvers which will cyclically employed on each job. `seq` must be a string where each character corresponds to a SAT solver: `l` for Lingeling, `c` for CaDiCaL, and `g` for Glucose (only if compiled accordingly, see Building). For instance, providing `-satsolver=llg` and `-t=4`, the employed solvers on a problem will be Lingeling-Lingeling-Glucose-Lingeling on the first node, Lingeling-Glucose-Lingeling-Lingeling on the second, and so on.
 * `-l=<load-factor>`: A float `l ∈ (0, 1]` that determines which system load (i.e. the ratio `#busy-nodes / #nodes`) will be aimed at in the balancing computations. A load factor very close (or equal) to one may cause performance degradation due to job requests bouncing through the system without finding an empty node. A load factor close to zero will keep the majority of processes idle. In single instance solving mode, this number is automatically set to 1: in this case, there are as many job requests as there are processes and every job request will be successful at its very first hop.
 * `-T=<time-limit>`: Run the entire system for the specified amount of seconds.
 * `-cpuh-per-instance=<limit>, -time-per-instance=<limit>`: Sets the per-job resource limits before a job is timeouted. Due to some conformity issues, the CPUh `<limit>` is provided in hours whereas the wallclock time `<limit>` is provided in seconds. CPUh are measured as the theoretical _worker thread resources_ a job would have according to the balancing results assuming instant migrations.
@@ -125,15 +127,14 @@ The following "interfaces" are included and/or planned:
 In its default configuration, the source code of mallob can be used, changed and redistributed under the terms of the Lesser General Public License (LGPLv3), one notable exception being the source file `src/app/sat/hordesat/solvers/glucose.cpp` (see below).
 The used versions of Lingeling and YalSAT are MIT-licensed, as is HordeSat.
 
-The Glucose interface of mallob, unfortunately, is non-free software due to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE).
-Notably, its usage in competitive events is restricted. So when compiling mallob with `MALLOB_USE_RESTRICTED=1` make sure that you have read and understood these restrictions.
+The Glucose interface of mallob, unfortunately, is non-free software due to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE). Notably, its usage in competitive events is restricted. So when compiling mallob with `MALLOB_USE_RESTRICTED=1` make sure that you have read and understood these restrictions.
 
 ## Remarks
 
 This system will be published in the near future by Peter Sanders and Dominik Schreiber in an academic journal article.
 If you want to cite the system's SAT solving engine, please cite: 
 
-Schreiber, Dominik (2020): **Engineering HordeSat Towards Malleability: mallob-mono in the SAT 2020 Cloud Track.** Proceedings of SAT Competition 2020, to appear. Preprint: http://algo2.iti.kit.edu/download/SAT_Comp_2020.pdf
+Schreiber, Dominik (2020): **Engineering HordeSat Towards Malleability: mallob-mono in the SAT 2020 Cloud Track.** SAT COMPETITION 2020: 45. URL: https://helda.helsinki.fi/bitstream/handle/10138/318754/sc2020_proceedings.pdf?sequence=1#page=45
 
-Many thanks to Armin Biere et al. for the SAT solvers Lingeling and YalSAT this system uses and to Tomáš Balyo for HordeSat, the portfolio solver this project's solver engine is built upon.
+Many thanks to Armin Biere et al. for the SAT solvers Lingeling and YalSAT this system uses by default and to Tomáš Balyo for HordeSat, the portfolio solver this project's solver engine is built upon.
 
