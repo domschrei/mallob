@@ -65,7 +65,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
 
     // Signal initialization to parent
     pid_t pid = Proc::getPid();
-    log->log(1, "Hello from child\n");
+    log->log(1, "Hello from child %i\n", pid);
     hsm->isSpawned = true;
     
     // Prepare solver
@@ -116,7 +116,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
 
             // For each solver thread
             std::vector<long> threadTids = hlib.getSolverTids();
-            for (int i = 0; i < threadTids.size(); i++) {
+            for (size_t i = 0; i < threadTids.size(); i++) {
                 if (threadTids[i] < 0) continue;
                 
                 success = Proc::getThreadCpuRatio(threadTids[i], perc_cpu, sysShare);
@@ -212,9 +212,9 @@ int main(int argc, char *argv[]) {
 
     int rankOfParent = params.getIntParam("mpirank");
 
-    Console::init(rankOfParent, params.getIntParam("v"), params.isSet("colors"), 
-            /*threadsafeOutput=*/false, /*quiet=*/params.isSet("q"), 
-            /*cPrefix=*/params.isSet("mono"), params.getParam("log"));
+    Console::init(rankOfParent, params.getIntParam("v"), params.isNotNull("colors"), 
+            /*threadsafeOutput=*/false, /*quiet=*/params.isNotNull("q"), 
+            /*cPrefix=*/params.isNotNull("mono"), params.getParam("log"));
     
     auto log = getLog(params);
     log->log(Console::VERB, "Launching SAT engine %s", MALLOB_VERSION);

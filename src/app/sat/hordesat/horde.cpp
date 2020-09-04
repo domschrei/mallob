@@ -127,7 +127,8 @@ void HordeLib::init() {
 		case 'l':
 			// Lingeling
 			hlog(3, "S%i : Employing Lingeling\n", globalSolverId);
-			solverInterfaces.emplace_back(new Lingeling(*logger, globalSolverId, i, params.getParam("jobstr"), numLgl++, params.isSet("aod")));
+			solverInterfaces.emplace_back(new Lingeling(*logger, globalSolverId, i, params.getParam("jobstr"), numLgl++, 
+					params.isNotNull("aod")));
 			break;
 		case 'c':
 			// Cadical
@@ -323,7 +324,7 @@ void HordeLib::setSolvingState(SolvingState state) {
 int HordeLib::finishSolving() {
 
 	assert(solvingState == STANDBY);
-	if (params.isSet("stats")) {
+	if (params.isNotNull("stats")) {
 		dumpStats();
 	}
 	return finalResult;

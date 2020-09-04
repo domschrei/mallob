@@ -7,6 +7,9 @@
 #include <stdarg.h>
 #include <sys/time.h>
 #include <string>
+
+// Turn off incompatible function types warning in openmpi
+#define OMPI_SKIP_MPICXX 1
 #include <mpi.h>
 
 #include "logging_interface.hpp"

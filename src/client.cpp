@@ -406,7 +406,7 @@ void Client::readInstanceList(std::string& filename) {
     }
 
     std::string line;
-    bool jitterPriorities = _params.isSet("jjp");
+    bool jitterPriorities = _params.isNotNull("jjp");
     while(std::getline(file, line)) {
         if (line.substr(0, 1) == std::string("#")) {
             continue;

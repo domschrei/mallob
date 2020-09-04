@@ -41,7 +41,7 @@ void SolverThread::start() {
 void SolverThread::init() {
     _tid = Proc::getTid();
     log(3, "tid %ld\n", _tid);
-    if (_params.isSet("pin")) pin();
+    if (_params.isNotNull("pin")) pin();
     _initialized = true;
 }
 

@@ -24,7 +24,7 @@ Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
             _has_right_child(false) {
     
     _growth_period = _params.getFloatParam("g");
-    _continuous_growth = _params.isSet("cg");
+    _continuous_growth = _params.isNotNull("cg");
     _max_demand = _params.getIntParam("md");
 }
 

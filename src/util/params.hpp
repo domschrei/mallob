@@ -39,6 +39,7 @@ public:
 	void setParam(const string& name, const string& value);
 
 	bool isSet(const string& name) const;
+	bool isNotNull(const string& name) const;
 	
 	string getParam(const string& name) const;
 	string getParam(const string& name, const string& defaultValue) const;
@@ -55,7 +56,7 @@ public:
 	double getDoubleParam(const string& name, double defaultValue) const;
 
 	const map<string, string>& getMap() const;
-	char* const* asCArgs(const std::string& execName) const;
+	char* const* asCArgs(const char* execName) const;
 };
 
 #endif /* PARAMETERPROCESSOR_H_ */

@@ -26,7 +26,7 @@
 void Worker::init() {
     
     // Initialize pseudo-random order of nodes
-    if (_params.isSet("derandomize")) {
+    if (_params.isNotNull("derandomize")) {
         createExpanderGraph();
     }
 
@@ -98,7 +98,7 @@ void Worker::init() {
     MyMpi::beginListening();
 
     // Send warm-up messages with your pseudorandom bounce destinations
-    if (_params.isSet("derandomize") && _params.isSet("warmup")) {
+    if (_params.isNotNull("derandomize") && _params.isNotNull("warmup")) {
         IntVec payload({1, 2, 3, 4, 5, 6, 7, 8});
         int numRuns = 5;
         for (int run = 0; run < numRuns; run++) {
@@ -113,11 +113,11 @@ void Worker::init() {
     MPI_Barrier(MPI_COMM_WORLD);
     Console::log(Console::VERB, "Passed global init barrier");
 
-    if (_params.isSet("mmpi")) _mpi_monitor_thread = std::thread(mpiMonitor, this);
+    if (_params.isNotNull("mmpi")) _mpi_monitor_thread = std::thread(mpiMonitor, this);
     else MyMpi::_monitor_off = true;
 
     // Initiate single instance solving as the "root node"
-    if (_params.isSet("mono") && _world_rank == 0) {
+    if (_params.isNotNull("mono") && _world_rank == 0) {
 
         std::string instanceFilename = _params.getParam("mono");
         Console::log(Console::INFO, "Initiate solving of mono instance \"%s\"", instanceFilename.c_str());
@@ -151,7 +151,7 @@ void Worker::mainProgram() {
     float memCheckPeriod = 3.0;
     float jobCheckPeriod = 0.01;
     float balanceCheckPeriod = 0.01;
-    bool doYield = _params.isSet("yield");
+    bool doYield = _params.isNotNull("yield");
 
     Watchdog watchdog(/*checkIntervMillis=*/60*1000, lastMemCheckTime);
 
@@ -658,7 +658,7 @@ void Worker::handleSendJobResult(MessageHandlePtr& handle) {
         Console::log_noprefix(Console::CRIT, "v %s", model.c_str());
     }
 
-    if (_params.isSet("mono")) {
+    if (_params.isNotNull("mono")) {
         // Single instance solving is done: begin exit signal
         MyMpi::isend(MPI_COMM_WORLD, 0, MSG_DO_EXIT, IntVec({0}));
     }
@@ -747,7 +747,7 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandlePtr& handle) {
             }
         }
         // Otherwise, pick a random node
-        if (nextNodeRank == -1 && _params.isSet("derandomize")) {
+        if (nextNodeRank == -1 && _params.isNotNull("derandomize")) {
             nextNodeRank = Random::choice(_hop_destinations);
         } else if (nextNodeRank == -1) {
             nextNodeRank = getRandomNonSelfWorkerNode();
@@ -821,7 +821,7 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
     }
 
     int nextRank;
-    if (_params.isSet("derandomize")) {
+    if (_params.isNotNull("derandomize")) {
         // Get random choice from bounce alternatives
         nextRank = Random::choice(_hop_destinations);
         if (_hop_destinations.size() > 2) {
@@ -872,7 +872,7 @@ void Worker::updateVolume(int jobId, int volume) {
     IntPair payload(jobId, volume);
 
     // Mono instance mode: Set job tree permutation to identity
-    bool mono = _params.isSet("mono");
+    bool mono = _params.isNotNull("mono");
 
     // For each potential child (left, right):
     std::set<int> dormantChildren = job.getDormantChildren();

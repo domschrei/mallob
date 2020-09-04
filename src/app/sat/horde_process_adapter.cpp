@@ -93,7 +93,8 @@ HordeProcessAdapter::~HordeProcessAdapter() {
 pid_t HordeProcessAdapter::run() {
 
     // Assemble c-style program arguments
-    char* const* argv = _params.asCArgs("mallob_sat_process");
+    const char* execName = "mallob_sat_process";
+    char* const* argv = _params.asCArgs(execName);
     Console::log(Console::VVERB, "EXEC child\n");
 
     // FORK: Create a child process

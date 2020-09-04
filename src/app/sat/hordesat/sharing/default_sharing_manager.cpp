@@ -29,7 +29,7 @@ int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
     //log(3, "Sharing clauses among %i nodes\n", size);
     static int prodInc = 1;
 	static int lastInc = 0;
-	if (!params.isSet("fd")) {
+	if (!params.isNotNull("fd")) {
 		logger.log(2, "clear node clsfltr\n");
 		nodeFilter.clear();
 	}
@@ -38,7 +38,7 @@ int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
 	logger.log(3, "Prepared %i clauses, size %i\n", selectedCount, used);
 	stats.sharedClauses += selectedCount;
 	float usedRatio = ((float)used)/maxSize;
-	if (usedRatio < params.isSet("icpr")) {
+	if (usedRatio < params.getFloatParam("icpr")) {
 		int increaser = lastInc++ % solvers.size();
 		solvers[increaser]->increaseClauseProduction();
 		logger.log(3, "Node %d production increase for %d. time, sid %d will increase.\n", rank, prodInc++, increaser);
@@ -119,7 +119,7 @@ void DefaultSharingManager::digestSharing(const int* begin, int buflen) {
 	if (solvers.size() > 1) {
 		for (size_t sid = 0; sid < solvers.size(); sid++) {
 			logger.log(2, "S%d fltrd %.2f%% (%d)\n", sid, passedFilter == 0 ? 0 : 100*(1-((float)added[sid]/passedFilter)), passedFilter-added[sid]);
-			if (!params.isSet("fd")) {
+			if (!params.isNotNull("fd")) {
 				logger.log(2, "S%d clear clsfltr\n", sid);
 				solverFilters[sid]->clear();	
 			} 

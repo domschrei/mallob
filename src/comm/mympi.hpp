@@ -7,6 +7,9 @@
 #include <set>
 #include <map>
 #include <assert.h>
+
+// Turn off incompatible function types warning in openmpi
+#define OMPI_SKIP_MPICXX 1
 #include <mpi.h>
 
 #include "data/serializable.hpp"
