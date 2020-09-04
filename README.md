@@ -23,14 +23,14 @@ From the globally aggregated measures, each job can compute its new volume and c
 
 ### SAT Solving Engine
 
-The SAT solving engine of mallob is based on [HordeSat](https://baldur.iti.kit.edu/hordesat/) (Balyo and Sanders 2015) which we adapted to handle malleability.
-We employ portfolio solving using Lingeling-bcj and YalSAT as primary SAT solving backends but are in the process of integrating additional solvers such as CaDiCaL.
-Diversification is done over random seeds, sparse random setting of phase variables, and native diversification of solvers based on Plingeling-ayv and -bcj.
+The SAT solving engine of mallob is based on [HordeSat](https://baldur.iti.kit.edu/hordesat/) (Balyo and Sanders 2015) which we re-engineered in various aspects to improve its performance and to handle malleability.
+We employ portfolio solving using Lingeling-bcj, YalSAT, Glucose, and CaDiCaL (not yet fully supported) as possible SAT solving backends.
+Diversification is done over random seeds, sparse random setting of phase variables, and native option-based diversification of solvers (in the case of Lingeling using diversifiers from Plingeling-ayv and -bcj).
 
 All communication has been made completely asynchronous and now happens along the job tree.
-We modified HordeSat's clause exchange and made it much more careful, sharing fewer clauses of higher importance saving lots of bandwidth and computation time. 
-The clause filters now forget some portion of registered clauses per time interval allowing for clauses to be re-shared after some time.
-We also did additional miscellaneous performance improvements with a significant impact such as the reduction of unnecessary syscalls.
+We modified HordeSat's clause exchange and made it much more careful, sharing fewer clauses of higher importance in a duplicate-free manner, which saves lots of bandwidth and computation time.
+The clause filtering mechanism has been reworked as well and now periodically forgets some probabilistic portion of registered clauses allowing for clauses to be re-shared after some time.
+Several further performance improvements were introduced to mallob, for instance the reduction of unnecessary syscalls compared to HordeSat.
 
 ### Utilization
 
@@ -38,7 +38,7 @@ In its current evaluation stage, mallob features a number of _simulated client p
 In the future, we intend to replace simulated client processes with interfaces "from the outer world", e.g. TCP/HTTP/..., to easily connect external applications to mallob.
 
 mallob also features a single instance mode, _mallob-mono_, where only a single provided SAT formula is solved on the entire set of available cores.
-Using this configuration on 1600 hardware threads in parallel in an AWS environment, mallob [scored the first place](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf#page=36) of the first Cloud Track of the international [SAT Competition 2020](https://satcompetition.github.io/2020/). mallob significantly outperformed the competitors and was the only solver in the competition exceeding 300 solved instances (out of 400).
+Using this configuration on 1600 hardware threads in parallel in an AWS environment, mallob [scored the first place](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf#page=36) of the first Cloud Track of the international [SAT Competition 2020](https://satcompetition.github.io/2020/), solving the most instances among all solvers of all tracks.
 
 ## Building
 
@@ -116,11 +116,11 @@ After a complete run of mallob, you can run `bash calc_runtimes.sh <path/to/logd
 
 ## Programming Interfaces
 
-The following "interfaces" are included and/or planned:
+mallob can be extended in the following ways:
 
-* To extend mallob by adding another kind of job solving engine, a subclass of `Job` (see `src/app/job.hpp`) must be created and an additional case must be added to `JobDatabase::createJob` (see `src/data/job_database.cpp`). To make the job database acknowledge what kind of job is introduced in a program run with several kinds of jobs, the `JobDescription` structure should be extended by a corresponding flag (and be on either end of the serialization so that it can be read directly). Finally, the `Client` class must be extended to read and introduce this new kind of jobs.
-* To add another kind of SAT solving engine, instead of directly inheriting from `Job`, a subclass of `BaseSatJob` (see `src/app/sat/base_sat_job.hpp`) can be created that already incorporates a simple kind of clause sharing. Take a look at an implementation such as `ForkedSatJob` to see how the interface can be used.
-* To add a new SAT solver to be used in a SAT solver engine, implement the interface `PortfolioSolverInterface` (see `src/app/sat/hordesat/solvers/portfolio_solver_interface.hpp`); you can use the existing implementation for `Lingeling` (`lingeling.cpp`) and adapt it to your solver.
+* To add a new SAT solver to be used in a SAT solver engine, implement the interface `PortfolioSolverInterface` (see `src/app/sat/hordesat/solvers/portfolio_solver_interface.hpp`); you can use the existing implementation for `Lingeling` (`lingeling.cpp`) and adapt it to your solver. Then add your solver to the portfolio initialization in `src/app/sat/hordesat/horde.cpp`.
+* To implement a different kind of SAT solving engine, instead of directly inheriting from `Job`, a subclass of `BaseSatJob` (see `src/app/sat/base_sat_job.hpp`) can be created that already incorporates a simple kind of clause sharing. Take a look at an implementation such as `ForkedSatJob` to see how the interface can be used.
+* To extend mallob by adding another kind of job solving engine (like combinatorial search, planning, SMT, ...), a subclass of `Job` (see `src/app/job.hpp`) must be created and an additional case must be added to `JobDatabase::createJob` (see `src/data/job_database.cpp`). To make the job database acknowledge what kind of job is introduced in a program run with several kinds of jobs, the `JobDescription` structure should be extended by a corresponding flag (and be on either end of the serialization so that it can be read directly). Finally, the `Client` class must be extended to read and introduce this new kind of jobs.
 
 ## Licensing
 
