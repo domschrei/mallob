@@ -91,7 +91,7 @@ private:
     void sparseDiversification(int mpi_size, int mpi_rank);
 	void randomDiversification();
 	void sparseRandomDiversification(int mpi_size);
-	void nativeDiversification(int mpi_rank, int mpi_size);
+	void nativeDiversification();
 	void binValueDiversification(int mpi_size, int mpi_rank);
 
     void runOnce();

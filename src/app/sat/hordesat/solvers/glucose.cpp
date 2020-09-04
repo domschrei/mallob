@@ -11,8 +11,9 @@ Note that this file (specifically MGlucose::parallelImportClauses()) is non-free
 as it uses adapted code from Glucose. For its licensing see the LICENSE file in src/app/sat/hordesat/glucose.
 */
 
-MGlucose::MGlucose(LoggingInterface& logger, int globalId, int localId, std::string jobname) 
-		: SimpSolver(), PortfolioSolverInterface(logger, globalId, localId, jobname) {
+MGlucose::MGlucose(LoggingInterface& logger, int globalId, int localId, 
+			std::string jobname, int diversificationIndex) 
+		: SimpSolver(), PortfolioSolverInterface(logger, globalId, localId, jobname, diversificationIndex) {
 	
 	verbosity = -1;
 	verbEveryConflicts = 100000;
@@ -45,8 +46,9 @@ void MGlucose::addLiteral(int lit) {
 	}
 }
 
-void MGlucose::diversify(int rank, int size) {
-	random_seed = rank;
+void MGlucose::diversify(int seed) {
+	int rank = getDiversificationIndex();
+	random_seed = seed;
 	adaptStrategies = false;
 
 	switch (rank % numDiversifications) {

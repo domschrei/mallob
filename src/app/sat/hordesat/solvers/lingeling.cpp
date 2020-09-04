@@ -124,7 +124,8 @@ void cbConsumeCls(void* sp, int** clause, int* glue) {
 
 
 Lingeling::Lingeling(LoggingInterface& logger, int globalId, int localId, std::string jobname, 
-		bool addOldDiversifications) : PortfolioSolverInterface(logger, globalId, localId, jobname) {
+		int diversificationIndex, bool addOldDiversifications) 
+	: PortfolioSolverInterface(logger, globalId, localId, jobname, diversificationIndex) {
 
 	solver = lglinit();
 	
@@ -166,9 +167,10 @@ void Lingeling::addLiteral(int lit) {
 	lgladd(solver, lit);
 }
 
-void Lingeling::diversify(int rank, int size) {
+void Lingeling::diversify(int seed) {
 	
-	lglsetopt(solver, "seed", rank);
+	lglsetopt(solver, "seed", seed);
+	int rank = getDiversificationIndex();
 	
 	// This method is based on Plingeling: OLD from ayv, NEW from bcj
 

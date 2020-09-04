@@ -145,12 +145,12 @@ void SolverThread::diversify() {
 		break;
 	case 4:
 		log(3, "dv: native\n");
-		nativeDiversification(_portfolio_rank, _portfolio_size);
+		nativeDiversification();
 		break;
 	case 5:
 		log(3, "dv: sparse, native\n");
 		sparseDiversification(_portfolio_size, _portfolio_rank);
-		nativeDiversification(_portfolio_rank, _portfolio_size);
+		nativeDiversification();
 		break;
 	case 6:
 		log(3, "dv: sparserand, s=%u\n", seed);
@@ -163,7 +163,7 @@ void SolverThread::diversify() {
         } else {
             log(3, "dv: native, s=%u\n", seed);
         }
-		nativeDiversification(_portfolio_rank, _portfolio_size);
+		nativeDiversification();
 		break;
 	case 0:
 		log(3, "dv: none\n");
@@ -205,10 +205,8 @@ void SolverThread::sparseRandomDiversification(int mpi_size) {
     }
 }
 
-void SolverThread::nativeDiversification(int mpi_rank, int mpi_size) {
-
-    int solversCount = _params.getIntParam("t", 1);
-    _solver.diversify(_solver.getGlobalId(), mpi_size*solversCount);
+void SolverThread::nativeDiversification() {
+    _solver.diversify(_solver.getGlobalId());
 }
 
 void SolverThread::binValueDiversification(int mpi_size, int mpi_rank) {

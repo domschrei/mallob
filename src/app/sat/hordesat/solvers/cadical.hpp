@@ -35,13 +35,13 @@ private:
 	bool seedSet = false;
 
 public:
-	Cadical(LoggingInterface& logger, int globalId, int localId, std::string jobName);
+	Cadical(LoggingInterface& logger, int globalId, int localId, std::string jobName, int diversificationIndex);
 	 ~Cadical();
 
 	// Add a (list of) permanent clause(s) to the formula
 	void addLiteral(int lit) override;
 
-	void diversify(int rank, int size) override;
+	void diversify(int seed) override;
 	void setPhase(const int var, const bool phase) override;
 
 	// Solve the formula with a given set of assumptions

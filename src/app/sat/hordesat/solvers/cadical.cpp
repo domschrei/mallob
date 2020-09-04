@@ -14,8 +14,9 @@
 
 const int CLAUSE_LEARN_INTERRUPT_THRESHOLD = 10000;
 
-Cadical::Cadical(LoggingInterface& logger, int globalId, int localId, std::string jobname)
-	: PortfolioSolverInterface(logger, globalId, localId, jobname), solver(new CaDiCaL::Solver), terminator(logger), learner(*this) {
+Cadical::Cadical(LoggingInterface& logger, int globalId, int localId, std::string jobname, int diversificationIndex)
+	: PortfolioSolverInterface(logger, globalId, localId, jobname, diversificationIndex),
+	  solver(new CaDiCaL::Solver), terminator(logger), learner(*this) {
 	
 	solver->connect_terminator(&terminator);
 }
@@ -24,15 +25,15 @@ void Cadical::addLiteral(int lit) {
 	solver->add(lit);
 }
 
-void Cadical::diversify(int rank, int size) {
+void Cadical::diversify(int seed) {
 
 	// Options may only be set in the initialization phase, so the seed cannot be re-set
 	if (!seedSet) {
-		solver->set("seed", rank);
+		solver->set("seed", seed);
 		seedSet = true;
 	}
 	
-	// TODO: More diversification
+	// TODO: More diversification using getDiversificationIndex()
 }
 
 void Cadical::setPhase(const int var, const bool phase) {

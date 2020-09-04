@@ -57,7 +57,7 @@ protected:
 public:
 
 	// constructor
-	PortfolioSolverInterface(LoggingInterface& logger, int globalId, int localId, std::string jobname);
+	PortfolioSolverInterface(LoggingInterface& logger, int globalId, int localId, std::string jobname, int diversificationIndex);
 
     // destructor
 	virtual ~PortfolioSolverInterface() {}
@@ -97,8 +97,9 @@ public:
 	// Get solver statistics
 	virtual SolvingStatistics getStatistics() = 0;
 
-	// You are solver #rank of #size solvers, diversify your parameters (seeds, heuristics, etc.) accordingly.
-	virtual void diversify(int rank, int size) = 0;
+	// Diversify your parameters (seeds, heuristics, etc.) according to the seed
+	// and the individual diversification index given by getDiversificationIndex().
+	virtual void diversify(int seed) = 0;
 
 	// How many "true" different diversifications do you have?
 	// May be used to decide when to apply additional diversifications.
@@ -124,8 +125,22 @@ protected:
 // Other methods
 
 public:
+	/**
+	 * The solver's ID which is globally unique for the particular job
+	 * that is being computed on.
+	 * Equal to <rank> * <solvers_per_node> + <local_id>.
+	 */
 	int getGlobalId() {return _global_id;}
+	/**
+	 * The solver's local ID on this node and job. 
+	 */
 	int getLocalId() {return _local_id;}
+	/**
+	 * This number n denotes that this solver is the n-th solver of this type
+	 * being employed to compute on this job.
+	 * Equal to the global ID minus the number of solvers of a different type.
+	 */
+	int getDiversificationIndex() {return _diversification_index;}
 	
 	void interrupt();
 	void uninterrupt();
@@ -140,6 +155,7 @@ private:
 	std::string _job_name;
 	int _global_id;
 	int _local_id;
+	int _diversification_index;
 };
 
 // Returns the elapsed time (seconds) since the currently registered solver's start time.

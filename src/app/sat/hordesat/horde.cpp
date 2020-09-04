@@ -95,42 +95,59 @@ void HordeLib::init() {
 	solversCount = params.getIntParam("t", 1);
 	//printf("solvers is %d", solversCount);
 
-	int which = params.getIntParam("satsolver", 1);
+	// Retrieve the string defining the cycle of solver choices, one character per solver
+	// e.g. "llgc" => lingeling lingeling glucose cadical lingeling lingeling glucose ...
+	std::string solverChoices = params.getParam("satsolver", "l");
+	
+	// These numbers become the diversifier indices of the solvers on this node
+	int numLgl = 0;
+	int numGlu = 0;
+	int numCdc = 0;
+
+	// Add solvers from full cycles on previous ranks
+	// and from the begun cycle on the previous rank
+	int numFullCycles = (mpi_rank * solversCount) / solverChoices.size();
+	int begunCyclePos = (mpi_rank * solversCount) % solverChoices.size();
+	for (int i = 0; i < solverChoices.size(); i++) {
+		int* solverToAdd;
+		switch (solverChoices[i]) {
+		case 'l': solverToAdd = &numLgl; break;
+		case 'g': solverToAdd = &numGlu; break;
+		case 'c': solverToAdd = &numCdc; break;
+		}
+		*solverToAdd += numFullCycles + (i < begunCyclePos);
+	}
+
+	// Instantiate solvers according to the global solver IDs and diversification indices
+	int cyclePos = begunCyclePos;
 	for (int i = 0; i < solversCount; i++) {
-		int solverId = i + solversCount * mpi_rank;
-		
-		// TODO When there are multiple solver implementations,
-		// allocate them here instead of / together with Lingeling
-		switch (which) {
-		case 1:
+		int globalSolverId = mpi_rank * solversCount + i;
+		// Which solver?
+		switch (solverChoices[cyclePos]) {
+		case 'l':
 			// Lingeling
-			solverInterfaces.emplace_back(new Lingeling(*logger, solverId, i, params.getParam("jobstr"), params.isSet("aod")));
+			hlog(3, "S%i : Employing Lingeling\n", globalSolverId);
+			solverInterfaces.emplace_back(new Lingeling(*logger, globalSolverId, i, params.getParam("jobstr"), numLgl++, params.isSet("aod")));
 			break;
-		case 2:
+		case 'c':
 			// Cadical
-			solverInterfaces.emplace_back(new Cadical(*logger, solverId, i, params.getParam("jobstr")));
+			hlog(3, "S%i : Employing Cadical\n", globalSolverId);
+			solverInterfaces.emplace_back(new Cadical(*logger, globalSolverId, i, params.getParam("jobstr"), numCdc++));
 			break;
 #ifdef MALLOB_USE_RESTRICTED
-		case 3:
+		case 'g':
 			// Glucose
-			solverInterfaces.emplace_back(new MGlucose(*logger, solverId, i, params.getParam("jobstr")));
+			hlog(3, "S%i: Employing Glucose\n", globalSolverId);
+			solverInterfaces.emplace_back(new MGlucose(*logger, globalSolverId, i, params.getParam("jobstr"), numGlu++));
 			break;
 #endif
 		default:
-			// Alternate between available solvers
-#ifdef MALLOB_USE_RESTRICTED
-			int cycle = 3;
-#else
-			int cycle = 2;
-#endif
-			switch (i % 3) {
-			case 0: solverInterfaces.emplace_back(new Lingeling(*logger, solverId, i, params.getParam("jobstr"), params.isSet("aod"))); break;
-			case 1: solverInterfaces.emplace_back(new Cadical(*logger, solverId, i, params.getParam("jobstr"))); break;
-#ifdef MALLOB_USE_RESTRICTED
-			case 2: solverInterfaces.emplace_back(new MGlucose(*logger, solverId, i, params.getParam("jobstr"))); break;
-#endif
-			}
+			// Invalid solver
+			hlog(0, "Fatal error: Invalid solver \"%c\" assigned\n", solverChoices[cyclePos]);
+			abort();
+			break;
 		}
+		cyclePos = (cyclePos+1) % solverChoices.size();
 	}
 
 	sleepInt = 1000 * params.getIntParam("i", 1000);

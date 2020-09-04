@@ -53,13 +53,14 @@ private:
 	int numDiversifications;
 
 public:
-	Lingeling(LoggingInterface& logger, int globalId, int localId, std::string jobName, bool addOldDiversifications);
+	Lingeling(LoggingInterface& logger, int globalId, int localId, std::string jobName, 
+				int diversificationIndex, bool addOldDiversifications);
 	 ~Lingeling() override;
 
 	// Add a (list of) permanent clause(s) to the formula
 	void addLiteral(int lit) override;
 
-	void diversify(int rank, int size) override;
+	void diversify(int seed) override;
 	void setPhase(const int var, const bool phase) override;
 
 	// Solve the formula with a given set of assumptions
