@@ -45,7 +45,8 @@ private:
     ConditionVariable suspendCond;
 
 	int numDiversifications;
-	unsigned int glueLimit;
+	unsigned int strictGlueLimit;
+	unsigned int lenientGlueLimit;
 
 
 public:

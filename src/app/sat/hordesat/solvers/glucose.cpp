@@ -22,7 +22,8 @@ MGlucose::MGlucose(LoggingInterface& logger, int globalId, int localId,
 	stopSolver = 0;
 	learnedClauseCallback = NULL;
 
-	glueLimit = 2;
+	strictGlueLimit = 2;
+	lenientGlueLimit = 5;
 
 	suspendSolver = false;
 	maxvar = 0;
@@ -170,7 +171,8 @@ void MGlucose::setLearnedClauseCallback(LearnedClauseCallback* callback) {
 }
 
 void MGlucose::increaseClauseProduction() {
-	if (glueLimit < 8) glueLimit++;
+	if (lenientGlueLimit < 8) lenientGlueLimit++;
+	else if (strictGlueLimit < 8) strictGlueLimit++;
 }
 
 int MGlucose::getVariablesCount() {
@@ -242,7 +244,7 @@ void MGlucose::buildFailedMap() {
 }
 
 bool MGlucose::parallelJobIsFinished() {
-	// Use (or abuse) this method to suspend a solver during its execution
+	// Use (or rather abuse) this method to suspend a solver during its execution
 	if (suspendSolver) {
 		suspendCond.wait(suspendMutex, [this]{return !suspendSolver;});
 	}
@@ -268,14 +270,17 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 
 	// decide whether to export the clause
 	bool accept = false;
-	// Export clauses which are seen for the (at least) second time now
+	// Export good clauses which are seen for the (at least) second time now
 	// Filtering by clause length and by duplicates is done elsewhere!
 	c.setExported(c.getExported() + 1);
 	if (!c.wasImported() && c.getExported() >= 2) {
-		if (c.lbd() <= glueLimit) {
+		// Lenient check: LBD does not need to be "that good"
+		if (c.lbd() <= lenientGlueLimit) {
 			accept = true;
 		}
 	}
+	// Export clause unconditionally if it has a very good LBD score
+	accept = accept || (!c.wasImported() && c.lbd() <= strictGlueLimit);
 	if (!accept) return;
 	
 	// assemble clause
