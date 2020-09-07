@@ -246,8 +246,6 @@ void Worker::mainProgram() {
                     int result = job.appl_solveLoop();
                     if (result >= 0) {
                         // Solver done!
-                        job.appl_dumpStats();
-
                         // Signal termination to root -- may be a self message
                         int jobRootRank = job.getRootNodeRank();
                         IntVec payload({job.getId(), job.getRevision(), result});

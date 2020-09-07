@@ -11,11 +11,15 @@
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 
 struct SharingStatistics {
-	SharingStatistics():sharedClauses(0),importedClauses(0),filteredClauses(0),dropped(0) {}
-	unsigned long sharedClauses;
+	SharingStatistics():exportedClauses(0),importedClauses(0),
+		clausesDroppedAtExport(0),
+		clausesFilteredAtExport(0),
+		clausesFilteredAtImport(0) {}
+	unsigned long exportedClauses;
 	unsigned long importedClauses;
-	unsigned long filteredClauses;
-	unsigned long dropped;
+	unsigned long clausesDroppedAtExport;
+	unsigned long clausesFilteredAtExport;
+	unsigned long clausesFilteredAtImport;
 };
 
 class SharingManagerInterface {

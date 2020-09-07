@@ -99,10 +99,8 @@ void ThreadedSatJob::appl_interrupt() {
 }
 
 void ThreadedSatJob::appl_interrupt_unsafe() {
-    if (solverNotNull()) {
-        _solver->interrupt(); // interrupt SAT solving (but keeps solver threads!)
-        _solver->finishSolving(); // concludes solving process
-    }
+    // interrupt SAT solving (but keeps solver threads!)
+    if (solverNotNull()) _solver->interrupt(); 
 }
 
 void ThreadedSatJob::cleanUpThread() {
@@ -172,7 +170,7 @@ int ThreadedSatJob::appl_solveLoop() {
 void ThreadedSatJob::appl_dumpStats() {
     if (isInState({ACTIVE})) {
 
-        getSolver()->dumpStats();
+        getSolver()->dumpStats(/*final=*/false);
         if (_time_of_start_solving <= 0) return;
         
         std::vector<long> threadTids = getSolver()->getSolverTids();

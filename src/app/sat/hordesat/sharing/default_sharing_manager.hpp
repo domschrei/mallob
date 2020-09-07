@@ -58,10 +58,10 @@ protected:
 			if (parent.nodeFilter.registerClause(cls)) {
 				int* res = parent.cdb.addClause(cls);
 				if (res == NULL) {
-					parent.stats.dropped++;
+					parent.stats.clausesDroppedAtExport++;
 				}
 			} else {
-				parent.stats.filteredClauses++;
+				parent.stats.clausesFilteredAtExport++;
 			}
 		}
 	};

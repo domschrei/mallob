@@ -80,14 +80,13 @@ public:
     void digestSharing(const std::vector<int>& result);
 	void digestSharing(int* begin, int size);
 
-    int finishSolving();
     void interrupt();
 	void setSolvingState(SolvingStates::SolvingState state);
     void setPaused();
     void unsetPaused();
 	void abort();
 
-	void dumpStats();
+	void dumpStats(bool final);
 	std::vector<long> getSolverTids() {
 		std::vector<long> tids;
 		for (size_t i = 0; i < solverThreads.size(); i++) {

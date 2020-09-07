@@ -36,7 +36,7 @@ int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
 	int selectedCount;
 	int used = cdb.giveSelection(begin, maxSize, &selectedCount);
 	logger.log(3, "Prepared %i clauses, size %i\n", selectedCount, used);
-	stats.sharedClauses += selectedCount;
+	stats.exportedClauses += selectedCount;
 	float usedRatio = ((float)used)/maxSize;
 	if (usedRatio < params.getFloatParam("icpr")) {
 		int increaser = lastInc++ % solvers.size();
@@ -89,6 +89,7 @@ void DefaultSharingManager::digestSharing(const int* begin, int buflen) {
 				}
 			}
 			if (anyPassed) passedFilter++;
+			else failedFilter++;
 		} else {
 			// Only one solver on this node: No per-solver filtering.
 			// Use the node filter in this case to prevent redundant learning.
@@ -103,8 +104,8 @@ void DefaultSharingManager::digestSharing(const int* begin, int buflen) {
 		clsbegin = cdb.getNextIncomingClause(size);
 	}
 	int total = passedFilter + failedFilter;
-	stats.filteredClauses += failedFilter;
 	stats.importedClauses += passedFilter;
+	stats.clausesFilteredAtImport += failedFilter;
 	
 	if (total == 0) return;
 

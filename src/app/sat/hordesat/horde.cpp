@@ -272,7 +272,7 @@ void HordeLib::digestSharing(int* begin, int size) {
 	sharingManager->digestSharing(begin, size);
 }
 
-void HordeLib::dumpStats() {
+void HordeLib::dumpStats(bool final) {
 	if (isCleanedUp() || !isFullyInitialized()) return;
 
 	// Local statistics
@@ -280,7 +280,8 @@ void HordeLib::dumpStats() {
 	for (int i = 0; i < solversCount; i++) {
 		if (solverInterfaces[i] == NULL) continue;
 		SolvingStatistics st = solverInterfaces[i]->getStatistics();
-		hlog(1, "S%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f\n",
+		hlog(1, "%sS%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f\n",
+				final ? "END " : "",
 				solverInterfaces[i]->getGlobalId(), st.propagations, st.decisions, st.conflicts, st.memPeak);
 		locSolveStats.conflicts += st.conflicts;
 		locSolveStats.decisions += st.decisions;
@@ -292,9 +293,13 @@ void HordeLib::dumpStats() {
 	if (sharingManager != NULL) {
 		locShareStats = sharingManager->getStatistics();
 	}
-	hlog(1, "pps:%lu decs:%lu cnfs:%lu mem:%0.2f shrd:%lu fltd:%lu\n",
-			locSolveStats.propagations, locSolveStats.decisions, locSolveStats.conflicts, 
-			locSolveStats.memPeak, locShareStats.sharedClauses, locShareStats.filteredClauses);
+	unsigned long exportedWithFailed = locShareStats.exportedClauses + locShareStats.clausesFilteredAtExport + locShareStats.clausesDroppedAtExport;
+	unsigned long importedWithFailed = locShareStats.importedClauses + locShareStats.clausesFilteredAtImport;
+	hlog(1, "%spps:%lu decs:%lu cnfs:%lu mem:%0.2f exp:%lu/%lu(drp:%lu) imp:%lu/%lu\n",
+			final ? "END " : "",
+			locSolveStats.propagations, locSolveStats.decisions, locSolveStats.conflicts, locSolveStats.memPeak, 
+			locShareStats.exportedClauses, exportedWithFailed, locShareStats.clausesDroppedAtExport, 
+			locShareStats.importedClauses, importedWithFailed);
 }
 
 void HordeLib::setPaused() {
@@ -306,7 +311,10 @@ void HordeLib::unsetPaused() {
 }
 
 void HordeLib::interrupt() {
-	if (solvingState != STANDBY) setSolvingState(STANDBY);
+	if (solvingState != STANDBY) {
+		setSolvingState(STANDBY);
+		dumpStats(/*final=*/true);
+	}
 }
 
 void HordeLib::abort() {
@@ -319,15 +327,6 @@ void HordeLib::setSolvingState(SolvingState state) {
 
 	hlog(2, "state transition %s -> %s\n", SolvingStateNames[oldState], SolvingStateNames[state]);
 	for (auto& solver : solverThreads) solver->setState(state);
-}
-
-int HordeLib::finishSolving() {
-
-	assert(solvingState == STANDBY);
-	if (params.isNotNull("stats")) {
-		dumpStats();
-	}
-	return finalResult;
 }
 
 int HordeLib::value(int lit) {

@@ -78,7 +78,6 @@ void ForkedSatJob::appl_interrupt() {
     auto lock = _solver_lock.getLock();
     if (solverNotNull()) {
         _solver->setSolvingState(SolvingStates::STANDBY); // interrupt SAT solving (but keeps solver threads!)
-        _solver->dumpStats(); // concludes solving process
     }
 }
 
