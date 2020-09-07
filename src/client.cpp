@@ -321,9 +321,6 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
         }
     }
 
-    Console::logUnsafe(Console::VERB, ""); // line break
-    Console::releaseLock();
-
     if (_jobs[jobId]->isIncremental() && desc.getRevision() > revision) {
         // Introduce next revision
         revision++;
