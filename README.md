@@ -44,8 +44,7 @@ Using this configuration on 1600 hardware threads in parallel in an AWS environm
 
 We use GNU Make as our build tool. Additionally, a valid MPI installation is required (e.g. OpenMPI, Intel MPI, MPICH, ...).
 
-Go into the directory `src/hordesat` and execute `bash build.sh` which will (a) attempt to find your MPI installation, (b) fetch and build the necessary SAT solving backends, and (c) call mallob's `make` with the appropriate arguments.
-This generates the executable `build/mallob`.
+Go into the base directory and execute `bash build.sh` which will (a) attempt to find your MPI installation, (b) fetch and build the necessary SAT solving backends, and (c) call mallob's `make` with the appropriate arguments. This generates the executable `build/mallob`.
 If you want to make use of Glucose as a SAT solver, execute `MALLOB_USE_RESTRICTED=1 bash build.sh` instead (after having read the Licensing section below).
 
 Alternatively, you can run mallob in a virtualized manner using Docker, which was successfully done for the SAT Competition 2020.
