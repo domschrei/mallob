@@ -39,19 +39,14 @@ private:
 	vector<vector<int> > clausesToAdd;
 	vector<vector<int> > learnedClausesToAdd;
 	vector<int> unitsToAdd;
-	int* unitsBuffer;
-	size_t unitsBufferSize;
-	int* clsBuffer;
-	size_t clsBufferSize;
     
     volatile bool suspendSolver;
     Mutex suspendMutex;
     ConditionVariable suspendCond;
 
 	int numDiversifications;
-
 	unsigned int glueLimit;
- 	unsigned int goodlimitsize = 25;
+
 
 public:
 	MGlucose(LoggingInterface& logger, int globalId, int localId, std::string jobName, int diversificationIndex);
@@ -107,15 +102,15 @@ private:
 
 	void parallelImportUnaryClauses() override;
 	bool parallelImportClauses() override; // true if the empty clause was received
-
 	void parallelExportUnaryClause(Glucose::Lit p) override;
-	void parallelExportClauseDuringSearch(Glucose::Clause &c) override;
-	void parallelExportClauseDuringConflictAnalysis(Glucose::Clause &c);
+	void parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysis);
 
+	void parallelExportClauseDuringSearch(Glucose::Clause &c) override {
+		parallelExportClause(c, false);
+	}
+	// This method is a misnomer, it should say EXport.
 	inline void parallelImportClauseDuringConflictAnalysis(Glucose::Clause &c, Glucose::CRef confl) override {
-		// This method is a misnomer, it should say EXport.
-		// Forward to correctly named method.
-		return parallelExportClauseDuringConflictAnalysis(c);
+		parallelExportClause(c, true);
 	}
 };
 

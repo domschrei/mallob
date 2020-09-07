@@ -24,10 +24,6 @@ MGlucose::MGlucose(LoggingInterface& logger, int globalId, int localId,
 
 	glueLimit = 2;
 
-	unitsBufferSize = clsBufferSize = 100;
-	unitsBuffer = (int*) malloc(unitsBufferSize*sizeof(int));
-	clsBuffer = (int*) malloc(clsBufferSize*sizeof(int));
-
 	suspendSolver = false;
 	maxvar = 0;
 
@@ -203,8 +199,6 @@ SolvingStatistics MGlucose::getStatistics() {
 
 MGlucose::~MGlucose() {
 	resetMaps();
-	free(unitsBuffer);
-	free(clsBuffer);
 }
 
 Glucose::Lit MGlucose::encodeLit(int lit) {
@@ -261,7 +255,7 @@ void MGlucose::parallelExportUnaryClause(Glucose::Lit p) {
 	learnedClauseCallback->processClause(vcls, getLocalId());
 }
 
-void MGlucose::parallelExportClauseDuringSearch(Glucose::Clause &c) {
+void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysis) {
 	
 	// unit clause
 	if (c.size() == 1) {
@@ -269,34 +263,32 @@ void MGlucose::parallelExportClauseDuringSearch(Glucose::Clause &c) {
 		return;
 	}
 
-	// check glue
-	unsigned int glue = c.lbd();
-	if (glue > glueLimit) {
-		return;
+	// discard clauses coming from the "DuringSearch" method
+	if (!fromConflictAnalysis) return;
+
+	// decide whether to export the clause
+	bool accept = false;
+	// Export clauses which are seen for the (at least) second time now
+	// Filtering by clause length and by duplicates is done elsewhere!
+	c.setExported(c.getExported() + 1);
+	if (!c.wasImported() && c.getExported() >= 2) {
+		if (c.lbd() <= glueLimit) {
+			accept = true;
+		}
 	}
+	if (!accept) return;
 	
 	// assemble clause
 	vector<int> vcls(1+c.size());
 	int i = 0;
 	// to avoid zeros in the array, 1 is added to the glue
-	vcls[i++] = 1+glue;
+	vcls[i++] = 1+c.lbd();
 	for (int j = 0; j < c.size(); j++) {
 		vcls[i++] = decodeLit(c[j]);
 	}
 	
 	// export clause
 	learnedClauseCallback->processClause(vcls, getLocalId());
-}
-
-void MGlucose::parallelExportClauseDuringConflictAnalysis(Glucose::Clause &c) {
-	if (c.getExported() != 2) {
-		c.setExported(c.getExported() + 1);
-		if (!c.wasImported() && c.getExported() == 2) { // It's a new interesting clause: 
-			if (c.lbd() == 2u || (c.size() < (int)goodlimitsize && c.lbd() <= glueLimit)) {
-				parallelExportClauseDuringSearch(c);
-			}
-		}
-	}
 }
 
 /*
