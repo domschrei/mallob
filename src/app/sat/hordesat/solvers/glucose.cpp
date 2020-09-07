@@ -288,6 +288,17 @@ void MGlucose::parallelExportClauseDuringSearch(Glucose::Clause &c) {
 	learnedClauseCallback->processClause(vcls, getLocalId());
 }
 
+void MGlucose::parallelExportClauseDuringConflictAnalysis(Glucose::Clause &c) {
+	if (c.getExported() != 2) {
+		c.setExported(c.getExported() + 1);
+		if (!c.wasImported() && c.getExported() == 2) { // It's a new interesting clause: 
+			if (c.lbd() == 2u || (c.size() < (int)goodlimitsize && c.lbd() <= glueLimit)) {
+				parallelExportClauseDuringSearch(c);
+			}
+		}
+	}
+}
+
 /*
  * This method is an adaptation of ParallelSolver::parallelImportClauses().
  */
@@ -366,8 +377,4 @@ void MGlucose::parallelImportUnaryClauses() {
 	unitsToAdd.clear();
 
 	clauseAddMutex.unlock();
-}
-
-void MGlucose::parallelImportClauseDuringConflictAnalysis(Glucose::Clause &c, Glucose::CRef confl) {
-	// TODO
 }

@@ -22,7 +22,6 @@ private:
 	std::string name;
 	int stopSolver;
 	LearnedClauseCallback* learnedClauseCallback;
-	unsigned int glueLimit;
 	Mutex clauseAddMutex;
 
 	Glucose::vec<Glucose::Lit> clause;
@@ -50,6 +49,9 @@ private:
     ConditionVariable suspendCond;
 
 	int numDiversifications;
+
+	unsigned int glueLimit;
+ 	unsigned int goodlimitsize = 25;
 
 public:
 	MGlucose(LoggingInterface& logger, int globalId, int localId, std::string jobName, int diversificationIndex);
@@ -106,11 +108,15 @@ private:
 	void parallelImportUnaryClauses() override;
 	bool parallelImportClauses() override; // true if the empty clause was received
 
-	void parallelImportClauseDuringConflictAnalysis(Glucose::Clause &c, Glucose::CRef confl) override;
-
 	void parallelExportUnaryClause(Glucose::Lit p) override;
 	void parallelExportClauseDuringSearch(Glucose::Clause &c) override;
+	void parallelExportClauseDuringConflictAnalysis(Glucose::Clause &c);
 
+	inline void parallelImportClauseDuringConflictAnalysis(Glucose::Clause &c, Glucose::CRef confl) override {
+		// This method is a misnomer, it should say EXport.
+		// Forward to correctly named method.
+		return parallelExportClauseDuringConflictAnalysis(c);
+	}
 };
 
 #endif /* LINGELING_H_ */
