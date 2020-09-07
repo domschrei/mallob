@@ -107,6 +107,8 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
         if (!interrupted && hsm->doDumpStats && !hsm->didDumpStats) {
             log->log(3, "DO dump stats\n");
             
+            hlib.dumpStats();
+
             // For this management thread
             double perc_cpu; float sysShare;
             bool success = Proc::getThreadCpuRatio(Proc::getTid(), perc_cpu, sysShare);

@@ -292,9 +292,9 @@ void HordeLib::dumpStats() {
 	if (sharingManager != NULL) {
 		locShareStats = sharingManager->getStatistics();
 	}
-	hlog(1, "slv:%d res:%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f shrd:%lu fltd:%lu\n",
-			finalResult != 0, finalResult, locSolveStats.propagations, locSolveStats.decisions,
-			locSolveStats.conflicts, locSolveStats.memPeak, locShareStats.sharedClauses, locShareStats.filteredClauses);
+	hlog(1, "pps:%lu decs:%lu cnfs:%lu mem:%0.2f shrd:%lu fltd:%lu\n",
+			locSolveStats.propagations, locSolveStats.decisions, locSolveStats.conflicts, 
+			locSolveStats.memPeak, locShareStats.sharedClauses, locShareStats.filteredClauses);
 }
 
 void HordeLib::setPaused() {
