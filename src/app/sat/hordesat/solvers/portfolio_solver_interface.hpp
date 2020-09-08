@@ -35,6 +35,30 @@ struct SolvingStatistics {
 	double memPeak;
 };
 
+struct SolverSetup {
+
+	// General important fields
+	LoggingInterface* logger;
+	int globalId;
+	int localId; 
+	std::string jobname; 
+	int diversificationIndex;
+
+	// SAT Solving settings
+
+	// In any case, these bounds MUST be fulfilled for a clause to be exported
+	unsigned int hardMaxClauseLength;
+	unsigned int hardInitialMaxLbd;
+	unsigned int hardFinalMaxLbd;
+	// These bounds may not be fulfilled in case the solver deems the clause very good
+	// due to other observations
+	unsigned int softMaxClauseLength;
+	unsigned int softInitialMaxLbd;
+	unsigned int softFinalMaxLbd;
+	// For lingeling ("use old diversification")
+	bool useAdditionalDiversification;
+};
+
 class LearnedClauseCallback {
 public:
 	virtual void processClause(vector<int>& cls, int solverId) = 0;
@@ -50,6 +74,7 @@ class PortfolioSolverInterface {
 
 protected:
 	LoggingInterface& _logger;
+	SolverSetup _setup;
 
 
 // ************** INTERFACE TO IMPLEMENT **************
@@ -57,7 +82,7 @@ protected:
 public:
 
 	// constructor
-	PortfolioSolverInterface(LoggingInterface& logger, int globalId, int localId, std::string jobname, int diversificationIndex);
+	PortfolioSolverInterface(const SolverSetup& setup);
 
     // destructor
 	virtual ~PortfolioSolverInterface() {}

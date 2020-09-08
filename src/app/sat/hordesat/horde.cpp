@@ -118,28 +118,41 @@ void HordeLib::init() {
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
 	}
 
+	SolverSetup setup;
+	setup.logger = logger.get();
+	setup.jobname = params.getParam("jobstr");
+	setup.useAdditionalDiversification = params.isNotNull("aod");
+	setup.hardInitialMaxLbd = params.getIntParam("ihlbd");
+	setup.hardFinalMaxLbd = params.getIntParam("fhlbd");
+	setup.softInitialMaxLbd = params.getIntParam("islbd");
+	setup.softFinalMaxLbd = params.getIntParam("fslbd");
+	setup.hardMaxClauseLength = params.getIntParam("hmcl");
+	setup.softMaxClauseLength = params.getIntParam("smcl");
+
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
-	for (int i = 0; i < solversCount; i++) {
-		int globalSolverId = mpi_rank * solversCount + i;
+	for (setup.localId = 0; setup.localId < solversCount; setup.localId++) {
+		setup.globalId = mpi_rank * solversCount + setup.localId;
 		// Which solver?
 		switch (solverChoices[cyclePos]) {
 		case 'l':
 			// Lingeling
-			hlog(3, "S%i : Employing Lingeling\n", globalSolverId);
-			solverInterfaces.emplace_back(new Lingeling(*logger, globalSolverId, i, params.getParam("jobstr"), numLgl++, 
-					params.isNotNull("aod")));
+			hlog(3, "S%i : Employing Lingeling\n", setup.globalId);
+			setup.diversificationIndex = numLgl++;
+			solverInterfaces.emplace_back(new Lingeling(setup));
 			break;
 		case 'c':
 			// Cadical
-			hlog(3, "S%i : Employing Cadical\n", globalSolverId);
-			solverInterfaces.emplace_back(new Cadical(*logger, globalSolverId, i, params.getParam("jobstr"), numCdc++));
+			hlog(3, "S%i : Employing Cadical\n", setup.globalId);
+			setup.diversificationIndex = numCdc++;
+			solverInterfaces.emplace_back(new Cadical(setup));
 			break;
 #ifdef MALLOB_USE_RESTRICTED
 		case 'g':
 			// Glucose
-			hlog(3, "S%i: Employing Glucose\n", globalSolverId);
-			solverInterfaces.emplace_back(new MGlucose(*logger, globalSolverId, i, params.getParam("jobstr"), numGlu++));
+			hlog(3, "S%i: Employing Glucose\n", setup.globalId);
+			setup.diversificationIndex = numGlu++;
+			solverInterfaces.emplace_back(new MGlucose(setup));
 			break;
 #endif
 		default:
@@ -280,7 +293,7 @@ void HordeLib::dumpStats(bool final) {
 	for (int i = 0; i < solversCount; i++) {
 		if (solverInterfaces[i] == NULL) continue;
 		SolvingStatistics st = solverInterfaces[i]->getStatistics();
-		hlog(1, "%sS%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f\n",
+		hlog(0, "%sS%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f\n",
 				final ? "END " : "",
 				solverInterfaces[i]->getGlobalId(), st.propagations, st.decisions, st.conflicts, st.memPeak);
 		locSolveStats.conflicts += st.conflicts;
@@ -295,11 +308,19 @@ void HordeLib::dumpStats(bool final) {
 	}
 	unsigned long exportedWithFailed = locShareStats.exportedClauses + locShareStats.clausesFilteredAtExport + locShareStats.clausesDroppedAtExport;
 	unsigned long importedWithFailed = locShareStats.importedClauses + locShareStats.clausesFilteredAtImport;
-	hlog(1, "%spps:%lu decs:%lu cnfs:%lu mem:%0.2f exp:%lu/%lu(drp:%lu) imp:%lu/%lu\n",
+	hlog(0, "%spps:%lu decs:%lu cnfs:%lu mem:%0.2f exp:%lu/%lu(drp:%lu) imp:%lu/%lu\n",
 			final ? "END " : "",
 			locSolveStats.propagations, locSolveStats.decisions, locSolveStats.conflicts, locSolveStats.memPeak, 
 			locShareStats.exportedClauses, exportedWithFailed, locShareStats.clausesDroppedAtExport, 
 			locShareStats.importedClauses, importedWithFailed);
+	if (final) {
+		// Histogram over clause lengths
+		std::string hist = "";
+		for (int i = 0; i < 50; i++) {
+			hist += std::to_string(locShareStats.seenClauseLenHistogram[i]) + " ";
+		}
+		hlog(0, "END clenhist: %s\n", hist.c_str());
+	}
 }
 
 void HordeLib::setPaused() {

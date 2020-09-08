@@ -20,6 +20,7 @@ struct SharingStatistics {
 	unsigned long clausesDroppedAtExport;
 	unsigned long clausesFilteredAtExport;
 	unsigned long clausesFilteredAtImport;
+	unsigned long* seenClauseLenHistogram;
 };
 
 class SharingManagerInterface {

@@ -14,9 +14,9 @@
 
 const int CLAUSE_LEARN_INTERRUPT_THRESHOLD = 10000;
 
-Cadical::Cadical(LoggingInterface& logger, int globalId, int localId, std::string jobname, int diversificationIndex)
-	: PortfolioSolverInterface(logger, globalId, localId, jobname, diversificationIndex),
-	  solver(new CaDiCaL::Solver), terminator(logger), learner(*this) {
+Cadical::Cadical(const SolverSetup& setup)
+	: PortfolioSolverInterface(setup),
+	  solver(new CaDiCaL::Solver), terminator(*setup.logger), learner(*this) {
 	
 	solver->connect_terminator(&terminator);
 }

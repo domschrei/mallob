@@ -37,6 +37,8 @@ protected:
 
 	float lastBufferClear = 0;
 
+	unsigned long seenClauseLenHistogram[256];
+
 	class Callback : public LearnedClauseCallback {
 	public:
 		DefaultSharingManager& parent;
@@ -45,6 +47,8 @@ protected:
 			hasSolverFilters = parent.solvers.size() > 1;
 		}
 		void processClause(vector<int>& cls, int solverId) {
+
+			parent.seenClauseLenHistogram[cls.size() == 1 ? 1 : cls.size()-1]++;
 
 			// If applicable, register clause in child filter
 			// such that it will not be re-imported to this solver.

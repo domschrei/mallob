@@ -44,8 +44,7 @@ int cbCheckTerminate(void* solverPtr) {
 }
 
 void cbProduceUnit(void* sp, int lit) {
-	vector<int> vcls;
-	vcls.push_back(lit);
+	vector<int> vcls(1, lit);
 	Lingeling* lp = (Lingeling*)sp;
 	lp->callback->processClause(vcls, lp->getLocalId());
 }
@@ -57,16 +56,21 @@ void cbProduce(void* sp, int* cls, int glue) {
 		return;
 	}
 	Lingeling* lp = (Lingeling*)sp;
-	if (glue > lp->glueLimit) {
+	// LBD score check
+	if (glue > (int)lp->glueLimit) {
 		return;
 	}
-	vector<int> vcls;
+	// size check
+	unsigned int size = 0;
+	unsigned int i = 0;
+	while (cls[i++] != 0) size++;
+	if (size > lp->sizeLimit) return;
+	// build vector of literals
+	vector<int> vcls(1+size);
 	// to avoid zeros in the array, 1 is added to the glue
-	vcls.push_back(1+glue);
-	int i = 0;
-	while (cls[i] != 0) {
-		vcls.push_back(cls[i]);
-		i++;
+	vcls[0] = 1+glue;
+	for (i = 1; i <= size; i++) {
+		vcls[i] = cls[i-1];
 	}
 	//printf("glue = %d, size = %lu\n", glue, vcls.size());
 	lp->callback->processClause(vcls, lp->getLocalId());
@@ -123,9 +127,8 @@ void cbConsumeCls(void* sp, int** clause, int* glue) {
 }
 
 
-Lingeling::Lingeling(LoggingInterface& logger, int globalId, int localId, std::string jobname, 
-		int diversificationIndex, bool addOldDiversifications) 
-	: PortfolioSolverInterface(logger, globalId, localId, jobname, diversificationIndex) {
+Lingeling::Lingeling(const SolverSetup& setup) 
+	: PortfolioSolverInterface(setup) {
 
 	solver = lglinit();
 	
@@ -135,14 +138,15 @@ Lingeling::Lingeling(LoggingInterface& logger, int globalId, int localId, std::s
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
 	lglsetopt(solver, "bca", 0);
 	
-	lastTermCallbackTime = logger.getTime();
+	lastTermCallbackTime = _logger.getTime();
 
 	stopSolver = 0;
 	callback = NULL;
 
 	lglsetime(solver, getTime);
 	lglseterm(solver, cbCheckTerminate, this);
-	glueLimit = 2;
+	glueLimit = _setup.softInitialMaxLbd;
+	sizeLimit = _setup.softMaxClauseLength;
 
 	unitsBufferSize = clsBufferSize = 100;
 	unitsBuffer = (int*) malloc(unitsBufferSize*sizeof(int));
@@ -151,7 +155,7 @@ Lingeling::Lingeling(LoggingInterface& logger, int globalId, int localId, std::s
     suspendSolver = false;
     maxvar = 0;
 
-	if (addOldDiversifications) {
+	if (_setup.useAdditionalDiversification) {
 		numDiversifications = 20;
 	} else {
 		numDiversifications = 14;
@@ -332,7 +336,7 @@ void Lingeling::setLearnedClauseCallback(LearnedClauseCallback* callback) {
 }
 
 void Lingeling::increaseClauseProduction() {
-	if (glueLimit < 8) glueLimit++;
+	if (glueLimit < _setup.softFinalMaxLbd) glueLimit++;
 }
 
 int Lingeling::getVariablesCount() {

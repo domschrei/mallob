@@ -40,12 +40,12 @@ void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ..
 	va_end(vl);
 }
 
-PortfolioSolverInterface::PortfolioSolverInterface(LoggingInterface& logger, int globalId, int localId, 
-			std::string jobname, int diversificationIndex) 
-		: _logger(logger), _job_name(jobname), _global_id(globalId), _local_id(localId), 
-		  _diversification_index(diversificationIndex) {
-	updateTimer(jobname);
-	_global_name = "<h-" + jobname + "_S" + std::to_string(globalId) + ">";
+PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup) 
+		: _logger(*setup.logger), _setup(setup), _job_name(setup.jobname), 
+		  _global_id(setup.globalId), _local_id(setup.localId), 
+		  _diversification_index(setup.diversificationIndex) {
+	updateTimer(_job_name);
+	_global_name = "<h-" + _job_name + "_S" + std::to_string(_global_id) + ">";
 }
 
 void PortfolioSolverInterface::interrupt() {

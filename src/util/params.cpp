@@ -51,7 +51,6 @@ void Parameters::setDefaults() {
     setParam("l", "0.95"); // load factor
     setParam("log", "."); // logging directory
     setParam("lbc", "0"); // leaky bucket client parameter (0 = no leaky bucket, jobs enter by time) 
-    setParam("mcl", "8"); // maximum clause length (0 = no limit)
     setParam("md", "0"); // maximum demand per job (0 = no limit)
     setParam("mmpi", "0"); // monitor MPI
     setParam("mono", ""); // mono instance solving mode (if nonempty)
@@ -72,6 +71,15 @@ void Parameters::setDefaults() {
     setParam("v", "2"); // verbosity 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...
     setParam("warmup", "0"); // warmup run
     setParam("yield", "0"); // yield manager thread when no new messages
+
+    setParam("ihlbd", "7");
+    setParam("fhlbd", "7");
+
+    setParam("islbd", "2");
+    setParam("fslbd", "7");
+
+    setParam("hmcl", "20");
+    setParam("smcl", "5");
 }
 
 void Parameters::expand() {
@@ -96,14 +104,13 @@ void Parameters::expand() {
 
 void Parameters::printUsage() const {
 
-    Console::log(Console::INFO, "Usage: mallob [options] <scenario>");
+    Console::log(Console::INFO, "Usage: mallob <scenario> [options]");
     Console::log(Console::INFO, "  OR   mallob -mono=<formula> [options]");
     Console::log(Console::INFO, "<scenario> : File path and name prefix for client scenario(s);");
     Console::log(Console::INFO, "             will parse <name>.0 for one client, ");
     Console::log(Console::INFO, "             <name>.0 and <name>.1 for two clients, ...");
     Console::log(Console::INFO, "<formula> :  See -mono option");
-    Console::log(Console::INFO, "Options:");
-    Console::log(Console::INFO, "-aod[=<0|1>]          Add additional old diversifiers to Lingeling");
+    Console::log(Console::INFO, "General options:");
     Console::log(Console::INFO, "-appmode=<mode>       Application mode: \"fork\" or \"thread\"");
     Console::log(Console::INFO, "-ba=<num-ba>          Number of bounce alternatives per node (only relevant if -derandomize)");
     Console::log(Console::INFO, "-bm=<balance-mode>    Balancing mode:");
@@ -113,7 +120,6 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "-cbbs=<size>          Clause buffer base size in integers (default: 1500)");
     Console::log(Console::INFO, "-cbdf=<factor>        Clause buffer discount factor: reduce buffer size per node by <factor> each depth");
     Console::log(Console::INFO, "                      (0 < factor <= 1.0; default: 1.0)");
-    Console::log(Console::INFO, "-cfhl=<secs>          Set clause filter half life of clauses until forgotten (integer; 0: no forgetting)"); 
     Console::log(Console::INFO, "-cg[=<0|1>]           Continuous growth of job demands: make job demands increase more finely grained"); 
     Console::log(Console::INFO, "                      (node by node instead of layer by layer)");
     Console::log(Console::INFO, "-colors[=<0|1>]       Colored terminal output based on messages' verbosity");
@@ -121,7 +127,6 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "-derandomize[=<0|1>]  Derandomize job bouncing");
     Console::log(Console::INFO, "-g=<growth-period>    Grow job demand exponentially every t seconds (t >= 0; 0: immediate growth)");
     Console::log(Console::INFO, "-h|-help              Print usage");
-    Console::log(Console::INFO, "-icpr=<ratio>         Increase a solver's Clause Production when it fills less than <Ratio> of its buffer");
     Console::log(Console::INFO, "                      (0 <= x < 1; 0: never increase)");
     Console::log(Console::INFO, "-jc=<size>            Size of job cache for suspended, yet unfinished jobs (int x >= 0; 0: no limit)");
     Console::log(Console::INFO, "-jjp[=<0|1>]          Jitter job priorities to break ties during rebalancing");
@@ -129,11 +134,9 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "-lbc=<num-jobs>       Make each client a leaky bucket with x active jobs at any given time");
     Console::log(Console::INFO, "                      (int x >= 0, 0: jobs arrive at individual times instead)");
     Console::log(Console::INFO, "-log=<log-dir>        Directory to save logs in (default: .)");
-    Console::log(Console::INFO, "-mcl=<max-length>     Maximum clause length: Only share clauses up to some length (int x >= 0; 0: no limit)");
     Console::log(Console::INFO, "-md=<max-demand>      Limit any job's demand to some maximum value (int x >= 0; 0: no limit)");
     Console::log(Console::INFO, "-mmpi[=<0|1>]         Monitor MPI: Launch an additional thread per process checking when the main thread");
     Console::log(Console::INFO, "                      is inside some MPI call");
-    Console::log(Console::INFO, "-phasediv[=<0|1>]     Do not diversify solvers based on phase; native diversification only");
     Console::log(Console::INFO, "-p=<rebalance-period> Do balancing every t seconds (t > 0). With -bm=ed : minimum delay between balancings");
     Console::log(Console::INFO, "-q[=<0|1>]            Be quiet, do not log to stdout besides critical information");
     Console::log(Console::INFO, "-r=<round-mode>       Mode of rounding of assignments in balancing:");
@@ -144,7 +147,6 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "                      (0: no discarding)");
     Console::log(Console::INFO, "-s=<comm-period>      Do job-internal communication every t seconds (t >= 0, 0: do not communicate)");
     Console::log(Console::INFO, "-s2f=<file-basename>  Write solutions to file with provided base name + job ID");
-    Console::log(Console::INFO, "-satsolver=<seq>      Sequence of SAT solvers to cycle through for each job, one character per solver:\n");
 #ifdef MALLOB_USE_RESTRICTED
     Console::log(Console::INFO, "                      l=lingeling c=cadical g=glucose\n");
 #else
@@ -159,6 +161,25 @@ void Parameters::printUsage() const {
     Console::log(Console::INFO, "-v=<verb-num>         Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...");
     Console::log(Console::INFO, "-warmup[=<0|1>]       Do one explicit All-To-All warmup among all nodes in the beginning");
     Console::log(Console::INFO, "-yield[=<0|1>]        Yield manager thread whenever there are no new messages");
+    Console::log(Console::INFO, "");
+    Console::log(Console::INFO, "Sat solver options:");
+    Console::log(Console::INFO, "-aod[=<0|1>]          Add additional old diversifiers to Lingeling");
+    Console::log(Console::INFO, "-cfhl=<secs>          Set clause filter half life of clauses until forgotten (integer; 0: no forgetting)"); 
+    Console::log(Console::INFO, "-fhlbd=<max-length>   Final hard LBD limit: After max. number of clause prod. increases, this MUST be fulfilled");
+    Console::log(Console::INFO, "                      for any clause to be shared");
+    Console::log(Console::INFO, "-fslbd=<max-length>   Final soft LBD limit: After max. number of clause prod. increases, this must be fulfilled");
+    Console::log(Console::INFO, "                      for a clause to be shared except it has special solver-dependent qualities");
+    Console::log(Console::INFO, "-icpr=<ratio>         Increase a solver's Clause Production when it fills less than <Ratio> of its buffer");
+    Console::log(Console::INFO, "-ihlbd=<max-length>   Initial hard LBD limit: Before any clause prod. increase, this MUST be fulfilled for any");
+    Console::log(Console::INFO, "                      clause to be shared");
+    Console::log(Console::INFO, "-islbd=<max-length>   Initial soft LBD limit: Before any clause prod. increase, this must be fulfilled for a");
+    Console::log(Console::INFO, "                      clause to be shared except it has special solver-dependent qualities");
+    Console::log(Console::INFO, "-hmcl=<max-length>    Hard maximum clause length: Only share clauses up to some length (int x >= 0; 0: no limit)");
+    Console::log(Console::INFO, "-phasediv[=<0|1>]     Do not diversify solvers based on phase; native diversification only");
+    Console::log(Console::INFO, "-satsolver=<seq>      Sequence of SAT solvers to cycle through for each job, one character per solver:\n");
+    Console::log(Console::INFO, "-smcl=<max-length>    Soft maximum clause length: Only share clauses up to some length (int x >= 0; 0: no limit)");
+    Console::log(Console::INFO, "                      except a clause has special solver-dependent qualities");
+
 }
 
 string Parameters::getFilename() const {

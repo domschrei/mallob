@@ -35,7 +35,7 @@ private:
 	bool seedSet = false;
 
 public:
-	Cadical(LoggingInterface& logger, int globalId, int localId, std::string jobName, int diversificationIndex);
+	Cadical(const SolverSetup& setup);
 	 ~Cadical();
 
 	// Add a (list of) permanent clause(s) to the formula

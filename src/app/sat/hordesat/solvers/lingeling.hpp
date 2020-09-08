@@ -23,7 +23,6 @@ private:
 	std::string name;
 	int stopSolver;
 	LearnedClauseCallback* callback;
-	int glueLimit;
 	Mutex clauseAddMutex;
 	int maxvar;
 	double lastTermCallbackTime;
@@ -50,11 +49,12 @@ private:
     Mutex suspendMutex;
     ConditionVariable suspendCond;
 
-	int numDiversifications;
+	unsigned int numDiversifications;
+	unsigned int glueLimit;
+	unsigned int sizeLimit;
 
 public:
-	Lingeling(LoggingInterface& logger, int globalId, int localId, std::string jobName, 
-				int diversificationIndex, bool addOldDiversifications);
+	Lingeling(const SolverSetup& setup);
 	 ~Lingeling() override;
 
 	// Add a (list of) permanent clause(s) to the formula

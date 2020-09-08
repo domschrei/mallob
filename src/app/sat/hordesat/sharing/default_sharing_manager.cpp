@@ -13,11 +13,14 @@ DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
 		vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, 
 		const Parameters& params, const LoggingInterface& logger)
 	:size(mpi_size),rank(mpi_rank),solvers(solvers),params(params),logger(logger),
-	cdb(logger),nodeFilter(/*maxClauseLen=*/params.getIntParam("mcl", 0),/*checkUnits=*/true),callback(*this) {
+	cdb(logger),nodeFilter(/*maxClauseLen=*/params.getIntParam("hmcl", 0),/*checkUnits=*/true),callback(*this) {
 
+	memset(seenClauseLenHistogram, 0, 256*sizeof(unsigned long));
+	stats.seenClauseLenHistogram = seenClauseLenHistogram;
+	
     for (size_t i = 0; i < solvers.size(); i++) {
 		if (solvers.size() > 1) {
-			solverFilters.push_back(new ClauseFilter(/*maxClauseLen=*/params.getIntParam("mcl", 0), /*checkUnits=*/true));
+			solverFilters.push_back(new ClauseFilter(/*maxClauseLen=*/params.getIntParam("hmcl", 0), /*checkUnits=*/true));
 		}
 		solvers[i]->setLearnedClauseCallback(&callback);
 	}

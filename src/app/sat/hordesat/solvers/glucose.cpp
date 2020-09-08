@@ -11,9 +11,8 @@ Note that this file (specifically MGlucose::parallelImportClauses()) is non-free
 as it uses adapted code from Glucose. For its licensing see the LICENSE file in src/app/sat/hordesat/glucose.
 */
 
-MGlucose::MGlucose(LoggingInterface& logger, int globalId, int localId, 
-			std::string jobname, int diversificationIndex) 
-		: SimpSolver(), PortfolioSolverInterface(logger, globalId, localId, jobname, diversificationIndex) {
+MGlucose::MGlucose(const SolverSetup& setup) 
+		: SimpSolver(), PortfolioSolverInterface(setup) {
 	
 	verbosity = -1;
 	verbEveryConflicts = 100000;
@@ -22,13 +21,12 @@ MGlucose::MGlucose(LoggingInterface& logger, int globalId, int localId,
 	stopSolver = 0;
 	learnedClauseCallback = NULL;
 
-	strictGlueLimit = 2;
-	lenientGlueLimit = 5;
-
 	suspendSolver = false;
 	maxvar = 0;
 
 	numDiversifications = 10;
+	softMaxLbd = _setup.softInitialMaxLbd;
+	hardMaxLbd = _setup.hardInitialMaxLbd;
 }
 
 void MGlucose::addLiteral(int lit) {
@@ -110,9 +108,7 @@ SatResult MGlucose::solve(const vector<int>& asmpt) {
 	clauseAddMutex.lock();
 	for (size_t i = 0; i < clausesToAdd.size(); i++) {
 		for (size_t j = 0; j < clausesToAdd[i].size(); j++) {
-			int lit = clausesToAdd[i][j];
-			if (abs(lit) > maxvar) maxvar = abs(lit);
-			addLiteral(lit);
+			addLiteral(clausesToAdd[i][j]);
 		}
 		addLiteral(0);
 	}
@@ -171,8 +167,8 @@ void MGlucose::setLearnedClauseCallback(LearnedClauseCallback* callback) {
 }
 
 void MGlucose::increaseClauseProduction() {
-	if (lenientGlueLimit < 8) lenientGlueLimit++;
-	else if (strictGlueLimit < 8) strictGlueLimit++;
+	if (hardMaxLbd < _setup.hardFinalMaxLbd) hardMaxLbd++;
+	else if (softMaxLbd < _setup.softFinalMaxLbd) softMaxLbd++;
 }
 
 int MGlucose::getVariablesCount() {
@@ -274,13 +270,15 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 	// Filtering by clause length and by duplicates is done elsewhere!
 	c.setExported(c.getExported() + 1);
 	if (!c.wasImported() && c.getExported() >= 2) {
-		// Lenient check: LBD does not need to be "that good"
-		if (c.lbd() <= lenientGlueLimit) {
+		// Lenient check: only needs to pass "hard" max LBD check
+		if (c.size() <= (int)_setup.hardMaxClauseLength && c.lbd() <= hardMaxLbd) {
 			accept = true;
 		}
 	}
-	// Export clause unconditionally if it has a very good LBD score
-	accept = accept || (!c.wasImported() && c.lbd() <= strictGlueLimit);
+	// Export clause unconditionally if it passes the soft checks
+	accept = accept || (!c.wasImported() 
+			&& c.size() <= (int)_setup.softMaxClauseLength 
+			&& c.lbd() <= softMaxLbd);
 	if (!accept) return;
 	
 	// assemble clause

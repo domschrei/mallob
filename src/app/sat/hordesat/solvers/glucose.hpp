@@ -45,12 +45,11 @@ private:
     ConditionVariable suspendCond;
 
 	int numDiversifications;
-	unsigned int strictGlueLimit;
-	unsigned int lenientGlueLimit;
-
+	unsigned int softMaxLbd;
+	unsigned int hardMaxLbd;
 
 public:
-	MGlucose(LoggingInterface& logger, int globalId, int localId, std::string jobName, int diversificationIndex);
+	MGlucose(const SolverSetup& setup);
 	 ~MGlucose() override;
 
 	// Add a (list of) permanent clause(s) to the formula
