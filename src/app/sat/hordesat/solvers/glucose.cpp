@@ -269,8 +269,8 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 	// Export good clauses which are seen for the (at least) second time now
 	// Filtering by clause length and by duplicates is done elsewhere!
 	c.setExported(c.getExported() + 1);
-	if (!c.wasImported() && c.getExported() >= 2) {
-		// Lenient check: only needs to pass "hard" max LBD check
+	if (!c.wasImported() && c.getExported() == 2) {
+		// Lenient check: only needs to pass "hard" limits on clause length & LBD
 		if (c.size() <= (int)_setup.hardMaxClauseLength && c.lbd() <= hardMaxLbd) {
 			accept = true;
 		}
@@ -343,7 +343,7 @@ bool MGlucose::parallelImportClauses() {
 			ca[cr].setOneWatched(false); // Warning: those clauses will never be promoted by a conflict clause (or rarely: they are propagated!)
 			attachClause(cr);
 		} else {
-			if(useUnaryWatched) {
+			if (useUnaryWatched) {
 				attachClausePurgatory(cr);
 				ca[cr].setOneWatched(true);
 			} else {

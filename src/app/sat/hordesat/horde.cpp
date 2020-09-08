@@ -316,7 +316,7 @@ void HordeLib::dumpStats(bool final) {
 	if (final) {
 		// Histogram over clause lengths
 		std::string hist = "";
-		for (int i = 0; i < 50; i++) {
+		for (int i = 1; i < 50; i++) {
 			hist += std::to_string(locShareStats.seenClauseLenHistogram[i]) + " ";
 		}
 		hlog(0, "END clenhist: %s\n", hist.c_str());
