@@ -79,9 +79,15 @@ void cbProduce(void* sp, int* cls, int glue) {
 void cbConsumeUnits(void* sp, int** start, int** end) {
 	Lingeling* lp = (Lingeling*)sp;
 
-	if (lp->unitsToAdd.empty() || (lp->clauseAddMutex.tryLock() == false)) {
+	if (!lp->clauseAddMutex.tryLock()) {
 		*start = lp->unitsBuffer;
 		*end = lp->unitsBuffer;
+		return;
+	}
+	if (lp->unitsToAdd.empty()) {
+		*start = lp->unitsBuffer;
+		*end = lp->unitsBuffer;
+		lp->clauseAddMutex.unlock();
 		return;
 	}
 	if (lp->unitsToAdd.size() >= lp->unitsBufferSize) {
@@ -101,12 +107,13 @@ void cbConsumeUnits(void* sp, int** start, int** end) {
 void cbConsumeCls(void* sp, int** clause, int* glue) {
 	Lingeling* lp = (Lingeling*)sp;
 
-	if (lp->learnedClausesToAdd.empty()) {
+	if (!lp->clauseAddMutex.tryLock()) {
 		*clause = NULL;
 		return;
 	}
-	if (lp->clauseAddMutex.tryLock() == false) {
+	if (lp->learnedClausesToAdd.empty()) {
 		*clause = NULL;
+		lp->clauseAddMutex.unlock();
 		return;
 	}
 	vector<int> cls = lp->learnedClausesToAdd.back();
