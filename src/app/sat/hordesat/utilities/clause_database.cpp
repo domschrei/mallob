@@ -141,7 +141,6 @@ const int* ClauseDatabase::getNextIncomingClause(int& size) {
 		int start = currentPos++;
 		while (incomingBuffer[currentPos] != 0) currentPos++;
 		// currentPos is now at separator-"0" after the clause to export
-		//cls.insert(cls.end(), incomingBuffer+start, incomingBuffer+currentPos);
 		const int* clsbegin = incomingBuffer+start;
 		size = currentPos-start;
 
@@ -161,7 +160,15 @@ const int* ClauseDatabase::getNextIncomingClause(int& size) {
 		currentSize++;
 		remainingClsOfCurrentSize = incomingBuffer[currentPos++];
 	}
-	assert(remainingClsOfCurrentSize > 0);
+	if (remainingClsOfCurrentSize <= 0) {
+		logger.log(-1, "ERROR: %i remaining clauses of size %i at position %i\nBuffer:", remainingClsOfCurrentSize, currentSize, currentPos);
+		std::string buffer;
+		for (size_t i = 0; i < bufferSize; i++) {
+			buffer += " " + std::to_string(incomingBuffer[i]);
+		}
+		logger.log(-1, "%s\n", buffer.c_str());
+		abort();
+	}
 
 	// Get start and stop index of next clause
 	int start = currentPos;
