@@ -12,6 +12,8 @@
 #include "util/sys/threading.hpp"
 #include "app/sat/hordesat/utilities/logging_interface.hpp"
 
+#include "util/ringbuffer.hpp"
+
 #include <map>
 
 struct LGL;
@@ -40,9 +42,11 @@ private:
 
 	// clause addition
 	vector<vector<int> > clausesToAdd;
-	vector<vector<int> > learnedClausesToAdd;
-	vector<int> unitsToAdd;
 	vector<int> assumptions;
+
+	RingBuffer<std::vector<int>> learnedClauses;
+	RingBuffer<int> learnedUnits;
+	
 	int* unitsBuffer;
 	size_t unitsBufferSize;
 	int* clsBuffer;

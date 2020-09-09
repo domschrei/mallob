@@ -87,25 +87,26 @@ void cbConsumeUnits(void* sp, int** start, int** end) {
 		return;
 	}
 	// Nothing to import?
-	if (lp->unitsToAdd.empty()) {
+	if (lp->learnedUnits.empty()) {
 		lp->clauseAddMutex.unlock();
 		return;
 	}
 
 	// Increase buffer size as needed
-	if (lp->unitsToAdd.size() >= lp->unitsBufferSize) {
-		lp->unitsBufferSize = 2*lp->unitsToAdd.size();
+	if (lp->learnedUnits.size() >= lp->unitsBufferSize) {
+		lp->unitsBufferSize = 2*lp->learnedUnits.size();
 		lp->unitsBuffer = (int*)realloc((void*)lp->unitsBuffer, lp->unitsBufferSize * sizeof(int));
 	}
 
-	// Copy literals from "unitsToAdd" to the lingeling buffer
-	memcpy(lp->unitsBuffer, lp->unitsToAdd.data(), lp->unitsToAdd.size()*sizeof(int));
+	// Copy literals from ring buffer to the lingeling buffer
+	int i = 0;
+	int lit;
+	while (lp->learnedUnits.consume(lit)) {
+		lp->unitsBuffer[i++] = lit;
+	}
 	// Set correct bounds
 	*start = lp->unitsBuffer;
-	*end = *start + lp->unitsToAdd.size();
-	
-	// Clear temporary storage for literals
-	lp->unitsToAdd.clear();
+	*end = *start + lp->learnedUnits.size();
 
 	// Return lock
 	lp->clauseAddMutex.unlock();
@@ -119,16 +120,15 @@ void cbConsumeCls(void* sp, int** clause, int* glue) {
 		*clause = NULL;
 		return;
 	}
-	// Nothing to import?
-	if (lp->learnedClausesToAdd.empty()) {
+
+	// Retrieve clause to import
+	vector<int> cls;
+	if (!lp->learnedClauses.consume(cls)) {
+		// Nothing to import
 		*clause = NULL;
 		lp->clauseAddMutex.unlock();
 		return;
 	}
-
-	// Retrieve clause to import
-	vector<int> cls = lp->learnedClausesToAdd.back();
-	lp->learnedClausesToAdd.pop_back();
 
 	// Increase buffer size as needed
 	if (cls.size()+1 >= lp->clsBufferSize) {
@@ -152,7 +152,8 @@ void cbConsumeCls(void* sp, int** clause, int* glue) {
 
 
 Lingeling::Lingeling(const SolverSetup& setup) 
-	: PortfolioSolverInterface(setup) {
+	: PortfolioSolverInterface(setup), learnedClauses(LGL_CLS_BUFFER_MAX_SIZE), 
+		learnedUnits(LGL_UNIT_BUFFER_MAX_SIZE) {
 
 	solver = lglinit();
 	
@@ -352,16 +353,12 @@ void Lingeling::addLearnedClause(const int* begin, int size) {
 		return;
 	}
 	if (size == 1) {
-		if (unitsToAdd.size() >= LGL_UNIT_BUFFER_MAX_SIZE) {
+		if (!learnedUnits.produce(*begin)) {
 			slog(this, -1, "Unit buffer full!\n");
-		} else {
-			unitsToAdd.push_back(*begin);
 		}
 	} else {
-		if (learnedClausesToAdd.size() >= LGL_CLS_BUFFER_MAX_SIZE) {
+		if (!learnedClauses.produce(std::vector<int>(begin, begin+size))) {
 			slog(this, -1, "Clause buffer full!\n");
-		} else {
-			learnedClausesToAdd.emplace_back(begin, begin+size);
 		}
 	}
 	clauseAddMutex.unlock();
