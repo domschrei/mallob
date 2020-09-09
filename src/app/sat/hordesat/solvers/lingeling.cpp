@@ -8,6 +8,7 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include <chrono>
+#include <string.h>
 
 #include "lingeling.hpp"
 #include "app/sat/hordesat/utilities/debug_utils.hpp"
@@ -78,58 +79,74 @@ void cbProduce(void* sp, int* cls, int glue) {
 
 void cbConsumeUnits(void* sp, int** start, int** end) {
 	Lingeling* lp = (Lingeling*)sp;
+	*start = lp->unitsBuffer;
+	*end = lp->unitsBuffer;
 
+	// Unlockable?
 	if (!lp->clauseAddMutex.tryLock()) {
-		*start = lp->unitsBuffer;
-		*end = lp->unitsBuffer;
 		return;
 	}
+	// Nothing to import?
 	if (lp->unitsToAdd.empty()) {
-		*start = lp->unitsBuffer;
-		*end = lp->unitsBuffer;
 		lp->clauseAddMutex.unlock();
 		return;
 	}
+
+	// Increase buffer size as needed
 	if (lp->unitsToAdd.size() >= lp->unitsBufferSize) {
 		lp->unitsBufferSize = 2*lp->unitsToAdd.size();
 		lp->unitsBuffer = (int*)realloc((void*)lp->unitsBuffer, lp->unitsBufferSize * sizeof(int));
 	}
 
-	for (size_t i = 0; i < lp->unitsToAdd.size(); i++) {
-		lp->unitsBuffer[i] = lp->unitsToAdd[i];
-	}
-
+	// Copy literals from "unitsToAdd" to the lingeling buffer
+	memcpy(lp->unitsBuffer, lp->unitsToAdd.data(), lp->unitsToAdd.size()*sizeof(int));
+	// Set correct bounds
 	*start = lp->unitsBuffer;
 	*end = *start + lp->unitsToAdd.size();
+	
+	// Clear temporary storage for literals
+	lp->unitsToAdd.clear();
+
+	// Return lock
 	lp->clauseAddMutex.unlock();
 }
 
 void cbConsumeCls(void* sp, int** clause, int* glue) {
 	Lingeling* lp = (Lingeling*)sp;
 
+	// Unlockable?
 	if (!lp->clauseAddMutex.tryLock()) {
 		*clause = NULL;
 		return;
 	}
+	// Nothing to import?
 	if (lp->learnedClausesToAdd.empty()) {
 		*clause = NULL;
 		lp->clauseAddMutex.unlock();
 		return;
 	}
+
+	// Retrieve clause to import
 	vector<int> cls = lp->learnedClausesToAdd.back();
 	lp->learnedClausesToAdd.pop_back();
 
+	// Increase buffer size as needed
 	if (cls.size()+1 >= lp->clsBufferSize) {
 		lp->clsBufferSize = 2*cls.size();
 		lp->clsBuffer = (int*)realloc((void*)lp->clsBuffer, lp->clsBufferSize * sizeof(int));
 	}
-	// to avoid zeros in the array, 1 was added to the glue
-	*glue = cls[0]-1;
+
+	// Set glue
+	*glue = cls[0]-1; // to avoid zeros in the array, 1 was added to the glue
+	// Write clause into buffer
 	for (size_t i = 1; i < cls.size(); i++) {
 		lp->clsBuffer[i-1] = cls[i];
 	}
 	lp->clsBuffer[cls.size()-1] = 0;
+	// Make "clause" point to buffer
 	*clause = lp->clsBuffer;
+
+	// Return lock
 	lp->clauseAddMutex.unlock();
 }
 
@@ -335,9 +352,17 @@ void Lingeling::addLearnedClause(const int* begin, int size) {
 		return;
 	}
 	if (size == 1) {
-		unitsToAdd.push_back(*begin);
+		if (unitsToAdd.size() >= LGL_UNIT_BUFFER_MAX_SIZE) {
+			slog(this, -1, "Unit buffer full!\n");
+		} else {
+			unitsToAdd.push_back(*begin);
+		}
 	} else {
-		learnedClausesToAdd.emplace_back(begin, begin+size);
+		if (learnedClausesToAdd.size() >= LGL_CLS_BUFFER_MAX_SIZE) {
+			slog(this, -1, "Clause buffer full!\n");
+		} else {
+			learnedClausesToAdd.emplace_back(begin, begin+size);
+		}
 	}
 	clauseAddMutex.unlock();
 
