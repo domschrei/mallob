@@ -21,8 +21,6 @@
 class DefaultSharingManager : public SharingManagerInterface {
 
 protected:
-	// MPI paramaters
-	int size, rank;
 	// associated solvers
 	vector<std::shared_ptr<PortfolioSolverInterface>>& solvers;
 	vector<ClauseFilter*> solverFilters;
@@ -74,7 +72,7 @@ protected:
 	SharingStatistics stats;
 
 public:
-	DefaultSharingManager(int mpi_size, int mpi_rank, vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
+	DefaultSharingManager(vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
 			const Parameters& params, const LoggingInterface& logger);
     int prepareSharing(int* begin, int maxSize);
     void digestSharing(const std::vector<int>& result);

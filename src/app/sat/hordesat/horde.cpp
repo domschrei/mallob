@@ -166,7 +166,7 @@ void HordeLib::init() {
 
 	sleepInt = 1000 * params.getIntParam("i", 1000);
 
-	sharingManager.reset(new DefaultSharingManager(mpi_size, mpi_rank, solverInterfaces, params, *logger));
+	sharingManager.reset(new DefaultSharingManager(solverInterfaces, params, *logger));
 	hlog(3, "Initialized all-to-all clause sharing.\n");
 }
 

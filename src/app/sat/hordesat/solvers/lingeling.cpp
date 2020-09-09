@@ -319,12 +319,13 @@ set<int> Lingeling::getFailedAssumptions() {
 }
 
 void Lingeling::addLearnedClause(const int* begin, int size) {
-	auto lock = clauseAddMutex.getLock();
+	if (!clauseAddMutex.tryLock()) return;
 	if (size == 1) {
 		unitsToAdd.push_back(*begin);
 	} else {
 		learnedClausesToAdd.emplace_back(begin, begin+size);
 	}
+	clauseAddMutex.unlock();
 }
 
 void Lingeling::setLearnedClauseCallback(LearnedClauseCallback* callback) {

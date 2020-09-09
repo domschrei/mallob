@@ -9,10 +9,10 @@
 
 #include "default_sharing_manager.hpp"
 
-DefaultSharingManager::DefaultSharingManager(int mpi_size, int mpi_rank,
+DefaultSharingManager::DefaultSharingManager(
 		vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, 
 		const Parameters& params, const LoggingInterface& logger)
-	:size(mpi_size),rank(mpi_rank),solvers(solvers),params(params),logger(logger),
+	:solvers(solvers),params(params),logger(logger),
 	cdb(logger),nodeFilter(/*maxClauseLen=*/params.getIntParam("hmcl", 0),/*checkUnits=*/true),callback(*this) {
 
 	memset(seenClauseLenHistogram, 0, 256*sizeof(unsigned long));
@@ -44,7 +44,7 @@ int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
 	if (usedRatio < params.getFloatParam("icpr")) {
 		int increaser = lastInc++ % solvers.size();
 		solvers[increaser]->increaseClauseProduction();
-		logger.log(3, "Node %d production increase for %d. time, sid %d will increase.\n", rank, prodInc++, increaser);
+		logger.log(3, "Production increase for %d. time, sid %d will increase.\n", prodInc++, increaser);
 	}
 	logger.log(3, "Filled %.1f%% of buffer\n", 100*usedRatio);
 	return used;
@@ -56,10 +56,6 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 }
 
 void DefaultSharingManager::digestSharing(const int* begin, int buflen) {
-	
-	// "size" is the amount of buffers in the result: 
-	// always one, because buffers are merged into one big buffer
-	size = 1;
     
 	// Get all clauses
 	cdb.setIncomingBuffer(begin, buflen);

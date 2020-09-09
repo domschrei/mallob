@@ -154,12 +154,13 @@ set<int> MGlucose::getFailedAssumptions() {
 }
 
 void MGlucose::addLearnedClause(const int* begin, int size) {
-	auto lock = clauseAddMutex.getLock();
+	if (!clauseAddMutex.tryLock()) return;
 	if (size == 1) {
 		unitsToAdd.push_back(*begin);
 	} else {
 		learnedClausesToAdd.emplace_back(begin, begin+size);
 	}
+	clauseAddMutex.unlock();
 }
 
 void MGlucose::setLearnedClauseCallback(LearnedClauseCallback* callback) {
