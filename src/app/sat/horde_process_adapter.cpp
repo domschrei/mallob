@@ -174,18 +174,8 @@ std::vector<int> HordeProcessAdapter::getCollectedClauses() {
 
 void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses) {
     if (_hsm->doImport && !_hsm->didImport) {
-        float time = Timer::elapsedSeconds();
-        Console::log(Console::WARN, "waiting for last clause import to finish ...");
-        while (_hsm->doImport && !_hsm->didImport) usleep(10);
-        time = Timer::elapsedSeconds() - time;
-        Console::log(Console::WARN, "-- done waiting after %.3fs", time);
-        if (time >= 1) {
-            std::string buf = "";
-            for (int i = 0; i < _hsm->importBufferSize; i++) {
-                buf += " " + std::to_string(_import_buffer[i]);
-            }
-            Console::log(Console::WARN, "Last input buffer (size %i): %s", _hsm->importBufferSize, buf.c_str());
-        }
+        Console::log(Console::WARN, "Still digesting previous batch of clauses: discard this batch");
+        return;
     }
     _hsm->importBufferSize = clauses.size();
     memcpy(_import_buffer, clauses.data(), clauses.size()*sizeof(int));

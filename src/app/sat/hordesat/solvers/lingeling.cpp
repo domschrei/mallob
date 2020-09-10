@@ -344,11 +344,11 @@ set<int> Lingeling::getFailedAssumptions() {
 }
 
 void Lingeling::addLearnedClause(const int* begin, int size) {
-	double time = _logger.getTime();
+	//double time = _logger.getTime();
 	if (!clauseAddMutex.tryLock()) {
 
-		time = _logger.getTime() - time;
-		if (time > 0.2f) slog(this, -1, "[0] addLearnedClause took %.2fs!\n", time);
+		//time = _logger.getTime() - time;
+		//if (time > 0.2f) slog(this, -1, "[0] addLearnedClause took %.2fs!\n", time);
 
 		return;
 	}
@@ -363,8 +363,8 @@ void Lingeling::addLearnedClause(const int* begin, int size) {
 	}
 	clauseAddMutex.unlock();
 
-	time = _logger.getTime() - time;
-	if (time > 0.2f) slog(this, -1, "[1] addLearnedClause took %.2fs!\n", time);
+	//time = _logger.getTime() - time;
+	//if (time > 0.2f) slog(this, -1, "[1] addLearnedClause took %.2fs! (size %i)\n", time, size);
 }
 
 void Lingeling::setLearnedClauseCallback(LearnedClauseCallback* callback) {
