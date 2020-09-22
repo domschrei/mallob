@@ -67,6 +67,12 @@ int BaseCubeSatJob::appl_solveLoop() {
         if (result != UNKNOWN) {
             Console::log_send(Console::INFO, getRootNodeRank(), "%s : found result %s", toStr(),
                               result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN");
+
+            _result.id = getId();
+            _result.result = result;
+            _result.revision = getDescription().getRevision();
+            _result.solution.clear();
+
             return 1;
         }
     }
