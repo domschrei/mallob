@@ -8,6 +8,7 @@
 
 #include "app/sat/forked_sat_job.hpp"
 #include "app/sat/threaded_sat_job.hpp"
+#include "app/sat/cube/base_cube_sat_job.hpp"
 #include "util/sys/timer.hpp"
 #include "util/console.hpp"
 #include "balancing/cutoff_priority_balancer.hpp"
@@ -40,6 +41,8 @@ Job& JobDatabase::createJob(int commSize, int worldRank, int jobId) {
 
     if (_params.getParam("appmode") == "fork") {
         _jobs[jobId] = new ForkedSatJob(_params, commSize, worldRank, jobId);
+    } else if (_params.getParam("appmode") == "cube") {
+        _jobs[jobId] = new BaseCubeSatJob(_params, commSize, worldRank, jobId);
     } else {
         _jobs[jobId] = new ThreadedSatJob(_params, commSize, worldRank, jobId);
     }
