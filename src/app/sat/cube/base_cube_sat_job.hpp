@@ -18,7 +18,6 @@ class BaseCubeSatJob : public Job {
 
    public:
     BaseCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId);
-    ~BaseCubeSatJob() override;
 
     bool appl_initialize() override;
     bool appl_doneInitializing() override;

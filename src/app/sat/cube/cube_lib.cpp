@@ -19,25 +19,40 @@ void CubeLib::generateCubes() {
 }
 
 void CubeLib::startWorking() {
-    worker_thread = std::thread(&CubeWorker::mainLoop, _cube_worker.get());
+    _worker_thread = std::thread(&CubeWorker::mainLoop, _cube_worker.get());
+}
+
+void CubeLib::interrupt() {
+    _isInterrupted.store(true);
+    _cube_worker->interrupt();
+}
+
+void CubeLib::withdraw() {
+    _worker_thread.join();
 }
 
 // Only the worker starts communication. Execution only needs to be passed through.
 bool CubeLib::wantsToCommunicate() {
-    return _cube_worker->wantsToCommunicate();
+    if (!_isInterrupted)
+        return _cube_worker->wantsToCommunicate();
+    else
+        return false;
 }
 
 // Only the worker starts communication. Execution only needs to be passed through.
 void CubeLib::beginCommunication() {
-    _cube_worker->beginCommunication();
+    if (!_isInterrupted)
+        _cube_worker->beginCommunication();
 }
 
 // Pass the message to either the root or the worker
 void CubeLib::handleMessage(int source, JobMessage &msg) {
-    if (_isRoot && (msg.tag == MSG_REQUEST_CUBES || msg.tag == MSG_RETURN_FAILED_CUBES)) {
-        _cube_root->handleMessage(source, msg);
-    } else if (msg.tag == MSG_SEND_CUBES || msg.tag == MSG_RECEIVED_FAILED_CUBES) {
-        _cube_worker->handleMessage(source, msg);
+    if (!_isInterrupted) {
+        if (_isRoot && (msg.tag == MSG_REQUEST_CUBES || msg.tag == MSG_RETURN_FAILED_CUBES)) {
+            _cube_root->handleMessage(source, msg);
+        } else if (msg.tag == MSG_SEND_CUBES || msg.tag == MSG_RECEIVED_FAILED_CUBES) {
+            _cube_worker->handleMessage(source, msg);
+        }
+        // TODO: Throw error
     }
-    // TODO: Throw error
 }

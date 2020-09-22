@@ -19,6 +19,11 @@ class CubeLib {
     // Termination flag
     SatResult _result = UNKNOWN;
 
+    // Worker thread
+    std::thread _worker_thread;
+
+    std::atomic_bool _isInterrupted{false};
+
     bool _isRoot = false;
 
    public:
@@ -33,10 +38,13 @@ class CubeLib {
 
     void generateCubes();
 
-    // Worker thread
-    std::thread worker_thread;
-
     void startWorking();
+
+    // Disables all communication methods
+    void interrupt();
+
+    // Makes destructable
+    void withdraw();
 
     SatResult getResult() {
         return _result;

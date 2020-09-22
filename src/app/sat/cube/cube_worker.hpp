@@ -40,6 +40,8 @@ class CubeWorker {
     Mutex _state_mutex;
     ConditionVariable _state_cond;
 
+    std::atomic_bool _isInterrupted{false};
+
     SatResult solve();
 
     void digestSendCubes(std::vector<Cube> cubes);
@@ -53,6 +55,8 @@ class CubeWorker {
     bool wantsToCommunicate();
     void beginCommunication();
     void handleMessage(int source, JobMessage &msg);
+
+    void interrupt();
 };
 
 #endif /* MSCHICK_CUBE_WORKER_H */

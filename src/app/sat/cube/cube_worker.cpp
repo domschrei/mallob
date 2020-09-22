@@ -34,7 +34,12 @@ void CubeWorker::mainLoop() {
 
     while (true) {
         // After the condition is fulfilled, the lock is reaquired
-        _state_cond.wait(lock, [&] { return _worker_state == WORKING; });
+        _state_cond.wait(lock, [&] { return _worker_state == WORKING || _isInterrupted; });
+
+        // Exit main loop
+        if (_isInterrupted) {
+            return;
+        }
 
         // There should be local cubes available now
         assert(!_local_cubes.empty());
@@ -42,12 +47,11 @@ void CubeWorker::mainLoop() {
         // Start solving the local cubes
         SatResult result = solve();
 
-        assert(result == SAT || result == UNSAT);
-
         if (result == SAT) {
             _worker_state = SOLVED;
             _result = SAT;
-        } else {
+
+        } else if (result == UNSAT){
             _worker_state = FAILED;
         }
     }
@@ -59,18 +63,21 @@ SatResult CubeWorker::solve() {
     for (Cube &next_local_cube : _local_cubes) {
         auto result = _solver->solve(next_local_cube.getPath());
 
-        assert(result == SAT || result == UNSAT);
-
         // Check result
         if (result == SAT) {
             _logger->log(1, "Found a solution.\n");
             return SAT;
-        } else {
+
+        } else if (result == UNKNOWN) {
+            _logger->log(1, "Solver interrupted.\n");
+            return UNKNOWN;
+
+        } else if (result == UNSAT) {
             _logger->log(1, "Cube failed.\n");
             next_local_cube.fail();
         }
     }
-
+    // All cubes were unsatisfiable
     return UNSAT;
 }
 
@@ -129,6 +136,14 @@ void CubeWorker::handleMessage(int source, JobMessage &msg) {
     } else {
         // TODO: Throw error
     }
+}
+
+void CubeWorker::interrupt() {
+    _isInterrupted.store(true);
+    // Exit solve if currently solving
+    _solver->interrupt();
+    // Resume worker thread if currently waiting
+    _state_cond.notify();
 }
 
 void CubeWorker::digestSendCubes(std::vector<Cube> cubes) {

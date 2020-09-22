@@ -49,14 +49,28 @@ void BaseCubeSatJob::appl_unpause() {
 }
 
 void BaseCubeSatJob::appl_interrupt() {
-    assert(Console::fail("Not implemented yet!"));
+    if (_isInitialized) {
+        _lib->interrupt();
+    }
 }
 
 void BaseCubeSatJob::appl_withdraw() {
-    assert(Console::fail("Not implemented yet!"));
+    if (_isInitialized) {
+        _lib->withdraw();
+    }
 }
 
 int BaseCubeSatJob::appl_solveLoop() {
+    if (_isInitialized) {
+        SatResult result = _lib->getResult();
+
+        if (result != UNKNOWN) {
+            Console::log_send(Console::INFO, getRootNodeRank(), "%s : found result %s", toStr(),
+                              result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN");
+            return 1;
+        }
+    }
+    // Default case
     return -1;
 }
 
@@ -90,8 +104,4 @@ int BaseCubeSatJob::getDemand(int prevVolume, float elapsedTime) const {
         return 1;
     else
         return Job::getDemand(prevVolume, elapsedTime);
-}
-
-BaseCubeSatJob::~BaseCubeSatJob() {
-    assert(Console::fail("Not implemented yet!"));
 }
