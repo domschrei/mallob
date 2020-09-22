@@ -1,28 +1,35 @@
+#include "base_cube_sat_job.hpp"
+
 #include <assert.h>
 
 #include "util/console.hpp"
-#include "cube_communicator.hpp"
 
-#include "base_cube_sat_job.hpp"
-
-BaseCubeSatJob::BaseCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId) : 
-        BaseSatJob(params, commSize, worldRank, jobId), _job_comm_period(params.getFloatParam("s")) {
-}
+BaseCubeSatJob::BaseCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId)
+    : Job(params, commSize, worldRank, jobId), _cube_comm(this) {}
 
 bool BaseCubeSatJob::appl_initialize() {
-    _lib = std::make_unique<CubeLib>(*(getDescription().getPayloads().at(0)));
+    // Get formula
+    std::vector<int> formula = *(getDescription().getPayloads().at(0));
 
     if (isRoot()) {
+        // Initialize cube lib with root and worker
+        _lib = std::make_unique<CubeLib>(formula, _cube_comm, 5, 4);
+        // Generate cubes
         _lib->generateCubes();
+    } else {
+        // Initialize cube lib with worker
+        _lib = std::make_unique<CubeLib>(formula, _cube_comm);
     }
 
-    _cube_comm = (void*) new CubeCommunicator(this);
+    _isInitialized.store(true);
+
+    _lib->startWorking();
 
     return true;
 }
 
 bool BaseCubeSatJob::appl_doneInitializing() {
-    return true;
+    return _isInitialized;
 }
 
 void BaseCubeSatJob::appl_updateRole() {
@@ -54,7 +61,6 @@ int BaseCubeSatJob::appl_solveLoop() {
 }
 
 void BaseCubeSatJob::appl_dumpStats() {
-
 }
 
 bool BaseCubeSatJob::appl_isDestructible() {
@@ -62,60 +68,28 @@ bool BaseCubeSatJob::appl_isDestructible() {
 }
 
 bool BaseCubeSatJob::appl_wantsToBeginCommunication() const {
-    Console::log(Console::INFO, "Wants to Begin Comm?");
-    if (isRoot()) {
-        return true;
-    }
-    return !_lib->hasCubes();
+    if (_isInitialized)
+        return _lib->wantsToCommunicate();
+    else
+        return false;
 }
 
 void BaseCubeSatJob::appl_beginCommunication() {
-    if (_cube_comm != NULL && !isRoot()) {
-        Console::log(Console::INFO, "Sending request");
-        ((CubeCommunicator*) _cube_comm)->requestCubes();
+    if (_isInitialized) {
+        return _lib->beginCommunication();
     }
-    Console::log(Console::INFO, "Cube Comm is null");
 }
 
 void BaseCubeSatJob::appl_communicate(int source, JobMessage& msg) {
-    Console::log(Console::INFO, "Communicating");
-        if (_cube_comm != NULL) {
-        Console::log(Console::INFO, "Sending request");
-        ((CubeCommunicator*) _cube_comm)->handle(source, msg);
-    }
-    Console::log(Console::INFO, "Cube Comm is null");
+    if (_isInitialized && this->isInState({JobState::ACTIVE}))
+        return _lib->handleMessage(source, msg);
 }
 
-bool BaseCubeSatJob::isInitialized() {
-    assert(Console::fail("Not implemented yet!"));
-}
-void BaseCubeSatJob::prepareSharing(int maxSize) {
-    assert(Console::fail("Not implemented yet!"));
-}
-bool BaseCubeSatJob::hasPreparedSharing() {
-    assert(Console::fail("Not implemented yet!"));
-}
-std::vector<int> BaseCubeSatJob::getPreparedClauses() {
-    assert(Console::fail("Not implemented yet!"));
-}
-void BaseCubeSatJob::digestSharing(const std::vector<int>& clauses) {
-    assert(Console::fail("Not implemented yet!"));
-}
-
-void BaseCubeSatJob::prepareCubes() {
-    //NOOP
-}
-
-bool BaseCubeSatJob::hasPreparedCubes() {
-    return _lib->hasCubes();
-}
-
-std::vector<int> BaseCubeSatJob::getPreparedCubes() {
-    return _lib->getPreparedCubes();
-}
-
-void BaseCubeSatJob::digestCubes(const std::vector<int>& cubes) {
-    return _lib->digestCubes(cubes);
+int BaseCubeSatJob::getDemand(int prevVolume, float elapsedTime) const {
+    if (!_isInitialized)
+        return 1;
+    else
+        return Job::getDemand(prevVolume, elapsedTime);
 }
 
 BaseCubeSatJob::~BaseCubeSatJob() {

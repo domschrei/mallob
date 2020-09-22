@@ -65,6 +65,10 @@ public:
 		auto lock = mutex.getLock();
 		while (!condition()) condvar.wait(lock);
 	}
+	// Pass unique_lock if already in use
+    void wait(std::unique_lock<std::mutex>& lock, std::function<bool()> condition) {
+		while (!condition()) condvar.wait(lock);
+	}
 	void notify() {
 		condvar.notify_all();
 	}

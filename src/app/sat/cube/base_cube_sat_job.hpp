@@ -1,27 +1,22 @@
 #ifndef MSCHICK_BASE_CUBE_SAT_JOB_H
 #define MSCHICK_BASE_CUBE_SAT_JOB_H
 
+#include <atomic>
+#include <memory>
+
+#include "app/job.hpp"
+#include "cube_communicator.hpp"
 #include "cube_lib.hpp"
 
-#include "app/sat/base_sat_job.hpp"
-
-class BaseCubeSatJob : public BaseSatJob {
-
-private:
+class BaseCubeSatJob : public Job {
+   private:
     std::unique_ptr<CubeLib> _lib;
 
-    void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
+    CubeCommunicator _cube_comm;
 
-    void* _cube_comm = NULL; // CubeCommunicator instance (avoiding fwd decl.)
+    std::atomic_bool _isInitialized{false};
 
-    float _time_of_start_solving = 0;
-    float _time_of_last_comm = 0;
-    float _job_comm_period;
-
-    bool _done_locally = false;
-
-public:
-
+   public:
     BaseCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId);
     ~BaseCubeSatJob() override;
 
@@ -42,28 +37,7 @@ public:
     void appl_dumpStats() override;
     bool appl_isDestructible() override;
 
-    // Methods from BaseSatJob:
-    bool isInitialized() override;
-    void prepareSharing(int maxSize) override;
-    bool hasPreparedSharing() override;
-    std::vector<int> getPreparedClauses() override;
-    void digestSharing(const std::vector<int>& clauses) override;
-
-    // Methods from BaseCubeSatJob:
-    void prepareCubes();
-    bool hasPreparedCubes();
-    std::vector<int> getPreparedCubes();
-    void digestCubes(const std::vector<int>& cubes);
-
-private:
-    std::unique_ptr<CubeLib>& getLib() {
-        assert(libNotNull());
-        return _lib;
-    }
-
-    bool libNotNull() {
-        return _lib != NULL;
-    }
+    int getDemand(int prevVolume, float elapsedTime = Timer::elapsedSeconds()) const override;
 };
 
 #endif /* MSCHICK_BASE_CUBE_SAT_JOB_H */
