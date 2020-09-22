@@ -56,7 +56,9 @@ void BaseCubeSatJob::appl_interrupt() {
 
 void BaseCubeSatJob::appl_withdraw() {
     if (_isInitialized) {
+        // TODO: Make asynchronous
         _lib->withdraw();
+        _isDestructible.store(true);
     }
 }
 
@@ -84,7 +86,7 @@ void BaseCubeSatJob::appl_dumpStats() {
 }
 
 bool BaseCubeSatJob::appl_isDestructible() {
-    return false;
+    return _isDestructible.load();
 }
 
 bool BaseCubeSatJob::appl_wantsToBeginCommunication() const {

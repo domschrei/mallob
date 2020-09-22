@@ -15,6 +15,7 @@ class BaseCubeSatJob : public Job {
     CubeCommunicator _cube_comm;
 
     std::atomic_bool _isInitialized{false};
+    std::atomic_bool _isDestructible{false};
 
    public:
     BaseCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId);
