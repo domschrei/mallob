@@ -55,11 +55,20 @@ class CubeWorker {
    public:
     CubeWorker(std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result);
 
-    // Starts worker thread
+    // Starts the worker thread
     void startWorking();
 
+    // Asynchronously interrupts the worker thread
     void interrupt();
+    // Synchronously join the worker thread
     void join();
+
+    // Asynchonously suspends the worker thread
+    // Messages still need to be received. Otherwise the worker will get into a defective state.
+    // TODO: Test this assumption even if the job is currently inactive
+    void suspend();
+    // Synchronously resumes the worker thread
+    void resume();
 
     bool wantsToCommunicate();
     void beginCommunication();

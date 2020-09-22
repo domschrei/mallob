@@ -43,6 +43,12 @@ class CubeLib {
     // Makes destructable
     void withdraw();
 
+    // Suspend all working threads
+    void suspend();
+
+    // Resumes all working threads
+    void resume();
+
     SatResult getResult() {
         return _result;
     }

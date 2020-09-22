@@ -41,11 +41,15 @@ void BaseCubeSatJob::appl_updateDescription(int fromRevision) {
 }
 
 void BaseCubeSatJob::appl_pause() {
-    assert(Console::fail("Not implemented yet!"));
+    if (_isInitialized) {
+        _lib->suspend();
+    }
 }
 
 void BaseCubeSatJob::appl_unpause() {
-    assert(Console::fail("Not implemented yet!"));
+    if (_isInitialized) {
+        _lib->resume();
+    }
 }
 
 void BaseCubeSatJob::appl_interrupt() {
@@ -98,13 +102,13 @@ bool BaseCubeSatJob::appl_wantsToBeginCommunication() const {
 
 void BaseCubeSatJob::appl_beginCommunication() {
     if (_isInitialized) {
-        return _lib->beginCommunication();
+        _lib->beginCommunication();
     }
 }
 
 void BaseCubeSatJob::appl_communicate(int source, JobMessage& msg) {
     if (_isInitialized && this->isInState({JobState::ACTIVE}))
-        return _lib->handleMessage(source, msg);
+        _lib->handleMessage(source, msg);
 }
 
 int BaseCubeSatJob::getDemand(int prevVolume, float elapsedTime) const {

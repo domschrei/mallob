@@ -92,10 +92,19 @@ void CubeWorker::interrupt() {
     _solver->interrupt();
     // Resume worker thread if currently waiting
     _state_cond.notify();
+    // This guarantees termination of the mainLoop 
 }
 
 void CubeWorker::join() {
     _worker_thread.join();
+}
+
+void CubeWorker::suspend() {
+    _solver->suspend();
+}
+
+void CubeWorker::resume() {
+    _solver->resume();
 }
 
 bool CubeWorker::wantsToCommunicate() {

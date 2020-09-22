@@ -22,13 +22,25 @@ void CubeLib::startWorking() {
     _cube_worker->startWorking();
 }
 
+// Interrupt is called sequentially to wantsToCommunicate, beginCommunication and handleMessage.
+// So there is no communication after a call to interrupt.
+// Only two flags are set so this return fast.
 void CubeLib::interrupt() {
     _isInterrupted.store(true);
     _cube_worker->interrupt();
 }
 
+// Waits for worker threads to finish.
 void CubeLib::withdraw() {
     _cube_worker->join();
+}
+
+void CubeLib::suspend() {
+    _cube_worker->suspend();
+}
+
+void CubeLib::resume() {
+    _cube_worker->resume();
 }
 
 // Only the worker starts communication. Execution only needs to be passed through.
