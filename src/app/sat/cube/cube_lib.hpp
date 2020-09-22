@@ -3,7 +3,6 @@
 
 #include <memory>
 #include <vector>
-#include <thread>
 
 #include "cube_communicator.hpp"
 #include "cube_root.hpp"
@@ -19,9 +18,7 @@ class CubeLib {
     // Termination flag
     SatResult _result = UNKNOWN;
 
-    // Worker thread
-    std::thread _worker_thread;
-
+    // Flag that blocks all communication on interruption
     std::atomic_bool _isInterrupted{false};
 
     bool _isRoot = false;

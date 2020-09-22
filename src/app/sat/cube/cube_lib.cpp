@@ -19,7 +19,7 @@ void CubeLib::generateCubes() {
 }
 
 void CubeLib::startWorking() {
-    _worker_thread = std::thread(&CubeWorker::mainLoop, _cube_worker.get());
+    _cube_worker->startWorking();
 }
 
 void CubeLib::interrupt() {
@@ -28,7 +28,7 @@ void CubeLib::interrupt() {
 }
 
 void CubeLib::withdraw() {
-    _worker_thread.join();
+    _cube_worker->join();
 }
 
 // Only the worker starts communication. Execution only needs to be passed through.

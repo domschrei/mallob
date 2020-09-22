@@ -81,6 +81,23 @@ SatResult CubeWorker::solve() {
     return UNSAT;
 }
 
+void CubeWorker::startWorking() {
+    _worker_thread = std::thread(&CubeWorker::mainLoop, this);
+}
+
+
+void CubeWorker::interrupt() {
+    _isInterrupted.store(true);
+    // Exit solve if currently solving
+    _solver->interrupt();
+    // Resume worker thread if currently waiting
+    _state_cond.notify();
+}
+
+void CubeWorker::join() {
+    _worker_thread.join();
+}
+
 bool CubeWorker::wantsToCommunicate() {
     // Assures method does not return true twice on the same condition
     // TryLock prevents blocking
@@ -136,14 +153,6 @@ void CubeWorker::handleMessage(int source, JobMessage &msg) {
     } else {
         // TODO: Throw error
     }
-}
-
-void CubeWorker::interrupt() {
-    _isInterrupted.store(true);
-    // Exit solve if currently solving
-    _solver->interrupt();
-    // Resume worker thread if currently waiting
-    _state_cond.notify();
 }
 
 void CubeWorker::digestSendCubes(std::vector<Cube> cubes) {
