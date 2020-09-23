@@ -10,12 +10,14 @@
 
 CubeWorker::CubeWorker(std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result)
     : _formula(formula), _cube_comm(cube_comm), _result(result) {
+
     // Initialize logger
-    _logger = std::unique_ptr<LoggingInterface>(
-        new DefaultLoggingInterface(1, "<c-1>"));
+    _logger = std::make_unique<DefaultLoggingInterface>(1, "<c-1>");
+
     // Initialize solver
-    _solver = std::unique_ptr<PortfolioSolverInterface>(
-        new Cadical(*_logger, 1, 1, "c"));
+    SolverSetup setup;
+	setup.logger = _logger.get();
+    _solver = std::make_unique<Cadical>(setup);
 
     // Read formula
     for (int lit : _formula) {
