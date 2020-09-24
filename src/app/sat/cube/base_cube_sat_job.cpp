@@ -60,10 +60,13 @@ void BaseCubeSatJob::appl_interrupt() {
 
 void BaseCubeSatJob::appl_withdraw() {
     if (_isInitialized) {
-        // TODO: Make asynchronous
-        _lib->withdraw();
-        _isDestructible.store(true);
+        _withdraw_thread = std::thread(&BaseCubeSatJob::cleanUp, this);
     }
+}
+
+void BaseCubeSatJob::cleanUp() {
+    _lib->withdraw();
+    _isDestructible.store(true);
 }
 
 int BaseCubeSatJob::appl_solveLoop() {
@@ -86,11 +89,10 @@ int BaseCubeSatJob::appl_solveLoop() {
     return -1;
 }
 
-void BaseCubeSatJob::appl_dumpStats() {
-}
+void BaseCubeSatJob::appl_dumpStats() {}
 
 bool BaseCubeSatJob::appl_isDestructible() {
-    return _isDestructible.load();
+    return _isDestructible.load() && _withdraw_thread.joinable();
 }
 
 bool BaseCubeSatJob::appl_wantsToBeginCommunication() const {
@@ -116,4 +118,8 @@ int BaseCubeSatJob::getDemand(int prevVolume, float elapsedTime) const {
         return 1;
     else
         return Job::getDemand(prevVolume, elapsedTime);
+}
+
+BaseCubeSatJob::~BaseCubeSatJob() {
+    _withdraw_thread.join();
 }

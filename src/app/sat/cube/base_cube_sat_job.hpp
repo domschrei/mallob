@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <memory>
+#include <thread>
 
 #include "app/job.hpp"
 #include "cube_communicator.hpp"
@@ -17,8 +18,11 @@ class BaseCubeSatJob : public Job {
     std::atomic_bool _isInitialized{false};
     std::atomic_bool _isDestructible{false};
 
+    std::thread _withdraw_thread;
+
    public:
     BaseCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId);
+    ~BaseCubeSatJob() override;
 
     bool appl_initialize() override;
     bool appl_doneInitializing() override;
@@ -38,6 +42,8 @@ class BaseCubeSatJob : public Job {
     bool appl_isDestructible() override;
 
     int getDemand(int prevVolume, float elapsedTime = Timer::elapsedSeconds()) const override;
+
+    void cleanUp();
 };
 
 #endif /* MSCHICK_BASE_CUBE_SAT_JOB_H */
