@@ -217,7 +217,7 @@ void ThreadedSatJob::appl_beginCommunication() {
 
 void ThreadedSatJob::appl_communicate(int source, JobMessage& msg) {
     Console::log(Console::VVVVERB, "comm");
-    if (_clause_comm == NULL) return;
+    if (_clause_comm == NULL || !isActive()) return;
     auto lock = _horde_manipulation_lock.getLock();
     if (_clause_comm != NULL)
         ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, msg);

@@ -135,7 +135,7 @@ void BaseCubeSatJob::appl_beginCommunication() {
 }
 
 void BaseCubeSatJob::appl_communicate(int source, JobMessage& msg) {
-    if (_isInitialized && this->isInState({JobState::ACTIVE}))
+    if (isInState({ACTIVE, SUSPENDED}))
         _lib->handleMessage(source, msg);
 }
 

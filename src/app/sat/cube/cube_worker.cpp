@@ -110,45 +110,33 @@ void CubeWorker::resume() {
 }
 
 bool CubeWorker::wantsToCommunicate() {
-    // Assures method does not return true twice on the same condition
-    // TryLock prevents blocking
-    if (!_state_mutex.tryLock()) {
-        return false;
-    }
-
-    // The atomicity of the state assures that the state change is seen by all after the return
     if (_worker_state == WAITING) {
-        // Worker was waiting for cubes
-        _worker_state = REQUESTING;
-        // Worker now waits to receive cubes
-
-        _state_mutex.unlock();
+        // Worker is waiting to request new cubes
         return true;
 
     } else if (_worker_state == FAILED) {
-        // Worker was waiting to send his failed cubes
-        _worker_state = RETURNING;
-        // Worker now waits for his failed cubes to be received
-
-        _state_mutex.unlock();
+        // Worker is waiting to send his failed cubes
         return true;
 
     } else {
-        _state_mutex.unlock();
+        // Default case
         return false;
     }
 }
 
 void CubeWorker::beginCommunication() {
-    if (_worker_state == REQUESTING) {
+    // Blocks until lock is aquired
+    const std::lock_guard<Mutex> lock(_state_mutex);
+    
+    if (_worker_state == WAITING) {
+        _worker_state = REQUESTING;
         _cube_comm.requestCubes();
 
-    } else if (_worker_state == RETURNING) {
+    } else if (_worker_state == FAILED) {
+        _worker_state = RETURNING;
+
         auto serialized_failed_cubes = serializeCubes(_local_cubes);
         _cube_comm.returnFailedCubes(serialized_failed_cubes);
-
-    } else {
-        // TODO: Throw error
     }
 }
 

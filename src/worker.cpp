@@ -482,7 +482,7 @@ void Worker::handleSendApplicationMessage(MessageHandlePtr& handle) {
     }
     // Give message to corresponding job
     Job& job = _job_db.get(jobId);
-    if (job.isActive()) job.appl_communicate(handle->source, msg);
+    job.appl_communicate(handle->source, msg);
 }
 
 void Worker::handleNotifyJobDone(MessageHandlePtr& handle) {
