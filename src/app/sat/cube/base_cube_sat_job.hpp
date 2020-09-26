@@ -8,6 +8,7 @@
 #include "app/job.hpp"
 #include "cube_communicator.hpp"
 #include "cube_lib.hpp"
+#include "util/sys/threading.hpp"
 
 class BaseCubeSatJob : public Job {
    private:
@@ -15,6 +16,10 @@ class BaseCubeSatJob : public Job {
 
     CubeCommunicator _cube_comm;
 
+    Mutex _initialization_mutex;
+
+    std::atomic_bool _abort_before_initialization{false};
+    
     std::atomic_bool _isInitialized{false};
     std::atomic_bool _isDestructible{false};
 

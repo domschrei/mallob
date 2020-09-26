@@ -8,6 +8,17 @@ BaseCubeSatJob::BaseCubeSatJob(Parameters& params, int commSize, int worldRank, 
     : Job(params, commSize, worldRank, jobId), _cube_comm(this) {}
 
 bool BaseCubeSatJob::appl_initialize() {
+    // Aquire initialization lock
+    const std::lock_guard<Mutex> lock(_initialization_mutex);
+
+    // Check if job was aborted before initialization
+    if (_abort_before_initialization) {
+        // Lib was never initialized thus making the job destructable
+        // This does not lead to a problem, because a job is never deleted before it finishes its initialization
+        _isDestructible.store(true);
+        return false;
+    }
+
     // Get formula
     std::vector<int> formula = *(getDescription().getPayloads().at(0));
 
@@ -53,14 +64,29 @@ void BaseCubeSatJob::appl_unpause() {
 }
 
 void BaseCubeSatJob::appl_interrupt() {
+    // Aquire initialization lock
+    const std::lock_guard<Mutex> lock(_initialization_mutex);
+
     if (_isInitialized) {
         _lib->interrupt();
+    } else {
+        // Set flag to abort subsequent initialization
+        // Otherwise wait for preceding initialization to finish
+        _abort_before_initialization.store(true);
     }
 }
 
 void BaseCubeSatJob::appl_withdraw() {
+    // Aquire initialization lock
+    const std::lock_guard<Mutex> lock(_initialization_mutex);
+
     if (_isInitialized) {
+        _lib->interrupt();
         _withdraw_thread = std::thread(&BaseCubeSatJob::cleanUp, this);
+    } else {
+        // Set flag to abort subsequent initialization
+        // Otherwise wait for preceding initialization to finish
+        _abort_before_initialization.store(true);
     }
 }
 
@@ -92,7 +118,7 @@ int BaseCubeSatJob::appl_solveLoop() {
 void BaseCubeSatJob::appl_dumpStats() {}
 
 bool BaseCubeSatJob::appl_isDestructible() {
-    return _isDestructible.load() && _withdraw_thread.joinable();
+    return _isDestructible.load();
 }
 
 bool BaseCubeSatJob::appl_wantsToBeginCommunication() const {
@@ -121,5 +147,12 @@ int BaseCubeSatJob::getDemand(int prevVolume, float elapsedTime) const {
 }
 
 BaseCubeSatJob::~BaseCubeSatJob() {
-    _withdraw_thread.join();
+    const std::lock_guard<Mutex> lock(_initialization_mutex);
+
+    // The withdraw thread might still be default constructed, because of an aborted initialization
+    if (_withdraw_thread.joinable()) {
+        // Resume lib if currently suspended
+        _lib->resume();
+        _withdraw_thread.join();
+    }
 }
