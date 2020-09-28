@@ -1,26 +1,16 @@
 #ifndef MSCHICK_CUBE_WORKER_H
 #define MSCHICK_CUBE_WORKER_H
 
-#include <atomic>
 #include <memory>
-#include <vector>
 #include <thread>
 
-#include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 #include "app/sat/hordesat/utilities/logging_interface.hpp"
 #include "cube.hpp"
-#include "cube_communicator.hpp"
+#include "cube_worker_interface.hpp"
 #include "util/sys/threading.hpp"
 
-class CubeWorker {
+class CubeWorker : public CubeWorkerInterface {
    private:
-    std::vector<int> &_formula;
-
-    CubeCommunicator &_cube_comm;
-
-    // Termination flag (no atomic needed)
-    SatResult &_result;
-
     // Worker thread
     std::thread _worker_thread;
 
@@ -52,29 +42,22 @@ class CubeWorker {
     void digestSendCubes(std::vector<Cube> cubes);
     void digestReveicedFailedCubes();
 
-    void clog(int verbosityLevel, const char* fmt, ...);
+    void clog(int verbosityLevel, const char *fmt, ...);
 
    public:
     CubeWorker(const Parameters &params, std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result);
 
-    // Starts the worker thread
-    void startWorking();
+    void startWorking() override;
 
-    // Asynchronously interrupts the worker thread
-    void interrupt();
-    // Synchronously join the worker thread
-    void join();
+    void interrupt() override;
+    void join() override;
 
-    // Asynchonously suspends the worker thread
-    // Messages still need to be received. Otherwise the worker will get into a defective state.
-    // TODO: Test this assumption even if the job is currently inactive
-    void suspend();
-    // Synchronously resumes the worker thread
-    void resume();
+    void suspend() override;
+    void resume() override;
 
-    bool wantsToCommunicate();
-    void beginCommunication();
-    void handleMessage(int source, JobMessage &msg);
+    bool wantsToCommunicate() override;
+    void beginCommunication() override;
+    void handleMessage(int source, JobMessage &msg) override;
 };
 
 #endif /* MSCHICK_CUBE_WORKER_H */

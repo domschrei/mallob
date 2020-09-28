@@ -6,14 +6,14 @@
 
 #include "cube_communicator.hpp"
 #include "cube_root.hpp"
-#include "cube_worker.hpp"
+#include "cube_worker_interface.hpp"
 
 class CubeLib {
    private:
     std::vector<int> _formula;
 
     std::unique_ptr<CubeRoot> _cube_root;
-    std::unique_ptr<CubeWorker> _cube_worker;
+    std::unique_ptr<CubeWorkerInterface> _cube_worker;
 
     // Termination flag
     SatResult _result = UNKNOWN;

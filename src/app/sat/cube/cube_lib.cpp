@@ -4,6 +4,7 @@
 
 #include "cube_communicator.hpp"
 #include "util/console.hpp"
+#include "cube_worker.hpp"
 
 CubeLib::CubeLib(const Parameters &params, std::vector<int> formula, CubeCommunicator &cube_comm) : _formula(formula) {
     _cube_worker = std::make_unique<CubeWorker>(params, _formula, cube_comm, _result);

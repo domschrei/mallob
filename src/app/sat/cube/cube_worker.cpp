@@ -9,7 +9,7 @@
 #include "util/console.hpp"
 
 CubeWorker::CubeWorker(const Parameters &params, std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result)
-    : _formula(formula), _cube_comm(cube_comm), _result(result) {
+    : CubeWorkerInterface(formula, cube_comm, result) {
     auto verbosity = params.getIntParam("v", 1);
     auto identifier = "<c-" + std::string(params.getParam("jobstr", "")) + ">";
 
