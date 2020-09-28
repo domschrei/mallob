@@ -96,7 +96,7 @@ if [ ! -d cadical ]; then
     echo "Fetching CaDiCaL ..."
     git clone https://github.com/arminbiere/cadical
     cd cadical
-    ./configure
+    ./configure -q
     make
     cp build/libcadical.a .
     cd ..

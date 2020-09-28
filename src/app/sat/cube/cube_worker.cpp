@@ -8,15 +8,17 @@
 #include "cube_communicator.hpp"
 #include "util/console.hpp"
 
-CubeWorker::CubeWorker(std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result)
+CubeWorker::CubeWorker(const Parameters &params, std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result)
     : _formula(formula), _cube_comm(cube_comm), _result(result) {
+    auto verbosity = params.getIntParam("v", 1);
+    auto identifier = "<c-" + std::string(params.getParam("jobstr", "")) + ">";
 
     // Initialize logger
-    _logger = std::make_unique<DefaultLoggingInterface>(1, "<c-1>");
+    _logger = std::make_unique<DefaultLoggingInterface>(verbosity, identifier);
 
     // Initialize solver
     SolverSetup setup;
-	setup.logger = _logger.get();
+    setup.logger = _logger.get();
     _solver = std::make_unique<Cadical>(setup);
 
     // Read formula
@@ -38,8 +40,11 @@ void CubeWorker::mainLoop() {
         // After the condition is fulfilled, the lock is reaquired
         _state_cond.wait(lock, [&] { return _worker_state == WORKING || _isInterrupted; });
 
+        clog(2, "The main loop continues.\n");
+
         // Exit main loop
         if (_isInterrupted) {
+            clog(2, "Exiting main loop.\n");
             return;
         }
 
@@ -53,29 +58,27 @@ void CubeWorker::mainLoop() {
             _worker_state = SOLVED;
             _result = SAT;
 
-        } else if (result == UNSAT){
+        } else if (result == UNSAT) {
             _worker_state = FAILED;
         }
     }
 }
 
 SatResult CubeWorker::solve() {
-    _logger->log(1, "Solving.\n");
-
     for (Cube &next_local_cube : _local_cubes) {
         auto result = _solver->solve(next_local_cube.getPath());
 
         // Check result
         if (result == SAT) {
-            _logger->log(1, "Found a solution.\n");
+            clog(3, "Found a solution.\n");
             return SAT;
 
         } else if (result == UNKNOWN) {
-            _logger->log(1, "Solver interrupted.\n");
+            clog(3, "Solving interrupted.\n");
             return UNKNOWN;
 
         } else if (result == UNSAT) {
-            _logger->log(1, "Cube failed.\n");
+            clog(3, "Cube failed.\n");
             next_local_cube.fail();
         }
     }
@@ -87,14 +90,13 @@ void CubeWorker::startWorking() {
     _worker_thread = std::thread(&CubeWorker::mainLoop, this);
 }
 
-
 void CubeWorker::interrupt() {
     _isInterrupted.store(true);
     // Exit solve if currently solving
     _solver->interrupt();
     // Resume worker thread if currently waiting
     _state_cond.notify();
-    // This guarantees termination of the mainLoop 
+    // This guarantees termination of the mainLoop
 }
 
 void CubeWorker::join() {
@@ -127,7 +129,7 @@ bool CubeWorker::wantsToCommunicate() {
 void CubeWorker::beginCommunication() {
     // Blocks until lock is aquired
     const std::lock_guard<Mutex> lock(_state_mutex);
-    
+
     if (_worker_state == WAITING) {
         _worker_state = REQUESTING;
         _cube_comm.requestCubes();
@@ -158,7 +160,7 @@ void CubeWorker::digestSendCubes(std::vector<Cube> cubes) {
     const std::lock_guard<Mutex> lock(_state_mutex);
     assert(_worker_state == REQUESTING);
 
-    _logger->log(1, "Digesting send cubes.\n");
+    clog(2, "Digesting send cubes.\n");
 
     _local_cubes = cubes;
 
@@ -172,9 +174,16 @@ void CubeWorker::digestReveicedFailedCubes() {
     const std::lock_guard<Mutex> lock(_state_mutex);
     assert(_worker_state == RETURNING);
 
-    _logger->log(1, "Digesting received failed cubes.\n");
+    clog(2, "Digesting received failed cubes.\n");
 
     // Failed cubes were returned
     // Worker can now request new cubes
     _worker_state = WAITING;
+}
+
+void CubeWorker::clog(int verbosityLevel, const char *fmt, ...) {
+    va_list vl;
+    va_start(vl, fmt);
+    _logger->log_va_list(verbosityLevel, fmt, vl);
+    va_end(vl);
 }

@@ -5,11 +5,12 @@
 #include "cube_communicator.hpp"
 #include "util/console.hpp"
 
-CubeLib::CubeLib(std::vector<int> formula, CubeCommunicator &cube_comm) : _formula(formula) {
-    _cube_worker = std::make_unique<CubeWorker>(_formula, cube_comm, _result);
+CubeLib::CubeLib(const Parameters &params, std::vector<int> formula, CubeCommunicator &cube_comm) : _formula(formula) {
+    _cube_worker = std::make_unique<CubeWorker>(params, _formula, cube_comm, _result);
 }
 
-CubeLib::CubeLib(std::vector<int> formula, CubeCommunicator &cube_comm, int depth, size_t cubes_per_worker) : CubeLib(formula, cube_comm) {
+CubeLib::CubeLib(const Parameters &params, std::vector<int> formula, CubeCommunicator &cube_comm, int depth, size_t cubes_per_worker)
+    : CubeLib(params, formula, cube_comm) {
     _cube_root = std::make_unique<CubeRoot>(_formula, cube_comm, _result, depth, cubes_per_worker);
     _isRoot = true;
 }

@@ -3,6 +3,7 @@
 #include <assert.h>
 
 #include "util/console.hpp"
+#include "../horde_config.hpp"
 
 BaseCubeSatJob::BaseCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId)
     : Job(params, commSize, worldRank, jobId), _cube_comm(this) {}
@@ -14,7 +15,9 @@ bool BaseCubeSatJob::appl_initialize() {
     // Check if job was aborted before initialization
     if (_abort_before_initialization) {
         // Lib was never initialized thus making the job destructable
-        // This does not lead to a problem, because a job is never deleted before it finishes its initialization
+        // This does not lead to a call of the destructor before this method returns
+        // because a job is never deleted before it finishes its initialization
+        Console::log(Console::INFO, "%s : abort intializing cube lib ", toStr());
         _isDestructible.store(true);
         return false;
     }
@@ -22,15 +25,24 @@ bool BaseCubeSatJob::appl_initialize() {
     // Get formula
     std::vector<int> formula = *(getDescription().getPayloads().at(0));
 
+    Console::log(Console::INFO, "%s : started intializing cube lib ", toStr());
+
+    Parameters hParams(_params);
+    HordeConfig::applyDefault(hParams, *this);
+
     if (isRoot()) {
         // Initialize cube lib with root and worker
-        _lib = std::make_unique<CubeLib>(formula, _cube_comm, 5, 4);
+        _lib = std::make_unique<CubeLib>(hParams, formula, _cube_comm, 5, 4);
         // Generate cubes
+        Console::log(Console::INFO, "%s : started generating cubes ", toStr());
         _lib->generateCubes();
+        Console::log(Console::INFO, "%s : finished generating cubes ", toStr());
     } else {
         // Initialize cube lib with worker
-        _lib = std::make_unique<CubeLib>(formula, _cube_comm);
+        _lib = std::make_unique<CubeLib>(hParams, formula, _cube_comm);
     }
+
+    Console::log(Console::INFO, "%s : finished intializing cube lib ", toStr());
 
     _isInitialized.store(true);
 
@@ -91,8 +103,12 @@ void BaseCubeSatJob::appl_withdraw() {
 }
 
 void BaseCubeSatJob::cleanUp() {
+    Console::log(Console::INFO, "%s : started cleanup thread ", toStr());
+
     _lib->withdraw();
     _isDestructible.store(true);
+
+    Console::log(Console::INFO, "%s : finished cleanup thread ", toStr());
 }
 
 int BaseCubeSatJob::appl_solveLoop() {
@@ -148,11 +164,13 @@ int BaseCubeSatJob::getDemand(int prevVolume, float elapsedTime) const {
 
 BaseCubeSatJob::~BaseCubeSatJob() {
     const std::lock_guard<Mutex> lock(_initialization_mutex);
+    Console::log(Console::INFO, "%s : enter destructor ", toStr());
 
     // The withdraw thread might still be default constructed, because of an aborted initialization
     if (_withdraw_thread.joinable()) {
         // Resume lib if currently suspended
         _lib->resume();
         _withdraw_thread.join();
+        Console::log(Console::INFO, "%s : joined cleanup thread ", toStr());
     }
 }

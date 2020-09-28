@@ -52,8 +52,10 @@ class CubeWorker {
     void digestSendCubes(std::vector<Cube> cubes);
     void digestReveicedFailedCubes();
 
+    void clog(int verbosityLevel, const char* fmt, ...);
+
    public:
-    CubeWorker(std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result);
+    CubeWorker(const Parameters &params, std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result);
 
     // Starts the worker thread
     void startWorking();

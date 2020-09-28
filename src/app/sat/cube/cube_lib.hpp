@@ -25,9 +25,9 @@ class CubeLib {
 
    public:
     // Worker constructor
-    CubeLib(std::vector<int> formula, CubeCommunicator &cube_comm);
+    CubeLib(const Parameters &params, std::vector<int> formula, CubeCommunicator &cube_comm);
     // Root constructor
-    CubeLib(std::vector<int> formula, CubeCommunicator &cube_comm, int depth, size_t cubes_per_worker);
+    CubeLib(const Parameters &params, std::vector<int> formula, CubeCommunicator &cube_comm, int depth, size_t cubes_per_worker);
 
     bool wantsToCommunicate();
     void beginCommunication();
