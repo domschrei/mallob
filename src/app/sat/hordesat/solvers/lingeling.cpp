@@ -35,7 +35,7 @@ int cbCheckTerminate(void* solverPtr) {
 		slog(lp, 2, "RESUME");
 
 		if (lp->stopSolver) {
-			slog(lp, 2, "STOP after suspension", elapsed);
+			slog(lp, 2, "STOP after suspension");
 			return 1;
 		}
     }

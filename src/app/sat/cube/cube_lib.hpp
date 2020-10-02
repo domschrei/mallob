@@ -12,6 +12,8 @@ class CubeLib {
    private:
     std::vector<int> _formula;
 
+    LoggingInterface &_logger;
+
     std::unique_ptr<CubeRoot> _cube_root;
     std::unique_ptr<CubeWorkerInterface> _cube_worker;
 
@@ -25,9 +27,9 @@ class CubeLib {
 
    public:
     // Worker constructor
-    CubeLib(const Parameters &params, std::vector<int> formula, CubeCommunicator &cube_comm);
+    CubeLib(const Parameters &params, std::vector<int> formula, CubeCommunicator &cube_comm, LoggingInterface &logger);
     // Root constructor
-    CubeLib(const Parameters &params, std::vector<int> formula, CubeCommunicator &cube_comm, int depth, size_t cubes_per_worker);
+    CubeLib(const Parameters &params, std::vector<int> formula, CubeCommunicator &cube_comm, LoggingInterface &logger, int depth, size_t cubes_per_worker);
 
     bool wantsToCommunicate();
     void beginCommunication();

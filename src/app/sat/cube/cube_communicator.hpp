@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "app/job.hpp"
+#include "app/sat/hordesat/utilities/logging_interface.hpp"
 
 const int MSG_REQUEST_CUBES = 835;
 const int MSG_SEND_CUBES = 836;
@@ -12,14 +13,17 @@ const int MSG_RECEIVED_FAILED_CUBES = 838;
 
 class CubeCommunicator {
    private:
-    Job* _job = nullptr;
+    Job &_job;
 
-    bool _initialized = false;
+    LoggingInterface &_logger;
+
+    void log_send(int destRank, const char *str, ...);
+    void log_send(int destRank, std::vector<int> &payload, const char *str, ...);
+
+    static std::string payloadToString(std::vector<int> &payload);
 
    public:
-    CubeCommunicator(Job* job) : _job(job) {
-        _initialized = true;
-    }
+    CubeCommunicator(Job &job, LoggingInterface &logger) : _job(job), _logger(logger) {};
 
     // Worker requests cubes from root node
     void requestCubes();

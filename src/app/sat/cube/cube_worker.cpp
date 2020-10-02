@@ -4,21 +4,16 @@
 
 #include "app/sat/hordesat/solvers/cadical.hpp"
 #include "app/sat/hordesat/solvers/cadical_interface.hpp"
-#include "app/sat/hordesat/utilities/default_logging_interface.hpp"
+#include "app/sat/console_horde_interface.hpp"
 #include "cube_communicator.hpp"
 #include "util/console.hpp"
 
-CubeWorker::CubeWorker(const Parameters &params, std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result)
-    : CubeWorkerInterface(formula, cube_comm, result) {
-    auto verbosity = params.getIntParam("v", 1);
-    auto identifier = "<c-" + std::string(params.getParam("jobstr", "")) + ">";
-
-    // Initialize logger
-    _logger = std::make_unique<DefaultLoggingInterface>(verbosity, identifier);
+CubeWorker::CubeWorker(std::vector<int> &formula, CubeCommunicator &cube_comm, LoggingInterface &logger, SatResult &result)
+    : CubeWorkerInterface(formula, cube_comm, logger, result) {
 
     // Initialize solver
     SolverSetup setup;
-    setup.logger = _logger.get();
+    setup.logger = &_logger;
     _solver = std::make_unique<Cadical>(setup);
 
     // Read formula
@@ -40,11 +35,11 @@ void CubeWorker::mainLoop() {
         // After the condition is fulfilled, the lock is reaquired
         _state_cond.wait(lock, [&] { return _worker_state == WORKING || _isInterrupted; });
 
-        clog(2, "The main loop continues.\n");
+        _logger.log(0, "The main loop continues.\n");
 
         // Exit main loop
         if (_isInterrupted) {
-            clog(2, "Exiting main loop.\n");
+            _logger.log(0, "Exiting main loop.\n");
             return;
         }
 
@@ -70,15 +65,15 @@ SatResult CubeWorker::solve() {
 
         // Check result
         if (result == SAT) {
-            clog(3, "Found a solution.\n");
+            _logger.log(1, "Found a solution.\n");
             return SAT;
 
         } else if (result == UNKNOWN) {
-            clog(3, "Solving interrupted.\n");
+            _logger.log(1, "Solving interrupted.\n");
             return UNKNOWN;
 
         } else if (result == UNSAT) {
-            clog(3, "Cube failed.\n");
+            _logger.log(1, "Cube failed.\n");
             next_local_cube.fail();
         }
     }
@@ -160,7 +155,7 @@ void CubeWorker::digestSendCubes(std::vector<Cube> cubes) {
     const std::lock_guard<Mutex> lock(_state_mutex);
     assert(_worker_state == REQUESTING);
 
-    clog(2, "Digesting send cubes.\n");
+    _logger.log(0, "Digesting send cubes.\n");
 
     _local_cubes = cubes;
 
@@ -174,16 +169,9 @@ void CubeWorker::digestReveicedFailedCubes() {
     const std::lock_guard<Mutex> lock(_state_mutex);
     assert(_worker_state == RETURNING);
 
-    clog(2, "Digesting received failed cubes.\n");
+    _logger.log(0, "Digesting received failed cubes.\n");
 
     // Failed cubes were returned
     // Worker can now request new cubes
     _worker_state = WAITING;
-}
-
-void CubeWorker::clog(int verbosityLevel, const char *fmt, ...) {
-    va_list vl;
-    va_start(vl, fmt);
-    _logger->log_va_list(verbosityLevel, fmt, vl);
-    va_end(vl);
 }

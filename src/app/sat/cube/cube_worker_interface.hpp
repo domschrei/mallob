@@ -12,13 +12,14 @@ class CubeWorkerInterface {
     std::vector<int> &_formula;
 
     CubeCommunicator &_cube_comm;
+    LoggingInterface &_logger;
 
     // Termination flag (no atomic needed)
     SatResult &_result;
 
    public:
-    CubeWorkerInterface(std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result)
-        : _formula(formula), _cube_comm(cube_comm), _result(result) {}
+    CubeWorkerInterface(std::vector<int> &formula, CubeCommunicator &cube_comm, LoggingInterface &logger, SatResult &result)
+        : _formula(formula), _cube_comm(cube_comm), _logger(logger), _result(result) {}
 
     // Starts the worker thread
     virtual void startWorking() = 0;

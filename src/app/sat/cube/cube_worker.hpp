@@ -28,7 +28,6 @@ class CubeWorker : public CubeWorkerInterface {
 
     std::vector<Cube> _local_cubes;
 
-    std::unique_ptr<LoggingInterface> _logger;
     std::unique_ptr<PortfolioSolverInterface> _solver;
 
     Mutex _state_mutex;
@@ -42,10 +41,8 @@ class CubeWorker : public CubeWorkerInterface {
     void digestSendCubes(std::vector<Cube> cubes);
     void digestReveicedFailedCubes();
 
-    void clog(int verbosityLevel, const char *fmt, ...);
-
    public:
-    CubeWorker(const Parameters &params, std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result);
+    CubeWorker(std::vector<int> &formula, CubeCommunicator &cube_comm, LoggingInterface &logger, SatResult &result);
 
     void startWorking() override;
 

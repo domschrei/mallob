@@ -5,6 +5,7 @@
 #include <memory>
 #include <thread>
 
+#include "../console_horde_interface.hpp"
 #include "app/job.hpp"
 #include "cube_communicator.hpp"
 #include "cube_lib.hpp"
@@ -12,18 +13,23 @@
 
 class BaseCubeSatJob : public Job {
    private:
-    std::unique_ptr<CubeLib> _lib;
+    ConsoleHordeInterface _logger;
 
     CubeCommunicator _cube_comm;
+
+    std::unique_ptr<CubeLib> _lib;
 
     Mutex _initialization_mutex;
 
     std::atomic_bool _abort_before_initialization{false};
-    
+
     std::atomic_bool _isInitialized{false};
     std::atomic_bool _isDestructible{false};
 
     std::thread _withdraw_thread;
+
+    std::string getIdentifier() { return "<c-" + std::string(toStr()) + ">"; }
+    std::string getLogfileSuffix() { return std::string(toStr()); };
 
    public:
     BaseCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId);
