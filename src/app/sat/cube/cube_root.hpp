@@ -30,6 +30,8 @@ class CubeRoot {
     
     void digestFailedCubes(std::vector<Cube> &failedCubes);
 
+    void parseStatus(int status);
+
    public:
     CubeRoot(std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result, int depth, size_t cubes_per_worker);
     

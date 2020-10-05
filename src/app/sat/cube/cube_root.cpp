@@ -15,31 +15,44 @@ bool CubeRoot::generateCubes() {
     }
 
     // Create cubes
-    auto cubes = solver.generate_cubes(_depth).cubes;
+    auto cubesWithStatus = solver.generate_cubes(_depth);
+    auto cubes = cubesWithStatus.cubes;
+    auto status = cubesWithStatus.status;
 
     // Check if formula was already solved
-    if (solver.state() == CaDiCaL::SATISFIED) {
-        _result = SatResult::SAT;
-        return true;
-    }
-    if (solver.state() == CaDiCaL::UNSATISFIED) {
-        _result = SatResult::UNSAT;
+    if (status) {
+        parseStatus(status);
         return true;
     }
 
     // Assert that all cubes were generated
     assert(cubes.size() == pow(2, _depth));
 
-    // Assert there are no zeros in cubes
-    for (auto cube : cubes) {
-        for (auto lit : cube) {
-            assert(lit != 0);
+    // For some reason cadical may return 0 on a call to lookahead (used in generate_cubes) signaling a solved formula but does not change its state.
+    // This behavior can be seen with the formula satcoin-genesis-SAT-3.cnf.
+    // Because of this we check for zeros in the cubes and if there are any we start to solve here, expecting it to return instantaneously.
+    // We only check the first cube, because the cubes consist of the permutations of the negations of the same literals.
+    for (auto lit : cubes.at(0)) {
+        if (lit == 0) {
+            auto result = solver.solve();
+            parseStatus(result);
+            return true;
         }
     }
 
     // Insert cubes into _root_cubes
     for (auto cube_vec : cubes) {
         _root_cubes.emplace_back(cube_vec);
+    }
+
+    return false;
+}
+
+void CubeRoot::parseStatus(int status) {
+    if (status == 10) {
+        _result = SatResult::SAT;
+    } else if (status == 20) {
+        _result = SatResult::UNSAT;
     }
 }
 
