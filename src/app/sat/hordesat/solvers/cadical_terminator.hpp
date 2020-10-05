@@ -44,16 +44,14 @@ struct HordeTerminator : public CaDiCaL::Terminator {
     void setSuspend() {
         _suspend.store(true);
     }
+    // This method is critical and may only be called when the terminator is suspended
     void unsetSuspend() {
-        // Guarantees that this method is executed sequentially.
-        const std::lock_guard<Mutex> method_lock(_unsuspendMutex);
+        // Assert that the solver was previously suspended.
+        assert(_suspend.load() == true);
 
-        // Exit method if unsuspended
-        if (!_suspend.load()) return;
-        
         // Wait for _suspendMutex to be aquired. This guarantees that the solver is suspended.
         // The _suspendMutex is aquired during the initialization of this terminator, therefore it happens before any calls to unsetSuspend.
-        const std::lock_guard<Mutex> cv_lock(_suspendMutex);
+        const std::lock_guard<Mutex> lock(_suspendMutex);
         _suspend.store(false);
         _suspendCond.notify();
     }

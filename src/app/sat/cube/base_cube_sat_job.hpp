@@ -19,14 +19,26 @@ class BaseCubeSatJob : public Job {
 
     std::unique_ptr<CubeLib> _lib;
 
-    Mutex _initialization_mutex;
+    Mutex _manipulation_mutex;
 
     std::atomic_bool _abort_before_initialization{false};
 
+    // Flag that signals if the CubeLib was succesfully initialized
+    // Set during appl_initialize
     std::atomic_bool _isInitialized{false};
+    // Flag that signals if the CubeWorker was started
+    // Set during appl_initialize
+    std::atomic_bool _isWorking{false};
+    // Flag that signals if this job was suspended
+    std::atomic_bool _isSuspended{false};
+    // Flag that signals if the withdraw thread was started
+    std::atomic_bool _isWithdrawing{false};
+    // Flag that signals if the job may be destructed
     std::atomic_bool _isDestructible{false};
 
     std::thread _withdraw_thread;
+
+    void withdraw();
 
     std::string getIdentifier() { return "<c-" + std::string(toStr()) + ">"; }
     std::string getLogfileSuffix() { return std::string(toStr()); };
@@ -53,8 +65,6 @@ class BaseCubeSatJob : public Job {
     bool appl_isDestructible() override;
 
     int getDemand(int prevVolume, float elapsedTime = Timer::elapsedSeconds()) const override;
-
-    void cleanUp();
 };
 
 #endif /* MSCHICK_BASE_CUBE_SAT_JOB_H */

@@ -9,9 +9,16 @@
 #include "util/console.hpp"
 
 CubeWorker::CubeWorker(std::vector<int> &formula, CubeCommunicator &cube_comm, LoggingInterface &logger, SatResult &result)
-    : CubeWorkerInterface(formula, cube_comm, logger, result) {
+    : CubeWorkerInterface(formula, cube_comm, logger, result) {}
+
+void CubeWorker::mainLoop() {
+    auto lock = _state_mutex.getLock();
+
+    assert(_worker_state == IDLING);
 
     // Initialize solver
+    // This is done by the worker thread, thus reducing the work of the job initializer thread
+    // This also makes the worker thread hold the mutex in the terminator
     SolverSetup setup;
     setup.logger = &_logger;
     _solver = std::make_unique<Cadical>(setup);
@@ -20,16 +27,8 @@ CubeWorker::CubeWorker(std::vector<int> &formula, CubeCommunicator &cube_comm, L
     for (int lit : _formula) {
         _solver->addLiteral(lit);
     }
-}
-
-void CubeWorker::mainLoop() {
-    auto lock = _state_mutex.getLock();
-
-    assert(_worker_state == IDLING);
 
     _worker_state = WAITING;
-
-    // TODO: Check if this works. Otherwise extend CondVar.wait to take a unique lock or use std::mutex
 
     while (true) {
         // After the condition is fulfilled, the lock is reaquired
@@ -89,7 +88,7 @@ void CubeWorker::interrupt() {
     _isInterrupted.store(true);
     // Exit solve if currently solving
     _solver->interrupt();
-    // Resume worker thread if currently waiting
+    // Resume _worker_thread if currently waiting in mainLoop
     _state_cond.notify();
     // This guarantees termination of the mainLoop
 }

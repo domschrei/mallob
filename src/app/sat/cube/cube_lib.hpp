@@ -35,20 +35,25 @@ class CubeLib {
     void beginCommunication();
     void handleMessage(int source, JobMessage& msg);
 
-    void generateCubes();
+    bool generateCubes();
 
     void startWorking();
 
+    // Makes worker thread terminate asynchronously
+    // Requires that startWorking was called previously
     // Disables all communication methods
     void interrupt();
 
-    // Makes destructable
+    // Joins worker thread
+    // Requires that interrupt was called previously
     void withdraw();
 
     // Suspend all working threads
+    // Requires that startWorking was called previously
     void suspend();
 
     // Resumes all working threads
+    // Requires that suspend was called previously
     void resume();
 
     SatResult getResult() {

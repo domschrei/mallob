@@ -33,7 +33,9 @@ class CubeRoot {
    public:
     CubeRoot(std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result, int depth, size_t cubes_per_worker);
     
-    void generateCubes();
+    // Generates cubes
+    // Returns true if formula was solved during cube generation
+    bool generateCubes();
 
     void handleMessage(int source, JobMessage &msg);
 };

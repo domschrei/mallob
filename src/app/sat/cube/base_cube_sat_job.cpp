@@ -6,14 +6,14 @@
 #include "util/console.hpp"
 
 BaseCubeSatJob::BaseCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId)
-    : Job(params, commSize, worldRank, jobId), 
-    _logger(getIdentifier(), getLogfileSuffix()),
-    _cube_comm(*this, _logger) {
+    : Job(params, commSize, worldRank, jobId),
+      _logger(getIdentifier(), getLogfileSuffix()),
+      _cube_comm(*this, _logger) {
 }
 
 bool BaseCubeSatJob::appl_initialize() {
     // Aquire initialization lock
-    const std::lock_guard<Mutex> lock(_initialization_mutex);
+    const std::lock_guard<Mutex> lock(_manipulation_mutex);
 
     // Check if job was aborted before initialization
     if (_abort_before_initialization) {
@@ -36,10 +36,24 @@ bool BaseCubeSatJob::appl_initialize() {
     if (isRoot()) {
         // Initialize cube lib with root and worker
         _lib = std::make_unique<CubeLib>(hParams, formula, _cube_comm, _logger, 5, 4);
+
         // Generate cubes
         _logger.log(0, "%s : started generating cubes ", toStr());
-        _lib->generateCubes();
+        auto solved = _lib->generateCubes();
         _logger.log(0, "%s : finished generating cubes ", toStr());
+
+        // Check if formula was solved durin cube generation
+        if (solved) {
+            _logger.log(0, "%s : solved formula during cube generation", toStr());
+
+            // CubeLib was succesfully initialized
+            _isInitialized.store(true);
+
+            // Worker thread is never started
+            _isDestructible.store(true);
+            return true;
+        }
+
     } else {
         // Initialize cube lib with worker
         _lib = std::make_unique<CubeLib>(hParams, formula, _cube_comm, _logger);
@@ -47,8 +61,19 @@ bool BaseCubeSatJob::appl_initialize() {
 
     _logger.log(0, "%s : finished intializing cube lib ", toStr());
 
+    // Succesfully initialized
     _isInitialized.store(true);
 
+    // Set working flag
+    _isWorking.store(true);
+
+    // If job was suspended before initialization, respecting INITIALIZING_TO_SUSPENDED
+    if (_isSuspended) {
+        // Set suspension flag in _lib
+        _lib->suspend();
+    }
+    
+    // Start working
     _lib->startWorking();
 
     return true;
@@ -67,22 +92,42 @@ void BaseCubeSatJob::appl_updateDescription(int fromRevision) {
 }
 
 void BaseCubeSatJob::appl_pause() {
-    if (_isInitialized) {
+    // Aquire initialization lock
+    const std::lock_guard<Mutex> lock(_manipulation_mutex);
+
+    _logger.log(0, "%s : appl_pause was called", toStr());
+
+    _isSuspended = true;
+
+    if (_isWorking && !_isWithdrawing) {
         _lib->suspend();
     }
 }
 
+// Critical
 void BaseCubeSatJob::appl_unpause() {
-    if (_isInitialized) {
+    // Aquire initialization lock
+    const std::lock_guard<Mutex> lock(_manipulation_mutex);
+
+    _logger.log(0, "%s : appl_unpause was called", toStr());
+
+    _isSuspended = false;
+
+    // Job is also unsuspended during withdraw
+    // These checks prevents calling resume twice
+    if (_isWorking && _isSuspended && !_isWithdrawing) {
         _lib->resume();
     }
 }
 
 void BaseCubeSatJob::appl_interrupt() {
     // Aquire initialization lock
-    const std::lock_guard<Mutex> lock(_initialization_mutex);
+    const std::lock_guard<Mutex> lock(_manipulation_mutex);
 
-    if (_isInitialized) {
+    _logger.log(0, "%s : appl_interrupt was called", toStr());
+
+    if (_isWorking) {
+        // Uncritical
         _lib->interrupt();
     } else {
         // Set flag to abort subsequent initialization
@@ -93,11 +138,19 @@ void BaseCubeSatJob::appl_interrupt() {
 
 void BaseCubeSatJob::appl_withdraw() {
     // Aquire initialization lock
-    const std::lock_guard<Mutex> lock(_initialization_mutex);
+    const std::lock_guard<Mutex> lock(_manipulation_mutex);
 
-    if (_isInitialized) {
+    _logger.log(0, "%s : appl_withdraw was called", toStr());
+
+    if (_isWorking) {
+        // Uncritical
         _lib->interrupt();
-        _withdraw_thread = std::thread(&BaseCubeSatJob::cleanUp, this);
+
+        // Job may only be withdrawn once
+        if (!_isWithdrawing) {
+            _isWithdrawing = true;
+            _withdraw_thread = std::thread(&BaseCubeSatJob::withdraw, this);
+        }
     } else {
         // Set flag to abort subsequent initialization
         // Otherwise wait for preceding initialization to finish
@@ -105,8 +158,13 @@ void BaseCubeSatJob::appl_withdraw() {
     }
 }
 
-void BaseCubeSatJob::cleanUp() {
+void BaseCubeSatJob::withdraw() {
     _logger.log(0, "%s : started cleanup thread ", toStr());
+
+    // Resume worker thread if necessary to allow termination
+    if (_isSuspended) {
+        _lib->resume();
+    }
 
     _lib->withdraw();
     _isDestructible.store(true);
@@ -139,40 +197,45 @@ bool BaseCubeSatJob::appl_isDestructible() {
     return _isDestructible.load();
 }
 
+// Noop in _lib when interrupted -> No _isWithdrawing check required
 bool BaseCubeSatJob::appl_wantsToBeginCommunication() const {
-    if (_isInitialized)
+    if (_isWorking)
         return _lib->wantsToCommunicate();
     else
         return false;
 }
 
+// Noop in _lib when interrupted -> No _isWithdrawing check required
 void BaseCubeSatJob::appl_beginCommunication() {
-    if (_isInitialized) {
+    if (_isWorking) {
         _lib->beginCommunication();
     }
 }
 
+// Noop in _lib when interrupted -> No _isWithdrawing check required
 void BaseCubeSatJob::appl_communicate(int source, JobMessage& msg) {
-    if (isInState({ACTIVE, SUSPENDED}))
+    if (_isWorking)
         _lib->handleMessage(source, msg);
 }
 
 int BaseCubeSatJob::getDemand(int prevVolume, float elapsedTime) const {
-    if (!_isInitialized)
+    if (!_isWorking)
         return 1;
     else
         return Job::getDemand(prevVolume, elapsedTime);
 }
 
 BaseCubeSatJob::~BaseCubeSatJob() {
-    const std::lock_guard<Mutex> lock(_initialization_mutex);
+    // Aquire initialization lock
+    const std::lock_guard<Mutex> lock(_manipulation_mutex);
+
     _logger.log(0, "%s : enter destructor ", toStr());
 
     // The withdraw thread might still be default constructed, because of an aborted initialization
     if (_withdraw_thread.joinable()) {
-        // Resume lib if currently suspended
-        _lib->resume();
         _withdraw_thread.join();
         _logger.log(0, "%s : joined cleanup thread ", toStr());
     }
+
+    _logger.log(0, "%s : exit destructor ", toStr());
 }

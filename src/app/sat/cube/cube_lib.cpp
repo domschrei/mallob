@@ -17,8 +17,8 @@ CubeLib::CubeLib(const Parameters &params, std::vector<int> formula, CubeCommuni
     _isRoot = true;
 }
 
-void CubeLib::generateCubes() {
-    _cube_root->generateCubes();
+bool CubeLib::generateCubes() {
+    return _cube_root->generateCubes();
 }
 
 void CubeLib::startWorking() {

@@ -6,7 +6,7 @@
 CubeRoot::CubeRoot(std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result, int depth, size_t cubes_per_worker)
     : _formula(formula), _cube_comm(cube_comm), _result(result), _depth(depth), _cubes_per_worker(cubes_per_worker) {}
 
-void CubeRoot::generateCubes() {
+bool CubeRoot::generateCubes() {
     CaDiCaL::Solver solver;
 
     // Read formula
@@ -17,8 +17,25 @@ void CubeRoot::generateCubes() {
     // Create cubes
     auto cubes = solver.generate_cubes(_depth).cubes;
 
+    // Check if formula was already solved
+    if (solver.state() == CaDiCaL::SATISFIED) {
+        _result = SatResult::SAT;
+        return true;
+    }
+    if (solver.state() == CaDiCaL::UNSATISFIED) {
+        _result = SatResult::UNSAT;
+        return true;
+    }
+
     // Assert that all cubes were generated
     assert(cubes.size() == pow(2, _depth));
+
+    // Assert there are no zeros in cubes
+    for (auto cube : cubes) {
+        for (auto lit : cube) {
+            assert(lit != 0);
+        }
+    }
 
     // Insert cubes into _root_cubes
     for (auto cube_vec : cubes) {
