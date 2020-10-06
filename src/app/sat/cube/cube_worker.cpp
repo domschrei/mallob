@@ -9,16 +9,9 @@
 #include "util/console.hpp"
 
 CubeWorker::CubeWorker(std::vector<int> &formula, CubeCommunicator &cube_comm, LoggingInterface &logger, SatResult &result)
-    : CubeWorkerInterface(formula, cube_comm, logger, result) {}
-
-void CubeWorker::mainLoop() {
-    auto lock = _state_mutex.getLock();
-
-    assert(_worker_state == IDLING);
+    : CubeWorkerInterface(formula, cube_comm, logger, result) {
 
     // Initialize solver
-    // This is done by the worker thread, thus reducing the work of the job initializer thread
-    // This also makes the worker thread hold the mutex in the terminator
     SolverSetup setup;
     setup.logger = &_logger;
     _solver = std::make_unique<Cadical>(setup);
@@ -27,6 +20,12 @@ void CubeWorker::mainLoop() {
     for (int lit : _formula) {
         _solver->addLiteral(lit);
     }
+}
+
+void CubeWorker::mainLoop() {
+    auto lock = _state_mutex.getLock();
+
+    assert(_worker_state == IDLING);
 
     _worker_state = WAITING;
 

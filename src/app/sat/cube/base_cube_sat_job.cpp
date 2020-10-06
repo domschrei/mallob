@@ -64,17 +64,17 @@ bool BaseCubeSatJob::appl_initialize() {
     // Succesfully initialized
     _isInitialized.store(true);
 
-    // Set working flag
-    _isWorking.store(true);
-
     // If job was suspended before initialization, respecting INITIALIZING_TO_SUSPENDED
     if (_isSuspended) {
         // Set suspension flag in _lib
         _lib->suspend();
     }
-    
+
+    // Order does not matter
     // Start working
     _lib->startWorking();
+    // Set working flag
+    _isWorking.store(true);
 
     return true;
 }
