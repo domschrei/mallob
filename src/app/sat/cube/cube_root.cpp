@@ -25,12 +25,22 @@ bool CubeRoot::generateCubes() {
         return true;
     }
 
-    // Assert that all cubes were generated
-    assert(cubes.size() == pow(2, _depth));
-
     // For some reason cadical may return 0 on a call to lookahead (used in generate_cubes) signaling a solved formula but does not change its state.
-    // This behavior can be seen with the formula satcoin-genesis-SAT-3.cnf.
-    // Because of this we check for zeros in the cubes and if there are any we start to solve here, expecting it to return instantaneously.
+    // In this case the returnted cubes vector either is empty or contains zeros.
+    //
+    // It is empty for the formula Problem14_label20_true-unreach-call.c.cnf
+    // It contains zeros for the formula satcoin-genesis-SAT-3.cnf.
+    //
+    // Because of this we check for a too small cube array or zeros in the cubes and in this case we start to solve here, expecting it to return instantaneously.
+
+    // Check if cubes vector is too small
+    if (cubes.size() != pow(2, _depth)) {
+        auto result = solver.solve();
+        parseStatus(result);
+        return true;
+    }
+
+    // Check if there are zeros in the cubes
     // We only check the first cube, because the cubes consist of the permutations of the negations of the same literals.
     for (auto lit : cubes.at(0)) {
         if (lit == 0) {
