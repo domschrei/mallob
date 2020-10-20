@@ -1,6 +1,7 @@
 #ifndef MSCHICK_CUBE_ROOT_H
 #define MSCHICK_CUBE_ROOT_H
 
+#include <atomic>
 #include <vector>
 
 #include "app/sat/hordesat/solvers/cadical_interface.hpp"
@@ -11,6 +12,24 @@
 
 class CubeRoot {
    private:
+    CaDiCaL::Solver _solver;
+
+    // Flag that signals if the cube generation was interrupted
+    std::atomic_bool _isInterrupted{false};
+
+    // Local terminator that encapsulates the _isInterrupted flag
+    struct Terminator : public CaDiCaL::Terminator {
+        Terminator(std::atomic_bool &isInterrupted) : _isInterrupted(isInterrupted) {}
+
+        bool terminate() override {
+            return _isInterrupted.load();
+        }
+
+       private:
+        std::atomic_bool &_isInterrupted;
+
+    } terminator{_isInterrupted};
+
     std::vector<int> &_formula;
 
     CubeCommunicator &_cube_comm;
@@ -27,17 +46,19 @@ class CubeRoot {
     Mutex _root_cubes_lock;
 
     std::vector<Cube> prepareCubes(int target);
-    
+
     void digestFailedCubes(std::vector<Cube> &failedCubes);
 
     void parseStatus(int status);
 
    public:
     CubeRoot(std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result, int depth, size_t cubes_per_worker);
-    
+
     // Generates cubes
-    // Returns true if formula was solved during cube generation
+    // Returns true if the job should start working
     bool generateCubes();
+
+    void interrupt();
 
     void handleMessage(int source, JobMessage &msg);
 };

@@ -19,25 +19,32 @@ class BaseCubeSatJob : public Job {
 
     std::unique_ptr<CubeLib> _lib;
 
-    Mutex _manipulation_mutex;
+    // Lifecycle of a BaseCubeSatJob
+    enum State {
+        UNINITIALIZED,
+        INITIALIZING,
+        ACTIVE,
+        WITHDRAWING,
+        DESTRUCTABLE,
+    };
+    // TODO The state may not need to be atomic since it is only altered while hold the initialization mutex
+    std::atomic<State> _job_state{UNINITIALIZED};
 
-    std::atomic_bool _abort_before_initialization{false};
+    // Mutex to guarantee mutual exclusion of the initializer thread and the thread controlling the job
+    Mutex _initialization_mutex;
 
-    // Flag that signals if the CubeLib was succesfully initialized
-    // Set during appl_initialize
-    std::atomic_bool _isInitialized{false};
-    // Flag that signals if the CubeWorker was started
-    // Set during appl_initialize
-    std::atomic_bool _isWorking{false};
+    // TODO These flag may do not need to be atomic since they are only accessed while holding the initialization mutex
+    // Flag that signals if this job was interrupted
+    std::atomic_bool _isInterrupted{false};
     // Flag that signals if this job was suspended
     std::atomic_bool _isSuspended{false};
-    // Flag that signals if the withdraw thread was started
-    std::atomic_bool _isWithdrawing{false};
-    // Flag that signals if the job may be destructed
-    std::atomic_bool _isDestructible{false};
 
+    // Encapsulates behavior of appl_interrupt and appl_withdraw
+    // Needs to be removed later when the behavior of them differs
+    void interrupt_and_start_withdrawing();
+
+    // Withdraws worker
     std::thread _withdraw_thread;
-
     void withdraw();
 
     std::string getIdentifier() { return "<c-" + std::string(toStr()) + ">"; }

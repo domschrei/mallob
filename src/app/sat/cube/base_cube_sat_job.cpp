@@ -12,75 +12,89 @@ BaseCubeSatJob::BaseCubeSatJob(Parameters& params, int commSize, int worldRank, 
 }
 
 bool BaseCubeSatJob::appl_initialize() {
-    // Aquire initialization lock
-    const std::lock_guard<Mutex> lock(_manipulation_mutex);
+    // Aquiring initialization mutex
+    {
+        const std::lock_guard<Mutex> lock(_initialization_mutex);
 
-    // Check if job was aborted before initialization
-    if (_abort_before_initialization) {
-        // Lib was never initialized thus making the job destructable
-        // This does not lead to a call of the destructor before this method returns
-        // because a job is never deleted before it finishes its initialization
-        _logger.log(0, "%s : abort intializing cube lib ", toStr());
-        _isDestructible.store(true);
-        return false;
-    }
-
-    // Get formula
-    std::vector<int> formula = *(getDescription().getPayloads().at(0));
-
-    _logger.log(0, "%s : started intializing cube lib ", toStr());
-
-    Parameters hParams(_params);
-    HordeConfig::applyDefault(hParams, *this);
-
-    if (isRoot()) {
-        // Initialize cube lib with root and worker
-        _lib = std::make_unique<CubeLib>(hParams, formula, _cube_comm, _logger, 5, 4);
-
-        // Generate cubes
-        _logger.log(0, "%s : started generating cubes ", toStr());
-        auto solved = _lib->generateCubes();
-        _logger.log(0, "%s : finished generating cubes ", toStr());
-
-        // Check if formula was solved durin cube generation
-        if (solved) {
-            _logger.log(0, "%s : solved formula during cube generation", toStr());
-
-            // CubeLib was succesfully initialized
-            _isInitialized.store(true);
-
-            // Worker thread is never started
-            _isDestructible.store(true);
-            return true;
+        // Check if job was aborted before initialization
+        if (_isInterrupted) {
+            // Lib was never initialized thus making the job destructable
+            _logger.log(0, "%s : job was interrupted before initialization ", toStr());
+            _job_state.store(State::DESTRUCTABLE);
+            return false;
         }
 
-    } else {
-        // Initialize cube lib with worker
-        _lib = std::make_unique<CubeLib>(hParams, formula, _cube_comm, _logger);
+        _logger.log(0, "%s : started intializing cube lib ", toStr());
+
+        _job_state.store(INITIALIZING);
+
+        std::vector<int> formula = *(getDescription().getPayloads().at(0));
+
+        // TODO Remove this when introducing the cube setup and add support for depth and batch size
+        Parameters hParams(_params);
+        HordeConfig::applyDefault(hParams, *this);
+
+        if (!isRoot()) {
+            // Initialize cube lib with worker
+            _lib = std::make_unique<CubeLib>(hParams, formula, _cube_comm, _logger);
+
+            _logger.log(0, "%s : finished intializing cube lib with worker ", toStr());
+
+            _job_state.store(ACTIVE);
+
+            // If job was suspended before initialization. Respecting INITIALIZING_TO_SUSPENDED
+            if (_isSuspended) {
+                _lib->suspend();
+            }
+
+            _lib->startWorking();
+
+            return true;
+
+        } else {
+            // Initialize cube lib with root and worker
+            _lib = std::make_unique<CubeLib>(hParams, formula, _cube_comm, _logger, 5, 4);
+        }
     }
+    // Release initialization mutex
 
-    _logger.log(0, "%s : finished intializing cube lib ", toStr());
+    // Generate cubes
+    // This cannot be suspended but is interruptable
+    _logger.log(0, "%s : started generating cubes ", toStr());
+    auto shouldStartWorkking = _lib->generateCubes();
+    _logger.log(0, "%s : finished generating cubes ", toStr());
 
-    // Succesfully initialized
-    _isInitialized.store(true);
+    // Aquiring initialization mutex
+    {
+        const std::lock_guard<Mutex> lock(_initialization_mutex);
 
-    // If job was suspended before initialization, respecting INITIALIZING_TO_SUSPENDED
-    if (_isSuspended) {
-        // Set suspension flag in _lib
-        _lib->suspend();
+        // Only turn active when there are cubes and the job was not interrupted
+        if (shouldStartWorkking && !_isInterrupted) {
+            _logger.log(0, "%s : finished intializing cube lib with root and worker ", toStr());
+
+            _job_state.store(ACTIVE);
+
+            // If job was suspended before initialization. Respecting INITIALIZING_TO_SUSPENDED
+            if (_isSuspended) {
+                _lib->suspend();
+            }
+
+            _lib->startWorking();
+
+            return true;
+
+        } else {
+            // Initialization was aborted either because the formula was solved during cube generation or because of an interrupt during cube generation
+            _logger.log(0, "%s : initialization was aborted ", toStr());
+            _job_state.store(State::DESTRUCTABLE);
+            return false;
+        }
     }
-
-    // Order does not matter
-    // Start working
-    _lib->startWorking();
-    // Set working flag
-    _isWorking.store(true);
-
-    return true;
+    // Release initialization mutex
 }
 
 bool BaseCubeSatJob::appl_doneInitializing() {
-    return _isInitialized;
+    return _job_state != State::UNINITIALIZED && _job_state != State::INITIALIZING;
 }
 
 void BaseCubeSatJob::appl_updateRole() {
@@ -92,88 +106,83 @@ void BaseCubeSatJob::appl_updateDescription(int fromRevision) {
 }
 
 void BaseCubeSatJob::appl_pause() {
-    // Aquire initialization lock
-    const std::lock_guard<Mutex> lock(_manipulation_mutex);
+    const std::lock_guard<Mutex> lock(_initialization_mutex);
 
     _logger.log(0, "%s : appl_pause was called", toStr());
 
-    _isSuspended = true;
+    _isSuspended.store(true);
 
-    if (_isWorking && !_isWithdrawing) {
+    // Job may only be suspended during
+    if (_job_state == State::ACTIVE) {
         _lib->suspend();
     }
 }
 
-// Critical
 void BaseCubeSatJob::appl_unpause() {
-    // Aquire initialization lock
-    const std::lock_guard<Mutex> lock(_manipulation_mutex);
+    const std::lock_guard<Mutex> lock(_initialization_mutex);
 
     _logger.log(0, "%s : appl_unpause was called", toStr());
 
-    _isSuspended = false;
+    _isSuspended.store(false);
 
-    // Job is also unsuspended during withdraw
-    // These checks prevents calling resume twice
-    if (_isWorking && _isSuspended && !_isWithdrawing) {
+    if (_job_state == State::ACTIVE) {
         _lib->resume();
     }
 }
 
 void BaseCubeSatJob::appl_interrupt() {
-    // Aquire initialization lock
-    const std::lock_guard<Mutex> lock(_manipulation_mutex);
+    const std::lock_guard<Mutex> lock(_initialization_mutex);
 
     _logger.log(0, "%s : appl_interrupt was called", toStr());
 
-    if (_isWorking) {
-        // Uncritical
-        _lib->interrupt();
-    } else {
-        // Set flag to abort subsequent initialization
-        // Otherwise wait for preceding initialization to finish
-        _abort_before_initialization.store(true);
-    }
+    interrupt_and_start_withdrawing();
 }
 
 void BaseCubeSatJob::appl_withdraw() {
-    // Aquire initialization lock
-    const std::lock_guard<Mutex> lock(_manipulation_mutex);
+    const std::lock_guard<Mutex> lock(_initialization_mutex);
 
     _logger.log(0, "%s : appl_withdraw was called", toStr());
 
-    if (_isWorking) {
-        // Uncritical
+    interrupt_and_start_withdrawing();
+}
+
+void BaseCubeSatJob::interrupt_and_start_withdrawing() {
+    _isInterrupted.store(true);
+
+    if (_job_state == State::INITIALIZING) {
+        _lib->interrupt();
+    }
+
+    if (_job_state == State::ACTIVE) {
         _lib->interrupt();
 
-        // Job may only be withdrawn once
-        if (!_isWithdrawing) {
-            _isWithdrawing = true;
-            _withdraw_thread = std::thread(&BaseCubeSatJob::withdraw, this);
+        // Resume worker thread if necessary to allow termination
+        if (_isSuspended) {
+            _lib->resume();
+            _isSuspended.store(false);
         }
-    } else {
-        // Set flag to abort subsequent initialization
-        // Otherwise wait for preceding initialization to finish
-        _abort_before_initialization.store(true);
+
+        _job_state.store(State::WITHDRAWING);
+
+        _withdraw_thread = std::thread(&BaseCubeSatJob::withdraw, this);
     }
 }
 
 void BaseCubeSatJob::withdraw() {
     _logger.log(0, "%s : started cleanup thread ", toStr());
 
-    // Resume worker thread if necessary to allow termination
-    if (_isSuspended) {
-        _lib->resume();
-    }
-
+    // Wait until worker is joined
     _lib->withdraw();
-    _isDestructible.store(true);
+
+    const std::lock_guard<Mutex> lock(_initialization_mutex);
+
+    _job_state.store(State::DESTRUCTABLE);
 
     _logger.log(0, "%s : finished cleanup thread ", toStr());
 }
 
 int BaseCubeSatJob::appl_solveLoop() {
-    if (_isInitialized) {
+    if (_job_state != State::UNINITIALIZED && _job_state != State::INITIALIZING) {
         SatResult result = _lib->getResult();
 
         if (result != UNKNOWN) {
@@ -194,40 +203,38 @@ int BaseCubeSatJob::appl_solveLoop() {
 void BaseCubeSatJob::appl_dumpStats() {}
 
 bool BaseCubeSatJob::appl_isDestructible() {
-    return _isDestructible.load();
+    return _job_state == State::DESTRUCTABLE;
 }
 
-// Noop in _lib when interrupted -> No _isWithdrawing check required
+// Messages are only required during ACTIVE to guarantee correct solving.
+// Messages do not need to be answered during WITHDRAWING or DESTRUCTABLE. The worker automatically terminates after a call to interrupt.
+// Locking would be required to prevent race conditions. This can be omitted because the job is only controlled by a single thread.
 bool BaseCubeSatJob::appl_wantsToBeginCommunication() const {
-    if (_isWorking)
+    if (_job_state == State::ACTIVE)
         return _lib->wantsToCommunicate();
     else
         return false;
 }
 
-// Noop in _lib when interrupted -> No _isWithdrawing check required
 void BaseCubeSatJob::appl_beginCommunication() {
-    if (_isWorking) {
+    if (_job_state == State::ACTIVE)
         _lib->beginCommunication();
-    }
 }
 
-// Noop in _lib when interrupted -> No _isWithdrawing check required
 void BaseCubeSatJob::appl_communicate(int source, JobMessage& msg) {
-    if (_isWorking)
+    if (_job_state == State::ACTIVE)
         _lib->handleMessage(source, msg);
 }
 
 int BaseCubeSatJob::getDemand(int prevVolume, float elapsedTime) const {
-    if (!_isWorking)
+    if (_job_state != State::ACTIVE)
         return 1;
     else
         return Job::getDemand(prevVolume, elapsedTime);
 }
 
 BaseCubeSatJob::~BaseCubeSatJob() {
-    // Aquire initialization lock
-    const std::lock_guard<Mutex> lock(_manipulation_mutex);
+    const std::lock_guard<Mutex> lock(_initialization_mutex);
 
     _logger.log(0, "%s : enter destructor ", toStr());
 

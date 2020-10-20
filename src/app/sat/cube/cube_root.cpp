@@ -4,25 +4,31 @@
 #include <cmath>
 
 CubeRoot::CubeRoot(std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result, int depth, size_t cubes_per_worker)
-    : _formula(formula), _cube_comm(cube_comm), _result(result), _depth(depth), _cubes_per_worker(cubes_per_worker) {}
+    : _formula(formula), _cube_comm(cube_comm), _result(result), _depth(depth), _cubes_per_worker(cubes_per_worker) {
+        _solver.connect_terminator(&terminator);
+    }
 
 bool CubeRoot::generateCubes() {
-    CaDiCaL::Solver solver;
-
     // Read formula
     for (auto lit : _formula) {
-        solver.add(lit);
+        _solver.add(lit);
     }
 
     // Create cubes
-    auto cubesWithStatus = solver.generate_cubes(_depth);
+    auto cubesWithStatus = _solver.generate_cubes(_depth);
     auto cubes = cubesWithStatus.cubes;
     auto status = cubesWithStatus.status;
 
     // Check if formula was already solved
     if (status) {
         parseStatus(status);
-        return true;
+        return false;
+    }
+    // Check if generate_cubes finished because of an interrupt
+    else {
+        if (_isInterrupted.load()) {
+            return false;
+        }
     }
 
     // For some reason cadical may return 0 on a call to lookahead (used in generate_cubes) signaling a solved formula but does not change its state.
@@ -35,18 +41,18 @@ bool CubeRoot::generateCubes() {
 
     // Check if cubes vector is too small
     if (cubes.size() != pow(2, _depth)) {
-        auto result = solver.solve();
+        auto result = _solver.solve();
         parseStatus(result);
-        return true;
+        return false;
     }
 
     // Check if there are zeros in the cubes
     // We only check the first cube, because the cubes consist of the permutations of the negations of the same literals.
     for (auto lit : cubes.at(0)) {
         if (lit == 0) {
-            auto result = solver.solve();
+            auto result = _solver.solve();
             parseStatus(result);
-            return true;
+            return false;
         }
     }
 
@@ -55,7 +61,12 @@ bool CubeRoot::generateCubes() {
         _root_cubes.emplace_back(cube_vec);
     }
 
-    return false;
+    return true;
+}
+
+void CubeRoot::interrupt() {
+    // This should interrupt CaDiCaL::Solver::generate_cubes() since the terminator is referenced in the lookahead.cpp in the function terminating_asked()
+    _isInterrupted.store(true);
 }
 
 void CubeRoot::parseStatus(int status) {

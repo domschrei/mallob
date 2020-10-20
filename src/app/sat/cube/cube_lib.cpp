@@ -30,7 +30,8 @@ void CubeLib::startWorking() {
 // Only two flags are set so this return fast.
 void CubeLib::interrupt() {
     _isInterrupted.store(true);
-    _cube_worker->interrupt();
+    if (_cube_root != nullptr) _cube_root->interrupt();
+    if (_cube_worker != nullptr) _cube_worker->interrupt();
 }
 
 // Waits for worker threads to finish.
