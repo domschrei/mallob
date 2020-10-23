@@ -15,21 +15,19 @@
 const int CLAUSE_LEARN_INTERRUPT_THRESHOLD = 10000;
 
 Cadical::Cadical(const SolverSetup& setup)
-	: PortfolioSolverInterface(setup),
-	  solver(new CaDiCaL::Solver), terminator(*setup.logger), learner(*this) {
-	
-	solver->connect_terminator(&terminator);
+	: PortfolioSolverInterface(setup), terminator(*setup.logger), learner(*this) {
+	solver.connect_terminator(&terminator);
 }
 
 void Cadical::addLiteral(int lit) {
-	solver->add(lit);
+	solver.add(lit);
 }
 
 void Cadical::diversify(int seed) {
 
 	// Options may only be set in the initialization phase, so the seed cannot be re-set
 	if (!seedSet) {
-		solver->set("seed", seed);
+		solver.set("seed", seed);
 		seedSet = true;
 	}
 	
@@ -37,7 +35,7 @@ void Cadical::diversify(int seed) {
 }
 
 void Cadical::setPhase(const int var, const bool phase) {
-	solver->phase(phase ? var : -var);
+	solver.phase(phase ? var : -var);
 }
 
 // Solve the formula with a given set of assumptions
@@ -60,11 +58,11 @@ SatResult Cadical::solve(const vector<int>& assumptions) {
 
 	// set the assumptions
 	for (auto assumption : assumptions) {
-		solver->assume(assumption);
+		solver.assume(assumption);
 	}
 
 	// start solving
-	int res = solver->solve();
+	int res = solver.solve();
 	switch (res) {
 	case 0:
 		return UNKNOWN;
@@ -97,7 +95,7 @@ vector<int> Cadical::getSolution() {
 	vector<int> result = {0};
 
 	for (int i = 1; i <= getVariablesCount(); i++)
-		result.push_back(solver->val(i));
+		result.push_back(solver.val(i));
 
 	return result;
 }
@@ -105,7 +103,7 @@ vector<int> Cadical::getSolution() {
 set<int> Cadical::getFailedAssumptions() {
 	set<int> result;
 	for (auto assumption : assumptions)
-		if (solver->failed(assumption))
+		if (solver.failed(assumption))
 			result.insert(assumption);
 
 	return result;
@@ -126,7 +124,7 @@ void Cadical::addLearnedClause(const int* begin, int size) {
 
 void Cadical::setLearnedClauseCallback(LearnedClauseCallback* callback) {
 	learner.setCallback(callback);
-	solver->connect_learner(&learner);
+	solver.connect_learner(&learner);
 }
 
 void Cadical::increaseClauseProduction() {
@@ -134,7 +132,7 @@ void Cadical::increaseClauseProduction() {
 }
 
 int Cadical::getVariablesCount() {
-	return solver->vars();
+	return solver.vars();
 }
 
 int Cadical::getNumOriginalDiversifications() {
@@ -142,7 +140,7 @@ int Cadical::getNumOriginalDiversifications() {
 }
 
 int Cadical::getSplittingVariable() {
-	return solver->lookahead();
+	return solver.lookahead();
 }
 
 SolvingStatistics Cadical::getStatistics() {
@@ -151,8 +149,4 @@ SolvingStatistics Cadical::getStatistics() {
 	// The can be directly printed with
 	// solver->statistics();
 	return st;
-}
-
-Cadical::~Cadical() {
-	solver.release();
 }

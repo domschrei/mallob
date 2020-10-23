@@ -6,14 +6,14 @@
 #include "cube_worker.hpp"
 #include "util/console.hpp"
 
-CubeLib::CubeLib(const Parameters &params, std::vector<int> formula, CubeCommunicator &cube_comm, LoggingInterface &logger)
-    : _formula(formula), _logger(logger) {
-    _cube_worker = std::make_unique<CubeWorker>(_formula, cube_comm, logger, _result);
+CubeLib::CubeLib(const Parameters &params, std::vector<int> &formula, CubeCommunicator &cube_comm, LoggingInterface &logger)
+    : _logger(logger) {
+    _cube_worker = std::make_unique<CubeWorker>(formula, cube_comm, logger, _result);
 }
 
-CubeLib::CubeLib(const Parameters &params, std::vector<int> formula, CubeCommunicator &cube_comm, LoggingInterface &logger, int depth, size_t cubes_per_worker)
+CubeLib::CubeLib(const Parameters &params, std::vector<int> &formula, CubeCommunicator &cube_comm, LoggingInterface &logger, int depth, size_t cubes_per_worker)
     : CubeLib(params, formula, cube_comm, logger) {
-    _cube_root = std::make_unique<CubeRoot>(_formula, cube_comm, _result, depth, cubes_per_worker);
+    _cube_root = std::make_unique<CubeRoot>(formula, cube_comm, _result, depth, cubes_per_worker);
     _isRoot = true;
 }
 

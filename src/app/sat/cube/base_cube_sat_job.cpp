@@ -21,6 +21,7 @@ bool BaseCubeSatJob::appl_initialize() {
             // Lib was never initialized thus making the job destructable
             _logger.log(0, "%s : job was interrupted before initialization ", toStr());
             _job_state.store(State::DESTRUCTABLE);
+            cleanup();
             return false;
         }
 
@@ -28,7 +29,7 @@ bool BaseCubeSatJob::appl_initialize() {
 
         _job_state.store(INITIALIZING);
 
-        std::vector<int> formula = *(getDescription().getPayloads().at(0));
+        auto &formula = *(getDescription().getPayloads().at(0).get());
 
         // TODO Remove this when introducing the cube setup and add support for depth and batch size
         Parameters hParams(_params);
@@ -87,6 +88,7 @@ bool BaseCubeSatJob::appl_initialize() {
             // Initialization was aborted either because the formula was solved during cube generation or because of an interrupt during cube generation
             _logger.log(0, "%s : initialization was aborted ", toStr());
             _job_state.store(State::DESTRUCTABLE);
+            cleanup();
             return false;
         }
     }
@@ -169,7 +171,7 @@ void BaseCubeSatJob::interrupt_and_start_withdrawing() {
 }
 
 void BaseCubeSatJob::withdraw() {
-    _logger.log(0, "%s : started cleanup thread ", toStr());
+    _logger.log(0, "%s : started withdraw thread ", toStr());
 
     // Wait until worker is joined
     _lib->withdraw();
@@ -178,7 +180,21 @@ void BaseCubeSatJob::withdraw() {
 
     _job_state.store(State::DESTRUCTABLE);
 
-    _logger.log(0, "%s : finished cleanup thread ", toStr());
+    cleanup();
+
+    _logger.log(0, "%s : finished withdraw thread ", toStr());
+}
+
+void BaseCubeSatJob::cleanup() {
+    _logger.log(0, "%s : started cleanup ", toStr());
+
+    // Delete _lib
+    if (_lib != nullptr) _lib.reset();
+
+    // Clear payload
+    getDescription().clearPayload();
+
+    _logger.log(0, "%s : finished cleanup ", toStr());
 }
 
 int BaseCubeSatJob::appl_solveLoop() {

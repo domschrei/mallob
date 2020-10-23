@@ -47,6 +47,8 @@ class BaseCubeSatJob : public Job {
     std::thread _withdraw_thread;
     void withdraw();
 
+    void cleanup();
+
     std::string getIdentifier() { return "<c-" + std::string(toStr()) + ">"; }
     std::string getLogfileSuffix() { return std::string(toStr()); };
 
