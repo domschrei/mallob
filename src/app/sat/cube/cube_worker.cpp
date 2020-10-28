@@ -14,6 +14,13 @@ CubeWorker::CubeWorker(std::vector<int> &formula, CubeCommunicator &cube_comm, L
     // Initialize solver
     SolverSetup setup;
     setup.logger = &_logger;
+
+    // TODO Fill with valid values
+	setup.globalId = 0;
+	setup.localId = 0; 
+	setup.jobname = "cube"; 
+	setup.diversificationIndex = 0;
+
     _solver = std::make_unique<Cadical>(setup);
 
     // Read formula
@@ -59,7 +66,9 @@ void CubeWorker::mainLoop() {
 
 SatResult CubeWorker::solve() {
     for (Cube &next_local_cube : _local_cubes) {
-        auto result = _solver->solve(next_local_cube.getPath());
+        auto path = next_local_cube.getPath();
+        
+        auto result = _solver->solve(path);
 
         // Check result
         if (result == SAT) {
