@@ -6,20 +6,18 @@
 
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 #include "cube_communicator.hpp"
+#include "cube_setup.hpp"
 
 class CubeWorkerInterface {
    protected:
-    std::vector<int> &_formula;
-
+    std::shared_ptr<std::vector<int>> _formula;
     CubeCommunicator &_cube_comm;
     LoggingInterface &_logger;
-
-    // Termination flag (no atomic needed)
     SatResult &_result;
 
    public:
-    CubeWorkerInterface(std::vector<int> &formula, CubeCommunicator &cube_comm, LoggingInterface &logger, SatResult &result)
-        : _formula(formula), _cube_comm(cube_comm), _logger(logger), _result(result) {}
+    CubeWorkerInterface(CubeSetup &setup) : _formula(setup.formula), _cube_comm(setup.cube_comm), _logger(setup.logger), _result(setup.result) {}
+    virtual ~CubeWorkerInterface() {_logger.log(0, "Enter destructor of CubeWorkerInterface.\n");}
 
     // Starts the worker thread
     virtual void startWorking() = 0;

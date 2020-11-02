@@ -2,7 +2,6 @@
 
 #include <assert.h>
 
-#include "../horde_config.hpp"
 #include "util/console.hpp"
 
 BaseCubeSatJob::BaseCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId)
@@ -28,15 +27,11 @@ bool BaseCubeSatJob::appl_initialize() {
 
         _job_state.store(INITIALIZING);
 
-        std::vector<int> formula = *(getDescription().getPayloads().at(0));
-
-        // TODO Remove this when introducing the cube setup and add support for depth and batch size
-        Parameters hParams(_params);
-        HordeConfig::applyDefault(hParams, *this);
+        CubeSetup cube_setup(getDescription().getPayloads().at(0), _cube_comm, _logger, _params, _sat_result);
 
         if (!isRoot()) {
             // Initialize cube lib with worker
-            _lib = std::make_unique<CubeLib>(hParams, formula, _cube_comm, _logger);
+            _lib = std::make_unique<CubeLib>(cube_setup);
 
             _logger.log(0, "%s : finished intializing cube lib with worker ", toStr());
 
@@ -53,7 +48,7 @@ bool BaseCubeSatJob::appl_initialize() {
 
         } else {
             // Initialize cube lib with root and worker
-            _lib = std::make_unique<CubeLib>(hParams, formula, _cube_comm, _logger, 5, 4);
+            _lib = std::make_unique<CubeLib>(cube_setup);
         }
     }
     // Release initialization mutex
@@ -87,7 +82,9 @@ bool BaseCubeSatJob::appl_initialize() {
             // Initialization was aborted either because the formula was solved during cube generation or because of an interrupt during cube generation
             _logger.log(0, "%s : initialization was aborted ", toStr());
             _job_state.store(State::DESTRUCTABLE);
-            return false;
+            _lib.reset();
+            // TODO: Should we return here true or false
+            return true;
         }
     }
     // Release initialization mutex
@@ -178,18 +175,18 @@ void BaseCubeSatJob::withdraw() {
 
     _job_state.store(State::DESTRUCTABLE);
 
+    _lib.reset();
+
     _logger.log(0, "%s : finished cleanup thread ", toStr());
 }
 
 int BaseCubeSatJob::appl_solveLoop() {
     if (_job_state != State::UNINITIALIZED && _job_state != State::INITIALIZING) {
-        SatResult result = _lib->getResult();
-
-        if (result != UNKNOWN) {
-            _logger.log(0, "%s : found result %s", toStr(), result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN");
+        if (_sat_result != UNKNOWN) {
+            _logger.log(0, "%s : found result %s", toStr(), _sat_result == 10 ? "SAT" : _sat_result == 20 ? "UNSAT" : "UNKNOWN");
 
             _result.id = getId();
-            _result.result = result;
+            _result.result = _sat_result;
             _result.revision = getDescription().getRevision();
             _result.solution.clear();
 

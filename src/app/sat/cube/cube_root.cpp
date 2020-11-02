@@ -3,14 +3,20 @@
 #include <cassert>
 #include <cmath>
 
-CubeRoot::CubeRoot(std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result, int depth, size_t cubes_per_worker)
-    : _formula(formula), _cube_comm(cube_comm), _result(result), _depth(depth), _cubes_per_worker(cubes_per_worker) {
-        _solver.connect_terminator(&terminator);
-    }
+CubeRoot::CubeRoot(CubeSetup &setup)
+    : _formula(setup.formula), _cube_comm(setup.cube_comm), _logger(setup.logger), _result(setup.result), _terminator(_isInterrupted) {
+
+    _depth = setup.params.getIntParam("cube-depth");
+    _cubes_per_worker = setup.params.getIntParam("cubes-per-worker");
+
+    _solver.connect_terminator(&_terminator);
+}
+
+CubeRoot::~CubeRoot() { _logger.log(0, "Enter destructor of CubeRoot.\n"); }
 
 bool CubeRoot::generateCubes() {
     // Read formula
-    for (auto lit : _formula) {
+    for (auto lit : *_formula.get()) {
         _solver.add(lit);
     }
 
@@ -24,11 +30,10 @@ bool CubeRoot::generateCubes() {
         parseStatus(status);
         return false;
     }
+
     // Check if generate_cubes finished because of an interrupt
-    else {
-        if (_isInterrupted.load()) {
-            return false;
-        }
+    if (_isInterrupted.load()) {
+        return false;
     }
 
     // For some reason cadical may return 0 on a call to lookahead (used in generate_cubes) signaling a solved formula but does not change its state.
@@ -38,6 +43,8 @@ bool CubeRoot::generateCubes() {
     // It contains zeros for the formula satcoin-genesis-SAT-3.cnf.
     //
     // Because of this we check for a too small cube array or zeros in the cubes and in this case we start to solve here, expecting it to return instantaneously.
+
+    // TODO Check if this assumption holds
 
     // Check if cubes vector is too small
     if (cubes.size() != pow(2, _depth)) {
@@ -78,7 +85,6 @@ void CubeRoot::parseStatus(int status) {
 }
 
 void CubeRoot::handleMessage(int source, JobMessage &msg) {
-    // Synchronize _root_cubes access
     const std::lock_guard<Mutex> lock(_root_cubes_lock);
 
     if (_root_cubes.empty()) {

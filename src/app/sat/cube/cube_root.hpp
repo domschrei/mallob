@@ -6,6 +6,7 @@
 
 #include "app/sat/hordesat/solvers/cadical_interface.hpp"
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
+#include "cube_setup.hpp"
 #include "cube.hpp"
 #include "cube_communicator.hpp"
 #include "util/sys/threading.hpp"
@@ -17,6 +18,11 @@ class CubeRoot {
     // Flag that signals if the cube generation was interrupted
     std::atomic_bool _isInterrupted{false};
 
+    std::shared_ptr<std::vector<int>> _formula;
+    CubeCommunicator &_cube_comm;
+    LoggingInterface &_logger;
+    SatResult &_result;
+
     // Local terminator that encapsulates the _isInterrupted flag
     struct Terminator : public CaDiCaL::Terminator {
         Terminator(std::atomic_bool &isInterrupted) : _isInterrupted(isInterrupted) {}
@@ -27,15 +33,9 @@ class CubeRoot {
 
        private:
         std::atomic_bool &_isInterrupted;
-
-    } terminator{_isInterrupted};
-
-    std::vector<int> &_formula;
-
-    CubeCommunicator &_cube_comm;
-
-    // Termination flag (no atomic needed)
-    SatResult &_result;
+    };
+    
+    Terminator _terminator;
 
     // Depth for cube generation
     int _depth;
@@ -52,10 +52,12 @@ class CubeRoot {
     void parseStatus(int status);
 
    public:
-    CubeRoot(std::vector<int> &formula, CubeCommunicator &cube_comm, SatResult &result, int depth, size_t cubes_per_worker);
+    CubeRoot(CubeSetup &setup);
+    ~CubeRoot();
 
     // Generates cubes
     // Returns true if the job should start working
+    // TODO differentiate between finished during cube generation and interrupt during cube generation
     bool generateCubes();
 
     void interrupt();

@@ -80,6 +80,10 @@ void Parameters::setDefaults() {
 
     setParam("hmcl", "20");
     setParam("smcl", "5");
+
+    // Cube params
+    setParam("cube-depth", "5"); // depth of initial cubes tree
+    setParam("cubes-per-worker", "4"); // upper limit of send cubes per worker request
 }
 
 void Parameters::expand() {

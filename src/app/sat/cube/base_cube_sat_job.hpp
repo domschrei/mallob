@@ -19,6 +19,9 @@ class BaseCubeSatJob : public Job {
 
     std::unique_ptr<CubeLib> _lib;
 
+    // Termination flag
+    SatResult _sat_result = UNKNOWN;
+
     // Lifecycle of a BaseCubeSatJob
     enum State {
         UNINITIALIZED,

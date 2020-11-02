@@ -42,7 +42,8 @@ class CubeWorker : public CubeWorkerInterface {
     void digestReveicedFailedCubes();
 
    public:
-    CubeWorker(std::vector<int> &formula, CubeCommunicator &cube_comm, LoggingInterface &logger, SatResult &result);
+    CubeWorker(CubeSetup setup);
+    ~CubeWorker();
 
     void startWorking() override;
 

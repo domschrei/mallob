@@ -6,16 +6,12 @@
 #include "cube_worker.hpp"
 #include "util/console.hpp"
 
-CubeLib::CubeLib(const Parameters &params, std::vector<int> formula, CubeCommunicator &cube_comm, LoggingInterface &logger)
-    : _formula(formula), _logger(logger) {
-    _cube_worker = std::make_unique<CubeWorker>(_formula, cube_comm, logger, _result);
+CubeLib::CubeLib(CubeSetup &setup) {   
+    _cube_worker = std::make_unique<CubeWorker>(setup);
+    _cube_root = std::make_unique<CubeRoot>(setup);
 }
 
-CubeLib::CubeLib(const Parameters &params, std::vector<int> formula, CubeCommunicator &cube_comm, LoggingInterface &logger, int depth, size_t cubes_per_worker)
-    : CubeLib(params, formula, cube_comm, logger) {
-    _cube_root = std::make_unique<CubeRoot>(_formula, cube_comm, _result, depth, cubes_per_worker);
-    _isRoot = true;
-}
+// CubeLib::~CubeLib() { _logger.log(0, "Enter destructor of CubeLib.\n"); }
 
 bool CubeLib::generateCubes() {
     return _cube_root->generateCubes();
@@ -64,7 +60,7 @@ void CubeLib::beginCommunication() {
 // Pass the message to either the root or the worker
 void CubeLib::handleMessage(int source, JobMessage &msg) {
     if (!_isInterrupted) {
-        if (_isRoot && (msg.tag == MSG_REQUEST_CUBES || msg.tag == MSG_RETURN_FAILED_CUBES)) {
+        if (msg.tag == MSG_REQUEST_CUBES || msg.tag == MSG_RETURN_FAILED_CUBES) {
             _cube_root->handleMessage(source, msg);
         } else if (msg.tag == MSG_SEND_CUBES || msg.tag == MSG_RECEIVED_FAILED_CUBES) {
             _cube_worker->handleMessage(source, msg);

@@ -2,32 +2,27 @@
 
 #include <cassert>
 
+#include "app/sat/console_horde_interface.hpp"
 #include "app/sat/hordesat/solvers/cadical.hpp"
 #include "app/sat/hordesat/solvers/cadical_interface.hpp"
-#include "app/sat/console_horde_interface.hpp"
 #include "cube_communicator.hpp"
 #include "util/console.hpp"
 
-CubeWorker::CubeWorker(std::vector<int> &formula, CubeCommunicator &cube_comm, LoggingInterface &logger, SatResult &result)
-    : CubeWorkerInterface(formula, cube_comm, logger, result) {
-
+CubeWorker::CubeWorker(CubeSetup setup) : CubeWorkerInterface(setup) {
     // Initialize solver
-    SolverSetup setup;
-    setup.logger = &_logger;
+    SolverSetup solver_setup;
+    solver_setup.logger = &_logger;
 
     // TODO Fill with valid values
-	setup.globalId = 0;
-	setup.localId = 0; 
-	setup.jobname = "cube"; 
-	setup.diversificationIndex = 0;
+    solver_setup.globalId = 0;
+    solver_setup.localId = 0;
+    solver_setup.jobname = "cube";
+    solver_setup.diversificationIndex = 0;
 
-    _solver = std::make_unique<Cadical>(setup);
-
-    // Read formula
-    for (int lit : _formula) {
-        _solver->addLiteral(lit);
-    }
+    _solver = std::make_unique<Cadical>(solver_setup);
 }
+
+CubeWorker::~CubeWorker() { _logger.log(0, "Enter destructor of CubeWorker.\n"); }
 
 void CubeWorker::mainLoop() {
     auto lock = _state_mutex.getLock();
@@ -67,7 +62,7 @@ void CubeWorker::mainLoop() {
 SatResult CubeWorker::solve() {
     for (Cube &next_local_cube : _local_cubes) {
         auto path = next_local_cube.getPath();
-        
+
         auto result = _solver->solve(path);
 
         // Check result
@@ -89,6 +84,11 @@ SatResult CubeWorker::solve() {
 }
 
 void CubeWorker::startWorking() {
+    // Read formula
+    for (int lit : *_formula.get()) {
+        _solver->addLiteral(lit);
+    }
+
     _worker_thread = std::thread(&CubeWorker::mainLoop, this);
 }
 
