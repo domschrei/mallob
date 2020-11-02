@@ -395,7 +395,7 @@ Job::~Job() {
         if (_initializer_thread->joinable()) {
             _initializer_thread->join();
         }
-        _initializer_thread.release();
+        _initializer_thread.reset();
         _initializer_thread = NULL;
     }
     
