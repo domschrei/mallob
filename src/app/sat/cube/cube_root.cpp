@@ -12,7 +12,7 @@ CubeRoot::CubeRoot(CubeSetup &setup)
     _solver.connect_terminator(&_terminator);
 }
 
-CubeRoot::~CubeRoot() { _logger.log(0, "Enter destructor of CubeRoot.\n"); }
+CubeRoot::~CubeRoot() { _logger.log(0, "Enter destructor of CubeRoot"); }
 
 bool CubeRoot::generateCubes() {
     // Read formula

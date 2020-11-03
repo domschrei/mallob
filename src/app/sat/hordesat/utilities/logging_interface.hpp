@@ -8,6 +8,8 @@
 class LoggingInterface {
 
 public:
+    virtual ~LoggingInterface() {};
+
     virtual double getTime() const = 0;
 
     virtual void log(int verbosityLevel, const char* fmt, ...) const = 0;

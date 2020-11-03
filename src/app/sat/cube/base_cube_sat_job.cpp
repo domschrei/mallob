@@ -4,26 +4,33 @@
 
 #include "util/console.hpp"
 
+// worldRank is mpi rank
+// job id is id of job
+// where is rank of job of this node -> it gets entered somewhen to_name
+
 BaseCubeSatJob::BaseCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId)
     : Job(params, commSize, worldRank, jobId),
-      _logger(getIdentifier(), getLogfileSuffix()),
-      _cube_comm(*this, _logger) {
-}
+      _logger("<c-" + std::string(toStr()) + ">", std::string(toStr())),
+      _cube_comm(*this, _logger) {}
 
 bool BaseCubeSatJob::appl_initialize() {
     // Aquiring initialization mutex
     {
         const std::lock_guard<Mutex> lock(_initialization_mutex);
 
+        // Update _logger
+        _logger.setIdentifier("<c-" + std::string(toStr()) + ">");
+        _logger.log(0, "Logger was updated");
+
         // Check if job was aborted before initialization
         if (_isInterrupted) {
             // Lib was never initialized thus making the job destructable
-            _logger.log(0, "%s : job was interrupted before initialization ", toStr());
+            _logger.log(0, "Job was interrupted before initialization");
             _job_state.store(State::DESTRUCTABLE);
             return false;
         }
 
-        _logger.log(0, "%s : started intializing cube lib ", toStr());
+        _logger.log(0, "Started intializing cube lib");
 
         _job_state.store(INITIALIZING);
 
@@ -33,7 +40,7 @@ bool BaseCubeSatJob::appl_initialize() {
             // Initialize cube lib with worker
             _lib = std::make_unique<CubeLib>(cube_setup);
 
-            _logger.log(0, "%s : finished intializing cube lib with worker ", toStr());
+            _logger.log(0, "Finished intializing cube lib with worker");
 
             _job_state.store(ACTIVE);
 
@@ -55,9 +62,9 @@ bool BaseCubeSatJob::appl_initialize() {
 
     // Generate cubes
     // This cannot be suspended but is interruptable
-    _logger.log(0, "%s : started generating cubes ", toStr());
+    _logger.log(0, "Started generating cubes");
     auto shouldStartWorkking = _lib->generateCubes();
-    _logger.log(0, "%s : finished generating cubes ", toStr());
+    _logger.log(0, "Finished generating cubes");
 
     // Aquiring initialization mutex
     {
@@ -65,7 +72,7 @@ bool BaseCubeSatJob::appl_initialize() {
 
         // Only turn active when there are cubes and the job was not interrupted
         if (shouldStartWorkking && !_isInterrupted) {
-            _logger.log(0, "%s : finished intializing cube lib with root and worker ", toStr());
+            _logger.log(0, "Finished intializing cube lib with root and worker");
 
             _job_state.store(ACTIVE);
 
@@ -80,10 +87,12 @@ bool BaseCubeSatJob::appl_initialize() {
 
         } else {
             // Initialization was aborted either because the formula was solved during cube generation or because of an interrupt during cube generation
-            _logger.log(0, "%s : initialization was aborted ", toStr());
+            _logger.log(0, "Initialization was aborted");
             _job_state.store(State::DESTRUCTABLE);
             _lib.reset();
             // TODO: Should we return here true or false
+            // True when formula was solved during cube generation
+            // False if interrupted during cube generation
             return true;
         }
     }
@@ -105,7 +114,7 @@ void BaseCubeSatJob::appl_updateDescription(int fromRevision) {
 void BaseCubeSatJob::appl_pause() {
     const std::lock_guard<Mutex> lock(_initialization_mutex);
 
-    _logger.log(0, "%s : appl_pause was called", toStr());
+    _logger.log(0, "appl_pause was called");
 
     _isSuspended.store(true);
 
@@ -118,7 +127,7 @@ void BaseCubeSatJob::appl_pause() {
 void BaseCubeSatJob::appl_unpause() {
     const std::lock_guard<Mutex> lock(_initialization_mutex);
 
-    _logger.log(0, "%s : appl_unpause was called", toStr());
+    _logger.log(0, "appl_unpause was called");
 
     _isSuspended.store(false);
 
@@ -130,7 +139,7 @@ void BaseCubeSatJob::appl_unpause() {
 void BaseCubeSatJob::appl_interrupt() {
     const std::lock_guard<Mutex> lock(_initialization_mutex);
 
-    _logger.log(0, "%s : appl_interrupt was called", toStr());
+    _logger.log(0, "appl_interrupt was called");
 
     interrupt_and_start_withdrawing();
 }
@@ -138,7 +147,7 @@ void BaseCubeSatJob::appl_interrupt() {
 void BaseCubeSatJob::appl_withdraw() {
     const std::lock_guard<Mutex> lock(_initialization_mutex);
 
-    _logger.log(0, "%s : appl_withdraw was called", toStr());
+    _logger.log(0, "appl_withdraw was called");
 
     interrupt_and_start_withdrawing();
 }
@@ -166,7 +175,7 @@ void BaseCubeSatJob::interrupt_and_start_withdrawing() {
 }
 
 void BaseCubeSatJob::withdraw() {
-    _logger.log(0, "%s : started cleanup thread ", toStr());
+    _logger.log(0, "Started withdraw thread");
 
     // Wait until worker is joined
     _lib->withdraw();
@@ -177,13 +186,13 @@ void BaseCubeSatJob::withdraw() {
 
     _lib.reset();
 
-    _logger.log(0, "%s : finished cleanup thread ", toStr());
+    _logger.log(0, "Finished withdraw thread");
 }
 
 int BaseCubeSatJob::appl_solveLoop() {
     if (_job_state != State::UNINITIALIZED && _job_state != State::INITIALIZING) {
         if (_sat_result != UNKNOWN) {
-            _logger.log(0, "%s : found result %s", toStr(), _sat_result == 10 ? "SAT" : _sat_result == 20 ? "UNSAT" : "UNKNOWN");
+            _logger.log(0, "Found result %s", _sat_result == 10 ? "SAT" : _sat_result == 20 ? "UNSAT" : "UNKNOWN");
 
             _result.id = getId();
             _result.result = _sat_result;
@@ -233,13 +242,13 @@ int BaseCubeSatJob::getDemand(int prevVolume, float elapsedTime) const {
 BaseCubeSatJob::~BaseCubeSatJob() {
     const std::lock_guard<Mutex> lock(_initialization_mutex);
 
-    _logger.log(0, "%s : enter destructor ", toStr());
+    _logger.log(0, "Enter destructor");
 
     // The withdraw thread might still be default constructed, because of an aborted initialization
     if (_withdraw_thread.joinable()) {
         _withdraw_thread.join();
-        _logger.log(0, "%s : joined cleanup thread ", toStr());
+        _logger.log(0, "Joined cleanup thread");
     }
 
-    _logger.log(0, "%s : exit destructor ", toStr());
+    _logger.log(0, "Exit destructor");
 }

@@ -14,7 +14,7 @@ void CubeCommunicator::requestCubes() {
     msg.tag = MSG_REQUEST_CUBES;
 
     int rootRank = _job.getRootNodeRank();
-    log_send(rootRank, msg.payload, "%s : requestCubes", _job.toStr());
+    log_send(rootRank, msg.payload, "requestCubes");
     MyMpi::isend(MPI_COMM_WORLD, rootRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 }
 
@@ -28,7 +28,7 @@ void CubeCommunicator::sendCubes(int target, std::vector<int> &serialized_cubes)
     msg.tag = MSG_SEND_CUBES;
     msg.payload = serialized_cubes;
 
-    log_send(target, msg.payload, "%s : sendCubes", _job.toStr());
+    log_send(target, msg.payload, "sendCubes");
     MyMpi::isend(MPI_COMM_WORLD, target, MSG_SEND_APPLICATION_MESSAGE, msg);
 }
 
@@ -43,7 +43,7 @@ void CubeCommunicator::returnFailedCubes(std::vector<int> &serialized_failed_cub
     msg.payload = serialized_failed_cubes;
 
     int rootRank = _job.getRootNodeRank();
-    log_send(rootRank, msg.payload, "%s : returnFailedCubes", _job.toStr());
+    log_send(rootRank, msg.payload, "returnFailedCubes");
     MyMpi::isend(MPI_COMM_WORLD, rootRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 }
 
@@ -54,7 +54,7 @@ void CubeCommunicator::receivedFailedCubes(int target) {
     msg.epoch = 0;  // unused
     msg.tag = MSG_RECEIVED_FAILED_CUBES;
 
-    log_send(target, msg.payload, "%s : receivedFailedCubes", _job.toStr());
+    log_send(target, msg.payload, "receivedFailedCubes");
     MyMpi::isend(MPI_COMM_WORLD, target, MSG_SEND_APPLICATION_MESSAGE, msg);
 }
 

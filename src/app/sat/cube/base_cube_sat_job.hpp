@@ -5,7 +5,7 @@
 #include <memory>
 #include <thread>
 
-#include "../console_horde_interface.hpp"
+#include "cube_job_logger.hpp"
 #include "app/job.hpp"
 #include "cube_communicator.hpp"
 #include "cube_lib.hpp"
@@ -13,7 +13,7 @@
 
 class BaseCubeSatJob : public Job {
    private:
-    ConsoleHordeInterface _logger;
+    CubeJobLogger _logger;
 
     CubeCommunicator _cube_comm;
 
@@ -49,9 +49,6 @@ class BaseCubeSatJob : public Job {
     // Withdraws worker
     std::thread _withdraw_thread;
     void withdraw();
-
-    std::string getIdentifier() { return "<c-" + std::string(toStr()) + ">"; }
-    std::string getLogfileSuffix() { return std::string(toStr()); };
 
    public:
     BaseCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId);

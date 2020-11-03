@@ -22,7 +22,7 @@ CubeWorker::CubeWorker(CubeSetup setup) : CubeWorkerInterface(setup) {
     _solver = std::make_unique<Cadical>(solver_setup);
 }
 
-CubeWorker::~CubeWorker() { _logger.log(0, "Enter destructor of CubeWorker.\n"); }
+CubeWorker::~CubeWorker() { _logger.log(0, "Enter destructor of CubeWorker"); }
 
 void CubeWorker::mainLoop() {
     auto lock = _state_mutex.getLock();
@@ -35,11 +35,11 @@ void CubeWorker::mainLoop() {
         // After the condition is fulfilled, the lock is reaquired
         _state_cond.wait(lock, [&] { return _worker_state == WORKING || _isInterrupted; });
 
-        _logger.log(0, "The main loop continues.\n");
+        _logger.log(0, "The main loop continues");
 
         // Exit main loop
         if (_isInterrupted) {
-            _logger.log(0, "Exiting main loop.\n");
+            _logger.log(0, "Exiting main loop");
             return;
         }
 
@@ -67,15 +67,15 @@ SatResult CubeWorker::solve() {
 
         // Check result
         if (result == SAT) {
-            _logger.log(1, "Found a solution.\n");
+            _logger.log(1, "Found a solution");
             return SAT;
 
         } else if (result == UNKNOWN) {
-            _logger.log(1, "Solving interrupted.\n");
+            _logger.log(1, "Solving interrupted");
             return UNKNOWN;
 
         } else if (result == UNSAT) {
-            _logger.log(1, "Cube failed.\n");
+            _logger.log(1, "Cube failed");
             next_local_cube.fail();
         }
     }
@@ -162,7 +162,7 @@ void CubeWorker::digestSendCubes(std::vector<Cube> cubes) {
     const std::lock_guard<Mutex> lock(_state_mutex);
     assert(_worker_state == REQUESTING);
 
-    _logger.log(0, "Digesting send cubes.\n");
+    _logger.log(0, "Digesting send cubes");
 
     _local_cubes = cubes;
 
@@ -176,7 +176,7 @@ void CubeWorker::digestReveicedFailedCubes() {
     const std::lock_guard<Mutex> lock(_state_mutex);
     assert(_worker_state == RETURNING);
 
-    _logger.log(0, "Digesting received failed cubes.\n");
+    _logger.log(0, "Digesting received failed cubes");
 
     // Failed cubes were returned
     // Worker can now request new cubes

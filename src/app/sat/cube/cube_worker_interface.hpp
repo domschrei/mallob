@@ -17,7 +17,7 @@ class CubeWorkerInterface {
 
    public:
     CubeWorkerInterface(CubeSetup &setup) : _formula(setup.formula), _cube_comm(setup.cube_comm), _logger(setup.logger), _result(setup.result) {}
-    virtual ~CubeWorkerInterface() {_logger.log(0, "Enter destructor of CubeWorkerInterface.\n");}
+    virtual ~CubeWorkerInterface() {_logger.log(0, "Enter destructor of CubeWorkerInterface");}
 
     // Starts the worker thread
     virtual void startWorking() = 0;
