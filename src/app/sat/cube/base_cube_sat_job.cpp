@@ -6,11 +6,11 @@
 
 // worldRank is mpi rank
 // job id is id of job
-// where is rank of job of this node -> it gets entered somewhen to_name
+// where is rank of job of this node -> it gets entered to _name before appl_initialize is called
 
 BaseCubeSatJob::BaseCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId)
     : Job(params, commSize, worldRank, jobId),
-      _logger("<c-" + std::string(toStr()) + ">", std::string(toStr())),
+      _logger("<c-" + std::to_string(_world_rank) + std::string(toStr()) + ">", std::string(toStr())),
       _cube_comm(*this, _logger) {}
 
 bool BaseCubeSatJob::appl_initialize() {
@@ -19,7 +19,7 @@ bool BaseCubeSatJob::appl_initialize() {
         const std::lock_guard<Mutex> lock(_initialization_mutex);
 
         // Update _logger
-        _logger.setIdentifier("<c-" + std::string(toStr()) + ">");
+        _logger.setIdentifier("<c-" + std::to_string(_world_rank) + std::string(toStr()) + ">");
         _logger.log(0, "Logger was updated");
 
         // Check if job was aborted before initialization
