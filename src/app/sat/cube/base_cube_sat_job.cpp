@@ -88,12 +88,13 @@ bool BaseCubeSatJob::appl_initialize() {
         } else {
             // Initialization was aborted either because the formula was solved during cube generation or because of an interrupt during cube generation
             _logger.log(0, "Initialization was aborted");
+
             _job_state.store(State::DESTRUCTABLE);
             _lib.reset();
-            // TODO: Should we return here true or false
-            // True when formula was solved during cube generation
-            // False if interrupted during cube generation
-            return true;
+
+            // Return true when formula was solved during cube generation
+            // Return false if interrupted during cube generation
+            return _sat_result != UNKNOWN ? true : false;
         }
     }
     // Release initialization mutex

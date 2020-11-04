@@ -57,7 +57,6 @@ class CubeRoot {
 
     // Generates cubes
     // Returns true if the job should start working
-    // TODO differentiate between finished during cube generation and interrupt during cube generation
     bool generateCubes();
 
     void interrupt();

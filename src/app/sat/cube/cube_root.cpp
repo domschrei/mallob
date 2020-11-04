@@ -44,7 +44,7 @@ bool CubeRoot::generateCubes() {
     //
     // Because of this we check for a too small cube array or zeros in the cubes and in this case we start to solve here, expecting it to return instantaneously.
 
-    // TODO Check if this assumption holds
+    // If the solve does not return instantaneously, it gets interrupted via the same interrupt that is supposed to interrupt the cube generation
 
     // Check if cubes vector is too small
     if (cubes.size() != pow(2, _depth)) {
