@@ -63,6 +63,8 @@ SatResult CubeWorker::solve() {
     for (Cube &next_local_cube : _local_cubes) {
         auto path = next_local_cube.getPath();
 
+        _logger.log(0, "Started solving a cube");
+
         auto result = _solver->solve(path);
 
         // Check result
@@ -136,11 +138,15 @@ void CubeWorker::beginCommunication() {
         _worker_state = REQUESTING;
         _cube_comm.requestCubes();
 
+        _logger.log(0, "Requested cubes");
+
     } else if (_worker_state == FAILED) {
         _worker_state = RETURNING;
 
         auto serialized_failed_cubes = serializeCubes(_local_cubes);
         _cube_comm.returnFailedCubes(serialized_failed_cubes);
+
+        _logger.log(0, "Returned %zu failed cubes", _local_cubes.size());
     }
 }
 

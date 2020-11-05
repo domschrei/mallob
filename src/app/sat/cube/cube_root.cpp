@@ -96,6 +96,8 @@ void CubeRoot::handleMessage(int source, JobMessage &msg) {
         auto serialized_cubes = serializeCubes(prepared_cubes);
         _cube_comm.sendCubes(source, serialized_cubes);
 
+        _logger.log(0, "Sent %zu cubes to %i", prepared_cubes.size(), source);
+
     } else if (msg.tag == MSG_RETURN_FAILED_CUBES) {
         auto serialized_failed_cubes = msg.payload;
         auto failed_cubes = unserializeCubes(serialized_failed_cubes);
@@ -103,6 +105,8 @@ void CubeRoot::handleMessage(int source, JobMessage &msg) {
 
         // Signal failed cubes were digested
         _cube_comm.receivedFailedCubes(source);
+        
+        _logger.log(0, "Sent receivedFailedCubes signal to %i", source);
     }
 }
 
