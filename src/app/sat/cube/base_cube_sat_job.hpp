@@ -50,6 +50,13 @@ class BaseCubeSatJob : public Job {
     std::thread _withdraw_thread;
     void withdraw();
 
+    // Performance
+    double _working_since = 0.0;
+    double _working_duration = 0.0;
+
+    double _suspended_since = 0.0;
+    double _suspended_duration = 0.0;
+
    public:
     BaseCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId);
     ~BaseCubeSatJob() override;

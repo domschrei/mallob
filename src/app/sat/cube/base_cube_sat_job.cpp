@@ -45,8 +45,12 @@ bool BaseCubeSatJob::appl_initialize() {
             _job_state.store(ACTIVE);
 
             // If job was suspended before initialization. Respecting INITIALIZING_TO_SUSPENDED
+            // Set _since accordingly
             if (_isSuspended) {
                 _lib->suspend();
+                _suspended_since = _logger.getTime();
+            } else {
+                _working_since = _logger.getTime();
             }
 
             _lib->startWorking();
@@ -77,8 +81,12 @@ bool BaseCubeSatJob::appl_initialize() {
             _job_state.store(ACTIVE);
 
             // If job was suspended before initialization. Respecting INITIALIZING_TO_SUSPENDED
+            // Set _since accordingly
             if (_isSuspended) {
                 _lib->suspend();
+                _suspended_since = _logger.getTime();
+            } else {
+                _working_since = _logger.getTime();
             }
 
             _lib->startWorking();
@@ -117,11 +125,17 @@ void BaseCubeSatJob::appl_pause() {
 
     _logger.log(0, "appl_pause was called");
 
+    // Do nothing if already suspended
+    if (_isSuspended) return;
+
     _isSuspended.store(true);
 
-    // Job may only be suspended during
     if (_job_state == State::ACTIVE) {
         _lib->suspend();
+
+        double pause_time = _logger.getTime();
+        _working_duration = pause_time - _working_since;
+        _suspended_since = pause_time;
     }
 }
 
@@ -130,10 +144,17 @@ void BaseCubeSatJob::appl_unpause() {
 
     _logger.log(0, "appl_unpause was called");
 
+    // Do nothing if already unsuspended
+    if (!_isSuspended) return;
+
     _isSuspended.store(false);
 
     if (_job_state == State::ACTIVE) {
         _lib->resume();
+
+        double unpause_time = _logger.getTime();
+        _suspended_duration += unpause_time - _suspended_since;
+        _working_since = unpause_time;
     }
 }
 
@@ -166,12 +187,18 @@ void BaseCubeSatJob::interrupt_and_start_withdrawing() {
         // Resume worker thread if necessary to allow termination
         if (_isSuspended) {
             _lib->resume();
-            _isSuspended.store(false);
         }
 
         _job_state.store(State::WITHDRAWING);
 
         _withdraw_thread = std::thread(&BaseCubeSatJob::withdraw, this);
+    }
+
+    // Calculate duration of last segment
+    if (_isSuspended) {
+        _suspended_duration = _logger.getTime() - _suspended_since;
+    } else {
+        _working_duration = _logger.getTime() - _working_since;
     }
 }
 
@@ -244,6 +271,10 @@ BaseCubeSatJob::~BaseCubeSatJob() {
     const std::lock_guard<Mutex> lock(_initialization_mutex);
 
     _logger.log(0, "Enter destructor");
+
+    // Print durations
+    _logger.log(0, "Time working: %.3f", _working_duration);
+    _logger.log(0, "Time suspended: %.3f", _suspended_duration);
 
     // The withdraw thread might still be default constructed, because of an aborted initialization
     if (_withdraw_thread.joinable()) {

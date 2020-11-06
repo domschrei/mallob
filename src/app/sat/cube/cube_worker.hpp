@@ -35,6 +35,9 @@ class CubeWorker : public CubeWorkerInterface {
 
     std::atomic_bool _isInterrupted{false};
 
+    double _time_of_last_msg = 0.0;
+    double _time_waiting_for_msg = 0.0;
+
     void mainLoop();
     SatResult solve();
 

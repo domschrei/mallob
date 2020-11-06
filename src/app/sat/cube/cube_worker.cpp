@@ -22,7 +22,16 @@ CubeWorker::CubeWorker(CubeSetup setup) : CubeWorkerInterface(setup) {
     _solver = std::make_unique<Cadical>(solver_setup);
 }
 
-CubeWorker::~CubeWorker() { _logger.log(0, "Enter destructor of CubeWorker"); }
+CubeWorker::~CubeWorker() {
+    _logger.log(0, "Enter destructor of CubeWorker");
+
+    if (_worker_state == WAITING || _worker_state == FAILED) {
+        // Worker was waiting for a message when destruction occured
+        _time_waiting_for_msg += _logger.getTime() - _time_of_last_msg;
+    }
+
+    _logger.log(0, "Time waiting for messages: %.3f", _time_waiting_for_msg);
+}
 
 void CubeWorker::mainLoop() {
     auto lock = _state_mutex.getLock();
@@ -135,28 +144,44 @@ void CubeWorker::beginCommunication() {
     const std::lock_guard<Mutex> lock(_state_mutex);
 
     if (_worker_state == WAITING) {
+        // Put this into if clause because wantsToCommunicate does not change the state and may return true multiple times
+        _time_of_last_msg = _logger.getTime();
+
         _worker_state = REQUESTING;
+
         _cube_comm.requestCubes();
 
-        _logger.log(0, "Requested cubes");
+        _logger.log(0, "Sent requestCubes signal to root");
 
     } else if (_worker_state == FAILED) {
+        // Put this into if clause because wantsToCommunicate does not change the state and may return true multiple times
+        _time_of_last_msg = _logger.getTime();
+
         _worker_state = RETURNING;
 
         auto serialized_failed_cubes = serializeCubes(_local_cubes);
+
         _cube_comm.returnFailedCubes(serialized_failed_cubes);
 
-        _logger.log(0, "Returned %zu failed cubes", _local_cubes.size());
+        _logger.log(0, "Sent %zu failed cubes to root", _local_cubes.size());
     }
 }
 
 void CubeWorker::handleMessage(int source, JobMessage &msg) {
+    // Is only called if a message is received so this can be at the start of the message
+    _time_waiting_for_msg += _logger.getTime() - _time_of_last_msg;
+
     if (msg.tag == MSG_SEND_CUBES) {
         auto serialized_cubes = msg.payload;
         auto cubes = unserializeCubes(serialized_cubes);
+
+        _logger.log(0, "Received %zu cubes from root", cubes.size());
+
         digestSendCubes(cubes);
 
     } else if (msg.tag == MSG_RECEIVED_FAILED_CUBES) {
+        _logger.log(0, "Received receivedFailedCubes signal from root");
+
         digestReveicedFailedCubes();
 
     } else {
@@ -167,8 +192,6 @@ void CubeWorker::handleMessage(int source, JobMessage &msg) {
 void CubeWorker::digestSendCubes(std::vector<Cube> cubes) {
     const std::lock_guard<Mutex> lock(_state_mutex);
     assert(_worker_state == REQUESTING);
-
-    _logger.log(0, "Digesting send cubes");
 
     _local_cubes = cubes;
 
@@ -181,8 +204,6 @@ void CubeWorker::digestSendCubes(std::vector<Cube> cubes) {
 void CubeWorker::digestReveicedFailedCubes() {
     const std::lock_guard<Mutex> lock(_state_mutex);
     assert(_worker_state == RETURNING);
-
-    _logger.log(0, "Digesting received failed cubes");
 
     // Failed cubes were returned
     // Worker can now request new cubes

@@ -5,7 +5,7 @@
 
 CubeRoot::CubeRoot(CubeSetup &setup)
     : _formula(setup.formula), _cube_comm(setup.cube_comm), _logger(setup.logger), _result(setup.result), _terminator(_isInterrupted) {
-
+        
     _depth = setup.params.getIntParam("cube-depth");
     _cubes_per_worker = setup.params.getIntParam("cubes-per-worker");
 
@@ -92,8 +92,11 @@ void CubeRoot::handleMessage(int source, JobMessage &msg) {
     }
 
     if (msg.tag == MSG_REQUEST_CUBES) {
+        _logger.log(0, "Received requestCubes signal from %i", source);
+
         auto prepared_cubes = prepareCubes(source);
         auto serialized_cubes = serializeCubes(prepared_cubes);
+
         _cube_comm.sendCubes(source, serialized_cubes);
 
         _logger.log(0, "Sent %zu cubes to %i", prepared_cubes.size(), source);
@@ -101,11 +104,13 @@ void CubeRoot::handleMessage(int source, JobMessage &msg) {
     } else if (msg.tag == MSG_RETURN_FAILED_CUBES) {
         auto serialized_failed_cubes = msg.payload;
         auto failed_cubes = unserializeCubes(serialized_failed_cubes);
+
+        _logger.log(0, "Received %zu failed cubes from %i", failed_cubes.size(), source);
+
         digestFailedCubes(failed_cubes);
 
-        // Signal failed cubes were digested
         _cube_comm.receivedFailedCubes(source);
-        
+
         _logger.log(0, "Sent receivedFailedCubes signal to %i", source);
     }
 }
