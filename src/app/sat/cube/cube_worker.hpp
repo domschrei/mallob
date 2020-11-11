@@ -27,6 +27,7 @@ class CubeWorker : public CubeWorkerInterface {
     std::atomic<State> _worker_state{State::IDLING};
 
     std::vector<Cube> _local_cubes;
+    std::vector<Cube> _failed_cubes;
 
     std::unique_ptr<PortfolioSolverInterface> _solver;
 
@@ -39,7 +40,11 @@ class CubeWorker : public CubeWorkerInterface {
     double _time_waiting_for_msg = 0.0;
 
     void mainLoop();
-    SatResult solve();
+    // Solve _formula using _local_cubes
+    void solve();
+
+    // Determine of the given cube includes a failed cube
+    bool includesFailedCube(Cube &cube);
 
     void digestSendCubes(std::vector<Cube> cubes);
     void digestReveicedFailedCubes();

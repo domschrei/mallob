@@ -2,10 +2,10 @@
 
 #include <cassert>
 #include <cmath>
+#include <functional>
 
 CubeRoot::CubeRoot(CubeSetup &setup)
     : _formula(setup.formula), _cube_comm(setup.cube_comm), _logger(setup.logger), _result(setup.result), _terminator(_isInterrupted) {
-        
     _depth = setup.params.getIntParam("cube-depth");
     _cubes_per_worker = setup.params.getIntParam("cubes-per-worker");
 
@@ -139,12 +139,25 @@ std::vector<Cube> CubeRoot::prepareCubes(int target) {
 }
 
 void CubeRoot::digestFailedCubes(std::vector<Cube> &failed_cubes) {
-    for (auto failed_cube : failed_cubes) {
-        // Erases all occurences of given cube
-        // Behavior is defined if there are no occurences
-        // https://stackoverflow.com/questions/24011627/erasing-using-iterator-from-find-or-remove
-        _root_cubes.erase(std::remove(_root_cubes.begin(), _root_cubes.end(), failed_cube), _root_cubes.end());
-    }
+    std::function<bool(Cube&)> includesPredicate = [&failed_cubes](Cube &rootCube) {
+        for (Cube &failed_cube : failed_cubes)
+            if (rootCube.includes(failed_cube))
+                return true;
+
+        return false;
+    };
+
+    auto sizeBefore = _root_cubes.size();
+
+    // Erases all root cubes that include a failed cube
+    // Behavior is defined if no root cube matches
+    // https://stackoverflow.com/questions/24011627/erasing-using-iterator-from-find-or-remove
+    // Function follows Erase-remove idiom https://en.wikipedia.org/wiki/Erase%E2%80%93remove_idiom
+    _root_cubes.erase(std::remove_if(_root_cubes.begin(), _root_cubes.end(), includesPredicate), _root_cubes.end());
+
+    auto sizeAfter = _root_cubes.size();
+
+    _logger.log(0, "Pruned %zu root cubes", sizeBefore - sizeAfter);
 
     // Check for UNSAT
     if (_root_cubes.empty()) {

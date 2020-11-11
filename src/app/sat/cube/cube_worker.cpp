@@ -48,7 +48,7 @@ void CubeWorker::mainLoop() {
 
         // Exit main loop
         if (_isInterrupted) {
-            _logger.log(0, "Exiting main loop");
+            _logger.log(0, "Leaving the main loop due to an interruption");
             return;
         }
 
@@ -56,42 +56,72 @@ void CubeWorker::mainLoop() {
         assert(!_local_cubes.empty());
 
         // Start solving the local cubes
-        SatResult result = solve();
+        solve();
 
-        if (result == SAT) {
-            _worker_state = SOLVED;
-            _result = SAT;
-
-        } else if (result == UNSAT) {
-            _worker_state = FAILED;
+        if (_result != UNKNOWN) {
+            _logger.log(0, "Leaving the main loop because a solution was found");
+            return;
         }
     }
 }
 
-SatResult CubeWorker::solve() {
+void CubeWorker::solve() {
     for (Cube &next_local_cube : _local_cubes) {
         auto path = next_local_cube.getPath();
 
         _logger.log(0, "Started solving a cube");
 
+        if (includesFailedCube(next_local_cube)) {
+            _logger.log(0, "Skipped cube");
+            continue;
+        }
+
         auto result = _solver->solve(path);
 
         // Check result
         if (result == SAT) {
-            _logger.log(1, "Found a solution");
-            return SAT;
+            _logger.log(1, "Found a solution: SAT");
+            _worker_state = SOLVED;
+            _result = SAT;
+
+            return;
 
         } else if (result == UNKNOWN) {
             _logger.log(1, "Solving interrupted");
-            return UNKNOWN;
+
+            return;
 
         } else if (result == UNSAT) {
             _logger.log(1, "Cube failed");
-            next_local_cube.fail();
+
+            auto failed_assumps = _solver->getFailedAssumptions();
+
+            if (failed_assumps.size() > 0) {
+                _logger.log(1, "Added failed cube");
+
+                // At least one assumption failed -> Append to _failed_cubes
+                _failed_cubes.emplace_back(failed_assumps.begin(), failed_assumps.end());
+
+            } else {
+                _logger.log(1, "Found a solution: UNSAT");
+
+                // Intersection of assumptions and core is empty -> Formula is unsatisfiable
+                _worker_state = SOLVED;
+                _result = UNSAT;
+
+                return;
+            }
         }
     }
-    // All cubes were unsatisfiable
-    return UNSAT;
+    // All cubes were unsatisfiable and always at least one assumption failed
+    _worker_state = FAILED;
+}
+
+bool CubeWorker::includesFailedCube(Cube &cube) {
+    for (Cube &failed_cube : _failed_cubes)
+        if (cube.includes(failed_cube)) return true;
+
+    return false;
 }
 
 void CubeWorker::startWorking() {
@@ -159,11 +189,11 @@ void CubeWorker::beginCommunication() {
 
         _worker_state = RETURNING;
 
-        auto serialized_failed_cubes = serializeCubes(_local_cubes);
+        auto serialized_failed_cubes = serializeCubes(_failed_cubes);
 
         _cube_comm.returnFailedCubes(serialized_failed_cubes);
 
-        _logger.log(0, "Sent %zu failed cubes to root", _local_cubes.size());
+        _logger.log(0, "Sent %zu failed cubes to root", _failed_cubes.size());
     }
 }
 
@@ -204,6 +234,8 @@ void CubeWorker::digestSendCubes(std::vector<Cube> cubes) {
 void CubeWorker::digestReveicedFailedCubes() {
     const std::lock_guard<Mutex> lock(_state_mutex);
     assert(_worker_state == RETURNING);
+
+    _failed_cubes.clear();
 
     // Failed cubes were returned
     // Worker can now request new cubes
