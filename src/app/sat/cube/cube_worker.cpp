@@ -5,10 +5,9 @@
 #include "app/sat/console_horde_interface.hpp"
 #include "app/sat/hordesat/solvers/cadical.hpp"
 #include "app/sat/hordesat/solvers/cadical_interface.hpp"
-#include "cube_communicator.hpp"
 #include "util/console.hpp"
 
-CubeWorker::CubeWorker(CubeSetup setup) : CubeWorkerInterface(setup) {
+CubeWorker::CubeWorker(CubeSetup &setup) : CubeWorkerInterface(setup) {
     // Initialize solver
     SolverSetup solver_setup;
     solver_setup.logger = &_logger;

@@ -49,7 +49,7 @@ class CubeWorker : public CubeWorkerInterface {
     void digestReveicedFailedCubes();
 
    public:
-    CubeWorker(CubeSetup setup);
+    CubeWorker(CubeSetup &setup);
     ~CubeWorker();
 
     void startWorking() override;
