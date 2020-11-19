@@ -21,8 +21,7 @@ class CubeWorker : public CubeWorkerInterface {
         WORKING,
         FAILED,
         RETURNING,
-        SOLVED,
-        FINISHED
+        SOLVED
     };
     std::atomic<State> _worker_state{State::IDLING};
 
