@@ -54,3 +54,19 @@ std::vector<Cube> unserializeCubes(std::vector<int> &serialized_cubes) {
 
     return cubes;
 }
+
+void prune(std::vector<Cube> &cubes, std::vector<Cube> &failed) {
+    std::function<bool(Cube &)> includesPredicate = [&failed](Cube &cube) {
+        for (Cube &failed_cube : failed)
+            if (cube.includes(failed_cube))
+                return true;
+
+        return false;
+    };
+
+    // Erases all root cubes that include a failed cube
+    // Behavior is defined if no root cube matches
+    // https://stackoverflow.com/questions/24011627/erasing-using-iterator-from-find-or-remove
+    // Function follows Erase-remove idiom https://en.wikipedia.org/wiki/Erase%E2%80%93remove_idiom
+    cubes.erase(std::remove_if(cubes.begin(), cubes.end(), includesPredicate), cubes.end());
+}

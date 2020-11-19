@@ -46,4 +46,7 @@ std::vector<int> serializeCubes(std::vector<Cube> &cubes);
 
 std::vector<Cube> unserializeCubes(std::vector<int> &serialized_cubes);
 
+// Helper method to prune cubes using given failed cubes
+void prune(std::vector<Cube> &cubes, std::vector<Cube> &failed);
+
 #endif /* MSCHICK_CUBE_H */

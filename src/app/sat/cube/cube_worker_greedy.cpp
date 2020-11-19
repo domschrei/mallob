@@ -91,21 +91,9 @@ void CubeWorkerGreedy::receiveFailed(std::vector<Cube> &failed) {
 
     _logger.log(0, "Added %zu failed local cubes", failed.size());
 
-    std::function<bool(Cube &)> includesPredicate = [&failed](Cube &cube) {
-        for (Cube &failed_cube : failed)
-            if (cube.includes(failed_cube))
-                return true;
-
-        return false;
-    };
-
     auto sizeBefore = _local_cubes.size();
 
-    // Erases all local cubes that include a failed cube
-    // Behavior is defined if no local cube matches
-    // https://stackoverflow.com/questions/24011627/erasing-using-iterator-from-find-or-remove
-    // Function follows Erase-remove idiom https://en.wikipedia.org/wiki/Erase%E2%80%93remove_idiom
-    _local_cubes.erase(std::remove_if(_local_cubes.begin(), _local_cubes.end(), includesPredicate), _local_cubes.end());
+    prune(_local_cubes, failed);
 
     auto sizeAfter = _local_cubes.size();
 

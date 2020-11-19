@@ -157,21 +157,9 @@ std::vector<Cube> CubeRoot::prepareCubes(int target) {
 }
 
 void CubeRoot::digestFailedCubes(std::vector<Cube> &failed_cubes) {
-    std::function<bool(Cube &)> includesPredicate = [&failed_cubes](Cube &rootCube) {
-        for (Cube &failed_cube : failed_cubes)
-            if (rootCube.includes(failed_cube))
-                return true;
-
-        return false;
-    };
-
     auto sizeBefore = _root_cubes.size();
 
-    // Erases all root cubes that include a failed cube
-    // Behavior is defined if no root cube matches
-    // https://stackoverflow.com/questions/24011627/erasing-using-iterator-from-find-or-remove
-    // Function follows Erase-remove idiom https://en.wikipedia.org/wiki/Erase%E2%80%93remove_idiom
-    _root_cubes.erase(std::remove_if(_root_cubes.begin(), _root_cubes.end(), includesPredicate), _root_cubes.end());
+    prune(_root_cubes, failed_cubes);
 
     auto sizeAfter = _root_cubes.size();
 
