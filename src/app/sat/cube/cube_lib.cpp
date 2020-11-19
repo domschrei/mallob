@@ -4,10 +4,15 @@
 
 #include "cube_communicator.hpp"
 #include "cube_worker.hpp"
+#include "cube_worker_greedy.hpp"
 #include "util/console.hpp"
 
-CubeLib::CubeLib(CubeSetup &setup) {   
-    _cube_worker = std::make_unique<CubeWorker>(setup);
+CubeLib::CubeLib(CubeSetup &setup) {
+    if (setup.params.getParam("cube-worker") == "greedy")
+        _cube_worker = std::make_unique<CubeWorkerGreedy>(setup);
+    else
+        _cube_worker = std::make_unique<CubeWorker>(setup);
+
     _cube_root = std::make_unique<CubeRoot>(setup);
 }
 

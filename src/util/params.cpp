@@ -82,6 +82,7 @@ void Parameters::setDefaults() {
     setParam("smcl", "5");
 
     // Cube params
+    setParam("cube-worker", "greedy"); // type of cube worker
     setParam("cube-depth", "5"); // depth of initial cubes tree
     setParam("cubes-per-worker", "4"); // upper limit of send cubes per worker request
 }
