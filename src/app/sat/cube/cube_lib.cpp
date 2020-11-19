@@ -60,7 +60,7 @@ void CubeLib::beginCommunication() {
 // Pass the message to either the root or the worker
 void CubeLib::handleMessage(int source, JobMessage &msg) {
     if (!_isInterrupted) {
-        if (msg.tag == MSG_REQUEST_CUBES || msg.tag == MSG_RETURN_FAILED_CUBES) {
+        if (msg.tag == MSG_REQUEST_CUBES || msg.tag == MSG_RETURN_FAILED_CUBES || msg.tag == MSG_RETURN_FAILED_AND_REQUEST_CUBES) {
             _cube_root->handleMessage(source, msg);
         } else if (msg.tag == MSG_SEND_CUBES || msg.tag == MSG_RECEIVED_FAILED_CUBES) {
             _cube_worker->handleMessage(source, msg);

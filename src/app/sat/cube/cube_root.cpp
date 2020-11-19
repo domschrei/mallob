@@ -112,6 +112,24 @@ void CubeRoot::handleMessage(int source, JobMessage &msg) {
         _cube_comm.receivedFailedCubes(source);
 
         _logger.log(0, "Sent receivedFailedCubes signal to %i", source);
+
+    } else if (msg.tag == MSG_RETURN_FAILED_AND_REQUEST_CUBES) {
+        auto serialized_failed_cubes = msg.payload;
+        auto failed_cubes = unserializeCubes(serialized_failed_cubes);
+
+        _logger.log(0, "Received %zu failed cubes from %i", failed_cubes.size(), source);
+
+        digestFailedCubes(failed_cubes);
+
+        // Only send cubes if there are any left
+        if (_root_cubes.size() > 0) {
+            auto prepared_cubes = prepareCubes(source);
+            auto serialized_cubes = serializeCubes(prepared_cubes);
+
+            _cube_comm.sendCubes(source, serialized_cubes);
+
+            _logger.log(0, "Sent %zu cubes to %i", prepared_cubes.size(), source);
+        }
     }
 }
 
@@ -139,7 +157,7 @@ std::vector<Cube> CubeRoot::prepareCubes(int target) {
 }
 
 void CubeRoot::digestFailedCubes(std::vector<Cube> &failed_cubes) {
-    std::function<bool(Cube&)> includesPredicate = [&failed_cubes](Cube &rootCube) {
+    std::function<bool(Cube &)> includesPredicate = [&failed_cubes](Cube &rootCube) {
         for (Cube &failed_cube : failed_cubes)
             if (rootCube.includes(failed_cube))
                 return true;
@@ -161,6 +179,7 @@ void CubeRoot::digestFailedCubes(std::vector<Cube> &failed_cubes) {
 
     // Check for UNSAT
     if (_root_cubes.empty()) {
+        _logger.log(0, "All root cubes pruned: UNSAT");
         _result = UNSAT;
     }
 }

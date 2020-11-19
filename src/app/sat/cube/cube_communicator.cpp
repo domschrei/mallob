@@ -58,6 +58,20 @@ void CubeCommunicator::receivedFailedCubes(int target) {
     MyMpi::isend(MPI_COMM_WORLD, target, MSG_SEND_APPLICATION_MESSAGE, msg);
 }
 
+void CubeCommunicator::returnFailedAndRequestCubes(std::vector<int> &serialized_failed_cubes) {
+
+    // Return possibly empty failed cubes to root and request new cubes
+    JobMessage msg;
+    msg.jobId = _job.getId();
+    msg.epoch = 0;  // unused
+    msg.tag = MSG_RETURN_FAILED_AND_REQUEST_CUBES;
+    msg.payload = serialized_failed_cubes;
+
+    int rootRank = _job.getRootNodeRank();
+    log_send(rootRank, msg.payload, "returnFailedAndRequestCubes");
+    MyMpi::isend(MPI_COMM_WORLD, rootRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+}
+
 void CubeCommunicator::log_send(int destRank, std::vector<int> &payload, const char *str, ...) {
     // Convert payload
     auto payloadString = payloadToString(payload);

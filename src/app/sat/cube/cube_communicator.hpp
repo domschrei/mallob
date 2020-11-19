@@ -11,6 +11,8 @@ const int MSG_SEND_CUBES = 836;
 const int MSG_RETURN_FAILED_CUBES = 837;
 const int MSG_RECEIVED_FAILED_CUBES = 838;
 
+const int MSG_RETURN_FAILED_AND_REQUEST_CUBES = 839;
+
 class CubeCommunicator {
    private:
     Job &_job;
@@ -36,6 +38,9 @@ class CubeCommunicator {
 
     // Root signals that it has received the failed cubes
     void receivedFailedCubes(int target);
+
+    // Worker returns failed cubes and requests new cubes
+    void returnFailedAndRequestCubes(std::vector<int>& serialized_failed_cubes);
 };
 
 #endif /* MSCHICK_CUBE_COMMUNICATOR_H */
