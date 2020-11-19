@@ -165,6 +165,9 @@ void CubeWorkerGreedy::handleMessage(int source, JobMessage &msg) {
 void CubeWorkerGreedy::digestSendCubes(std::vector<Cube> &cubes) {
     assert(_request_state == RECEIVING_CUBES);
 
+    // Prune received cubes using the failed cubes that were received during communication
+    prune(cubes, _failed_local_cubes);
+
     // Insert new cubes at the start of the local cubes
     _local_cubes.insert(_local_cubes.begin(), cubes.begin(), cubes.end());
 
