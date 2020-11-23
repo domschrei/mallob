@@ -92,6 +92,7 @@ void CubeRoot::parseStatus(int status) {
 void CubeRoot::handleMessage(int source, JobMessage &msg) {
     const std::lock_guard<Mutex> lock(_root_cubes_lock);
 
+    // Abort if message handling not necessary
     if (_root_cubes.empty()) {
         return;
     }

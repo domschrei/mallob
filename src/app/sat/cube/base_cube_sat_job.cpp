@@ -241,6 +241,7 @@ bool BaseCubeSatJob::appl_isDestructible() {
 }
 
 // Messages are only required during ACTIVE to guarantee correct solving.
+// This allows all communication to be completed, regardless of suspension.
 // Messages do not need to be answered during WITHDRAWING or DESTRUCTABLE. The worker automatically terminates after a call to interrupt.
 // Locking would be required to prevent race conditions. This can be omitted because the job is only controlled by a single thread.
 bool BaseCubeSatJob::appl_wantsToBeginCommunication() const {
