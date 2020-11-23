@@ -8,6 +8,7 @@ CubeRoot::CubeRoot(CubeSetup &setup)
     : _formula(setup.formula), _cube_comm(setup.cube_comm), _logger(setup.logger), _result(setup.result), _terminator(_isInterrupted) {
     _depth = setup.params.getIntParam("cube-depth");
     _cubes_per_worker = setup.params.getIntParam("cubes-per-worker");
+    _randomizeCubes = setup.params.isSet("random-cubes");
 
     _solver.connect_terminator(&_terminator);
 }
@@ -67,6 +68,10 @@ bool CubeRoot::generateCubes() {
     for (auto cube_vec : cubes) {
         _root_cubes.emplace_back(cube_vec);
     }
+
+    // Shuffle cubes if random flag is set
+    if (_randomizeCubes)
+        std::shuffle(_root_cubes.begin(), _root_cubes.end(), _rng);
 
     return true;
 }
@@ -149,6 +154,10 @@ std::vector<Cube> CubeRoot::prepareCubes(int target) {
     }
 
     std::vector<Cube> prepared_cubes(begin, end);
+
+    // Shuffle prepared cubes
+    if (_randomizeCubes)
+        std::shuffle(prepared_cubes.begin(), prepared_cubes.end(), _rng);
 
     // Move used cubes to back in root cubes
     std::rotate(begin, end, _root_cubes.end());

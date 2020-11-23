@@ -3,6 +3,8 @@
 
 #include <atomic>
 #include <vector>
+#include <algorithm>
+#include <random>
 
 #include "app/sat/hordesat/solvers/cadical_interface.hpp"
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
@@ -44,6 +46,10 @@ class CubeRoot {
     // Root cubes
     std::vector<Cube> _root_cubes;
     Mutex _root_cubes_lock;
+
+    // Random
+    std::default_random_engine _rng;
+    bool _randomizeCubes = false;
 
     std::vector<Cube> prepareCubes(int target);
 
