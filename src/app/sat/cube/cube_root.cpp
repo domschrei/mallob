@@ -8,6 +8,7 @@ CubeRoot::CubeRoot(CubeSetup &setup)
     : _formula(setup.formula), _cube_comm(setup.cube_comm), _logger(setup.logger), _result(setup.result), _terminator(_isInterrupted) {
     _depth = setup.params.getIntParam("cube-depth");
     _cubes_per_worker = setup.params.getIntParam("cubes-per-worker");
+    _randomizeCubes = setup.params.isSet("random-cubes");
 
     _solver.connect_terminator(&_terminator);
 }
@@ -68,6 +69,10 @@ bool CubeRoot::generateCubes() {
         _root_cubes.emplace_back(cube_vec);
     }
 
+    // Shuffle cubes if random flag is set
+    if (_randomizeCubes)
+        std::shuffle(_root_cubes.begin(), _root_cubes.end(), _rng);
+
     return true;
 }
 
@@ -87,6 +92,7 @@ void CubeRoot::parseStatus(int status) {
 void CubeRoot::handleMessage(int source, JobMessage &msg) {
     const std::lock_guard<Mutex> lock(_root_cubes_lock);
 
+    // Abort if message handling not necessary
     if (_root_cubes.empty()) {
         return;
     }
@@ -112,6 +118,24 @@ void CubeRoot::handleMessage(int source, JobMessage &msg) {
         _cube_comm.receivedFailedCubes(source);
 
         _logger.log(0, "Sent receivedFailedCubes signal to %i", source);
+
+    } else if (msg.tag == MSG_RETURN_FAILED_AND_REQUEST_CUBES) {
+        auto serialized_failed_cubes = msg.payload;
+        auto failed_cubes = unserializeCubes(serialized_failed_cubes);
+
+        _logger.log(0, "Received %zu failed cubes from %i", failed_cubes.size(), source);
+
+        digestFailedCubes(failed_cubes);
+
+        // Only send cubes if there are any left
+        if (_root_cubes.size() > 0) {
+            auto prepared_cubes = prepareCubes(source);
+            auto serialized_cubes = serializeCubes(prepared_cubes);
+
+            _cube_comm.sendCubes(source, serialized_cubes);
+
+            _logger.log(0, "Sent %zu cubes to %i", prepared_cubes.size(), source);
+        }
     }
 }
 
@@ -132,6 +156,10 @@ std::vector<Cube> CubeRoot::prepareCubes(int target) {
 
     std::vector<Cube> prepared_cubes(begin, end);
 
+    // Shuffle prepared cubes
+    if (_randomizeCubes)
+        std::shuffle(prepared_cubes.begin(), prepared_cubes.end(), _rng);
+
     // Move used cubes to back in root cubes
     std::rotate(begin, end, _root_cubes.end());
 
@@ -139,21 +167,9 @@ std::vector<Cube> CubeRoot::prepareCubes(int target) {
 }
 
 void CubeRoot::digestFailedCubes(std::vector<Cube> &failed_cubes) {
-    std::function<bool(Cube&)> includesPredicate = [&failed_cubes](Cube &rootCube) {
-        for (Cube &failed_cube : failed_cubes)
-            if (rootCube.includes(failed_cube))
-                return true;
-
-        return false;
-    };
-
     auto sizeBefore = _root_cubes.size();
 
-    // Erases all root cubes that include a failed cube
-    // Behavior is defined if no root cube matches
-    // https://stackoverflow.com/questions/24011627/erasing-using-iterator-from-find-or-remove
-    // Function follows Erase-remove idiom https://en.wikipedia.org/wiki/Erase%E2%80%93remove_idiom
-    _root_cubes.erase(std::remove_if(_root_cubes.begin(), _root_cubes.end(), includesPredicate), _root_cubes.end());
+    prune(_root_cubes, failed_cubes);
 
     auto sizeAfter = _root_cubes.size();
 
@@ -161,6 +177,7 @@ void CubeRoot::digestFailedCubes(std::vector<Cube> &failed_cubes) {
 
     // Check for UNSAT
     if (_root_cubes.empty()) {
+        _logger.log(0, "All root cubes pruned: UNSAT");
         _result = UNSAT;
     }
 }
