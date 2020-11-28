@@ -1,8 +1,8 @@
-#include "cube_solver_thread.hpp"
+#include "cube_generator_thread.hpp"
 
 #include <cassert>
 
-CubeSolverThread::CubeSolverThread(CubeSolverThreadManagerInterface &worker, CubeSetup &setup) : _worker(worker), _formula(setup.formula), _logger(setup.logger), _result(setup.result) {
+CubeGeneratorThread::CubeSolverThread(CubeGeneratorThreadManagerInterface &worker, CubeSetup &setup) : _worker(worker), _formula(setup.formula), _logger(setup.logger), _result(setup.result) {
     // Initialize solver
     SolverSetup solver_setup;
     solver_setup.logger = &_logger;
@@ -26,7 +26,7 @@ void CubeSolverThread::start() {
     for (int lit : *_formula.get())
         _solver->addLiteral(lit);
 
-    _thread = std::thread(&CubeSolverThread::run, this);
+    _thread = std::thread(&CubeGeneratorThread::run, this);
 }
 
 void CubeSolverThread::interrupt() {

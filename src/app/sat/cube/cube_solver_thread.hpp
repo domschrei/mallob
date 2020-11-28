@@ -1,20 +1,18 @@
 #ifndef MSCHICK_CUBE_SOLVER_THREAD_H
 #define MSCHICK_CUBE_SOLVER_THREAD_H
 
-#include <thread>
 #include <atomic>
+#include <thread>
 
-#include "app/sat/console_horde_interface.hpp"
 #include "app/sat/hordesat/solvers/cadical.hpp"
-#include "app/sat/hordesat/utilities/logging_interface.hpp"
-#include "cube.hpp"
-#include "cube_worker_interface.hpp"
+#include "cube_setup.hpp"
+#include "cube_solver_thread_manager_interface.hpp"
 
 class CubeSolverThread {
    private:
-    CubeWorkerInterface *_worker;
+    CubeSolverThreadManagerInterface &_worker;
 
-    VecPtr _formula;
+    std::shared_ptr<std::vector<int>> _formula;
 
     LoggingInterface &_logger;
 
@@ -36,7 +34,7 @@ class CubeSolverThread {
     bool includesFailedCube(Cube &cube);
 
    public:
-    CubeSolverThread(CubeWorkerInterface *worker, CubeSetup &setup);
+    CubeSolverThread(CubeSolverThreadManagerInterface &worker, CubeSetup &setup);
     ~CubeSolverThread();
 
     void start();

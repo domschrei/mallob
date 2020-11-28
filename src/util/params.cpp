@@ -33,7 +33,7 @@ void Parameters::init(int argc, char** argv) {
 
 void Parameters::setDefaults() {
     setParam("aod", "0"); // add old diversifiers (to lgl)
-    setParam("appmode", "fork"); // application mode (fork or thread)
+    setParam("appmode", "cube"); // application mode (fork or thread)
     setParam("ba", "4"); // num bounce alternatives (only relevant if -derandomize)
     setParam("bm", "ed"); // event-driven balancing (ed = event-driven, fp = fixed-period)
     setParam("c", "1"); // num clients
@@ -49,8 +49,8 @@ void Parameters::setDefaults() {
     setParam("jc", "4"); // job cache
     setParam("jjp", "1"); // jitter job priorities
     setParam("l", "0.95"); // load factor
-    setParam("log", "."); // logging directory
-    setParam("lbc", "0"); // leaky bucket client parameter (0 = no leaky bucket, jobs enter by time) 
+    setParam("log", "log"); // logging directory
+    setParam("lbc", "1"); // leaky bucket client parameter (0 = no leaky bucket, jobs enter by time) 
     setParam("md", "0"); // maximum demand per job (0 = no limit)
     setParam("mmpi", "0"); // monitor MPI
     setParam("mono", ""); // mono instance solving mode (if nonempty)
@@ -188,7 +188,7 @@ void Parameters::printUsage() const {
 }
 
 string Parameters::getFilename() const {
-  return _filename;
+  return "scenarios/testscenario";
 }
 
 void Parameters::printParams() const {
