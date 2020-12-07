@@ -303,12 +303,14 @@ void EventDrivenBalancer::calculateBalancingResult() {
     std::string assignMsg = " ";
     float aggregatedDemand = 0;
     int numJobs = 0;
-    for (const auto& entry : _states.getEntries()) {
-        const Event& ev = entry.second; 
+    for (const auto& [key, ev] : _states.getEntries()) {
         _demands[ev.jobId] = ev.demand;
         _priorities[ev.jobId] = ev.priority;
-
+        assert(ev.demand >= 0);
         if (ev.demand == 0) continue;
+        
+        assert(ev.priority > 0 && ev.priority <= 1 || Console::fail("Job event for #%i has priority %.2f!", ev.jobId, ev.priority));
+
         numJobs++;
         aggregatedDemand += (ev.demand-1) * ev.priority;
         assignMsg += "#" + std::to_string(ev.jobId) + "=" + std::to_string(ev.demand) + " ";
@@ -316,6 +318,17 @@ void EventDrivenBalancer::calculateBalancingResult() {
     Console::log(verb, "BLC e=%i demand={%s}", _balancing_epoch, assignMsg.c_str());
     float totalAvailVolume = MyMpi::size(_comm) * _load_factor - numJobs;
 
+    // 2a. Bail out if the elementary demand of each job cannot be met
+    if (totalAvailVolume < 0) {
+        Console::log(Console::WARN, "[WARN] Too many jobs - balancer bailing out, assigning 1 to each job");
+        _volumes.clear();
+        for (const auto& [jobId, job] : _jobs_being_balanced) {
+            if (_states.getEntries().at(jobId).demand > 0)
+                _volumes[jobId] = 1;
+        }
+        return;
+    }
+    
     // 2. Calculate initial assignments and remaining demanded resources
     std::map<int, double> assignments;
     float assignedResources = 0;
@@ -335,8 +348,9 @@ void EventDrivenBalancer::calculateBalancingResult() {
         
     }
     assignMsg = " ";
-    for (const auto& e : assignments) {
-        assignMsg += "#" + std::to_string(e.first) + "=" + Console::floatToStr(e.second, 2) + " ";
+    for (const auto& [jobId, a] : assignments) {
+        assert(a >= 0 || a <= totalAvailVolume || Console::fail("Invalid assignment %.3f for job %i!", a, jobId));
+        assignMsg += "#" + std::to_string(jobId) + "=" + Console::floatToStr(a, 2) + " ";
     }
     Console::log(verb, "BLC e=%i init_assign={%s}", _balancing_epoch, assignMsg.c_str());
 
