@@ -77,6 +77,8 @@ void JobDatabase::init(int jobId, std::shared_ptr<std::vector<uint8_t>> descript
                 "Deserialize job #%i, desc. of size %i", jobId, description->size());
         Job& job = get(jobId);
         job.setDescription(description);
+        assert(job.getDescription().getPriority() > 0 && job.getDescription().getPriority() <= 1.0 
+            || Console::fail("%s has priority %.2f!", job.toStr(), job.getDescription().getPriority()));
 
         // Remember arrival and initialize used CPU time (if root node)
         _arrivals[jobId] = Timer::elapsedSeconds();
@@ -112,9 +114,10 @@ bool JobDatabase::checkComputationLimits(int jobId) {
     float newCpuTime = (_volumes.count(jobId) ? _volumes[jobId] : 1) * _threads_per_job * elapsedTime;
     assert(newCpuTime >= 0);
     _cpu_time_used[jobId] += newCpuTime;
-    bool hasCpuLimit = _cpusecs_per_instance > 0;
     
-    if (hasCpuLimit && _cpu_time_used[jobId] > _cpusecs_per_instance) {
+    if ((_cpusecs_per_instance > 0 && _cpu_time_used[jobId] > _cpusecs_per_instance)
+        || (get(jobId).getDescription().getCpuLimit() > 0 && 
+            _cpu_time_used[jobId] > get(jobId).getDescription().getCpuLimit())) {
         // Job exceeded its cpu time limit
         Console::log(Console::INFO, "#%i CPU TIMEOUT: aborting", jobId);
         terminate = true;
@@ -122,7 +125,9 @@ bool JobDatabase::checkComputationLimits(int jobId) {
     } else {
         // Calculate wall clock time
         float jobAge = get(jobId).getAge();
-        if (_wcsecs_per_instance > 0 && jobAge > _wcsecs_per_instance) {
+        if ((_wcsecs_per_instance > 0 && jobAge > _wcsecs_per_instance) 
+            || (get(jobId).getDescription().getWallclockLimit() > 0 && 
+                jobAge > get(jobId).getDescription().getWallclockLimit())) {
             // Job exceeded its wall clock time limit
             Console::log(Console::INFO, "#%i WALLCLOCK TIMEOUT: aborting", jobId);
             terminate = true;

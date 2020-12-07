@@ -21,6 +21,8 @@ private:
     float _priority = 1.0;
     bool _incremental;
     int _revision;
+    float _wallclock_limit = 0; // in seconds
+    float _cpu_limit = 0; // in CPU seconds
 
     float _arrival; // only for introducing a job
 
@@ -41,6 +43,8 @@ public:
     int getRootRank() const {return _root_rank;}
     float getPriority() const {return _priority;}
     int getRevision() const {return _revision;}
+    float getWallclockLimit() const {return _wallclock_limit;}
+    float getCpuLimit() const {return _cpu_limit;}
     const std::vector<VecPtr>& getPayloads() const {return _payloads;}
     const std::vector<VecPtr>& getAssumptions() const {return _assumptions;}
     const VecPtr& getPayload(size_t revision) const {return revision >= _payloads.size() ? nullVec : _payloads[revision];}
@@ -54,6 +58,8 @@ public:
 
     void setRootRank(int rootRank) {_root_rank = rootRank;}
     void setRevision(int revision) {_revision = revision;}
+    void setWallclockLimit(float limit) {_wallclock_limit = limit;}
+    void setCpuLimit(float limit) {_cpu_limit = limit;}
     void setNumVars(int numVars) {_num_vars = numVars;}
     void addPayload(const VecPtr& payload) {_payloads.push_back(payload);}
     void addAssumptions(const VecPtr& assumptions) {_assumptions.push_back(assumptions);}

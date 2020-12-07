@@ -10,7 +10,7 @@ JobDescription::~JobDescription() {
 
 int JobDescription::getTransferSize(bool allRevisions) const {
     int size = 4*sizeof(int)
-            +sizeof(float)
+            +3*sizeof(float)
             +sizeof(bool);
     for (int x = 0; x <= _revision; x++) {
         size += sizeof(int) * (1 + _payloads[x]->size());
@@ -44,6 +44,8 @@ JobDescription& JobDescription::deserialize(const std::vector<uint8_t>& packed) 
     n = sizeof(bool); memcpy(&_incremental, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&_num_vars, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&_revision, packed.data()+i, n); i += n;
+    n = sizeof(float); memcpy(&_wallclock_limit, packed.data()+i, n); i += n;
+    n = sizeof(float); memcpy(&_cpu_limit, packed.data()+i, n); i += n;
 
     // Payload
     for (int r = 0; r <= _revision; r++) {
@@ -88,7 +90,9 @@ std::shared_ptr<std::vector<uint8_t>> JobDescription::serialize(bool allRevision
     n = sizeof(int); memcpy(packed->data()+i, &_num_vars, n); i += n;
     int rev = allRevisions ? _revision : 0;
     n = sizeof(int); memcpy(packed->data()+i, &rev, n); i += n;
-
+    n = sizeof(float); memcpy(packed->data()+i, &_wallclock_limit, n); i += n;
+    n = sizeof(float); memcpy(packed->data()+i, &_cpu_limit, n); i += n;
+    
     // Payload
     for (int r = 0; r <= _revision; r++) {
         writeRevision(r, *packed, i);
