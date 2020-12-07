@@ -3,6 +3,7 @@
 #define DOMPASCH_MALLOB_ANYTIME_SAT_CLAUSE_COMMUNICATOR_H
 
 #include "util/params.hpp"
+#include "util/robin_hood.hpp"
 #include "data/job_transfer.hpp"
 #include "app/job.hpp"
 #include "base_sat_job.hpp"
@@ -21,7 +22,7 @@ private:
     const float _clause_buf_discount_factor;
 
     std::vector<std::vector<int>> _clause_buffers;
-    std::unordered_set<std::vector<int>, ClauseFilter::ClauseHasher> _clause_filter;
+    robin_hood::unordered_set<std::vector<int>, ClauseFilter::ClauseHasher> _clause_filter;
     int _num_aggregated_nodes;
 
     bool _initialized = false;

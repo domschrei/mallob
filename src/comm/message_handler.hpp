@@ -2,7 +2,7 @@
 #ifndef DOMPASCH_MALLOB_MESSAGE_HANDLER
 #define DOMPASCH_MALLOB_MESSAGE_HANDLER
 
-#include <unordered_map>
+#include "util/robin_hood.hpp"
 #include <functional>
 
 #include "mympi.hpp"
@@ -15,7 +15,7 @@ public:
     static const int TAG_DEFAULT;
 
 private:
-    std::unordered_map<int, MsgCallback> _callbacks;
+    robin_hood::unordered_map<int, MsgCallback> _callbacks;
 
 public:
     MessageHandler();

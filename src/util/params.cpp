@@ -191,7 +191,8 @@ void Parameters::printUsage() const {
 
 void Parameters::printParams() const {
     std::string out = "";
-    std::map<std::string, std::string> sortedParams(_params.begin(), _params.end());
+    std::map<std::string, std::string> sortedParams;
+    for (const auto& [key, val] : _params) sortedParams[key] = val;
     for (const auto& it : sortedParams) {
         if (it.second.empty()) {
             out += it.first + ", ";

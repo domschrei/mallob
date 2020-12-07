@@ -5,7 +5,7 @@
 #include <random>
 #include <algorithm>
 #include <cmath>
-#include <unordered_map>
+#include "util/robin_hood.hpp"
 
 class AdjustablePermutation {
 
@@ -16,7 +16,7 @@ private:
     std::mt19937 _rng;
     std::vector<std::vector<int>> _feistels;
 
-    std::unordered_map<int, int> _adjusted_values;
+    robin_hood::unordered_map<int, int> _adjusted_values;
 
     bool _identity_disallowed = false;
     std::vector<AdjustablePermutation*> _disallowed_permutations;

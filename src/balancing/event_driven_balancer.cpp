@@ -309,7 +309,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
         assert(ev.demand >= 0);
         if (ev.demand == 0) continue;
         
-        assert(ev.priority > 0 && ev.priority <= 1 || Console::fail("Job event for #%i has priority %.2f!", ev.jobId, ev.priority));
+        assert((ev.priority > 0 && ev.priority <= 1) || Console::fail("Job event for #%i has priority %.2f!", ev.jobId, ev.priority));
 
         numJobs++;
         aggregatedDemand += (ev.demand-1) * ev.priority;

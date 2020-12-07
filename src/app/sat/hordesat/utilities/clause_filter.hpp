@@ -10,7 +10,7 @@
 
 #include <vector>
 #include <bitset>
-#include <unordered_set>
+#include "util/robin_hood.hpp"
 
 #include "util/sys/threading.hpp"
 
@@ -61,7 +61,7 @@ private:
 	int maxClauseLen = 0;
 	bool checkUnits = false;
 
-	std::unordered_set<int, UnitHasher> units;
+	robin_hood::unordered_set<int, UnitHasher> units;
 	Mutex unitLock;
 };
 
