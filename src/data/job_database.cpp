@@ -16,8 +16,8 @@
 JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm): 
         _params(params), _comm(comm) {
     _threads_per_job = params.getIntParam("t");
-    _wcsecs_per_instance = params.getFloatParam("time-per-instance");
-    _cpusecs_per_instance = 3600 * params.getFloatParam("cpuh-per-instance");
+    _wcsecs_per_instance = params.getFloatParam("job-wallclock-limit");
+    _cpusecs_per_instance = params.getFloatParam("job-cpu-limit");
     _load = 0;
     _last_load_change = Timer::elapsedSeconds();
     _current_job = NULL;

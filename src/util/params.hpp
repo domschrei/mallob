@@ -8,21 +8,21 @@
 #ifndef DOMPASCH_PARAMETERPROCESSOR_H_
 #define DOMPASCH_PARAMETERPROCESSOR_H_
 
-#include "string.h"
 #include <map>
 #include <string>
 #include <iostream>
-#include "stdlib.h"
-using namespace std;
+
+#include "util/robin_hood.hpp"
 
 #define ROUNDING_BISECTION "bisec"
 #define ROUNDING_PROBABILISTIC "prob"
 #define ROUNDING_FLOOR "floor"
 
 class Parameters {
+
 private:
-	map<string, string> _params;
-	string _filename;
+	robin_hood::unordered_map<std::string, std::string> _params;
+
 public:
 	Parameters() = default;
 
@@ -31,31 +31,29 @@ public:
 	void expand();
 
 	void printUsage() const;
-	string getFilename() const;
 	void printParams() const;
 	
 	void setParam(const char* name);
 	void setParam(const char* name, const char* value);
-	void setParam(const string& name, const string& value);
+	void setParam(const std::string& name, const std::string& value);
 
-	bool isSet(const string& name) const;
-	bool isNotNull(const string& name) const;
+	bool isSet(const std::string& name) const;
+	bool isNotNull(const std::string& name) const;
 	
-	string getParam(const string& name) const;
-	string getParam(const string& name, const string& defaultValue) const;
-	const string& operator[](const string& key) const;
-	string& operator[](const string& key);
+	std::string getParam(const std::string& name) const;
+	std::string getParam(const std::string& name, const std::string& defaultValue) const;
+	const std::string& operator[](const std::string& key) const;
+	std::string& operator[](const std::string& key);
 
-	int getIntParam(const string& name) const;
-	int getIntParam(const string& name, int defaultValue) const;
+	int getIntParam(const std::string& name) const;
+	int getIntParam(const std::string& name, int defaultValue) const;
 	
-	float getFloatParam(const string& name) const;
-	float getFloatParam(const string& name, float defaultValue) const;
+	float getFloatParam(const std::string& name) const;
+	float getFloatParam(const std::string& name, float defaultValue) const;
 
-	double getDoubleParam(const string& name) const;
-	double getDoubleParam(const string& name, double defaultValue) const;
+	double getDoubleParam(const std::string& name) const;
+	double getDoubleParam(const std::string& name, double defaultValue) const;
 
-	const map<string, string>& getMap() const;
 	char* const* asCArgs(const char* execName) const;
 };
 

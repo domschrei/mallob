@@ -70,15 +70,24 @@ void Client::readAllInstances() {
     }
 }
 
+void Client::handleNewJob(JobDescription* desc) {
+    auto lock = _incoming_job_queue_lock.getLock();
+    _incoming_job_queue.push_back(desc);
+}
+
 void Client::init() {
 
     _last_introduced_job_idx = -1;
     int internalRank = MyMpi::rank(_comm);
-    std::string filename = _params.getFilename() + "." + std::to_string(internalRank);
-    readInstanceList(filename);
-    Console::log(Console::INFO, "Client main thread started");
 
-    _instance_reader_thread = std::thread(&Client::readAllInstances, this);
+    if (_params.isSet("scenario")) {
+        std::string filename = _params.getParam("scenario") + "." + std::to_string(internalRank);
+        readInstanceList(filename);
+        _instance_reader_thread = std::thread(&Client::readAllInstances, this);
+    } else {
+        _file_adapter = new JobFileAdapter(".api/jobs/", [&](JobDescription* desc) {handleNewJob(desc);});
+    }
+    Console::log(Console::INFO, "Client main thread started");
 
     // Begin listening to incoming messages
     MyMpi::beginListening();
@@ -177,6 +186,23 @@ int Client::getMaxNumParallelJobs() {
 
 int Client::getNextIntroduceableJob() {
     
+    // Jobs in the incoming queue?
+    {
+        auto lock = _incoming_job_queue_lock.getLock();
+        for (auto desc : _incoming_job_queue) {
+            std::shared_ptr<JobDescription> job(desc);
+
+            int id = job->getId();
+            _ordered_job_ids.push_back(id);
+            _jobs[id] = job;
+            assert(job->getPriority() > 0 && job->getPriority() <= 1.0f);
+
+            auto lock = _job_ready_lock.getLock();
+            _job_ready[id] = true;
+        }
+        _incoming_job_queue.clear();
+    }
+
     // Are there any non-introduced jobs left?
     if (_last_introduced_job_idx+1 >= (int)_ordered_job_ids.size()) return -1;
     
@@ -242,7 +268,7 @@ void Client::checkClientDone() {
     bool jobQueueEmpty = _last_introduced_job_idx+1 >= (int)_ordered_job_ids.size();
 
     // If no jobs left and all introduced jobs done:
-    if (jobQueueEmpty && _introduced_job_ids.empty()) {
+    if (_file_adapter == nullptr && jobQueueEmpty && _introduced_job_ids.empty()) {
         // All jobs are done
         Console::log(Console::INFO, "All my jobs are terminated");
         int myRank = MyMpi::rank(MPI_COMM_WORLD);
@@ -321,6 +347,10 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
         }
     }
 
+    if (_file_adapter != nullptr) {
+        _file_adapter->handleJobDone(jobResult);
+    }
+
     if (_jobs[jobId]->isIncremental() && desc.getRevision() > revision) {
         // Introduce next revision
         revision++;
@@ -339,8 +369,16 @@ void Client::handleAbort(MessageHandlePtr& handle) {
 
     IntVec request(*handle->recvData);
     int jobId = request[0];
-    
     Console::log_recv(Console::INFO, handle->source, "TIMEOUT #%i %.6f", jobId, Timer::elapsedSeconds() - _jobs[jobId]->getArrival());
+    
+    if (_file_adapter != nullptr) {
+        JobResult result;
+        result.id = jobId;
+        result.revision = _jobs[result.id]->getRevision();
+        result.result = 0;
+        _file_adapter->handleJobDone(result);
+    }
+
     finishJob(jobId);
 }
 
@@ -393,6 +431,8 @@ void Client::handleExit(MessageHandlePtr& handle) {
 
 void Client::readInstanceList(std::string& filename) {
 
+    if (filename.empty()) return;
+
     Console::log(Console::INFO, "Reading instances from file %s", filename.c_str());
     std::fstream file;
     file.open(filename, std::ios::in);
@@ -404,7 +444,7 @@ void Client::readInstanceList(std::string& filename) {
 
     std::string line;
     bool jitterPriorities = _params.isNotNull("jjp");
-    while(std::getline(file, line)) {
+    while (std::getline(file, line)) {
         if (line.substr(0, 1) == std::string("#")) {
             continue;
         }
@@ -425,8 +465,8 @@ void Client::readInstanceList(std::string& filename) {
 
         std::shared_ptr<JobDescription> job = std::make_shared<JobDescription>(id, priority, incremental);
         job->setArrival(arrival);
-        _jobs[id] = job;
         _ordered_job_ids.push_back(id);
+        _jobs[id] = job;
         _job_instances[id] = instanceFilename;
     }
     file.close();

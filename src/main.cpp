@@ -50,8 +50,7 @@ int main(int argc, char *argv[]) {
     
     if (rank == 0)
         params.printParams();
-    if (params.isSet("h") || params.isSet("help") 
-            || (!params.isNotNull("mono") && params.getFilename().size() == 0)) {
+    if (params.isSet("h") || params.isSet("help")) {
         // Help requested or no job input provided
         if (rank == 0) {
             params.printUsage();

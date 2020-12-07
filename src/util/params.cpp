@@ -1,8 +1,91 @@
 
 #include "assert.h"
+#include "string.h"
 
 #include "params.hpp"
 #include "console.hpp"
+
+const char* OPTIONS = 
+    "Usage: [mpiexec -np <num-mpi-processes> [mpi-options]] mallob [options]"
+
+    "\n\nModes of operation:"
+    "\nBy default, the JSON API to dynamically introduce jobs is enabled."
+    "\nTo resolve a single SAT instance, use -mono."
+    "\nTo test mallob under a fixed scenario of jobs to be processed, use -scenario."
+    "\n-c=<num-clients>      Amount of client nodes (int c >= 1, or 0 iff -mono is set)"
+    "\n-h|-help              Print usage and set parameters, then quit"
+    "\n-lbc=<num-jobs>       Make each client a leaky bucket with x active jobs at any given time"
+    "\n                      (int x >= 0, 0: jobs arrive at individual times instead)"
+    "\n-mono=<filename>      Mono instance: Solve the provided CNF instance with full power, then exit."
+    "\n                      NOTE: Overrides options; see mallob -mono=<filename> -h"
+    "\n-scenario=<prefix>    Do not use JSON API but instead read jobs from static scenario files"
+    "\n                      <prefix>.0 , ... , <prefix>.<#clients-1>"
+
+    "\n\nSystem options:"
+    "\n-appmode=<mode>       Application mode: \"fork\" (spawn child process for each job on each MPI process)"
+    "\n                      or \"thread\" (execute jobs in separate threads but within the same process)"
+    "\n-jc=<size>            Size of job cache for suspended yet unfinished jobs (int x >= 0; 0: no limit)"
+    "\n-mmpi[=<0|1>]         Monitor MPI: Launch an additional thread per process checking when the main thread"
+    "\n                      is inside some MPI call"
+    "\n-sleep=<micros>       Sleep provided number of microseconds between loop cycles of worker main thread"
+    "\n-T=<time-limit>       Run entire system for x seconds (x >= 0; 0: run indefinitely)"
+    "\n-t=<num-threads>      Amount of worker threads per node (int t >= 1)"
+    "\n-warmup[=<0|1>]       Do one explicit All-To-All warmup among all nodes in the beginning"
+    "\n-yield[=<0|1>]        Yield manager thread whenever there are no new messages"
+
+    "\n\nOutput options:"
+    "\n-colors[=<0|1>]       Colored terminal output based on messages' verbosity"
+    "\n-log=<log-dir>        Directory to save logs in"
+    "\n-q[=<0|1>]            Quiet mode: do not log to stdout besides critical information"
+    "\n-s2f=<file-basename>  Write solutions to file with provided base name + job ID"
+    "\n-v=<verb-num>         Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ..."
+
+    "\n\nScheduler parameters:"
+    "\n-ba=<num-ba>          Number of bounce alternatives per node (only relevant if -derandomize)"
+    "\n-bm=<fp|ed>           Balancing mode (\"fp\": fixed-period, \"ed\": event-driven)"
+    "\n-derandomize[=<0|1>]  Derandomize job bouncing and build a <num-ba>-regular message graph instead"
+    "\n-jjp[=<0|1>]          Jitter job priorities to break ties during rebalancing"
+    "\n-l=<load-factor>      Load factor to be aimed at (0 < l < 1)"
+    "\n-p=<rebalance-period> Do balancing every t seconds (t > 0). With -bm=ed : minimum delay between balancings"
+    "\n-r=<prob|bisec|floor> Mode of rounding of assignments in balancing"
+    "\n                      (\"prob\": probabilistic, \"bisec\": iterative bisection, \"floor\" - always round down)"
+    "\n-rto=<duration>       Request timeout: discard non-root job requests when older than <duration> seconds"
+    "\n                      (0: no discarding)"
+
+    "\n\nGlobal properties of jobs:"
+    "\n-cg[=<0|1>]           Continuous growth of job demands (0: layer by layer, 1: node by node)"
+    "\n-g=<growth-period>    Grow job demand exponentially every t seconds (t >= 0; 0: immediate growth)"
+    "\n-job-cpu-limit=<x>    Timeout an instance after x cpu seconds (x >= 0; 0: no timeout)"
+    "\n-job-wallclock-limit=<x> Timeout an instance after x seconds wall clock time (x >= 0; 0: no timeout)"
+    "\n-md=<max-demand>      Limit any job's demand to some maximum value (int x >= 0; 0: no limit)"
+    "\n-s=<comm-period>      Do job-internal communication every t seconds (t >= 0, 0: do not communicate)"
+
+    "\n\nSAT solving application options:"
+    "\n-aod[=<0|1>]          Add additional old diversifiers to Lingeling"
+    "\n-cbbs=<size>          Clause buffer base size in integers (default: 1500)"
+    "\n-cbdf=<factor>        Clause buffer discount factor: reduce buffer size per node by <factor> each depth"
+    "\n                      (0 < factor <= 1.0; default: 1.0)"
+    "\n-cfhl=<secs>          Set clause filter half life of clauses until forgotten (integer; 0: no forgetting)"
+    "\n-fhlbd=<max-length>   Final hard LBD limit: After max. number of clause prod. increases, this MUST be fulfilled"
+    "\n                      for any clause to be shared"
+    "\n-fslbd=<max-length>   Final soft LBD limit: After max. number of clause prod. increases, this must be fulfilled"
+    "\n                      for a clause to be shared except it has special solver-dependent qualities"
+    "\n-icpr=<ratio>         Increase a solver's Clause Production when it fills less than <ratio> of its buffer"
+    "\n                      (0 <= x < 1; 0: never increase)"
+    "\n-ihlbd=<max-length>   Initial hard LBD limit: Before any clause prod. increase, this MUST be fulfilled for any"
+    "\n                      clause to be shared"
+    "\n-islbd=<max-length>   Initial soft LBD limit: Before any clause prod. increase, this must be fulfilled for a"
+    "\n                      clause to be shared except it has special solver-dependent qualities"
+    "\n-hmcl=<max-length>    Hard maximum clause length: Only share clauses up to some length (int x >= 0; 0: no limit)"
+    "\n-phasediv[=<0|1>]     Do not diversify solvers based on phase; native diversification only"
+    "\n-satsolver=<seq>      Sequence of SAT solvers to cycle through for each job, one character per solver:"
+#ifdef MALLOB_USE_RESTRICTED
+    "\n                      l=lingeling c=cadical g=glucose"
+#else
+    "\n                      l=lingeling c=cadical"
+#endif
+    "\n-smcl=<max-length>    Soft maximum clause length: Only share clauses up to some length (int x >= 0; 0: no limit)"
+    "\n                      except a clause has special solver-dependent qualities";
 
 /**
  * Taken from Hordesat:ParameterProcessor.h by Tomas Balyo.
@@ -12,7 +95,6 @@ void Parameters::init(int argc, char** argv) {
     for (int i = 1; i < argc; i++) {
         char* arg = argv[i];
         if (arg[0] != '-') {
-            _filename = std::string(arg);
             continue;
         }
         char* eq = strchr(arg, '=');
@@ -62,22 +144,23 @@ void Parameters::setDefaults() {
     setParam("s", "1.0"); // job communication period (seconds)
     setParam("s2f", ""); // write solutions to file (file path, or empty string for no writing)
     setParam("satsolver", "l"); // which SAT solvers to cycle through
+    //setParam("scenario", "<filename>"); // set base name of scenario(s) to be simulated
     setParam("sleep", "100"); // microsecs to sleep in between worker main loop cycles
     setParam("T", "0"); // total time to run the system (0 = no limit)
     setParam("t", "1"); // num threads per node
     setParam("td", "0.01"); // temperature decay for thermodyn. balancing
-    setParam("cpuh-per-instance", "0"); // time limit per instance, in cpu hours (0 = no limit)
-    setParam("time-per-instance", "0"); // time limit per instance, in seconds wall clock time (0 = no limit)
+    setParam("job-cpu-limit", "0"); // resource limit per instance, in cpu seconds (0 = no limit)
+    setParam("job-wallclock-limit", "0"); // time limit per instance, in seconds wall clock time (0 = no limit)
     setParam("v", "2"); // verbosity 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...
     setParam("warmup", "0"); // warmup run
     setParam("yield", "0"); // yield manager thread when no new messages
-
+    // {Initial, final} hard LBD (glue) limit
     setParam("ihlbd", "7");
     setParam("fhlbd", "7");
-
+    // {Initial, final} soft LBD (glue) limit
     setParam("islbd", "2");
     setParam("fslbd", "7");
-
+    // {Hard, soft} maximal clause length
     setParam("hmcl", "20");
     setParam("smcl", "5");
 }
@@ -103,92 +186,13 @@ void Parameters::expand() {
 }
 
 void Parameters::printUsage() const {
-
-    Console::log(Console::INFO, "Usage: mallob <scenario> [options]");
-    Console::log(Console::INFO, "  OR   mallob -mono=<formula> [options]");
-    Console::log(Console::INFO, "<scenario> : File path and name prefix for client scenario(s);");
-    Console::log(Console::INFO, "             will parse <name>.0 for one client, ");
-    Console::log(Console::INFO, "             <name>.0 and <name>.1 for two clients, ...");
-    Console::log(Console::INFO, "<formula> :  See -mono option");
-    Console::log(Console::INFO, "General options:");
-    Console::log(Console::INFO, "-appmode=<mode>       Application mode: \"fork\" or \"thread\"");
-    Console::log(Console::INFO, "-ba=<num-ba>          Number of bounce alternatives per node (only relevant if -derandomize)");
-    Console::log(Console::INFO, "-bm=<balance-mode>    Balancing mode:");
-    Console::log(Console::INFO, "                      \"fp\" - fixed-period");
-    Console::log(Console::INFO, "                      \"ed\" (default) - event-driven");
-    Console::log(Console::INFO, "-c=<num-clients>      Amount of client nodes (int c >= 1)");
-    Console::log(Console::INFO, "-cbbs=<size>          Clause buffer base size in integers (default: 1500)");
-    Console::log(Console::INFO, "-cbdf=<factor>        Clause buffer discount factor: reduce buffer size per node by <factor> each depth");
-    Console::log(Console::INFO, "                      (0 < factor <= 1.0; default: 1.0)");
-    Console::log(Console::INFO, "-cg[=<0|1>]           Continuous growth of job demands: make job demands increase more finely grained"); 
-    Console::log(Console::INFO, "                      (node by node instead of layer by layer)");
-    Console::log(Console::INFO, "-colors[=<0|1>]       Colored terminal output based on messages' verbosity");
-    Console::log(Console::INFO, "-cpuh-per-instance=<time-limit> Timeout an instance after x cpu hours (x >= 0; 0: no timeout)");
-    Console::log(Console::INFO, "-derandomize[=<0|1>]  Derandomize job bouncing");
-    Console::log(Console::INFO, "-g=<growth-period>    Grow job demand exponentially every t seconds (t >= 0; 0: immediate growth)");
-    Console::log(Console::INFO, "-h|-help              Print usage");
-    Console::log(Console::INFO, "                      (0 <= x < 1; 0: never increase)");
-    Console::log(Console::INFO, "-jc=<size>            Size of job cache for suspended, yet unfinished jobs (int x >= 0; 0: no limit)");
-    Console::log(Console::INFO, "-jjp[=<0|1>]          Jitter job priorities to break ties during rebalancing");
-    Console::log(Console::INFO, "-l=<load-factor>      Load factor to be aimed at (0 < l < 1)");
-    Console::log(Console::INFO, "-lbc=<num-jobs>       Make each client a leaky bucket with x active jobs at any given time");
-    Console::log(Console::INFO, "                      (int x >= 0, 0: jobs arrive at individual times instead)");
-    Console::log(Console::INFO, "-log=<log-dir>        Directory to save logs in (default: .)");
-    Console::log(Console::INFO, "-md=<max-demand>      Limit any job's demand to some maximum value (int x >= 0; 0: no limit)");
-    Console::log(Console::INFO, "-mmpi[=<0|1>]         Monitor MPI: Launch an additional thread per process checking when the main thread");
-    Console::log(Console::INFO, "                      is inside some MPI call");
-    Console::log(Console::INFO, "-p=<rebalance-period> Do balancing every t seconds (t > 0). With -bm=ed : minimum delay between balancings");
-    Console::log(Console::INFO, "-q[=<0|1>]            Be quiet, do not log to stdout besides critical information");
-    Console::log(Console::INFO, "-r=<round-mode>       Mode of rounding of assignments in balancing:");
-    Console::log(Console::INFO, "                      \"prob\" - simple probabilistic rounding");
-    Console::log(Console::INFO, "                      \"bisec\" (default) - iterative bisection to find optimal cutoff point");
-    Console::log(Console::INFO, "                      \"floor\" - always round down");
-    Console::log(Console::INFO, "-rto=<duration>       Request timeout: discard job requests when older than <duration> seconds");
-    Console::log(Console::INFO, "                      (0: no discarding)");
-    Console::log(Console::INFO, "-s=<comm-period>      Do job-internal communication every t seconds (t >= 0, 0: do not communicate)");
-    Console::log(Console::INFO, "-s2f=<file-basename>  Write solutions to file with provided base name + job ID");
-#ifdef MALLOB_USE_RESTRICTED
-    Console::log(Console::INFO, "                      l=lingeling c=cadical g=glucose\n");
-#else
-    Console::log(Console::INFO, "                      l=lingeling c=cadical\n");
-#endif
-    Console::log(Console::INFO, "-mono=<filename>      Mono instance: Solve the provided CNF instance with full power, then exit.");
-    Console::log(Console::INFO, "                      NOTE: Overrides options -bm=ed -c=1 -g=0 -l=1 -md=0 -p=0.01");
-    Console::log(Console::INFO, "-sleep=<micros>       Sleep provided number of microseconds between loop cycles of worker main thread");
-    Console::log(Console::INFO, "-T=<time-limit>       Run entire system for x seconds (x >= 0; 0: run indefinitely)");
-    Console::log(Console::INFO, "-t=<num-threads>      Amount of worker threads per node (int t >= 1)");
-    Console::log(Console::INFO, "-time-per-instance=<time-limit> Timeout an instance after x seconds wall clock time (x >= 0; 0: no timeout)");
-    Console::log(Console::INFO, "-v=<verb-num>         Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ...");
-    Console::log(Console::INFO, "-warmup[=<0|1>]       Do one explicit All-To-All warmup among all nodes in the beginning");
-    Console::log(Console::INFO, "-yield[=<0|1>]        Yield manager thread whenever there are no new messages");
-    Console::log(Console::INFO, "");
-    Console::log(Console::INFO, "Sat solver options:");
-    Console::log(Console::INFO, "-aod[=<0|1>]          Add additional old diversifiers to Lingeling");
-    Console::log(Console::INFO, "-cfhl=<secs>          Set clause filter half life of clauses until forgotten (integer; 0: no forgetting)"); 
-    Console::log(Console::INFO, "-fhlbd=<max-length>   Final hard LBD limit: After max. number of clause prod. increases, this MUST be fulfilled");
-    Console::log(Console::INFO, "                      for any clause to be shared");
-    Console::log(Console::INFO, "-fslbd=<max-length>   Final soft LBD limit: After max. number of clause prod. increases, this must be fulfilled");
-    Console::log(Console::INFO, "                      for a clause to be shared except it has special solver-dependent qualities");
-    Console::log(Console::INFO, "-icpr=<ratio>         Increase a solver's Clause Production when it fills less than <Ratio> of its buffer");
-    Console::log(Console::INFO, "-ihlbd=<max-length>   Initial hard LBD limit: Before any clause prod. increase, this MUST be fulfilled for any");
-    Console::log(Console::INFO, "                      clause to be shared");
-    Console::log(Console::INFO, "-islbd=<max-length>   Initial soft LBD limit: Before any clause prod. increase, this must be fulfilled for a");
-    Console::log(Console::INFO, "                      clause to be shared except it has special solver-dependent qualities");
-    Console::log(Console::INFO, "-hmcl=<max-length>    Hard maximum clause length: Only share clauses up to some length (int x >= 0; 0: no limit)");
-    Console::log(Console::INFO, "-phasediv[=<0|1>]     Do not diversify solvers based on phase; native diversification only");
-    Console::log(Console::INFO, "-satsolver=<seq>      Sequence of SAT solvers to cycle through for each job, one character per solver:\n");
-    Console::log(Console::INFO, "-smcl=<max-length>    Soft maximum clause length: Only share clauses up to some length (int x >= 0; 0: no limit)");
-    Console::log(Console::INFO, "                      except a clause has special solver-dependent qualities");
-
-}
-
-string Parameters::getFilename() const {
-  return _filename;
+    Console::log(Console::INFO, OPTIONS);
 }
 
 void Parameters::printParams() const {
     std::string out = "";
-    for (const auto& it : _params) {
+    std::map<std::string, std::string> sortedParams(_params.begin(), _params.end());
+    for (const auto& it : sortedParams) {
         if (it.second.empty()) {
             out += it.first + ", ";
         } else {
@@ -211,17 +215,17 @@ void Parameters::setParam(const std::string& name, const std::string& value) {
     _params[name] = value;
 }
 
-bool Parameters::isSet(const string& name) const {
+bool Parameters::isSet(const std::string& name) const {
     return _params.find(name) != _params.end();
 }
 
-bool Parameters::isNotNull(const string& name) const {
+bool Parameters::isNotNull(const std::string& name) const {
     auto it = _params.find(name);
     if (it == _params.end()) return false;
     return it->second != "0" && it->second != "";
 }
 
-string Parameters::getParam(const string& name, const string& defaultValue) const {
+std::string Parameters::getParam(const std::string& name, const std::string& defaultValue) const {
     if (isSet(name)) {
         return _params.at(name);
     } else {
@@ -229,11 +233,11 @@ string Parameters::getParam(const string& name, const string& defaultValue) cons
     }
 }
 
-string Parameters::getParam(const string& name) const {
+std::string Parameters::getParam(const std::string& name) const {
     return getParam(name, "ndef");
 }
 
-int Parameters::getIntParam(const string& name, int defaultValue) const {
+int Parameters::getIntParam(const std::string& name, int defaultValue) const {
     if (isSet(name)) {
         return atoi(_params.at(name).c_str());
     } else {
@@ -241,21 +245,21 @@ int Parameters::getIntParam(const string& name, int defaultValue) const {
     }
 }
 
-const string& Parameters::operator[](const string& key) const {
+const std::string& Parameters::operator[](const std::string& key) const {
     assert(isSet(key));
     return _params.at(key);
 }
 
-string& Parameters::operator[](const string& key) {
+std::string& Parameters::operator[](const std::string& key) {
     return _params[key];
 }
 
-int Parameters::getIntParam(const string& name) const {
+int Parameters::getIntParam(const std::string& name) const {
     assert(isSet(name));
     return atoi(_params.at(name).c_str());
 }
 
-double Parameters::getDoubleParam(const string& name, double defaultValue) const {
+double Parameters::getDoubleParam(const std::string& name, double defaultValue) const {
     if (isSet(name)) {
         return atof(_params.at(name).c_str());
     } else {
@@ -263,20 +267,16 @@ double Parameters::getDoubleParam(const string& name, double defaultValue) const
     }
 }
 
-double Parameters::getDoubleParam(const string& name) const {
+double Parameters::getDoubleParam(const std::string& name) const {
     assert(isSet(name));
     return atof(_params.at(name).c_str());
 }
 
-float Parameters::getFloatParam(const string& name, float defaultValue) const {
+float Parameters::getFloatParam(const std::string& name, float defaultValue) const {
     return (float)getDoubleParam(name, defaultValue);
 }
-float Parameters::getFloatParam(const string& name) const {
+float Parameters::getFloatParam(const std::string& name) const {
     return (float)getDoubleParam(name);
-}
-
-const std::map<std::string, std::string>& Parameters::getMap() const {
-    return _params;
 }
 
 char* const* Parameters::asCArgs(const char* execName) const {

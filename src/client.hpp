@@ -10,6 +10,7 @@
 #include "data/job_description.hpp"
 #include "data/epoch_counter.hpp"
 #include "util/sys/threading.hpp"
+#include "data/job_file_adapter.hpp"
 
 struct JobByArrivalComparator {
     inline bool operator() (const JobDescription& struct1, const JobDescription& struct2) {
@@ -25,19 +26,23 @@ private:
     Parameters& _params;
 
     std::vector<int> _ordered_job_ids;
+    std::map<int, std::shared_ptr<JobDescription>> _jobs;
     std::map<int, std::string> _job_instances;
-    std::map<int, std::shared_ptr<JobDescription>> _jobs; 
+
+    std::vector<JobDescription*> _incoming_job_queue;
+    Mutex _incoming_job_queue_lock;
+
+    volatile int _last_introduced_job_idx;
     std::set<int> _introduced_job_ids; 
     std::map<int, bool> _job_ready;
-    std::map<int, int> _root_nodes;
     Mutex _job_ready_lock;
-    volatile int _last_introduced_job_idx;
-
+    
+    std::map<int, int> _root_nodes;
     std::set<int> _client_ranks;
+    int _num_alive_clients;
 
     std::thread _instance_reader_thread;
-
-    int _num_alive_clients;
+    JobFileAdapter* _file_adapter = nullptr;
 
 public:
     Client(MPI_Comm comm, Parameters& params, std::set<int> clientRanks)
@@ -49,8 +54,12 @@ public:
     void init();
     void mainProgram();
 
+    void handleNewJob(JobDescription* desc);
+
 private:
     void readAllInstances();
+    void readInstanceList(std::string& filename);
+    void readFormula(std::string& filename, JobDescription& job);
 
     bool checkTerminate();
     void checkClientDone();
@@ -70,9 +79,7 @@ private:
     bool isJobReady(int jobId);
     void introduceJob(std::shared_ptr<JobDescription>& jobPtr);
     void finishJob(int jobId);
-    void readInstanceList(std::string& filename);
-    void readFormula(std::string& filename, JobDescription& job);
-    friend void readAllInstances(Client* client);
+    
 };
 
 #endif
