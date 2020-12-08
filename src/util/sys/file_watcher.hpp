@@ -5,6 +5,7 @@
 #include <sys/inotify.h>
 #include <unistd.h>
 #include <assert.h>
+#include <fcntl.h>
 
 #include <string>
 #include <thread>
@@ -37,11 +38,18 @@ public:
         
         FileUtils::mkdir(_directory);
 
+        // Initialize inotify
         _inotify_fd = inotify_init();
         if (_inotify_fd < 0) {
             Console::log(Console::CRIT, "Failed to set up inotify, code %i\n", errno);
             abort();
         }
+        
+        // Make inotify nonblocking
+        int flags = fcntl(_inotify_fd, F_GETFL, 0);
+        fcntl(_inotify_fd, F_SETFL, flags | O_NONBLOCK);
+        
+        // Initialize watcher
         _inotify_wd = inotify_add_watch(_inotify_fd, _directory.c_str(), events);
         if (_inotify_wd < 0) {
             Console::log(Console::CRIT, "Failed to add inotify watch, code %i\n", errno);
@@ -54,10 +62,12 @@ public:
             char* buffer = (char*)malloc(bufferSize);
 
             while (!_exiting) {
-                // wait for an event to occur
+                usleep(1000 * 10); // 10 milliseconds
+
+                // poll for an event to occur
                 int len = read(_inotify_fd, buffer, bufferSize);
+                if (len == -1) continue;
                 int i = 0;
-                assert(len >= 0);
                 
                 // Iterate over found events
                 while (i < len) {
