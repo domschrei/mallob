@@ -323,7 +323,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
         Console::log(Console::WARN, "[WARN] Too many jobs - balancer bailing out, assigning 1 to each job");
         _volumes.clear();
         for (const auto& [jobId, job] : _jobs_being_balanced) {
-            if (_states.getEntries().at(jobId).demand > 0)
+            if (_states.getEntries().count(jobId) && _states.getEntries().at(jobId).demand > 0)
                 _volumes[jobId] = 1;
         }
         return;
