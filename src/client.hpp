@@ -42,7 +42,7 @@ private:
     int _num_alive_clients;
 
     std::thread _instance_reader_thread;
-    JobFileAdapter* _file_adapter = nullptr;
+    std::unique_ptr<JobFileAdapter> _file_adapter;
 
 public:
     Client(MPI_Comm comm, Parameters& params, std::set<int> clientRanks)

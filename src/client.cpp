@@ -85,7 +85,11 @@ void Client::init() {
         readInstanceList(filename);
         _instance_reader_thread = std::thread(&Client::readAllInstances, this);
     } else {
-        _file_adapter = new JobFileAdapter(".api/jobs/", [&](JobDescription* desc) {handleNewJob(desc);});
+        _file_adapter = std::unique_ptr<JobFileAdapter>(
+            new JobFileAdapter(".api/jobs." + std::to_string(internalRank) + "/", 
+                [&](JobDescription* desc) {handleNewJob(desc);}
+            )
+        );
     }
     Console::log(Console::INFO, "Client main thread started");
 
@@ -268,7 +272,7 @@ void Client::checkClientDone() {
     bool jobQueueEmpty = _last_introduced_job_idx+1 >= (int)_ordered_job_ids.size();
 
     // If no jobs left and all introduced jobs done:
-    if (_file_adapter == nullptr && jobQueueEmpty && _introduced_job_ids.empty()) {
+    if (_file_adapter && jobQueueEmpty && _introduced_job_ids.empty()) {
         // All jobs are done
         Console::log(Console::INFO, "All my jobs are terminated");
         int myRank = MyMpi::rank(MPI_COMM_WORLD);
@@ -347,7 +351,7 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
         }
     }
 
-    if (_file_adapter != nullptr) {
+    if (_file_adapter) {
         _file_adapter->handleJobDone(jobResult);
     }
 
@@ -371,7 +375,7 @@ void Client::handleAbort(MessageHandlePtr& handle) {
     int jobId = request[0];
     Console::log_recv(Console::INFO, handle->source, "TIMEOUT #%i %.6f", jobId, Timer::elapsedSeconds() - _jobs[jobId]->getArrival());
     
-    if (_file_adapter != nullptr) {
+    if (_file_adapter) {
         JobResult result;
         result.id = jobId;
         result.revision = _jobs[result.id]->getRevision();

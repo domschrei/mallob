@@ -11,6 +11,7 @@
 #include <functional>
 
 #include "util/console.hpp"
+#include "util/sys/fileutils.hpp"
 
 class FileWatcher {
 
@@ -34,6 +35,8 @@ public:
             _directory(directory),
             _exiting(false), _callback(callback) {
         
+        FileUtils::mkdir(_directory);
+
         _inotify_fd = inotify_init();
         if (_inotify_fd < 0) {
             Console::log(Console::CRIT, "Failed to set up inotify, code %i\n", errno);

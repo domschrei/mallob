@@ -50,6 +50,11 @@ public:
         _results_watcher(_base_path + "/done/", (int) (IN_DELETE | IN_MOVED_FROM), 
             [&](const FileWatcher::Event& event) {handleJobResultDeleted(event);}),
         _running_id(1), _new_job_callback(newJobCallback) {
+        
+        // Create directories as necessary
+        FileUtils::mkdir(_base_path + "/new/");
+        FileUtils::mkdir(_base_path + "/pending/");
+        FileUtils::mkdir(_base_path + "/done/");
 
         // Read job files which already exist
         const std::filesystem::path newJobsPath { _base_path + "/new/" };
