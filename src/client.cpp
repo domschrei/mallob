@@ -272,7 +272,7 @@ void Client::checkClientDone() {
     bool jobQueueEmpty = _last_introduced_job_idx+1 >= (int)_ordered_job_ids.size();
 
     // If no jobs left and all introduced jobs done:
-    if (_file_adapter && jobQueueEmpty && _introduced_job_ids.empty()) {
+    if (!_file_adapter && jobQueueEmpty && _introduced_job_ids.empty()) {
         // All jobs are done
         Console::log(Console::INFO, "All my jobs are terminated");
         int myRank = MyMpi::rank(MPI_COMM_WORLD);
@@ -355,17 +355,19 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
         _file_adapter->handleJobDone(jobResult);
     }
 
-    if (_jobs[jobId]->isIncremental() && desc.getRevision() > revision) {
-        // Introduce next revision
-        revision++;
-        IntVec payload({jobId, revision});
-        Console::log_send(Console::INFO, _root_nodes[jobId], "Introducing #%i rev. %i", jobId, revision);
-        MyMpi::isend(MPI_COMM_WORLD, _root_nodes[jobId], MSG_NOTIFY_JOB_REVISION, payload);
-    } else {
-        // Job is completely done
-        IntVec payload({jobId});
-        MyMpi::isend(MPI_COMM_WORLD, _root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
-        finishJob(jobId);
+    if (_jobs[jobId]->isIncremental()) {
+        if (desc.getRevision() > revision) {
+            // Introduce next revision
+            revision++;
+            IntVec payload({jobId, revision});
+            Console::log_send(Console::INFO, _root_nodes[jobId], "Introducing #%i rev. %i", jobId, revision);
+            MyMpi::isend(MPI_COMM_WORLD, _root_nodes[jobId], MSG_NOTIFY_JOB_REVISION, payload);
+        } else {
+            // Job is completely done
+            IntVec payload({jobId});
+            MyMpi::isend(MPI_COMM_WORLD, _root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
+            finishJob(jobId);
+        }
     }
 }
 
