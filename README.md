@@ -40,10 +40,19 @@ Several further performance improvements were introduced to mallob, for instance
 
 ## Building
 
-We use GNU Make as our build tool. Additionally, a valid MPI installation is required (e.g. OpenMPI, Intel MPI, MPICH, ...).
+We use CMake as our build tool. 
 
-Go into the base directory and execute `bash build.sh` which will (a) attempt to find your MPI installation, (b) fetch and build the necessary SAT solving backends, and (c) call mallob's `make` with the appropriate arguments. This generates the executable `build/mallob`.
-If you want to make use of Glucose as a SAT solver, execute `MALLOB_USE_RESTRICTED=1 bash build.sh` instead (after having read the Licensing section below).
+Note that a valid MPI installation is required (e.g. OpenMPI, Intel MPI, MPICH, ...).
+In addition, before building mallob you must first execute `cd lib && bash fetch_and_build_sat_solvers.sh` which, as the name tells, fetches and builds all supported SAT solving libraries.
+
+To build mallob, execute the following usual steps:
+```
+mkdir -p build
+cd build
+cmake ..
+make
+```
+If you want to make use of Glucose as a SAT solver, use the cmake option `-DMALLOB_USE_RESTRICTED=1` (after having read the Licensing section below).
 
 Alternatively, you can run mallob in a virtualized manner using Docker, which was successfully done for the SAT Competition 2020.
 Adjust the `CMD` statement in the `Dockerfile` and edit the execution script `aws-run.sh` to fit your particular infrastructure. 
