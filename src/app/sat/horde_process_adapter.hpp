@@ -2,8 +2,6 @@
 #ifndef DOMPASCH_MALLOB_HORDE_PROCESS_ADAPTER_H
 #define DOMPASCH_MALLOB_HORDE_PROCESS_ADAPTER_H
 
-#include <map>
-
 #include "hordesat/utilities/logging_interface.hpp"
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"

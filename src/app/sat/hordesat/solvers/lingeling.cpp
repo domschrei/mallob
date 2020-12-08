@@ -14,7 +14,7 @@
 #include "app/sat/hordesat/utilities/debug_utils.hpp"
 
 extern "C" {
-	#include "app/sat/hordesat/lingeling/lglib.h"
+	#include "lglib.h"
 }
 
 int cbCheckTerminate(void* solverPtr) {

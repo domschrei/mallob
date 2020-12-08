@@ -12,7 +12,7 @@
 #include "util/sys/threading.hpp"
 #include "app/sat/hordesat/utilities/logging_interface.hpp"
 
-#include "app/sat/hordesat/glucose/simp/SimpSolver.h"
+#include "simp/SimpSolver.h"
 
 #include <map>
 
