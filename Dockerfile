@@ -33,17 +33,19 @@ RUN apt-get install build-essential -y
 RUN apt-get install zlib1g-dev -y
 RUN DEBIAN_FRONTEND=noninteractive apt install -y iproute2 cmake python python-pip build-essential gfortran wget curl
 RUN pip install supervisor awscli
-RUN apt-get install openmpi-bin openmpi-common libopenmpi-dev iputils-ping -y
+RUN apt-get install openmpi-bin openmpi-common libopenmpi-dev iputils-ping cmake -y
 
 ADD src src
-ADD build.sh .
-ADD makefile .
+ADD lib lib
+ADD CMakeLists.txt .
 ADD aws-run.sh aws-run.sh
 ADD make_combined_hostfile.py supervised-scripts/make_combined_hostfile.py
 ADD test.cnf supervised-scripts/test.cnf
 
 # Build mallob
-RUN bash build.sh
+RUN cd lib && bash fetch_and_build_sat_solvers.sh && cd ..
+RUN mkdir build
+RUN cd build && cmake .. && make && cd ..
 
 #ENV LD_LIBRARY_PATH=/usr/lib/openmpi/lib/:$LD_LIBRARY_PATH
 EXPOSE 22
