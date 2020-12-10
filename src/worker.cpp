@@ -229,6 +229,14 @@ void Worker::mainProgram() {
                     // Timeout (CPUh or wallclock time) hit
                     timeoutJob(id);
                 } else if (job.getState() == ACTIVE) {
+                    
+                    if (job.testReadyToGrow()) {
+                        if (!job.getJobTree().isRoot()) {
+                            // Non-root worker: query parent for the volume of this job
+                            IntVec payload({id});
+                            MyMpi::isend(MPI_COMM_WORLD, job.getJobTree().getParentNodeRank(), MSG_QUERY_VOLUME, payload);
+                        }
+                    }
 
                     // Check if a result was found
                     int result = job.appl_solved();
@@ -617,12 +625,6 @@ void Worker::handleSendJob(MessageHandlePtr& handle) {
     Console::log_recv(Console::VVVERB, handle->source, "Receiving some desc. of size %i", data->size());
     int jobId = Serializable::get<int>(*data);
     _job_db.init(jobId, data, handle->source);
-
-    if (!_job_db.get(jobId).getJobTree().isRoot()) {
-        // Non-root worker: query parent for the volume of this job
-        IntVec payload({jobId});
-        MyMpi::isend(MPI_COMM_WORLD, _job_db.get(jobId).getJobTree().getParentNodeRank(), MSG_QUERY_VOLUME, payload);
-    }
 }
 
 void Worker::handleSendJobResult(MessageHandlePtr& handle) {
@@ -852,7 +854,7 @@ void Worker::updateVolume(int jobId, int volume) {
             // Propagate volume update
             MyMpi::isend(MPI_COMM_WORLD, ranks[i], MSG_NOTIFY_VOLUME_UPDATE, payload);
 
-        } else if (job.hasDescription() && nextIndex < volume) {
+        } else if ((job.isReadyToGrow() || job.testReadyToGrow()) && nextIndex < volume) {
             // Grow
             Console::log(Console::VVVERB, "%s : grow", job.toStr());
             if (mono) job.getJobTree().updateJobNode(indices[i], indices[i]);

@@ -20,13 +20,6 @@ ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank
 void ForkedSatJob::appl_start(std::shared_ptr<std::vector<uint8_t>> data) {
 
     if (!_init_thread.joinable()) _init_thread = std::thread([this, data]() {
-
-        if (!hasDescription()) {
-            // Unpack description
-            unpackDescription(data);
-        } else {
-            // TODO see if there is a new revision (-> unpackAmendment) or should just restart
-        }
         
         Parameters hParams(_params);
         HordeConfig::applyDefault(hParams, *this);

@@ -4,18 +4,23 @@ import numpy
 import time
 from scipy.stats import truncnorm
 import os.path
-
+from os import listdir
+from os.path import isfile, join
 
 """
 Given an integer inst_id, returns a SAT instance associated to that ID.
 The associated instances may cycle, e.g., map (inst_id % num_instances) to an instance.
 """
 def get_instance_filename(inst_id):
-    # TODO implement properly
+    files = [f for f in listdir("instances/") if isfile(join("instances/", f)) and (f.endswith(".cnf.xz") or f.endswith(".cnf"))]
+    random.shuffle(files)
+    return "instances/" + files[inst_id % len(files)]
+    """
     if inst_id % 2 == 0:
         return "/home/dominik/workspace/sat_instances/test_sat.cnf"
     else:
         return "/home/dominik/workspace/sat_instances/test_unsat.cnf"
+    """
 
 """
 Represents a single job of a particular client.
@@ -114,7 +119,7 @@ Takes a job instance and writes a JSON file into the mallob API directory.
 """
 def introduce_job(job):
     log("%s introduces job %s", (job._user, job._name))
-    with open("jobs.0/new/" + job.get_json_filename(), "w") as f:
+    with open(".api/jobs.0/new/" + job.get_json_filename(), "w") as f:
         f.write(job.to_json())
 
 
@@ -137,7 +142,7 @@ clients = []
 arrival_time = 0
 for i in range(num_clients):
     c = create_random_client(arrival_time)
-    with open("users/" + c._name + ".json", "w") as f:
+    with open(".api/users/" + c._name + ".json", "w") as f:
         f.write(c.user_to_json())
     clients += [c]
     arrival_time += + numpy.random.exponential(client_interarrival_time)
@@ -171,7 +176,7 @@ while any_left:
         
         elif active_jobs[i] is not None:
             # Check if job finished
-            done_file = "jobs/done/" + active_jobs[i].get_json_filename()
+            done_file = ".api/jobs/done/" + active_jobs[i].get_json_filename()
             if os.path.isfile(done_file):
                 # -- job finished
                 log("%s finished", (c._name + "." + active_jobs[i]._name,))
