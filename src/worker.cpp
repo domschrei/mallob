@@ -231,7 +231,10 @@ void Worker::mainProgram() {
                 } else if (job.getState() == ACTIVE) {
                     
                     if (job.testReadyToGrow()) {
-                        if (!job.getJobTree().isRoot()) {
+                        if (job.getJobTree().isRoot()) {
+                            // Root worker: update volume again (to trigger growth)
+                            if (job.getVolume() > 1) updateVolume(id, job.getVolume());
+                        } else {
                             // Non-root worker: query parent for the volume of this job
                             IntVec payload({id});
                             MyMpi::isend(MPI_COMM_WORLD, job.getJobTree().getParentNodeRank(), MSG_QUERY_VOLUME, payload);
