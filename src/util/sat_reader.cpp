@@ -1,17 +1,13 @@
 
-/*
- * SatUtils.cpp
- *
- *  Created on: Mar 9, 2015
- *      Author: balyo
- */
-
 #include <ctype.h>
 #include <stdio.h>
+#include <iostream>
+#include <assert.h>
 
 #include "sat_reader.hpp"
 
 std::shared_ptr<std::vector<int>> SatReader::read() {
+
 	FILE* f;
 	bool piped;
 	if ((_filename.size() > 3 && _filename.substr(_filename.size()-3, 3) == ".xz")
@@ -28,47 +24,68 @@ std::shared_ptr<std::vector<int>> SatReader::read() {
 	if (f == NULL) {
 		return NULL;
 	}
-	int c = 0;
-	bool neg = false;
+	
 	std::shared_ptr<std::vector<int>> cls = std::make_shared<std::vector<int>>();
-	while (c != EOF) {
-		c = fgetc(f);
+	
+	bool neg = false;
+	bool comment = false;
+	bool beganNum = false;
+	int num = 0;
 
-		// comment or problem definition line
-		if (c == 'c' || c == 'p') {
-			// skip this line
-			while(c != '\n') {
-				c = fgetc(f);
-			}
-			continue;
-		}
-		// whitespace
-		if (isspace(c)) {
-			continue;
-		}
-		// negative
-		if (c == '-') {
-			neg = true;
-			continue;
-		}
+	// Read every character of the formula (in a buffered manner)
+	char buffer[4096] = {'\0'};
+	while (fgets(buffer, sizeof(buffer), f)) {
+		size_t pos = 0;
+		while (buffer[pos] != '\0') {
 
-		// number
-		if (isdigit(c)) {
-			int num = c - '0';
-			c = fgetc(f);
-			while (isdigit(c)) {
+			int c = buffer[pos++];
+
+			if (comment && c != '\n') continue;
+
+			switch (c) {
+			case '\n':
+				comment = false;
+				if (beganNum) {
+					assert(num == 0);
+					cls->push_back(0);
+					beganNum = false;
+				}
+				break;
+			case 'p':
+			case 'c':
+				comment = true;
+				break;
+			case ' ':
+				if (beganNum) {
+					_num_vars = std::max(_num_vars, num);
+					cls->push_back((neg ? -1 : 1) * num);
+					num = 0;
+					beganNum = false;
+				}
+				neg = false;
+				break;
+			case '-':
+				neg = true;
+				beganNum = true;
+				break;
+			default:
 				num = num*10 + (c-'0');
-				c = fgetc(f);
+				beganNum = true;
+				break;
 			}
-			_num_vars = std::max(_num_vars, num);
-			if (neg) {
-				num *= -1;
-			}
-			neg = false;
-
-			cls->push_back(num);
 		}
 	}
+	if (beganNum) { // final zero (without newline)
+		assert(num == 0);
+		cls->push_back(0);
+	}
+
+	/*
+	for (int lit : *cls) {
+		std::cout << lit << " ";
+		if (lit == 0) std::cout << "\n";
+	}
+	*/
 
 	if (piped) pclose(f);
 	else fclose(f);
