@@ -56,6 +56,7 @@ void Job::start(std::shared_ptr<std::vector<uint8_t>> data) {
     }
 
     if (_time_of_arrival <= 0) _time_of_arrival = Timer::elapsedSeconds();
+    if (_time_of_initialization <= 0) _time_of_initialization = Timer::elapsedSeconds();
     _time_of_last_limit_check = Timer::elapsedSeconds();
     _volume = 1;
     appl_start(data);
