@@ -7,3 +7,4 @@ lib/*/
 build/
 instances/*.cnf
 instances/*.cnf.xz
+instances/*.uri

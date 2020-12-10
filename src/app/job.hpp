@@ -112,7 +112,9 @@ public:
     Free all data associated to this job instance.
     Join all associated threads if any are left.
     */
-    virtual ~Job() {}
+    virtual ~Job() {
+        for (auto& thread : _unpack_threads) if (thread.joinable()) thread.join();
+    }
     
     /*
     Measure for the age of a job -- decreases with time.
