@@ -176,12 +176,14 @@ while any_left:
             log("Client %s arrives", (c._name,))
             active_jobs[i] = c.get_next_job()
             introduce_job(active_jobs[i])
+            any_left = True
         
         elif active_jobs[i] is not None:
             # Check if job finished
             done_file = ".api/jobs.0/done/" + active_jobs[i].get_json_filename()
             if os.path.isfile(done_file):
                 # -- job finished
+
                 f = open(done_file, 'r')
                 j = json.load(f)
                 log("%s finished (response time: %.3f, result code: %i)", (c._name + "." + active_jobs[i]._name, j["result"]["responsetime"], j["result"]["resultcode"]))
