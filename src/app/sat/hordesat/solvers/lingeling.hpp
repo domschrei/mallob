@@ -19,7 +19,7 @@
 struct LGL;
 
 #define LGL_UNIT_BUFFER_MAX_SIZE 5000
-#define LGL_CLS_BUFFER_MAX_SIZE 5000
+#define LGL_CLS_BUFFER_MAX_SIZE 10000
 
 class Lingeling : public PortfolioSolverInterface {
 
