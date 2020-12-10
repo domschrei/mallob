@@ -10,7 +10,7 @@ float AnytimeSatClauseCommunicator::getBufferLimit(int numAggregatedNodes) {
 }
 
 bool AnytimeSatClauseCommunicator::canSendClauses() {
-    if (!_initialized) return false;
+    if (!_initialized || _job->getState() != ACTIVE) return false;
 
     size_t numChildren = 0;
     // Must have received clauses from each existing children
@@ -57,8 +57,6 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
 }
 
 void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
-    if (!_initialized || _job->getState() == ACTIVE)
-        return;
 
     if (msg.tag == MSG_GATHER_CLAUSES) {
         // Gather received clauses, send to parent
