@@ -13,6 +13,7 @@
 #include "fork.hpp"
 #include "proc.hpp"
 #include "util/console.hpp"
+#include "util/sys/stacktrace.hpp"
 
 void propagateSignalAndExit(int signum) {
 
@@ -35,19 +36,10 @@ void doNothing(int signum) {
 }
 
 void handleAbort(int sig) {
-    const int maxArraySize = 30;
-    void *array[maxArraySize];
-    size_t size;
-
-    // get void*'s for all entries on the stack
-    size = backtrace(array, maxArraySize);
-
+    
     // print out all the frames
-    Console::log(Console::CRIT, "Error from pid=%ld tid=%ld signal=%d - Backtrace:\n", Proc::getPid(), Proc::getTid(), sig);
-    char** bt = backtrace_symbols(array, size);
-    for (size_t i = 0; i < size; i++) {
-        Console::log(Console::CRIT, "- %s", bt[i]);
-    }
+    Console::log(Console::CRIT, "Error from pid=%ld tid=%ld signal=%d", Proc::getPid(), Proc::getTid(), sig);
+    Console::log(Console::CRIT, "Backtrace: \n%s", backtrace().c_str());
 
     // Send exit signals to children and exit yourself
     propagateSignalAndExit(sig);
@@ -70,8 +62,8 @@ void Fork::init(int rank, bool leafProcess) {
     */
 
     signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
-    //signal(SIGSEGV, handleAbort);
-    //signal(SIGABRT, handleAbort);
+    signal(SIGSEGV, handleAbort);
+    signal(SIGABRT, handleAbort);
 
     if (!leafProcess) {
         signal(SIGTERM, propagateSignalAndExit);
