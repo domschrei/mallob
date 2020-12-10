@@ -86,7 +86,7 @@ void Client::init() {
         _instance_reader_thread = std::thread(&Client::readAllInstances, this);
     } else {
         _file_adapter = std::unique_ptr<JobFileAdapter>(
-            new JobFileAdapter(".api/jobs." + std::to_string(internalRank) + "/", 
+            new JobFileAdapter(_params, ".api/jobs." + std::to_string(internalRank) + "/", 
                 [&](JobDescription* desc) {handleNewJob(desc);}
             )
         );

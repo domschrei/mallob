@@ -5,6 +5,7 @@
 #include "util/sys/fileutils.hpp"
 #include "util/sat_reader.hpp"
 #include "util/sys/time_period.hpp"
+#include "util/random.hpp"
 
 void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
 
@@ -76,6 +77,10 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
 
     // Initialize new job
     float priority = userPrio * (j.contains("priority") ? j["priority"].get<float>() : 1.0f);
+    if (_params.isNotNull("jjp")) {
+        // Jitter job priority
+        priority *= 0.99 + 0.01 * Random::rand();
+    }
     float arrival = Timer::elapsedSeconds();
     JobDescription* job = new JobDescription(id, priority, /*incremental=*/false);
     if (j.contains("wallclock-limit")) {

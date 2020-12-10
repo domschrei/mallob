@@ -30,6 +30,8 @@ public:
     };
 
 private:
+    const Parameters& _params;
+
     std::string _base_path;
     FileWatcher _new_jobs_watcher;
     FileWatcher _results_watcher;
@@ -42,8 +44,8 @@ private:
 
 public:
 
-    JobFileAdapter() = default;
-    JobFileAdapter(const std::string& basePath, std::function<void(JobDescription* desc)> newJobCallback) : 
+    JobFileAdapter(const Parameters& params, const std::string& basePath, std::function<void(JobDescription* desc)> newJobCallback) : 
+        _params(params),
         _base_path(basePath),
         _new_jobs_watcher(_base_path + "/new/", (int) (IN_MOVED_TO | IN_MODIFY | IN_CLOSE_WRITE), 
             [&](const FileWatcher::Event& event) {handleNewJob(event);}),

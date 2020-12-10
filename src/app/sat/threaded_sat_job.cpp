@@ -32,12 +32,8 @@ void ThreadedSatJob::appl_start(std::shared_ptr<std::vector<uint8_t>> data) {
         _solver->continueSolving(formulaAmendments, desc.getAssumptions(desc.getRevision()));
     
     } else if (!_init_thread.joinable()) _init_thread = std::thread([this, data]() {
-
-        // Unpack description
-        unpackDescription(data);
         
         // Initialize Hordesat instance
-        assert(!_initialized);
         Parameters hParams(_params);
         HordeConfig::applyDefault(hParams, *this);
         _solver = std::unique_ptr<HordeLib>(new HordeLib(hParams, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(

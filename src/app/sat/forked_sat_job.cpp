@@ -19,7 +19,17 @@ ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank
 
 void ForkedSatJob::appl_start(std::shared_ptr<std::vector<uint8_t>> data) {
 
-    if (!_init_thread.joinable()) _init_thread = std::thread([this, data]() {
+    if (_initialized) {
+        
+        // Already initialized => Has a valid solver instance
+        auto lock = _solver_lock.getLock();
+        _done_locally = false;
+        // TODO Update job index etc. from JobTree
+        // TODO Update job description and amendments (in a separate thread!)
+        // Continue solving
+        _solver->setSolvingState(SolvingStates::ACTIVE);
+    
+    } else if (!_init_thread.joinable()) _init_thread = std::thread([this, data]() {
         
         Parameters hParams(_params);
         HordeConfig::applyDefault(hParams, *this);
