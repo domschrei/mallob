@@ -130,6 +130,9 @@ private:
     std::optional<JobDescription> _description;
     std::shared_ptr<std::vector<uint8_t>> _serialized_description;
 
+    std::vector<std::thread> _unpack_threads;
+    std::vector<bool> _unpack_done;
+
     float _time_of_arrival;
     float _time_of_initialization = 0;
     float _time_of_abort = 0;
@@ -239,8 +242,32 @@ public:
     void unpackDescription(std::shared_ptr<std::vector<uint8_t>> data) {
         _description.emplace();
         _description.value().deserialize(*data);
-        _priority = _description->getPriority();
+        _priority = _description.value().getPriority();
     };
+
+    bool testReadyToGrow() {
+        auto lock = _job_manipulation_lock.getLock();
+        bool allJoined = !_unpack_threads.empty();
+        for (size_t i = 0; i < _unpack_threads.size(); i++) {
+            if (_unpack_threads[i].joinable() && _unpack_done[i]) {
+                // Thread
+                _unpack_threads[i].join();
+            } else {
+                allJoined = false;
+                break;
+            }
+        }
+        if (allJoined) {
+            _unpack_threads.clear();
+            _unpack_done.clear();
+            return true;
+        }
+        return false;
+    }
+    bool isReadyToGrow() {
+        auto lock = _job_manipulation_lock.getLock();
+        return _unpack_threads.empty() && hasDescription();
+    }
 
     void updateVolumeAndUsedCpu(int newVolume) {
         // Compute used CPU time within last time slice
@@ -251,10 +278,34 @@ public:
         _volume = newVolume;
     }
 
+    bool checkResourceLimit(float wcSecsPerInstance, float cpuSecsPerInstance) {
+
+        updateVolumeAndUsedCpu(getVolume());
+        float usedWcSecs = getAge();
+        float usedCpuSecs = getUsedCpuSeconds();
+
+        if ((cpuSecsPerInstance > 0 && usedCpuSecs > cpuSecsPerInstance)
+            || (isReadyToGrow() && getDescription().getCpuLimit() > 0 && 
+                usedCpuSecs > getDescription().getCpuLimit())) {
+            // Job exceeded its cpu time limit
+            Console::log(Console::INFO, "#%i CPU TIMEOUT: aborting", _id);
+            return true;
+        }
+
+        if ((wcSecsPerInstance > 0 && usedWcSecs > wcSecsPerInstance) 
+                || (isReadyToGrow() && getDescription().getWallclockLimit() > 0 && 
+                    usedWcSecs > getDescription().getWallclockLimit())) {
+            // Job exceeded its wall clock time limit
+            Console::log(Console::INFO, "#%i WALLCLOCK TIMEOUT: aborting", _id);
+            return true;
+        }
+
+        return false;
+    }
+
     // ... of various meta data
 
     void setResultTransferPending(bool pending) {_result_transfer_pending = pending;}
-    void bumpLastLimitCheck() {_time_of_last_limit_check = Timer::elapsedSeconds();}
 
 
     // toString methods

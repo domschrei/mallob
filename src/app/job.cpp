@@ -31,35 +31,50 @@ void Job::updateJobTree(int index, int rootRank, int parentRank) {
 }
 
 void Job::commit(const JobRequest& req) {
-    assertState(INACTIVE);
+    assert(getState() != ACTIVE);
+    assert(getState() != PAST);
     _commitment = req;
     _job_tree.clearJobNodeUpdates();
     updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
 }
 
 void Job::uncommit() {
-    assertState(INACTIVE);
+    assert(getState() != ACTIVE);
     _commitment.reset();
 }
 
 void Job::start(std::shared_ptr<std::vector<uint8_t>> data) {
     assertState(INACTIVE);
-    _state = ACTIVE;
-
-    if (!hasDescription()) {
-        // Explicitly store serialized data s.t. it can be forwarded later
-        // without the need to re-serialize the job description
-        assert(data && data->size() > 0);
-        _serialized_description = data;
-    } else if (data) {
-        // TODO Handle amendment to job description
-    }
-
+    
     if (_time_of_arrival <= 0) _time_of_arrival = Timer::elapsedSeconds();
     if (_time_of_initialization <= 0) _time_of_initialization = Timer::elapsedSeconds();
     _time_of_last_limit_check = Timer::elapsedSeconds();
     _volume = 1;
-    appl_start(data);
+    
+    _state = ACTIVE;
+
+    auto lock = _job_manipulation_lock.getLock();
+    size_t i = _unpack_done.size();
+    _unpack_done.emplace_back(false);
+    _unpack_threads.emplace_back([this, data, i]() {
+
+        if (!hasDescription()) {
+            // Explicitly store serialized data s.t. it can be forwarded later
+            // without the need to re-serialize the job description
+            assert(data && data->size() > 0);
+            _serialized_description = data;
+            unpackDescription(data);
+        } else if (data) {
+            // TODO Handle amendment to job description
+        }
+    
+        {
+            auto lock = _job_manipulation_lock.getLock();
+            _unpack_done[i] = true;
+        }
+
+        appl_start(data);
+    });
 }
 
 void Job::stop() {
@@ -99,7 +114,8 @@ void Job::terminate() {
 }
 
 bool Job::isDestructible() {
-    return appl_isDestructible();
+    assert(getState() == PAST);
+    return (_unpack_threads.empty() || testReadyToGrow()) && appl_isDestructible();
 }
 
 int Job::getDemand(int prevVolume, float elapsedTime) const {

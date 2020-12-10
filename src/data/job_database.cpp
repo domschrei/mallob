@@ -66,28 +66,7 @@ bool JobDatabase::checkComputationLimits(int jobId) {
 
     auto& job = get(jobId);
     if (!job.getJobTree().isRoot()) return false;
-
-    job.updateVolumeAndUsedCpu(job.getVolume());
-    float usedWcSecs = job.getAge();
-    float usedCpuSecs = job.getUsedCpuSeconds();
-
-    if ((_cpusecs_per_instance > 0 && usedCpuSecs > _cpusecs_per_instance)
-        || (get(jobId).getDescription().getCpuLimit() > 0 && 
-            usedCpuSecs > get(jobId).getDescription().getCpuLimit())) {
-        // Job exceeded its cpu time limit
-        Console::log(Console::INFO, "#%i CPU TIMEOUT: aborting", jobId);
-        return true;
-    }
-
-    if ((_wcsecs_per_instance > 0 && usedWcSecs > _wcsecs_per_instance) 
-            || (get(jobId).getDescription().getWallclockLimit() > 0 && 
-                usedWcSecs > get(jobId).getDescription().getWallclockLimit())) {
-        // Job exceeded its wall clock time limit
-        Console::log(Console::INFO, "#%i WALLCLOCK TIMEOUT: aborting", jobId);
-        return true;
-    }
-
-    return false;
+    return job.checkResourceLimit(_wcsecs_per_instance, _cpusecs_per_instance);
 }
 
 
@@ -264,11 +243,14 @@ void JobDatabase::reactivate(const JobRequest& req, int source) {
     // Already has job description: Directly resume job (if not terminated yet)
     assert(has(req.jobId));
     Job& job = get(req.jobId);
-    assert(job.getState() == INACTIVE);
     Console::log_recv(Console::INFO, source, "Reactivate %s", 
                 toStr(req.jobId, req.requestedNodeIndex).c_str());
     setLoad(1, req.jobId);
-    job.start(std::shared_ptr<std::vector<uint8_t>>());
+    if (job.getState() == SUSPENDED) {
+        job.resume();
+    } else if (job.getState() == INACTIVE) {
+        job.start(std::shared_ptr<std::vector<uint8_t>>());
+    }
 }
 
 void JobDatabase::suspend(int jobId) {
