@@ -3,7 +3,6 @@
 #define DOMSCHREI_MALLOB_JOB_FILE_LISTENER_HPP
 
 #include <functional>
-#include <filesystem>
 
 #include "util/sys/file_watcher.hpp"
 #include "util/console.hpp"
@@ -48,7 +47,8 @@ public:
         _params(params),
         _base_path(basePath),
         _new_jobs_watcher(_base_path + "/new/", (int) (IN_MOVED_TO | IN_MODIFY | IN_CLOSE_WRITE), 
-            [&](const FileWatcher::Event& event) {handleNewJob(event);}),
+            [&](const FileWatcher::Event& event) {handleNewJob(event);}, 
+            FileWatcher::InitialFilesHandling::TRIGGER_CREATE_EVENT),
         _results_watcher(_base_path + "/done/", (int) (IN_DELETE | IN_MOVED_FROM), 
             [&](const FileWatcher::Event& event) {handleJobResultDeleted(event);}),
         _running_id(1), _new_job_callback(newJobCallback) {
@@ -57,15 +57,6 @@ public:
         FileUtils::mkdir(_base_path + "/new/");
         FileUtils::mkdir(_base_path + "/pending/");
         FileUtils::mkdir(_base_path + "/done/");
-
-        // Read job files which already exist
-        const std::filesystem::path newJobsPath { _base_path + "/new/" };
-        for (const auto& entry : std::filesystem::directory_iterator(newJobsPath)) {
-            const auto filenameStr = entry.path().filename().string();
-            if (entry.is_regular_file()) {
-                handleNewJob(FileWatcher::Event{IN_CREATE, filenameStr});
-            }
-        }
     }
 
     // FileWatcher events
