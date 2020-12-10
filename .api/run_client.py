@@ -176,7 +176,7 @@ while any_left:
         
         elif active_jobs[i] is not None:
             # Check if job finished
-            done_file = ".api/jobs/done/" + active_jobs[i].get_json_filename()
+            done_file = ".api/jobs.0/done/" + active_jobs[i].get_json_filename()
             if os.path.isfile(done_file):
                 # -- job finished
                 log("%s finished", (c._name + "." + active_jobs[i]._name,))
