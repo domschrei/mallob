@@ -103,6 +103,7 @@ void cbConsumeUnits(void* sp, int** start, int** end) {
 	int lit;
 	while (lp->learnedUnits.consume(lit)) {
 		lp->unitsBuffer[i++] = lit;
+		lp->numDigested++;
 	}
 	// Set correct bounds
 	*start = lp->unitsBuffer;
@@ -128,7 +129,7 @@ void cbConsumeCls(void* sp, int** clause, int* glue) {
 		*clause = NULL;
 		lp->clauseAddMutex.unlock();
 		return;
-	}
+	} else lp->numDigested++;
 
 	// Increase buffer size as needed
 	if (cls.size()+1 >= lp->clsBufferSize) {
@@ -354,12 +355,12 @@ void Lingeling::addLearnedClause(const int* begin, int size) {
 	}
 	if (size == 1) {
 		if (!learnedUnits.produce(*begin)) {
-			slog(this, -1, "Unit buffer full!\n");
-		}
+			slog(this, -1, "Unit buffer full! (recv=%i digs=%i)\n", numReceived, numDigested);
+		} else numReceived++;
 	} else {
 		if (!learnedClauses.produce(std::vector<int>(begin, begin+size))) {
-			slog(this, -1, "Clause buffer full!\n");
-		}
+			slog(this, -1, "Clause buffer full! (recv=%i digs=%i)\n", numReceived, numDigested);
+		} else numReceived++;
 	}
 	clauseAddMutex.unlock();
 

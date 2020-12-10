@@ -51,6 +51,8 @@ private:
 	size_t unitsBufferSize;
 	int* clsBuffer;
 	size_t clsBufferSize;
+	int numReceived = 0;
+	int numDigested = 0;
     
     volatile bool suspendSolver;
     Mutex suspendMutex;
