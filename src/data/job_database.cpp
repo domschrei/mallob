@@ -72,8 +72,8 @@ bool JobDatabase::checkComputationLimits(int jobId) {
 
 void JobDatabase::forget(int jobId) {
     Job& job = get(jobId);
-    if (job.getState() == ACTIVE) job.suspend();
-    if (job.getState() == SUSPENDED) job.stop();
+    if (job.getState() == SUSPENDED) job.resume();
+    if (job.getState() == ACTIVE) job.stop();
     if (job.getState() == INACTIVE) job.terminate();
     assert(job.getState() == PAST);
     // Check if the job can be destructed
