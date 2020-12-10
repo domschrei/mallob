@@ -12,7 +12,19 @@
 #include "sat_reader.hpp"
 
 std::shared_ptr<std::vector<int>> SatReader::read() {
-    FILE* f = fopen(_filename.c_str(), "r");
+	FILE* f;
+	bool piped;
+	if ((_filename.size() > 3 && _filename.substr(_filename.size()-3, 3) == ".xz")
+		|| (_filename.size() > 5 && _filename.substr(_filename.size()-5, 5) == ".lzma")) {
+		// Decompress, read output
+		auto command = "xz -c -d " + _filename;
+		f = popen(command.c_str(), "r");
+		piped = true;
+	} else {
+		// Directly read file
+    	f = fopen(_filename.c_str(), "r");
+		piped = false;
+	}
 	if (f == NULL) {
 		return NULL;
 	}
@@ -57,7 +69,9 @@ std::shared_ptr<std::vector<int>> SatReader::read() {
 			cls->push_back(num);
 		}
 	}
-	fclose(f);
+
+	if (piped) pclose(f);
+	else fclose(f);
 
 	return cls;
 }
