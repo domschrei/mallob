@@ -311,7 +311,7 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
 
     // 2a. Bail out if the elementary demand of each job cannot be met
     if (totalAvailVolume < 0) {
-        Console::log(Console::WARN, "[WARN] Too many jobs - balancer bailing out, assigning 1 to each job");
+        Console::log(verb, "BLC Too many jobs: bailing out, assigning 1 to each job");
         for (const auto& [jobId, job] : _jobs_being_balanced) {
             if (_states.getEntries().count(jobId) && getNewDemand(jobId) > 0)
                 volumes[jobId] = 1;
