@@ -171,11 +171,11 @@ class EventDrivenBalancer : public Balancer {
 public:
     EventDrivenBalancer(MPI_Comm& comm, Parameters& params);
 
-    bool beginBalancing(std::map<int, Job*>& jobs) override;
+    bool beginBalancing(robin_hood::unordered_map<int, Job*>& jobs) override;
     bool canContinueBalancing() override {return false;}
     bool continueBalancing() override {return false;}
     bool continueBalancing(MessageHandlePtr handle) override {return this->handle(handle);}
-    const std::map<int, int>& getBalancingResult() override {return _volumes;}
+    robin_hood::unordered_map<int, int> getBalancingResult() override;
 
     void forget(int jobId) override;
 
@@ -185,7 +185,7 @@ private:
 
     EventMap _states;
     EventMap _diffs;
-    std::map<int, int> _job_epochs;
+    robin_hood::unordered_map<int, int> _job_epochs;
     float _last_balancing;
 
     std::list<EventMap> _recent_broadcasts_normal;
@@ -203,7 +203,8 @@ private:
     bool isRoot(int rank, bool reversedTree);
     bool isLeaf(int rank, bool reversedTree);
 
-    void calculateBalancingResult();
+    int getNewDemand(int jobId);
+    float getPriority(int jobId);
 };
 
 #endif

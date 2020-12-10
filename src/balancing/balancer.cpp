@@ -1,26 +1,8 @@
 
 #include "balancer.hpp"
 
-int Balancer::getVolume(int jobId) {
-    if (!_volumes.count(jobId))
-        return 1;
-    return _volumes[jobId];
-}
-
-bool Balancer::hasVolume(int jobId) {
-    return _volumes.count(jobId);
-}
-
-void Balancer::updateVolume(int jobId, int volume) {
-    _volumes[jobId] = volume;
-}
-
 void Balancer::forget(int jobId) {
     _jobs_being_balanced.erase(jobId);
-    _volumes.erase(jobId);
-    _priorities.erase(jobId);
-    _demands.erase(jobId);
-    _temperatures.erase(jobId);
 }
 
 void Balancer::iReduce(float contribution, int rootRank) {
@@ -35,5 +17,5 @@ void Balancer::iAllReduce(float contribution) {
 }
 
 int Balancer::getDemand(const Job& job) {
-    return job.getDemand(getVolume(job.getId()));
+    return job.getDemand(job.getVolume());
 }

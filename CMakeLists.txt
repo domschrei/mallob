@@ -25,7 +25,7 @@ set(BASE_SOURCES
     src/app/sat/hordesat/solvers/cadical.cpp src/app/sat/hordesat/solvers/lingeling.cpp src/app/sat/hordesat/solvers/portfolio_solver_interface.cpp src/app/sat/hordesat/solvers/solver_thread.cpp src/app/sat/hordesat/solvers/solving_state.cpp 
     src/app/sat/hordesat/utilities/buffer_manager.cpp src/app/sat/hordesat/utilities/clause_database.cpp src/app/sat/hordesat/utilities/clause_filter.cpp src/app/sat/hordesat/utilities/clause_manager.cpp src/app/sat/hordesat/utilities/dimspec_utils.cpp 
     src/app/sat/threaded_sat_job.cpp 
-    src/balancing/balancer.cpp src/balancing/cutoff_priority_balancer.cpp src/balancing/event_driven_balancer.cpp src/balancing/rounding.cpp 
+    src/balancing/balancer.cpp src/balancing/event_driven_balancer.cpp src/balancing/rounding.cpp 
     src/comm/message_handler.cpp src/comm/mpi_monitor.cpp src/comm/mympi.cpp 
     src/data/job_database.cpp src/data/job_description.cpp src/data/job_file_adapter.cpp src/data/job_result.cpp src/data/reduceable.cpp 
     src/util/console.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sat_reader.cpp 

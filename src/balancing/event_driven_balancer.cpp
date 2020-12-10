@@ -17,34 +17,24 @@ EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params) : B
     Console::log(Console::VVERB, ".");
 }
 
-bool EventDrivenBalancer::beginBalancing(std::map<int, Job*>& jobs) {
+bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& jobs) {
 
     // Identify jobs to balance
-    _jobs_being_balanced = std::map<int, Job*>();
-    for (const auto& it : jobs) {
-        int id = it.first;
-        Job& job = *it.second;
-
-        // Must be root of this job in order to be considered
-        if (!job.isRoot()) continue;
-
-        bool participate = !job.isPast() && !job.isForgetting() && job.isActive();
-
-        if (participate) {
+    _jobs_being_balanced = robin_hood::unordered_map<int, Job*>();
+    for (const auto& [id, job] : jobs) if (job->getJobTree().isRoot()) {
+        
+        if (job->getState() == ACTIVE) {
             // Job participates
-            _jobs_being_balanced[id] = it.second;
+            _jobs_being_balanced[id] = job;
 
             // Insert this job as an event, if there is something novel about it
             if (!_job_epochs.count(id)) {
                 // Completely new!
                 _job_epochs[id] = 1;
-                _volumes[id] = 1;
             } 
             int epoch = _job_epochs[id];
-            int demand = getDemand(*it.second);
-            _demands[id] = demand;
-            _priorities[id] = it.second->getDescription().getPriority();
-            Event ev({id, epoch, demand, _priorities[id]});
+            int demand = getDemand(*job);
+            Event ev({id, epoch, demand, job->getPriority()});
             if (!_states.getEntries().count(id) || ev.demand != _states.getEntries().at(id).demand) {
                 // Not contained yet in state: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
@@ -54,10 +44,9 @@ bool EventDrivenBalancer::beginBalancing(std::map<int, Job*>& jobs) {
                 } 
             }
             
-        } else if (_volumes.count(id)) {
-            // Job used to be active, but not any more
-            _demands[id] = 0;
-            Event ev({id, _job_epochs[id], 0, _priorities[id]});
+        } else {
+            // Job might have been active just before
+            Event ev({id, _job_epochs[id], 0, job->getPriority()});
             if (!_states.getEntries().count(id) || ev.demand != _states.getEntries().at(id).demand) {
                 // Not contained yet in state: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
@@ -72,9 +61,6 @@ bool EventDrivenBalancer::beginBalancing(std::map<int, Job*>& jobs) {
     // initiate a balancing, if applicable
     return reduceIfApplicable(BOTH);
 }
-
-// TODO: Handle non-power of two number of workers.
-// E.g. handle any even number of workers.
 
 bool EventDrivenBalancer::handle(const MessageHandlePtr& handle) {
     if (handle->tag != MSG_BROADCAST_DATA && handle->tag != MSG_REDUCE_DATA)
@@ -204,9 +190,6 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
         // Successful balancing: Bump epoch
         _balancing_epoch++;
 
-        // Calculate and publish new assignments.
-        calculateBalancingResult();
-
         // Begin new reduction, if necessary and enough time passed.
         reduceIfApplicable(BOTH);
     }
@@ -292,20 +275,28 @@ bool EventDrivenBalancer::isLeaf(int rank, bool reversedTree) {
     return rank % 2 == (reversedTree ? 0 : 1);
 }
 
-void EventDrivenBalancer::calculateBalancingResult() {
+int EventDrivenBalancer::getNewDemand(int jobId) {
+    return _states.getEntries().at(jobId).demand;
+}
+
+float EventDrivenBalancer::getPriority(int jobId) {
+    return _states.getEntries().at(jobId).priority;
+}
+
+robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
 
     Console::log(Console::VVVERB, "BLC: calc result");
 
     int rank = MyMpi::rank(MPI_COMM_WORLD);
     int verb = rank == 0 ? Console::VVERB : Console::VVVVERB;  
 
+    robin_hood::unordered_map<int, int> volumes;
+
     // 1. Calculate aggregated demand of all jobs
     std::string assignMsg = " ";
     float aggregatedDemand = 0;
     int numJobs = 0;
     for (const auto& [key, ev] : _states.getEntries()) {
-        _demands[ev.jobId] = ev.demand;
-        _priorities[ev.jobId] = ev.priority;
         assert(ev.demand >= 0);
         if (ev.demand == 0) continue;
         
@@ -321,16 +312,15 @@ void EventDrivenBalancer::calculateBalancingResult() {
     // 2a. Bail out if the elementary demand of each job cannot be met
     if (totalAvailVolume < 0) {
         Console::log(Console::WARN, "[WARN] Too many jobs - balancer bailing out, assigning 1 to each job");
-        _volumes.clear();
         for (const auto& [jobId, job] : _jobs_being_balanced) {
-            if (_states.getEntries().count(jobId) && _states.getEntries().at(jobId).demand > 0)
-                _volumes[jobId] = 1;
+            if (_states.getEntries().count(jobId) && getNewDemand(jobId) > 0)
+                volumes[jobId] = 1;
         }
-        return;
+        return volumes;
     }
     
     // 2. Calculate initial assignments and remaining demanded resources
-    std::map<int, double> assignments;
+    robin_hood::unordered_map<int, double> assignments;
     float assignedResources = 0;
     std::map<float, float, std::less<float>> demandedResources;
     for (const auto& entry : _states.getEntries()) {
@@ -370,8 +360,8 @@ void EventDrivenBalancer::calculateBalancingResult() {
         if (ev.demand <= 1) continue;
 
         int jobId = ev.jobId;
-        int demand = _demands[jobId];
-        float priority = _priorities[jobId];
+        int demand = getNewDemand(jobId);
+        float priority = getPriority(jobId);
         float prevPriority = -1;
         for (const auto& entry : demandedResources) {
             if (entry.first == priority) break;
@@ -403,7 +393,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
     Console::log(verb, "BLC e=%i adj_assign={%s}", _balancing_epoch, assignMsg.c_str());
 
     // 4. Round job assignments
-    std::map<int, int> allVolumes;
+    robin_hood::unordered_map<int, int> allVolumes;
     if (_params.getParam("r") == ROUNDING_FLOOR) {
         // Round by flooring
         for (const auto& entry : _states.getEntries()) {
@@ -436,7 +426,7 @@ void EventDrivenBalancer::calculateBalancingResult() {
             int utilization = 0;
             if (idx <= remainders.size()) {
                 // Round your local assignments and calculate utilization sum
-                _volumes = Rounding::getRoundedAssignments(idx, utilization, remainders, assignments);
+                volumes = Rounding::getRoundedAssignments(idx, utilization, remainders, assignments);
             }
 
             // Store result, if it is the best one so far
@@ -484,11 +474,13 @@ void EventDrivenBalancer::calculateBalancingResult() {
     }
 
     // 5. Only remember job assignments that are of a local job
-    _volumes.clear();
+    volumes.clear();
     for (const auto& pair : _jobs_being_balanced) {
         if (allVolumes[pair.first] >= 1)
-            _volumes[pair.first] = allVolumes[pair.first];
+            volumes[pair.first] = allVolumes[pair.first];
     }
+
+    return volumes;
 }
 
 void EventDrivenBalancer::forget(int jobId) {

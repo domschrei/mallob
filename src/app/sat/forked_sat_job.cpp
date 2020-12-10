@@ -17,35 +17,46 @@ ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank
         BaseSatJob(params, commSize, worldRank, jobId), _job_comm_period(params.getFloatParam("s")) {
 }
 
-bool ForkedSatJob::appl_initialize() {
+void ForkedSatJob::appl_start(std::shared_ptr<std::vector<uint8_t>> data) {
 
-    assert(hasJobDescription());
+    if (!_init_thread.joinable()) _init_thread = std::thread([this, data]() {
 
-    auto lock = _solver_lock.getLock();
+        if (!hasDescription()) {
+            // Unpack description
+            unpackDescription(data);
+        } else {
+            // TODO see if there is a new revision (-> unpackAmendment) or should just restart
+        }
+        
+        Parameters hParams(_params);
+        HordeConfig::applyDefault(hParams, *this);
 
-    Parameters hParams(_params);
-    HordeConfig::applyDefault(hParams, *this);
+        _solver.reset(new HordeProcessAdapter(hParams,
+                getDescription().getPayloads(), 
+                getDescription().getAssumptions(getDescription().getRevision())));
+        _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
 
-    _solver.reset(new HordeProcessAdapter(hParams,
-            getDescription().getPayloads(), 
-            getDescription().getAssumptions(getDescription().getRevision())));
-    _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
-
-    if (_abort_after_initialization) {
-        return false;
-    }
-
-    if (solverNotNull()) {
         Console::log(Console::VVVERB, "%s : beginning to solve", toStr());
         _solver_pid = _solver->run();
         Console::log(Console::VERB, "%s : spawned child pid=%i", toStr(), _solver_pid);
         Console::log(Console::VERB, "%s : finished horde initialization", toStr());
         _time_of_start_solving = Timer::elapsedSeconds();
-    }
 
-    return !_abort_after_initialization;
+        _initialized = true;
+
+        auto lock = _solver_lock.getLock();
+        auto state = getState();
+        if (state == SUSPENDED) _solver->setSolvingState(SolvingStates::SUSPENDED);
+        if (state == INACTIVE || state == PAST) _solver->setSolvingState(SolvingStates::STANDBY);
+        if (state == PAST) {
+            _solver->setSolvingState(SolvingStates::ABORTING);
+            delete (AnytimeSatClauseCommunicator*)_clause_comm;
+            _clause_comm = NULL;
+        }
+    });
 }
 
+/*
 bool ForkedSatJob::appl_doneInitializing() {
     return _solver != NULL && getSolver()->isFullyInitialized();
 }
@@ -62,85 +73,80 @@ void ForkedSatJob::appl_updateDescription(int fromRevision) {
     assert(Console::fail("Not implemented yet!"));
     //if (solverNotNull()) getSolver()->continueSolving(formulaAmendments, desc.getAssumptions(desc.getRevision()));
 }
+*/
 
-void ForkedSatJob::appl_pause() {
+void ForkedSatJob::appl_suspend() {
+    if (!_initialized) return;
     auto lock = _solver_lock.getLock();
-    if (solverNotNull()) getSolver()->setSolvingState(SolvingStates::SUSPENDED);
+    _solver->setSolvingState(SolvingStates::SUSPENDED);
 }
 
-void ForkedSatJob::appl_unpause() {
+void ForkedSatJob::appl_resume() {
+    if (!_initialized) return;
     auto lock = _solver_lock.getLock();
-    if (solverNotNull()) getSolver()->setSolvingState(SolvingStates::ACTIVE);
+    _solver->setSolvingState(SolvingStates::ACTIVE);
 }
 
-void ForkedSatJob::appl_interrupt() {
+void ForkedSatJob::appl_stop() {
+    if (!_initialized) return;
     auto lock = _solver_lock.getLock();
-    if (solverNotNull()) {
-        _solver->setSolvingState(SolvingStates::STANDBY); // interrupt SAT solving (but keeps solver threads!)
-    }
+    _solver->setSolvingState(SolvingStates::STANDBY);
 }
 
-void ForkedSatJob::appl_withdraw() {
-
+void ForkedSatJob::appl_terminate() {
+    if (!_initialized) return;
     auto lock = _solver_lock.getLock();
-    if (isInitializingUnsafe()) {
-        _abort_after_initialization = true;
-    }
-    if (_clause_comm != NULL) {
-        delete (AnytimeSatClauseCommunicator*)_clause_comm;
-        _clause_comm = NULL;
-    }
-    if (solverNotNull()) {
-        getSolver()->setSolvingState(SolvingStates::ABORTING);
-    }
+    delete (AnytimeSatClauseCommunicator*)_clause_comm;
+    _clause_comm = NULL;
+    _solver->setSolvingState(SolvingStates::ABORTING);
 }
 
-int ForkedSatJob::appl_solveLoop() {
+int ForkedSatJob::appl_solved() {
 
     int result = -1;
-    if (getState() != ACTIVE) return result;
+    if (!_initialized || getState() != ACTIVE) return result;
     if (_done_locally) return result;
 
     // Did a solver find a result?
+    auto lock = _solver_lock.getLock();
     if (_solver->check()) {
         auto solution = _solver->getSolution();
         result = solution.first;
-        Console::log_send(Console::INFO, getRootNodeRank(), "%s : found result %s", toStr(), 
+        Console::log_send(Console::INFO, getJobTree().getRootNodeRank(), "%s : found result %s", toStr(), 
                             result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN");
-        auto lock = _solver_lock.getLock();
-        _result.id = getId();
-        _result.result = result;
-        _result.revision = getDescription().getRevision();
-        _result.solution = solution.second;
+        _internal_result.id = getId();
+        _internal_result.result = result;
+        _internal_result.revision = getDescription().getRevision();
+        _internal_result.solution = solution.second;
         _done_locally = true;
     }
     return result;
 }
 
+JobResult ForkedSatJob::appl_getResult() {
+    return _internal_result;
+}
+
 void ForkedSatJob::appl_dumpStats() {
-    if (isInStateUnsafe({ACTIVE})) getSolver()->dumpStats();
+    if (!_initialized || getState() != ACTIVE) return;
+    _solver->dumpStats();
 }
 
 bool ForkedSatJob::appl_isDestructible() {
     // Solver is NULL or child process terminated
-    return _solver_pid == -1 || Fork::didChildExit(_solver_pid);
+    return !_initialized || Fork::didChildExit(_solver_pid);
 }
 
-bool ForkedSatJob::appl_wantsToBeginCommunication() const {
-    if (_job_comm_period <= 0) return false;
-    if (_clause_comm == NULL) return false;
+bool ForkedSatJob::appl_wantsToBeginCommunication() {
+    if (!_initialized || getState() != ACTIVE || _job_comm_period <= 0) return false;
     // Special "timed" conditions for leaf nodes:
-    if (isLeaf()) {
+    if (getJobTree().isLeaf()) {
         // At least half a second since initialization / reactivation
         if (getAgeSinceActivation() < 0.5 * _job_comm_period) return false;
         // At least params["s"] seconds since last communication 
         if (Timer::elapsedSeconds()-_time_of_last_comm < _job_comm_period) return false;
     }
-    bool locked = _solver_lock.tryLock();
-    if (!locked) {
-        Console::log(Console::VVVVERB, "cannot lock: no comm");    
-        return false;
-    } 
+    if (!_solver_lock.tryLock()) return false;
     bool wants = ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses();
     _solver_lock.unlock();
     return wants;
@@ -152,7 +158,7 @@ void ForkedSatJob::appl_beginCommunication() {
     auto lock = _solver_lock.getLock();
     if (_clause_comm != NULL) 
         ((AnytimeSatClauseCommunicator*) _clause_comm)->sendClausesToParent();
-    if (isLeaf()) _time_of_last_comm = Timer::elapsedSeconds();
+    if (getJobTree().isLeaf()) _time_of_last_comm = Timer::elapsedSeconds();
 }
 
 void ForkedSatJob::appl_communicate(int source, JobMessage& msg) {
@@ -164,8 +170,7 @@ void ForkedSatJob::appl_communicate(int source, JobMessage& msg) {
 }
 
 bool ForkedSatJob::isInitialized() {
-    if (!solverNotNull()) return false;
-    return _solver->isFullyInitialized();
+    return _initialized && _solver->isFullyInitialized();
 }
 void ForkedSatJob::prepareSharing(int maxSize) {
     _solver->collectClauses(maxSize);
@@ -181,24 +186,12 @@ void ForkedSatJob::digestSharing(const std::vector<int>& clauses) {
 }
 
 ForkedSatJob::~ForkedSatJob() {
-
     Console::log(Console::VVERB, "%s : enter destructor", toStr());
-    auto lock = _solver_lock.getLock();
-
-    Console::log(Console::VVVVERB, "%s : destroy clause comm", toStr());
-    if (_clause_comm != NULL) {
-        delete (AnytimeSatClauseCommunicator*)_clause_comm;
-        _clause_comm = NULL;
-    }
-
-    Console::log(Console::VVVVERB, "%s : destroy solver env", toStr());
-    if (solverNotNull()) {
-        _solver = NULL;
-    }
+    if (_init_thread.joinable()) _init_thread.join();
+    _solver = NULL;
     if (_solver_pid != -1 && !Fork::didChildExit(_solver_pid)) {
         Console::log(Console::VVVVERB, "%s : SIGKILLing child pid=%i", toStr(), _solver_pid);
         Fork::hardkill(_solver_pid);
     }
-
     Console::log(Console::VVERB, "%s : destructed SAT job", toStr());
 }

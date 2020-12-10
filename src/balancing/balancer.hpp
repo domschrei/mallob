@@ -2,8 +2,7 @@
 #ifndef DOMPASCH_BALANCER_INTERFACE_H
 #define DOMPASCH_BALANCER_INTERFACE_H
 
-#include <map>
-
+#include "util/robin_hood.hpp"
 #include "app/job.hpp"
 #include "comm/mympi.hpp"
 #include "util/params.hpp"
@@ -14,9 +13,6 @@ public:
     Balancer(MPI_Comm& comm, Parameters& params) :
     _comm(comm), _params(params), _load_factor(params.getFloatParam("l")), _balancing(false) {}
 
-    int getVolume(int jobId);
-    bool hasVolume(int jobId);
-    void updateVolume(int jobId, int volume);
     virtual void forget(int jobId);
 
     // Asynchronous rebalancing
@@ -30,7 +26,7 @@ public:
      * Do first part of balancing procedure, until finished or until some synchronization is necessary.
      * Returns true if finished.
      */
-    virtual bool beginBalancing(std::map<int, Job*>& jobs) = 0;
+    virtual bool beginBalancing(robin_hood::unordered_map<int, Job*>& jobs) = 0;
     /**
      * True if any necessary synchronization stage is finished such that the balancing can continue.
      */
@@ -48,13 +44,14 @@ public:
     /**
      * If balancing finished, returns the result.
      */
-    virtual const std::map<int, int>& getBalancingResult() = 0;
+    virtual robin_hood::unordered_map<int, int> getBalancingResult() = 0;
 
 protected:
     float allReduce(float contribution) const;
     void iAllReduce(float contribution);
     float reduce(float contribution, int rootRank) const;
     void iReduce(float contribution, int rootRank);
+
     int getDemand(const Job& job);
 
 protected:
@@ -64,11 +61,7 @@ protected:
     bool _balancing;
     int _balancing_epoch = 0;
 
-    std::map<int, Job*> _jobs_being_balanced;
-    std::map<int, int> _volumes;
-    std::map<int, float> _priorities;
-    std::map<int, int> _demands;
-    std::map<int, double> _temperatures;
+    robin_hood::unordered_map<int, Job*> _jobs_being_balanced;
 
     float _reduce_contrib;
     MPI_Request _reduce_request;

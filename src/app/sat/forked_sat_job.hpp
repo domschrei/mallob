@@ -22,36 +22,37 @@
 class ForkedSatJob : public BaseSatJob {
 
 private:
-    volatile bool _abort_after_initialization = false;
+    volatile bool _initialized = false;
 
     std::unique_ptr<HordeProcessAdapter> _solver;
     int _solver_pid = -1;
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
 
-    mutable Mutex _solver_lock;
+    std::thread _init_thread;
+    Mutex _solver_lock;
 
     float _time_of_start_solving = 0;
     float _time_of_last_comm = 0;
     float _job_comm_period;
 
     bool _done_locally = false;
+    JobResult _internal_result;
 
 public:
 
     ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId);
     ~ForkedSatJob() override;
 
-    bool appl_initialize() override;
-    bool appl_doneInitializing() override;
-    void appl_updateRole() override;
-    void appl_updateDescription(int fromRevision) override;
-    void appl_pause() override;
-    void appl_unpause() override;
-    void appl_interrupt() override;
-    void appl_withdraw() override;
-    int appl_solveLoop() override;
+    void appl_start(std::shared_ptr<std::vector<uint8_t>> data) override;
+    void appl_stop() override;
+    void appl_suspend() override;
+    void appl_resume() override;
+    void appl_terminate() override;
 
-    bool appl_wantsToBeginCommunication() const override;
+    int appl_solved() override;
+    JobResult appl_getResult() override;
+
+    bool appl_wantsToBeginCommunication() override;
     void appl_beginCommunication() override;
     void appl_communicate(int source, JobMessage& msg) override;
 
@@ -68,17 +69,6 @@ public:
     bool hasPreparedSharing() override;
     std::vector<int> getPreparedClauses() override;
     void digestSharing(const std::vector<int>& clauses) override;
-
-private:
-
-    std::unique_ptr<HordeProcessAdapter>& getSolver() {
-        assert(_solver != NULL);
-        return _solver;
-    }
-
-    bool solverNotNull() {
-        return _solver != NULL;
-    }
 };
 
 

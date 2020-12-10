@@ -21,16 +21,18 @@
 class ThreadedSatJob : public BaseSatJob {
 
 private:
-    volatile bool _abort_after_initialization = false;
+    volatile bool _initialized = false;
 
     std::unique_ptr<HordeLib> _solver;
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
     std::vector<int> _clause_buffer;
 
     volatile bool _done_locally;
+    int _result_code;
 
-    std::thread _bg_thread;
-    mutable Mutex _horde_manipulation_lock;
+    std::thread _init_thread;
+    std::thread _destroy_thread;
+    Mutex _solver_lock;
 
     float _time_of_start_solving = 0;
     float _time_of_last_comm = 0;
@@ -41,17 +43,16 @@ public:
     ThreadedSatJob(const Parameters& params, int commSize, int worldRank, int jobId);
     ~ThreadedSatJob() override;
 
-    bool appl_initialize() override;
-    bool appl_doneInitializing() override;
-    void appl_updateRole() override;
-    void appl_updateDescription(int fromRevision) override;
-    void appl_pause() override;
-    void appl_unpause() override;
-    void appl_interrupt() override;
-    void appl_withdraw() override;
-    int appl_solveLoop() override;
+    void appl_start(std::shared_ptr<std::vector<uint8_t>> data) override;
+    void appl_stop() override;
+    void appl_suspend() override;
+    void appl_resume() override;
+    void appl_terminate() override;
 
-    bool appl_wantsToBeginCommunication() const override;
+    int appl_solved() override;
+    JobResult appl_getResult() override;
+
+    bool appl_wantsToBeginCommunication() override;
     void appl_beginCommunication() override;
     void appl_communicate(int source, JobMessage& msg) override;
 
@@ -74,20 +75,8 @@ public:
         return _solver;
     }
 
-    void lockHordeManipulation();
-    void unlockHordeManipulation();
-
 private:
     void extractResult(int resultCode);
-
-    void appl_interrupt_unsafe();
-
-    void cleanUpThread();
-    void cleanUp();
-
-    bool solverNotNull() {
-        return _solver != NULL;
-    }
 };
 
 

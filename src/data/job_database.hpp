@@ -2,9 +2,9 @@
 #ifndef DOMPASCH_MALLOB_JOB_DATABASE_HPP
 #define DOMPASCH_MALLOB_JOB_DATABASE_HPP
 
-#include <map>
 #include <thread>
 
+#include "util/robin_hood.hpp"
 #include "app/job.hpp"
 #include "job_transfer.hpp"
 #include "balancing/balancer.hpp"
@@ -23,13 +23,18 @@ private:
     MPI_Comm& _comm;
     std::unique_ptr<Balancer> _balancer;
 
-    std::map<int, Job*> _jobs;
-    std::map<int, JobRequest> _commitments;
-    std::map<int, float> _arrivals;
-    std::map<int, float> _cpu_time_used;
-    std::map<int, float> _last_limit_check;
-    std::map<int, int> _volumes;
-    std::map<int, std::thread> _initializer_threads;
+    struct JobInfo {
+        Job* job;
+        std::optional<JobRequest> commitment;
+        float arrival;
+        float usedCpuSeconds;
+        float lastLimitCheck;
+        int volume;
+        std::thread initializerThread;
+    };
+
+    robin_hood::unordered_map<int, Job*> _jobs;
+    bool _has_commitment = false;
 
     int _load;
     Job* _current_job;
@@ -53,9 +58,8 @@ public:
     bool isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAccepted = false);
 
     void commit(JobRequest& req);
-    bool hasCommitments() const;
     bool hasCommitment(int jobId) const;
-    JobRequest& getCommitment(int jobId);
+    const JobRequest& getCommitment(int jobId);
     void uncommit(int jobId);
 
     bool tryAdopt(const JobRequest& req, bool oneshot, int& removedJob);
@@ -73,8 +77,7 @@ public:
     bool continueBalancing();
     bool continueBalancing(MessageHandlePtr& handle);
     void finishBalancing();
-    const std::map<int, int>& getBalancingResult();
-    void overrideBalancerVolume(int jobId, int volume);
+    robin_hood::unordered_map<int, int> getBalancingResult();
 
     bool has(int id) const;
     Job& get(int id) const;
@@ -83,9 +86,6 @@ public:
     int getLoad() const;
     void setLoad(int load, int whichJobId);
     bool isIdle() const;
-
-    bool hasVolume(int jobId);
-    int getVolume(int jobId);
 
     std::string toStr(int j, int idx) const;
     

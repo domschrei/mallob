@@ -17,55 +17,51 @@ ThreadedSatJob::ThreadedSatJob(const Parameters& params, int commSize, int world
         BaseSatJob(params, commSize, worldRank, jobId), _done_locally(false), _job_comm_period(params.getFloatParam("s")) {
 }
 
-void ThreadedSatJob::lockHordeManipulation() {
-    _horde_manipulation_lock.lock();
-}
-void ThreadedSatJob::unlockHordeManipulation() {
-    _horde_manipulation_lock.unlock();
-}
+void ThreadedSatJob::appl_start(std::shared_ptr<std::vector<uint8_t>> data) {
 
-bool ThreadedSatJob::appl_initialize() {
+    if (_initialized) {
+        
+        // Already initialized => Has a valid solver instance
+        auto lock = _solver_lock.getLock();
+        _done_locally = false;
+        // TODO Update job index etc. from JobTree
+        // TODO Update job description and amendments (in a separate thread!)
+        JobDescription& desc = getDescription();
+        std::vector<VecPtr> formulaAmendments; //= desc.getPayloads(0, desc.getRevision());
+        // Continue solving
+        _solver->continueSolving(formulaAmendments, desc.getAssumptions(desc.getRevision()));
+    
+    } else if (!_init_thread.joinable()) _init_thread = std::thread([this, data]() {
 
-    assert(hasJobDescription());
-    //_horde_manipulation_lock.updateName(std::string("HordeManip") + toStr());
+        // Unpack description
+        unpackDescription(data);
+        
+        // Initialize Hordesat instance
+        assert(!_initialized);
+        Parameters hParams(_params);
+        HordeConfig::applyDefault(hParams, *this);
+        _solver = std::unique_ptr<HordeLib>(new HordeLib(hParams, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(
+            "<h-" + std::string(toStr()) + ">", "#" + std::to_string(getId()) + "."
+        ))));
+        _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
 
-    // Initialize Hordesat instance
-    assert(_solver == NULL || Console::fail("Solver is not NULL! State of %s : %s", toStr(), jobStateToStr()));
-
-    auto lock = _horde_manipulation_lock.getLock();
-
-    if (_abort_after_initialization) {
-        return false;
-    }
-
-    Parameters hParams(_params);
-    HordeConfig::applyDefault(hParams, *this);
-
-    Console::log(Console::VERB, "%s : creating horde instance", toStr());
-    _solver = std::unique_ptr<HordeLib>(new HordeLib(hParams, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(
-        "<h-" + std::string(toStr()) + ">", "#" + std::to_string(getId()) + "."
-    ))));
-    _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
-
-    if (_abort_after_initialization) {
-        return false;
-    }
-
-    if (solverNotNull()) {
         Console::log(Console::VVVERB, "%s : beginning to solve", toStr());
         JobDescription& desc = getDescription();
         getSolver()->beginSolving(desc.getPayloads(), desc.getAssumptions(desc.getRevision()));
         Console::log(Console::VERB, "%s : finished horde initialization", toStr());
         _time_of_start_solving = Timer::elapsedSeconds();
-    }
 
-    return !_abort_after_initialization;
+        _initialized = true;
+
+        auto lock = _solver_lock.getLock();
+        auto state = getState();
+        if (state != ACTIVE) appl_suspend();
+        if (state != SUSPENDED) appl_stop();
+        if (state != INACTIVE) appl_terminate();
+    });
 }
 
-bool ThreadedSatJob::appl_doneInitializing() {
-    return _solver != NULL && getSolver()->isFullyInitialized();
-}
-
+/*
 void ThreadedSatJob::appl_updateRole() {
     if (!solverNotNull()) return;
     auto lock = _horde_manipulation_lock.getLock();
@@ -79,152 +75,133 @@ void ThreadedSatJob::appl_updateDescription(int fromRevision) {
     _done_locally = false;
     if (solverNotNull()) getSolver()->continueSolving(formulaAmendments, desc.getAssumptions(desc.getRevision()));
 }
+*/
 
-void ThreadedSatJob::appl_pause() {
-    if (!solverNotNull()) return;
-    auto lock = _horde_manipulation_lock.getLock();
-    if (solverNotNull()) getSolver()->setPaused();
+void ThreadedSatJob::appl_suspend() {
+    if (!_initialized) return;
+    auto lock = _solver_lock.getLock();
+    getSolver()->setPaused();
 }
 
-void ThreadedSatJob::appl_unpause() {
-    if (!solverNotNull()) return;
-    auto lock = _horde_manipulation_lock.getLock();
-    if (solverNotNull()) getSolver()->unsetPaused();
+void ThreadedSatJob::appl_resume() {
+    if (!_initialized) return;
+    auto lock = _solver_lock.getLock();
+    getSolver()->unsetPaused();
 }
 
-void ThreadedSatJob::appl_interrupt() {
-    if (!solverNotNull()) return;
-    auto lock = _horde_manipulation_lock.getLock();
-    appl_interrupt_unsafe();
+void ThreadedSatJob::appl_stop() {
+    if (!_initialized) return;
+    auto lock = _solver_lock.getLock();
+    _solver->interrupt();
 }
 
-void ThreadedSatJob::appl_interrupt_unsafe() {
-    // interrupt SAT solving (but keeps solver threads!)
-    if (solverNotNull()) _solver->interrupt(); 
-}
-
-void ThreadedSatJob::cleanUpThread() {
-    Console::log(Console::VVERB, "%s : cleanup thread start", toStr());
-    auto lock = _horde_manipulation_lock.getLock();
-    cleanUp();
-    Console::log(Console::VVERB, "%s : cleanup thread done", toStr());
-}
-
-void ThreadedSatJob::cleanUp() {
-    if (solverNotNull()) _solver->cleanUp();
-}
-
-void ThreadedSatJob::appl_withdraw() {
-
-    auto lock = _horde_manipulation_lock.getLock();
-    if (isInitializingUnsafe()) {
-        _abort_after_initialization = true;
-    }
-    if (_clause_comm != NULL) {
+void ThreadedSatJob::appl_terminate() {
+    if (!_initialized) return;
+    if (!_destroy_thread.joinable()) _destroy_thread = std::thread([this]() {
+        auto lock = _solver_lock.getLock();
         delete (AnytimeSatClauseCommunicator*)_clause_comm;
         _clause_comm = NULL;
-    }
-    if (solverNotNull()) {
-        getSolver()->abort();
-        // Do cleanup of HordeLib and its threads in a separate thread to avoid blocking
-        _bg_thread = std::thread(&ThreadedSatJob::cleanUpThread, this);
-    }
+        _solver->abort();
+        _solver->cleanUp();
+    });
 }
 
-void ThreadedSatJob::extractResult(int resultCode) {
-    auto lock = _horde_manipulation_lock.getLock();
+JobResult ThreadedSatJob::appl_getResult() {
+    auto lock = _solver_lock.getLock();
+    JobResult _result;
     _result.id = getId();
-    _result.result = resultCode;
+    _result.result = _result_code;
     _result.revision = getDescription().getRevision();
     _result.solution.clear();
-    if (resultCode == SAT) {
+    if (_result_code == SAT) {
         _result.solution = getSolver()->getTruthValues();
-    } else if (resultCode == UNSAT) {
+    } else if (_result_code == UNSAT) {
         std::set<int>& assumptions = getSolver()->getFailedAssumptions();
         std::copy(assumptions.begin(), assumptions.end(), std::back_inserter(_result.solution));
     }
+    return _result;
 }
 
-int ThreadedSatJob::appl_solveLoop() {
+int ThreadedSatJob::appl_solved() {
 
     int result = -1;
 
     // Already reported the actual result, or still initializing
-    if (_done_locally) {
+    if (_done_locally || !_initialized || getState() != ACTIVE) {
         return result;
     }
 
-    if (getState() == ACTIVE) result = getSolver()->solveLoop();
-    else return result;
+    auto lock = _solver_lock.getLock();
+    result = getSolver()->solveLoop();
 
     // Did a solver find a result?
     if (result >= 0) {
         _done_locally = true;
-        Console::log_send(Console::INFO, getRootNodeRank(), "%s : found result %s", toStr(), 
+        Console::log_send(Console::INFO, getJobTree().getRootNodeRank(), "%s : found result %s", toStr(), 
                             result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN");
-        extractResult(result);
+        _result_code = result;
     }
     return result;
 }
 
 void ThreadedSatJob::appl_dumpStats() {
-    if (isInState({ACTIVE})) {
 
-        getSolver()->dumpStats(/*final=*/false);
-        if (_time_of_start_solving <= 0) return;
-        
-        std::vector<long> threadTids = getSolver()->getSolverTids();
-        for (size_t i = 0; i < threadTids.size(); i++) {
-            if (threadTids[i] < 0) continue;
-            double cpuRatio; float sysShare;
-            bool ok = Proc::getThreadCpuRatio(threadTids[i], cpuRatio, sysShare);
-            if (ok)
-                Console::log(Console::VERB, "%s td.%ld : %.2f%% CPU -> %.2f%% systime", 
-                    toStr(), threadTids[i], cpuRatio, 100*sysShare);
-        }
+    if (!_initialized || getState() != ACTIVE) return;
+    auto lock = _solver_lock.getLock();
+
+    getSolver()->dumpStats(/*final=*/false);
+    if (_time_of_start_solving <= 0) return;
+    
+    std::vector<long> threadTids = getSolver()->getSolverTids();
+    for (size_t i = 0; i < threadTids.size(); i++) {
+        if (threadTids[i] < 0) continue;
+        double cpuRatio; float sysShare;
+        bool ok = Proc::getThreadCpuRatio(threadTids[i], cpuRatio, sysShare);
+        if (ok) Console::log(Console::VERB, "%s td.%ld : %.2f%% CPU -> %.2f%% systime", 
+                toStr(), threadTids[i], cpuRatio, 100*sysShare);
     }
 }
 
 bool ThreadedSatJob::appl_isDestructible() {
-    return !solverNotNull() || _solver->isCleanedUp();
+    if (!_initialized) return false;
+    auto lock = _solver_lock.getLock();
+    return _solver->isCleanedUp();
 }
 
-bool ThreadedSatJob::appl_wantsToBeginCommunication() const {
-    if (_job_comm_period <= 0) return false;
-    if (_clause_comm == NULL) return false;
+bool ThreadedSatJob::appl_wantsToBeginCommunication() {
+    if (!_initialized || getState() != ACTIVE || _job_comm_period <= 0) return false;
     // Special "timed" conditions for leaf nodes:
-    if (isLeaf()) {
+    if (getJobTree().isLeaf()) {
         // At least half a second since initialization / reactivation
         if (getAgeSinceActivation() < 0.5 * _job_comm_period) return false;
         // At least params["s"] seconds since last communication 
         if (Timer::elapsedSeconds()-_time_of_last_comm < _job_comm_period) return false;
     }
-    bool locked = _horde_manipulation_lock.tryLock();
-    if (!locked) return false;
+    if (!_solver_lock.tryLock()) return false;
     bool wants = ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses();
-    _horde_manipulation_lock.unlock();
+    _solver_lock.unlock();
     return wants;
 }
 
 void ThreadedSatJob::appl_beginCommunication() {
+    if (!_initialized || getState() != ACTIVE) return;
     Console::log(Console::VVVVERB, "begincomm");
-    if (_clause_comm == NULL) return;
-    auto lock = _horde_manipulation_lock.getLock();
-    if (_clause_comm != NULL) 
-        ((AnytimeSatClauseCommunicator*) _clause_comm)->sendClausesToParent();
-    if (isLeaf()) _time_of_last_comm = Timer::elapsedSeconds();
+    if (!_solver_lock.tryLock()) return;
+    ((AnytimeSatClauseCommunicator*) _clause_comm)->sendClausesToParent();
+    if (getJobTree().isLeaf()) _time_of_last_comm = Timer::elapsedSeconds();
+    _solver_lock.unlock();
 }
 
 void ThreadedSatJob::appl_communicate(int source, JobMessage& msg) {
+    if (!_initialized || getState() != ACTIVE) return;
     Console::log(Console::VVVVERB, "comm");
-    if (_clause_comm == NULL) return;
-    auto lock = _horde_manipulation_lock.getLock();
-    if (_clause_comm != NULL)
-        ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, msg);
+    auto lock = _solver_lock.getLock();
+    ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, msg);
 }
 
 bool ThreadedSatJob::isInitialized() {
-    if (!solverNotNull()) return false;
+    if (!_initialized) return false;
+    auto lock = _solver_lock.getLock();
     return _solver->isFullyInitialized();
 }
 void ThreadedSatJob::prepareSharing(int maxSize) {
@@ -241,32 +218,15 @@ std::vector<int> ThreadedSatJob::getPreparedClauses() {
     return out;
 }
 void ThreadedSatJob::digestSharing(const std::vector<int>& clauses) {
+    if (!_initialized) return;
+    auto lock = _solver_lock.getLock();
     _solver->digestSharing(clauses);
 }
 
 ThreadedSatJob::~ThreadedSatJob() {
-
     Console::log(Console::VVERB, "%s : enter destructor", toStr());
-    auto lock = _horde_manipulation_lock.getLock();
-
-    if (_clause_comm != NULL) {
-        delete (AnytimeSatClauseCommunicator*)_clause_comm;
-        _clause_comm = NULL;
-    }
-
-    if (_bg_thread.joinable()) {
-        Console::log(Console::VVERB, "%s : joining bg thread", toStr());
-        lock.unlock();
-        _bg_thread.join(); // if already aborting
-        lock.lock();
-    }
-
-    if (solverNotNull() && !_solver->isCleanedUp()) {
-        Console::log(Console::VVERB, "%s : destruct hordesat", toStr());
-        appl_interrupt_unsafe();
-        _solver->abort();
-        cleanUp();
-    }
-
+    assert(appl_isDestructible());
+    if (_init_thread.joinable()) _init_thread.join();
+    if (_destroy_thread.joinable()) _destroy_thread.join();
     Console::log(Console::VVERB, "%s : destructed SAT job", toStr());
 }

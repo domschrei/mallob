@@ -14,8 +14,8 @@ bool AnytimeSatClauseCommunicator::canSendClauses() {
 
     size_t numChildren = 0;
     // Must have received clauses from each existing children
-    if (_job->hasLeftChild()) numChildren++;
-    if (_job->hasRightChild()) numChildren++;
+    if (_job->getJobTree().hasLeftChild()) numChildren++;
+    if (_job->getJobTree().hasRightChild()) numChildren++;
 
     if (_clause_buffers.size() >= numChildren) {
         if (!_job->hasPreparedSharing()) {
@@ -35,14 +35,14 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
     // Merge all collected clauses, reset buffers
     std::vector<int> clausesToShare = prepareClauses();
 
-    if (_job->isRoot()) {
+    if (_job->getJobTree().isRoot()) {
         // Share complete set of clauses to children
         Console::log(Console::VVERB, "%s : switch gather => broadcast", _job->toStr()); 
         learnClauses(clausesToShare);
         sendClausesToChildren(clausesToShare);
     } else {
         // Send set of clauses to parent
-        int parentRank = _job->getParentNodeRank();
+        int parentRank = _job->getJobTree().getParentNodeRank();
         JobMessage msg;
         msg.jobId = _job->getId();
         msg.epoch = 0; // unused
@@ -57,7 +57,7 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
 }
 
 void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
-    if (!_initialized || _job->isNotInState({JobState::ACTIVE}))
+    if (!_initialized || _job->getState() == ACTIVE)
         return;
 
     if (msg.tag == MSG_GATHER_CLAUSES) {
@@ -92,7 +92,7 @@ void AnytimeSatClauseCommunicator::learnClauses(const std::vector<int>& clauses)
         // Locally learn clauses
         
         // If not active or not fully initialized yet: discard clauses
-        if (_job->isNotInState({ACTIVE}) || !_job->isInitialized()) {
+        if (_job->getState() != ACTIVE || !_job->isInitialized()) {
             Console::log(Console::VVERB, "%s : discard buffer, job is not (yet?) active", 
                     _job->toStr());
             return;
@@ -114,13 +114,13 @@ void AnytimeSatClauseCommunicator::sendClausesToChildren(const std::vector<int>&
     msg.tag = MSG_DISTRIBUTE_CLAUSES;
     msg.payload = clauses;
     int childRank;
-    if (_job->hasLeftChild()) {
-        childRank = _job->getLeftChildNodeRank();
+    if (_job->getJobTree().hasLeftChild()) {
+        childRank = _job->getJobTree().getLeftChildNodeRank();
         Console::log_send(Console::VVERB, childRank, "%s : broadcast", _job->toStr());
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
-    if (_job->hasRightChild()) {
-        childRank = _job->getRightChildNodeRank();
+    if (_job->getJobTree().hasRightChild()) {
+        childRank = _job->getJobTree().getRightChildNodeRank();
         Console::log_send(Console::VVERB, childRank, "%s : broadcast", _job->toStr());
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
@@ -141,7 +141,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     // Locally collect clauses from own solvers, add to clause buffer
     std::vector<int> selfClauses;
     // If not fully initialized yet, broadcast an empty set of clauses
-    if (_job->isNotInState({ACTIVE}) || !_job->isInitialized() || !_job->hasPreparedSharing()) {
+    if (_job->getState() != ACTIVE || !_job->isInitialized() || !_job->hasPreparedSharing()) {
         selfClauses = std::vector<int>();
     } else {
         // Else, retrieve clauses from solvers

@@ -70,8 +70,8 @@ void Fork::init(int rank, bool leafProcess) {
     */
 
     signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
-    signal(SIGSEGV, handleAbort);
-    signal(SIGABRT, handleAbort);
+    //signal(SIGSEGV, handleAbort);
+    //signal(SIGABRT, handleAbort);
 
     if (!leafProcess) {
         signal(SIGTERM, propagateSignalAndExit);

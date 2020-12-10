@@ -24,7 +24,7 @@ struct JobRequest : public Serializable {
 public:
     JobRequest() = default;
 
-    JobRequest(int jobId, int rootRank, int requestingNodeRank, int requestedNodeIndex, float timeOfBirth, int numHops) :
+    JobRequest(int jobId, int rootRank, int requestingNodeRank, int requestedNodeIndex, float timeOfBirth, int numHops = 0) :
         jobId(jobId),
         rootRank(rootRank),
         requestingNodeRank(requestingNodeRank),

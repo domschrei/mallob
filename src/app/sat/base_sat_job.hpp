@@ -21,18 +21,19 @@ public:
 
     // Methods common to all Job instances
 
-    virtual bool appl_initialize() = 0;
-    virtual bool appl_doneInitializing() = 0;
-    virtual void appl_updateRole() = 0;
-    virtual void appl_updateDescription(int fromRevision) = 0;
-    virtual void appl_pause() = 0;
-    virtual void appl_unpause() = 0;
-    virtual void appl_interrupt() = 0;
-    virtual void appl_withdraw() = 0;
-    virtual int appl_solveLoop() = 0;
-    virtual bool appl_wantsToBeginCommunication() const = 0;
+    virtual void appl_start(std::shared_ptr<std::vector<uint8_t>> data) = 0;
+    virtual void appl_stop() = 0;
+    virtual void appl_suspend() = 0;
+    virtual void appl_resume() = 0;
+    virtual void appl_terminate() = 0;
+
+    virtual int appl_solved() = 0;
+    virtual JobResult appl_getResult() = 0;
+    
+    virtual bool appl_wantsToBeginCommunication() = 0;
     virtual void appl_beginCommunication() = 0;
     virtual void appl_communicate(int source, JobMessage& msg) = 0;
+    
     virtual void appl_dumpStats() = 0;
     virtual bool appl_isDestructible() = 0;
 };

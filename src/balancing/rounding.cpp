@@ -5,13 +5,13 @@
 
 namespace Rounding {
 
-std::map<int, int> getRoundedAssignments(int remainderIdx, int& sum, 
-    const SortedDoubleSequence& remainders, const std::map<int, double>& assignments) {
+robin_hood::unordered_map<int, int> getRoundedAssignments(int remainderIdx, int& sum, 
+    const SortedDoubleSequence& remainders, const robin_hood::unordered_map<int, double>& assignments) {
 
     double remainder = remainderIdx < remainders.size() ? remainders[remainderIdx] : 1.0;
     //int occurrences =  remainderIdx < _remainders.size() ? _remainders.getOccurrences(remainderIdx) : 0;
 
-    std::map<int, int> roundedAssignments;
+    robin_hood::unordered_map<int, int> roundedAssignments;
     for (auto it : assignments) {
 
         double r = it.second - (int)it.second;
