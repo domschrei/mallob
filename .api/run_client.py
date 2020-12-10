@@ -6,21 +6,24 @@ from scipy.stats import truncnorm
 import os.path
 from os import listdir
 from os.path import isfile, join
+import json
 
 """
 Given an integer inst_id, returns a SAT instance associated to that ID.
 The associated instances may cycle, e.g., map (inst_id % num_instances) to an instance.
 """
 def get_instance_filename(inst_id):
-    files = [f for f in listdir("instances/") if isfile(join("instances/", f)) and (f.endswith(".cnf.xz") or f.endswith(".cnf"))]
-    random.shuffle(files)
-    return "instances/" + files[inst_id % len(files)]
     """
     if inst_id % 2 == 0:
         return "/home/dominik/workspace/sat_instances/test_sat.cnf"
     else:
         return "/home/dominik/workspace/sat_instances/test_unsat.cnf"
     """
+    files = [f for f in listdir("instances/") if isfile(join("instances/", f)) and (f.endswith(".cnf.xz") or f.endswith(".cnf"))]
+    files.sort()
+    r = random.Random(int(inst_id / len(files)))
+    r.shuffle(files)
+    return "instances/" + files[inst_id % len(files)]
 
 """
 Represents a single job of a particular client.
@@ -75,7 +78,7 @@ class Client:
 
 # Running IDs for clients and jobs
 global_client_id = 1
-global_job_id = 1
+global_job_id = 0
 
 # Global start time
 global_starttime = time.time_ns()
@@ -118,7 +121,7 @@ def create_random_client(arrival_time):
 Takes a job instance and writes a JSON file into the mallob API directory.
 """
 def introduce_job(job):
-    log("%s introduces job %s", (job._user, job._name))
+    log("%s introduces job %s (%s)", (job._user, job._name, job._filename))
     with open(".api/jobs.0/new/" + job.get_json_filename(), "w") as f:
         f.write(job.to_json())
 
@@ -130,8 +133,8 @@ mean_stream_length = 1
 stdv_stream_length = 3
 
 # Number and arrival frequency of clients
-num_clients = 100
-client_interarrival_time = 1
+num_clients = 64
+client_interarrival_time = 2.00
 
 # Resource limits given to each job (overriding mallob's global options!)
 wc_limit_per_job = 600
@@ -179,7 +182,11 @@ while any_left:
             done_file = ".api/jobs.0/done/" + active_jobs[i].get_json_filename()
             if os.path.isfile(done_file):
                 # -- job finished
-                log("%s finished", (c._name + "." + active_jobs[i]._name,))
+                f = open(done_file, 'r')
+                j = json.load(f)
+                log("%s finished (response time: %.3f, result code: %i)", (c._name + "." + active_jobs[i]._name, j["result"]["responsetime"], j["result"]["resultcode"]))
+                f.close()
+
                 os.remove(done_file)
                 # Introduce next job
                 if c.has_next_job():
