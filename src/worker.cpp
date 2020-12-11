@@ -581,7 +581,7 @@ void Worker::handleQueryJobRevisionDetails(MessageHandlePtr& handle) {
 
     assert(_job_db.has(jobId));
 
-    JobDescription& desc = _job_db.get(jobId).getDescription();
+    const JobDescription& desc = _job_db.get(jobId).getDescription();
     IntVec response({jobId, firstRevision, lastRevision, desc.getTransferSize(firstRevision, lastRevision)});
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DETAILS, response);
 }

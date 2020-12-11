@@ -17,7 +17,7 @@ ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank
         BaseSatJob(params, commSize, worldRank, jobId), _job_comm_period(params.getFloatParam("s")) {
 }
 
-void ForkedSatJob::appl_start(std::shared_ptr<std::vector<uint8_t>> data) {
+void ForkedSatJob::appl_start() {
 
     if (_initialized) {
         
@@ -29,14 +29,14 @@ void ForkedSatJob::appl_start(std::shared_ptr<std::vector<uint8_t>> data) {
         // Continue solving
         _solver->setSolvingState(SolvingStates::ACTIVE);
     
-    } else if (!_init_thread.joinable()) _init_thread = std::thread([this, data]() {
+    } else if (!_init_thread.joinable()) _init_thread = std::thread([this]() {
         
         Parameters hParams(_params);
         HordeConfig::applyDefault(hParams, *this);
 
         _solver.reset(new HordeProcessAdapter(hParams,
                 getDescription().getPayloads(), 
-                getDescription().getAssumptions(getDescription().getRevision())));
+                getDescription().getAssumptions(getRevision())));
         _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
 
         Console::log(Console::VVVERB, "%s : beginning to solve", toStr());
@@ -119,7 +119,7 @@ int ForkedSatJob::appl_solved() {
                             result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN");
         _internal_result.id = getId();
         _internal_result.result = result;
-        _internal_result.revision = getDescription().getRevision();
+        _internal_result.revision = getRevision();
         _internal_result.solution = solution.second;
         _done_locally = true;
     }

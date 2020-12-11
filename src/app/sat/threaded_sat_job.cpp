@@ -17,7 +17,7 @@ ThreadedSatJob::ThreadedSatJob(const Parameters& params, int commSize, int world
         BaseSatJob(params, commSize, worldRank, jobId), _done_locally(false), _job_comm_period(params.getFloatParam("s")) {
 }
 
-void ThreadedSatJob::appl_start(std::shared_ptr<std::vector<uint8_t>> data) {
+void ThreadedSatJob::appl_start() {
 
     if (_initialized) {
         
@@ -26,12 +26,11 @@ void ThreadedSatJob::appl_start(std::shared_ptr<std::vector<uint8_t>> data) {
         _done_locally = false;
         // TODO Update job index etc. from JobTree
         // TODO Update job description and amendments (in a separate thread!)
-        JobDescription& desc = getDescription();
-        std::vector<VecPtr> formulaAmendments; //= desc.getPayloads(0, desc.getRevision());
         // Continue solving
-        _solver->continueSolving(formulaAmendments, desc.getAssumptions(desc.getRevision()));
+        _solver->continueSolving(std::vector<VecPtr>(), 
+                getDescription().getAssumptions(getRevision()));
     
-    } else if (!_init_thread.joinable()) _init_thread = std::thread([this, data]() {
+    } else if (!_init_thread.joinable()) _init_thread = std::thread([this]() {
         
         // Initialize Hordesat instance
         Parameters hParams(_params);
@@ -42,8 +41,8 @@ void ThreadedSatJob::appl_start(std::shared_ptr<std::vector<uint8_t>> data) {
         _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
 
         Console::log(Console::VVVERB, "%s : beginning to solve", toStr());
-        JobDescription& desc = getDescription();
-        getSolver()->beginSolving(desc.getPayloads(), desc.getAssumptions(desc.getRevision()));
+        const JobDescription& desc = getDescription();
+        getSolver()->beginSolving(desc.getPayloads(), desc.getAssumptions(getRevision()));
         Console::log(Console::VERB, "%s : finished horde initialization", toStr());
         _time_of_start_solving = Timer::elapsedSeconds();
 
@@ -107,7 +106,7 @@ JobResult ThreadedSatJob::appl_getResult() {
     JobResult _result;
     _result.id = getId();
     _result.result = _result_code;
-    _result.revision = getDescription().getRevision();
+    _result.revision = getRevision();
     _result.solution.clear();
     if (_result_code == SAT) {
         _result.solution = getSolver()->getTruthValues();

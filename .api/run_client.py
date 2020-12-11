@@ -7,21 +7,27 @@ import os.path
 from os import listdir
 from os.path import isfile, join
 import json
+import copy
 
 """
 Given an integer inst_id, returns a SAT instance associated to that ID.
 The associated instances may cycle, e.g., map (inst_id % num_instances) to an instance.
 """
 def get_instance_filename(inst_id):
-    """
-    if inst_id % 2 == 0:
-        return "/home/dominik/workspace/sat_instances/test_sat.cnf"
-    else:
-        return "/home/dominik/workspace/sat_instances/test_unsat.cnf"
-    """
-    files = [f for f in listdir("instances/") if isfile(join("instances/", f)) and (f.endswith(".cnf.xz") or f.endswith(".cnf"))]
-    files.sort()
-    r = random.Random(int(inst_id / len(files)))
+
+    # Read benchmark file
+    global global_benchmark
+    if not global_benchmark:
+        global_benchmark = []
+        for line in open(".api/benchmark_sat2020", "r").readlines():
+            str = line.rstrip()
+            if str:
+                global_benchmark += [str]
+        global_benchmark.sort()
+
+    # Select a file randomly
+    files = copy.deepcopy(global_benchmark)
+    r = random.Random(int(inst_id / len(global_benchmark)))
     r.shuffle(files)
     return "instances/" + files[inst_id % len(files)]
 
@@ -82,6 +88,9 @@ global_job_id = 0
 
 # Global start time
 global_starttime = time.time_ns()
+
+# List of instance file names from which new jobs are drawn
+global_benchmark = None
 
 """
 Returns the elapsed time since program start in seconds (float)

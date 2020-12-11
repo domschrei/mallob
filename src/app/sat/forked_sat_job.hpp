@@ -43,7 +43,7 @@ public:
     ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId);
     ~ForkedSatJob() override;
 
-    void appl_start(std::shared_ptr<std::vector<uint8_t>> data) override;
+    void appl_start() override;
     void appl_stop() override;
     void appl_suspend() override;
     void appl_resume() override;

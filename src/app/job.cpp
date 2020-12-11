@@ -46,8 +46,7 @@ void Job::uncommit() {
 void Job::start(std::shared_ptr<std::vector<uint8_t>> data) {
     assertState(INACTIVE);
     
-    if (_time_of_arrival <= 0) _time_of_arrival = Timer::elapsedSeconds();
-    if (_time_of_initialization <= 0) _time_of_initialization = Timer::elapsedSeconds();
+    if (_time_of_activation <= 0) _time_of_activation = Timer::elapsedSeconds();
     _time_of_last_limit_check = Timer::elapsedSeconds();
     _volume = 1;
     
@@ -67,13 +66,14 @@ void Job::start(std::shared_ptr<std::vector<uint8_t>> data) {
         } else if (data) {
             // TODO Handle amendment to job description
         }
-    
+
+        // Mark unpacking as done    
         {
             auto lock = _job_manipulation_lock.getLock();
             _unpack_done[i] = true;
         }
 
-        appl_start(data);
+        appl_start();
     });
 }
 
@@ -126,9 +126,9 @@ int Job::getDemand(int prevVolume, float elapsedTime) const {
             // Immediate growth
             demand = _job_tree.getCommSize();
         } else {
-            if (_time_of_initialization <= 0) demand = 1;
+            if (_time_of_activation <= 0) demand = 1;
             else {
-                float t = elapsedTime-_time_of_initialization;
+                float t = elapsedTime-_time_of_activation;
                 
                 // Continuous growth
                 float numPeriods = t/_growth_period;
@@ -160,7 +160,7 @@ double Job::getTemperature() const {
     double baseTemp = 0.95;
     double decay = 0.99; // higher means slower convergence
 
-    int age = (int) (Timer::elapsedSeconds()-_time_of_initialization);
+    int age = (int) (Timer::elapsedSeconds()-_time_of_activation);
     double eps = 2*std::numeric_limits<double>::epsilon();
 
     // Start with temperature 1.0, exponentially converge towards baseTemp 

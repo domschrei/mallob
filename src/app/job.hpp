@@ -22,7 +22,7 @@
 
 class Job {
 
-// Protected fields, may be read and/or manipulated by your application code.
+// Protected fields, may be accessed by your application code.
 protected:
     /*
     The parameters the application was started with.
@@ -39,21 +39,37 @@ public:
     PAST <--terminate()-- INACTIVE --start()--> ACTIVE --suspend()--> STANDBY
                                    <--stop()---        <--resume()---
 
+    General notes:
+    * Communication (MyMpi::*) may ONLY take place within mallob's main thread, i.e., 
+      within the appl_* methods (and not a thread spawned from it).
+    * All appl_* methods must return immediately. Heavy work must be performed concurrently
+      within a separate thread. Exceptions are appl_beginCommunication and appl_communicate
+      where a decent amount of work of the main thread may be necessary to handle communication.
+    * Your code must bookkeep the active threads of your application, make them ready to be joined 
+      after appl_terminate() has been called, and be able to instantly join them if
+      your appl_isDestructible() returns true. 
+    * If your application spawns child processes, appl_suspend() and appl_resume() can be
+      realized over SIGTSTP and SIGCONT signals, but also make sure that the process is
+      terminated after appl_terminate().
+
     */
 
     /*
-    Begin, or continue, to process the job. This method must return immediately or almost immediately,
-    i.e., any heavy tasks must be done within separate threads or processes.
+    Begin, or continue, to process the job.
+    At the first call of appl_start(), you can safely assume that the job description
+    is already present: getDescription() returns a valid JobDescription instance.
     appl_start() may be called again after appl_stop(); in this case, the internal job data
     (i.e. its description) may have changed and must be reconsidered.
     */
-    virtual void appl_start(std::shared_ptr<std::vector<uint8_t>> data) = 0;
+    virtual void appl_start() = 0;
     /*
     Stop to process an active job.
     */
     virtual void appl_stop() = 0;
     /*
     Suspend the job, enabling a resumption of the job processing at a later time.
+    After suspension is completed, the job should not spend any CPU time on itself any more
+    (with the possible exception of concurrent initializer threads that are still running).
     */
     virtual void appl_suspend() = 0;
     /*
@@ -61,22 +77,24 @@ public:
     */
     virtual void appl_resume() = 0;
     /*
-
+    Terminate an inactive job which is irrecoverably marked for deletion: This method
+    can concurrently trigger a cleanup of any resources needed for solving the job.
     */
     virtual void appl_terminate() = 0;
     /*
     Check from the main thread whether any solution was already found.
     Return a result code if applicable, or -1 otherwise.
+    This method can be used to perform further (quick) checks regarding the application
+    and can be expected to be called frequently while the job is active.
     */
     virtual int appl_solved() = 0;
     /*
-
+    appl_solved() returned a result >= 0; return a fitting JobResult instance at this point.
+    This method must only be valid once after a solution has been found.
     */
     virtual JobResult appl_getResult() = 0;
     /*
     Signal if this job instance would like to initiate a new job communication phase.
-    This method has a valid default implementation based on system clock and the "s" arg value, 
-    so it must not be re-implemented.
     */
     virtual bool appl_wantsToBeginCommunication() = 0;
     /*
@@ -96,21 +114,19 @@ public:
     /*
     Return how many processes this job would like to run on based on its meta data 
     and its previous volume.
-    This method has a valid default implementation, so it does not need to be re-implemented.
-    It must return an integer greater than 0 and no greater than _comm_size.
+    This method must return an integer greater than 0 and no greater than _comm_size. 
+    It has a valid default implementation, so it does not need to be re-implemented.
     */
     virtual int getDemand(int prevVolume, float elapsedTime = Timer::elapsedSeconds()) const;
 
     /*
     Return true iff the instance can be quickly deleted without any errors
     (i.e., no running concurrent thread of unknown residual life time depends 
-    on the instance any more, and if appl_withdraw() contains any heavy lifting 
-    then it was already done).
+    on the instance any more, and the destructor will return immediately).
     */
     virtual bool appl_isDestructible() = 0;
     /*
-    Free all data associated to this job instance.
-    Join all associated threads if any are left.
+    Free all data associated to this job instance. Join all associated threads if any are left.
     */
     virtual ~Job() {
         for (auto& thread : _unpack_threads) if (thread.joinable()) thread.join();
@@ -129,14 +145,15 @@ public:
 private:
     int _id;
     std::string _name;
-    std::optional<JobDescription> _description;
+    bool _has_description = false;
+    JobDescription _description;
     std::shared_ptr<std::vector<uint8_t>> _serialized_description;
 
     std::vector<std::thread> _unpack_threads;
     std::vector<bool> _unpack_done;
 
     float _time_of_arrival;
-    float _time_of_initialization = 0;
+    float _time_of_activation = 0;
     float _time_of_abort = 0;
     float _time_of_last_comm = 0;
     float _time_of_last_limit_check = 0;
@@ -176,7 +193,8 @@ public:
     // Requires the job to be in a committed state.
     void uncommit();
     
-    // Internally initializes the job (if necessary) and begins solving.
+    // Concurrently unpacks the job description and then calls the job implementation's
+    // appl_start() method from there.
     void start(std::shared_ptr<std::vector<uint8_t>> data);
     // Interrupt the execution of all internal solvers.
     void stop();
@@ -186,6 +204,7 @@ public:
     // Resume all internal solvers given that they were frozen.
     void resume();
     
+    // Returns true if communicate() should be called.
     bool wantsToCommunicate();
     // Initiate a communication with other nodes in the associated job tree.
     void communicate();
@@ -194,38 +213,34 @@ public:
     // and the job's payload. Only leaves behind the job's meta data.
     void terminate();
 
+    // Updates the role of this job instance within the distributed job tree.
+    // This method marks this job instance as the <index>th node working on it
+    // and remembers the ranks of the root node of the job and of the parent
+    // of this node.
     void updateJobTree(int index, int rootRank, int parentRank);
 
 
     // Getter methods and simple queries
 
-    // ... for the job state
-
-    // Simple getter for current job state.
     JobState getState() const {return _state;};
     void assertState(JobState state) const {assert(_state == state || Console::fail("State of %s : %s", toStr(), jobStateToStr()));};
-
-    // ... for the job's current meta data
-
     int getVolume() const {return _volume;}
     float getPriority() const {return _priority;}
-    bool hasDescription() const {return _description.has_value();};
-    JobDescription& getDescription() {assert(hasDescription()); return _description.value();};
-    const JobDescription& getDescription() const {assert(hasDescription()); return _description.value();};
+    bool hasDescription() const {return _has_description;};
+    const JobDescription& getDescription() const {assert(hasDescription()); return _description;};
     std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription() {return _serialized_description;};
     bool hasCommitment() const {return _commitment.has_value();}
     const JobRequest& getCommitment() const {assert(hasCommitment()); return _commitment.value();}
     int getId() const {return _id;};
     int getIndex() const {return _job_tree.getIndex();};
-    int getRevision() const {return getDescription().getRevision();};
+    int getRevision() const {assert(hasDescription()); return getDescription().getRevision();};
     const JobResult& getResult();
     // Elapsed seconds since the job's constructor call.
     float getAge() const {return Timer::elapsedSeconds() - _time_of_arrival;}
     // Elapsed seconds since initialization was ended.
-    float getAgeSinceActivation() const {return Timer::elapsedSeconds() - _time_of_initialization;}
+    float getAgeSinceActivation() const {return Timer::elapsedSeconds() - _time_of_activation;}
     // Elapsed seconds since termination of the job.
     float getAgeSinceAbort() const {return Timer::elapsedSeconds() - _time_of_abort;}
-    float getAgeSinceLastLimitCheck() const {return Timer::elapsedSeconds() - std::max(_time_of_arrival, _time_of_last_limit_check);}
     float getUsedCpuSeconds() const {return _used_cpu_seconds;}
 
     // Return true iff this job instance has found a job result that it still needs to communicate.
@@ -239,14 +254,11 @@ public:
     JobTree& getJobTree() {return _job_tree;}
     const JobTree& getJobTree() const {return _job_tree;}
 
-    // Setter methods and simple manipulations
 
-    void unpackDescription(std::shared_ptr<std::vector<uint8_t>> data) {
-        _description.emplace();
-        _description.value().deserialize(*data);
-        _priority = _description.value().getPriority();
-    };
-
+    // Tests if all unpacking of job descriptions is finished
+    // and, consequently, the job is ready to forward its description
+    // to children itself. The method returns true only once;
+    // repeated calls about the growth readiness can be made via isReadyToGrow().
     bool testReadyToGrow() {
         auto lock = _job_manipulation_lock.getLock();
         bool allJoined = !_unpack_threads.empty();
@@ -271,6 +283,9 @@ public:
         return _unpack_threads.empty() && hasDescription();
     }
 
+    // Updates the job's resource usage based on the period of time which passed
+    // since the last call (or the job's activation) and the old volume of the job,
+    // and then updates the volume itself.
     void updateVolumeAndUsedCpu(int newVolume) {
         // Compute used CPU time within last time slice
         float time = Timer::elapsedSeconds();
@@ -280,6 +295,8 @@ public:
         _volume = newVolume;
     }
 
+    // Updates the job's resource usage and then checks whether the job reached
+    // a limit imposed by its description or by a global parameter.
     bool checkResourceLimit(float wcSecsPerInstance, float cpuSecsPerInstance) {
 
         updateVolumeAndUsedCpu(getVolume());
@@ -305,8 +322,7 @@ public:
         return false;
     }
 
-    // ... of various meta data
-
+    // Marks the job to be indestructible as long as pending is true.
     void setResultTransferPending(bool pending) {_result_transfer_pending = pending;}
 
 
@@ -316,6 +332,15 @@ public:
         return _name.c_str();
     };
     const char* jobStateToStr() const {return jobStateStrings[(int)_state];};
+
+
+private:
+
+    void unpackDescription(std::shared_ptr<std::vector<uint8_t>> data) {
+        _description.deserialize(*data);
+        _priority = _description.getPriority();
+        _has_description = true;
+    };
 };
 
 #endif
