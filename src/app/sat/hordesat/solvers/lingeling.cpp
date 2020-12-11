@@ -355,11 +355,11 @@ void Lingeling::addLearnedClause(const int* begin, int size) {
 	}
 	if (size == 1) {
 		if (!learnedUnits.produce(*begin)) {
-			slog(this, -1, "Unit buffer full! (recv=%i digs=%i)\n", numReceived, numDigested);
+			slog(this, 2, "Unit buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
 		} else numReceived++;
 	} else {
 		if (!learnedClauses.produce(std::vector<int>(begin, begin+size))) {
-			slog(this, -1, "Clause buffer full! (recv=%i digs=%i)\n", numReceived, numDigested);
+			slog(this, 2, "Clause buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
 		} else numReceived++;
 	}
 	clauseAddMutex.unlock();
