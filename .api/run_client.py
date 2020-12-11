@@ -188,6 +188,7 @@ while any_left:
                 try:
                     j = json.load(f)
                     log("%s finished (response time: %.3f, result code: %i)", (c._name + "." + active_jobs[i]._name, j["result"]["responsetime"], j["result"]["resultcode"]))
+                    f.close()
                     os.remove(done_file)
                     
                     # Introduce next job
@@ -200,7 +201,6 @@ while any_left:
 
                 except json.decoder.JSONDecodeError as e:
                     # Could not parse JSON file - probably it is still being written. Try again later
-                    pass
+                    f.close()
 
 log("Done.")
- 
