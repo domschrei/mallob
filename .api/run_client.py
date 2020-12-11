@@ -189,18 +189,18 @@ while any_left:
                     j = json.load(f)
                     log("%s finished (response time: %.3f, result code: %i)", (c._name + "." + active_jobs[i]._name, j["result"]["responsetime"], j["result"]["resultcode"]))
                     os.remove(done_file)
-                except json.decoder.JSONDecodeError as e:
-                    log("Could not read JSON at %s", (done_file,))
-                    log("%s finished (response time: ???, result code: ???)", (c._name + "." + active_jobs[i]._name,))
-                f.close()
+                    
+                    # Introduce next job
+                    if c.has_next_job():
+                        active_jobs[i] = c.get_next_job()
+                        introduce_job(active_jobs[i])
+                    else:
+                        log("%s completed", (c._name,))
+                        active_jobs[i] = None
 
-                # Introduce next job
-                if c.has_next_job():
-                    active_jobs[i] = c.get_next_job()
-                    introduce_job(active_jobs[i])
-                else:
-                    log("%s completed", (c._name,))
-                    active_jobs[i] = None
+                except json.decoder.JSONDecodeError as e:
+                    # Could not parse JSON file - probably it is still being written. Try again later
+                    pass
 
 log("Done.")
  
