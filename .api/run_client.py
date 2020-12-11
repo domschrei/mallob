@@ -185,11 +185,15 @@ while any_left:
                 # -- job finished
 
                 f = open(done_file, 'r')
-                j = json.load(f)
-                log("%s finished (response time: %.3f, result code: %i)", (c._name + "." + active_jobs[i]._name, j["result"]["responsetime"], j["result"]["resultcode"]))
+                try:
+                    j = json.load(f)
+                    log("%s finished (response time: %.3f, result code: %i)", (c._name + "." + active_jobs[i]._name, j["result"]["responsetime"], j["result"]["resultcode"]))
+                    os.remove(done_file)
+                except json.decoder.JSONDecodeError as e:
+                    log("Could not read JSON at %s", (done_file,))
+                    log("%s finished (response time: ???, result code: ???)", (c._name + "." + active_jobs[i]._name,))
                 f.close()
 
-                os.remove(done_file)
                 # Introduce next job
                 if c.has_next_job():
                     active_jobs[i] = c.get_next_job()
