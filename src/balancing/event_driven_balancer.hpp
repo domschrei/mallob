@@ -115,7 +115,9 @@ public:
 
     bool insertIfNovel(const Event& ev) {
         // Update map if no such job entry yet or existing entry is older
-        if (!_map.count(ev.jobId) || (ev.dominates(_map[ev.jobId]) && ev.demand != _map[ev.jobId].demand)) {
+        if (!_map.count(ev.jobId) || (ev.dominates(_map[ev.jobId]) && 
+                (ev.demand != _map[ev.jobId].demand || ev.priority != _map[ev.jobId].priority)
+            )) {
             _map[ev.jobId] = ev;
             return true;
         }
