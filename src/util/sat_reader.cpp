@@ -27,7 +27,7 @@ std::shared_ptr<std::vector<int>> SatReader::read() {
 	
 	std::shared_ptr<std::vector<int>> cls = std::make_shared<std::vector<int>>();
 	
-	bool neg = false;
+	int sign = 1;
 	bool comment = false;
 	bool beganNum = false;
 	int num = 0;
@@ -58,14 +58,14 @@ std::shared_ptr<std::vector<int>> SatReader::read() {
 			case ' ':
 				if (beganNum) {
 					_num_vars = std::max(_num_vars, num);
-					cls->push_back((neg ? -1 : 1) * num);
+					cls->push_back(sign * num);
 					num = 0;
 					beganNum = false;
 				}
-				neg = false;
+				sign = 1;
 				break;
 			case '-':
-				neg = true;
+				sign = -1;
 				beganNum = true;
 				break;
 			default:
