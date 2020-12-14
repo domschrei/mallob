@@ -11,13 +11,15 @@
 #include "util/console.hpp"
 #include "comm/mpi_monitor.hpp"
 
-#define MPICALL(cmd, str) {if (!MyMpi::_monitor_off) {initcall((str).c_str());} int err = cmd; if (!MyMpi::_monitor_off) endcall(); chkerr(err);}
+#define MPICALL(cmd, str) {if (!MyMpi::_monitor_off) {initcall((str).c_str());} \
+if (MyMpi::_delay_monkey) MyMpi::delayRandomly(); int err = cmd; if (!MyMpi::_monitor_off) endcall(); chkerr(err);}
 
 int MyMpi::_max_msg_length;
 std::set<MessageHandlePtr> MyMpi::_handles;
 std::set<MessageHandlePtr> MyMpi::_sent_handles;
 std::map<int, MsgTag> MyMpi::_tags;
 bool MyMpi::_monitor_off;
+bool MyMpi::_delay_monkey;
 
 int handleId;
 
@@ -357,4 +359,10 @@ int MyMpi::rank(MPI_Comm comm) {
     int rank = -1;
     MPICALL(MPI_Comm_rank(comm, &rank), std::string("commRank"))
     return rank;
+}
+
+void MyMpi::delayRandomly() {
+    if (_delay_monkey && Random::rand() * 1000 <= 1) { // chance of 1:1000
+        usleep(1000 * 1000 * Random::rand()); // Sleep for up to one second
+    }
 }

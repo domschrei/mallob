@@ -114,6 +114,7 @@ void Worker::init() {
 
     if (_params.isNotNull("mmpi")) _mpi_monitor_thread = std::thread(mpiMonitor, this);
     else MyMpi::_monitor_off = true;
+    if (_params.isNotNull("delaymonkey")) MyMpi::_delay_monkey = true;
 
     // Initiate single instance solving as the "root node"
     if (_params.isNotNull("mono") && _world_rank == 0) {

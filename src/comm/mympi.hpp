@@ -103,6 +103,7 @@ class MyMpi {
 public:
     static int _max_msg_length;
     static bool _monitor_off;
+    static bool _delay_monkey;
 
     static void init(int argc, char *argv[]);
     static void beginListening();
@@ -140,6 +141,7 @@ public:
 
     // defined in mpi_monitor.*
     static std::string currentCall(double* callStart);
+    static void delayRandomly();
 
 private:
     static std::set<MessageHandlePtr> _handles;
