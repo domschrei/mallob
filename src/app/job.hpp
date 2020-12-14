@@ -226,14 +226,15 @@ public:
     void assertState(JobState state) const {assert(_state == state || Console::fail("State of %s : %s", toStr(), jobStateToStr()));};
     int getVolume() const {return _volume;}
     float getPriority() const {return _priority;}
-    bool hasDescription() const {return _has_description;};
-    const JobDescription& getDescription() const {assert(hasDescription()); return _description;};
+    bool hasReceivedDescription() const {return _serialized_description != nullptr;};
+    bool hasDeserializedDescription() const {return _has_description;};
+    const JobDescription& getDescription() const {assert(hasDeserializedDescription()); return _description;};
     std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription() {return _serialized_description;};
     bool hasCommitment() const {return _commitment.has_value();}
     const JobRequest& getCommitment() const {assert(hasCommitment()); return _commitment.value();}
     int getId() const {return _id;};
     int getIndex() const {return _job_tree.getIndex();};
-    int getRevision() const {assert(hasDescription()); return getDescription().getRevision();};
+    int getRevision() const {assert(hasDeserializedDescription()); return getDescription().getRevision();};
     const JobResult& getResult();
     // Elapsed seconds since the job's constructor call.
     float getAge() const {return Timer::elapsedSeconds() - _time_of_arrival;}
@@ -280,7 +281,7 @@ public:
     }
     bool isReadyToGrow() {
         auto lock = _job_manipulation_lock.getLock();
-        return _unpack_threads.empty() && hasDescription();
+        return _unpack_threads.empty() && hasDeserializedDescription();
     }
 
     // Updates the job's resource usage based on the period of time which passed

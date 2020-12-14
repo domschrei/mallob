@@ -7,11 +7,6 @@
 #include "util/console.hpp"
 #include "util/sys/timer.hpp"
 
-/*
-Compile with:
-g++ -g -Isrc src/test/test_permutation.cpp src/util/{random,console,permutation,timer,params}.cpp -o test_permutation
-*/
-
 int main() {
 
     Timer::init();

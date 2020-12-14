@@ -245,6 +245,7 @@ void JobDatabase::reactivate(const JobRequest& req, int source) {
     Job& job = get(req.jobId);
     Console::log_recv(Console::INFO, source, "Reactivate %s", 
                 toStr(req.jobId, req.requestedNodeIndex).c_str());
+    job.updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
     setLoad(1, req.jobId);
     if (job.getState() == SUSPENDED) {
         job.resume();
@@ -281,6 +282,7 @@ void JobDatabase::forgetOldJobs() {
     for (auto idJobPair : _jobs) {
         int id = idJobPair.first;
         Job& job = *idJobPair.second;
+        if (job.hasCommitment()) continue;
         // Old inactive job
         if (job.getState() == INACTIVE && job.getAge() >= 60) {
             jobsToForget.push_back(id);

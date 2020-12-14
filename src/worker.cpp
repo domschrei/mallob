@@ -426,7 +426,7 @@ void Worker::handleRequestNode(MessageHandlePtr& handle, bool oneshot) {
             // Job is not known yet: create instance, request full transfer
             _job_db.createJob(MyMpi::size(_comm), _world_rank, req.jobId);
             fullTransfer = true;
-        } else if (!_job_db.get(req.jobId).hasDescription()) {
+        } else if (!_job_db.get(req.jobId).hasReceivedDescription()) {
             // Job is known, but never received full description:
             // request full transfer
             fullTransfer = true;

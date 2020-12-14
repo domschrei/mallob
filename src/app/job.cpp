@@ -53,15 +53,17 @@ void Job::start(std::shared_ptr<std::vector<uint8_t>> data) {
     _state = ACTIVE;
 
     auto lock = _job_manipulation_lock.getLock();
+    
+    _serialized_description = data;
+    
     size_t i = _unpack_done.size();
     _unpack_done.emplace_back(false);
     _unpack_threads.emplace_back([this, data, i]() {
 
-        if (!hasDescription()) {
+        if (!hasDeserializedDescription()) {
             // Explicitly store serialized data s.t. it can be forwarded later
             // without the need to re-serialize the job description
             assert(data && data->size() > 0);
-            _serialized_description = data;
             unpackDescription(data);
         } else if (data) {
             // TODO Handle amendment to job description
