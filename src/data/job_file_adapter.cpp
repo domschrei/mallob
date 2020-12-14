@@ -15,6 +15,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
     std::string userFile, jobName;
     int id;
     float userPrio;
+    float arrival = Timer::elapsedSeconds();
 
     {
         auto lock = _job_map_mutex.getLock();
@@ -67,6 +68,8 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
         
         id = _running_id++;
         userPrio = jUser["priority"].get<float>();
+        _job_name_to_id[jobName] = id;
+        _job_id_to_image[id] = JobImage(id, jobName, event.name, arrival);
 
         // Remove original file, move to "pending"
         FileUtils::rm(eventFile);
@@ -95,7 +98,6 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
         // Jitter job priority
         priority *= 0.99 + 0.01 * Random::rand();
     }
-    float arrival = Timer::elapsedSeconds();
     JobDescription* job = new JobDescription(id, priority, /*incremental=*/false);
     if (j.contains("wallclock-limit")) {
         job->setWallclockLimit(TimePeriod(j["wallclock-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS));
@@ -114,13 +116,6 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
 
     // Callback to client: New job arrival.
     _new_job_callback(std::shared_ptr<JobDescription>(job));
-
-    // Remember name/id mapping
-    {
-        auto lock = _job_map_mutex.getLock();
-        _job_name_to_id[jobName] = id;
-        _job_id_to_image[id] = JobImage(id, jobName, event.name, arrival);
-    }
 }
 
 void JobFileAdapter::handleJobDone(const JobResult& result) {
