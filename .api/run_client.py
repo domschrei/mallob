@@ -20,7 +20,7 @@ def get_instance_filename(inst_id):
     global global_benchmark
     if not global_benchmark:
         global_benchmark = []
-        for line in open(".api/benchmark_sat2020", "r").readlines():
+        for line in open(".api/benchmark_trivial", "r").readlines():
             str = line.rstrip()
             if str:
                 global_benchmark += [str]
@@ -144,7 +144,7 @@ stdv_stream_length = 3
 
 # Number and arrival frequency of clients
 num_clients = 64
-client_interarrival_time = 2.00
+client_interarrival_time = 0.01
 
 # Resource limits given to each job (overriding mallob's global options!)
 wc_limit_per_job = 600

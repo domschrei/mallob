@@ -41,17 +41,16 @@ public:
 
     General notes:
     * Communication (MyMpi::*) may ONLY take place within mallob's main thread, i.e., 
-      within the appl_* methods (and not a thread spawned from it).
+      within the appl_* methods (and NOT within a thread spawned from it).
     * All appl_* methods must return immediately. Heavy work must be performed concurrently
       within a separate thread. Exceptions are appl_beginCommunication and appl_communicate
-      where a decent amount of work of the main thread may be necessary to handle communication.
+      where a certain amount of work of the main thread may be necessary to handle communication.
     * Your code must bookkeep the active threads of your application, make them ready to be joined 
-      after appl_terminate() has been called, and be able to instantly join them if
+      after appl_terminate() has been called, and be able to instantly join them as soon as
       your appl_isDestructible() returns true. 
     * If your application spawns child processes, appl_suspend() and appl_resume() can be
-      realized over SIGTSTP and SIGCONT signals, but also make sure that the process is
+      realized over SIGTSTP and SIGCONT signals, but do make sure that the process is
       terminated after appl_terminate().
-
     */
 
     /*

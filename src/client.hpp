@@ -29,7 +29,7 @@ private:
     std::map<int, std::shared_ptr<JobDescription>> _jobs;
     std::map<int, std::string> _job_instances;
 
-    std::vector<JobDescription*> _incoming_job_queue;
+    std::vector<std::shared_ptr<JobDescription>> _incoming_job_queue;
     Mutex _incoming_job_queue_lock;
 
     volatile int _last_introduced_job_idx;
@@ -54,7 +54,7 @@ public:
     void init();
     void mainProgram();
 
-    void handleNewJob(JobDescription* desc);
+    void handleNewJob(std::shared_ptr<JobDescription> desc);
 
 private:
     void readAllInstances();

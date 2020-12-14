@@ -149,11 +149,11 @@ Each scenario file must be formatted like this:
 IDs must be positive integers. Priorities must be in the interval `(0,1]`; greater numbers denote a higher priority. 
 Arrival times denote the point in time since program start where a given job _may_ enter the system; but depending on the program configuration (see `lbc` option below) the actual introduction of the job may be deferred to a later point in time.
 
-### More Options
+### Options Overview
 
 All command-line options of mallob can be seen by executing mallob without any parameters or with the `-h` option.
 The exact options mallob uses, including all non-overridden default values, are printed out on program start at default verbosity.
-Here is some explanation for the most important ones:
+Here is some explanation for the most important ones.
 
 * `-c=<#clients>`: The number of designated client MPI processes. When a scenario file `-scenario=path/to/file.txt` is provided, the program assumes the existence of separate scenario files `path/to/file.txt.0`, `path/to/file.txt.1`, ..., `path/to/file.txt.<#clients-1>`. Note that this number will be subtracted from the amount of actual worker processes within your program execution: `#processes = #workers + #clients`. 
 * `-lbc=<#jobs-per-client>`: Simulates "leaky bucket clients": each client process will strive to have exactly `<#jobs-per-client>` jobs in the system at any given time. As long as the amount of active jobs of this client is lower than this number, the client will introduce new jobs as possible. In other words, the provided number is the amount of _streams of jobs_ that each client wishes to be solved in parallel.

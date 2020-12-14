@@ -70,7 +70,7 @@ void Client::readAllInstances() {
     }
 }
 
-void Client::handleNewJob(JobDescription* desc) {
+void Client::handleNewJob(std::shared_ptr<JobDescription> desc) {
     auto lock = _incoming_job_queue_lock.getLock();
     _incoming_job_queue.push_back(desc);
 }
@@ -87,7 +87,7 @@ void Client::init() {
     } else {
         _file_adapter = std::unique_ptr<JobFileAdapter>(
             new JobFileAdapter(_params, ".api/jobs." + std::to_string(internalRank) + "/", 
-                [&](JobDescription* desc) {handleNewJob(desc);}
+                [&](std::shared_ptr<JobDescription> desc) {handleNewJob(desc);}
             )
         );
     }
@@ -193,9 +193,7 @@ int Client::getNextIntroduceableJob() {
     // Jobs in the incoming queue?
     {
         auto lock = _incoming_job_queue_lock.getLock();
-        for (auto desc : _incoming_job_queue) {
-            std::shared_ptr<JobDescription> job(desc);
-
+        for (auto job : _incoming_job_queue) {
             int id = job->getId();
             _ordered_job_ids.push_back(id);
             _jobs[id] = job;

@@ -38,12 +38,13 @@ private:
     robin_hood::unordered_node_map<int, JobImage> _job_id_to_image;
     int _running_id;
 
-    std::function<void(JobDescription* desc)> _new_job_callback;
+    std::function<void(std::shared_ptr<JobDescription> desc)> _new_job_callback;
     Mutex _job_map_mutex;
 
 public:
 
-    JobFileAdapter(const Parameters& params, const std::string& basePath, std::function<void(JobDescription* desc)> newJobCallback) : 
+    JobFileAdapter(const Parameters& params, const std::string& basePath, 
+                        std::function<void(std::shared_ptr<JobDescription> desc)> newJobCallback) : 
         _params(params),
         _base_path(basePath),
         _new_jobs_watcher(_base_path + "/new/", (int) (IN_MOVED_TO | IN_MODIFY | IN_CLOSE_WRITE), 
