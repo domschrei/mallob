@@ -40,7 +40,8 @@ if(MALLOB_USE_RESTRICTED)
     set(BASE_SOURCES ${BASE_SOURCES} ${RESTRICTED_SOURCES})
     set(BASE_LDIRS ${BASE_LDIRS} src/app/sat/hordesat/glucose)
     set(BASE_LIBS ${BASE_LIBS} glucose)
-	set(BASE_INCLUDES ${BASE_INCLUDES} src/app/sat/hordesat/glucose)
+    set(BASE_INCLUDES ${BASE_INCLUDES} src/app/sat/hordesat/glucose)
+    add_compile_definitions(MALLOB_USE_RESTRICTED)
 endif()
 
 
