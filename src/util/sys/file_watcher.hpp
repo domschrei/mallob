@@ -14,6 +14,7 @@
 
 #include "util/console.hpp"
 #include "util/sys/fileutils.hpp"
+#include "util/sys/thread_group.hpp"
 
 class FileWatcher {
 
@@ -45,6 +46,8 @@ public:
 
             FileUtils::mkdir(_directory);
 
+            ThreadGroup threads;
+
             // Read job files which may already exist
             if (_init_files_handling == TRIGGER_CREATE_EVENT) {
                 const std::filesystem::path newJobsPath { _directory };
@@ -53,7 +56,7 @@ public:
                     if (entry.is_regular_file()) {
                         // Trigger CREATE event
                         Console::log(Console::VVERB, "FileWatcher: File event");
-                        _callback(FileWatcher::Event{IN_CREATE, filenameStr});
+                        threads.doTask([this, filenameStr]() {_callback(FileWatcher::Event{IN_CREATE, filenameStr});});
                     }
                     if (_exiting) return;
                 }
@@ -95,7 +98,7 @@ public:
                     inotify_event* event = (inotify_event*) &buffer[i];
                     Event ev{event->mask, std::string(event->name, event->len)};
                     Console::log(Console::VVERB, "FileWatcher: File event");
-                    _callback(ev);
+                    threads.doTask([this, ev]() {_callback(ev);});
                     i += eventSize + event->len;
                 }
             }

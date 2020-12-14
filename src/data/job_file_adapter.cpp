@@ -9,62 +9,73 @@
 
 void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
 
-    Console::log(Console::VVERB, "New job file event: type %i, name \"%s\"\n", event.type, event.name.c_str());
+    Console::log(Console::VERB, "New job file event: type %i, name \"%s\"\n", event.type, event.name.c_str());
 
-    auto lock = _job_map_mutex.getLock();
-
-    // Attempt to read job file
-    std::string eventFile = getJobFilePath(event, NEW);
-    if (!std::filesystem::is_regular_file(eventFile)) {
-        return; // File does not exist (any more)
-    }
     nlohmann::json j;
-    try {
-        std::ifstream i(eventFile);
-        i >> j;
-    } catch (const nlohmann::detail::parse_error& e) {
-        Console::log(Console::WARN, "Parse error on %s: %s\n", eventFile.c_str(), e.what());
-        return;
-    }
+    std::string userFile, jobName;
+    int id;
+    float userPrio;
 
-    // Check and read essential fields from JSON
-    if (!j.contains("user") || !j.contains("name") || !j.contains("file")) {
-        Console::log(Console::WARN, "Job file missing essential field(s). Ignoring this file.\n");
-        return;
-    }
-    std::string user = j["user"].get<std::string>();
-    std::string name = j["name"].get<std::string>();
-    std::string jobName = user + "." + name + ".json";
+    {
+        auto lock = _job_map_mutex.getLock();
+        
+        // Attempt to read job file
+        std::string eventFile = getJobFilePath(event, NEW);
+        if (!std::filesystem::is_regular_file(eventFile)) {
+            return; // File does not exist (any more)
+        }
+        try {
+            std::ifstream i(eventFile);
+            i >> j;
+        } catch (const nlohmann::detail::parse_error& e) {
+            Console::log(Console::WARN, "Parse error on %s: %s\n", eventFile.c_str(), e.what());
+            return;
+        }
 
+        // Check and read essential fields from JSON
+        if (!j.contains("user") || !j.contains("name") || !j.contains("file")) {
+            Console::log(Console::WARN, "Job file missing essential field(s). Ignoring this file.\n");
+            return;
+        }
+        std::string user = j["user"].get<std::string>();
+        std::string name = j["name"].get<std::string>();
+        jobName = user + "." + name + ".json";
 
-    if (_job_name_to_id.count(jobName)) {
-        Console::log(Console::WARN, "Modification of a file I already parsed! Ignoring.\n");
-        return;
-    }
+        if (_job_name_to_id.count(jobName)) {
+            Console::log(Console::WARN, "Modification of a file I already parsed! Ignoring.\n");
+            return;
+        }
 
-    // Get user definition
-    std::string userFile = getUserFilePath(user);
-    nlohmann::json jUser;
-    try {
-        std::ifstream i(userFile);
-        i >> jUser;
-    } catch (const nlohmann::detail::parse_error& e) {
-        Console::log(Console::WARN, "Unknown user or invalid user definition: %s\n", e.what());
-        return;
+        // Get user definition
+        userFile = getUserFilePath(user);
+        nlohmann::json jUser;
+        try {
+            std::ifstream i(userFile);
+            i >> jUser;
+        } catch (const nlohmann::detail::parse_error& e) {
+            Console::log(Console::WARN, "Unknown user or invalid user definition: %s\n", e.what());
+            return;
+        }
+        if (!jUser.contains("id") || !jUser.contains("priority")) {
+            Console::log(Console::WARN, "User file %s missing essential field(s). Ignoring job file with this user.\n", userFile.c_str());
+            return;
+        }
+        if (jUser["id"].get<std::string>() != user) {
+            Console::log(Console::WARN, "User file %s has inconsistent user ID. Ignoring job file with this user.\n", userFile.c_str());
+            return;
+        }
+        
+        id = _running_id++;
+        userPrio = jUser["priority"].get<float>();
+
+        // Remove original file, move to "pending"
+        FileUtils::rm(eventFile);
+        std::ofstream o(getJobFilePath(id, PENDING));
+        o << std::setw(4) << j << std::endl;
     }
-    if (!jUser.contains("id") || !jUser.contains("priority")) {
-        Console::log(Console::WARN, "User file %s missing essential field(s). Ignoring job file with this user.\n", userFile.c_str());
-        return;
-    }
-    if (jUser["id"].get<std::string>() != user) {
-        Console::log(Console::WARN, "User file %s has inconsistent user ID. Ignoring job file with this user.\n", userFile.c_str());
-        return;
-    }
-    float userPrio = jUser["priority"].get<float>();
-    
-    int id = _running_id++;
 
     // Parse CNF input file
+    float time = Timer::elapsedSeconds();
     std::string file = j["file"].get<std::string>();
     SatReader r(file);
     VecPtr formula = r.read();
@@ -73,7 +84,10 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
         Console::log(Console::WARN, "File %s could not be opened - skipping #%i", file.c_str(), id);
         return;
     }
-    Console::log(Console::VERB, "%i literals including separation zeros, %i assumptions", formula->size(), assumptions->size());
+    time = Timer::elapsedSeconds() - time;
+    Console::log(Console::VERB, "Parsed %s (%i literals w/ separators, %i assumptions) in %.3fs", 
+            userFile.c_str(), formula->size(), assumptions->size(), time);
+    time = Timer::elapsedSeconds();
 
     // Initialize new job
     float priority = userPrio * (j.contains("priority") ? j["priority"].get<float>() : 1.0f);
@@ -95,18 +109,18 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
     job->addAssumptions(assumptions);
     job->setNumVars(r.getNumVars());
     job->setArrival(arrival);
+    time = Timer::elapsedSeconds() - time;
+    Console::log(Console::VERB, "Initialized job #%i (%s) in %.3fs", id, userFile.c_str(), time);
 
     // Callback to client: New job arrival.
-    _new_job_callback(job);
+    _new_job_callback(std::shared_ptr<JobDescription>(job));
 
     // Remember name/id mapping
-    _job_name_to_id[jobName] = id;
-    _job_id_to_image[id] = JobImage(id, jobName, event.name, arrival);
-
-    // Remove original file, move to "pending"
-    FileUtils::rm(eventFile);
-    std::ofstream o(getJobFilePath(id, PENDING));
-    o << std::setw(4) << j << std::endl;
+    {
+        auto lock = _job_map_mutex.getLock();
+        _job_name_to_id[jobName] = id;
+        _job_id_to_image[id] = JobImage(id, jobName, event.name, arrival);
+    }
 }
 
 void JobFileAdapter::handleJobDone(const JobResult& result) {
