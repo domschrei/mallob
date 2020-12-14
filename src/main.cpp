@@ -48,6 +48,8 @@ int main(int argc, char *argv[]) {
             /*threadsafeOutput=*/false, /*quiet=*/params.isNotNull("q"), 
             /*cPrefix=*/params.isNotNull("mono"), params.getParam("log"));
     
+    MyMpi::setOptions(params);
+
     if (rank == 0)
         params.printParams();
     if (params.isSet("h") || params.isSet("help")) {

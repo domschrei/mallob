@@ -12,14 +12,14 @@
 #include "comm/mpi_monitor.hpp"
 
 #define MPICALL(cmd, str) {if (!MyMpi::_monitor_off) {initcall((str).c_str());} \
-if (MyMpi::_delay_monkey) MyMpi::delayRandomly(); int err = cmd; if (!MyMpi::_monitor_off) endcall(); chkerr(err);}
+int err = cmd; if (!MyMpi::_monitor_off) endcall(); chkerr(err);}
 
 int MyMpi::_max_msg_length;
 std::set<MessageHandlePtr> MyMpi::_handles;
 std::set<MessageHandlePtr> MyMpi::_sent_handles;
 std::map<int, MsgTag> MyMpi::_tags;
 bool MyMpi::_monitor_off;
-bool MyMpi::_delay_monkey;
+int MyMpi::_monkey_flags = 0;
 
 int handleId;
 
@@ -98,8 +98,8 @@ int MyMpi::nextHandleId() {
     return handleId++;
 }
 
-void MyMpi::init(int argc, char *argv[])
-{    
+void MyMpi::init(int argc, char *argv[]) {
+
     int provided = -1;
     MPICALL(MPI_Init_thread(&argc, &argv, MPI_THREAD_SINGLE, &provided), std::string("init"))
     if (provided != MPI_THREAD_SINGLE) {
@@ -109,7 +109,6 @@ void MyMpi::init(int argc, char *argv[])
     }
 
     _max_msg_length = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + MAX_ANYTIME_MESSAGE_SIZE;
-    _monitor_off = false;
     handleId = 1;
 
     std::vector<MsgTag> tagList;
@@ -151,6 +150,18 @@ void MyMpi::init(int argc, char *argv[])
     for (const auto& tag : tagList) _tags[tag.id] = tag;
 }
 
+void MyMpi::setOptions(const Parameters& params) {
+    _monitor_off = !params.isNotNull("mmpi");
+    if (params.isNotNull("delaymonkey")) {
+        Console::log(Console::INFO, "Enabling delay monkey");
+        _monkey_flags |= MONKEY_DELAY;
+    }
+    if (params.isNotNull("latencymonkey")) {
+        Console::log(Console::INFO, "Enabling latency monkey");
+        _monkey_flags |= MONKEY_LATENCY;
+    }
+}
+
 void MyMpi::beginListening() {
     MessageHandlePtr handle = MyMpi::irecv(MPI_COMM_WORLD, MSG_ANYTIME);
     Console::log(Console::VVVERB, "Msg ID=%i : listening to tag %i", handle->id, MSG_ANYTIME);
@@ -176,6 +187,9 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
 }
 
 MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object) {
+
+    latencyMonkey();
+    delayMonkey();
 
     if (object->empty()) {
         object->push_back(0);
@@ -361,8 +375,18 @@ int MyMpi::rank(MPI_Comm comm) {
     return rank;
 }
 
-void MyMpi::delayRandomly() {
-    if (_delay_monkey && Random::rand() * 1000 <= 1) { // chance of 1:1000
-        usleep(1000 * 1000 * Random::rand()); // Sleep for up to one second
+void MyMpi::latencyMonkey() {
+    if (_monkey_flags & MONKEY_LATENCY) {
+        float duration = 1 * 1000 + 9 * 1000 * Random::rand(); // Sleep between one and ten millisecs
+        //Console::log(Console::VVVERB, "LATENCY_MONKEY %.3fs", 0.001 * 0.001 * duration);
+        usleep(duration); 
+    }
+}
+
+void MyMpi::delayMonkey() {
+    if ((_monkey_flags & MONKEY_DELAY) && Random::rand() * 100 <= 1) { // chance of 1:100
+        float duration = 1000 * 1000 * Random::rand(); // Sleep for up to one second
+        Console::log(Console::VVVERB, "DELAY_MONKEY %.3fs", 0.001 * 0.001 * duration);
+        usleep(duration); 
     }
 }

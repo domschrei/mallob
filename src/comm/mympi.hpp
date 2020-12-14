@@ -101,11 +101,15 @@ typedef std::shared_ptr<MessageHandle> MessageHandlePtr;
 class MyMpi {
 
 public:
+    static const int MONKEY_LATENCY = 1;
+    static const int MONKEY_DELAY = 2;
+
     static int _max_msg_length;
     static bool _monitor_off;
-    static bool _delay_monkey;
+    static int _monkey_flags;
 
     static void init(int argc, char *argv[]);
+    static void setOptions(const Parameters& params);
     static void beginListening();
 
     static MessageHandlePtr isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object);
@@ -141,7 +145,8 @@ public:
 
     // defined in mpi_monitor.*
     static std::string currentCall(double* callStart);
-    static void delayRandomly();
+    static void latencyMonkey();
+    static void delayMonkey();
 
 private:
     static std::set<MessageHandlePtr> _handles;

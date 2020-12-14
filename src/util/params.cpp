@@ -24,8 +24,9 @@ const char* OPTIONS =
     "\n\nSystem options:"
     "\n-appmode=<mode>       Application mode: \"fork\" (spawn child process for each job on each MPI process)"
     "\n                      or \"thread\" (execute jobs in separate threads but within the same process)"
-    "\n-delaymonkey[=<0|1>]  Randomly delay some messages (for testing robustness)"
+    "\n-delaymonkey[=<0|1>]  Small chance for each MPI call to block for some random amount of time"
     "\n-jc=<size>            Size of job cache for suspended yet unfinished jobs (int x >= 0; 0: no limit)"
+    "\n-latencymonkey[=<0|1>]    Block all MPI_Isend operations by a small randomized amount of time"
     "\n-mmpi[=<0|1>]         Monitor MPI: Launch an additional thread per process checking when the main thread"
     "\n                      is inside some MPI call"
     "\n-sleep=<micros>       Sleep provided number of microseconds between loop cycles of worker main thread"
@@ -125,7 +126,7 @@ void Parameters::setDefaults() {
     setParam("cfhl", "60"); // clause buffer half life
     setParam("cg", "1"); // continuous growth
     setParam("colors", "0"); // colored terminal output
-    setParam("delaymonkey", "0"); // randomly delay some messages (for testing robustness)
+    setParam("delaymonkey", "0"); // Small chance for each MPI call to block for some random amount of time
     setParam("derandomize", "1"); // derandomize job bouncing
     setParam("g", "5.0"); // job demand growth interval
     //setParam("h"); setParam("help"); // print usage
@@ -133,6 +134,7 @@ void Parameters::setDefaults() {
     setParam("jc", "4"); // job cache
     setParam("jjp", "1"); // jitter job priorities
     setParam("l", "0.95"); // load factor
+    setParam("latencymonkey", "0"); // Block all MPI_Isend operations by a small randomized amount of time 
     setParam("log", "."); // logging directory
     setParam("lbc", "0"); // leaky bucket client parameter (0 = no leaky bucket, jobs enter by time) 
     setParam("md", "0"); // maximum demand per job (0 = no limit)
