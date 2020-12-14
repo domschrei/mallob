@@ -25,7 +25,6 @@ Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
 void Job::updateJobTree(int index, int rootRank, int parentRank) {
 
     if (index == 0) rootRank = -1;
-    Console::log(Console::VERB, "UPDATE_JOB_TREE (%i,%i,%i)", index, rootRank, parentRank);
     _name = "#" + std::to_string(_id) + ":" + std::to_string(index);
     _job_tree.update(index, rootRank, parentRank);
 }
@@ -108,11 +107,8 @@ void Job::terminate() {
     _job_tree.unsetLeftChild();
     _job_tree.unsetRightChild();
 
-    // Free up memory
-    _description = JobDescription();
-    _serialized_description = IntVec({_id}).serialize();
     _time_of_abort = Timer::elapsedSeconds();
-    Console::log(Console::VERB, "%s : terminated, memory freed", toStr());
+    Console::log(Console::VERB, "%s : terminated", toStr());
 }
 
 bool Job::isDestructible() {

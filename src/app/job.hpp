@@ -125,12 +125,6 @@ public:
     on the instance any more, and the destructor will return immediately).
     */
     virtual bool appl_isDestructible() = 0;
-    /*
-    Free all data associated to this job instance. Join all associated threads if any are left.
-    */
-    virtual ~Job() {
-        for (auto& thread : _unpack_threads) if (thread.joinable()) thread.join();
-    }
     
     /*
     Measure for the age of a job -- decreases with time.
@@ -138,6 +132,12 @@ public:
     */
     virtual double getTemperature() const;
     
+    /*
+    Free all data associated to this job instance. Join all associated threads if any are left.
+    */
+    virtual ~Job() {
+        for (auto& thread : _unpack_threads) if (thread.joinable()) thread.join();
+    }
     // END of interface to implement as an application.
 
 

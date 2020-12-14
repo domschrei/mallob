@@ -113,11 +113,9 @@ public:
         updateParentNodeRank(parentRank);
     }
     void updateJobNode(int index, int newRank) {
-        Console::log(Console::VERB, "UPDATE_JOB_TREE %i -> %i", index, newRank);
         _job_node_ranks.adjust(index, newRank);
     }
     void clearJobNodeUpdates() {
-        Console::log(Console::VERB, "CLEAR_JOB_TREE");
         _job_node_ranks.clear();
     }
     void updateParentNodeRank(int newRank) {
