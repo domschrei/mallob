@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
  
-import matplotlib.pyplot as plt
 import math
 import sys
 import re
 
+import matplotlib
+matplotlib.use('pdf')
+matplotlib.rcParams['hatch.linewidth'] = 0.5  # previous pdf hatch linewidth
+import matplotlib.pyplot as plt
 from matplotlib import rc
-#rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
-## for Palatino and other serif fonts use:
-#rc('font',**{'family':'serif','serif':['Palatino']})
+rc('font', family='serif')
+#rc('font', serif=['Times'])
 rc('text', usetex=True)
 
 colors = ['#377eb8', '#ff7f00', '#e41a1c', '#f781bf', '#a65628', '#4daf4a', '#984ea3', '#999999', '#dede00', '#377eb8']
@@ -41,6 +43,7 @@ xmax = None
 ymin = None
 ymax = None
 confidence_area = False
+legend_right = False
 
 outfile = None
 
@@ -98,6 +101,8 @@ for arg in sys.argv[1:]:
         outfile = arg[3:]
     elif arg.startswith("-confidence") or arg.startswith("--confidence"):
         confidence_area = True
+    elif arg == "-legendright" or arg == "--legendright":
+        legend_right = True
     else:
         files += [arg]
 
@@ -105,6 +110,13 @@ for arg in sys.argv[1:]:
 def process_line(line, X, Y, C, lc):
     
     words = line.rstrip().split(" ")
+    
+    # check validity
+    for word in words:
+        try:
+            x = float(word)
+        except:
+            return
     
     num_ys = len(words)
     if colorvals:
@@ -130,8 +142,8 @@ def process_line(line, X, Y, C, lc):
         
     # Y values
     for i in range(len(words)):
-        Y[i] += [float(words[i])]
-
+        y = float(words[i])
+        Y[i] += [y]
 
 if not files:
     # Read from stdin
@@ -220,7 +232,10 @@ if logx:
 if logy:
     plt.yscale("log")
 if do_legend:
-    plt.legend()
+    if legend_right:
+        plt.legend(bbox_to_anchor=(1.05, 0.5), loc='center left', edgecolor="black")
+    else:
+        plt.legend()
 plt.tight_layout()
 if outfile:
     plt.savefig(outfile)
