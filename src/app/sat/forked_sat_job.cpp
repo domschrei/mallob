@@ -116,7 +116,7 @@ int ForkedSatJob::appl_solved() {
         auto solution = _solver->getSolution();
         result = solution.first;
         Console::log_send(Console::INFO, getJobTree().getRootNodeRank(), "%s : found result %s", toStr(), 
-                            result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN");
+                            result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         _internal_result.id = getId();
         _internal_result.result = result;
         _internal_result.revision = getRevision();

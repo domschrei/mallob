@@ -3,8 +3,9 @@
 #define DOMPASCH_CUCKOO_REBALANCER_SERIALIZABLE
 
 #include <vector>
-#include <cstdint>
 #include <memory>
+#include <cstdint>
+#include <cstring>
 
 /*
 Generic interface for serializing and deserializing arbitrary data, mainly
@@ -27,6 +28,15 @@ public:
     static T get(const std::vector<uint8_t>& packed);
 };
 
-#include "serializable_impl.hpp"
+template<typename T> 
+T Serializable::get(const std::vector<uint8_t>& packed) {
+    if constexpr (std::is_base_of<Serializable, T>()) {
+        return T().deserialize(packed);
+    } else {
+        T elem;
+        memcpy(&elem, packed.data(), sizeof(T));
+        return elem;
+    }
+}
 
 #endif

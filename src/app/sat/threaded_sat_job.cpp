@@ -133,7 +133,7 @@ int ThreadedSatJob::appl_solved() {
     if (result >= 0) {
         _done_locally = true;
         Console::log_send(Console::INFO, getJobTree().getRootNodeRank(), "%s : found result %s", toStr(), 
-                            result == 10 ? "SAT" : result == 20 ? "UNSAT" : "UNKNOWN");
+                            result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         _result_code = result;
     }
     return result;

@@ -8,19 +8,22 @@
 #include <limits>
 
 #include "worker.hpp"
+
 #include "app/sat/threaded_sat_job.hpp"
 #include "app/sat/forked_sat_job.hpp"
+#include "app/sat/sat_constants.h"
+
+#include "balancing/event_driven_balancer.hpp"
+#include "comm/mpi_monitor.hpp"
 #include "data/serializable.hpp"
+#include "data/job_description.hpp"
+#include "util/sys/fork.hpp"
+#include "util/sys/proc.hpp"
 #include "util/sys/timer.hpp"
+#include "util/sys/watchdog.hpp"
 #include "util/console.hpp"
 #include "util/random.hpp"
-#include "util/sys/proc.hpp"
 #include "util/sat_reader.hpp"
-#include "util/sys/fork.hpp"
-#include "comm/mpi_monitor.hpp"
-#include "balancing/event_driven_balancer.hpp"
-#include "data/job_description.hpp"
-#include "util/sys/watchdog.hpp"
 
 void Worker::init() {
     
@@ -636,8 +639,9 @@ void Worker::handleSendJobResult(MessageHandlePtr& handle) {
     int revision = jobResult.revision;
 
     Console::log_recv(Console::INFO, handle->source, "Received result of job #%i rev. %i, code: %i", jobId, revision, resultCode);
-    Console::log_noprefix(Console::CRIT, "s %s", resultCode == 10 ? "SATISFIABLE" : resultCode == 20 ? "UNSATISFIABLE" : "UNKNOWN");
-    if (resultCode == 10) {
+    Console::log_noprefix(Console::CRIT, "s %s", resultCode == RESULT_SAT ? "SATISFIABLE" 
+                            : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN");
+    if (resultCode == RESULT_SAT) {
         std::string model = "";
         for (size_t x = 1; x < jobResult.solution.size(); x++) {
             model += std::to_string(jobResult.solution[x]) + " ";

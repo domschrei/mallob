@@ -21,51 +21,35 @@
 #include <set>
 #include <map>
 
-using namespace std;
-
 class HordeLib {
+
 private:
-	int mpi_size;
-	int mpi_rank;
 
-	size_t sleepInt;
-	int solversCount;
-	std::unique_ptr<SharingManagerInterface> sharingManager;
+	Parameters _params;
+	std::shared_ptr<LoggingInterface> _logger;
 	
-	volatile SolvingStates::SolvingState solvingState;
-	
-	std::vector<std::shared_ptr<std::vector<int>>> formulae;
-	std::shared_ptr<vector<int>> assumptions;
-	
-	std::vector<std::shared_ptr<PortfolioSolverInterface>> solverInterfaces;
-	std::vector<std::shared_ptr<SolverThread>> solverThreads;
-	
-	SatResult finalResult;
-	vector<int> truthValues;
-	set<int> failedAssumptions;
+	size_t _sleep_microsecs;
+	size_t _num_solvers;
 
-    double startSolving;
-    int maxSeconds;
-	size_t maxRounds;
-	size_t round;
-	bool anySolutionFound = false;
-
-	std::shared_ptr<LoggingInterface> logger;
+	// Payload to solve
+	std::vector<std::shared_ptr<std::vector<int>>> _formulae;
+	std::shared_ptr<std::vector<int>> _assumptions;
 	
-	// settings
-	Parameters params;
-
-	bool cleanedUp = false;
+	std::unique_ptr<SharingManagerInterface> _sharing_manager;
+	std::vector<std::shared_ptr<PortfolioSolverInterface>> _solver_interfaces;
+	std::vector<std::shared_ptr<SolverThread>> _solver_threads;
+	
+	volatile SolvingStates::SolvingState _state;
+	SatResult _result;
+	std::vector<int> _model;
+	std::set<int> _failed_assumptions;
+	bool _solution_found = false;
+	bool _cleaned_up = false;
 
 public:
-	friend class SolverThread;
 
-	// methods
-	HordeLib(int argc, char** argv);
     HordeLib(const Parameters& params, std::shared_ptr<LoggingInterface> loggingInterface = NULL);
-	~HordeLib();
-
-	const Parameters& getParams() {return params;}
+	~HordeLib() = default;
 
     void beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
 							const std::shared_ptr<std::vector<int>>& assumptions);
@@ -73,7 +57,7 @@ public:
 							const std::shared_ptr<std::vector<int>>& assumptions);
 	void updateRole(int rank, int numNodes);
 	bool isFullyInitialized();
-	bool isAnySolutionFound() {return anySolutionFound;}
+	bool isAnySolutionFound() {return _solution_found;}
     int solveLoop();
 
     int prepareSharing(int* begin, int maxSize);
@@ -86,11 +70,13 @@ public:
     void unsetPaused();
 	void abort();
 
+	const Parameters& getParams() {return _params;}
 	void dumpStats(bool final);
 	std::vector<long> getSolverTids() {
 		std::vector<long> tids;
-		for (size_t i = 0; i < solverThreads.size(); i++) {
-			if (solverThreads[i]->isInitialized()) tids.push_back(solverThreads[i]->getTid());
+		for (size_t i = 0; i < _solver_threads.size(); i++) {
+			if (_solver_threads[i]->isInitialized()) 
+				tids.push_back(_solver_threads[i]->getTid());
 		}
 		return tids;
 	}
@@ -98,19 +84,16 @@ public:
 	int value(int lit);
 	int failed(int lit);
 	std::vector<int>& getTruthValues() {
-		return truthValues;
+		return _model;
 	}
 	std::set<int>& getFailedAssumptions() {
-		return failedAssumptions;
+		return _failed_assumptions;
 	}
 
 	void hlog(int verbosityLevel, const char* fmt, ...);
 
 	void cleanUp();
-	bool isCleanedUp() {return cleanedUp;}
-	
-private:
-    void init();	
+	bool isCleanedUp() {return _cleaned_up;}	
 };
 
 #endif /* HORDELIB_H_ */

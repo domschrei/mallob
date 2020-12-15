@@ -6,6 +6,7 @@
 #include "util/sat_reader.hpp"
 #include "util/sys/time_period.hpp"
 #include "util/random.hpp"
+#include "app/sat/sat_constants.h"
 
 void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
 
@@ -138,7 +139,7 @@ void JobFileAdapter::handleJobDone(const JobResult& result) {
     // Pack job result into JSON
     j["result"] = { 
         { "resultcode", result.result }, 
-        { "resultstring", result.result == 10 ? "SAT" : result.result == 20 ? "UNSAT" : "UNKNOWN" }, 
+        { "resultstring", result.result == RESULT_SAT ? "SAT" : result.result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN" }, 
         { "revision", result.revision }, 
         { "solution", result.solution },
         { "responsetime", Timer::elapsedSeconds() - _job_id_to_image[result.id].arrivalTime }

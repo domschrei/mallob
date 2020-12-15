@@ -15,6 +15,7 @@
 #include "data/job_transfer.hpp"
 #include "data/job_result.hpp"
 #include "util/random.hpp"
+#include "app/sat/sat_constants.h"
 
 // Executed by a separate worker thread
 void Client::readAllInstances() {
@@ -327,7 +328,7 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
 
     // Output response time and solution header
     Console::log(Console::INFO, "RESPONSE_TIME #%i %.6f rev. %i", jobId, Timer::elapsedSeconds() - desc.getArrival(), revision);
-    Console::log(Console::INFO, "SOLUTION #%i %s rev. %i", jobId, resultCode == 10 ? "SAT" : "UNSAT", revision);
+    Console::log(Console::INFO, "SOLUTION #%i %s rev. %i", jobId, resultCode == RESULT_SAT ? "SAT" : "UNSAT", revision);
 
     // Write full solution to file, if desired
     std::string baseFilename = _params.getParam("s2f");
@@ -339,7 +340,7 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
             Console::log(Console::CRIT, "ERROR: Could not open solution file");
         } else {
             file << "c SOLUTION #" << jobId << " rev. " << revision << " ";
-            file << (resultCode == 10 ? "SAT" : resultCode == 20 ? "UNSAT" : "UNKNOWN") << "\n"; 
+            file << (resultCode == RESULT_SAT ? "SAT" : resultCode == RESULT_UNSAT ? "UNSAT" : "UNKNOWN") << "\n"; 
             for (auto lit : jobResult.solution) {
                 if (lit == 0) continue;
                 file << lit << " ";
