@@ -9,18 +9,20 @@ from os import listdir
 from os.path import isfile, join
 import json
 import copy
+from optparse import OptionParser
+
 
 """
 Given an integer inst_id, returns a SAT instance associated to that ID.
 The associated instances may cycle, e.g., map (inst_id % num_instances) to an instance.
 """
-def get_instance_filename(inst_id):
+def get_instance_filename(options, inst_id):
 
     # Read benchmark file
     global global_benchmark
     if not global_benchmark:
         global_benchmark = []
-        for line in open(".api/benchmark_trivial", "r").readlines():
+        for line in open(options.benchmark_file, "r").readlines():
             str = line.rstrip()
             if str:
                 global_benchmark += [str]
@@ -28,7 +30,7 @@ def get_instance_filename(inst_id):
 
     # Select a file randomly
     files = copy.deepcopy(global_benchmark)
-    r = random.Random(int(inst_id / len(global_benchmark)))
+    r = random.Random(options.seed + int(inst_id / len(global_benchmark)))
     r.shuffle(files)
     return "instances/" + files[inst_id % len(files)]
 
@@ -114,15 +116,15 @@ def get_truncated_normal(mean=0, sd=1, low=0, upp=10):
 """
 Creates a new client with a random stream of jobs.
 """
-def create_random_client(arrival_time):
+def create_random_client(options, arrival_time):
     global global_job_id, global_client_id
     
     c = Client("c-" + str(global_client_id), arrival_time, priority=1.0)
     global_client_id += 1
     
-    streamlen = get_truncated_normal(mean_stream_length, stdv_stream_length, min_stream_length, max_stream_length)
+    streamlen = get_truncated_normal(options.mean_stream_length, options.stddev_stream_length, options.min_stream_length, options.max_stream_length)
     for _ in range(streamlen):
-        c.add_job_to_stream(get_instance_filename(global_job_id))
+        c.add_job_to_stream(get_instance_filename(options, global_job_id))
         global_job_id += 1
     
     return c
@@ -136,81 +138,91 @@ def introduce_job(job):
         f.write(job.to_json())
 
 
-# Statistical parameters for the generation of job streams
-min_stream_length = 1
-max_stream_length = 100
-mean_stream_length = 1
-stdv_stream_length = 3
+def main():
+    usage = "usage: %prog [options] <benchmark_file>"
+    parser = OptionParser(usage=usage)
+    parser.add_option("-c", "--num-clients",          type="int",   dest="num_clients",          default="1",   help="number of clients arriving")
+    parser.add_option("-m", "--min-stream-length",    type="int",   dest="min_stream_length",    default="1",   help="minimum length of any job stream")
+    parser.add_option("-x", "--max-stream-length",    type="int",   dest="max_stream_length",    default="100", help="maximum length of any job stream")
+    parser.add_option("-n", "--mean-stream-length",   type="float", dest="mean_stream_length",   default="1",   help="mean length of job streams")
+    parser.add_option("-d", "--stddev-stream-length", type="float", dest="stddev_stream_length", default="3",   help="standard deviation of length of job streams")
+    parser.add_option("-i", "--interarrival-time",    type="float", dest="interarrival_time",    default="10",  help="interarrival time of clients")
+    parser.add_option("-S", "--seed",                 type="float", dest="seed",                 default="0",   help="random seed (0 for no seed)")
+    parser.add_option("-W", "--wallclock-limit",      type="float", dest="wc_limit_per_job",     default="0",   help="wallclock limit per job in seconds (0 for no limit)")
+    parser.add_option("-C", "--cpu-limit",            type="float", dest="cpu_limit_per_job",    default="0",   help="cpu limit per job in CPU seconds (0 for no limit)")
+    (options, args) = parser.parse_args()
+    if len(args) != 1:
+        print("Please provide a benchmark file to read jobs from.")
+        exit(1)
 
-# Number and arrival frequency of clients
-num_clients = 64
-client_interarrival_time = 0.01
-
-# Resource limits given to each job (overriding mallob's global options!)
-wc_limit_per_job = 600
-cpu_limit_per_job = 100000
-
-# Create a number of random clients with a random job stream each
-clients = []
-arrival_time = 0
-for i in range(num_clients):
-    c = create_random_client(arrival_time)
-    with open(".api/users/" + c._name + ".json", "w") as f:
-        f.write(c.user_to_json())
-    clients += [c]
-    arrival_time += + numpy.random.exponential(client_interarrival_time)
-
-# Remember the currently active job for each client
-active_jobs = [None for c in clients]
-
-# Main loop where jobs are introduced and finished job information is removed
-any_left = True
-while any_left:
-    time.sleep(0.1)
-    elapsed = elapsed_time()
-    any_left = False
+    options.benchmark_file = args[0]
     
-    # For each client
-    for i in range(len(clients)):
-        c = clients[i]
-        job = active_jobs[i]
-        
-        # Is client not yet active (not arrived yet) or does it have an active job?
-        if c._arrival > elapsed or active_jobs[i] is not None:
-            # -> Program will resume for another loop
-            any_left = True
-        
-        # Did client arrive just now?
-        if active_jobs[i] is None and c._arrival <= elapsed and c.has_next_job():
-            # -> Introduce first job
-            log("Client %s arrives", (c._name,))
-            active_jobs[i] = c.get_next_job()
-            introduce_job(active_jobs[i])
-            any_left = True
-        
-        elif active_jobs[i] is not None:
-            # Check if job finished
-            done_file = ".api/jobs.0/done/" + active_jobs[i].get_json_filename()
-            if os.path.isfile(done_file):
-                # -- job finished
+    if options.seed != 0:
+        random.seed(options.seed)
 
-                f = open(done_file, 'r')
-                try:
-                    j = json.load(f)
-                    log("%s finished (response time: %.3f, result code: %i)", (c._name + "." + active_jobs[i]._name, j["result"]["responsetime"], j["result"]["resultcode"]))
-                    f.close()
-                    os.remove(done_file)
-                    
-                    # Introduce next job
-                    if c.has_next_job():
-                        active_jobs[i] = c.get_next_job()
-                        introduce_job(active_jobs[i])
-                    else:
-                        log("%s completed", (c._name,))
-                        active_jobs[i] = None
+    # Create a number of random clients with a random job stream each
+    clients = []
+    arrival_time = 0
+    for i in range(options.num_clients):
+        c = create_random_client(options, arrival_time)
+        with open(".api/users/" + c._name + ".json", "w") as f:
+            f.write(c.user_to_json())
+        clients += [c]
+        arrival_time += + numpy.random.exponential(options.interarrival_time)
 
-                except json.decoder.JSONDecodeError as e:
-                    # Could not parse JSON file - probably it is still being written. Try again later
-                    f.close()
+    # Remember the currently active job for each client
+    active_jobs = [None for c in clients]
 
-log("Done.")
+    # Main loop where jobs are introduced and finished job information is removed
+    any_left = True
+    while any_left:
+        time.sleep(0.1)
+        elapsed = elapsed_time()
+        any_left = False
+        
+        # For each client
+        for i in range(len(clients)):
+            c = clients[i]
+            
+            # Is client not yet active (not arrived yet) or does it have an active job?
+            if c._arrival > elapsed or active_jobs[i] is not None:
+                # -> Program will resume for another loop
+                any_left = True
+            
+            # Did client arrive just now?
+            if active_jobs[i] is None and c._arrival <= elapsed and c.has_next_job():
+                # -> Introduce first job
+                log("Client %s arrives", (c._name,))
+                active_jobs[i] = c.get_next_job()
+                introduce_job(active_jobs[i])
+                any_left = True
+            
+            elif active_jobs[i] is not None:
+                # Check if job finished
+                done_file = ".api/jobs.0/done/" + active_jobs[i].get_json_filename()
+                if os.path.isfile(done_file):
+                    # -- job finished
+
+                    f = open(done_file, 'r')
+                    try:
+                        j = json.load(f)
+                        log("%s finished (response time: %.3f, result code: %i)", (c._name + "." + active_jobs[i]._name, j["result"]["responsetime"], j["result"]["resultcode"]))
+                        f.close()
+                        os.remove(done_file)
+                        
+                        # Introduce next job
+                        if c.has_next_job():
+                            active_jobs[i] = c.get_next_job()
+                            introduce_job(active_jobs[i])
+                        else:
+                            log("%s completed", (c._name,))
+                            active_jobs[i] = None
+
+                    except json.decoder.JSONDecodeError as e:
+                        # Could not parse JSON file - probably it is still being written. Try again later
+                        f.close()
+
+    log("Done.")
+
+if __name__ == "__main__":
+    main()
