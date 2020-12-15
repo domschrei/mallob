@@ -128,12 +128,6 @@ void Client::mainProgram() {
 
     while (!checkTerminate()) {
 
-        if (Timer::elapsedSeconds() > 600) {
-            Console::log(Console::CRIT, "DEBUG EXIT");
-            int *ptr = 0; 
-            *ptr = 0xdeadbeef; 
-        }
-
         // Print memory usage info
         if (Timer::elapsedSeconds() - lastStatTime > 5) {
             double vm_usage, resident_set; int cpu;
