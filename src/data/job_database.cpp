@@ -276,25 +276,18 @@ void JobDatabase::forgetOldJobs() {
 
     std::vector<int> jobsToForget;
     int jobCacheSize = _params.getIntParam("jc");
+    size_t numJobsWithDescription = 0;
 
     // Scan jobs for being forgettable
     std::priority_queue<std::pair<int, float>, std::vector<std::pair<int, float>>, SuspendedJobComparator> suspendedQueue;
-    for (auto idJobPair : _jobs) {
-        int id = idJobPair.first;
-        Job& job = *idJobPair.second;
+    for (auto [id, jobPtr] : _jobs) {
+        Job& job = *jobPtr;
+        if (job.hasReceivedDescription()) numJobsWithDescription++;
         if (job.hasCommitment()) continue;
         // Old inactive job
         if (job.getState() == INACTIVE && job.getAge() >= 60) {
             jobsToForget.push_back(id);
             continue;
-        }
-        // Suspended job: Forget w.r.t. age, but only if there is a limit on the job cache
-        if (jobCacheSize > 0 && job.getState() == SUSPENDED) {
-            // Job must not be rooted here
-            if (job.getJobTree().isRoot()) continue;
-            // Insert job into PQ according to its age 
-            float age = job.getAgeSinceActivation();
-            suspendedQueue.emplace(id, age);
         }
         // Past jobs
         if (job.getState() == PAST) {
@@ -303,6 +296,14 @@ void JobDatabase::forgetOldJobs() {
             // If the node found a result, it must have been already transferred
             if (job.isResultTransferPending()) continue;
             jobsToForget.push_back(id);
+        }
+        // Suspended job: Forget w.r.t. age, but only if there is a limit on the job cache
+        if (job.getState() == SUSPENDED && jobCacheSize > 0) {
+            // Job must not be rooted here
+            if (job.getJobTree().isRoot()) continue;
+            // Insert job into PQ according to its age
+            float age = job.getAgeSinceActivation();
+            suspendedQueue.emplace(id, age);
         }
     }
 
@@ -316,6 +317,8 @@ void JobDatabase::forgetOldJobs() {
     for (int jobId : jobsToForget) {
         forget(jobId);
     }
+
+    Console::log(Console::VERB, "%i resident jobs, %i with description", _jobs.size(), numJobsWithDescription);
 }
 
 bool JobDatabase::has(int id) const {
