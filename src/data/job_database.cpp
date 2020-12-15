@@ -146,6 +146,12 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
         Console::log(Console::VERB, "Req. %s : job inactive (%s)", job.toStr(), job.jobStateToStr());
         return true;
     
+    } else if (req.requestedNodeIndex != job.getJobTree().getLeftChildIndex() 
+            && req.requestedNodeIndex != job.getJobTree().getRightChildIndex()) {
+        // Requested node index is not a valid child index for this job
+        Console::log(Console::VERB, "Req. %s : not a valid child index (any more)", job.toStr());
+        return true;
+
     } else if (alreadyAccepted) {
         return false;
 
@@ -157,12 +163,6 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
     } else if (req.requestedNodeIndex == job.getJobTree().getRightChildIndex() && job.getJobTree().hasRightChild()) {
         // Job already has a right child
         Console::log(Console::VERB, "Req. %s : already has right child", job.toStr());
-        return true;
-
-    } else if (req.requestedNodeIndex != job.getJobTree().getLeftChildIndex() 
-            && req.requestedNodeIndex != job.getJobTree().getRightChildIndex()) {
-        // Requested node index is not a valid child index for this job
-        Console::log(Console::VERB, "Req. %s : not a valid child index (any more)", job.toStr());
         return true;
     }
 

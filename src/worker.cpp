@@ -324,7 +324,7 @@ void Worker::handleConfirmJobRevisionDetails(MessageHandlePtr& handle) {
 void Worker::handleConfirmAdoption(MessageHandlePtr& handle) {
     JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
 
-    // If job offer is obsolete, the description contains the job id ONLY
+    // If job offer is obsolete, send a stub description containing the job id ONLY
     if (_job_db.isAdoptionOfferObsolete(req, /*alreadyAccepted=*/true)) {
         // Obsolete request
         Console::log_recv(Console::VERB, handle->source, "Reject offer %s from time %.2f", 
@@ -547,7 +547,7 @@ void Worker::handleOfferAdoption(MessageHandlePtr& handle) {
                 Console::log_send(Console::VERB, handle->source, "Resume child %s", 
                         _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
             }
-            // Child *will* start / resume its job solvers.
+            // Child will start / resume its job solvers.
             // Mark new node as one of the node's children
             auto relative = job.getJobTree().setChild(handle->source, req.requestedNodeIndex);
             if (relative == JobTree::TreeRelative::NONE) assert(req.requestedNodeIndex == 0);
