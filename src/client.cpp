@@ -128,6 +128,12 @@ void Client::mainProgram() {
 
     while (!checkTerminate()) {
 
+        if (Timer::elapsedSeconds() > 600) {
+            Console::log(Console::CRIT, "DEBUG EXIT");
+            int *ptr = 0; 
+            *ptr = 0xdeadbeef; 
+        }
+
         // Print memory usage info
         if (Timer::elapsedSeconds() - lastStatTime > 5) {
             double vm_usage, resident_set; int cpu;
@@ -366,7 +372,7 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
             MyMpi::isend(MPI_COMM_WORLD, _root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
             finishJob(jobId);
         }
-    }
+    } else finishJob(jobId);
 }
 
 void Client::handleAbort(MessageHandlePtr& handle) {
@@ -391,6 +397,11 @@ void Client::finishJob(int jobId) {
     // Clean up job
     _introduced_job_ids.erase(jobId);
     _jobs.erase(jobId);
+    _root_nodes.erase(jobId);
+    {
+        auto lock = _job_ready_lock.getLock();
+        _job_ready.erase(jobId);
+    }
 
     // Report to other clients if all your jobs are done
     checkClientDone();

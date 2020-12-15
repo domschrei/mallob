@@ -23,16 +23,6 @@ private:
     MPI_Comm& _comm;
     std::unique_ptr<Balancer> _balancer;
 
-    struct JobInfo {
-        Job* job;
-        std::optional<JobRequest> commitment;
-        float arrival;
-        float usedCpuSeconds;
-        float lastLimitCheck;
-        int volume;
-        std::thread initializerThread;
-    };
-
     robin_hood::unordered_map<int, Job*> _jobs;
     bool _has_commitment = false;
 

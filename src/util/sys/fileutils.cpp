@@ -53,6 +53,7 @@ int FileUtils::mergeFiles(std::string globstr, std::string dest, bool removeOrig
         }
     }
     
+    globfree(&result);
     return status;
 }
 
