@@ -95,7 +95,7 @@ void MGlucose::setPhase(const int var, const bool phase) {
 
 // Solve the formula with a given set of assumptions
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
-SatResult MGlucose::solve(const vector<int>& asmpt) {
+SatResult MGlucose::solve(const std::vector<int>& asmpt) {
 	
 	assumptions.clear();
 	for (int lit : asmpt) assumptions.push(encodeLit(lit));
@@ -134,8 +134,8 @@ void MGlucose::unsetSolverSuspend() {
 	suspendCond.notify();
 }
 
-vector<int> MGlucose::getSolution() {
-	vector<int> result;
+std::vector<int> MGlucose::getSolution() {
+	std::vector<int> result;
 	result.push_back(0);
 	for (int i = 1; i <= maxvar; i++) {
 		result.push_back(solvedValue(i));
@@ -143,8 +143,8 @@ vector<int> MGlucose::getSolution() {
 	return result;
 }
 
-set<int> MGlucose::getFailedAssumptions() {
-	set<int> result;
+std::set<int> MGlucose::getFailedAssumptions() {
+	std::set<int> result;
 	for (int i = 0; i < assumptions.size(); i++) {
 		if (failed(assumptions[i])) {
 			result.insert(decodeLit(assumptions[i]));
@@ -163,7 +163,7 @@ void MGlucose::addLearnedClause(const int* begin, int size) {
 	clauseAddMutex.unlock();
 }
 
-void MGlucose::setLearnedClauseCallback(LearnedClauseCallback* callback) {
+void MGlucose::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 	this->learnedClauseCallback = callback;
 }
 
@@ -249,9 +249,9 @@ bool MGlucose::parallelJobIsFinished() {
 }
 
 void MGlucose::parallelExportUnaryClause(Glucose::Lit p) {
-	vector<int> vcls;
+	std::vector<int> vcls;
 	vcls.push_back(decodeLit(p));
-	learnedClauseCallback->processClause(vcls, getLocalId());
+	learnedClauseCallback(vcls, getLocalId());
 }
 
 void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysis) {
@@ -283,7 +283,7 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 	if (!accept) return;
 	
 	// assemble clause
-	vector<int> vcls(1+c.size());
+	std::vector<int> vcls(1+c.size());
 	int i = 0;
 	// to avoid zeros in the array, 1 is added to the glue
 	vcls[i++] = 1+c.lbd();
@@ -292,7 +292,7 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 	}
 	
 	// export clause
-	learnedClauseCallback->processClause(vcls, getLocalId());
+	learnedClauseCallback(vcls, getLocalId());
 }
 
 /*

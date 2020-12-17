@@ -180,7 +180,7 @@ int HordeLib::solveLoop() {
 	}
 
 	if (done) {
-		hlog(0, "Returning result\n");
+		hlog(3, "Returning result\n");
 		return _result;
 	}
     return -1; // no result yet
@@ -230,12 +230,24 @@ void HordeLib::dumpStats(bool final) {
 			locShareStats.importedClauses, importedWithFailed);
 
 	if (final) {
-		// Histogram over clause lengths
+		// Histogram over clause lengths (do not print trailing zeroes)
 		std::string hist = "";
-		for (size_t i = 1; i < 50; i++) {
-			hist += std::to_string(locShareStats.seenClauseLenHistogram[i]) + " ";
+		std::string histZeroesOnly = "";
+		for (size_t i = 1; i < CLAUSE_LEN_HIST_LENGTH; i++) {
+			auto val = locShareStats.seenClauseLenHistogram[i];
+			if (val > 0) {
+				if (!histZeroesOnly.empty()) {
+					// Flush sequence of zeroes into main string
+					hist += histZeroesOnly;
+					histZeroesOnly = "";
+				}
+				hist += " " + std::to_string(val);
+			} else {
+				// Append zero to side string
+				histZeroesOnly += " " + std::to_string(val);
+			}
 		}
-		hlog(0, "END clenhist: %s\n", hist.c_str());
+		if (!hist.empty()) hlog(0, "END clenhist:%s\n", hist.c_str());
 	}
 }
 
@@ -249,8 +261,8 @@ void HordeLib::unsetPaused() {
 
 void HordeLib::interrupt() {
 	if (_state != STANDBY) {
-		setSolvingState(STANDBY);
 		dumpStats(/*final=*/true);
+		setSolvingState(STANDBY);
 	}
 }
 

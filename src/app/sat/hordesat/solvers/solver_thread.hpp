@@ -26,7 +26,7 @@ private:
     std::thread _thread;
 
     const std::vector<std::shared_ptr<std::vector<int>>>& _formulae;
-    const std::shared_ptr<vector<int>>& _assumptions;
+    const std::shared_ptr<std::vector<int>>& _assumptions;
     
     int _local_id;
     std::string _name;
@@ -52,7 +52,7 @@ public:
     SolverThread(const Parameters& params, const LoggingInterface& logger,
                 std::shared_ptr<PortfolioSolverInterface> solver, 
                 const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
-                const std::shared_ptr<vector<int>>& assumptions, 
+                const std::shared_ptr<std::vector<int>>& assumptions, 
                 int localId, bool* finished);
     ~SolverThread();
 

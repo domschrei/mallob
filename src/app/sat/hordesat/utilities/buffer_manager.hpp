@@ -11,11 +11,9 @@
 #include <map>
 #include <vector>
 
-using namespace std;
-
 class BufferManager {
 private:
-	map<int, vector<int*> > returnedBuffers;
+	std::map<int, std::vector<int*> > returnedBuffers;
 
 public:
 	BufferManager();

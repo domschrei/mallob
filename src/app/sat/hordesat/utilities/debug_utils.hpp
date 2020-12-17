@@ -6,8 +6,6 @@
 #include <time.h>
 #include <vector>
 
-using namespace std;
-
 //DEBUG MACROS
 //#define HORDE_DBG(X) X
 #define HORDE_DBG(X)
@@ -38,7 +36,7 @@ inline void printArray(const int* s, int parts, int size) {
 /**
  * Print a clause (vector of integers)
  */
-inline void printVector(const vector<int>& vec) {
+inline void printVector(const std::vector<int>& vec) {
 	printf("[");
 	if (vec.size() > 0) {
 		printf("%d",vec[0]);

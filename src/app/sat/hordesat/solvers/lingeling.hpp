@@ -27,7 +27,7 @@ private:
 	LGL* solver;
 	std::string name;
 	int stopSolver;
-	LearnedClauseCallback* callback;
+	LearnedClauseCallback callback;
 	Mutex clauseAddMutex;
 	int maxvar;
 	double lastTermCallbackTime;
@@ -41,8 +41,8 @@ private:
 	friend void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ...);
 
 	// clause addition
-	vector<vector<int> > clausesToAdd;
-	vector<int> assumptions;
+	std::vector<std::vector<int>> clausesToAdd;
+	std::vector<int> assumptions;
 
 	RingBuffer<std::vector<int>> learnedClauses;
 	RingBuffer<int> learnedUnits;
@@ -73,22 +73,22 @@ public:
 	void setPhase(const int var, const bool phase) override;
 
 	// Solve the formula with a given set of assumptions
-	SatResult solve(const vector<int>& assumptions) override;
+	SatResult solve(const std::vector<int>& assumptions) override;
 
 	void setSolverInterrupt() override;
 	void unsetSolverInterrupt() override;
     void setSolverSuspend() override;
     void unsetSolverSuspend() override;
 
-	vector<int> getSolution() override;
-	set<int> getFailedAssumptions() override;
+	std::vector<int> getSolution() override;
+	std::set<int> getFailedAssumptions() override;
 
 	// Add a learned clause to the formula
 	// The learned clauses might be added later or possibly never
 	void addLearnedClause(const int* begin, int size) override;
 
 	// Set a function that should be called for each learned clause
-	void setLearnedClauseCallback(LearnedClauseCallback* callback) override;
+	void setLearnedClauseCallback(const LearnedClauseCallback& callback) override;
 
 	// Request the solver to produce more clauses
 	void increaseClauseProduction() override;

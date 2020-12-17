@@ -22,7 +22,7 @@ struct HordeLearner : public CaDiCaL::Learner {
 			if (glue != 1)
 		        _currClause.insert(_currClause.begin(), glue + 1);
 
-			_callback->processClause(_currClause, _portfolio.getLocalId());
+			_callback(_currClause, _portfolio.getLocalId());
 			_currClause.clear();
 		}
 	}
@@ -31,16 +31,16 @@ struct HordeLearner : public CaDiCaL::Learner {
         if (_glueLimit < 8) _glueLimit++;
     }
 
-    void setCallback(LearnedClauseCallback *callback) {
+    void setCallback(const LearnedClauseCallback& callback) {
         _callback = callback;
     }
 
 	private:
         int _glueLimit = 2;
         
-		LearnedClauseCallback *_callback;
+		LearnedClauseCallback _callback;
 
         PortfolioSolverInterface &_portfolio;
 
-		vector<int> _currClause;
+		std::vector<int> _currClause;
 };

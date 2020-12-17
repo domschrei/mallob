@@ -13,7 +13,7 @@
 #include "util/console.hpp"
 #include "util/params.hpp"
 #include "util/sys/shared_memory.hpp"
-#include "util/sys/fork.hpp"
+#include "util/sys/process.hpp"
 #include "util/sys/proc.hpp"
 
 #include "app/sat/horde_process_adapter.hpp"
@@ -91,6 +91,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
         // Terminate
         if (hsm->doTerminate) {
             log->log(3, "DO terminate\n");
+            hlib.dumpStats(/*final=*/true);
             break;
         }
 
@@ -222,7 +223,7 @@ int main(int argc, char *argv[]) {
     log->log(Console::VERB, "Launching SAT engine %s", MALLOB_VERSION);
 
     // Initialize signal handlers
-    Fork::init(rankOfParent);
+    Process::init(rankOfParent);
 
     try {
         // Launch program

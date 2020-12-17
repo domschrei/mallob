@@ -14,8 +14,6 @@
 #include "app/sat/hordesat/utilities/logging_interface.hpp"
 #include "app/sat/hordesat/utilities/default_logging_interface.hpp"
 
-using namespace std;
-
 #define BUCKET_SIZE 1000
 
 struct Bucket {
@@ -32,11 +30,11 @@ public:
 	/**
 	 * Add a learned clause that you want to share. Return a pointer to it
 	 */
-	int* addClause(vector<int>& clause);
+	int* addClause(std::vector<int>& clause);
 	/**
 	 * Add a very important learned clause that you want to share
 	 */
-	void addVIPClause(vector<int>& clause);
+	void addVIPClause(std::vector<int>& clause);
 	/**
 	 * Fill the given buffer with data for the sending our learned clauses
 	 * Return the number of used memory, at most size.
@@ -59,8 +57,8 @@ private:
 	Mutex addClauseLock;
 
 	// Structures for EXPORTING
-	vector<Bucket*> buckets;
-	vector<vector<int> > vipClauses;
+	std::vector<Bucket*> buckets;
+	std::vector<std::vector<int> > vipClauses;
 
 	// Structures for IMPORTING	
 	const int* incomingBuffer;

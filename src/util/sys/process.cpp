@@ -10,24 +10,31 @@
 #include <signal.h>
 #include <assert.h>
 
-#include "fork.hpp"
+#include "process.hpp"
 #include "proc.hpp"
 #include "util/console.hpp"
 #include "util/sys/stacktrace.hpp"
 
+
+int Process::_rank;
+std::set<pid_t> Process::_children;
+bool Process::_modifying_children;
+bool Process::_exit_signal_caught;
+
+
+
 void propagateSignalAndExit(int signum) {
 
-    if (!Fork::_modifying_children) {
-        
+    if (!Process::_modifying_children) {
         // Propagate signal to children
-        for (pid_t child : Fork::_children) {
-            Fork::sendSignal(child, SIGTERM);
-            Fork::sendSignal(child, SIGCONT);
+        for (pid_t child : Process::_children) {
+            Process::sendSignal(child, SIGTERM);
+            Process::sendSignal(child, SIGCONT);
         }
     }
 
     // Exit yourself
-    exit(signum == SIGABRT || signum == SIGSEGV ? 1 : 0);
+    Process::_exit_signal_caught = true;
 }
 
 void doNothing(int signum) {
@@ -45,11 +52,9 @@ void handleAbort(int sig) {
     propagateSignalAndExit(sig);
 }
 
-int Fork::_rank;
-std::set<pid_t> Fork::_children;
-bool Fork::_modifying_children;
 
-void Fork::init(int rank, bool leafProcess) {
+
+void Process::init(int rank, bool leafProcess) {
 
     /*
     struct sigaction sa;
@@ -61,6 +66,10 @@ void Fork::init(int rank, bool leafProcess) {
     sigaction(SIGABRT, &sa, NULL);
     */
 
+    _rank = rank;
+    _modifying_children = false;
+    _exit_signal_caught = false;
+
     signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
     signal(SIGSEGV, handleAbort);
     signal(SIGABRT, handleAbort);
@@ -69,14 +78,9 @@ void Fork::init(int rank, bool leafProcess) {
         signal(SIGTERM, propagateSignalAndExit);
         signal(SIGINT, propagateSignalAndExit);
     }
-
-    _rank = rank;
-    _modifying_children = false;
-
-    setenv("PATH", ("build/app/sat:" + std::string((const char*) getenv("PATH"))).c_str(), /*overwrite=*/1);
 }
 
-pid_t Fork::createChild() {
+pid_t Process::createChild() {
     pid_t res = fork();
 
     _modifying_children = true;
@@ -91,22 +95,22 @@ pid_t Fork::createChild() {
     return res;
 }
 
-void Fork::terminate(pid_t childpid) {
+void Process::terminate(pid_t childpid) {
     sendSignal(childpid, SIGTERM);
 }
-void Fork::hardkill(pid_t childpid) {
+void Process::hardkill(pid_t childpid) {
     sendSignal(childpid, SIGKILL);
 }
-void Fork::suspend(pid_t childpid) {
+void Process::suspend(pid_t childpid) {
     sendSignal(childpid, SIGTSTP);
 }
-void Fork::resume(pid_t childpid) {
+void Process::resume(pid_t childpid) {
     sendSignal(childpid, SIGCONT);
 }
-void Fork::wakeUp(pid_t childpid) {
+void Process::wakeUp(pid_t childpid) {
     sendSignal(childpid, SIGUSR1);
 }
-void Fork::terminateAll() {
+void Process::terminateAll() {
     std::set<int> children = _children;
     for (int childpid : children) {
         terminate(childpid);
@@ -114,14 +118,14 @@ void Fork::terminateAll() {
     }
 }
 
-void Fork::sendSignal(pid_t childpid, int signum) {
+void Process::sendSignal(pid_t childpid, int signum) {
     int result = kill(childpid, signum);
     if (result == -1) {
         Console::log(Console::WARN, "[WARN] kill -%i %i returned -1", signum, childpid);
     }
 }
 
-bool Fork::didChildExit(pid_t childpid) {
+bool Process::didChildExit(pid_t childpid) {
 
     if (!_children.count(childpid)) return true;
     
@@ -134,4 +138,8 @@ bool Fork::didChildExit(pid_t childpid) {
         return true;
     }
     return false;
+}
+
+bool Process::isExitSignalCaught() {
+    return _exit_signal_caught;
 }

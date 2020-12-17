@@ -15,10 +15,9 @@
 #include <vector>
 #include <set>
 #include <stdexcept>
+#include <functional>
 
 #include "app/sat/hordesat/utilities/logging_interface.hpp"
-
-using namespace std;
 
 enum SatResult {
 	SAT = 10,
@@ -59,13 +58,9 @@ struct SolverSetup {
 	bool useAdditionalDiversification;
 };
 
-class LearnedClauseCallback {
-public:
-	virtual void processClause(vector<int>& cls, int solverId) = 0;
-	virtual ~LearnedClauseCallback() {};
-};
-
 void updateTimer(std::string jobName);
+
+typedef std::function<void(std::vector<int>& cls, int solverId)> LearnedClauseCallback;
 
 /**
  * Interface for solvers that can be used in the portfolio.
@@ -98,13 +93,13 @@ public:
 	virtual void setPhase(const int var, const bool phase) = 0;
 
 	// Solve the formula with a given set of assumptions
-	virtual SatResult solve(const vector<int>& assumptions = vector<int>()) = 0;
+	virtual SatResult solve(const std::vector<int>& assumptions = std::vector<int>()) = 0;
 
 	// Get a solution vector containing lit or -lit for each lit in the model
-	virtual vector<int> getSolution() = 0;
+	virtual std::vector<int> getSolution() = 0;
 
 	// Get a set of failed assumptions
-	virtual set<int> getFailedAssumptions() = 0;
+	virtual std::set<int> getFailedAssumptions() = 0;
 
 	// Add a permanent literal to the formula (zero for clause separator)
 	virtual void addLiteral(int lit) = 0;
@@ -114,7 +109,7 @@ public:
 	virtual void addLearnedClause(const int* begin, int size) = 0;
 
 	// Set a function that should be called for each learned clause
-	virtual void setLearnedClauseCallback(LearnedClauseCallback* callback) = 0;
+	virtual void setLearnedClauseCallback(const LearnedClauseCallback& callback) = 0;
 
 	// Request the solver to produce more clauses
 	virtual void increaseClauseProduction() = 0;

@@ -17,7 +17,7 @@
 #include "comm/mpi_monitor.hpp"
 #include "data/serializable.hpp"
 #include "data/job_description.hpp"
-#include "util/sys/fork.hpp"
+#include "util/sys/process.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/watchdog.hpp"
@@ -952,9 +952,15 @@ void Worker::applyBalancing() {
 }
 
 bool Worker::checkTerminate() {
-    if (_exiting) return true;
+    bool terminate = false;
+    if (_exiting) terminate = true;
+    if (Process::isExitSignalCaught()) terminate = true;
     if (_global_timeout > 0 && Timer::elapsedSeconds() > _global_timeout) {
-        Console::log(Console::INFO, "Global timeout: terminating.");
+        terminate = true;
+    }
+    if (terminate) {
+        Console::log(_world_rank == 0 ? Console::INFO : Console::VERB, 
+                "Terminating.");
         return true;
     }
     return false;
@@ -1009,7 +1015,7 @@ Worker::~Worker() {
     _exiting = true;
 
     // Send termination signal to the entire process group 
-    Fork::terminateAll();
+    Process::terminateAll();
     
     // -- quicker than normal terminate
     // -- workaround for idle times after finishing

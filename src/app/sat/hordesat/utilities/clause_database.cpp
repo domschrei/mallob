@@ -14,12 +14,12 @@
 
 DefaultLoggingInterface ClauseDatabase::dli;
 
-void ClauseDatabase::addVIPClause(vector<int>& clause) {
+void ClauseDatabase::addVIPClause(std::vector<int>& clause) {
 	auto lock = addClauseLock.getLock();
 	vipClauses.push_back(clause);
 }
 
-int* ClauseDatabase::addClause(vector<int>& clause) {
+int* ClauseDatabase::addClause(std::vector<int>& clause) {
 	if (addClauseLock.tryLock() == false) return NULL;
 
 	unsigned int csize = clause.size();
@@ -67,7 +67,7 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 	// First add the VIP clauses
 	HORDE_DBG(printf("adding the %d VIP clauses.\n", vipClauses.size()));
 	while (!vipClauses.empty()) {
-		vector<int>& vipCls = vipClauses.back();
+		std::vector<int>& vipCls = vipClauses.back();
 		int len = vipCls.size();
 		if (used+len+1 >= size) break; // stop if buffer is too small
 		for (int i = 0; i < len; i++) {

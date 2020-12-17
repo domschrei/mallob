@@ -10,7 +10,7 @@
 #include "util/random.hpp"
 #include "util/params.hpp"
 #include "util/sys/shared_memory.hpp"
-#include "util/sys/fork.hpp"
+#include "util/sys/process.hpp"
 #include "util/sys/proc.hpp"
 #include "worker.hpp"
 #include "client.hpp"
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     Random::init(numNodes, rank);
 
     // Initialize bookkeeping of child processes
-    Fork::init(rank);
+    Process::init(rank);
 
     // Find client ranks
     std::set<int> externalClientRanks;

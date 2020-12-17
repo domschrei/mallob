@@ -11,7 +11,7 @@ BufferManager::BufferManager() {
 }
 
 int* BufferManager::getBuffer(int size) {
-	vector<int*>& buffers = returnedBuffers[size];
+	std::vector<int*>& buffers = returnedBuffers[size];
 	if (buffers.size() > 0) {
 		int* buffer = buffers[buffers.size() - 1];
 		buffers.pop_back();
@@ -28,8 +28,8 @@ void BufferManager::returnBuffer(int* location) {
 }
 
 void BufferManager::cleanReturnedBuffers() {
-	for (map<int,vector<int*> >::iterator it = returnedBuffers.begin(); it != returnedBuffers.end(); ++it) {
-		for (vector<int*>::iterator bit = it->second.begin(); bit != it->second.end(); ++bit) {
+	for (std::map<int, std::vector<int*> >::iterator it = returnedBuffers.begin(); it != returnedBuffers.end(); ++it) {
+		for (std::vector<int*>::iterator bit = it->second.begin(); bit != it->second.end(); ++bit) {
 			delete[] (*bit - 1);
 		}
 		it->second.clear();

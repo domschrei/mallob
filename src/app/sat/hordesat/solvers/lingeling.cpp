@@ -45,9 +45,9 @@ int cbCheckTerminate(void* solverPtr) {
 }
 
 void cbProduceUnit(void* sp, int lit) {
-	vector<int> vcls(1, lit);
+	std::vector<int> vcls(1, lit);
 	Lingeling* lp = (Lingeling*)sp;
-	lp->callback->processClause(vcls, lp->getLocalId());
+	lp->callback(vcls, lp->getLocalId());
 }
 
 void cbProduce(void* sp, int* cls, int glue) {
@@ -67,14 +67,14 @@ void cbProduce(void* sp, int* cls, int glue) {
 	while (cls[i++] != 0) size++;
 	if (size > lp->sizeLimit) return;
 	// build vector of literals
-	vector<int> vcls(1+size);
+	std::vector<int> vcls(1+size);
 	// to avoid zeros in the array, 1 is added to the glue
 	vcls[0] = 1+glue;
 	for (i = 1; i <= size; i++) {
 		vcls[i] = cls[i-1];
 	}
 	//printf("glue = %d, size = %lu\n", glue, vcls.size());
-	lp->callback->processClause(vcls, lp->getLocalId());
+	lp->callback(vcls, lp->getLocalId());
 }
 
 void cbConsumeUnits(void* sp, int** start, int** end) {
@@ -123,7 +123,7 @@ void cbConsumeCls(void* sp, int** clause, int* glue) {
 	}
 
 	// Retrieve clause to import
-	vector<int> cls;
+	std::vector<int> cls;
 	if (!lp->learnedClauses.consume(cls)) {
 		// Nothing to import
 		*clause = NULL;
@@ -274,7 +274,7 @@ void Lingeling::setPhase(const int var, const bool phase) {
 
 // Solve the formula with a given set of assumptions
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
-SatResult Lingeling::solve(const vector<int>& assumptions) {
+SatResult Lingeling::solve(const std::vector<int>& assumptions) {
 	
 	this->assumptions = assumptions;
 	// add the clauses
@@ -321,8 +321,8 @@ void Lingeling::unsetSolverSuspend() {
 	suspendCond.notify();
 }
 
-vector<int> Lingeling::getSolution() {
-	vector<int> result;
+std::vector<int> Lingeling::getSolution() {
+	std::vector<int> result;
 	result.push_back(0);
 	for (int i = 1; i <= maxvar; i++) {
 		if (lglderef(solver, i) > 0) {
@@ -334,8 +334,8 @@ vector<int> Lingeling::getSolution() {
 	return result;
 }
 
-set<int> Lingeling::getFailedAssumptions() {
-	set<int> result;
+std::set<int> Lingeling::getFailedAssumptions() {
+	std::set<int> result;
 	for (size_t i = 0; i < assumptions.size(); i++) {
 		if (lglfailed(solver, assumptions[i])) {
 			result.insert(assumptions[i]);
@@ -368,7 +368,7 @@ void Lingeling::addLearnedClause(const int* begin, int size) {
 	//if (time > 0.2f) slog(this, -1, "[1] addLearnedClause took %.2fs! (size %i)\n", time, size);
 }
 
-void Lingeling::setLearnedClauseCallback(LearnedClauseCallback* callback) {
+void Lingeling::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 	this->callback = callback;
 	lglsetproducecls(solver, cbProduce, this);
 	lglsetproduceunit(solver, cbProduceUnit, this);

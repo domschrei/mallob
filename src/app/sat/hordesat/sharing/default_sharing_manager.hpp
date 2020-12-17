@@ -16,69 +16,40 @@
 #include "app/sat/hordesat/utilities/clause_filter.hpp"
 #include "util/params.hpp"
 
-#define COMM_BUFFER_SIZE 1500
+#define CLAUSE_LEN_HIST_LENGTH 256
 
 class DefaultSharingManager : public SharingManagerInterface {
 
 protected:
 	// associated solvers
-	vector<std::shared_ptr<PortfolioSolverInterface>>& solvers;
-	vector<ClauseFilter*> solverFilters;
+	std::vector<std::shared_ptr<PortfolioSolverInterface>>& _solvers;
+	std::vector<ClauseFilter> _solver_filters;
 	
 	// global parameters
-	const Parameters& params;
-	const LoggingInterface& logger;
+	const Parameters& _params;
+	const LoggingInterface& _logger;
 
-	ClauseDatabase cdb;
-	ClauseFilter nodeFilter;
-	int outBuffer[COMM_BUFFER_SIZE];
+	ClauseDatabase _cdb;
+	ClauseFilter _node_filter;
+	
+	float _last_buffer_clear = 0;
 
-	float lastBufferClear = 0;
+	unsigned long _seen_clause_len_histogram[CLAUSE_LEN_HIST_LENGTH];
 
-	unsigned long seenClauseLenHistogram[256];
-
-	class Callback : public LearnedClauseCallback {
-	public:
-		DefaultSharingManager& parent;
-		bool hasSolverFilters;
-		Callback(DefaultSharingManager& parent):parent(parent) {
-			hasSolverFilters = parent.solvers.size() > 1;
-		}
-		void processClause(vector<int>& cls, int solverId) {
-
-			parent.seenClauseLenHistogram[cls.size() == 1 ? 1 : cls.size()-1]++;
-
-			// If applicable, register clause in child filter
-			// such that it will not be re-imported to this solver.
-			if (hasSolverFilters) {
-				parent.solverFilters[solverId]->registerClause(cls);
-			}
-
-			// Check parent filter if this clause is admissible for export.
-			// (If a clause is already registered, then we assume that it was, 
-			// or will be, globally shared to everyone.)
-			if (parent.nodeFilter.registerClause(cls)) {
-				int* res = parent.cdb.addClause(cls);
-				if (res == NULL) {
-					parent.stats.clausesDroppedAtExport++;
-				}
-			} else {
-				parent.stats.clausesFilteredAtExport++;
-			}
-		}
-	};
-
-	Callback callback;
-	SharingStatistics stats;
+	SharingStatistics _stats;
 
 public:
-	DefaultSharingManager(vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
+	DefaultSharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
 			const Parameters& params, const LoggingInterface& logger);
     int prepareSharing(int* begin, int maxSize);
     void digestSharing(const std::vector<int>& result);
 	void digestSharing(const int* begin, int buflen);
 	SharingStatistics getStatistics();
-	~DefaultSharingManager();
+	~DefaultSharingManager() = default;
+
+private:
+	void processClause(std::vector<int>& cls, int solverId);
+
 };
 
 #endif /* SHARING_ALLTOALLSHARINGMANAGER_H_ */

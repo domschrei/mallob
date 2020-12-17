@@ -10,21 +10,23 @@
 #include "default_sharing_manager.hpp"
 
 DefaultSharingManager::DefaultSharingManager(
-		vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, 
+		std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, 
 		const Parameters& params, const LoggingInterface& logger)
-	:solvers(solvers),params(params),logger(logger),
-	cdb(logger),nodeFilter(/*maxClauseLen=*/params.getIntParam("hmcl", 0),/*checkUnits=*/true),callback(*this) {
+	: _solvers(solvers), _params(params), _logger(logger), _cdb(logger), 
+		_node_filter(/*maxClauseLen=*/params.getIntParam("hmcl", 0), /*checkUnits=*/true) {
 
-	memset(seenClauseLenHistogram, 0, 256*sizeof(unsigned long));
-	stats.seenClauseLenHistogram = seenClauseLenHistogram;
+	memset(_seen_clause_len_histogram, 0, CLAUSE_LEN_HIST_LENGTH*sizeof(unsigned long));
+	_stats.seenClauseLenHistogram = _seen_clause_len_histogram;
+
+	auto callback = [this](std::vector<int>& cls, int solverId) {processClause(cls, solverId);};
 	
-    for (size_t i = 0; i < solvers.size(); i++) {
-		if (solvers.size() > 1) {
-			solverFilters.push_back(new ClauseFilter(/*maxClauseLen=*/params.getIntParam("hmcl", 0), /*checkUnits=*/true));
+    for (size_t i = 0; i < _solvers.size(); i++) {
+		if (_solvers.size() > 1) {
+			_solver_filters.emplace_back(/*maxClauseLen=*/params.getIntParam("hmcl", 0), /*checkUnits=*/true);
 		}
-		solvers[i]->setLearnedClauseCallback(&callback);
+		_solvers[i]->setLearnedClauseCallback(callback);
 	}
-	lastBufferClear = logger.getTime();
+	_last_buffer_clear = logger.getTime();
 }
 
 int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
@@ -32,21 +34,21 @@ int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
     //log(3, "Sharing clauses among %i nodes\n", size);
     static int prodInc = 1;
 	static int lastInc = 0;
-	if (!params.isNotNull("fd")) {
-		logger.log(2, "clear node clsfltr\n");
-		nodeFilter.clear();
+	if (!_params.isNotNull("fd")) {
+		_logger.log(2, "clear node clsfltr\n");
+		_node_filter.clear();
 	}
 	int selectedCount;
-	int used = cdb.giveSelection(begin, maxSize, &selectedCount);
-	logger.log(3, "Prepared %i clauses, size %i\n", selectedCount, used);
-	stats.exportedClauses += selectedCount;
+	int used = _cdb.giveSelection(begin, maxSize, &selectedCount);
+	_logger.log(3, "Prepared %i clauses, size %i\n", selectedCount, used);
+	_stats.exportedClauses += selectedCount;
 	float usedRatio = ((float)used)/maxSize;
-	if (usedRatio < params.getFloatParam("icpr")) {
-		int increaser = lastInc++ % solvers.size();
-		solvers[increaser]->increaseClauseProduction();
-		logger.log(3, "Production increase for %d. time, sid %d will increase.\n", prodInc++, increaser);
+	if (usedRatio < _params.getFloatParam("icpr")) {
+		int increaser = lastInc++ % _solvers.size();
+		_solvers[increaser]->increaseClauseProduction();
+		_logger.log(3, "Production increase for %d. time, sid %d will increase.\n", prodInc++, increaser);
 	}
-	logger.log(3, "Filled %.1f%% of buffer\n", 100*usedRatio);
+	_logger.log(3, "Filled %.1f%% of buffer\n", 100*usedRatio);
 	return used;
 }
 
@@ -58,31 +60,31 @@ void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
 void DefaultSharingManager::digestSharing(const int* begin, int buflen) {
     
 	// Get all clauses
-	cdb.setIncomingBuffer(begin, buflen);
+	_cdb.setIncomingBuffer(begin, buflen);
 	
 	int passedFilter = 0;
 	int failedFilter = 0;
 	std::vector<int> lens;
-	std::vector<int> added(solvers.size(), 0);
+	std::vector<int> added(_solvers.size(), 0);
 
 	// For each incoming clause:
 	int size;
-	const int* clsbegin = cdb.getNextIncomingClause(size);
+	const int* clsbegin = _cdb.getNextIncomingClause(size);
 	while (clsbegin != NULL) {
 		
 		int clauseLen = (size > 1 ? size-1 : size); // subtract "glue" int
 		while (clauseLen-1 >= (int)lens.size()) lens.push_back(0);
 		lens[clauseLen-1]++;
 
-		if (solvers.size() > 1) {
+		if (_solvers.size() > 1) {
 			// Multiple solvers: Employing the node filter here would prevent 
 			// local sharing, i.e., if solver 0 on node n learns a clause
 			// then solvers 1..k on node n will never receive it.
 			// So only use the per-solver filters.
 			bool anyPassed = false;
-			for (size_t sid = 0; sid < solvers.size(); sid++) {
-				if (solverFilters[sid]->registerClause(clsbegin, size)) {
-					solvers[sid]->addLearnedClause(clsbegin, size);
+			for (size_t sid = 0; sid < _solvers.size(); sid++) {
+				if (_solver_filters[sid].registerClause(clsbegin, size)) {
+					_solvers[sid]->addLearnedClause(clsbegin, size);
 					added[sid]++;
 					anyPassed = true;
 				}
@@ -92,58 +94,74 @@ void DefaultSharingManager::digestSharing(const int* begin, int buflen) {
 		} else {
 			// Only one solver on this node: No per-solver filtering.
 			// Use the node filter in this case to prevent redundant learning.
-			if (nodeFilter.registerClause(clsbegin, size)) {
-				solvers[0]->addLearnedClause(clsbegin, size);
+			if (_node_filter.registerClause(clsbegin, size)) {
+				_solvers[0]->addLearnedClause(clsbegin, size);
 				passedFilter++;
 			} else {
 				failedFilter++;
 			}
 		}
 
-		clsbegin = cdb.getNextIncomingClause(size);
+		clsbegin = _cdb.getNextIncomingClause(size);
 	}
 	int total = passedFilter + failedFilter;
-	stats.importedClauses += passedFilter;
-	stats.clausesFilteredAtImport += failedFilter;
+	_stats.importedClauses += passedFilter;
+	_stats.clausesFilteredAtImport += failedFilter;
 	
 	if (total == 0) return;
 
 	// Process-wide stats
 	std::string lensStr = "";
 	for (int len : lens) lensStr += std::to_string(len) + " ";
-	logger.log(1, "fltrd %.2f%% (%d/%d), lens %s\n",
+	_logger.log(1, "fltrd %.2f%% (%d/%d), lens %s\n",
 			100*(float)failedFilter/total, failedFilter, total, 
 			lensStr.c_str());
 
 	// Per-solver stats
-	if (solvers.size() > 1) {
-		for (size_t sid = 0; sid < solvers.size(); sid++) {
-			logger.log(2, "S%d fltrd %.2f%% (%d)\n", sid, passedFilter == 0 ? 0 : 100*(1-((float)added[sid]/passedFilter)), passedFilter-added[sid]);
-			if (!params.isNotNull("fd")) {
-				logger.log(2, "S%d clear clsfltr\n", sid);
-				solverFilters[sid]->clear();	
+	if (_solvers.size() > 1) {
+		for (size_t sid = 0; sid < _solvers.size(); sid++) {
+			_logger.log(2, "S%d fltrd %.2f%% (%d)\n", sid, passedFilter == 0 ? 0 : 100*(1-((float)added[sid]/passedFilter)), passedFilter-added[sid]);
+			if (!_params.isNotNull("fd")) {
+				_logger.log(2, "S%d clear clsfltr\n", sid);
+				_solver_filters[sid].clear();	
 			} 
 		}
 	}
 
 	// Clear half of the clauses from the filter (probabilistically) if a clause filter half life is set
-	if (params.getIntParam("cfhl", 0) > 0 && logger.getTime() - lastBufferClear > params.getIntParam("cfhl", 0)) {
-		logger.log(1, "forget half of clauses in filters\n");
-		for (size_t sid = 0; sid < solverFilters.size(); sid++) {
-			solverFilters[sid]->clearHalf();
+	if (_params.getIntParam("cfhl", 0) > 0 && _logger.getTime() - _last_buffer_clear > _params.getIntParam("cfhl", 0)) {
+		_logger.log(1, "forget half of clauses in filters\n");
+		for (size_t sid = 0; sid < _solver_filters.size(); sid++) {
+			_solver_filters[sid].clearHalf();
 		}
-		nodeFilter.clearHalf();
-		lastBufferClear = logger.getTime();
+		_node_filter.clearHalf();
+		_last_buffer_clear = _logger.getTime();
+	}
+}
+
+void DefaultSharingManager::processClause(std::vector<int>& cls, int solverId) {
+
+	_seen_clause_len_histogram[cls.size() == 1 ? 1 : std::min(cls.size(), (size_t)CLAUSE_LEN_HIST_LENGTH)-1]++;
+
+	// If applicable, register clause in child filter
+	// such that it will not be re-imported to this solver.
+	if (_solvers.size() > 1) {
+		_solver_filters[solverId].registerClause(cls);
+	}
+
+	// Check parent filter if this clause is admissible for export.
+	// (If a clause is already registered, then we assume that it was, 
+	// or will be, globally shared to everyone.)
+	if (_node_filter.registerClause(cls)) {
+		int* res = _cdb.addClause(cls);
+		if (res == NULL) {
+			_stats.clausesDroppedAtExport++;
+		}
+	} else {
+		_stats.clausesFilteredAtExport++;
 	}
 }
 
 SharingStatistics DefaultSharingManager::getStatistics() {
-	return stats;
+	return _stats;
 }
-
-DefaultSharingManager::~DefaultSharingManager() {
-	for (size_t i = 0; i < solverFilters.size(); i++) {
-		delete solverFilters[i];
-	}
-}
-

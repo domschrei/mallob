@@ -323,7 +323,7 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
     int resultCode = jobResult.result;
     int revision = jobResult.revision;
 
-    Console::log_recv(Console::INFO, handle->source, "Received result of job #%i rev. %i, code: %i", jobId, revision, resultCode);
+    Console::log_recv(Console::VVERB, handle->source, "Received result of job #%i rev. %i, code: %i", jobId, revision, resultCode);
     JobDescription& desc = *_jobs[jobId];
 
     // Output response time and solution header

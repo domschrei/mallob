@@ -9,7 +9,7 @@
 #include "util/sys/shared_memory.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/timer.hpp"
-#include "util/sys/fork.hpp"
+#include "util/sys/process.hpp"
 #include "util/console.hpp"
 
 HordeProcessAdapter::HordeProcessAdapter(const Parameters& params,
@@ -98,7 +98,7 @@ pid_t HordeProcessAdapter::run() {
     Console::log(Console::VVERB, "EXEC child\n");
 
     // FORK: Create a child process
-    pid_t res = Fork::createChild();
+    pid_t res = Process::createChild();
     if (res > 0) {
         // [parent process]
         _child_pid = res;
@@ -133,13 +133,13 @@ void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
     if (state == SolvingStates::ABORTING) {
         //Fork::terminate(_child_pid); // Terminate child process by signal.
         _hsm->doTerminate = true; // Kindly ask child process to terminate.
-        Fork::resume(_child_pid); // Continue (resume) process.
+        Process::resume(_child_pid); // Continue (resume) process.
     }
     if (state == SolvingStates::SUSPENDED) {
-        Fork::suspend(_child_pid); // Stop (suspend) process.
+        Process::suspend(_child_pid); // Stop (suspend) process.
     }
     if (state == SolvingStates::ACTIVE) {
-        Fork::resume(_child_pid); // Continue (resume) process.
+        Process::resume(_child_pid); // Continue (resume) process.
     }
     if (state == SolvingStates::STANDBY) {
         _hsm->doInterrupt = true;
@@ -157,7 +157,7 @@ void HordeProcessAdapter::updateRole(int rank, int size) {
 void HordeProcessAdapter::collectClauses(int maxSize) {
     _hsm->exportBufferMaxSize = maxSize;
     _hsm->doExport = true;
-    if (_hsm->isInitialized) Fork::wakeUp(_child_pid);
+    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 bool HordeProcessAdapter::hasCollectedClauses() {
     return _hsm->didExport;
@@ -180,7 +180,7 @@ void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses) {
     _hsm->importBufferSize = clauses.size();
     memcpy(_import_buffer, clauses.data(), clauses.size()*sizeof(int));
     _hsm->doImport = true;
-    if (_hsm->isInitialized) Fork::wakeUp(_child_pid);
+    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 
 void HordeProcessAdapter::dumpStats() {

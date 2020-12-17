@@ -10,8 +10,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-using namespace std;
-
 #define NUM_PRIMES 16
 
 static unsigned const int primes [] = {2038072819, 2038073287,	2038073761,	2038074317,
@@ -19,7 +17,7 @@ static unsigned const int primes [] = {2038072819, 2038073287,	2038073761,	20380
 		2038072847,	2038073341,	2038073789,	2038074329,
 		2038074751,	2038075231,	2038075751,	2038076267};
 
-size_t ClauseFilter::hash(const vector<int>& cls, int which, bool skipFirst) {
+size_t ClauseFilter::hash(const std::vector<int>& cls, int which, bool skipFirst) {
 	return hash(cls.data(), cls.size(), which, skipFirst);
 }
 
@@ -36,7 +34,7 @@ size_t ClauseFilter::hash(const int* begin, int size, int which, bool skipFirst)
 	return res;
 }
 
-bool ClauseFilter::registerClause(const vector<int>& cls) {
+bool ClauseFilter::registerClause(const std::vector<int>& cls) {
 	return registerClause(cls.data(), cls.size());
 }
 

@@ -1,5 +1,6 @@
 
 #include <sys/resource.h>
+#include <assert.h>
 
 #include "app/sat/hordesat/solvers/solver_thread.hpp"
 #include "app/sat/hordesat/horde.hpp"
@@ -17,7 +18,8 @@ void SolverThread::log(int verb, const char* fmt, ...) {
 
 SolverThread::SolverThread(const Parameters& params, const LoggingInterface& logger,
          std::shared_ptr<PortfolioSolverInterface> solver, 
-        const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<vector<int>>& assumptions, 
+        const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
+        const std::shared_ptr<std::vector<int>>& assumptions, 
         int localId, bool* finished) : 
     _params(params), _solver_ptr(solver), _solver(*solver), 
     _logger(logger.copy("S"+std::to_string(_solver.getGlobalId()))), 
@@ -222,6 +224,7 @@ void SolverThread::binValueDiversification(int mpi_size, int mpi_rank) {
     int vars = _solver.getVariablesCount();
     int num = mpi_rank * _local_id;
 
+    assert(log > 0);
     for (int var = 1; var < vars; var++) {
         int bit = var % log;
         bool phase = (num >> bit) & 1 ? true : false;
@@ -282,7 +285,7 @@ void SolverThread::reportResult(int res) {
     log(3, "found result\n");
     if (res == SAT || res == UNSAT) {
         if (_state == ACTIVE) {
-            log(-1, "found result %s\n", res==SAT?"SAT":"UNSAT");
+            log(2, "found result %s\n", res==SAT?"SAT":"UNSAT");
             _result = SatResult(res);
             if (res == SAT) { 
                 _solution = _solver.getSolution();

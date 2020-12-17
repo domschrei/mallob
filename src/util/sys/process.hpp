@@ -6,12 +6,13 @@
 
 #include "util/sys/threading.hpp"
 
-class Fork {
+class Process {
 
 public:
     static int _rank;
     static std::set<pid_t> _children;
     static bool _modifying_children;
+    static bool _exit_signal_caught;
 
     static void init(int rank, bool leafProcess = false);
     
@@ -29,6 +30,7 @@ public:
 
     /* 0: running, -1: error, childpid: exited */
     static bool didChildExit(pid_t childpid);
+    static bool isExitSignalCaught();
 };
 
 #endif

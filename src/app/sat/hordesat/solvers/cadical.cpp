@@ -42,7 +42,7 @@ void Cadical::setPhase(const int var, const bool phase) {
 
 // Solve the formula with a given set of assumptions
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
-SatResult Cadical::solve(const vector<int>& assumptions) {
+SatResult Cadical::solve(const std::vector<int>& assumptions) {
 	
 	// remember assumptions
 	this->assumptions = assumptions;
@@ -93,8 +93,8 @@ void Cadical::unsetSolverSuspend() {
     terminator.unsetSuspend();
 }
 
-vector<int> Cadical::getSolution() {
-	vector<int> result = {0};
+std::vector<int> Cadical::getSolution() {
+	std::vector<int> result = {0};
 
 	for (int i = 1; i <= getVariablesCount(); i++)
 		result.push_back(solver->val(i));
@@ -102,8 +102,8 @@ vector<int> Cadical::getSolution() {
 	return result;
 }
 
-set<int> Cadical::getFailedAssumptions() {
-	set<int> result;
+std::set<int> Cadical::getFailedAssumptions() {
+	std::set<int> result;
 	for (auto assumption : assumptions)
 		if (solver->failed(assumption))
 			result.insert(assumption);
@@ -124,7 +124,7 @@ void Cadical::addLearnedClause(const int* begin, int size) {
 	}
 }
 
-void Cadical::setLearnedClauseCallback(LearnedClauseCallback* callback) {
+void Cadical::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 	learner.setCallback(callback);
 	solver->connect_learner(&learner);
 }

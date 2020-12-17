@@ -10,7 +10,7 @@
 #include "anytime_sat_clause_communicator.hpp"
 #include "horde_shared_memory.hpp"
 #include "util/sys/proc.hpp"
-#include "util/sys/fork.hpp"
+#include "util/sys/process.hpp"
 #include "horde_config.hpp"
 
 ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId) : 
@@ -137,7 +137,7 @@ void ForkedSatJob::appl_dumpStats() {
 
 bool ForkedSatJob::appl_isDestructible() {
     // Solver is NULL or child process terminated
-    return !_initialized || Fork::didChildExit(_solver_pid);
+    return !_initialized || Process::didChildExit(_solver_pid);
 }
 
 bool ForkedSatJob::appl_wantsToBeginCommunication() {
@@ -192,9 +192,9 @@ ForkedSatJob::~ForkedSatJob() {
     Console::log(Console::VVERB, "%s : enter destructor", toStr());
     if (_init_thread.joinable()) _init_thread.join();
     _solver = NULL;
-    if (_solver_pid != -1 && !Fork::didChildExit(_solver_pid)) {
+    if (_solver_pid != -1 && !Process::didChildExit(_solver_pid)) {
         Console::log(Console::VVVVERB, "%s : SIGKILLing child pid=%i", toStr(), _solver_pid);
-        Fork::hardkill(_solver_pid);
+        Process::hardkill(_solver_pid);
     }
     Console::log(Console::VVERB, "%s : destructed SAT job", toStr());
 }
