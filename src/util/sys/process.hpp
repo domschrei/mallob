@@ -3,6 +3,7 @@
 #define DOMPASCH_MALLOB_FORK_H
 
 #include <set>
+#include <atomic>
 
 #include "util/sys/threading.hpp"
 
@@ -11,8 +12,8 @@ class Process {
 public:
     static int _rank;
     static std::set<pid_t> _children;
-    static bool _modifying_children;
-    static bool _exit_signal_caught;
+    static std::atomic_bool _modifying_children;
+    static std::atomic_bool _exit_signal_caught;
 
     static void init(int rank, bool leafProcess = false);
     

@@ -36,7 +36,7 @@ private:
     std::vector<int> _hop_destinations;
 
     std::thread _mpi_monitor_thread;
-    volatile bool _exiting = false;
+    std::atomic_bool _exiting = false;
 
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& _client_nodes) :

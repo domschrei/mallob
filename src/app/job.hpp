@@ -8,6 +8,7 @@
 #include <initializer_list>
 #include <set>
 #include <assert.h>
+#include <atomic>
 
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
@@ -144,7 +145,7 @@ public:
 private:
     int _id;
     std::string _name;
-    bool _has_description = false;
+    std::atomic_bool _has_description = false;
     JobDescription _description;
     std::shared_ptr<std::vector<uint8_t>> _serialized_description;
 

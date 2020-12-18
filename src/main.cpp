@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
 
     char hostname[1024];
 	gethostname(hostname, 1024);
-    Console::log(Console::VERB, "Launching mallob %s pid=%lu on host %s", MALLOB_VERSION, Proc::getPid(), hostname);
+    Console::log(Console::VERB, "mallob %s pid=%lu on host %s", MALLOB_VERSION, Proc::getPid(), hostname);
 
     // Global and local seed, such that all nodes have access to a synchronized randomness
     // as well as to an individual randomness that differs among nodes

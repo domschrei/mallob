@@ -21,13 +21,13 @@
 class ThreadedSatJob : public BaseSatJob {
 
 private:
-    volatile bool _initialized = false;
+    std::atomic_bool _initialized = false;
 
     std::unique_ptr<HordeLib> _solver;
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
     std::vector<int> _clause_buffer;
 
-    volatile bool _done_locally;
+    std::atomic_bool _done_locally;
     int _result_code;
 
     std::thread _init_thread;

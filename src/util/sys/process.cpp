@@ -18,8 +18,8 @@
 
 int Process::_rank;
 std::set<pid_t> Process::_children;
-bool Process::_modifying_children;
-bool Process::_exit_signal_caught;
+std::atomic_bool Process::_modifying_children;
+std::atomic_bool Process::_exit_signal_caught;
 
 
 

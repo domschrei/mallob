@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <utility>
 #include <thread>
+#include <atomic>
 
 #include "util/params.hpp"
 #include "util/sys/threading.hpp"
@@ -42,10 +43,10 @@ private:
     std::set<int> _failed_assumptions;
 
     size_t _imported_lits = 0;
-    bool _initialized = false;
     long _tid = -1;
 
-    bool* _finished_flag;
+    std::atomic_bool _initialized = false;
+    std::atomic_bool* _finished_flag;
 
 
 public:
@@ -53,7 +54,7 @@ public:
                 std::shared_ptr<PortfolioSolverInterface> solver, 
                 const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
                 const std::shared_ptr<std::vector<int>>& assumptions, 
-                int localId, bool* finished);
+                int localId, std::atomic_bool* finished);
     ~SolverThread();
 
     void init();

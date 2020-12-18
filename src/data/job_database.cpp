@@ -58,7 +58,7 @@ void JobDatabase::init(int jobId, std::shared_ptr<std::vector<uint8_t>> descript
 
     // Initialize job (in a separate thread)
     setLoad(1, jobId);
-    Console::log(Console::VERB, "Received desc. of #%i - initializing", jobId);
+    Console::log_recv(Console::VERB, source, "START #%i", jobId);
     get(jobId).start(description);
 }
 
@@ -78,8 +78,8 @@ void JobDatabase::forget(int jobId) {
     assert(job.getState() == PAST);
     // Check if the job can be destructed
     if (job.isDestructible()) {
+        Console::log(Console::VERB, "FORGET #%i", jobId);
         free(jobId);
-        Console::log(Console::VVVERB, "Forgot #%i", jobId);
     }
 }
 
@@ -97,7 +97,7 @@ void JobDatabase::free(int jobId) {
     _jobs.erase(jobId);
     delete &job;
 
-    Console::log(Console::VERB, "Deleted %s", toStr(jobId, index).c_str());
+    Console::log(Console::VVERB, "Deleted %s", toStr(jobId, index).c_str());
     Console::mergeJobLogs(jobId);
 }
 
@@ -243,13 +243,15 @@ void JobDatabase::reactivate(const JobRequest& req, int source) {
     // Already has job description: Directly resume job (if not terminated yet)
     assert(has(req.jobId));
     Job& job = get(req.jobId);
-    Console::log_recv(Console::INFO, source, "Reactivate %s", 
-                toStr(req.jobId, req.requestedNodeIndex).c_str());
     job.updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
     setLoad(1, req.jobId);
     if (job.getState() == SUSPENDED) {
+        Console::log_recv(Console::VERB, source, "RESUME %s", 
+                    toStr(req.jobId, req.requestedNodeIndex).c_str());
         job.resume();
     } else if (job.getState() == INACTIVE) {
+        Console::log_recv(Console::VERB, source, "RESTART %s", 
+                    toStr(req.jobId, req.requestedNodeIndex).c_str());
         job.start(std::shared_ptr<std::vector<uint8_t>>());
     }
 }
@@ -258,6 +260,7 @@ void JobDatabase::suspend(int jobId) {
     assert(has(jobId) && get(jobId).getState() == ACTIVE);
     get(jobId).suspend();
     setLoad(0, jobId);
+    Console::log(Console::VERB, "SUSPEND %s", get(jobId).toStr());
 }
 
 void JobDatabase::stop(int jobId, bool terminate) {
@@ -267,8 +270,10 @@ void JobDatabase::stop(int jobId, bool terminate) {
     if (job.getState() == INACTIVE && terminate) {
         if (!isIdle() && getActive().getId() == jobId) setLoad(0, jobId);
         job.terminate();
-        Console::log(Console::INFO, "%s : terminated", job.toStr());
+        Console::log(Console::VERB, "TERMINATE %s", job.toStr());
         if (job.hasCommitment()) uncommit(jobId);
+    } else {
+        Console::log(Console::VERB, "STOP %s", job.toStr());
     }
 }
 
@@ -318,7 +323,8 @@ void JobDatabase::forgetOldJobs() {
         forget(jobId);
     }
 
-    Console::log(Console::VERB, "%i resident jobs, %i with description", _jobs.size(), numJobsWithDescription);
+    if (!_jobs.empty())
+        Console::log(Console::VERB, "%i resident jobs, %i with description", _jobs.size(), numJobsWithDescription);
 }
 
 bool JobDatabase::has(int id) const {

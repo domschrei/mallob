@@ -65,7 +65,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
 
     // Signal initialization to parent
     pid_t pid = Proc::getPid();
-    log->log(1, "Hello from child %i\n", pid);
+    log->log(1, "Mallob solving engine pid=%i\n", pid);
     hsm->isSpawned = true;
     
     // Prepare solver

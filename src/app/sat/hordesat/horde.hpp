@@ -8,18 +8,19 @@
 #ifndef HORDELIB_H_
 #define HORDELIB_H_
 
+#include <atomic>
+#include <thread>
+#include <vector>
+#include <memory>
+#include <set>
+#include <map>
+
 #include "util/sys/threading.hpp"
 #include "utilities/logging_interface.hpp"
 #include "sharing/sharing_manager_interface.hpp"
 #include "solvers/solver_thread.hpp"
 #include "solvers/solving_state.hpp"
 #include "util/params.hpp"
-
-#include <thread>
-#include <vector>
-#include <memory>
-#include <set>
-#include <map>
 
 class HordeLib {
 
@@ -43,8 +44,8 @@ private:
 	SatResult _result;
 	std::vector<int> _model;
 	std::set<int> _failed_assumptions;
-	bool _solution_found = false;
-	bool _cleaned_up = false;
+	std::atomic_bool _solution_found = false;
+	std::atomic_bool _cleaned_up = false;
 
 public:
 

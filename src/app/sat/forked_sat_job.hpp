@@ -6,6 +6,7 @@
 #include <memory>
 #include <thread>
 #include <assert.h>
+#include <atomic>
 
 #include "hordesat/horde.hpp"
 
@@ -22,7 +23,7 @@
 class ForkedSatJob : public BaseSatJob {
 
 private:
-    volatile bool _initialized = false;
+    std::atomic_bool _initialized = false;
 
     std::unique_ptr<HordeProcessAdapter> _solver;
     int _solver_pid = -1;
@@ -35,7 +36,7 @@ private:
     float _time_of_last_comm = 0;
     float _job_comm_period;
 
-    bool _done_locally = false;
+    std::atomic_bool _done_locally = false;
     JobResult _internal_result;
 
 public:

@@ -20,7 +20,7 @@ SolverThread::SolverThread(const Parameters& params, const LoggingInterface& log
          std::shared_ptr<PortfolioSolverInterface> solver, 
         const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
         const std::shared_ptr<std::vector<int>>& assumptions, 
-        int localId, bool* finished) : 
+        int localId, std::atomic_bool* finished) : 
     _params(params), _solver_ptr(solver), _solver(*solver), 
     _logger(logger.copy("S"+std::to_string(_solver.getGlobalId()))), 
     _formulae(formulae), _assumptions(assumptions), 
