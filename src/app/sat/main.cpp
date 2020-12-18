@@ -223,7 +223,7 @@ int main(int argc, char *argv[]) {
     log->log(Console::VERB, "Launching SAT engine %s", MALLOB_VERSION);
 
     // Initialize signal handlers
-    Process::init(rankOfParent);
+    Process::init(rankOfParent, /*leafProcess=*/true);
 
     try {
         // Launch program
