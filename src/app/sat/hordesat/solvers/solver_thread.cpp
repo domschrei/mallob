@@ -332,7 +332,9 @@ void SolverThread::setState(SolvingState state) {
     _state_cond.notify();
 }
 
-SolverThread::~SolverThread() {}
+SolverThread::~SolverThread() {
+    if (_thread.joinable()) _thread.join();
+}
 
 const char* SolverThread::toStr() {
     _name = "S" + std::to_string(_solver.getGlobalId());
