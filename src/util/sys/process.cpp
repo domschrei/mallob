@@ -24,16 +24,7 @@ bool Process::_exit_signal_caught;
 
 
 void propagateSignalAndExit(int signum) {
-
-    if (!Process::_modifying_children) {
-        // Propagate signal to children
-        for (pid_t child : Process::_children) {
-            Process::sendSignal(child, SIGTERM);
-            Process::sendSignal(child, SIGCONT);
-        }
-    }
-
-    // Exit yourself
+    Process::forwardTerminateToChildren();
     Process::_exit_signal_caught = true;
 }
 
@@ -49,22 +40,13 @@ void handleAbort(int sig) {
     Console::log(Console::CRIT, "Backtrace: \n%s", backtrace().c_str());
 
     // Send exit signals to children and exit yourself
-    propagateSignalAndExit(sig);
+    Process::forwardTerminateToChildren();
+    exit(sig);
 }
 
 
 
 void Process::init(int rank, bool leafProcess) {
-
-    /*
-    struct sigaction sa;
-    sa.sa_sigaction = (void*) bt_sighandler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART | SA_SIGINFO;
-
-    sigaction(SIGSEGV, &sa, NULL);
-    sigaction(SIGABRT, &sa, NULL);
-    */
 
     _rank = rank;
     _modifying_children = false;
@@ -115,6 +97,16 @@ void Process::terminateAll() {
     for (int childpid : children) {
         terminate(childpid);
         resume(childpid);
+    }
+}
+
+void Process::forwardTerminateToChildren() {
+    if (!Process::_modifying_children) {
+        // Propagate signal to children
+        for (pid_t child : Process::_children) {
+            Process::sendSignal(child, SIGTERM);
+            Process::sendSignal(child, SIGCONT);
+        }
     }
 }
 

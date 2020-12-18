@@ -45,9 +45,8 @@ void ForkedSatJob::appl_start() {
         Console::log(Console::VERB, "%s : finished horde initialization", toStr());
         _time_of_start_solving = Timer::elapsedSeconds();
 
-        _initialized = true;
-
         auto lock = _solver_lock.getLock();
+        _initialized = true;
         auto state = getState();
         if (state == SUSPENDED) _solver->setSolvingState(SolvingStates::SUSPENDED);
         if (state == INACTIVE || state == PAST) _solver->setSolvingState(SolvingStates::STANDBY);

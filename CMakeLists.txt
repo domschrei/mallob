@@ -8,6 +8,10 @@ set(CMAKE_CXX_STANDARD 17)
 
 add_compile_options(-rdynamic)
 add_link_options(-rdynamic)
+if(CMAKE_BUILD_TYPE MATCHES DEBUG)
+    #add_compile_options(-ggdb -fno-omit-frame-pointer -fsanitize=address)
+    #add_link_options(-ggdb -fno-omit-frame-pointer -fsanitize=address)
+endif()
 
 
 # Libraries and includes
@@ -15,7 +19,6 @@ add_link_options(-rdynamic)
 set(BASE_LDIRS lib/lingeling lib/yalsat lib/cadical lib/glucose)
 set(BASE_LIBS ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} m z lgl yals pthread cadical rt dl)
 set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib/lingeling lib/glucose)
-set(BASE_COMPILEFLAGS ${MPI_CXX_COMPILE_FLAGS} -Wall -Wextra -pedantic)
 
 
 # Source files

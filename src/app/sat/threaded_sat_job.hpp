@@ -63,6 +63,8 @@ public:
     // int getDemand(int prevVolume) const override;
     // bool wantsToCommunicate() const override;
 
+    void terminateUnsafe();
+
     // Methods from BaseSatJob:
     bool isInitialized() override;
     void prepareSharing(int maxSize) override;

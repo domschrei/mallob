@@ -107,7 +107,7 @@ HordeLib::HordeLib(const Parameters& params, std::shared_ptr<LoggingInterface> l
 		cyclePos = (cyclePos+1) % solverChoices.size();
 	}
 
-	_sharing_manager.reset(new DefaultSharingManager(_solver_interfaces, params, *_logger));
+	_sharing_manager.reset(new DefaultSharingManager(_solver_interfaces, _params, *_logger));
 	hlog(3, "initialized\n");
 }
 

@@ -28,6 +28,8 @@ public:
 
     static void sendSignal(pid_t childpid, int signum);
 
+    static void forwardTerminateToChildren();
+
     /* 0: running, -1: error, childpid: exited */
     static bool didChildExit(pid_t childpid);
     static bool isExitSignalCaught();

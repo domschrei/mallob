@@ -46,13 +46,12 @@ void ThreadedSatJob::appl_start() {
         Console::log(Console::VERB, "%s : finished horde initialization", toStr());
         _time_of_start_solving = Timer::elapsedSeconds();
 
-        _initialized = true;
-
         auto lock = _solver_lock.getLock();
+        _initialized = true;
         auto state = getState();
-        if (state != ACTIVE) appl_suspend();
-        if (state != SUSPENDED) appl_stop();
-        if (state != INACTIVE) appl_terminate();
+        if (state == SUSPENDED) getSolver()->setPaused(); 
+        if (state == INACTIVE || state == PAST) _solver->interrupt();
+        if (state == PAST) terminateUnsafe();
     });
 }
 
@@ -92,6 +91,11 @@ void ThreadedSatJob::appl_stop() {
 
 void ThreadedSatJob::appl_terminate() {
     if (!_initialized) return;
+    auto lock = _solver_lock.getLock();
+    terminateUnsafe();
+}
+
+void ThreadedSatJob::terminateUnsafe() {
     if (!_destroy_thread.joinable()) _destroy_thread = std::thread([this]() {
         auto lock = _solver_lock.getLock();
         delete (AnytimeSatClauseCommunicator*)_clause_comm;
