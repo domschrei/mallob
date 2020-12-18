@@ -162,9 +162,7 @@ void ThreadedSatJob::appl_dumpStats() {
 }
 
 bool ThreadedSatJob::appl_isDestructible() {
-    if (!_initialized) return false;
-    auto lock = _solver_lock.getLock();
-    return _solver->isCleanedUp();
+    return !_initialized || _solver->isCleanedUp();
 }
 
 bool ThreadedSatJob::appl_wantsToBeginCommunication() {

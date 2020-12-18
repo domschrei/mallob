@@ -6,9 +6,9 @@ find_package(MPI REQUIRED)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_compile_options(-rdynamic)
-add_link_options(-rdynamic)
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
+    add_compile_options(-rdynamic -ggdb)
+    add_link_options(-rdynamic -ggdb)
     #add_compile_options(-ggdb -fno-omit-frame-pointer -fsanitize=address)
     #add_link_options(-ggdb -fno-omit-frame-pointer -fsanitize=address)
 endif()
