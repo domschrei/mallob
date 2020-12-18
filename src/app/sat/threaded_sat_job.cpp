@@ -200,7 +200,6 @@ void ThreadedSatJob::appl_communicate(int source, JobMessage& msg) {
 
 bool ThreadedSatJob::isInitialized() {
     if (!_initialized) return false;
-    auto lock = _solver_lock.getLock();
     return _solver->isFullyInitialized();
 }
 void ThreadedSatJob::prepareSharing(int maxSize) {
@@ -217,8 +216,6 @@ std::vector<int> ThreadedSatJob::getPreparedClauses() {
     return out;
 }
 void ThreadedSatJob::digestSharing(const std::vector<int>& clauses) {
-    if (!_initialized) return;
-    auto lock = _solver_lock.getLock();
     _solver->digestSharing(clauses);
 }
 
