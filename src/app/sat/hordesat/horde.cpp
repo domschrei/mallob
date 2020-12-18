@@ -317,3 +317,7 @@ void HordeLib::cleanUp() {
 
 	_cleaned_up = true;
 }
+
+HordeLib::~HordeLib() {
+	if (!_cleaned_up) cleanUp();
+}

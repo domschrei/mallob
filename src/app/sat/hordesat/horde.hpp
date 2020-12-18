@@ -49,7 +49,7 @@ private:
 public:
 
     HordeLib(const Parameters& params, std::shared_ptr<LoggingInterface> loggingInterface = NULL);
-	~HordeLib() = default;
+	~HordeLib();
 
     void beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
 							const std::shared_ptr<std::vector<int>>& assumptions);

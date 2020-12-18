@@ -224,8 +224,7 @@ void ThreadedSatJob::digestSharing(const std::vector<int>& clauses) {
 
 ThreadedSatJob::~ThreadedSatJob() {
     Console::log(Console::VVERB, "%s : enter destructor", toStr());
-    assert(appl_isDestructible());
     if (_init_thread.joinable()) _init_thread.join();
     if (_destroy_thread.joinable()) _destroy_thread.join();
-    Console::log(Console::VVERB, "%s : destructed SAT job", toStr());
+    Console::log(Console::VVERB, "%s : destructing SAT job", toStr());
 }
