@@ -40,7 +40,7 @@ public:
      * Processes a message adressed to the balancing procedure.
      * Returns true if the balancing finished.
      */
-    virtual bool continueBalancing(MessageHandlePtr handle) = 0;
+    virtual bool continueBalancing(MessageHandle& handle) = 0;
     /**
      * If balancing finished, returns the result.
      */

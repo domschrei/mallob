@@ -146,31 +146,32 @@ void Client::mainProgram() {
         if (nextId >= 0) introduceJob(_jobs[nextId]);
 
         // Poll messages, if present
-        auto handle = MyMpi::poll(time);
-        if (handle) {
+        auto maybeHandle = MyMpi::poll(time);
+        if (maybeHandle) {
             // Process message
-            Console::log_recv(Console::VVVERB, handle->source, "Processing msg, tag %i", handle->tag);
+            auto& handle = maybeHandle.value();
+            Console::log_recv(Console::VVVERB, handle.source, "Processing msg, tag %i", handle.tag);
 
-            if (handle->tag == MSG_NOTIFY_JOB_DONE) {
+            if (handle.tag == MSG_NOTIFY_JOB_DONE) {
                 handleJobDone(handle);
-            } else if (handle->tag == MSG_SEND_JOB_RESULT) {
+            } else if (handle.tag == MSG_SEND_JOB_RESULT) {
                 handleSendJobResult(handle);
-            } else if (handle->tag == MSG_NOTIFY_JOB_ABORTING) {
+            } else if (handle.tag == MSG_NOTIFY_JOB_ABORTING) {
                 handleAbort(handle);
-            } else if (handle->tag == MSG_OFFER_ADOPTION) {
+            } else if (handle.tag == MSG_OFFER_ADOPTION) {
                 handleRequestBecomeChild(handle);
-            } else if (handle->tag == MSG_CONFIRM_ADOPTION) {
+            } else if (handle.tag == MSG_CONFIRM_ADOPTION) {
                 handleAckAcceptBecomeChild(handle);
-            } else if (handle->tag == MSG_QUERY_JOB_REVISION_DETAILS) {
+            } else if (handle.tag == MSG_QUERY_JOB_REVISION_DETAILS) {
                 handleQueryJobRevisionDetails(handle);
-            } else if (handle->tag == MSG_CONFIRM_JOB_REVISION_DETAILS) {
+            } else if (handle.tag == MSG_CONFIRM_JOB_REVISION_DETAILS) {
                 handleAckJobRevisionDetails(handle);
-            } else if (handle->tag == MSG_CLIENT_FINISHED) {
+            } else if (handle.tag == MSG_CLIENT_FINISHED) {
                 handleClientFinished(handle);
-            }  else if (handle->tag == MSG_DO_EXIT) {
+            }  else if (handle.tag == MSG_DO_EXIT) {
                 handleExit(handle);
             } else {
-                Console::log_recv(Console::WARN, handle->source, "Unknown msg tag %i", handle->tag);
+                Console::log_recv(Console::WARN, handle.source, "Unknown msg tag %i", handle.tag);
             }
         }
 
@@ -284,46 +285,46 @@ void Client::checkClientDone() {
     }
 }
 
-void Client::handleRequestBecomeChild(MessageHandlePtr& handle) {
-    JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
+void Client::handleRequestBecomeChild(MessageHandle& handle) {
+    JobRequest req = Serializable::get<JobRequest>(handle.recvData);
     const JobDescription& desc = *_jobs[req.jobId];
 
     // Send job signature
-    JobSignature sig(req.jobId, /*rootRank=*/handle->source, req.revision, desc.getTransferSize(false));
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACCEPT_ADOPTION_OFFER, sig);
+    JobSignature sig(req.jobId, /*rootRank=*/handle.source, req.revision, desc.getTransferSize(false));
+    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_ACCEPT_ADOPTION_OFFER, sig);
     //stats.increment("sentMessages");
 }
 
-void Client::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
-    JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
+void Client::handleAckAcceptBecomeChild(MessageHandle& handle) {
+    JobRequest req = Serializable::get<JobRequest>(handle.recvData);
     JobDescription& desc = *_jobs[req.jobId];
     assert(desc.getId() == req.jobId || Console::fail("%i != %i", desc.getId(), req.jobId));
-    Console::log_send(Console::VVERB, handle->source, "Sending job desc. of #%i of size %i", desc.getId(), desc.getTransferSize(false));
-    _root_nodes[req.jobId] = handle->source;
+    Console::log_send(Console::VVERB, handle.source, "Sending job desc. of #%i of size %i", desc.getId(), desc.getTransferSize(false));
+    _root_nodes[req.jobId] = handle.source;
     auto data = desc.serializeFirstRevision();
 
-    int jobId = Serializable::get<int>(*data);    
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, data);
-    Console::log_send(Console::VVERB, handle->source, "Sent job desc. of #%i of size %i", jobId, data->size());
+    int jobId = Serializable::get<int>(data);    
+    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_DESCRIPTION, data);
+    Console::log_send(Console::VVERB, handle.source, "Sent job desc. of #%i of size %i", jobId, data.size());
 }
 
-void Client::handleJobDone(MessageHandlePtr& handle) {
-    IntPair recv(*handle->recvData);
+void Client::handleJobDone(MessageHandle& handle) {
+    IntPair recv(handle.recvData);
     int jobId = recv.first;
     int resultSize = recv.second;
-    Console::log_recv(Console::VVERB, handle->source, "Will receive job result, length %i, for job #%i", resultSize, jobId);
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_QUERY_JOB_RESULT, handle->recvData);
-    MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_RESULT, resultSize);
+    Console::log_recv(Console::VVERB, handle.source, "Will receive job result, length %i, for job #%i", resultSize, jobId);
+    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_QUERY_JOB_RESULT, handle.recvData);
+    MyMpi::irecv(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_RESULT, resultSize);
 }
 
-void Client::handleSendJobResult(MessageHandlePtr& handle) {
+void Client::handleSendJobResult(MessageHandle& handle) {
 
-    JobResult jobResult = Serializable::get<JobResult>(*handle->recvData);
+    JobResult jobResult = Serializable::get<JobResult>(handle.recvData);
     int jobId = jobResult.id;
     int resultCode = jobResult.result;
     int revision = jobResult.revision;
 
-    Console::log_recv(Console::VVERB, handle->source, "Received result of job #%i rev. %i, code: %i", jobId, revision, resultCode);
+    Console::log_recv(Console::VVERB, handle.source, "Received result of job #%i rev. %i, code: %i", jobId, revision, resultCode);
     JobDescription& desc = *_jobs[jobId];
 
     // Output response time and solution header
@@ -370,11 +371,11 @@ void Client::handleSendJobResult(MessageHandlePtr& handle) {
     } else finishJob(jobId);
 }
 
-void Client::handleAbort(MessageHandlePtr& handle) {
+void Client::handleAbort(MessageHandle& handle) {
 
-    IntVec request(*handle->recvData);
+    IntVec request(handle.recvData);
     int jobId = request[0];
-    Console::log_recv(Console::INFO, handle->source, "TIMEOUT #%i %.6f", jobId, Timer::elapsedSeconds() - _jobs[jobId]->getArrival());
+    Console::log_recv(Console::INFO, handle.source, "TIMEOUT #%i %.6f", jobId, Timer::elapsedSeconds() - _jobs[jobId]->getArrival());
     
     if (_file_adapter) {
         JobResult result;
@@ -406,35 +407,35 @@ void Client::finishJob(int jobId) {
     if (nextId >= 0) introduceJob(_jobs[nextId]);
 }
 
-void Client::handleQueryJobRevisionDetails(MessageHandlePtr& handle) {
+void Client::handleQueryJobRevisionDetails(MessageHandle& handle) {
 
-    IntVec request(*handle->recvData);
+    IntVec request(handle.recvData);
     int jobId = request[0];
     int firstRevision = request[1];
     int lastRevision = request[2];
 
     JobDescription& desc = *_jobs[jobId];
     IntVec response({jobId, firstRevision, lastRevision, desc.getTransferSize(firstRevision, lastRevision)});
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DETAILS, response);
+    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_REVISION_DETAILS, response);
 }
 
-void Client::handleAckJobRevisionDetails(MessageHandlePtr& handle) {
+void Client::handleAckJobRevisionDetails(MessageHandle& handle) {
 
-    IntVec response(*handle->recvData);
+    IntVec response(handle.recvData);
     int jobId = response[0];
     int firstRevision = response[1];
     int lastRevision = response[2];
     //int transferSize = response[3];
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DATA, 
+    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_REVISION_DATA, 
                 _jobs[jobId]->serialize(firstRevision, lastRevision));
 }
 
-void Client::handleClientFinished(MessageHandlePtr& handle) {
+void Client::handleClientFinished(MessageHandle& handle) {
     // Some other client is done
     _num_alive_clients--;
 }
 
-void Client::handleExit(MessageHandlePtr& handle) {
+void Client::handleExit(MessageHandle& handle) {
     Console::forceFlush();
     exit(1);
 }

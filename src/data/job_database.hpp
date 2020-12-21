@@ -41,7 +41,7 @@ public:
     ~JobDatabase();
 
     Job& createJob(int commSize, int worldRank, int jobId);
-    void init(int jobId, std::shared_ptr<std::vector<uint8_t>> description, int source);
+    void init(int jobId, std::vector<uint8_t>&& description, int source);
     bool checkComputationLimits(int jobId);
 
     bool isRequestObsolete(const JobRequest& req);
@@ -65,7 +65,7 @@ public:
     bool isTimeForRebalancing();
     bool beginBalancing();
     bool continueBalancing();
-    bool continueBalancing(MessageHandlePtr& handle);
+    bool continueBalancing(MessageHandle& handle);
     void finishBalancing();
     robin_hood::unordered_map<int, int> getBalancingResult();
 

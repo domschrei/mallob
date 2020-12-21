@@ -1,15 +1,15 @@
 
 #include "job_result.hpp"
 
-std::shared_ptr<std::vector<uint8_t>> JobResult::serialize() const {
+std::vector<uint8_t> JobResult::serialize() const {
     int size = 3*sizeof(int) + solution.size()*sizeof(int);
-    std::shared_ptr<std::vector<uint8_t>> packed = std::make_shared<std::vector<uint8_t>>(size);
+    std::vector<uint8_t> packed(size);
 
     int i = 0, n;
-    n = sizeof(int); memcpy(packed->data()+i, &id, n); i += n;
-    n = sizeof(int); memcpy(packed->data()+i, &result, n); i += n;
-    n = sizeof(int); memcpy(packed->data()+i, &revision, n); i += n;
-    n = solution.size() * sizeof(int); memcpy(packed->data()+i, solution.data(), n); i += n;
+    n = sizeof(int); memcpy(packed.data()+i, &id, n); i += n;
+    n = sizeof(int); memcpy(packed.data()+i, &result, n); i += n;
+    n = sizeof(int); memcpy(packed.data()+i, &revision, n); i += n;
+    n = solution.size() * sizeof(int); memcpy(packed.data()+i, solution.data(), n); i += n;
     return packed;
 }
 

@@ -39,11 +39,11 @@ bool Reduceable::startReduction(MPI_Comm& comm, std::set<int> excludedRanks) {
     return true; 
 }
 
-bool Reduceable::advanceReduction(MessageHandlePtr handle) {
+bool Reduceable::advanceReduction(MessageHandle& handle) {
 
-    std::unique_ptr<Reduceable> received = getDeserialized(*handle->recvData);
+    std::unique_ptr<Reduceable> received = getDeserialized(handle.recvData);
     if (received->isEmpty()) {
-        int source = handle->source;
+        int source = handle.source;
         _excluded_ranks.insert(source);
         Console::log(Console::VVVVERB, "-- empty!");
     }
@@ -108,8 +108,8 @@ bool Reduceable::startBroadcast(MPI_Comm& comm, std::set<int>& excludedRanks) {
     return true;
 }
 
-bool Reduceable::advanceBroadcast(MessageHandlePtr handle) {
-    deserialize(*handle->recvData); // overwrite local data
+bool Reduceable::advanceBroadcast(MessageHandle& handle) {
+    deserialize(handle.recvData); // overwrite local data
 
     _power /= 2;
     for (; _power >= 2; _power /= 2) {

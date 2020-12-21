@@ -64,15 +64,15 @@ private:
     bool checkTerminate();
     void checkClientDone();
 
-    void handleRequestBecomeChild(MessageHandlePtr& handle);
-    void handleJobDone(MessageHandlePtr& handle);
-    void handleAbort(MessageHandlePtr& handle);
-    void handleSendJobResult(MessageHandlePtr& handle);
-    void handleAckAcceptBecomeChild(MessageHandlePtr& handle);
-    void handleQueryJobRevisionDetails(MessageHandlePtr& handle);
-    void handleAckJobRevisionDetails(MessageHandlePtr& handle);
-    void handleClientFinished(MessageHandlePtr& handle);
-    void handleExit(MessageHandlePtr& handle);
+    void handleRequestBecomeChild(MessageHandle& handle);
+    void handleJobDone(MessageHandle& handle);
+    void handleAbort(MessageHandle& handle);
+    void handleSendJobResult(MessageHandle& handle);
+    void handleAckAcceptBecomeChild(MessageHandle& handle);
+    void handleQueryJobRevisionDetails(MessageHandle& handle);
+    void handleAckJobRevisionDetails(MessageHandle& handle);
+    void handleClientFinished(MessageHandle& handle);
+    void handleExit(MessageHandle& handle);
 
     int getMaxNumParallelJobs();
     int getNextIntroduceableJob();

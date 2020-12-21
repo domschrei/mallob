@@ -147,7 +147,7 @@ private:
     std::string _name;
     std::atomic_bool _has_description = false;
     JobDescription _description;
-    std::shared_ptr<std::vector<uint8_t>> _serialized_description;
+    std::vector<uint8_t> _serialized_description;
 
     std::vector<std::thread> _unpack_threads;
     std::vector<bool> _unpack_done;
@@ -195,7 +195,7 @@ public:
     
     // Concurrently unpacks the job description and then calls the job implementation's
     // appl_start() method from there.
-    void start(std::shared_ptr<std::vector<uint8_t>> data);
+    void start(std::vector<uint8_t>&& data);
     // Interrupt the execution of all internal solvers.
     void stop();
     
@@ -226,10 +226,10 @@ public:
     void assertState(JobState state) const {assert(_state == state || Console::fail("State of %s : %s", toStr(), jobStateToStr()));};
     int getVolume() const {return _volume;}
     float getPriority() const {return _priority;}
-    bool hasReceivedDescription() const {return _serialized_description != nullptr;};
+    bool hasReceivedDescription() const {return !_serialized_description.empty();};
     bool hasDeserializedDescription() const {return _has_description;};
     const JobDescription& getDescription() const {assert(hasDeserializedDescription()); return _description;};
-    std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription() {return _serialized_description;};
+    std::vector<uint8_t>& getSerializedDescription() {return _serialized_description;};
     bool hasCommitment() const {return _commitment.has_value();}
     const JobRequest& getCommitment() const {assert(hasCommitment()); return _commitment.value();}
     int getId() const {return _id;};
@@ -337,8 +337,8 @@ public:
 
 private:
 
-    void unpackDescription(std::shared_ptr<std::vector<uint8_t>> data) {
-        _description.deserialize(*data);
+    void unpackDescription() {
+        _description.deserialize(_serialized_description);
         _priority = _description.getPriority();
         _has_description = true;
     };

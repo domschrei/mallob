@@ -15,7 +15,7 @@ void MessageHandler::pollMessages(float elapsedTime) {
     // Process new messages
     auto handle = MyMpi::poll(elapsedTime);
     if (handle) {
-        if (_callbacks.count(handle->tag)) _callbacks[handle->tag](handle);
-        else if (_callbacks.count(TAG_DEFAULT)) _callbacks[TAG_DEFAULT](handle);
+        if (_callbacks.count(handle.value().tag)) _callbacks[handle.value().tag](handle.value());
+        else if (_callbacks.count(TAG_DEFAULT)) _callbacks[TAG_DEFAULT](handle.value());
     }
 }

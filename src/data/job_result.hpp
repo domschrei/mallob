@@ -22,7 +22,7 @@ public:
     int getTransferSize() const {return sizeof(int)*3 + sizeof(int)*solution.size();}
 
     JobResult& deserialize(const std::vector<uint8_t>& packed) override;
-    std::shared_ptr<std::vector<uint8_t>> serialize() const override;
+    std::vector<uint8_t> serialize() const override;
 };
 
 #endif

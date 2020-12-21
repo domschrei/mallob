@@ -7,6 +7,7 @@
 #include <set>
 #include <map>
 #include <assert.h>
+#include <optional>
 
 // Turn off incompatible function types warning in openmpi
 #define OMPI_SKIP_MPICXX 1
@@ -41,49 +42,61 @@ struct MessageHandle {
     int id;
     int tag;
     int source;
-    std::shared_ptr<std::vector<uint8_t>> sendData;
-    std::shared_ptr<std::vector<uint8_t>> recvData;
     bool selfMessage = false;
     bool finished = false;
     float creationTime = 0;
     MPI_Request request;
     MPI_Status status;
+    std::vector<uint8_t> sendData;
+    std::vector<uint8_t> recvData;
 
-    MessageHandle(int id) : id(id) {
-        status.MPI_SOURCE = -1; 
-        status.MPI_TAG = -1; 
-        sendData = std::make_shared<std::vector<uint8_t>>();
-        recvData = std::make_shared<std::vector<uint8_t>>();
-        creationTime = Timer::elapsedSeconds();
-        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
-    }
-    MessageHandle(int id, int recvSize) : id(id) {
-        status.MPI_SOURCE = -1; 
-        status.MPI_TAG = -1; 
-        sendData = std::make_shared<std::vector<uint8_t>>();
-        recvData = std::make_shared<std::vector<uint8_t>>(recvSize);
-        creationTime = Timer::elapsedSeconds();
-        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
-    }
-    MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& data) : id(id), sendData(data) {
-        status.MPI_SOURCE = -1; 
-        status.MPI_TAG = -1; 
-        recvData = std::make_shared<std::vector<uint8_t>>();
-        creationTime = Timer::elapsedSeconds();
-        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
-    }
-    MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& sendData, const std::shared_ptr<std::vector<uint8_t>>& recvData) : 
-        id(id), sendData(sendData), recvData(recvData) {
+    MessageHandle() = default;
+    MessageHandle(int id, float time = Timer::elapsedSeconds()) : id(id), creationTime(time) {
         status.MPI_SOURCE = -1; 
         status.MPI_TAG = -1;
-        creationTime = Timer::elapsedSeconds();
         //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
     }
+    MessageHandle(int id, int recvSize, float time = Timer::elapsedSeconds()) : id(id), creationTime(time) {
+        status.MPI_SOURCE = -1; 
+        status.MPI_TAG = -1;
+        recvData.resize(recvSize);
+        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
+    }
+    MessageHandle(int id, const std::vector<uint8_t>& data, float time = Timer::elapsedSeconds()) : 
+            id(id), sendData(data), creationTime(time) {
+        status.MPI_SOURCE = -1; 
+        status.MPI_TAG = -1;
+        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
+    }
+    MessageHandle(int id, const std::vector<uint8_t>& sendData, 
+            const std::vector<uint8_t>& recvData, 
+            float time = Timer::elapsedSeconds()) : 
+            id(id), sendData(sendData), recvData(recvData), creationTime(time) {
+        status.MPI_SOURCE = -1; 
+        status.MPI_TAG = -1;
+        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
+    }
+    MessageHandle(MessageHandle&& other) : id(other.id), tag(other.tag), source(other.source), 
+            sendData(std::move(other.sendData)), recvData(std::move(other.recvData)), selfMessage(other.selfMessage), 
+            finished(other.finished), creationTime(other.creationTime), request(other.request), 
+            status(other.status) {}
 
     ~MessageHandle() {
-        sendData = NULL;
-        recvData = NULL;
         //Console::log(Console::VVVVERB, "Msg ID=%i deleted", id);
+    }
+
+    MessageHandle& operator=(MessageHandle&& other) {
+        id = other.id;
+        tag = other.tag;
+        source = other.source;
+        sendData = std::move(other.sendData);
+        recvData = std::move(other.recvData);
+        selfMessage = other.selfMessage;
+        finished = other.finished;
+        creationTime = other.creationTime;
+        request = other.request;
+        status = other.status;
+        return *this;
     }
 
     bool testSent();
@@ -91,12 +104,6 @@ struct MessageHandle {
     bool shouldCancel(float elapsedTime);
     void cancel();
 };
-
-/**
- * A std::shared_ptr around a MessageHandle instance which captures all relevant information
- * on a specific MPI message.
- */
-typedef std::shared_ptr<MessageHandle> MessageHandlePtr;
 
 class MyMpi {
 
@@ -112,12 +119,12 @@ public:
     static void setOptions(const Parameters& params);
     static void beginListening();
 
-    static MessageHandlePtr isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object);
-    static MessageHandlePtr isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object);
-    static MessageHandlePtr irecv(MPI_Comm communicator);
-    static MessageHandlePtr irecv(MPI_Comm communicator, int tag);
-    static MessageHandlePtr irecv(MPI_Comm communicator, int source, int tag);
-    static MessageHandlePtr irecv(MPI_Comm communicator, int source, int tag, int size);
+    static void isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object);
+    static void isend(MPI_Comm communicator, int recvRank, int tag, const std::vector<uint8_t>& object);
+    static void irecv(MPI_Comm communicator);
+    static void irecv(MPI_Comm communicator, int tag);
+    static void irecv(MPI_Comm communicator, int source, int tag);
+    static void irecv(MPI_Comm communicator, int source, int tag, int size);
     /*
     static MessageHandlePtr  send(MPI_Comm communicator, int recvRank, int tag, const Serializable& object);
     static MessageHandlePtr  send(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object);
@@ -130,7 +137,7 @@ public:
 
     static bool test(MPI_Request& request, MPI_Status& status);
 
-    static MessageHandlePtr poll(float elapsedTime = Timer::elapsedSeconds());
+    static std::optional<MessageHandle> poll(float elapsedTime = Timer::elapsedSeconds());
     static int getNumActiveHandles() {
         return _handles.size();
     }
@@ -149,8 +156,8 @@ public:
     static void delayMonkey();
 
 private:
-    static std::vector<MessageHandlePtr> _handles;
-    static std::vector<MessageHandlePtr> _sent_handles;
+    static std::vector<MessageHandle> _handles;
+    static std::vector<MessageHandle> _sent_handles;
     static robin_hood::unordered_map<int, MsgTag> _tags;
 
     static void resetListenerIfNecessary(int tag);

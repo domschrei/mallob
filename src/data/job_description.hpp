@@ -66,16 +66,16 @@ public:
     void setArrival(float arrival) {_arrival = arrival;};
     void clearPayload();
 
-    std::shared_ptr<std::vector<uint8_t>> serialize() const override;
+    std::vector<uint8_t> serialize() const override;
     JobDescription& deserialize(const std::vector<uint8_t>& packed) override;
 
-    std::shared_ptr<std::vector<uint8_t>> serialize(int firstRevision, int lastRevision) const;
+    std::vector<uint8_t> serialize(int firstRevision, int lastRevision) const;
     void merge(const std::vector<uint8_t>& packed);
 
-    std::shared_ptr<std::vector<uint8_t>> serializeFirstRevision() const;
+    std::vector<uint8_t> serializeFirstRevision() const;
 
 private:
-    std::shared_ptr<std::vector<uint8_t>> serialize(bool allRevisions) const;
+    std::vector<uint8_t> serialize(bool allRevisions) const;
     void writeRevision(int revision, std::vector<uint8_t>& dest, int& i) const;
     void readRevision(const std::vector<uint8_t>& src, int& i);
 };

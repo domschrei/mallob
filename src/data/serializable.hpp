@@ -21,7 +21,7 @@ Alternatively, you can call deserialize(byteVector) on an "empty" Serializable o
 class Serializable {
 
 public:
-    virtual std::shared_ptr<std::vector<uint8_t>> serialize() const = 0;
+    virtual std::vector<uint8_t> serialize() const = 0;
     virtual Serializable& deserialize(const std::vector<uint8_t>& packed) = 0;
     
     template<typename T>

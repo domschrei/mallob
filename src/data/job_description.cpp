@@ -29,7 +29,7 @@ int JobDescription::getTransferSize(int firstRevision, int lastRevision) const {
     return size;
 }
 
-std::shared_ptr<std::vector<uint8_t>> JobDescription::serialize() const {
+std::vector<uint8_t> JobDescription::serialize() const {
     return serialize(true);
 }
 
@@ -55,47 +55,46 @@ JobDescription& JobDescription::deserialize(const std::vector<uint8_t>& packed) 
     return *this;
 }
 
-std::shared_ptr<std::vector<uint8_t>> JobDescription::serialize(int firstRevision, int lastRevision) const {
+std::vector<uint8_t> JobDescription::serialize(int firstRevision, int lastRevision) const {
 
-    std::shared_ptr<std::vector<uint8_t>> packed = std::make_shared<std::vector<uint8_t>>(
-            getTransferSize(firstRevision, lastRevision));
+    std::vector<uint8_t> packed(getTransferSize(firstRevision, lastRevision));
 
     int i = 0, n;
-    n = sizeof(int); memcpy(packed->data()+i, &_id, n); i += n;
-    n = sizeof(int); memcpy(packed->data()+i, &firstRevision, n); i += n;
-    n = sizeof(int); memcpy(packed->data()+i, &lastRevision, n); i += n;
+    n = sizeof(int); memcpy(packed.data()+i, &_id, n); i += n;
+    n = sizeof(int); memcpy(packed.data()+i, &firstRevision, n); i += n;
+    n = sizeof(int); memcpy(packed.data()+i, &lastRevision, n); i += n;
 
     // Payload
     for (int r = firstRevision; r <= lastRevision; r++) {
-        writeRevision(r, *packed, i);
+        writeRevision(r, packed, i);
     }
 
     return packed;
 }
 
-std::shared_ptr<std::vector<uint8_t>> JobDescription::serializeFirstRevision() const {
+std::vector<uint8_t> JobDescription::serializeFirstRevision() const {
     return serialize(false);
 }
 
-std::shared_ptr<std::vector<uint8_t>> JobDescription::serialize(bool allRevisions) const {
+std::vector<uint8_t> JobDescription::serialize(bool allRevisions) const {
 
-    std::shared_ptr<std::vector<uint8_t>> packed = std::make_shared<std::vector<uint8_t>>(getTransferSize(allRevisions));
+    std::vector<uint8_t> packed(getTransferSize(allRevisions));
 
     // Basic data
     int i = 0, n;
-    n = sizeof(int); memcpy(packed->data()+i, &_id, n); i += n;
-    n = sizeof(int); memcpy(packed->data()+i, &_root_rank, n); i += n;
-    n = sizeof(float); memcpy(packed->data()+i, &_priority, n); i += n;
-    n = sizeof(bool); memcpy(packed->data()+i, &_incremental, n); i += n;
-    n = sizeof(int); memcpy(packed->data()+i, &_num_vars, n); i += n;
+    n = sizeof(int);    memcpy(packed.data()+i, &_id, n); i += n;
+    n = sizeof(int);    memcpy(packed.data()+i, &_root_rank, n); i += n;
+    n = sizeof(float);  memcpy(packed.data()+i, &_priority, n); i += n;
+    n = sizeof(bool);   memcpy(packed.data()+i, &_incremental, n); i += n;
+    n = sizeof(int);    memcpy(packed.data()+i, &_num_vars, n); i += n;
     int rev = allRevisions ? _revision : 0;
-    n = sizeof(int); memcpy(packed->data()+i, &rev, n); i += n;
-    n = sizeof(float); memcpy(packed->data()+i, &_wallclock_limit, n); i += n;
-    n = sizeof(float); memcpy(packed->data()+i, &_cpu_limit, n); i += n;
+    n = sizeof(int);    memcpy(packed.data()+i, &rev, n); i += n;
+    n = sizeof(float);  memcpy(packed.data()+i, &_wallclock_limit, n); i += n;
+    n = sizeof(float);  memcpy(packed.data()+i, &_cpu_limit, n); i += n;
     
     // Payload
     for (int r = 0; r <= _revision; r++) {
-        writeRevision(r, *packed, i);
+        writeRevision(r, packed, i);
         if (!allRevisions) break;
     }
 

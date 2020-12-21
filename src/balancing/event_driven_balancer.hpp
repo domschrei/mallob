@@ -36,14 +36,14 @@ private:
     std::map<int, Event> _map;
     const int _size_per_event = 3*sizeof(int)+sizeof(float);
 public:
-    virtual std::shared_ptr<std::vector<uint8_t>> serialize() const override {
-        auto result = std::make_shared<std::vector<uint8_t>>(_map.size() * _size_per_event);
+    virtual std::vector<uint8_t> serialize() const override {
+        std::vector<uint8_t> result(_map.size() * _size_per_event);
         int i = 0, n;
         for (const auto& entry : _map) {
-            n = sizeof(int); memcpy(result->data()+i, &entry.second.jobId, n); i += n;
-            n = sizeof(int); memcpy(result->data()+i, &entry.second.epoch, n); i += n;
-            n = sizeof(int); memcpy(result->data()+i, &entry.second.demand, n); i += n;
-            n = sizeof(float); memcpy(result->data()+i, &entry.second.priority, n); i += n;
+            n = sizeof(int); memcpy(result.data()+i, &entry.second.jobId, n); i += n;
+            n = sizeof(int); memcpy(result.data()+i, &entry.second.epoch, n); i += n;
+            n = sizeof(int); memcpy(result.data()+i, &entry.second.demand, n); i += n;
+            n = sizeof(float); memcpy(result.data()+i, &entry.second.priority, n); i += n;
         }
         return result;
     }
@@ -176,7 +176,7 @@ public:
     bool beginBalancing(robin_hood::unordered_map<int, Job*>& jobs) override;
     bool canContinueBalancing() override {return false;}
     bool continueBalancing() override {return false;}
-    bool continueBalancing(MessageHandlePtr handle) override {return this->handle(handle);}
+    bool continueBalancing(MessageHandle& handle) override {return this->handle(handle);}
     robin_hood::unordered_map<int, int> getBalancingResult() override;
 
     void forget(int jobId) override;
@@ -193,7 +193,7 @@ private:
     std::list<EventMap> _recent_broadcasts_normal;
     std::list<EventMap> _recent_broadcasts_reversed;
 
-    bool handle(const MessageHandlePtr& handle);
+    bool handle(MessageHandle& handle);
     bool reduce(const EventMap& data, bool reversedTree);
     bool reduceIfApplicable(int which);
     void broadcast(const EventMap& data, bool reversedTree);

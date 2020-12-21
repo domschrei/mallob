@@ -7,7 +7,7 @@
 
 #include "mympi.hpp"
 
-typedef std::function<void(MessageHandlePtr&)> MsgCallback;
+typedef std::function<void(MessageHandle&)> MsgCallback;
 
 class MessageHandler {
 

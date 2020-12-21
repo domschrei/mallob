@@ -19,7 +19,7 @@ protected:
 public:
     virtual ~Reduceable() = default;
 
-    virtual std::shared_ptr<std::vector<uint8_t>> serialize() const override = 0;
+    virtual std::vector<uint8_t> serialize() const override = 0;
     virtual Reduceable& deserialize(const std::vector<uint8_t>& packed) override = 0;
     virtual void merge(const Reduceable& other) = 0;
     virtual std::unique_ptr<Reduceable> getDeserialized(const std::vector<uint8_t>& packed) const = 0;
@@ -30,11 +30,11 @@ public:
     void broadcastFromRankZero(MPI_Comm& comm, std::set<int> excludedRanks = std::set<int>());
 
     bool startReduction(MPI_Comm& comm, std::set<int> excludedRanks = std::set<int>());
-    bool advanceReduction(MessageHandlePtr handle);
+    bool advanceReduction(MessageHandle& handle);
     std::set<int>& getExcludedRanks() {return _excluded_ranks;}
 
     bool startBroadcast(MPI_Comm& comm, std::set<int>& excludedRanks);
-    bool advanceBroadcast(MessageHandlePtr handle);
+    bool advanceBroadcast(MessageHandle& handle);
 };
 
 #endif

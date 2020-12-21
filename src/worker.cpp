@@ -34,68 +34,68 @@ void Worker::init() {
 
     // Begin listening to an incoming message
     _msg_handler.registerCallback(MSG_ACCEPT_ADOPTION_OFFER, 
-        [&](auto h) {handleAcceptAdoptionOffer(h);});
+        [&](auto& h) {handleAcceptAdoptionOffer(h);});
     _msg_handler.registerCallback(MSG_CONFIRM_ADOPTION, 
-        [&](auto h) {handleConfirmAdoption(h);});
+        [&](auto& h) {handleConfirmAdoption(h);});
     _msg_handler.registerCallback(MSG_CONFIRM_JOB_REVISION_DETAILS, 
-        [&](auto h) {handleConfirmJobRevisionDetails(h);});
+        [&](auto& h) {handleConfirmJobRevisionDetails(h);});
     _msg_handler.registerCallback(MSG_DO_EXIT, 
-        [&](auto h) {handleDoExit(h);});
+        [&](auto& h) {handleDoExit(h);});
     _msg_handler.registerCallback(MSG_NOTIFY_JOB_ABORTING, 
-        [&](auto h) {handleNotifyJobAborting(h);});
+        [&](auto& h) {handleNotifyJobAborting(h);});
     _msg_handler.registerCallback(MSG_NOTIFY_JOB_DONE, 
-        [&](auto h) {handleNotifyJobDone(h);});
+        [&](auto& h) {handleNotifyJobDone(h);});
     _msg_handler.registerCallback(MSG_NOTIFY_JOB_REVISION, 
-        [&](auto h) {handleNotifyJobRevision(h);});
+        [&](auto& h) {handleNotifyJobRevision(h);});
     _msg_handler.registerCallback(MSG_NOTIFY_JOB_TERMINATING, 
-        [&](auto h) {handleNotifyJobTerminating(h);});
+        [&](auto& h) {handleNotifyJobTerminating(h);});
     _msg_handler.registerCallback(MSG_NOTIFY_NODE_LEAVING_JOB, 
-        [&](auto h) {handleNotifyNodeLeavingJob(h);});
+        [&](auto& h) {handleNotifyNodeLeavingJob(h);});
     _msg_handler.registerCallback(MSG_NOTIFY_RESULT_FOUND, 
-        [&](auto h) {handleNotifyResultFound(h);});
+        [&](auto& h) {handleNotifyResultFound(h);});
     _msg_handler.registerCallback(MSG_NOTIFY_RESULT_OBSOLETE, 
-        [&](auto h) {handleNotifyResultObsolete(h);});
+        [&](auto& h) {handleNotifyResultObsolete(h);});
     _msg_handler.registerCallback(MSG_NOTIFY_VOLUME_UPDATE, 
-        [&](auto h) {handleNotifyVolumeUpdate(h);});
+        [&](auto& h) {handleNotifyVolumeUpdate(h);});
     _msg_handler.registerCallback(MSG_OFFER_ADOPTION, 
-        [&](auto h) {handleOfferAdoption(h);});
+        [&](auto& h) {handleOfferAdoption(h);});
     _msg_handler.registerCallback(MSG_QUERY_JOB_RESULT, 
-        [&](auto h) {handleQueryJobResult(h);});
+        [&](auto& h) {handleQueryJobResult(h);});
     _msg_handler.registerCallback(MSG_QUERY_JOB_REVISION_DETAILS, 
-        [&](auto h) {handleQueryJobRevisionDetails(h);});
+        [&](auto& h) {handleQueryJobRevisionDetails(h);});
     _msg_handler.registerCallback(MSG_QUERY_VOLUME, 
-        [&](auto h) {handleQueryVolume(h);});
+        [&](auto& h) {handleQueryVolume(h);});
     _msg_handler.registerCallback(MSG_REJECT_ADOPTION_OFFER, 
-        [&](auto h) {handleRejectAdoptionOffer(h);});
+        [&](auto& h) {handleRejectAdoptionOffer(h);});
     _msg_handler.registerCallback(MSG_REJECT_ONESHOT, 
-        [&](auto h) {handleRejectOneshot(h);});
+        [&](auto& h) {handleRejectOneshot(h);});
     _msg_handler.registerCallback(MSG_REQUEST_NODE, 
-        [&](auto h) {handleRequestNode(h, /*oneshot=*/false);});
+        [&](auto& h) {handleRequestNode(h, /*oneshot=*/false);});
     _msg_handler.registerCallback(MSG_REQUEST_NODE_ONESHOT, 
-        [&](auto h) {handleRequestNode(h, /*oneshot=*/true);});
+        [&](auto& h) {handleRequestNode(h, /*oneshot=*/true);});
     _msg_handler.registerCallback(MSG_SEND_APPLICATION_MESSAGE, 
-        [&](auto h) {handleSendApplicationMessage(h);});
+        [&](auto& h) {handleSendApplicationMessage(h);});
     _msg_handler.registerCallback(MSG_SEND_CLIENT_RANK, 
-        [&](auto h) {handleSendClientRank(h);});
+        [&](auto& h) {handleSendClientRank(h);});
     _msg_handler.registerCallback(MSG_SEND_JOB_DESCRIPTION, 
-        [&](auto h) {handleSendJob(h);});
+        [&](auto& h) {handleSendJob(h);});
     _msg_handler.registerCallback(MSG_SEND_JOB_REVISION_DETAILS, 
-        [&](auto h) {handleSendJobRevisionDetails(h);});
+        [&](auto& h) {handleSendJobRevisionDetails(h);});
     _msg_handler.registerCallback(MSG_SEND_JOB_REVISION_DATA, 
-        [&](auto h) {handleSendJobRevisionData(h);});
+        [&](auto& h) {handleSendJobRevisionData(h);});
     _msg_handler.registerCallback(MSG_SEND_JOB_RESULT, 
-        [&](auto h) {handleSendJobResult(h);});
-    auto balanceCb = [&](MessageHandlePtr& handle) {
+        [&](auto& h) {handleSendJobResult(h);});
+    auto balanceCb = [&](MessageHandle& handle) {
         if (_job_db.continueBalancing(handle)) applyBalancing();
     };
     _msg_handler.registerCallback(MSG_COLLECTIVE_OPERATION, balanceCb);
     _msg_handler.registerCallback(MSG_REDUCE_DATA, balanceCb);
     _msg_handler.registerCallback(MSG_BROADCAST_DATA, balanceCb);
-    _msg_handler.registerCallback(MSG_WARMUP, [&](auto h) {
-        Console::log_recv(Console::VVVERB, h->source, "Warmup msg");
+    _msg_handler.registerCallback(MSG_WARMUP, [&](auto& h) {
+        Console::log_recv(Console::VVVERB, h.source, "Warmup msg");
     });
-    _msg_handler.registerCallback(MessageHandler::TAG_DEFAULT, [&](auto h) {
-        Console::log_recv(Console::WARN, h->source, "[WARN] Unknown message tag %i", h->tag);
+    _msg_handler.registerCallback(MessageHandler::TAG_DEFAULT, [&](auto& h) {
+        Console::log_recv(Console::WARN, h.source, "[WARN] Unknown message tag %i", h.tag);
     });
     MyMpi::beginListening();
 
@@ -271,9 +271,9 @@ void Worker::mainProgram() {
     fflush(stdout);
 }
 
-void Worker::handleNotifyJobAborting(MessageHandlePtr& handle) {
+void Worker::handleNotifyJobAborting(MessageHandle& handle) {
 
-    int jobId = Serializable::get<int>(*handle->recvData);
+    int jobId = Serializable::get<int>(handle.recvData);
     if (!_job_db.has(jobId)) return;
 
     interruptJob(jobId, /*terminate=*/true, /*reckless=*/true);
@@ -281,14 +281,14 @@ void Worker::handleNotifyJobAborting(MessageHandlePtr& handle) {
     if (_job_db.get(jobId).getJobTree().isRoot()) {
         // Forward information on aborted job to client
         MyMpi::isend(MPI_COMM_WORLD, _job_db.get(jobId).getJobTree().getParentNodeRank(), 
-            MSG_NOTIFY_JOB_ABORTING, handle->recvData);
+            MSG_NOTIFY_JOB_ABORTING, handle.recvData);
     }
 }
 
-void Worker::handleAcceptAdoptionOffer(MessageHandlePtr& handle) {
+void Worker::handleAcceptAdoptionOffer(MessageHandle& handle) {
 
     // Retrieve according job commitment
-    JobSignature sig = Serializable::get<JobSignature>(*handle->recvData);
+    JobSignature sig = Serializable::get<JobSignature>(handle.recvData);
     if (!_job_db.hasCommitment(sig.jobId)) {
         Console::log(Console::WARN, "[WARN] Job commitment for #%i not present despite adoption accept msg", sig.jobId);
         return;
@@ -300,70 +300,70 @@ void Worker::handleAcceptAdoptionOffer(MessageHandlePtr& handle) {
         // Full transfer of job description is required:
         // Send ACK to parent and receive full job description
         Console::log(Console::VVERB, "Will receive desc. of #%i, size %i", req.jobId, sig.getTransferSize());
-        MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, sig.getTransferSize()); // to be received later
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_CONFIRM_ADOPTION, req);
+        MyMpi::irecv(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_DESCRIPTION, sig.getTransferSize()); // to be received later
+        MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_CONFIRM_ADOPTION, req);
     } else {
         _job_db.uncommit(req.jobId);
-        _job_db.reactivate(req, handle->source);
+        _job_db.reactivate(req, handle.source);
         // Query parent for current volume of job
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_QUERY_VOLUME, IntVec({req.jobId}));
+        MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_QUERY_VOLUME, IntVec({req.jobId}));
     }
 }
 
-void Worker::handleConfirmJobRevisionDetails(MessageHandlePtr& handle) {
-    IntVec response(*handle->recvData);
+void Worker::handleConfirmJobRevisionDetails(MessageHandle& handle) {
+    IntVec response(handle.recvData);
     int jobId = response[0];
     int firstRevision = response[1];
     int lastRevision = response[2];
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DATA, 
+    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_REVISION_DATA, 
                 _job_db.get(jobId).getDescription().serialize(firstRevision, lastRevision));
 }
 
-void Worker::handleConfirmAdoption(MessageHandlePtr& handle) {
-    JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
+void Worker::handleConfirmAdoption(MessageHandle& handle) {
+    JobRequest req = Serializable::get<JobRequest>(handle.recvData);
 
     // If job offer is obsolete, send a stub description containing the job id ONLY
     if (_job_db.isAdoptionOfferObsolete(req, /*alreadyAccepted=*/true)) {
         // Obsolete request
-        Console::log_recv(Console::VERB, handle->source, "REJECT r.%s birth=%.2f hops=%i", 
+        Console::log_recv(Console::VERB, handle.source, "REJECT r.%s birth=%.2f hops=%i", 
                             _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str(), 
                             req.timeOfBirth, req.numHops);
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, IntVec({req.jobId}));
+        MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_DESCRIPTION, IntVec({req.jobId}));
         return;
     }
     Job& job = _job_db.get(req.jobId);
 
     // Retrieve and send concerned job description
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, job.getSerializedDescription());
-    Console::log_send(Console::VVERB, handle->source, "Sent job desc. of %s", job.toStr());
+    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_DESCRIPTION, job.getSerializedDescription());
+    Console::log_send(Console::VVERB, handle.source, "Sent job desc. of %s", job.toStr());
 
     // Mark new node as one of the node's children
-    auto relative = job.getJobTree().setChild(handle->source, req.requestedNodeIndex);
+    auto relative = job.getJobTree().setChild(handle.source, req.requestedNodeIndex);
     if (relative == JobTree::TreeRelative::NONE) assert(req.requestedNodeIndex == 0);
 }
 
-void Worker::handleDoExit(MessageHandlePtr& handle) {
-    Console::log_recv(Console::VERB, handle->source, "Received exit signal");
+void Worker::handleDoExit(MessageHandle& handle) {
+    Console::log_recv(Console::VERB, handle.source, "Received exit signal");
 
     // Forward exit signal
     if (_world_rank*2+1 < MyMpi::size(MPI_COMM_WORLD))
-        MyMpi::isend(MPI_COMM_WORLD, _world_rank*2+1, MSG_DO_EXIT, handle->recvData);
+        MyMpi::isend(MPI_COMM_WORLD, _world_rank*2+1, MSG_DO_EXIT, handle.recvData);
     if (_world_rank*2+2 < MyMpi::size(MPI_COMM_WORLD))
-        MyMpi::isend(MPI_COMM_WORLD, _world_rank*2+2, MSG_DO_EXIT, handle->recvData);
+        MyMpi::isend(MPI_COMM_WORLD, _world_rank*2+2, MSG_DO_EXIT, handle.recvData);
     while (MyMpi::hasOpenSentHandles()) MyMpi::testSentHandles();
 
     _exiting = true;
 }
 
-void Worker::handleRejectOneshot(MessageHandlePtr& handle) {
-    JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
-    Console::log_recv(Console::VVVERB, handle->source, 
+void Worker::handleRejectOneshot(MessageHandle& handle) {
+    JobRequest req = Serializable::get<JobRequest>(handle.recvData);
+    Console::log_recv(Console::VVVERB, handle.source, 
         "%s rejected by dormant child", _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
 
     if (_job_db.isAdoptionOfferObsolete(req)) return;
 
     Job& job = _job_db.get(req.jobId);
-    job.getJobTree().addFailToDormantChild(handle->source);
+    job.getJobTree().addFailToDormantChild(handle.source);
 
     bool doNormalHopping = false;
     if (req.numHops > std::max(_params.getIntParam("jc"), 2)) {
@@ -374,7 +374,7 @@ void Worker::handleRejectOneshot(MessageHandlePtr& handle) {
         req.numHops++;
         // Get dormant children without the node that just declined
         std::set<int> dormantChildren = job.getJobTree().getDormantChildren();
-        if (dormantChildren.count(handle->source)) dormantChildren.erase(handle->source);
+        if (dormantChildren.count(handle.source)) dormantChildren.erase(handle.source);
         if (dormantChildren.empty()) {
             // No fitting dormant children left
             doNormalHopping = true;
@@ -389,17 +389,17 @@ void Worker::handleRejectOneshot(MessageHandlePtr& handle) {
     if (doNormalHopping) {
         Console::log(Console::VVERB, "%s : switch to normal hops", job.toStr());
         req.numHops = -1;
-        bounceJobRequest(req, handle->source);
+        bounceJobRequest(req, handle.source);
     }
 }
 
-void Worker::handleRequestNode(MessageHandlePtr& handle, bool oneshot) {
+void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
 
-    JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
+    JobRequest req = Serializable::get<JobRequest>(handle.recvData);
 
     // Discard request if it has become obsolete
     if (_job_db.isRequestObsolete(req)) {
-        Console::log_recv(Console::VERB, handle->source, "DISCARD r.%s birth=%.2f hops=%i oneshot=%i", 
+        Console::log_recv(Console::VERB, handle.source, "DISCARD r.%s birth=%.2f hops=%i oneshot=%i", 
                 _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str(), req.timeOfBirth, req.numHops, oneshot ? 1 : 0);
         return;
     }
@@ -415,7 +415,7 @@ void Worker::handleRequestNode(MessageHandlePtr& handle, bool oneshot) {
 
         // Adoption takes place
         std::string jobstr = _job_db.toStr(req.jobId, req.requestedNodeIndex);
-        Console::log_recv(Console::VERB, handle->source, "ADOPT r.%s birth=%.2f hops=%i oneshot=%i", jobstr.c_str(), 
+        Console::log_recv(Console::VERB, handle.source, "ADOPT r.%s birth=%.2f hops=%i oneshot=%i", jobstr.c_str(), 
                 req.timeOfBirth, req.numHops, oneshot ? 1 : 0);
         assert(_job_db.isIdle() || Console::fail("Adopting a job, but not idle!"));
 
@@ -436,20 +436,20 @@ void Worker::handleRequestNode(MessageHandlePtr& handle, bool oneshot) {
 
     } else {
         if (oneshot) {
-            Console::log_send(Console::VVVERB, handle->source, "decline oneshot request for %s", 
+            Console::log_send(Console::VVVERB, handle.source, "decline oneshot request for %s", 
                         _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
-            MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_REJECT_ONESHOT, handle->recvData);
+            MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_REJECT_ONESHOT, handle.recvData);
         } else {
             // Continue job finding procedure somewhere else
-            bounceJobRequest(req, handle->source);
+            bounceJobRequest(req, handle.source);
         }
     }
 }
 
-void Worker::handleSendClientRank(MessageHandlePtr& handle) {
+void Worker::handleSendClientRank(MessageHandle& handle) {
 
     // Receive rank of the job's client
-    IntPair recv(*handle->recvData);
+    IntPair recv(handle.recvData);
     int jobId = recv.first;
     int clientRank = recv.second;
     assert(_job_db.has(jobId));
@@ -458,18 +458,18 @@ void Worker::handleSendClientRank(MessageHandlePtr& handle) {
     informClientJobIsDone(jobId, clientRank);
 }
 
-void Worker::handleIncrementalJobFinished(MessageHandlePtr& handle) {
-    interruptJob(Serializable::get<int>(*handle->recvData), /*terminate=*/true, /*reckless=*/false);
+void Worker::handleIncrementalJobFinished(MessageHandle& handle) {
+    interruptJob(Serializable::get<int>(handle.recvData), /*terminate=*/true, /*reckless=*/false);
 }
 
-void Worker::handleInterrupt(MessageHandlePtr& handle) {
-    interruptJob(Serializable::get<int>(*handle->recvData), /*terminate=*/false, /*reckless=*/false);
+void Worker::handleInterrupt(MessageHandle& handle) {
+    interruptJob(Serializable::get<int>(handle.recvData), /*terminate=*/false, /*reckless=*/false);
 }
 
-void Worker::handleSendApplicationMessage(MessageHandlePtr& handle) {
+void Worker::handleSendApplicationMessage(MessageHandle& handle) {
 
     // Deserialize job-specific message
-    JobMessage msg = Serializable::get<JobMessage>(*handle->recvData);
+    JobMessage msg = Serializable::get<JobMessage>(handle.recvData);
     int jobId = msg.jobId;
     if (!_job_db.has(jobId)) {
         Console::log(Console::WARN, "[WARN] Job message from unknown job #%i", jobId);
@@ -477,20 +477,20 @@ void Worker::handleSendApplicationMessage(MessageHandlePtr& handle) {
     }
     // Give message to corresponding job
     Job& job = _job_db.get(jobId);
-    if (job.getState() == ACTIVE) job.appl_communicate(handle->source, msg);
+    if (job.getState() == ACTIVE) job.appl_communicate(handle.source, msg);
 }
 
-void Worker::handleNotifyJobDone(MessageHandlePtr& handle) {
-    IntPair recv(*handle->recvData);
+void Worker::handleNotifyJobDone(MessageHandle& handle) {
+    IntPair recv(handle.recvData);
     int jobId = recv.first;
     int resultSize = recv.second;
-    Console::log_recv(Console::VVERB, handle->source, "Will receive job result, length %i, for job #%i", resultSize, jobId);
-    MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_RESULT, resultSize);
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_QUERY_JOB_RESULT, handle->recvData);
+    Console::log_recv(Console::VVERB, handle.source, "Will receive job result, length %i, for job #%i", resultSize, jobId);
+    MyMpi::irecv(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_RESULT, resultSize);
+    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_QUERY_JOB_RESULT, handle.recvData);
 }
 
-void Worker::handleNotifyJobRevision(MessageHandlePtr& handle) {
-    IntVec payload(*handle->recvData);
+void Worker::handleNotifyJobRevision(MessageHandle& handle) {
+    IntVec payload(handle.recvData);
     int jobId = payload[0];
     int revision = payload[1];
 
@@ -502,17 +502,17 @@ void Worker::handleNotifyJobRevision(MessageHandlePtr& handle) {
     if (revision > lastKnownRevision) {
         Console::log(Console::VERB, "Received revision update #%i rev. %i (I am at rev. %i)", jobId, revision, lastKnownRevision);
         IntVec request({jobId, lastKnownRevision+1, revision});
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_QUERY_JOB_REVISION_DETAILS, request);
+        MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_QUERY_JOB_REVISION_DETAILS, request);
     } else {
         // TODO ???
         Console::log(Console::WARN, "[WARN] Useless revision update #%i rev. %i (I am already at rev. %i)", jobId, revision, lastKnownRevision);
     }
 }
 
-void Worker::handleOfferAdoption(MessageHandlePtr& handle) {
+void Worker::handleOfferAdoption(MessageHandle& handle) {
 
-    JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
-    Console::log_recv(Console::VVERB, handle->source, "Adoption offer for %s", 
+    JobRequest req = Serializable::get<JobRequest>(handle.recvData);
+    Console::log_recv(Console::VVERB, handle.source, "Adoption offer for %s", 
                     _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
 
     bool reject = false;
@@ -526,7 +526,7 @@ void Worker::handleOfferAdoption(MessageHandlePtr& handle) {
         // Check if node should be adopted or rejected
         if (_job_db.isAdoptionOfferObsolete(req)) {
             // Obsolete request
-            Console::log_recv(Console::VERB, handle->source, "REJECT r.%s birth=%.2f hops=%i", 
+            Console::log_recv(Console::VERB, handle.source, "REJECT r.%s birth=%.2f hops=%i", 
                                 job.toStr(), req.timeOfBirth, req.numHops);
             reject = true;
 
@@ -536,43 +536,43 @@ void Worker::handleOfferAdoption(MessageHandlePtr& handle) {
 
             // Send job signature
             JobSignature sig(req.jobId, req.rootRank, req.revision, desc.getTransferSize(true));
-            MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_ACCEPT_ADOPTION_OFFER, sig);
+            MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_ACCEPT_ADOPTION_OFFER, sig);
 
             // If req.fullTransfer, then wait for the child to acknowledge having received the signature
             if (req.fullTransfer == 1) {
-                Console::log_send(Console::VVERB, handle->source, "Will send desc. of %s", 
+                Console::log_send(Console::VVERB, handle.source, "Will send desc. of %s", 
                         _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
             } else {
-                Console::log_send(Console::VVERB, handle->source, "Resume child %s", 
+                Console::log_send(Console::VVERB, handle.source, "Resume child %s", 
                         _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
             }
             // Child will start / resume its job solvers.
             // Mark new node as one of the node's children
-            auto relative = job.getJobTree().setChild(handle->source, req.requestedNodeIndex);
+            auto relative = job.getJobTree().setChild(handle.source, req.requestedNodeIndex);
             if (relative == JobTree::TreeRelative::NONE) assert(req.requestedNodeIndex == 0);
         }
     }
 
     // If rejected: Send message to rejected child node
     if (reject) {
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_REJECT_ADOPTION_OFFER, req);
+        MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_REJECT_ADOPTION_OFFER, req);
     }
 }
 
-void Worker::handleQueryJobResult(MessageHandlePtr& handle) {
+void Worker::handleQueryJobResult(MessageHandle& handle) {
 
     // Receive acknowledgement that the client received the advertised result size
     // and wishes to receive the full job result
-    int jobId = Serializable::get<int>(*handle->recvData);
+    int jobId = Serializable::get<int>(handle.recvData);
     assert(_job_db.has(jobId));
     const JobResult& result = _job_db.get(jobId).getResult();
-    Console::log_send(Console::VERB, handle->source, "Send full result to client");
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_RESULT, result);
+    Console::log_send(Console::VERB, handle.source, "Send full result to client");
+    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_RESULT, result);
     _job_db.get(jobId).setResultTransferPending(false);
 }
 
-void Worker::handleQueryJobRevisionDetails(MessageHandlePtr& handle) {
-    IntVec request(*handle->recvData);
+void Worker::handleQueryJobRevisionDetails(MessageHandle& handle) {
+    IntVec request(handle.recvData);
     int jobId = request[0];
     int firstRevision = request[1];
     int lastRevision = request[2];
@@ -581,12 +581,12 @@ void Worker::handleQueryJobRevisionDetails(MessageHandlePtr& handle) {
 
     const JobDescription& desc = _job_db.get(jobId).getDescription();
     IntVec response({jobId, firstRevision, lastRevision, desc.getTransferSize(firstRevision, lastRevision)});
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DETAILS, response);
+    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_REVISION_DETAILS, response);
 }
 
-void Worker::handleQueryVolume(MessageHandlePtr& handle) {
+void Worker::handleQueryVolume(MessageHandle& handle) {
 
-    IntVec payload(*handle->recvData);
+    IntVec payload(handle.recvData);
     int jobId = payload[0];
 
     // No volume of this job (yet?) -- ignore.
@@ -595,46 +595,45 @@ void Worker::handleQueryVolume(MessageHandlePtr& handle) {
     int volume = _job_db.get(jobId).getVolume();
     IntVec response({jobId, volume});
 
-    Console::log_send(Console::VVERB, handle->source, "Answer #%i volume query with v=%i", jobId, volume);
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_NOTIFY_VOLUME_UPDATE, response);
+    Console::log_send(Console::VVERB, handle.source, "Answer #%i volume query with v=%i", jobId, volume);
+    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_NOTIFY_VOLUME_UPDATE, response);
 }
 
-void Worker::handleRejectAdoptionOffer(MessageHandlePtr& handle) {
+void Worker::handleRejectAdoptionOffer(MessageHandle& handle) {
 
     // Retrieve committed job
-    JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
+    JobRequest req = Serializable::get<JobRequest>(handle.recvData);
     if (!_job_db.has(req.jobId)) return;
     Job &job = _job_db.get(req.jobId);
 
     // Erase commitment
-    Console::log_recv(Console::VVERB, handle->source, "Rejected to become %s : uncommitting", job.toStr());
+    Console::log_recv(Console::VVERB, handle.source, "Rejected to become %s : uncommitting", job.toStr());
     _job_db.uncommit(req.jobId);
 }
 
-void Worker::handleNotifyResultObsolete(MessageHandlePtr& handle) {
-
-    IntVec res(*handle->recvData);
+void Worker::handleNotifyResultObsolete(MessageHandle& handle) {
+    IntVec res(handle.recvData);
     int jobId = res[0];
     //int revision = res[1];
     if (!_job_db.has(jobId)) return;
-    Console::log_recv(Console::VVERB, handle->source, "job result for %s unwanted", _job_db.get(jobId).toStr());
+    Console::log_recv(Console::VVERB, handle.source, "job result for %s unwanted", _job_db.get(jobId).toStr());
     _job_db.get(jobId).setResultTransferPending(false);
 }
 
-void Worker::handleSendJob(MessageHandlePtr& handle) {
-    auto data = handle->recvData;
-    Console::log_recv(Console::VVVERB, handle->source, "Receiving some desc. of size %i", data->size());
-    int jobId = Serializable::get<int>(*data);
-    _job_db.init(jobId, data, handle->source);
+void Worker::handleSendJob(MessageHandle& handle) {
+    auto& data = handle.recvData;
+    Console::log_recv(Console::VVVERB, handle.source, "Receiving some desc. of size %i", data.size());
+    int jobId = Serializable::get<int>(data);
+    _job_db.init(jobId, std::move(data), handle.source);
 }
 
-void Worker::handleSendJobResult(MessageHandlePtr& handle) {
-    JobResult jobResult = Serializable::get<JobResult>(*handle->recvData);
+void Worker::handleSendJobResult(MessageHandle& handle) {
+    JobResult jobResult = Serializable::get<JobResult>(handle.recvData);
     int jobId = jobResult.id;
     int resultCode = jobResult.result;
     int revision = jobResult.revision;
 
-    Console::log_recv(Console::INFO, handle->source, "Received result of job #%i rev. %i, code: %i", jobId, revision, resultCode);
+    Console::log_recv(Console::INFO, handle.source, "Received result of job #%i rev. %i, code: %i", jobId, revision, resultCode);
     Console::log_noprefix(Console::CRIT, "s %s", resultCode == RESULT_SAT ? "SATISFIABLE" 
                             : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN");
     if (resultCode == RESULT_SAT) {
@@ -651,13 +650,13 @@ void Worker::handleSendJobResult(MessageHandlePtr& handle) {
     }
 }
 
-void Worker::handleSendJobRevisionData(MessageHandlePtr& handle) {
-    int jobId = Serializable::get<int>(*handle->recvData);
+void Worker::handleSendJobRevisionData(MessageHandle& handle) {
+    int jobId = Serializable::get<int>(handle.recvData);
     assert(_job_db.has(jobId));
 
     // TODO in separate thread
     Job& job = _job_db.get(jobId);
-    //job.unpackAmendment(handle->recvData);
+    //job.unpackAmendment(handle.recvData);
     int revision = job.getDescription().getRevision();
     Console::log(Console::INFO, "%s : computing on #%i rev. %i", job.toStr(), jobId, revision);
     
@@ -672,19 +671,19 @@ void Worker::handleSendJobRevisionData(MessageHandlePtr& handle) {
     }
 }
 
-void Worker::handleSendJobRevisionDetails(MessageHandlePtr& handle) {
-    IntVec response(*handle->recvData);
+void Worker::handleSendJobRevisionDetails(MessageHandle& handle) {
+    IntVec response(handle.recvData);
     int transferSize = response[3];
-    MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_REVISION_DATA, transferSize);
-    MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_CONFIRM_JOB_REVISION_DETAILS, handle->recvData);
+    MyMpi::irecv(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_REVISION_DATA, transferSize);
+    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_CONFIRM_JOB_REVISION_DETAILS, handle.recvData);
 }
 
-void Worker::handleNotifyJobTerminating(MessageHandlePtr& handle) {
-    interruptJob(Serializable::get<int>(*handle->recvData), /*terminate=*/true, /*reckless=*/false);
+void Worker::handleNotifyJobTerminating(MessageHandle& handle) {
+    interruptJob(Serializable::get<int>(handle.recvData), /*terminate=*/true, /*reckless=*/false);
 }
 
-void Worker::handleNotifyVolumeUpdate(MessageHandlePtr& handle) {
-    IntPair recv(*handle->recvData);
+void Worker::handleNotifyVolumeUpdate(MessageHandle& handle) {
+    IntPair recv(handle.recvData);
     int jobId = recv.first;
     int volume = recv.second;
     if (!_job_db.has(jobId)) {
@@ -696,24 +695,24 @@ void Worker::handleNotifyVolumeUpdate(MessageHandlePtr& handle) {
     updateVolume(jobId, volume);
 }
 
-void Worker::handleNotifyNodeLeavingJob(MessageHandlePtr& handle) {
+void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
 
     // Retrieve job
-    IntPair recv(*handle->recvData);
+    IntPair recv(handle.recvData);
     int jobId = recv.first;
     int index = recv.second;
     if (!_job_db.has(jobId)) return;
     Job& job = _job_db.get(jobId);
 
     // Prune away the respective child if necessary
-    auto pruned = job.getJobTree().prune(handle->source, index);
+    auto pruned = job.getJobTree().prune(handle.source, index);
 
     // If necessary, find replacement
     if (pruned != JobTree::TreeRelative::NONE && index < job.getVolume()) {
 
         // Try to find a dormant child that is not the message source
         int tag = MSG_REQUEST_NODE_ONESHOT;
-        int nextNodeRank = job.getJobTree().findDormantChild(handle->source);
+        int nextNodeRank = job.getJobTree().findDormantChild(handle.source);
         if (nextNodeRank == -1) {
             // If unsucessful, pick a random node
             tag = MSG_REQUEST_NODE;
@@ -735,29 +734,29 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandlePtr& handle) {
     if (job.wantsToCommunicate()) job.communicate();
 }
 
-void Worker::handleNotifyResultFound(MessageHandlePtr& handle) {
+void Worker::handleNotifyResultFound(MessageHandle& handle) {
 
     // Retrieve job
-    IntVec res(*handle->recvData);
+    IntVec res(handle.recvData);
     int jobId = res[0];
     int revision = res[1];
     if (!_job_db.has(jobId) || !_job_db.get(jobId).getJobTree().isRoot()) {
         Console::log(Console::WARN, "[WARN] Invalid adressee for job result of #%i", jobId);
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_NOTIFY_RESULT_OBSOLETE, handle->recvData);
+        MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_NOTIFY_RESULT_OBSOLETE, handle.recvData);
         return;
     }
     if (_job_db.get(jobId).getState() == PAST) {
-        Console::log_recv(Console::VVERB, handle->source, "Discard obsolete result for job #%i", jobId);
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_NOTIFY_RESULT_OBSOLETE, handle->recvData);
+        Console::log_recv(Console::VVERB, handle.source, "Discard obsolete result for job #%i", jobId);
+        MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_NOTIFY_RESULT_OBSOLETE, handle.recvData);
         return;
     }
     if (_job_db.get(jobId).getRevision() > revision) {
-        Console::log_recv(Console::VVERB, handle->source, "Discard obsolete result for job #%i rev. %i", jobId, revision);
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_NOTIFY_RESULT_OBSOLETE, handle->recvData);
+        Console::log_recv(Console::VVERB, handle.source, "Discard obsolete result for job #%i rev. %i", jobId, revision);
+        MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_NOTIFY_RESULT_OBSOLETE, handle.recvData);
         return;
     }
     
-    Console::log_recv(Console::VERB, handle->source, "Result found for job #%i", jobId);
+    Console::log_recv(Console::VERB, handle.source, "Result found for job #%i", jobId);
 
     // Terminate job and propagate termination message
     if (_job_db.get(jobId).getDescription().isIncremental()) {
@@ -768,14 +767,14 @@ void Worker::handleNotifyResultFound(MessageHandlePtr& handle) {
 
     // Redirect termination signal
     IntPair payload(jobId, _job_db.get(jobId).getJobTree().getParentNodeRank());
-    if (handle->source == _world_rank) {
+    if (handle.source == _world_rank) {
         // Self-message of root node: Directly send termination message to client
         informClientJobIsDone(payload.first, payload.second);
     } else {
         // Send rank of client node to the finished worker,
         // such that the worker can inform the client of the result
-        MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_CLIENT_RANK, payload);
-        Console::log_send(Console::VVERB, handle->source, "Forward rank of client (%i)", payload.second); 
+        MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_CLIENT_RANK, payload);
+        Console::log_send(Console::VVERB, handle.source, "Forward rank of client (%i)", payload.second); 
     }
 }
 
@@ -924,11 +923,11 @@ void Worker::informClientJobIsDone(int jobId, int clientRank) {
 void Worker::timeoutJob(int jobId) {
     // "Virtual self message" aborting the job
     IntVec payload({jobId, _job_db.get(jobId).getRevision()});
-    MessageHandlePtr handle(new MessageHandle(MyMpi::nextHandleId()));
-    handle->source = _world_rank;
-    handle->recvData = payload.serialize();
-    handle->tag = MSG_NOTIFY_JOB_ABORTING;
-    handle->finished = true;
+    MessageHandle handle(MyMpi::nextHandleId());
+    handle.source = _world_rank;
+    handle.recvData = payload.serialize();
+    handle.tag = MSG_NOTIFY_JOB_ABORTING;
+    handle.finished = true;
     handleNotifyJobAborting(handle);
 }
 

@@ -39,7 +39,7 @@ Job& JobDatabase::createJob(int commSize, int worldRank, int jobId) {
     return *_jobs[jobId];
 }
 
-void JobDatabase::init(int jobId, std::shared_ptr<std::vector<uint8_t>> description, int source) {
+void JobDatabase::init(int jobId, std::vector<uint8_t>&& description, int source) {
 
     if (!has(jobId) || get(jobId).getState() == PAST) {
         Console::log(Console::WARN, "[WARN] Unknown or past job #%i : discard desc.", jobId);
@@ -51,7 +51,7 @@ void JobDatabase::init(int jobId, std::shared_ptr<std::vector<uint8_t>> descript
     uncommit(jobId);
 
     // Empty job description
-    if (description->size() == sizeof(int)) {
+    if (description.size() == sizeof(int)) {
         Console::log(Console::VVERB, "Received empty desc. of #%i - uncommit and ignore", jobId);
         return;
     }
@@ -59,7 +59,7 @@ void JobDatabase::init(int jobId, std::shared_ptr<std::vector<uint8_t>> descript
     // Initialize job (in a separate thread)
     setLoad(1, jobId);
     Console::log_recv(Console::VERB, source, "START %s", job.toStr());
-    get(jobId).start(description);
+    get(jobId).start(std::move(description));
 }
 
 bool JobDatabase::checkComputationLimits(int jobId) {
@@ -252,7 +252,7 @@ void JobDatabase::reactivate(const JobRequest& req, int source) {
     } else if (job.getState() == INACTIVE) {
         Console::log_recv(Console::VERB, source, "RESTART %s", 
                     toStr(req.jobId, req.requestedNodeIndex).c_str());
-        job.start(std::shared_ptr<std::vector<uint8_t>>());
+        job.start(std::vector<uint8_t>());
     }
 }
 
@@ -398,7 +398,7 @@ bool JobDatabase::continueBalancing() {
     return false;
 }
 
-bool JobDatabase::continueBalancing(MessageHandlePtr& handle) {
+bool JobDatabase::continueBalancing(MessageHandle& handle) {
     bool done = _balancer->continueBalancing(handle);
     if (done) finishBalancing();
     return done;

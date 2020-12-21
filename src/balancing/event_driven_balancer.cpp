@@ -62,19 +62,19 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
     return reduceIfApplicable(BOTH);
 }
 
-bool EventDrivenBalancer::handle(const MessageHandlePtr& handle) {
-    if (handle->tag != MSG_BROADCAST_DATA && handle->tag != MSG_REDUCE_DATA)
+bool EventDrivenBalancer::handle(MessageHandle& handle) {
+    if (handle.tag != MSG_BROADCAST_DATA && handle.tag != MSG_REDUCE_DATA)
         return false;
     
     Console::log(Console::VVVERB, "BLC: handle");
 
-    int sender = handle->source;
+    int sender = handle.source;
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
-    EventMap data = Serializable::get<EventMap>(*handle->recvData);
+    EventMap data = Serializable::get<EventMap>(handle.recvData);
     bool done = false;
 
     //Console::log(Console::VERB, "BLC MSG");
-    if (handle->tag == MSG_REDUCE_DATA) {
+    if (handle.tag == MSG_REDUCE_DATA) {
 
         bool reversedTree = sender < myRank;
 
@@ -85,7 +85,7 @@ bool EventDrivenBalancer::handle(const MessageHandlePtr& handle) {
         // Forward reduction, switch to broadcast as necessary
         done = reduceIfApplicable(reversedTree ? REVERSED_TREE : NORMAL_TREE);
     }
-    if (handle->tag == MSG_BROADCAST_DATA) {
+    if (handle.tag == MSG_BROADCAST_DATA) {
 
         bool reversedTree = sender > myRank;
 

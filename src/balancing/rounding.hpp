@@ -53,10 +53,10 @@ bool isEmpty() const override {
     return data.empty();
 }
 
-std::shared_ptr<std::vector<uint8_t>> serialize() const override {
+std::vector<uint8_t> serialize() const override {
     int size = this->data.size()*sizeof(double);
-    std::shared_ptr<std::vector<uint8_t>> data = std::make_shared<std::vector<uint8_t>>(size);
-    memcpy(data->data(), this->data.data(), size);
+    std::vector<uint8_t> data(size);
+    memcpy(data.data(), this->data.data(), size);
     return data;
 }
 
