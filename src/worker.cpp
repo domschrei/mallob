@@ -295,6 +295,7 @@ void Worker::handleAcceptAdoptionOffer(MessageHandle& handle) {
     }
 
     const JobRequest& req = _job_db.getCommitment(sig.jobId);
+    Console::log(Console::CRIT, "REQUEST #%i", sig.jobId);
 
     if (req.fullTransfer == 1) {
         // Full transfer of job description is required:
@@ -311,7 +312,7 @@ void Worker::handleAcceptAdoptionOffer(MessageHandle& handle) {
 }
 
 void Worker::handleConfirmJobRevisionDetails(MessageHandle& handle) {
-    IntVec response(handle.recvData);
+    IntVec response = Serializable::get<IntVec>(handle.recvData);
     int jobId = response[0];
     int firstRevision = response[1];
     int lastRevision = response[2];
@@ -449,7 +450,7 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
 void Worker::handleSendClientRank(MessageHandle& handle) {
 
     // Receive rank of the job's client
-    IntPair recv(handle.recvData);
+    IntPair recv = Serializable::get<IntPair>(handle.recvData);
     int jobId = recv.first;
     int clientRank = recv.second;
     assert(_job_db.has(jobId));
@@ -481,7 +482,7 @@ void Worker::handleSendApplicationMessage(MessageHandle& handle) {
 }
 
 void Worker::handleNotifyJobDone(MessageHandle& handle) {
-    IntPair recv(handle.recvData);
+    IntPair recv = Serializable::get<IntPair>(handle.recvData);
     int jobId = recv.first;
     int resultSize = recv.second;
     Console::log_recv(Console::VVERB, handle.source, "Will receive job result, length %i, for job #%i", resultSize, jobId);
@@ -490,7 +491,7 @@ void Worker::handleNotifyJobDone(MessageHandle& handle) {
 }
 
 void Worker::handleNotifyJobRevision(MessageHandle& handle) {
-    IntVec payload(handle.recvData);
+    IntVec payload = Serializable::get<IntVec>(handle.recvData);
     int jobId = payload[0];
     int revision = payload[1];
 
@@ -572,7 +573,7 @@ void Worker::handleQueryJobResult(MessageHandle& handle) {
 }
 
 void Worker::handleQueryJobRevisionDetails(MessageHandle& handle) {
-    IntVec request(handle.recvData);
+    IntVec request = Serializable::get<IntVec>(handle.recvData);
     int jobId = request[0];
     int firstRevision = request[1];
     int lastRevision = request[2];
@@ -586,7 +587,7 @@ void Worker::handleQueryJobRevisionDetails(MessageHandle& handle) {
 
 void Worker::handleQueryVolume(MessageHandle& handle) {
 
-    IntVec payload(handle.recvData);
+    IntVec payload = Serializable::get<IntVec>(handle.recvData);
     int jobId = payload[0];
 
     // No volume of this job (yet?) -- ignore.
@@ -612,7 +613,7 @@ void Worker::handleRejectAdoptionOffer(MessageHandle& handle) {
 }
 
 void Worker::handleNotifyResultObsolete(MessageHandle& handle) {
-    IntVec res(handle.recvData);
+    IntVec res = Serializable::get<IntVec>(handle.recvData);
     int jobId = res[0];
     //int revision = res[1];
     if (!_job_db.has(jobId)) return;
@@ -672,7 +673,7 @@ void Worker::handleSendJobRevisionData(MessageHandle& handle) {
 }
 
 void Worker::handleSendJobRevisionDetails(MessageHandle& handle) {
-    IntVec response(handle.recvData);
+    IntVec response = Serializable::get<IntVec>(handle.recvData);
     int transferSize = response[3];
     MyMpi::irecv(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_REVISION_DATA, transferSize);
     MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_CONFIRM_JOB_REVISION_DETAILS, handle.recvData);
@@ -683,7 +684,7 @@ void Worker::handleNotifyJobTerminating(MessageHandle& handle) {
 }
 
 void Worker::handleNotifyVolumeUpdate(MessageHandle& handle) {
-    IntPair recv(handle.recvData);
+    IntPair recv = Serializable::get<IntPair>(handle.recvData);
     int jobId = recv.first;
     int volume = recv.second;
     if (!_job_db.has(jobId)) {
@@ -698,7 +699,7 @@ void Worker::handleNotifyVolumeUpdate(MessageHandle& handle) {
 void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
 
     // Retrieve job
-    IntPair recv(handle.recvData);
+    IntPair recv = Serializable::get<IntPair>(handle.recvData);
     int jobId = recv.first;
     int index = recv.second;
     if (!_job_db.has(jobId)) return;
@@ -737,7 +738,7 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
 void Worker::handleNotifyResultFound(MessageHandle& handle) {
 
     // Retrieve job
-    IntVec res(handle.recvData);
+    IntVec res = Serializable::get<IntVec>(handle.recvData);
     int jobId = res[0];
     int revision = res[1];
     if (!_job_db.has(jobId) || !_job_db.get(jobId).getJobTree().isRoot()) {

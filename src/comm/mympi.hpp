@@ -156,8 +156,10 @@ public:
     static void delayMonkey();
 
 private:
-    static std::vector<MessageHandle> _handles;
-    static std::vector<MessageHandle> _sent_handles;
+    typedef std::unique_ptr<MessageHandle> MessageHandlePtr;
+
+    static std::vector<MessageHandlePtr> _handles;
+    static std::vector<MessageHandlePtr> _sent_handles;
     static robin_hood::unordered_map<int, MsgTag> _tags;
 
     static void resetListenerIfNecessary(int tag);

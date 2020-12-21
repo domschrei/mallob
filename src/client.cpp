@@ -258,8 +258,9 @@ void Client::introduceJob(std::shared_ptr<JobDescription>& jobPtr) {
     AdjustablePermutation p(n, jobId);
     int nodeRank = p.get(0);
 
-    const JobRequest req(jobId, /*rootRank=*/-1, /*requestingNodeRank=*/_world_rank, 
+    JobRequest req(jobId, /*rootRank=*/-1, /*requestingNodeRank=*/_world_rank, 
         /*requestedNodeIndex=*/0, /*epoch=*/-1, /*numHops=*/0);
+    req.timeOfBirth = job.getArrival();
 
     Console::log_send(Console::INFO, nodeRank, "Introducing job #%i", jobId);
     MyMpi::isend(MPI_COMM_WORLD, nodeRank, MSG_REQUEST_NODE, req);
@@ -309,7 +310,7 @@ void Client::handleAckAcceptBecomeChild(MessageHandle& handle) {
 }
 
 void Client::handleJobDone(MessageHandle& handle) {
-    IntPair recv(handle.recvData);
+    IntPair recv = Serializable::get<IntPair>(handle.recvData);
     int jobId = recv.first;
     int resultSize = recv.second;
     Console::log_recv(Console::VVERB, handle.source, "Will receive job result, length %i, for job #%i", resultSize, jobId);
@@ -373,7 +374,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
 
 void Client::handleAbort(MessageHandle& handle) {
 
-    IntVec request(handle.recvData);
+    IntVec request = Serializable::get<IntVec>(handle.recvData);
     int jobId = request[0];
     Console::log_recv(Console::INFO, handle.source, "TIMEOUT #%i %.6f", jobId, Timer::elapsedSeconds() - _jobs[jobId]->getArrival());
     
@@ -409,7 +410,7 @@ void Client::finishJob(int jobId) {
 
 void Client::handleQueryJobRevisionDetails(MessageHandle& handle) {
 
-    IntVec request(handle.recvData);
+    IntVec request = Serializable::get<IntVec>(handle.recvData);
     int jobId = request[0];
     int firstRevision = request[1];
     int lastRevision = request[2];
@@ -421,7 +422,7 @@ void Client::handleQueryJobRevisionDetails(MessageHandle& handle) {
 
 void Client::handleAckJobRevisionDetails(MessageHandle& handle) {
 
-    IntVec response(handle.recvData);
+    IntVec response = Serializable::get<IntVec>(handle.recvData);
     int jobId = response[0];
     int firstRevision = response[1];
     int lastRevision = response[2];

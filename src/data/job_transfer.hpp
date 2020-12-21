@@ -146,11 +146,8 @@ struct IntPair : public Serializable {
     int second;
 
 public:
+    IntPair() = default;
     IntPair(int first, int second) : first(first), second(second) {}
-
-    IntPair(const std::vector<uint8_t>& packed) {
-        deserialize(packed);
-    }
 
     std::vector<uint8_t> serialize() const override {
         int size = (2*sizeof(int));
@@ -174,11 +171,9 @@ struct IntVec : public Serializable {
     std::vector<int> data;
 
 public:
+    IntVec() = default;
     IntVec(const std::vector<int>& data) : data(data) {}
     IntVec(const std::initializer_list<int>& list) : data(list) {}
-    IntVec(const std::vector<uint8_t>& packed) {
-        deserialize(packed);
-    }
 
     std::vector<uint8_t> serialize() const override {
         int size = (data.size()*sizeof(int));
