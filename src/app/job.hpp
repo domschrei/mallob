@@ -301,7 +301,7 @@ public:
     bool checkResourceLimit(float wcSecsPerInstance, float cpuSecsPerInstance) {
 
         updateVolumeAndUsedCpu(getVolume());
-        float usedWcSecs = getAge();
+        float usedWcSecs = getAgeSinceActivation();
         float usedCpuSecs = getUsedCpuSeconds();
 
         if ((cpuSecsPerInstance > 0 && usedCpuSecs > cpuSecsPerInstance)

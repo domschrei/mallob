@@ -295,7 +295,6 @@ void Worker::handleAcceptAdoptionOffer(MessageHandle& handle) {
     }
 
     const JobRequest& req = _job_db.getCommitment(sig.jobId);
-    Console::log(Console::CRIT, "REQUEST #%i", sig.jobId);
 
     if (req.fullTransfer == 1) {
         // Full transfer of job description is required:
@@ -923,7 +922,7 @@ void Worker::informClientJobIsDone(int jobId, int clientRank) {
 
 void Worker::timeoutJob(int jobId) {
     // "Virtual self message" aborting the job
-    IntVec payload({jobId, _job_db.get(jobId).getRevision()});
+    IntVec payload({jobId});
     MessageHandle handle(MyMpi::nextHandleId());
     handle.source = _world_rank;
     handle.recvData = payload.serialize();
