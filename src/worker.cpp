@@ -156,13 +156,9 @@ void Worker::mainProgram() {
 
     Watchdog watchdog(/*checkIntervMillis=*/60*1000, lastMemCheckTime);
 
-    while (!checkTerminate()) {
-
-        if (sleepMicrosecs > 0) usleep(sleepMicrosecs);
-        if (doYield) std::this_thread::yield();
+    float time = lastMemCheckTime;
+    while (!checkTerminate(time)) {
         
-        float time = Timer::elapsedSeconds();
-
         // Poll received messages, make progress in sent messages
         _msg_handler.pollMessages(time);
         MyMpi::testSentHandles();
@@ -268,6 +264,11 @@ void Worker::mainProgram() {
             Console::log(verb, "sysstate busy=%.2f%% jobs=%i accmem=%.2fGB", 
                         100*result[0]/MyMpi::size(_comm), (int)result[1], result[2]);
         }
+
+        if (sleepMicrosecs > 0) usleep(sleepMicrosecs);
+        if (doYield) std::this_thread::yield();
+
+        time = Timer::elapsedSeconds();
     }
 
     watchdog.stop();
@@ -912,10 +913,6 @@ void Worker::interruptJob(int jobId, bool terminate, bool reckless) {
     }
     job.getJobTree().getPastChildren().clear();
 
-    // Try to send away termination message as fast as possible
-    // to make space for other expanding jobs
-    MyMpi::testSentHandles();
-
     // Stop, and possibly terminate, the job
     _job_db.stop(jobId, terminate);
 }
@@ -956,11 +953,11 @@ void Worker::applyBalancing() {
     }
 }
 
-bool Worker::checkTerminate() {
+bool Worker::checkTerminate(float time) {
     bool terminate = false;
     if (_exiting) terminate = true;
     if (Process::isExitSignalCaught()) terminate = true;
-    if (_global_timeout > 0 && Timer::elapsedSeconds() > _global_timeout) {
+    if (_global_timeout > 0 && time > _global_timeout) {
         terminate = true;
     }
     if (terminate) {

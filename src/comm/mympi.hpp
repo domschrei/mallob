@@ -130,7 +130,7 @@ public:
 
     static bool test(MPI_Request& request, MPI_Status& status);
 
-    static std::vector<MessageHandlePtr> poll(float elapsedTime = Timer::elapsedSeconds());
+    static MessageHandlePtr poll(float elapsedTime = Timer::elapsedSeconds());
     static int getNumActiveHandles() {
         return _handles.size();
     }
@@ -149,9 +149,9 @@ public:
     static void delayMonkey();
 
 private:
-    static std::set<MessageHandlePtr> _handles;
-    static std::set<MessageHandlePtr> _sent_handles;
-    static std::map<int, MsgTag> _tags;
+    static std::vector<MessageHandlePtr> _handles;
+    static std::vector<MessageHandlePtr> _sent_handles;
+    static robin_hood::unordered_map<int, MsgTag> _tags;
 
     static void resetListenerIfNecessary(int tag);
 

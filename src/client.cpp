@@ -115,9 +115,8 @@ bool Client::checkTerminate() {
         // Send MSG_EXIT to worker of rank 0, which will broadcast it
         MyMpi::isend(MPI_COMM_WORLD, 0, MSG_DO_EXIT, IntVec({0}));
 
-        // Force sending all handles before exiting
-        while (MyMpi::hasOpenSentHandles())
-            MyMpi::testSentHandles();
+        // Force send all handles before exiting
+        while (MyMpi::hasOpenSentHandles()) MyMpi::testSentHandles();
         return true;
     }
     return false;
@@ -129,13 +128,15 @@ void Client::mainProgram() {
 
     while (!checkTerminate()) {
 
+        float time = Timer::elapsedSeconds();
+
         // Print memory usage info
-        if (Timer::elapsedSeconds() - lastStatTime > 5) {
+        if (time - lastStatTime > 5) {
             auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::FLAT);
             info.vmUsage *= 0.001 * 0.001;
             info.residentSetSize *= 0.001 * 0.001;
             Console::log(Console::VERB, "mem cpu=%i %.2fGB", info.cpu, info.residentSetSize);
-            lastStatTime = Timer::elapsedSeconds();
+            lastStatTime = time;
         }
 
         // Introduce next job(s) as applicable
@@ -145,8 +146,8 @@ void Client::mainProgram() {
         if (nextId >= 0) introduceJob(_jobs[nextId]);
 
         // Poll messages, if present
-        std::vector<MessageHandlePtr> handles = MyMpi::poll();
-        for (MessageHandlePtr& handle : handles) {
+        auto handle = MyMpi::poll(time);
+        if (handle) {
             // Process message
             Console::log_recv(Console::VVVERB, handle->source, "Processing msg, tag %i", handle->tag);
 

@@ -15,9 +15,9 @@
 int err = cmd; if (!MyMpi::_monitor_off) endcall(); chkerr(err);}
 
 int MyMpi::_max_msg_length;
-std::set<MessageHandlePtr> MyMpi::_handles;
-std::set<MessageHandlePtr> MyMpi::_sent_handles;
-std::map<int, MsgTag> MyMpi::_tags;
+std::vector<MessageHandlePtr> MyMpi::_handles;
+std::vector<MessageHandlePtr> MyMpi::_sent_handles;
+robin_hood::unordered_map<int, MsgTag> MyMpi::_tags;
 bool MyMpi::_monitor_off;
 int MyMpi::_monkey_flags = 0;
 
@@ -217,7 +217,7 @@ MessageHandlePtr MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, cons
         MPICALL(MPI_Isend(handle->sendData->data(), handle->sendData->size(), MPI_BYTE, recvRank, tag, communicator, &handle->request), "isend"+std::to_string(handle->id))
     }
 
-    (selfMessage ? _handles : _sent_handles).insert(handle);
+    (selfMessage ? _handles : _sent_handles).push_back(handle);
     
     return handle;
 }
@@ -259,7 +259,7 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
 
     MPICALL(MPI_Irecv(handle->recvData->data(), msgSize, MPI_BYTE, source, isAnytimeTag(tag) ? MSG_ANYTIME : tag, 
                 communicator, &handle->request), "irecv"+std::to_string(handle->id))
-    _handles.insert(handle);
+    _handles.push_back(handle);
     return handle;
 }
 
@@ -270,7 +270,7 @@ MessageHandlePtr MyMpi::irecv(MPI_Comm communicator, int source, int tag, int si
     handle->tag = tag;
     MPICALL(MPI_Irecv(handle->recvData->data(), size, MPI_BYTE, source, isAnytimeTag(tag) ? MSG_ANYTIME : tag, 
                 communicator, &handle->request), "irecv"+std::to_string(handle->id))
-    _handles.insert(handle);
+    _handles.push_back(handle);
     return handle;
 }
 
@@ -317,33 +317,28 @@ bool MyMpi::test(MPI_Request& request, MPI_Status& status) {
     return flag;
 }
 
-std::vector<MessageHandlePtr> MyMpi::poll(float elapsedTime) {
+MessageHandlePtr MyMpi::poll(float elapsedTime) {
 
-    std::vector<MessageHandlePtr> foundHandles;
-    std::vector<MessageHandlePtr> handlesToCancel;
+    MessageHandlePtr foundHandle;
 
-    // Find ready handle of best priority
-    for (auto& h : _handles) {
-        if (h->testReceived()) {
-            foundHandles.push_back(h);
+    // Find some ready handle
+    size_t offset = 0;
+    for (size_t i = 0; i < _handles.size(); i++) {
+        auto h = _handles[i];
+        if (!foundHandle && h->testReceived()) {
+            foundHandle = h;
+            resetListenerIfNecessary(h->tag);
+            offset++;
         } else if (h->shouldCancel(elapsedTime)) {
-            handlesToCancel.push_back(h);
+            h->cancel();
+            offset++;
+        } else if (offset > 0) {
+            _handles[i-offset] = h;
         }
     }
+    _handles.resize(_handles.size()-offset);
 
-    // Cancel obsolete handles
-    for (size_t i = 0; i < handlesToCancel.size(); i++) {
-        _handles.erase(handlesToCancel[i]);
-        handlesToCancel[i]->cancel();
-    }
-
-    // Remove and return found handle
-    for (size_t i = 0; i < foundHandles.size(); i++) {
-        _handles.erase(foundHandles[i]);
-        resetListenerIfNecessary(foundHandles[i]->tag);
-    } 
-
-    return foundHandles;
+    return foundHandle;
 }
 
 bool MyMpi::hasOpenSentHandles() {
@@ -351,17 +346,18 @@ bool MyMpi::hasOpenSentHandles() {
 }
 
 void MyMpi::testSentHandles() {
-    std::vector<MessageHandlePtr> finishedHandles;
-    for (auto& h : _sent_handles) {
+    size_t offset = 0;
+    for (size_t i = 0; i < _sent_handles.size(); i++) {
+        auto h = _sent_handles[i];
         if (h->testSent()) {
             // Sending operation completed
             Console::log(Console::VVVERB, "Msg ID=%i isent", h->id);
-            finishedHandles.push_back(h);
+            offset++;
+        } else if (offset > 0) {
+            _sent_handles[i-offset] = h;
         }
     }
-    for (auto& h : finishedHandles) {
-        _sent_handles.erase(h);
-    }
+    _sent_handles.resize(_sent_handles.size()-offset);
 }
 
 int MyMpi::size(MPI_Comm comm) {

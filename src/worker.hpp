@@ -86,7 +86,7 @@ private:
     void applyBalancing();
     void timeoutJob(int jobId);
     
-    bool checkTerminate();
+    bool checkTerminate(float time);
     void createExpanderGraph();
     int getRandomNonSelfWorkerNode();
 
