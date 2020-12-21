@@ -88,14 +88,14 @@ void Job::suspend() {
     assertState(ACTIVE);
     _state = SUSPENDED;
     appl_suspend();
-    Console::log(Console::INFO, "%s : suspended solver", toStr());
+    Console::log(Console::VVERB, "%s : suspended solver", toStr());
 }
 
 void Job::resume() {
     assertState(SUSPENDED);
     _state = ACTIVE;
     appl_resume();
-    Console::log(Console::INFO, "%s : resumed solving threads", toStr());
+    Console::log(Console::VVERB, "%s : resumed solving threads", toStr());
 }
 
 void Job::terminate() {
@@ -108,7 +108,7 @@ void Job::terminate() {
     _job_tree.unsetRightChild();
 
     _time_of_abort = Timer::elapsedSeconds();
-    Console::log(Console::VERB, "%s : terminated", toStr());
+    Console::log(Console::VVERB, "%s : terminated", toStr());
 }
 
 bool Job::isDestructible() {

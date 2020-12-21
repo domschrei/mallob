@@ -152,12 +152,13 @@ void MyMpi::init(int argc, char *argv[]) {
 
 void MyMpi::setOptions(const Parameters& params) {
     _monitor_off = !params.isNotNull("mmpi");
+    int verb = MyMpi::rank(MPI_COMM_WORLD) == 0 ? Console::INFO : Console::VVERB;
     if (params.isNotNull("delaymonkey")) {
-        Console::log(Console::INFO, "Enabling delay monkey");
+        Console::log(verb, "Enabling delay monkey");
         _monkey_flags |= MONKEY_DELAY;
     }
     if (params.isNotNull("latencymonkey")) {
-        Console::log(Console::INFO, "Enabling latency monkey");
+        Console::log(verb, "Enabling latency monkey");
         _monkey_flags |= MONKEY_LATENCY;
     }
 }

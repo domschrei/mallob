@@ -6,11 +6,17 @@ find_package(MPI REQUIRED)
 
 set(CMAKE_CXX_STANDARD 17)
 
+
+# Build-specific compile options
+
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
     add_compile_options(-rdynamic -ggdb)
     add_link_options(-rdynamic -ggdb)
     #add_compile_options(-ggdb -fno-omit-frame-pointer -fsanitize=address)
     #add_link_options(-ggdb -fno-omit-frame-pointer -fsanitize=address)
+    add_compile_definitions(MALLOB_VERSION=\"dbg\")
+else()
+    add_compile_definitions(MALLOB_VERSION=\"rls\")
 endif()
 
 

@@ -97,9 +97,9 @@ void Client::init() {
     // Begin listening to incoming messages
     MyMpi::beginListening();
 
-    Console::log(Console::VERB, "Global init barrier ...");
+    Console::log(Console::VVERB, "Global init barrier ...");
     MPI_Barrier(MPI_COMM_WORLD);
-    Console::log(Console::VERB, "Passed global init barrier");
+    Console::log(Console::VVERB, "Passed global init barrier");
 }
 
 bool Client::checkTerminate() {
@@ -298,20 +298,20 @@ void Client::handleAckAcceptBecomeChild(MessageHandlePtr& handle) {
     JobRequest req = Serializable::get<JobRequest>(*handle->recvData);
     JobDescription& desc = *_jobs[req.jobId];
     assert(desc.getId() == req.jobId || Console::fail("%i != %i", desc.getId(), req.jobId));
-    Console::log_send(Console::VERB, handle->source, "Sending job desc. of #%i of size %i", desc.getId(), desc.getTransferSize(false));
+    Console::log_send(Console::VVERB, handle->source, "Sending job desc. of #%i of size %i", desc.getId(), desc.getTransferSize(false));
     _root_nodes[req.jobId] = handle->source;
     auto data = desc.serializeFirstRevision();
 
     int jobId = Serializable::get<int>(*data);    
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_DESCRIPTION, data);
-    Console::log_send(Console::VERB, handle->source, "Sent job desc. of #%i of size %i", jobId, data->size());
+    Console::log_send(Console::VVERB, handle->source, "Sent job desc. of #%i of size %i", jobId, data->size());
 }
 
 void Client::handleJobDone(MessageHandlePtr& handle) {
     IntPair recv(*handle->recvData);
     int jobId = recv.first;
     int resultSize = recv.second;
-    Console::log_recv(Console::VERB, handle->source, "Will receive job result, length %i, for job #%i", resultSize, jobId);
+    Console::log_recv(Console::VVERB, handle->source, "Will receive job result, length %i, for job #%i", resultSize, jobId);
     MyMpi::isend(MPI_COMM_WORLD, handle->source, MSG_QUERY_JOB_RESULT, handle->recvData);
     MyMpi::irecv(MPI_COMM_WORLD, handle->source, MSG_SEND_JOB_RESULT, resultSize);
 }
@@ -494,7 +494,7 @@ void Client::readFormula(std::string& filename, JobDescription& job) {
         job.addPayload(formula);
         job.addAssumptions(assumptions);
         job.setNumVars(r.getNumVars());
-        Console::log(Console::VERB, "%i literals including separation zeros, %i assumptions", formula->size(), assumptions->size());
+        Console::log(Console::VERB, "Read %i lits w/ separators, %i assumptions", formula->size(), assumptions->size());
     } else {
         Console::log(Console::WARN, "File %s could not be opened - skipping #%i", filename.c_str(), job.getId());
     }

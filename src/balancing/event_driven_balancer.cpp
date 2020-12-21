@@ -39,7 +39,7 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
                 // Not contained yet in state: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
-                    Console::log(Console::VERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, epoch);
+                    Console::log(Console::VVERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, epoch);
                     _job_epochs[id]++;
                 } 
             }
@@ -51,7 +51,7 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
                 // Not contained yet in state: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
-                    Console::log(Console::VERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[id]);
+                    Console::log(Console::VVERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[id]);
                     _job_epochs[id]++;
                 }    
             }

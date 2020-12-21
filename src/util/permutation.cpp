@@ -47,11 +47,11 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
         AdjustablePermutation* p = new AdjustablePermutation(n, n*(r+1));
         
         if (myRank == 0) {
-            Console::append(Console::INFO, "Permutation %i  : ", r);
+            Console::append(Console::VVERB, "Permutation %i  : ", r);
             for (int pos = 0; pos < n; pos++) {
-                Console::append(Console::INFO, "%i ", p->get(pos));
+                Console::append(Console::VVERB, "%i ", p->get(pos));
             }
-            Console::log(Console::INFO, "");
+            Console::log(Console::VVERB, "");
         }
 
         // For each position of the permutation, left to right
@@ -81,17 +81,17 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
                 // Adjust permutation
                 p->adjust(pos, swapVal);
                 p->adjust(swapPos, val);
-                if (myRank == 0) Console::log(Console::INFO, "SWAP %i@%i <-> %i@%i", swapVal, swapPos, val, pos);
+                if (myRank == 0) Console::log(Console::VVERB, "SWAP %i@%i <-> %i@%i", swapVal, swapPos, val, pos);
             }
         }
         
-        if (myRank == 0) {
-            Console::append(Console::INFO, "Permutation %i' : ", r);
+        //if (myRank == 0) {
+            Console::append(Console::VERB, "Permutation %i' : ", r);
             for (int pos = 0; pos < n; pos++) {
-                Console::append(Console::INFO, "%i ", p->get(pos));
+                Console::append(Console::VERB, "%i ", p->get(pos));
             }
-            Console::log(Console::INFO, "");
-        }
+            Console::log(Console::VERB, "");
+        //}
 
         // Check that the amount of incoming edges to this node is correct
         int numIncoming = 0;

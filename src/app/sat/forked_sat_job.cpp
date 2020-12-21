@@ -41,8 +41,7 @@ void ForkedSatJob::appl_start() {
 
         Console::log(Console::VVVERB, "%s : beginning to solve", toStr());
         _solver_pid = _solver->run();
-        Console::log(Console::VERB, "%s : spawned child pid=%i", toStr(), _solver_pid);
-        Console::log(Console::VERB, "%s : finished horde initialization", toStr());
+        Console::log(Console::VVERB, "%s : spawned child pid=%i", toStr(), _solver_pid);
         _time_of_start_solving = Timer::elapsedSeconds();
 
         auto lock = _solver_lock.getLock();

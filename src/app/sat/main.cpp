@@ -33,7 +33,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
     
     // Set up "management" block of shared memory created by the parent
     std::string shmemId = "/edu.kit.iti.mallob." + std::to_string(Proc::getParentPid()) + "." + programParams.getParam("mpirank") + ".#" + programParams.getParam("jobid");
-    log->log(Console::VERB, "Access base shmem: %s", shmemId.c_str());
+    log->log(Console::VVERB, "Access base shmem: %s", shmemId.c_str());
     HordeSharedMemory* hsm = (HordeSharedMemory*) SharedMemory::access(shmemId, sizeof(HordeSharedMemory));
     assert(hsm != nullptr);
 
@@ -64,8 +64,6 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
     int* importBuffer = (int*) SharedMemory::access(shmemId + ".clauseimport", maxImportBufferSize);
 
     // Signal initialization to parent
-    pid_t pid = Proc::getPid();
-    log->log(1, "Mallob solving engine pid=%i\n", pid);
     hsm->isSpawned = true;
     
     // Prepare solver
@@ -220,7 +218,8 @@ int main(int argc, char *argv[]) {
             /*cPrefix=*/params.isNotNull("mono"), params.getParam("log"));
     
     auto log = getLog(params);
-    log->log(Console::VERB, "Launching SAT engine %s", MALLOB_VERSION);
+    pid_t pid = Proc::getPid();
+    log->log(Console::VERB, "mallob SAT engine %s pid=%lu", MALLOB_VERSION, pid);
 
     // Initialize signal handlers
     Process::init(rankOfParent, /*leafProcess=*/true);

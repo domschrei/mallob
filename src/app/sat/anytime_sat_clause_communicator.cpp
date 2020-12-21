@@ -49,7 +49,7 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
         msg.tag = MSG_GATHER_CLAUSES;
         msg.payload = clausesToShare;
         msg.payload.push_back(_num_aggregated_nodes);
-        Console::log_send(Console::VERB, parentRank, "%s : gather", _job->toStr());
+        Console::log_send(Console::VVERB, parentRank, "%s : gather", _job->toStr());
         MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
 
@@ -83,7 +83,7 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
 }
 
 void AnytimeSatClauseCommunicator::learnClauses(const std::vector<int>& clauses) {
-    Console::log(Console::VERB, "%s : learn, size %i", _job->toStr(), clauses.size());
+    Console::log(Console::VVERB, "%s : learn, size %i", _job->toStr(), clauses.size());
     testConsistency(clauses);
     
     if (clauses.size() > 0) {
@@ -99,7 +99,7 @@ void AnytimeSatClauseCommunicator::learnClauses(const std::vector<int>& clauses)
         // Locally digest clauses
         Console::log(Console::VVERB, "%s : digest", _job->toStr());
         _job->digestSharing(clauses);
-        Console::log(Console::VERB, "%s : digested", _job->toStr());
+        Console::log(Console::VVERB, "%s : digested", _job->toStr());
     }
 }
 

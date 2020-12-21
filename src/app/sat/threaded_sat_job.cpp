@@ -43,7 +43,7 @@ void ThreadedSatJob::appl_start() {
         Console::log(Console::VVVERB, "%s : beginning to solve", toStr());
         const JobDescription& desc = getDescription();
         getSolver()->beginSolving(desc.getPayloads(), desc.getAssumptions(getRevision()));
-        Console::log(Console::VERB, "%s : finished horde initialization", toStr());
+        Console::log(Console::VVERB, "%s : finished horde initialization", toStr());
         _time_of_start_solving = Timer::elapsedSeconds();
 
         auto lock = _solver_lock.getLock();
@@ -156,7 +156,7 @@ void ThreadedSatJob::appl_dumpStats() {
         if (threadTids[i] < 0) continue;
         double cpuRatio; float sysShare;
         bool ok = Proc::getThreadCpuRatio(threadTids[i], cpuRatio, sysShare);
-        if (ok) Console::log(Console::VERB, "%s td.%ld : %.2f%% CPU -> %.2f%% systime", 
+        if (ok) Console::log(Console::VERB, "%s td.%ld : %.2f%% CPU (%.2f%% sys)", 
                 toStr(), threadTids[i], cpuRatio, 100*sysShare);
     }
 }

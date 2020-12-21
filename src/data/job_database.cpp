@@ -52,13 +52,13 @@ void JobDatabase::init(int jobId, std::shared_ptr<std::vector<uint8_t>> descript
 
     // Empty job description
     if (description->size() == sizeof(int)) {
-        Console::log(Console::VERB, "Received empty desc. of #%i - uncommit and ignore", jobId);
+        Console::log(Console::VVERB, "Received empty desc. of #%i - uncommit and ignore", jobId);
         return;
     }
 
     // Initialize job (in a separate thread)
     setLoad(1, jobId);
-    Console::log_recv(Console::VERB, source, "START #%i", jobId);
+    Console::log_recv(Console::VERB, source, "START %s", job.toStr());
     get(jobId).start(description);
 }
 
@@ -113,12 +113,12 @@ bool JobDatabase::isRequestObsolete(const JobRequest& req) {
         || (job.getJobTree().hasLeftChild() && req.requestedNodeIndex == job.getJobTree().getLeftChildIndex())
         || (job.getJobTree().hasRightChild() && req.requestedNodeIndex == job.getJobTree().getRightChildIndex())) {
             // Request completed!
-            Console::log(Console::VERB, "Req. %s : already completed", job.toStr());
+            Console::log(Console::VVERB, "Req. %s : already completed", job.toStr());
             return true;
         }
         if (job.getState() == PAST) {
             // Job has already terminated!
-            Console::log(Console::VERB, "Req. %s : past job", job.toStr());
+            Console::log(Console::VVERB, "Req. %s : past job", job.toStr());
             return true;
         }
     }
@@ -143,13 +143,13 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
     Job& job = get(req.jobId);
     if (job.getState() != ACTIVE) {
         // Job is not active
-        Console::log(Console::VERB, "Req. %s : job inactive (%s)", job.toStr(), job.jobStateToStr());
+        Console::log(Console::VVERB, "Req. %s : job inactive (%s)", job.toStr(), job.jobStateToStr());
         return true;
     
     } else if (req.requestedNodeIndex != job.getJobTree().getLeftChildIndex() 
             && req.requestedNodeIndex != job.getJobTree().getRightChildIndex()) {
         // Requested node index is not a valid child index for this job
-        Console::log(Console::VERB, "Req. %s : not a valid child index (any more)", job.toStr());
+        Console::log(Console::VVERB, "Req. %s : not a valid child index (any more)", job.toStr());
         return true;
 
     } else if (alreadyAccepted) {
@@ -157,12 +157,12 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
 
     } else if (req.requestedNodeIndex == job.getJobTree().getLeftChildIndex() && job.getJobTree().hasLeftChild()) {
         // Job already has a left child
-        Console::log(Console::VERB, "Req. %s : already has left child", job.toStr());
+        Console::log(Console::VVERB, "Req. %s : already has left child", job.toStr());
         return true;
 
     } else if (req.requestedNodeIndex == job.getJobTree().getRightChildIndex() && job.getJobTree().hasRightChild()) {
         // Job already has a right child
-        Console::log(Console::VERB, "Req. %s : already has right child", job.toStr());
+        Console::log(Console::VVERB, "Req. %s : already has right child", job.toStr());
         return true;
     }
 
@@ -201,7 +201,7 @@ bool JobDatabase::tryAdopt(const JobRequest& req, bool oneshot, int& removedJob)
 
     // Know that the job already finished?
     if (has(req.jobId) && get(req.jobId).getState() == PAST) {
-        Console::log(Console::VERB, "Reject req. %s : already finished", 
+        Console::log(Console::VVERB, "Reject req. %s : already finished", 
                         toStr(req.jobId, req.requestedNodeIndex).c_str());
         return false;
     }
@@ -226,8 +226,8 @@ bool JobDatabase::tryAdopt(const JobRequest& req, bool oneshot, int& removedJob)
         if (job.getState() == ACTIVE && !job.getJobTree().isRoot() && job.getJobTree().isLeaf()) {
             
             // Inform parent node of the original job  
-            Console::log(Console::VERB, "Suspend %s ...", job.toStr());
-            Console::log(Console::VERB, "... to adopt starving %s", 
+            Console::log(Console::VVERB, "Suspend %s ...", job.toStr());
+            Console::log(Console::VVERB, "... to adopt starving %s", 
                             toStr(req.jobId, req.requestedNodeIndex).c_str());
 
             removedJob = job.getId();
@@ -324,7 +324,7 @@ void JobDatabase::forgetOldJobs() {
     }
 
     if (!_jobs.empty())
-        Console::log(Console::VERB, "%i resident jobs, %i with description", _jobs.size(), numJobsWithDescription);
+        Console::log(Console::VERB, "%i resident jobs, %i with desc.", _jobs.size(), numJobsWithDescription);
 }
 
 bool JobDatabase::has(int id) const {
@@ -409,8 +409,6 @@ void JobDatabase::finishBalancing() {
     // All collective operations are done; reset synchronized timer
     _epoch_counter.resetLastSync();
 
-    // Retrieve balancing results
-    Console::log(Console::VVVERB, "Finishing balancing ...");
     Console::log(MyMpi::rank(MPI_COMM_WORLD) == 0 ? Console::VERB : Console::VVVERB, "Balancing completed.");
 
     // Add last slice of idle/busy time 
