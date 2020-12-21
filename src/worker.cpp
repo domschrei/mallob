@@ -181,7 +181,7 @@ void Worker::mainProgram() {
             Proc::getSelfMemAndSchedCpu(cpu, vm_usage, resident_set);
             vm_usage *= 0.001 * 0.001;
             resident_set *= 0.001 * 0.001;
-            Console::log(Console::VERB, "mem cpu=%i vm=%.4fGB rss=%.4fGB", cpu, vm_usage, resident_set);
+            Console::log(Console::VERB, "mem cpu=%i %.2fGB", cpu, resident_set);
             _sys_state.setLocal(2, resident_set);
 
             // For this "management" thread

@@ -85,13 +85,13 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
             }
         }
         
-        //if (myRank == 0) {
+        if (myRank == 0) {
             Console::append(Console::VERB, "Permutation %i' : ", r);
             for (int pos = 0; pos < n; pos++) {
                 Console::append(Console::VERB, "%i ", p->get(pos));
             }
             Console::log(Console::VERB, "");
-        //}
+        }
 
         // Check that the amount of incoming edges to this node is correct
         int numIncoming = 0;
