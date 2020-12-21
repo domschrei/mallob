@@ -112,7 +112,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
             double perc_cpu; float sysShare;
             bool success = Proc::getThreadCpuRatio(Proc::getTid(), perc_cpu, sysShare);
             if (success) {
-                log->log(0, "child_main : %.2f%% CPU -> %.2f%% systime", perc_cpu, sysShare*100);
+                log->log(0, "child_main : %.2f%% CPU (%.2f%% sys)", perc_cpu, sysShare*100);
             }
 
             // For each solver thread
@@ -122,7 +122,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
                 
                 success = Proc::getThreadCpuRatio(threadTids[i], perc_cpu, sysShare);
                 if (success) {
-                    log->log(0, "td.%ld : %.2f%% CPU -> %.2f%% systime", threadTids[i], perc_cpu, sysShare*100);
+                    log->log(0, "td.%ld : %.2f%% CPU (%.2f%% sys)", threadTids[i], perc_cpu, sysShare*100);
                 }
             }
 

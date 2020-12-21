@@ -176,13 +176,12 @@ void Worker::mainProgram() {
             lastMemCheckTime = time;
             // Print stats
 
-            // For this process
-            double vm_usage, resident_set; int cpu;
-            Proc::getSelfMemAndSchedCpu(cpu, vm_usage, resident_set);
-            vm_usage *= 0.001 * 0.001;
-            resident_set *= 0.001 * 0.001;
-            Console::log(Console::VERB, "mem cpu=%i %.2fGB", cpu, resident_set);
-            _sys_state.setLocal(2, resident_set);
+            // For this process and subprocesses
+            auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::RECURSE);
+            info.vmUsage *= 0.001 * 0.001;
+            info.residentSetSize *= 0.001 * 0.001;
+            Console::log(Console::VERB, "mem cpu=%i %.2fGB", info.cpu, info.residentSetSize);
+            _sys_state.setLocal(2, info.residentSetSize);
 
             // For this "management" thread
             double perc_cpu; float sysShare;
@@ -945,12 +944,14 @@ void Worker::applyBalancing() {
     
     // Update volumes found during balancing, and trigger job expansions / shrinkings
     for (const auto& [jobId, volume] : _job_db.getBalancingResult()) {
+        /*
         if (_job_db.has(jobId) && _job_db.get(jobId).getVolume() != volume) {
             Console::log(
                 _job_db.get(jobId).getJobTree().isRoot() ? Console::INFO : Console::VVERB, 
                 "#%i : update v=%i", jobId, volume
             );
         }
+        */
         updateVolume(jobId, volume);
     }
 }

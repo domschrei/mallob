@@ -14,6 +14,9 @@
 
 #include "util/sys/threading.hpp"
 
+/*
+Interface to some process-related information from the /proc filesystem.
+*/
 class Proc {
 
 private:
@@ -24,12 +27,14 @@ private:
     static Mutex _tid_lock;
 
 public:
+
     static pid_t getPid();
     static pid_t getParentPid();
     static long getTid();
 
-    // https://stackoverflow.com/a/671389
-    static void getSelfMemAndSchedCpu(int& cpu, double& vm_usage, double& resident_set);
+    struct RuntimeInfo {int cpu = -1; double vmUsage = 0; double residentSetSize = 0;};
+    enum SubprocessMode {RECURSE, FLAT};
+    static RuntimeInfo getRuntimeInfo(pid_t pid, SubprocessMode mode);
 
     /*
     If successful, returns the used CPU ratio and the share of time it spent in kernel mode.

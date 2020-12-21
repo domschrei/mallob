@@ -131,11 +131,10 @@ void Client::mainProgram() {
 
         // Print memory usage info
         if (Timer::elapsedSeconds() - lastStatTime > 5) {
-            double vm_usage, resident_set; int cpu;
-            Proc::getSelfMemAndSchedCpu(cpu, vm_usage, resident_set);
-            vm_usage *= 0.001 * 0.001;
-            resident_set *= 0.001 * 0.001;
-            Console::log(Console::VERB, "mem cpu=%i %.2fGB", cpu, resident_set);
+            auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::FLAT);
+            info.vmUsage *= 0.001 * 0.001;
+            info.residentSetSize *= 0.001 * 0.001;
+            Console::log(Console::VERB, "mem cpu=%i %.2fGB", info.cpu, info.residentSetSize);
             lastStatTime = Timer::elapsedSeconds();
         }
 
