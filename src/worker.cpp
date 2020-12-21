@@ -163,11 +163,6 @@ void Worker::mainProgram() {
         _msg_handler.pollMessages(time);
         MyMpi::testSentHandles();
 
-        // Increment iteration modulo ten;
-        // only continue job checking etc. at every tenth iteration
-        iteration = (iteration == 9 ? 0 : iteration+1);
-        if (iteration > 0) continue; 
-
         if (time - lastMemCheckTime > memCheckPeriod) {
             lastMemCheckTime = time;
             // Print stats

@@ -323,7 +323,8 @@ MessageHandlePtr MyMpi::poll(float elapsedTime) {
 
     // Find some ready handle
     size_t offset = 0;
-    for (size_t i = 0; i < _handles.size(); i++) {
+    size_t size = _handles.size();
+    for (size_t i = 0; i < size; i++) {
         auto h = _handles[i];
         if (!foundHandle && h->testReceived()) {
             foundHandle = h;
@@ -336,7 +337,7 @@ MessageHandlePtr MyMpi::poll(float elapsedTime) {
             _handles[i-offset] = h;
         }
     }
-    _handles.resize(_handles.size()-offset);
+    if (offset > 0) _handles.resize(size-offset);
 
     return foundHandle;
 }
@@ -346,8 +347,11 @@ bool MyMpi::hasOpenSentHandles() {
 }
 
 void MyMpi::testSentHandles() {
+
     size_t offset = 0;
-    for (size_t i = 0; i < _sent_handles.size(); i++) {
+    size_t size = _sent_handles.size();
+    
+    for (size_t i = 0; i < size; i++) {
         auto h = _sent_handles[i];
         if (h->testSent()) {
             // Sending operation completed
@@ -357,7 +361,8 @@ void MyMpi::testSentHandles() {
             _sent_handles[i-offset] = h;
         }
     }
-    _sent_handles.resize(_sent_handles.size()-offset);
+
+    if (offset > 0) _sent_handles.resize(size-offset);
 }
 
 int MyMpi::size(MPI_Comm comm) {
