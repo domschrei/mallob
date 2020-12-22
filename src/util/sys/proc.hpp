@@ -13,6 +13,7 @@
 #include <map>
 
 #include "util/sys/threading.hpp"
+#include "util/robin_hood.hpp"
 
 /*
 Interface to some process-related information from the /proc filesystem.
@@ -20,11 +21,15 @@ Interface to some process-related information from the /proc filesystem.
 class Proc {
 
 private:
-    static std::map<long, float> _tid_lastcall;
-    static std::map<long, unsigned long> _tid_utime;
-    static std::map<long, unsigned long> _tid_stime;
-
-    static Mutex _tid_lock;
+    struct CpuInfo { 
+        double uticks = 0, sticks = 0, passedSecs = 0;
+        CpuInfo() = default;
+        CpuInfo(CpuInfo& other) = default; 
+        CpuInfo& operator=(CpuInfo&& other) = default;
+        CpuInfo& operator=(const CpuInfo& other) = default;
+    };
+    static robin_hood::unordered_map<long, CpuInfo> _cpu_info_per_tid;
+    static Mutex _cpu_info_lock;
 
 public:
 
@@ -42,6 +47,8 @@ public:
     the measurement and is guaranteed to fail.
     */
     static bool getThreadCpuRatio(long tid, double& cpuRatio, float& sysShare);
+
+    static float getUptime();
 
 };
 

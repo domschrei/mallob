@@ -12,16 +12,13 @@ robin_hood::unordered_map<int, int> getRoundedAssignments(int remainderIdx, int&
     //int occurrences =  remainderIdx < _remainders.size() ? _remainders.getOccurrences(remainderIdx) : 0;
 
     robin_hood::unordered_map<int, int> roundedAssignments;
-    for (auto it : assignments) {
-
-        double r = it.second - (int)it.second;
+    for (auto& [jobId, assignment] : assignments) {
         
-        if (r < remainder) 
-            roundedAssignments[it.first] = std::floor(it.second);
-        else 
-            roundedAssignments[it.first] = std::ceil(it.second);
-        
-        sum += roundedAssignments[it.first];
+        int floor = (int)assignment;
+        double r = assignment - floor;
+        int rounded = r < remainder ? floor : floor+1;
+        roundedAssignments[jobId] = rounded;
+        sum += rounded;
     }
     return roundedAssignments;
 }

@@ -80,13 +80,9 @@ bool MessageHandle::testReceived() {
 }
 
 bool MessageHandle::shouldCancel(float elapsedTime) {
-    // Non-finished, no self message,
-    // At least 2 minutes old, not an anytime tag
-    if (!finished && !selfMessage && elapsedTime-creationTime > 120.f 
-            && !MyMpi::isAnytimeTag(tag)) {
-        return true;
-    }
-    return false;
+    // Non-finished, no self message, sufficiently old, not an anytime tag
+    return !finished && !selfMessage && elapsedTime-creationTime > 60.f 
+            && !MyMpi::isAnytimeTag(tag);
 }
 
 void MessageHandle::cancel() {
@@ -302,7 +298,7 @@ std::optional<MessageHandle> MyMpi::poll(float elapsedTime) {
         if (!foundHandle && h.testReceived()) {
             foundHandle = std::move(h);
     
-            if (isAnytimeTag(foundHandle->tag)) {
+            if (!h.selfMessage && isAnytimeTag(foundHandle->tag)) {
                 // Reset listener, appending a new handle to _handles
                 MyMpi::irecv(MPI_COMM_WORLD, MSG_ANYTIME);
                 // Move new handle from the back to the current position

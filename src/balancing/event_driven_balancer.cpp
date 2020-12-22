@@ -323,15 +323,14 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
     robin_hood::unordered_map<int, double> assignments;
     float assignedResources = 0;
     std::map<float, float, std::less<float>> demandedResources;
-    for (const auto& entry : _states.getEntries()) {
-        const Event& ev = entry.second;
+    for (const auto& [jobId, ev] : _states.getEntries()) {
         if (ev.demand == 0) continue;
 
         double initialMetRatio = totalAvailVolume * ev.priority / aggregatedDemand;
         // job demand minus "atomic" demand that is met by default
         int remainingDemand = ev.demand - 1;
         // assignment: atomic node plus fair share of reduced aggregation
-        assignments[ev.jobId] = 1 + std::min(1.0, initialMetRatio) * remainingDemand;
+        assignments[jobId] = 1 + std::min(1.0, initialMetRatio) * remainingDemand;
         assignedResources += assignments[ev.jobId] - 1;
         if (!demandedResources.count(ev.priority)) demandedResources[ev.priority] = 0;
         demandedResources[ev.priority] += ev.demand - assignments[ev.jobId];
@@ -355,11 +354,9 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
     if (remainingResources < 0.1) remainingResources = 0; // too low a remainder to make a difference
     Console::log(verb, "BLC e=%i remaining=%.3f", _balancing_epoch, remainingResources);
 
-    for (const auto& entry : _states.getEntries()) {
-        const Event& ev = entry.second;
+    for (const auto& [jobId, ev] : _states.getEntries()) {
         if (ev.demand <= 1) continue;
 
-        int jobId = ev.jobId;
         int demand = getNewDemand(jobId);
         float priority = getPriority(jobId);
         float prevPriority = -1;
@@ -409,8 +406,8 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
         // Calculate optimal rounding by bisection
 
         SortedDoubleSequence remainders;
-        for (const auto& entry : _states.getEntries()) {
-            double remainder = assignments[entry.first] - (int)assignments[entry.first];
+        for (const auto& [jobId, ev] : _states.getEntries()) {
+            double remainder = assignments[jobId] - (int)assignments[jobId];
             if (remainder > 0 && remainder < 1) remainders.add(remainder);
         }
         int lower = 0, upper = remainders.size();
@@ -452,8 +449,8 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
                 allVolumes = Rounding::getRoundedAssignments(bestRemainderIdx, sum, remainders, assignments);
 
                 double remainder = (bestRemainderIdx < remainders.size() ? remainders[bestRemainderIdx] : 1.0);
-                Console::log(verb-1, "BLC e=%i DONE its=%i rmd=%.3f util=%.2f pen=%.2f", 
-                            _balancing_epoch, iterations, remainder, bestUtilization, bestPenalty);
+                Console::log(verb-1, "BLC e=%i DONE n=%i its=%i rmd=%.3f util=%.2f pen=%.2f", 
+                            _balancing_epoch, assignments.size(), iterations, remainder, bestUtilization, bestPenalty);
                 break;
 
             } else if (lower < upper) {

@@ -3,17 +3,14 @@
 #include <sys/resource.h>
 #include <sys/syscall.h>
 #include <map>
+#include <assert.h>
 
 #include "proc.hpp"
 #include "util/sys/timer.hpp"
+#include "util/console.hpp"
 
-
-// Static fields
-std::map<long, float>         Proc::_tid_lastcall;
-std::map<long, unsigned long> Proc::_tid_utime;
-std::map<long, unsigned long> Proc::_tid_stime;
-Mutex Proc::_tid_lock;
-
+robin_hood::unordered_map<long, Proc::CpuInfo> Proc::_cpu_info_per_tid;
+Mutex Proc::_cpu_info_lock;
 
 pid_t Proc::getPid() {
     return getpid();
@@ -79,65 +76,61 @@ Proc::RuntimeInfo Proc::getRuntimeInfo(pid_t pid, SubprocessMode mode) {
     return info;
 }
 
+float Proc::getUptime() {
+    // Get uptime in seconds
+    std::ifstream uptime_stream("/proc/uptime", std::ios_base::in);
+    float uptime;
+    uptime_stream >> uptime;
+    uptime_stream.close();
+    return uptime;
+}
+
 bool Proc::getThreadCpuRatio(long tid, double& cpuRatio, float& sysShare) {
    
     using std::ios_base;
     using std::ifstream;
     using std::string;
 
-    /*
-    // Get uptime in seconds
-    ifstream uptime_stream("/proc/uptime", ios_base::in);
-    unsigned long uptime;
-    uptime_stream >> uptime;
-    uptime_stream.close();
-    */
+    static unsigned long hertz = sysconf(_SC_CLK_TCK);
 
-    // Get hertz
-    unsigned long hertz = sysconf(_SC_CLK_TCK);
+    double uptime = getUptime();
 
-    // Get current relative time
-    float age = Timer::elapsedSeconds();
-
-    // Get actual stats of interest
+    // Get stats of interest
     std::string filepath = "/proc/" + std::to_string(getPid()) + "/task/" + std::to_string(tid) + "/stat";
     ifstream stat_stream(filepath, ios_base::in);
     if (!stat_stream.good()) return false;
-    // dummy vars for leading entries in stat that we don't care about
+
+    // dummy vars for leading entries
     string pid, comm, state, ppid, pgrp, session, tty_nr;
     string tpgid, flags, minflt, cminflt, majflt, cmajflt;
     string cutime, cstime, priority, nice;
-    string O, itrealvalue, starttime;
-    // the two fields we want
-    unsigned long utime = 0;
-    unsigned long stime = 0;
+    string O, itrealvalue;
+
+    double uticks = 0, sticks = 0, starttime = 0;
     stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
                 >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
-                >> utime >> stime >> cutime >> cstime >> priority >> nice
+                >> uticks >> sticks >> cutime >> cstime >> priority >> nice
                 >> O >> itrealvalue >> starttime;
     stat_stream.close();
 
-    auto lock = _tid_lock.getLock();
+    auto lock = _cpu_info_lock.getLock();
 
-    if (!_tid_lastcall.count(tid)) {
-        _tid_lastcall[tid] = Timer::elapsedSeconds();
-        _tid_utime[tid] = utime;
-        _tid_stime[tid] = stime;
-        return false;
-    }
+    CpuInfo& info = _cpu_info_per_tid[tid];
 
-    unsigned long utimeDiff = utime - _tid_utime[tid];
-    unsigned long stimeDiff = stime - _tid_stime[tid];
-    unsigned long totalDiff = utimeDiff + stimeDiff;
-    float elapsedTime = age - _tid_lastcall[tid];
+    auto ticks = uticks + sticks;
+    auto ticksDiff = ticks - (info.uticks + info.sticks);
+    auto sTicksDiff = sticks - info.sticks;
 
-    // Compute result
-    cpuRatio = 100 * (float(totalDiff) / hertz) / elapsedTime;
-    sysShare = totalDiff == 0 ? 0 : float(stimeDiff) / totalDiff;
+    auto passedSecs = uptime - (starttime / hertz);
+    auto passedSecsDiff = passedSecs - info.passedSecs;
+    Console::log(Console::VVERB, "PROC tid=%lu spent %.2f ticks over %.2f secs", tid, ticksDiff, passedSecsDiff);
 
-    _tid_lastcall[tid] = age;
-    _tid_utime[tid] = utime;
-    _tid_stime[tid] = stime;
+    cpuRatio = passedSecsDiff == 0 ? 0 : (100 * ((ticksDiff / hertz) / passedSecsDiff));
+    sysShare = ticksDiff == 0 ? 0 : sTicksDiff / ticksDiff;
+
+    info.uticks = uticks;
+    info.sticks = sticks;
+    info.passedSecs = passedSecs;
 
     return true;
 }
