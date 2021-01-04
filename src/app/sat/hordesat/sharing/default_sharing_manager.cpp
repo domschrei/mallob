@@ -113,16 +113,15 @@ void DefaultSharingManager::digestSharing(const int* begin, int buflen) {
 	// Process-wide stats
 	std::string lensStr = "";
 	for (int len : lens) lensStr += std::to_string(len) + " ";
-	_logger.log(1, "fltrd %.2f%% (%d/%d), lens %s\n",
-			100*(float)failedFilter/total, failedFilter, total, 
-			lensStr.c_str());
+	_logger.log(1, "disc %d total %d lens %s\n",
+			failedFilter, total, lensStr.c_str());
 
 	// Per-solver stats
 	if (_solvers.size() > 1) {
 		for (size_t sid = 0; sid < _solvers.size(); sid++) {
-			_logger.log(2, "S%d fltrd %.2f%% (%d)\n", sid, passedFilter == 0 ? 0 : 100*(1-((float)added[sid]/passedFilter)), passedFilter-added[sid]);
+			_logger.log(2, "S%d disc %d\n", sid, passedFilter-added[sid]);
 			if (!_params.isNotNull("fd")) {
-				_logger.log(2, "S%d clear clsfltr\n", sid);
+				_logger.log(2, "S%d clear filter\n", sid);
 				_solver_filters[sid].clear();	
 			} 
 		}

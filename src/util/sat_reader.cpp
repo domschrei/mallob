@@ -76,7 +76,6 @@ std::shared_ptr<std::vector<int>> SatReader::read() {
 		}
 	}
 	if (beganNum) { // final zero (without newline)
-		assert(num == 0);
 		cls->push_back(0);
 	}
 
