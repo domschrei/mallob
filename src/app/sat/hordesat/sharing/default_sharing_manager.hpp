@@ -30,7 +30,6 @@ protected:
 	const LoggingInterface& _logger;
 
 	ClauseDatabase _cdb;
-	ClauseFilter _node_filter;
 	
 	float _last_buffer_clear = 0;
 

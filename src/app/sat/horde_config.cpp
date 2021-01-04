@@ -14,7 +14,6 @@ void HordeConfig::applyDefault(Parameters& params, const Job& job) {
         // Do not do sparse random ("phase") diversification
         params["diversify"] = "4"; // native diversification only
     }
-    params["fd"] = "1"; // filter duplicate clauses
     params["i"] = "0"; // #microseconds to sleep during solve loop
     params["apprank"] = std::to_string(job.getIndex()); // rank within application
     params["mpisize"] = std::to_string(job.getGlobalNumWorkers()); // size of worker comm
