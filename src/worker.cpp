@@ -171,14 +171,15 @@ void Worker::mainProgram() {
             auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::RECURSE);
             info.vmUsage *= 0.001 * 0.001;
             info.residentSetSize *= 0.001 * 0.001;
-            Console::log(Console::VERB, "mem cpu=%i %.2fGB", info.cpu, info.residentSetSize);
+            Console::log(Console::VVERB, "mainthread_cpu=%i", info.cpu);
+            Console::log(Console::VERB, "mem=%.2fGB", info.residentSetSize);
             _sys_state.setLocal(2, info.residentSetSize);
 
             // For this "management" thread
-            double perc_cpu; float sysShare;
-            bool success = Proc::getThreadCpuRatio(Proc::getTid(), perc_cpu, sysShare);
+            double cpuShare; float sysShare;
+            bool success = Proc::getThreadCpuRatio(Proc::getTid(), cpuShare, sysShare);
             if (success) {
-                Console::log(Console::VERB, "main : %.2f%% CPU (%.2f%% sys)", perc_cpu, 100*sysShare);
+                Console::log(Console::VERB, "mainthread cpuratio=%.3f sys=%.3f", cpuShare, sysShare);
             }
 
             // For the current job
@@ -256,8 +257,8 @@ void Worker::mainProgram() {
         if (_sys_state.aggregate(time)) {
             float* result = _sys_state.getGlobal();
             int verb = (_world_rank == 0 ? Console::INFO : Console::VVVVERB);
-            Console::log(verb, "sysstate busy=%.2f%% jobs=%i accmem=%.2fGB", 
-                        100*result[0]/MyMpi::size(_comm), (int)result[1], result[2]);
+            Console::log(verb, "sysstate busyratio=%.3f jobs=%i globmem=%.2fGB", 
+                        result[0]/MyMpi::size(_comm), (int)result[1], result[2]);
         }
 
         if (sleepMicrosecs > 0) usleep(sleepMicrosecs);

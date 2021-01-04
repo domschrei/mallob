@@ -125,7 +125,7 @@ bool Proc::getThreadCpuRatio(long tid, double& cpuRatio, float& sysShare) {
     auto passedSecsDiff = passedSecs - info.passedSecs;
     Console::log(Console::VVERB, "PROC tid=%lu spent %.2f ticks over %.2f secs", tid, ticksDiff, passedSecsDiff);
 
-    cpuRatio = passedSecsDiff == 0 ? 0 : (100 * ((ticksDiff / hertz) / passedSecsDiff));
+    cpuRatio = passedSecsDiff == 0 ? 0 : ((ticksDiff / hertz) / passedSecsDiff);
     sysShare = ticksDiff == 0 ? 0 : sTicksDiff / ticksDiff;
 
     info.uticks = uticks;

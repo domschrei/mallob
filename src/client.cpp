@@ -135,7 +135,8 @@ void Client::mainProgram() {
             auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::FLAT);
             info.vmUsage *= 0.001 * 0.001;
             info.residentSetSize *= 0.001 * 0.001;
-            Console::log(Console::VERB, "mem cpu=%i %.2fGB", info.cpu, info.residentSetSize);
+            Console::log(Console::VVERB, "mainthread_cpu=%i", info.cpu);
+            Console::log(Console::VERB, "mem=%.2fGB", info.residentSetSize);
             lastStatTime = time;
         }
 
@@ -150,7 +151,7 @@ void Client::mainProgram() {
         if (maybeHandle) {
             // Process message
             auto& handle = maybeHandle.value();
-            Console::log_recv(Console::VVVERB, handle.source, "Processing msg, tag %i", handle.tag);
+            Console::log_recv(Console::VVVERB, handle.source, "process msg tag=%i", handle.tag);
 
             if (handle.tag == MSG_NOTIFY_JOB_DONE) {
                 handleJobDone(handle);

@@ -48,7 +48,7 @@ int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
 		_solvers[increaser]->increaseClauseProduction();
 		_logger.log(3, "Production increase for %d. time, sid %d will increase.\n", prodInc++, increaser);
 	}
-	_logger.log(3, "Filled %.1f%% of buffer\n", 100*usedRatio);
+	_logger.log(3, "buffer fillratio=%.3f\n", usedRatio);
 	return used;
 }
 

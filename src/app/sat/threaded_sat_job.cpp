@@ -156,7 +156,7 @@ void ThreadedSatJob::appl_dumpStats() {
         if (threadTids[i] < 0) continue;
         double cpuRatio; float sysShare;
         bool ok = Proc::getThreadCpuRatio(threadTids[i], cpuRatio, sysShare);
-        if (ok) Console::log(Console::VERB, "%s td.%ld : %.2f%% CPU (%.2f%% sys)", 
+        if (ok) Console::log(Console::VERB, "%s td.%ld cpuratio=%.3f sys=%.3f", 
                 toStr(), threadTids[i], cpuRatio, 100*sysShare);
     }
 }
