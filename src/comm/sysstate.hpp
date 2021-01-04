@@ -20,6 +20,7 @@ public:
     SysState(MPI_Comm& comm);
     void setLocal(int pos, float val);
     void setLocal(std::initializer_list<float> elems);
+    void addLocal(int pos, float val);
     bool aggregate(float elapsedTime = Timer::elapsedSeconds());
     float* getGlobal();
 };

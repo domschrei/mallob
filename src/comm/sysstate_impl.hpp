@@ -25,6 +25,11 @@ void SysState<N>::setLocal(int pos, float val) {
 }
 
 template <int N>
+void SysState<N>::addLocal(int pos, float val) {
+    _local_state[pos] += val;
+}
+
+template <int N>
 bool SysState<N>::aggregate(float elapsedTime) {
 
     float time = elapsedTime;

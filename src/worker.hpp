@@ -20,6 +20,11 @@
 #include "data/job_database.hpp"
 #include "comm/sysstate.hpp"
 
+#define SYSSTATE_BUSYRATIO 0
+#define SYSSTATE_NUMJOBS 1
+#define SYSSTATE_GLOBALMEM 2
+#define SYSSTATE_NUMHOPS 3
+
 class Worker {
 
 private:
@@ -31,7 +36,7 @@ private:
 
     JobDatabase _job_db;
     MessageHandler _msg_handler;
-    SysState<3> _sys_state;
+    SysState<4> _sys_state;
 
     std::vector<int> _hop_destinations;
 

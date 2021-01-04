@@ -173,7 +173,7 @@ void Worker::mainProgram() {
             info.residentSetSize *= 0.001 * 0.001;
             Console::log(Console::VVERB, "mainthread_cpu=%i", info.cpu);
             Console::log(Console::VERB, "mem=%.2fGB", info.residentSetSize);
-            _sys_state.setLocal(2, info.residentSetSize);
+            _sys_state.setLocal(SYSSTATE_GLOBALMEM, info.residentSetSize);
 
             // For this "management" thread
             double cpuShare; float sysShare;
@@ -205,16 +205,16 @@ void Worker::mainProgram() {
             lastJobCheckTime = time;
 
             if (_job_db.isIdle()) {
-                _sys_state.setLocal(0, 0.0f); // busy nodes
-                _sys_state.setLocal(1, 0.0f); // active jobs
+                _sys_state.setLocal(SYSSTATE_BUSYRATIO, 0.0f); // busy nodes
+                _sys_state.setLocal(SYSSTATE_NUMJOBS, 0.0f); // active jobs
 
             } else {
                 Job &job = _job_db.getActive();
                 int id = job.getId();
                 bool isRoot = job.getJobTree().isRoot();
 
-                _sys_state.setLocal(0, 1.0f); // busy nodes
-                _sys_state.setLocal(1, isRoot ? 1.0f : 0.0f); // active jobs
+                _sys_state.setLocal(SYSSTATE_BUSYRATIO, 1.0f); // busy nodes
+                _sys_state.setLocal(SYSSTATE_NUMJOBS, isRoot ? 1.0f : 0.0f); // active jobs
 
                 bool abort = false;
                 if (isRoot) abort = _job_db.checkComputationLimits(id);
@@ -257,8 +257,9 @@ void Worker::mainProgram() {
         if (_sys_state.aggregate(time)) {
             float* result = _sys_state.getGlobal();
             int verb = (_world_rank == 0 ? Console::INFO : Console::VVVVERB);
-            Console::log(verb, "sysstate busyratio=%.3f jobs=%i globmem=%.2fGB", 
-                        result[0]/MyMpi::size(_comm), (int)result[1], result[2]);
+            Console::log(verb, "sysstate busyratio=%.3f jobs=%i globmem=%.2fGB hops=%i", 
+                        result[0]/MyMpi::size(_comm), (int)result[1], result[2], result[3]);
+            _sys_state.setLocal(SYSSTATE_NUMHOPS, 0); // reset #hops
         }
 
         if (sleepMicrosecs > 0) usleep(sleepMicrosecs);
@@ -784,6 +785,7 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
     // Increment #hops
     request.numHops++;
     int num = request.numHops;
+    _sys_state.addLocal(SYSSTATE_NUMHOPS, 1);
 
     // Show warning if #hops is a large power of two
     if ((num >= 512) && ((num & (num - 1)) == 0)) {
