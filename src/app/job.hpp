@@ -255,12 +255,9 @@ public:
     JobTree& getJobTree() {return _job_tree;}
     const JobTree& getJobTree() const {return _job_tree;}
 
-
-    // Tests if all unpacking of job descriptions is finished
-    // and, consequently, the job is ready to forward its description
-    // to children itself. The method returns true only once;
-    // repeated calls about the growth readiness can be made via isReadyToGrow().
-    bool testReadyToGrow() {
+    // Tests if all unpacking of job descriptions is finished and, in that case,
+    // joins and cleans up all corresponding threads.
+    bool testDeserializationDone() {
         auto lock = _job_manipulation_lock.getLock();
         bool allJoined = !_unpack_threads.empty();
         for (size_t i = 0; i < _unpack_threads.size(); i++) {
@@ -278,10 +275,6 @@ public:
             return true;
         }
         return false;
-    }
-    bool isReadyToGrow() {
-        auto lock = _job_manipulation_lock.getLock();
-        return _unpack_threads.empty() && hasDeserializedDescription();
     }
 
     // Updates the job's resource usage based on the period of time which passed
@@ -305,7 +298,7 @@ public:
         float usedCpuSecs = getUsedCpuSeconds();
 
         if ((cpuSecsPerInstance > 0 && usedCpuSecs > cpuSecsPerInstance)
-            || (isReadyToGrow() && getDescription().getCpuLimit() > 0 && 
+            || (hasDeserializedDescription() && getDescription().getCpuLimit() > 0 && 
                 usedCpuSecs > getDescription().getCpuLimit())) {
             // Job exceeded its cpu time limit
             Console::log(Console::INFO, "#%i CPU TIMEOUT: aborting", _id);
@@ -313,8 +306,8 @@ public:
         }
 
         if ((wcSecsPerInstance > 0 && usedWcSecs > wcSecsPerInstance) 
-                || (isReadyToGrow() && getDescription().getWallclockLimit() > 0 && 
-                    usedWcSecs > getDescription().getWallclockLimit())) {
+            || (hasDeserializedDescription() && getDescription().getWallclockLimit() > 0 && 
+                usedWcSecs > getDescription().getWallclockLimit())) {
             // Job exceeded its wall clock time limit
             Console::log(Console::INFO, "#%i WALLCLOCK TIMEOUT: aborting", _id);
             return true;

@@ -110,7 +110,7 @@ void Job::terminate() {
 
 bool Job::isDestructible() {
     assert(getState() == PAST);
-    return (_unpack_threads.empty() || testReadyToGrow()) && appl_isDestructible();
+    return (_unpack_threads.empty() || testDeserializationDone()) && appl_isDestructible();
 }
 
 int Job::getDemand(int prevVolume, float elapsedTime) const {
