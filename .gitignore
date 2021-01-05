@@ -8,3 +8,5 @@ build/
 instances/*.cnf
 instances/*.cnf.xz
 instances/*.uri
+upload.sh
+download.sh
