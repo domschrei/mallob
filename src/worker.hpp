@@ -24,6 +24,7 @@
 #define SYSSTATE_NUMJOBS 1
 #define SYSSTATE_GLOBALMEM 2
 #define SYSSTATE_NUMHOPS 3
+#define SYSSTATE_SPAWNEDREQUESTS 4
 
 class Worker {
 
@@ -36,7 +37,7 @@ private:
 
     JobDatabase _job_db;
     MessageHandler _msg_handler;
-    SysState<4> _sys_state;
+    SysState<5> _sys_state;
 
     std::vector<int> _hop_destinations;
 

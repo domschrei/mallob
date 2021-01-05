@@ -257,8 +257,8 @@ void Worker::mainProgram() {
         if (_sys_state.aggregate(time)) {
             float* result = _sys_state.getGlobal();
             int verb = (_world_rank == 0 ? Console::INFO : Console::VVVVERB);
-            Console::log(verb, "sysstate busyratio=%.3f jobs=%i globmem=%.2fGB hops=%i", 
-                        result[0]/MyMpi::size(_comm), (int)result[1], result[2], (int)result[3]);
+            Console::log(verb, "sysstate busyratio=%.3f jobs=%i globmem=%.2fGB newreqs=%i hops=%i", 
+                        result[0]/MyMpi::size(_comm), (int)result[1], result[2], (int)result[4], (int)result[3]);
             _sys_state.setLocal(SYSSTATE_NUMHOPS, 0); // reset #hops
         }
 
@@ -385,6 +385,7 @@ void Worker::handleRejectOneshot(MessageHandle& handle) {
             int rank = Random::choice(dormantChildren);
             MyMpi::isend(MPI_COMM_WORLD, rank, MSG_REQUEST_NODE_ONESHOT, req);
             Console::log_send(Console::VVERB, rank, "%s : query dormant child", job.toStr());
+            _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
         }
     }
 
@@ -730,6 +731,7 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
         Console::log_send(Console::VVERB, nextNodeRank, "%s : try to find child replacing defected %s", 
                         job.toStr(), _job_db.toStr(jobId, index).c_str());
         MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, tag, req);
+        _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
     }
 
     // Initiate communication if the job now became willing to communicate
@@ -876,6 +878,7 @@ void Worker::updateVolume(int jobId, int volume) {
             Console::log_send(Console::VERB, nextNodeRank, "%s growing, request %s", 
                         job.toStr(), _job_db.toStr(job.getId(), nextIndex).c_str());
             MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, tag, req);
+            _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
         }
     }
 

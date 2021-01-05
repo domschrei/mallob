@@ -28,7 +28,19 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
             _job_epochs[id] = 1;
         }
 
-        if (job->getState() == ACTIVE) {
+        if (job->getState() == PAST) {
+            // Job might have been active just before: Signal its termination
+            Event ev({id, _job_epochs[id], /*demand=*/0, /*priority=*/0});
+            if (_states.getEntries().count(id)) {
+                // Job is registered in state with non-zero demand: try to insert into diffs map
+                bool inserted = _diffs.insertIfNovel(ev);
+                if (inserted) {
+                    Console::log(Console::VVERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[id]);
+                    _job_epochs[id]++;
+                }    
+            }
+            
+        } else {
             // Job participates
             _jobs_being_balanced[id] = job;
 
@@ -43,18 +55,6 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
                     Console::log(Console::VVERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, epoch);
                     _job_epochs[id]++;
                 } 
-            }
-            
-        } else if (job->getState() == PAST) {
-            // Job might have been active just before
-            Event ev({id, _job_epochs[id], /*demand=*/0, /*priority=*/0});
-            if (_states.getEntries().count(id)) {
-                // Job is registered in state with non-zero demand: try to insert into diffs map
-                bool inserted = _diffs.insertIfNovel(ev);
-                if (inserted) {
-                    Console::log(Console::VVERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[id]);
-                    _job_epochs[id]++;
-                }    
             }
         }
     }
