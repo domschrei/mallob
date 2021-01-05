@@ -318,13 +318,13 @@ void JobDatabase::forgetOldJobs() {
         suspendedQueue.pop();
     }
 
+    if (!_jobs.empty())
+        Console::log(Console::VERB, "%i resident jobs, %i with desc.", _jobs.size(), numJobsWithDescription);
+    
     // Perform forgetting of jobs
     for (int jobId : jobsToForget) {
         forget(jobId);
     }
-
-    if (!_jobs.empty())
-        Console::log(Console::VERB, "%i resident jobs, %i with desc.", _jobs.size(), numJobsWithDescription);
 }
 
 bool JobDatabase::has(int id) const {

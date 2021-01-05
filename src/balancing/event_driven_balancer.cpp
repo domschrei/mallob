@@ -23,17 +23,18 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
     _jobs_being_balanced = robin_hood::unordered_map<int, Job*>();
     for (const auto& [id, job] : jobs) if (job->getJobTree().isRoot()) {
         
+        if (!_job_epochs.count(id)) {
+            // Completely new!
+            _job_epochs[id] = 1;
+        }
+
         if (job->getState() == ACTIVE) {
             // Job participates
             _jobs_being_balanced[id] = job;
 
             // Insert this job as an event, if there is something novel about it
-            if (!_job_epochs.count(id)) {
-                // Completely new!
-                _job_epochs[id] = 1;
-            } 
             int epoch = _job_epochs[id];
-            int demand = getDemand(*job);
+            int demand = std::max(1, getDemand(*job));
             Event ev({id, epoch, demand, job->getPriority()});
             if (!_states.getEntries().count(id) || ev.demand != _states.getEntries().at(id).demand) {
                 // Not contained yet in state: try to insert into diffs map
@@ -44,11 +45,11 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
                 } 
             }
             
-        } else {
+        } else if (job->getState() == PAST) {
             // Job might have been active just before
-            Event ev({id, _job_epochs[id], 0, job->getPriority()});
-            if (!_states.getEntries().count(id) || ev.demand != _states.getEntries().at(id).demand) {
-                // Not contained yet in state: try to insert into diffs map
+            Event ev({id, _job_epochs[id], /*demand=*/0, /*priority=*/0});
+            if (_states.getEntries().count(id)) {
+                // Job is registered in state with non-zero demand: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
                     Console::log(Console::VVERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[id]);
@@ -189,6 +190,10 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
     if (anyChange) {
         // Successful balancing: Bump epoch
         _balancing_epoch++;
+
+        // Clean up entries belonging to terminated jobs
+        _states.removeOldZeros();
+        _diffs.removeOldZeros();
 
         // Begin new reduction, if necessary and enough time passed.
         reduceIfApplicable(BOTH);

@@ -145,11 +145,11 @@ public:
         return change;
     }
     void removeOldZeros() {
-        int epochDiff = 100;
+        int minEpochDiff = 0;
         int latestEpoch = 0;
         std::vector<int> keysToErase;
         for (const auto& entry : _map) {
-            if (entry.second.demand == 0) {
+            if (entry.second.demand == 0 && entry.second.priority <= 0) {
                 // Filtered out
                 keysToErase.push_back(entry.first);
             }
@@ -157,7 +157,7 @@ public:
         }
         // Remove all filtered keys which are old enough
         for (auto key : keysToErase) {
-            if (latestEpoch - _map[key].epoch >= epochDiff) _map.erase(key);
+            if (latestEpoch - _map[key].epoch >= minEpochDiff) _map.erase(key);
         }
     }
     bool operator==(const EventMap& other) const {
