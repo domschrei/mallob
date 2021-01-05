@@ -4,15 +4,6 @@ import math
 import sys
 import re
 
-import matplotlib
-matplotlib.use('pdf')
-matplotlib.rcParams['hatch.linewidth'] = 0.5  # previous pdf hatch linewidth
-import matplotlib.pyplot as plt
-from matplotlib import rc
-rc('font', family='serif')
-#rc('font', serif=['Times'])
-rc('text', usetex=True)
-
 colors = ['#377eb8', '#ff7f00', '#e41a1c', '#f781bf', '#a65628', '#4daf4a', '#984ea3', '#999999', '#dede00', '#377eb8']
 markers = ['^', 's', 'o', '+', 'x', '*']
 linestyles = ["-.", ":", "--", "-"]
@@ -106,6 +97,15 @@ for arg in sys.argv[1:]:
     else:
         files += [arg]
 
+import matplotlib
+if outfile:
+    matplotlib.use('pdf')
+matplotlib.rcParams['hatch.linewidth'] = 0.5  # previous pdf hatch linewidth
+import matplotlib.pyplot as plt
+from matplotlib import rc
+rc('font', family='serif')
+#rc('font', serif=['Times'])
+rc('text', usetex=True)
 
 def process_line(line, X, Y, C, lc):
     
