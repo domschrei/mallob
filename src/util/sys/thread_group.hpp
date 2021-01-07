@@ -11,6 +11,7 @@
 class ThreadGroup {
 
 private:
+    bool _exiting = false;
     std::vector<std::thread> _threads;
     std::vector<bool> _threads_running;
     Mutex _vec_manip_mutex;
@@ -18,6 +19,7 @@ private:
 public:
     ThreadGroup() {}
     void doTask(std::function<void()> callable) {
+        if (_exiting) return;
         cleanUp();
         auto lock = _vec_manip_mutex.getLock();
         const size_t i = _threads.size();
@@ -29,16 +31,17 @@ public:
         });
     }
     void cleanUp() {
+        if (_exiting) return;
+        
         auto lock = _vec_manip_mutex.getLock();
-        for (const auto& running : _threads_running) 
-            if (running) return;
+        for (const auto& running : _threads_running) if (running) return;
         
         _threads_running.clear();
         for (auto& thread : _threads) thread.join();
         _threads.clear();
     }
     ~ThreadGroup() {
-        auto lock = _vec_manip_mutex.getLock();
+        _exiting = true;
         for (auto& thread : _threads) if (thread.joinable()) thread.join();
     }
 };

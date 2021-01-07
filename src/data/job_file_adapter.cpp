@@ -7,8 +7,11 @@
 #include "util/sys/time_period.hpp"
 #include "util/random.hpp"
 #include "app/sat/sat_constants.h"
+#include "util/sys/terminator.hpp"
 
 void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
+
+    if (Terminator::isTerminating()) return;
 
     Console::log(Console::VERB, "New job file event: type %i, name \"%s\"\n", event.type, event.name.c_str());
 
@@ -121,6 +124,8 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
 
 void JobFileAdapter::handleJobDone(const JobResult& result) {
 
+    if (Terminator::isTerminating()) return;
+
     auto lock = _job_map_mutex.getLock();
 
     std::string eventFile = getJobFilePath(result.id, PENDING);
@@ -152,6 +157,8 @@ void JobFileAdapter::handleJobDone(const JobResult& result) {
 }
 
 void JobFileAdapter::handleJobResultDeleted(const FileWatcher::Event& event) {
+
+    if (Terminator::isTerminating()) return;
 
     Console::log(Console::VVERB, "Result file deletion event: type %i, name \"%s\"\n", event.type, event.name.c_str());
 
