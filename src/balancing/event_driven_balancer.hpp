@@ -148,12 +148,12 @@ public:
         int minEpochDiff = 0;
         int latestEpoch = 0;
         std::vector<int> keysToErase;
-        for (const auto& entry : _map) {
-            if (entry.second.demand == 0 && entry.second.priority <= 0) {
+        for (const auto& [jobId, ev] : _map) {
+            if (ev.demand == 0 && ev.priority <= 0) {
                 // Filtered out
-                keysToErase.push_back(entry.first);
+                keysToErase.push_back(jobId);
             }
-            latestEpoch = std::max(latestEpoch, entry.second.epoch);
+            latestEpoch = std::max(latestEpoch, ev.epoch);
         }
         // Remove all filtered keys which are old enough
         for (auto key : keysToErase) {

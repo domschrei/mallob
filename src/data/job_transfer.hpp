@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <cstring>
+#include <sstream>
 
 #include "serializable.hpp"
 
@@ -60,6 +61,16 @@ public:
         n = sizeof(float); memcpy(&timeOfBirth, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&numHops, packed.data()+i, n); i += n;
         return *this;
+    }
+
+    std::string toStr() const {
+        std::ostringstream out;
+        out.precision(3);
+        out << std::fixed << timeOfBirth;
+        auto birthStr = out.str();
+        return "r.#" + std::to_string(jobId) + ":" + std::to_string(requestedNodeIndex) 
+                + " <- [" + std::to_string(requestingNodeRank) + "] born=" + birthStr 
+                + " hops=" + std::to_string(numHops);
     }
 };
 

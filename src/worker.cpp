@@ -318,9 +318,7 @@ void Worker::handleConfirmAdoption(MessageHandle& handle) {
     // If job offer is obsolete, send a stub description containing the job id ONLY
     if (_job_db.isAdoptionOfferObsolete(req, /*alreadyAccepted=*/true)) {
         // Obsolete request
-        Console::log_recv(Console::VERB, handle.source, "REJECT r.%s birth=%.2f hops=%i", 
-                            _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str(), 
-                            req.timeOfBirth, req.numHops);
+        Console::log_recv(Console::VERB, handle.source, "REJECT %s", req.toStr().c_str());
         MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_DESCRIPTION, IntVec({req.jobId}));
         return;
     }
@@ -393,8 +391,8 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
 
     // Discard request if it has become obsolete
     if (_job_db.isRequestObsolete(req)) {
-        Console::log_recv(Console::VERB, handle.source, "DISCARD r.%s birth=%.2f hops=%i oneshot=%i", 
-                _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str(), req.timeOfBirth, req.numHops, oneshot ? 1 : 0);
+        Console::log_recv(Console::VERB, handle.source, "DISCARD %s oneshot=%i", 
+                req.toStr().c_str(), oneshot ? 1 : 0);
         return;
     }
 
@@ -409,8 +407,7 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
 
         // Adoption takes place
         std::string jobstr = _job_db.toStr(req.jobId, req.requestedNodeIndex);
-        Console::log_recv(Console::VERB, handle.source, "ADOPT r.%s birth=%.2f hops=%i oneshot=%i", jobstr.c_str(), 
-                req.timeOfBirth, req.numHops, oneshot ? 1 : 0);
+        Console::log_recv(Console::VERB, handle.source, "ADOPT %s oneshot=%i", req.toStr().c_str(), oneshot ? 1 : 0);
         assert(_job_db.isIdle() || Console::fail("Adopting a job, but not idle!"));
 
         // Commit on the job, send a request to the parent
@@ -520,8 +517,7 @@ void Worker::handleOfferAdoption(MessageHandle& handle) {
         // Check if node should be adopted or rejected
         if (_job_db.isAdoptionOfferObsolete(req)) {
             // Obsolete request
-            Console::log_recv(Console::VERB, handle.source, "REJECT r.%s birth=%.2f hops=%i", 
-                                job.toStr(), req.timeOfBirth, req.numHops);
+            Console::log_recv(Console::VERB, handle.source, "REJECT %s", req.toStr().c_str());
             reject = true;
 
         } else {
@@ -724,9 +720,9 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
         if (nextNodeRank == -1) {
             // If unsucessful, pick a random node
             tag = MSG_REQUEST_NODE;
-            if (nextNodeRank == -1 && _params.isNotNull("derandomize")) {
+            if (_params.isNotNull("derandomize")) {
                 nextNodeRank = Random::choice(_hop_destinations);
-            } else if (nextNodeRank == -1) {
+            } else {
                 nextNodeRank = getRandomNonSelfWorkerNode();
             }
         }

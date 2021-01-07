@@ -93,7 +93,7 @@ public:
                 int i = 0;
                 
                 // Iterate over found events
-                while (i < len) {
+                while (!_exiting && i < len) {
                     // digest event
                     inotify_event* event = (inotify_event*) &buffer[i];
                     Event ev{event->mask, std::string(event->name, event->len)};
