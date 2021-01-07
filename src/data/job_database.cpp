@@ -208,8 +208,8 @@ bool JobDatabase::tryAdopt(const JobRequest& req, bool oneshot, int& removedJob)
 
     // Node is idle and not committed to another job
     if (isIdle()) {
-        // Oneshot request: Job must be present and suspended
         if (!oneshot) return true;
+        // Oneshot request: Job must be present and suspended
         else return (has(req.jobId) && get(req.jobId).getState() == SUSPENDED);
     }
 

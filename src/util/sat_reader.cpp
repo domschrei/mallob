@@ -5,6 +5,7 @@
 #include <assert.h>
 
 #include "sat_reader.hpp"
+#include "util/sys/terminator.hpp"
 
 std::shared_ptr<std::vector<int>> SatReader::read() {
 
@@ -34,7 +35,7 @@ std::shared_ptr<std::vector<int>> SatReader::read() {
 
 	// Read every character of the formula (in a buffered manner)
 	char buffer[4096] = {'\0'};
-	while (fgets(buffer, sizeof(buffer), f)) {
+	while (!Terminator::isTerminating() && fgets(buffer, sizeof(buffer), f)) {
 		size_t pos = 0;
 		while (buffer[pos] != '\0') {
 

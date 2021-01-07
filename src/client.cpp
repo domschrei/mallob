@@ -16,6 +16,7 @@
 #include "data/job_result.hpp"
 #include "util/random.hpp"
 #include "app/sat/sat_constants.h"
+#include "util/sys/terminator.hpp"
 
 // Executed by a separate worker thread
 void Client::readAllInstances() {
@@ -106,6 +107,7 @@ bool Client::checkTerminate() {
 
     if (Timer::globalTimelimReached(_params)) {
         Console::log(Console::INFO, "Global timeout: terminating");
+        Terminator::setTerminating();
         return true;
     }
     if (_num_alive_clients == 0) {
@@ -117,6 +119,7 @@ bool Client::checkTerminate() {
 
         // Force send all handles before exiting
         while (MyMpi::hasOpenSentHandles()) MyMpi::testSentHandles();
+        Terminator::setTerminating();
         return true;
     }
     return false;

@@ -41,7 +41,7 @@ set(BASE_SOURCES
     src/comm/message_handler.cpp src/comm/mpi_monitor.cpp src/comm/mympi.cpp 
     src/data/job_database.cpp src/data/job_description.cpp src/data/job_file_adapter.cpp src/data/job_result.cpp src/data/reduceable.cpp 
     src/util/console.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sat_reader.cpp 
-    src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/shared_memory.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp
+    src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/shared_memory.cpp src/util/sys/terminator.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp
 )
 set(RESTRICTED_SOURCES src/app/sat/hordesat/solvers/glucose.cpp)
 

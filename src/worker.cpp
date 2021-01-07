@@ -24,6 +24,7 @@
 #include "util/console.hpp"
 #include "util/random.hpp"
 #include "util/sat_reader.hpp"
+#include "util/sys/terminator.hpp"
 
 void Worker::init() {
     
@@ -964,6 +965,7 @@ bool Worker::checkTerminate(float time) {
     if (terminate) {
         Console::log(_world_rank == 0 ? Console::INFO : Console::VERB, 
                 "Terminating.");
+        Terminator::setTerminating();
         return true;
     }
     return false;
