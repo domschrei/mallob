@@ -475,11 +475,17 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
         }
     }
 
+    // Log final assignments
+    std::string msg = "";
+    for (const auto& [jobId, vol] : allVolumes) {
+        msg += " #" + std::to_string(jobId) + ":" + std::to_string(vol);
+    }
+    Console::log(verb-1, "BLC assigned%s", msg.c_str());
+
     // 5. Only remember job assignments that are of a local job
     volumes.clear();
-    for (const auto& pair : _jobs_being_balanced) {
-        if (allVolumes[pair.first] >= 1)
-            volumes[pair.first] = allVolumes[pair.first];
+    for (const auto& [jobId, job] : _jobs_being_balanced) {
+        if (allVolumes[jobId] >= 1) volumes[jobId] = allVolumes[jobId];
     }
 
     return volumes;

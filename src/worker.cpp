@@ -250,6 +250,7 @@ void Worker::mainProgram() {
             Console::log(verb, "sysstate busyratio=%.3f jobs=%i globmem=%.2fGB newreqs=%i hops=%i", 
                         result[0]/MyMpi::size(_comm), (int)result[1], result[2], (int)result[4], (int)result[3]);
             _sys_state.setLocal(SYSSTATE_NUMHOPS, 0); // reset #hops
+            _sys_state.setLocal(SYSSTATE_SPAWNEDREQUESTS, 0); // reset #requests
         }
 
         if (sleepMicrosecs > 0) usleep(sleepMicrosecs);
