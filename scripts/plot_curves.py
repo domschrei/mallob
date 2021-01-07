@@ -35,6 +35,7 @@ ymin = None
 ymax = None
 confidence_area = False
 legend_right = False
+rectangular = True
 
 outfile = None
 
@@ -131,8 +132,12 @@ def process_line(line, X, Y, C, lc):
                 Y += [[]]
         
     # X value
+    if rectangular and len(X) > 0:
+        x = float(words[0])-0.0001
+        X += [x]
     if explicit_xvals:
-        X += [float(words[0])]
+        x = float(words[0])
+        X += [x]
         words = words[1:]
         if colorvals:
             C += [int(words[-1])]
@@ -143,6 +148,8 @@ def process_line(line, X, Y, C, lc):
     # Y values
     for i in range(len(words)):
         y = float(words[i])
+        if rectangular and len(Y[i]) > 0:
+            Y[i] += [Y[i][-1]]
         Y[i] += [y]
 
 if not files:
@@ -238,6 +245,6 @@ if do_legend:
         plt.legend()
 plt.tight_layout()
 if outfile:
-    plt.savefig(outfile)
+    plt.savefig(outfile, dpi=300)
 else:
     plt.show() 
