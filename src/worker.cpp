@@ -526,10 +526,9 @@ void Worker::handleOfferAdoption(MessageHandle& handle) {
 
         } else {
             // Adopt the job
-            const JobDescription& desc = job.getDescription();
 
             // Send job signature
-            JobSignature sig(req.jobId, req.rootRank, req.revision, desc.getTransferSize(true));
+            JobSignature sig(req.jobId, req.rootRank, req.revision, job.getSerializedDescription().size());
             MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_ACCEPT_ADOPTION_OFFER, sig);
 
             // If req.fullTransfer, then wait for the child to acknowledge having received the signature
