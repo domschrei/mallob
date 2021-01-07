@@ -477,10 +477,12 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
 
     // Log final assignments
     std::string msg = "";
+    int sum = 0;
     for (const auto& [jobId, vol] : allVolumes) {
         msg += " #" + std::to_string(jobId) + ":" + std::to_string(vol);
+        sum += vol;
     }
-    Console::log(verb-1, "BLC assigned%s", msg.c_str());
+    Console::log(verb-1, "BLC assigned%s sum=%i", msg.c_str(), sum);
 
     // 5. Only remember job assignments that are of a local job
     volumes.clear();
