@@ -7,9 +7,12 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <sys/stat.h>
 
-int FileUtils::mkdir(std::string dir) {
-    return system(("mkdir -p \"" + dir + "\"").c_str());
+int FileUtils::mkdir(const std::string& dir) {
+    auto res = ::mkdir(dir.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
+    if (res == 0 || res == EEXIST) return 0;
+    return res;
 }
 
 int errfunc(const char* epath, int eerrno) {
@@ -17,7 +20,7 @@ int errfunc(const char* epath, int eerrno) {
     return 0;
 }
 
-int FileUtils::mergeFiles(std::string globstr, std::string dest, bool removeOriginals) {
+int FileUtils::mergeFiles(const std::string& globstr, const std::string& dest, bool removeOriginals) {
     
     glob_t result;
     int status = glob(globstr.c_str(), /*flags=*/0, errfunc, &result);
@@ -57,7 +60,7 @@ int FileUtils::mergeFiles(std::string globstr, std::string dest, bool removeOrig
     return status;
 }
 
-int FileUtils::append(std::string srcFile, std::string destFile) {
+int FileUtils::append(const std::string& srcFile, const std::string& destFile) {
     
     std::ifstream src(srcFile);
     std::ofstream dest(destFile, std::ios::app);
@@ -72,6 +75,6 @@ int FileUtils::append(std::string srcFile, std::string destFile) {
     }
 }
 
-int FileUtils::rm(std::string file) {
+int FileUtils::rm(const std::string& file) {
     return remove(file.c_str());
 }

@@ -16,6 +16,7 @@
 #include "util/sys/fileutils.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/threading.hpp"
+#include "util/sys/proc.hpp"
 
 #define V0_CRIT 0
 #define V1_WARN 1
@@ -135,6 +136,7 @@ private:
     bool _colored_output = false;
     bool _quiet = false;
     bool _c_prefix = false;
+    mutable pid_t _associated_tid = 0;
 
 public:
     std::string getLogFilename() {
@@ -199,6 +201,23 @@ public:
 private:
 
     void log(va_list& args, unsigned int options, const char* str) const {
+        
+        /*
+        // Abort on unsafe logging concurrency
+        if (_associated_tid == 0) {
+            _associated_tid = Proc::getTid();
+        } else if (_associated_tid > 0) {
+            auto tid = Proc::getTid();
+            if (tid != _associated_tid) {
+                auto prevTid = _associated_tid;
+                _associated_tid = -1;
+                log(V0_CRIT, "Unsafe concurrency in %s (original tid: %ld, this tid: %ld)\n", 
+                        _log_filename.c_str(), prevTid, tid);
+                fflush(stdout);
+                abort();
+            }
+        }
+        */
 
         int verbosity = options & 7;
         if (verbosity > _verbosity) return;

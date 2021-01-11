@@ -39,10 +39,10 @@ void ThreadedSatJob::appl_start() {
         )));
         _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
 
-        log(V5_DEBG, "%s : beginning to solve\n", toStr());
+        //log(V5_DEBG, "%s : beginning to solve\n", toStr());
         const JobDescription& desc = getDescription();
         getSolver()->beginSolving(desc.getPayloads(), desc.getAssumptions(getRevision()));
-        log(V4_VVER, "%s : finished horde initialization\n", toStr());
+        //log(V4_VVER, "%s : finished horde initialization\n", toStr());
         _time_of_start_solving = Timer::elapsedSeconds();
 
         auto lock = _solver_lock.getLock();

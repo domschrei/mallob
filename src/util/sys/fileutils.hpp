@@ -7,10 +7,10 @@
 class FileUtils {
 
 public:
-    static int mkdir(std::string dir);
-    static int mergeFiles(std::string globstr, std::string dest, bool removeOriginals);
-    static int append(std::string srcFile, std::string destFile);
-    static int rm(std::string file);
+    static int mkdir(const std::string& dir);
+    static int mergeFiles(const std::string& globstr, const std::string& dest, bool removeOriginals);
+    static int append(const std::string& srcFile, const std::string& destFile);
+    static int rm(const std::string& file);
 };
 
 #endif

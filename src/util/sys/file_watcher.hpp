@@ -63,7 +63,7 @@ public:
                     const auto filenameStr = entry.path().filename().string();
                     if (entry.is_regular_file()) {
                         // Trigger CREATE event
-                        log(V4_VVER, "FileWatcher: File event\n");
+                        //logger.log(V4_VVER, "FileWatcher: File event\n");
                         threads.doTask([this, filenameStr] (Logger& lg) {
                             _callback(FileWatcher::Event{IN_CREATE, filenameStr}, lg);
                         });
@@ -75,7 +75,7 @@ public:
             // Initialize inotify
             _inotify_fd = inotify_init();
             if (_inotify_fd < 0) {
-                log(V0_CRIT, "Failed to set up inotify, code %i\n", errno);
+                logger.log(V0_CRIT, "Failed to set up inotify, code %i\n", errno);
                 abort();
             }
             
@@ -86,7 +86,7 @@ public:
             // Initialize watcher
             _inotify_wd = inotify_add_watch(_inotify_fd, _directory.c_str(), events);
             if (_inotify_wd < 0) {
-                log(V0_CRIT, "Failed to add inotify watch, code %i\n", errno);
+                logger.log(V0_CRIT, "Failed to add inotify watch, code %i\n", errno);
                 abort();
             }
 
@@ -107,7 +107,7 @@ public:
                     // digest event
                     inotify_event* event = (inotify_event*) &buffer[i];
                     Event ev{event->mask, std::string(event->name, event->len)};
-                    log(V4_VVER, "FileWatcher: File event\n");
+                    //logger.log(V4_VVER, "FileWatcher: File event\n");
                     threads.doTask([this, ev](Logger& lg) {_callback(ev, lg);});
                     i += eventSize + event->len;
                 }

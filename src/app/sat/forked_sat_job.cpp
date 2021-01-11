@@ -38,9 +38,9 @@ void ForkedSatJob::appl_start() {
                 getDescription().getAssumptions(getRevision())));
         _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
 
-        log(V5_DEBG, "%s : beginning to solve\n", toStr());
+        //log(V5_DEBG, "%s : beginning to solve\n", toStr());
         _solver_pid = _solver->run();
-        log(V4_VVER, "%s : spawned child pid=%i\n", toStr(), _solver_pid);
+        //log(V4_VVER, "%s : spawned child pid=%i\n", toStr(), _solver_pid);
         _time_of_start_solving = Timer::elapsedSeconds();
 
         auto lock = _solver_lock.getLock();

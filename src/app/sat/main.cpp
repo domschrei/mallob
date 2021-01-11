@@ -110,7 +110,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
             double cpuShare; float sysShare;
             bool success = Proc::getThreadCpuRatio(Proc::getTid(), cpuShare, sysShare);
             if (success) {
-                log.log(V2_INFO, "child_main cpuratio=%.3f sys=%.3f", cpuShare, sysShare);
+                log.log(V2_INFO, "child_main cpuratio=%.3f sys=%.3f\n", cpuShare, sysShare);
             }
 
             // For each solver thread
@@ -120,7 +120,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
                 
                 success = Proc::getThreadCpuRatio(threadTids[i], cpuShare, sysShare);
                 if (success) {
-                    log.log(V2_INFO, "td.%ld cpuratio=%.3f sys=%.3f", threadTids[i], cpuShare, sysShare);
+                    log.log(V2_INFO, "td.%ld cpuratio=%.3f sys=%.3f\n", threadTids[i], cpuShare, sysShare);
                 }
             }
 
