@@ -9,20 +9,13 @@
 
 using namespace SolvingStates;
 
-void SolverThread::log(int verb, const char* fmt, ...) {
-    va_list vl;
-    va_start(vl, fmt);
-    _logger->log_va_list(verb, fmt, vl);
-    va_end(vl);
-}
-
-SolverThread::SolverThread(const Parameters& params, const LoggingInterface& logger,
+SolverThread::SolverThread(const Parameters& params,
          std::shared_ptr<PortfolioSolverInterface> solver, 
         const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
         const std::shared_ptr<std::vector<int>>& assumptions, 
         int localId, std::atomic_bool* finished) : 
     _params(params), _solver_ptr(solver), _solver(*solver), 
-    _logger(logger.copy("S"+std::to_string(_solver.getGlobalId()))), 
+    _logger(_solver.getLogger()), 
     _formulae(formulae), _assumptions(assumptions), 
     _local_id(localId), _finished_flag(finished) {
     
@@ -42,7 +35,7 @@ void SolverThread::start() {
 
 void SolverThread::init() {
     _tid = Proc::getTid();
-    log(3, "tid %ld\n", _tid);
+    _logger.log(V5_DEBG, "tid %ld\n", _tid);
     if (_params.isNotNull("pin")) pin();
     _initialized = true;
 }
@@ -55,13 +48,13 @@ void SolverThread::pin() {
 	int localRank = 0;
 	const char* lranks = getenv("OMPI_COMM_WORLD_LOCAL_RANK");
 	if (lranks == NULL) {
-		log(0, "WARNING: local rank was not determined\n");
+		_logger.log(V2_INFO, "WARNING: local rank was not determined\n");
 	} else {
 		localRank = atoi(lranks);
 	}
 	int desiredCpu = lastCpu + localRank*solversCount;
 	lastCpu++;
-	log(0, "Pinning thread to proc %d of %d, local rank is %d\n",
+	_logger.log(V2_INFO, "Pinning thread to proc %d of %d, local rank is %d\n",
 			desiredCpu, numCores, localRank);
 
 	cpu_set_t cpuSet;
@@ -81,12 +74,12 @@ void* SolverThread::run() {
         runOnce();
         waitWhile(STANDBY);
     }
-    log(2, "exiting\n");
+    _logger.log(V4_VVER, "exiting\n");
     return NULL;
 }
 
 void SolverThread::readFormula() {
-    log(3, "importing clauses\n");
+    _logger.log(V5_DEBG, "importing clauses\n");
 
     size_t prevLits = _imported_lits;
     size_t begin = _imported_lits;
@@ -101,7 +94,7 @@ void SolverThread::readFormula() {
         if (i < _formulae.size() && cancelThread()) return;
     }
 
-    log(2, "imported cnf (%i lits)\n", _imported_lits-prevLits);
+    _logger.log(V4_VVER, "imported cnf (%i lits)\n", _imported_lits-prevLits);
 }
 
 void SolverThread::read(const std::vector<int>& formula, int begin) {
@@ -134,41 +127,41 @@ void SolverThread::diversify() {
 
 	switch (diversificationMode) {
 	case 1:
-		log(3, "dv: sparse\n");
+		_logger.log(V5_DEBG, "dv: sparse\n");
 		sparseDiversification(_portfolio_size, _portfolio_rank);
 		break;
 	case 2:
-		log(3, "dv: bin\n");
+		_logger.log(V5_DEBG, "dv: bin\n");
 		binValueDiversification(_portfolio_size, _portfolio_rank);
 		break;
 	case 3:
-		log(3, "dv: rand, s=%u\n", seed);
+		_logger.log(V5_DEBG, "dv: rand, s=%u\n", seed);
 		randomDiversification();
 		break;
 	case 4:
-		log(3, "dv: native\n");
+		_logger.log(V5_DEBG, "dv: native\n");
 		nativeDiversification();
 		break;
 	case 5:
-		log(3, "dv: sparse, native\n");
+		_logger.log(V5_DEBG, "dv: sparse, native\n");
 		sparseDiversification(_portfolio_size, _portfolio_rank);
 		nativeDiversification();
 		break;
 	case 6:
-		log(3, "dv: sparserand, s=%u\n", seed);
+		_logger.log(V5_DEBG, "dv: sparserand, s=%u\n", seed);
 		sparseRandomDiversification(_portfolio_size);
 		break;
 	case 7:
         if (_solver.getGlobalId() >= _solver.getNumOriginalDiversifications()) {
-		    log(3, "dv: sparserand, native, s=%u\n", seed);
+		    _logger.log(V5_DEBG, "dv: sparserand, native, s=%u\n", seed);
 		    sparseRandomDiversification(_portfolio_size);
         } else {
-            log(3, "dv: native, s=%u\n", seed);
+            _logger.log(V5_DEBG, "dv: native, s=%u\n", seed);
         }
 		nativeDiversification();
 		break;
 	case 0:
-		log(3, "dv: none\n");
+		_logger.log(V5_DEBG, "dv: none\n");
 		break;
 	}
 }
@@ -234,7 +227,7 @@ void SolverThread::binValueDiversification(int mpi_size, int mpi_rank) {
 
 void SolverThread::runOnce() {
 
-    //hlib->hlog(3, "solverRunningThread, beginning main loop\n");
+    //hlib->h_logger.log(V5_DEBG, "solverRunningThread, beginning main loop\n");
     while (true) {
 
         // Solving has just been done -> finish
@@ -246,10 +239,10 @@ void SolverThread::runOnce() {
         // Solving has been done now -> finish
         if (cancelRun()) break;
 
-        //hlib->hlog(0, "rank %d starting solver with %d new lits, %d assumptions: %d\n", hlib->mpi_rank, litsAdded, hlib->assumptions.size(), hlib->assumptions[0]);
-        log(3, "BEGSOL\n");
+        //hlib->h_logger.log(V2_INFO, "rank %d starting solver with %d new lits, %d assumptions: %d\n", hlib->mpi_rank, litsAdded, hlib->assumptions.size(), hlib->assumptions[0]);
+        _logger.log(V5_DEBG, "BEGSOL\n");
         SatResult res = _solver.solve(*_assumptions);
-        log(3, "ENDSOL\n");
+        _logger.log(V5_DEBG, "ENDSOL\n");
 
         // If interrupted externally
         if (cancelRun()) break;
@@ -261,16 +254,16 @@ void SolverThread::runOnce() {
 
 void SolverThread::waitWhile(SolvingState state) {
     if (_state != state) return;
-    log(3, "wait while %s\n", SolvingStateNames[state]);
+    _logger.log(V5_DEBG, "wait while %s\n", SolvingStateNames[state]);
     _state_cond.wait(_state_mutex, [&]{return _state != state;});
-    log(3, "end wait\n");
+    _logger.log(V5_DEBG, "end wait\n");
 }
 
 bool SolverThread::cancelRun() {
     SolvingState s = _state;
     bool cancel = s == STANDBY || s == ABORTING;
     if (cancel) {
-        log(1, "cancel run\n");
+        _logger.log(V3_VERB, "cancel run\n");
     }
     return cancel;
 }
@@ -282,10 +275,10 @@ bool SolverThread::cancelThread() {
 }
 
 void SolverThread::reportResult(int res) {
-    log(3, "found result\n");
+    _logger.log(V5_DEBG, "found result\n");
     if (res == SAT || res == UNSAT) {
         if (_state == ACTIVE) {
-            log(2, "found result %s\n", res==SAT?"SAT":"UNSAT");
+            _logger.log(V4_VVER, "found result %s\n", res==SAT?"SAT":"UNSAT");
             _result = SatResult(res);
             if (res == SAT) { 
                 _solution = _solver.getSolution();

@@ -13,7 +13,7 @@
 void testSolveSimpleFormula() {
     printf("testSolveSimpleFormula\n");
 
-    DefaultLoggingInterface logger;
+    DefaultConsole logger;
     Cadical cadical = Cadical(logger, 0, 0, "TESTJOB");
 
     SatReader r("/home/maxi/gates/6s33.cnf");
@@ -36,7 +36,7 @@ void terminateSolver(PortfolioSolverInterface *solver) {
 void testTermination() {
     printf("testTermination\n");
 
-    DefaultLoggingInterface logger;
+    DefaultConsole logger;
     Cadical cadical = Cadical(logger, 0, 0, "TESTJOB");
 
     SatReader r("/home/maxi/gates/vmpc_32.renamed-as.sat05-1919.cnf");
@@ -64,7 +64,7 @@ void unsuspendSolver(PortfolioSolverInterface *solver) {
 void testSuspend() {
     printf("testSuspend\n");
 
-    DefaultLoggingInterface logger;
+    DefaultConsole logger;
     Cadical cadical = Cadical(logger, 0, 0, "TESTJOB");
 
     SatReader r("/home/maxi/gates/6s33.cnf");
@@ -101,7 +101,7 @@ struct Callback : public LearnedClauseCallback {
 void testExportClauses() {
     printf("testExportClauses\n");
 
-    DefaultLoggingInterface logger;
+    DefaultConsole logger;
     Cadical cadical = Cadical(logger, 0, 0, "TESTJOB");
 
     SatReader r("/home/maxi/gates/6s33.cnf");
@@ -123,7 +123,7 @@ void testExportClauses() {
 void testAssume() {
     printf("testAssume\n");
 
-    DefaultLoggingInterface logger;
+    DefaultConsole logger;
     Cadical cadical = Cadical(logger, 0, 0, "TESTJOB");
 
     SatReader r("/home/maxi/gates/vmpc_32.renamed-as.sat05-1919.cnf");
@@ -141,7 +141,7 @@ void testAssume() {
 void testImportUnits() {
     printf("testImportUnits\n");
 
-    DefaultLoggingInterface logger;
+    DefaultConsole logger;
     Cadical cadical = Cadical(logger, 0, 0, "TESTJOB");
 
     SatReader r("/home/maxi/gates/vmpc_32.renamed-as.sat05-1919.cnf");
@@ -170,7 +170,7 @@ void testImportUnits() {
 void testImportFailingClause() {
     printf("testImportFailingClause\n");
 
-    DefaultLoggingInterface logger;
+    DefaultConsole logger;
     Cadical cadical = Cadical(logger, 0, 0, "TESTJOB");
 
     SatReader r("/home/maxi/gates/vmpc_32.renamed-as.sat05-1919.cnf");

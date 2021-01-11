@@ -10,7 +10,7 @@
 
 #include "util/params.hpp"
 #include "util/sys/threading.hpp"
-#include "app/sat/hordesat/utilities/logging_interface.hpp"
+#include "util/logger.hpp"
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 #include "app/sat/hordesat/solvers/solving_state.hpp"
 
@@ -23,7 +23,7 @@ private:
     const Parameters& _params;
     std::shared_ptr<PortfolioSolverInterface> _solver_ptr;
     PortfolioSolverInterface& _solver;
-    std::shared_ptr<LoggingInterface> _logger;
+    Logger& _logger;
     std::thread _thread;
 
     const std::vector<std::shared_ptr<std::vector<int>>>& _formulae;
@@ -50,8 +50,7 @@ private:
 
 
 public:
-    SolverThread(const Parameters& params, const LoggingInterface& logger,
-                std::shared_ptr<PortfolioSolverInterface> solver, 
+    SolverThread(const Parameters& params, std::shared_ptr<PortfolioSolverInterface> solver, 
                 const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
                 const std::shared_ptr<std::vector<int>>& assumptions, 
                 int localId, std::atomic_bool* finished);
@@ -101,7 +100,6 @@ private:
     bool cancelThread();
     void reportResult(int res);
 
-    void log(int verb, const char* fmt, ...);
     const char* toStr();
 
 };

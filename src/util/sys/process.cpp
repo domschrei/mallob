@@ -12,7 +12,7 @@
 
 #include "process.hpp"
 #include "proc.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "util/sys/stacktrace.hpp"
 
 
@@ -36,8 +36,8 @@ void doNothing(int signum) {
 void handleAbort(int sig) {
     
     // print out all the frames
-    Console::log(Console::CRIT, "Error from pid=%ld tid=%ld signal=%d", Proc::getPid(), Proc::getTid(), sig);
-    Console::log(Console::CRIT, "Backtrace: \n%s", backtrace().c_str());
+    log(V0_CRIT, "Error from pid=%ld tid=%ld signal=%d\n", Proc::getPid(), Proc::getTid(), sig);
+    log(V0_CRIT, "Backtrace: \n%s\n", backtrace().c_str());
 
     // Send exit signals to children and exit yourself
     Process::forwardTerminateToChildren();
@@ -113,7 +113,7 @@ void Process::forwardTerminateToChildren() {
 void Process::sendSignal(pid_t childpid, int signum) {
     int result = kill(childpid, signum);
     if (result == -1) {
-        Console::log(Console::WARN, "[WARN] kill -%i %i returned -1", signum, childpid);
+        log(V1_WARN, "[WARN] kill -%i %i returned -1\n", signum, childpid);
     }
 }
 

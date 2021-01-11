@@ -9,11 +9,11 @@
 #include "app/sat/sat_constants.h"
 #include "util/sys/terminator.hpp"
 
-void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
+void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) {
 
     if (Terminator::isTerminating()) return;
 
-    Console::log(Console::VERB, "New job file event: type %i, name \"%s\"\n", event.type, event.name.c_str());
+    log.log(V3_VERB, "New job file event: type %i, name \"%s\"\n", event.type, event.name.c_str());
 
     nlohmann::json j;
     std::string userFile, jobName;
@@ -33,13 +33,13 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
             std::ifstream i(eventFile);
             i >> j;
         } catch (const nlohmann::detail::parse_error& e) {
-            Console::log(Console::WARN, "Parse error on %s: %s\n", eventFile.c_str(), e.what());
+            log.log(V1_WARN, "Parse error on %s: %s\n", eventFile.c_str(), e.what());
             return;
         }
 
         // Check and read essential fields from JSON
         if (!j.contains("user") || !j.contains("name") || !j.contains("file")) {
-            Console::log(Console::WARN, "Job file missing essential field(s). Ignoring this file.\n");
+            log.log(V1_WARN, "Job file missing essential field(s). Ignoring this file.\n");
             return;
         }
         std::string user = j["user"].get<std::string>();
@@ -47,7 +47,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
         jobName = user + "." + name + ".json";
 
         if (_job_name_to_id.count(jobName)) {
-            Console::log(Console::WARN, "Modification of a file I already parsed! Ignoring.\n");
+            log.log(V1_WARN, "Modification of a file I already parsed! Ignoring.\n");
             return;
         }
 
@@ -58,15 +58,15 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
             std::ifstream i(userFile);
             i >> jUser;
         } catch (const nlohmann::detail::parse_error& e) {
-            Console::log(Console::WARN, "Unknown user or invalid user definition: %s\n", e.what());
+            log.log(V1_WARN, "Unknown user or invalid user definition: %s\n", e.what());
             return;
         }
         if (!jUser.contains("id") || !jUser.contains("priority")) {
-            Console::log(Console::WARN, "User file %s missing essential field(s). Ignoring job file with this user.\n", userFile.c_str());
+            log.log(V1_WARN, "User file %s missing essential field(s). Ignoring job file with this user.\n", userFile.c_str());
             return;
         }
         if (jUser["id"].get<std::string>() != user) {
-            Console::log(Console::WARN, "User file %s has inconsistent user ID. Ignoring job file with this user.\n", userFile.c_str());
+            log.log(V1_WARN, "User file %s has inconsistent user ID. Ignoring job file with this user.\n", userFile.c_str());
             return;
         }
         
@@ -88,11 +88,11 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
     VecPtr formula = r.read();
     VecPtr assumptions = std::make_shared<std::vector<int>>();
     if (formula == NULL) {
-        Console::log(Console::WARN, "File %s could not be opened - skipping #%i", file.c_str(), id);
+        log.log(V1_WARN, "File %s could not be opened - skipping #%i\n", file.c_str(), id);
         return;
     }
     time = Timer::elapsedSeconds() - time;
-    Console::log(Console::VERB, "Parsed %s (%i literals w/ separators, %i assumptions) in %.3fs", 
+    log.log(V3_VERB, "Parsed %s (%i literals w/ separators, %i assumptions) in %.3fs\n", 
             userFile.c_str(), formula->size(), assumptions->size(), time);
     time = Timer::elapsedSeconds();
 
@@ -105,18 +105,18 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event) {
     JobDescription* job = new JobDescription(id, priority, /*incremental=*/false);
     if (j.contains("wallclock-limit")) {
         job->setWallclockLimit(TimePeriod(j["wallclock-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS));
-        Console::log(Console::VVERB, "Job #%i : wallclock time limit %i secs\n", id, job->getWallclockLimit());
+        log.log(V4_VVER, "Job #%i : wallclock time limit %i secs\n", id, job->getWallclockLimit());
     }
     if (j.contains("cpu-limit")) {
         job->setCpuLimit(TimePeriod(j["cpu-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS));
-        Console::log(Console::VVERB, "Job #%i : CPU time limit %i CPUs\n", id, job->getCpuLimit());
+        log.log(V4_VVER, "Job #%i : CPU time limit %i CPUs\n", id, job->getCpuLimit());
     }
     job->addPayload(formula);
     job->addAssumptions(assumptions);
     job->setNumVars(r.getNumVars());
     job->setArrival(arrival);
     time = Timer::elapsedSeconds() - time;
-    Console::log(Console::VERB, "Initialized job #%i (%s) in %.3fs", id, userFile.c_str(), time);
+    log.log(V3_VERB, "Initialized job #%i (%s) in %.3fs\n", id, userFile.c_str(), time);
 
     // Callback to client: New job arrival.
     _new_job_callback(std::shared_ptr<JobDescription>(job));
@@ -137,7 +137,7 @@ void JobFileAdapter::handleJobDone(const JobResult& result) {
     try {
         i >> j;
     } catch (const nlohmann::detail::parse_error& e) {
-        Console::log(Console::WARN, "Parse error on %s: %s\n", eventFile.c_str(), e.what());
+        _logger.log(V1_WARN, "Parse error on %s: %s\n", eventFile.c_str(), e.what());
         return;
     }
 
@@ -156,18 +156,18 @@ void JobFileAdapter::handleJobDone(const JobResult& result) {
     o << std::setw(4) << j << std::endl;
 }
 
-void JobFileAdapter::handleJobResultDeleted(const FileWatcher::Event& event) {
+void JobFileAdapter::handleJobResultDeleted(const FileWatcher::Event& event, Logger& log) {
 
     if (Terminator::isTerminating()) return;
 
-    Console::log(Console::VVERB, "Result file deletion event: type %i, name \"%s\"\n", event.type, event.name.c_str());
+    log.log(V4_VVER, "Result file deletion event: type %i, name \"%s\"\n", event.type, event.name.c_str());
 
     auto lock = _job_map_mutex.getLock();
 
     std::string jobName = event.name;
     jobName.erase(std::find(jobName.begin(), jobName.end(), '\0'), jobName.end());
     if (!_job_name_to_id.contains(jobName)) {
-        Console::log(Console::WARN, "Cannot clean up job \"%s\" : not known", jobName.c_str());
+        log.log(V1_WARN, "Cannot clean up job \"%s\" : not known\n", jobName.c_str());
         return;
     }
 

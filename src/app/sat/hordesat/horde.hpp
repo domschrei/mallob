@@ -16,7 +16,7 @@
 #include <map>
 
 #include "util/sys/threading.hpp"
-#include "utilities/logging_interface.hpp"
+#include "util/logger.hpp"
 #include "sharing/sharing_manager_interface.hpp"
 #include "solvers/solver_thread.hpp"
 #include "solvers/solving_state.hpp"
@@ -27,7 +27,7 @@ class HordeLib {
 private:
 
 	Parameters _params;
-	std::shared_ptr<LoggingInterface> _logger;
+	Logger _logger;
 	
 	size_t _sleep_microsecs;
 	size_t _num_solvers;
@@ -49,7 +49,7 @@ private:
 
 public:
 
-    HordeLib(const Parameters& params, std::shared_ptr<LoggingInterface> loggingInterface = NULL);
+    HordeLib(const Parameters& params, Logger&& loggingInterface);
 	~HordeLib();
 
     void beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
@@ -90,8 +90,6 @@ public:
 	std::set<int>& getFailedAssumptions() {
 		return _failed_assumptions;
 	}
-
-	void hlog(int verbosityLevel, const char* fmt, ...);
 
 	void cleanUp();
 	bool isCleanedUp() {return _cleaned_up;}	

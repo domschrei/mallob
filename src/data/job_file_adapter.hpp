@@ -5,13 +5,14 @@
 #include <functional>
 
 #include "util/sys/file_watcher.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "util/robin_hood.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "util/json.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/threading.hpp"
+#include "util/logger.hpp"
 
 class JobFileAdapter {
 
@@ -30,6 +31,7 @@ public:
 
 private:
     const Parameters& _params;
+    Logger _logger;
 
     std::string _base_path;
     FileWatcher _new_jobs_watcher;
@@ -43,26 +45,33 @@ private:
 
 public:
 
-    JobFileAdapter(const Parameters& params, const std::string& basePath, 
+    JobFileAdapter(const Parameters& params, Logger&& logger, const std::string& basePath, 
                         std::function<void(std::shared_ptr<JobDescription> desc)> newJobCallback) : 
         _params(params),
+        _logger(std::move(logger)),
         _base_path(basePath),
         _new_jobs_watcher(_base_path + "/new/", (int) (IN_MOVED_TO | IN_MODIFY | IN_CLOSE_WRITE), 
-            [&](const FileWatcher::Event& event) {handleNewJob(event);}, 
-            FileWatcher::InitialFilesHandling::TRIGGER_CREATE_EVENT),
+            [&](const FileWatcher::Event& event, Logger& log) {handleNewJob(event, log);},
+            _logger, FileWatcher::InitialFilesHandling::TRIGGER_CREATE_EVENT, /*numThreads=*/4),
         _results_watcher(_base_path + "/done/", (int) (IN_DELETE | IN_MOVED_FROM), 
-            [&](const FileWatcher::Event& event) {handleJobResultDeleted(event);}),
+            [&](const FileWatcher::Event& event, Logger& log) {handleJobResultDeleted(event, log);}, 
+            _logger),
         _running_id(1), _new_job_callback(newJobCallback) {
         
         // Create directories as necessary
         FileUtils::mkdir(_base_path + "/new/");
         FileUtils::mkdir(_base_path + "/pending/");
         FileUtils::mkdir(_base_path + "/done/");
+
+        _logger.log(V2_INFO, "operational at %s\n", _base_path.c_str());
+    }
+    ~JobFileAdapter() {
+        _logger.log(V2_INFO, "shut down\n");
     }
 
     // FileWatcher events
-    void handleNewJob(const FileWatcher::Event& event);
-    void handleJobResultDeleted(const FileWatcher::Event& event);
+    void handleNewJob(const FileWatcher::Event& event, Logger& log);
+    void handleJobResultDeleted(const FileWatcher::Event& event, Logger& log);
 
     // Event when a job is finished
     void handleJobDone(const JobResult& result);

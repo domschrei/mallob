@@ -14,7 +14,7 @@
 #include <mpi.h>
 
 #include "data/serializable.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 
 #include "msgtags.h"
@@ -54,19 +54,19 @@ struct MessageHandle {
     MessageHandle(int id, float time = Timer::elapsedSeconds()) : id(id), creationTime(time) {
         status.MPI_SOURCE = -1; 
         status.MPI_TAG = -1;
-        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
+        //log(V5_DEBG, "Msg ID=%i created\n", id);
     }
     MessageHandle(int id, int recvSize, float time = Timer::elapsedSeconds()) : id(id), creationTime(time) {
         status.MPI_SOURCE = -1; 
         status.MPI_TAG = -1;
         recvData.resize(recvSize);
-        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
+        //log(V5_DEBG, "Msg ID=%i created\n", id);
     }
     MessageHandle(int id, const std::vector<uint8_t>& data, float time = Timer::elapsedSeconds()) : 
             id(id), sendData(data), creationTime(time) {
         status.MPI_SOURCE = -1; 
         status.MPI_TAG = -1;
-        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
+        //log(V5_DEBG, "Msg ID=%i created\n", id);
     }
     MessageHandle(int id, const std::vector<uint8_t>& sendData, 
             const std::vector<uint8_t>& recvData, 
@@ -74,7 +74,7 @@ struct MessageHandle {
             id(id), sendData(sendData), recvData(recvData), creationTime(time) {
         status.MPI_SOURCE = -1; 
         status.MPI_TAG = -1;
-        //Console::log(Console::VVVVERB, "Msg ID=%i created", id);
+        //log(V5_DEBG, "Msg ID=%i created\n", id);
     }
     MessageHandle(MessageHandle&& other) : id(other.id), tag(other.tag), source(other.source), 
             sendData(std::move(other.sendData)), recvData(std::move(other.recvData)), selfMessage(other.selfMessage), 
@@ -82,7 +82,7 @@ struct MessageHandle {
             status(other.status) {}
 
     ~MessageHandle() {
-        //Console::log(Console::VVVVERB, "Msg ID=%i deleted", id);
+        //log(V5_DEBG, "Msg ID=%i deleted\n", id);
     }
 
     MessageHandle& operator=(MessageHandle&& other) {

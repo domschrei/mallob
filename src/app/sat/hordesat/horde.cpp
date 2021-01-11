@@ -8,8 +8,8 @@
 #include "horde.hpp"
 
 #include "utilities/debug_utils.hpp"
-#include "utilities/default_logging_interface.hpp"
 #include "sharing/default_sharing_manager.hpp"
+#include "util/sys/timer.hpp"
 #include "solvers/cadical.hpp"
 #include "solvers/lingeling.hpp"
 #ifdef MALLOB_USE_RESTRICTED
@@ -26,13 +26,12 @@
 
 using namespace SolvingStates;
 
-HordeLib::HordeLib(const Parameters& params, std::shared_ptr<LoggingInterface> loggingInterface) : 
-			_params(params), _logger(loggingInterface), _state(INITIALIZING) {
+HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) : 
+			_params(params), _logger(std::move(loggingInterface)), _state(INITIALIZING) {
 	
     int appRank = params.getIntParam("apprank");
-    int mpiSize = params.getIntParam("mpisize");
 
-	hlog(0, "Hlib engine on job %s", params.getParam("jobstr").c_str());
+	_logger.log(V2_INFO, "Hlib engine on job %s\n", params.getParam("jobstr").c_str());
 	//params.printParams();
 	_num_solvers = params.getIntParam("t", 1);
 	_sleep_microsecs = 1000 * params.getIntParam("i", 1000);
@@ -62,7 +61,7 @@ HordeLib::HordeLib(const Parameters& params, std::shared_ptr<LoggingInterface> l
 
 	// Solver-agnostic options each solver in the portfolio will receive
 	SolverSetup setup;
-	setup.logger = _logger.get();
+	setup.logger = &_logger;
 	setup.jobname = params.getParam("jobstr");
 	setup.useAdditionalDiversification = params.isNotNull("aod");
 	setup.hardInitialMaxLbd = params.getIntParam("ihlbd");
@@ -81,34 +80,34 @@ HordeLib::HordeLib(const Parameters& params, std::shared_ptr<LoggingInterface> l
 		case 'l':
 			// Lingeling
 			setup.diversificationIndex = numLgl++;
-			hlog(3, "S%i : Lingeling-%i\n", setup.globalId, setup.diversificationIndex);
+			_logger.log(V5_DEBG, "S%i : Lingeling-%i\n", setup.globalId, setup.diversificationIndex);
 			_solver_interfaces.emplace_back(new Lingeling(setup));
 			break;
 		case 'c':
 			// Cadical
 			setup.diversificationIndex = numCdc++;
-			hlog(3, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
+			_logger.log(V5_DEBG, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
 			_solver_interfaces.emplace_back(new Cadical(setup));
 			break;
 #ifdef MALLOB_USE_RESTRICTED
 		case 'g':
 			// Glucose
 			setup.diversificationIndex = numGlu++;
-			hlog(3, "S%i: Glucose-%i\n", setup.globalId, setup.diversificationIndex);
+			_logger.log(V5_DEBG, "S%i: Glucose-%i\n", setup.globalId, setup.diversificationIndex);
 			_solver_interfaces.emplace_back(new MGlucose(setup));
 			break;
 #endif
 		default:
 			// Invalid solver
-			hlog(0, "Fatal error: Invalid solver \"%c\" assigned\n", solverChoices[cyclePos]);
+			_logger.log(V2_INFO, "Fatal error: Invalid solver \"%c\" assigned\n", solverChoices[cyclePos]);
 			abort();
 			break;
 		}
 		cyclePos = (cyclePos+1) % solverChoices.size();
 	}
 
-	_sharing_manager.reset(new DefaultSharingManager(_solver_interfaces, _params, *_logger));
-	hlog(3, "initialized\n");
+	_sharing_manager.reset(new DefaultSharingManager(_solver_interfaces, _params, _logger));
+	_logger.log(V5_DEBG, "initialized\n");
 }
 
 void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
@@ -126,13 +125,13 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 
 	for (size_t i = 0; i < _num_solvers; i++) {
 		_solver_threads.emplace_back(new SolverThread(
-			_params, *_logger, _solver_interfaces[i], formulae, assumptions, i, &_solution_found
+			_params, _solver_interfaces[i], formulae, assumptions, i, &_solution_found
 		));
 		_solver_threads.back()->start();
 	}
 
 	setSolvingState(ACTIVE);
-	hlog(3, "started solver threads\n");
+	_logger.log(V5_DEBG, "started solver threads\n");
 }
 
 void HordeLib::continueSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
@@ -180,7 +179,7 @@ int HordeLib::solveLoop() {
 	}
 
 	if (done) {
-		hlog(3, "Returning result\n");
+		_logger.log(V5_DEBG, "Returning result\n");
 		return _result;
 	}
     return -1; // no result yet
@@ -188,7 +187,7 @@ int HordeLib::solveLoop() {
 
 int HordeLib::prepareSharing(int* begin, int maxSize) {
 	if (isCleanedUp()) return 0;
-	hlog(3, "collecting clauses on this node\n");
+	_logger.log(V5_DEBG, "collecting clauses on this node\n");
 	return _sharing_manager->prepareSharing(begin, maxSize);
 }
 
@@ -209,7 +208,7 @@ void HordeLib::dumpStats(bool final) {
 	SolvingStatistics locSolveStats;
 	for (size_t i = 0; i < _num_solvers; i++) {
 		SolvingStatistics st = _solver_interfaces[i]->getStatistics();
-		hlog(0, "%sS%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f\n",
+		_logger.log(V2_INFO, "%sS%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f\n",
 				final ? "END " : "",
 				_solver_interfaces[i]->getGlobalId(), st.propagations, st.decisions, st.conflicts, st.memPeak);
 		locSolveStats.conflicts += st.conflicts;
@@ -223,7 +222,7 @@ void HordeLib::dumpStats(bool final) {
 
 	unsigned long exportedWithFailed = locShareStats.exportedClauses + locShareStats.clausesFilteredAtExport + locShareStats.clausesDroppedAtExport;
 	unsigned long importedWithFailed = locShareStats.importedClauses + locShareStats.clausesFilteredAtImport;
-	hlog(0, "%spps:%lu decs:%lu cnfs:%lu mem:%0.2f exp:%lu/%lu(drp:%lu) imp:%lu/%lu\n",
+	_logger.log(V2_INFO, "%spps:%lu decs:%lu cnfs:%lu mem:%0.2f exp:%lu/%lu(drp:%lu) imp:%lu/%lu\n",
 			final ? "END " : "",
 			locSolveStats.propagations, locSolveStats.decisions, locSolveStats.conflicts, locSolveStats.memPeak, 
 			locShareStats.exportedClauses, exportedWithFailed, locShareStats.clausesDroppedAtExport, 
@@ -247,7 +246,11 @@ void HordeLib::dumpStats(bool final) {
 				histZeroesOnly += " " + std::to_string(val);
 			}
 		}
-		if (!hist.empty()) hlog(0, "END clenhist:%s\n", hist.c_str());
+		if (!hist.empty()) _logger.log(V2_INFO, "END clenhist:%s\n", hist.c_str());
+
+		// Flush logs
+		for (auto& solver : _solver_interfaces) solver->getLogger().flush();
+		_logger.flush();
 	}
 }
 
@@ -274,7 +277,7 @@ void HordeLib::setSolvingState(SolvingState state) {
 	SolvingState oldState = _state;
 	_state = state;
 
-	hlog(2, "state change %s -> %s\n", SolvingStateNames[oldState], SolvingStateNames[state]);
+	_logger.log(V4_VVER, "state change %s -> %s\n", SolvingStateNames[oldState], SolvingStateNames[state]);
 	for (auto& solver : _solver_threads) solver->setState(state);
 }
 
@@ -286,17 +289,10 @@ int HordeLib::failed(int lit) {
 	return _failed_assumptions.find(lit) != _failed_assumptions.end();
 }
 
-void HordeLib::hlog(int verbosityLevel, const char* fmt, ...) {
-	va_list vl;
-    va_start(vl, fmt);
-	_logger->log_va_list(verbosityLevel, fmt, vl);
-	va_end(vl);
-}
-
 void HordeLib::cleanUp() {
-	double time = _logger->getTime();
+	double time = Timer::elapsedSeconds();
 
-	hlog(3, "[hlib-cleanup] enter\n");
+	_logger.log(V5_DEBG, "[hlib-cleanup] enter\n");
 
 	// for any running threads left:
 	setSolvingState(ABORTING);
@@ -306,14 +302,15 @@ void HordeLib::cleanUp() {
 		_solver_threads[i]->tryJoin();
 	}
 	_solver_threads.clear();
-	hlog(3, "[hlib-cleanup] joined threads\n");
+	_logger.log(V5_DEBG, "[hlib-cleanup] joined threads\n");
 
 	// delete solvers
 	_solver_interfaces.clear();
-	hlog(3, "[hlib-cleanup] cleared solvers\n");
+	_logger.log(V5_DEBG, "[hlib-cleanup] cleared solvers\n");
 
-	time = _logger->getTime() - time;
-	hlog(2, "[hlib-cleanup] done, took %.3f s\n", time);
+	time = Timer::elapsedSeconds() - time;
+	_logger.log(V4_VVER, "[hlib-cleanup] done, took %.3f s\n", time);
+	_logger.flush();
 
 	_cleaned_up = true;
 }

@@ -11,8 +11,7 @@
 #include <vector>
 
 #include "util/sys/threading.hpp"
-#include "app/sat/hordesat/utilities/logging_interface.hpp"
-#include "app/sat/hordesat/utilities/default_logging_interface.hpp"
+#include "util/logger.hpp"
 
 #define BUCKET_SIZE 1000
 
@@ -23,8 +22,7 @@ struct Bucket {
 
 class ClauseDatabase {
 public:
-	ClauseDatabase() : logger(dli) {}
-	ClauseDatabase(const LoggingInterface& logger) : logger(logger) {}
+	ClauseDatabase(const Logger& logger) : logger(logger) {}
 	virtual ~ClauseDatabase();
 
 	/**
@@ -52,8 +50,7 @@ public:
 	const int* getNextIncomingClause(int& size);
 
 private:
-	static DefaultLoggingInterface dli;
-	const LoggingInterface& logger;
+	const Logger& logger;
 	Mutex addClauseLock;
 
 	// Structures for EXPORTING

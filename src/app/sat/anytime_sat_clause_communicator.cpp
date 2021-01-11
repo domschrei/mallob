@@ -1,7 +1,7 @@
 
 #include "anytime_sat_clause_communicator.hpp"
 
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "comm/mympi.hpp"
 #include "hordesat/utilities/clause_filter.hpp"
 
@@ -37,7 +37,7 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
 
     if (_job->getJobTree().isRoot()) {
         // Share complete set of clauses to children
-        Console::log(Console::VVERB, "%s : switch gather => broadcast", _job->toStr()); 
+        log(V4_VVER, "%s : switch gather => broadcast\n", _job->toStr()); 
         learnClauses(clausesToShare);
         sendClausesToChildren(clausesToShare);
     } else {
@@ -49,7 +49,7 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
         msg.tag = MSG_GATHER_CLAUSES;
         msg.payload = clausesToShare;
         msg.payload.push_back(_num_aggregated_nodes);
-        Console::log_send(Console::VVERB, parentRank, "%s : gather", _job->toStr());
+        log(LOG_ADD_DESTRANK | V4_VVER, "%s : gather", parentRank, _job->toStr());
         MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
 
@@ -66,7 +66,7 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         std::vector<int>& clauses = msg.payload;
         testConsistency(clauses);
         
-        Console::log(Console::VVVERB, "%s : receive, size %i", _job->toStr(), clauses.size());
+        log(V5_DEBG, "%s : receive, size %i\n", _job->toStr(), clauses.size());
         
         // Add received clauses to local set of collected clauses
         _clause_buffers.push_back(clauses);
@@ -83,7 +83,7 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
 }
 
 void AnytimeSatClauseCommunicator::learnClauses(const std::vector<int>& clauses) {
-    Console::log(Console::VVERB, "%s : learn, size %i", _job->toStr(), clauses.size());
+    log(V4_VVER, "%s : learn, size %i\n", _job->toStr(), clauses.size());
     testConsistency(clauses);
     
     if (clauses.size() > 0) {
@@ -91,15 +91,15 @@ void AnytimeSatClauseCommunicator::learnClauses(const std::vector<int>& clauses)
         
         // If not active or not fully initialized yet: discard clauses
         if (_job->getState() != ACTIVE || !_job->isInitialized()) {
-            Console::log(Console::VVERB, "%s : discard buffer, job is not (yet?) active", 
+            log(V4_VVER, "%s : discard buffer, job is not (yet?) active\n", 
                     _job->toStr());
             return;
         }
 
         // Locally digest clauses
-        Console::log(Console::VVERB, "%s : digest", _job->toStr());
+        log(V4_VVER, "%s : digest\n", _job->toStr());
         _job->digestSharing(clauses);
-        Console::log(Console::VVERB, "%s : digested", _job->toStr());
+        log(V4_VVER, "%s : digested\n", _job->toStr());
     }
 }
 
@@ -114,12 +114,12 @@ void AnytimeSatClauseCommunicator::sendClausesToChildren(const std::vector<int>&
     int childRank;
     if (_job->getJobTree().hasLeftChild()) {
         childRank = _job->getJobTree().getLeftChildNodeRank();
-        Console::log_send(Console::VVERB, childRank, "%s : broadcast", _job->toStr());
+        log(LOG_ADD_DESTRANK | V4_VVER, "%s : broadcast", childRank, _job->toStr());
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
     if (_job->getJobTree().hasRightChild()) {
         childRank = _job->getJobTree().getRightChildNodeRank();
-        Console::log_send(Console::VVERB, childRank, "%s : broadcast", _job->toStr());
+        log(LOG_ADD_DESTRANK | V4_VVER, "%s : broadcast", childRank, _job->toStr());
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
 }
@@ -133,7 +133,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     float s = getBufferLimit(_num_aggregated_nodes);
     int totalSize = std::ceil(s);
     int selfSize = std::ceil(s / _num_aggregated_nodes);
-    Console::log(Console::VVVERB, "%s : aggregated=%i max_self=%i max_total=%i", _job->toStr(), 
+    log(V5_DEBG, "%s : aggregated=%i max_self=%i max_total=%i\n", _job->toStr(), 
             _num_aggregated_nodes, selfSize, totalSize);
 
     // Locally collect clauses from own solvers, add to clause buffer
@@ -143,7 +143,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
         selfClauses = std::vector<int>();
     } else {
         // Else, retrieve clauses from solvers
-        Console::log(Console::VVERB, "%s : collect local cls, max. size %i", 
+        log(V4_VVER, "%s : collect local cls, max. size %i\n", 
                     _job->toStr(), selfSize);
         selfClauses = _job->getPreparedClauses();
         testConsistency(selfClauses);
@@ -151,7 +151,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     _clause_buffers.push_back(selfClauses);
 
     // Merge all collected buffer into a single buffer
-    Console::log(Console::VVVERB, "%s : merge %i buffers, max. size %i", 
+    log(V5_DEBG, "%s : merge %i buffers, max. size %i\n", 
                 _job->toStr(), _clause_buffers.size(), totalSize);
     std::vector<std::vector<int>*> buffers;
     for (auto& buf : _clause_buffers) buffers.push_back(&buf);
@@ -205,9 +205,9 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
             }
 
             /*
-            Console::append(Console::VVVERB, "VIP ");
-            for (int l : cls) Console::append(Console::VVVERB, "%i ", l);
-            Console::log(Console::VVVERB, "");*/
+            Logger::append(V5_DEBG, "VIP ");
+            for (int l : cls) Logger::append(V5_DEBG, "%i ", l);
+            log(V5_DEBG, "\n");*/
 
             // Clear clause vector, update counters
             cls.clear();
@@ -258,10 +258,10 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
             }
 
             /*
-            Console::append(Console::VVVERB, "CLS ");
+            Logger::append(V5_DEBG, "CLS ");
             for (int i = pos; i < pos+clauseLength; i++) 
-                Console::append(Console::VVVERB, "%i ", vec[i]);
-            Console::log(Console::VVVERB, "");*/
+                Logger::append(V5_DEBG, "%i ", vec[i]);
+            log(V5_DEBG, "\n");*/
 
             // Update counters for remaining clauses 
             positions[picked] += clauseLength;
@@ -322,12 +322,12 @@ bool AnytimeSatClauseCommunicator::testConsistency(const std::vector<int>& buffe
     }
 
     if (consistent > 0) {
-        Console::log(Console::CRIT, "Consistency ERROR %i in clause buffer at position %i", consistent, pos);
+        log(V0_CRIT, "Consistency ERROR %i in clause buffer at position %i: \n", consistent, pos);
         for (size_t p = 0; p < buffer.size(); p++) {
-            if (p == pos) Console::append(Console::CRIT, "(%i) ", buffer[p]);
-            else          Console::append(Console::CRIT, "%i ", buffer[p]);
+            if (p == pos) log(LOG_NO_PREFIX | V0_CRIT, "(%i) ", buffer[p]);
+            else          log(LOG_NO_PREFIX | V0_CRIT, "%i ", buffer[p]);
         }
-        Console::append(Console::CRIT, "\n");
+        log(LOG_NO_PREFIX | V0_CRIT, "\n");
         abort();
     }
     return consistent == 0;

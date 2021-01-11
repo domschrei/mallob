@@ -18,7 +18,7 @@
 #include "data/job_transfer.hpp"
 #include "data/epoch_counter.hpp"
 #include "data/job_state.h"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "app/job_tree.hpp"
 
 class Job {
@@ -223,7 +223,7 @@ public:
     // Getter methods and simple queries
 
     JobState getState() const {return _state;};
-    void assertState(JobState state) const {assert(_state == state || Console::fail("State of %s : %s", toStr(), jobStateToStr()));};
+    void assertState(JobState state) const {assert(_state == state || log_return_false("State of %s : %s", toStr(), jobStateToStr()));};
     int getVolume() const {return _volume;}
     float getPriority() const {return _priority;}
     bool hasReceivedDescription() const {return !_serialized_description.empty();};
@@ -301,7 +301,7 @@ public:
             || (hasDeserializedDescription() && getDescription().getCpuLimit() > 0 && 
                 usedCpuSecs > getDescription().getCpuLimit())) {
             // Job exceeded its cpu time limit
-            Console::log(Console::INFO, "#%i CPU TIMEOUT: aborting", _id);
+            log(V2_INFO, "#%i CPU TIMEOUT: aborting\n", _id);
             return true;
         }
 
@@ -309,7 +309,7 @@ public:
             || (hasDeserializedDescription() && getDescription().getWallclockLimit() > 0 && 
                 usedWcSecs > getDescription().getWallclockLimit())) {
             // Job exceeded its wall clock time limit
-            Console::log(Console::INFO, "#%i WALLCLOCK TIMEOUT: aborting", _id);
+            log(V2_INFO, "#%i WALLCLOCK TIMEOUT: aborting\n", _id);
             return true;
         }
 

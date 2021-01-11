@@ -6,8 +6,6 @@
 
 void initcall(const char* op);
 void endcall();
-
-class Worker;
-void mpiMonitor(Worker* worker);
+void mpiMonitor();
 
 #endif

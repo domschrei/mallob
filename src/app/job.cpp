@@ -5,7 +5,7 @@
 
 #include "assert.h"
 #include "app/job.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 
 Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
@@ -85,14 +85,14 @@ void Job::suspend() {
     assertState(ACTIVE);
     _state = SUSPENDED;
     appl_suspend();
-    Console::log(Console::VVERB, "%s : suspended solver", toStr());
+    log(V4_VVER, "%s : suspended solver\n", toStr());
 }
 
 void Job::resume() {
     assertState(SUSPENDED);
     _state = ACTIVE;
     appl_resume();
-    Console::log(Console::VVERB, "%s : resumed solving threads", toStr());
+    log(V4_VVER, "%s : resumed solving threads\n", toStr());
 }
 
 void Job::terminate() {
@@ -105,7 +105,7 @@ void Job::terminate() {
     _job_tree.unsetRightChild();
 
     _time_of_abort = Timer::elapsedSeconds();
-    Console::log(Console::VVERB, "%s : terminated", toStr());
+    log(V4_VVER, "%s : terminated\n", toStr());
 }
 
 bool Job::isDestructible() {

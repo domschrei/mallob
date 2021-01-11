@@ -12,8 +12,6 @@
 #include "clause_database.hpp"
 #include "app/sat/hordesat/utilities/debug_utils.hpp"
 
-DefaultLoggingInterface ClauseDatabase::dli;
-
 void ClauseDatabase::addVIPClause(std::vector<int>& clause) {
 	auto lock = addClauseLock.getLock();
 	vipClauses.push_back(clause);
@@ -115,9 +113,9 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 	addClauseLock.unlock();
 	int all = fitting + notFitting;
 	if (all > 0) {
-		logger.log(3, "%d fit %d (%d%%) didn't \n", fitting, notFitting, notFitting*100/(all));
+		logger.log(V5_DEBG, "%d fit %d (%d%%) didn't \n", fitting, notFitting, notFitting*100/(all));
 	} else {
-		logger.log(3, "No clauses for export.\n");
+		logger.log(V5_DEBG, "No clauses for export.\n");
 	}
 	if (selectedCount != NULL) {
 		*selectedCount = fitting;

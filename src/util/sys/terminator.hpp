@@ -4,6 +4,8 @@
 
 #include <atomic>
 
+#include "util/sys/process.hpp"
+
 class Terminator {
 
 private:
@@ -14,6 +16,7 @@ public:
         _exit = true;
     }
     static bool isTerminating() {
+        if (!_exit && Process::isExitSignalCaught()) setTerminating();
         return _exit;
     }
 

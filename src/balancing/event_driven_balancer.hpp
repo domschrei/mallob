@@ -8,7 +8,7 @@
 
 #include "balancing/balancer.hpp"
 #include "data/reduceable.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 
 struct Event {
     int jobId;

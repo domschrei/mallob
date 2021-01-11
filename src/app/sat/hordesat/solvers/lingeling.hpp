@@ -10,7 +10,7 @@
 
 #include "portfolio_solver_interface.hpp"
 #include "util/sys/threading.hpp"
-#include "app/sat/hordesat/utilities/logging_interface.hpp"
+#include "util/logger.hpp"
 
 #include "util/ringbuffer.hpp"
 
@@ -38,7 +38,6 @@ private:
 	friend void cbProduceUnit(void* sp, int lit);
 	friend void cbConsumeUnits(void* sp, int** start, int** end);
 	friend void cbConsumeCls(void* sp, int** clause, int* glue);
-	friend void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ...);
 
 	// clause addition
 	std::vector<std::vector<int>> clausesToAdd;

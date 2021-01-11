@@ -2,7 +2,7 @@
 #ifndef DOMPASCH_MALLOB_HORDE_PROCESS_ADAPTER_H
 #define DOMPASCH_MALLOB_HORDE_PROCESS_ADAPTER_H
 
-#include "hordesat/utilities/logging_interface.hpp"
+#include "util/logger.hpp"
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
 #include "hordesat/solvers/solving_state.hpp"
@@ -13,7 +13,7 @@ class HordeProcessAdapter {
 
 private:
     Parameters _params;
-    std::shared_ptr<LoggingInterface> _log;
+    std::shared_ptr<Logger> _log;
 
     const std::vector<std::shared_ptr<std::vector<int>>>& _formulae; 
     const std::shared_ptr<std::vector<int>>& _assumptions;

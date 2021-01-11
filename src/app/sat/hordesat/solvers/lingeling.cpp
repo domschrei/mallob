@@ -12,6 +12,7 @@
 
 #include "lingeling.hpp"
 #include "app/sat/hordesat/utilities/debug_utils.hpp"
+#include "util/sys/timer.hpp"
 
 extern "C" {
 	#include "lglib.h"
@@ -20,23 +21,23 @@ extern "C" {
 int cbCheckTerminate(void* solverPtr) {
 	Lingeling* lp = (Lingeling*)solverPtr;
 
-	double elapsed = lp->_logger.getTime() - lp->lastTermCallbackTime;
-	lp->lastTermCallbackTime = lp->_logger.getTime();
+	double elapsed = Timer::elapsedSeconds() - lp->lastTermCallbackTime;
+	lp->lastTermCallbackTime = Timer::elapsedSeconds();
     
 	if (lp->stopSolver) {
-		slog(lp, 1, "STOP (%.2fs since last cb)", elapsed);
+		lp->_logger.log(V3_VERB, "STOP (%.2fs since last cb)", elapsed);
 		return 1;
 	}
 
     if (lp->suspendSolver) {
         // Stay inside this function call as long as solver is suspended
-		slog(lp, 1, "SUSPEND (%.2fs since last cb)", elapsed);
+		lp->_logger.log(V3_VERB, "SUSPEND (%.2fs since last cb)", elapsed);
 
 		lp->suspendCond.wait(lp->suspendMutex, [&lp]{return !lp->suspendSolver;});
-		slog(lp, 2, "RESUME");
+		lp->_logger.log(V4_VVER, "RESUME");
 
 		if (lp->stopSolver) {
-			slog(lp, 2, "STOP after suspension", elapsed);
+			lp->_logger.log(V4_VVER, "STOP after suspension", elapsed);
 			return 1;
 		}
     }
@@ -164,7 +165,7 @@ Lingeling::Lingeling(const SolverSetup& setup)
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
 	lglsetopt(solver, "bca", 0);
 	
-	lastTermCallbackTime = _logger.getTime();
+	lastTermCallbackTime = Timer::elapsedSeconds();
 
 	stopSolver = 0;
 	callback = NULL;
@@ -349,23 +350,23 @@ void Lingeling::addLearnedClause(const int* begin, int size) {
 	if (!clauseAddMutex.tryLock()) {
 
 		//time = _logger.getTime() - time;
-		//if (time > 0.2f) slog(this, -1, "[0] addLearnedClause took %.2fs!\n", time);
+		//if (time > 0.2f) lp->_logger.log(-1, "[0] addLearnedClause took %.2fs!\n", time);
 
 		return;
 	}
 	if (size == 1) {
 		if (!learnedUnits.produce(*begin)) {
-			slog(this, 2, "Unit buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
+			_logger.log(V4_VVER, "Unit buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
 		} else numReceived++;
 	} else {
 		if (!learnedClauses.produce(std::vector<int>(begin, begin+size))) {
-			slog(this, 2, "Clause buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
+			_logger.log(V4_VVER, "Clause buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
 		} else numReceived++;
 	}
 	clauseAddMutex.unlock();
 
 	//time = _logger.getTime() - time;
-	//if (time > 0.2f) slog(this, -1, "[1] addLearnedClause took %.2fs! (size %i)\n", time, size);
+	//if (time > 0.2f) lp->_logger.log(-1, "[1] addLearnedClause took %.2fs! (size %i)\n", time, size);
 }
 
 void Lingeling::setLearnedClauseCallback(const LearnedClauseCallback& callback) {

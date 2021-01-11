@@ -6,7 +6,7 @@
 
 #include "comm/mympi.hpp"
 #include "util/sys/timer.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "util/random.hpp"
 #include "util/params.hpp"
 #include "util/sys/shared_memory.hpp"
@@ -44,9 +44,8 @@ int main(int argc, char *argv[]) {
 
     Parameters params;
     params.init(argc, argv);
-    Console::init(rank, params.getIntParam("v"), params.isNotNull("colors"), 
-            /*threadsafeOutput=*/false, /*quiet=*/params.isNotNull("q"), 
-            /*cPrefix=*/params.isNotNull("mono"), params.getParam("log"));
+    Logger::init(rank, params.getIntParam("v"), params.isNotNull("colors"), 
+            /*quiet=*/params.isNotNull("q"), /*cPrefix=*/params.isNotNull("mono"), params.getParam("log"));
     
     MyMpi::setOptions(params);
 
@@ -63,7 +62,7 @@ int main(int argc, char *argv[]) {
 
     char hostname[1024];
 	gethostname(hostname, 1024);
-    Console::log(Console::VERB, "mallob %s pid=%lu on host %s", MALLOB_VERSION, Proc::getPid(), hostname);
+    log(V3_VERB, "mallob %s pid=%lu on host %s\n", MALLOB_VERSION, Proc::getPid(), hostname);
 
     // Global and local seed, such that all nodes have access to a synchronized randomness
     // as well as to an individual randomness that differs among nodes
@@ -76,7 +75,7 @@ int main(int argc, char *argv[]) {
     std::set<int> externalClientRanks;
     int numClients = params.getIntParam("c");
     int numWorkers = numNodes - numClients;
-    assert(numWorkers > 0 || Console::fail("Need at least one worker node!"));
+    assert(numWorkers > 0 || log_return_false("Need at least one worker node!"));
     for (int i = 1; i <= numClients; i++)
         externalClientRanks.insert(numNodes-i);
     bool isExternalClient = rank >= numWorkers;
@@ -93,7 +92,7 @@ int main(int argc, char *argv[]) {
     MPI_Comm newComm;
     MPI_Comm_split(MPI_COMM_WORLD, color, rank, &newComm);
 
-    //std::set_terminate(Console::forceFlush);
+    //std::set_terminate(Logger::forceFlush);
 
     try {
         // Launch node's main program
@@ -103,16 +102,16 @@ int main(int argc, char *argv[]) {
             doWorkerNodeProgram(newComm, params, externalClientRanks);
         }
     } catch (const std::exception &ex) {
-        Console::log(Console::CRIT, "Unexpected ERROR: \"%s\" - aborting", ex.what());
-        Console::forceFlush();
+        log(V0_CRIT, "Unexpected ERROR: \"%s\" - aborting\n", ex.what());
+        Logger::getMainInstance().flush();
         exit(1);
     } catch (...) {
-        Console::log(Console::CRIT, "Unexpected ERROR - aborting");
-        Console::forceFlush();
+        log(V0_CRIT, "Unexpected ERROR - aborting\n");
+        Logger::getMainInstance().flush();
         exit(1);
     }
 
     MPI_Finalize();
-    Console::log(Console::INFO, "Exiting happily");
-    Console::flush();
+    log(V2_INFO, "Exiting happily\n");
+    Logger::getMainInstance().flush();
 }

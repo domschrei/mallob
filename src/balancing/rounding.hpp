@@ -39,7 +39,7 @@ void merge(const Reduceable& other) override {
             newElem = data[i++];
         else
             newElem = otherSet.data[j++];
-        assert((newElem > 0 && newElem < 1.0) || Console::fail("%.3f is an invalid remainder to reduce!", newElem));
+        assert((newElem > 0 && newElem < 1.0) || log_return_false("%.3f is an invalid remainder to reduce!", newElem));
         
         // Only insert unique elements
         if (newData.empty() || newElem != newData.back()) {
@@ -65,7 +65,7 @@ SortedDoubleSequence& deserialize(const std::vector<uint8_t>& packed) override {
         // Empty / stub object
         return *this;
     }
-    assert(packed.size() % sizeof(double) == 0 || Console::fail("%i not a multiple of %i!", packed.size(), sizeof(double)));
+    assert(packed.size() % sizeof(double) == 0 || log_return_false("%i not a multiple of %i!", packed.size(), sizeof(double)));
     int size = packed.size() / sizeof(double);
     this->data.clear(); this->data.resize(size);
     memcpy(this->data.data(), packed.data(), packed.size());

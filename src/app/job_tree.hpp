@@ -9,7 +9,7 @@
 #include "util/permutation.hpp"
 #include "data/job_transfer.hpp"
 #include "util/sys/timer.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 
 class JobTree {
 

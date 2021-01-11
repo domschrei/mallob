@@ -2,11 +2,11 @@
 #include <cmath>
 
 #include "reduceable.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 
 
 bool Reduceable::startReduction(MPI_Comm& comm, std::set<int> excludedRanks) {
-    Console::log(Console::VVVVERB, "Starting reduction");
+    log(V5_DEBG, "Starting reduction\n");
     _comm = comm;
     _excluded_ranks = excludedRanks;
     _my_rank = MyMpi::rank(comm);
@@ -19,22 +19,22 @@ bool Reduceable::startReduction(MPI_Comm& comm, std::set<int> excludedRanks) {
         if (_my_rank % _power == 0 && _my_rank+_power/2 < MyMpi::size(comm)) {
             // Receive
             if (_excluded_ranks.count(_my_rank+_power/2)) continue;
-            Console::log(Console::VVVVERB, "Red. k=%i : Receiving", _power);
+            log(V5_DEBG, "Red. k=%i : Receiving\n", _power);
             MyMpi::irecv(comm, _my_rank+_power/2, MSG_COLLECTIVE_OPERATION);
             return false;
         } else if (_my_rank % _power == _power/2) {
             // Send
             if (_excluded_ranks.count(_my_rank-_power/2)) continue;
-            Console::log_send(Console::VVVVERB, _my_rank-_power/2, "Red. k=%i : Sending", _power);
+            log(LOG_ADD_DESTRANK | V5_DEBG, "Red. k=%i : Sending", _my_rank-_power/2, _power);
             MyMpi::isend(comm, _my_rank-_power/2, MSG_COLLECTIVE_OPERATION, *this);
         }
     }
 
     // already finished (sending / receiving nothing)
     if (isEmpty()) {
-        Console::log(Console::VVVVERB, "Red. : Will not participate in broadcast");
+        log(V5_DEBG, "Red. : Will not participate in broadcast\n");
         _excluded_ranks.insert(_my_rank);
-        Console::log(Console::VVVVERB, "Red. : %i excluded ranks", _excluded_ranks.size());
+        log(V5_DEBG, "Red. : %i excluded ranks\n", _excluded_ranks.size());
     }
     return true; 
 }
@@ -45,7 +45,7 @@ bool Reduceable::advanceReduction(MessageHandle& handle) {
     if (received->isEmpty()) {
         int source = handle.source;
         _excluded_ranks.insert(source);
-        Console::log(Console::VVVVERB, "-- empty!");
+        log(V5_DEBG, "-- empty!\n");
     }
     merge(*received); // reduce into local object
 
@@ -54,14 +54,14 @@ bool Reduceable::advanceReduction(MessageHandle& handle) {
         if (_my_rank % _power == 0 && _my_rank+_power/2 < MyMpi::size(_comm)) {
             // Receive
             if (_excluded_ranks.count(_my_rank+_power/2) == 0) {
-                Console::log(Console::VVVVERB, "Red. k=%i : Receiving", _power);
+                log(V5_DEBG, "Red. k=%i : Receiving\n", _power);
                 MyMpi::irecv(_comm, _my_rank+_power/2, MSG_COLLECTIVE_OPERATION);
                 return false;
             } 
         } else if (_my_rank % _power == _power/2) {
             // Send
             if (_excluded_ranks.count(_my_rank-_power/2) == 0) {
-                Console::log_send(Console::VVVVERB, _my_rank-_power/2, "Red. k=%i : Sending", _power);
+                log(LOG_ADD_DESTRANK | V5_DEBG, "Red. k=%i : Sending", _my_rank-_power/2, _power);
                 MyMpi::isend(_comm, _my_rank-_power/2, MSG_COLLECTIVE_OPERATION, *this);
             }
         }
@@ -70,14 +70,14 @@ bool Reduceable::advanceReduction(MessageHandle& handle) {
 
     // Finished!
     if (isEmpty()) {
-        Console::log(Console::VVVVERB, "Red. : Will not participate in broadcast");
+        log(V5_DEBG, "Red. : Will not participate in broadcast\n");
         _excluded_ranks.insert(_my_rank);
     }
     return true; // finished
 }
 
 bool Reduceable::startBroadcast(MPI_Comm& comm, std::set<int>& excludedRanks) {
-    Console::log(Console::VVVVERB, "Starting broadcast");
+    log(V5_DEBG, "Starting broadcast\n");
 
     this->_comm = comm;
     _my_rank = MyMpi::rank(comm);
@@ -85,7 +85,7 @@ bool Reduceable::startBroadcast(MPI_Comm& comm, std::set<int>& excludedRanks) {
     this->_excluded_ranks = excludedRanks;
 
     if (excludedRanks.count(_my_rank)) {
-        Console::log(Console::VVVVERB, "Brc. : Not participating");
+        log(V5_DEBG, "Brc. : Not participating\n");
         return true;
     }
 
@@ -95,12 +95,12 @@ bool Reduceable::startBroadcast(MPI_Comm& comm, std::set<int>& excludedRanks) {
             if (excludedRanks.count(_my_rank+_power/2)) {
                 continue;
             }
-            Console::log_send(Console::VVVVERB, _my_rank+_power/2, "Brc. k=%i : Sending", _power);
+            log(LOG_ADD_DESTRANK | V5_DEBG, "Brc. k=%i : Sending", _my_rank+_power/2, _power);
             MyMpi::isend(comm, _my_rank+_power/2, MSG_COLLECTIVE_OPERATION, *this);
 
         } else if (_my_rank % _power == _power/2) {
             // Receive
-            Console::log(Console::VVVVERB, "Brc. k=%i : Receiving", _power);
+            log(V5_DEBG, "Brc. k=%i : Receiving\n", _power);
             MyMpi::irecv(comm, _my_rank-_power/2, MSG_COLLECTIVE_OPERATION);
             return false;
         }
@@ -119,12 +119,12 @@ bool Reduceable::advanceBroadcast(MessageHandle& handle) {
             if (_excluded_ranks.count(_my_rank+_power/2)) {
                 continue;
             }
-            Console::log_send(Console::VVVVERB, _my_rank+_power/2, "Brc. k=%i : Sending", _power);
+            log(LOG_ADD_DESTRANK | V5_DEBG, "Brc. k=%i : Sending", _my_rank+_power/2, _power);
             MyMpi::isend(_comm, _my_rank+_power/2, MSG_COLLECTIVE_OPERATION, *this);
 
         } else if (_my_rank % _power == _power/2) {
             // Receive
-            Console::log(Console::VVVVERB, "Brc. k=%i : Receiving", _power);
+            log(V5_DEBG, "Brc. k=%i : Receiving\n", _power);
             MyMpi::irecv(_comm, _my_rank-_power/2, MSG_COLLECTIVE_OPERATION);
             return false;
         }

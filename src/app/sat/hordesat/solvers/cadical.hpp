@@ -13,7 +13,7 @@
 #include "portfolio_solver_interface.hpp"
 
 #include "util/sys/threading.hpp"
-#include "app/sat/hordesat/utilities/logging_interface.hpp"
+#include "util/logger.hpp"
 
 #include "app/sat/hordesat/solvers/cadical_interface.hpp"
 #include "app/sat/hordesat/solvers/cadical_terminator.hpp"

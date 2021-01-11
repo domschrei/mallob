@@ -4,14 +4,14 @@
 
 #include "util/random.hpp"
 #include "util/permutation.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 
 int main() {
 
     Timer::init();
     Random::init(rand(), rand());
-    Console::init(0, Console::VVVVERB, false, false, false, "/dev/null");
+    Logger::init(0, V5_DEBG, false, false, false, "/dev/null");
 
     std::vector<int> ns({8, 10, 12, 14, 16, 18, 20, 30, 32, 34, 48, 64, 128, 256, 512, 1024});
     std::vector<int> rs({1, 2, 3, 4, 5, 8, 16});
@@ -20,9 +20,9 @@ int main() {
         for (int n : ns) {
             if (n < 2*r) continue;
 
-            Console::log(Console::INFO, "n=%i, r=%i", n, r);
+            log(V2_INFO, "n=%i, r=%i\n", n, r);
             for (int rank = 0; rank < n; rank++) {
-                Console::log(Console::INFO, " rank=%i", rank);
+                log(V2_INFO, " rank=%i\n", rank);
                 std::vector<int> outgoingEdges = AdjustablePermutation::createExpanderGraph(n, r, rank);
                 
                 // Correctness checks

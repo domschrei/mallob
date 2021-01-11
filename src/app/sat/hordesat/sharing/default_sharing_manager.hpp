@@ -27,7 +27,7 @@ protected:
 	
 	// global parameters
 	const Parameters& _params;
-	const LoggingInterface& _logger;
+	const Logger& _logger;
 
 	ClauseDatabase _cdb;
 	
@@ -39,7 +39,7 @@ protected:
 
 public:
 	DefaultSharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
-			const Parameters& params, const LoggingInterface& logger);
+			const Parameters& params, const Logger& logger);
     int prepareSharing(int* begin, int maxSize);
     void digestSharing(const std::vector<int>& result);
 	void digestSharing(const int* begin, int buflen);

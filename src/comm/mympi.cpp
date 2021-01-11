@@ -8,7 +8,7 @@
 
 #include "util/random.hpp"
 #include "util/sys/timer.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "comm/mpi_monitor.hpp"
 
 #define MPICALL(cmd, str) {if (!MyMpi::_monitor_off) {initcall((str).c_str());} \
@@ -25,13 +25,13 @@ int handleId;
 
 void chkerr(int err) {
     if (err != 0) {
-        Console::log(Console::CRIT, "MPI ERROR errcode=%i", err);
+        log(V0_CRIT, "MPI ERROR errcode=%i\n", err);
         abort();
     }
 }
 
 bool MessageHandle::testSent() {
-    assert(!selfMessage || Console::fail("Attempting to MPI_Test a self message!"));
+    assert(!selfMessage || log_return_false("Attempting to MPI_Test a self message!"));
     if (finished) return true;
     int flag = 0;
     MPICALL(MPI_Test(&request, &flag, &status), "testsent" + std::to_string(id))
@@ -55,7 +55,7 @@ bool MessageHandle::testReceived() {
         if (flag) {
             finished = true;
             tag = status.MPI_TAG;
-            assert(status.MPI_SOURCE >= 0 || Console::fail("MPI_SOURCE = %i", status.MPI_SOURCE));
+            assert(status.MPI_SOURCE >= 0 || log_return_false("MPI_SOURCE = %i", status.MPI_SOURCE));
             source = status.MPI_SOURCE;
         }
     }
@@ -148,25 +148,25 @@ void MyMpi::init(int argc, char *argv[]) {
 
 void MyMpi::setOptions(const Parameters& params) {
     _monitor_off = !params.isNotNull("mmpi");
-    int verb = MyMpi::rank(MPI_COMM_WORLD) == 0 ? Console::INFO : Console::VVERB;
+    int verb = MyMpi::rank(MPI_COMM_WORLD) == 0 ? V2_INFO : V4_VVER;
     if (params.isNotNull("delaymonkey")) {
-        Console::log(verb, "Enabling delay monkey");
+        log(verb, "Enabling delay monkey\n");
         _monkey_flags |= MONKEY_DELAY;
     }
     if (params.isNotNull("latencymonkey")) {
-        Console::log(verb, "Enabling latency monkey");
+        log(verb, "Enabling latency monkey\n");
         _monkey_flags |= MONKEY_LATENCY;
     }
 }
 
 void MyMpi::beginListening() {
     MyMpi::irecv(MPI_COMM_WORLD, MSG_ANYTIME);
-    Console::log(Console::VVVERB, "Msg ID=%i : listening to tag %i", _handles.back()->id, MSG_ANYTIME);
+    log(V5_DEBG, "Msg ID=%i : listening to tag %i\n", _handles.back()->id, MSG_ANYTIME);
 }
 
 bool MyMpi::isAnytimeTag(int tag) {
     if (tag == MSG_ANYTIME) return true;
-    assert(_tags.count(tag) || Console::fail("Unknown tag %i\n", tag));
+    assert(_tags.count(tag) || log_return_false("Unknown tag %i\n", tag));
     return _tags[tag].anytime;
 }
 
@@ -197,7 +197,7 @@ void MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::vecto
     }
     handle.tag = tag;
 
-    Console::log(Console::VVVERB, "Msg ID=%i dest=%i tag=%i size=%i", handle.id, 
+    log(V5_DEBG, "Msg ID=%i dest=%i tag=%i size=%i\n", handle.id, 
                 recvRank, appTag, handle.sendData.size());
     
     if (selfMessage) {
@@ -226,7 +226,7 @@ MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const
     } else {
         MPICALL(MPI_Send(handle.sendData->data(), handle.sendData->size(), MPI_BYTE, recvRank, tag, communicator), "send"+std::to_string(handle.id))
     }
-    Console::log(Console::VVVERB, "Msg ID=%i sent", handle.id);
+    log(V5_DEBG, "Msg ID=%i sent\n", handle.id);
     return handle;
 }
 */
@@ -304,7 +304,7 @@ std::optional<MessageHandle> MyMpi::poll(float elapsedTime) {
                 // Move new handle from the back to the current position
                 _handles[i] = std::move(_handles.back());
                 _handles.resize(_handles.size()-1);
-                Console::log(Console::VVVERB, "Msg ID=%i : listening to tag %i", _handles[i]->id, MSG_ANYTIME);
+                log(V5_DEBG, "Msg ID=%i : listening to tag %i\n", _handles[i]->id, MSG_ANYTIME);
             } else {
                 // Overwrite this position
                 offset++;
@@ -337,7 +337,7 @@ void MyMpi::testSentHandles() {
         auto& h = *_sent_handles[i];
         if (h.testSent()) {
             // Sending operation completed
-            Console::log(Console::VVVERB, "Msg ID=%i isent", h.id);
+            log(V5_DEBG, "Msg ID=%i isent\n", h.id);
             offset++;
         } else if (offset > 0) {
             _sent_handles[i-offset] = std::move(_sent_handles[i]);
@@ -362,7 +362,7 @@ int MyMpi::rank(MPI_Comm comm) {
 void MyMpi::latencyMonkey() {
     if (_monkey_flags & MONKEY_LATENCY) {
         float duration = 1 * 1000 + 9 * 1000 * Random::rand(); // Sleep between one and ten millisecs
-        //Console::log(Console::VVVERB, "LATENCY_MONKEY %.3fs", 0.001 * 0.001 * duration);
+        //log(V5_DEBG, "LATENCY_MONKEY %.3fs\n", 0.001 * 0.001 * duration);
         usleep(duration); 
     }
 }
@@ -370,7 +370,7 @@ void MyMpi::latencyMonkey() {
 void MyMpi::delayMonkey() {
     if ((_monkey_flags & MONKEY_DELAY) && Random::rand() * 100 <= 1) { // chance of 1:100
         float duration = 1000 * 1000 * Random::rand(); // Sleep for up to one second
-        Console::log(Console::VVVERB, "DELAY_MONKEY %.3fs", 0.001 * 0.001 * duration);
+        log(V5_DEBG, "DELAY_MONKEY %.3fs\n", 0.001 * 0.001 * duration);
         usleep(duration); 
     }
 }

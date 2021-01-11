@@ -2,10 +2,9 @@
 #include <thread>
 #include "assert.h"
 
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "comm/mympi.hpp"
-#include "console_horde_interface.hpp"
 #include "forked_sat_job.hpp"
 #include "anytime_sat_clause_communicator.hpp"
 #include "horde_shared_memory.hpp"
@@ -39,9 +38,9 @@ void ForkedSatJob::appl_start() {
                 getDescription().getAssumptions(getRevision())));
         _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
 
-        Console::log(Console::VVVERB, "%s : beginning to solve", toStr());
+        log(V5_DEBG, "%s : beginning to solve\n", toStr());
         _solver_pid = _solver->run();
-        Console::log(Console::VVERB, "%s : spawned child pid=%i", toStr(), _solver_pid);
+        log(V4_VVER, "%s : spawned child pid=%i\n", toStr(), _solver_pid);
         _time_of_start_solving = Timer::elapsedSeconds();
 
         auto lock = _solver_lock.getLock();
@@ -71,7 +70,7 @@ void ForkedSatJob::appl_updateDescription(int fromRevision) {
     auto lock = _solver_lock.getLock();
     JobDescription& desc = getDescription();
     std::vector<VecPtr> formulaAmendments = desc.getPayloads(fromRevision, desc.getRevision());
-    assert(Console::fail("Not implemented yet!"));
+    assert(log_return_false("Not implemented yet!"));
     //if (solverNotNull()) getSolver()->continueSolving(formulaAmendments, desc.getAssumptions(desc.getRevision()));
 }
 */
@@ -113,7 +112,7 @@ int ForkedSatJob::appl_solved() {
     if (_solver->check()) {
         auto solution = _solver->getSolution();
         result = solution.first;
-        Console::log_send(Console::INFO, getJobTree().getRootNodeRank(), "%s : found result %s", toStr(), 
+        log(LOG_ADD_DESTRANK | V2_INFO, "%s : found result %s", getJobTree().getRootNodeRank(), toStr(), 
                             result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         _internal_result.id = getId();
         _internal_result.result = result;
@@ -154,7 +153,7 @@ bool ForkedSatJob::appl_wantsToBeginCommunication() {
 }
 
 void ForkedSatJob::appl_beginCommunication() {
-    Console::log(Console::VVVVERB, "begincomm");
+    log(V5_DEBG, "begincomm\n");
     if (_clause_comm == NULL) return;
     auto lock = _solver_lock.getLock();
     if (_clause_comm != NULL) 
@@ -163,7 +162,7 @@ void ForkedSatJob::appl_beginCommunication() {
 }
 
 void ForkedSatJob::appl_communicate(int source, JobMessage& msg) {
-    Console::log(Console::VVVVERB, "comm");
+    log(V5_DEBG, "comm\n");
     if (_clause_comm == NULL) return;
     auto lock = _solver_lock.getLock();
     if (_clause_comm != NULL)
@@ -187,12 +186,12 @@ void ForkedSatJob::digestSharing(const std::vector<int>& clauses) {
 }
 
 ForkedSatJob::~ForkedSatJob() {
-    Console::log(Console::VVERB, "%s : enter destructor", toStr());
+    log(V4_VVER, "%s : enter destructor\n", toStr());
     if (_init_thread.joinable()) _init_thread.join();
     _solver = NULL;
     if (_solver_pid != -1 && !Process::didChildExit(_solver_pid)) {
-        Console::log(Console::VVVVERB, "%s : SIGKILLing child pid=%i", toStr(), _solver_pid);
+        log(V5_DEBG, "%s : SIGKILLing child pid=%i\n", toStr(), _solver_pid);
         Process::hardkill(_solver_pid);
     }
-    Console::log(Console::VVERB, "%s : destructed SAT job", toStr());
+    log(V4_VVER, "%s : destructed SAT job\n", toStr());
 }

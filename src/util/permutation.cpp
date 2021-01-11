@@ -2,7 +2,7 @@
 #include <assert.h>
 
 #include "permutation.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "util/random.hpp"
 
 std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, int myRank) {
@@ -22,7 +22,7 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
             int val = pInit.get(pos);
             int nextVal = pInit.get((pos+1) % n);
             intrinsicPartners[val] = nextVal;
-            //Console::log(Console::INFO, "%i => %i", val, nextVal);
+            //log(V2_INFO, "%i => %i\n", val, nextVal);
         }
         outgoingEdges.push_back(intrinsicPartners[myRank]);
     }
@@ -47,11 +47,11 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
         AdjustablePermutation* p = new AdjustablePermutation(n, n*(r+1));
         
         if (myRank == 0) {
-            Console::append(Console::VVERB, "Permutation %i  : ", r);
+            log(V4_VVER, "Permutation %i  : ", r);
             for (int pos = 0; pos < n; pos++) {
-                Console::append(Console::VVERB, "%i ", p->get(pos));
+                log(LOG_NO_PREFIX | V4_VVER, "%i ", p->get(pos));
             }
-            Console::log(Console::VVERB, "");
+            log(LOG_NO_PREFIX | V4_VVER, "\n");
         }
 
         // For each position of the permutation, left to right
@@ -81,16 +81,16 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
                 // Adjust permutation
                 p->adjust(pos, swapVal);
                 p->adjust(swapPos, val);
-                if (myRank == 0) Console::log(Console::VVERB, "SWAP %i@%i <-> %i@%i", swapVal, swapPos, val, pos);
+                if (myRank == 0) log(V4_VVER, "SWAP %i@%i <-> %i@%i\n", swapVal, swapPos, val, pos);
             }
         }
         
         if (myRank == 0) {
-            Console::append(Console::VERB, "Permutation %i' : ", r);
+            log(V3_VERB, "Permutation %i' : ", r);
             for (int pos = 0; pos < n; pos++) {
-                Console::append(Console::VERB, "%i ", p->get(pos));
+                log(LOG_NO_PREFIX | V3_VERB, "%i ", p->get(pos));
             }
-            Console::log(Console::VERB, "");
+            log(V3_VERB, "\n");
         }
 
         // Check that the amount of incoming edges to this node is correct
@@ -98,7 +98,7 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
         for (int pos = 0; pos < n; pos++) {
             if (p->get(pos) == myRank) numIncoming++;
         }
-        assert(numIncoming == 1 || Console::fail("Rank %i : %i incoming edges!", myRank, numIncoming));
+        assert(numIncoming == 1 || log_return_false("Rank %i : %i incoming edges!", myRank, numIncoming));
 
         permutations.push_back(p);
         outgoingEdges.push_back(p->get(myRank));
@@ -134,7 +134,7 @@ AdjustablePermutation::AdjustablePermutation(int n, int seed) {
 
 int AdjustablePermutation::get(int x) const {
     if (x < 0 || x >= _n) {
-        Console::log(Console::WARN, "Invalid input for adj.perm. [0,%i) : %i", _n, x);
+        log(V1_WARN, "Invalid input for adj.perm. [0,%i) : %i\n", _n, x);
         while (x < 0) x += 100*_n;
         x = x % _n;
     }
@@ -186,7 +186,7 @@ int AdjustablePermutation::get(int x) const {
 
 void AdjustablePermutation::adjust(int x, int new_x) {
     if (x < 0 || x >= _n) {
-        Console::log(Console::WARN, "Invalid input for adj.perm. [0,%i) : %i", _n, x);
+        log(V1_WARN, "Invalid input for adj.perm. [0,%i) : %i\n", _n, x);
         while (x < 0) x += 100*_n;
         x = x % _n;
     }

@@ -5,10 +5,9 @@
 #include "threaded_sat_job.hpp"
 
 #include "assert.h"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "comm/mympi.hpp"
-#include "console_horde_interface.hpp"
 #include "anytime_sat_clause_communicator.hpp"
 #include "util/sys/proc.hpp"
 #include "horde_config.hpp"
@@ -35,15 +34,15 @@ void ThreadedSatJob::appl_start() {
         // Initialize Hordesat instance
         Parameters hParams(_params);
         HordeConfig::applyDefault(hParams, *this);
-        _solver = std::unique_ptr<HordeLib>(new HordeLib(hParams, std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(
+        _solver = std::unique_ptr<HordeLib>(new HordeLib(hParams, Logger::getMainInstance().copy(
             "<h-" + std::string(toStr()) + ">", "#" + std::to_string(getId()) + "."
-        ))));
+        )));
         _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
 
-        Console::log(Console::VVVERB, "%s : beginning to solve", toStr());
+        log(V5_DEBG, "%s : beginning to solve\n", toStr());
         const JobDescription& desc = getDescription();
         getSolver()->beginSolving(desc.getPayloads(), desc.getAssumptions(getRevision()));
-        Console::log(Console::VVERB, "%s : finished horde initialization", toStr());
+        log(V4_VVER, "%s : finished horde initialization\n", toStr());
         _time_of_start_solving = Timer::elapsedSeconds();
 
         auto lock = _solver_lock.getLock();
@@ -136,7 +135,7 @@ int ThreadedSatJob::appl_solved() {
     // Did a solver find a result?
     if (result >= 0) {
         _done_locally = true;
-        Console::log_send(Console::INFO, getJobTree().getRootNodeRank(), "%s : found result %s", toStr(), 
+        log(LOG_ADD_DESTRANK | V2_INFO, "%s : found result %s", getJobTree().getRootNodeRank(), toStr(), 
                             result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         _result_code = result;
     }
@@ -156,7 +155,7 @@ void ThreadedSatJob::appl_dumpStats() {
         if (threadTids[i] < 0) continue;
         double cpuRatio; float sysShare;
         bool ok = Proc::getThreadCpuRatio(threadTids[i], cpuRatio, sysShare);
-        if (ok) Console::log(Console::VERB, "%s td.%ld cpuratio=%.3f sys=%.3f", 
+        if (ok) log(V3_VERB, "%s td.%ld cpuratio=%.3f sys=%.3f\n", 
                 toStr(), threadTids[i], cpuRatio, 100*sysShare);
     }
 }
@@ -182,7 +181,7 @@ bool ThreadedSatJob::appl_wantsToBeginCommunication() {
 
 void ThreadedSatJob::appl_beginCommunication() {
     if (!_initialized || getState() != ACTIVE) return;
-    Console::log(Console::VVVVERB, "begincomm");
+    log(V5_DEBG, "begincomm\n");
     if (!_solver_lock.tryLock()) return;
     ((AnytimeSatClauseCommunicator*) _clause_comm)->sendClausesToParent();
     if (getJobTree().isLeaf()) _time_of_last_comm = Timer::elapsedSeconds();
@@ -191,7 +190,7 @@ void ThreadedSatJob::appl_beginCommunication() {
 
 void ThreadedSatJob::appl_communicate(int source, JobMessage& msg) {
     if (!_initialized || getState() != ACTIVE) return;
-    Console::log(Console::VVVVERB, "comm");
+    log(V5_DEBG, "comm\n");
     auto lock = _solver_lock.getLock();
     ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, msg);
 }
@@ -218,8 +217,8 @@ void ThreadedSatJob::digestSharing(const std::vector<int>& clauses) {
 }
 
 ThreadedSatJob::~ThreadedSatJob() {
-    Console::log(Console::VVERB, "%s : enter destructor", toStr());
+    log(V4_VVER, "%s : enter destructor\n", toStr());
     if (_init_thread.joinable()) _init_thread.join();
     if (_destroy_thread.joinable()) _destroy_thread.join();
-    Console::log(Console::VVERB, "%s : destructing SAT job", toStr());
+    log(V4_VVER, "%s : destructing SAT job\n", toStr());
 }

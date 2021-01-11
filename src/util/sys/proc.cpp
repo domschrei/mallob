@@ -7,7 +7,7 @@
 
 #include "proc.hpp"
 #include "util/sys/timer.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 
 robin_hood::unordered_map<long, Proc::CpuInfo> Proc::_cpu_info_per_tid;
 Mutex Proc::_cpu_info_lock;
@@ -123,7 +123,7 @@ bool Proc::getThreadCpuRatio(long tid, double& cpuRatio, float& sysShare) {
 
     auto passedSecs = uptime - (starttime / hertz);
     auto passedSecsDiff = passedSecs - info.passedSecs;
-    Console::log(Console::VVERB, "PROC tid=%lu spent %.2f ticks over %.2f secs", tid, ticksDiff, passedSecsDiff);
+    log(V4_VVER, "PROC tid=%lu spent %.2f ticks over %.2f secs\n", tid, ticksDiff, passedSecsDiff);
 
     cpuRatio = passedSecsDiff == 0 ? 0 : ((ticksDiff / hertz) / passedSecsDiff);
     sysShare = ticksDiff == 0 ? 0 : sTicksDiff / ticksDiff;

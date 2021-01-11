@@ -42,7 +42,6 @@ private:
     std::vector<int> _hop_destinations;
 
     std::thread _mpi_monitor_thread;
-    std::atomic_bool _exiting = false;
 
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& _client_nodes) :
@@ -96,8 +95,6 @@ private:
     bool checkTerminate(float time);
     void createExpanderGraph();
     int getRandomNonSelfWorkerNode();
-
-    friend void mpiMonitor(Worker* worker);
 };
 
 #endif

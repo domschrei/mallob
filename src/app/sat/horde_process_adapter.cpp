@@ -10,7 +10,7 @@
 #include "util/sys/proc.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/process.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 
 HordeProcessAdapter::HordeProcessAdapter(const Parameters& params,
             const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<std::vector<int>>& assumptions) :
@@ -23,7 +23,7 @@ void HordeProcessAdapter::initSharedMemory() {
 
     // Initialize "management" shared memory
     _shmem_id = "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + "." + _params["mpirank"] + ".#" + _params["jobid"];
-    Console::log(Console::VVERB, "Setup base shmem: %s", _shmem_id.c_str());
+    log(V4_VVER, "Setup base shmem: %s\n", _shmem_id.c_str());
     void* mainShmem = SharedMemory::create(_shmem_id, sizeof(HordeSharedMemory));
     _shmem.push_back(std::tuple<std::string, void*, int>(_shmem_id, mainShmem, sizeof(HordeSharedMemory)));
     _hsm = new ((char*)mainShmem) HordeSharedMemory();
@@ -95,7 +95,7 @@ pid_t HordeProcessAdapter::run() {
     // Assemble c-style program arguments
     const char* execName = "mallob_sat_process";
     char* const* argv = _params.asCArgs(execName);
-    Console::log(Console::VVERB, "EXEC child\n");
+    log(V4_VVER, "EXEC child\n");
 
     // FORK: Create a child process
     pid_t res = Process::createChild();
@@ -174,7 +174,7 @@ std::vector<int> HordeProcessAdapter::getCollectedClauses() {
 
 void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses) {
     if (_hsm->doImport && !_hsm->didImport) {
-        Console::log(Console::WARN, "Still digesting previous batch of clauses: discard this batch");
+        log(V1_WARN, "Still digesting previous batch of clauses: discard this batch\n");
         return;
     }
     _hsm->importBufferSize = clauses.size();

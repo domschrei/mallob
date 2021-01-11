@@ -3,7 +3,7 @@
 
 #include "util/sys/threading.hpp"
 #include "util/sys/timer.hpp"
-#include "worker.hpp"
+#include "util/sys/terminator.hpp"
 
 Mutex callLock;
 double doingMpiTasksTime;
@@ -29,20 +29,20 @@ std::string MyMpi::currentCall(double* callStart) {
     return op;
 }
 
-void mpiMonitor(Worker* worker) {
-    while (!worker->_exiting) {
+void mpiMonitor() {
+    while (!Terminator::isTerminating()) {
         double callStart = 0;
         std::string opName = MyMpi::currentCall(&callStart);
         std::string report = "MMPI %i active handles";
         if (callStart < 0.00001 || opName == "") {
-            Console::log(Console::VERB, report.c_str(), MyMpi::getNumActiveHandles());
+            log(V3_VERB, report.c_str(), MyMpi::getNumActiveHandles());
         } else {
             double elapsed = Timer::elapsedSeconds() - callStart;
             report += ", in \"%s\" for %.3fs";
-            Console::log(Console::VERB, report.c_str(), MyMpi::getNumActiveHandles(), opName.c_str(), elapsed);
+            log(V3_VERB, report.c_str(), MyMpi::getNumActiveHandles(), opName.c_str(), elapsed);
             if (elapsed > 60.0) {
                 // Inside some MPI call for a minute
-                Console::fail("MPI call takes too long - aborting");
+                log_return_false("MPI call takes too long - aborting");
                 exit(1);
             }
         }

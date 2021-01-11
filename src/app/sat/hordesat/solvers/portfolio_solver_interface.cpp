@@ -4,7 +4,7 @@
 #include <chrono>
 
 #include "util/sys/threading.hpp"
-#include "app/sat/hordesat/utilities/logging_interface.hpp"
+#include "util/logger.hpp"
 
 #include "portfolio_solver_interface.hpp"
 
@@ -31,17 +31,10 @@ double getTime() {
 	timeCallbackLock.unlock();
 	return time_span.count() / 1000;
 }
-void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ...) {
-	std::string msg = slv->_global_name + " ";
-	msg += fmt;
-	va_list vl;
-	va_start(vl, fmt);
-	slv->_logger.log_va_list(verbosityLevel, msg.c_str(), vl);
-	va_end(vl);
-}
 
 PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup) 
-		: _logger(*setup.logger), _setup(setup), _job_name(setup.jobname), 
+		: _logger(setup.logger->copy("S"+std::to_string(setup.globalId), "S"+std::to_string(setup.globalId))), 
+		  _setup(setup), _job_name(setup.jobname), 
 		  _global_id(setup.globalId), _local_id(setup.localId), 
 		  _diversification_index(setup.diversificationIndex) {
 	updateTimer(_job_name);
@@ -50,6 +43,7 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 
 void PortfolioSolverInterface::interrupt() {
 	setSolverInterrupt();
+	_logger.flush();
 }
 void PortfolioSolverInterface::uninterrupt() {
 	updateTimer(_job_name);

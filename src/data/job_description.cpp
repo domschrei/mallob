@@ -2,7 +2,7 @@
 #include <assert.h>
 
 #include "job_description.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 
 JobDescription::~JobDescription() {
     clearPayload();

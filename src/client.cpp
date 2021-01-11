@@ -9,7 +9,7 @@
 #include "client.hpp"
 #include "util/sat_reader.hpp"
 #include "util/sys/timer.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "util/permutation.hpp"
 #include "util/sys/proc.hpp"
 #include "data/job_transfer.hpp"
@@ -21,19 +21,19 @@
 // Executed by a separate worker thread
 void Client::readAllInstances() {
 
-    Console::log(Console::VERB, "FILE_IO started");
+    log(V3_VERB, "FILE_IO started\n");
 
     for (size_t i = 0; i < _ordered_job_ids.size(); i++) {
 
         if (checkTerminate()) {
-            Console::log(Console::VERB, "FILE_IO stopping");
+            log(V3_VERB, "FILE_IO stopping\n");
             return;
         }
 
         // Keep at most 10 full jobs in memory at any time 
         while (i - _last_introduced_job_idx > 10) {
             if (checkTerminate()) {
-                Console::log(Console::VERB, "FILE_IO stopping");
+                log(V3_VERB, "FILE_IO stopping\n");
                 return;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -42,10 +42,10 @@ void Client::readAllInstances() {
         int jobId = _ordered_job_ids[i];
         JobDescription& job = *_jobs[jobId];
         if (job.isIncremental()) {
-            Console::log(Console::VVERB, "FILE_IO Job #%i is incremental", jobId);
+            log(V4_VVER, "FILE_IO Job #%i is incremental\n", jobId);
         }
 
-        Console::log(Console::VERB, "FILE_IO reading \"%s\" (#%i)", _job_instances[jobId].c_str(), jobId);
+        log(V3_VERB, "FILE_IO reading \"%s\" (#%i)\n", _job_instances[jobId].c_str(), jobId);
 
         if (job.isIncremental()) {
             int revision = 0;
@@ -65,7 +65,7 @@ void Client::readAllInstances() {
             readFormula(_job_instances[jobId], job);
         }
 
-        Console::log(Console::VERB, "FILE_IO read \"%s\" (#%i)", _job_instances[jobId].c_str(), jobId);
+        log(V3_VERB, "FILE_IO read \"%s\" (#%i)\n", _job_instances[jobId].c_str(), jobId);
 
         auto lock = _job_ready_lock.getLock();
         _job_ready[jobId] = true;
@@ -88,31 +88,37 @@ void Client::init() {
         _instance_reader_thread = std::thread(&Client::readAllInstances, this);
     } else {
         _file_adapter = std::unique_ptr<JobFileAdapter>(
-            new JobFileAdapter(_params, ".api/jobs." + std::to_string(internalRank) + "/", 
+            new JobFileAdapter(_params, 
+                Logger::getMainInstance().copy("API", "#0."),
+                ".api/jobs." + std::to_string(internalRank) + "/", 
                 [&](std::shared_ptr<JobDescription> desc) {handleNewJob(desc);}
             )
         );
     }
-    Console::log(Console::INFO, "Client main thread started");
+    log(V2_INFO, "Client main thread started\n");
 
     // Begin listening to incoming messages
     MyMpi::beginListening();
 
-    Console::log(Console::VVERB, "Global init barrier ...");
+    log(V4_VVER, "Global init barrier ...\n");
     MPI_Barrier(MPI_COMM_WORLD);
-    Console::log(Console::VVERB, "Passed global init barrier");
+    log(V4_VVER, "Passed global init barrier\n");
 }
 
 bool Client::checkTerminate() {
 
+    if (Terminator::isTerminating()) {
+        log(V2_INFO, "Terminating.\n");
+        return true;
+    }
     if (Timer::globalTimelimReached(_params)) {
-        Console::log(Console::INFO, "Global timeout: terminating");
+        log(V2_INFO, "Global timeout: terminating\n");
         Terminator::setTerminating();
         return true;
     }
     if (_num_alive_clients == 0) {
         // Send exit message to part of workers
-        Console::log(Console::VERB, "Clients done: sending EXIT to workers");
+        log(V3_VERB, "Clients done: sending EXIT to workers\n");
 
         // Send MSG_EXIT to worker of rank 0, which will broadcast it
         MyMpi::isend(MPI_COMM_WORLD, 0, MSG_DO_EXIT, IntVec({0}));
@@ -138,8 +144,8 @@ void Client::mainProgram() {
             auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::FLAT);
             info.vmUsage *= 0.001 * 0.001;
             info.residentSetSize *= 0.001 * 0.001;
-            Console::log(Console::VVERB, "mainthread_cpu=%i", info.cpu);
-            Console::log(Console::VERB, "mem=%.2fGB", info.residentSetSize);
+            log(V4_VVER, "mainthread_cpu=%i\n", info.cpu);
+            log(V3_VERB, "mem=%.2fGB\n", info.residentSetSize);
             lastStatTime = time;
         }
 
@@ -154,7 +160,7 @@ void Client::mainProgram() {
         if (maybeHandle) {
             // Process message
             auto& handle = maybeHandle.value();
-            Console::log_recv(Console::VVVERB, handle.source, "process msg tag=%i", handle.tag);
+            log(LOG_ADD_SRCRANK | V5_DEBG, "process msg tag=%i", handle.source, handle.tag);
 
             if (handle.tag == MSG_NOTIFY_JOB_DONE) {
                 handleJobDone(handle);
@@ -175,7 +181,7 @@ void Client::mainProgram() {
             }  else if (handle.tag == MSG_DO_EXIT) {
                 handleExit(handle);
             } else {
-                Console::log_recv(Console::WARN, handle.source, "Unknown msg tag %i", handle.tag);
+                log(LOG_ADD_SRCRANK | V1_WARN, "Unknown msg tag %i", handle.source, handle.tag);
             }
         }
 
@@ -185,7 +191,7 @@ void Client::mainProgram() {
         usleep(1000); // 1000 = 1 millisecond
     }
 
-    Console::flush();
+    Logger::getMainInstance().flush();
     fflush(stdout);
 }
 
@@ -196,6 +202,8 @@ int Client::getMaxNumParallelJobs() {
 
 int Client::getNextIntroduceableJob() {
     
+    if (checkTerminate()) return -1;
+
     // Jobs in the incoming queue?
     {
         auto lock = _incoming_job_queue_lock.getLock();
@@ -249,7 +257,7 @@ void Client::introduceJob(std::shared_ptr<JobDescription>& jobPtr) {
 
     if (job.getPayload(0) == nullptr || job.getPayload(0)->size() <= 1) {
         // Some I/O error kept the instance from being read
-        Console::log(Console::WARN, "Skipping job #%i due to previous I/O error", jobId);
+        log(V1_WARN, "Skipping job #%i due to previous I/O error\n", jobId);
         return;
     }
 
@@ -258,7 +266,7 @@ void Client::introduceJob(std::shared_ptr<JobDescription>& jobPtr) {
 
     // Find the job's canonical initial node
     int n = MyMpi::size(MPI_COMM_WORLD) - MyMpi::size(_comm);
-    Console::log(Console::VVERB, "Creating permutation of size %i ...", n);
+    log(V4_VVER, "Creating permutation of size %i ...\n", n);
     AdjustablePermutation p(n, jobId);
     int nodeRank = p.get(0);
 
@@ -266,7 +274,7 @@ void Client::introduceJob(std::shared_ptr<JobDescription>& jobPtr) {
         /*requestedNodeIndex=*/0, /*epoch=*/-1, /*numHops=*/0);
     req.timeOfBirth = job.getArrival();
 
-    Console::log_send(Console::INFO, nodeRank, "Introducing job #%i", jobId);
+    log(LOG_ADD_DESTRANK | V2_INFO, "Introducing job #%i", nodeRank, jobId);
     MyMpi::isend(MPI_COMM_WORLD, nodeRank, MSG_REQUEST_NODE, req);
     _introduced_job_ids.insert(jobId);
     _last_introduced_job_idx++;
@@ -279,7 +287,7 @@ void Client::checkClientDone() {
     // If no jobs left and all introduced jobs done:
     if (!_file_adapter && jobQueueEmpty && _introduced_job_ids.empty()) {
         // All jobs are done
-        Console::log(Console::INFO, "All my jobs are terminated");
+        log(V2_INFO, "All my jobs are terminated\n");
         int myRank = MyMpi::rank(MPI_COMM_WORLD);
         for (int i = MyMpi::size(MPI_COMM_WORLD)-MyMpi::size(_comm); i < MyMpi::size(MPI_COMM_WORLD); i++) {
             if (i != myRank) {
@@ -303,21 +311,21 @@ void Client::handleRequestBecomeChild(MessageHandle& handle) {
 void Client::handleAckAcceptBecomeChild(MessageHandle& handle) {
     JobRequest req = Serializable::get<JobRequest>(handle.recvData);
     JobDescription& desc = *_jobs[req.jobId];
-    assert(desc.getId() == req.jobId || Console::fail("%i != %i", desc.getId(), req.jobId));
-    Console::log_send(Console::VVERB, handle.source, "Sending job desc. of #%i of size %i", desc.getId(), desc.getTransferSize(false));
+    assert(desc.getId() == req.jobId || log_return_false("%i != %i\n", desc.getId(), req.jobId));
+    log(LOG_ADD_DESTRANK | V4_VVER, "Sending job desc. of #%i of size %i", handle.source, desc.getId(), desc.getTransferSize(false));
     _root_nodes[req.jobId] = handle.source;
     auto data = desc.serializeFirstRevision();
 
     int jobId = Serializable::get<int>(data);    
     MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_DESCRIPTION, data);
-    Console::log_send(Console::VVERB, handle.source, "Sent job desc. of #%i of size %i", jobId, data.size());
+    log(LOG_ADD_DESTRANK | V4_VVER, "Sent job desc. of #%i of size %i", handle.source, jobId, data.size());
 }
 
 void Client::handleJobDone(MessageHandle& handle) {
     IntPair recv = Serializable::get<IntPair>(handle.recvData);
     int jobId = recv.first;
     int resultSize = recv.second;
-    Console::log_recv(Console::VVERB, handle.source, "Will receive job result, length %i, for job #%i", resultSize, jobId);
+    log(LOG_ADD_SRCRANK | V4_VVER, "Will receive job result, length %i, for job #%i", handle.source, resultSize, jobId);
     MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_QUERY_JOB_RESULT, handle.recvData);
     MyMpi::irecv(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_RESULT, resultSize);
 }
@@ -329,12 +337,12 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     int resultCode = jobResult.result;
     int revision = jobResult.revision;
 
-    Console::log_recv(Console::VVERB, handle.source, "Received result of job #%i rev. %i, code: %i", jobId, revision, resultCode);
+    log(LOG_ADD_SRCRANK | V4_VVER, "Received result of job #%i rev. %i, code: %i", handle.source, jobId, revision, resultCode);
     JobDescription& desc = *_jobs[jobId];
 
     // Output response time and solution header
-    Console::log(Console::INFO, "RESPONSE_TIME #%i %.6f rev. %i", jobId, Timer::elapsedSeconds() - desc.getArrival(), revision);
-    Console::log(Console::INFO, "SOLUTION #%i %s rev. %i", jobId, resultCode == RESULT_SAT ? "SAT" : "UNSAT", revision);
+    log(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, Timer::elapsedSeconds() - desc.getArrival(), revision);
+    log(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId, resultCode == RESULT_SAT ? "SAT" : "UNSAT", revision);
 
     // Write full solution to file, if desired
     std::string baseFilename = _params.getParam("s2f");
@@ -343,7 +351,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
         std::ofstream file;
         file.open(filename);
         if (!file.is_open()) {
-            Console::log(Console::CRIT, "ERROR: Could not open solution file");
+            log(V0_CRIT, "ERROR: Could not open solution file\n");
         } else {
             file << "c SOLUTION #" << jobId << " rev. " << revision << " ";
             file << (resultCode == RESULT_SAT ? "SAT" : resultCode == RESULT_UNSAT ? "UNSAT" : "UNKNOWN") << "\n"; 
@@ -365,7 +373,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
             // Introduce next revision
             revision++;
             IntVec payload({jobId, revision});
-            Console::log_send(Console::INFO, _root_nodes[jobId], "Introducing #%i rev. %i", jobId, revision);
+            log(LOG_ADD_DESTRANK | V2_INFO, "Introducing #%i rev. %i", _root_nodes[jobId], jobId, revision);
             MyMpi::isend(MPI_COMM_WORLD, _root_nodes[jobId], MSG_NOTIFY_JOB_REVISION, payload);
         } else {
             // Job is completely done
@@ -380,7 +388,7 @@ void Client::handleAbort(MessageHandle& handle) {
 
     IntVec request = Serializable::get<IntVec>(handle.recvData);
     int jobId = request[0];
-    Console::log_recv(Console::INFO, handle.source, "TIMEOUT #%i %.6f", jobId, Timer::elapsedSeconds() - _jobs[jobId]->getArrival());
+    log(LOG_ADD_SRCRANK | V2_INFO, "TIMEOUT #%i %.6f", handle.source, jobId, Timer::elapsedSeconds() - _jobs[jobId]->getArrival());
     
     if (_file_adapter) {
         JobResult result;
@@ -441,20 +449,19 @@ void Client::handleClientFinished(MessageHandle& handle) {
 }
 
 void Client::handleExit(MessageHandle& handle) {
-    Console::forceFlush();
-    exit(1);
+    Terminator::setTerminating();
 }
 
 void Client::readInstanceList(std::string& filename) {
 
     if (filename.empty()) return;
 
-    Console::log(Console::INFO, "Reading instances from file %s", filename.c_str());
+    log(V2_INFO, "Reading instances from file %s\n", filename.c_str());
     std::fstream file;
     file.open(filename, std::ios::in);
     if (!file.is_open()) {
-        Console::log(Console::CRIT, "ERROR: Could not open instance file - exiting");
-        Console::forceFlush();
+        log(V0_CRIT, "ERROR: Could not open instance file - exiting\n");
+        Logger::getMainInstance().flush();
         exit(1);
     }
 
@@ -487,7 +494,7 @@ void Client::readInstanceList(std::string& filename) {
     }
     file.close();
 
-    Console::log(Console::INFO, "Read %i job instances from file %s", _jobs.size(), filename.c_str());
+    log(V2_INFO, "Read %i job instances from file %s\n", _jobs.size(), filename.c_str());
     //std::sort(jobs.begin(), jobs.end(), JobByArrivalComparator());
 }
 
@@ -500,9 +507,9 @@ void Client::readFormula(std::string& filename, JobDescription& job) {
         job.addPayload(formula);
         job.addAssumptions(assumptions);
         job.setNumVars(r.getNumVars());
-        Console::log(Console::VERB, "Read %i lits w/ separators, %i assumptions", formula->size(), assumptions->size());
+        log(V3_VERB, "Read %i lits w/ separators, %i assumptions\n", formula->size(), assumptions->size());
     } else {
-        Console::log(Console::WARN, "File %s could not be opened - skipping #%i", filename.c_str(), job.getId());
+        log(V1_WARN, "File %s could not be opened - skipping #%i\n", filename.c_str(), job.getId());
     }
 }
 
@@ -510,5 +517,10 @@ Client::~Client() {
     if (_instance_reader_thread.joinable())
         _instance_reader_thread.join();
 
-    Console::log(Console::VVERB, "Leaving client destructor");
+    _file_adapter.reset();
+
+    // Merge logs from instance reader
+    Logger::getMainInstance().mergeJobLogs(0);
+
+    log(V4_VVER, "Leaving client destructor\n");
 }

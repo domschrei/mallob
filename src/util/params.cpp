@@ -3,7 +3,7 @@
 #include "string.h"
 
 #include "params.hpp"
-#include "console.hpp"
+#include "logger.hpp"
 
 const char* OPTIONS = 
     "Usage: [mpiexec -np <num-mpi-processes> [mpi-options]] mallob [options]"
@@ -190,7 +190,7 @@ void Parameters::expand() {
 }
 
 void Parameters::printUsage() const {
-    Console::log(Console::INFO, OPTIONS);
+    log(V2_INFO, OPTIONS);
 }
 
 void Parameters::printParams() const {
@@ -205,7 +205,7 @@ void Parameters::printParams() const {
         }
     }
     out = out.substr(0, out.size()-2);
-    Console::log(Console::INFO, "Program options: %s", out.c_str());
+    log(V2_INFO, "Program options: %s\n", out.c_str());
 }
 
 void Parameters::setParam(const char* name) {

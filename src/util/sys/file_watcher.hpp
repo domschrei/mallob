@@ -11,10 +11,12 @@
 #include <thread>
 #include <functional>
 #include <filesystem>
+#include <memory>
 
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/thread_group.hpp"
+#include "util/logger.hpp"
 
 class FileWatcher {
 
@@ -32,21 +34,27 @@ private:
     int _inotify_wd = 0;
     std::thread _thread;
     bool _exiting;
-    std::function<void(const Event&)> _callback;
+    std::function<void(const Event&, Logger& logger)> _callback;
     InitialFilesHandling _init_files_handling;
 
 public:
     FileWatcher() = default;
-    FileWatcher(const std::string& directory, int events, std::function<void(const Event&)> callback, 
-    InitialFilesHandling initFilesHandling = IGNORE) : 
+    FileWatcher(const std::string& directory, int events, 
+        std::function<void(const Event&, Logger&)> callback, Logger& logger,
+        InitialFilesHandling initFilesHandling = IGNORE, size_t numThreads = 4) : 
+    
             _directory(directory),
             _exiting(false), _callback(callback), _init_files_handling(initFilesHandling) {
         
-        _thread = std::thread([events, this]() {
+        _thread = std::thread([events, this, numThreads, &logger]() {
 
             FileUtils::mkdir(_directory);
 
-            ThreadGroup threads;
+            std::vector<Logger> loggers;
+            for (size_t i = 0; i < numThreads; i++) {
+                loggers.push_back(logger.copy(std::to_string(i), ""));
+            }
+            ThreadGroup<Logger> threads(numThreads, loggers);
 
             // Read job files which may already exist
             if (_init_files_handling == TRIGGER_CREATE_EVENT) {
@@ -55,8 +63,10 @@ public:
                     const auto filenameStr = entry.path().filename().string();
                     if (entry.is_regular_file()) {
                         // Trigger CREATE event
-                        Console::log(Console::VVERB, "FileWatcher: File event");
-                        threads.doTask([this, filenameStr]() {_callback(FileWatcher::Event{IN_CREATE, filenameStr});});
+                        log(V4_VVER, "FileWatcher: File event\n");
+                        threads.doTask([this, filenameStr] (Logger& lg) {
+                            _callback(FileWatcher::Event{IN_CREATE, filenameStr}, lg);
+                        });
                     }
                     if (_exiting) return;
                 }
@@ -65,7 +75,7 @@ public:
             // Initialize inotify
             _inotify_fd = inotify_init();
             if (_inotify_fd < 0) {
-                Console::log(Console::CRIT, "Failed to set up inotify, code %i\n", errno);
+                log(V0_CRIT, "Failed to set up inotify, code %i\n", errno);
                 abort();
             }
             
@@ -76,7 +86,7 @@ public:
             // Initialize watcher
             _inotify_wd = inotify_add_watch(_inotify_fd, _directory.c_str(), events);
             if (_inotify_wd < 0) {
-                Console::log(Console::CRIT, "Failed to add inotify watch, code %i\n", errno);
+                log(V0_CRIT, "Failed to add inotify watch, code %i\n", errno);
                 abort();
             }
 
@@ -97,8 +107,8 @@ public:
                     // digest event
                     inotify_event* event = (inotify_event*) &buffer[i];
                     Event ev{event->mask, std::string(event->name, event->len)};
-                    Console::log(Console::VVERB, "FileWatcher: File event");
-                    threads.doTask([this, ev]() {_callback(ev);});
+                    log(V4_VVER, "FileWatcher: File event\n");
+                    threads.doTask([this, ev](Logger& lg) {_callback(ev, lg);});
                     i += eventSize + event->len;
                 }
             }

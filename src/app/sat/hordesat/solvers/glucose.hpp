@@ -10,7 +10,7 @@
 
 #include "portfolio_solver_interface.hpp"
 #include "util/sys/threading.hpp"
-#include "app/sat/hordesat/utilities/logging_interface.hpp"
+#include "util/logger.hpp"
 
 #include "simp/SimpSolver.h"
 
@@ -32,9 +32,6 @@ private:
 	bool nomodel = true;
 	unsigned long long calls = 0;
     
-	// Friends: Callbacks for Lingeling and logging inside these callbacks
-	friend void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ...);
-
 	// clause addition
 	std::vector<std::vector<int> > clausesToAdd;
 	std::vector<std::vector<int> > learnedClausesToAdd;

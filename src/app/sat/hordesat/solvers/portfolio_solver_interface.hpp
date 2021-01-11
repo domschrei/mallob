@@ -17,7 +17,7 @@
 #include <stdexcept>
 #include <functional>
 
-#include "app/sat/hordesat/utilities/logging_interface.hpp"
+#include "util/logger.hpp"
 
 enum SatResult {
 	SAT = 10,
@@ -37,7 +37,7 @@ struct SolvingStatistics {
 struct SolverSetup {
 
 	// General important fields
-	LoggingInterface* logger;
+	Logger* logger;
 	int globalId;
 	int localId; 
 	std::string jobname; 
@@ -68,7 +68,7 @@ typedef std::function<void(std::vector<int>& cls, int solverId)> LearnedClauseCa
 class PortfolioSolverInterface {
 
 protected:
-	LoggingInterface& _logger;
+	Logger _logger;
 	SolverSetup _setup;
 
 
@@ -161,14 +161,13 @@ public:
 	 * Equal to the global ID minus the number of solvers of a different type.
 	 */
 	int getDiversificationIndex() {return _diversification_index;}
+
+	Logger& getLogger() {return _logger;}
 	
 	void interrupt();
 	void uninterrupt();
 	void suspend();
 	void resume();
-
-	// Friend function implemented in .cpp
-	friend void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ...);
 
 private:
 	std::string _global_name;
@@ -180,7 +179,5 @@ private:
 
 // Returns the elapsed time (seconds) since the currently registered solver's start time.
 double getTime();
-
-void slog(PortfolioSolverInterface* slv, int verbosityLevel, const char* fmt, ...);
 
 #endif /* PORTFOLIOSOLVERINTERFACE_H_ */

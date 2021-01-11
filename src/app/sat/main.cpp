@@ -10,30 +10,28 @@
 #include <assert.h>
 
 #include "util/sys/timer.hpp"
-#include "util/console.hpp"
+#include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/sys/shared_memory.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/proc.hpp"
 
 #include "app/sat/horde_process_adapter.hpp"
-#include "app/sat/console_horde_interface.hpp"
 #include "hordesat/horde.hpp"
 
 #ifndef MALLOB_VERSION
 #define MALLOB_VERSION "(dbg)"
 #endif
 
-std::shared_ptr<LoggingInterface> getLog(const Parameters& params) {
-    return std::shared_ptr<LoggingInterface>(new ConsoleHordeInterface(
-            "<h-" + params.getParam("jobstr") + ">", "#" + params.getParam("jobid") + "."));
+Logger getLog(const Parameters& params) {
+    return Logger::getMainInstance().copy("<" + params.getParam("jobstr") + ">", "#" + params.getParam("jobid") + ".");
 }
 
-void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Parameters& programParams) {
+void runSolverEngine(const Logger& log, const Parameters& programParams) {
     
     // Set up "management" block of shared memory created by the parent
     std::string shmemId = "/edu.kit.iti.mallob." + std::to_string(Proc::getParentPid()) + "." + programParams.getParam("mpirank") + ".#" + programParams.getParam("jobid");
-    log->log(Console::VVERB, "Access base shmem: %s", shmemId.c_str());
+    log.log(V4_VVER, "Access base shmem: %s\n", shmemId.c_str());
     HordeSharedMemory* hsm = (HordeSharedMemory*) SharedMemory::access(shmemId, sizeof(HordeSharedMemory));
     assert(hsm != nullptr);
 
@@ -67,7 +65,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
     hsm->isSpawned = true;
     
     // Prepare solver
-    HordeLib hlib(programParams, log);
+    HordeLib hlib(programParams, log.copy("H", "H"));
     hlib.beginSolving(formulae, assumptions);
     bool interrupted = false;
     std::vector<int> solutionVec;
@@ -84,18 +82,18 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
         float time = Timer::elapsedSeconds();
         int sleepStatus = usleep(1000 /*1 millisecond*/);
         time = Timer::elapsedSeconds() - time;
-        if (sleepStatus != 0) log->log(3, "Woken up after %i us\n", (int) (1000*1000*time));
+        if (sleepStatus != 0) log.log(V5_DEBG, "Woken up after %i us\n", (int) (1000*1000*time));
 
         // Terminate
         if (hsm->doTerminate) {
-            log->log(3, "DO terminate\n");
+            log.log(V5_DEBG, "DO terminate\n");
             hlib.dumpStats(/*final=*/true);
             break;
         }
 
         // Interrupt solvers
         if (hsm->doInterrupt && !hsm->didInterrupt) {
-            log->log(3, "DO interrupt\n");
+            log.log(V5_DEBG, "DO interrupt\n");
             hlib.interrupt();
             hsm->didInterrupt = true;
             interrupted = true;
@@ -104,7 +102,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
 
         // Dump stats
         if (!interrupted && hsm->doDumpStats && !hsm->didDumpStats) {
-            log->log(3, "DO dump stats\n");
+            log.log(V5_DEBG, "DO dump stats\n");
             
             hlib.dumpStats(/*final=*/false);
 
@@ -112,7 +110,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
             double cpuShare; float sysShare;
             bool success = Proc::getThreadCpuRatio(Proc::getTid(), cpuShare, sysShare);
             if (success) {
-                log->log(0, "child_main cpuratio=%.3f sys=%.3f", cpuShare, sysShare);
+                log.log(V2_INFO, "child_main cpuratio=%.3f sys=%.3f", cpuShare, sysShare);
             }
 
             // For each solver thread
@@ -122,7 +120,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
                 
                 success = Proc::getThreadCpuRatio(threadTids[i], cpuShare, sysShare);
                 if (success) {
-                    log->log(0, "td.%ld cpuratio=%.3f sys=%.3f", threadTids[i], cpuShare, sysShare);
+                    log.log(V2_INFO, "td.%ld cpuratio=%.3f sys=%.3f", threadTids[i], cpuShare, sysShare);
                 }
             }
 
@@ -132,7 +130,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
 
         // Update role
         if (hsm->doUpdateRole && !hsm->didUpdateRole) {
-            log->log(3, "DO update role\n");
+            log.log(V5_DEBG, "DO update role\n");
             hlib.updateRole(hsm->portfolioRank, hsm->portfolioSize);
             hsm->didUpdateRole = true;
         }
@@ -140,7 +138,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
 
         // Check if clauses should be exported
         if (!interrupted && hsm->doExport && !hsm->didExport) {
-            log->log(3, "DO export clauses\n");
+            log.log(V5_DEBG, "DO export clauses\n");
             // Collect local clauses, put into shared memory
             hsm->exportBufferTrueSize = hlib.prepareSharing(exportBuffer, hsm->exportBufferMaxSize);
             hsm->didExport = true;
@@ -149,7 +147,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
 
         // Check if clauses should be imported
         if (!interrupted && hsm->doImport && !hsm->didImport) {
-            log->log(3, "DO import clauses\n");
+            log.log(V5_DEBG, "DO import clauses\n");
             // Write imported clauses from shared memory into vector
             hlib.digestSharing(importBuffer, hsm->importBufferSize);
             hsm->didImport = true;
@@ -158,7 +156,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
 
         // Check initialization state
         if (!interrupted && !hsm->isInitialized && hlib.isFullyInitialized()) {
-            log->log(3, "DO set initialized\n");
+            log.log(V5_DEBG, "DO set initialized\n");
             hsm->isInitialized = true;
         }
 
@@ -166,7 +164,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
         if (interrupted || hsm->hasSolution) continue;
         int result = hlib.solveLoop();
         if (result >= 0) {
-            log->log(3, "DO write solution\n");
+            log.log(V5_DEBG, "DO write solution\n");
             // Solution found!
             if (result == SatResult::SAT) {
                 // SAT
@@ -186,7 +184,7 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
                 solutionShmem = (char*) SharedMemory::create(solutionShmemId, solutionShmemSize);
                 memcpy(solutionShmem, solutionVec.data(), solutionShmemSize);
             }
-            log->log(3, "DONE write solution\n");
+            log.log(V5_DEBG, "DONE write solution\n");
             hsm->hasSolution = true;
             continue;
         }
@@ -197,12 +195,12 @@ void runSolverEngine(const std::shared_ptr<LoggingInterface>& log, const Paramet
     if (!solutionShmemId.empty()) SharedMemory::free(solutionShmemId, solutionShmem, solutionShmemSize);
     hsm->didTerminate = true;
     SharedMemory::free(shmemId, (char*)hsm, sizeof(HordeSharedMemory));
+
+    log.flush();
     
     // Exit normally, but avoid calling destructors (some threads may be unresponsive)
     raise(SIGTERM);
 }
-
-
 
 int main(int argc, char *argv[]) {
     
@@ -213,13 +211,12 @@ int main(int argc, char *argv[]) {
 
     int rankOfParent = params.getIntParam("mpirank");
 
-    Console::init(rankOfParent, params.getIntParam("v"), params.isNotNull("colors"), 
-            /*threadsafeOutput=*/false, /*quiet=*/params.isNotNull("q"), 
-            /*cPrefix=*/params.isNotNull("mono"), params.getParam("log"));
+    Logger::init(rankOfParent, params.getIntParam("v"), params.isNotNull("colors"), 
+            /*quiet=*/params.isNotNull("q"), /*cPrefix=*/params.isNotNull("mono"), params.getParam("log"));
     
     auto log = getLog(params);
     pid_t pid = Proc::getPid();
-    log->log(Console::VERB, "mallob SAT engine %s pid=%lu", MALLOB_VERSION, pid);
+    log.log(V3_VERB, "mallob SAT engine %s pid=%lu\n", MALLOB_VERSION, pid);
 
     // Initialize signal handlers
     Process::init(rankOfParent, /*leafProcess=*/true);
@@ -229,15 +226,15 @@ int main(int argc, char *argv[]) {
         runSolverEngine(log, params);
 
     } catch (const std::exception &ex) {
-        log->log(Console::CRIT, "Unexpected ERROR: \"%s\" - aborting", ex.what());
-        Console::forceFlush();
+        log.log(V0_CRIT, "Unexpected ERROR: \"%s\" - aborting\n", ex.what());
+        log.flush();
         exit(1);
     } catch (...) {
-        log->log(Console::CRIT, "Unexpected ERROR - aborting");
-        Console::forceFlush();
+        log.log(V0_CRIT, "Unexpected ERROR - aborting\n");
+        log.flush();
         exit(1);
     }
 
-    Console::log(Console::INFO, "Exiting");
-    Console::flush();
+    log.log(V2_INFO, "Exiting\n");
+    log.flush();
 }

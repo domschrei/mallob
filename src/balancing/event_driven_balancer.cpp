@@ -6,15 +6,15 @@
 EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params) : Balancer(comm, params) {
     _last_balancing = 0;
 
-    Console::log(Console::VVERB, "BLC_TREE_NORMAL parent: %i", getParentRank(false));
-    Console::append(Console::VVERB, "BLC_TREE_NORMAL children: ");
-    for (int child : getChildRanks(false)) Console::append(Console::VVERB, "%i ", child);
-    Console::log(Console::VVERB, ".");
+    log(V4_VVER, "BLC_TREE_NORMAL parent: %i\n", getParentRank(false));
+    log(V4_VVER, "BLC_TREE_NORMAL children: ");
+    for (int child : getChildRanks(false)) log(LOG_NO_PREFIX | V4_VVER, "%i ", child);
+    log(V4_VVER, ".\n");
 
-    Console::log(Console::VVERB, "BLC_TREE_REVERSED parent: %i", getParentRank(true));
-    Console::append(Console::VVERB, "BLC_TREE_REVERSED children: ");
-    for (int child : getChildRanks(true)) Console::append(Console::VVERB, "%i ", child);
-    Console::log(Console::VVERB, ".");
+    log(V4_VVER, "BLC_TREE_REVERSED parent: %i\n", getParentRank(true));
+    log(V4_VVER, "BLC_TREE_REVERSED children: ");
+    for (int child : getChildRanks(true)) log(LOG_NO_PREFIX | V4_VVER, "%i ", child);
+    log(V4_VVER, ".\n");
 }
 
 bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& jobs) {
@@ -35,7 +35,7 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
                 // Job is registered in state with non-zero demand: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
-                    Console::log(Console::VVERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, _job_epochs[id]);
+                    log(V4_VVER, "JOB_EVENT #%i demand=%i (je=%i)\n", ev.jobId, ev.demand, _job_epochs[id]);
                     _job_epochs[id]++;
                 }    
             }
@@ -52,7 +52,7 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
                 // Not contained yet in state: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
-                    Console::log(Console::VVERB, "JOB_EVENT #%i demand=%i (je=%i)", ev.jobId, ev.demand, epoch);
+                    log(V4_VVER, "JOB_EVENT #%i demand=%i (je=%i)\n", ev.jobId, ev.demand, epoch);
                     _job_epochs[id]++;
                 } 
             }
@@ -67,14 +67,14 @@ bool EventDrivenBalancer::handle(MessageHandle& handle) {
     if (handle.tag != MSG_BROADCAST_DATA && handle.tag != MSG_REDUCE_DATA)
         return false;
     
-    Console::log(Console::VVVERB, "BLC: handle");
+    log(V5_DEBG, "BLC: handle\n");
 
     int sender = handle.source;
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
     EventMap data = Serializable::get<EventMap>(handle.recvData);
     bool done = false;
 
-    //Console::log(Console::VERB, "BLC MSG");
+    //log(V3_VERB, "BLC MSG\n");
     if (handle.tag == MSG_REDUCE_DATA) {
 
         bool reversedTree = sender < myRank;
@@ -106,7 +106,7 @@ bool EventDrivenBalancer::reduceIfApplicable(int which) {
     // Enough time passed since last balancing?
     if (Timer::elapsedSeconds() - _last_balancing < _params.getFloatParam("p")) return false;
 
-    if (which == BOTH) Console::log(Console::VVERB, "Initiate balancing (%i diffs)", _diffs.getEntries().size());
+    if (which == BOTH) log(V4_VVER, "Initiate balancing (%i diffs)\n", _diffs.getEntries().size());
 
     // Send to according parents.
     bool done = false;
@@ -133,7 +133,7 @@ bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
         
         // Send to other root
         MyMpi::isend(MPI_COMM_WORLD, getRootRank(!reversedTree), MSG_BROADCAST_DATA, data);
-        Console::log_send(Console::VVVERB, getRootRank(!reversedTree), "BLC root handshake");
+        log(LOG_ADD_DESTRANK | V5_DEBG, "BLC root handshake", getRootRank(!reversedTree));
             
         // Broadcast and digest
         broadcast(data, reversedTree);
@@ -143,7 +143,7 @@ bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
 
         // Send to actual parent
         MyMpi::isend(MPI_COMM_WORLD, parent, MSG_REDUCE_DATA, data);
-        //Console::log_send(Console::VERB, parent, "RED");
+        //log(LOG_ADD_DESTRANK | V3_VERB, parent, "RED");
     }
 
     return done;     
@@ -176,7 +176,7 @@ void EventDrivenBalancer::broadcast(const EventMap& data, bool reversedTree) {
     for (int child : getChildRanks(reversedTree)) {
         // Send to actual child
         MyMpi::isend(MPI_COMM_WORLD, child, MSG_BROADCAST_DATA, data);
-        //Console::log_send(Console::VERB, child, "BRC");
+        //log(LOG_ADD_DESTRANK | V3_VERB, child, "BRC");
     }
 }
 
@@ -290,10 +290,10 @@ float EventDrivenBalancer::getPriority(int jobId) {
 
 robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
 
-    Console::log(Console::VVVERB, "BLC: calc result");
+    log(V5_DEBG, "BLC: calc result\n");
 
     int rank = MyMpi::rank(MPI_COMM_WORLD);
-    int verb = rank == 0 ? Console::VVERB : Console::VVVVERB;  
+    int verb = rank == 0 ? V4_VVER : V5_DEBG;  
 
     robin_hood::unordered_map<int, int> volumes;
 
@@ -305,18 +305,18 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
         assert(ev.demand >= 0);
         if (ev.demand == 0) continue;
         
-        assert((ev.priority > 0 && ev.priority <= 1) || Console::fail("Job event for #%i has priority %.2f!", ev.jobId, ev.priority));
+        assert((ev.priority > 0 && ev.priority <= 1) || log_return_false("Job event for #%i has priority %.2f!", ev.jobId, ev.priority));
 
         numJobs++;
         aggregatedDemand += (ev.demand-1) * ev.priority;
         assignMsg += "#" + std::to_string(ev.jobId) + "=" + std::to_string(ev.demand) + " ";
     }
-    Console::log(verb, "BLC e=%i demand={%s}", _balancing_epoch, assignMsg.c_str());
+    log(verb, "BLC e=%i demand={%s}\n", _balancing_epoch, assignMsg.c_str());
     float totalAvailVolume = MyMpi::size(_comm) * _load_factor - numJobs;
 
     // 2a. Bail out if the elementary demand of each job cannot be met
     if (totalAvailVolume < 0) {
-        Console::log(verb, "BLC Too many jobs: bailing out, assigning 1 to each job");
+        log(verb, "BLC Too many jobs: bailing out, assigning 1 to each job\n");
         for (const auto& [jobId, job] : _jobs_being_balanced) {
             if (_states.getEntries().count(jobId) && getNewDemand(jobId) > 0)
                 volumes[jobId] = 1;
@@ -343,21 +343,21 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
     }
     assignMsg = " ";
     for (const auto& [jobId, a] : assignments) {
-        assert(a >= 0 || a <= totalAvailVolume || Console::fail("Invalid assignment %.3f for job %i!", a, jobId));
-        assignMsg += "#" + std::to_string(jobId) + "=" + Console::floatToStr(a, 2) + " ";
+        assert(a >= 0 || a <= totalAvailVolume || log_return_false("Invalid assignment %.3f for job %i!", a, jobId));
+        assignMsg += "#" + std::to_string(jobId) + "=" + Logger::floatToStr(a, 2) + " ";
     }
-    Console::log(verb, "BLC e=%i init_assign={%s}", _balancing_epoch, assignMsg.c_str());
+    log(verb, "BLC e=%i init_assign={%s}\n", _balancing_epoch, assignMsg.c_str());
 
     // 3. Calculate final floating-point assignments for all jobs
 
-    Console::log(verb, "BLC e=%i init_assigned=%.3f", 
+    log(verb, "BLC e=%i init_assigned=%.3f\n", 
         _balancing_epoch, assignedResources);
     
     // Atomic job assignments are already subtracted from _total_avail_volume
     // and are not part of the all-reduced assignedResources either
     float remainingResources = totalAvailVolume - assignedResources;
     if (remainingResources < 0.1) remainingResources = 0; // too low a remainder to make a difference
-    Console::log(verb, "BLC e=%i remaining=%.3f", _balancing_epoch, remainingResources);
+    log(verb, "BLC e=%i remaining=%.3f\n", _balancing_epoch, remainingResources);
 
     for (const auto& [jobId, ev] : _states.getEntries()) {
         if (ev.demand <= 1) continue;
@@ -390,9 +390,9 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
     }
     assignMsg = " ";
     for (const auto& e : assignments) {
-        assignMsg += "#" + std::to_string(e.first) + "=" + Console::floatToStr(e.second, 2) + " ";
+        assignMsg += "#" + std::to_string(e.first) + "=" + Logger::floatToStr(e.second, 2) + " ";
     }
-    Console::log(verb, "BLC e=%i adj_assign={%s}", _balancing_epoch, assignMsg.c_str());
+    log(verb, "BLC e=%i adj_assign={%s}\n", _balancing_epoch, assignMsg.c_str());
 
     // 4. Round job assignments
     robin_hood::unordered_map<int, int> allVolumes;
@@ -442,7 +442,7 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
             // Log iteration
             if (!remainders.isEmpty() && idx <= remainders.size()) {
                 double remainder = (idx < remainders.size() ? remainders[idx] : 1.0);
-                Console::log(verb, "BLC e=%i RND it=%i [%i,%i]=>%i rmd=%.3f util=%.2f pen=%.2f", 
+                log(verb, "BLC e=%i RND it=%i [%i,%i]=>%i rmd=%.3f util=%.2f pen=%.2f\n", 
                                 _balancing_epoch, iterations, lower, upper, idx,
                                 remainder, (float)utilization, p);
             }
@@ -454,7 +454,7 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
                 allVolumes = Rounding::getRoundedAssignments(bestRemainderIdx, sum, remainders, assignments);
 
                 double remainder = (bestRemainderIdx < remainders.size() ? remainders[bestRemainderIdx] : 1.0);
-                Console::log(verb-1, "BLC e=%i DONE n=%i its=%i rmd=%.3f util=%.2f pen=%.2f", 
+                log(verb-1, "BLC e=%i DONE n=%i its=%i rmd=%.3f util=%.2f pen=%.2f\n", 
                             _balancing_epoch, assignments.size(), iterations, remainder, bestUtilization, bestPenalty);
                 break;
 
@@ -482,7 +482,7 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
         msg += " #" + std::to_string(jobId) + ":" + std::to_string(vol);
         sum += vol;
     }
-    Console::log(verb-1, "BLC assigned%s sum=%i", msg.c_str(), sum);
+    log(verb-1, "BLC assigned%s sum=%i\n", msg.c_str(), sum);
 
     // 5. Only remember job assignments that are of a local job
     volumes.clear();

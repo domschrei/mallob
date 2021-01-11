@@ -1,7 +1,7 @@
 
 #include "watchdog.hpp"
 
-#include "util/console.hpp"
+#include "util/logger.hpp"
 
 Watchdog::Watchdog(long checkIntervMillis, float time) {
 
@@ -14,7 +14,7 @@ Watchdog::Watchdog(long checkIntervMillis, float time) {
             if (!_running) break;
             auto lock = _reset_lock.getLock();
             if (Timer::elapsedSeconds() - _last_reset > maxResetSecs) {
-                Console::log(Console::CRIT, "Watchdog: Timeout detected -- aborting");
+                log(V0_CRIT, "Watchdog: Timeout detected -- aborting\n");
                 abort();
             }
         }
