@@ -409,7 +409,7 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
         // Adoption takes place
         std::string jobstr = _job_db.toStr(req.jobId, req.requestedNodeIndex);
         log(LOG_ADD_SRCRANK | V3_VERB, "ADOPT %s oneshot=%i", handle.source, req.toStr().c_str(), oneshot ? 1 : 0);
-        assert(_job_db.isIdle() || log_return_false("Adopting a job, but not idle!"));
+        assert(_job_db.isIdle() || log_return_false("Adopting a job, but not idle!\n"));
 
         // Commit on the job, send a request to the parent
         bool fullTransfer = false;

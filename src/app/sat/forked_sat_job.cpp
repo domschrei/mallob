@@ -70,7 +70,7 @@ void ForkedSatJob::appl_updateDescription(int fromRevision) {
     auto lock = _solver_lock.getLock();
     JobDescription& desc = getDescription();
     std::vector<VecPtr> formulaAmendments = desc.getPayloads(fromRevision, desc.getRevision());
-    assert(log_return_false("Not implemented yet!"));
+    assert(log_return_false("Not implemented yet!\n"));
     //if (solverNotNull()) getSolver()->continueSolving(formulaAmendments, desc.getAssumptions(desc.getRevision()));
 }
 */

@@ -98,7 +98,7 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
         for (int pos = 0; pos < n; pos++) {
             if (p->get(pos) == myRank) numIncoming++;
         }
-        assert(numIncoming == 1 || log_return_false("Rank %i : %i incoming edges!", myRank, numIncoming));
+        assert(numIncoming == 1 || log_return_false("Rank %i : %i incoming edges!\n", myRank, numIncoming));
 
         permutations.push_back(p);
         outgoingEdges.push_back(p->get(myRank));

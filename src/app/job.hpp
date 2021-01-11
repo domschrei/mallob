@@ -223,7 +223,7 @@ public:
     // Getter methods and simple queries
 
     JobState getState() const {return _state;};
-    void assertState(JobState state) const {assert(_state == state || log_return_false("State of %s : %s", toStr(), jobStateToStr()));};
+    void assertState(JobState state) const {assert(_state == state || log_return_false("State of %s : %s\n", toStr(), jobStateToStr()));};
     int getVolume() const {return _volume;}
     float getPriority() const {return _priority;}
     bool hasReceivedDescription() const {return !_serialized_description.empty();};

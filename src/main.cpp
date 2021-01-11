@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
     std::set<int> externalClientRanks;
     int numClients = params.getIntParam("c");
     int numWorkers = numNodes - numClients;
-    assert(numWorkers > 0 || log_return_false("Need at least one worker node!"));
+    assert(numWorkers > 0 || log_return_false("Need at least one worker node!\n"));
     for (int i = 1; i <= numClients; i++)
         externalClientRanks.insert(numNodes-i);
     bool isExternalClient = rank >= numWorkers;

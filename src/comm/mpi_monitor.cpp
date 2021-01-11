@@ -35,14 +35,15 @@ void mpiMonitor() {
         std::string opName = MyMpi::currentCall(&callStart);
         std::string report = "MMPI %i active handles";
         if (callStart < 0.00001 || opName == "") {
+            report += "\n";
             log(V3_VERB, report.c_str(), MyMpi::getNumActiveHandles());
         } else {
             double elapsed = Timer::elapsedSeconds() - callStart;
-            report += ", in \"%s\" for %.3fs";
+            report += ", in \"%s\" for %.3fs\n";
             log(V3_VERB, report.c_str(), MyMpi::getNumActiveHandles(), opName.c_str(), elapsed);
             if (elapsed > 60.0) {
                 // Inside some MPI call for a minute
-                log_return_false("MPI call takes too long - aborting");
+                log_return_false("MPI call takes too long - aborting\n");
                 exit(1);
             }
         }

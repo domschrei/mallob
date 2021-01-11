@@ -9,9 +9,22 @@
 #include <fstream>
 #include <sys/stat.h>
 
+#include "util/logger.hpp"
+
 int FileUtils::mkdir(const std::string& dir) {
+    for (size_t i = 0; i < dir.size(); i++) {
+        if (dir[i] == '/' && i > 0 && i+1 < dir.size()) {
+            std::string subdir(dir.begin(), dir.begin() + i);
+            int res = ::mkdir(subdir.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);   
+            if (res != 0 && errno != EEXIST) {
+                log(V0_CRIT, "mkdir -p \"%s\" failed, errno %i\n", subdir.c_str(), errno);
+                return res;
+            }  
+        }
+    }
     auto res = ::mkdir(dir.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
-    if (res == 0 || res == EEXIST) return 0;
+    if (res == 0 || errno == EEXIST) return 0;
+    log(V0_CRIT, "mkdir -p \"%s\" failed, errno %i\n", dir.c_str(), errno);
     return res;
 }
 

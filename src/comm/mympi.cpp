@@ -31,7 +31,7 @@ void chkerr(int err) {
 }
 
 bool MessageHandle::testSent() {
-    assert(!selfMessage || log_return_false("Attempting to MPI_Test a self message!"));
+    assert(!selfMessage || log_return_false("Attempting to MPI_Test a self message!\n"));
     if (finished) return true;
     int flag = 0;
     MPICALL(MPI_Test(&request, &flag, &status), "testsent" + std::to_string(id))
@@ -55,7 +55,7 @@ bool MessageHandle::testReceived() {
         if (flag) {
             finished = true;
             tag = status.MPI_TAG;
-            assert(status.MPI_SOURCE >= 0 || log_return_false("MPI_SOURCE = %i", status.MPI_SOURCE));
+            assert(status.MPI_SOURCE >= 0 || log_return_false("MPI_SOURCE = %i\n", status.MPI_SOURCE));
             source = status.MPI_SOURCE;
         }
     }

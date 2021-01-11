@@ -305,7 +305,7 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
         assert(ev.demand >= 0);
         if (ev.demand == 0) continue;
         
-        assert((ev.priority > 0 && ev.priority <= 1) || log_return_false("Job event for #%i has priority %.2f!", ev.jobId, ev.priority));
+        assert((ev.priority > 0 && ev.priority <= 1) || log_return_false("Job event for #%i has priority %.2f!\n", ev.jobId, ev.priority));
 
         numJobs++;
         aggregatedDemand += (ev.demand-1) * ev.priority;
@@ -343,7 +343,7 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
     }
     assignMsg = " ";
     for (const auto& [jobId, a] : assignments) {
-        assert(a >= 0 || a <= totalAvailVolume || log_return_false("Invalid assignment %.3f for job %i!", a, jobId));
+        assert(a >= 0 || a <= totalAvailVolume || log_return_false("Invalid assignment %.3f for job %i!\n", a, jobId));
         assignMsg += "#" + std::to_string(jobId) + "=" + Logger::floatToStr(a, 2) + " ";
     }
     log(verb, "BLC e=%i init_assign={%s}\n", _balancing_epoch, assignMsg.c_str());
