@@ -1,4 +1,6 @@
 
+#include <climits>
+
 #include "event_driven_balancer.hpp"
 #include "util/random.hpp"
 #include "balancing/rounding.hpp"
@@ -23,26 +25,28 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
     _jobs_being_balanced = robin_hood::unordered_map<int, Job*>();
     for (const auto& [id, job] : jobs) if (job->getJobTree().isRoot()) {
         
-        if (!_job_epochs.count(id)) {
-            // Completely new!
-            _job_epochs[id] = 1;
-        }
-
-        if (job->getState() == PAST) {
+        if (_job_epochs.count(id) && job->getState() == PAST) {
+            
             // Job might have been active just before: Signal its termination
-            Event ev({id, _job_epochs[id], /*demand=*/0, /*priority=*/0});
+            Event ev({id, /*epoch=*/INT_MAX, /*demand=*/0, /*priority=*/0});
             if (_states.getEntries().count(id) || _diffs.getEntries().count(id)) {
                 // Job is registered, possibly with non-zero demand: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
-                    log(V3_VERB, "JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, _job_epochs[id]);
-                    _job_epochs[id]++;
-                }    
+                    log(V3_VERB, "JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, ev.epoch);
+                    _job_epochs[id] = -1;
+                }
             }
             
-        } else {
+        } else if (job->getState() != PAST) {
+
             // Job participates
             _jobs_being_balanced[id] = job;
+            
+            if (!_job_epochs.count(id)) {
+                // Completely new!
+                _job_epochs[id] = 1;
+            }
 
             // Insert this job as an event, if there is something novel about it
             int epoch = _job_epochs[id];
@@ -193,8 +197,18 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
         // Successful balancing: Bump epoch
         _balancing_epoch++;
 
-        // Clean up entries belonging to terminated jobs
-        _states.removeOldZeros();
+        // Identify terminated jobs
+        auto oldJobIds = _states.removeOldZeros();
+        for (auto jobId : oldJobIds) {
+            _job_epochs[jobId] = -1;
+        }
+        // Remove terminated jobs from states and diffs
+        for (const auto& [jobId, epoch] : _job_epochs) {
+            if (epoch < 0) {
+                _states.remove(jobId);
+                _diffs.remove(jobId);
+            }
+        }
     }
     return anyChange;
 }
