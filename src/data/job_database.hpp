@@ -19,7 +19,6 @@ private:
     float _load_factor;
     float _balance_period;
 
-    EpochCounter _epoch_counter;
     MPI_Comm& _comm;
     std::unique_ptr<Balancer> _balancer;
 
@@ -28,7 +27,7 @@ private:
 
     int _load;
     Job* _current_job;
-    float _last_load_change;
+    float _last_balancing_initiation;
 
     struct SuspendedJobComparator {
         bool operator()(const std::pair<int, float>& left, const std::pair<int, float>& right) {

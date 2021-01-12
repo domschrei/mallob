@@ -18,7 +18,7 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm):
     _wcsecs_per_instance = params.getFloatParam("job-wallclock-limit");
     _cpusecs_per_instance = params.getFloatParam("job-cpu-limit");
     _load = 0;
-    _last_load_change = Timer::elapsedSeconds();
+    _last_balancing_initiation = 0;
     _current_job = NULL;
     _load_factor = params.getFloatParam("l");
     assert(0 < _load_factor && _load_factor <= 1.0);
@@ -355,7 +355,6 @@ void JobDatabase::setLoad(int load, int whichJobId) {
     // Measure time for which worker was {idle,busy}
     float now = Timer::elapsedSeconds();
     //stats.add((load == 0 ? "busyTime" : "idleTime"), now - lastLoadChange);
-    _last_load_change = now;
     assert(has(whichJobId));
     if (load == 1) {
         assert(_current_job == NULL);
@@ -374,12 +373,14 @@ bool JobDatabase::isIdle() const {
 }
 
 bool JobDatabase::isTimeForRebalancing() {
-    return !_balancer->isBalancing() && _epoch_counter.getSecondsSinceLastSync() >= _balance_period;
+    return !_balancer->isBalancing() 
+        && Timer::elapsedSeconds() - _last_balancing_initiation >= _balance_period;
 }
 
 bool JobDatabase::beginBalancing() {
 
     // Initiate balancing procedure
+    _last_balancing_initiation = Timer::elapsedSeconds();
     bool done = _balancer->beginBalancing(_jobs);
     // If nothing to do, finish up balancing
     if (done) finishBalancing();
@@ -405,19 +406,7 @@ bool JobDatabase::continueBalancing(MessageHandle& handle) {
 }
 
 void JobDatabase::finishBalancing() {
-
-    // All collective operations are done; reset synchronized timer
-    _epoch_counter.resetLastSync();
-
     log(MyMpi::rank(MPI_COMM_WORLD) == 0 ? V3_VERB : V5_DEBG, "Balancing completed.\n");
-
-    // Add last slice of idle/busy time 
-    //stats.add((load == 1 ? "busyTime" : "idleTime"), Timer::elapsedSeconds() - lastLoadChange);
-    _last_load_change = Timer::elapsedSeconds();
-
-    // Advance to next epoch
-    _epoch_counter.increment();
-    log(V5_DEBG, "Advancing to epoch %i\n", _epoch_counter.getEpoch());
 }
 
 robin_hood::unordered_map<int, int> JobDatabase::getBalancingResult() {

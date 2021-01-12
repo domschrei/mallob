@@ -199,7 +199,8 @@ void Worker::mainProgram() {
             lastBalanceCheckTime = time;
             if (_job_db.isTimeForRebalancing()) {
                 if (_job_db.beginBalancing()) applyBalancing();
-            } else if (_job_db.continueBalancing()) applyBalancing();
+            } 
+            if (_job_db.continueBalancing()) applyBalancing();
         } 
 
         // Check active job
