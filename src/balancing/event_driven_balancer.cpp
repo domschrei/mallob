@@ -195,9 +195,6 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
 
         // Clean up entries belonging to terminated jobs
         _states.removeOldZeros();
-
-        // Begin new reduction, if necessary and enough time passed.
-        reduceIfApplicable(BOTH);
     }
     return anyChange;
 }

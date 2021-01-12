@@ -34,7 +34,10 @@ class EventMap : public Reduceable {
 
 private:
     std::map<int, Event> _map;
+    robin_hood::unordered_map<int, float> _recently_removed_jobs;
+
     const int _size_per_event = 3*sizeof(int)+sizeof(float);
+
 public:
     virtual std::vector<uint8_t> serialize() const override {
         std::vector<uint8_t> result(_map.size() * _size_per_event);
@@ -114,6 +117,8 @@ public:
     }
 
     bool insertIfNovel(const Event& ev) {
+        // Do not insert jobs which have been recently removed
+        if (_recently_removed_jobs.count(ev.jobId)) return false;
         // Update map if no such job entry yet or existing entry is older
         if (!_map.count(ev.jobId) || (ev.dominates(_map[ev.jobId]) && 
                 (ev.demand != _map[ev.jobId].demand || ev.priority != _map[ev.jobId].priority)
@@ -153,15 +158,28 @@ public:
         return change;
     }
     void removeOldZeros() {
+        float time = Timer::elapsedSeconds();
+        
+        // Remove entries for which demand and priority are set to zero
         std::vector<int> keysToErase;
         for (const auto& [jobId, ev] : _map) {
             if (ev.demand == 0 && ev.priority <= 0) {
                 // Filtered out
                 keysToErase.push_back(jobId);
+                // Remember for some time that this job was removed
+                _recently_removed_jobs[jobId] = time;
             }
         }
-        // Remove all filtered keys which are old enough
         for (auto key : keysToErase) _map.erase(key);
+
+        // Remove job IDs from recently removed jobs if they are old enough
+        keysToErase.clear();
+        for (const auto& [jobId, removedTime] : _recently_removed_jobs) {
+            if (time - removedTime > 30.f) {
+                keysToErase.push_back(jobId);
+            }
+        }
+        for (auto key : keysToErase) _recently_removed_jobs.erase(key);
     }
     bool operator==(const EventMap& other) const {
         return getEntries() == other.getEntries();
