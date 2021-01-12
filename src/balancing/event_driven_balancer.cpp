@@ -35,7 +35,7 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
                 // Job is registered in state with non-zero demand: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
-                    log(V4_VVER, "JOB_EVENT #%i demand=%i (je=%i)\n", ev.jobId, ev.demand, _job_epochs[id]);
+                    log(V3_VERB, "JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, _job_epochs[id]);
                     _job_epochs[id]++;
                 }    
             }
@@ -54,7 +54,7 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
                 // Not contained yet in state: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
-                    log(V4_VVER, "JOB_EVENT #%i demand=%i (je=%i)\n", ev.jobId, ev.demand, epoch);
+                    log(V3_VERB, "JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, _job_epochs[id]);
                     _job_epochs[id]++;
                 } 
             }
@@ -82,7 +82,7 @@ bool EventDrivenBalancer::handle(MessageHandle& handle) {
         bool reversedTree = sender < myRank;
 
         // Apply reduction
-        data.filterBy(_states);
+        //data.filterBy(_states);
         _diffs.updateBy(data);
         
         // Forward reduction, switch to broadcast as necessary
