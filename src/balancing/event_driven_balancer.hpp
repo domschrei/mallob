@@ -197,6 +197,8 @@ private:
     EventMap _states;
     EventMap _diffs;
     robin_hood::unordered_map<int, int> _job_epochs;
+    robin_hood::unordered_map<int, float> _time_of_termination;
+    
     float _last_balancing;
 
     std::list<EventMap> _recent_broadcasts_normal;

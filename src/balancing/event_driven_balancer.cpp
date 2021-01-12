@@ -21,6 +21,19 @@ EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params) : B
 
 bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& jobs) {
 
+    // Remove jobs which terminated some time ago
+    float now = Timer::elapsedSeconds();
+    std::vector<int> removedJobs;
+    for (const auto& [jobId, time] : _time_of_termination) {
+        if (now - time >= 60.f) {
+            removedJobs.push_back(jobId);
+        }
+    }
+    for (int jobId : removedJobs) {
+        _time_of_termination.erase(jobId);
+        _states.remove(jobId);
+    }
+
     // Identify jobs to balance
     _jobs_being_balanced = robin_hood::unordered_map<int, Job*>();
     for (const auto& [id, job] : jobs) if (job->getJobTree().isRoot()) {
@@ -198,7 +211,12 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
         _balancing_epoch++;
 
         // Remove terminated jobs
-        //_states.removeOldZeros();
+        float time = Timer::elapsedSeconds();
+        for (const auto& [jobId, ev] : data.getEntries()) {
+            if (ev.demand == 0 && ev.priority <= 0.0) {
+                _time_of_termination[jobId] = time;
+            }
+        }
     }
     return anyChange;
 }
@@ -497,6 +515,5 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
 
 void EventDrivenBalancer::forget(int jobId) {
     _job_epochs.erase(jobId);
-    _states.remove(jobId);
     Balancer::forget(jobId);
 }
