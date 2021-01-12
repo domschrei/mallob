@@ -213,7 +213,7 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
 
         // Remove terminated jobs
         float time = Timer::elapsedSeconds();
-        for (const auto& [jobId, ev] : _states.getEntries()) {
+        for (const auto& [jobId, ev] : data.getEntries()) {
             if (ev.demand == 0 && ev.priority <= 0.0) {
                 log(V3_VERB, "BLC mark termination of %i\n", jobId);
                 _time_of_termination[jobId] = time;
