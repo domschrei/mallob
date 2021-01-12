@@ -31,8 +31,8 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
         if (job->getState() == PAST) {
             // Job might have been active just before: Signal its termination
             Event ev({id, _job_epochs[id], /*demand=*/0, /*priority=*/0});
-            if (_states.getEntries().count(id)) {
-                // Job is registered in state with non-zero demand: try to insert into diffs map
+            if (_states.getEntries().count(id) || _diffs.getEntries().count(id)) {
+                // Job is registered, possibly with non-zero demand: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
                     log(V3_VERB, "JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, _job_epochs[id]);

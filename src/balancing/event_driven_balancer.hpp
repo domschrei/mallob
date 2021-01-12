@@ -129,10 +129,18 @@ public:
     void filterBy(const EventMap& otherMap) {
         std::vector<int> keysToErase;
         for (const auto& [jobId, ev] : _map) {
-            if (otherMap.getEntries().count(jobId) 
-                && otherMap.getEntries().at(jobId).epoch >= ev.epoch) {
-                // Filtered out
-                keysToErase.push_back(jobId);
+            if (otherMap.getEntries().count(jobId)) {
+                auto& otherEv = otherMap.getEntries().at(jobId);
+                if (otherEv.epoch == ev.epoch) {
+                    assert(otherEv.priority == ev.priority
+                        || log_return_false(V0_CRIT, "#%i e=%i : prio %.2f != %.2f!\n", jobId, ev.epoch, ev.priority, otherEv.priority));
+                    assert(otherEv.demand == ev.demand
+                        || log_return_false(V0_CRIT, "#%i e=%i : demand %i != %i!\n", jobId, ev.epoch, ev.demand, otherEv.demand));
+                }
+                if (otherEv.epoch >= ev.epoch) {
+                    // Filtered out
+                    keysToErase.push_back(jobId);
+                }
             }
         }
         for (auto key : keysToErase) _map.erase(key);
@@ -145,20 +153,15 @@ public:
         return change;
     }
     void removeOldZeros() {
-        int minEpochDiff = 0;
-        int latestEpoch = 0;
         std::vector<int> keysToErase;
         for (const auto& [jobId, ev] : _map) {
             if (ev.demand == 0 && ev.priority <= 0) {
                 // Filtered out
                 keysToErase.push_back(jobId);
             }
-            latestEpoch = std::max(latestEpoch, ev.epoch);
         }
         // Remove all filtered keys which are old enough
-        for (auto key : keysToErase) {
-            if (latestEpoch - _map[key].epoch >= minEpochDiff) _map.erase(key);
-        }
+        for (auto key : keysToErase) _map.erase(key);
     }
     bool operator==(const EventMap& other) const {
         return getEntries() == other.getEntries();
