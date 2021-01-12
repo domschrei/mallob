@@ -30,6 +30,7 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
         }
     }
     for (int jobId : removedJobs) {
+        log(V3_VERB, "BLC apply termination of %i\n", jobId);
         _time_of_termination.erase(jobId);
         _states.remove(jobId);
     }
@@ -212,8 +213,9 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
 
         // Remove terminated jobs
         float time = Timer::elapsedSeconds();
-        for (const auto& [jobId, ev] : data.getEntries()) {
+        for (const auto& [jobId, ev] : _states.getEntries()) {
             if (ev.demand == 0 && ev.priority <= 0.0) {
+                log(V3_VERB, "BLC mark termination of %i\n", jobId);
                 _time_of_termination[jobId] = time;
             }
         }
