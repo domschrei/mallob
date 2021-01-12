@@ -128,11 +128,11 @@ public:
     }
     void filterBy(const EventMap& otherMap) {
         std::vector<int> keysToErase;
-        for (const auto& entry : _map) {
-            if (otherMap.getEntries().count(entry.first) 
-                && otherMap.getEntries().at(entry.first).epoch >= entry.second.epoch) {
+        for (const auto& [jobId, ev] : _map) {
+            if (otherMap.getEntries().count(jobId) 
+                && otherMap.getEntries().at(jobId).epoch >= ev.epoch) {
                 // Filtered out
-                keysToErase.push_back(entry.first);
+                keysToErase.push_back(jobId);
             }
         }
         for (auto key : keysToErase) _map.erase(key);

@@ -48,7 +48,9 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
             int epoch = _job_epochs[id];
             int demand = std::max(1, getDemand(*job));
             Event ev({id, epoch, demand, job->getPriority()});
-            if (!_states.getEntries().count(id) || ev.demand != _states.getEntries().at(id).demand) {
+            if (!_states.getEntries().count(id) 
+                    || ev.demand != _states.getEntries().at(id).demand 
+                    || ev.priority != _states.getEntries().at(id).priority) {
                 // Not contained yet in state: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
@@ -193,7 +195,6 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
 
         // Clean up entries belonging to terminated jobs
         _states.removeOldZeros();
-        _diffs.removeOldZeros();
 
         // Begin new reduction, if necessary and enough time passed.
         reduceIfApplicable(BOTH);
