@@ -497,5 +497,6 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
 
 void EventDrivenBalancer::forget(int jobId) {
     _job_epochs.erase(jobId);
+    _states.remove(jobId);
     Balancer::forget(jobId);
 }
