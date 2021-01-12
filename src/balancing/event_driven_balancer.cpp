@@ -34,7 +34,7 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
                     log(V3_VERB, "JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, ev.epoch);
-                    _job_epochs[id] = -1;
+                    _job_epochs.erase(id);
                 }
             }
             
@@ -197,18 +197,8 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
         // Successful balancing: Bump epoch
         _balancing_epoch++;
 
-        // Identify terminated jobs
-        auto oldJobIds = _states.removeOldZeros();
-        for (auto jobId : oldJobIds) {
-            _job_epochs[jobId] = -1;
-        }
-        // Remove terminated jobs from states and diffs
-        for (const auto& [jobId, epoch] : _job_epochs) {
-            if (epoch < 0) {
-                _states.remove(jobId);
-                _diffs.remove(jobId);
-            }
-        }
+        // Remove terminated jobs
+        //_states.removeOldZeros();
     }
     return anyChange;
 }
