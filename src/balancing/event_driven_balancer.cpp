@@ -21,20 +21,6 @@ EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params) : B
 
 bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& jobs) {
 
-    // Remove jobs which terminated some time ago
-    float now = Timer::elapsedSeconds();
-    std::vector<int> removedJobs;
-    for (const auto& [jobId, time] : _time_of_termination) {
-        if (now - time >= 60.f) {
-            removedJobs.push_back(jobId);
-        }
-    }
-    for (int jobId : removedJobs) {
-        log(V3_VERB, "BLC apply termination of %i\n", jobId);
-        _time_of_termination.erase(jobId);
-        _states.remove(jobId);
-    }
-
     // Identify jobs to balance
     _jobs_being_balanced = robin_hood::unordered_map<int, Job*>();
     for (const auto& [id, job] : jobs) if (job->getJobTree().isRoot()) {
@@ -213,21 +199,6 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
     if (anyChange) {
         // Successful balancing: Bump epoch
         _balancing_epoch++;
-
-        // Remove terminated jobs
-        float time = Timer::elapsedSeconds();
-        for (const auto& [jobId, ev] : data.getEntries()) {
-            if (ev.demand == 0 && ev.priority <= 0.0) {
-                log(V3_VERB, "BLC mark termination of %i\n", jobId);
-                _time_of_termination[jobId] = time;
-            }
-        }
-
-        // Force remove any entries associated with terminated jobs
-        for (const auto& [jobId, time] : _time_of_termination) {
-            _states.remove(jobId);
-            _diffs.remove(jobId);
-        }
     }
     return anyChange;
 }
@@ -320,6 +291,30 @@ float EventDrivenBalancer::getPriority(int jobId) {
 }
 
 robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
+
+    float now = Timer::elapsedSeconds();
+    
+    // Mark terminated jobs
+    for (const auto& [jobId, ev] : _states.getEntries()) {
+        if (ev.epoch == INT_MAX) {
+            log(V3_VERB, "BLC mark termination of %i\n", jobId);
+            _time_of_termination[jobId] = now;
+        }
+    }
+    // Force remove any entries associated with terminated jobs
+    // Finalize jobs which terminated some time ago
+    std::vector<int> removedJobs;
+    for (const auto& [jobId, time] : _time_of_termination) {
+        _states.remove(jobId);
+        _diffs.remove(jobId);
+        if (now - time >= 60.f) {
+            removedJobs.push_back(jobId);
+        }
+    }
+    for (int jobId : removedJobs) {
+        log(V3_VERB, "BLC apply termination of %i\n", jobId);
+        _time_of_termination.erase(jobId);
+    }
 
     log(V5_DEBG, "BLC: calc result\n");
 
