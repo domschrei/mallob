@@ -253,7 +253,7 @@ def main():
                         # Introduce next job
                         if c.has_next_job():
                             active_jobs[i] = c.get_next_job()
-                            introduce_job(active_jobs[i])
+                            introduce_job(active_jobs[i], options)
                         else:
                             log("%s completed", (c._name,))
                             active_jobs[i] = None
