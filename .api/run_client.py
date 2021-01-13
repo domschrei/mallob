@@ -4,13 +4,14 @@ import random
 import numpy
 import time
 from scipy.stats import truncnorm
+from scipy.stats import lognorm
 import os.path
 from os import listdir
 from os.path import isfile, join
 import json
 import copy
 from optparse import OptionParser
-
+import psutil
 
 """
 Given an integer inst_id, returns a SAT instance associated to that ID.
@@ -108,48 +109,72 @@ def log(msg, args=()):
     print("[%.2f]" % (elapsed_time(),), msg % args)
 
 """
-Truncates a normal distribution at lower and upper limits.
+Returns a single random sample from a normal distribution truncated at lower and upper limits.
 """
 def get_truncated_normal(mean=0, sd=1, low=0, upp=10):
     return int(truncnorm((low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd).rvs().round())
 
 """
+Returns a single random sample from a log-normal distribution truncated at lower and upper limits.
+"""
+def get_lognorm(s, low=1, upp=100):
+    val = lognorm(s).rvs()
+    return max(low, min(upp, int(val.round())))
+
+"""
 Creates a new client with a random stream of jobs.
 """
-def create_random_client(options, arrival_time):
+def create_random_clients(options, arrival_time):
     global global_job_id, global_client_id
     
-    c = Client("c-" + str(global_client_id), arrival_time, priority=1.0)
+    stream_width = get_lognorm(options.shape_stream_width, low=options.min_stream_width, upp=options.max_stream_width)
+    cs = []
+
+    for i in range(stream_width):
+        c = Client("c" + str(global_client_id) + "_" + str(i), arrival_time, priority=1.0)
+        
+        streamlen = get_truncated_normal(options.mean_stream_length, options.stddev_stream_length, options.min_stream_length, options.max_stream_length)
+        for _ in range(streamlen):
+            c.add_job_to_stream(get_instance_filename(options, global_job_id))
+            global_job_id += 1
+        cs += [c]
+
     global_client_id += 1
-    
-    streamlen = get_truncated_normal(options.mean_stream_length, options.stddev_stream_length, options.min_stream_length, options.max_stream_length)
-    for _ in range(streamlen):
-        c.add_job_to_stream(get_instance_filename(options, global_job_id))
-        global_job_id += 1
-    
-    return c
+    return cs
 
 """
 Takes a job instance and writes a JSON file into the mallob API directory.
 """
-def introduce_job(job):
-    log("%s introduces job %s (%s)", (job._user, job._name, job._filename))
-    with open(".api/jobs.0/new/" + job.get_json_filename(), "w") as f:
+def introduce_job(job, options):
+    p = int(random.random() * options.num_client_processes)
+    log("%s introduces job %s (%s) to .api/jobs.%i/", (job._user, job._name, job._filename, p))
+    with open(".api/jobs." + str(p) + "/new/" + job.get_json_filename(), "w") as f:
         f.write(job.to_json())
 
 
 def main():
+    global global_starttime
+
     usage = "usage: %prog [options] <benchmark_file>"
     parser = OptionParser(usage=usage)
-    parser.add_option("-c", "--num-clients",          type="int",   dest="num_clients",          default="1",   help="number of clients arriving")
+    
+    parser.add_option("-n", "--num-clients",          type="int",   dest="num_clients",          default="1",   help="number of clients arriving")
+    parser.add_option("-i", "--interarrival-time",    type="float", dest="interarrival_time",    default="10",  help="interarrival time of clients")
+    parser.add_option("-p", "--num-client-processes", type="int",   dest="num_client_processes", default="1",   help="number of client processes operating mallob's API")
+    
     parser.add_option("-m", "--min-stream-length",    type="int",   dest="min_stream_length",    default="1",   help="minimum length of any job stream")
     parser.add_option("-x", "--max-stream-length",    type="int",   dest="max_stream_length",    default="100", help="maximum length of any job stream")
-    parser.add_option("-n", "--mean-stream-length",   type="float", dest="mean_stream_length",   default="1",   help="mean length of job streams")
+    parser.add_option("-e", "--mean-stream-length",   type="float", dest="mean_stream_length",   default="1",   help="mean length of job streams")
     parser.add_option("-d", "--stddev-stream-length", type="float", dest="stddev_stream_length", default="3",   help="standard deviation of length of job streams")
-    parser.add_option("-i", "--interarrival-time",    type="float", dest="interarrival_time",    default="10",  help="interarrival time of clients")
-    parser.add_option("-S", "--seed",                 type="float", dest="seed",                 default="0",   help="random seed (0 for no seed)")
-    parser.add_option("-W", "--wallclock-limit",      type="float", dest="wc_limit_per_job",     default="0",   help="wallclock limit per job in seconds (0 for no limit)")
-    parser.add_option("-C", "--cpu-limit",            type="float", dest="cpu_limit_per_job",    default="0",   help="cpu limit per job in CPU seconds (0 for no limit)")
+    
+    parser.add_option("-M", "--min-stream-width",    type="int",   dest="min_stream_width",      default="1",   help="minimum width of any job stream")
+    parser.add_option("-X", "--max-stream-width",    type="int",   dest="max_stream_width",      default="1",   help="maximum width of any job stream")
+    parser.add_option("-S", "--shape-stream-width",  type="float", dest="shape_stream_width",    default="1",   help="shape parameter for log-normal width of job streams")
+    
+    parser.add_option("-s", "--seed",                 type="float", dest="seed",                 default="0",   help="random seed (0 for no seed)")
+    parser.add_option("-w", "--wallclock-limit",      type="float", dest="wc_limit_per_job",     default="0",   help="wallclock limit per job in seconds (0 for no limit)")
+    parser.add_option("-c", "--cpu-limit",            type="float", dest="cpu_limit_per_job",    default="0",   help="cpu limit per job in CPU seconds (0 for no limit)")
+    
     (options, args) = parser.parse_args()
     if len(args) != 1:
         print("Please provide a benchmark file to read jobs from.")
@@ -161,17 +186,32 @@ def main():
         random.seed(options.seed)
 
     # Create a number of random clients with a random job stream each
+    log("Creating clients ...")
     clients = []
     arrival_time = 0
     for i in range(options.num_clients):
-        c = create_random_client(options, arrival_time)
-        with open(".api/users/" + c._name + ".json", "w") as f:
-            f.write(c.user_to_json())
-        clients += [c]
+        cs = create_random_clients(options, arrival_time)
+        for c in cs:
+            with open(".api/users/" + c._name + ".json", "w") as f:
+                f.write(c.user_to_json())
+            clients += [c]
         arrival_time += + numpy.random.exponential(options.interarrival_time)
 
     # Remember the currently active job for each client
     active_jobs = [None for c in clients]
+    log("Clients set up. Waiting for mallob ...")
+
+    # Wait for mallob process
+    mallob_active = False
+    while not mallob_active:
+        for process in psutil.process_iter():
+            if process.name() == "mallob":
+                mallob_active = True
+                break
+        time.sleep(0.1)
+    log("Process named \"mallob\" is active!")
+    global_starttime = time.time_ns()
+    log("Launching clients.")
 
     # Main loop where jobs are introduced and finished job information is removed
     any_left = True
@@ -194,7 +234,7 @@ def main():
                 # -> Introduce first job
                 log("Client %s arrives", (c._name,))
                 active_jobs[i] = c.get_next_job()
-                introduce_job(active_jobs[i])
+                introduce_job(active_jobs[i], options)
                 any_left = True
             
             elif active_jobs[i] is not None:

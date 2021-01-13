@@ -50,6 +50,25 @@ public:
 
             FileUtils::mkdir(_directory);
 
+            // Initialize inotify
+            _inotify_fd = inotify_init();
+            if (_inotify_fd < 0) {
+                logger.log(V0_CRIT, "Failed to set up inotify, code %i\n", errno);
+                abort();
+            }
+            
+            // Make inotify nonblocking
+            int flags = fcntl(_inotify_fd, F_GETFL, 0);
+            fcntl(_inotify_fd, F_SETFL, flags | O_NONBLOCK);
+            
+            // Initialize watcher
+            _inotify_wd = inotify_add_watch(_inotify_fd, _directory.c_str(), events);
+            if (_inotify_wd < 0) {
+                logger.log(V0_CRIT, "Failed to add inotify watch, code %i\n", errno);
+                abort();
+            }
+
+            // Initialize thread group
             std::vector<Logger> loggers;
             for (size_t i = 0; i < numThreads; i++) {
                 loggers.push_back(logger.copy(std::to_string(i), ""));
@@ -72,28 +91,10 @@ public:
                 }
             }
             
-            // Initialize inotify
-            _inotify_fd = inotify_init();
-            if (_inotify_fd < 0) {
-                logger.log(V0_CRIT, "Failed to set up inotify, code %i\n", errno);
-                abort();
-            }
-            
-            // Make inotify nonblocking
-            int flags = fcntl(_inotify_fd, F_GETFL, 0);
-            fcntl(_inotify_fd, F_SETFL, flags | O_NONBLOCK);
-            
-            // Initialize watcher
-            _inotify_wd = inotify_add_watch(_inotify_fd, _directory.c_str(), events);
-            if (_inotify_wd < 0) {
-                logger.log(V0_CRIT, "Failed to add inotify watch, code %i\n", errno);
-                abort();
-            }
-
+            // Main loop
             size_t eventSize = sizeof(struct inotify_event);
             size_t bufferSize = 1024 * eventSize + 16;
             char* buffer = (char*)malloc(bufferSize);
-
             while (!_exiting) {
                 usleep(1000 * 10); // 10 milliseconds
 
