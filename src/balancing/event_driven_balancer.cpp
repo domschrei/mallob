@@ -222,6 +222,12 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
                 _time_of_termination[jobId] = time;
             }
         }
+
+        // Force remove any entries associated with terminated jobs
+        for (const auto& [jobId, time] : _time_of_termination) {
+            _states.remove(jobId);
+            _diffs.remove(jobId);
+        }
     }
     return anyChange;
 }
