@@ -122,7 +122,7 @@ void SolverThread::diversify() {
     unsigned int seed = 42;
     hash_combine<unsigned int>(seed, (int)_tid);
     hash_combine<unsigned int>(seed, _portfolio_size);
-    hash_combine<unsigned int>(seed, _portfolio_rank);  
+    hash_combine<unsigned int>(seed, _portfolio_rank);
     srand(seed);
 
 	switch (diversificationMode) {

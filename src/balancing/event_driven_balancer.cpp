@@ -302,18 +302,10 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
         }
     }
     // Force remove any entries associated with terminated jobs
-    // Finalize jobs which terminated some time ago
-    std::vector<int> removedJobs;
     for (const auto& [jobId, time] : _time_of_termination) {
         _states.remove(jobId);
         _diffs.remove(jobId);
-        if (now - time >= 60.f) {
-            removedJobs.push_back(jobId);
-        }
-    }
-    for (int jobId : removedJobs) {
-        log(V3_VERB, "BLC apply termination of %i\n", jobId);
-        _time_of_termination.erase(jobId);
+        _jobs_being_balanced.erase(jobId);
     }
 
     log(V5_DEBG, "BLC: calc result\n");
@@ -521,5 +513,6 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
 
 void EventDrivenBalancer::forget(int jobId) {
     _job_epochs.erase(jobId);
+    _time_of_termination.erase(jobId);
     Balancer::forget(jobId);
 }
