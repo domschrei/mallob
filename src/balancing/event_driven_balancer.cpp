@@ -205,7 +205,10 @@ bool EventDrivenBalancer::digest(const EventMap& data) {
     bool anyChange = _states.updateBy(data);
 
     // Filter local diffs by the new "global" state.
+    size_t diffSize = _diffs.getEntries().size();
     _diffs.filterBy(_states);
+    log(V3_VERB, "BLC digest %i diffs, %i/%i local diffs remaining\n", 
+            data.getEntries().size(), _diffs.getEntries().size(), diffSize);
     
     if (anyChange) {
         // Successful balancing: Bump epoch
