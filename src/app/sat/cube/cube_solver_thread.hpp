@@ -1,29 +1,40 @@
 #ifndef MSCHICK_CUBE_SOLVER_THREAD_H
 #define MSCHICK_CUBE_SOLVER_THREAD_H
 
-#include <thread>
 #include <atomic>
+#include <thread>
+#include <optional>
 
-#include "app/sat/console_horde_interface.hpp"
 #include "app/sat/hordesat/solvers/cadical.hpp"
-#include "app/sat/hordesat/utilities/logging_interface.hpp"
-#include "cube.hpp"
-#include "cube_worker_interface.hpp"
+#include "dynamic_cube_setup.hpp"
+#include "cube_solver_thread_manager_interface.hpp"
 
 class CubeSolverThread {
    private:
-    CubeWorkerInterface *_worker;
+    CubeSolverThreadManagerInterface &_manager;
 
-    VecPtr _formula;
+    std::shared_ptr<std::vector<int>> _formula;
 
     LoggingInterface &_logger;
 
+    SatResult &_result;
+
     std::unique_ptr<PortfolioSolverInterface> _solver;
 
-    std::vector<Cube> _cubes;
-    std::vector<Cube> _failed_cubes;
+    // The cube to solve
+    // This is optional since it is set from the outside and needs to be possibly empty
+    std::optional<Cube> _cube;
 
-    SatResult &_result;
+    // The found failed assumptions
+    // This is optional since it is optionally filled during solve()
+    std::optional<Cube> _failed;
+
+    // Buffer for new failed cubes
+    // They are added before every call to solve
+    std::vector<int> _new_failed_cubes;
+
+    // Mutex that protects access to the new failed cubes
+    Mutex _new_failed_cubes_lock;
 
     std::thread _thread;
 
@@ -32,18 +43,15 @@ class CubeSolverThread {
     void run();
     void solve();
 
-    // Helper to determine whether a given cube includes a failed cube
-    bool includesFailedCube(Cube &cube);
-
    public:
-    CubeSolverThread(CubeWorkerInterface *worker, CubeSetup &setup);
+    CubeSolverThread(CubeSolverThreadManagerInterface &worker, DynamicCubeSetup &setup);
     ~CubeSolverThread();
 
     void start();
     void interrupt();
+    void join();
 
-    void suspend();
-    void unsuspend();
+    void handleFailed(const std::vector<int> &failed);
 };
 
 #endif /* MSCHICK_CUBE_SOLVER_THREAD_H */

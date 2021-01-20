@@ -41,9 +41,9 @@ bool SysState<N>::aggregate(float elapsedTime) {
             if (done) {
                 _aggregating = false;
                 return true;
-            } else if (_last_aggregation > 0 && timeSinceLast > 300) {
-                Console::log(Console::CRIT, "Unresponsive node(s) since 300 seconds! Aborting");
-                abort();
+            // } else if (_last_aggregation > 0 && timeSinceLast > 300) {
+            //     Console::log(Console::CRIT, "Unresponsive node(s) since 300 seconds! Aborting");
+            //     abort();
             }
         }
     }

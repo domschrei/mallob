@@ -2,7 +2,8 @@
 
 #include <cassert>
 
-CubeSolverThread::CubeSolverThread(CubeWorkerInterface *worker, CubeSetup &setup) : _worker(worker), _formula(setup.formula), _logger(setup.logger), _result(setup.result) {
+CubeSolverThread::CubeSolverThread(CubeSolverThreadManagerInterface &manager, DynamicCubeSetup &setup)
+    : _manager(manager), _formula(setup.formula), _logger(setup.logger), _result(setup.result) {
     // Initialize solver
     SolverSetup solver_setup;
     solver_setup.logger = &_logger;
@@ -14,17 +15,23 @@ CubeSolverThread::CubeSolverThread(CubeWorkerInterface *worker, CubeSetup &setup
     solver_setup.diversificationIndex = 0;
 
     _solver = std::make_unique<Cadical>(solver_setup);
+
+    // Initialization is done in a seperate thread thus hard work is allowed
+    // Also this allows a universal start
+    // Read formula
+    for (int lit : *_formula.get()) _solver->addLiteral(lit);
 }
 
 CubeSolverThread::~CubeSolverThread() {
-    if (_thread.joinable())
-        _thread.join();
+    if (_thread.joinable()) _thread.join();
 }
 
 void CubeSolverThread::start() {
-    // Read formula
-    for (int lit : *_formula.get())
-        _solver->addLiteral(lit);
+    // Reset
+    _solver->uninterrupt();
+    _isInterrupted.store(false);
+
+    assert(!_thread.joinable());
 
     _thread = std::thread(&CubeSolverThread::run, this);
 }
@@ -32,47 +39,53 @@ void CubeSolverThread::start() {
 void CubeSolverThread::interrupt() {
     _isInterrupted.store(true);
 
-    // Interrupt solver
     _solver->interrupt();
 }
 
-void CubeSolverThread::suspend() {
-    _solver->suspend();
-}
+void CubeSolverThread::join() {
+    // This is also called with the job control thread therefore it cannot be called simultaneously to start
+    assert(_thread.joinable());
 
-void CubeSolverThread::unsuspend() {
-    _solver->resume();
+    _thread.join();
 }
 
 void CubeSolverThread::run() {
     while (!_isInterrupted) {
-        // Request cubes
-        _worker->shareCubes(_cubes, _failed_cubes);
+        // Reset cube
+        _cube.reset();
 
-        // Failed cubes were sent
-        _failed_cubes.clear();
+        // Send failed and request new cube
+        _manager.shareCubes(_failed, _cube);
 
+        // Failed assumptions were sent
+        _failed.reset();
+
+        // TODO Change to possibly learn and definitely add
+        {
+            const std::lock_guard<Mutex> lock(_new_failed_cubes_lock);
+
+            // Add received failed cubes to formula
+            for (int lit : _new_failed_cubes) _solver->addLiteral(lit);
+
+            // Reset buffer for received failed cubes
+            _new_failed_cubes.clear();
+        }
+
+        // Start work
         solve();
 
-        if (_result != UNKNOWN)
-            return;
-        
-        // All cubes were solved or solver was interrupted
-        _cubes.clear();
+        // Exit loop if formula was solved
+        if (_result != UNKNOWN) return;
     }
     _logger.log(0, "Leaving the main loop");
 }
 
 void CubeSolverThread::solve() {
-    for (Cube &cube : _cubes) {
+    if (_cube.has_value()) {
         _logger.log(0, "Started solving a cube");
 
-        if (includesFailedCube(cube)) {
-            _logger.log(0, "Skipped cube");
-            continue;
-        }
-
-        auto path = cube.getPath();
+        // Assume and solve
+        auto path = _cube.value().getPath();
         auto result = _solver->solve(path);
 
         // Check result
@@ -80,40 +93,34 @@ void CubeSolverThread::solve() {
             _logger.log(1, "Found a solution: SAT");
             _result = SAT;
 
-            return;
-
         } else if (result == UNKNOWN) {
             _logger.log(1, "Solving interrupted");
-
-            return;
 
         } else if (result == UNSAT) {
             _logger.log(1, "Cube failed");
 
-            auto failed_assumps = _solver->getFailedAssumptions();
+            auto failed_assumptions = _solver->getFailedAssumptions();
 
-            if (failed_assumps.size() > 0) {
-                _logger.log(1, "Added failed cube");
+            if (failed_assumptions.size() > 0) {
+                _logger.log(1, "Found failed assumptions");
 
-                // At least one assumption failed -> Append to _failed_cubes
-                _failed_cubes.emplace_back(failed_assumps.begin(), failed_assumps.end());
+                // At least one assumption failed -> Set failed
+                _failed.emplace(failed_assumptions.begin(), failed_assumptions.end());
 
             } else {
                 _logger.log(1, "Found a solution: UNSAT");
 
                 // Intersection of assumptions and core is empty -> Formula is unsatisfiable
                 _result = UNSAT;
-
-                return;
             }
         }
     }
-    // All cubes were unsatisfiable and always at least one assumption failed or cubes is empty
 }
 
-bool CubeSolverThread::includesFailedCube(Cube &cube) {
-    for (Cube &failed_cube : _failed_cubes)
-        if (cube.includes(failed_cube)) return true;
+void CubeSolverThread::handleFailed(const std::vector<int> &failed) {
+    const std::lock_guard<Mutex> lock(_new_failed_cubes_lock);
 
-    return false;
+    // TODO Add a new function in PortfolioSolver that allows clauses to be added for the next call to solve and may be learned asynchronously
+    // Learn failed clauses
+    _solver->addLearnedClause(failed.data(), failed.size());
 }

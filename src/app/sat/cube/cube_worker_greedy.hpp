@@ -4,13 +4,12 @@
 #include <memory>
 #include <thread>
 
-#include "app/sat/hordesat/utilities/logging_interface.hpp"
-#include "cube.hpp"
-#include "cube_solver_thread.hpp"
 #include "cube_worker_interface.hpp"
+#include "cube.hpp"
+#include "cube_solver_thread_manager_interface.hpp"
 #include "util/sys/threading.hpp"
 
-class CubeWorkerGreedy : public CubeWorkerInterface {
+class CubeWorkerGreedy : public CubeWorkerInterface, public CubeSolverThreadManagerInterface {
    private:
     // Get value from -t of mallob
     size_t _thread_count = 0;
@@ -43,7 +42,7 @@ class CubeWorkerGreedy : public CubeWorkerInterface {
    public:
     CubeWorkerGreedy(CubeSetup &setup);
 
-    void shareCubes(std::vector<Cube> &cubes, std::vector<Cube> &failed) override;
+    void shareCubes(std::vector<Cube> &cubes, std::vector<Cube> &failed, CubeSolverThread *thread) override;
     void shareFailed(std::vector<Cube> &failed) override;
 
     void startWorking() override;

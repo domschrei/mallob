@@ -12,3 +12,14 @@ mallob
 .sconsign.dblite
 .vscode/
 .ccls-cache
+
+build/*
+
+src/app/sat/hordesat/lingeling/*
+src/app/sat/hordesat/yalsat/*
+src/app/sat/hordesat/glucose/*
+
+*.tar.gz
+*.zip
+
+log.*

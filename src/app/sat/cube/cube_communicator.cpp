@@ -18,6 +18,18 @@ void CubeCommunicator::requestCubes() {
     MyMpi::isend(MPI_COMM_WORLD, rootRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 }
 
+void CubeCommunicator::requestCubesFromParent() {
+    // Send request message to parent node
+    JobMessage msg;
+    msg.jobId = _job.getId();
+    msg.epoch = 0;  // unused
+    msg.tag = MSG_REQUEST_CUBES_FROM_PARENT;
+
+    int parentRank = _job.getParentNodeRank();
+    log_send(parentRank, msg.payload, "requestCubesFromParent");
+    MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+}
+
 void CubeCommunicator::sendCubes(int target, std::vector<int> &serialized_cubes) {
     assert(!serialized_cubes.empty());
 
@@ -59,7 +71,6 @@ void CubeCommunicator::receivedFailedCubes(int target) {
 }
 
 void CubeCommunicator::returnFailedAndRequestCubes(std::vector<int> &serialized_failed_cubes) {
-
     // Return possibly empty failed cubes to root and request new cubes
     JobMessage msg;
     msg.jobId = _job.getId();
@@ -69,6 +80,46 @@ void CubeCommunicator::returnFailedAndRequestCubes(std::vector<int> &serialized_
 
     int rootRank = _job.getRootNodeRank();
     log_send(rootRank, msg.payload, "returnFailedAndRequestCubes");
+    MyMpi::isend(MPI_COMM_WORLD, rootRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+}
+
+void CubeCommunicator::requestFailedCubes() {
+    // Send request message to root node
+    JobMessage msg;
+    msg.jobId = _job.getId();
+    msg.epoch = 0;  // unused
+    msg.tag = MSG_REQUEST_FAILED_CUBES;
+
+    int rootRank = _job.getRootNodeRank();
+    log_send(rootRank, msg.payload, "requestFailedCubes");
+    MyMpi::isend(MPI_COMM_WORLD, rootRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+}
+
+void CubeCommunicator::sendFailedCubes(int target, std::vector<int>& serialized_failed_cubes) {
+    // Send (possibly empty) failed cubes to requesting node
+    // Empty because this kind u message is necessaryto receive to finish the initialization
+    JobMessage msg;
+    msg.jobId = _job.getId();
+    msg.epoch = 0;  // unused
+    msg.tag = MSG_SEND_FAILED_CUBES;
+    msg.payload = serialized_failed_cubes;
+
+    log_send(target, msg.payload, "sendFailedCubes");
+    MyMpi::isend(MPI_COMM_WORLD, target, MSG_SEND_APPLICATION_MESSAGE, msg);
+}
+
+void CubeCommunicator::sendCubesToRoot(std::vector<int> &serialized_cubes) {
+    assert(!serialized_cubes.empty());
+
+    // Send cubes to requesting node
+    JobMessage msg;
+    msg.jobId = _job.getId();
+    msg.epoch = 0;  // unused
+    msg.tag = MSG_SEND_CUBES;
+    msg.payload = serialized_cubes;
+
+    int rootRank = _job.getRootNodeRank();
+    log_send(rootRank, msg.payload, "sendCubesToRoot");
     MyMpi::isend(MPI_COMM_WORLD, rootRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 }
 

@@ -26,7 +26,7 @@ void CubeWorkerGreedy::startWorking() {
 }
 
 void CubeWorkerGreedy::shareCubes(std::vector<Cube> &cubes, std::vector<Cube> &failed) {
-    _logger.log(0, "shareCubes is called", _local_cubes.size());
+    _logger.log(0, "shareCubes is called");
 
     auto lock = _local_cubes_mutex.getLock();
 
