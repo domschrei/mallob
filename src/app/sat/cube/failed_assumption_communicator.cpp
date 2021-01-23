@@ -20,16 +20,23 @@ void FailedAssumptionCommunicator::gather() {
     _received_failed_assumptions.insert(_received_failed_assumptions.end(), failed_assumption.begin(), failed_assumption.end());
 
     if (_job.isRoot()) {
-        // TODO Do we really have the problem here that a clause may be never added to the root filter because there was a random collision because of the used bloom filter?
+        // TODO Do we have the problem here that a clause may be never added to the root filter because there was a random collision due to the bloom filter?
         persist(_received_failed_assumptions);
 
         _received_failed_assumptions.clear();
 
         // For the beginning we always distribute all found failed assumptions
+        // Merge all clauses in the filter into one vector 
+        std::vector<int> clauses_to_distribute;
+        for (auto &clause : _clause_filter) {
+            clauses_to_distribute.insert(clauses_to_distribute.end(), clause.begin(), clause.end());
+        }
         // TODO Improve this
 
-        auto 
-        distribute();
+        // If there are failed assumptions, distribute them
+        if (!clauses_to_distribute.empty()) {
+            distribute(clauses_to_distribute);
+        }
 
     } else {
         // Send everything in the accumulator to the parent
@@ -49,10 +56,51 @@ void FailedAssumptionCommunicator::gather() {
 }
 
 void FailedAssumptionCommunicator::persist(std::vector<int> &failed_assumptions) {
+    std::vector<int> new_clauses;
+    std::vector<int> clause;
 
+    for (auto lit : failed_assumptions) {
+        if (lit == 0) {
+            // No empty clauses allowed
+            assert(!clause.empty());
+
+            // Try to add the clause to the filter
+            bool clause_is_new = _clause_filter.insert(clause).second;
+
+            // If the clause is new add it to new clauses
+            if (clause_is_new) new_clauses.insert(new_clauses.end(), clause.begin(), clause.end());
+
+            // Clear local variable
+            clause.clear();
+
+        } else {
+            clause.push_back(lit);
+        }
+    }
+
+    // Pass new failed assumption to the lib
+    if (!new_clauses.empty()) _job.digestFailedAssumptions(new_clauses);
 };
 
-void FailedAssumptionCommunicator::distribute(std::vector<int> &failed_assumptions);
+void FailedAssumptionCommunicator::distribute(std::vector<int> &failed_assumptions) {
+    JobMessage msg;
+    msg.jobId = _job.getId();
+    msg.epoch = 0;  // unused
+    msg.tag = MSG_FAILED_ASSUMPTION_DISTRIBUTE;
+    msg.payload = failed_assumptions;
+
+    if (_job.hasLeftChild()) {
+        int leftChildRank = _job.getLeftChildNodeRank();
+        log_send(leftChildRank, msg.payload, "distribute");
+        MyMpi::isend(MPI_COMM_WORLD, leftChildRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+    }
+
+    if (_job.hasRightChild()) {
+        int rightChildRank = _job.getRightChildNodeRank();
+        log_send(rightChildRank, msg.payload, "distribute");
+        MyMpi::isend(MPI_COMM_WORLD, rightChildRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+    }
+};
 
 void FailedAssumptionCommunicator::handle(int source, JobMessage &msg) {
     // Caller guarantees that the job cannot be interrupted

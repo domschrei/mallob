@@ -225,7 +225,7 @@ DynamicCubeSatJob::~DynamicCubeSatJob() {
 /* Methods for clause sharing */
 
 bool DynamicCubeSatJob::isRequesting() {
-    // The caller guarantees that the job is active
+    // The caller guarantees that the job is active -> active is needed to communicate with parent and children
 
     // Return false if the lib is not initialized
     if (appl_doneInitializing())
@@ -235,7 +235,7 @@ bool DynamicCubeSatJob::isRequesting() {
 };
 
 std::vector<Cube> DynamicCubeSatJob::getCubes(size_t bias) {
-    // The caller guarantees that the job is active
+    // The caller guarantees that the job is active -> active is needed to communicate with parent and children
 
     // Return empty vector if not the lib is not initialized
     if (appl_doneInitializing()) return std::vector<Cube>();
@@ -257,7 +257,14 @@ std::vector<Cube> DynamicCubeSatJob::releaseAllCubes() {
     return _lib->releaseAllCubes();
 };
 
-std::vector<int> DynamicCubeSatJob::getFailedAssumptions() { return _lib->getNewFailedAssumptions(); }
+std::vector<int> DynamicCubeSatJob::getFailedAssumptions() {
+    // The caller guarantees that the job is active -> active is needed to communicate with parent and children
+
+    // Return empty vector if not the lib is not initialized
+    if (appl_doneInitializing()) return std::vector<int>();
+
+    return _lib->getNewFailedAssumptions();
+}
 
 void DynamicCubeSatJob::digestFailedAssumptions(std::vector<int>& failed_assumptions) {
     // May only be called after a job was initialized, otherwise some failed assumptions may never be learned
