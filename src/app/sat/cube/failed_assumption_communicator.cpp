@@ -26,7 +26,7 @@ void FailedAssumptionCommunicator::gather() {
         _received_failed_assumptions.clear();
 
         // For the beginning we always distribute all found failed assumptions
-        // Merge all clauses in the filter into one vector 
+        // Merge all clauses in the filter into one vector
         std::vector<int> clauses_to_distribute;
         for (auto &clause : _clause_filter) {
             clauses_to_distribute.insert(clauses_to_distribute.end(), clause.begin(), clause.end());
@@ -119,12 +119,17 @@ void FailedAssumptionCommunicator::handle(int source, JobMessage &msg) {
         assert(msg.tag == MSG_FAILED_ASSUMPTION_GATHER || msg.tag == MSG_FAILED_ASSUMPTION_DISTRIBUTE);
 
         // This message must be a remainder of before this job was suspended
+
         if (msg.tag == MSG_FAILED_ASSUMPTION_GATHER) {
             // Send the failed assumptions that would be lost to the root node
             sendToRoot(msg.payload);
         }
 
-        // MSG_FAILED_ASSUMPTION_DISTRIBUTE is ignored
+        // Even when the job is suspended, new failed cubes may be learnt
+        // if (msg.tag == MSG_FAILED_ASSUMPTION_DISTRIBUTE && _job.appl_doneInitializing()) {
+        //     persist(msg.payload);
+        // }
+        // Currently MSG_FAILED_ASSUMPTION_DISTRIBUTE is ignored
 
     } else {
         // The job is active
@@ -148,8 +153,10 @@ void FailedAssumptionCommunicator::handle(int source, JobMessage &msg) {
             // The payload may not be empty
             assert(!msg.payload.empty());
 
-            // Persist the payload
-            persist(msg.payload);
+            // If the lib is initialized, persist the distributed failed assumptions
+            if (_job.appl_doneInitializing()) persist(msg.payload);
+
+            distribute(msg.payload);
 
         } else if (msg.tag == MSG_FAILED_ASSUMPTION_SEND_TO_ROOT) {
             // The payload may not be empty
