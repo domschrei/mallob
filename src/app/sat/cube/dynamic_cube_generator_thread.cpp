@@ -83,16 +83,26 @@ void DynamicCubeGeneratorThread::generate() {
             // Return if split literal is 0 due to an interruption
             if (_isInterrupted) return;
 
-            // If these assertions fail, we need to also solve here
-            assert(_solver.status() != 0);
+            // For the formula #30 we saw that the split literal and the status may are zero we therefore try to solve here, this should return quickly
+            if (_solver.status() == 0) {
+                _logger.log(0, "DynamicCubeGeneratorThread: Split literal and status are zero -> Start solving");
+
+                // Reassume cube
+                for (auto lit : path) _solver.assume(lit);
+
+                // Try solving
+                _solver.solve();
+                _logger.log(0, "DynamicCubeGeneratorThread: Finished solving");
+            }
+
             assert(_solver.status() == 10 || _solver.status() == 20);
 
             if (_solver.status() == 10) {
-                _logger.log(1, "DynamicCubeGeneratorThread: Found a solution: SAT");
+                _logger.log(0, "DynamicCubeGeneratorThread: Found a solution: SAT");
                 _result = UNSAT;
 
             } else if (_solver.status() == 20) {
-                _logger.log(1, "DynamicCubeGeneratorThread: Cube failed");
+                _logger.log(0, "DynamicCubeGeneratorThread: Cube failed");
 
                 // Gather failed assumptions
                 std::vector<int> failed_assumptions;
@@ -100,13 +110,13 @@ void DynamicCubeGeneratorThread::generate() {
                     if (_solver.failed(lit)) failed_assumptions.push_back(lit);
 
                 if (failed_assumptions.size() > 0) {
-                    _logger.log(1, "DynamicCubeGeneratorThread: Found failed assumptions");
+                    _logger.log(0, "DynamicCubeGeneratorThread: Found failed assumptions");
 
                     // At least one assumption failed -> Set failed
                     _failed.emplace(failed_assumptions);
 
                 } else {
-                    _logger.log(1, "DynamicCubeGeneratorThread: Found a solution: UNSAT");
+                    _logger.log(0, "DynamicCubeGeneratorThread: Found a solution: UNSAT");
 
                     // Intersection of assumptions and core is empty -> Formula is unsatisfiable
                     _result = UNSAT;
