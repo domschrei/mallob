@@ -24,8 +24,6 @@ void FailedAssumptionCommunicator::gather() {
     _received_failed_assumptions.insert(_received_failed_assumptions.end(), failed_assumption.begin(), failed_assumption.end());
 
     if (_job.isRoot()) {
-        _logger.log(0, "FailedAssumptionCommunicator: This job is root -> 1. Persist everything received 2. Distribute all known failed assumptions");
-
         // TODO Do we have the problem here that a clause may be never added to the root filter because there was a random collision due to the bloom filter?
         persist(_received_failed_assumptions);
 
@@ -45,8 +43,6 @@ void FailedAssumptionCommunicator::gather() {
         }
 
     } else {
-        _logger.log(0, "FailedAssumptionCommunicator: This job is not root -> send everything received to the parent");
-
         // Send everything in the accumulator to the parent
         JobMessage msg;
         msg.jobId = _job.getId();
@@ -137,7 +133,7 @@ void FailedAssumptionCommunicator::handle(int source, JobMessage &msg) {
         // This message must be a remainder of before this job was suspended
 
         if (msg.tag == MSG_FAILED_ASSUMPTION_GATHER && !msg.payload.empty()) {
-            _logger.log(0, "FailedAssumptionCommunicator: Received not empty gather while suspended -> send failed assumptions to root");
+            _logger.log(0, "FailedAssumptionCommunicator: Received not empty gather while suspended");
 
             // Send the failed assumptions that would be lost to the root node
             sendToRoot(msg.payload);
@@ -145,7 +141,7 @@ void FailedAssumptionCommunicator::handle(int source, JobMessage &msg) {
         } else if (msg.tag == MSG_FAILED_ASSUMPTION_DISTRIBUTE) {
             assert(!msg.payload.empty());
 
-            _logger.log(0, "FailedAssumptionCommunicator: Received distribute while suspended -> ignore");
+            _logger.log(0, "FailedAssumptionCommunicator: Received distribute while suspended");
         }
 
         // Even when the job is suspended, new failed cubes may be learnt
@@ -157,7 +153,7 @@ void FailedAssumptionCommunicator::handle(int source, JobMessage &msg) {
     } else {
         // The job is active
         if (msg.tag == MSG_FAILED_ASSUMPTION_GATHER) {
-            _logger.log(0, "FailedAssumptionCommunicator: Received gather while active -> 1. Add received 2. Increment message counter 3. Maybe gather");
+            _logger.log(0, "FailedAssumptionCommunicator: Received gather while active");
 
             // The payload may be empty
             if (!msg.payload.empty()) {
@@ -172,13 +168,15 @@ void FailedAssumptionCommunicator::handle(int source, JobMessage &msg) {
 
             if (++_messageCounter >= numChildren) {
                 gather();
+            } else {
+                _logger.log(0, "FailedAssumptionCommunicator: Received %i messages and has %i children", _messageCounter, numChildren);
             }
 
         } else if (msg.tag == MSG_FAILED_ASSUMPTION_DISTRIBUTE) {
             // The payload may not be empty
             assert(!msg.payload.empty());
 
-            _logger.log(0, "FailedAssumptionCommunicator: Received distribute while active -> 1. If initialized persist 2. Distribute to children");
+            _logger.log(0, "FailedAssumptionCommunicator: Received distribute while active");
 
             // If the lib is initialized, persist the distributed failed assumptions
             if (_job.appl_doneInitializing()) persist(msg.payload);
@@ -192,7 +190,7 @@ void FailedAssumptionCommunicator::handle(int source, JobMessage &msg) {
             // This message may only be send to the root node
             assert(_job.isRoot());
 
-            _logger.log(0, "FailedAssumptionCommunicator: Received send to root -> Add received");
+            _logger.log(0, "FailedAssumptionCommunicator: Received send to root");
 
             // Insert received failed assumptions
             _received_failed_assumptions.insert(_received_failed_assumptions.end(), msg.payload.begin(), msg.payload.end());
@@ -224,7 +222,7 @@ void FailedAssumptionCommunicator::log_send(int destRank, std::vector<int> &payl
     va_list vl;
     // Puts first value in parameter list into str
     va_start(vl, str);
-    std::string output = std::string(str) + " => [" + std::to_string(destRank) + "] { #" + std::to_string(payload.size()) + "}";
+    std::string output = std::string(str) + " => [" + std::to_string(destRank) + "] Buffer size: " + std::to_string(payload.size());
     _logger.log_va_list(0, output.c_str(), vl);
     va_end(vl);
 }

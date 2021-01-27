@@ -2,8 +2,10 @@
 
 #include <cassert>
 
+std::atomic<int> DynamicCubeSolverThread::_counter{0};
+
 DynamicCubeSolverThread::DynamicCubeSolverThread(DynamicCubeSolverThreadManagerInterface &manager, DynamicCubeSetup &setup)
-    : _manager(manager), _formula(setup.formula), _logger(setup.logger), _result(setup.result) {
+    : _manager(manager), _formula(setup.formula), _logger(setup.logger), _result(setup.result), _instance_counter{DynamicCubeSolverThread::_counter++} {
     // Initialize solver
     SolverSetup solver_setup;
     solver_setup.logger = &_logger;
@@ -64,10 +66,12 @@ void DynamicCubeSolverThread::run() {
         {
             const std::lock_guard<Mutex> lock(_new_failed_cubes_lock);
 
-            _logger.log(0, "DynamicCubeSolverThread: Adding new failed clauses from buffer with size %zu", _new_failed_cubes.size());
+            _logger.log(0, "DynamicCubeSolverThread %i: Adding new failed clauses. Buffer size: %zu", _instance_counter, _new_failed_cubes.size());
 
             // Add received failed cubes to formula
             for (int lit : _new_failed_cubes) _solver->addLiteral(lit);
+
+            _added_failed_assumptions_buffer += _new_failed_cubes.size();
 
             // Reset buffer for received failed cubes
             _new_failed_cubes.clear();
@@ -79,12 +83,12 @@ void DynamicCubeSolverThread::run() {
         // Exit loop if formula was solved
         if (_result != UNKNOWN) return;
     }
-    _logger.log(0, "DynamicCubeSolverThread: Leaving the main loop");
+    _logger.log(0, "DynamicCubeSolverThread %i: Leaving the main loop", _instance_counter);
 }
 
 void DynamicCubeSolverThread::solve() {
     if (_cube.has_value()) {
-        _logger.log(0, "DynamicCubeSolverThread: Started solving a cube");
+        _logger.log(0, "DynamicCubeSolverThread %i: Started solving the cube %s", _instance_counter, _cube.value().toString());
 
         // Assume and solve
         auto path = _cube.value().getPath();
@@ -92,39 +96,41 @@ void DynamicCubeSolverThread::solve() {
 
         // Check result
         if (result == SAT) {
-            _logger.log(1, "DynamicCubeSolverThread: Found a solution: SAT");
+            _logger.log(0, "DynamicCubeSolverThread %i: Found a solution: SAT", _instance_counter);
+            _logger.log(0, "DynamicCubeSolverThread %i: Used cube %s", _instance_counter, _cube.value().toString());
+            _logger.log(0, "DynamicCubeSolverThread %i: Size of added buffer of failed assumption: %zu", _instance_counter, _added_failed_assumptions_buffer);
             _result = SAT;
 
         } else if (result == UNKNOWN) {
-            _logger.log(1, "DynamicCubeSolverThread: Solving interrupted");
+            // Exit solving due to an interruption
 
         } else if (result == UNSAT) {
-            _logger.log(1, "DynamicCubeSolverThread: Cube failed");
+            _logger.log(1, "DynamicCubeSolverThread %i: The Cube %s failed", _instance_counter, _cube.value().toString());
 
             auto failed_assumptions = _solver->getFailedAssumptions();
 
             if (failed_assumptions.size() > 0) {
-                _logger.log(1, "DynamicCubeSolverThread: Found failed assumptions");
-
                 // At least one assumption failed -> Set failed
                 _failed.emplace(failed_assumptions.begin(), failed_assumptions.end());
 
             } else {
-                _logger.log(1, "DynamicCubeSolverThread: Found a solution: UNSAT");
+                _logger.log(0, "DynamicCubeSolverThread %i: Found a solution: UNSAT", _instance_counter);
+                _logger.log(0, "DynamicCubeSolverThread %i: Used cube %s", _instance_counter, _cube.value().toString());
+                _logger.log(0, "DynamicCubeSolverThread %i: Size of added buffer of failed assumption: %zu", _instance_counter, _added_failed_assumptions_buffer);
 
                 // Intersection of assumptions and core is empty -> Formula is unsatisfiable
                 _result = UNSAT;
             }
         }
     } else {
-        _logger.log(0, "DynamicCubeSolverThread: Skipped solving, because no cube is available");
+        _logger.log(0, "DynamicCubeSolverThread %i: Skipped solving, because no cube is available", _instance_counter);
     }
 }
 
 void DynamicCubeSolverThread::handleFailed(const std::vector<int> &failed) {
     const std::lock_guard<Mutex> lock(_new_failed_cubes_lock);
 
-    _logger.log(0, "DynamicCubeSolverThread: Adding new failed assumption with buffer size %zu", failed.size());
+    _logger.log(0, "DynamicCubeSolverThread %i: Inserting new failed assumption. Buffer size: %zu", _instance_counter, failed.size());
 
     // Insert failed cubes at the end of new failed cubes
     _new_failed_cubes.insert(_new_failed_cubes.end(), failed.begin(), failed.end());

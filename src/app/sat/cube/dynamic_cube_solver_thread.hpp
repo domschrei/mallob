@@ -2,8 +2,8 @@
 #define MSCHICK_CUBE_SOLVER_THREAD_H
 
 #include <atomic>
-#include <thread>
 #include <optional>
+#include <thread>
 
 #include "app/sat/hordesat/solvers/cadical.hpp"
 #include "dynamic_cube_setup.hpp"
@@ -39,6 +39,12 @@ class DynamicCubeSolverThread {
     std::thread _thread;
 
     std::atomic_bool _isInterrupted{false};
+
+    static std::atomic<int> _counter;
+
+    int _instance_counter = 0;
+
+    size_t _added_failed_assumptions_buffer = 0;
 
     void run();
     void solve();

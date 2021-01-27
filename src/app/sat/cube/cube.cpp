@@ -1,6 +1,8 @@
 #include "cube.hpp"
 
 #include <cassert>
+#include <iterator>
+#include <sstream>
 
 std::vector<int> Cube::getPath() { return _path; }
 
@@ -23,8 +25,26 @@ bool Cube::includes(std::vector<Cube> &otherCubes) {
     return false;
 }
 
-void Cube::extend(int lit) {
-    _path.push_back(lit);
+void Cube::extend(int lit) { _path.push_back(lit); }
+
+std::string Cube::toString() {
+    // https://www.geeksforgeeks.org/transform-vector-string/
+    if (!_path.empty()) {
+        std::ostringstream stringStream;
+
+        stringStream << "{ ";
+
+        // Convert all but the last element to avoid a trailing ","
+        std::copy(_path.begin(), _path.end() - 1, std::ostream_iterator<int>(stringStream, ", "));
+
+        // Now add the last element with no delimiter and closing tag
+        stringStream << _path.back() << " }";
+
+        return stringStream.str();
+
+    } else {
+        return "{ }";
+    }
 }
 
 std::vector<int> Cube::invert() {
@@ -78,7 +98,7 @@ void prune(std::vector<Cube> &cubes, std::vector<Cube> &failed) {
     cubes.erase(std::remove_if(cubes.begin(), cubes.end(), includesPredicate), cubes.end());
 }
 
-// This method remove all from new failed superseeded failed cubes in failed and then adds the new failed cubes 
+// This method remove all from new failed superseeded failed cubes in failed and then adds the new failed cubes
 void mergeFailed(std::vector<Cube> &failed, std::vector<Cube> &new_failed) {
     // Prune superseeded failed cubes
     prune(failed, new_failed);

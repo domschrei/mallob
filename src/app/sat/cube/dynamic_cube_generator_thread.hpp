@@ -56,6 +56,12 @@ class DynamicCubeGeneratorThread {
 
     Terminator _terminator;
 
+    static std::atomic<int> _counter;
+
+    int _instance_counter = 0;
+
+    size_t _added_failed_assumptions_buffer = 0;
+
     void run();
     void generate();
 

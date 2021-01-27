@@ -33,6 +33,8 @@ class Cube {
     bool operator==(const Cube &other) const {
         return this->_path == other._path;
     }
+
+    std::string toString();
 };
 
 std::vector<int> serializeCubes(std::vector<Cube> &cubes);

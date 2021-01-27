@@ -43,8 +43,6 @@ void DynamicCubeCommunicator::sendMessageToParent() {
 
     // Satisfy nodes while both requester and received cubes is set
     while (!_requester.empty() && !_received_cubes.empty()) {
-        _logger.log(0, "DynamicCubeCommunicator: Started satisfying");
-
         size_t requesterCount = _requester.size();
         size_t cubeCount = _received_cubes.size();
 
@@ -73,23 +71,19 @@ void DynamicCubeCommunicator::sendMessageToParent() {
 
     // Stop here if i am root
     if (_job.isRoot()) {
-        _logger.log(0, "DynamicCubeCommunicator: Do not send anything to the parent because this job is root");
         return;
     }
 
     // Non root nodes send the left over information to their parent
     if (!_received_cubes.empty()) {
-        _logger.log(0, "DynamicCubeCommunicator: There are free cubes -> Send them to the parent");
         // There are still free cubes left over. Send them to the parent.
         sendCubesToParent();
 
     } else if (!_requester.empty()) {
-        _logger.log(0, "DynamicCubeCommunicator: There are requesters -> Send them to the parent");
         // There are still unsatisied requests. Send them to the parent.
         sendRequestsToParent();
 
     } else {
-        _logger.log(0, "DynamicCubeCommunicator: There is nothing left -> Send all good to parent");
         // Nothing left over. Send all good to parent.
         sendAllGoodToParent();
     }
@@ -168,13 +162,13 @@ void DynamicCubeCommunicator::handle(int source, JobMessage &msg) {
 
         // This message must be a remainder of before this job was suspended
         if (msg.tag == MSG_DYNAMIC_SEND || msg.tag == MSG_DYNAMIC_FULFILL) {
-            _logger.log(0, "DynamicCubeCommunicator: Received send or fulfill while suspended -> send cubes to root");
+            _logger.log(0, "DynamicCubeCommunicator: Received send or fulfill while suspended");
 
             // Send the cubes that would be lost to the root node
             auto cubes = unserializeCubes(msg.payload);
             sendCubesToRoot(cubes);
         } else {
-            _logger.log(0, "DynamicCubeCommunicator: Received request or all good while suspended -> ignore");
+            _logger.log(0, "DynamicCubeCommunicator: Received request or all good while suspended");
         }
 
         // MSG_DYNAMIC_REQUEST and MSG_DYNAMIC_ALL_GOOD are ignored
@@ -186,7 +180,7 @@ void DynamicCubeCommunicator::handle(int source, JobMessage &msg) {
                 // The payload may not be empty
                 assert(!msg.payload.empty());
 
-                _logger.log(0, "DynamicCubeCommunicator: Received send while active -> 1. Insert cubes 2. Increment message counter 3. Maybe sendMessageToParent");
+                _logger.log(0, "DynamicCubeCommunicator: Received send while active");
 
                 // Insert received cubes
                 auto cubes = unserializeCubes(msg.payload);
@@ -196,13 +190,13 @@ void DynamicCubeCommunicator::handle(int source, JobMessage &msg) {
                 // The payload may not be empty
                 assert(!msg.payload.empty());
 
-                _logger.log(0, "DynamicCubeCommunicator: Received request while active -> 1. Insert requester 2. Increment message counter 3. Maybe sendMessageToParent");
+                _logger.log(0, "DynamicCubeCommunicator: Received request while active");
 
                 // Insert received requester
                 _requester.insert(_requester.end(), msg.payload.begin(), msg.payload.end());
 
             } else if (msg.tag == MSG_DYNAMIC_ALL_GOOD) {
-                _logger.log(0, "DynamicCubeCommunicator: Received all good while active -> 1. Increment message counter 2. Maybe sendMessageToParent");
+                _logger.log(0, "DynamicCubeCommunicator: Received all good while active");
             }
 
             // Count children
@@ -212,13 +206,15 @@ void DynamicCubeCommunicator::handle(int source, JobMessage &msg) {
 
             if (++_messageCounter >= numChildren) {
                 sendMessageToParent();
+            } else {
+                _logger.log(0, "DynamicCubeCommunicator: Received %i messages and has %i children", _messageCounter, numChildren);
             }
 
         } else if (msg.tag == MSG_DYNAMIC_FULFILL) {
             // The payload may not be empty
             assert(!msg.payload.empty());
 
-            _logger.log(0, "DynamicCubeCommunicator: Received fulfill while active -> Digest cubes");
+            _logger.log(0, "DynamicCubeCommunicator: Received fulfill while active");
 
             auto cubes = unserializeCubes(msg.payload);
             _job.digestCubes(cubes);
@@ -230,7 +226,7 @@ void DynamicCubeCommunicator::handle(int source, JobMessage &msg) {
             // This message may only be send to the root node
             assert(_job.isRoot());
 
-            _logger.log(0, "DynamicCubeCommunicator: Root received send to root -> Insert cubes");
+            _logger.log(0, "DynamicCubeCommunicator: Root received send to root");
 
             auto cubes = unserializeCubes(msg.payload);
             _received_cubes.insert(_received_cubes.end(), cubes.begin(), cubes.end());
@@ -271,6 +267,7 @@ bool DynamicCubeCommunicator::isDynamicCubeMessage(int tag) {
     return tag == MSG_DYNAMIC_SEND || tag == MSG_DYNAMIC_REQUEST || tag == MSG_DYNAMIC_ALL_GOOD || tag == MSG_DYNAMIC_FULFILL || tag == MSG_DYNAMIC_SEND_TO_ROOT;
 }
 
+// TODO Show amount of cubes here instead of buffer
 void DynamicCubeCommunicator::log_send(int destRank, std::vector<int> &payload, const char *str, ...) {
     // // Convert payload
     // auto payloadString = payloadToString(payload);
@@ -279,13 +276,13 @@ void DynamicCubeCommunicator::log_send(int destRank, std::vector<int> &payload, 
     va_list vl;
     // Puts first value in parameter list into str
     va_start(vl, str);
-    std::string output = std::string(str) + " => [" + std::to_string(destRank) + "] { #" + std::to_string(payload.size()) + "}";
+    std::string output = std::string(str) + " => [" + std::to_string(destRank) + "] Buffer size: " + std::to_string(payload.size());
     _logger.log_va_list(0, output.c_str(), vl);
     va_end(vl);
 }
 
 std::string DynamicCubeCommunicator::payloadToString(std::vector<int> &payload) {
-    // https://www.DynamicCubeCommunicatorgeeksforgeeks.org/transform-vector-string/
+    // https://www.geeksforgeeks.org/transform-vector-string/
     if (!payload.empty()) {
         std::ostringstream stringStream;
         // Convert all but the last element to avoid a trailing ","
