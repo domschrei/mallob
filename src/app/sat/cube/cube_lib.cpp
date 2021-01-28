@@ -16,7 +16,7 @@ CubeLib::CubeLib(CubeSetup &setup) {
     _cube_root = std::make_unique<CubeRoot>(setup);
 }
 
-// CubeLib::~CubeLib() { _logger.log(0, "Enter destructor of CubeLib.\n"); }
+CubeLib::~CubeLib() {}
 
 bool CubeLib::generateCubes() {
     return _cube_root->generateCubes();

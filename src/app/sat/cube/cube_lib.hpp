@@ -19,7 +19,8 @@ class CubeLib {
 
    public:
     CubeLib(CubeSetup &setup);
-    // ~CubeLib();
+    
+    ~CubeLib();
 
     bool wantsToCommunicate();
     void beginCommunication();

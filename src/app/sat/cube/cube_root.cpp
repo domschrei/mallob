@@ -149,11 +149,6 @@ std::vector<Cube> CubeRoot::prepareCubes(int target) {
     std::vector<Cube>::iterator begin = _root_cubes.begin();
     std::vector<Cube>::iterator end = _root_cubes.begin() + distance;
 
-    // Assign all cubes to target
-    for (auto it = begin; it != end; it++) {
-        it->assign(target);
-    }
-
     std::vector<Cube> prepared_cubes(begin, end);
 
     // Shuffle prepared cubes

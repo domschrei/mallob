@@ -2,24 +2,35 @@
 
 #include <cassert>
 
-const std::vector<int> Cube::getPath() {
-    return _path;
+std::vector<int> Cube::getPath() { return _path; }
+
+// TODO: This is very ugly, may be we refactor cube to use a set internally
+// Is the order of literals in a cube important? It defines the guiding path...
+bool Cube::includes(Cube &otherCube) {
+    std::vector<int> myPath = _path;
+    std::sort(myPath.begin(), myPath.end());
+
+    std::vector<int> otherPath = otherCube.getPath();
+    std::sort(otherPath.begin(), otherPath.end());
+
+    return std::includes(myPath.begin(), myPath.end(), otherPath.begin(), otherPath.end());
 }
 
-void Cube::assign(int node) {
-    _assignedTo.push_back(node);
+bool Cube::includes(std::vector<Cube> &otherCubes) {
+    for (auto &otherCube : otherCubes)
+        if (includes(otherCube)) return true;
+
+    return false;
 }
 
-size_t Cube::getAssignedCount() {
-    return _assignedTo.size();
+void Cube::extend(int lit) {
+    _path.push_back(lit);
 }
 
-void Cube::fail() {
-    _failed = true;
-}
-
-bool Cube::hasFailed() {
-    return _failed;
+std::vector<int> Cube::invert() {
+    std::vector<int> inverted;
+    for (auto lit : _path) inverted.push_back(-lit);
+    return inverted;
 }
 
 std::vector<int> serializeCubes(std::vector<Cube> &cubes) {
@@ -56,17 +67,22 @@ std::vector<Cube> unserializeCubes(std::vector<int> &serialized_cubes) {
 }
 
 void prune(std::vector<Cube> &cubes, std::vector<Cube> &failed) {
-    std::function<bool(Cube &)> includesPredicate = [&failed](Cube &cube) {
-        for (Cube &failed_cube : failed)
-            if (cube.includes(failed_cube))
-                return true;
-
-        return false;
-    };
+    std::function<bool(Cube &)> includesPredicate = [&failed](Cube &cube) { return cube.includes(failed); };
 
     // Erases all root cubes that include a failed cube
     // Behavior is defined if no root cube matches
     // https://stackoverflow.com/questions/24011627/erasing-using-iterator-from-find-or-remove
+    // Behavior is defined if cubes is empty
+    // https://stackoverflow.com/questions/23761273/stdremove-with-vectorerase-and-undefined-behavior
     // Function follows Erase-remove idiom https://en.wikipedia.org/wiki/Erase%E2%80%93remove_idiom
     cubes.erase(std::remove_if(cubes.begin(), cubes.end(), includesPredicate), cubes.end());
+}
+
+// This method remove all from new failed superseeded failed cubes in failed and then adds the new failed cubes 
+void mergeFailed(std::vector<Cube> &failed, std::vector<Cube> &new_failed) {
+    // Prune superseeded failed cubes
+    prune(failed, new_failed);
+
+    // Add new failed cubes
+    failed.insert(failed.end(), new_failed.begin(), new_failed.end());
 }
