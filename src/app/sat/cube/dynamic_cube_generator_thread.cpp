@@ -79,7 +79,7 @@ void DynamicCubeGeneratorThread::run() {
 
 void DynamicCubeGeneratorThread::generate() {
     if (_cube.has_value()) {
-        _logger.log(0, "DynamicCubeGeneratorThread %i: Started expanding the cube %s", _instance_counter, _cube.value().toString());
+        _logger.log(0, "DynamicCubeGeneratorThread %i: Started expanding the cube %s", _instance_counter, _cube.value().toString().c_str());
 
         // Assume cube
         auto path = _cube.value().getPath();
@@ -110,7 +110,7 @@ void DynamicCubeGeneratorThread::generate() {
 
             if (_solver.status() == 10) {
                 _logger.log(0, "DynamicCubeGeneratorThread %i: Found a solution: SAT", _instance_counter);
-                _logger.log(0, "DynamicCubeGeneratorThread %i: Used cube %s", _instance_counter, _cube.value().toString());
+                _logger.log(0, "DynamicCubeGeneratorThread %i: Used cube %s", _instance_counter, _cube.value().toString().c_str());
                 _logger.log(0, "DynamicCubeGeneratorThread %i: Size of added buffer of failed assumption: %zu", _instance_counter, _added_failed_assumptions_buffer);
                 _result = SAT;
 
@@ -126,7 +126,7 @@ void DynamicCubeGeneratorThread::generate() {
 
                 } else {
                     _logger.log(0, "DynamicCubeGeneratorThread %i: Found a solution: UNSAT", _instance_counter);
-                    _logger.log(0, "DynamicCubeGeneratorThread %i: Used cube %s", _instance_counter, _cube.value().toString());
+                    _logger.log(0, "DynamicCubeGeneratorThread %i: Used cube %s", _instance_counter, _cube.value().toString().c_str());
                     _logger.log(0, "DynamicCubeGeneratorThread %i: Size of added buffer of failed assumption: %zu", _instance_counter, _added_failed_assumptions_buffer);
 
                     // Intersection of assumptions and core is empty -> Formula is unsatisfiable

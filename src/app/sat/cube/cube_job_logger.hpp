@@ -59,7 +59,7 @@ class CubeJobLogger : public LoggingInterface {
     }
 
     void log_va_list(int verbosityLevel, const char *fmt, va_list args) const override {
-        char buf[1024];
+        char buf[2048];
         vsprintf(buf, fmt, args);
     
         const std::lock_guard<Mutex> lock(_logmutex);

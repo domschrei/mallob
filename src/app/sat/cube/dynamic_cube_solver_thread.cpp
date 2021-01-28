@@ -88,7 +88,7 @@ void DynamicCubeSolverThread::run() {
 
 void DynamicCubeSolverThread::solve() {
     if (_cube.has_value()) {
-        _logger.log(0, "DynamicCubeSolverThread %i: Started solving the cube %s", _instance_counter, _cube.value().toString());
+        _logger.log(0, "DynamicCubeSolverThread %i: Started solving the cube %s", _instance_counter, _cube.value().toString().c_str());
 
         // Assume and solve
         auto path = _cube.value().getPath();
@@ -97,7 +97,7 @@ void DynamicCubeSolverThread::solve() {
         // Check result
         if (result == SAT) {
             _logger.log(0, "DynamicCubeSolverThread %i: Found a solution: SAT", _instance_counter);
-            _logger.log(0, "DynamicCubeSolverThread %i: Used cube %s", _instance_counter, _cube.value().toString());
+            _logger.log(0, "DynamicCubeSolverThread %i: Used cube %s", _instance_counter, _cube.value().toString().c_str());
             _logger.log(0, "DynamicCubeSolverThread %i: Size of added buffer of failed assumption: %zu", _instance_counter, _added_failed_assumptions_buffer);
             _result = SAT;
 
@@ -105,7 +105,7 @@ void DynamicCubeSolverThread::solve() {
             // Exit solving due to an interruption
 
         } else if (result == UNSAT) {
-            _logger.log(1, "DynamicCubeSolverThread %i: The Cube %s failed", _instance_counter, _cube.value().toString());
+            _logger.log(1, "DynamicCubeSolverThread %i: The Cube %s failed", _instance_counter, _cube.value().toString().c_str());
 
             auto failed_assumptions = _solver->getFailedAssumptions();
 
@@ -115,7 +115,7 @@ void DynamicCubeSolverThread::solve() {
 
             } else {
                 _logger.log(0, "DynamicCubeSolverThread %i: Found a solution: UNSAT", _instance_counter);
-                _logger.log(0, "DynamicCubeSolverThread %i: Used cube %s", _instance_counter, _cube.value().toString());
+                _logger.log(0, "DynamicCubeSolverThread %i: Used cube %s", _instance_counter, _cube.value().toString().c_str());
                 _logger.log(0, "DynamicCubeSolverThread %i: Size of added buffer of failed assumption: %zu", _instance_counter, _added_failed_assumptions_buffer);
 
                 // Intersection of assumptions and core is empty -> Formula is unsatisfiable
