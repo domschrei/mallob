@@ -273,7 +273,7 @@ void Worker::handleNotifyJobAborting(MessageHandle& handle) {
 
     interruptJob(jobId, /*terminate=*/true, /*reckless=*/true);
     
-    if (_job_db.get(jobId).getJobTree().isRoot()) {
+    if (!_params.isNotNull("mono") && _job_db.get(jobId).getJobTree().isRoot()) {
         // Forward information on aborted job to client
         MyMpi::isend(MPI_COMM_WORLD, _job_db.get(jobId).getJobTree().getParentNodeRank(), 
             MSG_NOTIFY_JOB_ABORTING, handle.recvData);
@@ -938,6 +938,11 @@ void Worker::timeoutJob(int jobId) {
     handle.tag = MSG_NOTIFY_JOB_ABORTING;
     handle.finished = true;
     handleNotifyJobAborting(handle);
+    if (_params.isNotNull("mono")) {
+        // Single job hit a limit, so there is no solution to be reported:
+        // begin to propagate exit signal
+        MyMpi::isend(MPI_COMM_WORLD, 0, MSG_DO_EXIT, IntVec({0}));
+    }
 }
 
 void Worker::applyBalancing() {
