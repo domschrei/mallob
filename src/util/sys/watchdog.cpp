@@ -7,14 +7,19 @@ Watchdog::Watchdog(long checkIntervMillis, float time) {
 
     reset(time);
     float maxResetSecs = ((float)checkIntervMillis)/1000;
+    auto parentTid = Proc::getTid();
 
-    _thread = std::thread([&, checkIntervMillis, maxResetSecs]() {
+    _thread = std::thread([&, parentTid, checkIntervMillis, maxResetSecs]() {
         while (_running) {
             usleep(1000 * 1000 /*1 second*/);
             if (!_running) break;
             auto lock = _reset_lock.getLock();
             if (Timer::elapsedSeconds() - _last_reset > maxResetSecs) {
-                log(V0_CRIT, "Watchdog: Timeout detected -- aborting\n");
+                
+                log(V0_CRIT, "Watchdog: Timeout detected! Trying to observe the parent's current location ...\n");
+                std::string command = "gdb --q --n --ex bt --batch --pid " + std::to_string(parentTid);
+                system(command.c_str());
+                log(V0_CRIT, "Aborting.\n");
                 abort();
             }
         }
