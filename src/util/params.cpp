@@ -87,7 +87,8 @@ const char* OPTIONS =
     "\n                      l=lingeling c=cadical"
 #endif
     "\n-smcl=<max-length>    Soft maximum clause length: Only share clauses up to some length (int x >= 0; 0: no limit)"
-    "\n                      except a clause has special solver-dependent qualities";
+    "\n                      except a clause has special solver-dependent qualities"
+    "\n";
 
 /**
  * Taken from Hordesat:ParameterProcessor.h by Tomas Balyo.
@@ -186,6 +187,10 @@ void Parameters::expand() {
             std::string key = ("lbc" + std::to_string(c));
             if (!isSet(key)) setParam(key.c_str(), lbc.c_str());
         }
+    }
+    const char* maxOptions[6] = {"ihlbd", "fhlbd", "islbd", "fslbd", "hmcl", "smcl"};
+    for (auto opt : maxOptions) {
+        if (getIntParam(opt) == 0) setParam(opt, std::to_string(INT32_MAX).c_str());
     }
 }
 

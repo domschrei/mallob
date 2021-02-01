@@ -41,7 +41,7 @@ int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
 	if (usedRatio < _params.getFloatParam("icpr")) {
 		int increaser = lastInc++ % _solvers.size();
 		_solvers[increaser]->increaseClauseProduction();
-		_logger.log(V5_DEBG, "Production increase for %d. time, sid %d will increase.\n", prodInc++, increaser);
+		_logger.log(V3_VERB, "Production increase for %d. time, sid %d will increase.\n", prodInc++, increaser);
 	}
 	_logger.log(V5_DEBG, "buffer fillratio=%.3f\n", usedRatio);
 	return used;
