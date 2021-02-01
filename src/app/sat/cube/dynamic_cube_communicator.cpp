@@ -63,7 +63,8 @@ void DynamicCubeCommunicator::sendMessageToParent() {
         // Remove requester
         _requester.pop_back();
 
-        _logger.log(0, "DynamicCubeCommunicator: There are %zu requester and %zu free cubes after an iteration of satisfying", _requester.size(), _received_cubes.size());
+        _logger.log(0, "DynamicCubeCommunicator: There are %zu requester and %zu free cubes after an iteration of satisfying", _requester.size(),
+                    _received_cubes.size());
     }
 
     // Now requester or/and received cubes should be empty
@@ -148,9 +149,9 @@ void DynamicCubeCommunicator::handle(int source, JobMessage &msg) {
     // Caller guarantees that the job cannot be interrupted
 
     // Can only be suspended or active, because the message was once in the job tree
-    assert(_job.isSuspended() || _job.isActive());
+    assert(_job.isActive() || _job.isSuspended() || _job.isCommitted() || Console::fail("%s", _job.jobStateToStr()));
 
-    if (_job.isSuspended()) {
+    if (_job.isSuspended() || _job.isCommitted()) {
         // The call to suspend must already be finished
         assert(_received_cubes.empty() && _requester.empty());
 
@@ -264,7 +265,8 @@ void DynamicCubeCommunicator::releaseAll() {
 }
 
 bool DynamicCubeCommunicator::isDynamicCubeMessage(int tag) {
-    return tag == MSG_DYNAMIC_SEND || tag == MSG_DYNAMIC_REQUEST || tag == MSG_DYNAMIC_ALL_GOOD || tag == MSG_DYNAMIC_FULFILL || tag == MSG_DYNAMIC_SEND_TO_ROOT;
+    return tag == MSG_DYNAMIC_SEND || tag == MSG_DYNAMIC_REQUEST || tag == MSG_DYNAMIC_ALL_GOOD || tag == MSG_DYNAMIC_FULFILL ||
+           tag == MSG_DYNAMIC_SEND_TO_ROOT;
 }
 
 // TODO Show amount of cubes here instead of buffer

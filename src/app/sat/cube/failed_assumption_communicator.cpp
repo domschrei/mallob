@@ -118,9 +118,9 @@ void FailedAssumptionCommunicator::handle(int source, JobMessage &msg) {
     // Caller guarantees that the job cannot be interrupted
 
     // Can only be suspended or active, because the message was once in the job tree
-    assert(_job.isSuspended() || _job.isActive());
+    assert(_job.isActive() || _job.isSuspended() || _job.isCommitted() || Console::fail("%s", _job.jobStateToStr()));
 
-    if (_job.isSuspended()) {
+    if (_job.isSuspended() || _job.isCommitted()) {
         // The call to suspend must already be finished
         assert(_received_failed_assumptions.empty());
 
