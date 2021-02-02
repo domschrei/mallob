@@ -64,7 +64,7 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         int numAggregated = msg.payload.back();
         msg.payload.pop_back();
         std::vector<int>& clauses = msg.payload;
-        testConsistency(clauses);
+        testConsistency(clauses, std::ceil(getBufferLimit(numAggregated)));
         
         log(V5_DEBG, "%s : receive, size %i\n", _job->toStr(), clauses.size());
         
@@ -82,9 +82,9 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
     }
 }
 
-void AnytimeSatClauseCommunicator::learnClauses(const std::vector<int>& clauses) {
+void AnytimeSatClauseCommunicator::learnClauses(std::vector<int>& clauses) {
     log(V4_VVER, "%s : learn, size %i\n", _job->toStr(), clauses.size());
-    testConsistency(clauses);
+    testConsistency(clauses, 0);
     
     if (clauses.size() > 0) {
         // Locally learn clauses
@@ -146,7 +146,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
         log(V4_VVER, "%s : collect local cls, max. size %i\n", 
                     _job->toStr(), selfSize);
         selfClauses = _job->getPreparedClauses();
-        testConsistency(selfClauses);
+        testConsistency(selfClauses, selfSize);
     }
     _clause_buffers.push_back(selfClauses);
 
@@ -156,7 +156,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     std::vector<std::vector<int>*> buffers;
     for (auto& buf : _clause_buffers) buffers.push_back(&buf);
     std::vector<int> vec = merge(buffers, totalSize);
-    testConsistency(vec);
+    testConsistency(vec, totalSize);
 
     // Reset clause buffers
     _clause_buffers.clear();
@@ -194,8 +194,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
             // Clause finished
 
             // Clause buffer size limit reached?
-            if (result.size() + cls.size() > maxSize)
-                return result;
+            if (result.size() + cls.size() > maxSize) break;
 
             // Clause not seen yet?
             if (_clause_filter.insert(cls).second) {
@@ -217,9 +216,9 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
     }
 
     int clauseLength = 1;
-    bool anyLeft = true;
-    while (anyLeft) {
-        anyLeft = false;
+    bool doContinue = true;
+    while (doContinue) {
+        doContinue = false;
 
         // Get number of clauses of clauseLength for each buffer
         // and also the sum over all these numbers
@@ -228,7 +227,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
         for (size_t i = 0; i < buffers.size(); i++) {
             nclsoflen[i] = positions[i] < (int)buffers[i]->size() ? 
                             buffers[i]->at(positions[i]) : 0;
-            if (positions[i] < (int)buffers[i]->size()) anyLeft = true;
+            if (positions[i] < (int)buffers[i]->size()) doContinue = true;
             allclsoflen += nclsoflen[i];
             positions[i]++;
         }
@@ -241,7 +240,10 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
         int picked = -1;
         while (allclsoflen > 0) {
             // Limit reached?
-            if (result.size() + clauseLength > maxSize) return result;
+            if (result.size() + clauseLength > maxSize) {
+                doContinue = false;
+                break;
+            }
 
             // Identify next clause
             do picked = (picked+1) % nvips.size(); while (nclsoflen[picked] == 0);
@@ -272,12 +274,21 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
         clauseLength++;
     }
 
+    // Remove trailing zeroes because they are unnecessary
+    // (as long as the buffer does not become empty)
+    while (result.size() > 1 && result.back() == 0) result.pop_back();
+
     _clause_filter.clear();
     return result;
 }
 
-bool AnytimeSatClauseCommunicator::testConsistency(const std::vector<int>& buffer) {
+bool AnytimeSatClauseCommunicator::testConsistency(std::vector<int>& buffer, size_t maxSize) {
     if (buffer.empty()) return true;
+
+    if (maxSize > 0 && buffer.size() > maxSize) {
+        log(V0_CRIT, "Clause buffer too full (%i/%i) - aborting\n", buffer.size(), maxSize);
+        abort();
+    }
 
     int consistent = 0;
     size_t pos = 0;
