@@ -6,7 +6,7 @@
 #include "hordesat/utilities/clause_filter.hpp"
 
 float AnytimeSatClauseCommunicator::getBufferLimit(int numAggregatedNodes) {
-    return _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(numAggregatedNodes+1));
+    return numAggregatedNodes * _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(numAggregatedNodes+1));
 }
 
 bool AnytimeSatClauseCommunicator::canSendClauses() {
@@ -276,7 +276,8 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
 
     // Remove trailing zeroes because they are unnecessary
     // (as long as the buffer does not become empty)
-    while (result.size() > 1 && result.back() == 0) result.pop_back();
+    while (result.size() > 1 && result.back() == 0 && result[result.size()-2] == 0) 
+        result.pop_back();
 
     _clause_filter.clear();
     return result;
