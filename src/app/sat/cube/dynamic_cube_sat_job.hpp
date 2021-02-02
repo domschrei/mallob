@@ -57,7 +57,7 @@ class DynamicCubeSatJob : public Job {
     // Methods required by the dynamic cube communicator
 
     bool isRequesting();
-    std::vector<Cube> getCubes(size_t bias);
+    std::vector<Cube> getCubes(int bias);
     void digestCubes(std::vector<Cube>& cubes);
     std::vector<Cube> releaseAllCubes();
 

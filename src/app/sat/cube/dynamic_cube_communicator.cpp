@@ -29,8 +29,9 @@ void DynamicCubeCommunicator::sendMessageToParent() {
         _requester.push_back(_job.getMyMpiRank());
 
     } else {
+        // Calculate how many cubes are needed to send fulfill each request with the specified amount of cubes per request
+        int bias = static_cast<int>(_requester.size()) * _cubesPerRequest - static_cast<int>(_received_cubes.size());
         // Try to get cubes. This is biased by the received requests and cubes
-        size_t bias = _requester.size() * _cubesPerRequest - _received_cubes.size();
         std::vector<Cube> cubes = _job.getCubes(bias);
 
         _logger.log(0, "DynamicCubeCommunicator: This job shares %zu free cubes", cubes.size());
@@ -43,15 +44,15 @@ void DynamicCubeCommunicator::sendMessageToParent() {
 
     // Satisfy nodes while both requester and received cubes is set
     while (!_requester.empty() && !_received_cubes.empty()) {
-        size_t requesterCount = _requester.size();
-        size_t cubeCount = _received_cubes.size();
+        int requesterCount = static_cast<int>(_requester.size());
+        int cubeCount = static_cast<int>(_received_cubes.size());
 
         // Calculate min of ceiled division and maximum cubes per request
-        size_t cubesPerNextRequester = std::min(cubeCount / requesterCount + (cubeCount % requesterCount != 0), _cubesPerRequest);
+        int cubesPerNextRequester = std::min(cubeCount / requesterCount + (cubeCount % requesterCount != 0), _cubesPerRequest);
 
         // Extract cubes
         std::vector<Cube> cubesToSend;
-        for (size_t i = 0; i < cubesPerNextRequester; i++) {
+        for (int i = 0; i < cubesPerNextRequester; i++) {
             assert(!_received_cubes.empty());
             cubesToSend.push_back(_received_cubes.back());
             _received_cubes.pop_back();

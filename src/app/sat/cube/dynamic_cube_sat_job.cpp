@@ -254,7 +254,7 @@ bool DynamicCubeSatJob::isRequesting() {
         return _lib->isRequesting();
 }
 
-std::vector<Cube> DynamicCubeSatJob::getCubes(size_t bias) {
+std::vector<Cube> DynamicCubeSatJob::getCubes(int bias) {
     // The caller guarantees that the job is active -> active is needed to communicate with parent and children
 
     // Return empty vector if not the lib is not initialized

@@ -20,7 +20,7 @@ class DynamicCubeCommunicator {
     LoggingInterface &_logger;
 
     // How many cubes should be send to a requesting job instance
-    size_t _cubesPerRequest = 0;
+    int _cubesPerRequest = 0;
 
     // Counts how many messages were received since last send
     // Is reset after every sendMessageToParent

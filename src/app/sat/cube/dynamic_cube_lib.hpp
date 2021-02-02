@@ -19,25 +19,22 @@ class DynamicCubeLib : public DynamicCubeSolverThreadManagerInterface, public Dy
     std::atomic<State> _state{INACTIVE};
 
     // Number of local threads that solve cubes
-    size_t _solver_thread_count = 0;
+    int _solver_thread_count = 0;
 
     // Cube solver threads
     // Wrap instances in unique_ptr to work around
     // https://stackoverflow.com/questions/42180500/vector-of-thread-wrapper-with-thread-bound-to-class-member-function
     std::vector<std::unique_ptr<DynamicCubeSolverThread>> _solver_threads;
 
-    size_t _max_dynamic_cubes = 0;
+    int _max_dynamic_cubes = 0;
 
     // Number of local threads that generate cubes
-    size_t _generator_thread_count = 0;
+    int _generator_thread_count = 0;
 
     // Cube generator threads
     // Wrap instances in unique_ptr to work around
     // https://stackoverflow.com/questions/42180500/vector-of-thread-wrapper-with-thread-bound-to-class-member-function
     std::vector<std::unique_ptr<DynamicCubeGeneratorThread>> _generator_threads;
-
-    // size of send cubes
-    size_t _cubes_per_worker = 0;
 
     // State to manage cube requests via wantsToCommunicate and beginCommunication
     enum RequestState {
@@ -95,7 +92,7 @@ class DynamicCubeLib : public DynamicCubeSolverThreadManagerInterface, public Dy
 
     // For cube communication
     bool isRequesting();
-    std::vector<Cube> getCubes(size_t bias);
+    std::vector<Cube> getCubes(int bias);
     void digestCubes(std::vector<Cube> &cubes);
     std::vector<Cube> releaseAllCubes();
 

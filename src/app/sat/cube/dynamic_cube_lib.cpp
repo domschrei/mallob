@@ -16,14 +16,14 @@ DynamicCubeLib::DynamicCubeLib(DynamicCubeSetup &setup, bool isRoot) : _logger(s
     _generator_thread_count = 1;
 
     // Create cube solver threads
-    for (size_t i = 0; i < _solver_thread_count; i++) {
+    for (int i = 0; i < _solver_thread_count; i++) {
         // https://stackoverflow.com/questions/3283778/why-can-i-not-push-back-a-unique-ptr-into-a-vector
         std::unique_ptr<DynamicCubeSolverThread> solver = std::make_unique<DynamicCubeSolverThread>(*this, setup);
         _solver_threads.push_back(std::move(solver));
     }
 
     // Create cube generator threads
-    for (size_t i = 0; i < _generator_thread_count; i++) {
+    for (int i = 0; i < _generator_thread_count; i++) {
         // https://stackoverflow.com/questions/3283778/why-can-i-not-push-back-a-unique-ptr-into-a-vector
         std::unique_ptr<DynamicCubeGeneratorThread> generator = std::make_unique<DynamicCubeGeneratorThread>(*this, setup);
         _generator_threads.push_back(std::move(generator));
@@ -182,10 +182,10 @@ void DynamicCubeLib::shareCubeToSplit(std::optional<Cube> &lastCube, int splitLi
             // Leave next cube empty on interruption
             return;
 
-        } else if (_dynamic_cubes.size() > _max_dynamic_cubes) {
+        } else if (static_cast<int>(_dynamic_cubes.size()) > _max_dynamic_cubes) {
             _logger.log(0, "DynamicCubeGeneratorThread waits because there are too many cubes");
             // Wait because there are too many cubes
-            _generator_cv.wait(lock, [&] { return _dynamic_cubes.size() <= _max_dynamic_cubes || _state.load() == INTERRUPTING; });
+            _generator_cv.wait(lock, [&] { return static_cast<int>(_dynamic_cubes.size()) <= _max_dynamic_cubes || _state.load() == INTERRUPTING; });
 
         } else if (!_dynamic_cubes.hasACubeForSplitting()) {
             if (_request_state == NONE && !_dynamic_cubes.hasSplittingCubes()) {
@@ -240,12 +240,14 @@ bool DynamicCubeLib::isRequesting() {
     }
 }
 
-std::vector<Cube> DynamicCubeLib::getCubes(size_t bias) {
+std::vector<Cube> DynamicCubeLib::getCubes(int bias) {
     const std::lock_guard<Mutex> lock(_local_lock);
 
     assert(_state.load() == ACTIVE);
 
-    size_t cubesToGet = std::max(_dynamic_cubes.size() - _solver_thread_count * 2, bias);
+    // Using initializer list for comparing 3 values
+    // https://codereview.stackexchange.com/questions/26100/maximum-of-three-values-in-c
+    int cubesToGet = std::max({static_cast<int>(_dynamic_cubes.size()) - _solver_thread_count * 2, bias, 0});
 
     return _dynamic_cubes.getFreeCubesForSending(cubesToGet);
 }
