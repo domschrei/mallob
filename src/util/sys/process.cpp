@@ -39,6 +39,9 @@ void handleAbort(int sig) {
     log(V0_CRIT, "Error from pid=%ld tid=%ld signal=%d\n", Proc::getPid(), Proc::getTid(), sig);
     log(V0_CRIT, "Backtrace: \n%s\n", backtrace().c_str());
 
+    // additionally write a trace of this thread found by gdb
+    Process::writeTrace(Proc::getTid());
+
     // Send exit signals to children and exit yourself
     Process::forwardTerminateToChildren();
     exit(sig);
@@ -134,4 +137,12 @@ bool Process::didChildExit(pid_t childpid) {
 
 bool Process::isExitSignalCaught() {
     return _exit_signal_caught;
+}
+
+void Process::writeTrace(long tid) {
+    long callingTid = Proc::getTid();
+    std::string command = "gdb --q --n --ex bt --batch --pid " + std::to_string(tid) 
+            + " > mallob_thread_trace_" + std::to_string(tid) 
+            + "_by_" + std::to_string(callingTid) + " 2>&1";
+    system(command.c_str());
 }

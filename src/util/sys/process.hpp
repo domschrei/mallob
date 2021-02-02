@@ -34,6 +34,8 @@ public:
     /* 0: running, -1: error, childpid: exited */
     static bool didChildExit(pid_t childpid);
     static bool isExitSignalCaught();
+
+    static void writeTrace(long tid);
 };
 
 #endif

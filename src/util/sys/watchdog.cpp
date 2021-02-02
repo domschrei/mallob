@@ -2,6 +2,7 @@
 #include "watchdog.hpp"
 
 #include "util/logger.hpp"
+#include "util/sys/process.hpp"
 
 Watchdog::Watchdog(long checkIntervMillis, float time) {
 
@@ -16,9 +17,8 @@ Watchdog::Watchdog(long checkIntervMillis, float time) {
             auto lock = _reset_lock.getLock();
             if (Timer::elapsedSeconds() - _last_reset > maxResetSecs) {
                 
-                log(V0_CRIT, "Watchdog: Timeout detected! Trying to observe the parent's current location ...\n");
-                std::string command = "gdb --q --n --ex bt --batch --pid " + std::to_string(parentTid);
-                system(command.c_str());
+                log(V0_CRIT, "Watchdog: Timeout detected! Writing trace ...\n");
+                Process::writeTrace(parentTid);
                 log(V0_CRIT, "Aborting.\n");
                 abort();
             }
