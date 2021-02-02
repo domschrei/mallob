@@ -28,6 +28,17 @@ class FailedAssumptionCommunicator {
     // Filter for received failed assumption
     std::unordered_set<std::vector<int>, ClauseFilter::ClauseHasher> _clause_filter;
 
+    // New clauses that were learnt in the last call of persist
+    std::vector<int> _new_clauses;
+
+    // Root member
+    // Start index from all clauses for distribute
+    int _distribute_start_index = 0;
+
+    // Root member
+    // Storing all clauses from the clause filter in a serial form
+    std::vector<int> _all_clauses;
+
     // Add the failed assumptions to the local filter and add them to the corresponding lib
     void persist(std::vector<int> &failed_assumptions);
 

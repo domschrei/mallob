@@ -24,22 +24,128 @@ void FailedAssumptionCommunicator::gather() {
     _received_failed_assumptions.insert(_received_failed_assumptions.end(), failed_assumption.begin(), failed_assumption.end());
 
     if (_job.isRoot()) {
-        // TODO Do we have the problem here that a clause may be never added to the root filter because there was a random collision due to the bloom filter?
+        // Persist everything received
         persist(_received_failed_assumptions);
 
+        // Clear received failed assumptions
         _received_failed_assumptions.clear();
 
-        // For the beginning we always distribute all found failed assumptions
-        // Merge all clauses in the filter into one vector
-        std::vector<int> clauses_to_distribute;
-        for (auto &clause : _clause_filter) {
-            clauses_to_distribute.insert(clauses_to_distribute.end(), clause.begin(), clause.end());
-        }
-        // TODO Improve this
+        // Start distribute if there are new clauses or existing clauses
+        if (!_new_clauses.empty() || !_all_clauses.empty()) {
+            // We set a fix limit for distribute
+            // Every distribute we share the new clauses
+            // Then we fill the buffer using old clauses, starting from the member _distribute_start_index
+            const int limit = 10000;
+            // TODO Rework using dynamic limit from AnyTimeSatClauseCommunicator
 
-        // If there are failed assumptions, distribute them
-        if (!clauses_to_distribute.empty()) {
-            distribute(clauses_to_distribute);
+            // Buffer for distribute
+            std::vector<int> clauses_to_distribute;
+
+            // Insert new clauses from last persist
+            // If there are no new clauses, none are inserted
+            clauses_to_distribute.insert(clauses_to_distribute.end(), _new_clauses.begin(), _new_clauses.end());
+
+            if (_new_clauses.size() + _all_clauses.size() <= limit) {
+                // All clauses can be send
+
+                // Reset start index
+                _distribute_start_index = 0;
+
+                // Insert all clauses into distribute buffer
+                clauses_to_distribute.insert(clauses_to_distribute.end(), _all_clauses.begin(), _all_clauses.end());
+
+            } else {
+                // Not all clauses can be send
+
+                // Remaining space in distribute buffer
+                int remaining = limit - static_cast<int>(_new_clauses.size());
+                // Must be larger than zero
+                assert(remaining >= 1);
+
+                // The start index must point at the beginning of a clause
+                assert(_all_clauses.at(_distribute_start_index) != 0);
+                assert(_distribute_start_index == 0 || _all_clauses.at(_distribute_start_index - 1) == 0);
+                // This clause is the first one to send
+
+                // Create iterator from start index
+                std::vector<int>::iterator start_iterator = std::next(_all_clauses.begin(), _distribute_start_index);
+
+                assert(*start_iterator == _all_clauses.at(_distribute_start_index));
+
+                // How many elements can be send before setting the start index back to the beginning
+                int size_until_end = std::distance(start_iterator, _all_clauses.end());
+                // Must be greater than or equal to two, since that is the smallest size for a clause
+                assert(size_until_end >= 2);
+
+                if (size_until_end == remaining) {
+                    // The elements between the start index and the end are exactly enough to fill the distribute buffer to its limit
+
+                    clauses_to_distribute.insert(clauses_to_distribute.end(), start_iterator, _all_clauses.end());
+
+                    _distribute_start_index = 0;
+
+                } else if (size_until_end > remaining) {
+                    // The elements between the start index and the end are more than needed to fill the distribute buffer to its limit
+
+                    // This reverse iterator points inclusively between the same element of start_iterator or at the second to last element of _all_clauses
+                    std::vector<int>::reverse_iterator reverse_end_iterator = std::next(_all_clauses.rbegin(), size_until_end - remaining);
+
+                    // Find closest zero or the end
+                    reverse_end_iterator = std::find(reverse_end_iterator, _all_clauses.rend(), 0);
+
+                    assert(reverse_end_iterator == _all_clauses.rend() || *reverse_end_iterator == 0);
+
+                    // Create iterator one element behind reverse_end_iterator
+                    // https://riptutorial.com/cplusplus/example/5101/reverse-iterators
+                    std::vector<int>::iterator end_iterator = reverse_end_iterator.base();
+
+                    assert(end_iterator != _all_clauses.end());
+                    assert(std::distance(start_iterator, end_iterator) < remaining);
+
+                    clauses_to_distribute.insert(clauses_to_distribute.end(), start_iterator, end_iterator);
+
+                    // Set _distribute_start_index to index of end iterator
+                    _distribute_start_index = end_iterator - _all_clauses.begin();
+
+                } else {
+                    // The elements between the start index and the end are less than needed to fill the distribute buffer to its limit
+                    // Add them all and get the remaining from the beginning of _all_clauses
+
+                    clauses_to_distribute.insert(clauses_to_distribute.end(), start_iterator, _all_clauses.end());
+
+                    // Recalculate remaining
+                    remaining = remaining - size_until_end;
+
+                    // Remaining must be lower than the size
+                    assert(_all_clauses.size() > remaining);
+                    // This reverse iterator points at the maximum amount of elements that are in the limit
+                    std::vector<int>::reverse_iterator reverse_end_iterator = std::next(_all_clauses.rbegin(), _all_clauses.size() - remaining);
+
+                    // Find closest zero or the end
+                    reverse_end_iterator = std::find(reverse_end_iterator, _all_clauses.rend(), 0);
+
+                    assert(reverse_end_iterator == _all_clauses.rend() || *reverse_end_iterator == 0);
+
+                    // Create iterator one element behind reverse_end_iterator
+                    // https://riptutorial.com/cplusplus/example/5101/reverse-iterators
+                    std::vector<int>::iterator end_iterator = reverse_end_iterator.base();
+
+                    clauses_to_distribute.insert(clauses_to_distribute.end(), _all_clauses.begin(), end_iterator);
+
+                    // Set _distribute_start_index to index of end iterator
+                    _distribute_start_index = end_iterator - _all_clauses.begin();
+                }
+            }
+
+            assert(clauses_to_distribute.size() <= limit);
+
+            // Distribute if there is something to distribute
+            if (!clauses_to_distribute.empty()) {
+                distribute(clauses_to_distribute);
+            }
+
+            // Insert new clauses into all clauses
+            _all_clauses.insert(_all_clauses.end(), _new_clauses.begin(), _new_clauses.end());
         }
 
     } else {
@@ -62,7 +168,8 @@ void FailedAssumptionCommunicator::gather() {
 void FailedAssumptionCommunicator::persist(std::vector<int> &failed_assumptions) {
     // Failed assumption may be empty
 
-    std::vector<int> new_clauses;
+    _new_clauses.clear();
+
     std::vector<int> clause;
 
     for (auto lit : failed_assumptions) {
@@ -77,7 +184,7 @@ void FailedAssumptionCommunicator::persist(std::vector<int> &failed_assumptions)
             bool clause_is_new = _clause_filter.insert(clause).second;
 
             // If the clause is new add it to new clauses
-            if (clause_is_new) new_clauses.insert(new_clauses.end(), clause.begin(), clause.end());
+            if (clause_is_new) _new_clauses.insert(_new_clauses.end(), clause.begin(), clause.end());
 
             // Clear local variable
             clause.clear();
@@ -91,7 +198,7 @@ void FailedAssumptionCommunicator::persist(std::vector<int> &failed_assumptions)
     assert(clause.empty());
 
     // Pass new failed assumption to the lib
-    if (!new_clauses.empty()) _job.digestFailedAssumptions(new_clauses);
+    if (!_new_clauses.empty()) _job.digestFailedAssumptions(_new_clauses);
 }
 
 void FailedAssumptionCommunicator::distribute(std::vector<int> &failed_assumptions) {
