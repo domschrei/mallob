@@ -194,6 +194,8 @@ void MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::vecto
         handle.sendData.resize(prevSize+sizeof(int));
         memcpy(handle.sendData.data()+prevSize, &tag, sizeof(int));
         tag = MSG_ANYTIME;
+        assert(handle.sendData.size() <= _max_msg_length 
+            || log_return_false("Too long message of size %i\n", _max_msg_length));
     }
     handle.tag = tag;
 
