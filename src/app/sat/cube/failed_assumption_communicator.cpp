@@ -87,8 +87,10 @@ void FailedAssumptionCommunicator::gather() {
                 } else if (size_until_end > remaining) {
                     // The elements between the start index and the end are more than needed to fill the distribute buffer to its limit
 
-                    // This reverse iterator points inclusively between the same element of start_iterator or at the second to last element of _all_clauses
+                    // The range [start_iterator, reverse_end_iterator] should contain exactly #remaining items
                     std::vector<int>::reverse_iterator reverse_end_iterator = std::next(_all_clauses.rbegin(), size_until_end - remaining);
+
+                    assert(std::distance(start_iterator, reverse_end_iterator.base()) == remaining);
 
                     // Find closest zero or the end
                     reverse_end_iterator = std::find(reverse_end_iterator, _all_clauses.rend(), 0);
@@ -99,8 +101,10 @@ void FailedAssumptionCommunicator::gather() {
                     // https://riptutorial.com/cplusplus/example/5101/reverse-iterators
                     std::vector<int>::iterator end_iterator = reverse_end_iterator.base();
 
-                    assert(end_iterator != _all_clauses.end());
-                    assert(std::distance(start_iterator, end_iterator) < remaining);
+                    // The end iterator must be at the same position or after the start iterator
+                    assert(end_iterator - start_iterator >= 0);
+                    // The distance cannot be higher than remaining
+                    assert(std::distance(start_iterator, end_iterator) <= remaining);
 
                     clauses_to_distribute.insert(clauses_to_distribute.end(), start_iterator, end_iterator);
 
@@ -118,8 +122,10 @@ void FailedAssumptionCommunicator::gather() {
 
                     // Remaining must be lower than the size
                     assert(static_cast<int>(_all_clauses.size()) > remaining);
-                    // This reverse iterator points at the maximum amount of elements that are in the limit
+                    // The range [_all_clauses.begin(), reverse_end_iterator] should contain exactly #remaining items
                     std::vector<int>::reverse_iterator reverse_end_iterator = std::next(_all_clauses.rbegin(), _all_clauses.size() - remaining);
+
+                    assert(std::distance(_all_clauses.begin(), reverse_end_iterator.base()) == remaining);
 
                     // Find closest zero or the end
                     reverse_end_iterator = std::find(reverse_end_iterator, _all_clauses.rend(), 0);
@@ -129,6 +135,9 @@ void FailedAssumptionCommunicator::gather() {
                     // Create iterator one element behind reverse_end_iterator
                     // https://riptutorial.com/cplusplus/example/5101/reverse-iterators
                     std::vector<int>::iterator end_iterator = reverse_end_iterator.base();
+
+                    // The distance cannot be higher than remaining
+                    assert(std::distance(_all_clauses.begin(), end_iterator) <= remaining);
 
                     clauses_to_distribute.insert(clauses_to_distribute.end(), _all_clauses.begin(), end_iterator);
 
