@@ -41,7 +41,8 @@ public:
 
 private:
     
-    float getBufferLimit(int numAggregatedNodes);
+    enum BufferMode {SELF, ALL};
+    size_t getBufferLimit(int numAggregatedNodes, BufferMode mode);
 
     std::vector<int> prepareClauses(); 
     void learnClauses(std::vector<int>& clauses);

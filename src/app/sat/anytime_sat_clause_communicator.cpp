@@ -5,8 +5,13 @@
 #include "comm/mympi.hpp"
 #include "hordesat/utilities/clause_filter.hpp"
 
-float AnytimeSatClauseCommunicator::getBufferLimit(int numAggregatedNodes) {
-    return numAggregatedNodes * _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(numAggregatedNodes+1));
+size_t AnytimeSatClauseCommunicator::getBufferLimit(int numAggregatedNodes, BufferMode mode) {
+    float limit = _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(numAggregatedNodes+1));
+    if (mode == SELF) {
+        return std::ceil(limit);
+    } else {
+        return std::ceil(numAggregatedNodes * limit);
+    }
 }
 
 bool AnytimeSatClauseCommunicator::canSendClauses() {
@@ -19,7 +24,7 @@ bool AnytimeSatClauseCommunicator::canSendClauses() {
 
     if (_clause_buffers.size() >= numChildren) {
         if (!_job->hasPreparedSharing()) {
-            int limit = std::ceil(getBufferLimit(_num_aggregated_nodes+1) / (_num_aggregated_nodes+1));
+            int limit = getBufferLimit(_num_aggregated_nodes+1, BufferMode::SELF);
             _job->prepareSharing(limit);
         }
         if (_job->hasPreparedSharing()) {
@@ -64,7 +69,7 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         int numAggregated = msg.payload.back();
         msg.payload.pop_back();
         std::vector<int>& clauses = msg.payload;
-        testConsistency(clauses, std::ceil(getBufferLimit(numAggregated)));
+        testConsistency(clauses, getBufferLimit(numAggregated, BufferMode::ALL));
         
         log(V5_DEBG, "%s : receive, size %i\n", _job->toStr(), clauses.size());
         
@@ -130,9 +135,8 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     _num_aggregated_nodes++;
 
     assert(_num_aggregated_nodes > 0);
-    float s = getBufferLimit(_num_aggregated_nodes);
-    int totalSize = std::ceil(s);
-    int selfSize = std::ceil(s / _num_aggregated_nodes);
+    int totalSize = getBufferLimit(_num_aggregated_nodes, BufferMode::ALL);
+    int selfSize = getBufferLimit(_num_aggregated_nodes, BufferMode::SELF);
     log(V5_DEBG, "%s : aggregated=%i max_self=%i max_total=%i\n", _job->toStr(), 
             _num_aggregated_nodes, selfSize, totalSize);
 
@@ -219,6 +223,11 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
     bool doContinue = true;
     while (doContinue) {
         doContinue = false;
+
+        if (result.size() + 1 + clauseLength > maxSize) {
+            // No clauses of this size are fitting into the buffer any more: stop
+            break;
+        }
 
         // Get number of clauses of clauseLength for each buffer
         // and also the sum over all these numbers
