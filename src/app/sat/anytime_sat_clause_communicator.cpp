@@ -131,8 +131,8 @@ void AnytimeSatClauseCommunicator::sendClausesToChildren(const std::vector<int>&
 
 std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
 
-    // +1 for local clauses
-    _num_aggregated_nodes++;
+    // +1 for local clauses, but at most as many contributions as there are nodes
+    _num_aggregated_nodes = std::min(_num_aggregated_nodes+1, _job->getJobTree().getCommSize());
 
     assert(_num_aggregated_nodes > 0);
     int totalSize = getBufferLimit(_num_aggregated_nodes, BufferMode::ALL);

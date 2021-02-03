@@ -19,8 +19,6 @@
 
 #include "msgtags.h"
 
-#define MAX_JOB_MESSAGE_PAYLOAD_PER_NODE 1500*sizeof(int)
-#define MAX_ANYTIME_MESSAGE_SIZE 1024
 #define MIN_PRIORITY 0
 
 /*

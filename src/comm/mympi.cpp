@@ -104,7 +104,6 @@ void MyMpi::init(int argc, char *argv[]) {
         exit(1);
     }
 
-    _max_msg_length = MyMpi::size(MPI_COMM_WORLD) * MAX_JOB_MESSAGE_PAYLOAD_PER_NODE + MAX_ANYTIME_MESSAGE_SIZE;
     handleId = 1;
 
     std::vector<MsgTag> tagList;
@@ -157,6 +156,7 @@ void MyMpi::setOptions(const Parameters& params) {
         log(verb, "Enabling latency monkey\n");
         _monkey_flags |= MONKEY_LATENCY;
     }
+    _max_msg_length = sizeof(int) * MyMpi::size(MPI_COMM_WORLD) * params.getIntParam("cbbs") + 1024;
 }
 
 void MyMpi::beginListening() {
