@@ -168,7 +168,11 @@ int DynamicCubeSatJob::appl_solveLoop() {
 
 void DynamicCubeSatJob::appl_dumpStats() {}
 
-bool DynamicCubeSatJob::appl_isDestructible() { return _job_state == State::WITHDRAWN; }
+bool DynamicCubeSatJob::appl_isDestructible() {
+    // Allow destruction when this job was not initialized
+    // This should not be a race condition, since it is done in the threaded_sat_job.cpp
+    return !appl_doneInitializing() || _job_state == State::WITHDRAWN;
+}
 
 bool DynamicCubeSatJob::appl_wantsToBeginCommunication() const {
     // Before this method is called isInStateUnsafe({ACTIVE, INITIALIZING_TO_ACTIVE}) is checked
