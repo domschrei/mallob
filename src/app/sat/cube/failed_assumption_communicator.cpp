@@ -117,7 +117,7 @@ void FailedAssumptionCommunicator::gather() {
                     remaining = remaining - size_until_end;
 
                     // Remaining must be lower than the size
-                    assert(_all_clauses.size() > remaining);
+                    assert(static_cast<int>(_all_clauses.size()) > remaining);
                     // This reverse iterator points at the maximum amount of elements that are in the limit
                     std::vector<int>::reverse_iterator reverse_end_iterator = std::next(_all_clauses.rbegin(), _all_clauses.size() - remaining);
 
@@ -315,6 +315,24 @@ void FailedAssumptionCommunicator::sendToRoot(std::vector<int> &failed_assumptio
     int rootNodeRank = _job.getRootNodeRank();
     log_send(rootNodeRank, msg.payload, "sendToRoot");
     MyMpi::isend(MPI_COMM_WORLD, rootNodeRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+}
+
+void FailedAssumptionCommunicator::release() {
+    // The caller guarantees that the DynamicCubeSatJob was interrupted
+
+    // Reset messageCounter
+    _messageCounter = 0;
+
+    // Get local failed assumptions and insert into received failed assumptions
+    auto failed_assumption = _job.getFailedAssumptions();
+    _received_failed_assumptions.insert(_received_failed_assumptions.end(), failed_assumption.begin(), failed_assumption.end());
+
+    if (!_received_failed_assumptions.empty()) {
+        sendToRoot(_received_failed_assumptions);
+    }
+
+    // Clear everything
+    _received_failed_assumptions.clear();
 }
 
 bool FailedAssumptionCommunicator::isFailedAssumptionMessage(int tag) {

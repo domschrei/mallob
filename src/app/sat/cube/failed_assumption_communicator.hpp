@@ -57,6 +57,8 @@ class FailedAssumptionCommunicator {
 
     void handle(int source, JobMessage &msg);
 
+    void release();
+
     static bool isFailedAssumptionMessage(int tag);
 };
 

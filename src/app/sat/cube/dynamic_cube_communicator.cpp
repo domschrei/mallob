@@ -251,6 +251,9 @@ void DynamicCubeCommunicator::sendCubesToRoot(std::vector<Cube> &cubes) {
 void DynamicCubeCommunicator::releaseAll() {
     // The caller guarantees that the DynamicCubeSatJob was interrupted and the cubes were unassigned
 
+    // Reset messageCounter
+    _messageCounter = 0;
+
     auto cubes = _job.releaseAllCubes();
 
     // Insert released cubes into received cubes

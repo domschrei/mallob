@@ -77,9 +77,12 @@ void DynamicCubeSatJob::appl_pause() {
     } else if (_job_state == WORKING) {
         // Synchronously interrupt and join the dynamic cube lib
         _lib->suspend();
+
         // Release all cubes
         ((DynamicCubeCommunicator*)_dynamic_cube_comm)->releaseAll();
-        // TODO: Share all found failed cubes
+
+        // Share all found failed cubes
+        ((FailedAssumptionCommunicator*)_failed_assumption_comm)->release();
 
         // Set state to suspended
         _job_state = SUSPENDED;
