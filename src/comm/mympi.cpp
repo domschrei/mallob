@@ -15,8 +15,8 @@
 int err = cmd; if (!MyMpi::_monitor_off) endcall(); chkerr(err);}
 
 int MyMpi::_max_msg_length;
-std::vector<MyMpi::MessageHandlePtr> MyMpi::_handles;
-std::vector<MyMpi::MessageHandlePtr> MyMpi::_sent_handles;
+std::vector<MessageHandlePtr> MyMpi::_handles;
+std::vector<MessageHandlePtr> MyMpi::_sent_handles;
 robin_hood::unordered_map<int, MsgTag> MyMpi::_tags;
 bool MyMpi::_monitor_off;
 int MyMpi::_monkey_flags = 0;
@@ -182,32 +182,29 @@ void MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::vecto
     bool selfMessage = rank(communicator) == recvRank;
 
     auto& handles = (selfMessage ? _handles : _sent_handles);
-    handles.emplace_back(new MessageHandle(nextHandleId(), object));
+    // Append a single zero to an otherwise empty message
+    handles.emplace_back(new MessageHandle(nextHandleId(), 
+            object.empty() ? std::vector<uint8_t>(1, 0) : object
+    ));
     auto& handle = *handles.back();
     int appTag = tag;
 
-    // Append a single zero to an otherwise empty message
-    if (handle.sendData.empty()) handle.sendData.push_back(0);
     // Overwrite tag as MSG_ANYTIME, append application tag to message
     if (isAnytimeTag(tag)) {
-        int prevSize = object.size();
-        handle.sendData.resize(prevSize+sizeof(int));
-        memcpy(handle.sendData.data()+prevSize, &tag, sizeof(int));
+        handle.appendTagToSendData(tag);
         tag = MSG_ANYTIME;
-        assert(handle.sendData.size() <= _max_msg_length 
+        assert(handle.getSendData().size() <= _max_msg_length 
             || log_return_false("Too long message of size %i\n", _max_msg_length));
     }
     handle.tag = tag;
 
     log(V5_DEBG, "Msg ID=%i dest=%i tag=%i size=%i\n", handle.id, 
-                recvRank, appTag, handle.sendData.size());
+                recvRank, appTag, handle.getSendData().size());
     
     if (selfMessage) {
-        handle.recvData = handle.sendData;
-        handle.source = recvRank;
-        handle.selfMessage = true;
+        handle.receiveSelfMessage(handle.getSendData(), recvRank);
     } else {
-        MPICALL(MPI_Isend(handle.sendData.data(), handle.sendData.size(), MPI_BYTE, recvRank, 
+        MPICALL(MPI_Isend(handle.getSendData().data(), handle.getSendData().size(), MPI_BYTE, recvRank, 
                 tag, communicator, &handle.request), "isend"+std::to_string(handle.id))
     }
 }
@@ -220,13 +217,13 @@ MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const
 MessageHandlePtr MyMpi::send(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object) {
     MessageHandlePtr handle(new MessageHandle(nextHandleId(), object));
     if (rank(communicator) == recvRank) {
-        handle.recvData = handle.sendData;
+        handle.getRecvData() = handle.getSendData();
         handle.tag = tag;
         handle.source = recvRank;
         handle.selfMessage = true;
         _handles.insert(handle);
     } else {
-        MPICALL(MPI_Send(handle.sendData->data(), handle.sendData->size(), MPI_BYTE, recvRank, tag, communicator), "send"+std::to_string(handle.id))
+        MPICALL(MPI_Send(handle.getSendData()->data(), handle.getSendData()->size(), MPI_BYTE, recvRank, tag, communicator), "send"+std::to_string(handle.id))
     }
     log(V5_DEBG, "Msg ID=%i sent\n", handle.id);
     return handle;
@@ -288,19 +285,22 @@ bool MyMpi::test(MPI_Request& request, MPI_Status& status) {
     return flag;
 }
 
-std::optional<MessageHandle> MyMpi::poll(float elapsedTime) {
+MessageHandlePtr MyMpi::poll(float elapsedTime) {
 
-    std::optional<MessageHandle> foundHandle;
+    MessageHandlePtr foundHandle;
 
     // Find some ready handle
     size_t offset = 0;
     size_t size = _handles.size();
     for (size_t i = 0; i < size; i++) {
-        auto& h = *_handles[i];
-        if (!foundHandle && h.testReceived()) {
+        auto& h = _handles[i];
+        if (!foundHandle && h->testReceived()) {
+            
+            // Handle found!
             foundHandle = std::move(h);
-    
-            if (!h.selfMessage && isAnytimeTag(foundHandle->tag)) {
+
+            // Any listener to reset?
+            if (!foundHandle->selfMessage && isAnytimeTag(foundHandle->tag)) {
                 // Reset listener, appending a new handle to _handles
                 MyMpi::irecv(MPI_COMM_WORLD, MSG_ANYTIME);
                 // Move new handle from the back to the current position
@@ -312,9 +312,9 @@ std::optional<MessageHandle> MyMpi::poll(float elapsedTime) {
                 offset++;
             }
 
-        } else if (h.shouldCancel(elapsedTime)) {
+        } else if (h->shouldCancel(elapsedTime)) {
             // Cancel handle, mark this position to be overwritten
-            h.cancel();
+            h->cancel();
             offset++;
 
         } else if (offset > 0) {

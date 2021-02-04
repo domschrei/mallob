@@ -84,7 +84,7 @@ private:
     void handleNotifyNodeLeavingJob(MessageHandle& handle);
     void handleNotifyResultFound(MessageHandle& handle);
     
-    void initJob(int jobId, std::vector<uint8_t>& data, int senderRank);
+    void initJob(int jobId, std::vector<uint8_t>&& data, int senderRank);
     void bounceJobRequest(JobRequest& request, int senderRank);
     void updateVolume(int jobId, int demand);
     void interruptJob(int jobId, bool terminate, bool reckless);

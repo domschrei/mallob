@@ -159,7 +159,7 @@ void Client::mainProgram() {
         auto maybeHandle = MyMpi::poll(time);
         if (maybeHandle) {
             // Process message
-            auto& handle = maybeHandle.value();
+            auto& handle = *maybeHandle;
             log(LOG_ADD_SRCRANK | V5_DEBG, "process msg tag=%i", handle.source, handle.tag);
 
             if (handle.tag == MSG_NOTIFY_JOB_DONE) {
@@ -299,7 +299,7 @@ void Client::checkClientDone() {
 }
 
 void Client::handleRequestBecomeChild(MessageHandle& handle) {
-    JobRequest req = Serializable::get<JobRequest>(handle.recvData);
+    JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
     const JobDescription& desc = *_jobs[req.jobId];
 
     // Send job signature
@@ -309,7 +309,7 @@ void Client::handleRequestBecomeChild(MessageHandle& handle) {
 }
 
 void Client::handleAckAcceptBecomeChild(MessageHandle& handle) {
-    JobRequest req = Serializable::get<JobRequest>(handle.recvData);
+    JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
     JobDescription& desc = *_jobs[req.jobId];
     assert(desc.getId() == req.jobId || log_return_false("%i != %i\n", desc.getId(), req.jobId));
     log(LOG_ADD_DESTRANK | V4_VVER, "Sending job desc. of #%i of size %i", handle.source, desc.getId(), desc.getTransferSize(false));
@@ -322,17 +322,17 @@ void Client::handleAckAcceptBecomeChild(MessageHandle& handle) {
 }
 
 void Client::handleJobDone(MessageHandle& handle) {
-    IntPair recv = Serializable::get<IntPair>(handle.recvData);
+    IntPair recv = Serializable::get<IntPair>(handle.getRecvData());
     int jobId = recv.first;
     int resultSize = recv.second;
     log(LOG_ADD_SRCRANK | V4_VVER, "Will receive job result, length %i, for job #%i", handle.source, resultSize, jobId);
-    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_QUERY_JOB_RESULT, handle.recvData);
+    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_QUERY_JOB_RESULT, handle.getRecvData());
     MyMpi::irecv(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_RESULT, resultSize);
 }
 
 void Client::handleSendJobResult(MessageHandle& handle) {
 
-    JobResult jobResult = Serializable::get<JobResult>(handle.recvData);
+    JobResult jobResult = Serializable::get<JobResult>(handle.getRecvData());
     int jobId = jobResult.id;
     int resultCode = jobResult.result;
     int revision = jobResult.revision;
@@ -386,7 +386,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
 
 void Client::handleAbort(MessageHandle& handle) {
 
-    IntVec request = Serializable::get<IntVec>(handle.recvData);
+    IntVec request = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = request[0];
     log(LOG_ADD_SRCRANK | V2_INFO, "TIMEOUT #%i %.6f", handle.source, jobId, Timer::elapsedSeconds() - _jobs[jobId]->getArrival());
     
@@ -422,7 +422,7 @@ void Client::finishJob(int jobId) {
 
 void Client::handleQueryJobRevisionDetails(MessageHandle& handle) {
 
-    IntVec request = Serializable::get<IntVec>(handle.recvData);
+    IntVec request = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = request[0];
     int firstRevision = request[1];
     int lastRevision = request[2];
@@ -434,7 +434,7 @@ void Client::handleQueryJobRevisionDetails(MessageHandle& handle) {
 
 void Client::handleAckJobRevisionDetails(MessageHandle& handle) {
 
-    IntVec response = Serializable::get<IntVec>(handle.recvData);
+    IntVec response = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = response[0];
     int firstRevision = response[1];
     int lastRevision = response[2];

@@ -33,75 +33,8 @@ struct MsgTag {
     MsgTag(int id, bool anytime) : id(id), anytime(anytime) {}
 };
 
-/*
-Represents a single message that is being sent or received.
-*/
-struct MessageHandle {
-    int id;
-    int tag;
-    int source;
-    bool selfMessage = false;
-    bool finished = false;
-    float creationTime = 0;
-    MPI_Request request;
-    MPI_Status status;
-    std::vector<uint8_t> sendData;
-    std::vector<uint8_t> recvData;
-
-    MessageHandle() = default;
-    MessageHandle(int id, float time = Timer::elapsedSeconds()) : id(id), creationTime(time) {
-        status.MPI_SOURCE = -1; 
-        status.MPI_TAG = -1;
-        //log(V5_DEBG, "Msg ID=%i created\n", id);
-    }
-    MessageHandle(int id, int recvSize, float time = Timer::elapsedSeconds()) : id(id), creationTime(time) {
-        status.MPI_SOURCE = -1; 
-        status.MPI_TAG = -1;
-        recvData.resize(recvSize);
-        //log(V5_DEBG, "Msg ID=%i created\n", id);
-    }
-    MessageHandle(int id, const std::vector<uint8_t>& data, float time = Timer::elapsedSeconds()) : 
-            id(id), sendData(data), creationTime(time) {
-        status.MPI_SOURCE = -1; 
-        status.MPI_TAG = -1;
-        //log(V5_DEBG, "Msg ID=%i created\n", id);
-    }
-    MessageHandle(int id, const std::vector<uint8_t>& sendData, 
-            const std::vector<uint8_t>& recvData, 
-            float time = Timer::elapsedSeconds()) : 
-            id(id), sendData(sendData), recvData(recvData), creationTime(time) {
-        status.MPI_SOURCE = -1; 
-        status.MPI_TAG = -1;
-        //log(V5_DEBG, "Msg ID=%i created\n", id);
-    }
-    MessageHandle(MessageHandle&& other) : id(other.id), tag(other.tag), source(other.source), 
-            sendData(std::move(other.sendData)), recvData(std::move(other.recvData)), selfMessage(other.selfMessage), 
-            finished(other.finished), creationTime(other.creationTime), request(other.request), 
-            status(other.status) {}
-
-    ~MessageHandle() {
-        //log(V5_DEBG, "Msg ID=%i deleted\n", id);
-    }
-
-    MessageHandle& operator=(MessageHandle&& other) {
-        id = other.id;
-        tag = other.tag;
-        source = other.source;
-        sendData = std::move(other.sendData);
-        recvData = std::move(other.recvData);
-        selfMessage = other.selfMessage;
-        finished = other.finished;
-        creationTime = other.creationTime;
-        request = other.request;
-        status = other.status;
-        return *this;
-    }
-
-    bool testSent();
-    bool testReceived();
-    bool shouldCancel(float elapsedTime);
-    void cancel();
-};
+struct MessageHandle;
+typedef std::unique_ptr<MessageHandle> MessageHandlePtr;
 
 class MyMpi {
 
@@ -135,7 +68,7 @@ public:
 
     static bool test(MPI_Request& request, MPI_Status& status);
 
-    static std::optional<MessageHandle> poll(float elapsedTime = Timer::elapsedSeconds());
+    static MessageHandlePtr poll(float elapsedTime = Timer::elapsedSeconds());
     static int getNumActiveHandles() {
         return _handles.size();
     }
@@ -154,14 +87,112 @@ public:
     static void delayMonkey();
 
 private:
-    typedef std::unique_ptr<MessageHandle> MessageHandlePtr;
-
     static std::vector<MessageHandlePtr> _handles;
     static std::vector<MessageHandlePtr> _sent_handles;
     static robin_hood::unordered_map<int, MsgTag> _tags;
 
     static void resetListenerIfNecessary(int tag);
+};
 
+
+/*
+Represents a single message that is being sent or received.
+*/
+struct MessageHandle {
+
+private:
+    std::vector<uint8_t> sendData;
+    std::vector<uint8_t> recvData;
+
+public:
+    int id;
+    int tag;
+    int source;
+    bool selfMessage = false;
+    bool finished = false;
+    float creationTime = 0;
+    MPI_Request request;
+    MPI_Status status;
+
+    MessageHandle() = default;
+    MessageHandle(int id, float time = Timer::elapsedSeconds()) : id(id), creationTime(time) {
+        status.MPI_SOURCE = -1; 
+        status.MPI_TAG = -1;
+        //log(V5_DEBG, "Msg ID=%i created\n", id);
+    }
+    MessageHandle(int id, int recvSize, float time = Timer::elapsedSeconds()) : id(id), creationTime(time) {
+        status.MPI_SOURCE = -1; 
+        status.MPI_TAG = -1;
+        recvData.resize(recvSize);
+        //log(V5_DEBG, "Msg ID=%i created\n", id);
+    }
+    MessageHandle(int id, const std::vector<uint8_t>& data, float time = Timer::elapsedSeconds()) : 
+            id(id), sendData(data), creationTime(time) {
+        status.MPI_SOURCE = -1; 
+        status.MPI_TAG = -1;
+        //log(V5_DEBG, "Msg ID=%i created\n", id);
+    }
+    MessageHandle(int id, const std::vector<uint8_t>& sendData, 
+            const std::vector<uint8_t>& recvData, 
+            float time = Timer::elapsedSeconds()) : 
+            id(id), sendData(sendData), recvData(recvData), creationTime(time) {
+        status.MPI_SOURCE = -1; 
+        status.MPI_TAG = -1;
+        //log(V5_DEBG, "Msg ID=%i created\n", id);
+    }
+
+    MessageHandle(MessageHandle& other) = delete;
+    MessageHandle(MessageHandle&& other) = delete;
+    /*
+    : id(other.id), tag(other.tag), source(other.source), 
+            sendData(std::move(other.sendData)), recvData(std::move(other.recvData)), selfMessage(other.selfMessage), 
+            finished(other.finished), creationTime(other.creationTime), request(other.request), 
+            status(other.status) {}
+    */
+
+    ~MessageHandle() {
+        //log(V5_DEBG, "Msg ID=%i deleted\n", id);
+    }
+
+    MessageHandle& operator=(const MessageHandle& other) = delete; 
+    MessageHandle& operator=(MessageHandle&& other) = delete; 
+    /*
+    {
+        id = other.id;
+        tag = other.tag;
+        source = other.source;
+        sendData = std::move(other.sendData);
+        recvData = std::move(other.recvData);
+        selfMessage = other.selfMessage;
+        finished = other.finished;
+        creationTime = other.creationTime;
+        request = other.request;
+        status = other.status;
+        return *this;
+    }*/
+
+    const std::vector<uint8_t>& getSendData() const { return sendData;}
+    const std::vector<uint8_t>& getRecvData() const { return recvData;}
+    std::vector<uint8_t>&& moveRecvData() { return std::move(recvData);}
+
+    void appendTagToSendData(int tag) {
+        int prevSize = sendData.size();
+        sendData.resize(prevSize+sizeof(int));
+        memcpy(sendData.data()+prevSize, &tag, sizeof(int));
+    }
+    void receiveSelfMessage(const std::vector<uint8_t>& recvData, int rank) {
+        this->recvData = recvData;
+        source = rank;
+        selfMessage = true;
+    }
+
+    bool testSent();
+    bool testReceived();
+    bool shouldCancel(float elapsedTime);
+    void cancel();
+
+    friend void MyMpi::irecv(MPI_Comm communicator, int source, int tag);
+    friend void MyMpi::irecv(MPI_Comm communicator, int source, int tag, int size);
 };
 
 #endif
