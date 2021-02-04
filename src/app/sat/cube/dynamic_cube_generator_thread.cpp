@@ -13,6 +13,7 @@ DynamicCubeGeneratorThread::DynamicCubeGeneratorThread(DynamicCubeGeneratorThrea
       _instance_counter{DynamicCubeGeneratorThread::_counter++} {
     // Connect terminator
     _solver.connect_terminator(&_terminator);
+
     // Initialization is done in a seperate thread thus hard work is allowed
     // Also this allows a universal start
     // Read formula
@@ -57,15 +58,17 @@ void DynamicCubeGeneratorThread::run() {
         {
             const std::lock_guard<Mutex> lock(_new_failed_cubes_lock);
 
-            _logger.log(0, "DynamicCubeGeneratorThread %i: Adding new failed clauses. Buffer size: %zu", _instance_counter, _new_failed_cubes.size());
+            if (!_new_failed_cubes.empty()) {
+                _logger.log(0, "DynamicCubeGeneratorThread %i: Adding new failed clauses. Buffer size: %zu", _instance_counter, _new_failed_cubes.size());
 
-            // Add received failed cubes to formula
-            for (int lit : _new_failed_cubes) _solver.add(lit);
+                // Add received failed cubes to formula
+                for (int lit : _new_failed_cubes) _solver.add(lit);
 
-            _added_failed_assumptions_buffer += _new_failed_cubes.size();
+                _added_failed_assumptions_buffer += _new_failed_cubes.size();
 
-            // Reset buffer for received failed cubes
-            _new_failed_cubes.clear();
+                // Reset buffer for received failed cubes
+                _new_failed_cubes.clear();
+            }
         }
 
         // Start work
@@ -79,7 +82,7 @@ void DynamicCubeGeneratorThread::run() {
 
 void DynamicCubeGeneratorThread::generate() {
     if (_cube.has_value()) {
-        _logger.log(0, "DynamicCubeGeneratorThread %i: Started expanding the cube %s", _instance_counter, _cube.value().toString().c_str());
+        _logger.log(0, "DynamicCubeGeneratorThread %i: Started expanding a cube with size %zu", _instance_counter, _cube.value().getPath().size());
 
         // Assume cube
         auto path = _cube.value().getPath();
@@ -110,8 +113,9 @@ void DynamicCubeGeneratorThread::generate() {
 
             if (_solver.status() == 10) {
                 _logger.log(0, "DynamicCubeGeneratorThread %i: Found a solution: SAT", _instance_counter);
-                _logger.log(0, "DynamicCubeGeneratorThread %i: Used cube %s", _instance_counter, _cube.value().toString().c_str());
-                _logger.log(0, "DynamicCubeGeneratorThread %i: Size of added buffer of failed assumption: %zu", _instance_counter, _added_failed_assumptions_buffer);
+                _logger.log(0, "DynamicCubeGeneratorThread %i: Used cube has size %zu", _instance_counter, _cube.value().getPath().size());
+                _logger.log(0, "DynamicCubeGeneratorThread %i: Size of added buffer from failed assumptions: %zu", _instance_counter,
+                            _added_failed_assumptions_buffer);
                 _result = SAT;
 
             } else if (_solver.status() == 20) {
@@ -126,8 +130,9 @@ void DynamicCubeGeneratorThread::generate() {
 
                 } else {
                     _logger.log(0, "DynamicCubeGeneratorThread %i: Found a solution: UNSAT", _instance_counter);
-                    _logger.log(0, "DynamicCubeGeneratorThread %i: Used cube %s", _instance_counter, _cube.value().toString().c_str());
-                    _logger.log(0, "DynamicCubeGeneratorThread %i: Size of added buffer of failed assumption: %zu", _instance_counter, _added_failed_assumptions_buffer);
+                    _logger.log(0, "DynamicCubeGeneratorThread %i: Used cube has size %zu", _instance_counter, _cube.value().getPath().size());
+                    _logger.log(0, "DynamicCubeGeneratorThread %i: Size of added buffer from failed assumptions: %zu", _instance_counter,
+                                _added_failed_assumptions_buffer);
 
                     // Intersection of assumptions and core is empty -> Formula is unsatisfiable
                     _result = UNSAT;
@@ -144,7 +149,7 @@ void DynamicCubeGeneratorThread::generate() {
 void DynamicCubeGeneratorThread::handleFailed(const std::vector<int> &failed) {
     const std::lock_guard<Mutex> lock(_new_failed_cubes_lock);
 
-    _logger.log(0, "DynamicCubeGeneratorThread %i: Inserting new failed assumption. Buffer size: %zu", _instance_counter, failed.size());
+    _logger.log(0, "DynamicCubeGeneratorThread %i: Inserting new failed clauses. Buffer size: %zu", _instance_counter, failed.size());
 
     // Insert failed cubes at the end of new failed cubes
     _new_failed_cubes.insert(_new_failed_cubes.end(), failed.begin(), failed.end());

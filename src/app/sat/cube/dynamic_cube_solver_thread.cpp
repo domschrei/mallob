@@ -66,15 +66,17 @@ void DynamicCubeSolverThread::run() {
         {
             const std::lock_guard<Mutex> lock(_new_failed_cubes_lock);
 
-            _logger.log(0, "DynamicCubeSolverThread %i: Adding new failed clauses. Buffer size: %zu", _instance_counter, _new_failed_cubes.size());
+            if (!_new_failed_cubes.empty()) {
+                _logger.log(0, "DynamicCubeSolverThread %i: Adding new failed clauses. Buffer size: %zu", _instance_counter, _new_failed_cubes.size());
 
-            // Add received failed cubes to formula
-            for (int lit : _new_failed_cubes) _solver->addLiteral(lit);
+                // Add received failed cubes to formula
+                for (int lit : _new_failed_cubes) _solver->addLiteral(lit);
 
-            _added_failed_assumptions_buffer += _new_failed_cubes.size();
+                _added_failed_assumptions_buffer += _new_failed_cubes.size();
 
-            // Reset buffer for received failed cubes
-            _new_failed_cubes.clear();
+                // Reset buffer for received failed cubes
+                _new_failed_cubes.clear();
+            }
         }
 
         // Start work
@@ -88,7 +90,7 @@ void DynamicCubeSolverThread::run() {
 
 void DynamicCubeSolverThread::solve() {
     if (_cube.has_value()) {
-        _logger.log(0, "DynamicCubeSolverThread %i: Started solving the cube %s", _instance_counter, _cube.value().toString().c_str());
+        _logger.log(0, "DynamicCubeSolverThread %i: Started solving a cube with size %zu", _instance_counter, _cube.value().getPath().size());
 
         // Assume and solve
         auto path = _cube.value().getPath();
@@ -97,15 +99,15 @@ void DynamicCubeSolverThread::solve() {
         // Check result
         if (result == SAT) {
             _logger.log(0, "DynamicCubeSolverThread %i: Found a solution: SAT", _instance_counter);
-            _logger.log(0, "DynamicCubeSolverThread %i: Used cube %s", _instance_counter, _cube.value().toString().c_str());
-            _logger.log(0, "DynamicCubeSolverThread %i: Size of added buffer of failed assumption: %zu", _instance_counter, _added_failed_assumptions_buffer);
+            _logger.log(0, "DynamicCubeSolverThread %i: Used cube has size %zu", _instance_counter, _cube.value().getPath().size());
+            _logger.log(0, "DynamicCubeSolverThread %i: Size of added buffer from failed assumptions: %zu", _instance_counter, _added_failed_assumptions_buffer);
             _result = SAT;
 
         } else if (result == UNKNOWN) {
             // Exit solving due to an interruption
 
         } else if (result == UNSAT) {
-            _logger.log(1, "DynamicCubeSolverThread %i: The Cube %s failed", _instance_counter, _cube.value().toString().c_str());
+            _logger.log(1, "DynamicCubeSolverThread %i: The Cube failed", _instance_counter);
 
             auto failed_assumptions = _solver->getFailedAssumptions();
 
@@ -115,8 +117,9 @@ void DynamicCubeSolverThread::solve() {
 
             } else {
                 _logger.log(0, "DynamicCubeSolverThread %i: Found a solution: UNSAT", _instance_counter);
-                _logger.log(0, "DynamicCubeSolverThread %i: Used cube %s", _instance_counter, _cube.value().toString().c_str());
-                _logger.log(0, "DynamicCubeSolverThread %i: Size of added buffer of failed assumption: %zu", _instance_counter, _added_failed_assumptions_buffer);
+                _logger.log(0, "DynamicCubeSolverThread %i: Used cube has size %zu", _instance_counter, _cube.value().getPath().size());
+                _logger.log(0, "DynamicCubeSolverThread %i: Size of added buffer from failed assumptions: %zu", _instance_counter,
+                            _added_failed_assumptions_buffer);
 
                 // Intersection of assumptions and core is empty -> Formula is unsatisfiable
                 _result = UNSAT;
@@ -130,7 +133,7 @@ void DynamicCubeSolverThread::solve() {
 void DynamicCubeSolverThread::handleFailed(const std::vector<int> &failed) {
     const std::lock_guard<Mutex> lock(_new_failed_cubes_lock);
 
-    _logger.log(0, "DynamicCubeSolverThread %i: Inserting new failed assumption. Buffer size: %zu", _instance_counter, failed.size());
+    _logger.log(0, "DynamicCubeSolverThread %i: Inserting new failed clauses. Buffer size: %zu", _instance_counter, failed.size());
 
     // Insert failed cubes at the end of new failed cubes
     _new_failed_cubes.insert(_new_failed_cubes.end(), failed.begin(), failed.end());
