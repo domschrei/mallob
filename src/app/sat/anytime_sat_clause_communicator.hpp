@@ -49,7 +49,7 @@ private:
     void sendClausesToChildren(const std::vector<int>& clauses);
 
     std::vector<int> merge(const std::vector<std::vector<int>*>& buffers, size_t maxSize);
-    bool testConsistency(std::vector<int>& buffer, size_t maxSize);
+    bool testConsistency(const std::vector<int>& buffer, size_t maxSize);
 };
 
 #endif

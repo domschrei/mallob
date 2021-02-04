@@ -292,7 +292,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
     return result;
 }
 
-bool AnytimeSatClauseCommunicator::testConsistency(std::vector<int>& buffer, size_t maxSize) {
+bool AnytimeSatClauseCommunicator::testConsistency(const std::vector<int>& buffer, size_t maxSize) {
     if (buffer.empty()) return true;
 
     if (maxSize > 0 && buffer.size() > maxSize) {
@@ -338,6 +338,7 @@ bool AnytimeSatClauseCommunicator::testConsistency(std::vector<int>& buffer, siz
                 consistent = 6; break;
             }
         }
+        if (consistent != 0) break;
         pos += numCls * length + 1;
         length++;
     }
