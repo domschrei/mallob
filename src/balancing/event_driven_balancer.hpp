@@ -181,6 +181,7 @@ class EventDrivenBalancer : public Balancer {
 
 public:
     EventDrivenBalancer(MPI_Comm& comm, Parameters& params);
+    ~EventDrivenBalancer() override {}
 
     bool beginBalancing(robin_hood::unordered_map<int, Job*>& jobs) override;
     bool canContinueBalancing() override {return false;}

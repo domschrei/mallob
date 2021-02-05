@@ -11,6 +11,7 @@
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "balancing/event_driven_balancer.hpp"
+#include "util/sys/watchdog.hpp"
 
 JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm): 
         _params(params), _comm(comm) {
@@ -86,16 +87,16 @@ void JobDatabase::forget(int jobId) {
 void JobDatabase::free(int jobId) {
 
     if (!has(jobId)) return;
-    Job& job = get(jobId);
-    int index = job.getIndex();
-    log(V4_VVER, "Delete %s\n", job.toStr());
+    Job* job = &get(jobId);
+    int index = job->getIndex();
+    log(V4_VVER, "Delete %s\n", job->toStr());
 
     // Remove job meta data from balancer
     _balancer->forget(jobId);
 
     // Delete job and its solvers
     _jobs.erase(jobId);
-    delete &job;
+    delete job;
 
     log(V4_VVER, "Deleted %s\n", toStr(jobId, index).c_str());
     Logger::getMainInstance().mergeJobLogs(jobId);
@@ -414,8 +415,19 @@ robin_hood::unordered_map<int, int> JobDatabase::getBalancingResult() {
 }
 
 JobDatabase::~JobDatabase() {
-    // Delete each job (iterating over "jobs" invalid as entries are deleted)
+
+    // Setup a watchdog to get feedback on hanging destructors
+    Watchdog watchdog(/*checkIntervMillis=*/10*1000, Timer::elapsedSeconds());
+
+    // Collect all jobs 
     std::vector<int> jobIds;
     for (auto idJobPair : _jobs) jobIds.push_back(idJobPair.first);
-    for (int jobId : jobIds) free(jobId);
+    
+    // Delete each job
+    for (int jobId : jobIds) {
+        free(jobId);
+        watchdog.reset();
+    }
+
+    watchdog.stop();
 }

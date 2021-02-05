@@ -65,7 +65,7 @@ bool MessageHandle::testReceived() {
         if (!selfMessage) {
             int count = 0;
             MPICALL(MPI_Get_count(&status, MPI_BYTE, &count), "getcount" + std::to_string(id))
-            if (count > 0 && count < (int)recvData.size()) {
+            if (count > 0 && count != MPI_UNDEFINED && count < (int)recvData.size()) {
                 recvData.resize(count);
             }
         }
