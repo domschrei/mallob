@@ -1028,4 +1028,9 @@ Worker::~Worker() {
     if (_mpi_monitor_thread.joinable()) _mpi_monitor_thread.join();
 
     log(V4_VVER, "Destruct worker\n");
+
+    if (_params.isNotNull("mono") && _params.getParam("appmode") != "fork") {
+        // Terminate directly without destructing resident job
+        MPI_Finalize();
+    }
 }
