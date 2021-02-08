@@ -26,12 +26,13 @@ enum SatResult {
 };
 
 struct SolvingStatistics {
-	SolvingStatistics():propagations(0),decisions(0),conflicts(0),restarts(0),memPeak(0) {}
-	unsigned long propagations;
-	unsigned long decisions;
-	unsigned long conflicts;
-	unsigned long restarts;
-	double memPeak;
+	unsigned long propagations = 0;
+	unsigned long decisions = 0;
+	unsigned long conflicts = 0;
+	unsigned long restarts = 0;
+	unsigned long receivedClauses = 0;
+	unsigned long digestedClauses = 0;
+	double memPeak = 0;
 };
 
 struct SolverSetup {
@@ -56,6 +57,8 @@ struct SolverSetup {
 	unsigned int softFinalMaxLbd;
 	// For lingeling ("use old diversification")
 	bool useAdditionalDiversification;
+
+	size_t anticipatedLitsToImportPerCycle;
 };
 
 void updateTimer(std::string jobName);

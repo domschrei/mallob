@@ -18,9 +18,6 @@
 
 struct LGL;
 
-#define LGL_UNIT_BUFFER_MAX_SIZE 5000
-#define LGL_CLS_BUFFER_MAX_SIZE 10000
-
 class Lingeling : public PortfolioSolverInterface {
 
 private:
@@ -28,7 +25,6 @@ private:
 	std::string name;
 	int stopSolver;
 	LearnedClauseCallback callback;
-	Mutex clauseAddMutex;
 	int maxvar;
 	double lastTermCallbackTime;
     
@@ -43,13 +39,12 @@ private:
 	std::vector<std::vector<int>> clausesToAdd;
 	std::vector<int> assumptions;
 
-	RingBuffer<std::vector<int>> learnedClauses;
-	RingBuffer<int> learnedUnits;
+	RingBuffer learnedClauses;
+	RingBuffer learnedUnits;
 	
-	int* unitsBuffer;
-	size_t unitsBufferSize;
-	int* clsBuffer;
-	size_t clsBufferSize;
+	std::vector<int> learnedClausesBuffer;
+	std::vector<int> learnedUnitsBuffer;
+	std::vector<int> learnedClause;
 	int numReceived = 0;
 	int numDigested = 0;
     

@@ -70,6 +70,7 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 	setup.softFinalMaxLbd = params.getIntParam("fslbd");
 	setup.hardMaxClauseLength = params.getIntParam("hmcl");
 	setup.softMaxClauseLength = params.getIntParam("smcl");
+	setup.anticipatedLitsToImportPerCycle = params.getIntParam("mblpc");
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
@@ -208,9 +209,9 @@ void HordeLib::dumpStats(bool final) {
 	SolvingStatistics locSolveStats;
 	for (size_t i = 0; i < _num_solvers; i++) {
 		SolvingStatistics st = _solver_interfaces[i]->getStatistics();
-		_logger.log(V2_INFO, "%sS%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f\n",
+		_logger.log(V2_INFO, "%sS%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f recv:%lu digd:%lu\n",
 				final ? "END " : "",
-				_solver_interfaces[i]->getGlobalId(), st.propagations, st.decisions, st.conflicts, st.memPeak);
+				_solver_interfaces[i]->getGlobalId(), st.propagations, st.decisions, st.conflicts, st.memPeak, st.receivedClauses, st.digestedClauses);
 		locSolveStats.conflicts += st.conflicts;
 		locSolveStats.decisions += st.decisions;
 		locSolveStats.memPeak += st.memPeak;

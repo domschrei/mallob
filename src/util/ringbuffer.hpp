@@ -3,55 +3,68 @@
 #define DOMSCHREI_MALLOB_RINGBUFFER_HPP
 
 #include <vector>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <assert.h>
 
-template <typename T>
+#include "util/ringbuf/ringbuf.h"
+
 class RingBuffer {
 
 private:
-    std::vector<T> _buffer;
-    size_t _prod_idx;
-    size_t _cons_idx;
-    size_t _num_available;
+    uint8_t* _data;
+    ringbuf_t* _ringbuf;
+    ringbuf_worker_t* _producer;
+    size_t _capacity;
 
 public:
-    RingBuffer(int size) : _buffer(size) {
-        _prod_idx = 0;
-        _cons_idx = 0;
-        _num_available = 0;
+    RingBuffer(size_t size) : _capacity(size) {
+        size_t ringbufSize;
+        ringbuf_get_sizes(/*nworkers=*/1, &ringbufSize, nullptr);
+        _ringbuf = (ringbuf_t*)malloc(ringbufSize);
+        ringbuf_setup(_ringbuf, /*nworkers=*/1, size);
+        _producer = ringbuf_register(_ringbuf, /*worker_id=*/0);
+        _data = (uint8_t*)malloc(sizeof(int)*size);
     }
 
-    bool produce(const T& elem) {
-        if (_num_available == _buffer.size()) return false;
-        _buffer[_prod_idx] = elem;
-        _prod_idx = (_prod_idx+1) % _buffer.size();
-        _num_available++;
+    bool produce(const int* data, size_t size, bool addSeparationZero) {
+        
+        ssize_t offset = ringbuf_acquire(_ringbuf, _producer, size + (addSeparationZero ? 1 : 0));
+        if (offset == -1) return false;
+        
+        memcpy(_data+sizeof(int)*offset, data, sizeof(int)*size);
+        if (addSeparationZero) {
+            int zeroToAppend = 0;
+            memcpy(_data+sizeof(int)*(offset+size), &zeroToAppend, sizeof(int));
+        }
+        
+        ringbuf_produce(_ringbuf, _producer);
+        
         return true;
     }
 
-    bool produce(T&& elem) {
-        if (_num_available == _buffer.size()) return false;
-        _buffer[_prod_idx] = std::move(elem);
-        _prod_idx = (_prod_idx+1) % _buffer.size();
-        _num_available++;
+    bool consume(std::vector<int>& elem) {
+
+        size_t offset;
+        size_t len = ringbuf_consume(_ringbuf, &offset);
+        elem.resize(len);
+        if (len == 0) return false;
+        
+        memcpy(elem.data(), _data+sizeof(int)*offset, len*sizeof(int));
+
+        ringbuf_release(_ringbuf, len);
+        
         return true;
     }
 
-    bool consume(T& elem) {
-        if (_num_available == 0) return false;
-        elem = _buffer[_cons_idx];
-        _cons_idx = (_cons_idx+1) % _buffer.size();
-        _num_available--;
-        return true;
+    size_t getCapacity() const {
+        return _capacity;
     }
 
-    bool empty() {
-        return _num_available == 0;
-    }
-    size_t size() {
-        return _num_available;
-    }
-    size_t capacity() {
-        return _buffer.size();
+    ~RingBuffer() {
+        free(_ringbuf);
+        free(_data);
     }
 };
 

@@ -80,82 +80,63 @@ void cbProduce(void* sp, int* cls, int glue) {
 
 void cbConsumeUnits(void* sp, int** start, int** end) {
 	Lingeling* lp = (Lingeling*)sp;
-	*start = lp->unitsBuffer;
-	*end = lp->unitsBuffer;
 
-	// Unlockable?
-	if (!lp->clauseAddMutex.tryLock()) {
-		return;
-	}
-	// Nothing to import?
-	if (lp->learnedUnits.empty()) {
-		lp->clauseAddMutex.unlock();
-		return;
-	}
+	bool success = lp->learnedUnits.consume(lp->learnedUnitsBuffer);
+	if (!success) lp->learnedUnitsBuffer.clear();
+	
+	*start = lp->learnedUnitsBuffer.data();
+	*end = lp->learnedUnitsBuffer.data()+lp->learnedUnitsBuffer.size();
 
-	// Increase buffer size as needed
-	if (lp->learnedUnits.size() >= lp->unitsBufferSize) {
-		lp->unitsBufferSize = 2*lp->learnedUnits.size();
-		lp->unitsBuffer = (int*)realloc((void*)lp->unitsBuffer, lp->unitsBufferSize * sizeof(int));
-	}
-
-	// Copy literals from ring buffer to the lingeling buffer
-	int i = 0;
-	int lit;
-	while (lp->learnedUnits.consume(lit)) {
-		lp->unitsBuffer[i++] = lit;
-		lp->numDigested++;
-	}
-	// Set correct bounds
-	*start = lp->unitsBuffer;
-	*end = *start + lp->learnedUnits.size();
-
-	// Return lock
-	lp->clauseAddMutex.unlock();
+	lp->numDigested += lp->learnedUnitsBuffer.size();
 }
 
 void cbConsumeCls(void* sp, int** clause, int* glue) {
 	Lingeling* lp = (Lingeling*)sp;
 
-	// Unlockable?
-	if (!lp->clauseAddMutex.tryLock()) {
-		*clause = NULL;
+	// Retrieve clauses from parallel ringbuffer as necessary
+	if (lp->learnedClausesBuffer.empty()) {
+		bool success = lp->learnedClauses.consume(lp->learnedClausesBuffer);
+		if (!success) lp->learnedClausesBuffer.clear();
+	}
+	
+	// Is there a clause?
+	if (lp->learnedClausesBuffer.empty()) {
+		*clause = nullptr;
 		return;
 	}
 
-	// Retrieve clause to import
-	std::vector<int> cls;
-	if (!lp->learnedClauses.consume(cls)) {
-		// Nothing to import
-		*clause = NULL;
-		lp->clauseAddMutex.unlock();
-		return;
-	} else lp->numDigested++;
+	/*
+	std::string str = ""; for (auto l : lp->learnedClausesBuffer) str += " " + std::to_string(l);
+	lp->_logger.log(V4_VVER, "LCB:%s\n", str.c_str());
+	*/
 
-	// Increase buffer size as needed
-	if (cls.size()+1 >= lp->clsBufferSize) {
-		lp->clsBufferSize = 2*cls.size();
-		lp->clsBuffer = (int*)realloc((void*)lp->clsBuffer, lp->clsBufferSize * sizeof(int));
-	}
+	// Extract a clause
+	size_t pos = lp->learnedClausesBuffer.size()-1;
+	assert(lp->learnedClausesBuffer[pos] == 0);
+	do {pos--;} while (pos > 0 && lp->learnedClausesBuffer[pos-1] != 0);
+	assert(pos == 0 || pos >= 3); // glue int, >= two literals, separation zero
 
 	// Set glue
-	*glue = cls[0]-1; // to avoid zeros in the array, 1 was added to the glue
+	*glue = lp->learnedClausesBuffer[pos]-1; // to avoid zeros in the array, 1 was added to the glue
+	assert(*glue > 0);
 	// Write clause into buffer
-	for (size_t i = 1; i < cls.size(); i++) {
-		lp->clsBuffer[i-1] = cls[i];
-	}
-	lp->clsBuffer[cls.size()-1] = 0;
+	lp->learnedClause.resize(lp->learnedClausesBuffer.size()-pos-1);
+	memcpy(lp->learnedClause.data(), lp->learnedClausesBuffer.data()+pos+1, lp->learnedClause.size()*sizeof(int));
 	// Make "clause" point to buffer
-	*clause = lp->clsBuffer;
+	*clause = lp->learnedClause.data();
 
-	// Return lock
-	lp->clauseAddMutex.unlock();
+	lp->learnedClausesBuffer.resize(pos);
+	assert(lp->learnedClausesBuffer.empty() || lp->learnedClausesBuffer[pos-1] == 0);
+	lp->numDigested++;
 }
 
 
 Lingeling::Lingeling(const SolverSetup& setup) 
-	: PortfolioSolverInterface(setup), learnedClauses(LGL_CLS_BUFFER_MAX_SIZE), 
-		learnedUnits(LGL_UNIT_BUFFER_MAX_SIZE) {
+	: PortfolioSolverInterface(setup), 
+		learnedClauses(4*setup.anticipatedLitsToImportPerCycle), 
+		learnedUnits(2*setup.anticipatedLitsToImportPerCycle + 1) {
+
+	_logger.log(V4_VVER, "Local buffer sizes: %ld, %ld\n", learnedClauses.getCapacity(), learnedUnits.getCapacity());
 
 	solver = lglinit();
 	
@@ -174,10 +155,6 @@ Lingeling::Lingeling(const SolverSetup& setup)
 	lglseterm(solver, cbCheckTerminate, this);
 	glueLimit = _setup.softInitialMaxLbd;
 	sizeLimit = _setup.softMaxClauseLength;
-
-	unitsBufferSize = clsBufferSize = 100;
-	unitsBuffer = (int*) malloc(unitsBufferSize*sizeof(int));
-	clsBuffer = (int*) malloc(clsBufferSize*sizeof(int));
 
     suspendSolver = false;
     maxvar = 0;
@@ -279,7 +256,6 @@ SatResult Lingeling::solve(const std::vector<int>& assumptions) {
 	
 	this->assumptions = assumptions;
 	// add the clauses
-	clauseAddMutex.lock();
 	for (size_t i = 0; i < clausesToAdd.size(); i++) {
 		for (size_t j = 0; j < clausesToAdd[i].size(); j++) {
 			int lit = clausesToAdd[i][j];
@@ -289,8 +265,7 @@ SatResult Lingeling::solve(const std::vector<int>& assumptions) {
 		lgladd(solver, 0);
 	}
 	clausesToAdd.clear();
-	clauseAddMutex.unlock();
-
+	
 	// set the assumptions
 	for (size_t i = 0; i < assumptions.size(); i++) {
 		// freezing problems
@@ -346,24 +321,16 @@ std::set<int> Lingeling::getFailedAssumptions() {
 }
 
 void Lingeling::addLearnedClause(const int* begin, int size) {
-	//double time = _logger.getTime();
-	if (!clauseAddMutex.tryLock()) {
 
-		//time = _logger.getTime() - time;
-		//if (time > 0.2f) lp->_logger.log(-1, "[0] addLearnedClause took %.2fs!\n", time);
-
-		return;
-	}
 	if (size == 1) {
-		if (!learnedUnits.produce(*begin)) {
+		if (!learnedUnits.produce(begin, size, /*addSeparationZero=*/false)) {
 			_logger.log(V4_VVER, "Unit buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
 		} else numReceived++;
 	} else {
-		if (!learnedClauses.produce(std::vector<int>(begin, begin+size))) {
+		if (!learnedClauses.produce(begin, size, /*addSeparationZero=*/true)) {
 			_logger.log(V4_VVER, "Clause buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
 		} else numReceived++;
 	}
-	clauseAddMutex.unlock();
 
 	//time = _logger.getTime() - time;
 	//if (time > 0.2f) lp->_logger.log(-1, "[1] addLearnedClause took %.2fs! (size %i)\n", time, size);
@@ -400,11 +367,11 @@ SolvingStatistics Lingeling::getStatistics() {
 	st.decisions = lglgetdecs(solver);
 	st.propagations = lglgetprops(solver);
 	st.memPeak = lglmaxmb(solver);
+	st.receivedClauses = numReceived;
+	st.digestedClauses = numDigested;
 	return st;
 }
 
 Lingeling::~Lingeling() {
 	lglrelease(solver);
-	free(unitsBuffer);
-	free(clsBuffer);
 }
