@@ -42,6 +42,8 @@ class FailedAssumptionCommunicator {
     // Add the failed assumptions to the local filter and add them to the corresponding lib
     void persist(std::vector<int> &failed_assumptions);
 
+    void startDistribute();
+
     // Send the failed assumptions to all children
     void distribute(std::vector<int> &failed_assumptions);
 

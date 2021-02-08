@@ -9,6 +9,49 @@
 
 FailedAssumptionCommunicator::FailedAssumptionCommunicator(DynamicCubeSatJob &job, LoggingInterface &logger) : _job(job), _logger(logger) {}
 
+// Returns an end iterator to the start of a clause in buffer
+// with the range [start iterator, end iterator) containing the most possible clauses with a length less than the limit
+//
+// The parameter startIndex must be the index of a first literal of any clause in buffer
+// The limit must be less than the std::distance(std::next(buffer.begin(), startIndex), buffer.end())
+inline std::vector<int>::const_iterator findEndIteratorForLimit(const std::vector<int> &buffer, int startIndex, int limit) {
+    assert(startIndex == 0 || buffer.at(startIndex - 1) == 0);
+
+    // Create iterator to start index
+    std::vector<int>::const_iterator start_iterator = std::next(buffer.begin(), startIndex);
+
+    assert(*start_iterator == buffer.at(startIndex));
+
+    // How many elements can be send before setting the start index back to the beginning
+    int distance_to_end = std::distance(start_iterator, buffer.end());
+    // Must be greater than or equal to two, since that is the smallest size for a clause
+    assert(distance_to_end >= 2);
+
+    // The limit must be less than the distance to the end otherwise the caller could just have gotten buffer.end()
+    assert(limit < distance_to_end);
+
+    std::vector<int>::const_reverse_iterator reverse_end_iterator = std::next(buffer.rbegin(), distance_to_end - limit);
+
+    // The reverse iterator must be after or at most one element in front of the start iterator
+    assert(reverse_end_iterator.base() - buffer.begin() >= startIndex);
+    // The range [start_iterator, reverse_end_iterator.base()) should contain exactly #limit items
+    assert(std::distance(start_iterator, reverse_end_iterator.base()) == limit);
+
+    // Find closest zero or the start
+    reverse_end_iterator = std::find(reverse_end_iterator, buffer.rend(), 0);
+
+    assert(reverse_end_iterator == buffer.rend() || *reverse_end_iterator == 0);
+
+    // Create iterator one element behind reverse_end_iterator
+    // https://riptutorial.com/cplusplus/example/5101/reverse-iterators
+    std::vector<int>::const_iterator end_iterator = reverse_end_iterator.base();
+
+    // The distance between start iterator and end must be lower or equal to limit after find
+    assert(std::distance(start_iterator, end_iterator) <= limit);
+
+    return end_iterator;
+}
+
 void FailedAssumptionCommunicator::gather() {
     // May be called during ACTIVE or INITIALIZING_TO_ACTIVE
     // If the second one is the case, the methods in the DynamicCubeSatJob guarantees that the uninitialized lib is not accessed and dummy values are returned
@@ -32,131 +75,8 @@ void FailedAssumptionCommunicator::gather() {
 
         // Start distribute if there are new clauses or existing clauses
         if (!_new_clauses.empty() || !_all_clauses.empty()) {
-            // We set a fix limit for distribute
-            // Every distribute we share the new clauses
-            // Then we fill the buffer using old clauses, starting from the member _distribute_start_index
-            const int limit = 10000;
-            // TODO Rework using dynamic limit from AnyTimeSatClauseCommunicator
-
-            // Buffer for distribute
-            std::vector<int> clauses_to_distribute;
-
-            // Insert new clauses from last persist
-            // If there are no new clauses, none are inserted
-            clauses_to_distribute.insert(clauses_to_distribute.end(), _new_clauses.begin(), _new_clauses.end());
-
-            if (_new_clauses.size() + _all_clauses.size() <= limit) {
-                // All clauses can be send
-
-                // Reset start index
-                _distribute_start_index = 0;
-
-                // Insert all clauses into distribute buffer
-                clauses_to_distribute.insert(clauses_to_distribute.end(), _all_clauses.begin(), _all_clauses.end());
-
-            } else {
-                // Not all clauses can be send
-
-                // Remaining space in distribute buffer
-                int remaining = limit - static_cast<int>(_new_clauses.size());
-                // Must be larger than zero
-                assert(remaining >= 1);
-
-                // The start index must point at the beginning of a clause
-                assert(_all_clauses.at(_distribute_start_index) != 0);
-                assert(_distribute_start_index == 0 || _all_clauses.at(_distribute_start_index - 1) == 0);
-                // This clause is the first one to send
-
-                // Create iterator from start index
-                std::vector<int>::iterator start_iterator = std::next(_all_clauses.begin(), _distribute_start_index);
-
-                assert(*start_iterator == _all_clauses.at(_distribute_start_index));
-
-                // How many elements can be send before setting the start index back to the beginning
-                int size_until_end = std::distance(start_iterator, _all_clauses.end());
-                // Must be greater than or equal to two, since that is the smallest size for a clause
-                assert(size_until_end >= 2);
-
-                if (size_until_end == remaining) {
-                    // The elements between the start index and the end are exactly enough to fill the distribute buffer to its limit
-
-                    clauses_to_distribute.insert(clauses_to_distribute.end(), start_iterator, _all_clauses.end());
-
-                    _distribute_start_index = 0;
-
-                } else if (size_until_end > remaining) {
-                    // The elements between the start index and the end are more than needed to fill the distribute buffer to its limit
-
-                    // The range [start_iterator, reverse_end_iterator] should contain exactly #remaining items
-                    std::vector<int>::reverse_iterator reverse_end_iterator = std::next(_all_clauses.rbegin(), size_until_end - remaining);
-
-                    assert(std::distance(start_iterator, reverse_end_iterator.base()) == remaining);
-
-                    // Find closest zero or the end
-                    reverse_end_iterator = std::find(reverse_end_iterator, _all_clauses.rend(), 0);
-
-                    assert(reverse_end_iterator == _all_clauses.rend() || *reverse_end_iterator == 0);
-
-                    // Create iterator one element behind reverse_end_iterator
-                    // https://riptutorial.com/cplusplus/example/5101/reverse-iterators
-                    std::vector<int>::iterator end_iterator = reverse_end_iterator.base();
-
-                    // The end iterator must be at the same position or after the start iterator
-                    assert(end_iterator - start_iterator >= 0);
-                    // The distance cannot be higher than remaining
-                    assert(std::distance(start_iterator, end_iterator) <= remaining);
-
-                    clauses_to_distribute.insert(clauses_to_distribute.end(), start_iterator, end_iterator);
-
-                    // Set _distribute_start_index to index of end iterator
-                    _distribute_start_index = end_iterator - _all_clauses.begin();
-
-                } else {
-                    // The elements between the start index and the end are less than needed to fill the distribute buffer to its limit
-                    // Add them all and get the remaining from the beginning of _all_clauses
-
-                    clauses_to_distribute.insert(clauses_to_distribute.end(), start_iterator, _all_clauses.end());
-
-                    // Recalculate remaining
-                    remaining = remaining - size_until_end;
-
-                    // Remaining must be lower than the size
-                    assert(static_cast<int>(_all_clauses.size()) > remaining);
-                    // The range [_all_clauses.begin(), reverse_end_iterator] should contain exactly #remaining items
-                    std::vector<int>::reverse_iterator reverse_end_iterator = std::next(_all_clauses.rbegin(), _all_clauses.size() - remaining);
-
-                    assert(std::distance(_all_clauses.begin(), reverse_end_iterator.base()) == remaining);
-
-                    // Find closest zero or the end
-                    reverse_end_iterator = std::find(reverse_end_iterator, _all_clauses.rend(), 0);
-
-                    assert(reverse_end_iterator == _all_clauses.rend() || *reverse_end_iterator == 0);
-
-                    // Create iterator one element behind reverse_end_iterator
-                    // https://riptutorial.com/cplusplus/example/5101/reverse-iterators
-                    std::vector<int>::iterator end_iterator = reverse_end_iterator.base();
-
-                    // The distance cannot be higher than remaining
-                    assert(std::distance(_all_clauses.begin(), end_iterator) <= remaining);
-
-                    clauses_to_distribute.insert(clauses_to_distribute.end(), _all_clauses.begin(), end_iterator);
-
-                    // Set _distribute_start_index to index of end iterator
-                    _distribute_start_index = end_iterator - _all_clauses.begin();
-                }
-            }
-
-            assert(clauses_to_distribute.size() <= limit);
-
-            // Distribute if there is something to distribute
-            if (!clauses_to_distribute.empty()) {
-                distribute(clauses_to_distribute);
-            }
-
-            // Insert new clauses into all clauses
-            _all_clauses.insert(_all_clauses.end(), _new_clauses.begin(), _new_clauses.end());
+            startDistribute();
         }
-
     } else {
         // Send everything in the accumulator to the parent
         JobMessage msg;
@@ -208,6 +128,128 @@ void FailedAssumptionCommunicator::persist(std::vector<int> &failed_assumptions)
 
     // Pass new failed assumption to the lib
     if (!_new_clauses.empty()) _job.digestFailedAssumptions(_new_clauses);
+}
+
+void FailedAssumptionCommunicator::startDistribute() {
+    // We set a fix limit for distribute
+    // Every distribute we share the new clauses
+    // Then we fill the buffer using old clauses, starting from the member _distribute_start_index
+    const int limit = 20000;
+    // TODO Rework using dynamic limit from AnyTimeSatClauseCommunicator
+
+    // Buffer for distribute
+    std::vector<int> clauses_to_distribute;
+
+    if (_new_clauses.size() + _all_clauses.size() <= limit) {
+        // All clauses can be send
+
+        // Append new clauses to all clauses
+        _all_clauses.insert(_all_clauses.end(), _new_clauses.begin(), _new_clauses.end());
+
+        // Insert all clauses into distribute buffer
+        clauses_to_distribute.insert(clauses_to_distribute.end(), _all_clauses.begin(), _all_clauses.end());
+
+        // Reset start index
+        _distribute_start_index = 0;
+
+    } else if (_new_clauses.size() > limit) {
+        // The new clauses are larger than the limit
+        // This is very undesired! If this happens twice in a row some new clauses are not sent for some time
+        // TODO Also gather is not restricted by size -> An error could happen because of to many clauses that are sent
+        // Send as many new clauses as possible, then set the distribute start index in a way that the remaining clauses are sent next time
+        _logger.log(0, "FailedAssumptionCommunicator: The new clauses are larger than the limit");
+
+        // Set start index one behind the last element in all clauses
+        int start_index = _all_clauses.size();
+
+        // Append new clauses to all clauses
+        _all_clauses.insert(_all_clauses.end(), _new_clauses.begin(), _new_clauses.end());
+
+        std::vector<int>::const_iterator start_iterator = std::next(_all_clauses.cbegin(), start_index);
+
+        std::vector<int>::const_iterator end_iterator = findEndIteratorForLimit(_all_clauses, start_index, limit);
+
+        clauses_to_distribute.insert(clauses_to_distribute.cend(), start_iterator, end_iterator);
+
+        // Set distribute start index to the first clause that was not send of the new clauses
+        _distribute_start_index = end_iterator - _all_clauses.cbegin();
+
+        assert(_all_clauses.at(_distribute_start_index) == *end_iterator);
+
+    } else {
+        // All new clauses can be send, but only a subset of the existing clauses
+
+        // Remaining space in distribute buffer
+        int remaining_space = limit - static_cast<int>(_new_clauses.size());
+        // Must be larger than zero and smaller than then size of clauses
+        assert(remaining_space > 0);
+        assert(remaining_space < static_cast<int>(_all_clauses.size()));
+
+        // The start index must point at the beginning of a clause
+        assert(_all_clauses.at(_distribute_start_index) != 0);
+        // Either the first clause or some clause in the buffer
+        assert(_distribute_start_index == 0 || _all_clauses.at(_distribute_start_index - 1) == 0);
+        // This clause is the first one to send
+
+        // Create iterator from start index
+        std::vector<int>::const_iterator start_iterator = std::next(_all_clauses.cbegin(), _distribute_start_index);
+
+        assert(*start_iterator == _all_clauses.at(_distribute_start_index));
+
+        // How many elements can be send before setting the start index back to the beginning
+        int distance_until_end = std::distance(start_iterator, _all_clauses.cend());
+        // Must be greater than or equal to two, since that is the smallest size for a clause
+        assert(distance_until_end >= 2);
+
+        if (distance_until_end == remaining_space) {
+            // The elements between the start index and the end are exactly enough to fill the distribute buffer to its limit
+
+            clauses_to_distribute.insert(clauses_to_distribute.end(), start_iterator, _all_clauses.cend());
+
+            _distribute_start_index = 0;
+
+        } else if (distance_until_end > remaining_space) {
+            // The elements between the start index and the end are more than needed to fill the distribute buffer to its limit
+
+            std::vector<int>::const_iterator end_iterator = findEndIteratorForLimit(_all_clauses, _distribute_start_index, remaining_space);
+
+            clauses_to_distribute.insert(clauses_to_distribute.end(), start_iterator, end_iterator);
+
+            // Set _distribute_start_index to index of end iterator
+            _distribute_start_index = end_iterator - _all_clauses.begin();
+
+            assert(_all_clauses.at(_distribute_start_index) == *end_iterator);
+
+        } else {
+            // The elements between the start index and the end are less than needed to fill the distribute buffer to its limit
+            // Add them all and get the remaining from the beginning of _all_clauses
+            assert(distance_until_end < remaining_space);
+
+            // Inser all remaining
+            clauses_to_distribute.insert(clauses_to_distribute.end(), start_iterator, _all_clauses.cend());
+
+            // Recalculate remaining
+            remaining_space = remaining_space - distance_until_end;
+
+            // Remaining must be lower than the size
+            assert(static_cast<int>(_all_clauses.size()) > remaining_space);
+
+            std::vector<int>::const_iterator end_iterator = findEndIteratorForLimit(_all_clauses, 0, remaining_space);
+
+            clauses_to_distribute.insert(clauses_to_distribute.end(), _all_clauses.cbegin(), end_iterator);
+
+            // Set _distribute_start_index to index of end iterator
+            _distribute_start_index = end_iterator - _all_clauses.begin();
+        }
+        // Insert new clauses into all clauses
+        _all_clauses.insert(_all_clauses.end(), _new_clauses.begin(), _new_clauses.end());
+    }
+    // The entry condition for this branch is that there are either _new_clauses or _all_clauses is not empty -> something must be shared
+    assert(clauses_to_distribute.size() > 0);
+    assert(clauses_to_distribute.size() <= limit);
+
+    // Distribute if there is something to distribute
+    distribute(clauses_to_distribute);
 }
 
 void FailedAssumptionCommunicator::distribute(std::vector<int> &failed_assumptions) {
