@@ -326,13 +326,14 @@ void Lingeling::addLearnedClause(const int* begin, int size) {
 		if (!learnedUnits.produce(begin, size, /*addSeparationZero=*/false)) {
 			//_logger.log(V4_VVER, "Unit buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
 			numDiscarded++;
-		} else numReceived++;
+		}
 	} else {
 		if (!learnedClauses.produce(begin, size, /*addSeparationZero=*/true)) {
 			//_logger.log(V4_VVER, "Clause buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
 			numDiscarded++;
-		} else numReceived++;
+		}
 	}
+	numReceived++;
 
 	//time = _logger.getTime() - time;
 	//if (time > 0.2f) lp->_logger.log(-1, "[1] addLearnedClause took %.2fs! (size %i)\n", time, size);

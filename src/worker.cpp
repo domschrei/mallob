@@ -1032,5 +1032,6 @@ Worker::~Worker() {
     if (_params.isNotNull("mono") && _params.getParam("appmode") != "fork") {
         // Terminate directly without destructing resident job
         MPI_Finalize();
+        exit(0);
     }
 }
