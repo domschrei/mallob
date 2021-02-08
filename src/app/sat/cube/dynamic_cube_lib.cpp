@@ -245,9 +245,15 @@ std::vector<Cube> DynamicCubeLib::getCubes(int bias) {
 
     assert(_state.load() == ACTIVE);
 
+    // Count how many cubes there are more than 2x#SolverThreads
+    int redundant_cubes = static_cast<int>(_dynamic_cubes.size()) - _solver_thread_count * 2;
+
+    // Only so many cubes may be shared, that every solver thread can still get one
+    int maximum = static_cast<int>(_dynamic_cubes.size()) - _solver_thread_count;
+
     // Using initializer list for comparing 3 values
     // https://codereview.stackexchange.com/questions/26100/maximum-of-three-values-in-c
-    int cubesToGet = std::max({static_cast<int>(_dynamic_cubes.size()) - _solver_thread_count * 2, bias, 0});
+    int cubesToGet = std::min(std::max({redundant_cubes, bias, 0}), maximum);
 
     return _dynamic_cubes.getFreeCubesForSending(cubesToGet);
 }

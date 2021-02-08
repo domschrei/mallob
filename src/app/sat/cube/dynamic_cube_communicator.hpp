@@ -55,10 +55,10 @@ class DynamicCubeCommunicator {
 
     // This function is called after node was suspendend. 
     // All cubes are send to the root node
-    // All requests are  
+    // All requests are deleted, since they belong to suspended nodes
     void releaseAll();
 
     static bool isDynamicCubeMessage(int tag);
 };
 
-#endif /* MSCHICK_CUBE_SOLVER_THREAD_MANAGER_INTERFACE_H */
+#endif /* MSCHICK_DYNAMIC_CUBE_COMMUNICATOR_H */

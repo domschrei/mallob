@@ -29,7 +29,7 @@ void DynamicCubeCommunicator::sendMessageToParent() {
         _requester.push_back(_job.getMyMpiRank());
 
     } else {
-        // Calculate how many cubes are needed to send fulfill each request with the specified amount of cubes per request
+        // Calculate how many cubes are needed to fulfill each request with the specified amount of cubes per request
         int bias = static_cast<int>(_requester.size()) * _cubesPerRequest - static_cast<int>(_received_cubes.size());
         // Try to get cubes. This is biased by the received requests and cubes
         std::vector<Cube> cubes = _job.getCubes(bias);
