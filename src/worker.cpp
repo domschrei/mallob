@@ -640,14 +640,29 @@ void Worker::handleSendJobResult(MessageHandle& handle) {
     int revision = jobResult.revision;
 
     log(LOG_ADD_SRCRANK | V2_INFO, "Received result of job #%i rev. %i, code: %i", handle.source, jobId, revision, resultCode);
-    log(LOG_NO_PREFIX | V0_CRIT, "s %s", resultCode == RESULT_SAT ? "SATISFIABLE" 
-                            : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN");
+    std::string resultString = "s " + std::string(resultCode == RESULT_SAT ? "SATISFIABLE" 
+                        : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN") + "\n";
+    std::string modelString = "";
     if (resultCode == RESULT_SAT) {
-        std::string model = "";
+        modelString = "v ";
         for (size_t x = 1; x < jobResult.solution.size(); x++) {
-            model += std::to_string(jobResult.solution[x]) + " ";
+            modelString += std::to_string(jobResult.solution[x]) + " ";
         }
-        log(LOG_NO_PREFIX | V0_CRIT, "v %s", model.c_str());
+        modelString += "\n";
+    }
+    if (_params.isNotNull("s2f")) {
+        std::ofstream file;
+        file.open(_params.getParam("s2f"));
+        if (!file.is_open()) {
+            log(V0_CRIT, "ERROR: Could not open solution file\n");
+        } else {
+            file << resultString;
+            if (!modelString.empty()) file << modelString;
+            file.close();
+        }
+    } else {
+        log(LOG_NO_PREFIX | V0_CRIT, resultString.c_str());
+        if (!modelString.empty()) log(LOG_NO_PREFIX | V0_CRIT, modelString.c_str());
     }
 
     if (_params.isNotNull("mono")) {
