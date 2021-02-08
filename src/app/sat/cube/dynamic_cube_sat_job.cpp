@@ -3,6 +3,7 @@
 #include <cassert>
 
 #include "dynamic_cube_communicator.hpp"
+#include "new_dynamic_cube_communicator.hpp"
 #include "failed_assumption_communicator.hpp"
 #include "util/console.hpp"
 
@@ -14,7 +15,7 @@ DynamicCubeSatJob::DynamicCubeSatJob(Parameters& params, int commSize, int world
     : Job(params, commSize, worldRank, jobId),
       _logger("<c-" + std::to_string(_world_rank) + std::string(toStr()) + ">", std::string(toStr())),
       _job_comm_period(params.getFloatParam("s")) {
-    _dynamic_cube_comm = new DynamicCubeCommunicator(*this, _logger, params.getIntParam("t"));
+    _dynamic_cube_comm = new NewDynamicCubeCommunicator(*this, _logger, params.getIntParam("t"));
     _failed_assumption_comm = new FailedAssumptionCommunicator(*this, _logger);
 }
 
@@ -79,7 +80,7 @@ void DynamicCubeSatJob::appl_pause() {
         _lib->suspend();
 
         // Release all cubes
-        ((DynamicCubeCommunicator*)_dynamic_cube_comm)->releaseAll();
+        ((NewDynamicCubeCommunicator*)_dynamic_cube_comm)->releaseAll();
 
         // Share all found failed cubes
         ((FailedAssumptionCommunicator*)_failed_assumption_comm)->release();
@@ -202,7 +203,7 @@ bool DynamicCubeSatJob::appl_wantsToBeginCommunication() const {
 
 void DynamicCubeSatJob::appl_beginCommunication() {
     // Is called by the same thread directly after appl_wantsToBeginCommunication return, therefore no suspension or interruption could have happenend since
-    ((DynamicCubeCommunicator*)_dynamic_cube_comm)->sendMessageToParent();
+    ((NewDynamicCubeCommunicator*)_dynamic_cube_comm)->sendMessageToParent();
     ((FailedAssumptionCommunicator*)_failed_assumption_comm)->gather();
 
     _time_of_last_comm = Timer::elapsedSeconds();
@@ -213,8 +214,8 @@ void DynamicCubeSatJob::appl_communicate(int source, JobMessage& msg) {
     // !Messages are send to nodes not to job tree positions!
     // Handle message if job was not interrupted
     if (_job_state != INTERRUPTED_BEFORE_INITIALIZATION && _job_state != WITHDRAWING && _job_state != WITHDRAWN) {
-        if (DynamicCubeCommunicator::isDynamicCubeMessage(msg.tag)) {
-            ((DynamicCubeCommunicator*)_dynamic_cube_comm)->handle(source, msg);
+        if (NewDynamicCubeCommunicator::isDynamicCubeMessage(msg.tag)) {
+            ((NewDynamicCubeCommunicator*)_dynamic_cube_comm)->handle(source, msg);
 
         } else if (FailedAssumptionCommunicator::isFailedAssumptionMessage(msg.tag)) {
             ((FailedAssumptionCommunicator*)_failed_assumption_comm)->handle(source, msg);
@@ -246,7 +247,7 @@ DynamicCubeSatJob::~DynamicCubeSatJob() {
 
     // Destroy the communicators
     assert(_dynamic_cube_comm != NULL);
-    delete (DynamicCubeCommunicator*)_dynamic_cube_comm;
+    delete (NewDynamicCubeCommunicator*)_dynamic_cube_comm;
 
     assert(_failed_assumption_comm != NULL);
     delete (FailedAssumptionCommunicator*)_failed_assumption_comm;

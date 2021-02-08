@@ -12,7 +12,7 @@
 
 DynamicCubeLib::DynamicCubeLib(DynamicCubeSetup &setup, bool isRoot) : _logger(setup.logger) {
     _solver_thread_count = setup.params.getIntParam("t");
-    _max_dynamic_cubes = _solver_thread_count * 3;
+    _max_dynamic_cubes = _solver_thread_count * 2;
     _generator_thread_count = 1;
 
     // Create cube solver threads
@@ -182,10 +182,10 @@ void DynamicCubeLib::shareCubeToSplit(std::optional<Cube> &lastCube, int splitLi
             // Leave next cube empty on interruption
             return;
 
-        } else if (static_cast<int>(_dynamic_cubes.size()) > _max_dynamic_cubes) {
+        } else if (static_cast<int>(_dynamic_cubes.size()) >= _max_dynamic_cubes) {
             _logger.log(0, "DynamicCubeGeneratorThread waits because there are too many cubes");
             // Wait because there are too many cubes
-            _generator_cv.wait(lock, [&] { return static_cast<int>(_dynamic_cubes.size()) <= _max_dynamic_cubes || _state.load() == INTERRUPTING; });
+            _generator_cv.wait(lock, [&] { return static_cast<int>(_dynamic_cubes.size()) < _max_dynamic_cubes || _state.load() == INTERRUPTING; });
 
         } else if (!_dynamic_cubes.hasACubeForSplitting()) {
             if (_request_state == NONE && !_dynamic_cubes.hasSplittingCubes()) {
