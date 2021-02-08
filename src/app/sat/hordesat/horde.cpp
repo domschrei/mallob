@@ -209,9 +209,11 @@ void HordeLib::dumpStats(bool final) {
 	SolvingStatistics locSolveStats;
 	for (size_t i = 0; i < _num_solvers; i++) {
 		SolvingStatistics st = _solver_interfaces[i]->getStatistics();
-		_logger.log(V2_INFO, "%sS%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f recv:%lu digd:%lu\n",
+		_logger.log(V2_INFO, "%sS%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f recv:%lu digd:%lu disc:%lu\n",
 				final ? "END " : "",
-				_solver_interfaces[i]->getGlobalId(), st.propagations, st.decisions, st.conflicts, st.memPeak, st.receivedClauses, st.digestedClauses);
+				_solver_interfaces[i]->getGlobalId(), 
+				st.propagations, st.decisions, st.conflicts, st.memPeak, 
+				st.receivedClauses, st.digestedClauses, st.discardedClauses);
 		locSolveStats.conflicts += st.conflicts;
 		locSolveStats.decisions += st.decisions;
 		locSolveStats.memPeak += st.memPeak;

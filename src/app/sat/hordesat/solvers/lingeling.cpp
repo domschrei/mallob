@@ -324,11 +324,13 @@ void Lingeling::addLearnedClause(const int* begin, int size) {
 
 	if (size == 1) {
 		if (!learnedUnits.produce(begin, size, /*addSeparationZero=*/false)) {
-			_logger.log(V4_VVER, "Unit buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
+			//_logger.log(V4_VVER, "Unit buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
+			numDiscarded++;
 		} else numReceived++;
 	} else {
 		if (!learnedClauses.produce(begin, size, /*addSeparationZero=*/true)) {
-			_logger.log(V4_VVER, "Clause buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
+			//_logger.log(V4_VVER, "Clause buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
+			numDiscarded++;
 		} else numReceived++;
 	}
 
@@ -369,6 +371,7 @@ SolvingStatistics Lingeling::getStatistics() {
 	st.memPeak = lglmaxmb(solver);
 	st.receivedClauses = numReceived;
 	st.digestedClauses = numDigested;
+	st.discardedClauses = numDiscarded;
 	return st;
 }
 

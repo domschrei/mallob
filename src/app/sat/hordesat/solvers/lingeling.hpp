@@ -45,8 +45,9 @@ private:
 	std::vector<int> learnedClausesBuffer;
 	std::vector<int> learnedUnitsBuffer;
 	std::vector<int> learnedClause;
-	int numReceived = 0;
-	int numDigested = 0;
+	unsigned long numReceived = 0;
+	unsigned long numDigested = 0;
+	unsigned long numDiscarded = 0;
     
     volatile bool suspendSolver;
     Mutex suspendMutex;

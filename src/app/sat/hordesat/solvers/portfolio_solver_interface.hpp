@@ -32,6 +32,7 @@ struct SolvingStatistics {
 	unsigned long restarts = 0;
 	unsigned long receivedClauses = 0;
 	unsigned long digestedClauses = 0;
+	unsigned long discardedClauses = 0;
 	double memPeak = 0;
 };
 
