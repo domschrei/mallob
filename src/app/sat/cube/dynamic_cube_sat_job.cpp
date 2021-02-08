@@ -238,11 +238,18 @@ DynamicCubeSatJob::~DynamicCubeSatJob() {
 
     _logger.log(0, "Enter destructor");
 
-    // The withdraw thread might still be default constructed, because of an aborted initialization
+    // The withdraw thread might still be default constructed, because of an aborted initialization or a prior suspension
     if (_withdraw_thread.joinable()) {
         _withdraw_thread.join();
         _logger.log(0, "Joined cleanup thread");
     }
+
+    // Destroy the communicators
+    assert(_dynamic_cube_comm != NULL);
+    delete (DynamicCubeCommunicator*)_dynamic_cube_comm;
+
+    assert(_failed_assumption_comm != NULL);
+    delete (FailedAssumptionCommunicator*)_failed_assumption_comm;
 
     _logger.log(0, "Exit destructor");
 }
