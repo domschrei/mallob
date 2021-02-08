@@ -66,14 +66,30 @@ class DynamicCubes {
 
     // May return a cube that is not being solved
     std::optional<Cube> tryToGetACubeForSolving() {
-        for (auto &cube : _dynamic_cubes)
-            if (cube.isSolving == false) {
-                // Assign cube to requesting thread
-                cube.isSolving = true;
+        DynamicCube *selected_dynamic_cube = nullptr;
 
-                return cube.cube;
+        for (auto &dynamic_cube : _dynamic_cubes)
+
+            if (!dynamic_cube.isSolving) {
+                if (selected_dynamic_cube != nullptr) {
+                    // If a cube was selected and this solvable cube is shorter -> change selection
+                    if (dynamic_cube.cube.getPath().size() < selected_dynamic_cube->cube.getPath().size()) {
+                        selected_dynamic_cube = &dynamic_cube;
+                    }
+                } else {
+                    // Select first possible cube
+                    selected_dynamic_cube = &dynamic_cube;
+                }
             }
 
+        if (selected_dynamic_cube != nullptr) {
+            // A cube was selected -> set it to solving and return it
+            selected_dynamic_cube->isSolving = true;
+
+            return selected_dynamic_cube->cube;
+        }
+
+        // No cube solvable
         return std::nullopt;
     }
 
