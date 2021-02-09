@@ -17,17 +17,29 @@ DynamicCubeLib::DynamicCubeLib(DynamicCubeSetup &setup, bool isRoot) : _logger(s
 
     // Create cube solver threads
     for (int i = 0; i < _solver_thread_count; i++) {
-        // https://stackoverflow.com/questions/3283778/why-can-i-not-push-back-a-unique-ptr-into-a-vector
-        std::unique_ptr<DynamicCubeSolverThread> solver = std::make_unique<DynamicCubeSolverThread>(*this, setup);
-        _solver_threads.push_back(std::move(solver));
+        _initializer_threads.emplace_back([this, setup]() {
+            // https://stackoverflow.com/questions/3283778/why-can-i-not-push-back-a-unique-ptr-into-a-vector
+            std::unique_ptr<DynamicCubeSolverThread> solver = std::make_unique<DynamicCubeSolverThread>(*this, setup);
+            const std::lock_guard<Mutex> lock(_local_lock);
+            _solver_threads.push_back(std::move(solver));
+        });
     }
 
     // Create cube generator threads
     for (int i = 0; i < _generator_thread_count; i++) {
-        // https://stackoverflow.com/questions/3283778/why-can-i-not-push-back-a-unique-ptr-into-a-vector
-        std::unique_ptr<DynamicCubeGeneratorThread> generator = std::make_unique<DynamicCubeGeneratorThread>(*this, setup);
-        _generator_threads.push_back(std::move(generator));
+        _initializer_threads.emplace_back([this, setup]() {
+            // https://stackoverflow.com/questions/3283778/why-can-i-not-push-back-a-unique-ptr-into-a-vector
+            std::unique_ptr<DynamicCubeGeneratorThread> generator = std::make_unique<DynamicCubeGeneratorThread>(*this, setup);
+            const std::lock_guard<Mutex> lock(_local_lock);
+            _generator_threads.push_back(std::move(generator));
+        });
     }
+
+    _logger.log(0, "DynamicCubeLib: Started all initializer threads");
+
+    for (auto &thread : _initializer_threads) thread.join();
+
+    _logger.log(0, "DynamicCubeLib: Joined all initializer threads");
 
     // Insert an empty cube into the dynamic cubes of the root lib instance
     if (isRoot) {

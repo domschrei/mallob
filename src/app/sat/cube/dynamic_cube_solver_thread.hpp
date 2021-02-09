@@ -50,7 +50,7 @@ class DynamicCubeSolverThread {
     void solve();
 
    public:
-    DynamicCubeSolverThread(DynamicCubeSolverThreadManagerInterface &worker, DynamicCubeSetup &setup);
+    DynamicCubeSolverThread(DynamicCubeSolverThreadManagerInterface &worker, const DynamicCubeSetup &setup);
     ~DynamicCubeSolverThread();
 
     void start();

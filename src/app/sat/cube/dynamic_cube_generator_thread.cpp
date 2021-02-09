@@ -4,7 +4,7 @@
 
 std::atomic<int> DynamicCubeGeneratorThread::_counter{0};
 
-DynamicCubeGeneratorThread::DynamicCubeGeneratorThread(DynamicCubeGeneratorThreadManagerInterface &manager, DynamicCubeSetup &setup)
+DynamicCubeGeneratorThread::DynamicCubeGeneratorThread(DynamicCubeGeneratorThreadManagerInterface &manager, const DynamicCubeSetup &setup)
     : _manager(manager),
       _formula(setup.formula),
       _logger(setup.logger),

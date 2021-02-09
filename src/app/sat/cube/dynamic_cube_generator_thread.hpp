@@ -66,7 +66,7 @@ class DynamicCubeGeneratorThread {
     void generate();
 
    public:
-    DynamicCubeGeneratorThread(DynamicCubeGeneratorThreadManagerInterface &manager, DynamicCubeSetup &setup);
+    DynamicCubeGeneratorThread(DynamicCubeGeneratorThreadManagerInterface &manager, const DynamicCubeSetup &setup);
     ~DynamicCubeGeneratorThread();
 
     void start();

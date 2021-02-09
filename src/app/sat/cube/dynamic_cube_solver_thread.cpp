@@ -4,7 +4,7 @@
 
 std::atomic<int> DynamicCubeSolverThread::_counter{0};
 
-DynamicCubeSolverThread::DynamicCubeSolverThread(DynamicCubeSolverThreadManagerInterface &manager, DynamicCubeSetup &setup)
+DynamicCubeSolverThread::DynamicCubeSolverThread(DynamicCubeSolverThreadManagerInterface &manager, const DynamicCubeSetup &setup)
     : _manager(manager), _formula(setup.formula), _logger(setup.logger), _result(setup.result), _instance_counter{DynamicCubeSolverThread::_counter++} {
     // Initialize solver
     SolverSetup solver_setup;

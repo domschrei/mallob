@@ -21,6 +21,9 @@ class DynamicCubeLib : public DynamicCubeSolverThreadManagerInterface, public Dy
     // Number of local threads that solve cubes
     int _solver_thread_count = 0;
 
+    // Threads to initialize the solver threads and the generator threads
+    std::vector<std::thread> _initializer_threads;
+
     // Cube solver threads
     // Wrap instances in unique_ptr to work around
     // https://stackoverflow.com/questions/42180500/vector-of-thread-wrapper-with-thread-bound-to-class-member-function
