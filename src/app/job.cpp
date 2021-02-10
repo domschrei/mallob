@@ -42,37 +42,20 @@ void Job::uncommit() {
     _commitment.reset();
 }
 
-void Job::start(std::vector<uint8_t>&& data) {
+void Job::start(const std::shared_ptr<std::vector<uint8_t>>& data) {
     assertState(INACTIVE);
     
     if (_time_of_activation <= 0) _time_of_activation = Timer::elapsedSeconds();
     _time_of_last_limit_check = Timer::elapsedSeconds();
     _volume = 1;
+
+    _description.deserialize(data);
+    _priority = _description.getPriority();
+    _has_description = true;
     
     _state = ACTIVE;
 
-    auto lock = _job_manipulation_lock.getLock();
-    
-    _serialized_description = std::move(data);
-    
-    size_t i = _unpack_done.size();
-    _unpack_done.emplace_back(false);
-    _unpack_threads.emplace_back([this, i]() {
-
-        if (!hasDeserializedDescription()) {
-            unpackDescription();
-        } else {
-            // TODO Handle amendment to job description
-        }
-
-        // Mark unpacking as done    
-        {
-            auto lock = _job_manipulation_lock.getLock();
-            _unpack_done[i] = true;
-        }
-
-        appl_start();
-    });
+    appl_start();
 }
 
 void Job::stop() {
@@ -110,7 +93,7 @@ void Job::terminate() {
 
 bool Job::isDestructible() {
     assert(getState() == PAST);
-    return (_unpack_threads.empty() || testDeserializationDone()) && appl_isDestructible();
+    return appl_isDestructible();
 }
 
 int Job::getDemand(int prevVolume, float elapsedTime) const {

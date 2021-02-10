@@ -24,10 +24,12 @@ int main() {
         log(V2_INFO, "Reading test CNF %s ...\n", f.c_str());
         float time = Timer::elapsedSeconds();
         SatReader r(f);
-        auto result = r.read();
+        JobDescription d;
+        bool success = r.read(d);
+        assert(success);
         time = Timer::elapsedSeconds() - time;
         log(V2_INFO, " - done, took %.3fs\n", time);
-        assert(result);
+        assert(d.getFormulaSize() > 0);
 
         log(V2_INFO, "Only decompressing CNF %s for comparison ...\n", f.c_str());
         float time2 = Timer::elapsedSeconds();

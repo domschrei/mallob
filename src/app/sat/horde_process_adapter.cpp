@@ -12,9 +12,9 @@
 #include "util/sys/process.hpp"
 #include "util/logger.hpp"
 
-HordeProcessAdapter::HordeProcessAdapter(const Parameters& params,
-            const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<std::vector<int>>& assumptions) :
-                _params(params), _formulae(formulae), _assumptions(assumptions) {
+HordeProcessAdapter::HordeProcessAdapter(const Parameters& params, 
+    size_t fSize, const int* fLits, size_t aSize, const int* aLits) :    
+        _params(params), _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits) {
 
     initSharedMemory();
 }
@@ -50,23 +50,20 @@ void HordeProcessAdapter::initSharedMemory() {
     _hsm->solutionSize = 0;
     _hsm->exportBufferTrueSize = 0;
 
-    // Put formulae into their own blocks of shared memory
-    int fIdx = 0;
-    for (const auto& f : _formulae) {
-        int size = sizeof(int) * f->size();
-        std::string fShmemId = _shmem_id + ".formulae." + std::to_string(fIdx);
-        void* fShmem = SharedMemory::create(fShmemId, size);
-        _shmem.push_back(std::tuple<std::string, void*, int>(fShmemId, fShmem, size));
-        memcpy((int*)fShmem, f->data(), size);
-        _params.setParam("fbufsize" + std::to_string(fIdx), std::to_string(size));
-    }
+    // Put formula into its own block of shared memory
+    int size = sizeof(int) * _f_size;
+    std::string fShmemId = _shmem_id + ".formulae.0";
+    void* fShmem = SharedMemory::create(fShmemId, size);
+    _shmem.push_back(std::tuple<std::string, void*, int>(fShmemId, fShmem, size));
+    memcpy((int*)fShmem, _f_lits, size);
+    _params.setParam("fbufsize0", std::to_string(size));
 
     // Put assumptions into their own block of shared memory
-    int size = sizeof(int) * _assumptions->size();
+    size = sizeof(int) * _a_size;
     std::string aShmemId = _shmem_id + ".assumptions";
     void* aShmem = SharedMemory::create(aShmemId, size);
     _shmem.push_back(std::tuple<std::string, void*, int>(aShmemId, aShmem, size));
-    memcpy((int*)aShmem, _assumptions->data(), size);
+    memcpy((int*)aShmem, _a_lits, size);
     _params.setParam("asmptbufsize", std::to_string(size));
 
     // Create block of shared memory for clause export

@@ -97,7 +97,7 @@ public:
 	virtual void setPhase(const int var, const bool phase) = 0;
 
 	// Solve the formula with a given set of assumptions
-	virtual SatResult solve(const std::vector<int>& assumptions = std::vector<int>()) = 0;
+	virtual SatResult solve(size_t numAssumptions, const int* assumptions) = 0;
 
 	// Get a solution vector containing lit or -lit for each lit in the model
 	virtual std::vector<int> getSolution() = 0;

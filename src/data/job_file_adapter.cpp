@@ -81,22 +81,8 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         o << std::setw(4) << j << std::endl;
     }
 
-    // Parse CNF input file
-    float time = Timer::elapsedSeconds();
-    std::string file = j["file"].get<std::string>();
-    SatReader r(file);
-    VecPtr formula = r.read();
-    VecPtr assumptions = std::make_shared<std::vector<int>>();
-    if (formula == NULL) {
-        log.log(V1_WARN, "File %s could not be opened - skipping #%i\n", file.c_str(), id);
-        return;
-    }
-    time = Timer::elapsedSeconds() - time;
-    log.log(V3_VERB, "Parsed %s (%i literals w/ separators, %i assumptions) in %.3fs\n", 
-            userFile.c_str(), formula->size(), assumptions->size(), time);
-    time = Timer::elapsedSeconds();
-
     // Initialize new job
+    float time = Timer::elapsedSeconds();
     float priority = userPrio * (j.contains("priority") ? j["priority"].get<float>() : 1.0f);
     if (_params.isNotNull("jjp")) {
         // Jitter job priority
@@ -111,12 +97,18 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         job->setCpuLimit(TimePeriod(j["cpu-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS));
         log.log(V4_VVER, "Job #%i : CPU time limit %i CPUs\n", id, job->getCpuLimit());
     }
-    job->addPayload(formula);
-    job->addAssumptions(assumptions);
-    job->setNumVars(r.getNumVars());
     job->setArrival(arrival);
+    
+    // Parse CNF input file
+    std::string file = j["file"].get<std::string>();
+    SatReader r(file);
+    bool success = r.read(*job);
+    if (!success) {
+        log.log(V1_WARN, "File %s could not be opened - skipping #%i\n", file.c_str(), id);
+        return;
+    }
     time = Timer::elapsedSeconds() - time;
-    log.log(V3_VERB, "Initialized job #%i (%s) in %.3fs\n", id, userFile.c_str(), time);
+    log.log(V3_VERB, "Initialized job #%i (%s) in %.3fs: %ld lits w/ separators\n", id, userFile.c_str(), time, job->getFormulaSize());
 
     // Callback to client: New job arrival.
     _new_job_callback(std::shared_ptr<JobDescription>(job));

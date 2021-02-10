@@ -36,24 +36,12 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
     assert(hsm != nullptr);
 
     // Read formulae and assumptions from other individual blocks of shared memory
-    std::vector<std::shared_ptr<std::vector<int>>> formulae;
-    int fIdx = 0;
-    while (programParams.isSet("fbufsize" + std::to_string(fIdx))) {
-        int fSize = programParams.getIntParam("fbufsize" + std::to_string(fIdx));
-        std::string fId = shmemId + ".formulae." + std::to_string(fIdx);
-        int* fPtr = (int*) SharedMemory::access(fId, fSize);
-        formulae.emplace_back(new std::vector<int>(fPtr, fPtr+(fSize/sizeof(int))));
-        SharedMemory::free(fId, (char*)fPtr, fSize);
-        fIdx++;
-    }
-    std::shared_ptr<std::vector<int>> assumptions;
-    if (programParams.isSet("asmptbufsize")) {
-        int aSize = programParams.getIntParam("asmptbufsize");
-        std::string aId = shmemId + ".assumptions";
-        int* aPtr = (int*) SharedMemory::access(aId, aSize);
-        assumptions.reset(new std::vector<int>(aPtr, aPtr+(aSize/sizeof(int))));
-        SharedMemory::free(aId, (char*)aPtr, aSize);
-    }
+    int fSize = programParams.getIntParam("fbufsize0");
+    std::string fId = shmemId + ".formulae.0";
+    int* fPtr = (int*) SharedMemory::access(fId, fSize);
+    int aSize = programParams.getIntParam("asmptbufsize");
+    std::string aId = shmemId + ".assumptions";
+    int* aPtr = (int*) SharedMemory::access(aId, aSize);
 
     // Set up export and import buffers for clause exchanges
     int maxExportBufferSize = programParams.getIntParam("cbbs") * sizeof(int);
@@ -66,7 +54,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
     
     // Prepare solver
     HordeLib hlib(programParams, log.copy("H", "H"));
-    hlib.beginSolving(formulae, assumptions);
+    hlib.beginSolving(fSize/sizeof(int), fPtr, aSize/sizeof(int), aPtr);
     bool interrupted = false;
     std::vector<int> solutionVec;
 
@@ -190,6 +178,8 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
         }
     }
 
+    SharedMemory::free(fId, (char*)fPtr, fSize);
+    SharedMemory::free(aId, (char*)aPtr, aSize);
     SharedMemory::free(shmemId + ".clauseexport", (char*)exportBuffer, maxExportBufferSize);
     SharedMemory::free(shmemId + ".clauseimport", (char*)importBuffer, maxImportBufferSize);
     if (!solutionShmemId.empty()) SharedMemory::free(solutionShmemId, solutionShmem, solutionShmemSize);

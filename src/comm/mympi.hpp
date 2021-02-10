@@ -52,6 +52,7 @@ public:
 
     static void isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object);
     static void isend(MPI_Comm communicator, int recvRank, int tag, const std::vector<uint8_t>& object);
+    static void isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object);
     static void irecv(MPI_Comm communicator);
     static void irecv(MPI_Comm communicator, int tag);
     static void irecv(MPI_Comm communicator, int source, int tag);
@@ -91,6 +92,7 @@ private:
     static std::vector<MessageHandlePtr> _sent_handles;
     static robin_hood::unordered_map<int, MsgTag> _tags;
 
+    static void doIsend(MPI_Comm communicator, int recvRank, int tag);
     static void resetListenerIfNecessary(int tag);
 };
 
@@ -101,7 +103,7 @@ Represents a single message that is being sent or received.
 struct MessageHandle {
 
 private:
-    std::vector<uint8_t> sendData;
+    std::shared_ptr<std::vector<uint8_t>> sendData;
     std::vector<uint8_t> recvData;
 
 public:
@@ -127,15 +129,13 @@ public:
         //log(V5_DEBG, "Msg ID=%i created\n", id);
     }
     MessageHandle(int id, const std::vector<uint8_t>& data, float time = Timer::elapsedSeconds()) : 
-            id(id), sendData(data), creationTime(time) {
+            id(id), sendData(new std::vector<uint8_t>(data)), creationTime(time) {
         status.MPI_SOURCE = -1; 
         status.MPI_TAG = -1;
         //log(V5_DEBG, "Msg ID=%i created\n", id);
     }
-    MessageHandle(int id, const std::vector<uint8_t>& sendData, 
-            const std::vector<uint8_t>& recvData, 
-            float time = Timer::elapsedSeconds()) : 
-            id(id), sendData(sendData), recvData(recvData), creationTime(time) {
+    MessageHandle(int id, const std::shared_ptr<std::vector<uint8_t>>& data, float time = Timer::elapsedSeconds()) : 
+            id(id), sendData(data), creationTime(time) {
         status.MPI_SOURCE = -1; 
         status.MPI_TAG = -1;
         //log(V5_DEBG, "Msg ID=%i created\n", id);
@@ -171,14 +171,14 @@ public:
         return *this;
     }*/
 
-    const std::vector<uint8_t>& getSendData() const { return sendData;}
+    const std::vector<uint8_t>& getSendData() const { return *sendData;}
     const std::vector<uint8_t>& getRecvData() const { return recvData;}
     std::vector<uint8_t>&& moveRecvData() { return std::move(recvData);}
 
     void appendTagToSendData(int tag) {
-        int prevSize = sendData.size();
-        sendData.resize(prevSize+sizeof(int));
-        memcpy(sendData.data()+prevSize, &tag, sizeof(int));
+        int prevSize = sendData->size();
+        sendData->resize(prevSize+sizeof(int));
+        memcpy(sendData->data()+prevSize, &tag, sizeof(int));
     }
     void receiveSelfMessage(const std::vector<uint8_t>& recvData, int rank) {
         this->recvData = recvData;

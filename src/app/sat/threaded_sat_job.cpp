@@ -19,15 +19,12 @@ ThreadedSatJob::ThreadedSatJob(const Parameters& params, int commSize, int world
 void ThreadedSatJob::appl_start() {
 
     if (_initialized) {
-        
         // Already initialized => Has a valid solver instance
-        auto lock = _solver_lock.getLock();
-        _done_locally = false;
+        
         // TODO Update job index etc. from JobTree
-        // TODO Update job description and amendments (in a separate thread!)
-        // Continue solving
-        _solver->continueSolving(std::vector<VecPtr>(), 
-                getDescription().getAssumptions(getRevision()));
+        // TODO Update job description and amendments
+        // TODO Continue solving
+        abort();
     
     } else if (!_init_thread.joinable()) _init_thread = std::thread([this]() {
         
@@ -41,7 +38,12 @@ void ThreadedSatJob::appl_start() {
 
         //log(V5_DEBG, "%s : beginning to solve\n", toStr());
         const JobDescription& desc = getDescription();
-        getSolver()->beginSolving(desc.getPayloads(), desc.getAssumptions(getRevision()));
+        getSolver()->beginSolving(
+            desc.getFormulaSize(), 
+            desc.getFormulaPayload(), 
+            desc.getAssumptionsSize(), 
+            desc.getAssumptionsPayload()
+        );
         //log(V4_VVER, "%s : finished horde initialization\n", toStr());
         _time_of_start_solving = Timer::elapsedSeconds();
 

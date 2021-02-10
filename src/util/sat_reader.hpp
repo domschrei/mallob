@@ -6,16 +6,16 @@
 #include <vector>
 #include <memory>
 
+#include "data/job_description.hpp"
+
 class SatReader {
 
 private:
     std::string _filename;
-    int _num_vars = -1;
 
 public:
     SatReader(std::string filename) : _filename(filename) {}
-    std::shared_ptr<std::vector<int>> read();
-    int getNumVars() {return _num_vars;}
+    bool read(JobDescription& desc);
 };
 
 #endif

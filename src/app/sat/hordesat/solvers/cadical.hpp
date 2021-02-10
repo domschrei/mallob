@@ -45,7 +45,7 @@ public:
 	void setPhase(const int var, const bool phase) override;
 
 	// Solve the formula with a given set of assumptions
-	SatResult solve(const std::vector<int>& assumptions) override;
+	SatResult solve(size_t numAssumptions, const int* assumptions) override;
 
 	void setSolverInterrupt() override;
 	void unsetSolverInterrupt() override;

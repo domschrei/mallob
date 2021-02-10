@@ -11,12 +11,11 @@ using namespace SolvingStates;
 
 SolverThread::SolverThread(const Parameters& params,
          std::shared_ptr<PortfolioSolverInterface> solver, 
-        const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
-        const std::shared_ptr<std::vector<int>>& assumptions, 
+        size_t fSize, const int* fLits, size_t aSize, const int* aLits,
         int localId, std::atomic_bool* finished) : 
     _params(params), _solver_ptr(solver), _solver(*solver), 
     _logger(_solver.getLogger()), 
-    _formulae(formulae), _assumptions(assumptions), 
+    _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits),
     _local_id(localId), _finished_flag(finished) {
     
     _portfolio_rank = _params.getIntParam("apprank", 0);
@@ -79,35 +78,23 @@ void* SolverThread::run() {
 }
 
 void SolverThread::readFormula() {
-    _logger.log(V5_DEBG, "importing clauses\n");
-
+    _logger.log(V5_DEBG, "importing clauses (%ld lits)\n", _f_size);
     size_t prevLits = _imported_lits;
-    size_t begin = _imported_lits;
-
-    size_t i = 0;
-    for (std::shared_ptr<std::vector<int>> f : _formulae) {
-        if (begin < f->size())
-            read(*f, begin);
-        begin -= f->size();
-        i++;
-        //if (i < hlib->formulae.size() && cancelRun()) return;
-        if (i < _formulae.size() && cancelThread()) return;
-    }
-
-    _logger.log(V4_VVER, "imported cnf (%i lits)\n", _imported_lits-prevLits);
+    read();
+    _logger.log(V4_VVER, "imported cnf (%ld lits)\n", _imported_lits-prevLits);
 }
 
-void SolverThread::read(const std::vector<int>& formula, int begin) {
+void SolverThread::read() {
     int batchSize = 100000;
-    for (int start = std::max(0, begin); start < (int) formula.size(); start += batchSize) {
+    for (size_t start = _imported_lits; start < _f_size; start += batchSize) {
         
         //waitWhile(SUSPENDED);
         //if (cancelRun()) break;
         if (cancelThread()) break;
 
-        int limit = std::min(start+batchSize, (int) formula.size());
-        for (int i = start; i < limit; i++) {
-            _solver.addLiteral(formula[i]);
+        size_t limit = std::min(start+batchSize, _f_size);
+        for (size_t i = start; i < limit; i++) {
+            _solver.addLiteral(_f_lits[i]);
             _imported_lits++;
         }
     }
@@ -241,7 +228,7 @@ void SolverThread::runOnce() {
 
         //hlib->h_logger.log(V2_INFO, "rank %d starting solver with %d new lits, %d assumptions: %d\n", hlib->mpi_rank, litsAdded, hlib->assumptions.size(), hlib->assumptions[0]);
         _logger.log(V5_DEBG, "BEGSOL\n");
-        SatResult res = _solver.solve(*_assumptions);
+        SatResult res = _solver.solve(_a_size, _a_lits);
         _logger.log(V5_DEBG, "ENDSOL\n");
 
         // If interrupted externally

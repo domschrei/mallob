@@ -33,9 +33,13 @@ void ForkedSatJob::appl_start() {
         Parameters hParams(_params);
         HordeConfig::applyDefault(hParams, *this);
 
+        const JobDescription& desc = getDescription();
         _solver.reset(new HordeProcessAdapter(hParams,
-                getDescription().getPayloads(), 
-                getDescription().getAssumptions(getRevision())));
+            desc.getFormulaSize(), 
+            desc.getFormulaPayload(), 
+            desc.getAssumptionsSize(), 
+            desc.getAssumptionsPayload()
+        ));
         _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
 
         //log(V5_DEBG, "%s : beginning to solve\n", toStr());

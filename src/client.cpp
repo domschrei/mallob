@@ -255,12 +255,6 @@ void Client::introduceJob(std::shared_ptr<JobDescription>& jobPtr) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
-    if (job.getPayload(0) == nullptr || job.getPayload(0)->size() <= 1) {
-        // Some I/O error kept the instance from being read
-        log(V1_WARN, "Skipping job #%i due to previous I/O error\n", jobId);
-        return;
-    }
-
     // Set job arrival
     job.setArrival(Timer::elapsedSeconds());
 
@@ -303,7 +297,7 @@ void Client::handleRequestBecomeChild(MessageHandle& handle) {
     const JobDescription& desc = *_jobs[req.jobId];
 
     // Send job signature
-    JobSignature sig(req.jobId, /*rootRank=*/handle.source, req.revision, desc.getTransferSize(false));
+    JobSignature sig(req.jobId, /*rootRank=*/handle.source, req.revision, desc.getTransferSize());
     MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_ACCEPT_ADOPTION_OFFER, sig);
     //stats.increment("sentMessages");
 }
@@ -312,13 +306,13 @@ void Client::handleAckAcceptBecomeChild(MessageHandle& handle) {
     JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
     JobDescription& desc = *_jobs[req.jobId];
     assert(desc.getId() == req.jobId || log_return_false("%i != %i\n", desc.getId(), req.jobId));
-    log(LOG_ADD_DESTRANK | V4_VVER, "Sending job desc. of #%i of size %i", handle.source, desc.getId(), desc.getTransferSize(false));
+    log(LOG_ADD_DESTRANK | V4_VVER, "Sending job desc. of #%i of size %i", handle.source, desc.getId(), desc.getTransferSize());
     _root_nodes[req.jobId] = handle.source;
-    auto data = desc.serializeFirstRevision();
+    auto data = desc.getSerialization();
 
-    int jobId = Serializable::get<int>(data);    
+    int jobId = Serializable::get<int>(*data);    
     MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_DESCRIPTION, data);
-    log(LOG_ADD_DESTRANK | V4_VVER, "Sent job desc. of #%i of size %i", handle.source, jobId, data.size());
+    log(LOG_ADD_DESTRANK | V4_VVER, "Sent job desc. of #%i of size %i", handle.source, jobId, data->size());
 }
 
 void Client::handleJobDone(MessageHandle& handle) {
@@ -428,7 +422,7 @@ void Client::handleQueryJobRevisionDetails(MessageHandle& handle) {
     int lastRevision = request[2];
 
     JobDescription& desc = *_jobs[jobId];
-    IntVec response({jobId, firstRevision, lastRevision, desc.getTransferSize(firstRevision, lastRevision)});
+    IntVec response({jobId, firstRevision, lastRevision, desc.getTransferSize()});
     MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_REVISION_DETAILS, response);
 }
 
@@ -439,8 +433,9 @@ void Client::handleAckJobRevisionDetails(MessageHandle& handle) {
     int firstRevision = response[1];
     int lastRevision = response[2];
     //int transferSize = response[3];
-    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_REVISION_DATA, 
-                _jobs[jobId]->serialize(firstRevision, lastRevision));
+    
+    // TODO not implemented
+    abort();
 }
 
 void Client::handleClientFinished(MessageHandle& handle) {
@@ -501,13 +496,9 @@ void Client::readInstanceList(std::string& filename) {
 void Client::readFormula(std::string& filename, JobDescription& job) {
 
     SatReader r(filename);
-    VecPtr formula = r.read();
-    VecPtr assumptions = std::make_shared<std::vector<int>>();
-    if (formula != NULL) {
-        job.addPayload(formula);
-        job.addAssumptions(assumptions);
-        job.setNumVars(r.getNumVars());
-        log(V3_VERB, "Read %i lits w/ separators, %i assumptions\n", formula->size(), assumptions->size());
+    bool success = r.read(job);
+    if (success) {
+        log(V3_VERB, "Read %s\n", filename.c_str());
     } else {
         log(V1_WARN, "File %s could not be opened - skipping #%i\n", filename.c_str(), job.getId());
     }

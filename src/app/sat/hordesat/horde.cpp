@@ -111,22 +111,13 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 	_logger.log(V5_DEBG, "initialized\n");
 }
 
-void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
-							const std::shared_ptr<std::vector<int>>& assumptions) {
+void HordeLib::beginSolving(size_t fSize, const int* fLits, size_t aSize, const int* aLits) {
 	
-	// Store payload to solve
-	for (auto vec : formulae) {
-		if (vec == NULL) return;
-		_formulae.push_back(vec);
-	}
-	if (assumptions != NULL) _assumptions = assumptions;
-	assert(_assumptions != NULL);
-
 	_result = UNKNOWN;
 
 	for (size_t i = 0; i < _num_solvers; i++) {
 		_solver_threads.emplace_back(new SolverThread(
-			_params, _solver_interfaces[i], formulae, assumptions, i, &_solution_found
+			_params, _solver_interfaces[i], fSize, fLits, aSize, aLits, i, &_solution_found
 		));
 		_solver_threads.back()->start();
 	}
@@ -135,13 +126,9 @@ void HordeLib::beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>
 	_logger.log(V5_DEBG, "started solver threads\n");
 }
 
-void HordeLib::continueSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
-								const std::shared_ptr<std::vector<int>>& assumptions) {
+void HordeLib::continueSolving(size_t fSize, const int* fLits, size_t aSize, const int* aLits) {
 	
-	// Update payload
-	for (auto vec : formulae) _formulae.push_back(vec);
-	_assumptions = assumptions;
-	_result = UNKNOWN;
+	// TODO Update payload
 
 	// unset standby
 	setSolvingState(ACTIVE);

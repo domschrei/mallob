@@ -31,10 +31,6 @@ private:
 	
 	size_t _sleep_microsecs;
 	size_t _num_solvers;
-
-	// Payload to solve
-	std::vector<std::shared_ptr<std::vector<int>>> _formulae;
-	std::shared_ptr<std::vector<int>> _assumptions;
 	
 	std::unique_ptr<SharingManagerInterface> _sharing_manager;
 	std::vector<std::shared_ptr<PortfolioSolverInterface>> _solver_interfaces;
@@ -52,10 +48,8 @@ public:
     HordeLib(const Parameters& params, Logger&& loggingInterface);
 	~HordeLib();
 
-    void beginSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
-							const std::shared_ptr<std::vector<int>>& assumptions);
-	void continueSolving(const std::vector<std::shared_ptr<std::vector<int>>>& formulae, 
-							const std::shared_ptr<std::vector<int>>& assumptions);
+    void beginSolving(size_t fSize, const int* fLits, size_t aSize, const int* aLits);
+	void continueSolving(size_t fSize, const int* fLits, size_t aSize, const int* aLits);
 	void updateRole(int rank, int numNodes);
 	bool isFullyInitialized();
 	bool isAnySolutionFound() {return _solution_found;}

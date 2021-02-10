@@ -135,9 +135,7 @@ public:
     /*
     Free all data associated to this job instance. Join all associated threads if any are left.
     */
-    virtual ~Job() {
-        for (auto& thread : _unpack_threads) if (thread.joinable()) thread.join();
-    }
+    virtual ~Job() {}
     // END of interface to implement as an application.
 
 
@@ -147,10 +145,6 @@ private:
     std::string _name;
     std::atomic_bool _has_description = false;
     JobDescription _description;
-    std::vector<uint8_t> _serialized_description;
-
-    std::vector<std::thread> _unpack_threads;
-    std::vector<bool> _unpack_done;
 
     float _time_of_arrival;
     float _time_of_activation = 0;
@@ -195,7 +189,7 @@ public:
     
     // Concurrently unpacks the job description and then calls the job implementation's
     // appl_start() method from there.
-    void start(std::vector<uint8_t>&& data);
+    void start(const std::shared_ptr<std::vector<uint8_t>>& data);
     // Interrupt the execution of all internal solvers.
     void stop();
     
@@ -226,10 +220,10 @@ public:
     void assertState(JobState state) const {assert(_state == state || log_return_false("State of %s : %s\n", toStr(), jobStateToStr()));};
     int getVolume() const {return _volume;}
     float getPriority() const {return _priority;}
-    bool hasReceivedDescription() const {return !_serialized_description.empty();};
+    bool hasReceivedDescription() const {return _has_description;};
     bool hasDeserializedDescription() const {return _has_description;};
     const JobDescription& getDescription() const {assert(hasDeserializedDescription()); return _description;};
-    std::vector<uint8_t>& getSerializedDescription() {return _serialized_description;};
+    std::shared_ptr<std::vector<uint8_t>> getSerializedDescription() {return _description.getSerialization();};
     bool hasCommitment() const {return _commitment.has_value();}
     const JobRequest& getCommitment() const {assert(hasCommitment()); return _commitment.value();}
     int getId() const {return _id;};
@@ -254,28 +248,6 @@ public:
     int getMyMpiRank() const {return _job_tree.getRank();}
     JobTree& getJobTree() {return _job_tree;}
     const JobTree& getJobTree() const {return _job_tree;}
-
-    // Tests if all unpacking of job descriptions is finished and, in that case,
-    // joins and cleans up all corresponding threads.
-    bool testDeserializationDone() {
-        auto lock = _job_manipulation_lock.getLock();
-        bool allJoined = !_unpack_threads.empty();
-        for (size_t i = 0; i < _unpack_threads.size(); i++) {
-            if (_unpack_threads[i].joinable() && _unpack_done[i]) {
-                // Thread
-                _unpack_threads[i].join();
-            } else {
-                allJoined = false;
-                break;
-            }
-        }
-        if (allJoined) {
-            _unpack_threads.clear();
-            _unpack_done.clear();
-            return true;
-        }
-        return false;
-    }
 
     // Updates the job's resource usage based on the period of time which passed
     // since the last call (or the job's activation) and the old volume of the job,
@@ -326,15 +298,6 @@ public:
         return _name.c_str();
     };
     const char* jobStateToStr() const {return jobStateStrings[(int)_state];};
-
-
-private:
-
-    void unpackDescription() {
-        _description.deserialize(_serialized_description);
-        _priority = _description.getPriority();
-        _has_description = true;
-    };
 };
 
 #endif

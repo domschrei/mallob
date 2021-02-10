@@ -176,16 +176,40 @@ void MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const Serializab
 
 void MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::vector<uint8_t>& object) {
 
-    latencyMonkey();
-    delayMonkey();
-
     bool selfMessage = rank(communicator) == recvRank;
-
     auto& handles = (selfMessage ? _handles : _sent_handles);
+
     // Append a single zero to an otherwise empty message
     handles.emplace_back(new MessageHandle(nextHandleId(), 
             object.empty() ? std::vector<uint8_t>(1, 0) : object
     ));
+    
+    doIsend(communicator, recvRank, tag);
+}
+
+void MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object) {
+
+    bool selfMessage = rank(communicator) == recvRank;
+    auto& handles = (selfMessage ? _handles : _sent_handles);
+    
+    // Append a single zero to an otherwise empty message
+    if (object->empty()) {
+        handles.emplace_back(new MessageHandle(nextHandleId(), std::vector<uint8_t>(1, 0)));
+    } else {
+        handles.emplace_back(new MessageHandle(nextHandleId(), object));
+    }
+
+    doIsend(communicator, recvRank, tag);
+}
+
+void MyMpi::doIsend(MPI_Comm communicator, int recvRank, int tag) {
+
+    latencyMonkey();
+    delayMonkey();
+
+    bool selfMessage = rank(communicator) == recvRank;
+    auto& handles = (selfMessage ? _handles : _sent_handles);
+
     auto& handle = *handles.back();
     int appTag = tag;
 

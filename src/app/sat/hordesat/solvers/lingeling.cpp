@@ -252,9 +252,8 @@ void Lingeling::setPhase(const int var, const bool phase) {
 
 // Solve the formula with a given set of assumptions
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
-SatResult Lingeling::solve(const std::vector<int>& assumptions) {
+SatResult Lingeling::solve(size_t numAssumptions, const int* assumptions) {
 	
-	this->assumptions = assumptions;
 	// add the clauses
 	for (size_t i = 0; i < clausesToAdd.size(); i++) {
 		for (size_t j = 0; j < clausesToAdd[i].size(); j++) {
@@ -267,11 +266,13 @@ SatResult Lingeling::solve(const std::vector<int>& assumptions) {
 	clausesToAdd.clear();
 	
 	// set the assumptions
-	for (size_t i = 0; i < assumptions.size(); i++) {
+	this->assumptions.clear();
+	for (size_t i = 0; i < numAssumptions; i++) {
 		// freezing problems
 		int lit = assumptions[i];
 		if (abs(lit) > maxvar) maxvar = abs(lit);
 		lglassume(solver, lit);
+		this->assumptions.push_back(lit);
 	}
 	int res = lglsat(solver);
 	switch (res) {

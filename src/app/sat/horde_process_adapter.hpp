@@ -15,8 +15,10 @@ private:
     Parameters _params;
     std::shared_ptr<Logger> _log;
 
-    const std::vector<std::shared_ptr<std::vector<int>>>& _formulae; 
-    const std::shared_ptr<std::vector<int>>& _assumptions;
+    size_t _f_size;
+    const int* _f_lits;
+    size_t _a_size;
+    const int* _a_lits;
 
     std::vector<std::tuple<std::string, void*, int>> _shmem;
     std::string _shmem_id;
@@ -30,7 +32,7 @@ private:
 
 public:
     HordeProcessAdapter(const Parameters& params, 
-            const std::vector<std::shared_ptr<std::vector<int>>>& formulae, const std::shared_ptr<std::vector<int>>& assumptions);
+            size_t fSize, const int* fLits, size_t aSize, const int* aLits);
     ~HordeProcessAdapter();
 
     /*

@@ -7,7 +7,7 @@
 #include "sat_reader.hpp"
 #include "util/sys/terminator.hpp"
 
-std::shared_ptr<std::vector<int>> SatReader::read() {
+bool SatReader::read(JobDescription& desc) {
 
 	FILE* f;
 	bool piped;
@@ -23,15 +23,16 @@ std::shared_ptr<std::vector<int>> SatReader::read() {
 		piped = false;
 	}
 	if (f == NULL) {
-		return NULL;
+		return false;
 	}
 	
-	std::shared_ptr<std::vector<int>> cls = std::make_shared<std::vector<int>>();
+	desc.beginInitialization();
 	
 	int sign = 1;
 	bool comment = false;
 	bool beganNum = false;
 	int num = 0;
+	int maxVar = 0;
 
 	// Read every character of the formula (in a buffered manner)
 	char buffer[4096] = {'\0'};
@@ -48,7 +49,7 @@ std::shared_ptr<std::vector<int>> SatReader::read() {
 				comment = false;
 				if (beganNum) {
 					assert(num == 0);
-					cls->push_back(0);
+					desc.addLiteral(0);
 					beganNum = false;
 				}
 				break;
@@ -58,8 +59,8 @@ std::shared_ptr<std::vector<int>> SatReader::read() {
 				break;
 			case ' ':
 				if (beganNum) {
-					_num_vars = std::max(_num_vars, num);
-					cls->push_back(sign * num);
+					maxVar = std::max(maxVar, num);
+					desc.addLiteral(sign * num);
 					num = 0;
 					beganNum = false;
 				}
@@ -77,23 +78,14 @@ std::shared_ptr<std::vector<int>> SatReader::read() {
 		}
 	}
 	if (beganNum) { // final zero (without newline)
-		cls->push_back(0);
+		desc.addLiteral(0);
 	}
 
-	/*
-	for (int lit : *cls) {
-		std::cout << lit << " ";
-		if (lit == 0) std::cout << "\n";
-	}
-	*/
+	desc.setNumVars(maxVar);
+	desc.endInitialization();
 
 	if (piped) pclose(f);
 	else fclose(f);
 
-	return cls;
+	return true;
 }
-
-
-
-
-

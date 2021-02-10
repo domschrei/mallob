@@ -42,10 +42,7 @@ void Cadical::setPhase(const int var, const bool phase) {
 
 // Solve the formula with a given set of assumptions
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
-SatResult Cadical::solve(const std::vector<int>& assumptions) {
-	
-	// remember assumptions
-	this->assumptions = assumptions;
+SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 
 	// add the learned clauses
 	learnMutex.lock();
@@ -59,8 +56,11 @@ SatResult Cadical::solve(const std::vector<int>& assumptions) {
 	learnMutex.unlock();
 
 	// set the assumptions
-	for (auto assumption : assumptions) {
-		solver->assume(assumption);
+	this->assumptions.clear();
+	for (size_t i = 0; i < numAssumptions; i++) {
+		int lit = assumptions[i];
+		solver->assume(lit);
+		this->assumptions.push_back(lit);
 	}
 
 	// start solving

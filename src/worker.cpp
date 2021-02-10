@@ -128,18 +128,23 @@ void Worker::init() {
         log(V3_VERB, "read instance\n");
         int jobId = 1;
         JobDescription desc(jobId, /*prio=*/1, /*incremental=*/false);
-        auto formula = SatReader(instanceFilename).read();
-        desc.addPayload(formula);
-        desc.addAssumptions(VecPtr(new std::vector<int>()));
         desc.setRootRank(0);
+        bool success = SatReader(instanceFilename).read(desc);
+        if (!success) {
+            log(V0_CRIT, "Could not open file! Aborting.\n");
+            Terminator::setTerminating();
+            return;
+        }
+        log(V3_VERB, "%ld lits w/ separators; lits = %i %i %i %i ...\n", desc.getFormulaSize(),
+                desc.getFormulaPayload()[0], desc.getFormulaPayload()[1], desc.getFormulaPayload()[2], desc.getFormulaPayload()[3]);
 
         // Add as a new local SAT job image
-        log(V3_VERB, "init SAT job image\n");
+        log(V3_VERB, "%ld lits w/ separators; init SAT job image\n", desc.getFormulaSize());
         _job_db.createJob(MyMpi::size(_comm), _world_rank, jobId);
         JobRequest req(jobId, 0, 0, 0, 0, 0);
         _job_db.commit(req);
-        auto serializedDesc = desc.serialize();
-        initJob(jobId, std::move(serializedDesc), _world_rank);
+        auto serializedDesc = desc.getSerialization();
+        initJob(jobId, serializedDesc, _world_rank);
     }
 }
 
@@ -310,8 +315,9 @@ void Worker::handleConfirmJobRevisionDetails(MessageHandle& handle) {
     int jobId = response[0];
     int firstRevision = response[1];
     int lastRevision = response[2];
-    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_REVISION_DATA, 
-                _job_db.get(jobId).getDescription().serialize(firstRevision, lastRevision));
+
+    // TODO not implemented.
+    abort();
 }
 
 void Worker::handleConfirmAdoption(MessageHandle& handle) {
@@ -526,7 +532,7 @@ void Worker::handleOfferAdoption(MessageHandle& handle) {
             // Adopt the job
 
             // Send job signature
-            JobSignature sig(req.jobId, req.rootRank, req.revision, job.getSerializedDescription().size());
+            JobSignature sig(req.jobId, req.rootRank, req.revision, job.getSerializedDescription()->size());
             MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_ACCEPT_ADOPTION_OFFER, sig);
 
             // If req.fullTransfer, then wait for the child to acknowledge having received the signature
@@ -571,7 +577,7 @@ void Worker::handleQueryJobRevisionDetails(MessageHandle& handle) {
     assert(_job_db.has(jobId));
 
     const JobDescription& desc = _job_db.get(jobId).getDescription();
-    IntVec response({jobId, firstRevision, lastRevision, desc.getTransferSize(firstRevision, lastRevision)});
+    IntVec response({jobId, firstRevision, lastRevision, desc.getTransferSize()});
     MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_REVISION_DETAILS, response);
 }
 
@@ -612,15 +618,17 @@ void Worker::handleNotifyResultObsolete(MessageHandle& handle) {
 }
 
 void Worker::handleSendJob(MessageHandle& handle) {
-    auto& data = handle.getRecvData();
+    const auto& data = handle.getRecvData();
     log(LOG_ADD_SRCRANK | V5_DEBG, "Receiving some desc. of size %i", handle.source, data.size());
     int jobId = Serializable::get<int>(data);
-    initJob(jobId, handle.moveRecvData(), handle.source);
+    initJob(jobId, std::shared_ptr<std::vector<uint8_t>>(
+        new std::vector<uint8_t>(handle.moveRecvData())
+    ), handle.source);
 }
 
-void Worker::initJob(int jobId, std::vector<uint8_t>&& data, int senderRank) {
+void Worker::initJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& data, int senderRank) {
 
-    _job_db.init(jobId, std::move(data), senderRank);
+    _job_db.init(jobId, data, senderRank);
 
     auto& job = _job_db.get(jobId);
     if (job.getJobTree().isRoot()) {
