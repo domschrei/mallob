@@ -6,7 +6,7 @@
 
 
 void JobDescription::beginInitialization() {
-    _raw_data.reset(new std::vector<uint8_t>(getTransferSize()));
+    _raw_data.reset(new std::vector<uint8_t>(getMetadataSize()));
     _revision = 0;
     _f_size = 0;
     _a_size = 0;
@@ -36,7 +36,7 @@ void JobDescription::endInitialization() {
 
 
 
-constexpr int JobDescription::getTransferSize() const {
+constexpr int JobDescription::getMetadataSize() const {
     return   4*sizeof(int)
             +3*sizeof(float)
             +sizeof(bool)

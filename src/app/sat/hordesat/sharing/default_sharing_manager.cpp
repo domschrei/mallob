@@ -35,13 +35,13 @@ int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
 
 	int selectedCount;
 	int used = _cdb.giveSelection(begin, maxSize, &selectedCount);
-	_logger.log(V5_DEBG, "Prepared %i clauses, size %i\n", selectedCount, used);
+	_logger.log(V5_DEBG, "prepared %i clauses, size %i\n", selectedCount, used);
 	_stats.exportedClauses += selectedCount;
 	float usedRatio = ((float)used)/maxSize;
 	if (usedRatio < _params.getFloatParam("icpr")) {
 		int increaser = lastInc++ % _solvers.size();
 		_solvers[increaser]->increaseClauseProduction();
-		_logger.log(V3_VERB, "Production increase for %d. time, sid %d will increase.\n", prodInc++, increaser);
+		_logger.log(V3_VERB, "prod. increase no. %d (sid %d)\n", prodInc++, increaser);
 	}
 	_logger.log(V5_DEBG, "buffer fillratio=%.3f\n", usedRatio);
 	return used;

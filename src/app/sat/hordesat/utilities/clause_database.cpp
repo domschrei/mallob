@@ -115,7 +115,7 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 	if (all > 0) {
 		logger.log(V5_DEBG, "%d fit %d (%d%%) didn't \n", fitting, notFitting, notFitting*100/(all));
 	} else {
-		logger.log(V5_DEBG, "No clauses for export.\n");
+		logger.log(V5_DEBG, "no clauses\n");
 	}
 	if (selectedCount != NULL) {
 		*selectedCount = fitting;

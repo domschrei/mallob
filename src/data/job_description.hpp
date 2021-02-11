@@ -84,7 +84,8 @@ public:
     
     float getArrival() const {return _arrival;}
     bool isIncremental() const {return _incremental;}
-    constexpr int getTransferSize() const;
+    constexpr int getMetadataSize() const;
+    int getFullTransferSize() const {return _raw_data->size();}
     int getNumVars() {return _num_vars;}
 
     void setRootRank(int rootRank) {_root_rank = rootRank;}

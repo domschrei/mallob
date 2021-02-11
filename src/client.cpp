@@ -297,7 +297,7 @@ void Client::handleRequestBecomeChild(MessageHandle& handle) {
     const JobDescription& desc = *_jobs[req.jobId];
 
     // Send job signature
-    JobSignature sig(req.jobId, /*rootRank=*/handle.source, req.revision, desc.getTransferSize());
+    JobSignature sig(req.jobId, /*rootRank=*/handle.source, req.revision, desc.getFullTransferSize());
     MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_ACCEPT_ADOPTION_OFFER, sig);
     //stats.increment("sentMessages");
 }
@@ -306,7 +306,7 @@ void Client::handleAckAcceptBecomeChild(MessageHandle& handle) {
     JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
     JobDescription& desc = *_jobs[req.jobId];
     assert(desc.getId() == req.jobId || log_return_false("%i != %i\n", desc.getId(), req.jobId));
-    log(LOG_ADD_DESTRANK | V4_VVER, "Sending job desc. of #%i of size %i", handle.source, desc.getId(), desc.getTransferSize());
+    log(LOG_ADD_DESTRANK | V4_VVER, "Sending job desc. of #%i of size %i", handle.source, desc.getId(), desc.getFullTransferSize());
     _root_nodes[req.jobId] = handle.source;
     auto data = desc.getSerialization();
 
@@ -422,7 +422,7 @@ void Client::handleQueryJobRevisionDetails(MessageHandle& handle) {
     int lastRevision = request[2];
 
     JobDescription& desc = *_jobs[jobId];
-    IntVec response({jobId, firstRevision, lastRevision, desc.getTransferSize()});
+    IntVec response({jobId, firstRevision, lastRevision, desc.getFullTransferSize()});
     MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_REVISION_DETAILS, response);
 }
 
