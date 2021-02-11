@@ -150,16 +150,14 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
         log(V4_VVER, "%s : collect local cls, max. size %i\n", 
                     _job->toStr(), selfSize);
         selfClauses = _job->getPreparedClauses();
-        testConsistency(selfClauses, selfSize);
+        testConsistency(selfClauses, 0 /*do not check buffer's size limit*/);
     }
-    _clause_buffers.push_back(selfClauses);
+    _clause_buffers.push_back(std::move(selfClauses));
 
     // Merge all collected buffer into a single buffer
     log(V5_DEBG, "%s : merge %i buffers, max. size %i\n", 
                 _job->toStr(), _clause_buffers.size(), totalSize);
-    std::vector<std::vector<int>*> buffers;
-    for (auto& buf : _clause_buffers) buffers.push_back(&buf);
-    std::vector<int> vec = merge(buffers, totalSize);
+    std::vector<int> vec = merge(totalSize);
     testConsistency(vec, totalSize);
 
     // Reset clause buffers
@@ -167,17 +165,17 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     return vec;
 }
 
-std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vector<int>*>& buffers, size_t maxSize) {
+std::vector<int> AnytimeSatClauseCommunicator::merge(size_t maxSize) {
     std::vector<int> result;
 
     // Position counter for each buffer
-    std::vector<int> positions(buffers.size(), 0);
+    std::vector<int> positions(_clause_buffers.size(), 0);
 
     // How many VIP clauses in each buffer?
-    std::vector<int> nvips(buffers.size());
+    std::vector<int> nvips(_clause_buffers.size());
     int totalNumVips = 0;
-    for (size_t i = 0; i < buffers.size(); i++) {
-        nvips[i] = (buffers[i]->size() > 0) ? buffers[i]->at(positions[i]) : 0;
+    for (size_t i = 0; i < _clause_buffers.size(); i++) {
+        nvips[i] = (_clause_buffers[i].size() > 0) ? _clause_buffers[i][positions[i]] : 0;
         totalNumVips += nvips[i];
         positions[i]++;
     } 
@@ -191,7 +189,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
     while (totalNumVips > 0) {
         do picked = (picked+1) % nvips.size(); while (nvips[picked] == 0);
         int& pos = positions[picked];
-        int lit = buffers[picked]->at(pos++);
+        int lit = _clause_buffers[picked][pos++];
         // Append to clause
         cls.push_back(lit);
         if (lit == 0) {
@@ -231,12 +229,12 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
 
         // Get number of clauses of clauseLength for each buffer
         // and also the sum over all these numbers
-        std::vector<int> nclsoflen(buffers.size());
+        std::vector<int> nclsoflen(_clause_buffers.size());
         int allclsoflen = 0;
-        for (size_t i = 0; i < buffers.size(); i++) {
-            nclsoflen[i] = positions[i] < (int)buffers[i]->size() ? 
-                            buffers[i]->at(positions[i]) : 0;
-            if (positions[i] < (int)buffers[i]->size()) doContinue = true;
+        for (size_t i = 0; i < _clause_buffers.size(); i++) {
+            nclsoflen[i] = positions[i] < (int)_clause_buffers[i].size() ? 
+                            _clause_buffers[i][positions[i]] : 0;
+            if (positions[i] < (int)_clause_buffers[i].size()) doContinue = true;
             allclsoflen += nclsoflen[i];
             positions[i]++;
         }
@@ -256,7 +254,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(const std::vector<std::vect
 
             // Identify next clause
             do picked = (picked+1) % nvips.size(); while (nclsoflen[picked] == 0);
-            const std::vector<int>& vec = *buffers[picked];
+            const std::vector<int>& vec = _clause_buffers[picked];
             int pos = positions[picked];
             auto begin = vec.begin()+pos;
             auto end = vec.begin()+pos+clauseLength;

@@ -5,13 +5,6 @@
 #include "util/logger.hpp"
 
 
-// INITIALIZATION OF A JOB by reading a SAT formula
-
-void push_int(std::shared_ptr<std::vector<uint8_t>>& vec, int x) {
-    vec->resize(vec->size()+sizeof(int));
-    memcpy(vec->data()+vec->size()-sizeof(int), &x, sizeof(int));
-}
-
 void JobDescription::beginInitialization() {
     _raw_data.reset(new std::vector<uint8_t>(getTransferSize()));
     _revision = 0;
@@ -19,19 +12,9 @@ void JobDescription::beginInitialization() {
     _a_size = 0;
 }
 
-void JobDescription::addLiteral(int lit) {
-    // Push literal to raw data, update counter
-    push_int(_raw_data, lit);
-    _f_size++;
-}
-
-void JobDescription::addAssumption(int lit) {
-    // Push literal to raw data, update counter
-    push_int(_raw_data, lit);
-    _a_size++;
-}
-
 void JobDescription::endInitialization() {
+    
+    _raw_data->shrink_to_fit();
 
     // Serialize meta data into the vector's beginning (place was reserved earlier)
     int i = 0, n;

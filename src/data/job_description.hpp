@@ -38,6 +38,13 @@ private:
     const int* _f_payload;
     const int* _a_payload;
 
+private:
+    inline static void push_int(std::shared_ptr<std::vector<uint8_t>>& vec, int x) {
+        if (vec->capacity() == vec->size()) vec->reserve(2*vec->size());
+        for (size_t i = 0; i < sizeof(int); i++) vec->push_back(0);
+        memcpy(vec->data()+vec->size()-sizeof(int), &x, sizeof(int));
+    }
+
 public:
 
     JobDescription() = default;
@@ -46,8 +53,16 @@ public:
     ~JobDescription() {}
 
     void beginInitialization();
-    void addLiteral(int lit);
-    void addAssumption(int lit);
+    inline void addLiteral(int lit) {
+        // Push literal to raw data, update counter
+        push_int(_raw_data, lit);
+        _f_size++;
+    }
+    inline void addAssumption(int lit) {
+        // Push literal to raw data, update counter
+        push_int(_raw_data, lit);
+        _a_size++;
+    }
     void endInitialization();
     
     JobDescription& deserialize(const std::vector<uint8_t>& packed) override;
