@@ -111,7 +111,7 @@ void DynamicCubeLib::suspend() {
 void DynamicCubeLib::shareCubes(std::optional<Cube> &failedAssumptions, std::optional<Cube> &nextCube) {
     auto lock = _local_lock.getLock();
 
-    _logger.log(0, "DynamicCubeSolverThread entered shareCubes");
+    _logger.log(0, "DynamicCubeSolverThread entered shareCubes, %s", _dynamic_cubes.toString().c_str());
 
     // Next cube must be empty at the beginning
     assert(!nextCube.has_value());
@@ -148,7 +148,10 @@ void DynamicCubeLib::shareCubes(std::optional<Cube> &failedAssumptions, std::opt
         } else {
             _logger.log(0, "DynamicCubeSolverThread waits because no cube could be assigned");
             // Wait because there are no solvable cubes
-            _solver_cv.wait(lock, [&] { return _dynamic_cubes.hasACubeForSolving() || _state.load() == INTERRUPTING; });
+            _solver_cv.wait(lock, [this] {
+                _logger.log(0, "DynamicCubeSolverThread was notified, %s", _dynamic_cubes.toString().c_str());
+                return _dynamic_cubes.hasACubeForSolving() || _state.load() == INTERRUPTING;
+            });
         }
     }
 }
@@ -156,7 +159,7 @@ void DynamicCubeLib::shareCubes(std::optional<Cube> &failedAssumptions, std::opt
 void DynamicCubeLib::shareCubeToSplit(std::optional<Cube> &lastCube, int splitLit, std::optional<Cube> &failedAssumptions, std::optional<Cube> &nextCube) {
     auto lock = _local_lock.getLock();
 
-    _logger.log(0, "DynamicCubeGeneratorThread entered shareCubeToSplit");
+    _logger.log(0, "DynamicCubeGeneratorThread entered shareCubeToSplit, %s", _dynamic_cubes.toString().c_str());
 
     // Next cube must be empty at the beginning
     assert(!nextCube.has_value());
@@ -197,7 +200,10 @@ void DynamicCubeLib::shareCubeToSplit(std::optional<Cube> &lastCube, int splitLi
         } else if (static_cast<int>(_dynamic_cubes.size()) >= _max_dynamic_cubes) {
             _logger.log(0, "DynamicCubeGeneratorThread waits because there are too many cubes");
             // Wait because there are too many cubes
-            _generator_cv.wait(lock, [&] { return static_cast<int>(_dynamic_cubes.size()) < _max_dynamic_cubes || _state.load() == INTERRUPTING; });
+            _generator_cv.wait(lock, [this] {
+                _logger.log(0, "DynamicCubeGeneratorThread was notified, %s", _dynamic_cubes.toString().c_str());
+                return static_cast<int>(_dynamic_cubes.size()) < _max_dynamic_cubes || _state.load() == INTERRUPTING;
+            });
 
         } else if (!_dynamic_cubes.hasACubeForSplitting()) {
             if (_request_state == NONE && !_dynamic_cubes.hasSplittingCubes()) {
@@ -209,7 +215,17 @@ void DynamicCubeLib::shareCubeToSplit(std::optional<Cube> &lastCube, int splitLi
             _logger.log(0, "DynamicCubeGeneratorThread waits because no cube could be assigned");
             // Wait because there are no splittable cubes
             // Because the thread is waiting for a new cube for splitting this does not wake and and set the state to requesting after getting notified
-            _generator_cv.wait(lock, [&] { return _dynamic_cubes.hasACubeForSplitting() || _state.load() == INTERRUPTING; });
+            _generator_cv.wait(lock, [this] {
+                _logger.log(0, "DynamicCubeGeneratorThread was notified, %s", _dynamic_cubes.toString().c_str());
+                // Resume when
+                // 1. There is a cube to split
+                // 2. There are no cubes to split and the lib is not requesting and no cube is being split
+                // TODO Problem with multiple generators (If a cube that is being split is pruned the program does not know that a generator is still running)
+                // -> But this should not cause problems. The lib should start to request. A generator thread could just unecessarly resume and then wait.  
+                // 3. The lib was interrupted
+                return _dynamic_cubes.hasACubeForSplitting() || (_request_state == NONE && !_dynamic_cubes.hasSplittingCubes()) ||
+                       _state.load() == INTERRUPTING;
+            });
 
         } else {
             nextCube = _dynamic_cubes.tryToGetACubeForSplitting();
@@ -226,6 +242,8 @@ void DynamicCubeLib::shareCubeToSplit(std::optional<Cube> &lastCube, int splitLi
 void DynamicCubeLib::handleFailedAssumptions(Cube &failed) {
     // local lock must be held
 
+    _logger.log(0, "Before handleFailedAssumptions(), %s", _dynamic_cubes.toString().c_str());
+
     auto path = failed.getPath();
     assert(!path.empty());
 
@@ -237,6 +255,8 @@ void DynamicCubeLib::handleFailedAssumptions(Cube &failed) {
 
     // Append delimiter to buffer
     _local_failed.push_back(0);
+
+    _logger.log(0, "After handleFailedAssumptions(), %s", _dynamic_cubes.toString().c_str());
 }
 
 bool DynamicCubeLib::isRequesting() {
@@ -257,17 +277,23 @@ std::vector<Cube> DynamicCubeLib::getCubes(int bias) {
 
     assert(_state.load() == ACTIVE);
 
-    // Count how many cubes there are more than 2x#SolverThreads
-    int redundant_cubes = static_cast<int>(_dynamic_cubes.size()) - _solver_thread_count * 2;
+    _logger.log(0, "Before getCubes(), %s", _dynamic_cubes.toString().c_str());
 
     // Only so many cubes may be shared, that every solver thread can still get one
-    int maximum = static_cast<int>(_dynamic_cubes.size()) - _solver_thread_count;
+    int number_shareable_cubes = static_cast<int>(_dynamic_cubes.size()) - _solver_thread_count;
 
     // Using initializer list for comparing 3 values
     // https://codereview.stackexchange.com/questions/26100/maximum-of-three-values-in-c
-    int cubesToGet = std::min(std::max({redundant_cubes, bias, 0}), maximum);
+    int cubesToGet = std::min(std::max(bias, 0), number_shareable_cubes);
 
-    return _dynamic_cubes.getFreeCubesForSending(cubesToGet);
+    // Notify generator
+    _generator_cv.notify();
+
+    auto freeCubes = _dynamic_cubes.getFreeCubesForSending(cubesToGet);
+
+    _logger.log(0, "After getCubes(), %s", _dynamic_cubes.toString().c_str());
+
+    return freeCubes;
 }
 
 void DynamicCubeLib::digestCubes(std::vector<Cube> &received_cubes) {
@@ -278,11 +304,15 @@ void DynamicCubeLib::digestCubes(std::vector<Cube> &received_cubes) {
 
     _logger.log(0, "Digesting %zu cubes", received_cubes.size());
 
+    _logger.log(0, "Before digestCubes(), %s", _dynamic_cubes.toString().c_str());
+
     // Reset request state
     _request_state = NONE;
 
     // Insert new cubes at the end of the local cubes
     _dynamic_cubes.insert(received_cubes);
+
+    _logger.log(0, "After digestCubes(), %s", _dynamic_cubes.toString().c_str());
 
     // Notify starved solver and generator threads
     _solver_cv.notify();

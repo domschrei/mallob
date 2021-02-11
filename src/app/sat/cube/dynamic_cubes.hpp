@@ -3,6 +3,8 @@
 
 #include <cassert>
 #include <optional>
+#include <sstream>
+#include <string>
 #include <vector>
 
 #include "cube.hpp"
@@ -130,7 +132,7 @@ class DynamicCubes {
         return std::nullopt;
     }
 
-    // Return whether there is a cube with that is not splitting
+    // Return whether there is a cube that is not splitting
     bool hasACubeForSplitting() {
         for (auto &cube : _dynamic_cubes)
             if (!cube.isSplitting) return true;
@@ -195,7 +197,7 @@ class DynamicCubes {
         return free_cubes;
     }
 
-    void report(LoggingInterface &logger) {
+    std::string toString() {
         int cube_count = 0;
         int solving_count = 0;
         int splitting_count = 0;
@@ -206,7 +208,11 @@ class DynamicCubes {
             if (dynamic_cube.isSplitting) splitting_count++;
         }
 
-        logger.log(0, "Dynamic Cubes: There are %i cubes of which %i are solved and %i are split", cube_count, solving_count, splitting_count);
+        std::ostringstream oss;
+
+        oss << "Dynamic Cubes: There are " << cube_count << " cubes of which " << solving_count << " are solved and " << splitting_count << " are split";
+
+        return oss.str();
     }
 };
 
