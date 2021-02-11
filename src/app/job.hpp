@@ -297,7 +297,7 @@ public:
     const char* toStr() const {
         return _name.c_str();
     };
-    const char* jobStateToStr() const {return jobStateStrings[(int)_state];};
+    const char* jobStateToStr() const {return JOB_STATE_STRINGS[(int)_state];};
 };
 
 #endif
