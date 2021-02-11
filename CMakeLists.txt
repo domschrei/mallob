@@ -1,5 +1,4 @@
-
-cmake_minimum_required(VERSION 3.16.3)
+cmake_minimum_required(VERSION 3.11.4)
 project (mallob)
 
 find_package(MPI REQUIRED)
@@ -10,19 +9,21 @@ set(CMAKE_CXX_STANDARD 17)
 # Build-specific compile options
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
-    add_compile_options(-rdynamic -ggdb)
-    add_link_options(-rdynamic -ggdb)
-    add_compile_options(-fno-omit-frame-pointer -fsanitize=address -static-libasan)
-    add_link_options(-fno-omit-frame-pointer -fsanitize=address -static-libasan)
-    add_compile_definitions(MALLOB_VERSION=\"dbg\")
+    add_definitions("-DMALLOB_VERSION=\"dbg\"")
+    set(MY_DEBUG_OPTIONS "-rdynamic -g -ggdb") 
 else()
-    add_compile_definitions(MALLOB_VERSION=\"rls\")
+    add_definitions("-DMALLOB_VERSION=\"rls\"")
+    set(MY_DEBUG_OPTIONS "-rdynamic -g -ggdb") 
+endif()
+
+if(MALLOB_USE_ASAN)
+    set(MY_DEBUG_OPTIONS "${MY_DEBUG_OPTIONS} -fno-omit-frame-pointer -fsanitize=address -static-libasan") 
 endif()
 
 
 # Libraries and includes
 
-set(BASE_LDIRS lib/lingeling lib/yalsat lib/cadical lib/glucose)
+link_directories(lib/lingeling lib/yalsat lib/cadical lib/glucose)
 set(BASE_LIBS ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} m z lgl yals pthread cadical rt dl)
 set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib/lingeling lib/glucose)
 
@@ -51,7 +52,7 @@ if(MALLOB_USE_RESTRICTED)
     set(BASE_LDIRS ${BASE_LDIRS} src/app/sat/hordesat/glucose)
     set(BASE_LIBS ${BASE_LIBS} glucose)
     set(BASE_INCLUDES ${BASE_INCLUDES} src/app/sat/hordesat/glucose)
-    add_compile_definitions(MALLOB_USE_RESTRICTED)
+    add_definitions(-DMALLOB_USE_RESTRICTED)
 endif()
 
 
@@ -62,7 +63,6 @@ add_library(mallob_commons
 )
 target_include_directories(mallob_commons PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_commons PRIVATE ${BASE_COMPILEFLAGS})
-target_link_directories(mallob_commons PRIVATE ${BASE_LDIRS})
 target_link_libraries(mallob_commons ${BASE_LIBS})
 
 
@@ -77,26 +77,28 @@ target_include_directories(mallob_sat_process PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob PRIVATE ${BASE_COMPILEFLAGS})
 target_compile_options(mallob_sat_process PRIVATE ${BASE_COMPILEFLAGS})
 
-target_link_directories(mallob PRIVATE ${BASE_LDIRS})
-target_link_directories(mallob_sat_process PRIVATE ${BASE_LDIRS})
 target_link_libraries(mallob ${BASE_LIBS} mallob_commons)
 target_link_libraries(mallob_sat_process ${BASE_LIBS} mallob_commons) 
 
 
+# Debug flags to find line numbers in stack traces etc.
+
+add_definitions("${MY_DEBUG_OPTIONS}")
+SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MY_DEBUG_OPTIONS}")
+
+
 # Tests
 
-enable_testing()
+#enable_testing()
 
 add_executable(test_permutation src/test/test_permutation.cpp)
 target_include_directories(test_permutation PRIVATE ${BASE_INCLUDES})
 target_compile_options(test_permutation PRIVATE ${BASE_COMPILEFLAGS})
-target_link_directories(test_permutation PRIVATE ${BASE_LDIRS})
 target_link_libraries(test_permutation ${BASE_LIBS} mallob_commons)
 add_test(NAME test_permutation COMMAND test_permutation)
 
 add_executable(test_sat_reader src/test/test_sat_reader.cpp)
 target_include_directories(test_sat_reader PRIVATE ${BASE_INCLUDES})
 target_compile_options(test_sat_reader PRIVATE ${BASE_COMPILEFLAGS})
-target_link_directories(test_sat_reader PRIVATE ${BASE_LDIRS})
 target_link_libraries(test_sat_reader ${BASE_LIBS} mallob_commons)
 add_test(NAME test_sat_reader COMMAND test_sat_reader)
