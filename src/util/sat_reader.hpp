@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <assert.h>
 
 #include "data/job_description.hpp"
 
@@ -13,9 +14,51 @@ class SatReader {
 private:
     std::string _filename;
 
+    int _sign = 1;
+	bool _comment = false;
+	bool _began_num = false;
+	int _num = 0;
+	int _max_var = 0;
+
 public:
     SatReader(std::string filename) : _filename(filename) {}
     bool read(JobDescription& desc);
+    inline void process(char c, JobDescription& desc) {
+
+        if (_comment && c != '\n') return;
+
+        switch (c) {
+        case '\n':
+            _comment = false;
+            if (_began_num) {
+                assert(_num == 0);
+                desc.addLiteral(0);
+                _began_num = false;
+            }
+            break;
+        case 'p':
+        case 'c':
+            _comment = true;
+            break;
+        case ' ':
+            if (_began_num) {
+                _max_var = std::max(_max_var, _num);
+                desc.addLiteral(_sign * _num);
+                _num = 0;
+                _began_num = false;
+            }
+            _sign = 1;
+            break;
+        case '-':
+            _sign = -1;
+            _began_num = true;
+            break;
+        default:
+            _num = _num*10 + (c-'0');
+            _began_num = true;
+            break;
+        }
+    }
 };
 
 #endif

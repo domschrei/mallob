@@ -40,8 +40,7 @@ private:
 
 private:
     inline static void push_int(std::shared_ptr<std::vector<uint8_t>>& vec, int x) {
-        if (vec->capacity() == vec->size()) vec->reserve(2*vec->size());
-        for (size_t i = 0; i < sizeof(int); i++) vec->push_back(0);
+        vec->resize(vec->size()+sizeof(int));
         memcpy(vec->data()+vec->size()-sizeof(int), &x, sizeof(int));
     }
 
@@ -53,6 +52,7 @@ public:
     ~JobDescription() {}
 
     void beginInitialization();
+    void reserveSize(size_t size);
     inline void addLiteral(int lit) {
         // Push literal to raw data, update counter
         push_int(_raw_data, lit);

@@ -12,6 +12,10 @@ void JobDescription::beginInitialization() {
     _a_size = 0;
 }
 
+void JobDescription::reserveSize(size_t size) {
+    _raw_data->reserve(getMetadataSize() + size);
+}
+
 void JobDescription::endInitialization() {
     
     _raw_data->shrink_to_fit();
