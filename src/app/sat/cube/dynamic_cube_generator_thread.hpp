@@ -20,6 +20,8 @@ class DynamicCubeGeneratorThread {
     // May solve formula during lookahead
     SatResult &_result;
 
+    CaDiCaL::Solver _cube_checker;
+
     CaDiCaL::Solver _solver;
 
     // Cube that should be expanded

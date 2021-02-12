@@ -13,6 +13,7 @@ DynamicCubeGeneratorThread::DynamicCubeGeneratorThread(DynamicCubeGeneratorThrea
       _instance_counter{DynamicCubeGeneratorThread::_counter++} {
     // Connect terminator
     _solver.connect_terminator(&_terminator);
+    _cube_checker.connect_terminator(&_terminator);
 
     // Initialization is done in a seperate thread thus hard work is allowed
     // Also this allows a universal start
@@ -55,6 +56,9 @@ void DynamicCubeGeneratorThread::run() {
         // Failed assumptions were sent
         _failed.reset();
 
+        // Reset split literal
+        _split_literal = 0;
+
         {
             const std::lock_guard<Mutex> lock(_new_failed_cubes_lock);
 
@@ -63,6 +67,9 @@ void DynamicCubeGeneratorThread::run() {
 
                 // Add received failed cubes to formula
                 for (int lit : _new_failed_cubes) _solver.add(lit);
+
+                // Add received failed cubes to cube checker
+                for (int lit : _new_failed_cubes) _cube_checker.add(lit);
 
                 _added_failed_assumptions_buffer += _new_failed_cubes.size();
 
@@ -82,10 +89,51 @@ void DynamicCubeGeneratorThread::run() {
 
 void DynamicCubeGeneratorThread::generate() {
     if (_cube.has_value()) {
+        auto path = _cube.value().getPath();
+        _logger.log(0, "DynamicCubeGeneratorThread %i: Checking a cube with size %zu", _instance_counter, _cube.value().getPath().size());
+
+        // Cube checker assumes cube
+        for (auto lit : path) _cube_checker.assume(lit);
+
+        // Check
+        auto result = _cube_checker.solve();
+
+        if (result == 10) {
+            _logger.log(0, "DynamicCubeGeneratorThread %i: The Cube is valid", _instance_counter);
+
+        } else if (result == 0) {
+            _logger.log(0, "DynamicCubeGeneratorThread %i: Interruption during cube checking", _instance_counter);
+
+            assert(_isInterrupted);
+
+            return;
+
+        } else if (result == 20) {
+            _logger.log(0, "DynamicCubeGeneratorThread %i: The Cube is conflicting with the failed clauses", _instance_counter);
+
+            // Gather failed assumptions
+            std::vector<int> failed_assumptions;
+            for (auto lit : path)
+                if (_cube_checker.failed(lit)) failed_assumptions.push_back(lit);
+
+            if (failed_assumptions.empty()) {
+                _logger.log(0, "DynamicCubeGeneratorThread %i: Found a solution: UNSAT", _instance_counter);
+                _logger.log(0, "DynamicCubeGeneratorThread %i: Used cube has size %zu", _instance_counter, _cube.value().getPath().size());
+                _logger.log(0, "DynamicCubeGeneratorThread %i: Size of added buffer from failed assumptions: %zu", _instance_counter,
+                            _added_failed_assumptions_buffer);
+                            
+                // The added failed cubes are unsatisfiable
+                _result = UNSAT;
+            } else {
+                _failed.emplace(failed_assumptions);
+            }
+
+            return;
+        }
+
         _logger.log(0, "DynamicCubeGeneratorThread %i: Started expanding a cube with size %zu", _instance_counter, _cube.value().getPath().size());
 
-        // Assume cube
-        auto path = _cube.value().getPath();
+        // Solver assumes cube
         for (auto lit : path) _solver.assume(lit);
 
         // Lookahead
