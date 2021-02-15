@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "cube.hpp"
+#include "util/random.hpp"
 
 // This manages cubes in a dynamic cube lib
 // Each cube can be split and solved simultaneously
@@ -149,25 +150,36 @@ class DynamicCubes {
     }
 
     // Returns a bool whether the given split cube was added
-    bool handleSplit(Cube &splitCube, int splitLit) {
+    bool handleSplit(Cube splitCube, int splitLit) {
+        // I expect the lit in splitLit to be a better literal to assume 
+        // Because we currently dont tell the solver of the new assumption (and do not know how this could be possible without interrruption) 
+        // We should randomly choose the assumption for the new free cube
+
+        // Randomly draw 1 or -1
+        int random_factor = Random::global_rand() >= 0.5 ? 1 : -1;
+
         // TODO Alter cube to use a set of ints instead of a vector to make this error free
         // The loop may miss the same cube with a different order of the lits
         // This should never happen but who knows
         for (auto &dynamicCube : _dynamic_cubes) {
             if (dynamicCube.cube == splitCube) {
+                // This cube must be splitting
+                assert(dynamicCube.isSplitting);
+
                 // Extend original cube and set it to not splitting
-                dynamicCube.cube.extend(splitLit);
+                dynamicCube.cube.extend(splitLit * random_factor);
                 dynamicCube.isSplitting = false;
 
-                // TODO Notify the assigned solver thread of this extension
+                // TODO Notify the assigned solver thread of this extension (How?)
 
                 // Create new cube using inverse splitting literal
-                splitCube.extend(-splitLit);
+                splitCube.extend(-splitLit * random_factor);
                 _dynamic_cubes.emplace_back(splitCube);
 
                 return true;
             }
         }
+        // The cube was pruned while splitting
         return false;
     }
 

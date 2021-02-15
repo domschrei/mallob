@@ -72,7 +72,7 @@ class DynamicCubeLib : public DynamicCubeSolverThreadManagerInterface, public Dy
     // Digest payload of received message
 
     // Helper methods
-    void handleFailedAssumptions(Cube &failed);
+    void handleFailedAssumptions(Cube failed);
 
    protected:
    public:
