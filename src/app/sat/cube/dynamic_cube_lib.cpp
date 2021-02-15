@@ -239,7 +239,7 @@ void DynamicCubeLib::shareCubeToSplit(std::optional<Cube> &lastCube, int splitLi
     }
 }
 
-void DynamicCubeLib::handleFailedAssumptions(Cube &failed) {
+void DynamicCubeLib::handleFailedAssumptions(Cube failed) {
     // local lock must be held
 
     _logger.log(0, "Before handleFailedAssumptions(), %s", _dynamic_cubes.toString().c_str());
