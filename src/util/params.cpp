@@ -30,6 +30,8 @@ const char* OPTIONS =
     "\n-mmpi[=<0|1>]         Monitor MPI: Launch an additional thread per process checking when the main thread"
     "\n                      is inside some MPI call"
     "\n-sleep=<micros>       Sleep provided number of microseconds between loop cycles of worker main thread"
+    "\n-slpp=<limit>         Size limit per process: no more than max(1, floor(<limit>/<jobsize>)) threads"
+    "\n                      are spawned per process (0: no limit)"
     "\n-T=<time-limit>       Run entire system for x seconds (x >= 0; 0: run indefinitely)"
     "\n-t=<num-threads>      Amount of worker threads per node (int t >= 1)"
     "\n-warmup[=<0|1>]       Do one explicit All-To-All warmup among all nodes in the beginning"
@@ -139,6 +141,7 @@ void Parameters::setDefaults() {
     setParam("log", "."); // logging directory
     setParam("lbc", "0"); // leaky bucket client parameter (0 = no leaky bucket, jobs enter by time) 
     setParam("md", "0"); // maximum demand per job (0 = no limit)
+    setParam("slpp", "0"); // size limit per process (0 = no limit)
     setParam("mmpi", "0"); // monitor MPI
     setParam("mono", ""); // mono instance solving mode (if nonempty)
     setParam("phasediv", "1"); // Do phase-based diversification (in addition to native)

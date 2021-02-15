@@ -23,6 +23,7 @@ void HordeConfig::applyDefault(Parameters& params, const Job& job) {
     params["mpirank"] = std::to_string(job.getMyMpiRank()); // rank of this node
     params["jobid"] = std::to_string(job.getId());
     params["starttime"] = std::to_string(Timer::getStartTime());
+    params["threads"] = std::to_string(job.getNumThreads());
 
     // max. broadcasted literals per cycle
     params["mblpc"] = std::to_string(

@@ -13,7 +13,6 @@ class JobDatabase {
 
 private:
     Parameters& _params;
-    int _threads_per_job;
     float _wcsecs_per_instance;
     float _cpusecs_per_instance;
     float _load_factor;

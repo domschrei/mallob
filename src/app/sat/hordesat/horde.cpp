@@ -33,7 +33,7 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 
 	_logger.log(V2_INFO, "Hlib engine on job %s\n", params.getParam("jobstr").c_str());
 	//params.printParams();
-	_num_solvers = params.getIntParam("t", 1);
+	_num_solvers = params.getIntParam("threads", 1);
 	_sleep_microsecs = 1000 * params.getIntParam("i", 1000);
 
 	// Retrieve the string defining the cycle of solver choices, one character per solver

@@ -237,6 +237,7 @@ public:
     // Elapsed seconds since termination of the job.
     float getAgeSinceAbort() const {return Timer::elapsedSeconds() - _time_of_abort;}
     float getUsedCpuSeconds() const {return _used_cpu_seconds;}
+    int getNumThreads() const {return _threads_per_job;}
 
     // Return true iff this job instance has found a job result that it still needs to communicate.
     bool isResultTransferPending() const {return _result_transfer_pending;}
