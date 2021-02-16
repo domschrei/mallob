@@ -26,6 +26,7 @@ int handleId;
 void chkerr(int err) {
     if (err != 0) {
         log(V0_CRIT, "MPI ERROR errcode=%i\n", err);
+        Logger::getMainInstance().flush();
         abort();
     }
 }

@@ -101,6 +101,7 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 		default:
 			// Invalid solver
 			_logger.log(V2_INFO, "Fatal error: Invalid solver \"%c\" assigned\n", solverChoices[cyclePos]);
+			_logger.flush();
 			abort();
 			break;
 		}

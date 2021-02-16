@@ -22,7 +22,7 @@ private:
     const float _clause_buf_discount_factor;
 
     std::vector<std::vector<int>> _clause_buffers;
-    robin_hood::unordered_set<std::vector<int>, ClauseFilter::ClauseHasher> _clause_filter;
+    robin_hood::unordered_set<std::vector<int>, ClauseFilter::ClauseHasher, ClauseFilter::ClauseHashBasedEquals> _clause_filter;
     int _num_aggregated_nodes;
 
     bool _initialized = false;

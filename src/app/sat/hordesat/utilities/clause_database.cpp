@@ -165,7 +165,8 @@ const int* ClauseDatabase::getNextIncomingClause(int& size) {
 			buffer += " " + std::to_string(incomingBuffer[i]);
 		}
 		logger.log(-1, "%s\n", buffer.c_str());
-		abort();
+		logger.flush();
+        abort();
 	}
 
 	// Get start and stop index of next clause

@@ -27,7 +27,7 @@ size_t ClauseFilter::hash(const int* begin, int size, int which, bool skipFirst)
 		if (skipFirst) {
 			skipFirst = false;
 			continue;
-		}	
+		}
 		int lit = *it;
 		res ^= lit * primes[abs((lit^which) & 15)];
 	}

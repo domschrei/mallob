@@ -20,6 +20,7 @@ Watchdog::Watchdog(long checkIntervMillis, float time) {
                 log(V0_CRIT, "Watchdog: Timeout detected! Writing trace ...\n");
                 Process::writeTrace(parentTid);
                 log(V0_CRIT, "Aborting.\n");
+                Logger::getMainInstance().flush();
                 abort();
             }
         }

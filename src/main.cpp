@@ -19,19 +19,38 @@
 #define MALLOB_VERSION "(dbg)"
 #endif
 
-
 void doExternalClientProgram(MPI_Comm& commClients, Parameters& params, const std::set<int>& clientRanks) {
     
     Client client(commClients, params, clientRanks);
-    client.init();
-    client.mainProgram();
+    try {
+        client.init();
+        client.mainProgram();
+    } catch (const std::exception& ex) {
+        log(V0_CRIT, "Unexpected ERROR: \"%s\" - aborting\n", ex.what());
+        Logger::getMainInstance().flush();
+        exit(1);
+    } catch (...) {
+        log(V0_CRIT, "Unexpected ERROR - aborting\n");
+        Logger::getMainInstance().flush();
+        exit(1);
+    }
 }
 
 void doWorkerNodeProgram(MPI_Comm& commWorkers, Parameters& params, const std::set<int>& clientRanks) {
 
     Worker worker(commWorkers, params, clientRanks);
-    worker.init();
-    worker.mainProgram();
+    try {
+        worker.init();
+        worker.mainProgram();
+    } catch (const std::exception& ex) {
+        log(V0_CRIT, "Unexpected ERROR: \"%s\" - aborting\n", ex.what());
+        Logger::getMainInstance().flush();
+        exit(1);
+    } catch (...) {
+        log(V0_CRIT, "Unexpected ERROR - aborting\n");
+        Logger::getMainInstance().flush();
+        exit(1);
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -92,23 +111,11 @@ int main(int argc, char *argv[]) {
     MPI_Comm newComm;
     MPI_Comm_split(MPI_COMM_WORLD, color, rank, &newComm);
 
-    //std::set_terminate(Logger::forceFlush);
-
-    try {
-        // Launch node's main program
-        if (isExternalClient) {
-            doExternalClientProgram(newComm, params, externalClientRanks);
-        } else {
-            doWorkerNodeProgram(newComm, params, externalClientRanks);
-        }
-    } catch (const std::exception &ex) {
-        log(V0_CRIT, "Unexpected ERROR: \"%s\" - aborting\n", ex.what());
-        Logger::getMainInstance().flush();
-        exit(1);
-    } catch (...) {
-        log(V0_CRIT, "Unexpected ERROR - aborting\n");
-        Logger::getMainInstance().flush();
-        exit(1);
+    // Launch node's main program
+    if (isExternalClient) {
+        doExternalClientProgram(newComm, params, externalClientRanks);
+    } else {
+        doWorkerNodeProgram(newComm, params, externalClientRanks);
     }
 
     MPI_Finalize();

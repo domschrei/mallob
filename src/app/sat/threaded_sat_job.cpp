@@ -24,6 +24,7 @@ void ThreadedSatJob::appl_start() {
         // TODO Update job index etc. from JobTree
         // TODO Update job description and amendments
         // TODO Continue solving
+        Logger::getMainInstance().flush();
         abort();
     
     } else if (!_init_thread.joinable()) _init_thread = std::thread([this]() {

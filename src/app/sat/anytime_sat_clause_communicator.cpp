@@ -295,6 +295,7 @@ bool AnytimeSatClauseCommunicator::testConsistency(const std::vector<int>& buffe
 
     if (maxSize > 0 && buffer.size() > maxSize) {
         log(V0_CRIT, "Clause buffer too full (%i/%i) - aborting\n", buffer.size(), maxSize);
+        Logger::getMainInstance().flush();
         abort();
     }
 
@@ -348,6 +349,7 @@ bool AnytimeSatClauseCommunicator::testConsistency(const std::vector<int>& buffe
             else          log(LOG_NO_PREFIX | V0_CRIT, "%i ", buffer[p]);
         }
         log(LOG_NO_PREFIX | V0_CRIT, "\n");
+        Logger::getMainInstance().flush();
         abort();
     }
     return consistent == 0;

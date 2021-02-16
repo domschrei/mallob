@@ -31,6 +31,14 @@ public:
 			return ClauseFilter::hash(unitCls, 1, false);
 		}
 	};
+	struct ClauseHashBasedEquals {
+		ClauseHasher _hasher;
+		bool operator()(const std::vector<int>& a, const std::vector<int>& b) const {
+			if (a.size() != b.size()) return false; // only clauses of same size are equal
+			if (a.size() == 1) return a[0] == b[0]; // exact comparison of unit clauses
+			return _hasher(a) == _hasher(b); // inexact hash-based comparison otherwise
+		}
+	};
 
 private:
 	std::bitset<NUM_BITS> s1;
