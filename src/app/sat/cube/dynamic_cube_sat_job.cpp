@@ -3,9 +3,10 @@
 #include <cassert>
 
 #include "dynamic_cube_communicator.hpp"
-#include "new_dynamic_cube_communicator.hpp"
 #include "failed_assumption_communicator.hpp"
+#include "new_dynamic_cube_communicator.hpp"
 #include "util/console.hpp"
+#include "util/sys/proc.hpp"
 
 // worldRank is mpi rank
 // job id is id of job
@@ -167,7 +168,32 @@ int DynamicCubeSatJob::appl_solveLoop() {
     return -1;
 }
 
-void DynamicCubeSatJob::appl_dumpStats() {}
+void DynamicCubeSatJob::appl_dumpStats() {
+    if (isInState({ACTIVE})) {
+        std::vector<long> solverTids = _lib->getSolverTids();
+
+        _logger.log(0, "Logging utitilization of %zu solver threads:", solverTids.size());
+
+        for (size_t i = 0; i < solverTids.size(); i++) {
+            if (solverTids[i] != -1) dumpStats(solverTids[i]);
+        }
+
+        std::vector<long> generatorTids = _lib->getGeneratorTids();
+
+        _logger.log(0, "Logging utitilization of %zu generator threads:", generatorTids.size());
+
+        for (size_t i = 0; i < generatorTids.size(); i++) {
+            if (generatorTids[i] != -1) dumpStats(generatorTids[i]);
+        }
+    }
+}
+
+void DynamicCubeSatJob::dumpStats(long tid) {
+    double cpuRatio;
+    float sysShare;
+    bool ok = Proc::getThreadCpuRatio(tid, cpuRatio, sysShare);
+    if (ok) _logger.log(0, "%s td.%ld : %.2f%% CPU -> %.2f%% systime", toStr(), tid, cpuRatio, 100 * sysShare);
+}
 
 bool DynamicCubeSatJob::appl_isDestructible() {
     // Allow destruction when this job was not initialized

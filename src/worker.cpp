@@ -153,7 +153,7 @@ void Worker::mainProgram() {
     float balanceCheckPeriod = 0.01;
     bool doYield = _params.isNotNull("yield");
 
-    Watchdog watchdog(/*checkIntervMillis=*/60*1000, lastMemCheckTime);
+    Watchdog watchdog(/*checkIntervMillis=*/300*1000, lastMemCheckTime);
 
     while (!checkTerminate()) {
 
@@ -187,7 +187,7 @@ void Worker::mainProgram() {
             double perc_cpu; float sysShare;
             bool success = Proc::getThreadCpuRatio(Proc::getTid(), perc_cpu, sysShare);
             if (success) {
-                Console::log(Console::VERB, "main : %.2f%% CPU -> %.2f%% systime", perc_cpu, 100*sysShare);
+                Console::log(Console::INFO, "main : %.2f%% CPU -> %.2f%% systime", perc_cpu, 100*sysShare);
             }
 
             // For the current job

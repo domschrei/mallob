@@ -50,6 +50,8 @@ class DynamicCubeSatJob : public Job {
     float _time_of_last_comm = 0;
     float _job_comm_period;
 
+    void dumpStats(long tid);
+
    public:
     DynamicCubeSatJob(Parameters& params, int commSize, int worldRank, int jobId);
     ~DynamicCubeSatJob() override;

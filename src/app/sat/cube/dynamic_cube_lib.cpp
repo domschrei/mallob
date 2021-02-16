@@ -221,7 +221,7 @@ void DynamicCubeLib::shareCubeToSplit(std::optional<Cube> &lastCube, int splitLi
                 // 1. There is a cube to split
                 // 2. There are no cubes to split and the lib is not requesting and no cube is being split
                 // TODO Problem with multiple generators (If a cube that is being split is pruned the program does not know that a generator is still running)
-                // -> But this should not cause problems. The lib should start to request. A generator thread could just unecessarly resume and then wait.  
+                // -> But this should not cause problems. The lib should start to request. A generator thread could just unecessarly resume and then wait.
                 // 3. The lib was interrupted
                 return _dynamic_cubes.hasACubeForSplitting() || (_request_state == NONE && !_dynamic_cubes.hasSplittingCubes()) ||
                        _state.load() == INTERRUPTING;
@@ -355,4 +355,26 @@ void DynamicCubeLib::digestFailedAssumptions(std::vector<int> &failed_assumption
     // Send failed assumptions to all threads
     for (auto &solver_thread : _solver_threads) solver_thread->handleFailed(failed_assumptions);
     for (auto &generator_thread : _generator_threads) generator_thread->handleFailed(failed_assumptions);
+}
+
+std::vector<long> DynamicCubeLib::getSolverTids() {
+    std::vector<long> tids;
+
+    for (auto &solver_thread : _solver_threads) {
+        auto tid = solver_thread->getTid();
+        tids.push_back(tid);
+    }
+    
+    return tids;
+}
+
+std::vector<long> DynamicCubeLib::getGeneratorTids() {
+    std::vector<long> tids;
+
+    for (auto &generator_thread : _generator_threads) {
+        auto tid = generator_thread->getTid();
+        tids.push_back(tid);
+    }
+
+    return tids;
 }

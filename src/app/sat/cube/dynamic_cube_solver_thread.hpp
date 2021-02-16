@@ -49,6 +49,8 @@ class DynamicCubeSolverThread {
     void run();
     void solve();
 
+    long _tid = -1;
+
    public:
     DynamicCubeSolverThread(DynamicCubeSolverThreadManagerInterface &worker, const DynamicCubeSetup &setup);
     ~DynamicCubeSolverThread();
@@ -58,6 +60,8 @@ class DynamicCubeSolverThread {
     void join();
 
     void handleFailed(const std::vector<int> &failed);
+
+    long getTid() const { return _tid; }
 };
 
 #endif /* MSCHICK_CUBE_SOLVER_THREAD_H */

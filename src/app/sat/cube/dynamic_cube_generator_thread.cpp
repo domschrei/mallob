@@ -2,6 +2,8 @@
 
 #include <cassert>
 
+#include "util/sys/proc.hpp"
+
 std::atomic<int> DynamicCubeGeneratorThread::_counter{0};
 
 DynamicCubeGeneratorThread::DynamicCubeGeneratorThread(DynamicCubeGeneratorThreadManagerInterface &manager, const DynamicCubeSetup &setup)
@@ -45,6 +47,9 @@ void DynamicCubeGeneratorThread::join() {
 }
 
 void DynamicCubeGeneratorThread::run() {
+    // Set thread id
+    _tid = Proc::getTid();
+
     while (!_isInterrupted) {
         // Set last cube and reset cube
         std::optional<Cube> lastCube = _cube;
@@ -84,7 +89,11 @@ void DynamicCubeGeneratorThread::run() {
         // Exit loop if formula was solved
         if (_result != UNKNOWN) return;
     }
+
     _logger.log(0, "DynamicCubeGeneratorThread %i: Leaving the main loop", _instance_counter);
+
+    // Reset thread id
+    _tid = -1;
 }
 
 void DynamicCubeGeneratorThread::generate() {

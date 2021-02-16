@@ -2,6 +2,8 @@
 
 #include <cassert>
 
+#include "util/sys/proc.hpp"
+
 std::atomic<int> DynamicCubeSolverThread::_counter{0};
 
 DynamicCubeSolverThread::DynamicCubeSolverThread(DynamicCubeSolverThreadManagerInterface &manager, const DynamicCubeSetup &setup)
@@ -52,6 +54,9 @@ void DynamicCubeSolverThread::join() {
 }
 
 void DynamicCubeSolverThread::run() {
+    // Set thread id
+    _tid = Proc::getTid();
+
     while (!_isInterrupted) {
         // Reset cube
         _cube.reset();
@@ -85,7 +90,11 @@ void DynamicCubeSolverThread::run() {
         // Exit loop if formula was solved
         if (_result != UNKNOWN) return;
     }
+
     _logger.log(0, "DynamicCubeSolverThread %i: Leaving the main loop", _instance_counter);
+
+    // Reset thread id
+    _tid = -1;
 }
 
 void DynamicCubeSolverThread::solve() {
@@ -100,7 +109,8 @@ void DynamicCubeSolverThread::solve() {
         if (result == SAT) {
             _logger.log(0, "DynamicCubeSolverThread %i: Found a solution: SAT", _instance_counter);
             _logger.log(0, "DynamicCubeSolverThread %i: Used cube has size %zu", _instance_counter, _cube.value().getPath().size());
-            _logger.log(0, "DynamicCubeSolverThread %i: Size of added buffer from failed assumptions: %zu", _instance_counter, _added_failed_assumptions_buffer);
+            _logger.log(0, "DynamicCubeSolverThread %i: Size of added buffer from failed assumptions: %zu", _instance_counter,
+                        _added_failed_assumptions_buffer);
             _result = SAT;
 
         } else if (result == UNKNOWN) {

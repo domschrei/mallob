@@ -67,6 +67,8 @@ class DynamicCubeGeneratorThread {
     void run();
     void generate();
 
+    long _tid = -1;
+
    public:
     DynamicCubeGeneratorThread(DynamicCubeGeneratorThreadManagerInterface &manager, const DynamicCubeSetup &setup);
     ~DynamicCubeGeneratorThread();
@@ -76,6 +78,8 @@ class DynamicCubeGeneratorThread {
     void join();
 
     void handleFailed(const std::vector<int> &failed);
+
+    long getTid() const { return _tid; }
 };
 
 #endif /* MSCHICK_CUBE_GENERATOR_THREAD_H */

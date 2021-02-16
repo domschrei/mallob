@@ -102,6 +102,9 @@ class DynamicCubeLib : public DynamicCubeSolverThreadManagerInterface, public Dy
     // For failed assumption communication
     std::vector<int> getNewFailedAssumptions();
     void digestFailedAssumptions(std::vector<int> &failed_assumptions);
+
+    std::vector<long> getSolverTids();
+    std::vector<long> getGeneratorTids();
 };
 
 #endif /* MSCHICK_DYNAMIC_CUBE_LIB_H */
