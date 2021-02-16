@@ -1374,7 +1374,7 @@ private:
         // we don't retry, fail if overflowing
         // don't need to check max num elements
         if (0 == mMaxNumElementsAllowed && !try_increase_info()) {
-            throwOverflowError(); // impossible to reach LCOV_EXCL_LINE
+            //throwOverflowError(); // impossible to reach LCOV_EXCL_LINE
         }
 
         size_t idx;
@@ -1834,7 +1834,7 @@ public:
             newSize *= 2;
         }
         if (ROBIN_HOOD_UNLIKELY(newSize == 0)) {
-            throwOverflowError();
+            //throwOverflowError();
         }
 
         rehashPowerOfTwo(newSize);
