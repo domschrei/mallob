@@ -44,8 +44,9 @@ private:
     enum BufferMode {SELF, ALL};
     size_t getBufferLimit(int numAggregatedNodes, BufferMode mode);
 
-    std::vector<int> prepareClauses(); 
-    void learnClauses(std::vector<int>& clauses);
+    std::vector<int> prepareClauses();
+    void broadcastAndLearn(const std::vector<int>& clauses);
+    void learnClauses(const std::vector<int>& clauses);
     void sendClausesToChildren(const std::vector<int>& clauses);
 
     std::vector<int> merge(size_t maxSize);

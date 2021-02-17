@@ -5,6 +5,30 @@
 #include "comm/mympi.hpp"
 #include "hordesat/utilities/clause_filter.hpp"
 
+void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
+
+    if (msg.tag == MSG_GATHER_CLAUSES) {
+        // Gather received clauses, send to parent
+
+        int numAggregated = msg.payload.back();
+        msg.payload.pop_back();
+        std::vector<int>& clauses = msg.payload;
+        testConsistency(clauses, getBufferLimit(numAggregated, BufferMode::ALL));
+        
+        log(V5_DEBG, "%s : receive s=%i\n", _job->toStr(), clauses.size());
+        
+        // Add received clauses to local set of collected clauses
+        _clause_buffers.push_back(clauses);
+        _num_aggregated_nodes += numAggregated;
+
+        if (canSendClauses()) sendClausesToParent();
+
+    } else if (msg.tag == MSG_DISTRIBUTE_CLAUSES) {
+        // Learn received clauses, send them to children
+        broadcastAndLearn(msg.payload);
+    }
+}
+
 size_t AnytimeSatClauseCommunicator::getBufferLimit(int numAggregatedNodes, BufferMode mode) {
     float limit = _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(numAggregatedNodes+1));
     if (mode == SELF) {
@@ -42,9 +66,8 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
 
     if (_job->getJobTree().isRoot()) {
         // Share complete set of clauses to children
-        log(V4_VVER, "%s : switch gather => broadcast\n", _job->toStr()); 
-        learnClauses(clausesToShare);
-        sendClausesToChildren(clausesToShare);
+        log(V4_VVER, "%s : gather => broadcast\n", _job->toStr()); 
+        broadcastAndLearn(clausesToShare);
     } else {
         // Send set of clauses to parent
         int parentRank = _job->getJobTree().getParentNodeRank();
@@ -53,43 +76,22 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
         msg.epoch = 0; // unused
         msg.tag = MSG_GATHER_CLAUSES;
         msg.payload = clausesToShare;
+        log(LOG_ADD_DESTRANK | V4_VVER, "%s : gather s=%i", parentRank, _job->toStr(), msg.payload.size());
         msg.payload.push_back(_num_aggregated_nodes);
-        log(LOG_ADD_DESTRANK | V4_VVER, "%s : gather", parentRank, _job->toStr());
         MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
 
     _num_aggregated_nodes = 0;
 }
 
-void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
-
-    if (msg.tag == MSG_GATHER_CLAUSES) {
-        // Gather received clauses, send to parent
-        // TODO count each child only once
-        int numAggregated = msg.payload.back();
-        msg.payload.pop_back();
-        std::vector<int>& clauses = msg.payload;
-        testConsistency(clauses, getBufferLimit(numAggregated, BufferMode::ALL));
-        
-        log(V5_DEBG, "%s : receive, size %i\n", _job->toStr(), clauses.size());
-        
-        // Add received clauses to local set of collected clauses
-        _clause_buffers.push_back(clauses);
-        _num_aggregated_nodes += numAggregated;
-
-        if (canSendClauses()) sendClausesToParent();
-
-    } else if (msg.tag == MSG_DISTRIBUTE_CLAUSES) {
-        // Learn received clauses, send them to children
-        std::vector<int>& clauses = msg.payload;
-        learnClauses(clauses);
-        sendClausesToChildren(clauses);
-    }
+void AnytimeSatClauseCommunicator::broadcastAndLearn(const std::vector<int>& clauses) {
+    testConsistency(clauses, 0);
+    sendClausesToChildren(clauses);
+    learnClauses(clauses);
 }
 
-void AnytimeSatClauseCommunicator::learnClauses(std::vector<int>& clauses) {
-    log(V4_VVER, "%s : learn, size %i\n", _job->toStr(), clauses.size());
-    testConsistency(clauses, 0);
+void AnytimeSatClauseCommunicator::learnClauses(const std::vector<int>& clauses) {
+    log(V4_VVER, "%s : learn s=%i\n", _job->toStr(), clauses.size());
     
     if (clauses.size() > 0) {
         // Locally learn clauses
@@ -119,12 +121,12 @@ void AnytimeSatClauseCommunicator::sendClausesToChildren(const std::vector<int>&
     int childRank;
     if (_job->getJobTree().hasLeftChild()) {
         childRank = _job->getJobTree().getLeftChildNodeRank();
-        log(LOG_ADD_DESTRANK | V4_VVER, "%s : broadcast", childRank, _job->toStr());
+        log(LOG_ADD_DESTRANK | V4_VVER, "%s : broadcast s=%i", childRank, _job->toStr(), msg.payload.size());
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
     if (_job->getJobTree().hasRightChild()) {
         childRank = _job->getJobTree().getRightChildNodeRank();
-        log(LOG_ADD_DESTRANK | V4_VVER, "%s : broadcast", childRank, _job->toStr());
+        log(LOG_ADD_DESTRANK | V4_VVER, "%s : broadcast s=%i", childRank, _job->toStr(), msg.payload.size());
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
 }
@@ -137,7 +139,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     assert(_num_aggregated_nodes > 0);
     int totalSize = getBufferLimit(_num_aggregated_nodes, BufferMode::ALL);
     int selfSize = getBufferLimit(_num_aggregated_nodes, BufferMode::SELF);
-    log(V5_DEBG, "%s : aggregated=%i max_self=%i max_total=%i\n", _job->toStr(), 
+    log(V5_DEBG, "%s : aggr=%i max_self=%i max_total=%i\n", _job->toStr(), 
             _num_aggregated_nodes, selfSize, totalSize);
 
     // Locally collect clauses from own solvers, add to clause buffer
@@ -147,7 +149,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
         selfClauses = std::vector<int>();
     } else {
         // Else, retrieve clauses from solvers
-        log(V4_VVER, "%s : collect local cls, max. size %i\n", 
+        log(V4_VVER, "%s : collect s<=%i\n", 
                     _job->toStr(), selfSize);
         selfClauses = _job->getPreparedClauses();
         testConsistency(selfClauses, 0 /*do not check buffer's size limit*/);
@@ -155,7 +157,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     _clause_buffers.push_back(std::move(selfClauses));
 
     // Merge all collected buffer into a single buffer
-    log(V5_DEBG, "%s : merge %i buffers, max. size %i\n", 
+    log(V5_DEBG, "%s : merge n=%i s<=%i\n", 
                 _job->toStr(), _clause_buffers.size(), totalSize);
     std::vector<int> vec = merge(totalSize);
     testConsistency(vec, totalSize);
