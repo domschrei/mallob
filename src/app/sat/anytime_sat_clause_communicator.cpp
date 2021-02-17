@@ -66,7 +66,6 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
 
     if (_job->getJobTree().isRoot()) {
         // Share complete set of clauses to children
-        log(V4_VVER, "%s : gather => broadcast\n", _job->toStr()); 
         broadcastAndLearn(clausesToShare);
     } else {
         // Send set of clauses to parent
