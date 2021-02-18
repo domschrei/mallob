@@ -85,6 +85,10 @@ void DynamicCubeGeneratorThread::run() {
         if (_result != UNKNOWN) return;
     }
     _logger.log(0, "DynamicCubeGeneratorThread %i: Leaving the main loop", _instance_counter);
+
+    // Deleting the current cube so it will not be set on a resume
+    // Otherwise on a call of shareCubeToSplit there would be a last cube and failed would be empty
+    _cube.reset();
 }
 
 void DynamicCubeGeneratorThread::generate() {
@@ -121,7 +125,7 @@ void DynamicCubeGeneratorThread::generate() {
                 _logger.log(0, "DynamicCubeGeneratorThread %i: Used cube has size %zu", _instance_counter, _cube.value().getPath().size());
                 _logger.log(0, "DynamicCubeGeneratorThread %i: Size of added buffer from failed assumptions: %zu", _instance_counter,
                             _added_failed_assumptions_buffer);
-                            
+
                 // The added failed cubes are unsatisfiable
                 _result = UNSAT;
             } else {
