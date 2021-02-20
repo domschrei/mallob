@@ -2,9 +2,8 @@
 
 #include <cassert>
 
-#include "dynamic_cube_communicator.hpp"
-#include "new_dynamic_cube_communicator.hpp"
 #include "failed_assumption_communicator.hpp"
+#include "new_dynamic_cube_communicator.hpp"
 #include "util/console.hpp"
 
 // worldRank is mpi rank
@@ -133,7 +132,7 @@ void DynamicCubeSatJob::interrupt_and_start_withdrawing() {
 
     } else if (_job_state == SUSPENDED) {
         _job_state = WITHDRAWN;
-    }
+    } 
 }
 
 void DynamicCubeSatJob::withdraw() {
@@ -141,6 +140,8 @@ void DynamicCubeSatJob::withdraw() {
 
     // Wait until dynamic cube lib is joined
     _lib->join();
+
+    _logger.log(0, "Joined dynamic cube lib");
 
     const std::lock_guard<Mutex> lock(_initialization_mutex);
 
@@ -172,7 +173,7 @@ void DynamicCubeSatJob::appl_dumpStats() {}
 bool DynamicCubeSatJob::appl_isDestructible() {
     // Allow destruction when this job was not initialized
     // This should not be a race condition, since it is done in the threaded_sat_job.cpp
-    return !appl_doneInitializing() || _job_state == State::WITHDRAWN;
+    return !appl_doneInitializing() || _job_state == WITHDRAWING || _job_state == State::WITHDRAWN;
 }
 
 bool DynamicCubeSatJob::appl_wantsToBeginCommunication() const {
@@ -235,7 +236,7 @@ int DynamicCubeSatJob::getDemand(int prevVolume, float elapsedTime) const {
 }
 
 DynamicCubeSatJob::~DynamicCubeSatJob() {
-    const std::lock_guard<Mutex> lock(_initialization_mutex);
+    assert(isDestructible());
 
     _logger.log(0, "Enter destructor");
 
