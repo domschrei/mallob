@@ -18,7 +18,7 @@ class DynamicCubeGeneratorThreadManagerInterface {
     // If the last given cube was proven to be unsatisfiable, failed contains the failed assumptions
     // At the end next cube is filled with a new cube that should be split
     // If no cube should be split the method waits internally
-    virtual void shareCubeToSplit(std::optional<Cube> &lastCube, int splitLit, std::optional<Cube> &failedAssumptions, std::optional<Cube> &nextCube) = 0;
+    virtual void shareCubeToSplit(std::optional<Cube> &lastCube, int splitLit, std::optional<Cube> &failedAssumptions, std::optional<Cube> &nextCube, int id) = 0;
 };
 
 #endif /* MSCHICK_DYNAMIC_CUBE_GENERATOR_THREAD_MANAGER_INTERFACE_H */

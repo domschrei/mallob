@@ -88,10 +88,10 @@ class DynamicCubeLib : public DynamicCubeSolverThreadManagerInterface, public Dy
     void suspend();
 
     // Interface functions of CubeSolverThreadManagerInterface
-    void shareCubes(std::optional<Cube> &failedAssumptions, std::optional<Cube> &nextCube) override;
+    void shareCube(std::optional<Cube> &failedAssumptions, std::optional<Cube> &nextCube, int id) override;
 
     // Interface function of CubeGeneratorManagerInterface
-    void shareCubeToSplit(std::optional<Cube> &lastCube, int splitLit, std::optional<Cube> &failedAssumptions, std::optional<Cube> &nextCube) override;
+    void shareCubeToSplit(std::optional<Cube> &lastCube, int splitLit, std::optional<Cube> &failedAssumptions, std::optional<Cube> &nextCube, int id) override;
 
     // For cube communication
     bool isRequesting();

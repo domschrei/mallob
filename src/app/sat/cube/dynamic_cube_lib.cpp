@@ -108,22 +108,22 @@ void DynamicCubeLib::suspend() {
     _dynamic_cubes.resetAssignment();
 }
 
-void DynamicCubeLib::shareCubes(std::optional<Cube> &failedAssumptions, std::optional<Cube> &nextCube) {
+void DynamicCubeLib::shareCube(std::optional<Cube> &failedAssumptions, std::optional<Cube> &nextCube, int id) {
     auto lock = _local_lock.getLock();
 
-    _logger.log(0, "DynamicCubeSolverThread entered shareCubes, %s", _dynamic_cubes.toString().c_str());
+    _logger.log(0, "DynamicCubeSolverThread %i: entered shareCubes, %s", id, _dynamic_cubes.toString().c_str());
 
     // Next cube must be empty at the beginning
     assert(!nextCube.has_value());
 
     if (failedAssumptions.has_value()) {
-        _logger.log(0, "DynamicCubeSolverThread added new failed assumptions");
+        _logger.log(0, "DynamicCubeSolverThread %i: added new failed assumptions", id);
 
         handleFailedAssumptions(failedAssumptions.value());
     }
 
     while (true) {
-        _logger.log(0, "DynamicCubeSolverThread entered cube retrieval loop");
+        _logger.log(0, "DynamicCubeSolverThread %i: entered cube retrieval loop", id);
 
         // Lib cannot be inactive
         assert(_state.load() != INACTIVE);
@@ -134,7 +134,7 @@ void DynamicCubeLib::shareCubes(std::optional<Cube> &failedAssumptions, std::opt
 
         // Leave cube empty on interruption
         if (_state.load() == INTERRUPTING) {
-            _logger.log(0, "DynamicCubeSolverThread did not get a cube because the lib is interrupted");
+            _logger.log(0, "DynamicCubeSolverThread %i: did not get a cube because the lib is interrupted", id);
             return;
         }
 
@@ -142,24 +142,28 @@ void DynamicCubeLib::shareCubes(std::optional<Cube> &failedAssumptions, std::opt
         nextCube = _dynamic_cubes.tryToGetACubeForSolving();
 
         if (nextCube.has_value()) {
-            _logger.log(0, "DynamicCubeSolverThread retrieved a cube");
+            _logger.log(0, "DynamicCubeSolverThread %i: retrieved a cube", id);
             return;
 
         } else {
-            _logger.log(0, "DynamicCubeSolverThread waits because no cube could be assigned");
+            _logger.log(0, "DynamicCubeSolverThread %i: waits because no cube could be assigned", id);
+
             // Wait because there are no solvable cubes
-            _solver_cv.wait(lock, [this] {
-                _logger.log(0, "DynamicCubeSolverThread was notified, %s", _dynamic_cubes.toString().c_str());
+            _solver_cv.wait(lock, [this, id] {
+                _logger.log(0, "DynamicCubeSolverThread %i: was notified, %s", id, _dynamic_cubes.toString().c_str());
                 return _dynamic_cubes.hasACubeForSolving() || _state.load() == INTERRUPTING;
             });
+
+            _logger.log(0, "DynamicCubeSolverThread %i: resumes because a cube could be assigned", id);
         }
     }
 }
 
-void DynamicCubeLib::shareCubeToSplit(std::optional<Cube> &lastCube, int splitLit, std::optional<Cube> &failedAssumptions, std::optional<Cube> &nextCube) {
+void DynamicCubeLib::shareCubeToSplit(std::optional<Cube> &lastCube, int splitLit, std::optional<Cube> &failedAssumptions, std::optional<Cube> &nextCube,
+                                      int id) {
     auto lock = _local_lock.getLock();
 
-    _logger.log(0, "DynamicCubeGeneratorThread entered shareCubeToSplit, %s", _dynamic_cubes.toString().c_str());
+    _logger.log(0, "DynamicCubeGeneratorThread %i: entered shareCubeToSplit, %s", id, _dynamic_cubes.toString().c_str());
 
     // Next cube must be empty at the beginning
     assert(!nextCube.has_value());
@@ -170,15 +174,19 @@ void DynamicCubeLib::shareCubeToSplit(std::optional<Cube> &lastCube, int splitLi
             bool addedNewCube = _dynamic_cubes.handleSplit(lastCube.value(), splitLit);
 
             if (addedNewCube) {
-                _logger.log(0, "DynamicCubeGeneratorThread created a new dynamic cube");
+                _logger.log(0, "DynamicCubeGeneratorThread %i: created a new dynamic cube with size %zu", id, lastCube.value().getPath().size() + 1);
 
                 // Dynamic cubes was succesfully extended
                 // Notify starved solver and generator threads
                 _solver_cv.notify();
                 _generator_cv.notify();
+
+            } else {
+                _logger.log(0, "DynamicCubeGeneratorThread %i: could not create a new dynamic cube, the expanded cube was pruned", id);
             }
+
         } else {
-            _logger.log(0, "DynamicCubeGeneratorThread added new failed assumptions");
+            _logger.log(0, "DynamicCubeGeneratorThread %i: added new failed assumptions", id);
 
             // If last cube is valid and was proven to be failing handle the failed assumptions
             assert(failedAssumptions.has_value());
@@ -187,23 +195,26 @@ void DynamicCubeLib::shareCubeToSplit(std::optional<Cube> &lastCube, int splitLi
     }
 
     while (true) {
-        _logger.log(0, "DynamicCubeGeneratorThread entered cube retrieval loop");
+        _logger.log(0, "DynamicCubeGeneratorThread %i: entered cube retrieval loop", id);
 
         // Lib cannot be inactive
         assert(_state.load() != INACTIVE);
 
         if (_state.load() == INTERRUPTING) {
-            _logger.log(0, "DynamicCubeGeneratorThread did not get a cube because the lib is interrupted");
+            _logger.log(0, "DynamicCubeGeneratorThread %i: did not get a cube because the lib is interrupted", id);
             // Leave next cube empty on interruption
             return;
 
         } else if (static_cast<int>(_dynamic_cubes.size()) >= _max_dynamic_cubes) {
-            _logger.log(0, "DynamicCubeGeneratorThread waits because there are too many cubes");
+            _logger.log(0, "DynamicCubeGeneratorThread %i: waits because there are too many cubes", id);
+
             // Wait because there are too many cubes
-            _generator_cv.wait(lock, [this] {
-                _logger.log(0, "DynamicCubeGeneratorThread was notified, %s", _dynamic_cubes.toString().c_str());
+            _generator_cv.wait(lock, [this, id] {
+                _logger.log(0, "DynamicCubeGeneratorThread %i: was notified, %s", id, _dynamic_cubes.toString().c_str());
                 return static_cast<int>(_dynamic_cubes.size()) < _max_dynamic_cubes || _state.load() == INTERRUPTING;
             });
+
+            _logger.log(0, "DynamicCubeGeneratorThread %i: resume because there are no longer too many cubes", id);
 
         } else if (!_dynamic_cubes.hasACubeForSplitting()) {
             if (_request_state == NONE && !_dynamic_cubes.hasSplittingCubes()) {
@@ -211,28 +222,30 @@ void DynamicCubeLib::shareCubeToSplit(std::optional<Cube> &lastCube, int splitLi
                 // Request new cubes because no cube can be split and no cube is being split
                 _request_state = REQUESTING;
             }
+            _logger.log(0, "DynamicCubeGeneratorThread %i: waits because no cube could be assigned", id);
 
-            _logger.log(0, "DynamicCubeGeneratorThread waits because no cube could be assigned");
             // Wait because there are no splittable cubes
             // Because the thread is waiting for a new cube for splitting this does not wake and and set the state to requesting after getting notified
-            _generator_cv.wait(lock, [this] {
-                _logger.log(0, "DynamicCubeGeneratorThread was notified, %s", _dynamic_cubes.toString().c_str());
+            _generator_cv.wait(lock, [this, id] {
+                _logger.log(0, "DynamicCubeGeneratorThread %i: was notified, %s", id, _dynamic_cubes.toString().c_str());
                 // Resume when
                 // 1. There is a cube to split
                 // 2. There are no cubes to split and the lib is not requesting and no cube is being split
                 // TODO Problem with multiple generators (If a cube that is being split is pruned the program does not know that a generator is still running)
-                // -> But this should not cause problems. The lib should start to request. A generator thread could just unecessarly resume and then wait.  
+                // -> But this should not cause problems. The lib should start to request. A generator thread could just unecessarly resume and then wait.
                 // 3. The lib was interrupted
                 return _dynamic_cubes.hasACubeForSplitting() || (_request_state == NONE && !_dynamic_cubes.hasSplittingCubes()) ||
                        _state.load() == INTERRUPTING;
             });
+
+            _logger.log(0, "DynamicCubeGeneratorThread %i: resumes because a cube could be assigned", id);
 
         } else {
             nextCube = _dynamic_cubes.tryToGetACubeForSplitting();
 
             assert(nextCube.has_value());
 
-            _logger.log(0, "DynamicCubeGeneratorThread retrieved a cube");
+            _logger.log(0, "DynamicCubeGeneratorThread %i: retrieved a cube", id);
 
             return;
         }
