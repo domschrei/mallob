@@ -20,6 +20,8 @@ class DynamicCubeGeneratorThread {
     // May solve formula during lookahead
     SatResult &_result;
 
+    bool _use_cube_checker = false;
+
     CaDiCaL::Solver _cube_checker;
 
     CaDiCaL::Solver _solver;
@@ -66,6 +68,9 @@ class DynamicCubeGeneratorThread {
 
     void run();
     void generate();
+
+    // Return a bool whether the cube should be split
+    bool check();
 
    public:
     DynamicCubeGeneratorThread(DynamicCubeGeneratorThreadManagerInterface &manager, const DynamicCubeSetup &setup);

@@ -15,11 +15,7 @@ class DynamicCubeSolverThreadManagerInterface {
     // Insert free local cubes into cubes, waits internally if none are available
     // If interrupted cubes is left empty
     // Found failed cubes should be put into failed
-    virtual void shareCubes(std::optional<Cube> &failedAssumptions, std::optional<Cube> &nextCube) = 0;
-
-    // Send failed cubes to manager
-    // Not necessarily implemented
-    virtual void shareFailed(std::vector<Cube> &failed){};
+    virtual void shareCube(std::optional<Cube> &failedAssumptions, std::optional<Cube> &nextCube, int id) = 0;
 };
 
 #endif /* MSCHICK_DYNAMIC_CUBE_SOLVER_THREAD_MANAGER_INTERFACE_H */
