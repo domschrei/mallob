@@ -18,6 +18,9 @@ DynamicCubeSolverThread::DynamicCubeSolverThread(DynamicCubeSolverThreadManagerI
 
     _solver = std::make_unique<Cadical>(solver_setup);
 
+    // Check flag if failed clauses should be learnt
+    _learn_clauses = setup.params.isSet("learn_clauses_in_solver");
+
     // Initialization is done in a seperate thread thus hard work is allowed
     // Also this allows a universal start
     // Read formula
@@ -142,7 +145,6 @@ void DynamicCubeSolverThread::handleFailed(const std::vector<int> &failed) {
     // Insert failed cubes at the end of new failed cubes
     _new_failed_cubes.insert(_new_failed_cubes.end(), failed.begin(), failed.end());
 
-    // TODO Add a new function in PortfolioSolver that allows clauses to be added for the next call to solve and may be learned asynchronously
-    // Learn failed clauses
-    // _solver->addLearnedClause(failed.data(), failed.size());
+    // Learn failed clauses if option is set
+    if (_learn_clauses) _solver->addLearnedClause(failed.data(), failed.size());
 }

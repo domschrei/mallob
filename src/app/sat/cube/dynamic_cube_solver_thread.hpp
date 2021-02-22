@@ -46,6 +46,8 @@ class DynamicCubeSolverThread {
 
     size_t _added_failed_assumptions_buffer = 0;
 
+    bool _learn_clauses = false;
+
     void run();
     void solve();
 
