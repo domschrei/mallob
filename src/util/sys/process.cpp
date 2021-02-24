@@ -19,13 +19,15 @@
 int Process::_rank;
 std::set<pid_t> Process::_children;
 std::atomic_bool Process::_modifying_children;
-std::atomic_bool Process::_exit_signal_caught;
+std::atomic_bool Process::_exit_signal_caught = false;
+std::atomic_int Process::_exit_signal = 0;
 
 
 
 void propagateSignalAndExit(int signum) {
     Process::forwardTerminateToChildren();
     Process::_exit_signal_caught = true;
+    Process::_exit_signal = signum;
 }
 
 void doNothing(int signum) {
@@ -135,8 +137,10 @@ bool Process::didChildExit(pid_t childpid) {
     return false;
 }
 
-bool Process::isExitSignalCaught() {
-    return _exit_signal_caught;
+std::optional<int> Process::isExitSignalCaught() {
+    std::optional<int> opt;
+    if (_exit_signal_caught) opt = _exit_signal;
+    return opt;
 }
 
 void Process::writeTrace(long tid) {
