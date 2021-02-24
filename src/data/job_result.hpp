@@ -10,13 +10,13 @@
 
 struct JobResult : public Serializable {
 
-    int id;
+    int id = 0;
     int revision;
     int result;
     std::vector<int> solution;
 
 public:
-    JobResult() : solution(std::vector<int>()) {}
+    JobResult() {}
     JobResult(int id, int result, std::vector<int> solution) : id(id), result(result), solution(solution) {}
 
     int getTransferSize() const {return sizeof(int)*3 + sizeof(int)*solution.size();}

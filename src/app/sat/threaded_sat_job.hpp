@@ -29,6 +29,7 @@ private:
 
     std::atomic_bool _done_locally;
     int _result_code;
+    JobResult _result;
 
     std::thread _init_thread;
     std::thread _destroy_thread;

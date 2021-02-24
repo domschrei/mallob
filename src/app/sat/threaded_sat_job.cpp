@@ -108,8 +108,8 @@ void ThreadedSatJob::terminateUnsafe() {
 }
 
 JobResult ThreadedSatJob::appl_getResult() {
+    if (_result.id != 0) return _result;
     auto lock = _solver_lock.getLock();
-    JobResult _result;
     _result.id = getId();
     _result.result = _result_code;
     _result.revision = getRevision();
@@ -141,6 +141,10 @@ int ThreadedSatJob::appl_solved() {
         log(LOG_ADD_DESTRANK | V2_INFO, "%s : found result %s", getJobTree().getRootNodeRank(), toStr(), 
                             result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         _result_code = result;
+
+        // Extract result to avoid later deadlocks
+        lock.unlock();
+        appl_getResult(); // locks internally
     }
     return result;
 }
