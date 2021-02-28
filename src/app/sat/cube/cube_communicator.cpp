@@ -74,13 +74,13 @@ void CubeCommunicator::returnFailedAndRequestCubes(std::vector<int> &serialized_
 
 void CubeCommunicator::log_send(int destRank, std::vector<int> &payload, const char *str, ...) {
     // Convert payload
-    auto payloadString = payloadToString(payload);
+    // auto payloadString = payloadToString(payload);
 
     // For addtitional printf params
     va_list vl;
     // Puts first value in parameter list into str
     va_start(vl, str);
-    std::string output = std::string(str) + " => [" + std::to_string(destRank) + "] {" + payloadString + "}";
+    std::string output = std::string(str) + " => [" + std::to_string(destRank) + "] Buffer size: " + std::to_string(payload.size());
     _logger.log_va_list(0, output.c_str(), vl);
     va_end(vl);
 }
