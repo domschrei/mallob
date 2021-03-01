@@ -59,7 +59,7 @@ void cbProduce(void* sp, int* cls, int glue) {
 	}
 	Lingeling* lp = (Lingeling*)sp;
 	// LBD score check
-	if (glue > (int)lp->glueLimit) {
+	if (lp->glueLimit != 0 && glue > (int)lp->glueLimit) {
 		return;
 	}
 	// size check
@@ -349,7 +349,8 @@ void Lingeling::setLearnedClauseCallback(const LearnedClauseCallback& callback) 
 }
 
 void Lingeling::increaseClauseProduction() {
-	if (glueLimit < _setup.softFinalMaxLbd) glueLimit++;
+	if (glueLimit != 0 && glueLimit < _setup.softFinalMaxLbd) 
+		glueLimit++;
 }
 
 int Lingeling::getVariablesCount() {

@@ -35,7 +35,7 @@ ymin = None
 ymax = None
 confidence_area = False
 legend_right = False
-rectangular = True
+rectangular = False
 
 outfile = None
 
@@ -95,6 +95,8 @@ for arg in sys.argv[1:]:
         confidence_area = True
     elif arg == "-legendright" or arg == "--legendright":
         legend_right = True
+    elif arg == "-rect" or arg == "--rect":
+        rectangular = True
     else:
         files += [arg]
 
