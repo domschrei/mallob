@@ -202,7 +202,7 @@ void Lingeling::diversify(int seed) {
 		
 		// NEW: local search solver
 		case 4:
-			lglsetopt (solver, "plain", rank % (2*numDiversifications) >= numDiversifications);
+			lglsetopt (solver, "plain", rank % (2*numDiversifications) < numDiversifications);
 			lglsetopt (solver, "locs", -1);
 			lglsetopt (solver, "locsrtc", 1);
 			lglsetopt (solver, "locswait", 0);
