@@ -4,6 +4,7 @@
 
 #include <string>
 #include <set>
+#include <atomic>
 
 #include "comm/mympi.hpp"
 #include "util/params.hpp"
@@ -11,10 +12,13 @@
 #include "data/epoch_counter.hpp"
 #include "util/sys/threading.hpp"
 #include "data/job_file_adapter.hpp"
+#include "data/job_metadata.hpp"
 
 struct JobByArrivalComparator {
-    inline bool operator() (const JobDescription& struct1, const JobDescription& struct2) {
-        return (struct1.getArrival() < struct2.getArrival());
+    inline bool operator() (const JobMetadata& struct1, const JobMetadata& struct2) const {
+        if (struct1.description->getArrival() != struct2.description->getArrival())
+            return (struct1.description->getArrival() < struct2.description->getArrival());
+        return struct1.description->getId() < struct2.description->getId();
     }
 };
 
@@ -25,18 +29,29 @@ private:
     int _world_rank;
     Parameters& _params;
 
-    std::vector<int> _ordered_job_ids;
-    std::map<int, std::shared_ptr<JobDescription>> _jobs;
-    std::map<int, std::string> _job_instances;
+    // For incoming job meta data. Full instance is NOT read yet.
+    // Filled from JobFileAdapter, emptied by instance reader thread,
+    // ready jobs are put in the ready queue.
+    std::set<JobMetadata, JobByArrivalComparator> _incoming_job_queue;
+    std::atomic_int _num_incoming_jobs = 0;
+    // Safeguards _incoming_job_queue.
+    Mutex _incoming_job_lock;
 
-    std::vector<std::shared_ptr<JobDescription>> _incoming_job_queue;
-    Mutex _incoming_job_queue_lock;
+    // For jobs which have been fully read and initialized
+    // and whose prerequisites for activation are met.
+    std::list<std::shared_ptr<JobDescription>> _ready_job_queue;
+    std::atomic<int> _num_ready_jobs = 0;
+    // Safeguards _ready_job_queue.
+    Mutex _ready_job_lock;
 
-    volatile int _last_introduced_job_idx;
-    std::set<int> _introduced_job_ids; 
-    std::map<int, bool> _job_ready;
-    Mutex _job_ready_lock;
+    // For active jobs in the system. ONLY ACCESSIBLE FROM CLIENT'S MAIN THREAD.
+    std::map<int, std::shared_ptr<JobDescription>> _active_jobs;
     
+    // Collection of job IDs which finished (for checking dependencies).
+    robin_hood::unordered_flat_set<int, robin_hood::hash<int>> _done_jobs;
+    // Safeguards _done_jobs.
+    Mutex _done_job_lock; 
+
     std::map<int, int> _root_nodes;
     std::set<int> _client_ranks;
     int _num_alive_clients;
@@ -54,15 +69,14 @@ public:
     void init();
     void mainProgram();
 
-    void handleNewJob(std::shared_ptr<JobDescription> desc);
+    // Callback from JobFileAdapter when a new job's meta data were read
+    void handleNewJob(JobMetadata&& data);
 
 private:
-    void readAllInstances();
-    void readInstanceList(std::string& filename);
+    void readIncomingJobs(Logger log);
     void readFormula(std::string& filename, JobDescription& job);
 
     bool checkTerminate();
-    void checkClientDone();
 
     void handleRequestBecomeChild(MessageHandle& handle);
     void handleJobDone(MessageHandle& handle);
@@ -75,9 +89,7 @@ private:
     void handleExit(MessageHandle& handle);
 
     int getMaxNumParallelJobs();
-    int getNextIntroduceableJob();
-    bool isJobReady(int jobId);
-    void introduceJob(std::shared_ptr<JobDescription>& jobPtr);
+    void introduceNextJob();
     void finishJob(int jobId);
     
 };

@@ -80,7 +80,14 @@ public:
             // Read job files which may already exist
             if (_init_files_handling == TRIGGER_CREATE_EVENT) {
                 const std::filesystem::path newJobsPath { _directory };
+                std::vector<std::filesystem::directory_entry> files; 
                 for (const auto& entry : std::filesystem::directory_iterator(newJobsPath)) {
+                    files.push_back(entry);
+                }
+                sort(files.begin(), files.end(), [](const std::filesystem::directory_entry& a, const std::filesystem::directory_entry& b) { 
+                    return a.path().filename().string() < b.path().filename().string(); 
+                });
+                for (const auto& entry : files) {
                     const auto filenameStr = entry.path().filename().string();
                     if (entry.is_regular_file()) {
                         // Trigger CREATE event

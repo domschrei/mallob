@@ -83,7 +83,7 @@ The mallob-mono configuration for the SAT 2020 Cloud Track essentially correspon
 ```
 This runs four solver threads for each MPI process and writes all output to stdout as well as to the specified log directory, with moderate verbosity.
 
-### 2. Normal mode (JSON API)
+### 2. Scheduling mode (JSON API)
 
 Launch mallob without any particular options regarding its mode of operation. mallob then opens up a JSON API which can be used over the file system of any of the client nodes under `<base directory>/.api/`.
 
@@ -99,11 +99,15 @@ To introduce a job to the system, drop a JSON file in `.api/jobs/new/` structure
     "file": "/path/to/difficult/formula.cnf", 
     "priority": 0.7, 
     "wallclock-limit": "5m", 
-    "cpu-limit": "10h"
+    "cpu-limit": "10h",
+    "arrival": 10.3,
+    "dependencies": ["admin/prereq-job1", "admin/prereq-job2"]
 }
 ```    
 The essential fields are "user", "name", and "file". Job names must be unique for each user for each execution of mallob.
 In this example, a job is introduced with effective priority `<user-prio> * <job-prio> = 1.0 * 0.7 = 0.7`, with a wallclock limit of five minutes and a CPU limit of 10 CPUh (supply "0" or leave out these fields to keep the job unlimited).
+
+The "arrival" and "dependencies" fields are useful to test a particular preset scenario of jobs: The "arrival" field ensures that the job will be scheduled only after mallob ran for the specified amount of seconds. The "dependencies" field ensures that the job is scheduled only if all specified other jobs are already processed.
 
 mallob is notified by the kernel as soon as the file is placed in `.api/jobs/new/` and will immediately move the job description to `.api/jobs/pending/` and schedule the job.
 
@@ -132,30 +136,13 @@ In case of SAT, the solution field contains the found satisfying assignment.
 
 We plan to introduce further options and to provide more information over this API in the future.
 
-### 3. Static mode (scenario file(s))
-
-mallob takes an option `-scenario=<prefix>` which tells it to disable the JSON API and instead introduce jobs to the system according to special _scenario file_(s).
-If there are `n` clients, the files `<prefix>.0, <prefix>.1, ..., <prefix>.<n-1>` will be considered as scenario files for the respective clients.
-
-Each scenario file must be formatted like this:
-
-```
-# ID Arv. Prio. Filename
-1 5.00 0.3 instances/easy.cnf
-2 7.58 0.2 instances/hard_unsat.cnf
-3 13.37 0.99 instances/important.cnf
-[...]
-```
-IDs must be positive integers. Priorities must be in the interval `(0,1]`; greater numbers denote a higher priority. 
-Arrival times denote the point in time since program start where a given job _may_ enter the system; but depending on the program configuration (see `lbc` option below) the actual introduction of the job may be deferred to a later point in time.
-
 ### Options Overview
 
 All command-line options of mallob can be seen by executing mallob without any parameters or with the `-h` option.
 The exact options mallob uses, including all non-overridden default values, are printed out on program start at default verbosity.
 Here is some explanation for the most important ones.
 
-* `-c=<#clients>`: The number of designated client MPI processes. When a scenario file `-scenario=path/to/file.txt` is provided, the program assumes the existence of separate scenario files `path/to/file.txt.0`, `path/to/file.txt.1`, ..., `path/to/file.txt.<#clients-1>`. Note that this number will be subtracted from the amount of actual worker processes within your program execution: `#processes = #workers + #clients`. 
+* `-c=<#clients>`: The number of designated client MPI processes. Note that this number will be subtracted from the amount of actual worker processes within your program execution: `#processes = #workers + #clients`. 
 * `-lbc=<#jobs-per-client>`: Simulates "leaky bucket clients": each client process will strive to have exactly `<#jobs-per-client>` jobs in the system at any given time. As long as the amount of active jobs of this client is lower than this number, the client will introduce new jobs as possible. In other words, the provided number is the amount of _streams of jobs_ that each client wishes to be solved in parallel.
 * `-v=<verbosity>`: How verbose the output should be. `-v=6` is generally the highest supported verbosity and will generate very large log files (including a report for every single P2P message). Verbosity values of 3 or 4 are more moderate. For outputting to log files only and not to stdout, use the `-q` (quiet) option.
 * `-t=<#threads>`: Each mallob process will run `<#threads>` worker threads for each active job.

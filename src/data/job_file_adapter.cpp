@@ -18,8 +18,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
     nlohmann::json j;
     std::string userFile, jobName;
     int id;
-    float userPrio;
-    float arrival = Timer::elapsedSeconds();
+    float userPrio, arrival;
 
     {
         auto lock = _job_map_mutex.getLock();
@@ -46,11 +45,6 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         std::string name = j["name"].get<std::string>();
         jobName = user + "." + name + ".json";
 
-        if (_job_name_to_id.count(jobName)) {
-            log.log(V1_WARN, "Modification of a file I already parsed! Ignoring.\n");
-            return;
-        }
-
         // Get user definition
         userFile = getUserFilePath(user);
         nlohmann::json jUser;
@@ -70,9 +64,19 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
             return;
         }
         
-        id = _running_id++;
+        // Get internal ID for this job
+        if (!_job_name_to_id.count(jobName)) _job_name_to_id[jobName] = _running_id++;
+        id = _job_name_to_id[jobName];
+        log.log(V3_VERB, "Mapping job \"%s\" to internal ID #%i\n", jobName.c_str(), id);
+
+        // Was job already parsed before?
+        if (_job_id_to_image.count(id)) {
+            log.log(V1_WARN, "Modification of a file I already parsed! Ignoring.\n");
+            return;
+        }
+        
         userPrio = jUser["priority"].get<float>();
-        _job_name_to_id[jobName] = id;
+        arrival = j.contains("arrival") ? j["arrival"].get<float>() : Timer::elapsedSeconds();
         _job_id_to_image[id] = JobImage(id, jobName, event.name, arrival);
 
         // Remove original file, move to "pending"
@@ -82,7 +86,6 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
     }
 
     // Initialize new job
-    float time = Timer::elapsedSeconds();
     float priority = userPrio * (j.contains("priority") ? j["priority"].get<float>() : 1.0f);
     if (_params.isNotNull("jjp")) {
         // Jitter job priority
@@ -90,28 +93,37 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
     }
     JobDescription* job = new JobDescription(id, priority, /*incremental=*/false);
     if (j.contains("wallclock-limit")) {
-        job->setWallclockLimit(TimePeriod(j["wallclock-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS));
-        log.log(V4_VVER, "Job #%i : wallclock time limit %i secs\n", id, job->getWallclockLimit());
+        float limit = TimePeriod(j["wallclock-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS);
+        job->setWallclockLimit(limit);
+        log.log(V4_VVER, "Job #%i : wallclock time limit %.3f secs\n", id, limit);
     }
     if (j.contains("cpu-limit")) {
-        job->setCpuLimit(TimePeriod(j["cpu-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS));
-        log.log(V4_VVER, "Job #%i : CPU time limit %i CPUs\n", id, job->getCpuLimit());
+        float limit = TimePeriod(j["cpu-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS);
+        job->setCpuLimit(limit);
+        log.log(V4_VVER, "Job #%i : CPU time limit %.3f CPU secs\n", id, limit);
     }
     job->setArrival(arrival);
-    
-    // Parse CNF input file
     std::string file = j["file"].get<std::string>();
-    SatReader r(file);
-    bool success = r.read(*job);
-    if (!success) {
-        log.log(V1_WARN, "File %s could not be opened - skipping #%i\n", file.c_str(), id);
-        return;
+    
+    // Translate dependencies (if any) to internal job IDs
+    std::vector<int> idDependencies;
+    std::vector<std::string> nameDependencies;
+    if (j.contains("dependencies")) nameDependencies = j["dependencies"].get<std::vector<std::string>>();
+    const std::string ending = ".json";
+    for (auto name : nameDependencies) {
+        // Convert to the name with ".json" file ending
+        name += ending;
+        // If the job is not yet known, assign to it a new ID
+        // that will be used by the job later
+        if (!_job_name_to_id.count(name)) {
+            _job_name_to_id[name] = _running_id++;
+            log.log(V3_VERB, "Forward mapping job \"%s\" to internal ID #%i\n", name.c_str(), _job_name_to_id[name]);
+        }
+        idDependencies.push_back(_job_name_to_id[name]);
     }
-    time = Timer::elapsedSeconds() - time;
-    log.log(V3_VERB, "Initialized job #%i (%s) in %.3fs: %ld lits w/ separators\n", id, userFile.c_str(), time, job->getFormulaSize());
 
     // Callback to client: New job arrival.
-    _new_job_callback(std::shared_ptr<JobDescription>(job));
+    _new_job_callback(JobMetadata{std::shared_ptr<JobDescription>(job), file, idDependencies});
 }
 
 void JobFileAdapter::handleJobDone(const JobResult& result) {

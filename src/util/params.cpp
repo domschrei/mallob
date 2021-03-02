@@ -11,16 +11,13 @@ const char* OPTIONS =
     "\n\nModes of operation:"
     "\nBy default, the JSON API to dynamically introduce jobs is enabled."
     "\nTo resolve a single SAT instance, use -mono."
-    "\nTo test mallob under a fixed scenario of jobs to be processed, use -scenario."
     "\n-c=<num-clients>      Amount of client nodes (int c >= 1, or 0 iff -mono is set)"
     "\n-h|-help              Print usage and set parameters, then quit"
-    "\n-lbc=<num-jobs>       Make each client a leaky bucket with x active jobs at any given time"
-    "\n                      (int x >= 0, 0: jobs arrive at individual times instead)"
+    "\n-lbc=<num-jobs>       Make each client a leaky bucket with up to x active jobs at any given time"
+    "\n                      (int x >= 0, 0: no limit)"
     "\n-mono=<filename>      Mono instance: Solve the provided CNF instance with full power, then exit."
     "\n                      NOTE: Overrides options; see mallob -mono=<filename> -h"
-    "\n-scenario=<prefix>    Do not use JSON API but instead read jobs from static scenario files"
-    "\n                      <prefix>.0 , ... , <prefix>.<#clients-1>"
-
+    
     "\n\nSystem options:"
     "\n-appmode=<mode>       Application mode: \"fork\" (spawn child process for each job on each MPI process)"
     "\n                      or \"thread\" (execute jobs in separate threads but within the same process)"
@@ -152,7 +149,6 @@ void Parameters::setDefaults() {
     setParam("s", "1.0"); // job communication period (seconds)
     setParam("s2f", ""); // write solutions to file (file path, or empty string for no writing)
     setParam("satsolver", "l"); // which SAT solvers to cycle through
-    //setParam("scenario", "<filename>"); // set base name of scenario(s) to be simulated
     setParam("sleep", "100"); // microsecs to sleep in between worker main loop cycles
     setParam("T", "0"); // total time to run the system (0 = no limit)
     setParam("t", "1"); // num threads per node

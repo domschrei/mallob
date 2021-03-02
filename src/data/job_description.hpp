@@ -4,7 +4,7 @@
 #include <vector>
 #include <cstring>
 
-#include "serializable.hpp"
+#include "data/serializable.hpp"
 
 typedef std::shared_ptr<std::vector<int>> VecPtr;
 
