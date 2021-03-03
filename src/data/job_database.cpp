@@ -290,14 +290,14 @@ void JobDatabase::forgetOldJobs() {
         if (job.hasReceivedDescription()) numJobsWithDescription++;
         if (job.hasCommitment()) continue;
         // Old inactive job
-        if (job.getState() == INACTIVE && job.getAge() >= 60) {
+        if (job.getState() == INACTIVE && job.getAge() >= 10) {
             jobsToForget.push_back(id);
             continue;
         }
         // Past jobs
         if (job.getState() == PAST) {
-            // If job is past, it must have been so for at least 60 seconds
-            if (job.getAgeSinceAbort() < 60) continue;
+            // If job is past, it must have been so for at least 10 seconds
+            if (job.getAgeSinceAbort() < 10) continue;
             // If the node found a result, it must have been already transferred
             if (job.isResultTransferPending()) continue;
             jobsToForget.push_back(id);
@@ -319,7 +319,7 @@ void JobDatabase::forgetOldJobs() {
     }
 
     if (!_jobs.empty())
-        log(V3_VERB, "%i resident jobs, %i with desc.\n", _jobs.size(), numJobsWithDescription);
+        log(V3_VERB, "%i resident jobs\n", _jobs.size());
     
     // Perform forgetting of jobs
     for (int jobId : jobsToForget) {
