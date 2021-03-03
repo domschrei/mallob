@@ -101,6 +101,7 @@ void Client::readIncomingJobs(Logger log) {
                 delete flag;
                 it = readerTasks.erase(it);
                 --it;
+                _sys_state.addLocal(SYSSTATE_PARSED_JOBS, 1);
             }
         }
 
@@ -114,9 +115,12 @@ void Client::readIncomingJobs(Logger log) {
 }
 
 void Client::handleNewJob(JobMetadata&& data) {
-    auto lock = _incoming_job_lock.getLock();
-    _incoming_job_queue.insert(std::move(data));
+    {
+        auto lock = _incoming_job_lock.getLock();
+        _incoming_job_queue.insert(std::move(data));
+    }
     _num_incoming_jobs++;
+    _sys_state.addLocal(SYSSTATE_ENTERED_JOBS, 1);
 }
 
 void Client::init() {
@@ -124,7 +128,7 @@ void Client::init() {
     int internalRank = MyMpi::rank(_comm);
 
     _file_adapter = std::unique_ptr<JobFileAdapter>(
-        new JobFileAdapter(_params, 
+        new JobFileAdapter(internalRank, _params, 
             Logger::getMainInstance().copy("API", "#0."),
             ".api/jobs." + std::to_string(internalRank) + "/", 
             [&](JobMetadata&& data) {handleNewJob(std::move(data));}
@@ -153,18 +157,6 @@ bool Client::checkTerminate() {
     }
     if (Timer::globalTimelimReached(_params)) {
         log(V2_INFO, "Global timeout: terminating\n");
-        Terminator::setTerminating();
-        return true;
-    }
-    if (_num_alive_clients == 0) {
-        // Send exit message to part of workers
-        log(V3_VERB, "Clients done: sending EXIT to workers\n");
-
-        // Send MSG_EXIT to worker of rank 0, which will broadcast it
-        MyMpi::isend(MPI_COMM_WORLD, 0, MSG_DO_EXIT, IntVec({0}));
-
-        // Force send all handles before exiting
-        while (MyMpi::hasOpenSentHandles()) MyMpi::testSentHandles();
         Terminator::setTerminating();
         return true;
     }
@@ -215,8 +207,6 @@ void Client::mainProgram() {
                 handleQueryJobRevisionDetails(handle);
             } else if (handle.tag == MSG_CONFIRM_JOB_REVISION_DETAILS) {
                 handleAckJobRevisionDetails(handle);
-            } else if (handle.tag == MSG_CLIENT_FINISHED) {
-                handleClientFinished(handle);
             }  else if (handle.tag == MSG_DO_EXIT) {
                 handleExit(handle);
             } else {
@@ -225,6 +215,26 @@ void Client::mainProgram() {
         }
 
         MyMpi::testSentHandles();
+        
+        // Advance an all-reduction of the current system state
+        if (_sys_state.aggregate(time)) {
+            float* result = _sys_state.getGlobal();
+            int processed = (int)result[SYSSTATE_PROCESSED_JOBS];
+            int verb = (MyMpi::rank(_comm) == 0 ? V2_INFO : V5_DEBG);
+            log(verb, "sysstate entered=%i parsed=%i scheduled=%i processed=%i\n", 
+                        (int)result[SYSSTATE_ENTERED_JOBS], 
+                        (int)result[SYSSTATE_PARSED_JOBS], 
+                        (int)result[SYSSTATE_SCHEDULED_JOBS], 
+                        processed);
+            int jobLimit = _params.getIntParam("J");
+            if (jobLimit > 0 && processed >= jobLimit) {
+                log(V2_INFO, "Job limit reached.\n");
+                // Job limit reached - exit
+                Terminator::setTerminating();
+                // Send MSG_EXIT to worker of rank 0, which will broadcast it
+                MyMpi::isend(MPI_COMM_WORLD, 0, MSG_DO_EXIT, IntVec({0}));
+            }
+        }
 
         // Sleep for a bit
         usleep(1000); // 1000 = 1 millisecond
@@ -263,6 +273,7 @@ void Client::introduceNextJob() {
     JobDescription& job = *jobPtr;
     int jobId = job.getId();
     _active_jobs[jobId] = jobPtr;
+    _sys_state.addLocal(SYSSTATE_SCHEDULED_JOBS, 1);
 
     // Set actual job arrival
     job.setArrival(Timer::elapsedSeconds());
@@ -394,6 +405,7 @@ void Client::finishJob(int jobId) {
     }
     _root_nodes.erase(jobId);
     _active_jobs.erase(jobId);
+    _sys_state.addLocal(SYSSTATE_PROCESSED_JOBS, 1);
 
     introduceNextJob();
 }
@@ -420,11 +432,6 @@ void Client::handleAckJobRevisionDetails(MessageHandle& handle) {
     
     // TODO not implemented
     abort();
-}
-
-void Client::handleClientFinished(MessageHandle& handle) {
-    // Some other client is done
-    _num_alive_clients--;
 }
 
 void Client::handleExit(MessageHandle& handle) {

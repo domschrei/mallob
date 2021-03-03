@@ -13,6 +13,12 @@
 #include "util/sys/threading.hpp"
 #include "data/job_file_adapter.hpp"
 #include "data/job_metadata.hpp"
+#include "comm/sysstate.hpp"
+
+#define SYSSTATE_ENTERED_JOBS 0
+#define SYSSTATE_PARSED_JOBS 1
+#define SYSSTATE_SCHEDULED_JOBS 2
+#define SYSSTATE_PROCESSED_JOBS 3
 
 struct JobByArrivalComparator {
     inline bool operator() (const JobMetadata& struct1, const JobMetadata& struct2) const {
@@ -40,7 +46,7 @@ private:
     // For jobs which have been fully read and initialized
     // and whose prerequisites for activation are met.
     std::list<std::shared_ptr<JobDescription>> _ready_job_queue;
-    std::atomic<int> _num_ready_jobs = 0;
+    std::atomic_int _num_ready_jobs = 0;
     // Safeguards _ready_job_queue.
     Mutex _ready_job_lock;
 
@@ -54,17 +60,15 @@ private:
 
     std::map<int, int> _root_nodes;
     std::set<int> _client_ranks;
-    int _num_alive_clients;
+    SysState<4> _sys_state;
 
     std::thread _instance_reader_thread;
     std::unique_ptr<JobFileAdapter> _file_adapter;
 
 public:
     Client(MPI_Comm comm, Parameters& params, std::set<int> clientRanks)
-        : _comm(comm), _params(params), _client_ranks(clientRanks) {
-        _world_rank = MyMpi::rank(MPI_COMM_WORLD);
-        _num_alive_clients = MyMpi::size(comm);
-    };
+        : _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
+        _params(params), _client_ranks(clientRanks), _sys_state(_comm) {}
     ~Client();
     void init();
     void mainProgram();

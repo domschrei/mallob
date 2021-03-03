@@ -133,11 +133,6 @@ A message that tells some node (worker or client) to immediately exit the applic
 */
 const int MSG_DO_EXIT = 25;
 /*
-A client tells another client that the sender is now out of jobs to introduce to the system.
-Used to detect early termination.
-*/
-const int MSG_CLIENT_FINISHED = 26;
-/*
 Some data is being reduced or broadcast via a custom operation.
 */
 const int MSG_COLLECTIVE_OPERATION = 27;

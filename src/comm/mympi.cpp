@@ -115,8 +115,7 @@ void MyMpi::init(int argc, char *argv[]) {
     tagList.emplace_back(MSG_REDUCE_DATA,                   true);
     tagList.emplace_back(MSG_BROADCAST_DATA,                true);
     tagList.emplace_back(MSG_COLLECTIVE_OPERATION,          false);
-    tagList.emplace_back(MSG_CONFIRM_ADOPTION,              true); 
-    tagList.emplace_back(MSG_CLIENT_FINISHED,               true);
+    tagList.emplace_back(MSG_CONFIRM_ADOPTION,              true);
     tagList.emplace_back(MSG_DO_EXIT,                       true);   
     tagList.emplace_back(MSG_REQUEST_NODE,                  true);
     tagList.emplace_back(MSG_REQUEST_NODE_ONESHOT,          true);

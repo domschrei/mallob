@@ -37,7 +37,7 @@ private:
 
     Mutex _job_map_mutex;
     std::function<void(JobMetadata&&)> _new_job_callback;
-    std::atomic_int _running_id = 1;
+    std::atomic_int _running_id;
     
     std::string _base_path;
     FileWatcher _new_jobs_watcher;
@@ -47,12 +47,13 @@ private:
 
 public:
 
-    JobFileAdapter(const Parameters& params, Logger&& logger, const std::string& basePath, 
+    JobFileAdapter(int clientRank, const Parameters& params, Logger&& logger, const std::string& basePath, 
                         std::function<void(JobMetadata&&)> newJobCallback) : 
         _params(params),
         _logger(std::move(logger)),
         _job_map_mutex(),
         _new_job_callback(newJobCallback),
+        _running_id(clientRank * 100000 + 1),
         _base_path(basePath),
         _new_jobs_watcher(_base_path + "/new/", (int) (IN_MOVED_TO | IN_MODIFY | IN_CLOSE_WRITE), 
             [&](const FileWatcher::Event& event, Logger& log) {handleNewJob(event, log);},

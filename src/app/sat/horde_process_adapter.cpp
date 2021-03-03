@@ -82,8 +82,8 @@ void HordeProcessAdapter::initSharedMemory() {
 }
 
 HordeProcessAdapter::~HordeProcessAdapter() {
-    for (auto& shmem : _shmem) {
-        SharedMemory::free(std::get<0>(shmem), (char*)std::get<1>(shmem), std::get<2>(shmem));
+    for (auto& [name, addr, size] : _shmem) {
+        SharedMemory::free(name, (char*)addr, size);
     }
 }
 
@@ -200,7 +200,7 @@ std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
     // and remember to clean it up later when destructing the adapter
     int* shmemSolution = (int*) SharedMemory::access(_shmem_id + ".solution", solution.size()*sizeof(int));
     memcpy(solution.data(), shmemSolution, solution.size()*sizeof(int));
-    _shmem.push_back(std::tuple<std::string, void*, int>(_shmem_id + ".solution", shmemSolution, solution.size()*sizeof(int)));
+    _shmem.emplace_back(_shmem_id + ".solution", (void*)shmemSolution, solution.size()*sizeof(int));
     
     return std::pair<SatResult, std::vector<int>>(_hsm->result, solution);
 }

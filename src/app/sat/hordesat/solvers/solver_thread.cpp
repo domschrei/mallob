@@ -90,7 +90,7 @@ void SolverThread::read() {
         
         //waitWhile(SUSPENDED);
         //if (cancelRun()) break;
-        if (cancelThread()) break;
+        if (cancelThread()) return;
 
         size_t limit = std::min(start+batchSize, _f_size);
         for (size_t i = start; i < limit; i++) {

@@ -13,11 +13,13 @@ const char* OPTIONS =
     "\nTo resolve a single SAT instance, use -mono."
     "\n-c=<num-clients>      Amount of client nodes (int c >= 1, or 0 iff -mono is set)"
     "\n-h|-help              Print usage and set parameters, then quit"
+    "\n-J=<num-jobs>         Exit as soon as <num-jobs> jobs have been processed"
     "\n-lbc=<num-jobs>       Make each client a leaky bucket with up to x active jobs at any given time"
     "\n                      (int x >= 0, 0: no limit)"
     "\n-mono=<filename>      Mono instance: Solve the provided CNF instance with full power, then exit."
-    "\n                      NOTE: Overrides options; see mallob -mono=<filename> -h"
-    
+    "\n                      NOTE: Overrides some options; see mallob -mono=<filename> -h"
+    "\n-T=<time-limit>       Run entire system for at most x seconds (x >= 0; 0: run indefinitely)"
+
     "\n\nSystem options:"
     "\n-appmode=<mode>       Application mode: \"fork\" (spawn child process for each job on each MPI process)"
     "\n                      or \"thread\" (execute jobs in separate threads but within the same process)"
@@ -29,7 +31,6 @@ const char* OPTIONS =
     "\n-sleep=<micros>       Sleep provided number of microseconds between loop cycles of worker main thread"
     "\n-slpp=<limit>         Size limit per process: no more than max(1, floor(<limit>/<jobsize>)) threads"
     "\n                      are spawned per process (0: no limit)"
-    "\n-T=<time-limit>       Run entire system for x seconds (x >= 0; 0: run indefinitely)"
     "\n-t=<num-threads>      Amount of worker threads per node (int t >= 1)"
     "\n-warmup[=<0|1>]       Do one explicit All-To-All warmup among all nodes in the beginning"
     "\n-yield[=<0|1>]        Yield manager thread whenever there are no new messages"
@@ -131,6 +132,7 @@ void Parameters::setDefaults() {
     setParam("g", "5.0"); // job demand growth interval
     //setParam("h"); setParam("help"); // print usage
     setParam("icpr", "0.8"); // increase clause production ratio
+    setParam("J", "0"); // exit after this number of jobs has been processed (0 = no limit)
     setParam("jc", "4"); // job cache
     setParam("jjp", "1"); // jitter job priorities
     setParam("l", "0.95"); // load factor

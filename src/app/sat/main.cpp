@@ -178,18 +178,13 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
         }
     }
 
-    SharedMemory::free(fId, (char*)fPtr, fSize);
-    SharedMemory::free(aId, (char*)aPtr, aSize);
-    SharedMemory::free(shmemId + ".clauseexport", (char*)exportBuffer, maxExportBufferSize);
-    SharedMemory::free(shmemId + ".clauseimport", (char*)importBuffer, maxImportBufferSize);
-    if (!solutionShmemId.empty()) SharedMemory::free(solutionShmemId, solutionShmem, solutionShmemSize);
     hsm->didTerminate = true;
-    SharedMemory::free(shmemId, (char*)hsm, sizeof(HordeSharedMemory));
-
     log.flush();
     
     // Exit normally, but avoid calling destructors (some threads may be unresponsive)
     raise(SIGTERM);
+
+    // Shared memory will be cleaned up by the parent process.
 }
 
 int main(int argc, char *argv[]) {
