@@ -56,24 +56,24 @@ void Client::readIncomingJobs(Logger log) {
                 // Job can be read
                 foundJob = data;
                 auto finishedFlag = new std::atomic_bool(false);
-                readerTasks.emplace_back([this, &log, data, finishedFlag]() {
+                readerTasks.emplace_back([this, &log, foundJob, finishedFlag]() {
 
                     // Read job
-                    int id = data.description->getId();
+                    int id = foundJob.description->getId();
                     float time = Timer::elapsedSeconds();
-                    SatReader r(data.file);
-                    log.log(V3_VERB, "[T] Reading job #%i (%s) ...\n", id, data.file.c_str());
-                    bool success = r.read(*data.description);
+                    SatReader r(foundJob.file);
+                    log.log(V3_VERB, "[T] Reading job #%i (%s) ...\n", id, foundJob.file.c_str());
+                    bool success = r.read(*foundJob.description);
                     if (!success) {
-                        log.log(V1_WARN, "[T] File %s could not be opened - skipping #%i\n", data.file.c_str(), id);
+                        log.log(V1_WARN, "[T] File %s could not be opened - skipping #%i\n", foundJob.file.c_str(), id);
                     } else {
                         time = Timer::elapsedSeconds() - time;
                         log.log(V3_VERB, "[T] Initialized job #%i (%s) in %.3fs: %ld lits w/ separators\n", 
-                                id, data.file.c_str(), time, data.description->getFormulaSize());
+                                id, foundJob.file.c_str(), time, foundJob.description->getFormulaSize());
                         
                         // Enqueue in ready jobs
                         auto lock = _ready_job_lock.getLock();
-                        _ready_job_queue.emplace_back(data.description);
+                        _ready_job_queue.emplace_back(foundJob.description);
                         _num_ready_jobs++;
                     }
                     *finishedFlag = true;
@@ -110,6 +110,7 @@ void Client::readIncomingJobs(Logger log) {
     }
 
     log.log(V3_VERB, "Stopping\n");
+    log.flush();
 
     for (auto& [thread, flag] : readerTasks) thread.join();
 }

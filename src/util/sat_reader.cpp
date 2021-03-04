@@ -35,7 +35,7 @@ bool SatReader::read(JobDescription& desc) {
 		if (fd == -1) return false;
 		char* f;
 
-		int size;
+		off_t size;
     	struct stat s;
 		int status = stat(_filename.c_str(), &s);
 		if (status == -1) return false;
