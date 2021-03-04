@@ -106,20 +106,29 @@ bool JobDatabase::isRequestObsolete(const JobRequest& req) {
     // Requests for a job root never become obsolete
     if (req.requestedNodeIndex == 0) return false;
 
-    // Does this node KNOW that the request is already completed?
-    if (!isIdle() && req.jobId == getActive().getId()) {
+    if (has(req.jobId)) {
         Job& job = get(req.jobId);
-        if (req.requestedNodeIndex == job.getIndex()
-        || (job.getJobTree().hasLeftChild() && req.requestedNodeIndex == job.getJobTree().getLeftChildIndex())
-        || (job.getJobTree().hasRightChild() && req.requestedNodeIndex == job.getJobTree().getRightChildIndex())) {
-            // Request completed!
-            log(V4_VVER, "Req. %s : already completed\n", job.toStr());
-            return true;
-        }
         if (job.getState() == PAST) {
             // Job has already terminated!
-            log(V4_VVER, "Req. %s : past job\n", job.toStr());
+            log(V4_VVER, "%s : past job\n", req.toStr().c_str());
             return true;
+        }
+        if (job.getState() == ACTIVE) {
+            // Does this node KNOW that the request is already completed?
+            if (req.requestedNodeIndex == job.getIndex()
+            || (job.getJobTree().hasLeftChild() && req.requestedNodeIndex == job.getJobTree().getLeftChildIndex())
+            || (job.getJobTree().hasRightChild() && req.requestedNodeIndex == job.getJobTree().getRightChildIndex())) {
+                // Request already completed!
+                log(V4_VVER, "%s : already completed\n", req.toStr().c_str());
+                return true;
+            }
+            // Am I the transitive parent of the request and do I know
+            // that the job's volume does not allow for this node any more? 
+            if (job.getVolume() > 0 && job.getVolume() <= req.requestedNodeIndex 
+                    && job.getJobTree().isTransitiveParentOf(req.requestedNodeIndex)) {
+                log(V4_VVER, "%s : new volume too small\n", req.toStr().c_str());
+                return true;
+            }
         }
     }
     
@@ -191,52 +200,62 @@ void JobDatabase::uncommit(int jobId) {
     }
 }
 
-bool JobDatabase::tryAdopt(const JobRequest& req, bool oneshot, int& removedJob) {
+JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, bool oneshot, int sender, int& removedJob) {
 
     // Decide whether job should be adopted or bounced to another node
     removedJob = -1;
     
     // Already have another commitment?
-    if (_has_commitment) return false;
+    if (_has_commitment) return REJECT;
 
-    // Know that the job already finished?
-    if (has(req.jobId) && get(req.jobId).getState() == PAST) {
-        log(V4_VVER, "Reject req. %s : already finished\n", 
-                        toStr(req.jobId, req.requestedNodeIndex).c_str());
-        return false;
+    if (has(req.jobId)) {
+        // Know that the job already finished?
+        Job& job = get(req.jobId);
+        if (job.getState() == PAST) {
+            log(V4_VVER, "Reject req. %s : already finished\n", 
+                            toStr(req.jobId, req.requestedNodeIndex).c_str());
+            return DISCARD;
+        }
     }
 
     // Node is idle and not committed to another job
     if (isIdle()) {
-        if (!oneshot) return true;
+        if (!oneshot) return ADOPT_FROM_IDLE;
         // Oneshot request: Job must be present and suspended
-        else return (has(req.jobId) && get(req.jobId).getState() == SUSPENDED);
+        else return (has(req.jobId) && get(req.jobId).getState() == SUSPENDED ? ADOPT_FROM_IDLE : REJECT);
     }
 
     // Request for a root node exceeded max #hops: 
     // Possibly adopt the job while dismissing the active job
-    if (req.requestedNodeIndex == 0 && req.numHops > 32) {
+    if (req.requestedNodeIndex == 0 && req.numHops >= 32) {
 
-        // Does not work if this node already works on that job
-        if (has(req.jobId) && get(req.jobId).getState() == ACTIVE)
-            return false;
+        // Adoption only works if this node does not yet compute for that job
+        if (!has(req.jobId) || get(req.jobId).getState() != ACTIVE) {
 
-        // Current job must be a non-root leaf node
-        Job& job = getActive();
-        if (job.getState() == ACTIVE && !job.getJobTree().isRoot() && job.getJobTree().isLeaf()) {
-            
-            // Inform parent node of the original job  
-            log(V4_VVER, "Suspend %s ...\n", job.toStr());
-            log(V4_VVER, "... to adopt starving %s\n", 
-                            toStr(req.jobId, req.requestedNodeIndex).c_str());
+            // Current job must be a non-root leaf node
+            Job& job = getActive();
+            if (job.getState() == ACTIVE && !job.getJobTree().isRoot() && job.getJobTree().isLeaf()) {
+                
+                // Inform parent node of the original job  
+                log(V4_VVER, "Suspend %s ...\n", job.toStr());
+                log(V4_VVER, "... to adopt starving %s\n", 
+                                toStr(req.jobId, req.requestedNodeIndex).c_str());
 
-            removedJob = job.getId();
-            suspend(removedJob);
-            return true;
+                removedJob = job.getId();
+                suspend(removedJob);
+                return ADOPT_REPLACE_CURRENT;
+            }
+        }
+
+        // Adoption did not work out: Defer the request if a certain #hops is reached
+        if (req.numHops % std::max(32, MyMpi::size(_comm)) == 0) {
+            log(V3_VERB, "Defer %s\n", req.toStr().c_str());
+            _deferred_requests.emplace_back(Timer::elapsedSeconds(), sender, req);
+            return DEFER;
         }
     }
 
-    return false;
+    return REJECT;
 }
 
 void JobDatabase::reactivate(const JobRequest& req, int source) {
@@ -325,6 +344,22 @@ void JobDatabase::forgetOldJobs() {
     for (int jobId : jobsToForget) {
         forget(jobId);
     }
+}
+
+std::vector<std::pair<JobRequest, int>>  JobDatabase::getDeferredRequestsToForward(float time) {
+    
+    std::vector<std::pair<JobRequest, int>> result;
+    for (auto& [deferredTime, senderRank, req] : _deferred_requests) {
+        if (time - deferredTime < 1.0f) break;
+        result.emplace_back(std::move(req), senderRank);
+        log(V3_VERB, "Reactivate deferred %s\n", req.toStr().c_str());
+    }
+
+    for (size_t i = 0; i < result.size(); i++) {
+        _deferred_requests.pop_front();
+    }
+
+    return result;
 }
 
 bool JobDatabase::has(int id) const {

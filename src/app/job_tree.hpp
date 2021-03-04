@@ -143,6 +143,23 @@ public:
             _dormant_children_num_fails.erase(rank);
     }
 
+    bool isTransitiveParentOf(int index) {
+        if (index == _index) return true;
+        int lower = _index, upper = _index;
+        while (lower < _comm_size) {
+            lower = getLeftChildIndex(lower);
+            upper = getRightChildIndex(upper);
+            if (lower <= index && index <= upper) return true;
+            if (index < lower) return false;
+        }
+        return false;
+    }
+
+private:
+    static int getLeftChildIndex(int index) {return 2*(index+1)-1;}
+    static int getRightChildIndex(int index) {return 2*(index+1);}
+    static int getParentIndex(int index) {return (index-1)/2;}    
+
 };
 
 #endif

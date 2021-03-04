@@ -3,6 +3,7 @@
 #define DOMPASCH_MALLOB_JOB_DATABASE_HPP
 
 #include <thread>
+#include <list>
 
 #include "util/robin_hood.hpp"
 #include "app/job.hpp"
@@ -28,6 +29,8 @@ private:
     Job* _current_job;
     float _last_balancing_initiation;
 
+    std::list<std::tuple<float, int, JobRequest>> _deferred_requests;
+
     struct SuspendedJobComparator {
         bool operator()(const std::pair<int, float>& left, const std::pair<int, float>& right) {
             return left.second < right.second;
@@ -50,7 +53,8 @@ public:
     const JobRequest& getCommitment(int jobId);
     void uncommit(int jobId);
 
-    bool tryAdopt(const JobRequest& req, bool oneshot, int& removedJob);
+    enum AdoptionResult {ADOPT_FROM_IDLE, ADOPT_REPLACE_CURRENT, REJECT, DEFER, DISCARD};
+    AdoptionResult tryAdopt(const JobRequest& req, bool oneshot, int sender, int& removedJob);
     
     void reactivate(const JobRequest& req, int source);
     void suspend(int jobId);
@@ -59,6 +63,8 @@ public:
     void forgetOldJobs();
     void forget(int jobId);
     void free(int jobId);
+
+    std::vector<std::pair<JobRequest, int>> getDeferredRequestsToForward(float time);
 
     bool isTimeForRebalancing();
     bool beginBalancing();

@@ -77,6 +77,7 @@ void Job::suspend() {
     assertState(ACTIVE);
     _state = SUSPENDED;
     appl_suspend();
+    _volume = 0;
     log(V4_VVER, "%s : suspended solver\n", toStr());
 }
 
@@ -90,6 +91,7 @@ void Job::resume() {
 void Job::terminate() {
     assertState(INACTIVE);
     _state = PAST;
+    _volume = 0;
 
     appl_terminate();
 

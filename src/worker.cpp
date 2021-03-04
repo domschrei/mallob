@@ -154,11 +154,13 @@ void Worker::mainProgram() {
     float lastMemCheckTime = Timer::elapsedSeconds();
     float lastJobCheckTime = lastMemCheckTime;
     float lastBalanceCheckTime = lastMemCheckTime;
+    float lastMaintenanceCheckTime = lastMemCheckTime;
 
     float sleepMicrosecs = _params.getFloatParam("sleep");
     float memCheckPeriod = 3.0;
     float jobCheckPeriod = 0.01;
     float balanceCheckPeriod = 0.01;
+    float maintenanceCheckPeriod = 1.0;
     bool doYield = _params.isNotNull("yield");
 
     Watchdog watchdog(/*checkIntervMillis=*/60*1000, lastMemCheckTime);
@@ -191,12 +193,6 @@ void Worker::mainProgram() {
 
             // For the current job
             if (!_job_db.isIdle()) _job_db.getActive().appl_dumpStats();
-
-            // Forget jobs that are old or wasting memory
-            _job_db.forgetOldJobs();
-
-            // Reset watchdog
-            watchdog.reset(time);
         }
 
         // Advance load balancing operations
@@ -206,7 +202,23 @@ void Worker::mainProgram() {
                 if (_job_db.beginBalancing()) applyBalancing();
             } 
             if (_job_db.continueBalancing()) applyBalancing();
-        } 
+        }
+
+        // Do diverse periodic maintenance tasks
+        if (time - lastMaintenanceCheckTime > maintenanceCheckPeriod) {
+            lastMaintenanceCheckTime = time;
+
+            // Forget jobs that are old or wasting memory
+            _job_db.forgetOldJobs();
+
+            // Reset watchdog
+            watchdog.reset(time);
+
+            // Continue to bounce requests which were deferred earlier
+            for (auto& [req, senderRank] : _job_db.getDeferredRequestsToForward(time)) {
+                bounceJobRequest(req, senderRank);
+            }
+        }
 
         // Check active job
         if (time - lastJobCheckTime >= jobCheckPeriod) {
@@ -405,9 +417,10 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
     }
 
     int removedJob;
-    bool adopts = _job_db.tryAdopt(req, oneshot, removedJob);
-    if (adopts) {
-        if (removedJob >= 0) {
+    auto adoptionResult = _job_db.tryAdopt(req, oneshot, handle.source, removedJob);
+    if (adoptionResult == JobDatabase::ADOPT_FROM_IDLE || adoptionResult == JobDatabase::ADOPT_REPLACE_CURRENT) {
+
+        if (adoptionResult == JobDatabase::ADOPT_REPLACE_CURRENT) {
             Job& job = _job_db.get(removedJob);
             IntPair pair(job.getId(), job.getIndex());
             MyMpi::isend(MPI_COMM_WORLD, job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, pair);
@@ -433,7 +446,7 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
         _job_db.commit(req);
         MyMpi::isend(MPI_COMM_WORLD, req.requestingNodeRank, MSG_OFFER_ADOPTION, req);
 
-    } else {
+    } else if (adoptionResult == JobDatabase::REJECT) {
         if (oneshot) {
             log(LOG_ADD_DESTRANK | V5_DEBG, "decline oneshot request for %s", handle.source, 
                         _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
@@ -586,12 +599,22 @@ void Worker::handleQueryVolume(MessageHandle& handle) {
     IntVec payload = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = payload[0];
 
-    // No volume of this job (yet?) -- ignore.
+    // Unknown job? -- ignore.
     if (!_job_db.has(jobId)) return;
 
-    int volume = _job_db.get(jobId).getVolume();
-    IntVec response({jobId, volume});
+    Job& job = _job_db.get(jobId);
+    int volume = job.getVolume();
+    
+    // Volume is unknown right now? Query parent recursively. 
+    // (Answer will flood back to the entire subtree)
+    if (job.getState() == ACTIVE && volume == 0) {
+        assert(!job.getJobTree().isRoot());
+        MyMpi::isend(MPI_COMM_WORLD, job.getJobTree().getParentNodeRank(), MSG_QUERY_VOLUME, handle.getRecvData());
+        return;
+    }
 
+    // Send response
+    IntVec response({jobId, volume});
     log(LOG_ADD_DESTRANK | V4_VVER, "Answer #%i volume query with v=%i", handle.source, jobId, volume);
     MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_NOTIFY_VOLUME_UPDATE, response);
 }
@@ -817,7 +840,7 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
 
     // Show warning if #hops is a large power of two
     if ((num >= 512) && ((num & (num - 1)) == 0)) {
-        log(V1_WARN, "[WARN] Hop no. %i for %s\n", num, _job_db.toStr(request.jobId, request.requestedNodeIndex).c_str());
+        log(V1_WARN, "[WARN] %s\n", request.toStr().c_str());
     }
 
     int nextRank;
