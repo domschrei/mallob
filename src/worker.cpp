@@ -361,7 +361,7 @@ void Worker::handleDoExit(MessageHandle& handle) {
         MyMpi::isend(MPI_COMM_WORLD, _world_rank*2+1, MSG_DO_EXIT, handle.getRecvData());
     if (_world_rank*2+2 < MyMpi::size(MPI_COMM_WORLD))
         MyMpi::isend(MPI_COMM_WORLD, _world_rank*2+2, MSG_DO_EXIT, handle.getRecvData());
-    while (MyMpi::hasOpenSentHandles()) MyMpi::testSentHandles();
+    MyMpi::testSentHandles();
 
     Terminator::setTerminating();
 }
