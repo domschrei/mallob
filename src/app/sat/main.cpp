@@ -27,27 +27,35 @@ Logger getLog(const Parameters& params) {
     return Logger::getMainInstance().copy("<" + params.getParam("jobstr") + ">", "#" + params.getParam("jobid") + ".");
 }
 
+void* accessMemory(const Logger& log, const std::string& shmemId, size_t size) {
+    void* ptr = SharedMemory::access(shmemId, size);
+    if (ptr == nullptr) {
+        log.log(V0_CRIT, "Could not access shmem %s! Aborting.\n", shmemId.c_str());  
+        raise(SIGTERM);  
+    }
+    return ptr;
+}
+
 void runSolverEngine(const Logger& log, const Parameters& programParams) {
     
     // Set up "management" block of shared memory created by the parent
     std::string shmemId = "/edu.kit.iti.mallob." + std::to_string(Proc::getParentPid()) + "." + programParams.getParam("mpirank") + ".#" + programParams.getParam("jobid");
     log.log(V4_VVER, "Access base shmem: %s\n", shmemId.c_str());
-    HordeSharedMemory* hsm = (HordeSharedMemory*) SharedMemory::access(shmemId, sizeof(HordeSharedMemory));
-    assert(hsm != nullptr);
+    HordeSharedMemory* hsm = (HordeSharedMemory*) accessMemory(log, shmemId, sizeof(HordeSharedMemory));
 
     // Read formulae and assumptions from other individual blocks of shared memory
     int fSize = programParams.getIntParam("fbufsize0");
     std::string fId = shmemId + ".formulae.0";
-    int* fPtr = (int*) SharedMemory::access(fId, fSize);
+    int* fPtr = (int*) accessMemory(log, fId, fSize);
     int aSize = programParams.getIntParam("asmptbufsize");
     std::string aId = shmemId + ".assumptions";
-    int* aPtr = (int*) SharedMemory::access(aId, aSize);
+    int* aPtr = (int*) accessMemory(log, aId, aSize);
 
     // Set up export and import buffers for clause exchanges
     int maxExportBufferSize = programParams.getIntParam("cbbs") * sizeof(int);
-    int* exportBuffer = (int*) SharedMemory::access(shmemId + ".clauseexport", maxExportBufferSize);
+    int* exportBuffer = (int*) accessMemory(log, shmemId + ".clauseexport", maxExportBufferSize);
     int maxImportBufferSize = programParams.getIntParam("cbbs") * sizeof(int) * programParams.getIntParam("mpisize");
-    int* importBuffer = (int*) SharedMemory::access(shmemId + ".clauseimport", maxImportBufferSize);
+    int* importBuffer = (int*) accessMemory(log, shmemId + ".clauseimport", maxImportBufferSize);
 
     // Signal initialization to parent
     hsm->isSpawned = true;
@@ -219,7 +227,4 @@ int main(int argc, char *argv[]) {
         log.flush();
         exit(1);
     }
-
-    log.log(V2_INFO, "Exiting\n");
-    log.flush();
 }
