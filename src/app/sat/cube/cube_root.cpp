@@ -16,6 +16,8 @@ CubeRoot::CubeRoot(CubeSetup &setup)
 CubeRoot::~CubeRoot() { _logger.log(0, "Enter destructor of CubeRoot"); }
 
 bool CubeRoot::generateCubes() {
+    _logger.log(0, "Cube generation has started");
+
     // Read formula
     for (auto lit : *_formula.get()) {
         _solver.add(lit);
@@ -34,6 +36,7 @@ bool CubeRoot::generateCubes() {
 
     // Check if generate_cubes finished because of an interrupt
     if (_isInterrupted.load()) {
+        _logger.log(0, "Cube generation was interrupted");
         return false;
     }
 
@@ -43,13 +46,21 @@ bool CubeRoot::generateCubes() {
     // It is empty for the formula Problem14_label20_true-unreach-call.c.cnf
     // It contains zeros for the formula satcoin-genesis-SAT-3.cnf.
     //
-    // Because of this we check for a too small cube array or zeros in the cubes and in this case we start to solve here, expecting it to return instantaneously.
+    // Because of this we check for a too small cube array or zeros in the cubes and in this case we start to solve here, expecting it to return
+    // instantaneously.
 
     // If the solve does not return instantaneously, it gets interrupted via the same interrupt that is supposed to interrupt the cube generation
 
     // Check if cubes vector is too small
     if (cubes.size() != pow(2, _depth)) {
+        _logger.log(0, "Cube generation did not complete properly. Too few cubes have been created");
+
+        _logger.log(0, "Starting solve in cube root expecting a fast return");
         auto result = _solver.solve();
+        _logger.log(0, "Finished solve in cube root");
+
+        assert(result != 0);
+
         parseStatus(result);
         return false;
     }
@@ -58,11 +69,20 @@ bool CubeRoot::generateCubes() {
     // We only check the first cube, because the cubes consist of the permutations of the negations of the same literals.
     for (auto lit : cubes.at(0)) {
         if (lit == 0) {
+            _logger.log(0, "Cube generation did not complete properly. There are zeros in the splitting literals");
+
+            _logger.log(0, "Starting solve in cube root expecting a fast return");
             auto result = _solver.solve();
+            _logger.log(0, "Finished solve in cube root");
+
+            assert(result != 0);
+
             parseStatus(result);
             return false;
         }
     }
+
+    _logger.log(0, "Cube generation has finished");
 
     // Insert cubes into _root_cubes
     for (auto cube_vec : cubes) {
@@ -70,8 +90,10 @@ bool CubeRoot::generateCubes() {
     }
 
     // Shuffle cubes if random flag is set
-    if (_randomizeCubes)
+    if (_randomizeCubes) {
+        _logger.log(0, "Shuffling created cubes");
         std::shuffle(_root_cubes.begin(), _root_cubes.end(), _rng);
+    }
 
     return true;
 }
@@ -157,8 +179,7 @@ std::vector<Cube> CubeRoot::prepareCubes(int target) {
     std::vector<Cube> prepared_cubes(begin, end);
 
     // Shuffle prepared cubes
-    if (_randomizeCubes)
-        std::shuffle(prepared_cubes.begin(), prepared_cubes.end(), _rng);
+    if (_randomizeCubes) std::shuffle(prepared_cubes.begin(), prepared_cubes.end(), _rng);
 
     // Move used cubes to back in root cubes
     std::rotate(begin, end, _root_cubes.end());

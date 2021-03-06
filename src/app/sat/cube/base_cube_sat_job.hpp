@@ -25,7 +25,7 @@ class BaseCubeSatJob : public Job {
     // Lifecycle of a BaseCubeSatJob
     enum State {
         UNINITIALIZED,
-        INITIALIZING,
+        INITIALIZING, // In a none root node, this state is never seen from the outside
         ACTIVE,
         WITHDRAWING,
         DESTRUCTABLE,
