@@ -120,6 +120,8 @@ Returns a single random sample from a normal distribution truncated at lower and
 """
 def get_truncated_normal(mean=0, sd=1, low=0, upp=10):
     global random_state
+    if low == upp:
+        return low
     return int(truncnorm((low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd).rvs(random_state=random_state).round())
 
 """
@@ -127,6 +129,8 @@ Returns a single random sample from a log-normal distribution truncated at lower
 """
 def get_lognorm(s, low=1, upp=100):
     global random_state
+    if low == upp:
+        return low
     val = lognorm(s).rvs(random_state=random_state)
     return max(low, min(upp, int(val.round())))
 
