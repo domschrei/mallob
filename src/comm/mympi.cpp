@@ -313,40 +313,38 @@ MessageHandlePtr MyMpi::poll(float elapsedTime) {
 
     MessageHandlePtr foundHandle;
 
-    // Find some ready handle
-    size_t offset = 0;
-    size_t size = _handles.size();
-    for (size_t i = 0; i < size; i++) {
+    // Traverse all active handles
+    for (size_t i = 0; i < _handles.size(); i++) {
         auto& h = _handles[i];
-        if (!foundHandle && h->testReceived()) {
-            
-            // Handle found!
+        bool handleRemoved = false;
+
+        if (!foundHandle && h->testReceived()) {    
+            // Finished handle found!
             foundHandle = std::move(h);
+            handleRemoved = true;
 
             // Any listener to reset?
             if (!foundHandle->selfMessage && isAnytimeTag(foundHandle->tag)) {
                 // Reset listener, appending a new handle to _handles
                 MyMpi::irecv(MPI_COMM_WORLD, MSG_ANYTIME);
-                // Move new handle from the back to the current position
-                _handles[i] = std::move(_handles.back());
-                _handles.resize(_handles.size()-1);
-                log(V5_DEBG, "Msg ID=%i : listening to tag %i\n", _handles[i]->id, MSG_ANYTIME);
-            } else {
-                // Overwrite this position
-                offset++;
             }
 
         } else if (h->shouldCancel(elapsedTime)) {
             // Cancel handle, mark this position to be overwritten
             h->cancel();
-            offset++;
+            handleRemoved = true;
+        }
 
-        } else if (offset > 0) {
-            // Handle is not finished yet: Overwrite old handle
-            _handles[i-offset] = std::move(_handles[i]);
+        // Shorten the list of handles if one was removed
+        if (handleRemoved) {
+            if (i+1 < _handles.size()) {
+                // Move new handle from the back to the current position
+                _handles[i] = std::move(_handles.back());
+            }
+            _handles.resize(_handles.size()-1);
         }
     }
-    if (offset > 0) _handles.resize(size-offset);
+
     return foundHandle;
 }
 
