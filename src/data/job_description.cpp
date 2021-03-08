@@ -91,7 +91,7 @@ std::vector<uint8_t> JobDescription::serialize() const {
     return *_raw_data;
 }
 
-std::shared_ptr<std::vector<uint8_t>> JobDescription::getSerialization() {
+const std::shared_ptr<std::vector<uint8_t>>& JobDescription::getSerialization() {
     return _raw_data;
 }
 

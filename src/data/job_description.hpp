@@ -97,7 +97,7 @@ public:
     void clearPayload();
 
     std::vector<uint8_t> serialize() const override;
-    std::shared_ptr<std::vector<uint8_t>> getSerialization();
+    const std::shared_ptr<std::vector<uint8_t>>& getSerialization();
 
 };
 

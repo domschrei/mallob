@@ -345,8 +345,10 @@ void Worker::handleConfirmAdoption(MessageHandle& handle) {
     Job& job = _job_db.get(req.jobId);
 
     // Retrieve and send concerned job description
-    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_DESCRIPTION, job.getSerializedDescription());
-    log(LOG_ADD_DESTRANK | V4_VVER, "Sent job desc. of %s", handle.source, job.toStr());
+    const auto& descPtr = job.getSerializedDescription();
+    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_DESCRIPTION, descPtr);
+    log(LOG_ADD_DESTRANK | V4_VVER, "Sent job desc. of %s, size %i", handle.source, 
+            job.toStr(), descPtr->size());
 
     // Mark new node as one of the node's children
     auto relative = job.getJobTree().setChild(handle.source, req.requestedNodeIndex);
@@ -642,8 +644,8 @@ void Worker::handleNotifyResultObsolete(MessageHandle& handle) {
 
 void Worker::handleSendJob(MessageHandle& handle) {
     const auto& data = handle.getRecvData();
-    log(LOG_ADD_SRCRANK | V5_DEBG, "Receiving some desc. of size %i", handle.source, data.size());
-    int jobId = Serializable::get<int>(data);
+    int jobId = data.size() >= sizeof(int) ? Serializable::get<int>(data) : -1;
+    log(LOG_ADD_SRCRANK | V4_VVER, "Got desc. of size %i for job #%i", handle.source, data.size(), jobId);
     initJob(jobId, std::shared_ptr<std::vector<uint8_t>>(
         new std::vector<uint8_t>(handle.moveRecvData())
     ), handle.source);
@@ -651,16 +653,17 @@ void Worker::handleSendJob(MessageHandle& handle) {
 
 void Worker::initJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& data, int senderRank) {
 
-    _job_db.init(jobId, data, senderRank);
-
-    auto& job = _job_db.get(jobId);
-    if (job.getJobTree().isRoot()) {
-        // Root worker: update volume (to trigger growth if desired)
-        if (job.getVolume() > 1) updateVolume(jobId, job.getVolume());
-    } else {
-        // Non-root worker: query parent for the volume of this job
-        IntVec payload({jobId});
-        MyMpi::isend(MPI_COMM_WORLD, job.getJobTree().getParentNodeRank(), MSG_QUERY_VOLUME, payload);
+    bool success = _job_db.init(jobId, data, senderRank);
+    if (success) {
+        auto& job = _job_db.get(jobId);
+        if (job.getJobTree().isRoot()) {
+            // Root worker: update volume (to trigger growth if desired)
+            if (job.getVolume() > 1) updateVolume(jobId, job.getVolume());
+        } else {
+            // Non-root worker: query parent for the volume of this job
+            IntVec payload({jobId});
+            MyMpi::isend(MPI_COMM_WORLD, job.getJobTree().getParentNodeRank(), MSG_QUERY_VOLUME, payload);
+        }
     }
 }
 

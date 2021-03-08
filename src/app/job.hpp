@@ -223,7 +223,7 @@ public:
     bool hasReceivedDescription() const {return _has_description;};
     bool hasDeserializedDescription() const {return _has_description;};
     const JobDescription& getDescription() const {assert(hasDeserializedDescription()); return _description;};
-    std::shared_ptr<std::vector<uint8_t>> getSerializedDescription() {return _description.getSerialization();};
+    const std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription() {return _description.getSerialization();};
     bool hasCommitment() const {return _commitment.has_value();}
     const JobRequest& getCommitment() const {assert(hasCommitment()); return _commitment.value();}
     int getId() const {return _id;};

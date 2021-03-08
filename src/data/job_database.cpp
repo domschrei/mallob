@@ -39,11 +39,11 @@ Job& JobDatabase::createJob(int commSize, int worldRank, int jobId) {
     return *_jobs[jobId];
 }
 
-void JobDatabase::init(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source) {
+bool JobDatabase::init(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source) {
 
     if (!has(jobId) || get(jobId).getState() == PAST) {
-        log(V1_WARN, "[WARN] Unknown or past job #%i : discard desc.\n", jobId);
-        return;
+        log(V1_WARN, "[WARN] Unknown or past job #%i : discard desc. of size %i\n", jobId, description->size());
+        return false;
     }
     auto& job = get(jobId);
 
@@ -53,13 +53,14 @@ void JobDatabase::init(int jobId, const std::shared_ptr<std::vector<uint8_t>>& d
     // Empty job description
     if (description->size() == sizeof(int)) {
         log(V4_VVER, "Received empty desc. of #%i - uncommit and ignore\n", jobId);
-        return;
+        return false;
     }
 
     // Initialize job (in a separate thread)
     setLoad(1, jobId);
     log(LOG_ADD_SRCRANK | V3_VERB, "START %s", source, job.toStr());
     get(jobId).start(description);
+    return true;
 }
 
 bool JobDatabase::checkComputationLimits(int jobId) {
