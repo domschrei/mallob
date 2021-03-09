@@ -263,7 +263,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(size_t maxSize) {
                         lowestLbd = _clause_buffers[i][positions[i]];
                     }
                 }
-                log(V4_VVER, "pos=%i len=%i lbd=%i\n", result.size(), clauseLength, lowestLbd);
+                //log(V4_VVER, "pos=%i len=%i lbd=%i\n", result.size(), clauseLength, lowestLbd);
             } else {
                 do picked = (picked+1) % nclsoflen.size(); while (nclsoflen[picked] == 0);
             }
