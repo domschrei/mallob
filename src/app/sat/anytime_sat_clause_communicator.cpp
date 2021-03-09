@@ -13,7 +13,7 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         int numAggregated = msg.payload.back();
         msg.payload.pop_back();
         std::vector<int>& clauses = msg.payload;
-        testConsistency(clauses, getBufferLimit(numAggregated, BufferMode::ALL));
+        testConsistency(clauses, getBufferLimit(numAggregated, BufferMode::ALL), /*sortByLbd=*/false);
         
         log(V5_DEBG, "%s : receive s=%i\n", _job->toStr(), clauses.size());
         
@@ -83,13 +83,13 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
     _num_aggregated_nodes = 0;
 }
 
-void AnytimeSatClauseCommunicator::broadcastAndLearn(const std::vector<int>& clauses) {
-    testConsistency(clauses, 0);
+void AnytimeSatClauseCommunicator::broadcastAndLearn(std::vector<int>& clauses) {
+    testConsistency(clauses, 0, /*sortByLbd=*/false);
     sendClausesToChildren(clauses);
     learnClauses(clauses);
 }
 
-void AnytimeSatClauseCommunicator::learnClauses(const std::vector<int>& clauses) {
+void AnytimeSatClauseCommunicator::learnClauses(std::vector<int>& clauses) {
     log(V4_VVER, "%s : learn s=%i\n", _job->toStr(), clauses.size());
     
     if (clauses.size() > 0) {
@@ -109,7 +109,7 @@ void AnytimeSatClauseCommunicator::learnClauses(const std::vector<int>& clauses)
     }
 }
 
-void AnytimeSatClauseCommunicator::sendClausesToChildren(const std::vector<int>& clauses) {
+void AnytimeSatClauseCommunicator::sendClausesToChildren(std::vector<int>& clauses) {
     
     // Send clauses to children
     JobMessage msg;
@@ -151,7 +151,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
         log(V4_VVER, "%s : collect s<=%i\n", 
                     _job->toStr(), selfSize);
         selfClauses = _job->getPreparedClauses();
-        testConsistency(selfClauses, 0 /*do not check buffer's size limit*/);
+        testConsistency(selfClauses, 0 /*do not check buffer's size limit*/, /*sortByLbd=*/_sort_by_lbd);
     }
     _clause_buffers.push_back(std::move(selfClauses));
 
@@ -159,7 +159,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     log(V5_DEBG, "%s : merge n=%i s<=%i\n", 
                 _job->toStr(), _clause_buffers.size(), totalSize);
     std::vector<int> vec = merge(totalSize);
-    testConsistency(vec, totalSize);
+    testConsistency(vec, totalSize, /*sortByLbd=*/false);
 
     // Reset clause buffers
     _clause_buffers.clear();
@@ -254,7 +254,19 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(size_t maxSize) {
             }
 
             // Identify next clause
-            do picked = (picked+1) % nvips.size(); while (nclsoflen[picked] == 0);
+            if (clauseLength > 1 && _sort_by_lbd) {
+                size_t lowestLbd = maxSize;
+                for (size_t x = 0; x < nclsoflen.size(); x++) {
+                    size_t i = (picked+1+x) % nclsoflen.size();
+                    if (nclsoflen[i] > 0 && _clause_buffers[i][positions[i]] < lowestLbd) {
+                        picked = i;
+                        lowestLbd = _clause_buffers[i][positions[i]];
+                    }
+                }
+                log(V4_VVER, "pos=%i len=%i lbd=%i\n", result.size(), clauseLength, lowestLbd);
+            } else {
+                do picked = (picked+1) % nclsoflen.size(); while (nclsoflen[picked] == 0);
+            }
             const std::vector<int>& vec = _clause_buffers[picked];
             int pos = positions[picked];
             auto begin = vec.begin()+pos;
@@ -291,7 +303,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(size_t maxSize) {
     return result;
 }
 
-bool AnytimeSatClauseCommunicator::testConsistency(const std::vector<int>& buffer, size_t maxSize) {
+bool AnytimeSatClauseCommunicator::testConsistency(std::vector<int>& buffer, size_t maxSize, bool sortByLbd) {
     if (buffer.empty()) return true;
 
     if (maxSize > 0 && buffer.size() > maxSize) {
@@ -329,6 +341,36 @@ bool AnytimeSatClauseCommunicator::testConsistency(const std::vector<int>& buffe
         if (numCls < 0) {
             consistent = 4; break;
         }
+
+        if (length > 1 && sortByLbd && numCls > 1) {
+            
+            // Sort indices of clauses ascending by LBD score
+            std::vector<int> clsIndices(numCls);
+            for (size_t i = 0; i < numCls; i++) clsIndices[i] = i;
+            std::sort(clsIndices.begin(), clsIndices.end(), [&buffer, pos, length](const int& a, const int& b) {
+                // Compare LBD score of a-th clause with LBD score of b-th clause
+                return buffer[pos+1+a*length] < buffer[pos+1+b*length];
+            });
+
+            // Store originally sorted clauses in a temporary vector
+            std::vector<int> originalClauses(buffer.begin()+pos+1, buffer.begin()+pos+1+numCls*length);
+
+            // Write clauses according to their correct ordering into the buffer
+            size_t i = pos+1;
+            int currentLbd = 0;
+            for (int clsIndex : clsIndices) {
+                assert(currentLbd <= originalClauses[clsIndex*length] 
+                    || log_return_false("%i %i %i\n", length, currentLbd, originalClauses[clsIndex*length]));
+                currentLbd = originalClauses[clsIndex*length];
+                assert(currentLbd >= 2);
+                // For each clause literal:
+                for (size_t x = 0; x < length; x++) {
+                    buffer[i++] = originalClauses[clsIndex*length + x];
+                }
+            }
+            assert(i == pos+1+numCls*length);
+        }
+
         for (int offset = 1; offset <= numCls * length; offset++) {
             if (pos+offset >= buffer.size()) {
                 consistent = 5; break;

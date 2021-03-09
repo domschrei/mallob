@@ -88,6 +88,7 @@ const char* OPTIONS =
 #endif
     "\n-smcl=<max-length>    Soft maximum clause length: Only share clauses up to some length (int x >= 0; 0: no limit)"
     "\n                      except a clause has special solver-dependent qualities"
+    "\n-sort-by-lbd=<0|1>    Sort each clause buffer ascendingly by LBD scores"
     "\n";
 
 /**
@@ -152,6 +153,7 @@ void Parameters::setDefaults() {
     setParam("s2f", ""); // write solutions to file (file path, or empty string for no writing)
     setParam("satsolver", "l"); // which SAT solvers to cycle through
     setParam("sleep", "100"); // microsecs to sleep in between worker main loop cycles
+    setParam("sort-by-lbd", "0"); // sort by LBD score
     setParam("T", "0"); // total time to run the system (0 = no limit)
     setParam("t", "1"); // num threads per node
     setParam("td", "0.01"); // temperature decay for thermodyn. balancing

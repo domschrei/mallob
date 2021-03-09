@@ -20,6 +20,7 @@ private:
 
     const int _clause_buf_base_size;
     const float _clause_buf_discount_factor;
+    const bool _sort_by_lbd;
 
     std::vector<std::vector<int>> _clause_buffers;
     robin_hood::unordered_set<std::vector<int>, ClauseFilter::ClauseHasher, ClauseFilter::ClauseHashBasedEquals> _clause_filter;
@@ -31,6 +32,7 @@ public:
     AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : _params(params), _job(job), 
         _clause_buf_base_size(_params.getIntParam("cbbs")), 
         _clause_buf_discount_factor(_params.getFloatParam("cbdf")),
+        _sort_by_lbd(params.isNotNull("sort-by-lbd")),
         _num_aggregated_nodes(0) {
 
         _initialized = true;
@@ -45,12 +47,12 @@ private:
     size_t getBufferLimit(int numAggregatedNodes, BufferMode mode);
 
     std::vector<int> prepareClauses();
-    void broadcastAndLearn(const std::vector<int>& clauses);
-    void learnClauses(const std::vector<int>& clauses);
-    void sendClausesToChildren(const std::vector<int>& clauses);
+    void broadcastAndLearn(std::vector<int>& clauses);
+    void learnClauses(std::vector<int>& clauses);
+    void sendClausesToChildren(std::vector<int>& clauses);
 
     std::vector<int> merge(size_t maxSize);
-    bool testConsistency(const std::vector<int>& buffer, size_t maxSize);
+    bool testConsistency(std::vector<int>& buffer, size_t maxSize, bool sortByLbd);
 };
 
 #endif
