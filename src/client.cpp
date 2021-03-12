@@ -31,7 +31,7 @@ void Client::readIncomingJobs(Logger log) {
 
         float time = Timer::elapsedSeconds();
 
-        if (_num_incoming_jobs > 0 && numActiveTasks+_num_loaded_jobs < 10) {
+        if (_num_incoming_jobs > 0 && numActiveTasks+_num_loaded_jobs < 32) {
             auto lock = _incoming_job_lock.getLock();
 
             JobMetadata foundJob;
