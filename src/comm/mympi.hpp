@@ -50,9 +50,9 @@ public:
     static void setOptions(const Parameters& params);
     static void beginListening();
 
-    static void isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object);
-    static void isend(MPI_Comm communicator, int recvRank, int tag, const std::vector<uint8_t>& object);
-    static void isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object);
+    static int isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object);
+    static int isend(MPI_Comm communicator, int recvRank, int tag, const std::vector<uint8_t>& object);
+    static int isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object);
     static void irecv(MPI_Comm communicator);
     static void irecv(MPI_Comm communicator, int tag);
     static void irecv(MPI_Comm communicator, int source, int tag);
@@ -74,7 +74,7 @@ public:
         return _handles.size();
     }
     static bool hasOpenSentHandles();
-    static void testSentHandles();
+    static void testSentHandles(std::vector<int>* finishedIds = nullptr);
     static bool isAnytimeTag(int tag);
 
     static int size(MPI_Comm comm);

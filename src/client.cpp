@@ -25,12 +25,13 @@ void Client::readIncomingJobs(Logger log) {
     log.log(V3_VERB, "Starting\n");
 
     std::list<std::pair<std::thread, std::atomic_bool*>> readerTasks;
+    std::atomic_int numActiveTasks = 0;
 
     while (!checkTerminate()) {
 
         float time = Timer::elapsedSeconds();
 
-        if (_num_incoming_jobs > 0) {
+        if (_num_incoming_jobs > 0 && numActiveTasks < 10) {
             auto lock = _incoming_job_lock.getLock();
 
             JobMetadata foundJob;
@@ -79,6 +80,7 @@ void Client::readIncomingJobs(Logger log) {
                     *finishedFlag = true;
 
                 }, finishedFlag);
+                numActiveTasks++;
                 break;
             }
 
@@ -100,6 +102,7 @@ void Client::readIncomingJobs(Logger log) {
                 thread.join();
                 delete flag;
                 it = readerTasks.erase(it);
+                numActiveTasks--;
                 --it;
                 _sys_state.addLocal(SYSSTATE_PARSED_JOBS, 1);
             }
@@ -126,7 +129,7 @@ void Client::handleNewJob(JobMetadata&& data) {
 
 void Client::init() {
 
-    int internalRank = MyMpi::rank(_comm);
+    int internalRank = MyMpi::rank(_comm) + _params.getIntParam("fapii");
 
     _file_adapter = std::unique_ptr<JobFileAdapter>(
         new JobFileAdapter(internalRank, _params, 
@@ -167,6 +170,7 @@ bool Client::checkTerminate() {
 void Client::mainProgram() {
 
     float lastStatTime = Timer::elapsedSeconds();
+    std::vector<int> finishedHandleIds;
 
     while (!checkTerminate()) {
 
@@ -215,7 +219,19 @@ void Client::mainProgram() {
             }
         }
 
-        MyMpi::testSentHandles();
+        MyMpi::testSentHandles(&finishedHandleIds);
+        // Clear job descriptions which are sent
+        for (int id : finishedHandleIds) {
+            if (_transfer_msg_id_to_job_id.count(id)) {
+                int jobId = _transfer_msg_id_to_job_id.at(id);
+                if (_active_jobs.count(jobId)) {
+                    log(V3_VERB, "Clear description of sent job #%i\n", jobId);
+                    _active_jobs.at(jobId)->clearPayload();
+                }
+                _transfer_msg_id_to_job_id.erase(id);
+            }
+        }
+        finishedHandleIds.clear();
         
         // Advance an all-reduction of the current system state
         if (_sys_state.aggregate(time)) {
@@ -312,8 +328,9 @@ void Client::handleAckAcceptBecomeChild(MessageHandle& handle) {
     auto data = desc.getSerialization();
 
     int jobId = Serializable::get<int>(*data);    
-    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_DESCRIPTION, data);
+    int msgId = MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_DESCRIPTION, data);
     log(LOG_ADD_DESTRANK | V4_VVER, "Sent job desc. of #%i of size %i", handle.source, jobId, data->size());
+    _transfer_msg_id_to_job_id[msgId] = jobId;
 }
 
 void Client::handleJobDone(MessageHandle& handle) {

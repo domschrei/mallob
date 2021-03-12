@@ -65,6 +65,9 @@ private:
     std::thread _instance_reader_thread;
     std::unique_ptr<JobFileAdapter> _file_adapter;
 
+    // Maps a job ID to the ID of the message handle transferring its description
+    std::map<int, int> _transfer_msg_id_to_job_id;
+
 public:
     Client(MPI_Comm comm, Parameters& params, std::set<int> clientRanks)
         : _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 

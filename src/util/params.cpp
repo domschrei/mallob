@@ -12,6 +12,7 @@ const char* OPTIONS =
     "\nBy default, the JSON API to dynamically introduce jobs is enabled."
     "\nTo resolve a single SAT instance, use -mono."
     "\n-c=<num-clients>      Amount of client nodes (int c >= 1, or 0 iff -mono is set)"
+    "\n-fapii=<index>        1st API index: with c clients, uses .api/jobs.{<index>..<index>+c-1}/ as directories"
     "\n-h|-help              Print usage and set parameters, then quit"
     "\n-J=<num-jobs>         Exit as soon as <num-jobs> jobs have been processed"
     "\n-lbc=<num-jobs>       Make each client a leaky bucket with up to x active jobs at any given time"
@@ -130,6 +131,7 @@ void Parameters::setDefaults() {
     setParam("colors", "0"); // colored terminal output
     setParam("delaymonkey", "0"); // Small chance for each MPI call to block for some random amount of time
     setParam("derandomize", "1"); // derandomize job bouncing
+    setParam("fapii", "0"); // first API index
     setParam("g", "5.0"); // job demand growth interval
     //setParam("h"); setParam("help"); // print usage
     setParam("icpr", "0.8"); // increase clause production ratio

@@ -170,36 +170,40 @@ bool MyMpi::isAnytimeTag(int tag) {
     return _tags[tag].anytime;
 }
 
-void MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object) {
-    isend(communicator, recvRank, tag, object.serialize());
+int MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const Serializable& object) {
+    return isend(communicator, recvRank, tag, object.serialize());
 }
 
-void MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::vector<uint8_t>& object) {
+int MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::vector<uint8_t>& object) {
 
     bool selfMessage = rank(communicator) == recvRank;
     auto& handles = (selfMessage ? _handles : _sent_handles);
 
     // Append a single zero to an otherwise empty message
-    handles.emplace_back(new MessageHandle(nextHandleId(), 
+    int id = nextHandleId();
+    handles.emplace_back(new MessageHandle(id, 
             object.empty() ? std::vector<uint8_t>(1, 0) : object
     ));
     
     doIsend(communicator, recvRank, tag);
+    return id;
 }
 
-void MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object) {
+int MyMpi::isend(MPI_Comm communicator, int recvRank, int tag, const std::shared_ptr<std::vector<uint8_t>>& object) {
 
     bool selfMessage = rank(communicator) == recvRank;
     auto& handles = (selfMessage ? _handles : _sent_handles);
     
     // Append a single zero to an otherwise empty message
+    int id = nextHandleId();
     if (object->empty()) {
-        handles.emplace_back(new MessageHandle(nextHandleId(), std::vector<uint8_t>(1, 0)));
+        handles.emplace_back(new MessageHandle(id, std::vector<uint8_t>(1, 0)));
     } else {
-        handles.emplace_back(new MessageHandle(nextHandleId(), object));
+        handles.emplace_back(new MessageHandle(id, object));
     }
 
     doIsend(communicator, recvRank, tag);
+    return id;
 }
 
 void MyMpi::doIsend(MPI_Comm communicator, int recvRank, int tag) {
@@ -352,7 +356,7 @@ bool MyMpi::hasOpenSentHandles() {
     return !_sent_handles.empty();
 }
 
-void MyMpi::testSentHandles() {
+void MyMpi::testSentHandles(std::vector<int>* finished) {
 
     size_t offset = 0;
     size_t size = _sent_handles.size();
@@ -362,6 +366,7 @@ void MyMpi::testSentHandles() {
         if (h.testSent()) {
             // Sending operation completed
             log(V5_DEBG, "Msg ID=%i isent\n", h.id);
+            if (finished != nullptr) finished->push_back(h.id);
             offset++;
         } else if (offset > 0) {
             _sent_handles[i-offset] = std::move(_sent_handles[i]);
