@@ -67,6 +67,8 @@ private:
 
     // Maps a job ID to the ID of the message handle transferring its description
     std::map<int, int> _transfer_msg_id_to_job_id;
+    // Number of jobs with a loaded description (taking memory!)
+    std::atomic_int _num_loaded_jobs = 0;
 
 public:
     Client(MPI_Comm comm, Parameters& params, std::set<int> clientRanks)

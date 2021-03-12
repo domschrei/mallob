@@ -31,7 +31,7 @@ void Client::readIncomingJobs(Logger log) {
 
         float time = Timer::elapsedSeconds();
 
-        if (_num_incoming_jobs > 0 && numActiveTasks < 10) {
+        if (_num_incoming_jobs > 0 && numActiveTasks+_num_loaded_jobs < 10) {
             auto lock = _incoming_job_lock.getLock();
 
             JobMetadata foundJob;
@@ -103,6 +103,7 @@ void Client::readIncomingJobs(Logger log) {
                 delete flag;
                 it = readerTasks.erase(it);
                 numActiveTasks--;
+                _num_loaded_jobs++;
                 --it;
                 _sys_state.addLocal(SYSSTATE_PARSED_JOBS, 1);
             }
@@ -227,6 +228,7 @@ void Client::mainProgram() {
                 if (_active_jobs.count(jobId)) {
                     log(V3_VERB, "Clear description of sent job #%i\n", jobId);
                     _active_jobs.at(jobId)->clearPayload();
+                    _num_loaded_jobs--;
                 }
                 _transfer_msg_id_to_job_id.erase(id);
             }
