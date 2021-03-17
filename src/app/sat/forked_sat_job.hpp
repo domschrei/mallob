@@ -32,6 +32,9 @@ private:
     std::thread _init_thread;
     Mutex _solver_lock;
 
+    std::thread _destruct_thread;
+    std::atomic_bool _shmem_freed = false;
+
     float _time_of_start_solving = 0;
     float _time_of_last_comm = 0;
     float _job_comm_period;

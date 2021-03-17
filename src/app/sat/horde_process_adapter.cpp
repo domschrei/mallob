@@ -82,9 +82,14 @@ void HordeProcessAdapter::initSharedMemory() {
 }
 
 HordeProcessAdapter::~HordeProcessAdapter() {
+    freeSharedMemory();
+}
+
+void HordeProcessAdapter::freeSharedMemory() {
     for (auto& [name, addr, size] : _shmem) {
         SharedMemory::free(name, (char*)addr, size);
     }
+    _shmem.clear();
 }
 
 pid_t HordeProcessAdapter::run() {

@@ -157,17 +157,19 @@ void Worker::mainProgram() {
     float lastMaintenanceCheckTime = lastMemCheckTime;
 
     float sleepMicrosecs = _params.getFloatParam("sleep");
-    float memCheckPeriod = 3.0;
     float jobCheckPeriod = 0.01;
     float balanceCheckPeriod = 0.01;
     float maintenanceCheckPeriod = 1.0;
+    float memCheckPeriod = 3.0;
     bool doYield = _params.isNotNull("yield");
 
-    Watchdog watchdog(/*checkIntervMillis=*/60*1000, lastMemCheckTime);
+    Watchdog watchdog(/*checkIntervMillis=*/200, lastMemCheckTime);
+    watchdog.setWarningPeriod(100); // warn after 0.1s without a reset
+    watchdog.setAbortPeriod(60*1000); // abort after 60s without a reset
 
     float time = lastMemCheckTime;
     while (!checkTerminate(time)) {
-        
+
         // Poll received messages, make progress in sent messages
         _msg_handler.pollMessages(time);
         MyMpi::testSentHandles();
@@ -202,6 +204,9 @@ void Worker::mainProgram() {
                 if (_job_db.beginBalancing()) applyBalancing();
             } 
             if (_job_db.continueBalancing()) applyBalancing();
+
+            // Reset watchdog
+            watchdog.reset(time);
         }
 
         // Do diverse periodic maintenance tasks
@@ -210,9 +215,6 @@ void Worker::mainProgram() {
 
             // Forget jobs that are old or wasting memory
             _job_db.forgetOldJobs();
-
-            // Reset watchdog
-            watchdog.reset(time);
 
             // Continue to bounce requests which were deferred earlier
             for (auto& [req, senderRank] : _job_db.getDeferredRequestsToForward(time)) {
@@ -312,8 +314,8 @@ void Worker::handleAcceptAdoptionOffer(MessageHandle& handle) {
         // Full transfer of job description is required:
         // Send ACK to parent and receive full job description
         log(V4_VVER, "Will receive desc. of #%i, size %i\n", req.jobId, sig.getTransferSize());
-        MyMpi::irecv(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_DESCRIPTION, sig.getTransferSize()); // to be received later
         MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_CONFIRM_ADOPTION, req);
+        MyMpi::irecv(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_DESCRIPTION, sig.getTransferSize()); // to be received later
     } else {
         _job_db.uncommit(req.jobId);
         _job_db.reactivate(req, handle.source);

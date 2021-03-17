@@ -244,6 +244,7 @@ public:
     // Returns whether the job is easily and quickly destructible as of now. 
     // (calls appl_isDestructible())
     bool isDestructible();
+    void clearJobDescription() {_description.clearPayload();}
     
     int getGlobalNumWorkers() const {return _job_tree.getCommSize();}
     int getMyMpiRank() const {return _job_tree.getRank();}

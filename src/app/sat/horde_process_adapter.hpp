@@ -55,6 +55,8 @@ public:
     bool check();
     std::pair<SatResult, std::vector<int>> getSolution();
 
+    void freeSharedMemory();
+
 private:
     void initSharedMemory();
 

@@ -16,6 +16,7 @@
 #include "data/serializable.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
+#include "util/sys/concurrent_allocator.hpp"
 
 #include "msgtags.h"
 
@@ -45,6 +46,8 @@ public:
     static int _max_msg_length;
     static bool _monitor_off;
     static int _monkey_flags;
+    struct RecvBundle {int source; int tag; MPI_Comm comm;};
+    static ConcurrentAllocator<RecvBundle> _alloc;
 
     static void init(int argc, char *argv[]);
     static void setOptions(const Parameters& params);
@@ -173,6 +176,7 @@ public:
 
     const std::vector<uint8_t>& getSendData() const { return *sendData;}
     const std::vector<uint8_t>& getRecvData() const { return recvData;}
+    void setReceive(std::vector<uint8_t>&& buf) {recvData = std::move(buf);}
     std::vector<uint8_t>&& moveRecvData() { return std::move(recvData);}
 
     void appendTagToSendData(int tag) {
@@ -193,6 +197,7 @@ public:
 
     friend void MyMpi::irecv(MPI_Comm communicator, int source, int tag);
     friend void MyMpi::irecv(MPI_Comm communicator, int source, int tag, int size);
+    friend void MyMpi::testSentHandles(std::vector<int>* finishedIds);
 };
 
 #endif

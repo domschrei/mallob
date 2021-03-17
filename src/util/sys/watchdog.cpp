@@ -4,32 +4,40 @@
 #include "util/logger.hpp"
 #include "util/sys/process.hpp"
 
-Watchdog::Watchdog(long checkIntervMillis, float time) {
+Watchdog::Watchdog(int checkIntervalMillis, float time) {
 
     reset(time);
-    float maxResetSecs = ((float)checkIntervMillis)/1000;
     auto parentTid = Proc::getTid();
 
-    _thread = std::thread([&, parentTid, checkIntervMillis, maxResetSecs]() {
+    _thread = std::thread([&, parentTid, checkIntervalMillis]() {
         while (_running) {
-            usleep(1000 * 1000 /*1 second*/);
+            usleep(1000 * checkIntervalMillis);
             if (!_running) break;
-            auto lock = _reset_lock.getLock();
-            if (Timer::elapsedSeconds() - _last_reset > maxResetSecs) {
-                
+            int timeMillis = (int) (1000*Timer::elapsedSeconds());
+            auto elapsed = timeMillis - _last_reset_millis;
+            if (_abort_period_millis > 0 && elapsed > _abort_period_millis) {   
                 log(V0_CRIT, "Watchdog: Timeout detected! Writing trace ...\n");
                 Process::writeTrace(parentTid);
                 log(V0_CRIT, "Aborting.\n");
                 Logger::getMainInstance().flush();
                 abort();
             }
+            if (_warning_period_millis > 0 && elapsed > _warning_period_millis) {
+                log(V1_WARN, "[WARN] Watchdog: No reset for %i ms!\n", elapsed);
+            }
         }
     });
 }
 
+void Watchdog::setWarningPeriod(int periodMillis) {
+    _warning_period_millis = periodMillis;
+}
+void Watchdog::setAbortPeriod(int periodMillis) {
+    _abort_period_millis = periodMillis;
+}
+
 void Watchdog::reset(float time) {
-    auto lock = _reset_lock.getLock();
-    _last_reset = time;
+    _last_reset_millis = (int) (1000*time);
 }
 
 void Watchdog::stop() {

@@ -36,6 +36,7 @@ ymax = None
 confidence_area = False
 legend_right = False
 rectangular = False
+linewidth = None
 
 outfile = None
 
@@ -87,6 +88,8 @@ for arg in sys.argv[1:]:
         ymin = float(arg[6:])
     elif arg.startswith("-ymax="):
         ymax = float(arg[6:])
+    elif arg.startswith("-lw="):
+        linewidth = float(arg[4:])
     elif arg.startswith("-title="):
         heading = arg[7:]
     elif arg.startswith("-o="):
@@ -224,6 +227,9 @@ for d in data:
         
     if do_linestyles:
         kwargs['linestyle'] = linestyles[i%len(linestyles)]
+    
+    if linewidth:
+        kwargs['lw'] = linewidth
     
     plt.plot(d[0], d[1], **kwargs)
     i += 1

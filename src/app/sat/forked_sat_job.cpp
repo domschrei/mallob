@@ -137,8 +137,25 @@ void ForkedSatJob::appl_dumpStats() {
 }
 
 bool ForkedSatJob::appl_isDestructible() {
-    // Solver is NULL or child process terminated
-    return !_initialized || Process::didChildExit(_solver_pid);
+    // Not initialized (yet): No init thread may be running
+    if (!_initialized) return !_init_thread.joinable();
+    // Job completely terminated:
+    if (Process::didChildExit(_solver_pid)) {
+        // Ensure concurrent destruction of shared memory
+        if (!_destruct_thread.joinable() && !_shmem_freed) {
+            log(V4_VVER, "%s : freeing mem\n", toStr());
+            _destruct_thread = std::thread([this]() {
+                _solver->freeSharedMemory();
+                clearJobDescription();
+                _shmem_freed = true;
+                log(V4_VVER, "%s : mem freed\n", toStr());
+            });
+        }
+        // Job is destructible as soon as shared memory is cleaned up
+        return _shmem_freed;
+    }
+    // Solver is neither uninitialized nor terminated
+    return false;
 }
 
 bool ForkedSatJob::appl_wantsToBeginCommunication() {
@@ -192,6 +209,7 @@ void ForkedSatJob::digestSharing(const std::vector<int>& clauses) {
 ForkedSatJob::~ForkedSatJob() {
     log(V4_VVER, "%s : enter destructor\n", toStr());
     if (_init_thread.joinable()) _init_thread.join();
+    if (_destruct_thread.joinable()) _destruct_thread.join();
     _solver = NULL;
     if (_solver_pid != -1 && !Process::didChildExit(_solver_pid)) {
         log(V5_DEBG, "%s : SIGKILLing child pid=%i\n", toStr(), _solver_pid);

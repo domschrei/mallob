@@ -20,6 +20,7 @@ std::vector<MessageHandlePtr> MyMpi::_sent_handles;
 robin_hood::unordered_map<int, MsgTag> MyMpi::_tags;
 bool MyMpi::_monitor_off;
 int MyMpi::_monkey_flags = 0;
+ConcurrentAllocator<MyMpi::RecvBundle> MyMpi::_alloc;
 
 int handleId;
 
@@ -278,11 +279,18 @@ void MyMpi::irecv(MPI_Comm communicator, int source, int tag) {
 }
 
 void MyMpi::irecv(MPI_Comm communicator, int source, int tag, int size) {
-
     assert(source >= 0);
+
+    if (size >= 4000000) {
+        // Big allocation (>= 1M ints): allocate concurrently
+        log(V4_VVER, "Concurrent allocation for IRECV of size %i\n", size);
+        _alloc.order(RecvBundle{source, tag, communicator}, size);
+        return;
+    }
+
+    // Small allocation: allocate directly
     _handles.emplace_back(new MessageHandle(nextHandleId(), size));
     auto& handle = *_handles.back();
-
     handle.source = source;
     handle.tag = tag;
     MPICALL(MPI_Irecv(handle.recvData.data(), size, MPI_BYTE, source, isAnytimeTag(tag) ? MSG_ANYTIME : tag, 
@@ -374,6 +382,22 @@ void MyMpi::testSentHandles(std::vector<int>* finished) {
     }
 
     if (offset > 0) _sent_handles.resize(size-offset);
+
+    // Check concurrently allocated irecv buffers
+    RecvBundle bundle;
+    auto ptr = _alloc.poll(bundle);
+    while (ptr) {
+        auto hPtr = new MessageHandle(nextHandleId());
+        log(V4_VVER, "Opening concurrently allocated IRECV, size %i\n", ptr->size());
+        hPtr->setReceive(std::move(*ptr));
+        hPtr->source = bundle.source;
+        hPtr->tag = bundle.tag;
+        _handles.emplace_back(hPtr);
+        MPICALL(MPI_Irecv(hPtr->recvData.data(), hPtr->recvData.size(), MPI_BYTE,
+                hPtr->source, isAnytimeTag(hPtr->tag) ? MSG_ANYTIME : hPtr->tag, 
+                bundle.comm, &hPtr->request), "irecv"+std::to_string(hPtr->id))
+        ptr = _alloc.poll(bundle);
+    }
 }
 
 int MyMpi::size(MPI_Comm comm) {
