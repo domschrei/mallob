@@ -11,6 +11,11 @@
 
 #include "util/logger.hpp"
 
+bool FileUtils::isRegularFile(const std::string& file) {
+    struct stat sb;
+    return stat(file.c_str(), &sb) == 0 && S_ISREG(sb.st_mode);
+}
+
 int FileUtils::mkdir(const std::string& dir) {
     for (size_t i = 0; i < dir.size(); i++) {
         if (dir[i] == '/' && i > 0 && i+1 < dir.size()) {

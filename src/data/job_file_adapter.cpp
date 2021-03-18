@@ -25,7 +25,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         
         // Attempt to read job file
         std::string eventFile = getJobFilePath(event, NEW);
-        if (!std::filesystem::is_regular_file(eventFile)) {
+        if (!FileUtils::isRegularFile(eventFile)) {
             return; // File does not exist (any more)
         }
         try {
@@ -133,7 +133,7 @@ void JobFileAdapter::handleJobDone(const JobResult& result) {
     auto lock = _job_map_mutex.getLock();
 
     std::string eventFile = getJobFilePath(result.id, PENDING);
-    if (!std::filesystem::is_regular_file(eventFile)) {
+    if (!FileUtils::isRegularFile(eventFile)) {
         return; // File does not exist (any more)
     }
     std::ifstream i(eventFile);

@@ -3,14 +3,15 @@
 #define DOMPASCH_MALLOB_FILE_WATCHER_HPP
 
 #include <sys/inotify.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <assert.h>
 #include <fcntl.h>
+#include <dirent.h>
 
 #include <string>
 #include <thread>
 #include <functional>
-#include <filesystem>
 #include <memory>
 
 #include "util/logger.hpp"
@@ -79,21 +80,26 @@ public:
 
             // Read job files which may already exist
             if (_init_files_handling == TRIGGER_CREATE_EVENT) {
-                const std::filesystem::path newJobsPath { _directory };
-                std::vector<std::filesystem::directory_entry> files; 
-                for (const auto& entry : std::filesystem::directory_iterator(newJobsPath)) {
-                    files.push_back(entry);
-                }
-                sort(files.begin(), files.end(), [](const std::filesystem::directory_entry& a, const std::filesystem::directory_entry& b) { 
-                    return a.path().filename().string() < b.path().filename().string(); 
-                });
+
+                // Retrieve sorted list of files in directory
+                std::vector<std::string> files;
+                struct dirent* entry;
+                DIR *dir = opendir(_directory.c_str());
+                if (dir != NULL) {
+                    while ((entry = readdir(dir)) != NULL) {
+                        files.emplace_back(entry->d_name);
+                    }
+                    closedir(dir);
+                } 
+                sort(files.begin(), files.end());
+                
                 for (const auto& entry : files) {
-                    const auto filenameStr = entry.path().filename().string();
-                    if (entry.is_regular_file()) {
+                    const auto filenameStr = _directory + "/" + entry;
+                    if (FileUtils::isRegularFile(filenameStr)) {
                         // Trigger CREATE event
                         //logger.log(V4_VVER, "FileWatcher: File event\n");
-                        threads.doTask([this, filenameStr] (Logger& lg) {
-                            _callback(FileWatcher::Event{IN_CREATE, filenameStr}, lg);
+                        threads.doTask([this, entry] (Logger& lg) {
+                            _callback(FileWatcher::Event{IN_CREATE, entry}, lg);
                         });
                     }
                     if (_exiting) return;
