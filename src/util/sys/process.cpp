@@ -36,6 +36,9 @@ void doNothing(int signum) {
 }
 
 void handleAbort(int sig) {
+
+    // Try to flush output
+    Logger::getMainInstance().flush();
     
     // print out all the frames
     log(V0_CRIT, "Error from pid=%ld tid=%ld signal=%d\n", Proc::getPid(), Proc::getTid(), sig);
@@ -44,8 +47,13 @@ void handleAbort(int sig) {
     // additionally write a trace of this thread found by gdb
     Process::writeTrace(Proc::getTid());
 
-    // Send exit signals to children and exit yourself
+    // Send exit signals to children and 
     Process::forwardTerminateToChildren();
+
+    // Try to flush output again
+    Logger::getMainInstance().flush();
+
+    // exit yourself
     exit(sig);
 }
 
