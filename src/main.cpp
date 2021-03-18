@@ -27,12 +27,10 @@ void doExternalClientProgram(MPI_Comm& commClients, Parameters& params, const st
         client.mainProgram();
     } catch (const std::exception& ex) {
         log(V0_CRIT, "Unexpected ERROR: \"%s\" - aborting\n", ex.what());
-        Logger::getMainInstance().flush();
-        exit(1);
+        Process::doExit(1);
     } catch (...) {
         log(V0_CRIT, "Unexpected ERROR - aborting\n");
-        Logger::getMainInstance().flush();
-        exit(1);
+        Process::doExit(1);
     }
 }
 
@@ -44,12 +42,10 @@ void doWorkerNodeProgram(MPI_Comm& commWorkers, Parameters& params, const std::s
         worker.mainProgram();
     } catch (const std::exception& ex) {
         log(V0_CRIT, "Unexpected ERROR: \"%s\" - aborting\n", ex.what());
-        Logger::getMainInstance().flush();
-        exit(1);
+        Process::doExit(1);
     } catch (...) {
         log(V0_CRIT, "Unexpected ERROR - aborting\n");
-        Logger::getMainInstance().flush();
-        exit(1);
+        Process::doExit(1);
     }
 }
 
@@ -60,6 +56,9 @@ int main(int argc, char *argv[]) {
 
     int numNodes = MyMpi::size(MPI_COMM_WORLD);
     int rank = MyMpi::rank(MPI_COMM_WORLD);
+
+    // Initialize bookkeeping of child processes and signals
+    Process::init(rank);
 
     Parameters params;
     params.init(argc, argv);
@@ -76,7 +75,7 @@ int main(int argc, char *argv[]) {
             params.printUsage();
         }
         MPI_Finalize();
-        exit(0);
+        Process::doExit(0);
     }
 
     char hostname[1024];
@@ -86,9 +85,6 @@ int main(int argc, char *argv[]) {
     // Global and local seed, such that all nodes have access to a synchronized randomness
     // as well as to an individual randomness that differs among nodes
     Random::init(numNodes, rank);
-
-    // Initialize bookkeeping of child processes
-    Process::init(rank);
 
     // Find client ranks
     std::set<int> externalClientRanks;
@@ -120,5 +116,5 @@ int main(int argc, char *argv[]) {
 
     MPI_Finalize();
     log(V2_INFO, "Exiting happily\n");
-    Logger::getMainInstance().flush();
+    Process::doExit(0);
 }

@@ -5,6 +5,7 @@
 #include <set>
 #include <atomic>
 #include <optional>
+#include <thread>
 
 #include "util/sys/threading.hpp"
 
@@ -12,10 +13,14 @@ class Process {
 
 public:
     static int _rank;
+
+    static Mutex _children_mutex;
     static std::set<pid_t> _children;
-    static std::atomic_bool _modifying_children;
+
     static std::atomic_bool _exit_signal_caught;
     static std::atomic_int _exit_signal;
+
+    static std::thread _terminate_checker;
 
     static void init(int rank, bool leafProcess = false);
     
@@ -27,8 +32,6 @@ public:
     static void resume(pid_t childpid);
     static void wakeUp(pid_t childpid);
 
-    static void terminateAll();
-
     static void sendSignal(pid_t childpid, int signum);
 
     static void forwardTerminateToChildren();
@@ -38,6 +41,8 @@ public:
     static std::optional<int> isExitSignalCaught();
 
     static void writeTrace(long tid);
+
+    static void doExit(int retval);
 };
 
 #endif

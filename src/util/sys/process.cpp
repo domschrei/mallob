@@ -17,78 +17,75 @@
 
 
 int Process::_rank;
+
+Mutex Process::_children_mutex;
 std::set<pid_t> Process::_children;
-std::atomic_bool Process::_modifying_children;
+
 std::atomic_bool Process::_exit_signal_caught = false;
 std::atomic_int Process::_exit_signal = 0;
 
+std::thread Process::_terminate_checker;
 
-
-void propagateSignalAndExit(int signum) {
-    Process::forwardTerminateToChildren();
-    Process::_exit_signal_caught = true;
-    Process::_exit_signal = signum;
-}
 
 void doNothing(int signum) {
     // Do nothing, just return
     //std::cout << "WOKE_UP" << std::endl;
 }
 
-void handleAbort(int sig) {
-
-    // Try to flush output
-    Logger::getMainInstance().flush();
-    
-    // print out all the frames
-    log(V0_CRIT, "Error from pid=%ld tid=%ld signal=%d\n", Proc::getPid(), Proc::getTid(), sig);
-    log(V0_CRIT, "Backtrace: \n%s\n", backtrace().c_str());
-
-    // Try to flush output again
-    Logger::getMainInstance().flush();
-
-    // additionally write a trace of this thread found by gdb
-    Process::writeTrace(Proc::getTid());
-
-    // Send exit signals to children and 
-    Process::forwardTerminateToChildren();
-
-    // Try to flush output again
-    Logger::getMainInstance().flush();
-
-    // exit yourself
-    exit(sig);
+void handleSignal(int signum) {
+    Process::doExit(signum);
 }
 
+void Process::doExit(int retval) {
+    if (retval == SIGSEGV || retval == SIGABRT) {
+        // Try to write a trace of this thread found by gdb
+        Process::writeTrace(Proc::getTid());
+    }
+    _exit_signal = retval;
+    _exit_signal_caught = true;
+    _terminate_checker.join();
+    exit(retval);
+}
 
 
 void Process::init(int rank, bool leafProcess) {
 
     _rank = rank;
-    _modifying_children = false;
     _exit_signal_caught = false;
 
     signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
-    signal(SIGSEGV, handleAbort);
-    signal(SIGABRT, handleAbort);
+    signal(SIGSEGV, handleSignal);
+    signal(SIGABRT, handleSignal);
+    signal(SIGTERM, handleSignal);
+    signal(SIGINT, handleSignal);
 
-    if (!leafProcess) {
-        signal(SIGTERM, propagateSignalAndExit);
-        signal(SIGINT, propagateSignalAndExit);
-    }
+    _terminate_checker = std::thread([leafProcess]() {
+
+        while (!_exit_signal_caught) usleep(1000 * 100); // 0.1s
+
+        if (!leafProcess) forwardTerminateToChildren();
+
+        if (_exit_signal == SIGABRT || _exit_signal == SIGSEGV) {
+            int sig = _exit_signal;
+            log(V0_CRIT, "Error from pid=%ld tid=%ld signal=%d\n", 
+                    Proc::getPid(), Proc::getTid(), sig);
+        }
+
+        // Try to flush output again
+        Logger::getMainInstance().flush();
+    });
 }
 
 pid_t Process::createChild() {
     pid_t res = fork();
 
-    _modifying_children = true;
     if (res > 0) {
         // parent process
+        auto lock = _children_mutex.getLock();
         _children.insert(res);
     } else {
         assert(res >= 0);
     }
-    _modifying_children = false;
 
     return res;
 }
@@ -108,21 +105,13 @@ void Process::resume(pid_t childpid) {
 void Process::wakeUp(pid_t childpid) {
     sendSignal(childpid, SIGUSR1);
 }
-void Process::terminateAll() {
-    std::set<int> children = _children;
-    for (int childpid : children) {
+
+void Process::forwardTerminateToChildren() { 
+    // Propagate signal to children
+    auto lock = _children_mutex.getLock();
+    for (pid_t childpid : Process::_children) {
         terminate(childpid);
         resume(childpid);
-    }
-}
-
-void Process::forwardTerminateToChildren() {
-    if (!Process::_modifying_children) {
-        // Propagate signal to children
-        for (pid_t child : Process::_children) {
-            Process::sendSignal(child, SIGTERM);
-            Process::sendSignal(child, SIGCONT);
-        }
     }
 }
 
@@ -135,14 +124,13 @@ void Process::sendSignal(pid_t childpid, int signum) {
 
 bool Process::didChildExit(pid_t childpid) {
 
+    auto lock = _children_mutex.getLock();
     if (!_children.count(childpid)) return true;
     
     int status;
     pid_t result = waitpid(childpid, &status, WNOHANG /*| WUNTRACED | WCONTINUED*/);
     if (result != 0) {
-        _modifying_children = true;
         _children.erase(childpid);
-        _modifying_children = false;
         return true;
     }
     return false;

@@ -44,7 +44,7 @@ void mpiMonitor() {
             if (elapsed > 60.0) {
                 // Inside some MPI call for a minute
                 log_return_false("MPI call takes too long - aborting\n");
-                exit(1);
+                Process::doExit(1);
             }
         }
         usleep(1000 * 1000); // 1s

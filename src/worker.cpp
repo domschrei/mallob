@@ -1073,9 +1073,6 @@ Worker::~Worker() {
 
     Terminator::setTerminating();
 
-    // Send termination signal to the entire process group 
-    Process::terminateAll();
-
     if (_mpi_monitor_thread.joinable()) _mpi_monitor_thread.join();
 
     log(V4_VVER, "Destruct worker\n");
@@ -1083,6 +1080,6 @@ Worker::~Worker() {
     if (_params.isNotNull("mono") && _params.getParam("appmode") != "fork") {
         // Terminate directly without destructing resident job
         MPI_Finalize();
-        exit(0);
+        Process::doExit(0);
     }
 }

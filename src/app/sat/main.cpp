@@ -31,7 +31,7 @@ void* accessMemory(const Logger& log, const std::string& shmemId, size_t size) {
     void* ptr = SharedMemory::access(shmemId, size);
     if (ptr == nullptr) {
         log.log(V0_CRIT, "Could not access shmem %s! Aborting.\n", shmemId.c_str());  
-        raise(SIGTERM);  
+        Process::doExit(0);  
     }
     return ptr;
 }
@@ -190,7 +190,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
     log.flush();
     
     // Exit normally, but avoid calling destructors (some threads may be unresponsive)
-    raise(SIGTERM);
+    Process::doExit(0);
 
     // Shared memory will be cleaned up by the parent process.
 }
@@ -204,15 +204,15 @@ int main(int argc, char *argv[]) {
 
     int rankOfParent = params.getIntParam("mpirank");
 
+    // Initialize signal handlers
+    Process::init(rankOfParent, /*leafProcess=*/true);
+
     Logger::init(rankOfParent, params.getIntParam("v"), params.isNotNull("colors"), 
             /*quiet=*/params.isNotNull("q"), /*cPrefix=*/params.isNotNull("mono"), params.getParam("log"));
     
     auto log = getLog(params);
     pid_t pid = Proc::getPid();
     log.log(V3_VERB, "mallob SAT engine %s pid=%lu\n", MALLOB_VERSION, pid);
-
-    // Initialize signal handlers
-    Process::init(rankOfParent, /*leafProcess=*/true);
 
     try {
         // Launch program
@@ -221,10 +221,10 @@ int main(int argc, char *argv[]) {
     } catch (const std::exception &ex) {
         log.log(V0_CRIT, "Unexpected ERROR: \"%s\" - aborting\n", ex.what());
         log.flush();
-        exit(1);
+        Process::doExit(1);
     } catch (...) {
         log.log(V0_CRIT, "Unexpected ERROR - aborting\n");
         log.flush();
-        exit(1);
+        Process::doExit(1);
     }
 }

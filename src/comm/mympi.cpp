@@ -10,6 +10,7 @@
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "comm/mpi_monitor.hpp"
+#include "util/sys/process.hpp"
 
 #define MPICALL(cmd, str) {if (!MyMpi::_monitor_off) {initcall((str).c_str());} \
 int err = cmd; if (!MyMpi::_monitor_off) endcall(); chkerr(err);}
@@ -103,7 +104,7 @@ void MyMpi::init(int argc, char *argv[]) {
     if (provided != MPI_THREAD_SINGLE) {
         std::cout << "ERROR initializing MPI: wanted id=" << MPI_THREAD_SINGLE 
                 << ", got id=" << provided << std::endl;
-        exit(1);
+        Process::doExit(1);
     }
 
     handleId = 1;

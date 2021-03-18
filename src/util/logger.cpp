@@ -103,7 +103,9 @@ Logger::~Logger() {
 }
 
 void Logger::mergeJobLogs(int jobId) {
-    int status = FileUtils::mergeFiles(_log_filename + "#" + std::to_string(jobId) + ".*", _log_directory + "jobs." + std::to_string(_rank), true);
+    std::string globstring = _log_filename + "#" + std::to_string(jobId) + ".*";
+    std::string dest = _log_directory + "jobs." + std::to_string(_rank);
+    int status = FileUtils::mergeFiles(globstring, dest, true);
     if (status != 0) {
         log(V1_WARN, "WARN: Could not merge logs, exit code: %i\n", status);
     }
