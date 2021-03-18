@@ -13,7 +13,6 @@
 #include <map>
 
 #include "util/sys/threading.hpp"
-#include "util/robin_hood.hpp"
 
 /*
 Interface to some process-related information from the /proc filesystem.
@@ -28,7 +27,7 @@ private:
         CpuInfo& operator=(CpuInfo&& other) = default;
         CpuInfo& operator=(const CpuInfo& other) = default;
     };
-    static robin_hood::unordered_map<long, CpuInfo> _cpu_info_per_tid;
+    static std::map<long, CpuInfo> _cpu_info_per_tid;
     static Mutex _cpu_info_lock;
 
 public:

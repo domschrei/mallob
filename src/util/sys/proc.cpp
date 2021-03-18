@@ -9,7 +9,7 @@
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 
-robin_hood::unordered_map<long, Proc::CpuInfo> Proc::_cpu_info_per_tid;
+std::map<long, Proc::CpuInfo> Proc::_cpu_info_per_tid;
 Mutex Proc::_cpu_info_lock;
 
 pid_t Proc::getPid() {
