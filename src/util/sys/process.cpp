@@ -44,6 +44,9 @@ void handleAbort(int sig) {
     log(V0_CRIT, "Error from pid=%ld tid=%ld signal=%d\n", Proc::getPid(), Proc::getTid(), sig);
     log(V0_CRIT, "Backtrace: \n%s\n", backtrace().c_str());
 
+    // Try to flush output again
+    Logger::getMainInstance().flush();
+
     // additionally write a trace of this thread found by gdb
     Process::writeTrace(Proc::getTid());
 
