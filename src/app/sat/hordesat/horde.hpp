@@ -56,7 +56,7 @@ public:
     int solveLoop();
 
     int prepareSharing(int* begin, int maxSize);
-    void digestSharing(const std::vector<int>& result);
+    void digestSharing(std::vector<int>& result);
 	void digestSharing(int* begin, int size);
 
     void interrupt();

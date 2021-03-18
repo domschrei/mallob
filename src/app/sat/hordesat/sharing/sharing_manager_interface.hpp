@@ -27,8 +27,8 @@ class SharingManagerInterface {
 
 public:
 	virtual int prepareSharing(int* begin, int maxSize) = 0;
-    virtual void digestSharing(const std::vector<int>& result) = 0;
-    virtual void digestSharing(const int* begin, int size) = 0;
+    virtual void digestSharing(std::vector<int>& result) = 0;
+    virtual void digestSharing(int* begin, int size) = 0;
 
     virtual SharingStatistics getStatistics() = 0;
 	virtual ~SharingManagerInterface() {};

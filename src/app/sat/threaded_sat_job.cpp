@@ -219,7 +219,7 @@ std::vector<int> ThreadedSatJob::getPreparedClauses() {
     _clause_buffer.clear();
     return out;
 }
-void ThreadedSatJob::digestSharing(const std::vector<int>& clauses) {
+void ThreadedSatJob::digestSharing(std::vector<int>& clauses) {
     _solver->digestSharing(clauses);
 }
 

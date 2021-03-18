@@ -202,7 +202,7 @@ bool ForkedSatJob::hasPreparedSharing() {
 std::vector<int> ForkedSatJob::getPreparedClauses() {
     return _solver->getCollectedClauses();
 }
-void ForkedSatJob::digestSharing(const std::vector<int>& clauses) {
+void ForkedSatJob::digestSharing(std::vector<int>& clauses) {
     _solver->digestClauses(clauses);
 }
 

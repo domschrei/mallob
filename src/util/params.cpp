@@ -87,6 +87,7 @@ const char* OPTIONS =
 #else
     "\n                      l=lingeling c=cadical"
 #endif
+    "\n-shufcls[=<0|1>]      Shuffle literals in each clause at import"
     "\n-smcl=<max-length>    Soft maximum clause length: Only share clauses up to some length (int x >= 0; 0: no limit)"
     "\n                      except a clause has special solver-dependent qualities"
     "\n-sort-by-lbd=<0|1>    Sort each clause buffer ascendingly by LBD scores"
@@ -154,6 +155,7 @@ void Parameters::setDefaults() {
     setParam("s", "1.0"); // job communication period (seconds)
     setParam("s2f", ""); // write solutions to file (file path, or empty string for no writing)
     setParam("satsolver", "l"); // which SAT solvers to cycle through
+    setParam("shufcls", "0"); // shuffle clause literals at import
     setParam("sleep", "100"); // microsecs to sleep in between worker main loop cycles
     setParam("sort-by-lbd", "0"); // sort by LBD score
     setParam("T", "0"); // total time to run the system (0 = no limit)

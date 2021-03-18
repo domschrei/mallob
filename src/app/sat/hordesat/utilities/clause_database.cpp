@@ -123,7 +123,7 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 	return used;
 }
 
-void ClauseDatabase::setIncomingBuffer(const int* buffer, int size) {
+void ClauseDatabase::setIncomingBuffer(int* buffer, int size) {
 	incomingBuffer = buffer;
 	bufferSize = size;
 	currentPos = 1;
@@ -132,14 +132,14 @@ void ClauseDatabase::setIncomingBuffer(const int* buffer, int size) {
 	remainingVipLits = buffer[0]; // # VIP literals including separators
 }
 
-const int* ClauseDatabase::getNextIncomingClause(int& size) {
+int* ClauseDatabase::getNextIncomingClause(int& size) {
 
 	if (remainingVipLits > 0) {
 		// VIP clause
 		int start = currentPos++;
 		while (incomingBuffer[currentPos] != 0) currentPos++;
 		// currentPos is now at separator-"0" after the clause to export
-		const int* clsbegin = incomingBuffer+start;
+		int* clsbegin = incomingBuffer+start;
 		size = currentPos-start;
 
 		// Move currentPos pointer to begin of next clause
@@ -178,7 +178,7 @@ const int* ClauseDatabase::getNextIncomingClause(int& size) {
 	// Insert clause literals
 	//cls.clear();
 	//cls.insert(cls.end(), incomingBuffer+start, incomingBuffer+stop);
-	const int* clsbegin = incomingBuffer+start;
+	int* clsbegin = incomingBuffer+start;
 	size = currentSize;
 	return clsbegin;
 }

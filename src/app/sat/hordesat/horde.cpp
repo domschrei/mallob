@@ -180,7 +180,7 @@ int HordeLib::prepareSharing(int* begin, int maxSize) {
 	return _sharing_manager->prepareSharing(begin, maxSize);
 }
 
-void HordeLib::digestSharing(const std::vector<int>& result) {
+void HordeLib::digestSharing(std::vector<int>& result) {
 	if (isCleanedUp()) return;
 	_sharing_manager->digestSharing(result);
 }

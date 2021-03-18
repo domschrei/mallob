@@ -9,6 +9,7 @@
 
 #include "default_sharing_manager.hpp"
 #include "util/sys/timer.hpp"
+#include "util/shuffle.hpp"
 
 DefaultSharingManager::DefaultSharingManager(
 		std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, 
@@ -47,12 +48,12 @@ int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
 	return used;
 }
 
-void DefaultSharingManager::digestSharing(const std::vector<int>& result) {
+void DefaultSharingManager::digestSharing(std::vector<int>& result) {
 
 	digestSharing(result.data(), result.size());
 }
 
-void DefaultSharingManager::digestSharing(const int* begin, int buflen) {
+void DefaultSharingManager::digestSharing(int* begin, int buflen) {
     
 	// Get all clauses
 	_cdb.setIncomingBuffer(begin, buflen);
@@ -61,13 +62,19 @@ void DefaultSharingManager::digestSharing(const int* begin, int buflen) {
 	std::vector<int> lens;
 	std::vector<int> added(_solvers.size(), 0);
 
+	bool shuffleClauses = _params.isNotNull("shufcls");
+	if (shuffleClauses) _logger.log(V4_VVER, "Shuffling each clause\n");
+
 	// For each incoming clause:
 	int size;
-	const int* clsbegin = _cdb.getNextIncomingClause(size);
+	int* clsbegin = _cdb.getNextIncomingClause(size);
 	while (clsbegin != NULL) {
 		
 		numClauses++;
 		int clauseLen = (size > 1 ? size-1 : size); // subtract "glue" int
+
+		// Shuffle clause (NOT the 1st position as this is the glue score)
+		if (shuffleClauses) shuffle(clsbegin+1, size-1);
 		
 		// Clause length stats
 		while (clauseLen-1 >= (int)lens.size()) lens.push_back(0);

@@ -42,12 +42,12 @@ public:
 	 * Set the pointer for the buffer of <size> containing the incoming shared clauses 
 	 * which has the same shape as the data returned by the giveSelection method.
 	 */
-	void setIncomingBuffer(const int* buffer, int size);
+	void setIncomingBuffer(int* buffer, int size);
 	/**
 	 * Fill the given clause with the literals of the next incomming clause.
 	 * Return false if no more clauses.
 	 */
-	const int* getNextIncomingClause(int& size);
+	int* getNextIncomingClause(int& size);
 
 private:
 	const Logger& logger;
@@ -58,7 +58,7 @@ private:
 	std::vector<std::vector<int> > vipClauses;
 
 	// Structures for IMPORTING	
-	const int* incomingBuffer;
+	int* incomingBuffer;
 	size_t bufferSize;
 	size_t currentPos;
 	size_t currentSize; // 0 for VIP clauses

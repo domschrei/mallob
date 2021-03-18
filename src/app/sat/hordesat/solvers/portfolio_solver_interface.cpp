@@ -2,34 +2,34 @@
 
 #include <map>
 #include <chrono>
+#include <atomic>
 
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
+#include "util/sys/timer.hpp"
 
 #include "portfolio_solver_interface.hpp"
 
 using namespace std::chrono;
 
 Mutex timeCallbackLock;
-std::map<std::string, high_resolution_clock::time_point> times;
+std::map<std::string, unsigned long> times;
 std::string currentSolverName = "";
-high_resolution_clock::time_point lglSolverStartTime;
+std::atomic_ulong lglSolverStartTime;
 
 void updateTimer(std::string jobName) {
 	auto lock = timeCallbackLock.getLock();
 	if (currentSolverName == jobName) return;
 	if (!times.count(jobName)) {
-		times[jobName] = high_resolution_clock::now();
+		times[jobName] = (unsigned long) (1000*1000*Timer::elapsedSeconds());
 	}
 	lglSolverStartTime = times[jobName];
 	currentSolverName = jobName;
 }
 double getTime() {
-    high_resolution_clock::time_point nowTime = high_resolution_clock::now();
-	timeCallbackLock.lock();
-    duration<double, std::milli> time_span = nowTime - lglSolverStartTime;    
-	timeCallbackLock.unlock();
-	return time_span.count() / 1000;
+    auto nowTime = (unsigned long) (1000*1000*Timer::elapsedSeconds());
+    double timeSpan = nowTime - lglSolverStartTime;    
+	return ((double)timeSpan) / (1000 * 1000);
 }
 
 PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup) 

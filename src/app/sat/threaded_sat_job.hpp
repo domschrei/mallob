@@ -71,7 +71,7 @@ public:
     void prepareSharing(int maxSize) override;
     bool hasPreparedSharing() override;
     std::vector<int> getPreparedClauses() override;
-    void digestSharing(const std::vector<int>& clauses) override;
+    void digestSharing(std::vector<int>& clauses) override;
 
     std::unique_ptr<HordeLib>& getSolver() {
         assert(_solver != NULL);

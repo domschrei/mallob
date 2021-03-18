@@ -17,7 +17,7 @@ public:
     virtual void prepareSharing(int maxSize) = 0;
     virtual bool hasPreparedSharing() = 0;
     virtual std::vector<int> getPreparedClauses() = 0;
-    virtual void digestSharing(const std::vector<int>& clauses) = 0;
+    virtual void digestSharing(std::vector<int>& clauses) = 0;
 
     // Methods common to all Job instances
 
