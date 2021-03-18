@@ -30,7 +30,7 @@ private:
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
 
     std::thread _init_thread;
-    Mutex _solver_lock;
+    Mutex _solver_state_change_mutex;
 
     std::thread _destruct_thread;
     std::atomic_bool _shmem_freed = false;

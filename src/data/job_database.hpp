@@ -37,6 +37,11 @@ private:
         };
     };
 
+    std::thread _janitor;
+    std::list<Job*> _jobs_to_free;
+    Mutex _janitor_mutex;
+    std::atomic_bool _exiting = false;
+
 public:
     JobDatabase(Parameters& params, MPI_Comm& comm);
     ~JobDatabase();

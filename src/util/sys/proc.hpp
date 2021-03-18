@@ -21,11 +21,9 @@ class Proc {
 
 private:
     struct CpuInfo { 
-        double uticks = 0, sticks = 0, passedSecs = 0;
-        CpuInfo() = default;
-        CpuInfo(CpuInfo& other) = default; 
-        CpuInfo& operator=(CpuInfo&& other) = default;
-        CpuInfo& operator=(const CpuInfo& other) = default;
+        double uticks = 0;
+        double sticks = 0;
+        double passedSecs = 0;
     };
     static std::map<long, CpuInfo> _cpu_info_per_tid;
     static Mutex _cpu_info_lock;

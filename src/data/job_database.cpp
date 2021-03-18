@@ -70,38 +70,6 @@ bool JobDatabase::checkComputationLimits(int jobId) {
     return job.checkResourceLimit(_wcsecs_per_instance, _cpusecs_per_instance);
 }
 
-
-void JobDatabase::forget(int jobId) {
-    Job& job = get(jobId);
-    if (job.getState() == SUSPENDED) job.resume();
-    if (job.getState() == ACTIVE) job.stop();
-    if (job.getState() == INACTIVE) job.terminate();
-    assert(job.getState() == PAST);
-    // Check if the job can be destructed
-    if (job.isDestructible()) {
-        log(V3_VERB, "FORGET #%i\n", jobId);
-        free(jobId);
-    }
-}
-
-void JobDatabase::free(int jobId) {
-
-    if (!has(jobId)) return;
-    Job* job = &get(jobId);
-    int index = job->getIndex();
-    log(V4_VVER, "Delete %s\n", job->toStr());
-
-    // Remove job meta data from balancer
-    _balancer->forget(jobId);
-
-    // Delete job and its solvers
-    _jobs.erase(jobId);
-    delete job;
-
-    log(V4_VVER, "Deleted %s\n", toStr(jobId, index).c_str());
-    Logger::getMainInstance().mergeJobLogs(jobId);
-}
-
 bool JobDatabase::isRequestObsolete(const JobRequest& req) {
 
     // Requests for a job root never become obsolete
@@ -347,6 +315,55 @@ void JobDatabase::forgetOldJobs() {
     }
 }
 
+void JobDatabase::forget(int jobId) {
+    Job& job = get(jobId);
+    if (job.getState() == SUSPENDED) job.resume();
+    if (job.getState() == ACTIVE) job.stop();
+    if (job.getState() == INACTIVE) job.terminate();
+    assert(job.getState() == PAST);
+    // Check if the job can be destructed
+    if (job.isDestructible()) {
+        log(V3_VERB, "FORGET #%i\n", jobId);
+        free(jobId);
+    }
+}
+
+void JobDatabase::free(int jobId) {
+
+    if (!has(jobId)) return;
+    Job* job = &get(jobId);
+    int index = job->getIndex();
+    log(V4_VVER, "Delete %s\n", job->toStr());
+
+    // Remove job meta data from balancer
+    _balancer->forget(jobId);
+
+    // Delete job and its solvers
+    _jobs.erase(jobId);
+
+    // Concurrently free associated resources
+    {
+        auto lock = _janitor_mutex.getLock();
+        _jobs_to_free.emplace_back(job);
+    }
+    if (!_janitor.joinable()) _janitor = std::thread([this]() {
+        log(V3_VERB, "Job-DB Janitor tid=%lu\n", Proc::getTid());
+        while (!_exiting) {
+            usleep(1000 * 1000);
+            std::list<Job*> copy;
+            {
+                auto lock = _janitor_mutex.getLock();
+                copy = std::move(_jobs_to_free);
+                _jobs_to_free.clear();
+            }
+            for (auto job : copy) delete job;
+        }
+    });
+
+    log(V4_VVER, "Deleted %s\n", toStr(jobId, index).c_str());
+    Logger::getMainInstance().mergeJobLogs(jobId);
+}
+
 std::vector<std::pair<JobRequest, int>>  JobDatabase::getDeferredRequestsToForward(float time) {
     
     std::vector<std::pair<JobRequest, int>> result;
@@ -452,7 +469,9 @@ robin_hood::unordered_map<int, int> JobDatabase::getBalancingResult() {
 JobDatabase::~JobDatabase() {
 
     // Setup a watchdog to get feedback on hanging destructors
-    Watchdog watchdog(/*checkIntervMillis=*/10*1000, Timer::elapsedSeconds());
+    Watchdog watchdog(/*checkIntervMillis=*/200, Timer::elapsedSeconds());
+    watchdog.setWarningPeriod(500);
+    watchdog.setAbortPeriod(10*1000);
 
     // Collect all jobs 
     std::vector<int> jobIds;
@@ -463,6 +482,10 @@ JobDatabase::~JobDatabase() {
         free(jobId);
         watchdog.reset();
     }
+
+    // Join cleanup thread for old jobs
+    _exiting = true;
+    if (_janitor.joinable()) _janitor.join();
 
     watchdog.stop();
 }
