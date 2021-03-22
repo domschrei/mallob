@@ -43,7 +43,7 @@ bool SatReader::read(JobDescription& desc) {
 		desc.reserveSize(size / sizeof(int));
 
 		f = (char *) mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
-		for (int i = 0; i < size; i++) {
+		for (long i = 0; i < size; i++) {
 			process(f[i], desc);
 		}
 		munmap(f, size);
@@ -52,7 +52,7 @@ bool SatReader::read(JobDescription& desc) {
 	} else {
 		// Read every character of the formula (in a buffered manner)
 		char buffer[4096] = {'\0'};
-		while (!Terminator::isTerminating() && fgets(buffer, sizeof(buffer), pipe)) {
+		while (!Terminator::isTerminating() && fgets(buffer, sizeof(buffer), pipe) != nullptr) {
 			size_t pos = 0;
 			while (buffer[pos] != '\0') {
 				int c = buffer[pos++];
