@@ -16,6 +16,7 @@ public:
 
     static Mutex _children_mutex;
     static std::set<pid_t> _children;
+    static std::atomic_bool _main_process;
 
     static std::atomic_bool _exit_signal_caught;
     static std::atomic_int _exit_signal;

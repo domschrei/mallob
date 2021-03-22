@@ -20,6 +20,7 @@ int Process::_rank;
 
 Mutex Process::_children_mutex;
 std::set<pid_t> Process::_children;
+std::atomic_bool Process::_main_process;
 
 std::atomic_bool Process::_exit_signal_caught = false;
 std::atomic_int Process::_exit_signal = 0;
@@ -32,18 +33,28 @@ void doNothing(int signum) {
     //std::cout << "WOKE_UP" << std::endl;
 }
 
-void handleExitSignal(int signum) {
-    Process::doExit(signum);
-}
-
-void Process::doExit(int retval) {
+void handleSignal(int signum) {
+    // Do not recursively catch signals (if something goes wrong in here)
     if (Process::_exit_signal_caught) return;
-    _exit_signal = retval;
-    _exit_signal_caught = true;
-    if (retval == SIGSEGV || retval == SIGABRT) {
+
+    Process::_exit_signal = signum;
+    Process::_exit_signal_caught = true;
+    
+    if (signum == SIGSEGV || signum == SIGABRT) {
         // Try to write a trace of this thread found by gdb
         Process::writeTrace(Proc::getTid());
     }
+    
+    // If this is the main process, its main loop will detect termination.
+    // If this is a subprocess, exit immediately
+    if (!Process::_main_process) Process::doExit(signum);
+}
+
+void Process::doExit(int retval) {
+    // Set exit signal to make terminate checker stop
+    Process::_exit_signal = retval;
+    Process::_exit_signal_caught = true;
+    // Join terminate checker
     _terminate_checker.join();
     // Exit with normal exit code if terminated or interrupted,
     // with caught signal otherwise
@@ -55,18 +66,13 @@ void Process::init(int rank, bool leafProcess) {
 
     _rank = rank;
     _exit_signal_caught = false;
+    _main_process = !leafProcess;
 
-    signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
-    signal(SIGSEGV, handleExitSignal);
-    signal(SIGABRT, handleExitSignal);
-    signal(SIGTERM, handleExitSignal);
-    signal(SIGINT,  handleExitSignal);
-
-    _terminate_checker = std::thread([leafProcess]() {
+    _terminate_checker = std::thread([]() {
 
         while (!_exit_signal_caught) usleep(1000 * 100); // 0.1s
 
-        if (!leafProcess) forwardTerminateToChildren();
+        if (_main_process) forwardTerminateToChildren();
 
         if (_exit_signal == SIGABRT || _exit_signal == SIGSEGV) {
             int sig = _exit_signal;
@@ -77,6 +83,12 @@ void Process::init(int rank, bool leafProcess) {
         // Try to flush output again
         Logger::getMainInstance().flush();
     });
+
+    signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
+    signal(SIGSEGV, handleSignal);
+    signal(SIGABRT, handleSignal);
+    signal(SIGTERM, handleSignal);
+    signal(SIGINT,  handleSignal);
 }
 
 pid_t Process::createChild() {
