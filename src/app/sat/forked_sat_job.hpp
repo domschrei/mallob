@@ -73,6 +73,10 @@ public:
     bool hasPreparedSharing() override;
     std::vector<int> getPreparedClauses() override;
     void digestSharing(std::vector<int>& clauses) override;
+
+private:
+    void startDestructThreadIfNecessary();
+
 };
 
 

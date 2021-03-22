@@ -32,17 +32,18 @@ void doNothing(int signum) {
     //std::cout << "WOKE_UP" << std::endl;
 }
 
-void handleSignal(int signum) {
+void handleExitSignal(int signum) {
     Process::doExit(signum);
 }
 
 void Process::doExit(int retval) {
+    if (Process::_exit_signal_caught) return;
+    _exit_signal = retval;
+    _exit_signal_caught = true;
     if (retval == SIGSEGV || retval == SIGABRT) {
         // Try to write a trace of this thread found by gdb
         Process::writeTrace(Proc::getTid());
     }
-    _exit_signal = retval;
-    _exit_signal_caught = true;
     _terminate_checker.join();
     exit(retval);
 }
@@ -54,10 +55,10 @@ void Process::init(int rank, bool leafProcess) {
     _exit_signal_caught = false;
 
     signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
-    signal(SIGSEGV, handleSignal);
-    signal(SIGABRT, handleSignal);
-    signal(SIGTERM, handleSignal);
-    signal(SIGINT, handleSignal);
+    signal(SIGSEGV, handleExitSignal);
+    signal(SIGABRT, handleExitSignal);
+    signal(SIGTERM, handleExitSignal);
+    signal(SIGINT,  handleExitSignal);
 
     _terminate_checker = std::thread([leafProcess]() {
 
@@ -83,8 +84,10 @@ pid_t Process::createChild() {
         // parent process
         auto lock = _children_mutex.getLock();
         _children.insert(res);
-    } else {
-        assert(res >= 0);
+    } else if (res == -1) {
+        // fork failed
+        log(V0_CRIT, "fork returned errno %i\n", (int)errno);
+        abort();
     }
 
     return res;

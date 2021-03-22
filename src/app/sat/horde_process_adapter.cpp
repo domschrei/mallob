@@ -115,9 +115,11 @@ pid_t HordeProcessAdapter::run() {
 
     // [child process]
     // Execute the SAT process.
-    execvp("mallob_sat_process", argv);
-
-    abort(); // if this is reached, something went wrong with execvp
+    int result = execvp("mallob_sat_process", argv);
+    
+    // If this is reached, something went wrong with execvp
+    log(V0_CRIT, "execvp returned %i with errno %i\n", result, (int)errno);
+    abort();
 }
 
 bool HordeProcessAdapter::isFullyInitialized() {

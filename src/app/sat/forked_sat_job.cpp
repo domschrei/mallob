@@ -77,18 +77,7 @@ void ForkedSatJob::appl_terminate() {
     if (!_initialized) return;
     auto lock = _solver_state_change_mutex.getLock();
     _solver->setSolvingState(SolvingStates::ABORTING);
-
-    // Ensure concurrent destruction of shared memory
-    if (!_destruct_thread.joinable() && !_shmem_freed) {
-        log(V4_VVER, "%s : freeing mem\n", toStr());
-        _destruct_thread = std::thread([this]() {
-            while (!Process::didChildExit(_solver_pid))
-                usleep(100*1000); // 0.1s
-            _solver->freeSharedMemory();
-            log(V4_VVER, "%s : mem freed\n", toStr());
-            _shmem_freed = true;
-        });
-    }
+    startDestructThreadIfNecessary();
 }
 
 int ForkedSatJob::appl_solved() {
@@ -121,9 +110,12 @@ void ForkedSatJob::appl_dumpStats() {
 }
 
 bool ForkedSatJob::appl_isDestructible() {
+    assert(getState() == PAST);
     // Not initialized (yet): No init thread may be running
     if (!_initialized) return !_init_thread.joinable();
-    // Job completely terminated:
+    // If shared memory needs to be cleaned up, start an according thread
+    startDestructThreadIfNecessary();
+    // Everything cleaned up?
     return _shmem_freed;
 }
 
@@ -171,6 +163,20 @@ std::vector<int> ForkedSatJob::getPreparedClauses() {
 void ForkedSatJob::digestSharing(std::vector<int>& clauses) {
     if (!_initialized) return;
     _solver->digestClauses(clauses);
+}
+
+void ForkedSatJob::startDestructThreadIfNecessary() {
+    // Ensure concurrent destruction of shared memory
+    if (!_destruct_thread.joinable() && !_shmem_freed) {
+        log(V4_VVER, "%s : freeing mem\n", toStr());
+        _destruct_thread = std::thread([this]() {
+            while (!Process::didChildExit(_solver_pid))
+                usleep(100*1000); // 0.1s
+            _solver->freeSharedMemory();
+            log(V4_VVER, "%s : mem freed\n", toStr());
+            _shmem_freed = true;
+        });
+    }
 }
 
 ForkedSatJob::~ForkedSatJob() {
