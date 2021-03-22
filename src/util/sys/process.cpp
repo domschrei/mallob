@@ -45,7 +45,9 @@ void Process::doExit(int retval) {
         Process::writeTrace(Proc::getTid());
     }
     _terminate_checker.join();
-    exit(retval);
+    // Exit with normal exit code if terminated or interrupted,
+    // with caught signal otherwise
+    exit((retval == SIGTERM || retval == SIGINT) ? 0 : retval);
 }
 
 
