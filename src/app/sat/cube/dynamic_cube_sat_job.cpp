@@ -232,7 +232,10 @@ int DynamicCubeSatJob::getDemand(int prevVolume, float elapsedTime) const {
     if (_job_state != WORKING)
         return 1;
     else
-        return Job::getDemand(prevVolume, elapsedTime);
+        if (_lib->allCubesGenerated())
+            return Job::getDemand(prevVolume, elapsedTime);
+        else
+            return prevVolume;
 }
 
 DynamicCubeSatJob::~DynamicCubeSatJob() {
