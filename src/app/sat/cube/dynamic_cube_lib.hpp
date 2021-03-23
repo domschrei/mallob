@@ -64,6 +64,9 @@ class DynamicCubeLib : public DynamicCubeSolverThreadManagerInterface, public Dy
     ConditionVariable _solver_cv;
     ConditionVariable _generator_cv;
 
+    // Counter for the generator threads, that are waiting because there are too many cubes
+    int _waiting_generator_threads = 0;
+
     // Local learnt clauses
     // Received from the local solver threads
     // They are stored here until they are shared with the system
@@ -102,6 +105,8 @@ class DynamicCubeLib : public DynamicCubeSolverThreadManagerInterface, public Dy
     // For failed assumption communication
     std::vector<int> getNewFailedAssumptions();
     void digestFailedAssumptions(std::vector<int> &failed_assumptions);
+
+    bool allCubesGenerated();
 };
 
 #endif /* MSCHICK_DYNAMIC_CUBE_LIB_H */

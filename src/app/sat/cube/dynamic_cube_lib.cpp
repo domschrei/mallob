@@ -208,11 +208,17 @@ void DynamicCubeLib::shareCubeToSplit(std::optional<Cube> &lastCube, int splitLi
         } else if (static_cast<int>(_dynamic_cubes.size()) >= _max_dynamic_cubes) {
             _logger.log(0, "DynamicCubeGeneratorThread %i: waits because there are too many cubes", id);
 
+            // Increment waiting generators
+            _waiting_generator_threads++;
+
             // Wait because there are too many cubes
             _generator_cv.wait(lock, [this, id] {
                 _logger.log(0, "DynamicCubeGeneratorThread %i: was notified, %s", id, _dynamic_cubes.toString().c_str());
                 return static_cast<int>(_dynamic_cubes.size()) < _max_dynamic_cubes || _state.load() == INTERRUPTING;
             });
+
+            // Decrement waiting generators
+            _waiting_generator_threads--;
 
             _logger.log(0, "DynamicCubeGeneratorThread %i: resumes because there are no longer too many cubes", id);
 
@@ -368,4 +374,8 @@ void DynamicCubeLib::digestFailedAssumptions(std::vector<int> &failed_assumption
     // Send failed assumptions to all threads
     for (auto &solver_thread : _solver_threads) solver_thread->handleFailed(failed_assumptions);
     for (auto &generator_thread : _generator_threads) generator_thread->handleFailed(failed_assumptions);
+}
+
+bool DynamicCubeLib::allCubesGenerated() {
+    return _generator_thread_count == _waiting_generator_threads;
 }
