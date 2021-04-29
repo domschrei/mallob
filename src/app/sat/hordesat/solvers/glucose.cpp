@@ -2,6 +2,7 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include <chrono>
+#include <random>
 
 #include "glucose.hpp"
 #include "app/sat/hordesat/utilities/debug_utils.hpp"
@@ -15,7 +16,7 @@ MGlucose::MGlucose(const SolverSetup& setup)
 		: SimpSolver(), PortfolioSolverInterface(setup) {
 	
 	verbosity = -1;
-	verbEveryConflicts = 100000;
+	verbEveryConflicts = 10000000;
 	parsing = 0;
 
 	stopSolver = 0;
@@ -41,6 +42,9 @@ void MGlucose::addLiteral(int lit) {
 	}
 }
 
+/*
+ * This method uses some of the diversification from SolverConfiguration::configureSAT14().
+ */
 void MGlucose::diversify(int seed) {
 	int rank = getDiversificationIndex();
 	random_seed = seed;
@@ -48,43 +52,61 @@ void MGlucose::diversify(int seed) {
 
 	switch (rank % numDiversifications) {
 	case 0:
+		break; // default solver
 	case 1:
-		// Normal mode with strategy adaptation
 		adaptStrategies = true;
 		break;
 	case 2:
-		// Plain mode without any simplification
 		use_simplification = false;
 		break;
-	case 3:
-		// Shrink clauses by asymmetric branching
-		use_asymm = true;
+	case 3: 
+		var_decay = 0.94;
+		max_var_decay = 0.96;
+		firstReduceDB = 600;
 		break;
 	case 4:
-		// Perform no variable elimination
-		use_elim = false;
+		var_decay = 0.90;
+		max_var_decay = 0.97;
+		firstReduceDB = 500;
 		break;
 	case 5:
-		// Do some random variable decisions
-		random_var_freq = 0.2;
+		var_decay = 0.85;
+		max_var_decay = 0.93;
+		firstReduceDB = 400;
 		break;
 	case 6:
-		// Do not perform phase saving
-		phase_saving = 0;
+		// Glucose 2.0 (+ blocked restarts)
+		var_decay = 0.95;
+		max_var_decay = 0.95;
+		firstReduceDB = 4000;
+		lbdQueue.growTo(100);
+		sizeLBDQueue = 100;
+		K = 0.7;
+		incReduceDB = 500;
 		break;
 	case 7:
-		// Use lower decay factors -> more "short-term" memory for activity
-		max_var_decay = 0.9;
-		clause_decay = 0.99;
+		var_decay = 0.93;
+		max_var_decay = 0.96;
+		firstReduceDB = 100;
+		incReduceDB = 500;
 		break;
 	case 8:
-		// Randomize phase at first branch after a restart
-		randomize_on_restarts = 1;
+		var_decay = 0.75;
+		max_var_decay = 0.94;
+		firstReduceDB = 2000;
 		break;
 	case 9:
-		// Very frequent restarts
-		luby_restart_factor = 10;
+		var_decay = 0.94;
+		max_var_decay = 0.96;
+		firstReduceDB = 800;
 		break;
+	}
+
+	if (rank > numDiversifications) {
+		std::mt19937 rng = std::mt19937(seed);
+		std::uniform_real_distribution<float> dist = std::uniform_real_distribution<float>(0, 1);
+		firstReduceDB += -50 + 100 * dist(rng);
+		var_decay = std::min(var_decay -0.01 + 0.02 * dist(rng), max_var_decay);
 	}
 }
 
@@ -157,7 +179,10 @@ std::set<int> MGlucose::getFailedAssumptions() {
 }
 
 void MGlucose::addLearnedClause(const int* begin, int size) {
-	if (!clauseAddMutex.tryLock()) return;
+	if (!clauseAddMutex.tryLock()) {
+		return;
+	}
+	numReceived++;
 	if (size == 1) {
 		unitsToAdd.push_back(*begin);
 	} else {
@@ -196,6 +221,9 @@ SolvingStatistics MGlucose::getStatistics() {
 	st.propagations = propagations;
 	st.restarts = starts;
 	st.memPeak = 0; // TODO
+	st.receivedClauses = numReceived;
+	st.digestedClauses = numDigested;
+	st.discardedClauses = numDiscarded;
 	return st;
 }
 
@@ -318,7 +346,8 @@ bool MGlucose::parallelImportClauses() {
 			Glucose::Lit l = encodeLit(importedClause[0]);
 			if (value(var(l)) == l_Undef) {
 				uncheckedEnqueue(l);
-			}
+				numDigested++;
+			} else numDiscarded++;
 			continue;
 		}
 
@@ -356,6 +385,7 @@ bool MGlucose::parallelImportClauses() {
 			}
 		}
 		assert(ca[cr].learnt());
+		numDigested++;
 	}
 	learnedClausesToAdd.clear();
 

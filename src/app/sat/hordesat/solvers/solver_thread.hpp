@@ -13,6 +13,7 @@
 #include "util/logger.hpp"
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 #include "app/sat/hordesat/solvers/solving_state.hpp"
+#include "app/sat/hordesat/utilities/clause_shuffler.hpp"
 
 // Forward declarations
 class HordeLib;
@@ -30,6 +31,8 @@ private:
     const int* _f_lits;
     size_t _a_size;
     const int* _a_lits;
+    ClauseShuffler _shuffler;
+    bool _shuffle;
     
     int _local_id;
     std::string _name;
@@ -88,12 +91,8 @@ private:
     void readFormula();
     void read();
 
-    void diversify();
-    void sparseDiversification(int mpi_size, int mpi_rank);
-	void randomDiversification();
-	void sparseRandomDiversification(int mpi_size);
-	void nativeDiversification();
-	void binValueDiversification(int mpi_size, int mpi_rank);
+    void diversifyInitially();
+    void diversifyAfterReading();
 
     void runOnce();
     void waitWhile(SolvingStates::SolvingState state);

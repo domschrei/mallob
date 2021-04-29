@@ -221,6 +221,9 @@ std::vector<int> ThreadedSatJob::getPreparedClauses() {
 }
 void ThreadedSatJob::digestSharing(std::vector<int>& clauses) {
     _solver->digestSharing(clauses);
+    if (getJobTree().isRoot()) {
+        log(V2_INFO, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
+    }
 }
 
 ThreadedSatJob::~ThreadedSatJob() {

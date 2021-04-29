@@ -52,7 +52,7 @@ bool log_return_false(const char* str, ...) {
     return false;
 }
 
-void Logger::init(int rank, int verbosity, bool coloredOutput, bool quiet, bool cPrefix, std::string logDir) {
+void Logger::init(int rank, int verbosity, bool coloredOutput, bool quiet, bool cPrefix, std::string* logDirOrNull) {
     _main_instance._rank = rank;
     _main_instance._verbosity = std::min(7, verbosity);
     _main_instance._colored_output = coloredOutput;
@@ -60,19 +60,24 @@ void Logger::init(int rank, int verbosity, bool coloredOutput, bool quiet, bool 
     _main_instance._c_prefix = cPrefix;
 
     // Create logging directory as necessary
-    _main_instance._log_directory = (logDir.size() == 0 ? "." : logDir) + "/" + std::to_string(rank) + "/";
-    int status = FileUtils::mkdir(_main_instance._log_directory);
-    if (status != 0) {
-        _main_instance.log(V0_CRIT, "ERROR %i while trying to create / access log directory \"%s\"", 
-            status, _main_instance._log_directory.c_str());
-    }
+    if (logDirOrNull != nullptr) {
 
-    // Open logging files
-    _main_instance._log_filename = _main_instance._log_directory + "log" + std::string(".") + std::to_string(rank);
-    _main_instance._log_cfile = fopen(_main_instance._log_filename.c_str(), "a");
-    if (_main_instance._log_cfile == nullptr) {
-        _main_instance.log(V0_CRIT, "ERROR while trying to open log file \"%s\"", 
-            _main_instance._log_filename.c_str());
+        std::string& logDir = *logDirOrNull;
+
+        _main_instance._log_directory = (logDir.size() == 0 ? "." : logDir) + "/" + std::to_string(rank) + "/";
+        int status = FileUtils::mkdir(_main_instance._log_directory);
+        if (status != 0) {
+            _main_instance.log(V0_CRIT, "ERROR %i while trying to create / access log directory \"%s\"\n", 
+                status, _main_instance._log_directory.c_str());
+        }
+
+        // Open logging files
+        _main_instance._log_filename = _main_instance._log_directory + "log" + std::string(".") + std::to_string(rank);
+        _main_instance._log_cfile = fopen(_main_instance._log_filename.c_str(), "a");
+        if (_main_instance._log_cfile == nullptr) {
+            _main_instance.log(V0_CRIT, "ERROR while trying to open log file \"%s\"\n", 
+                _main_instance._log_filename.c_str());
+        }
     }
 }
 Logger::Logger(Logger&& other) :
@@ -113,11 +118,13 @@ void Logger::mergeJobLogs(int jobId) {
 
 Logger Logger::copy(const std::string& linePrefix, const std::string& filenameSuffix, int verbosityOffset) const {
     Logger c;
-    c._log_directory = _log_directory;
-    c._log_filename = _log_filename + filenameSuffix;
-    c._log_cfile = fopen(c._log_filename.c_str(), "a");
-    if (c._log_cfile == nullptr) {
-        log(V0_CRIT, "ERROR while trying to open child log file \"%s\"", c._log_filename.c_str());
+    if (_log_cfile != nullptr) {
+        c._log_directory = _log_directory;
+        c._log_filename = _log_filename + filenameSuffix;
+        c._log_cfile = fopen(c._log_filename.c_str(), "a");
+        if (c._log_cfile == nullptr) {
+            log(V0_CRIT, "ERROR while trying to open child log file \"%s\"", c._log_filename.c_str());
+        }
     }
     c._line_prefix = _line_prefix + " " + linePrefix;
     c._verbosity = _verbosity + verbosityOffset;

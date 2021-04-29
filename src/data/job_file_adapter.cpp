@@ -102,6 +102,11 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         job->setCpuLimit(limit);
         log.log(V4_VVER, "Job #%i : CPU time limit %.3f CPU secs\n", id, limit);
     }
+    if (j.contains("max-demand")) {
+        int maxDemand = j["max-demand"].get<int>();
+        job->setMaxDemand(maxDemand);
+        log.log(V4_VVER, "Job #%i : max demand %i\n", id, maxDemand);
+    }
     job->setArrival(arrival);
     std::string file = j["file"].get<std::string>();
     

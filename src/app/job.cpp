@@ -51,6 +51,13 @@ void Job::start(const std::shared_ptr<std::vector<uint8_t>>& data) {
 
     _description.deserialize(data);
     _priority = _description.getPriority();
+    if (_description.getMaxDemand() > 0) {
+        // Set max. demand to more restrictive number
+        // among global and job-internal limit
+        _max_demand = _max_demand == 0 ? 
+            _description.getMaxDemand() // no global max. demand defined
+            : std::min(_max_demand, _description.getMaxDemand()); // both limits defined
+    }
     
     if (_params.getIntParam("slpp") > 0 && 
             _threads_per_job * _description.getFormulaSize() > (size_t)_params.getIntParam("slpp")) {

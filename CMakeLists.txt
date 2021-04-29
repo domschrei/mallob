@@ -25,7 +25,7 @@ endif()
 
 link_directories(lib/lingeling lib/yalsat lib/cadical lib/glucose)
 set(BASE_LIBS ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} m z lgl yals pthread cadical rt dl)
-set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib/lingeling lib/glucose)
+set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib/lingeling lib/glucose lib)
 
 
 # Source files

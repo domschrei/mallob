@@ -39,7 +39,7 @@ private:
     Logger(const Logger& other) = delete;
     Logger& operator=(const Logger& other) = delete;
 public:
-    static void init(int rank, int verbosity, bool coloredOutput, bool quiet, bool cPrefix, std::string logDir=".");
+    static void init(int rank, int verbosity, bool coloredOutput, bool quiet, bool cPrefix, std::string* logDirOrNull);
     static Logger& getMainInstance() {
         return _main_instance;
     }

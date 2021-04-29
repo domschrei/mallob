@@ -12,13 +12,15 @@
 #include "app/sat/hordesat/solvers/cadical.hpp"
 #include "app/sat/hordesat/utilities/debug_utils.hpp"
 
-const int CLAUSE_LEARN_INTERRUPT_THRESHOLD = 10000;
+//const int CLAUSE_LEARN_INTERRUPT_THRESHOLD = 10000;
 
 Cadical::Cadical(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),
-	  solver(new CaDiCaL::Solver), terminator(*setup.logger), learner(*this) {
+	  solver(new CaDiCaL::Solver), terminator(*setup.logger), 
+	  learner(_setup), learnSource(_setup) {
 	
 	solver->connect_terminator(&terminator);
+	solver->connect_learn_source(&learnSource);
 }
 
 void Cadical::addLiteral(int lit) {
@@ -29,11 +31,31 @@ void Cadical::diversify(int seed) {
 
 	// Options may only be set in the initialization phase, so the seed cannot be re-set
 	if (!seedSet) {
-		solver->set("seed", seed);
+		_logger.log(V3_VERB, "Diversifying %i\n", getDiversificationIndex());
+		bool okay = solver->set("seed", seed);
+		assert(okay);
+		switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
+		case 1: okay = solver->configure ("plain"); break;
+		case 2: okay = solver->set("walk", 0); break;
+		case 3: okay = solver->set("inprocessing", 0); break;
+		case 4: okay = solver->set("restartint", 100); break;
+		case 5: okay = solver->set("phase", 0); break;
+		case 6: okay = solver->set("decompose", 0); break;
+		case 7: okay = solver->set("elim", 0); break;
+		case 0: default: break;
+		//case 6: solver->set("cover", 1); break;
+		//case 7: solver->set("chrono", 0); break;
+		}
+		assert(okay);
+		if (getDiversificationIndex() >= getNumOriginalDiversifications()) 
+			okay = solver->set("shuffle", 1);
+		assert(okay);
 		seedSet = true;
 	}
-	
-	// TODO: More diversification using getDiversificationIndex()
+}
+
+int Cadical::getNumOriginalDiversifications() {
+	return 8;
 }
 
 void Cadical::setPhase(const int var, const bool phase) {
@@ -112,6 +134,12 @@ std::set<int> Cadical::getFailedAssumptions() {
 }
 
 void Cadical::addLearnedClause(const int* begin, int size) {
+	//_logger.log(V4_VVER, "Add clause of size %i to CaDiCaL learn source\n", size);
+	if (size == 1) learnSource.addUnit(*begin);
+	else learnSource.addClause(begin, size);
+
+	/*
+	// Old approach of interrupting and then adding non-redundant clauses
 	auto lock = learnMutex.getLock();
 	if (size == 1) {
 		learnedClauses.emplace_back(begin, begin + 1);
@@ -122,6 +150,7 @@ void Cadical::addLearnedClause(const int* begin, int size) {
 	if (learnedClauses.size() > CLAUSE_LEARN_INTERRUPT_THRESHOLD) {
 		setSolverInterrupt();
 	}
+	*/
 }
 
 void Cadical::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
@@ -137,19 +166,17 @@ int Cadical::getVariablesCount() {
 	return solver->vars();
 }
 
-int Cadical::getNumOriginalDiversifications() {
-	return 0;
-}
-
 int Cadical::getSplittingVariable() {
 	return solver->lookahead();
 }
 
 SolvingStatistics Cadical::getStatistics() {
+	CaDiCaL::Solver::Statistics s = solver->get_stats();
 	SolvingStatistics st;
-	// Stats are currently not accessible for the outside
-	// The can be directly printed with
-	// solver->statistics();
+	st.conflicts = s.conflicts;
+	st.decisions = s.decisions;
+	st.propagations = s.propagations;
+	st.restarts = s.restarts;
 	return st;
 }
 

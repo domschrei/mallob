@@ -21,7 +21,13 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         _clause_buffers.push_back(clauses);
         _num_aggregated_nodes += numAggregated;
 
-        if (canSendClauses()) sendClausesToParent();
+        if (canSendClauses()) {
+            if (_job->getJobTree().isRoot()) {
+                // Rank zero: log the broadcast
+                log(V2_INFO, "%s : Distribute clause buffer from %i sources\n", _job->toStr(), _num_aggregated_nodes+1);
+            }
+            sendClausesToParent();
+        }
 
     } else if (msg.tag == MSG_DISTRIBUTE_CLAUSES) {
         // Learn received clauses, send them to children

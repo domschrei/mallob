@@ -16,7 +16,7 @@ SolverThread::SolverThread(const Parameters& params,
     _params(params), _solver_ptr(solver), _solver(*solver), 
     _logger(_solver.getLogger()), 
     _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits),
-    _local_id(localId), _finished_flag(finished) {
+    _shuffler(fSize, fLits), _local_id(localId), _finished_flag(finished) {
     
     _portfolio_rank = _params.getIntParam("apprank", 0);
     _portfolio_size = _params.getIntParam("mpisize", 1);
@@ -63,11 +63,14 @@ void SolverThread::pin() {
 }
 
 void* SolverThread::run() {
-        
+
+    diversifyInitially();
+
     while (!cancelThread()) {
         readFormula();
         if (cancelThread()) break;
-        diversify();
+        diversifyAfterReading();
+        _shuffler = ClauseShuffler(0, nullptr);
     
         waitWhile(STANDBY);
         runOnce();
@@ -85,24 +88,35 @@ void SolverThread::readFormula() {
 }
 
 void SolverThread::read() {
-    int batchSize = 100000;
-    for (size_t start = _imported_lits; start < _f_size; start += batchSize) {
-        
-        //waitWhile(SUSPENDED);
-        //if (cancelRun()) break;
-        if (cancelThread()) return;
+    
+    if (_shuffle) {
 
-        size_t limit = std::min(start+batchSize, _f_size);
-        for (size_t i = start; i < limit; i++) {
-            _solver.addLiteral(_f_lits[i]);
-            _imported_lits++;
+        while (!cancelThread() && _shuffler.hasNextClause()) {
+            for (int lit : _shuffler.nextClause()) {
+                _solver.addLiteral(lit);
+                _imported_lits++;
+            }
+        }
+
+    } else {
+
+        int batchSize = 100000;
+        for (size_t start = _imported_lits; start < _f_size; start += batchSize) {
+            
+            //waitWhile(SUSPENDED);
+            //if (cancelRun()) break;
+            if (cancelThread()) return;
+
+            size_t limit = std::min(start+batchSize, _f_size);
+            for (size_t i = start; i < limit; i++) {
+                _solver.addLiteral(_f_lits[i]);
+                _imported_lits++;
+            }
         }
     }
 }
 
-void SolverThread::diversify() {
-
-	int diversificationMode = _params.getIntParam("diversify", 1);
+void SolverThread::diversifyInitially() {
 
     // Random seed: will be the same whenever rank and size stay the same,
     // changes to something completely new when rank or size change. 
@@ -111,104 +125,32 @@ void SolverThread::diversify() {
     hash_combine<unsigned int>(seed, _portfolio_size);
     hash_combine<unsigned int>(seed, _portfolio_rank);
     srand(seed);
+    _solver.diversify(seed);
 
-	switch (diversificationMode) {
-	case 1:
-		_logger.log(V5_DEBG, "dv: sparse\n");
-		sparseDiversification(_portfolio_size, _portfolio_rank);
-		break;
-	case 2:
-		_logger.log(V5_DEBG, "dv: bin\n");
-		binValueDiversification(_portfolio_size, _portfolio_rank);
-		break;
-	case 3:
-		_logger.log(V5_DEBG, "dv: rand, s=%u\n", seed);
-		randomDiversification();
-		break;
-	case 4:
-		_logger.log(V5_DEBG, "dv: native\n");
-		nativeDiversification();
-		break;
-	case 5:
-		_logger.log(V5_DEBG, "dv: sparse, native\n");
-		sparseDiversification(_portfolio_size, _portfolio_rank);
-		nativeDiversification();
-		break;
-	case 6:
-		_logger.log(V5_DEBG, "dv: sparserand, s=%u\n", seed);
-		sparseRandomDiversification(_portfolio_size);
-		break;
-	case 7:
-        if (_solver.getGlobalId() >= _solver.getNumOriginalDiversifications()) {
-		    _logger.log(V5_DEBG, "dv: sparserand, native, s=%u\n", seed);
-		    sparseRandomDiversification(_portfolio_size);
-        } else {
-            _logger.log(V5_DEBG, "dv: native, s=%u\n", seed);
+    // Shuffle input
+    // ... only if original diversifications are exhausted
+    _shuffle = _solver.getDiversificationIndex() >= _solver.getNumOriginalDiversifications();
+    float random = 0.001f * (rand() % 1000); // random number in [0,1)
+    assert(random >= 0); assert(random <= 1);
+    // ... only if random throw hits user-defined probability
+    _shuffle = _shuffle && random < _params.getFloatParam("shufinp");
+    if (_shuffle) {
+        _logger.log(V4_VVER, "Shuffling input\n");
+        _shuffler.doShuffle();
+    }
+}
+
+void SolverThread::diversifyAfterReading() {
+	if (_solver.getGlobalId() >= _solver.getNumOriginalDiversifications()) {
+        int solversCount = _params.getIntParam("threads", 1);
+        int totalSolvers = solversCount * _portfolio_size;
+        int vars = _solver.getVariablesCount();
+
+        for (int var = 1; var <= vars; var++) {
+            if (rand() % totalSolvers == 0) {
+                _solver.setPhase(var, rand() % 2 == 1);
+            }
         }
-		nativeDiversification();
-		break;
-	case 0:
-		_logger.log(V5_DEBG, "dv: none\n");
-		break;
-	}
-}
-
-void SolverThread::sparseDiversification(int mpi_size, int mpi_rank) {
-
-    int solversCount = _params.getIntParam("threads", 1);
-    int totalSolvers = mpi_size * solversCount;
-    int vars = _solver.getVariablesCount();
-    int shift = (mpi_rank * solversCount) + _local_id;
-
-    for (int var = 1; var + totalSolvers < vars; var += totalSolvers) {
-        _solver.setPhase(var + shift, true);
-    }
-}
-
-void SolverThread::randomDiversification() {
-
-    int vars = _solver.getVariablesCount();
-
-    for (int var = 1; var <= vars; var++) {
-        _solver.setPhase(var, rand()%2 == 1);
-    }
-}
-
-void SolverThread::sparseRandomDiversification(int mpi_size) {
-
-    int solversCount = _params.getIntParam("threads", 1);
-	int totalSolvers = solversCount * mpi_size;
-    int vars = _solver.getVariablesCount();
-
-    for (int var = 1; var <= vars; var++) {
-        if (rand() % totalSolvers == 0) {
-            _solver.setPhase(var, rand() % 2 == 1);
-        }
-    }
-}
-
-void SolverThread::nativeDiversification() {
-    _solver.diversify(_solver.getGlobalId());
-}
-
-void SolverThread::binValueDiversification(int mpi_size, int mpi_rank) {
-
-    int solversCount = _params.getIntParam("threads", 1);
-	int totalSolvers = mpi_size * solversCount;
-	int tmp = totalSolvers;
-	int log = 0;
-	while (tmp) {
-		tmp >>= 1;
-		log++;
-	}
-    int vars = _solver.getVariablesCount();
-    int num = mpi_rank * _local_id;
-
-    assert(log > 0);
-    for (int var = 1; var < vars; var++) {
-        int bit = var % log;
-        bool phase = (num >> bit) & 1 ? true : false;
-        _solver.setPhase(var, phase);
     }
 }
 

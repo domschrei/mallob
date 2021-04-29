@@ -45,6 +45,11 @@ private:
 	unsigned int softMaxLbd;
 	unsigned int hardMaxLbd;
 
+	// Clause statistics
+	unsigned long numReceived = 0;
+	unsigned long numDigested = 0;
+	unsigned long numDiscarded = 0;
+
 public:
 	MGlucose(const SolverSetup& setup);
 	 ~MGlucose() override;

@@ -678,13 +678,13 @@ void Worker::handleSendJobResult(MessageHandle& handle) {
     log(LOG_ADD_SRCRANK | V2_INFO, "Received result of job #%i rev. %i, code: %i", handle.source, jobId, revision, resultCode);
     std::string resultString = "s " + std::string(resultCode == RESULT_SAT ? "SATISFIABLE" 
                         : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN") + "\n";
-    std::string modelString = "";
+    std::stringstream modelString;
     if (resultCode == RESULT_SAT) {
-        modelString = "v ";
+        modelString << "v ";
         for (size_t x = 1; x < jobResult.solution.size(); x++) {
-            modelString += std::to_string(jobResult.solution[x]) + " ";
+            modelString << std::to_string(jobResult.solution[x]) << " ";
         }
-        modelString += "\n";
+        modelString << "0\n";
     }
     if (_params.isNotNull("s2f")) {
         std::ofstream file;
@@ -693,12 +693,12 @@ void Worker::handleSendJobResult(MessageHandle& handle) {
             log(V0_CRIT, "ERROR: Could not open solution file\n");
         } else {
             file << resultString;
-            if (!modelString.empty()) file << modelString;
+            file << modelString.str();
             file.close();
         }
     } else {
         log(LOG_NO_PREFIX | V0_CRIT, resultString.c_str());
-        if (!modelString.empty()) log(LOG_NO_PREFIX | V0_CRIT, modelString.c_str());
+        log(LOG_NO_PREFIX | V0_CRIT, modelString.str().c_str());
     }
 
     if (_params.isNotNull("mono")) {
@@ -1030,6 +1030,7 @@ void Worker::createExpanderGraph() {
     // Pick fixed number k of bounce destinations
     int numBounceAlternatives = _params.getIntParam("ba");
     int numWorkers = MyMpi::size(_comm);
+    if (numWorkers == 1) return; // no hops
 
     // Check validity of num bounce alternatives
     if (2*numBounceAlternatives > numWorkers) {

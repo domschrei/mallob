@@ -23,6 +23,7 @@ private:
     int _revision = -1;
     float _wallclock_limit = 0; // in seconds
     float _cpu_limit = 0; // in CPU seconds
+    int _max_demand = 0;
 
     float _arrival; // only for introducing a job
 
@@ -76,6 +77,7 @@ public:
     int getRevision() const {return _revision;}
     float getWallclockLimit() const {return _wallclock_limit;}
     float getCpuLimit() const {return _cpu_limit;}
+    int getMaxDemand() const {return _max_demand;}
     
     size_t getFormulaSize() const {return _f_size;}
     const int* getFormulaPayload() const {return _f_payload;}
@@ -92,6 +94,7 @@ public:
     void setRevision(int revision) {_revision = revision;}
     void setWallclockLimit(float limit) {_wallclock_limit = limit;}
     void setCpuLimit(float limit) {_cpu_limit = limit;}
+    void setMaxDemand(int maxDemand) {_max_demand = maxDemand;}
     void setNumVars(int numVars) {_num_vars = numVars;}
     void setArrival(float arrival) {_arrival = arrival;};
     void clearPayload();

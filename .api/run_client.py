@@ -42,20 +42,21 @@ Represents a single job of a particular client.
 """
 class Job:
     
-    def __init__(self, user, name, filename, priority=1, wc_timeout=0, cpu_timeout=0, arrival=0, dependencies=[]):
+    def __init__(self, user, name, filename, priority=1, wc_timeout=0, cpu_timeout=0, max_demand=0, arrival=0, dependencies=[]):
         self._user = user
         self._name = name
         self._filename = filename
         self._priority = priority
         self._wc_timeout = wc_timeout
         self._cpu_timeout = cpu_timeout
+        self._max_demand = max_demand
         self._arrival = arrival
         self._dependencies = dependencies
 
     def to_json(self):
         d_str = str(self._dependencies).replace("'", "\"")
-        return '{ "user": "%s", "name": "%s", "file": "%s", "priority": %.3f, "wallclock-limit": "%s", "cpu-limit": "%s", "arrival": %.3f, "dependencies": %s }' % (
-            self._user, self._name, self._filename, self._priority, self._wc_timeout, self._cpu_timeout, self._arrival, d_str)
+        return '{ "user": "%s", "name": "%s", "file": "%s", "priority": %.3f, "wallclock-limit": "%s", "cpu-limit": "%s", "max-demand": %i, "arrival": %.3f, "dependencies": %s }' % (
+            self._user, self._name, self._filename, self._priority, self._wc_timeout, self._cpu_timeout, self._max_demand, self._arrival, d_str)
     
     def get_json_filename(self):
         return self._user + "." + self._name + ".json"
@@ -72,11 +73,11 @@ class Client:
         self._stream = []
         self._running_job_id = 1
     
-    def add_job_to_stream(self, filename, priority=1, wc_timeout=0, cpu_timeout=0, arrival=0):
+    def add_job_to_stream(self, filename, priority=1, wc_timeout=0, cpu_timeout=0, max_demand=0, arrival=0):
         dependencies = [self._stream[-1]._user+"."+self._stream[-1]._name] if self._stream else []
         self._stream += [Job(self._name, "job-" + str(self._running_job_id), filename,
                         priority=self._priority*priority, wc_timeout=wc_timeout, cpu_timeout=cpu_timeout, 
-                        arrival=max(arrival,self._arrival), dependencies=dependencies)]
+                        max_demand=max_demand, arrival=max(arrival,self._arrival), dependencies=dependencies)]
         self._running_job_id += 1
     
     def has_next_job(self):

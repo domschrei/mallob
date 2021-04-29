@@ -1,44 +1,53 @@
+// Copyright (c) 2015 Tomas Balyo, Karlsruhe Institute of Technology
+// Copyright (c) 2021 Norbert Manthey
 /*
- * Cadical.hpp
+ * MergeSat.h
  *
- *  Created on: Jun 26, 2020
- *      Author: schick
+ *  Created on: Oct 9, 2014
+ *      Author: balyo
  */
 
-#ifndef MSCHICK_CADICAL_H_
-#define MSCHICK_CADICAL_H_
-
-#include <map>
+#ifndef MINISAT_H_
+#define MINISAT_H_
 
 #include "portfolio_solver_interface.hpp"
-
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 
-#include "app/sat/hordesat/solvers/cadical_interface.hpp"
-#include "app/sat/hordesat/solvers/cadical_terminator.hpp"
-#include "app/sat/hordesat/solvers/cadical_learner.hpp"
-#include "app/sat/hordesat/solvers/cadical_learn_source.hpp"
+#define CLS_COUNT_INTERRUPT_LIMIT 300
 
-class Cadical : public PortfolioSolverInterface {
+// allow to modify the name of the namespace, if required
+#ifndef MERGESAT_NSPACE
+#define MERGESAT_NSPACE Minisat
+#endif
+
+// some forward declatarations for MergeSat
+namespace MERGESAT_NSPACE {
+	class SimpSolver;
+	class Lit;
+	template<class T> class vec;
+}
+
+class MergeSatBackend : public PortfolioSolverInterface {
 
 private:
-	std::unique_ptr<CaDiCaL::Solver> solver;
+	MERGESAT_NSPACE::SimpSolver *solver;
+	
+	std::vector<std::vector<int>> learnedClausesToAdd;
+	std::vector<std::vector<int>> clausesToAdd;
+	std::vector<int> clauseToAdd;
 
-	Mutex learnMutex;
+	Mutex clauseAddingLock;
+	LearnedClauseCallback callback;
+	int sizeLimit;
+	int lbdLimit;
 
-	std::vector<std::vector<int> > learnedClauses;
-	std::vector<int> assumptions;
-
-	HordeTerminator terminator;
-    HordeLearner learner;
-	MallobLearnSource learnSource;
-
-	bool seedSet = false;
+	friend void miniLearnCallback(const std::vector<int>& cls, int glueValue, void* issuer);
+	friend void consumeSharedCls(void* issuer);
 
 public:
-	Cadical(const SolverSetup& setup);
-	 ~Cadical();
+	MergeSatBackend(const SolverSetup& setup);
+	~MergeSatBackend() override;
 
 	// Add a (list of) permanent clause(s) to the formula
 	void addLiteral(int lit) override;
@@ -77,6 +86,9 @@ public:
 
 	// Get solver statistics
 	SolvingStatistics getStatistics() override;
+
+	void addInternalClausesToSolver(bool firstTime);
 };
 
-#endif /* CADICAL_H_ */
+
+#endif /* MINISAT_H_ */

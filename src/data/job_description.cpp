@@ -30,6 +30,7 @@ void JobDescription::endInitialization() {
     n = sizeof(int);    memcpy(_raw_data->data()+i, &_revision, n); i += n;
     n = sizeof(float);  memcpy(_raw_data->data()+i, &_wallclock_limit, n); i += n;
     n = sizeof(float);  memcpy(_raw_data->data()+i, &_cpu_limit, n); i += n;
+    n = sizeof(int);    memcpy(_raw_data->data()+i, &_max_demand, n); i += n;
     n = sizeof(size_t); memcpy(_raw_data->data()+i, &_f_size, n); i += n;
     n = sizeof(size_t); memcpy(_raw_data->data()+i, &_a_size, n); i += n;
 
@@ -41,7 +42,7 @@ void JobDescription::endInitialization() {
 
 
 constexpr int JobDescription::getMetadataSize() const {
-    return   4*sizeof(int)
+    return   5*sizeof(int)
             +3*sizeof(float)
             +sizeof(bool)
             +2*sizeof(size_t);
@@ -79,6 +80,7 @@ void JobDescription::deserialize() {
     n = sizeof(int);     memcpy(&_revision, _raw_data->data()+i, n);         i += n;
     n = sizeof(float);   memcpy(&_wallclock_limit, _raw_data->data()+i, n);  i += n;
     n = sizeof(float);   memcpy(&_cpu_limit, _raw_data->data()+i, n);        i += n;
+    n = sizeof(int);     memcpy(&_max_demand, _raw_data->data()+i, n);       i += n;
     n = sizeof(size_t);  memcpy(&_f_size, _raw_data->data()+i, n);           i += n;
     n = sizeof(size_t);  memcpy(&_a_size, _raw_data->data()+i, n);           i += n;
 

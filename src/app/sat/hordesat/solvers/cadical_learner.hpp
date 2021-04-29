@@ -1,46 +1,53 @@
 
+#include <assert.h>
+
 #include "app/sat/hordesat/solvers/cadical_interface.hpp"
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 
 struct HordeLearner : public CaDiCaL::Learner {
-	HordeLearner(PortfolioSolverInterface &portfolio) : _portfolio(portfolio) {}
+
+private:
+	const SolverSetup& _setup;
+	LearnedClauseCallback _callback;
+	std::vector<int> _curr_clause;
+	int _glue_limit;
+	
+public:
+	HordeLearner(const SolverSetup& setup) : _setup(setup), _glue_limit(_setup.softInitialMaxLbd) {}
 	~HordeLearner() override {}
 
   	bool learning(int size) override {
-		return size <= _glueLimit;
+		return size > 0 && size <= _setup.softMaxClauseLength;
 	}
 
 	void learn(int lit) override {
-		if (lit) {
+		if (lit != 0) {
 			// Received a literal
-			_currClause.push_back(lit);
+			_curr_clause.push_back(lit);
 		} else {
 			// Received a zero - clause is finished
-			int glue = _currClause.size();
 
-			// Add (glue + 1) to the front of the clause if not at unit
-			if (glue != 1)
-		        _currClause.insert(_currClause.begin(), glue + 1);
-
-			_callback(_currClause, _portfolio.getLocalId());
-			_currClause.clear();
+			bool eligible = true;
+			if (_curr_clause.size() > 1) {
+				assert(_curr_clause.size() >= 3); // glue value plus at least two literals
+				// Non-unit clause: First integer is glue value
+				int& glue = _curr_clause[0];
+				if (glue > _glue_limit) eligible = false;
+				glue++; // add 1 to glue to avoid zeroes in clause buffer
+				assert(glue > 0);
+			}
+			
+			// Export clause (if eligible), reset current clause
+			if (eligible) _callback(_curr_clause, _setup.localId);
+			_curr_clause.clear();
 		}
 	}
 
     void incGlueLimit() {
-        if (_glueLimit < 8) _glueLimit++;
+        if (_glue_limit < (int)_setup.softFinalMaxLbd) _glue_limit++;
     }
 
     void setCallback(const LearnedClauseCallback& callback) {
         _callback = callback;
     }
-
-	private:
-        int _glueLimit = 2;
-        
-		LearnedClauseCallback _callback;
-
-        PortfolioSolverInterface &_portfolio;
-
-		std::vector<int> _currClause;
 };

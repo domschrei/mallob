@@ -12,6 +12,7 @@
 #include "util/sys/timer.hpp"
 #include "solvers/cadical.hpp"
 #include "solvers/lingeling.hpp"
+//#include "solvers/mergesat.hpp"
 #ifdef MALLOB_USE_RESTRICTED
 #include "solvers/glucose.hpp"
 #endif
@@ -44,6 +45,7 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 	int numLgl = 0;
 	int numGlu = 0;
 	int numCdc = 0;
+	int numMrg = 0;
 
 	// Add solvers from full cycles on previous ranks
 	// and from the begun cycle on the previous rank
@@ -55,6 +57,7 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 		case 'l': solverToAdd = &numLgl; break;
 		case 'g': solverToAdd = &numGlu; break;
 		case 'c': solverToAdd = &numCdc; break;
+		case 'm': solverToAdd = &numMrg; break;
 		}
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
 	}
@@ -81,20 +84,26 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 		case 'l':
 			// Lingeling
 			setup.diversificationIndex = numLgl++;
-			_logger.log(V5_DEBG, "S%i : Lingeling-%i\n", setup.globalId, setup.diversificationIndex);
+			_logger.log(V4_VVER, "S%i : Lingeling-%i\n", setup.globalId, setup.diversificationIndex);
 			_solver_interfaces.emplace_back(new Lingeling(setup));
 			break;
 		case 'c':
 			// Cadical
 			setup.diversificationIndex = numCdc++;
-			_logger.log(V5_DEBG, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
+			_logger.log(V4_VVER, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
 			_solver_interfaces.emplace_back(new Cadical(setup));
 			break;
+		/*case 'm':
+			// MergeSat
+			setup.diversificationIndex = numMrg++;
+			_logger.log(V4_VVER, "S%i : MergeSat-%i\n", setup.globalId, setup.diversificationIndex);
+			_solver_interfaces.emplace_back(new MergeSatBackend(setup));
+			break;*/
 #ifdef MALLOB_USE_RESTRICTED
 		case 'g':
 			// Glucose
 			setup.diversificationIndex = numGlu++;
-			_logger.log(V5_DEBG, "S%i: Glucose-%i\n", setup.globalId, setup.diversificationIndex);
+			_logger.log(V4_VVER, "S%i: Glucose-%i\n", setup.globalId, setup.diversificationIndex);
 			_solver_interfaces.emplace_back(new MGlucose(setup));
 			break;
 #endif

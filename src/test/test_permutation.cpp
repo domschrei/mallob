@@ -11,7 +11,7 @@ int main() {
 
     Timer::init();
     Random::init(rand(), rand());
-    Logger::init(0, V5_DEBG, false, false, false, "/dev/null");
+    Logger::init(0, V5_DEBG, false, false, false, nullptr);
 
     std::vector<int> ns({8, 10, 12, 14, 16, 18, 20, 30, 32, 34, 48, 64, 128, 256, 512, 1024});
     std::vector<int> rs({1, 2, 3, 4, 5, 8, 16});

@@ -163,6 +163,9 @@ std::vector<int> ForkedSatJob::getPreparedClauses() {
 void ForkedSatJob::digestSharing(std::vector<int>& clauses) {
     if (!_initialized) return;
     _solver->digestClauses(clauses);
+    if (getJobTree().isRoot()) {
+        log(V2_INFO, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
+    }
 }
 
 void ForkedSatJob::startDestructThreadIfNecessary() {
