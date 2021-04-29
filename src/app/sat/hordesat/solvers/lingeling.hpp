@@ -27,6 +27,7 @@ private:
 	LearnedClauseCallback callback;
 	int maxvar;
 	double lastTermCallbackTime;
+	const bool incremental;
     
 	// Friends: Callbacks for Lingeling and logging inside these callbacks
 	friend int cbCheckTerminate(void* solverPtr);
@@ -36,7 +37,6 @@ private:
 	friend void cbConsumeCls(void* sp, int** clause, int* glue);
 
 	// clause addition
-	std::vector<std::vector<int>> clausesToAdd;
 	std::vector<int> assumptions;
 
 	RingBuffer learnedClauses;
@@ -99,6 +99,8 @@ public:
 	// Get solver statistics
 	SolvingStatistics getStatistics() override;
 
+private:
+	void updateMaxVar(int lit);
     
 };
 

@@ -12,6 +12,7 @@ struct JobMetadata {
     std::shared_ptr<JobDescription> description;
     std::string file;
     std::vector<int> dependencies;
+    bool done = false;
 
     bool operator==(const JobMetadata& other) const {
         return file == other.file;

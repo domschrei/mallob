@@ -7,7 +7,7 @@
 
 #include "util/sys/file_watcher.hpp"
 #include "util/logger.hpp"
-#include "util/robin_hood.hpp"
+#include "util/hashing.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "data/job_metadata.hpp"
@@ -25,10 +25,11 @@ public:
         std::string userQualifiedName;
         std::string originalFileName;
         float arrivalTime;
+        bool incremental = false;
 
         JobImage() = default;
         JobImage(int id, const std::string& userQualifiedName, const std::string& originalFileName, float arrivalTime) 
-            : id(id), userQualifiedName(userQualifiedName), originalFileName(originalFileName), arrivalTime(arrivalTime) {} 
+            : id(id), userQualifiedName(userQualifiedName), originalFileName(originalFileName), arrivalTime(arrivalTime) {}
     };
 
 private:
@@ -42,8 +43,9 @@ private:
     std::string _base_path;
     FileWatcher _new_jobs_watcher;
     FileWatcher _results_watcher;
-    robin_hood::unordered_node_map<std::string, int> _job_name_to_id;
-    robin_hood::unordered_node_map<int, JobImage> _job_id_to_image;
+    robin_hood::unordered_node_map<std::string, std::pair<int, int>> _job_name_to_id_rev;
+    robin_hood::unordered_node_map<int, int> _job_id_to_latest_rev;
+    robin_hood::unordered_node_map<std::pair<int, int>, JobImage, IntPairHasher> _job_id_rev_to_image;
 
 public:
 
@@ -81,7 +83,7 @@ public:
     void handleJobDone(const JobResult& result);
 
 private:
-    std::string getJobFilePath(int id, Status status);
+    std::string getJobFilePath(int id, int revision, Status status);
     std::string getJobFilePath(const FileWatcher::Event& event, Status status);
     std::string getUserFilePath(const std::string& user);
 

@@ -7,13 +7,14 @@
 #include <utility>
 #include <thread>
 #include <atomic>
+#include <list>
 
 #include "util/params.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
+#include "data/job_result.hpp"
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 #include "app/sat/hordesat/solvers/solving_state.hpp"
-#include "app/sat/hordesat/utilities/clause_shuffler.hpp"
 
 // Forward declarations
 class HordeLib;
@@ -27,42 +28,55 @@ private:
     Logger& _logger;
     std::thread _thread;
 
-    size_t _f_size;
-    const int* _f_lits;
-    size_t _a_size;
-    const int* _a_lits;
-    ClauseShuffler _shuffler;
-    bool _shuffle;
+    std::vector<std::pair<size_t, const int*>> _pending_formulae;
+    std::vector<std::pair<size_t, const int*>> _pending_assumptions;
     
     int _local_id;
     std::string _name;
     int _portfolio_rank;
     int _portfolio_size;
+    long _tid = -1;
 
-    volatile SolvingStates::SolvingState _state;
     Mutex _state_mutex;
     ConditionVariable _state_cond;
 
-    SatResult _result;
-    std::vector<int> _solution;
-    std::set<int> _failed_assumptions;
-
-    size_t _imported_lits = 0;
-    long _tid = -1;
+    std::atomic_int _latest_revision = 0;
+    std::atomic_int _active_revision;
+    std::atomic_ulong _imported_lits_curr_revision = 0;
 
     std::atomic_bool _initialized = false;
-    std::atomic_bool* _finished_flag;
+    std::atomic_bool _interrupted = false;
+    std::atomic_bool _suspended = false;
+    std::atomic_bool _terminated = false;
+
+    bool _found_result = false;
+    JobResult _result;
 
 
 public:
     SolverThread(const Parameters& params, std::shared_ptr<PortfolioSolverInterface> solver, 
-                size_t fSize, const int* fLits, size_t aSize, const int* aLits,
-                int localId, std::atomic_bool* finished);
+                size_t fSize, const int* fLits, size_t aSize, const int* aLits, int localId);
     ~SolverThread();
 
-    void init();
     void start();
-    void setState(SolvingStates::SolvingState state);
+    void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits);
+    void setInterrupt(bool interrupt) {
+        {
+            auto lock = _state_mutex.getLock();
+            _interrupted = interrupt;
+            if (_interrupted) _solver.interrupt();
+        }
+        _state_cond.notify();
+    }
+    void setSuspend(bool suspend) {
+        {
+            auto lock = _state_mutex.getLock();
+            _suspended = suspend;
+            if (_suspended) _solver.suspend();
+        }
+        _state_cond.notify();
+    }
+    void setTerminate() {_terminated = true;};
     void tryJoin() {if (_thread.joinable()) _thread.join();}
 
     bool isInitialized() const {
@@ -71,33 +85,33 @@ public:
     int getTid() const {
         return _tid;
     }
-    SolvingStates::SolvingState getState() const {
-        return _state;
+    bool hasFoundResult(int revision) {
+        auto lock = _state_mutex.getLock();
+        return _active_revision == revision && _found_result;
     }
-    SatResult getSatResult() const {
+    JobResult& getSatResult() {
         return _result;
     }
-    const std::vector<int>& getSolution() const {
-        return _solution;
-    }
-    const std::set<int>& getFailedAssumptions() const {
-        return _failed_assumptions;
-    }
+
+    int getActiveRevision() const {return _active_revision;}
 
 private:
+    void init();
     void* run();
     
     void pin();
-    void readFormula();
-    void read();
+    bool readFormula();
 
     void diversifyInitially();
     void diversifyAfterReading();
 
     void runOnce();
-    void waitWhile(SolvingStates::SolvingState state);
-    bool cancelRun();
-    bool cancelThread();
+    
+    void waitWhileSolved();
+    void waitWhileInterrupted();
+    void waitWhileSuspended();
+    void waitUntil(std::function<bool()> predicate);
+    
     void reportResult(int res);
 
     const char* toStr();

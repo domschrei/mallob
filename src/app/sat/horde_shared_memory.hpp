@@ -9,23 +9,22 @@
 struct HordeSharedMemory {
 
     // Meta data parent->child
-    int portfolioRank;
-    int portfolioSize;
+    int fSize;
+    int aSize;
+    int revision;
 
     // Instructions parent->child
     bool doExport;
     bool doImport;
     bool doDumpStats;
-    bool doUpdateRole;
-    bool doInterrupt;
+    bool doStartNextRevision;
     bool doTerminate;
 
     // Responses child->parent
     bool didExport;
     bool didImport;
     bool didDumpStats;
-    bool didUpdateRole;
-    bool didInterrupt;
+    bool didStartNextRevision;
     bool didTerminate;
 
     // State alerts child->parent
@@ -34,6 +33,7 @@ struct HordeSharedMemory {
     bool hasSolution;
     SatResult result;
 	int solutionSize;
+    int solutionRevision;
     
     // Clause buffers: parent->child
     int exportBufferMaxSize;

@@ -36,6 +36,15 @@ void* accessMemory(const Logger& log, const std::string& shmemId, size_t size) {
     return ptr;
 }
 
+void importRevision(const Logger& log, HordeLib& hlib, const std::string& shmemId, int revision) {
+    size_t* fSizePtr = (size_t*) accessMemory(log, shmemId + ".fsize." + std::to_string(revision), sizeof(size_t));
+    size_t* aSizePtr = (size_t*) accessMemory(log, shmemId + ".asize." + std::to_string(revision), sizeof(size_t));
+    log.log(V4_VVER, "Loading rev. %i : %i lits, %i assumptions\n", revision, *fSizePtr, *aSizePtr);
+    int* fPtr = (int*) accessMemory(log, shmemId + ".formulae." + std::to_string(revision), sizeof(int) * (*fSizePtr));
+    int* aPtr = (int*) accessMemory(log, shmemId + ".assumptions." + std::to_string(revision), sizeof(int) * (*aSizePtr));
+    hlib.appendRevision(revision, *fSizePtr, fPtr, *aSizePtr, aPtr);
+}
+
 void runSolverEngine(const Logger& log, const Parameters& programParams) {
     
     // Set up "management" block of shared memory created by the parent
@@ -44,12 +53,6 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
     HordeSharedMemory* hsm = (HordeSharedMemory*) accessMemory(log, shmemId, sizeof(HordeSharedMemory));
 
     // Read formulae and assumptions from other individual blocks of shared memory
-    int fSize = programParams.getIntParam("fbufsize0");
-    std::string fId = shmemId + ".formulae.0";
-    int* fPtr = (int*) accessMemory(log, fId, fSize);
-    int aSize = programParams.getIntParam("asmptbufsize");
-    std::string aId = shmemId + ".assumptions";
-    int* aPtr = (int*) accessMemory(log, aId, aSize);
 
     // Set up export and import buffers for clause exchanges
     int maxExportBufferSize = programParams.getIntParam("cbbs") * sizeof(int);
@@ -62,10 +65,22 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
     
     // Prepare solver
     HordeLib hlib(programParams, log.copy("H", "H"));
-    hlib.beginSolving(fSize/sizeof(int), fPtr, aSize/sizeof(int), aPtr);
-    bool interrupted = false;
+    // Import first revision
+    {
+        int* fPtr = (int*) accessMemory(log, shmemId + ".formulae.0", sizeof(int) * hsm->fSize);
+        int* aPtr = (int*) accessMemory(log, shmemId + ".assumptions.0", sizeof(int) * hsm->aSize);
+        hlib.appendRevision(0, hsm->fSize, fPtr, hsm->aSize, aPtr);
+    }
+    // Import subsequent revisions
+    int lastImportedRevision = 0;
+    while (!hsm->doStartNextRevision && lastImportedRevision < hsm->revision) {
+        lastImportedRevision++;
+        importRevision(log, hlib, shmemId, lastImportedRevision);
+    }
+    // Start solver threads
+    hlib.solve();
+    
     std::vector<int> solutionVec;
-
     std::string solutionShmemId = "";
     char* solutionShmem;
     int solutionShmemSize = 0;
@@ -87,17 +102,22 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
             break;
         }
 
-        // Interrupt solvers
-        if (hsm->doInterrupt && !hsm->didInterrupt) {
-            log.log(V5_DEBG, "DO interrupt\n");
+        // Uninterrupt solvers
+        if (hsm->doStartNextRevision && !hsm->didStartNextRevision) {
+            log.log(V5_DEBG, "DO start next revision\n");
             hlib.interrupt();
-            hsm->didInterrupt = true;
-            interrupted = true;
+            // Read all revisions since last solve
+            while (lastImportedRevision < hsm->revision) {
+                lastImportedRevision++;
+                importRevision(log, hlib, shmemId, lastImportedRevision);
+            }
+            hlib.solve();
+            hsm->didStartNextRevision = true;
         }
-        if (!hsm->doInterrupt) hsm->didInterrupt = false;
+        if (!hsm->doStartNextRevision) hsm->didStartNextRevision = false;
 
         // Dump stats
-        if (!interrupted && hsm->doDumpStats && !hsm->didDumpStats) {
+        if (hsm->doDumpStats && !hsm->didDumpStats) {
             log.log(V5_DEBG, "DO dump stats\n");
             
             hlib.dumpStats(/*final=*/false);
@@ -124,16 +144,8 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
         }
         if (!hsm->doDumpStats) hsm->didDumpStats = false;
 
-        // Update role
-        if (hsm->doUpdateRole && !hsm->didUpdateRole) {
-            log.log(V5_DEBG, "DO update role\n");
-            hlib.updateRole(hsm->portfolioRank, hsm->portfolioSize);
-            hsm->didUpdateRole = true;
-        }
-        if (!hsm->doUpdateRole) hsm->didUpdateRole = false;
-
         // Check if clauses should be exported
-        if (!interrupted && hsm->doExport && !hsm->didExport) {
+        if (hsm->doExport && !hsm->didExport) {
             log.log(V5_DEBG, "DO export clauses\n");
             // Collect local clauses, put into shared memory
             hsm->exportBufferTrueSize = hlib.prepareSharing(exportBuffer, hsm->exportBufferMaxSize);
@@ -142,7 +154,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
         if (!hsm->doExport) hsm->didExport = false;
 
         // Check if clauses should be imported
-        if (!interrupted && hsm->doImport && !hsm->didImport) {
+        if (hsm->doImport && !hsm->didImport) {
             log.log(V5_DEBG, "DO import clauses\n");
             // Write imported clauses from shared memory into vector
             hlib.digestSharing(importBuffer, hsm->importBufferSize);
@@ -151,29 +163,25 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
         if (!hsm->doImport) hsm->didImport = false;
 
         // Check initialization state
-        if (!interrupted && !hsm->isInitialized && hlib.isFullyInitialized()) {
+        if (!hsm->isInitialized && hlib.isFullyInitialized()) {
             log.log(V5_DEBG, "DO set initialized\n");
             hsm->isInitialized = true;
         }
 
         // Check solved state
-        if (interrupted || hsm->hasSolution) continue;
-        int result = hlib.solveLoop();
-        if (result >= 0) {
+        if (hsm->hasSolution) continue;
+        int resultCode = hlib.solveLoop();
+        if (resultCode >= 0) {
             log.log(V5_DEBG, "DO write solution\n");
             // Solution found!
-            if (result == SatResult::SAT) {
-                // SAT
-                hsm->result = SAT;
-                solutionVec = hlib.getTruthValues();
-            } else if (result == SatResult::UNSAT) {
-                // UNSAT
-                hsm->result = UNSAT; 
-                std::set<int> fa = hlib.getFailedAssumptions();
-                for (int x : fa) solutionVec.push_back(x);
-            }
-            // Write solution
+            auto& result = hlib.getResult();
+            result.id = programParams.getIntParam("jobid");
+            assert(result.revision == lastImportedRevision);
+            solutionVec = result.solution;
+            hsm->result = SatResult(result.result);
             hsm->solutionSize = solutionVec.size();
+            hsm->solutionRevision = result.revision;
+            // Write solution
             if (hsm->solutionSize > 0) {
                 solutionShmemId = shmemId + ".solution";
                 solutionShmemSize =  hsm->solutionSize*sizeof(int);
@@ -203,16 +211,12 @@ int main(int argc, char *argv[]) {
     Timer::init(params.getDoubleParam("starttime"));
 
     int rankOfParent = params.getIntParam("mpirank");
-    
-    Random::init(params.getIntParam("mpisize"), rankOfParent);
 
     // Initialize signal handlers
     Process::init(rankOfParent, /*leafProcess=*/true);
 
-    std::string logdir = params.getParam("log");
     Logger::init(rankOfParent, params.getIntParam("v"), params.isNotNull("colors"), 
-            /*quiet=*/params.isNotNull("q"), /*cPrefix=*/params.isNotNull("mono"), 
-            params.isNotNull("nolog") ? nullptr : &logdir);
+            /*quiet=*/params.isNotNull("q"), /*cPrefix=*/params.isNotNull("mono"), params.getParam("log"));
     
     auto log = getLog(params);
     pid_t pid = Proc::getPid();

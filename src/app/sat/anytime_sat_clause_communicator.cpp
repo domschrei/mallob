@@ -7,6 +7,10 @@
 
 void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
 
+    // Discard messages from a revision inconsistent with
+    // the current local revision
+    if (msg.revision != _job->getRevision()) return;
+
     if (msg.tag == MSG_GATHER_CLAUSES) {
         // Gather received clauses, send to parent
 
@@ -21,13 +25,7 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         _clause_buffers.push_back(clauses);
         _num_aggregated_nodes += numAggregated;
 
-        if (canSendClauses()) {
-            if (_job->getJobTree().isRoot()) {
-                // Rank zero: log the broadcast
-                log(V2_INFO, "%s : Distribute clause buffer from %i sources\n", _job->toStr(), _num_aggregated_nodes+1);
-            }
-            sendClausesToParent();
-        }
+        if (canSendClauses()) sendClausesToParent();
 
     } else if (msg.tag == MSG_DISTRIBUTE_CLAUSES) {
         // Learn received clauses, send them to children
@@ -78,6 +76,7 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
         int parentRank = _job->getJobTree().getParentNodeRank();
         JobMessage msg;
         msg.jobId = _job->getId();
+        msg.revision = _job->getRevision();
         msg.epoch = 0; // unused
         msg.tag = MSG_GATHER_CLAUSES;
         msg.payload = clausesToShare;
@@ -120,6 +119,7 @@ void AnytimeSatClauseCommunicator::sendClausesToChildren(std::vector<int>& claus
     // Send clauses to children
     JobMessage msg;
     msg.jobId = _job->getId();
+    msg.revision = _job->getRevision();
     msg.epoch = 0; // unused
     msg.tag = MSG_DISTRIBUTE_CLAUSES;
     msg.payload = clauses;

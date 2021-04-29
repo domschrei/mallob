@@ -17,8 +17,8 @@ struct JobRequest : public Serializable {
     int rootRank;
     int requestingNodeRank;
     int requestedNodeIndex;
-    int fullTransfer;
-    int revision;
+    int currentRevision;
+    int lastKnownRevision;
     float timeOfBirth;
     int numHops;
 
@@ -30,8 +30,8 @@ public:
         rootRank(rootRank),
         requestingNodeRank(requestingNodeRank),
         requestedNodeIndex(requestedNodeIndex),
-        fullTransfer(1),
-        revision(0),
+        currentRevision(0),
+        lastKnownRevision(-1),
         timeOfBirth(timeOfBirth),
         numHops(numHops) {}
 
@@ -43,8 +43,8 @@ public:
         n = sizeof(int); memcpy(packed.data()+i, &rootRank, n); i += n;
         n = sizeof(int); memcpy(packed.data()+i, &requestingNodeRank, n); i += n;
         n = sizeof(int); memcpy(packed.data()+i, &requestedNodeIndex, n); i += n;
-        n = sizeof(int); memcpy(packed.data()+i, &fullTransfer, n); i += n;
-        n = sizeof(int); memcpy(packed.data()+i, &revision, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &currentRevision, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &lastKnownRevision, n); i += n;
         n = sizeof(float); memcpy(packed.data()+i, &timeOfBirth, n); i += n;
         n = sizeof(int); memcpy(packed.data()+i, &numHops, n); i += n;
         return packed;
@@ -56,8 +56,8 @@ public:
         n = sizeof(int); memcpy(&rootRank, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&requestingNodeRank, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&requestedNodeIndex, packed.data()+i, n); i += n;
-        n = sizeof(int); memcpy(&fullTransfer, packed.data()+i, n); i += n;
-        n = sizeof(int); memcpy(&revision, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&currentRevision, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&lastKnownRevision, packed.data()+i, n); i += n;
         n = sizeof(float); memcpy(&timeOfBirth, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&numHops, packed.data()+i, n); i += n;
         return *this;
@@ -69,7 +69,8 @@ public:
         out << std::fixed << timeOfBirth;
         auto birthStr = out.str();
         return "r.#" + std::to_string(jobId) + ":" + std::to_string(requestedNodeIndex) 
-                + " <- [" + std::to_string(requestingNodeRank) + "] born=" + birthStr 
+                + " rev. " + std::to_string(currentRevision) + " <- [" 
+                + std::to_string(requestingNodeRank) + "] born=" + birthStr 
                 + " hops=" + std::to_string(numHops);
     }
 };
@@ -82,16 +83,16 @@ struct JobSignature : public Serializable {
 
     int jobId;
     int rootRank;
-    int revision;
+    int firstIncludedRevision;
     size_t transferSize;
 
 public:
     JobSignature() = default;
 
-    JobSignature(int jobId, int rootRank, int revision, size_t transferSize) :
+    JobSignature(int jobId, int rootRank, int firstIncludedRevision, size_t transferSize) :
         jobId(jobId),
         rootRank(rootRank),
-        revision(revision),
+        firstIncludedRevision(firstIncludedRevision),
         transferSize(transferSize) {}
 
     int getTransferSize() const {
@@ -105,7 +106,7 @@ public:
         int i = 0, n;
         n = sizeof(int);    memcpy(packed.data()+i, &jobId, n); i += n;
         n = sizeof(int);    memcpy(packed.data()+i, &rootRank, n); i += n;
-        n = sizeof(int);    memcpy(packed.data()+i, &revision, n); i += n;
+        n = sizeof(int);    memcpy(packed.data()+i, &firstIncludedRevision, n); i += n;
         n = sizeof(size_t); memcpy(packed.data()+i, &transferSize, n); i += n;
         return packed;
     }
@@ -114,7 +115,7 @@ public:
         int i = 0, n;
         n = sizeof(int);    memcpy(&jobId, packed.data()+i, n); i += n;
         n = sizeof(int);    memcpy(&rootRank, packed.data()+i, n); i += n;
-        n = sizeof(int);    memcpy(&revision, packed.data()+i, n); i += n;
+        n = sizeof(int);    memcpy(&firstIncludedRevision, packed.data()+i, n); i += n;
         n = sizeof(size_t); memcpy(&transferSize, packed.data()+i, n); i += n;
         return *this;
     }
@@ -123,17 +124,19 @@ public:
 struct JobMessage : public Serializable {
 
     int jobId;
+    int revision;
     int tag;
     int epoch;
     std::vector<int> payload;
 
 public:
     std::vector<uint8_t> serialize() const override {
-        int size = 3*sizeof(int) + payload.size()*sizeof(int);
+        int size = 4*sizeof(int) + payload.size()*sizeof(int);
         std::vector<uint8_t> packed(size);
 
         int i = 0, n;
         n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &revision, n); i += n;
         n = sizeof(int); memcpy(packed.data()+i, &tag, n); i += n;
         n = sizeof(int); memcpy(packed.data()+i, &epoch, n); i += n;
         n = payload.size()*sizeof(int); memcpy(packed.data()+i, payload.data(), n); i += n;
@@ -143,6 +146,7 @@ public:
     JobMessage& deserialize(const std::vector<uint8_t>& packed) override {
         int i = 0, n;
         n = sizeof(int); memcpy(&jobId, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&revision, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&tag, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&epoch, packed.data()+i, n); i += n;
         n = packed.size()-i; payload.resize(n/sizeof(int)); 

@@ -21,13 +21,15 @@ bool SatReader::read(JobDescription& desc) {
 		if (pipe == nullptr) return false;
 	}
 	
+	int revision = desc.getRevision();
 	desc.beginInitialization();
 	
 	_sign = 1;
 	_comment = false;
 	_began_num = false;
+	_assumption = false;
 	_num = 0;
-	_max_var = 0;
+	_max_var = desc.getNumVars();
 
 	if (pipe == nullptr) {
 		// Read file with mmap
@@ -62,10 +64,12 @@ bool SatReader::read(JobDescription& desc) {
 	}
 
 	if (_began_num) { // write final zero (without newline)
-		desc.addLiteral(0);
+		if (!_assumption) desc.addLiteral(0);
 	}
 
 	desc.setNumVars(_max_var);
+	desc.setFirstRevision(revision);
+	desc.setRevision(revision);
 	desc.endInitialization();
 
 	if (pipe != nullptr) pclose(pipe);

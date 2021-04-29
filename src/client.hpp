@@ -53,8 +53,8 @@ private:
     // For active jobs in the system. ONLY ACCESSIBLE FROM CLIENT'S MAIN THREAD.
     std::map<int, std::shared_ptr<JobDescription>> _active_jobs;
     
-    // Collection of job IDs which finished (for checking dependencies).
-    robin_hood::unordered_flat_set<int, robin_hood::hash<int>> _done_jobs;
+    // Collection of job IDs which finished (for checking dependencies) and their corresponding revision.
+    robin_hood::unordered_flat_map<int, int, robin_hood::hash<int>> _done_jobs;
     // Safeguards _done_jobs.
     Mutex _done_job_lock; 
 
@@ -92,14 +92,12 @@ private:
     void handleAbort(MessageHandle& handle);
     void handleSendJobResult(MessageHandle& handle);
     void handleAckAcceptBecomeChild(MessageHandle& handle);
-    void handleQueryJobRevisionDetails(MessageHandle& handle);
-    void handleAckJobRevisionDetails(MessageHandle& handle);
     void handleClientFinished(MessageHandle& handle);
     void handleExit(MessageHandle& handle);
 
     int getMaxNumParallelJobs();
     void introduceNextJob();
-    void finishJob(int jobId);
+    void finishJob(int jobId, bool hasIncrementalSuccessors);
     
 };
 

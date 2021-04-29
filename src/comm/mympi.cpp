@@ -113,7 +113,6 @@ void MyMpi::init(int argc, char *argv[]) {
     /*                   Tag name                           anytime  */
     tagList.emplace_back(MSG_NOTIFY_JOB_ABORTING,           true); 
     tagList.emplace_back(MSG_ACCEPT_ADOPTION_OFFER,         true); 
-    tagList.emplace_back(MSG_CONFIRM_JOB_REVISION_DETAILS,  true);
     tagList.emplace_back(MSG_REDUCE_DATA,                   true);
     tagList.emplace_back(MSG_BROADCAST_DATA,                true);
     tagList.emplace_back(MSG_COLLECTIVE_OPERATION,          false);
@@ -126,18 +125,14 @@ void MyMpi::init(int argc, char *argv[]) {
     tagList.emplace_back(MSG_INTERRUPT,                     true); 
     tagList.emplace_back(MSG_SEND_APPLICATION_MESSAGE,      true); 
     tagList.emplace_back(MSG_NOTIFY_JOB_DONE,               true);
-    tagList.emplace_back(MSG_NOTIFY_JOB_REVISION,           true); 
     tagList.emplace_back(MSG_OFFER_ADOPTION,                true); 
     tagList.emplace_back(MSG_REJECT_ONESHOT,                true); 
     tagList.emplace_back(MSG_QUERY_JOB_RESULT,              true); 
-    tagList.emplace_back(MSG_QUERY_JOB_REVISION_DETAILS,    true); 
     tagList.emplace_back(MSG_QUERY_VOLUME,                  true); 
     tagList.emplace_back(MSG_REJECT_ADOPTION_OFFER,         true); 
     tagList.emplace_back(MSG_NOTIFY_RESULT_OBSOLETE,        true);
     tagList.emplace_back(MSG_SEND_JOB_DESCRIPTION,          false); 
     tagList.emplace_back(MSG_SEND_JOB_RESULT,               false); 
-    tagList.emplace_back(MSG_SEND_JOB_REVISION_DATA,        false);
-    tagList.emplace_back(MSG_SEND_JOB_REVISION_DETAILS,     true); 
     tagList.emplace_back(MSG_NOTIFY_JOB_TERMINATING,        true); 
     tagList.emplace_back(MSG_NOTIFY_VOLUME_UPDATE,          true); 
     tagList.emplace_back(MSG_WARMUP,                        true); 

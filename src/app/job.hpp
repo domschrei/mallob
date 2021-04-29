@@ -37,8 +37,12 @@ public:
     State diagram:
                              |
                              v
-    PAST <--terminate()-- INACTIVE --start()--> ACTIVE --suspend()--> STANDBY
-                                   <--stop()---        <--resume()---
+    PAST <--terminate()-- INACTIVE --start()-->        --suspend()--> SUSPENDED
+                                   <--stop()--- ACTIVE <--resume()---
+                                                  ^|
+                                        restart() || interrupt()
+                                                  |v
+                                                STANDBY
 
     General notes:
     * Communication (MyMpi::*) may ONLY take place within mallob's main thread, i.e., 
@@ -76,6 +80,11 @@ public:
     Resume a suspended job in the same internal state where it was suspended.
     */
     virtual void appl_resume() = 0;
+
+    virtual void appl_interrupt() = 0;
+
+    virtual void appl_restart() = 0;
+
     /*
     Terminate an inactive job which is irrecoverably marked for deletion: This method
     can concurrently trigger a cleanup of any resources needed for solving the job.
@@ -197,6 +206,9 @@ public:
     void suspend();
     // Resume all internal solvers given that they were frozen.
     void resume();
+
+    void interrupt();
+    void restart(const std::shared_ptr<std::vector<uint8_t>>& data);
     
     // Returns true if communicate() should be called.
     bool wantsToCommunicate();

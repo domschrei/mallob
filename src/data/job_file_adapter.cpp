@@ -19,6 +19,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
     std::string userFile, jobName;
     int id;
     float userPrio, arrival;
+    bool incremental;
 
     {
         auto lock = _job_map_mutex.getLock();
@@ -63,25 +64,74 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
             log.log(V1_WARN, "User file %s has inconsistent user ID. Ignoring job file with this user.\n", userFile.c_str());
             return;
         }
-        
-        // Get internal ID for this job
-        if (!_job_name_to_id.count(jobName)) _job_name_to_id[jobName] = _running_id++;
-        id = _job_name_to_id[jobName];
-        log.log(V3_VERB, "Mapping job \"%s\" to internal ID #%i\n", jobName.c_str(), id);
 
-        // Was job already parsed before?
-        if (_job_id_to_image.count(id)) {
-            log.log(V1_WARN, "Modification of a file I already parsed! Ignoring.\n");
-            return;
-        }
-        
         userPrio = jUser["priority"].get<float>();
         arrival = j.contains("arrival") ? j["arrival"].get<float>() : Timer::elapsedSeconds();
-        _job_id_to_image[id] = JobImage(id, jobName, event.name, arrival);
+        incremental = j.contains("incremental") ? j["incremental"].get<bool>() : false;
+
+        if (incremental && j.contains("precursor")) {
+
+            // This is a new increment of a former job - assign SAME internal ID
+            auto precursorName = j["precursor"].get<std::string>() + ".json";
+            if (!_job_name_to_id_rev.count(precursorName)) {
+                log.log(V1_WARN, "[WARN] Unknown precursor job \"%s\"!\n", precursorName.c_str());
+                return;
+            }
+            auto [jobId, rev] = _job_name_to_id_rev[precursorName];
+            id = jobId;
+
+            if (j.contains("done") && j["done"].get<bool>()) {
+
+                // Incremental job is notified to be done
+                log.log(V3_VERB, "Incremental job #%i is done\n", jobId);
+                _job_name_to_id_rev.erase(precursorName);
+                for (int rev = 0; rev <= _job_id_to_latest_rev[id]; rev++) {
+                    _job_id_rev_to_image.erase(std::pair<int, int>(id, rev));
+                }
+                _job_id_to_latest_rev.erase(id);
+
+                // Notify client that this incremental job is done
+                JobMetadata data;
+                data.description = std::shared_ptr<JobDescription>(new JobDescription(id, 0, true));
+                data.done = true;
+                _new_job_callback(std::move(data));
+                FileUtils::rm(eventFile);
+                return;
+
+            } else {
+
+                // Job is not done -- add increment to job
+                _job_id_to_latest_rev[id] = rev+1;
+                _job_name_to_id_rev[jobName] = std::pair<int, int>(id, rev+1);
+                JobImage img = JobImage(id, jobName, event.name, arrival);
+                img.incremental = true;
+                _job_id_rev_to_image[std::pair<int, int>(id, rev+1)] = img;
+            }
+
+        } else {
+
+            // Create new internal ID for this job
+            if (!_job_name_to_id_rev.count(jobName)) 
+                _job_name_to_id_rev[jobName] = std::pair<int, int>(_running_id++, 0);
+            auto pair = _job_name_to_id_rev[jobName];
+            id = pair.first;
+            log.log(V3_VERB, "Mapping job \"%s\" to internal ID #%i\n", jobName.c_str(), id);
+
+            // Was job already parsed before?
+            if (_job_id_rev_to_image.count(std::pair<int, int>(id, 0))) {
+                log.log(V1_WARN, "Modification of a file I already parsed! Ignoring.\n");
+                return;
+            }
+
+            JobImage img(id, jobName, event.name, arrival);
+            img.incremental = incremental;
+            _job_id_rev_to_image[std::pair<int, int>(id, 0)] = std::move(img);
+            _job_id_to_latest_rev[id] = 0;
+        }
 
         // Remove original file, move to "pending"
         FileUtils::rm(eventFile);
-        std::ofstream o(getJobFilePath(id, PENDING));
+        std::ofstream o(getJobFilePath(id, _job_id_to_latest_rev[id], PENDING));
         o << std::setw(4) << j << std::endl;
     }
 
@@ -91,7 +141,8 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         // Jitter job priority
         priority *= 0.99 + 0.01 * Random::rand();
     }
-    JobDescription* job = new JobDescription(id, priority, /*incremental=*/false);
+    JobDescription* job = new JobDescription(id, priority, incremental);
+    job->setRevision(_job_id_to_latest_rev[id]);
     if (j.contains("wallclock-limit")) {
         float limit = TimePeriod(j["wallclock-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS);
         job->setWallclockLimit(limit);
@@ -120,11 +171,11 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         name += ending;
         // If the job is not yet known, assign to it a new ID
         // that will be used by the job later
-        if (!_job_name_to_id.count(name)) {
-            _job_name_to_id[name] = _running_id++;
-            log.log(V3_VERB, "Forward mapping job \"%s\" to internal ID #%i\n", name.c_str(), _job_name_to_id[name]);
+        if (!_job_name_to_id_rev.count(name)) {
+            _job_name_to_id_rev[name] = std::pair<int, int>(_running_id++, 0);
+            log.log(V3_VERB, "Forward mapping job \"%s\" to internal ID #%i\n", name.c_str(), _job_name_to_id_rev[name].first);
         }
-        idDependencies.push_back(_job_name_to_id[name]);
+        idDependencies.push_back(_job_name_to_id_rev[name].first); // TODO inexact: introduce dependencies for job revisions
     }
 
     // Callback to client: New job arrival.
@@ -137,7 +188,7 @@ void JobFileAdapter::handleJobDone(const JobResult& result) {
 
     auto lock = _job_map_mutex.getLock();
 
-    std::string eventFile = getJobFilePath(result.id, PENDING);
+    std::string eventFile = getJobFilePath(result.id, result.revision, PENDING);
     if (!FileUtils::isRegularFile(eventFile)) {
         return; // File does not exist (any more)
     }
@@ -156,12 +207,12 @@ void JobFileAdapter::handleJobDone(const JobResult& result) {
         { "resultstring", result.result == RESULT_SAT ? "SAT" : result.result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN" }, 
         { "revision", result.revision }, 
         { "solution", result.solution },
-        { "responsetime", Timer::elapsedSeconds() - _job_id_to_image[result.id].arrivalTime }
+        { "responsetime", Timer::elapsedSeconds() - _job_id_rev_to_image[std::pair<int, int>(result.id, result.revision)].arrivalTime }
     };
 
     // Remove file in "pending", move to "done"
     FileUtils::rm(eventFile);
-    std::ofstream o(getJobFilePath(result.id, DONE));
+    std::ofstream o(getJobFilePath(result.id, result.revision, DONE));
     o << std::setw(4) << j << std::endl;
 }
 
@@ -175,19 +226,24 @@ void JobFileAdapter::handleJobResultDeleted(const FileWatcher::Event& event, Log
 
     std::string jobName = event.name;
     jobName.erase(std::find(jobName.begin(), jobName.end(), '\0'), jobName.end());
-    if (!_job_name_to_id.contains(jobName)) {
+    if (!_job_name_to_id_rev.contains(jobName)) {
         log.log(V1_WARN, "Cannot clean up job \"%s\" : not known\n", jobName.c_str());
         return;
     }
 
-    int id = _job_name_to_id.at(jobName);
-    _job_name_to_id.erase(jobName);
-    _job_id_to_image.erase(id);
+    if (_job_id_rev_to_image[_job_name_to_id_rev.at(jobName)].incremental)
+        return; // do not clean up
+
+    auto [id, rev] = _job_name_to_id_rev.at(jobName);
+    _job_name_to_id_rev.erase(jobName);
+    _job_id_rev_to_image.erase(std::pair<int, int>(id, rev));
+    log.log(V4_VVER, "Cleaned up \"%s\"\n", event.name.c_str());
 }
 
 
-std::string JobFileAdapter::getJobFilePath(int id, JobFileAdapter::Status status) {
-    return _base_path + (status == NEW ? "/new/" : status == PENDING ? "/pending/" : "/done/") + _job_id_to_image[id].userQualifiedName;
+std::string JobFileAdapter::getJobFilePath(int id, int revision, JobFileAdapter::Status status) {
+    return _base_path + (status == NEW ? "/new/" : status == PENDING ? "/pending/" : "/done/") + 
+        _job_id_rev_to_image[std::pair<int, int>(id, revision)].userQualifiedName;
 }
 
 std::string JobFileAdapter::getJobFilePath(const FileWatcher::Event& event, JobFileAdapter::Status status) {

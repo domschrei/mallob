@@ -21,6 +21,7 @@
 #include "solvers/solver_thread.hpp"
 #include "solvers/solving_state.hpp"
 #include "util/params.hpp"
+#include "data/job_result.hpp"
 
 class HordeLib {
 
@@ -36,11 +37,10 @@ private:
 	std::vector<std::shared_ptr<PortfolioSolverInterface>> _solver_interfaces;
 	std::vector<std::shared_ptr<SolverThread>> _solver_threads;
 	
+	bool _solvers_started = false;
 	volatile SolvingStates::SolvingState _state;
-	SatResult _result;
-	std::vector<int> _model;
-	std::set<int> _failed_assumptions;
-	std::atomic_bool _solution_found = false;
+	int _revision = -1;
+	JobResult _result;
 	std::atomic_bool _cleaned_up = false;
 
 public:
@@ -48,12 +48,12 @@ public:
     HordeLib(const Parameters& params, Logger&& loggingInterface);
 	~HordeLib();
 
-    void beginSolving(size_t fSize, const int* fLits, size_t aSize, const int* aLits);
-	void continueSolving(size_t fSize, const int* fLits, size_t aSize, const int* aLits);
-	void updateRole(int rank, int numNodes);
+    void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits);
+	void solve();
+
 	bool isFullyInitialized();
-	bool isAnySolutionFound() {return _solution_found;}
     int solveLoop();
+	JobResult& getResult() {return _result;}
 
     int prepareSharing(int* begin, int maxSize);
     void digestSharing(std::vector<int>& result);
@@ -74,15 +74,6 @@ public:
 				tids.push_back(_solver_threads[i]->getTid());
 		}
 		return tids;
-	}
-
-	int value(int lit);
-	int failed(int lit);
-	std::vector<int>& getTruthValues() {
-		return _model;
-	}
-	std::set<int>& getFailedAssumptions() {
-		return _failed_assumptions;
 	}
 
 	void cleanUp();

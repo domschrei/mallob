@@ -18,60 +18,32 @@ ThreadedSatJob::ThreadedSatJob(const Parameters& params, int commSize, int world
 
 void ThreadedSatJob::appl_start() {
 
-    if (_initialized) {
-        // Already initialized => Has a valid solver instance
-        
-        // TODO Update job index etc. from JobTree
-        // TODO Update job description and amendments
-        // TODO Continue solving
-        Logger::getMainInstance().flush();
-        abort();
+    assert(!_initialized);
     
-    } else if (!_init_thread.joinable()) _init_thread = std::thread([this]() {
-        
-        // Initialize Hordesat instance
-        Parameters hParams(_params);
-        HordeConfig::applyDefault(hParams, *this);
-        _solver = std::unique_ptr<HordeLib>(new HordeLib(hParams, Logger::getMainInstance().copy(
-            "<h-" + std::string(toStr()) + ">", "#" + std::to_string(getId()) + "."
-        )));
-        _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
+    // Initialize Hordesat instance
+    Parameters hParams(_params);
+    HordeConfig::applyDefault(hParams, *this);
+    _solver = std::unique_ptr<HordeLib>(new HordeLib(hParams, Logger::getMainInstance().copy(
+        "<h-" + std::string(toStr()) + ">", "#" + std::to_string(getId()) + "."
+    )));
+    _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
 
-        //log(V5_DEBG, "%s : beginning to solve\n", toStr());
-        const JobDescription& desc = getDescription();
-        getSolver()->beginSolving(
-            desc.getFormulaSize(), 
-            desc.getFormulaPayload(), 
-            desc.getAssumptionsSize(), 
+    //log(V5_DEBG, "%s : beginning to solve\n", toStr());
+    const JobDescription& desc = getDescription();
+    while (_last_imported_revision < desc.getRevision()) {
+        _last_imported_revision++;
+        _solver->appendRevision(_last_imported_revision, 
+            desc.getFormulaPayloadSize(_last_imported_revision), 
+            desc.getFormulaPayload(_last_imported_revision), 
+            _last_imported_revision == desc.getRevision() ? desc.getAssumptionsSize() : 0, 
             desc.getAssumptionsPayload()
         );
-        //log(V4_VVER, "%s : finished horde initialization\n", toStr());
-        _time_of_start_solving = Timer::elapsedSeconds();
-
-        auto lock = _solver_lock.getLock();
-        _initialized = true;
-        auto state = getState();
-        if (state == SUSPENDED) getSolver()->setPaused(); 
-        if (state == INACTIVE || state == PAST) _solver->interrupt();
-        if (state == PAST) terminateUnsafe();
-    });
+    }
+    _solver->solve();
+    //log(V4_VVER, "%s : finished horde initialization\n", toStr());
+    _time_of_start_solving = Timer::elapsedSeconds();
+    _initialized = true;
 }
-
-/*
-void ThreadedSatJob::appl_updateRole() {
-    if (!solverNotNull()) return;
-    auto lock = _horde_manipulation_lock.getLock();
-    if (solverNotNull()) getSolver()->updateRole(getIndex(), _comm_size);
-}
-
-void ThreadedSatJob::appl_updateDescription(int fromRevision) {
-    auto lock = _horde_manipulation_lock.getLock();
-    JobDescription& desc = getDescription();
-    std::vector<VecPtr> formulaAmendments = desc.getPayloads(fromRevision, desc.getRevision());
-    _done_locally = false;
-    if (solverNotNull()) getSolver()->continueSolving(formulaAmendments, desc.getAssumptions(desc.getRevision()));
-}
-*/
 
 void ThreadedSatJob::appl_suspend() {
     if (!_initialized) return;
@@ -89,6 +61,32 @@ void ThreadedSatJob::appl_stop() {
     if (!_initialized) return;
     auto lock = _solver_lock.getLock();
     _solver->interrupt();
+}
+
+void ThreadedSatJob::appl_interrupt() {
+    appl_stop();
+}
+
+void ThreadedSatJob::appl_restart() {
+    if (!_initialized) return;
+    auto lock = _solver_lock.getLock();
+
+    _done_locally = false;
+    _result = JobResult();
+    _result_code = 0;
+    
+    const JobDescription& desc = getDescription();
+    while (_last_imported_revision < desc.getRevision()) {
+        _last_imported_revision++;
+        _solver->appendRevision(
+            _last_imported_revision,
+            desc.getFormulaPayloadSize(_last_imported_revision), 
+            desc.getFormulaPayload(_last_imported_revision),
+            _last_imported_revision == desc.getRevision() ? desc.getAssumptionsSize() : 0,
+            desc.getAssumptionsPayload()
+        );
+    }
+    _solver->solve();
 }
 
 void ThreadedSatJob::appl_terminate() {
@@ -110,16 +108,9 @@ void ThreadedSatJob::terminateUnsafe() {
 JobResult ThreadedSatJob::appl_getResult() {
     if (_result.id != 0) return _result;
     auto lock = _solver_lock.getLock();
+    _result = getSolver()->getResult();
     _result.id = getId();
-    _result.result = _result_code;
-    _result.revision = getRevision();
-    _result.solution.clear();
-    if (_result_code == SAT) {
-        _result.solution = getSolver()->getTruthValues();
-    } else if (_result_code == UNSAT) {
-        std::set<int>& assumptions = getSolver()->getFailedAssumptions();
-        std::copy(assumptions.begin(), assumptions.end(), std::back_inserter(_result.solution));
-    }
+    assert(_result.revision == getRevision());
     return _result;
 }
 
@@ -221,14 +212,10 @@ std::vector<int> ThreadedSatJob::getPreparedClauses() {
 }
 void ThreadedSatJob::digestSharing(std::vector<int>& clauses) {
     _solver->digestSharing(clauses);
-    if (getJobTree().isRoot()) {
-        log(V2_INFO, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
-    }
 }
 
 ThreadedSatJob::~ThreadedSatJob() {
     log(V4_VVER, "%s : enter destructor\n", toStr());
-    if (_init_thread.joinable()) _init_thread.join();
     if (_destroy_thread.joinable()) _destroy_thread.join();
     log(V4_VVER, "%s : destructing SAT job\n", toStr());
 }

@@ -12,7 +12,7 @@
 #include "util/sys/timer.hpp"
 #include "solvers/cadical.hpp"
 #include "solvers/lingeling.hpp"
-//#include "solvers/mergesat.hpp"
+#include "solvers/mergesat.hpp"
 #ifdef MALLOB_USE_RESTRICTED
 #include "solvers/glucose.hpp"
 #endif
@@ -66,6 +66,7 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 	SolverSetup setup;
 	setup.logger = &_logger;
 	setup.jobname = params.getParam("jobstr");
+	setup.incremental = params.isNotNull("incremental");
 	setup.useAdditionalDiversification = params.isNotNull("aod");
 	setup.hardInitialMaxLbd = params.getIntParam("ihlbd");
 	setup.hardFinalMaxLbd = params.getIntParam("fhlbd");
@@ -93,12 +94,12 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 			_logger.log(V4_VVER, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
 			_solver_interfaces.emplace_back(new Cadical(setup));
 			break;
-		/*case 'm':
+		case 'm':
 			// MergeSat
 			setup.diversificationIndex = numMrg++;
 			_logger.log(V4_VVER, "S%i : MergeSat-%i\n", setup.globalId, setup.diversificationIndex);
 			_solver_interfaces.emplace_back(new MergeSatBackend(setup));
-			break;*/
+			break;
 #ifdef MALLOB_USE_RESTRICTED
 		case 'g':
 			// Glucose
@@ -121,31 +122,33 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 	_logger.log(V5_DEBG, "initialized\n");
 }
 
-void HordeLib::beginSolving(size_t fSize, const int* fLits, size_t aSize, const int* aLits) {
-	
-	_result = UNKNOWN;
-
+void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits) {
+	assert(_state != ACTIVE);
+	_logger.log(V4_VVER, "append rev. %i: %i lits, %i assumptions\n", revision, fSize, aSize);
+	assert(_revision+1 == revision);
 	for (size_t i = 0; i < _num_solvers; i++) {
-		_solver_threads.emplace_back(new SolverThread(
-			_params, _solver_interfaces[i], fSize, fLits, aSize, aLits, i, &_solution_found
-		));
-		_solver_threads.back()->start();
+		if (revision == 0) {
+			// Initialize solver thread
+			_solver_threads.emplace_back(new SolverThread(
+				_params, _solver_interfaces[i], fSize, fLits, aSize, aLits, i
+			));
+		} else {
+			_solver_threads[i]->appendRevision(revision, fSize, fLits, aSize, aLits);
+		}
 	}
-
-	setSolvingState(ACTIVE);
-	_logger.log(V5_DEBG, "started solver threads\n");
+	_revision = revision;
 }
 
-void HordeLib::continueSolving(size_t fSize, const int* fLits, size_t aSize, const int* aLits) {
-	
-	// TODO Update payload
-
-	// unset standby
+void HordeLib::solve() {
+	assert(_revision >= 0);
+	_result.result = UNKNOWN;
 	setSolvingState(ACTIVE);
-}
-
-void HordeLib::updateRole(int rank, int numNodes) {
-	
+	if (!_solvers_started) {
+		// Need to start threads
+		_logger.log(V4_VVER, "starting threads\n");
+		for (auto& thread : _solver_threads) thread->start();
+		_solvers_started = true;
+	}
 }
 
 bool HordeLib::isFullyInitialized() {
@@ -165,20 +168,19 @@ int HordeLib::solveLoop() {
     // Solving done?
 	bool done = false;
 	for (size_t i = 0; i < _solver_threads.size(); i++) {
-		if (_solver_threads[i]->getState() == STANDBY) {
-			done = true;
-			_result = _solver_threads[i]->getSatResult();
-			if (_result == SAT) {
-				_model = _solver_threads[i]->getSolution();
-			} else {
-				_failed_assumptions = _solver_threads[i]->getFailedAssumptions();
+		if (_solver_threads[i]->hasFoundResult(_revision)) {
+			auto& result = _solver_threads[i]->getSatResult();
+			if (result.revision == _revision) {
+				done = true;
+				_result = std::move(result);
+				break;
 			}
 		}
 	}
 
 	if (done) {
 		_logger.log(V5_DEBG, "Returning result\n");
-		return _result;
+		return _result.result;
 	}
     return -1; // no result yet
 }
@@ -264,29 +266,29 @@ void HordeLib::unsetPaused() {
 
 void HordeLib::interrupt() {
 	if (_state != STANDBY) {
-		dumpStats(/*final=*/true);
+		dumpStats(/*final=*/false);
 		setSolvingState(STANDBY);
 	}
 }
 
 void HordeLib::abort() {
-	if (_state != ABORTING) setSolvingState(ABORTING);
+	if (_state != ABORTING) {
+		dumpStats(/*final=*/true);
+		setSolvingState(ABORTING);
+	}
 }
 
 void HordeLib::setSolvingState(SolvingState state) {
 	SolvingState oldState = _state;
 	_state = state;
-
 	_logger.log(V4_VVER, "state change %s -> %s\n", SolvingStateNames[oldState], SolvingStateNames[state]);
-	for (auto& solver : _solver_threads) solver->setState(state);
-}
-
-int HordeLib::value(int lit) {
-	return _model[abs(lit)];
-}
-
-int HordeLib::failed(int lit) {
-	return _failed_assumptions.find(lit) != _failed_assumptions.end();
+	for (auto& solver : _solver_threads) {
+		if (state == SolvingState::ABORTING) {
+			solver->setTerminate();
+		}
+		solver->setSuspend(state == SolvingState::SUSPENDED);
+		solver->setInterrupt(state == SolvingState::STANDBY);
+	}
 }
 
 void HordeLib::cleanUp() {
