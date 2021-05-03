@@ -55,6 +55,24 @@ public:
             _world_to_int_rank.at(worldRank) : -1;
     }
 
+    /*
+    Returns the entire list of world ranks in the communicator at the present time.
+    The result at position i contains this->getWorldRankOrMinusOne(i).
+    */
+    std::vector<int> getRanklist() const {
+        auto lock = _access_mutex.getLock();
+        return _ranklist;
+    }
+
+    /*
+    Returns the entire map of world ranks to internal ranks in the commicator
+    at the present time. The result maps i to this->getInternalRankOrMinusOne(i).
+    */
+    robin_hood::unordered_flat_map<int, int> getWorldToInternalMap() const {
+        auto lock = _access_mutex.getLock();
+        return _world_to_int_rank;
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
     // End of communicator methods
     ////////////////////////////////////////////////////////////////////////////////    
