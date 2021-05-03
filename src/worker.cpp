@@ -197,11 +197,13 @@ void Worker::mainProgram() {
             if (!_job_db.isIdle()) {
                 Job& job = _job_db.getActive();
                 job.appl_dumpStats();
-                std::string commStr = "";
-                for (size_t i = 0; i < job.getJobComm().size(); i++) {
-                    commStr += " " + std::to_string(job.getJobComm()[i]);
+                if (job.getJobTree().isRoot()) {
+                    std::string commStr = "";
+                    for (size_t i = 0; i < job.getJobComm().size(); i++) {
+                        commStr += " " + std::to_string(job.getJobComm()[i]);
+                    }
+                    log(V4_VVER, "%s job comm:%s\n", job.toStr(), commStr.c_str());
                 }
-                log(V4_VVER, "%s job comm:%s\n", job.toStr(), commStr.c_str());
             }
         }
 
