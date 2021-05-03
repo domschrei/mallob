@@ -255,6 +255,7 @@ public:
     int getMyMpiRank() const {return _job_tree.getRank();}
     JobTree& getJobTree() {return _job_tree;}
     const JobTree& getJobTree() const {return _job_tree;}
+    const JobComm& getJobComm() const {return _comm;}
 
     // Updates the job's resource usage based on the period of time which passed
     // since the last call (or the job's activation) and the old volume of the job,

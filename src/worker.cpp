@@ -194,7 +194,15 @@ void Worker::mainProgram() {
             }
 
             // For the current job
-            if (!_job_db.isIdle()) _job_db.getActive().appl_dumpStats();
+            if (!_job_db.isIdle()) {
+                Job& job = _job_db.getActive();
+                job.appl_dumpStats();
+                std::string commStr = "";
+                for (size_t i = 0; i < job.getJobComm().size(); i++) {
+                    commStr += " " + std::to_string(job.getJobComm()[i]);
+                }
+                log(V4_VVER, "%s job comm:%s\n", job.toStr(), commStr.c_str());
+            }
         }
 
         // Advance load balancing operations

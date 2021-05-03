@@ -5,20 +5,67 @@
 #include <vector>
 #include <assert.h>
 
+#include "util/robin_hood.hpp"
 #include "util/sys/timer.hpp"
 #include "app/job_tree.hpp"
 #include "comm/mympi.hpp"
+#include "util/sys/threading.hpp"
 
 #define MSG_AGGREGATE_RANKLIST 420
 #define MSG_BROADCAST_RANKLIST 421
 
 class JobComm {
 
+public:
+    ////////////////////////////////////////////////////////////////////////////////
+    // Communicator methods
+    ////////////////////////////////////////////////////////////////////////////////
+
+    /*
+    Returns the MPI_COMM_WORLD rank of the node of the given internal rank 
+    (job tree index) or -1 if the internal rank is unknown or invalid.
+    */
+    int getWorldRankOrMinusOne(int intRank) const {
+        auto lock = _access_mutex.getLock();
+        return (size_t)intRank < _ranklist.size() ? _ranklist[intRank] : -1;
+    }
+
+    /*
+    See getWorldRankOrMinusOne(intRank).
+    */
+    int operator[](int intRank) const {
+        return getWorldRankOrMinusOne(intRank);
+    }
+    
+    /*
+    Returns the current number of nodes within the communicator.
+    */
+    size_t size() const {
+        auto lock = _access_mutex.getLock();
+        return _ranklist.size();
+    }
+    
+    /*
+    Returns the internal rank (job tree index) of the given MPI_COMM_WORLD rank
+    or -1 if no node of this internal rank exists within the communicator as of now.
+    */
+    int getInternalRankOrMinusOne(int worldRank) const {
+        auto lock = _access_mutex.getLock();
+        return _world_to_int_rank.count(worldRank) ? 
+            _world_to_int_rank.at(worldRank) : -1;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // End of communicator methods
+    ////////////////////////////////////////////////////////////////////////////////    
+
 private:
     int _id;
     JobTree& _job_tree;
     
+    mutable Mutex _access_mutex;
     std::vector<int> _ranklist;
+    robin_hood::unordered_flat_map<int, int> _world_to_int_rank;
 
     std::vector<int> _next_ranklist;
     bool _aggregate_ranklist = false;
@@ -27,9 +74,13 @@ private:
     float _ranklist_agg_period = 0;
 
 public:
+    ////////////////////////////////////////////////////////////////////////////////
+    // Construction methods
+    ////////////////////////////////////////////////////////////////////////////////
+
     JobComm(int id, JobTree& tree, float updatePeriod) : _id(id), 
         _job_tree(tree), _ranklist_agg_period(updatePeriod) {}
-
+    
     bool wantsToAggregate() {
         if (_ranklist_agg_period <= 0) return false;
         if (_job_tree.isLeaf() 
@@ -44,7 +95,9 @@ public:
 
     void beginAggregation() {
         if (_job_tree.getIndex() == 0) {
+            auto lock = _access_mutex.getLock();
             _ranklist = std::vector<int>(1, _job_tree.getRank());
+            updateMap();
         } else {
             JobMessage msg;
             msg.payload = std::vector<int>(_job_tree.getIndex()+1, -1);
@@ -91,8 +144,13 @@ public:
             ranklist = _next_ranklist;
 
             if (myIndex == 0) {
-                // Store locally and broadcast
-                _ranklist = _next_ranklist;
+                // Store locally
+                {
+                    auto lock = _access_mutex.getLock();
+                    _ranklist = _next_ranklist;
+                    updateMap();
+                }
+                // Broadcast
                 msg.tag = MSG_BROADCAST_RANKLIST;
                 if (_job_tree.hasLeftChild())
                     MyMpi::isend(MPI_COMM_WORLD, _job_tree.getLeftChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
@@ -113,7 +171,11 @@ public:
         } else if (msg.tag == MSG_BROADCAST_RANKLIST) {
 
             // Store locally and forward to children
-            _ranklist = msg.payload;
+            {
+                auto lock = _access_mutex.getLock();
+                _ranklist = msg.payload;
+                updateMap();
+            }
             if (_job_tree.hasLeftChild())
                 MyMpi::isend(MPI_COMM_WORLD, _job_tree.getLeftChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
             if (_job_tree.hasRightChild())
@@ -124,15 +186,11 @@ public:
         return false;
     }
 
-    int getRankOrMinusOne(int index) const {return (size_t)index < _ranklist.size() ? _ranklist[index] : -1;}
-    bool hasRank(int index) const {return getRankOrMinusOne(index) >= 0;}
-    int getRank(int index) const {
-        int rank = getRankOrMinusOne(index);
-        assert(rank >= 0);
-        return rank;
+    void updateMap() {
+        _world_to_int_rank.clear();
+        for (size_t i = 0; i < _ranklist.size(); i++) 
+            _world_to_int_rank[_ranklist[i]] = i;
     }
-    int operator[](int index) const {return getRankOrMinusOne(index);}
-    size_t getCommSize() const {return _ranklist.size();}
 };
 
 #endif
