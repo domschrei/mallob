@@ -20,6 +20,7 @@
 #include "data/job_state.h"
 #include "util/logger.hpp"
 #include "app/job_tree.hpp"
+#include "comm/job_comm.hpp"
 
 class Job {
 
@@ -151,6 +152,7 @@ private:
     float _time_of_abort = 0;
     float _time_of_last_comm = 0;
     float _time_of_last_limit_check = 0;
+    float _time_of_last_ranklist_agg = 0;
     float _used_cpu_seconds = 0;
     
     float _growth_period;
@@ -165,6 +167,7 @@ private:
     bool _result_transfer_pending = false;
 
     JobTree _job_tree;
+    JobComm _comm;
     
     int _volume = 1;
     float _priority = 0.01;
@@ -202,6 +205,8 @@ public:
     bool wantsToCommunicate();
     // Initiate a communication with other nodes in the associated job tree.
     void communicate();
+
+    void communicate(int source, JobMessage& msg);
 
     // Interrupt the execution of solvers and withdraw the associated solvers 
     // and the job's payload. Only leaves behind the job's meta data.
