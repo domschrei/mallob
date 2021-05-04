@@ -332,7 +332,6 @@ void JobDatabase::free(int jobId) {
 
     if (!has(jobId)) return;
     Job* job = &get(jobId);
-    int index = job->getIndex();
     log(V4_VVER, "Delete %s\n", job->toStr());
 
     // Remove job meta data from balancer
@@ -356,12 +355,13 @@ void JobDatabase::free(int jobId) {
                 copy = std::move(_jobs_to_free);
                 _jobs_to_free.clear();
             }
-            for (auto job : copy) delete job;
+            for (auto job : copy) {
+                int id = job->getId();
+                delete job;
+                Logger::getMainInstance().mergeJobLogs(id);
+            }
         }
     });
-
-    log(V4_VVER, "Deleted %s\n", toStr(jobId, index).c_str());
-    Logger::getMainInstance().mergeJobLogs(jobId);
 }
 
 std::vector<std::pair<JobRequest, int>>  JobDatabase::getDeferredRequestsToForward(float time) {
@@ -404,10 +404,6 @@ int JobDatabase::getLoad() const {
 void JobDatabase::setLoad(int load, int whichJobId) {
     assert(load + _load == 1); // (load WAS 1) XOR (load BECOMES 1)
     _load = load;
-
-    // Measure time for which worker was {idle,busy}
-    float now = Timer::elapsedSeconds();
-    //stats.add((load == 0 ? "busyTime" : "idleTime"), now - lastLoadChange);
     assert(has(whichJobId));
     if (load == 1) {
         assert(_current_job == NULL);
