@@ -38,10 +38,13 @@ The clause filtering mechanism has been reworked as well and now periodically fo
 Several further performance improvements were introduced to mallob, for instance the reduction of unnecessary syscalls compared to HordeSat.
 
 
-## Building
+## Installation
 
-We use CMake as our build tool. 
+There are two options on how to obtain a functional instance of Mallob: (a) by direct installation on your Linux system, or (b) via Docker.
 
+### Build on Linux
+
+Mallob is built with CMake. 
 Note that a valid MPI installation is required (e.g. OpenMPI, Intel MPI, MPICH, ...).
 In addition, before building mallob you must first execute `cd lib && bash fetch_and_build_sat_solvers.sh` which, as the name tells, fetches and builds all supported SAT solving libraries.
 
@@ -49,46 +52,47 @@ To build mallob, execute the following usual steps:
 ```
 mkdir -p build
 cd build
-cmake ..
+cmake .. <cmake-options>
 make
 ```
 If you want to make use of Glucose as a SAT solver, use the cmake option `-DMALLOB_USE_RESTRICTED=1` (after having read the Licensing section below).
+Use `-DMALLOB_USE_ASAN=1` to build Mallob with Address Sanitizer for debugging purposes.
 
-Alternatively, you can run mallob in a virtualized manner using Docker, which was successfully done for the SAT Competition 2020.
-Adjust the `CMD` statement in the `Dockerfile` and edit the execution script `aws-run.sh` to fit your particular infrastructure. 
+### Docker
 
+Alternatively, you can run mallob in a Docker container.
+Run `docker build .` in the base directory after setting up Docker on your machine.
+The final line of the output is the ID to run the container, e.g. by running `docker run -i -t <id> bash` and then executing Mallob interactively inside with the options of your choosing.
 
 ## Usage
 
 mallob can be used in several modes of operation which are explained in the following.
 
-### 0. Help
+### Launching Mallob
 
-Execute `mallob -h` or `mallob -help` to get a comprehensive list of all program options.
+For any multinode computations, Mallob is launched with `mpirun`, `mpiexec` or some other MPI application launcher. In addition, Mallob supports spawning SAT solver engines in two ways: As a number of separate threads within the MPI process, or as its individual child process. This can be set with `-appmode=thread` or `-appmode=fork` respectively. Forked mode is the default mode and requires that (i) the executable `mallob_sat_process` (produced during the build) is located in a directory contained in the `PATH` environment variable and (ii) the environment variable `RDMAV_FORK_SAFE=1` must be set.
 
-### 1. Mono instance solving mode
-
-Call mallob in one of the two following ways:
-
+To sum up, a command to launch Mallob is usually structured like this: 
 ```
-mallob -mono=<cnf-file> [options]
-mpirun -np <num-processes> [mpi options] mallob -mono=<cnf-file> [options]
+RDMAV_FORK_SAFE=1 PATH=.:$PATH mpirun <mpi-options> ./mallob <options>
 ```
 
-mallob will run in single instance solving mode on the provided CNF formula file: All available MPI processes (if any) are used with full power to resolve the formula in parallel. This option overrides a couple of options concerning balancing and job demands.
+### Solving a single SAT instance
 
-The mallob-mono configuration for the SAT 2020 Cloud Track essentially corresponds to the following parameter combination for the current version:
+Call mallob with the option `-mono=<cnf-file>`.
+Mallob will run in single instance solving mode on the provided CNF file: All available MPI processes (if any) are used with full power to resolve the formula in parallel. This option overrides a couple of options concerning balancing and job demands.
+
+For instance, the `mallob-mono` configuration for the SC 2020 Cloud Track roughly corresponds to the following parameter combination:
 ```
 -mono=<input_cnf> -log=<logdir> -T=<timelim_secs> -appmode=thread -cbdf=0.75 -cfhl=300 -mcl=5 -sleep=1000 -t=4 -v=3 -satsolver=l
 ```
 This runs four solver threads for each MPI process and writes all output to stdout as well as to the specified log directory, with moderate verbosity.
 
-### 2. Scheduling mode (JSON API)
+### Scheduling and solving many instances
 
-Launch mallob without any particular options regarding its mode of operation. mallob then opens up a JSON API which can be used over the file system of any of the client nodes under `<base directory>/.api/`.
+Launch mallob without any particular options regarding its mode of operation. Mallob then opens up a JSON API which can be used over the file system of any of the client nodes under `<base directory>/.api/`.
 
-The API distinguishes jobs by the user which introduced them. By default there is a user `admin` defined as follows in `.api/users/admin.json`:  
-`{ "id": "admin", "priority": 1.000 }`  
+The API distinguishes jobs by the user which introduced them. By default there is a user `admin` defined in `.api/users/admin.json`.
 You can just use this user or create a new one and save it under `.api/users/<user-id>.json`. The priority must be larger than zero and no larger than one; a higher number gives more importance to the user's jobs.
 
 To introduce a job to the system, drop a JSON file in `.api/jobs/new/` structured as follows:  
@@ -134,7 +138,9 @@ Such a file may look like this:
 The result code is 0 is unknown, 10 if SAT, and 20 if UNSAT.
 In case of SAT, the solution field contains the found satisfying assignment.
 
-We plan to introduce further options and to provide more information over this API in the future.
+### Incremental SAT solving
+
+In its scheduling mode Mallob can be used as a backend for incremental SAT solving.
 
 ### Options Overview
 
