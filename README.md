@@ -1,10 +1,7 @@
 
-# mallob 
+# Mallob 
 
-**Mal**leable **Lo**ad **B**alancer.  
-**M**ultitasking **A**gi**l**e **Lo**gic **B**lackbox.  
-Award-winning SAT Solving for the cloud.
-
+Short links: [Experimental data of our SAT21 paper](https://github.com/domschrei/mallob-experimental-data) · [Animallob: Interactive visualization of experiments](https://dominikschreiber.de/animallob)
 
 ## Overview
 
