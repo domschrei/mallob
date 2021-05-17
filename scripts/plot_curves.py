@@ -100,6 +100,12 @@ for arg in sys.argv[1:]:
         legend_right = True
     elif arg == "-rect" or arg == "--rect":
         rectangular = True
+    elif arg.startswith("-markers="):
+        markers = arg[len("-markers="):].split(",")
+    elif arg.startswith("-linestyles="):
+        linestyles = arg[len("-linestyles="):].split(",")
+    elif arg.startswith("-colors="):
+        colors = arg[len("-colors="):].split(",")
     else:
         files += [arg]
 
