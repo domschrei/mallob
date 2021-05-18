@@ -30,7 +30,6 @@ private:
 	Parameters _params;
 	Logger _logger;
 	
-	size_t _sleep_microsecs;
 	size_t _num_solvers;
 	
 	std::unique_ptr<SharingManagerInterface> _sharing_manager;

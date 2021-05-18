@@ -120,11 +120,13 @@ void HordeProcessAdapter::appendRevisions(const std::vector<RevisionData>& revis
         createSharedMemoryBlock("assumptions." + revStr, sizeof(int) * revData.aSize, (void*)revData.aLits);
     }
 
-    if (_hsm->isInitialized) {
-        _revision_update = latestRevision;
-    } else {
+    _hsm->hasSolution = false;
+
+    if (_state == SolvingStates::INITIALIZING) {
         // Child process not set up yet: Can directly order to parse new clauses
         _hsm->revision = latestRevision;
+    } else {
+        _revision_update = latestRevision;
     }
 }
 
@@ -206,9 +208,11 @@ std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
 
     // ACCESS the existing shared memory segment to the solution vector
     // and remember to clean it up later when destructing the adapter
-    int* shmemSolution = (int*) SharedMemory::access(_shmem_id + ".solution", solution.size()*sizeof(int));
+    int rev = _hsm->solutionRevision;
+    std::string id = _shmem_id + ".solution." + std::to_string(rev);
+    int* shmemSolution = (int*) SharedMemory::access(id, solution.size()*sizeof(int));
     memcpy(solution.data(), shmemSolution, solution.size()*sizeof(int));
-    _shmem.emplace_back(_shmem_id + ".solution", (void*)shmemSolution, solution.size()*sizeof(int));
+    _shmem.emplace_back(id, (void*)shmemSolution, solution.size()*sizeof(int));
     
     return std::pair<SatResult, std::vector<int>>(_hsm->result, solution);
 }

@@ -35,8 +35,7 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 	_logger.log(V2_INFO, "Hlib engine on job %s\n", params.getParam("jobstr").c_str());
 	//params.printParams();
 	_num_solvers = params.getIntParam("threads", 1);
-	_sleep_microsecs = 1000 * params.getIntParam("i", 1000);
-
+	
 	// Retrieve the string defining the cycle of solver choices, one character per solver
 	// e.g. "llgc" => lingeling lingeling glucose cadical lingeling lingeling glucose ...
 	std::string solverChoices = params.getParam("satsolver", "l");
@@ -162,15 +161,12 @@ bool HordeLib::isFullyInitialized() {
 int HordeLib::solveLoop() {
 	if (isCleanedUp()) return -1;
 
-	// Sleeping?
-    if (_sleep_microsecs > 0) usleep(_sleep_microsecs);
-
     // Solving done?
 	bool done = false;
 	for (size_t i = 0; i < _solver_threads.size(); i++) {
 		if (_solver_threads[i]->hasFoundResult(_revision)) {
 			auto& result = _solver_threads[i]->getSatResult();
-			if (result.revision == _revision) {
+			if (result.result > 0 && result.revision == _revision) {
 				done = true;
 				_result = std::move(result);
 				break;

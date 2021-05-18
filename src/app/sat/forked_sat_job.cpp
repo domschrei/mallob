@@ -80,6 +80,8 @@ void ForkedSatJob::loadIncrements() {
         });
     }
     if (!revisions.empty()) _solver->appendRevisions(revisions);
+    _done_locally = false;
+    _internal_result = JobResult();
 }
 
 void ForkedSatJob::appl_suspend() {
@@ -109,10 +111,6 @@ void ForkedSatJob::appl_interrupt() {
 void ForkedSatJob::appl_restart() {
     if (!_initialized) return;
     auto lock = _solver_state_change_mutex.getLock();
-
-    _done_locally = false;
-    _internal_result = JobResult();
-
     loadIncrements();
     _solver->setSolvingState(SolvingStates::ACTIVE);
 }

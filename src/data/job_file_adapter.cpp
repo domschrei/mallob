@@ -38,7 +38,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         }
 
         // Check and read essential fields from JSON
-        if (!j.contains("user") || !j.contains("name") || !j.contains("file")) {
+        if (!j.contains("user") || !j.contains("name")) {
             log.log(V1_WARN, "Job file missing essential field(s). Ignoring this file.\n");
             return;
         }

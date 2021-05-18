@@ -84,6 +84,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
     std::string solutionShmemId = "";
     char* solutionShmem;
     int solutionShmemSize = 0;
+    int lastSolvedRevision = -1;
 
     // Main loop
     while (true) {
@@ -168,8 +169,11 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
             hsm->isInitialized = true;
         }
 
+        // Do not check solved state if the current 
+        // revision has already been solved
+        if (lastSolvedRevision == lastImportedRevision) continue;
+
         // Check solved state
-        if (hsm->hasSolution) continue;
         int resultCode = hlib.solveLoop();
         if (resultCode >= 0) {
             log.log(V5_DEBG, "DO write solution\n");
@@ -178,16 +182,17 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
             result.id = programParams.getIntParam("jobid");
             assert(result.revision == lastImportedRevision);
             solutionVec = result.solution;
+            hsm->solutionRevision = result.revision;
             hsm->result = SatResult(result.result);
             hsm->solutionSize = solutionVec.size();
-            hsm->solutionRevision = result.revision;
             // Write solution
             if (hsm->solutionSize > 0) {
-                solutionShmemId = shmemId + ".solution";
+                solutionShmemId = shmemId + ".solution." + std::to_string(hsm->solutionRevision);
                 solutionShmemSize =  hsm->solutionSize*sizeof(int);
                 solutionShmem = (char*) SharedMemory::create(solutionShmemId, solutionShmemSize);
                 memcpy(solutionShmem, solutionVec.data(), solutionShmemSize);
             }
+            lastSolvedRevision = lastImportedRevision;
             log.log(V5_DEBG, "DONE write solution\n");
             hsm->hasSolution = true;
             continue;

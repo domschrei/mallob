@@ -30,7 +30,7 @@ private:
     const int* _f_lits;
     size_t _a_size;
     const int* _a_lits;
-    int _revision_update;
+    int _revision_update = -1;
     
     std::vector<std::tuple<std::string, void*, int>> _shmem;
     std::string _shmem_id;
