@@ -72,6 +72,7 @@ void* SolverThread::run() {
         // Sleep and wait if the solver should not do solving right now
         waitWhileSolved();
         waitWhileSuspended();
+        waitWhileInterrupted();
         
         bool readingDone = readFormula();
 
