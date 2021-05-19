@@ -8,6 +8,7 @@
 #include "hordesat/solvers/solving_state.hpp"
 #include "hordesat/solvers/portfolio_solver_interface.hpp"
 #include "horde_shared_memory.hpp"
+#include "data/checksum.hpp"
 
 class HordeProcessAdapter {
 
@@ -47,8 +48,8 @@ public:
 
     void collectClauses(int maxSize);
     bool hasCollectedClauses();
-    std::vector<int> getCollectedClauses();
-    void digestClauses(const std::vector<int>& clauses);
+    std::vector<int> getCollectedClauses(Checksum& checksum);
+    void digestClauses(const std::vector<int>& clauses, const Checksum& checksum);
 
     void dumpStats();
     

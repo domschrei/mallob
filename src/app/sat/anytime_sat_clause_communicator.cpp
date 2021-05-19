@@ -128,9 +128,16 @@ void AnytimeSatClauseCommunicator::learnClauses(std::vector<int>& clauses) {
             return;
         }
 
+        // Compute checksum for this set of clauses
+        Checksum checksum;
+        if (_use_checksums) {
+            checksum.combine(_job->getId());
+            for (int lit : clauses) checksum.combine(lit);
+        }
+
         // Locally digest clauses
         log(V4_VVER, "%s : digest\n", _job->toStr());
-        _job->digestSharing(clauses);
+        _job->digestSharing(clauses, checksum);
         log(V4_VVER, "%s : digested\n", _job->toStr());
     }
 }
@@ -182,7 +189,19 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
         // Else, retrieve clauses from solvers
         log(V4_VVER, "%s : collect s<=%i\n", 
                     _job->toStr(), selfSize);
-        selfClauses = _job->getPreparedClauses();
+        Checksum checksum;
+        selfClauses = _job->getPreparedClauses(checksum);
+        if (_use_checksums) {
+            // Verify checksum of clause buffer from solver backend
+            Checksum chk;
+            chk.combine(_job->getId());
+            for (int lit : selfClauses) chk.combine(lit);
+            if (checksum.get() != chk.get()) {
+                log(V1_WARN, "[WARN] %s : checksum fail in clsbuf (expected count: %ld, actual count: %ld)\n", 
+                _job->toStr(), checksum.count(), chk.count());
+                return std::vector<int>();
+            }
+        }
         testConsistency(selfClauses, 0 /*do not check buffer's size limit*/, /*sortByLbd=*/_sort_by_lbd);
     }
     _clause_buffers.push_back(std::move(selfClauses));

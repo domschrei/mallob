@@ -208,19 +208,21 @@ bool ThreadedSatJob::isInitialized() {
 }
 void ThreadedSatJob::prepareSharing(int maxSize) {
     _clause_buffer.resize(maxSize);
-    int actualSize = _solver->prepareSharing(_clause_buffer.data(), maxSize);
+    _clause_checksum = Checksum();
+    int actualSize = _solver->prepareSharing(_clause_buffer.data(), maxSize, _clause_checksum);
     _clause_buffer.resize(actualSize);
 }
 bool ThreadedSatJob::hasPreparedSharing() {
     return !_clause_buffer.empty();
 }
-std::vector<int> ThreadedSatJob::getPreparedClauses() {
+std::vector<int> ThreadedSatJob::getPreparedClauses(Checksum& checksum) {
     std::vector<int> out = _clause_buffer;
     _clause_buffer.clear();
+    checksum = _clause_checksum;
     return out;
 }
-void ThreadedSatJob::digestSharing(std::vector<int>& clauses) {
-    _solver->digestSharing(clauses);
+void ThreadedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& checksum) {
+    _solver->digestSharing(clauses, checksum);
     if (getJobTree().isRoot()) {
         log(V2_INFO, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
     }

@@ -15,6 +15,7 @@
 #include "util/sys/shared_memory.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/proc.hpp"
+#include "data/checksum.hpp"
 
 #include "app/sat/horde_process_adapter.hpp"
 #include "hordesat/horde.hpp"
@@ -136,7 +137,8 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
         if (!interrupted && hsm->doExport && !hsm->didExport) {
             log.log(V5_DEBG, "DO export clauses\n");
             // Collect local clauses, put into shared memory
-            hsm->exportBufferTrueSize = hlib.prepareSharing(exportBuffer, hsm->exportBufferMaxSize);
+            hsm->exportChecksum = Checksum();
+            hsm->exportBufferTrueSize = hlib.prepareSharing(exportBuffer, hsm->exportBufferMaxSize, hsm->exportChecksum);
             hsm->didExport = true;
         }
         if (!hsm->doExport) hsm->didExport = false;
@@ -145,7 +147,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
         if (!interrupted && hsm->doImport && !hsm->didImport) {
             log.log(V5_DEBG, "DO import clauses\n");
             // Write imported clauses from shared memory into vector
-            hlib.digestSharing(importBuffer, hsm->importBufferSize);
+            hlib.digestSharing(importBuffer, hsm->importBufferSize, hsm->importChecksum);
             hsm->didImport = true;
         }
         if (!hsm->doImport) hsm->didImport = false;

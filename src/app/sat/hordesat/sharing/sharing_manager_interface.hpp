@@ -9,6 +9,7 @@
 #define SHARING_SHARINGMANAGERINTERFACE_H_
 
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
+#include "data/checksum.hpp"
 
 struct SharingStatistics {
 	SharingStatistics():exportedClauses(0),importedClauses(0),

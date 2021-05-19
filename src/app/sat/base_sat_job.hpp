@@ -3,6 +3,7 @@
 #define DOMPASCH_MALLOB_BASE_SAT_JOB_H
 
 #include "app/job.hpp"
+#include "data/checksum.hpp"
 
 class BaseSatJob : public Job {
 
@@ -16,8 +17,8 @@ public:
     virtual bool isInitialized() = 0;
     virtual void prepareSharing(int maxSize) = 0;
     virtual bool hasPreparedSharing() = 0;
-    virtual std::vector<int> getPreparedClauses() = 0;
-    virtual void digestSharing(std::vector<int>& clauses) = 0;
+    virtual std::vector<int> getPreparedClauses(Checksum& checksum) = 0;
+    virtual void digestSharing(std::vector<int>& clauses, const Checksum& checksum) = 0;
 
     // Methods common to all Job instances
 

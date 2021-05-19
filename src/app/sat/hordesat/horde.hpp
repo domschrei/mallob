@@ -21,6 +21,7 @@
 #include "solvers/solver_thread.hpp"
 #include "solvers/solving_state.hpp"
 #include "util/params.hpp"
+#include "data/checksum.hpp"
 
 class HordeLib {
 
@@ -55,9 +56,9 @@ public:
 	bool isAnySolutionFound() {return _solution_found;}
     int solveLoop();
 
-    int prepareSharing(int* begin, int maxSize);
-    void digestSharing(std::vector<int>& result);
-	void digestSharing(int* begin, int size);
+    int prepareSharing(int* begin, int maxSize, Checksum& checksum);
+    void digestSharing(std::vector<int>& result, const Checksum& checksum);
+	void digestSharing(int* begin, int size, const Checksum& checksum);
 
     void interrupt();
 	void setSolvingState(SolvingStates::SolvingState state);

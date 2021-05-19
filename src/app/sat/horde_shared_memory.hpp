@@ -5,6 +5,7 @@
 #include <sys/types.h>
 
 #include "hordesat/solvers/portfolio_solver_interface.hpp"
+#include "data/checksum.hpp"
 
 struct HordeSharedMemory {
 
@@ -38,9 +39,11 @@ struct HordeSharedMemory {
     // Clause buffers: parent->child
     int exportBufferMaxSize;
     int importBufferSize;
+    Checksum importChecksum;
     
     // Clause buffers: child->parent
     int exportBufferTrueSize;
+    Checksum exportChecksum;
 };
 
 #endif

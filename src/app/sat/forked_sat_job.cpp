@@ -156,13 +156,13 @@ bool ForkedSatJob::hasPreparedSharing() {
     if (!_initialized) return false;
     return _solver->hasCollectedClauses();
 }
-std::vector<int> ForkedSatJob::getPreparedClauses() {
+std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum) {
     if (!_initialized) return std::vector<int>();
-    return _solver->getCollectedClauses();
+    return _solver->getCollectedClauses(checksum);
 }
-void ForkedSatJob::digestSharing(std::vector<int>& clauses) {
+void ForkedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& checksum) {
     if (!_initialized) return;
-    _solver->digestClauses(clauses);
+    _solver->digestClauses(clauses, checksum);
     if (getJobTree().isRoot()) {
         log(V2_INFO, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
     }

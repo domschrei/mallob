@@ -63,7 +63,7 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 	std::vector<int> added(_solvers.size(), 0);
 
 	bool shuffleClauses = _params.isNotNull("shufshcls");
-
+	
 	// For each incoming clause:
 	int size;
 	int* clsbegin = _cdb.getNextIncomingClause(size);

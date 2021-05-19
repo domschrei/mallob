@@ -183,19 +183,48 @@ int HordeLib::solveLoop() {
     return -1; // no result yet
 }
 
-int HordeLib::prepareSharing(int* begin, int maxSize) {
+int HordeLib::prepareSharing(int* begin, int maxSize, Checksum& checksum) {
 	if (isCleanedUp()) return 0;
 	_logger.log(V5_DEBG, "collecting clauses on this node\n");
-	return _sharing_manager->prepareSharing(begin, maxSize);
+	int size = _sharing_manager->prepareSharing(begin, maxSize);
+
+	if (_params.isNotNull("checksums")) {
+		checksum.combine(_params.getIntParam("jobid"));
+		for (int i = 0; i < size; i++) checksum.combine(begin[i]);
+	}
+
+	return size;
 }
 
-void HordeLib::digestSharing(std::vector<int>& result) {
+void HordeLib::digestSharing(std::vector<int>& result, const Checksum& checksum) {
 	if (isCleanedUp()) return;
+
+	if (_params.isNotNull("checksums")) {
+		Checksum chk;
+		chk.combine(_params.getIntParam("jobid"));
+		for (int lit : result) chk.combine(lit);
+		if (chk.get() != checksum.get()) {
+			_logger.log(V1_WARN, "[WARN] Checksum fail (expected count: %ld, actual count: %ld)\n", checksum.count(), chk.count());
+			return;
+		}
+	}
+
 	_sharing_manager->digestSharing(result);
 }
 
-void HordeLib::digestSharing(int* begin, int size) {
+void HordeLib::digestSharing(int* begin, int size, const Checksum& checksum) {
 	if (isCleanedUp()) return;
+
+	if (_params.isNotNull("checksums")) {
+		Checksum chk;
+		chk.combine(_params.getIntParam("jobid"));
+		for (int i = 0; i < size; i++) chk.combine(begin[i]);
+		if (chk.get() != checksum.get()) {
+			_logger.log(V1_WARN, "[WARN] Checksum fail (expected count: %ld, actual count: %ld)\n", checksum.count(), chk.count());
+			return;
+		}
+	}
+
 	_sharing_manager->digestSharing(begin, size);
 }
 

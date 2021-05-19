@@ -165,21 +165,23 @@ void HordeProcessAdapter::collectClauses(int maxSize) {
 bool HordeProcessAdapter::hasCollectedClauses() {
     return _hsm->didExport;
 }
-std::vector<int> HordeProcessAdapter::getCollectedClauses() {
+std::vector<int> HordeProcessAdapter::getCollectedClauses(Checksum& checksum) {
     if (!_hsm->didExport) {
         return std::vector<int>();
     }
     std::vector<int> clauses(_hsm->exportBufferTrueSize);
     memcpy(clauses.data(), _export_buffer, clauses.size()*sizeof(int));
+    checksum = _hsm->exportChecksum;
     _hsm->doExport = false;
     return clauses;
 }
 
-void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses) {
+void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses, const Checksum& checksum) {
     if (_hsm->doImport && !_hsm->didImport) {
         log(V1_WARN, "Still digesting previous batch of clauses: discard this batch\n");
         return;
     }
+    _hsm->importChecksum = checksum;
     _hsm->importBufferSize = clauses.size();
     memcpy(_import_buffer, clauses.data(), clauses.size()*sizeof(int));
     _hsm->doImport = true;

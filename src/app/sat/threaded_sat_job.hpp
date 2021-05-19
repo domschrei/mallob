@@ -26,6 +26,7 @@ private:
     std::unique_ptr<HordeLib> _solver;
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
     std::vector<int> _clause_buffer;
+    Checksum _clause_checksum;
 
     std::atomic_bool _done_locally;
     int _result_code;
@@ -70,8 +71,8 @@ public:
     bool isInitialized() override;
     void prepareSharing(int maxSize) override;
     bool hasPreparedSharing() override;
-    std::vector<int> getPreparedClauses() override;
-    void digestSharing(std::vector<int>& clauses) override;
+    std::vector<int> getPreparedClauses(Checksum& checksum) override;
+    void digestSharing(std::vector<int>& clauses, const Checksum& checksum) override;
 
     std::unique_ptr<HordeLib>& getSolver() {
         assert(_solver != NULL);
