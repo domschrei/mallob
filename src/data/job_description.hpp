@@ -33,7 +33,9 @@ private:
     float _wallclock_limit = 0; // in seconds
     float _cpu_limit = 0; // in CPU seconds
     int _max_demand = 0;
+
     Checksum _checksum;
+    const bool _use_checksums = false;
 
     float _arrival; // only for introducing a job
 
@@ -62,8 +64,9 @@ private:
 public:
 
     JobDescription() = default;
-    JobDescription(int id, float priority, bool incremental) : _id(id), _root_rank(-1),
-                _priority(priority), _incremental(incremental), _first_revision(0), _revision(0) {}
+    JobDescription(int id, float priority, bool incremental, bool computeChecksums = false) : _id(id), _root_rank(-1),
+                _priority(priority), _incremental(incremental), _first_revision(0), _revision(0), 
+                _use_checksums(computeChecksums) {}
     ~JobDescription() {}
 
     // Parse (initial) job description into this object
@@ -74,7 +77,7 @@ public:
         // Push literal to raw data, update counter
         push_obj<int>(_raw_data, lit);
         _f_size++;
-        _checksum.combine(lit);
+        if (_use_checksums) _checksum.combine(lit);
     }
     inline void addAssumption(int lit) {
         // Push literal to raw data, update counter
