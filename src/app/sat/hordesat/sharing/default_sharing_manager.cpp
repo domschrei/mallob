@@ -62,8 +62,7 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 	std::vector<int> lens;
 	std::vector<int> added(_solvers.size(), 0);
 
-	bool shuffleClauses = _params.isNotNull("shufcls");
-	if (shuffleClauses) _logger.log(V4_VVER, "Shuffling each clause\n");
+	bool shuffleClauses = _params.isNotNull("shufshcls");
 
 	// For each incoming clause:
 	int size;

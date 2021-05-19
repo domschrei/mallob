@@ -62,9 +62,13 @@ int main(int argc, char *argv[]) {
 
     Parameters params;
     params.init(argc, argv);
+
+    bool quiet = /*quiet=*/params.isNotNull("q");
+    if (params.isNotNull("0o") && rank > 0) quiet = true;
+    std::string logdir = params.getParam("log");
     Logger::init(rank, params.getIntParam("v"), params.isNotNull("colors"), 
-            /*quiet=*/params.isNotNull("q"), /*cPrefix=*/params.isNotNull("mono"), params.getParam("log"));
-    
+            quiet, /*cPrefix=*/params.isNotNull("mono"), params.isNotNull("nolog") ? nullptr : &logdir);
+
     MyMpi::setOptions(params);
 
     if (rank == 0)

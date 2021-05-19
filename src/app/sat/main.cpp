@@ -240,11 +240,15 @@ int main(int argc, char *argv[]) {
 
     int rankOfParent = params.getIntParam("mpirank");
 
+    Random::init(params.getIntParam("mpisize"), rankOfParent);
+
     // Initialize signal handlers
     Process::init(rankOfParent, /*leafProcess=*/true);
 
+    std::string logdir = params.getParam("log");
     Logger::init(rankOfParent, params.getIntParam("v"), params.isNotNull("colors"), 
-            /*quiet=*/params.isNotNull("q"), /*cPrefix=*/params.isNotNull("mono"), params.getParam("log"));
+            /*quiet=*/params.isNotNull("q"), /*cPrefix=*/params.isNotNull("mono"),
+            params.isNotNull("nolog") ? nullptr : &logdir);
     
     auto log = getLog(params);
     pid_t pid = Proc::getPid();

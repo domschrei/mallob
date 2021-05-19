@@ -14,7 +14,7 @@ SolverThread::SolverThread(const Parameters& params,
         size_t fSize, const int* fLits, size_t aSize, const int* aLits,
         int localId) : 
     _params(params), _solver_ptr(solver), _solver(*solver), 
-    _logger(_solver.getLogger()), _local_id(localId) {
+    _logger(_solver.getLogger()), _shuffler(fSize, fLits), _local_id(localId) {
     
     _portfolio_rank = _params.getIntParam("apprank", 0);
     _portfolio_size = _params.getIntParam("mpisize", 1);
@@ -80,6 +80,8 @@ void* SolverThread::run() {
         if (!readingDone || _interrupted) continue;
         
         diversifyAfterReading();
+        _shuffler = ClauseShuffler(0, nullptr);
+
         runOnce();
     }
 
@@ -92,6 +94,20 @@ bool SolverThread::readFormula() {
 
     size_t fSize = 0;
     const int* fLits;
+
+    /*
+    // TODO Include
+
+    if (_shuffle) {
+
+        while (!cancelThread() && _shuffler.hasNextClause()) {
+            for (int lit : _shuffler.nextClause()) {
+                _solver.addLiteral(lit);
+                _imported_lits++;
+            }
+        }
+    }
+    */
 
     while (true) {
 
@@ -174,7 +190,23 @@ void SolverThread::diversifyInitially() {
     hash_combine<unsigned int>(seed, _portfolio_size);
     hash_combine<unsigned int>(seed, _portfolio_rank);
     srand(seed);
-    _solver.diversify(_solver.getGlobalId());
+    _solver.diversify(seed);
+
+    /*
+    // TODO Include
+    
+    // Shuffle input
+    // ... only if original diversifications are exhausted
+    _shuffle = _solver.getDiversificationIndex() >= _solver.getNumOriginalDiversifications();
+    float random = 0.001f * (rand() % 1000); // random number in [0,1)
+    assert(random >= 0); assert(random <= 1);
+    // ... only if random throw hits user-defined probability
+    _shuffle = _shuffle && random < _params.getFloatParam("shufinp");
+    if (_shuffle) {
+        _logger.log(V4_VVER, "Shuffling input\n");
+        _shuffler.doShuffle();
+    }
+    */
 }
 
 void SolverThread::diversifyAfterReading() {

@@ -38,8 +38,10 @@ const char* OPTIONS =
     "\n-yield[=<0|1>]        Yield manager thread whenever there are no new messages"
 
     "\n\nOutput options:"
+    "\n-0o[=<0|1>]           Zero only: Process of rank 0 is the only one to perform logging"
     "\n-colors[=<0|1>]       Colored terminal output based on messages' verbosity"
     "\n-log=<log-dir>        Directory to save logs in"
+    "\n-nolog[=<0|1>]        Turn off logging to filesystem"
     "\n-q[=<0|1>]            Quiet mode: do not log to stdout besides critical information"
     "\n-s2f=<file-basename>  Write solutions to file with provided base name + job ID"
     "\n-v=<verb-num>         Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB ..."
@@ -89,7 +91,9 @@ const char* OPTIONS =
 #else
     "\n                      l=lingeling c=cadical"
 #endif
-    "\n-shufcls[=<0|1>]      Shuffle literals in each clause at import"
+    "\n-shufinp[=[0,1)]      Shuffle clauses and literals of the input with the provided probability"
+    "\n                      after original diversification is exhausted"
+    "\n-shufshcls[=<0|1>]    Shuffle literals in each shared clause at import"
     "\n-smcl=<max-length>    Soft maximum clause length: Only share clauses up to some length (int x >= 0; 0: no limit)"
     "\n                      except a clause has special solver-dependent qualities"
     "\n-sort-by-lbd=<0|1>    Sort each clause buffer ascendingly by LBD scores"
@@ -122,6 +126,7 @@ void Parameters::init(int argc, char** argv) {
 }
 
 void Parameters::setDefaults() {
+    setParam("0o", "0"); // zero only logging
     setParam("aod", "0"); // add old diversifiers (to lgl)
     setParam("appmode", "fork"); // application mode (fork or thread)
     setParam("ba", "4"); // num bounce alternatives (only relevant if -derandomize)
@@ -151,6 +156,7 @@ void Parameters::setDefaults() {
     setParam("slpp", "0"); // size limit per process (0 = no limit)
     setParam("mmpi", "0"); // monitor MPI
     setParam("mono", ""); // mono instance solving mode (if nonempty)
+    setParam("nolog", "0"); // no logging to files
     setParam("phasediv", "1"); // Do phase-based diversification (in addition to native)
     setParam("p", "0.1"); // minimum interval between rebalancings (seconds)
     setParam("q", "0"); // no logging to stdout
@@ -159,7 +165,8 @@ void Parameters::setDefaults() {
     setParam("s", "1.0"); // job communication period (seconds)
     setParam("s2f", ""); // write solutions to file (file path, or empty string for no writing)
     setParam("satsolver", "l"); // which SAT solvers to cycle through
-    setParam("shufcls", "0"); // shuffle clause literals at import
+    setParam("shufinp", "0"); // shuffle input
+    setParam("shufshcls", "0"); // shuffle ordering of literals within each shared clause at import
     setParam("sleep", "100"); // microsecs to sleep in between worker main loop cycles
     setParam("sort-by-lbd", "0"); // sort by LBD score
     setParam("T", "0"); // total time to run the system (0 = no limit)

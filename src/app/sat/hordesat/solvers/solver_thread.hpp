@@ -15,6 +15,7 @@
 #include "data/job_result.hpp"
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 #include "app/sat/hordesat/solvers/solving_state.hpp"
+#include "app/sat/hordesat/utilities/clause_shuffler.hpp"
 
 // Forward declarations
 class HordeLib;
@@ -31,6 +32,9 @@ private:
     std::vector<std::pair<size_t, const int*>> _pending_formulae;
     std::vector<std::pair<size_t, const int*>> _pending_assumptions;
     
+    ClauseShuffler _shuffler;
+    bool _shuffle;
+
     int _local_id;
     std::string _name;
     int _portfolio_rank;
