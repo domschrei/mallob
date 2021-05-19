@@ -135,6 +135,7 @@ void Parameters::setDefaults() {
     setParam("cbdf", "0.75"); // clause buffer discount factor
     setParam("cfhl", "60"); // clause buffer half life
     setParam("cg", "1"); // continuous growth
+    setParam("checksums", "0");
     setParam("colors", "0"); // colored terminal output
     setParam("delaymonkey", "0"); // Small chance for each MPI call to block for some random amount of time
     setParam("derandomize", "1"); // derandomize job bouncing

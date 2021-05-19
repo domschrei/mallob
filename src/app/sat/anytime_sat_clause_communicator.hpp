@@ -15,12 +15,13 @@ const int MSG_DISTRIBUTE_CLAUSES = 418;
 class AnytimeSatClauseCommunicator {
 
 private:
-    const Parameters& _params;
+    Parameters _params;
     BaseSatJob* _job = NULL;
 
     const int _clause_buf_base_size;
     const float _clause_buf_discount_factor;
     const bool _sort_by_lbd;
+    const bool _use_checksums;
 
     std::vector<std::vector<int>> _clause_buffers;
     robin_hood::unordered_set<std::vector<int>, ClauseFilter::ClauseHasher, ClauseFilter::ClauseHashBasedEquals> _clause_filter;
@@ -33,6 +34,7 @@ public:
         _clause_buf_base_size(_params.getIntParam("cbbs")), 
         _clause_buf_discount_factor(_params.getFloatParam("cbdf")),
         _sort_by_lbd(params.isNotNull("sort-by-lbd")),
+        _use_checksums(params.isNotNull("checksums")),
         _num_aggregated_nodes(0) {
 
         _initialized = true;

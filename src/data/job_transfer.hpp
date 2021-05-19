@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include "serializable.hpp"
+#include "data/checksum.hpp"
 
 /**
  * Sent around during the search of a node to adopt the job.
@@ -125,17 +126,19 @@ struct JobMessage : public Serializable {
     int jobId;
     int tag;
     int epoch;
+    Checksum checksum;
     std::vector<int> payload;
 
 public:
     std::vector<uint8_t> serialize() const override {
-        int size = 3*sizeof(int) + payload.size()*sizeof(int);
+        int size = 3*sizeof(int) + payload.size()*sizeof(int) + sizeof(Checksum);
         std::vector<uint8_t> packed(size);
 
         int i = 0, n;
         n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;
         n = sizeof(int); memcpy(packed.data()+i, &tag, n); i += n;
         n = sizeof(int); memcpy(packed.data()+i, &epoch, n); i += n;
+        n = sizeof(Checksum); memcpy(packed.data()+i, &checksum, n); i += n;
         n = payload.size()*sizeof(int); memcpy(packed.data()+i, payload.data(), n); i += n;
         return packed;
     }
@@ -145,6 +148,7 @@ public:
         n = sizeof(int); memcpy(&jobId, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&tag, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&epoch, packed.data()+i, n); i += n;
+        n = sizeof(Checksum); memcpy(&checksum, packed.data()+i, n); i += n;
         n = packed.size()-i; payload.resize(n/sizeof(int)); 
         memcpy(payload.data(), packed.data()+i, n); i += n;
         return *this;

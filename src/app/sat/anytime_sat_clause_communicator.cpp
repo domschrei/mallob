@@ -7,6 +7,22 @@
 
 void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
 
+    if (msg.jobId != _job->getId()) {
+        log(LOG_ADD_SRCRANK | V1_WARN, "[WARN] %s : stray job message meant for #%i\n", source, _job->toStr(), msg.jobId);
+        return;
+    }
+
+    if (_use_checksums) {
+        Checksum chk;
+        chk.combine(msg.jobId);
+        for (int& lit : msg.payload) chk.combine(lit);
+        if (chk.get() != msg.checksum.get()) {
+            log(V1_WARN, "[WARN] %s : checksum fail in job msg (expected count: %ld, actual count: %ld)\n", 
+                _job->toStr(), msg.checksum.count(), chk.count());
+            return;
+        }
+    }
+
     if (msg.tag == MSG_GATHER_CLAUSES) {
         // Gather received clauses, send to parent
 
@@ -83,6 +99,10 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
         msg.payload = clausesToShare;
         log(LOG_ADD_DESTRANK | V4_VVER, "%s : gather s=%i", parentRank, _job->toStr(), msg.payload.size());
         msg.payload.push_back(_num_aggregated_nodes);
+        if (_use_checksums) {
+            msg.checksum.combine(msg.jobId);
+            for (int& lit : msg.payload) msg.checksum.combine(lit);
+        }
         MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
 
@@ -123,6 +143,12 @@ void AnytimeSatClauseCommunicator::sendClausesToChildren(std::vector<int>& claus
     msg.epoch = 0; // unused
     msg.tag = MSG_DISTRIBUTE_CLAUSES;
     msg.payload = clauses;
+
+    if (_use_checksums) {
+        msg.checksum.combine(msg.jobId);
+        for (int& lit : msg.payload) msg.checksum.combine(lit);
+    }
+
     int childRank;
     if (_job->getJobTree().hasLeftChild()) {
         childRank = _job->getJobTree().getLeftChildNodeRank();
