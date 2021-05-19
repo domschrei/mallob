@@ -36,12 +36,29 @@ void* accessMemory(const Logger& log, const std::string& shmemId, size_t size) {
     return ptr;
 }
 
-void importRevision(const Logger& log, HordeLib& hlib, const std::string& shmemId, int revision) {
+void updateChecksum(Checksum& checksum, int* ptr, size_t size) {
+    for (size_t i = 0; i < size; i++) checksum.combine(ptr[i]);
+}
+
+void importRevision(const Logger& log, HordeLib& hlib, const std::string& shmemId, int revision, Checksum& checksum) {
     size_t* fSizePtr = (size_t*) accessMemory(log, shmemId + ".fsize." + std::to_string(revision), sizeof(size_t));
     size_t* aSizePtr = (size_t*) accessMemory(log, shmemId + ".asize." + std::to_string(revision), sizeof(size_t));
     log.log(V4_VVER, "Loading rev. %i : %i lits, %i assumptions\n", revision, *fSizePtr, *aSizePtr);
     int* fPtr = (int*) accessMemory(log, shmemId + ".formulae." + std::to_string(revision), sizeof(int) * (*fSizePtr));
     int* aPtr = (int*) accessMemory(log, shmemId + ".assumptions." + std::to_string(revision), sizeof(int) * (*aSizePtr));
+    
+    // Append accessed data to local checksum
+    updateChecksum(checksum, fPtr, *fSizePtr);
+    // Access checksum from outside
+    Checksum* chk = (Checksum*) accessMemory(log, shmemId + ".checksum." + std::to_string(revision), sizeof(Checksum));
+    if (chk->count() > 0) {
+        // Check checksum
+        if (checksum.get() != chk->get()) {
+            log.log(V0_CRIT, "ERROR: Checksum fail at rev. %i. Incoming count: %ld ; local count: %ld\n", revision, chk->count(), checksum.count());
+            abort();
+        }
+    }
+
     hlib.appendRevision(revision, *fSizePtr, fPtr, *aSizePtr, aPtr);
 }
 
@@ -63,6 +80,8 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
     // Signal initialization to parent
     hsm->isSpawned = true;
     
+    Checksum checksum;
+
     // Prepare solver
     HordeLib hlib(programParams, log.copy("H", "H"));
     // Import first revision
@@ -70,12 +89,13 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
         int* fPtr = (int*) accessMemory(log, shmemId + ".formulae.0", sizeof(int) * hsm->fSize);
         int* aPtr = (int*) accessMemory(log, shmemId + ".assumptions.0", sizeof(int) * hsm->aSize);
         hlib.appendRevision(0, hsm->fSize, fPtr, hsm->aSize, aPtr);
+        updateChecksum(checksum, fPtr, hsm->fSize);
     }
     // Import subsequent revisions
     int lastImportedRevision = 0;
     while (!hsm->doStartNextRevision && lastImportedRevision < hsm->revision) {
         lastImportedRevision++;
-        importRevision(log, hlib, shmemId, lastImportedRevision);
+        importRevision(log, hlib, shmemId, lastImportedRevision, checksum);
     }
     // Start solver threads
     hlib.solve();
@@ -110,7 +130,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
             // Read all revisions since last solve
             while (lastImportedRevision < hsm->revision) {
                 lastImportedRevision++;
-                importRevision(log, hlib, shmemId, lastImportedRevision);
+                importRevision(log, hlib, shmemId, lastImportedRevision, checksum);
             }
             hlib.solve();
             hsm->didStartNextRevision = true;

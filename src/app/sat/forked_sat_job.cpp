@@ -73,6 +73,7 @@ void ForkedSatJob::loadIncrements() {
                 _last_imported_revision, numLits, numAssumptions);
         revisions.emplace_back(HordeProcessAdapter::RevisionData {
             _last_imported_revision,
+            _last_imported_revision == lastRev ? desc.getChecksum() : Checksum(),
             numLits, 
             desc.getFormulaPayload(_last_imported_revision),
             numAssumptions,

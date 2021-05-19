@@ -10,12 +10,14 @@
 #include "hordesat/solvers/solving_state.hpp"
 #include "hordesat/solvers/portfolio_solver_interface.hpp"
 #include "horde_shared_memory.hpp"
+#include "data/checksum.hpp"
 
 class HordeProcessAdapter {
 
 public:
     struct RevisionData {
         int revision;
+        Checksum checksum;
         size_t fSize;
         const int* fLits;
         size_t aSize;

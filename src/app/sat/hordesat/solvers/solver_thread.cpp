@@ -117,8 +117,8 @@ bool SolverThread::readFormula() {
             size_t end = std::min(start+batchSize, fSize);
             for (size_t i = start; i < end; i++) {
                 if (std::abs(fLits[i]) > 134217723) {
-                    _logger.log(V0_CRIT, "ERROR of domain at rev. %i pos. %ld! Last %i literals: %i %i %i %i %i\n", 
-                        (int)_active_revision, i, 
+                    _logger.log(V0_CRIT, "ERROR of domain at rev. %i pos. %ld/%ld. Last %i literals: %i %i %i %i %i\n", 
+                        (int)_active_revision, i, fSize,
                         (int) std::min(i+1, (size_t)5),
                         i >= 4 ? fLits[i-4] : 0,
                         i >= 3 ? fLits[i-3] : 0,

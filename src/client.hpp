@@ -54,7 +54,8 @@ private:
     std::map<int, std::shared_ptr<JobDescription>> _active_jobs;
     
     // Collection of job IDs which finished (for checking dependencies) and their corresponding revision.
-    robin_hood::unordered_flat_map<int, int, robin_hood::hash<int>> _done_jobs;
+    struct DoneInfo {int revision; Checksum lastChecksum;};
+    robin_hood::unordered_flat_map<int, DoneInfo, robin_hood::hash<int>> _done_jobs;
     // Safeguards _done_jobs.
     Mutex _done_job_lock; 
 

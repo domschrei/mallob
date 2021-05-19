@@ -111,13 +111,15 @@ pid_t HordeProcessAdapter::getPid() {
 void HordeProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisions) {
 
     int latestRevision = 0;
-    for (const auto& revData : revisions) {
+    for (size_t i = 0; i < revisions.size(); i++) {
+        const auto& revData = revisions[i];
         latestRevision = std::max(latestRevision, revData.revision);
         auto revStr = std::to_string(revData.revision);
         createSharedMemoryBlock("fsize."       + revStr, sizeof(size_t),              (void*)&revData.fSize);
         createSharedMemoryBlock("asize."       + revStr, sizeof(size_t),              (void*)&revData.aSize);
         createSharedMemoryBlock("formulae."    + revStr, sizeof(int) * revData.fSize, (void*)revData.fLits);
         createSharedMemoryBlock("assumptions." + revStr, sizeof(int) * revData.aSize, (void*)revData.aLits);
+        createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
     }
 
     _hsm->hasSolution = false;

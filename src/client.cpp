@@ -35,7 +35,7 @@ void Client::readIncomingJobs(Logger log) {
             auto lock = _incoming_job_lock.getLock();
 
             JobMetadata foundJob;
-            for (const auto& data : _incoming_job_queue) {
+            for (auto& data : _incoming_job_queue) {
                 
                 // Jobs are sorted by arrival:
                 // If this job has not arrived yet, then none have arrived yet
@@ -55,8 +55,11 @@ void Client::readIncomingJobs(Logger log) {
                         // Check if the precursor of this incremental job is already done
                         if (!_done_jobs.count(data.description->getId()))
                             dependenciesSatisfied = false; // no job with this ID is done yet
-                        else if (data.description->getRevision() != _done_jobs[data.description->getId()]+1)
+                        else if (data.description->getRevision() != _done_jobs[data.description->getId()].revision+1)
                             dependenciesSatisfied = false; // job with correct revision not done yet
+                        else {
+                            data.description->setChecksum(_done_jobs[data.description->getId()].lastChecksum);
+                        }
                     }
                 }
                 if (!dependenciesSatisfied) continue;
@@ -436,7 +439,7 @@ void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {
     // Clean up job, remember as done
     {
         auto lock = _done_job_lock.getLock();
-        _done_jobs[jobId] = _active_jobs[jobId]->getRevision();
+        _done_jobs[jobId] = DoneInfo{_active_jobs[jobId]->getRevision(), _active_jobs[jobId]->getChecksum()};
     }
     if (!hasIncrementalSuccessors) {
         _root_nodes.erase(jobId);

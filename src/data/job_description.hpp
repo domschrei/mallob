@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "data/serializable.hpp"
+#include "data/checksum.hpp"
 
 typedef std::shared_ptr<std::vector<int>> VecPtr;
 
@@ -32,6 +33,7 @@ private:
     float _wallclock_limit = 0; // in seconds
     float _cpu_limit = 0; // in CPU seconds
     int _max_demand = 0;
+    Checksum _checksum;
 
     float _arrival; // only for introducing a job
 
@@ -72,6 +74,7 @@ public:
         // Push literal to raw data, update counter
         push_obj<int>(_raw_data, lit);
         _f_size++;
+        _checksum.combine(lit);
     }
     inline void addAssumption(int lit) {
         // Push literal to raw data, update counter
@@ -119,6 +122,9 @@ public:
     void setNumVars(int numVars) {_num_vars = numVars;}
     void setArrival(float arrival) {_arrival = arrival;};
     void clearPayload();
+
+    Checksum getChecksum() const {return _checksum;}
+    void setChecksum(const Checksum& checksum) {_checksum = checksum;}
 
     std::vector<uint8_t> serialize() const override;
     const std::shared_ptr<std::vector<uint8_t>>& getSerialization();
