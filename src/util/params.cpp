@@ -59,6 +59,7 @@ const char* OPTIONS =
     "\n\nGlobal properties of jobs:"
     "\n-cg[=<0|1>]           Continuous growth of job demands (0: layer by layer, 1: node by node)"
     "\n-g=<growth-period>    Grow job demand exponentially every t seconds (t >= 0; 0: immediate growth)"
+    "\n-jcup=<comm-period>   Job communicator update period (0: do not update / use job communicator)"
     "\n-job-cpu-limit=<x>    Timeout an instance after x cpu seconds (x >= 0; 0: no timeout)"
     "\n-job-wallclock-limit=<x> Timeout an instance after x seconds wall clock time (x >= 0; 0: no timeout)"
     "\n-md=<max-demand>      Limit any job's demand to some maximum value (int x >= 0; 0: no limit)"
@@ -140,6 +141,7 @@ void Parameters::setDefaults() {
     setParam("icpr", "0.8"); // increase clause production ratio
     setParam("J", "0"); // exit after this number of jobs has been processed (0 = no limit)
     setParam("jc", "4"); // job cache
+    setParam("jcup", "0"); // job comm update period (0: no updating)
     setParam("jjp", "1"); // jitter job priorities
     setParam("l", "0.95"); // load factor
     setParam("latencymonkey", "0"); // Block all MPI_Isend operations by a small randomized amount of time 

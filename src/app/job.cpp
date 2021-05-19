@@ -7,6 +7,7 @@
 #include "app/job.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
+#include "comm/mympi.hpp"
 
 Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
             _params(params), 
@@ -14,7 +15,8 @@ Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
             _name("#" + std::to_string(jobId)),
             _time_of_arrival(Timer::elapsedSeconds()), 
             _state(INACTIVE),
-            _job_tree(commSize, worldRank, jobId) {
+            _job_tree(commSize, worldRank, jobId), 
+            _comm(_id, _job_tree, params.getFloatParam("jcup")) {
     
     _growth_period = _params.getFloatParam("g");
     _continuous_growth = _params.isNotNull("cg");
@@ -207,9 +209,17 @@ const JobResult& Job::getResult() {
 
 bool Job::wantsToCommunicate() {
     if (_state != ACTIVE) return false;
+    if (_comm.wantsToAggregate()) return true;
     return appl_wantsToBeginCommunication();
 }
 
 void Job::communicate() {
-    appl_beginCommunication();
+    if (_comm.isAggregating()) _comm.beginAggregation();
+    else appl_beginCommunication();
+}
+
+void Job::communicate(int source, JobMessage& msg) {
+    if (!_comm.handle(msg)) {
+        appl_communicate(source, msg);
+    }
 }
