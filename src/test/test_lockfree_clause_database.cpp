@@ -112,7 +112,7 @@ void testRandomClauses() {
     std::vector<std::vector<int>> inputClauses;
     for (int i = 0; i < numClauses; i++) {
         int len = (int) (maxClauseSize * Random::rand()) + 1;
-        int lbd = (int) (len * Random::rand()) + 1;
+        int lbd = std::min(len, (int) ((len-1) * Random::rand()) + 2);
         assert(lbd >= 1 && lbd <= len);
         std::vector<int> cls(1, lbd);
         for (int x = 0; x < len; x++) {

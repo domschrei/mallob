@@ -35,7 +35,7 @@ public:
         _clause_buf_discount_factor(_params.getFloatParam("cbdf")),
         _sort_by_lbd(params.isNotNull("sort-by-lbd")),
         _use_checksums(params.isNotNull("checksums")),
-        _cdb(_params.getIntParam("hmcl"), 5, _clause_buf_base_size, 1),
+        _cdb(_params.getIntParam("hmcl"), 8, _clause_buf_base_size, 1),
         _num_aggregated_nodes(0) {
 
         _initialized = true;

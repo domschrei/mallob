@@ -22,7 +22,7 @@ public:
         void next(int maxLbdPartitionedSize) {
             if (lbd == size || size > maxLbdPartitionedSize) {
                 size++;
-                lbd = 1;
+                lbd = 2;
             } else {
                 lbd++;
             }
@@ -232,12 +232,12 @@ private:
 
 public:
     LockfreeClauseDatabase(int maxClauseSize, int maxLbdPartitionedSize, int baseBufferSize, int numProducers) 
-                : _max_clause_size(maxClauseSize), _max_lbd_partitioned_size(std::max(1, maxLbdPartitionedSize)) {
+                : _max_clause_size(maxClauseSize), _max_lbd_partitioned_size(std::max(2, maxLbdPartitionedSize)) {
         
         for (int clauseSize = 1; clauseSize <= _max_clause_size; clauseSize++) {
             if (clauseSize <= _max_lbd_partitioned_size) {
                 // Create one bucket for each possible LBD value at this size
-                for (int lbd = 1; lbd <= clauseSize; lbd++) {
+                for (int lbd = 2; lbd <= std::max(2, clauseSize); lbd++) {
                     _buffers.push_back(new UniformClauseRingBuffer(baseBufferSize, clauseSize, numProducers));
                 }
             } else {
@@ -322,15 +322,13 @@ private:
         size_t index = 0;
         // For all smaller clause sizes, add up the number of buckets
         for (int c = 1; c < clauseSize; c++) 
-            index += (c <= _max_lbd_partitioned_size ? c : 1);
+            index += (c <= _max_lbd_partitioned_size ? std::max(c-1,1) : 1);
         // If applicable, also add up the number of buckets of lower lbd
         if (clauseSize <= _max_lbd_partitioned_size) 
-            for (int l = 1; l < lbd; l++) index++;
+            for (int l = 2; l < lbd; l++) index++;
         if (index < _buffers.size()) return *_buffers[index];
         else return NULL_BUFFER;
     }
-
 };
-
 
 #endif
