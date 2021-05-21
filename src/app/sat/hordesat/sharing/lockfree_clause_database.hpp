@@ -47,18 +47,20 @@ public:
         size_t _remaining_cls_of_bucket = 0;
 
         size_t _hash;
-        size_t _true_hash;
+        size_t _true_hash = 1;
 
     public:
         BufferReader(int* buffer, int size, int maxLbdPartitionedSize) : _buffer(buffer), _size(size), 
                 _max_lbd_partitioned_size(maxLbdPartitionedSize) {
             
-            // Extract checksum
             int numInts = sizeof(size_t)/sizeof(int);
-            assert(size >= numInts);
-            memcpy(&_true_hash, _buffer, sizeof(size_t));
+            if (_size > 0) {
+                // Extract checksum
+                assert(size >= numInts);
+                memcpy(&_true_hash, _buffer, sizeof(size_t));
+            }
 
-            _remaining_cls_of_bucket = _size == numInts ? 0 : _buffer[numInts];
+            _remaining_cls_of_bucket = _size <= numInts ? 0 : _buffer[numInts];
             _current_pos = numInts+1;
             _hash = 1;
         }
