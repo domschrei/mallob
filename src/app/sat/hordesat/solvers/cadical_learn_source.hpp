@@ -10,8 +10,8 @@ struct MallobLearnSource : public CaDiCaL::LearnSource {
 private:
     Logger& _log;
 
-    RingBuffer _learned_clauses;
-	RingBuffer _learned_units;
+    UnitClauseRingBuffer _learned_units;
+	MixedNonunitClauseRingBuffer _learned_clauses;
 
     std::vector<int> _intermediate_unit_buffer;
     std::vector<int> _intermediate_buffer;
@@ -31,13 +31,13 @@ public:
     ~MallobLearnSource() { }
 
     void addUnit(int lit) {
-        if (!_learned_units.produce(&lit, 1, false)) {
+        if (!_learned_units.insertUnit(lit)) {
             _num_discarded++;
         }
         _num_received++;
     }
     void addClause(const int* begin, size_t size) {
-        if (!_learned_clauses.produce(begin, size, true)) {
+        if (!_learned_clauses.insertClause(begin, size, 0)) {
             _num_discarded++;
         }
         _num_received++;
@@ -49,9 +49,10 @@ public:
         // Clauses left in intermediate buffer?
         if (!_intermediate_buffer.empty()) return true;
         // Try to refill buffer with unit clause ringbuffer
-        if (_learned_units.consume(_intermediate_unit_buffer)) return true;
+        int zero = 0;
+        if (_learned_units.getUnits(_intermediate_unit_buffer)) return true;
         // Try to refill buffer with clause ringbuffer
-        return _learned_clauses.consume(_intermediate_buffer);
+        return _learned_clauses.getClause(_intermediate_buffer);
     }
     const std::vector<int>& getNextClause() override {
 

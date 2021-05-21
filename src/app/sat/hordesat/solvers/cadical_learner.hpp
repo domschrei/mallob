@@ -33,12 +33,13 @@ public:
 				// Non-unit clause: First integer is glue value
 				int& glue = _curr_clause[0];
 				if (glue > _glue_limit) eligible = false;
-				glue++; // add 1 to glue to avoid zeroes in clause buffer
 				assert(glue > 0);
 			}
 			
 			// Export clause (if eligible), reset current clause
-			if (eligible) _callback(_curr_clause, _setup.localId);
+			if (eligible) 
+				_callback(Clause{_curr_clause.data()+1, (int)_curr_clause.size()-1, _curr_clause[0]}, 
+							_setup.localId);
 			_curr_clause.clear();
 		}
 	}

@@ -28,7 +28,7 @@ public:
 	/**
 	 * Add a learned clause that you want to share. Return a pointer to it
 	 */
-	int* addClause(std::vector<int>& clause);
+	int* addClause(const int* clause, size_t size);
 	/**
 	 * Add a very important learned clause that you want to share
 	 */

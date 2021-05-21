@@ -133,10 +133,10 @@ std::set<int> Cadical::getFailedAssumptions() {
 	return result;
 }
 
-void Cadical::addLearnedClause(const int* begin, int size) {
+void Cadical::addLearnedClause(const Clause& c) {
 	//_logger.log(V4_VVER, "Add clause of size %i to CaDiCaL learn source\n", size);
-	if (size == 1) learnSource.addUnit(*begin);
-	else learnSource.addClause(begin, size);
+	if (c.size == 1) learnSource.addUnit(*c.begin);
+	else learnSource.addClause(c.begin, c.size);
 
 	/*
 	// Old approach of interrupting and then adding non-redundant clauses

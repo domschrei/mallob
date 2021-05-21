@@ -178,15 +178,15 @@ std::set<int> MGlucose::getFailedAssumptions() {
 	return result;
 }
 
-void MGlucose::addLearnedClause(const int* begin, int size) {
+void MGlucose::addLearnedClause(const Clause& c) {
 	if (!clauseAddMutex.tryLock()) {
 		return;
 	}
 	numReceived++;
-	if (size == 1) {
-		unitsToAdd.push_back(*begin);
+	if (c.size == 1) {
+		unitsToAdd.push_back(*c.begin);
 	} else {
-		learnedClausesToAdd.emplace_back(begin, begin+size);
+		learnedClausesToAdd.emplace_back(c.begin, c.begin+c.size);
 	}
 	clauseAddMutex.unlock();
 }
@@ -281,8 +281,9 @@ bool MGlucose::parallelJobIsFinished() {
 
 void MGlucose::parallelExportUnaryClause(Glucose::Lit p) {
 	std::vector<int> vcls;
-	vcls.push_back(decodeLit(p));
-	learnedClauseCallback(vcls, getLocalId());
+	int lit = decodeLit(p);
+	Clause c{&lit, 1, 1};
+	learnedClauseCallback(c, getLocalId());
 }
 
 void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysis) {
@@ -314,16 +315,14 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 	if (!accept) return;
 	
 	// assemble clause
-	std::vector<int> vcls(1+c.size());
-	int i = 0;
+	std::vector<int> vcls(c.size());
 	// to avoid zeros in the array, 1 is added to the glue
-	vcls[i++] = 1+c.lbd();
 	for (int j = 0; j < c.size(); j++) {
-		vcls[i++] = decodeLit(c[j]);
+		vcls[j] = decodeLit(c[j]);
 	}
 	
 	// export clause
-	learnedClauseCallback(vcls, getLocalId());
+	learnedClauseCallback(Clause{vcls.data(), c.size(), (int)c.lbd()}, getLocalId());
 }
 
 /*

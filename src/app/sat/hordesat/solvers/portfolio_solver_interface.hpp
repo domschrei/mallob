@@ -17,6 +17,7 @@
 #include <stdexcept>
 #include <functional>
 
+#include "app/sat/hordesat/utilities/clause.hpp"
 #include "util/logger.hpp"
 
 enum SatResult {
@@ -64,7 +65,7 @@ struct SolverSetup {
 
 void updateTimer(std::string jobName);
 
-typedef std::function<void(std::vector<int>& cls, int solverId)> LearnedClauseCallback;
+typedef std::function<void(const Clause&, int)> LearnedClauseCallback;
 
 /**
  * Interface for solvers that can be used in the portfolio.
@@ -110,7 +111,7 @@ public:
 
 	// Add a learned clause to the formula
 	// The learned clauses might be added later or possibly never
-	virtual void addLearnedClause(const int* begin, int size) = 0;
+	virtual void addLearnedClause(const Clause& c) = 0;
 
 	// Set a function that should be called for each learned clause
 	virtual void setLearnedClauseCallback(const LearnedClauseCallback& callback) = 0;

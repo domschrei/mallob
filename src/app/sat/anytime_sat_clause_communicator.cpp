@@ -29,7 +29,7 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         int numAggregated = msg.payload.back();
         msg.payload.pop_back();
         std::vector<int>& clauses = msg.payload;
-        testConsistency(clauses, getBufferLimit(numAggregated, BufferMode::ALL), /*sortByLbd=*/false);
+        //testConsistency(clauses, getBufferLimit(numAggregated, BufferMode::ALL), /*sortByLbd=*/false);
         
         log(V5_DEBG, "%s : receive s=%i\n", _job->toStr(), clauses.size());
         
@@ -110,7 +110,7 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
 }
 
 void AnytimeSatClauseCommunicator::broadcastAndLearn(std::vector<int>& clauses) {
-    testConsistency(clauses, 0, /*sortByLbd=*/false);
+    //testConsistency(clauses, 0, /*sortByLbd=*/false);
     sendClausesToChildren(clauses);
     learnClauses(clauses);
 }
@@ -202,7 +202,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
                 return std::vector<int>();
             }
         }
-        testConsistency(selfClauses, 0 /*do not check buffer's size limit*/, /*sortByLbd=*/_sort_by_lbd);
+        //testConsistency(selfClauses, 0 /*do not check buffer's size limit*/, /*sortByLbd=*/_sort_by_lbd);
     }
     _clause_buffers.push_back(std::move(selfClauses));
 
@@ -210,7 +210,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     log(V5_DEBG, "%s : merge n=%i s<=%i\n", 
                 _job->toStr(), _clause_buffers.size(), totalSize);
     std::vector<int> vec = merge(totalSize);
-    testConsistency(vec, totalSize, /*sortByLbd=*/false);
+    //testConsistency(vec, totalSize, /*sortByLbd=*/false);
 
     // Reset clause buffers
     _clause_buffers.clear();
@@ -218,140 +218,10 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
 }
 
 std::vector<int> AnytimeSatClauseCommunicator::merge(size_t maxSize) {
-    std::vector<int> result;
-
-    // Position counter for each buffer
-    std::vector<int> positions(_clause_buffers.size(), 0);
-
-    // How many VIP clauses in each buffer?
-    std::vector<int> nvips(_clause_buffers.size());
-    int totalNumVips = 0;
-    for (size_t i = 0; i < _clause_buffers.size(); i++) {
-        nvips[i] = (_clause_buffers[i].size() > 0) ? _clause_buffers[i][positions[i]] : 0;
-        totalNumVips += nvips[i];
-        positions[i]++;
-    } 
-
-    // Store number of VIP clauses of resulting buffer here
-    result.push_back(0);
-    int& resvips = result[0];
-
-    std::vector<int> cls;
-    int picked = -1;
-    while (totalNumVips > 0) {
-        do picked = (picked+1) % nvips.size(); while (nvips[picked] == 0);
-        int& pos = positions[picked];
-        int lit = _clause_buffers[picked][pos++];
-        // Append to clause
-        cls.push_back(lit);
-        if (lit == 0) {
-            // Clause finished
-
-            // Clause buffer size limit reached?
-            if (result.size() + cls.size() > maxSize) break;
-
-            // Clause not seen yet?
-            if (_clause_filter.insert(cls).second) {
-                // Insert clause into result clause buffer
-                result.insert(result.end(), cls.begin(), cls.end());
-                resvips++;
-            }
-
-            /*
-            Logger::append(V5_DEBG, "VIP ");
-            for (int l : cls) Logger::append(V5_DEBG, "%i ", l);
-            log(V5_DEBG, "\n");*/
-
-            // Clear clause vector, update counters
-            cls.clear();
-            nvips[picked]--;
-            totalNumVips--;
-        }
-    }
-
-    int clauseLength = 1;
-    bool doContinue = true;
-    while (doContinue) {
-        doContinue = false;
-
-        if (result.size() + 1 + clauseLength > maxSize) {
-            // No clauses of this size are fitting into the buffer any more: stop
-            break;
-        }
-
-        // Get number of clauses of clauseLength for each buffer
-        // and also the sum over all these numbers
-        std::vector<int> nclsoflen(_clause_buffers.size());
-        int allclsoflen = 0;
-        for (size_t i = 0; i < _clause_buffers.size(); i++) {
-            nclsoflen[i] = positions[i] < (int)_clause_buffers[i].size() ? 
-                            _clause_buffers[i][positions[i]] : 0;
-            if (positions[i] < (int)_clause_buffers[i].size()) doContinue = true;
-            allclsoflen += nclsoflen[i];
-            positions[i]++;
-        }
-
-        // Store number of inserted clauses of clauseLength in result[numpos]
-        result.push_back(0);
-        int numpos = result.size()-1;
-        
-        // Read clauses from buffers in a cyclic manner
-        int picked = -1;
-        while (allclsoflen > 0) {
-            // Limit reached?
-            if (result.size() + clauseLength > maxSize) {
-                doContinue = false;
-                break;
-            }
-
-            // Identify next clause
-            if (clauseLength > 1 && _sort_by_lbd) {
-                size_t lowestLbd = maxSize;
-                for (size_t x = 0; x < nclsoflen.size(); x++) {
-                    size_t i = (picked+1+x) % nclsoflen.size();
-                    if (nclsoflen[i] > 0 && _clause_buffers[i][positions[i]] < lowestLbd) {
-                        picked = i;
-                        lowestLbd = _clause_buffers[i][positions[i]];
-                    }
-                }
-                //log(V4_VVER, "pos=%i len=%i lbd=%i\n", result.size(), clauseLength, lowestLbd);
-            } else {
-                do picked = (picked+1) % nclsoflen.size(); while (nclsoflen[picked] == 0);
-            }
-            const std::vector<int>& vec = _clause_buffers[picked];
-            int pos = positions[picked];
-            auto begin = vec.begin()+pos;
-            auto end = vec.begin()+pos+clauseLength;
-
-            // Clause not included yet?
-            if (_clause_filter.insert(std::vector<int>(begin, end)).second) {
-                // Insert and increase corresponding counters
-                result.insert(result.end(), begin, end);
-                result[numpos]++;
-            }
-
-            /*
-            Logger::append(V5_DEBG, "CLS ");
-            for (int i = pos; i < pos+clauseLength; i++) 
-                Logger::append(V5_DEBG, "%i ", vec[i]);
-            log(V5_DEBG, "\n");*/
-
-            // Update counters for remaining clauses 
-            positions[picked] += clauseLength;
-            nclsoflen[picked]--;
-            allclsoflen--;
-        }
-
-        clauseLength++;
-    }
-
-    // Remove trailing zeroes because they are unnecessary
-    // (as long as the buffer does not become empty)
-    while (result.size() > 1 && result.back() == 0 && result[result.size()-2] == 0) 
-        result.pop_back();
-
-    _clause_filter.clear();
-    return result;
+    auto merger = _cdb.getBufferMerger();
+    for (auto& buffer : _clause_buffers) 
+        merger.add(_cdb.getBufferReader(buffer.data(), buffer.size()));
+    return merger.merge(maxSize);
 }
 
 bool AnytimeSatClauseCommunicator::testConsistency(std::vector<int>& buffer, size_t maxSize, bool sortByLbd) {

@@ -39,12 +39,13 @@ private:
 	std::vector<std::vector<int>> clausesToAdd;
 	std::vector<int> assumptions;
 
-	RingBuffer learnedClauses;
-	RingBuffer learnedUnits;
+	MixedNonunitClauseRingBuffer learnedClauses;
+	UnitClauseRingBuffer learnedUnits;
 	
 	std::vector<int> learnedClausesBuffer;
 	std::vector<int> learnedUnitsBuffer;
 	std::vector<int> learnedClause;
+
 	unsigned long numReceived = 0;
 	unsigned long numDigested = 0;
 	unsigned long numDiscarded = 0;
@@ -56,6 +57,11 @@ private:
 	unsigned int numDiversifications;
 	unsigned int glueLimit;
 	unsigned int sizeLimit;
+
+	void doProduce(int* cls, int glue);
+	void doProduceUnit(int lit);
+	void doConsume(int** start, int* glue);
+	void doConsumeUnits(int** start, int** end);
 
 public:
 	Lingeling(const SolverSetup& setup);
@@ -80,7 +86,7 @@ public:
 
 	// Add a learned clause to the formula
 	// The learned clauses might be added later or possibly never
-	void addLearnedClause(const int* begin, int size) override;
+	void addLearnedClause(const Clause& clause) override;
 
 	// Set a function that should be called for each learned clause
 	void setLearnedClauseCallback(const LearnedClauseCallback& callback) override;

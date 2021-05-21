@@ -4,10 +4,10 @@
 
 #include "util/params.hpp"
 #include "util/robin_hood.hpp"
+#include "hordesat/sharing/lockfree_clause_database.hpp"
 #include "data/job_transfer.hpp"
 #include "app/job.hpp"
 #include "base_sat_job.hpp"
-#include "hordesat/utilities/clause_filter.hpp"
 
 const int MSG_GATHER_CLAUSES = 417;
 const int MSG_DISTRIBUTE_CLAUSES = 418;
@@ -23,8 +23,8 @@ private:
     const bool _sort_by_lbd;
     const bool _use_checksums;
 
+    LockfreeClauseDatabase _cdb;
     std::vector<std::vector<int>> _clause_buffers;
-    robin_hood::unordered_set<std::vector<int>, ClauseFilter::ClauseHasher, ClauseFilter::ClauseHashBasedEquals> _clause_filter;
     int _num_aggregated_nodes;
 
     bool _initialized = false;
@@ -35,6 +35,7 @@ public:
         _clause_buf_discount_factor(_params.getFloatParam("cbdf")),
         _sort_by_lbd(params.isNotNull("sort-by-lbd")),
         _use_checksums(params.isNotNull("checksums")),
+        _cdb(_params.getIntParam("hmcl"), 5, _clause_buf_base_size, 1),
         _num_aggregated_nodes(0) {
 
         _initialized = true;

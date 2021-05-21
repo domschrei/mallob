@@ -17,10 +17,8 @@ void ClauseDatabase::addVIPClause(std::vector<int>& clause) {
 	vipClauses.push_back(clause);
 }
 
-int* ClauseDatabase::addClause(std::vector<int>& clause) {
+int* ClauseDatabase::addClause(const int* clause, size_t csize) {
 	if (addClauseLock.tryLock() == false) return NULL;
-
-	unsigned int csize = clause.size();
 
 	while (buckets.size() < csize) {
 		Bucket* b = new Bucket();

@@ -18,6 +18,8 @@ extern "C" {
 	#include "lglib.h"
 }
 
+/***************************** CALLBACKS *****************************/
+
 int cbCheckTerminate(void* solverPtr) {
 	Lingeling* lp = (Lingeling*)solverPtr;
 
@@ -44,91 +46,21 @@ int cbCheckTerminate(void* solverPtr) {
     
     return 0;
 }
-
 void cbProduceUnit(void* sp, int lit) {
-	std::vector<int> vcls(1, lit);
-	Lingeling* lp = (Lingeling*)sp;
-	lp->callback(vcls, lp->getLocalId());
+	((Lingeling*)sp)->doProduceUnit(lit);
 }
-
 void cbProduce(void* sp, int* cls, int glue) {
-	// unit clause, call produceUnit
-	if (cls[1] == 0) {
-		cbProduceUnit(sp, cls[0]);
-		return;
-	}
-	Lingeling* lp = (Lingeling*)sp;
-	// LBD score check
-	if (lp->glueLimit != 0 && glue > (int)lp->glueLimit) {
-		return;
-	}
-	// size check
-	unsigned int size = 0;
-	unsigned int i = 0;
-	while (cls[i++] != 0) size++;
-	if (size > lp->sizeLimit) return;
-	// build vector of literals
-	std::vector<int> vcls(1+size);
-	// to avoid zeros in the array, 1 is added to the glue
-	vcls[0] = 1+glue;
-	for (i = 1; i <= size; i++) {
-		vcls[i] = cls[i-1];
-	}
-	//printf("glue = %d, size = %lu\n", glue, vcls.size());
-	lp->callback(vcls, lp->getLocalId());
+	((Lingeling*)sp)->doProduce(cls, glue);
 }
-
 void cbConsumeUnits(void* sp, int** start, int** end) {
-	Lingeling* lp = (Lingeling*)sp;
-
-	bool success = lp->learnedUnits.consume(lp->learnedUnitsBuffer);
-	if (!success) lp->learnedUnitsBuffer.clear();
-	
-	*start = lp->learnedUnitsBuffer.data();
-	*end = lp->learnedUnitsBuffer.data()+lp->learnedUnitsBuffer.size();
-
-	lp->numDigested += lp->learnedUnitsBuffer.size();
+	((Lingeling*)sp)->doConsumeUnits(start, end);
 }
-
 void cbConsumeCls(void* sp, int** clause, int* glue) {
-	Lingeling* lp = (Lingeling*)sp;
-
-	// Retrieve clauses from parallel ringbuffer as necessary
-	if (lp->learnedClausesBuffer.empty()) {
-		bool success = lp->learnedClauses.consume(lp->learnedClausesBuffer);
-		if (!success) lp->learnedClausesBuffer.clear();
-	}
-	
-	// Is there a clause?
-	if (lp->learnedClausesBuffer.empty()) {
-		*clause = nullptr;
-		return;
-	}
-
-	/*
-	std::string str = ""; for (auto l : lp->learnedClausesBuffer) str += " " + std::to_string(l);
-	lp->_logger.log(V4_VVER, "LCB:%s\n", str.c_str());
-	*/
-
-	// Extract a clause
-	size_t pos = lp->learnedClausesBuffer.size()-1;
-	assert(lp->learnedClausesBuffer[pos] == 0);
-	do {pos--;} while (pos > 0 && lp->learnedClausesBuffer[pos-1] != 0);
-	assert(pos == 0 || pos >= 3); // glue int, >= two literals, separation zero
-
-	// Set glue
-	*glue = lp->learnedClausesBuffer[pos]-1; // to avoid zeros in the array, 1 was added to the glue
-	assert(*glue > 0);
-	// Write clause into buffer
-	lp->learnedClause.resize(lp->learnedClausesBuffer.size()-pos-1);
-	memcpy(lp->learnedClause.data(), lp->learnedClausesBuffer.data()+pos+1, lp->learnedClause.size()*sizeof(int));
-	// Make "clause" point to buffer
-	*clause = lp->learnedClause.data();
-
-	lp->learnedClausesBuffer.resize(pos);
-	assert(lp->learnedClausesBuffer.empty() || lp->learnedClausesBuffer[pos-1] == 0);
-	lp->numDigested++;
+	((Lingeling*)sp)->doConsume(clause, glue);
 }
+
+/************************** END OF CALLBACKS **************************/
+
 
 
 Lingeling::Lingeling(const SolverSetup& setup) 
@@ -136,13 +68,10 @@ Lingeling::Lingeling(const SolverSetup& setup)
 		learnedClauses(4*setup.anticipatedLitsToImportPerCycle), 
 		learnedUnits(2*setup.anticipatedLitsToImportPerCycle + 1) {
 
-	_logger.log(V4_VVER, "Local buffer sizes: %ld, %ld\n", learnedClauses.getCapacity(), learnedUnits.getCapacity());
+	//_logger.log(V4_VVER, "Local buffer sizes: %ld, %ld\n", learnedClauses.getCapacity(), learnedUnits.getCapacity());
 
 	solver = lglinit();
-	
-	//lglsetopt(solver, "verbose", 1);
-	//lglsetopt(solver, "termint", 10);
-	
+		
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
 	lglsetopt(solver, "bca", 0);
 	
@@ -298,38 +227,69 @@ void Lingeling::unsetSolverSuspend() {
 	suspendCond.notify();
 }
 
-std::vector<int> Lingeling::getSolution() {
-	std::vector<int> result;
-	result.push_back(0);
-	for (int i = 1; i <= maxvar; i++) {
-		if (lglderef(solver, i) > 0) {
-			result.push_back(i);
-		} else {
-			result.push_back(-i);
-		}
-	}
-	return result;
+
+void Lingeling::doProduceUnit(int lit) {
+	Clause c{&lit, 1, 1};
+	callback(c, getLocalId());
 }
 
-std::set<int> Lingeling::getFailedAssumptions() {
-	std::set<int> result;
-	for (size_t i = 0; i < assumptions.size(); i++) {
-		if (lglfailed(solver, assumptions[i])) {
-			result.insert(assumptions[i]);
-		}
+void Lingeling::doProduce(int* cls, int glue) {
+	
+	// unit clause
+	if (cls[1] == 0) {
+		doProduceUnit(cls[0]);
+		return;
 	}
-	return result;
+	
+	// LBD score check
+	if (glueLimit != 0 && glue > (int)glueLimit) {
+		return;
+	}
+	// size check
+	int size = 0;
+	unsigned int i = 0;
+	while (cls[i++] != 0) size++;
+	if (size > sizeLimit) return;
+	
+	// export clause
+	callback(Clause{cls, size, glue}, getLocalId());
 }
 
-void Lingeling::addLearnedClause(const int* begin, int size) {
+void Lingeling::doConsumeUnits(int** start, int** end) {
 
-	if (size == 1) {
-		if (!learnedUnits.produce(begin, size, /*addSeparationZero=*/false)) {
+	// Get as many unit clauses as possible
+	learnedUnitsBuffer.clear();
+	bool success = true;
+	while (success) success = learnedUnits.getUnits(learnedUnitsBuffer);
+	
+	*start = learnedUnitsBuffer.data();
+	*end = learnedUnitsBuffer.data()+learnedUnitsBuffer.size();
+	numDigested += learnedUnitsBuffer.size();
+}
+
+void Lingeling::doConsume(int** clause, int* glue) {
+	*clause = nullptr;
+
+	// Get a single (non-unit) clause
+	learnedClausesBuffer.clear();
+	bool success = learnedClauses.getClause(learnedClausesBuffer);
+	if (!success) return;
+	if (learnedClausesBuffer.empty()) return;
+
+	*glue = learnedClausesBuffer[0];
+	*clause = learnedClausesBuffer.data()+1;
+	numDigested++;
+}
+
+void Lingeling::addLearnedClause(const Clause& c) {
+
+	if (c.size == 1) {
+		if (!learnedUnits.insertUnit(*c.begin)) {
 			//_logger.log(V4_VVER, "Unit buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
 			numDiscarded++;
 		}
 	} else {
-		if (!learnedClauses.produce(begin, size, /*addSeparationZero=*/true)) {
+		if (!learnedClauses.insertClause(c)) {
 			//_logger.log(V4_VVER, "Clause buffer full (recv=%i digs=%i)\n", numReceived, numDigested);
 			numDiscarded++;
 		}
@@ -351,6 +311,30 @@ void Lingeling::setLearnedClauseCallback(const LearnedClauseCallback& callback) 
 void Lingeling::increaseClauseProduction() {
 	if (glueLimit != 0 && glueLimit < _setup.softFinalMaxLbd) 
 		glueLimit++;
+}
+
+
+std::vector<int> Lingeling::getSolution() {
+	std::vector<int> result;
+	result.push_back(0);
+	for (int i = 1; i <= maxvar; i++) {
+		if (lglderef(solver, i) > 0) {
+			result.push_back(i);
+		} else {
+			result.push_back(-i);
+		}
+	}
+	return result;
+}
+
+std::set<int> Lingeling::getFailedAssumptions() {
+	std::set<int> result;
+	for (size_t i = 0; i < assumptions.size(); i++) {
+		if (lglfailed(solver, assumptions[i])) {
+			result.insert(assumptions[i]);
+		}
+	}
+	return result;
 }
 
 int Lingeling::getVariablesCount() {

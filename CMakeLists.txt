@@ -89,7 +89,7 @@ SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MY_DEBUG_OPTIONS}")
 
 # Tests
 
-#enable_testing()
+enable_testing()
 
 add_executable(test_permutation src/test/test_permutation.cpp)
 target_include_directories(test_permutation PRIVATE ${BASE_INCLUDES})
@@ -102,3 +102,15 @@ target_include_directories(test_sat_reader PRIVATE ${BASE_INCLUDES})
 target_compile_options(test_sat_reader PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(test_sat_reader ${BASE_LIBS} mallob_commons)
 add_test(NAME test_sat_reader COMMAND test_sat_reader)
+
+add_executable(test_ringbuffer src/test/test_ringbuffer.cpp)
+target_include_directories(test_ringbuffer PRIVATE ${BASE_INCLUDES})
+target_compile_options(test_ringbuffer PRIVATE ${BASE_COMPILEFLAGS})
+target_link_libraries(test_ringbuffer ${BASE_LIBS} mallob_commons)
+add_test(NAME test_ringbuffer COMMAND test_ringbuffer)
+
+add_executable(test_lockfree_clause_database src/test/test_lockfree_clause_database.cpp)
+target_include_directories(test_lockfree_clause_database PRIVATE ${BASE_INCLUDES})
+target_compile_options(test_lockfree_clause_database PRIVATE ${BASE_COMPILEFLAGS})
+target_link_libraries(test_lockfree_clause_database ${BASE_LIBS} mallob_commons)
+add_test(NAME test_lockfree_clause_database COMMAND test_lockfree_clause_database)

@@ -14,12 +14,20 @@
 DefaultSharingManager::DefaultSharingManager(
 		std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, 
 		const Parameters& params, const Logger& logger)
-	: _solvers(solvers), _params(params), _logger(logger), _cdb(logger) {
+	: _solvers(solvers), _params(params), _logger(logger), 
+	_cdb(
+		/*maxClauseSize=*/_params.getIntParam("hmcl"), 
+		/*maxLbdPartitionedSize=*/5, 
+		/*baseBufferSize=*/_params.getIntParam("cbbs"), 
+		/*numProducers=*/_solvers.size()
+	) {
 
 	memset(_seen_clause_len_histogram, 0, CLAUSE_LEN_HIST_LENGTH*sizeof(unsigned long));
 	_stats.seenClauseLenHistogram = _seen_clause_len_histogram;
 
-	auto callback = [this](std::vector<int>& cls, int solverId) {processClause(cls, solverId);};
+	auto callback = [this](const Clause& c, int solverId) {
+		processClause(solverId, c);
+	};
 	
     for (size_t i = 0; i < _solvers.size(); i++) {
 		_solver_filters.emplace_back(/*maxClauseLen=*/params.getIntParam("hmcl", 0), /*checkUnits=*/true);
@@ -34,18 +42,21 @@ int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
     static int prodInc = 1;
 	static int lastInc = 0;
 
-	int selectedCount;
-	int used = _cdb.giveSelection(begin, maxSize, &selectedCount);
-	_logger.log(V5_DEBG, "prepared %i clauses, size %i\n", selectedCount, used);
-	_stats.exportedClauses += selectedCount;
-	float usedRatio = ((float)used)/maxSize;
+	int numExportedClauses = 0;
+	auto buffer = _cdb.exportBuffer(maxSize, numExportedClauses);
+	memcpy(begin, buffer.data(), buffer.size()*sizeof(int));
+
+	_logger.log(V5_DEBG, "prepared %i clauses, size %i\n", numExportedClauses, buffer.size());
+	_stats.exportedClauses += numExportedClauses;
+	float usedRatio = ((float)buffer.size())/maxSize;
 	if (usedRatio < _params.getFloatParam("icpr")) {
 		int increaser = lastInc++ % _solvers.size();
 		_solvers[increaser]->increaseClauseProduction();
 		_logger.log(V3_VERB, "prod. increase no. %d (sid %d)\n", prodInc++, increaser);
 	}
 	_logger.log(V5_DEBG, "buffer fillratio=%.3f\n", usedRatio);
-	return used;
+	
+	return buffer.size();
 }
 
 void DefaultSharingManager::digestSharing(std::vector<int>& result) {
@@ -56,7 +67,7 @@ void DefaultSharingManager::digestSharing(std::vector<int>& result) {
 void DefaultSharingManager::digestSharing(int* begin, int buflen) {
     
 	// Get all clauses
-	_cdb.setIncomingBuffer(begin, buflen);
+	auto reader = _cdb.getBufferReader(begin, buflen);
 	
 	size_t numClauses = 0;
 	std::vector<int> lens;
@@ -65,29 +76,27 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 	bool shuffleClauses = _params.isNotNull("shufshcls");
 	
 	// For each incoming clause:
-	int size;
-	int* clsbegin = _cdb.getNextIncomingClause(size);
-	while (clsbegin != NULL) {
+	auto clause = reader.getNextIncomingClause();
+	while (clause.begin != nullptr) {
 		
 		numClauses++;
-		int clauseLen = (size > 1 ? size-1 : size); // subtract "glue" int
 
 		// Shuffle clause (NOT the 1st position as this is the glue score)
-		if (shuffleClauses) shuffle(clsbegin+1, size-1);
+		if (shuffleClauses) shuffle(clause.begin, clause.size);
 		
 		// Clause length stats
-		while (clauseLen-1 >= (int)lens.size()) lens.push_back(0);
-		lens[clauseLen-1]++;
+		while (clause.size-1 >= (int)lens.size()) lens.push_back(0);
+		lens[clause.size-1]++;
 
 		// Import clause into each solver if its filter allows it
 		for (size_t sid = 0; sid < _solvers.size(); sid++) {
-			if (_solver_filters[sid].registerClause(clsbegin, size)) {
-				_solvers[sid]->addLearnedClause(clsbegin, size);
+			if (_solver_filters[sid].registerClause(clause.begin, clause.size)) {
+				_solvers[sid]->addLearnedClause(clause);
 				added[sid]++;
 			}
 		}
 
-		clsbegin = _cdb.getNextIncomingClause(size);
+		clause = reader.getNextIncomingClause();
 	}
 	_stats.importedClauses += numClauses;
 	
@@ -112,15 +121,15 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 	}
 }
 
-void DefaultSharingManager::processClause(std::vector<int>& cls, int solverId) {
+void DefaultSharingManager::processClause(int solverId, const Clause& clause) {
 
 	// Add clause length to statistics
-	_seen_clause_len_histogram[cls.size() == 1 ? 1 : std::min(cls.size(), (size_t)CLAUSE_LEN_HIST_LENGTH)-1]++;
+	_seen_clause_len_histogram[std::min(clause.size, CLAUSE_LEN_HIST_LENGTH)-1]++;
 
 	// Register clause in this solver's filter
-	if (_solver_filters[solverId].registerClause(cls)) {
+	if (_solver_filters[solverId].registerClause(clause.begin, clause.size)) {
 		// Success - write clause into database if possible
-		if (_cdb.addClause(cls) == NULL) _stats.clausesDroppedAtExport++;
+		if (!_cdb.addClause(solverId, clause)) _stats.clausesDroppedAtExport++;
 	} else {
 		// Clause was already registered before
 		_stats.clausesFilteredAtExport++;

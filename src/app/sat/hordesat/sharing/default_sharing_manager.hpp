@@ -13,6 +13,8 @@
 
 #include "app/sat/hordesat/sharing/sharing_manager_interface.hpp"
 #include "app/sat/hordesat/utilities/clause_database.hpp"
+#include "app/sat/hordesat/sharing/lockfree_clause_database.hpp"
+#include "app/sat/hordesat/utilities/clause.hpp"
 #include "app/sat/hordesat/utilities/clause_filter.hpp"
 #include "util/params.hpp"
 
@@ -29,7 +31,7 @@ protected:
 	const Parameters& _params;
 	const Logger& _logger;
 
-	ClauseDatabase _cdb;
+	LockfreeClauseDatabase _cdb;
 	
 	float _last_buffer_clear = 0;
 
@@ -47,7 +49,7 @@ public:
 	~DefaultSharingManager() = default;
 
 private:
-	void processClause(std::vector<int>& cls, int solverId);
+	void processClause(int solverId, const Clause& clause);
 
 };
 
