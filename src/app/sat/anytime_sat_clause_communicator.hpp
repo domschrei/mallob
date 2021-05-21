@@ -56,6 +56,14 @@ private:
 
     std::vector<int> merge(size_t maxSize);
     bool testConsistency(std::vector<int>& buffer, size_t maxSize, bool sortByLbd);
+
+    std::vector<int> getEmptyBuffer() {
+        int numExported = 0;
+        auto result = _cdb.exportBuffer(100, numExported); // empty!
+        assert(numExported == 0);
+        assert(result.size() == sizeof(size_t)/sizeof(int)); // only the hash checksum
+        return result;
+    }
 };
 
 #endif

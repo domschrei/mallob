@@ -184,7 +184,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     std::vector<int> selfClauses;
     // If not fully initialized yet, broadcast an empty set of clauses
     if (_job->getState() != ACTIVE || !_job->isInitialized() || !_job->hasPreparedSharing()) {
-        selfClauses = std::vector<int>();
+        selfClauses = getEmptyBuffer();
     } else {
         // Else, retrieve clauses from solvers
         log(V4_VVER, "%s : collect s<=%i\n", 
@@ -199,7 +199,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
             if (checksum.get() != chk.get()) {
                 log(V1_WARN, "[WARN] %s : checksum fail in clsbuf (expected count: %ld, actual count: %ld)\n", 
                 _job->toStr(), checksum.count(), chk.count());
-                return std::vector<int>();
+                return getEmptyBuffer();
             }
         }
         //testConsistency(selfClauses, 0 /*do not check buffer's size limit*/, /*sortByLbd=*/_sort_by_lbd);
