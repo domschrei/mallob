@@ -5,12 +5,9 @@ set -e
 if [ ! -f mergesat/libmergesat.a ]; then
 
     # Get MergeSat and patch it
-    wget https://dominikschreiber.de/mergesat-devel.zip
-    unzip mergesat-devel.zip
-    rm mergesat-devel.zip
-    mv mergesat-devel mergesat
+    git clone git@github.com:conp-solutions/mergesat.git
     cd mergesat
-    #git checkout devel # might be a specific commit lateron
+    git checkout devel # might be a specific commit lateron
     
     # Change include paths in files in order not to collide with Glucose's includes
     set +e
@@ -118,7 +115,7 @@ if [ ! -f cadical/libcadical.a ]; then
     
     echo "Building CaDiCaL ..."
 
-    ./configure 
+    ./configure
     make
     cp build/libcadical.a .
     cd ..

@@ -23,7 +23,7 @@ public:
         _rng(std::mt19937(seed)), _dist(std::uniform_real_distribution<float>(0, 1)) {
             _rng_func = [this]() {return _dist(_rng);};
         }
-    
+
     void doShuffle(bool permuteClauses = true, bool permuteLiterals = true) {
 
         // Build vector of clauses (size + pointer to data)
@@ -40,7 +40,7 @@ public:
             }
         }
         assert(sumOfSizes + _clauses.size() == _input_size);
-        
+
         if (permuteClauses) {
             // Shuffle order of clauses
             shuffle(_clauses.data(), _clauses.size(), _rng_func);

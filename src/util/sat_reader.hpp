@@ -17,6 +17,7 @@ private:
     int _sign = 1;
 	bool _comment = false;
 	bool _began_num = false;
+    bool _assumption = false;
 	int _num = 0;
 	int _max_var = 0;
 
@@ -32,18 +33,26 @@ public:
             _comment = false;
             if (_began_num) {
                 assert(_num == 0);
-                desc.addLiteral(0);
+                if (!_assumption) desc.addLiteral(0);
                 _began_num = false;
             }
+            _assumption = false;
             break;
         case 'p':
         case 'c':
             _comment = true;
             break;
+        case 'a':
+            _assumption = true;
+            break;
         case ' ':
             if (_began_num) {
                 _max_var = std::max(_max_var, _num);
-                desc.addLiteral(_sign * _num);
+                if (!_assumption) {
+                    desc.addLiteral(_sign * _num);
+                } else if (_num != 0) {
+                    desc.addAssumption(_sign * _num);
+                }
                 _num = 0;
                 _began_num = false;
             }
@@ -54,6 +63,7 @@ public:
             _began_num = true;
             break;
         default:
+            // Add digit to current number
             _num = _num*10 + (c-'0');
             _began_num = true;
             break;

@@ -28,6 +28,7 @@ private:
     std::unique_ptr<HordeProcessAdapter> _solver;
     int _solver_pid = -1;
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
+    int _last_imported_revision = 0;
 
     std::thread _init_thread;
     Mutex _solver_state_change_mutex;
@@ -52,6 +53,8 @@ public:
     void appl_suspend() override;
     void appl_resume() override;
     void appl_terminate() override;
+    void appl_interrupt() override;
+    void appl_restart() override;
 
     int appl_solved() override;
     JobResult appl_getResult() override;
@@ -75,6 +78,7 @@ public:
     void digestSharing(std::vector<int>& clauses, const Checksum& checksum) override;
 
 private:
+    void loadIncrements();
     void startDestructThreadIfNecessary();
 
 };

@@ -35,7 +35,7 @@ void Client::readIncomingJobs(Logger log) {
             auto lock = _incoming_job_lock.getLock();
 
             JobMetadata foundJob;
-            for (const auto& data : _incoming_job_queue) {
+            for (auto& data : _incoming_job_queue) {
                 
                 // Jobs are sorted by arrival:
                 // If this job has not arrived yet, then none have arrived yet
@@ -51,6 +51,16 @@ void Client::readIncomingJobs(Logger log) {
                             break;
                         }
                     }
+                    if (data.description->isIncremental() && data.description->getRevision() > 0) {
+                        // Check if the precursor of this incremental job is already done
+                        if (!_done_jobs.count(data.description->getId()))
+                            dependenciesSatisfied = false; // no job with this ID is done yet
+                        else if (data.description->getRevision() != _done_jobs[data.description->getId()].revision+1)
+                            dependenciesSatisfied = false; // job with correct revision not done yet
+                        else {
+                            data.description->setChecksum(_done_jobs[data.description->getId()].lastChecksum);
+                        }
+                    }
                 }
                 if (!dependenciesSatisfied) continue;
 
@@ -63,14 +73,15 @@ void Client::readIncomingJobs(Logger log) {
                     int id = foundJob.description->getId();
                     float time = Timer::elapsedSeconds();
                     SatReader r(foundJob.file);
-                    log.log(V3_VERB, "[T] Reading job #%i (%s) ...\n", id, foundJob.file.c_str());
+                    log.log(V3_VERB, "[T] Reading job #%i rev. %i (%s) ...\n", id, foundJob.description->getRevision(), foundJob.file.c_str());
                     bool success = r.read(*foundJob.description);
                     if (!success) {
                         log.log(V1_WARN, "[T] File %s could not be opened - skipping #%i\n", foundJob.file.c_str(), id);
                     } else {
                         time = Timer::elapsedSeconds() - time;
-                        log.log(V3_VERB, "[T] Initialized job #%i (%s) in %.3fs: %ld lits w/ separators\n", 
-                                id, foundJob.file.c_str(), time, foundJob.description->getFormulaSize());
+                        log.log(V3_VERB, "[T] Initialized job #%i (%s) in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
+                                id, foundJob.file.c_str(), time, foundJob.description->getFormulaSize(), 
+                                foundJob.description->getAssumptionsSize());
                         
                         // Enqueue in ready jobs
                         auto lock = _ready_job_lock.getLock();
@@ -120,6 +131,18 @@ void Client::readIncomingJobs(Logger log) {
 }
 
 void Client::handleNewJob(JobMetadata&& data) {
+
+    if (data.done) {
+        // Incremental job notified to be finished
+        int jobId = data.description->getId();
+        log(LOG_ADD_DESTRANK | V3_VERB, "Notifying #%i:0 that job is done", _root_nodes[jobId], jobId);
+        IntVec payload({jobId});
+        MyMpi::isend(MPI_COMM_WORLD, _root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
+        finishJob(jobId, /*hasIncrementalSuccessors=*/false);
+        return;
+    }
+
+    // Introduce new job into "incoming" queue
     {
         auto lock = _incoming_job_lock.getLock();
         _incoming_job_queue.insert(std::move(data));
@@ -209,11 +232,7 @@ void Client::mainProgram() {
                 handleRequestBecomeChild(handle);
             } else if (handle.tag == MSG_CONFIRM_ADOPTION) {
                 handleAckAcceptBecomeChild(handle);
-            } else if (handle.tag == MSG_QUERY_JOB_REVISION_DETAILS) {
-                handleQueryJobRevisionDetails(handle);
-            } else if (handle.tag == MSG_CONFIRM_JOB_REVISION_DETAILS) {
-                handleAckJobRevisionDetails(handle);
-            }  else if (handle.tag == MSG_DO_EXIT) {
+            } else if (handle.tag == MSG_DO_EXIT) {
                 handleExit(handle);
             } else {
                 log(LOG_ADD_SRCRANK | V1_WARN, "Unknown msg tag %i", handle.source, handle.tag);
@@ -297,26 +316,38 @@ void Client::introduceNextJob() {
     // Set actual job arrival
     job.setArrival(Timer::elapsedSeconds());
 
-    // Find the job's canonical initial node
-    int n = MyMpi::size(MPI_COMM_WORLD) - MyMpi::size(_comm);
-    log(V4_VVER, "Creating permutation of size %i ...\n", n);
-    AdjustablePermutation p(n, jobId);
-    int nodeRank = p.get(0);
+    int nodeRank;
+    if (job.isIncremental()) {
+        // Incremental job: Send request to root node in standby
+        nodeRank = _root_nodes[jobId];
+    } else {
+        // Find the job's canonical initial node
+        int n = MyMpi::size(MPI_COMM_WORLD) - MyMpi::size(_comm);
+        log(V4_VVER, "Creating permutation of size %i ...\n", n);
+        AdjustablePermutation p(n, jobId);
+        nodeRank = p.get(0);
+    }   
+    log(V4_VVER, "%i\n", job.getRevision());
 
     JobRequest req(jobId, /*rootRank=*/-1, /*requestingNodeRank=*/_world_rank, 
         /*requestedNodeIndex=*/0, /*epoch=*/-1, /*numHops=*/0);
+    req.currentRevision = job.getRevision();
     req.timeOfBirth = job.getArrival();
 
-    log(LOG_ADD_DESTRANK | V2_INFO, "Introducing job #%i", nodeRank, jobId);
+    log(LOG_ADD_DESTRANK | V2_INFO, "Introducing job #%i : %s", nodeRank, jobId, req.toStr().c_str());
     MyMpi::isend(MPI_COMM_WORLD, nodeRank, MSG_REQUEST_NODE, req);
 }
 
 void Client::handleRequestBecomeChild(MessageHandle& handle) {
     JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
     const JobDescription& desc = *_active_jobs[req.jobId];
+    log(V4_VVER, "OFFER for %s\n", req.toStr().c_str());
 
     // Send job signature
-    JobSignature sig(req.jobId, /*rootRank=*/handle.source, req.revision, desc.getFullTransferSize());
+    int firstIncludedRevision = req.lastKnownRevision+1;
+    JobSignature sig(req.jobId, /*rootRank=*/handle.source, firstIncludedRevision, 
+        firstIncludedRevision <= req.currentRevision ? desc.getTransferSize(firstIncludedRevision) : 0);
+    log(LOG_ADD_DESTRANK | V4_VVER, "Sending job signature of #%i rev. %i: transfer size %i", handle.source, req.jobId, req.currentRevision, sig.transferSize);
     MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_ACCEPT_ADOPTION_OFFER, sig);
     //stats.increment("sentMessages");
 }
@@ -325,7 +356,7 @@ void Client::handleAckAcceptBecomeChild(MessageHandle& handle) {
     JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
     JobDescription& desc = *_active_jobs[req.jobId];
     assert(desc.getId() == req.jobId || log_return_false("%i != %i\n", desc.getId(), req.jobId));
-    log(LOG_ADD_DESTRANK | V4_VVER, "Sending job desc. of #%i of size %i", handle.source, desc.getId(), desc.getFullTransferSize());
+    log(LOG_ADD_DESTRANK | V4_VVER, "Sending job desc. of #%i rev. %i of size %i", handle.source, desc.getId(), desc.getRevision(), desc.getFullTransferSize());
     _root_nodes[req.jobId] = handle.source;
     auto data = desc.getSerialization();
 
@@ -361,7 +392,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     // Write full solution to file, if desired
     std::string baseFilename = _params.getParam("s2f");
     if (!baseFilename.empty()) {
-        std::string filename = baseFilename + "_" + std::to_string(jobId);
+        std::string filename = baseFilename + "_" + std::to_string(jobId) + "." + std::to_string(revision);
         std::ofstream file;
         file.open(filename);
         if (!file.is_open()) {
@@ -382,20 +413,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
         _file_adapter->handleJobDone(jobResult);
     }
 
-    if (_active_jobs[jobId]->isIncremental()) {
-        if (desc.getRevision() > revision) {
-            // Introduce next revision
-            revision++;
-            IntVec payload({jobId, revision});
-            log(LOG_ADD_DESTRANK | V2_INFO, "Introducing #%i rev. %i", _root_nodes[jobId], jobId, revision);
-            MyMpi::isend(MPI_COMM_WORLD, _root_nodes[jobId], MSG_NOTIFY_JOB_REVISION, payload);
-        } else {
-            // Job is completely done
-            IntVec payload({jobId});
-            MyMpi::isend(MPI_COMM_WORLD, _root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
-            finishJob(jobId);
-        }
-    } else finishJob(jobId);
+    finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
 }
 
 void Client::handleAbort(MessageHandle& handle) {
@@ -413,45 +431,23 @@ void Client::handleAbort(MessageHandle& handle) {
         _file_adapter->handleJobDone(result);
     }
 
-    finishJob(jobId);
+    finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
 }
 
-void Client::finishJob(int jobId) {
+void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {
 
     // Clean up job, remember as done
     {
         auto lock = _done_job_lock.getLock();
-        _done_jobs.insert(jobId);
+        _done_jobs[jobId] = DoneInfo{_active_jobs[jobId]->getRevision(), _active_jobs[jobId]->getChecksum()};
     }
-    _root_nodes.erase(jobId);
-    _active_jobs.erase(jobId);
+    if (!hasIncrementalSuccessors) {
+        _root_nodes.erase(jobId);
+        _active_jobs.erase(jobId);
+    }
     _sys_state.addLocal(SYSSTATE_PROCESSED_JOBS, 1);
 
     introduceNextJob();
-}
-
-void Client::handleQueryJobRevisionDetails(MessageHandle& handle) {
-
-    IntVec request = Serializable::get<IntVec>(handle.getRecvData());
-    int jobId = request[0];
-    int firstRevision = request[1];
-    int lastRevision = request[2];
-
-    JobDescription& desc = *_active_jobs[jobId];
-    IntVec response({jobId, firstRevision, lastRevision, desc.getFullTransferSize()});
-    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_REVISION_DETAILS, response);
-}
-
-void Client::handleAckJobRevisionDetails(MessageHandle& handle) {
-
-    IntVec response = Serializable::get<IntVec>(handle.getRecvData());
-    int jobId = response[0];
-    int firstRevision = response[1];
-    int lastRevision = response[2];
-    //int transferSize = response[3];
-    
-    // TODO not implemented
-    abort();
 }
 
 void Client::handleExit(MessageHandle& handle) {

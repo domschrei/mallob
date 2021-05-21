@@ -21,38 +21,68 @@ void ForkedSatJob::appl_start() {
     assert(!_initialized);
     assert(!_init_thread.joinable());
 
+    Parameters hParams(_params);
+    HordeConfig::applyDefault(hParams, *this);
+
+    const JobDescription& desc = getDescription();
+    log(V4_VVER, "%s : rev. %i\n", toStr(), desc.getRevision());
+
+    _solver.reset(new HordeProcessAdapter(hParams,
+        desc.getFormulaPayloadSize(0), 
+        desc.getFormulaPayload(0), 
+        // do not import assumptions if they belong to a later revision
+        desc.getRevision() > 0 ? 0 : desc.getAssumptionsSize(),
+        desc.getAssumptionsPayload()
+    ));
+    loadIncrements();
+    _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
+
+    //log(V5_DEBG, "%s : beginning to solve\n", toStr());
+    _solver_pid = _solver->run();
+
+    //log(V4_VVER, "%s : spawned child pid=%i\n", toStr(), _solver_pid);
+    _time_of_start_solving = Timer::elapsedSeconds();
+
+    {
+        auto lock = _solver_state_change_mutex.getLock();
+        auto state = getState();
+        if (state == SUSPENDED) 
+            _solver->setSolvingState(SolvingStates::SUSPENDED);
+        if (state == INACTIVE || state == PAST) 
+            _solver->setSolvingState(SolvingStates::STANDBY);
+        if (state == PAST) {
+            _solver->setSolvingState(SolvingStates::ABORTING);
+        }
+        _initialized = true;
+    }
+    
     _init_thread = std::thread([this]() {
         
-        Parameters hParams(_params);
-        HordeConfig::applyDefault(hParams, *this);
-
-        const JobDescription& desc = getDescription();
-        _solver.reset(new HordeProcessAdapter(hParams,
-            desc.getFormulaSize(), 
-            desc.getFormulaPayload(), 
-            desc.getAssumptionsSize(), 
-            desc.getAssumptionsPayload()
-        ));
-        _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
-
-        //log(V5_DEBG, "%s : beginning to solve\n", toStr());
-        _solver_pid = _solver->run();
-        //log(V4_VVER, "%s : spawned child pid=%i\n", toStr(), _solver_pid);
-        _time_of_start_solving = Timer::elapsedSeconds();
-
-        {
-            auto lock = _solver_state_change_mutex.getLock();
-            auto state = getState();
-            if (state == SUSPENDED) 
-                _solver->setSolvingState(SolvingStates::SUSPENDED);
-            if (state == INACTIVE || state == PAST) 
-                _solver->setSolvingState(SolvingStates::STANDBY);
-            if (state == PAST) {
-                _solver->setSolvingState(SolvingStates::ABORTING);
-            }
-            _initialized = true;
-        }
     });
+}
+
+void ForkedSatJob::loadIncrements() {
+    const auto& desc = getDescription();
+    int lastRev = desc.getRevision();
+    std::vector<HordeProcessAdapter::RevisionData> revisions;
+    while (_last_imported_revision < lastRev) {
+        _last_imported_revision++;
+        size_t numLits = desc.getFormulaPayloadSize(_last_imported_revision);
+        size_t numAssumptions = _last_imported_revision == lastRev ? desc.getAssumptionsSize() : 0;
+        log(V4_VVER, "%s : Load rev. %i : %i lits, %i assumptions\n", toStr(), 
+                _last_imported_revision, numLits, numAssumptions);
+        revisions.emplace_back(HordeProcessAdapter::RevisionData {
+            _last_imported_revision,
+            _last_imported_revision == lastRev ? desc.getChecksum() : Checksum(),
+            numLits, 
+            desc.getFormulaPayload(_last_imported_revision),
+            numAssumptions,
+            desc.getAssumptionsPayload()
+        });
+    }
+    if (!revisions.empty()) _solver->appendRevisions(revisions);
+    _done_locally = false;
+    _internal_result = JobResult();
 }
 
 void ForkedSatJob::appl_suspend() {
@@ -73,6 +103,19 @@ void ForkedSatJob::appl_stop() {
     _solver->setSolvingState(SolvingStates::STANDBY);
 }
 
+void ForkedSatJob::appl_interrupt() {
+    if (!_initialized) return;
+    auto lock = _solver_state_change_mutex.getLock();
+    _solver->setSolvingState(SolvingStates::STANDBY);
+}
+
+void ForkedSatJob::appl_restart() {
+    if (!_initialized) return;
+    auto lock = _solver_state_change_mutex.getLock();
+    loadIncrements();
+    _solver->setSolvingState(SolvingStates::ACTIVE);
+}
+
 void ForkedSatJob::appl_terminate() {
     if (!_initialized) return;
     auto lock = _solver_state_change_mutex.getLock();
@@ -89,7 +132,7 @@ int ForkedSatJob::appl_solved() {
     if (_solver->check()) {
         auto solution = _solver->getSolution();
         result = solution.first;
-        log(LOG_ADD_DESTRANK | V2_INFO, "%s : found result %s", getJobTree().getRootNodeRank(), toStr(), 
+        log(LOG_ADD_DESTRANK | V2_INFO, "%s rev. %i : found result %s", getJobTree().getRootNodeRank(), toStr(), getRevision(), 
                             result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         _internal_result.id = getId();
         _internal_result.result = result;

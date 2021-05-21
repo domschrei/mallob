@@ -33,11 +33,11 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
                 // Job is registered, possibly with non-zero demand: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
-                    log(V3_VERB, "JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, ev.epoch);
+                    log(V3_VERB, "(1) JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, ev.epoch);
                     _job_epochs.erase(id);
                 }
             }
-            
+        
         } else if (job->getState() != PAST) {
 
             // Job participates
@@ -49,16 +49,23 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
             }
 
             // Insert this job as an event, if there is something novel about it
-            int epoch = _job_epochs[id];
-            int demand = std::max(1, getDemand(*job));
-            Event ev({id, epoch, demand, job->getPriority()});
+            Event ev;
+            if (job->getState() == STANDBY) {
+                // Job is in STANDBY mode: set demand of zero
+                ev = Event({id, /*epoch=*/_job_epochs[id], /*demand=*/0, /*priority=*/job->getPriority()});
+            } else {
+                // Job must be active
+                int epoch = _job_epochs[id];
+                int demand = std::max(1, getDemand(*job));
+                ev = Event({id, epoch, demand, job->getPriority()});
+            }
             if (!_states.getEntries().count(id) 
                     || ev.demand != _states.getEntries().at(id).demand 
                     || ev.priority != _states.getEntries().at(id).priority) {
                 // Not contained yet in state: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
-                    log(V3_VERB, "JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, _job_epochs[id]);
+                    log(V3_VERB, "(2) JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, _job_epochs[id]);
                     _job_epochs[id]++;
                 } 
             }

@@ -27,58 +27,35 @@ void HordeProcessAdapter::initSharedMemory() {
     void* mainShmem = SharedMemory::create(_shmem_id, sizeof(HordeSharedMemory));
     _shmem.push_back(std::tuple<std::string, void*, int>(_shmem_id, mainShmem, sizeof(HordeSharedMemory)));
     _hsm = new ((char*)mainShmem) HordeSharedMemory();
-    _hsm->portfolioRank = atoi(_params["apprank"].c_str());
-    _hsm->portfolioSize = atoi(_params["mpisize"].c_str());
     _hsm->doExport = false;
     _hsm->doImport = false;
     _hsm->doDumpStats = false;
-    _hsm->doUpdateRole = false;
-    _hsm->doInterrupt = false;
+    _hsm->doStartNextRevision = false;
     _hsm->doTerminate = false;
     _hsm->exportBufferMaxSize = 0;
     _hsm->importBufferSize = 0;
     _hsm->didExport = false;
     _hsm->didImport = false;
     _hsm->didDumpStats = false;
-    _hsm->didUpdateRole = false;
-    _hsm->didInterrupt = false;
+    _hsm->didStartNextRevision = false;
     _hsm->didTerminate = false;
     _hsm->isSpawned = false;
     _hsm->isInitialized = false;
     _hsm->hasSolution = false;
     _hsm->result = UNKNOWN;
     _hsm->solutionSize = 0;
+    _hsm->solutionRevision = -1;
     _hsm->exportBufferTrueSize = 0;
+    _hsm->fSize = _f_size;
+    _hsm->aSize = _a_size;
+    _hsm->revision = _params.getIntParam("firstrev");
 
-    // Put formula into its own block of shared memory
-    int size = sizeof(int) * _f_size;
-    std::string fShmemId = _shmem_id + ".formulae.0";
-    void* fShmem = SharedMemory::create(fShmemId, size);
-    _shmem.push_back(std::tuple<std::string, void*, int>(fShmemId, fShmem, size));
-    memcpy((int*)fShmem, _f_lits, size);
-    _params.setParam("fbufsize0", std::to_string(size));
-
-    // Put assumptions into their own block of shared memory
-    size = sizeof(int) * _a_size;
-    std::string aShmemId = _shmem_id + ".assumptions";
-    void* aShmem = SharedMemory::create(aShmemId, size);
-    _shmem.push_back(std::tuple<std::string, void*, int>(aShmemId, aShmem, size));
-    memcpy((int*)aShmem, _a_lits, size);
-    _params.setParam("asmptbufsize", std::to_string(size));
-
-    // Create block of shared memory for clause export
-    int maxExportBufferSize = _params.getIntParam("cbbs") * sizeof(int);
-    std::string exportShmemId = _shmem_id + ".clauseexport";
-    _export_buffer = (int*) SharedMemory::create(exportShmemId, maxExportBufferSize);
-    _shmem.push_back(std::tuple<std::string, void*, int>(exportShmemId, _export_buffer, maxExportBufferSize));
-    memset(_export_buffer, 0, maxExportBufferSize);
-
-    // Create block of shared memory for clause import
-    int maxImportBufferSize = _params.getIntParam("cbbs") * sizeof(int) * _params.getIntParam("mpisize");
-    std::string importShmemId = _shmem_id + ".clauseimport";
-    _import_buffer = (int*) SharedMemory::create(importShmemId, maxImportBufferSize);
-    _shmem.push_back(std::tuple<std::string, void*, int>(importShmemId, _import_buffer, maxImportBufferSize));
-    memset(_import_buffer, 0, maxImportBufferSize);
+    createSharedMemoryBlock("formulae.0", sizeof(int) * _f_size, (void*)_f_lits);
+    createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
+    _export_buffer = (int*) createSharedMemoryBlock("clauseexport", 
+            _params.getIntParam("cbbs") * sizeof(int), nullptr);
+    _import_buffer = (int*) createSharedMemoryBlock("clauseimport", 
+            _params.getIntParam("cbbs") * sizeof(int) * _params.getIntParam("mpisize"), nullptr);
 }
 
 HordeProcessAdapter::~HordeProcessAdapter() {
@@ -109,6 +86,7 @@ pid_t HordeProcessAdapter::run() {
         int i = 1;
         while (argv[i] != nullptr) free(argv[i++]);
         delete[] argv;
+
         
         return res;
     }
@@ -130,6 +108,30 @@ pid_t HordeProcessAdapter::getPid() {
     return _child_pid;
 }
 
+void HordeProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisions) {
+
+    int latestRevision = 0;
+    for (size_t i = 0; i < revisions.size(); i++) {
+        const auto& revData = revisions[i];
+        latestRevision = std::max(latestRevision, revData.revision);
+        auto revStr = std::to_string(revData.revision);
+        createSharedMemoryBlock("fsize."       + revStr, sizeof(size_t),              (void*)&revData.fSize);
+        createSharedMemoryBlock("asize."       + revStr, sizeof(size_t),              (void*)&revData.aSize);
+        createSharedMemoryBlock("formulae."    + revStr, sizeof(int) * revData.fSize, (void*)revData.fLits);
+        createSharedMemoryBlock("assumptions." + revStr, sizeof(int) * revData.aSize, (void*)revData.aLits);
+        createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
+    }
+
+    _hsm->hasSolution = false;
+
+    if (_state == SolvingStates::INITIALIZING) {
+        // Child process not set up yet: Can directly order to parse new clauses
+        _hsm->revision = latestRevision;
+    } else {
+        _revision_update = latestRevision;
+    }
+}
+
 void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
     if (state == _state) return;
 
@@ -142,19 +144,11 @@ void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
         Process::suspend(_child_pid); // Stop (suspend) process.
     }
     if (state == SolvingStates::ACTIVE) {
+        _hsm->hasSolution = false;
         Process::resume(_child_pid); // Continue (resume) process.
-    }
-    if (state == SolvingStates::STANDBY) {
-        _hsm->doInterrupt = true;
     }
 
     _state = state;
-}
-
-void HordeProcessAdapter::updateRole(int rank, int size) {
-    _hsm->portfolioRank = rank;
-    _hsm->portfolioSize = size;
-    _hsm->doUpdateRole = true;
 }
 
 void HordeProcessAdapter::collectClauses(int maxSize) {
@@ -194,11 +188,22 @@ void HordeProcessAdapter::dumpStats() {
 }
 
 bool HordeProcessAdapter::check() {
-    if (_hsm->didImport)     _hsm->doImport     = false;
-    if (_hsm->didUpdateRole) _hsm->doUpdateRole = false;
-    if (_hsm->didInterrupt)  _hsm->doInterrupt  = false;
-    if (_hsm->didDumpStats)  _hsm->doDumpStats  = false;
-    return _hsm->hasSolution;
+
+    if (_hsm->didImport)            _hsm->doImport            = false;
+    if (_hsm->didStartNextRevision) _hsm->doStartNextRevision = false;
+    if (_hsm->didDumpStats)         _hsm->doDumpStats         = false;
+
+    if (!_hsm->doStartNextRevision 
+        && !_hsm->didStartNextRevision 
+        && _revision_update >= 0) {
+        
+        _hsm->revision = _revision_update;
+        _revision_update = -1;
+        _hsm->doStartNextRevision = true;
+    }
+    
+    if (_hsm->hasSolution) return _hsm->solutionRevision == _hsm->revision;
+    return false;
 }
 
 std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
@@ -207,9 +212,25 @@ std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
 
     // ACCESS the existing shared memory segment to the solution vector
     // and remember to clean it up later when destructing the adapter
-    int* shmemSolution = (int*) SharedMemory::access(_shmem_id + ".solution", solution.size()*sizeof(int));
+    int rev = _hsm->solutionRevision;
+    std::string id = _shmem_id + ".solution." + std::to_string(rev);
+    int* shmemSolution = (int*) SharedMemory::access(id, solution.size()*sizeof(int));
     memcpy(solution.data(), shmemSolution, solution.size()*sizeof(int));
-    _shmem.emplace_back(_shmem_id + ".solution", (void*)shmemSolution, solution.size()*sizeof(int));
+    _shmem.emplace_back(id, (void*)shmemSolution, solution.size()*sizeof(int));
     
     return std::pair<SatResult, std::vector<int>>(_hsm->result, solution);
 }
+
+
+void* HordeProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_t size, void* data) {
+    std::string id = _shmem_id + "." + shmemSubId;
+    void* shmem = SharedMemory::create(id, size);
+    if (data == nullptr) {
+        memset(shmem, 0, size);
+    } else {
+        memcpy(shmem, data, size);
+    }
+    _shmem.emplace_back(id, shmem, size);
+    return shmem;
+}
+

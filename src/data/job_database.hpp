@@ -48,6 +48,8 @@ public:
 
     Job& createJob(int commSize, int worldRank, int jobId);
     bool init(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source);
+    bool restart(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source);
+
     bool checkComputationLimits(int jobId);
 
     bool isRequestObsolete(const JobRequest& req);
@@ -85,7 +87,8 @@ public:
     int getLoad() const;
     void setLoad(int load, int whichJobId);
     bool isIdle() const;
-
+    bool hasDormantRoot() const;
+    
     std::string toStr(int j, int idx) const;
     
 };

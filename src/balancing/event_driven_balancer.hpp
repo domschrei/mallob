@@ -77,19 +77,19 @@ public:
 
             if (it != _map.end() && otherIt != otherEventMap._map.end()) {
                 // Both have an element left: compare them
-                const auto& pair = *it;
-                const auto& otherPair = *otherIt;
-                if (pair.first == otherPair.first) {
+                const auto& [id, ev] = *it;
+                const auto& [otherId, otherEv] = *otherIt;
+                if (id == otherId) {
                     // Same ID -- take newer event, forget other one
-                    newMap[pair.first] = (pair.second.dominates(otherPair.second) ? pair.second : otherPair.second);
+                    newMap[id] = (ev.dominates(otherEv) ? ev : otherEv);
                     it++; otherIt++;
                 } else {
                     // Different ID -- insert lower one
-                    if (pair.first < otherPair.first) {
-                        newMap[pair.first] = pair.second;
+                    if (id < otherId) {
+                        newMap[id] = ev;
                         it++;
                     } else {
-                        newMap[otherPair.first] = otherPair.second;
+                        newMap[otherId] = otherEv;
                         otherIt++;
                     }
                 }

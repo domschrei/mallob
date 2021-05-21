@@ -58,7 +58,6 @@ public:
 private:
     void handleNotifyJobAborting(MessageHandle& handle);
     void handleAcceptAdoptionOffer(MessageHandle& handle);
-    void handleConfirmJobRevisionDetails(MessageHandle& handle);
     void handleConfirmAdoption(MessageHandle& handle);
     void handleDoExit(MessageHandle& handle);
     void handleRejectOneshot(MessageHandle& handle);
@@ -68,23 +67,20 @@ private:
     void handleInterrupt(MessageHandle& handle);
     void handleSendApplicationMessage(MessageHandle& handle);
     void handleNotifyJobDone(MessageHandle& handle);
-    void handleNotifyJobRevision(MessageHandle& handle);
     void handleOfferAdoption(MessageHandle& handle);
     void handleQueryJobResult(MessageHandle& handle);
-    void handleQueryJobRevisionDetails(MessageHandle& handle);
     void handleQueryVolume(MessageHandle& handle);
     void handleRejectAdoptionOffer(MessageHandle& handle);
     void handleNotifyResultObsolete(MessageHandle& handle);
     void handleSendJob(MessageHandle& handle);
     void handleSendJobResult(MessageHandle& handle);
-    void handleSendJobRevisionData(MessageHandle& handle);
-    void handleSendJobRevisionDetails(MessageHandle& handle);
     void handleNotifyJobTerminating(MessageHandle& handle);
     void handleNotifyVolumeUpdate(MessageHandle& handle);
     void handleNotifyNodeLeavingJob(MessageHandle& handle);
     void handleNotifyResultFound(MessageHandle& handle);
     
     void initJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& data, int senderRank);
+    void restartJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& data, int senderRank);
     void bounceJobRequest(JobRequest& request, int senderRank);
     void updateVolume(int jobId, int demand);
     void interruptJob(int jobId, bool terminate, bool reckless);
