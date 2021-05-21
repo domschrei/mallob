@@ -149,6 +149,12 @@ std::shared_ptr<std::vector<uint8_t>> JobDescription::extractUpdate(int firstInc
 
     assert(firstIncludedRevision <= _revision || log_return_false("%i != %i\n", firstIncludedRevision, _revision));
 
+    if (firstIncludedRevision == 0) {
+        // Query for the entire description:
+        // Can just return the full serialization
+        return _raw_data;
+    }
+
     log(V4_VVER, "Extract revisions %i .. %i\n", firstIncludedRevision, _revision);
 
     // Create base object
