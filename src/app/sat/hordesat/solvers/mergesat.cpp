@@ -145,9 +145,9 @@ void MergeSatBackend::addLiteral(int lit) {
 	}
 }
 
-void MergeSatBackend::addLearnedClause(const int* begin, int size) {
+void MergeSatBackend::addLearnedClause(const Mallob::Clause& c) {
 	auto lock = clauseAddingLock.getLock();
-	(size == 1 ? clausesToAdd : learnedClausesToAdd).push_back(std::vector<int>(begin, begin+size));
+	(c.size == 1 ? clausesToAdd : learnedClausesToAdd).push_back(std::vector<int>(c.begin, c.begin+c.size));
 	// this will be picked up by the solver without restarting it
 }
 
@@ -158,15 +158,8 @@ void miniLearnCallback(const std::vector<int>& cls, int glueValue, void* issuer)
 	if (glueValue > mp->lbdLimit) return;
 	if (cls.size() == 0) return;
 	 
-	std::vector<int> ncls;
-	if (cls.size() > 1) {
-		assert(glueValue > 0); // check that glue is positive
-		ncls.push_back(glueValue+1);
-	}
-	for (int i = 0; i < cls.size(); i++) {
-		ncls.push_back(cls[i]);
-	}
-	mp->callback(ncls, mp->getLocalId());
+	std::vector<int> ncls(cls);
+	mp->callback(Mallob::Clause{ncls.data(), (int)ncls.size(), glueValue}, mp->getLocalId());
 }
 
 void consumeSharedCls(void* issuer) {

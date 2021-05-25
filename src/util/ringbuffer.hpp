@@ -9,6 +9,8 @@
 #include <assert.h>
 
 #include "app/sat/hordesat/utilities/clause.hpp"
+using namespace Mallob;
+
 #include "util/ringbuf/ringbuf.h"
 
 class RingBuffer {

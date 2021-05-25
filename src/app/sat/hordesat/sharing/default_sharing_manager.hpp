@@ -14,7 +14,6 @@
 #include "app/sat/hordesat/sharing/sharing_manager_interface.hpp"
 #include "app/sat/hordesat/utilities/clause_database.hpp"
 #include "app/sat/hordesat/sharing/lockfree_clause_database.hpp"
-#include "app/sat/hordesat/utilities/clause.hpp"
 #include "app/sat/hordesat/utilities/clause_filter.hpp"
 #include "util/params.hpp"
 

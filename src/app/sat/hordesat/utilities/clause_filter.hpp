@@ -11,7 +11,9 @@
 #include <vector>
 #include <bitset>
 #include "util/robin_hood.hpp"
+
 #include "app/sat/hordesat/utilities/clause.hpp"
+using namespace Mallob;
 
 #include "util/sys/threading.hpp"
 

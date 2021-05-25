@@ -9,6 +9,8 @@
 #define GLUCOSE_H_
 
 #include "portfolio_solver_interface.hpp"
+using namespace Mallob;
+
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 

@@ -8,7 +8,6 @@
 #include "util/ringbuffer.hpp"
 #include "util/robin_hood.hpp"
 #include "util/hashing.hpp"
-#include "app/sat/hordesat/utilities/clause.hpp"
 #include "app/sat/hordesat/utilities/clause_filter.hpp"
 #include "util/logger.hpp"
 

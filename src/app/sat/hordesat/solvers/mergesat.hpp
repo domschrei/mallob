@@ -68,7 +68,7 @@ public:
 
 	// Add a learned clause to the formula
 	// The learned clauses might be added later or possibly never
-	void addLearnedClause(const int* begin, int size) override;
+	void addLearnedClause(const Mallob::Clause& clause) override;
 
 	// Set a function that should be called for each learned clause
 	void setLearnedClauseCallback(const LearnedClauseCallback& callback) override;
