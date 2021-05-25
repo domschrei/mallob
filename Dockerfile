@@ -37,15 +37,9 @@ COPY --from=builder build/mallob mallob
 COPY --from=builder build/mallob_sat_process mallob_sat_process
 RUN chmod 755 mallob
 RUN chmod 755 mallob_sat_process
-ADD make_plain_hostfile.py supervised-scripts/make_combined_hostfile.py
-RUN chmod 755 supervised-scripts/make_combined_hostfile.py
-#
-#ADD mpi-run-aws-relay.sh supervised-scripts/mpi-run.sh
 ADD mpi-run-aws.sh supervised-scripts/mpi-run.sh
-#
 RUN chmod 755 supervised-scripts/mpi-run.sh
 ADD test.cnf test.cnf
-RUN ls -lt
 USER mallob
 CMD ["/usr/sbin/sshd", "-D", "-f", "/home/mallob/.ssh/sshd_config"]
 CMD supervised-scripts/mpi-run.sh

@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
     std::string logdir = params.getParam("log");
     Logger::init(rank, params.getIntParam("v"), params.isNotNull("colors"), 
             quiet, /*cPrefix=*/params.isNotNull("mono"), params.isNotNull("nolog") ? nullptr : &logdir);
-    
+
     MyMpi::setOptions(params);
 
     if (rank == 0)

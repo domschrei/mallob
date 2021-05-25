@@ -64,7 +64,8 @@ void cbConsumeCls(void* sp, int** clause, int* glue) {
 
 
 Lingeling::Lingeling(const SolverSetup& setup) 
-	: PortfolioSolverInterface(setup), 
+	: PortfolioSolverInterface(setup),
+		incremental(setup.incremental),
 		learnedClauses(4*setup.anticipatedLitsToImportPerCycle), 
 		learnedUnits(2*setup.anticipatedLitsToImportPerCycle + 1) {
 
@@ -97,11 +98,25 @@ Lingeling::Lingeling(const SolverSetup& setup)
 
 void Lingeling::addLiteral(int lit) {
 	
-	// TODO required for incremental solving?
-	//if (lit != 0) lglfreeze(solver, lit);
-	
-	if (abs(lit) > maxvar) maxvar = abs(lit);
+	if (lit == 0) {
+		lgladd(solver, 0);
+		return;
+	}
+	updateMaxVar(lit);
 	lgladd(solver, lit);
+}
+
+void Lingeling::updateMaxVar(int lit) {
+	lit = abs(lit);
+	assert(lit <= 134217723); // lingeling internal literal limit
+	if (!incremental) maxvar = lit;
+	else while (maxvar < lit) {
+		maxvar++;
+		// Freezing required for incremental solving only.
+		// This loop ensures that each literal that is added
+		// or assumed at some point is frozen exactly once.
+		lglfreeze(solver, maxvar);
+	}
 }
 
 void Lingeling::diversify(int seed) {
@@ -183,27 +198,18 @@ void Lingeling::setPhase(const int var, const bool phase) {
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
 SatResult Lingeling::solve(size_t numAssumptions, const int* assumptions) {
 	
-	// add the clauses
-	for (size_t i = 0; i < clausesToAdd.size(); i++) {
-		for (size_t j = 0; j < clausesToAdd[i].size(); j++) {
-			int lit = clausesToAdd[i][j];
-			if (abs(lit) > maxvar) maxvar = abs(lit);
-			lgladd(solver, lit);
-		}
-		lgladd(solver, 0);
-	}
-	clausesToAdd.clear();
-	
 	// set the assumptions
 	this->assumptions.clear();
 	for (size_t i = 0; i < numAssumptions; i++) {
 		// freezing problems
 		int lit = assumptions[i];
-		if (abs(lit) > maxvar) maxvar = abs(lit);
+		updateMaxVar(lit);
 		lglassume(solver, lit);
 		this->assumptions.push_back(lit);
 	}
+
 	int res = lglsat(solver);
+	
 	switch (res) {
 	case LGL_SATISFIABLE:
 		return SAT;

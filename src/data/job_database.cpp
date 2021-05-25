@@ -63,6 +63,30 @@ bool JobDatabase::init(int jobId, const std::shared_ptr<std::vector<uint8_t>>& d
     return true;
 }
 
+bool JobDatabase::restart(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source) {
+
+    if (!has(jobId) || get(jobId).getState() == PAST) {
+        log(V1_WARN, "[WARN] Unknown or past job #%i : discard desc. of size %i\n", jobId, description->size());
+        return false;
+    }
+    auto& job = get(jobId);
+
+    // Erase job commitment
+    uncommit(jobId);
+
+    // Empty job description
+    if (description->size() == sizeof(int)) {
+        log(V4_VVER, "Received empty desc. of #%i - uncommit and ignore\n", jobId);
+        return false;
+    }
+
+    // Restart job (in a separate thread)
+    setLoad(1, jobId);
+    log(LOG_ADD_SRCRANK | V3_VERB, "RESTART %s", source, job.toStr());
+    get(jobId).restart(description);
+    return true;
+}
+
 bool JobDatabase::checkComputationLimits(int jobId) {
 
     auto& job = get(jobId);
@@ -123,27 +147,33 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
         // Job is not active
         log(V4_VVER, "Req. %s : job inactive (%s)\n", job.toStr(), job.jobStateToStr());
         return true;
-    
-    } else if (req.requestedNodeIndex != job.getJobTree().getLeftChildIndex() 
+    }
+    if (req.requestedNodeIndex != job.getJobTree().getLeftChildIndex() 
             && req.requestedNodeIndex != job.getJobTree().getRightChildIndex()) {
         // Requested node index is not a valid child index for this job
         log(V4_VVER, "Req. %s : not a valid child index (any more)\n", job.toStr());
         return true;
-
-    } else if (alreadyAccepted) {
+    }
+    if (req.currentRevision < job.getRevision()) {
+        // Job was updated in the meantime
+        log(V4_VVER, "Req. %s : rev. %i not up to date\n", job.toStr(), req.currentRevision);
+        return true;
+    }
+    if (alreadyAccepted) {
         return false;
 
-    } else if (req.requestedNodeIndex == job.getJobTree().getLeftChildIndex() && job.getJobTree().hasLeftChild()) {
+    }
+    if (req.requestedNodeIndex == job.getJobTree().getLeftChildIndex() && job.getJobTree().hasLeftChild()) {
         // Job already has a left child
         log(V4_VVER, "Req. %s : already has left child\n", job.toStr());
         return true;
 
-    } else if (req.requestedNodeIndex == job.getJobTree().getRightChildIndex() && job.getJobTree().hasRightChild()) {
+    }
+    if (req.requestedNodeIndex == job.getJobTree().getRightChildIndex() && job.getJobTree().hasRightChild()) {
         // Job already has a right child
         log(V4_VVER, "Req. %s : already has right child\n", job.toStr());
         return true;
     }
-
     return false;
 }
 
@@ -187,16 +217,27 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, bool on
         }
     }
 
+    bool isThisDormantRoot = has(req.jobId) && get(req.jobId).getJobTree().isRoot();
+
+    if (!isThisDormantRoot && hasDormantRoot() && req.requestedNodeIndex == 0) {
+        // Cannot adopt a root node while there is still another dormant root here
+        return REJECT;
+    }
+
+
     // Node is idle and not committed to another job
     if (isIdle()) {
         if (!oneshot) return ADOPT_FROM_IDLE;
         // Oneshot request: Job must be present and suspended
-        else return (has(req.jobId) && get(req.jobId).getState() == SUSPENDED ? ADOPT_FROM_IDLE : REJECT);
+        else return (has(req.jobId) && 
+            (get(req.jobId).getState() == SUSPENDED || get(req.jobId).getState() == STANDBY) 
+                ? ADOPT_FROM_IDLE : REJECT);
     }
 
-    // Request for a root node exceeded max #hops: 
+    // Request for a root node which either exceeded a large number of hops
+    // or which already resides on this node as a dormant root:
     // Possibly adopt the job while dismissing the active job
-    if (req.requestedNodeIndex == 0 && req.numHops >= 32) {
+    if (req.requestedNodeIndex == 0 && (req.numHops >= 32 || isThisDormantRoot)) {
 
         // Adoption only works if this node does not yet compute for that job
         if (!has(req.jobId) || get(req.jobId).getState() != ACTIVE) {
@@ -217,7 +258,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, bool on
         }
 
         // Adoption did not work out: Defer the request if a certain #hops is reached
-        if (req.numHops % std::max(32, MyMpi::size(_comm)) == 0) {
+        if (req.numHops > 0 && req.numHops % std::max(32, MyMpi::size(_comm)) == 0) {
             log(V3_VERB, "Defer %s\n", req.toStr().c_str());
             _deferred_requests.emplace_back(Timer::elapsedSeconds(), sender, req);
             return DEFER;
@@ -253,15 +294,18 @@ void JobDatabase::suspend(int jobId) {
 
 void JobDatabase::stop(int jobId, bool terminate) {
     Job& job = get(jobId);
+    if (!isIdle() && getActive().getId() == jobId) setLoad(0, jobId);
+    if (job.hasCommitment()) uncommit(jobId);
     if (job.getState() == SUSPENDED) job.resume();
-    if (job.getState() == ACTIVE) job.stop();
-    if (job.getState() == INACTIVE && terminate) {
-        if (!isIdle() && getActive().getId() == jobId) setLoad(0, jobId);
-        job.terminate();
-        log(V3_VERB, "TERMINATE %s\n", job.toStr());
-        if (job.hasCommitment()) uncommit(jobId);
+    if (terminate) {
+        if (job.getState() == ACTIVE) job.stop();
+        if (job.getState() == INACTIVE || job.getState() == STANDBY) {
+            job.terminate();
+            log(V3_VERB, "TERMINATE %s\n", job.toStr());
+        } 
     } else {
-        log(V3_VERB, "STOP %s\n", job.toStr());
+        log(V3_VERB, "STOP %s (state: %s)\n", job.toStr(), job.jobStateToStr());
+        if (job.getState() == ACTIVE) job.interrupt();
     }
 }
 
@@ -460,6 +504,14 @@ void JobDatabase::finishBalancing() {
 
 robin_hood::unordered_map<int, int> JobDatabase::getBalancingResult() {
     return _balancer->getBalancingResult();
+}
+
+bool JobDatabase::hasDormantRoot() const {
+    for (auto& [_, job] : _jobs) {
+        if (job->getJobTree().isRoot() && job->getState() == STANDBY) 
+            return true;
+    }
+    return false;
 }
 
 JobDatabase::~JobDatabase() {

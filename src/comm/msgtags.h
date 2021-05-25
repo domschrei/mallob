@@ -103,17 +103,11 @@ the sender is defecting to another job.
 Data type: [jobId, index]
 */
 const int MSG_NOTIFY_NODE_LEAVING_JOB = 16;
-/* For incremental jobs. Unsupported as of now */
-const int MSG_NOTIFY_JOB_REVISION = 17;
-/* For incremental jobs. Unsupported as of now */
-const int MSG_QUERY_JOB_REVISION_DETAILS = 18;
-/* For incremental jobs. Unsupported as of now */
-const int MSG_SEND_JOB_REVISION_DETAILS = 19;
-/* For incremental jobs. Unsupported as of now */
-const int MSG_CONFIRM_JOB_REVISION_DETAILS = 20;
-/* For incremental jobs. Unsupported as of now */
-const int MSG_SEND_JOB_REVISION_DATA = 21;
-/* For incremental jobs. Unsupported as of now */
+/* 
+The sender (a client or a worker) informs the receiver (a worker) that a certain
+incremental job is completed and can be cleaned up.
+Data type: [jobId]
+*/
 const int MSG_INCREMENTAL_JOB_FINISHED = 22;
 /*
 The sender informs the receiver that the receiver should interrupt 

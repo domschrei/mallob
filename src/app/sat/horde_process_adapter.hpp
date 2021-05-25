@@ -2,6 +2,8 @@
 #ifndef DOMPASCH_MALLOB_HORDE_PROCESS_ADAPTER_H
 #define DOMPASCH_MALLOB_HORDE_PROCESS_ADAPTER_H
 
+#include <list>
+
 #include "util/logger.hpp"
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
@@ -12,6 +14,16 @@
 
 class HordeProcessAdapter {
 
+public:
+    struct RevisionData {
+        int revision;
+        Checksum checksum;
+        size_t fSize;
+        const int* fLits;
+        size_t aSize;
+        const int* aLits;
+    };
+
 private:
     Parameters _params;
     std::shared_ptr<Logger> _log;
@@ -20,7 +32,8 @@ private:
     const int* _f_lits;
     size_t _a_size;
     const int* _a_lits;
-
+    int _revision_update = -1;
+    
     std::vector<std::tuple<std::string, void*, int>> _shmem;
     std::string _shmem_id;
     HordeSharedMemory* _hsm;
@@ -29,7 +42,7 @@ private:
     int* _import_buffer;
 
     pid_t _child_pid;
-    SolvingStates::SolvingState _state;
+    SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
 
 public:
     HordeProcessAdapter(const Parameters& params, 
@@ -43,8 +56,9 @@ public:
     bool isFullyInitialized();
     pid_t getPid();
 
+    void appendRevisions(const std::vector<RevisionData>& revisions);
+
     void setSolvingState(SolvingStates::SolvingState state);
-    void updateRole(int rank, int size);
 
     void collectClauses(int maxSize);
     bool hasCollectedClauses();
@@ -60,6 +74,7 @@ public:
 
 private:
     void initSharedMemory();
+    void* createSharedMemoryBlock(std::string shmemSubId, size_t size, void* data);
 
 };
 

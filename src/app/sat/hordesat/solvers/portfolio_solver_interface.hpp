@@ -45,6 +45,7 @@ struct SolverSetup {
 	int localId; 
 	std::string jobname; 
 	int diversificationIndex;
+	bool incremental;
 
 	// SAT Solving settings
 

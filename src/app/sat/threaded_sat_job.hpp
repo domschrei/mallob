@@ -31,8 +31,8 @@ private:
     std::atomic_bool _done_locally;
     int _result_code;
     JobResult _result;
+    int _last_imported_revision = -1;
 
-    std::thread _init_thread;
     std::thread _destroy_thread;
     Mutex _solver_lock;
 
@@ -49,6 +49,8 @@ public:
     void appl_stop() override;
     void appl_suspend() override;
     void appl_resume() override;
+    void appl_interrupt() override;
+    void appl_restart() override;
     void appl_terminate() override;
 
     int appl_solved() override;

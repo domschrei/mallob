@@ -11,6 +11,9 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         log(LOG_ADD_SRCRANK | V1_WARN, "[WARN] %s : stray job message meant for #%i\n", source, _job->toStr(), msg.jobId);
         return;
     }
+    // Discard messages from a revision inconsistent with
+    // the current local revision
+    if (msg.revision != _job->getRevision()) return;
 
     if (_use_checksums) {
         Checksum chk;
@@ -94,6 +97,7 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
         int parentRank = _job->getJobTree().getParentNodeRank();
         JobMessage msg;
         msg.jobId = _job->getId();
+        msg.revision = _job->getRevision();
         msg.epoch = 0; // unused
         msg.tag = MSG_GATHER_CLAUSES;
         msg.payload = clausesToShare;
@@ -147,6 +151,7 @@ void AnytimeSatClauseCommunicator::sendClausesToChildren(std::vector<int>& claus
     // Send clauses to children
     JobMessage msg;
     msg.jobId = _job->getId();
+    msg.revision = _job->getRevision();
     msg.epoch = 0; // unused
     msg.tag = MSG_DISTRIBUTE_CLAUSES;
     msg.payload = clauses;

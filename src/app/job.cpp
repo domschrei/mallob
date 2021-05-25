@@ -97,8 +97,30 @@ void Job::resume() {
     log(V4_VVER, "%s : resumed solving threads\n", toStr());
 }
 
+void Job::interrupt() {
+    assertState(ACTIVE);
+    _state = STANDBY;
+    appl_interrupt();
+    _job_tree.unsetLeftChild();
+    _job_tree.unsetRightChild();
+    log(V4_VVER, "%s : interrupted solver\n", toStr());
+}
+
+void Job::restart(const std::shared_ptr<std::vector<uint8_t>>& data) {
+    assertState(STANDBY);
+    _time_of_activation = Timer::elapsedSeconds();
+    _time_of_last_limit_check = Timer::elapsedSeconds();
+    _volume = 1;
+    assert(!isResultTransferPending());
+    _result.reset();
+    _description.applyUpdate(data);
+    _state = ACTIVE;
+    appl_restart();
+    log(V4_VVER, "%s : restarted solver\n", toStr());
+}
+
 void Job::terminate() {
-    assertState(INACTIVE);
+    assert(_state == INACTIVE || _state == STANDBY || log_return_false("State of %s : %s\n", toStr(), jobStateToStr()));
     _state = PAST;
     _volume = 0;
 

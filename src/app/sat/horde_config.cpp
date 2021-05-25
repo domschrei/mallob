@@ -19,6 +19,8 @@ void HordeConfig::applyDefault(Parameters& params, const Job& job) {
     params["mpisize"] = std::to_string(job.getGlobalNumWorkers()); // size of worker comm
     std::string identifier = std::string(job.toStr());
     params["jobstr"] = identifier;
+    params["incremental"] = job.getDescription().isIncremental() ? "1" : "0";
+    params["firstrev"] = std::to_string(job.getRevision());
     
     params["mpirank"] = std::to_string(job.getMyMpiRank()); // rank of this node
     params["jobid"] = std::to_string(job.getId());

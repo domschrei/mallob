@@ -61,7 +61,6 @@ void Logger::init(int rank, int verbosity, bool coloredOutput, bool quiet, bool 
 
     // Create logging directory as necessary
     if (logDirOrNull != nullptr) {
-
         std::string& logDir = *logDirOrNull;
 
         _main_instance._log_directory = (logDir.size() == 0 ? "." : logDir) + "/" + std::to_string(rank) + "/";
