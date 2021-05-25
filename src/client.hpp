@@ -55,6 +55,7 @@ private:
     
     // Collection of job IDs which finished (for checking dependencies) and their corresponding revision.
     struct DoneInfo {int revision; Checksum lastChecksum;};
+    robin_hood::unordered_flat_set<int, robin_hood::hash<int>> _recently_done_jobs;
     robin_hood::unordered_flat_map<int, DoneInfo, robin_hood::hash<int>> _done_jobs;
     // Safeguards _done_jobs.
     Mutex _done_job_lock; 

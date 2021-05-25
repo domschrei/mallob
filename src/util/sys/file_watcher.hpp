@@ -42,7 +42,7 @@ public:
     FileWatcher() = default;
     FileWatcher(const std::string& directory, int events, 
         std::function<void(const Event&, Logger&)> callback, Logger& logger,
-        InitialFilesHandling initFilesHandling = IGNORE, size_t numThreads = 4) : 
+        InitialFilesHandling initFilesHandling = IGNORE, size_t numThreads = 1) : 
     
             _directory(directory),
             _exiting(false), _callback(callback), _init_files_handling(initFilesHandling) {

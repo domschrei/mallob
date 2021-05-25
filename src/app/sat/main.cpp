@@ -201,11 +201,16 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
         // Check solved state
         int resultCode = hlib.solveLoop();
         if (resultCode >= 0) {
-            log.log(V5_DEBG, "DO write solution\n");
             // Solution found!
             auto& result = hlib.getResult();
             result.id = programParams.getIntParam("jobid");
             assert(result.revision == lastImportedRevision);
+            if (hsm->doStartNextRevision && !hsm->didStartNextRevision) {
+                // Result obsolete: there is already another revision
+                continue;
+            }
+
+            log.log(V5_DEBG, "DO write solution\n");
             solutionVec = result.solution;
             hsm->solutionRevision = result.revision;
             hsm->result = SatResult(result.result);
@@ -220,7 +225,6 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
             lastSolvedRevision = lastImportedRevision;
             log.log(V5_DEBG, "DONE write solution\n");
             hsm->hasSolution = true;
-            continue;
         }
     }
 

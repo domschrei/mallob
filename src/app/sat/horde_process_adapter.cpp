@@ -25,7 +25,7 @@ void HordeProcessAdapter::initSharedMemory() {
     _shmem_id = "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + "." + _params["mpirank"] + ".#" + _params["jobid"];
     //log(V4_VVER, "Setup base shmem: %s\n", _shmem_id.c_str());
     void* mainShmem = SharedMemory::create(_shmem_id, sizeof(HordeSharedMemory));
-    _shmem.push_back(std::tuple<std::string, void*, int>(_shmem_id, mainShmem, sizeof(HordeSharedMemory)));
+    _shmem.insert(ShmemObject{_shmem_id, mainShmem, sizeof(HordeSharedMemory)});
     _hsm = new ((char*)mainShmem) HordeSharedMemory();
     _hsm->doExport = false;
     _hsm->doImport = false;
@@ -59,12 +59,14 @@ void HordeProcessAdapter::initSharedMemory() {
 }
 
 HordeProcessAdapter::~HordeProcessAdapter() {
+    if (_hsm != nullptr && _hsm->hasSolution) checkSolution();
     freeSharedMemory();
 }
 
 void HordeProcessAdapter::freeSharedMemory() {
-    for (auto& [name, addr, size] : _shmem) {
-        SharedMemory::free(name, (char*)addr, size);
+    _hsm = nullptr;
+    for (auto& shmemObj : _shmem) {
+        SharedMemory::free(shmemObj.id, (char*)shmemObj.data, shmemObj.size);
     }
     _shmem.clear();
 }
@@ -122,6 +124,7 @@ void HordeProcessAdapter::appendRevisions(const std::vector<RevisionData>& revis
         createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
     }
 
+    if (_hsm->hasSolution) checkSolution();
     _hsm->hasSolution = false;
 
     if (_state == SolvingStates::INITIALIZING) {
@@ -144,6 +147,7 @@ void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
         Process::suspend(_child_pid); // Stop (suspend) process.
     }
     if (state == SolvingStates::ACTIVE) {
+        if (_hsm->hasSolution) checkSolution();
         _hsm->hasSolution = false;
         Process::resume(_child_pid); // Continue (resume) process.
     }
@@ -202,8 +206,23 @@ bool HordeProcessAdapter::check() {
         _hsm->doStartNextRevision = true;
     }
     
-    if (_hsm->hasSolution) return _hsm->solutionRevision == _hsm->revision;
+    if (_hsm->hasSolution) return checkSolution();
     return false;
+}
+
+bool HordeProcessAdapter::checkSolution() {
+
+    int rev = _hsm->solutionRevision;
+
+    // ACCESS the existing shared memory segment to the solution vector
+    // and remember to clean it up later when destructing the adapter
+    if (_hsm->solutionSize > 0) {
+        std::string id = _shmem_id + ".solution." + std::to_string(rev);
+        int* shmemSolution = (int*) SharedMemory::access(id, _hsm->solutionSize*sizeof(int));
+        _shmem.insert(ShmemObject{id, (void*)shmemSolution, _hsm->solutionSize*sizeof(int)});
+    }
+
+    return _hsm->solutionRevision == _hsm->revision;
 }
 
 std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
@@ -216,7 +235,7 @@ std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
     std::string id = _shmem_id + ".solution." + std::to_string(rev);
     int* shmemSolution = (int*) SharedMemory::access(id, solution.size()*sizeof(int));
     memcpy(solution.data(), shmemSolution, solution.size()*sizeof(int));
-    _shmem.emplace_back(id, (void*)shmemSolution, solution.size()*sizeof(int));
+    _shmem.insert(ShmemObject{id, (void*)shmemSolution, solution.size()*sizeof(int)});
     
     return std::pair<SatResult, std::vector<int>>(_hsm->result, solution);
 }
@@ -230,7 +249,7 @@ void* HordeProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_
     } else {
         memcpy(shmem, data, size);
     }
-    _shmem.emplace_back(id, shmem, size);
+    _shmem.insert(ShmemObject{id, shmem, size});
     return shmem;
 }
 

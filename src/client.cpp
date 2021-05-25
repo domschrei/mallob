@@ -135,10 +135,8 @@ void Client::handleNewJob(JobMetadata&& data) {
     if (data.done) {
         // Incremental job notified to be finished
         int jobId = data.description->getId();
-        log(LOG_ADD_DESTRANK | V3_VERB, "Notifying #%i:0 that job is done", _root_nodes[jobId], jobId);
-        IntVec payload({jobId});
-        MyMpi::isend(MPI_COMM_WORLD, _root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
-        finishJob(jobId, /*hasIncrementalSuccessors=*/false);
+        auto lock = _done_job_lock.getLock();
+        _recently_done_jobs.insert(jobId);
         return;
     }
 
@@ -208,6 +206,20 @@ void Client::mainProgram() {
             log(V4_VVER, "mainthread_cpu=%i\n", info.cpu);
             log(V3_VERB, "mem=%.2fGB\n", info.residentSetSize);
             lastStatTime = time;
+        }
+
+        // Send notification messages for recently done jobs
+        robin_hood::unordered_flat_set<int, robin_hood::hash<int>> doneJobs;
+        {
+            auto lock = _done_job_lock.getLock();
+            doneJobs = std::move(_recently_done_jobs);
+            _recently_done_jobs.clear();
+        }
+        for (int jobId : doneJobs) {
+            log(LOG_ADD_DESTRANK | V3_VERB, "Notifying #%i:0 that job is done", _root_nodes[jobId], jobId);
+            IntVec payload({jobId});
+            MyMpi::isend(MPI_COMM_WORLD, _root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
+            finishJob(jobId, /*hasIncrementalSuccessors=*/false);
         }
 
         // Introduce next job(s) as applicable
@@ -444,8 +456,8 @@ void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {
     if (!hasIncrementalSuccessors) {
         _root_nodes.erase(jobId);
         _active_jobs.erase(jobId);
+        _sys_state.addLocal(SYSSTATE_PROCESSED_JOBS, 1);
     }
-    _sys_state.addLocal(SYSSTATE_PROCESSED_JOBS, 1);
 
     introduceNextJob();
 }

@@ -34,9 +34,25 @@ private:
     const int* _a_lits;
     int _revision_update = -1;
     
-    std::vector<std::tuple<std::string, void*, int>> _shmem;
+    struct ShmemObject {
+        std::string id; 
+        void* data; 
+        size_t size;
+        bool operator==(const ShmemObject& other) const {
+            return id == other.id && size == other.size;
+        }
+    };
+    struct ShmemObjectHasher {
+        size_t operator()(const ShmemObject& obj) const {
+            size_t hash = 1;
+            hash_combine(hash, obj.id);
+            hash_combine(hash, obj.size);
+            return hash;
+        }
+    };
+    robin_hood::unordered_flat_set<ShmemObject, ShmemObjectHasher> _shmem;
     std::string _shmem_id;
-    HordeSharedMemory* _hsm;
+    HordeSharedMemory* _hsm = nullptr;
 
     int* _export_buffer;
     int* _import_buffer;
@@ -75,6 +91,7 @@ public:
 private:
     void initSharedMemory();
     void* createSharedMemoryBlock(std::string shmemSubId, size_t size, void* data);
+    bool checkSolution();
 
 };
 

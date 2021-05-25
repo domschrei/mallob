@@ -19,7 +19,7 @@
 class JobFileAdapter {
 
 public:
-    enum Status {NEW, PENDING, DONE};
+    enum Status {NEW, PENDING, DONE, INTRODUCED};
     struct JobImage {
         int id;
         std::string userQualifiedName;

@@ -27,6 +27,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         // Attempt to read job file
         std::string eventFile = getJobFilePath(event, NEW);
         if (!FileUtils::isRegularFile(eventFile)) {
+            log.log(V3_VERB, "Job file %s does not exist (any more)\n", eventFile.c_str());        
             return; // File does not exist (any more)
         }
         try {
@@ -130,9 +131,17 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         }
 
         // Remove original file, move to "pending"
+        {
+            std::string pendingFile = getJobFilePath(id, _job_id_to_latest_rev[id], PENDING);
+            log.log(V4_VVER, "Move %s to %s\n", eventFile.c_str(), pendingFile.c_str());
+            std::ofstream o(pendingFile);
+            o << std::setw(4) << j << std::endl;
+        }
+        {
+            std::ofstream o(getJobFilePath(id, _job_id_to_latest_rev[id], INTRODUCED));
+            o << std::setw(4) << j << std::endl;
+        }
         FileUtils::rm(eventFile);
-        std::ofstream o(getJobFilePath(id, _job_id_to_latest_rev[id], PENDING));
-        o << std::setw(4) << j << std::endl;
     }
 
     // Initialize new job
@@ -189,7 +198,10 @@ void JobFileAdapter::handleJobDone(const JobResult& result) {
     auto lock = _job_map_mutex.getLock();
 
     std::string eventFile = getJobFilePath(result.id, result.revision, PENDING);
+    _logger.log(V3_VERB, "Job done event for #%i rev. %i : %s\n", result.id, result.revision, eventFile.c_str());
+
     if (!FileUtils::isRegularFile(eventFile)) {
+        _logger.log(V1_WARN, "Pending job file %s gone!\n", eventFile.c_str());
         return; // File does not exist (any more)
     }
     std::ifstream i(eventFile);
@@ -200,7 +212,7 @@ void JobFileAdapter::handleJobDone(const JobResult& result) {
         _logger.log(V1_WARN, "Parse error on %s: %s\n", eventFile.c_str(), e.what());
         return;
     }
-
+    
     // Pack job result into JSON
     j["result"] = { 
         { "resultcode", result.result }, 
@@ -211,9 +223,9 @@ void JobFileAdapter::handleJobDone(const JobResult& result) {
     };
 
     // Remove file in "pending", move to "done"
-    FileUtils::rm(eventFile);
     std::ofstream o(getJobFilePath(result.id, result.revision, DONE));
     o << std::setw(4) << j << std::endl;
+    FileUtils::rm(eventFile);
 }
 
 void JobFileAdapter::handleJobResultDeleted(const FileWatcher::Event& event, Logger& log) {
@@ -240,14 +252,21 @@ void JobFileAdapter::handleJobResultDeleted(const FileWatcher::Event& event, Log
     log.log(V4_VVER, "Cleaned up \"%s\"\n", event.name.c_str());
 }
 
+std::string getDirectory(JobFileAdapter::Status status) {
+    return status == JobFileAdapter::Status::NEW ? "/new/" : (
+        status == JobFileAdapter::Status::PENDING ? "/pending/" : (
+            status == JobFileAdapter::Status::INTRODUCED ? "/introduced/" : "/done/"
+        )
+    );
+}
 
 std::string JobFileAdapter::getJobFilePath(int id, int revision, JobFileAdapter::Status status) {
-    return _base_path + (status == NEW ? "/new/" : status == PENDING ? "/pending/" : "/done/") + 
+    return _base_path + getDirectory(status) + 
         _job_id_rev_to_image[std::pair<int, int>(id, revision)].userQualifiedName;
 }
 
 std::string JobFileAdapter::getJobFilePath(const FileWatcher::Event& event, JobFileAdapter::Status status) {
-    return _base_path + (status == NEW ? "/new/" : status == PENDING ? "/pending/" : "/done/") + event.name;
+    return _base_path + getDirectory(status) + event.name;
 }
 
 std::string JobFileAdapter::getUserFilePath(const std::string& user) {
