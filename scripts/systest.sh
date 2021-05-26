@@ -142,6 +142,7 @@ cleanup
 
 
 # Incremental tests
+
 for test in roverg10 transportg29; do
     introduce_incremental_job $test 
     test 4 -t=2 -l=1 -satsolver=l -v=4 -J=1 -incrementaltest
@@ -174,3 +175,6 @@ for lbc in 4 8; do
     done
     test 10 -t=2 -lbc=$lbc -J=8 -l=1 -satsolver=l -v=4 -checkjsonresults
 done
+
+
+echo "All tests done."
