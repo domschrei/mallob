@@ -143,7 +143,7 @@ cleanup
 
 # Incremental tests
 
-for test in roverg10 transportg29; do
+for test in entertainment08 roverg10 transportg29 ; do
     introduce_incremental_job $test 
     test 4 -t=2 -l=1 -satsolver=l -v=4 -J=1 -incrementaltest
 done
