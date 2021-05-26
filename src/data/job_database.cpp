@@ -27,6 +27,25 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm):
     // Initialize balancer
     //balancer = std::unique_ptr<Balancer>(new ThermodynamicBalancer(comm, params));
     _balancer = std::unique_ptr<Balancer>(new EventDrivenBalancer(comm, params));
+
+    _janitor = std::thread([this]() {
+        log(V3_VERB, "Job-DB Janitor tid=%lu\n", Proc::getTid());
+        while (!_exiting || _num_stored_jobs > 0) {
+            usleep(1000 * 1000);
+            std::list<Job*> copy;
+            {
+                auto lock = _janitor_mutex.getLock();
+                copy = std::move(_jobs_to_free);
+                _jobs_to_free.clear();
+            }
+            for (auto job : copy) {
+                int id = job->getId();
+                delete job;
+                Logger::getMainInstance().mergeJobLogs(id);
+                _num_stored_jobs--;
+            }
+        }
+    });
 }
 
 Job& JobDatabase::createJob(int commSize, int worldRank, int jobId) {
@@ -36,6 +55,7 @@ Job& JobDatabase::createJob(int commSize, int worldRank, int jobId) {
     } else {
         _jobs[jobId] = new ThreadedSatJob(_params, commSize, worldRank, jobId);
     }
+    _num_stored_jobs++;
     return *_jobs[jobId];
 }
 
@@ -389,23 +409,6 @@ void JobDatabase::free(int jobId) {
         auto lock = _janitor_mutex.getLock();
         _jobs_to_free.emplace_back(job);
     }
-    if (!_janitor.joinable()) _janitor = std::thread([this]() {
-        log(V3_VERB, "Job-DB Janitor tid=%lu\n", Proc::getTid());
-        while (!_exiting) {
-            usleep(1000 * 1000);
-            std::list<Job*> copy;
-            {
-                auto lock = _janitor_mutex.getLock();
-                copy = std::move(_jobs_to_free);
-                _jobs_to_free.clear();
-            }
-            for (auto job : copy) {
-                int id = job->getId();
-                delete job;
-                Logger::getMainInstance().mergeJobLogs(id);
-            }
-        }
-    });
 }
 
 std::vector<std::pair<JobRequest, int>>  JobDatabase::getDeferredRequestsToForward(float time) {

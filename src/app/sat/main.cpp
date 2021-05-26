@@ -205,7 +205,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
             auto& result = hlib.getResult();
             result.id = programParams.getIntParam("jobid");
             assert(result.revision == lastImportedRevision);
-            if (hsm->doStartNextRevision && !hsm->didStartNextRevision) {
+            if (hsm->doTerminate || (hsm->doStartNextRevision && !hsm->didStartNextRevision)) {
                 // Result obsolete: there is already another revision
                 continue;
             }
@@ -214,11 +214,12 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
             solutionVec = result.solution;
             hsm->solutionRevision = result.revision;
             hsm->result = SatResult(result.result);
-            hsm->solutionSize = solutionVec.size();
+            size_t* solutionSize = (size_t*) SharedMemory::create(shmemId + ".solutionsize." + std::to_string(hsm->solutionRevision), sizeof(size_t));
+            *solutionSize = solutionVec.size();
             // Write solution
-            if (hsm->solutionSize > 0) {
+            if (*solutionSize > 0) {
                 solutionShmemId = shmemId + ".solution." + std::to_string(hsm->solutionRevision);
-                solutionShmemSize =  hsm->solutionSize*sizeof(int);
+                solutionShmemSize =  *solutionSize*sizeof(int);
                 solutionShmem = (char*) SharedMemory::create(solutionShmemId, solutionShmemSize);
                 memcpy(solutionShmem, solutionVec.data(), solutionShmemSize);
             }

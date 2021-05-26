@@ -33,7 +33,6 @@ struct HordeSharedMemory {
     bool isInitialized;
     bool hasSolution;
     SatResult result;
-	int solutionSize;
     int solutionRevision;
     
     // Clause buffers: parent->child

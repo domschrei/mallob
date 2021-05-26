@@ -91,7 +91,6 @@ public:
 private:
     void initSharedMemory();
     void* createSharedMemoryBlock(std::string shmemSubId, size_t size, void* data);
-    bool checkSolution();
 
 };
 

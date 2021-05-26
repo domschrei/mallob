@@ -43,7 +43,6 @@ void HordeProcessAdapter::initSharedMemory() {
     _hsm->isInitialized = false;
     _hsm->hasSolution = false;
     _hsm->result = UNKNOWN;
-    _hsm->solutionSize = 0;
     _hsm->solutionRevision = -1;
     _hsm->exportBufferTrueSize = 0;
     _hsm->fSize = _f_size;
@@ -59,12 +58,21 @@ void HordeProcessAdapter::initSharedMemory() {
 }
 
 HordeProcessAdapter::~HordeProcessAdapter() {
-    if (_hsm != nullptr && _hsm->hasSolution) checkSolution();
     freeSharedMemory();
 }
 
 void HordeProcessAdapter::freeSharedMemory() {
-    _hsm = nullptr;
+    if (_hsm != nullptr) {
+        for (int rev = 0; rev <= _hsm->revision; rev++) {
+            size_t* solSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));
+            if (solSize != nullptr) {
+                char* solution = (char*) SharedMemory::access(_shmem_id + ".solution." + std::to_string(rev), *solSize * sizeof(int));
+                SharedMemory::free(_shmem_id + ".solution." + std::to_string(rev), solution, *solSize * sizeof(int));
+                SharedMemory::free(_shmem_id + ".solutionsize." + std::to_string(rev), (char*)solSize, sizeof(size_t));
+            }
+        }
+        _hsm = nullptr;
+    }
     for (auto& shmemObj : _shmem) {
         SharedMemory::free(shmemObj.id, (char*)shmemObj.data, shmemObj.size);
     }
@@ -124,7 +132,6 @@ void HordeProcessAdapter::appendRevisions(const std::vector<RevisionData>& revis
         createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
     }
 
-    if (_hsm->hasSolution) checkSolution();
     _hsm->hasSolution = false;
 
     if (_state == SolvingStates::INITIALIZING) {
@@ -147,7 +154,6 @@ void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
         Process::suspend(_child_pid); // Stop (suspend) process.
     }
     if (state == SolvingStates::ACTIVE) {
-        if (_hsm->hasSolution) checkSolution();
         _hsm->hasSolution = false;
         Process::resume(_child_pid); // Continue (resume) process.
     }
@@ -206,36 +212,21 @@ bool HordeProcessAdapter::check() {
         _hsm->doStartNextRevision = true;
     }
     
-    if (_hsm->hasSolution) return checkSolution();
+    if (_hsm->hasSolution) return _hsm->solutionRevision == _hsm->revision;
     return false;
 }
 
-bool HordeProcessAdapter::checkSolution() {
-
-    int rev = _hsm->solutionRevision;
-
-    // ACCESS the existing shared memory segment to the solution vector
-    // and remember to clean it up later when destructing the adapter
-    if (_hsm->solutionSize > 0) {
-        std::string id = _shmem_id + ".solution." + std::to_string(rev);
-        int* shmemSolution = (int*) SharedMemory::access(id, _hsm->solutionSize*sizeof(int));
-        _shmem.insert(ShmemObject{id, (void*)shmemSolution, _hsm->solutionSize*sizeof(int)});
-    }
-
-    return _hsm->solutionRevision == _hsm->revision;
-}
-
 std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
-    if (_hsm->solutionSize == 0) return std::pair<SatResult, std::vector<int>>(_hsm->result, std::vector<int>()); 
-    std::vector<int> solution(_hsm->solutionSize);
+
+    int rev = _hsm->solutionRevision;
+    size_t* solutionSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));
+    if (*solutionSize == 0) return std::pair<SatResult, std::vector<int>>(_hsm->result, std::vector<int>()); 
+
+    std::vector<int> solution(*solutionSize);
 
     // ACCESS the existing shared memory segment to the solution vector
-    // and remember to clean it up later when destructing the adapter
-    int rev = _hsm->solutionRevision;
-    std::string id = _shmem_id + ".solution." + std::to_string(rev);
-    int* shmemSolution = (int*) SharedMemory::access(id, solution.size()*sizeof(int));
+    int* shmemSolution = (int*) SharedMemory::access(_shmem_id + ".solution." + std::to_string(rev), solution.size()*sizeof(int));
     memcpy(solution.data(), shmemSolution, solution.size()*sizeof(int));
-    _shmem.insert(ShmemObject{id, (void*)shmemSolution, solution.size()*sizeof(int)});
     
     return std::pair<SatResult, std::vector<int>>(_hsm->result, solution);
 }

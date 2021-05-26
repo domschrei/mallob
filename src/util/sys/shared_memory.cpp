@@ -29,6 +29,9 @@ namespace SharedMemory {
 
     void* access(const std::string& specifier, size_t size) {
 
+        std::string shmemFile = "/dev/shm/" + specifier;
+        if (::access(shmemFile.c_str(), F_OK) == -1) return nullptr;
+
         int memFd = shm_open(specifier.c_str(), O_RDWR, 0);
         if (memFd == -1) {
             perror("Can't open file");
