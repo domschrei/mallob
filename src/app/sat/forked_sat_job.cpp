@@ -89,6 +89,7 @@ void ForkedSatJob::appl_suspend() {
     if (!_initialized) return;
     auto lock = _solver_state_change_mutex.getLock();
     _solver->setSolvingState(SolvingStates::SUSPENDED);
+    ((AnytimeSatClauseCommunicator*)_clause_comm)->suspend();
 }
 
 void ForkedSatJob::appl_resume() {

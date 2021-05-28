@@ -17,7 +17,7 @@ DefaultSharingManager::DefaultSharingManager(
 	: _solvers(solvers), _params(params), _logger(logger), 
 	_cdb(
 		/*maxClauseSize=*/_params.getIntParam("hmcl"), 
-		/*maxLbdPartitionedSize=*/8,
+		/*maxLbdPartitionedSize=*/_params.getIntParam("mlbdps"),
 		/*baseBufferSize=*/_params.getIntParam("cbbs"), 
 		/*numProducers=*/_solvers.size()
 	) {

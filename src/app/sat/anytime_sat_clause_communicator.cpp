@@ -26,6 +26,15 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         }
     }
 
+    if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_SEND_CLAUSES) {
+        _cls_history.addEpoch(msg.epoch, msg.payload, /*entireIndex=*/true);
+        learnClauses(msg.payload);
+    }
+    if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_SUBSCRIBE)
+        _cls_history.onSubscribe(source, msg.payload[0], msg.payload[1]);
+    if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_UNSUBSCRIBE)
+        _cls_history.onUnsubscribe(source);
+
     if (msg.tag == MSG_GATHER_CLAUSES) {
         // Gather received clauses, send to parent
 
@@ -40,27 +49,18 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         _clause_buffers.push_back(clauses);
         _num_aggregated_nodes += numAggregated;
 
-        if (canSendClauses()) {
-            if (_job->getJobTree().isRoot()) {
-                // Rank zero: log the broadcast
-                log(V2_INFO, "%s : Distribute clause buffer from %i sources\n", _job->toStr(), _num_aggregated_nodes+1);
-            }
-            sendClausesToParent();
-        }
+        if (canSendClauses()) sendClausesToParent();
 
     } else if (msg.tag == MSG_DISTRIBUTE_CLAUSES) {
+        _current_epoch = msg.epoch;
+
         // Learn received clauses, send them to children
         broadcastAndLearn(msg.payload);
     }
 }
 
-size_t AnytimeSatClauseCommunicator::getBufferLimit(int numAggregatedNodes, BufferMode mode) {
-    float limit = _clause_buf_base_size * std::pow(_clause_buf_discount_factor, std::log2(numAggregatedNodes+1));
-    if (mode == SELF) {
-        return std::ceil(limit);
-    } else {
-        return std::ceil(numAggregatedNodes * limit);
-    }
+size_t AnytimeSatClauseCommunicator::getBufferLimit(int numAggregatedNodes, MyMpi::BufferQueryMode mode) {
+    return MyMpi::getBinaryTreeBufferLimit(numAggregatedNodes, _clause_buf_base_size, _clause_buf_discount_factor, mode);
 }
 
 bool AnytimeSatClauseCommunicator::canSendClauses() {
@@ -73,7 +73,7 @@ bool AnytimeSatClauseCommunicator::canSendClauses() {
 
     if (_clause_buffers.size() >= numChildren) {
         if (!_job->hasPreparedSharing()) {
-            int limit = getBufferLimit(_num_aggregated_nodes+1, BufferMode::SELF);
+            int limit = getBufferLimit(_num_aggregated_nodes+1, MyMpi::SELF);
             _job->prepareSharing(limit);
         }
         if (_job->hasPreparedSharing()) {
@@ -90,8 +90,12 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
     std::vector<int> clausesToShare = prepareClauses();
 
     if (_job->getJobTree().isRoot()) {
+        // Rank zero: proceed to broadcast
+        log(V2_INFO, "%s epoch %i: Broadcast clauses from %i sources\n", _job->toStr(), 
+            _current_epoch, _num_aggregated_nodes+1);
         // Share complete set of clauses to children
         broadcastAndLearn(clausesToShare);
+        _current_epoch++;
     } else {
         // Send set of clauses to parent
         int parentRank = _job->getJobTree().getParentNodeRank();
@@ -152,7 +156,7 @@ void AnytimeSatClauseCommunicator::sendClausesToChildren(std::vector<int>& claus
     JobMessage msg;
     msg.jobId = _job->getId();
     msg.revision = _job->getRevision();
-    msg.epoch = 0; // unused
+    msg.epoch = _current_epoch;
     msg.tag = MSG_DISTRIBUTE_CLAUSES;
     msg.payload = clauses;
 
@@ -172,6 +176,14 @@ void AnytimeSatClauseCommunicator::sendClausesToChildren(std::vector<int>& claus
         log(LOG_ADD_DESTRANK | V4_VVER, "%s : broadcast s=%i", childRank, _job->toStr(), msg.payload.size());
         MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
+
+    if (_use_cls_history) {
+        // Add clause batch to history
+        _cls_history.addEpoch(msg.epoch, msg.payload, /*entireIndex=*/false);
+
+        // Send next batches of historic clauses to subscribers as necessary
+        _cls_history.sendNextBatches();
+    }
 }
 
 std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
@@ -180,8 +192,8 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     _num_aggregated_nodes = std::min(_num_aggregated_nodes+1, _job->getJobTree().getCommSize());
 
     assert(_num_aggregated_nodes > 0);
-    int totalSize = getBufferLimit(_num_aggregated_nodes, BufferMode::ALL);
-    int selfSize = getBufferLimit(_num_aggregated_nodes, BufferMode::SELF);
+    int totalSize = getBufferLimit(_num_aggregated_nodes, MyMpi::ALL);
+    int selfSize = getBufferLimit(_num_aggregated_nodes, MyMpi::SELF);
     log(V5_DEBG, "%s : aggr=%i max_self=%i max_total=%i\n", _job->toStr(), 
             _num_aggregated_nodes, selfSize, totalSize);
 
@@ -220,6 +232,10 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     // Reset clause buffers
     _clause_buffers.clear();
     return vec;
+}
+
+void AnytimeSatClauseCommunicator::suspend() {
+    if (_use_cls_history) _cls_history.onSuspend();
 }
 
 std::vector<int> AnytimeSatClauseCommunicator::merge(size_t maxSize) {

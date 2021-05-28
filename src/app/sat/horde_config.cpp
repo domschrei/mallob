@@ -29,7 +29,7 @@ void HordeConfig::applyDefault(Parameters& params, const Job& job) {
 
     // max. broadcasted literals per cycle
     params["mblpc"] = std::to_string(
-        job.getGlobalNumWorkers() * params.getIntParam("cbbs") 
-        * std::pow(params.getFloatParam("cbdf"), std::log2(job.getGlobalNumWorkers()+1))
+        (1+params.getIntParam("chaf")) *
+        MyMpi::getBinaryTreeBufferLimit(job.getGlobalNumWorkers(), params.getIntParam("cbbs"), params.getFloatParam("cbdf"), MyMpi::ALL)
     );
 }

@@ -11,6 +11,7 @@
 #include "util/sys/timer.hpp"
 #include "util/sys/process.hpp"
 #include "util/logger.hpp"
+#include "comm/mympi.hpp"
 
 HordeProcessAdapter::HordeProcessAdapter(const Parameters& params, 
     size_t fSize, const int* fLits, size_t aSize, const int* aLits) :    
@@ -53,8 +54,14 @@ void HordeProcessAdapter::initSharedMemory() {
     createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
     _export_buffer = (int*) createSharedMemoryBlock("clauseexport", 
             _params.getIntParam("cbbs") * sizeof(int), nullptr);
+    int inputBufferSize = sizeof(int) * _params.getIntParam("chaf") * MyMpi::getBinaryTreeBufferLimit(
+        _params.getIntParam("mpisize"), 
+        _params.getIntParam("cbbs"), 
+        _params.getFloatParam("cbdf"), 
+        MyMpi::ALL
+    ) + 1024;
     _import_buffer = (int*) createSharedMemoryBlock("clauseimport", 
-            _params.getIntParam("cbbs") * sizeof(int) * _params.getIntParam("mpisize"), nullptr);
+            inputBufferSize, nullptr);
 }
 
 HordeProcessAdapter::~HordeProcessAdapter() {

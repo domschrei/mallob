@@ -39,13 +39,15 @@ function run() {
             
             echo "$donefile present"
             
-            if [ $result == unsat ] ; then
-                if ! grep -q '"resultstring": "UNSAT"' $donefile ; then
-                    error "Expected result UNSAT for $file was not found."
-                fi
-            elif [ $result == sat ] ; then
-                if ! grep -q '"resultstring": "SAT"' $donefile ; then
-                    error "Expected result SAT for $file was not found."
+            if ! grep -q '"resultstring": "UNKNOWN"' $donefile ; then
+                if [ $result == unsat ] ; then
+                    if ! grep -q '"resultstring": "UNSAT"' $donefile ; then
+                        error "Expected result UNSAT for $file was not found."
+                    fi
+                elif [ $result == sat ] ; then
+                    if ! grep -q '"resultstring": "SAT"' $donefile ; then
+                        error "Expected result SAT for $file was not found."
+                    fi
                 fi
             fi
             rm $donefile
@@ -102,7 +104,11 @@ function test() {
 function introduce_job() {
     jobname=$1
     instance=$2
-    echo '{ "user": "admin", "name": "'$jobname'", "file": "'$instance'", "priority": 1.000, "wallclock-limit": "0", "cpu-limit": "0" }' > .api/jobs.0/new/$1.json
+    wclimit=$3
+    if [ "$3" == "" ]; then wclimit="0"; fi
+    arrival=$4
+    if [ "$4" == "" ]; then arrival="0"; fi
+    echo '{ "arrival": '$arrival', "user": "admin", "name": "'$jobname'", "file": "'$instance'", "priority": 1.000, "wallclock-limit": "'$wclimit'", "cpu-limit": "0" }' > .api/jobs.0/new/$1.json
     cp .api/jobs.0/new/$1.json .api/jobs.0/introduced/admin.$1.json
 }
 
@@ -141,6 +147,33 @@ cleanup
 
 
 
+# Generate periodic "disturbance" jobs
+t=4
+n=0
+while [ $t -le 60 ]; do
+    # wallclock limit of 4s, arrival @ t
+    introduce_job sat-$t instances/r3sat_300.cnf 4 $t
+    t=$((t+8))
+    n=$((n+1))
+done
+# Generate actual job
+introduce_job sat-main instances/r3sat_500.cnf 60
+test 13 -t=1 -lbc=2 -J=$((n+1)) -l=1 -satsolver=l -v=4 -checkjsonresults -checksums=1
+
+exit 0
+
+# Scheduling tests
+
+for lbc in 4 8; do
+    # 8 jobs (4 SAT, 4 UNSAT)
+    for c in {1..4}; do
+        introduce_job sat-$c instances/r3sat_300.cnf
+        introduce_job unsat-$c instances/r3unsat_300.cnf
+    done
+    test 10 -t=2 -lbc=$lbc -J=8 -l=1 -satsolver=l -v=4 -checkjsonresults
+done
+
+
 # Incremental tests
 
 for test in entertainment08 roverg10 transportg29 ; do
@@ -162,18 +195,6 @@ for mode in thread fork; do
     test 1 -t=1 -mono=$instancefile -satsolver=l -appmode=$mode -v=4 -assertresult=UNSAT
     test 1 -t=8 -mono=$instancefile -satsolver=l -appmode=$mode -v=4 -assertresult=UNSAT
     test 8 -t=2 -mono=$instancefile -satsolver=l -appmode=$mode -v=4 -assertresult=UNSAT
-done
-
-
-# Scheduling tests
-
-for lbc in 4 8; do
-    # 8 jobs (4 SAT, 4 UNSAT)
-    for c in {1..4}; do
-        introduce_job sat-$c instances/r3sat_300.cnf
-        introduce_job unsat-$c instances/r3unsat_300.cnf
-    done
-    test 10 -t=2 -lbc=$lbc -J=8 -l=1 -satsolver=l -v=4 -checkjsonresults
 done
 
 

@@ -25,7 +25,6 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm):
     _balance_period = params.getFloatParam("p");       
 
     // Initialize balancer
-    //balancer = std::unique_ptr<Balancer>(new ThermodynamicBalancer(comm, params));
     _balancer = std::unique_ptr<Balancer>(new EventDrivenBalancer(comm, params));
 
     _janitor = std::thread([this]() {

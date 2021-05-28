@@ -142,6 +142,15 @@ void MyMpi::init(int argc, char *argv[]) {
     for (const auto& tag : tagList) _tags[tag.id] = tag;
 }
 
+size_t MyMpi::getBinaryTreeBufferLimit(int numWorkers, int baseSize, float discountFactor, BufferQueryMode mode) {
+    float limit = baseSize * std::pow(discountFactor, std::log2(numWorkers+1));
+    if (mode == SELF) {
+        return std::ceil(limit);
+    } else {
+        return std::ceil(numWorkers * limit);
+    }
+}
+
 void MyMpi::setOptions(const Parameters& params) {
     _monitor_off = !params.isNotNull("mmpi");
     int verb = MyMpi::rank(MPI_COMM_WORLD) == 0 ? V2_INFO : V4_VVER;
@@ -154,6 +163,14 @@ void MyMpi::setOptions(const Parameters& params) {
         _monkey_flags |= MONKEY_LATENCY;
     }
     _max_msg_length = sizeof(int) * MyMpi::size(MPI_COMM_WORLD) * params.getIntParam("cbbs") + 1024;
+    _max_msg_length = std::max((size_t)_max_msg_length, 
+        sizeof(int) * params.getIntParam("chaf") * getBinaryTreeBufferLimit(
+            MyMpi::size(MPI_COMM_WORLD), 
+            params.getIntParam("cbbs"), 
+            params.getFloatParam("cbdf"), 
+            ALL
+        ) + 1024
+    );
 }
 
 void MyMpi::beginListening() {

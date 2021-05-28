@@ -136,7 +136,10 @@ void Parameters::setDefaults() {
     setParam("cbdf", "0.75"); // clause buffer discount factor
     setParam("cfhl", "60"); // clause buffer half life
     setParam("cg", "1"); // continuous growth
+    setParam("ch", "1"); // employ clause history mechanism
+    setParam("chaf", "5"); // clause history aggregation factor
     setParam("checksums", "0"); // checksums for every job description transfer
+    setParam("chstms", "60"); // clause history short-term memory size
     setParam("colors", "0"); // colored terminal output
     setParam("delaymonkey", "0"); // Small chance for each MPI call to block for some random amount of time
     setParam("derandomize", "1"); // derandomize job bouncing
@@ -154,6 +157,7 @@ void Parameters::setDefaults() {
     setParam("lbc", "0"); // leaky bucket client parameter (0 = no leaky bucket, jobs enter by time) 
     setParam("md", "0"); // maximum demand per job (0 = no limit)
     setParam("slpp", "0"); // size limit per process (0 = no limit)
+    setParam("mlbdps", "8"); // max. LBD partitioning size
     setParam("mmpi", "0"); // monitor MPI
     setParam("mono", ""); // mono instance solving mode (if nonempty)
     setParam("nolog", "0"); // no logging to files
@@ -192,6 +196,7 @@ void Parameters::expand() {
     if (isNotNull("mono")) {
         // Single instance solving
         setParam("c", "0"); // no clients
+        setParam("ch", "0"); // no clause history
         setParam("g", "0.0"); // instantaneous growth of job demand
         setParam("l", "1.0"); // full load factor
         setParam("md", "0"); // no limit of max. demand

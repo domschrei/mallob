@@ -80,6 +80,9 @@ public:
     static void testSentHandles(std::vector<int>* finishedIds = nullptr);
     static bool isAnytimeTag(int tag);
 
+    enum BufferQueryMode {SELF, ALL};
+    static size_t getBinaryTreeBufferLimit(int numWorkers, int baseSize, float discountFactor, BufferQueryMode mode);
+
     static int size(MPI_Comm comm);
     static int rank(MPI_Comm comm);
     

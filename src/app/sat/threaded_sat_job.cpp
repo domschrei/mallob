@@ -49,6 +49,7 @@ void ThreadedSatJob::appl_suspend() {
     if (!_initialized) return;
     auto lock = _solver_lock.getLock();
     getSolver()->setPaused();
+    ((AnytimeSatClauseCommunicator*)_clause_comm)->suspend();
 }
 
 void ThreadedSatJob::appl_resume() {

@@ -8,6 +8,7 @@
 #include "data/job_transfer.hpp"
 #include "app/job.hpp"
 #include "base_sat_job.hpp"
+#include "clause_history.hpp"
 
 const int MSG_GATHER_CLAUSES = 417;
 const int MSG_DISTRIBUTE_CLAUSES = 418;
@@ -22,10 +23,13 @@ private:
     const float _clause_buf_discount_factor;
     const bool _sort_by_lbd;
     const bool _use_checksums;
+    const bool _use_cls_history;
 
+    ClauseHistory _cls_history;
     LockfreeClauseDatabase _cdb;
     std::vector<std::vector<int>> _clause_buffers;
     int _num_aggregated_nodes;
+    int _current_epoch = 0;
 
     bool _initialized = false;
 
@@ -35,7 +39,9 @@ public:
         _clause_buf_discount_factor(_params.getFloatParam("cbdf")),
         _sort_by_lbd(params.isNotNull("sort-by-lbd")),
         _use_checksums(params.isNotNull("checksums")),
-        _cdb(_params.getIntParam("hmcl"), 8, _clause_buf_base_size, 1),
+        _use_cls_history(params.isNotNull("ch")),
+        _cls_history(_params, getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job),
+        _cdb(_params.getIntParam("hmcl"), _params.getIntParam("mlbdps"), _clause_buf_base_size, 1),
         _num_aggregated_nodes(0) {
 
         _initialized = true;
@@ -43,11 +49,11 @@ public:
     bool canSendClauses();
     void sendClausesToParent();
     void handle(int source, JobMessage& msg);
+    void suspend();
 
 private:
     
-    enum BufferMode {SELF, ALL};
-    size_t getBufferLimit(int numAggregatedNodes, BufferMode mode);
+    size_t getBufferLimit(int numAggregatedNodes, MyMpi::BufferQueryMode mode);
 
     std::vector<int> prepareClauses();
     void broadcastAndLearn(std::vector<int>& clauses);
