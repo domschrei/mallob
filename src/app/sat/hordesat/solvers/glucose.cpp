@@ -46,8 +46,9 @@ void MGlucose::addLiteral(int lit) {
  * This method uses some of the diversification from SolverConfiguration::configureSAT14().
  */
 void MGlucose::diversify(int seed) {
+
 	int rank = getDiversificationIndex();
-	random_seed = seed;
+	random_seed = (std::abs(seed) % UINT16_MAX) + 1;
 	adaptStrategies = false;
 
 	switch (rank % numDiversifications) {
@@ -186,7 +187,10 @@ void MGlucose::addLearnedClause(const Clause& c) {
 	if (c.size == 1) {
 		unitsToAdd.push_back(*c.begin);
 	} else {
-		learnedClausesToAdd.emplace_back(c.begin, c.begin+c.size);
+		// LBD value first, then clause payload
+		learnedClausesToAdd.emplace_back(1, c.lbd);
+		learnedClausesToAdd.back().insert(learnedClausesToAdd.back().end(), 
+			c.begin, c.begin+c.size);
 	}
 	clauseAddMutex.unlock();
 }
@@ -316,7 +320,6 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 	
 	// assemble clause
 	std::vector<int> vcls(c.size());
-	// to avoid zeros in the array, 1 is added to the glue
 	for (int j = 0; j < c.size(); j++) {
 		vcls[j] = decodeLit(c[j]);
 	}
@@ -351,8 +354,7 @@ bool MGlucose::parallelImportClauses() {
 		}
 
 		// Assemble Glucose-style clause
-		// to avoid zeros in the array, 1 was added to the glue
-		unsigned int glue = importedClause[0]-1;
+		unsigned int glue = importedClause[0];
 		Glucose::vec<Glucose::Lit> glucClause;
 		for (size_t i = 1; i < importedClause.size(); i++) glucClause.push(encodeLit(importedClause[i]));
 
