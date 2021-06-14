@@ -186,7 +186,19 @@ public:
         }
 
         // Update most recent epoch
+        auto prevLatestEpoch = _latest_epoch;
         _latest_epoch = std::max(_latest_epoch, epoch);
+
+        // If necessary, reduce a batch from Shorttermmemory-Size to Longtermmemory-Size
+        if (_latest_epoch > prevLatestEpoch && _latest_epoch >= _num_stm_slots) {
+            int indexToReduce = _latest_epoch - _num_stm_slots;
+            if (isBatchComplete(indexToReduce) && _history[indexToReduce].clauses.size() > _ltm_buffer_size) {
+                // Reduce this batch
+                auto merger = _cdb.getBufferMerger();
+                merger.add(_cdb.getBufferReader(_history[indexToReduce].clauses.data(), _history[indexToReduce].clauses.size()));
+                _history[indexToReduce].clauses = merger.merge(_ltm_buffer_size);
+            }
+        }
 
         // Debugging output
         if (!_missing_epoch_ranges.empty()) {
