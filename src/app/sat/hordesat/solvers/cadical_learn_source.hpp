@@ -49,7 +49,6 @@ public:
         // Clauses left in intermediate buffer?
         if (!_intermediate_buffer.empty()) return true;
         // Try to refill buffer with unit clause ringbuffer
-        int zero = 0;
         if (_learned_units.getUnits(_intermediate_unit_buffer)) return true;
         // Try to refill buffer with clause ringbuffer
         return _learned_clauses.getClause(_intermediate_buffer);
@@ -71,7 +70,6 @@ public:
         do {pos--;} while (pos > 0 && _intermediate_buffer[pos-1] != 0);
         assert(pos == 0 || pos >= 3); // glue int, >= two literals, separation zero
         _next_clause.resize(_intermediate_buffer.size()-pos-1);
-        _intermediate_buffer[pos]--; // to avoid zeros in the array, 1 was added to the glue
         // Write clause into buffer
         memcpy(_next_clause.data(), _intermediate_buffer.data()+pos, _next_clause.size()*sizeof(int));
         assert(_next_clause[0] > 0);
