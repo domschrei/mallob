@@ -36,6 +36,15 @@ private:
 	std::unique_ptr<SharingManagerInterface> _sharing_manager;
 	std::vector<std::shared_ptr<PortfolioSolverInterface>> _solver_interfaces;
 	std::vector<std::shared_ptr<SolverThread>> _solver_threads;
+	std::vector<std::shared_ptr<SolverThread>> _obsolete_solver_threads;
+
+	struct RevisionData {
+		size_t fSize;
+		const int* fLits;
+		size_t aSize;
+		const int* aLits;
+	};
+	std::vector<RevisionData> _revision_data;
 	
 	bool _solvers_started = false;
 	volatile SolvingStates::SolvingState _state;
@@ -77,7 +86,12 @@ public:
 	}
 
 	void cleanUp();
-	bool isCleanedUp() {return _cleaned_up;}	
+	bool isCleanedUp() {return _cleaned_up;}
+
+private:
+
+	std::shared_ptr<PortfolioSolverInterface> createSolver(const SolverSetup& setup);
+
 };
 
 #endif /* HORDELIB_H_ */

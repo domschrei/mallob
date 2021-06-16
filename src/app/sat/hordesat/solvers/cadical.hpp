@@ -77,6 +77,8 @@ public:
 
 	// Get solver statistics
 	SolvingStatistics getStatistics() override;
+
+	bool supportsIncrementalSat() override {return true;}
 };
 
 #endif /* CADICAL_H_ */

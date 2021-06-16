@@ -56,3 +56,9 @@ void PortfolioSolverInterface::resume() {
 	updateTimer(_job_name);
 	unsetSolverSuspend();
 }
+
+void PortfolioSolverInterface::setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback) {
+	setLearnedClauseCallback([callback, this](const Mallob::Clause& c, int solverId) {
+		callback(c, solverId, _current_cond_var_or_zero);
+	});
+}

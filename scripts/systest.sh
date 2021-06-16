@@ -144,37 +144,40 @@ cleanup
 # Incremental tests
 
 for test in entertainment08 roverg10 transportg29 ; do
-    introduce_incremental_job $test 
-    test 4 -t=2 -l=1 -satsolver=l -v=4 -J=1 -incrementaltest
+    for slv in g c l lg; do
+        introduce_incremental_job $test 
+        test 4 -t=2 -l=1 -satsolver=$slv -v=5 -J=1 -incrementaltest
+    done
 done
-
-
-# Basic mono tests
-
-for mode in thread fork; do
-
-    instancefile="instances/r3sat_300.cnf"
-    test 1 -t=1 -mono=$instancefile -satsolver=l -appmode=$mode -v=4 -assertresult=SAT
-    test 1 -t=8 -mono=$instancefile -satsolver=l -appmode=$mode -v=4 -assertresult=SAT
-    test 8 -t=2 -mono=$instancefile -satsolver=l -appmode=$mode -v=4 -assertresult=SAT
-
-    instancefile="instances/r3unsat_300.cnf"
-    test 1 -t=1 -mono=$instancefile -satsolver=l -appmode=$mode -v=4 -assertresult=UNSAT
-    test 1 -t=8 -mono=$instancefile -satsolver=l -appmode=$mode -v=4 -assertresult=UNSAT
-    test 8 -t=2 -mono=$instancefile -satsolver=l -appmode=$mode -v=4 -assertresult=UNSAT
-done
-
 
 # Scheduling tests
 
 for lbc in 4 8; do
-    # 8 jobs (4 SAT, 4 UNSAT)
-    for c in {1..4}; do
-        introduce_job sat-$c instances/r3sat_300.cnf
-        introduce_job unsat-$c instances/r3unsat_300.cnf
+    for slv in l g c lgc; do
+        # 8 jobs (4 SAT, 4 UNSAT)
+        for c in {1..4}; do
+            introduce_job sat-$c instances/r3sat_300.cnf
+            introduce_job unsat-$c instances/r3unsat_300.cnf
+        done
+        test 10 -t=2 -lbc=$lbc -J=8 -l=1 -satsolver=$slv -v=4 -checkjsonresults
     done
-    test 10 -t=2 -lbc=$lbc -J=8 -l=1 -satsolver=l -v=4 -checkjsonresults
 done
 
+# Basic mono tests
+
+for mode in thread fork; do
+    for slv in l g c lgc; do
+
+        instancefile="instances/r3sat_300.cnf"
+        test 1 -t=1 -mono=$instancefile -satsolver=$slv -appmode=$mode -v=4 -assertresult=SAT
+        test 1 -t=8 -mono=$instancefile -satsolver=$slv -appmode=$mode -v=4 -assertresult=SAT
+        test 8 -t=2 -mono=$instancefile -satsolver=$slv -appmode=$mode -v=4 -assertresult=SAT
+
+        instancefile="instances/r3unsat_300.cnf"
+        test 1 -t=1 -mono=$instancefile -satsolver=$slv -appmode=$mode -v=4 -assertresult=UNSAT
+        test 1 -t=8 -mono=$instancefile -satsolver=$slv -appmode=$mode -v=4 -assertresult=UNSAT
+        test 8 -t=2 -mono=$instancefile -satsolver=$slv -appmode=$mode -v=4 -assertresult=UNSAT
+    done
+done
 
 echo "All tests done."

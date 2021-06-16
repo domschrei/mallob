@@ -28,6 +28,11 @@ public:
 		} else {
 			// Received a zero - clause is finished
 
+			if (_curr_clause.empty()) {
+				_setup.logger->log(V4_VVER, "Received empty clause!\n");
+				return;
+			}
+
 			bool eligible = true;
 			if (_curr_clause.size() > 1) {
 				assert(_curr_clause.size() >= 3); // glue value plus at least two literals
@@ -38,9 +43,15 @@ public:
 			}
 			
 			// Export clause (if eligible), reset current clause
-			if (eligible) 
-				_callback(Clause{_curr_clause.data()+1, (int)_curr_clause.size()-1, _curr_clause[0]}, 
-							_setup.localId);
+			if (eligible) {
+				if (_curr_clause.size() > 1) {
+					_callback(Clause{_curr_clause.data()+1, (int)_curr_clause.size()-1, _curr_clause[0]}, 
+						_setup.localId);
+				} else {
+					_callback(Clause{_curr_clause.data(), 1, 1}, 
+						_setup.localId);
+				}
+			} 
 			_curr_clause.clear();
 		}
 	}

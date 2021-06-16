@@ -114,3 +114,9 @@ target_include_directories(test_lockfree_clause_database PRIVATE ${BASE_INCLUDES
 target_compile_options(test_lockfree_clause_database PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(test_lockfree_clause_database ${BASE_LIBS} mallob_commons)
 add_test(NAME test_lockfree_clause_database COMMAND test_lockfree_clause_database)
+
+add_executable(test_variable_translator src/test/test_variable_translator.cpp)
+target_include_directories(test_variable_translator PRIVATE ${BASE_INCLUDES})
+target_compile_options(test_variable_translator PRIVATE ${BASE_COMPILEFLAGS})
+target_link_libraries(test_variable_translator ${BASE_LIBS} mallob_commons)
+add_test(NAME test_variable_translator COMMAND test_variable_translator)

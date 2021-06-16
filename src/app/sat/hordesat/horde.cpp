@@ -50,13 +50,14 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 	// and from the begun cycle on the previous rank
 	int numFullCycles = (appRank * _num_solvers) / solverChoices.size();
 	int begunCyclePos = (appRank * _num_solvers) % solverChoices.size();
+	bool hasPseudoincrementalSolvers = false;
 	for (size_t i = 0; i < solverChoices.size(); i++) {
 		int* solverToAdd;
 		switch (solverChoices[i]) {
 		case 'l': solverToAdd = &numLgl; break;
-		case 'g': solverToAdd = &numGlu; break;
+		case 'g': solverToAdd = &numGlu; hasPseudoincrementalSolvers = true; break;
 		case 'c': solverToAdd = &numCdc; break;
-		case 'm': solverToAdd = &numMrg; break;
+		case 'm': solverToAdd = &numMrg; hasPseudoincrementalSolvers = true; break;
 		}
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
 	}
@@ -74,46 +75,21 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 	setup.hardMaxClauseLength = params.getIntParam("hmcl");
 	setup.softMaxClauseLength = params.getIntParam("smcl");
 	setup.anticipatedLitsToImportPerCycle = params.getIntParam("mblpc");
+	setup.hasPseudoincrementalSolvers = setup.incremental && hasPseudoincrementalSolvers;
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
 	for (setup.localId = 0; setup.localId < _num_solvers; setup.localId++) {
 		setup.globalId = appRank * _num_solvers + setup.localId;
 		// Which solver?
+		setup.solverType = solverChoices[cyclePos];
 		switch (solverChoices[cyclePos]) {
-		case 'l':
-			// Lingeling
-			setup.diversificationIndex = numLgl++;
-			_logger.log(V4_VVER, "S%i : Lingeling-%i\n", setup.globalId, setup.diversificationIndex);
-			_solver_interfaces.emplace_back(new Lingeling(setup));
-			break;
-		case 'c':
-			// Cadical
-			setup.diversificationIndex = numCdc++;
-			_logger.log(V4_VVER, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
-			_solver_interfaces.emplace_back(new Cadical(setup));
-			break;
-		case 'm':
-			// MergeSat
-			setup.diversificationIndex = numMrg++;
-			_logger.log(V4_VVER, "S%i : MergeSat-%i\n", setup.globalId, setup.diversificationIndex);
-			_solver_interfaces.emplace_back(new MergeSatBackend(setup));
-			break;
-#ifdef MALLOB_USE_RESTRICTED
-		case 'g':
-			// Glucose
-			setup.diversificationIndex = numGlu++;
-			_logger.log(V4_VVER, "S%i: Glucose-%i\n", setup.globalId, setup.diversificationIndex);
-			_solver_interfaces.emplace_back(new MGlucose(setup));
-			break;
-#endif
-		default:
-			// Invalid solver
-			_logger.log(V2_INFO, "Fatal error: Invalid solver \"%c\" assigned\n", solverChoices[cyclePos]);
-			_logger.flush();
-			abort();
-			break;
+		case 'l': setup.diversificationIndex = numLgl++; break;
+		case 'c': setup.diversificationIndex = numCdc++; break;
+		case 'm': setup.diversificationIndex = numMrg++; break;
+		case 'g': setup.diversificationIndex = numGlu++; break;
 		}
+		_solver_interfaces.emplace_back(createSolver(setup));
 		cyclePos = (cyclePos+1) % solverChoices.size();
 	}
 
@@ -121,10 +97,46 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 	_logger.log(V5_DEBG, "initialized\n");
 }
 
+std::shared_ptr<PortfolioSolverInterface> HordeLib::createSolver(const SolverSetup& setup) {
+	std::shared_ptr<PortfolioSolverInterface> solver;
+	switch (setup.solverType) {
+	case 'l':
+		// Lingeling
+		_logger.log(V4_VVER, "S%i : Lingeling-%i\n", setup.globalId, setup.diversificationIndex);
+		solver.reset(new Lingeling(setup));
+		break;
+	case 'c':
+		// Cadical
+		_logger.log(V4_VVER, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
+		solver.reset(new Cadical(setup));
+		break;
+	case 'm':
+		// MergeSat
+		_logger.log(V4_VVER, "S%i : MergeSat-%i\n", setup.globalId, setup.diversificationIndex);
+		solver.reset(new MergeSatBackend(setup));
+		break;
+#ifdef MALLOB_USE_RESTRICTED
+	case 'g':
+		// Glucose
+		_logger.log(V4_VVER, "S%i: Glucose-%i\n", setup.globalId, setup.diversificationIndex);
+		solver.reset(new MGlucose(setup));
+		break;
+#endif
+	default:
+		// Invalid solver
+		_logger.log(V2_INFO, "Fatal error: Invalid solver \"%c\" assigned\n", setup.solverType);
+		_logger.flush();
+		abort();
+		break;
+	}
+	return solver;
+}
+
 void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits) {
 	assert(_state != ACTIVE);
 	_logger.log(V4_VVER, "append rev. %i: %i lits, %i assumptions\n", revision, fSize, aSize);
 	assert(_revision+1 == revision);
+	_revision_data.push_back(RevisionData{fSize, fLits, aSize, aLits});
 	for (size_t i = 0; i < _num_solvers; i++) {
 		if (revision == 0) {
 			// Initialize solver thread
@@ -132,7 +144,32 @@ void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size
 				_params, _solver_interfaces[i], fSize, fLits, aSize, aLits, i
 			));
 		} else {
-			_solver_threads[i]->appendRevision(revision, fSize, fLits, aSize, aLits);
+			if (_solver_interfaces[i]->supportsIncrementalSat()) {
+				_solver_threads[i]->appendRevision(revision, fSize, fLits, aSize, aLits);
+			} else {
+				// No support for incremental SAT! 
+				// Phase out old solver thread
+				_sharing_manager->stopClauseImport(i);
+				_solver_threads[i]->setTerminate();
+				_obsolete_solver_threads.push_back(std::move(_solver_threads[i]));
+				// Setup new solver  and new solver thread
+				_solver_interfaces[i] = createSolver(_solver_interfaces[i]->getSolverSetup());
+				_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
+					_params, _solver_interfaces[i], 
+					_revision_data[0].fSize, _revision_data[0].fLits, 
+					_revision_data[0].aSize, _revision_data[0].aLits, 
+					i
+				));
+				// Load entire formula 
+				for (int importedRevision = 1; importedRevision <= revision; importedRevision++) {
+					auto data = _revision_data[importedRevision];
+					_solver_threads[i]->appendRevision(importedRevision, 
+						data.fSize, data.fLits, data.aSize, data.aLits
+					);
+				}
+				_sharing_manager->continueClauseImport(i);
+				_solvers_started = false; // need to restart at least one solver
+			}
 		}
 	}
 	_revision = revision;
@@ -325,10 +362,11 @@ void HordeLib::cleanUp() {
 	setSolvingState(ABORTING);
 	
 	// join and delete threads
-	for (size_t i = 0; i < _solver_threads.size(); i++) {
-		_solver_threads[i]->tryJoin();
-	}
+	for (auto& thread : _solver_threads) thread->tryJoin();
+	for (auto& thread : _obsolete_solver_threads) thread->tryJoin();
 	_solver_threads.clear();
+	_obsolete_solver_threads.clear();
+
 	_logger.log(V5_DEBG, "[hlib-cleanup] joined threads\n");
 
 	// delete solvers

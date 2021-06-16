@@ -35,7 +35,6 @@ private:
 	unsigned long long calls = 0;
     
 	// clause addition
-	std::vector<std::vector<int> > clausesToAdd;
 	std::vector<std::vector<int> > learnedClausesToAdd;
 	std::vector<int> unitsToAdd;
     
@@ -93,6 +92,8 @@ public:
 
 	// Get solver statistics
 	SolvingStatistics getStatistics() override;
+
+	bool supportsIncrementalSat() override {return false;}
 
 private:
 	Glucose::Lit encodeLit(int lit);

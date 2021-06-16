@@ -34,6 +34,9 @@ public:
     virtual SharingStatistics getStatistics() = 0;
 	virtual ~SharingManagerInterface() {};
 
+	virtual void stopClauseImport(int solverId) = 0;
+	virtual void continueClauseImport(int solverId) = 0;
+
 };
 
 

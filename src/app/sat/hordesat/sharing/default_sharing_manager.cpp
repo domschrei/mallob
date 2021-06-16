@@ -25,13 +25,12 @@ DefaultSharingManager::DefaultSharingManager(
 	memset(_seen_clause_len_histogram, 0, CLAUSE_LEN_HIST_LENGTH*sizeof(unsigned long));
 	_stats.seenClauseLenHistogram = _seen_clause_len_histogram;
 
-	auto callback = [this](const Clause& c, int solverId) {
-		processClause(solverId, c);
-	};
+	auto callback = getCallback();
 	
     for (size_t i = 0; i < _solvers.size(); i++) {
 		_solver_filters.emplace_back(/*maxClauseLen=*/params.getIntParam("hmcl", 0), /*checkUnits=*/true);
-		_solvers[i]->setLearnedClauseCallback(callback);
+		_solvers[i]->setExtLearnedClauseCallback(callback);
+		_importing.push_back(true);
 	}
 	_last_buffer_clear = Timer::elapsedSeconds();
 }
@@ -121,15 +120,32 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 	}
 }
 
-void DefaultSharingManager::processClause(int solverId, const Clause& clause) {
+void DefaultSharingManager::processClause(int solverId, const Clause& clause, int condVarOrZero) {
+	if (!_importing[solverId]) return;
+
+	auto clauseBegin = clause.begin;
+	auto clauseSize = clause.size;
+
+	// If necessary, apply a transformation to the clause:
+	// Add the supplied conditional variable in negated form to the clause.
+	// This effectively renders the found conflict relative to the assumptions
+	// which were added not as assumptions but as permanent unit clauses.
+	std::vector<int> tldClause;
+	if (condVarOrZero != 0) {
+		tldClause.insert(tldClause.end(), clause.begin, clause.begin+clause.size);
+		tldClause.push_back(-condVarOrZero);
+		clauseBegin = tldClause.data();
+		clauseSize++;
+	}
 
 	// Add clause length to statistics
-	_seen_clause_len_histogram[std::min(clause.size, CLAUSE_LEN_HIST_LENGTH)-1]++;
+	_seen_clause_len_histogram[std::min(clauseSize, CLAUSE_LEN_HIST_LENGTH)-1]++;
 
 	// Register clause in this solver's filter
-	if (_solver_filters[solverId].registerClause(clause.begin, clause.size)) {
+	if (_solver_filters[solverId].registerClause(clauseBegin, clauseSize)) {
 		// Success - write clause into database if possible
-		if (!_cdb.addClause(solverId, clause)) _stats.clausesDroppedAtExport++;
+		Clause tldClause{clauseBegin, clauseSize, clause.lbd};
+		if (!_cdb.addClause(solverId, tldClause)) _stats.clausesDroppedAtExport++;
 	} else {
 		// Clause was already registered before
 		_stats.clausesFilteredAtExport++;
@@ -138,4 +154,15 @@ void DefaultSharingManager::processClause(int solverId, const Clause& clause) {
 
 SharingStatistics DefaultSharingManager::getStatistics() {
 	return _stats;
+}
+
+void DefaultSharingManager::stopClauseImport(int solverId) {
+	assert(solverId >= 0 && solverId < _solvers.size());
+	_importing[solverId] = false;
+}
+
+void DefaultSharingManager::continueClauseImport(int solverId) {
+	assert(solverId >= 0 && solverId < _solvers.size());
+	_importing[solverId] = true;
+	_solvers[solverId]->setExtLearnedClauseCallback(getCallback());
 }
