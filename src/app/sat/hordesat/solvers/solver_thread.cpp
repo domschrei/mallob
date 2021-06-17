@@ -172,7 +172,7 @@ bool SolverThread::readFormula() {
                 
                 // Make clause exporter append this condition
                 // to each clause this solver exports
-                if (!_solver.supportsIncrementalSat())
+                if (_solver.exportsConditionalClauses() || !_solver.getSolverSetup().doIncrementalSolving)
                     _solver.setCurrentCondVarOrZero(aSize > 0 ? aEquivVar : 0);
                 
                 if (aSize > 0) {

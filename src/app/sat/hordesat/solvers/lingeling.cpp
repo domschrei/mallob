@@ -65,7 +65,7 @@ void cbConsumeCls(void* sp, int** clause, int* glue) {
 
 Lingeling::Lingeling(const SolverSetup& setup) 
 	: PortfolioSolverInterface(setup),
-		incremental(setup.incremental),
+		incremental(setup.doIncrementalSolving),
 		learnedClauses(4*setup.anticipatedLitsToImportPerCycle), 
 		learnedUnits(2*setup.anticipatedLitsToImportPerCycle + 1) {
 

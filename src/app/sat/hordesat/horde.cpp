@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <algorithm>
 #include <csignal>
 #include <unistd.h>
@@ -53,11 +54,13 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 	bool hasPseudoincrementalSolvers = false;
 	for (size_t i = 0; i < solverChoices.size(); i++) {
 		int* solverToAdd;
+		bool pseudoIncremental = islower(solverChoices[i]);
+		if (pseudoIncremental) hasPseudoincrementalSolvers = true;
 		switch (solverChoices[i]) {
-		case 'l': solverToAdd = &numLgl; break;
-		case 'g': solverToAdd = &numGlu; hasPseudoincrementalSolvers = true; break;
-		case 'c': solverToAdd = &numCdc; break;
-		case 'm': solverToAdd = &numMrg; hasPseudoincrementalSolvers = true; break;
+		case 'l': case 'L': solverToAdd = &numLgl; break;
+		case 'g': case 'G': solverToAdd = &numGlu; break;
+		case 'c': case 'C': solverToAdd = &numCdc; break;
+		case 'm': case 'M': solverToAdd = &numMrg; break;
 		}
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
 	}
@@ -66,7 +69,7 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 	SolverSetup setup;
 	setup.logger = &_logger;
 	setup.jobname = params.getParam("jobstr");
-	setup.incremental = params.isNotNull("incremental");
+	setup.isJobIncremental = params.isNotNull("incremental");
 	setup.useAdditionalDiversification = params.isNotNull("aod");
 	setup.hardInitialMaxLbd = params.getIntParam("ihlbd");
 	setup.hardFinalMaxLbd = params.getIntParam("fhlbd");
@@ -75,7 +78,7 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 	setup.hardMaxClauseLength = params.getIntParam("hmcl");
 	setup.softMaxClauseLength = params.getIntParam("smcl");
 	setup.anticipatedLitsToImportPerCycle = params.getIntParam("mblpc");
-	setup.hasPseudoincrementalSolvers = setup.incremental && hasPseudoincrementalSolvers;
+	setup.hasPseudoincrementalSolvers = setup.isJobIncremental && hasPseudoincrementalSolvers;
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
@@ -83,11 +86,12 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 		setup.globalId = appRank * _num_solvers + setup.localId;
 		// Which solver?
 		setup.solverType = solverChoices[cyclePos];
-		switch (solverChoices[cyclePos]) {
-		case 'l': setup.diversificationIndex = numLgl++; break;
-		case 'c': setup.diversificationIndex = numCdc++; break;
-		case 'm': setup.diversificationIndex = numMrg++; break;
-		case 'g': setup.diversificationIndex = numGlu++; break;
+		setup.doIncrementalSolving = setup.isJobIncremental && !islower(setup.solverType);
+		switch (setup.solverType) {
+		case 'l': case 'L': setup.diversificationIndex = numLgl++; break;
+		case 'c': case 'C': setup.diversificationIndex = numCdc++; break;
+		case 'm': case 'M': setup.diversificationIndex = numMrg++; break;
+		case 'g': case 'G': setup.diversificationIndex = numGlu++; break;
 		}
 		_solver_interfaces.emplace_back(createSolver(setup));
 		cyclePos = (cyclePos+1) % solverChoices.size();
@@ -101,22 +105,26 @@ std::shared_ptr<PortfolioSolverInterface> HordeLib::createSolver(const SolverSet
 	std::shared_ptr<PortfolioSolverInterface> solver;
 	switch (setup.solverType) {
 	case 'l':
+	case 'L':
 		// Lingeling
 		_logger.log(V4_VVER, "S%i : Lingeling-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new Lingeling(setup));
 		break;
 	case 'c':
+	case 'C':
 		// Cadical
 		_logger.log(V4_VVER, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new Cadical(setup));
 		break;
 	case 'm':
+	//case 'M': // no support for incremental mode as of now
 		// MergeSat
 		_logger.log(V4_VVER, "S%i : MergeSat-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new MergeSatBackend(setup));
 		break;
 #ifdef MALLOB_USE_RESTRICTED
 	case 'g':
+	//case 'G': // no support for incremental mode as of now
 		// Glucose
 		_logger.log(V4_VVER, "S%i: Glucose-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new MGlucose(setup));
@@ -145,10 +153,10 @@ void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size
 				_params, _solver_interfaces[i], fSize, fLits, aSize, aLits, i
 			));
 		} else {
-			if (_solver_interfaces[i]->supportsIncrementalSat()) {
+			if (_solver_interfaces[i]->getSolverSetup().doIncrementalSolving) {
 				_solver_threads[i]->appendRevision(revision, fSize, fLits, aSize, aLits);
 			} else {
-				// No support for incremental SAT! 
+				// Pseudo-incremental SAT solving: 
 				// Phase out old solver thread
 				_sharing_manager->stopClauseImport(i);
 				_solver_threads[i]->setTerminate();

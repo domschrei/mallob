@@ -46,7 +46,8 @@ struct SolverSetup {
 	int localId; 
 	std::string jobname; 
 	int diversificationIndex;
-	bool incremental;
+	bool isJobIncremental;
+	bool doIncrementalSolving;
 	bool hasPseudoincrementalSolvers;
 	char solverType;
 

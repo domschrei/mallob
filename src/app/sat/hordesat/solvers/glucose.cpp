@@ -15,7 +15,8 @@ as it uses adapted code from Glucose. For its licensing see the LICENSE file in 
 MGlucose::MGlucose(const SolverSetup& setup) 
 		: SimpSolver(), PortfolioSolverInterface(setup) {
 	
-	if (supportsIncrementalSat() && setup.incremental) setIncrementalMode();
+	if (supportsIncrementalSat() && setup.doIncrementalSolving) 
+		setIncrementalMode();
 
 	verbosity = -1;
 	verbEveryConflicts = 10000000;
