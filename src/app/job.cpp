@@ -62,10 +62,10 @@ void Job::start(const std::shared_ptr<std::vector<uint8_t>>& data) {
     }
     
     if (_params.getIntParam("slpp") > 0 && 
-            _threads_per_job * _description.getFormulaSize() > (size_t)_params.getIntParam("slpp")) {
+            _threads_per_job * _description.getNumFormulaLiterals() > (size_t)_params.getIntParam("slpp")) {
         
         // Solver literal threshold exceeded: reduce number of solvers for this job
-        int optNumThreads = std::floor((float)_params.getIntParam("slpp") / _description.getFormulaSize());
+        int optNumThreads = std::floor((float)_params.getIntParam("slpp") / _description.getNumFormulaLiterals());
         _threads_per_job = std::max(1, optNumThreads);
         log(V2_INFO, "%s : literal threshold exceeded - cut down #threads to %i\n", toStr(), _threads_per_job);
     }

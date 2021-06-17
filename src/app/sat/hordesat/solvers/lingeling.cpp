@@ -109,7 +109,7 @@ void Lingeling::addLiteral(int lit) {
 void Lingeling::updateMaxVar(int lit) {
 	lit = abs(lit);
 	assert(lit <= 134217723); // lingeling internal literal limit
-	if (!incremental) maxvar = lit;
+	if (!incremental) maxvar = std::max(maxvar, lit);
 	else while (maxvar < lit) {
 		maxvar++;
 		// Freezing required for incremental solving only.
@@ -281,6 +281,14 @@ void Lingeling::doConsume(int** clause, int* glue) {
 	bool success = learnedClauses.getClause(learnedClausesBuffer);
 	if (!success) return;
 	if (learnedClausesBuffer.empty()) return;
+
+	//std::string str = "consume cls : ";
+	for (size_t i = 0; i < learnedClausesBuffer.size(); i++) {
+		int lit = learnedClausesBuffer[i];
+		//str += std::to_string(lit) + " ";
+		assert(i == 0 || std::abs(lit) <= maxvar);
+	}
+	//_logger.log(V4_VVER, "%s\n", str.c_str());
 
 	*glue = learnedClausesBuffer[0];
 	*clause = learnedClausesBuffer.data()+1;

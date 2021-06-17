@@ -39,8 +39,8 @@ void MGlucose::addLiteral(int lit) {
 		clause.push(encodeLit(lit));
 		if (incremental) {
 			while (maxvar < std::abs(lit)) {
-				setFrozen(Glucose::var(encodeLit(maxvar)), true);
 				maxvar++;
+				setFrozen(Glucose::var(encodeLit(maxvar)), true);
 			}
 		} else {
 			maxvar = std::max(maxvar, abs(lit));
@@ -285,6 +285,7 @@ bool MGlucose::parallelJobIsFinished() {
 void MGlucose::parallelExportUnaryClause(Glucose::Lit p) {
 	std::vector<int> vcls;
 	int lit = decodeLit(p);
+	assert(std::abs(lit) <= maxvar || log_return_false("Literal %i exported!\n", lit));
 	Clause c{&lit, 1, 1};
 	learnedClauseCallback(c, getLocalId());
 }
@@ -321,6 +322,7 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 	std::vector<int> vcls(c.size());
 	for (int j = 0; j < c.size(); j++) {
 		vcls[j] = decodeLit(c[j]);
+		assert(std::abs(vcls[j]) <= maxvar || log_return_false("Literal %i exported!\n", vcls[j]));
 	}
 	
 	// export clause

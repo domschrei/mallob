@@ -30,9 +30,8 @@ void ForkedSatJob::appl_start() {
     _solver.reset(new HordeProcessAdapter(hParams,
         desc.getFormulaPayloadSize(0), 
         desc.getFormulaPayload(0), 
-        // do not import assumptions if they belong to a later revision
-        desc.getRevision() > 0 ? 0 : desc.getAssumptionsSize(),
-        desc.getAssumptionsPayload()
+        desc.getAssumptionsSize(0),
+        desc.getAssumptionsPayload(0)
     ));
     loadIncrements();
     _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
@@ -68,7 +67,7 @@ void ForkedSatJob::loadIncrements() {
     while (_last_imported_revision < lastRev) {
         _last_imported_revision++;
         size_t numLits = desc.getFormulaPayloadSize(_last_imported_revision);
-        size_t numAssumptions = _last_imported_revision == lastRev ? desc.getAssumptionsSize() : 0;
+        size_t numAssumptions = desc.getAssumptionsSize(_last_imported_revision);
         log(V4_VVER, "%s : Load rev. %i : %i lits, %i assumptions\n", toStr(), 
                 _last_imported_revision, numLits, numAssumptions);
         revisions.emplace_back(HordeProcessAdapter::RevisionData {
@@ -77,7 +76,7 @@ void ForkedSatJob::loadIncrements() {
             numLits, 
             desc.getFormulaPayload(_last_imported_revision),
             numAssumptions,
-            desc.getAssumptionsPayload()
+            desc.getAssumptionsPayload(_last_imported_revision)
         });
     }
     if (!revisions.empty()) _solver->appendRevisions(revisions);

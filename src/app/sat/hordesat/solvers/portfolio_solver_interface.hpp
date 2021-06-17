@@ -134,6 +134,7 @@ public:
 	virtual int getNumOriginalDiversifications() = 0;
 
 	virtual bool supportsIncrementalSat() = 0;
+	virtual bool exportsConditionalClauses() = 0;
 
 protected:
 	// Interrupt the SAT solving, solving cannot continue until interrupt is unset.

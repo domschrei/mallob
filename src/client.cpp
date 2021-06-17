@@ -80,8 +80,8 @@ void Client::readIncomingJobs(Logger log) {
                     } else {
                         time = Timer::elapsedSeconds() - time;
                         log.log(V3_VERB, "[T] Initialized job #%i (%s) in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
-                                id, foundJob.file.c_str(), time, foundJob.description->getFormulaSize(), 
-                                foundJob.description->getAssumptionsSize());
+                                id, foundJob.file.c_str(), time, foundJob.description->getNumFormulaLiterals(), 
+                                foundJob.description->getNumAssumptionLiterals());
                         
                         // Enqueue in ready jobs
                         auto lock = _ready_job_lock.getLock();

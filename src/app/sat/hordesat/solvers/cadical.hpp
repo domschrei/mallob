@@ -79,6 +79,7 @@ public:
 	SolvingStatistics getStatistics() override;
 
 	bool supportsIncrementalSat() override {return true;}
+	bool exportsConditionalClauses() override {return false;}
 };
 
 #endif /* CADICAL_H_ */

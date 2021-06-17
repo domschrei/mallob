@@ -129,11 +129,9 @@ void Worker::init() {
             Terminator::setTerminating();
             return;
         }
-        log(V3_VERB, "%ld lits w/ separators; lits = %i %i %i %i ...\n", desc.getFormulaSize(),
-                desc.getFormulaPayload()[0], desc.getFormulaPayload()[1], desc.getFormulaPayload()[2], desc.getFormulaPayload()[3]);
 
         // Add as a new local SAT job image
-        log(V3_VERB, "%ld lits w/ separators; init SAT job image\n", desc.getFormulaSize());
+        log(V3_VERB, "%ld lits w/ separators; init SAT job image\n", desc.getNumFormulaLiterals());
         _job_db.createJob(MyMpi::size(_comm), _world_rank, jobId);
         JobRequest req(jobId, 0, 0, 0, 0, 0);
         _job_db.commit(req);

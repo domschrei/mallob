@@ -3,6 +3,7 @@
 #include <map>
 #include <chrono>
 #include <atomic>
+#include <assert.h>
 
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
@@ -59,6 +60,8 @@ void PortfolioSolverInterface::resume() {
 
 void PortfolioSolverInterface::setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback) {
 	setLearnedClauseCallback([callback, this](const Mallob::Clause& c, int solverId) {
-		callback(c, solverId, _current_cond_var_or_zero);
+		int condVar = _current_cond_var_or_zero;
+		assert(condVar >= 0);
+		callback(c, solverId, condVar);
 	});
 }

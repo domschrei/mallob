@@ -94,6 +94,7 @@ public:
 	SolvingStatistics getStatistics() override;
 
 	bool supportsIncrementalSat() override {return false;}
+	bool exportsConditionalClauses() override {return true;}
 
 private:
 	Glucose::Lit encodeLit(int lit);

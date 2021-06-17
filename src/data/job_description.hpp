@@ -47,12 +47,14 @@ private:
     
     // Contains THE ENTIRE OBJECT and all payload / assumptions in serialized form.
     std::shared_ptr<std::vector<uint8_t>> _raw_data;
-   
-    const int* _f_payload;
-    const int* _a_payload;
-
+    
     // Stores the position (in bytes) and size (in integers) of each revision's payload.
-    std::vector<std::pair<size_t, size_t>> _revisions_pos_and_size;
+    struct RevisionInfo {
+        size_t pos;
+        size_t fSize;
+        size_t aSize;
+    };
+    std::vector<RevisionInfo> _revisions_pos_fsize_asize;
 
 private:
     template <typename T>
@@ -83,6 +85,7 @@ public:
         // Push literal to raw data, update counter
         push_obj<int>(_raw_data, lit);
         _a_size++;
+        if (_use_checksums) _checksum.combine(-lit);
     }
     void endInitialization();
     // Returns the index in _raw_data after the written meta data.
@@ -104,11 +107,6 @@ public:
     float getWallclockLimit() const {return _wallclock_limit;}
     float getCpuLimit() const {return _cpu_limit;}
     int getMaxDemand() const {return _max_demand;}
-    
-    size_t getFormulaSize() const {return _f_size;}
-    const int* getFormulaPayload() const {return _f_payload;}
-    size_t getAssumptionsSize() const {return _a_size;}
-    const int* getAssumptionsPayload() const {return _a_payload;}
     
     float getArrival() const {return _arrival;}
     bool isIncremental() const {return _incremental;}
@@ -132,8 +130,12 @@ public:
     std::vector<uint8_t> serialize() const override;
     const std::shared_ptr<std::vector<uint8_t>>& getSerialization();
 
+    size_t getNumFormulaLiterals() const {return _f_size;}
+    size_t getNumAssumptionLiterals() const {return _a_size;}
     size_t getFormulaPayloadSize(int revision) const;
     const int* getFormulaPayload(int revision) const;
+    size_t getAssumptionsSize(int revision) const;
+    const int* getAssumptionsPayload(int revision) const;
     size_t getTransferSize(int firstIncludedRevision) const;
     std::shared_ptr<std::vector<uint8_t>> extractUpdate(int firstIncludedRevision) const;
 

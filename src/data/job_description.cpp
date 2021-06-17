@@ -19,13 +19,16 @@ void JobDescription::reserveSize(size_t size) {
 
 void JobDescription::endInitialization() {
     
-    _raw_data->reserve(_raw_data->size()+sizeof(int));
+    _raw_data->reserve(_raw_data->size()+2*sizeof(int));
 
     writeMetadataAndPointers();
 
     // Append size of first and only revision
     push_obj<size_t>(_raw_data, _f_size);
-    _revisions_pos_and_size.emplace_back(getMetadataSize(), _f_size);
+    push_obj<size_t>(_raw_data, _a_size);
+    _revisions_pos_fsize_asize.push_back(
+        RevisionInfo{(size_t)getMetadataSize(), _f_size, _a_size}
+    );
 }
 
 int JobDescription::writeMetadataAndPointers() {
@@ -46,30 +49,40 @@ int JobDescription::writeMetadataAndPointers() {
     n = sizeof(size_t);  memcpy(_raw_data->data()+i, &_f_size, n); i += n;
     n = sizeof(size_t);  memcpy(_raw_data->data()+i, &_a_size, n); i += n;
 
-    // Set payload pointers, move "i" to 1st position after payload and assumptions
-    n = sizeof(int)*_f_size; _f_payload = (int*) (_raw_data->data()+i); i += n;
-    n = sizeof(int)*_a_size; _a_payload = (int*) (_raw_data->data()+i); i += n;
-
+    // Move "i" to 1st position after payloads and assumptions
+    n = sizeof(int)*_f_size; i += n;
+    n = sizeof(int)*_a_size; i += n;
     return i;
 }
 
 size_t JobDescription::getFormulaPayloadSize(int revision) const {
-    int relativeIndex = _revisions_pos_and_size.size() - (_revision - revision) - 1;
-    return _revisions_pos_and_size[relativeIndex].second;
+    int relativeIndex = _revisions_pos_fsize_asize.size() - (_revision - revision) - 1;
+    return _revisions_pos_fsize_asize[relativeIndex].fSize;
+}
+
+size_t JobDescription::getAssumptionsSize(int revision) const {
+    int relativeIndex = _revisions_pos_fsize_asize.size() - (_revision - revision) - 1;
+    return _revisions_pos_fsize_asize[relativeIndex].aSize;
 }
 
 const int* JobDescription::getFormulaPayload(int revision) const {
-    int relativeIndex = _revisions_pos_and_size.size() - (_revision - revision) - 1;
-    size_t pos = _revisions_pos_and_size[relativeIndex].first;
+    int relativeIndex = _revisions_pos_fsize_asize.size() - (_revision - revision) - 1;
+    size_t pos = _revisions_pos_fsize_asize[relativeIndex].pos;
     return (const int*) (_raw_data->data()+pos);
+}
+
+const int* JobDescription::getAssumptionsPayload(int revision) const {
+    int relativeIndex = _revisions_pos_fsize_asize.size() - (_revision - revision) - 1;
+    size_t pos = _revisions_pos_fsize_asize[relativeIndex].pos;
+    return (const int*) (_raw_data->data()+pos+sizeof(int)*_revisions_pos_fsize_asize[relativeIndex].fSize);
 }
 
 size_t JobDescription::getTransferSize(int firstIncludedRevision) const {
     size_t size = getMetadataSize();
     for (int rev = firstIncludedRevision; rev <= _revision; rev++) {
         size += sizeof(int) * getFormulaPayloadSize(rev) + sizeof(size_t);
+        size += sizeof(int) * getAssumptionsSize(rev) + sizeof(size_t);
     }
-    size += sizeof(int) * getAssumptionsSize();
     if (firstIncludedRevision == 0) assert(size == getFullTransferSize() || log_return_false("%i != %i\n", size, getFullTransferSize()));
     return size;
 }
@@ -124,16 +137,17 @@ void JobDescription::deserialize() {
 
     // Payload
     size_t pos = i; // position where revisions' payloads begin
-    n = sizeof(int)*_f_size; _f_payload = (int*) (_raw_data->data()+i); i += n;
-    n = sizeof(int)*_a_size; _a_payload = (int*) (_raw_data->data()+i); i += n;
+    n = sizeof(int)*_f_size; i += n;
+    n = sizeof(int)*_a_size; i += n;
 
     // Size and data of revisions
     n = sizeof(size_t);
-    size_t revSize;
+    size_t fSize, aSize;
     while (i < _raw_data->size()) {
-        memcpy(&revSize, _raw_data->data()+i, n); i += n;
-        _revisions_pos_and_size.emplace_back(pos, revSize);
-        pos += revSize*sizeof(int);
+        memcpy(&fSize, _raw_data->data()+i, n); i += n;
+        memcpy(&aSize, _raw_data->data()+i, n); i += n;
+        _revisions_pos_fsize_asize.push_back(RevisionInfo{pos, fSize, aSize});
+        pos += fSize*sizeof(int) + aSize*sizeof(int);
     }
 }
 
@@ -171,25 +185,26 @@ std::shared_ptr<std::vector<uint8_t>> JobDescription::extractUpdate(int firstInc
     desc._first_revision = firstIncludedRevision;
     desc._revision = _revision;
 
-    // Insert each desired revision's payload
+    // Insert each desired revision's payload and assumptions
     size_t pos = getMetadataSize();
     for (int rev = firstIncludedRevision; rev <= _revision; rev++) {
         size_t fSize = getFormulaPayloadSize(rev);
         log(V4_VVER, "Revision %i: size %i\n", rev, fSize);
         const int* fData = getFormulaPayload(rev);
+        size_t aSize = getAssumptionsSize(rev);
+        const int* aData = getAssumptionsPayload(rev);
         desc._raw_data->insert(desc._raw_data->end(), (uint8_t*)fData, (uint8_t*)(fData+fSize));
-        desc._revisions_pos_and_size.emplace_back(pos, fSize);
+        desc._raw_data->insert(desc._raw_data->end(), (uint8_t*)aData, (uint8_t*)(aData+aSize));
+        desc._revisions_pos_fsize_asize.push_back(RevisionInfo{pos, fSize, aSize});
         desc._f_size += fSize;
-        pos += sizeof(int) * fSize;
+        desc._a_size += aSize;
+        pos += sizeof(int) * fSize + sizeof(int) * aSize;
     }
 
-    // Insert assumptions
-    desc._raw_data->insert(desc._raw_data->end(), (uint8_t*)_a_payload, (uint8_t*)(_a_payload+_a_size));
-    desc._a_size = _a_size;
-
     // Append revisions' size and data
-    for (const auto& [_, size] : desc._revisions_pos_and_size) {
-        push_obj<size_t>(desc._raw_data, size);
+    for (const auto& [pos, fSize, aSize] : desc._revisions_pos_fsize_asize) {
+        push_obj<size_t>(desc._raw_data, fSize);
+        push_obj<size_t>(desc._raw_data, aSize);
     }
 
     // Write all meta data into raw data field
@@ -208,9 +223,8 @@ void JobDescription::applyUpdate(const std::shared_ptr<std::vector<uint8_t>>& pa
     desc.deserialize(packed);
 
     // Cut off raw data after the main payload (so far)
-    _raw_data->resize(_raw_data->size() 
-        - sizeof(int) * _a_size                           // old assumptions
-        - sizeof(size_t) * _revisions_pos_and_size.size() // size of each revision so far
+    _raw_data->resize(_raw_data->size()
+        - 2 * sizeof(size_t) * _revisions_pos_fsize_asize.size() // size of each revision so far
     );
 
     int firstNewRevision = _revision+1;
@@ -225,10 +239,15 @@ void JobDescription::applyUpdate(const std::shared_ptr<std::vector<uint8_t>>& pa
     _num_vars = std::max(_num_vars, desc._num_vars);
     size_t pos = _raw_data->size();
 
-    // Append new permanent payload (clauses)
-    const int* newPayload = desc.getFormulaPayload();
-    for (size_t i = 0; i < desc.getFormulaSize(); i++) {
-        addLiteral(*(newPayload+i));
+    // Append new formula and assumptions payload
+    const int* payloadPtr = (const int*) (desc._raw_data->data() + desc.getMetadataSize());
+    for (int rev = firstNewRevision; rev <= _revision; rev++) {
+        for (size_t i = 0; i < desc.getFormulaPayloadSize(rev); i++) {
+            addLiteral(*payloadPtr); payloadPtr++;
+        }
+        for (size_t i = 0; i < desc.getAssumptionsSize(rev); i++) {
+            addAssumption(*payloadPtr); payloadPtr++;
+        }
     }
 
     // Check checksum
@@ -237,27 +256,22 @@ void JobDescription::applyUpdate(const std::shared_ptr<std::vector<uint8_t>>& pa
         abort();
     }
 
-    // Append new assumptions
-    const int* newAssumptions = desc.getAssumptionsPayload();
-    _a_size = 0;
-    for (size_t i = 0; i < desc.getAssumptionsSize(); i++) {
-        addAssumption(*(newAssumptions+i));
-    }
-
     // Append old revision sizes
-    for (const auto& [_, size] : _revisions_pos_and_size) {
-        push_obj<size_t>(_raw_data, size);
+    for (const auto& [pos, fSize, aSize] : _revisions_pos_fsize_asize) {
+        push_obj<size_t>(_raw_data, fSize);
+        push_obj<size_t>(_raw_data, aSize);
     }
     // Append new revision sizes
     for (int rev = firstNewRevision; rev <= _revision; rev++) {
         push_obj<size_t>(_raw_data, desc.getFormulaPayloadSize(rev));
+        push_obj<size_t>(_raw_data, desc.getAssumptionsSize(rev));
     }
     // Set correct size and data of each revision
     for (int rev = firstNewRevision; rev <= _revision; rev++) {
-        _revisions_pos_and_size.emplace_back(
-            pos, desc.getFormulaPayloadSize(rev) 
+        _revisions_pos_fsize_asize.push_back(
+            RevisionInfo{pos, desc.getFormulaPayloadSize(rev), desc.getAssumptionsSize(rev)}
         );
-        pos += desc.getFormulaPayloadSize(rev) * sizeof(int);
+        pos += desc.getFormulaPayloadSize(rev) * sizeof(int) + desc.getAssumptionsSize(rev) * sizeof(int);
     }
 
     // Rewrite meta data, reset payload + assumptions pointers

@@ -144,7 +144,7 @@ void DefaultSharingManager::processClause(int solverId, const Clause& clause, in
 	// Register clause in this solver's filter
 	if (_solver_filters[solverId].registerClause(clauseBegin, clauseSize)) {
 		// Success - write clause into database if possible
-		Clause tldClause{clauseBegin, clauseSize, clause.lbd};
+		Clause tldClause{clauseBegin, clauseSize, clauseSize == 1 ? 1 : (clauseSize == 2 ? 2 : clause.lbd)};
 		if (!_cdb.addClause(solverId, tldClause)) _stats.clausesDroppedAtExport++;
 	} else {
 		// Clause was already registered before
