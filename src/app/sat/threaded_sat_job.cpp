@@ -35,8 +35,8 @@ void ThreadedSatJob::appl_start() {
         _solver->appendRevision(_last_imported_revision, 
             desc.getFormulaPayloadSize(_last_imported_revision), 
             desc.getFormulaPayload(_last_imported_revision), 
-            _last_imported_revision == desc.getRevision() ? desc.getAssumptionsSize() : 0, 
-            desc.getAssumptionsPayload()
+            desc.getAssumptionsSize(_last_imported_revision), 
+            desc.getAssumptionsPayload(_last_imported_revision)
         );
     }
     _solver->solve();
@@ -83,8 +83,8 @@ void ThreadedSatJob::appl_restart() {
             _last_imported_revision,
             desc.getFormulaPayloadSize(_last_imported_revision), 
             desc.getFormulaPayload(_last_imported_revision),
-            _last_imported_revision == desc.getRevision() ? desc.getAssumptionsSize() : 0,
-            desc.getAssumptionsPayload()
+            desc.getAssumptionsSize(_last_imported_revision),
+            desc.getAssumptionsPayload(_last_imported_revision)
         );
     }
     _solver->solve();

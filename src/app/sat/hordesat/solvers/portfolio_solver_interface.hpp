@@ -16,6 +16,7 @@
 #include <set>
 #include <stdexcept>
 #include <functional>
+#include <atomic>
 
 #include "app/sat/hordesat/utilities/clause.hpp"
 #include "util/logger.hpp"
@@ -45,7 +46,10 @@ struct SolverSetup {
 	int localId; 
 	std::string jobname; 
 	int diversificationIndex;
-	bool incremental;
+	bool isJobIncremental;
+	bool doIncrementalSolving;
+	bool hasPseudoincrementalSolvers;
+	char solverType;
 
 	// SAT Solving settings
 
@@ -67,6 +71,7 @@ struct SolverSetup {
 void updateTimer(std::string jobName);
 
 typedef std::function<void(const Mallob::Clause&, int)> LearnedClauseCallback;
+typedef std::function<void(const Mallob::Clause&, int, int)> ExtLearnedClauseCallback;
 
 /**
  * Interface for solvers that can be used in the portfolio.
@@ -77,11 +82,9 @@ protected:
 	Logger _logger;
 	SolverSetup _setup;
 
-
 // ************** INTERFACE TO IMPLEMENT **************
 
 public:
-
 	// constructor
 	PortfolioSolverInterface(const SolverSetup& setup);
 
@@ -131,6 +134,9 @@ public:
 	// May be used to decide when to apply additional diversifications.
 	virtual int getNumOriginalDiversifications() = 0;
 
+	virtual bool supportsIncrementalSat() = 0;
+	virtual bool exportsConditionalClauses() = 0;
+
 protected:
 	// Interrupt the SAT solving, solving cannot continue until interrupt is unset.
 	virtual void setSolverInterrupt() = 0;
@@ -168,8 +174,13 @@ public:
 	 */
 	int getDiversificationIndex() {return _diversification_index;}
 
+	void setCurrentCondVarOrZero(int condVarOrZero) {_current_cond_var_or_zero = condVarOrZero;}
+	void setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback);
+
 	Logger& getLogger() {return _logger;}
 	
+	const SolverSetup& getSolverSetup() {return _setup;}
+
 	void interrupt();
 	void uninterrupt();
 	void suspend();
@@ -181,6 +192,7 @@ private:
 	int _global_id;
 	int _local_id;
 	int _diversification_index;
+	std::atomic_int _current_cond_var_or_zero = 0;
 };
 
 // Returns the elapsed time (seconds) since the currently registered solver's start time.

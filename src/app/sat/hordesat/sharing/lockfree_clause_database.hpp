@@ -249,6 +249,7 @@ public:
     bool addClause(int producerId, const Clause& c) {
         auto& buf = getBuffer(c.size, c.lbd);
         if (buf.isNull()) return false;
+        //log(V4_VVER, "Storing clause of size %i, LBD %i ...\n", c.size, c.lbd);
         return buf.insertClause(c, producerId);
     }
 

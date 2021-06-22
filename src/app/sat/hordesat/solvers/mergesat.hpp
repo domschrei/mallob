@@ -87,6 +87,9 @@ public:
 	// Get solver statistics
 	SolvingStatistics getStatistics() override;
 
+	bool supportsIncrementalSat() override {return false;}
+	bool exportsConditionalClauses() override {return true;}
+
 	void addInternalClausesToSolver(bool firstTime);
 };
 

@@ -15,6 +15,7 @@
 #include "app/sat/hordesat/utilities/clause_database.hpp"
 #include "app/sat/hordesat/sharing/lockfree_clause_database.hpp"
 #include "app/sat/hordesat/utilities/clause_filter.hpp"
+#include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 #include "util/params.hpp"
 
 #define CLAUSE_LEN_HIST_LENGTH 256
@@ -25,6 +26,7 @@ protected:
 	// associated solvers
 	std::vector<std::shared_ptr<PortfolioSolverInterface>>& _solvers;
 	std::vector<ClauseFilter> _solver_filters;
+	std::vector<bool> _importing;
 	
 	// global parameters
 	const Parameters& _params;
@@ -47,8 +49,16 @@ public:
 	SharingStatistics getStatistics();
 	~DefaultSharingManager() = default;
 
+	void stopClauseImport(int solverId) override;
+	void continueClauseImport(int solverId) override;
+
 private:
-	void processClause(int solverId, const Clause& clause);
+	void processClause(int solverId, const Clause& clause, int condVarOrZero);
+	ExtLearnedClauseCallback getCallback() {
+		return [this](const Clause& c, int solverId, int condVarOrZero) {
+			processClause(solverId, c, condVarOrZero);
+		};
+	};
 
 };
 

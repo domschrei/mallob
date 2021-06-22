@@ -16,6 +16,7 @@
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 #include "app/sat/hordesat/solvers/solving_state.hpp"
 #include "app/sat/hordesat/utilities/clause_shuffler.hpp"
+#include "app/sat/hordesat/utilities/variable_translator.hpp"
 
 // Forward declarations
 class HordeLib;
@@ -47,6 +48,9 @@ private:
     std::atomic_int _latest_revision = 0;
     std::atomic_int _active_revision;
     std::atomic_ulong _imported_lits_curr_revision = 0;
+    int _max_var = 0;
+    VariableTranslator _vt;
+    bool _has_pseudoincremental_solvers;
 
     std::atomic_bool _initialized = false;
     std::atomic_bool _interrupted = false;

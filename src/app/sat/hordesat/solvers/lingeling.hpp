@@ -105,6 +105,9 @@ public:
 	// Get solver statistics
 	SolvingStatistics getStatistics() override;
 
+	bool supportsIncrementalSat() override {return true;}
+	bool exportsConditionalClauses() override {return false;}
+
 private:
 	void updateMaxVar(int lit);
     

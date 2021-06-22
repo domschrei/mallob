@@ -168,7 +168,7 @@ void Parameters::setDefaults() {
     setParam("rto", "0"); // (job)requests timeout in seconds
     setParam("s", "1.0"); // job communication period (seconds)
     setParam("s2f", ""); // write solutions to file (file path, or empty string for no writing)
-    setParam("satsolver", "l"); // which SAT solvers to cycle through
+    setParam("satsolver", "L"); // which SAT solvers to cycle through
     setParam("shufinp", "0"); // shuffle input
     setParam("shufshcls", "0"); // shuffle ordering of literals within each shared clause at import
     setParam("sleep", "100"); // microsecs to sleep in between worker main loop cycles

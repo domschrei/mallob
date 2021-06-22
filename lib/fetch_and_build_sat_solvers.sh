@@ -51,6 +51,8 @@ if [ ! -f glucose/libglucose.a ]; then
     mv glucose-syrup-4.1 glucose
     patch glucose/core/Solver.cc < Glucose_Solver.cc.patch
     
+    #cp -r ../../mglucose glucose
+
     echo "Building Glucose ..."
     
     # Make Glucose

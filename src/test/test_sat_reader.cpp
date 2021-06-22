@@ -29,7 +29,7 @@ int main() {
         assert(success);
         time = Timer::elapsedSeconds() - time;
         log(V2_INFO, " - done, took %.3fs\n", time);
-        assert(d.getFormulaSize() > 0);
+        assert(d.getNumFormulaLiterals() > 0);
 
         log(V2_INFO, "Only decompressing CNF %s for comparison ...\n", f.c_str());
         float time2 = Timer::elapsedSeconds();
