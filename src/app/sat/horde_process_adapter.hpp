@@ -60,6 +60,8 @@ private:
     pid_t _child_pid;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
 
+    std::list<std::pair<std::vector<int>, Checksum>> _temp_clause_buffers;
+
 public:
     HordeProcessAdapter(const Parameters& params, 
             size_t fSize, const int* fLits, size_t aSize, const int* aLits);
@@ -89,6 +91,7 @@ public:
     void freeSharedMemory();
 
 private:
+    void doDigest(const std::vector<int>& clauses, const Checksum& checksum);
     void initSharedMemory();
     void* createSharedMemoryBlock(std::string shmemSubId, size_t size, void* data);
 

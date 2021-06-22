@@ -12,7 +12,7 @@ cleanup
 # Generate periodic "disturbance" jobs
 t=5
 n=0
-job_before="admin.disturb-$t"
+job_before=\"admin.disturb-$t\"
 while [ $t -le 24000 ]; do
     # wallclock limit of 15s, arrival @ t
     introduce_job disturb-$t instances/r3unknown_100k.cnf 15 $t
@@ -27,4 +27,4 @@ done
 
 RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $1 --oversubscribe build/mallob \
 -t=4 -l=1 -g=0 -satsolver=l -v=4 -T=24000 -ch=1 -chaf=5 -chstms=60 -appmode=fork \
--cfhl=1 -smcl=0 -hmcl=0 -ihlbd=0 -islbd=0 -fhlbd=0 -fslbd=0 -checksums=1 -log=test_$$
+-cfhl=1 -smcl=30 -hmcl=30 -mlbdps=8 -ihlbd=0 -islbd=0 -fhlbd=0 -fslbd=0 -checksums=1 -log=test_$$

@@ -189,9 +189,14 @@ std::vector<int> HordeProcessAdapter::getCollectedClauses(Checksum& checksum) {
 
 void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses, const Checksum& checksum) {
     if (_hsm->doImport && !_hsm->didImport) {
-        log(V1_WARN, "Still digesting previous batch of clauses: discard this batch\n");
+        // Cannot import right now -- defer into temporary storage 
+        _temp_clause_buffers.emplace_back(clauses, checksum);
         return;
     }
+    doDigest(clauses, checksum);
+}
+
+void HordeProcessAdapter::doDigest(const std::vector<int>& clauses, const Checksum& checksum) {
     _hsm->importChecksum = checksum;
     _hsm->importBufferSize = clauses.size();
     memcpy(_import_buffer, clauses.data(), clauses.size()*sizeof(int));
@@ -217,6 +222,12 @@ bool HordeProcessAdapter::check() {
         _hsm->revision = _revision_update;
         _revision_update = -1;
         _hsm->doStartNextRevision = true;
+    }
+
+    if (!_hsm->doImport && !_hsm->didImport && !_temp_clause_buffers.empty()) {
+        // Digest next clause buffer from intermediate storage
+        doDigest(_temp_clause_buffers.front().first, _temp_clause_buffers.front().second);
+        _temp_clause_buffers.erase(_temp_clause_buffers.begin());
     }
     
     if (_hsm->hasSolution) return _hsm->solutionRevision == _hsm->revision;
