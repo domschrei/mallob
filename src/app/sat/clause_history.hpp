@@ -20,7 +20,7 @@ public:
         int endIndex;
     };
     struct Entry {
-        std::vector<int> clauses;
+        std::vector<std::vector<int>> clauses;
         std::vector<bool> aggregated;
         Entry() {}
         Entry(int size) : aggregated(std::vector<bool>(size, false)) {}
@@ -85,7 +85,7 @@ public:
             msg.revision = _job.getRevision();
             msg.epoch = indexToFirstEpoch(subscription.nextIndex);
             msg.tag = MSG_CLAUSE_HISTORY_SEND_CLAUSES;
-            msg.payload = _history[subscription.nextIndex].clauses;
+            msg.payload = _history[subscription.nextIndex].clauses.at(0);
             if (_use_checksums) setChecksum(msg);
             MyMpi::isend(MPI_COMM_WORLD, subscription.correspondingRank, MSG_SEND_APPLICATION_MESSAGE, msg);
             log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Send batch of epoch %i", subscription.correspondingRank, _job.toStr(), msg.epoch);
@@ -107,21 +107,25 @@ public:
         //if (entireIndex) log(V4_VVER, "CLSHIST Received clauses of index %i\n", index);
         
         // Insert clauses into history vector
-        while (index >= _history.size()) _history.emplace_back(_aggregation_factor);
-        if (_history[index].empty()) {
-            _history[index].clauses = clauses;
-        } else {
-            // Merge with prior clauses at that index
-            auto merger = _cdb.getBufferMerger();
-            merger.add(_cdb.getBufferReader(_history[index].clauses.data(), _history[index].clauses.size()));
-            merger.add(_cdb.getBufferReader(clauses.data(), clauses.size()));
-            _history[index].clauses = merger.merge(isShorttermMemory(index) ? _stm_buffer_size : _ltm_buffer_size);
-        }
-        if (entireIndex) {
-            for (size_t i = 0; i < _aggregation_factor; i++) 
-                _history[index].aggregated[i] = true;
-        } else {
-            _history[index].aggregated[offset] = true;
+        if (!isEpochPresent(epoch)) {
+            while (index >= _history.size()) _history.emplace_back(_aggregation_factor);
+            _history[index].clauses.push_back(clauses);
+            if (entireIndex) {
+                for (size_t i = 0; i < _aggregation_factor; i++) 
+                    _history[index].aggregated[i] = true;
+            } else {
+                _history[index].aggregated[offset] = true;
+            }
+            if (isBatchComplete(index)) {
+                // Merge with prior clauses at that index
+                auto merger = _cdb.getBufferMerger();
+                for (auto& clsbuf : _history[index].clauses)
+                    merger.add(_cdb.getBufferReader(clsbuf.data(), clsbuf.size()));
+                merger.add(_cdb.getBufferReader(clauses.data(), clauses.size()));
+                auto merged = merger.merge(isShorttermMemory(index) ? _stm_buffer_size : _ltm_buffer_size);
+                _history[index].clauses.resize(1);
+                _history[index].clauses[0] = std::move(merged);
+            }
         }
 
         // Reduce missing slices in chronological order
@@ -195,8 +199,9 @@ public:
             if (isBatchComplete(indexToReduce) && _history[indexToReduce].clauses.size() > _ltm_buffer_size) {
                 // Reduce this batch
                 auto merger = _cdb.getBufferMerger();
-                merger.add(_cdb.getBufferReader(_history[indexToReduce].clauses.data(), _history[indexToReduce].clauses.size()));
-                _history[indexToReduce].clauses = merger.merge(_ltm_buffer_size);
+                auto clsbuf = _history[indexToReduce].clauses.at(0);
+                merger.add(_cdb.getBufferReader(clsbuf.data(), clsbuf.size()));
+                _history[indexToReduce].clauses[0] = merger.merge(_ltm_buffer_size);
             }
         }
 

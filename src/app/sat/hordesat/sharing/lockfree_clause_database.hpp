@@ -132,6 +132,7 @@ public:
             size_t hash = 1;
 
             std::vector<int> out;
+            out.reserve(sizeLimit);
             for (int i = 0; i < sizeof(size_t)/sizeof(int); i++)
                 out.push_back(0); // placeholder for checksum
             out.push_back(0); // counter for clauses of first bucket
@@ -146,12 +147,17 @@ public:
                 bool anyLeft = false;
                 for (size_t i = 0; i < _readers.size(); i++) {
                     Clause& c = nextClauses[i];
+                    if (c.size == -1) continue; // no clauses left
 
                     // If no clause is present, try to read the next one
                     if (c.begin == nullptr) {
                         c = _readers[i].getNextIncomingClause();
+                        if (c.begin == nullptr) {
+                            // no clauses left, set a magic number
+                            c.size = -1;
+                            continue;
+                        }
                     }
-                    if (c.begin == nullptr) continue;
                     
                     // Clause present - update bound on size and LBD
                     if (!anyLeft || c.size < newBucket.size || 
