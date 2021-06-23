@@ -63,9 +63,9 @@ function test_oscillating() {
     test 13 -t=1 -lbc=2 -J=$((n+1)) -l=1 -satsolver=l -v=4 -checkjsonresults -checksums=1
 }
 
-test_mono
-test_scheduling
-test_incremental
 test_oscillating
+test_scheduling
+#test_mono
+#test_incremental
 
 echo "All tests done."

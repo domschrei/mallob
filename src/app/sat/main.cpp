@@ -66,6 +66,15 @@ void importRevision(const Logger& log, HordeLib& hlib, const std::string& shmemI
     hlib.appendRevision(revision, *fSizePtr, fPtr, *aSizePtr, aPtr);
 }
 
+void doSleep(const Logger& log) {
+    // Wait until something happens
+    // (can be interrupted by Fork::wakeUp(hsm->childPid))
+    float time = Timer::elapsedSeconds();
+    int sleepStatus = usleep(1000 /*1 millisecond*/);
+    time = Timer::elapsedSeconds() - time;
+    if (sleepStatus != 0) log.log(V5_DEBG, "Woken up after %i us\n", (int) (1000*1000*time));
+}
+
 void runSolverEngine(const Logger& log, const Parameters& programParams, HordeConfig& config) {
     
     // Set up "management" block of shared memory created by the parent
@@ -92,6 +101,10 @@ void runSolverEngine(const Logger& log, const Parameters& programParams, HordeCo
 
     // Prepare solver
     HordeLib hlib(programParams, config, log.copy("H", "H"));
+
+    // Wait until everything is prepared for the solver to begin
+    while (!hsm->doBegin) doSleep(log);
+
     // Import first revision
     {
         int* fPtr = (int*) accessMemory(log, shmemId + ".formulae.0", sizeof(int) * hsm->fSize);
@@ -101,9 +114,13 @@ void runSolverEngine(const Logger& log, const Parameters& programParams, HordeCo
     }
     // Import subsequent revisions
     int lastImportedRevision = 0;
-    while (!hsm->doStartNextRevision && lastImportedRevision < hsm->revision) {
-        lastImportedRevision++;
-        importRevision(log, hlib, shmemId, lastImportedRevision, checksum);
+    while (lastImportedRevision < hsm->firstRevision) {
+        if (hsm->doStartNextRevision && !hsm->didStartNextRevision) {
+            lastImportedRevision++;
+            importRevision(log, hlib, shmemId, lastImportedRevision, checksum);
+            hsm->didStartNextRevision = true;
+        } else doSleep(log);
+        if (!hsm->doStartNextRevision) hsm->didStartNextRevision = false;
     }
     // Start solver threads
     hlib.solve();
@@ -117,12 +134,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams, HordeCo
     // Main loop
     while (true) {
 
-        // Wait until something happens
-        // (can be interrupted by Fork::wakeUp(hsm->childPid))
-        float time = Timer::elapsedSeconds();
-        int sleepStatus = usleep(1000 /*1 millisecond*/);
-        time = Timer::elapsedSeconds() - time;
-        if (sleepStatus != 0) log.log(V5_DEBG, "Woken up after %i us\n", (int) (1000*1000*time));
+        doSleep(log);
 
         // Terminate
         if (hsm->doTerminate) {

@@ -16,8 +16,10 @@ struct HordeSharedMemory {
     int fSize;
     int aSize;
     int revision;
+    int firstRevision;
 
     // Instructions parent->child
+    bool doBegin;
     bool doExport;
     bool doImport;
     bool doDumpStats;

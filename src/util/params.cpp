@@ -103,11 +103,15 @@ void Parameters::printParams() const {
 
 char* const* Parameters::asCArgs(const char* execName) const {
 
-    const char** argv = new const char*[_map.size()+2];
+    size_t numArgs = 0;
+    for (const auto& [id, opt] : _map) if (!opt->getValAsString().empty()) numArgs++;
+
+    const char** argv = new const char*[numArgs+2];
     argv[0] = execName;
     int i = 1;
     for (const auto& [id, opt] : _map) {
         std::string val = opt->getValAsString();
+        if (val.empty()) continue;
         size_t argsize = 1 + id.size() + (!val.empty() ? 1 + val.size() : 0) + 1;
         char* arg = (char*) malloc(argsize * sizeof(char));
         arg[0] = '-';

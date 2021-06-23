@@ -28,6 +28,7 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
     void* mainShmem = SharedMemory::create(_shmem_id, sizeof(HordeSharedMemory));
     _shmem.insert(ShmemObject{_shmem_id, mainShmem, sizeof(HordeSharedMemory)});
     _hsm = new ((char*)mainShmem) HordeSharedMemory();
+    _hsm->doBegin = false;
     _hsm->doExport = false;
     _hsm->doImport = false;
     _hsm->doDumpStats = false;
@@ -48,10 +49,9 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
     _hsm->exportBufferTrueSize = 0;
     _hsm->fSize = _f_size;
     _hsm->aSize = _a_size;
-    _hsm->revision = config.firstrev;
+    _hsm->firstRevision = config.firstrev;
+    _hsm->revision = 0;
 
-    createSharedMemoryBlock("formulae.0", sizeof(int) * _f_size, (void*)_f_lits);
-    createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
     _export_buffer = (int*) createSharedMemoryBlock("clauseexport", 
             _params.clauseBufferBaseSize() * sizeof(int), nullptr);
     _hsm->importBufferMaxSize = _params.clauseHistoryAggregationFactor() * MyMpi::getBinaryTreeBufferLimit(
@@ -60,11 +60,41 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
     ) + 1024;
     _import_buffer = (int*) createSharedMemoryBlock("clauseimport", 
             sizeof(int)*_hsm->importBufferMaxSize, nullptr);
-    
     _hsm->config = std::move(config);
+    _latest_published_revision = 0;
+    
+    _concurrent_shmem_allocator = std::thread([this]() {
+
+        createSharedMemoryBlock("formulae.0", sizeof(int) * _f_size, (void*)_f_lits);
+        createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
+        _latest_ready_revision = 0;
+
+        _hsm->doBegin = true;
+
+        while (!_hsm->doTerminate) {
+            usleep(1000*10);
+            RevisionData revData;
+            {
+                auto lock = _revisions_mutex.getLock();
+                if (_revisions_to_write.empty()) continue;
+                revData = _revisions_to_write.front();
+                _revisions_to_write.erase(_revisions_to_write.begin());
+            }
+            auto revStr = std::to_string(revData.revision);
+            createSharedMemoryBlock("fsize."       + revStr, sizeof(size_t),              (void*)&revData.fSize);
+            createSharedMemoryBlock("asize."       + revStr, sizeof(size_t),              (void*)&revData.aSize);
+            createSharedMemoryBlock("formulae."    + revStr, sizeof(int) * revData.fSize, (void*)revData.fLits);
+            createSharedMemoryBlock("assumptions." + revStr, sizeof(int) * revData.aSize, (void*)revData.aLits);
+            createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
+            log(V4_VVER, "Revision %i ready!\n", revData.revision);
+            _latest_ready_revision = revData.revision;
+        }
+    });
 }
 
 HordeProcessAdapter::~HordeProcessAdapter() {
+    if (_concurrent_shmem_allocator.joinable())
+        _concurrent_shmem_allocator.join();
     freeSharedMemory();
 }
 
@@ -126,27 +156,8 @@ pid_t HordeProcessAdapter::getPid() {
 }
 
 void HordeProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisions) {
-
-    int latestRevision = 0;
-    for (size_t i = 0; i < revisions.size(); i++) {
-        const auto& revData = revisions[i];
-        latestRevision = std::max(latestRevision, revData.revision);
-        auto revStr = std::to_string(revData.revision);
-        createSharedMemoryBlock("fsize."       + revStr, sizeof(size_t),              (void*)&revData.fSize);
-        createSharedMemoryBlock("asize."       + revStr, sizeof(size_t),              (void*)&revData.aSize);
-        createSharedMemoryBlock("formulae."    + revStr, sizeof(int) * revData.fSize, (void*)revData.fLits);
-        createSharedMemoryBlock("assumptions." + revStr, sizeof(int) * revData.aSize, (void*)revData.aLits);
-        createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
-    }
-
-    _hsm->hasSolution = false;
-
-    if (_state == SolvingStates::INITIALIZING) {
-        // Child process not set up yet: Can directly order to parse new clauses
-        _hsm->revision = latestRevision;
-    } else {
-        _revision_update = latestRevision;
-    }
+    auto lock = _revisions_mutex.getLock();
+    _revisions_to_write.insert(_revisions_to_write.end(), revisions.begin(), revisions.end());
 }
 
 void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
@@ -218,10 +229,10 @@ bool HordeProcessAdapter::check() {
 
     if (!_hsm->doStartNextRevision 
         && !_hsm->didStartNextRevision 
-        && _revision_update >= 0) {
+        && _latest_published_revision < _latest_ready_revision) {
         
-        _hsm->revision = _revision_update;
-        _revision_update = -1;
+        _latest_published_revision++;
+        _hsm->revision = _latest_published_revision;
         _hsm->doStartNextRevision = true;
     }
 

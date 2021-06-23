@@ -27,6 +27,11 @@ namespace SharedMemory {
         return buffer;
     }
 
+    bool canAccess(const std::string& specifier) {
+        std::string shmemFile = "/dev/shm/" + specifier;
+        return ::access(shmemFile.c_str(), F_OK) != -1;
+    }
+
     void* access(const std::string& specifier, size_t size) {
 
         std::string shmemFile = "/dev/shm/" + specifier;

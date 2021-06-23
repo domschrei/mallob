@@ -3,6 +3,7 @@
 #define DOMPASCH_MALLOB_HORDE_PROCESS_ADAPTER_H
 
 #include <list>
+#include <thread>
 
 #include "util/logger.hpp"
 #include "util/sys/threading.hpp"
@@ -32,7 +33,6 @@ private:
     const int* _f_lits;
     size_t _a_size;
     const int* _a_lits;
-    int _revision_update = -1;
     
     struct ShmemObject {
         std::string id; 
@@ -56,11 +56,16 @@ private:
 
     int* _export_buffer;
     int* _import_buffer;
+    std::list<std::pair<std::vector<int>, Checksum>> _temp_clause_buffers;
 
     pid_t _child_pid;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
 
-    std::list<std::pair<std::vector<int>, Checksum>> _temp_clause_buffers;
+    std::atomic_int _latest_ready_revision = -1;
+    std::atomic_int _latest_published_revision = -1;
+    std::thread _concurrent_shmem_allocator;
+    std::list<RevisionData> _revisions_to_write;
+    Mutex _revisions_mutex;
 
 public:
     HordeProcessAdapter(const Parameters& params, HordeConfig&& config,
