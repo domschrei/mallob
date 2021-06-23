@@ -13,6 +13,7 @@
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 #include "data/job_result.hpp"
+#include "app/sat/horde_config.hpp"
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 #include "app/sat/hordesat/solvers/solving_state.hpp"
 #include "app/sat/hordesat/utilities/clause_shuffler.hpp"
@@ -40,6 +41,7 @@ private:
     std::string _name;
     int _portfolio_rank;
     int _portfolio_size;
+    int _local_solvers_count;
     long _tid = -1;
 
     Mutex _state_mutex;
@@ -62,7 +64,7 @@ private:
 
 
 public:
-    SolverThread(const Parameters& params, std::shared_ptr<PortfolioSolverInterface> solver, 
+    SolverThread(const Parameters& params, const HordeConfig& config, std::shared_ptr<PortfolioSolverInterface> solver, 
                 size_t fSize, const int* fLits, size_t aSize, const int* aLits, int localId);
     ~SolverThread();
 

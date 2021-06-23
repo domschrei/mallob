@@ -21,7 +21,6 @@ private:
 
     const int _clause_buf_base_size;
     const float _clause_buf_discount_factor;
-    const bool _sort_by_lbd;
     const bool _use_checksums;
     const bool _use_cls_history;
 
@@ -35,13 +34,12 @@ private:
 
 public:
     AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : _params(params), _job(job), 
-        _clause_buf_base_size(_params.getIntParam("cbbs")), 
-        _clause_buf_discount_factor(_params.getFloatParam("cbdf")),
-        _sort_by_lbd(params.isNotNull("sort-by-lbd")),
-        _use_checksums(params.isNotNull("checksums")),
-        _use_cls_history(params.isNotNull("ch")),
+        _clause_buf_base_size(_params.clauseBufferBaseSize()), 
+        _clause_buf_discount_factor(_params.clauseBufferDiscountFactor()),
+        _use_checksums(params.useChecksums()),
+        _use_cls_history(params.collectClauseHistory()),
         _cls_history(_params, getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job),
-        _cdb(_params.getIntParam("hmcl"), _params.getIntParam("mlbdps"), _clause_buf_base_size, 1),
+        _cdb(_params.hardMaxClauseLength(), _params.maxLbdPartitioningSize(), _clause_buf_base_size, 1),
         _num_aggregated_nodes(0) {
 
         _initialized = true;

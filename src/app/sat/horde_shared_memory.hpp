@@ -6,8 +6,11 @@
 
 #include "hordesat/solvers/portfolio_solver_interface.hpp"
 #include "data/checksum.hpp"
+#include "horde_config.hpp"
 
 struct HordeSharedMemory {
+
+    HordeConfig config;
 
     // Meta data parent->child
     int fSize;

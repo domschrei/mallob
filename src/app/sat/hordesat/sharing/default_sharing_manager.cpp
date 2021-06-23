@@ -16,9 +16,9 @@ DefaultSharingManager::DefaultSharingManager(
 		const Parameters& params, const Logger& logger)
 	: _solvers(solvers), _params(params), _logger(logger), 
 	_cdb(
-		/*maxClauseSize=*/_params.getIntParam("hmcl"), 
-		/*maxLbdPartitionedSize=*/_params.getIntParam("mlbdps"),
-		/*baseBufferSize=*/_params.getIntParam("cbbs"), 
+		/*maxClauseSize=*/_params.hardMaxClauseLength(),
+		/*maxLbdPartitionedSize=*/_params.maxLbdPartitioningSize(),
+		/*baseBufferSize=*/_params.clauseBufferBaseSize(),
 		/*numProducers=*/_solvers.size()
 	) {
 
@@ -28,7 +28,7 @@ DefaultSharingManager::DefaultSharingManager(
 	auto callback = getCallback();
 	
     for (size_t i = 0; i < _solvers.size(); i++) {
-		_solver_filters.emplace_back(/*maxClauseLen=*/params.getIntParam("hmcl", 0), /*checkUnits=*/true);
+		_solver_filters.emplace_back(/*maxClauseLen=*/params.hardMaxClauseLength(), /*checkUnits=*/true);
 		_solvers[i]->setExtLearnedClauseCallback(callback);
 		_importing.push_back(true);
 	}
@@ -48,7 +48,7 @@ int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
 	_logger.log(V5_DEBG, "prepared %i clauses, size %i\n", numExportedClauses, buffer.size());
 	_stats.exportedClauses += numExportedClauses;
 	float usedRatio = ((float)buffer.size())/maxSize;
-	if (usedRatio < _params.getFloatParam("icpr")) {
+	if (usedRatio < _params.increaseClauseProductionRatio()) {
 		int increaser = lastInc++ % _solvers.size();
 		_solvers[increaser]->increaseClauseProduction();
 		_logger.log(V3_VERB, "prod. increase no. %d (sid %d)\n", prodInc++, increaser);
@@ -72,7 +72,7 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 	std::vector<int> lens;
 	std::vector<int> added(_solvers.size(), 0);
 
-	bool shuffleClauses = _params.isNotNull("shufshcls");
+	bool shuffleClauses = _params.shuffleSharedClauses();
 	
 	// For each incoming clause:
 	auto clause = reader.getNextIncomingClause();
@@ -111,7 +111,7 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 	}
 
 	// Clear half of the clauses from the filter (probabilistically) if a clause filter half life is set
-	if (_params.getIntParam("cfhl", 0) > 0 && Timer::elapsedSeconds() - _last_buffer_clear > _params.getIntParam("cfhl", 0)) {
+	if (_params.clauseFilterHalfLife() > 0 && Timer::elapsedSeconds() - _last_buffer_clear > _params.clauseFilterHalfLife()) {
 		_logger.log(V3_VERB, "forget half of clauses in filters\n");
 		for (size_t sid = 0; sid < _solver_filters.size(); sid++) {
 			_solver_filters[sid].clearHalf();

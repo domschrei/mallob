@@ -11,7 +11,7 @@ class Balancer {
 
 public:
     Balancer(MPI_Comm& comm, Parameters& params) :
-    _comm(comm), _params(params), _load_factor(params.getFloatParam("l")), _balancing(false) {}
+    _comm(comm), _params(params), _load_factor(params.loadFactor()), _balancing(false) {}
     virtual ~Balancer() {}
 
     virtual void forget(int jobId);

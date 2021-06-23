@@ -13,7 +13,7 @@
 #include "horde_config.hpp"
 
 ThreadedSatJob::ThreadedSatJob(const Parameters& params, int commSize, int worldRank, int jobId) : 
-        BaseSatJob(params, commSize, worldRank, jobId), _done_locally(false), _job_comm_period(params.getFloatParam("s")) {
+        BaseSatJob(params, commSize, worldRank, jobId), _done_locally(false), _job_comm_period(params.appCommPeriod()) {
 }
 
 void ThreadedSatJob::appl_start() {
@@ -22,10 +22,12 @@ void ThreadedSatJob::appl_start() {
     
     // Initialize Hordesat instance
     Parameters hParams(_params);
-    HordeConfig::applyDefault(hParams, *this);
-    _solver = std::unique_ptr<HordeLib>(new HordeLib(hParams, Logger::getMainInstance().copy(
-        "<h-" + std::string(toStr()) + ">", "#" + std::to_string(getId()) + "."
-    )));
+    HordeConfig config(_params, *this);
+    _solver = std::unique_ptr<HordeLib>(new HordeLib(hParams, config, 
+        Logger::getMainInstance().copy(
+            "<h-" + std::string(toStr()) + ">", "#" + std::to_string(getId()) + "."
+        )
+    ));
     _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
 
     //log(V5_DEBG, "%s : beginning to solve\n", toStr());

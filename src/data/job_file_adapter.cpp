@@ -146,7 +146,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
 
     // Initialize new job
     float priority = userPrio * (j.contains("priority") ? j["priority"].get<float>() : 1.0f);
-    if (_params.isNotNull("jjp")) {
+    if (_params.jitterJobPriorities()) {
         // Jitter job priority
         priority *= 0.99 + 0.01 * Random::rand();
     }

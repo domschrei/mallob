@@ -63,7 +63,7 @@ private:
     std::list<std::pair<std::vector<int>, Checksum>> _temp_clause_buffers;
 
 public:
-    HordeProcessAdapter(const Parameters& params, 
+    HordeProcessAdapter(const Parameters& params, HordeConfig&& config,
             size_t fSize, const int* fLits, size_t aSize, const int* aLits);
     ~HordeProcessAdapter();
 
@@ -92,7 +92,7 @@ public:
 
 private:
     void doDigest(const std::vector<int>& clauses, const Checksum& checksum);
-    void initSharedMemory();
+    void initSharedMemory(HordeConfig&& config);
     void* createSharedMemoryBlock(std::string shmemSubId, size_t size, void* data);
 
 };

@@ -55,15 +55,15 @@ private:
 
 public:
     ClauseHistory(Parameters& params, int stmBufferSizePerEpoch, BaseSatJob& job) : 
-        _aggregation_factor(params.getIntParam("chaf")), 
-        _num_stm_slots(params.getIntParam("chstms")), 
+        _aggregation_factor(params.clauseHistoryAggregationFactor()), 
+        _num_stm_slots(params.clauseHistoryShortTermMemSize()), 
         _stm_buffer_size(_aggregation_factor * stmBufferSizePerEpoch), 
-        _ltm_buffer_size(params.getIntParam("cbbs")), 
-        _use_checksums(params.isNotNull("checksums")),
+        _ltm_buffer_size(params.clauseBufferBaseSize()), 
+        _use_checksums(params.useChecksums()),
         _cdb(
-            /*maxClauseSize=*/params.getIntParam("hmcl"), 
-            /*maxLbdPartitionedSize=*/params.getIntParam("mlbdps"),
-            /*baseBufferSize=*/params.getIntParam("cbbs"), 
+            /*maxClauseSize=*/params.hardMaxClauseLength(), 
+            /*maxLbdPartitionedSize=*/params.maxLbdPartitioningSize(),
+            /*baseBufferSize=*/params.clauseBufferBaseSize(), 
             /*numProducers=*/1
 	    ), _job(job) {}
 

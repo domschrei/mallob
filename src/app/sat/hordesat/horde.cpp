@@ -28,18 +28,19 @@
 
 using namespace SolvingStates;
 
-HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) : 
-			_params(params), _logger(std::move(loggingInterface)), _state(INITIALIZING) {
+HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&& loggingInterface) : 
+			_params(params), _config(config), _logger(std::move(loggingInterface)), _state(INITIALIZING) {
 	
-    int appRank = params.getIntParam("apprank");
+    int appRank = config.apprank;
 
-	_logger.log(V2_INFO, "Hlib engine on job %s\n", params.getParam("jobstr").c_str());
+	_logger.log(V2_INFO, "Hlib engine on job %s\n", config.getJobStr().c_str());
 	//params.printParams();
-	_num_solvers = params.getIntParam("threads", 1);
+	_num_solvers = config.threads;
+	_job_id = config.jobid;
 	
 	// Retrieve the string defining the cycle of solver choices, one character per solver
 	// e.g. "llgc" => lingeling lingeling glucose cadical lingeling lingeling glucose ...
-	std::string solverChoices = params.getParam("satsolver", "l");
+	std::string solverChoices = params.satSolverSequence();
 	
 	// These numbers become the diversifier indices of the solvers on this node
 	int numLgl = 0;
@@ -68,16 +69,16 @@ HordeLib::HordeLib(const Parameters& params, Logger&& loggingInterface) :
 	// Solver-agnostic options each solver in the portfolio will receive
 	SolverSetup setup;
 	setup.logger = &_logger;
-	setup.jobname = params.getParam("jobstr");
-	setup.isJobIncremental = params.isNotNull("incremental");
-	setup.useAdditionalDiversification = params.isNotNull("aod");
-	setup.hardInitialMaxLbd = params.getIntParam("ihlbd");
-	setup.hardFinalMaxLbd = params.getIntParam("fhlbd");
-	setup.softInitialMaxLbd = params.getIntParam("islbd");
-	setup.softFinalMaxLbd = params.getIntParam("fslbd");
-	setup.hardMaxClauseLength = params.getIntParam("hmcl");
-	setup.softMaxClauseLength = params.getIntParam("smcl");
-	setup.anticipatedLitsToImportPerCycle = params.getIntParam("mblpc");
+	setup.jobname = config.getJobStr();
+	setup.isJobIncremental = config.incremental;
+	setup.useAdditionalDiversification = params.addOldLglDiversifiers();
+	setup.hardInitialMaxLbd = params.initialHardLbdLimit();
+	setup.hardFinalMaxLbd = params.finalHardLbdLimit();
+	setup.softInitialMaxLbd = params.initialSoftLbdLimit();
+	setup.softFinalMaxLbd = params.finalSoftLbdLimit();
+	setup.hardMaxClauseLength = params.hardMaxClauseLength();
+	setup.softMaxClauseLength = params.softMaxClauseLength();
+	setup.anticipatedLitsToImportPerCycle = config.maxBroadcastedLitsPerCycle;
 	setup.hasPseudoincrementalSolvers = setup.isJobIncremental && hasPseudoincrementalSolvers;
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
@@ -150,7 +151,7 @@ void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size
 		if (revision == 0) {
 			// Initialize solver thread
 			_solver_threads.emplace_back(new SolverThread(
-				_params, _solver_interfaces[i], fSize, fLits, aSize, aLits, i
+				_params, _config, _solver_interfaces[i], fSize, fLits, aSize, aLits, i
 			));
 		} else {
 			if (_solver_interfaces[i]->getSolverSetup().doIncrementalSolving) {
@@ -164,7 +165,7 @@ void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size
 				// Setup new solver  and new solver thread
 				_solver_interfaces[i] = createSolver(_solver_interfaces[i]->getSolverSetup());
 				_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
-					_params, _solver_interfaces[i], 
+					_params, _config, _solver_interfaces[i], 
 					_revision_data[0].fSize, _revision_data[0].fLits, 
 					_revision_data[0].aSize, _revision_data[0].aLits, 
 					i
@@ -232,8 +233,8 @@ int HordeLib::prepareSharing(int* begin, int maxSize, Checksum& checksum) {
 	_logger.log(V5_DEBG, "collecting clauses on this node\n");
 	int size = _sharing_manager->prepareSharing(begin, maxSize);
 
-	if (_params.isNotNull("checksums")) {
-		checksum.combine(_params.getIntParam("jobid"));
+	if (_params.useChecksums()) {
+		checksum.combine(_job_id);
 		for (int i = 0; i < size; i++) checksum.combine(begin[i]);
 	}
 
@@ -243,9 +244,9 @@ int HordeLib::prepareSharing(int* begin, int maxSize, Checksum& checksum) {
 void HordeLib::digestSharing(std::vector<int>& result, const Checksum& checksum) {
 	if (isCleanedUp()) return;
 
-	if (_params.isNotNull("checksums")) {
+	if (_params.useChecksums()) {
 		Checksum chk;
-		chk.combine(_params.getIntParam("jobid"));
+		chk.combine(_job_id);
 		for (int lit : result) chk.combine(lit);
 		if (chk.get() != checksum.get()) {
 			_logger.log(V1_WARN, "[WARN] Checksum fail (expected count: %ld, actual count: %ld)\n", checksum.count(), chk.count());
@@ -259,9 +260,9 @@ void HordeLib::digestSharing(std::vector<int>& result, const Checksum& checksum)
 void HordeLib::digestSharing(int* begin, int size, const Checksum& checksum) {
 	if (isCleanedUp()) return;
 
-	if (_params.isNotNull("checksums")) {
+	if (_params.useChecksums()) {
 		Checksum chk;
-		chk.combine(_params.getIntParam("jobid"));
+		chk.combine(_job_id);
 		for (int i = 0; i < size; i++) chk.combine(begin[i]);
 		if (chk.get() != checksum.get()) {
 			_logger.log(V1_WARN, "[WARN] Checksum fail (expected count: %ld, actual count: %ld)\n", checksum.count(), chk.count());

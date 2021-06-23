@@ -63,17 +63,18 @@ int main(int argc, char *argv[]) {
     Parameters params;
     params.init(argc, argv);
 
-    bool quiet = /*quiet=*/params.isNotNull("q");
-    if (params.isNotNull("0o") && rank > 0) quiet = true;
-    std::string logdir = params.getParam("log");
-    Logger::init(rank, params.getIntParam("v"), params.isNotNull("colors"), 
-            quiet, /*cPrefix=*/params.isNotNull("mono"), params.isNotNull("nolog") ? nullptr : &logdir);
+    bool quiet = params.quiet();
+    if (params.zeroOnlyLogging() && rank > 0) quiet = true;
+    std::string logdir = params.logDirectory();
+    Logger::init(rank, params.verbosity(), params.coloredOutput(), 
+            quiet, /*cPrefix=*/params.monoFilename.isSet(), 
+            params.logToFiles() ? &logdir : nullptr);
 
     MyMpi::setOptions(params);
 
     if (rank == 0)
         params.printParams();
-    if (params.isSet("h") || params.isSet("help")) {
+    if (params.help()) {
         // Help requested or no job input provided
         if (rank == 0) {
             params.printUsage();
@@ -92,7 +93,7 @@ int main(int argc, char *argv[]) {
 
     // Find client ranks
     std::set<int> externalClientRanks;
-    int numClients = params.getIntParam("c");
+    int numClients = params.numClients();
     int numWorkers = numNodes - numClients;
     assert(numWorkers > 0 || log_return_false("Need at least one worker node!\n"));
     for (int i = 1; i <= numClients; i++)

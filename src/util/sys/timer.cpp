@@ -11,7 +11,7 @@ double Timer::now() {
 }
 
 void Timer::init(double start) {
-    startTime = start == -1 ? now() : start;
+    startTime = start == -1 ? now() : now()-start;
 }
 
 /**
@@ -22,7 +22,7 @@ float Timer::elapsedSeconds() {
 }
 
 bool Timer::globalTimelimReached(Parameters& params) {
-    return params.getFloatParam("T") > 0 && elapsedSeconds() > params.getFloatParam("T");
+    return params.timeLimit() > 0 && elapsedSeconds() > params.timeLimit();
 }
 
 double Timer::getStartTime() {

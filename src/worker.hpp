@@ -48,7 +48,7 @@ public:
         _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), _client_nodes(_client_nodes), 
         _params(params), _job_db(_params, _comm), _sys_state(_comm)
         {
-            _global_timeout = _params.getFloatParam("T");
+            _global_timeout = _params.timeLimit();
         }
 
     ~Worker();

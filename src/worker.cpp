@@ -29,7 +29,7 @@
 void Worker::init() {
     
     // Initialize pseudo-random order of nodes
-    if (_params.isNotNull("derandomize")) {
+    if (_params.derandomize()) {
         createExpanderGraph();
     }
 
@@ -95,7 +95,7 @@ void Worker::init() {
     MyMpi::beginListening();
 
     // Send warm-up messages with your pseudorandom bounce destinations
-    if (_params.isNotNull("derandomize") && _params.isNotNull("warmup")) {
+    if (_params.derandomize() && _params.warmup()) {
         IntVec payload({1, 2, 3, 4, 5, 6, 7, 8});
         int numRuns = 5;
         for (int run = 0; run < numRuns; run++) {
@@ -113,9 +113,9 @@ void Worker::init() {
     if (!MyMpi::_monitor_off) _mpi_monitor_thread = std::thread(mpiMonitor);
     
     // Initiate single instance solving as the "root node"
-    if (_params.isNotNull("mono") && _world_rank == 0) {
+    if (_params.monoFilename.isSet() && _world_rank == 0) {
 
-        std::string instanceFilename = _params.getParam("mono");
+        std::string instanceFilename = _params.monoFilename();
         log(V2_INFO, "Initiate solving of mono instance \"%s\"\n", instanceFilename.c_str());
 
         // Create job description with formula
@@ -148,12 +148,12 @@ void Worker::mainProgram() {
     float lastBalanceCheckTime = lastMemCheckTime;
     float lastMaintenanceCheckTime = lastMemCheckTime;
 
-    float sleepMicrosecs = _params.getFloatParam("sleep");
+    float sleepMicrosecs = _params.sleepMicrosecs();
     float jobCheckPeriod = 0.01;
     float balanceCheckPeriod = 0.01;
     float maintenanceCheckPeriod = 1.0;
     float memCheckPeriod = 3.0;
-    bool doYield = _params.isNotNull("yield");
+    bool doYield = _params.yield();
 
     Watchdog watchdog(/*checkIntervMillis=*/200, lastMemCheckTime);
     watchdog.setWarningPeriod(100); // warn after 0.1s without a reset
@@ -294,7 +294,7 @@ void Worker::handleNotifyJobAborting(MessageHandle& handle) {
 
     interruptJob(jobId, /*terminate=*/true, /*reckless=*/true);
     
-    if (!_params.isNotNull("mono") && _job_db.get(jobId).getJobTree().isRoot()) {
+    if (!_params.monoFilename.isSet() && _job_db.get(jobId).getJobTree().isRoot()) {
         // Forward information on aborted job to client
         MyMpi::isend(MPI_COMM_WORLD, _job_db.get(jobId).getJobTree().getParentNodeRank(), 
             MSG_NOTIFY_JOB_ABORTING, handle.getRecvData());
@@ -379,7 +379,7 @@ void Worker::handleRejectOneshot(MessageHandle& handle) {
     job.getJobTree().addFailToDormantChild(handle.source);
 
     bool doNormalHopping = false;
-    if (req.numHops > std::max(_params.getIntParam("jc"), 2)) {
+    if (req.numHops > std::max(_params.jobCacheSize(), 2)) {
         // Oneshot node finding exceeded
         doNormalHopping = true;
     } else {
@@ -679,9 +679,9 @@ void Worker::handleSendJobResult(MessageHandle& handle) {
         }
         modelString << "0\n";
     }
-    if (_params.isNotNull("s2f")) {
+    if (_params.solutionToFile.isSet()) {
         std::ofstream file;
-        file.open(_params.getParam("s2f"));
+        file.open(_params.solutionToFile());
         if (!file.is_open()) {
             log(V0_CRIT, "ERROR: Could not open solution file\n");
         } else {
@@ -693,7 +693,7 @@ void Worker::handleSendJobResult(MessageHandle& handle) {
         log(LOG_NO_PREFIX | V0_CRIT, modelString.str().c_str());
     }
 
-    if (_params.isNotNull("mono")) {
+    if (_params.monoFilename.isSet()) {
         // Single instance solving is done: begin exit signal
         MyMpi::isend(MPI_COMM_WORLD, 0, MSG_DO_EXIT, IntVec({0}));
     }
@@ -737,7 +737,7 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
         if (nextNodeRank == -1) {
             // If unsucessful, pick a random node
             tag = MSG_REQUEST_NODE;
-            if (_params.isNotNull("derandomize")) {
+            if (_params.derandomize()) {
                 nextNodeRank = Random::choice(_hop_destinations);
             } else {
                 nextNodeRank = getRandomNonSelfWorkerNode();
@@ -813,7 +813,7 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
     }
 
     int nextRank;
-    if (_params.isNotNull("derandomize")) {
+    if (_params.derandomize()) {
         // Get random choice from bounce alternatives
         nextRank = Random::choice(_hop_destinations);
         if (_hop_destinations.size() > 2) {
@@ -864,7 +864,7 @@ void Worker::updateVolume(int jobId, int volume) {
     IntPair payload(jobId, volume);
 
     // Mono instance mode: Set job tree permutation to identity
-    bool mono = _params.isNotNull("mono");
+    bool mono = _params.monoFilename.isSet();
 
     // For each potential child (left, right):
     std::set<int> dormantChildren = job.getJobTree().getDormantChildren();
@@ -961,7 +961,7 @@ void Worker::timeoutJob(int jobId) {
     handle.finished = true;
     handle.receiveSelfMessage(payload.serialize(), _world_rank);
     handleNotifyJobAborting(handle);
-    if (_params.isNotNull("mono")) {
+    if (_params.monoFilename.isSet()) {
         // Single job hit a limit, so there is no solution to be reported:
         // begin to propagate exit signal
         MyMpi::isend(MPI_COMM_WORLD, 0, MSG_DO_EXIT, IntVec({0}));
@@ -1001,7 +1001,7 @@ bool Worker::checkTerminate(float time) {
 void Worker::createExpanderGraph() {
 
     // Pick fixed number k of bounce destinations
-    int numBounceAlternatives = _params.getIntParam("ba");
+    int numBounceAlternatives = _params.numBounceAlternatives();
     int numWorkers = MyMpi::size(_comm);
     if (numWorkers == 1) return; // no hops
 
@@ -1051,7 +1051,7 @@ Worker::~Worker() {
 
     log(V4_VVER, "Destruct worker\n");
 
-    if (_params.isNotNull("mono") && _params.getParam("appmode") != "fork") {
+    if (_params.monoFilename.isSet() && _params.applicationSpawnMode() != "fork") {
         // Terminate directly without destructing resident job
         MPI_Finalize();
         Process::doExit(0);

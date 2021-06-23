@@ -13,17 +13,17 @@
 #include "util/logger.hpp"
 #include "comm/mympi.hpp"
 
-HordeProcessAdapter::HordeProcessAdapter(const Parameters& params, 
+HordeProcessAdapter::HordeProcessAdapter(const Parameters& params, HordeConfig&& config,
     size_t fSize, const int* fLits, size_t aSize, const int* aLits) :    
         _params(params), _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits) {
 
-    initSharedMemory();
+    initSharedMemory(std::move(config));
 }
 
-void HordeProcessAdapter::initSharedMemory() {
+void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
 
     // Initialize "management" shared memory
-    _shmem_id = "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + "." + _params["mpirank"] + ".#" + _params["jobid"];
+    _shmem_id = "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + "." + std::to_string(config.mpirank) + ".#" + std::to_string(config.jobid);
     //log(V4_VVER, "Setup base shmem: %s\n", _shmem_id.c_str());
     void* mainShmem = SharedMemory::create(_shmem_id, sizeof(HordeSharedMemory));
     _shmem.insert(ShmemObject{_shmem_id, mainShmem, sizeof(HordeSharedMemory)});
@@ -48,20 +48,20 @@ void HordeProcessAdapter::initSharedMemory() {
     _hsm->exportBufferTrueSize = 0;
     _hsm->fSize = _f_size;
     _hsm->aSize = _a_size;
-    _hsm->revision = _params.getIntParam("firstrev");
+    _hsm->revision = config.firstrev;
 
     createSharedMemoryBlock("formulae.0", sizeof(int) * _f_size, (void*)_f_lits);
     createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
     _export_buffer = (int*) createSharedMemoryBlock("clauseexport", 
-            _params.getIntParam("cbbs") * sizeof(int), nullptr);
-    int inputBufferSize = sizeof(int) * _params.getIntParam("chaf") * MyMpi::getBinaryTreeBufferLimit(
-        _params.getIntParam("mpisize"), 
-        _params.getIntParam("cbbs"), 
-        _params.getFloatParam("cbdf"), 
+            _params.clauseBufferBaseSize() * sizeof(int), nullptr);
+    int inputBufferSize = sizeof(int) * _params.clauseHistoryAggregationFactor() * MyMpi::getBinaryTreeBufferLimit(
+        config.mpisize, _params.clauseBufferBaseSize(), _params.clauseBufferDiscountFactor(), 
         MyMpi::ALL
     ) + 1024;
     _import_buffer = (int*) createSharedMemoryBlock("clauseimport", 
             inputBufferSize, nullptr);
+    
+    _hsm->config = std::move(config);
 }
 
 HordeProcessAdapter::~HordeProcessAdapter() {

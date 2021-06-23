@@ -117,7 +117,7 @@ bool EventDrivenBalancer::reduceIfApplicable(int which) {
     // Have anything to reduce?
     if (_diffs.isEmpty()) return false;
     // Enough time passed since last balancing?
-    if (Timer::elapsedSeconds() - _last_balancing < _params.getFloatParam("p")) return false;
+    if (Timer::elapsedSeconds() - _last_balancing < _params.balancingPeriod()) return false;
 
     if (which == BOTH) log(V4_VVER, "Initiate balancing (%i diffs)\n", _diffs.getEntries().size());
 
@@ -421,17 +421,17 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
 
     // 4. Round job assignments
     robin_hood::unordered_map<int, int> allVolumes;
-    if (_params.getParam("r") == ROUNDING_FLOOR) {
+    if (_params.balanceRoundingMode() == ROUNDING_FLOOR) {
         // Round by flooring
         for (const auto& entry : _states.getEntries()) {
             allVolumes[entry.first] = std::floor(assignments[entry.first]);
         }
-    } else if (_params.getParam("r") == ROUNDING_PROBABILISTIC) {
+    } else if (_params.balanceRoundingMode() == ROUNDING_PROBABILISTIC) {
         // Round probabilistically
         for (const auto& entry : _states.getEntries()) {
             allVolumes[entry.first] = Random::roundProbabilistically(assignments[entry.first]);
         }
-    } else if (_params.getParam("r") == ROUNDING_BISECTION) {
+    } else if (_params.balanceRoundingMode() == ROUNDING_BISECTION) {
 
         // Calculate optimal rounding by bisection
 

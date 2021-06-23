@@ -15,14 +15,14 @@
 
 JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm): 
         _params(params), _comm(comm) {
-    _wcsecs_per_instance = params.getFloatParam("job-wallclock-limit");
-    _cpusecs_per_instance = params.getFloatParam("job-cpu-limit");
+    _wcsecs_per_instance = params.jobWallclockLimit();
+    _cpusecs_per_instance = params.jobCpuLimit();
     _load = 0;
     _last_balancing_initiation = 0;
     _current_job = NULL;
-    _load_factor = params.getFloatParam("l");
+    _load_factor = params.loadFactor();
     assert(0 < _load_factor && _load_factor <= 1.0);
-    _balance_period = params.getFloatParam("p");       
+    _balance_period = params.balancingPeriod();       
 
     // Initialize balancer
     _balancer = std::unique_ptr<Balancer>(new EventDrivenBalancer(comm, params));
@@ -49,7 +49,7 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm):
 
 Job& JobDatabase::createJob(int commSize, int worldRank, int jobId) {
 
-    if (_params.getParam("appmode") == "fork") {
+    if (_params.applicationSpawnMode() == "fork") {
         _jobs[jobId] = new ForkedSatJob(_params, commSize, worldRank, jobId);
     } else {
         _jobs[jobId] = new ThreadedSatJob(_params, commSize, worldRank, jobId);
@@ -144,7 +144,7 @@ bool JobDatabase::isRequestObsolete(const JobRequest& req) {
         }
     }
     
-    float maxAge = _params.getFloatParam("rto"); // request time out
+    float maxAge = _params.requestTimeout(); // request time out
     if (maxAge > 0) {
         //float timelim = 0.25 + 2 * params.getFloatParam("p");
         return Timer::elapsedSeconds() - req.timeOfBirth >= maxAge; 
@@ -331,7 +331,7 @@ void JobDatabase::stop(int jobId, bool terminate) {
 void JobDatabase::forgetOldJobs() {
 
     std::vector<int> jobsToForget;
-    int jobCacheSize = _params.getIntParam("jc");
+    int jobCacheSize = _params.jobCacheSize();
     size_t numJobsWithDescription = 0;
 
     // Scan jobs for being forgettable

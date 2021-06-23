@@ -24,8 +24,8 @@
 #define MALLOB_VERSION "(dbg)"
 #endif
 
-Logger getLog(const Parameters& params) {
-    return Logger::getMainInstance().copy("<" + params.getParam("jobstr") + ">", "#" + params.getParam("jobid") + ".");
+Logger getLog(const Parameters& params, const HordeConfig& config) {
+    return Logger::getMainInstance().copy("<" + config.getJobStr() + ">", "#" + std::to_string(config.jobid) + ".");
 }
 
 void* accessMemory(const Logger& log, const std::string& shmemId, size_t size) {
@@ -66,28 +66,28 @@ void importRevision(const Logger& log, HordeLib& hlib, const std::string& shmemI
     hlib.appendRevision(revision, *fSizePtr, fPtr, *aSizePtr, aPtr);
 }
 
-void runSolverEngine(const Logger& log, const Parameters& programParams) {
+void runSolverEngine(const Logger& log, const Parameters& programParams, HordeConfig& config) {
     
     // Set up "management" block of shared memory created by the parent
-    std::string shmemId = "/edu.kit.iti.mallob." + std::to_string(Proc::getParentPid()) + "." + programParams.getParam("mpirank") + ".#" + programParams.getParam("jobid");
+    std::string shmemId = "/edu.kit.iti.mallob." + std::to_string(Proc::getParentPid()) + "." + std::to_string(config.mpirank) + ".#" + std::to_string(config.jobid);
     log.log(V4_VVER, "Access base shmem: %s\n", shmemId.c_str());
     HordeSharedMemory* hsm = (HordeSharedMemory*) accessMemory(log, shmemId, sizeof(HordeSharedMemory));
 
     // Read formulae and assumptions from other individual blocks of shared memory
 
     // Set up export and import buffers for clause exchanges
-    int maxExportBufferSize = programParams.getIntParam("cbbs") * sizeof(int);
+    int maxExportBufferSize = programParams.clauseBufferBaseSize() * sizeof(int);
     int* exportBuffer = (int*) accessMemory(log, shmemId + ".clauseexport", maxExportBufferSize);
-    int maxImportBufferSize = programParams.getIntParam("cbbs") * sizeof(int) * programParams.getIntParam("mpisize");
+    int maxImportBufferSize = programParams.clauseBufferBaseSize() * sizeof(int) * config.mpisize;
     int* importBuffer = (int*) accessMemory(log, shmemId + ".clauseimport", maxImportBufferSize);
 
     // Signal initialization to parent
     hsm->isSpawned = true;
     
-    Checksum* checksum = programParams.isNotNull("checksums") ? new Checksum() : nullptr;
+    Checksum* checksum = programParams.useChecksums() ? new Checksum() : nullptr;
 
     // Prepare solver
-    HordeLib hlib(programParams, log.copy("H", "H"));
+    HordeLib hlib(programParams, config, log.copy("H", "H"));
     // Import first revision
     {
         int* fPtr = (int*) accessMemory(log, shmemId + ".formulae.0", sizeof(int) * hsm->fSize);
@@ -203,7 +203,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams) {
         if (resultCode >= 0) {
             // Solution found!
             auto& result = hlib.getResult();
-            result.id = programParams.getIntParam("jobid");
+            result.id = config.jobid;
             assert(result.revision == lastImportedRevision);
             if (hsm->doTerminate || (hsm->doStartNextRevision && !hsm->didStartNextRevision)) {
                 // Result obsolete: there is already another revision
@@ -242,28 +242,32 @@ int main(int argc, char *argv[]) {
     
     Parameters params;
     params.init(argc, argv);
-    
-    Timer::init(params.getDoubleParam("starttime"));
+    HordeConfig config(params.hordeConfig());
 
-    int rankOfParent = params.getIntParam("mpirank");
+    Timer::init(config.starttime);
 
-    Random::init(params.getIntParam("mpisize"), rankOfParent);
+    int rankOfParent = config.mpirank;
+
+    Random::init(config.mpisize, rankOfParent);
 
     // Initialize signal handlers
     Process::init(rankOfParent, /*leafProcess=*/true);
 
-    std::string logdir = params.getParam("log");
-    Logger::init(rankOfParent, params.getIntParam("v"), params.isNotNull("colors"), 
-            /*quiet=*/params.isNotNull("q"), /*cPrefix=*/params.isNotNull("mono"),
-            params.isNotNull("nolog") ? nullptr : &logdir);
+    std::string logdir = params.logDirectory();
+    Logger::init(rankOfParent, params.verbosity(), params.coloredOutput(), 
+            params.quiet(), /*cPrefix=*/params.monoFilename.isSet(),
+            params.logToFiles() ? &logdir : nullptr);
     
-    auto log = getLog(params);
+    auto log = getLog(params, config);
     pid_t pid = Proc::getPid();
     log.log(V3_VERB, "mallob SAT engine %s pid=%lu\n", MALLOB_VERSION, pid);
+    if (params.verbosity() >= V5_DEBG) {
+        params.printParams();
+    }
 
     try {
         // Launch program
-        runSolverEngine(log, params);
+        runSolverEngine(log, params, config);
 
     } catch (const std::exception &ex) {
         log.log(V0_CRIT, "Unexpected ERROR: \"%s\" - aborting\n", ex.what());

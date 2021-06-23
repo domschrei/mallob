@@ -13,7 +13,7 @@
 #include "horde_config.hpp"
 
 ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId) : 
-        BaseSatJob(params, commSize, worldRank, jobId), _job_comm_period(params.getFloatParam("s")) {
+        BaseSatJob(params, commSize, worldRank, jobId), _job_comm_period(params.appCommPeriod()) {
 }
 
 void ForkedSatJob::appl_start() {
@@ -21,20 +21,22 @@ void ForkedSatJob::appl_start() {
     assert(!_initialized);
     assert(!_init_thread.joinable());
 
+    HordeConfig config(_params, *this);
     Parameters hParams(_params);
-    HordeConfig::applyDefault(hParams, *this);
+    hParams.hordeConfig.set(config.toString());
+    if (_params.verbosity() >= V5_DEBG) hParams.printParams();
 
     const JobDescription& desc = getDescription();
     log(V4_VVER, "%s : rev. %i\n", toStr(), desc.getRevision());
 
-    _solver.reset(new HordeProcessAdapter(hParams,
+    _solver.reset(new HordeProcessAdapter(hParams, std::move(config),
         desc.getFormulaPayloadSize(0), 
         desc.getFormulaPayload(0), 
         desc.getAssumptionsSize(0),
         desc.getAssumptionsPayload(0)
     ));
     loadIncrements();
-    _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
+    _clause_comm = (void*) new AnytimeSatClauseCommunicator(_params, this);
 
     //log(V5_DEBG, "%s : beginning to solve\n", toStr());
     _solver_pid = _solver->run();

@@ -152,22 +152,22 @@ size_t MyMpi::getBinaryTreeBufferLimit(int numWorkers, int baseSize, float disco
 }
 
 void MyMpi::setOptions(const Parameters& params) {
-    _monitor_off = !params.isNotNull("mmpi");
+    _monitor_off = !params.monitorMpi();
     int verb = MyMpi::rank(MPI_COMM_WORLD) == 0 ? V2_INFO : V4_VVER;
-    if (params.isNotNull("delaymonkey")) {
+    if (params.delayMonkey()) {
         log(verb, "Enabling delay monkey\n");
         _monkey_flags |= MONKEY_DELAY;
     }
-    if (params.isNotNull("latencymonkey")) {
+    if (params.latencyMonkey()) {
         log(verb, "Enabling latency monkey\n");
         _monkey_flags |= MONKEY_LATENCY;
     }
-    _max_msg_length = sizeof(int) * MyMpi::size(MPI_COMM_WORLD) * params.getIntParam("cbbs") + 1024;
+    _max_msg_length = sizeof(int) * MyMpi::size(MPI_COMM_WORLD) * params.clauseBufferBaseSize() + 1024;
     _max_msg_length = std::max((size_t)_max_msg_length, 
-        sizeof(int) * params.getIntParam("chaf") * getBinaryTreeBufferLimit(
+        sizeof(int) * params.clauseHistoryAggregationFactor() * getBinaryTreeBufferLimit(
             MyMpi::size(MPI_COMM_WORLD), 
-            params.getIntParam("cbbs"), 
-            params.getFloatParam("cbdf"), 
+            params.clauseBufferBaseSize(), 
+            params.clauseBufferDiscountFactor(), 
             ALL
         ) + 1024
     );

@@ -9,7 +9,7 @@
 
 using namespace SolvingStates;
 
-SolverThread::SolverThread(const Parameters& params,
+SolverThread::SolverThread(const Parameters& params, const HordeConfig& config,
          std::shared_ptr<PortfolioSolverInterface> solver, 
         size_t fSize, const int* fLits, size_t aSize, const int* aLits,
         int localId) : 
@@ -17,8 +17,9 @@ SolverThread::SolverThread(const Parameters& params,
     _logger(_solver.getLogger()), _shuffler(fSize, fLits), _local_id(localId), 
     _has_pseudoincremental_solvers(solver->getSolverSetup().hasPseudoincrementalSolvers) {
     
-    _portfolio_rank = _params.getIntParam("apprank", 0);
-    _portfolio_size = _params.getIntParam("mpisize", 1);
+    _portfolio_rank = config.apprank;
+    _portfolio_size = config.mpisize;
+    _local_solvers_count = config.threads;
 
     appendRevision(0, fSize, fLits, aSize, aLits);
     _result.result = UNKNOWN;
@@ -34,34 +35,10 @@ void SolverThread::start() {
 void SolverThread::init() {
     _tid = Proc::getTid();
     _logger.log(V5_DEBG, "tid %ld\n", _tid);
-    if (_params.isNotNull("pin")) pin();
     _initialized = true;
     
     _active_revision = 0;
     _imported_lits_curr_revision = 0;
-}
-
-void SolverThread::pin() {
-    
-    int solversCount = _params.getIntParam("threads", 1);
-	static int lastCpu = 0;
-	int numCores = sysconf(_SC_NPROCESSORS_ONLN);
-	int localRank = 0;
-	const char* lranks = getenv("OMPI_COMM_WORLD_LOCAL_RANK");
-	if (lranks == NULL) {
-		_logger.log(V2_INFO, "WARNING: local rank was not determined\n");
-	} else {
-		localRank = atoi(lranks);
-	}
-	int desiredCpu = lastCpu + localRank*solversCount;
-	lastCpu++;
-	_logger.log(V2_INFO, "Pinning thread to proc %d of %d, local rank is %d\n",
-			desiredCpu, numCores, localRank);
-
-	cpu_set_t cpuSet;
-	CPU_ZERO(&cpuSet);
-	CPU_SET(desiredCpu, &cpuSet);
-	sched_setaffinity(0, sizeof(cpuSet), &cpuSet);
 }
 
 void* SolverThread::run() {
@@ -249,7 +226,7 @@ void SolverThread::diversifyInitially() {
 
 void SolverThread::diversifyAfterReading() {
 	if (_solver.getGlobalId() >= _solver.getNumOriginalDiversifications()) {
-        int solversCount = _params.getIntParam("threads", 1);
+        int solversCount = _local_solvers_count;
         int totalSolvers = solversCount * _portfolio_size;
         int vars = _solver.getVariablesCount();
 

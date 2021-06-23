@@ -151,7 +151,7 @@ void Client::handleNewJob(JobMetadata&& data) {
 
 void Client::init() {
 
-    int internalRank = MyMpi::rank(_comm) + _params.getIntParam("fapii");
+    int internalRank = MyMpi::rank(_comm) + _params.firstApiIndex();
 
     _file_adapter = std::unique_ptr<JobFileAdapter>(
         new JobFileAdapter(internalRank, _params, 
@@ -276,7 +276,7 @@ void Client::mainProgram() {
                         (int)result[SYSSTATE_PARSED_JOBS], 
                         (int)result[SYSSTATE_SCHEDULED_JOBS], 
                         processed);
-            int jobLimit = _params.getIntParam("J");
+            int jobLimit = _params.numJobs();
             if (jobLimit > 0 && processed >= jobLimit) {
                 log(V2_INFO, "Job limit reached.\n");
                 // Job limit reached - exit
@@ -295,8 +295,7 @@ void Client::mainProgram() {
 }
 
 int Client::getMaxNumParallelJobs() {
-    std::string query = "lbc" + std::to_string(MyMpi::rank(_comm));
-    return _params.getIntParam(query.c_str());
+    return _params.activeJobsPerClient();
 }
 
 void Client::introduceNextJob() {
@@ -402,7 +401,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     log(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId, resultCode == RESULT_SAT ? "SAT" : "UNSAT", revision);
 
     // Write full solution to file, if desired
-    std::string baseFilename = _params.getParam("s2f");
+    std::string baseFilename = _params.solutionToFile();
     if (!baseFilename.empty()) {
         std::string filename = baseFilename + "_" + std::to_string(jobId) + "." + std::to_string(revision);
         std::ofstream file;

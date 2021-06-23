@@ -16,12 +16,12 @@ Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
             _time_of_arrival(Timer::elapsedSeconds()), 
             _state(INACTIVE),
             _job_tree(commSize, worldRank, jobId), 
-            _comm(_id, _job_tree, params.getFloatParam("jcup")) {
+            _comm(_id, _job_tree, params.jobCommUpdatePeriod()) {
     
-    _growth_period = _params.getFloatParam("g");
-    _continuous_growth = _params.isNotNull("cg");
-    _max_demand = _params.getIntParam("md");
-    _threads_per_job = _params.getIntParam("t");
+    _growth_period = _params.growthPeriod();
+    _continuous_growth = _params.continuousGrowth();
+    _max_demand = _params.maxDemand();
+    _threads_per_job = _params.numThreadsPerProcess();
 }
 
 void Job::updateJobTree(int index, int rootRank, int parentRank) {
@@ -61,11 +61,11 @@ void Job::start(const std::shared_ptr<std::vector<uint8_t>>& data) {
             : std::min(_max_demand, _description.getMaxDemand()); // both limits defined
     }
     
-    if (_params.getIntParam("slpp") > 0 && 
-            _threads_per_job * _description.getNumFormulaLiterals() > (size_t)_params.getIntParam("slpp")) {
+    if (_params.sizeLimitPerProcess() > 0 && 
+            _threads_per_job * _description.getNumFormulaLiterals() > (size_t)_params.sizeLimitPerProcess()) {
         
         // Solver literal threshold exceeded: reduce number of solvers for this job
-        int optNumThreads = std::floor((float)_params.getIntParam("slpp") / _description.getNumFormulaLiterals());
+        int optNumThreads = std::floor((float)_params.sizeLimitPerProcess() / _description.getNumFormulaLiterals());
         _threads_per_job = std::max(1, optNumThreads);
         log(V2_INFO, "%s : literal threshold exceeded - cut down #threads to %i\n", toStr(), _threads_per_job);
     }

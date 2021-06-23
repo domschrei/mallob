@@ -23,13 +23,16 @@
 #include "util/params.hpp"
 #include "data/checksum.hpp"
 #include "data/job_result.hpp"
+#include "app/sat/horde_config.hpp"
 
 class HordeLib {
 
 private:
 
 	Parameters _params;
+	HordeConfig _config;
 	Logger _logger;
+	int _job_id;
 	
 	size_t _num_solvers;
 	
@@ -54,7 +57,7 @@ private:
 
 public:
 
-    HordeLib(const Parameters& params, Logger&& loggingInterface);
+    HordeLib(const Parameters& params, const HordeConfig& config, Logger&& loggingInterface);
 	~HordeLib();
 
     void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits);
