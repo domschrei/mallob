@@ -56,7 +56,6 @@ private:
 
     int* _export_buffer;
     int* _import_buffer;
-    int _max_import_buffer_bytes;
 
     pid_t _child_pid;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;

@@ -76,10 +76,14 @@ void runSolverEngine(const Logger& log, const Parameters& programParams, HordeCo
     // Read formulae and assumptions from other individual blocks of shared memory
 
     // Set up export and import buffers for clause exchanges
-    int maxExportBufferSize = programParams.clauseBufferBaseSize() * sizeof(int);
-    int* exportBuffer = (int*) accessMemory(log, shmemId + ".clauseexport", maxExportBufferSize);
-    int maxImportBufferSize = programParams.clauseBufferBaseSize() * sizeof(int) * config.mpisize;
-    int* importBuffer = (int*) accessMemory(log, shmemId + ".clauseimport", maxImportBufferSize);
+    int* exportBuffer;
+    int* importBuffer;
+    {
+        int maxExportBufferSize = programParams.clauseBufferBaseSize() * sizeof(int);
+        exportBuffer = (int*) accessMemory(log, shmemId + ".clauseexport", maxExportBufferSize);
+        int maxImportBufferSize = hsm->importBufferMaxSize * sizeof(int);
+        importBuffer = (int*) accessMemory(log, shmemId + ".clauseimport", maxImportBufferSize);
+    }
 
     // Signal initialization to parent
     hsm->isSpawned = true;
@@ -183,6 +187,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams, HordeCo
         if (hsm->doImport && !hsm->didImport) {
             log.log(V5_DEBG, "DO import clauses\n");
             // Write imported clauses from shared memory into vector
+            assert(hsm->importBufferSize <= hsm->importBufferMaxSize);
             hlib.digestSharing(importBuffer, hsm->importBufferSize, hsm->importChecksum);
             hsm->didImport = true;
         }
