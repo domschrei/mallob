@@ -54,12 +54,12 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
     createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
     _export_buffer = (int*) createSharedMemoryBlock("clauseexport", 
             _params.clauseBufferBaseSize() * sizeof(int), nullptr);
-    int inputBufferSize = sizeof(int) * _params.clauseHistoryAggregationFactor() * MyMpi::getBinaryTreeBufferLimit(
+    _max_import_buffer_bytes = sizeof(int) * _params.clauseHistoryAggregationFactor() * MyMpi::getBinaryTreeBufferLimit(
         config.mpisize, _params.clauseBufferBaseSize(), _params.clauseBufferDiscountFactor(), 
         MyMpi::ALL
     ) + 1024;
     _import_buffer = (int*) createSharedMemoryBlock("clauseimport", 
-            inputBufferSize, nullptr);
+            _max_import_buffer_bytes, nullptr);
     
     _hsm->config = std::move(config);
 }
@@ -188,7 +188,7 @@ std::vector<int> HordeProcessAdapter::getCollectedClauses(Checksum& checksum) {
 }
 
 void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses, const Checksum& checksum) {
-    if (_hsm->doImport && !_hsm->didImport) {
+    if (_hsm->doImport) {
         // Cannot import right now -- defer into temporary storage 
         _temp_clause_buffers.emplace_back(clauses, checksum);
         return;
@@ -199,6 +199,7 @@ void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses, const C
 void HordeProcessAdapter::doDigest(const std::vector<int>& clauses, const Checksum& checksum) {
     _hsm->importChecksum = checksum;
     _hsm->importBufferSize = clauses.size();
+    assert(_hsm->importBufferSize <= _max_import_buffer_bytes);
     memcpy(_import_buffer, clauses.data(), clauses.size()*sizeof(int));
     _hsm->doImport = true;
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
