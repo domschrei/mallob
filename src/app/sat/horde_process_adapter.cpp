@@ -71,7 +71,7 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
 
         _hsm->doBegin = true;
 
-        while (!_hsm->doTerminate) {
+        while (!_do_terminate) {
             usleep(1000*10);
             RevisionData revData;
             {
@@ -93,14 +93,16 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
 }
 
 HordeProcessAdapter::~HordeProcessAdapter() {
-    _hsm->doTerminate = true;
-    if (_concurrent_shmem_allocator.joinable())
-        _concurrent_shmem_allocator.join();
     freeSharedMemory();
 }
 
 void HordeProcessAdapter::freeSharedMemory() {
     if (_hsm != nullptr) {
+        
+        _do_terminate = true;
+        if (_concurrent_shmem_allocator.joinable())
+            _concurrent_shmem_allocator.join();
+        
         for (int rev = 0; rev <= _hsm->revision; rev++) {
             size_t* solSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));
             if (solSize != nullptr) {

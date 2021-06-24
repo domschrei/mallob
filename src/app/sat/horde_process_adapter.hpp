@@ -53,6 +53,7 @@ private:
     robin_hood::unordered_flat_set<ShmemObject, ShmemObjectHasher> _shmem;
     std::string _shmem_id;
     HordeSharedMemory* _hsm = nullptr;
+    bool _do_terminate = false;
 
     int* _export_buffer;
     int* _import_buffer;
