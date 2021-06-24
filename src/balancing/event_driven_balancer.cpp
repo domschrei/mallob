@@ -467,7 +467,8 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
             }
 
             // Store result, if it is the best one so far
-            float p = Rounding::penalty((float)utilization / MyMpi::size(_comm), _load_factor);
+            float p = utilization > MyMpi::size(_comm) * _load_factor ? 1 : 
+                Rounding::penalty((float)utilization / MyMpi::size(_comm), _load_factor);
             if (bestRemainderIdx == -1 || p < bestPenalty) {
                 bestPenalty = p;
                 bestRemainderIdx = idx;
