@@ -93,6 +93,7 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
 }
 
 HordeProcessAdapter::~HordeProcessAdapter() {
+    _hsm->doTerminate = true;
     if (_concurrent_shmem_allocator.joinable())
         _concurrent_shmem_allocator.join();
     freeSharedMemory();
