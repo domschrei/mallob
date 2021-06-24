@@ -91,7 +91,7 @@ public:
             log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Send batch of index %i", subscription.correspondingRank, _job.toStr(), subscription.nextIndex);
 
             subscription.nextIndex++;
-            if (subscription.nextIndex == subscription.endIndex) {
+            if (subscription.nextIndex >= subscription.endIndex) {
                 // Erase completed subscription
                 log(V4_VVER, "CLSHIST %s Subscription [%i] finished\n", _job.toStr(), subscription.correspondingRank);    
                 subscribersToDelete.push_back(rank);
