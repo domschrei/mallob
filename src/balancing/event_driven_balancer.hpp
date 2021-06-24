@@ -162,6 +162,7 @@ public:
         for (const auto& entry : otherMap.getEntries()) {
             change |= insertIfNovel(entry.second);
         }
+        change |= otherMap._global_epoch > _global_epoch;
         _global_epoch = std::max(_global_epoch, otherMap._global_epoch);
         return change;
     }

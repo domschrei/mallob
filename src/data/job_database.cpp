@@ -245,7 +245,6 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, bool on
         return REJECT;
     }
 
-
     // Node is idle and not committed to another job
     if (isIdle()) {
         if (!oneshot) return ADOPT_FROM_IDLE;
@@ -255,10 +254,9 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, bool on
                 ? ADOPT_FROM_IDLE : REJECT);
     }
 
-    // Request for a root node which either exceeded a large number of hops
-    // or which already resides on this node as a dormant root:
+    // Request for a root node:
     // Possibly adopt the job while dismissing the active job
-    if (req.requestedNodeIndex == 0 && (req.numHops >= 32 || isThisDormantRoot)) {
+    if (req.requestedNodeIndex == 0) {
 
         // Adoption only works if this node does not yet compute for that job
         if (!has(req.jobId) || get(req.jobId).getState() != ACTIVE) {
