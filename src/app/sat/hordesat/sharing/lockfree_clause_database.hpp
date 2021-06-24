@@ -85,14 +85,14 @@ public:
                 _remaining_cls_of_bucket = _buffer[_current_pos++];
             }
 
+            if (_current_pos >= _size) return cls;
             bool partitionedByLbd = _bucket.size <= _max_lbd_partitioned_size;
-
-            assert(_current_pos < _size);
             assert(_buffer[_current_pos] != 0);
 
             // Get start and stop index of next clause
             int start = _current_pos;
             int stop = start + _bucket.size;
+            if (stop+(partitionedByLbd ? 0 : 1) > _size) return cls;
 
             hash_combine(_hash, ClauseHasher::hash(
                 _buffer+start,

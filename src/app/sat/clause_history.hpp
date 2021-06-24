@@ -104,7 +104,8 @@ public:
     void addEpoch(int epoch, std::vector<int>& clauses, bool entireIndex) {
         auto [index, offset] = epochToIndexAndOffset(epoch);
 
-        //if (entireIndex) log(V4_VVER, "CLSHIST Received clauses of index %i\n", index);
+        if (entireIndex) log(V4_VVER, "CLSHIST Received cls, index %i\n", index);
+        else log(V4_VVER, "CLSHIST Received cls, epoch %i\n", epoch);
         
         // Insert clauses into history vector
         if (!isEpochPresent(epoch)) {
@@ -121,10 +122,10 @@ public:
                 auto merger = _cdb.getBufferMerger();
                 for (auto& clsbuf : _history[index].clauses)
                     merger.add(_cdb.getBufferReader(clsbuf.data(), clsbuf.size()));
-                merger.add(_cdb.getBufferReader(clauses.data(), clauses.size()));
                 auto merged = merger.merge(isShorttermMemory(index) ? _stm_buffer_size : _ltm_buffer_size);
                 _history[index].clauses.resize(1);
                 _history[index].clauses[0] = std::move(merged);
+                log(V4_VVER, "CLSHIST Merged index into buf size %i\n", _history[index].clauses[0].size());
             }
         }
 
