@@ -57,7 +57,7 @@ public:
     ClauseHistory(Parameters& params, int stmBufferSizePerEpoch, BaseSatJob& job) : 
         _aggregation_factor(params.clauseHistoryAggregationFactor()), 
         _num_stm_slots(params.clauseHistoryShortTermMemSize()), 
-        _stm_buffer_size(_aggregation_factor * stmBufferSizePerEpoch), 
+        _stm_buffer_size(stmBufferSizePerEpoch), 
         _ltm_buffer_size(params.clauseBufferBaseSize()), 
         _use_checksums(params.useChecksums()),
         _cdb(
@@ -109,14 +109,28 @@ public:
         
         // Insert clauses into history vector
         if (!isEpochPresent(epoch)) {
+            // Append history entries as long as possible
             while (index >= _history.size()) _history.emplace_back(_aggregation_factor);
-            _history[index].clauses.push_back(clauses);
+            
+            // Shorten the incoming buffer as necessary
+            size_t sizeLimit = (isShorttermMemory(index) ? _stm_buffer_size/(entireIndex?1:_aggregation_factor) : _ltm_buffer_size);
+            if (clauses.size() <= sizeLimit) {
+                _history[index].clauses.push_back(clauses);
+            } else {
+                std::vector<int> shortened;
+                shortened.reserve(sizeLimit);
+                shortened.insert(shortened.end(), clauses.begin(), clauses.begin()+sizeLimit);
+                _history[index].clauses.push_back(std::move(shortened));
+            }
+
+            // Mark incoming epoch(s) as arrived
             if (entireIndex) {
                 for (size_t i = 0; i < _aggregation_factor; i++) 
                     _history[index].aggregated[i] = true;
             } else {
                 _history[index].aggregated[offset] = true;
             }
+            
             if (isBatchComplete(index)) {
                 // Merge with prior clauses at that index
                 auto merger = _cdb.getBufferMerger();
@@ -197,12 +211,9 @@ public:
         // If necessary, reduce a batch from Shorttermmemory-Size to Longtermmemory-Size
         if (_latest_epoch > prevLatestEpoch && _latest_epoch >= _num_stm_slots) {
             int indexToReduce = _latest_epoch - _num_stm_slots;
-            if (isBatchComplete(indexToReduce) && _history[indexToReduce].clauses.size() > _ltm_buffer_size) {
+            if (isBatchComplete(indexToReduce) && _history[indexToReduce].clauses[0].size() > _ltm_buffer_size) {
                 // Reduce this batch
-                auto merger = _cdb.getBufferMerger();
-                auto clsbuf = _history[indexToReduce].clauses.at(0);
-                merger.add(_cdb.getBufferReader(clsbuf.data(), clsbuf.size()));
-                _history[indexToReduce].clauses[0] = merger.merge(_ltm_buffer_size);
+                _history[indexToReduce].clauses[0].resize(_ltm_buffer_size);
             }
         }
 
