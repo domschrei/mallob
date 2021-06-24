@@ -50,7 +50,7 @@ private:
     LockfreeClauseDatabase _cdb;
     BaseSatJob& _job;
 
-    std::vector<Subscription> _subscribers;
+    robin_hood::unordered_flat_map<int, Subscription> _subscribers;
     Subscription _subscription;
 
 public:
@@ -71,8 +71,8 @@ public:
     // give the job nodes time to digest each batch of clauses.
     void sendNextBatches() {
 
-        for (size_t i = 0; i < _subscribers.size(); i++) {
-            auto& subscription = _subscribers[i];
+        std::vector<int> subscribersToDelete;
+        for (auto& [rank, subscription] : _subscribers) {
             log(V4_VVER, "CLSHIST %s Subscriber [%i]: [%i,%i) %i/%i\n", _job.toStr(), subscription.correspondingRank, 
                 subscription.nextIndex, subscription.endIndex, 
                 subscription.nextIndex < _history.size() ? _history[subscription.nextIndex].numAggregated() : 0, _aggregation_factor);
@@ -94,10 +94,29 @@ public:
             if (subscription.nextIndex == subscription.endIndex) {
                 // Erase completed subscription
                 log(V4_VVER, "CLSHIST %s Subscription [%i] finished\n", _job.toStr(), subscription.correspondingRank);    
-                _subscribers.erase(_subscribers.begin()+i);
-                i--;
+                subscribersToDelete.push_back(rank);
             }
         }
+        for (int rank : subscribersToDelete) _subscribers.erase(rank);
+    }
+
+    void subscribe() {
+        auto [from, to] = *_missing_epoch_ranges.begin();
+        _subscription.nextIndex = epochToIndexAndOffset(from).first;
+        _subscription.endIndex = epochToIndexAndOffset(to).first;
+        _subscription.correspondingRank = _job.getJobTree().getParentNodeRank();
+        
+        // Send subscription message
+        JobMessage msg;
+        msg.jobId = _job.getId();
+        msg.revision = _job.getRevision();
+        msg.tag = MSG_CLAUSE_HISTORY_SUBSCRIBE;
+        msg.payload.push_back(_subscription.nextIndex);
+        msg.payload.push_back(_subscription.endIndex);
+        if (_use_checksums) setChecksum(msg);
+        MyMpi::isend(MPI_COMM_WORLD, _subscription.correspondingRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+        log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Subscribe for indices [%i,%i)", _subscription.correspondingRank, _job.toStr(), 
+            msg.payload[0], msg.payload[1]);
     }
 
     // Reaction to MSG_CLAUSE_HISTORY_SEND_CLAUSES
@@ -174,33 +193,20 @@ public:
 
         // Update your own subscription
         if (_subscription.correspondingRank >= 0) {
-            _subscription.nextIndex = index+1;
-            if (_subscription.nextIndex == _subscription.endIndex) {
-                // Subscription done! Ends automatically at the corresp. rank.
-                _subscription = Subscription();
+            if (_subscription.nextIndex != index) {
+                // Received "wrong" index: Renew subscription with correct range
+                subscribe();
+            } else {
+                _subscription.nextIndex++;
+                if (_subscription.nextIndex >= _subscription.endIndex) {
+                    // Subscription done! Ends automatically at the corresp. rank.
+                    _subscription = Subscription();
+                }
             }
         }   
         if (_subscription.correspondingRank == -1) {
             // No subscription active - start new one?
-
-            if (!_missing_epoch_ranges.empty()) {
-                auto [from, to] = *_missing_epoch_ranges.begin();
-                _subscription.nextIndex = epochToIndexAndOffset(from).first;
-                _subscription.endIndex = epochToIndexAndOffset(to).first;
-                _subscription.correspondingRank = _job.getJobTree().getParentNodeRank();
-                
-                // Send subscription message
-                JobMessage msg;
-                msg.jobId = _job.getId();
-                msg.revision = _job.getRevision();
-                msg.tag = MSG_CLAUSE_HISTORY_SUBSCRIBE;
-                msg.payload.push_back(_subscription.nextIndex);
-                msg.payload.push_back(_subscription.endIndex);
-                if (_use_checksums) setChecksum(msg);
-                MyMpi::isend(MPI_COMM_WORLD, _subscription.correspondingRank, MSG_SEND_APPLICATION_MESSAGE, msg);
-                log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Subscribe for indices [%i,%i)", _subscription.correspondingRank, _job.toStr(), 
-                    msg.payload[0], msg.payload[1]);
-            }
+            if (!_missing_epoch_ranges.empty()) subscribe();
         }
 
         // Update most recent epoch
@@ -240,18 +246,13 @@ public:
     // Reaction to MSG_CLAUSE_HISTORY_SUBSCRIBE
     void onSubscribe(int source, int beginIndex, int endIndex) {
         log(V4_VVER, "CLSHIST %s [%i] subscribed\n", _job.toStr(), source);
-        _subscribers.push_back(Subscription{source, beginIndex, endIndex});
+        _subscribers[source] = Subscription{source, beginIndex, endIndex};
     }
 
     // Reaction to MSG_CLAUSE_HISTORY_UNSUBSCRIBE
     void onUnsubscribe(int source) {
         log(V4_VVER, "CLSHIST %s [%i] unsubscribed\n", _job.toStr(), source);
-        for (size_t i = 0; i < _subscribers.size(); i++) {
-            if (_subscribers[i].correspondingRank == source) {
-                _subscribers.erase(_subscribers.begin()+i);
-                i--;
-            }
-        }
+        _subscribers.erase(source);
     }
 
     // Must be called whenever the job node suspends its execution.
