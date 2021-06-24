@@ -33,14 +33,16 @@ struct Event {
 class EventMap : public Reduceable {
 
 private:
+    size_t _global_epoch = 0;
     std::map<int, Event> _map;
 
     const int _size_per_event = 3*sizeof(int)+sizeof(float);
 
 public:
     virtual std::vector<uint8_t> serialize() const override {
-        std::vector<uint8_t> result(_map.size() * _size_per_event);
+        std::vector<uint8_t> result(sizeof(size_t) + _map.size() * _size_per_event);
         int i = 0, n;
+        n = sizeof(size_t); memcpy(result.data()+i, &_global_epoch, n); i += n;
         for (const auto& entry : _map) {
             n = sizeof(int); memcpy(result.data()+i, &entry.second.jobId, n); i += n;
             n = sizeof(int); memcpy(result.data()+i, &entry.second.epoch, n); i += n;
@@ -51,10 +53,10 @@ public:
     }
     virtual EventMap& deserialize(const std::vector<uint8_t>& packed) override {
         _map.clear();
-        if (packed.size() <= sizeof(int)) return *this;
-        assert(packed.empty() || packed.size() % _size_per_event == 0);
-        int numEvents = packed.size() / _size_per_event;
+        int numEvents = (packed.size()-sizeof(size_t)) / _size_per_event;
         int i = 0, n;
+        n = sizeof(size_t); memcpy(&_global_epoch, packed.data()+i, n); i += n;
+        if (packed.size() <= sizeof(size_t)+sizeof(int)) return *this;
         for (int ev = 0; ev < numEvents; ev++) {
             Event newEvent;
             n = sizeof(int); memcpy(&newEvent.jobId, packed.data()+i, n); i += n;
@@ -68,6 +70,7 @@ public:
     virtual void merge(const Reduceable& other) {
 
         EventMap& otherEventMap = (EventMap&) other;
+        _global_epoch = std::max(_global_epoch, otherEventMap._global_epoch);
         auto it = _map.begin();
         auto otherIt = otherEventMap._map.begin();
         std::map<int, Event> newMap;
@@ -113,6 +116,12 @@ public:
     virtual bool isEmpty() const {
         return _map.empty();
     }
+    size_t getGlobalEpoch() const {
+        return _global_epoch;
+    }
+    void bumpGlobalEpoch() {
+        _global_epoch++;
+    }
 
     bool insertIfNovel(const Event& ev) {
         if (ev.epoch < 0) return false; // Old, terminated job
@@ -146,12 +155,14 @@ public:
             }
         }
         for (auto key : keysToErase) _map.erase(key);
+        _global_epoch = std::max(_global_epoch, otherMap._global_epoch);
     }
     bool updateBy(const EventMap& otherMap) {
         bool change = false;
         for (const auto& entry : otherMap.getEntries()) {
             change |= insertIfNovel(entry.second);
         }
+        _global_epoch = std::max(_global_epoch, otherMap._global_epoch);
         return change;
     }
     std::vector<int> removeOldZeros() {      
@@ -188,6 +199,7 @@ public:
     bool continueBalancing() override {return false;}
     bool continueBalancing(MessageHandle& handle) override {return this->handle(handle);}
     robin_hood::unordered_map<int, int> getBalancingResult() override;
+    size_t getGlobalEpoch() const;
 
     void forget(int jobId) override;
 
@@ -206,9 +218,9 @@ private:
     std::list<EventMap> _recent_broadcasts_reversed;
 
     bool handle(MessageHandle& handle);
-    bool reduce(const EventMap& data, bool reversedTree);
+    bool reduce(EventMap& data, bool reversedTree);
     bool reduceIfApplicable(int which);
-    void broadcast(const EventMap& data, bool reversedTree);
+    void broadcast(EventMap& data, bool reversedTree);
     bool digest(const EventMap& data);
 
     int getRootRank(bool reversedTree);

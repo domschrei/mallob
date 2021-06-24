@@ -22,11 +22,13 @@ struct JobRequest : public Serializable {
     int lastKnownRevision;
     float timeOfBirth;
     int numHops;
+    int balancingEpoch;
 
 public:
     JobRequest() = default;
 
-    JobRequest(int jobId, int rootRank, int requestingNodeRank, int requestedNodeIndex, float timeOfBirth, int numHops = 0) :
+    JobRequest(int jobId, int rootRank, int requestingNodeRank, int requestedNodeIndex, 
+            float timeOfBirth, int balancingEpoch, int numHops) :
         jobId(jobId),
         rootRank(rootRank),
         requestingNodeRank(requestingNodeRank),
@@ -34,10 +36,11 @@ public:
         currentRevision(0),
         lastKnownRevision(-1),
         timeOfBirth(timeOfBirth),
-        numHops(numHops) {}
+        numHops(numHops), 
+        balancingEpoch(balancingEpoch) {}
 
     std::vector<uint8_t> serialize() const override {
-        int size = (7*sizeof(int)+sizeof(float));
+        int size = (8*sizeof(int)+sizeof(float));
         std::vector<uint8_t> packed(size);
         int i = 0, n;
         n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;
@@ -48,6 +51,7 @@ public:
         n = sizeof(int); memcpy(packed.data()+i, &lastKnownRevision, n); i += n;
         n = sizeof(float); memcpy(packed.data()+i, &timeOfBirth, n); i += n;
         n = sizeof(int); memcpy(packed.data()+i, &numHops, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &balancingEpoch, n); i += n;
         return packed;
     }
 
@@ -61,6 +65,7 @@ public:
         n = sizeof(int); memcpy(&lastKnownRevision, packed.data()+i, n); i += n;
         n = sizeof(float); memcpy(&timeOfBirth, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&numHops, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&balancingEpoch, packed.data()+i, n); i += n;
         return *this;
     }
 
@@ -72,7 +77,8 @@ public:
         return "r.#" + std::to_string(jobId) + ":" + std::to_string(requestedNodeIndex) 
                 + " rev. " + std::to_string(currentRevision) + " <- [" 
                 + std::to_string(requestingNodeRank) + "] born=" + birthStr 
-                + " hops=" + std::to_string(numHops);
+                + " hops=" + std::to_string(numHops)
+                + " epoch=" + std::to_string(balancingEpoch);
     }
 };
 

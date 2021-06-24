@@ -118,6 +118,12 @@ bool JobDatabase::isRequestObsolete(const JobRequest& req) {
     // Requests for a job root never become obsolete
     if (req.requestedNodeIndex == 0) return false;
 
+    if (req.balancingEpoch < _balancer->getGlobalEpoch()) {
+        // Request from a past balancing epoch
+        log(V4_VVER, "%s : past epoch\n", req.toStr().c_str());
+        return true;
+    }
+
     if (has(req.jobId)) {
         Job& job = get(req.jobId);
         if (job.getState() == PAST) {
@@ -142,14 +148,6 @@ bool JobDatabase::isRequestObsolete(const JobRequest& req) {
                 return true;
             }
         }
-    }
-    
-    float maxAge = _params.requestTimeout(); // request time out
-    if (maxAge > 0) {
-        //float timelim = 0.25 + 2 * params.getFloatParam("p");
-        return Timer::elapsedSeconds() - req.timeOfBirth >= maxAge; 
-    } else {
-        return false; // not obsolete
     }
 }
 
@@ -178,9 +176,13 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
         log(V4_VVER, "Req. %s : rev. %i not up to date\n", job.toStr(), req.currentRevision);
         return true;
     }
+    // Does the job's volume not allow for this node any more? 
+    if (job.getVolume() > 0 && job.getVolume() <= req.requestedNodeIndex) {
+        log(V4_VVER, "Req. %s : new volume too small\n", req.toStr().c_str());
+        return true;
+    }
     if (alreadyAccepted) {
         return false;
-
     }
     if (req.requestedNodeIndex == job.getJobTree().getLeftChildIndex() && job.getJobTree().hasLeftChild()) {
         // Job already has a left child

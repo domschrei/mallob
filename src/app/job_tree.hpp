@@ -23,6 +23,7 @@ private:
     int _client_rank;
     robin_hood::unordered_set<int> _past_children;
     robin_hood::unordered_map<int, int> _dormant_children_num_fails;
+    int _balancing_epoch_of_last_requests;
 
 public:
     JobTree(int commSize, int rank, int seed) : _comm_size(commSize), _rank(rank), _job_node_ranks(commSize, seed) {}
@@ -53,12 +54,18 @@ public:
         }
         return c;
     }
+    void setBalancingEpochOfLastRequests(int epoch) {
+        _balancing_epoch_of_last_requests = epoch;
+    }
+    int getBalancingEpochOfLastRequests() {
+        return _balancing_epoch_of_last_requests;
+    }
 
     enum TreeRelative {LEFT_CHILD, RIGHT_CHILD, NONE};
-    JobRequest getJobRequestFor(int jobId, TreeRelative rel) {
+    JobRequest getJobRequestFor(int jobId, TreeRelative rel, int balancingEpoch) {
         return JobRequest(jobId, getRootNodeRank(), _rank, 
                 rel == LEFT_CHILD ? getLeftChildIndex() : getRightChildIndex(), 
-                Timer::elapsedSeconds());
+                Timer::elapsedSeconds(), balancingEpoch, 0);
     }
     TreeRelative prune(int leavingRank, int leavingIndex) {
         if (hasLeftChild() && getLeftChildIndex() == leavingIndex && getLeftChildNodeRank() == leavingRank) {

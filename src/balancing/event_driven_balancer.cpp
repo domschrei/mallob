@@ -132,7 +132,7 @@ bool EventDrivenBalancer::reduceIfApplicable(int which) {
     return done;
 }
 
-bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
+bool EventDrivenBalancer::reduce(EventMap& data, bool reversedTree) {
     bool done = false;
 
     if (MyMpi::size(_comm) == 1) {
@@ -147,7 +147,7 @@ bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
         // Send to other root
         MyMpi::isend(MPI_COMM_WORLD, getRootRank(!reversedTree), MSG_BROADCAST_DATA, data);
         log(LOG_ADD_DESTRANK | V5_DEBG, "BLC root handshake", getRootRank(!reversedTree));
-            
+
         // Broadcast and digest
         broadcast(data, reversedTree);
         done = digest(data);
@@ -162,7 +162,7 @@ bool EventDrivenBalancer::reduce(const EventMap& data, bool reversedTree) {
     return done;     
 }
 
-void EventDrivenBalancer::broadcast(const EventMap& data, bool reversedTree) {
+void EventDrivenBalancer::broadcast(EventMap& data, bool reversedTree) {
 
     // List of recently broadcast event maps
     std::list<EventMap>& recentBroadcasts = (reversedTree ? _recent_broadcasts_reversed : _recent_broadcasts_normal);
@@ -180,6 +180,12 @@ void EventDrivenBalancer::broadcast(const EventMap& data, bool reversedTree) {
     }
     if (!doSend) return;
 
+    if (isRoot(MyMpi::rank(MPI_COMM_WORLD), reversedTree) 
+        || isRoot(MyMpi::rank(MPI_COMM_WORLD), !reversedTree)) {
+        // Root
+        data.bumpGlobalEpoch();
+    }
+
     // Add current event map to currently broadcast maps
     recentBroadcasts.push_front(data);
     if (recentBroadcasts.size() > RECENT_BROADCAST_MEMORY) 
@@ -194,6 +200,7 @@ void EventDrivenBalancer::broadcast(const EventMap& data, bool reversedTree) {
 }
 
 bool EventDrivenBalancer::digest(const EventMap& data) {
+    log(V4_VVER, "BLC DIGEST epoch=%ld\n", data.getGlobalEpoch());
 
     bool anyChange = _states.updateBy(data);
 
@@ -295,6 +302,10 @@ int EventDrivenBalancer::getNewDemand(int jobId) {
 
 float EventDrivenBalancer::getPriority(int jobId) {
     return _states.getEntries().at(jobId).priority;
+}
+
+size_t EventDrivenBalancer::getGlobalEpoch() const {
+    return _states.getGlobalEpoch();
 }
 
 robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
@@ -507,7 +518,7 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
         msg += " #" + std::to_string(jobId) + ":" + std::to_string(vol);
         sum += vol;
     }
-    log(verb-1, "BLC assigned%s sum=%i\n", msg.c_str(), sum);
+    log(verb-1, "BLC assigned%s sum=%i epoch=%ld\n", msg.c_str(), sum, _states.getGlobalEpoch());
 
     // 5. Only remember job assignments that are of a local job
     volumes.clear();

@@ -80,6 +80,7 @@ public:
     bool continueBalancing(MessageHandle& handle);
     void finishBalancing();
     robin_hood::unordered_map<int, int> getBalancingResult();
+    int getGlobalBalancingEpoch() const {return _balancer->getGlobalEpoch();}
 
     bool has(int id) const;
     Job& get(int id) const;

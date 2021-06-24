@@ -133,7 +133,7 @@ void Worker::init() {
         // Add as a new local SAT job image
         log(V3_VERB, "%ld lits w/ separators; init SAT job image\n", desc.getNumFormulaLiterals());
         _job_db.createJob(MyMpi::size(_comm), _world_rank, jobId);
-        JobRequest req(jobId, 0, 0, 0, 0, 0);
+        JobRequest req(jobId, 0, 0, 0, 0, 0, 0);
         _job_db.commit(req);
         auto serializedDesc = desc.getSerialization();
         initJob(jobId, serializedDesc, _world_rank);
@@ -585,7 +585,7 @@ void Worker::handleQueryVolume(MessageHandle& handle) {
     }
 
     // Send response
-    IntVec response({jobId, volume});
+    IntVec response({jobId, volume, _job_db.getGlobalBalancingEpoch()});
     log(LOG_ADD_DESTRANK | V4_VVER, "Answer #%i volume query with v=%i", handle.source, jobId, volume);
     MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_NOTIFY_VOLUME_UPDATE, response);
 }
@@ -637,7 +637,7 @@ void Worker::initJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& dat
         auto& job = _job_db.get(jobId);
         if (job.getJobTree().isRoot()) {
             // Root worker: update volume (to trigger growth if desired)
-            if (job.getVolume() > 1) updateVolume(jobId, job.getVolume());
+            if (job.getVolume() > 1) updateVolume(jobId, job.getVolume(), _job_db.getGlobalBalancingEpoch());
         } else {
             // Non-root worker: query parent for the volume of this job
             IntVec payload({jobId});
@@ -653,7 +653,7 @@ void Worker::restartJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& 
         auto& job = _job_db.get(jobId);
         if (job.getJobTree().isRoot()) {
             // Root worker: update volume (to trigger growth if desired)
-            if (job.getVolume() > 1) updateVolume(jobId, job.getVolume());
+            if (job.getVolume() > 1) updateVolume(jobId, job.getVolume(), _job_db.getGlobalBalancingEpoch());
         } else {
             // Non-root worker: query parent for the volume of this job
             IntVec payload({jobId});
@@ -704,16 +704,17 @@ void Worker::handleNotifyJobTerminating(MessageHandle& handle) {
 }
 
 void Worker::handleNotifyVolumeUpdate(MessageHandle& handle) {
-    IntPair recv = Serializable::get<IntPair>(handle.getRecvData());
-    int jobId = recv.first;
-    int volume = recv.second;
+    IntVec recv = Serializable::get<IntVec>(handle.getRecvData());
+    int jobId = recv[0];
+    int volume = recv[1];
+    int balancingEpoch = recv[2];
     if (!_job_db.has(jobId)) {
         log(V1_WARN, "[WARN] Volume update for unknown #%i\n", jobId);
         return;
     }
 
     // Update volume assignment in job instance (and its children)
-    updateVolume(jobId, volume);
+    updateVolume(jobId, volume, balancingEpoch);
 }
 
 void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
@@ -745,7 +746,7 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
         }
         
         // Initiate search for a replacement for the defected child
-        JobRequest req = job.getJobTree().getJobRequestFor(jobId, pruned);
+        JobRequest req = job.getJobTree().getJobRequestFor(jobId, pruned, _job_db.getGlobalBalancingEpoch());
         log(LOG_ADD_DESTRANK | V4_VVER, "%s : try to find child replacing defected %s", nextNodeRank, 
                         job.toStr(), _job_db.toStr(jobId, index).c_str());
         MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, tag, req);
@@ -843,7 +844,7 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
     MyMpi::isend(MPI_COMM_WORLD, nextRank, MSG_REQUEST_NODE, request);
 }
 
-void Worker::updateVolume(int jobId, int volume) {
+void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
 
     if (!_job_db.has(jobId)) return;
     Job &job = _job_db.get(jobId);
@@ -861,7 +862,7 @@ void Worker::updateVolume(int jobId, int volume) {
     job.updateVolumeAndUsedCpu(volume);
 
     // Prepare volume update to propagate down the job tree
-    IntPair payload(jobId, volume);
+    IntVec payload{jobId, volume, balancingEpoch};
 
     // Mono instance mode: Set job tree permutation to identity
     bool mono = _params.monoFilename.isSet();
@@ -878,7 +879,8 @@ void Worker::updateVolume(int jobId, int volume) {
             // Propagate volume update
             MyMpi::isend(MPI_COMM_WORLD, ranks[i], MSG_NOTIFY_VOLUME_UPDATE, payload);
 
-        } else if (nextIndex < volume) {
+        } else if (nextIndex < volume 
+                && job.getJobTree().getBalancingEpochOfLastRequests() < balancingEpoch) {
             if (_job_db.hasDormantRoot()) {
                 // Becoming an inner node is not acceptable
                 // because then the dormant root cannot be restarted seamlessly
@@ -890,7 +892,8 @@ void Worker::updateVolume(int jobId, int volume) {
             // Grow
             log(V5_DEBG, "%s : grow\n", job.toStr());
             if (mono) job.getJobTree().updateJobNode(indices[i], indices[i]);
-            JobRequest req(jobId, job.getJobTree().getRootNodeRank(), _world_rank, nextIndex, Timer::elapsedSeconds(), 0);
+            JobRequest req(jobId, job.getJobTree().getRootNodeRank(), _world_rank, nextIndex, 
+                    Timer::elapsedSeconds(), balancingEpoch, 0);
             req.currentRevision = job.getRevision();
             int nextNodeRank, tag;
             if (dormantChildren.empty()) {
@@ -908,6 +911,7 @@ void Worker::updateVolume(int jobId, int volume) {
             _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
         }
     }
+    job.getJobTree().setBalancingEpochOfLastRequests(balancingEpoch);
 
     // Shrink (and pause solving) if necessary
     if (thisIndex > 0 && thisIndex >= volume) {
@@ -980,7 +984,7 @@ void Worker::applyBalancing() {
             );
         }
         */
-        updateVolume(jobId, volume);
+        updateVolume(jobId, volume, _job_db.getGlobalBalancingEpoch());
     }
 }
 

@@ -325,7 +325,8 @@ void Client::introduceNextJob() {
     _sys_state.addLocal(SYSSTATE_SCHEDULED_JOBS, 1);
 
     // Set actual job arrival
-    job.setArrival(Timer::elapsedSeconds());
+    float time = Timer::elapsedSeconds();
+    job.setArrival(time);
 
     int nodeRank;
     if (job.isIncremental()) {
@@ -341,7 +342,7 @@ void Client::introduceNextJob() {
     log(V4_VVER, "%i\n", job.getRevision());
 
     JobRequest req(jobId, /*rootRank=*/-1, /*requestingNodeRank=*/_world_rank, 
-        /*requestedNodeIndex=*/0, /*epoch=*/-1, /*numHops=*/0);
+        /*requestedNodeIndex=*/0, /*timeOfBirth=*/time, /*balancingEpoch=*/-1, /*numHops=*/0);
     req.currentRevision = job.getRevision();
     req.timeOfBirth = job.getArrival();
 

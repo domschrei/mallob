@@ -47,6 +47,8 @@ public:
      */
     virtual robin_hood::unordered_map<int, int> getBalancingResult() = 0;
 
+    virtual size_t getGlobalEpoch() const = 0;
+
 protected:
     float allReduce(float contribution) const;
     void iAllReduce(float contribution);
