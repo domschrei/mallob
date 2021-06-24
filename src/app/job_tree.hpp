@@ -23,7 +23,7 @@ private:
     int _client_rank;
     robin_hood::unordered_set<int> _past_children;
     robin_hood::unordered_map<int, int> _dormant_children_num_fails;
-    int _balancing_epoch_of_last_requests;
+    int _balancing_epoch_of_last_requests = -1;
 
 public:
     JobTree(int commSize, int rank, int seed) : _comm_size(commSize), _rank(rank), _job_node_ranks(commSize, seed) {}

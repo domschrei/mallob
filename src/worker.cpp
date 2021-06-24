@@ -856,8 +856,8 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
 
     // Root node update message
     int thisIndex = job.getIndex();
-    if (thisIndex == 0 && job.getVolume() != volume) {
-        log(V3_VERB, "%s : update v=%i\n", job.toStr(), volume);
+    if (thisIndex == 0) {
+        log(job.getVolume() == volume ? V4_VVER : V3_VERB, "%s : update v=%i\n", job.toStr(), volume);
     }
     job.updateVolumeAndUsedCpu(volume);
 
@@ -905,8 +905,8 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
                 nextNodeRank = Random::choice(dormantChildren);
                 dormantChildren.erase(nextNodeRank);
             }
-            log(LOG_ADD_DESTRANK | V3_VERB, "%s growing, request %s", nextNodeRank, 
-                        job.toStr(), _job_db.toStr(job.getId(), nextIndex).c_str());
+            log(LOG_ADD_DESTRANK | V3_VERB, "%s growing: %s", nextNodeRank, 
+                        job.toStr(), req.toStr().c_str());
             MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, tag, req);
             _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
         }
