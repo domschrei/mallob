@@ -88,7 +88,7 @@ public:
             msg.payload = _history[subscription.nextIndex].clauses.at(0);
             if (_use_checksums) setChecksum(msg);
             MyMpi::isend(MPI_COMM_WORLD, subscription.correspondingRank, MSG_SEND_APPLICATION_MESSAGE, msg);
-            log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Send batch of epoch %i", subscription.correspondingRank, _job.toStr(), msg.epoch);
+            log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Send batch of index %i", subscription.correspondingRank, _job.toStr(), subscription.nextIndex);
 
             subscription.nextIndex++;
             if (subscription.nextIndex == subscription.endIndex) {
@@ -108,7 +108,8 @@ public:
         else log(V4_VVER, "CLSHIST Received cls, epoch %i\n", epoch);
         
         // Insert clauses into history vector
-        if (!isEpochPresent(epoch)) {
+        bool alreadyPresent = entireIndex ? isBatchComplete(index) : isEpochPresent(epoch);
+        if (!alreadyPresent) {
             // Append history entries as long as possible
             while (index >= _history.size()) _history.emplace_back(_aggregation_factor);
             
@@ -144,19 +145,17 @@ public:
         }
 
         // Reduce missing slices in chronological order
-        if (!_missing_epoch_ranges.empty()) {
-            for (auto it = _missing_epoch_ranges.begin(); it != _missing_epoch_ranges.end(); ++it) {
-                auto& [from, to] = *it;
+        for (auto it = _missing_epoch_ranges.begin(); it != _missing_epoch_ranges.end(); ++it) {
+            auto& [from, to] = *it;
 
-                // Shrink missing range by all epochs which are now present
-                while (from < to && isEpochPresent(from)) from++;
-                while (from < to && isEpochPresent(to-1)) to--;
-                
-                if (from == to) {
-                    // Missing range finished!
-                    it = _missing_epoch_ranges.erase(it);
-                    it--;
-                }
+            // Shrink missing range by all epochs which are now present
+            while (from < to && isEpochPresent(from)) from++;
+            while (from < to && isEpochPresent(to-1)) to--;
+            
+            if (from == to) {
+                // Missing range finished!
+                it = _missing_epoch_ranges.erase(it);
+                it--;
             }
         }
 
