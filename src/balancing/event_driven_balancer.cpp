@@ -180,8 +180,7 @@ void EventDrivenBalancer::broadcast(EventMap& data, bool reversedTree) {
     }
     if (!doSend) return;
 
-    if (isRoot(MyMpi::rank(MPI_COMM_WORLD), reversedTree) 
-        || isRoot(MyMpi::rank(MPI_COMM_WORLD), !reversedTree)) {
+    if (isRoot(MyMpi::rank(MPI_COMM_WORLD), reversedTree)) {
         // Root
         data.bumpGlobalEpoch();
     }

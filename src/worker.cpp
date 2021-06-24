@@ -857,7 +857,8 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
     // Root node update message
     int thisIndex = job.getIndex();
     if (thisIndex == 0) {
-        log(job.getVolume() == volume ? V4_VVER : V3_VERB, "%s : update v=%i\n", job.toStr(), volume);
+        log(job.getVolume() == volume ? V4_VVER : V3_VERB, "%s : update v=%i epoch=%i lastreqsepoch=%i\n", 
+            job.toStr(), volume, balancingEpoch, job.getJobTree().getBalancingEpochOfLastRequests());
     }
     job.updateVolumeAndUsedCpu(volume);
 
