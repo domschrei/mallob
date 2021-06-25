@@ -15,26 +15,7 @@ Our system can be used to resolve many formulae from various users at once, prov
 Mallob also features a single instance mode, _Mallob-mono_, where only a single provided SAT formula is solved on the entire set of available cores.
 Using this configuration on 1600 hardware threads in parallel in an AWS environment, Mallob [scored the first place](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf#page=36) of the first Cloud Track of the international [SAT Competition 2020](https://satcompetition.github.io/2020/), solving the most instances among all solvers of all tracks.
 
-### Job Scheduling and Load Balancing
-
-The system is fully decentralized and features randomized dynamic malleable load balancing realized over message passing (MPI). 
-When a new job arrives in the system, it will randomly bounce through the system (corresponding to a random walk) until an idle process adopts it and becomes the job's initial "root" process. 
-Then, with the job dynamically updating its demand, the job may receive additional nodes which form a _job tree_, a binary tree rooted at the initial process, as their central means of communication.
-
-Each root node in the system carries basic information on its job's meta data, such as its current demand, its current volume (= #processes) or its priority. 
-A _balancing phase_ consists of one or multiple aggregations (all-reduce collective operations) of this meta data that will be carried out whenever the necessity arises.
-From the globally aggregated measures, each job can compute its new volume and can act accordingly by growing or shrinking its job tree.
-
-### SAT Solving Engine
-
-The SAT solving engine of Mallob is based on [HordeSat](https://baldur.iti.kit.edu/hordesat/) (Balyo and Sanders 2015) which we re-engineered in various aspects to improve its performance and to handle malleability.
-We employ portfolio solving using Lingeling-bcj, YalSAT, Glucose, and CaDiCaL (not yet fully supported) as possible SAT solving backends.
-Diversification is done over random seeds, sparse random setting of phase variables, and native option-based diversification of solvers (in the case of Lingeling using diversifiers from Plingeling-ayv and -bcj).
-
-All communication has been made completely asynchronous and now happens along the job tree.
-We modified HordeSat's clause exchange and made it much more careful, sharing fewer clauses of higher importance in a duplicate-free manner, which saves lots of bandwidth and computation time.
-The clause filtering mechanism has been reworked as well and now periodically forgets some probabilistic portion of registered clauses allowing for clauses to be re-shared after some time.
-Several further performance improvements were introduced to Mallob, for instance the reduction of unnecessary syscalls compared to HordeSat.
+More information on the design decisions and techniques of Mallob can be found in [our SAT 2021 paper](https://dominikschreiber.de/papers/2021-sat-scalable.pdf).
 
 <hr/>
 
@@ -178,21 +159,7 @@ In case of SAT, the solution field contains the found satisfying assignment; in 
 
 ### Options Overview
 
-All command-line options of Mallob can be seen by executing Mallob without any parameters or with the `-h` option.
-The exact options Mallob uses, including all non-overridden default values, are printed out on program start at default verbosity.
-Here is an explanation for some important ones.
-
-* `-c=<#clients>`: The number of designated client MPI processes. Note that this number will be subtracted from the amount of actual worker processes within your program execution: `#processes = #workers + #clients`. 
-* `-lbc=<#jobs-per-client>`: Each client process will strive to have exactly `<#jobs-per-client>` jobs in the system at any given time. As long as the amount of active jobs of this client is lower than this number, the client will introduce new jobs as possible. In other words, the provided number is the amount of _streams of jobs_ that each client wishes to be solved in parallel.
-* `-v=<verbosity>`: How verbose the output should be. `-v=6` is generally the highest supported verbosity and will generate very large log files (including a report for every single P2P message). Verbosity values of 3 or 4 are more moderate. For outputting to log files only and not to stdout, use the `-q` (quiet) option.
-* `-t=<#threads>`: Each Mallob process will run `<#threads>` worker threads for each active job.
-* `-satsolver=<seq>`: A sequence of SAT solvers which will cyclically employed on each job. `seq` must be a string where each character corresponds to a SAT solver: `l` for Lingeling, `c` for CaDiCaL, and `g` for Glucose (only if compiled accordingly, see Building). For instance, providing `-satsolver=llg` and `-t=4`, the employed solvers on a problem will be Lingeling-Lingeling-Glucose-Lingeling on the first node, Lingeling-Glucose-Lingeling-Lingeling on the second, and so on.
-* `-l=<load-factor>`: A float `l ∈ (0, 1]` that determines which system load (i.e. the ratio `#busy-nodes / #nodes`) will be aimed at in the balancing computations. A load factor very close (or equal) to one may cause performance degradation due to job requests bouncing through the system without finding an empty node. A load factor close to zero will keep the majority of processes idle. In single instance solving mode, this number is automatically set to 1: in this case, there are as many job requests as there are processes and every job request will be successful at its very first hop.
-* `-T=<time-limit>`: Run the entire system for the specified amount of seconds.
-* `-job-cpu-limit=<limit>, -job-wallclock-limit=<limit>`: Sets the per-job resource limits before a job is timeouted. The CPU limit is provided in CPU seconds and the wallclock limit is provided in seconds. CPU resources are measured as the theoretical _worker thread resources_ a job would have according to the balancing results, assuming instant migrations. These values may be overridden if the job-specific limits set over the JSON API are more strict.
-* `-md=<max-demand>`: Limits the maximum possible demand any single job may have to `<max-demand>`.
-* `-g=<growth-period>`: Make every job update its demand `d` according to `d := 2d+1` every `<growth-period>` seconds. When zero, a job commonly instantly assumes its full demand (i.e. the complete system). By default, the demand of a job is updated only when the next growth period is hit (i.e. when the demand is equal to the amount of nodes in a binary tree of depth `k`). With the option `-cg` (continuous growth), demands are updated at every integer.
-* `sleep=<microsecs>`: How many microseconds a worker main thread should sleep in between one of its loop cycles. Use 100µs (default) for a very agile system handling messages quickly. You can usually use higher values (1-10ms) for single instance solving mode to give the solver threads a bit more computation time.
+All command-line options of Mallob can be seen by executing Mallob with the `-h` option. This also works without the `mpirun` prefix.
 
 <hr/>
 
@@ -200,6 +167,7 @@ Here is an explanation for some important ones.
 
 Mallob can be extended in the following ways:
 
+* New options to the application (or a subsystem thereof) can be added in `src/optionslist.hpp`.
 * To add a new SAT solver to be used in a SAT solver engine, implement the interface `PortfolioSolverInterface` (see `src/app/sat/hordesat/solvers/portfolio_solver_interface.hpp`); you can use the existing implementation for `Lingeling` (`lingeling.cpp`) and adapt it to your solver. Then add your solver to the portfolio initialization in `src/app/sat/hordesat/horde.cpp`.
 * To implement a different kind of SAT solving engine, instead of directly inheriting from `Job`, a subclass of `BaseSatJob` (see `src/app/sat/base_sat_job.hpp`) can be created that already incorporates a kind of clause sharing. Take a look at an implementation such as `ForkedSatJob` to see how the interface can be used.
 * To extend Mallob by adding another kind of job solving engine (like combinatorial search, planning, SMT, ...), a subclass of `Job` (see `src/app/job.hpp`) must be created and an additional case must be added to `JobDatabase::createJob` (see `src/data/job_database.cpp`). To make the job database acknowledge what kind of job is introduced in a program run with several kinds of jobs, the `JobDescription` structure should be extended by a corresponding flag (and be on either end of the serialization so that it can be read directly). Finally, the `Client` class must be extended to read and introduce this new kind of jobs.
