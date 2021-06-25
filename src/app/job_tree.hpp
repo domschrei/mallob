@@ -149,6 +149,9 @@ public:
         if (_dormant_children_num_fails[rank] >= 3)
             _dormant_children_num_fails.erase(rank);
     }
+    void eraseDormantChild(int rank) {
+        _dormant_children_num_fails.erase(rank);
+    }
 
     bool isTransitiveParentOf(int index) {
         if (index == _index) return true;

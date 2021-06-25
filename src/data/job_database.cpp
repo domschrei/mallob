@@ -124,31 +124,32 @@ bool JobDatabase::isRequestObsolete(const JobRequest& req) {
         return true;
     }
 
-    if (has(req.jobId)) {
-        Job& job = get(req.jobId);
-        if (job.getState() == PAST) {
-            // Job has already terminated!
-            log(V4_VVER, "%s : past job\n", req.toStr().c_str());
+    if (!has(req.jobId)) return false;
+
+    Job& job = get(req.jobId);
+    if (job.getState() == PAST) {
+        // Job has already terminated!
+        log(V4_VVER, "%s : past job\n", req.toStr().c_str());
+        return true;
+    }
+    if (job.getState() == ACTIVE) {
+        // Does this node KNOW that the request is already completed?
+        if (req.requestedNodeIndex == job.getIndex()
+        || (job.getJobTree().hasLeftChild() && req.requestedNodeIndex == job.getJobTree().getLeftChildIndex())
+        || (job.getJobTree().hasRightChild() && req.requestedNodeIndex == job.getJobTree().getRightChildIndex())) {
+            // Request already completed!
+            log(V4_VVER, "%s : already completed\n", req.toStr().c_str());
             return true;
         }
-        if (job.getState() == ACTIVE) {
-            // Does this node KNOW that the request is already completed?
-            if (req.requestedNodeIndex == job.getIndex()
-            || (job.getJobTree().hasLeftChild() && req.requestedNodeIndex == job.getJobTree().getLeftChildIndex())
-            || (job.getJobTree().hasRightChild() && req.requestedNodeIndex == job.getJobTree().getRightChildIndex())) {
-                // Request already completed!
-                log(V4_VVER, "%s : already completed\n", req.toStr().c_str());
-                return true;
-            }
-            // Am I the transitive parent of the request and do I know
-            // that the job's volume does not allow for this node any more? 
-            if (job.getVolume() > 0 && job.getVolume() <= req.requestedNodeIndex 
-                    && job.getJobTree().isTransitiveParentOf(req.requestedNodeIndex)) {
-                log(V4_VVER, "%s : new volume too small\n", req.toStr().c_str());
-                return true;
-            }
+        // Am I the transitive parent of the request and do I know
+        // that the job's volume does not allow for this node any more? 
+        if (job.getVolume() > 0 && job.getVolume() <= req.requestedNodeIndex 
+                && job.getJobTree().isTransitiveParentOf(req.requestedNodeIndex)) {
+            log(V4_VVER, "%s : new volume too small\n", req.toStr().c_str());
+            return true;
         }
     }
+    return false;
 }
 
 bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAccepted) {
@@ -249,9 +250,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, bool on
     if (isIdle()) {
         if (!oneshot) return ADOPT_FROM_IDLE;
         // Oneshot request: Job must be present and suspended
-        else return (has(req.jobId) && 
-            (get(req.jobId).getState() == SUSPENDED || get(req.jobId).getState() == STANDBY) 
-                ? ADOPT_FROM_IDLE : REJECT);
+        else return (hasDormantJob(req.jobId) ? ADOPT_FROM_IDLE : REJECT);
     }
 
     // Request for a root node:
@@ -514,6 +513,11 @@ bool JobDatabase::hasDormantRoot() const {
             return true;
     }
     return false;
+}
+
+bool JobDatabase::hasDormantJob(int jobId) const {
+    return has(jobId) && 
+            (get(jobId).getState() == SUSPENDED || get(jobId).getState() == STANDBY);
 }
 
 JobDatabase::~JobDatabase() {

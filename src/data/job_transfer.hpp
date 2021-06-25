@@ -82,6 +82,30 @@ public:
     }
 };
 
+struct OneshotJobRequestRejection : public Serializable {
+
+    JobRequest request;
+    bool isChildStillDormant;
+
+    OneshotJobRequestRejection() = default;
+    OneshotJobRequestRejection(const JobRequest& request, bool isChildStillDormant) : 
+        request(request), isChildStillDormant(isChildStillDormant) {}
+    
+    std::vector<uint8_t> serialize() const override {
+        std::vector<uint8_t> packed = request.serialize();
+        size_t sizeBefore = packed.size();
+        packed.resize(packed.size()+sizeof(bool));
+        memcpy(packed.data()+sizeBefore, &isChildStillDormant, sizeof(bool));
+        return packed;
+    }
+
+    OneshotJobRequestRejection& deserialize(const std::vector<uint8_t> &packed) override {
+        request.deserialize(packed);
+        memcpy(&isChildStillDormant, packed.data()+packed.size()-sizeof(bool), sizeof(bool));
+        return *this;
+    }
+};
+
 /**
  * Sent as pre-information on a job that will be transferred
  * based on a previous commitment.

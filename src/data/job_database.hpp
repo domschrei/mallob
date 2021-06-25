@@ -90,6 +90,7 @@ public:
     void setLoad(int load, int whichJobId);
     bool isIdle() const;
     bool hasDormantRoot() const;
+    bool hasDormantJob(int id) const;
     
     std::string toStr(int j, int idx) const;
     

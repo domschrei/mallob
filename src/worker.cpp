@@ -369,14 +369,19 @@ void Worker::handleDoExit(MessageHandle& handle) {
 }
 
 void Worker::handleRejectOneshot(MessageHandle& handle) {
-    JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
+    OneshotJobRequestRejection rej = Serializable::get<OneshotJobRequestRejection>(handle.getRecvData());
+    JobRequest& req = rej.request;
     log(LOG_ADD_SRCRANK | V5_DEBG, "%s rejected by dormant child", handle.source, 
             _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
 
     if (_job_db.isAdoptionOfferObsolete(req)) return;
 
     Job& job = _job_db.get(req.jobId);
-    job.getJobTree().addFailToDormantChild(handle.source);
+    if (rej.isChildStillDormant) {
+        job.getJobTree().addFailToDormantChild(handle.source);
+    } else {
+        job.getJobTree().eraseDormantChild(handle.source);
+    }
 
     bool doNormalHopping = false;
     if (req.numHops > std::max(_params.jobCacheSize(), 2)) {
@@ -450,9 +455,10 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
 
     } else if (adoptionResult == JobDatabase::REJECT) {
         if (oneshot) {
+            OneshotJobRequestRejection rej(req, _job_db.hasDormantJob(req.jobId));
             log(LOG_ADD_DESTRANK | V5_DEBG, "decline oneshot request for %s", handle.source, 
                         _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
-            MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_REJECT_ONESHOT, handle.getRecvData());
+            MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_REJECT_ONESHOT, rej);
         } else {
             // Continue job finding procedure somewhere else
             bounceJobRequest(req, handle.source);
