@@ -42,6 +42,7 @@ private:
     std::vector<int> _hop_destinations;
     robin_hood::unordered_set<int> _busy_neighbors;
     std::set<WorkRequest, WorkRequestComparator> _recent_work_requests;
+    float _time_only_idle_worker = -1;
 
     std::thread _mpi_monitor_thread;
 

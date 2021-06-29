@@ -168,11 +168,11 @@ void Worker::mainProgram() {
     while (!checkTerminate(time)) {
 
         if (wasIdle != _job_db.isIdle()) {
-            // Load status changed
+            // Load status changed since last cycle
             sendStatusToNeighbors();
             wasIdle = !wasIdle;
         }
-
+        
         // Poll received messages, make progress in sent messages
         _msg_handler.pollMessages(time);
         MyMpi::testSentHandles();
@@ -220,6 +220,14 @@ void Worker::mainProgram() {
 
             // Reset watchdog
             watchdog.reset(time);
+
+            if (_job_db.isIdle() && _time_only_idle_worker > 0 && time - _time_only_idle_worker >= 0.05) {
+                // This worker is the only idle worker within its local vicinity since some time
+                log(V4_VVER, "All neighbors are busy - requesting work\n");
+                WorkRequest req(_world_rank, _job_db.getGlobalBalancingEpoch());
+                MyMpi::isend(MPI_COMM_WORLD, Random::choice(_hop_destinations), MSG_REQUEST_WORK, req);
+                _time_only_idle_worker = -1;
+            }
         }
 
         // Do diverse periodic maintenance tasks
@@ -851,10 +859,10 @@ void Worker::updateNeighborStatus(int rank, bool busy) {
     if (busy) _busy_neighbors.insert(rank);
     else _busy_neighbors.erase(rank);
     if (_job_db.isIdle() && _busy_neighbors.size() == _hop_destinations.size()) {
-        // This worker is the only idle worker within the local vicinity
-        log(V4_VVER, "All neighbors are busy - requesting work\n");
-        WorkRequest req(_world_rank, _job_db.getGlobalBalancingEpoch());
-        MyMpi::isend(MPI_COMM_WORLD, Random::choice(_hop_destinations), MSG_REQUEST_WORK, req);
+        if (_time_only_idle_worker <= 0)
+            _time_only_idle_worker = Timer::elapsedSeconds();
+    } else {
+        _time_only_idle_worker = -1;
     }
 }
 
