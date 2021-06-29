@@ -80,6 +80,10 @@ void Worker::init() {
         [&](auto& h) {handleSendJob(h);});
     _msg_handler.registerCallback(MSG_SEND_JOB_RESULT, 
         [&](auto& h) {handleSendJobResult(h);});
+    _msg_handler.registerCallback(MSG_NOTIFY_NEIGHBOR_STATUS,
+        [&](auto& h) {handleNotifyNeighborStatus(h);});
+    _msg_handler.registerCallback(MSG_REQUEST_WORK,
+        [&](auto& h) {handleRequestWork(h);});
     auto balanceCb = [&](MessageHandle& handle) {
         if (_job_db.continueBalancing(handle)) applyBalancing();
     };
@@ -154,6 +158,7 @@ void Worker::mainProgram() {
     float maintenanceCheckPeriod = 1.0;
     float memCheckPeriod = 3.0;
     bool doYield = _params.yield();
+    bool wasIdle = true;
 
     Watchdog watchdog(/*checkIntervMillis=*/200, lastMemCheckTime);
     watchdog.setWarningPeriod(100); // warn after 0.1s without a reset
@@ -161,6 +166,12 @@ void Worker::mainProgram() {
 
     float time = lastMemCheckTime;
     while (!checkTerminate(time)) {
+
+        if (wasIdle != _job_db.isIdle()) {
+            // Load status changed
+            sendStatusToNeighbors();
+            wasIdle = !wasIdle;
+        }
 
         // Poll received messages, make progress in sent messages
         _msg_handler.pollMessages(time);
@@ -420,6 +431,15 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
     if (_job_db.isRequestObsolete(req)) {
         log(LOG_ADD_SRCRANK | V3_VERB, "DISCARD %s oneshot=%i", handle.source, 
                 req.toStr().c_str(), oneshot ? 1 : 0);
+        return;
+    }
+
+    if (!oneshot && !_job_db.isIdle() && !_recent_work_requests.empty()) {
+        // Forward the job request to the source of a recent work request
+        log(V4_VVER, "Forward job req. to recent work req.\n");
+        WorkRequest wreq = *_recent_work_requests.begin();
+        MyMpi::isend(MPI_COMM_WORLD, wreq.requestingRank, MSG_REQUEST_NODE, req);
+        _recent_work_requests.erase(_recent_work_requests.begin());
         return;
     }
 
@@ -807,6 +827,70 @@ void Worker::handleNotifyResultFound(MessageHandle& handle) {
     }
 }
 
+void Worker::handleNotifyNeighborStatus(MessageHandle& handle) {
+    bool isBusy = handle.getRecvData().at(0) == 1;
+    updateNeighborStatus(handle.source, isBusy);
+}
+
+void Worker::updateNeighborStatus(int rank, bool busy) {
+    if (busy) _busy_neighbors.insert(rank);
+    else _busy_neighbors.erase(rank);
+    if (_job_db.isIdle() && _busy_neighbors.size() == _hop_destinations.size()) {
+        // This worker is the only idle worker within the local vicinity
+        log(V4_VVER, "All neighbors are busy - requesting work\n");
+        WorkRequest req(_world_rank, _job_db.getGlobalBalancingEpoch());
+        MyMpi::isend(MPI_COMM_WORLD, Random::choice(_hop_destinations), MSG_REQUEST_WORK, req);
+    }
+}
+
+void Worker::handleRequestWork(MessageHandle& handle) {
+    WorkRequest req = Serializable::get<WorkRequest>(handle.getRecvData());
+    
+    // Is this work request obsolete?
+    // - I am this worker but I am not idle any more
+    if (req.requestingRank == _world_rank && !_job_db.isIdle()) return;
+    // - _busy_neighbors contains this worker
+    if (_busy_neighbors.count(req.requestingRank)) return;
+    // - # hops exceeding # workers
+    if (req.numHops >= MyMpi::size(_comm)) return;
+    
+    // Remember work request for upcoming job requests
+    // if the request does not originate from myself
+    if (req.requestingRank != _world_rank) {
+        // Try to find a recent work request from the same rank
+        auto foundReq = _recent_work_requests.end();
+        for (auto it = _recent_work_requests.begin(); it != _recent_work_requests.end(); ++it) {
+            if (it->requestingRank == handle.source) {
+                foundReq = it;
+                break;
+            }
+        }
+        // Found? -> Remove it if the new request dominates the old one
+        bool dominatingOrNovel = true;
+        if (foundReq != _recent_work_requests.end()) {
+            const WorkRequest& otherReq = *foundReq;
+            dominatingOrNovel = req.balancingEpoch > otherReq.balancingEpoch || req.numHops < otherReq.numHops;
+            if (dominatingOrNovel) _recent_work_requests.erase(foundReq);
+        }
+        // Insert new request if dominating or novel
+        if (dominatingOrNovel) _recent_work_requests.insert(req);
+        // Cap number of resident work requests at ten
+        if (_recent_work_requests.size() > 10)
+            _recent_work_requests.erase(std::prev(_recent_work_requests.end()));
+    }
+
+    // Past-past balancing epoch: remember request but do not bounce it any further
+    if (req.balancingEpoch+1 < _job_db.getGlobalBalancingEpoch()) return;
+
+    // Bounce work request
+    int dest = Random::choice(_hop_destinations);
+    // (if possible, not just back to the sender)
+    while (_hop_destinations.size() > 1 && dest == handle.source) {
+        dest = Random::choice(_hop_destinations);
+    }
+    MyMpi::isend(MPI_COMM_WORLD, dest, MSG_REQUEST_WORK, handle.getRecvData());
+}
+
 void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
 
     // Increment #hops
@@ -976,6 +1060,13 @@ void Worker::timeoutJob(int jobId) {
         // Single job hit a limit, so there is no solution to be reported:
         // begin to propagate exit signal
         MyMpi::isend(MPI_COMM_WORLD, 0, MSG_DO_EXIT, IntVec({0}));
+    }
+}
+
+void Worker::sendStatusToNeighbors() {
+    std::vector<uint8_t> payload(1, _job_db.isIdle() ? 0 : 1);
+    for (int rank : _hop_destinations) {
+        MyMpi::isend(MPI_COMM_WORLD, rank, MSG_NOTIFY_NEIGHBOR_STATUS, payload);
     }
 }
 

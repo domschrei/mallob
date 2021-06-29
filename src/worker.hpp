@@ -40,6 +40,8 @@ private:
     SysState<5> _sys_state;
 
     std::vector<int> _hop_destinations;
+    robin_hood::unordered_set<int> _busy_neighbors;
+    std::set<WorkRequest, WorkRequestComparator> _recent_work_requests;
 
     std::thread _mpi_monitor_thread;
 
@@ -78,6 +80,8 @@ private:
     void handleNotifyVolumeUpdate(MessageHandle& handle);
     void handleNotifyNodeLeavingJob(MessageHandle& handle);
     void handleNotifyResultFound(MessageHandle& handle);
+    void handleNotifyNeighborStatus(MessageHandle& handle);
+    void handleRequestWork(MessageHandle& handle);
     
     void initJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& data, int senderRank);
     void restartJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& data, int senderRank);
@@ -87,6 +91,10 @@ private:
     void informClientJobIsDone(int jobId, int clientRank);
     void applyBalancing();
     void timeoutJob(int jobId);
+
+    void sendStatusToNeighbors();
+    void updateNeighborStatus(int rank, bool busy);
+    bool isOnlyIdleWorkerInLocalPerimeter();
     
     bool checkTerminate(float time);
     void createExpanderGraph();

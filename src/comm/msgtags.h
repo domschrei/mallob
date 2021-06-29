@@ -53,7 +53,7 @@ Data type: JobRequest
 const int MSG_CONFIRM_ADOPTION = 7;
 /*
 The sender propagates a job's volume update to the receiver.
-Data type: [jobId, volume]
+Data type: [jobId, volume, globalCommEpoch] (3 ints)
 */
 const int MSG_NOTIFY_VOLUME_UPDATE = 8;
 /*
@@ -148,6 +148,10 @@ The sender notifies the receiver that the job result the receiver just sent
 is obsolete and will not be needed. It does not need to be preserved.
 */
 const int MSG_NOTIFY_RESULT_OBSOLETE = 31;
+
+const int MSG_NOTIFY_NEIGHBOR_STATUS = 32;
+
+const int MSG_REQUEST_WORK = 33;
 
 /*
 Pseudo-tag representing all tags that can be received at any time.

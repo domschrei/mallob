@@ -106,6 +106,40 @@ struct OneshotJobRequestRejection : public Serializable {
     }
 };
 
+struct WorkRequest : public Serializable {
+    int requestingRank;
+    int numHops;
+    int balancingEpoch;
+
+    WorkRequest() = default;
+    WorkRequest(int rank, int balancingEpoch) : requestingRank(rank), numHops(0), balancingEpoch(balancingEpoch) {}
+
+    std::vector<uint8_t> serialize() const override {
+        std::vector<uint8_t> packed(3*sizeof(int));
+        int i = 0, n;
+        n = sizeof(int); memcpy(packed.data()+i, &requestingRank, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &numHops, n); i += n;
+        n = sizeof(int); memcpy(packed.data()+i, &balancingEpoch, n); i += n;
+        return packed;
+    }
+
+    WorkRequest& deserialize(const std::vector<uint8_t> &packed) override {
+        int i = 0, n;
+        n = sizeof(int); memcpy(&requestingRank, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&numHops, packed.data()+i, n); i += n;
+        n = sizeof(int); memcpy(&balancingEpoch, packed.data()+i, n); i += n;
+        return *this;
+    }
+};
+
+struct WorkRequestComparator {
+    bool operator()(const WorkRequest& lhs, const WorkRequest& rhs) const {
+        if (lhs.balancingEpoch != rhs.balancingEpoch) return lhs.balancingEpoch > rhs.balancingEpoch;
+        if (lhs.numHops != rhs.numHops) return lhs.numHops < rhs.numHops;
+        return std::hash<int>()(lhs.requestingRank) < std::hash<int>()(rhs.requestingRank);
+    }
+};
+
 /**
  * Sent as pre-information on a job that will be transferred
  * based on a previous commitment.
