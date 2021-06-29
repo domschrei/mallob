@@ -437,6 +437,8 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
     if (!oneshot && !_job_db.isIdle() && !_recent_work_requests.empty()) {
         // Forward the job request to the source of a recent work request
         WorkRequest wreq = *_recent_work_requests.begin();
+        req.numHops++;
+        _sys_state.addLocal(SYSSTATE_NUMHOPS, 1);
         log(LOG_ADD_DESTRANK | V4_VVER, "Forward %s to recent work req.", wreq.requestingRank, req.toStr().c_str());
         MyMpi::isend(MPI_COMM_WORLD, wreq.requestingRank, MSG_REQUEST_NODE, req);
         _recent_work_requests.erase(_recent_work_requests.begin());
@@ -851,8 +853,8 @@ void Worker::handleRequestWork(MessageHandle& handle) {
     if (req.requestingRank == _world_rank && !_job_db.isIdle()) return;
     // - _busy_neighbors contains this worker
     if (_busy_neighbors.count(req.requestingRank)) return;
-    // - # hops exceeding # workers
-    if (req.numHops >= MyMpi::size(_comm)) return;
+    // - # hops exceeding significant ratio of # workers
+    if (req.numHops >= MyMpi::size(_comm) / 2) return;
     
     // Remember work request for upcoming job requests
     // if the request does not originate from myself
@@ -883,12 +885,13 @@ void Worker::handleRequestWork(MessageHandle& handle) {
     if (req.balancingEpoch+1 < _job_db.getGlobalBalancingEpoch()) return;
 
     // Bounce work request
+    req.numHops++;
     int dest = Random::choice(_hop_destinations);
     // (if possible, not just back to the sender)
     while (_hop_destinations.size() > 1 && dest == handle.source) {
         dest = Random::choice(_hop_destinations);
     }
-    MyMpi::isend(MPI_COMM_WORLD, dest, MSG_REQUEST_WORK, handle.getRecvData());
+    MyMpi::isend(MPI_COMM_WORLD, dest, MSG_REQUEST_WORK, req);
 }
 
 void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
