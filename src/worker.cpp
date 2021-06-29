@@ -436,8 +436,8 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
 
     if (!oneshot && !_job_db.isIdle() && !_recent_work_requests.empty()) {
         // Forward the job request to the source of a recent work request
-        log(V4_VVER, "Forward job req. to recent work req.\n");
         WorkRequest wreq = *_recent_work_requests.begin();
+        log(LOG_ADD_DESTRANK | V4_VVER, "Forward %s to recent work req.", wreq.requestingRank, req.toStr().c_str());
         MyMpi::isend(MPI_COMM_WORLD, wreq.requestingRank, MSG_REQUEST_NODE, req);
         _recent_work_requests.erase(_recent_work_requests.begin());
         return;
