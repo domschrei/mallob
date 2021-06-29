@@ -1080,6 +1080,7 @@ void Worker::timeoutJob(int jobId) {
 }
 
 void Worker::sendStatusToNeighbors() {
+    if (!_params.workRequests()) return;
     std::vector<uint8_t> payload(1, _job_db.isIdle() ? 0 : 1);
     for (int rank : _hop_destinations) {
         MyMpi::isend(MPI_COMM_WORLD, rank, MSG_NOTIFY_NEIGHBOR_STATUS, payload);

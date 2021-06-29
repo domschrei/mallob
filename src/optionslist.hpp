@@ -30,6 +30,7 @@ OPT_BOOL(quiet,                          "q", "quiet",                      fals
 OPT_BOOL(shuffleSharedClauses,           "shufshcls", "",                   false,                      "Shuffle literals in each shared clause randomly on import")
 OPT_BOOL(useChecksums,                   "checksums", "",                   false,                      "Compute and verify checksum for every job description transfer")
 OPT_BOOL(warmup,                         "warmup", "",                      false,                      "Do one explicit All-To-All warmup among all nodes in the beginning")
+OPT_BOOL(workRequests,                   "wr", "",                          false,                      "Send around work requests similarly to job requests")
 OPT_BOOL(yield,                          "yield", "",                       false,                      "Yield manager thread whenever there are no new messages")
 OPT_BOOL(zeroOnlyLogging,                "0o", "",                          false,                      "Only PE of rank zero does logging")
 
