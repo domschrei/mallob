@@ -129,7 +129,7 @@ void Worker::init() {
         desc.setRootRank(0);
         bool success = SatReader(instanceFilename).read(desc);
         if (!success) {
-            log(V0_CRIT, "Could not open file! Aborting.\n");
+            log(V0_CRIT, "ERROR: Could not open file! Aborting.\n");
             Terminator::setTerminating();
             return;
         }

@@ -76,7 +76,7 @@ void Process::init(int rank, bool leafProcess) {
 
         if (_exit_signal == SIGABRT || _exit_signal == SIGSEGV) {
             int sig = _exit_signal;
-            log(V0_CRIT, "Error from pid=%ld tid=%ld signal=%d\n", 
+            log(V0_CRIT, "ERROR from pid=%ld tid=%ld signal=%d\n", 
                     Proc::getPid(), Proc::getTid(), sig);
         }
 
@@ -100,7 +100,7 @@ pid_t Process::createChild() {
         _children.insert(res);
     } else if (res == -1) {
         // fork failed
-        log(V0_CRIT, "fork returned errno %i\n", (int)errno);
+        log(V0_CRIT, "ERROR: fork returned errno %i\n", (int)errno);
         abort();
     }
 

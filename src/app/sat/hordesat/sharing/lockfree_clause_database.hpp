@@ -45,15 +45,17 @@ public:
         BucketLabel _bucket;
         size_t _remaining_cls_of_bucket = 0;
 
+        bool _use_checksum;
         size_t _hash;
         size_t _true_hash = 1;
 
     public:
-        BufferReader(int* buffer, int size, int maxLbdPartitionedSize) : _buffer(buffer), _size(size), 
-                _max_lbd_partitioned_size(maxLbdPartitionedSize) {
+        BufferReader(int* buffer, int size, int maxLbdPartitionedSize, bool useChecksum = true) : 
+                _buffer(buffer), _size(size), 
+                _max_lbd_partitioned_size(maxLbdPartitionedSize), _use_checksum(useChecksum) {
             
             int numInts = sizeof(size_t)/sizeof(int);
-            if (_size > 0) {
+            if (_use_checksum && _size > 0) {
                 // Extract checksum
                 assert(size >= numInts);
                 memcpy(&_true_hash, _buffer, sizeof(size_t));
@@ -73,8 +75,8 @@ public:
                 // Nothing left to read?
                 if (_current_pos >= _size) {
                     // Verify checksum
-                    if (_hash != _true_hash) {
-                        log(V0_CRIT, "Checksum fail!\n");
+                    if (_use_checksum && _hash != _true_hash) {
+                        log(V0_CRIT, "ERROR: Checksum fail!\n");
                         abort();
                     }
                     return cls;
@@ -94,10 +96,12 @@ public:
             int stop = start + _bucket.size;
             if (stop+(partitionedByLbd ? 0 : 1) > _size) return cls;
 
-            hash_combine(_hash, ClauseHasher::hash(
-                _buffer+start,
-                _bucket.size+(partitionedByLbd ? 0 : 1), 3
-            ));
+            if (_use_checksum) {
+                hash_combine(_hash, ClauseHasher::hash(
+                    _buffer+start,
+                    _bucket.size+(partitionedByLbd ? 0 : 1), 3
+                ));
+            }
 
             if (partitionedByLbd) {
                 // set LBD value inferred from buffer structure
@@ -315,8 +319,8 @@ public:
         return selection;
     }
 
-    BufferReader getBufferReader(int* begin, size_t size) {
-        return BufferReader(begin, size, _max_lbd_partitioned_size);
+    BufferReader getBufferReader(int* begin, size_t size, bool useChecksums = true) {
+        return BufferReader(begin, size, _max_lbd_partitioned_size, useChecksums);
     }
 
     BufferMerger getBufferMerger() {

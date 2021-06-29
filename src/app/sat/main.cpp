@@ -31,7 +31,7 @@ Logger getLog(const Parameters& params, const HordeConfig& config) {
 void* accessMemory(const Logger& log, const std::string& shmemId, size_t size) {
     void* ptr = SharedMemory::access(shmemId, size);
     if (ptr == nullptr) {
-        log.log(V0_CRIT, "Could not access shmem %s! Aborting.\n", shmemId.c_str());  
+        log.log(V0_CRIT, "ERROR: Could not access shmem %s! Aborting.\n", shmemId.c_str());  
         Process::doExit(0);  
     }
     return ptr;

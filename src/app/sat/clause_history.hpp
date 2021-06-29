@@ -155,7 +155,7 @@ public:
                 // Merge with prior clauses at that index
                 auto merger = _cdb.getBufferMerger();
                 for (auto& clsbuf : _history[index].clauses)
-                    merger.add(_cdb.getBufferReader(clsbuf.data(), clsbuf.size()));
+                    merger.add(_cdb.getBufferReader(clsbuf.data(), clsbuf.size(), /*useChecksums=*/false));
                 auto merged = merger.merge(isShorttermMemory(index) ? _stm_buffer_size : _ltm_buffer_size);
                 _history[index].clauses.resize(1);
                 _history[index].clauses[0] = std::move(merged);
