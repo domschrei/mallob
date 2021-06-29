@@ -436,13 +436,26 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
 
     if (!oneshot && !_job_db.isIdle() && !_recent_work_requests.empty()) {
         // Forward the job request to the source of a recent work request
-        WorkRequest wreq = *_recent_work_requests.begin();
-        req.numHops++;
-        _sys_state.addLocal(SYSSTATE_NUMHOPS, 1);
-        log(LOG_ADD_DESTRANK | V4_VVER, "Forward %s to recent work req.", wreq.requestingRank, req.toStr().c_str());
-        MyMpi::isend(MPI_COMM_WORLD, wreq.requestingRank, MSG_REQUEST_NODE, req);
-        _recent_work_requests.erase(_recent_work_requests.begin());
-        return;
+
+        // Remove old work requests and try and find a recent one
+        auto it = _recent_work_requests.begin();
+        while (it != _recent_work_requests.end()) {
+            if (it->balancingEpoch+1 < _job_db.getGlobalBalancingEpoch()) {
+                it = _recent_work_requests.erase(it);
+            } else {
+                break;
+            }
+        }
+        // Found one?
+        if (it != _recent_work_requests.end()) {
+            WorkRequest wreq = *_recent_work_requests.begin();
+            req.numHops++;
+            _sys_state.addLocal(SYSSTATE_NUMHOPS, 1);
+            log(LOG_ADD_DESTRANK | V4_VVER, "Forward %s to recent work req.", wreq.requestingRank, req.toStr().c_str());
+            MyMpi::isend(MPI_COMM_WORLD, wreq.requestingRank, MSG_REQUEST_NODE, req);
+            _recent_work_requests.erase(_recent_work_requests.begin());
+            return;
+        }
     }
 
     int removedJob;
@@ -854,7 +867,7 @@ void Worker::handleRequestWork(MessageHandle& handle) {
     // - _busy_neighbors contains this worker
     if (_busy_neighbors.count(req.requestingRank)) return;
     // - # hops exceeding significant ratio of # workers
-    if (req.numHops >= MyMpi::size(_comm) / 2) return;
+    if (req.numHops >= std::ceil(0.1 * MyMpi::size(_comm))) return;
     
     // Remember work request for upcoming job requests
     // if the request does not originate from myself
@@ -876,8 +889,8 @@ void Worker::handleRequestWork(MessageHandle& handle) {
         }
         // Insert new request if dominating or novel
         if (dominatingOrNovel) _recent_work_requests.insert(req);
-        // Cap number of resident work requests at ten
-        if (_recent_work_requests.size() > 10)
+        // Cap number of resident work requests
+        if (_recent_work_requests.size() > 3)
             _recent_work_requests.erase(std::prev(_recent_work_requests.end()));
     }
 
