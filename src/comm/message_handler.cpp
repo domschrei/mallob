@@ -8,6 +8,8 @@ MessageHandler::MessageHandler() {
 }
 
 void MessageHandler::registerCallback(int tag, const MsgCallback& cb) {
+    if (_callbacks.count(tag))
+        log(V1_WARN, "[WARN] Overwriting existent callback for tag %i!\n", tag);
     _callbacks[tag] = cb;
 }
 

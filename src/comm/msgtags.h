@@ -147,11 +147,11 @@ const int MSG_SEND_APPLICATION_MESSAGE = 30;
 The sender notifies the receiver that the job result the receiver just sent
 is obsolete and will not be needed. It does not need to be preserved.
 */
-const int MSG_NOTIFY_RESULT_OBSOLETE = 31;
+const int MSG_NOTIFY_RESULT_OBSOLETE = 34;
 
-const int MSG_NOTIFY_NEIGHBOR_STATUS = 32;
+const int MSG_NOTIFY_NEIGHBOR_STATUS = 35;
 
-const int MSG_REQUEST_WORK = 33;
+const int MSG_REQUEST_WORK = 36;
 
 /*
 Pseudo-tag representing all tags that can be received at any time.
