@@ -167,6 +167,10 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         job->setMaxDemand(maxDemand);
         log.log(V4_VVER, "Job #%i : max demand %i\n", id, maxDemand);
     }
+    if (j.contains("application")) {
+        auto app = j["application"].get<std::string>();
+        job->setApplication(app == "SAT" ? JobDescription::Application::SAT : JobDescription::Application::DUMMY);
+    }
     job->setArrival(arrival);
     std::string file = j["file"].get<std::string>();
     

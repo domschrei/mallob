@@ -8,6 +8,8 @@
 
 #include "app/sat/forked_sat_job.hpp"
 #include "app/sat/threaded_sat_job.hpp"
+#include "app/dummy/dummy_job.hpp"
+
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "balancing/event_driven_balancer.hpp"
@@ -47,12 +49,18 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm):
     });
 }
 
-Job& JobDatabase::createJob(int commSize, int worldRank, int jobId) {
+Job& JobDatabase::createJob(int commSize, int worldRank, int jobId, JobDescription::Application application) {
 
-    if (_params.applicationSpawnMode() == "fork") {
-        _jobs[jobId] = new ForkedSatJob(_params, commSize, worldRank, jobId);
-    } else {
-        _jobs[jobId] = new ThreadedSatJob(_params, commSize, worldRank, jobId);
+    switch (application) {
+    case JobDescription::Application::SAT:
+        if (_params.applicationSpawnMode() == "fork") {
+            _jobs[jobId] = new ForkedSatJob(_params, commSize, worldRank, jobId);
+        } else {
+            _jobs[jobId] = new ThreadedSatJob(_params, commSize, worldRank, jobId);
+        }
+        break;
+    case JobDescription::Application::DUMMY:
+        _jobs[jobId] = new DummyJob(_params, commSize, worldRank, jobId);
     }
     _num_stored_jobs++;
     return *_jobs[jobId];

@@ -5,6 +5,27 @@
 #include "util/logger.hpp"
 #include "util/random.hpp"
 
+std::vector<int> AdjustablePermutation::createUndirectedExpanderGraph(int n, int degree, int myRank) {
+    assert(degree % 2 == 0);
+    
+    std::vector<int> myEdges;
+
+    // Get index of this worker within a particular permutation of all ranks
+    AdjustablePermutation p(n, /*seed=*/(n-1)*degree);
+    int myIndex = 0;
+    while (p.get(myIndex) != myRank) myIndex++;
+
+    // Add edges to workers which have a specific distance to this worker
+    // with respect to the drawn permutation of ranks
+    for (size_t i = 0; i < degree/2; i++) {
+        int offset = 1 + i * std::max(1, (n / (degree-1)));
+        myEdges.push_back(p.get((n+myIndex+offset) % n));
+        myEdges.push_back(p.get((n+myIndex-offset) % n));
+    }
+
+    return myEdges;
+}
+
 std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, int myRank) {
 
     std::vector<int> outgoingEdges;

@@ -139,6 +139,7 @@ void MyMpi::init(int argc, char *argv[]) {
     tagList.emplace_back(MSG_NOTIFY_RESULT_FOUND,           true);
     tagList.emplace_back(MSG_NOTIFY_NODE_LEAVING_JOB,       true); 
     tagList.emplace_back(MSG_NOTIFY_NEIGHBOR_STATUS,        true); 
+    tagList.emplace_back(MSG_NOTIFY_NEIGHBOR_IDLE_DISTANCE, true); 
     tagList.emplace_back(MSG_REQUEST_WORK,                  true); 
     
     for (const auto& tag : tagList) _tags[tag.id] = tag;

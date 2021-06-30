@@ -22,6 +22,7 @@ private:
     std::vector<AdjustablePermutation*> _disallowed_permutations;
 
 public:
+    static std::vector<int> createUndirectedExpanderGraph(int n, int r, int myRank);
     static std::vector<int> createExpanderGraph(int n, int r, int myRank);
 
     AdjustablePermutation() = default;

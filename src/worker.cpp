@@ -82,6 +82,8 @@ void Worker::init() {
         [&](auto& h) {handleSendJobResult(h);});
     _msg_handler.registerCallback(MSG_NOTIFY_NEIGHBOR_STATUS,
         [&](auto& h) {handleNotifyNeighborStatus(h);});
+    _msg_handler.registerCallback(MSG_NOTIFY_NEIGHBOR_IDLE_DISTANCE,
+        [&](auto& h) {handleNotifyNeighborIdleDistance(h);});
     _msg_handler.registerCallback(MSG_REQUEST_WORK,
         [&](auto& h) {handleRequestWork(h);});
     auto balanceCb = [&](MessageHandle& handle) {
@@ -136,8 +138,8 @@ void Worker::init() {
 
         // Add as a new local SAT job image
         log(V3_VERB, "%ld lits w/ separators; init SAT job image\n", desc.getNumFormulaLiterals());
-        _job_db.createJob(MyMpi::size(_comm), _world_rank, jobId);
-        JobRequest req(jobId, 0, 0, 0, 0, 0, 0);
+        _job_db.createJob(MyMpi::size(_comm), _world_rank, jobId,JobDescription::Application::SAT);
+        JobRequest req(jobId, JobDescription::Application::SAT, 0, 0, 0, 0, 0, 0);
         _job_db.commit(req);
         auto serializedDesc = desc.getSerialization();
         initJob(jobId, serializedDesc, _world_rank);
@@ -409,6 +411,7 @@ void Worker::handleRejectOneshot(MessageHandle& handle) {
     } else {
         // Attempt another oneshot request
         req.numHops++;
+        _sys_state.addLocal(SYSSTATE_NUMHOPS, 1);
         // Get dormant children without the node that just declined
         std::set<int> dormantChildren = job.getJobTree().getDormantChildren();
         if (dormantChildren.count(handle.source)) dormantChildren.erase(handle.source);
@@ -484,7 +487,7 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
         // Commit on the job, send a request to the parent
         if (!_job_db.has(req.jobId)) {
             // Job is not known yet: create instance, request full transfer
-            _job_db.createJob(MyMpi::size(_comm), _world_rank, req.jobId);
+            _job_db.createJob(MyMpi::size(_comm), _world_rank, req.jobId, req.application);
             req.lastKnownRevision = -1;
         } else if (!_job_db.get(req.jobId).hasReceivedDescription()) {
             // Job is known, but never received full description:
@@ -795,7 +798,8 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
         }
         
         // Initiate search for a replacement for the defected child
-        JobRequest req = job.getJobTree().getJobRequestFor(jobId, pruned, _job_db.getGlobalBalancingEpoch());
+        JobRequest req = job.getJobTree().getJobRequestFor(jobId, pruned, _job_db.getGlobalBalancingEpoch(), 
+                job.getDescription().getApplication());
         log(LOG_ADD_DESTRANK | V4_VVER, "%s : try to find child replacing defected %s", nextNodeRank, 
                         job.toStr(), _job_db.toStr(jobId, index).c_str());
         MyMpi::isend(MPI_COMM_WORLD, nextNodeRank, tag, req);
@@ -853,6 +857,25 @@ void Worker::handleNotifyResultFound(MessageHandle& handle) {
 void Worker::handleNotifyNeighborStatus(MessageHandle& handle) {
     bool isBusy = handle.getRecvData().at(0) == 1;
     updateNeighborStatus(handle.source, isBusy);
+}
+
+void Worker::handleNotifyNeighborIdleDistance(MessageHandle& handle) {
+    int distBefore = getIdleDistance();
+    _neighbor_idle_distance[handle.source] = Serializable::get<int>(handle.getRecvData());
+    int distAfter = getIdleDistance();
+    if (distAfter != distBefore) {
+        log(V4_VVER, "New idle distance %i\n", distAfter);
+        sendStatusToNeighbors();
+    }
+}
+
+int Worker::getIdleDistance() {
+    if (_job_db.isIdle()) return 0;
+    int minDistance = _params.maxIdleDistance();
+    for (const auto& [rank, dist] : _neighbor_idle_distance) {
+        minDistance = std::min(minDistance, dist+1);
+    }
+    return minDistance;
 }
 
 void Worker::updateNeighborStatus(int rank, bool busy) {
@@ -930,7 +953,7 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
     int nextRank;
     if (_params.derandomize()) {
         // Get random choice from bounce alternatives
-        nextRank = Random::choice(_hop_destinations);
+        nextRank = getWeightedRandomNeighbor();
         if (_hop_destinations.size() > 2) {
             // ... if possible while skipping the requesting node and the sender
             while (nextRank == request.requestingNodeRank || nextRank == senderRank) {
@@ -1007,8 +1030,8 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
             // Grow
             log(V5_DEBG, "%s : grow\n", job.toStr());
             if (mono) job.getJobTree().updateJobNode(indices[i], indices[i]);
-            JobRequest req(jobId, job.getJobTree().getRootNodeRank(), _world_rank, nextIndex, 
-                    Timer::elapsedSeconds(), balancingEpoch, 0);
+            JobRequest req(jobId, job.getDescription().getApplication(), job.getJobTree().getRootNodeRank(), 
+                    _world_rank, nextIndex, Timer::elapsedSeconds(), balancingEpoch, 0);
             req.currentRevision = job.getRevision();
             int nextNodeRank, tag;
             if (dormantChildren.empty()) {
@@ -1088,11 +1111,36 @@ void Worker::timeoutJob(int jobId) {
 }
 
 void Worker::sendStatusToNeighbors() {
-    if (!_params.workRequests()) return;
-    std::vector<uint8_t> payload(1, _job_db.isIdle() ? 0 : 1);
-    for (int rank : _hop_destinations) {
-        MyMpi::isend(MPI_COMM_WORLD, rank, MSG_NOTIFY_NEIGHBOR_STATUS, payload);
+    if (_params.workRequests()) {
+        std::vector<uint8_t> payload(1, _job_db.isIdle() ? 0 : 1);
+        for (int rank : _hop_destinations) {
+            MyMpi::isend(MPI_COMM_WORLD, rank, MSG_NOTIFY_NEIGHBOR_STATUS, payload);
+        }
     }
+    if (_params.maxIdleDistance() > 0) {
+        int idleDistance = getIdleDistance();
+        auto payload = IntVec({idleDistance});
+        for (int rank : _hop_destinations) {
+            MyMpi::isend(MPI_COMM_WORLD, rank, MSG_NOTIFY_NEIGHBOR_IDLE_DISTANCE, payload);
+        }
+    }
+}
+
+int Worker::getWeightedRandomNeighbor() {
+    
+    int sum = 0;
+    for (const auto& [rank, dist] : _neighbor_idle_distance) 
+        sum += 1 + _params.maxIdleDistance() - dist;
+    
+    int rand = (int) (sum*Random::rand());
+    
+    sum = 0;
+    for (const auto& [rank, dist] : _neighbor_idle_distance) {
+        int add = 1 + _params.maxIdleDistance() - dist;
+        if (rand < sum+add) return rank;
+        sum += add;
+    }
+    abort();
 }
 
 void Worker::applyBalancing() {
@@ -1140,8 +1188,12 @@ void Worker::createExpanderGraph() {
     }  
 
     // Create graph, get outgoing edges from this node
-    _hop_destinations = AdjustablePermutation::createExpanderGraph(numWorkers, numBounceAlternatives, _world_rank);
-    assert((int)_hop_destinations.size() == numBounceAlternatives);
+    _hop_destinations = _params.maxIdleDistance() > 0 ?
+        AdjustablePermutation::createUndirectedExpanderGraph(numWorkers, numBounceAlternatives, _world_rank)
+        : AdjustablePermutation::createExpanderGraph(numWorkers, numBounceAlternatives, _world_rank);
+    for (int dest : _hop_destinations) {
+        _neighbor_idle_distance[dest] = 0; // initially, all workers are idle
+    }
 
     // Output found bounce alternatives
     std::string info = "";
@@ -1149,6 +1201,7 @@ void Worker::createExpanderGraph() {
         info += std::to_string(_hop_destinations[i]) + " ";
     }
     log(V3_VERB, "My bounce alternatives: %s\n", info.c_str());
+    assert((int)_hop_destinations.size() == numBounceAlternatives);
 }
 
 int Worker::getRandomNonSelfWorkerNode() {

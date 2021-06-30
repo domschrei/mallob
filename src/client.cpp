@@ -341,7 +341,7 @@ void Client::introduceNextJob() {
     }   
     log(V4_VVER, "%i\n", job.getRevision());
 
-    JobRequest req(jobId, /*rootRank=*/-1, /*requestingNodeRank=*/_world_rank, 
+    JobRequest req(jobId, job.getApplication(), /*rootRank=*/-1, /*requestingNodeRank=*/_world_rank, 
         /*requestedNodeIndex=*/0, /*timeOfBirth=*/time, /*balancingEpoch=*/-1, /*numHops=*/0);
     req.currentRevision = job.getRevision();
     req.timeOfBirth = job.getArrival();

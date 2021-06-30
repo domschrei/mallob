@@ -151,7 +151,9 @@ const int MSG_NOTIFY_RESULT_OBSOLETE = 34;
 
 const int MSG_NOTIFY_NEIGHBOR_STATUS = 35;
 
-const int MSG_REQUEST_WORK = 36;
+const int MSG_NOTIFY_NEIGHBOR_IDLE_DISTANCE = 36;
+
+const int MSG_REQUEST_WORK = 37;
 
 /*
 Pseudo-tag representing all tags that can be received at any time.

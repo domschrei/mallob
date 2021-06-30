@@ -40,6 +40,8 @@ private:
     SysState<5> _sys_state;
 
     std::vector<int> _hop_destinations;
+    robin_hood::unordered_map<int, int> _neighbor_idle_distance;
+
     robin_hood::unordered_set<int> _busy_neighbors;
     std::set<WorkRequest, WorkRequestComparator> _recent_work_requests;
     float _time_only_idle_worker = -1;
@@ -82,6 +84,7 @@ private:
     void handleNotifyNodeLeavingJob(MessageHandle& handle);
     void handleNotifyResultFound(MessageHandle& handle);
     void handleNotifyNeighborStatus(MessageHandle& handle);
+    void handleNotifyNeighborIdleDistance(MessageHandle& handle);
     void handleRequestWork(MessageHandle& handle);
     
     void initJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& data, int senderRank);
@@ -94,6 +97,9 @@ private:
     void timeoutJob(int jobId);
 
     void sendStatusToNeighbors();
+    int getIdleDistance();
+    int getWeightedRandomNeighbor();
+
     void updateNeighborStatus(int rank, bool busy);
     bool isOnlyIdleWorkerInLocalPerimeter();
     

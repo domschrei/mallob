@@ -47,7 +47,7 @@ public:
     JobDatabase(Parameters& params, MPI_Comm& comm);
     ~JobDatabase();
 
-    Job& createJob(int commSize, int worldRank, int jobId);
+    Job& createJob(int commSize, int worldRank, int jobId, JobDescription::Application application);
     bool init(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source);
     bool restart(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source);
 

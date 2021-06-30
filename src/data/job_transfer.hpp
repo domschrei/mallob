@@ -8,6 +8,7 @@
 
 #include "serializable.hpp"
 #include "data/checksum.hpp"
+#include "data/job_description.hpp"
 
 /**
  * Sent around during the search of a node to adopt the job.
@@ -15,6 +16,7 @@
 struct JobRequest : public Serializable {
 
     int jobId;
+    JobDescription::Application application;
     int rootRank;
     int requestingNodeRank;
     int requestedNodeIndex;
@@ -27,9 +29,11 @@ struct JobRequest : public Serializable {
 public:
     JobRequest() = default;
 
-    JobRequest(int jobId, int rootRank, int requestingNodeRank, int requestedNodeIndex, 
+    JobRequest(int jobId, JobDescription::Application application, int rootRank, 
+            int requestingNodeRank, int requestedNodeIndex, 
             float timeOfBirth, int balancingEpoch, int numHops) :
         jobId(jobId),
+        application(application),
         rootRank(rootRank),
         requestingNodeRank(requestingNodeRank),
         requestedNodeIndex(requestedNodeIndex),
@@ -40,10 +44,11 @@ public:
         balancingEpoch(balancingEpoch) {}
 
     std::vector<uint8_t> serialize() const override {
-        int size = (8*sizeof(int)+sizeof(float));
+        int size = (8*sizeof(int)+sizeof(float)+sizeof(JobDescription::Application));
         std::vector<uint8_t> packed(size);
         int i = 0, n;
         n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;
+        n = sizeof(JobDescription::Application); memcpy(packed.data()+i, &application, n); i += n;
         n = sizeof(int); memcpy(packed.data()+i, &rootRank, n); i += n;
         n = sizeof(int); memcpy(packed.data()+i, &requestingNodeRank, n); i += n;
         n = sizeof(int); memcpy(packed.data()+i, &requestedNodeIndex, n); i += n;
@@ -58,6 +63,7 @@ public:
     JobRequest& deserialize(const std::vector<uint8_t> &packed) override {
         int i = 0, n;
         n = sizeof(int); memcpy(&jobId, packed.data()+i, n); i += n;
+        n = sizeof(JobDescription::Application); memcpy(&application, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&rootRank, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&requestingNodeRank, packed.data()+i, n); i += n;
         n = sizeof(int); memcpy(&requestedNodeIndex, packed.data()+i, n); i += n;

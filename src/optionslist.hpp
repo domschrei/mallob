@@ -47,6 +47,7 @@ OPT_INT(initialSoftLbdLimit,             "islbd", "",                       0,  
 OPT_INT(jobCacheSize,                    "jc", "job-cache",                 4,    0, LARGE_INT,         "Size of job cache per PE for suspended yet unfinished job nodes")
 OPT_INT(numBounceAlternatives,           "ba", "",                          4,    1, LARGE_INT,         "Number of bounce alternatives per PE (only relevant if -derandomize)")
 OPT_INT(maxDemand,                       "md", "max-demand",                0,    0, LARGE_INT,         "Limit any job's demand to this value")
+OPT_INT(maxIdleDistance,                 "mid", "",                         4,    0, LARGE_INT,         "Propagate idle distance of workers up to this limit through worker graph to weight randomness in request bouncing")
 OPT_INT(maxLbdPartitioningSize,          "mlbdps", "",                      8,    1, LARGE_INT,         "Store clauses with up to this LBD in separate buckets")
 OPT_INT(numClients,                      "c", "num-clients",                1,    0, LARGE_INT,         "Number of client nodes")
 OPT_INT(numJobs,                         "J", "num-jobs",                   0,    0, LARGE_INT,         "Exit as soon as this number of jobs has been processed")

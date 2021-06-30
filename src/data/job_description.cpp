@@ -35,19 +35,20 @@ int JobDescription::writeMetadataAndPointers() {
 
     // Serialize meta data into the vector's beginning (place was reserved earlier)
     int i = 0, n;
-    n = sizeof(int);     memcpy(_raw_data->data()+i, &_id, n); i += n;
-    n = sizeof(int);     memcpy(_raw_data->data()+i, &_root_rank, n); i += n;
-    n = sizeof(float);   memcpy(_raw_data->data()+i, &_priority, n); i += n;
-    n = sizeof(bool);    memcpy(_raw_data->data()+i, &_incremental, n); i += n;
-    n = sizeof(int);     memcpy(_raw_data->data()+i, &_num_vars, n); i += n;
-    n = sizeof(int);     memcpy(_raw_data->data()+i, &_first_revision, n); i += n;
-    n = sizeof(int);     memcpy(_raw_data->data()+i, &_revision, n); i += n;
-    n = sizeof(float);   memcpy(_raw_data->data()+i, &_wallclock_limit, n); i += n;
-    n = sizeof(float);   memcpy(_raw_data->data()+i, &_cpu_limit, n); i += n;
-    n = sizeof(int);     memcpy(_raw_data->data()+i, &_max_demand, n); i += n;
-    n = sizeof(Checksum);memcpy(_raw_data->data()+i, &_checksum, n); i += n;
-    n = sizeof(size_t);  memcpy(_raw_data->data()+i, &_f_size, n); i += n;
-    n = sizeof(size_t);  memcpy(_raw_data->data()+i, &_a_size, n); i += n;
+    n = sizeof(int);         memcpy(_raw_data->data()+i, &_id, n); i += n;
+    n = sizeof(int);         memcpy(_raw_data->data()+i, &_root_rank, n); i += n;
+    n = sizeof(float);       memcpy(_raw_data->data()+i, &_priority, n); i += n;
+    n = sizeof(bool);        memcpy(_raw_data->data()+i, &_incremental, n); i += n;
+    n = sizeof(int);         memcpy(_raw_data->data()+i, &_num_vars, n); i += n;
+    n = sizeof(int);         memcpy(_raw_data->data()+i, &_first_revision, n); i += n;
+    n = sizeof(int);         memcpy(_raw_data->data()+i, &_revision, n); i += n;
+    n = sizeof(float);       memcpy(_raw_data->data()+i, &_wallclock_limit, n); i += n;
+    n = sizeof(float);       memcpy(_raw_data->data()+i, &_cpu_limit, n); i += n;
+    n = sizeof(int);         memcpy(_raw_data->data()+i, &_max_demand, n); i += n;
+    n = sizeof(Application); memcpy(_raw_data->data()+i, &_application, n); i += n;
+    n = sizeof(Checksum);    memcpy(_raw_data->data()+i, &_checksum, n); i += n;
+    n = sizeof(size_t);      memcpy(_raw_data->data()+i, &_f_size, n); i += n;
+    n = sizeof(size_t);      memcpy(_raw_data->data()+i, &_a_size, n); i += n;
 
     // Move "i" to 1st position after payloads and assumptions
     n = sizeof(int)*_f_size; i += n;
@@ -94,7 +95,8 @@ constexpr int JobDescription::getMetadataSize() const {
             +3*sizeof(float)
             +sizeof(bool)
             +2*sizeof(size_t)
-            +sizeof(Checksum);
+            +sizeof(Checksum)
+            +sizeof(Application);
 }
 
 
@@ -121,19 +123,20 @@ void JobDescription::deserialize() {
     size_t i = 0, n;
 
     // Basic data
-    n = sizeof(int);     memcpy(&_id, _raw_data->data()+i, n);               i += n;
-    n = sizeof(int);     memcpy(&_root_rank, _raw_data->data()+i, n);        i += n;
-    n = sizeof(float);   memcpy(&_priority, _raw_data->data()+i, n);         i += n;
-    n = sizeof(bool);    memcpy(&_incremental, _raw_data->data()+i, n);      i += n;
-    n = sizeof(int);     memcpy(&_num_vars, _raw_data->data()+i, n);         i += n;
-    n = sizeof(int);     memcpy(&_first_revision, _raw_data->data()+i, n);   i += n;
-    n = sizeof(int);     memcpy(&_revision, _raw_data->data()+i, n);         i += n;
-    n = sizeof(float);   memcpy(&_wallclock_limit, _raw_data->data()+i, n);  i += n;
-    n = sizeof(float);   memcpy(&_cpu_limit, _raw_data->data()+i, n);        i += n;
-    n = sizeof(int);     memcpy(&_max_demand, _raw_data->data()+i, n);       i += n;
-    n = sizeof(Checksum);memcpy(&_checksum, _raw_data->data()+i, n);         i += n;
-    n = sizeof(size_t);  memcpy(&_f_size, _raw_data->data()+i, n);           i += n;
-    n = sizeof(size_t);  memcpy(&_a_size, _raw_data->data()+i, n);           i += n;
+    n = sizeof(int);         memcpy(&_id, _raw_data->data()+i, n);              i += n;
+    n = sizeof(int);         memcpy(&_root_rank, _raw_data->data()+i, n);       i += n;
+    n = sizeof(float);       memcpy(&_priority, _raw_data->data()+i, n);        i += n;
+    n = sizeof(bool);        memcpy(&_incremental, _raw_data->data()+i, n);     i += n;
+    n = sizeof(int);         memcpy(&_num_vars, _raw_data->data()+i, n);        i += n;
+    n = sizeof(int);         memcpy(&_first_revision, _raw_data->data()+i, n);  i += n;
+    n = sizeof(int);         memcpy(&_revision, _raw_data->data()+i, n);        i += n;
+    n = sizeof(float);       memcpy(&_wallclock_limit, _raw_data->data()+i, n); i += n;
+    n = sizeof(float);       memcpy(&_cpu_limit, _raw_data->data()+i, n);       i += n;
+    n = sizeof(int);         memcpy(&_max_demand, _raw_data->data()+i, n);      i += n;
+    n = sizeof(Application); memcpy(&_application, _raw_data->data()+i, n);     i += n;
+    n = sizeof(Checksum);    memcpy(&_checksum, _raw_data->data()+i, n);        i += n;
+    n = sizeof(size_t);      memcpy(&_f_size, _raw_data->data()+i, n);          i += n;
+    n = sizeof(size_t);      memcpy(&_a_size, _raw_data->data()+i, n);          i += n;
 
     // Payload
     size_t pos = i; // position where revisions' payloads begin
@@ -179,6 +182,7 @@ std::shared_ptr<std::vector<uint8_t>> JobDescription::extractUpdate(int firstInc
     desc._cpu_limit = _cpu_limit;
     desc._max_demand = _max_demand;
     desc._arrival = _arrival;
+    desc._application = _application;
     desc._checksum = _checksum;
 
     desc.beginInitialization(); // allocate space for meta data

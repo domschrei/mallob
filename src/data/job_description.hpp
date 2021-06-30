@@ -21,6 +21,9 @@ typedef std::shared_ptr<std::vector<int>> VecPtr;
  */
 class JobDescription : public Serializable {
 
+public:
+    enum Application {SAT, DUMMY};
+
 private:
 
     // Global meta data
@@ -33,6 +36,7 @@ private:
     float _wallclock_limit = 0; // in seconds
     float _cpu_limit = 0; // in CPU seconds
     int _max_demand = 0;
+    Application _application = SAT;
 
     Checksum _checksum;
     const bool _use_checksums = false;
@@ -107,6 +111,7 @@ public:
     float getWallclockLimit() const {return _wallclock_limit;}
     float getCpuLimit() const {return _cpu_limit;}
     int getMaxDemand() const {return _max_demand;}
+    Application getApplication() const {return _application;}
     
     float getArrival() const {return _arrival;}
     bool isIncremental() const {return _incremental;}
@@ -122,6 +127,7 @@ public:
     void setMaxDemand(int maxDemand) {_max_demand = maxDemand;}
     void setNumVars(int numVars) {_num_vars = numVars;}
     void setArrival(float arrival) {_arrival = arrival;};
+    void setApplication(Application app) {_application = app;}
     void clearPayload();
 
     Checksum getChecksum() const {return _checksum;}

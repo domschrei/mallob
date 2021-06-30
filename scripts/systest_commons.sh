@@ -105,7 +105,9 @@ function introduce_job() {
     arrival=$4
     if [ "$4" == "" ]; then arrival="0"; fi
     dependency=$5
-    echo '{ "arrival": '$arrival', "dependencies": ['$dependency'], "user": "admin", "name": "'$jobname'", "file": "'$instance'", "priority": 1.000, "wallclock-limit": "'$wclimit'", "cpu-limit": "0" }' > .api/jobs.0/new/$1.json
+    application=$6
+    if [ "$6" == "" ]; then application="SAT"; fi
+    echo '{ "application": "'$application'", "arrival": '$arrival', "dependencies": ['$dependency'], "user": "admin", "name": "'$jobname'", "file": "'$instance'", "priority": 1.000, "wallclock-limit": "'$wclimit'", "cpu-limit": "0" }' > .api/jobs.0/new/$1.json
     cp .api/jobs.0/new/$1.json .api/jobs.0/introduced/admin.$1.json
     echo "admin.$jobname"
 }
