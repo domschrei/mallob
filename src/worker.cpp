@@ -791,7 +791,7 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
             // If unsucessful, pick a random node
             tag = MSG_REQUEST_NODE;
             if (_params.derandomize()) {
-                nextNodeRank = Random::choice(_hop_destinations);
+                nextNodeRank = getWeightedRandomNeighbor();
             } else {
                 nextNodeRank = getRandomNonSelfWorkerNode();
             }
@@ -957,7 +957,7 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
         if (_hop_destinations.size() > 2) {
             // ... if possible while skipping the requesting node and the sender
             while (nextRank == request.requestingNodeRank || nextRank == senderRank) {
-                nextRank = Random::choice(_hop_destinations);
+                nextRank = getWeightedRandomNeighbor();
             }
         }
     } else {
@@ -1134,11 +1134,10 @@ int Worker::getWeightedRandomNeighbor() {
     
     int rand = (int) (sum*Random::rand());
     
-    sum = 0;
+    int newSum = 0;
     for (const auto& [rank, dist] : _neighbor_idle_distance) {
-        int add = 1 + _params.maxIdleDistance() - dist;
-        if (rand < sum+add) return rank;
-        sum += add;
+        newSum += 1 + _params.maxIdleDistance() - dist;
+        if (rand < newSum) return rank;
     }
     abort();
 }
@@ -1147,14 +1146,6 @@ void Worker::applyBalancing() {
     
     // Update volumes found during balancing, and trigger job expansions / shrinkings
     for (const auto& [jobId, volume] : _job_db.getBalancingResult()) {
-        /*
-        if (_job_db.has(jobId) && _job_db.get(jobId).getVolume() != volume) {
-            log(
-                _job_db.get(jobId).getJobTree().isRoot() ? V2_INFO : V4_VVER, 
-                "#%i : update v=%i", jobId, volume
-            );
-        }
-        */
         updateVolume(jobId, volume, _job_db.getGlobalBalancingEpoch());
     }
 }
