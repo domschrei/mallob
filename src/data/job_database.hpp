@@ -61,8 +61,9 @@ public:
     const JobRequest& getCommitment(int jobId);
     void uncommit(int jobId);
 
+    enum JobRequestMode {TARGETED_REJOIN, NORMAL, IGNORE_FAIL};
     enum AdoptionResult {ADOPT_FROM_IDLE, ADOPT_REPLACE_CURRENT, REJECT, DEFER, DISCARD};
-    AdoptionResult tryAdopt(const JobRequest& req, bool oneshot, int sender, int& removedJob);
+    AdoptionResult tryAdopt(const JobRequest& req, JobRequestMode mode, int sender, int& removedJob);
     
     void reactivate(const JobRequest& req, int source);
     void suspend(int jobId);

@@ -19,6 +19,7 @@
 #include "comm/message_handler.hpp"
 #include "data/job_database.hpp"
 #include "comm/sysstate.hpp"
+#include "comm/distributed_bfs.hpp"
 
 #define SYSSTATE_BUSYRATIO 0
 #define SYSSTATE_NUMJOBS 1
@@ -46,15 +47,36 @@ private:
     std::set<WorkRequest, WorkRequestComparator> _recent_work_requests;
     float _time_only_idle_worker = -1;
 
+    DistributedBFS _bfs;
+
     std::thread _mpi_monitor_thread;
 
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& _client_nodes) :
         _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), _client_nodes(_client_nodes), 
-        _params(params), _job_db(_params, _comm), _sys_state(_comm)
-        {
-            _global_timeout = _params.timeLimit();
-        }
+        _params(params), _job_db(_params, _comm), _sys_state(_comm), 
+        _bfs(_hop_destinations, [this](const JobRequest& req) {
+            if (_job_db.isIdle() && !_job_db.hasCommitment(req.jobId)) {
+                // Try to adopt this job request
+                log(V4_VVER, "BFS Try adopting %s\n", req.toStr().c_str());
+                MessageHandle handle;
+                handle.receiveSelfMessage(req.serialize(), _world_rank);
+                handleRequestNode(handle, JobDatabase::IGNORE_FAIL);
+                return _job_db.hasCommitment(req.jobId) ? _world_rank : -1;
+            }
+            return -1;
+        }, [this](const JobRequest& request, int foundRank) {
+            if (foundRank == -1) {
+                log(V4_VVER, "%s : BFS unsuccessful - continue bouncing\n", request.toStr().c_str());
+                JobRequest req = request;
+                bounceJobRequest(req, _world_rank);
+            } else {
+                log(V4_VVER, "%s : BFS successful ([%i] adopting)\n", request.toStr().c_str(), foundRank);
+            }
+        })
+    {
+        _global_timeout = _params.timeLimit();
+    }
 
     ~Worker();
     void init();
@@ -66,7 +88,7 @@ private:
     void handleConfirmAdoption(MessageHandle& handle);
     void handleDoExit(MessageHandle& handle);
     void handleRejectOneshot(MessageHandle& handle);
-    void handleRequestNode(MessageHandle& handle, bool oneshot);
+    void handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMode mode);
     void handleSendClientRank(MessageHandle& handle);
     void handleIncrementalJobFinished(MessageHandle& handle);
     void handleInterrupt(MessageHandle& handle);

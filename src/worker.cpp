@@ -69,9 +69,9 @@ void Worker::init() {
     _msg_handler.registerCallback(MSG_REJECT_ONESHOT, 
         [&](auto& h) {handleRejectOneshot(h);});
     _msg_handler.registerCallback(MSG_REQUEST_NODE, 
-        [&](auto& h) {handleRequestNode(h, /*oneshot=*/false);});
+        [&](auto& h) {handleRequestNode(h, JobDatabase::JobRequestMode::NORMAL);});
     _msg_handler.registerCallback(MSG_REQUEST_NODE_ONESHOT, 
-        [&](auto& h) {handleRequestNode(h, /*oneshot=*/true);});
+        [&](auto& h) {handleRequestNode(h, JobDatabase::JobRequestMode::TARGETED_REJOIN);});
     _msg_handler.registerCallback(MSG_SEND_APPLICATION_MESSAGE, 
         [&](auto& h) {handleSendApplicationMessage(h);});
     _msg_handler.registerCallback(MSG_SEND_CLIENT_RANK, 
@@ -86,6 +86,10 @@ void Worker::init() {
         [&](auto& h) {handleNotifyNeighborIdleDistance(h);});
     _msg_handler.registerCallback(MSG_REQUEST_WORK,
         [&](auto& h) {handleRequestWork(h);});
+    _msg_handler.registerCallback(MSG_REQUEST_IDLE_NODE_BFS,
+        [&](auto& h) {_bfs.handle(h);});
+    _msg_handler.registerCallback(MSG_ANSWER_IDLE_NODE_BFS,
+        [&](auto& h) {_bfs.handle(h);});
     auto balanceCb = [&](MessageHandle& handle) {
         if (_job_db.continueBalancing(handle)) applyBalancing();
     };
@@ -243,6 +247,8 @@ void Worker::mainProgram() {
             for (auto& [req, senderRank] : _job_db.getDeferredRequestsToForward(time)) {
                 bounceJobRequest(req, senderRank);
             }
+
+            _bfs.collectGarbage(_job_db.getGlobalBalancingEpoch());
         }
 
         // Check active job
@@ -434,18 +440,18 @@ void Worker::handleRejectOneshot(MessageHandle& handle) {
     }
 }
 
-void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
+void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMode mode) {
 
     JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
 
     // Discard request if it has become obsolete
     if (_job_db.isRequestObsolete(req)) {
-        log(LOG_ADD_SRCRANK | V3_VERB, "DISCARD %s oneshot=%i", handle.source, 
-                req.toStr().c_str(), oneshot ? 1 : 0);
+        log(LOG_ADD_SRCRANK | V3_VERB, "DISCARD %s mode=%i", handle.source, 
+                req.toStr().c_str(), mode);
         return;
     }
 
-    if (!oneshot && !_job_db.isIdle() && !_recent_work_requests.empty()) {
+    if (mode == JobDatabase::NORMAL && !_job_db.isIdle() && !_recent_work_requests.empty()) {
         // Forward the job request to the source of a recent work request
 
         // Remove old work requests and try and find a recent one
@@ -470,7 +476,7 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
     }
 
     int removedJob;
-    auto adoptionResult = _job_db.tryAdopt(req, oneshot, handle.source, removedJob);
+    auto adoptionResult = _job_db.tryAdopt(req, mode, handle.source, removedJob);
     if (adoptionResult == JobDatabase::ADOPT_FROM_IDLE || adoptionResult == JobDatabase::ADOPT_REPLACE_CURRENT) {
 
         if (adoptionResult == JobDatabase::ADOPT_REPLACE_CURRENT) {
@@ -481,7 +487,7 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
 
         // Adoption takes place
         std::string jobstr = _job_db.toStr(req.jobId, req.requestedNodeIndex);
-        log(LOG_ADD_SRCRANK | V3_VERB, "ADOPT %s oneshot=%i", handle.source, req.toStr().c_str(), oneshot ? 1 : 0);
+        log(LOG_ADD_SRCRANK | V3_VERB, "ADOPT %s mode=%i", handle.source, req.toStr().c_str(), mode);
         assert(_job_db.isIdle() || log_return_false("Adopting a job, but not idle!\n"));
 
         // Commit on the job, send a request to the parent
@@ -500,12 +506,12 @@ void Worker::handleRequestNode(MessageHandle& handle, bool oneshot) {
         MyMpi::isend(MPI_COMM_WORLD, req.requestingNodeRank, MSG_OFFER_ADOPTION, req);
 
     } else if (adoptionResult == JobDatabase::REJECT) {
-        if (oneshot) {
+        if (mode == JobDatabase::TARGETED_REJOIN) {
             OneshotJobRequestRejection rej(req, _job_db.hasDormantJob(req.jobId));
             log(LOG_ADD_DESTRANK | V5_DEBG, "decline oneshot request for %s", handle.source, 
                         _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
             MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_REJECT_ONESHOT, rej);
-        } else {
+        } else if (mode == JobDatabase::NORMAL) {
             // Continue job finding procedure somewhere else
             bounceJobRequest(req, handle.source);
         }
@@ -948,6 +954,16 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
     // Show warning if #hops is a large power of two
     if ((num >= 512) && ((num & (num - 1)) == 0)) {
         log(V1_WARN, "[WARN] %s\n", request.toStr().c_str());
+    }
+
+    if (num >= _params.hopsUntilBfs() && num % _params.hopsBetweenBfs() == 0 && _params.maxBfsDepth() > 0) {
+        // Initiate a BFS to find an idle worker for this request
+        // Increase depth for each further BFS for this request
+        int depth = 1 + (num - _params.hopsUntilBfs()) / _params.hopsBetweenBfs();
+        depth = std::min(depth, _params.maxBfsDepth());
+        log(V4_VVER, "Initiate BFS (d=%i) for %s\n", depth, request.toStr().c_str());
+        _bfs.startSearch(request, depth);
+        return;
     }
 
     int nextRank;

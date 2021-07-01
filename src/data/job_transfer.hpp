@@ -86,6 +86,17 @@ public:
                 + " hops=" + std::to_string(numHops)
                 + " epoch=" + std::to_string(balancingEpoch);
     }
+
+    bool operator==(const JobRequest& other) const {
+        return jobId == other.jobId 
+            && requestedNodeIndex == other.requestedNodeIndex 
+            && balancingEpoch == other.balancingEpoch
+            && currentRevision == other.currentRevision
+            && numHops == other.numHops;
+    }
+    bool operator!=(const JobRequest& other) const {
+        return !(*this == other);
+    }
 };
 
 struct OneshotJobRequestRejection : public Serializable {

@@ -229,7 +229,7 @@ void JobDatabase::uncommit(int jobId) {
     }
 }
 
-JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, bool oneshot, int sender, int& removedJob) {
+JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequestMode mode, int sender, int& removedJob) {
 
     // Decide whether job should be adopted or bounced to another node
     removedJob = -1;
@@ -256,7 +256,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, bool on
 
     // Node is idle and not committed to another job
     if (isIdle()) {
-        if (!oneshot) return ADOPT_FROM_IDLE;
+        if (mode != TARGETED_REJOIN) return ADOPT_FROM_IDLE;
         // Oneshot request: Job must be present and suspended
         else return (hasDormantJob(req.jobId) ? ADOPT_FROM_IDLE : REJECT);
     }
