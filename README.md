@@ -7,15 +7,13 @@ Short links: [Experimental data of our SAT21 paper](https://github.com/domschrei
 
 ## Overview
 
-Mallob is a platform for massively parallel and distributed processing of malleable jobs, handling their scheduling and load balancing.
+Mallob is a platform for massively parallel and distributed on-demand processing of malleable jobs, handling their scheduling and load balancing.
 Malleability means that the CPU resources allotted to a job may vary _during its execution_ depending on the system's overall load.
 
-The current principal (and only) application of Mallob is massively parallel and distributed multi-tasking SAT solving "on demand":
-Our system can be used to resolve many formulae from various users at once, providing a very generic JSON API to introduce SAT jobs to the system and retrieve a solution for them.
-Mallob also features a single instance mode, _Mallob-mono_, where only a single provided SAT formula is solved on the entire set of available cores.
-Using this configuration on 1600 hardware threads in parallel in an AWS environment, Mallob [scored the first place](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf#page=36) of the first Cloud Track of the international [SAT Competition 2020](https://satcompetition.github.io/2020/), solving the most instances among all solvers of all tracks.
+Most notably, Mallob features an engine for distributed SAT solving. 
+According to the International SAT Competition [2020🥇](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf) and [2021🥇🥈](https://satcompetition.github.io/2021/slides/ISC2021.pdf), Mallob is currently the best approach for SAT solving on a large scale (800 physical cores) and one of the best approaches for SAT solving on a moderate scale (32 physical cores).
 
-More information on the design decisions and techniques of Mallob can be found in [our SAT 2021 paper](https://dominikschreiber.de/papers/2021-sat-scalable.pdf).
+More information on the design decisions and techniques of Mallob can be found in [our SAT 2021 paper](https://dominikschreiber.de/papers/2021-sat-scalable.pdf) where we also evaluated Mallob on up to 2560 physical cores.
 
 <hr/>
 
