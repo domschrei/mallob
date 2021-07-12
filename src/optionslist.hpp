@@ -66,6 +66,7 @@ OPT_FLOAT(clauseBufferDiscountFactor,    "cbdf", "",                        0.9,
 OPT_FLOAT(clauseFilterHalfLife,          "cfhl", "",                        0,    0, LARGE_INT,         "Set clause filter half life of clauses until forgotten")
 OPT_FLOAT(growthPeriod,                  "g", "growth-period",              0,    0, LARGE_INT,         "Grow job demand exponentially every t seconds (0: immediate full growth)" )
 OPT_FLOAT(increaseClauseProductionRatio, "icpr", "",                        0,    0, 1,                 "Increase a solver's Clause Production when it fills less than <ratio> of its buffer")
+OPT_FLOAT(inputShuffleProbability,       "isp", "",                         0,    0, 1,                 "Probability for solver with exhausted diversification to shuffle all clauses and all literals of each clause in the input")
 OPT_FLOAT(jobCommUpdatePeriod,           "jcup", "",                        0,    0, LARGE_INT,         "Job communicator update period (0: never update)" )
 OPT_FLOAT(jobCpuLimit,                   "jcl", "job-cpu-limit",            0,    0, LARGE_INT,         "Timeout an instance after x cpu seconds")
 OPT_FLOAT(jobWallclockLimit,             "jwl", "job-wallclock-limit",      0,    0, LARGE_INT,         "Timeout an instance after x seconds wall clock time")

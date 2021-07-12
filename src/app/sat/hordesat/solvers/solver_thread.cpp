@@ -14,7 +14,7 @@ SolverThread::SolverThread(const Parameters& params, const HordeConfig& config,
         size_t fSize, const int* fLits, size_t aSize, const int* aLits,
         int localId) : 
     _params(params), _solver_ptr(solver), _solver(*solver), 
-    _logger(_solver.getLogger()), _shuffler(fSize, fLits), _local_id(localId), 
+    _logger(_solver.getLogger()), _local_id(localId), 
     _has_pseudoincremental_solvers(solver->getSolverSetup().hasPseudoincrementalSolvers) {
     
     _portfolio_rank = config.apprank;
@@ -45,6 +45,14 @@ void* SolverThread::run() {
 
     diversifyInitially();        
 
+    // Shuffle input
+    // ... only if original diversifications are exhausted
+    _shuffle = _solver.getDiversificationIndex() >= _solver.getNumOriginalDiversifications();
+    float random = 0.001f * (rand() % 1000); // random number in [0,1)
+    assert(random >= 0); assert(random <= 1);
+    // ... only if random throw hits user-defined probability
+    _shuffle = _shuffle && random < _params.inputShuffleProbability();
+
     while (!_terminated) {
 
         // Sleep and wait if the solver should not do solving right now
@@ -58,7 +66,6 @@ void* SolverThread::run() {
         if (!readingDone || _interrupted) continue;
         
         diversifyAfterReading();
-        _shuffler = ClauseShuffler(0, nullptr);
 
         runOnce();
     }
@@ -75,21 +82,21 @@ bool SolverThread::readFormula() {
     size_t aSize = 0;
     const int* aLits;
 
-    /*
-    // TODO Include
-
-    if (_shuffle) {
-
-        while (!cancelThread() && _shuffler.hasNextClause()) {
-            for (int lit : _shuffler.nextClause()) {
-                _solver.addLiteral(lit);
-                _imported_lits++;
-            }
-        }
-    }
-    */
-
     while (true) {
+
+        // Shuffle input if necessary
+        if (_imported_lits_curr_revision == 0 && _shuffle) {
+            _logger.log(V4_VVER, "Shuffling input rev. %i\n", (int)_active_revision);
+            {
+                auto lock = _state_mutex.getLock();
+                assert(_active_revision < (int)_pending_formulae.size());
+                fSize = _pending_formulae[_active_revision].first;
+                fLits = _pending_formulae[_active_revision].second;
+            }
+            auto [sData, sSize] = _shuffler.doShuffle(fLits, fSize);
+            _pending_formulae[_active_revision].first = sSize;
+            _pending_formulae[_active_revision].second = sData;
+        }
 
         // Fetch the next formula to read
         {
@@ -102,15 +109,9 @@ bool SolverThread::readFormula() {
         }
 
         _logger.log(V4_VVER, "Reading rev. %i, start %i\n", (int)_active_revision, (int)_imported_lits_curr_revision);
-
+        
         // Read the formula in batches from the point where you left off
         for (size_t start = _imported_lits_curr_revision; start < fSize; start += batchSize) {
-            
-            waitWhileSuspended();
-            if (_interrupted) {
-                _logger.log(V4_VVER, "Reading interrupted @ %i\n", (int)_imported_lits_curr_revision);
-                return false;
-            }
 
             size_t end = std::min(start+batchSize, fSize);
             for (size_t i = start; i < end; i++) {
@@ -131,6 +132,12 @@ bool SolverThread::readFormula() {
                 _imported_lits_curr_revision++;
                 //_dbg_lits += std::to_string(fLits[i]) + " ";
                 //if (fLits[i] == 0) _dbg_lits += "\n";
+            }
+            
+            waitWhileSuspended();
+            if (_interrupted) {
+                _logger.log(V4_VVER, "Reading interrupted @ %i\n", (int)_imported_lits_curr_revision);
+                return false;
             }
         }
         for (size_t i = 0; i < aSize; i++) _max_var = std::max(_max_var, std::abs(aLits[i]));
