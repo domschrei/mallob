@@ -47,6 +47,7 @@
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <limits>
 
 // #define ROBIN_HOOD_LOG_ENABLED
 #ifdef ROBIN_HOOD_LOG_ENABLED

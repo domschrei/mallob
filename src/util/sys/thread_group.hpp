@@ -4,6 +4,7 @@
 
 #include <array>
 #include <list>
+#include <optional>
 #include <thread>
 #include <functional>
 
