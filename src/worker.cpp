@@ -23,7 +23,7 @@
 #include "util/sys/watchdog.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
-#include "util/sat_reader.hpp"
+#include "data/job_reader.hpp"
 #include "util/sys/terminator.hpp"
 
 void Worker::init() {
@@ -133,7 +133,7 @@ void Worker::init() {
         int jobId = 1;
         JobDescription desc(jobId, /*prio=*/1, /*incremental=*/false);
         desc.setRootRank(0);
-        bool success = SatReader(instanceFilename).read(desc);
+        bool success = JobReader::read(instanceFilename, desc);
         if (!success) {
             log(V0_CRIT, "ERROR: Could not open file! Aborting.\n");
             Terminator::setTerminating();

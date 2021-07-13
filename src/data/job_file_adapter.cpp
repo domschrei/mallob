@@ -3,7 +3,6 @@
 
 #include "job_file_adapter.hpp"
 #include "util/sys/fileutils.hpp"
-#include "util/sat_reader.hpp"
 #include "util/sys/time_period.hpp"
 #include "util/random.hpp"
 #include "app/sat/sat_constants.h"

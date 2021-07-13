@@ -8,7 +8,6 @@
 #include <list>
 
 #include "client.hpp"
-#include "util/sat_reader.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/permutation.hpp"
@@ -18,6 +17,7 @@
 #include "util/random.hpp"
 #include "app/sat/sat_constants.h"
 #include "util/sys/terminator.hpp"
+#include "data/job_reader.hpp"
 
 // Executed by a separate worker thread
 void Client::readIncomingJobs(Logger log) {
@@ -72,9 +72,8 @@ void Client::readIncomingJobs(Logger log) {
                     // Read job
                     int id = foundJob.description->getId();
                     float time = Timer::elapsedSeconds();
-                    SatReader r(foundJob.file);
                     log.log(V3_VERB, "[T] Reading job #%i rev. %i (%s) ...\n", id, foundJob.description->getRevision(), foundJob.file.c_str());
-                    bool success = r.read(*foundJob.description);
+                    bool success = JobReader::read(foundJob.file, *foundJob.description);
                     if (!success) {
                         log.log(V1_WARN, "[T] File %s could not be opened - skipping #%i\n", foundJob.file.c_str(), id);
                     } else {
@@ -464,17 +463,6 @@ void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {
 
 void Client::handleExit(MessageHandle& handle) {
     Terminator::setTerminating();
-}
-
-void Client::readFormula(std::string& filename, JobDescription& job) {
-
-    SatReader r(filename);
-    bool success = r.read(job);
-    if (success) {
-        log(V3_VERB, "Read %s\n", filename.c_str());
-    } else {
-        log(V1_WARN, "File %s could not be opened - skipping #%i\n", filename.c_str(), job.getId());
-    }
 }
 
 Client::~Client() {

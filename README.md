@@ -166,9 +166,17 @@ All command-line options of Mallob can be seen by executing Mallob with the `-h`
 Mallob can be extended in the following ways:
 
 * New options to the application (or a subsystem thereof) can be added in `src/optionslist.hpp`.
-* To add a new SAT solver to be used in a SAT solver engine, implement the interface `PortfolioSolverInterface` (see `src/app/sat/hordesat/solvers/portfolio_solver_interface.hpp`); you can use the existing implementation for `Lingeling` (`lingeling.cpp`) and adapt it to your solver. Then add your solver to the portfolio initialization in `src/app/sat/hordesat/horde.cpp`.
-* To implement a different kind of SAT solving engine, instead of directly inheriting from `Job`, a subclass of `BaseSatJob` (see `src/app/sat/base_sat_job.hpp`) can be created that already incorporates a kind of clause sharing. Take a look at an implementation such as `ForkedSatJob` to see how the interface can be used.
-* To extend Mallob by adding another kind of job solving engine (like combinatorial search, planning, SMT, ...), a subclass of `Job` (see `src/app/job.hpp`) must be created and an additional case must be added to `JobDatabase::createJob` (see `src/data/job_database.cpp`). To make the job database acknowledge what kind of job is introduced in a program run with several kinds of jobs, the `JobDescription` structure should be extended by a corresponding flag (and be on either end of the serialization so that it can be read directly). Finally, the `Client` class must be extended to read and introduce this new kind of jobs.
+* To add a new SAT solver to be used in a SAT solver engine, do the following:
+    - Add a subclass of `PortfolioSolverInterface`. (You can use the existing implementation for any of the existing solvers and adapt it to your solver.)
+    - Add your solver to the portfolio initialization in `src/app/sat/hordesat/horde.cpp`.
+* To extend Mallob by adding another kind of job solving engine (like combinatorial search, planning, SMT, ...), do the following:
+    - Extend the enumeration `JobDescription::Application` by a corresponding item.
+    - In `JobReader::read`, add a parser for your application.
+    - In `JobFileAdapter::handleNewJob`, add a new case for the `application` field in JSON files.
+    - Create a subclass of `Job` (see `src/app/job.hpp`) and implement all pure virtual methods. 
+    - Add an additional case to `JobDatabase::createJob`.
+* To add a unit test, create a class `test_*.cpp` in `src/test` and then add the test case to the bottom of `CMakeLists.txt`.
+* To add a system test, consult the files `scripts/systest_commons.sh` and/or `scripts/systest.sh`.
 
 <hr/>
 
@@ -191,12 +199,32 @@ Furthermore, in our implementation we make thankful use of the following project
 * [robin_hood hashing](https://github.com/martinus/robin-hood-hashing) by Martin Ankerl, for efficient unordered maps and sets
 * [JSON for Modern C++](https://github.com/nlohmann/json) by Niels Lohmann, for reading and writing JSON files
 
-If you make use of Mallob in an academic setting, please cite this upcoming conference paper:
+If you make use of Mallob in an academic setting, please cite this SAT'21 conference paper:
 
-Schreiber, Dominik and Sanders, Peter (2021): **Scalable SAT Solving in the Cloud.** In: Proceedings of SAT 2021. To appear.  
-Preprint available at: https://dominikschreiber.de/papers/2021-sat-scalable.pdf
+```
+@inproceedings{schreiber2021scalable,
+  title={Scalable SAT Solving in the Cloud},
+  author={Schreiber, Dominik and Sanders, Peter},
+  booktitle={International Conference on Theory and Applications of Satisfiability Testing},
+  pages={518--534},
+  year={2021},
+  organization={Springer},
+  doi={10.1007/978-3-030-80223-3_35}
+}
+```
 
-If you want to specifically cite Mallob-mono in the scope of the International SAT Competition 2020, please cite: 
-
-Schreiber, Dominik (2020): **Engineering HordeSat Towards Malleability: mallob-mono in the SAT 2020 Cloud Track.** SAT COMPETITION 2020: 45.  
-URL: https://helda.helsinki.fi/bitstream/handle/10138/318754/sc2020_proceedings.pdf?sequence=1#page=45
+If you want to specifically cite Mallob in the scope of an International SAT Competition, please cite: 
+```
+@article{schreiber2020engineering,
+  title={Engineering HordeSat Towards Malleability: mallob-mono in the SAT 2020 Cloud Track},
+  author={Schreiber, Dominik},
+  journal={SAT Competition 2020},
+  pages={45}
+}
+@article{schreiber2021mallob,
+  title={Mallob in the SAT Competition 2021},
+  author={Schreiber, Dominik},
+  journal={SAT Competition 2021},
+  note={To appear.}
+}
+```

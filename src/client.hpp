@@ -85,8 +85,7 @@ public:
 
 private:
     void readIncomingJobs(Logger log);
-    void readFormula(std::string& filename, JobDescription& job);
-
+    
     bool checkTerminate();
 
     void handleRequestBecomeChild(MessageHandle& handle);

@@ -213,22 +213,6 @@ void SolverThread::diversifyInitially() {
     hash_combine<unsigned int>(seed, _portfolio_rank);
     srand(seed);
     _solver.diversify(seed);
-
-    /*
-    // TODO Include
-    
-    // Shuffle input
-    // ... only if original diversifications are exhausted
-    _shuffle = _solver.getDiversificationIndex() >= _solver.getNumOriginalDiversifications();
-    float random = 0.001f * (rand() % 1000); // random number in [0,1)
-    assert(random >= 0); assert(random <= 1);
-    // ... only if random throw hits user-defined probability
-    _shuffle = _shuffle && random < _params.getFloatParam("shufinp");
-    if (_shuffle) {
-        _logger.log(V4_VVER, "Shuffling input\n");
-        _shuffler.doShuffle();
-    }
-    */
 }
 
 void SolverThread::diversifyAfterReading() {

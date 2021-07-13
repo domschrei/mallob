@@ -40,7 +40,7 @@ set(BASE_SOURCES
     src/app/sat/threaded_sat_job.cpp 
     src/balancing/balancer.cpp src/balancing/event_driven_balancer.cpp src/balancing/rounding.cpp 
     src/comm/message_handler.cpp src/comm/mpi_monitor.cpp src/comm/mympi.cpp 
-    src/data/job_database.cpp src/data/job_description.cpp src/data/job_file_adapter.cpp src/data/job_result.cpp src/data/reduceable.cpp 
+    src/data/job_database.cpp src/data/job_description.cpp src/data/job_file_adapter.cpp src/data/job_reader.cpp src/data/job_result.cpp src/data/reduceable.cpp 
     src/util/logger.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sat_reader.cpp 
     src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/shared_memory.cpp src/util/sys/terminator.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp
     src/util/ringbuf/ringbuf.c
