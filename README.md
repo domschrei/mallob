@@ -108,6 +108,7 @@ Here is a brief overview of all required and optional fields in the JSON API:
 | name              | **yes**   | String       | A user-unique name for this job (increment)                                                                    |
 | file              | **yes***  | String       | File path of the input formula to solve                                                                        |
 | priority          | **yes***  | Float (0,1)  | Priority of the job (higher is more important)                                                                 |
+| application       | no        | String       | Which kind of problem is being solved; currently either of "SAT" or "DUMMY" (default: SAT)                     |
 | wallclock-limit   | no        | String       | Job wallclock limit: combination of a number and a unit (ms/s/m/h/d)                                           |
 | cpu-limit         | no        | String       | Job CPU time limit: combination of a number and a unit (ms/s/m/h/d)                                            |
 | arrival           | no        | Float >= 0   | Job's arrival time (seconds) since program start; ignore job until then                                        |
