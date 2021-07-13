@@ -94,7 +94,13 @@ struct FloatOption : public Option {
         this->val = val;
     }
     bool isNonzero() const {return val != 0;}
-    std::string getValAsString() const override {return std::to_string(val);}
+    std::string getValAsString() const override {
+        std::string str = std::to_string(val);
+        if (str.find('.') == std::string::npos) return str; 
+        while (str[str.size()-1] == '0') str = str.substr(0, str.size()-1);
+        if (str[str.size()-1] == '.') str = str.substr(0, str.size()-1);
+        return str;
+    }
     void setValAsString(const std::string& valStr) override {set(atof(valStr.c_str()));}
     void copyValue(const Option& other) override {set( ((FloatOption&)other)() );}
     const char* getTypeString() const override {return "float";}

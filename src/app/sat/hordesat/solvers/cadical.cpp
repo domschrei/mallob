@@ -142,20 +142,6 @@ void Cadical::addLearnedClause(const Clause& c) {
 		for (size_t i = 0; i < c.size; i++) clauseWithLbd[1+i] = *(c.begin+i);
 		learnSource.addClause(clauseWithLbd.data(), clauseWithLbd.size());
 	}
-
-	/*
-	// Old approach of interrupting and then adding non-redundant clauses
-	auto lock = learnMutex.getLock();
-	if (size == 1) {
-		learnedClauses.emplace_back(begin, begin + 1);
-	} else {
-		// Skip glue in front of array
-		learnedClauses.emplace_back(begin + 1, begin + size);
-	}
-	if (learnedClauses.size() > CLAUSE_LEARN_INTERRUPT_THRESHOLD) {
-		setSolverInterrupt();
-	}
-	*/
 }
 
 void Cadical::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
