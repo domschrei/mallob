@@ -90,6 +90,8 @@ void Worker::init() {
         [&](auto& h) {_bfs.handle(h);});
     _msg_handler.registerCallback(MSG_ANSWER_IDLE_NODE_BFS,
         [&](auto& h) {_bfs.handle(h);});
+    _msg_handler.registerCallback(MSG_NOTIFY_ASSIGNMENT_UPDATE, 
+        [&](auto& h) {_coll_assign.handle(h);});
     auto balanceCb = [&](MessageHandle& handle) {
         if (_job_db.continueBalancing(handle)) applyBalancing();
     };
@@ -120,7 +122,7 @@ void Worker::init() {
     MPI_Barrier(MPI_COMM_WORLD);
     log(V4_VVER, "Passed global init barrier\n");
 
-    if (!MyMpi::_monitor_off) _mpi_monitor_thread = std::thread(mpiMonitor);
+    if (!MyMpi::_monitor_off) _mpi_monitor.run(mpiMonitor);
     
     // Initiate single instance solving as the "root node"
     if (_params.monoFilename.isSet() && _world_rank == 0) {
@@ -176,6 +178,7 @@ void Worker::mainProgram() {
         if (wasIdle != _job_db.isIdle()) {
             // Load status changed since last cycle
             sendStatusToNeighbors();
+            if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
             wasIdle = !wasIdle;
         }
         
@@ -233,6 +236,11 @@ void Worker::mainProgram() {
                 WorkRequest req(_world_rank, _job_db.getGlobalBalancingEpoch());
                 MyMpi::isend(MPI_COMM_WORLD, Random::choice(_hop_destinations), MSG_REQUEST_WORK, req);
                 _time_only_idle_worker = -1;
+            }
+
+            // Advance collective assignment of nodes
+            if (_params.hopsUntilCollectiveAssignment() >= 0) {
+                _coll_assign.advance(_job_db.getGlobalBalancingEpoch());
             }
         }
 
@@ -658,6 +666,7 @@ void Worker::handleRejectAdoptionOffer(MessageHandle& handle) {
     // Erase commitment
     log(LOG_ADD_SRCRANK | V4_VVER, "Rejected to become %s : uncommitting", handle.source, job.toStr());
     _job_db.uncommit(req.jobId);
+    if (_params.hopsUntilCollectiveAssignment() >= 0 && _job_db.isIdle()) _coll_assign.setStatusDirty();
 }
 
 void Worker::handleNotifyResultObsolete(MessageHandle& handle) {
@@ -966,6 +975,12 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
         return;
     }
 
+    if (_params.hopsUntilCollectiveAssignment() >= 0 && num >= _params.hopsUntilCollectiveAssignment()
+        && request.requestedNodeIndex > 0) {
+        _coll_assign.addJobRequest(request);
+        return;
+    }
+
     int nextRank;
     if (_params.derandomize()) {
         // Get random choice from bounce alternatives
@@ -1009,10 +1024,8 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
 
     // Root node update message
     int thisIndex = job.getIndex();
-    if (thisIndex == 0) {
-        log(job.getVolume() == volume ? V4_VVER : V3_VERB, "%s : update v=%i epoch=%i lastreqsepoch=%i\n", 
-            job.toStr(), volume, balancingEpoch, job.getJobTree().getBalancingEpochOfLastRequests());
-    }
+    log(job.getVolume() == volume || thisIndex == 0 ? V4_VVER : V3_VERB, "%s : update v=%i epoch=%i lastreqsepoch=%i\n", 
+        job.toStr(), volume, balancingEpoch, job.getJobTree().getBalancingEpochOfLastRequests());
     job.updateVolumeAndUsedCpu(volume);
 
     // Prepare volume update to propagate down the job tree
@@ -1030,8 +1043,11 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
         int nextIndex = indices[i];
         if (has[i]) {
             ranks[i] = i == 0 ? job.getJobTree().getLeftChildNodeRank() : job.getJobTree().getRightChildNodeRank();
-            // Propagate volume update
-            MyMpi::isend(MPI_COMM_WORLD, ranks[i], MSG_NOTIFY_VOLUME_UPDATE, payload);
+
+            if (_params.explicitVolumeUpdates()) {
+                // Propagate volume update
+                MyMpi::isend(MPI_COMM_WORLD, ranks[i], MSG_NOTIFY_VOLUME_UPDATE, payload);
+            }
 
         } else if (nextIndex < volume 
                 && job.getJobTree().getBalancingEpochOfLastRequests() < balancingEpoch) {
@@ -1195,9 +1211,14 @@ void Worker::createExpanderGraph() {
     }  
 
     // Create graph, get outgoing edges from this node
-    _hop_destinations = _params.maxIdleDistance() > 0 ?
-        AdjustablePermutation::createUndirectedExpanderGraph(numWorkers, numBounceAlternatives, _world_rank)
-        : AdjustablePermutation::createExpanderGraph(numWorkers, numBounceAlternatives, _world_rank);
+    if (_params.maxIdleDistance() > 0) {
+        _hop_destinations = AdjustablePermutation::createUndirectedExpanderGraph(numWorkers, numBounceAlternatives, _world_rank);        
+    } else {
+        auto permutations = AdjustablePermutation::getPermutations(numWorkers, numBounceAlternatives);
+        _hop_destinations = AdjustablePermutation::createExpanderGraph(permutations, _world_rank);
+        if (_params.hopsUntilCollectiveAssignment() >= 0)
+            _coll_assign = CollectiveAssignment(_job_db, MyMpi::size(_comm), AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, _world_rank));
+    }
     for (int dest : _hop_destinations) {
         _neighbor_idle_distance[dest] = 0; // initially, all workers are idle
     }
@@ -1231,10 +1252,8 @@ int Worker::getRandomNonSelfWorkerNode() {
 }
 
 Worker::~Worker() {
-
     Terminator::setTerminating();
-
-    if (_mpi_monitor_thread.joinable()) _mpi_monitor_thread.join();
+    _mpi_monitor.stop();
 
     log(V4_VVER, "Destruct worker\n");
 

@@ -7,16 +7,15 @@
 #include <thread>
 #include <assert.h>
 
-#include "hordesat/horde.hpp"
-
 #include "app/job.hpp"
 #include "util/params.hpp"
 #include "util/permutation.hpp"
 #include "data/job_description.hpp"
 #include "data/job_transfer.hpp"
-#include "data/epoch_counter.hpp"
 #include "sat_constants.h"
 #include "base_sat_job.hpp"
+
+class HordeLib; // forward declaration
 
 class ThreadedSatJob : public BaseSatJob {
 

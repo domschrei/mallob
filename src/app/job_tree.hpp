@@ -5,7 +5,7 @@
 #include <set>
 #include <assert.h>
 
-#include "util/robin_hood.hpp"
+#include "util/hashing.hpp"
 #include "util/permutation.hpp"
 #include "data/job_transfer.hpp"
 #include "util/sys/timer.hpp"

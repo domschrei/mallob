@@ -3,9 +3,12 @@
 #include <unistd.h>
 #include <ctime>
 #include <algorithm>
+#include <iostream>
+#include <assert.h>
 
 #include "mympi.hpp"
 
+#include "util/params.hpp"
 #include "util/random.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
@@ -92,6 +95,19 @@ void MessageHandle::cancel() {
     MPICALL(MPI_Cancel(&request), "cancel" + std::to_string(id))
 }
 
+void MessageHandle::appendTagToSendData(int tag) {
+    int prevSize = sendData->size();
+    sendData->resize(prevSize+sizeof(int));
+    memcpy(sendData->data()+prevSize, &tag, sizeof(int));
+}
+
+void MessageHandle::receiveSelfMessage(const std::vector<uint8_t>& recvData, int rank) {
+    this->recvData = recvData;
+    source = rank;
+    selfMessage = true;
+}
+
+
 
 int MyMpi::nextHandleId() {
     return handleId++;
@@ -142,7 +158,8 @@ void MyMpi::init(int argc, char *argv[]) {
     tagList.emplace_back(MSG_NOTIFY_NEIGHBOR_IDLE_DISTANCE, true); 
     tagList.emplace_back(MSG_REQUEST_WORK,                  true); 
     tagList.emplace_back(MSG_REQUEST_IDLE_NODE_BFS,         true); 
-    tagList.emplace_back(MSG_ANSWER_IDLE_NODE_BFS,          true); 
+    tagList.emplace_back(MSG_ANSWER_IDLE_NODE_BFS,          true);
+    tagList.emplace_back(MSG_NOTIFY_ASSIGNMENT_UPDATE,      true);
     
     for (const auto& tag : tagList) _tags[tag.id] = tag;
 }

@@ -5,17 +5,10 @@
 #include <string>
 #include <memory>
 #include <thread>
-#include <assert.h>
 #include <atomic>
-
-#include "hordesat/horde.hpp"
 
 #include "app/job.hpp"
 #include "util/params.hpp"
-#include "util/permutation.hpp"
-#include "data/job_description.hpp"
-#include "data/job_transfer.hpp"
-#include "data/epoch_counter.hpp"
 #include "horde_process_adapter.hpp"
 #include "sat_constants.h"
 #include "base_sat_job.hpp"
@@ -30,7 +23,6 @@ private:
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
     int _last_imported_revision = 0;
 
-    std::thread _init_thread;
     Mutex _solver_state_change_mutex;
 
     std::thread _destruct_thread;

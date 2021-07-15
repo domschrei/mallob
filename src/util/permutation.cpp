@@ -1,34 +1,13 @@
 
 #include <assert.h>
+#include <set>
 
 #include "permutation.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
 
-std::vector<int> AdjustablePermutation::createUndirectedExpanderGraph(int n, int degree, int myRank) {
-    assert(degree % 2 == 0);
-    
-    std::vector<int> myEdges;
+std::vector<std::vector<int>> AdjustablePermutation::getPermutations(int n, int degree) {
 
-    // Get index of this worker within a particular permutation of all ranks
-    AdjustablePermutation p(n, /*seed=*/(n-1)*degree);
-    int myIndex = 0;
-    while (p.get(myIndex) != myRank) myIndex++;
-
-    // Add edges to workers which have a specific distance to this worker
-    // with respect to the drawn permutation of ranks
-    for (size_t i = 0; i < degree/2; i++) {
-        int offset = 1 + i * std::max(1, (n / (degree-1)));
-        myEdges.push_back(p.get((n+myIndex+offset) % n));
-        myEdges.push_back(p.get((n+myIndex-offset) % n));
-    }
-
-    return myEdges;
-}
-
-std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, int myRank) {
-
-    std::vector<int> outgoingEdges;
     std::vector<AdjustablePermutation*> permutations;
 
     // First outgoing edges:
@@ -45,7 +24,6 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
             intrinsicPartners[val] = nextVal;
             //log(V2_INFO, "%i => %i\n", val, nextVal);
         }
-        outgoingEdges.push_back(intrinsicPartners[myRank]);
     }
 
     // Blackbox checker whether some value at some position of a new permutation
@@ -67,14 +45,6 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
         // disallowing identity and previous permutations
         AdjustablePermutation* p = new AdjustablePermutation(n, n*(r+1));
         
-        if (myRank == 0) {
-            log(V4_VVER, "Permutation %i  : ", r);
-            for (int pos = 0; pos < n; pos++) {
-                log(LOG_NO_PREFIX | V4_VVER, "%i ", p->get(pos));
-            }
-            log(LOG_NO_PREFIX | V4_VVER, "\n");
-        }
-
         // For each position of the permutation, left to right
         for (int pos = 0; pos < n; pos++) {
             int val = p->get(pos);
@@ -102,36 +72,125 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(int n, int degree, i
                 // Adjust permutation
                 p->adjust(pos, swapVal);
                 p->adjust(swapPos, val);
-                if (myRank == 0) log(V4_VVER, "SWAP %i@%i <-> %i@%i\n", swapVal, swapPos, val, pos);
             }
         }
         
-        if (myRank == 0) {
-            log(V3_VERB, "Permutation %i' : ", r);
-            for (int pos = 0; pos < n; pos++) {
-                log(LOG_NO_PREFIX | V3_VERB, "%i ", p->get(pos));
-            }
-            log(V3_VERB, "\n");
-        }
-
-        // Check that the amount of incoming edges to this node is correct
-        int numIncoming = 0;
-        for (int pos = 0; pos < n; pos++) {
-            if (p->get(pos) == myRank) numIncoming++;
-        }
-        assert(numIncoming == 1 || log_return_false("Rank %i : %i incoming edges!\n", myRank, numIncoming));
-
         permutations.push_back(p);
-        outgoingEdges.push_back(p->get(myRank));
     }
 
-    // Clean up
+    // Transform output and clean up
+    std::vector<std::vector<int>> out;
+    out.push_back(std::move(intrinsicPartners));
     for (size_t i = 0; i < permutations.size(); i++) {
+        std::vector<int> thisPerm(n);
+        for (size_t j = 0; j < n; j++) thisPerm[j] = permutations[i]->get(j);
+        out.push_back(std::move(thisPerm));
         delete permutations[i];
     }
 
+    return out;
+}
+
+std::vector<int> AdjustablePermutation::createUndirectedExpanderGraph(int n, int degree, int myRank) {
+    assert(degree % 2 == 0);
+    
+    std::vector<int> myEdges;
+
+    // Get index of this worker within a particular permutation of all ranks
+    AdjustablePermutation p(n, /*seed=*/(n-1)*degree);
+    int myIndex = 0;
+    while (p.get(myIndex) != myRank) myIndex++;
+
+    // Add edges to workers which have a specific distance to this worker
+    // with respect to the drawn permutation of ranks
+    for (size_t i = 0; i < degree/2; i++) {
+        int offset = 1 + i * std::max(1, (n / (degree-1)));
+        myEdges.push_back(p.get((n+myIndex+offset) % n));
+        myEdges.push_back(p.get((n+myIndex-offset) % n));
+    }
+
+    return myEdges;
+}
+
+std::vector<int> AdjustablePermutation::createExpanderGraph(const std::vector<std::vector<int>>& permutations, int myRank) {
+
+    if (myRank == 0) {
+        for (size_t i = 0; i < permutations.size(); i++) {
+            std::string str;
+            for (size_t j = 0; j < permutations[i].size(); j++) str += std::to_string(permutations[i][j]) + " ";
+            log(V4_VVER, "Perm. %i: %s\n", i, str.c_str());
+        }
+    }
+
+    std::vector<int> outgoingEdges(permutations.size());
+    for (size_t i = 0; i < permutations.size(); i++) outgoingEdges[i] = permutations[i][myRank];
     return outgoingEdges;
 }
+
+/*
+Perform a modified Dijkstra's algorithm to find the outgoing edge from PE #myRank 
+along the shortest path towards each PE. For each PE x, this constructs a distributed 
+r-ary reduction tree of PEs that is probabilistically balanced and rooted at x.
+*/
+std::vector<int> AdjustablePermutation::getBestOutgoingEdgeForEachNode(const std::vector<std::vector<int>>& permutations, int myRank) {
+    
+    size_t numNodes = permutations[0].size();
+    size_t degree = permutations.size();
+
+    std::vector<int> distance(numNodes, INT32_MAX);
+    distance[myRank] = 0;
+    
+    auto comp = [&distance, myRank](int x, int y) {
+        if (distance[x] != distance[y]) return distance[x] < distance[y];
+        // Tie breaking is done pseudo-randomly and differently for each PE:
+        // Helps to distribute the child nodes more uniformly
+        return robin_hood::hash_int(x+myRank) < robin_hood::hash_int(y+myRank);
+    };
+    auto unvisitedSet = std::set<int, decltype(comp)>(comp);
+    for (size_t i = 0; i < numNodes; i++) unvisitedSet.insert(i);
+
+    std::vector<int> bestOutgoingEdge(numNodes, -1);
+
+    while (!unvisitedSet.empty()) {
+        int currentNode = *unvisitedSet.begin();
+        
+        // For each of the current node's successors:
+        for (size_t i = 0; i < permutations.size(); i++) {
+            int succNode = permutations[i][currentNode];
+            if (!unvisitedSet.count(succNode)) continue;
+
+            // Initialize best outgoing edge for each of the initial node's neighbors
+            if (currentNode == myRank) {
+                bestOutgoingEdge[currentNode] = succNode; 
+            }
+            assert(bestOutgoingEdge[currentNode] >= 0);
+
+            // Update distance and best outgoing edge
+            int newDistance = distance[currentNode] + 1;
+            if (newDistance < distance[succNode]) {
+                unvisitedSet.erase(succNode);
+                distance[succNode] = newDistance;
+                unvisitedSet.insert(succNode);
+                bestOutgoingEdge[succNode] = bestOutgoingEdge[currentNode];
+            }
+        }
+
+        unvisitedSet.erase(currentNode);
+    }
+    bestOutgoingEdge[myRank] = myRank;
+
+    /*
+    std::string str = "";
+    for (size_t i = 0; i < bestOutgoingEdge.size(); i++) {
+        str += std::to_string(i) + std::string("->") + std::to_string(bestOutgoingEdge[i]) + std::string(" ");
+    }
+    log(V4_VVER, "Best out edges: %s\n", str.c_str());
+    */
+
+    return bestOutgoingEdge;
+}
+
+
 
 AdjustablePermutation::AdjustablePermutation(int n, int seed) {
 

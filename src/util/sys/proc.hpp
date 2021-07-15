@@ -2,14 +2,7 @@
 #ifndef MALLOB_MEMORY_USAGE_H
 #define MALLOB_MEMORY_USAGE_H
 
-#include <sys/time.h>
-#include <sys/resource.h>
-
 #include <unistd.h>
-#include <ios>
-#include <iostream>
-#include <fstream>
-#include <string>
 #include <map>
 
 #include "util/sys/threading.hpp"

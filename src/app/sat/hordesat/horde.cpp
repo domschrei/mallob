@@ -1,8 +1,6 @@
 /*
- * HordeLib.cpp
- *
- *  Created on: Mar 24, 2017
- *      Author: balyo
+ * This is a heavily modified successor of HordeSat's entry point.
+ * Original class created on: Mar 24, 2017, Author: balyo
  */
 
 #include "horde.hpp"

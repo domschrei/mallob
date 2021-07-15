@@ -10,7 +10,7 @@
 
 #include <vector>
 #include <bitset>
-#include "util/robin_hood.hpp"
+#include "util/hashing.hpp"
 
 #include "app/sat/hordesat/utilities/clause.hpp"
 using namespace Mallob;

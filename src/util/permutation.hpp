@@ -5,7 +5,7 @@
 #include <random>
 #include <algorithm>
 #include <cmath>
-#include "util/robin_hood.hpp"
+#include "util/hashing.hpp"
 
 class AdjustablePermutation {
 
@@ -23,7 +23,10 @@ private:
 
 public:
     static std::vector<int> createUndirectedExpanderGraph(int n, int r, int myRank);
-    static std::vector<int> createExpanderGraph(int n, int r, int myRank);
+    
+    static std::vector<std::vector<int>> getPermutations(int n, int r);
+    static std::vector<int> createExpanderGraph(const std::vector<std::vector<int>>& permutations, int myRank);
+    static std::vector<int> getBestOutgoingEdgeForEachNode(const std::vector<std::vector<int>>& permutations, int myRank);
 
     AdjustablePermutation() = default;
     AdjustablePermutation(int n, int seed);

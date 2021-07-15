@@ -14,7 +14,7 @@
 #include "proc.hpp"
 #include "util/logger.hpp"
 #include "util/sys/stacktrace.hpp"
-
+#include "util/sys/background_worker.hpp"
 
 int Process::_rank;
 
@@ -25,7 +25,7 @@ std::atomic_bool Process::_main_process;
 std::atomic_bool Process::_exit_signal_caught = false;
 std::atomic_int Process::_exit_signal = 0;
 
-std::thread Process::_terminate_checker;
+BackgroundWorker Process::_terminate_checker;
 
 
 void doNothing(int signum) {
@@ -55,7 +55,7 @@ void Process::doExit(int retval) {
     Process::_exit_signal = retval;
     Process::_exit_signal_caught = true;
     // Join terminate checker
-    _terminate_checker.join();
+    _terminate_checker.stop();
     // Exit with normal exit code if terminated or interrupted,
     // with caught signal otherwise
     exit((retval == SIGTERM || retval == SIGINT) ? 0 : retval);
@@ -68,20 +68,21 @@ void Process::init(int rank, bool leafProcess) {
     _exit_signal_caught = false;
     _main_process = !leafProcess;
 
-    _terminate_checker = std::thread([]() {
+    _terminate_checker.run([]() {
 
-        while (!_exit_signal_caught) usleep(1000 * 100); // 0.1s
-
-        if (_main_process) forwardTerminateToChildren();
-
-        if (_exit_signal == SIGABRT || _exit_signal == SIGSEGV) {
-            int sig = _exit_signal;
-            log(V0_CRIT, "ERROR from pid=%ld tid=%ld signal=%d\n", 
-                    Proc::getPid(), Proc::getTid(), sig);
+        while (_terminate_checker.continueRunning() && !_exit_signal_caught) {
+            usleep(1000 * 100); // 0.1s
         }
 
-        // Try to flush output again
-        Logger::getMainInstance().flush();
+        if (_exit_signal_caught) {
+            if (_main_process) forwardTerminateToChildren();
+
+            if (_exit_signal == SIGABRT || _exit_signal == SIGSEGV) {
+                int sig = _exit_signal;
+                log(V0_CRIT, "ERROR from pid=%ld tid=%ld signal=%d\n", 
+                        Proc::getPid(), Proc::getTid(), sig);
+            }
+        }
     });
 
     signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1

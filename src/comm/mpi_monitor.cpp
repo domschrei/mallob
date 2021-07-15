@@ -1,6 +1,8 @@
 
 #include "mpi_monitor.hpp"
 
+#include <unistd.h>
+
 #include "util/sys/threading.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/terminator.hpp"

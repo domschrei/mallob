@@ -9,11 +9,11 @@
 #include "comm/mympi.hpp"
 #include "util/params.hpp"
 #include "data/job_description.hpp"
-#include "data/epoch_counter.hpp"
 #include "util/sys/threading.hpp"
 #include "data/job_file_adapter.hpp"
 #include "data/job_metadata.hpp"
 #include "comm/sysstate.hpp"
+#include "util/sys/background_worker.hpp"
 
 #define SYSSTATE_ENTERED_JOBS 0
 #define SYSSTATE_PARSED_JOBS 1
@@ -64,7 +64,7 @@ private:
     std::set<int> _client_ranks;
     SysState<4> _sys_state;
 
-    std::thread _instance_reader_thread;
+    BackgroundWorker _instance_reader;
     std::unique_ptr<JobFileAdapter> _file_adapter;
 
     // Maps a job ID to the ID of the message handle transferring its description
@@ -86,8 +86,6 @@ public:
 private:
     void readIncomingJobs(Logger log);
     
-    bool checkTerminate();
-
     void handleRequestBecomeChild(MessageHandle& handle);
     void handleJobDone(MessageHandle& handle);
     void handleAbort(MessageHandle& handle);

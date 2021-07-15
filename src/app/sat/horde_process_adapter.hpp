@@ -3,15 +3,14 @@
 #define DOMPASCH_MALLOB_HORDE_PROCESS_ADAPTER_H
 
 #include <list>
-#include <thread>
 
 #include "util/logger.hpp"
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
 #include "hordesat/solvers/solving_state.hpp"
-#include "hordesat/solvers/portfolio_solver_interface.hpp"
 #include "horde_shared_memory.hpp"
 #include "data/checksum.hpp"
+#include "util/sys/background_worker.hpp"
 
 class HordeProcessAdapter {
 
@@ -53,7 +52,6 @@ private:
     robin_hood::unordered_flat_set<ShmemObject, ShmemObjectHasher> _shmem;
     std::string _shmem_id;
     HordeSharedMemory* _hsm = nullptr;
-    bool _do_terminate = false;
 
     int* _export_buffer;
     int* _import_buffer;
@@ -64,7 +62,7 @@ private:
 
     std::atomic_int _latest_ready_revision = -1;
     std::atomic_int _latest_published_revision = -1;
-    std::thread _concurrent_shmem_allocator;
+    BackgroundWorker _concurrent_shmem_allocator;
     std::list<RevisionData> _revisions_to_write;
     Mutex _revisions_mutex;
 

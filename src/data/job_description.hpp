@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cstring>
+#include <memory>
 
 #include "data/serializable.hpp"
 #include "data/checksum.hpp"

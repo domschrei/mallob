@@ -2,7 +2,7 @@
 #ifndef DOMPASCH_TIMER_H
 #define DOMPASCH_TIMER_H
 
-#include "util/params.hpp"
+class Parameters; // forward declaration
 
 class Timer {
 

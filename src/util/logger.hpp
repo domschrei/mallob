@@ -3,20 +3,7 @@
 #define DOMPASCH_CONSOLE_H
 
 #include <string>
-#include <fstream>
 #include <stdarg.h>
-#include <iostream>
-#include <ostream>
-#include <ctime>
-#include <iomanip>
-#include <cstring>
-#include <cmath>
-#include <cstdlib>
-
-#include "util/sys/fileutils.hpp"
-#include "util/sys/timer.hpp"
-#include "util/sys/threading.hpp"
-#include "util/sys/proc.hpp"
 
 #define V0_CRIT 0
 #define V1_WARN 1

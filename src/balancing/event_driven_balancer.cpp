@@ -520,11 +520,13 @@ robin_hood::unordered_map<int, int> EventDrivenBalancer::getBalancingResult() {
     }
     log(verb-1, "BLC assigned%s sum=%i epoch=%ld\n", msg.c_str(), sum, _states.getGlobalEpoch());
 
+    /*
     // 5. Only remember job assignments that are of a local job
     volumes.clear();
     for (const auto& [jobId, job] : _jobs_being_balanced) {
         if (allVolumes[jobId] >= 1) volumes[jobId] = allVolumes[jobId];
     }
+    */
 
     return volumes;
 }

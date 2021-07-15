@@ -5,9 +5,10 @@
 #include <set>
 #include <atomic>
 #include <optional>
-#include <thread>
 
 #include "util/sys/threading.hpp"
+
+class BackgroundWorker; // forward declaration
 
 class Process {
 
@@ -21,7 +22,7 @@ public:
     static std::atomic_bool _exit_signal_caught;
     static std::atomic_int _exit_signal;
 
-    static std::thread _terminate_checker;
+    static BackgroundWorker _terminate_checker;
 
     static void init(int rank, bool leafProcess = false);
     

@@ -2,13 +2,13 @@
 #ifndef DOMPASCH_MALLOB_JOB_DATABASE_HPP
 #define DOMPASCH_MALLOB_JOB_DATABASE_HPP
 
-#include <thread>
 #include <list>
 
-#include "util/robin_hood.hpp"
+#include "util/hashing.hpp"
 #include "app/job.hpp"
 #include "job_transfer.hpp"
 #include "balancing/balancer.hpp"
+#include "util/sys/background_worker.hpp"
 
 class JobDatabase {
 
@@ -38,10 +38,9 @@ private:
         };
     };
 
-    std::thread _janitor;
+    BackgroundWorker _janitor;
     std::list<Job*> _jobs_to_free;
     Mutex _janitor_mutex;
-    std::atomic_bool _exiting = false;
 
 public:
     JobDatabase(Parameters& params, MPI_Comm& comm);
@@ -92,6 +91,7 @@ public:
     bool isIdle() const;
     bool hasDormantRoot() const;
     bool hasDormantJob(int id) const;
+    std::vector<int> getDormantJobs() const;
     
     std::string toStr(int j, int idx) const;
     

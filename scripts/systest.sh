@@ -34,7 +34,7 @@ function test_scheduling() {
                 introduce_job sat-$c instances/r3sat_300.cnf
                 introduce_job unsat-$c instances/r3unsat_300.cnf
             done
-            test 10 -t=2 -lbc=$lbc -J=8 -l=1 -satsolver=$slv -v=5 -checkjsonresults
+            test 10 -t=2 -lbc=$lbc -J=8 -l=1 -satsolver=$slv -v=5 -checkjsonresults -huca=0
         done
     done
 }
@@ -63,9 +63,9 @@ function test_oscillating() {
     test 13 -t=1 -lbc=2 -J=$((n+1)) -l=1 -satsolver=l -v=4 -checkjsonresults -checksums=1
 }
 
-test_oscillating
+test_mono
+test_incremental
 test_scheduling
-#test_mono
-#test_incremental
+test_oscillating
 
 echo "All tests done."

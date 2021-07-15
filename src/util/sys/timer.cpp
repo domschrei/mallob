@@ -2,6 +2,7 @@
 #include <chrono>
 
 #include "timer.hpp"
+#include "util/params.hpp"
 
 using namespace std::chrono;
 double startTime;

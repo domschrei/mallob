@@ -1,13 +1,13 @@
 
-#include <thread>
 #include <cmath>
 #include <limits>
+#include <assert.h>
 
-#include "assert.h"
 #include "app/job.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
-#include "comm/mympi.hpp"
+#include "util/permutation.hpp"
+
 
 Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
             _params(params), 

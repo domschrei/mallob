@@ -2,7 +2,7 @@
 #ifndef DOMPASCH_MALLOB_MESSAGE_HANDLER
 #define DOMPASCH_MALLOB_MESSAGE_HANDLER
 
-#include "util/robin_hood.hpp"
+#include "util/hashing.hpp"
 #include <functional>
 
 #include "mympi.hpp"

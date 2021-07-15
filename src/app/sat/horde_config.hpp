@@ -2,7 +2,6 @@
 #ifndef DOMPASCH_MALLOB_HORDE_CONFIG_HPP
 #define DOMPASCH_MALLOB_HORDE_CONFIG_HPP
 
-#include <map>
 #include <sstream>
 #include <iostream>
 

@@ -3,7 +3,6 @@
 #define DOMPASCH_MALLOB_OPTIONS_LIST_HPP
 
 #include "util/option.hpp"
-#include "util/hashing.hpp"
 
 // All declared options will be stored in this member of the Parameters class.
 OptMap _map;
@@ -20,6 +19,7 @@ OPT_BOOL(coloredOutput,                  "colors", "",                      fals
 OPT_BOOL(continuousGrowth,               "cg", "",                          true,                       "Continuous growth of job demands")
 OPT_BOOL(delayMonkey,                    "delaymonkey", "",                 false,                      "Small chance for each MPI call to block for some random amount of time")
 OPT_BOOL(derandomize,                    "derandomize", "",                 true,                       "Derandomize job bouncing and build a <bounce-alternatives>-regular message graph instead")
+OPT_BOOL(explicitVolumeUpdates,          "evu", "",                         false,                      "Broadcast volume updates through job tree instead of letting each PE compute it itself")
 OPT_BOOL(help,                           "h", "help",                       false,                      "Print help and exit")
 OPT_BOOL(jitterJobPriorities,            "jjp", "jitter-job-priorities",    true,                       "Jitter job priorities to break ties during rebalancing")
 OPT_BOOL(latencyMonkey,                  "latencymonkey", "",               false,                      "Block all MPI_Isend operations by a small randomized amount of time")
@@ -44,6 +44,7 @@ OPT_INT(firstApiIndex,                   "fapii", "",                       0,  
 OPT_INT(hopsBetweenBfs,                  "hbbfs", "",                       10,   0, MAX_INT,           "After a job request hopped this many times after unsuccessful \"hill climbing\" BFS, perform another BFS")
 OPT_INT(hardMaxClauseLength,             "hmcl", "",                        30,   0, LARGE_INT,         "Only share clauses up to this length")
 OPT_INT(hopsUntilBfs,                    "hubfs", "",                       100,  0, MAX_INT,           "After a job request hopped this many times, perform a \"hill climbing\" BFS")
+OPT_INT(hopsUntilCollectiveAssignment,   "huca", "",                        -1,   -1, LARGE_INT,        "After a job request hopped this many times, add it to collective negotiation of requests and idle nodes");
 OPT_INT(initialHardLbdLimit,             "ihlbd", "",                       LARGE_INT, 0, LARGE_INT,    "Before any clause prod. increase, this MUST be fulfilled for any clause to be shared")
 OPT_INT(initialSoftLbdLimit,             "islbd", "",                       LARGE_INT, 0, LARGE_INT,    "Before any clause prod. increase, this must be fulfilled for any clause to be shared except for special cases")
 OPT_INT(jobCacheSize,                    "jc", "job-cache",                 4,    0, LARGE_INT,         "Size of job cache per PE for suspended yet unfinished job nodes")

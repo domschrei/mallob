@@ -27,7 +27,7 @@ void Client::readIncomingJobs(Logger log) {
     std::list<std::pair<std::thread, std::atomic_bool*>> readerTasks;
     std::atomic_int numActiveTasks = 0;
 
-    while (!checkTerminate()) {
+    while (_instance_reader.continueRunning()) {
 
         float time = Timer::elapsedSeconds();
 
@@ -159,7 +159,7 @@ void Client::init() {
             [&](JobMetadata&& data) {handleNewJob(std::move(data));}
         )
     );
-    _instance_reader_thread = std::thread([this]() {
+    _instance_reader.run([this]() {
         readIncomingJobs(
             Logger::getMainInstance().copy("<Reader>", "#-1.")
         );
@@ -174,28 +174,15 @@ void Client::init() {
     log(V4_VVER, "Passed global init barrier\n");
 }
 
-bool Client::checkTerminate() {
-
-    if (Terminator::isTerminating()) {
-        log(V2_INFO, "Terminating.\n");
-        return true;
-    }
-    if (Timer::globalTimelimReached(_params)) {
-        log(V2_INFO, "Global timeout: terminating\n");
-        Terminator::setTerminating();
-        return true;
-    }
-    return false;
-}
-
 void Client::mainProgram() {
 
     float lastStatTime = Timer::elapsedSeconds();
     std::vector<int> finishedHandleIds;
 
-    while (!checkTerminate()) {
+    while (!Terminator::isTerminating()) {
 
         float time = Timer::elapsedSeconds();
+        if (Timer::globalTimelimReached(_params)) Terminator::setTerminating();
 
         // Print memory usage info
         if (time - lastStatTime > 5) {
@@ -299,7 +286,7 @@ int Client::getMaxNumParallelJobs() {
 
 void Client::introduceNextJob() {
 
-    if (checkTerminate()) return;
+    if (Terminator::isTerminating()) return;
 
     // Are there any non-introduced jobs left?
     if (_num_ready_jobs == 0) return;
@@ -466,9 +453,7 @@ void Client::handleExit(MessageHandle& handle) {
 }
 
 Client::~Client() {
-    if (_instance_reader_thread.joinable())
-        _instance_reader_thread.join();
-
+    _instance_reader.stop();
     _file_adapter.reset();
 
     // Merge logs from instance reader

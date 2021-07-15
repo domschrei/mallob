@@ -7,6 +7,7 @@
 #include <set>
 #include <vector>
 #include <cstring>
+#include <assert.h>
 
 #include "data/reduceable.hpp"
 

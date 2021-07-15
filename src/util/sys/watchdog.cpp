@@ -1,7 +1,10 @@
 
 #include "watchdog.hpp"
 
+#include <unistd.h>
+
 #include "util/logger.hpp"
+#include "util/sys/proc.hpp"
 #include "util/sys/process.hpp"
 
 Watchdog::Watchdog(int checkIntervalMillis, float time) {
@@ -9,10 +12,8 @@ Watchdog::Watchdog(int checkIntervalMillis, float time) {
     reset(time);
     auto parentTid = Proc::getTid();
 
-    _thread = std::thread([&, parentTid, checkIntervalMillis]() {
-        while (_running) {
-            usleep(1000 * checkIntervalMillis);
-            if (!_running) break;
+    _worker.run([&, parentTid, checkIntervalMillis]() {
+        while (_worker.continueRunning()) {
             int timeMillis = (int) (1000*Timer::elapsedSeconds());
             auto elapsed = timeMillis - _last_reset_millis;
             if (_abort_period_millis > 0 && elapsed > _abort_period_millis) {   
@@ -25,6 +26,7 @@ Watchdog::Watchdog(int checkIntervalMillis, float time) {
             if (_warning_period_millis > 0 && elapsed > _warning_period_millis) {
                 log(V1_WARN, "[WARN] Watchdog: No reset for %i ms!\n", elapsed);
             }
+            usleep(1000 * checkIntervalMillis);
         }
     });
 }
@@ -41,10 +43,5 @@ void Watchdog::reset(float time) {
 }
 
 void Watchdog::stop() {
-    _running = false;
-}
-
-Watchdog::~Watchdog() {
-    _running = false;
-    if (_thread.joinable()) _thread.join();
+    _worker.stop();
 }

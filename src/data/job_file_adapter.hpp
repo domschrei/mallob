@@ -16,6 +16,8 @@
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 
+class Parameters;
+
 class JobFileAdapter {
 
 public:

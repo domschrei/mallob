@@ -1,15 +1,14 @@
 
-#include <map>
 #include <thread>
+#include <assert.h>
 
 #include "threaded_sat_job.hpp"
 
-#include "assert.h"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
-#include "comm/mympi.hpp"
 #include "anytime_sat_clause_communicator.hpp"
 #include "util/sys/proc.hpp"
+#include "hordesat/horde.hpp"
 #include "horde_config.hpp"
 
 ThreadedSatJob::ThreadedSatJob(const Parameters& params, int commSize, int worldRank, int jobId) : 

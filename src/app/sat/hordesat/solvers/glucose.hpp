@@ -16,8 +16,6 @@ using namespace Mallob;
 
 #include "simp/SimpSolver.h"
 
-#include <map>
-
 class MGlucose : Glucose::SimpSolver, public PortfolioSolverInterface {
 
 private:

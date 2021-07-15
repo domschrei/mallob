@@ -4,19 +4,17 @@
 
 #include <atomic>
 #include <list>
-#include <thread>
 #include <vector>
 
 #include "util/logger.hpp"
 #include "util/sys/threading.hpp"
+#include "util/sys/background_worker.hpp"
 
 template <typename T>
 class ConcurrentAllocator {
 
 private:
-    std::atomic_bool _exiting = false;
-
-    std::thread _thread;
+    BackgroundWorker _worker;
     std::atomic_bool _thread_done = true;
 
     std::atomic_int _num_open = 0;
@@ -54,11 +52,11 @@ public:
 
     void startThread() {
         // Join old thread
-        if (_thread.joinable()) _thread.join();
+        _worker.stop();
         _thread_done = false;
         // Spawn new thread
-        _thread = std::thread([this]() {
-            while (!_exiting && _num_open > 0) {
+        _worker.run([this]() {
+            while (_worker.continueRunning() && _num_open > 0) {
                 
                 _work_mutex.lock();
                 auto [id, s] = _work_queue.front();
@@ -76,11 +74,6 @@ public:
             }
             _thread_done = true;
         });
-    }
-
-    ~ConcurrentAllocator() {
-        _exiting = true;
-        if (_thread.joinable()) _thread.join();
     }
 };
 

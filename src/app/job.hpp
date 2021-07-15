@@ -4,19 +4,14 @@
 
 #include <string>
 #include <memory>
-#include <thread>
-#include <initializer_list>
-#include <set>
 #include <assert.h>
 #include <atomic>
 
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
-#include "util/permutation.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "data/job_transfer.hpp"
-#include "data/epoch_counter.hpp"
 #include "data/job_state.h"
 #include "util/logger.hpp"
 #include "app/job_tree.hpp"

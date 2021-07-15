@@ -1,6 +1,6 @@
 
 #include <thread>
-#include "assert.h"
+#include <assert.h>
 
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
@@ -19,8 +19,7 @@ ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank
 void ForkedSatJob::appl_start() {
 
     assert(!_initialized);
-    assert(!_init_thread.joinable());
-
+    
     HordeConfig config(_params, *this);
     Parameters hParams(_params);
     hParams.hordeConfig.set(config.toString());
@@ -56,10 +55,6 @@ void ForkedSatJob::appl_start() {
         }
         _initialized = true;
     }
-    
-    _init_thread = std::thread([this]() {
-        
-    });
 }
 
 void ForkedSatJob::loadIncrements() {
@@ -156,8 +151,8 @@ void ForkedSatJob::appl_dumpStats() {
 
 bool ForkedSatJob::appl_isDestructible() {
     assert(getState() == PAST);
-    // Not initialized (yet): No init thread may be running
-    if (!_initialized) return !_init_thread.joinable();
+    // Not initialized (yet)?
+    if (!_initialized) return true;
     // If shared memory needs to be cleaned up, start an according thread
     startDestructThreadIfNecessary();
     // Everything cleaned up?
@@ -230,7 +225,6 @@ void ForkedSatJob::startDestructThreadIfNecessary() {
 ForkedSatJob::~ForkedSatJob() {
     log(V4_VVER, "%s : enter destructor\n", toStr());
 
-    if (_init_thread.joinable()) _init_thread.join();
     if (_destruct_thread.joinable()) _destruct_thread.join();
 
     if (_initialized) {

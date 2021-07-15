@@ -158,6 +158,8 @@ const int MSG_REQUEST_WORK = 37;
 const int MSG_REQUEST_IDLE_NODE_BFS = 38;
 const int MSG_ANSWER_IDLE_NODE_BFS = 39;
 
+const int MSG_NOTIFY_ASSIGNMENT_UPDATE = 40;
+
 /*
 Pseudo-tag representing all tags that can be received at any time.
 NOT a tag to be used outside of MyMpi.*.

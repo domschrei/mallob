@@ -1,5 +1,6 @@
 
 #include <iomanip>
+#include <fstream>
 
 #include "job_file_adapter.hpp"
 #include "util/sys/fileutils.hpp"
@@ -7,6 +8,7 @@
 #include "util/random.hpp"
 #include "app/sat/sat_constants.h"
 #include "util/sys/terminator.hpp"
+#include "util/params.hpp"
 
 void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) {
 

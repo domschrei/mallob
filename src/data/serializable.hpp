@@ -3,7 +3,6 @@
 #define DOMPASCH_CUCKOO_REBALANCER_SERIALIZABLE
 
 #include <vector>
-#include <memory>
 #include <cstdint>
 #include <cstring>
 

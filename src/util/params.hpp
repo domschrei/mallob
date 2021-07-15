@@ -1,18 +1,7 @@
-/*
- * ParameterProcessor.h
- *
- *  Created on: Dec 5, 2014
- *      Author: balyo
- */
 
 #ifndef DOMPASCH_PARAMETERPROCESSOR_H_
 #define DOMPASCH_PARAMETERPROCESSOR_H_
 
-#include <map>
-#include <string>
-#include <iostream>
-
-#include "util/robin_hood.hpp"
 #include "util/option.hpp"
 
 class Parameters {
@@ -33,4 +22,4 @@ public:
 	char* const* asCArgs(const char* execName) const;
 };
 
-#endif /* PARAMETERPROCESSOR_H_ */
+#endif

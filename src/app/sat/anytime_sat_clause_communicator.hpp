@@ -3,7 +3,7 @@
 #define DOMPASCH_MALLOB_ANYTIME_SAT_CLAUSE_COMMUNICATOR_H
 
 #include "util/params.hpp"
-#include "util/robin_hood.hpp"
+#include "util/hashing.hpp"
 #include "hordesat/sharing/lockfree_clause_database.hpp"
 #include "data/job_transfer.hpp"
 #include "app/job.hpp"

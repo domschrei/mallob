@@ -5,7 +5,6 @@
 #include <set>
 #include <chrono>
 #include <string>
-#include <thread>
 #include <memory>
 
 #include "comm/mympi.hpp"
@@ -14,12 +13,13 @@
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "data/job_transfer.hpp"
-#include "data/epoch_counter.hpp"
 #include "balancing/balancer.hpp"
 #include "comm/message_handler.hpp"
 #include "data/job_database.hpp"
 #include "comm/sysstate.hpp"
 #include "comm/distributed_bfs.hpp"
+#include "util/sys/background_worker.hpp"
+#include "balancing/collective_assignment.hpp"
 
 #define SYSSTATE_BUSYRATIO 0
 #define SYSSTATE_NUMJOBS 1
@@ -48,8 +48,9 @@ private:
     float _time_only_idle_worker = -1;
 
     DistributedBFS _bfs;
+    CollectiveAssignment _coll_assign;
 
-    std::thread _mpi_monitor_thread;
+    BackgroundWorker _mpi_monitor;
 
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& _client_nodes) :

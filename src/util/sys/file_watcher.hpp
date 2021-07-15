@@ -10,7 +10,6 @@
 #include <dirent.h>
 
 #include <string>
-#include <thread>
 #include <functional>
 #include <memory>
 
@@ -18,6 +17,7 @@
 #include "util/sys/fileutils.hpp"
 #include "util/sys/thread_group.hpp"
 #include "util/logger.hpp"
+#include "util/sys/background_worker.hpp"
 
 class FileWatcher {
 
@@ -33,8 +33,7 @@ private:
     std::string _directory;
     int _inotify_fd = 0;
     int _inotify_wd = 0;
-    std::thread _thread;
-    bool _exiting;
+    BackgroundWorker _worker;
     std::function<void(const Event&, Logger& logger)> _callback;
     InitialFilesHandling _init_files_handling;
 
@@ -44,10 +43,9 @@ public:
         std::function<void(const Event&, Logger&)> callback, Logger& logger,
         InitialFilesHandling initFilesHandling = IGNORE, size_t numThreads = 1) : 
     
-            _directory(directory),
-            _exiting(false), _callback(callback), _init_files_handling(initFilesHandling) {
+            _directory(directory), _callback(callback), _init_files_handling(initFilesHandling) {
         
-        _thread = std::thread([events, this, numThreads, &logger]() {
+        _worker.run([events, this, numThreads, &logger]() {
 
             FileUtils::mkdir(_directory);
 
@@ -102,7 +100,7 @@ public:
                             _callback(FileWatcher::Event{IN_CREATE, entry}, lg);
                         });
                     }
-                    if (_exiting) return;
+                    if (!_worker.continueRunning()) return;
                 }
             }
             
@@ -110,7 +108,7 @@ public:
             size_t eventSize = sizeof(struct inotify_event);
             size_t bufferSize = 1024 * eventSize + 16;
             char* buffer = (char*)malloc(bufferSize);
-            while (!_exiting) {
+            while (_worker.continueRunning()) {
                 usleep(1000 * 10); // 10 milliseconds
 
                 // poll for an event to occur
@@ -119,7 +117,7 @@ public:
                 int i = 0;
                 
                 // Iterate over found events
-                while (!_exiting && i < len) {
+                while (_worker.continueRunning() && i < len) {
                     // digest event
                     inotify_event* event = (inotify_event*) &buffer[i];
                     Event ev{event->mask, std::string(event->name, event->len)};
@@ -134,8 +132,7 @@ public:
     }
 
     ~FileWatcher() {
-        _exiting = true;
-        if (_thread.joinable()) _thread.join();
+        _worker.stop();
         if (_inotify_fd != 0) close(_inotify_fd);
     }
 };

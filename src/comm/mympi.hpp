@@ -2,21 +2,18 @@
 #ifndef DOMPASCH_CUCKOO_BALANCER_BOOSTMPI
 #define DOMPASCH_CUCKOO_BALANCER_BOOSTMPI
 
-#include <iostream>
 #include <memory>
 #include <set>
 #include <map>
-#include <assert.h>
-#include <optional>
 
 // Turn off incompatible function types warning in openmpi
 #define OMPI_SKIP_MPICXX 1
 #include <mpi.h>
 
 #include "data/serializable.hpp"
-#include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/concurrent_allocator.hpp"
+#include "util/hashing.hpp"
 
 #include "msgtags.h"
 
@@ -34,6 +31,7 @@ struct MsgTag {
     MsgTag(int id, bool anytime) : id(id), anytime(anytime) {}
 };
 
+class Parameters;
 struct MessageHandle;
 typedef std::unique_ptr<MessageHandle> MessageHandlePtr;
 
@@ -182,16 +180,8 @@ public:
     void setReceive(std::vector<uint8_t>&& buf) {recvData = std::move(buf);}
     std::vector<uint8_t>&& moveRecvData() { return std::move(recvData);}
 
-    void appendTagToSendData(int tag) {
-        int prevSize = sendData->size();
-        sendData->resize(prevSize+sizeof(int));
-        memcpy(sendData->data()+prevSize, &tag, sizeof(int));
-    }
-    void receiveSelfMessage(const std::vector<uint8_t>& recvData, int rank) {
-        this->recvData = recvData;
-        source = rank;
-        selfMessage = true;
-    }
+    void appendTagToSendData(int tag);
+    void receiveSelfMessage(const std::vector<uint8_t>& recvData, int rank);
 
     bool testSent();
     bool testReceived();

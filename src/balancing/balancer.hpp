@@ -2,7 +2,7 @@
 #ifndef DOMPASCH_BALANCER_INTERFACE_H
 #define DOMPASCH_BALANCER_INTERFACE_H
 
-#include "util/robin_hood.hpp"
+#include "util/hashing.hpp"
 #include "app/job.hpp"
 #include "comm/mympi.hpp"
 #include "util/params.hpp"

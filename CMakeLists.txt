@@ -32,17 +32,18 @@ set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib/lingeling lib/glucose lib)
 
 set(BASE_SOURCES
     src/app/job.cpp 
+    src/app/dummy/dummy_reader.cpp
     src/app/sat/anytime_sat_clause_communicator.cpp src/app/sat/forked_sat_job.cpp src/app/sat/horde_config.cpp src/app/sat/horde_process_adapter.cpp 
     src/app/sat/hordesat/horde.cpp 
     src/app/sat/hordesat/sharing/default_sharing_manager.cpp 
     src/app/sat/hordesat/solvers/cadical.cpp src/app/sat/hordesat/solvers/lingeling.cpp src/app/sat/hordesat/solvers/mergesat.cpp src/app/sat/hordesat/solvers/portfolio_solver_interface.cpp src/app/sat/hordesat/solvers/solver_thread.cpp src/app/sat/hordesat/solvers/solving_state.cpp 
     src/app/sat/hordesat/utilities/buffer_manager.cpp src/app/sat/hordesat/utilities/clause_database.cpp src/app/sat/hordesat/utilities/clause_filter.cpp 
     src/app/sat/threaded_sat_job.cpp 
-    src/balancing/balancer.cpp src/balancing/event_driven_balancer.cpp src/balancing/rounding.cpp 
+    src/balancing/balancer.cpp src/balancing/collective_assignment.cpp src/balancing/event_driven_balancer.cpp src/balancing/rounding.cpp 
     src/comm/message_handler.cpp src/comm/mpi_monitor.cpp src/comm/mympi.cpp 
-    src/data/job_database.cpp src/data/job_description.cpp src/data/job_file_adapter.cpp src/data/job_reader.cpp src/data/job_result.cpp src/data/reduceable.cpp 
-    src/util/logger.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sat_reader.cpp 
-    src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/shared_memory.cpp src/util/sys/terminator.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp
+    src/data/job_database.cpp src/data/job_description.cpp src/data/job_file_adapter.cpp src/data/job_reader.cpp src/data/job_result.cpp src/data/reduceable.cpp src/data/job_transfer.cpp 
+    src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sat_reader.cpp 
+    src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/shared_memory.cpp src/util/sys/terminator.cpp src/util/sys/threading.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp
     src/util/ringbuf/ringbuf.c
 )
 set(RESTRICTED_SOURCES src/app/sat/hordesat/solvers/glucose.cpp)

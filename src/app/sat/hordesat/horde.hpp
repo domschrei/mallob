@@ -1,19 +1,14 @@
 /*
- * HordeLib.h
- *
- *  Created on: Mar 24, 2017
- *      Author: balyo
+ * This is a heavily modified successor of HordeSat's entry point.
+ * Original class created on: Mar 24, 2017, Author: balyo
  */
 
 #ifndef HORDELIB_H_
 #define HORDELIB_H_
 
 #include <atomic>
-#include <thread>
 #include <vector>
 #include <memory>
-#include <set>
-#include <map>
 
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"

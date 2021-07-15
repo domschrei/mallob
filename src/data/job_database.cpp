@@ -14,6 +14,7 @@
 #include "util/logger.hpp"
 #include "balancing/event_driven_balancer.hpp"
 #include "util/sys/watchdog.hpp"
+#include "util/sys/proc.hpp"
 
 JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm): 
         _params(params), _comm(comm) {
@@ -29,9 +30,9 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm):
     // Initialize balancer
     _balancer = std::unique_ptr<Balancer>(new EventDrivenBalancer(comm, params));
 
-    _janitor = std::thread([this]() {
+    _janitor.run([this]() {
         log(V3_VERB, "Job-DB Janitor tid=%lu\n", Proc::getTid());
-        while (!_exiting || _num_stored_jobs > 0) {
+        while (_janitor.continueRunning() || _num_stored_jobs > 0) {
             usleep(1000 * 1000);
             std::list<Job*> copy;
             {
@@ -528,6 +529,14 @@ bool JobDatabase::hasDormantJob(int jobId) const {
             (get(jobId).getState() == SUSPENDED || get(jobId).getState() == STANDBY);
 }
 
+std::vector<int> JobDatabase::getDormantJobs() const {
+    std::vector<int> out;
+    for (auto& [jobId, _] : _jobs) {
+        if (hasDormantJob(jobId)) out.push_back(jobId);
+    }
+    return out;
+}
+
 JobDatabase::~JobDatabase() {
 
     // Setup a watchdog to get feedback on hanging destructors
@@ -545,9 +554,6 @@ JobDatabase::~JobDatabase() {
         watchdog.reset();
     }
 
-    // Join cleanup thread for old jobs
-    _exiting = true;
-    if (_janitor.joinable()) _janitor.join();
-
+    _janitor.stop();
     watchdog.stop();
 }

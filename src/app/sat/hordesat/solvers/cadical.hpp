@@ -8,8 +8,6 @@
 #ifndef MSCHICK_CADICAL_H_
 #define MSCHICK_CADICAL_H_
 
-#include <map>
-
 #include "portfolio_solver_interface.hpp"
 
 #include "util/sys/threading.hpp"

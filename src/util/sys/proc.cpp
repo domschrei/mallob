@@ -1,9 +1,16 @@
 
+
+#include <sys/time.h>
+#include <sys/resource.h>
 #include <sched.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
 #include <map>
 #include <assert.h>
+#include <ios>
+#include <iostream>
+#include <fstream>
+#include <string>
 
 #include "proc.hpp"
 #include "util/sys/timer.hpp"

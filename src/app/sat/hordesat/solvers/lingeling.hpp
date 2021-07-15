@@ -14,8 +14,6 @@
 
 #include "util/ringbuffer.hpp"
 
-#include <map>
-
 struct LGL;
 
 class Lingeling : public PortfolioSolverInterface {

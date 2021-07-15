@@ -5,7 +5,7 @@
 #include <vector>
 #include <assert.h>
 
-#include "util/robin_hood.hpp"
+#include "util/hashing.hpp"
 #include "util/sys/timer.hpp"
 #include "app/job_tree.hpp"
 #include "comm/mympi.hpp"
