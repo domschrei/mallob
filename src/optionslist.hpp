@@ -44,7 +44,7 @@ OPT_INT(firstApiIndex,                   "fapii", "",                       0,  
 OPT_INT(hopsBetweenBfs,                  "hbbfs", "",                       10,   0, MAX_INT,           "After a job request hopped this many times after unsuccessful \"hill climbing\" BFS, perform another BFS")
 OPT_INT(hardMaxClauseLength,             "hmcl", "",                        30,   0, LARGE_INT,         "Only share clauses up to this length")
 OPT_INT(hopsUntilBfs,                    "hubfs", "",                       100,  0, MAX_INT,           "After a job request hopped this many times, perform a \"hill climbing\" BFS")
-OPT_INT(hopsUntilCollectiveAssignment,   "huca", "",                        -1,   -1, LARGE_INT,        "After a job request hopped this many times, add it to collective negotiation of requests and idle nodes");
+OPT_INT(hopsUntilCollectiveAssignment,   "huca", "",                        -1,   -1, LARGE_INT,        "After a job request hopped this many times, add it to collective negotiation of requests and idle nodes (0: immediately, -1: never");
 OPT_INT(initialHardLbdLimit,             "ihlbd", "",                       LARGE_INT, 0, LARGE_INT,    "Before any clause prod. increase, this MUST be fulfilled for any clause to be shared")
 OPT_INT(initialSoftLbdLimit,             "islbd", "",                       LARGE_INT, 0, LARGE_INT,    "Before any clause prod. increase, this must be fulfilled for any clause to be shared except for special cases")
 OPT_INT(jobCacheSize,                    "jc", "job-cache",                 4,    0, LARGE_INT,         "Size of job cache per PE for suspended yet unfinished job nodes")

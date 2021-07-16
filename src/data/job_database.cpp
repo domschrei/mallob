@@ -215,6 +215,10 @@ void JobDatabase::commit(JobRequest& req) {
     }
 }
 
+bool JobDatabase::hasCommitment() const {
+    return _has_commitment;
+}
+
 bool JobDatabase::hasCommitment(int jobId) const {
     return has(jobId) && get(jobId).hasCommitment();
 }

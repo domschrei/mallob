@@ -69,11 +69,11 @@ void CollectiveAssignment::deserialize(const std::vector<uint8_t>& packed, int s
 
     } else if (kind == COLL_ASSIGN_REQUESTS) {
         // List of job requests
-        log(LOG_ADD_SRCRANK | V3_VERB, "[CA] got requests", source);
         n = JobRequest::getTransferSize();
         while (i+n <= packed.size()) {
             std::vector<uint8_t> reqPacked(packed.begin()+i, packed.begin()+i+n);
             JobRequest req = Serializable::get<JobRequest>(reqPacked);
+            req.numHops++;
             log(LOG_ADD_SRCRANK | V3_VERB, "[CA] got %s", source, req.toStr().c_str());
             _request_list.insert(req);
             i += n;
@@ -97,9 +97,10 @@ void CollectiveAssignment::resolveRequests() {
 
         // Is there an optimal fit for this request?
         // -- self?
-        if (_job_db->isIdle() && _job_db->hasDormantJob(id)) {
+        if (_job_db->isIdle() && !_job_db->hasCommitment() && _job_db->hasDormantJob(id)) {
             // self is optimal fit
             destination = MyMpi::rank(MPI_COMM_WORLD);
+            usesCachedSlot = true;
         } else {
             // -- other PE?
             int bestNumCached = 0;
@@ -116,15 +117,20 @@ void CollectiveAssignment::resolveRequests() {
         if (destination < 0) {
             // No optimal fit found
 
-            // Is there a non-optimal fit for this request?
-            // -- self?
-            if (_job_db->isIdle()) destination = MyMpi::rank(MPI_COMM_WORLD);
-            else {
-                // -- other PE?
-                for (const auto& [rank, status] : _child_statuses) {
-                    if (status.numIdle > 0) {
-                        destination = rank;
-                        break;
+            // Continue search for a non-optimal fit if root or #hops is large enough
+            if (getCurrentRoot() == MyMpi::rank(MPI_COMM_WORLD) || req.numHops >= 5) {
+
+                // Is there a non-optimal fit for this request?
+                // -- self?
+                if (_job_db->isIdle() && !_job_db->hasCommitment()) {
+                    destination = MyMpi::rank(MPI_COMM_WORLD);
+                } else {
+                    // -- other PE?
+                    for (const auto& [rank, status] : _child_statuses) {
+                        if (status.numIdle > 0) {
+                            destination = rank;
+                            break;
+                        }
                     }
                 }
             }
@@ -142,10 +148,12 @@ void CollectiveAssignment::resolveRequests() {
             }
         } else {
             // Fit found: send to respective child
-            log(LOG_ADD_DESTRANK | V3_VERB, "[CA] Send %s to destination", destination, req.toStr().c_str());
+            log(LOG_ADD_DESTRANK | V3_VERB, "[CA] Send %s to dest. (cached job: %s)", destination, 
+                req.toStr().c_str(), usesCachedSlot ? "true" : "false");
             // Update status
             if (destination == MyMpi::rank(MPI_COMM_WORLD)) {
-                log(V3_VERB, "[CA] Digest %s locally\n", req.toStr().c_str());
+                log(V3_VERB, "[CA] Digest %s locally (cached job: %s)\n", req.toStr().c_str(), 
+                    usesCachedSlot ? "true" : "false");
                 _local_request_callback(req, destination);
             } else {
                 requestsPerDestination[destination].push_back(req);

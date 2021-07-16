@@ -56,6 +56,7 @@ public:
     bool isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAccepted = false);
 
     void commit(JobRequest& req);
+    bool hasCommitment() const;
     bool hasCommitment(int jobId) const;
     const JobRequest& getCommitment(int jobId);
     void uncommit(int jobId);
