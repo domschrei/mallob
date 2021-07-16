@@ -27,10 +27,10 @@ std::vector<uint8_t> CollectiveAssignment::serialize(const Status& status) {
     return packed;
 }
 
-std::vector<uint8_t> CollectiveAssignment::serializeRequests() {
+std::vector<uint8_t> CollectiveAssignment::serialize(const std::vector<JobRequest>& requests) {
     std::vector<uint8_t> packed;
     packed.push_back(COLL_ASSIGN_REQUESTS);
-    for (auto& req : _request_list) {
+    for (auto& req : requests) {
         auto reqPacked = req.serialize();
         packed.insert(packed.end(), reqPacked.begin(), reqPacked.end());
     }
@@ -69,18 +69,26 @@ void CollectiveAssignment::deserialize(const std::vector<uint8_t>& packed, int s
 
     } else if (kind == COLL_ASSIGN_REQUESTS) {
         // List of job requests
-
-        while (i+sizeof(JobRequest) <= packed.size()) {
-            std::vector<uint8_t> reqPacked(packed.begin()+i, packed.begin()+i+sizeof(JobRequest));
-            _request_list.insert(Serializable::get<JobRequest>(reqPacked));
-            i += sizeof(JobRequest);
+        log(LOG_ADD_SRCRANK | V3_VERB, "[CA] got requests", source);
+        n = JobRequest::getTransferSize();
+        while (i+n <= packed.size()) {
+            std::vector<uint8_t> reqPacked(packed.begin()+i, packed.begin()+i+n);
+            JobRequest req = Serializable::get<JobRequest>(reqPacked);
+            log(LOG_ADD_SRCRANK | V3_VERB, "[CA] got %s", source, req.toStr().c_str());
+            _request_list.insert(req);
+            i += n;
         }
     }
 }
 
 void CollectiveAssignment::resolveRequests() {
-    
+    // Guard against recursive calls (would be illegal due to iteration over map)
+    static bool resolving = false;
+    assert(!resolving);
+    resolving = true;
+
     std::vector<JobRequest> requestsToKeep;
+    robin_hood::unordered_map<int, std::vector<JobRequest>> requestsPerDestination;
 
     for (const auto& req : _request_list) {
         int id = req.jobId;
@@ -130,14 +138,17 @@ void CollectiveAssignment::resolveRequests() {
             } else {
                 // Send job request upwards
                 log(LOG_ADD_DESTRANK | V3_VERB, "[CA] Send %s to parent", getCurrentParent(), req.toStr().c_str());
-                MyMpi::isend(MPI_COMM_WORLD, getCurrentParent(), MSG_REQUEST_NODE, req);
+                requestsPerDestination[getCurrentParent()].push_back(req);
             }
         } else {
             // Fit found: send to respective child
             log(LOG_ADD_DESTRANK | V3_VERB, "[CA] Send %s to destination", destination, req.toStr().c_str());
-            MyMpi::isend(MPI_COMM_WORLD, destination, MSG_REQUEST_NODE, req);
             // Update status
-            if (destination != MyMpi::rank(MPI_COMM_WORLD)) {
+            if (destination == MyMpi::rank(MPI_COMM_WORLD)) {
+                log(V3_VERB, "[CA] Digest %s locally\n", req.toStr().c_str());
+                _local_request_callback(req, destination);
+            } else {
+                requestsPerDestination[destination].push_back(req);
                 _child_statuses[destination].numIdle--;
                 if (usesCachedSlot)
                     _child_statuses[destination].numCachedPerJob[id]--;
@@ -147,6 +158,12 @@ void CollectiveAssignment::resolveRequests() {
 
     _request_list.clear();
     for (auto& req : requestsToKeep) _request_list.insert(std::move(req));
+    for (auto& [rank, requests] : requestsPerDestination) {
+        auto packed = serialize(requests);
+        MyMpi::isend(MPI_COMM_WORLD, rank, MSG_NOTIFY_ASSIGNMENT_UPDATE, packed);
+    }
+
+    resolving = false;
 }
 
 void CollectiveAssignment::setStatusDirty() {

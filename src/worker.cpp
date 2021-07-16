@@ -1217,7 +1217,18 @@ void Worker::createExpanderGraph() {
         auto permutations = AdjustablePermutation::getPermutations(numWorkers, numBounceAlternatives);
         _hop_destinations = AdjustablePermutation::createExpanderGraph(permutations, _world_rank);
         if (_params.hopsUntilCollectiveAssignment() >= 0)
-            _coll_assign = CollectiveAssignment(_job_db, MyMpi::size(_comm), AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, _world_rank));
+            _coll_assign = CollectiveAssignment(
+                _job_db, MyMpi::size(_comm), 
+                AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, _world_rank), 
+                [&](const JobRequest& req, int rank) {
+                    // receive a job request
+                    MessageHandle handle(MyMpi::nextHandleId());
+                    handle.tag = MSG_REQUEST_NODE;
+                    handle.finished = true;
+                    handle.receiveSelfMessage(req.serialize(), rank);
+                    handleRequestNode(handle, JobDatabase::NORMAL);
+                }
+            );
     }
     for (int dest : _hop_destinations) {
         _neighbor_idle_distance[dest] = 0; // initially, all workers are idle

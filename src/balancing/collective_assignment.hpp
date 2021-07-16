@@ -3,6 +3,7 @@
 #define DOMPASCH_MALLOB_COLLECTIVE_ASSIGNMENT_HPP
 
 #include <set>
+#include <functional>
 
 #include "data/job_transfer.hpp"
 #include "comm/mympi.hpp"
@@ -13,6 +14,7 @@ class CollectiveAssignment {
 
 private:
     JobDatabase* _job_db;
+    std::function<void(const JobRequest&, int)> _local_request_callback;
     
     struct Status {
         int numIdle;
@@ -29,14 +31,16 @@ private:
 
 public:
     CollectiveAssignment() {}
-    CollectiveAssignment(JobDatabase& jobDb, int numWorkers, std::vector<int>&& neighborTowardsRank) : 
-        _job_db(&jobDb), _num_workers(numWorkers), _neighbor_towards_rank(std::move(neighborTowardsRank)) {}
+    CollectiveAssignment(JobDatabase& jobDb, int numWorkers, std::vector<int>&& neighborTowardsRank, 
+    std::function<void(const JobRequest&, int)> localRequestCallback) : 
+        _job_db(&jobDb), _local_request_callback(localRequestCallback), _num_workers(numWorkers), 
+        _neighbor_towards_rank(std::move(neighborTowardsRank)) {}
 
     void handle(MessageHandle& handle);
 
     Status getAggregatedStatus();
     std::vector<uint8_t> serialize(const Status& status);
-    std::vector<uint8_t> serializeRequests();
+    std::vector<uint8_t> serialize(const std::vector<JobRequest>& requests);
     void deserialize(const std::vector<uint8_t>& packed, int source);
 
     void setStatusDirty();

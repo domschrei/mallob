@@ -6,8 +6,12 @@
 
 #include "data/job_description.hpp"
 
+size_t JobRequest::getTransferSize() {
+    return 8*sizeof(int)+sizeof(float)+sizeof(JobDescription::Application);
+}
+
 std::vector<uint8_t> JobRequest::serialize() const {
-    int size = (8*sizeof(int)+sizeof(float)+sizeof(JobDescription::Application));
+    int size = getTransferSize();
     std::vector<uint8_t> packed(size);
     int i = 0, n;
     n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;

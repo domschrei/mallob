@@ -16,7 +16,6 @@
 struct JobRequest : public Serializable {
 
     int jobId;
-    JobDescription::Application application;
     int rootRank;
     int requestingNodeRank;
     int requestedNodeIndex;
@@ -25,6 +24,7 @@ struct JobRequest : public Serializable {
     float timeOfBirth;
     int numHops;
     int balancingEpoch;
+    JobDescription::Application application;
 
 public:
     JobRequest() = default;
@@ -33,16 +33,17 @@ public:
             int requestingNodeRank, int requestedNodeIndex, 
             float timeOfBirth, int balancingEpoch, int numHops) :
         jobId(jobId),
-        application(application),
         rootRank(rootRank),
         requestingNodeRank(requestingNodeRank),
         requestedNodeIndex(requestedNodeIndex),
         currentRevision(0),
         lastKnownRevision(-1),
         timeOfBirth(timeOfBirth),
-        numHops(numHops), 
-        balancingEpoch(balancingEpoch) {}
+        numHops(numHops),
+        balancingEpoch(balancingEpoch),
+        application(application) {}
 
+    static size_t getTransferSize();
     std::vector<uint8_t> serialize() const override;
     JobRequest& deserialize(const std::vector<uint8_t> &packed) override;
     std::string toStr() const;
