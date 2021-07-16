@@ -43,7 +43,7 @@ OPT_INT(finalSoftLbdLimit,               "fslbd", "",                       LARG
 OPT_INT(firstApiIndex,                   "fapii", "",                       0,    0, LARGE_INT,         "1st API index: with c clients, uses .api/jobs.{<index>..<index>+c-1}/ as directories")
 OPT_INT(hopsBetweenBfs,                  "hbbfs", "",                       10,   0, MAX_INT,           "After a job request hopped this many times after unsuccessful \"hill climbing\" BFS, perform another BFS")
 OPT_INT(hardMaxClauseLength,             "hmcl", "",                        30,   0, LARGE_INT,         "Only share clauses up to this length")
-OPT_INT(hopsUntilBfs,                    "hubfs", "",                       100,  0, MAX_INT,           "After a job request hopped this many times, perform a \"hill climbing\" BFS")
+OPT_INT(hopsUntilBfs,                    "hubfs", "",                       LARGE_INT, 0, MAX_INT,      "After a job request hopped this many times, perform a \"hill climbing\" BFS")
 OPT_INT(hopsUntilCollectiveAssignment,   "huca", "",                        -1,   -1, LARGE_INT,        "After a job request hopped this many times, add it to collective negotiation of requests and idle nodes (0: immediately, -1: never");
 OPT_INT(initialHardLbdLimit,             "ihlbd", "",                       LARGE_INT, 0, LARGE_INT,    "Before any clause prod. increase, this MUST be fulfilled for any clause to be shared")
 OPT_INT(initialSoftLbdLimit,             "islbd", "",                       LARGE_INT, 0, LARGE_INT,    "Before any clause prod. increase, this must be fulfilled for any clause to be shared except for special cases")
@@ -58,7 +58,7 @@ OPT_INT(numJobs,                         "J", "num-jobs",                   0,  
 OPT_INT(numThreadsPerProcess,            "t", "threads-per-process",        1,    0, LARGE_INT,         "Number of worker threads per node")
 OPT_INT(sizeLimitPerProcess,             "slpp", "size-limit-per-process",  0,    0, MAX_INT,           "No more than max(1, floor(<limit>/<jobsize>)) threads are spawned per process")
 OPT_INT(sleepMicrosecs,                  "sleep", "",                       100,  0, LARGE_INT,         "Sleep this many microseconds between loop cycles of worker main thread")
-OPT_INT(softMaxClauseLength,             "hmcl", "",                        30,   0, LARGE_INT,         "Only share clauses up to this length except for special cases")
+OPT_INT(softMaxClauseLength,             "smcl", "",                        30,   0, LARGE_INT,         "Only share clauses up to this length except for special cases")
 OPT_INT(verbosity,                       "v", "verbosity",                  2,    0, 6,                 "Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB 5=DEBG")
 
 OPT_FLOAT(appCommPeriod,                 "s", "app-comm-period",            1,    0, LARGE_INT,         "Do job-internal communication every t seconds") 
