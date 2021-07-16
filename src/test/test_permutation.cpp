@@ -49,6 +49,7 @@ void testBestOutgoingEdges() {
         allEdges.push_back(std::move(edges));
     }
 
+    std::vector<int> nodesPerLevel(100, 0);
     for (int root = 0; root < n; root++) {
         
         robin_hood::unordered_map<int, std::vector<int>> graph;
@@ -65,6 +66,7 @@ void testBestOutgoingEdges() {
         while (!nodeStack.empty()) {
             std::vector<int> newNodeStack;
             log(V2_INFO, "%i nodes on level %i\n", nodeStack.size(), level);
+            nodesPerLevel[level] += nodeStack.size();
             for (int node : nodeStack) {
                 visited++;
                 for (int succ : graph[node]) {
@@ -74,16 +76,20 @@ void testBestOutgoingEdges() {
             nodeStack = newNodeStack;
             level++;
         }
-        log(V2_INFO, "%i visited\n", visited);
+        log(V2_INFO, "root=%i : %i visited\n", root, visited);
 
+        /*
         for (const auto& [src, dests] : graph) {
             if (dests.empty()) continue;
             std::string str;
             for (int d : dests) str += std::to_string(d) + " ";
             str = str.substr(0, str.size()-1);
             log(V2_INFO, "%i -> {%s}\n", src, str.c_str());
-        }
-        exit(0);
+        }*/
+    }
+
+    for (size_t i = 0; i < nodesPerLevel.size(); i++) {
+        log(V2_INFO, "l=%i n=%.3f\n", i, nodesPerLevel[i] / (float)n);
     }
 }
 
