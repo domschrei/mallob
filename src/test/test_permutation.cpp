@@ -42,16 +42,49 @@ void testBestOutgoingEdges() {
     int n = 1000;
     log(V2_INFO, "n=%i, r=%i\n", n, r);
     auto permutations = AdjustablePermutation::getPermutations(n, r);
-    int root = 1; 
-    std::vector<int> occ(n, 0);
+    std::vector<std::vector<int>> allEdges;
     for (size_t i = 0; i < n; i++) {
         log(V2_INFO, " rank=%i\n", i);
         auto edges = AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, i);
-        occ[edges[root]]++;
+        allEdges.push_back(std::move(edges));
     }
-    std::string out = "";
-    for (int x : occ) out += std::to_string(x) + " ";
-    log(V2_INFO, " occ: %s\n", out.c_str());
+
+    for (int root = 0; root < n; root++) {
+        
+        robin_hood::unordered_map<int, std::vector<int>> graph;
+        robin_hood::unordered_map<int, int> depth;
+        for (int rank = 0; rank < n; rank++) {
+            int src = allEdges[rank][root];
+            int dest = rank;
+            if (src != dest) graph[src].push_back(dest);
+        }
+        std::vector<int> nodeStack;
+        nodeStack.push_back(root);
+        int level = 0;
+        int visited = 0;
+        while (!nodeStack.empty()) {
+            std::vector<int> newNodeStack;
+            log(V2_INFO, "%i nodes on level %i\n", nodeStack.size(), level);
+            for (int node : nodeStack) {
+                visited++;
+                for (int succ : graph[node]) {
+                    newNodeStack.push_back(succ);
+                }
+            }
+            nodeStack = newNodeStack;
+            level++;
+        }
+        log(V2_INFO, "%i visited\n", visited);
+
+        for (const auto& [src, dests] : graph) {
+            if (dests.empty()) continue;
+            std::string str;
+            for (int d : dests) str += std::to_string(d) + " ";
+            str = str.substr(0, str.size()-1);
+            log(V2_INFO, "%i -> {%s}\n", src, str.c_str());
+        }
+        exit(0);
+    }
 }
 
 int main() {
@@ -61,6 +94,7 @@ int main() {
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
 
     testBestOutgoingEdges();
+    exit(0);
     testPermutations();
 
     return 0;
