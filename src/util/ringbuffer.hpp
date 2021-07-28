@@ -7,11 +7,91 @@
 #include <cstdlib>
 #include <cstring>
 #include <assert.h>
+#include <list>
+#include <atomic>
 
+#include "util/logger.hpp"
 #include "app/sat/hordesat/utilities/clause.hpp"
 using namespace Mallob;
 
 #include "util/ringbuf/ringbuf.h"
+
+template <typename T>
+class SPSCRingBuffer {
+
+private:
+    std::vector<T> _data;
+    ringbuf_t* _ringbuf = nullptr;
+    ringbuf_worker_t* _producer;
+    size_t _capacity = 0;
+    std::atomic_int _size = 0;
+
+    std::list<T> _consumer_buffer;
+
+public:
+    SPSCRingBuffer() {}
+    SPSCRingBuffer(size_t capacity) : _data(capacity), _capacity(capacity) {
+        size_t ringbufSize;
+        ringbuf_get_sizes(/*numProducers=*/1, &ringbufSize, nullptr);
+        _ringbuf = (ringbuf_t*)malloc(ringbufSize);
+        ringbuf_setup(_ringbuf, /*nworkers=*/1, _capacity);
+        _producer = ringbuf_register(_ringbuf, /*worker_id=*/0);
+    }
+
+    bool produce(T&& element) {
+        ssize_t offset = ringbuf_acquire(_ringbuf, _producer, /*size=*/1);
+        if (offset == -1) return false;
+        _data[offset] = std::move(element);
+        ringbuf_produce(_ringbuf, _producer);
+        _size++;
+        return true;
+    }
+
+    std::optional<T> consume() {
+        std::optional<T> out;
+        if (_consumer_buffer.empty()) {
+            size_t offset;
+            size_t len = ringbuf_consume(_ringbuf, &offset);
+            if (len == 1) {
+                out = std::move(_data[offset]);
+                ringbuf_release(_ringbuf, len);
+                _size--;
+                return out;
+            } else {
+                for (size_t i = 0; i < len; i++) {
+                    _consumer_buffer.push_back(std::move(_data[offset+i]));
+                }
+                ringbuf_release(_ringbuf, len);
+            }
+        }
+        if (_consumer_buffer.empty()) return out;
+
+        out = std::move(_consumer_buffer.front());
+        _consumer_buffer.pop_front();
+        _size--;
+        return out;
+    }
+
+    size_t getCapacity() const {
+        return _capacity;
+    }
+
+    size_t getSize() const {
+        return _size;
+    }
+
+    bool empty() const {
+        return _size == 0;
+    }
+
+    ~SPSCRingBuffer() {
+        if (!isNull()) {
+            free(_ringbuf);
+        }
+    }
+
+    bool isNull() const {return _ringbuf == nullptr;}
+};
 
 class RingBuffer {
 

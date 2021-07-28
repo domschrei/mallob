@@ -89,7 +89,7 @@ public:
         auto packed = msg.serialize();
         for (int rank : _my_successors) {
             log(LOG_ADD_DESTRANK | V5_DEBG, "BFS (d=%i) query", rank, msg.depth);
-            MyMpi::isend(MPI_COMM_WORLD, rank, MSG_REQUEST_IDLE_NODE_BFS, packed);
+            MyMpi::isend(rank, MSG_REQUEST_IDLE_NODE_BFS, std::move(packed));
         }
     }
 
@@ -111,7 +111,7 @@ public:
                     // than the previous message: Just send back negative answer
                     msg.answer = -1;
                     log(LOG_ADD_DESTRANK | V5_DEBG, "BFS (d=%i) answer %i", handle.source, msg.depth, msg.answer);
-                    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_ANSWER_IDLE_NODE_BFS, msg);
+                    MyMpi::isend(handle.source, MSG_ANSWER_IDLE_NODE_BFS, msg);
                     return;
                 }
             }
@@ -134,7 +134,7 @@ public:
                 // Explore successor nodes
                 for (int rank : _my_successors) {
                     log(LOG_ADD_DESTRANK | V5_DEBG, "BFS (d=%i) query %s", rank, msg.depth, msg.request.toStr().c_str());
-                    MyMpi::isend(MPI_COMM_WORLD, rank, MSG_REQUEST_IDLE_NODE_BFS, msg);
+                    MyMpi::isend(rank, MSG_REQUEST_IDLE_NODE_BFS, msg);
                 }
             }
         }
@@ -175,7 +175,7 @@ public:
             } else {
                 // Go back to predecessor node
                 log(LOG_ADD_DESTRANK | V5_DEBG, "BFS (d=%i) answer %i", parent, msg.depth, msg.answer);
-                MyMpi::isend(MPI_COMM_WORLD, parent, MSG_ANSWER_IDLE_NODE_BFS, msg);
+                MyMpi::isend(parent, MSG_ANSWER_IDLE_NODE_BFS, msg);
             }
         }
     }

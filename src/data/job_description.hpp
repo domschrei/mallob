@@ -1,5 +1,6 @@
-#ifndef DOMPASCH_CUCKOO_REBALANCER_JOB
-#define DOMPASCH_CUCKOO_REBALANCER_JOB
+
+#ifndef DOMPASCH_MALLOB_JOB_DESCRIPTION_HPP
+#define DOMPASCH_MALLOB_JOB_DESCRIPTION_HPP
 
 #include <vector>
 #include <cstring>
@@ -148,4 +149,4 @@ public:
 
 };
 
-#endif /* end of include guard: DOMPASCH_CUCKOO_REBALANCER_JOB */
+#endif

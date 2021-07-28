@@ -13,7 +13,7 @@ class JobDatabase; // forward declaration
 class CollectiveAssignment {
 
 private:
-    JobDatabase* _job_db;
+    JobDatabase* _job_db = nullptr;
     std::function<void(const JobRequest&, int)> _local_request_callback;
     
     struct Status {

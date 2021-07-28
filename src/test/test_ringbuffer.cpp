@@ -5,12 +5,98 @@
 #include <string>
 #include <thread>
 #include <set>
+#include <atomic>
 
 #include "util/random.hpp"
 #include "util/sat_reader.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "util/ringbuffer.hpp"
+
+std::atomic_int numDefaultConstructed = 0;
+std::atomic_int numCopyConstructed = 0;
+std::atomic_int numMoveConstructed = 0;
+std::atomic_int numCopyAssigned = 0;
+std::atomic_int numMoveAssigned = 0;
+
+struct DataObj {
+    int a;
+    float b;
+    std::vector<int> c;
+
+    DataObj() {
+        numDefaultConstructed++;
+    }
+    DataObj(DataObj&& other): a(other.a), b(other.b) {
+        c = std::move(other.c);
+        numMoveConstructed++;
+    }
+    DataObj(const DataObj& other) {
+        numCopyConstructed++;
+        if (!other.c.empty()) abort();
+        a = other.a;
+        b = other.b;
+        c = other.c;
+    }
+
+    DataObj& operator=(DataObj&& other) {
+        a = other.a;
+        b = other.b;
+        c = std::move(other.c);
+        numMoveAssigned++;
+        return *this;
+    }
+    DataObj& operator=(const DataObj& other) {
+        a = other.a;
+        b = other.b;
+        c = other.c;
+        numCopyAssigned++;
+        return *this;
+    }
+};
+
+void testSPSCRingBuffer() {
+    const int bufferSize = 128;
+    const int numInsertions = 10000;
+
+    log(V2_INFO, "Testing spsc ringbuffer ...\n");
+    SPSCRingBuffer<DataObj> r(bufferSize);
+    std::thread producer([&r]() {
+        int numInserted = 0;
+        DataObj o;
+        while (numInserted < numInsertions) {
+            o.a = 1;
+            o.b = 1.5;
+            o.c.resize(numInserted);
+            if (r.produce(std::move(o))) {
+                numInserted++;
+                log(V2_INFO, "Prod.: %i\n", numInserted);
+            }
+        }
+        log(V2_INFO, "Prod.: Done!\n");
+    });
+
+    // Consume
+    int numConsumed = 0;
+    while (numConsumed < numInsertions) {
+        auto opt = r.consume();
+        if (opt.has_value()) {
+            auto& o = opt.value();
+            assert(o.c.size() == numConsumed
+                || log_return_false("%i != %i!\n", o.c.size(), numConsumed));
+            numConsumed++;
+        }
+    }
+    log(V2_INFO, "Cons.: Done!\n");
+
+    producer.join();
+
+    log(V2_INFO, "default constructed: %i\n", (int)numDefaultConstructed);
+    log(V2_INFO, "copy constructed: %i\n", (int)numCopyConstructed);
+    log(V2_INFO, "move constructed: %i\n", (int)numMoveConstructed);
+    log(V2_INFO, "copy assigned: %i\n", (int)numCopyAssigned);
+    log(V2_INFO, "move assigned: %i\n", (int)numMoveAssigned);
+}
 
 void testMixedRingbuffer() {
     log(V2_INFO, "Testing mixed non-unit ringbuffer ...\n");
@@ -157,6 +243,7 @@ int main() {
     Timer::init();
     Random::init(rand(), rand());
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
+    testSPSCRingBuffer(); exit(0);
     testMixedRingbuffer();
     testUnitBuffer();
     testUniformClauseBuffer();

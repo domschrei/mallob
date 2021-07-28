@@ -10,6 +10,8 @@
 #include <assert.h>
 
 #include "data/reduceable.hpp"
+#include "util/logger.hpp"
+#include "util/hashing.hpp"
 
 struct SortedDoubleSequence : public Reduceable {
     std::vector<double> data;

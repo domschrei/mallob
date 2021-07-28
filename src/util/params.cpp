@@ -55,6 +55,7 @@ void Parameters::init(int argc, char** argv) {
 void Parameters::expand() {
     if (monoFilename.isSet()) {
         // Single instance solving
+        hopsUntilCollectiveAssignment.set(-1); // no collective assignments
         numClients.set(0); // no clients
         collectClauseHistory.set(false); // no clause history
         growthPeriod.set(0); // instantaneous growth of job demand

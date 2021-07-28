@@ -124,7 +124,7 @@ public:
             msg.jobId = _id;
             msg.tag = MSG_AGGREGATE_RANKLIST;
             //log(LOG_ADD_DESTRANK | V3_VERB, "send Ranklist size %i", getJobTree().getParentNodeRank(), msg.payload.size());
-            MyMpi::isend(MPI_COMM_WORLD, _job_tree.getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+            MyMpi::isend(_job_tree.getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
         }
         _time_of_last_ranklist_agg = Timer::elapsedSeconds();
         _aggregate_ranklist = false;
@@ -171,13 +171,13 @@ public:
                 // Broadcast
                 msg.tag = MSG_BROADCAST_RANKLIST;
                 if (_job_tree.hasLeftChild())
-                    MyMpi::isend(MPI_COMM_WORLD, _job_tree.getLeftChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+                    MyMpi::isend(_job_tree.getLeftChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
                 if (_job_tree.hasRightChild())
-                    MyMpi::isend(MPI_COMM_WORLD, _job_tree.getRightChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+                    MyMpi::isend(_job_tree.getRightChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
             } else {
                 // Forward to parent
                 //log(LOG_ADD_DESTRANK | V3_VERB, "send Ranklist size %i", getJobTree().getParentNodeRank(), msg.payload.size());
-                MyMpi::isend(MPI_COMM_WORLD, _job_tree.getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+                MyMpi::isend(_job_tree.getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
             }
 
             // Clean up aggregation data
@@ -195,9 +195,9 @@ public:
                 updateMap();
             }
             if (_job_tree.hasLeftChild())
-                MyMpi::isend(MPI_COMM_WORLD, _job_tree.getLeftChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+                MyMpi::isend(_job_tree.getLeftChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
             if (_job_tree.hasRightChild())
-                MyMpi::isend(MPI_COMM_WORLD, _job_tree.getRightChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+                MyMpi::isend(_job_tree.getRightChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
             return true;
         }
 

@@ -168,7 +168,7 @@ void CollectiveAssignment::resolveRequests() {
     for (auto& req : requestsToKeep) _request_list.insert(std::move(req));
     for (auto& [rank, requests] : requestsPerDestination) {
         auto packed = serialize(requests);
-        MyMpi::isend(MPI_COMM_WORLD, rank, MSG_NOTIFY_ASSIGNMENT_UPDATE, packed);
+        MyMpi::isend(rank, MSG_NOTIFY_ASSIGNMENT_UPDATE, std::move(packed));
     }
 
     resolving = false;
@@ -196,6 +196,7 @@ CollectiveAssignment::Status CollectiveAssignment::getAggregatedStatus() {
 }
 
 void CollectiveAssignment::advance(int epoch) {
+    if (_job_db == nullptr) return;
     bool newEpoch = epoch > _epoch;
 
     if (newEpoch) {
@@ -215,7 +216,7 @@ void CollectiveAssignment::advance(int epoch) {
         } else {
             auto packedStatus = serialize(status);
             log(LOG_ADD_DESTRANK | V3_VERB, "[CA] Prop. status: %i idle (epoch=%i)", getCurrentParent(), status.numIdle, _epoch);
-            MyMpi::isend(MPI_COMM_WORLD, getCurrentParent(), MSG_NOTIFY_ASSIGNMENT_UPDATE, packedStatus);
+            MyMpi::isend(getCurrentParent(), MSG_NOTIFY_ASSIGNMENT_UPDATE, std::move(packedStatus));
         }
         _status_dirty = false;
     }

@@ -71,6 +71,8 @@ private:
     std::map<int, int> _transfer_msg_id_to_job_id;
     // Number of jobs with a loaded description (taking memory!)
     std::atomic_int _num_loaded_jobs = 0;
+    Mutex _finished_msg_ids_mutex;
+    std::vector<int> _finished_msg_ids;
 
 public:
     Client(MPI_Comm comm, Parameters& params, std::set<int> clientRanks)
@@ -93,6 +95,7 @@ private:
     void handleAckAcceptBecomeChild(MessageHandle& handle);
     void handleClientFinished(MessageHandle& handle);
     void handleExit(MessageHandle& handle);
+    void handleJobDescriptionSent(int msgId);
 
     int getMaxNumParallelJobs();
     void introduceNextJob();

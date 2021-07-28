@@ -111,7 +111,7 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
             msg.checksum.combine(msg.jobId);
             for (int& lit : msg.payload) msg.checksum.combine(lit);
         }
-        MyMpi::isend(MPI_COMM_WORLD, parentRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+        MyMpi::isend(parentRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
 
     _num_aggregated_nodes = 0;
@@ -169,12 +169,12 @@ void AnytimeSatClauseCommunicator::sendClausesToChildren(std::vector<int>& claus
     if (_job->getJobTree().hasLeftChild()) {
         childRank = _job->getJobTree().getLeftChildNodeRank();
         log(LOG_ADD_DESTRANK | V4_VVER, "%s : broadcast s=%i", childRank, _job->toStr(), msg.payload.size());
-        MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+        MyMpi::isend(childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
     if (_job->getJobTree().hasRightChild()) {
         childRank = _job->getJobTree().getRightChildNodeRank();
         log(LOG_ADD_DESTRANK | V4_VVER, "%s : broadcast s=%i", childRank, _job->toStr(), msg.payload.size());
-        MyMpi::isend(MPI_COMM_WORLD, childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+        MyMpi::isend(childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
 
     if (_use_cls_history) {

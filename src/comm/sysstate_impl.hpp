@@ -42,8 +42,9 @@ bool SysState<N>::aggregate(float elapsedTime) {
             _aggregating = true;
         } else if (_aggregating) {
             MPI_Status status;
-            bool done = MyMpi::test(_request, status);
-            if (done) {
+            int flag;
+            MPI_Test(&_request, &flag, &status);
+            if (flag) {
                 _aggregating = false;
                 return true;
             } else if (_last_aggregation > 0 && timeSinceLast > 300) {

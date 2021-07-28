@@ -145,7 +145,7 @@ bool EventDrivenBalancer::reduce(EventMap& data, bool reversedTree) {
         // No parent / I AM ROOT. 
         
         // Send to other root
-        MyMpi::isend(MPI_COMM_WORLD, getRootRank(!reversedTree), MSG_BROADCAST_DATA, data);
+        MyMpi::isend(getRootRank(!reversedTree), MSG_BROADCAST_DATA, data);
         log(LOG_ADD_DESTRANK | V5_DEBG, "BLC root handshake", getRootRank(!reversedTree));
 
         // Broadcast and digest
@@ -155,7 +155,7 @@ bool EventDrivenBalancer::reduce(EventMap& data, bool reversedTree) {
     } else {
 
         // Send to actual parent
-        MyMpi::isend(MPI_COMM_WORLD, parent, MSG_REDUCE_DATA, data);
+        MyMpi::isend(parent, MSG_REDUCE_DATA, data);
         //log(LOG_ADD_DESTRANK | V3_VERB, parent, "RED");
     }
 
@@ -193,7 +193,7 @@ void EventDrivenBalancer::broadcast(EventMap& data, bool reversedTree) {
     // Do broadcast
     for (int child : getChildRanks(reversedTree)) {
         // Send to actual child
-        MyMpi::isend(MPI_COMM_WORLD, child, MSG_BROADCAST_DATA, data);
+        MyMpi::isend(child, MSG_BROADCAST_DATA, data);
         //log(LOG_ADD_DESTRANK | V3_VERB, child, "BRC");
     }
 }

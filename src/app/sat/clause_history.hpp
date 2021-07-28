@@ -87,7 +87,7 @@ public:
             msg.tag = MSG_CLAUSE_HISTORY_SEND_CLAUSES;
             msg.payload = _history[subscription.nextIndex].clauses.at(0);
             if (_use_checksums) setChecksum(msg);
-            MyMpi::isend(MPI_COMM_WORLD, subscription.correspondingRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+            MyMpi::isend(subscription.correspondingRank, MSG_SEND_APPLICATION_MESSAGE, msg);
             log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Send batch of index %i", subscription.correspondingRank, _job.toStr(), subscription.nextIndex);
 
             subscription.nextIndex++;
@@ -114,7 +114,7 @@ public:
         msg.payload.push_back(_subscription.nextIndex);
         msg.payload.push_back(_subscription.endIndex);
         if (_use_checksums) setChecksum(msg);
-        MyMpi::isend(MPI_COMM_WORLD, _subscription.correspondingRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+        MyMpi::isend(_subscription.correspondingRank, MSG_SEND_APPLICATION_MESSAGE, msg);
         log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Subscribe for indices [%i,%i)", _subscription.correspondingRank, _job.toStr(), 
             msg.payload[0], msg.payload[1]);
     }
@@ -264,7 +264,7 @@ public:
             msg.revision = _job.getRevision();
             msg.tag = MSG_CLAUSE_HISTORY_UNSUBSCRIBE;
             if (_use_checksums) setChecksum(msg);
-            MyMpi::isend(MPI_COMM_WORLD, _subscription.correspondingRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+            MyMpi::isend(_subscription.correspondingRank, MSG_SEND_APPLICATION_MESSAGE, msg);
             log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Unsubscribe", _subscription.correspondingRank, _job.toStr());
             _subscription = Subscription();
         }

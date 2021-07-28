@@ -166,8 +166,14 @@ void Client::init() {
     });
     log(V2_INFO, "Client main thread started\n");
 
-    // Begin listening to incoming messages
-    MyMpi::beginListening();
+    auto& q = MyMpi::getMessageQueue();
+    q.registerCallback(MSG_NOTIFY_JOB_DONE, [&](MessageHandle& h) {handleJobDone(h);});
+    q.registerCallback(MSG_SEND_JOB_RESULT, [&](MessageHandle& h) {handleSendJobResult(h);});
+    q.registerCallback(MSG_NOTIFY_JOB_ABORTING, [&](MessageHandle& h) {handleAbort(h);});
+    q.registerCallback(MSG_OFFER_ADOPTION, [&](MessageHandle& h) {handleRequestBecomeChild(h);});
+    q.registerCallback(MSG_CONFIRM_ADOPTION, [&](MessageHandle& h) {handleAckAcceptBecomeChild(h);});
+    q.registerCallback(MSG_DO_EXIT, [&](MessageHandle& h) {handleExit(h);});
+    q.registerSentCallback([&](int id) {handleJobDescriptionSent(id);});
 
     log(V4_VVER, "Global init barrier ...\n");
     MPI_Barrier(MPI_COMM_WORLD);
@@ -177,7 +183,6 @@ void Client::init() {
 void Client::mainProgram() {
 
     float lastStatTime = Timer::elapsedSeconds();
-    std::vector<int> finishedHandleIds;
 
     while (!Terminator::isTerminating()) {
 
@@ -204,7 +209,7 @@ void Client::mainProgram() {
         for (int jobId : doneJobs) {
             log(LOG_ADD_DESTRANK | V3_VERB, "Notifying #%i:0 that job is done", _root_nodes[jobId], jobId);
             IntVec payload({jobId});
-            MyMpi::isend(MPI_COMM_WORLD, _root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
+            MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
             finishJob(jobId, /*hasIncrementalSuccessors=*/false);
         }
 
@@ -213,44 +218,8 @@ void Client::mainProgram() {
         // to outside events without too much latency)
         introduceNextJob();
 
-        // Poll messages, if present
-        auto maybeHandle = MyMpi::poll(time);
-        if (maybeHandle) {
-            // Process message
-            auto& handle = *maybeHandle;
-            log(LOG_ADD_SRCRANK | V5_DEBG, "process msg tag=%i", handle.source, handle.tag);
-
-            if (handle.tag == MSG_NOTIFY_JOB_DONE) {
-                handleJobDone(handle);
-            } else if (handle.tag == MSG_SEND_JOB_RESULT) {
-                handleSendJobResult(handle);
-            } else if (handle.tag == MSG_NOTIFY_JOB_ABORTING) {
-                handleAbort(handle);
-            } else if (handle.tag == MSG_OFFER_ADOPTION) {
-                handleRequestBecomeChild(handle);
-            } else if (handle.tag == MSG_CONFIRM_ADOPTION) {
-                handleAckAcceptBecomeChild(handle);
-            } else if (handle.tag == MSG_DO_EXIT) {
-                handleExit(handle);
-            } else {
-                log(LOG_ADD_SRCRANK | V1_WARN, "Unknown msg tag %i", handle.source, handle.tag);
-            }
-        }
-
-        MyMpi::testSentHandles(&finishedHandleIds);
-        // Clear job descriptions which are sent
-        for (int id : finishedHandleIds) {
-            if (_transfer_msg_id_to_job_id.count(id)) {
-                int jobId = _transfer_msg_id_to_job_id.at(id);
-                if (_active_jobs.count(jobId)) {
-                    log(V3_VERB, "Clear description of sent job #%i\n", jobId);
-                    _active_jobs.at(jobId)->clearPayload();
-                    _num_loaded_jobs--;
-                }
-                _transfer_msg_id_to_job_id.erase(id);
-            }
-        }
-        finishedHandleIds.clear();
+        // Poll messages, test sent messages
+        MyMpi::getMessageQueue().advance();
         
         // Advance an all-reduction of the current system state
         if (_sys_state.aggregate(time)) {
@@ -268,7 +237,7 @@ void Client::mainProgram() {
                 // Job limit reached - exit
                 Terminator::setTerminating();
                 // Send MSG_EXIT to worker of rank 0, which will broadcast it
-                MyMpi::isend(MPI_COMM_WORLD, 0, MSG_DO_EXIT, IntVec({0}));
+                MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
             }
         }
 
@@ -333,7 +302,7 @@ void Client::introduceNextJob() {
     req.timeOfBirth = job.getArrival();
 
     log(LOG_ADD_DESTRANK | V2_INFO, "Introducing job #%i : %s", nodeRank, jobId, req.toStr().c_str());
-    MyMpi::isend(MPI_COMM_WORLD, nodeRank, MSG_REQUEST_NODE, req);
+    MyMpi::isend(nodeRank, MSG_REQUEST_NODE, req);
 }
 
 void Client::handleRequestBecomeChild(MessageHandle& handle) {
@@ -346,7 +315,7 @@ void Client::handleRequestBecomeChild(MessageHandle& handle) {
     JobSignature sig(req.jobId, /*rootRank=*/handle.source, firstIncludedRevision, 
         firstIncludedRevision <= req.currentRevision ? desc.getTransferSize(firstIncludedRevision) : 0);
     log(LOG_ADD_DESTRANK | V4_VVER, "Sending job signature of #%i rev. %i: transfer size %i", handle.source, req.jobId, req.currentRevision, sig.transferSize);
-    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_ACCEPT_ADOPTION_OFFER, sig);
+    MyMpi::isend(handle.source, MSG_ACCEPT_ADOPTION_OFFER, sig);
     //stats.increment("sentMessages");
 }
 
@@ -359,7 +328,7 @@ void Client::handleAckAcceptBecomeChild(MessageHandle& handle) {
     auto data = desc.getSerialization();
 
     int jobId = Serializable::get<int>(*data);    
-    int msgId = MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_DESCRIPTION, data);
+    int msgId = MyMpi::isend(handle.source, MSG_SEND_JOB_DESCRIPTION, data);
     log(LOG_ADD_DESTRANK | V4_VVER, "Sent job desc. of #%i of size %i", handle.source, jobId, data->size());
     _transfer_msg_id_to_job_id[msgId] = jobId;
 }
@@ -369,8 +338,7 @@ void Client::handleJobDone(MessageHandle& handle) {
     int jobId = recv.first;
     int resultSize = recv.second;
     log(LOG_ADD_SRCRANK | V4_VVER, "Will receive job result, length %i, for job #%i", handle.source, resultSize, jobId);
-    MyMpi::isend(MPI_COMM_WORLD, handle.source, MSG_QUERY_JOB_RESULT, handle.getRecvData());
-    MyMpi::irecv(MPI_COMM_WORLD, handle.source, MSG_SEND_JOB_RESULT, resultSize);
+    MyMpi::isendCopy(handle.source, MSG_QUERY_JOB_RESULT, handle.getRecvData());
 }
 
 void Client::handleSendJobResult(MessageHandle& handle) {
@@ -430,6 +398,18 @@ void Client::handleAbort(MessageHandle& handle) {
     }
 
     finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
+}
+
+void Client::handleJobDescriptionSent(int msgId) {
+    if (_transfer_msg_id_to_job_id.count(msgId)) {
+        int jobId = _transfer_msg_id_to_job_id.at(msgId);
+        if (_active_jobs.count(jobId)) {
+            log(V3_VERB, "Clear description of sent job #%i\n", jobId);
+            _active_jobs.at(jobId)->clearPayload();
+            _num_loaded_jobs--;
+        }
+        _transfer_msg_id_to_job_id.erase(msgId);
+    }
 }
 
 void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {

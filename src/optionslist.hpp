@@ -53,6 +53,7 @@ OPT_INT(maxBfsDepth,                     "mbfsd", "",                       4,  
 OPT_INT(maxDemand,                       "md", "max-demand",                0,    0, LARGE_INT,         "Limit any job's demand to this value")
 OPT_INT(maxIdleDistance,                 "mid", "",                         0,    0, LARGE_INT,         "Propagate idle distance of workers up to this limit through worker graph to weight randomness in request bouncing")
 OPT_INT(maxLbdPartitioningSize,          "mlbdps", "",                      8,    1, LARGE_INT,         "Store clauses with up to this LBD in separate buckets")
+OPT_INT(messageBatchingThreshold,        "mbt", "",                         1000000, 1000, MAX_INT,     "Employ batching of messages in batches of provided size")
 OPT_INT(numClients,                      "c", "num-clients",                1,    0, LARGE_INT,         "Number of client nodes")
 OPT_INT(numJobs,                         "J", "num-jobs",                   0,    0, LARGE_INT,         "Exit as soon as this number of jobs has been processed")
 OPT_INT(numThreadsPerProcess,            "t", "threads-per-process",        1,    0, LARGE_INT,         "Number of worker threads per node")

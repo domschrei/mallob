@@ -1,6 +1,6 @@
 
-#ifndef DOMPASCH_CUCKOO_REBALANCER_WORKER
-#define DOMPASCH_CUCKOO_REBALANCER_WORKER
+#ifndef DOMPASCH_MALLOB_WORKER_HPP
+#define DOMPASCH_MALLOB_WORKER_HPP
 
 #include <set>
 #include <chrono>
@@ -14,7 +14,6 @@
 #include "data/job_result.hpp"
 #include "data/job_transfer.hpp"
 #include "balancing/balancer.hpp"
-#include "comm/message_handler.hpp"
 #include "data/job_database.hpp"
 #include "comm/sysstate.hpp"
 #include "comm/distributed_bfs.hpp"
@@ -37,7 +36,6 @@ private:
     float _global_timeout;
 
     JobDatabase _job_db;
-    MessageHandler _msg_handler;
     SysState<5> _sys_state;
 
     std::vector<int> _hop_destinations;
@@ -49,8 +47,6 @@ private:
 
     DistributedBFS _bfs;
     CollectiveAssignment _coll_assign;
-
-    BackgroundWorker _mpi_monitor;
 
 public:
     Worker(MPI_Comm comm, Parameters& params, const std::set<int>& _client_nodes) :
