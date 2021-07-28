@@ -260,17 +260,27 @@ void Client::introduceNextJob() {
     // Are there any non-introduced jobs left?
     if (_num_ready_jobs == 0) return;
     
-    // Check if there is space for another active job in this client's "bucket"
+    // To check if there is space for another active job in this client's "bucket"
     size_t lbc = getMaxNumParallelJobs();
-    if (lbc > 0 && _active_jobs.size() >= lbc) return;
 
-    // Remove first job from ready queue
+    // Remove first eligible job from ready queue
     std::shared_ptr<JobDescription> jobPtr;
     {
         auto lock = _ready_job_lock.getLock();
-        jobPtr = _ready_job_queue.front();
-        _ready_job_queue.pop_front();
+        auto it = _ready_job_queue.begin(); 
+        for (; it != _ready_job_queue.end(); ++it) {
+            auto& j = *it;
+            // Either there is still space for another job,
+            // or the job must be incremental and already active
+            if (lbc <= 0 || _active_jobs.size() < lbc || 
+                (j->isIncremental() && _active_jobs.count(j->getId()))) {
+                jobPtr = j;
+                break;
+            }
+        }
+        if (jobPtr) _ready_job_queue.erase(it);
     }
+    if (!jobPtr) return;
     _num_ready_jobs--;
 
     // Store as an active job

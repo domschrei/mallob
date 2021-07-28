@@ -48,6 +48,13 @@ function test_incremental() {
     done
 }
 
+function test_many_incremental() {
+    for i in {1..80}; do
+        introduce_incremental_job entertainment08
+    done
+    test 4 -t=2 -l=1 -satsolver=LgC -v=5 -lbc=1 -incrementaltest -checksums=1 -huca=-1
+}
+
 function test_oscillating() {
     # Generate periodic "disturbance" jobs
     t=4
@@ -63,9 +70,10 @@ function test_oscillating() {
     test 13 -t=1 -lbc=2 -J=$((n+1)) -l=1 -satsolver=l -v=4 -checkjsonresults -checksums=1
 }
 
-test_incremental
-test_scheduling
-test_oscillating
-test_mono
+test_many_incremental
+#test_incremental
+#test_scheduling
+#test_oscillating
+#test_mono
 
 echo "All tests done."

@@ -27,7 +27,7 @@ function run() {
             cp .api/jobs.0/{introduced,new}/$file
 
             if [ "$result" == "" ] ; then
-                break
+                continue
             fi
 
             donefile=.api/jobs.0/done/admin.$file
@@ -112,9 +112,10 @@ function introduce_job() {
     echo "admin.$jobname"
 }
 
+globalcount=1
 function introduce_incremental_job() {
-    jobname=$1
-    instance=instances/incremental/$jobname
+    jobname=${globalcount}-$1
+    instance=instances/incremental/$1
     r=0
     last_revname=""
     while read -r result; do
@@ -132,13 +133,15 @@ function introduce_incremental_job() {
         r=$((r+1))
         last_revname=$revname
         echo ${revname}.json $result >> _incremental_jobs
-    done < instances/incremental/$jobname
+    done < instances/incremental/$1
 
     revname=${jobname}-${r}-$result
     echo '{"cpu-limit": "0", "file": "NONE", "incremental": true, "done": true,
         "name": "'$revname'", "precursor": "admin.'$last_revname'", "priority": 1.0, "user": "admin",
         "wallclock-limit": "0"}' > .api/jobs.0/introduced/${revname}.json
     echo ${revname}.json >> _incremental_jobs
+    
+    globalcount=$((globalcount+1))
 }
 
 export -f cleanup
