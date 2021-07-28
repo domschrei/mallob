@@ -62,6 +62,7 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
             sizeof(int)*_hsm->importBufferMaxSize, nullptr);
     _hsm->config = std::move(config);
     _latest_published_revision = 0;
+    _latest_revision = 0;
     
     _concurrent_shmem_allocator.run([this]() {
 
@@ -158,6 +159,7 @@ pid_t HordeProcessAdapter::getPid() {
 void HordeProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisions) {
     auto lock = _revisions_mutex.getLock();
     _revisions_to_write.insert(_revisions_to_write.end(), revisions.begin(), revisions.end());
+    _latest_revision = revisions.back().revision;
 }
 
 void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
@@ -172,7 +174,6 @@ void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
         Process::suspend(_child_pid); // Stop (suspend) process.
     }
     if (state == SolvingStates::ACTIVE) {
-        _hsm->hasSolution = false;
         Process::resume(_child_pid); // Continue (resume) process.
     }
 
@@ -242,7 +243,7 @@ bool HordeProcessAdapter::check() {
         _temp_clause_buffers.erase(_temp_clause_buffers.begin());
     }
     
-    if (_hsm->hasSolution) return _hsm->solutionRevision == _hsm->revision;
+    if (_hsm->hasSolution) return _hsm->solutionRevision == _latest_revision;
     return false;
 }
 

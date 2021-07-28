@@ -60,6 +60,7 @@ private:
     pid_t _child_pid;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
 
+    int _latest_revision = -1;
     std::atomic_int _latest_ready_revision = -1;
     std::atomic_int _latest_published_revision = -1;
     BackgroundWorker _concurrent_shmem_allocator;

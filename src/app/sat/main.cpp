@@ -150,6 +150,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams, HordeCo
                 lastImportedRevision++;
                 importRevision(log, hlib, shmemId, lastImportedRevision, checksum);
             }
+            hsm->hasSolution = false;
             hlib.solve();
             hsm->didStartNextRevision = true;
         }

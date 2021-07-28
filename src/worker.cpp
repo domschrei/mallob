@@ -370,7 +370,7 @@ void Worker::handleConfirmAdoption(MessageHandle& handle) {
     // Retrieve and send concerned job description
     // TODO do concurrently (may require expensive copying)
     log(V4_VVER, "Extracting job description for revisions [%i,%i]\n", req.lastKnownRevision+1, job.getRevision());
-    const auto& descPtr = job.getDescription().extractUpdate(req.lastKnownRevision+1);
+    auto descPtr = job.getDescription().extractUpdate(req.lastKnownRevision+1);
     assert(descPtr->size() == job.getDescription().getTransferSize(req.lastKnownRevision+1) 
         || log_return_false("%i != %i\n", descPtr->size(), job.getDescription().getTransferSize(req.lastKnownRevision+1)));
     MyMpi::isend(handle.source, MSG_SEND_JOB_DESCRIPTION, descPtr);

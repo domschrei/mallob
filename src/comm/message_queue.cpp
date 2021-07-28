@@ -64,7 +64,7 @@ int MessageQueue::send(DataPtr data, int dest, int tag) {
         h.sentBatches = 0;
         h.totalNumBatches = getTotalNumBatches(h);
         int sendTag = prepareSendHandleForNextBatch(h);
-        MPI_Isend(h.data->data(), _max_msg_size+3*sizeof(int), MPI_BYTE, dest, 
+        MPI_Isend(h.tempStorage.data(), h.tempStorage.size(), MPI_BYTE, dest, 
             sendTag, MPI_COMM_WORLD, &h.request);
         log(V4_VVER, "MQ sent 1st batch\n");
     } else {
@@ -144,7 +144,7 @@ void MessageQueue::processReceived() {
     MPI_Get_count(&status, MPI_BYTE, &msglen);
     const int source = status.MPI_SOURCE;
     int tag = status.MPI_TAG;
-    //log(V5_DEBG, "MQ RECV n=%i s=[%i] t=%i\n", msglen, source, tag);
+    log(V5_DEBG, "MQ RECV n=%i s=[%i] t=%i\n", msglen, source, tag);
 
     if (tag >= MSG_OFFSET_BATCHED_METADATA_AT_FRONT) {
         // Fragment of a message
@@ -224,6 +224,7 @@ void MessageQueue::processAssembledReceived() {
     while (opt.has_value()) {
         auto& h = opt.value();
 
+        log(V5_DEBG, "tag: %i\n", h.tag);
         _callbacks.at(h.tag)(h);
         
         if (h.getRecvData().size() > _max_msg_size) {
@@ -259,12 +260,7 @@ void MessageQueue::processSent() {
                     remove = false;
                     // Send next batch
                     int sendTag = prepareSendHandleForNextBatch(h);
-                    bool appendAtBack = sendTag >= MSG_OFFSET_BATCHED_METADATA_AT_BACK;
-                    auto startIndex = h.sentBatches*_max_msg_size - (appendAtBack ? 0 : 3*sizeof(int));
-                    auto msglen = _max_msg_size+3*sizeof(int);
-                    if (startIndex+msglen > h.data->size()) 
-                        msglen = h.data->size() - startIndex;
-                    MPI_Isend(h.data->data()+startIndex, msglen, MPI_BYTE, h.dest, 
+                    MPI_Isend(h.tempStorage.data(), h.tempStorage.size(), MPI_BYTE, h.dest, 
                         sendTag, MPI_COMM_WORLD, &h.request);
                 }
             }
@@ -285,43 +281,19 @@ void MessageQueue::processSent() {
 }
 
 int MessageQueue::prepareSendHandleForNextBatch(SendHandle& h) {
-
-    if (!h.tempStorage.empty()) {
-        // Edit back temporary storage into main data
-        memcpy(h.data->data()+h.tempPosition, h.tempStorage.data(), h.tempStorage.size());
-        if (h.data->size() == h.tempPosition+3*sizeof(int)) {
-            h.data->resize(h.tempPosition+h.tempStorage.size());
-        }
-        h.tempStorage.clear();
-    }
-
     int totalNumBatches = h.totalNumBatches;
+    size_t begin = h.sentBatches*_max_msg_size;
+    size_t end = std::min(h.data->size(), (h.sentBatches+1)*_max_msg_size);
+    h.tempStorage.resize((end-begin)+3*sizeof(int));
 
-    // Find a place to insert meta data
-    h.tempPosition = std::min(h.data->size(), (h.sentBatches+1)*_max_msg_size);
-    int returnTag;
-    if (h.data->size() < h.tempPosition+3*sizeof(int)) {
-        // No room for meta data at right end (last message): Append at front instead!
-        h.tempPosition = h.sentBatches*_max_msg_size - 3*sizeof(int);
-        assert(h.tempPosition >= 0);
-        returnTag = h.tag+MSG_OFFSET_BATCHED_METADATA_AT_FRONT;
-    } else {
-        // Append at back
-        returnTag = h.tag+MSG_OFFSET_BATCHED_METADATA_AT_BACK;
-        // Save data to be overwritten into temporary storage
-        int overwrittenSize = std::max(0ul, std::min(3*sizeof(int), h.data->size() - (h.sentBatches+1)*_max_msg_size));
-        if (overwrittenSize > 0) {
-            h.tempStorage.resize(overwrittenSize);
-            memcpy(h.tempStorage.data(), h.data->data()+h.tempPosition, overwrittenSize);
-        }
-    }
-
+    // Copy actual data
+    memcpy(h.tempStorage.data(), h.data->data()+begin, end-begin);
     // Copy meta data at insertion point
-    memcpy(h.data->data()+h.tempPosition, &h.id, sizeof(int));
-    memcpy(h.data->data()+h.tempPosition+sizeof(int), &h.sentBatches, sizeof(int));
-    memcpy(h.data->data()+h.tempPosition+2*sizeof(int), &totalNumBatches, sizeof(int));
+    memcpy(h.tempStorage.data()+(end-begin), &h.id, sizeof(int));
+    memcpy(h.tempStorage.data()+(end-begin)+sizeof(int), &h.sentBatches, sizeof(int));
+    memcpy(h.tempStorage.data()+(end-begin)+2*sizeof(int), &totalNumBatches, sizeof(int));
 
-    return returnTag;
+    return h.tag + MSG_OFFSET_BATCHED_METADATA_AT_BACK;
 }
 size_t MessageQueue::getTotalNumBatches(const SendHandle& h) const {return std::ceil(h.data->size() / (float)_max_msg_size);}
 bool MessageQueue::isBatched(const SendHandle& h) const {return h.sentBatches >= 0;}

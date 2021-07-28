@@ -51,7 +51,7 @@ private:
         int sentBatches = -1;
         int totalNumBatches;
         std::vector<uint8_t> tempStorage;
-        size_t tempPosition;
+        
         SendHandle() = default;
         SendHandle(SendHandle&& moved) {
             id = moved.id;
@@ -62,7 +62,6 @@ private:
             sentBatches = moved.sentBatches;
             totalNumBatches = moved.totalNumBatches;
             tempStorage = std::move(moved.tempStorage);
-            tempPosition = moved.tempPosition;
         }
         SendHandle& operator=(SendHandle&& moved) {
             id = moved.id;
@@ -73,7 +72,6 @@ private:
             sentBatches = moved.sentBatches;
             totalNumBatches = moved.totalNumBatches;
             tempStorage = std::move(moved.tempStorage);
-            tempPosition = moved.tempPosition;
             return *this;
         }
     };
