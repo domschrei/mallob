@@ -447,6 +447,7 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
     if (_job_db.isRequestObsolete(req)) {
         log(LOG_ADD_SRCRANK | V3_VERB, "DISCARD %s mode=%i", handle.source, 
                 req.toStr().c_str(), mode);
+        if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
         return;
     }
 
@@ -514,6 +515,7 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
             // Continue job finding procedure somewhere else
             bounceJobRequest(req, handle.source);
         }
+        if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
     }
 }
 

@@ -111,7 +111,13 @@ bool JobDatabase::restart(int jobId, const std::shared_ptr<std::vector<uint8_t>>
     // Restart job (in a separate thread)
     setLoad(1, jobId);
     log(LOG_ADD_SRCRANK | V3_VERB, "RESTART %s", source, job.toStr());
-    get(jobId).restart(description);
+    if (job.getState() == SUSPENDED) {
+        // Job is suspended, not standby:
+        // Perform transition SUSPENDED -> ACTIVE -> STANDBY
+        job.resume();
+        job.interrupt();
+    }
+    job.restart(description);
     return true;
 }
 

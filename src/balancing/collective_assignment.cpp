@@ -73,9 +73,11 @@ void CollectiveAssignment::deserialize(const std::vector<uint8_t>& packed, int s
         while (i+n <= packed.size()) {
             std::vector<uint8_t> reqPacked(packed.begin()+i, packed.begin()+i+n);
             JobRequest req = Serializable::get<JobRequest>(reqPacked);
-            req.numHops++;
-            log(LOG_ADD_SRCRANK | V3_VERB, "[CA] got %s", source, req.toStr().c_str());
-            _request_list.insert(req);
+            if (req.balancingEpoch >= _epoch) {
+                req.numHops++;
+                log(LOG_ADD_SRCRANK | V3_VERB, "[CA] got %s", source, req.toStr().c_str());
+                _request_list.insert(req);
+            }
             i += n;
         }
     }
@@ -94,6 +96,10 @@ void CollectiveAssignment::resolveRequests() {
         int id = req.jobId;
         int destination = -1;
         bool usesCachedSlot = false;
+        if (req.balancingEpoch < _epoch) {
+            // Obsolete request: Discard
+            continue;
+        }
 
         // Is there an optimal fit for this request?
         // -- self?
@@ -116,23 +122,25 @@ void CollectiveAssignment::resolveRequests() {
 
         if (destination < 0) {
             // No optimal fit found
+            // Is there a non-optimal fit for this request?
 
-            // Continue search for a non-optimal fit if root or #hops is large enough
-            if (getCurrentRoot() == MyMpi::rank(MPI_COMM_WORLD) || req.numHops >= 5) {
-
-                // Is there a non-optimal fit for this request?
-                // -- self?
-                if (_job_db->isIdle() && !_job_db->hasCommitment()) {
-                    destination = MyMpi::rank(MPI_COMM_WORLD);
-                } else {
-                    // -- other PE?
-                    for (const auto& [rank, status] : _child_statuses) {
-                        if (status.numIdle > 0) {
-                            destination = rank;
-                            break;
-                        }
+            bool canAdopt = _job_db->isIdle() && !_job_db->hasCommitment();
+            // If #hops is large enough: self?
+            if (canAdopt && req.numHops >= 5) {
+                destination = MyMpi::rank(MPI_COMM_WORLD);
+            } else {
+                // -- other PE?
+                for (const auto& [rank, status] : _child_statuses) {
+                    if (status.numIdle > 0) {
+                        destination = rank;
+                        break;
                     }
                 }
+            }
+
+            if (destination < 0 && canAdopt) {
+                // Still no fit found: Adopt the request yourself even if #hops is small
+                destination = MyMpi::rank(MPI_COMM_WORLD);
             }
         }
 
@@ -179,6 +187,7 @@ void CollectiveAssignment::setStatusDirty() {
 }
 
 void CollectiveAssignment::addJobRequest(JobRequest& req) {
+    if (req.balancingEpoch < _epoch) return; // discard
     log(V3_VERB, "[CA] Add req. %s\n", req.toStr().c_str());
     _request_list.insert(req);
 }
