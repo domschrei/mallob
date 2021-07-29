@@ -2,7 +2,7 @@
 
 function cleanup() {
     set +e
-    rm .api/jobs.0/*/*.json _systest _incremental_jobs /dev/shm/edu.kit.iti.mallob* 2> /dev/null
+    rm .api/jobs.0/*/*.json _systest _incremental_jobs-* /dev/shm/edu.kit.iti.mallob* 2> /dev/null
     set -e
 }
 
@@ -11,44 +11,57 @@ function error() {
     exit 1
 }
 
+function run_incremental() {
+    echo "$BASHPID: Reading incremental job from $1"
+    while read line; do
+                
+        file=$(echo $line|awk '{print $1}')
+        result=$(echo $line|awk '{print $2}')
+        
+        echo "$BASHPID: Initiate $file"
+        cp .api/jobs.0/{introduced,new}/$file
+
+        if [ "$result" == "" ] ; then
+            continue
+        fi
+
+        donefile=.api/jobs.0/done/admin.$file
+        while [ ! -f $donefile ]; do sleep 0.1 ; done
+        
+        echo "$BASHPID: Found $donefile"
+        
+        if ! grep -q '"resultstring": "UNKNOWN"' $donefile ; then
+            if [ $result == unsat ] ; then
+                if ! grep -q '"resultstring": "UNSAT"' $donefile ; then
+                    error "Expected result UNSAT for $file was not found."
+                fi
+            elif [ $result == sat ] ; then
+                if ! grep -q '"resultstring": "SAT"' $donefile ; then
+                    error "Expected result SAT for $file was not found."
+                fi
+            fi
+        fi
+        rm $donefile
+    done < $1
+    echo "$BASHPID: Done." 
+}
+
 function run() {
     echo "[$testcount] -np $@"
     np=$1
     shift 1
     if echo "$@"|grep -q "incrementaltest"; then
         RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob $@ 2>&1 > _systest &
-        mallobpid=$!
-        while read line; do
-            
-            file=$(echo $line|awk '{print $1}')
-            result=$(echo $line|awk '{print $2}')
-            
-            echo cp .api/jobs.0/{introduced,new}/$file
-            cp .api/jobs.0/{introduced,new}/$file
-
-            if [ "$result" == "" ] ; then
-                continue
-            fi
-
-            donefile=.api/jobs.0/done/admin.$file
-            while [ ! -f $donefile ]; do sleep 0.1 ; done
-            
-            echo "$donefile present"
-            
-            if ! grep -q '"resultstring": "UNKNOWN"' $donefile ; then
-                if [ $result == unsat ] ; then
-                    if ! grep -q '"resultstring": "UNSAT"' $donefile ; then
-                        error "Expected result UNSAT for $file was not found."
-                    fi
-                elif [ $result == sat ] ; then
-                    if ! grep -q '"resultstring": "SAT"' $donefile ; then
-                        error "Expected result SAT for $file was not found."
-                    fi
-                fi
-            fi
-            rm $donefile
-        done < _incremental_jobs
-        wait $mallobpid
+        waitpids=$!
+        for f in _incremental_jobs-* ; do
+            run_incremental "$f" &
+            newpid=$!
+            waitpids="$newpid $waitpids"
+        done
+        for pid in $waitpids; do
+            wait $pid
+            echo "Wait for $pid done"
+        done
     else
         RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob $@ 2>&1 > _systest
         #RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob $@ 2>&1 |grep -B10 -A10 "No such file"
@@ -132,20 +145,21 @@ function introduce_incremental_job() {
         fi
         r=$((r+1))
         last_revname=$revname
-        echo ${revname}.json $result >> _incremental_jobs
+        echo ${revname}.json $result >> _incremental_jobs-$globalcount
     done < instances/incremental/$1
 
     revname=${jobname}-${r}-$result
     echo '{"cpu-limit": "0", "file": "NONE", "incremental": true, "done": true,
         "name": "'$revname'", "precursor": "admin.'$last_revname'", "priority": 1.0, "user": "admin",
         "wallclock-limit": "0"}' > .api/jobs.0/introduced/${revname}.json
-    echo ${revname}.json >> _incremental_jobs
+    echo ${revname}.json >> _incremental_jobs-$globalcount
     
     globalcount=$((globalcount+1))
 }
 
 export -f cleanup
 export -f error
+export -f run_incremental
 export -f run 
 export -f check
 export -f test

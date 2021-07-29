@@ -49,10 +49,10 @@ function test_incremental() {
 }
 
 function test_many_incremental() {
-    for i in {1..80}; do
+    for i in {1..10}; do
         introduce_incremental_job entertainment08
     done
-    test 4 -t=2 -l=1 -satsolver=LgC -v=5 -J=80 -lbc=1 -incrementaltest -checksums=1 -huca=-1
+    test 4 -t=2 -l=1 -satsolver=LgC -v=5 -J=10 -lbc=1 -incrementaltest -checksums=1
 }
 
 function test_oscillating() {
@@ -70,10 +70,18 @@ function test_oscillating() {
     test 13 -t=1 -lbc=2 -J=$((n+1)) -l=1 -satsolver=l -v=4 -checkjsonresults -checksums=1
 }
 
+function test_incremental_scheduling() {
+    for test in entertainment08 roverg10 transportg29 ; do
+        introduce_incremental_job $test
+    done
+    test 8 -t=1 -l=1 -satsolver=LgC -v=5 -J=3 -incrementaltest -checksums=1
+}
+
 test_mono
 test_scheduling
 test_oscillating
 test_incremental
 test_many_incremental
+test_incremental_scheduling
 
 echo "All tests done."
