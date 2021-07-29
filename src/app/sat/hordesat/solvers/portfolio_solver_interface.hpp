@@ -177,6 +177,9 @@ public:
 	void setCurrentCondVarOrZero(int condVarOrZero) {_current_cond_var_or_zero = condVarOrZero;}
 	void setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback);
 
+	void setCurrentRevision(int revision) {_current_revision = revision;}
+	int getCurrentRevision() const {return _current_revision;}
+
 	Logger& getLogger() {return _logger;}
 	
 	const SolverSetup& getSolverSetup() {return _setup;}
@@ -193,6 +196,7 @@ private:
 	int _local_id;
 	int _diversification_index;
 	std::atomic_int _current_cond_var_or_zero = 0;
+	std::atomic_int _current_revision = 0;
 };
 
 // Returns the elapsed time (seconds) since the currently registered solver's start time.

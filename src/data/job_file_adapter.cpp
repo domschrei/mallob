@@ -185,6 +185,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         name += ending;
         // If the job is not yet known, assign to it a new ID
         // that will be used by the job later
+        auto lock = _job_map_mutex.getLock();
         if (!_job_name_to_id_rev.count(name)) {
             _job_name_to_id_rev[name] = std::pair<int, int>(_running_id++, 0);
             log.log(V3_VERB, "Forward mapping job \"%s\" to internal ID #%i\n", name.c_str(), _job_name_to_id_rev[name].first);

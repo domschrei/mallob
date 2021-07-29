@@ -43,11 +43,13 @@ private:
     std::atomic_int _running_id;
     
     std::string _base_path;
-    FileWatcher _new_jobs_watcher;
-    FileWatcher _results_watcher;
+
     robin_hood::unordered_node_map<std::string, std::pair<int, int>> _job_name_to_id_rev;
     robin_hood::unordered_node_map<int, int> _job_id_to_latest_rev;
     robin_hood::unordered_node_map<std::pair<int, int>, JobImage, IntPairHasher> _job_id_rev_to_image;
+    
+    FileWatcher _new_jobs_watcher;
+    FileWatcher _results_watcher;
 
 public:
 

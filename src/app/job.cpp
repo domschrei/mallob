@@ -35,6 +35,7 @@ void Job::commit(const JobRequest& req) {
     assert(getState() != ACTIVE);
     assert(getState() != PAST);
     _commitment = req;
+    _balancing_epoch_of_last_commitment = req.balancingEpoch;
     _job_tree.clearJobNodeUpdates();
     updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
 }

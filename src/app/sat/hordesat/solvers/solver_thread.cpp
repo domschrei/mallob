@@ -26,7 +26,7 @@ SolverThread::SolverThread(const Parameters& params, const HordeConfig& config,
 }
 
 void SolverThread::start() {
-    if (_tid == -1) _thread = std::thread([this]() {
+    if (!_thread.joinable()) _thread = std::thread([this]() {
         init();
         run();
     });
@@ -176,6 +176,8 @@ bool SolverThread::readFormula() {
                 }
             }
 
+            _solver.setCurrentRevision(_active_revision);
+            
             // No formula left to read?
             if (_active_revision == _latest_revision) {
                 _logger.log(V4_VVER, "Reading done @ rev. %i\n", (int)_active_revision);                

@@ -40,6 +40,8 @@ protected:
 
 	SharingStatistics _stats;
 
+	int _current_revision = -1;
+
 public:
 	DefaultSharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
 			const Parameters& params, const Logger& logger);
@@ -51,6 +53,8 @@ public:
 
 	void stopClauseImport(int solverId) override;
 	void continueClauseImport(int solverId) override;
+
+	void setRevision(int revision) override {_current_revision = revision;}
 
 private:
 	void processClause(int solverId, const Clause& clause, int condVarOrZero);

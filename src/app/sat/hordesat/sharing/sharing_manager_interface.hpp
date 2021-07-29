@@ -36,7 +36,7 @@ public:
 
 	virtual void stopClauseImport(int solverId) = 0;
 	virtual void continueClauseImport(int solverId) = 0;
-
+	virtual void setRevision(int revision) = 0;
 };
 
 

@@ -259,10 +259,17 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
     }
 
     bool isThisDormantRoot = has(req.jobId) && get(req.jobId).getJobTree().isRoot();
-
-    if (!isThisDormantRoot && hasDormantRoot() && req.requestedNodeIndex == 0) {
-        // Cannot adopt a root node while there is still another dormant root here
-        return REJECT;
+    if (isThisDormantRoot) {
+        if (req.requestedNodeIndex > 0) {
+            // Explicitly avoid to adopt a non-root node of the job of which I have a dormant root
+            // (commit would overwrite job index!)
+            return REJECT;
+        }
+    } else {
+        if (hasDormantRoot() && req.requestedNodeIndex == 0) {
+            // Cannot adopt a root node while there is still another dormant root here
+            return REJECT;
+        }
     }
 
     // Node is idle and not committed to another job
@@ -337,8 +344,8 @@ void JobDatabase::stop(int jobId, bool terminate) {
     if (terminate) {
         if (job.getState() == ACTIVE) job.stop();
         if (job.getState() == INACTIVE || job.getState() == STANDBY) {
-            job.terminate();
             log(V3_VERB, "TERMINATE %s\n", job.toStr());
+            job.terminate();
         } 
     } else {
         log(V3_VERB, "STOP %s (state: %s)\n", job.toStr(), job.jobStateToStr());
@@ -522,8 +529,12 @@ void JobDatabase::finishBalancing() {
     log(MyMpi::rank(MPI_COMM_WORLD) == 0 ? V3_VERB : V5_DEBG, "Balancing completed.\n");
 }
 
-robin_hood::unordered_map<int, int> JobDatabase::getBalancingResult() {
-    return _balancer->getBalancingResult();
+void JobDatabase::computeBalancingResult() {
+    _current_volumes = _balancer->getBalancingResult();
+}
+
+const robin_hood::unordered_map<int, int>& JobDatabase::getBalancingResult() {
+    return _current_volumes;
 }
 
 bool JobDatabase::hasDormantRoot() const {
@@ -545,6 +556,22 @@ std::vector<int> JobDatabase::getDormantJobs() const {
         if (hasDormantJob(jobId)) out.push_back(jobId);
     }
     return out;
+}
+
+bool JobDatabase::hasPendingRootReactivationRequest() const {
+    return _pending_root_reactivate_request.has_value();
+}
+
+JobRequest JobDatabase::loadPendingRootReactivationRequest() {
+    assert(hasPendingRootReactivationRequest());
+    JobRequest r = _pending_root_reactivate_request.value();
+    _pending_root_reactivate_request.reset();
+    return r;
+}
+
+void JobDatabase::setPendingRootReactivationRequest(JobRequest&& req) {
+    assert(!hasPendingRootReactivationRequest());
+    _pending_root_reactivate_request = std::move(req);
 }
 
 JobDatabase::~JobDatabase() {

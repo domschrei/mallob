@@ -147,6 +147,9 @@ public:
     size_t getTransferSize(int firstIncludedRevision) const;
     std::shared_ptr<std::vector<uint8_t>> extractUpdate(int firstIncludedRevision) const;
 
+private:
+    size_t getRelativeIndex(int revision) const;
+
 };
 
 #endif

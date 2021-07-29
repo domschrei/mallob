@@ -256,6 +256,15 @@ void Worker::mainProgram() {
         if (time - lastJobCheckTime >= jobCheckPeriod) {
             lastJobCheckTime = time;
 
+            // Load and try to adopt pending root reactivation request
+            if (_job_db.hasPendingRootReactivationRequest()) {
+                MessageHandle handle;
+                handle.tag = MSG_REQUEST_NODE;
+                handle.finished = true;
+                handle.receiveSelfMessage(_job_db.loadPendingRootReactivationRequest().serialize(), _world_rank);
+                handleRequestNode(handle, JobDatabase::NORMAL);
+            }
+
             if (_job_db.isIdle()) {
                 _sys_state.setLocal(SYSSTATE_BUSYRATIO, 0.0f); // busy nodes
                 _sys_state.setLocal(SYSSTATE_NUMJOBS, 0.0f); // active jobs
@@ -350,8 +359,7 @@ void Worker::handleAcceptAdoptionOffer(MessageHandle& handle) {
         // No transfer needed: Can start directly
         _job_db.uncommit(req.jobId);
         _job_db.reactivate(req, handle.source);
-        // Query parent for current volume of job
-        MyMpi::isend(handle.source, MSG_QUERY_VOLUME, IntVec({req.jobId}));
+        initiateVolumeUpdate(req.jobId);
     }
 }
 
@@ -506,7 +514,13 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
         MyMpi::isend(req.requestingNodeRank, MSG_OFFER_ADOPTION, req);
 
     } else if (adoptionResult == JobDatabase::REJECT) {
-        if (mode == JobDatabase::TARGETED_REJOIN) {
+        if (req.requestedNodeIndex == 0 && _job_db.has(req.jobId) && _job_db.get(req.jobId).getJobTree().isRoot()) {
+            // I have the dormant root of this request, but cannot adopt right now:
+            // defer until I can (e.g., until a made commitment can be broken)
+            log(V4_VVER, "Defer pending root reactivation %s\n", req.toStr().c_str());
+            _job_db.setPendingRootReactivationRequest(std::move(req));
+        } else if (mode == JobDatabase::TARGETED_REJOIN) {
+            // Send explicit rejection message
             OneshotJobRequestRejection rej(req, _job_db.hasDormantJob(req.jobId));
             log(LOG_ADD_DESTRANK | V5_DEBG, "decline oneshot request for %s", handle.source, 
                         _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
@@ -693,32 +707,14 @@ void Worker::initJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& dat
 
     bool success = _job_db.init(jobId, data, senderRank);
     if (success) {
-        auto& job = _job_db.get(jobId);
-        if (job.getJobTree().isRoot()) {
-            // Root worker: update volume (to trigger growth if desired)
-            if (job.getVolume() > 1) updateVolume(jobId, job.getVolume(), _job_db.getGlobalBalancingEpoch());
-        } else {
-            // Non-root worker: query parent for the volume of this job
-            IntVec payload({jobId});
-            MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_QUERY_VOLUME, payload);
-        }
+        initiateVolumeUpdate(jobId);
     }
 }
 
 void Worker::restartJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& data, int senderRank) {
 
     bool success = _job_db.restart(jobId, data, senderRank);
-    if (success) {
-        auto& job = _job_db.get(jobId);
-        if (job.getJobTree().isRoot()) {
-            // Root worker: update volume (to trigger growth if desired)
-            if (job.getVolume() > 1) updateVolume(jobId, job.getVolume(), _job_db.getGlobalBalancingEpoch());
-        } else {
-            // Non-root worker: query parent for the volume of this job
-            IntVec payload({jobId});
-            MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_QUERY_VOLUME, payload);
-        }
-    }
+    if (success) initiateVolumeUpdate(jobId);
 }
 
 void Worker::handleSendJobResult(MessageHandle& handle) {
@@ -1004,6 +1000,30 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
     MyMpi::isend(nextRank, MSG_REQUEST_NODE, request);
 }
 
+void Worker::initiateVolumeUpdate(int jobId) {
+    auto& job = _job_db.get(jobId);
+    if (_params.explicitVolumeUpdates()) {
+        if (job.getJobTree().isRoot()) {
+            // Root worker: update volume (to trigger growth if desired)
+            if (job.getVolume() > 1) updateVolume(jobId, job.getVolume(), _job_db.getGlobalBalancingEpoch());
+        } else {
+            // Non-root worker: query parent for the volume of this job
+            IntVec payload({jobId});
+            MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_QUERY_VOLUME, payload);
+        }
+    } else {
+        if (_job_db.getGlobalBalancingEpoch() < job.getBalancingEpochOfLastCommitment()) {
+            // Balancing epoch which caused this job node is not present yet
+            return;
+        }
+        // Read current volume from balancer
+        const auto& volumes = _job_db.getBalancingResult();
+        if (volumes.count(jobId) && volumes.at(jobId) > 0) {
+            updateVolume(jobId, volumes.at(jobId), _job_db.getGlobalBalancingEpoch());
+        }
+    }
+}
+
 void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
 
     if (!_job_db.has(jobId)) return;
@@ -1087,6 +1107,11 @@ void Worker::interruptJob(int jobId, bool terminate, bool reckless) {
     if (!_job_db.has(jobId)) return;
     Job& job = _job_db.get(jobId);
 
+    // Ignore if this job node is already in the goal state
+    // (also implying that it already forwarded such a request downwards)
+    if (terminate && job.getState() == PAST) return;
+    if (!terminate && job.getState() == STANDBY) return;
+
     // Propagate message down the job tree
     int msgTag;
     if (terminate && reckless) msgTag = MSG_NOTIFY_JOB_ABORTING;
@@ -1168,6 +1193,8 @@ int Worker::getWeightedRandomNeighbor() {
 
 void Worker::applyBalancing() {
     
+    _job_db.computeBalancingResult();
+
     // Update volumes found during balancing, and trigger job expansions / shrinkings
     for (const auto& [jobId, volume] : _job_db.getBalancingResult()) {
         updateVolume(jobId, volume, _job_db.getGlobalBalancingEpoch());

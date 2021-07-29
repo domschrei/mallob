@@ -89,6 +89,11 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 
 		// Import clause into each solver if its filter allows it
 		for (size_t sid = 0; sid < _solvers.size(); sid++) {
+			
+			// ignore clause "from the future"
+			// TODO do not discard, but defer to a later point in time
+			if (_solvers[sid]->getCurrentRevision() < _current_revision) continue; 
+
 			if (_solver_filters[sid].registerClause(clause.begin, clause.size)) {
 				_solvers[sid]->addLearnedClause(clause);
 				added[sid]++;

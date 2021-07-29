@@ -168,9 +168,10 @@ void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
     if (state == SolvingStates::ABORTING) {
         //Fork::terminate(_child_pid); // Terminate child process by signal.
         _hsm->doTerminate = true; // Kindly ask child process to terminate.
+        _hsm->doBegin = true; // Let child process know termination even if it waits for first revision
         Process::resume(_child_pid); // Continue (resume) process.
     }
-    if (state == SolvingStates::SUSPENDED) {
+    if (state == SolvingStates::SUSPENDED || state == SolvingStates::STANDBY) {
         Process::suspend(_child_pid); // Stop (suspend) process.
     }
     if (state == SolvingStates::ACTIVE) {
@@ -211,6 +212,7 @@ void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses, const C
 void HordeProcessAdapter::doDigest(const std::vector<int>& clauses, const Checksum& checksum) {
     _hsm->importChecksum = checksum;
     _hsm->importBufferSize = clauses.size();
+    _hsm->importBufferRevision = _latest_revision;
     assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
     memcpy(_import_buffer, clauses.data(), clauses.size()*sizeof(int));
     _hsm->doImport = true;

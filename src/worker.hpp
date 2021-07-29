@@ -109,6 +109,7 @@ private:
     void initJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& data, int senderRank);
     void restartJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& data, int senderRank);
     void bounceJobRequest(JobRequest& request, int senderRank);
+    void initiateVolumeUpdate(int jobId);
     void updateVolume(int jobId, int demand, int balancingEpoch);
     void interruptJob(int jobId, bool terminate, bool reckless);
     void informClientJobIsDone(int jobId, int clientRank);

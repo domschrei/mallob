@@ -286,7 +286,8 @@ void Lingeling::doConsume(int** clause, int* glue) {
 	for (size_t i = 0; i < learnedClausesBuffer.size(); i++) {
 		int lit = learnedClausesBuffer[i];
 		//str += std::to_string(lit) + " ";
-		assert(i == 0 || std::abs(lit) <= maxvar);
+		assert(i == 0 || std::abs(lit) <= maxvar 
+			|| log_return_false("ERROR: tried to import lit %i (max. var: %i)!\n", lit, maxvar));
 	}
 	//_logger.log(V4_VVER, "%s\n", str.c_str());
 

@@ -144,6 +144,7 @@ void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size
 	_logger.log(V4_VVER, "append rev. %i: %i lits, %i assumptions\n", revision, fSize, aSize);
 	assert(_revision+1 == revision);
 	_revision_data.push_back(RevisionData{fSize, fLits, aSize, aLits});
+	_sharing_manager->setRevision(revision);
 	
 	for (size_t i = 0; i < _num_solvers; i++) {
 		if (revision == 0) {

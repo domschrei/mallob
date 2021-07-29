@@ -50,12 +50,12 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
 
             // Insert this job as an event, if there is something novel about it
             Event ev;
+            int& epoch = _job_epochs[id];
             if (job->getState() == STANDBY) {
                 // Job is in STANDBY mode: set demand of zero
-                ev = Event({id, /*epoch=*/_job_epochs[id], /*demand=*/0, /*priority=*/job->getPriority()});
+                ev = Event({id, epoch, /*demand=*/0, job->getPriority()});
             } else {
                 // Job must be active
-                int epoch = _job_epochs[id];
                 int demand = std::max(1, getDemand(*job));
                 ev = Event({id, epoch, demand, job->getPriority()});
             }
@@ -65,8 +65,8 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
                 // Not contained yet in state: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
-                    log(V3_VERB, "(2) JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, _job_epochs[id]);
-                    _job_epochs[id]++;
+                    log(V3_VERB, "(2) JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, epoch);
+                    epoch++;
                 } 
             }
         }

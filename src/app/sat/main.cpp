@@ -73,6 +73,12 @@ void doSleep(const Logger& log) {
     if (sleepStatus != 0) log.log(V5_DEBG, "Woken up after %i us\n", (int) (1000*1000*time));
 }
 
+void doTerminate(const Logger& log, HordeSharedMemory* hsm) {
+    hsm->didTerminate = true;
+    log.flush();   
+    Process::doExit(0);
+}
+
 void runSolverEngine(const Logger& log, const Parameters& programParams, HordeConfig& config) {
     
     // Set up "management" block of shared memory created by the parent
@@ -102,6 +108,9 @@ void runSolverEngine(const Logger& log, const Parameters& programParams, HordeCo
 
     // Wait until everything is prepared for the solver to begin
     while (!hsm->doBegin) doSleep(log);
+    
+    // Terminate directly?
+    if (hsm->doTerminate) doTerminate(log, hsm);
 
     // Import first revision
     {
@@ -113,6 +122,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams, HordeCo
     // Import subsequent revisions
     int lastImportedRevision = 0;
     while (lastImportedRevision < hsm->firstRevision) {
+        if (hsm->doTerminate) doTerminate(log, hsm);
         if (hsm->doStartNextRevision && !hsm->didStartNextRevision) {
             lastImportedRevision++;
             importRevision(log, hlib, shmemId, lastImportedRevision, checksum);
@@ -194,8 +204,8 @@ void runSolverEngine(const Logger& log, const Parameters& programParams, HordeCo
         }
         if (!hsm->doExport) hsm->didExport = false;
 
-        // Check if clauses should be imported
-        if (hsm->doImport && !hsm->didImport) {
+        // Check if clauses should be imported (must not be "from the future")
+        if (hsm->doImport && !hsm->didImport && hsm->importBufferRevision <= lastImportedRevision) {
             log.log(V5_DEBG, "DO import clauses\n");
             // Write imported clauses from shared memory into vector
             assert(hsm->importBufferSize <= hsm->importBufferMaxSize);
@@ -245,11 +255,7 @@ void runSolverEngine(const Logger& log, const Parameters& programParams, HordeCo
         }
     }
 
-    hsm->didTerminate = true;
-    log.flush();
-    
-    // Exit normally, but avoid calling destructors (some threads may be unresponsive)
-    Process::doExit(0);
+    doTerminate(log, hsm);
 
     // Shared memory will be cleaned up by the parent process.
 }

@@ -167,6 +167,7 @@ private:
     JobState _state;
     Mutex _job_manipulation_lock;
     std::optional<JobRequest> _commitment;
+    int _balancing_epoch_of_last_commitment = -1;
     std::optional<JobResult> _result;
     bool _result_transfer_pending = false;
 
@@ -250,6 +251,7 @@ public:
     float getAgeSinceAbort() const {return Timer::elapsedSeconds() - _time_of_abort;}
     float getUsedCpuSeconds() const {return _used_cpu_seconds;}
     int getNumThreads() const {return _threads_per_job;}
+    int getBalancingEpochOfLastCommitment() const {return _balancing_epoch_of_last_commitment;}
 
     // Return true iff this job instance has found a job result that it still needs to communicate.
     bool isResultTransferPending() const {return _result_transfer_pending;}

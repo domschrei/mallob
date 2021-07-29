@@ -21,6 +21,7 @@ private:
 
     MPI_Comm& _comm;
     std::unique_ptr<Balancer> _balancer;
+    robin_hood::unordered_map<int, int> _current_volumes;
 
     std::atomic_int _num_stored_jobs = 0;
     robin_hood::unordered_map<int, Job*> _jobs;
@@ -30,7 +31,12 @@ private:
     Job* _current_job;
     float _last_balancing_initiation;
 
+    // Requests which lay dormant (e.g., due to too many hops / too busy system)
+    // and will be re-introduced to continue hopping after some time
     std::list<std::tuple<float, int, JobRequest>> _deferred_requests;
+
+    // Request to re-activate a local dormant root
+    std::optional<JobRequest> _pending_root_reactivate_request;
 
     struct SuspendedJobComparator {
         bool operator()(const std::pair<int, float>& left, const std::pair<int, float>& right) {
@@ -80,7 +86,8 @@ public:
     bool continueBalancing();
     bool continueBalancing(MessageHandle& handle);
     void finishBalancing();
-    robin_hood::unordered_map<int, int> getBalancingResult();
+    void computeBalancingResult();
+    const robin_hood::unordered_map<int, int>& getBalancingResult();
     int getGlobalBalancingEpoch() const {return _balancer->getGlobalEpoch();}
 
     bool has(int id) const;
@@ -93,7 +100,11 @@ public:
     bool hasDormantRoot() const;
     bool hasDormantJob(int id) const;
     std::vector<int> getDormantJobs() const;
-    
+
+    bool hasPendingRootReactivationRequest() const;
+    JobRequest loadPendingRootReactivationRequest();
+    void setPendingRootReactivationRequest(JobRequest&& req);
+
     std::string toStr(int j, int idx) const;
     
 };

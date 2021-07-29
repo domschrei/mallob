@@ -44,6 +44,7 @@ struct HordeSharedMemory {
     int exportBufferMaxSize;
     int importBufferMaxSize;
     int importBufferSize;
+    int importBufferRevision;
     Checksum importChecksum;
     
     // Clause buffers: child->parent

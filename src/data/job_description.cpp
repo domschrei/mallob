@@ -56,24 +56,29 @@ int JobDescription::writeMetadataAndPointers() {
     return i;
 }
 
+size_t JobDescription::getRelativeIndex(int revision) const {
+    size_t relativeIndex = _revisions_pos_fsize_asize.size() - (_revision - revision) - 1;
+    assert(relativeIndex < _revisions_pos_fsize_asize.size() 
+        || log_return_false("ERROR: relative index %i/%i for revision %i/%i!\n", 
+        relativeIndex, _revisions_pos_fsize_asize.size(), revision, _revision));
+    return relativeIndex;
+}
+
 size_t JobDescription::getFormulaPayloadSize(int revision) const {
-    int relativeIndex = _revisions_pos_fsize_asize.size() - (_revision - revision) - 1;
-    return _revisions_pos_fsize_asize[relativeIndex].fSize;
+    return _revisions_pos_fsize_asize[getRelativeIndex(revision)].fSize;
 }
 
 size_t JobDescription::getAssumptionsSize(int revision) const {
-    int relativeIndex = _revisions_pos_fsize_asize.size() - (_revision - revision) - 1;
-    return _revisions_pos_fsize_asize[relativeIndex].aSize;
+    return _revisions_pos_fsize_asize[getRelativeIndex(revision)].aSize;
 }
 
 const int* JobDescription::getFormulaPayload(int revision) const {
-    int relativeIndex = _revisions_pos_fsize_asize.size() - (_revision - revision) - 1;
-    size_t pos = _revisions_pos_fsize_asize[relativeIndex].pos;
+    size_t pos = _revisions_pos_fsize_asize[getRelativeIndex(revision)].pos;
     return (const int*) (_raw_data->data()+pos);
 }
 
 const int* JobDescription::getAssumptionsPayload(int revision) const {
-    int relativeIndex = _revisions_pos_fsize_asize.size() - (_revision - revision) - 1;
+    auto relativeIndex = getRelativeIndex(revision);
     size_t pos = _revisions_pos_fsize_asize[relativeIndex].pos;
     return (const int*) (_raw_data->data()+pos+sizeof(int)*_revisions_pos_fsize_asize[relativeIndex].fSize);
 }

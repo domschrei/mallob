@@ -225,6 +225,8 @@ void ForkedSatJob::startDestructThreadIfNecessary() {
 ForkedSatJob::~ForkedSatJob() {
     log(V4_VVER, "%s : enter destructor\n", toStr());
 
+    if (_initialized) _solver->setSolvingState(SolvingStates::ABORTING);
+
     if (_destruct_thread.joinable()) _destruct_thread.join();
 
     if (_initialized) {
