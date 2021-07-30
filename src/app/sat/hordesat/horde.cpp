@@ -96,7 +96,8 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 		cyclePos = (cyclePos+1) % solverChoices.size();
 	}
 
-	_sharing_manager.reset(new DefaultSharingManager(_solver_interfaces, _params, _logger));
+	_sharing_manager.reset(new DefaultSharingManager(_solver_interfaces, _params, _logger, 
+		/*max. deferred literals per solver=*/5*config.maxBroadcastedLitsPerCycle));
 	_logger.log(V5_DEBG, "initialized\n");
 }
 

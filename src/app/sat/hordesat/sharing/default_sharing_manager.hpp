@@ -10,6 +10,7 @@
 
 #include <cstring>
 #include <memory>
+#include <list>
 
 #include "app/sat/hordesat/sharing/sharing_manager_interface.hpp"
 #include "app/sat/hordesat/utilities/clause_database.hpp"
@@ -27,6 +28,14 @@ protected:
 	std::vector<std::shared_ptr<PortfolioSolverInterface>>& _solvers;
 	std::vector<ClauseFilter> _solver_filters;
 	std::vector<bool> _importing;
+
+	struct DeferredClauseList {
+		int revision;
+		size_t numLits = 0;
+		std::vector<std::vector<int>> clauses;
+	};
+	std::vector<std::list<DeferredClauseList>> _deferred_clauses;
+	size_t _max_deferred_lits_per_solver;
 	
 	// global parameters
 	const Parameters& _params;
@@ -44,7 +53,7 @@ protected:
 
 public:
 	DefaultSharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
-			const Parameters& params, const Logger& logger);
+			const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver);
     int prepareSharing(int* begin, int maxSize);
     void digestSharing(std::vector<int>& result);
 	void digestSharing(int* begin, int buflen);
@@ -63,6 +72,9 @@ private:
 			processClause(solverId, c, condVarOrZero);
 		};
 	};
+
+	bool addDeferredClause(int solverId, const Clause& c);
+	void digestDeferredClauses();
 
 };
 

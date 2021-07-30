@@ -13,8 +13,10 @@
 
 DefaultSharingManager::DefaultSharingManager(
 		std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, 
-		const Parameters& params, const Logger& logger)
-	: _solvers(solvers), _params(params), _logger(logger), 
+		const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver)
+	: _solvers(solvers), _deferred_clauses(_solvers.size()), 
+	_max_deferred_lits_per_solver(maxDeferredLitsPerSolver), 
+	_params(params), _logger(logger), 
 	_cdb(
 		/*maxClauseSize=*/_params.hardMaxClauseLength(),
 		/*maxLbdPartitionedSize=*/_params.maxLbdPartitioningSize(),
@@ -64,6 +66,7 @@ void DefaultSharingManager::digestSharing(std::vector<int>& result) {
 }
 
 void DefaultSharingManager::digestSharing(int* begin, int buflen) {
+	digestDeferredClauses();
     
 	// Get all clauses
 	auto reader = _cdb.getBufferReader(begin, buflen);
@@ -71,6 +74,7 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 	size_t numClauses = 0;
 	std::vector<int> lens;
 	std::vector<int> added(_solvers.size(), 0);
+	std::vector<int> deferred(_solvers.size(), 0);
 
 	bool shuffleClauses = _params.shuffleSharedClauses();
 	
@@ -90,9 +94,11 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 		// Import clause into each solver if its filter allows it
 		for (size_t sid = 0; sid < _solvers.size(); sid++) {
 			
-			// ignore clause "from the future"
-			// TODO do not discard, but defer to a later point in time
-			if (_solvers[sid]->getCurrentRevision() < _current_revision) continue; 
+			// Defer clause "from the future"
+			if (_solvers[sid]->getCurrentRevision() < _current_revision) {
+				if (addDeferredClause(sid, clause)) deferred[sid]++;
+				continue;
+			}
 
 			if (_solver_filters[sid].registerClause(clause.begin, clause.size)) {
 				_solvers[sid]->addLearnedClause(clause);
@@ -112,7 +118,7 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 	_logger.log(V3_VERB, "sharing total=%d lens %s\n", numClauses, lensStr.c_str());
 	// Per-solver stats
 	for (size_t sid = 0; sid < _solvers.size(); sid++) {
-		_logger.log(V3_VERB, "S%d imp=%d\n", sid, numClauses-added[sid]);
+		_logger.log(V3_VERB, "S%d imp=%d def=%d\n", _solvers[sid]->getGlobalId(), added[sid], deferred[sid]);
 	}
 
 	// Clear half of the clauses from the filter (probabilistically) if a clause filter half life is set
@@ -122,6 +128,60 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 			_solver_filters[sid].clearHalf();
 		}
 		_last_buffer_clear = Timer::elapsedSeconds();
+	}
+}
+
+bool DefaultSharingManager::addDeferredClause(int solverId, const Clause& c) {
+		
+	// Create copied clause
+	std::vector<int> clsVec(c.size+1);
+	clsVec[0] = c.lbd;
+	for (size_t i = 0; i < c.size; i++) clsVec[i+1] = c.begin[i];
+
+	// Find list to append clause to
+	auto& lists = _deferred_clauses[solverId];
+	if (lists.empty() || lists.back().revision < _current_revision) {
+		// No list for this revision yet: Append new list
+		DeferredClauseList list;
+		list.revision = _current_revision;
+		lists.push_back(std::move(list));
+	} else if (lists.back().numLits + c.size+1 > _max_deferred_lits_per_solver) {
+		return false; // limit on deferred clauses' volume reached
+	}
+
+	// Append clause to correct list
+	lists.back().clauses.push_back(std::move(clsVec));
+	lists.back().numLits += c.size+1;
+	return true;
+}
+
+void DefaultSharingManager::digestDeferredClauses() {
+
+	for (size_t sid = 0; sid < _solvers.size(); sid++) {
+		size_t numAdded = 0;	
+		auto& lists = _deferred_clauses[sid];
+		for (auto it = lists.begin(); it != lists.end(); it++) {
+			DeferredClauseList& list = *it;
+			if (list.revision > _solvers[sid]->getCurrentRevision()) {
+				// Not ready yet: all subsequent lists are not ready as well
+				break;
+			}
+			// Ready to import!
+			for (auto& cls : list.clauses) {
+				Clause c;
+				c.lbd = cls[0];
+				c.begin = cls.data()+1;
+				c.size = cls.size()-1;
+				if (_solver_filters[sid].registerClause(c.begin, c.size)) {
+					_solvers[sid]->addLearnedClause(c);
+					numAdded++;
+				}
+			}
+			// Remove clause list
+			it = lists.erase(it);
+			it--;
+		}
+		if (numAdded > 0) _logger.log(V4_VVER, "S%i added %i deferred cls\n", _solvers[sid]->getGlobalId(), numAdded);
 	}
 }
 
