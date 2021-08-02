@@ -39,7 +39,6 @@ RUN chmod 755 mallob
 RUN chmod 755 mallob_sat_process
 ADD mpi-run-aws.sh supervised-scripts/mpi-run.sh
 RUN chmod 755 supervised-scripts/mpi-run.sh
-ADD test.cnf test.cnf
 USER mallob
 CMD ["/usr/sbin/sshd", "-D", "-f", "/home/mallob/.ssh/sshd_config"]
 CMD supervised-scripts/mpi-run.sh

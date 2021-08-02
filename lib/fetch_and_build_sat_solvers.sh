@@ -5,7 +5,7 @@ set -e
 if [ ! -f mergesat/libmergesat.a ]; then
 
     # Get MergeSat and patch it
-    git clone git@github.com:conp-solutions/mergesat.git
+    git clone https://github.com/conp-solutions/mergesat.git
     cd mergesat
     git checkout devel # might be a specific commit lateron
     
