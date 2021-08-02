@@ -59,38 +59,6 @@ void ThreadedSatJob::appl_resume() {
     getSolver()->unsetPaused();
 }
 
-void ThreadedSatJob::appl_stop() {
-    if (!_initialized) return;
-    auto lock = _solver_lock.getLock();
-    _solver->interrupt();
-}
-
-void ThreadedSatJob::appl_interrupt() {
-    appl_stop();
-}
-
-void ThreadedSatJob::appl_restart() {
-    if (!_initialized) return;
-    auto lock = _solver_lock.getLock();
-
-    _done_locally = false;
-    _result = JobResult();
-    _result_code = 0;
-    
-    const JobDescription& desc = getDescription();
-    while (_last_imported_revision < desc.getRevision()) {
-        _last_imported_revision++;
-        _solver->appendRevision(
-            _last_imported_revision,
-            desc.getFormulaPayloadSize(_last_imported_revision), 
-            desc.getFormulaPayload(_last_imported_revision),
-            desc.getAssumptionsSize(_last_imported_revision),
-            desc.getAssumptionsPayload(_last_imported_revision)
-        );
-    }
-    _solver->solve();
-}
-
 void ThreadedSatJob::appl_terminate() {
     if (!_initialized) return;
     auto lock = _solver_lock.getLock();
@@ -119,6 +87,25 @@ JobResult ThreadedSatJob::appl_getResult() {
 int ThreadedSatJob::appl_solved() {
 
     int result = -1;
+
+    // Import new revisions as necessary
+    {
+        auto lock = _solver_lock.getLock();
+        const JobDescription& desc = getDescription();
+        while (_last_imported_revision < desc.getRevision()) {
+            _last_imported_revision++;
+            _solver->appendRevision(
+                _last_imported_revision,
+                desc.getFormulaPayloadSize(_last_imported_revision), 
+                desc.getFormulaPayload(_last_imported_revision),
+                desc.getAssumptionsSize(_last_imported_revision),
+                desc.getAssumptionsPayload(_last_imported_revision)
+            );
+            _done_locally = false;
+            _result = JobResult();
+            _result_code = 0;
+        }
+    }
 
     // Already reported the actual result, or still initializing
     if (_done_locally || !_initialized || getState() != ACTIVE) {

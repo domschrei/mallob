@@ -55,8 +55,8 @@ public:
     HordeLib(const Parameters& params, const HordeConfig& config, Logger&& loggingInterface);
 	~HordeLib();
 
-    void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits);
 	void solve();
+    void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits);
 
 	bool isFullyInitialized();
     int solveLoop();
@@ -66,8 +66,6 @@ public:
     void digestSharing(std::vector<int>& result, const Checksum& checksum);
 	void digestSharing(int* begin, int size, const Checksum& checksum);
 
-    void interrupt();
-	void setSolvingState(SolvingStates::SolvingState state);
     void setPaused();
     void unsetPaused();
 	void abort();

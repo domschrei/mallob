@@ -51,8 +51,8 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
             // Insert this job as an event, if there is something novel about it
             Event ev;
             int& epoch = _job_epochs[id];
-            if (job->getState() == STANDBY) {
-                // Job is in STANDBY mode: set demand of zero
+            if (job->getState() == SUSPENDED) {
+                // Job is suspended: set demand of zero
                 ev = Event({id, epoch, /*demand=*/0, job->getPriority()});
             } else {
                 // Job must be active

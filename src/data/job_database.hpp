@@ -53,8 +53,8 @@ public:
     ~JobDatabase();
 
     Job& createJob(int commSize, int worldRank, int jobId, JobDescription::Application application);
-    bool init(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source);
-    bool restart(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source);
+    void appendRevision(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source);
+    void execute(int jobId, int source);
 
     bool checkComputationLimits(int jobId);
 
@@ -73,7 +73,7 @@ public:
     
     void reactivate(const JobRequest& req, int source);
     void suspend(int jobId);
-    void stop(int jobId, bool terminate=false);
+    void terminate(int jobId);
 
     void forgetOldJobs();
     void forget(int jobId);

@@ -80,23 +80,23 @@ public:
     void mainProgram();
 
 private:
+    void handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMode mode);
+    void handleOfferAdoption(MessageHandle& handle);
+    void handleAnswerAdoptionOffer(MessageHandle& handle);
+    void handleQueryJobDescription(MessageHandle& handle);
+    void handleSendJobDescription(MessageHandle& handle);
+
     void handleNotifyJobAborting(MessageHandle& handle);
-    void handleAcceptAdoptionOffer(MessageHandle& handle);
-    void handleConfirmAdoption(MessageHandle& handle);
     void handleDoExit(MessageHandle& handle);
     void handleRejectOneshot(MessageHandle& handle);
-    void handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMode mode);
     void handleSendClientRank(MessageHandle& handle);
     void handleIncrementalJobFinished(MessageHandle& handle);
     void handleInterrupt(MessageHandle& handle);
     void handleSendApplicationMessage(MessageHandle& handle);
     void handleNotifyJobDone(MessageHandle& handle);
-    void handleOfferAdoption(MessageHandle& handle);
     void handleQueryJobResult(MessageHandle& handle);
     void handleQueryVolume(MessageHandle& handle);
-    void handleRejectAdoptionOffer(MessageHandle& handle);
     void handleNotifyResultObsolete(MessageHandle& handle);
-    void handleSendJob(MessageHandle& handle);
     void handleSendJobResult(MessageHandle& handle);
     void handleNotifyJobTerminating(MessageHandle& handle);
     void handleNotifyVolumeUpdate(MessageHandle& handle);
@@ -106,8 +106,7 @@ private:
     void handleNotifyNeighborIdleDistance(MessageHandle& handle);
     void handleRequestWork(MessageHandle& handle);
     
-    void initJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& data, int senderRank);
-    void restartJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& data, int senderRank);
+    void sendRevisionDescription(int jobId, int revision, int dest);
     void bounceJobRequest(JobRequest& request, int senderRank);
     void initiateVolumeUpdate(int jobId);
     void updateVolume(int jobId, int demand, int balancingEpoch);

@@ -67,58 +67,36 @@ Job& JobDatabase::createJob(int commSize, int worldRank, int jobId, JobDescripti
     return *_jobs[jobId];
 }
 
-bool JobDatabase::init(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source) {
+void JobDatabase::appendRevision(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source) {
 
     if (!has(jobId) || get(jobId).getState() == PAST) {
         log(V1_WARN, "[WARN] Unknown or past job #%i : discard desc. of size %i\n", jobId, description->size());
-        return false;
+        return;
     }
     auto& job = get(jobId);
 
-    // Erase job commitment
-    uncommit(jobId);
-
-    // Empty job description
-    if (description->size() == sizeof(int)) {
-        log(V4_VVER, "Received empty desc. of #%i - uncommit and ignore\n", jobId);
-        return false;
-    }
-
-    // Initialize job (in a separate thread)
-    setLoad(1, jobId);
-    log(LOG_ADD_SRCRANK | V3_VERB, "START %s", source, job.toStr());
-    get(jobId).start(description);
-    return true;
+    // Push revision description
+    job.pushRevision(description);
 }
 
-bool JobDatabase::restart(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source) {
+void JobDatabase::execute(int jobId, int source) {
 
     if (!has(jobId) || get(jobId).getState() == PAST) {
-        log(V1_WARN, "[WARN] Unknown or past job #%i : discard desc. of size %i\n", jobId, description->size());
-        return false;
+        log(V1_WARN, "[WARN] Unknown or past job #%i\n", jobId);
+        return;
     }
     auto& job = get(jobId);
 
-    // Erase job commitment
-    uncommit(jobId);
-
-    // Empty job description
-    if (description->size() == sizeof(int)) {
-        log(V4_VVER, "Received empty desc. of #%i - uncommit and ignore\n", jobId);
-        return false;
-    }
-
-    // Restart job (in a separate thread)
+    // Execute job
     setLoad(1, jobId);
-    log(LOG_ADD_SRCRANK | V3_VERB, "RESTART %s", source, job.toStr());
-    if (job.getState() == SUSPENDED) {
-        // Job is suspended, not standby:
-        // Perform transition SUSPENDED -> ACTIVE -> STANDBY
+    log(LOG_ADD_SRCRANK | V3_VERB, "EXECUTE %s", source, job.toStr());
+    if (job.getState() == INACTIVE) {
+        // Execute job for the first time
+        job.start();
+    } else {
+        // Restart job
         job.resume();
-        job.interrupt();
     }
-    job.restart(description);
-    return true;
 }
 
 bool JobDatabase::checkComputationLimits(int jobId) {
@@ -187,9 +165,9 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
         log(V4_VVER, "Req. %s : not a valid child index (any more)\n", job.toStr());
         return true;
     }
-    if (req.currentRevision < job.getRevision()) {
+    if (req.revision < job.getRevision()) {
         // Job was updated in the meantime
-        log(V4_VVER, "Req. %s : rev. %i not up to date\n", job.toStr(), req.currentRevision);
+        log(V4_VVER, "Req. %s : rev. %i not up to date\n", job.toStr(), req.revision);
         return true;
     }
     // Does the job's volume not allow for this node any more? 
@@ -318,15 +296,10 @@ void JobDatabase::reactivate(const JobRequest& req, int source) {
     Job& job = get(req.jobId);
     job.updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
     setLoad(1, req.jobId);
-    if (job.getState() == SUSPENDED) {
-        log(LOG_ADD_SRCRANK | V3_VERB, "RESUME %s", source, 
-                    toStr(req.jobId, req.requestedNodeIndex).c_str());
-        job.resume();
-    } else if (job.getState() == INACTIVE) {
-        log(LOG_ADD_SRCRANK | V3_VERB, "RESTART %s", source, 
-                    toStr(req.jobId, req.requestedNodeIndex).c_str());
-        abort(); // TODO not implemented yet
-    }
+    assert(!hasCommitment(req.jobId));
+    log(LOG_ADD_SRCRANK | V3_VERB, "RESUME %s", source, 
+                toStr(req.jobId, req.requestedNodeIndex).c_str());
+    job.resume();
 }
 
 void JobDatabase::suspend(int jobId) {
@@ -336,21 +309,11 @@ void JobDatabase::suspend(int jobId) {
     log(V3_VERB, "SUSPEND %s\n", get(jobId).toStr());
 }
 
-void JobDatabase::stop(int jobId, bool terminate) {
+void JobDatabase::terminate(int jobId) {
     Job& job = get(jobId);
     if (!isIdle() && getActive().getId() == jobId) setLoad(0, jobId);
+    job.terminate();
     if (job.hasCommitment()) uncommit(jobId);
-    if (job.getState() == SUSPENDED) job.resume();
-    if (terminate) {
-        if (job.getState() == ACTIVE) job.stop();
-        if (job.getState() == INACTIVE || job.getState() == STANDBY) {
-            log(V3_VERB, "TERMINATE %s\n", job.toStr());
-            job.terminate();
-        } 
-    } else {
-        log(V3_VERB, "STOP %s (state: %s)\n", job.toStr(), job.jobStateToStr());
-        if (job.getState() == ACTIVE) job.interrupt();
-    }
 }
 
 void JobDatabase::forgetOldJobs() {
@@ -405,9 +368,7 @@ void JobDatabase::forgetOldJobs() {
 
 void JobDatabase::forget(int jobId) {
     Job& job = get(jobId);
-    if (job.getState() == SUSPENDED) job.resume();
-    if (job.getState() == ACTIVE) job.stop();
-    if (job.getState() == INACTIVE) job.terminate();
+    job.terminate();
     assert(job.getState() == PAST);
     // Check if the job can be destructed
     if (job.isDestructible()) {
@@ -539,15 +500,14 @@ const robin_hood::unordered_map<int, int>& JobDatabase::getBalancingResult() {
 
 bool JobDatabase::hasDormantRoot() const {
     for (auto& [_, job] : _jobs) {
-        if (job->getJobTree().isRoot() && job->getState() == STANDBY) 
+        if (job->getJobTree().isRoot() && job->getState() == SUSPENDED) 
             return true;
     }
     return false;
 }
 
 bool JobDatabase::hasDormantJob(int jobId) const {
-    return has(jobId) && 
-            (get(jobId).getState() == SUSPENDED || get(jobId).getState() == STANDBY);
+    return has(jobId) && (get(jobId).getState() == SUSPENDED);
 }
 
 std::vector<int> JobDatabase::getDormantJobs() const {

@@ -58,12 +58,11 @@ void* SolverThread::run() {
         // Sleep and wait if the solver should not do solving right now
         waitWhileSolved();
         waitWhileSuspended();
-        waitWhileInterrupted();
         
         bool readingDone = readFormula();
 
-        // Skip solving attempt if interrupt is set
-        if (!readingDone || _interrupted) continue;
+        // Skip solving attempt if reading was incomplete
+        if (!readingDone) continue;
         
         diversifyAfterReading();
 
@@ -135,10 +134,6 @@ bool SolverThread::readFormula() {
             }
             
             waitWhileSuspended();
-            if (_interrupted) {
-                _logger.log(V4_VVER, "Reading interrupted @ %i\n", (int)_imported_lits_curr_revision);
-                return false;
-            }
         }
         for (size_t i = 0; i < aSize; i++) _max_var = std::max(_max_var, std::abs(aLits[i]));
 
@@ -201,6 +196,7 @@ void SolverThread::appendRevision(int revision, size_t fSize, const int* fLits, 
         assert(_latest_revision+1 == (int)_pending_formulae.size() 
             || log_return_false("%i != %i", _latest_revision+1, _pending_formulae.size()));
         _solver.interrupt();
+        _interrupted = true;
     }
     _state_cond.notify();
 }
@@ -241,10 +237,9 @@ void SolverThread::runOnce() {
         auto lock = _state_mutex.getLock();
 
         // Last point where upcoming solving attempt may be cancelled prematurely
-        if (_interrupted || _suspended) return;
+        if (_suspended) return;
 
-        // Make solver ready to solve by removing interrupt and suspend flags
-        _solver.uninterrupt();
+        // Make solver ready to solve by removing suspend flag
         _solver.resume();
 
         // Set assumptions for upcoming solving attempt, set correct revision
@@ -278,17 +273,20 @@ void SolverThread::runOnce() {
         }
         res = _solver.solve(0, nullptr);
     }
+    // Uninterrupt solver (if it was interrupted)
+    {
+        auto lock = _state_mutex.getLock();
+        _solver.uninterrupt();
+        _interrupted = false;
+    }
     _logger.log(V4_VVER, "ENDSOL\n");
 
     // Report result, if present
-    reportResult(res);
+    reportResult(res, revision);
 }
 
 void SolverThread::waitWhileSolved() {
     waitUntil([&]{return !_found_result;});
-}
-void SolverThread::waitWhileInterrupted() {
-    waitUntil([&]{return !_interrupted;});
 }
 void SolverThread::waitWhileSuspended() {
     waitUntil([&]{return !_suspended;});
@@ -299,16 +297,14 @@ void SolverThread::waitUntil(std::function<bool()> predicate) {
     _state_cond.wait(_state_mutex, predicate);
 }
 
-void SolverThread::reportResult(int res) {
+void SolverThread::reportResult(int res, int revision) {
 
-    if (res == 0 || _found_result || _interrupted) return;
+    if (res == 0 || _found_result) return;
+    const char* resultString = res==SAT?"SAT":"UNSAT";
 
     auto lock = _state_mutex.getLock();
 
-    int revision = _active_revision;
-    const char* resultString = res==SAT?"SAT":"UNSAT";
-
-    if (_active_revision != _latest_revision) {
+    if (revision != _latest_revision) {
         _logger.log(V4_VVER, "discard obsolete result %s for rev. %i\n", resultString, revision);
         return;
     }

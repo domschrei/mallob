@@ -33,24 +33,11 @@ of which a corresponding child position was advertised.
 Data type: JobRequest
 */
 const int MSG_OFFER_ADOPTION = 4;
-/*
-The senders confirms that the receiver may become the sender's child
-with respect to the job and index specified in the signature.
-Data type: JobSignature
-*/
-const int MSG_ACCEPT_ADOPTION_OFFER = 5;
-/*
-The sender rejects the receiver to become the sender's child
-with respect to the job and index specified in the signature.
-Data type: JobRequest
-*/
-const int MSG_REJECT_ADOPTION_OFFER = 6;
-/*
-The sender acknowledges that it received the receiver's previous
-MSG_ACCEPT_ADOPTION_OFFER message.
-Data type: JobRequest
-*/
-const int MSG_CONFIRM_ADOPTION = 7;
+
+const int MSG_ANSWER_ADOPTION_OFFER = 5;
+
+const int MSG_QUERY_JOB_DESCRIPTION = 6;
+
 /*
 The sender propagates a job's volume update to the receiver.
 Data type: [jobId, volume, globalCommEpoch] (3 ints)
@@ -159,6 +146,7 @@ const int MSG_REQUEST_IDLE_NODE_BFS = 38;
 const int MSG_ANSWER_IDLE_NODE_BFS = 39;
 
 const int MSG_NOTIFY_ASSIGNMENT_UPDATE = 40;
+
 
 /*
 Pseudo-tag representing all tags that can be received at any time.

@@ -76,9 +76,11 @@ void ForkedSatJob::loadIncrements() {
             desc.getAssumptionsPayload(_last_imported_revision)
         });
     }
-    if (!revisions.empty()) _solver->appendRevisions(revisions);
-    _done_locally = false;
-    _internal_result = JobResult();
+    if (!revisions.empty()) {
+        _solver->appendRevisions(revisions, getDesiredRevision());
+        _done_locally = false;
+        _internal_result = JobResult();
+    }
 }
 
 void ForkedSatJob::appl_suspend() {
@@ -94,25 +96,6 @@ void ForkedSatJob::appl_resume() {
     _solver->setSolvingState(SolvingStates::ACTIVE);
 }
 
-void ForkedSatJob::appl_stop() {
-    if (!_initialized) return;
-    auto lock = _solver_state_change_mutex.getLock();
-    _solver->setSolvingState(SolvingStates::STANDBY);
-}
-
-void ForkedSatJob::appl_interrupt() {
-    if (!_initialized) return;
-    auto lock = _solver_state_change_mutex.getLock();
-    _solver->setSolvingState(SolvingStates::STANDBY);
-}
-
-void ForkedSatJob::appl_restart() {
-    if (!_initialized) return;
-    auto lock = _solver_state_change_mutex.getLock();
-    loadIncrements();
-    _solver->setSolvingState(SolvingStates::ACTIVE);
-}
-
 void ForkedSatJob::appl_terminate() {
     if (!_initialized) return;
     auto lock = _solver_state_change_mutex.getLock();
@@ -123,6 +106,7 @@ void ForkedSatJob::appl_terminate() {
 int ForkedSatJob::appl_solved() {
     int result = -1;
     if (!_initialized || getState() != ACTIVE) return result;
+    loadIncrements();
     if (_done_locally) return result;
 
     // Did a solver find a result?

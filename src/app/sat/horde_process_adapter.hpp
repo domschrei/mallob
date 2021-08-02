@@ -60,9 +60,10 @@ private:
     pid_t _child_pid;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
 
-    int _latest_revision = -1;
-    std::atomic_int _latest_ready_revision = -1;
-    std::atomic_int _latest_published_revision = -1;
+    std::atomic_int _written_revision = -1;
+    int _published_revision = 0;
+    int _desired_revision = -1;
+
     BackgroundWorker _concurrent_shmem_allocator;
     std::list<RevisionData> _revisions_to_write;
     Mutex _revisions_mutex;
@@ -79,7 +80,7 @@ public:
     bool isFullyInitialized();
     pid_t getPid();
 
-    void appendRevisions(const std::vector<RevisionData>& revisions);
+    void appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision);
 
     void setSolvingState(SolvingStates::SolvingState state);
 

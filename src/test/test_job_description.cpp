@@ -49,9 +49,7 @@ void testIncrementalExample() {
     assert(desc.getNumFormulaLiterals() == 6);
     assert(desc.getNumAssumptionLiterals() == 1);
 
-    auto exported = desc.extractUpdate(0);
-    auto exported2 = desc.getSerialization();
-    assert(exported == exported2);
+    auto exported = desc.getSerialization(0);
 
     JobDescription imported(1, 1, true, true);
     imported.deserialize(exported);
@@ -73,31 +71,16 @@ void testIncrementalExample() {
     update.setRevision(1);
     r.read(update);
     log(V2_INFO, "Update: %i lits, %i assumptions\n", update.getNumFormulaLiterals(), update.getNumAssumptionLiterals());
-    exported = update.extractUpdate(1);
-    exported2 = update.getSerialization();
+    exported = update.getSerialization(1);
     JobDescription imported1(1, 1, true, true);
     imported1.deserialize(exported);
-    JobDescription imported2(1, 1, true, true);
-    imported2.deserialize(exported2);
-
+    
     assert(imported1.getNumAssumptionLiterals() == update.getNumAssumptionLiterals());
-    assert(imported2.getNumAssumptionLiterals() == update.getNumAssumptionLiterals());
     assert(update.getAssumptionsSize(1) == update.getNumAssumptionLiterals());
     for (size_t i = 0; i < update.getAssumptionsSize(1); i++) {
         log(V2_INFO, "Asmpt %i\n", update.getAssumptionsPayload(1)[i]);
         assert(update.getAssumptionsPayload(1)[i] == imported1.getAssumptionsPayload(1)[i]);
-        assert(update.getAssumptionsPayload(1)[i] == imported2.getAssumptionsPayload(1)[i]);
     }
-
-    assert(exported->size() == exported2->size());
-    for (size_t i = 0; i < std::min(exported->size(), exported2->size()) / sizeof(int); i++) {
-        int* val = (int*)(exported->data() + sizeof(int) * i);
-        int* val2 = (int*)(exported2->data() + sizeof(int) * i);
-        if (*val != *val2) log(V2_INFO, "%i : %i,%i\n", i, *val, *val2);
-    }
-    assert(*exported == *exported2);
-
-    //imported.applyUpdate(exported);
 }
 
 int main() {

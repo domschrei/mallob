@@ -141,8 +141,8 @@ std::shared_ptr<PortfolioSolverInterface> HordeLib::createSolver(const SolverSet
 }
 
 void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits) {
-	assert(_state != ACTIVE);
-	_logger.log(V4_VVER, "append rev. %i: %i lits, %i assumptions\n", revision, fSize, aSize);
+	
+	_logger.log(V4_VVER, "Import rev. %i: %i lits, %i assumptions\n", revision, fSize, aSize);
 	assert(_revision+1 == revision);
 	_revision_data.push_back(RevisionData{fSize, fLits, aSize, aLits});
 	_sharing_manager->setRevision(revision);
@@ -155,6 +155,7 @@ void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size
 			));
 		} else {
 			if (_solver_interfaces[i]->getSolverSetup().doIncrementalSolving) {
+				// True incremental SAT solving
 				_solver_threads[i]->appendRevision(revision, fSize, fLits, aSize, aLits);
 			} else {
 				// Pseudo-incremental SAT solving: 
@@ -162,7 +163,7 @@ void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size
 				_sharing_manager->stopClauseImport(i);
 				_solver_threads[i]->setTerminate();
 				_obsolete_solver_threads.push_back(std::move(_solver_threads[i]));
-				// Setup new solver  and new solver thread
+				// Setup new solver and new solver thread
 				_solver_interfaces[i] = createSolver(_solver_interfaces[i]->getSolverSetup());
 				_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
 					_params, _config, _solver_interfaces[i], 
@@ -178,7 +179,7 @@ void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size
 					);
 				}
 				_sharing_manager->continueClauseImport(i);
-				_solvers_started = false; // need to restart at least one solver
+				if (_solvers_started) _solver_threads[i]->start();
 			}
 		}
 	}
@@ -188,13 +189,13 @@ void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size
 void HordeLib::solve() {
 	assert(_revision >= 0);
 	_result.result = UNKNOWN;
-	setSolvingState(ACTIVE);
 	if (!_solvers_started) {
 		// Need to start threads
 		_logger.log(V4_VVER, "starting threads\n");
 		for (auto& thread : _solver_threads) thread->start();
 		_solvers_started = true;
 	}
+	_state = ACTIVE;
 }
 
 bool HordeLib::isFullyInitialized() {
@@ -329,37 +330,19 @@ void HordeLib::dumpStats(bool final) {
 }
 
 void HordeLib::setPaused() {
-	if (_state == ACTIVE)	setSolvingState(SUSPENDED);
+	_state = SUSPENDED;
+	for (auto& solver : _solver_threads) solver->setSuspend(true);
 }
 
 void HordeLib::unsetPaused() {
-	if (_state == SUSPENDED) setSolvingState(ACTIVE);
-}
-
-void HordeLib::interrupt() {
-	if (_state != STANDBY) {
-		dumpStats(/*final=*/false);
-		setSolvingState(STANDBY);
-	}
+	_state = ACTIVE;
+	for (auto& solver : _solver_threads) solver->setSuspend(false);
 }
 
 void HordeLib::abort() {
 	if (_state != ABORTING) {
 		dumpStats(/*final=*/true);
-		setSolvingState(ABORTING);
-	}
-}
-
-void HordeLib::setSolvingState(SolvingState state) {
-	SolvingState oldState = _state;
-	_state = state;
-	_logger.log(V4_VVER, "state change %s -> %s\n", SolvingStateNames[oldState], SolvingStateNames[state]);
-	for (auto& solver : _solver_threads) {
-		if (state == SolvingState::ABORTING) {
-			solver->setTerminate();
-		}
-		solver->setSuspend(state == SolvingState::SUSPENDED);
-		solver->setInterrupt(state == SolvingState::STANDBY);
+		for (auto& solver : _solver_threads) solver->setTerminate();
 	}
 }
 
@@ -369,7 +352,7 @@ void HordeLib::cleanUp() {
 	_logger.log(V5_DEBG, "[hlib-cleanup] enter\n");
 
 	// for any running threads left:
-	setSolvingState(ABORTING);
+	abort();
 	
 	// join and delete threads
 	for (auto& thread : _solver_threads) thread->tryJoin();

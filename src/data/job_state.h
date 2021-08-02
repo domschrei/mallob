@@ -6,8 +6,8 @@
  * Internal state of the job's image on this node.
  */
 enum JobState {
-    INACTIVE, ACTIVE, SUSPENDED, STANDBY, PAST
+    INACTIVE, ACTIVE, SUSPENDED, PAST
 };
-static const char * JOB_STATE_STRINGS[] = { "inactive", "active", "suspended", "standby", "past" };
+static const char * JOB_STATE_STRINGS[] = { "inactive", "active", "suspended", "past" };
 
 #endif

@@ -7,7 +7,7 @@
 #include "data/job_description.hpp"
 
 size_t JobRequest::getTransferSize() {
-    return 8*sizeof(int)+sizeof(float)+sizeof(JobDescription::Application);
+    return 7*sizeof(int)+sizeof(float)+sizeof(JobDescription::Application);
 }
 
 std::vector<uint8_t> JobRequest::serialize() const {
@@ -19,8 +19,7 @@ std::vector<uint8_t> JobRequest::serialize() const {
     n = sizeof(int); memcpy(packed.data()+i, &rootRank, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &requestingNodeRank, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &requestedNodeIndex, n); i += n;
-    n = sizeof(int); memcpy(packed.data()+i, &currentRevision, n); i += n;
-    n = sizeof(int); memcpy(packed.data()+i, &lastKnownRevision, n); i += n;
+    n = sizeof(int); memcpy(packed.data()+i, &revision, n); i += n;
     n = sizeof(float); memcpy(packed.data()+i, &timeOfBirth, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &numHops, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &balancingEpoch, n); i += n;
@@ -34,8 +33,7 @@ JobRequest& JobRequest::deserialize(const std::vector<uint8_t> &packed) {
     n = sizeof(int); memcpy(&rootRank, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&requestingNodeRank, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&requestedNodeIndex, packed.data()+i, n); i += n;
-    n = sizeof(int); memcpy(&currentRevision, packed.data()+i, n); i += n;
-    n = sizeof(int); memcpy(&lastKnownRevision, packed.data()+i, n); i += n;
+    n = sizeof(int); memcpy(&revision, packed.data()+i, n); i += n;
     n = sizeof(float); memcpy(&timeOfBirth, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&numHops, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&balancingEpoch, packed.data()+i, n); i += n;
@@ -48,7 +46,7 @@ std::string JobRequest::toStr() const {
     out << std::fixed << timeOfBirth;
     auto birthStr = out.str();
     return "r.#" + std::to_string(jobId) + ":" + std::to_string(requestedNodeIndex) 
-            + " rev. " + std::to_string(currentRevision) + " <- [" 
+            + " rev. " + std::to_string(revision) + " <- [" 
             + std::to_string(requestingNodeRank) + "] born=" + birthStr 
             + " hops=" + std::to_string(numHops)
             + " epoch=" + std::to_string(balancingEpoch);
@@ -58,7 +56,7 @@ bool JobRequest::operator==(const JobRequest& other) const {
     return jobId == other.jobId 
         && requestedNodeIndex == other.requestedNodeIndex 
         && balancingEpoch == other.balancingEpoch
-        && currentRevision == other.currentRevision
+        && revision == other.revision
         && numHops == other.numHops;
 }
 bool JobRequest::operator!=(const JobRequest& other) const {
@@ -68,7 +66,7 @@ bool JobRequest::operator<(const JobRequest& other) const {
     if (balancingEpoch != other.balancingEpoch) return balancingEpoch < other.balancingEpoch;
     if (jobId != other.jobId) return jobId < other.jobId;
     if (requestedNodeIndex != other.requestedNodeIndex) return requestedNodeIndex < other.requestedNodeIndex;
-    if (currentRevision != other.currentRevision) return currentRevision < other.currentRevision;
+    if (revision != other.revision) return revision < other.revision;
     return false;
 }
     

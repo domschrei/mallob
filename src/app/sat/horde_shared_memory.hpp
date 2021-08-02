@@ -15,8 +15,7 @@ struct HordeSharedMemory {
     // Meta data parent->child
     int fSize;
     int aSize;
-    int revision;
-    int firstRevision;
+    int desiredRevision;
 
     // Instructions parent->child
     bool doBegin;

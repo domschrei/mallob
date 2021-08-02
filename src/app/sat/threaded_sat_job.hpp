@@ -45,11 +45,8 @@ public:
     ~ThreadedSatJob() override;
 
     void appl_start() override;
-    void appl_stop() override;
     void appl_suspend() override;
     void appl_resume() override;
-    void appl_interrupt() override;
-    void appl_restart() override;
     void appl_terminate() override;
 
     int appl_solved() override;

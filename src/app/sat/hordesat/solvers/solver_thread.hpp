@@ -70,14 +70,6 @@ public:
 
     void start();
     void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits);
-    void setInterrupt(bool interrupt) {
-        {
-            auto lock = _state_mutex.getLock();
-            _interrupted = interrupt;
-            if (_interrupted) _solver.interrupt();
-        }
-        _state_cond.notify();
-    }
     void setSuspend(bool suspend) {
         {
             auto lock = _state_mutex.getLock();
@@ -118,11 +110,10 @@ private:
     void runOnce();
     
     void waitWhileSolved();
-    void waitWhileInterrupted();
     void waitWhileSuspended();
     void waitUntil(std::function<bool()> predicate);
     
-    void reportResult(int res);
+    void reportResult(int res, int revision);
 
     const char* toStr();
 

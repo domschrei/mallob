@@ -23,7 +23,6 @@ public:
     // Methods common to all Job instances
 
     virtual void appl_start() = 0;
-    virtual void appl_stop() = 0;
     virtual void appl_suspend() = 0;
     virtual void appl_resume() = 0;
     virtual void appl_terminate() = 0;

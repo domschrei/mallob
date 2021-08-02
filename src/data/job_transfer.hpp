@@ -19,8 +19,7 @@ struct JobRequest : public Serializable {
     int rootRank;
     int requestingNodeRank;
     int requestedNodeIndex;
-    int currentRevision;
-    int lastKnownRevision;
+    int revision;
     float timeOfBirth;
     int numHops;
     int balancingEpoch;
@@ -36,8 +35,7 @@ public:
         rootRank(rootRank),
         requestingNodeRank(requestingNodeRank),
         requestedNodeIndex(requestedNodeIndex),
-        currentRevision(0),
-        lastKnownRevision(-1),
+        revision(0),
         timeOfBirth(timeOfBirth),
         numHops(numHops),
         balancingEpoch(balancingEpoch),

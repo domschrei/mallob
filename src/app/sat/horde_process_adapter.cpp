@@ -49,8 +49,7 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
     _hsm->exportBufferTrueSize = 0;
     _hsm->fSize = _f_size;
     _hsm->aSize = _a_size;
-    _hsm->firstRevision = config.firstrev;
-    _hsm->revision = 0;
+    _hsm->desiredRevision = config.firstrev;
 
     _export_buffer = (int*) createSharedMemoryBlock("clauseexport", 
             _params.clauseBufferBaseSize() * sizeof(int), nullptr);
@@ -61,14 +60,15 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
     _import_buffer = (int*) createSharedMemoryBlock("clauseimport", 
             sizeof(int)*_hsm->importBufferMaxSize, nullptr);
     _hsm->config = std::move(config);
-    _latest_published_revision = 0;
-    _latest_revision = 0;
+
+    _written_revision = -1;
+    _desired_revision = _hsm->desiredRevision;
     
     _concurrent_shmem_allocator.run([this]() {
 
         createSharedMemoryBlock("formulae.0", sizeof(int) * _f_size, (void*)_f_lits);
         createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
-        _latest_ready_revision = 0;
+        _written_revision = 0;
 
         _hsm->doBegin = true;
 
@@ -87,8 +87,7 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
             createSharedMemoryBlock("formulae."    + revStr, sizeof(int) * revData.fSize, (void*)revData.fLits);
             createSharedMemoryBlock("assumptions." + revStr, sizeof(int) * revData.aSize, (void*)revData.aLits);
             createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
-            log(V4_VVER, "Revision %i ready!\n", revData.revision);
-            _latest_ready_revision = revData.revision;
+            _written_revision = revData.revision;
         }
     });
 }
@@ -101,7 +100,7 @@ void HordeProcessAdapter::freeSharedMemory() {
     if (_hsm != nullptr) {
         _concurrent_shmem_allocator.stop();
         
-        for (int rev = 0; rev <= _hsm->revision; rev++) {
+        for (int rev = 0; rev <= _written_revision; rev++) {
             size_t* solSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));
             if (solSize != nullptr) {
                 char* solution = (char*) SharedMemory::access(_shmem_id + ".solution." + std::to_string(rev), *solSize * sizeof(int));
@@ -156,10 +155,10 @@ pid_t HordeProcessAdapter::getPid() {
     return _child_pid;
 }
 
-void HordeProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisions) {
+void HordeProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision) {
     auto lock = _revisions_mutex.getLock();
     _revisions_to_write.insert(_revisions_to_write.end(), revisions.begin(), revisions.end());
-    _latest_revision = revisions.back().revision;
+    _desired_revision = desiredRevision;
 }
 
 void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
@@ -212,7 +211,7 @@ void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses, const C
 void HordeProcessAdapter::doDigest(const std::vector<int>& clauses, const Checksum& checksum) {
     _hsm->importChecksum = checksum;
     _hsm->importBufferSize = clauses.size();
-    _hsm->importBufferRevision = _latest_revision;
+    _hsm->importBufferRevision = _desired_revision;
     assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
     memcpy(_import_buffer, clauses.data(), clauses.size()*sizeof(int));
     _hsm->doImport = true;
@@ -232,10 +231,10 @@ bool HordeProcessAdapter::check() {
 
     if (!_hsm->doStartNextRevision 
         && !_hsm->didStartNextRevision 
-        && _latest_published_revision < _latest_ready_revision) {
+        && _published_revision < _written_revision) {
         
-        _latest_published_revision++;
-        _hsm->revision = _latest_published_revision;
+        _published_revision++;
+        _hsm->desiredRevision = _desired_revision;
         _hsm->doStartNextRevision = true;
     }
 
@@ -245,7 +244,7 @@ bool HordeProcessAdapter::check() {
         _temp_clause_buffers.erase(_temp_clause_buffers.begin());
     }
     
-    if (_hsm->hasSolution) return _hsm->solutionRevision == _latest_revision;
+    if (_hsm->hasSolution) return _hsm->solutionRevision == _desired_revision;
     return false;
 }
 

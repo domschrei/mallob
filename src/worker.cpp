@@ -34,10 +34,8 @@ void Worker::init() {
 
     // Begin listening to an incoming message
     auto& q = MyMpi::getMessageQueue();
-    q.registerCallback(MSG_ACCEPT_ADOPTION_OFFER, 
-        [&](auto& h) {handleAcceptAdoptionOffer(h);});
-    q.registerCallback(MSG_CONFIRM_ADOPTION, 
-        [&](auto& h) {handleConfirmAdoption(h);});
+    q.registerCallback(MSG_ANSWER_ADOPTION_OFFER,
+        [&](auto& h) {handleAnswerAdoptionOffer(h);});
     q.registerCallback(MSG_DO_EXIT, 
         [&](auto& h) {handleDoExit(h);});
     q.registerCallback(MSG_NOTIFY_JOB_ABORTING, 
@@ -60,12 +58,12 @@ void Worker::init() {
         [&](auto& h) {handleNotifyVolumeUpdate(h);});
     q.registerCallback(MSG_OFFER_ADOPTION, 
         [&](auto& h) {handleOfferAdoption(h);});
+    q.registerCallback(MSG_QUERY_JOB_DESCRIPTION,
+        [&](auto& h) {handleQueryJobDescription(h);});
     q.registerCallback(MSG_QUERY_JOB_RESULT, 
         [&](auto& h) {handleQueryJobResult(h);});
     q.registerCallback(MSG_QUERY_VOLUME, 
         [&](auto& h) {handleQueryVolume(h);});
-    q.registerCallback(MSG_REJECT_ADOPTION_OFFER, 
-        [&](auto& h) {handleRejectAdoptionOffer(h);});
     q.registerCallback(MSG_REJECT_ONESHOT, 
         [&](auto& h) {handleRejectOneshot(h);});
     q.registerCallback(MSG_REQUEST_NODE, 
@@ -77,7 +75,7 @@ void Worker::init() {
     q.registerCallback(MSG_SEND_CLIENT_RANK, 
         [&](auto& h) {handleSendClientRank(h);});
     q.registerCallback(MSG_SEND_JOB_DESCRIPTION, 
-        [&](auto& h) {handleSendJob(h);});
+        [&](auto& h) {handleSendJobDescription(h);});
     q.registerCallback(MSG_SEND_JOB_RESULT, 
         [&](auto& h) {handleSendJobResult(h);});
     q.registerCallback(MSG_NOTIFY_NEIGHBOR_STATUS,
@@ -141,8 +139,9 @@ void Worker::init() {
         _job_db.createJob(MyMpi::size(_comm), _world_rank, jobId,JobDescription::Application::SAT);
         JobRequest req(jobId, JobDescription::Application::SAT, 0, 0, 0, 0, 0, 0);
         _job_db.commit(req);
-        auto serializedDesc = desc.getSerialization();
-        initJob(jobId, serializedDesc, _world_rank);
+        auto serializedDesc = desc.getSerialization(0);
+        _job_db.appendRevision(jobId, serializedDesc, _world_rank);
+        _job_db.execute(jobId, _world_rank);
     }
 }
 
@@ -338,56 +337,77 @@ void Worker::handleNotifyJobAborting(MessageHandle& handle) {
     }
 }
 
-void Worker::handleAcceptAdoptionOffer(MessageHandle& handle) {
+void Worker::handleAnswerAdoptionOffer(MessageHandle& handle) {
+
+    IntPair pair = Serializable::get<IntPair>(handle.getRecvData());
+    int jobId = pair.first;
+    bool accepted = pair.second == 1;
 
     // Retrieve according job commitment
-    JobSignature sig = Serializable::get<JobSignature>(handle.getRecvData());
-    if (!_job_db.hasCommitment(sig.jobId)) {
-        log(V1_WARN, "[WARN] Job commitment for #%i not present despite adoption accept msg\n", sig.jobId);
+    if (!_job_db.hasCommitment(jobId)) {
+        log(V1_WARN, "[WARN] Job commitment for #%i not present despite adoption accept msg\n", jobId);
         return;
     }
+    const JobRequest& req = _job_db.getCommitment(jobId);
+    assert(_job_db.has(jobId));
+    Job &job = _job_db.get(jobId);
 
-    const JobRequest& req = _job_db.getCommitment(sig.jobId);
-
-    if (sig.getTransferSize() > 0) {
-        // Transfer of job description is required:
-        // Send ACK to parent and receive job description
-        log(V4_VVER, "Will receive desc. of #%i revisions [%i,%i], size %i\n", req.jobId, 
-                req.lastKnownRevision+1, req.currentRevision, sig.getTransferSize());
-        MyMpi::isend(handle.source, MSG_CONFIRM_ADOPTION, req);
+    if (accepted) {
+        // Accepted
+    
+        job.setDesiredRevision(req.revision);
+        if (!job.hasReceivedDescription() || job.getRevision() < req.revision) {
+            // Transfer of at least one revision is required
+            int requestedRevision = job.hasReceivedDescription() ? job.getRevision()+1 : 0;
+            MyMpi::isend(handle.source, MSG_QUERY_JOB_DESCRIPTION, IntPair(jobId, requestedRevision));
+        }
+        if (job.hasReceivedDescription()) {
+            // At least the initial description is present: Begin to execute job
+            _job_db.uncommit(req.jobId);
+            if (job.getState() == SUSPENDED) {
+                _job_db.reactivate(req, handle.source);
+            } else {
+                _job_db.execute(req.jobId, handle.source);
+            }
+            initiateVolumeUpdate(req.jobId);
+        }
+        
     } else {
-        // No transfer needed: Can start directly
+        // Rejected
+        log(LOG_ADD_SRCRANK | V4_VVER, "Rejected to become %s : uncommitting", handle.source, job.toStr());
+        if (_params.hopsUntilCollectiveAssignment() >= 0 && _job_db.isIdle()) 
+            _coll_assign.setStatusDirty();
         _job_db.uncommit(req.jobId);
-        _job_db.reactivate(req, handle.source);
-        initiateVolumeUpdate(req.jobId);
     }
 }
 
-void Worker::handleConfirmAdoption(MessageHandle& handle) {
-    JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
+void Worker::handleQueryJobDescription(MessageHandle& handle) {
+    IntPair pair = Serializable::get<IntPair>(handle.getRecvData());
+    int jobId = pair.first;
+    int revision = pair.second;
 
-    // If job offer is obsolete, send a stub description containing the job id ONLY
-    if (_job_db.isAdoptionOfferObsolete(req, /*alreadyAccepted=*/true)) {
-        // Obsolete request
-        log(LOG_ADD_SRCRANK | V3_VERB, "REJECT %s", handle.source, req.toStr().c_str());
-        MyMpi::isend(handle.source, MSG_SEND_JOB_DESCRIPTION, IntVec({req.jobId}));
+    assert(_job_db.has(jobId));
+    Job& job = _job_db.get(jobId);
+
+    if (job.getRevision() >= revision) {
+        sendRevisionDescription(jobId, revision, handle.source);
+    } else {
+        // This revision is not present yet: Defer this query
+        // and send the job description upon receiving it
+        job.addChildWaitingForRevision(handle.source, revision);
         return;
     }
-    Job& job = _job_db.get(req.jobId);
+}
 
+void Worker::sendRevisionDescription(int jobId, int revision, int dest) {
     // Retrieve and send concerned job description
-    // TODO do concurrently (may require expensive copying)
-    log(V4_VVER, "Extracting job description for revisions [%i,%i]\n", req.lastKnownRevision+1, job.getRevision());
-    auto descPtr = job.getDescription().extractUpdate(req.lastKnownRevision+1);
-    assert(descPtr->size() == job.getDescription().getTransferSize(req.lastKnownRevision+1) 
-        || log_return_false("%i != %i\n", descPtr->size(), job.getDescription().getTransferSize(req.lastKnownRevision+1)));
-    MyMpi::isend(handle.source, MSG_SEND_JOB_DESCRIPTION, descPtr);
-    log(LOG_ADD_DESTRANK | V4_VVER, "Sent job desc. of %s, size %i", handle.source, 
-            job.toStr(), descPtr->size());
-
-    // Mark new node as one of the node's children
-    auto relative = job.getJobTree().setChild(handle.source, req.requestedNodeIndex);
-    if (relative == JobTree::TreeRelative::NONE) assert(req.requestedNodeIndex == 0);
+    auto& job = _job_db.get(jobId);
+    const auto& descPtr = job.getSerializedDescription(revision);
+    assert(descPtr->size() == job.getDescription().getTransferSize(revision) 
+        || log_return_false("%i != %i\n", descPtr->size(), job.getDescription().getTransferSize(revision)));
+    MyMpi::isend(dest, MSG_SEND_JOB_DESCRIPTION, descPtr);
+    log(LOG_ADD_DESTRANK | V4_VVER, "Sent job desc. of %s rev. %i, size %i", dest, 
+            job.toStr(), revision, descPtr->size());
 }
 
 void Worker::handleDoExit(MessageHandle& handle) {
@@ -500,15 +520,8 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
 
         // Commit on the job, send a request to the parent
         if (!_job_db.has(req.jobId)) {
-            // Job is not known yet: create instance, request full transfer
+            // Job is not known yet: create instance
             _job_db.createJob(MyMpi::size(_comm), _world_rank, req.jobId, req.application);
-            req.lastKnownRevision = -1;
-        } else if (!_job_db.get(req.jobId).hasReceivedDescription()) {
-            // Job is known, but never received full description:
-            // request full transfer
-            req.lastKnownRevision = -1;
-        } else {
-            req.lastKnownRevision = _job_db.get(req.jobId).getRevision();
         }
         _job_db.commit(req);
         MyMpi::isend(req.requestingNodeRank, MSG_OFFER_ADOPTION, req);
@@ -600,18 +613,7 @@ void Worker::handleOfferAdoption(MessageHandle& handle) {
             reject = true;
 
         } else {
-            // Adopt the job
-
-            // Send job signature
-            int firstIncludedRevision = req.lastKnownRevision+1;
-            JobSignature sig(req.jobId, req.rootRank, firstIncludedRevision, 
-                firstIncludedRevision <= req.currentRevision ? 
-                    job.getDescription().getTransferSize(firstIncludedRevision) : 0
-            );
-            log(LOG_ADD_DESTRANK | V3_VERB, "Will transfer revisions %i through %i (size: %lu)", 
-                handle.source, firstIncludedRevision, req.currentRevision, sig.getTransferSize());
-            MyMpi::isend(handle.source, MSG_ACCEPT_ADOPTION_OFFER, sig);
-
+            // Adopt the job.
             // Child will start / resume its job solvers.
             // Mark new node as one of the node's children
             auto relative = job.getJobTree().setChild(handle.source, req.requestedNodeIndex);
@@ -619,10 +621,7 @@ void Worker::handleOfferAdoption(MessageHandle& handle) {
         }
     }
 
-    // If rejected: Send message to rejected child node
-    if (reject) {
-        MyMpi::isend(handle.source, MSG_REJECT_ADOPTION_OFFER, req);
-    }
+    MyMpi::isend(handle.source, MSG_ANSWER_ADOPTION_OFFER, IntPair(req.jobId, reject ? 0 : 1));
 }
 
 void Worker::handleQueryJobResult(MessageHandle& handle) {
@@ -662,19 +661,6 @@ void Worker::handleQueryVolume(MessageHandle& handle) {
     MyMpi::isend(handle.source, MSG_NOTIFY_VOLUME_UPDATE, response);
 }
 
-void Worker::handleRejectAdoptionOffer(MessageHandle& handle) {
-
-    // Retrieve committed job
-    JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
-    if (!_job_db.has(req.jobId)) return;
-    Job &job = _job_db.get(req.jobId);
-
-    // Erase commitment
-    log(LOG_ADD_SRCRANK | V4_VVER, "Rejected to become %s : uncommitting", handle.source, job.toStr());
-    _job_db.uncommit(req.jobId);
-    if (_params.hopsUntilCollectiveAssignment() >= 0 && _job_db.isIdle()) _coll_assign.setStatusDirty();
-}
-
 void Worker::handleNotifyResultObsolete(MessageHandle& handle) {
     IntVec res = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = res[0];
@@ -684,37 +670,49 @@ void Worker::handleNotifyResultObsolete(MessageHandle& handle) {
     _job_db.get(jobId).setResultTransferPending(false);
 }
 
-void Worker::handleSendJob(MessageHandle& handle) {
+void Worker::handleSendJobDescription(MessageHandle& handle) {
     const auto& data = handle.getRecvData();
     int jobId = data.size() >= sizeof(int) ? Serializable::get<int>(data) : -1;
     log(LOG_ADD_SRCRANK | V4_VVER, "Got desc. of size %i for job #%i", handle.source, data.size(), jobId);
-    if (_job_db.has(jobId) && _job_db.get(jobId).hasDeserializedDescription()
-            && _job_db.get(jobId).getDescription().isIncremental()) {
-        
-        // New revision of an incremental job
-        restartJob(jobId, std::shared_ptr<std::vector<uint8_t>>(
-            new std::vector<uint8_t>(handle.moveRecvData())
-        ), handle.source);
-    } else {
-        // Handle new job
-        initJob(jobId, std::shared_ptr<std::vector<uint8_t>>(
-            new std::vector<uint8_t>(handle.moveRecvData())
-        ), handle.source);
+    if (jobId == -1 || !_job_db.has(jobId)) {
+        if (_job_db.hasCommitment(jobId)) _job_db.uncommit(jobId);
+        return;
     }
-}
 
-void Worker::initJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& data, int senderRank) {
-
-    bool success = _job_db.init(jobId, data, senderRank);
-    if (success) {
+    // Append revision description to job
+    auto& job = _job_db.get(jobId);
+    auto dataPtr = std::shared_ptr<std::vector<uint8_t>>(
+        new std::vector<uint8_t>(handle.moveRecvData())
+    );
+    _job_db.appendRevision(jobId, dataPtr, handle.source);
+    // If job has not started yet, execute it now
+    if (_job_db.hasCommitment(jobId)) {
+        _job_db.uncommit(jobId);
+        _job_db.execute(jobId, handle.source);
         initiateVolumeUpdate(jobId);
+    } 
+
+    auto& waitingRankRevPairs = job.getWaitingRankRevisionPairs();
+    for (auto it = waitingRankRevPairs.begin(); it != waitingRankRevPairs.end(); ++it) {
+        auto& [rank, rev] = *it;
+        if (rev != job.getRevision()) continue;
+        if (job.getJobTree().hasLeftChild() && job.getJobTree().getLeftChildNodeRank() == rank) {
+            // Left child
+            sendRevisionDescription(jobId, rev, rank);
+        } else if (job.getJobTree().hasRightChild() && job.getJobTree().getRightChildNodeRank() == rank) {
+            // Right child
+            sendRevisionDescription(jobId, rev, rank);
+        } // else: obsolete request
+        // Remove processed request
+        it = waitingRankRevPairs.erase(it);
+        it--;
     }
-}
 
-void Worker::restartJob(int jobId, const std::shared_ptr<std::vector<uint8_t>>& data, int senderRank) {
-
-    bool success = _job_db.restart(jobId, data, senderRank);
-    if (success) initiateVolumeUpdate(jobId);
+    // Arrived at final revision?
+    if (_job_db.get(jobId).getRevision() < _job_db.get(jobId).getDesiredRevision()) {
+        // No: Query next revision
+        MyMpi::isend(handle.source, MSG_QUERY_JOB_DESCRIPTION, IntPair(jobId, _job_db.get(jobId).getRevision()+1));
+    }
 }
 
 void Worker::handleSendJobResult(MessageHandle& handle) {
@@ -1076,7 +1074,7 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
             if (mono) job.getJobTree().updateJobNode(indices[i], indices[i]);
             JobRequest req(jobId, job.getDescription().getApplication(), job.getJobTree().getRootNodeRank(), 
                     _world_rank, nextIndex, Timer::elapsedSeconds(), balancingEpoch, 0);
-            req.currentRevision = job.getRevision();
+            req.revision = job.getRevision();
             int nextNodeRank, tag;
             if (dormantChildren.empty()) {
                 tag = MSG_REQUEST_NODE;
@@ -1110,7 +1108,7 @@ void Worker::interruptJob(int jobId, bool terminate, bool reckless) {
     // Ignore if this job node is already in the goal state
     // (also implying that it already forwarded such a request downwards)
     if (terminate && job.getState() == PAST) return;
-    if (!terminate && job.getState() == STANDBY) return;
+    if (!terminate && job.getState() == SUSPENDED) return;
 
     // Propagate message down the job tree
     int msgTag;
@@ -1131,8 +1129,9 @@ void Worker::interruptJob(int jobId, bool terminate, bool reckless) {
     }
     if (terminate) job.getJobTree().getPastChildren().clear();
 
-    // Stop, and possibly terminate, the job
-    _job_db.stop(jobId, terminate);
+    // Suspend or terminate the job
+    if (terminate) _job_db.terminate(jobId);
+    else if (job.getState() == ACTIVE) _job_db.suspend(jobId);
 }
 
 void Worker::informClientJobIsDone(int jobId, int clientRank) {

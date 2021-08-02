@@ -51,9 +51,8 @@ struct BFS {
 struct JobRequestHasher {
     size_t operator()(const JobRequest& req) const {
         size_t h = 1;
-        hash_combine(h, req.currentRevision);
+        hash_combine(h, req.revision);
         hash_combine(h, req.jobId);
-        hash_combine(h, req.lastKnownRevision);
         hash_combine(h, req.numHops);
         hash_combine(h, req.requestedNodeIndex);
         hash_combine(h, req.requestingNodeRank);

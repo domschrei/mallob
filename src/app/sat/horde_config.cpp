@@ -9,7 +9,7 @@ HordeConfig::HordeConfig(const Parameters& params, const Job& job) {
     mpisize = job.getGlobalNumWorkers();
     jobid = job.getId();
     incremental = job.getDescription().isIncremental();
-    firstrev = job.getRevision();
+    firstrev = job.getDesiredRevision();
     threads = job.getNumThreads();
     maxBroadcastedLitsPerCycle = (1+params.clauseHistoryAggregationFactor()) *
     MyMpi::getBinaryTreeBufferLimit(job.getGlobalNumWorkers(), params.clauseBufferBaseSize(), params.clauseBufferDiscountFactor(), MyMpi::ALL);

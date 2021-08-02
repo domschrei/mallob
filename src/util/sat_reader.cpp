@@ -22,8 +22,7 @@ bool SatReader::read(JobDescription& desc) {
 		if (pipe == nullptr) return false;
 	}
 	
-	int revision = desc.getRevision();
-	desc.beginInitialization();
+	desc.beginInitialization(desc.getRevision());
 	
 	_sign = 1;
 	_comment = false;
@@ -69,8 +68,6 @@ bool SatReader::read(JobDescription& desc) {
 	}
 
 	desc.setNumVars(_max_var);
-	desc.setFirstRevision(revision);
-	desc.setRevision(revision);
 	desc.endInitialization();
 
 	if (pipe != nullptr) pclose(pipe);

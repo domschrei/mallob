@@ -68,7 +68,7 @@ private:
     std::unique_ptr<JobFileAdapter> _file_adapter;
 
     // Maps a job ID to the ID of the message handle transferring its description
-    std::map<int, int> _transfer_msg_id_to_job_id;
+    std::map<int, std::pair<int, int>> _transfer_msg_id_to_job_id_rev;
     // Number of jobs with a loaded description (taking memory!)
     std::atomic_int _num_loaded_jobs = 0;
     Mutex _finished_msg_ids_mutex;
@@ -88,11 +88,10 @@ public:
 private:
     void readIncomingJobs(Logger log);
     
-    void handleRequestBecomeChild(MessageHandle& handle);
+    void handleOfferAdoption(MessageHandle& handle);
     void handleJobDone(MessageHandle& handle);
     void handleAbort(MessageHandle& handle);
     void handleSendJobResult(MessageHandle& handle);
-    void handleAckAcceptBecomeChild(MessageHandle& handle);
     void handleClientFinished(MessageHandle& handle);
     void handleExit(MessageHandle& handle);
     void handleJobDescriptionSent(int msgId);

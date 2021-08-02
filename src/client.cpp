@@ -170,8 +170,7 @@ void Client::init() {
     q.registerCallback(MSG_NOTIFY_JOB_DONE, [&](MessageHandle& h) {handleJobDone(h);});
     q.registerCallback(MSG_SEND_JOB_RESULT, [&](MessageHandle& h) {handleSendJobResult(h);});
     q.registerCallback(MSG_NOTIFY_JOB_ABORTING, [&](MessageHandle& h) {handleAbort(h);});
-    q.registerCallback(MSG_OFFER_ADOPTION, [&](MessageHandle& h) {handleRequestBecomeChild(h);});
-    q.registerCallback(MSG_CONFIRM_ADOPTION, [&](MessageHandle& h) {handleAckAcceptBecomeChild(h);});
+    q.registerCallback(MSG_OFFER_ADOPTION, [&](MessageHandle& h) {handleOfferAdoption(h);});
     q.registerCallback(MSG_DO_EXIT, [&](MessageHandle& h) {handleExit(h);});
     q.registerSentCallback([&](int id) {handleJobDescriptionSent(id);});
 
@@ -308,39 +307,30 @@ void Client::introduceNextJob() {
 
     JobRequest req(jobId, job.getApplication(), /*rootRank=*/-1, /*requestingNodeRank=*/_world_rank, 
         /*requestedNodeIndex=*/0, /*timeOfBirth=*/time, /*balancingEpoch=*/-1, /*numHops=*/0);
-    req.currentRevision = job.getRevision();
+    req.revision = job.getRevision();
     req.timeOfBirth = job.getArrival();
 
     log(LOG_ADD_DESTRANK | V2_INFO, "Introducing job #%i : %s", nodeRank, jobId, req.toStr().c_str());
     MyMpi::isend(nodeRank, MSG_REQUEST_NODE, req);
 }
 
-void Client::handleRequestBecomeChild(MessageHandle& handle) {
+void Client::handleOfferAdoption(MessageHandle& handle) {
     JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
-    const JobDescription& desc = *_active_jobs[req.jobId];
     log(V4_VVER, "OFFER for %s\n", req.toStr().c_str());
-
-    // Send job signature
-    int firstIncludedRevision = req.lastKnownRevision+1;
-    JobSignature sig(req.jobId, /*rootRank=*/handle.source, firstIncludedRevision, 
-        firstIncludedRevision <= req.currentRevision ? desc.getTransferSize(firstIncludedRevision) : 0);
-    log(LOG_ADD_DESTRANK | V4_VVER, "Sending job signature of #%i rev. %i: transfer size %i", handle.source, req.jobId, req.currentRevision, sig.transferSize);
-    MyMpi::isend(handle.source, MSG_ACCEPT_ADOPTION_OFFER, sig);
-    //stats.increment("sentMessages");
-}
-
-void Client::handleAckAcceptBecomeChild(MessageHandle& handle) {
-    JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
-    JobDescription& desc = *_active_jobs[req.jobId];
+    
+    const JobDescription& desc = *_active_jobs[req.jobId];
     assert(desc.getId() == req.jobId || log_return_false("%i != %i\n", desc.getId(), req.jobId));
-    log(LOG_ADD_DESTRANK | V4_VVER, "Sending job desc. of #%i rev. %i of size %i", handle.source, desc.getId(), desc.getRevision(), desc.getFullTransferSize());
-    _root_nodes[req.jobId] = handle.source;
-    auto data = desc.getSerialization();
 
-    int jobId = Serializable::get<int>(*data);    
+    // Send job description
+    log(LOG_ADD_DESTRANK | V4_VVER, "Sending job desc. of #%i rev. %i of size %i", handle.source, desc.getId(), 
+        desc.getRevision(), desc.getTransferSize(desc.getRevision()));
+    const auto& data = desc.getSerialization(desc.getRevision());
     int msgId = MyMpi::isend(handle.source, MSG_SEND_JOB_DESCRIPTION, data);
-    log(LOG_ADD_DESTRANK | V4_VVER, "Sent job desc. of #%i of size %i", handle.source, jobId, data->size());
-    _transfer_msg_id_to_job_id[msgId] = jobId;
+    log(LOG_ADD_DESTRANK | V4_VVER, "Sent job desc. of #%i of size %i", handle.source, req.jobId, data->size());
+    
+    // Remember transaction
+    _root_nodes[req.jobId] = handle.source;
+    _transfer_msg_id_to_job_id_rev[msgId] = std::pair<int, int>(req.jobId, desc.getRevision());
 }
 
 void Client::handleJobDone(MessageHandle& handle) {
@@ -411,14 +401,14 @@ void Client::handleAbort(MessageHandle& handle) {
 }
 
 void Client::handleJobDescriptionSent(int msgId) {
-    if (_transfer_msg_id_to_job_id.count(msgId)) {
-        int jobId = _transfer_msg_id_to_job_id.at(msgId);
+    if (_transfer_msg_id_to_job_id_rev.count(msgId)) {
+        const auto& [jobId, rev] = _transfer_msg_id_to_job_id_rev.at(msgId);
         if (_active_jobs.count(jobId)) {
-            log(V3_VERB, "Clear description of sent job #%i\n", jobId);
-            _active_jobs.at(jobId)->clearPayload();
+            log(V3_VERB, "Clear description of sent job #%i rev. %i\n", jobId, rev);
+            _active_jobs.at(jobId)->clearPayload(rev);
             _num_loaded_jobs--;
         }
-        _transfer_msg_id_to_job_id.erase(msgId);
+        _transfer_msg_id_to_job_id_rev.erase(msgId);
     }
 }
 

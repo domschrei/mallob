@@ -6,6 +6,7 @@
 #include <memory>
 #include <assert.h>
 #include <atomic>
+#include <list>
 
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
@@ -31,21 +32,21 @@ public:
 
     /*
     State diagram:
+
+        |
+        v                         <--resume()---
+     INACTIVE --start()--> ACTIVE --suspend()--> SUSPENDED
+        |                    |                      |
+        ----------------terminate()------------------
                              |
                              v
-    PAST <--terminate()-- INACTIVE --start()-->        --suspend()--> SUSPENDED
-                                   <--stop()--- ACTIVE <--resume()---
-                                                  ^|
-                                        restart() || interrupt()
-                                                  |v
-                                                STANDBY
+                            PAST
 
     General notes:
     * Communication (MyMpi::*) may ONLY take place within mallob's main thread, i.e., 
       within the appl_* methods (and NOT within a thread spawned from it).
-    * All appl_* methods must return immediately. Heavy work must be performed concurrently
-      within a separate thread. Exceptions are appl_beginCommunication and appl_communicate
-      where a certain amount of work of the main thread may be necessary to handle communication.
+    * All appl_* methods must return very quickly. Heavy work must be performed concurrently
+      within a separate thread.
     * Your code must bookkeep the active threads of your application, make them ready to be joined 
       after appl_terminate() has been called, and be able to instantly join them as soon as
       your appl_isDestructible() returns true. 
@@ -58,31 +59,19 @@ public:
     Begin, or continue, to process the job.
     At the first call of appl_start(), you can safely assume that the job description
     is already present: getDescription() returns a valid JobDescription instance.
-    appl_start() may be called again after appl_stop(); in this case, the internal job data
-    (i.e. its description) may have changed and must be reconsidered.
     */
     virtual void appl_start() = 0;
     /*
-    Stop to process an active job.
-    */
-    virtual void appl_stop() = 0;
-    /*
     Suspend the job, enabling a resumption of the job processing at a later time.
-    After suspension is completed, the job should not spend any CPU time on itself any more
-    (with the possible exception of concurrent initializer threads that are still running).
+    After suspension is completed, the job should not spend any CPU time on itself any more.
     */
     virtual void appl_suspend() = 0;
     /*
-    Resume a suspended job in the same internal state where it was suspended.
+    Resume a suspended job.
     */
     virtual void appl_resume() = 0;
-
-    virtual void appl_interrupt() = 0;
-
-    virtual void appl_restart() = 0;
-
     /*
-    Terminate an inactive job which is irrecoverably marked for deletion: This method
+    Terminate a job which is irrecoverably marked for deletion: This method
     can concurrently trigger a cleanup of any resources needed for solving the job.
     */
     virtual void appl_terminate() = 0;
@@ -91,6 +80,8 @@ public:
     Return a result code if applicable, or -1 otherwise.
     This method can be used to perform further (quick) checks regarding the application
     and can be expected to be called frequently while the job is active.
+    For incremental applications, use this method to import new increments
+    of getDescription() to your application.
     */
     virtual int appl_solved() = 0;
     /*
@@ -150,6 +141,7 @@ private:
     std::string _name;
     std::atomic_bool _has_description = false;
     JobDescription _description;
+    int _desired_revision = 0;
 
     float _time_of_arrival;
     float _time_of_activation = 0;
@@ -170,6 +162,7 @@ private:
     int _balancing_epoch_of_last_commitment = -1;
     std::optional<JobResult> _result;
     bool _result_transfer_pending = false;
+    std::list<std::pair<int, int>> _waiting_rank_revision_pairs;
 
     JobTree _job_tree;
     JobComm _comm;
@@ -194,21 +187,15 @@ public:
     // Unmark the job as being subject of a commitment to some job request.
     // Requires the job to be in a committed state.
     void uncommit();
-    
-    // Concurrently unpacks the job description and then calls the job implementation's
-    // appl_start() method from there.
-    void start(const std::shared_ptr<std::vector<uint8_t>>& data);
-    // Interrupt the execution of all internal solvers.
-    void stop();
-    
-    // Freeze the execution of all internal solvers. They can be resumed at any time.
+    // Add the job description of the next (or the first/only) revision.
+    void pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data);
+    // Starts the execution of a new job.
+    void start();
+    // Suspend the execution of all internal solvers. They can be resumed at any time.
     void suspend();
-    // Resume all internal solvers given that they were frozen.
+    // Resume all internal solvers given that they were suspended.
     void resume();
 
-    void interrupt();
-    void restart(const std::shared_ptr<std::vector<uint8_t>>& data);
-    
     // Returns true if communicate() should be called.
     bool wantsToCommunicate();
     // Initiate a communication with other nodes in the associated job tree.
@@ -236,12 +223,13 @@ public:
     bool hasReceivedDescription() const {return _has_description;};
     bool hasDeserializedDescription() const {return _has_description;};
     const JobDescription& getDescription() const {assert(hasDeserializedDescription()); return _description;};
-    const std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription() {return _description.getSerialization();};
+    const std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription(int revision) {return _description.getSerialization(revision);};
     bool hasCommitment() const {return _commitment.has_value();}
     const JobRequest& getCommitment() const {assert(hasCommitment()); return _commitment.value();}
     int getId() const {return _id;};
     int getIndex() const {return _job_tree.getIndex();};
     int getRevision() const {assert(hasDeserializedDescription()); return getDescription().getRevision();};
+    int getDesiredRevision() const {return _desired_revision;}
     const JobResult& getResult();
     // Elapsed seconds since the job's constructor call.
     float getAge() const {return Timer::elapsedSeconds() - _time_of_arrival;}
@@ -258,13 +246,14 @@ public:
     // Returns whether the job is easily and quickly destructible as of now. 
     // (calls appl_isDestructible())
     bool isDestructible();
-    void clearJobDescription() {_description.clearPayload();}
+    void clearJobDescription() {for (size_t i = 0; i < getRevision(); i++) _description.clearPayload(i);}
     
     int getGlobalNumWorkers() const {return _job_tree.getCommSize();}
     int getMyMpiRank() const {return _job_tree.getRank();}
     JobTree& getJobTree() {return _job_tree;}
     const JobTree& getJobTree() const {return _job_tree;}
     const JobComm& getJobComm() const {return _comm;}
+    std::list<std::pair<int, int>>& getWaitingRankRevisionPairs() {return _waiting_rank_revision_pairs;}
 
     // Updates the job's resource usage based on the period of time which passed
     // since the last call (or the job's activation) and the old volume of the job,
@@ -311,7 +300,8 @@ public:
 
     // Marks the job to be indestructible as long as pending is true.
     void setResultTransferPending(bool pending) {_result_transfer_pending = pending;}
-
+    void addChildWaitingForRevision(int rank, int revision) {_waiting_rank_revision_pairs.emplace_back(rank, revision);}
+    void setDesiredRevision(int revision) {_desired_revision = revision;}
 
     // toString methods
 
