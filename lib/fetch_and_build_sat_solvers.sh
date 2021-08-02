@@ -4,33 +4,36 @@ set -e
 
 if [ ! -f mergesat/libmergesat.a ]; then
 
-    # Get MergeSat and patch it
-    git clone https://github.com/conp-solutions/mergesat.git
-    cd mergesat
-    git checkout devel # might be a specific commit lateron
-    
-    # Change include paths in files in order not to collide with Glucose's includes
-    set +e
-    for d in core mtl simp utils ; do
-        for f in $d/*.cc $d/*.h ; do
-            sed -i 's,#include "core/,#include "mergesat/minisat/core/,g' $f
-            sed -i 's,#include "mtl/,#include "mergesat/minisat/mtl/,g' $f 
-            sed -i 's,#include "simp/,#include "mergesat/minisat/simp/,g' $f
-            sed -i 's,#include "utils/,#include "mergesat/minisat/utils/,g' $f
+    if false; then
+        # Get MergeSat and patch it
+        git clone git@github.com:conp-solutions/mergesat.git
+        cd mergesat
+        git checkout devel # might be a specific commit lateron
+        
+        # Change include paths in files in order not to collide with Glucose's includes
+        set +e
+        for d in core mtl simp utils ; do
+            for f in $d/*.cc $d/*.h ; do
+                sed -i 's,#include "core/,#include "mergesat/minisat/core/,g' $f
+                sed -i 's,#include "mtl/,#include "mergesat/minisat/mtl/,g' $f 
+                sed -i 's,#include "simp/,#include "mergesat/minisat/simp/,g' $f
+                sed -i 's,#include "utils/,#include "mergesat/minisat/utils/,g' $f
+            done
         done
-    done
-    sed -i 's,MINISAT_CXXFLAGS = -I. ,MINISAT_CXXFLAGS = -I.. -I. ,g' Makefile
-    set -e
+        sed -i 's,MINISAT_CXXFLAGS = -I. ,MINISAT_CXXFLAGS = -I.. -I. ,g' Makefile
+        set -e
 
-    # Fix FPE bug in solver for particular diversifications 
-    sed -i 's,new_activity = 1000 / v;,if (v != 0) new_activity = 1000 / v;,g' core/Solver.cc
+        # Fix FPE bug in solver for particular diversifications 
+        sed -i 's,new_activity = 1000 / v;,if (v != 0) new_activity = 1000 / v;,g' core/Solver.cc
+        
+        cd ..
+    fi
+
+    # Get MergeSat (pre-patched)
+    wget https://dominikschreiber.de/mergesat-patched.tar.gz
+    tar xzvf mergesat-patched.tar.gz
+    rm mergesat-patched.tar.gz
     
-    cd ..
-
-    # fixup MergeSat to provide hook
-    # patch minisat/minisat/core/Solver.h < minisat.h.patch
-    # patch minisat/minisat/core/Solver.cc < minisat.cc.patch
-
     # Make MergeSat
     cd mergesat
     make all -j $(nproc)
