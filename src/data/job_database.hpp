@@ -53,7 +53,7 @@ public:
     ~JobDatabase();
 
     Job& createJob(int commSize, int worldRank, int jobId, JobDescription::Application application);
-    void appendRevision(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source);
+    bool appendRevision(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source);
     void execute(int jobId, int source);
 
     bool checkComputationLimits(int jobId);

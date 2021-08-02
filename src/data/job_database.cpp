@@ -67,16 +67,17 @@ Job& JobDatabase::createJob(int commSize, int worldRank, int jobId, JobDescripti
     return *_jobs[jobId];
 }
 
-void JobDatabase::appendRevision(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source) {
+bool JobDatabase::appendRevision(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source) {
 
     if (!has(jobId) || get(jobId).getState() == PAST) {
         log(V1_WARN, "[WARN] Unknown or past job #%i : discard desc. of size %i\n", jobId, description->size());
-        return;
+        return false;
     }
     auto& job = get(jobId);
 
     // Push revision description
     job.pushRevision(description);
+    return true;
 }
 
 void JobDatabase::execute(int jobId, int source) {
@@ -326,7 +327,7 @@ void JobDatabase::forgetOldJobs() {
     std::priority_queue<std::pair<int, float>, std::vector<std::pair<int, float>>, SuspendedJobComparator> suspendedQueue;
     for (auto [id, jobPtr] : _jobs) {
         Job& job = *jobPtr;
-        if (job.hasReceivedDescription()) numJobsWithDescription++;
+        if (job.hasDescription()) numJobsWithDescription++;
         if (job.hasCommitment()) continue;
         // Old inactive job
         if (job.getState() == INACTIVE && job.getAge() >= 10) {

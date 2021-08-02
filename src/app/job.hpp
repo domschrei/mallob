@@ -220,15 +220,14 @@ public:
     void assertState(JobState state) const {assert(_state == state || log_return_false("State of %s : %s\n", toStr(), jobStateToStr()));};
     int getVolume() const {return _volume;}
     float getPriority() const {return _priority;}
-    bool hasReceivedDescription() const {return _has_description;};
-    bool hasDeserializedDescription() const {return _has_description;};
-    const JobDescription& getDescription() const {assert(hasDeserializedDescription()); return _description;};
+    bool hasDescription() const {return _has_description;};
+    const JobDescription& getDescription() const {assert(hasDescription()); return _description;};
     const std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription(int revision) {return _description.getSerialization(revision);};
     bool hasCommitment() const {return _commitment.has_value();}
     const JobRequest& getCommitment() const {assert(hasCommitment()); return _commitment.value();}
     int getId() const {return _id;};
     int getIndex() const {return _job_tree.getIndex();};
-    int getRevision() const {assert(hasDeserializedDescription()); return getDescription().getRevision();};
+    int getRevision() const {assert(hasDescription()); return getDescription().getRevision();};
     int getDesiredRevision() const {return _desired_revision;}
     const JobResult& getResult();
     // Elapsed seconds since the job's constructor call.
@@ -280,7 +279,7 @@ public:
         float usedCpuSecs = getUsedCpuSeconds();
 
         if ((cpuSecsPerInstance > 0 && usedCpuSecs > cpuSecsPerInstance)
-            || (hasDeserializedDescription() && getDescription().getCpuLimit() > 0 && 
+            || (hasDescription() && getDescription().getCpuLimit() > 0 && 
                 usedCpuSecs > getDescription().getCpuLimit())) {
             // Job exceeded its cpu time limit
             log(V2_INFO, "#%i CPU TIMEOUT: aborting\n", _id);
@@ -288,7 +287,7 @@ public:
         }
 
         if ((wcSecsPerInstance > 0 && usedWcSecs > wcSecsPerInstance) 
-            || (hasDeserializedDescription() && getDescription().getWallclockLimit() > 0 && 
+            || (hasDescription() && getDescription().getWallclockLimit() > 0 && 
                 usedWcSecs > getDescription().getWallclockLimit())) {
             // Job exceeded its wall clock time limit
             log(V2_INFO, "#%i WALLCLOCK TIMEOUT: aborting\n", _id);

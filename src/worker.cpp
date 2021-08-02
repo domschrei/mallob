@@ -356,12 +356,12 @@ void Worker::handleAnswerAdoptionOffer(MessageHandle& handle) {
         // Accepted
     
         job.setDesiredRevision(req.revision);
-        if (!job.hasReceivedDescription() || job.getRevision() < req.revision) {
+        if (!job.hasDescription() || job.getRevision() < req.revision) {
             // Transfer of at least one revision is required
-            int requestedRevision = job.hasReceivedDescription() ? job.getRevision()+1 : 0;
+            int requestedRevision = job.hasDescription() ? job.getRevision()+1 : 0;
             MyMpi::isend(handle.source, MSG_QUERY_JOB_DESCRIPTION, IntPair(jobId, requestedRevision));
         }
-        if (job.hasReceivedDescription()) {
+        if (job.hasDescription()) {
             // At least the initial description is present: Begin to execute job
             _job_db.uncommit(req.jobId);
             if (job.getState() == SUSPENDED) {
@@ -684,7 +684,9 @@ void Worker::handleSendJobDescription(MessageHandle& handle) {
     auto dataPtr = std::shared_ptr<std::vector<uint8_t>>(
         new std::vector<uint8_t>(handle.moveRecvData())
     );
-    _job_db.appendRevision(jobId, dataPtr, handle.source);
+    bool valid = _job_db.appendRevision(jobId, dataPtr, handle.source);
+    if (!valid) return;
+
     // If job has not started yet, execute it now
     if (_job_db.hasCommitment(jobId)) {
         _job_db.uncommit(jobId);
