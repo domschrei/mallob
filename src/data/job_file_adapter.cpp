@@ -172,6 +172,9 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         auto app = j["application"].get<std::string>();
         job->setApplication(app == "SAT" ? JobDescription::Application::SAT : JobDescription::Application::DUMMY);
     }
+    if (j.contains("assumptions")) {
+        job->setPreloadedAssumptions(j["assumptions"].get<std::vector<int>>());
+    }
     job->setArrival(arrival);
     std::string file = j["file"].get<std::string>();
     

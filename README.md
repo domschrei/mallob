@@ -116,7 +116,8 @@ Here is a brief overview of all required and optional fields in the JSON API:
 | dependencies      | no        | String array | User-qualified job names (using "." as a separator) which must exit **before** this job is introduced          |
 | incremental       | no        | Bool         | Whether this job has multiple _increments_ / _revisions_ and should be treated as such                         |
 | precursor         | no        | String       | _(Only for incremental jobs)_ User-qualified job name (`<user>.<jobname>`) of this job's previous increment    |
-| incremental       | no        | Bool         | _(Only for incremental jobs)_ If `true`, the incremental job given by "precursor" is finalized and cleaned up. |
+| assumptions       | no        | Int array    | _(Only for incremental jobs)_ You can specify the set of assumptions for this increment directly in the JSON.  |
+| done              | no        | Bool         | _(Only for incremental jobs)_ If `true`, the incremental job given by "precursor" is finalized and cleaned up. |
 
 *) Not needed if `done` is set to `true`.
 
@@ -126,6 +127,8 @@ The formula file must be a valid CNF file. For incremental jobs, Mallob uses the
 `a <lit1> <lit2> ... 0`
 
 where `<lit1>`, `<lit2>` etc. are assumption literals.
+Alternatively, you can specify the assumptions directly in the JSON describing the job via the `assumptions` field (without any trailing zero).
+This way, an incremental application can maintain a single text file with a monotonically growing set of clauses and there is no need to edit away the previous assumptions every time.
 
 The "arrival" and "dependencies" fields are useful to test a particular preset scenario of jobs: The "arrival" field ensures that the job will be scheduled only after Mallob ran for the specified amount of seconds. The "dependencies" field ensures that the job is scheduled only if all specified other jobs are already processed.
 

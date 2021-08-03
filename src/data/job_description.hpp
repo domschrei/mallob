@@ -55,6 +55,9 @@ private:
         size_t aSize;
     };
 
+    // just for parsing
+    std::vector<int> _preloaded_assumptions;
+
 private:
     template <typename T>
     inline static void push_obj(std::shared_ptr<std::vector<uint8_t>>& vec, T x) {
@@ -121,7 +124,7 @@ public:
     void setNumVars(int numVars) {_num_vars = numVars;}
     void setArrival(float arrival) {_arrival = arrival;};
     void setApplication(Application app) {_application = app;}
-
+    void setPreloadedAssumptions(std::vector<int>&& asmpt) {_preloaded_assumptions = std::move(asmpt);}
 
     Checksum getChecksum() const {return _checksum;}
     void setChecksum(const Checksum& checksum) {_checksum = checksum;}
