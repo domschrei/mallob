@@ -163,7 +163,7 @@ void Worker::mainProgram() {
 
     Watchdog watchdog(/*checkIntervMillis=*/200, lastMemCheckTime);
     watchdog.setWarningPeriod(100); // warn after 0.1s without a reset
-    watchdog.setAbortPeriod(60*1000); // abort after 60s without a reset
+    watchdog.setAbortPeriod(_params.watchdogAbortMillis()); // abort after X ms without a reset
 
     float time = lastMemCheckTime;
     while (!checkTerminate(time)) {

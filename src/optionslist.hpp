@@ -61,6 +61,7 @@ OPT_INT(sizeLimitPerProcess,             "slpp", "size-limit-per-process",  0,  
 OPT_INT(sleepMicrosecs,                  "sleep", "",                       100,  0, LARGE_INT,         "Sleep this many microseconds between loop cycles of worker main thread")
 OPT_INT(softMaxClauseLength,             "smcl", "",                        30,   0, LARGE_INT,         "Only share clauses up to this length except for special cases")
 OPT_INT(verbosity,                       "v", "verbosity",                  2,    0, 6,                 "Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB 5=DEBG")
+OPT_INT(watchdogAbortMillis,             "wam", "",                         60000, 1, MAX_INT,          "Interval (in milliseconds) after which an un-reset watchdog in a worker's main thread will invoke a crash")
 
 OPT_FLOAT(appCommPeriod,                 "s", "app-comm-period",            1,    0, LARGE_INT,         "Do job-internal communication every t seconds") 
 OPT_FLOAT(balancingPeriod,               "p", "balancing-period",           0.1,  0, LARGE_INT,         "Minimum interval between subsequent rounds of balancing")
