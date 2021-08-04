@@ -97,7 +97,7 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 	}
 
 	_sharing_manager.reset(new DefaultSharingManager(_solver_interfaces, _params, _logger, 
-		/*max. deferred literals per solver=*/5*config.maxBroadcastedLitsPerCycle));
+		/*max. deferred literals per solver=*/5*config.maxBroadcastedLitsPerCycle, config.apprank));
 	_logger.log(V5_DEBG, "initialized\n");
 }
 
