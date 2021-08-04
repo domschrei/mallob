@@ -75,7 +75,7 @@ void CollectiveAssignment::deserialize(const std::vector<uint8_t>& packed, int s
             JobRequest req = Serializable::get<JobRequest>(reqPacked);
             if (req.balancingEpoch >= _epoch) {
                 req.numHops++;
-                log(LOG_ADD_SRCRANK | V3_VERB, "[CA] got %s", source, req.toStr().c_str());
+                log(LOG_ADD_SRCRANK | V4_VVER, "[CA] got %s", source, req.toStr().c_str());
                 _request_list.insert(req);
             }
             i += n;
@@ -151,16 +151,16 @@ void CollectiveAssignment::resolveRequests() {
                 requestsToKeep.push_back(req);
             } else {
                 // Send job request upwards
-                log(LOG_ADD_DESTRANK | V3_VERB, "[CA] Send %s to parent", getCurrentParent(), req.toStr().c_str());
+                log(LOG_ADD_DESTRANK | V4_VVER, "[CA] Send %s to parent", getCurrentParent(), req.toStr().c_str());
                 requestsPerDestination[getCurrentParent()].push_back(req);
             }
         } else {
             // Fit found: send to respective child
-            log(LOG_ADD_DESTRANK | V3_VERB, "[CA] Send %s to dest. (cached job: %s)", destination, 
+            log(LOG_ADD_DESTRANK | V4_VVER, "[CA] Send %s to dest. (cached job: %s)", destination, 
                 req.toStr().c_str(), usesCachedSlot ? "true" : "false");
             // Update status
             if (destination == MyMpi::rank(MPI_COMM_WORLD)) {
-                log(V3_VERB, "[CA] Digest %s locally (cached job: %s)\n", req.toStr().c_str(), 
+                log(V4_VVER, "[CA] Digest %s locally (cached job: %s)\n", req.toStr().c_str(), 
                     usesCachedSlot ? "true" : "false");
                 _local_request_callback(req, destination);
             } else {
@@ -188,7 +188,7 @@ void CollectiveAssignment::setStatusDirty() {
 
 void CollectiveAssignment::addJobRequest(JobRequest& req) {
     if (req.balancingEpoch < _epoch) return; // discard
-    log(V3_VERB, "[CA] Add req. %s\n", req.toStr().c_str());
+    log(V4_VVER, "[CA] Add req. %s\n", req.toStr().c_str());
     _request_list.insert(req);
 }
 
@@ -224,7 +224,7 @@ void CollectiveAssignment::advance(int epoch) {
             log(V3_VERB, "[CA] Root: %i requests, %i idle (epoch=%i)\n", _request_list.size(), status.numIdle, _epoch);
         } else {
             auto packedStatus = serialize(status);
-            log(LOG_ADD_DESTRANK | V3_VERB, "[CA] Prop. status: %i idle (epoch=%i)", getCurrentParent(), status.numIdle, _epoch);
+            log(LOG_ADD_DESTRANK | V4_VVER, "[CA] Prop. status: %i idle (epoch=%i)", getCurrentParent(), status.numIdle, _epoch);
             MyMpi::isend(getCurrentParent(), MSG_NOTIFY_ASSIGNMENT_UPDATE, std::move(packedStatus));
         }
         _status_dirty = false;

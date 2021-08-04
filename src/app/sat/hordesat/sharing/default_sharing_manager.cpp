@@ -13,10 +13,10 @@
 
 DefaultSharingManager::DefaultSharingManager(
 		std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, 
-		const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver)
+		const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver, int jobIndex)
 	: _solvers(solvers), _deferred_clauses(_solvers.size()), 
 	_max_deferred_lits_per_solver(maxDeferredLitsPerSolver), 
-	_params(params), _logger(logger), 
+	_params(params), _logger(logger), _job_index(jobIndex),
 	_cdb(
 		/*maxClauseSize=*/_params.hardMaxClauseLength(),
 		/*maxLbdPartitionedSize=*/_params.maxLbdPartitioningSize(),
@@ -115,7 +115,8 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 	// Process-wide stats
 	std::string lensStr = "";
 	for (int len : lens) lensStr += std::to_string(len) + " ";
-	_logger.log(V3_VERB, "sharing total=%d lens %s\n", numClauses, lensStr.c_str());
+	int verb = _job_index == 0 ? V3_VERB : V5_DEBG;
+	_logger.log(verb, "sharing total=%d lens %s\n", numClauses, lensStr.c_str());
 	// Per-solver stats
 	for (size_t sid = 0; sid < _solvers.size(); sid++) {
 		_logger.log(V3_VERB, "S%d imp=%d def=%d\n", _solvers[sid]->getGlobalId(), added[sid], deferred[sid]);
@@ -123,7 +124,7 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 
 	// Clear half of the clauses from the filter (probabilistically) if a clause filter half life is set
 	if (_params.clauseFilterHalfLife() > 0 && Timer::elapsedSeconds() - _last_buffer_clear > _params.clauseFilterHalfLife()) {
-		_logger.log(V3_VERB, "forget half of clauses in filters\n");
+		_logger.log(verb, "forget half of clauses in filters\n");
 		for (size_t sid = 0; sid < _solver_filters.size(); sid++) {
 			_solver_filters[sid].clearHalf();
 		}

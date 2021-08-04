@@ -160,8 +160,9 @@ public:
                 auto merged = merger.merge(isShorttermMemory(index) ? _stm_buffer_size : _ltm_buffer_size);
                 _history[index].clauses.resize(1);
                 _history[index].clauses[0] = std::move(merged);
-                log(V3_VERB, "CLSHIST Merged index %i (epochs %i..%i) into buf size %i\n", 
-                    index, indexToFirstEpoch(index), indexToFirstEpoch(index+1)-1, _history[index].clauses[0].size());
+                log(V3_VERB, "CLSHIST %s : Merged index %i (epochs %i..%i) into buf size %i\n", 
+                    _job.toStr(), index, indexToFirstEpoch(index), indexToFirstEpoch(index+1)-1, 
+                    _history[index].clauses[0].size());
             }
         }
 

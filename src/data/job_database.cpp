@@ -361,7 +361,7 @@ void JobDatabase::forgetOldJobs() {
     }
 
     if (!_jobs.empty())
-        log(V3_VERB, "%i resident jobs\n", _jobs.size());
+        log(V4_VVER, "%i resident jobs\n", _jobs.size());
     
     // Perform forgetting of jobs
     for (int jobId : jobsToForget) {

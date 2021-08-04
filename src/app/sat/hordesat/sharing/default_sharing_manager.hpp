@@ -40,6 +40,7 @@ protected:
 	// global parameters
 	const Parameters& _params;
 	const Logger& _logger;
+	int _job_index;
 
 	LockfreeClauseDatabase _cdb;
 	
@@ -53,7 +54,8 @@ protected:
 
 public:
 	DefaultSharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
-			const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver);
+			const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver,
+			int jobIndex);
     int prepareSharing(int* begin, int maxSize);
     void digestSharing(std::vector<int>& result);
 	void digestSharing(int* begin, int buflen);
