@@ -182,6 +182,7 @@ void Client::init() {
 void Client::mainProgram() {
 
     float lastStatTime = Timer::elapsedSeconds();
+    float lastDoneJobsCheckTime = lastStatTime;
 
     while (!Terminator::isTerminating()) {
 
@@ -199,17 +200,20 @@ void Client::mainProgram() {
         }
 
         // Send notification messages for recently done jobs
-        robin_hood::unordered_flat_set<int, robin_hood::hash<int>> doneJobs;
-        {
-            auto lock = _done_job_lock.getLock();
-            doneJobs = std::move(_recently_done_jobs);
-            _recently_done_jobs.clear();
-        }
-        for (int jobId : doneJobs) {
-            log(LOG_ADD_DESTRANK | V3_VERB, "Notifying #%i:0 that job is done", _root_nodes[jobId], jobId);
-            IntVec payload({jobId});
-            MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
-            finishJob(jobId, /*hasIncrementalSuccessors=*/false);
+        if (time - lastDoneJobsCheckTime > 0.1) {
+            robin_hood::unordered_flat_set<int, robin_hood::hash<int>> doneJobs;
+            {
+                auto lock = _done_job_lock.getLock();
+                doneJobs = std::move(_recently_done_jobs);
+                _recently_done_jobs.clear();
+            }
+            for (int jobId : doneJobs) {
+                log(LOG_ADD_DESTRANK | V3_VERB, "Notifying #%i:0 that job is done", _root_nodes[jobId], jobId);
+                IntVec payload({jobId});
+                MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
+                finishJob(jobId, /*hasIncrementalSuccessors=*/false);
+            }
+            lastDoneJobsCheckTime = time;
         }
 
         // Introduce next job(s) as applicable
@@ -241,7 +245,7 @@ void Client::mainProgram() {
         }
 
         // Sleep for a bit
-        usleep(1000); // 1000 = 1 millisecond
+        usleep(100); // 1000 = 1 millisecond
     }
 
     Logger::getMainInstance().flush();

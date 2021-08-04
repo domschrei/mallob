@@ -81,7 +81,7 @@ void MessageQueue::advance() {
     processReceived();
     processSelfReceived();
     processAssembledReceived();
-    if (_iteration & 0x7 == 0) processSent();
+    processSent();
     //log(V5_DEBG, "ENDADV\n");
 }
 
@@ -245,39 +245,44 @@ void MessageQueue::processAssembledReceived() {
 
 void MessageQueue::processSent() {
     // Test each send handle
-    for (auto it = sendQueue.begin(); it != sendQueue.end(); ++it) {
+    int numTested = 0;
+    for (auto it = sendQueue.begin(); it != sendQueue.end() && numTested < 6; ) {
         auto& h = *it;
         int flag;
         MPI_Status status;
         MPI_Test(&h.request, &flag, &status);
-        if (flag) {
-            // Sent!
-            //log(V5_DEBG, "MQ SENT n=%i d=[%i] t=%i\n", h.data->size(), h.dest, h.tag);
-            bool remove = true;
-            // Batched?
-            if (isBatched(h)) {
-                h.sentBatches++;
-                if (!isFinished(h)) {
-                    remove = false;
-                    // Send next batch
-                    int sendTag = prepareSendHandleForNextBatch(h);
-                    MPI_Isend(h.tempStorage.data(), h.tempStorage.size(), MPI_BYTE, h.dest, 
-                        sendTag, MPI_COMM_WORLD, &h.request);
-                }
-            }
-            // Remove handle
-            if (remove) {
-                _send_done_callback(h.id); // notify completion
+        numTested++;
 
-                if (h.data->size() > _max_msg_size) {
-                    // Concurrent deallocation of SendHandle's large chunk of data
-                    while (!_garbage_queue.produce(std::move(h.data))) {}
-                }
-                
-                it = sendQueue.erase(it);
-                it--;
+        if (!flag) {
+            it++; // go to next handle
+            continue;
+        }
+        
+        // Sent!
+        //log(V5_DEBG, "MQ SENT n=%i d=[%i] t=%i\n", h.data->size(), h.dest, h.tag);
+        
+        // Batched?
+        if (isBatched(h)) {
+            h.sentBatches++;
+            if (!isFinished(h)) {
+                // Send next batch
+                int sendTag = prepareSendHandleForNextBatch(h);
+                MPI_Isend(h.tempStorage.data(), h.tempStorage.size(), MPI_BYTE, h.dest, 
+                    sendTag, MPI_COMM_WORLD, &h.request);
+                continue; // test this handle another time
             }
         }
+
+        // Notify completion
+        _send_done_callback(h.id); 
+
+        if (h.data->size() > _max_msg_size) {
+            // Concurrent deallocation of SendHandle's large chunk of data
+            while (!_garbage_queue.produce(std::move(h.data))) {}
+        }
+        
+        // Remove handle
+        it = sendQueue.erase(it);
     }
 }
 
