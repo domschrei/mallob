@@ -78,6 +78,7 @@ private:
 
     size_t _max_msg_size;
     int _my_rank;
+    unsigned long long _iteration = 0;
 
     // Basic receive stuff
     MPI_Request _recv_request;

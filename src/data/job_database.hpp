@@ -81,7 +81,7 @@ public:
 
     std::vector<std::pair<JobRequest, int>> getDeferredRequestsToForward(float time);
 
-    bool isTimeForRebalancing();
+    bool isTimeForRebalancing(float time);
     bool beginBalancing();
     bool continueBalancing();
     bool continueBalancing(MessageHandle& handle);

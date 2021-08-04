@@ -456,9 +456,9 @@ bool JobDatabase::isIdle() const {
     return _load == 0;
 }
 
-bool JobDatabase::isTimeForRebalancing() {
+bool JobDatabase::isTimeForRebalancing(float time) {
     return !_balancer->isBalancing() 
-        && Timer::elapsedSeconds() - _last_balancing_initiation >= _balance_period;
+        && time - _last_balancing_initiation >= _balance_period;
 }
 
 bool JobDatabase::beginBalancing() {

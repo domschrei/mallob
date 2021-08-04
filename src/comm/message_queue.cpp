@@ -77,10 +77,11 @@ int MessageQueue::send(DataPtr data, int dest, int tag) {
 
 void MessageQueue::advance() {
     //log(V5_DEBG, "BEGADV\n");
+    _iteration++;
     processReceived();
     processSelfReceived();
     processAssembledReceived();
-    processSent();
+    if (_iteration & 0x7 == 0) processSent();
     //log(V5_DEBG, "ENDADV\n");
 }
 

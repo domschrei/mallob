@@ -152,14 +152,14 @@ void Worker::mainProgram() {
     float lastJobCheckTime = lastMemCheckTime;
     float lastBalanceCheckTime = lastMemCheckTime;
     float lastMaintenanceCheckTime = lastMemCheckTime;
-
-    float sleepMicrosecs = _params.sleepMicrosecs();
-    float jobCheckPeriod = 0.01;
-    float balanceCheckPeriod = 0.01;
-    float maintenanceCheckPeriod = 1.0;
-    float memCheckPeriod = 3.0;
-    bool doYield = _params.yield();
     bool wasIdle = true;
+
+    const float sleepMicrosecs = _params.sleepMicrosecs();
+    const float jobCheckPeriod = 0.01;
+    const float balanceCheckPeriod = 0.01;
+    const float maintenanceCheckPeriod = 1.0;
+    const float memCheckPeriod = 3.0;
+    const bool doYield = _params.yield();
 
     Watchdog watchdog(/*checkIntervMillis=*/200, lastMemCheckTime);
     watchdog.setWarningPeriod(100); // warn after 0.1s without a reset
@@ -167,6 +167,9 @@ void Worker::mainProgram() {
 
     float time = lastMemCheckTime;
     while (!checkTerminate(time)) {
+
+        // Reset watchdog
+        watchdog.reset(time);
 
         if (wasIdle != _job_db.isIdle()) {
             // Load status changed since last cycle
@@ -214,13 +217,10 @@ void Worker::mainProgram() {
         // Advance load balancing operations
         if (time - lastBalanceCheckTime > balanceCheckPeriod) {
             lastBalanceCheckTime = time;
-            if (_job_db.isTimeForRebalancing()) {
+            if (_job_db.isTimeForRebalancing(time)) {
                 if (_job_db.beginBalancing()) applyBalancing();
             } 
             if (_job_db.continueBalancing()) applyBalancing();
-
-            // Reset watchdog
-            watchdog.reset(time);
 
             if (_job_db.isIdle() && _time_only_idle_worker > 0 && time - _time_only_idle_worker >= 0.05) {
                 // This worker is the only idle worker within its local vicinity since some time
