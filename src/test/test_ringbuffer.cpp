@@ -243,9 +243,9 @@ int main() {
     Timer::init();
     Random::init(rand(), rand());
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
-    testSPSCRingBuffer(); exit(0);
     testMixedRingbuffer();
     testUnitBuffer();
     testUniformClauseBuffer();
     testUniformSizeClauseBuffer();
+    testSPSCRingBuffer(); exit(0);
 }

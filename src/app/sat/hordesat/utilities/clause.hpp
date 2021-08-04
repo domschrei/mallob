@@ -8,15 +8,23 @@ namespace Mallob {
         int* begin = nullptr; 
         int size = 0; 
         int lbd = 0;
+
+        std::string toStr() const {
+            std::string out = "(lbd=" + std::to_string(lbd) + ") ";
+            for (auto it = begin; it != begin+size; it++) {
+                out += std::to_string(*it) + " ";
+            }
+            return out.substr(0, out.size()-1);
+        }
     };
 
     struct ClauseHasher {
 
-        static size_t hash(const std::vector<int>& cls, int which) {
+        static inline size_t hash(const std::vector<int>& cls, int which) {
             return hash(cls.data(), cls.size(), which);
         }
 
-        static size_t hash(const int* begin, int size, int which) {
+        static inline size_t hash(const int* begin, int size, int which) {
             static unsigned const int primes [] = 
                     {2038072819, 2038073287, 2038073761, 2038074317,
                     2038072823,	2038073321,	2038073767, 2038074319,
@@ -31,13 +39,13 @@ namespace Mallob {
             return res;
         }
 
-        std::size_t operator()(const std::vector<int>& cls) const {
+        std::size_t inline operator()(const std::vector<int>& cls) const {
             return hash(cls, 3);
         }
-        std::size_t operator()(const Clause& cls) const {
+        std::size_t inline operator()(const Clause& cls) const {
             return hash(cls.begin, cls.size, 3);
         }
-        std::size_t operator()(const int& unit) const {
+        std::size_t inline operator()(const int& unit) const {
             std::vector<int> unitCls(1, unit);
             return hash(unitCls, 3);
         }

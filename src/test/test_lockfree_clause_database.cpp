@@ -5,6 +5,7 @@
 #include <string>
 #include <thread>
 #include <set>
+#include <random>
 
 #include "util/random.hpp"
 #include "util/logger.hpp"
@@ -103,13 +104,17 @@ void testRandomClauses() {
     log(V2_INFO, "Testing lock-free clause database ...\n");
 
     int maxClauseSize = 30;
-    int maxLbdPartitionedSize = 5;
-    int baseBufferSize = 10000;
-    int numProducers = 100;
-    int numClauses = 100;
+    int maxLbdPartitionedSize = 8;
+    int baseBufferSize = 1500;
+    int numProducers = 4;
+    int numClauses = 10000;
+
+    log(V2_INFO, "Generating %i clauses ...\n", numClauses);
 
     // Generate clauses
     std::vector<std::vector<int>> inputClauses;
+    ExactSortedClauseFilter filter;
+    int numDistinct = 0;
     for (int i = 0; i < numClauses; i++) {
         int len = (int) (maxClauseSize * Random::rand()) + 1;
         int lbd = std::min(len, (int) ((len-1) * Random::rand()) + 2);
@@ -121,25 +126,39 @@ void testRandomClauses() {
             assert(lit != 0);
             cls.push_back(lit);
         }
+        std::sort(cls.begin()+1, cls.end());
         assert(cls.size() == 1+len);
+        Clause c{cls.data()+1, cls.size(), lbd};
+        if (filter.registerClause(c)) numDistinct++;
         inputClauses.push_back(std::move(cls));
     }
 
+    log(V2_INFO, "Generated %i distinct clauses.\n", numDistinct);
+
+    log(V2_INFO, "Setting up clause database ...\n");
 
     LockfreeClauseDatabase cdb(maxClauseSize, maxLbdPartitionedSize, baseBufferSize, numProducers);
-
-
     std::vector<std::vector<int>> buffers;
 
-    for (size_t rep = 0; rep < 1; rep++) {
+    log(V2_INFO, "Performing multi-threaded addition of clauses ...\n");
+
+    for (size_t rep = 0; rep < 3; rep++) {
 
         // Create stream of clauses into database
         std::vector<std::thread> threads(numProducers);
+        std::atomic_int numAdded = 0;
+        std::atomic_int numAddedLiterals = 0;
+        std::atomic_int numRejected = 0;
         for (size_t i = 0; i < threads.size(); i++) {
-            threads[i] = std::thread([i, &inputClauses, &cdb]() {
-                for (int n = 0; n < 10; n++) {
-                    auto& clause = inputClauses[(int) (Random::rand() * inputClauses.size())];
-                    bool success = cdb.addClause(i, Clause{clause.data()+1, (int)clause.size()-1, clause[0]});
+            threads[i] = std::thread([i, &inputClauses, &cdb, &numAdded, &numRejected]() {
+                auto rng = std::mt19937(i);
+                auto dist = std::uniform_real_distribution<float>(0, 1);
+                for (int n = 0; n < 10000; n++) {
+                    auto& clause = inputClauses[(int) (dist(rng) * inputClauses.size())];
+                    Clause c{clause.data()+1, (int)clause.size()-1, clause[0]};
+                    //log(V2_INFO, "add cls %s\n", c.toStr().c_str());
+                    bool success = cdb.addClause(i, c);
+                    (success ? numAdded : numRejected)++;
                 }
             });
         }
@@ -150,31 +169,35 @@ void testRandomClauses() {
         // Export buffer from database
         int numExported = 0;
         auto out = cdb.exportBuffer(1000000, numExported);
+        log(V2_INFO, " - %i/%i added, %i exported into buffer\n", (int)numAdded, (int)numRejected, numExported);
+
         //for (int lit : out) log(LOG_NO_PREFIX | V4_VVER, "%i ", lit);
         //log(LOG_NO_PREFIX | V4_VVER, "\n");
         buffers.push_back(std::move(out));
     }
 
-
     auto merger = cdb.getBufferMerger();
     for (auto& out : buffers) merger.add(cdb.getBufferReader(out.data(), out.size()));
-    auto merged = merger.merge(10000);
 
-    for (int lit : merged) log(LOG_NO_PREFIX | V4_VVER, "%i ", lit);
-    log(LOG_NO_PREFIX | V4_VVER, "\n");
+    log(V2_INFO, "Merging buffers ...\n");
+    auto merged = merger.merge(1000000);
+    log(V2_INFO, "Merged buffers into buffer of size %i\n", merged.size());
+
+    //for (int lit : merged) log(LOG_NO_PREFIX | V4_VVER, "%i ", lit);
+    //log(LOG_NO_PREFIX | V4_VVER, "\n");
 
     auto reader = cdb.getBufferReader(merged.data(), merged.size());
     Clause c = reader.getNextIncomingClause();
     int readClauses = 0;
     while (c.begin != nullptr) {
         readClauses++;
-        log(LOG_NO_PREFIX | V4_VVER, "lbd=%i ", c.lbd);
-        for (size_t i = 0; i < c.size; i++) log(LOG_NO_PREFIX | V4_VVER, "%i ", c.begin[i]);
-        log(LOG_NO_PREFIX | V4_VVER, "0\n");
+        //log(LOG_NO_PREFIX | V4_VVER, "lbd=%i ", c.lbd);
+        //for (size_t i = 0; i < c.size; i++) log(LOG_NO_PREFIX | V4_VVER, "%i ", c.begin[i]);
+        //log(LOG_NO_PREFIX | V4_VVER, "0\n");
         c = reader.getNextIncomingClause();
     }
 
-    log(V3_VERB, "%i clauses\n", readClauses);
+    log(V3_VERB, "Read %i clauses from merged buffer\n", readClauses);
 
     //assert(merged == out);
 }
@@ -183,6 +206,6 @@ int main() {
     Timer::init();
     Random::init(rand(), rand());
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
-    testUniform();
+    //testUniform();
     testRandomClauses();
 }

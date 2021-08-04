@@ -16,6 +16,7 @@
 using namespace Mallob;
 
 #include "util/sys/threading.hpp"
+#include "util/logger.hpp"
 
 //#define NUM_BITS 268435399 // 32MB
 #define NUM_BITS 26843543 // 3,2MB

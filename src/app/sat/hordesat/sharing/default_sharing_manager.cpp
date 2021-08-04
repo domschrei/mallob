@@ -208,7 +208,8 @@ void DefaultSharingManager::processClause(int solverId, const Clause& clause, in
 
 	// Register clause in this solver's filter
 	if (_solver_filters[solverId].registerClause(clauseBegin, clauseSize)) {
-		// Success - write clause into database if possible
+		// Success - sort and write clause into database if possible
+		std::sort(clauseBegin, clauseBegin+clauseSize);
 		Clause tldClause{clauseBegin, clauseSize, clauseSize == 1 ? 1 : (clauseSize == 2 ? 2 : clause.lbd)};
 		if (!_cdb.addClause(solverId, tldClause)) _stats.clausesDroppedAtExport++;
 	} else {

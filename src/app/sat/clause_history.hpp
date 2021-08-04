@@ -129,7 +129,7 @@ public:
         // Insert clauses into history vector
         bool alreadyPresent = entireIndex ? isBatchComplete(index) : isEpochPresent(epoch);
         if (!alreadyPresent) {
-            // Append history entries as long as possible
+            // Append history entries as long as necessary
             while (index >= _history.size()) _history.emplace_back(_aggregation_factor);
             
             // Shorten the incoming buffer as necessary
@@ -153,6 +153,7 @@ public:
             
             if (isBatchComplete(index)) {
                 // Merge with prior clauses at that index
+                log(V4_VVER, "CLSHIST Merging index ...\n");
                 auto merger = _cdb.getBufferMerger();
                 for (auto& clsbuf : _history[index].clauses)
                     merger.add(_cdb.getBufferReader(clsbuf.data(), clsbuf.size(), /*useChecksums=*/false));

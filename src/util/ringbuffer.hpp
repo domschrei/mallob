@@ -102,6 +102,7 @@ private:
     size_t _capacity = 0;
 
     std::vector<int> _consumed_buffer;
+    int _consumed_size = 0;
 
 public:
     RingBuffer() {}
@@ -142,31 +143,35 @@ public:
 
     bool consume(int sizeOrZero, std::vector<int>& elem) {
 
-        if (_consumed_buffer.empty()) {
+        if (_consumed_size == 0) {
             // Fetch batch of clauses from ringbuffer
             size_t offset;
-            size_t len = ringbuf_consume(_ringbuf, &offset);
-            _consumed_buffer.resize(len);
+            _consumed_size = ringbuf_consume(_ringbuf, &offset);
+            if (_consumed_size <= 0) return false;
+            if (_consumed_buffer.size() < _consumed_size) 
+                _consumed_buffer.resize(_consumed_size);
             memcpy(_consumed_buffer.data(), 
                     _data+sizeof(int)*offset, 
-                    len*sizeof(int));
-            ringbuf_release(_ringbuf, len);
+                    _consumed_size*sizeof(int));
+            ringbuf_release(_ringbuf, _consumed_size);
         }
-        if (_consumed_buffer.empty()) return false;
-
+        
         // Extract a clause from the consumed buffer
         if (sizeOrZero > 0) {
-            size_t start = _consumed_buffer.size()-sizeOrZero;
-            elem.insert(elem.end(), _consumed_buffer.begin()+start, _consumed_buffer.end());
-            _consumed_buffer.resize(_consumed_buffer.size()-sizeOrZero);
+            int start = _consumed_size-sizeOrZero;
+            assert(start >= 0);
+            elem.resize(elem.size()+sizeOrZero);
+            memcpy(elem.data()+elem.size()-sizeOrZero, _consumed_buffer.data()+start, sizeOrZero*sizeof(int));
+            //elem.insert(elem.end(), _consumed_buffer.begin()+start, _consumed_buffer.begin()+start+sizeOrZero);
+            _consumed_size -= sizeOrZero; // "resize" consume buffer
         } else {
             // Read from the back until you hit a separation zero
-            size_t start = _consumed_buffer.size()-1;
+            int start = _consumed_size-1;
             while (start > 0 && _consumed_buffer[start-1] != 0) start--;
             assert(_consumed_buffer[start] != 0);
-            for (size_t i = start; i < _consumed_buffer.size(); i++)
+            for (size_t i = start; i < _consumed_size; i++)
                 elem.push_back(_consumed_buffer[i]);
-            _consumed_buffer.resize(start);
+            _consumed_size = start; // "resize" consume buffer
         }
         
         return true;
