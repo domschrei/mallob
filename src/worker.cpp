@@ -694,6 +694,7 @@ void Worker::handleSendJobDescription(MessageHandle& handle) {
         initiateVolumeUpdate(jobId);
     } 
 
+    // Handle child PEs waiting for the transfer of a revision of this job
     auto& waitingRankRevPairs = job.getWaitingRankRevisionPairs();
     for (auto it = waitingRankRevPairs.begin(); it != waitingRankRevPairs.end(); ++it) {
         auto& [rank, rev] = *it;

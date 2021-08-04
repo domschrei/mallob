@@ -23,8 +23,6 @@ private:
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
     int _last_imported_revision = 0;
 
-    Mutex _solver_state_change_mutex;
-
     std::thread _destruct_thread;
     std::atomic_bool _shmem_freed = false;
 

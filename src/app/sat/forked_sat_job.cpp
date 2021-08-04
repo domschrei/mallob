@@ -39,22 +39,9 @@ void ForkedSatJob::appl_start() {
 
     //log(V5_DEBG, "%s : beginning to solve\n", toStr());
     _solver_pid = _solver->run();
-
     //log(V4_VVER, "%s : spawned child pid=%i\n", toStr(), _solver_pid);
     _time_of_start_solving = Timer::elapsedSeconds();
-
-    {
-        auto lock = _solver_state_change_mutex.getLock();
-        auto state = getState();
-        if (state == SUSPENDED) 
-            _solver->setSolvingState(SolvingStates::SUSPENDED);
-        if (state == INACTIVE || state == PAST) 
-            _solver->setSolvingState(SolvingStates::STANDBY);
-        if (state == PAST) {
-            _solver->setSolvingState(SolvingStates::ABORTING);
-        }
-        _initialized = true;
-    }
+    _initialized = true;
 }
 
 void ForkedSatJob::loadIncrements() {
@@ -85,20 +72,17 @@ void ForkedSatJob::loadIncrements() {
 
 void ForkedSatJob::appl_suspend() {
     if (!_initialized) return;
-    auto lock = _solver_state_change_mutex.getLock();
     _solver->setSolvingState(SolvingStates::SUSPENDED);
     ((AnytimeSatClauseCommunicator*)_clause_comm)->suspend();
 }
 
 void ForkedSatJob::appl_resume() {
     if (!_initialized) return;
-    auto lock = _solver_state_change_mutex.getLock();
     _solver->setSolvingState(SolvingStates::ACTIVE);
 }
 
 void ForkedSatJob::appl_terminate() {
     if (!_initialized) return;
-    auto lock = _solver_state_change_mutex.getLock();
     _solver->setSolvingState(SolvingStates::ABORTING);
     startDestructThreadIfNecessary();
 }

@@ -50,15 +50,6 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
     _hsm->fSize = _f_size;
     _hsm->aSize = _a_size;
     _hsm->desiredRevision = config.firstrev;
-
-    _export_buffer = (int*) createSharedMemoryBlock("clauseexport", 
-            _params.clauseBufferBaseSize() * sizeof(int), nullptr);
-    _hsm->importBufferMaxSize = _params.clauseHistoryAggregationFactor() * MyMpi::getBinaryTreeBufferLimit(
-        config.mpisize, _params.clauseBufferBaseSize(), _params.clauseBufferDiscountFactor(), 
-        MyMpi::ALL
-    ) + 1024;
-    _import_buffer = (int*) createSharedMemoryBlock("clauseimport", 
-            sizeof(int)*_hsm->importBufferMaxSize, nullptr);
     _hsm->config = std::move(config);
 
     _written_revision = -1;
@@ -66,6 +57,17 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
     
     _concurrent_shmem_allocator.run([this]() {
 
+        // Allocate import and export buffers
+        _export_buffer = (int*) createSharedMemoryBlock("clauseexport", 
+                _params.clauseBufferBaseSize() * sizeof(int), nullptr);
+        _hsm->importBufferMaxSize = _params.clauseHistoryAggregationFactor() * MyMpi::getBinaryTreeBufferLimit(
+            _hsm->config.mpisize, _params.clauseBufferBaseSize(), _params.clauseBufferDiscountFactor(), 
+            MyMpi::ALL
+        ) + 1024;
+        _import_buffer = (int*) createSharedMemoryBlock("clauseimport", 
+                sizeof(int)*_hsm->importBufferMaxSize, nullptr);
+
+        // Allocate shared memory for formula, assumptions of initial revision
         createSharedMemoryBlock("formulae.0", sizeof(int) * _f_size, (void*)_f_lits);
         createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
         _written_revision = 0;
@@ -181,6 +183,7 @@ void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
 }
 
 void HordeProcessAdapter::collectClauses(int maxSize) {
+    if (!_hsm->doBegin) return;
     _hsm->exportBufferMaxSize = maxSize;
     _hsm->doExport = true;
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
@@ -189,7 +192,7 @@ bool HordeProcessAdapter::hasCollectedClauses() {
     return _hsm->didExport;
 }
 std::vector<int> HordeProcessAdapter::getCollectedClauses(Checksum& checksum) {
-    if (!_hsm->didExport) {
+    if (!_hsm->doBegin || !_hsm->didExport) {
         return std::vector<int>();
     }
     std::vector<int> clauses(_hsm->exportBufferTrueSize);
@@ -200,6 +203,7 @@ std::vector<int> HordeProcessAdapter::getCollectedClauses(Checksum& checksum) {
 }
 
 void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses, const Checksum& checksum) {
+    if (!_hsm->doBegin) return;
     if (_hsm->doImport) {
         // Cannot import right now -- defer into temporary storage 
         _temp_clause_buffers.emplace_back(clauses, checksum);

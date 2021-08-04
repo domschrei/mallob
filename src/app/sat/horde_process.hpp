@@ -47,14 +47,6 @@ public:
         log.log(V4_VVER, "Access base shmem: %s\n", _shmem_id.c_str());
         _hsm = (HordeSharedMemory*) accessMemory(_shmem_id, sizeof(HordeSharedMemory));
 
-        // Set up export and import buffers for clause exchanges
-        {
-            int maxExportBufferSize = params.clauseBufferBaseSize() * sizeof(int);
-            _export_buffer = (int*) accessMemory(_shmem_id + ".clauseexport", maxExportBufferSize);
-            int maxImportBufferSize = _hsm->importBufferMaxSize * sizeof(int);
-            _import_buffer = (int*) accessMemory(_shmem_id + ".clauseimport", maxImportBufferSize);
-        }
-
         // Signal initialization to parent
         _hsm->isSpawned = true;
         
@@ -67,6 +59,14 @@ public:
         
         // Terminate directly?
         if (_hsm->doTerminate) doTerminate();
+
+        // Set up export and import buffers for clause exchanges
+        {
+            int maxExportBufferSize = _params.clauseBufferBaseSize() * sizeof(int);
+            _export_buffer = (int*) accessMemory(_shmem_id + ".clauseexport", maxExportBufferSize);
+            int maxImportBufferSize = _hsm->importBufferMaxSize * sizeof(int);
+            _import_buffer = (int*) accessMemory(_shmem_id + ".clauseimport", maxImportBufferSize);
+        }
 
         // Import first revision
         {
