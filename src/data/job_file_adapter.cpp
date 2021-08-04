@@ -35,13 +35,13 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
             std::ifstream i(eventFile);
             i >> j;
         } catch (const nlohmann::detail::parse_error& e) {
-            log.log(V1_WARN, "Parse error on %s: %s\n", eventFile.c_str(), e.what());
+            log.log(V1_WARN, "[WARN] Parse error on %s: %s\n", eventFile.c_str(), e.what());
             return;
         }
 
         // Check and read essential fields from JSON
         if (!j.contains("user") || !j.contains("name")) {
-            log.log(V1_WARN, "Job file missing essential field(s). Ignoring this file.\n");
+            log.log(V1_WARN, "[WARN] Job file missing essential field(s). Ignoring this file.\n");
             return;
         }
         std::string user = j["user"].get<std::string>();
@@ -55,15 +55,15 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
             std::ifstream i(userFile);
             i >> jUser;
         } catch (const nlohmann::detail::parse_error& e) {
-            log.log(V1_WARN, "Unknown user or invalid user definition: %s\n", e.what());
+            log.log(V1_WARN, "[WARN] Unknown user or invalid user definition: %s\n", e.what());
             return;
         }
         if (!jUser.contains("id") || !jUser.contains("priority")) {
-            log.log(V1_WARN, "User file %s missing essential field(s). Ignoring job file with this user.\n", userFile.c_str());
+            log.log(V1_WARN, "[WARN] User file %s missing essential field(s). Ignoring job file with this user.\n", userFile.c_str());
             return;
         }
         if (jUser["id"].get<std::string>() != user) {
-            log.log(V1_WARN, "User file %s has inconsistent user ID. Ignoring job file with this user.\n", userFile.c_str());
+            log.log(V1_WARN, "[WARN] User file %s has inconsistent user ID. Ignoring job file with this user.\n", userFile.c_str());
             return;
         }
 
@@ -121,7 +121,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
 
             // Was job already parsed before?
             if (_job_id_rev_to_image.count(std::pair<int, int>(id, 0))) {
-                log.log(V1_WARN, "Modification of a file I already parsed! Ignoring.\n");
+                log.log(V1_WARN, "[WARN] Modification of a file I already parsed! Ignoring.\n");
                 return;
             }
 
@@ -210,7 +210,7 @@ void JobFileAdapter::handleJobDone(const JobResult& result) {
     _logger.log(V3_VERB, "Job done event for #%i rev. %i : %s\n", result.id, result.revision, eventFile.c_str());
 
     if (!FileUtils::isRegularFile(eventFile)) {
-        _logger.log(V1_WARN, "Pending job file %s gone!\n", eventFile.c_str());
+        _logger.log(V1_WARN, "[WARN] Pending job file %s gone!\n", eventFile.c_str());
         return; // File does not exist (any more)
     }
     std::ifstream i(eventFile);
@@ -218,7 +218,7 @@ void JobFileAdapter::handleJobDone(const JobResult& result) {
     try {
         i >> j;
     } catch (const nlohmann::detail::parse_error& e) {
-        _logger.log(V1_WARN, "Parse error on %s: %s\n", eventFile.c_str(), e.what());
+        _logger.log(V1_WARN, "[WARN] Parse error on %s: %s\n", eventFile.c_str(), e.what());
         return;
     }
     
@@ -248,7 +248,7 @@ void JobFileAdapter::handleJobResultDeleted(const FileWatcher::Event& event, Log
     std::string jobName = event.name;
     jobName.erase(std::find(jobName.begin(), jobName.end(), '\0'), jobName.end());
     if (!_job_name_to_id_rev.contains(jobName)) {
-        log.log(V1_WARN, "Cannot clean up job \"%s\" : not known\n", jobName.c_str());
+        log.log(V1_WARN, "[WARN] Cannot clean up job \"%s\" : not known\n", jobName.c_str());
         return;
     }
 

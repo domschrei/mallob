@@ -75,7 +75,7 @@ void Client::readIncomingJobs(Logger log) {
                     log.log(V3_VERB, "[T] Reading job #%i rev. %i (%s) ...\n", id, foundJob.description->getRevision(), foundJob.file.c_str());
                     bool success = JobReader::read(foundJob.file, *foundJob.description);
                     if (!success) {
-                        log.log(V1_WARN, "[T] File %s could not be opened - skipping #%i\n", foundJob.file.c_str(), id);
+                        log.log(V1_WARN, "[T] [WARN] File %s could not be opened - skipping #%i\n", foundJob.file.c_str(), id);
                     } else {
                         time = Timer::elapsedSeconds() - time;
                         log.log(V3_VERB, "[T] Initialized job #%i (%s) in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
@@ -164,7 +164,7 @@ void Client::init() {
             Logger::getMainInstance().copy("<Reader>", "#-1.")
         );
     });
-    log(V2_INFO, "Client main thread started\n");
+    log(V3_VERB, "Client main thread started\n");
 
     auto& q = MyMpi::getMessageQueue();
     q.registerCallback(MSG_NOTIFY_JOB_DONE, [&](MessageHandle& h) {handleJobDone(h);});
@@ -174,9 +174,9 @@ void Client::init() {
     q.registerCallback(MSG_DO_EXIT, [&](MessageHandle& h) {handleExit(h);});
     q.registerSentCallback([&](int id) {handleJobDescriptionSent(id);});
 
-    log(V4_VVER, "Global init barrier ...\n");
+    log(V5_DEBG, "Global init barrier ...\n");
     MPI_Barrier(MPI_COMM_WORLD);
-    log(V4_VVER, "Passed global init barrier\n");
+    log(V5_DEBG, "Passed global init barrier\n");
 }
 
 void Client::mainProgram() {
@@ -194,8 +194,7 @@ void Client::mainProgram() {
             auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::FLAT);
             info.vmUsage *= 0.001 * 0.001;
             info.residentSetSize *= 0.001 * 0.001;
-            log(V4_VVER, "mainthread_cpu=%i\n", info.cpu);
-            log(V3_VERB, "mem=%.2fGB\n", info.residentSetSize);
+            log(V3_VERB, "mainthread_cpu=%i mem=%.2fGB\n", info.cpu, info.residentSetSize);
             lastStatTime = time;
         }
 
@@ -208,7 +207,7 @@ void Client::mainProgram() {
                 _recently_done_jobs.clear();
             }
             for (int jobId : doneJobs) {
-                log(LOG_ADD_DESTRANK | V3_VERB, "Notifying #%i:0 that job is done", _root_nodes[jobId], jobId);
+                log(LOG_ADD_DESTRANK | V3_VERB, "Notify #%i:0 that job is done", _root_nodes[jobId], jobId);
                 IntVec payload({jobId});
                 MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
                 finishJob(jobId, /*hasIncrementalSuccessors=*/false);
@@ -303,18 +302,17 @@ void Client::introduceNextJob() {
     } else {
         // Find the job's canonical initial node
         int n = MyMpi::size(MPI_COMM_WORLD) - MyMpi::size(_comm);
-        log(V4_VVER, "Creating permutation of size %i ...\n", n);
+        log(V5_DEBG, "Creating permutation of size %i ...\n", n);
         AdjustablePermutation p(n, jobId);
         nodeRank = p.get(0);
-    }   
-    log(V4_VVER, "%i\n", job.getRevision());
+    }
 
     JobRequest req(jobId, job.getApplication(), /*rootRank=*/-1, /*requestingNodeRank=*/_world_rank, 
         /*requestedNodeIndex=*/0, /*timeOfBirth=*/time, /*balancingEpoch=*/-1, /*numHops=*/0);
     req.revision = job.getRevision();
     req.timeOfBirth = job.getArrival();
 
-    log(LOG_ADD_DESTRANK | V2_INFO, "Introducing job #%i : %s", nodeRank, jobId, req.toStr().c_str());
+    log(LOG_ADD_DESTRANK | V2_INFO, "Introducing job #%i rev. %i : %s", nodeRank, jobId, req.revision, req.toStr().c_str());
     MyMpi::isend(nodeRank, MSG_REQUEST_NODE, req);
 }
 
@@ -366,7 +364,8 @@ void Client::handleSendJobResult(MessageHandle& handle) {
         std::ofstream file;
         file.open(filename);
         if (!file.is_open()) {
-            log(V0_CRIT, "ERROR: Could not open solution file\n");
+            log(V0_CRIT, "[ERROR] Could not open solution file\n");
+            abort();
         } else {
             file << "c SOLUTION #" << jobId << " rev. " << revision << " ";
             file << (resultCode == RESULT_SAT ? "SAT" : resultCode == RESULT_UNSAT ? "UNSAT" : "UNKNOWN") << "\n"; 
@@ -408,7 +407,7 @@ void Client::handleJobDescriptionSent(int msgId) {
     if (_transfer_msg_id_to_job_id_rev.count(msgId)) {
         const auto& [jobId, rev] = _transfer_msg_id_to_job_id_rev.at(msgId);
         if (_active_jobs.count(jobId)) {
-            log(V3_VERB, "Clear description of sent job #%i rev. %i\n", jobId, rev);
+            log(V4_VVER, "Clear description of #%i rev. %i\n", jobId, rev);
             _active_jobs.at(jobId)->clearPayload(rev);
             _num_loaded_jobs--;
         }

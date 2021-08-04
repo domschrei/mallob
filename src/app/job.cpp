@@ -63,7 +63,7 @@ void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
         // Solver literal threshold exceeded: reduce number of solvers for this job
         int optNumThreads = std::floor((float)_params.sizeLimitPerProcess() / _description.getNumFormulaLiterals());
         _threads_per_job = std::max(1, optNumThreads);
-        log(V2_INFO, "%s : literal threshold exceeded - cut down #threads to %i\n", toStr(), _threads_per_job);
+        log(V3_VERB, "%s : literal threshold exceeded - cut down #threads to %i\n", toStr(), _threads_per_job);
     }
 
     _has_description = true;

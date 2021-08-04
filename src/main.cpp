@@ -26,10 +26,10 @@ void doExternalClientProgram(MPI_Comm& commClients, Parameters& params, const st
         client.init();
         client.mainProgram();
     } catch (const std::exception& ex) {
-        log(V0_CRIT, "Unexpected ERROR: \"%s\" - aborting\n", ex.what());
+        log(V0_CRIT, "[ERROR] uncaught \"%s\"\n", ex.what());
         Process::doExit(1);
     } catch (...) {
-        log(V0_CRIT, "Unexpected ERROR - aborting\n");
+        log(V0_CRIT, "[ERROR] uncaught exception\n");
         Process::doExit(1);
     }
 }
@@ -41,10 +41,10 @@ void doWorkerNodeProgram(MPI_Comm& commWorkers, Parameters& params, const std::s
         worker.init();
         worker.mainProgram();
     } catch (const std::exception& ex) {
-        log(V0_CRIT, "Unexpected ERROR: \"%s\" - aborting\n", ex.what());
+        log(V0_CRIT, "[ERROR] uncaught \"%s\"\n", ex.what());
         Process::doExit(1);
     } catch (...) {
-        log(V0_CRIT, "Unexpected ERROR - aborting\n");
+        log(V0_CRIT, "[ERROR] uncaught exception\n");
         Process::doExit(1);
     }
 }
@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
 
     char hostname[1024];
 	gethostname(hostname, 1024);
-    log(V3_VERB, "mallob %s pid=%lu on host %s\n", MALLOB_VERSION, Proc::getPid(), hostname);
+    log(V3_VERB, "Mallob %s pid=%lu on host %s\n", MALLOB_VERSION, Proc::getPid(), hostname);
 
     // Global and local seed, such that all nodes have access to a synchronized randomness
     // as well as to an individual randomness that differs among nodes

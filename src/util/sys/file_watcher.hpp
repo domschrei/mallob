@@ -52,7 +52,7 @@ public:
             // Initialize inotify
             _inotify_fd = inotify_init();
             if (_inotify_fd < 0) {
-                logger.log(V0_CRIT, "ERROR: Failed to set up inotify, code %i\n", errno);
+                logger.log(V0_CRIT, "[ERROR] Failed to set up inotify, errno %i\n", errno);
                 logger.flush();
                 abort();
             }
@@ -64,7 +64,7 @@ public:
             // Initialize watcher
             _inotify_wd = inotify_add_watch(_inotify_fd, _directory.c_str(), events);
             if (_inotify_wd < 0) {
-                logger.log(V0_CRIT, "ERROR: Failed to add inotify watch, code %i\n", errno);
+                logger.log(V0_CRIT, "[ERROR] Failed to add inotify watch, errno %i\n", errno);
                 logger.flush();
                 abort();
             }

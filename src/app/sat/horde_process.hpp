@@ -114,7 +114,7 @@ public:
                 double cpuShare; float sysShare;
                 bool success = Proc::getThreadCpuRatio(Proc::getTid(), cpuShare, sysShare);
                 if (success) {
-                    _log.log(V2_INFO, "child_main cpuratio=%.3f sys=%.3f\n", cpuShare, sysShare);
+                    _log.log(V3_VERB, "child_main cpuratio=%.3f sys=%.3f\n", cpuShare, sysShare);
                 }
 
                 // For each solver thread
@@ -124,7 +124,7 @@ public:
                     
                     success = Proc::getThreadCpuRatio(threadTids[i], cpuShare, sysShare);
                     if (success) {
-                        _log.log(V2_INFO, "td.%ld cpuratio=%.3f sys=%.3f\n", threadTids[i], cpuShare, sysShare);
+                        _log.log(V3_VERB, "td.%ld cpuratio=%.3f sys=%.3f\n", threadTids[i], cpuShare, sysShare);
                     }
                 }
 
@@ -202,7 +202,7 @@ private:
     void* accessMemory(const std::string& shmemId, size_t size) {
         void* ptr = SharedMemory::access(shmemId, size);
         if (ptr == nullptr) {
-            _log.log(V0_CRIT, "ERROR: Could not access shmem %s! Aborting.\n", shmemId.c_str());  
+            _log.log(V0_CRIT, "[ERROR] Could not access shmem %s\n", shmemId.c_str());  
             Process::doExit(0);  
         }
         return ptr;
@@ -232,7 +232,7 @@ private:
     void importRevision(int revision, Checksum* checksum) {
         size_t* fSizePtr = (size_t*) accessMemory(_shmem_id + ".fsize." + std::to_string(revision), sizeof(size_t));
         size_t* aSizePtr = (size_t*) accessMemory(_shmem_id + ".asize." + std::to_string(revision), sizeof(size_t));
-        _log.log(V4_VVER, "Load rev. %i/%i : %i lits, %i assumptions\n", revision, _desired_revision, *fSizePtr, *aSizePtr);
+        _log.log(V4_VVER, "Read rev. %i/%i : %i lits, %i assumptions\n", revision, _desired_revision, *fSizePtr, *aSizePtr);
         int* fPtr = (int*) accessMemory(_shmem_id + ".formulae." + std::to_string(revision), sizeof(int) * (*fSizePtr));
         int* aPtr = (int*) accessMemory(_shmem_id + ".assumptions." + std::to_string(revision), sizeof(int) * (*aSizePtr));
         
@@ -244,7 +244,7 @@ private:
             if (chk->count() > 0) {
                 // Check checksum
                 if (checksum->get() != chk->get()) {
-                    _log.log(V0_CRIT, "ERROR: Checksum fail at rev. %i. Incoming count: %ld ; local count: %ld\n", revision, chk->count(), checksum->count());
+                    _log.log(V0_CRIT, "[ERROR] Checksum fail at rev. %i. Incoming count: %ld ; local count: %ld\n", revision, chk->count(), checksum->count());
                     abort();
                 }
             }

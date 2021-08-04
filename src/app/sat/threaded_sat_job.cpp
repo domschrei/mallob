@@ -204,12 +204,12 @@ std::vector<int> ThreadedSatJob::getPreparedClauses(Checksum& checksum) {
 void ThreadedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& checksum) {
     _solver->digestSharing(clauses, checksum);
     if (getJobTree().isRoot()) {
-        log(V2_INFO, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
+        log(V3_VERB, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
     }
 }
 
 ThreadedSatJob::~ThreadedSatJob() {
-    log(V4_VVER, "%s : enter destructor\n", toStr());
+    log(V5_DEBG, "%s : enter TSJ destructor\n", toStr());
     if (_destroy_thread.joinable()) _destroy_thread.join();
-    log(V4_VVER, "%s : destructing SAT job\n", toStr());
+    log(V5_DEBG, "%s : destructed TSJ\n", toStr());
 }

@@ -17,9 +17,8 @@ Watchdog::Watchdog(int checkIntervalMillis, float time) {
             int timeMillis = (int) (1000*Timer::elapsedSeconds());
             auto elapsed = timeMillis - _last_reset_millis;
             if (_abort_period_millis > 0 && elapsed > _abort_period_millis) {   
-                log(V0_CRIT, "ERROR: Watchdog: Timeout detected! (Last reset @ %.3f) Writing trace ...\n", 0.001*_last_reset_millis);
+                log(V0_CRIT, "[ERROR] Watchdog: Timeout detected! (Last reset @ %.3f) Writing trace ...\n", 0.001*_last_reset_millis);
                 Process::writeTrace(parentTid);
-                log(V0_CRIT, "Aborting.\n");
                 Logger::getMainInstance().flush();
                 abort();
             }

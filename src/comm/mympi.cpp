@@ -20,7 +20,7 @@ void MyMpi::init(int argc, char *argv[]) {
     int provided = -1;
     MPICALL(MPI_Init_thread(&argc, &argv, MPI_THREAD_SINGLE, &provided), std::string("init"))
     if (provided != MPI_THREAD_SINGLE) {
-        std::cout << "ERROR initializing MPI: wanted id=" << MPI_THREAD_SINGLE 
+        std::cout << "[ERROR] MPI: wanted id=" << MPI_THREAD_SINGLE 
                 << ", got id=" << provided << std::endl;
         Process::doExit(1);
     }

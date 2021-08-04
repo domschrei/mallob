@@ -22,14 +22,14 @@ int FileUtils::mkdir(const std::string& dir) {
             std::string subdir(dir.begin(), dir.begin() + i);
             int res = ::mkdir(subdir.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);   
             if (res != 0 && errno != EEXIST) {
-                log(V0_CRIT, "ERROR: mkdir -p \"%s\" failed, errno %i\n", subdir.c_str(), errno);
+                log(V0_CRIT, "[ERROR] mkdir -p \"%s\" failed, errno %i\n", subdir.c_str(), errno);
                 return res;
             }  
         }
     }
     auto res = ::mkdir(dir.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
     if (res == 0 || errno == EEXIST) return 0;
-    log(V0_CRIT, "ERROR: mkdir -p \"%s\" failed, errno %i\n", dir.c_str(), errno);
+    log(V0_CRIT, "[ERROR] mkdir -p \"%s\" failed, errno %i\n", dir.c_str(), errno);
     return res;
 }
 

@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
     
     auto log = getLog(params, config);
     pid_t pid = Proc::getPid();
-    log.log(V3_VERB, "mallob SAT engine %s pid=%lu\n", MALLOB_VERSION, pid);
+    log.log(V3_VERB, "Mallob SAT engine %s pid=%lu\n", MALLOB_VERSION, pid);
     if (params.verbosity() >= V5_DEBG) {
         params.printParams();
     }
@@ -60,11 +60,11 @@ int main(int argc, char *argv[]) {
         p.run(); // does not return
 
     } catch (const std::exception &ex) {
-        log.log(V0_CRIT, "Unexpected ERROR: \"%s\" - aborting\n", ex.what());
+        log.log(V0_CRIT, "[ERROR] uncaught \"%s\"\n", ex.what());
         log.flush();
         Process::doExit(1);
     } catch (...) {
-        log.log(V0_CRIT, "Unexpected ERROR - aborting\n");
+        log.log(V0_CRIT, "[ERROR] uncaught exception\n");
         log.flush();
         Process::doExit(1);
     }

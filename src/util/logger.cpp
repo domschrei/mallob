@@ -79,7 +79,7 @@ void Logger::init(int rank, int verbosity, bool coloredOutput, bool quiet, bool 
         _main_instance._log_directory = (logDir.size() == 0 ? "." : logDir) + "/" + std::to_string(rank) + "/";
         int status = FileUtils::mkdir(_main_instance._log_directory);
         if (status != 0) {
-            _main_instance.log(V0_CRIT, "ERROR %i while trying to create / access log directory \"%s\"\n", 
+            _main_instance.log(V0_CRIT, "[ERROR] status %i while trying to create / access log directory \"%s\"\n", 
                 status, _main_instance._log_directory.c_str());
         }
 
@@ -87,7 +87,7 @@ void Logger::init(int rank, int verbosity, bool coloredOutput, bool quiet, bool 
         _main_instance._log_filename = _main_instance._log_directory + "log" + std::string(".") + std::to_string(rank);
         _main_instance._log_cfile = fopen(_main_instance._log_filename.c_str(), "a");
         if (_main_instance._log_cfile == nullptr) {
-            _main_instance.log(V0_CRIT, "ERROR while trying to open log file \"%s\"\n", 
+            _main_instance.log(V0_CRIT, "[ERROR] cannot open log file \"%s\"\n", 
                 _main_instance._log_filename.c_str());
         }
     }
@@ -124,7 +124,7 @@ void Logger::mergeJobLogs(int jobId) {
     std::string dest = _log_directory + "jobs." + std::to_string(_rank);
     int status = FileUtils::mergeFiles(globstring, dest, true);
     if (status != 0) {
-        log(V1_WARN, "WARN: Could not merge logs, exit code: %i\n", status);
+        log(V1_WARN, "[WARN] Could not merge logs, exit code: %i\n", status);
     }
 }
 
@@ -135,7 +135,7 @@ Logger Logger::copy(const std::string& linePrefix, const std::string& filenameSu
         c._log_filename = _log_filename + filenameSuffix;
         c._log_cfile = fopen(c._log_filename.c_str(), "a");
         if (c._log_cfile == nullptr) {
-            log(V0_CRIT, "ERROR while trying to open child log file \"%s\"", c._log_filename.c_str());
+            log(V0_CRIT, "[ERROR] cannot open child log file \"%s\"", c._log_filename.c_str());
         }
     }
     c._line_prefix = _line_prefix + " " + linePrefix;
@@ -186,7 +186,7 @@ void Logger::log(va_list& args, unsigned int options, const char* str) const {
         if (tid != _associated_tid) {
             auto prevTid = _associated_tid;
             _associated_tid = -1;
-            log(V0_CRIT, "Unsafe concurrency in %s (original tid: %ld, this tid: %ld)\n", 
+            log(V0_CRIT, "[ERROR] Unsafe concurrency in %s (original tid: %ld, this tid: %ld)\n", 
                     _log_filename.c_str(), prevTid, tid);
             fflush(stdout);
             abort();

@@ -20,7 +20,7 @@ public:
         if (!_exit) {
             auto optSignum = Process::isExitSignalCaught();
             if (optSignum) {
-                log(V2_INFO, "Caught process signal %i\n", optSignum.value());
+                log(V2_INFO, "Caught signal %i\n", optSignum.value());
                 setTerminating();
             }
         }

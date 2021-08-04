@@ -8,15 +8,15 @@
 EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params) : Balancer(comm, params) {
     _last_balancing = 0;
 
-    log(V4_VVER, "BLC_TREE_NORMAL parent: %i\n", getParentRank(false));
-    log(V4_VVER, "BLC_TREE_NORMAL children: ");
-    for (int child : getChildRanks(false)) log(LOG_NO_PREFIX | V4_VVER, "%i ", child);
-    log(LOG_NO_PREFIX | V4_VVER, ".\n");
+    log(V5_DEBG, "BLC_TREE_NORMAL parent: %i\n", getParentRank(false));
+    log(V5_DEBG, "BLC_TREE_NORMAL children: ");
+    for (int child : getChildRanks(false)) log(LOG_NO_PREFIX | V5_DEBG, "%i ", child);
+    log(LOG_NO_PREFIX | V5_DEBG, ".\n");
 
-    log(V4_VVER, "BLC_TREE_REVERSED parent: %i\n", getParentRank(true));
-    log(V4_VVER, "BLC_TREE_REVERSED children: ");
-    for (int child : getChildRanks(true)) log(LOG_NO_PREFIX | V4_VVER, "%i ", child);
-    log(LOG_NO_PREFIX | V4_VVER, ".\n");
+    log(V5_DEBG, "BLC_TREE_REVERSED parent: %i\n", getParentRank(true));
+    log(V5_DEBG, "BLC_TREE_REVERSED children: ");
+    for (int child : getChildRanks(true)) log(LOG_NO_PREFIX | V5_DEBG, "%i ", child);
+    log(LOG_NO_PREFIX | V5_DEBG, ".\n");
 }
 
 bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& jobs) {
@@ -33,7 +33,7 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
                 // Job is registered, possibly with non-zero demand: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
-                    log(V3_VERB, "(1) JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, ev.epoch);
+                    log(V3_VERB, "JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, ev.epoch);
                     _job_epochs.erase(id);
                 }
             }
@@ -65,7 +65,7 @@ bool EventDrivenBalancer::beginBalancing(robin_hood::unordered_map<int, Job*>& j
                 // Not contained yet in state: try to insert into diffs map
                 bool inserted = _diffs.insertIfNovel(ev);
                 if (inserted) {
-                    log(V3_VERB, "(2) JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, epoch);
+                    log(V3_VERB, "JOBEVENT #%i d=%i p=%.2f e=%i\n", ev.jobId, ev.demand, ev.priority, epoch);
                     epoch++;
                 } 
             }

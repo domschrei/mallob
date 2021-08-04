@@ -75,7 +75,7 @@ public:
                 if (_current_pos >= _size) {
                     // Verify checksum
                     if (_use_checksum && _hash != _true_hash) {
-                        log(V0_CRIT, "ERROR: Checksum fail!\n");
+                        log(V0_CRIT, "[ERROR] Checksum fail\n");
                         abort();
                     }
                     return cls;
@@ -172,7 +172,7 @@ public:
                         c = _readers[i].getNextIncomingClause();
                         if (c.begin == nullptr) {
                             // no clauses left, set a magic number
-                            //log(V2_INFO, "%i : out of clauses after receiving %i cls (%i added, %i filtered)\n", i, numReceived[i], numAdded[i], numFiltered[i]);
+                            //log(V5_DEBG, "%i : out of clauses after receiving %i cls (%i added, %i filtered)\n", i, numReceived[i], numAdded[i], numFiltered[i]);
                             c.size = -1;
                             selected[i] = false;
                             continue;

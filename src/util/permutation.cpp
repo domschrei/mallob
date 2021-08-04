@@ -22,7 +22,6 @@ std::vector<std::vector<int>> AdjustablePermutation::getPermutations(int n, int 
             int val = pInit.get(pos);
             int nextVal = pInit.get((pos+1) % n);
             intrinsicPartners[val] = nextVal;
-            //log(V2_INFO, "%i => %i\n", val, nextVal);
         }
     }
 
@@ -118,7 +117,7 @@ std::vector<int> AdjustablePermutation::createExpanderGraph(const std::vector<st
         for (size_t i = 0; i < permutations.size(); i++) {
             std::string str;
             for (size_t j = 0; j < permutations[i].size(); j++) str += std::to_string(permutations[i][j]) + " ";
-            log(V4_VVER, "Perm. %i: %s\n", i, str.c_str());
+            log(V5_DEBG, "Perm. %i: %s\n", i, str.c_str());
         }
     }
 
@@ -214,7 +213,7 @@ AdjustablePermutation::AdjustablePermutation(int n, int seed) {
 
 int AdjustablePermutation::get(int x) const {
     if (x < 0 || x >= _n) {
-        log(V1_WARN, "Invalid input for adj.perm. [0,%i) : %i\n", _n, x);
+        log(V1_WARN, "[WARN] Invalid input for adj.perm. [0,%i) : %i\n", _n, x);
         while (x < 0) x += 100*_n;
         x = x % _n;
     }
@@ -266,7 +265,7 @@ int AdjustablePermutation::get(int x) const {
 
 void AdjustablePermutation::adjust(int x, int new_x) {
     if (x < 0 || x >= _n) {
-        log(V1_WARN, "Invalid input for adj.perm. [0,%i) : %i\n", _n, x);
+        log(V1_WARN, "[WARN] Invalid input for adj.perm. [0,%i) : %i\n", _n, x);
         while (x < 0) x += 100*_n;
         x = x % _n;
     }

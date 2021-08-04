@@ -107,20 +107,20 @@ void Worker::init() {
         for (int run = 0; run < numRuns; run++) {
             for (auto rank : _hop_destinations) {
                 MyMpi::isend(rank, MSG_WARMUP, payload);
-                log(LOG_ADD_DESTRANK | V4_VVER, "Warmup msg", rank);
+                log(LOG_ADD_DESTRANK | V5_DEBG, "Warmup msg", rank);
             }
         }
     }
 
-    log(V4_VVER, "Global init barrier ...\n");
+    log(V5_DEBG, "Global init barrier ...\n");
     MPI_Barrier(MPI_COMM_WORLD);
-    log(V4_VVER, "Passed global init barrier\n");
+    log(V5_DEBG, "Passed global init barrier\n");
     
     // Initiate single instance solving as the "root node"
     if (_params.monoFilename.isSet() && _world_rank == 0) {
 
         std::string instanceFilename = _params.monoFilename();
-        log(V2_INFO, "Initiate solving of mono instance \"%s\"\n", instanceFilename.c_str());
+        log(V2_INFO, "Solve mono instance \"%s\"\n", instanceFilename.c_str());
 
         // Create job description with formula
         log(V3_VERB, "read instance\n");
@@ -129,7 +129,7 @@ void Worker::init() {
         desc.setRootRank(0);
         bool success = JobReader::read(instanceFilename, desc);
         if (!success) {
-            log(V0_CRIT, "ERROR: Could not open file! Aborting.\n");
+            log(V0_CRIT, "[ERROR] Could not open file!\n");
             Terminator::setTerminating();
             return;
         }
@@ -189,15 +189,14 @@ void Worker::mainProgram() {
             auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::RECURSE);
             info.vmUsage *= 0.001 * 0.001;
             info.residentSetSize *= 0.001 * 0.001;
-            log(V4_VVER, "mainthread_cpu=%i\n", info.cpu);
-            log(V3_VERB, "mem=%.2fGB\n", info.residentSetSize);
+            log(V4_VVER, "mem=%.2fGB\n", info.residentSetSize);
             _sys_state.setLocal(SYSSTATE_GLOBALMEM, info.residentSetSize);
 
             // For this "management" thread
             double cpuShare; float sysShare;
             bool success = Proc::getThreadCpuRatio(Proc::getTid(), cpuShare, sysShare);
             if (success) {
-                log(V3_VERB, "mainthread cpuratio=%.3f sys=%.3f\n", cpuShare, sysShare);
+                log(V3_VERB, "mainthread cpu=%i cpuratio=%.3f sys=%.3f\n", info.cpu, cpuShare, sysShare);
             }
 
             // For the current job
@@ -561,7 +560,7 @@ void Worker::handleSendClientRank(MessageHandle& handle) {
 void Worker::handleIncrementalJobFinished(MessageHandle& handle) {
     int jobId = Serializable::get<int>(handle.getRecvData());
     if (_job_db.has(jobId)) {
-        log(V3_VERB, "Incremental job %s is done\n", _job_db.get(jobId).toStr());
+        log(V3_VERB, "Incremental job %s done\n", _job_db.get(jobId).toStr());
         interruptJob(Serializable::get<int>(handle.getRecvData()), /*terminate=*/true, /*reckless=*/false);
     }
 }
@@ -739,7 +738,7 @@ void Worker::handleSendJobResult(MessageHandle& handle) {
         std::ofstream file;
         file.open(_params.solutionToFile());
         if (!file.is_open()) {
-            log(V0_CRIT, "ERROR: Could not open solution file\n");
+            log(V0_CRIT, "[ERROR] Could not open solution file\n");
         } else {
             file << resultString;
             file << modelString.str();
@@ -804,7 +803,7 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
         // Initiate search for a replacement for the defected child
         JobRequest req = job.getJobTree().getJobRequestFor(jobId, pruned, _job_db.getGlobalBalancingEpoch(), 
                 job.getDescription().getApplication());
-        log(LOG_ADD_DESTRANK | V4_VVER, "%s : try to find child replacing defected %s", nextNodeRank, 
+        log(LOG_ADD_DESTRANK | V4_VVER, "%s : request replacement for %s", nextNodeRank, 
                         job.toStr(), _job_db.toStr(jobId, index).c_str());
         MyMpi::isend(nextNodeRank, tag, req);
         _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
@@ -1035,9 +1034,8 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
         return;
     }
 
-    // Root node update message
     int thisIndex = job.getIndex();
-    log(job.getVolume() == volume || thisIndex == 0 ? V4_VVER : V3_VERB, "%s : update v=%i epoch=%i lastreqsepoch=%i\n", 
+    log(job.getVolume() == volume || thisIndex > 0 ? V4_VVER : V3_VERB, "%s : update v=%i epoch=%i lastreqsepoch=%i\n", 
         job.toStr(), volume, balancingEpoch, job.getJobTree().getBalancingEpochOfLastRequests());
     job.updateVolumeAndUsedCpu(volume);
 
@@ -1141,7 +1139,7 @@ void Worker::informClientJobIsDone(int jobId, int clientRank) {
     const JobResult& result = _job_db.get(jobId).getResult();
 
     // Send "Job done!" with advertised result size to client
-    log(LOG_ADD_DESTRANK | V4_VVER, "%s : send JOB_DONE to client", clientRank, _job_db.get(jobId).toStr());
+    log(LOG_ADD_DESTRANK | V4_VVER, "%s : inform client job is done", clientRank, _job_db.get(jobId).toStr());
     IntPair payload(jobId, result.getTransferSize());
     MyMpi::isend(clientRank, MSG_NOTIFY_JOB_DONE, payload);
 }

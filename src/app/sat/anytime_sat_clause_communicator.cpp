@@ -91,7 +91,7 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
 
     if (_job->getJobTree().isRoot()) {
         // Rank zero: proceed to broadcast
-        log(V2_INFO, "%s epoch %i: Broadcast clauses from %i sources\n", _job->toStr(), 
+        log(V3_VERB, "%s epoch %i: Broadcast clauses from %i sources\n", _job->toStr(), 
             _current_epoch, _num_aggregated_nodes+1);
         // Share complete set of clauses to children
         broadcastAndLearn(clausesToShare);
@@ -249,7 +249,7 @@ bool AnytimeSatClauseCommunicator::testConsistency(std::vector<int>& buffer, siz
     if (buffer.empty()) return true;
 
     if (maxSize > 0 && buffer.size() > maxSize) {
-        log(V0_CRIT, "ERROR: Clause buffer too full (%i/%i) - aborting\n", buffer.size(), maxSize);
+        log(V0_CRIT, "[ERROR] Clause buffer too full (%i/%i)\n", buffer.size(), maxSize);
         Logger::getMainInstance().flush();
         abort();
     }
@@ -328,7 +328,7 @@ bool AnytimeSatClauseCommunicator::testConsistency(std::vector<int>& buffer, siz
     }
 
     if (consistent > 0) {
-        log(V0_CRIT, "Consistency ERROR %i in clause buffer at position %i: \n", consistent, pos);
+        log(V0_CRIT, "[ERROR] Inconsistency %i in clause buffer at position %i: \n", consistent, pos);
         for (size_t p = 0; p < buffer.size(); p++) {
             if (p == pos) log(LOG_NO_PREFIX | V0_CRIT, "(%i) ", buffer[p]);
             else          log(LOG_NO_PREFIX | V0_CRIT, "%i ", buffer[p]);

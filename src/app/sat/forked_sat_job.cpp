@@ -26,7 +26,6 @@ void ForkedSatJob::appl_start() {
     if (_params.verbosity() >= V5_DEBG) hParams.printParams();
 
     const JobDescription& desc = getDescription();
-    log(V4_VVER, "%s : rev. %i\n", toStr(), desc.getRevision());
 
     _solver.reset(new HordeProcessAdapter(hParams, std::move(config),
         desc.getFormulaPayloadSize(0), 
@@ -52,7 +51,7 @@ void ForkedSatJob::loadIncrements() {
         _last_imported_revision++;
         size_t numLits = desc.getFormulaPayloadSize(_last_imported_revision);
         size_t numAssumptions = desc.getAssumptionsSize(_last_imported_revision);
-        log(V4_VVER, "%s : Load rev. %i : %i lits, %i assumptions\n", toStr(), 
+        log(V4_VVER, "%s : Forward rev. %i : %i lits, %i assumptions\n", toStr(), 
                 _last_imported_revision, numLits, numAssumptions);
         revisions.emplace_back(HordeProcessAdapter::RevisionData {
             _last_imported_revision,
@@ -172,26 +171,26 @@ void ForkedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& chec
     if (!_initialized) return;
     _solver->digestClauses(clauses, checksum);
     if (getJobTree().isRoot()) {
-        log(V2_INFO, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
+        log(V3_VERB, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
     }
 }
 
 void ForkedSatJob::startDestructThreadIfNecessary() {
     // Ensure concurrent destruction of shared memory
     if (!_destruct_thread.joinable() && !_shmem_freed) {
-        log(V4_VVER, "%s : freeing mem\n", toStr());
+        log(V4_VVER, "%s : FSJ freeing mem\n", toStr());
         _destruct_thread = std::thread([this]() {
             while (!Process::didChildExit(_solver_pid))
                 usleep(100*1000); // 0.1s
             _solver->freeSharedMemory();
-            log(V4_VVER, "%s : mem freed\n", toStr());
+            log(V4_VVER, "%s : FSJ mem freed\n", toStr());
             _shmem_freed = true;
         });
     }
 }
 
 ForkedSatJob::~ForkedSatJob() {
-    log(V4_VVER, "%s : enter destructor\n", toStr());
+    log(V5_DEBG, "%s : enter FSJ destructor\n", toStr());
 
     if (_initialized) _solver->setSolvingState(SolvingStates::ABORTING);
 
@@ -203,5 +202,5 @@ ForkedSatJob::~ForkedSatJob() {
         _solver = NULL;
     }
 
-    log(V4_VVER, "%s : destructed SAT job\n", toStr());
+    log(V5_DEBG, "%s : destructed FSJ\n", toStr());
 }

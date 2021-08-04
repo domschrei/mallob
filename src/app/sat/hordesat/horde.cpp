@@ -31,7 +31,7 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 	
     int appRank = config.apprank;
 
-	_logger.log(V2_INFO, "Hlib engine on job %s\n", config.getJobStr().c_str());
+	_logger.log(V4_VVER, "Hlib engine for %s\n", config.getJobStr().c_str());
 	//params.printParams();
 	_num_solvers = config.threads;
 	_job_id = config.jobid;
@@ -132,7 +132,7 @@ std::shared_ptr<PortfolioSolverInterface> HordeLib::createSolver(const SolverSet
 #endif
 	default:
 		// Invalid solver
-		_logger.log(V2_INFO, "Fatal error: Invalid solver \"%c\" assigned\n", setup.solverType);
+		_logger.log(V0_CRIT, "[ERROR] Invalid solver \"%c\" assigned\n", setup.solverType);
 		_logger.flush();
 		abort();
 		break;
@@ -277,11 +277,13 @@ void HordeLib::digestSharing(int* begin, int size, const Checksum& checksum) {
 void HordeLib::dumpStats(bool final) {
 	if (isCleanedUp() || !isFullyInitialized()) return;
 
+	int verb = final ? V3_VERB : V4_VVER;
+
 	// Local statistics
 	SolvingStatistics locSolveStats;
 	for (size_t i = 0; i < _num_solvers; i++) {
 		SolvingStatistics st = _solver_interfaces[i]->getStatistics();
-		_logger.log(V2_INFO, "%sS%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f recv:%lu digd:%lu disc:%lu\n",
+		_logger.log(verb, "%sS%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f recv:%lu digd:%lu disc:%lu\n",
 				final ? "END " : "",
 				_solver_interfaces[i]->getGlobalId(), 
 				st.propagations, st.decisions, st.conflicts, st.memPeak, 
@@ -297,7 +299,7 @@ void HordeLib::dumpStats(bool final) {
 
 	unsigned long exportedWithFailed = locShareStats.exportedClauses + locShareStats.clausesFilteredAtExport + locShareStats.clausesDroppedAtExport;
 	unsigned long importedWithFailed = locShareStats.importedClauses + locShareStats.clausesFilteredAtImport;
-	_logger.log(V2_INFO, "%spps:%lu decs:%lu cnfs:%lu mem:%0.2f exp:%lu/%lu(drp:%lu) imp:%lu/%lu\n",
+	_logger.log(verb, "%spps:%lu decs:%lu cnfs:%lu mem:%0.2f exp:%lu/%lu(drp:%lu) imp:%lu/%lu\n",
 			final ? "END " : "",
 			locSolveStats.propagations, locSolveStats.decisions, locSolveStats.conflicts, locSolveStats.memPeak, 
 			locShareStats.exportedClauses, exportedWithFailed, locShareStats.clausesDroppedAtExport, 
@@ -321,7 +323,7 @@ void HordeLib::dumpStats(bool final) {
 				histZeroesOnly += " " + std::to_string(val);
 			}
 		}
-		if (!hist.empty()) _logger.log(V2_INFO, "END clenhist:%s\n", hist.c_str());
+		if (!hist.empty()) _logger.log(V3_VERB, "END clenhist:%s\n", hist.c_str());
 
 		// Flush logs
 		for (auto& solver : _solver_interfaces) solver->getLogger().flush();
