@@ -319,6 +319,8 @@ void JobDatabase::terminate(int jobId) {
 
 void JobDatabase::forgetOldJobs() {
 
+    log(V5_DEBG, "scan for old jobs\n");
+
     std::vector<int> jobsToForget;
     int jobCacheSize = _params.jobCacheSize();
     size_t numJobsWithDescription = 0;

@@ -26,11 +26,11 @@ t=5
 n=0
 for i in {1..80}; do
     # wallclock limit, arrival, dependencies, application
-    introduce_job solve-$i instances/$(cat $benchmarkfile|head -$i|tail -1) 60 $t "" DUMMY 
+    introduce_job solve-$i instances/$(cat $benchmarkfile|head -$i|tail -1) 60 $t "" SAT #DUMMY 
     t=$((t+5))
     n=$((n+1))
 done
 
 RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $1 --oversubscribe build/mallob \
 -t=4 -l=1 -g=0.1 -cg=1 -satsolver=l -v=4 -T=600 -ch=1 -chaf=5 -chstms=60 -appmode=fork \
--cfhl=1 -smcl=30 -hmcl=30 -mlbdps=8 -checksums=1 -log=test_$$ -huca=0 -wam=10
+-cfhl=1 -smcl=30 -hmcl=30 -mlbdps=8 -checksums=0 -log=test_$$ -huca=0 -wam=10 -sleep=0
