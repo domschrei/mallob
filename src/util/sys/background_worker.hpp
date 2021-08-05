@@ -22,6 +22,9 @@ public:
     bool continueRunning() const {
         return !Terminator::isTerminating() && !_terminate;
     }
+    bool isRunning() const {
+        return _thread.joinable();
+    }
     void stop() {
         _terminate = true;
         if (_thread.joinable()) _thread.join();

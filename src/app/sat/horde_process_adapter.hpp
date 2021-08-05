@@ -26,6 +26,7 @@ public:
 
 private:
     Parameters _params;
+    HordeConfig _config;
     std::shared_ptr<Logger> _log;
 
     size_t _f_size;
@@ -52,6 +53,7 @@ private:
     robin_hood::unordered_flat_set<ShmemObject, ShmemObjectHasher> _shmem;
     std::string _shmem_id;
     HordeSharedMemory* _hsm = nullptr;
+    bool _initialized = false;
 
     int* _export_buffer;
     int* _import_buffer;
@@ -80,7 +82,6 @@ public:
     void appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision);
 
     void setSolvingState(SolvingStates::SolvingState state);
-    void applySolvingState();
 
     void collectClauses(int maxSize);
     bool hasCollectedClauses();
@@ -96,6 +97,8 @@ public:
     void freeSharedMemory();
 
 private:
+    void doInitialize();
+    void applySolvingState();
     void doDigest(const std::vector<int>& clauses, const Checksum& checksum);
     void initSharedMemory(HordeConfig&& config);
     void* createSharedMemoryBlock(std::string shmemSubId, size_t size, void* data);
