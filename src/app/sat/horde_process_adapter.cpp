@@ -13,9 +13,9 @@
 #include "util/logger.hpp"
 #include "comm/mympi.hpp"
 
-HordeProcessAdapter::HordeProcessAdapter(const Parameters& params, HordeConfig&& config,
+HordeProcessAdapter::HordeProcessAdapter(Parameters&& params, HordeConfig&& config,
     size_t fSize, const int* fLits, size_t aSize, const int* aLits) :    
-        _params(params), _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits) {
+        _params(std::move(params)), _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits) {
 
     initSharedMemory(std::move(config));
 }
@@ -54,8 +54,35 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
 
     _written_revision = -1;
     _desired_revision = _hsm->desiredRevision;
-    
-    _concurrent_shmem_allocator.run([this]() {
+}
+
+HordeProcessAdapter::~HordeProcessAdapter() {
+    freeSharedMemory();
+}
+
+void HordeProcessAdapter::freeSharedMemory() {
+    _background_worker.stop();
+
+    if (_hsm != nullptr) {
+        for (int rev = 0; rev <= _written_revision; rev++) {
+            size_t* solSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));
+            if (solSize != nullptr) {
+                char* solution = (char*) SharedMemory::access(_shmem_id + ".solution." + std::to_string(rev), *solSize * sizeof(int));
+                SharedMemory::free(_shmem_id + ".solution." + std::to_string(rev), solution, *solSize * sizeof(int));
+                SharedMemory::free(_shmem_id + ".solutionsize." + std::to_string(rev), (char*)solSize, sizeof(size_t));
+            }
+        }
+        _hsm = nullptr;
+    }
+    for (auto& shmemObj : _shmem) {
+        SharedMemory::free(shmemObj.id, (char*)shmemObj.data, shmemObj.size);
+    }
+    _shmem.clear();
+}
+
+void HordeProcessAdapter::run() {
+
+    _background_worker.run([this]() {
 
         // Allocate import and export buffers
         _export_buffer = (int*) createSharedMemoryBlock("clauseexport", 
@@ -72,9 +99,36 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
         createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
         _written_revision = 0;
 
+        // Assemble c-style program arguments
+        const char* execName = "mallob_sat_process";
+        char* const* argv = _params.asCArgs(execName);
+        
+        // FORK: Create a child process
+        pid_t res = Process::createChild();
+        if (res == 0) {
+            // [child process]
+            // Execute the SAT process.
+            int result = execvp("mallob_sat_process", argv);
+            
+            // If this is reached, something went wrong with execvp
+            log(V0_CRIT, "[ERROR] execvp returned %i with errno %i\n", result, (int)errno);
+            abort();
+        }
+
+        // [parent process]
+        int i = 1;
+        while (argv[i] != nullptr) free(argv[i++]);
+        delete[] argv;
+
         _hsm->doBegin = true;
 
-        while (_concurrent_shmem_allocator.continueRunning()) {
+        {
+            auto lock = _state_mutex.getLock();
+            _child_pid = res;
+            applySolvingState();
+        }
+
+        while (_background_worker.continueRunning()) {
             usleep(1000*10);
             RevisionData revData;
             {
@@ -94,67 +148,8 @@ void HordeProcessAdapter::initSharedMemory(HordeConfig&& config) {
     });
 }
 
-HordeProcessAdapter::~HordeProcessAdapter() {
-    freeSharedMemory();
-}
-
-void HordeProcessAdapter::freeSharedMemory() {
-    if (_hsm != nullptr) {
-        _concurrent_shmem_allocator.stop();
-        
-        for (int rev = 0; rev <= _written_revision; rev++) {
-            size_t* solSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));
-            if (solSize != nullptr) {
-                char* solution = (char*) SharedMemory::access(_shmem_id + ".solution." + std::to_string(rev), *solSize * sizeof(int));
-                SharedMemory::free(_shmem_id + ".solution." + std::to_string(rev), solution, *solSize * sizeof(int));
-                SharedMemory::free(_shmem_id + ".solutionsize." + std::to_string(rev), (char*)solSize, sizeof(size_t));
-            }
-        }
-        _hsm = nullptr;
-    }
-    for (auto& shmemObj : _shmem) {
-        SharedMemory::free(shmemObj.id, (char*)shmemObj.data, shmemObj.size);
-    }
-    _shmem.clear();
-}
-
-pid_t HordeProcessAdapter::run() {
-
-    // Assemble c-style program arguments
-    const char* execName = "mallob_sat_process";
-    char* const* argv = _params.asCArgs(execName);
-    
-    // FORK: Create a child process
-    pid_t res = Process::createChild();
-    if (res > 0) {
-        // [parent process]
-        _child_pid = res;
-        //while (!_hsm->isSpawned) usleep(250 /* 1/4 milliseconds */);
-        _state = SolvingStates::ACTIVE;
-
-        int i = 1;
-        while (argv[i] != nullptr) free(argv[i++]);
-        delete[] argv;
-
-        
-        return res;
-    }
-
-    // [child process]
-    // Execute the SAT process.
-    int result = execvp("mallob_sat_process", argv);
-    
-    // If this is reached, something went wrong with execvp
-    log(V0_CRIT, "[ERROR] execvp returned %i with errno %i\n", result, (int)errno);
-    abort();
-}
-
 bool HordeProcessAdapter::isFullyInitialized() {
     return _hsm->isInitialized;
-}
-
-pid_t HordeProcessAdapter::getPid() {
-    return _child_pid;
 }
 
 void HordeProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision) {
@@ -164,22 +159,26 @@ void HordeProcessAdapter::appendRevisions(const std::vector<RevisionData>& revis
 }
 
 void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
-    if (state == _state) return;
+    _state = state;
+    if (_hsm == nullptr || !_hsm->doBegin) return;
+    auto lock = _state_mutex.getLock();
+    applySolvingState();
 
-    if (state == SolvingStates::ABORTING) {
+}
+void HordeProcessAdapter::applySolvingState() {
+    assert(_child_pid != -1);
+    if (_state == SolvingStates::ABORTING) {
         //Fork::terminate(_child_pid); // Terminate child process by signal.
         _hsm->doTerminate = true; // Kindly ask child process to terminate.
         _hsm->doBegin = true; // Let child process know termination even if it waits for first revision
         Process::resume(_child_pid); // Continue (resume) process.
     }
-    if (state == SolvingStates::SUSPENDED || state == SolvingStates::STANDBY) {
+    if (_state == SolvingStates::SUSPENDED || _state == SolvingStates::STANDBY) {
         Process::suspend(_child_pid); // Stop (suspend) process.
     }
-    if (state == SolvingStates::ACTIVE) {
+    if (_state == SolvingStates::ACTIVE) {
         Process::resume(_child_pid); // Continue (resume) process.
     }
-
-    _state = state;
 }
 
 void HordeProcessAdapter::collectClauses(int maxSize) {
@@ -267,6 +266,16 @@ std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
     return std::pair<SatResult, std::vector<int>>(_hsm->result, solution);
 }
 
+void HordeProcessAdapter::waitUntilChildExited() {
+    while (true) {
+        {
+            auto lock = _state_mutex.getLock();
+            if (_child_pid == -1 || Process::didChildExit(_child_pid)) 
+                return;
+        }
+        usleep(100*1000); // 0.1s
+    }
+}
 
 void* HordeProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_t size, void* data) {
     std::string id = _shmem_id + "." + shmemSubId;

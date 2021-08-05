@@ -10,7 +10,7 @@ mkdir -p .api/jobs.0/{introduced,new,pending,done}/
 cleanup
 
 function test_mono() {
-    for mode in thread fork; do
+    for mode in fork thread; do
         for slv in lgc; do
 
             instancefile="instances/r3sat_300.cnf"

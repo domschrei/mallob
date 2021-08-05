@@ -19,7 +19,6 @@ private:
     std::atomic_bool _initialized = false;
 
     std::unique_ptr<HordeProcessAdapter> _solver;
-    int _solver_pid = -1;
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
     int _last_imported_revision = 0;
 

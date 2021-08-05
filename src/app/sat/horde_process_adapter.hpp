@@ -57,32 +57,30 @@ private:
     int* _import_buffer;
     std::list<std::pair<std::vector<int>, Checksum>> _temp_clause_buffers;
 
-    pid_t _child_pid;
+    pid_t _child_pid = -1;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
 
     std::atomic_int _written_revision = -1;
     int _published_revision = 0;
     int _desired_revision = -1;
 
-    BackgroundWorker _concurrent_shmem_allocator;
+    BackgroundWorker _background_worker;
     std::list<RevisionData> _revisions_to_write;
     Mutex _revisions_mutex;
+    Mutex _state_mutex;
 
 public:
-    HordeProcessAdapter(const Parameters& params, HordeConfig&& config,
+    HordeProcessAdapter(Parameters&& params, HordeConfig&& config,
             size_t fSize, const int* fLits, size_t aSize, const int* aLits);
     ~HordeProcessAdapter();
 
-    /*
-    Returns the PID of the spawned child process.
-    */
-    pid_t run();
+    void run();
     bool isFullyInitialized();
-    pid_t getPid();
 
     void appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision);
 
     void setSolvingState(SolvingStates::SolvingState state);
+    void applySolvingState();
 
     void collectClauses(int maxSize);
     bool hasCollectedClauses();
@@ -94,6 +92,7 @@ public:
     bool check();
     std::pair<SatResult, std::vector<int>> getSolution();
 
+    void waitUntilChildExited();
     void freeSharedMemory();
 
 private:

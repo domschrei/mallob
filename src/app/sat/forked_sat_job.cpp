@@ -27,7 +27,8 @@ void ForkedSatJob::appl_start() {
 
     const JobDescription& desc = getDescription();
 
-    _solver.reset(new HordeProcessAdapter(hParams, std::move(config),
+    _solver.reset(new HordeProcessAdapter(
+        std::move(hParams), std::move(config),
         desc.getFormulaPayloadSize(0), 
         desc.getFormulaPayload(0), 
         desc.getAssumptionsSize(0),
@@ -37,7 +38,7 @@ void ForkedSatJob::appl_start() {
     _clause_comm = (void*) new AnytimeSatClauseCommunicator(_params, this);
 
     //log(V5_DEBG, "%s : beginning to solve\n", toStr());
-    _solver_pid = _solver->run();
+    _solver->run();
     //log(V4_VVER, "%s : spawned child pid=%i\n", toStr(), _solver_pid);
     _time_of_start_solving = Timer::elapsedSeconds();
     _initialized = true;
@@ -180,8 +181,7 @@ void ForkedSatJob::startDestructThreadIfNecessary() {
     if (!_destruct_thread.joinable() && !_shmem_freed) {
         log(V4_VVER, "%s : FSJ freeing mem\n", toStr());
         _destruct_thread = std::thread([this]() {
-            while (!Process::didChildExit(_solver_pid))
-                usleep(100*1000); // 0.1s
+            _solver->waitUntilChildExited();
             _solver->freeSharedMemory();
             log(V4_VVER, "%s : FSJ mem freed\n", toStr());
             _shmem_freed = true;
