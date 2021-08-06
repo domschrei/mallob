@@ -24,8 +24,8 @@ private:
     const bool _use_checksums;
     const bool _use_cls_history;
 
-    ClauseHistory _cls_history;
     LockfreeClauseDatabase _cdb;
+    ClauseHistory _cls_history;
     std::vector<std::vector<int>> _clause_buffers;
     int _num_aggregated_nodes;
     int _current_epoch = 0;
@@ -38,8 +38,8 @@ public:
         _clause_buf_discount_factor(_params.clauseBufferDiscountFactor()),
         _use_checksums(params.useChecksums()),
         _use_cls_history(params.collectClauseHistory()),
-        _cls_history(_params, getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job),
         _cdb(_params.hardMaxClauseLength(), _params.maxLbdPartitioningSize(), _clause_buf_base_size, 1),
+        _cls_history(_params, getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job, _cdb),
         _num_aggregated_nodes(0) {
 
         _initialized = true;

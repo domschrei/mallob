@@ -6,6 +6,8 @@
 #include <functional>
 
 #include "util/sys/terminator.hpp"
+#include "util/logger.hpp"
+#include "util/sys/timer.hpp"
 
 class BackgroundWorker {
 
@@ -16,8 +18,11 @@ private:
 public:
     BackgroundWorker() {}
     void run(std::function<void()> runnable) {
+	    float time = Timer::elapsedSeconds();
         _terminate = false;
         _thread = std::thread(runnable);
+        time = Timer::elapsedSeconds() - time;
+        log(V5_DEBG, "starting bg worker took %.5fs\n");
     }
     bool continueRunning() const {
         return !Terminator::isTerminating() && !_terminate;

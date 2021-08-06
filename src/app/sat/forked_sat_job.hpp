@@ -19,7 +19,7 @@ private:
     std::atomic_bool _initialized = false;
 
     std::unique_ptr<HordeProcessAdapter> _solver;
-    void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
+    void* _clause_comm = nullptr; // SatClauseCommunicator instance (avoiding fwd decl.)
     int _last_imported_revision = 0;
 
     std::thread _destruct_thread;
@@ -64,6 +64,7 @@ public:
     void digestSharing(std::vector<int>& clauses, const Checksum& checksum) override;
 
 private:
+    bool checkClauseComm();
     void loadIncrements();
     void startDestructThreadIfNecessary();
 

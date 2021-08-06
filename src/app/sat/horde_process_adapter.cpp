@@ -12,10 +12,12 @@
 #include "util/sys/process.hpp"
 #include "util/logger.hpp"
 #include "comm/mympi.hpp"
+#include "app/sat/forked_sat_job.hpp"
+#include "app/sat/anytime_sat_clause_communicator.hpp"
 
-HordeProcessAdapter::HordeProcessAdapter(Parameters&& params, HordeConfig&& config,
+HordeProcessAdapter::HordeProcessAdapter(Parameters&& params, HordeConfig&& config, ForkedSatJob* job,
     size_t fSize, const int* fLits, size_t aSize, const int* aLits) :    
-        _params(std::move(params)), _config(std::move(config)), 
+        _params(std::move(params)), _config(std::move(config)), _job(job),
         _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits) {
 
     _written_revision = -1;
@@ -23,12 +25,12 @@ HordeProcessAdapter::HordeProcessAdapter(Parameters&& params, HordeConfig&& conf
 }
 
 void HordeProcessAdapter::run() {
-    _background_worker.run([this]() {
-        doInitialize();
-    });
+    _background_worker.run(std::bind(&HordeProcessAdapter::doInitialize, this));
 }
 
 void HordeProcessAdapter::doInitialize() {
+
+    _clause_comm = new AnytimeSatClauseCommunicator(_params, _job);
 
     // Initialize "management" shared memory
     _shmem_id = "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + "." 
@@ -125,6 +127,10 @@ void HordeProcessAdapter::doInitialize() {
     }
 }
 
+bool HordeProcessAdapter::hasClauseComm() {
+    return _initialized;
+}
+
 bool HordeProcessAdapter::isFullyInitialized() {
     return _initialized && _hsm->isInitialized;
 }
@@ -136,15 +142,15 @@ void HordeProcessAdapter::appendRevisions(const std::vector<RevisionData>& revis
 }
 
 void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
+    auto lock = _state_mutex.getLock();
     _state = state;
     if (!_initialized) return;
-    auto lock = _state_mutex.getLock();
     applySolvingState();
 
 }
 void HordeProcessAdapter::applySolvingState() {
     assert(_initialized && _child_pid != -1);
-    if (_state == SolvingStates::ABORTING) {
+    if (_state == SolvingStates::ABORTING && _hsm != nullptr) {
         //Fork::terminate(_child_pid); // Terminate child process by signal.
         _hsm->doTerminate = true; // Kindly ask child process to terminate.
         _hsm->doBegin = true; // Let child process know termination even if it waits for first revision
@@ -152,6 +158,7 @@ void HordeProcessAdapter::applySolvingState() {
     }
     if (_state == SolvingStates::SUSPENDED || _state == SolvingStates::STANDBY) {
         Process::suspend(_child_pid); // Stop (suspend) process.
+        ((AnytimeSatClauseCommunicator*)_clause_comm)->suspend();
     }
     if (_state == SolvingStates::ACTIVE) {
         Process::resume(_child_pid); // Continue (resume) process.
@@ -271,6 +278,7 @@ void* HordeProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_
 
 HordeProcessAdapter::~HordeProcessAdapter() {
     freeSharedMemory();
+    if (_clause_comm != nullptr) delete _clause_comm;
 }
 
 void HordeProcessAdapter::freeSharedMemory() {

@@ -28,14 +28,13 @@ void ForkedSatJob::appl_start() {
     const JobDescription& desc = getDescription();
 
     _solver.reset(new HordeProcessAdapter(
-        std::move(hParams), std::move(config),
+        std::move(hParams), std::move(config), this,
         desc.getFormulaPayloadSize(0), 
         desc.getFormulaPayload(0), 
         desc.getAssumptionsSize(0),
         desc.getAssumptionsPayload(0)
     ));
     loadIncrements();
-    _clause_comm = (void*) new AnytimeSatClauseCommunicator(_params, this);
 
     //log(V5_DEBG, "%s : beginning to solve\n", toStr());
     _solver->run();
@@ -73,7 +72,6 @@ void ForkedSatJob::loadIncrements() {
 void ForkedSatJob::appl_suspend() {
     if (!_initialized) return;
     _solver->setSolvingState(SolvingStates::SUSPENDED);
-    ((AnytimeSatClauseCommunicator*)_clause_comm)->suspend();
 }
 
 void ForkedSatJob::appl_resume() {
@@ -127,8 +125,16 @@ bool ForkedSatJob::appl_isDestructible() {
     return _shmem_freed;
 }
 
+bool ForkedSatJob::checkClauseComm() {
+    if (!_initialized) return false;
+    if (_clause_comm == nullptr && _solver->hasClauseComm()) 
+        _clause_comm = (void*)_solver->getClauseComm();
+    return _clause_comm != nullptr;
+}
+
 bool ForkedSatJob::appl_wantsToBeginCommunication() {
     if (!_initialized || getState() != ACTIVE || _job_comm_period <= 0) return false;
+    if (!checkClauseComm()) return false;
     // Special "timed" conditions for leaf nodes:
     if (getJobTree().isLeaf()) {
         // At least half a second since initialization / reactivation
@@ -142,6 +148,7 @@ bool ForkedSatJob::appl_wantsToBeginCommunication() {
 
 void ForkedSatJob::appl_beginCommunication() {
     if (!_initialized || getState() != ACTIVE) return;
+    if (!checkClauseComm()) return;
     log(V5_DEBG, "begincomm\n");
     ((AnytimeSatClauseCommunicator*) _clause_comm)->sendClausesToParent();
     if (getJobTree().isLeaf()) _time_of_last_comm = Timer::elapsedSeconds();
@@ -149,6 +156,7 @@ void ForkedSatJob::appl_beginCommunication() {
 
 void ForkedSatJob::appl_communicate(int source, JobMessage& msg) {
     if (!_initialized || getState() != ACTIVE) return;
+    if (!checkClauseComm()) return;
     log(V5_DEBG, "comm\n");
     ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, msg);
 }
@@ -193,14 +201,8 @@ ForkedSatJob::~ForkedSatJob() {
     log(V5_DEBG, "%s : enter FSJ destructor\n", toStr());
 
     if (_initialized) _solver->setSolvingState(SolvingStates::ABORTING);
-
     if (_destruct_thread.joinable()) _destruct_thread.join();
-
-    if (_initialized) {
-        delete (AnytimeSatClauseCommunicator*)_clause_comm;
-        _clause_comm = NULL;
-        _solver = NULL;
-    }
+    if (_initialized) _solver = NULL;
 
     log(V5_DEBG, "%s : destructed FSJ\n", toStr());
 }

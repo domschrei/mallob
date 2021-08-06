@@ -47,25 +47,20 @@ private:
     std::list<std::pair<int, int>> _missing_epoch_ranges;
     int _latest_epoch = -1;
 
-    LockfreeClauseDatabase _cdb;
+    LockfreeClauseDatabase& _cdb;
     BaseSatJob& _job;
 
     robin_hood::unordered_flat_map<int, Subscription> _subscribers;
     Subscription _subscription;
 
 public:
-    ClauseHistory(Parameters& params, int stmBufferSizePerEpoch, BaseSatJob& job) : 
+    ClauseHistory(Parameters& params, int stmBufferSizePerEpoch, BaseSatJob& job, LockfreeClauseDatabase& cdb) : 
         _aggregation_factor(params.clauseHistoryAggregationFactor()), 
         _num_stm_slots(params.clauseHistoryShortTermMemSize()), 
         _stm_buffer_size(stmBufferSizePerEpoch), 
         _ltm_buffer_size(params.clauseBufferBaseSize()), 
         _use_checksums(params.useChecksums()),
-        _cdb(
-            /*maxClauseSize=*/params.hardMaxClauseLength(), 
-            /*maxLbdPartitionedSize=*/params.maxLbdPartitioningSize(),
-            /*baseBufferSize=*/params.clauseBufferBaseSize(), 
-            /*numProducers=*/1
-	    ), _job(job) {}
+        _cdb(cdb), _job(job) {}
 
     // Should be called periodically but not to often in order to 
     // give the job nodes time to digest each batch of clauses.

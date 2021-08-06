@@ -12,6 +12,9 @@
 #include "data/checksum.hpp"
 #include "util/sys/background_worker.hpp"
 
+class ForkedSatJob; // fwd
+class AnytimeSatClauseCommunicator;
+
 class HordeProcessAdapter {
 
 public:
@@ -28,6 +31,9 @@ private:
     Parameters _params;
     HordeConfig _config;
     std::shared_ptr<Logger> _log;
+
+    ForkedSatJob* _job;
+    AnytimeSatClauseCommunicator* _clause_comm = nullptr;
 
     size_t _f_size;
     const int* _f_lits;
@@ -72,7 +78,7 @@ private:
     Mutex _state_mutex;
 
 public:
-    HordeProcessAdapter(Parameters&& params, HordeConfig&& config,
+    HordeProcessAdapter(Parameters&& params, HordeConfig&& config, ForkedSatJob* job,
             size_t fSize, const int* fLits, size_t aSize, const int* aLits);
     ~HordeProcessAdapter();
 
@@ -82,6 +88,9 @@ public:
     void appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision);
 
     void setSolvingState(SolvingStates::SolvingState state);
+
+    bool hasClauseComm();
+    AnytimeSatClauseCommunicator* getClauseComm() {return _clause_comm;}
 
     void collectClauses(int maxSize);
     bool hasCollectedClauses();

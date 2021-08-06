@@ -289,6 +289,10 @@ public:
         }
     }
 
+    ~LockfreeClauseDatabase() {
+        for (size_t i = 0; i < _buffers.size(); i++) delete _buffers[i];
+    }
+
     bool addClause(int producerId, const Clause& c) {
         auto& buf = getBuffer(c.size, c.lbd);
         if (buf.isNull()) return false;
