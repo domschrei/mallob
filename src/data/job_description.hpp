@@ -142,6 +142,8 @@ public:
     const int* getAssumptionsPayload(int revision) const;
     
     size_t getTransferSize(int revision) const;
+    
+    static int readRevisionIndex(const std::vector<uint8_t>& serialized);
 
 private:
     std::shared_ptr<std::vector<uint8_t>>& getRevisionData(int revision);

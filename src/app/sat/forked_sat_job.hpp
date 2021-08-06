@@ -6,6 +6,7 @@
 #include <memory>
 #include <thread>
 #include <atomic>
+#include <future>
 
 #include "app/job.hpp"
 #include "util/params.hpp"
@@ -22,7 +23,7 @@ private:
     void* _clause_comm = nullptr; // SatClauseCommunicator instance (avoiding fwd decl.)
     int _last_imported_revision = 0;
 
-    std::thread _destruct_thread;
+    std::future<void> _destruction;
     std::atomic_bool _shmem_freed = false;
 
     float _time_of_start_solving = 0;

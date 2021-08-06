@@ -97,11 +97,16 @@ constexpr int JobDescription::getMetadataSize() const {
 
 
 
-int JobDescription::prepareRevision(const std::vector<uint8_t>& packed) {
-    assert(packed.size() >= 2*sizeof(int)+2*sizeof(size_t));
+int JobDescription::readRevisionIndex(const std::vector<uint8_t>& serialized) {
+    assert(serialized.size() >= 2*sizeof(int)+2*sizeof(size_t));
     int revision;
-    memcpy(&revision, packed.data()+sizeof(int), sizeof(int));
+    memcpy(&revision, serialized.data()+sizeof(int), sizeof(int));
     assert(revision >= 0);
+    return revision;
+}
+
+int JobDescription::prepareRevision(const std::vector<uint8_t>& packed) {
+    int revision = JobDescription::readRevisionIndex(packed);
     while (revision >= _data_per_revision.size()) _data_per_revision.emplace_back();
     return revision;
 }

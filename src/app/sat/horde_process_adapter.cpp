@@ -14,6 +14,7 @@
 #include "comm/mympi.hpp"
 #include "app/sat/forked_sat_job.hpp"
 #include "app/sat/anytime_sat_clause_communicator.hpp"
+#include "util/sys/thread_pool.hpp"
 
 HordeProcessAdapter::HordeProcessAdapter(Parameters&& params, HordeConfig&& config, ForkedSatJob* job,
     size_t fSize, const int* fLits, size_t aSize, const int* aLits) :    
@@ -25,7 +26,9 @@ HordeProcessAdapter::HordeProcessAdapter(Parameters&& params, HordeConfig&& conf
 }
 
 void HordeProcessAdapter::run() {
-    _background_worker.run(std::bind(&HordeProcessAdapter::doInitialize, this));
+    ProcessWideThreadPool::get().addTask(
+        std::bind(&HordeProcessAdapter::doInitialize, this)
+    );
 }
 
 void HordeProcessAdapter::doInitialize() {
@@ -107,15 +110,31 @@ void HordeProcessAdapter::doInitialize() {
         _child_pid = res;
         applySolvingState();
     }
+}
 
-    while (_background_worker.continueRunning()) {
-        usleep(1000*10);
+void HordeProcessAdapter::startBackgroundWriterIfNecessary() {
+    if (!_initialized || _num_revisions_to_write == 0) return;
+    {
+        auto lock = _state_mutex.getLock();
+        if (!_bg_writer_running) {
+            _bg_writer_running = true;
+            _bg_writer = ProcessWideThreadPool::get().addTask(
+                std::bind(&HordeProcessAdapter::doWriteNextRevision, this)
+            );
+        }
+    }
+}
+
+void HordeProcessAdapter::doWriteNextRevision() {
+    
+    while (true) {
         RevisionData revData;
         {
             auto lock = _revisions_mutex.getLock();
-            if (_revisions_to_write.empty()) continue;
+            if (_revisions_to_write.empty()) break;
             revData = _revisions_to_write.front();
             _revisions_to_write.erase(_revisions_to_write.begin());
+            _num_revisions_to_write--;
         }
         auto revStr = std::to_string(revData.revision);
         createSharedMemoryBlock("fsize."       + revStr, sizeof(size_t),              (void*)&revData.fSize);
@@ -125,6 +144,9 @@ void HordeProcessAdapter::doInitialize() {
         createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
         _written_revision = revData.revision;
     }
+
+    auto lock = _state_mutex.getLock();
+    _bg_writer_running = false;
 }
 
 bool HordeProcessAdapter::hasClauseComm() {
@@ -139,6 +161,7 @@ void HordeProcessAdapter::appendRevisions(const std::vector<RevisionData>& revis
     auto lock = _revisions_mutex.getLock();
     _revisions_to_write.insert(_revisions_to_write.end(), revisions.begin(), revisions.end());
     _desired_revision = desiredRevision;
+    _num_revisions_to_write++;
 }
 
 void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
@@ -214,6 +237,8 @@ void HordeProcessAdapter::dumpStats() {
 bool HordeProcessAdapter::check() {
     if (!_initialized) return false;
 
+    startBackgroundWriterIfNecessary();
+
     if (_hsm->didImport)            _hsm->doImport            = false;
     if (_hsm->didStartNextRevision) _hsm->doStartNextRevision = false;
     if (_hsm->didDumpStats)         _hsm->doDumpStats         = false;
@@ -253,7 +278,7 @@ std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
 }
 
 void HordeProcessAdapter::waitUntilChildExited() {
-    if (!_initialized && !_background_worker.isRunning()) return;
+    if (!_initialized && !_bg_writer_running) return;
     while (true) {
         if (_initialized) {
             auto lock = _state_mutex.getLock();
@@ -282,8 +307,8 @@ HordeProcessAdapter::~HordeProcessAdapter() {
 }
 
 void HordeProcessAdapter::freeSharedMemory() {
-    _background_worker.stop();
-
+    _terminate = true;
+    if (_bg_writer_running) _bg_writer.get(); // wait for termination of background writer
     if (_hsm != nullptr) {
         for (int rev = 0; rev <= _written_revision; rev++) {
             size_t* solSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));

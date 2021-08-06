@@ -3,6 +3,7 @@
 #define DOMPASCH_MALLOB_HORDE_PROCESS_ADAPTER_H
 
 #include <list>
+#include <future>
 
 #include "util/logger.hpp"
 #include "util/sys/threading.hpp"
@@ -59,7 +60,11 @@ private:
     robin_hood::unordered_flat_set<ShmemObject, ShmemObjectHasher> _shmem;
     std::string _shmem_id;
     HordeSharedMemory* _hsm = nullptr;
-    bool _initialized = false;
+
+    volatile bool _initialized = false;
+    volatile bool _terminate = false;
+    volatile bool _bg_writer_running = false;
+    std::future<void> _bg_writer;
 
     int* _export_buffer;
     int* _import_buffer;
@@ -72,7 +77,7 @@ private:
     int _published_revision = 0;
     int _desired_revision = -1;
 
-    BackgroundWorker _background_worker;
+    std::atomic_int _num_revisions_to_write = 0;
     std::list<RevisionData> _revisions_to_write;
     Mutex _revisions_mutex;
     Mutex _state_mutex;
@@ -86,6 +91,7 @@ public:
     bool isFullyInitialized();
 
     void appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision);
+    void startBackgroundWriterIfNecessary();
 
     void setSolvingState(SolvingStates::SolvingState state);
 
@@ -107,6 +113,8 @@ public:
 
 private:
     void doInitialize();
+    void doWriteNextRevision();
+
     void applySolvingState();
     void doDigest(const std::vector<int>& clauses, const Checksum& checksum);
     void initSharedMemory(HordeConfig&& config);

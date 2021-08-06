@@ -30,6 +30,12 @@ void ConditionVariable::wait(Mutex& mutex, std::function<bool()> condition) {
     auto lock = mutex.getLock();
     while (!condition()) condvar.wait(lock);
 }
+void ConditionVariable::waitWithLockedMutex(std::unique_lock<std::mutex>& lock, std::function<bool()> condition) {
+    while (!condition()) condvar.wait(lock);
+}
+void ConditionVariable::notifySingle() {
+    condvar.notify_one();
+}
 void ConditionVariable::notify() {
     condvar.notify_all();
 }

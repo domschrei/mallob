@@ -23,6 +23,8 @@ private:
     
 public:
     void wait(Mutex& mutex, std::function<bool()> condition);
+	void waitWithLockedMutex(std::unique_lock<std::mutex>& lock, std::function<bool()> condition);
+	void notifySingle();
 	void notify();
 };
 

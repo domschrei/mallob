@@ -11,6 +11,7 @@
 #include "util/sys/proc.hpp"
 #include "util/sys/process.hpp"
 #include "horde_config.hpp"
+#include "util/sys/thread_pool.hpp"
 
 ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId) : 
         BaseSatJob(params, commSize, worldRank, jobId), _job_comm_period(params.appCommPeriod()) {
@@ -186,9 +187,9 @@ void ForkedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& chec
 
 void ForkedSatJob::startDestructThreadIfNecessary() {
     // Ensure concurrent destruction of shared memory
-    if (!_destruct_thread.joinable() && !_shmem_freed) {
+    if (!_destruction.valid() && !_shmem_freed) {
         log(V4_VVER, "%s : FSJ freeing mem\n", toStr());
-        _destruct_thread = std::thread([this]() {
+        _destruction = ProcessWideThreadPool::get().addTask([this]() {
             _solver->waitUntilChildExited();
             _solver->freeSharedMemory();
             log(V4_VVER, "%s : FSJ mem freed\n", toStr());
@@ -201,7 +202,7 @@ ForkedSatJob::~ForkedSatJob() {
     log(V5_DEBG, "%s : enter FSJ destructor\n", toStr());
 
     if (_initialized) _solver->setSolvingState(SolvingStates::ABORTING);
-    if (_destruct_thread.joinable()) _destruct_thread.join();
+    if (_destruction.valid()) _destruction.get();
     if (_initialized) _solver = NULL;
 
     log(V5_DEBG, "%s : destructed FSJ\n", toStr());

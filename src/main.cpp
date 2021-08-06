@@ -14,6 +14,7 @@
 #include "util/sys/proc.hpp"
 #include "worker.hpp"
 #include "client.hpp"
+#include "util/sys/thread_pool.hpp"
 
 #ifndef MALLOB_VERSION
 #define MALLOB_VERSION "(dbg)"
@@ -59,6 +60,7 @@ int main(int argc, char *argv[]) {
 
     // Initialize bookkeeping of child processes and signals
     Process::init(rank);
+    ProcessWideThreadPool::init(8);
 
     Parameters params;
     params.init(argc, argv);

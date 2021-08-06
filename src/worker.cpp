@@ -688,7 +688,11 @@ void Worker::handleSendJobDescription(MessageHandle& handle) {
 
     // If job has not started yet, execute it now
     if (_job_db.hasCommitment(jobId)) {
-        _job_db.uncommit(jobId);
+        {
+            const auto& req = _job_db.getCommitment(jobId);
+            job.setDesiredRevision(req.revision);
+            _job_db.uncommit(jobId);
+        }
         _job_db.execute(jobId, handle.source);
         initiateVolumeUpdate(jobId);
     } 
