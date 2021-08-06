@@ -318,7 +318,7 @@ void Client::introduceNextJob() {
 
 void Client::handleOfferAdoption(MessageHandle& handle) {
     JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
-    log(V4_VVER, "OFFER for %s\n", req.toStr().c_str());
+    log(V3_VERB, "Scheduling %s on [%i]\n", req.toStr().c_str(), handle.source);
     
     const JobDescription& desc = *_active_jobs[req.jobId];
     assert(desc.getId() == req.jobId || log_return_false("%i != %i\n", desc.getId(), req.jobId));
