@@ -19,6 +19,7 @@ source $(dirname "$0")/systest_commons.sh
 
 mkdir -p .api/jobs.0/
 mkdir -p .api/jobs.0/{introduced,new,pending,done}/
+mkdir -p runs
 cleanup
 
 # Generate chain of interdependent jobs
@@ -32,12 +33,13 @@ while read -r instance; do
     i=$((i+1))
 done < $benchmarkfile
 
-RDMAV_FORK_SAFE=1 PATH=build/:$PATH nohup mpirun -np $1 --oversubscribe build/mallob \
--t=4 -l=1 -g=0.1 -cg=1 -satsolver=l -v=3 -T=600 -ch=1 -chaf=5 -chstms=60 -appmode=fork \
--cfhl=1 -smcl=30 -hmcl=30 -mlbdps=8 -checksums=0 -log=test_$$ -huca=0 -wam=1000 -sleep=0 \
-2>&1 > OUT &
+# Set options
+options="-t=4 -satsolver=lcg -v=3 -ch=0 -chaf=5 -chstms=60 -cfhl=0 -smcl=30 -hmcl=30 -mlbdps=8 -checksums=0 -huca=0 -wam=1000 -sleep=100"
+
+# Launch Mallob
+runid="sateval_$(hostname)_$(git rev-parse --short HEAD)_np${1}_"$(echo $options|sed 's/-//g'|sed 's/=//g'|sed 's/ /_/g')
+RDMAV_FORK_SAFE=1 PATH=build/:$PATH nohup mpirun -np $1 --oversubscribe build/mallob -log=runs/$runid $options 2>&1 > OUT &
 
 echo "Use \"tail -f OUT\" to follow output"
 echo "Use \"killall mpirun\" to terminate"
-sleep 1
-echo ""
+sleep 1; echo "" # To mend ugly linebreak done by nohup
