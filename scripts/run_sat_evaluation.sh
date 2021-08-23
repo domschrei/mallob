@@ -32,6 +32,12 @@ while read -r instance; do
     i=$((i+1))
 done < $benchmarkfile
 
-RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $1 --oversubscribe build/mallob \
--t=4 -l=1 -g=0.1 -cg=1 -satsolver=l -v=4 -T=600 -ch=1 -chaf=5 -chstms=60 -appmode=fork \
--cfhl=1 -smcl=30 -hmcl=30 -mlbdps=8 -checksums=0 -log=test_$$ -huca=0 -wam=1000 -sleep=0
+RDMAV_FORK_SAFE=1 PATH=build/:$PATH nohup mpirun -np $1 --oversubscribe build/mallob \
+-t=4 -l=1 -g=0.1 -cg=1 -satsolver=l -v=3 -T=600 -ch=1 -chaf=5 -chstms=60 -appmode=fork \
+-cfhl=1 -smcl=30 -hmcl=30 -mlbdps=8 -checksums=0 -log=test_$$ -huca=0 -wam=1000 -sleep=0 \
+2>&1 > OUT &
+
+echo "Use \"tail -f OUT\" to follow output"
+echo "Use \"killall mpirun\" to terminate"
+sleep 1
+echo ""
