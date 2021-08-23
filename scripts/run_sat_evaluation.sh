@@ -8,6 +8,7 @@ if [ -z $2 ]; then
     for f in *.cnf ; do
        echo $f >> _benchmark_local
     done
+    shuf _benchmark_local -o _benchmark_local
     cd ..
     benchmarkfile="instances/_benchmark_local"
 else

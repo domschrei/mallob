@@ -3,7 +3,7 @@
 #set -e
 
 function gettrueresult() {
-    trueresult=$(cat RESULTS/sc2020instances|grep "$1"|awk '{print $3}')
+    trueresult=$(cat instances/metadata|grep "$1"|awk '{print $3}')
     if [ $trueresult != sat ] && [ $trueresult != unsat ] && [ $trueresult != unknown ]; then
         echo "Internal error: Instance $instance not found"
         #exit 1
