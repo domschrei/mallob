@@ -34,7 +34,8 @@ cd build
 cmake .. <cmake-options>
 make
 ```
-If you want to make use of Glucose as a SAT solver, use the cmake option `-DMALLOB_USE_RESTRICTED=1` (after having read the Licensing section below).
+If you want to make use of Glucose as a SAT solver, use the cmake option `-DMALLOB_USE_GLUCOSE=1` (after having read the Licensing section below).
+MergeSAT is not included either by default because it is in an experimental stage; use `-DMALLOB_USE_MERGESAT=1` to enable it.
 Use `-DMALLOB_USE_ASAN=1` to build Mallob with Address Sanitizer for debugging purposes.
 
 ### Docker
@@ -189,7 +190,7 @@ Mallob can be extended in the following ways:
 In its default configuration, the source code of Mallob can be used, changed and redistributed under the terms of the Lesser General Public License (LGPLv3), one notable exception being the source file `src/app/sat/hordesat/solvers/glucose.cpp` (see below).
 The used versions of Lingeling and YalSAT are MIT-licensed, as is HordeSat.
 
-The Glucose interface of Mallob, unfortunately, is non-free software due to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE). Notably, its usage in competitive events is restricted. So when compiling Mallob with `MALLOB_USE_RESTRICTED=1` make sure that you have read and understood these restrictions.
+The Glucose interface of Mallob, unfortunately, is non-free software due to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE). Notably, its usage in competitive events is restricted. So when compiling Mallob with `MALLOB_USE_GLUCOSE=1` make sure that you have read and understood these restrictions.
 
 <hr/>
 

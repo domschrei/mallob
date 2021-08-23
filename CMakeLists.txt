@@ -23,20 +23,38 @@ endif()
 
 # Libraries and includes
 
-link_directories(lib/lingeling lib/yalsat lib/cadical lib/glucose lib/mergesat)
-set(BASE_LIBS ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} m z lgl yals pthread cadical mergesat rt dl)
-set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib/lingeling lib/glucose lib)
+# Add new default solvers here
+link_directories(lib/lingeling lib/yalsat lib/cadical)
+set(BASE_LIBS ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} m z lgl yals pthread cadical rt dl)
+set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib/lingeling lib)
+
+set(MALLOB_SOLVERS "lingeling yalsat cadical") # add new default solvers here
+if(MALLOB_USE_GLUCOSE)
+    set(MALLOB_SOLVERS "${MALLOB_SOLVERS} glucose")
+    link_directories(lib/glucose)
+    set(BASE_SOURCES ${BASE_SOURCES} src/app/sat/hordesat/solvers/glucose.cpp)
+    set(BASE_LIBS ${BASE_LIBS} glucose)
+    set(BASE_INCLUDES ${BASE_INCLUDES} lib/glucose)
+    add_definitions(-DMALLOB_USE_GLUCOSE)
+endif()    
+if(MALLOB_USE_MERGESAT)
+    link_directories(lib/mergesat)
+    set(BASE_SOURCES ${BASE_SOURCES} src/app/sat/hordesat/solvers/mergesat.cpp)
+    set(BASE_LIBS ${BASE_LIBS} mergesat)
+    add_definitions(-DMALLOB_USE_MERGESAT)
+endif()    
+# Add new non-default solvers here
 
 
 # Source files
 
-set(BASE_SOURCES
+set(BASE_SOURCES ${BASE_SOURCES}
     src/app/job.cpp 
     src/app/dummy/dummy_reader.cpp
     src/app/sat/anytime_sat_clause_communicator.cpp src/app/sat/forked_sat_job.cpp src/app/sat/horde_config.cpp src/app/sat/horde_process_adapter.cpp 
     src/app/sat/hordesat/horde.cpp 
     src/app/sat/hordesat/sharing/default_sharing_manager.cpp 
-    src/app/sat/hordesat/solvers/cadical.cpp src/app/sat/hordesat/solvers/lingeling.cpp src/app/sat/hordesat/solvers/mergesat.cpp src/app/sat/hordesat/solvers/portfolio_solver_interface.cpp src/app/sat/hordesat/solvers/solver_thread.cpp src/app/sat/hordesat/solvers/solving_state.cpp 
+    src/app/sat/hordesat/solvers/cadical.cpp src/app/sat/hordesat/solvers/lingeling.cpp src/app/sat/hordesat/solvers/portfolio_solver_interface.cpp src/app/sat/hordesat/solvers/solver_thread.cpp src/app/sat/hordesat/solvers/solving_state.cpp 
     src/app/sat/hordesat/utilities/buffer_manager.cpp src/app/sat/hordesat/utilities/clause_database.cpp src/app/sat/hordesat/utilities/clause_filter.cpp 
     src/app/sat/threaded_sat_job.cpp 
     src/balancing/balancer.cpp src/balancing/collective_assignment.cpp src/balancing/event_driven_balancer.cpp src/balancing/rounding.cpp 
@@ -46,15 +64,6 @@ set(BASE_SOURCES
     src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/raw_thread.cpp src/util/sys/shared_memory.cpp src/util/sys/terminator.cpp src/util/sys/threading.cpp src/util/sys/thread_pool.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp
     src/util/ringbuf/ringbuf.c
 )
-set(RESTRICTED_SOURCES src/app/sat/hordesat/solvers/glucose.cpp)
-
-if(MALLOB_USE_RESTRICTED)
-    set(BASE_SOURCES ${BASE_SOURCES} ${RESTRICTED_SOURCES})
-    set(BASE_LDIRS ${BASE_LDIRS} src/app/sat/hordesat/glucose)
-    set(BASE_LIBS ${BASE_LIBS} glucose)
-    set(BASE_INCLUDES ${BASE_INCLUDES} src/app/sat/hordesat/glucose)
-    add_definitions(-DMALLOB_USE_RESTRICTED)
-endif()
 
 
 # Library with source files common to mallob and mallob_sat_process

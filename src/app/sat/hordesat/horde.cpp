@@ -10,8 +10,10 @@
 #include "util/sys/timer.hpp"
 #include "solvers/cadical.hpp"
 #include "solvers/lingeling.hpp"
+#ifdef MALLOB_USE_MERGESAT
 #include "solvers/mergesat.hpp"
-#ifdef MALLOB_USE_RESTRICTED
+#endif
+#ifdef MALLOB_USE_GLUCOSE
 #include "solvers/glucose.hpp"
 #endif
 
@@ -116,13 +118,15 @@ std::shared_ptr<PortfolioSolverInterface> HordeLib::createSolver(const SolverSet
 		_logger.log(V4_VVER, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new Cadical(setup));
 		break;
+#ifdef MALLOB_USE_MERGESAT
 	case 'm':
 	//case 'M': // no support for incremental mode as of now
 		// MergeSat
 		_logger.log(V4_VVER, "S%i : MergeSat-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new MergeSatBackend(setup));
 		break;
-#ifdef MALLOB_USE_RESTRICTED
+#endif
+#ifdef MALLOB_USE_GLUCOSE
 	case 'g':
 	//case 'G': // no support for incremental mode as of now
 		// Glucose

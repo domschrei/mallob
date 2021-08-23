@@ -2,9 +2,16 @@
 
 set -e
 
-bash fetch_solvers.sh
+if [ -z $1 ]; then
+    solvers="cglmy"
+    echo "Defaulting to solvers $solvers (supply another string to override solvers to build)"
+else
+    solvers="$1"
+fi
 
-if [ ! -f mergesat/libmergesat.a ]; then
+bash fetch_solvers.sh $solvers
+
+if echo $solvers|grep -q "m" && [ ! -f mergesat/libmergesat.a ]; then
 
     # Get MergeSat (pre-patched)
     tar xzvf mergesat-patched.tar.gz
@@ -14,11 +21,9 @@ if [ ! -f mergesat/libmergesat.a ]; then
     make all -j $(nproc)
     cp build/release/lib/libmergesat.a .
     cd ..
-else
-    echo "Assuming that a correct installation of MergeSat is present."
 fi
 
-if [ ! -f glucose/libglucose.a ]; then
+if echo $solvers|grep -q "g" && [ ! -f glucose/libglucose.a ]; then
 
     echo "Fetching Glucose ..."
 
@@ -34,14 +39,12 @@ if [ ! -f glucose/libglucose.a ]; then
     
     # Make Glucose
     cd glucose/simp
-    make rs libr
+    make libr
     cp lib.a ../libglucose.a
     cd ../..
-else
-    echo "Assuming that a correct installation of Glucose is present."
 fi
 
-if [ ! -f yalsat/libyals.a ]; then
+if echo $solvers|grep -q "y" && [ ! -f yalsat/libyals.a ]; then
 
     echo "Fetching YalSAT ..."
     
@@ -55,11 +58,9 @@ if [ ! -f yalsat/libyals.a ]; then
     ./configure.sh
     make
     cd ..
-else
-    echo "Assuming that a correct installation of YalSAT is present."
 fi
 
-if [ ! -f lingeling/liblgl.a ]; then
+if echo $solvers|grep -q "l" && [ ! -f lingeling/liblgl.a ]; then
     
     echo "Fetching lingeling ..."
     
@@ -73,11 +74,9 @@ if [ ! -f lingeling/liblgl.a ]; then
     ./configure.sh
     make
     cd ..
-else
-    echo "Assuming that a correct installation of Lingeling is present."
 fi
 
-if [ ! -f cadical/libcadical.a ]; then
+if echo $solvers|grep -q "c" && [ ! -f cadical/libcadical.a ]; then
 
     echo "Fetching CaDiCaL ..."
 
@@ -92,7 +91,4 @@ if [ ! -f cadical/libcadical.a ]; then
     make
     cp build/libcadical.a .
     cd ..
-
-else
-    echo "Assuming that a correct installation of CaDiCaL is present."
 fi
