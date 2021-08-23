@@ -60,10 +60,11 @@ int main(int argc, char *argv[]) {
 
     // Initialize bookkeeping of child processes and signals
     Process::init(rank);
-    ProcessWideThreadPool::init(8);
 
     Parameters params;
     params.init(argc, argv);
+
+    ProcessWideThreadPool::init(params.numThreadsPerProcess());
 
     bool quiet = params.quiet();
     if (params.zeroOnlyLogging() && rank > 0) quiet = true;

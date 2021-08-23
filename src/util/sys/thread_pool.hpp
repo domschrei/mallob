@@ -44,7 +44,7 @@ public:
             _job_queue.push_back(std::move(r));
             future = _job_queue.back().promise.get_future();
         }
-        _job_queue_cond_var.notifySingle();
+        _job_queue_cond_var.notify();
         return future;
     }
 

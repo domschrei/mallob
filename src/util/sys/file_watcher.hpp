@@ -15,9 +15,9 @@
 
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
-#include "util/sys/thread_group.hpp"
 #include "util/logger.hpp"
 #include "util/sys/background_worker.hpp"
+#include "util/sys/thread_pool.hpp"
 
 class FileWatcher {
 
@@ -41,11 +41,11 @@ public:
     FileWatcher() = default;
     FileWatcher(const std::string& directory, int events, 
         std::function<void(const Event&, Logger&)> callback, Logger& logger,
-        InitialFilesHandling initFilesHandling = IGNORE, size_t numThreads = 1) : 
+        InitialFilesHandling initFilesHandling = IGNORE) : 
     
             _directory(directory), _callback(callback), _init_files_handling(initFilesHandling) {
         
-        _worker.run([events, this, numThreads, &logger]() {
+        _worker.run([events, this, &logger]() {
 
             FileUtils::mkdir(_directory);
 
@@ -69,12 +69,8 @@ public:
                 abort();
             }
 
-            // Initialize thread group
-            std::vector<Logger> loggers;
-            for (size_t i = 0; i < numThreads; i++) {
-                loggers.push_back(logger.copy(std::to_string(i), ""));
-            }
-            ThreadGroup<Logger> threads(numThreads, loggers);
+            // Initialize logger for thread pool tasks
+            auto sublogger = logger.copy(std::string("T"), "");
 
             // Read job files which may already exist
             if (_init_files_handling == TRIGGER_CREATE_EVENT) {
@@ -96,8 +92,8 @@ public:
                     if (FileUtils::isRegularFile(filenameStr)) {
                         // Trigger CREATE event
                         //logger.log(V4_VVER, "FileWatcher: File event\n");
-                        threads.doTask([this, entry] (Logger& lg) {
-                            _callback(FileWatcher::Event{IN_CREATE, entry}, lg);
+                        ProcessWideThreadPool::get().addTask([this, entry, &sublogger] () {
+                            _callback(FileWatcher::Event{IN_CREATE, entry}, sublogger);
                         });
                     }
                     if (!_worker.continueRunning()) return;
@@ -122,7 +118,7 @@ public:
                     inotify_event* event = (inotify_event*) &buffer[i];
                     Event ev{event->mask, std::string(event->name, event->len)};
                     //logger.log(V4_VVER, "FileWatcher: File event\n");
-                    threads.doTask([this, ev](Logger& lg) {_callback(ev, lg);});
+                    ProcessWideThreadPool::get().addTask([this, ev, &sublogger] () {_callback(ev, sublogger);});
                     i += eventSize + event->len;
                 }
             }

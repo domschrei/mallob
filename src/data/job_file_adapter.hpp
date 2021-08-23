@@ -63,7 +63,7 @@ public:
         _base_path(basePath),
         _new_jobs_watcher(_base_path + "/new/", (int) (IN_MOVED_TO | IN_MODIFY | IN_CLOSE_WRITE), 
             [&](const FileWatcher::Event& event, Logger& log) {handleNewJob(event, log);},
-            _logger, FileWatcher::InitialFilesHandling::TRIGGER_CREATE_EVENT, /*numThreads=*/1),
+            _logger, FileWatcher::InitialFilesHandling::TRIGGER_CREATE_EVENT),
         _results_watcher(_base_path + "/done/", (int) (IN_DELETE | IN_MOVED_FROM), 
             [&](const FileWatcher::Event& event, Logger& log) {handleJobResultDeleted(event, log);}, 
             _logger) {

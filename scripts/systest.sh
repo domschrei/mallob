@@ -78,10 +78,10 @@ function test_incremental_scheduling() {
 }
 
 test_incremental_scheduling
-#test_incremental
-#test_mono
-#test_scheduling
-#test_oscillating
-#test_many_incremental
+test_incremental
+test_mono
+test_scheduling
+test_oscillating
+test_many_incremental
 
 echo "All tests done."
