@@ -125,8 +125,7 @@ void CollectiveAssignment::resolveRequests() {
             // Is there a non-optimal fit for this request?
 
             bool canAdopt = _job_db->isIdle() && !_job_db->hasCommitment();
-            // If #hops is large enough or this is a root request: self?
-            if (canAdopt && (req.numHops >= 5 || req.requestedNodeIndex == 0)) {
+            if (canAdopt) {
                 destination = MyMpi::rank(MPI_COMM_WORLD);
             } else {
                 // -- other PE?
@@ -136,11 +135,6 @@ void CollectiveAssignment::resolveRequests() {
                         break;
                     }
                 }
-            }
-
-            if (destination < 0 && canAdopt) {
-                // Still no fit found: Adopt the request yourself even if #hops is small
-                destination = MyMpi::rank(MPI_COMM_WORLD);
             }
         }
 
