@@ -33,7 +33,7 @@ done < $benchmarkfile
 options="-t=4 -lbc=4 -g=0.1 -satsolver=lcg -v=4 -J=$(($i-1)) -ch=1 -chaf=5 -chstms=60 -cfhl=0 -smcl=30 -hmcl=30 -mlbdps=8 -checksums=0 -huca=0 -wam=1000 -sleep=100"
 
 # Launch Mallob
-runid="sateval_$(hostname)_$(git rev-parse --short HEAD)_np${1}_"$(echo $options|sed 's/-//g'|sed 's/=//g'|sed 's/ /_/g')
+runid="sched_$(hostname)_$(git rev-parse --short HEAD)_np${1}_"$(echo $options|sed 's/-//g'|sed 's/=//g'|sed 's/ /_/g')
 RDMAV_FORK_SAFE=1 PATH=build/:$PATH nohup mpirun -np $1 --oversubscribe build/mallob -log=runs/$runid $options 2>&1 > OUT &
 
 echo "Use \"tail -f OUT\" to follow output"
