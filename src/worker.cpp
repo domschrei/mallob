@@ -145,6 +145,54 @@ void Worker::init() {
     }
 }
 
+void Worker::createExpanderGraph() {
+
+    // Pick fixed number k of bounce destinations
+    int numBounceAlternatives = _params.numBounceAlternatives();
+    int numWorkers = MyMpi::size(_comm);
+    if (numWorkers == 1) return; // no hops
+
+    // Check validity of num bounce alternatives
+    if (2*numBounceAlternatives > numWorkers) {
+        numBounceAlternatives = numWorkers / 2;
+        log(V1_WARN, "[WARN] Num bounce alternatives must be at most half the number of workers!\n");
+        log(V1_WARN, "[WARN] Falling back to safe value r=%i.\n", numBounceAlternatives);
+    }  
+
+    // Create graph, get outgoing edges from this node
+    if (_params.maxIdleDistance() > 0) {
+        _hop_destinations = AdjustablePermutation::createUndirectedExpanderGraph(numWorkers, numBounceAlternatives, _world_rank);        
+    } else {
+        auto permutations = AdjustablePermutation::getPermutations(numWorkers, numBounceAlternatives);
+        _hop_destinations = AdjustablePermutation::createExpanderGraph(permutations, _world_rank);
+        if (_params.hopsUntilCollectiveAssignment() >= 0)
+            _coll_assign = CollectiveAssignment(
+                _job_db, MyMpi::size(_comm), 
+                AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, _world_rank), 
+                // Callback for receiving a job request
+                [&](const JobRequest& req, int rank) {
+                    MessageHandle handle;
+                    handle.tag = MSG_REQUEST_NODE;
+                    handle.finished = true;
+                    handle.receiveSelfMessage(req.serialize(), rank);
+                    handleRequestNode(handle, JobDatabase::NORMAL);
+                }
+            );
+            _job_db.setCollectiveAssignment(_coll_assign);
+    }
+    for (int dest : _hop_destinations) {
+        _neighbor_idle_distance[dest] = 0; // initially, all workers are idle
+    }
+
+    // Output found bounce alternatives
+    std::string info = "";
+    for (size_t i = 0; i < _hop_destinations.size(); i++) {
+        info += std::to_string(_hop_destinations[i]) + " ";
+    }
+    log(V3_VERB, "My bounce alternatives: %s\n", info.c_str());
+    assert((int)_hop_destinations.size() == numBounceAlternatives);
+}
+
 void Worker::mainProgram() {
 
     int iteration = 0;
@@ -174,7 +222,6 @@ void Worker::mainProgram() {
         if (wasIdle != _job_db.isIdle()) {
             // Load status changed since last cycle
             sendStatusToNeighbors();
-            if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
             wasIdle = !wasIdle;
         }
         
@@ -374,8 +421,6 @@ void Worker::handleAnswerAdoptionOffer(MessageHandle& handle) {
     } else {
         // Rejected
         log(LOG_ADD_SRCRANK | V4_VVER, "Rejected to become %s : uncommitting", handle.source, job.toStr());
-        if (_params.hopsUntilCollectiveAssignment() >= 0 && _job_db.isIdle()) 
-            _coll_assign.setStatusDirty();
         _job_db.uncommit(req.jobId);
     }
 }
@@ -541,7 +586,6 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
             // Continue job finding procedure somewhere else
             bounceJobRequest(req, handle.source);
         }
-        if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
     }
 }
 
@@ -1217,53 +1261,6 @@ bool Worker::checkTerminate(float time) {
         return true;
     }
     return false;
-}
-
-void Worker::createExpanderGraph() {
-
-    // Pick fixed number k of bounce destinations
-    int numBounceAlternatives = _params.numBounceAlternatives();
-    int numWorkers = MyMpi::size(_comm);
-    if (numWorkers == 1) return; // no hops
-
-    // Check validity of num bounce alternatives
-    if (2*numBounceAlternatives > numWorkers) {
-        numBounceAlternatives = numWorkers / 2;
-        log(V1_WARN, "[WARN] Num bounce alternatives must be at most half the number of workers!\n");
-        log(V1_WARN, "[WARN] Falling back to safe value r=%i.\n", numBounceAlternatives);
-    }  
-
-    // Create graph, get outgoing edges from this node
-    if (_params.maxIdleDistance() > 0) {
-        _hop_destinations = AdjustablePermutation::createUndirectedExpanderGraph(numWorkers, numBounceAlternatives, _world_rank);        
-    } else {
-        auto permutations = AdjustablePermutation::getPermutations(numWorkers, numBounceAlternatives);
-        _hop_destinations = AdjustablePermutation::createExpanderGraph(permutations, _world_rank);
-        if (_params.hopsUntilCollectiveAssignment() >= 0)
-            _coll_assign = CollectiveAssignment(
-                _job_db, MyMpi::size(_comm), 
-                AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, _world_rank), 
-                [&](const JobRequest& req, int rank) {
-                    // receive a job request
-                    MessageHandle handle;
-                    handle.tag = MSG_REQUEST_NODE;
-                    handle.finished = true;
-                    handle.receiveSelfMessage(req.serialize(), rank);
-                    handleRequestNode(handle, JobDatabase::NORMAL);
-                }
-            );
-    }
-    for (int dest : _hop_destinations) {
-        _neighbor_idle_distance[dest] = 0; // initially, all workers are idle
-    }
-
-    // Output found bounce alternatives
-    std::string info = "";
-    for (size_t i = 0; i < _hop_destinations.size(); i++) {
-        info += std::to_string(_hop_destinations[i]) + " ";
-    }
-    log(V3_VERB, "My bounce alternatives: %s\n", info.c_str());
-    assert((int)_hop_destinations.size() == numBounceAlternatives);
 }
 
 int Worker::getRandomNonSelfWorkerNode() {

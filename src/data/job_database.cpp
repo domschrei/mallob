@@ -203,6 +203,7 @@ void JobDatabase::commit(JobRequest& req) {
     if (has(req.jobId)) {
         get(req.jobId).commit(req);
         _has_commitment = true;
+        if (_coll_assign) _coll_assign->setStatusDirty();
     }
 }
 
@@ -222,6 +223,7 @@ void JobDatabase::uncommit(int jobId) {
     if (has(jobId)) {
         get(jobId).uncommit();
         _has_commitment = false;
+        if (_coll_assign) _coll_assign->setStatusDirty();
     }
 }
 
@@ -231,7 +233,10 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
     removedJob = -1;
     
     // Already have another commitment?
-    if (_has_commitment) return REJECT;
+    if (_has_commitment) {
+        if (_coll_assign) _coll_assign->setStatusDirty();
+        return REJECT;
+    }
 
     if (has(req.jobId)) {
         // Know that the job already finished?
@@ -239,6 +244,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
         if (job.getState() == PAST) {
             log(V4_VVER, "Reject req. %s : already finished\n", 
                             toStr(req.jobId, req.requestedNodeIndex).c_str());
+            if (_coll_assign) _coll_assign->setStatusDirty();
             return DISCARD;
         }
     }
@@ -248,11 +254,13 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
         if (req.requestedNodeIndex > 0) {
             // Explicitly avoid to adopt a non-root node of the job of which I have a dormant root
             // (commit would overwrite job index!)
+            if (_coll_assign) _coll_assign->setStatusDirty();
             return REJECT;
         }
     } else {
         if (hasDormantRoot() && req.requestedNodeIndex == 0) {
             // Cannot adopt a root node while there is still another dormant root here
+            if (_coll_assign) _coll_assign->setStatusDirty();
             return REJECT;
         }
     }
@@ -261,7 +269,12 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
     if (isIdle()) {
         if (mode != TARGETED_REJOIN) return ADOPT_FROM_IDLE;
         // Oneshot request: Job must be present and suspended
-        else return (hasDormantJob(req.jobId) ? ADOPT_FROM_IDLE : REJECT);
+        else if (hasDormantJob(req.jobId)) {
+            return ADOPT_FROM_IDLE;
+        } else {
+            if (_coll_assign) _coll_assign->setStatusDirty();
+            return REJECT;
+        }
     }
 
     // Request for a root node:
@@ -294,6 +307,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
         }
     }
 
+    if (_coll_assign) _coll_assign->setStatusDirty();
     return REJECT;
 }
 
@@ -456,6 +470,7 @@ void JobDatabase::setLoad(int load, int whichJobId) {
         log(V3_VERB, "LOAD 0 (-%s)\n", get(whichJobId).toStr());
         _current_job = NULL;
     }
+    if (_coll_assign) _coll_assign->setStatusDirty();
 }
 
 bool JobDatabase::isIdle() const {
@@ -539,7 +554,8 @@ JobRequest JobDatabase::loadPendingRootReactivationRequest() {
 }
 
 void JobDatabase::setPendingRootReactivationRequest(JobRequest&& req) {
-    assert(!hasPendingRootReactivationRequest());
+    assert(!hasPendingRootReactivationRequest() 
+        || req.jobId == _pending_root_reactivate_request.value().jobId);
     _pending_root_reactivate_request = std::move(req);
 }
 

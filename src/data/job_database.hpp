@@ -9,6 +9,7 @@
 #include "job_transfer.hpp"
 #include "balancing/balancer.hpp"
 #include "util/sys/background_worker.hpp"
+#include "balancing/collective_assignment.hpp"
 
 class JobDatabase {
 
@@ -22,6 +23,7 @@ private:
     MPI_Comm& _comm;
     std::unique_ptr<Balancer> _balancer;
     robin_hood::unordered_map<int, int> _current_volumes;
+    CollectiveAssignment* _coll_assign = nullptr;
 
     std::atomic_int _num_stored_jobs = 0;
     robin_hood::unordered_map<int, Job*> _jobs;
@@ -51,6 +53,7 @@ private:
 public:
     JobDatabase(Parameters& params, MPI_Comm& comm);
     ~JobDatabase();
+    void setCollectiveAssignment(CollectiveAssignment& collAssign) {_coll_assign = &collAssign;}
 
     Job& createJob(int commSize, int worldRank, int jobId, JobDescription::Application application);
     bool appendRevision(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source);

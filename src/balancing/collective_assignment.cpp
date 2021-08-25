@@ -155,7 +155,7 @@ void CollectiveAssignment::addJobRequest(JobRequest& req) {
 
 CollectiveAssignment::Status CollectiveAssignment::getAggregatedStatus() {
     Status s;
-    s.numIdle = _job_db->isIdle() ? 1 : 0;
+    s.numIdle = _job_db->isIdle() && !_job_db->hasCommitment() ? 1 : 0;
     for (auto& [childRank, childStatus] : _child_statuses) {
         s.numIdle += childStatus.numIdle;
     }

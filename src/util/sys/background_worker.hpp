@@ -4,6 +4,7 @@
 
 #include <thread>
 #include <functional>
+#include <signal.h>
 
 #include "util/sys/terminator.hpp"
 #include "util/logger.hpp"

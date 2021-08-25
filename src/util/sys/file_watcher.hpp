@@ -8,6 +8,7 @@
 #include "util/assert.hpp"
 #include <fcntl.h>
 #include <dirent.h>
+#include <fstream>
 
 #include <string>
 #include <functional>
@@ -36,6 +37,7 @@ private:
     BackgroundWorker _worker;
     std::function<void(const Event&, Logger& logger)> _callback;
     InitialFilesHandling _init_files_handling;
+    std::atomic_bool _stop = false;
 
 public:
     FileWatcher() = default;
@@ -45,21 +47,20 @@ public:
     
             _directory(directory), _callback(callback), _init_files_handling(initFilesHandling) {
         
+        // Initialize inotify
+        FileUtils::mkdir(_directory);
+        _inotify_fd = inotify_init();
+        if (_inotify_fd < 0) {
+            logger.log(V0_CRIT, "[ERROR] Failed to set up inotify, errno %i\n", errno);
+            logger.flush();
+            abort();
+        }
+
         _worker.run([events, this, &logger]() {
 
-            FileUtils::mkdir(_directory);
-
-            // Initialize inotify
-            _inotify_fd = inotify_init();
-            if (_inotify_fd < 0) {
-                logger.log(V0_CRIT, "[ERROR] Failed to set up inotify, errno %i\n", errno);
-                logger.flush();
-                abort();
-            }
-            
             // Make inotify nonblocking
-            int flags = fcntl(_inotify_fd, F_GETFL, 0);
-            fcntl(_inotify_fd, F_SETFL, flags | O_NONBLOCK);
+            //int flags = fcntl(_inotify_fd, F_GETFL, 0);
+            //fcntl(_inotify_fd, F_SETFL, flags | O_NONBLOCK);
             
             // Initialize watcher
             _inotify_wd = inotify_add_watch(_inotify_fd, _directory.c_str(), events);
@@ -105,14 +106,17 @@ public:
             size_t bufferSize = 1024 * eventSize + 16;
             char* buffer = (char*)malloc(bufferSize);
             while (_worker.continueRunning()) {
-                usleep(1000 * 10); // 10 milliseconds
+                
+                // sleep only if file descriptor is non-blocking
+                //usleep(1000 * 10); // 10 milliseconds
 
                 // poll for an event to occur
                 int len = read(_inotify_fd, buffer, bufferSize);
+                if (_stop) break;
                 if (len == -1) continue;
-                int i = 0;
                 
                 // Iterate over found events
+                int i = 0;
                 while (_worker.continueRunning() && i < len) {
                     // digest event
                     inotify_event* event = (inotify_event*) &buffer[i];
@@ -128,8 +132,37 @@ public:
     }
 
     ~FileWatcher() {
+
+        if (_inotify_fd == 0) return;
+        
+        // Set flag for watcher thread to stop
+        _stop = true;
+
+
+        // Write dummy files to wake up watcher thread
+        
+        // Create a file
+        auto filename1 = _directory + "/STOP1";
+        std::ofstream output1(filename1);
+        output1.close();
+
+        // Create and then immediately delete a file
+        auto filename2 = _directory + "/STOP2";
+        std::ofstream output2(filename2);
+        output2.close();
+        remove(filename2.c_str());
+        
+
+        // Wait for watcher thread to stop and join
         _worker.stop();
-        if (_inotify_fd != 0) close(_inotify_fd);
+
+
+        // Clean up remaining dummy file
+        remove(filename1.c_str());
+
+        // Clean up descriptors
+        inotify_rm_watch(_inotify_fd, _inotify_wd);
+        close(_inotify_fd);
     }
 };
 
