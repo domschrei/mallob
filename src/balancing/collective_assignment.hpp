@@ -18,7 +18,6 @@ private:
     
     struct Status {
         int numIdle;
-        robin_hood::unordered_map<int, int> numCachedPerJob;
     };
     robin_hood::unordered_map<int, Status> _child_statuses;
     std::set<JobRequest> _request_list;
