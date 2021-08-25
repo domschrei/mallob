@@ -75,7 +75,7 @@ bool JobDatabase::appendRevision(int jobId, const std::shared_ptr<std::vector<ui
     }
     auto& job = get(jobId);
     int rev = JobDescription::readRevisionIndex(*description);
-    if (job.getRevision() >= rev) {
+    if (job.hasDescription() && job.getRevision() >= rev) {
         // Revision data is already present
         log(V1_WARN, "[WARN] #%i rev. %i already present : discard desc. of size %i\n", jobId, rev, description->size());
         return false;
