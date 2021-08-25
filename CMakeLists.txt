@@ -9,11 +9,14 @@ set(CMAKE_CXX_STANDARD 17)
 # Build-specific compile options
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
-    add_definitions("-DMALLOB_VERSION=\"dbg\"")
+    add_definitions(-DMALLOB_VERSION=\"dbg\" -DMALLOB_ASSERT=1)
     set(MY_DEBUG_OPTIONS "-rdynamic -g -ggdb") 
 else()
-    add_definitions("-DMALLOB_VERSION=\"rls\"")
-    set(MY_DEBUG_OPTIONS "-rdynamic -g -ggdb") 
+    add_definitions(-DMALLOB_VERSION=\"rls\")
+    set(MY_DEBUG_OPTIONS "-rdynamic -g -ggdb")
+    if(MALLOB_ASSERT)
+        add_definitions(-DMALLOB_ASSERT=1)
+    endif() 
 endif()
 
 if(MALLOB_USE_ASAN)

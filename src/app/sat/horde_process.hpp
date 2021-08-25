@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"

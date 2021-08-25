@@ -6,7 +6,7 @@
 #include <functional>
 #include <set>
 #include <vector>
-#include <assert.h>
+#include "util/assert.hpp"
 
 class Random {
 public:

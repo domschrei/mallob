@@ -1,6 +1,6 @@
 
 #include <thread>
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"

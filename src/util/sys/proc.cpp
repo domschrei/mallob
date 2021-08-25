@@ -6,7 +6,7 @@
 #include <sys/resource.h>
 #include <sys/syscall.h>
 #include <map>
-#include <assert.h>
+#include "util/assert.hpp"
 #include <ios>
 #include <iostream>
 #include <fstream>

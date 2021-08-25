@@ -1,5 +1,5 @@
 
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "job_description.hpp"
 #include "util/logger.hpp"

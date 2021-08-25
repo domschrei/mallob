@@ -3,7 +3,7 @@
 #define DOMPASCH_MALLOB_JOB_COMM_HPP
 
 #include <vector>
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "util/hashing.hpp"
 #include "util/sys/timer.hpp"

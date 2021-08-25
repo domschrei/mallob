@@ -2,7 +2,7 @@
 #include "option.hpp"
 
 #include <string>
-#include <assert.h>
+#include "util/assert.hpp"
 #include <iostream>
 
 Option::Option(OptMap& map, const std::string& id, const std::string& longid, const std::string& desc):

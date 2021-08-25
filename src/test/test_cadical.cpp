@@ -1,4 +1,4 @@
-#include <cassert>
+#include "util/assert.hpp"
 
 #include <iostream>
 

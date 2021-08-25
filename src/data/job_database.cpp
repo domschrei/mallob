@@ -1,7 +1,7 @@
 
 #include "job_database.hpp"
 
-#include <assert.h>
+#include "util/assert.hpp"
 #include <algorithm>
 #include <queue>
 #include <utility>

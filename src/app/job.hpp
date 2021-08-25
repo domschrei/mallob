@@ -4,7 +4,7 @@
 
 #include <string>
 #include <memory>
-#include <assert.h>
+#include "util/assert.hpp"
 #include <atomic>
 #include <list>
 

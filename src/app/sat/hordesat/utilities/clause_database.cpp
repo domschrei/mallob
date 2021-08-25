@@ -7,7 +7,7 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "clause_database.hpp"
 #include "app/sat/hordesat/utilities/debug_utils.hpp"

@@ -1,6 +1,6 @@
 
 #include <thread>
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "threaded_sat_job.hpp"
 
@@ -10,6 +10,7 @@
 #include "util/sys/proc.hpp"
 #include "hordesat/horde.hpp"
 #include "horde_config.hpp"
+#include "util/sys/thread_pool.hpp"
 
 ThreadedSatJob::ThreadedSatJob(const Parameters& params, int commSize, int worldRank, int jobId) : 
         BaseSatJob(params, commSize, worldRank, jobId), _done_locally(false), _job_comm_period(params.appCommPeriod()) {
@@ -48,26 +49,19 @@ void ThreadedSatJob::appl_start() {
 
 void ThreadedSatJob::appl_suspend() {
     if (!_initialized) return;
-    auto lock = _solver_lock.getLock();
     getSolver()->setPaused();
     ((AnytimeSatClauseCommunicator*)_clause_comm)->suspend();
 }
 
 void ThreadedSatJob::appl_resume() {
     if (!_initialized) return;
-    auto lock = _solver_lock.getLock();
     getSolver()->unsetPaused();
 }
 
 void ThreadedSatJob::appl_terminate() {
     if (!_initialized) return;
-    auto lock = _solver_lock.getLock();
-    terminateUnsafe();
-}
-
-void ThreadedSatJob::terminateUnsafe() {
-    if (!_destroy_thread.joinable()) _destroy_thread = std::thread([this]() {
-        auto lock = _solver_lock.getLock();
+    if (_destroy_future.valid()) return; 
+    _destroy_future = ProcessWideThreadPool::get().addTask([this]() {
         delete (AnytimeSatClauseCommunicator*)_clause_comm;
         _clause_comm = NULL;
         _solver->abort();
@@ -77,7 +71,6 @@ void ThreadedSatJob::terminateUnsafe() {
 
 JobResult ThreadedSatJob::appl_getResult() {
     if (_result.id != 0) return _result;
-    auto lock = _solver_lock.getLock();
     _result = getSolver()->getResult();
     _result.id = getId();
     assert(_result.revision == getRevision());
@@ -90,7 +83,6 @@ int ThreadedSatJob::appl_solved() {
 
     // Import new revisions as necessary
     {
-        auto lock = _solver_lock.getLock();
         const JobDescription& desc = getDescription();
         while (_last_imported_revision < desc.getRevision()) {
             _last_imported_revision++;
@@ -112,7 +104,6 @@ int ThreadedSatJob::appl_solved() {
         return result;
     }
 
-    auto lock = _solver_lock.getLock();
     result = getSolver()->solveLoop();
 
     // Did a solver find a result?
@@ -122,9 +113,8 @@ int ThreadedSatJob::appl_solved() {
                             result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         _result_code = result;
 
-        // Extract result to avoid later deadlocks
-        lock.unlock();
-        appl_getResult(); // locks internally
+        // Extract result
+        appl_getResult();
     }
     return result;
 }
@@ -132,7 +122,6 @@ int ThreadedSatJob::appl_solved() {
 void ThreadedSatJob::appl_dumpStats() {
 
     if (!_initialized || getState() != ACTIVE) return;
-    auto lock = _solver_lock.getLock();
 
     getSolver()->dumpStats(/*final=*/false);
     if (_time_of_start_solving <= 0) return;
@@ -160,25 +149,20 @@ bool ThreadedSatJob::appl_wantsToBeginCommunication() {
         // At least params["s"] seconds since last communication 
         if (Timer::elapsedSeconds()-_time_of_last_comm < _job_comm_period) return false;
     }
-    if (!_solver_lock.tryLock()) return false;
     bool wants = ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses();
-    _solver_lock.unlock();
     return wants;
 }
 
 void ThreadedSatJob::appl_beginCommunication() {
     if (!_initialized || getState() != ACTIVE) return;
     log(V5_DEBG, "begincomm\n");
-    if (!_solver_lock.tryLock()) return;
     ((AnytimeSatClauseCommunicator*) _clause_comm)->sendClausesToParent();
     if (getJobTree().isLeaf()) _time_of_last_comm = Timer::elapsedSeconds();
-    _solver_lock.unlock();
 }
 
 void ThreadedSatJob::appl_communicate(int source, JobMessage& msg) {
     if (!_initialized || getState() != ACTIVE) return;
     log(V5_DEBG, "comm\n");
-    auto lock = _solver_lock.getLock();
     ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, msg);
 }
 
@@ -209,7 +193,9 @@ void ThreadedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& ch
 }
 
 ThreadedSatJob::~ThreadedSatJob() {
+    if (!_initialized) return;
     log(V5_DEBG, "%s : enter TSJ destructor\n", toStr());
-    if (_destroy_thread.joinable()) _destroy_thread.join();
+    if (!_destroy_future.valid()) appl_terminate();
+    _destroy_future.get();
     log(V5_DEBG, "%s : destructed TSJ\n", toStr());
 }

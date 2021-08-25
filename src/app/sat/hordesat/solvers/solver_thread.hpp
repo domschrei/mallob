@@ -75,10 +75,14 @@ public:
             auto lock = _state_mutex.getLock();
             _suspended = suspend;
             if (_suspended) _solver.suspend();
+            else _solver.resume();
         }
         _state_cond.notify();
     }
-    void setTerminate() {_terminated = true;};
+    void setTerminate() {
+        _terminated = true;
+        _state_cond.notify();
+    }
     void tryJoin() {if (_thread.joinable()) _thread.join();}
 
     bool isInitialized() const {

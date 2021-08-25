@@ -1,5 +1,5 @@
 
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "app/sat/hordesat/solvers/cadical_interface.hpp"
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"

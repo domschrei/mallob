@@ -10,10 +10,10 @@
 #include "util/sys/timer.hpp"
 #include "solvers/cadical.hpp"
 #include "solvers/lingeling.hpp"
-#ifdef MALLOB_USE_MERGESAT
+#if MALLOB_USE_MERGESAT
 #include "solvers/mergesat.hpp"
 #endif
-#ifdef MALLOB_USE_GLUCOSE
+#if MALLOB_USE_GLUCOSE
 #include "solvers/glucose.hpp"
 #endif
 
@@ -24,7 +24,7 @@
 #include <csignal>
 #include <unistd.h>
 #include <sched.h>
-#include <assert.h>
+#include "util/assert.hpp"
 
 using namespace SolvingStates;
 
@@ -348,7 +348,10 @@ void HordeLib::unsetPaused() {
 void HordeLib::abort() {
 	if (_state != ABORTING) {
 		dumpStats(/*final=*/true);
-		for (auto& solver : _solver_threads) solver->setTerminate();
+		for (auto& solver : _solver_threads) {
+			solver->setSuspend(false);
+			solver->setTerminate();
+		}
 	}
 }
 

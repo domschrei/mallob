@@ -1,6 +1,6 @@
 
 #include <iostream>
-#include <assert.h>
+#include "util/assert.hpp"
 #include <vector>
 #include <string>
 #include <thread>

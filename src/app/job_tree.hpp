@@ -3,7 +3,7 @@
 #define DOMPASCH_MALLOB_JOB_TREE_HPP
 
 #include <set>
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "util/hashing.hpp"
 #include "util/permutation.hpp"

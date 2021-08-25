@@ -8,7 +8,7 @@
 #include <exception>
 #include <execinfo.h>
 #include <signal.h>
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "process.hpp"
 #include "proc.hpp"

@@ -2,7 +2,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <iostream>
-#include <assert.h>
+#include "util/assert.hpp"
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <fcntl.h>

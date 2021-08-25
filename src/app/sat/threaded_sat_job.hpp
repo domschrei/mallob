@@ -5,7 +5,8 @@
 #include <string>
 #include <memory>
 #include <thread>
-#include <assert.h>
+#include <future>
+#include "util/assert.hpp"
 
 #include "app/job.hpp"
 #include "util/params.hpp"
@@ -32,7 +33,7 @@ private:
     JobResult _result;
     int _last_imported_revision = -1;
 
-    std::thread _destroy_thread;
+    std::future<void> _destroy_future;
     Mutex _solver_lock;
 
     float _time_of_start_solving = 0;

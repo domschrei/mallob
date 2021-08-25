@@ -18,22 +18,21 @@
 #include "app/sat/sat_constants.h"
 #include "util/sys/terminator.hpp"
 #include "data/job_reader.hpp"
+#include "util/sys/thread_pool.hpp"
 
 // Executed by a separate worker thread
 void Client::readIncomingJobs(Logger log) {
 
     log.log(V3_VERB, "Starting\n");
 
-    std::list<std::pair<std::thread, std::atomic_bool*>> readerTasks;
-    std::atomic_int numActiveTasks = 0;
-
     while (_instance_reader.continueRunning()) {
 
         float time = Timer::elapsedSeconds();
 
-        if (_num_incoming_jobs > 0 && numActiveTasks+_num_loaded_jobs < 32) {
+        while (_num_incoming_jobs > 0 && _num_loaded_jobs < 32) {
             auto lock = _incoming_job_lock.getLock();
 
+            // Find a single job eligible for parsing
             JobMetadata foundJob;
             for (auto& data : _incoming_job_queue) {
                 
@@ -64,11 +63,9 @@ void Client::readIncomingJobs(Logger log) {
                 }
                 if (!dependenciesSatisfied) continue;
 
-                // Job can be read
+                // Job can be read: Enqueue reader task into thread pool
                 foundJob = data;
-                auto finishedFlag = new std::atomic_bool(false);
-                readerTasks.emplace_back([this, &log, foundJob, finishedFlag]() {
-
+                ProcessWideThreadPool::get().addTask([this, &log, foundJob]() {
                     // Read job
                     int id = foundJob.description->getId();
                     float time = Timer::elapsedSeconds();
@@ -86,37 +83,19 @@ void Client::readIncomingJobs(Logger log) {
                         auto lock = _ready_job_lock.getLock();
                         _ready_job_queue.emplace_back(foundJob.description);
                         _num_ready_jobs++;
+                        _num_loaded_jobs++;
+                        _sys_state.addLocal(SYSSTATE_PARSED_JOBS, 1);
                     }
-                    *finishedFlag = true;
-
-                }, finishedFlag);
-                numActiveTasks++;
+                });
                 break;
             }
 
-            // If a job was found, delete it from incoming queue
-            if (foundJob.description) {
-                _incoming_job_queue.erase(foundJob);
-                _num_incoming_jobs--;
-            }
-        }
-
-        // Check jobs being read for completion
-        for (auto it = readerTasks.begin(); it != readerTasks.end(); ++it) {
-            auto& [thread, flag] = *it;
-
-            assert(thread.joinable());
+            // No eligible jobs right now
+            if (!foundJob.description) break;
             
-            if (*flag) {
-                // Job reading done -- clean up
-                thread.join();
-                delete flag;
-                it = readerTasks.erase(it);
-                numActiveTasks--;
-                _num_loaded_jobs++;
-                --it;
-                _sys_state.addLocal(SYSSTATE_PARSED_JOBS, 1);
-            }
+            // If a job was found, delete it from incoming queue
+            _incoming_job_queue.erase(foundJob);
+            _num_incoming_jobs--;
         }
 
         // Rest for a while
@@ -125,8 +104,6 @@ void Client::readIncomingJobs(Logger log) {
 
     log.log(V3_VERB, "Stopping\n");
     log.flush();
-
-    for (auto& [thread, flag] : readerTasks) thread.join();
 }
 
 void Client::handleNewJob(JobMetadata&& data) {

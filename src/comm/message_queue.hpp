@@ -6,7 +6,7 @@
 
 #include <list>
 #include <cmath>
-#include <assert.h>
+#include "util/assert.hpp"
 #include <unistd.h>
 
 #include "util/hashing.hpp"

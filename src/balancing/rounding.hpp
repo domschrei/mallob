@@ -7,7 +7,7 @@
 #include <set>
 #include <vector>
 #include <cstring>
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "data/reduceable.hpp"
 #include "util/logger.hpp"

@@ -34,9 +34,16 @@ cd build
 cmake .. <cmake-options>
 make
 ```
-If you want to make use of Glucose as a SAT solver, use the cmake option `-DMALLOB_USE_GLUCOSE=1` (after having read the Licensing section below).
-MergeSAT is not included either by default because it is in an experimental stage; use `-DMALLOB_USE_MERGESAT=1` to enable it.
-Use `-DMALLOB_USE_ASAN=1` to build Mallob with Address Sanitizer for debugging purposes.
+
+As CMake options, specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
+In addition, you can use the following Mallob-specific build options:
+
+| Usage                       | Description                                                                                                |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| -DMALLOB_ASSERT=<0|1>       | Turn on assertions (even on release builds). Setting to 0 limits assertions to debug builds.               |
+| -DMALLOB_USE_ASAN=<0|1>     | Compile with Address Sanitizer for debugging purposes.                                                     |
+| -DMALLOB_USE_GLUCOSE=<0|1>  | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
+| -DMALLOB_USE_MERGESAT=<0|1> | Compile with support for MergeSAT SAT solver (disabled by default due to experimental state of interface). |
 
 ### Docker
 

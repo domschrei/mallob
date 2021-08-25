@@ -5,7 +5,7 @@
 #include <sys/inotify.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <assert.h>
+#include "util/assert.hpp"
 #include <fcntl.h>
 #include <dirent.h>
 

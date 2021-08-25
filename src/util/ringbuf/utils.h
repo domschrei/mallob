@@ -35,7 +35,7 @@
 #ifndef _UTILS_H_
 #define _UTILS_H_
 
-#include <assert.h>
+#include "util/assert.hpp"
 
 /*
  * A regular assert (debug/diagnostic only).

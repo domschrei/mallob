@@ -1,6 +1,6 @@
 
 #include <sys/resource.h>
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "app/sat/hordesat/solvers/solver_thread.hpp"
 #include "app/sat/hordesat/horde.hpp"
@@ -58,6 +58,7 @@ void* SolverThread::run() {
         // Sleep and wait if the solver should not do solving right now
         waitWhileSolved();
         waitWhileSuspended();
+        if (_terminated) break;
         
         bool readingDone = readFormula();
 
@@ -134,6 +135,7 @@ bool SolverThread::readFormula() {
             }
             
             waitWhileSuspended();
+            if (_terminated) return false;
         }
         for (size_t i = 0; i < aSize; i++) _max_var = std::max(_max_var, std::abs(aLits[i]));
 
@@ -286,10 +288,10 @@ void SolverThread::runOnce() {
 }
 
 void SolverThread::waitWhileSolved() {
-    waitUntil([&]{return !_found_result;});
+    waitUntil([&]{return _terminated || !_found_result;});
 }
 void SolverThread::waitWhileSuspended() {
-    waitUntil([&]{return !_suspended;});
+    waitUntil([&]{return _terminated || !_suspended;});
 }
 
 void SolverThread::waitUntil(std::function<bool()> predicate) {

@@ -1,5 +1,5 @@
 
-#include <assert.h>
+#include "util/assert.hpp"
 #include <sys/types.h>
 #include <stdlib.h>
 

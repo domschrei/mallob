@@ -1,7 +1,7 @@
 
 #include <cmath>
 #include <limits>
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "app/job.hpp"
 #include "util/logger.hpp"

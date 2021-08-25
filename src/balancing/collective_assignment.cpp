@@ -1,7 +1,7 @@
 
 #include "collective_assignment.hpp"
 
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "util/logger.hpp"
 #include "data/job_database.hpp"

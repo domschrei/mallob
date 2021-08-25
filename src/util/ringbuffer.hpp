@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <assert.h>
+#include "util/assert.hpp"
 #include <list>
 #include <atomic>
 

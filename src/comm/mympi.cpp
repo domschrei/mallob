@@ -4,7 +4,7 @@
 #include <ctime>
 #include <algorithm>
 #include <iostream>
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "mympi.hpp"
 

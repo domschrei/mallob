@@ -2,7 +2,7 @@
 #include <map>
 #include <chrono>
 #include <atomic>
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"

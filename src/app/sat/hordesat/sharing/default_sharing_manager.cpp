@@ -5,7 +5,7 @@
  *      Author: balyo
  */
 
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "default_sharing_manager.hpp"
 #include "util/sys/timer.hpp"

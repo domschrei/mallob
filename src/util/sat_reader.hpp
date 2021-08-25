@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include <assert.h>
+#include "util/assert.hpp"
 
 #include "data/job_description.hpp"
 
