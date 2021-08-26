@@ -161,7 +161,7 @@ void Client::mainProgram() {
     float lastStatTime = Timer::elapsedSeconds();
     float lastDoneJobsCheckTime = lastStatTime;
 
-    while (!Terminator::isTerminating()) {
+    while (!Terminator::isTerminating(/*fromMainThread=*/true)) {
 
         float time = Timer::elapsedSeconds();
         if (Timer::globalTimelimReached(_params)) Terminator::setTerminating();
@@ -234,7 +234,8 @@ int Client::getMaxNumParallelJobs() {
 
 void Client::introduceNextJob() {
 
-    if (Terminator::isTerminating()) return;
+    if (Terminator::isTerminating(/*fromMainThread=*/true)) 
+        return;
 
     // Are there any non-introduced jobs left?
     if (_num_ready_jobs == 0) return;

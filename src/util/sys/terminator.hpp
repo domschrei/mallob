@@ -3,9 +3,11 @@
 #define DOMPASCH_MALLOB_TERMINATOR_HPP
 
 #include <atomic>
+#include <signal.h>
 
 #include "util/logger.hpp"
 #include "util/sys/process.hpp"
+#include "util/sys/proc.hpp"
 
 class Terminator {
 
@@ -16,13 +18,20 @@ public:
     static void setTerminating() {
         _exit = true;
     }
-    static bool isTerminating() {
-        if (!_exit) {
-            auto optSignum = Process::isExitSignalCaught();
-            if (optSignum) {
-                log(V2_INFO, "Caught signal %i\n", optSignum.value());
-                setTerminating();
+    static bool isTerminating(bool fromMainThread = false) {
+        
+        auto optSignalInfo = Process::getCaughtSignal();
+        if (optSignalInfo) {
+
+            int signum = optSignalInfo.value().signum;
+            log(V2_INFO, "Caught signal %i\n", signum);
+            setTerminating();
+
+            if (fromMainThread) {
+                Process::handleTerminationSignal(optSignalInfo.value());
             }
+
+            return true;
         }
         
         return _exit;

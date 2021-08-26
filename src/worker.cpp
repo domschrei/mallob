@@ -1251,7 +1251,7 @@ void Worker::applyBalancing() {
 
 bool Worker::checkTerminate(float time) {
     bool terminate = false;
-    if (Terminator::isTerminating()) terminate = true;
+    if (Terminator::isTerminating(/*fromMainThread=*/true)) terminate = true;
     if (_global_timeout > 0 && time > _global_timeout) {
         terminate = true;
     }

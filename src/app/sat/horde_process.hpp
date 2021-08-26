@@ -58,7 +58,8 @@ public:
         while (!_hsm->doBegin) doSleep();
         
         // Terminate directly?
-        if (_hsm->doTerminate) doTerminate();
+        if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true)) 
+            doTerminate();
 
         // Set up export and import buffers for clause exchanges
         {
@@ -95,7 +96,7 @@ public:
             doSleep();
 
             // Terminate
-            if (_hsm->doTerminate) {
+            if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true)) {
                 _log.log(V5_DEBG, "DO terminate\n");
                 _hlib.dumpStats(/*final=*/true);
                 break;

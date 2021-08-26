@@ -22,14 +22,11 @@ int Process::_rank;
 Mutex Process::_children_mutex;
 std::set<pid_t> Process::_children;
 std::atomic_bool Process::_main_process;
+long Process::_main_tid;
 
 std::atomic_bool Process::_exit_signal_caught = false;
 std::atomic_int Process::_exit_signal = 0;
 std::atomic_long Process::_signal_tid = 0;
-std::atomic_bool Process::_exit_signal_digested = false;
-
-BackgroundWorker Process::_terminate_checker;
-
 
 void doNothing(int signum) {
     // Do nothing, just return
@@ -45,12 +42,34 @@ void handleSignal(int signum) {
         Process::_exit_signal_caught = true;
     }
     
-    usleep(1000 * 1000 * 1000); // sleep "indefinitely" until killed
+    // Special handling for termination and crash signals
+    Process::handleTerminationSignal(Process::getCaughtSignal().value());
+}
+
+bool Process::isCrash(int signum) {
+    return signum == SIGABRT || signum == SIGFPE || signum == SIGSEGV;
+}
+
+void Process::handleTerminationSignal(const SignalInfo& info) {
+    if (Process::isMainProcess()) Process::forwardTerminateToChildren();
+
+    if (isCrash(info.signum)) {
+        if (Proc::getTid() == Process::_main_tid) {
+            // Main thread: handle crash directly
+            long tid = info.tid;
+            log(V0_CRIT, "[ERROR] pid=%ld tid=%ld signal=%d\n", 
+                    Proc::getPid(), tid, info.signum);
+            // Try to write a trace of the concerned thread with gdb
+            Process::writeTrace(tid);
+            Process::doExit(1);
+        } else {
+            // Sleep "indefinitely" until killed by main thread
+            usleep(1000 * 1000 * 1000);
+        }
+    }
 }
 
 void Process::doExit(int retval) {
-    // Join terminate checker
-    _terminate_checker.stop();
     // Exit with normal exit code if terminated or interrupted,
     // with caught signal otherwise
     exit((retval == SIGTERM || retval == SIGINT) ? 0 : retval);
@@ -58,41 +77,10 @@ void Process::doExit(int retval) {
 
 
 void Process::init(int rank, bool leafProcess) {
-
     _rank = rank;
     _exit_signal_caught = false;
     _main_process = !leafProcess;
-
-    _terminate_checker.run([]() {
-
-        // Block all signals in this thread which are caught by other threads
-        sigset_t set;
-        sigemptyset(&set);
-        sigaddset(&set, SIGUSR1);
-        sigaddset(&set, SIGSEGV);
-        sigaddset(&set, SIGABRT);
-        sigaddset(&set, SIGTERM);
-        sigaddset(&set, SIGINT);
-        pthread_sigmask(SIG_BLOCK, &set, NULL);
-
-        while (_terminate_checker.continueRunning() && !_exit_signal_caught) {
-            usleep(1000 * 100); // 0.1s
-        }
-        if (!_terminate_checker.continueRunning()) return;
-
-        if (_exit_signal_caught) {
-            if (_main_process) forwardTerminateToChildren();
-
-            if (_exit_signal == SIGABRT || _exit_signal == SIGSEGV) {
-                int sig = _exit_signal;
-                log(V0_CRIT, "[ERROR] pid=%ld tid=%ld signal=%d\n", 
-                        Proc::getPid(), (long)_signal_tid, sig);
-                // Try to write a trace of the concerned thread with gdb
-                Process::writeTrace(_signal_tid);
-                _exit_signal_digested = true;
-            }
-        }
-    });
+    _main_tid = Proc::getTid();
 
     signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
     signal(SIGSEGV, handleSignal);
@@ -133,6 +121,10 @@ void Process::wakeUp(pid_t childpid) {
     sendSignal(childpid, SIGUSR1);
 }
 
+bool Process::isMainProcess() {
+    return _main_process;
+}
+
 void Process::forwardTerminateToChildren() { 
     // Propagate signal to children
     auto lock = _children_mutex.getLock();
@@ -163,9 +155,11 @@ bool Process::didChildExit(pid_t childpid) {
     return false;
 }
 
-std::optional<int> Process::isExitSignalCaught() {
-    std::optional<int> opt;
-    if (_exit_signal_digested) opt = _exit_signal;
+std::optional<Process::SignalInfo> Process::getCaughtSignal() {
+    std::optional<SignalInfo> opt;
+    if (_exit_signal_caught) {
+        opt = SignalInfo{_exit_signal, Proc::getPid(), _signal_tid};
+    }
     return opt;
 }
 

@@ -18,13 +18,12 @@ public:
     static Mutex _children_mutex;
     static std::set<pid_t> _children;
     static std::atomic_bool _main_process;
+    static long _main_tid;
 
     static std::atomic_bool _exit_signal_caught;
     static std::atomic_int _exit_signal;
     static std::atomic_long _signal_tid;
     static std::atomic_bool _exit_signal_digested;
-
-    static BackgroundWorker _terminate_checker;
 
     static void init(int rank, bool leafProcess = false);
     
@@ -38,11 +37,20 @@ public:
 
     static void sendSignal(pid_t childpid, int signum);
 
+    static bool isMainProcess();
     static void forwardTerminateToChildren();
 
     /* 0: running, -1: error, childpid: exited */
     static bool didChildExit(pid_t childpid);
-    static std::optional<int> isExitSignalCaught();
+
+    struct SignalInfo {
+        int signum;
+        pid_t pid;
+        long tid;
+    };
+    static std::optional<SignalInfo> getCaughtSignal();
+    static bool isCrash(int signum);
+    static void handleTerminationSignal(const SignalInfo& info);
 
     static void writeTrace(long tid);
 
