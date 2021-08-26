@@ -1,13 +1,14 @@
 
 #include <sys/types.h>
 #include <unistd.h>
-#include <signal.h>
 #include <cstdlib>
 #include <sys/wait.h>
 #include <iostream>
 #include <exception>
 #include <execinfo.h>
 #include <signal.h>
+#include <sys/syscall.h>
+
 #include "util/assert.hpp"
 
 #include "process.hpp"
@@ -24,6 +25,8 @@ std::atomic_bool Process::_main_process;
 
 std::atomic_bool Process::_exit_signal_caught = false;
 std::atomic_int Process::_exit_signal = 0;
+std::atomic_long Process::_signal_tid = 0;
+std::atomic_bool Process::_exit_signal_digested = false;
 
 BackgroundWorker Process::_terminate_checker;
 
@@ -34,26 +37,18 @@ void doNothing(int signum) {
 }
 
 void handleSignal(int signum) {
-    // Do not recursively catch signals (if something goes wrong in here)
-    if (Process::_exit_signal_caught) return;
 
-    Process::_exit_signal = signum;
-    Process::_exit_signal_caught = true;
-    
-    if (signum == SIGSEGV || signum == SIGABRT) {
-        // Try to write a trace of this thread found by gdb
-        Process::writeTrace(Proc::getTid());
+    // Do not recursively catch signals (if something goes wrong in here)
+    if (!Process::_exit_signal_caught) {
+        Process::_exit_signal = signum;
+        Process::_signal_tid = Proc::getTid();
+        Process::_exit_signal_caught = true;
     }
     
-    // If this is the main process, its main loop will detect termination.
-    // If this is a subprocess, exit immediately
-    if (!Process::_main_process) Process::doExit(signum);
+    usleep(1000 * 1000 * 1000); // sleep "indefinitely" until killed
 }
 
 void Process::doExit(int retval) {
-    // Set exit signal to make terminate checker stop
-    Process::_exit_signal = retval;
-    Process::_exit_signal_caught = true;
     // Join terminate checker
     _terminate_checker.stop();
     // Exit with normal exit code if terminated or interrupted,
@@ -70,9 +65,20 @@ void Process::init(int rank, bool leafProcess) {
 
     _terminate_checker.run([]() {
 
+        // Block all signals in this thread which are caught by other threads
+        sigset_t set;
+        sigemptyset(&set);
+        sigaddset(&set, SIGUSR1);
+        sigaddset(&set, SIGSEGV);
+        sigaddset(&set, SIGABRT);
+        sigaddset(&set, SIGTERM);
+        sigaddset(&set, SIGINT);
+        pthread_sigmask(SIG_BLOCK, &set, NULL);
+
         while (_terminate_checker.continueRunning() && !_exit_signal_caught) {
             usleep(1000 * 100); // 0.1s
         }
+        if (!_terminate_checker.continueRunning()) return;
 
         if (_exit_signal_caught) {
             if (_main_process) forwardTerminateToChildren();
@@ -80,7 +86,10 @@ void Process::init(int rank, bool leafProcess) {
             if (_exit_signal == SIGABRT || _exit_signal == SIGSEGV) {
                 int sig = _exit_signal;
                 log(V0_CRIT, "[ERROR] pid=%ld tid=%ld signal=%d\n", 
-                        Proc::getPid(), Proc::getTid(), sig);
+                        Proc::getPid(), (long)_signal_tid, sig);
+                // Try to write a trace of the concerned thread with gdb
+                Process::writeTrace(_signal_tid);
+                _exit_signal_digested = true;
             }
         }
     });
@@ -156,14 +165,14 @@ bool Process::didChildExit(pid_t childpid) {
 
 std::optional<int> Process::isExitSignalCaught() {
     std::optional<int> opt;
-    if (_exit_signal_caught) opt = _exit_signal;
+    if (_exit_signal_digested) opt = _exit_signal;
     return opt;
 }
 
 void Process::writeTrace(long tid) {
     long callingTid = Proc::getTid();
     std::string command = "gdb --q --n --ex bt --batch --pid " + std::to_string(tid) 
-            + " > mallob_thread_trace_" + std::to_string(tid) 
-            + "_by_" + std::to_string(callingTid) + " 2>&1";
+            + " > mallob_thread_trace_of_" + std::to_string(tid) 
+            + "_from_" + std::to_string(callingTid) + " 2>&1";
     system(command.c_str());
 }

@@ -21,6 +21,8 @@ public:
 
     static std::atomic_bool _exit_signal_caught;
     static std::atomic_int _exit_signal;
+    static std::atomic_long _signal_tid;
+    static std::atomic_bool _exit_signal_digested;
 
     static BackgroundWorker _terminate_checker;
 

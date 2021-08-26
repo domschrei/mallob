@@ -55,6 +55,9 @@ if echo $solvers|grep -q "y" && [ ! -f yalsat/libyals.a ]; then
     echo "Building YalSAT ..."
     
     cd yalsat
+    for f in *.c *.h ; do
+        sed -i 's/exit ([01])/abort()/g' $f
+    done
     ./configure.sh
     make
     cd ..
@@ -71,6 +74,9 @@ if echo $solvers|grep -q "l" && [ ! -f lingeling/liblgl.a ]; then
     echo "Building lingeling ..."
 
     cd lingeling
+    for f in *.c *.h ; do
+        sed -i 's/exit ([01])/abort()/g' $f
+    done
     ./configure.sh
     make
     cd ..
