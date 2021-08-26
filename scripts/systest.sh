@@ -67,7 +67,7 @@ function test_oscillating() {
     done
     # Generate actual job
     introduce_job sat-main instances/r3sat_500.cnf 60
-    test 13 -t=1 -lbc=2 -J=$((n+1)) -l=1 -satsolver=l -v=4 -checkjsonresults -checksums=1
+    test 13 -t=1 -lbc=2 -J=$((n+1)) -l=1 -satsolver=lgc -v=4 -checkjsonresults -checksums=1
 }
 
 function test_incremental_scheduling() {

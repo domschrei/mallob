@@ -12,11 +12,9 @@ fi
 bash fetch_solvers.sh $solvers
 
 if echo $solvers|grep -q "m" && [ ! -f mergesat/libmergesat.a ]; then
+    echo "Building MergeSAT"
 
-    # Get MergeSat (pre-patched)
     tar xzvf mergesat-patched.tar.gz
-
-    # Make MergeSat
     cd mergesat
     make all -j $(nproc)
     cp build/release/lib/libmergesat.a .
@@ -24,20 +22,13 @@ if echo $solvers|grep -q "m" && [ ! -f mergesat/libmergesat.a ]; then
 fi
 
 if echo $solvers|grep -q "g" && [ ! -f glucose/libglucose.a ]; then
-
-    echo "Fetching Glucose ..."
-
-    # Get Glucose and patch it
+    echo "Building Glucose ..."
+    
     tar xzvf glucose-syrup-4.1.tgz
     rm ._glucose-syrup-4.1
     mv glucose-syrup-4.1 glucose
     patch glucose/core/Solver.cc < Glucose_Solver.cc.patch
     
-    #cp -r ../../mglucose glucose
-
-    echo "Building Glucose ..."
-    
-    # Make Glucose
     cd glucose/simp
     make libr
     cp lib.a ../libglucose.a
@@ -45,15 +36,10 @@ if echo $solvers|grep -q "g" && [ ! -f glucose/libglucose.a ]; then
 fi
 
 if echo $solvers|grep -q "y" && [ ! -f yalsat/libyals.a ]; then
+    echo "Building YalSAT ..."
 
-    echo "Fetching YalSAT ..."
-    
-    # Get YalSAT
     unzip yalsat-03v.zip
     mv yalsat-03v yalsat
-    
-    echo "Building YalSAT ..."
-    
     cd yalsat
     for f in *.c *.h ; do
         sed -i 's/exit ([01])/abort()/g' $f
@@ -64,15 +50,10 @@ if echo $solvers|grep -q "y" && [ ! -f yalsat/libyals.a ]; then
 fi
 
 if echo $solvers|grep -q "l" && [ ! -f lingeling/liblgl.a ]; then
-    
-    echo "Fetching lingeling ..."
-    
-    # Get lingeling (SAT 2018, MIT-licenced)
-    tar xzvf lingeling-bcj-78ebb86-180517.tar.gz
-    mv lingeling-bcj-78ebb86-180517 lingeling
-    
     echo "Building lingeling ..."
 
+    tar xzvf lingeling-bcj-78ebb86-180517.tar.gz
+    mv lingeling-bcj-78ebb86-180517 lingeling
     cd lingeling
     for f in *.c *.h ; do
         sed -i 's/exit ([01])/abort()/g' $f
@@ -83,16 +64,9 @@ if echo $solvers|grep -q "l" && [ ! -f lingeling/liblgl.a ]; then
 fi
 
 if echo $solvers|grep -q "c" && [ ! -f cadical/libcadical.a ]; then
-
-    echo "Fetching CaDiCaL ..."
-
-    # Get CaDiCaL
-    mkdir -p cadical
-    cd cadical
-    tar xzvf ../cadical_clauseimport.tar.gz
-    
     echo "Building CaDiCaL ..."
 
+    cd cadical
     ./configure
     make
     cp build/libcadical.a .
