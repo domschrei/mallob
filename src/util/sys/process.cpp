@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <cstdlib>
 #include <sys/wait.h>
+#include <sys/prctl.h>
 #include <iostream>
 #include <exception>
 #include <execinfo.h>
@@ -92,6 +93,10 @@ void Process::init(int rank, bool leafProcess) {
     signal(SIGFPE, handleSignal);
     signal(SIGTERM, handleSignal);
     signal(SIGINT,  handleSignal);
+
+    // Allow any other process/thread to ptrace this process
+    // (used for debugging of crashes via external gdb call)
+    prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0);
 }
 
 pid_t Process::createChild() {
