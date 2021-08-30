@@ -40,8 +40,10 @@ void handleSignal(int signum) {
         Process::_exit_signal = signum;
         Process::_signal_tid = Proc::getTid();
         Process::_exit_signal_caught = true;
-        // Try to write a trace of the concerned thread with gdb
-        Process::writeTrace(Process::_signal_tid);
+        if (Process::isCrash(signum)) {
+            // Try to write a trace of the concerned thread with gdb
+            Process::writeTrace(Process::_signal_tid);
+        }
     }
     
     // Special handling for termination and crash signals
