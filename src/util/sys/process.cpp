@@ -63,8 +63,8 @@ void Process::handleTerminationSignal(const SignalInfo& info) {
             Process::writeTrace(tid);
             Process::doExit(1);
         } else {
-            // Sleep "indefinitely" until killed by main thread
-            usleep(1000 * 1000 * 1000);
+            // Sleep indefinitely until killed by main thread
+            while (true) {}
         }
     }
 }
@@ -85,6 +85,7 @@ void Process::init(int rank, bool leafProcess) {
     signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
     signal(SIGSEGV, handleSignal);
     signal(SIGABRT, handleSignal);
+    signal(SIGFPE, handleSignal);
     signal(SIGTERM, handleSignal);
     signal(SIGINT,  handleSignal);
 }
