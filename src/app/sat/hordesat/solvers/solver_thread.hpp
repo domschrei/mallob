@@ -80,6 +80,7 @@ public:
         _state_cond.notify();
     }
     void setTerminate() {
+        _solver.setTerminate();
         _terminated = true;
         _state_cond.notify();
     }

@@ -50,6 +50,7 @@ struct SolverSetup {
 	bool doIncrementalSolving;
 	bool hasPseudoincrementalSolvers;
 	char solverType;
+	int solverRevision;
 
 	// SAT Solving settings
 
@@ -188,6 +189,7 @@ public:
 	void uninterrupt();
 	void suspend();
 	void resume();
+	void setTerminate();
 
 private:
 	std::string _global_name;
@@ -197,6 +199,7 @@ private:
 	int _diversification_index;
 	std::atomic_int _current_cond_var_or_zero = 0;
 	std::atomic_int _current_revision = 0;
+	std::atomic_bool _terminated = false;
 };
 
 // Returns the elapsed time (seconds) since the currently registered solver's start time.

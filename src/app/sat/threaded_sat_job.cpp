@@ -64,7 +64,7 @@ void ThreadedSatJob::appl_terminate() {
     _destroy_future = ProcessWideThreadPool::get().addTask([this]() {
         delete (AnytimeSatClauseCommunicator*)_clause_comm;
         _clause_comm = NULL;
-        _solver->abort();
+        _solver->terminateSolvers();
         _solver->cleanUp();
     });
 }

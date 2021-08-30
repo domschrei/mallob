@@ -68,7 +68,7 @@ public:
 
     void setPaused();
     void unsetPaused();
-	void abort();
+	void terminateSolvers();
 
 	const Parameters& getParams() {return _params;}
 	void dumpStats(bool final);

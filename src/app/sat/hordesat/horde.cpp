@@ -80,6 +80,7 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 	setup.softMaxClauseLength = params.softMaxClauseLength();
 	setup.anticipatedLitsToImportPerCycle = config.maxBroadcastedLitsPerCycle;
 	setup.hasPseudoincrementalSolvers = setup.isJobIncremental && hasPseudoincrementalSolvers;
+	setup.solverRevision = 0;
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
@@ -168,7 +169,9 @@ void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size
 				_solver_threads[i]->setTerminate();
 				_obsolete_solver_threads.push_back(std::move(_solver_threads[i]));
 				// Setup new solver and new solver thread
-				_solver_interfaces[i] = createSolver(_solver_interfaces[i]->getSolverSetup());
+				SolverSetup s = _solver_interfaces[i]->getSolverSetup();
+				s.solverRevision++;
+				_solver_interfaces[i] = createSolver(s);
 				_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
 					_params, _config, _solver_interfaces[i], 
 					_revision_data[0].fSize, _revision_data[0].fLits, 
@@ -345,7 +348,7 @@ void HordeLib::unsetPaused() {
 	for (auto& solver : _solver_threads) solver->setSuspend(false);
 }
 
-void HordeLib::abort() {
+void HordeLib::terminateSolvers() {
 	if (_state != ABORTING) {
 		dumpStats(/*final=*/true);
 		for (auto& solver : _solver_threads) {
@@ -360,8 +363,8 @@ void HordeLib::cleanUp() {
 
 	_logger.log(V5_DEBG, "[hlib-cleanup] enter\n");
 
-	// for any running threads left:
-	abort();
+	// Terminate any remaining running threads
+	terminateSolvers();
 	
 	// join and delete threads
 	for (auto& thread : _solver_threads) thread->tryJoin();

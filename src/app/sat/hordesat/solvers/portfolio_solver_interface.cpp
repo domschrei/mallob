@@ -33,7 +33,10 @@ double getTime() {
 }
 
 PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup) 
-		: _logger(setup.logger->copy("S"+std::to_string(setup.globalId), "S"+std::to_string(setup.globalId))), 
+		: _logger(setup.logger->copy(
+				"S"+std::to_string(setup.globalId)+"."+std::to_string(setup.solverRevision), 
+				"S"+std::to_string(setup.globalId)+"."+std::to_string(setup.solverRevision)
+		  )), 
 		  _setup(setup), _job_name(setup.jobname), 
 		  _global_id(setup.globalId), _local_id(setup.localId), 
 		  _diversification_index(setup.diversificationIndex) {
@@ -56,9 +59,13 @@ void PortfolioSolverInterface::resume() {
 	updateTimer(_job_name);
 	unsetSolverSuspend();
 }
+void PortfolioSolverInterface::setTerminate() {
+	_terminated = true;
+}
 
 void PortfolioSolverInterface::setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback) {
 	setLearnedClauseCallback([callback, this](const Mallob::Clause& c, int solverId) {
+		if (_terminated) return;
 		int condVar = _current_cond_var_or_zero;
 		assert(condVar >= 0);
 		callback(c, solverId, condVar);
