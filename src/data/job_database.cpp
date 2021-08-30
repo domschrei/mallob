@@ -141,13 +141,6 @@ bool JobDatabase::isRequestObsolete(const JobRequest& req) {
             log(V4_VVER, "%s : already completed\n", req.toStr().c_str());
             return true;
         }
-        // Am I the transitive parent of the request and do I know
-        // that the job's volume does not allow for this node any more? 
-        if (job.getVolume() > 0 && job.getVolume() <= req.requestedNodeIndex 
-                && job.getJobTree().isTransitiveParentOf(req.requestedNodeIndex)) {
-            log(V4_VVER, "%s : new volume too small\n", req.toStr().c_str());
-            return true;
-        }
     }
     return false;
 }
@@ -175,11 +168,6 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
     if (req.revision < job.getRevision()) {
         // Job was updated in the meantime
         log(V4_VVER, "Req. %s : rev. %i not up to date\n", job.toStr(), req.revision);
-        return true;
-    }
-    // Does the job's volume not allow for this node any more? 
-    if (job.getVolume() > 0 && job.getVolume() <= req.requestedNodeIndex) {
-        log(V4_VVER, "Req. %s : new volume too small\n", req.toStr().c_str());
         return true;
     }
     if (alreadyAccepted) {
