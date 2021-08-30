@@ -32,7 +32,7 @@ DefaultSharingManager::DefaultSharingManager(
     for (size_t i = 0; i < _solvers.size(); i++) {
 		_solver_filters.emplace_back(/*maxClauseLen=*/params.hardMaxClauseLength(), /*checkUnits=*/true);
 		_solvers[i]->setExtLearnedClauseCallback(callback);
-		_importing.push_back(true);
+		_solver_revisions.push_back(_solvers[i]->getSolverSetup().solverRevision);
 	}
 	_last_buffer_clear = Timer::elapsedSeconds();
 }
@@ -186,8 +186,8 @@ void DefaultSharingManager::digestDeferredClauses() {
 	}
 }
 
-void DefaultSharingManager::processClause(int solverId, const Clause& clause, int condVarOrZero) {
-	if (!_importing[solverId]) return;
+void DefaultSharingManager::processClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero) {
+	if (_solver_revisions[solverId] != solverRevision) return;
 
 	auto clauseBegin = clause.begin;
 	auto clauseSize = clause.size;
@@ -225,11 +225,11 @@ SharingStatistics DefaultSharingManager::getStatistics() {
 
 void DefaultSharingManager::stopClauseImport(int solverId) {
 	assert(solverId >= 0 && solverId < _solvers.size());
-	_importing[solverId] = false;
+	_solver_revisions[solverId] = -1;
 }
 
 void DefaultSharingManager::continueClauseImport(int solverId) {
 	assert(solverId >= 0 && solverId < _solvers.size());
-	_importing[solverId] = true;
+	_solver_revisions[solverId] = _solvers[solverId]->getSolverSetup().solverRevision;
 	_solvers[solverId]->setExtLearnedClauseCallback(getCallback());
 }

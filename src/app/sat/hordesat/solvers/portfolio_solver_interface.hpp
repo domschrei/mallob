@@ -72,7 +72,7 @@ struct SolverSetup {
 void updateTimer(std::string jobName);
 
 typedef std::function<void(const Mallob::Clause&, int)> LearnedClauseCallback;
-typedef std::function<void(const Mallob::Clause&, int, int)> ExtLearnedClauseCallback;
+typedef std::function<void(const Mallob::Clause&, int, int, int)> ExtLearnedClauseCallback;
 
 /**
  * Interface for solvers that can be used in the portfolio.

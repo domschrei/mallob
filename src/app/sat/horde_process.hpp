@@ -46,9 +46,6 @@ public:
         _shmem_id = "/edu.kit.iti.mallob." + std::to_string(Proc::getParentPid()) + "." + std::to_string(config.mpirank) + ".#" + std::to_string(config.jobid);
         log.log(V4_VVER, "Access base shmem: %s\n", _shmem_id.c_str());
         _hsm = (HordeSharedMemory*) accessMemory(_shmem_id, sizeof(HordeSharedMemory));
-
-        // Signal initialization to parent
-        _hsm->isSpawned = true;
         
         _checksum = params.useChecksums() ? new Checksum() : nullptr;
     }

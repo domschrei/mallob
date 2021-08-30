@@ -33,7 +33,6 @@ struct HordeSharedMemory {
     bool didTerminate;
 
     // State alerts child->parent
-    bool isSpawned;
     bool isInitialized;
     bool hasSolution;
     SatResult result;

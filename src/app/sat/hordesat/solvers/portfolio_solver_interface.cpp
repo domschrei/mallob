@@ -68,6 +68,6 @@ void PortfolioSolverInterface::setExtLearnedClauseCallback(const ExtLearnedClaus
 		if (_terminated) return;
 		int condVar = _current_cond_var_or_zero;
 		assert(condVar >= 0);
-		callback(c, solverId, condVar);
+		callback(c, solverId, getSolverSetup().solverRevision, condVar);
 	});
 }

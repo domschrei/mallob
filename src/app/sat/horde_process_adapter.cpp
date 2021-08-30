@@ -56,7 +56,6 @@ void HordeProcessAdapter::doInitialize() {
     _hsm->didDumpStats = false;
     _hsm->didStartNextRevision = false;
     _hsm->didTerminate = false;
-    _hsm->isSpawned = false;
     _hsm->isInitialized = false;
     _hsm->hasSolution = false;
     _hsm->result = UNKNOWN;

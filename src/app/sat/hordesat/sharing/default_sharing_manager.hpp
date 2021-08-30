@@ -27,7 +27,7 @@ protected:
 	// associated solvers
 	std::vector<std::shared_ptr<PortfolioSolverInterface>>& _solvers;
 	std::vector<ClauseFilter> _solver_filters;
-	std::vector<bool> _importing;
+	std::vector<int> _solver_revisions;
 
 	struct DeferredClauseList {
 		int revision;
@@ -68,10 +68,10 @@ public:
 	void setRevision(int revision) override {_current_revision = revision;}
 
 private:
-	void processClause(int solverId, const Clause& clause, int condVarOrZero);
+	void processClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero);
 	ExtLearnedClauseCallback getCallback() {
-		return [this](const Clause& c, int solverId, int condVarOrZero) {
-			processClause(solverId, c, condVarOrZero);
+		return [this](const Clause& c, int solverId, int solverRevision, int condVarOrZero) {
+			processClause(solverId, solverRevision, c, condVarOrZero);
 		};
 	};
 
