@@ -26,6 +26,7 @@ HordeProcessAdapter::HordeProcessAdapter(Parameters&& params, HordeConfig&& conf
 }
 
 void HordeProcessAdapter::run() {
+    _running = true;
     ProcessWideThreadPool::get().addTask(
         std::bind(&HordeProcessAdapter::doInitialize, this)
     );
@@ -278,9 +279,11 @@ std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
 }
 
 void HordeProcessAdapter::waitUntilChildExited() {
-    if (!_initialized && !_bg_writer_running) return;
+    if (!_running) return;
     while (true) {
+        // Wait until initialized
         if (_initialized) {
+            // Check if child exited
             auto lock = _state_mutex.getLock();
             if (_child_pid == -1 || Process::didChildExit(_child_pid)) 
                 return;

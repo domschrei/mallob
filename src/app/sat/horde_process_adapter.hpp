@@ -61,6 +61,7 @@ private:
     std::string _shmem_id;
     HordeSharedMemory* _hsm = nullptr;
 
+    volatile bool _running = false;
     volatile bool _initialized = false;
     volatile bool _terminate = false;
     volatile bool _bg_writer_running = false;
