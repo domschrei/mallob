@@ -52,8 +52,8 @@ fi
 if echo $solvers|grep -q "l" && [ ! -f lingeling/liblgl.a ]; then
     echo "Building lingeling ..."
 
-    tar xzvf lingeling-bcj-78ebb86-180517.tar.gz
-    mv lingeling-bcj-78ebb86-180517 lingeling
+    #tar xzvf lingeling-bcj-78ebb86-180517.tar.gz
+    #mv lingeling-bcj-78ebb86-180517 lingeling
     cd lingeling
     for f in *.c *.h ; do
         sed -i 's/exit ([01])/abort()/g' $f
