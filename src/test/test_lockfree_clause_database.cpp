@@ -28,7 +28,7 @@ void testUniform() {
     std::vector<std::thread> threads(numProducers);
     for (size_t i = 0; i < threads.size(); i++) {
         threads[i] = std::thread([i, &cdb, maxLbdPartitionedSize, maxClauseSize]() {
-            LockfreeClauseDatabase::BucketLabel b;
+            BucketLabel b;
             for (size_t j = 0; j < 2*i; j++) b.next(maxLbdPartitionedSize);
             if (b.size <= maxLbdPartitionedSize) {
                 std::vector<int> lits;

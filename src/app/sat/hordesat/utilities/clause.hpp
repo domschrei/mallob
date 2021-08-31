@@ -2,6 +2,9 @@
 #ifndef DOMPASCH_MALLOB_CLAUSE_HPP
 #define DOMPASCH_MALLOB_CLAUSE_HPP
 
+#include <string>
+#include <vector>
+
 namespace Mallob {
     
     struct Clause {
