@@ -13,6 +13,7 @@
 #include "util/sys/shared_memory.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/proc.hpp"
+#include "util/sys/thread_pool.hpp"
 #include "data/checksum.hpp"
 #include "app/sat/horde_process.hpp"
 
@@ -38,6 +39,8 @@ int main(int argc, char *argv[]) {
     int rankOfParent = config.mpirank;
 
     Random::init(config.mpisize, rankOfParent);
+
+    ProcessWideThreadPool::init(1);
 
     // Initialize signal handlers
     Process::init(rankOfParent, /*leafProcess=*/true);
