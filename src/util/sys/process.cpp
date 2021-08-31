@@ -17,6 +17,7 @@
 #include "util/logger.hpp"
 #include "util/sys/stacktrace.hpp"
 #include "util/sys/background_worker.hpp"
+#include "util/sys/thread_pool.hpp"
 
 int Process::_rank;
 
@@ -178,5 +179,10 @@ void Process::writeTrace(long tid) {
     std::string command = "gdb --q --n --ex bt --batch --pid " + std::to_string(tid) 
             + " > mallob_thread_trace_of_" + std::to_string(tid) 
             + "_from_" + std::to_string(callingTid) + " 2>&1";
-    system(command.c_str());
+    // Execute GDB in separate thread to avoid self-tracing
+    auto future = ProcessWideThreadPool::get().addTask([&]() {
+        system(command.c_str());
+    });
+    // Wait for completion
+    future.get();
 }

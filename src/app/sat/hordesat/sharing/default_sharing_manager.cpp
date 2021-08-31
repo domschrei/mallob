@@ -174,6 +174,9 @@ void DefaultSharingManager::digestDeferredClauses() {
 				c.begin = cls.data()+1;
 				c.size = cls.size()-1;
 				if (_solver_filters[sid].registerClause(c.begin, c.size)) {
+					if (numAdded == 0) {
+						_logger.log(V5_DEBG, "S%i receives deferred cls\n", _solvers[sid]->getGlobalId());
+					}
 					_solvers[sid]->addLearnedClause(c);
 					numAdded++;
 				}

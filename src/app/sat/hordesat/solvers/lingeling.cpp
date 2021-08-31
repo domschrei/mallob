@@ -289,6 +289,10 @@ void Lingeling::doConsume(int** clause, int* glue) {
 		assert(i == 0 || std::abs(lit) <= maxvar 
 			|| log_return_false("ERROR: tried to import lit %i (max. var: %i)!\n", lit, maxvar));
 	}
+	assert(learnedClausesBuffer.back() == 0 || 
+		log_return_false("ERROR: consumed cls does not end w/ zero! Final lit %i @ idx. %i\n", 
+			learnedClausesBuffer.back(), learnedClausesBuffer.size()-1));
+
 	//_logger.log(V4_VVER, "%s\n", str.c_str());
 
 	*glue = learnedClausesBuffer[0];
@@ -297,6 +301,8 @@ void Lingeling::doConsume(int** clause, int* glue) {
 }
 
 void Lingeling::addLearnedClause(const Clause& c) {
+
+	assert(c.size <= _setup.hardMaxClauseLength || log_return_false("ERROR: clause size %i\n", c.size));
 
 	if (c.size == 1) {
 		if (!learnedUnits.insertUnit(*c.begin)) {
