@@ -77,7 +77,7 @@ function test_incremental_scheduling() {
     test 8 -t=1 -l=1 -satsolver=LgC -v=5 -J=3 -incrementaltest -checksums=1
 }
 
-test_mono
+#test_mono
 test_scheduling
 test_oscillating
 test_incremental

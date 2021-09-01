@@ -42,6 +42,7 @@ private:
     std::atomic_int _num_incoming_jobs = 0;
     // Safeguards _incoming_job_queue.
     Mutex _incoming_job_lock;
+    ConditionVariable _incoming_job_cond_var;
 
     // For jobs which have been fully read and initialized
     // and whose prerequisites for activation are met.

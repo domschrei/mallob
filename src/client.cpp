@@ -25,81 +25,85 @@ void Client::readIncomingJobs(Logger log) {
 
     log.log(V3_VERB, "Starting\n");
 
-    while (_instance_reader.continueRunning()) {
+    while (true) {
+        // Wait for a nonempty incoming job queue
+        _incoming_job_cond_var.wait(_incoming_job_lock, [&]() {
+            return !_instance_reader.continueRunning() 
+                || (_num_incoming_jobs > 0 && _num_loaded_jobs < 32);
+        });
+        if (!_instance_reader.continueRunning()) break;
 
+        // Obtain lock, measure time
+        auto lock = _incoming_job_lock.getLock();
         float time = Timer::elapsedSeconds();
 
-        while (_num_incoming_jobs > 0 && _num_loaded_jobs < 32) {
-            auto lock = _incoming_job_lock.getLock();
+        // Find a single job eligible for parsing
+        JobMetadata foundJob;
+        for (auto& data : _incoming_job_queue) {
+            
+            // Jobs are sorted by arrival:
+            // If this job has not arrived yet, then none have arrived yet
+            if (time < data.description->getArrival()) break;
 
-            // Find a single job eligible for parsing
-            JobMetadata foundJob;
-            for (auto& data : _incoming_job_queue) {
-                
-                // Jobs are sorted by arrival:
-                // If this job has not arrived yet, then none have arrived yet
-                if (time < data.description->getArrival()) break;
-
-                // Check job's dependencies
-                bool dependenciesSatisfied = true;
-                {
-                    auto lock = _done_job_lock.getLock();
-                    for (int jobId : data.dependencies) {
-                        if (!_done_jobs.count(jobId)) {
-                            dependenciesSatisfied = false;
-                            break;
-                        }
-                    }
-                    if (data.description->isIncremental() && data.description->getRevision() > 0) {
-                        // Check if the precursor of this incremental job is already done
-                        if (!_done_jobs.count(data.description->getId()))
-                            dependenciesSatisfied = false; // no job with this ID is done yet
-                        else if (data.description->getRevision() != _done_jobs[data.description->getId()].revision+1)
-                            dependenciesSatisfied = false; // job with correct revision not done yet
-                        else {
-                            data.description->setChecksum(_done_jobs[data.description->getId()].lastChecksum);
-                        }
+            // Check job's dependencies
+            bool dependenciesSatisfied = true;
+            {
+                auto lock = _done_job_lock.getLock();
+                for (int jobId : data.dependencies) {
+                    if (!_done_jobs.count(jobId)) {
+                        dependenciesSatisfied = false;
+                        break;
                     }
                 }
-                if (!dependenciesSatisfied) continue;
-
-                // Job can be read: Enqueue reader task into thread pool
-                foundJob = data;
-                ProcessWideThreadPool::get().addTask([this, &log, foundJob]() {
-                    // Read job
-                    int id = foundJob.description->getId();
-                    float time = Timer::elapsedSeconds();
-                    log.log(V3_VERB, "[T] Reading job #%i rev. %i (%s) ...\n", id, foundJob.description->getRevision(), foundJob.file.c_str());
-                    bool success = JobReader::read(foundJob.file, *foundJob.description);
-                    if (!success) {
-                        log.log(V1_WARN, "[T] [WARN] File %s could not be opened - skipping #%i\n", foundJob.file.c_str(), id);
-                    } else {
-                        time = Timer::elapsedSeconds() - time;
-                        log.log(V3_VERB, "[T] Initialized job #%i (%s) in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
-                                id, foundJob.file.c_str(), time, foundJob.description->getNumFormulaLiterals(), 
-                                foundJob.description->getNumAssumptionLiterals());
-                        
-                        // Enqueue in ready jobs
-                        auto lock = _ready_job_lock.getLock();
-                        _ready_job_queue.emplace_back(foundJob.description);
-                        _num_ready_jobs++;
-                        _num_loaded_jobs++;
-                        _sys_state.addLocal(SYSSTATE_PARSED_JOBS, 1);
+                if (data.description->isIncremental() && data.description->getRevision() > 0) {
+                    // Check if the precursor of this incremental job is already done
+                    if (!_done_jobs.count(data.description->getId()))
+                        dependenciesSatisfied = false; // no job with this ID is done yet
+                    else if (data.description->getRevision() != _done_jobs[data.description->getId()].revision+1)
+                        dependenciesSatisfied = false; // job with correct revision not done yet
+                    else {
+                        data.description->setChecksum(_done_jobs[data.description->getId()].lastChecksum);
                     }
-                });
-                break;
+                }
             }
+            if (!dependenciesSatisfied) continue;
 
-            // No eligible jobs right now
-            if (!foundJob.description) break;
-            
+            // Job can be read: Enqueue reader task into thread pool
+            foundJob = data;
+            ProcessWideThreadPool::get().addTask([this, &log, foundJob]() {
+                // Read job
+                int id = foundJob.description->getId();
+                float time = Timer::elapsedSeconds();
+                log.log(V3_VERB, "[T] Reading job #%i rev. %i (%s) ...\n", id, foundJob.description->getRevision(), foundJob.file.c_str());
+                bool success = JobReader::read(foundJob.file, *foundJob.description);
+                if (!success) {
+                    log.log(V1_WARN, "[T] [WARN] File %s could not be opened - skipping #%i\n", foundJob.file.c_str(), id);
+                } else {
+                    time = Timer::elapsedSeconds() - time;
+                    log.log(V3_VERB, "[T] Initialized job #%i (%s) in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
+                            id, foundJob.file.c_str(), time, foundJob.description->getNumFormulaLiterals(), 
+                            foundJob.description->getNumAssumptionLiterals());
+                    
+                    // Enqueue in ready jobs
+                    auto lock = _ready_job_lock.getLock();
+                    _ready_job_queue.emplace_back(foundJob.description);
+                    _num_ready_jobs++;
+                    _num_loaded_jobs++;
+                    _sys_state.addLocal(SYSSTATE_PARSED_JOBS, 1);
+                }
+            });
+            break;
+        }
+
+        if (foundJob.description) {
             // If a job was found, delete it from incoming queue
             _incoming_job_queue.erase(foundJob);
             _num_incoming_jobs--;
+        } else {
+            // No eligible jobs right now -- sleep for a while
+            lock.unlock();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-
-        // Rest for a while
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
     log.log(V3_VERB, "Stopping\n");
@@ -122,6 +126,7 @@ void Client::handleNewJob(JobMetadata&& data) {
         _incoming_job_queue.insert(std::move(data));
     }
     _num_incoming_jobs++;
+    _incoming_job_cond_var.notify();
     _sys_state.addLocal(SYSSTATE_ENTERED_JOBS, 1);
 }
 
@@ -414,6 +419,8 @@ void Client::handleExit(MessageHandle& handle) {
 }
 
 Client::~Client() {
+    _instance_reader.stopWithoutWaiting();
+    _incoming_job_cond_var.notify();
     _instance_reader.stop();
     _file_adapter.reset();
 

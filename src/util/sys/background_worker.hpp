@@ -35,6 +35,9 @@ public:
         _terminate = true;
         if (_thread.joinable()) _thread.join();
     }
+    void stopWithoutWaiting() {
+        _terminate = true;
+    }
     ~BackgroundWorker() {
         stop();
     }
