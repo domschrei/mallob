@@ -237,6 +237,15 @@ void HordeProcessAdapter::dumpStats() {
 bool HordeProcessAdapter::check() {
     if (!_initialized) return false;
 
+    /*
+    int exitStatus;
+    if (Process::didChildExit(_child_pid, &exitStatus) && exitStatus != 0) {
+        // Child exited!
+        log(V1_WARN, "Child %ld exited unexpectedly (status %i)\n", _child_pid, exitStatus);
+        // TODO fault tolerance w.r.t. crashing child: restart solver engine
+    }
+    */
+
     startBackgroundWriterIfNecessary();
 
     if (_hsm->didImport)            _hsm->doImport            = false;

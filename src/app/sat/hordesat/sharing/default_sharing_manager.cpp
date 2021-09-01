@@ -122,8 +122,13 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 		_logger.log(V3_VERB, "S%d imp=%d def=%d\n", _solvers[sid]->getGlobalId(), added[sid], deferred[sid]);
 	}
 
+	float cfhl = _params.clauseFilterHalfLife();
+	// Clear all filters if necessary
+	if ((int)cfhl == 0) {
+		for (auto& filter : _solver_filters) filter.clear();
+	}
 	// Clear half of the clauses from the filter (probabilistically) if a clause filter half life is set
-	if (_params.clauseFilterHalfLife() > 0 && Timer::elapsedSeconds() - _last_buffer_clear > _params.clauseFilterHalfLife()) {
+	if (cfhl > 0 && Timer::elapsedSeconds() - _last_buffer_clear > cfhl) {
 		_logger.log(verb, "forget half of clauses in filters\n");
 		for (size_t sid = 0; sid < _solver_filters.size(); sid++) {
 			_solver_filters[sid].clearHalf();

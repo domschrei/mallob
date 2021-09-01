@@ -41,7 +41,7 @@ public:
     static void forwardTerminateToChildren();
 
     /* 0: running, -1: error, childpid: exited */
-    static bool didChildExit(pid_t childpid);
+    static bool didChildExit(pid_t childpid, int* exitStatusOut = nullptr);
 
     struct SignalInfo {
         int signum;

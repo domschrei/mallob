@@ -1,6 +1,5 @@
 
 # HordeSat
 
-The sources in this directory are based on HordeSat.
-HordeSat is a massively parallel portfolio satisfiability solver.
-For more information visit the homepage https://baldur.iti.kit.edu/hordesat/.
+The sources in this directory have originated from HordeSat, a massively parallel portfolio satisfiability solver, and have since then been heavily modified, extended, and rewritten.
+For more information on HordeSat please visit https://baldur.iti.kit.edu/hordesat/.

@@ -66,7 +66,7 @@ OPT_INT(watchdogAbortMillis,             "wam", "",                         6000
 OPT_FLOAT(appCommPeriod,                 "s", "app-comm-period",            1,    0, LARGE_INT,         "Do job-internal communication every t seconds") 
 OPT_FLOAT(balancingPeriod,               "p", "balancing-period",           0.1,  0, LARGE_INT,         "Minimum interval between subsequent rounds of balancing")
 OPT_FLOAT(clauseBufferDiscountFactor,    "cbdf", "",                        0.9,  0.5, 1,               "Clause buffer discount factor: reduce buffer size per PE by <factor> each depth")
-OPT_FLOAT(clauseFilterHalfLife,          "cfhl", "",                        0,    0, LARGE_INT,         "Set clause filter half life of clauses until forgotten")
+OPT_FLOAT(clauseFilterHalfLife,          "cfhl", "",                        0,    -1, LARGE_INT,        "Set half life of clauses in solver filters (-1: never forget, 0: forget immediately")
 OPT_FLOAT(growthPeriod,                  "g", "growth-period",              0,    0, LARGE_INT,         "Grow job demand exponentially every t seconds (0: immediate full growth)" )
 OPT_FLOAT(increaseClauseProductionRatio, "icpr", "",                        0,    0, 1,                 "Increase a solver's Clause Production when it fills less than <ratio> of its buffer")
 OPT_FLOAT(inputShuffleProbability,       "isp", "",                         0,    0, 1,                 "Probability for solver with exhausted diversification to shuffle all clauses and all literals of each clause in the input")
