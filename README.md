@@ -11,7 +11,7 @@ Mallob is a platform for massively parallel and distributed on-demand processing
 Malleability means that the CPU resources allotted to a job may vary _during its execution_ depending on the system's overall load.
 
 Most notably, Mallob features an engine for distributed SAT solving. 
-According to the International SAT Competition [2020🥇](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf) and [2021🥇🥈](https://satcompetition.github.io/2021/slides/ISC2021.pdf), Mallob is currently the best approach for SAT solving on a large scale (800 physical cores) and one of the best approaches for SAT solving on a moderate scale (32 physical cores).
+According to the International SAT Competition [2020🥇](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf) and [2021🥇🥈🥈🥉](https://satcompetition.github.io/2021/slides/ISC2021.pdf), Mallob is currently the best approach for SAT solving on a large scale (800 physical cores) and one of the best approaches for SAT solving on a moderate scale (32 physical cores).
 
 More information on the design decisions and techniques of Mallob can be found in [our SAT 2021 paper](https://dominikschreiber.de/papers/2021-sat-scalable.pdf) where we also evaluated Mallob on up to 2560 physical cores.
 
@@ -83,6 +83,9 @@ Launch Mallob without any particular options regarding its mode of operation. Ea
 On a shared-memory machine, the easiest option is to just always use the directory `.api/jobs.0/` to introduce your jobs, leaving all other client interfaces idle (with minimum overhead).
 In case of many concurrent jobs, it is best to distribute your jobs evenly (or uniformly @ random) across all existing client interfaces in order to minimize response times.
 
+The number of worker PEs and client PEs can be set manually with the `-w=<#workers>` and `-c=<#clients>` options to enforce that some PEs are exclusively clients or exclusively workers.
+The first `#workers` ranks are assigned worker roles, and the last `#clients` ranks are assigned client roles. These may overlap, and setting one/both of the options to -1 means that _all_ PEs are assigned the respective role(s).
+
 **Users**
 
 The API distinguishes jobs by the user which introduced them. By default there is a user `admin` defined in `.api/users/admin.json`.
@@ -90,7 +93,7 @@ You can just use this user or create a new one and save it under `.api/users/<us
 
 **Introducing a Job**
 
-To introduce a job to the system, drop a JSON file in `.api/jobs.<i>/new/` (e.g., `.api/jobs.0/new/`) on the filesystem of PE i structured like this:  
+To introduce a job to the system, drop a JSON file in `.api/jobs.<i>/new/` (e.g., `.api/jobs.0/new/`) on the filesystem of the according PE structured like this:  
 ```
 { 
     "user": "admin", 
