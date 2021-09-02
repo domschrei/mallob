@@ -36,22 +36,18 @@ void Worker::init() {
     auto& q = MyMpi::getMessageQueue();
     q.registerCallback(MSG_ANSWER_ADOPTION_OFFER,
         [&](auto& h) {handleAnswerAdoptionOffer(h);});
-    q.registerCallback(MSG_DO_EXIT, 
-        [&](auto& h) {handleDoExit(h);});
     q.registerCallback(MSG_NOTIFY_JOB_ABORTING, 
         [&](auto& h) {handleNotifyJobAborting(h);});
-    q.registerCallback(MSG_NOTIFY_JOB_DONE, 
-        [&](auto& h) {handleNotifyJobDone(h);});
     q.registerCallback(MSG_NOTIFY_JOB_TERMINATING, 
         [&](auto& h) {handleNotifyJobTerminating(h);});
+    q.registerCallback(MSG_NOTIFY_RESULT_FOUND, 
+        [&](auto& h) {handleNotifyResultFound(h);});
     q.registerCallback(MSG_INCREMENTAL_JOB_FINISHED,
         [&](auto& h) {handleIncrementalJobFinished(h);});
     q.registerCallback(MSG_INTERRUPT,
         [&](auto& h) {handleInterrupt(h);});
     q.registerCallback(MSG_NOTIFY_NODE_LEAVING_JOB, 
         [&](auto& h) {handleNotifyNodeLeavingJob(h);});
-    q.registerCallback(MSG_NOTIFY_RESULT_FOUND, 
-        [&](auto& h) {handleNotifyResultFound(h);});
     q.registerCallback(MSG_NOTIFY_RESULT_OBSOLETE, 
         [&](auto& h) {handleNotifyResultObsolete(h);});
     q.registerCallback(MSG_NOTIFY_VOLUME_UPDATE, 
@@ -76,8 +72,6 @@ void Worker::init() {
         [&](auto& h) {handleSendClientRank(h);});
     q.registerCallback(MSG_SEND_JOB_DESCRIPTION, 
         [&](auto& h) {handleSendJobDescription(h);});
-    q.registerCallback(MSG_SEND_JOB_RESULT, 
-        [&](auto& h) {handleSendJobResult(h);});
     q.registerCallback(MSG_NOTIFY_NEIGHBOR_STATUS,
         [&](auto& h) {handleNotifyNeighborStatus(h);});
     q.registerCallback(MSG_NOTIFY_NEIGHBOR_IDLE_DISTANCE,
@@ -110,38 +104,6 @@ void Worker::init() {
                 log(LOG_ADD_DESTRANK | V5_DEBG, "Warmup msg", rank);
             }
         }
-    }
-
-    log(V5_DEBG, "Global init barrier ...\n");
-    MPI_Barrier(MPI_COMM_WORLD);
-    log(V5_DEBG, "Passed global init barrier\n");
-    
-    // Initiate single instance solving as the "root node"
-    if (_params.monoFilename.isSet() && _world_rank == 0) {
-
-        std::string instanceFilename = _params.monoFilename();
-        log(V2_INFO, "Solve mono instance \"%s\"\n", instanceFilename.c_str());
-
-        // Create job description with formula
-        log(V3_VERB, "read instance\n");
-        int jobId = 1;
-        JobDescription desc(jobId, /*prio=*/1, /*incremental=*/false);
-        desc.setRootRank(0);
-        bool success = JobReader::read(instanceFilename, desc);
-        if (!success) {
-            log(V0_CRIT, "[ERROR] Could not open file!\n");
-            Terminator::setTerminating();
-            return;
-        }
-
-        // Add as a new local SAT job image
-        log(V3_VERB, "%ld lits w/ separators; init SAT job image\n", desc.getNumFormulaLiterals());
-        _job_db.createJob(MyMpi::size(_comm), _world_rank, jobId,JobDescription::Application::SAT);
-        JobRequest req(jobId, JobDescription::Application::SAT, 0, 0, 0, 0, 0, 0);
-        _job_db.commit(req);
-        auto serializedDesc = desc.getSerialization(0);
-        _job_db.appendRevision(jobId, serializedDesc, _world_rank);
-        _job_db.execute(jobId, _world_rank);
     }
 }
 
@@ -193,180 +155,145 @@ void Worker::createExpanderGraph() {
     assert((int)_hop_destinations.size() == numBounceAlternatives);
 }
 
-void Worker::mainProgram() {
+void Worker::advance(float time) {
 
-    int iteration = 0;
-    float lastMemCheckTime = Timer::elapsedSeconds();
-    float lastJobCheckTime = lastMemCheckTime;
-    float lastBalanceCheckTime = lastMemCheckTime;
-    float lastMaintenanceCheckTime = lastMemCheckTime;
-    bool wasIdle = true;
+    if (time < 0) time = Timer::elapsedSeconds();
 
-    const float sleepMicrosecs = _params.sleepMicrosecs();
-    const float jobCheckPeriod = 0.01;
-    const float balanceCheckPeriod = 0.01;
-    const float maintenanceCheckPeriod = 1.0;
-    const float memCheckPeriod = 3.0;
-    const bool doYield = _params.yield();
+    // Reset watchdog
+    _watchdog.reset(time);
 
-    Watchdog watchdog(/*checkIntervMillis=*/200, lastMemCheckTime);
-    watchdog.setWarningPeriod(100); // warn after 0.1s without a reset
-    watchdog.setAbortPeriod(_params.watchdogAbortMillis()); // abort after X ms without a reset
+    if (_was_idle != _job_db.isIdle()) {
+        // Load status changed since last cycle
+        sendStatusToNeighbors();
+        _was_idle = !_was_idle;
+    }
+    
+    if (_periodic_mem_check.ready()) {
+        // Print stats
 
-    float time = lastMemCheckTime;
-    while (!checkTerminate(time)) {
+        // For this process and subprocesses
+        auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::RECURSE);
+        info.vmUsage *= 0.001 * 0.001;
+        info.residentSetSize *= 0.001 * 0.001;
+        log(V4_VVER, "mem=%.2fGB\n", info.residentSetSize);
+        _sys_state.setLocal(SYSSTATE_GLOBALMEM, info.residentSetSize);
 
-        // Reset watchdog
-        watchdog.reset(time);
-
-        if (wasIdle != _job_db.isIdle()) {
-            // Load status changed since last cycle
-            sendStatusToNeighbors();
-            wasIdle = !wasIdle;
+        // For this "management" thread
+        double cpuShare; float sysShare;
+        bool success = Proc::getThreadCpuRatio(Proc::getTid(), cpuShare, sysShare);
+        if (success) {
+            log(V3_VERB, "mainthread cpu=%i cpuratio=%.3f sys=%.3f\n", info.cpu, cpuShare, sysShare);
         }
-        
-        // Poll received messages, make progress in sent messages
-        MyMpi::getMessageQueue().advance();
 
-        if (time - lastMemCheckTime > memCheckPeriod) {
-            lastMemCheckTime = time;
-            // Print stats
-
-            // For this process and subprocesses
-            auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::RECURSE);
-            info.vmUsage *= 0.001 * 0.001;
-            info.residentSetSize *= 0.001 * 0.001;
-            log(V4_VVER, "mem=%.2fGB\n", info.residentSetSize);
-            _sys_state.setLocal(SYSSTATE_GLOBALMEM, info.residentSetSize);
-
-            // For this "management" thread
-            double cpuShare; float sysShare;
-            bool success = Proc::getThreadCpuRatio(Proc::getTid(), cpuShare, sysShare);
-            if (success) {
-                log(V3_VERB, "mainthread cpu=%i cpuratio=%.3f sys=%.3f\n", info.cpu, cpuShare, sysShare);
-            }
-
-            // For the current job
-            if (!_job_db.isIdle()) {
-                Job& job = _job_db.getActive();
-                job.appl_dumpStats();
-                if (job.getJobTree().isRoot()) {
-                    std::string commStr = "";
-                    for (size_t i = 0; i < job.getJobComm().size(); i++) {
-                        commStr += " " + std::to_string(job.getJobComm()[i]);
-                    }
-                    log(V4_VVER, "%s job comm:%s\n", job.toStr(), commStr.c_str());
+        // For the current job
+        if (!_job_db.isIdle()) {
+            Job& job = _job_db.getActive();
+            job.appl_dumpStats();
+            if (job.getJobTree().isRoot()) {
+                std::string commStr = "";
+                for (size_t i = 0; i < job.getJobComm().size(); i++) {
+                    commStr += " " + std::to_string(job.getJobComm()[i]);
                 }
+                log(V4_VVER, "%s job comm:%s\n", job.toStr(), commStr.c_str());
             }
         }
-
-        // Advance load balancing operations
-        if (time - lastBalanceCheckTime > balanceCheckPeriod) {
-            lastBalanceCheckTime = time;
-            if (_job_db.isTimeForRebalancing(time)) {
-                if (_job_db.beginBalancing()) applyBalancing();
-            } 
-            if (_job_db.continueBalancing()) applyBalancing();
-
-            if (_job_db.isIdle() && _time_only_idle_worker > 0 && time - _time_only_idle_worker >= 0.05) {
-                // This worker is the only idle worker within its local vicinity since some time
-                log(V4_VVER, "All neighbors are busy - requesting work\n");
-                WorkRequest req(_world_rank, _job_db.getGlobalBalancingEpoch());
-                MyMpi::isend(Random::choice(_hop_destinations), MSG_REQUEST_WORK, req);
-                _time_only_idle_worker = -1;
-            }
-
-            // Advance collective assignment of nodes
-            if (_params.hopsUntilCollectiveAssignment() >= 0) {
-                _coll_assign.advance(_job_db.getGlobalBalancingEpoch());
-            }
-        }
-
-        // Do diverse periodic maintenance tasks
-        if (time - lastMaintenanceCheckTime > maintenanceCheckPeriod) {
-            lastMaintenanceCheckTime = time;
-
-            // Forget jobs that are old or wasting memory
-            _job_db.forgetOldJobs();
-
-            // Continue to bounce requests which were deferred earlier
-            for (auto& [req, senderRank] : _job_db.getDeferredRequestsToForward(time)) {
-                bounceJobRequest(req, senderRank);
-            }
-
-            _bfs.collectGarbage(_job_db.getGlobalBalancingEpoch());
-        }
-
-        // Check active job
-        if (time - lastJobCheckTime >= jobCheckPeriod) {
-            lastJobCheckTime = time;
-
-            // Load and try to adopt pending root reactivation request
-            if (_job_db.hasPendingRootReactivationRequest()) {
-                MessageHandle handle;
-                handle.tag = MSG_REQUEST_NODE;
-                handle.finished = true;
-                handle.receiveSelfMessage(_job_db.loadPendingRootReactivationRequest().serialize(), _world_rank);
-                handleRequestNode(handle, JobDatabase::NORMAL);
-            }
-
-            if (_job_db.isIdle()) {
-                _sys_state.setLocal(SYSSTATE_BUSYRATIO, 0.0f); // busy nodes
-                _sys_state.setLocal(SYSSTATE_NUMJOBS, 0.0f); // active jobs
-
-            } else {
-                Job &job = _job_db.getActive();
-                int id = job.getId();
-                bool isRoot = job.getJobTree().isRoot();
-
-                _sys_state.setLocal(SYSSTATE_BUSYRATIO, 1.0f); // busy nodes
-                _sys_state.setLocal(SYSSTATE_NUMJOBS, isRoot ? 1.0f : 0.0f); // active jobs
-
-                bool abort = false;
-                if (isRoot) abort = _job_db.checkComputationLimits(id);
-                if (abort) {
-                    // Timeout (CPUh or wallclock time) hit
-                    timeoutJob(id);
-                } else if (job.getState() == ACTIVE) {
-                    
-                    // Check if a result was found
-                    int result = job.appl_solved();
-                    if (result >= 0) {
-                        // Solver done!
-                        // Signal notification to root -- may be a self message
-                        int jobRootRank = job.getJobTree().getRootNodeRank();
-                        IntVec payload({job.getId(), job.getRevision(), result});
-                        log(LOG_ADD_DESTRANK | V4_VVER, "%s : sending finished info", jobRootRank, job.toStr());
-                        MyMpi::isend(jobRootRank, MSG_NOTIFY_RESULT_FOUND, payload);
-                        job.setResultTransferPending(true);
-                    }
-                }
-
-                // Job communication (e.g. clause sharing)
-                if (job.wantsToCommunicate()) job.communicate();
-            }
-
-        }
-
-        // Advance an all-reduction of the current system state
-        if (_sys_state.aggregate(time)) {
-            float* result = _sys_state.getGlobal();
-            int verb = (_world_rank == 0 ? V2_INFO : V5_DEBG);
-            log(verb, "sysstate busyratio=%.3f jobs=%i globmem=%.2fGB newreqs=%i hops=%i\n", 
-                        result[0]/MyMpi::size(_comm), (int)result[1], result[2], (int)result[4], (int)result[3]);
-            _sys_state.setLocal(SYSSTATE_NUMHOPS, 0); // reset #hops
-            _sys_state.setLocal(SYSSTATE_SPAWNEDREQUESTS, 0); // reset #requests
-        }
-
-        if (sleepMicrosecs > 0) usleep(sleepMicrosecs);
-        if (doYield) std::this_thread::yield();
-
-        time = Timer::elapsedSeconds();
     }
 
-    watchdog.stop();
-    Logger::getMainInstance().flush();
-    fflush(stdout);
+    // Advance load balancing operations
+    if (_periodic_balance_check.ready()) {
+        
+        if (_job_db.isTimeForRebalancing(time)) {
+            if (_job_db.beginBalancing()) applyBalancing();
+        } 
+        if (_job_db.continueBalancing()) applyBalancing();
+
+        if (_job_db.isIdle() && _time_only_idle_worker > 0 && time - _time_only_idle_worker >= 0.05) {
+            // This worker is the only idle worker within its local vicinity since some time
+            log(V4_VVER, "All neighbors are busy - requesting work\n");
+            WorkRequest req(_world_rank, _job_db.getGlobalBalancingEpoch());
+            MyMpi::isend(Random::choice(_hop_destinations), MSG_REQUEST_WORK, req);
+            _time_only_idle_worker = -1;
+        }
+
+        // Advance collective assignment of nodes
+        if (_params.hopsUntilCollectiveAssignment() >= 0) {
+            _coll_assign.advance(_job_db.getGlobalBalancingEpoch());
+        }
+    }
+
+    // Do diverse periodic maintenance tasks
+    if (_periodic_maintenance.ready()) {
+        
+        // Forget jobs that are old or wasting memory
+        _job_db.forgetOldJobs();
+
+        // Continue to bounce requests which were deferred earlier
+        for (auto& [req, senderRank] : _job_db.getDeferredRequestsToForward(time)) {
+            bounceJobRequest(req, senderRank);
+        }
+
+        _bfs.collectGarbage(_job_db.getGlobalBalancingEpoch());
+    }
+
+    // Check active job
+    if (_periodic_job_check.ready()) {
+        
+        // Load and try to adopt pending root reactivation request
+        if (_job_db.hasPendingRootReactivationRequest()) {
+            MessageHandle handle;
+            handle.tag = MSG_REQUEST_NODE;
+            handle.finished = true;
+            handle.receiveSelfMessage(_job_db.loadPendingRootReactivationRequest().serialize(), _world_rank);
+            handleRequestNode(handle, JobDatabase::NORMAL);
+        }
+
+        if (_job_db.isIdle()) {
+            _sys_state.setLocal(SYSSTATE_BUSYRATIO, 0.0f); // busy nodes
+            _sys_state.setLocal(SYSSTATE_NUMJOBS, 0.0f); // active jobs
+
+        } else {
+            Job &job = _job_db.getActive();
+            int id = job.getId();
+            bool isRoot = job.getJobTree().isRoot();
+
+            _sys_state.setLocal(SYSSTATE_BUSYRATIO, 1.0f); // busy nodes
+            _sys_state.setLocal(SYSSTATE_NUMJOBS, isRoot ? 1.0f : 0.0f); // active jobs
+
+            bool abort = false;
+            if (isRoot) abort = _job_db.checkComputationLimits(id);
+            if (abort) {
+                // Timeout (CPUh or wallclock time) hit
+                timeoutJob(id);
+            } else if (job.getState() == ACTIVE) {
+                
+                // Check if a result was found
+                int result = job.appl_solved();
+                if (result >= 0) {
+                    // Solver done!
+                    // Signal notification to root -- may be a self message
+                    int jobRootRank = job.getJobTree().getRootNodeRank();
+                    IntVec payload({job.getId(), job.getRevision(), result});
+                    log(LOG_ADD_DESTRANK | V4_VVER, "%s : sending finished info", jobRootRank, job.toStr());
+                    MyMpi::isend(jobRootRank, MSG_NOTIFY_RESULT_FOUND, payload);
+                    job.setResultTransferPending(true);
+                }
+            }
+
+            // Job communication (e.g. clause sharing)
+            if (job.wantsToCommunicate()) job.communicate();
+        }
+
+    }
+
+    // Advance an all-reduction of the current system state
+    if (_sys_state.aggregate(time)) {
+        float* result = _sys_state.getGlobal();
+        int verb = (_world_rank == 0 ? V2_INFO : V5_DEBG);
+        log(verb, "sysstate busyratio=%.3f jobs=%i globmem=%.2fGB newreqs=%i hops=%i\n", 
+                    result[0]/MyMpi::size(_comm), (int)result[1], result[2], (int)result[4], (int)result[3]);
+        _sys_state.setLocal(SYSSTATE_NUMHOPS, 0); // reset #hops
+        _sys_state.setLocal(SYSSTATE_SPAWNEDREQUESTS, 0); // reset #requests
+    }
 }
 
 void Worker::handleNotifyJobAborting(MessageHandle& handle) {
@@ -376,10 +303,10 @@ void Worker::handleNotifyJobAborting(MessageHandle& handle) {
 
     interruptJob(jobId, /*terminate=*/true, /*reckless=*/true);
     
-    if (!_params.monoFilename.isSet() && _job_db.get(jobId).getJobTree().isRoot()) {
+    if (_job_db.get(jobId).getJobTree().isRoot()) {
         // Forward information on aborted job to client
         MyMpi::isend(_job_db.get(jobId).getJobTree().getParentNodeRank(), 
-            MSG_NOTIFY_JOB_ABORTING, handle.moveRecvData());
+            MSG_NOTIFY_CLIENT_JOB_ABORTING, handle.moveRecvData());
     }
 }
 
@@ -452,18 +379,6 @@ void Worker::sendRevisionDescription(int jobId, int revision, int dest) {
     MyMpi::isend(dest, MSG_SEND_JOB_DESCRIPTION, descPtr);
     log(LOG_ADD_DESTRANK | V4_VVER, "Sent job desc. of %s rev. %i, size %i", dest, 
             job.toStr(), revision, descPtr->size());
-}
-
-void Worker::handleDoExit(MessageHandle& handle) {
-    log(LOG_ADD_SRCRANK | V3_VERB, "Received exit signal", handle.source);
-
-    // Forward exit signal
-    if (_world_rank*2+1 < MyMpi::size(MPI_COMM_WORLD))
-        MyMpi::isendCopy(_world_rank*2+1, MSG_DO_EXIT, handle.getRecvData());
-    if (_world_rank*2+2 < MyMpi::size(MPI_COMM_WORLD))
-        MyMpi::isendCopy(_world_rank*2+2, MSG_DO_EXIT, handle.getRecvData());
-
-    Terminator::setTerminating();
 }
 
 void Worker::handleRejectOneshot(MessageHandle& handle) {
@@ -568,7 +483,9 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
             _job_db.createJob(MyMpi::size(_comm), _world_rank, req.jobId, req.application);
         }
         _job_db.commit(req);
-        MyMpi::isend(req.requestingNodeRank, MSG_OFFER_ADOPTION, req);
+        MyMpi::isend(req.requestingNodeRank, 
+            req.requestedNodeIndex == 0 ? MSG_OFFER_ADOPTION_OF_ROOT : MSG_OFFER_ADOPTION,
+            req);
 
     } else if (adoptionResult == JobDatabase::REJECT) {
         if (req.requestedNodeIndex == 0 && _job_db.has(req.jobId) && _job_db.get(req.jobId).getJobTree().isRoot()) {
@@ -625,14 +542,6 @@ void Worker::handleSendApplicationMessage(MessageHandle& handle) {
     // Give message to corresponding job
     Job& job = _job_db.get(jobId);
     if (job.getState() == ACTIVE) job.communicate(handle.source, msg);
-}
-
-void Worker::handleNotifyJobDone(MessageHandle& handle) {
-    IntPair recv = Serializable::get<IntPair>(handle.getRecvData());
-    int jobId = recv.first;
-    int resultSize = recv.second;
-    log(LOG_ADD_SRCRANK | V4_VVER, "Will receive job result, length %i, for job #%i", handle.source, resultSize, jobId);
-    MyMpi::isendCopy(handle.source, MSG_QUERY_JOB_RESULT, handle.getRecvData());
 }
 
 void Worker::handleOfferAdoption(MessageHandle& handle) {
@@ -762,43 +671,6 @@ void Worker::handleSendJobDescription(MessageHandle& handle) {
     if (_job_db.get(jobId).getRevision() < _job_db.get(jobId).getDesiredRevision()) {
         // No: Query next revision
         MyMpi::isend(handle.source, MSG_QUERY_JOB_DESCRIPTION, IntPair(jobId, _job_db.get(jobId).getRevision()+1));
-    }
-}
-
-void Worker::handleSendJobResult(MessageHandle& handle) {
-    JobResult jobResult = Serializable::get<JobResult>(handle.getRecvData());
-    int jobId = jobResult.id;
-    int resultCode = jobResult.result;
-    int revision = jobResult.revision;
-
-    log(LOG_ADD_SRCRANK | V2_INFO, "Received result of job #%i rev. %i, code: %i", handle.source, jobId, revision, resultCode);
-    std::string resultString = "s " + std::string(resultCode == RESULT_SAT ? "SATISFIABLE" 
-                        : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN") + "\n";
-    std::stringstream modelString;
-    if (resultCode == RESULT_SAT) {
-        modelString << "v ";
-        for (size_t x = 1; x < jobResult.solution.size(); x++) {
-            modelString << std::to_string(jobResult.solution[x]) << " ";
-        }
-        modelString << "0\n";
-    }
-    if (_params.solutionToFile.isSet()) {
-        std::ofstream file;
-        file.open(_params.solutionToFile());
-        if (!file.is_open()) {
-            log(V0_CRIT, "[ERROR] Could not open solution file\n");
-        } else {
-            file << resultString;
-            file << modelString.str();
-            file.close();
-        }
-    } else {
-        log(LOG_NO_PREFIX | V0_CRIT, modelString.str().c_str());
-    }
-
-    if (_params.monoFilename.isSet()) {
-        // Single instance solving is done: begin exit signal
-        MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
     }
 }
 
@@ -1264,17 +1136,11 @@ bool Worker::checkTerminate(float time) {
 }
 
 int Worker::getRandomNonSelfWorkerNode() {
-
-    // All clients are excluded from drawing
-    std::set<int> excludedNodes = std::set<int>(this->_client_nodes);
-    // THIS node is also excluded from drawing
-    excludedNodes.insert(_world_rank);
-    // Draw a node from the remaining nodes
     int size = MyMpi::size(_comm);
-
+    
     float r = Random::rand();
     int node = (int) (r * size);
-    while (excludedNodes.find(node) != excludedNodes.end()) {
+    while (node == _world_rank) {
         r = Random::rand();
         node = (int) (r * size);
     }
@@ -1283,6 +1149,8 @@ int Worker::getRandomNonSelfWorkerNode() {
 }
 
 Worker::~Worker() {
+
+    _watchdog.stop();
     Terminator::setTerminating();
 
     log(V4_VVER, "Destruct worker\n");

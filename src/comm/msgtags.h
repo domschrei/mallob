@@ -147,6 +147,9 @@ const int MSG_ANSWER_IDLE_NODE_BFS = 39;
 
 const int MSG_NOTIFY_ASSIGNMENT_UPDATE = 40;
 
+const int MSG_NOTIFY_CLIENT_JOB_ABORTING = 41;
+const int MSG_OFFER_ADOPTION_OF_ROOT = 42;
+
 
 /*
 Pseudo-tag representing all tags that can be received at any time.

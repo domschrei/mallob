@@ -19,6 +19,8 @@
 #include "comm/distributed_bfs.hpp"
 #include "util/sys/background_worker.hpp"
 #include "balancing/collective_assignment.hpp"
+#include "util/periodic_event.hpp"
+#include "util/sys/watchdog.hpp"
 
 #define SYSSTATE_BUSYRATIO 0
 #define SYSSTATE_NUMJOBS 1
@@ -31,7 +33,6 @@ class Worker {
 private:
     MPI_Comm _comm;
     int _world_rank;
-    std::set<int> _client_nodes;
     Parameters& _params;
     float _global_timeout;
 
@@ -48,9 +49,17 @@ private:
     DistributedBFS _bfs;
     CollectiveAssignment _coll_assign;
 
+    long long _iteration = 0;
+    PeriodicEvent<3000> _periodic_mem_check;
+    PeriodicEvent<10> _periodic_job_check;
+    PeriodicEvent<1> _periodic_balance_check;
+    PeriodicEvent<1000> _periodic_maintenance;
+    Watchdog _watchdog;
+    bool _was_idle = true;
+
 public:
-    Worker(MPI_Comm comm, Parameters& params, const std::set<int>& _client_nodes) :
-        _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), _client_nodes(_client_nodes), 
+    Worker(MPI_Comm comm, Parameters& params) :
+        _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
         _params(params), _job_db(_params, _comm), _sys_state(_comm), 
         _bfs(_hop_destinations, [this](const JobRequest& req) {
             if (_job_db.isIdle() && !_job_db.hasCommitment(req.jobId)) {
@@ -70,14 +79,17 @@ public:
             } else {
                 log(V4_VVER, "%s : BFS successful ([%i] adopting)\n", request.toStr().c_str(), foundRank);
             }
-        })
+        }), _watchdog(/*checkIntervMillis=*/200, Timer::elapsedSeconds())
     {
         _global_timeout = _params.timeLimit();
+        _watchdog.setWarningPeriod(100); // warn after 0.1s without a reset
+        _watchdog.setAbortPeriod(_params.watchdogAbortMillis()); // abort after X ms without a reset
     }
 
     ~Worker();
     void init();
-    void mainProgram();
+    void advance(float time = -1);
+    bool checkTerminate(float time);
 
 private:
     void handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMode mode);
@@ -97,7 +109,6 @@ private:
     void handleQueryJobResult(MessageHandle& handle);
     void handleQueryVolume(MessageHandle& handle);
     void handleNotifyResultObsolete(MessageHandle& handle);
-    void handleSendJobResult(MessageHandle& handle);
     void handleNotifyJobTerminating(MessageHandle& handle);
     void handleNotifyVolumeUpdate(MessageHandle& handle);
     void handleNotifyNodeLeavingJob(MessageHandle& handle);
@@ -122,7 +133,6 @@ private:
     void updateNeighborStatus(int rank, bool busy);
     bool isOnlyIdleWorkerInLocalPerimeter();
     
-    bool checkTerminate(float time);
     void createExpanderGraph();
     int getRandomNonSelfWorkerNode();
 };

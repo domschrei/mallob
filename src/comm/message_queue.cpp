@@ -33,6 +33,10 @@ MessageQueue::~MessageQueue() {
 }
 
 void MessageQueue::registerCallback(int tag, const MsgCallback& cb) {
+    if (_callbacks.count(tag)) {
+        log(V0_CRIT, "More than one callback for tag %i!\n", tag);
+        abort();
+    }
     _callbacks[tag] = cb;
 }
 

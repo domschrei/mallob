@@ -56,12 +56,14 @@ void Parameters::expand() {
     if (monoFilename.isSet()) {
         // Single instance solving
         hopsUntilCollectiveAssignment.set(-1); // no collective assignments
-        numClients.set(0); // no clients
+        numClients.set(1); // 1 client
+        numWorkers.set(-1); // all workers
         collectClauseHistory.set(false); // no clause history
         growthPeriod.set(0); // instantaneous growth of job demand
         loadFactor.set(1); // full load factor
         maxDemand.set(0); // no limit of max. demand
         balancingPeriod.set(0.01); // low balancing delay to immediately get full demand
+        numJobs.set(1); // one job to process
     }
 }
 

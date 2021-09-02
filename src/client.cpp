@@ -132,13 +132,10 @@ void Client::handleNewJob(JobMetadata&& data) {
 
 void Client::init() {
 
-    int internalRank = MyMpi::rank(_comm) + _params.firstApiIndex();
-
     _file_adapter = std::unique_ptr<JobFileAdapter>(
-        new JobFileAdapter(internalRank, _params, 
+        new JobFileAdapter(getInternalRank(), _params, 
             Logger::getMainInstance().copy("API", "#0."),
-            ".api/jobs." + std::to_string(internalRank) + "/", 
-            [&](JobMetadata&& data) {handleNewJob(std::move(data));}
+            getApiPath(), [&](JobMetadata&& data) {handleNewJob(std::move(data));}
         )
     );
     _instance_reader.run([this]() {
@@ -151,86 +148,63 @@ void Client::init() {
     auto& q = MyMpi::getMessageQueue();
     q.registerCallback(MSG_NOTIFY_JOB_DONE, [&](MessageHandle& h) {handleJobDone(h);});
     q.registerCallback(MSG_SEND_JOB_RESULT, [&](MessageHandle& h) {handleSendJobResult(h);});
-    q.registerCallback(MSG_NOTIFY_JOB_ABORTING, [&](MessageHandle& h) {handleAbort(h);});
-    q.registerCallback(MSG_OFFER_ADOPTION, [&](MessageHandle& h) {handleOfferAdoption(h);});
-    q.registerCallback(MSG_DO_EXIT, [&](MessageHandle& h) {handleExit(h);});
+    q.registerCallback(MSG_NOTIFY_CLIENT_JOB_ABORTING, [&](MessageHandle& h) {handleAbort(h);});
+    q.registerCallback(MSG_OFFER_ADOPTION_OF_ROOT, [&](MessageHandle& h) {handleOfferAdoption(h);});
     q.registerSentCallback([&](int id) {handleJobDescriptionSent(id);});
-
-    log(V5_DEBG, "Global init barrier ...\n");
-    MPI_Barrier(MPI_COMM_WORLD);
-    log(V5_DEBG, "Passed global init barrier\n");
 }
 
-void Client::mainProgram() {
+int Client::getInternalRank() {
+    return MyMpi::rank(_comm) + _params.firstApiIndex();
+}
 
-    float lastStatTime = Timer::elapsedSeconds();
-    float lastDoneJobsCheckTime = lastStatTime;
+std::string Client::getApiPath() {
+    return ".api/jobs." + std::to_string(getInternalRank()) + "/";
+}
 
-    while (!Terminator::isTerminating(/*fromMainThread=*/true)) {
+void Client::advance() {
 
-        float time = Timer::elapsedSeconds();
-        if (Timer::globalTimelimReached(_params)) Terminator::setTerminating();
-
-        // Print memory usage info
-        if (time - lastStatTime > 5) {
-            auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::FLAT);
-            info.vmUsage *= 0.001 * 0.001;
-            info.residentSetSize *= 0.001 * 0.001;
-            log(V3_VERB, "mainthread_cpu=%i mem=%.2fGB\n", info.cpu, info.residentSetSize);
-            lastStatTime = time;
+    float time = Timer::elapsedSeconds();
+    
+    // Send notification messages for recently done jobs
+    if (_periodic_check_done_jobs.ready()) {
+        robin_hood::unordered_flat_set<int, robin_hood::hash<int>> doneJobs;
+        {
+            auto lock = _done_job_lock.getLock();
+            doneJobs = std::move(_recently_done_jobs);
+            _recently_done_jobs.clear();
         }
-
-        // Send notification messages for recently done jobs
-        if (time - lastDoneJobsCheckTime > 0.1) {
-            robin_hood::unordered_flat_set<int, robin_hood::hash<int>> doneJobs;
-            {
-                auto lock = _done_job_lock.getLock();
-                doneJobs = std::move(_recently_done_jobs);
-                _recently_done_jobs.clear();
-            }
-            for (int jobId : doneJobs) {
-                log(LOG_ADD_DESTRANK | V3_VERB, "Notify #%i:0 that job is done", _root_nodes[jobId], jobId);
-                IntVec payload({jobId});
-                MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
-                finishJob(jobId, /*hasIncrementalSuccessors=*/false);
-            }
-            lastDoneJobsCheckTime = time;
+        for (int jobId : doneJobs) {
+            log(LOG_ADD_DESTRANK | V3_VERB, "Notify #%i:0 that job is done", _root_nodes[jobId], jobId);
+            IntVec payload({jobId});
+            MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
+            finishJob(jobId, /*hasIncrementalSuccessors=*/false);
         }
-
-        // Introduce next job(s) as applicable
-        // (only one job at a time to react better
-        // to outside events without too much latency)
-        introduceNextJob();
-
-        // Poll messages, test sent messages
-        MyMpi::getMessageQueue().advance();
-        
-        // Advance an all-reduction of the current system state
-        if (_sys_state.aggregate(time)) {
-            float* result = _sys_state.getGlobal();
-            int processed = (int)result[SYSSTATE_PROCESSED_JOBS];
-            int verb = (MyMpi::rank(_comm) == 0 ? V2_INFO : V5_DEBG);
-            log(verb, "sysstate entered=%i parsed=%i scheduled=%i processed=%i\n", 
-                        (int)result[SYSSTATE_ENTERED_JOBS], 
-                        (int)result[SYSSTATE_PARSED_JOBS], 
-                        (int)result[SYSSTATE_SCHEDULED_JOBS], 
-                        processed);
-            int jobLimit = _params.numJobs();
-            if (jobLimit > 0 && processed >= jobLimit) {
-                log(V2_INFO, "Job limit reached.\n");
-                // Job limit reached - exit
-                Terminator::setTerminating();
-                // Send MSG_EXIT to worker of rank 0, which will broadcast it
-                MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
-            }
-        }
-
-        // Sleep for a bit
-        usleep(100); // 1000 = 1 millisecond
     }
 
-    Logger::getMainInstance().flush();
-    fflush(stdout);
+    // Introduce next job(s) as applicable
+    // (only one job at a time to react better
+    // to outside events without too much latency)
+    introduceNextJob();
+    
+    // Advance an all-reduction of the current system state
+    if (_sys_state.aggregate(time)) {
+        float* result = _sys_state.getGlobal();
+        int processed = (int)result[SYSSTATE_PROCESSED_JOBS];
+        int verb = (MyMpi::rank(_comm) == 0 ? V2_INFO : V5_DEBG);
+        log(verb, "sysstate entered=%i parsed=%i scheduled=%i processed=%i\n", 
+                    (int)result[SYSSTATE_ENTERED_JOBS], 
+                    (int)result[SYSSTATE_PARSED_JOBS], 
+                    (int)result[SYSSTATE_SCHEDULED_JOBS], 
+                    processed);
+        int jobLimit = _params.numJobs();
+        if (jobLimit > 0 && processed >= jobLimit) {
+            log(V2_INFO, "Job limit reached.\n");
+            // Job limit reached - exit
+            Terminator::setTerminating();
+            // Send MSG_EXIT to worker of rank 0, which will broadcast it
+            MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
+        }
+    }
 }
 
 int Client::getMaxNumParallelJobs() {
@@ -284,7 +258,7 @@ void Client::introduceNextJob() {
         nodeRank = _root_nodes[jobId];
     } else {
         // Find the job's canonical initial node
-        int n = MyMpi::size(MPI_COMM_WORLD) - MyMpi::size(_comm);
+        int n = _params.numWorkers() >= 0 ? _params.numWorkers() : MyMpi::size(MPI_COMM_WORLD);
         log(V5_DEBG, "Creating permutation of size %i ...\n", n);
         AdjustablePermutation p(n, jobId);
         nodeRank = p.get(0);
@@ -340,25 +314,30 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     log(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, Timer::elapsedSeconds() - desc.getArrival(), revision);
     log(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId, resultCode == RESULT_SAT ? "SAT" : "UNSAT", revision);
 
-    // Write full solution to file, if desired
-    std::string baseFilename = _params.solutionToFile();
-    if (!baseFilename.empty()) {
-        std::string filename = baseFilename + "_" + std::to_string(jobId) + "." + std::to_string(revision);
+    std::string resultString = "s " + std::string(resultCode == RESULT_SAT ? "SATISFIABLE" 
+                        : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN") + "\n";
+    std::stringstream modelString;
+    if ((_params.solutionToFile.isSet() || _params.monoFilename.isSet()) 
+            && resultCode == RESULT_SAT) {
+        modelString << "v ";
+        for (size_t x = 1; x < jobResult.solution.size(); x++) {
+            modelString << std::to_string(jobResult.solution[x]) << " ";
+        }
+        modelString << "0\n";
+    }
+    if (_params.solutionToFile.isSet()) {
         std::ofstream file;
-        file.open(filename);
+        file.open(_params.solutionToFile());
         if (!file.is_open()) {
             log(V0_CRIT, "[ERROR] Could not open solution file\n");
-            abort();
         } else {
-            file << "c SOLUTION #" << jobId << " rev. " << revision << " ";
-            file << (resultCode == RESULT_SAT ? "SAT" : resultCode == RESULT_UNSAT ? "UNSAT" : "UNKNOWN") << "\n"; 
-            for (auto lit : jobResult.solution) {
-                if (lit == 0) continue;
-                file << lit << " ";
-            }
-            file << "\n";
+            file << resultString;
+            file << modelString.str();
             file.close();
         }
+    } else if (_params.monoFilename.isSet()) {
+        log(LOG_NO_PREFIX | V0_CRIT, resultString.c_str());
+        log(LOG_NO_PREFIX | V0_CRIT, modelString.str().c_str());
     }
 
     if (_file_adapter) {

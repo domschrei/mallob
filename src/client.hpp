@@ -14,6 +14,7 @@
 #include "data/job_metadata.hpp"
 #include "comm/sysstate.hpp"
 #include "util/sys/background_worker.hpp"
+#include "util/periodic_event.hpp"
 
 #define SYSSTATE_ENTERED_JOBS 0
 #define SYSSTATE_PARSED_JOBS 1
@@ -75,16 +76,21 @@ private:
     Mutex _finished_msg_ids_mutex;
     std::vector<int> _finished_msg_ids;
 
+    PeriodicEvent<100> _periodic_check_done_jobs;
+
 public:
-    Client(MPI_Comm comm, Parameters& params, std::set<int> clientRanks)
+    Client(MPI_Comm comm, Parameters& params)
         : _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
-        _params(params), _client_ranks(clientRanks), _sys_state(_comm) {}
+        _params(params), _sys_state(_comm) {}
     ~Client();
     void init();
-    void mainProgram();
+    void advance();
 
     // Callback from JobFileAdapter when a new job's meta data were read
     void handleNewJob(JobMetadata&& data);
+
+    int getInternalRank();
+    std::string getApiPath();
 
 private:
     void readIncomingJobs(Logger log);
