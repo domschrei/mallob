@@ -79,21 +79,18 @@ This runs four solver threads for each MPI process and writes all output to stdo
 
 ### Scheduling and solving many instances
 
-Launch Mallob without any particular options regarding its mode of operation. Mallob then opens up a JSON API which can be used over the file system of any of the client nodes under `<base directory>/.api/`.
+Launch Mallob without any particular options regarding its mode of operation. Each PE of rank i then spins up a JSON client interface which can be used over the PE's file system under `<mallob base directory>/.api/jobs.<i>/`.
+On a shared-memory machine, the easiest option is to just always use the directory `.api/jobs.0/` to introduce your jobs, leaving all other client interfaces idle (with minimum overhead).
+In case of many concurrent jobs, it is best to distribute your jobs evenly (or uniformly @ random) across all existing client interfaces in order to minimize response times.
 
 **Users**
 
 The API distinguishes jobs by the user which introduced them. By default there is a user `admin` defined in `.api/users/admin.json`.
 You can just use this user or create a new one and save it under `.api/users/<user-id>.json`. The priority must be larger than zero and no larger than one; a higher number gives more importance to the user's jobs.
 
-**Job Directories**
-
-If multiple clients are used, then the i-th client uses `.api/jobs.<i>/` as its API directory.
-Therefore, if only a single client is employed (which is the default), the directory `.api/jobs.0/` is used.
-
 **Introducing a Job**
 
-To introduce a job to the system, drop a JSON file in `.api/jobs.0/new/` structured like this:  
+To introduce a job to the system, drop a JSON file in `.api/jobs.<i>/new/` (e.g., `.api/jobs.0/new/`) on the filesystem of PE i structured like this:  
 ```
 { 
     "user": "admin", 
