@@ -84,7 +84,7 @@ public:
     void handleJobResultDeleted(const FileWatcher::Event& event, Logger& log);
 
     // Event when a job is finished
-    void handleJobDone(const JobResult& result);
+    void handleJobDone(const JobResult& result, const JobDescription::Statistics& stats);
 
 private:
     std::string getJobFilePath(int id, int revision, Status status);

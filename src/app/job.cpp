@@ -87,6 +87,7 @@ void Job::suspend() {
     _job_tree.unsetLeftChild();
     _job_tree.unsetRightChild();
     log(V4_VVER, "%s : suspended solver\n", toStr());
+    updateVolumeAndUsedCpu(getVolume());
 }
 
 void Job::resume() {
@@ -94,9 +95,13 @@ void Job::resume() {
     _state = ACTIVE;
     appl_resume();
     log(V4_VVER, "%s : resumed solving threads\n", toStr());
+    _time_of_last_limit_check = Timer::elapsedSeconds();
 }
 
 void Job::terminate() {
+    if (_state == ACTIVE) 
+        updateVolumeAndUsedCpu(getVolume());
+
     _state = PAST;
     _volume = 0;
 
@@ -179,8 +184,9 @@ double Job::getTemperature() const {
 
 const JobResult& Job::getResult() {
     if (!_result.has_value()) _result = appl_getResult();
-    assert(_result.value().id >= 0); 
-    return _result.value();
+    JobResult& result = _result.value();
+    assert(result.id >= 0);
+    return result;
 }
 
 bool Job::wantsToCommunicate() {

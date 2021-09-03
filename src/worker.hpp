@@ -101,7 +101,6 @@ private:
     void handleNotifyJobAborting(MessageHandle& handle);
     void handleDoExit(MessageHandle& handle);
     void handleRejectOneshot(MessageHandle& handle);
-    void handleSendClientRank(MessageHandle& handle);
     void handleIncrementalJobFinished(MessageHandle& handle);
     void handleInterrupt(MessageHandle& handle);
     void handleSendApplicationMessage(MessageHandle& handle);
@@ -122,7 +121,7 @@ private:
     void initiateVolumeUpdate(int jobId);
     void updateVolume(int jobId, int demand, int balancingEpoch);
     void interruptJob(int jobId, bool terminate, bool reckless);
-    void informClientJobIsDone(int jobId, int clientRank);
+    void sendJobDoneWithStatsToClient(int jobId, int successfulRank);
     void applyBalancing();
     void timeoutJob(int jobId);
 

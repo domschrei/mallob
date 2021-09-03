@@ -56,12 +56,6 @@ Data type: [jobId, resultCode]
 */
 const int MSG_NOTIFY_RESULT_FOUND = 10;
 /*
-The sender provides the global rank of the client node which initiated
-a certain job.
-Data type: [jobId, clientRank]
-*/
-const int MSG_SEND_CLIENT_RANK = 11;
-/*
 A signal to terminate a job is propagated.
 Data type: [jobId]
 */

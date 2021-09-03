@@ -35,6 +35,7 @@ void JobDescription::writeMetadata() {
     int i = 0, n;
     n = sizeof(int);         memcpy(data->data()+i, &_id, n); i += n;
     n = sizeof(int);         memcpy(data->data()+i, &_revision, n); i += n;
+    n = sizeof(int);         memcpy(data->data()+i, &_client_rank, n); i += n;
     n = sizeof(size_t);      memcpy(data->data()+i, &_f_size, n); i += n;
     n = sizeof(size_t);      memcpy(data->data()+i, &_a_size, n); i += n;
     n = sizeof(int);         memcpy(data->data()+i, &_root_rank, n); i += n;
@@ -60,13 +61,13 @@ std::shared_ptr<std::vector<uint8_t>>& JobDescription::getRevisionData(int revis
 
 size_t JobDescription::getFormulaPayloadSize(int revision) const {
     size_t fSize;
-    memcpy(&fSize, getRevisionData(revision)->data()+2*sizeof(int), sizeof(size_t));
+    memcpy(&fSize, getRevisionData(revision)->data()+3*sizeof(int), sizeof(size_t));
     return fSize;
 }
 
 size_t JobDescription::getAssumptionsSize(int revision) const {
     size_t aSize;
-    memcpy(&aSize, getRevisionData(revision)->data()+2*sizeof(int)+sizeof(size_t), sizeof(size_t));
+    memcpy(&aSize, getRevisionData(revision)->data()+3*sizeof(int)+sizeof(size_t), sizeof(size_t));
     return aSize;
 }
 
@@ -87,7 +88,7 @@ size_t JobDescription::getTransferSize(int revision) const {
 
 
 constexpr int JobDescription::getMetadataSize() const {
-    return 5*sizeof(int)
+    return 6*sizeof(int)
            +3*sizeof(float)
            +sizeof(bool)
            +2*sizeof(size_t)
@@ -98,7 +99,7 @@ constexpr int JobDescription::getMetadataSize() const {
 
 
 int JobDescription::readRevisionIndex(const std::vector<uint8_t>& serialized) {
-    assert(serialized.size() >= 2*sizeof(int)+2*sizeof(size_t));
+    assert(serialized.size() >= 3*sizeof(int)+2*sizeof(size_t));
     int revision;
     memcpy(&revision, serialized.data()+sizeof(int), sizeof(int));
     assert(revision >= 0);
@@ -139,6 +140,7 @@ void JobDescription::deserialize() {
     auto& latestData = _data_per_revision.back();
     n = sizeof(int);         memcpy(&_id, latestData->data()+i, n);              i += n;
     n = sizeof(int);         memcpy(&_revision, latestData->data()+i, n);        i += n;
+    n = sizeof(int);         memcpy(&_client_rank, latestData->data()+i, n);     i += n;
     n = sizeof(size_t);      memcpy(&_f_size, latestData->data()+i, n);          i += n;
     n = sizeof(size_t);      memcpy(&_a_size, latestData->data()+i, n);          i += n;
     n = sizeof(int);         memcpy(&_root_rank, latestData->data()+i, n);       i += n;

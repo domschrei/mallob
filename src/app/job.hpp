@@ -258,9 +258,6 @@ public:
     // since the last call (or the job's activation) and the old volume of the job,
     // and then updates the volume itself.
     void updateVolumeAndUsedCpu(int newVolume) {
-        
-        // Update volume
-        _volume = newVolume;
 
         if (_job_tree.isRoot()) {
             // Compute used CPU time within last time slice
@@ -268,6 +265,9 @@ public:
             _used_cpu_seconds += (time - _time_of_last_limit_check) * _threads_per_job * _volume;
             _time_of_last_limit_check = time;
         }
+        
+        // Update volume
+        _volume = newVolume;
     }
 
     // Updates the job's resource usage and then checks whether the job reached

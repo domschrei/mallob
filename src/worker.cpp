@@ -68,8 +68,6 @@ void Worker::init() {
         [&](auto& h) {handleRequestNode(h, JobDatabase::JobRequestMode::TARGETED_REJOIN);});
     q.registerCallback(MSG_SEND_APPLICATION_MESSAGE, 
         [&](auto& h) {handleSendApplicationMessage(h);});
-    q.registerCallback(MSG_SEND_CLIENT_RANK, 
-        [&](auto& h) {handleSendClientRank(h);});
     q.registerCallback(MSG_SEND_JOB_DESCRIPTION, 
         [&](auto& h) {handleSendJobDescription(h);});
     q.registerCallback(MSG_NOTIFY_NEIGHBOR_STATUS,
@@ -506,18 +504,6 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
     }
 }
 
-void Worker::handleSendClientRank(MessageHandle& handle) {
-
-    // Receive rank of the job's client
-    IntPair recv = Serializable::get<IntPair>(handle.getRecvData());
-    int jobId = recv.first;
-    int clientRank = recv.second;
-    assert(_job_db.has(jobId));
-
-    // Inform client of the found job result
-    informClientJobIsDone(jobId, clientRank);
-}
-
 void Worker::handleIncrementalJobFinished(MessageHandle& handle) {
     int jobId = Serializable::get<int>(handle.getRecvData());
     if (_job_db.has(jobId)) {
@@ -764,17 +750,8 @@ void Worker::handleNotifyResultFound(MessageHandle& handle) {
         handleNotifyJobTerminating(handle);
     }
 
-    // Redirect termination signal
-    IntPair payload(jobId, _job_db.get(jobId).getJobTree().getParentNodeRank());
-    if (handle.source == _world_rank) {
-        // Self-message of root node: Directly send termination message to client
-        informClientJobIsDone(payload.first, payload.second);
-    } else {
-        // Send rank of client node to the finished worker,
-        // such that the worker can inform the client of the result
-        MyMpi::isend(handle.source, MSG_SEND_CLIENT_RANK, payload);
-        log(LOG_ADD_DESTRANK | V4_VVER, "Forward rank of client (%i)", handle.source, payload.second); 
-    }
+    // Notify client
+    sendJobDoneWithStatsToClient(jobId, handle.source);
 }
 
 void Worker::handleNotifyNeighborStatus(MessageHandle& handle) {
@@ -1055,13 +1032,21 @@ void Worker::interruptJob(int jobId, bool terminate, bool reckless) {
     else if (job.getState() == ACTIVE) _job_db.suspend(jobId);
 }
 
-void Worker::informClientJobIsDone(int jobId, int clientRank) {
-    const JobResult& result = _job_db.get(jobId).getResult();
+void Worker::sendJobDoneWithStatsToClient(int jobId, int successfulRank) {
+    auto& job = _job_db.get(jobId);
+    const JobResult& result = job.getResult();
 
-    // Send "Job done!" with advertised result size to client
-    log(LOG_ADD_DESTRANK | V4_VVER, "%s : inform client job is done", clientRank, _job_db.get(jobId).toStr());
-    IntPair payload(jobId, result.getTransferSize());
-    MyMpi::isend(clientRank, MSG_NOTIFY_JOB_DONE, payload);
+    int clientRank = job.getDescription().getClientRank();
+    log(LOG_ADD_DESTRANK | V4_VVER, "%s : inform client job is done", clientRank, job.toStr());
+    job.updateVolumeAndUsedCpu(job.getVolume());
+    JobStatistics stats;
+    stats.jobId = jobId;
+    stats.successfulRank = successfulRank;
+    stats.usedWallclockSeconds = job.getAgeSinceActivation();
+    stats.usedCpuSeconds = job.getUsedCpuSeconds();
+
+    // Send "Job done!" with statistics to client
+    MyMpi::isend(clientRank, MSG_NOTIFY_JOB_DONE, stats);
 }
 
 void Worker::timeoutJob(int jobId) {

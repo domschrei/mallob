@@ -18,6 +18,14 @@ class JobDescription : public Serializable {
 
 public:
     enum Application {SAT, DUMMY};
+    struct Statistics {
+        float timeOfScheduling;
+        float parseTime;
+        float schedulingTime;
+        float processingTime;
+        float usedWallclockSeconds;
+        float usedCpuSeconds;
+    };
 
 private:
 
@@ -27,6 +35,7 @@ private:
     float _priority = 1.0;
     bool _incremental;
     int _revision = -1;
+    int _client_rank = -1;
     float _wallclock_limit = 0; // in seconds
     float _cpu_limit = 0; // in CPU seconds
     int _max_demand = 0;
@@ -58,6 +67,9 @@ private:
     // just for parsing
     std::vector<int> _preloaded_assumptions;
 
+    // just for scheduling
+    Statistics* _stats = nullptr;
+
 private:
     template <typename T>
     inline static void push_obj(std::shared_ptr<std::vector<uint8_t>>& vec, T x) {
@@ -71,7 +83,9 @@ public:
     JobDescription(int id, float priority, bool incremental, bool computeChecksums = false) : _id(id), _root_rank(-1),
                 _priority(priority), _incremental(incremental), _revision(0), 
                 _use_checksums(computeChecksums) {}
-    ~JobDescription() {}
+    ~JobDescription() {
+        if (_stats != nullptr) delete _stats;
+    }
 
     // Parse (initial) job description into this object
 
@@ -104,6 +118,7 @@ public:
     int getRootRank() const {return _root_rank;}
     float getPriority() const {return _priority;}
     int getRevision() const {return _revision;}
+    int getClientRank() const {return _client_rank;}
     float getWallclockLimit() const {return _wallclock_limit;}
     float getCpuLimit() const {return _cpu_limit;}
     int getMaxDemand() const {return _max_demand;}
@@ -118,6 +133,7 @@ public:
 
     void setRootRank(int rootRank) {_root_rank = rootRank;}
     void setRevision(int revision) {_revision = revision;}
+    void setClientRank(int clientRank) {_client_rank = clientRank;}
     void setWallclockLimit(float limit) {_wallclock_limit = limit;}
     void setCpuLimit(float limit) {_cpu_limit = limit;}
     void setMaxDemand(int maxDemand) {_max_demand = maxDemand;}
@@ -144,6 +160,11 @@ public:
     size_t getTransferSize(int revision) const;
     
     static int readRevisionIndex(const std::vector<uint8_t>& serialized);
+
+    Statistics& getStatistics() {
+        if (_stats == nullptr) _stats = new Statistics();
+        return *_stats;
+    }
 
 private:
     std::shared_ptr<std::vector<uint8_t>>& getRevisionData(int revision);

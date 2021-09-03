@@ -68,7 +68,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         }
 
         userPrio = jUser["priority"].get<float>();
-        arrival = j.contains("arrival") ? j["arrival"].get<float>() : Timer::elapsedSeconds();
+        arrival = j.contains("arrival") ? std::max(Timer::elapsedSeconds(), j["arrival"].get<float>()) : Timer::elapsedSeconds();
         incremental = j.contains("incremental") ? j["incremental"].get<bool>() : false;
 
         if (incremental && j.contains("precursor")) {
@@ -200,7 +200,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
     _new_job_callback(JobMetadata{std::shared_ptr<JobDescription>(job), file, idDependencies});
 }
 
-void JobFileAdapter::handleJobDone(const JobResult& result) {
+void JobFileAdapter::handleJobDone(const JobResult& result, const JobDescription::Statistics& stats) {
 
     if (Terminator::isTerminating()) return;
 
@@ -222,13 +222,25 @@ void JobFileAdapter::handleJobDone(const JobResult& result) {
         return;
     }
     
+    auto& img = _job_id_rev_to_image[std::pair<int, int>(result.id, result.revision)];
+
     // Pack job result into JSON
+    j["internal_id"] = result.id;
+    j["internal_revision"] = result.revision;
     j["result"] = { 
         { "resultcode", result.result }, 
         { "resultstring", result.result == RESULT_SAT ? "SAT" : result.result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN" }, 
-        { "revision", result.revision }, 
         { "solution", result.solution },
-        { "responsetime", Timer::elapsedSeconds() - _job_id_rev_to_image[std::pair<int, int>(result.id, result.revision)].arrivalTime }
+    };
+    j["stats"] = {
+        { "time", {
+            { "parsing", stats.parseTime },
+            { "scheduling", stats.schedulingTime },
+            { "processing", stats.processingTime },
+            { "total", Timer::elapsedSeconds() - img.arrivalTime }
+        } },
+        { "used_wallclock_seconds" , stats.usedWallclockSeconds },
+        { "used_cpu_seconds" , stats.usedCpuSeconds }
     };
 
     // Remove file in "pending", move to "done"

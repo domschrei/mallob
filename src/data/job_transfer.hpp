@@ -145,4 +145,18 @@ public:
     int& operator[](const int pos);
 };
 
+struct JobStatistics : public Serializable {
+
+    int jobId;
+    int successfulRank;
+    float usedWallclockSeconds;
+    float usedCpuSeconds;
+
+public:
+    JobStatistics() = default;
+    
+    std::vector<uint8_t> serialize() const override;
+    JobStatistics& deserialize(const std::vector<uint8_t>& packed) override;
+};
+
 #endif

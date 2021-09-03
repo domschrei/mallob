@@ -83,6 +83,7 @@ void Client::readIncomingJobs(Logger log) {
                     log.log(V3_VERB, "[T] Initialized job #%i (%s) in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
                             id, foundJob.file.c_str(), time, foundJob.description->getNumFormulaLiterals(), 
                             foundJob.description->getNumAssumptionLiterals());
+                    foundJob.description->getStatistics().parseTime = time;
                     
                     // Enqueue in ready jobs
                     auto lock = _ready_job_lock.getLock();
@@ -121,6 +122,7 @@ void Client::handleNewJob(JobMetadata&& data) {
     }
 
     // Introduce new job into "incoming" queue
+    data.description->setClientRank(_world_rank);
     {
         auto lock = _incoming_job_lock.getLock();
         _incoming_job_queue.insert(std::move(data));
@@ -275,9 +277,12 @@ void Client::introduceNextJob() {
 
 void Client::handleOfferAdoption(MessageHandle& handle) {
     JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
-    log(V3_VERB, "Scheduling %s on [%i] (latency: %.5fs)\n", req.toStr().c_str(), handle.source, Timer::elapsedSeconds() - req.timeOfBirth);
+    float schedulingTime = Timer::elapsedSeconds() - req.timeOfBirth;
+    log(V3_VERB, "Scheduling %s on [%i] (latency: %.5fs)\n", req.toStr().c_str(), handle.source, schedulingTime);
     
-    const JobDescription& desc = *_active_jobs[req.jobId];
+    JobDescription& desc = *_active_jobs[req.jobId];
+    desc.getStatistics().schedulingTime = schedulingTime;
+    desc.getStatistics().timeOfScheduling = Timer::elapsedSeconds();
     assert(desc.getId() == req.jobId || log_return_false("%i != %i\n", desc.getId(), req.jobId));
 
     // Send job description
@@ -293,11 +298,12 @@ void Client::handleOfferAdoption(MessageHandle& handle) {
 }
 
 void Client::handleJobDone(MessageHandle& handle) {
-    IntPair recv = Serializable::get<IntPair>(handle.getRecvData());
-    int jobId = recv.first;
-    int resultSize = recv.second;
-    log(LOG_ADD_SRCRANK | V4_VVER, "Will receive job result, length %i, for job #%i", handle.source, resultSize, jobId);
-    MyMpi::isendCopy(handle.source, MSG_QUERY_JOB_RESULT, handle.getRecvData());
+    JobStatistics stats = Serializable::get<JobStatistics>(handle.getRecvData());
+    log(LOG_ADD_SRCRANK | V4_VVER, "Will receive job result for job #%i", handle.source, stats.jobId);
+    MyMpi::isendCopy(stats.successfulRank, MSG_QUERY_JOB_RESULT, handle.getRecvData());
+    JobDescription& desc = *_active_jobs[stats.jobId];
+    desc.getStatistics().usedWallclockSeconds = stats.usedWallclockSeconds;
+    desc.getStatistics().usedCpuSeconds = stats.usedCpuSeconds;
 }
 
 void Client::handleSendJobResult(MessageHandle& handle) {
@@ -309,9 +315,10 @@ void Client::handleSendJobResult(MessageHandle& handle) {
 
     log(LOG_ADD_SRCRANK | V4_VVER, "Received result of job #%i rev. %i, code: %i", handle.source, jobId, revision, resultCode);
     JobDescription& desc = *_active_jobs[jobId];
+    desc.getStatistics().processingTime = Timer::elapsedSeconds() - desc.getStatistics().timeOfScheduling;
 
     // Output response time and solution header
-    log(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, Timer::elapsedSeconds() - desc.getArrival(), revision);
+    log(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, Timer::elapsedSeconds()-desc.getArrival(), revision);
     log(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId, resultCode == RESULT_SAT ? "SAT" : "UNSAT", revision);
 
     std::string resultString = "s " + std::string(resultCode == RESULT_SAT ? "SATISFIABLE" 
@@ -341,7 +348,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     }
 
     if (_file_adapter) {
-        _file_adapter->handleJobDone(jobResult);
+        _file_adapter->handleJobDone(jobResult, desc.getStatistics());
     }
 
     finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
@@ -359,7 +366,7 @@ void Client::handleAbort(MessageHandle& handle) {
         result.id = jobId;
         result.revision = _active_jobs[result.id]->getRevision();
         result.result = 0;
-        _file_adapter->handleJobDone(result);
+        _file_adapter->handleJobDone(result, _active_jobs[result.id]->getStatistics());
     }
 
     finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
