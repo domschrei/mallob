@@ -1,8 +1,9 @@
 
 #include "horde_config.hpp"
 #include "app/job.hpp"
+#include "util/sys/proc.hpp"
 
-HordeConfig::HordeConfig(const Parameters& params, const Job& job) {
+HordeConfig::HordeConfig(const Parameters& params, const Job& job, int recoveryIndex) {
     starttime = Timer::elapsedSeconds();
     apprank = job.getIndex();
     mpirank = job.getMyMpiRank();
@@ -13,4 +14,11 @@ HordeConfig::HordeConfig(const Parameters& params, const Job& job) {
     threads = job.getNumThreads();
     maxBroadcastedLitsPerCycle = (1+params.clauseHistoryAggregationFactor()) *
     MyMpi::getBinaryTreeBufferLimit(job.getGlobalNumWorkers(), params.clauseBufferBaseSize(), params.clauseBufferDiscountFactor(), MyMpi::ALL);
+    this->recoveryIndex = recoveryIndex;
+}
+
+std::string HordeConfig::getSharedMemId(pid_t pid) const {
+    return  "/edu.kit.iti.mallob." + std::to_string(pid) + "." 
+        + std::to_string(mpirank) + ".#" + std::to_string(jobid) 
+        + (recoveryIndex == 0 ? std::string() : "~" + std::to_string(recoveryIndex));
 }

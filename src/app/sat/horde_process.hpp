@@ -43,7 +43,7 @@ public:
         : _params(params), _config(config), _log(log), _hlib(_params, _config, _log.copy("H", "H")) {
 
         // Set up "management" block of shared memory created by the parent
-        _shmem_id = "/edu.kit.iti.mallob." + std::to_string(Proc::getParentPid()) + "." + std::to_string(config.mpirank) + ".#" + std::to_string(config.jobid);
+        _shmem_id = _config.getSharedMemId(Proc::getParentPid());
         log.log(V4_VVER, "Access base shmem: %s\n", _shmem_id.c_str());
         _hsm = (HordeSharedMemory*) accessMemory(_shmem_id, sizeof(HordeSharedMemory));
         

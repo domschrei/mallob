@@ -37,8 +37,7 @@ void HordeProcessAdapter::doInitialize() {
     _clause_comm = new AnytimeSatClauseCommunicator(_params, _job);
 
     // Initialize "management" shared memory
-    _shmem_id = "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + "." 
-        + std::to_string(_config.mpirank) + ".#" + std::to_string(_config.jobid);
+    _shmem_id = _config.getSharedMemId(Proc::getPid());
     //log(V4_VVER, "Setup base shmem: %s\n", _shmem_id.c_str());
     void* mainShmem = SharedMemory::create(_shmem_id, sizeof(HordeSharedMemory));
     _shmem.insert(ShmemObject{_shmem_id, mainShmem, sizeof(HordeSharedMemory)});
@@ -234,17 +233,16 @@ void HordeProcessAdapter::dumpStats() {
     // No hard need to wake up immediately
 }
 
-bool HordeProcessAdapter::check() {
-    if (!_initialized) return false;
+HordeProcessAdapter::SubprocessStatus HordeProcessAdapter::check() {
+    if (!_initialized) return NORMAL;
 
-    /*
     int exitStatus;
     if (Process::didChildExit(_child_pid, &exitStatus) && exitStatus != 0) {
         // Child exited!
         log(V1_WARN, "Child %ld exited unexpectedly (status %i)\n", _child_pid, exitStatus);
-        // TODO fault tolerance w.r.t. crashing child: restart solver engine
+        // Notify to restart solver engine
+        return CRASHED;
     }
-    */
 
     startBackgroundWriterIfNecessary();
 
@@ -267,8 +265,8 @@ bool HordeProcessAdapter::check() {
         _temp_clause_buffers.erase(_temp_clause_buffers.begin());
     }
     
-    if (_hsm->hasSolution) return _hsm->solutionRevision == _desired_revision;
-    return false;
+    if (_hsm->hasSolution) return _hsm->solutionRevision == _desired_revision ? FOUND_RESULT : NORMAL;
+    return NORMAL;
 }
 
 std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {

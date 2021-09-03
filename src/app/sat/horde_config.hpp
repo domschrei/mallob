@@ -21,9 +21,10 @@ struct HordeConfig {
     int firstrev;
     int threads;
     int maxBroadcastedLitsPerCycle;
+    int recoveryIndex;
 
     HordeConfig() {}
-    HordeConfig(const Parameters& params, const Job& job);
+    HordeConfig(const Parameters& params, const Job& job, int recoveryIndex);
     HordeConfig(const std::string& packed) {
         std::stringstream s_stream(packed);
         std::string substr;
@@ -36,7 +37,10 @@ struct HordeConfig {
         getline(s_stream, substr, ','); firstrev = atoi(substr.c_str());
         getline(s_stream, substr, ','); threads = atoi(substr.c_str());
         getline(s_stream, substr, ','); maxBroadcastedLitsPerCycle = atoi(substr.c_str());
+        getline(s_stream, substr, ','); recoveryIndex = atoi(substr.c_str());
     }
+
+    std::string getSharedMemId(pid_t pid) const;
 
     std::string toString() const {
         std::string out = "";
@@ -48,7 +52,8 @@ struct HordeConfig {
         out += std::to_string(incremental?1:0) + ",";
         out += std::to_string(firstrev) + ",";
         out += std::to_string(threads) + ",";
-        out += std::to_string(maxBroadcastedLitsPerCycle);
+        out += std::to_string(maxBroadcastedLitsPerCycle) + ",";
+        out += std::to_string(recoveryIndex);
         return out;
     }
 

@@ -5,6 +5,8 @@
  *      Author: balyo
  */
 
+#include <signal.h>
+
 #include "util/assert.hpp"
 
 #include "default_sharing_manager.hpp"
@@ -196,6 +198,14 @@ void DefaultSharingManager::digestDeferredClauses() {
 
 void DefaultSharingManager::processClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero) {
 	if (_solver_revisions[solverId] != solverRevision) return;
+
+	if (_params.crashMonkeyProbability() > 0) {
+		if (Random::rand() < _params.crashMonkeyProbability()) {
+			// Crash!
+			_logger.log(V3_VERB, "Simulating a crash!\n");
+			raise(SIGSEGV); // causes crash
+		}
+	}
 
 	auto clauseBegin = clause.begin;
 	auto clauseSize = clause.size;

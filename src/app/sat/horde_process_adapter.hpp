@@ -106,7 +106,8 @@ public:
 
     void dumpStats();
     
-    bool check();
+    enum SubprocessStatus {NORMAL, FOUND_RESULT, CRASHED};
+    SubprocessStatus check();
     std::pair<SatResult, std::vector<int>> getSolution();
 
     void waitUntilChildExited();

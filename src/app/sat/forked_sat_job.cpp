@@ -18,13 +18,19 @@ ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank
 }
 
 void ForkedSatJob::appl_start() {
-
     assert(!_initialized);
-    
-    HordeConfig config(_params, *this);
+    doStartSolver();
+    _time_of_start_solving = Timer::elapsedSeconds();
+    _initialized = true;
+}
+
+void ForkedSatJob::doStartSolver() {
+
+    HordeConfig config(_params, *this, _recovery_index);
     Parameters hParams(_params);
     hParams.hordeConfig.set(config.toString());
     if (_params.verbosity() >= V5_DEBG) hParams.printParams();
+    _last_imported_revision = 0;
 
     const JobDescription& desc = getDescription();
 
@@ -39,9 +45,6 @@ void ForkedSatJob::appl_start() {
 
     //log(V5_DEBG, "%s : beginning to solve\n", toStr());
     _solver->run();
-    //log(V4_VVER, "%s : spawned child pid=%i\n", toStr(), _solver_pid);
-    _time_of_start_solving = Timer::elapsedSeconds();
-    _initialized = true;
 }
 
 void ForkedSatJob::loadIncrements() {
@@ -93,7 +96,8 @@ int ForkedSatJob::appl_solved() {
     if (_done_locally) return result;
 
     // Did a solver find a result?
-    if (_solver->check()) {
+    auto status = _solver->check();
+    if (status == HordeProcessAdapter::FOUND_RESULT) {
         auto solution = _solver->getSolution();
         result = solution.first;
         log(LOG_ADD_DESTRANK | V2_INFO, "%s rev. %i : found result %s", getJobTree().getRootNodeRank(), toStr(), getRevision(), 
@@ -103,6 +107,20 @@ int ForkedSatJob::appl_solved() {
         _internal_result.revision = getRevision();
         _internal_result.solution = std::move(solution.second);
         _done_locally = true;
+    } else if (status == HordeProcessAdapter::CRASHED) {
+        // Subprocess crashed for whatever reason: try to recover
+
+        // Release "old" solver / clause comm from ownership, clean up concurrently
+        HordeProcessAdapter* solver = _solver.release();
+        ProcessWideThreadPool::get().addTask([solver]() {
+            solver->freeSharedMemory();
+            delete solver;
+        });
+        _clause_comm = nullptr;
+
+        // Start new solver (with renamed shared memory segments)
+        _recovery_index++;
+        doStartSolver();
     }
     return result;
 }

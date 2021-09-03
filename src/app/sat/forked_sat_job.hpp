@@ -22,6 +22,7 @@ private:
     std::unique_ptr<HordeProcessAdapter> _solver;
     void* _clause_comm = nullptr; // SatClauseCommunicator instance (avoiding fwd decl.)
     int _last_imported_revision = 0;
+    int _recovery_index = 0;
 
     std::future<void> _destruction;
     std::atomic_bool _shmem_freed = false;
@@ -65,6 +66,8 @@ public:
     void digestSharing(std::vector<int>& clauses, const Checksum& checksum) override;
 
 private:
+    void doStartSolver();
+
     bool checkClauseComm();
     void loadIncrements();
     void startDestructThreadIfNecessary();

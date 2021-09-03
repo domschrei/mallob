@@ -22,7 +22,7 @@ void ThreadedSatJob::appl_start() {
     
     // Initialize Hordesat instance
     Parameters hParams(_params);
-    HordeConfig config(_params, *this);
+    HordeConfig config(_params, *this, /*recoveryIndex=*/0);
     _solver = std::unique_ptr<HordeLib>(new HordeLib(hParams, config, 
         Logger::getMainInstance().copy(
             "<h-" + std::string(toStr()) + ">", "#" + std::to_string(getId()) + "."

@@ -74,14 +74,14 @@ function test_incremental_scheduling() {
     for test in entertainment08 roverg10 transportg29 ; do
         introduce_incremental_job $test
     done
-    test 8 -t=1 -l=1 -satsolver=LgC -v=5 -J=3 -incrementaltest -checksums=1
+    test 8 -t=1 -l=1 -satsolver=LgC -v=5 -J=3 -incrementaltest -checksums=1 -cmp=0.0001
 }
 
+test_incremental_scheduling
 test_mono
 test_scheduling
 test_oscillating
 test_incremental
 test_many_incremental
-test_incremental_scheduling
 
 echo "All tests done."
