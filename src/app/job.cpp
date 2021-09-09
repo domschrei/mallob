@@ -119,41 +119,38 @@ bool Job::isDestructible() {
     return appl_isDestructible();
 }
 
-int Job::getDemand(int prevVolume, float elapsedTime) const {
-    if (_state == ACTIVE) {
-        int commSize = _job_tree.getCommSize();
-        int demand; 
-        if (_growth_period <= 0) {
-            // Immediate growth
-            demand = _job_tree.getCommSize();
-        } else {
-            if (_time_of_activation <= 0) demand = 1;
-            else {
-                float t = elapsedTime-_time_of_activation;
-                
-                // Continuous growth
-                float numPeriods = t/_growth_period;
-                if (!_continuous_growth) {
-                    // Discrete periodic growth
-                    numPeriods = std::floor(numPeriods);
-                    demand = std::min(commSize, (1 << (int)(numPeriods + 1)) - 1);
-                } else {
-                    // d(0) := 1; d := 2d+1 every <growthPeriod> seconds
-                    demand = std::min(commSize, (int)std::pow(2, numPeriods + 1) - 1);
-                }
+int Job::getDemand() const {
+    if (_state != ACTIVE) return 0; 
+    
+    int commSize = _job_tree.getCommSize();
+    int demand; 
+    if (_growth_period <= 0) {
+        // Immediate growth
+        demand = _job_tree.getCommSize();
+    } else {
+        if (_time_of_activation <= 0) demand = 1;
+        else {
+            float t = Timer::elapsedSeconds()-_time_of_activation;
+            
+            // Continuous growth
+            float numPeriods = t/_growth_period;
+            if (!_continuous_growth) {
+                // Discrete periodic growth
+                numPeriods = std::floor(numPeriods);
+                demand = std::min(commSize, (1 << (int)(numPeriods + 1)) - 1);
+            } else {
+                // d(0) := 1; d := 2d+1 every <growthPeriod> seconds
+                demand = std::min(commSize, (int)std::pow(2, numPeriods + 1) - 1);
             }
         }
-
-        // Limit demand if desired
-        if (_max_demand > 0) {
-            demand = std::min(demand, _max_demand);
-        }
-        return demand;
-        
-    } else {
-        // "frozen"
-        return prevVolume;
     }
+
+    // Limit demand if desired
+    if (_max_demand > 0) {
+        demand = std::min(demand, _max_demand);
+    }
+    _last_demand = demand;
+    return demand;
 }
 
 double Job::getTemperature() const {

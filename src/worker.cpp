@@ -25,6 +25,39 @@
 #include "data/job_reader.hpp"
 #include "util/sys/terminator.hpp"
 
+Worker::Worker(MPI_Comm comm, Parameters& params) :
+    _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
+    _params(params), _job_db(_params, _comm), _sys_state(_comm), 
+    _bfs(_hop_destinations, [this](const JobRequest& req) {
+        if (_job_db.isIdle() && !_job_db.hasCommitment(req.jobId)) {
+            // Try to adopt this job request
+            log(V4_VVER, "BFS Try adopting %s\n", req.toStr().c_str());
+            MessageHandle handle;
+            handle.receiveSelfMessage(req.serialize(), _world_rank);
+            handleRequestNode(handle, JobDatabase::IGNORE_FAIL);
+            return _job_db.hasCommitment(req.jobId) ? _world_rank : -1;
+        }
+        return -1;
+    }, [this](const JobRequest& request, int foundRank) {
+        if (foundRank == -1) {
+            log(V4_VVER, "%s : BFS unsuccessful - continue bouncing\n", request.toStr().c_str());
+            JobRequest req = request;
+            bounceJobRequest(req, _world_rank);
+        } else {
+            log(V4_VVER, "%s : BFS successful ([%i] adopting)\n", request.toStr().c_str(), foundRank);
+        }
+    }), _watchdog(/*checkIntervMillis=*/200, Timer::elapsedSeconds())
+{
+    _global_timeout = _params.timeLimit();
+    _watchdog.setWarningPeriod(100); // warn after 0.1s without a reset
+    _watchdog.setAbortPeriod(_params.watchdogAbortMillis()); // abort after X ms without a reset
+
+    // Set callback which is called whenever a job's volume is updated
+    _job_db.setBalancerVolumeUpdateCallback([&](int jobId, int volume) {
+        updateVolume(jobId, volume, _job_db.getGlobalBalancingEpoch());
+    });
+}
+
 void Worker::init() {
     
     // Initialize pseudo-random order of nodes
@@ -83,7 +116,7 @@ void Worker::init() {
     q.registerCallback(MSG_NOTIFY_ASSIGNMENT_UPDATE, 
         [&](auto& h) {_coll_assign.handle(h);});
     auto balanceCb = [&](MessageHandle& handle) {
-        if (_job_db.continueBalancing(handle)) applyBalancing();
+        _job_db.handleBalancingMessage(handle);
     };
     q.registerCallback(MSG_COLLECTIVE_OPERATION, balanceCb);
     q.registerCallback(MSG_REDUCE_DATA, balanceCb);
@@ -199,11 +232,7 @@ void Worker::advance(float time) {
 
     // Advance load balancing operations
     if (_periodic_balance_check.ready()) {
-        
-        if (_job_db.isTimeForRebalancing(time)) {
-            if (_job_db.beginBalancing()) applyBalancing();
-        } 
-        if (_job_db.continueBalancing()) applyBalancing();
+        _job_db.advanceBalancing();
 
         if (_job_db.isIdle() && _time_only_idle_worker > 0 && time - _time_only_idle_worker >= 0.05) {
             // This worker is the only idle worker within its local vicinity since some time
@@ -274,6 +303,15 @@ void Worker::advance(float time) {
                     log(LOG_ADD_DESTRANK | V4_VVER, "%s : sending finished info", jobRootRank, job.toStr());
                     MyMpi::isend(jobRootRank, MSG_NOTIFY_RESULT_FOUND, payload);
                     job.setResultTransferPending(true);
+                }
+
+                // Update demand as necessary
+                if (isRoot) {
+                    int demand = job.getDemand();
+                    if (demand != job.getLastDemand()) {
+                        // Demand updated
+                        _job_db.handleDemandUpdate(job, demand);
+                    }
                 }
             }
 
@@ -913,10 +951,9 @@ void Worker::initiateVolumeUpdate(int jobId) {
             // Balancing epoch which caused this job node is not present yet
             return;
         }
-        // Read current volume from balancer
-        const auto& volumes = _job_db.getBalancingResult();
-        if (volumes.count(jobId) && volumes.at(jobId) > 0) {
-            updateVolume(jobId, volumes.at(jobId), _job_db.getGlobalBalancingEpoch());
+        // Apply current volume
+        if (_job_db.hasVolume(jobId)) {
+            updateVolume(jobId, _job_db.getVolume(jobId), _job_db.getGlobalBalancingEpoch());
         }
     }
 }
@@ -1094,16 +1131,6 @@ int Worker::getWeightedRandomNeighbor() {
         if (rand < newSum) return rank;
     }
     abort();
-}
-
-void Worker::applyBalancing() {
-    
-    _job_db.computeBalancingResult();
-
-    // Update volumes found during balancing, and trigger job expansions / shrinkings
-    for (const auto& [jobId, volume] : _job_db.getBalancingResult()) {
-        updateVolume(jobId, volume, _job_db.getGlobalBalancingEpoch());
-    }
 }
 
 bool Worker::checkTerminate(float time) {

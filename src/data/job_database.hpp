@@ -7,7 +7,7 @@
 #include "util/hashing.hpp"
 #include "app/job.hpp"
 #include "job_transfer.hpp"
-#include "balancing/balancer.hpp"
+#include "balancing/event_driven_balancer.hpp"
 #include "util/sys/background_worker.hpp"
 #include "balancing/collective_assignment.hpp"
 
@@ -21,7 +21,7 @@ private:
     float _balance_period;
 
     MPI_Comm& _comm;
-    std::unique_ptr<Balancer> _balancer;
+    std::unique_ptr<EventDrivenBalancer> _balancer;
     robin_hood::unordered_map<int, int> _current_volumes;
     CollectiveAssignment* _coll_assign = nullptr;
 
@@ -84,14 +84,13 @@ public:
 
     std::vector<std::pair<JobRequest, int>> getDeferredRequestsToForward(float time);
 
-    bool isTimeForRebalancing(float time);
-    bool beginBalancing();
-    bool continueBalancing();
-    bool continueBalancing(MessageHandle& handle);
-    void finishBalancing();
-    void computeBalancingResult();
-    const robin_hood::unordered_map<int, int>& getBalancingResult();
+    void setBalancerVolumeUpdateCallback(std::function<void(int, int)> cb) {_balancer->setVolumeUpdateCallback(cb);}
+    void advanceBalancing() {_balancer->advance();}
+    void handleBalancingMessage(MessageHandle& handle) {_balancer->handle(handle);}
     int getGlobalBalancingEpoch() const {return _balancer->getGlobalEpoch();}
+    bool hasVolume(int jobId) const {return _balancer->hasVolume(jobId);}
+    int getVolume(int jobId) const {return _balancer->getVolume(jobId);}
+    void handleDemandUpdate(Job& job, int demand) {_balancer->onDemandChange(job, demand);}
 
     bool has(int id) const;
     Job& get(int id) const;

@@ -113,7 +113,7 @@ public:
     This method must return an integer greater than 0 and no greater than _comm_size. 
     It has a valid default implementation, so it does not need to be re-implemented.
     */
-    virtual int getDemand(int prevVolume, float elapsedTime = Timer::elapsedSeconds()) const;
+    virtual int getDemand() const;
 
     /*
     Return true iff the instance can be quickly deleted without any errors
@@ -171,6 +171,7 @@ private:
     float _priority = 0.01;
     mutable double _last_temperature = 1.0;
     mutable int _age_of_const_cooldown = -1;
+    mutable int _last_demand = 0;
 
 // Public methods.
 public:
@@ -239,6 +240,7 @@ public:
     float getUsedCpuSeconds() const {return _used_cpu_seconds;}
     int getNumThreads() const {return _threads_per_job;}
     int getBalancingEpochOfLastCommitment() const {return _balancing_epoch_of_last_commitment;}
+    int getLastDemand() const {return _last_demand;}
 
     // Return true iff this job instance has found a job result that it still needs to communicate.
     bool isResultTransferPending() const {return _result_transfer_pending;}

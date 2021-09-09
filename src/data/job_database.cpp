@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <queue>
 #include <utility>
+#include <climits>
 
 #include "app/sat/forked_sat_job.hpp"
 #include "app/sat/threaded_sat_job.hpp"
@@ -28,7 +29,7 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm):
     _balance_period = params.balancingPeriod();       
 
     // Initialize balancer
-    _balancer = std::unique_ptr<Balancer>(new EventDrivenBalancer(comm, params));
+    _balancer = std::unique_ptr<EventDrivenBalancer>(new EventDrivenBalancer(_comm, _params));
 
     _janitor.run([this]() {
         log(V3_VERB, "Job-DB Janitor tid=%lu\n", Proc::getTid());
@@ -104,6 +105,8 @@ void JobDatabase::execute(int jobId, int source) {
         // Restart job
         job.resume();
     }
+
+    _balancer->onActivate(job);
 }
 
 bool JobDatabase::checkComputationLimits(int jobId) {
@@ -309,20 +312,27 @@ void JobDatabase::reactivate(const JobRequest& req, int source) {
     log(LOG_ADD_SRCRANK | V3_VERB, "RESUME %s", source, 
                 toStr(req.jobId, req.requestedNodeIndex).c_str());
     job.resume();
+    _balancer->onActivate(job);
 }
 
 void JobDatabase::suspend(int jobId) {
     assert(has(jobId) && get(jobId).getState() == ACTIVE);
-    get(jobId).suspend();
+    Job& job = get(jobId);
+    job.suspend();
     setLoad(0, jobId);
-    log(V3_VERB, "SUSPEND %s\n", get(jobId).toStr());
+    log(V3_VERB, "SUSPEND %s\n", job.toStr());
+    _balancer->onSuspend(job);
 }
 
 void JobDatabase::terminate(int jobId) {
     Job& job = get(jobId);
-    if (!isIdle() && getActive().getId() == jobId) setLoad(0, jobId);
+    bool wasTerminated = job.getState() == JobState::PAST;
+    if (!isIdle() && getActive().getId() == jobId) {
+        setLoad(0, jobId);
+    }
     job.terminate();
     if (job.hasCommitment()) uncommit(jobId);
+    if (!wasTerminated) _balancer->onTerminate(job);
 }
 
 void JobDatabase::forgetOldJobs() {
@@ -394,9 +404,6 @@ void JobDatabase::free(int jobId) {
     Job* job = &get(jobId);
     log(V4_VVER, "Delete %s\n", job->toStr());
 
-    // Remove job meta data from balancer
-    _balancer->forget(jobId);
-
     // Delete job and its solvers
     _jobs.erase(jobId);
 
@@ -463,51 +470,6 @@ void JobDatabase::setLoad(int load, int whichJobId) {
 
 bool JobDatabase::isIdle() const {
     return _load == 0;
-}
-
-bool JobDatabase::isTimeForRebalancing(float time) {
-    return !_balancer->isBalancing() 
-        && time - _last_balancing_initiation >= _balance_period;
-}
-
-bool JobDatabase::beginBalancing() {
-
-    // Initiate balancing procedure
-    _last_balancing_initiation = Timer::elapsedSeconds();
-    bool done = _balancer->beginBalancing(_jobs);
-    // If nothing to do, finish up balancing
-    if (done) finishBalancing();
-    return done;
-}
-
-bool JobDatabase::continueBalancing() {
-    if (_balancer->isBalancing()) {
-        // Advance balancing if possible (e.g. an iallreduce finished)
-        if (_balancer->canContinueBalancing()) {
-            bool done = _balancer->continueBalancing();
-            if (done) finishBalancing();
-            return done;
-        }
-    }
-    return false;
-}
-
-bool JobDatabase::continueBalancing(MessageHandle& handle) {
-    bool done = _balancer->continueBalancing(handle);
-    if (done) finishBalancing();
-    return done;
-}
-
-void JobDatabase::finishBalancing() {
-    log(MyMpi::rank(MPI_COMM_WORLD) == 0 ? V3_VERB : V5_DEBG, "Balancing completed.\n");
-}
-
-void JobDatabase::computeBalancingResult() {
-    _current_volumes = _balancer->getBalancingResult();
-}
-
-const robin_hood::unordered_map<int, int>& JobDatabase::getBalancingResult() {
-    return _current_volumes;
 }
 
 bool JobDatabase::hasDormantRoot() const {

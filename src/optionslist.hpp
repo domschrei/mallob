@@ -80,7 +80,6 @@ OPT_FLOAT(requestTimeout,                "rto", "request-timeout",          0,  
 OPT_FLOAT(timeLimit,                     "T", "time-limit",                 0,    0, LARGE_INT,         "Run entire system for at most this many seconds")
 
 OPT_STRING(applicationSpawnMode,         "appmode", "",                     "fork",                     "Application mode: \"fork\" (spawn child process for each job on each MPI process) or \"thread\" (execute jobs in separate threads but within the same process)")
-OPT_STRING(balanceRoundingMode,          "r",  "",                          "bisec",                    "Mode of rounding of assignments in balancing (\"prob\": probabilistic, \"bisec\": iterative bisection, \"floor\" - always round down)")
 OPT_STRING(hordeConfig,                  "hConf", "",                       "",                         "Supply Horde config for solver subprocess [internal option, do not use]")
 OPT_STRING(logDirectory,                 "log", "log-directory",            "",                         "Directory to save logs in")
 OPT_STRING(monoFilename,                 "mono", "",                        "",                         "Mono instance: Solve the provided CNF instance with full power, then exit")

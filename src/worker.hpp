@@ -13,7 +13,6 @@
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "data/job_transfer.hpp"
-#include "balancing/balancer.hpp"
 #include "data/job_database.hpp"
 #include "comm/sysstate.hpp"
 #include "comm/distributed_bfs.hpp"
@@ -58,34 +57,7 @@ private:
     bool _was_idle = true;
 
 public:
-    Worker(MPI_Comm comm, Parameters& params) :
-        _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
-        _params(params), _job_db(_params, _comm), _sys_state(_comm), 
-        _bfs(_hop_destinations, [this](const JobRequest& req) {
-            if (_job_db.isIdle() && !_job_db.hasCommitment(req.jobId)) {
-                // Try to adopt this job request
-                log(V4_VVER, "BFS Try adopting %s\n", req.toStr().c_str());
-                MessageHandle handle;
-                handle.receiveSelfMessage(req.serialize(), _world_rank);
-                handleRequestNode(handle, JobDatabase::IGNORE_FAIL);
-                return _job_db.hasCommitment(req.jobId) ? _world_rank : -1;
-            }
-            return -1;
-        }, [this](const JobRequest& request, int foundRank) {
-            if (foundRank == -1) {
-                log(V4_VVER, "%s : BFS unsuccessful - continue bouncing\n", request.toStr().c_str());
-                JobRequest req = request;
-                bounceJobRequest(req, _world_rank);
-            } else {
-                log(V4_VVER, "%s : BFS successful ([%i] adopting)\n", request.toStr().c_str(), foundRank);
-            }
-        }), _watchdog(/*checkIntervMillis=*/200, Timer::elapsedSeconds())
-    {
-        _global_timeout = _params.timeLimit();
-        _watchdog.setWarningPeriod(100); // warn after 0.1s without a reset
-        _watchdog.setAbortPeriod(_params.watchdogAbortMillis()); // abort after X ms without a reset
-    }
-
+    Worker(MPI_Comm comm, Parameters& params);
     ~Worker();
     void init();
     void advance(float time = -1);
@@ -119,10 +91,9 @@ private:
     void sendRevisionDescription(int jobId, int revision, int dest);
     void bounceJobRequest(JobRequest& request, int senderRank);
     void initiateVolumeUpdate(int jobId);
-    void updateVolume(int jobId, int demand, int balancingEpoch);
+    void updateVolume(int jobId, int volume, int balancingEpoch);
     void interruptJob(int jobId, bool terminate, bool reckless);
     void sendJobDoneWithStatsToClient(int jobId, int successfulRank);
-    void applyBalancing();
     void timeoutJob(int jobId);
 
     void sendStatusToNeighbors();

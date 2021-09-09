@@ -67,21 +67,21 @@ function test_oscillating() {
     done
     # Generate actual job
     introduce_job sat-main instances/r3sat_500.cnf 60
-    test 13 -t=1 -lbc=2 -J=$((n+1)) -l=1 -satsolver=lgc -v=4 -checkjsonresults -checksums=1
+    test 13 -t=1 -c=1 -lbc=2 -J=$((n+1)) -l=1 -satsolver=lgc -v=5 -checkjsonresults -checksums=1
 }
 
 function test_incremental_scheduling() {
     for test in entertainment08 roverg10 transportg29 ; do
         introduce_incremental_job $test
     done
-    test 8 -t=1 -l=1 -satsolver=LgC -v=5 -J=3 -incrementaltest -checksums=1 -cmp=0.0001
+    test 8 -t=1 -l=1 -satsolver=LgC -v=5 -J=3 -incrementaltest -checksums=1
 }
 
-test_incremental_scheduling
-test_mono
 test_scheduling
+test_mono
 test_oscillating
 test_incremental
+test_incremental_scheduling
 test_many_incremental
 
 echo "All tests done."
