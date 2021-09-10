@@ -63,13 +63,14 @@ For any multinode computations, Mallob is launched with `mpirun`, `mpiexec` or s
 
 To sum up, a command to launch Mallob is usually structured like this: 
 ```
-RDMAV_FORK_SAFE=1 PATH=.:$PATH mpirun <mpi-options> ./mallob <options>
+RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun <mpi-options> ./mallob <options>
 ```
+If you use Mallob within Docker, replace `build/:$PATH` with `.:$PATH`.
 Each option has the syntax `-key=value`.
 
 To "daemonize" Mallob, i.e., to let it run in the background as a server for your own application(s), run
 ```
-RDMAV_FORK_SAFE=1 PATH=.:$PATH nohup mpirun <mpi-options> ./mallob <options> 2>&1 > OUT &
+RDMAV_FORK_SAFE=1 PATH=build/:$PATH nohup mpirun <mpi-options> ./mallob <options> 2>&1 > OUT &
 ```
 where `OUT` is a text file to create for Mallob's output. (If you do not want such a file, use the "quiet" option, `-q=1`, instead.)
 If running in the background, do not forget to `kill` Mallob (i.e., SIGTERM the `mpirun` process) after you are done.
