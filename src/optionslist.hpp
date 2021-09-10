@@ -21,7 +21,7 @@ OPT_BOOL(delayMonkey,                    "delaymonkey", "",                 fals
 OPT_BOOL(derandomize,                    "derandomize", "",                 true,                       "Derandomize job bouncing and build a <bounce-alternatives>-regular message graph instead")
 OPT_BOOL(explicitVolumeUpdates,          "evu", "",                         false,                      "Broadcast volume updates through job tree instead of letting each PE compute it itself")
 OPT_BOOL(help,                           "h", "help",                       false,                      "Print help and exit")
-OPT_BOOL(jitterJobPriorities,            "jjp", "jitter-job-priorities",    true,                       "Jitter job priorities to break ties during rebalancing")
+OPT_BOOL(jitterJobPriorities,            "jjp", "jitter-job-priorities",    false,                      "Jitter job priorities to break ties during rebalancing")
 OPT_BOOL(latencyMonkey,                  "latencymonkey", "",               false,                      "Block all MPI_Isend operations by a small randomized amount of time")
 OPT_BOOL(monitorMpi,                     "mmpi", "monitor-mpi",             false,                      "Launch an additional thread per process checking when the main thread is inside an MPI call")
 OPT_BOOL(phaseDiversification,           "phasediv", "",                    true,                       "Diversify solvers based on phase in addition to native diversification")
