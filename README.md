@@ -65,6 +65,18 @@ To sum up, a command to launch Mallob is usually structured like this:
 ```
 RDMAV_FORK_SAFE=1 PATH=.:$PATH mpirun <mpi-options> ./mallob <options>
 ```
+Each option has the syntax `-key=value`.
+
+To "daemonize" Mallob, i.e., to let it run in the background as a server for your own application(s), run
+```
+RDMAV_FORK_SAFE=1 PATH=.:$PATH nohup mpirun <mpi-options> ./mallob <options> 2>&1 > OUT &
+```
+where `OUT` is a text file to create for Mallob's output. (If you do not want such a file, use the "quiet" option, `-q=1`, instead.)
+If running in the background, do not forget to `kill` Mallob (i.e., SIGTERM the `mpirun` process) after you are done.
+Alternatively you can specify the number of jobs to process (with `-J=<num-jobs>`) and/or the time to pass (with `-T=<timelim-secs>`) before Mallob should terminate on its own.
+
+For exact and clean logging, you should not rely on a textfile in which you piped Mallob's output (like `OUT` above).
+Instead, specify a logging directory with `-log=<log-dir>` where separate sub-directories and files will be created for each worker / thread.
 
 ### Solving a single SAT instance
 
@@ -153,11 +165,26 @@ Such a file may look like this:
     "name": "test-job-1",
     "priority": 0.7,
     "result": {
-        "responsetime": 0.02732086181640625,
-        "resultcode": 20,
-        "resultstring": "UNSAT",
-        "revision": 0,
-        "solution": []
+        "resultcode": 10,
+        "resultstring": "SAT",
+        "solution": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+        ]
+    },
+    "stats": {
+        "time": {
+            "parsing": 0.03756427764892578,
+            "processing": 0.07197785377502441,
+            "scheduling": 0.0002980232238769531,
+            "total": 0.11040472984313965
+        },
+        "used_cpu_seconds": 0.2633516788482666,
+        "used_wallclock_seconds": 0.06638360023498535
     },
     "user": "admin",
     "wallclock-limit": "5m"

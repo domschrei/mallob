@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
     std::string logdir = params.logDirectory();
     Logger::init(rank, params.verbosity(), params.coloredOutput(), 
             quiet, /*cPrefix=*/params.monoFilename.isSet(), 
-            params.logToFiles() ? &logdir : nullptr);
+            !logdir.empty() ? &logdir : nullptr);
 
     MyMpi::setOptions(params);
 

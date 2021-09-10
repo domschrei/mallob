@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     std::string logdir = params.logDirectory();
     Logger::init(rankOfParent, params.verbosity(), params.coloredOutput(), 
             params.quiet(), /*cPrefix=*/params.monoFilename.isSet(),
-            params.logToFiles() ? &logdir : nullptr);
+            !logdir.empty() ? &logdir : nullptr);
     
     auto log = getLog(params, config);
     pid_t pid = Proc::getPid();

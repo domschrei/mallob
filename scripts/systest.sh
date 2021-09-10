@@ -39,6 +39,16 @@ function test_scheduling() {
     done
 }
 
+function test_dry_scheduling() {
+    t=1
+    for i in {1..400}; do
+        # wallclock limit, arrival, dependencies, application
+        introduce_job dummy-$i no/such/instance.txt 1.5 $t "" DUMMY
+        t=$(echo "$t+0.1"|bc -l)
+    done
+    test 32 -c=1 -J=400 -v=5 -checksums=1
+}
+
 function test_incremental() {
     for test in entertainment08 roverg10 transportg29 ; do
         for slv in lgc LgC; do
@@ -77,11 +87,12 @@ function test_incremental_scheduling() {
     test 8 -t=1 -l=1 -satsolver=LgC -v=5 -J=3 -incrementaltest -checksums=1
 }
 
-test_scheduling
-test_mono
-test_oscillating
-test_incremental
-test_incremental_scheduling
-test_many_incremental
+test_dry_scheduling
+#test_scheduling
+#test_mono
+#test_oscillating
+#test_incremental
+#test_incremental_scheduling
+#test_many_incremental
 
 echo "All tests done."
