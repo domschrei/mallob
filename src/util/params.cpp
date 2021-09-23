@@ -2,6 +2,9 @@
 #include "util/assert.hpp"
 #include <string.h>
 #include <map>
+#include <istream>
+#include <iterator>
+#include <sstream>
 
 #include "params.hpp"
 #include "logger.hpp"
@@ -109,10 +112,29 @@ char* const* Parameters::asCArgs(const char* execName) const {
 
     size_t numArgs = 0;
     for (const auto& [id, opt] : _map) if (!opt->getValAsString().empty()) numArgs++;
+    std::vector<std::string> words;
+    if (subprocessPrefix.isSet()) {
+        std::istringstream buffer(subprocessPrefix()); 
+        words = std::vector<std::string>{std::istream_iterator<std::string>(buffer), {}};
+        numArgs += words.size();
+    }
 
     const char** argv = new const char*[numArgs+2];
-    argv[0] = execName;
-    int i = 1;
+    int i = 0;
+    
+    while (i < words.size()) {
+        auto wordlen = words[i].size();
+        char* arg = (char*) malloc(wordlen * sizeof(char));
+        strncpy(arg, words[i].c_str(), wordlen);
+        argv[i] = arg;
+        i++;
+    }
+
+    char* arg = (char*) malloc(strlen(execName) * sizeof(char));
+    strncpy(arg, execName, strlen(execName));
+    argv[i] = arg;
+    i++;
+
     for (const auto& [id, opt] : _map) {
         std::string val = opt->getValAsString();
         if (val.empty()) continue;

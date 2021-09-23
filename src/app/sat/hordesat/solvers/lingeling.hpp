@@ -8,9 +8,13 @@
 #ifndef LINGELING_H_
 #define LINGELING_H_
 
+#include <list>
+
 #include "portfolio_solver_interface.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
+#include "app/sat/hordesat/sharing/adaptive_clause_database.hpp"
+#include "app/sat/hordesat/sharing/import_buffer.hpp"
 
 #include "util/ringbuffer.hpp"
 
@@ -37,16 +41,11 @@ private:
 	// clause addition
 	std::vector<int> assumptions;
 
-	MixedNonunitClauseRingBuffer learnedClauses;
-	UnitClauseRingBuffer learnedUnits;
-	
-	std::vector<int> learnedClausesBuffer;
-	std::vector<int> learnedUnitsBuffer;
-	std::vector<int> learnedClause;
+	//MixedNonunitClauseRingBuffer learnedClauses;
+	//UnitClauseRingBuffer learnedUnits;
+	//std::vector<int> learnedUnitsBuffer;
 
-	unsigned long numReceived = 0;
-	unsigned long numDigested = 0;
-	unsigned long numDiscarded = 0;
+	unsigned long numProduced = 0;
     
     volatile bool suspendSolver;
     Mutex suspendMutex;
@@ -82,10 +81,6 @@ public:
 	std::vector<int> getSolution() override;
 	std::set<int> getFailedAssumptions() override;
 
-	// Add a learned clause to the formula
-	// The learned clauses might be added later or possibly never
-	void addLearnedClause(const Clause& clause) override;
-
 	// Set a function that should be called for each learned clause
 	void setLearnedClauseCallback(const LearnedClauseCallback& callback) override;
 
@@ -101,7 +96,7 @@ public:
 	int getSplittingVariable() override;
 
 	// Get solver statistics
-	SolvingStatistics getStatistics() override;
+	void writeStatistics(SolvingStatistics& stats) override;
 
 	bool supportsIncrementalSat() override {return true;}
 	bool exportsConditionalClauses() override {return false;}

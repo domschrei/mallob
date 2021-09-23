@@ -151,6 +151,7 @@ struct JobStatistics : public Serializable {
     int successfulRank;
     float usedWallclockSeconds;
     float usedCpuSeconds;
+    float latencyOf1stVolumeUpdate;
 
 public:
     JobStatistics() = default;

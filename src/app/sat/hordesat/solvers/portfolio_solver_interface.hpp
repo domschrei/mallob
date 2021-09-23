@@ -20,53 +20,14 @@
 
 #include "app/sat/hordesat/utilities/clause.hpp"
 #include "util/logger.hpp"
+#include "app/sat/hordesat/sharing/import_buffer.hpp"
+#include "solver_statistics.hpp"
+#include "solver_setup.hpp"
 
 enum SatResult {
 	SAT = 10,
 	UNSAT = 20,
 	UNKNOWN = 0
-};
-
-struct SolvingStatistics {
-	unsigned long propagations = 0;
-	unsigned long decisions = 0;
-	unsigned long conflicts = 0;
-	unsigned long restarts = 0;
-	unsigned long receivedClauses = 0;
-	unsigned long digestedClauses = 0;
-	unsigned long discardedClauses = 0;
-	double memPeak = 0;
-};
-
-struct SolverSetup {
-
-	// General important fields
-	Logger* logger;
-	int globalId;
-	int localId; 
-	std::string jobname; 
-	int diversificationIndex;
-	bool isJobIncremental;
-	bool doIncrementalSolving;
-	bool hasPseudoincrementalSolvers;
-	char solverType;
-	int solverRevision;
-
-	// SAT Solving settings
-
-	// In any case, these bounds MUST be fulfilled for a clause to be exported
-	unsigned int hardMaxClauseLength;
-	unsigned int hardInitialMaxLbd;
-	unsigned int hardFinalMaxLbd;
-	// These bounds may not be fulfilled in case the solver deems the clause very good
-	// due to other observations
-	unsigned int softMaxClauseLength;
-	unsigned int softInitialMaxLbd;
-	unsigned int softFinalMaxLbd;
-	// For lingeling ("use old diversification")
-	bool useAdditionalDiversification;
-
-	size_t anticipatedLitsToImportPerCycle;
 };
 
 void updateTimer(std::string jobName);
@@ -114,10 +75,6 @@ public:
 	// Add a permanent literal to the formula (zero for clause separator)
 	virtual void addLiteral(int lit) = 0;
 
-	// Add a learned clause to the formula
-	// The learned clauses might be added later or possibly never
-	virtual void addLearnedClause(const Mallob::Clause& c) = 0;
-
 	// Set a function that should be called for each learned clause
 	virtual void setLearnedClauseCallback(const LearnedClauseCallback& callback) = 0;
 
@@ -125,7 +82,7 @@ public:
 	virtual void increaseClauseProduction() = 0;
 
 	// Get solver statistics
-	virtual SolvingStatistics getStatistics() = 0;
+	virtual void writeStatistics(SolvingStatistics& stats) = 0;
 
 	// Diversify your parameters (seeds, heuristics, etc.) according to the seed
 	// and the individual diversification index given by getDiversificationIndex().
@@ -184,12 +141,33 @@ public:
 	Logger& getLogger() {return _logger;}
 	
 	const SolverSetup& getSolverSetup() {return _setup;}
+	const SolvingStatistics& getSolverStats() {
+		writeStatistics(_stats);
+		return _stats;
+	}
+	SolvingStatistics& getSolverStatsRef() {
+		return _stats;
+	}
 
 	void interrupt();
 	void uninterrupt();
 	void suspend();
 	void resume();
 	void setTerminate();
+
+
+	// Add a learned clause to the formula
+	// The learned clauses might be added later or possibly never
+	void addLearnedClause(const Mallob::Clause& c);
+
+	// Add a bulk of learned clauses, but only the ones for which conditional returns true
+	void addLearnedClauses(const std::vector<Mallob::Clause>& clauses, 
+		std::function<bool(const Clause&)> conditional);
+
+	// Within the solver, fetch a clause that was previously added as a learned clause.
+	bool fetchLearnedClause(Mallob::Clause& clauseOut, ImportBuffer::GetMode mode = ImportBuffer::ANY);
+	std::vector<int>& fetchLearnedUnitClauses();
+
 
 private:
 	std::string _global_name;
@@ -200,6 +178,9 @@ private:
 	std::atomic_int _current_cond_var_or_zero = 0;
 	std::atomic_int _current_revision = 0;
 	std::atomic_bool _terminated = false;
+
+	SolvingStatistics _stats;
+	ImportBuffer _import_buffer;
 };
 
 // Returns the elapsed time (seconds) since the currently registered solver's start time.

@@ -179,22 +179,6 @@ std::set<int> MGlucose::getFailedAssumptions() {
 	return result;
 }
 
-void MGlucose::addLearnedClause(const Clause& c) {
-	if (!clauseAddMutex.tryLock()) {
-		return;
-	}
-	numReceived++;
-	if (c.size == 1) {
-		unitsToAdd.push_back(*c.begin);
-	} else {
-		// LBD value first, then clause payload
-		learnedClausesToAdd.emplace_back(1, c.lbd);
-		learnedClausesToAdd.back().insert(learnedClausesToAdd.back().end(), 
-			c.begin, c.begin+c.size);
-	}
-	clauseAddMutex.unlock();
-}
-
 void MGlucose::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 	this->learnedClauseCallback = callback;
 }
@@ -218,17 +202,13 @@ int MGlucose::getSplittingVariable() {
 	return 0;
 }
 
-SolvingStatistics MGlucose::getStatistics() {
-	SolvingStatistics st;
-	st.conflicts = conflicts;
-	st.decisions = decisions;
-	st.propagations = propagations;
-	st.restarts = starts;
-	st.memPeak = 0; // TODO
-	st.receivedClauses = numReceived;
-	st.digestedClauses = numDigested;
-	st.discardedClauses = numDiscarded;
-	return st;
+void MGlucose::writeStatistics(SolvingStatistics& stats) {
+	stats.conflicts = conflicts;
+	stats.decisions = decisions;
+	stats.propagations = propagations;
+	stats.restarts = starts;
+	stats.memPeak = 0; // TODO
+	stats.producedClauses = numProduced;
 }
 
 MGlucose::~MGlucose() {
@@ -286,13 +266,16 @@ bool MGlucose::parallelJobIsFinished() {
 void MGlucose::parallelExportUnaryClause(Glucose::Lit p) {
 	std::vector<int> vcls;
 	int lit = decodeLit(p);
+	assert(lit != 0);
 	assert(std::abs(lit) <= maxvar || log_return_false("Literal %i exported!\n", lit));
 	Clause c{&lit, 1, 1};
+	numProduced++;
 	learnedClauseCallback(c, getLocalId());
 }
 
 void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysis) {
 	
+	if (c.size() == 0) return;
 	// unit clause
 	if (c.size() == 1) {
 		parallelExportUnaryClause(c[0]);
@@ -323,11 +306,13 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 	std::vector<int> vcls(c.size());
 	for (int j = 0; j < c.size(); j++) {
 		vcls[j] = decodeLit(c[j]);
+		assert(vcls[j] != 0);
 		assert(std::abs(vcls[j]) <= maxvar || log_return_false("Literal %i exported!\n", vcls[j]));
 	}
 	
 	// export clause
-	learnedClauseCallback(Clause{vcls.data(), c.size(), (int)c.lbd()}, getLocalId());
+	numProduced++;
+	learnedClauseCallback(Clause(vcls.data(), c.size(), (int)c.lbd()), getLocalId());
 }
 
 /*
@@ -335,30 +320,14 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
  */
 bool MGlucose::parallelImportClauses() {
 
-	if (!clauseAddMutex.tryLock()) return false;
-
-	for (const auto& importedClause : learnedClausesToAdd) {
-
-		if (importedClause.size() == 0) {
-			clauseAddMutex.unlock();
-			return true;
-		}
-
-		if (importedClause.size() == 1) {
-			// Unary clause
-			// This is an adaptation of ParallelSolver::parallelImportUnaryClauses().
-			Glucose::Lit l = encodeLit(importedClause[0]);
-			if (value(var(l)) == l_Undef) {
-				uncheckedEnqueue(l);
-				numDigested++;
-			} else numDiscarded++;
-			continue;
-		}
+	Mallob::Clause importedClause;
+	while (fetchLearnedClause(importedClause, ImportBuffer::NONUNITS_ONLY)) {
+		assert(importedClause.size > 1);
 
 		// Assemble Glucose-style clause
-		unsigned int glue = importedClause[0];
+		unsigned int glue = importedClause.lbd;
 		Glucose::vec<Glucose::Lit> glucClause;
-		for (size_t i = 1; i < importedClause.size(); i++) glucClause.push(encodeLit(importedClause[i]));
+		for (size_t i = 0; i < importedClause.size; i++) glucClause.push(encodeLit(importedClause.begin[i]));
 
 		//printf("Thread %d imports clause from thread %d\n", threadNumber(), importedFromThread);
 		Glucose::CRef cr = ca.alloc(glucClause, true, true);
@@ -388,25 +357,16 @@ bool MGlucose::parallelImportClauses() {
 			}
 		}
 		assert(ca[cr].learnt());
-		numDigested++;
 	}
-	learnedClausesToAdd.clear();
-
-	clauseAddMutex.unlock();
 	return false;
 }
 
 void MGlucose::parallelImportUnaryClauses() {
 
-	if (!clauseAddMutex.tryLock()) return;
-	
-	for (int lit : unitsToAdd) {
+	for (int lit : fetchLearnedUnitClauses()) {
 		Glucose::Lit l = encodeLit(lit);
 		if (value(var(l)) == l_Undef) {
 			uncheckedEnqueue(l);
 		}
 	}
-	unitsToAdd.clear();
-
-	clauseAddMutex.unlock();
 }

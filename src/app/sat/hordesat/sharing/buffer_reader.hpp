@@ -10,7 +10,7 @@
 
 class BufferReader {
 private:
-    int* _buffer;
+    int* _buffer = nullptr;
     size_t _size;
     int _max_lbd_partitioned_size;
 
@@ -23,8 +23,10 @@ private:
     size_t _true_hash = 1;
 
 public:
+    BufferReader() = default;
     BufferReader(int* buffer, int size, int maxLbdPartitionedSize, bool useChecksum = false);
     Mallob::Clause getNextIncomingClause();
+    void releaseBuffer() {_buffer = nullptr;}
 };
 
 #endif

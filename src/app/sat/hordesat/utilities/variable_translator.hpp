@@ -9,6 +9,7 @@
 class VariableTranslator {
 
 private:
+    bool _empty = true;
     std::vector<int> _extra_variables;
 
 public:
@@ -17,10 +18,11 @@ public:
         int tldMaxVar = getTldLit(latestOrigMaxVar);
         do tldMaxVar++; while (!_extra_variables.empty() && _extra_variables.back() >= tldMaxVar);
         _extra_variables.push_back(tldMaxVar);
+        _empty = false;
     }
 
     int getTldLit(int origLit) {
-        if (_extra_variables.empty()) return origLit;
+        if (_empty) return origLit;
         int absLit = std::abs(origLit);
         for (int tldExtraVar : _extra_variables) {
             if (tldExtraVar > absLit) break;
@@ -30,7 +32,7 @@ public:
     }
 
     int getOrigLitOrZero(int tldLit) {
-        if (_extra_variables.empty()) return tldLit;
+        if (_empty) return tldLit;
         int absLit = std::abs(tldLit);
         int shift = 0;
         for (int tldExtraVar : _extra_variables) {

@@ -236,6 +236,7 @@ void JobFileAdapter::handleJobDone(const JobResult& result, const JobDescription
         { "time", {
             { "parsing", stats.parseTime },
             { "scheduling", stats.schedulingTime },
+            { "first_balancing_latency", stats.latencyOf1stVolumeUpdate },
             { "processing", stats.processingTime },
             { "total", Timer::elapsedSeconds() - img.arrivalTime }
         } },

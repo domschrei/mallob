@@ -78,6 +78,7 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 	setup.softFinalMaxLbd = params.finalSoftLbdLimit();
 	setup.hardMaxClauseLength = params.hardMaxClauseLength();
 	setup.softMaxClauseLength = params.softMaxClauseLength();
+	setup.clauseBaseBufferSize = params.clauseBufferBaseSize();
 	setup.anticipatedLitsToImportPerCycle = config.maxBroadcastedLitsPerCycle;
 	setup.hasPseudoincrementalSolvers = setup.isJobIncremental && hasPseudoincrementalSolvers;
 	setup.solverRevision = 0;
@@ -286,51 +287,25 @@ void HordeLib::dumpStats(bool final) {
 
 	int verb = final ? V3_VERB : V4_VVER;
 
-	// Local statistics
-	SolvingStatistics locSolveStats;
+	// Solver statistics
+	SolvingStatistics solveStats;
 	for (size_t i = 0; i < _num_solvers; i++) {
-		SolvingStatistics st = _solver_interfaces[i]->getStatistics();
-		_logger.log(verb, "%sS%d pps:%lu decs:%lu cnfs:%lu mem:%0.2f recv:%lu digd:%lu disc:%lu\n",
-				final ? "END " : "",
-				_solver_interfaces[i]->getGlobalId(), 
-				st.propagations, st.decisions, st.conflicts, st.memPeak, 
-				st.receivedClauses, st.digestedClauses, st.discardedClauses);
-		locSolveStats.conflicts += st.conflicts;
-		locSolveStats.decisions += st.decisions;
-		locSolveStats.memPeak += st.memPeak;
-		locSolveStats.propagations += st.propagations;
-		locSolveStats.restarts += st.restarts;
+		SolvingStatistics st = _solver_interfaces[i]->getSolverStats();
+		_logger.log(verb, "%sS%d %s\n",
+				final ? "END " : "", _solver_interfaces[i]->getGlobalId(), st.getReport().c_str());
+		solveStats.aggregate(st);
 	}
-	SharingStatistics locShareStats;
-	if (_sharing_manager != NULL) locShareStats = _sharing_manager->getStatistics();
+	_logger.log(verb, "%s%s\n", final ? "END " : "", solveStats.getReport().c_str());
 
-	unsigned long exportedWithFailed = locShareStats.exportedClauses + locShareStats.clausesFilteredAtExport + locShareStats.clausesDroppedAtExport;
-	unsigned long importedWithFailed = locShareStats.importedClauses + locShareStats.clausesFilteredAtImport;
-	_logger.log(verb, "%spps:%lu decs:%lu cnfs:%lu mem:%0.2f exp:%lu/%lu(drp:%lu) imp:%lu/%lu\n",
-			final ? "END " : "",
-			locSolveStats.propagations, locSolveStats.decisions, locSolveStats.conflicts, locSolveStats.memPeak, 
-			locShareStats.exportedClauses, exportedWithFailed, locShareStats.clausesDroppedAtExport, 
-			locShareStats.importedClauses, importedWithFailed);
+	// Sharing statistics
+	SharingStatistics shareStats;
+	if (_sharing_manager != NULL) shareStats = _sharing_manager->getStatistics();
+	_logger.log(verb, "%s%s\n", final ? "END " : "", shareStats.getReport().c_str());
 
 	if (final) {
 		// Histogram over clause lengths (do not print trailing zeroes)
-		std::string hist = "";
-		std::string histZeroesOnly = "";
-		for (size_t i = 1; i < CLAUSE_LEN_HIST_LENGTH; i++) {
-			auto val = locShareStats.seenClauseLenHistogram[i];
-			if (val > 0) {
-				if (!histZeroesOnly.empty()) {
-					// Flush sequence of zeroes into main string
-					hist += histZeroesOnly;
-					histZeroesOnly = "";
-				}
-				hist += " " + std::to_string(val);
-			} else {
-				// Append zero to side string
-				histZeroesOnly += " " + std::to_string(val);
-			}
-		}
-		if (!hist.empty()) _logger.log(V3_VERB, "END clenhist:%s\n", hist.c_str());
+		_logger.log(V3_VERB, "clenhist prod %s\n", shareStats.histProduced->getReport().c_str());
+		_logger.log(V3_VERB, "clenhist admt %s\n", shareStats.histAdmittedToDb->getReport().c_str());
 
 		// Flush logs
 		for (auto& solver : _solver_interfaces) solver->getLogger().flush();

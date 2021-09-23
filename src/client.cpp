@@ -304,6 +304,7 @@ void Client::handleJobDone(MessageHandle& handle) {
     JobDescription& desc = *_active_jobs[stats.jobId];
     desc.getStatistics().usedWallclockSeconds = stats.usedWallclockSeconds;
     desc.getStatistics().usedCpuSeconds = stats.usedCpuSeconds;
+    desc.getStatistics().latencyOf1stVolumeUpdate = stats.latencyOf1stVolumeUpdate;
 }
 
 void Client::handleSendJobResult(MessageHandle& handle) {

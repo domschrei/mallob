@@ -40,7 +40,7 @@ while read -r instance; do
 done < $benchmarkfile
 
 # Set options
-options="-t=4 -lbc=4 -g=0.1 -satsolver=lcg -v=4 -J=$(($i-1)) -ch=1 -chaf=5 -chstms=60 -cfhl=0 -smcl=30 -hmcl=30 -mlbdps=8 -checksums=0 -huca=0 -wam=1000 -sleep=100"
+options="-t=4 -lbc=4 -g=0.1 -satsolver=lcg -v=4 -J=$(($i-1)) -ch=1 -chaf=5 -chstms=60 -s=0.25 -cfhl=0 -smcl=8 -hmcl=8 -mlbdps=8 -checksums=0 -huca=0 -wam=1000 -sleep=100"
 
 # Launch Mallob with a unique run ID for a logging directory
 runid="sched_$(hostname)_$(git rev-parse --short HEAD)_np${1}_"$(echo $options|sed 's/-//g'|sed 's/=//g'|sed 's/ /_/g')

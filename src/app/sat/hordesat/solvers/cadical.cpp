@@ -17,7 +17,11 @@
 Cadical::Cadical(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),
 	  solver(new CaDiCaL::Solver), terminator(*setup.logger), 
-	  learner(_setup), learnSource(_setup) {
+	  learner(_setup), learnSource(_setup, [this]() {
+		  Mallob::Clause c;
+		  fetchLearnedClause(c, ImportBuffer::ANY);
+		  return c;
+	  }) {
 	
 	solver->connect_terminator(&terminator);
 	solver->connect_learn_source(&learnSource);
@@ -133,17 +137,6 @@ std::set<int> Cadical::getFailedAssumptions() {
 	return result;
 }
 
-void Cadical::addLearnedClause(const Clause& c) {
-	//_logger.log(V4_VVER, "Add clause of size %i to CaDiCaL learn source\n", size);
-	if (c.size == 1) learnSource.addUnit(*c.begin);
-	else {
-		std::vector<int> clauseWithLbd(1+c.size);
-		clauseWithLbd[0] = c.lbd;
-		for (size_t i = 0; i < c.size; i++) clauseWithLbd[1+i] = *(c.begin+i);
-		learnSource.addClause(clauseWithLbd.data(), clauseWithLbd.size());
-	}
-}
-
 void Cadical::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 	learner.setCallback(callback);
 	solver->connect_learner(&learner);
@@ -161,14 +154,12 @@ int Cadical::getSplittingVariable() {
 	return solver->lookahead();
 }
 
-SolvingStatistics Cadical::getStatistics() {
+void Cadical::writeStatistics(SolvingStatistics& stats) {
 	CaDiCaL::Solver::Statistics s = solver->get_stats();
-	SolvingStatistics st;
-	st.conflicts = s.conflicts;
-	st.decisions = s.decisions;
-	st.propagations = s.propagations;
-	st.restarts = s.restarts;
-	return st;
+	stats.conflicts = s.conflicts;
+	stats.decisions = s.decisions;
+	stats.propagations = s.propagations;
+	stats.restarts = s.restarts;
 }
 
 Cadical::~Cadical() {

@@ -4,6 +4,9 @@
 
 #include <string>
 #include <vector>
+#include <cstring>
+
+#include "util/assert.hpp"
 
 namespace Mallob {
     
@@ -12,6 +15,18 @@ namespace Mallob {
         int size = 0; 
         int lbd = 0;
 
+        Clause() = default;
+        Clause(int* begin, int size, int lbd) : begin(begin), size(size), lbd(lbd) {}
+
+        Clause copy() const {
+            Clause c((int*)malloc(size*sizeof(int)), size, lbd);
+            memcpy(c.begin, begin, size*sizeof(int));
+            return c;
+        }
+
+        void assertNonZeroLiterals() const {
+            for (int i = 0; i < size; i++) assert(begin[i] != 0);
+        }
         std::string toStr() const {
             std::string out = "(lbd=" + std::to_string(lbd) + ") ";
             for (auto it = begin; it != begin+size; it++) {

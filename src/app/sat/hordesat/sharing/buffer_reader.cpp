@@ -20,7 +20,9 @@ BufferReader::BufferReader(int* buffer, int size, int maxLbdPartitionedSize, boo
 }
 
 Mallob::Clause BufferReader::getNextIncomingClause() {
-    Mallob::Clause cls {nullptr, 0, 0};
+    Mallob::Clause cls;
+
+    if (_buffer == nullptr) return cls;
 
     // Find appropriate clause size
     while (_remaining_cls_of_bucket == 0) {
@@ -32,6 +34,7 @@ Mallob::Clause BufferReader::getNextIncomingClause() {
                 log(V0_CRIT, "[ERROR] Checksum fail\n");
                 abort();
             }
+            _buffer = nullptr;
             return cls;
         }
 
@@ -40,14 +43,22 @@ Mallob::Clause BufferReader::getNextIncomingClause() {
         _remaining_cls_of_bucket = _buffer[_current_pos++];
     }
 
-    if (_current_pos >= _size) return cls;
+    if (_current_pos >= _size) {
+        _buffer = nullptr;
+        return cls;
+    }
     bool partitionedByLbd = _bucket.size <= _max_lbd_partitioned_size;
-    assert(_buffer[_current_pos] != 0);
+    assert(_buffer[_current_pos] != 0 || 
+        log_return_false("ERROR: Buffer is zero @ pos %i/%i (bucket (%i,%i))!\n", 
+            _current_pos, _size, _bucket.size, _bucket.lbd));
 
     // Get start and stop index of next clause
     int start = _current_pos;
     int stop = start + _bucket.size;
-    if (stop+(partitionedByLbd ? 0 : 1) > _size) return cls;
+    if (stop+(partitionedByLbd ? 0 : 1) > _size) {
+        _buffer = nullptr;
+        return cls;
+    }
 
     if (_use_checksum) {
         hash_combine(_hash, Mallob::ClauseHasher::hash(

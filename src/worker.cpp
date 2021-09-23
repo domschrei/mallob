@@ -225,7 +225,7 @@ void Worker::advance(float time) {
                 for (size_t i = 0; i < job.getJobComm().size(); i++) {
                     commStr += " " + std::to_string(job.getJobComm()[i]);
                 }
-                log(V4_VVER, "%s job comm:%s\n", job.toStr(), commStr.c_str());
+                if (!commStr.empty()) log(V4_VVER, "%s job comm:%s\n", job.toStr(), commStr.c_str());
             }
         }
     }
@@ -973,6 +973,11 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
         job.toStr(), volume, balancingEpoch, job.getJobTree().getBalancingEpochOfLastRequests());
     job.updateVolumeAndUsedCpu(volume);
 
+    if (job.getJobTree().isRoot() && job.getJobTree().getBalancingEpochOfLastRequests() == -1) {
+        // Job's volume is updated for the first time since its activation
+        job.setTimeOfFirstVolumeUpdate(Timer::elapsedSeconds());
+    }
+
     // Prepare volume update to propagate down the job tree
     IntVec payload{jobId, volume, balancingEpoch};
 
@@ -1081,6 +1086,7 @@ void Worker::sendJobDoneWithStatsToClient(int jobId, int successfulRank) {
     stats.successfulRank = successfulRank;
     stats.usedWallclockSeconds = job.getAgeSinceActivation();
     stats.usedCpuSeconds = job.getUsedCpuSeconds();
+    stats.latencyOf1stVolumeUpdate = job.getLatencyOfFirstVolumeUpdate();
 
     // Send "Job done!" with statistics to client
     MyMpi::isend(clientRank, MSG_NOTIFY_JOB_DONE, stats);

@@ -10,18 +10,27 @@
 
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 #include "data/checksum.hpp"
+#include "app/sat/hordesat/sharing/clause_histogram.hpp"
 
 struct SharingStatistics {
-	SharingStatistics():exportedClauses(0),importedClauses(0),
-		clausesDroppedAtExport(0),
-		clausesFilteredAtExport(0),
-		clausesFilteredAtImport(0) {}
-	unsigned long exportedClauses;
-	unsigned long importedClauses;
-	unsigned long clausesDroppedAtExport;
-	unsigned long clausesFilteredAtExport;
-	unsigned long clausesFilteredAtImport;
-	unsigned long* seenClauseLenHistogram;
+	unsigned long exportedClauses = 0;
+	unsigned long importedClauses = 0;
+	unsigned long clausesDroppedAtExport = 0;
+	unsigned long clausesFilteredAtExport = 0;
+	ClauseHistogram* histProduced;
+	ClauseHistogram* histAdmittedToDb;
+
+	std::string getReport() const {
+		unsigned long failedExported = clausesFilteredAtExport + clausesDroppedAtExport;
+		unsigned long exportedWithFailed = exportedClauses + failedExported;
+		float droppedRatio = failedExported == 0 ? 0 : (float)clausesDroppedAtExport / failedExported;
+
+		return "exp:" + std::to_string(exportedClauses) + "/" + std::to_string(exportedWithFailed)
+			+ " edrp:" + std::to_string(clausesDroppedAtExport) 
+					+ "(" + std::to_string((float) (0.01 * (int)(droppedRatio*100))) + ")"
+			+ " eflt:" + std::to_string(clausesFilteredAtExport)
+			+ " imp:" + std::to_string(importedClauses);
+	}
 };
 
 class SharingManagerInterface {

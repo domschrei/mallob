@@ -192,20 +192,22 @@ int& IntVec::operator[](const int pos) {
 }
 
 std::vector<uint8_t> JobStatistics::serialize() const {
-    std::vector<uint8_t> packed(2*sizeof(int) + 2*sizeof(float));
+    std::vector<uint8_t> packed(2*sizeof(int) + 3*sizeof(float));
     int i = 0, n;
-    n = sizeof(int);   memcpy(packed.data()+i, &jobId, sizeof(int));                  i += n;
-    n = sizeof(int);   memcpy(packed.data()+i, &successfulRank, sizeof(int));         i += n;
-    n = sizeof(float); memcpy(packed.data()+i, &usedWallclockSeconds, sizeof(float)); i += n;
-    n = sizeof(float); memcpy(packed.data()+i, &usedCpuSeconds, sizeof(float));       i += n;
+    n = sizeof(int);   memcpy(packed.data()+i, &jobId, sizeof(int));                      i += n;
+    n = sizeof(int);   memcpy(packed.data()+i, &successfulRank, sizeof(int));             i += n;
+    n = sizeof(float); memcpy(packed.data()+i, &usedWallclockSeconds, sizeof(float));     i += n;
+    n = sizeof(float); memcpy(packed.data()+i, &usedCpuSeconds, sizeof(float));           i += n;
+    n = sizeof(float); memcpy(packed.data()+i, &latencyOf1stVolumeUpdate, sizeof(float)); i += n;
     return packed;
 }
 
 JobStatistics& JobStatistics::deserialize(const std::vector<uint8_t>& packed) {
     int i = 0, n;
-    n = sizeof(int);   memcpy(&jobId, packed.data()+i, sizeof(int));                  i += n;
-    n = sizeof(int);   memcpy(&successfulRank, packed.data()+i, sizeof(int));         i += n;
-    n = sizeof(float); memcpy(&usedWallclockSeconds, packed.data()+i, sizeof(float)); i += n;
-    n = sizeof(float); memcpy(&usedCpuSeconds, packed.data()+i, sizeof(float));       i += n;
+    n = sizeof(int);   memcpy(&jobId, packed.data()+i, sizeof(int));                      i += n;
+    n = sizeof(int);   memcpy(&successfulRank, packed.data()+i, sizeof(int));             i += n;
+    n = sizeof(float); memcpy(&usedWallclockSeconds, packed.data()+i, sizeof(float));     i += n;
+    n = sizeof(float); memcpy(&usedCpuSeconds, packed.data()+i, sizeof(float));           i += n;
+    n = sizeof(float); memcpy(&latencyOf1stVolumeUpdate, packed.data()+i, sizeof(float)); i += n;
     return *this;
 }

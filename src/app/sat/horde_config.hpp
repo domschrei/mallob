@@ -58,7 +58,7 @@ struct HordeConfig {
     }
 
     std::string getJobStr() const {
-        return "#" + std::to_string(jobid) + "@" + std::to_string(mpirank);
+        return "#" + std::to_string(jobid);
     }
 };
 

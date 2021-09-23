@@ -81,15 +81,14 @@ void HordeProcessAdapter::doInitialize() {
     _written_revision = 0;
 
     // Assemble c-style program arguments
-    const char* execName = "mallob_sat_process";
-    char* const* argv = _params.asCArgs(execName);
+    char* const* argv = _params.asCArgs("mallob_sat_process");
     
     // FORK: Create a child process
     pid_t res = Process::createChild();
     if (res == 0) {
         // [child process]
         // Execute the SAT process.
-        int result = execvp("mallob_sat_process", argv);
+        int result = execvp(argv[0], argv);
         
         // If this is reached, something went wrong with execvp
         log(V0_CRIT, "[ERROR] execvp returned %i with errno %i\n", result, (int)errno);
@@ -97,7 +96,7 @@ void HordeProcessAdapter::doInitialize() {
     }
 
     // [parent process]
-    int i = 1;
+    int i = 0;
     while (argv[i] != nullptr) free(argv[i++]);
     delete[] argv;
 

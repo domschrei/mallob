@@ -26,7 +26,6 @@ OPT_BOOL(latencyMonkey,                  "latencymonkey", "",               fals
 OPT_BOOL(monitorMpi,                     "mmpi", "monitor-mpi",             false,                      "Launch an additional thread per process checking when the main thread is inside an MPI call")
 OPT_BOOL(phaseDiversification,           "phasediv", "",                    true,                       "Diversify solvers based on phase in addition to native diversification")
 OPT_BOOL(quiet,                          "q", "quiet",                      false,                      "Do not log to stdout besides critical information")
-OPT_BOOL(shuffleSharedClauses,           "shufshcls", "",                   false,                      "Shuffle literals in each shared clause randomly on import")
 OPT_BOOL(useChecksums,                   "checksums", "",                   false,                      "Compute and verify checksum for every job description transfer")
 OPT_BOOL(warmup,                         "warmup", "",                      false,                      "Do one explicit All-To-All warmup among all nodes in the beginning")
 OPT_BOOL(workRequests,                   "wr", "",                          false,                      "Send around work requests similarly to job requests")
@@ -66,7 +65,7 @@ OPT_INT(watchdogAbortMillis,             "wam", "",                         6000
 OPT_FLOAT(appCommPeriod,                 "s", "app-comm-period",            1,    0, LARGE_INT,         "Do job-internal communication every t seconds") 
 OPT_FLOAT(balancingPeriod,               "p", "balancing-period",           0.1,  0, LARGE_INT,         "Minimum interval between subsequent rounds of balancing")
 OPT_FLOAT(clauseBufferDiscountFactor,    "cbdf", "",                        0.9,  0.5, 1,               "Clause buffer discount factor: reduce buffer size per PE by <factor> each depth")
-OPT_FLOAT(clauseFilterHalfLife,          "cfhl", "",                        0,    -1, LARGE_INT,        "Set half life of clauses in solver filters (-1: never forget, 0: forget immediately")
+OPT_FLOAT(clauseFilterClearInterval,     "cfci", "",                        20,   -1, LARGE_INT,        "Set clear interval of clauses in solver filters (-1: never clear, 0: always clear")
 OPT_FLOAT(crashMonkeyProbability,        "cmp", "",                         0,    0, 1,                 "Have a solver thread crash with this probability each time it imports a clause")
 OPT_FLOAT(growthPeriod,                  "g", "growth-period",              0,    0, LARGE_INT,         "Grow job demand exponentially every t seconds (0: immediate full growth)" )
 OPT_FLOAT(increaseClauseProductionRatio, "icpr", "",                        0,    0, 1,                 "Increase a solver's Clause Production when it fills less than <ratio> of its buffer")
@@ -84,5 +83,6 @@ OPT_STRING(logDirectory,                 "log", "log-directory",            "", 
 OPT_STRING(monoFilename,                 "mono", "",                        "",                         "Mono instance: Solve the provided CNF instance with full power, then exit")
 OPT_STRING(satSolverSequence,            "satsolver",  "",                  "L",                        "Sequence of SAT solvers to cycle through for each job, one character per solver (capital letter for true incremental solver, lowercase for pseudo-incremental solving): l=lingeling c=cadical g=glucose m=mergesat")
 OPT_STRING(solutionToFile,               "s2f", "solution-to-file",         "",                         "Write solutions to file with provided base name + job ID")
+OPT_STRING(subprocessPrefix,             "subproc-prefix", "",              "",                         "Execute SAT subprocess with this prefix (e.g., \"valgrind\")")
 
 #endif

@@ -49,7 +49,7 @@ private:
 
     std::atomic_int _latest_revision = 0;
     std::atomic_int _active_revision;
-    std::atomic_ulong _imported_lits_curr_revision = 0;
+    unsigned long _imported_lits_curr_revision = 0;
     int _max_var = 0;
     VariableTranslator _vt;
     bool _has_pseudoincremental_solvers;

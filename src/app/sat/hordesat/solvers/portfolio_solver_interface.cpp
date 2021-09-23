@@ -39,7 +39,8 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 		  )), 
 		  _setup(setup), _job_name(setup.jobname), 
 		  _global_id(setup.globalId), _local_id(setup.localId), 
-		  _diversification_index(setup.diversificationIndex) {
+		  _diversification_index(setup.diversificationIndex),
+		  _import_buffer(setup, _stats) {
 	updateTimer(_job_name);
 	_global_name = "<h-" + _job_name + "_S" + std::to_string(_global_id) + ">";
 }
@@ -70,4 +71,22 @@ void PortfolioSolverInterface::setExtLearnedClauseCallback(const ExtLearnedClaus
 		assert(condVar >= 0);
 		callback(c, solverId, getSolverSetup().solverRevision, condVar);
 	});
+}
+
+void PortfolioSolverInterface::addLearnedClause(const Mallob::Clause& c) {
+	_import_buffer.add(c);
+}
+
+void PortfolioSolverInterface::addLearnedClauses(const std::vector<Mallob::Clause>& clauses, 
+	std::function<bool(const Clause&)> conditional) {
+	_import_buffer.bulkAdd(clauses, conditional);
+}
+
+bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, ImportBuffer::GetMode mode) {
+	clauseOut = _import_buffer.get(mode);
+	return clauseOut.begin != nullptr;
+}
+
+std::vector<int>& PortfolioSolverInterface::fetchLearnedUnitClauses() {
+	return _import_buffer.getUnitsBuffer();
 }

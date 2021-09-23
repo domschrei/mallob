@@ -145,7 +145,9 @@ private:
 
     float _time_of_arrival;
     float _time_of_activation = 0;
+    float _time_of_first_volume_update = -1;
     float _time_of_abort = 0;
+    
     float _time_of_last_comm = 0;
     float _time_of_last_limit_check = 0;
     float _time_of_last_ranklist_agg = 0;
@@ -237,6 +239,7 @@ public:
     float getAgeSinceActivation() const {return Timer::elapsedSeconds() - _time_of_activation;}
     // Elapsed seconds since termination of the job.
     float getAgeSinceAbort() const {return Timer::elapsedSeconds() - _time_of_abort;}
+    float getLatencyOfFirstVolumeUpdate() const {return _time_of_first_volume_update < 0 ? -1 : _time_of_first_volume_update - _time_of_activation;}
     float getUsedCpuSeconds() const {return _used_cpu_seconds;}
     int getNumThreads() const {return _threads_per_job;}
     int getBalancingEpochOfLastCommitment() const {return _balancing_epoch_of_last_commitment;}
@@ -248,6 +251,7 @@ public:
     // (calls appl_isDestructible())
     bool isDestructible();
     void clearJobDescription() {for (size_t i = 0; i < getRevision(); i++) _description.clearPayload(i);}
+    void setTimeOfFirstVolumeUpdate(float time) {_time_of_first_volume_update = time;}
     
     int getGlobalNumWorkers() const {return _job_tree.getCommSize();}
     int getMyMpiRank() const {return _job_tree.getRank();}

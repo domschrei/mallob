@@ -13,6 +13,7 @@ using namespace Mallob;
 
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
+#include "app/sat/hordesat/sharing/import_buffer.hpp"
 
 #include "simp/SimpSolver.h"
 
@@ -22,7 +23,6 @@ private:
 	std::string name;
 	int stopSolver;
 	LearnedClauseCallback learnedClauseCallback;
-	Mutex clauseAddMutex;
 
 	Glucose::vec<Glucose::Lit> clause;
 	Glucose::vec<Glucose::Lit> assumptions;
@@ -31,11 +31,7 @@ private:
 	unsigned char * fmap = 0; 
 	bool nomodel = true;
 	unsigned long long calls = 0;
-    
-	// clause addition
-	std::vector<std::vector<int> > learnedClausesToAdd;
-	std::vector<int> unitsToAdd;
-    
+        
     volatile bool suspendSolver;
     Mutex suspendMutex;
     ConditionVariable suspendCond;
@@ -45,9 +41,7 @@ private:
 	unsigned int hardMaxLbd;
 
 	// Clause statistics
-	unsigned long numReceived = 0;
-	unsigned long numDigested = 0;
-	unsigned long numDiscarded = 0;
+	unsigned long numProduced = 0;
 
 public:
 	MGlucose(const SolverSetup& setup);
@@ -70,10 +64,6 @@ public:
 	std::vector<int> getSolution() override;
 	std::set<int> getFailedAssumptions() override;
 
-	// Add a learned clause to the formula
-	// The learned clauses might be added later or possibly never
-	void addLearnedClause(const Clause& c) override;
-
 	// Set a function that should be called for each learned clause
 	void setLearnedClauseCallback(const LearnedClauseCallback& callback) override;
 
@@ -89,7 +79,7 @@ public:
 	int getSplittingVariable() override;
 
 	// Get solver statistics
-	SolvingStatistics getStatistics() override;
+	void writeStatistics(SolvingStatistics& stats) override;
 
 	bool supportsIncrementalSat() override {return false;}
 	bool exportsConditionalClauses() override {return true;}

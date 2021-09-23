@@ -12,6 +12,7 @@ private:
 	LearnedClauseCallback _callback;
 	std::vector<int> _curr_clause;
 	int _glue_limit;
+	unsigned long _num_produced;
 	
 public:
 	HordeLearner(const SolverSetup& setup) : _setup(setup), _glue_limit(_setup.softInitialMaxLbd) {}
@@ -27,6 +28,7 @@ public:
 			_curr_clause.push_back(lit);
 		} else {
 			// Received a zero - clause is finished
+			_num_produced++;
 
 			if (_curr_clause.empty()) {
 				_setup.logger->log(V4_VVER, "Received empty clause!\n");
@@ -63,4 +65,8 @@ public:
     void setCallback(const LearnedClauseCallback& callback) {
         _callback = callback;
     }
+
+	unsigned long getNumProduced() const {
+		return _num_produced;
+	}
 };

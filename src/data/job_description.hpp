@@ -25,6 +25,7 @@ public:
         float processingTime;
         float usedWallclockSeconds;
         float usedCpuSeconds;
+        float latencyOf1stVolumeUpdate;
     };
 
 private:

@@ -106,7 +106,7 @@ private:
 
 public:
     RingBuffer() {}
-    RingBuffer(size_t size, int numProducers = 1) : _capacity(size) {
+    RingBuffer(size_t size, int numProducers = 1, uint8_t* data = nullptr) : _data(data), _capacity(size) {
         size_t ringbufSize;
         ringbuf_get_sizes(/*nworkers=*/numProducers, &ringbufSize, nullptr);
         _ringbuf = (ringbuf_t*)malloc(ringbufSize);
@@ -114,7 +114,7 @@ public:
         for (int i = 0; i < numProducers; i++) {
             _producers.push_back(ringbuf_register(_ringbuf, /*worker_id=*/i));
         }
-        _data = (uint8_t*)malloc(sizeof(int)*size);
+        if (_data == nullptr) _data = (uint8_t*)malloc(sizeof(int)*size);
     }
 
     bool produce(const int* data, size_t size, int prefixOrZero, bool appendZero, int producerId = 0) {
@@ -180,6 +180,14 @@ public:
         return true;
     }
 
+    uint8_t* releaseBuffer() {
+        if (isNull()) return nullptr;
+        auto out = _data;
+        free(_ringbuf);
+        _ringbuf = nullptr;
+        return out;
+    }
+
     size_t getCapacity() const {
         return _capacity;
     }
@@ -202,7 +210,8 @@ protected:
 
 public:
     UniformSizeClauseRingBuffer() {}
-    UniformSizeClauseRingBuffer(size_t ringbufSize, int clauseSize, int numProducers = 1) : _ringbuf(ringbufSize, numProducers), _clause_size(clauseSize) {}
+    UniformSizeClauseRingBuffer(size_t ringbufSize, int clauseSize, int numProducers = 1, uint8_t* data = nullptr) : 
+        _ringbuf(ringbufSize, numProducers, data), _clause_size(clauseSize) {}
     
     bool isNull() {return _ringbuf.isNull();}
     virtual bool insertClause(const Clause& c, int producerId = 0) {
@@ -212,13 +221,16 @@ public:
     virtual bool getClause(std::vector<int>& out) {
         return _ringbuf.consume(_clause_size+1, out);
     }
+    uint8_t* releaseBuffer() {
+        return _ringbuf.releaseBuffer();
+    }
 };
 
 class UniformClauseRingBuffer : public UniformSizeClauseRingBuffer {
 
 public:
-    UniformClauseRingBuffer(size_t ringbufSize, int clauseSize, int numProducers = 1) : 
-        UniformSizeClauseRingBuffer(ringbufSize, clauseSize, numProducers) {}
+    UniformClauseRingBuffer(size_t ringbufSize, int clauseSize, int numProducers = 1, uint8_t* data = nullptr) : 
+        UniformSizeClauseRingBuffer(ringbufSize, clauseSize, numProducers, data) {}
     bool insertClause(const Clause& c, int producerId = 0) override {
         assert(c.size == _clause_size);
         return _ringbuf.produce(c.begin, _clause_size, 0, false, producerId);
