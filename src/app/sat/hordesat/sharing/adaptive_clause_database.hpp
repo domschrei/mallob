@@ -20,9 +20,12 @@ private:
     int _chunk_size;
     bool _use_checksum;
 
+    ClauseHistogram _hist_deleted_in_slots;
+
 public: 
     AdaptiveClauseDatabase(int maxClauseSize, int maxLbdPartitionedSize, int baseBufferSize, int numChunks, int numProducers, bool useChecksum = false):
-            _max_lbd_partitioned_size(maxLbdPartitionedSize), _chunk_size(baseBufferSize), _use_checksum(useChecksum) {
+            _max_lbd_partitioned_size(maxLbdPartitionedSize), _chunk_size(baseBufferSize), _use_checksum(useChecksum),
+            _hist_deleted_in_slots(maxClauseSize) {
         
         _chunk_mgr = ChunkManager(numChunks, baseBufferSize);
         
@@ -57,6 +60,8 @@ public:
                 return pair;
             });
 
+            _slots.back().setDeletedClausesHistogram(_hist_deleted_in_slots);
+
             l.next(maxLbdPartitionedSize);
         }
     }
@@ -68,7 +73,10 @@ public:
 
         // Find correct clause slot, attempt to insert
         size_t slotIdx = getSlotIdx(c.size, c.lbd);
-        if (slotIdx < 0 || slotIdx >= _slots.size()) return DROP; // clause is not acceptable
+        if (slotIdx < 0 || slotIdx >= _slots.size()) {
+            log(V1_WARN, "[WARN] %s -> invalid slot index %i\n", c.toStr().c_str(), slotIdx);
+            return DROP; // clause is not acceptable
+        }
         auto& slot = _slots[slotIdx];
         auto result = slot.insert(producerId, c);
         if (result == ClauseSlot::SlotResult::SUCCESS) return SUCCESS;
@@ -149,7 +157,7 @@ public:
 
         // Reserve space for checksum at the beginning of the buffer
         int numInts = (sizeof(size_t)/sizeof(int));
-        selection.resize(numInts);
+        for (int i = 0; i < numInts; i++) selection.push_back(0);
 
         BucketLabel bucket;
         int bufIdx = 0;
@@ -206,8 +214,9 @@ public:
         }
 
         // Remove trailing zeroes
-        while (!selection.empty() && selection[selection.size()-1] == 0)
-            selection.resize(selection.size()-1);
+        size_t lastNonzeroIdx = selection.size()-1;
+        while (lastNonzeroIdx > 0 && selection[lastNonzeroIdx] == 0) lastNonzeroIdx--;
+        selection.resize(lastNonzeroIdx);
 
         // Write final hash checksum
         memcpy(selection.data(), &hash, sizeof(size_t));
@@ -221,6 +230,10 @@ public:
 
     BufferMerger getBufferMerger() {
         return BufferMerger(_max_lbd_partitioned_size, _use_checksum);
+    }
+
+    ClauseHistogram& getDeletedClausesHistogram() {
+        return _hist_deleted_in_slots;
     }
 
 private:

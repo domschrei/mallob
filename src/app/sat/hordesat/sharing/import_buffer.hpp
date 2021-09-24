@@ -26,7 +26,7 @@ public:
 			setup.hardMaxClauseLength, 
             2, 
 			setup.clauseBaseBufferSize, 
-			std::max(1, (int) (4 * ((float)setup.anticipatedLitsToImportPerCycle) / setup.clauseBaseBufferSize)), 
+			std::max(10, (int) (3.0f * setup.anticipatedLitsToImportPerCycle / setup.clauseBaseBufferSize)), 
             1
 		) {}
 
@@ -43,14 +43,17 @@ public:
             _stats.discardedClauses++;
         } else if (result == AdaptiveClauseDatabase::TRY_LATER) {
             // defer clause
+            _stats.deferredClauses++;
             _deferred.push_back(c.copy());
         } else {
+            _stats.receivedClausesInserted++;
             // success: also try to insert clauses deferred earlier
             addDeferredClauses();
         }
     }
 
     void bulkAdd(const std::vector<Mallob::Clause>& clauses, std::function<bool(const Mallob::Clause&)> conditional) {
+        _stats.receivedClauses += clauses.size();
         addDeferredClauses();
         _cdb.bulkAddClauses(0, clauses, _deferred, _stats, conditional);
     }

@@ -26,6 +26,11 @@ public:
         atomics::incrementRelaxed(_total);
     }
 
+    void increase(size_t size, int by) {
+        _hist[std::min(size, _hist.size())-1]->fetch_add(by, std::memory_order_relaxed);
+        _total.fetch_add(by, std::memory_order_relaxed);
+    }
+
     std::string getReport() {
 
         // Find last position where actual information is stored

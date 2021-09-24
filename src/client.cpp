@@ -198,14 +198,17 @@ void Client::advance() {
                     (int)result[SYSSTATE_PARSED_JOBS], 
                     (int)result[SYSSTATE_SCHEDULED_JOBS], 
                     processed);
-        int jobLimit = _params.numJobs();
-        if (jobLimit > 0 && processed >= jobLimit) {
-            log(V2_INFO, "Job limit reached.\n");
-            // Job limit reached - exit
-            Terminator::setTerminating();
-            // Send MSG_EXIT to worker of rank 0, which will broadcast it
-            MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
-        }
+    }
+
+    int jobLimit = _params.numJobs();
+    if (jobLimit > 0 && (int)_sys_state.getGlobal()[SYSSTATE_PROCESSED_JOBS] >= jobLimit) {
+        log(V2_INFO, "Job limit reached.\n");
+        // Job limit reached - exit
+        Terminator::setTerminating();
+        // Send MSG_EXIT to worker of rank 0, which will broadcast it
+        MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
+        // Stop instance reader immediately
+        _instance_reader.stopWithoutWaiting();
     }
 }
 

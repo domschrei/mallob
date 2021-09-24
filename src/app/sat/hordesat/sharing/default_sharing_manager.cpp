@@ -25,10 +25,14 @@ DefaultSharingManager::DefaultSharingManager(
 		/*baseBufferSize=*/_params.clauseBufferBaseSize(),
 		/*numChunks=*/20,
 		/*numProducers=*/_solvers.size()
-	), _hist_produced(CLAUSE_LEN_HIST_LENGTH), _hist_admitted_to_db(CLAUSE_LEN_HIST_LENGTH) {
+	), _hist_produced(params.hardMaxClauseLength()), 
+	_hist_admitted_to_db(params.hardMaxClauseLength()), 
+	_hist_dropped_before_db(params.hardMaxClauseLength()) {
 
 	_stats.histProduced = &_hist_produced;
 	_stats.histAdmittedToDb = &_hist_admitted_to_db;
+	_stats.histDroppedBeforeDb = &_hist_dropped_before_db;
+	_stats.histDeletedInSlots = &_cdb.getDeletedClausesHistogram();
 
 	auto callback = getCallback();
 	
@@ -194,48 +198,58 @@ void DefaultSharingManager::processClause(int solverId, int solverRevision, cons
 	// Add the supplied conditional variable in negated form to the clause.
 	// This effectively renders the found conflict relative to the assumptions
 	// which were added not as assumptions but as permanent unit clauses.
-	std::vector<int> tldClauseVec;
+	std::vector<int>* tldClauseVec = nullptr;
 	if (condVarOrZero != 0) {
-		tldClauseVec.insert(tldClauseVec.end(), clause.begin, clause.begin+clause.size);
-		tldClauseVec.push_back(-condVarOrZero);
-		clauseBegin = tldClauseVec.data();
+		tldClauseVec = new std::vector<int>(clause.size+1);
+		for (int i = 0; i < clause.size; i++) tldClauseVec->at(i) = clause.begin[i];
+		tldClauseVec->at(clause.size) = -condVarOrZero;
+		clauseBegin = tldClauseVec->data();
 		clauseSize++;
 	}
 
 	// Add clause length to statistics
 	_hist_produced.increment(clauseSize);
 
-	bool success = false;
-
 	// Register clause in both process filter and solver filter
-	if (_process_filter.registerClause(clauseBegin, clauseSize) 
-			&& _solver_filters[solverId].registerClause(clauseBegin, clauseSize)) {
-		
-		// Sort and write clause into database if possible
-		std::sort(clauseBegin, clauseBegin+clauseSize);
-		Clause tldClause(clauseBegin, clauseSize, clauseSize == 1 ? 1 : (clauseSize == 2 ? 2 : clause.lbd));
-		auto result = _cdb.addClause(solverId, tldClause);
-		if (result == AdaptiveClauseDatabase::TRY_LATER) {
-			// copy and defer clause to insert at a later time
-			Clause copiedCls;
-			copiedCls.lbd = tldClause.lbd;
-			copiedCls.size = tldClause.size;
-			copiedCls.begin = (int*)malloc(sizeof(int) * tldClause.size);
-			memcpy(copiedCls.begin, tldClause.begin, sizeof(int) * tldClause.size);
-			_deferred_admitted_clauses[solverId].push_back(copiedCls);
-		} else if (result == AdaptiveClauseDatabase::DROP) {
-			// completely dropping the clause
-			_stats.clausesDroppedAtExport++;
-		} else {
-			// success
-			success = true;
-			_hist_admitted_to_db.increment(clauseSize);
-			if (solverStats) solverStats->producedClausesAdmitted++;
-		}
-	} else {
-		_stats.clausesFilteredAtExport++;
-		if (solverStats) solverStats->producedClausesFiltered++;
+	bool success = true;
+	if (!_solver_filters[solverId].registerClause(clauseBegin, clauseSize)) {
+		// Failed solver filter
+		_stats.clausesSolverFilteredAtExport++;
+		if (solverStats) solverStats->producedClausesSolverFiltered++;
+		success = false;
+	} else if (!_process_filter.registerClause(clauseBegin, clauseSize)) {
+		// Failed process filter
+		_stats.clausesProcessFilteredAtExport++;
+		if (solverStats) solverStats->producedClausesProcessFiltered++;
+		success = false;
 	}
+	if (!success) {
+		if (tldClauseVec) delete tldClauseVec;
+		return;
+	}
+	
+	// Sort and write clause into database if possible
+	success = false;
+	std::sort(clauseBegin, clauseBegin+clauseSize);
+	Clause tldClause(clauseBegin, clauseSize, clauseSize == 1 ? 1 : (clauseSize == 2 ? 2 : clause.lbd));
+	auto result = _cdb.addClause(solverId, tldClause);
+	if (result == AdaptiveClauseDatabase::TRY_LATER) {
+		// copy and defer clause to insert at a later time
+		_deferred_admitted_clauses[solverId].push_back(tldClause.copy());
+		_stats.clausesDeferredAtExport++;
+		if (solverStats) solverStats->producedClausesDeferred++;
+	} else if (result == AdaptiveClauseDatabase::DROP) {
+		// completely dropping the clause
+		_stats.clausesDroppedAtExport++;
+		if (solverStats) solverStats->producedClausesDropped++;
+		_hist_dropped_before_db.increment(clauseSize);
+	} else {
+		// success
+		success = true;
+		_hist_admitted_to_db.increment(clauseSize);
+		if (solverStats) solverStats->producedClausesAdmitted++;
+	}
+	if (tldClauseVec) delete tldClauseVec;
 
 	if (!success) return;
 	

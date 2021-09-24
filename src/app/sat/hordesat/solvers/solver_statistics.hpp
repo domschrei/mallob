@@ -5,6 +5,7 @@
 #include <string>
 
 struct SolvingStatistics {
+
 	unsigned long propagations = 0;
 	unsigned long decisions = 0;
 	unsigned long conflicts = 0;
@@ -13,12 +14,15 @@ struct SolvingStatistics {
 	
 	// clause export
 	unsigned long producedClauses = 0;
+	unsigned long producedClausesProcessFiltered = 0;
+	unsigned long producedClausesSolverFiltered = 0;
+	unsigned long producedClausesDeferred = 0;
 	unsigned long producedClausesAdmitted = 0;
-	unsigned long producedClausesFiltered = 0;
 	unsigned long producedClausesDropped = 0;
 
 	// clause import
 	unsigned long receivedClauses = 0;
+	unsigned long receivedClausesInserted = 0;
 	unsigned long receivedClausesFiltered = 0;
 	unsigned long deferredClauses = 0;
 	unsigned long digestedClauses = 0;
@@ -30,9 +34,11 @@ struct SolvingStatistics {
 			+ " cfs:" + std::to_string(conflicts)
 			+ " rst:" + std::to_string(restarts)
 			+ " prod:" + std::to_string(producedClauses)
-			+ " padmd:" + std::to_string(producedClausesAdmitted)
-			+ " pfltr:" + std::to_string(producedClausesFiltered)
-			+ " pdrpd:" + std::to_string(producedClausesDropped)
+			+ " admd:" + std::to_string(producedClausesAdmitted)
+			+ " pfltr:" + std::to_string(producedClausesProcessFiltered)
+			+ " sfltr:" + std::to_string(producedClausesSolverFiltered)
+			+ " pdefr:" + std::to_string(producedClausesDeferred)
+			+ " drpd:" + std::to_string(producedClausesDropped)
 			+ " recv:" + std::to_string(receivedClauses)
 			+ " rfltr:" + std::to_string(receivedClausesFiltered)
 			+ " digd:" + std::to_string(digestedClauses)
@@ -48,7 +54,8 @@ struct SolvingStatistics {
 		memPeak += other.memPeak;
 		producedClauses += other.producedClauses;
 		producedClausesAdmitted += other.producedClausesAdmitted;
-		producedClausesFiltered += other.producedClausesFiltered;
+		producedClausesProcessFiltered += other.producedClausesProcessFiltered;
+		producedClausesSolverFiltered += other.producedClausesSolverFiltered;
 		producedClausesDropped += other.producedClausesDropped;
 		receivedClauses += other.receivedClauses;
 		receivedClausesFiltered += other.receivedClausesFiltered;

@@ -74,6 +74,9 @@ Lingeling::Lingeling(const SolverSetup& setup)
 		
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
 	lglsetopt(solver, "bca", 0);
+
+	// Sync (i.e., export) unit clauses more frequently
+	lglsetopt(solver, "syncunint", 11111); // down from 111'111
 	
 	lastTermCallbackTime = Timer::elapsedSeconds();
 
@@ -122,7 +125,7 @@ void Lingeling::diversify(int seed) {
 	
 	lglsetopt(solver, "seed", seed);
 	int rank = getDiversificationIndex();
-	
+
 	// This method is based on Plingeling: OLD from ayv, NEW from bcj
 
 	lglsetopt(solver, "classify", 0); // NEW

@@ -61,6 +61,7 @@ protected:
 
 	ClauseHistogram _hist_produced;
 	ClauseHistogram _hist_admitted_to_db;
+	ClauseHistogram _hist_dropped_before_db;
 
 	SharingStatistics _stats;
 	std::vector<SolvingStatistics*> _solver_stats;

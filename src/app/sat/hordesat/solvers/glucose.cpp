@@ -63,12 +63,12 @@ void MGlucose::diversify(int seed) {
 
 	switch (rank % numDiversifications) {
 	case 0:
-		break; // default solver
-	case 1:
-		adaptStrategies = true;
-		break;
-	case 2:
 		use_simplification = false;
+		break;
+	case 1:
+		break; // default solver
+	case 2:
+		adaptStrategies = true;
 		break;
 	case 3: 
 		var_decay = 0.94;
@@ -274,33 +274,38 @@ void MGlucose::parallelExportUnaryClause(Glucose::Lit p) {
 }
 
 void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysis) {
-	
+	// Empty clause? Not handled here
 	if (c.size() == 0) return;
+
+	// discard clauses coming from the "DuringSearch" method
+	if (!fromConflictAnalysis) return;
+	if (c.wasImported()) return;
+
+	// The "exported" field has 2 bits so we cap it at 3 (where the clause 
+	// is no longer interesting for export).
+	c.setExported(std::min(3u, c.getExported() + 1));
+	assert(c.getExported() >= 1);
+	assert(c.getExported() <= 3);
+	
+	// Clause does not pass the hard quality limits? Discard.
+	if (c.size() > (int)_setup.hardMaxClauseLength || c.lbd() > hardMaxLbd) return;
+		
+	// A clause has "very good quality" iff it satisfies the *soft* limits
+	// (soft because they are not strict for exporting a clause).
+	bool veryGoodQuality = c.size() <= (int)_setup.softMaxClauseLength 
+						&& c.lbd() <= softMaxLbd;
+
+	// Accept the clause if seen for the 1st time with very good quality
+	// or if seen for the second time with normal quality.
+	bool accept = ((c.getExported() == 1 && veryGoodQuality) 
+				|| (c.getExported() == 2 && !veryGoodQuality));
+	if (!accept) return;
+
 	// unit clause
 	if (c.size() == 1) {
 		parallelExportUnaryClause(c[0]);
 		return;
 	}
-
-	// discard clauses coming from the "DuringSearch" method
-	if (!fromConflictAnalysis) return;
-
-	// decide whether to export the clause
-	bool accept = false;
-	// Export good clauses which are seen for the (at least) second time now
-	// Filtering by clause length and by duplicates is done elsewhere!
-	c.setExported(c.getExported() + 1);
-	if (!c.wasImported() && c.getExported() == 2) {
-		// Lenient check: only needs to pass "hard" limits on clause length & LBD
-		if (c.size() <= (int)_setup.hardMaxClauseLength && c.lbd() <= hardMaxLbd) {
-			accept = true;
-		}
-	}
-	// Export clause unconditionally if it passes the soft checks
-	accept = accept || (!c.wasImported() 
-			&& c.size() <= (int)_setup.softMaxClauseLength 
-			&& c.lbd() <= softMaxLbd);
-	if (!accept) return;
 	
 	// assemble clause
 	std::vector<int> vcls(c.size());
@@ -336,7 +341,7 @@ bool MGlucose::parallelImportClauses() {
 		// 0 means a broadcasted clause (good clause), 1 means a survivor clause, broadcasted
 		// 1: next time we see it in analyze, we share it (follow route / broadcast depending on the global strategy, part of an ongoing experimental stuff: a clause in one Watched will be set to exported 2 when promotted.
 		// 2: A broadcasted clause (or a survivor clause) do not share it anymore
-		ca[cr].setExported(0); 
+		ca[cr].setExported(2);
 		
 		//ca[cr].setImportedFrom(importedFromThread);
 		if(useUnaryWatched)

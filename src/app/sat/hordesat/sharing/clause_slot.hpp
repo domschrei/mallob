@@ -11,6 +11,7 @@
 #include "util/logger.hpp"
 #include "util/sys/atomics.hpp"
 #include "app/sat/hordesat/solvers/solver_statistics.hpp"
+#include "app/sat/hordesat/sharing/clause_histogram.hpp"
 
 // Possible states of a chunk of a clause slot.
 // A state s > 0 indicates that s threads are accessing the chunk.
@@ -77,6 +78,8 @@ private:
 
     int _clause_capacity_per_chunk;
 
+    ClauseHistogram* _hist_deleted = nullptr;
+
 public:
     ClauseSlot() {
         init(/*emptyList=*/true);
@@ -140,9 +143,8 @@ public:
 
     SlotResult insert(int producerId, const Clause& clause) {
         return insert(producerId, [producerId, &clause](Chunk& chunk) {
-            bool inserted = false;
             assert(chunk.data != nullptr);
-            inserted = chunk.data->insertClause(clause, producerId);
+            bool inserted = chunk.data->insertClause(clause, producerId);
             if (inserted) atomics::incrementRelaxed(chunk.numElems);
             return inserted;
         });
@@ -180,7 +182,7 @@ public:
             }
             if (numInserted > 0) 
                 chunk.numElems.fetch_add(numInserted, std::memory_order_relaxed);
-            stats.receivedClauses += numInserted;
+            stats.receivedClausesInserted += numInserted;
             return finished;
         });
 
@@ -216,8 +218,7 @@ public:
         for (auto it = fwdIterator(); !isEnd(it); ++it) {
             Chunk& chunk = *it;
 
-            bool full = isFull(chunk);
-            if (full) continue;
+            if (isFull(chunk)) continue;
 
             // Cannot access as a valid chunk?
             int actualState;
@@ -378,18 +379,20 @@ public:
                 someChunkBusy = true;
         }
 
+
         // Nothing found? Fail "spuriously" if some chunk was busy
         if (isEnd(it)) return someChunkBusy ? SPURIOUS_FAIL : TOTAL_FAIL;
 
         atomics::decrementRelaxed(_num_chunks);
         auto& chunk = *it;
+        int numElems = chunk.numElems.load(std::memory_order_acquire);
+        if (_hist_deleted) _hist_deleted->increase(_clause_size, numElems);
         data = (int*) chunk.data->releaseBuffer();
         delete chunk.data;
         chunk.data = nullptr;
         chunk.numElems.store(0, std::memory_order_relaxed);
         switchChunkState(chunk, SLOT_CHUNK_IN_DELETION, SLOT_CHUNK_INVALID, /*safeWithoutCompare=*/true);
         //log(V2_INFO, "CSL(%i,%i) -1: %i chunks\n", _clause_size, _lbd_value, (int)_num_chunks);
-
         return SUCCESS;
     }
 
@@ -404,6 +407,10 @@ public:
             out.push_back(chunk.state == SLOT_CHUNK_INVALID ? -1 : chunk.numElems.load(std::memory_order_relaxed));
         }
         return out;
+    }
+
+    void setDeletedClausesHistogram(ClauseHistogram& hist) {
+        _hist_deleted = &hist;
     }
 
 private:
@@ -435,9 +442,8 @@ private:
         // Swap sentinel with inserted chunk
         (--_chunks.end())->swap(*--(--_chunks.end()));
 
-        auto it = _chunks.begin(); ++it;
-        _list_head.store(it, std::memory_order_release);
-        it = _chunks.end(); --it;
+        // Update tail pointer
+        auto it = _chunks.end(); --it;
         _list_tail.store(it, std::memory_order_release);
 
         atomics::incrementRelaxed(_num_chunks);
@@ -502,6 +508,7 @@ private:
     bool isClauseCompatible(const Clause& c) {
         return c.size == _clause_size && (!_uniform_lbd_values || c.lbd == _lbd_value);
     }
+
 };
 
 #endif
