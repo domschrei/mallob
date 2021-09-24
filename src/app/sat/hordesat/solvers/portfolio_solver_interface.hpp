@@ -166,7 +166,7 @@ public:
 
 	// Within the solver, fetch a clause that was previously added as a learned clause.
 	bool fetchLearnedClause(Mallob::Clause& clauseOut, ImportBuffer::GetMode mode = ImportBuffer::ANY);
-	std::vector<int>& fetchLearnedUnitClauses();
+	std::vector<int> fetchLearnedUnitClauses();
 
 
 private:

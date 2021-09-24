@@ -19,6 +19,7 @@ namespace Mallob {
         Clause(int* begin, int size, int lbd) : begin(begin), size(size), lbd(lbd) {}
 
         Clause copy() const {
+            if (begin == nullptr) return Clause(nullptr, size, lbd);
             Clause c((int*)malloc(size*sizeof(int)), size, lbd);
             memcpy(c.begin, begin, size*sizeof(int));
             return c;

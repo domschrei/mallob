@@ -55,13 +55,16 @@ public:
     void bulkAdd(const std::vector<Mallob::Clause>& clauses, std::function<bool(const Mallob::Clause&)> conditional) {
         _stats.receivedClauses += clauses.size();
         addDeferredClauses();
+        //for (auto& c : clauses) add(c);
         _cdb.bulkAddClauses(0, clauses, _deferred, _stats, conditional);
     }
 
-    std::vector<int>& getUnitsBuffer() {
+    std::vector<int> getUnitsBuffer() {
         int numUnits = 0;
         auto buf = _cdb.exportBuffer(-1, numUnits, 1, 1);
         _plain_units_out = std::vector<int>(buf.data()+(buf.size()-numUnits), buf.data()+buf.size());
+        assert(_plain_units_out.size() == numUnits);
+        for (int i = 0; i < _plain_units_out.size(); i++) assert(_plain_units_out[i] != 0);
         _stats.digestedClauses += numUnits;
         return _plain_units_out;
     }

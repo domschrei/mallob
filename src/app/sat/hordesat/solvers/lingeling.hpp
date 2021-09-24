@@ -40,6 +40,7 @@ private:
 
 	// clause addition
 	std::vector<int> assumptions;
+	std::vector<int> unitsToAdd;
 
 	//MixedNonunitClauseRingBuffer learnedClauses;
 	//UnitClauseRingBuffer learnedUnits;

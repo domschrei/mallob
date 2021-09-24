@@ -68,12 +68,11 @@ Lingeling::Lingeling(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),
 		incremental(setup.doIncrementalSolving) {
 
-	//_logger.log(V4_VVER, "Local buffer sizes: %ld, %ld\n", learnedClauses.getCapacity(), learnedUnits.getCapacity());
-
 	solver = lglinit();
-		
+	
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
-	lglsetopt(solver, "bca", 0);
+	// TODO can you turn this off in incremental mode if all literals are frozen anyway?
+	lglsetopt(solver, "bca", 0); 
 
 	// Sync (i.e., export) unit clauses more frequently
 	lglsetopt(solver, "syncunint", 11111); // down from 111'111
@@ -99,12 +98,7 @@ Lingeling::Lingeling(const SolverSetup& setup)
 }
 
 void Lingeling::addLiteral(int lit) {
-	
-	if (lit == 0) {
-		lgladd(solver, 0);
-		return;
-	}
-	updateMaxVar(lit);
+	if (lit != 0) updateMaxVar(lit);
 	lgladd(solver, lit);
 }
 
@@ -237,7 +231,8 @@ void Lingeling::unsetSolverSuspend() {
 
 
 void Lingeling::doProduceUnit(int lit) {
-	Clause c{&lit, 1, 1};
+	assert(lit != 0);
+	Clause c(&lit, 1, 1);
 	numProduced++;
 	callback(c, getLocalId());
 }
@@ -246,7 +241,6 @@ void Lingeling::doProduce(int* cls, int glue) {
 	
 	// unit clause
 	if (cls[1] == 0) {
-		assert(cls[0] != 0);
 		doProduceUnit(cls[0]);
 		return;
 	}
@@ -264,16 +258,15 @@ void Lingeling::doProduce(int* cls, int glue) {
 	
 	// export clause
 	numProduced++;
-	callback(Clause{cls, size, glue}, getLocalId());
+	callback(Clause(cls, size, glue), getLocalId());
 }
 
 void Lingeling::doConsumeUnits(int** start, int** end) {
 
 	// Get as many unit clauses as possible
-	int numClauses = 0;
-	auto& units = fetchLearnedUnitClauses();
-	*start = units.data();
-	*end = units.data()+units.size();
+	unitsToAdd = fetchLearnedUnitClauses();
+	*start = unitsToAdd.data();
+	*end = unitsToAdd.data()+unitsToAdd.size();
 }
 
 void Lingeling::doConsume(int** clause, int* glue) {
@@ -282,7 +275,8 @@ void Lingeling::doConsume(int** clause, int* glue) {
 	Mallob::Clause c;
 	bool success = fetchLearnedClause(c, ImportBuffer::NONUNITS_ONLY);
 	if (!success) return;
-	
+
+	assert(c.size > 1);
 	//std::string str = "consume cls : ";
 	for (size_t i = 0; i < c.size; i++) {
 		int lit = c.begin[i];
@@ -290,7 +284,6 @@ void Lingeling::doConsume(int** clause, int* glue) {
 		assert(i == 0 || std::abs(lit) <= maxvar 
 			|| log_return_false("ERROR: tried to import lit %i (max. var: %i)!\n", lit, maxvar));
 	}
-	//_logger.log(V4_VVER, "%s\n", str.c_str());
 
 	*glue = c.lbd;
 	*clause = c.begin;

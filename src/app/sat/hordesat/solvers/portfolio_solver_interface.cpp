@@ -87,6 +87,6 @@ bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, Imp
 	return clauseOut.begin != nullptr;
 }
 
-std::vector<int>& PortfolioSolverInterface::fetchLearnedUnitClauses() {
+std::vector<int> PortfolioSolverInterface::fetchLearnedUnitClauses() {
 	return _import_buffer.getUnitsBuffer();
 }

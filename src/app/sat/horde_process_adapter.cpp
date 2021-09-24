@@ -82,7 +82,7 @@ void HordeProcessAdapter::doInitialize() {
 
     // Assemble c-style program arguments
     char* const* argv = _params.asCArgs("mallob_sat_process");
-    
+
     // FORK: Create a child process
     pid_t res = Process::createChild();
     if (res == 0) {

@@ -130,8 +130,8 @@ char* const* Parameters::asCArgs(const char* execName) const {
         i++;
     }
 
-    char* arg = (char*) malloc(strlen(execName) * sizeof(char));
-    strncpy(arg, execName, strlen(execName));
+    char* arg = (char*) malloc((strlen(execName)+1) * sizeof(char));
+    strncpy(arg, execName, strlen(execName)+1);
     argv[i] = arg;
     i++;
 

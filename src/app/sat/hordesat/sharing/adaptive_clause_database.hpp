@@ -216,7 +216,7 @@ public:
         // Remove trailing zeroes
         size_t lastNonzeroIdx = selection.size()-1;
         while (lastNonzeroIdx > 0 && selection[lastNonzeroIdx] == 0) lastNonzeroIdx--;
-        selection.resize(lastNonzeroIdx);
+        selection.resize(lastNonzeroIdx+1);
 
         // Write final hash checksum
         memcpy(selection.data(), &hash, sizeof(size_t));
