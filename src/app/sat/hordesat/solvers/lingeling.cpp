@@ -71,7 +71,7 @@ Lingeling::Lingeling(const SolverSetup& setup)
 	solver = lglinit();
 	
 	// BCA has to be disabled for valid clause sharing (or freeze all literals)
-	// TODO can you turn this off in incremental mode if all literals are frozen anyway?
+	// TODO can you omit this in incremental mode if all literals are frozen anyway?
 	lglsetopt(solver, "bca", 0); 
 
 	// Sync (i.e., export) unit clauses more frequently
@@ -267,6 +267,11 @@ void Lingeling::doConsumeUnits(int** start, int** end) {
 	unitsToAdd = fetchLearnedUnitClauses();
 	*start = unitsToAdd.data();
 	*end = unitsToAdd.data()+unitsToAdd.size();
+
+	for (int lit : unitsToAdd) {
+		assert(std::abs(lit) <= maxvar || 
+			log_return_false("ERROR: Tried to import unit clause %i (max. var: %i)!\n", lit, maxvar));
+	}
 }
 
 void Lingeling::doConsume(int** clause, int* glue) {

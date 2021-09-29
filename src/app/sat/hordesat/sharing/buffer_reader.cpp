@@ -15,6 +15,7 @@ BufferReader::BufferReader(int* buffer, int size, int maxLbdPartitionedSize, boo
     }
 
     _remaining_cls_of_bucket = _size <= numInts ? 0 : _buffer[numInts];
+    assert(_remaining_cls_of_bucket >= 0);
     _current_pos = numInts+1;
     _hash = 1;
 }
@@ -41,6 +42,7 @@ Mallob::Clause BufferReader::getNextIncomingClause() {
         // Go to next bucket
         _bucket.next(_max_lbd_partitioned_size);
         _remaining_cls_of_bucket = _buffer[_current_pos++];
+        assert(_remaining_cls_of_bucket >= 0);
     }
 
     if (_current_pos >= _size) {
@@ -76,6 +78,7 @@ Mallob::Clause BufferReader::getNextIncomingClause() {
         start++;
         stop++;
     }
+    assert(cls.lbd > 0);
     _current_pos = stop;
     _remaining_cls_of_bucket--;
 
