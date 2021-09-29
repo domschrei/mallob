@@ -33,6 +33,7 @@ private:
     HordeSharedMemory* _hsm;
     int* _export_buffer;
     int* _import_buffer;
+    int* _returned_buffer;
 
     int _last_imported_revision;
     int _desired_revision;
@@ -64,6 +65,7 @@ public:
             _export_buffer = (int*) accessMemory(_shmem_id + ".clauseexport", maxExportBufferSize);
             int maxImportBufferSize = _hsm->importBufferMaxSize * sizeof(int);
             _import_buffer = (int*) accessMemory(_shmem_id + ".clauseimport", maxImportBufferSize);
+            _returned_buffer = (int*) accessMemory(_shmem_id + ".returnedclauses", maxImportBufferSize);
         }
 
         // Import first revision
@@ -149,6 +151,14 @@ public:
                 _hsm->didImport = true;
             }
             if (!_hsm->doImport) _hsm->didImport = false;
+
+            // Re-insert returned clauses into the local clause database to be exported later
+            if (_hsm->doReturnClauses && !_hsm->didReturnClauses) {
+                _log.log(V5_DEBG, "DO return clauses\n");
+                _hlib.returnClauses(_returned_buffer, _hsm->returnedBufferSize);
+                _hsm->didReturnClauses = true;
+            }
+            if (!_hsm->doReturnClauses) _hsm->didReturnClauses = false;
 
             // Check initialization state
             if (!_hsm->isInitialized && _hlib.isFullyInitialized()) {

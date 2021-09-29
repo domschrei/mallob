@@ -69,7 +69,9 @@ private:
 
     int* _export_buffer;
     int* _import_buffer;
+    int* _returned_buffer;
     std::list<std::pair<std::vector<int>, Checksum>> _temp_clause_buffers;
+    std::list<std::vector<int>> _temp_returned_clauses;
 
     pid_t _child_pid = -1;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
@@ -103,6 +105,7 @@ public:
     bool hasCollectedClauses();
     std::vector<int> getCollectedClauses(Checksum& checksum);
     void digestClauses(const std::vector<int>& clauses, const Checksum& checksum);
+    void returnClauses(const std::vector<int>& clauses);
 
     void dumpStats();
     
@@ -119,6 +122,7 @@ private:
 
     void applySolvingState();
     void doDigest(const std::vector<int>& clauses, const Checksum& checksum);
+    void doReturnClauses(const std::vector<int>& clauses);
     void initSharedMemory(HordeConfig&& config);
     void* createSharedMemoryBlock(std::string shmemSubId, size_t size, void* data);
 

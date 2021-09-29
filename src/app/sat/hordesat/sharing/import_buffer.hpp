@@ -3,6 +3,7 @@
 #define DOMPASCH_MALLOB_IMPORT_BUFFER_HPP
 
 #include <vector>
+#include <list>
 
 #include "adaptive_clause_database.hpp"
 #include "app/sat/hordesat/solvers/solver_setup.hpp"
@@ -12,7 +13,7 @@ class ImportBuffer {
 private:
     SolvingStatistics& _stats;
     AdaptiveClauseDatabase _cdb;
-    std::vector<Mallob::Clause> _deferred;
+    std::list<Mallob::Clause> _deferred;
 
     std::vector<int> _ready_to_import_buffer;
 	BufferReader _ready_to_import_reader;
@@ -72,6 +73,7 @@ public:
         assert(_plain_units_out.size() == numUnits);
         for (int i = 0; i < _plain_units_out.size(); i++) assert(_plain_units_out[i] != 0);
         _stats.digestedClauses += numUnits;
+        _stats.histDigested->increase(1, numUnits);
         return _plain_units_out;
     }
 
@@ -102,14 +104,17 @@ public:
         
         _ready_to_import_reader = _cdb.getBufferReader(_ready_to_import_buffer.data(), _ready_to_import_buffer.size());
         _clause_out = _ready_to_import_reader.getNextIncomingClause();
-        if (_clause_out.begin != nullptr) _stats.digestedClauses++;
+        if (_clause_out.begin != nullptr) {
+            _stats.digestedClauses++;
+            _stats.histDigested->increment(_clause_out.size);
+        }
         return _clause_out;
     }
 
 private:
     void addDeferredClauses() {
         if (_deferred.empty()) return;
-        auto copiedVec = std::move(_deferred);
+        std::vector<Mallob::Clause> copiedVec(_deferred.begin(), _deferred.end());
         _deferred.clear();
         log(V2_INFO, "bulk add deferred cls, size %i\n", copiedVec.size());
         _cdb.bulkAddClauses(0, copiedVec, _deferred, _stats);

@@ -4,6 +4,8 @@
 
 #include <string>
 
+#include "app/sat/hordesat/sharing/clause_histogram.hpp"
+
 struct SolvingStatistics {
 
 	unsigned long propagations = 0;
@@ -13,6 +15,7 @@ struct SolvingStatistics {
 	double memPeak = 0;
 	
 	// clause export
+	ClauseHistogram* histProduced;
 	unsigned long producedClauses = 0;
 	unsigned long producedClausesProcessFiltered = 0;
 	unsigned long producedClausesSolverFiltered = 0;
@@ -21,6 +24,7 @@ struct SolvingStatistics {
 	unsigned long producedClausesDropped = 0;
 
 	// clause import
+	ClauseHistogram* histDigested;
 	unsigned long receivedClauses = 0;
 	unsigned long receivedClausesInserted = 0;
 	unsigned long receivedClausesFiltered = 0;

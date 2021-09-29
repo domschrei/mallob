@@ -284,17 +284,27 @@ void HordeLib::digestSharing(int* begin, int size, const Checksum& checksum) {
 	_sharing_manager->digestSharing(begin, size);
 }
 
+void HordeLib::returnClauses(int* begin, int size) {
+	if (isCleanedUp()) return;
+	_sharing_manager->returnClauses(begin, size);
+}
+
 void HordeLib::dumpStats(bool final) {
 	if (isCleanedUp() || !isFullyInitialized()) return;
 
-	int verb = final ? V3_VERB : V4_VVER;
+	int verb = final ? V2_INFO : V3_VERB;
 
 	// Solver statistics
 	SolvingStatistics solveStats;
 	for (size_t i = 0; i < _num_solvers; i++) {
 		SolvingStatistics st = _solver_interfaces[i]->getSolverStats();
+		int globalId = _solver_interfaces[i]->getGlobalId();
 		_logger.log(verb, "%sS%d %s\n",
-				final ? "END " : "", _solver_interfaces[i]->getGlobalId(), st.getReport().c_str());
+				final ? "END " : "", globalId, st.getReport().c_str());
+		_logger.log(verb, "%sS%d clenhist prod %s\n",
+				final ? "END " : "", globalId, st.histProduced->getReport().c_str());
+		_logger.log(verb, "%sS%d clenhist digd %s\n",
+				final ? "END " : "", globalId, st.histDigested->getReport().c_str());
 		solveStats.aggregate(st);
 	}
 	_logger.log(verb, "%s%s\n", final ? "END " : "", solveStats.getReport().c_str());
@@ -306,10 +316,11 @@ void HordeLib::dumpStats(bool final) {
 
 	if (final) {
 		// Histogram over clause lengths (do not print trailing zeroes)
-		_logger.log(V3_VERB, "clenhist prod %s\n", shareStats.histProduced->getReport().c_str());
-		_logger.log(V3_VERB, "clenhist admt %s\n", shareStats.histAdmittedToDb->getReport().c_str());
-		_logger.log(V3_VERB, "clenhist drpd %s\n", shareStats.histDroppedBeforeDb->getReport().c_str());
-		_logger.log(V3_VERB, "clenhist dltd %s\n", shareStats.histDeletedInSlots->getReport().c_str());
+		_logger.log(verb, "clenhist prod %s\n", shareStats.histProduced->getReport().c_str());
+		_logger.log(verb, "clenhist admt %s\n", shareStats.histAdmittedToDb->getReport().c_str());
+		_logger.log(verb, "clenhist drpd %s\n", shareStats.histDroppedBeforeDb->getReport().c_str());
+		_logger.log(verb, "clenhist dltd %s\n", shareStats.histDeletedInSlots->getReport().c_str());
+		_logger.log(verb, "clenhist retd %s\n", shareStats.histReturnedToDb->getReport().c_str());
 
 		// Flush logs
 		for (auto& solver : _solver_interfaces) solver->getLogger().flush();

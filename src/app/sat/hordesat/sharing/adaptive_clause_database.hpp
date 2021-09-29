@@ -2,6 +2,8 @@
 #ifndef DOMPASCH_MALLOB_WAITFREE_CLAUSE_DATABASE_HPP
 #define DOMPASCH_MALLOB_WAITFREE_CLAUSE_DATABASE_HPP
 
+#include <list>
+
 #include "clause_slot.hpp"
 #include "chunk_manager.hpp"
 #include "bucket_label.hpp"
@@ -85,7 +87,7 @@ public:
         return DROP; // total failure
     }
 
-    void bulkAddClauses(int producerId, const std::vector<Clause>& clauses, std::vector<Clause>& deferredOut, SolvingStatistics& stats,
+    void bulkAddClauses(int producerId, const std::vector<Clause>& clauses, std::list<Clause>& deferredOut, SolvingStatistics& stats,
             std::function<bool(const Clause& c)> conditional = [](const Clause&) {return true;}) {
 
         const Clause* cPtr = clauses.data();

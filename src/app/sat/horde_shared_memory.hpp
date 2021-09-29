@@ -21,6 +21,7 @@ struct HordeSharedMemory {
     bool doBegin;
     bool doExport;
     bool doImport;
+    bool doReturnClauses;
     bool doDumpStats;
     bool doStartNextRevision;
     bool doTerminate;
@@ -28,6 +29,7 @@ struct HordeSharedMemory {
     // Responses child->parent
     bool didExport;
     bool didImport;
+    bool didReturnClauses;
     bool didDumpStats;
     bool didStartNextRevision;
     bool didTerminate;
@@ -43,6 +45,7 @@ struct HordeSharedMemory {
     int importBufferMaxSize;
     int importBufferSize;
     int importBufferRevision;
+    int returnedBufferSize;
     Checksum importChecksum;
     
     // Clause buffers: child->parent

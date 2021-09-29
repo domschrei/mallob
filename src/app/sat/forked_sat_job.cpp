@@ -202,6 +202,10 @@ void ForkedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& chec
         log(V3_VERB, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
     }
 }
+void ForkedSatJob::returnClauses(std::vector<int>& clauses) {
+    if (!_initialized) return;
+    _solver->returnClauses(clauses);
+}
 
 void ForkedSatJob::startDestructThreadIfNecessary() {
     // Ensure concurrent destruction of shared memory

@@ -64,6 +64,7 @@ public:
     bool hasPreparedSharing() override;
     std::vector<int> getPreparedClauses(Checksum& checksum) override;
     void digestSharing(std::vector<int>& clauses, const Checksum& checksum) override;
+    void returnClauses(std::vector<int>& clauses) override;
 
 private:
     void doStartSolver();

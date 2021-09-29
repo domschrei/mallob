@@ -26,7 +26,9 @@ private:
 
     LockfreeClauseDatabase _cdb;
     ClauseHistory _cls_history;
+
     std::vector<std::vector<int>> _clause_buffers;
+    std::vector<int> _excess_clauses_from_merge;
     int _num_aggregated_nodes;
     int _current_epoch = 0;
 

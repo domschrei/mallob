@@ -39,6 +39,9 @@ protected:
 	// clause export
 	std::vector<std::list<Clause>> _deferred_admitted_clauses;
 
+	SolvingStatistics _returned_clauses_stats;
+	std::list<Clause> _deferred_returned_clauses;
+
 	// clause importing / digestion
 	struct DeferredClauseList {
 		int revision;
@@ -62,6 +65,7 @@ protected:
 	ClauseHistogram _hist_produced;
 	ClauseHistogram _hist_admitted_to_db;
 	ClauseHistogram _hist_dropped_before_db;
+	ClauseHistogram _hist_returned_to_db;
 
 	SharingStatistics _stats;
 	std::vector<SolvingStatistics*> _solver_stats;
@@ -72,16 +76,19 @@ public:
 	DefaultSharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
 			const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver,
 			int jobIndex);
-    int prepareSharing(int* begin, int maxSize);
-    void digestSharing(std::vector<int>& result);
-	void digestSharing(int* begin, int buflen);
-	SharingStatistics getStatistics();
 	~DefaultSharingManager() = default;
 
-	void stopClauseImport(int solverId) override;
-	void continueClauseImport(int solverId) override;
+    int prepareSharing(int* begin, int maxSize);
+    void returnClauses(int* begin, int buflen);
+
+	void digestSharing(std::vector<int>& result);
+	void digestSharing(int* begin, int buflen);
+
+	SharingStatistics getStatistics();
 
 	void setRevision(int revision) override {_current_revision = revision;}
+	void stopClauseImport(int solverId) override;
+	void continueClauseImport(int solverId) override;
 
 private:
 	void processClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero);
@@ -91,8 +98,9 @@ private:
 		};
 	};
 
-	bool addDeferredClause(int solverId, const Clause& c);
+	void tryReinsertDeferredClauses(int solverId, std::list<Clause>& clauses, SolvingStatistics* stats);
 	void digestDeferredFutureClauses();
+
 
 };
 

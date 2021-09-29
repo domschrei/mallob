@@ -45,6 +45,7 @@ void HordeProcessAdapter::doInitialize() {
     _hsm->doBegin = false;
     _hsm->doExport = false;
     _hsm->doImport = false;
+    _hsm->doReturnClauses = false;
     _hsm->doDumpStats = false;
     _hsm->doStartNextRevision = false;
     _hsm->doTerminate = false;
@@ -52,6 +53,7 @@ void HordeProcessAdapter::doInitialize() {
     _hsm->importBufferSize = 0;
     _hsm->didExport = false;
     _hsm->didImport = false;
+    _hsm->didReturnClauses = false;
     _hsm->didDumpStats = false;
     _hsm->didStartNextRevision = false;
     _hsm->didTerminate = false;
@@ -73,6 +75,8 @@ void HordeProcessAdapter::doInitialize() {
         MyMpi::ALL
     ) + 1024;
     _import_buffer = (int*) createSharedMemoryBlock("clauseimport", 
+            sizeof(int)*_hsm->importBufferMaxSize, nullptr);
+    _returned_buffer = (int*) createSharedMemoryBlock("returnedclauses",
             sizeof(int)*_hsm->importBufferMaxSize, nullptr);
 
     // Allocate shared memory for formula, assumptions of initial revision
@@ -226,6 +230,23 @@ void HordeProcessAdapter::doDigest(const std::vector<int>& clauses, const Checks
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 
+void HordeProcessAdapter::returnClauses(const std::vector<int>& clauses) {
+    if (!_initialized) return;
+    if (_hsm->doReturnClauses) {
+        // Cannot return right now: defer
+        _temp_returned_clauses.push_back(clauses);
+        return;
+    }
+    doReturnClauses(clauses);
+}
+
+void HordeProcessAdapter::doReturnClauses(const std::vector<int>& clauses) {
+    _hsm->returnedBufferSize = clauses.size();
+    memcpy(_returned_buffer, clauses.data(), clauses.size()*sizeof(int));
+    _hsm->doReturnClauses = true;
+    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
+}
+
 void HordeProcessAdapter::dumpStats() {
     if (!_initialized) return;
     _hsm->doDumpStats = true;
@@ -246,6 +267,7 @@ HordeProcessAdapter::SubprocessStatus HordeProcessAdapter::check() {
     startBackgroundWriterIfNecessary();
 
     if (_hsm->didImport)            _hsm->doImport            = false;
+    if (_hsm->didReturnClauses)     _hsm->doReturnClauses     = false;
     if (_hsm->didStartNextRevision) _hsm->doStartNextRevision = false;
     if (_hsm->didDumpStats)         _hsm->doDumpStats         = false;
 
@@ -262,6 +284,11 @@ HordeProcessAdapter::SubprocessStatus HordeProcessAdapter::check() {
         // Digest next clause buffer from intermediate storage
         doDigest(_temp_clause_buffers.front().first, _temp_clause_buffers.front().second);
         _temp_clause_buffers.erase(_temp_clause_buffers.begin());
+    }
+
+    if (!_hsm->doReturnClauses && !_hsm->didReturnClauses && !_temp_returned_clauses.empty()) {
+        doReturnClauses(_temp_returned_clauses.front());
+        _temp_returned_clauses.erase(_temp_returned_clauses.begin());
     }
     
     if (_hsm->hasSolution) return _hsm->solutionRevision == _desired_revision ? FOUND_RESULT : NORMAL;

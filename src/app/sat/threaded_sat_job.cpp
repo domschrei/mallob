@@ -192,6 +192,10 @@ void ThreadedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& ch
     }
 }
 
+void ThreadedSatJob::returnClauses(std::vector<int>& clauses) {
+    _solver->returnClauses(clauses.data(), clauses.size());
+}
+
 ThreadedSatJob::~ThreadedSatJob() {
     if (!_initialized) return;
     log(V5_DEBG, "%s : enter TSJ destructor\n", toStr());

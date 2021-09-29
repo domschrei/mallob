@@ -24,15 +24,17 @@ DefaultSharingManager::DefaultSharingManager(
 		/*maxLbdPartitionedSize=*/_params.maxLbdPartitioningSize(),
 		/*baseBufferSize=*/_params.clauseBufferBaseSize(),
 		/*numChunks=*/_params.numChunksForExport(),
-		/*numProducers=*/_solvers.size()
+		/*numProducers=*/_solvers.size()+1
 	), _hist_produced(params.hardMaxClauseLength()), 
 	_hist_admitted_to_db(params.hardMaxClauseLength()), 
-	_hist_dropped_before_db(params.hardMaxClauseLength()) {
+	_hist_dropped_before_db(params.hardMaxClauseLength()),
+	_hist_returned_to_db(params.hardMaxClauseLength()) {
 
 	_stats.histProduced = &_hist_produced;
 	_stats.histAdmittedToDb = &_hist_admitted_to_db;
 	_stats.histDroppedBeforeDb = &_hist_dropped_before_db;
 	_stats.histDeletedInSlots = &_cdb.getDeletedClausesHistogram();
+	_stats.histReturnedToDb = &_hist_returned_to_db;
 
 	auto callback = getCallback();
 	
@@ -179,7 +181,10 @@ void DefaultSharingManager::digestDeferredFutureClauses() {
 void DefaultSharingManager::processClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero) {
 	
 	auto& solverStats = _solver_stats[solverId];
-	if (solverStats) solverStats->producedClauses++;
+	if (solverStats) {
+		solverStats->producedClauses++;
+		solverStats->histProduced->increment(clause.size);
+	}
 	
 	if (_solver_revisions[solverId] != solverRevision) return;
 
@@ -254,7 +259,30 @@ void DefaultSharingManager::processClause(int solverId, int solverRevision, cons
 	if (!success) return;
 	
 	// If just successfully inserted a clause, also try to insert earlier deferred clauses
-	auto& clauseList = _deferred_admitted_clauses[solverId];
+	tryReinsertDeferredClauses(solverId, _deferred_admitted_clauses[solverId], solverStats);
+}
+
+void DefaultSharingManager::returnClauses(int* begin, int buflen) {
+
+	tryReinsertDeferredClauses(_solvers.size(), _deferred_returned_clauses, &_returned_clauses_stats);
+
+	// Convert to clause vector
+	auto reader = _cdb.getBufferReader(begin, buflen);
+	std::vector<Clause> clauseVec;
+	auto c = reader.getNextIncomingClause();
+	while (c.begin != nullptr) {
+		_hist_returned_to_db.increment(c.size);
+		clauseVec.push_back(c);
+		c = reader.getNextIncomingClause();
+	}
+
+	// Add clauses to clause database
+	_cdb.bulkAddClauses(_solvers.size(), clauseVec, _deferred_returned_clauses, _returned_clauses_stats, [&](const Clause& c) {
+		return _process_filter.registerClause(c.begin, c.size);
+	});
+}
+
+void DefaultSharingManager::tryReinsertDeferredClauses(int solverId, std::list<Clause>& clauseList, SolvingStatistics* stats) {
 	for (auto it = clauseList.begin(); it != clauseList.end(); ++it) {
 		Clause& c = *it;
 		auto result = _cdb.addClause(solverId, c);
@@ -263,11 +291,11 @@ void DefaultSharingManager::processClause(int solverId, int solverRevision, cons
 		if (result == AdaptiveClauseDatabase::DROP) {
 			// completely dropping the clause
 			_stats.clausesDroppedAtExport++;
-			if (solverStats) solverStats->producedClausesDropped++;
+			if (stats) stats->producedClausesDropped++;
 		}
 		if (result == AdaptiveClauseDatabase::SUCCESS) {
-			_hist_admitted_to_db.increment(clauseSize);
-			if (solverStats) solverStats->producedClausesAdmitted++;
+			_hist_admitted_to_db.increment(c.size);
+			if (stats) stats->producedClausesAdmitted++;
 		}
 		// clause admitted or discarded: free malloc'd clause
 		free(c.begin);

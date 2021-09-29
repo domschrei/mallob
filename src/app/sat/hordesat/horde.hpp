@@ -65,6 +65,7 @@ public:
     int prepareSharing(int* begin, int maxSize, Checksum& checksum);
     void digestSharing(std::vector<int>& result, const Checksum& checksum);
 	void digestSharing(int* begin, int size, const Checksum& checksum);
+	void returnClauses(int* begin, int size);
 
     void setPaused();
     void unsetPaused();

@@ -23,6 +23,7 @@ struct SharingStatistics {
 	ClauseHistogram* histAdmittedToDb;
 	ClauseHistogram* histDroppedBeforeDb;
 	ClauseHistogram* histDeletedInSlots;
+	ClauseHistogram* histReturnedToDb;
 
 	std::string getReport() const {
 		unsigned long failedExported = clausesProcessFilteredAtExport + clausesSolverFilteredAtExport + clausesDroppedAtExport;
@@ -45,6 +46,7 @@ public:
 	virtual int prepareSharing(int* begin, int maxSize) = 0;
     virtual void digestSharing(std::vector<int>& result) = 0;
     virtual void digestSharing(int* begin, int size) = 0;
+	virtual void returnClauses(int* begin, int buflen) = 0;
 
     virtual SharingStatistics getStatistics() = 0;
 	virtual ~SharingManagerInterface() {};

@@ -150,12 +150,13 @@ public:
         });
     }
 
-    void insert(int producerId, const Clause*& begin, const Clause* end, std::vector<Clause>& deferred,
+    void insert(int producerId, const Clause*& begin, const Clause* end, std::list<Clause>& deferred,
             SolvingStatistics& stats,
             std::function<bool(const Clause& c)> conditional = [](const Clause&) {return true;}) {
         
         const Clause* cPtr = begin;
-        auto result = insert(producerId, [this, producerId, &cPtr, end, conditional, &stats](Chunk& chunk) {
+        bool isClauseAdmitted = false;
+        auto result = insert(producerId, [this, &isClauseAdmitted, producerId, &cPtr, end, conditional, &stats](Chunk& chunk) {
             int numInserted = 0;
             bool finished = false;
             while (cPtr != end) {
@@ -173,12 +174,16 @@ public:
                     cPtr++;
                     continue; // skip this clause - condition not met
                 }
+                // Remember that this clause was admitted if it is not inserted
+                isClauseAdmitted = true; 
                 
                 // cannot insert: buffer full -> give up.
                 if (!chunk.data->insertClause(c, producerId)) break;
                 
+                // Clause successfully inserted
                 numInserted++;
                 cPtr++;
+                isClauseAdmitted = false;
             }
             if (numInserted > 0) 
                 chunk.numElems.fetch_add(numInserted, std::memory_order_relaxed);
@@ -192,7 +197,10 @@ public:
             
             // Compatible clause did not make it: not entirely successful
             assert(result != SUCCESS);
-            if (conditional(*cPtr)) {
+
+            // Check if clause was already admitted before
+            bool admitted = isClauseAdmitted || conditional(*cPtr);
+            if (admitted) {
                 if (result == SPURIOUS_FAIL) {
                     // Spurious failure: defer clause
                     deferred.push_back(cPtr->copy());
@@ -203,7 +211,9 @@ public:
                     stats.discardedClauses++;
                 }
             } else stats.receivedClausesFiltered++;
+            
             cPtr++;
+            isClauseAdmitted = false;
         }
         
         begin = cPtr;

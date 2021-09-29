@@ -60,6 +60,7 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
 }
 
 size_t AnytimeSatClauseCommunicator::getBufferLimit(int numAggregatedNodes, MyMpi::BufferQueryMode mode) {
+    if (mode == MyMpi::SELF) return _clause_buf_base_size;
     return MyMpi::getBinaryTreeBufferLimit(numAggregatedNodes, _clause_buf_base_size, _clause_buf_discount_factor, mode);
 }
 
@@ -229,6 +230,13 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     std::vector<int> vec = merge(totalSize);
     //testConsistency(vec, totalSize, /*sortByLbd=*/false);
 
+    // Some clauses may have been left behind during merge
+    if (_excess_clauses_from_merge.size() > sizeof(size_t)/sizeof(int)) {
+        // Add them as produced clauses to your local solver
+        // so that they can be re-exported (if they are good enough)
+        _job->returnClauses(_excess_clauses_from_merge);
+    }
+
     // Reset clause buffers
     _clause_buffers.clear();
     return vec;
@@ -242,7 +250,7 @@ std::vector<int> AnytimeSatClauseCommunicator::merge(size_t maxSize) {
     auto merger = _cdb.getBufferMerger();
     for (auto& buffer : _clause_buffers) 
         merger.add(_cdb.getBufferReader(buffer.data(), buffer.size()));
-    return merger.merge(maxSize);
+    return merger.merge(maxSize, &_excess_clauses_from_merge);
 }
 
 bool AnytimeSatClauseCommunicator::testConsistency(std::vector<int>& buffer, size_t maxSize, bool sortByLbd) {

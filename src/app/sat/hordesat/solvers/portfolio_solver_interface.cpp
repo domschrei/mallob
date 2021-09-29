@@ -43,6 +43,8 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 		  _import_buffer(setup, _stats) {
 	updateTimer(_job_name);
 	_global_name = "<h-" + _job_name + "_S" + std::to_string(_global_id) + ">";
+	_stats.histProduced = new ClauseHistogram(setup.hardMaxClauseLength);
+	_stats.histDigested = new ClauseHistogram(setup.hardMaxClauseLength);
 }
 
 void PortfolioSolverInterface::interrupt() {
