@@ -154,15 +154,15 @@ bool ForkedSatJob::checkClauseComm() {
 bool ForkedSatJob::appl_wantsToBeginCommunication() {
     if (!_initialized || getState() != ACTIVE || _job_comm_period <= 0) return false;
     if (!checkClauseComm()) return false;
-    // Special "timed" conditions for leaf nodes:
-    if (getJobTree().isLeaf()) {
-        // At least half a second since initialization / reactivation
-        if (getAgeSinceActivation() < 0.5 * _job_comm_period) return false;
-        // At least params["s"] seconds since last communication 
-        if (Timer::elapsedSeconds()-_time_of_last_comm < _job_comm_period) return false;
-    }
+    // Special "timed" condition: At least X seconds since last communication 
+    if (Timer::elapsedSeconds()-_time_of_last_comm < _job_comm_period) return false;
+    // Time has come: Prepare a new buffer of clauses
     bool wants = ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses();
-    return wants;
+    if (getJobTree().isLeaf()) {
+        // Leaf node: At least half a second since initialization / reactivation
+        return wants && (getAgeSinceActivation() >= 0.5 * _job_comm_period);
+    }
+    return false; // non-leaves do not begin the communication on their own
 }
 
 void ForkedSatJob::appl_beginCommunication() {
@@ -170,7 +170,6 @@ void ForkedSatJob::appl_beginCommunication() {
     if (!checkClauseComm()) return;
     log(V5_DEBG, "begincomm\n");
     ((AnytimeSatClauseCommunicator*) _clause_comm)->sendClausesToParent();
-    if (getJobTree().isLeaf()) _time_of_last_comm = Timer::elapsedSeconds();
 }
 
 void ForkedSatJob::appl_communicate(int source, JobMessage& msg) {
@@ -193,6 +192,7 @@ bool ForkedSatJob::hasPreparedSharing() {
 }
 std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum) {
     if (!_initialized) return std::vector<int>();
+    _time_of_last_comm = Timer::elapsedSeconds();
     return _solver->getCollectedClauses(checksum);
 }
 void ForkedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& checksum) {

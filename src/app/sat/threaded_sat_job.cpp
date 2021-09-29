@@ -142,15 +142,14 @@ bool ThreadedSatJob::appl_isDestructible() {
 
 bool ThreadedSatJob::appl_wantsToBeginCommunication() {
     if (!_initialized || getState() != ACTIVE || _job_comm_period <= 0) return false;
-    // Special "timed" conditions for leaf nodes:
+    // At least X seconds since last communication 
+    if (Timer::elapsedSeconds()-_time_of_last_comm < _job_comm_period) return false;
+    bool wants = ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses();
     if (getJobTree().isLeaf()) {
         // At least half a second since initialization / reactivation
-        if (getAgeSinceActivation() < 0.5 * _job_comm_period) return false;
-        // At least params["s"] seconds since last communication 
-        if (Timer::elapsedSeconds()-_time_of_last_comm < _job_comm_period) return false;
+        return wants && (getAgeSinceActivation() < 0.5 * _job_comm_period);
     }
-    bool wants = ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses();
-    return wants;
+    return false;
 }
 
 void ThreadedSatJob::appl_beginCommunication() {

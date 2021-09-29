@@ -192,6 +192,7 @@ void HordeProcessAdapter::applySolvingState() {
 
 void HordeProcessAdapter::collectClauses(int maxSize) {
     if (!_initialized) return;
+    if (_hsm->doExport) return;
     _hsm->exportBufferMaxSize = maxSize;
     _hsm->doExport = true;
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);

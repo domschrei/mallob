@@ -67,16 +67,18 @@ size_t AnytimeSatClauseCommunicator::getBufferLimit(int numAggregatedNodes, MyMp
 bool AnytimeSatClauseCommunicator::canSendClauses() {
     if (!_initialized || _job->getState() != ACTIVE) return false;
 
+    // Prepare sharing: "Order" a buffer of clauses from the solver engine
+    if (!_job->hasPreparedSharing()) {
+        int limit = getBufferLimit(_num_aggregated_nodes+1, MyMpi::SELF);
+        _job->prepareSharing(limit);
+    }
+
     size_t numChildren = 0;
     // Must have received clauses from each existing children
     if (_job->getJobTree().hasLeftChild()) numChildren++;
     if (_job->getJobTree().hasRightChild()) numChildren++;
 
     if (_clause_buffers.size() >= numChildren) {
-        if (!_job->hasPreparedSharing()) {
-            int limit = getBufferLimit(_num_aggregated_nodes+1, MyMpi::SELF);
-            _job->prepareSharing(limit);
-        }
         if (_job->hasPreparedSharing()) {
             return true;
         }
