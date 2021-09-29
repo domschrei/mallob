@@ -280,17 +280,22 @@ void Lingeling::doConsume(int** clause, int* glue) {
 	bool success = fetchLearnedClause(c, ImportBuffer::NONUNITS_ONLY);
 	if (!success) return;
 
+	// Assemble a zero-terminated array of all the literals
+	// (and keep it as a member until this function is called for the next time)
 	assert(c.size > 1);
+	zeroTerminatedClause.resize(c.size+1);
 	//std::string str = "consume cls : ";
 	for (size_t i = 0; i < c.size; i++) {
 		int lit = c.begin[i];
 		//str += std::to_string(lit) + " ";
 		assert(i == 0 || std::abs(lit) <= maxvar 
 			|| log_return_false("ERROR: tried to import lit %i (max. var: %i)!\n", lit, maxvar));
+		zeroTerminatedClause[i] = lit;
 	}
+	zeroTerminatedClause[c.size] = 0;
 
 	*glue = c.lbd;
-	*clause = c.begin;
+	*clause = zeroTerminatedClause.data();
 }
 
 void Lingeling::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
