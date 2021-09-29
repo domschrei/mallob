@@ -197,7 +197,6 @@ SatResult Lingeling::solve(size_t numAssumptions, const int* assumptions) {
 	// set the assumptions
 	this->assumptions.clear();
 	for (size_t i = 0; i < numAssumptions; i++) {
-		// freezing problems
 		int lit = assumptions[i];
 		updateMaxVar(lit);
 		lglassume(solver, lit);

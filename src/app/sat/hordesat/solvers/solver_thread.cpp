@@ -197,8 +197,10 @@ void SolverThread::appendRevision(int revision, size_t fSize, const int* fLits, 
         _found_result = false;
         assert(_latest_revision+1 == (int)_pending_formulae.size() 
             || log_return_false("%i != %i", _latest_revision+1, _pending_formulae.size()));
-        _solver.interrupt();
-        _interrupted = true;
+        if (revision > 0) {
+            _solver.interrupt();
+            _interrupted = true;
+        }
     }
     _state_cond.notify();
 }

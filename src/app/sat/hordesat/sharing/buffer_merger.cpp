@@ -56,12 +56,10 @@ std::vector<int> BufferMerger::merge(int sizeLimit, std::vector<int>* excessClau
         while (mergeRound(*excessClauses, INT32_MAX)) {}
         memcpy(excessClauses->data(), &_hash, sizeof(size_t));
 
-        /*
         // Remove trailing zeroes
         size_t lastNonzeroIdx = excessClauses->size()-1;
         while (lastNonzeroIdx > 0 && excessClauses->at(lastNonzeroIdx) == 0) lastNonzeroIdx--;
         excessClauses->resize(lastNonzeroIdx+1);
-        */
     }
 
     return out;
