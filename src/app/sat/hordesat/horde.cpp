@@ -82,6 +82,8 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 	setup.anticipatedLitsToImportPerCycle = config.maxBroadcastedLitsPerCycle;
 	setup.hasPseudoincrementalSolvers = setup.isJobIncremental && hasPseudoincrementalSolvers;
 	setup.solverRevision = 0;
+	setup.minNumChunksPerSolver = params.minNumChunksForImportPerSolver();
+	setup.numBufferedClsGenerations = params.bufferedImportedClsGenerations();
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;

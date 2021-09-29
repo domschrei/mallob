@@ -23,7 +23,7 @@ DefaultSharingManager::DefaultSharingManager(
 		/*maxClauseSize=*/_params.hardMaxClauseLength(),
 		/*maxLbdPartitionedSize=*/_params.maxLbdPartitioningSize(),
 		/*baseBufferSize=*/_params.clauseBufferBaseSize(),
-		/*numChunks=*/20,
+		/*numChunks=*/_params.numChunksForExport(),
 		/*numProducers=*/_solvers.size()
 	), _hist_produced(params.hardMaxClauseLength()), 
 	_hist_admitted_to_db(params.hardMaxClauseLength()), 

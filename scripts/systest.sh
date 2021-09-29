@@ -87,12 +87,12 @@ function test_incremental_scheduling() {
     test 8 -t=1 -l=1 -satsolver=LgC -v=5 -J=3 -incrementaltest -checksums=1
 }
 
+test_mono
 test_dry_scheduling
-#test_scheduling
-#test_mono
-#test_oscillating
-#test_incremental
-#test_incremental_scheduling
-#test_many_incremental
+test_scheduling
+test_oscillating
+test_incremental
+test_incremental_scheduling
+test_many_incremental
 
 echo "All tests done."

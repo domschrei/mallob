@@ -26,7 +26,13 @@ public:
 			setup.hardMaxClauseLength, 
             2, 
 			setup.clauseBaseBufferSize, 
-			std::max(10, (int) (3.0f * setup.anticipatedLitsToImportPerCycle / setup.clauseBaseBufferSize)), 
+			std::max(
+                setup.minNumChunksPerSolver, 
+                (int) (
+                    ((float) setup.numBufferedClsGenerations) * 
+                    setup.anticipatedLitsToImportPerCycle / setup.clauseBaseBufferSize
+                )
+            ), 
             1
 		) {}
 

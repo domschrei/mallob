@@ -18,6 +18,9 @@ struct SolverSetup {
 	bool hasPseudoincrementalSolvers;
 	char solverType;
 	int solverRevision;
+	
+	int minNumChunksPerSolver;
+	int numBufferedClsGenerations;
 
 	// SAT Solving settings
 
