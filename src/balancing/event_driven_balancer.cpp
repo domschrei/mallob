@@ -134,19 +134,19 @@ void EventDrivenBalancer::handleData(EventMap& data, int tag) {
         }
     }
     if (tag == MSG_BROADCAST_DATA) {
-        // Digest locally
-        digest(data);
         // Inner node: Broadcast further downwards
         if (!isLeaf(MyMpi::rank(MPI_COMM_WORLD))) {
             for (auto child : getChildRanks()) { // TODO inefficient calculation of children
                 MyMpi::isend(child, MSG_BROADCAST_DATA, data);
             }
         }
+        // Digest locally
+        digest(data);
     }
 }
 
 void EventDrivenBalancer::digest(const EventMap& data) {
-    log(V4_VVER, "BLC DIGEST epoch=%ld\n", data.getGlobalEpoch());
+    log(V4_VVER, "BLC DIGEST epoch=%ld size=%ld\n", data.getGlobalEpoch(), data.getEntries().size());
 
     _states.updateBy(data);
     _balancing_epoch = data.getGlobalEpoch();
@@ -163,12 +163,13 @@ void EventDrivenBalancer::digest(const EventMap& data) {
 void EventDrivenBalancer::computeBalancingResult() {
 
     float now = Timer::elapsedSeconds();
-    
-    log(V5_DEBG, "BLC: calc result\n");
-
     int rank = MyMpi::rank(MPI_COMM_WORLD);
     int verb = rank == 0 ? V4_VVER : V5_DEBG;
     _job_volumes.clear();
+
+    if (_states.isEmpty()) return;
+
+    log(V5_DEBG, "BLC: calc result\n");
 
     VolumeCalculator calc(_states, _params, MyMpi::size(_comm), verb);
     calc.calculateResult();

@@ -28,7 +28,7 @@ public:
             _params(params), _epoch(events.getGlobalEpoch()), _num_workers(numWorkers), _verbosity(verbosity) {
 
         // For each event
-        log(_verbosity, "BLC Collecting entries\n");
+        log(_verbosity, "BLC Collecting %i entries\n", events.getEntries().size());
         _entries.reserve(events.getEntries().size());
         for (const auto& [jobId, ev] : events.getEntries()) {
             assert(ev.demand >= 0);
