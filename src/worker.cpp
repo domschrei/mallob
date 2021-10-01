@@ -1037,7 +1037,6 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
                         job.toStr(), req.toStr().c_str());
             MyMpi::isend(nextNodeRank, tag, req);
             _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
-            _num_sent_requests++;
             if (i == 0) job.getJobTree().setDesireLeft(Timer::elapsedSeconds());
             else job.getJobTree().setDesireRight(Timer::elapsedSeconds());
         } else {
