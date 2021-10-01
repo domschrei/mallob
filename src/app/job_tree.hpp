@@ -25,6 +25,12 @@ private:
     robin_hood::unordered_map<int, int> _dormant_children_num_fails;
     int _balancing_epoch_of_last_requests = -1;
 
+    float _time_of_desire_left = -1;
+    float _time_of_desire_right = -1;
+    size_t _num_desires = 0;
+    size_t _num_fulfilled_desires = 0;
+    float _sum_desire_latencies = 0;
+
 public:
     JobTree(int commSize, int rank, int seed) : _comm_size(commSize), _rank(rank), _job_node_ranks(commSize, seed) {}
 
@@ -93,10 +99,12 @@ public:
     void setLeftChild(int rank) {
         _has_left_child = true;
         updateJobNode(getLeftChildIndex(), rank);
+        fulfilDesireLeft(Timer::elapsedSeconds());
     }
     void setRightChild(int rank) {
         _has_right_child = true;
         updateJobNode(getRightChildIndex(), rank);
+        fulfilDesireRight(Timer::elapsedSeconds());
     }
     void unsetLeftChild() {
         if (!_has_left_child) return; 
@@ -165,7 +173,33 @@ public:
         return false;
     }
 
+    void setDesireLeft(float time) {setDesire(_time_of_desire_left, time);}
+    void setDesireRight(float time) {setDesire(_time_of_desire_right, time);}
+    void unsetDesireLeft() {_time_of_desire_left = -1;}
+    void unsetDesireRight() {_time_of_desire_right = -1;}
+    void fulfilDesireLeft(float time) {fulfilDesire(_time_of_desire_left, time);}
+    void fulfilDesireRight(float time) {fulfilDesire(_time_of_desire_right, time);}
+
+    float getNumDesires() const {return _num_desires;}
+    float getNumFulfiledDesires() const {return _num_fulfilled_desires;}
+    float getSumOfDesireLatencies() const {return _sum_desire_latencies;}
+    
 private:
+    void setDesire(float& member, float time) {
+        if (member == -1) {
+            // new desire
+            member = time;
+            _num_desires++;
+        }
+    }
+    void fulfilDesire(float& member, float time) {
+        if (member == -1) return;
+        _num_fulfilled_desires++;
+        auto elapsed = time - member;
+        _sum_desire_latencies += elapsed;
+        member = -1; // no desire any more
+    }
+
     static int getLeftChildIndex(int index) {return 2*(index+1)-1;}
     static int getRightChildIndex(int index) {return 2*(index+1);}
     static int getParentIndex(int index) {return (index-1)/2;}    

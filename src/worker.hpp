@@ -14,18 +14,12 @@
 #include "data/job_result.hpp"
 #include "data/job_transfer.hpp"
 #include "data/job_database.hpp"
-#include "comm/sysstate.hpp"
+#include "data/worker_sysstate.hpp"
 #include "comm/distributed_bfs.hpp"
 #include "util/sys/background_worker.hpp"
 #include "balancing/collective_assignment.hpp"
 #include "util/periodic_event.hpp"
 #include "util/sys/watchdog.hpp"
-
-#define SYSSTATE_BUSYRATIO 0
-#define SYSSTATE_NUMJOBS 1
-#define SYSSTATE_GLOBALMEM 2
-#define SYSSTATE_NUMHOPS 3
-#define SYSSTATE_SPAWNEDREQUESTS 4
 
 class Worker {
 
@@ -36,7 +30,7 @@ private:
     float _global_timeout;
 
     JobDatabase _job_db;
-    SysState<5> _sys_state;
+    WorkerSysState _sys_state;
 
     std::vector<int> _hop_destinations;
     robin_hood::unordered_map<int, int> _neighbor_idle_distance;

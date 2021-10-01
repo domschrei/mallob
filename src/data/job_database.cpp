@@ -17,8 +17,8 @@
 #include "util/sys/watchdog.hpp"
 #include "util/sys/proc.hpp"
 
-JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm): 
-        _params(params), _comm(comm) {
+JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sysstate): 
+        _params(params), _comm(comm), _sys_state(sysstate) {
     _wcsecs_per_instance = params.jobWallclockLimit();
     _cpusecs_per_instance = params.jobCpuLimit();
     _load = 0;
@@ -330,6 +330,18 @@ void JobDatabase::terminate(int jobId) {
     if (!isIdle() && getActive().getId() == jobId) {
         setLoad(0, jobId);
     }
+
+    // Gather statistics
+    auto numDesires = job.getJobTree().getNumDesires();
+    auto numFulfilledDesires = job.getJobTree().getNumFulfiledDesires();
+    auto sumDesireLatencies = job.getJobTree().getSumOfDesireLatencies();
+    float desireFulfilmentRatio = numDesires == 0 ? 0 : (float)numFulfilledDesires / numDesires;
+    float meanFulfilmentLatency = numFulfilledDesires == 0 ? 0 : sumDesireLatencies / numFulfilledDesires;
+    log(V3_VERB, "#%i desires fulfilled=%.4f mean_latency=%.6f\n", jobId, desireFulfilmentRatio, meanFulfilmentLatency);
+    _sys_state.addLocal(SYSSTATE_NUMDESIRES, numDesires);
+    _sys_state.addLocal(SYSSTATE_NUMFULFILLEDDESIRES, numFulfilledDesires);
+    _sys_state.addLocal(SYSSTATE_SUMDESIRELATENCIES, sumDesireLatencies);
+
     job.terminate();
     if (job.hasCommitment()) uncommit(jobId);
     if (!wasTerminated) _balancer->onTerminate(job);
@@ -459,11 +471,14 @@ void JobDatabase::setLoad(int load, int whichJobId) {
         assert(_current_job == NULL);
         log(V3_VERB, "LOAD 1 (+%s)\n", get(whichJobId).toStr());
         _current_job = &get(whichJobId);
+        _time_of_last_adoption = Timer::elapsedSeconds();
     }
     if (load == 0) {
         assert(_current_job != NULL);
         log(V3_VERB, "LOAD 0 (-%s)\n", get(whichJobId).toStr());
         _current_job = NULL;
+        float timeBusy = Timer::elapsedSeconds() - _time_of_last_adoption;
+        _total_busy_time += timeBusy;
     }
     if (_coll_assign) _coll_assign->setStatusDirty();
 }
@@ -510,6 +525,8 @@ void JobDatabase::setPendingRootReactivationRequest(JobRequest&& req) {
 }
 
 JobDatabase::~JobDatabase() {
+
+    log(V3_VERB, "busytime=%.3f\n", _total_busy_time);
 
     // Setup a watchdog to get feedback on hanging destructors
     Watchdog watchdog(/*checkIntervMillis=*/200, Timer::elapsedSeconds());

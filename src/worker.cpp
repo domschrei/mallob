@@ -27,7 +27,7 @@
 
 Worker::Worker(MPI_Comm comm, Parameters& params) :
     _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
-    _params(params), _job_db(_params, _comm), _sys_state(_comm), 
+    _params(params), _job_db(_params, _comm, _sys_state), _sys_state(_comm), 
     _bfs(_hop_destinations, [this](const JobRequest& req) {
         if (_job_db.isIdle() && !_job_db.hasCommitment(req.jobId)) {
             // Try to adopt this job request
@@ -325,8 +325,16 @@ void Worker::advance(float time) {
     if (_sys_state.aggregate(time)) {
         float* result = _sys_state.getGlobal();
         int verb = (_world_rank == 0 ? V2_INFO : V5_DEBG);
-        log(verb, "sysstate busyratio=%.3f jobs=%i globmem=%.2fGB newreqs=%i hops=%i\n", 
-                    result[0]/MyMpi::size(_comm), (int)result[1], result[2], (int)result[4], (int)result[3]);
+
+        int numDesires = result[SYSSTATE_NUMDESIRES];
+        int numFulfilledDesires = result[SYSSTATE_NUMFULFILLEDDESIRES];
+        float ratioFulfilled = numDesires <= 0 ? 0 : (float)numFulfilledDesires / numDesires;
+        float latency = numFulfilledDesires <= 0 ? 0 : result[SYSSTATE_SUMDESIRELATENCIES] / numFulfilledDesires;
+
+        log(verb, "sysstate busyratio=%.3f jobs=%i globmem=%.2fGB newreqs=%i hops=%i des=%i ffdes=%.4f avglat=%.6f\n", 
+                    result[SYSSTATE_BUSYRATIO]/MyMpi::size(_comm), (int)result[SYSSTATE_NUMJOBS], 
+                    result[SYSSTATE_GLOBALMEM], (int)result[SYSSTATE_SPAWNEDREQUESTS], (int)result[SYSSTATE_NUMHOPS],
+                    numDesires, ratioFulfilled, latency);
         _sys_state.setLocal(SYSSTATE_NUMHOPS, 0); // reset #hops
         _sys_state.setLocal(SYSSTATE_SPAWNEDREQUESTS, 0); // reset #requests
     }
@@ -751,6 +759,8 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
                         job.toStr(), _job_db.toStr(jobId, index).c_str());
         MyMpi::isend(nextNodeRank, tag, req);
         _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
+        if (pruned == JobTree::LEFT_CHILD) job.getJobTree().setDesireLeft(Timer::elapsedSeconds());
+        else job.getJobTree().setDesireRight(Timer::elapsedSeconds());
     }
 
     // Initiate communication if the job now became willing to communicate
@@ -992,13 +1002,11 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
     for (int i = 0; i < 2; i++) {
         int nextIndex = indices[i];
         if (has[i]) {
-            ranks[i] = i == 0 ? job.getJobTree().getLeftChildNodeRank() : job.getJobTree().getRightChildNodeRank();
-
             if (_params.explicitVolumeUpdates()) {
                 // Propagate volume update
+                ranks[i] = i == 0 ? job.getJobTree().getLeftChildNodeRank() : job.getJobTree().getRightChildNodeRank();
                 MyMpi::isend(ranks[i], MSG_NOTIFY_VOLUME_UPDATE, payload);
             }
-
         } else if (nextIndex < volume 
                 && job.getJobTree().getBalancingEpochOfLastRequests() < balancingEpoch) {
             if (_job_db.hasDormantRoot()) {
@@ -1029,6 +1037,13 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
                         job.toStr(), req.toStr().c_str());
             MyMpi::isend(nextNodeRank, tag, req);
             _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
+            _num_sent_requests++;
+            if (i == 0) job.getJobTree().setDesireLeft(Timer::elapsedSeconds());
+            else job.getJobTree().setDesireRight(Timer::elapsedSeconds());
+        } else {
+            // Job does not want to grow - any more (?) - so unset any previous desire
+            if (i == 0) job.getJobTree().unsetDesireLeft();
+            else job.getJobTree().unsetDesireRight();
         }
     }
     job.getJobTree().setBalancingEpochOfLastRequests(balancingEpoch);

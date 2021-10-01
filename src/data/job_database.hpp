@@ -10,6 +10,7 @@
 #include "balancing/event_driven_balancer.hpp"
 #include "util/sys/background_worker.hpp"
 #include "balancing/collective_assignment.hpp"
+#include "data/worker_sysstate.hpp"
 
 class JobDatabase {
 
@@ -50,8 +51,12 @@ private:
     std::list<Job*> _jobs_to_free;
     Mutex _janitor_mutex;
 
+    WorkerSysState& _sys_state;
+    float _total_busy_time = 0;
+    float _time_of_last_adoption = 0;
+
 public:
-    JobDatabase(Parameters& params, MPI_Comm& comm);
+    JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sysstate);
     ~JobDatabase();
     void setCollectiveAssignment(CollectiveAssignment& collAssign) {_coll_assign = &collAssign;}
 
