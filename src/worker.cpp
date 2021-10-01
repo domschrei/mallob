@@ -1123,7 +1123,7 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
             if (mono) job.getJobTree().updateJobNode(indices[i], indices[i]);
             JobRequest req(jobId, job.getDescription().getApplication(), job.getJobTree().getRootNodeRank(), 
                     _world_rank, nextIndex, Timer::elapsedSeconds(), balancingEpoch, 0);
-            req.revision = job.getRevision();
+            req.revision = job.getDesiredRevision();
             int nextNodeRank, tag;
             if (dormantChildren.empty()) {
                 tag = MSG_REQUEST_NODE;
