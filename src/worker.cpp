@@ -335,8 +335,12 @@ void Worker::advance(float time) {
                     result[SYSSTATE_BUSYRATIO]/MyMpi::size(_comm), (int)result[SYSSTATE_NUMJOBS], 
                     result[SYSSTATE_GLOBALMEM], (int)result[SYSSTATE_SPAWNEDREQUESTS], (int)result[SYSSTATE_NUMHOPS],
                     numDesires, ratioFulfilled, latency);
-        _sys_state.setLocal(SYSSTATE_NUMHOPS, 0); // reset #hops
-        _sys_state.setLocal(SYSSTATE_SPAWNEDREQUESTS, 0); // reset #requests
+        // Reset fields which are added to incrementally
+        _sys_state.setLocal(SYSSTATE_NUMHOPS, 0);
+        _sys_state.setLocal(SYSSTATE_SPAWNEDREQUESTS, 0);
+        _sys_state.setLocal(SYSSTATE_NUMDESIRES, 0);
+        _sys_state.setLocal(SYSSTATE_NUMFULFILLEDDESIRES, 0);
+        _sys_state.setLocal(SYSSTATE_SUMDESIRELATENCIES, 0);
     }
 }
 
