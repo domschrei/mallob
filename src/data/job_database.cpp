@@ -130,11 +130,6 @@ bool JobDatabase::isRequestObsolete(const JobRequest& req) {
     if (!has(req.jobId)) return false;
 
     Job& job = get(req.jobId);
-    if (job.getState() == PAST) {
-        // Job has already terminated!
-        log(V4_VVER, "%s : past job\n", req.toStr().c_str());
-        return true;
-    }
     if (job.getState() == ACTIVE) {
         // Does this node KNOW that the request is already completed?
         if (req.requestedNodeIndex == job.getIndex()
@@ -233,7 +228,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
         // Know that the job already finished?
         Job& job = get(req.jobId);
         if (job.getState() == PAST) {
-            log(V4_VVER, "Reject req. %s : already finished\n", 
+            log(V4_VVER, "Reject req. %s : past job\n", 
                             toStr(req.jobId, req.requestedNodeIndex).c_str());
             if (_coll_assign) _coll_assign->setStatusDirty();
             return DISCARD;
@@ -368,8 +363,8 @@ void JobDatabase::forgetOldJobs() {
         }
         // Past jobs
         if (job.getState() == PAST) {
-            // If job is past, it must have been so for at least 10 seconds
-            if (job.getAgeSinceAbort() < 10) continue;
+            // If job is past, it must have been so for at least 3 seconds
+            if (job.getAgeSinceAbort() < 3) continue;
             // If the node found a result, it must have been already transferred
             if (job.isResultTransferPending()) continue;
             jobsToForget.push_back(id);

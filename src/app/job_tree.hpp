@@ -3,6 +3,7 @@
 #define DOMPASCH_MALLOB_JOB_TREE_HPP
 
 #include <set>
+#include <list>
 #include "util/assert.hpp"
 
 #include "util/hashing.hpp"
@@ -37,7 +38,8 @@ private:
             return !(*this == other);
         }
     };
-    std::set<DormantChild> _dormant_children;
+    std::list<int> _dormant_children;
+    std::list<int>::iterator _it_dormant_children;
     
     int _balancing_epoch_of_last_requests = -1;
 
@@ -48,7 +50,9 @@ private:
     float _sum_desire_latencies = 0;
 
 public:
-    JobTree(int commSize, int rank, int seed) : _comm_size(commSize), _rank(rank), _job_node_ranks(commSize, seed) {}
+    JobTree(int commSize, int rank, int seed) : _comm_size(commSize), _rank(rank), _job_node_ranks(commSize, seed) {
+        _it_dormant_children = _dormant_children.begin();
+    }
 
     int getIndex() const {return _index;}
     int getCommSize() const {return _comm_size;}
@@ -66,10 +70,12 @@ public:
     int getParentIndex() const {return (_index-1)/2;};
     robin_hood::unordered_set<int>& getPastChildren() {return _past_children;}
     int getRankOfNextDormantChild() {
-        auto child = *_dormant_children.begin();
-        _dormant_children.erase(_dormant_children.begin());
-        _dormant_children.insert(DormantChild{child.rank, child.numUses+1});
-        return child.rank;
+        if (_dormant_children.empty()) return -1;
+        int rank = *_it_dormant_children;
+        _it_dormant_children++;
+        if (_it_dormant_children == _dormant_children.end())
+            _it_dormant_children = _dormant_children.begin();
+        return rank;
     }
     void setBalancingEpochOfLastRequests(int epoch) {
         _balancing_epoch_of_last_requests = epoch;
@@ -154,10 +160,26 @@ public:
         }
     }
     void addDormantChild(int rank) {
-        _dormant_children.insert(DormantChild{rank, 0});
+        removeDormantChild(rank);
+        _dormant_children.insert(_it_dormant_children, rank);
     }
     void removeDormantChild(int rank) {
-        _dormant_children.erase(DormantChild{rank, 0});
+        if (_dormant_children.empty()) return;
+        int currentRank = *_it_dormant_children;
+        for (auto it = _dormant_children.begin(); it != _dormant_children.end(); ++it) {
+            if (*it == rank) {
+                it = _dormant_children.erase(it);
+                it--;
+            }
+        }
+        // Properly reset current iterator
+        _it_dormant_children = _dormant_children.begin();
+        for (auto it = _dormant_children.begin(); it != _dormant_children.end(); ++it) {
+            if (*it == currentRank) {
+                _it_dormant_children = it;
+                break;
+            }   
+        }
     }
 
     bool isTransitiveParentOf(int index) {

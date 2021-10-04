@@ -142,6 +142,7 @@ private:
     std::atomic_bool _has_description = false;
     JobDescription _description;
     int _desired_revision = 0;
+    int _last_solved_revision = -1;
 
     float _time_of_arrival;
     float _time_of_activation = 0;
@@ -307,6 +308,8 @@ public:
     void setResultTransferPending(bool pending) {_result_transfer_pending = pending;}
     void addChildWaitingForRevision(int rank, int revision) {_waiting_rank_revision_pairs.emplace_back(rank, revision);}
     void setDesiredRevision(int revision) {_desired_revision = revision;}
+    bool isRevisionSolved(int revision) {return _last_solved_revision >= revision;}
+    void setRevisionSolved(int revision) {_last_solved_revision = revision;}
 
     // toString methods
 

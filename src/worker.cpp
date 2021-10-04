@@ -448,15 +448,15 @@ void Worker::handleRejectOneshot(MessageHandle& handle) {
         doNormalHopping = true;
     } else {
         // Attempt another oneshot request
-        req.numHops++;
-        _sys_state.addLocal(SYSSTATE_NUMHOPS, 1);
         // Get dormant children without the node that just declined
         int rank = job.getJobTree().getRankOfNextDormantChild();
-        if (rank < 0) {
+        if (rank < 0 || rank == handle.source) {
             // No fitting dormant children left
             doNormalHopping = true;
         } else {
             // Pick a dormant child, forward request
+            req.numHops++;
+            _sys_state.addLocal(SYSSTATE_NUMHOPS, 1);
             MyMpi::isend(rank, MSG_REQUEST_NODE_ONESHOT, req);
             log(LOG_ADD_DESTRANK | V4_VVER, "%s : query dormant child", rank, job.toStr());
             _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
@@ -769,23 +769,23 @@ void Worker::handleNotifyResultFound(MessageHandle& handle) {
     IntVec res = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = res[0];
     int revision = res[1];
+
+    // Is the job result invalid or obsolete?
+    bool obsolete = false;
     if (!_job_db.has(jobId) || !_job_db.get(jobId).getJobTree().isRoot()) {
+        obsolete = true;
         log(V1_WARN, "[WARN] Invalid adressee for job result of #%i\n", jobId);
-        MyMpi::isendCopy(handle.source, MSG_NOTIFY_RESULT_OBSOLETE, handle.getRecvData());
-        return;
-    }
-    if (_job_db.get(jobId).getState() == PAST) {
-        log(LOG_ADD_SRCRANK | V4_VVER, "Discard obsolete result for job #%i", handle.source, jobId);
-        MyMpi::isendCopy(handle.source, MSG_NOTIFY_RESULT_OBSOLETE, handle.getRecvData());
-        return;
-    }
-    if (_job_db.get(jobId).getRevision() > revision) {
+    } else if (_job_db.get(jobId).getRevision() > revision || _job_db.get(jobId).isRevisionSolved(revision)) {
+        obsolete = true;
         log(LOG_ADD_SRCRANK | V4_VVER, "Discard obsolete result for job #%i rev. %i", handle.source, jobId, revision);
+    }
+    if (obsolete) {
         MyMpi::isendCopy(handle.source, MSG_NOTIFY_RESULT_OBSOLETE, handle.getRecvData());
         return;
     }
     
-    log(LOG_ADD_SRCRANK | V3_VERB, "Result found for job #%i", handle.source, jobId);
+    log(LOG_ADD_SRCRANK | V3_VERB, "#%i rev. %i solved", handle.source, jobId, revision);
+    _job_db.get(jobId).setRevisionSolved(revision);
 
     // Terminate job and propagate termination message
     if (_job_db.get(jobId).getDescription().isIncremental()) {
@@ -1007,6 +1007,7 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
             if (_job_db.hasDormantRoot()) {
                 // Becoming an inner node is not acceptable
                 // because then the dormant root cannot be restarted seamlessly
+                log(V4_VVER, "%s cannot grow due to dormant root\n", job.toStr());
                 _job_db.suspend(jobId);
                 MyMpi::isend(job.getJobTree().getParentNodeRank(), 
                     MSG_NOTIFY_NODE_LEAVING_JOB, IntPair(jobId, thisIndex));
@@ -1053,7 +1054,6 @@ void Worker::interruptJob(int jobId, bool terminate, bool reckless) {
 
     // Ignore if this job node is already in the goal state
     // (also implying that it already forwarded such a request downwards)
-    if (terminate && job.getState() == PAST) return;
     if (!terminate && job.getState() == SUSPENDED) return;
 
     // Propagate message down the job tree
