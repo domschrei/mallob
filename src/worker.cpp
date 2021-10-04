@@ -459,6 +459,12 @@ void Worker::handleRejectOneshot(MessageHandle& handle) {
             // No fitting dormant children left
             doNormalHopping = true;
         } else {
+            // TODO more organized querying of dormant children
+            // - callee returns reason WHY it does not accept (doesn't have job any more, not idle any more, ....)
+            // - query each dormant child once, not randomly (up to limit), latest dormant child first,
+            // remove children which lost the job, keep children which just happen to be busy right now
+            // - call all children at once? -> more commitments being broken, but higher prob. that a dormant child returns
+
             // Pick a dormant child, forward request
             int rank = Random::choice(dormantChildren);
             MyMpi::isend(rank, MSG_REQUEST_NODE_ONESHOT, req);
