@@ -1156,7 +1156,6 @@ void Worker::interruptJob(int jobId, bool terminate, bool reckless) {
 
     // Ignore if this job node is already in the goal state
     // (also implying that it already forwarded such a request downwards)
-    if (terminate && job.getState() == PAST) return;
     if (!terminate && job.getState() == SUSPENDED) return;
 
     // Propagate message down the job tree

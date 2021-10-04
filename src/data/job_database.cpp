@@ -127,11 +127,6 @@ bool JobDatabase::isRequestObsolete(const JobRequest& req) {
     if (!has(req.jobId)) return false;
 
     Job& job = get(req.jobId);
-    if (job.getState() == PAST) {
-        // Job has already terminated!
-        log(V4_VVER, "%s : past job\n", req.toStr().c_str());
-        return true;
-    }
     if (job.getState() == ACTIVE) {
         // Does this node KNOW that the request is already completed?
         if (req.requestedNodeIndex == job.getIndex()
