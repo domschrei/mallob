@@ -438,10 +438,8 @@ void Worker::handleRejectOneshot(MessageHandle& handle) {
     if (_job_db.isAdoptionOfferObsolete(req)) return;
 
     Job& job = _job_db.get(req.jobId);
-    if (rej.isChildStillDormant) {
-        job.getJobTree().addFailToDormantChild(handle.source);
-    } else {
-        job.getJobTree().eraseDormantChild(handle.source);
+    if (!rej.isChildStillDormant) {
+        job.getJobTree().removeDormantChild(handle.source);
     }
 
     bool doNormalHopping = false;
@@ -453,20 +451,12 @@ void Worker::handleRejectOneshot(MessageHandle& handle) {
         req.numHops++;
         _sys_state.addLocal(SYSSTATE_NUMHOPS, 1);
         // Get dormant children without the node that just declined
-        std::set<int> dormantChildren = job.getJobTree().getDormantChildren();
-        if (dormantChildren.count(handle.source)) dormantChildren.erase(handle.source);
-        if (dormantChildren.empty()) {
+        int rank = job.getJobTree().getRankOfNextDormantChild();
+        if (rank < 0) {
             // No fitting dormant children left
             doNormalHopping = true;
         } else {
-            // TODO more organized querying of dormant children
-            // - callee returns reason WHY it does not accept (doesn't have job any more, not idle any more, ....)
-            // - query each dormant child once, not randomly (up to limit), latest dormant child first,
-            // remove children which lost the job, keep children which just happen to be busy right now
-            // - call all children at once? -> more commitments being broken, but higher prob. that a dormant child returns
-
             // Pick a dormant child, forward request
-            int rank = Random::choice(dormantChildren);
             MyMpi::isend(rank, MSG_REQUEST_NODE_ONESHOT, req);
             log(LOG_ADD_DESTRANK | V4_VVER, "%s : query dormant child", rank, job.toStr());
             _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
@@ -751,15 +741,11 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
 
         // Try to find a dormant child that is not the message source
         int tag = MSG_REQUEST_NODE_ONESHOT;
-        int nextNodeRank = job.getJobTree().findDormantChild(handle.source);
-        if (nextNodeRank == -1) {
+        int nextNodeRank = job.getJobTree().getRankOfNextDormantChild();
+        if (nextNodeRank == -1 || nextNodeRank == handle.source) {
             // If unsucessful, pick a random node
             tag = MSG_REQUEST_NODE;
-            if (_params.derandomize()) {
-                nextNodeRank = getWeightedRandomNeighbor();
-            } else {
-                nextNodeRank = getRandomNonSelfWorkerNode();
-            }
+            nextNodeRank = _params.derandomize() ? getWeightedRandomNeighbor() : getRandomNonSelfWorkerNode();
         }
         
         // Initiate search for a replacement for the defected child
@@ -1005,7 +991,6 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
     bool mono = _params.monoFilename.isSet();
 
     // For each potential child (left, right):
-    std::set<int> dormantChildren = job.getJobTree().getDormantChildren();
     bool has[2] = {job.getJobTree().hasLeftChild(), job.getJobTree().hasRightChild()};
     int indices[2] = {job.getJobTree().getLeftChildIndex(), job.getJobTree().getRightChildIndex()};
     int ranks[2] = {-1, -1};
@@ -1033,15 +1018,12 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
             JobRequest req(jobId, job.getDescription().getApplication(), job.getJobTree().getRootNodeRank(), 
                     _world_rank, nextIndex, Timer::elapsedSeconds(), balancingEpoch, 0);
             req.revision = job.getDesiredRevision();
-            int nextNodeRank, tag;
-            if (dormantChildren.empty()) {
+            int tag = MSG_REQUEST_NODE_ONESHOT;
+            int nextNodeRank = job.getJobTree().getRankOfNextDormantChild(); 
+            if (nextNodeRank < 0) {
                 tag = MSG_REQUEST_NODE;
                 ranks[i] = i == 0 ? job.getJobTree().getLeftChildNodeRank() : job.getJobTree().getRightChildNodeRank();
                 nextNodeRank = ranks[i];
-            } else {
-                tag = MSG_REQUEST_NODE_ONESHOT;
-                nextNodeRank = Random::choice(dormantChildren);
-                dormantChildren.erase(nextNodeRank);
             }
             log(LOG_ADD_DESTRANK | V3_VERB, "%s growing: %s", nextNodeRank, 
                         job.toStr(), req.toStr().c_str());

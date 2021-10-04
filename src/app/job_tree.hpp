@@ -22,7 +22,23 @@ private:
     bool _has_right_child = false;
     int _client_rank;
     robin_hood::unordered_set<int> _past_children;
-    robin_hood::unordered_map<int, int> _dormant_children_num_fails;
+
+    struct DormantChild {
+        int rank;
+        int numUses = 0;
+        bool operator<(const DormantChild& other) const {
+            return numUses < other.numUses;
+        }
+        bool operator==(const DormantChild& other) const {
+            if (rank != other.rank) return false;
+            return true;
+        }
+        bool operator!=(const DormantChild& other) const {
+            return !(*this == other);
+        }
+    };
+    std::set<DormantChild> _dormant_children;
+    
     int _balancing_epoch_of_last_requests = -1;
 
     float _time_of_desire_left = -1;
@@ -49,16 +65,11 @@ public:
     int getParentNodeRank() const {return isRoot() ? _client_rank : _job_node_ranks[getParentIndex()];};
     int getParentIndex() const {return (_index-1)/2;};
     robin_hood::unordered_set<int>& getPastChildren() {return _past_children;}
-    int getNumFailsOfDormantChild(int rank) const {
-        assert(_dormant_children_num_fails.count(rank));
-        return _dormant_children_num_fails.at(rank);
-    }
-    std::set<int> getDormantChildren() const {
-        std::set<int> c;
-        for (const auto& [child, _] : _dormant_children_num_fails) {
-            c.insert(child);
-        }
-        return c;
+    int getRankOfNextDormantChild() {
+        auto child = *_dormant_children.begin();
+        _dormant_children.erase(_dormant_children.begin());
+        _dormant_children.insert(DormantChild{child.rank, child.numUses+1});
+        return child.rank;
     }
     void setBalancingEpochOfLastRequests(int epoch) {
         _balancing_epoch_of_last_requests = epoch;
@@ -142,23 +153,11 @@ public:
             updateJobNode(getParentIndex(), newRank);
         }
     }
-    int findDormantChild(int excludedRank) {
-        for (const auto& [child, numFails] : _dormant_children_num_fails) {
-            if (child != excludedRank) return child;
-        }
-        return -1;
-    }
     void addDormantChild(int rank) {
-        _dormant_children_num_fails[rank] = 0;
+        _dormant_children.insert(DormantChild{rank, 0});
     }
-    void addFailToDormantChild(int rank) {
-        if (!_dormant_children_num_fails.count(rank)) return;
-        _dormant_children_num_fails[rank]++;
-        if (_dormant_children_num_fails[rank] >= 3)
-            _dormant_children_num_fails.erase(rank);
-    }
-    void eraseDormantChild(int rank) {
-        _dormant_children_num_fails.erase(rank);
+    void removeDormantChild(int rank) {
+        _dormant_children.erase(DormantChild{rank, 0});
     }
 
     bool isTransitiveParentOf(int index) {
