@@ -22,7 +22,7 @@ public:
     EventDrivenBalancer(MPI_Comm& comm, Parameters& params);
     ~EventDrivenBalancer() {}
 
-    void setVolumeUpdateCallback(std::function<void(int, int)> callback);
+    void setVolumeUpdateCallback(std::function<void(int, int, float)> callback);
 
     void onActivate(const Job& job);
     void onDemandChange(const Job& job, int demand);
@@ -51,8 +51,9 @@ private:
     int _active_job_id = -1;
     robin_hood::unordered_map<int, int> _job_root_epochs;
     robin_hood::unordered_map<int, int> _job_volumes;
+    robin_hood::unordered_map<int, float> _time_of_pushed_event;
 
-    std::function<void(int, int)> _volume_update_callback;
+    std::function<void(int, int, float)> _volume_update_callback;
 
     int _root_rank;
     int _parent_rank;

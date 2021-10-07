@@ -89,7 +89,7 @@ public:
 
     std::vector<std::pair<JobRequest, int>> getDeferredRequestsToForward(float time);
 
-    void setBalancerVolumeUpdateCallback(std::function<void(int, int)> cb) {_balancer->setVolumeUpdateCallback(cb);}
+    void setBalancerVolumeUpdateCallback(std::function<void(int, int, float)> cb) {_balancer->setVolumeUpdateCallback(cb);}
     void advanceBalancing() {_balancer->advance();}
     void handleBalancingMessage(MessageHandle& handle) {_balancer->handle(handle);}
     int getGlobalBalancingEpoch() const {return _balancer->getGlobalEpoch();}

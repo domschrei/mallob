@@ -326,16 +326,31 @@ void JobDatabase::terminate(int jobId) {
         setLoad(0, jobId);
     }
 
-    // Gather statistics
-    auto numDesires = job.getJobTree().getNumDesires();
-    auto numFulfilledDesires = job.getJobTree().getNumFulfiledDesires();
-    auto sumDesireLatencies = job.getJobTree().getSumOfDesireLatencies();
-    float desireFulfilmentRatio = numDesires == 0 ? 0 : (float)numFulfilledDesires / numDesires;
-    float meanFulfilmentLatency = numFulfilledDesires == 0 ? 0 : sumDesireLatencies / numFulfilledDesires;
-    log(V3_VERB, "#%i desires fulfilled=%.4f mean_latency=%.6f\n", jobId, desireFulfilmentRatio, meanFulfilmentLatency);
-    _sys_state.addLocal(SYSSTATE_NUMDESIRES, numDesires);
-    _sys_state.addLocal(SYSSTATE_NUMFULFILLEDDESIRES, numFulfilledDesires);
-    _sys_state.addLocal(SYSSTATE_SUMDESIRELATENCIES, sumDesireLatencies);
+    if (!wasTerminated) {
+        // Gather statistics
+        auto numDesires = job.getJobTree().getNumDesires();
+        auto numFulfilledDesires = job.getJobTree().getNumFulfiledDesires();
+        auto sumDesireLatencies = job.getJobTree().getSumOfDesireLatencies();
+        float desireFulfilmentRatio = numDesires == 0 ? 0 : (float)numFulfilledDesires / numDesires;
+        float meanFulfilmentLatency = numFulfilledDesires == 0 ? 0 : sumDesireLatencies / numFulfilledDesires;
+
+        auto latencies = job.getJobTree().getDesireLatencies();
+        float meanLatency = 0, minLatency = 0, maxLatency = 0, medianLatency = 0;
+        if (!latencies.empty()) {
+            std::sort(latencies.begin(), latencies.end());
+            meanLatency = std::accumulate(latencies.begin(), latencies.end(), 0.0f) / latencies.size();
+            minLatency = latencies.front();
+            maxLatency = latencies.back();
+            medianLatency = latencies[latencies.size()/2];
+        }
+
+        log(V3_VERB, "%s desires fulfilled=%.4f latency={num:%i min:%.5f med:%.5f avg:%.5f max:%.5f}\n",
+            job.toStr(), desireFulfilmentRatio, latencies.size(), minLatency, medianLatency, meanLatency, maxLatency);
+    }
+
+    //_sys_state.addLocal(SYSSTATE_NUMDESIRES, numDesires);
+    //_sys_state.addLocal(SYSSTATE_NUMFULFILLEDDESIRES, numFulfilledDesires);
+    //_sys_state.addLocal(SYSSTATE_SUMDESIRELATENCIES, sumDesireLatencies);
 
     job.terminate();
     if (job.hasCommitment()) uncommit(jobId);

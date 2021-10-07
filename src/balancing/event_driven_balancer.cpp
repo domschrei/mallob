@@ -51,7 +51,7 @@ EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params) : _
     log(LOG_NO_PREFIX | V5_DEBG, ".\n");
 }
 
-void EventDrivenBalancer::setVolumeUpdateCallback(std::function<void(int, int)> callback) {
+void EventDrivenBalancer::setVolumeUpdateCallback(std::function<void(int, int, float)> callback) {
     _volume_update_callback = callback;
 }
 
@@ -102,7 +102,10 @@ void EventDrivenBalancer::onTerminate(const Job& job) {
 
 void EventDrivenBalancer::pushEvent(const Event& event) {
     bool inserted = _diffs.insertIfNovel(event);
-    if (inserted) advance();
+    if (inserted) {
+        _time_of_pushed_event[event.jobId] = Timer::elapsedSeconds();
+        advance();
+    }
 }
 
 void EventDrivenBalancer::advance() {
@@ -179,7 +182,12 @@ void EventDrivenBalancer::computeBalancingResult() {
         msg += std::to_string(entry.jobId) + ":" + std::to_string(entry.volume) + " ";
         _job_volumes[entry.jobId] = entry.volume;
         if (entry.jobId == _active_job_id) {
-            _volume_update_callback(entry.jobId, entry.volume);
+            float elapsed = 0;
+            if (_time_of_pushed_event.count(_active_job_id)) {
+                elapsed = Timer::elapsedSeconds() - _time_of_pushed_event[_active_job_id];
+            }
+            _time_of_pushed_event.erase(_active_job_id);
+            _volume_update_callback(entry.jobId, entry.volume, elapsed);
         }
     }
     log(rank == 0 ? V3_VERB : V4_VVER, "BLC %s\n", msg.c_str());

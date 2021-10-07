@@ -53,8 +53,8 @@ Worker::Worker(MPI_Comm comm, Parameters& params) :
     _watchdog.setAbortPeriod(_params.watchdogAbortMillis()); // abort after X ms without a reset
 
     // Set callback which is called whenever a job's volume is updated
-    _job_db.setBalancerVolumeUpdateCallback([&](int jobId, int volume) {
-        updateVolume(jobId, volume, _job_db.getGlobalBalancingEpoch());
+    _job_db.setBalancerVolumeUpdateCallback([&](int jobId, int volume, float eventLatency) {
+        updateVolume(jobId, volume, _job_db.getGlobalBalancingEpoch(), eventLatency);
     });
 }
 
@@ -331,10 +331,9 @@ void Worker::advance(float time) {
         float ratioFulfilled = numDesires <= 0 ? 0 : (float)numFulfilledDesires / numDesires;
         float latency = numFulfilledDesires <= 0 ? 0 : result[SYSSTATE_SUMDESIRELATENCIES] / numFulfilledDesires;
 
-        log(verb, "sysstate busyratio=%.3f jobs=%i globmem=%.2fGB newreqs=%i hops=%i des=%i ffdes=%.4f avglat=%.6f\n", 
+        log(verb, "sysstate busyratio=%.3f jobs=%i globmem=%.2fGB newreqs=%i hops=%i\n", 
                     result[SYSSTATE_BUSYRATIO]/MyMpi::size(_comm), (int)result[SYSSTATE_NUMJOBS], 
-                    result[SYSSTATE_GLOBALMEM], (int)result[SYSSTATE_SPAWNEDREQUESTS], (int)result[SYSSTATE_NUMHOPS],
-                    numDesires, ratioFulfilled, latency);
+                    result[SYSSTATE_GLOBALMEM], (int)result[SYSSTATE_SPAWNEDREQUESTS], (int)result[SYSSTATE_NUMHOPS]);
         // Reset fields which are added to incrementally
         _sys_state.setLocal(SYSSTATE_NUMHOPS, 0);
         _sys_state.setLocal(SYSSTATE_SPAWNEDREQUESTS, 0);
@@ -721,7 +720,7 @@ void Worker::handleNotifyVolumeUpdate(MessageHandle& handle) {
     }
 
     // Update volume assignment in job instance (and its children)
-    updateVolume(jobId, volume, balancingEpoch);
+    updateVolume(jobId, volume, balancingEpoch, 0);
 }
 
 void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
@@ -946,7 +945,7 @@ void Worker::initiateVolumeUpdate(int jobId) {
     if (_params.explicitVolumeUpdates()) {
         if (job.getJobTree().isRoot()) {
             // Root worker: update volume (to trigger growth if desired)
-            if (job.getVolume() > 1) updateVolume(jobId, job.getVolume(), _job_db.getGlobalBalancingEpoch());
+            if (job.getVolume() > 1) updateVolume(jobId, job.getVolume(), _job_db.getGlobalBalancingEpoch(), 0);
         } else {
             // Non-root worker: query parent for the volume of this job
             IntVec payload({jobId});
@@ -959,12 +958,12 @@ void Worker::initiateVolumeUpdate(int jobId) {
         }
         // Apply current volume
         if (_job_db.hasVolume(jobId)) {
-            updateVolume(jobId, _job_db.getVolume(jobId), _job_db.getGlobalBalancingEpoch());
+            updateVolume(jobId, _job_db.getVolume(jobId), _job_db.getGlobalBalancingEpoch(), 0);
         }
     }
 }
 
-void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
+void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float eventLatency) {
 
     if (!_job_db.has(jobId)) return;
     Job &job = _job_db.get(jobId);
@@ -975,8 +974,8 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
     }
 
     int thisIndex = job.getIndex();
-    log(job.getVolume() == volume || thisIndex > 0 ? V4_VVER : V3_VERB, "%s : update v=%i epoch=%i lastreqsepoch=%i\n", 
-        job.toStr(), volume, balancingEpoch, job.getJobTree().getBalancingEpochOfLastRequests());
+    log(job.getVolume() == volume || thisIndex > 0 ? V4_VVER : V3_VERB, "%s : update v=%i epoch=%i lastreqsepoch=%i evlat=%.5f\n", 
+        job.toStr(), volume, balancingEpoch, job.getJobTree().getBalancingEpochOfLastRequests(), eventLatency);
     job.updateVolumeAndUsedCpu(volume);
 
     if (job.getJobTree().isRoot() && job.getJobTree().getBalancingEpochOfLastRequests() == -1) {
@@ -1030,8 +1029,8 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch) {
                         job.toStr(), req.toStr().c_str());
             MyMpi::isend(nextNodeRank, tag, req);
             _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
-            if (i == 0) job.getJobTree().setDesireLeft(Timer::elapsedSeconds());
-            else job.getJobTree().setDesireRight(Timer::elapsedSeconds());
+            if (i == 0) job.getJobTree().setDesireLeft(Timer::elapsedSeconds() - eventLatency);
+            else job.getJobTree().setDesireRight(Timer::elapsedSeconds() - eventLatency);
         } else {
             // Job does not want to grow - any more (?) - so unset any previous desire
             if (i == 0) job.getJobTree().unsetDesireLeft();

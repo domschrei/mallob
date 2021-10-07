@@ -48,6 +48,7 @@ private:
     size_t _num_desires = 0;
     size_t _num_fulfilled_desires = 0;
     float _sum_desire_latencies = 0;
+    std::vector<float> _desire_latencies;
 
 public:
     JobTree(int commSize, int rank, int seed) : _comm_size(commSize), _rank(rank), _job_node_ranks(commSize, seed) {
@@ -198,12 +199,11 @@ public:
     void setDesireRight(float time) {setDesire(_time_of_desire_right, time);}
     void unsetDesireLeft() {_time_of_desire_left = -1;}
     void unsetDesireRight() {_time_of_desire_right = -1;}
-    void fulfilDesireLeft(float time) {fulfilDesire(_time_of_desire_left, time);}
-    void fulfilDesireRight(float time) {fulfilDesire(_time_of_desire_right, time);}
 
     float getNumDesires() const {return _num_desires;}
     float getNumFulfiledDesires() const {return _num_fulfilled_desires;}
     float getSumOfDesireLatencies() const {return _sum_desire_latencies;}
+    const std::vector<float>& getDesireLatencies() const {return _desire_latencies;}
     
 private:
     void setDesire(float& member, float time) {
@@ -213,11 +213,14 @@ private:
             _num_desires++;
         }
     }
+    void fulfilDesireLeft(float time) {fulfilDesire(_time_of_desire_left, time);}
+    void fulfilDesireRight(float time) {fulfilDesire(_time_of_desire_right, time);}
     void fulfilDesire(float& member, float time) {
         if (member == -1) return;
         _num_fulfilled_desires++;
         auto elapsed = time - member;
         _sum_desire_latencies += elapsed;
+        _desire_latencies.push_back(elapsed);
         member = -1; // no desire any more
     }
 
