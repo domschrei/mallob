@@ -48,10 +48,10 @@ function sample_exponential() {
 function create_job_chains() {
     
     ninstances=$(cat $benchmarkfile|wc -l)
-    interarrivaltime=10
-    jobsperclient_lambda=2
-    timeperjob=60
-    maxtime=1000
+    interarrivaltime=1
+    jobsperclient_lambda=1.5
+    timeperjob=30
+    maxtime=300
     
     instno=1
     i=1
@@ -59,10 +59,8 @@ function create_job_chains() {
     c=1
     
     while true; do
-        echo $t
         if (( $(echo "$t > $maxtime" |bc -l) )); then break; fi
         jobsthisclient=$(sample_exponential $jobsperclient_lambda)
-        echo "  $jobsthisclient"
         
         added=false
         for k in $(seq 1 $jobsthisclient); do
@@ -83,17 +81,18 @@ function create_job_chains() {
         fi
     done
 
-    echo "Introduced $i jobs"
+    echo $i
 }
 
 
 # Generate chain of independent jobs
 #create_independent_jobs
 # Generate clients, each with a chain of dependent jobs
-create_job_chains
+numjobs=$(create_job_chains)
+echo "Generated $numjobs jobs"
 
 # Set options
-options="-t=4 -lbc=4 -g=0.1 -satsolver=lcg -v=4 -J=$(($i-1)) -ch=1 -chaf=5 -chstms=60 -s=0.25 -cfhl=0 -smcl=8 -hmcl=8 -mlbdps=8 -checksums=0 -huca=0 -wam=1000 -sleep=100"
+options="-t=4 -c=1 -lbc=$1 -satsolver=lcg -v=4 -J=$numjobs -ch=1 -chaf=5 -chstms=60 -s=0.25 -cfhl=0 -smcl=8 -hmcl=8 -mlbdps=8 -checksums=0 -huca=0 -sleep=100"
 
 # Launch Mallob with a unique run ID for a logging directory
 runid="sched_$(hostname)_$(git rev-parse --short HEAD)_np${1}_"$(echo $options|sed 's/-//g'|sed 's/=//g'|sed 's/ /_/g')
