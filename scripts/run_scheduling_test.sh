@@ -31,13 +31,66 @@ mkdir -p .api/jobs.0/
 mkdir -p .api/jobs.0/{introduced,new,pending,done}/
 cleanup
 
+function create_independent_jobs() {
+    i=1
+    while read -r instance; do
+        # Parameters: job name, instance path, wallclock limit, arrival, dependencies, application (SAT or DUMMY)
+        introduce_job solve-$i instances/$instance 300 0 "" SAT
+        i=$((i+1))
+    done < $benchmarkfile
+}
+
+function sample_exponential() {
+    lambda="$1"
+    echo "- $lambda * l( 1 - 0.0001 * $((1 + $RANDOM % 9999)) )"|bc -l
+}
+
+function create_job_chains() {
+    
+    ninstances=$(cat $benchmarkfile|wc -l)
+    interarrivaltime=10
+    jobsperclient_lambda=2
+    timeperjob=60
+    maxtime=1000
+    
+    instno=1
+    i=1
+    t=1
+    c=1
+    
+    while true; do
+        echo $t
+        if (( $(echo "$t > $maxtime" |bc -l) )); then break; fi
+        jobsthisclient=$(sample_exponential $jobsperclient_lambda)
+        echo "  $jobsthisclient"
+        
+        added=false
+        for k in $(seq 1 $jobsthisclient); do
+            added=true
+            dep=""
+            if [ $k -gt 1 ]; then dep="\"admin.solve-$c-$(($k-1))\"" ; fi 
+            introduce_job solve-$c-$k $(sed "${instno}q;d" $benchmarkfile) $timeperjob $t "$dep" DUMMY 
+            i=$(($i+1))
+            instno=$(($instno+1))
+            if [ $instno -gt $ninstances ]; then 
+                instno=1
+            fi
+        done
+
+        if $added; then
+            t=$( echo $t + $(sample_exponential $interarrivaltime) |bc -l )
+            c=$((c+1))
+        fi
+    done
+
+    echo "Introduced $i jobs"
+}
+
+
 # Generate chain of independent jobs
-i=1
-while read -r instance; do
-    # Parameters: job name, instance path, wallclock limit, arrival, dependencies, application (SAT or DUMMY)
-    introduce_job solve-$i instances/$instance 300 0 "" SAT
-    i=$((i+1))
-done < $benchmarkfile
+#create_independent_jobs
+# Generate clients, each with a chain of dependent jobs
+create_job_chains
 
 # Set options
 options="-t=4 -lbc=4 -g=0.1 -satsolver=lcg -v=4 -J=$(($i-1)) -ch=1 -chaf=5 -chstms=60 -s=0.25 -cfhl=0 -smcl=8 -hmcl=8 -mlbdps=8 -checksums=0 -huca=0 -wam=1000 -sleep=100"
