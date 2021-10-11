@@ -98,12 +98,23 @@ void EventDrivenBalancer::onTerminate(const Job& job) {
         job.getId(), /*jobEpoch=*/INT_MAX, /*demand=*/0, /*priority=*/0 
     }));
     _job_root_epochs.erase(job.getId());
+
+    if (!_balancing_latencies.count(job.getId())) return;
+    auto& latencies = _balancing_latencies[job.getId()];
+    if (!latencies.empty()) {
+        std::sort(latencies.begin(), latencies.end());
+        float avgLatency = std::accumulate(latencies.begin(), latencies.end(), 0.0f) / latencies.size();
+        log(V3_VERB, "%s balancing latency={num:%i min:%.5f med:%.5f avg:%.5f max:%.5f}\n", 
+            job.toStr(), latencies.size(), latencies.front(), latencies[latencies.size()/2], avgLatency, latencies.back());
+    }
+    _balancing_latencies.erase(job.getId());
 }
 
 void EventDrivenBalancer::pushEvent(const Event& event) {
     bool inserted = _diffs.insertIfNovel(event);
     if (inserted) {
-        _time_of_pushed_event[event.jobId] = Timer::elapsedSeconds();
+        if (!_time_of_pushed_event.count(event.jobId)) 
+            _time_of_pushed_event[event.jobId] = Timer::elapsedSeconds();
         advance();
     }
 }
@@ -185,8 +196,9 @@ void EventDrivenBalancer::computeBalancingResult() {
             float elapsed = 0;
             if (_time_of_pushed_event.count(_active_job_id)) {
                 elapsed = Timer::elapsedSeconds() - _time_of_pushed_event[_active_job_id];
+                _balancing_latencies[entry.jobId].push_back(elapsed);
+                _time_of_pushed_event.erase(_active_job_id);
             }
-            _time_of_pushed_event.erase(_active_job_id);
             _volume_update_callback(entry.jobId, entry.volume, elapsed);
         }
     }

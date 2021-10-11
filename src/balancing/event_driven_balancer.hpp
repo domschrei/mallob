@@ -52,6 +52,7 @@ private:
     robin_hood::unordered_map<int, int> _job_root_epochs;
     robin_hood::unordered_map<int, int> _job_volumes;
     robin_hood::unordered_map<int, float> _time_of_pushed_event;
+    robin_hood::unordered_map<int, std::vector<float>> _balancing_latencies;
 
     std::function<void(int, int, float)> _volume_update_callback;
 

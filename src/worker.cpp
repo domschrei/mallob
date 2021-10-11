@@ -1029,8 +1029,8 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
                         job.toStr(), req.toStr().c_str());
             MyMpi::isend(nextNodeRank, tag, req);
             _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
-            if (i == 0) job.getJobTree().setDesireLeft(Timer::elapsedSeconds() - eventLatency);
-            else job.getJobTree().setDesireRight(Timer::elapsedSeconds() - eventLatency);
+            if (i == 0) job.getJobTree().setDesireLeft(Timer::elapsedSeconds());
+            else job.getJobTree().setDesireRight(Timer::elapsedSeconds());
         } else {
             // Job does not want to grow - any more (?) - so unset any previous desire
             if (i == 0) job.getJobTree().unsetDesireLeft();
