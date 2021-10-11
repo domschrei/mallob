@@ -8,6 +8,7 @@ struct BalancingEntry {
 
     int jobId;
     int demand;
+    int originalDemand;
     float priority;
 
     double fairShare;
@@ -17,6 +18,7 @@ struct BalancingEntry {
     int volumeUpper;
 
     BalancingEntry(int jobId, int demand, float priority) : jobId(jobId), demand(demand), priority(priority) {
+        originalDemand = demand;
         volumeLower = 1;
         volume = 1;
         volumeUpper = 1;

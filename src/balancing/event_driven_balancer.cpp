@@ -90,7 +90,10 @@ void EventDrivenBalancer::onSuspend(const Job& job) {
 
 void EventDrivenBalancer::onTerminate(const Job& job) {
 
-    if (_active_job_id == job.getId()) _active_job_id = -1;
+    if (_active_job_id == job.getId()) {
+        _active_job_id = -1;
+        _pending_entries.clear();
+    } 
     if (!job.getJobTree().isRoot()) return;
 
     assert(_job_root_epochs.at(job.getId()) > 0);
@@ -113,8 +116,8 @@ void EventDrivenBalancer::onTerminate(const Job& job) {
 void EventDrivenBalancer::pushEvent(const Event& event) {
     bool inserted = _diffs.insertIfNovel(event);
     if (inserted) {
-        if (!_time_of_pushed_event.count(event.jobId)) 
-            _time_of_pushed_event[event.jobId] = Timer::elapsedSeconds();
+        _pending_entries.insert(PendingEvent{event.jobId, event.demand, event.priority, Timer::elapsedSeconds()});
+        log(V1_WARN, "[WARN] insert (%i,%i,%.3f)\n", event.jobId, event.demand, event.priority);
         advance();
     }
 }
@@ -194,11 +197,15 @@ void EventDrivenBalancer::computeBalancingResult() {
         _job_volumes[entry.jobId] = entry.volume;
         if (entry.jobId == _active_job_id) {
             float elapsed = 0;
-            if (_time_of_pushed_event.count(_active_job_id)) {
-                elapsed = Timer::elapsedSeconds() - _time_of_pushed_event[_active_job_id];
+            PendingEvent ev{_active_job_id, entry.originalDemand, entry.priority, 0};
+            if (_pending_entries.count(ev)) {
+
+                auto it = _pending_entries.find(ev);
+                elapsed = Timer::elapsedSeconds() - it->time;
                 _balancing_latencies[entry.jobId].push_back(elapsed);
-                _time_of_pushed_event.erase(_active_job_id);
+                _pending_entries.erase(it);
             }
+            
             _volume_update_callback(entry.jobId, entry.volume, elapsed);
         }
     }
