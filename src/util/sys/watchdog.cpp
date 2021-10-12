@@ -20,7 +20,7 @@ Watchdog::Watchdog(int checkIntervalMillis, float time) {
                 log(V0_CRIT, "[ERROR] Watchdog: Timeout detected! (Last reset @ %.3f) Writing trace ...\n", 0.001*_last_reset_millis);
                 Process::writeTrace(parentTid);
                 Logger::getMainInstance().flush();
-                abort();
+                raise(SIGABRT);
             }
             if (_warning_period_millis > 0 && elapsed > _warning_period_millis) {
                 log(V1_WARN, "[WARN] Watchdog: No reset for %i ms!\n", elapsed);

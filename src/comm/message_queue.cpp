@@ -15,7 +15,7 @@
 #include "util/ringbuffer.hpp"
 
 MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize), 
-    _fragmented_queue(128), _fused_queue(128), _garbage_queue(128) {
+    _fragmented_queue(1024), _fused_queue(1024), _garbage_queue(1024) {
     
     MPI_Comm_rank(MPI_COMM_WORLD, &_my_rank);
     _recv_data = (uint8_t*) malloc(maxMsgSize+20);
@@ -63,14 +63,13 @@ int MessageQueue::send(DataPtr data, int dest, int tag) {
     }
 
     if (data->size() > _max_msg_size+3*sizeof(int)) {
-        log(V4_VVER, "MQ init batch send\n");
         // Batch data, only send first batch
         h.sentBatches = 0;
         h.totalNumBatches = getTotalNumBatches(h);
         int sendTag = prepareSendHandleForNextBatch(h);
         MPI_Isend(h.tempStorage.data(), h.tempStorage.size(), MPI_BYTE, dest, 
             sendTag, MPI_COMM_WORLD, &h.request);
-        log(V4_VVER, "MQ sent 1st batch\n");
+        log(V4_VVER, "MQ sent batch %i/%i\n", 0, h.totalNumBatches);
     } else {
         // Directly send entire message
         MPI_Isend(h.data->data(), msgSize, MPI_BYTE, dest, tag, MPI_COMM_WORLD, &h.request);
@@ -178,16 +177,22 @@ void MessageQueue::processReceived() {
         msglen -= 3*sizeof(int);
         
         // Store data in fragments structure
+        
         //log(V5_DEBG, "MQ STORE\n");
         auto& fragment = _fragmented_messages[std::pair<int, int>(source, id)];
         fragment.source = source;
         fragment.tag = tag;
+
+        assert(sentBatch < totalNumBatches || log_return_false("Invalid batch %i/%i!\n", sentBatch, totalNumBatches));
         if (sentBatch >= fragment.dataFragments.size()) fragment.dataFragments.resize(sentBatch+1);
+
         //log(V5_DEBG, "MQ STORE alloc\n");
+        assert(fragment.dataFragments[sentBatch] == nullptr || log_return_false("Batch %i/%i already present!\n", sentBatch, totalNumBatches));
         fragment.dataFragments[sentBatch].reset(new std::vector<uint8_t>(_recv_data+offset, _recv_data+offset+msglen));
-        fragment.receivedFragments++;
+        
         //log(V5_DEBG, "MQ STORE produce\n");
         // All fragments of the message received?
+        fragment.receivedFragments++;
         if (fragment.receivedFragments == totalNumBatches) {
             while (!_fragmented_queue.produce(std::move(fragment))) {}
         }
@@ -291,6 +296,8 @@ void MessageQueue::processSent() {
 }
 
 int MessageQueue::prepareSendHandleForNextBatch(SendHandle& h) {
+    assert(!isFinished(h) || log_return_false("Batched handle (n=%i) already finished!\n", h.sentBatches));
+
     int totalNumBatches = h.totalNumBatches;
     size_t begin = h.sentBatches*_max_msg_size;
     size_t end = std::min(h.data->size(), (h.sentBatches+1)*_max_msg_size);
