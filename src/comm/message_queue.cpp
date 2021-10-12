@@ -215,9 +215,13 @@ void MessageQueue::processReceived() {
 
 void MessageQueue::processSelfReceived() {
     if (_self_recv_queue.empty()) return;
-    // move queue due to concurrent modification in callback
-    std::vector<SendHandle> copiedQueue(std::move(_self_recv_queue)); 
-    _self_recv_queue.clear();
+    // copy content of queue due to concurrent modification in callback
+    // (up to x elements in order to stay responsive)
+    std::vector<SendHandle> copiedQueue;
+    while (!_self_recv_queue.empty() && copiedQueue.size() < 4) {
+        copiedQueue.push_back(std::move(_self_recv_queue.front()));
+        _self_recv_queue.pop_front();
+    }
     for (auto& sh : copiedQueue) {
         MessageHandle h;
         h.tag = sh.tag;
@@ -231,6 +235,7 @@ void MessageQueue::processSelfReceived() {
 void MessageQueue::processAssembledReceived() {
     // Process fully assembled batched messages
     auto opt = _fused_queue.consume();
+    int consumed = 0;
     while (opt.has_value()) {
         auto& h = opt.value();
 
@@ -248,6 +253,9 @@ void MessageQueue::processAssembledReceived() {
             )) {}
         }
 
+        consumed++;
+        if (consumed >= 4) break;
+
         opt = _fused_queue.consume();
     }
 }
@@ -255,7 +263,7 @@ void MessageQueue::processAssembledReceived() {
 void MessageQueue::processSent() {
     // Test each send handle
     int numTested = 0;
-    for (auto it = sendQueue.begin(); it != sendQueue.end() && numTested < 6; ) {
+    for (auto it = sendQueue.begin(); it != sendQueue.end() && numTested < 4; ) {
         auto& h = *it;
         int flag;
         MPI_Status status;

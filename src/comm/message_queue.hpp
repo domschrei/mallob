@@ -83,7 +83,7 @@ private:
     // Basic receive stuff
     MPI_Request _recv_request;
     uint8_t* _recv_data;
-    std::vector<SendHandle> _self_recv_queue;
+    std::list<SendHandle> _self_recv_queue;
 
     // Fragmented messages stuff
     robin_hood::unordered_map<std::pair<int, int>, ReceiveFragment, IntPairHasher> _fragmented_messages;
