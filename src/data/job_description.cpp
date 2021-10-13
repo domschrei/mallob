@@ -163,5 +163,5 @@ const std::shared_ptr<std::vector<uint8_t>>& JobDescription::getSerialization(in
 }
 
 void JobDescription::clearPayload(int revision) {
-    getRevisionData(revision)->clear();
+    getRevisionData(revision).reset();
 }

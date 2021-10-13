@@ -299,6 +299,7 @@ int MessageQueue::prepareSendHandleForNextBatch(SendHandle& h) {
     int totalNumBatches = h.totalNumBatches;
     size_t begin = h.sentBatches*_max_msg_size;
     size_t end = std::min(h.data->size(), (h.sentBatches+1)*_max_msg_size);
+    assert(end>begin || log_return_false("%ld <= %ld\n", end, begin));
     h.tempStorage.resize((end-begin)+3*sizeof(int));
 
     // Copy actual data
