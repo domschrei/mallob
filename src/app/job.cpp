@@ -120,7 +120,11 @@ bool Job::isDestructible() {
 }
 
 int Job::getDemand() const {
-    if (_state != ACTIVE) return 0; 
+    
+    if (_state != ACTIVE) {
+        if (_commitment.has_value()) return 1;
+        return 0;
+    } 
     
     int commSize = _job_tree.getCommSize();
     int demand; 

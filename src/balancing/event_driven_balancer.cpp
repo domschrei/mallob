@@ -57,7 +57,9 @@ void EventDrivenBalancer::setVolumeUpdateCallback(std::function<void(int, int, f
 
 void EventDrivenBalancer::onActivate(const Job& job) {
     
+    if (_active_job_id == job.getId()) return;
     _active_job_id = job.getId();
+    
     if (!job.getJobTree().isRoot()) return;
     
     if (!_job_root_epochs.count(job.getId())) _job_root_epochs[job.getId()] = 0;

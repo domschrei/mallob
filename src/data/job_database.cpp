@@ -109,6 +109,11 @@ void JobDatabase::execute(int jobId, int source) {
     _balancer->onActivate(job);
 }
 
+void JobDatabase::preregisterJobInBalancer(int jobId) {
+    assert(has(jobId));
+    _balancer->onActivate(get(jobId));
+}
+
 bool JobDatabase::checkComputationLimits(int jobId) {
 
     auto& job = get(jobId);
