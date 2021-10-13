@@ -83,6 +83,7 @@ public:
         _clause_out = _ready_to_import_reader.getNextIncomingClause();
         if (_clause_out.begin != nullptr) {
             _stats.digestedClauses++;
+            _stats.histDigested->increment(_clause_out.size);
             return _clause_out;
         }
 
