@@ -145,16 +145,6 @@ const int MSG_NOTIFY_CLIENT_JOB_ABORTING = 41;
 const int MSG_OFFER_ADOPTION_OF_ROOT = 42;
 
 
-/*
-Pseudo-tag representing all tags that can be received at any time.
-NOT a tag to be used outside of MyMpi.*.
-*/
-const int MSG_ANYTIME = 1337;
-const int MSG_ANYTIME_BATCHED = 1338;
-
-
-const int MSG_OFFSET_BATCHED_METADATA_AT_FRONT = 10000;
-const int MSG_OFFSET_BATCHED_METADATA_AT_BACK = 20000;
-
+const int MSG_OFFSET_BATCHED = 10000;
 
 #endif

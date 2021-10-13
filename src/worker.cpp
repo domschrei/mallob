@@ -1041,6 +1041,7 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
 
     // Shrink (and pause solving) if necessary
     if (thisIndex > 0 && thisIndex >= volume) {
+        log(V3_VERB, "%s shrinking\n", job.toStr());
         _job_db.suspend(jobId);
         MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, IntPair(jobId, thisIndex));
     }

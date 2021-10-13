@@ -47,9 +47,9 @@ void MessageQueue::registerSentCallback(std::function<void(int)> callback) {
 int MessageQueue::send(DataPtr data, int dest, int tag) {
 
     // Initialize send handle
-    sendQueue.push_back(SendHandle());
-    SendHandle& h = sendQueue.back();
-    h.id = runningSendId++;
+    _send_queue.push_back(SendHandle());
+    SendHandle& h = _send_queue.back();
+    h.id = _running_send_id++;
     h.data = data;
     h.dest = dest;
     h.tag = tag;
@@ -58,7 +58,7 @@ int MessageQueue::send(DataPtr data, int dest, int tag) {
     if (dest == _my_rank) {
         // Self message
         _self_recv_queue.push_back(std::move(h));
-        sendQueue.pop_back();
+        _send_queue.pop_back();
         return _self_recv_queue.back().id;
     }
 
@@ -150,45 +150,35 @@ void MessageQueue::processReceived() {
     int tag = status.MPI_TAG;
     log(V5_DEBG, "MQ RECV n=%i s=[%i] t=%i\n", msglen, source, tag);
 
-    if (tag >= MSG_OFFSET_BATCHED_METADATA_AT_FRONT) {
+    if (tag >= MSG_OFFSET_BATCHED) {
         // Fragment of a message
-
-        // To which end has the metadata been appended?
-        bool appendedAtBack = false;
-        if (tag >= MSG_OFFSET_BATCHED_METADATA_AT_BACK) {
-            appendedAtBack = true;
-            tag -= MSG_OFFSET_BATCHED_METADATA_AT_BACK;
-        } else tag -= MSG_OFFSET_BATCHED_METADATA_AT_FRONT;
-
-        int offset = 0;
+        tag -= MSG_OFFSET_BATCHED;
         int id, sentBatch, totalNumBatches;
-        if (appendedAtBack) {
-            // Read meta data from end of message
-            memcpy(&id, _recv_data+msglen - 3*sizeof(int), sizeof(int));
-            memcpy(&sentBatch, _recv_data+msglen - 2*sizeof(int), sizeof(int));
-            memcpy(&totalNumBatches, _recv_data+msglen - sizeof(int), sizeof(int));
-        } else {
-            // Read meta data from front of message
-            memcpy(&id, _recv_data, sizeof(int));
-            memcpy(&sentBatch, _recv_data+sizeof(int), sizeof(int));
-            memcpy(&totalNumBatches, _recv_data+2*sizeof(int), sizeof(int));
-            offset = 3*sizeof(int);
-        }
+        // Read meta data from end of message
+        memcpy(&id, _recv_data+msglen - 3*sizeof(int), sizeof(int));
+        memcpy(&sentBatch, _recv_data+msglen - 2*sizeof(int), sizeof(int));
+        memcpy(&totalNumBatches, _recv_data+msglen - sizeof(int), sizeof(int));
         msglen -= 3*sizeof(int);
         
         // Store data in fragments structure
         
         //log(V5_DEBG, "MQ STORE\n");
-        auto& fragment = _fragmented_messages[std::pair<int, int>(source, id)];
-        fragment.source = source;
-        fragment.tag = tag;
+        auto key = std::pair<int, int>(source, id);
+        if (!_fragmented_messages.count(key)) {
+            auto& fragment = _fragmented_messages[key];
+            fragment.source = source;
+            fragment.tag = tag;
+        }
+        auto& fragment = _fragmented_messages[key];
 
+        assert(fragment.source == source);
+        assert(fragment.tag == tag);
         assert(sentBatch < totalNumBatches || log_return_false("Invalid batch %i/%i!\n", sentBatch, totalNumBatches));
         if (sentBatch >= fragment.dataFragments.size()) fragment.dataFragments.resize(sentBatch+1);
 
         //log(V5_DEBG, "MQ STORE alloc\n");
         assert(fragment.dataFragments[sentBatch] == nullptr || log_return_false("Batch %i/%i already present!\n", sentBatch, totalNumBatches));
-        fragment.dataFragments[sentBatch].reset(new std::vector<uint8_t>(_recv_data+offset, _recv_data+offset+msglen));
+        fragment.dataFragments[sentBatch].reset(new std::vector<uint8_t>(_recv_data, _recv_data+msglen));
         
         //log(V5_DEBG, "MQ STORE produce\n");
         // All fragments of the message received?
@@ -263,7 +253,7 @@ void MessageQueue::processAssembledReceived() {
 void MessageQueue::processSent() {
     // Test each send handle
     int numTested = 0;
-    for (auto it = sendQueue.begin(); it != sendQueue.end() && numTested < 4; ) {
+    for (auto it = _send_queue.begin(); it != _send_queue.end() && numTested < 4; ) {
         auto& h = *it;
         int flag;
         MPI_Status status;
@@ -286,7 +276,7 @@ void MessageQueue::processSent() {
                 int sendTag = prepareSendHandleForNextBatch(h);
                 MPI_Isend(h.tempStorage.data(), h.tempStorage.size(), MPI_BYTE, h.dest, 
                     sendTag, MPI_COMM_WORLD, &h.request);
-                continue; // test this handle another time
+                continue; // test this handle one more time
             }
         }
 
@@ -299,7 +289,7 @@ void MessageQueue::processSent() {
         }
         
         // Remove handle
-        it = sendQueue.erase(it);
+        it = _send_queue.erase(it); // go to next handle
     }
 }
 
@@ -318,7 +308,7 @@ int MessageQueue::prepareSendHandleForNextBatch(SendHandle& h) {
     memcpy(h.tempStorage.data()+(end-begin)+sizeof(int), &h.sentBatches, sizeof(int));
     memcpy(h.tempStorage.data()+(end-begin)+2*sizeof(int), &totalNumBatches, sizeof(int));
 
-    return h.tag + MSG_OFFSET_BATCHED_METADATA_AT_BACK;
+    return h.tag + MSG_OFFSET_BATCHED;
 }
 size_t MessageQueue::getTotalNumBatches(const SendHandle& h) const {return std::ceil(h.data->size() / (float)_max_msg_size);}
 bool MessageQueue::isBatched(const SendHandle& h) const {return h.sentBatches >= 0;}

@@ -67,7 +67,7 @@ function create_job_chains() {
             added=true
             dep=""
             if [ $k -gt 1 ]; then dep="\"admin.solve-$c-$(($k-1))\"" ; fi 
-            introduce_job solve-$c-$k $(sed "${instno}q;d" $benchmarkfile) $timeperjob $t "$dep" DUMMY 
+            introduce_job solve-$c-$k instances/$(sed "${instno}q;d" $benchmarkfile) $timeperjob $t "$dep" DUMMY
             i=$(($i+1))
             instno=$(($instno+1))
             if [ $instno -gt $ninstances ]; then 

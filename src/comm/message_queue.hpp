@@ -91,8 +91,8 @@ private:
     SPSCRingBuffer<MessageHandle> _fused_queue;
 
     // Send stuff
-    std::list<SendHandle> sendQueue;
-    int runningSendId = 1;
+    std::list<SendHandle> _send_queue;
+    int _running_send_id = 1;
 
     // Garbage collection
     SPSCRingBuffer<DataPtr> _garbage_queue;

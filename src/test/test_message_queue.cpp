@@ -84,7 +84,7 @@ void testSimpleP2P() {
 
 void testBigP2P() {
 
-    const bool verifyData = false;
+    const bool verifyData = true;
     const int N[] = {10, 249999, 250000, 250001, 900000, 1249999, 1250000, 1250001, 100000000};
     //const int N[] = {10, 249999, 250000, 250001, 900000};
     const int numTests = sizeof(N) / sizeof(int);
@@ -110,6 +110,7 @@ void testBigP2P() {
         log(V2_INFO, "#%i received\n", msgIdx);
         
         if (verifyData) {
+            assert(h.tag == TAG_INT_VEC);
             auto vec = Serializable::get<IntVec>(h.getRecvData()).data;
             assert(vec.size() == N[msgIdx] || log_return_false("Wrong size: %i != %i\n", vec.size(), N[msgIdx]));
             for (size_t i = 0; i < vec.size(); i++) {

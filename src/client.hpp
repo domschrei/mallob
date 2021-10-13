@@ -69,8 +69,6 @@ private:
     BackgroundWorker _instance_reader;
     std::unique_ptr<JobFileAdapter> _file_adapter;
 
-    // Maps a job ID to the ID of the message handle transferring its description
-    std::map<int, std::pair<int, int>> _transfer_msg_id_to_job_id_rev;
     // Number of jobs with a loaded description (taking memory!)
     std::atomic_int _num_loaded_jobs = 0;
     Mutex _finished_msg_ids_mutex;
@@ -101,7 +99,6 @@ private:
     void handleSendJobResult(MessageHandle& handle);
     void handleClientFinished(MessageHandle& handle);
     void handleExit(MessageHandle& handle);
-    void handleJobDescriptionSent(int msgId);
 
     int getMaxNumParallelJobs();
     void introduceNextJob();

@@ -152,7 +152,6 @@ void Client::init() {
     q.registerCallback(MSG_SEND_JOB_RESULT, [&](MessageHandle& h) {handleSendJobResult(h);});
     q.registerCallback(MSG_NOTIFY_CLIENT_JOB_ABORTING, [&](MessageHandle& h) {handleAbort(h);});
     q.registerCallback(MSG_OFFER_ADOPTION_OF_ROOT, [&](MessageHandle& h) {handleOfferAdoption(h);});
-    q.registerSentCallback([&](int id) {handleJobDescriptionSent(id);});
 }
 
 int Client::getInternalRank() {
@@ -297,7 +296,11 @@ void Client::handleOfferAdoption(MessageHandle& handle) {
     
     // Remember transaction
     _root_nodes[req.jobId] = handle.source;
-    _transfer_msg_id_to_job_id_rev[msgId] = std::pair<int, int>(req.jobId, desc.getRevision());
+
+    // Clean up job description from this side (copy of shared_ptr will remain in message_queue until sent)
+    log(V4_VVER, "Clear description of #%i rev. %i\n", req.jobId, desc.getRevision());
+    desc.clearPayload(desc.getRevision());
+    _num_loaded_jobs--;
 }
 
 void Client::handleJobDone(MessageHandle& handle) {
@@ -374,18 +377,6 @@ void Client::handleAbort(MessageHandle& handle) {
     }
 
     finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
-}
-
-void Client::handleJobDescriptionSent(int msgId) {
-    if (_transfer_msg_id_to_job_id_rev.count(msgId)) {
-        const auto& [jobId, rev] = _transfer_msg_id_to_job_id_rev.at(msgId);
-        if (_active_jobs.count(jobId)) {
-            log(V4_VVER, "Clear description of #%i rev. %i\n", jobId, rev);
-            _active_jobs.at(jobId)->clearPayload(rev);
-            _num_loaded_jobs--;
-        }
-        _transfer_msg_id_to_job_id_rev.erase(msgId);
-    }
 }
 
 void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {

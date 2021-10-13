@@ -148,8 +148,11 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
     // Requests for a job root never become obsolete
     if (req.requestedNodeIndex == 0) return false;
 
-    // Job not known anymore: obsolete
-    if (!has(req.jobId)) return true;
+    if (!has(req.jobId)) {
+        // Job not known anymore: obsolete
+        log(V4_VVER, "Req. %s : job unknown\n", req.toStr().c_str());
+        return true;
+    }
 
     Job& job = get(req.jobId);
     if (job.getState() != ACTIVE) {
