@@ -25,17 +25,16 @@ cleanup
 
 # Generate chain of interdependent jobs
 n=0
-prevjob=""
 i=1
 while read -r instance; do
     # wallclock limit, arrival, dependencies, application
-    prevjob=\"$(introduce_job solve-$i instances/$instance 300 0 "$prevjob" SAT)\" 
+    introduce_job solve-$i instances/$instance 300 0 "" SAT
     n=$((n+1))
     i=$((i+1))
 done < $benchmarkfile
 
 # Set options
-options="-t=4 -satsolver=lcg -v=3 -ch=0 -chaf=5 -chstms=60 -cfhl=0 -smcl=30 -hmcl=30 -mlbdps=8 -checksums=0 -huca=0 -wam=1000 -sleep=100"
+options="-c=1 -t=4 -lbc=1 -J=$n -satsolver=cccllg -v=4 -ch=0 -smcl=30 -hmcl=30 -mlbdps=5 -huca=0"
 
 # Launch Mallob
 runid="sateval_$(hostname)_$(git rev-parse --short HEAD)_np${1}_"$(echo $options|sed 's/-//g'|sed 's/=//g'|sed 's/ /_/g')
