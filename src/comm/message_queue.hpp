@@ -50,6 +50,7 @@ private:
         DataPtr data;
         int sentBatches = -1;
         int totalNumBatches;
+        int sizePerBatch;
         std::vector<uint8_t> tempStorage;
         
         SendHandle() = default;
@@ -61,7 +62,10 @@ private:
             data = std::move(moved.data);
             sentBatches = moved.sentBatches;
             totalNumBatches = moved.totalNumBatches;
+            sizePerBatch = moved.sizePerBatch;
             tempStorage = std::move(moved.tempStorage);
+            
+            moved.request = MPI_REQUEST_NULL;
         }
         SendHandle& operator=(SendHandle&& moved) {
             id = moved.id;
@@ -71,9 +75,33 @@ private:
             data = std::move(moved.data);
             sentBatches = moved.sentBatches;
             totalNumBatches = moved.totalNumBatches;
+            sizePerBatch = moved.sizePerBatch;
             tempStorage = std::move(moved.tempStorage);
+            
+            moved.request = MPI_REQUEST_NULL;
             return *this;
         }
+
+        int prepareForNextBatch() {
+            assert(!isFinished() || log_return_false("Batched handle (n=%i) already finished!\n", sentBatches));
+
+            size_t begin = sentBatches*sizePerBatch;
+            size_t end = std::min(data->size(), (size_t)(sentBatches+1)*sizePerBatch);
+            assert(end>begin || log_return_false("%ld <= %ld\n", end, begin));
+            tempStorage.resize((end-begin)+3*sizeof(int));
+
+            // Copy actual data
+            memcpy(tempStorage.data(), data->data()+begin, end-begin);
+            // Copy meta data at insertion point
+            memcpy(tempStorage.data()+(end-begin), &id, sizeof(int));
+            memcpy(tempStorage.data()+(end-begin)+sizeof(int), &sentBatches, sizeof(int));
+            memcpy(tempStorage.data()+(end-begin)+2*sizeof(int), &totalNumBatches, sizeof(int));
+
+            return tag + MSG_OFFSET_BATCHED;
+        }
+        size_t getTotalNumBatches() const {return std::ceil(data->size() / (float)sizePerBatch);}
+        bool isBatched() const {return sentBatches >= 0;}
+        bool isFinished() const {assert(isBatched()); return sentBatches == totalNumBatches;}
     };
 
     size_t _max_msg_size;
@@ -123,10 +151,6 @@ private:
     void processSelfReceived();
     void processAssembledReceived();
     void processSent();
-    int prepareSendHandleForNextBatch(SendHandle& h);
-    size_t getTotalNumBatches(const SendHandle& h) const;
-    bool isBatched(const SendHandle& h) const;
-    bool isFinished(const SendHandle& h) const;
 };
 
 #endif

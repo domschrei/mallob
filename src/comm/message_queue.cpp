@@ -47,32 +47,35 @@ void MessageQueue::registerSentCallback(std::function<void(int)> callback) {
 int MessageQueue::send(DataPtr data, int dest, int tag) {
 
     // Initialize send handle
-    _send_queue.push_back(SendHandle());
-    SendHandle& h = _send_queue.back();
-    h.id = _running_send_id++;
-    h.data = data;
-    h.dest = dest;
-    h.tag = tag;
-    int msgSize = h.data->size();
+    {
+        SendHandle handle;
+        handle.id = _running_send_id++;
+        handle.data = data;
+        handle.dest = dest;
+        handle.tag = tag;
+    
+        if (dest == _my_rank) {
+            // Self message
+            _self_recv_queue.push_back(std::move(handle));
+            return _self_recv_queue.back().id;
+        }
 
-    if (dest == _my_rank) {
-        // Self message
-        _self_recv_queue.push_back(std::move(h));
-        _send_queue.pop_back();
-        return _self_recv_queue.back().id;
+        _send_queue.push_back(std::move(handle));
     }
 
-    if (data->size() > _max_msg_size+3*sizeof(int)) {
+    SendHandle& h = _send_queue.back();
+    if (h.data->size() > _max_msg_size+3*sizeof(int)) {
         // Batch data, only send first batch
+        h.sizePerBatch = _max_msg_size;
         h.sentBatches = 0;
-        h.totalNumBatches = getTotalNumBatches(h);
-        int sendTag = prepareSendHandleForNextBatch(h);
+        h.totalNumBatches = h.getTotalNumBatches();
+        int sendTag = h.prepareForNextBatch();
         MPI_Isend(h.tempStorage.data(), h.tempStorage.size(), MPI_BYTE, dest, 
             sendTag, MPI_COMM_WORLD, &h.request);
         log(V4_VVER, "MQ sent batch %i/%i\n", 0, h.totalNumBatches);
     } else {
         // Directly send entire message
-        MPI_Isend(h.data->data(), msgSize, MPI_BYTE, dest, tag, MPI_COMM_WORLD, &h.request);
+        MPI_Isend(h.data->data(), h.data->size(), MPI_BYTE, dest, tag, MPI_COMM_WORLD, &h.request);
     }
 
     return h.id;
@@ -155,14 +158,14 @@ void MessageQueue::processReceived() {
         tag -= MSG_OFFSET_BATCHED;
         int id, sentBatch, totalNumBatches;
         // Read meta data from end of message
-        memcpy(&id, _recv_data+msglen - 3*sizeof(int), sizeof(int));
-        memcpy(&sentBatch, _recv_data+msglen - 2*sizeof(int), sizeof(int));
-        memcpy(&totalNumBatches, _recv_data+msglen - sizeof(int), sizeof(int));
+        memcpy(&id,              _recv_data+msglen - 3*sizeof(int), sizeof(int));
+        memcpy(&sentBatch,       _recv_data+msglen - 2*sizeof(int), sizeof(int));
+        memcpy(&totalNumBatches, _recv_data+msglen - 1*sizeof(int), sizeof(int));
         msglen -= 3*sizeof(int);
         
         // Store data in fragments structure
         
-        //log(V5_DEBG, "MQ STORE\n");
+        log(V5_DEBG, "MQ STORE (%i,%i) %i/%i\n", source, id, sentBatch, totalNumBatches);
         auto key = std::pair<int, int>(source, id);
         if (!_fragmented_messages.count(key)) {
             auto& fragment = _fragmented_messages[key];
@@ -229,7 +232,7 @@ void MessageQueue::processAssembledReceived() {
     while (opt.has_value()) {
         auto& h = opt.value();
 
-        log(V5_DEBG, "tag: %i\n", h.tag);
+        log(V5_DEBG, "MQ FUSED t=%i\n", h.tag);
         _callbacks.at(h.tag)(h);
         
         if (h.getRecvData().size() > _max_msg_size) {
@@ -251,10 +254,15 @@ void MessageQueue::processAssembledReceived() {
 }
 
 void MessageQueue::processSent() {
-    // Test each send handle
+
     int numTested = 0;
-    for (auto it = _send_queue.begin(); it != _send_queue.end() && numTested < 4; ) {
-        auto& h = *it;
+    auto it = _send_queue.begin();
+
+    // Test each send handle
+    while (it != _send_queue.end()) {
+        if (numTested == 4) break; // limit number of tests per call
+
+        SendHandle& h = *it;
         int flag;
         MPI_Status status;
         MPI_Test(&h.request, &flag, &status);
@@ -267,50 +275,35 @@ void MessageQueue::processSent() {
         
         // Sent!
         //log(V5_DEBG, "MQ SENT n=%i d=[%i] t=%i\n", h.data->size(), h.dest, h.tag);
-        
+        bool completed = true;
+
         // Batched?
-        if (isBatched(h)) {
+        if (h.isBatched()) {
+            log(V5_DEBG, "MQ SENT id=%i %i/%i n=%i d=[%i] t=%i\n", h.id, h.sentBatches, 
+                h.totalNumBatches, h.data->size(), h.dest, h.tag);
             h.sentBatches++;
-            if (!isFinished(h)) {
+            if (!h.isFinished()) {
                 // Send next batch
-                int sendTag = prepareSendHandleForNextBatch(h);
+                int sendTag = h.prepareForNextBatch();
                 MPI_Isend(h.tempStorage.data(), h.tempStorage.size(), MPI_BYTE, h.dest, 
                     sendTag, MPI_COMM_WORLD, &h.request);
-                continue; // test this handle one more time
+                completed = false;
             }
         }
 
-        // Notify completion
-        _send_done_callback(h.id); 
+        if (completed) {
+            // Notify completion
+            _send_done_callback(h.id); 
 
-        if (h.data->size() > _max_msg_size) {
-            // Concurrent deallocation of SendHandle's large chunk of data
-            while (!_garbage_queue.produce(std::move(h.data))) {}
+            if (h.data->size() > _max_msg_size) {
+                // Concurrent deallocation of SendHandle's large chunk of data
+                while (!_garbage_queue.produce(std::move(h.data))) {}
+            }
+            
+            // Remove handle
+            it = _send_queue.erase(it); // go to next handle
+        } else {
+            it++; // go to next handle
         }
-        
-        // Remove handle
-        it = _send_queue.erase(it); // go to next handle
     }
 }
-
-int MessageQueue::prepareSendHandleForNextBatch(SendHandle& h) {
-    assert(!isFinished(h) || log_return_false("Batched handle (n=%i) already finished!\n", h.sentBatches));
-
-    int totalNumBatches = h.totalNumBatches;
-    size_t begin = h.sentBatches*_max_msg_size;
-    size_t end = std::min(h.data->size(), (h.sentBatches+1)*_max_msg_size);
-    assert(end>begin || log_return_false("%ld <= %ld\n", end, begin));
-    h.tempStorage.resize((end-begin)+3*sizeof(int));
-
-    // Copy actual data
-    memcpy(h.tempStorage.data(), h.data->data()+begin, end-begin);
-    // Copy meta data at insertion point
-    memcpy(h.tempStorage.data()+(end-begin), &h.id, sizeof(int));
-    memcpy(h.tempStorage.data()+(end-begin)+sizeof(int), &h.sentBatches, sizeof(int));
-    memcpy(h.tempStorage.data()+(end-begin)+2*sizeof(int), &totalNumBatches, sizeof(int));
-
-    return h.tag + MSG_OFFSET_BATCHED;
-}
-size_t MessageQueue::getTotalNumBatches(const SendHandle& h) const {return std::ceil(h.data->size() / (float)_max_msg_size);}
-bool MessageQueue::isBatched(const SendHandle& h) const {return h.sentBatches >= 0;}
-bool MessageQueue::isFinished(const SendHandle& h) const {return h.sentBatches == h.totalNumBatches;}
