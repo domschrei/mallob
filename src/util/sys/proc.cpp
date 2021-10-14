@@ -71,17 +71,7 @@ Proc::RuntimeInfo Proc::getRuntimeInfo(pid_t pid, SubprocessMode mode) {
     if (mode != RECURSE) return info;
 
     // Read all child PIDs
-    std::set<int> childPids;
-    for (const auto& childFile : FileUtils::glob("/proc/" + std::to_string(pid) + "/task/*/children")) {
-
-        ifstream children_stream(childFile.c_str(), ios_base::in);
-        if (!children_stream.good()) continue;
-        
-        pid_t childPid;
-        while (children_stream >> childPid) {
-            childPids.insert(childPid);
-        }
-    }
+    std::vector<pid_t> childPids = getChildren(pid);
 
     // Get runtime info for each PID
     int numChildren = 0;
@@ -143,7 +133,7 @@ bool Proc::getThreadCpuRatio(long tid, double& cpuRatio, float& sysShare) {
 
     auto passedSecs = uptime - (starttime / hertz);
     auto passedSecsDiff = passedSecs - info.passedSecs;
-    log(V4_VVER, "PROC tid=%lu spent %.2f ticks over %.2f secs\n", tid, ticksDiff, passedSecsDiff);
+    //log(V4_VVER, "PROC tid=%lu spent %.2f ticks over %.2f secs\n", tid, ticksDiff, passedSecsDiff);
 
     cpuRatio = passedSecsDiff == 0 ? 0 : ((ticksDiff / hertz) / passedSecsDiff);
     sysShare = ticksDiff == 0 ? 0 : sTicksDiff / ticksDiff;
@@ -153,4 +143,48 @@ bool Proc::getThreadCpuRatio(long tid, double& cpuRatio, float& sysShare) {
     info.passedSecs = passedSecs;
 
     return true;
+}
+
+std::vector<pid_t> Proc::getChildren(pid_t pid) {
+    // Read all child PIDs
+    std::set<pid_t> childPids;
+    for (const auto& childFile : FileUtils::glob("/proc/" + std::to_string(pid) + "/task/*/children")) {
+
+        std::ifstream children_stream(childFile.c_str(), std::ios_base::in);
+        if (!children_stream.good()) continue;
+        
+        pid_t childPid;
+        while (children_stream >> childPid) {
+            childPids.insert(childPid);
+        }
+    }
+    return std::vector<pid_t>(childPids.begin(), childPids.end());
+}
+
+long Proc::getRecursiveProportionalSetSizeKbs(pid_t pid) {
+
+    long memory = 0;
+    std::ifstream smapsRollup("/proc/" + std::to_string(pid) + "/smaps_rollup", std::ios_base::in);
+    if (!smapsRollup.good()) return memory;
+    std::string line;
+    while (getline(smapsRollup, line)) {
+        if (line.size() > 4 && line.substr(0, 4) == "Pss:") {
+            // Anatomy of a line (example):
+            // "Pss:              513166 kB"
+            std::string stringOfInts = "";
+            for (char c : line) stringOfInts += std::to_string((int)(c)) + ",";
+            // Find start and end indices of memory value
+            int i = 4;
+            while (line[i] == ' ') i++;
+            int j = i+1;
+            while (line[j] != ' ') j++;
+            std::string memValStr = line.substr(i, j-i);
+            memory += atol(memValStr.c_str());
+        }
+    }
+
+    auto childPids = getChildren(pid);
+    for (pid_t child : childPids) memory += getRecursiveProportionalSetSizeKbs(child);
+
+    return memory;
 }

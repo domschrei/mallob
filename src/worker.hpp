@@ -43,12 +43,18 @@ private:
     CollectiveAssignment _coll_assign;
 
     long long _iteration = 0;
-    PeriodicEvent<3000> _periodic_mem_check;
+    PeriodicEvent<1000> _periodic_stats_check;
+    PeriodicEvent<2990> _periodic_big_stats_check; // ready at every 3rd "ready" of _periodic_stats_check
     PeriodicEvent<10> _periodic_job_check;
     PeriodicEvent<1> _periodic_balance_check;
     PeriodicEvent<1000> _periodic_maintenance;
     Watchdog _watchdog;
     bool _was_idle = true;
+
+    std::atomic_bool _node_stats_calculated = true;
+    float _node_memory_gbs = 0;
+    double _mainthread_cpu_share = 0;
+    float _mainthread_sys_share = 0;
 
 public:
     Worker(MPI_Comm comm, Parameters& params);

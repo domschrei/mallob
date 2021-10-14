@@ -24,6 +24,7 @@
 #include "util/random.hpp"
 #include "data/job_reader.hpp"
 #include "util/sys/terminator.hpp"
+#include "util/sys/thread_pool.hpp"
 
 Worker::Worker(MPI_Comm comm, Parameters& params) :
     _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
@@ -199,33 +200,42 @@ void Worker::advance(float time) {
         _was_idle = !_was_idle;
     }
     
-    if (_periodic_mem_check.ready()) {
+    if (_periodic_stats_check.ready()) {
         // Print stats
 
         // For this process and subprocesses
-        auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::RECURSE);
-        info.vmUsage *= 0.001 * 0.001;
-        info.residentSetSize *= 0.001 * 0.001;
-        log(V4_VVER, "mem=%.2fGB\n", info.residentSetSize);
-        _sys_state.setLocal(SYSSTATE_GLOBALMEM, info.residentSetSize);
+        if (_node_stats_calculated.load(std::memory_order_acquire)) {
+            
+            _sys_state.setLocal(SYSSTATE_GLOBALMEM, _node_memory_gbs);
+            log(V4_VVER, "mem=%.2fGB mt_cpu=%.3f mt_sys=%.3f\n", _node_memory_gbs, _mainthread_cpu_share, _mainthread_sys_share);
 
-        // For this "management" thread
-        double cpuShare; float sysShare;
-        bool success = Proc::getThreadCpuRatio(Proc::getTid(), cpuShare, sysShare);
-        if (success) {
-            log(V3_VERB, "mainthread cpu=%i cpuratio=%.3f sys=%.3f\n", info.cpu, cpuShare, sysShare);
+            // Recompute stats for next query time
+            // (concurrently because computation of PSS is expensive)
+            _node_stats_calculated.store(false, std::memory_order_relaxed);
+            auto pid = Proc::getPid();
+            ProcessWideThreadPool::get().addTask([&, pid]() {
+                auto memoryKbs = Proc::getRecursiveProportionalSetSizeKbs(Proc::getPid());
+                auto memoryGbs = memoryKbs / 1024.f / 1024.f;
+                _node_memory_gbs = memoryGbs;
+                Proc::getThreadCpuRatio(Proc::getTid(), _mainthread_cpu_share, _mainthread_sys_share);
+                _node_stats_calculated.store(true, std::memory_order_release);
+            });
         }
 
-        // For the current job
-        if (!_job_db.isIdle()) {
-            Job& job = _job_db.getActive();
-            job.appl_dumpStats();
-            if (job.getJobTree().isRoot()) {
-                std::string commStr = "";
-                for (size_t i = 0; i < job.getJobComm().size(); i++) {
-                    commStr += " " + std::to_string(job.getJobComm()[i]);
+        // Print further stats?
+        if (_periodic_big_stats_check.ready()) {
+
+            // For the current job
+            if (!_job_db.isIdle()) {
+                Job& job = _job_db.getActive();
+                job.appl_dumpStats();
+                if (job.getJobTree().isRoot()) {
+                    std::string commStr = "";
+                    for (size_t i = 0; i < job.getJobComm().size(); i++) {
+                        commStr += " " + std::to_string(job.getJobComm()[i]);
+                    }
+                    if (!commStr.empty()) log(V4_VVER, "%s job comm:%s\n", job.toStr(), commStr.c_str());
                 }
-                if (!commStr.empty()) log(V4_VVER, "%s job comm:%s\n", job.toStr(), commStr.c_str());
             }
         }
     }

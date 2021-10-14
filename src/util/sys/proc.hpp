@@ -31,6 +31,10 @@ public:
     enum SubprocessMode {RECURSE, FLAT};
     static RuntimeInfo getRuntimeInfo(pid_t pid, SubprocessMode mode);
 
+    static std::vector<pid_t> getChildren(pid_t pid);
+
+    static long getRecursiveProportionalSetSizeKbs(pid_t pid);
+
     /*
     If successful, returns the used CPU ratio and the share of time it spent in kernel mode.
     Measured SINCE the previous call to this method. The first call initializes
