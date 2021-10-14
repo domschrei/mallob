@@ -164,10 +164,21 @@ std::vector<pid_t> Proc::getChildren(pid_t pid) {
 long Proc::getRecursiveProportionalSetSizeKbs(pid_t pid) {
 
     long memory = 0;
-    std::ifstream smapsRollup("/proc/" + std::to_string(pid) + "/smaps_rollup", std::ios_base::in);
-    if (!smapsRollup.good()) return memory;
+
+    // 1st attempt: read "rollup" file integrating all memory pages (more efficient)
+    // (present since Linux 4.14) 
+    bool usingRollup = true;
+    std::ifstream smaps("/proc/" + std::to_string(pid) + "/smaps_rollup", std::ios_base::in);
+    if (!smaps.good()) {
+        // 2nd attempt: read normal smaps file and sum up all "PSS" entries
+        usingRollup = false;
+        smaps = std::ifstream("/proc/" + std::to_string(pid) + "/smaps", std::ios_base::in);
+        if (!smaps.good()) return memory;
+    }
+
+    // Iterate over lines of the file
     std::string line;
-    while (getline(smapsRollup, line)) {
+    while (getline(smaps, line)) {
         if (line.size() > 4 && line.substr(0, 4) == "Pss:") {
             // Anatomy of a line (example):
             // "Pss:              513166 kB"
@@ -180,9 +191,11 @@ long Proc::getRecursiveProportionalSetSizeKbs(pid_t pid) {
             while (line[j] != ' ') j++;
             std::string memValStr = line.substr(i, j-i);
             memory += atol(memValStr.c_str());
+            if (usingRollup) break; // only one relevant line to read
         }
     }
 
+    // Recurse over all children
     auto childPids = getChildren(pid);
     for (pid_t child : childPids) memory += getRecursiveProportionalSetSizeKbs(child);
 
