@@ -40,42 +40,14 @@ int errfunc(const char* epath, int eerrno) {
 
 int FileUtils::mergeFiles(const std::string& globstr, const std::string& dest, bool removeOriginals) {
     
-    glob_t result;
-    int status = glob(globstr.c_str(), /*flags=*/0, errfunc, &result);
-    
-    if (status == GLOB_NOMATCH) {
-        // This is not an error: The set of files to merge is merely empty.
-        globfree(&result);
-        return 0;
-    }
-    if (status == GLOB_ABORTED) {
-        globfree(&result);
-        return 1;
-    }
-    if (status == GLOB_NOSPACE) {
-        globfree(&result);
-        return 2;
-    }
-
     // For each file matched
-    for (size_t i = 0; i < result.gl_pathc; i++) {
-        std::string file = std::string(result.gl_pathv[i]);
-        status = append(file, dest);
-        if (status != 0) {
-            globfree(&result);
-            return 2 + status;
-        } 
-        if (removeOriginals) {
-            status = rm(file);
-            if (status != 0) {
-                globfree(&result);
-                return -2 - status;
-            }
+    for (const auto& file : glob(globstr)) {
+        int status = append(file, dest);
+        if (status == 0 && removeOriginals) {
+            rm(file);
         }
     }
-    
-    globfree(&result);
-    return status;
+    return 0;
 }
 
 int FileUtils::append(const std::string& srcFile, const std::string& destFile) {
@@ -95,4 +67,30 @@ int FileUtils::append(const std::string& srcFile, const std::string& destFile) {
 
 int FileUtils::rm(const std::string& file) {
     return remove(file.c_str());
+}
+
+std::vector<std::string> FileUtils::glob(const std::string& pattern) {
+    std::vector<std::string> files;
+
+    glob_t result;
+    int status = ::glob(pattern.c_str(), /*flags=*/0, errfunc, &result);
+    
+    if (status == GLOB_NOMATCH) {
+        // This is not an error: The set of files to merge is merely empty.
+        globfree(&result);
+        return files;
+    }
+    if (status == GLOB_ABORTED || status == GLOB_NOSPACE) {
+        globfree(&result);
+        return files;
+    }
+
+    // For each file matched
+    for (size_t i = 0; i < result.gl_pathc; i++) {
+        std::string file = std::string(result.gl_pathv[i]);
+        files.push_back(std::move(file));
+    }
+    
+    globfree(&result);
+    return files;
 }

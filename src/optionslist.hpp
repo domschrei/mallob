@@ -58,7 +58,7 @@ OPT_INT(numChunksForExport,              "nce", "",                         20, 
 OPT_INT(numClients,                      "c", "num-clients",                -1,    -1, LARGE_INT,       "Number of client PEs to initialize (beginning from last rank), -1: all PEs are clients")
 OPT_INT(numJobs,                         "J", "num-jobs",                   0,    0, LARGE_INT,         "Exit as soon as this number of jobs has been processed")
 OPT_INT(numThreadsPerProcess,            "t", "threads-per-process",        1,    0, LARGE_INT,         "Number of worker threads per node")
-OPT_INT(sizeLimitPerProcess,             "slpp", "size-limit-per-process",  0,    0, MAX_INT,           "No more than max(1, floor(<limit>/<jobsize>)) threads are spawned per process")
+OPT_INT(maxLiteralsPerThread,            "mlpt", "max-lits-per-thread",     50000000, 0, MAX_INT,       "If formula is larger than threshold, reduce #threads per PE until #threads=1 or until limit is met \"on average\"")
 OPT_INT(sleepMicrosecs,                  "sleep", "",                       100,  0, LARGE_INT,         "Sleep this many microseconds between loop cycles of worker main thread")
 OPT_INT(softMaxClauseLength,             "smcl", "",                        30,   0, LARGE_INT,         "Only share clauses up to this length except for special cases")
 OPT_INT(verbosity,                       "v", "verbosity",                  2,    0, 6,                 "Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB 5=DEBG")

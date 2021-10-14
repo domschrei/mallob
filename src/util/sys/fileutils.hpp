@@ -3,6 +3,7 @@
 #define DOMPASCH_MALLOB_FILE_UTILS_H
 
 #include <string>
+#include <vector>
 
 class FileUtils {
 
@@ -12,6 +13,8 @@ public:
     static int append(const std::string& srcFile, const std::string& destFile);
     static int rm(const std::string& file);
     static bool isRegularFile(const std::string& file);
+
+    static std::vector<std::string> glob(const std::string& pattern);
 };
 
 #endif

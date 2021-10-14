@@ -11,7 +11,9 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <set>
 
+#include "util/sys/fileutils.hpp"
 #include "proc.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
@@ -66,19 +68,30 @@ Proc::RuntimeInfo Proc::getRuntimeInfo(pid_t pid, SubprocessMode mode) {
     info.residentSetSize = rss * page_size_kb;
     info.cpu = sched_getcpu();
 
-    // Recursively read memory usage of all children
-    if (mode == RECURSE) {
-        auto childFile = "/proc/" + std::to_string(pid) + "/task/" + std::to_string(pid) + "/children";
-        ifstream children_stream(childFile.c_str(), ios_base::in);
-        if (!children_stream.good()) return info;
+    if (mode != RECURSE) return info;
 
+    // Read all child PIDs
+    std::set<int> childPids;
+    for (const auto& childFile : FileUtils::glob("/proc/" + std::to_string(pid) + "/task/*/children")) {
+
+        ifstream children_stream(childFile.c_str(), ios_base::in);
+        if (!children_stream.good()) continue;
+        
         pid_t childPid;
         while (children_stream >> childPid) {
-            RuntimeInfo childInfo = getRuntimeInfo(childPid, mode);
-            info.vmUsage += childInfo.vmUsage;
-            info.residentSetSize += childInfo.residentSetSize;
+            childPids.insert(childPid);
         }
     }
+
+    // Get runtime info for each PID
+    int numChildren = 0;
+    for (int childPid : childPids) {
+        RuntimeInfo childInfo = getRuntimeInfo(childPid, mode);
+        info.vmUsage += childInfo.vmUsage;
+        info.residentSetSize += childInfo.residentSetSize;
+        numChildren++;
+    }
+    log(V5_DEBG, "%i : %i children\n", pid, numChildren);
 
     return info;
 }
