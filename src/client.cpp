@@ -21,9 +21,12 @@
 #include "util/sys/thread_pool.hpp"
 
 // Executed by a separate worker thread
-void Client::readIncomingJobs(Logger log) {
+void Client::readIncomingJobs() {
 
+    Logger log = Logger::getMainInstance().copy("<Reader>", "#-1.");
     log.log(V3_VERB, "Starting\n");
+
+    std::vector<std::future<void>> taskFutures;
 
     while (true) {
         // Wait for a nonempty incoming job queue
@@ -70,7 +73,7 @@ void Client::readIncomingJobs(Logger log) {
 
             // Job can be read: Enqueue reader task into thread pool
             foundJob = data;
-            ProcessWideThreadPool::get().addTask([this, &log, foundJob]() {
+            auto future = ProcessWideThreadPool::get().addTask([this, &log, foundJob]() {
                 // Read job
                 int id = foundJob.description->getId();
                 float time = Timer::elapsedSeconds();
@@ -93,6 +96,7 @@ void Client::readIncomingJobs(Logger log) {
                     _sys_state.addLocal(SYSSTATE_PARSED_JOBS, 1);
                 }
             });
+            taskFutures.push_back(std::move(future));
             break;
         }
 
@@ -108,6 +112,8 @@ void Client::readIncomingJobs(Logger log) {
     }
 
     log.log(V3_VERB, "Stopping\n");
+    // Wait for all tasks to finish
+    for (auto& future : taskFutures) future.get();
     log.flush();
 }
 
@@ -141,9 +147,7 @@ void Client::init() {
         )
     );
     _instance_reader.run([this]() {
-        readIncomingJobs(
-            Logger::getMainInstance().copy("<Reader>", "#-1.")
-        );
+        readIncomingJobs();
     });
     log(V3_VERB, "Client main thread started\n");
 

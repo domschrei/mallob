@@ -91,7 +91,7 @@ public:
     std::string getApiPath();
 
 private:
-    void readIncomingJobs(Logger log);
+    void readIncomingJobs();
     
     void handleOfferAdoption(MessageHandle& handle);
     void handleJobDone(MessageHandle& handle);
