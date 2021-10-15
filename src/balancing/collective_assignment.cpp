@@ -93,7 +93,7 @@ void CollectiveAssignment::resolveRequests() {
 
         // Is there an optimal fit for this request?
         // -- self?
-        if (_job_db->isIdle() && !_job_db->hasCommitment()) {
+        if (!_job_db->isBusyOrCommitted()) {
             // self is optimal fit
             destination = MyMpi::rank(MPI_COMM_WORLD);
         } else {
@@ -155,7 +155,7 @@ void CollectiveAssignment::addJobRequest(JobRequest& req) {
 
 CollectiveAssignment::Status CollectiveAssignment::getAggregatedStatus() {
     Status s;
-    s.numIdle = _job_db->isIdle() && !_job_db->hasCommitment() ? 1 : 0;
+    s.numIdle = _job_db->isBusyOrCommitted() ? 0 : 1;
     for (auto& [childRank, childStatus] : _child_statuses) {
         s.numIdle += childStatus.numIdle;
     }

@@ -105,7 +105,9 @@ public:
     
     int getLoad() const;
     void setLoad(int load, int whichJobId);
-    bool isIdle() const;
+    bool isBusyOrCommitted() const;
+    bool hasActiveJob() const;
+
     bool hasDormantRoot() const;
     bool hasDormantJob(int id) const;
     std::vector<int> getDormantJobs() const;

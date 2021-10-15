@@ -30,7 +30,7 @@ Worker::Worker(MPI_Comm comm, Parameters& params) :
     _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
     _params(params), _job_db(_params, _comm, _sys_state), _sys_state(_comm), 
     _bfs(_hop_destinations, [this](const JobRequest& req) {
-        if (_job_db.isIdle() && !_job_db.hasCommitment(req.jobId)) {
+        if (!_job_db.isBusyOrCommitted()) {
             // Try to adopt this job request
             log(V4_VVER, "BFS Try adopting %s\n", req.toStr().c_str());
             MessageHandle handle;
@@ -194,10 +194,10 @@ void Worker::advance(float time) {
     // Reset watchdog
     _watchdog.reset(time);
 
-    if (_was_idle != _job_db.isIdle()) {
+    if (_was_busy != _job_db.isBusyOrCommitted()) {
         // Load status changed since last cycle
         sendStatusToNeighbors();
-        _was_idle = !_was_idle;
+        _was_busy = !_was_busy;
     }
     
     if (_periodic_stats_check.ready()) {
@@ -226,7 +226,7 @@ void Worker::advance(float time) {
         if (_periodic_big_stats_check.ready()) {
 
             // For the current job
-            if (!_job_db.isIdle()) {
+            if (_job_db.hasActiveJob()) {
                 Job& job = _job_db.getActive();
                 job.appl_dumpStats();
                 if (job.getJobTree().isRoot()) {
@@ -244,7 +244,7 @@ void Worker::advance(float time) {
     if (_periodic_balance_check.ready()) {
         _job_db.advanceBalancing();
 
-        if (_job_db.isIdle() && _time_only_idle_worker > 0 && time - _time_only_idle_worker >= 0.05) {
+        if (!_job_db.isBusyOrCommitted() && _time_only_idle_worker > 0 && time - _time_only_idle_worker >= 0.05) {
             // This worker is the only idle worker within its local vicinity since some time
             log(V4_VVER, "All neighbors are busy - requesting work\n");
             WorkRequest req(_world_rank, _job_db.getGlobalBalancingEpoch());
@@ -284,11 +284,16 @@ void Worker::advance(float time) {
             handleRequestNode(handle, JobDatabase::NORMAL);
         }
 
-        if (_job_db.isIdle()) {
+        if (!_job_db.isBusyOrCommitted()) {
+            // PE is completely idle
             _sys_state.setLocal(SYSSTATE_BUSYRATIO, 0.0f); // busy nodes
             _sys_state.setLocal(SYSSTATE_NUMJOBS, 0.0f); // active jobs
-
+        } else if (!_job_db.hasActiveJob()) {
+            // PE is committed but not active
+            _sys_state.setLocal(SYSSTATE_BUSYRATIO, 1.0f); // busy nodes
+            _sys_state.setLocal(SYSSTATE_NUMJOBS, 0.0f); // active jobs
         } else {
+            // PE runs an active job
             Job &job = _job_db.getActive();
             int id = job.getId();
             bool isRoot = job.getJobTree().isRoot();
@@ -497,7 +502,7 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
         return;
     }
 
-    if (mode == JobDatabase::NORMAL && !_job_db.isIdle() && !_recent_work_requests.empty()) {
+    if (mode == JobDatabase::NORMAL && _job_db.isBusyOrCommitted() && !_recent_work_requests.empty()) {
         // Forward the job request to the source of a recent work request
 
         // Remove old work requests and try and find a recent one
@@ -534,7 +539,7 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
         // Adoption takes place
         std::string jobstr = _job_db.toStr(req.jobId, req.requestedNodeIndex);
         log(LOG_ADD_SRCRANK | V3_VERB, "ADOPT %s mode=%i", handle.source, req.toStr().c_str(), mode);
-        assert(_job_db.isIdle() || log_return_false("Adopting a job, but not idle!\n"));
+        assert(!_job_db.isBusyOrCommitted() || log_return_false("Adopting a job, but not idle!\n"));
 
         // Commit on the job, send a request to the parent
         if (!_job_db.has(req.jobId)) {
@@ -829,7 +834,7 @@ void Worker::handleNotifyNeighborIdleDistance(MessageHandle& handle) {
 }
 
 int Worker::getIdleDistance() {
-    if (_job_db.isIdle()) return 0;
+    if (!_job_db.isBusyOrCommitted()) return 0;
     int minDistance = _params.maxIdleDistance();
     for (const auto& [rank, dist] : _neighbor_idle_distance) {
         minDistance = std::min(minDistance, dist+1);
@@ -840,7 +845,7 @@ int Worker::getIdleDistance() {
 void Worker::updateNeighborStatus(int rank, bool busy) {
     if (busy) _busy_neighbors.insert(rank);
     else _busy_neighbors.erase(rank);
-    if (_job_db.isIdle() && _busy_neighbors.size() == _hop_destinations.size()) {
+    if (!_job_db.isBusyOrCommitted() && _busy_neighbors.size() == _hop_destinations.size()) {
         if (_time_only_idle_worker <= 0)
             _time_only_idle_worker = Timer::elapsedSeconds();
     } else {
@@ -853,7 +858,7 @@ void Worker::handleRequestWork(MessageHandle& handle) {
     
     // Is this work request obsolete?
     // - I am this worker but I am not idle any more
-    if (req.requestingRank == _world_rank && !_job_db.isIdle()) return;
+    if (req.requestingRank == _world_rank && _job_db.isBusyOrCommitted()) return;
     // - _busy_neighbors contains this worker
     if (_busy_neighbors.count(req.requestingRank)) return;
     // - # hops exceeding significant ratio of # workers
@@ -1131,7 +1136,7 @@ void Worker::timeoutJob(int jobId) {
 
 void Worker::sendStatusToNeighbors() {
     if (_params.workRequests()) {
-        std::vector<uint8_t> payload(1, _job_db.isIdle() ? 0 : 1);
+        std::vector<uint8_t> payload(1, _job_db.isBusyOrCommitted() ? 1 : 0);
         for (int rank : _hop_destinations) {
             MyMpi::isendCopy(rank, MSG_NOTIFY_NEIGHBOR_STATUS, payload);
         }

@@ -49,7 +49,7 @@ private:
     PeriodicEvent<1> _periodic_balance_check;
     PeriodicEvent<1000> _periodic_maintenance;
     Watchdog _watchdog;
-    bool _was_idle = true;
+    bool _was_busy = false;
 
     std::atomic_bool _node_stats_calculated = true;
     float _node_memory_gbs = 0;

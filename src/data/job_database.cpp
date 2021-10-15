@@ -260,7 +260,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
     }
 
     // Node is idle and not committed to another job
-    if (isIdle()) {
+    if (!isBusyOrCommitted()) {
         if (mode != TARGETED_REJOIN) return ADOPT_FROM_IDLE;
         // Oneshot request: Job must be present and suspended
         else if (hasDormantJob(req.jobId)) {
@@ -330,7 +330,7 @@ void JobDatabase::suspend(int jobId) {
 void JobDatabase::terminate(int jobId) {
     Job& job = get(jobId);
     bool wasTerminated = job.getState() == JobState::PAST;
-    if (!isIdle() && getActive().getId() == jobId) {
+    if (hasActiveJob() && getActive().getId() == jobId) {
         setLoad(0, jobId);
     }
 
@@ -501,8 +501,12 @@ void JobDatabase::setLoad(int load, int whichJobId) {
     if (_coll_assign) _coll_assign->setStatusDirty();
 }
 
-bool JobDatabase::isIdle() const {
-    return _load == 0;
+bool JobDatabase::hasActiveJob() const {
+    return _load == 1;
+}
+
+bool JobDatabase::isBusyOrCommitted() const {
+    return hasActiveJob() || hasCommitment();
 }
 
 bool JobDatabase::hasDormantRoot() const {
