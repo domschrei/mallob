@@ -284,13 +284,16 @@ void Worker::advance(float time) {
             handleRequestNode(handle, JobDatabase::NORMAL);
         }
 
-        if (!_job_db.isBusyOrCommitted()) {
-            // PE is completely idle
-            _sys_state.setLocal(SYSSTATE_BUSYRATIO, 0.0f); // busy nodes
-            _sys_state.setLocal(SYSSTATE_NUMJOBS, 0.0f); // active jobs
-        } else if (!_job_db.hasActiveJob()) {
-            // PE is committed but not active
-            _sys_state.setLocal(SYSSTATE_BUSYRATIO, 1.0f); // busy nodes
+        if (!_job_db.hasActiveJob()) {
+            if (_job_db.isBusyOrCommitted()) {
+                // PE is committed but not active
+                _sys_state.setLocal(SYSSTATE_BUSYRATIO, 1.0f); // busy nodes
+                _sys_state.setLocal(SYSSTATE_COMMITTEDRATIO, 1.0f); // committed nodes
+            } else {
+                // PE is completely idle
+                _sys_state.setLocal(SYSSTATE_BUSYRATIO, 0.0f); // busy nodes
+                _sys_state.setLocal(SYSSTATE_COMMITTEDRATIO, 0.0f); // committed nodes
+            }
             _sys_state.setLocal(SYSSTATE_NUMJOBS, 0.0f); // active jobs
         } else {
             // PE runs an active job
@@ -299,6 +302,7 @@ void Worker::advance(float time) {
             bool isRoot = job.getJobTree().isRoot();
 
             _sys_state.setLocal(SYSSTATE_BUSYRATIO, 1.0f); // busy nodes
+            _sys_state.setLocal(SYSSTATE_COMMITTEDRATIO, 0.0f); // committed nodes
             _sys_state.setLocal(SYSSTATE_NUMJOBS, isRoot ? 1.0f : 0.0f); // active jobs
 
             bool abort = false;
@@ -346,9 +350,10 @@ void Worker::advance(float time) {
         float ratioFulfilled = numDesires <= 0 ? 0 : (float)numFulfilledDesires / numDesires;
         float latency = numFulfilledDesires <= 0 ? 0 : result[SYSSTATE_SUMDESIRELATENCIES] / numFulfilledDesires;
 
-        log(verb, "sysstate busyratio=%.3f jobs=%i globmem=%.2fGB newreqs=%i hops=%i\n", 
-                    result[SYSSTATE_BUSYRATIO]/MyMpi::size(_comm), (int)result[SYSSTATE_NUMJOBS], 
-                    result[SYSSTATE_GLOBALMEM], (int)result[SYSSTATE_SPAWNEDREQUESTS], (int)result[SYSSTATE_NUMHOPS]);
+        log(verb, "sysstate busyratio=%.3f cmtdratio=%.3f jobs=%i globmem=%.2fGB newreqs=%i hops=%i\n", 
+                    result[SYSSTATE_BUSYRATIO]/MyMpi::size(_comm), result[SYSSTATE_COMMITTEDRATIO]/MyMpi::size(_comm), 
+                    (int)result[SYSSTATE_NUMJOBS], result[SYSSTATE_GLOBALMEM], (int)result[SYSSTATE_SPAWNEDREQUESTS], 
+                    (int)result[SYSSTATE_NUMHOPS]);
         // Reset fields which are added to incrementally
         _sys_state.setLocal(SYSSTATE_NUMHOPS, 0);
         _sys_state.setLocal(SYSSTATE_SPAWNEDREQUESTS, 0);
