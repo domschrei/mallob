@@ -301,6 +301,7 @@ void Client::handleOfferAdoption(MessageHandle& handle) {
     log(V4_VVER, "Clear description of #%i rev. %i\n", req.jobId, desc.getRevision());
     desc.clearPayload(desc.getRevision());
     _num_loaded_jobs--;
+    _incoming_job_cond_var.notify(); // waiting instance reader might be able to continue now
 }
 
 void Client::handleJobDone(MessageHandle& handle) {
