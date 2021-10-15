@@ -88,7 +88,8 @@ private:
             size_t begin = sentBatches*sizePerBatch;
             size_t end = std::min(data->size(), (size_t)(sentBatches+1)*sizePerBatch);
             assert(end>begin || log_return_false("%ld <= %ld\n", end, begin));
-            tempStorage.resize((end-begin)+3*sizeof(int));
+            size_t msglen = (end-begin)+3*sizeof(int);
+            tempStorage.resize(msglen);
 
             // Copy actual data
             memcpy(tempStorage.data(), data->data()+begin, end-begin);
@@ -99,8 +100,8 @@ private:
 
             return tag + MSG_OFFSET_BATCHED;
         }
-        size_t getTotalNumBatches() const {return std::ceil(data->size() / (float)sizePerBatch);}
         bool isBatched() const {return sentBatches >= 0;}
+        size_t getTotalNumBatches() const {assert(isBatched()); return std::ceil(data->size() / (float)sizePerBatch);}
         bool isFinished() const {assert(isBatched()); return sentBatches == totalNumBatches;}
     };
 

@@ -141,17 +141,21 @@ void MessageQueue::runGarbageCollector() {
 void MessageQueue::processReceived() {
     // Test receive
     //log(V5_DEBG, "MQ TEST\n");
-    int flag;
+    int flag = false;
     MPI_Status status;
     MPI_Test(&_recv_request, &flag, &status);
     if (!flag) return;
 
     // Message finished
-    int msglen;
-    MPI_Get_count(&status, MPI_BYTE, &msglen);
     const int source = status.MPI_SOURCE;
     int tag = status.MPI_TAG;
-    log(V5_DEBG, "MQ RECV n=%i s=[%i] t=%i\n", msglen, source, tag);
+    int msglen;
+    MPI_Get_count(&status, MPI_BYTE, &msglen);
+    log(V5_DEBG, "MQ RECV n=%i s=[%i] t=%i c=(%i,...,%i,%i,%i)\n", msglen, source, tag, 
+            msglen>=1*sizeof(int) ? *(int*)(_recv_data) : 0, 
+            msglen>=3*sizeof(int) ? *(int*)(_recv_data+msglen - 3*sizeof(int)) : 0, 
+            msglen>=2*sizeof(int) ? *(int*)(_recv_data+msglen - 2*sizeof(int)) : 0, 
+            msglen>=1*sizeof(int) ? *(int*)(_recv_data+msglen - 1*sizeof(int)) : 0);
 
     if (tag >= MSG_OFFSET_BATCHED) {
         // Fragment of a message
@@ -165,7 +169,7 @@ void MessageQueue::processReceived() {
         
         // Store data in fragments structure
         
-        log(V5_DEBG, "MQ STORE (%i,%i) %i/%i\n", source, id, sentBatch, totalNumBatches);
+        //log(V5_DEBG, "MQ STORE (%i,%i) %i/%i\n", source, id, sentBatch, totalNumBatches);
         auto key = std::pair<int, int>(source, id);
         if (!_fragmented_messages.count(key)) {
             auto& fragment = _fragmented_messages[key];
@@ -200,6 +204,7 @@ void MessageQueue::processReceived() {
         _callbacks.at(h.tag)(h);
         //log(V5_DEBG, "MQ dealloc\n");
     }
+
     // Reset recv handle
     //log(V5_DEBG, "MQ MPI_Irecv\n");
     MPI_Irecv(_recv_data, _max_msg_size+20, MPI_BYTE, MPI_ANY_SOURCE, 
@@ -263,9 +268,9 @@ void MessageQueue::processSent() {
         if (numTested == 4) break; // limit number of tests per call
 
         SendHandle& h = *it;
-        int flag;
-        MPI_Status status;
-        MPI_Test(&h.request, &flag, &status);
+        assert(h.request != MPI_REQUEST_NULL);
+        int flag = false;
+        MPI_Test(&h.request, &flag, MPI_STATUS_IGNORE);
         numTested++;
 
         if (!flag) {
@@ -279,9 +284,16 @@ void MessageQueue::processSent() {
 
         // Batched?
         if (h.isBatched()) {
-            log(V5_DEBG, "MQ SENT id=%i %i/%i n=%i d=[%i] t=%i\n", h.id, h.sentBatches, 
-                h.totalNumBatches, h.data->size(), h.dest, h.tag);
+            // Batch of a large message sent
+            log(V5_DEBG, "MQ SENT id=%i %i/%i n=%i d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", h.id, h.sentBatches, 
+                h.totalNumBatches, h.data->size(), h.dest, h.tag, 
+                *(int*)(h.tempStorage.data()), 
+                *(int*)(h.tempStorage.data()+h.tempStorage.size()-3*sizeof(int)), 
+                *(int*)(h.tempStorage.data()+h.tempStorage.size()-2*sizeof(int)),
+                *(int*)(h.tempStorage.data()+h.tempStorage.size()-1*sizeof(int)));
             h.sentBatches++;
+
+            // More batches yet to send?
             if (!h.isFinished()) {
                 // Send next batch
                 int sendTag = h.prepareForNextBatch();
