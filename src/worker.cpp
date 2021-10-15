@@ -400,12 +400,6 @@ void Worker::handleAnswerAdoptionOffer(MessageHandle& handle) {
             // Transfer of at least one revision is required
             int requestedRevision = job.hasDescription() ? job.getRevision()+1 : 0;
             MyMpi::isend(handle.source, MSG_QUERY_JOB_DESCRIPTION, IntPair(jobId, requestedRevision));
-            if (job.getJobTree().isRoot()) {
-                // As this is an entirely new job, already register it in the balancer
-                // (with demand of 1) to properly block this PE as long as the description
-                // has not arrived yet
-                _job_db.preregisterJobInBalancer(jobId);
-            }
         }
         if (job.hasDescription()) {
             // At least the initial description is present: Begin to execute job
@@ -555,6 +549,14 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
         MyMpi::isend(req.requestingNodeRank, 
             req.requestedNodeIndex == 0 ? MSG_OFFER_ADOPTION_OF_ROOT : MSG_OFFER_ADOPTION,
             req);
+        
+        if (req.requestedNodeIndex == 0) {
+            // As this is the root of an entirely new job, already register it in the balancer
+            // (with demand of 1) to properly block this PE as long as the description
+            // has not arrived yet (and it WILL arrive, as there is no failure condition for
+            // scheduling the root of a job)
+            _job_db.preregisterJobInBalancer(req.jobId);
+        }
 
     } else if (adoptionResult == JobDatabase::REJECT) {
         if (req.requestedNodeIndex == 0 && _job_db.has(req.jobId) && _job_db.get(req.jobId).getJobTree().isRoot()) {
