@@ -245,6 +245,7 @@ public:
     int getNumThreads() const {return _threads_per_job;}
     int getBalancingEpochOfLastCommitment() const {return _balancing_epoch_of_last_commitment;}
     int getLastDemand() const {return _last_demand;}
+    void setLastDemand(int demand) {_last_demand = demand;}
 
     // Return true iff this job instance has found a job result that it still needs to communicate.
     bool isResultTransferPending() const {return _result_transfer_pending;}

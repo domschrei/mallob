@@ -75,7 +75,7 @@ void EventDrivenBalancer::onDemandChange(const Job& job, int demand) {
     assert(_job_root_epochs.at(job.getId()) > 0);
 
     pushEvent(Event({
-        job.getId(), ++_job_root_epochs[job.getId()], job.getDemand(), job.getPriority()
+        job.getId(), ++_job_root_epochs[job.getId()], demand, job.getPriority()
     }));
 }
 

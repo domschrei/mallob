@@ -122,8 +122,7 @@ bool Job::isDestructible() {
 int Job::getDemand() const {
     
     if (_state != ACTIVE) {
-        if (_commitment.has_value()) return 1;
-        return 0;
+        return _commitment.has_value() ? 1 : 0;
     } 
     
     int commSize = _job_tree.getCommSize();
@@ -153,7 +152,6 @@ int Job::getDemand() const {
     if (_max_demand > 0) {
         demand = std::min(demand, _max_demand);
     }
-    _last_demand = demand;
     return demand;
 }
 
