@@ -53,28 +53,8 @@ private:
     robin_hood::unordered_map<int, int> _job_volumes;
     robin_hood::unordered_map<int, std::vector<float>> _balancing_latencies;
 
-    struct PendingEvent {
-        int jobId;
-        int demand;
-        float priority;
-        float time;
-        bool operator<(const PendingEvent& other) const {
-            if (jobId != other.jobId) return jobId < other.jobId;
-            if (demand != other.demand) return demand < other.demand;
-            if (priority != other.priority) return priority < other.priority;
-            return false;
-        }
-        bool operator==(const PendingEvent& other) const {
-            if (jobId != other.jobId) return false;
-            if (demand != other.demand) return false;
-            if (priority != other.priority) return false;
-            return true;
-        }
-        bool operator!=(const PendingEvent& other) const {
-            return !(*this == other);
-        }
-    };
-    std::set<PendingEvent> _pending_entries;
+    // Maps a job ID to a pair of (time of last balancing event, associated job epoch)
+    robin_hood::unordered_map<int, std::pair<int, float>> _pending_entries;
 
     std::function<void(int, int, float)> _volume_update_callback;
 

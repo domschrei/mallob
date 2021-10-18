@@ -121,7 +121,12 @@ void EventDrivenBalancer::onTerminate(const Job& job) {
 void EventDrivenBalancer::pushEvent(const Event& event) {
     bool inserted = _diffs.insertIfNovel(event);
     if (inserted) {
-        _pending_entries.insert(PendingEvent{event.jobId, event.demand, event.priority, Timer::elapsedSeconds()});
+        if (_pending_entries.count(event.jobId)) {
+            // There is a pending event for this job that now becomes obsolete: 
+            // attribute max. latency
+            _balancing_latencies[event.jobId].push_back(Timer::elapsedSeconds() - _pending_entries[event.jobId].second);
+        }
+        _pending_entries[event.jobId] = std::pair<int, float>(event.epoch, Timer::elapsedSeconds());
         log(V1_WARN, "[WARN] insert (%i,%i,%.3f)\n", event.jobId, event.demand, event.priority);
         advance();
     }
@@ -206,17 +211,22 @@ void EventDrivenBalancer::computeBalancingResult() {
     for (const auto& entry : calc.getEntries()) {
         msg += std::to_string(entry.jobId) + ":" + std::to_string(entry.volume) + " ";
         _job_volumes[entry.jobId] = entry.volume;
+
+        // My active job?
         if (entry.jobId == _active_job_id) {
             float elapsed = 0;
-            PendingEvent ev{_active_job_id, entry.originalDemand, entry.priority, 0};
-            if (_pending_entries.count(ev)) {
-
-                auto it = _pending_entries.find(ev);
-                elapsed = Timer::elapsedSeconds() - it->time;
-                _balancing_latencies[entry.jobId].push_back(elapsed);
-                _pending_entries.erase(it);
+            // Did I fire an event for this job which is not yet fulfilled?
+            if (_pending_entries.count(_active_job_id)) {
+                auto it = _pending_entries.find(_active_job_id);
+                auto& [epoch, time] = it->second;
+                // Does the event's epoch fit to the received epoch?
+                if (epoch == _states.getEntries().at(_active_job_id).epoch) {
+                    // -- Yes: Measure latency, remove pending event
+                    elapsed = Timer::elapsedSeconds() - time;
+                    _balancing_latencies[entry.jobId].push_back(elapsed);
+                    _pending_entries.erase(it);
+                }
             }
-            
             _volume_update_callback(entry.jobId, entry.volume, elapsed);
         }
     }
