@@ -107,8 +107,8 @@ private:
             sumOfDemands += job.demand;
             tieBreaker += tieBreakerStep;
 
-            assert(std::abs(1 - job.getVolume(1 / job.fairShare)) <= 0.0001 || log_return_false("%.5f\n", job.getVolume(1 / job.fairShare)));
-            assert(std::abs(job.demand - job.getVolume(job.demand / job.fairShare)) <= 0.0001);
+            assert(1 == job.getVolume(1 / job.fairShare) || log_return_false("ERROR #%i 1 != %i\n", job.jobId, job.getVolume(1 / job.fairShare)));
+            assert(job.demand == job.getVolume(job.demand / job.fairShare) || log_return_false("ERROR #%i %i != %i\n", job.jobId, job.demand, job.getVolume(job.demand / job.fairShare)));
             //log(_verbosity, "BLC #%i : fair share %.3f\n", job.jobId, job.fairShare);
         }
         centerOfWeight /= _entries.size();
