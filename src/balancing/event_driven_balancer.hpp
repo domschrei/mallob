@@ -24,7 +24,7 @@ public:
 
     void setVolumeUpdateCallback(std::function<void(int, int, float)> callback);
 
-    void onActivate(const Job& job);
+    void onActivate(const Job& job, int demand);
     void onDemandChange(const Job& job, int demand);
     void onSuspend(const Job& job);
     void onTerminate(const Job& job);

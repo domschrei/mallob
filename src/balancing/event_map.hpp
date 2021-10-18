@@ -194,6 +194,16 @@ public:
     bool operator!=(const EventMap& other) const {
         return !(*this == other);
     }
+
+    std::string toStr() const {
+        std::string out = "{ ";
+        for (auto& [id, ev] : getEntries()) {
+            out += "(" + std::to_string(id) + "," + std::to_string(ev.demand) + "," 
+                + std::to_string(ev.priority) + "," + std::to_string(ev.epoch) + ") ";
+        }
+        out += "}";
+        return out;
+    }
 };
 
 #endif

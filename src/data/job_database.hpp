@@ -97,7 +97,10 @@ public:
     
     bool hasVolume(int jobId) const {return _balancer->hasVolume(jobId);}
     int getVolume(int jobId) const {return _balancer->getVolume(jobId);}
-    void handleDemandUpdate(Job& job, int demand) {_balancer->onDemandChange(job, demand);}
+    void handleDemandUpdate(Job& job, int demand) {
+        _balancer->onDemandChange(job, demand);
+        job.setLastDemand(demand);
+    }
 
     bool has(int id) const;
     Job& get(int id) const;

@@ -106,12 +106,17 @@ void JobDatabase::execute(int jobId, int source) {
         job.resume();
     }
 
-    _balancer->onActivate(job);
+    int demand = job.getDemand();
+    _balancer->onActivate(job, demand);
+    job.setLastDemand(demand);
 }
 
 void JobDatabase::preregisterJobInBalancer(int jobId) {
     assert(has(jobId));
-    _balancer->onActivate(get(jobId));
+    auto& job = get(jobId);
+    int demand = std::max(1, job.getDemand());
+    _balancer->onActivate(job, demand);
+    job.setLastDemand(demand);
 }
 
 bool JobDatabase::checkComputationLimits(int jobId) {
@@ -315,7 +320,10 @@ void JobDatabase::reactivate(const JobRequest& req, int source) {
     log(LOG_ADD_SRCRANK | V3_VERB, "RESUME %s", source, 
                 toStr(req.jobId, req.requestedNodeIndex).c_str());
     job.resume();
-    _balancer->onActivate(job);
+
+    int demand = job.getDemand();
+    _balancer->onActivate(job, demand);
+    job.setLastDemand(demand);
 }
 
 void JobDatabase::suspend(int jobId) {

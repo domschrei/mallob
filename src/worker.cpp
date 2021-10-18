@@ -327,11 +327,9 @@ void Worker::advance(float time) {
                 // Update demand as necessary
                 if (isRoot) {
                     int demand = job.getDemand();
-                    int prevDemand = job.getLastDemand();
-                    if (demand != prevDemand) {
+                    if (demand != job.getLastDemand()) {
                         // Demand updated
                         _job_db.handleDemandUpdate(job, demand);
-                        job.setLastDemand(prevDemand);
                     }
                 }
             }

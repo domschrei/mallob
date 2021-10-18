@@ -55,16 +55,19 @@ void EventDrivenBalancer::setVolumeUpdateCallback(std::function<void(int, int, f
     _volume_update_callback = callback;
 }
 
-void EventDrivenBalancer::onActivate(const Job& job) {
+void EventDrivenBalancer::onActivate(const Job& job, int demand) {
     
-    if (_active_job_id == job.getId()) return;
+    if (_active_job_id == job.getId()) {
+        onDemandChange(job, demand);
+        return;
+    }
     _active_job_id = job.getId();
     
     if (!job.getJobTree().isRoot()) return;
     
     if (!_job_root_epochs.count(job.getId())) _job_root_epochs[job.getId()] = 0;
     pushEvent(Event({
-        job.getId(), ++_job_root_epochs[job.getId()], std::max(1, job.getDemand()), job.getPriority()
+        job.getId(), ++_job_root_epochs[job.getId()], std::max(1, demand), job.getPriority()
     }));
 }
 
@@ -165,7 +168,11 @@ void EventDrivenBalancer::handleData(EventMap& data, int tag) {
 }
 
 void EventDrivenBalancer::digest(const EventMap& data) {
+    
     log(V4_VVER, "BLC DIGEST epoch=%ld size=%ld\n", data.getGlobalEpoch(), data.getEntries().size());
+    //log(V4_VVER, "BLC DIGEST data=%s\n", data.toStr().c_str());
+    //log(V4_VVER, "BLC DIGEST states=%s\n", _states.toStr().c_str());
+    //log(V4_VVER, "BLC DIGEST diff=%s\n", _diffs.toStr().c_str());
 
     _states.updateBy(data);
     _balancing_epoch = data.getGlobalEpoch();
@@ -175,6 +182,7 @@ void EventDrivenBalancer::digest(const EventMap& data) {
     // Filter local diffs by the new "global" state.
     size_t diffSize = _diffs.getEntries().size();
     _diffs.filterBy(_states);
+
     log(V4_VVER, "BLC digest %i diffs, %i/%i local diffs remaining\n", 
             data.getEntries().size(), _diffs.getEntries().size(), diffSize);
     _states.removeOldZeros();
