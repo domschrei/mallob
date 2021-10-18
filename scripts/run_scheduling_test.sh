@@ -67,7 +67,7 @@ function create_job_chains() {
             added=true
             dep=""
             if [ $k -gt 1 ]; then dep="\"admin.solve-$c-$(($k-1))\"" ; fi 
-            introduce_job solve-$c-$k instances/$(sed "${instno}q;d" $benchmarkfile) $timeperjob $t "$dep" DUMMY
+            introduce_job solve-$c-$k instances/$(sed "${instno}q;d" $benchmarkfile) $timeperjob $t "$dep" SAT
             i=$(($i+1))
             instno=$(($instno+1))
             if [ $instno -gt $ninstances ]; then 
@@ -92,7 +92,7 @@ numjobs=$(create_job_chains)
 echo "Generated $numjobs jobs"
 
 # Set options
-options="-t=4 -c=1 -lbc=$1 -satsolver=lcg -v=4 -J=$numjobs -ch=1 -chaf=5 -chstms=60 -s=0.25 -cfhl=0 -smcl=8 -hmcl=8 -mlbdps=8 -checksums=0 -huca=0 -sleep=100"
+options="-t=4 -c=1 -lbc=$1 -satsolver=cccllg -v=5 -J=$numjobs -s=1 -mlbdps=5 -checksums=0 -huca=0 -sleep=100"
 
 # Launch Mallob with a unique run ID for a logging directory
 runid="sched_$(hostname)_$(git rev-parse --short HEAD)_np${1}_"$(echo $options|sed 's/-//g'|sed 's/=//g'|sed 's/ /_/g')
