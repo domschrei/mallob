@@ -1005,8 +1005,8 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
     if (job.getState() != ACTIVE) {
         // Job is not active right now
 
-        // If job is shrinking and I am committed with the job, uncommit
-        if (job.getIndex() > 0 && job.getIndex() >= volume) {
+        // If I am committed with the job and the job is shrinking accordingly, uncommit
+        if (job.hasCommitment() && job.getIndex() > 0 && job.getIndex() >= volume) {
             log(V4_VVER, "%s shrunk : uncommitting", job.toStr());
             _job_db.uncommit(jobId);
         }
