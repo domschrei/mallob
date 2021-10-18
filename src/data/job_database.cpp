@@ -202,6 +202,7 @@ void JobDatabase::commit(JobRequest& req) {
     if (has(req.jobId)) {
         get(req.jobId).commit(req);
         _has_commitment = true;
+        log(V3_VERB, "COMMIT %s\n", get(req.jobId).toStr());
         if (_coll_assign) _coll_assign->setStatusDirty();
     }
 }
@@ -220,6 +221,7 @@ const JobRequest& JobDatabase::getCommitment(int jobId) {
 
 void JobDatabase::uncommit(int jobId) {
     if (has(jobId)) {
+        log(V3_VERB, "UNCOMMIT %s\n", get(jobId).toStr());
         get(jobId).uncommit();
         _has_commitment = false;
         if (_coll_assign) _coll_assign->setStatusDirty();

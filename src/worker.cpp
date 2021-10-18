@@ -730,7 +730,10 @@ void Worker::handleSendJobDescription(MessageHandle& handle) {
         }
         _job_db.execute(jobId, handle.source);
         initiateVolumeUpdate(jobId);
-    } else if (job.getState() != ACTIVE) return; // inactive, uncommitted job
+    }
+    
+    // Job inactive?
+    if (job.getState() != ACTIVE) return;
 
     // Arrived at final revision?
     if (_job_db.get(jobId).getRevision() < _job_db.get(jobId).getDesiredRevision()) {
@@ -1009,6 +1012,7 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
         if (job.hasCommitment() && job.getIndex() > 0 && job.getIndex() >= volume) {
             log(V4_VVER, "%s shrunk : uncommitting", job.toStr());
             _job_db.uncommit(jobId);
+            MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, IntPair(jobId, job.getIndex()));
         }
         return;
     }
