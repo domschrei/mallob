@@ -98,6 +98,7 @@ private:
         for (auto& job : _entries) {
             job.fairShare = job.priority / sumOfPriorities * availableVolume;
             job.demand = std::min(job.demand, (int) (availableVolume - _entries.size() + 1)); // cap demand at max. reachable volume
+            assert(job.demand > 0);
             job.remainder = tieBreaker;
             auto lb = job.getFairShareMultiplierLowerBound();
             auto ub = job.getFairShareMultiplierUpperBound();

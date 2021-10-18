@@ -177,6 +177,7 @@ void EventDrivenBalancer::digest(const EventMap& data) {
     _diffs.filterBy(_states);
     log(V4_VVER, "BLC digest %i diffs, %i/%i local diffs remaining\n", 
             data.getEntries().size(), _diffs.getEntries().size(), diffSize);
+    _states.removeOldZeros();
 }
 
 void EventDrivenBalancer::computeBalancingResult() {
