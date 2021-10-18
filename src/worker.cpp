@@ -332,6 +332,23 @@ void Worker::advance(float time) {
                         _job_db.handleDemandUpdate(job, demand);
                     }
                 }
+
+                // Handle child PEs waiting for the transfer of a revision of this job
+                auto& waitingRankRevPairs = job.getWaitingRankRevisionPairs();
+                for (auto it = waitingRankRevPairs.begin(); it != waitingRankRevPairs.end(); ++it) {
+                    auto& [rank, rev] = *it;
+                    if (rev > job.getRevision()) continue;
+                    if (job.getJobTree().hasLeftChild() && job.getJobTree().getLeftChildNodeRank() == rank) {
+                        // Left child
+                        sendRevisionDescription(id, rev, rank);
+                    } else if (job.getJobTree().hasRightChild() && job.getJobTree().getRightChildNodeRank() == rank) {
+                        // Right child
+                        sendRevisionDescription(id, rev, rank);
+                    } // else: obsolete request
+                    // Remove processed request
+                    it = waitingRankRevPairs.erase(it);
+                    it--;
+                }
             }
 
             // Job communication (e.g. clause sharing)
@@ -713,24 +730,7 @@ void Worker::handleSendJobDescription(MessageHandle& handle) {
         }
         _job_db.execute(jobId, handle.source);
         initiateVolumeUpdate(jobId);
-    } 
-
-    // Handle child PEs waiting for the transfer of a revision of this job
-    auto& waitingRankRevPairs = job.getWaitingRankRevisionPairs();
-    for (auto it = waitingRankRevPairs.begin(); it != waitingRankRevPairs.end(); ++it) {
-        auto& [rank, rev] = *it;
-        if (rev != job.getRevision()) continue;
-        if (job.getJobTree().hasLeftChild() && job.getJobTree().getLeftChildNodeRank() == rank) {
-            // Left child
-            sendRevisionDescription(jobId, rev, rank);
-        } else if (job.getJobTree().hasRightChild() && job.getJobTree().getRightChildNodeRank() == rank) {
-            // Right child
-            sendRevisionDescription(jobId, rev, rank);
-        } // else: obsolete request
-        // Remove processed request
-        it = waitingRankRevPairs.erase(it);
-        it--;
-    }
+    } else if (job.getState() != ACTIVE) return; // inactive, uncommitted job
 
     // Arrived at final revision?
     if (_job_db.get(jobId).getRevision() < _job_db.get(jobId).getDesiredRevision()) {
