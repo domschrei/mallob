@@ -572,14 +572,6 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
         MyMpi::isend(req.requestingNodeRank, 
             req.requestedNodeIndex == 0 ? MSG_OFFER_ADOPTION_OF_ROOT : MSG_OFFER_ADOPTION,
             req);
-        
-        if (req.requestedNodeIndex == 0) {
-            // As this is the root of an entirely new job, already register it in the balancer
-            // (with demand of 1) to properly block this PE as long as the description
-            // has not arrived yet (and it WILL arrive, as there is no failure condition for
-            // scheduling the root of a job)
-            _job_db.preregisterJobInBalancer(req.jobId);
-        }
 
     } else if (adoptionResult == JobDatabase::REJECT) {
         if (req.requestedNodeIndex == 0 && _job_db.has(req.jobId) && _job_db.get(req.jobId).getJobTree().isRoot()) {
@@ -1010,7 +1002,7 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
 
         // If I am committed with the job and the job is shrinking accordingly, uncommit
         if (job.hasCommitment() && job.getIndex() > 0 && job.getIndex() >= volume) {
-            log(V4_VVER, "%s shrunk : uncommitting", job.toStr());
+            log(V4_VVER, "%s shrunk : uncommitting\n", job.toStr());
             _job_db.uncommit(jobId);
             MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, IntPair(jobId, job.getIndex()));
         }

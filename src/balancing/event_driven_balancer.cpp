@@ -58,7 +58,7 @@ void EventDrivenBalancer::setVolumeUpdateCallback(std::function<void(int, int, f
 void EventDrivenBalancer::onActivate(const Job& job, int demand) {
     
     if (_active_job_id == job.getId()) {
-        onDemandChange(job, demand);
+        if (job.getJobTree().isRoot()) onDemandChange(job, demand);
         return;
     }
     _active_job_id = job.getId();

@@ -114,7 +114,7 @@ void JobDatabase::execute(int jobId, int source) {
 void JobDatabase::preregisterJobInBalancer(int jobId) {
     assert(has(jobId));
     auto& job = get(jobId);
-    int demand = std::max(1, job.getDemand());
+    int demand = std::max(1, job.getJobTree().isRoot() ? 0 : job.getDemand());
     _balancer->onActivate(job, demand);
     job.setLastDemand(demand);
 }
@@ -200,9 +200,14 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
 
 void JobDatabase::commit(JobRequest& req) {
     if (has(req.jobId)) {
+        log(V3_VERB, "COMMIT %s\n", get(req.jobId).toStr());
         get(req.jobId).commit(req);
         _has_commitment = true;
-        log(V3_VERB, "COMMIT %s\n", get(req.jobId).toStr());
+        
+        // Subscribe for volume updates for this job even if the job is not active yet
+        // Also reserves a PE of space for this job in case this is a root node
+        preregisterJobInBalancer(req.jobId);
+
         if (_coll_assign) _coll_assign->setStatusDirty();
     }
 }
@@ -223,6 +228,7 @@ void JobDatabase::uncommit(int jobId) {
     if (has(jobId)) {
         log(V3_VERB, "UNCOMMIT %s\n", get(jobId).toStr());
         get(jobId).uncommit();
+        _balancer->onTerminate(get(jobId));
         _has_commitment = false;
         if (_coll_assign) _coll_assign->setStatusDirty();
     }
