@@ -439,6 +439,7 @@ void Worker::handleAnswerAdoptionOffer(MessageHandle& handle) {
         // Rejected
         log(LOG_ADD_SRCRANK | V4_VVER, "Rejected to become %s : uncommitting", handle.source, job.toStr());
         _job_db.uncommit(req.jobId);
+        _job_db.unregisterJobFromBalancer(req.jobId);
     }
 }
 
@@ -701,7 +702,10 @@ void Worker::handleSendJobDescription(MessageHandle& handle) {
     int jobId = data.size() >= sizeof(int) ? Serializable::get<int>(data) : -1;
     log(LOG_ADD_SRCRANK | V4_VVER, "Got desc. of size %i for job #%i", handle.source, data.size(), jobId);
     if (jobId == -1 || !_job_db.has(jobId)) {
-        if (_job_db.hasCommitment(jobId)) _job_db.uncommit(jobId);
+        if (_job_db.hasCommitment(jobId)) {
+            _job_db.uncommit(jobId);
+            _job_db.unregisterJobFromBalancer(jobId);
+        }
         return;
     }
 
@@ -1004,6 +1008,7 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
         if (job.hasCommitment() && job.getIndex() > 0 && job.getIndex() >= volume) {
             log(V4_VVER, "%s shrunk : uncommitting\n", job.toStr());
             _job_db.uncommit(jobId);
+            _job_db.unregisterJobFromBalancer(jobId);
             MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, IntPair(jobId, job.getIndex()));
         }
         return;

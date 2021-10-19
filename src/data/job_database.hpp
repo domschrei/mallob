@@ -94,6 +94,7 @@ public:
     void advanceBalancing() {_balancer->advance();}
     void handleBalancingMessage(MessageHandle& handle) {_balancer->handle(handle);}
     int getGlobalBalancingEpoch() const {return _balancer->getGlobalEpoch();}
+    void unregisterJobFromBalancer(int jobId) {_balancer->onTerminate(get(jobId));}
     
     bool hasVolume(int jobId) const {return _balancer->hasVolume(jobId);}
     int getVolume(int jobId) const {return _balancer->getVolume(jobId);}

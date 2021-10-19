@@ -116,7 +116,7 @@ void JobDatabase::preregisterJobInBalancer(int jobId) {
     auto& job = get(jobId);
     int demand = std::max(1, job.getJobTree().isRoot() ? 0 : job.getDemand());
     _balancer->onActivate(job, demand);
-    job.setLastDemand(demand);
+    if (job.getJobTree().isRoot()) job.setLastDemand(demand);
 }
 
 bool JobDatabase::checkComputationLimits(int jobId) {
@@ -228,7 +228,6 @@ void JobDatabase::uncommit(int jobId) {
     if (has(jobId)) {
         log(V3_VERB, "UNCOMMIT %s\n", get(jobId).toStr());
         get(jobId).uncommit();
-        _balancer->onTerminate(get(jobId));
         _has_commitment = false;
         if (_coll_assign) _coll_assign->setStatusDirty();
     }
