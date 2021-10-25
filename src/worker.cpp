@@ -159,10 +159,10 @@ void Worker::createExpanderGraph() {
     } else {
         auto permutations = AdjustablePermutation::getPermutations(numWorkers, numBounceAlternatives);
         _hop_destinations = AdjustablePermutation::createExpanderGraph(permutations, _world_rank);
-        if (_params.hopsUntilCollectiveAssignment() >= 0)
+        if (_params.hopsUntilCollectiveAssignment() >= 0) {
             _coll_assign = CollectiveAssignment(
                 _job_db, MyMpi::size(_comm), 
-                AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, _world_rank), 
+                AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, _world_rank),
                 // Callback for receiving a job request
                 [&](const JobRequest& req, int rank) {
                     MessageHandle handle;
@@ -173,6 +173,7 @@ void Worker::createExpanderGraph() {
                 }
             );
             _job_db.setCollectiveAssignment(_coll_assign);
+        }
     }
     for (int dest : _hop_destinations) {
         _neighbor_idle_distance[dest] = 0; // initially, all workers are idle
@@ -770,25 +771,8 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
 
     // If necessary, find replacement
     if (pruned != JobTree::TreeRelative::NONE && index < job.getVolume()) {
-
-        // Try to find a dormant child that is not the message source
-        int tag = MSG_REQUEST_NODE_ONESHOT;
-        int nextNodeRank = job.getJobTree().getRankOfNextDormantChild();
-        if (nextNodeRank == -1 || nextNodeRank == handle.source) {
-            // If unsucessful, pick a random node
-            tag = MSG_REQUEST_NODE;
-            nextNodeRank = _params.derandomize() ? getWeightedRandomNeighbor() : getRandomNonSelfWorkerNode();
-        }
-        
-        // Initiate search for a replacement for the defected child
-        JobRequest req = job.getJobTree().getJobRequestFor(jobId, pruned, _job_db.getGlobalBalancingEpoch(), 
-                job.getDescription().getApplication());
-        log(LOG_ADD_DESTRANK | V4_VVER, "%s : request replacement for %s", nextNodeRank, 
-                        job.toStr(), _job_db.toStr(jobId, index).c_str());
-        MyMpi::isend(nextNodeRank, tag, req);
-        _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
-        if (pruned == JobTree::LEFT_CHILD) job.getJobTree().setDesireLeft(Timer::elapsedSeconds());
-        else job.getJobTree().setDesireRight(Timer::elapsedSeconds());
+        log(V4_VVER, "%s : look for replacement for %s", job.toStr(), _job_db.toStr(jobId, index).c_str());
+        spawnJobRequest(jobId, pruned==JobTree::LEFT_CHILD, _job_db.getGlobalBalancingEpoch());
     }
 
     // Initiate communication if the job now became willing to communicate
@@ -1054,24 +1038,7 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
                 break;
             }
             // Grow
-            log(V5_DEBG, "%s : grow\n", job.toStr());
-            if (mono) job.getJobTree().updateJobNode(indices[i], indices[i]);
-            JobRequest req(jobId, job.getDescription().getApplication(), job.getJobTree().getRootNodeRank(), 
-                    _world_rank, nextIndex, Timer::elapsedSeconds(), balancingEpoch, 0);
-            req.revision = job.getDesiredRevision();
-            int tag = MSG_REQUEST_NODE_ONESHOT;
-            int nextNodeRank = job.getJobTree().getRankOfNextDormantChild(); 
-            if (nextNodeRank < 0) {
-                tag = MSG_REQUEST_NODE;
-                ranks[i] = i == 0 ? job.getJobTree().getLeftChildNodeRank() : job.getJobTree().getRightChildNodeRank();
-                nextNodeRank = ranks[i];
-            }
-            log(LOG_ADD_DESTRANK | V3_VERB, "%s growing: %s", nextNodeRank, 
-                        job.toStr(), req.toStr().c_str());
-            MyMpi::isend(nextNodeRank, tag, req);
-            _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
-            if (i == 0) job.getJobTree().setDesireLeft(Timer::elapsedSeconds());
-            else job.getJobTree().setDesireRight(Timer::elapsedSeconds());
+            spawnJobRequest(jobId, i==0, balancingEpoch);
         } else {
             // Job does not want to grow - any more (?) - so unset any previous desire
             if (i == 0) job.getJobTree().unsetDesireLeft();
@@ -1086,6 +1053,34 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
         _job_db.suspend(jobId);
         MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, IntPair(jobId, thisIndex));
     }
+}
+
+void Worker::spawnJobRequest(int jobId, bool left, int balancingEpoch) {
+
+    Job& job = _job_db.get(jobId);
+    log(V5_DEBG, "%s : grow\n", job.toStr());
+    
+    int index = left ? job.getJobTree().getLeftChildIndex() : job.getJobTree().getRightChildIndex();
+    if (_params.monoFilename.isSet()) job.getJobTree().updateJobNode(index, index);
+
+    JobRequest req(jobId, job.getDescription().getApplication(), job.getJobTree().getRootNodeRank(), 
+            _world_rank, index, Timer::elapsedSeconds(), balancingEpoch, 0);
+    req.revision = job.getDesiredRevision();
+    int tag = MSG_REQUEST_NODE;    
+    int nextNodeRank = job.getJobTree().getRankOfNextDormantChild(); 
+    if (nextNodeRank < 0) {
+        tag = MSG_REQUEST_NODE;
+        nextNodeRank = left ? job.getJobTree().getLeftChildNodeRank() : job.getJobTree().getRightChildNodeRank();
+    }
+    
+    log(LOG_ADD_DESTRANK | V3_VERB, "%s growing: %s", nextNodeRank, 
+                job.toStr(), req.toStr().c_str());
+    
+    MyMpi::isend(nextNodeRank, tag, req);
+    
+    _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
+    if (left) job.getJobTree().setDesireLeft(Timer::elapsedSeconds());
+    else job.getJobTree().setDesireRight(Timer::elapsedSeconds());
 }
 
 void Worker::interruptJob(int jobId, bool terminate, bool reckless) {

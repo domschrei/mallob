@@ -90,8 +90,11 @@ private:
     
     void sendRevisionDescription(int jobId, int revision, int dest);
     void bounceJobRequest(JobRequest& request, int senderRank);
+    
     void initiateVolumeUpdate(int jobId);
     void updateVolume(int jobId, int volume, int balancingEpoch, float eventLatency);
+    void spawnJobRequest(int jobId, bool left, int balancingEpoch);
+
     void interruptJob(int jobId, bool terminate, bool reckless);
     void sendJobDoneWithStatsToClient(int jobId, int successfulRank);
     void timeoutJob(int jobId);
