@@ -50,6 +50,9 @@ private:
     float _sum_desire_latencies = 0;
     std::vector<float> _desire_latencies;
 
+    int _wait_epoch = -1;
+    int _stop_wait_epoch = -1;
+
 public:
     JobTree(int commSize, int rank, int seed) : _comm_size(commSize), _rank(rank), _job_node_ranks(commSize, seed) {
         _it_dormant_children = _dormant_children.begin();
@@ -205,6 +208,18 @@ public:
     float getSumOfDesireLatencies() const {return _sum_desire_latencies;}
     const std::vector<float>& getDesireLatencies() const {return _desire_latencies;}
     
+    void setWaitingForReactivation(int epoch) {
+        log(V5_DEBG, "RBS WAIT\n");
+        _wait_epoch = std::max(_wait_epoch, epoch);
+    }
+    void stopWaitingForReactivation(int epoch) {
+        if (_stop_wait_epoch < epoch) log(V5_DEBG, "RBS STOPWAIT\n");
+        _stop_wait_epoch = std::max(_stop_wait_epoch, epoch);
+    }
+    bool isWaitingForReactivation() const {
+        return _wait_epoch > _stop_wait_epoch;
+    }
+
 private:
     void setDesire(float& member, float time) {
         if (member == -1) {

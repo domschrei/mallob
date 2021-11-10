@@ -33,13 +33,6 @@ private:
     WorkerSysState _sys_state;
 
     std::vector<int> _hop_destinations;
-    robin_hood::unordered_map<int, int> _neighbor_idle_distance;
-
-    robin_hood::unordered_set<int> _busy_neighbors;
-    std::set<WorkRequest, WorkRequestComparator> _recent_work_requests;
-    float _time_only_idle_worker = -1;
-
-    DistributedBFS _bfs;
     CollectiveAssignment _coll_assign;
 
     long long _iteration = 0;
@@ -49,7 +42,6 @@ private:
     PeriodicEvent<1> _periodic_balance_check;
     PeriodicEvent<1000> _periodic_maintenance;
     Watchdog _watchdog;
-    bool _was_busy = false;
 
     std::atomic_bool _node_stats_calculated = true;
     float _node_memory_gbs = 0;

@@ -17,6 +17,7 @@
 #include "util/logger.hpp"
 #include "app/job_tree.hpp"
 #include "comm/job_comm.hpp"
+#include "scheduling/local_scheduler.hpp"
 
 class Job {
 
@@ -169,6 +170,7 @@ private:
 
     JobTree _job_tree;
     JobComm _comm;
+    LocalScheduler _scheduler;
     
     int _volume = 1;
     float _priority = 0.01;
@@ -260,6 +262,7 @@ public:
     JobTree& getJobTree() {return _job_tree;}
     const JobTree& getJobTree() const {return _job_tree;}
     const JobComm& getJobComm() const {return _comm;}
+    LocalScheduler& getScheduler() {return _scheduler;}
     std::list<std::pair<int, int>>& getWaitingRankRevisionPairs() {return _waiting_rank_revision_pairs;}
 
     // Updates the job's resource usage based on the period of time which passed

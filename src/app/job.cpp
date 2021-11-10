@@ -16,7 +16,25 @@ Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
             _time_of_arrival(Timer::elapsedSeconds()), 
             _state(INACTIVE),
             _job_tree(commSize, worldRank, jobId), 
-            _comm(_id, _job_tree, params.jobCommUpdatePeriod()) {
+            _comm(_id, _job_tree, params.jobCommUpdatePeriod()),
+            _scheduler(_id, _params, _job_tree, 
+                // callback to emit a directed job request message to a specific PE
+                [this](int epoch, int requestedIndex, int rank) {
+                    JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
+                        _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, -2);
+                    log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", rank, req.toStr().c_str());
+                    MyMpi::isend(rank, MSG_REQUEST_NODE_ONESHOT, req);
+                },
+                // callback to emit a certain, undirected job request message
+                [this](int epoch, int requestedIndex) {
+                    JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
+                        _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, 0);
+                    int dest = _job_tree.getLeftChildIndex() == requestedIndex ? 
+                        _job_tree.getLeftChildNodeRank() : _job_tree.getRightChildNodeRank();
+                    log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", dest, req.toStr().c_str());
+                    MyMpi::isend(dest, MSG_REQUEST_NODE, req);
+                }
+            ) {
     
     _growth_period = _params.growthPeriod();
     _continuous_growth = _params.continuousGrowth();
@@ -38,6 +56,12 @@ void Job::commit(const JobRequest& req) {
     _balancing_epoch_of_last_commitment = req.balancingEpoch;
     _job_tree.clearJobNodeUpdates();
     updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
+    if (_job_tree.isRoot()) {
+        JobSchedulingUpdate update;
+        update.epoch = req.balancingEpoch;
+        if (update.epoch < 0) update.epoch = 0;
+        getScheduler().initializeScheduling(update);
+    }
 }
 
 void Job::uncommit() {
@@ -74,8 +98,9 @@ void Job::start() {
     assertState(INACTIVE);
     if (_time_of_activation <= 0) _time_of_activation = Timer::elapsedSeconds();
     _time_of_last_limit_check = Timer::elapsedSeconds();
-    _volume = 1;
+    _volume = std::max(1, _volume);
     _state = ACTIVE;
+    log(V4_VVER, "%s : new job node starting\n", toStr());
     appl_start();
 }
 
@@ -83,7 +108,6 @@ void Job::suspend() {
     assertState(ACTIVE);
     _state = SUSPENDED;
     appl_suspend();
-    _volume = 0;
     _job_tree.unsetLeftChild();
     _job_tree.unsetRightChild();
     log(V4_VVER, "%s : suspended solver\n", toStr());
@@ -92,6 +116,7 @@ void Job::suspend() {
 
 void Job::resume() {
     assertState(SUSPENDED);
+    _volume = std::max(1, _volume);
     _state = ACTIVE;
     appl_resume();
     log(V4_VVER, "%s : resumed solving threads\n", toStr());
@@ -103,8 +128,7 @@ void Job::terminate() {
         updateVolumeAndUsedCpu(getVolume());
 
     _state = PAST;
-    _volume = 0;
-
+    
     appl_terminate();
 
     _job_tree.unsetLeftChild();

@@ -37,6 +37,8 @@ private:
     // Requests which lay dormant (e.g., due to too many hops / too busy system)
     // and will be re-introduced to continue hopping after some time
     std::list<std::tuple<float, int, JobRequest>> _deferred_requests;
+    std::map<int, std::list<MessageHandle>> _future_request_msgs;
+    robin_hood::unordered_map<int, std::list<JobRequest>> _root_requests;
 
     // Request to re-activate a local dormant root
     std::optional<JobRequest> _pending_root_reactivate_request;
@@ -91,6 +93,7 @@ public:
 
     void preregisterJobInBalancer(int jobId);
     void setBalancerVolumeUpdateCallback(std::function<void(int, int, float)> cb) {_balancer->setVolumeUpdateCallback(cb);}
+    void setBalancingDoneCallback(std::function<void()> cb) {_balancer->setBalancingDoneCallback(cb);}
     void advanceBalancing() {_balancer->advance();}
     void handleBalancingMessage(MessageHandle& handle) {_balancer->handle(handle);}
     int getGlobalBalancingEpoch() const {return _balancer->getGlobalEpoch();}
@@ -115,6 +118,12 @@ public:
     bool hasDormantRoot() const;
     bool hasDormantJob(int id) const;
     std::vector<int> getDormantJobs() const;
+    bool hasInactiveJobsWaitingForReactivation() const;
+
+    void addFutureRequestMessage(int epoch, MessageHandle&& h);
+    std::optional<MessageHandle> getArrivedFutureRequest();
+    void addRootRequest(const JobRequest& req);
+    std::optional<JobRequest> getRootRequest(int jobId);
 
     bool hasPendingRootReactivationRequest() const;
     JobRequest loadPendingRootReactivationRequest();

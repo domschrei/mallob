@@ -64,11 +64,11 @@ void CollectiveAssignment::deserialize(const std::vector<uint8_t>& packed, int s
         while (i+n <= packed.size()) {
             std::vector<uint8_t> reqPacked(packed.begin()+i, packed.begin()+i+n);
             JobRequest req = Serializable::get<JobRequest>(reqPacked);
-            if (req.balancingEpoch >= _epoch) {
+            if (req.balancingEpoch >= _epoch || req.requestedNodeIndex == 0) {
                 req.numHops++;
                 log(LOG_ADD_SRCRANK | V4_VVER, "[CA] got %s", source, req.toStr().c_str());
                 _request_list.insert(req);
-            }
+            } else log(LOG_ADD_SRCRANK | V4_VVER, "[CA] DISCARD %s", source, req.toStr().c_str());
             i += n;
         }
     }
@@ -86,14 +86,14 @@ void CollectiveAssignment::resolveRequests() {
     for (const auto& req : _request_list) {
         int id = req.jobId;
         int destination = -1;
-        if (req.balancingEpoch < _epoch) {
+        if (req.balancingEpoch < _epoch && req.requestedNodeIndex > 0) {
             // Obsolete request: Discard
             continue;
         }
 
         // Is there an optimal fit for this request?
         // -- self?
-        if (!_job_db->isBusyOrCommitted()) {
+        if (isIdle()) {
             // self is optimal fit
             destination = MyMpi::rank(MPI_COMM_WORLD);
         } else {
@@ -148,14 +148,14 @@ void CollectiveAssignment::setStatusDirty() {
 }
 
 void CollectiveAssignment::addJobRequest(JobRequest& req) {
-    if (req.balancingEpoch < _epoch) return; // discard
+    if (req.balancingEpoch < _epoch && req.requestedNodeIndex > 0) return; // discard
     log(V4_VVER, "[CA] Add req. %s\n", req.toStr().c_str());
     _request_list.insert(req);
 }
 
 CollectiveAssignment::Status CollectiveAssignment::getAggregatedStatus() {
     Status s;
-    s.numIdle = _job_db->isBusyOrCommitted() ? 0 : 1;
+    s.numIdle = isIdle() ? 1 : 0;
     for (auto& [childRank, childStatus] : _child_statuses) {
         s.numIdle += childStatus.numIdle;
     }
@@ -196,4 +196,8 @@ int CollectiveAssignment::getCurrentRoot() {
 
 int CollectiveAssignment::getCurrentParent() {
     return _neighbor_towards_rank[getCurrentRoot()];
+}
+
+bool CollectiveAssignment::isIdle() {
+    return !_job_db->isBusyOrCommitted() && !_job_db->hasInactiveJobsWaitingForReactivation();
 }

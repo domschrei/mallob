@@ -51,6 +51,8 @@ public:
 
     int getCurrentRoot();
     int getCurrentParent();
+
+    bool isIdle();
 };
 
 #endif

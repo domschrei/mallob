@@ -53,7 +53,14 @@ int MessageQueue::send(DataPtr data, int dest, int tag) {
         handle.data = data;
         handle.dest = dest;
         handle.tag = tag;
-    
+
+        int msglen = handle.data->size();
+        log(V5_DEBG, "MQ SEND n=%i d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", handle.data->size(), dest, tag, 
+            msglen>=1*sizeof(int) ? *(int*)(handle.data->data()) : 0, 
+            msglen>=3*sizeof(int) ? *(int*)(handle.data->data()+msglen - 3*sizeof(int)) : 0, 
+            msglen>=2*sizeof(int) ? *(int*)(handle.data->data()+msglen - 2*sizeof(int)) : 0, 
+            msglen>=1*sizeof(int) ? *(int*)(handle.data->data()+msglen - 1*sizeof(int)) : 0);
+
         if (dest == _my_rank) {
             // Self message
             _self_recv_queue.push_back(std::move(handle));

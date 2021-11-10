@@ -55,6 +55,17 @@ void EventDrivenBalancer::setVolumeUpdateCallback(std::function<void(int, int, f
     _volume_update_callback = callback;
 }
 
+void EventDrivenBalancer::setBalancingDoneCallback(std::function<void()> callback) {
+    _balancing_done_callback = callback;
+}
+
+void EventDrivenBalancer::onProbe(int jobId) {
+    _local_jobs.insert(jobId);
+    pushEvent(Event({
+        jobId, /*jobRootEpoch=*/1, /*demand=*/1, /*priority=*/0.01
+    }));
+}
+
 void EventDrivenBalancer::onActivate(const Job& job, int demand) {
     
     if (_active_job_id == job.getId()) {
@@ -62,13 +73,18 @@ void EventDrivenBalancer::onActivate(const Job& job, int demand) {
         return;
     }
     _active_job_id = job.getId();
+    _local_jobs.insert(job.getId());
     
     if (!job.getJobTree().isRoot()) return;
     
-    if (!_job_root_epochs.count(job.getId())) _job_root_epochs[job.getId()] = 0;
+    if (!_job_root_epochs.count(job.getId())) _job_root_epochs[job.getId()] = 1;
+    /*
+    // Do NOT push this event because it was already pushed at onProbe()
+    // (with an improper priority, but this does not matter due to atomic demand)
     pushEvent(Event({
         job.getId(), ++_job_root_epochs[job.getId()], std::max(1, demand), job.getPriority()
     }));
+    */
 }
 
 void EventDrivenBalancer::onDemandChange(const Job& job, int demand) {
@@ -98,6 +114,7 @@ void EventDrivenBalancer::onTerminate(const Job& job) {
     if (_active_job_id == job.getId()) {
         _active_job_id = -1;
         _pending_entries.clear();
+        _local_jobs.erase(job.getId());
     } 
     if (!job.getJobTree().isRoot()) return;
 
@@ -136,31 +153,35 @@ void EventDrivenBalancer::advance() {
     // Have anything to reduce?
     if (_diffs.isEmpty()) return;
 
-    // Enough time passed since last balancing?
+    // Is ready to perform balancing again?
     if (!_periodic_balancing.ready()) return;
 
-    log(V4_VVER, "Initiate balancing (%i diffs)\n", _diffs.getEntries().size());
-
-    handleData(_diffs, MSG_REDUCE_DATA);
+    EventMap m = std::move(_diffs);
+    _diffs.clear();
+    handleData(m, MSG_REDUCE_DATA, /*checkedReady=*/true);
 }
 
 void EventDrivenBalancer::handle(MessageHandle& handle) {
-    auto data = Serializable::get<EventMap>(handle.getRecvData());
-    handleData(data, handle.tag);
+    EventMap data = Serializable::get<EventMap>(handle.getRecvData());
+    handleData(data, handle.tag, /*checkedReady=*/false);
 }
 
-void EventDrivenBalancer::handleData(EventMap& data, int tag) {
+void EventDrivenBalancer::handleData(EventMap& data, int tag, bool checkedReady) {
     if (tag == MSG_REDUCE_DATA) {
-        if (isRoot(MyMpi::rank(MPI_COMM_WORLD))) {
-            // Switch to broadcast, continue below @ other branch
-            data.bumpGlobalEpoch();
-            tag = MSG_BROADCAST_DATA;
-        } else {
-            // Reduce further upwards
-            MyMpi::isend(getParentRank(), MSG_REDUCE_DATA, data);
+        _diffs.updateBy(data);
+        if (checkedReady || _periodic_balancing.ready()) {
+            if (isRoot(MyMpi::rank(MPI_COMM_WORLD))) {
+                // Switch to broadcast, continue below @ other branch
+                _diffs.setGlobalEpoch(_balancing_epoch+1);
+                tag = MSG_BROADCAST_DATA;
+                handleData(_diffs, MSG_BROADCAST_DATA, /*checkedReady=*/true);
+            } else { 
+                // send diff upwards
+                MyMpi::isend(getParentRank(), MSG_REDUCE_DATA, _diffs);
+                _diffs.clear();
+            }
         }
-    }
-    if (tag == MSG_BROADCAST_DATA) {
+    } else if (tag == MSG_BROADCAST_DATA) {
         // Inner node: Broadcast further downwards
         if (!isLeaf(MyMpi::rank(MPI_COMM_WORLD))) {
             for (auto child : getChildRanks()) { // TODO inefficient calculation of children
@@ -175,12 +196,14 @@ void EventDrivenBalancer::handleData(EventMap& data, int tag) {
 void EventDrivenBalancer::digest(const EventMap& data) {
     
     log(V4_VVER, "BLC DIGEST epoch=%ld size=%ld\n", data.getGlobalEpoch(), data.getEntries().size());
-    //log(V4_VVER, "BLC DIGEST data=%s\n", data.toStr().c_str());
-    //log(V4_VVER, "BLC DIGEST states=%s\n", _states.toStr().c_str());
-    //log(V4_VVER, "BLC DIGEST diff=%s\n", _diffs.toStr().c_str());
+    log(V4_VVER, "BLC DIGEST diff=%s\n", _diffs.toStr().c_str());
+    log(V4_VVER, "BLC DIGEST data=%s\n", data.toStr().c_str());
+    log(V4_VVER, "BLC DIGEST states_pre=%s\n", _states.toStr().c_str());
 
     _states.updateBy(data);
     _balancing_epoch = data.getGlobalEpoch();
+
+    log(V4_VVER, "BLC DIGEST states_post=%s\n", _states.toStr().c_str());
 
     computeBalancingResult();
 
@@ -211,10 +234,10 @@ void EventDrivenBalancer::computeBalancingResult() {
     for (const auto& entry : calc.getEntries()) {
         msg += std::to_string(entry.jobId) + ":" + std::to_string(entry.volume) + " ";
         _job_volumes[entry.jobId] = entry.volume;
+        float elapsed = 0;
 
         // My active job?
         if (entry.jobId == _active_job_id) {
-            float elapsed = 0;
             // Did I fire an event for this job which is not yet fulfilled?
             if (_pending_entries.count(_active_job_id)) {
                 auto it = _pending_entries.find(_active_job_id);
@@ -227,10 +250,21 @@ void EventDrivenBalancer::computeBalancingResult() {
                     _pending_entries.erase(it);
                 }
             }
-            _volume_update_callback(entry.jobId, entry.volume, elapsed);
         }
+        
+        // Trigger balancing callback?
+        if (_local_jobs.count(entry.jobId))
+            _volume_update_callback(entry.jobId, entry.volume, elapsed);
     }
+
+    // also call callback for all jobs whose volume became zero
+    for (const auto& entry : calc.getZeroEntries()) {
+        if (_local_jobs.count(entry.jobId))
+            _volume_update_callback(entry.jobId, 0, 0);
+    }
+    
     log(rank == 0 ? V3_VERB : V4_VVER, "BLC %s\n", msg.c_str());
+    if (_balancing_done_callback) _balancing_done_callback();
 }
 
 bool EventDrivenBalancer::hasVolume(int jobId) const {

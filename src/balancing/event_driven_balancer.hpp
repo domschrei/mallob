@@ -23,7 +23,9 @@ public:
     ~EventDrivenBalancer() {}
 
     void setVolumeUpdateCallback(std::function<void(int, int, float)> callback);
+    void setBalancingDoneCallback(std::function<void()> callback);
 
+    void onProbe(int jobId);
     void onActivate(const Job& job, int demand);
     void onDemandChange(const Job& job, int demand);
     void onSuspend(const Job& job);
@@ -49,6 +51,7 @@ private:
     int _balancing_epoch = 0;
 
     int _active_job_id = -1;
+    robin_hood::unordered_set<int> _local_jobs;
     robin_hood::unordered_map<int, int> _job_root_epochs;
     robin_hood::unordered_map<int, int> _job_volumes;
     robin_hood::unordered_map<int, std::vector<float>> _balancing_latencies;
@@ -57,6 +60,7 @@ private:
     robin_hood::unordered_map<int, std::pair<int, float>> _pending_entries;
 
     std::function<void(int, int, float)> _volume_update_callback;
+    std::function<void()> _balancing_done_callback;
 
     int _root_rank;
     int _parent_rank;
@@ -64,12 +68,12 @@ private:
 
     void pushEvent(const Event& event);
 
-    void handleData(EventMap& data, int tag);
+    void handleData(EventMap& data, int tag, bool checkedReady);
     void reduce(EventMap& data);
     void reduceIfApplicable();
     void broadcast(EventMap& data);
     void digest(const EventMap& data);
-    
+
     void computeBalancingResult();
 
     int getRootRank();

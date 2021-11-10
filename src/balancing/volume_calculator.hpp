@@ -19,6 +19,7 @@ class VolumeCalculator {
 private:
     Parameters& _params;
     std::vector<BalancingEntry> _entries;
+    std::vector<BalancingEntry> _zero_entries;
     int _epoch;
     int _num_workers;
     int _verbosity;
@@ -32,10 +33,11 @@ public:
         _entries.reserve(events.getEntries().size());
         for (const auto& [jobId, ev] : events.getEntries()) {
             assert(ev.demand >= 0);
-            if (ev.demand == 0) continue; // job has no demand
-            assert((ev.priority > 0) || log_return_false("#%i has priority %.2f!\n", ev.jobId, ev.priority));
-
-            _entries.push_back(BalancingEntry(ev.jobId, ev.demand, ev.priority));
+            if (ev.demand == 0) _zero_entries.emplace_back(ev.jobId, ev.demand, ev.priority); // job has no demand
+            else {
+                assert((ev.priority > 0) || log_return_false("#%i has priority %.2f!\n", ev.jobId, ev.priority));
+                _entries.emplace_back(ev.jobId, ev.demand, ev.priority);
+            }
         }
     }
 
@@ -45,6 +47,9 @@ public:
 
     const std::vector<BalancingEntry>& getEntries() {
         return _entries;
+    }
+    const std::vector<BalancingEntry>& getZeroEntries() {
+        return _zero_entries;
     }
 
 private:
@@ -110,7 +115,7 @@ private:
 
             assert(1 == job.getVolume(1 / job.fairShare) || log_return_false("ERROR #%i 1 != %i\n", job.jobId, job.getVolume(1 / job.fairShare)));
             assert(job.demand == job.getVolume(job.demand / job.fairShare) || log_return_false("ERROR #%i %i != %i\n", job.jobId, job.demand, job.getVolume(job.demand / job.fairShare)));
-            //log(_verbosity, "BLC #%i : fair share %.3f\n", job.jobId, job.fairShare);
+            log(_verbosity, "BLC #%i : fair share %.3f\n", job.jobId, job.fairShare);
         }
         centerOfWeight /= _entries.size();
 
@@ -152,14 +157,16 @@ private:
                 if (job.volumeLower == job.volumeUpper) {
                     // Job has the same volume in the entire range to search:
                     // dismiss job from remaining computation
-                    //log(_verbosity, "f_j=%.3f r_j=%.3f\n", job.fairShare, job.remainder);
-                    //log(_verbosity, "#%i : v(%.3f) = v(%.3f) = %i. Dismissing\n", job.jobId, left, right, job.volumeLower);
+                    //log(_verbosity, "BLC #%i : f_j=%.3f r_j=%.3f\n", job.jobId, job.fairShare, job.remainder);
+                    //log(_verbosity, "BLC #%i : v(%.3f) = v(%.3f) = %i. Dismissing\n", job.jobId, left, right, job.volumeLower);
+                    job.volume = job.volumeLower;
                     utilization += job.volumeLower;
                     baseUtilization += job.volumeLower;
                     job.dismissAndSwapWith(_entries[numDismissedJobs++]);
                 } else {
                     // Evaluate job's volume, add to utilization
                     job.volume = job.getVolume(fairShareMultiplier);
+                    //log(_verbosity, "BLC #%i : f_j=%.3f r_j=%.3f v_j=%i\n", job.jobId, job.fairShare, job.remainder, job.volume);
                     utilization += job.volume;
                 }
             }

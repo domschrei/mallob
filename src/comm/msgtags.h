@@ -144,14 +144,9 @@ const int MSG_NOTIFY_ASSIGNMENT_UPDATE = 40;
 const int MSG_NOTIFY_CLIENT_JOB_ABORTING = 41;
 const int MSG_OFFER_ADOPTION_OF_ROOT = 42;
 
-const int MSG_SCHED_PROPAGATE = 51; // downwards
-const int MSG_SCHED_NOTIFY_NONE_LEFT = 52; // downwards
-const int MSG_SCHED_REQUEST_REACTIVATE = 53; // to the "outside"
-const int MSG_SCHED_CONFIRM_REACTIVATE = 54; // upwards
-const int MSG_SCHED_REJECT_REACTIVATE = 55; // upwards
-const int MSG_SCHED_REQUEST_INACTIVE_NODES = 56; // upwards
-const int MSG_SCHED_CONCLUDE = 57; // upwards
-const int MSG_SCHED_NEW_INACTIVE_NODE = 58; // upwards, not tied to an epoch
+const int MSG_SCHED_INITIALIZE_CHILD_WITH_NODES = 51; // downwards
+const int MSG_SCHED_RETURN_NODES = 52; // upwards
+const int MSG_SCHED_RELEASE_FROM_WAITING = 53;
 
 const int MSG_OFFSET_BATCHED = 10000;
 

@@ -46,6 +46,7 @@ function test_dry_scheduling() {
         introduce_job dummy-$i no/such/instance.txt 1.5 $t "" DUMMY
         t=$(echo "$t+0.1"|bc -l)
     done
+    echo "400 jobs set up."
     test 32 -c=1 -J=400 -v=5 -checksums=1
 }
 
@@ -69,15 +70,19 @@ function test_oscillating() {
     # Generate periodic "disturbance" jobs
     t=4
     n=0
+    RANDOM=1
     while [ $t -le 60 ]; do
         # wallclock limit of 4s, arrival @ t
-        introduce_job sat-$t instances/r3sat_300.cnf 4 $t
+        introduce_job sat-$t instances/r3sat_500.cnf $(($RANDOM % 18 + 2)) $t "" DUMMY $(($RANDOM % 7 * 2 + 1)) 
         t=$((t+8))
         n=$((n+1))
     done
     # Generate actual job
-    introduce_job sat-main instances/r3sat_500.cnf 60
-    test 13 -t=1 -c=1 -lbc=2 -J=$((n+1)) -l=1 -satsolver=lgc -v=5 -checkjsonresults -checksums=1
+    introduce_job sat-main-1 instances/r3sat_500.cnf 60 0 "" DUMMY
+    introduce_job sat-main-2 instances/r3sat_500.cnf 60 0 "" DUMMY
+    introduce_job sat-main-3 instances/r3sat_500.cnf 60 0 "" DUMMY
+    introduce_job sat-main-4 instances/r3sat_500.cnf 60 0 "" DUMMY
+    nocleanup=1 test 32 -t=1 -c=1 -lbc=5 -J=$((n+4)) -l=1 -satsolver=lgc -v=5 -checkjsonresults -checksums=1 -rs -jc=2
 }
 
 function test_incremental_scheduling() {
@@ -87,12 +92,12 @@ function test_incremental_scheduling() {
     test 8 -t=1 -l=1 -satsolver=LgC -v=5 -J=3 -incrementaltest -checksums=1
 }
 
-test_incremental_scheduling
+test_oscillating
 exit
 test_dry_scheduling
+test_incremental_scheduling
 test_mono
 test_scheduling
-test_oscillating
 test_incremental
 test_many_incremental
 

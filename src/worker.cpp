@@ -29,25 +29,7 @@
 Worker::Worker(MPI_Comm comm, Parameters& params) :
     _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
     _params(params), _job_db(_params, _comm, _sys_state), _sys_state(_comm), 
-    _bfs(_hop_destinations, [this](const JobRequest& req) {
-        if (!_job_db.isBusyOrCommitted()) {
-            // Try to adopt this job request
-            log(V4_VVER, "BFS Try adopting %s\n", req.toStr().c_str());
-            MessageHandle handle;
-            handle.receiveSelfMessage(req.serialize(), _world_rank);
-            handleRequestNode(handle, JobDatabase::IGNORE_FAIL);
-            return _job_db.hasCommitment(req.jobId) ? _world_rank : -1;
-        }
-        return -1;
-    }, [this](const JobRequest& request, int foundRank) {
-        if (foundRank == -1) {
-            log(V4_VVER, "%s : BFS unsuccessful - continue bouncing\n", request.toStr().c_str());
-            JobRequest req = request;
-            bounceJobRequest(req, _world_rank);
-        } else {
-            log(V4_VVER, "%s : BFS successful ([%i] adopting)\n", request.toStr().c_str(), foundRank);
-        }
-    }), _watchdog(/*checkIntervMillis=*/200, Timer::elapsedSeconds())
+    _watchdog(/*checkIntervMillis=*/200, Timer::elapsedSeconds())
 {
     _global_timeout = _params.timeLimit();
     _watchdog.setWarningPeriod(100); // warn after 0.1s without a reset
@@ -56,6 +38,19 @@ Worker::Worker(MPI_Comm comm, Parameters& params) :
     // Set callback which is called whenever a job's volume is updated
     _job_db.setBalancerVolumeUpdateCallback([&](int jobId, int volume, float eventLatency) {
         updateVolume(jobId, volume, _job_db.getGlobalBalancingEpoch(), eventLatency);
+    });
+    // Set callback for whenever a new balancing has been concluded
+    _job_db.setBalancingDoneCallback([&]() {
+        // apply any job requests which have arrived from a "future epoch"
+        // which has now become the present (or a past) epoch
+        while (true) {
+            auto optHandle = _job_db.getArrivedFutureRequest();
+            if (!optHandle.has_value()) break;
+            auto& h = optHandle.value();
+            handleRequestNode(h, h.tag == MSG_REQUEST_NODE ? 
+                JobDatabase::JobRequestMode::NORMAL : 
+                JobDatabase::JobRequestMode::TARGETED_REJOIN);
+        }
     });
 }
 
@@ -104,16 +99,6 @@ void Worker::init() {
         [&](auto& h) {handleSendApplicationMessage(h);});
     q.registerCallback(MSG_SEND_JOB_DESCRIPTION, 
         [&](auto& h) {handleSendJobDescription(h);});
-    q.registerCallback(MSG_NOTIFY_NEIGHBOR_STATUS,
-        [&](auto& h) {handleNotifyNeighborStatus(h);});
-    q.registerCallback(MSG_NOTIFY_NEIGHBOR_IDLE_DISTANCE,
-        [&](auto& h) {handleNotifyNeighborIdleDistance(h);});
-    q.registerCallback(MSG_REQUEST_WORK,
-        [&](auto& h) {handleRequestWork(h);});
-    q.registerCallback(MSG_REQUEST_IDLE_NODE_BFS,
-        [&](auto& h) {_bfs.handle(h);});
-    q.registerCallback(MSG_ANSWER_IDLE_NODE_BFS,
-        [&](auto& h) {_bfs.handle(h);});
     q.registerCallback(MSG_NOTIFY_ASSIGNMENT_UPDATE, 
         [&](auto& h) {_coll_assign.handle(h);});
     auto balanceCb = [&](MessageHandle& handle) {
@@ -124,6 +109,21 @@ void Worker::init() {
     q.registerCallback(MSG_BROADCAST_DATA, balanceCb);
     q.registerCallback(MSG_WARMUP, [&](auto& h) {
         log(LOG_ADD_SRCRANK | V5_DEBG, "Warmup msg", h.source);
+    });
+
+    auto localSchedulerCb = [&](MessageHandle& handle) {
+        int jobId = Serializable::get<int>(handle.getRecvData());
+        if (_job_db.has(jobId)) _job_db.get(jobId).getScheduler().handle(handle);
+    };
+    q.registerCallback(MSG_SCHED_INITIALIZE_CHILD_WITH_NODES, localSchedulerCb);
+    q.registerCallback(MSG_SCHED_RETURN_NODES, localSchedulerCb);
+    q.registerCallback(MSG_SCHED_RELEASE_FROM_WAITING, [&](MessageHandle& handle) {
+        IntPair idEpoch = Serializable::get<IntPair>(handle.getRecvData());
+        auto& [jobId, epoch] = idEpoch;
+        if (_job_db.has(jobId)) {
+            _job_db.get(jobId).getJobTree().stopWaitingForReactivation(epoch);
+            if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
+        }        
     });
 
     // Send warm-up messages with your pseudorandom bounce destinations
@@ -175,9 +175,6 @@ void Worker::createExpanderGraph() {
             _job_db.setCollectiveAssignment(_coll_assign);
         }
     }
-    for (int dest : _hop_destinations) {
-        _neighbor_idle_distance[dest] = 0; // initially, all workers are idle
-    }
 
     // Output found bounce alternatives
     std::string info = "";
@@ -194,12 +191,6 @@ void Worker::advance(float time) {
 
     // Reset watchdog
     _watchdog.reset(time);
-
-    if (_was_busy != _job_db.isBusyOrCommitted()) {
-        // Load status changed since last cycle
-        sendStatusToNeighbors();
-        _was_busy = !_was_busy;
-    }
     
     if (_periodic_stats_check.ready()) {
         // Print stats
@@ -245,14 +236,6 @@ void Worker::advance(float time) {
     if (_periodic_balance_check.ready()) {
         _job_db.advanceBalancing();
 
-        if (!_job_db.isBusyOrCommitted() && _time_only_idle_worker > 0 && time - _time_only_idle_worker >= 0.05) {
-            // This worker is the only idle worker within its local vicinity since some time
-            log(V4_VVER, "All neighbors are busy - requesting work\n");
-            WorkRequest req(_world_rank, _job_db.getGlobalBalancingEpoch());
-            MyMpi::isend(Random::choice(_hop_destinations), MSG_REQUEST_WORK, req);
-            _time_only_idle_worker = -1;
-        }
-
         // Advance collective assignment of nodes
         if (_params.hopsUntilCollectiveAssignment() >= 0) {
             _coll_assign.advance(_job_db.getGlobalBalancingEpoch());
@@ -269,8 +252,6 @@ void Worker::advance(float time) {
         for (auto& [req, senderRank] : _job_db.getDeferredRequestsToForward(time)) {
             bounceJobRequest(req, senderRank);
         }
-
-        _bfs.collectGarbage(_job_db.getGlobalBalancingEpoch());
     }
 
     // Check active job
@@ -479,9 +460,15 @@ void Worker::handleRejectOneshot(MessageHandle& handle) {
     log(LOG_ADD_SRCRANK | V5_DEBG, "%s rejected by dormant child", handle.source, 
             _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
 
+    Job& job = _job_db.get(req.jobId);
+    if (_params.reactivationScheduling()) {
+        job.getScheduler().handleRejectReactivation(handle.source, req.balancingEpoch, 
+            req.requestedNodeIndex, !rej.isChildStillDormant);
+        return;
+    }
+
     if (_job_db.isAdoptionOfferObsolete(req)) return;
 
-    Job& job = _job_db.get(req.jobId);
     if (!rej.isChildStillDormant) {
         job.getJobTree().removeDormantChild(handle.source);
     }
@@ -526,38 +513,44 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
         return;
     }
 
-    if (mode == JobDatabase::NORMAL && _job_db.isBusyOrCommitted() && !_recent_work_requests.empty()) {
-        // Forward the job request to the source of a recent work request
-
-        // Remove old work requests and try and find a recent one
-        auto it = _recent_work_requests.begin();
-        while (it != _recent_work_requests.end()) {
-            if (it->balancingEpoch+1 < _job_db.getGlobalBalancingEpoch()) {
-                it = _recent_work_requests.erase(it);
-            } else {
-                break;
-            }
-        }
-        // Found one?
-        if (it != _recent_work_requests.end()) {
-            WorkRequest wreq = *_recent_work_requests.begin();
-            req.numHops++;
-            _sys_state.addLocal(SYSSTATE_NUMHOPS, 1);
-            log(LOG_ADD_DESTRANK | V4_VVER, "Forward %s to recent work req.", wreq.requestingRank, req.toStr().c_str());
-            MyMpi::isend(wreq.requestingRank, MSG_REQUEST_NODE, req);
-            _recent_work_requests.erase(_recent_work_requests.begin());
-            return;
-        }
+    if (req.requestedNodeIndex == 0 && req.numHops == 0) {
+        // Fresh new job incoming!
+        _job_db.addRootRequest(std::move(req));
+        return;
     }
 
+    if (req.balancingEpoch > _job_db.getGlobalBalancingEpoch()) {
+        // Job request is "from the future": defer it until it is from the present
+        _job_db.addFutureRequestMessage(req.balancingEpoch, std::move(handle));
+        return;
+    }
+
+    JobDatabase::AdoptionResult adoptionResult;
     int removedJob;
-    auto adoptionResult = _job_db.tryAdopt(req, mode, handle.source, removedJob);
+    if (_params.reactivationScheduling()) {
+        if (mode == JobDatabase::TARGETED_REJOIN) {
+            // Mark job as having been notified of the current scheduling and that it is not further needed.
+            if (_job_db.has(req.jobId)) _job_db.get(req.jobId).getJobTree().stopWaitingForReactivation(req.balancingEpoch); 
+        } else if (_job_db.hasInactiveJobsWaitingForReactivation()) {
+            // In reactivation-based scheduling, block incoming requests if you are still waiting
+            // for a notification from some job of which you have an inactive job node.
+            // Does not apply for targeted requests!
+            adoptionResult = JobDatabase::REJECT;
+        }
+    }
+    if (_params.reactivationScheduling() && mode != JobDatabase::TARGETED_REJOIN 
+            && _job_db.hasInactiveJobsWaitingForReactivation()) {
+        adoptionResult = JobDatabase::REJECT;
+    } else {
+        adoptionResult = _job_db.tryAdopt(req, mode, handle.source, removedJob);
+    }
+
     if (adoptionResult == JobDatabase::ADOPT_FROM_IDLE || adoptionResult == JobDatabase::ADOPT_REPLACE_CURRENT) {
 
         if (adoptionResult == JobDatabase::ADOPT_REPLACE_CURRENT) {
             Job& job = _job_db.get(removedJob);
-            IntPair pair(job.getId(), job.getIndex());
-            MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, pair);
+            MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, 
+                IntVec({job.getId(), job.getIndex(), job.getJobTree().getRootNodeRank()}));
         }
 
         // Adoption takes place
@@ -584,8 +577,8 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
         } else if (mode == JobDatabase::TARGETED_REJOIN) {
             // Send explicit rejection message
             OneshotJobRequestRejection rej(req, _job_db.hasDormantJob(req.jobId));
-            log(LOG_ADD_DESTRANK | V5_DEBG, "decline oneshot request for %s", handle.source, 
-                        _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
+            log(LOG_ADD_DESTRANK | V5_DEBG, "REJECT %s myepoch=%i", handle.source, 
+                        req.toStr().c_str(), _job_db.getGlobalBalancingEpoch());
             MyMpi::isend(handle.source, MSG_REJECT_ONESHOT, rej);
         } else if (mode == JobDatabase::NORMAL) {
             // Continue job finding procedure somewhere else
@@ -635,7 +628,7 @@ void Worker::handleOfferAdoption(MessageHandle& handle) {
         Job &job = _job_db.get(req.jobId);
 
         // Check if node should be adopted or rejected
-        if (_job_db.isAdoptionOfferObsolete(req)) {
+        if (_job_db.isAdoptionOfferObsolete(req) || !job.getScheduler().acceptsChild(req.requestedNodeIndex)) {
             // Obsolete request
             log(LOG_ADD_SRCRANK | V3_VERB, "REJECT %s", handle.source, req.toStr().c_str());
             reject = true;
@@ -650,6 +643,16 @@ void Worker::handleOfferAdoption(MessageHandle& handle) {
     }
 
     MyMpi::isend(handle.source, MSG_ANSWER_ADOPTION_OFFER, IntPair(req.jobId, reject ? 0 : 1));
+
+    if (_params.reactivationScheduling()) {
+        Job& job = _job_db.get(req.jobId);
+        if (!reject) {
+            job.getScheduler().handleChildJoining(handle.source, req.balancingEpoch, req.requestedNodeIndex);
+        } else {
+            job.getScheduler().handleRejectReactivation(handle.source, req.balancingEpoch, 
+                req.requestedNodeIndex, false);
+        }
+    }
 }
 
 void Worker::handleQueryJobResult(MessageHandle& handle) {
@@ -760,10 +763,15 @@ void Worker::handleNotifyVolumeUpdate(MessageHandle& handle) {
 void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
 
     // Retrieve job
-    IntPair recv = Serializable::get<IntPair>(handle.getRecvData());
-    int jobId = recv.first;
-    int index = recv.second;
-    if (!_job_db.has(jobId)) return;
+    IntVec recv = Serializable::get<IntVec>(handle.getRecvData());
+    int jobId = recv.data[0];
+    int index = recv.data[1];
+    int rootRank = recv.data[2];
+
+    if (!_job_db.has(jobId)) {
+        MyMpi::isend(rootRank, MSG_NOTIFY_NODE_LEAVING_JOB, handle.moveRecvData());
+        return;
+    }
     Job& job = _job_db.get(jobId);
 
     // Prune away the respective child if necessary
@@ -771,7 +779,7 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
 
     // If necessary, find replacement
     if (pruned != JobTree::TreeRelative::NONE && index < job.getVolume()) {
-        log(V4_VVER, "%s : look for replacement for %s", job.toStr(), _job_db.toStr(jobId, index).c_str());
+        log(V4_VVER, "%s : look for replacement for %s\n", job.toStr(), _job_db.toStr(jobId, index).c_str());
         spawnJobRequest(jobId, pruned==JobTree::LEFT_CHILD, _job_db.getGlobalBalancingEpoch());
     }
 
@@ -814,90 +822,6 @@ void Worker::handleNotifyResultFound(MessageHandle& handle) {
     sendJobDoneWithStatsToClient(jobId, handle.source);
 }
 
-void Worker::handleNotifyNeighborStatus(MessageHandle& handle) {
-    bool isBusy = handle.getRecvData().at(0) == 1;
-    updateNeighborStatus(handle.source, isBusy);
-}
-
-void Worker::handleNotifyNeighborIdleDistance(MessageHandle& handle) {
-    int distBefore = getIdleDistance();
-    _neighbor_idle_distance[handle.source] = Serializable::get<int>(handle.getRecvData());
-    int distAfter = getIdleDistance();
-    if (distAfter != distBefore) {
-        log(V4_VVER, "New idle distance %i\n", distAfter);
-        sendStatusToNeighbors();
-    }
-}
-
-int Worker::getIdleDistance() {
-    if (!_job_db.isBusyOrCommitted()) return 0;
-    int minDistance = _params.maxIdleDistance();
-    for (const auto& [rank, dist] : _neighbor_idle_distance) {
-        minDistance = std::min(minDistance, dist+1);
-    }
-    return minDistance;
-}
-
-void Worker::updateNeighborStatus(int rank, bool busy) {
-    if (busy) _busy_neighbors.insert(rank);
-    else _busy_neighbors.erase(rank);
-    if (!_job_db.isBusyOrCommitted() && _busy_neighbors.size() == _hop_destinations.size()) {
-        if (_time_only_idle_worker <= 0)
-            _time_only_idle_worker = Timer::elapsedSeconds();
-    } else {
-        _time_only_idle_worker = -1;
-    }
-}
-
-void Worker::handleRequestWork(MessageHandle& handle) {
-    WorkRequest req = Serializable::get<WorkRequest>(handle.getRecvData());
-    
-    // Is this work request obsolete?
-    // - I am this worker but I am not idle any more
-    if (req.requestingRank == _world_rank && _job_db.isBusyOrCommitted()) return;
-    // - _busy_neighbors contains this worker
-    if (_busy_neighbors.count(req.requestingRank)) return;
-    // - # hops exceeding significant ratio of # workers
-    if (req.numHops >= std::ceil(0.1 * MyMpi::size(_comm))) return;
-    
-    // Remember work request for upcoming job requests
-    // if the request does not originate from myself
-    if (req.requestingRank != _world_rank) {
-        // Try to find a recent work request from the same rank
-        auto foundReq = _recent_work_requests.end();
-        for (auto it = _recent_work_requests.begin(); it != _recent_work_requests.end(); ++it) {
-            if (it->requestingRank == handle.source) {
-                foundReq = it;
-                break;
-            }
-        }
-        // Found? -> Remove it if the new request dominates the old one
-        bool dominatingOrNovel = true;
-        if (foundReq != _recent_work_requests.end()) {
-            const WorkRequest& otherReq = *foundReq;
-            dominatingOrNovel = req.balancingEpoch > otherReq.balancingEpoch || req.numHops < otherReq.numHops;
-            if (dominatingOrNovel) _recent_work_requests.erase(foundReq);
-        }
-        // Insert new request if dominating or novel
-        if (dominatingOrNovel) _recent_work_requests.insert(req);
-        // Cap number of resident work requests
-        if (_recent_work_requests.size() > 3)
-            _recent_work_requests.erase(std::prev(_recent_work_requests.end()));
-    }
-
-    // Past-past balancing epoch: remember request but do not bounce it any further
-    if (req.balancingEpoch+1 < _job_db.getGlobalBalancingEpoch()) return;
-
-    // Bounce work request
-    req.numHops++;
-    int dest = Random::choice(_hop_destinations);
-    // (if possible, not just back to the sender)
-    while (_hop_destinations.size() > 1 && dest == handle.source) {
-        dest = Random::choice(_hop_destinations);
-    }
-    MyMpi::isend(dest, MSG_REQUEST_WORK, req);
-}
-
 void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
 
     // Increment #hops
@@ -910,18 +834,10 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
         log(V1_WARN, "[WARN] %s\n", request.toStr().c_str());
     }
 
-    if (num >= _params.hopsUntilBfs() && num % _params.hopsBetweenBfs() == 0 && _params.maxBfsDepth() > 0) {
-        // Initiate a BFS to find an idle worker for this request
-        // Increase depth for each further BFS for this request
-        int depth = 1 + (num - _params.hopsUntilBfs()) / _params.hopsBetweenBfs();
-        depth = std::min(depth, _params.maxBfsDepth());
-        log(V4_VVER, "Initiate BFS (d=%i) for %s\n", depth, request.toStr().c_str());
-        _bfs.startSearch(request, depth);
-        return;
-    }
-
+    // If hopped enough for collective assignment to be enabled
+    // and if either reactivation scheduling is employed or the requested node is non-root
     if (_params.hopsUntilCollectiveAssignment() >= 0 && num >= _params.hopsUntilCollectiveAssignment()
-        && request.requestedNodeIndex > 0) {
+        && (_params.reactivationScheduling() || request.requestedNodeIndex > 0)) {
         _coll_assign.addJobRequest(request);
         return;
     }
@@ -982,31 +898,60 @@ void Worker::initiateVolumeUpdate(int jobId) {
 
 void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float eventLatency) {
 
-    if (!_job_db.has(jobId)) return;
+    if (!_job_db.has(jobId)) {
+        auto optReq = _job_db.getRootRequest(jobId);
+        if (optReq.has_value()) {
+            log(V3_VERB, "Activate %s\n", optReq.value().toStr().c_str());
+            bounceJobRequest(optReq.value(), optReq.value().requestingNodeRank);
+        }
+        return;
+    }
+
     Job &job = _job_db.get(jobId);
+
+    int thisIndex = job.getIndex();
+    int prevVolume = job.getVolume();
+    log(prevVolume == volume || thisIndex > 0 ? V4_VVER : V3_VERB, "%s : update v=%i epoch=%i lastreqsepoch=%i evlat=%.5f\n", 
+        job.toStr(), volume, balancingEpoch, job.getJobTree().getBalancingEpochOfLastRequests(), eventLatency);
+    job.updateVolumeAndUsedCpu(volume);
+    job.getJobTree().stopWaitingForReactivation(balancingEpoch-1);
 
     if (job.getState() != ACTIVE) {
         // Job is not active right now
 
+        // Update reactivation-based scheduling if the job is committed, too
+        if (job.hasCommitment() && _params.reactivationScheduling()) {
+            job.getScheduler().updateBalancing(balancingEpoch, volume);
+        } 
+        
         // If I am committed with the job and the job is shrinking accordingly, uncommit
         if (job.hasCommitment() && job.getIndex() > 0 && job.getIndex() >= volume) {
             log(V4_VVER, "%s shrunk : uncommitting\n", job.toStr());
             _job_db.uncommit(jobId);
             _job_db.unregisterJobFromBalancer(jobId);
-            MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, IntPair(jobId, job.getIndex()));
+            if (!_params.reactivationScheduling())
+                MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, 
+                    IntVec({jobId, job.getIndex(), job.getJobTree().getRootNodeRank()}));
         }
+
+        // If I am suspended and the job grows, wait for scheduling messages
+        if (job.getState() == SUSPENDED && prevVolume < volume) {
+            log(V5_DEBG, "RBS volume grown %i -> %i\n", prevVolume, volume);
+            job.getJobTree().setWaitingForReactivation(balancingEpoch);
+        }
+
         return;
     }
 
-    int thisIndex = job.getIndex();
-    log(job.getVolume() == volume || thisIndex > 0 ? V4_VVER : V3_VERB, "%s : update v=%i epoch=%i lastreqsepoch=%i evlat=%.5f\n", 
-        job.toStr(), volume, balancingEpoch, job.getJobTree().getBalancingEpochOfLastRequests(), eventLatency);
-    job.updateVolumeAndUsedCpu(volume);
-
-    if (job.getJobTree().isRoot() && job.getJobTree().getBalancingEpochOfLastRequests() == -1) {
-        // Job's volume is updated for the first time since its activation
-        job.setTimeOfFirstVolumeUpdate(Timer::elapsedSeconds());
+    if (job.getJobTree().isRoot()) {
+        if (job.getJobTree().getBalancingEpochOfLastRequests() == -1) {
+            // Job's volume is updated for the first time since its activation
+            job.setTimeOfFirstVolumeUpdate(Timer::elapsedSeconds());
+        }
     }
+    
+    if (_params.reactivationScheduling())
+        job.getScheduler().updateBalancing(balancingEpoch, volume);
 
     // Prepare volume update to propagate down the job tree
     IntVec payload{jobId, volume, balancingEpoch};
@@ -1021,10 +966,14 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
     for (int i = 0; i < 2; i++) {
         int nextIndex = indices[i];
         if (has[i]) {
+            ranks[i] = i == 0 ? job.getJobTree().getLeftChildNodeRank() : job.getJobTree().getRightChildNodeRank();
             if (_params.explicitVolumeUpdates()) {
                 // Propagate volume update
-                ranks[i] = i == 0 ? job.getJobTree().getLeftChildNodeRank() : job.getJobTree().getRightChildNodeRank();
                 MyMpi::isend(ranks[i], MSG_NOTIFY_VOLUME_UPDATE, payload);
+            }
+            if (_params.reactivationScheduling() && nextIndex >= volume) {
+                // Child leaves
+                job.getJobTree().prune(ranks[i], nextIndex);
             }
         } else if (nextIndex < volume 
                 && job.getJobTree().getBalancingEpochOfLastRequests() < balancingEpoch) {
@@ -1034,24 +983,31 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
                 log(V4_VVER, "%s cannot grow due to dormant root\n", job.toStr());
                 _job_db.suspend(jobId);
                 MyMpi::isend(job.getJobTree().getParentNodeRank(), 
-                    MSG_NOTIFY_NODE_LEAVING_JOB, IntPair(jobId, thisIndex));
+                    MSG_NOTIFY_NODE_LEAVING_JOB, IntVec({jobId, thisIndex, job.getJobTree().getRootNodeRank()}));
                 break;
             }
-            // Grow
-            spawnJobRequest(jobId, i==0, balancingEpoch);
+            if (!_params.reactivationScheduling()) {
+                // Try to grow immediately
+                spawnJobRequest(jobId, i==0, balancingEpoch);
+            }
         } else {
             // Job does not want to grow - any more (?) - so unset any previous desire
             if (i == 0) job.getJobTree().unsetDesireLeft();
             else job.getJobTree().unsetDesireRight();
         }
     }
+
     job.getJobTree().setBalancingEpochOfLastRequests(balancingEpoch);
 
     // Shrink (and pause solving) if necessary
     if (thisIndex > 0 && thisIndex >= volume) {
         log(V3_VERB, "%s shrinking\n", job.toStr());
         _job_db.suspend(jobId);
-        MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, IntPair(jobId, thisIndex));
+        if (!_params.reactivationScheduling()) {
+            // Send explicit leaving message
+            MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, 
+                IntVec({jobId, thisIndex, job.getJobTree().getRootNodeRank()}));
+        }
     }
 }
 
@@ -1149,36 +1105,9 @@ void Worker::timeoutJob(int jobId) {
     }
 }
 
-void Worker::sendStatusToNeighbors() {
-    if (_params.workRequests()) {
-        std::vector<uint8_t> payload(1, _job_db.isBusyOrCommitted() ? 1 : 0);
-        for (int rank : _hop_destinations) {
-            MyMpi::isendCopy(rank, MSG_NOTIFY_NEIGHBOR_STATUS, payload);
-        }
-    }
-    if (_params.maxIdleDistance() > 0) {
-        int idleDistance = getIdleDistance();
-        auto payload = IntVec({idleDistance});
-        for (int rank : _hop_destinations) {
-            MyMpi::isend(rank, MSG_NOTIFY_NEIGHBOR_IDLE_DISTANCE, payload);
-        }
-    }
-}
-
 int Worker::getWeightedRandomNeighbor() {
-    
-    int sum = 0;
-    for (const auto& [rank, dist] : _neighbor_idle_distance) 
-        sum += 1 + _params.maxIdleDistance() - dist;
-    
-    int rand = (int) (sum*Random::rand());
-    
-    int newSum = 0;
-    for (const auto& [rank, dist] : _neighbor_idle_distance) {
-        newSum += 1 + _params.maxIdleDistance() - dist;
-        if (rand < newSum) return rank;
-    }
-    abort();
+    int rand = (int) (_hop_destinations.size()*Random::rand());
+    return _hop_destinations[rand];
 }
 
 bool Worker::checkTerminate(float time) {

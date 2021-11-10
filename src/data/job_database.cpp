@@ -160,25 +160,25 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
 
     if (!has(req.jobId)) {
         // Job not known anymore: obsolete
-        log(V4_VVER, "Req. %s : job unknown\n", req.toStr().c_str());
+        log(V4_VVER, "%s : job unknown\n", req.toStr().c_str());
         return true;
     }
 
     Job& job = get(req.jobId);
     if (job.getState() != ACTIVE) {
         // Job is not active
-        log(V4_VVER, "Req. %s : job inactive (%s)\n", job.toStr(), job.jobStateToStr());
+        log(V4_VVER, "%s : job inactive (%s)\n", req.toStr().c_str(), job.jobStateToStr());
         return true;
     }
     if (req.requestedNodeIndex != job.getJobTree().getLeftChildIndex() 
             && req.requestedNodeIndex != job.getJobTree().getRightChildIndex()) {
         // Requested node index is not a valid child index for this job
-        log(V4_VVER, "Req. %s : not a valid child index (any more)\n", job.toStr());
+        log(V4_VVER, "%s : not a valid child index (any more)\n", job.toStr());
         return true;
     }
     if (req.revision < job.getRevision()) {
         // Job was updated in the meantime
-        log(V4_VVER, "Req. %s : rev. %i not up to date\n", job.toStr(), req.revision);
+        log(V4_VVER, "%s : rev. %i not up to date\n", req.toStr().c_str(), req.revision);
         return true;
     }
     if (alreadyAccepted) {
@@ -186,13 +186,13 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
     }
     if (req.requestedNodeIndex == job.getJobTree().getLeftChildIndex() && job.getJobTree().hasLeftChild()) {
         // Job already has a left child
-        log(V4_VVER, "Req. %s : already has left child\n", job.toStr());
+        log(V4_VVER, "%s : already has left child\n", req.toStr().c_str());
         return true;
 
     }
     if (req.requestedNodeIndex == job.getJobTree().getRightChildIndex() && job.getJobTree().hasRightChild()) {
         // Job already has a right child
-        log(V4_VVER, "Req. %s : already has right child\n", job.toStr());
+        log(V4_VVER, "%s : already has right child\n", req.toStr().c_str());
         return true;
     }
     return false;
@@ -245,13 +245,27 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
     }
 
     if (has(req.jobId)) {
-        // Know that the job already finished?
         Job& job = get(req.jobId);
+        // Know that the job already finished?
         if (job.getState() == PAST) {
-            log(V4_VVER, "Reject req. %s : past job\n", 
+            log(V4_VVER, "Discard req. %s : past job\n", 
                             toStr(req.jobId, req.requestedNodeIndex).c_str());
             if (_coll_assign) _coll_assign->setStatusDirty();
             return DISCARD;
+        }
+        if (!job.getScheduler().canCommit()) {
+            log(V4_VVER, "Reject req. %s : scheduler busy\n", 
+                            toStr(req.jobId, req.requestedNodeIndex).c_str());
+            if (_coll_assign) _coll_assign->setStatusDirty();
+            return REJECT;
+        }
+        if (req.balancingEpoch < getGlobalBalancingEpoch() 
+                && hasVolume(req.jobId) && getVolume(req.jobId) <= req.requestedNodeIndex) {
+            // Job is known to have shrunk since the request spawned
+            log(V4_VVER, "Reject req. %s : job shrunk\n", 
+                            toStr(req.jobId, req.requestedNodeIndex).c_str());
+            if (_coll_assign) _coll_assign->setStatusDirty();
+            return REJECT;
         }
     }
 
@@ -285,7 +299,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
 
     // Request for a root node:
     // Possibly adopt the job while dismissing the active job
-    if (req.requestedNodeIndex == 0) {
+    if (req.requestedNodeIndex == 0 && !_params.reactivationScheduling()) {
 
         // Adoption only works if this node does not yet compute for that job
         if (!has(req.jobId) || get(req.jobId).getState() != ACTIVE) {
@@ -544,6 +558,15 @@ std::vector<int> JobDatabase::getDormantJobs() const {
     return out;
 }
 
+bool JobDatabase::hasInactiveJobsWaitingForReactivation() const {
+    if (!_params.reactivationScheduling()) return false;
+    for (auto& [_, job] : _jobs) {
+        if (job->getState() == SUSPENDED && job->getJobTree().isWaitingForReactivation()) 
+            return true;
+    }
+    return false;
+}
+
 bool JobDatabase::hasPendingRootReactivationRequest() const {
     return _pending_root_reactivate_request.has_value();
 }
@@ -559,6 +582,41 @@ void JobDatabase::setPendingRootReactivationRequest(JobRequest&& req) {
     assert(!hasPendingRootReactivationRequest() 
         || req.jobId == _pending_root_reactivate_request.value().jobId);
     _pending_root_reactivate_request = std::move(req);
+}
+
+void JobDatabase::addFutureRequestMessage(int epoch, MessageHandle&& h) {
+    _future_request_msgs[epoch].push_back(std::move(h));
+}
+
+std::optional<MessageHandle> JobDatabase::getArrivedFutureRequest() {
+    int presentEpoch = getGlobalBalancingEpoch();
+    for (auto& [epoch, msgs] : _future_request_msgs) {
+        if (epoch <= presentEpoch) {
+            // found a candidate message
+            auto optHandle = std::optional<MessageHandle>(std::move(msgs.front()));
+            msgs.pop_front();
+            if (msgs.empty()) _future_request_msgs.erase(epoch);
+            return optHandle;
+        }
+    }
+    return std::optional<MessageHandle>();
+}
+
+void JobDatabase::addRootRequest(const JobRequest& req) {
+    _root_requests[req.jobId].push_back(req);
+    _balancer->onProbe(req.jobId);
+}
+
+std::optional<JobRequest> JobDatabase::getRootRequest(int jobId) {
+    
+    auto it = _root_requests.find(jobId);
+    if (it == _root_requests.end()) return std::optional<JobRequest>();
+
+    auto& list = it->second;
+    std::optional<JobRequest> optReq = std::optional<JobRequest>(list.front());
+    list.pop_front();
+    if (list.empty()) _root_requests.erase(jobId);
+    return optReq;
 }
 
 JobDatabase::~JobDatabase() {

@@ -26,6 +26,7 @@ OPT_BOOL(latencyMonkey,                  "latencymonkey", "",               fals
 OPT_BOOL(monitorMpi,                     "mmpi", "monitor-mpi",             false,                      "Launch an additional thread per process checking when the main thread is inside an MPI call")
 OPT_BOOL(phaseDiversification,           "phasediv", "",                    true,                       "Diversify solvers based on phase in addition to native diversification")
 OPT_BOOL(quiet,                          "q", "quiet",                      false,                      "Do not log to stdout besides critical information")
+OPT_BOOL(reactivationScheduling,         "rs", "",                          false,                      "Perform reactivation-based scheduling")
 OPT_BOOL(useChecksums,                   "checksums", "",                   false,                      "Compute and verify checksum for every job description transfer")
 OPT_BOOL(warmup,                         "warmup", "",                      false,                      "Do one explicit All-To-All warmup among all nodes in the beginning")
 OPT_BOOL(workRequests,                   "wr", "",                          false,                      "Send around work requests similarly to job requests")

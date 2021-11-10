@@ -122,16 +122,14 @@ public:
     size_t getGlobalEpoch() const {
         return _global_epoch;
     }
-    void bumpGlobalEpoch() {
-        _global_epoch++;
+    void setGlobalEpoch(int epoch) {
+        _global_epoch = epoch;
     }
 
     bool insertIfNovel(const Event& ev) {
         if (ev.epoch < 0) return false; // Old, terminated job
         // Update map if no such job entry yet or existing entry is older
-        if (!_map.count(ev.jobId) || (ev.dominates(_map[ev.jobId]) && 
-                (ev.demand != _map[ev.jobId].demand || ev.priority != _map[ev.jobId].priority)
-            )) {
+        if (!_map.count(ev.jobId) || ev.dominates(_map[ev.jobId])) {
             _map[ev.jobId] = ev;
             return true;
         }
@@ -187,6 +185,9 @@ public:
     }
     void remove(int key) {
         _map.erase(key);
+    }
+    void clear() {
+        _map.clear();
     }
     bool operator==(const EventMap& other) const {
         return getEntries() == other.getEntries();
