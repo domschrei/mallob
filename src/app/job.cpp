@@ -22,6 +22,7 @@ Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
                 [this](int epoch, int requestedIndex, int rank) {
                     JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
                         _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, -2);
+                    req.application = getApplication();
                     log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", rank, req.toStr().c_str());
                     MyMpi::isend(rank, MSG_REQUEST_NODE_ONESHOT, req);
                 },
@@ -29,6 +30,7 @@ Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
                 [this](int epoch, int requestedIndex) {
                     JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
                         _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, 0);
+                    req.application = getApplication();
                     int dest = _job_tree.getLeftChildIndex() == requestedIndex ? 
                         _job_tree.getLeftChildNodeRank() : _job_tree.getRightChildNodeRank();
                     log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", dest, req.toStr().c_str());
@@ -57,6 +59,8 @@ void Job::commit(const JobRequest& req) {
     _job_tree.clearJobNodeUpdates();
     updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
     if (_job_tree.isRoot()) {
+        // Initialize the root's local scheduler, which in turn initializes
+        // the scheduler of each child node (recursively)
         JobSchedulingUpdate update;
         update.epoch = req.balancingEpoch;
         if (update.epoch < 0) update.epoch = 0;

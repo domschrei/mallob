@@ -200,7 +200,7 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
 
 void JobDatabase::commit(JobRequest& req) {
     if (has(req.jobId)) {
-        log(V3_VERB, "COMMIT %s\n", get(req.jobId).toStr());
+        log(V3_VERB, "COMMIT %s -> #%i:%i\n", get(req.jobId).toStr(), req.jobId, req.requestedNodeIndex);
         get(req.jobId).commit(req);
         _has_commitment = true;
         

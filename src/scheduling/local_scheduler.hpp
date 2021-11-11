@@ -24,6 +24,9 @@ private:
     std::unique_ptr<ChildInterface> _empty_session;
     int _epoch_of_last_suspension = -1;
 
+    int _last_update_epoch = -1;
+    int _last_update_volume = -1;
+
     bool _suspending = false;
     bool _suspended = true;
 
@@ -53,6 +56,10 @@ public:
             MyMpi::isend(parentRank, MSG_SCHED_RETURN_NODES, update);
             return;
         }
+        if (update.volume >= 0 && update.epoch > _last_update_epoch) {
+            _last_update_epoch = update.epoch;
+            _last_update_volume = update.volume;
+        }
 
         _suspended = false;
         auto [leftUpdate, rightUpdate] = update.split(_job_tree.getIndex());
@@ -62,6 +69,10 @@ public:
             session.reset(new ChildInterface(_job_id, _job_tree, std::move(childUpdate.inactiveJobNodes), 
                     i == 0 ? _job_tree.getLeftChildIndex() : _job_tree.getRightChildIndex(), 
                     i == 0 ? _job_tree.getLeftChildNodeRank() : _job_tree.getRightChildNodeRank()));
+            if (_last_update_epoch >= 0) {
+                auto directive = session->handleBalancingUpdate(_last_update_epoch, _last_update_volume);
+                applyDirective(directive, session);
+            }
         }
     }
 
@@ -69,6 +80,9 @@ public:
     void updateBalancing(int epoch, int volume) {
 
         log(V5_DEBG, "RBS #%i:%i BLC e=%i\n", _job_id, _job_tree.getIndex(), epoch);
+        if (_last_update_epoch >= epoch) return;
+        _last_update_epoch = epoch;
+        _last_update_volume = volume;
 
         for (auto& session : _sessions) {
             if (!session) continue;
@@ -101,8 +115,7 @@ public:
             JobSchedulingUpdate update;
             update.deserialize(h.getRecvData());
             auto& session = getSessionByChildRank(h.source);
-            assert(session);
-            session->addJobNodesFromSuspendedChild(update.inactiveJobNodes);
+            if (session) session->addJobNodesFromSuspendedChild(update.inactiveJobNodes);
         }
 
         if (canReturnInactiveJobNodes()) returnInactiveJobNodesToParent();
@@ -111,7 +124,7 @@ public:
     void handleRejectReactivation(int source, int epoch, int index, bool lost) {
         
         auto& session = getSessionByChildIndex(index);
-        assert(session);
+        if (!session) return;
         auto directive = session->handleRejectionOfPotentialChild(index, epoch, lost);
         applyDirective(directive, session);
     }
@@ -119,7 +132,7 @@ public:
     void handleChildJoining(int source, int epoch, int index) {
         
         auto& session = getSessionByChildIndex(index);
-        assert(session);
+        if (!session) return;
         log(V5_DEBG, "RBS Child %i found\n", source);
         session->handleChildJoining(source, index, epoch);
     }
@@ -134,7 +147,9 @@ public:
       send scheduling update down to the children
     */
     void handleChildReturningInactiveJobNodes(int childRank, const InactiveJobNodeList& nodes) {
-        getSessionByChildRank(childRank)->addJobNodesFromSuspendedChild(nodes);
+        auto& session = getSessionByChildRank(childRank);
+        if (!session) return;
+        session->addJobNodesFromSuspendedChild(nodes);
     }
 
     /*

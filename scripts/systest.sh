@@ -82,7 +82,7 @@ function test_oscillating() {
     introduce_job sat-main-2 instances/r3sat_500.cnf 60 0 "" DUMMY
     introduce_job sat-main-3 instances/r3sat_500.cnf 60 0 "" DUMMY
     introduce_job sat-main-4 instances/r3sat_500.cnf 60 0 "" DUMMY
-    nocleanup=1 test 32 -t=1 -c=1 -lbc=5 -J=$((n+4)) -l=1 -satsolver=lgc -v=5 -checkjsonresults -checksums=1 -rs -jc=2
+    nocleanup=1 test 32 -t=1 -c=1 -J=$((n+4)) -l=1 -satsolver=lgc -v=5 -checkjsonresults -checksums=1 -rs -jc=2
 }
 
 function test_incremental_scheduling() {

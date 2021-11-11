@@ -56,6 +56,8 @@ public:
       terminated after appl_terminate().
     */
 
+    virtual JobDescription::Application getApplication() const = 0;
+
     /*
     Begin, or continue, to process the job.
     At the first call of appl_start(), you can safely assume that the job description

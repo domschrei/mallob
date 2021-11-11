@@ -14,6 +14,8 @@ public:
 
     // Methods common to all BaseSatJob instances
 
+    virtual JobDescription::Application getApplication() const override {return JobDescription::SAT;}
+
     virtual bool isInitialized() = 0;
     virtual void prepareSharing(int maxSize) = 0;
     virtual bool hasPreparedSharing() = 0;

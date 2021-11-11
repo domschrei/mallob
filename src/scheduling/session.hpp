@@ -8,8 +8,8 @@ private:
     JobTree& tree;
     InactiveJobNodeList nodes;
 
-    int epoch;
-    int volume;
+    int epoch = -1;
+    int volume = -1;
     int childIndex;
     int childRank;
 
@@ -30,7 +30,9 @@ public:
     // called from local balancer update
     enum MsgDirective {DO_NOTHING, EMIT_DIRECTED_REQUEST, EMIT_UNDIRECTED_REQUEST};
     MsgDirective handleBalancingUpdate(int newEpoch, int newVolume) {
-        if (newEpoch > epoch) numQueriedJobNodes = 0;
+        log(V5_DEBG, "RBS CHILD #%i:%i e=%i->%i v=%i->%i\n", jobId, childIndex, epoch, newEpoch, volume, newVolume);
+        if (newEpoch <= epoch) return DO_NOTHING; 
+        numQueriedJobNodes = 0;
         epoch = newEpoch;
         volume = newVolume;
         if (!hasChild() && wantsChild()) {
@@ -78,6 +80,7 @@ public:
         JobSchedulingUpdate update;
         update.jobId = jobId;
         update.epoch = epoch;
+        update.volume = volume;
         update.inactiveJobNodes = nodes.extractSubtree(index, /*excludeRoot=*/true);
         MyMpi::isend(childRank, MSG_SCHED_INITIALIZE_CHILD_WITH_NODES, update);
         childHasNodes = true;
