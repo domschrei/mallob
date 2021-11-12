@@ -165,7 +165,7 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
     }
 
     Job& job = get(req.jobId);
-    if (job.getState() != ACTIVE) {
+    if (job.getState() != ACTIVE && !hasCommitment(req.jobId)) {
         // Job is not active
         log(V4_VVER, "%s : job inactive (%s)\n", req.toStr().c_str(), job.jobStateToStr());
         return true;
