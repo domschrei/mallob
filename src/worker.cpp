@@ -108,7 +108,7 @@ void Worker::init() {
     q.registerCallback(MSG_REDUCE_DATA, balanceCb);
     q.registerCallback(MSG_BROADCAST_DATA, balanceCb);
     q.registerCallback(MSG_WARMUP, [&](auto& h) {
-        log(LOG_ADD_SRCRANK | V5_DEBG, "Warmup msg", h.source);
+        log(LOG_ADD_SRCRANK | V4_VVER, "Received warmup msg", h.source);
     });
 
     auto localSchedulerCb = [&](MessageHandle& handle) {
@@ -129,12 +129,10 @@ void Worker::init() {
     // Send warm-up messages with your pseudorandom bounce destinations
     if (_params.derandomize() && _params.warmup()) {
         IntVec payload({1, 2, 3, 4, 5, 6, 7, 8});
-        int numRuns = 5;
-        for (int run = 0; run < numRuns; run++) {
-            for (auto rank : _hop_destinations) {
-                MyMpi::isend(rank, MSG_WARMUP, payload);
-                log(LOG_ADD_DESTRANK | V5_DEBG, "Warmup msg", rank);
-            }
+        for (auto rank : _hop_destinations) {
+            MyMpi::isend(rank, MSG_WARMUP, payload);
+            log(LOG_ADD_DESTRANK | V4_VVER, "Sending warmup msg", rank);
+            MyMpi::getMessageQueue().advance();
         }
     }
 }
