@@ -211,6 +211,11 @@ public:
         return session.operator bool();
     }
 
+    void resetRole() {
+        _epoch_of_last_suspension = -1;
+        _last_update_epoch = -1;
+    }
+
 private:
 
     void applyDirective(ChildInterface::MsgDirective directive, std::unique_ptr<ChildInterface>& session) {
