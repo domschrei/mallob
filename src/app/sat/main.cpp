@@ -53,10 +53,7 @@ int main(int argc, char *argv[]) {
     auto log = getLog(params, config);
     pid_t pid = Proc::getPid();
     log.log(V3_VERB, "Mallob SAT engine %s pid=%lu\n", MALLOB_VERSION, pid);
-    if (params.verbosity() >= V5_DEBG) {
-        params.printParams();
-    }
-
+    
     try {
         // Launch program
         HordeProcess p(params, config, log);
