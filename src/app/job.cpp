@@ -58,13 +58,13 @@ void Job::commit(const JobRequest& req) {
     _balancing_epoch_of_last_commitment = req.balancingEpoch;
     _job_tree.clearJobNodeUpdates();
     updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
+    getScheduler().resetRole();
     if (_job_tree.isRoot()) {
         // Initialize the root's local scheduler, which in turn initializes
         // the scheduler of each child node (recursively)
         JobSchedulingUpdate update;
         update.epoch = req.balancingEpoch;
         if (update.epoch < 0) update.epoch = 0;
-        getScheduler().resetRole();
         getScheduler().initializeScheduling(update);
     }
 }

@@ -50,19 +50,8 @@ public:
     }
 
     MsgDirective handleRejectionOfPotentialChild(int index, int epoch, bool lost) {
-
         assert(index == childIndex || log_return_false("ERROR %i != %i\n", index, childIndex));
-        
-        InactiveJobNode node(childRank, childIndex, epoch);
-        auto it = nodes.set.find(node);
-        if (it != nodes.set.end()) {
-            if (lost) {
-                it->status = InactiveJobNode::LOST;
-            } else {
-                it->status = InactiveJobNode::BUSY;
-            }
-        }
-
+        findAndUpdateNode(childRank, childIndex, epoch, lost ? InactiveJobNode::LOST : InactiveJobNode::BUSY);
         return recruitChild();
     }
 
@@ -86,14 +75,7 @@ public:
         childHasNodes = true;
 
         // If you can find the job node of this rank, set it to CONSUMED.
-        InactiveJobNode node(source, index, epoch);
-        auto it = update.inactiveJobNodes.set.find(node);
-        if (it == update.inactiveJobNodes.set.end()) {
-            node = InactiveJobNode(source, index, update.epoch);
-            it = update.inactiveJobNodes.set.find(node);
-            if (it == update.inactiveJobNodes.set.end()) return;
-        }
-        it->status = InactiveJobNode::CONSUMED;
+        findAndUpdateNode(source, index, epoch, InactiveJobNode::CONSUMED);        
     }
 
     int getChildIndex() const {
@@ -151,5 +133,29 @@ private:
             }
         }
         notifiedInactiveNodes = true;
+    }
+
+    void findAndUpdateNode(int rank, int index, int epoch, InactiveJobNode::Status status) {
+        
+        InactiveJobNode node(rank, 0, INT32_MAX);
+        bool found = false;
+        
+        auto it = nodes.set.lower_bound(node);
+        for (; it != nodes.set.end(); ++it) {
+            auto& n = *it;
+            if (n.rank != rank) return;
+            if (n.originalIndex != index) continue;
+            // Correct node found
+            node = n;
+            nodes.set.erase(n);
+            found = true;
+            break;
+        }
+
+        if (found) {
+            node.lastEpoch = epoch;
+            node.status = status;
+            nodes.set.insert(node);
+        }
     }
 };
