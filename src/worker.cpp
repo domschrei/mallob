@@ -528,7 +528,8 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
     if (_params.reactivationScheduling()) {
         if (mode == JobDatabase::TARGETED_REJOIN) {
             // Mark job as having been notified of the current scheduling and that it is not further needed.
-            if (_job_db.has(req.jobId)) _job_db.get(req.jobId).getJobTree().stopWaitingForReactivation(req.balancingEpoch); 
+            if (_job_db.has(req.jobId)) _job_db.get(req.jobId).getJobTree().stopWaitingForReactivation(req.balancingEpoch);
+            if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
         } else if (_job_db.hasInactiveJobsWaitingForReactivation()) {
             // In reactivation-based scheduling, block incoming requests if you are still waiting
             // for a notification from some job of which you have an inactive job node.
@@ -915,6 +916,7 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
 
     bool wasWaiting = job.getJobTree().isWaitingForReactivation();
     job.getJobTree().stopWaitingForReactivation(balancingEpoch-1);
+    if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
 
     if (job.getState() != ACTIVE) {
         // Job is not active right now
