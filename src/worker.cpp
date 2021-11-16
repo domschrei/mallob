@@ -912,6 +912,8 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
     log(prevVolume == volume || thisIndex > 0 ? V4_VVER : V3_VERB, "%s : update v=%i epoch=%i lastreqsepoch=%i evlat=%.5f\n", 
         job.toStr(), volume, balancingEpoch, job.getJobTree().getBalancingEpochOfLastRequests(), eventLatency);
     job.updateVolumeAndUsedCpu(volume);
+
+    bool wasWaiting = job.getJobTree().isWaitingForReactivation();
     job.getJobTree().stopWaitingForReactivation(balancingEpoch-1);
 
     if (job.getState() != ACTIVE) {
@@ -932,10 +934,17 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
                     IntVec({jobId, job.getIndex(), job.getJobTree().getRootNodeRank()}));
         }
 
-        // If I am suspended and the job grows, wait for scheduling messages
-        if (job.getState() == SUSPENDED && prevVolume < volume) {
-            log(V5_DEBG, "RBS volume grown %i -> %i\n", prevVolume, volume);
-            job.getJobTree().setWaitingForReactivation(balancingEpoch);
+        if (job.getState() == SUSPENDED) {
+            // If the volume WAS and IS larger than my index and I WAS waiting,
+            // then I will KEEP waiting.
+            if (job.getIndex() < prevVolume && job.getIndex() < volume && wasWaiting) {
+                job.getJobTree().setWaitingForReactivation(balancingEpoch);
+            }
+            // If the volume WASN'T but now IS larger than my index,
+            // then I will START waiting
+            if (job.getIndex() >= prevVolume && job.getIndex() < volume) {
+                job.getJobTree().setWaitingForReactivation(balancingEpoch);
+            }
         }
 
         return;

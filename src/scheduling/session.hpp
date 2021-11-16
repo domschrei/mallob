@@ -33,8 +33,24 @@ public:
         log(V5_DEBG, "RBS CHILD #%i:%i e=%i->%i v=%i->%i\n", jobId, childIndex, epoch, newEpoch, volume, newVolume);
         if (newEpoch <= epoch) return DO_NOTHING; 
         numQueriedJobNodes = 0;
+        
         epoch = newEpoch;
         volume = newVolume;
+        
+        // Reset availability status of inactive nodes
+        for (auto& node : nodes.set) {
+            if (node.status == InactiveJobNode::BUSY) {
+                // This node was busy in the last epoch; it may be available now.
+                node.status = InactiveJobNode::AVAILABLE;
+                notifiedInactiveNodes = false;
+            }
+            if (node.status == InactiveJobNode::AVAILABLE && !wantsChild()) {
+                // Node which is not desired for this epoch:
+                // No need to notify it later, so mark it busy now.
+                node.status = InactiveJobNode::BUSY;
+            }
+        }
+
         if (!hasChild() && wantsChild()) {
             // Emit a (new) request with up-to-date epoch.
             return recruitChild();
@@ -89,6 +105,7 @@ public:
     }
 
     InactiveJobNodeList&& returnJobNodes() {
+        notifyRemainingInactiveNodes();
         return std::move(nodes);
     }
 
