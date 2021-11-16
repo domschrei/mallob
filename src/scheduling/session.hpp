@@ -44,7 +44,7 @@ public:
                 node.status = InactiveJobNode::AVAILABLE;
                 notifiedInactiveNodes = false;
             }
-            if (node.status == InactiveJobNode::AVAILABLE && !wantsChild()) {
+            if (node.status == InactiveJobNode::AVAILABLE && node.originalIndex >= newVolume) {
                 // Node which is not desired for this epoch:
                 // No need to notify it later, so mark it busy now.
                 node.status = InactiveJobNode::BUSY;
@@ -91,7 +91,8 @@ public:
         childHasNodes = true;
 
         // If you can find the job node of this rank, set it to CONSUMED.
-        findAndUpdateNode(source, index, epoch, InactiveJobNode::CONSUMED);        
+        findAndUpdateNode(source, index, epoch, InactiveJobNode::CONSUMED);
+        notifyRemainingInactiveNodes();
     }
 
     int getChildIndex() const {
@@ -154,25 +155,24 @@ private:
 
     void findAndUpdateNode(int rank, int index, int epoch, InactiveJobNode::Status status) {
         
-        InactiveJobNode node(rank, 0, INT32_MAX);
+        InactiveJobNode node(rank, index, INT32_MAX);
         bool found = false;
         
         auto it = nodes.set.lower_bound(node);
         for (; it != nodes.set.end(); ++it) {
             auto& n = *it;
-            if (n.rank != rank) return;
-            if (n.originalIndex != index) continue;
+            if (n.originalIndex != index) return;
+            if (n.rank != rank) continue;
+            
             // Correct node found
             node = n;
             nodes.set.erase(n);
-            found = true;
-            break;
-        }
 
-        if (found) {
             node.lastEpoch = epoch;
             node.status = status;
             nodes.set.insert(node);
+            log(V5_DEBG, "RBS Update (%i,%i,%i) -> status %i\n", rank, index, epoch, status);
+            return;
         }
     }
 };

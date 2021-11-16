@@ -156,7 +156,7 @@ public:
     True iff received nodes from child (if it was present) and handleSuspend() was called. 
     */
     bool canReturnInactiveJobNodes() {
-        if (!_suspended && _suspending && !_job_tree.hasLeftChild() && !_job_tree.hasRightChild()) {
+        if (!_suspended && _suspending) {
             auto& left = _sessions[0];
             auto& right = _sessions[1];
             if (!(left->doesChildHaveNodes()) && !(right->doesChildHaveNodes())) {
