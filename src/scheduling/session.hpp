@@ -68,7 +68,8 @@ public:
     MsgDirective handleRejectionOfPotentialChild(int index, int epoch, bool lost) {
         assert(index == childIndex || log_return_false("ERROR %i != %i\n", index, childIndex));
         findAndUpdateNode(childRank, childIndex, epoch, lost ? InactiveJobNode::LOST : InactiveJobNode::BUSY);
-        return recruitChild();
+        if (!hasChild() && wantsChild()) return recruitChild();
+        return DO_NOTHING;
     }
 
     void handleChildJoining(int source, int index, int epoch) {
@@ -153,17 +154,16 @@ private:
         notifiedInactiveNodes = true;
     }
 
-    void findAndUpdateNode(int rank, int index, int epoch, InactiveJobNode::Status status) {
+    bool findAndUpdateNode(int rank, int index, int epoch, InactiveJobNode::Status status) {
         
-        InactiveJobNode node(rank, index, INT32_MAX);
-        bool found = false;
-        
+        InactiveJobNode node(rank, index, INT32_MAX);        
         auto it = nodes.set.lower_bound(node);
+
         for (; it != nodes.set.end(); ++it) {
             auto& n = *it;
-            if (n.originalIndex != index) return;
+            if (n.originalIndex != index) break;
             if (n.rank != rank) continue;
-            
+
             // Correct node found
             node = n;
             nodes.set.erase(n);
@@ -172,7 +172,10 @@ private:
             node.status = status;
             nodes.set.insert(node);
             log(V5_DEBG, "RBS Update (%i,%i,%i) -> status %i\n", rank, index, epoch, status);
-            return;
+            return true;
         }
+
+        log(V5_DEBG, "RBS (%i,%i,%i) not found\n", rank, index, epoch);
+        return false;
     }
 };
