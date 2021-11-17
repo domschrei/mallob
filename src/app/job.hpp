@@ -310,6 +310,8 @@ public:
         return false;
     }
 
+    void initScheduler(std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq);
+
     // Marks the job to be indestructible as long as pending is true.
     void setResultTransferPending(bool pending) {_result_transfer_pending = pending;}
     void addChildWaitingForRevision(int rank, int revision) {_waiting_rank_revision_pairs.emplace_back(rank, revision);}

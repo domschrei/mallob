@@ -560,7 +560,10 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
         // Commit on the job, send a request to the parent
         if (!_job_db.has(req.jobId)) {
             // Job is not known yet: create instance
-            _job_db.createJob(MyMpi::size(_comm), _world_rank, req.jobId, req.application);
+            Job& job = _job_db.createJob(MyMpi::size(_comm), _world_rank, req.jobId, req.application);
+            job.initScheduler([this](const JobRequest& req, int tag, bool left, int dest) {
+                sendJobRequest(req, tag, left, dest);
+            });
         }
         _job_db.commit(req);
         MyMpi::isend(req.requestingNodeRank, 
@@ -1023,7 +1026,6 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
 void Worker::spawnJobRequest(int jobId, bool left, int balancingEpoch) {
 
     Job& job = _job_db.get(jobId);
-    log(V5_DEBG, "%s : grow\n", job.toStr());
     
     int index = left ? job.getJobTree().getLeftChildIndex() : job.getJobTree().getRightChildIndex();
     if (_params.monoFilename.isSet()) job.getJobTree().updateJobNode(index, index);
@@ -1032,16 +1034,27 @@ void Worker::spawnJobRequest(int jobId, bool left, int balancingEpoch) {
             _world_rank, index, Timer::elapsedSeconds(), balancingEpoch, 0);
     req.revision = job.getDesiredRevision();
     int tag = MSG_REQUEST_NODE;    
-    int nextNodeRank = job.getJobTree().getRankOfNextDormantChild(); 
-    if (nextNodeRank < 0) {
-        tag = MSG_REQUEST_NODE;
-        nextNodeRank = left ? job.getJobTree().getLeftChildNodeRank() : job.getJobTree().getRightChildNodeRank();
+
+    sendJobRequest(req, tag, left, -1);
+}
+
+void Worker::sendJobRequest(const JobRequest& req, int tag, bool left, int dest) {
+
+    auto& job = _job_db.get(req.jobId);
+
+    if (dest == -1) {
+        int nextNodeRank = job.getJobTree().getRankOfNextDormantChild(); 
+        if (nextNodeRank < 0) {
+            tag = MSG_REQUEST_NODE;
+            nextNodeRank = left ? job.getJobTree().getLeftChildNodeRank() : job.getJobTree().getRightChildNodeRank();
+        }
+        dest = nextNodeRank;
     }
-    
-    log(LOG_ADD_DESTRANK | V3_VERB, "%s growing: %s", nextNodeRank, 
+
+    log(LOG_ADD_DESTRANK | V3_VERB, "%s growing: %s", dest, 
                 job.toStr(), req.toStr().c_str());
     
-    MyMpi::isend(nextNodeRank, tag, req);
+    MyMpi::isend(dest, tag, req);
     
     _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
     if (left) job.getJobTree().setDesireLeft(Timer::elapsedSeconds());

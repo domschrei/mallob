@@ -31,13 +31,15 @@ private:
     bool _suspended = true;
 
 public:
-    LocalScheduler(int jobId, const Parameters& params, JobTree& jobTree, 
-            std::function<void(int, int, int)> cbEmitDirectedJobRequest, 
-            std::function<void(int, int)> cbEmitUndirectedJobRequest) 
-        : _job_id(jobId), _params(params), _job_tree(jobTree), 
-            _cb_emit_directed_job_request(cbEmitDirectedJobRequest),
-            _cb_emit_undirected_job_request(cbEmitUndirectedJobRequest) {
+    LocalScheduler(int jobId, const Parameters& params, JobTree& jobTree) 
+        : _job_id(jobId), _params(params), _job_tree(jobTree) {
         _sessions.resize(2);
+    }
+
+    void initCallbacks(std::function<void(int, int, int)> cbEmitDirectedJobRequest, 
+            std::function<void(int, int)> cbEmitUndirectedJobRequest) {
+        _cb_emit_directed_job_request = cbEmitDirectedJobRequest;
+        _cb_emit_undirected_job_request = cbEmitUndirectedJobRequest;
     }
 
     /*

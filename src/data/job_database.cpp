@@ -32,7 +32,8 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sys
     _balancer = std::unique_ptr<EventDrivenBalancer>(new EventDrivenBalancer(_comm, _params));
 
     _janitor.run([this]() {
-        log(V3_VERB, "Job-DB Janitor tid=%lu\n", Proc::getTid());
+        auto lg = Logger::getMainInstance().copy("<Janitor>", "janitor");
+        lg.log(V3_VERB, "tid=%lu\n", Proc::getTid());
         while (_janitor.continueRunning() || _num_stored_jobs > 0) {
             usleep(1000 * 1000);
             std::list<Job*> copy;

@@ -17,31 +17,35 @@ Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
             _state(INACTIVE),
             _job_tree(commSize, worldRank, jobId), 
             _comm(_id, _job_tree, params.jobCommUpdatePeriod()),
-            _scheduler(_id, _params, _job_tree, 
-                // callback to emit a directed job request message to a specific PE
-                [this](int epoch, int requestedIndex, int rank) {
-                    JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
-                        _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, -2);
-                    req.application = getApplication();
-                    log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", rank, req.toStr().c_str());
-                    MyMpi::isend(rank, MSG_REQUEST_NODE_ONESHOT, req);
-                },
-                // callback to emit a certain, undirected job request message
-                [this](int epoch, int requestedIndex) {
-                    JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
-                        _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, 0);
-                    req.application = getApplication();
-                    int dest = _job_tree.getLeftChildIndex() == requestedIndex ? 
-                        _job_tree.getLeftChildNodeRank() : _job_tree.getRightChildNodeRank();
-                    log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", dest, req.toStr().c_str());
-                    MyMpi::isend(dest, MSG_REQUEST_NODE, req);
-                }
-            ) {
+            _scheduler(_id, _params, _job_tree) {
     
     _growth_period = _params.growthPeriod();
     _continuous_growth = _params.continuousGrowth();
     _max_demand = _params.maxDemand();
     _threads_per_job = _params.numThreadsPerProcess();
+}
+
+void Job::initScheduler(std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq) {
+    _scheduler.initCallbacks(
+        // callback to emit a directed job request message to a specific PE
+        [this, emitJobReq](int epoch, int requestedIndex, int rank) {
+            JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
+                _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, -2);
+            req.application = getApplication();
+            log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", rank, req.toStr().c_str());
+            emitJobReq(req, MSG_REQUEST_NODE_ONESHOT, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), rank);
+        },
+        // callback to emit a certain, undirected job request message
+        [this, emitJobReq](int epoch, int requestedIndex) {
+            JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
+                _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, 0);
+            req.application = getApplication();
+            int dest = _job_tree.getLeftChildIndex() == requestedIndex ? 
+                _job_tree.getLeftChildNodeRank() : _job_tree.getRightChildNodeRank();
+            log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", dest, req.toStr().c_str());
+            emitJobReq(req, MSG_REQUEST_NODE, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), -1);
+        }
+    );
 }
 
 void Job::updateJobTree(int index, int rootRank, int parentRank) {

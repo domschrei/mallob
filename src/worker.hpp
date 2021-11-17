@@ -86,6 +86,7 @@ private:
     void initiateVolumeUpdate(int jobId);
     void updateVolume(int jobId, int volume, int balancingEpoch, float eventLatency);
     void spawnJobRequest(int jobId, bool left, int balancingEpoch);
+    void sendJobRequest(const JobRequest& req, int tag, bool left, int dest);
 
     void interruptJob(int jobId, bool terminate, bool reckless);
     void sendJobDoneWithStatsToClient(int jobId, int successfulRank);
