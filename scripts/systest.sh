@@ -43,7 +43,7 @@ function test_dry_scheduling() {
     t=1
     for i in {1..400}; do
         # wallclock limit, arrival, dependencies, application
-        introduce_job dummy-$i no/such/instance.txt 1.5 $t "" DUMMY
+        wclimit=1.5 arrival=$t application=DUMMY introduce_job dummy-$i no/such/instance.txt
         t=$(echo "$t+0.1"|bc -l)
     done
     echo "400 jobs set up."
@@ -71,18 +71,20 @@ function test_oscillating() {
     t=4
     n=0
     RANDOM=1
+    app=SAT
     while [ $t -le 60 ]; do
         # wallclock limit of 4s, arrival @ t
-        introduce_job sat-$t instances/r3sat_500.cnf $(($RANDOM % 18 + 2)) $t "" DUMMY $(($RANDOM % 7 * 2 + 1)) 
+        wclimit=$(($RANDOM % 18 + 2)) arrival=$t application=$app \
+        maxdemand=$(($RANDOM % 7 * 2 + 1)) introduce_job sat-$t instances/r3sat_500.cnf
         t=$((t+8))
         n=$((n+1))
     done
     # Generate actual job
-    introduce_job sat-main-1 instances/r3sat_500.cnf 60 0 "" DUMMY
-    introduce_job sat-main-2 instances/r3sat_500.cnf 60 0 "" DUMMY
-    introduce_job sat-main-3 instances/r3sat_500.cnf 60 0 "" DUMMY
-    introduce_job sat-main-4 instances/r3sat_500.cnf 60 0 "" DUMMY
-    nocleanup=1 test 32 -t=1 -c=1 -J=$((n+4)) -l=1 -satsolver=lgc -v=5 -checkjsonresults -checksums=1 -rs -jc=2
+    wclimit=60 application=$app priority=0.1 introduce_job sat-main-1 instances/r3sat_500.cnf
+    wclimit=60 application=$app priority=0.2 introduce_job sat-main-2 instances/r3sat_500.cnf
+    wclimit=60 application=$app priority=0.3 introduce_job sat-main-3 instances/r3sat_500.cnf
+    wclimit=60 application=$app priority=0.4 introduce_job sat-main-4 instances/r3sat_500.cnf
+    nocleanup=1 test 32 -t=1 -c=1 -J=$((n+4)) -l=1 -satsolver=lgc -v=5 -checkjsonresults -checksums=1 -rs -jc=2 -warmup
 }
 
 function test_incremental_scheduling() {

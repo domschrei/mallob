@@ -113,16 +113,13 @@ function test() {
 function introduce_job() {
     jobname=$1
     instance=$2
-    wclimit=$3
-    if [ "$3" == "" ]; then wclimit="0"; fi
-    arrival=$4
-    if [ "$4" == "" ]; then arrival="0"; fi
-    dependency=$5
-    application=$6
-    if [ "$6" == "" ]; then application="SAT"; fi
-    maxdemand=$7
-    if [ "$7" == "" ]; then maxdemand="0"; fi
-    echo '{ "application": "'$application'", "arrival": '$arrival', "dependencies": ['$dependency'], "user": "admin", "name": "'$jobname'", "file": "'$instance'", "priority": 1.000, "wallclock-limit": "'$wclimit'", "cpu-limit": "0", "max-demand": '$maxdemand' }' > .api/jobs.0/new/$1.json
+    if [ -z $wclimit ]; then wclimit="0"; fi
+    if [ -z $arrival ]; then arrival="0"; fi
+    if [ -z $dependency ]; then dependency=""; fi
+    if [ -z $application ]; then application="SAT"; fi
+    if [ -z $maxdemand ]; then maxdemand="0"; fi
+    if [ -z $priority ]; then priority="1"; fi
+    echo '{ "application": "'$application'", "arrival": '$arrival', "dependencies": ['$dependency'], "user": "admin", "name": "'$jobname'", "file": "'$instance'", "priority": '$priority', "wallclock-limit": "'$wclimit'", "cpu-limit": "0", "max-demand": '$maxdemand' }' > .api/jobs.0/new/$1.json
     cp .api/jobs.0/new/$1.json .api/jobs.0/introduced/admin.$1.json
 }
 

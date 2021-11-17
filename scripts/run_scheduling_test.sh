@@ -35,7 +35,7 @@ function create_independent_jobs() {
     i=1
     while read -r instance; do
         # Parameters: job name, instance path, wallclock limit, arrival, dependencies, application (SAT or DUMMY)
-        introduce_job solve-$i instances/$instance 300 0 "" SAT
+        wclimit=300 introduce_job solve-$i instances/$instance
         i=$((i+1))
     done < $benchmarkfile
 }
@@ -67,7 +67,7 @@ function create_job_chains() {
             added=true
             dep=""
             if [ $k -gt 1 ]; then dep="\"admin.solve-$c-$(($k-1))\"" ; fi 
-            introduce_job solve-$c-$k instances/$(sed "${instno}q;d" $benchmarkfile) $timeperjob $t "$dep" SAT
+            wclimit=$timeperjob arrival=$t dependency="$dep" introduce_job solve-$c-$k instances/$(sed "${instno}q;d" $benchmarkfile)
             i=$(($i+1))
             instno=$(($instno+1))
             if [ $instno -gt $ninstances ]; then 
