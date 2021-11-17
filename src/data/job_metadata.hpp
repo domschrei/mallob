@@ -15,7 +15,11 @@ struct JobMetadata {
     bool done = false;
 
     bool operator==(const JobMetadata& other) const {
-        return file == other.file;
+        if (!description != !(other.description)) return false;
+        if (!description) return file == other.file;
+        if (description->getId() != other.description->getId()) return false;
+        if (description->getRevision() != other.description->getRevision()) return false;
+        return true;
     }
     bool operator!=(const JobMetadata& other) const {
         return !(*this == other);
