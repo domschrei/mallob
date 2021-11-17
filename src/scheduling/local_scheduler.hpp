@@ -208,7 +208,7 @@ public:
 
     bool acceptsChild(int index) {
         auto& session = getSessionByChildIndex(index);
-        return session.operator bool();
+        return session && !session->hasChild() && session->wantsChild();
     }
 
     void resetRole() {
