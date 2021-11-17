@@ -115,7 +115,7 @@ public:
             JobSchedulingUpdate update;
             update.deserialize(h.getRecvData());
             auto& session = getSessionByChildRank(h.source);
-            if (session) session->addJobNodesFromSuspendedChild(update.inactiveJobNodes);
+            if (session) session->addJobNodesFromSuspendedChild(h.source, update.inactiveJobNodes);
         }
 
         if (canReturnInactiveJobNodes()) returnInactiveJobNodesToParent();
@@ -149,7 +149,7 @@ public:
     void handleChildReturningInactiveJobNodes(int childRank, const InactiveJobNodeList& nodes) {
         auto& session = getSessionByChildRank(childRank);
         if (!session) return;
-        session->addJobNodesFromSuspendedChild(nodes);
+        session->addJobNodesFromSuspendedChild(childRank, nodes);
     }
 
     /*
@@ -186,7 +186,7 @@ public:
         nodes.set.insert(myNode);
         
         // Consolidate set of inactive nodes (discarding lost ones)
-        nodes.cleanUpStatusesAndGetCurrentRanks();
+        nodes.cleanUpStatuses();
 
         // Send inactive job nodes to parent
         JobSchedulingUpdate update;
@@ -224,132 +224,6 @@ private:
         if (directive == ChildInterface::EMIT_UNDIRECTED_REQUEST) 
             _cb_emit_undirected_job_request(session->getEpoch(), session->getChildIndex());
     }
-    
-#ifdef NONONONO
-    /*
-    For each child position (left, right):
-    If present: split, broadcast down
-    If not present: handle split section yourself
-    Handling split sections: digestJobSchedulingUpdate
-    */
-    void handleJobSchedulingUpdate(const JobSchedulingUpdate& update) {
-        
-        log(V5_DEBG, "RBS HANDLE #%i e=%i v=%i inactives={%s}\n", update.jobId, update.epoch, update.volume, update.inactiveJobNodes.toStr().c_str());
-        int vol = update.volume;
-
-        int numConsuming = 0;
-        bool consumes[2];
-        for (size_t i = 0; i < 2; i++) {
-            auto& session = _sessions[i];
-            auto rel = session ? session->getMessageRelation(update.epoch) : Session::OPEN_NEW_SESSION;
-            consumes[i] = rel == Session::OPEN_NEW_SESSION || (rel == Session::ACCEPT && session->isWaitingForParent());
-            if (consumes[i]) numConsuming++;
-            if (rel == Session::OPEN_NEW_SESSION) session.reset(nullptr);
-        }
-
-        // Two child positions to care for: split up the update
-        std::pair<JobSchedulingUpdate, JobSchedulingUpdate> splitUpdate;
-        if (numConsuming == 2) splitUpdate = update.split(_job_tree.getIndex());
-        auto& [leftUpdate, rightUpdate] = splitUpdate;
-        Session::Result results[2];
-
-        // Supply the update to each child
-        for (size_t i = 0; i < 2; i++) {
-            if (!consumes[i]) continue;
-            auto& session = _sessions[i];
-            auto& myUpdate = numConsuming <= 1 ? update : (i == 0 ? leftUpdate : rightUpdate);
-            auto rel = Session::OPEN_NEW_SESSION;
-            if (session) rel = session->getMessageRelation(myUpdate.epoch);
-            
-            if (rel == Session::OPEN_NEW_SESSION) {
-                session.reset(new Session(_job_tree, myUpdate, 
-                    i == 0 ? _job_tree.getLeftChildIndex() : _job_tree.getRightChildIndex(), 
-                    i == 0 ? _job_tree.getLeftChildNodeRank() : _job_tree.getRightChildNodeRank(), 
-                    results[i]));
-            } else {
-                results[i] = session->handleAddJobNodes(myUpdate.inactiveJobNodes);
-            }
-            handleResult(_sessions[i], results[i], _sessions[1-i]);
-        }
-    }
-
-    void handleResult(std::unique_ptr<Session>& session, Session::Result result, std::unique_ptr<Session>& otherSession) {
-        
-        bool sessionsSameEpoch = otherSession && (otherSession->getLatestIncludedEpoch() == session->getLatestIncludedEpoch());
-
-        if (result == Session::OK) {
-            return;
-        }
-        if (result == Session::EMIT_DIRECTED_REQUEST) {
-            _cb_emit_directed_job_request(session->getLatestIncludedEpoch(), session->getChildIndex(), session->getChildRank());
-        }
-        if (result == Session::EMIT_UNDIRECTED_REQUEST) {
-            _cb_emit_undirected_job_request(session->getLatestIncludedEpoch(), session->getChildIndex());
-        }
-        if (result == Session::REQUEST_INACTIVE_NODES) {
-            // wants to have excess nodes
-            if (sessionsSameEpoch && otherSession->hasExcessNodesReady()) {
-                // Transfer nodes from other session to this session
-                session->handleAddJobNodes(otherSession->getJobNodes());
-                otherSession->setExcessNodesExported();
-            } else {
-                if (_job_tree.isRoot()) {
-                    // No more inactive job nodes left: Send notification down
-                    auto res = session->handleNotifyNoneLeft();
-                    handleResult(session, res, otherSession);
-                } else if (!_inactive_node_request_pending) {
-                    // Query parent for more nodes
-                    _inactive_node_request_pending = true;
-                    log(V5_DEBG, "RBS REQUEST_NODES\n");
-                    MyMpi::isend(_job_tree.getParentNodeRank(), MSG_SCHED_REQUEST_INACTIVE_NODES, 
-                        IntVec({_job_id, session->getEpochOfOrigin()}));
-                }
-            }
-        }
-        
-        if (result == Session::CONCLUDE) {
-
-            log(V5_DEBG, "RBS #%i:%i DONE e=%i inactives={%s}\n", _job_id, session->getChildIndex(), session->getEpochOfOrigin(), session->getJobNodes().toStr().c_str());
-            
-            if (session->hasExcessNodesReady() && sessionsSameEpoch && otherSession->canConsumeInactiveJobNodes()) {
-                // Transfer nodes from this session to other session
-                auto res = otherSession->handleAddJobNodes(session->getJobNodes());
-                handleResult(session, res, otherSession);
-                session->setExcessNodesExported();
-
-            } else if (sessionsSameEpoch && otherSession->isDone()) {
-                // Both sessions are done 
-
-                // Retrieve union of gathered job nodes
-                InactiveJobNodeList jobNodes = session->getJobNodes();
-                jobNodes.mergePreferringNewer(otherSession->getJobNodes());
-                
-                // Insert this node as well (with status "consumed") to reduce all currently active nodes
-                auto myNode = InactiveJobNode(MyMpi::rank(MPI_COMM_WORLD), _job_tree.getIndex(), session->getLatestIncludedEpoch());
-                myNode.status = InactiveJobNode::CONSUMED;
-                jobNodes.set.insert(myNode);
-                
-                if (_job_tree.isRoot()) {
-                    // Job scheduling phase finished: Remember inactive job nodes
-                    _inactive_job_nodes.set.insert(jobNodes.set.begin(), jobNodes.set.end());
-                    _active_job_ranks = _inactive_job_nodes.cleanUpStatusesAndGetCurrentRanks(); // remove lost inactive job nodes, reset busy ones
-                    auto activesStr = activeRanksToStr();
-
-                    log(V5_DEBG, "RBS #%i DONE e=%i actives={%s} inactives={%s}\n", _job_id, session->getEpochOfOrigin(), 
-                        activesStr.c_str(), _inactive_job_nodes.toStr().c_str());
-                } else {
-                    // Send up excess nodes from both
-                    JobSchedulingUpdate update = session->getMetadata();
-                    update.inactiveJobNodes = std::move(jobNodes);
-                    MyMpi::isend(_job_tree.getParentNodeRank(), MSG_SCHED_CONCLUDE, update);
-                }
-
-                // Delete both sessions, create new empty session pointers
-                reset();
-            }
-        }
-    }
-#endif
 
     std::unique_ptr<ChildInterface>& getSessionByChildIndex(int childIndex) {
         if (_sessions[0] && childIndex == _sessions[0]->getChildIndex()) return _sessions[0];

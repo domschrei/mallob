@@ -14,7 +14,7 @@ struct InactiveJobNode : public Serializable {
     int rank;
     int originalIndex;
     int lastEpoch;
-    mutable enum Status {AVAILABLE, BUSY, LOST, CONSUMED} status = AVAILABLE;
+    mutable enum Status {AVAILABLE, BUSY, LOST} status = AVAILABLE;
     static const char* STATUS_STR[4];
 
     InactiveJobNode() {}
@@ -62,15 +62,13 @@ struct InactiveJobNodeList : public Serializable {
         filterDuplicates();
     }
 
-    void mergeReplacingPreferringConsumed(const InactiveJobNodeList& other) {
+    void mergeReplacing(const InactiveJobNodeList& other) {
         
         robin_hood::unordered_map<int, InactiveJobNode> nodesByRank;
         for (auto& node : set) nodesByRank[node.rank] = node;
 
         for (auto& otherNode : other.set) {
-            if (nodesByRank.count(otherNode.rank) && 
-                    (nodesByRank.at(otherNode.rank).status != InactiveJobNode::CONSUMED 
-                    || otherNode.status == InactiveJobNode::CONSUMED))
+            if (nodesByRank.count(otherNode.rank))
                 set.erase(nodesByRank.at(otherNode.rank));
             set.insert(otherNode);
         }
@@ -103,24 +101,17 @@ struct InactiveJobNodeList : public Serializable {
         return result;
     }
 
-    std::vector<int> cleanUpStatusesAndGetCurrentRanks() {
+    void cleanUpStatuses() {
 
         std::vector<InactiveJobNode> nodesToDelete; // track nodes to remove
-        std::vector<int> consumedRanks;
-
+        
         for (auto& node : set) {
-            if (node.status == InactiveJobNode::CONSUMED) {
-                while (node.originalIndex >= consumedRanks.size()) consumedRanks.push_back(-1);
-                assert(consumedRanks[node.originalIndex] == -1);
-                consumedRanks[node.originalIndex] = node.rank;
-            }
-            if (node.status == InactiveJobNode::LOST || node.status == InactiveJobNode::CONSUMED)
+            if (node.status == InactiveJobNode::LOST)
                 nodesToDelete.push_back(node);
             else node.status = InactiveJobNode::AVAILABLE; // reset temporarily busy nodes to available
         }
 
         for (auto& node : nodesToDelete) set.erase(node);
-        return consumedRanks;
     }
 
     void filterDuplicates() {

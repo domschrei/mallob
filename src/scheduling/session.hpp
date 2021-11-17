@@ -59,10 +59,11 @@ public:
     }
 
     // a suspended child returns its inactive job nodes
-    void addJobNodesFromSuspendedChild(const InactiveJobNodeList& newNodes) {
+    void addJobNodesFromSuspendedChild(int rank, const InactiveJobNodeList& newNodes) {
         nodes.mergePreferringNewer(newNodes);
         notifiedInactiveNodes = false;
         childHasNodes = false;
+        findAndUpdateNode(rank, childIndex, epoch, InactiveJobNode::AVAILABLE);
     }
 
     MsgDirective handleRejectionOfPotentialChild(int index, int epoch, bool lost) {
@@ -91,8 +92,8 @@ public:
         MyMpi::isend(childRank, MSG_SCHED_INITIALIZE_CHILD_WITH_NODES, update);
         childHasNodes = true;
 
-        // If you can find the job node of this rank, set it to CONSUMED.
-        findAndUpdateNode(source, index, epoch, InactiveJobNode::CONSUMED);
+        // If you can find the job node of this rank, set it to BUSY.
+        findAndUpdateNode(source, index, epoch, InactiveJobNode::BUSY);
         notifyRemainingInactiveNodes();
     }
 
