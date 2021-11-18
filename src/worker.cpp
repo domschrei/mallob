@@ -298,10 +298,15 @@ void Worker::advance(float time) {
                     // Solver done!
                     // Signal notification to root -- may be a self message
                     int jobRootRank = job.getJobTree().getRootNodeRank();
-                    IntVec payload({job.getId(), job.getRevision(), result});
-                    log(LOG_ADD_DESTRANK | V4_VVER, "%s : sending finished info", jobRootRank, job.toStr());
+                    IntVec payload;
+                    {
+                        auto resultStruct = job.getResult();
+                        auto key = std::pair<int, int>(id, resultStruct.revision);
+                        payload = IntVec({id, resultStruct.revision, result});
+                        log(LOG_ADD_DESTRANK | V4_VVER, "%s rev. %i: sending finished info", jobRootRank, job.toStr(), key.second);
+                        _pending_results[key] = std::move(resultStruct);
+                    }
                     MyMpi::isend(jobRootRank, MSG_NOTIFY_RESULT_FOUND, payload);
-                    job.setResultTransferPending(true);
                 }
 
                 // Update demand as necessary
@@ -364,14 +369,14 @@ void Worker::handleNotifyJobAborting(MessageHandle& handle) {
 
     int jobId = Serializable::get<int>(handle.getRecvData());
     if (!_job_db.has(jobId)) return;
-
-    interruptJob(jobId, /*terminate=*/true, /*reckless=*/true);
     
     if (_job_db.get(jobId).getJobTree().isRoot()) {
         // Forward information on aborted job to client
         MyMpi::isend(_job_db.get(jobId).getJobTree().getParentNodeRank(), 
             MSG_NOTIFY_CLIENT_JOB_ABORTING, handle.moveRecvData());
     }
+
+    interruptJob(jobId, /*terminate=*/true, /*reckless=*/true);
 }
 
 void Worker::handleAnswerAdoptionOffer(MessageHandle& handle) {
@@ -657,12 +662,14 @@ void Worker::handleQueryJobResult(MessageHandle& handle) {
 
     // Receive acknowledgement that the client received the advertised result size
     // and wishes to receive the full job result
-    int jobId = Serializable::get<int>(handle.getRecvData());
-    assert(_job_db.has(jobId));
-    const JobResult& result = _job_db.get(jobId).getResult();
-    log(LOG_ADD_DESTRANK | V3_VERB, "Send result of #%i rev. %i to client", handle.source, jobId, result.revision);
+    JobStatistics stats; stats.deserialize(handle.getRecvData());
+    int jobId = stats.jobId;
+    auto key = std::pair<int, int>(jobId, stats.revision);
+    log(LOG_ADD_DESTRANK | V3_VERB, "Send result of #%i rev. %i to client", handle.source, jobId, stats.revision);
+    assert(_pending_results.count(key));
+    JobResult& result = _pending_results.at(key);
     MyMpi::isend(handle.source, MSG_SEND_JOB_RESULT, result);
-    _job_db.get(jobId).setResultTransferPending(false);
+    _pending_results.erase(key);
 }
 
 void Worker::handleQueryVolume(MessageHandle& handle) {
@@ -693,10 +700,9 @@ void Worker::handleQueryVolume(MessageHandle& handle) {
 void Worker::handleNotifyResultObsolete(MessageHandle& handle) {
     IntVec res = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = res[0];
-    //int revision = res[1];
-    if (!_job_db.has(jobId)) return;
-    log(LOG_ADD_SRCRANK | V4_VVER, "job result for %s unwanted", handle.source, _job_db.get(jobId).toStr());
-    _job_db.get(jobId).setResultTransferPending(false);
+    int revision = res[1];
+    log(LOG_ADD_SRCRANK | V4_VVER, "job result for #%i rev. %i unwanted", handle.source, jobId, revision);
+    _pending_results.erase(std::pair<int, int>(jobId, revision));
 }
 
 void Worker::handleSendJobDescription(MessageHandle& handle) {
@@ -817,7 +823,7 @@ void Worker::handleNotifyResultFound(MessageHandle& handle) {
     }
 
     // Notify client
-    sendJobDoneWithStatsToClient(jobId, handle.source);
+    sendJobDoneWithStatsToClient(jobId, revision, handle.source);
 }
 
 void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
@@ -1090,15 +1096,15 @@ void Worker::interruptJob(int jobId, bool terminate, bool reckless) {
     else if (job.getState() == ACTIVE) _job_db.suspend(jobId);
 }
 
-void Worker::sendJobDoneWithStatsToClient(int jobId, int successfulRank) {
+void Worker::sendJobDoneWithStatsToClient(int jobId, int revision, int successfulRank) {
     auto& job = _job_db.get(jobId);
-    const JobResult& result = job.getResult();
 
     int clientRank = job.getDescription().getClientRank();
     log(LOG_ADD_DESTRANK | V4_VVER, "%s : inform client job is done", clientRank, job.toStr());
     job.updateVolumeAndUsedCpu(job.getVolume());
     JobStatistics stats;
     stats.jobId = jobId;
+    stats.revision = revision;
     stats.successfulRank = successfulRank;
     stats.usedWallclockSeconds = job.getAgeSinceActivation();
     stats.usedCpuSeconds = job.getUsedCpuSeconds();

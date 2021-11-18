@@ -48,6 +48,8 @@ private:
     double _mainthread_cpu_share = 0;
     float _mainthread_sys_share = 0;
 
+    robin_hood::unordered_map<std::pair<int, int>, JobResult, IntPairHasher> _pending_results;
+
 public:
     Worker(MPI_Comm comm, Parameters& params);
     ~Worker();
@@ -89,7 +91,7 @@ private:
     void sendJobRequest(const JobRequest& req, int tag, bool left, int dest);
 
     void interruptJob(int jobId, bool terminate, bool reckless);
-    void sendJobDoneWithStatsToClient(int jobId, int successfulRank);
+    void sendJobDoneWithStatsToClient(int jobId, int revision, int successfulRank);
     void timeoutJob(int jobId);
 
     void sendStatusToNeighbors();

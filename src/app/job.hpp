@@ -167,7 +167,6 @@ private:
     std::optional<JobRequest> _commitment;
     int _balancing_epoch_of_last_commitment = -1;
     std::optional<JobResult> _result;
-    bool _result_transfer_pending = false;
     std::list<std::pair<int, int>> _waiting_rank_revision_pairs;
 
     JobTree _job_tree;
@@ -251,8 +250,6 @@ public:
     int getLastDemand() const {return _last_demand;}
     void setLastDemand(int demand) {_last_demand = demand;}
 
-    // Return true iff this job instance has found a job result that it still needs to communicate.
-    bool isResultTransferPending() const {return _result_transfer_pending;}
     // Returns whether the job is easily and quickly destructible as of now. 
     // (calls appl_isDestructible())
     bool isDestructible();
@@ -313,7 +310,6 @@ public:
     void initScheduler(std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq);
 
     // Marks the job to be indestructible as long as pending is true.
-    void setResultTransferPending(bool pending) {_result_transfer_pending = pending;}
     void addChildWaitingForRevision(int rank, int revision) {_waiting_rank_revision_pairs.emplace_back(rank, revision);}
     void setDesiredRevision(int revision) {_desired_revision = revision;}
     bool isRevisionSolved(int revision) {return _last_solved_revision >= revision;}

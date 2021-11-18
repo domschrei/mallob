@@ -17,12 +17,13 @@
 class ForkedSatJob : public BaseSatJob {
 
 private:
+    static std::atomic_int _static_subprocess_index;
+    
     std::atomic_bool _initialized = false;
 
     std::unique_ptr<HordeProcessAdapter> _solver;
     void* _clause_comm = nullptr; // SatClauseCommunicator instance (avoiding fwd decl.)
     int _last_imported_revision = 0;
-    int _recovery_index = 0;
 
     std::future<void> _destruction;
     std::atomic_bool _shmem_freed = false;

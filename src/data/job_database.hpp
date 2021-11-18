@@ -50,6 +50,7 @@ private:
     };
 
     BackgroundWorker _janitor;
+    std::list<Job*> _job_destruct_queue;
     std::list<Job*> _jobs_to_free;
     Mutex _janitor_mutex;
     ConditionVariable _janitor_cond_var;
@@ -88,8 +89,7 @@ public:
 
     void forgetOldJobs();
     void forget(int jobId);
-    void free(int jobId);
-
+    
     std::vector<std::pair<JobRequest, int>> getDeferredRequestsToForward(float time);
 
     void preregisterJobInBalancer(int jobId);

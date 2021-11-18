@@ -148,6 +148,7 @@ public:
 struct JobStatistics : public Serializable {
 
     int jobId;
+    int revision;
     int successfulRank;
     float usedWallclockSeconds;
     float usedCpuSeconds;

@@ -13,6 +13,8 @@
 #include "horde_config.hpp"
 #include "util/sys/thread_pool.hpp"
 
+std::atomic_int ForkedSatJob::_static_subprocess_index = 1;
+
 ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId) : 
         BaseSatJob(params, commSize, worldRank, jobId), _job_comm_period(params.appCommPeriod()) {
 }
@@ -26,7 +28,7 @@ void ForkedSatJob::appl_start() {
 
 void ForkedSatJob::doStartSolver() {
 
-    HordeConfig config(_params, *this, _recovery_index);
+    HordeConfig config(_params, *this, _static_subprocess_index++);
     Parameters hParams(_params);
     hParams.hordeConfig.set(config.toString());
     if (_params.verbosity() >= V5_DEBG) hParams.printParams();
@@ -119,7 +121,6 @@ int ForkedSatJob::appl_solved() {
         _clause_comm = nullptr;
 
         // Start new solver (with renamed shared memory segments)
-        _recovery_index++;
         doStartSolver();
     }
     return result;

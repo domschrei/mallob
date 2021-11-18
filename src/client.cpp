@@ -310,7 +310,7 @@ void Client::handleOfferAdoption(MessageHandle& handle) {
 
 void Client::handleJobDone(MessageHandle& handle) {
     JobStatistics stats = Serializable::get<JobStatistics>(handle.getRecvData());
-    log(LOG_ADD_SRCRANK | V4_VVER, "Will receive job result for job #%i", handle.source, stats.jobId);
+    log(LOG_ADD_SRCRANK | V4_VVER, "Will receive job result for job #%i rev. %i", handle.source, stats.jobId, stats.revision);
     MyMpi::isendCopy(stats.successfulRank, MSG_QUERY_JOB_RESULT, handle.getRecvData());
     JobDescription& desc = *_active_jobs[stats.jobId];
     desc.getStatistics().usedWallclockSeconds = stats.usedWallclockSeconds;

@@ -73,8 +73,8 @@ Job& JobDatabase::createJob(int commSize, int worldRank, int jobId, JobDescripti
 
 bool JobDatabase::appendRevision(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source) {
 
-    if (!has(jobId) || get(jobId).getState() == PAST) {
-        log(V1_WARN, "[WARN] Unknown or past job #%i : discard desc. of size %i\n", jobId, description->size());
+    if (!has(jobId)) {
+        log(V1_WARN, "[WARN] Unknown job #%i : discard desc. of size %i\n", jobId, description->size());
         return false;
     }
     auto& job = get(jobId);
@@ -92,8 +92,8 @@ bool JobDatabase::appendRevision(int jobId, const std::shared_ptr<std::vector<ui
 
 void JobDatabase::execute(int jobId, int source) {
 
-    if (!has(jobId) || get(jobId).getState() == PAST) {
-        log(V1_WARN, "[WARN] Unknown or past job #%i\n", jobId);
+    if (!has(jobId)) {
+        log(V1_WARN, "[WARN] Unknown job #%i\n", jobId);
         return;
     }
     auto& job = get(jobId);
@@ -258,13 +258,6 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
 
     if (has(req.jobId)) {
         Job& job = get(req.jobId);
-        // Know that the job already finished?
-        if (job.getState() == PAST) {
-            log(V4_VVER, "Reject req. %s : past job being cleaned up\n", 
-                            toStr(req.jobId, req.requestedNodeIndex).c_str());
-            if (_coll_assign) _coll_assign->setStatusDirty();
-            return REJECT;
-        }
         if (job.getIndex() > 0 && !job.getScheduler().canCommit()) {
             log(V4_VVER, "Reject req. %s : scheduler busy\n", 
                             toStr(req.jobId, req.requestedNodeIndex).c_str());
@@ -404,9 +397,25 @@ void JobDatabase::terminate(int jobId) {
     job.terminate();
     if (job.hasCommitment()) uncommit(jobId);
     if (!wasTerminated) _balancer->onTerminate(job);
+
+    log(V4_VVER, "Delete %s\n", job.toStr());
+    forget(jobId);
 }
 
 void JobDatabase::forgetOldJobs() {
+
+    // Find "forgotten" jobs in destruction queue which can now be destructed
+    for (auto it = _job_destruct_queue.begin(); it != _job_destruct_queue.end(); ++it) {
+        Job* job = *it;
+        if (job->isDestructible()) {
+            // Move pointer to "free" queue emptied by janitor thread
+            auto lock = _janitor_mutex.getLock();
+            _jobs_to_free.emplace_back(job);
+            _janitor_cond_var.notify();
+            it = _job_destruct_queue.erase(it);
+            --it;
+        }
+    }
 
     log(V5_DEBG, "scan for old jobs\n");
 
@@ -424,14 +433,6 @@ void JobDatabase::forgetOldJobs() {
         if (job.getState() == INACTIVE && job.getAge() >= 10) {
             jobsToForget.push_back(id);
             continue;
-        }
-        // Past jobs
-        if (job.getState() == PAST) {
-            // If job is past, it must have been so for at least 3 seconds
-            if (job.getAgeSinceAbort() < 3) continue;
-            // If the node found a result, it must have been already transferred
-            if (job.isResultTransferPending()) continue;
-            jobsToForget.push_back(id);
         }
         // Suspended job: Forget w.r.t. age, but only if there is a limit on the job cache
         if (job.getState() == SUSPENDED && jobCacheSize > 0) {
@@ -453,37 +454,16 @@ void JobDatabase::forgetOldJobs() {
         log(V4_VVER, "%i resident jobs\n", _jobs.size());
     
     // Perform forgetting of jobs
-    for (int jobId : jobsToForget) {
-        forget(jobId);
-    }
+    for (int jobId : jobsToForget) forget(jobId);
 }
 
 void JobDatabase::forget(int jobId) {
     Job& job = get(jobId);
     if (job.getState() != PAST) job.terminate();
     assert(job.getState() == PAST);
-    // Check if the job can be destructed
-    if (job.isDestructible()) {
-        log(V3_VERB, "FORGET #%i\n", jobId);
-        free(jobId);
-    }
-}
-
-void JobDatabase::free(int jobId) {
-
-    if (!has(jobId)) return;
-    Job* job = &get(jobId);
-    log(V4_VVER, "Delete %s\n", job->toStr());
-
-    // Delete job and its solvers
+    Job* jobPtr = &job;
+    _job_destruct_queue.push_back(jobPtr);
     _jobs.erase(jobId);
-
-    // Concurrently free associated resources
-    {
-        auto lock = _janitor_mutex.getLock();
-        _jobs_to_free.emplace_back(job);
-        _janitor_cond_var.notify();
-    }
 }
 
 std::vector<std::pair<JobRequest, int>>  JobDatabase::getDeferredRequestsToForward(float time) {
@@ -645,9 +625,15 @@ JobDatabase::~JobDatabase() {
     std::vector<int> jobIds;
     for (auto idJobPair : _jobs) jobIds.push_back(idJobPair.first);
     
-    // Delete each job
+    // Forget each job, move raw pointer to destruct queue
     for (int jobId : jobIds) {
-        free(jobId);
+        forget(jobId);
+        watchdog.reset();
+    }
+
+    // Empty destruct queue into garbage for janitor to clean up
+    while (!_job_destruct_queue.empty()) {
+        forgetOldJobs();
         watchdog.reset();
     }
 
