@@ -32,6 +32,7 @@ void Job::initScheduler(std::function<void(const JobRequest& req, int tag, bool 
             JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
                 _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, -2);
             req.application = getApplication();
+            req.revision = std::max(0, getRevision());
             log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", rank, req.toStr().c_str());
             emitJobReq(req, MSG_REQUEST_NODE_ONESHOT, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), rank);
         },
@@ -40,6 +41,7 @@ void Job::initScheduler(std::function<void(const JobRequest& req, int tag, bool 
             JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
                 _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, 0);
             req.application = getApplication();
+            req.revision = std::max(0, getRevision());
             int dest = _job_tree.getLeftChildIndex() == requestedIndex ? 
                 _job_tree.getLeftChildNodeRank() : _job_tree.getRightChildNodeRank();
             log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", dest, req.toStr().c_str());
@@ -62,14 +64,15 @@ void Job::commit(const JobRequest& req) {
     _balancing_epoch_of_last_commitment = req.balancingEpoch;
     _job_tree.clearJobNodeUpdates();
     updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
-    getScheduler().resetRole();
-    if (_job_tree.isRoot()) {
+    if (_job_tree.isRoot() && req.revision == 0) {
         // Initialize the root's local scheduler, which in turn initializes
         // the scheduler of each child node (recursively)
         JobSchedulingUpdate update;
         update.epoch = req.balancingEpoch;
         if (update.epoch < 0) update.epoch = 0;
         getScheduler().initializeScheduling(update);
+    } else {
+        getScheduler().resetRole();
     }
 }
 
@@ -115,6 +118,7 @@ void Job::start() {
 
 void Job::suspend() {
     assertState(ACTIVE);
+    if (_scheduler.isActive()) _scheduler.suspend();
     _state = SUSPENDED;
     appl_suspend();
     _job_tree.unsetLeftChild();

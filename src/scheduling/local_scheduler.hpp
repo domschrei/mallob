@@ -92,13 +92,16 @@ public:
             applyDirective(directive, session);
         }
         
-        if (volume <= _job_tree.getIndex()) {
-            // Suspend (if not already suspended), remember this epoch as most recent suspension
-            _epoch_of_last_suspension = epoch;
-            if (!_suspended) {
-                _suspending = true;
-                if (canReturnInactiveJobNodes()) returnInactiveJobNodesToParent();
-            }
+        if (volume <= _job_tree.getIndex()) suspend(epoch);
+    }
+
+    void suspend(int epoch = -1) {
+        if (epoch == -1) epoch = std::max(_last_update_epoch, _epoch_of_last_suspension);
+        // Suspend (if not already suspended), remember this epoch as most recent suspension
+        _epoch_of_last_suspension = epoch;
+        if (!_suspended) {
+            _suspending = true;
+            if (canReturnInactiveJobNodes()) returnInactiveJobNodesToParent();
         }
     }
 
@@ -150,7 +153,10 @@ public:
     */
     void handleChildReturningInactiveJobNodes(int childRank, const InactiveJobNodeList& nodes) {
         auto& session = getSessionByChildRank(childRank);
-        if (!session) return;
+        if (!session) {
+            log(V5_DEBG, "RBS discarding inactives={%s}\n", nodes.toStr().c_str());
+            return;
+        }
         session->addJobNodesFromSuspendedChild(childRank, nodes);
     }
 
@@ -158,6 +164,7 @@ public:
     True iff received nodes from child (if it was present) and handleSuspend() was called. 
     */
     bool canReturnInactiveJobNodes() {
+        if (_job_tree.isRoot()) return false;
         if (!_suspended && _suspending) {
             auto& left = _sessions[0];
             auto& right = _sessions[1];
@@ -204,13 +211,29 @@ public:
         _sessions.resize(2);
     }
 
+    bool isActive() const {
+        return !_suspended && !_suspending;
+    }
+
     bool canCommit() const {
         return _suspended;
     }
 
     bool acceptsChild(int index) {
         auto& session = getSessionByChildIndex(index);
-        return session && !session->hasChild() && session->wantsChild();
+        if (!session) {
+            log(V5_DEBG, "RBS child idx=%i not present\n", index);
+            return false;
+        }
+        if (session->hasChild()) {
+            log(V5_DEBG, "RBS child idx=%i has child\n", index);
+            return false;
+        }
+        if (!session->wantsChild()) {
+            log(V5_DEBG, "RBS child idx=%i wants no child\n", index);
+            return false;
+        }
+        return true;
     }
 
     void resetRole() {

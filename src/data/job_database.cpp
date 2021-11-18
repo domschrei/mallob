@@ -245,6 +245,15 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
         return REJECT;
     }
 
+    // Does this node have a dormant root which is NOT this job?
+    if (hasDormantRoot() && (
+        !has(req.jobId)
+        || !get(req.jobId).getJobTree().isRoot() 
+        || get(req.jobId).getState() != SUSPENDED
+    )) {
+        return REJECT;
+    }
+
     if (has(req.jobId)) {
         Job& job = get(req.jobId);
         // Know that the job already finished?
@@ -254,7 +263,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
             if (_coll_assign) _coll_assign->setStatusDirty();
             return DISCARD;
         }
-        if (!job.getScheduler().canCommit()) {
+        if (job.getIndex() > 0 && !job.getScheduler().canCommit()) {
             log(V4_VVER, "Reject req. %s : scheduler busy\n", 
                             toStr(req.jobId, req.requestedNodeIndex).c_str());
             if (_coll_assign) _coll_assign->setStatusDirty();

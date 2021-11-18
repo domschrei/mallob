@@ -511,8 +511,8 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
         return;
     }
 
-    if (req.requestedNodeIndex == 0 && req.numHops == 0) {
-        // Fresh new job incoming!
+    if (req.requestedNodeIndex == 0 && req.numHops == 0 && req.revision == 0) {
+        // Fresh new job incoming! Probe balancer for a free spot.
         _job_db.addRootRequest(std::move(req));
         return;
     }
@@ -523,22 +523,18 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
         return;
     }
 
-    JobDatabase::AdoptionResult adoptionResult;
+    JobDatabase::AdoptionResult adoptionResult = JobDatabase::ADOPT_FROM_IDLE;
     int removedJob;
-    if (_params.reactivationScheduling()) {
-        if (mode == JobDatabase::TARGETED_REJOIN) {
-            // Mark job as having been notified of the current scheduling and that it is not further needed.
-            if (_job_db.has(req.jobId)) _job_db.get(req.jobId).getJobTree().stopWaitingForReactivation(req.balancingEpoch);
-            if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
-        } else if (_job_db.hasInactiveJobsWaitingForReactivation()) {
-            // In reactivation-based scheduling, block incoming requests if you are still waiting
-            // for a notification from some job of which you have an inactive job node.
-            // Does not apply for targeted requests!
-            adoptionResult = JobDatabase::REJECT;
-        }
+    if (_params.reactivationScheduling() && mode == JobDatabase::TARGETED_REJOIN) {
+        // Mark job as having been notified of the current scheduling and that it is not further needed.
+        if (_job_db.has(req.jobId)) _job_db.get(req.jobId).getJobTree().stopWaitingForReactivation(req.balancingEpoch);
+        if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
     }
     if (_params.reactivationScheduling() && mode != JobDatabase::TARGETED_REJOIN 
-            && _job_db.hasInactiveJobsWaitingForReactivation()) {
+            && _job_db.hasInactiveJobsWaitingForReactivation() && req.requestedNodeIndex > 0) {
+        // In reactivation-based scheduling, block incoming requests if you are still waiting
+        // for a notification from some job of which you have an inactive job node.
+        // Does not apply for targeted requests!
         adoptionResult = JobDatabase::REJECT;
     } else {
         adoptionResult = _job_db.tryAdopt(req, mode, handle.source, removedJob);
