@@ -52,6 +52,7 @@ private:
     BackgroundWorker _janitor;
     std::list<Job*> _jobs_to_free;
     Mutex _janitor_mutex;
+    ConditionVariable _janitor_cond_var;
 
     WorkerSysState& _sys_state;
     float _total_busy_time = 0;

@@ -35,10 +35,12 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sys
         auto lg = Logger::getMainInstance().copy("<Janitor>", "janitor");
         lg.log(V3_VERB, "tid=%lu\n", Proc::getTid());
         while (_janitor.continueRunning() || _num_stored_jobs > 0) {
-            usleep(1000 * 1000);
             std::list<Job*> copy;
             {
                 auto lock = _janitor_mutex.getLock();
+                _janitor_cond_var.waitWithLockedMutex(lock, [&]() {
+                    return !_janitor.continueRunning() || !_jobs_to_free.empty();
+                });
                 copy = std::move(_jobs_to_free);
                 _jobs_to_free.clear();
             }
@@ -258,10 +260,10 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
         Job& job = get(req.jobId);
         // Know that the job already finished?
         if (job.getState() == PAST) {
-            log(V4_VVER, "Discard req. %s : past job\n", 
+            log(V4_VVER, "Reject req. %s : past job being cleaned up\n", 
                             toStr(req.jobId, req.requestedNodeIndex).c_str());
             if (_coll_assign) _coll_assign->setStatusDirty();
-            return DISCARD;
+            return REJECT;
         }
         if (job.getIndex() > 0 && !job.getScheduler().canCommit()) {
             log(V4_VVER, "Reject req. %s : scheduler busy\n", 
@@ -458,7 +460,7 @@ void JobDatabase::forgetOldJobs() {
 
 void JobDatabase::forget(int jobId) {
     Job& job = get(jobId);
-    job.terminate();
+    if (job.getState() != PAST) job.terminate();
     assert(job.getState() == PAST);
     // Check if the job can be destructed
     if (job.isDestructible()) {
@@ -480,6 +482,7 @@ void JobDatabase::free(int jobId) {
     {
         auto lock = _janitor_mutex.getLock();
         _jobs_to_free.emplace_back(job);
+        _janitor_cond_var.notify();
     }
 }
 
