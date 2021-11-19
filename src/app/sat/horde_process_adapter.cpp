@@ -104,11 +104,10 @@ void HordeProcessAdapter::doInitialize() {
     while (argv[i] != nullptr) free(argv[i++]);
     delete[] argv;
 
-    _initialized = true;
-    _hsm->doBegin = true;
-
     {
         auto lock = _state_mutex.getLock();
+        _initialized = true;
+        _hsm->doBegin = true;
         _child_pid = res;
         applySolvingState();
     }
