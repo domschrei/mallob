@@ -46,7 +46,8 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sys
                 copy = std::move(_jobs_to_free);
                 _jobs_to_free.clear();
             }
-            for (auto job : copy) {
+            lg.log(V5_DEBG, "Found %i job(s) to delete\n", copy.size());
+            for (Job* job : copy) {
                 int id = job->getId();
                 lg.log(V4_VVER, "DELETE #%i\n", id);
                 delete job;
@@ -416,7 +417,7 @@ void JobDatabase::forgetOldJobs() {
             // Move pointer to "free" queue emptied by janitor thread
             {
                 auto lock = _janitor_mutex.getLock();
-                _jobs_to_free.emplace_back(job);
+                _jobs_to_free.push_back(job);
             }
             _janitor_cond_var.notify();
             it = _job_destruct_queue.erase(it);
