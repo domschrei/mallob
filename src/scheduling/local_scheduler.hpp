@@ -67,6 +67,7 @@ public:
         auto [leftUpdate, rightUpdate] = update.split(_job_tree.getIndex());
         for (size_t i = 0; i < 2; i++) {
             auto& session = _sessions[i];
+            assert(!session);
             auto& childUpdate = i==0 ? leftUpdate : rightUpdate;
             session.reset(new ChildInterface(_job_id, _job_tree, std::move(childUpdate.inactiveJobNodes), 
                     i == 0 ? _job_tree.getLeftChildIndex() : _job_tree.getRightChildIndex(), 
@@ -239,6 +240,8 @@ public:
     void resetRole() {
         _epoch_of_last_suspension = -1;
         _last_update_epoch = -1;
+        _sessions.clear();
+        _sessions.resize(2);
     }
 
 private:

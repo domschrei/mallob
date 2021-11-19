@@ -71,7 +71,7 @@ void Job::commit(const JobRequest& req) {
         update.epoch = req.balancingEpoch;
         if (update.epoch < 0) update.epoch = 0;
         getScheduler().initializeScheduling(update);
-    } else {
+    } else if (!_job_tree.isRoot()) {
         getScheduler().resetRole();
     }
 }
