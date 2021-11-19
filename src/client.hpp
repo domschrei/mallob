@@ -44,6 +44,9 @@ private:
     // Safeguards _incoming_job_queue.
     Mutex _incoming_job_lock;
     ConditionVariable _incoming_job_cond_var;
+    
+    std::set<float> _arrival_times;
+    Mutex _arrival_times_lock;
 
     // For jobs which have been fully read and initialized
     // and whose prerequisites for activation are met.

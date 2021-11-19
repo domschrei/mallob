@@ -130,6 +130,10 @@ void Client::handleNewJob(JobMetadata&& data) {
     // Introduce new job into "incoming" queue
     data.description->setClientRank(_world_rank);
     {
+        auto lock = _arrival_times_lock.getLock();
+        _arrival_times.insert(data.description->getArrival());
+    }
+    {
         auto lock = _incoming_job_lock.getLock();
         _incoming_job_queue.insert(std::move(data));
     }
@@ -184,6 +188,22 @@ void Client::advance() {
             MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
             finishJob(jobId, /*hasIncrementalSuccessors=*/false);
         }
+    }
+
+    // Process arrival times chronologically; if at least one "happened", notify reader
+    if (_arrival_times_lock.tryLock()) {
+        bool notify = false;
+        for (auto it = _arrival_times.begin(); it != _arrival_times.end(); ++it) {
+            float arr = *it;
+            if (arr > time) break;
+            
+            notify = true;
+            it = _arrival_times.erase(it);
+            if (it == _arrival_times.end()) break;
+            --it;
+        }
+        _arrival_times_lock.unlock();
+        if (notify) _incoming_job_cond_var.notify();
     }
 
     // Introduce next job(s) as applicable
@@ -397,6 +417,7 @@ void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {
         _sys_state.addLocal(SYSSTATE_PROCESSED_JOBS, 1);
     }
 
+    _incoming_job_cond_var.notify(); // waiting instance reader might be able to continue now
     introduceNextJob();
 }
 
