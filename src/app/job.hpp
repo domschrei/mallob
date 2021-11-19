@@ -250,6 +250,7 @@ public:
     int getLastDemand() const {return _last_demand;}
     void setLastDemand(int demand) {_last_demand = demand;}
 
+    bool canBeTerminated() const {return _scheduler.canCommit();}
     // Returns whether the job is easily and quickly destructible as of now. 
     // (calls appl_isDestructible())
     bool isDestructible();

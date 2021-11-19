@@ -32,7 +32,7 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sys
     _balancer = std::unique_ptr<EventDrivenBalancer>(new EventDrivenBalancer(_comm, _params));
 
     _janitor.run([this]() {
-        auto lg = Logger::getMainInstance().copy("<Janitor>", "janitor");
+        auto lg = Logger::getMainInstance().copy("<Janitor>", ".janitor");
         lg.log(V3_VERB, "tid=%lu\n", Proc::getTid());
         while (_janitor.continueRunning() || _num_stored_jobs > 0) {
             std::list<Job*> copy;
@@ -41,6 +41,8 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sys
                 _janitor_cond_var.waitWithLockedMutex(lock, [&]() {
                     return !_janitor.continueRunning() || !_jobs_to_free.empty();
                 });
+                if (!_janitor.continueRunning() && _jobs_to_free.empty())
+                    break;
                 copy = std::move(_jobs_to_free);
                 _jobs_to_free.clear();
             }
@@ -362,6 +364,7 @@ void JobDatabase::suspend(int jobId) {
 }
 
 void JobDatabase::terminate(int jobId) {
+    assert(has(jobId));
     Job& job = get(jobId);
     bool wasTerminated = job.getState() == JobState::PAST;
     if (hasActiveJob() && getActive().getId() == jobId) {
@@ -409,15 +412,15 @@ void JobDatabase::forgetOldJobs() {
         Job* job = *it;
         if (job->isDestructible()) {
             // Move pointer to "free" queue emptied by janitor thread
-            auto lock = _janitor_mutex.getLock();
-            _jobs_to_free.emplace_back(job);
+            {
+                auto lock = _janitor_mutex.getLock();
+                _jobs_to_free.emplace_back(job);
+            }
             _janitor_cond_var.notify();
             it = _job_destruct_queue.erase(it);
             --it;
         }
     }
-
-    log(V5_DEBG, "scan for old jobs\n");
 
     std::vector<int> jobsToForget;
     int jobCacheSize = _params.jobCacheSize();
@@ -435,7 +438,7 @@ void JobDatabase::forgetOldJobs() {
             continue;
         }
         // Suspended job: Forget w.r.t. age, but only if there is a limit on the job cache
-        if (job.getState() == SUSPENDED && jobCacheSize > 0) {
+        if (job.getState() == SUSPENDED && job.canBeTerminated() && jobCacheSize > 0) {
             // Job must not be rooted here
             if (job.getJobTree().isRoot()) continue;
             // Insert job into PQ according to its age
@@ -634,9 +637,11 @@ JobDatabase::~JobDatabase() {
     // Empty destruct queue into garbage for janitor to clean up
     while (!_job_destruct_queue.empty()) {
         forgetOldJobs();
+        _janitor_cond_var.notify();
         watchdog.reset();
     }
 
-    _janitor.stop();
+    _janitor.stopWithoutWaiting();
+    _janitor_cond_var.notify();
     watchdog.stop();
 }

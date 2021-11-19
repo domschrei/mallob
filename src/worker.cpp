@@ -433,7 +433,7 @@ void Worker::handleQueryJobDescription(MessageHandle& handle) {
     int jobId = pair.first;
     int revision = pair.second;
 
-    assert(_job_db.has(jobId));
+    if (!_job_db.has(jobId)) return;
     Job& job = _job_db.get(jobId);
 
     if (job.getRevision() >= revision) {
@@ -462,6 +462,8 @@ void Worker::handleRejectOneshot(MessageHandle& handle) {
     JobRequest& req = rej.request;
     log(LOG_ADD_SRCRANK | V5_DEBG, "%s rejected by dormant child", handle.source, 
             _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
+
+    if (!_job_db.has(req.jobId)) return;
 
     Job& job = _job_db.get(req.jobId);
     if (_params.reactivationScheduling()) {
@@ -648,7 +650,10 @@ void Worker::handleOfferAdoption(MessageHandle& handle) {
     MyMpi::isend(handle.source, MSG_ANSWER_ADOPTION_OFFER, IntPair(req.jobId, reject ? 0 : 1));
 
     if (_params.reactivationScheduling()) {
+        
+        if (!_job_db.has(req.jobId)) return;
         Job& job = _job_db.get(req.jobId);
+
         if (!reject) {
             job.getScheduler().handleChildJoining(handle.source, req.balancingEpoch, req.requestedNodeIndex);
         } else {
