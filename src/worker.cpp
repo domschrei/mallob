@@ -114,6 +114,11 @@ void Worker::init() {
     auto localSchedulerCb = [&](MessageHandle& handle) {
         int jobId = Serializable::get<int>(handle.getRecvData());
         if (_job_db.has(jobId)) _job_db.get(jobId).getScheduler().handle(handle);
+        else if (handle.tag == MSG_SCHED_INITIALIZE_CHILD_WITH_NODES) {
+            // A scheduling package for an unknown job arrived:
+            // it is important to return this package to the sender
+            MyMpi::isend(handle.source, MSG_SCHED_RETURN_NODES, handle.moveRecvData());
+        }
     };
     q.registerCallback(MSG_SCHED_INITIALIZE_CHILD_WITH_NODES, localSchedulerCb);
     q.registerCallback(MSG_SCHED_RETURN_NODES, localSchedulerCb);
