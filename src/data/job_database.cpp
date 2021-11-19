@@ -48,6 +48,7 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sys
             }
             for (auto job : copy) {
                 int id = job->getId();
+                lg.log(V4_VVER, "DELETE #%i\n", id);
                 delete job;
                 Logger::getMainInstance().mergeJobLogs(id);
                 _num_stored_jobs--;
@@ -408,9 +409,10 @@ void JobDatabase::terminate(int jobId) {
 void JobDatabase::forgetOldJobs() {
 
     // Find "forgotten" jobs in destruction queue which can now be destructed
-    for (auto it = _job_destruct_queue.begin(); it != _job_destruct_queue.end(); ++it) {
+    for (auto it = _job_destruct_queue.begin(); it != _job_destruct_queue.end(); ) {
         Job* job = *it;
         if (job->isDestructible()) {
+            log(V4_VVER, "%s : order deletion\n", job->toStr());
             // Move pointer to "free" queue emptied by janitor thread
             {
                 auto lock = _janitor_mutex.getLock();
@@ -418,8 +420,7 @@ void JobDatabase::forgetOldJobs() {
             }
             _janitor_cond_var.notify();
             it = _job_destruct_queue.erase(it);
-            --it;
-        }
+        } else ++it;
     }
 
     std::vector<int> jobsToForget;
@@ -461,10 +462,14 @@ void JobDatabase::forgetOldJobs() {
 }
 
 void JobDatabase::forget(int jobId) {
-    Job& job = get(jobId);
-    if (job.getState() != PAST) job.terminate();
-    assert(job.getState() == PAST);
-    Job* jobPtr = &job;
+    Job* jobPtr;
+    {
+        Job& job = get(jobId);
+        log(V4_VVER, "FORGET %s\n", job.toStr());
+        if (job.getState() != PAST) job.terminate();
+        assert(job.getState() == PAST);
+        jobPtr = &job;
+    }
     _job_destruct_queue.push_back(jobPtr);
     _jobs.erase(jobId);
 }
@@ -624,7 +629,7 @@ JobDatabase::~JobDatabase() {
     watchdog.setWarningPeriod(500);
     watchdog.setAbortPeriod(10*1000);
 
-    // Collect all jobs 
+    // Collect all jobs from central job table
     std::vector<int> jobIds;
     for (auto idJobPair : _jobs) jobIds.push_back(idJobPair.first);
     
