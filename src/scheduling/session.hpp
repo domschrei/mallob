@@ -61,9 +61,11 @@ public:
     // a suspended child returns its inactive job nodes
     void addJobNodesFromSuspendedChild(int rank, const InactiveJobNodeList& newNodes) {
         nodes.mergePreferringNewer(newNodes);
+        nodes.cleanUpStatuses();
         notifiedInactiveNodes = false;
         childHasNodes = false;
         findAndUpdateNode(rank, childIndex, epoch, InactiveJobNode::AVAILABLE);
+        log(V5_DEBG, "RBS ADDED_NODES inactives={%s}\n", nodes.toStr().c_str());
     }
 
     MsgDirective handleRejectionOfPotentialChild(int index, int epoch, bool lost) {
@@ -109,6 +111,7 @@ public:
 
     InactiveJobNodeList&& returnJobNodes() {
         notifyRemainingInactiveNodes();
+        log(V5_DEBG, "RBS RETURNING_NODES inactives={%s}\n", nodes.toStr().c_str());
         return std::move(nodes);
     }
 
