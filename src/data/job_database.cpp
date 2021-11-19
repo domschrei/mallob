@@ -43,7 +43,7 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sys
                 });
                 if (!_janitor.continueRunning() && _jobs_to_free.empty())
                     break;
-                copy = std::move(_jobs_to_free);
+                for (Job* job : _jobs_to_free) copy.push_back(job);
                 _jobs_to_free.clear();
             }
             lg.log(V5_DEBG, "Found %i job(s) to delete\n", copy.size());
@@ -650,4 +650,5 @@ JobDatabase::~JobDatabase() {
     _janitor.stopWithoutWaiting();
     _janitor_cond_var.notify();
     watchdog.stop();
+    _janitor.stop();
 }
