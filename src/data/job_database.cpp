@@ -240,7 +240,7 @@ void JobDatabase::initScheduler(JobRequest& req, std::function<void(const JobReq
             JobSchedulingUpdate update;
             update.epoch = req.balancingEpoch;
             if (update.epoch < 0) update.epoch = 0;
-            _schedulers.at(key).initializeScheduling(update);
+            _schedulers.at(key).initializeScheduling(update, job.getJobTree().getParentNodeRank());
         } else {
             _schedulers.at(key).beginResumptionAsRoot();
         }

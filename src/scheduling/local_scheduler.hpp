@@ -76,7 +76,9 @@ public:
     - (!has && wants): begin negotiation procedure using inactive job nodes
     - (has && wants): forward update to child
     */
-    void initializeScheduling(JobSchedulingUpdate& update) {
+    void initializeScheduling(JobSchedulingUpdate& update, int parentRank) {
+
+        _parent_rank = parentRank;
 
         if (_index > 0 && update.epoch <= _epoch_of_last_suspension) {
             // Past update: just send it back
@@ -143,7 +145,7 @@ public:
             // Message from parent with job nodes
             JobSchedulingUpdate update;
             update.deserialize(h.getRecvData());
-            initializeScheduling(update);
+            initializeScheduling(update, h.source);
 
         } else if (h.tag == MSG_SCHED_RETURN_NODES) {
             
@@ -199,7 +201,7 @@ public:
         _sessions.clear();
         _sessions.resize(2);
 
-        initializeScheduling(update);
+        initializeScheduling(update, _parent_rank);
     }
 
     /*
