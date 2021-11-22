@@ -982,6 +982,12 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
             }
         }
 
+        // Unset any previous desires if the job volume decreased accordingly
+        if (!job.getJobTree().hasLeftChild() && job.getJobTree().getLeftChildIndex() >= volume)
+            job.getJobTree().unsetDesireLeft();
+        if (!job.getJobTree().hasRightChild() && job.getJobTree().getRightChildIndex() >= volume)
+            job.getJobTree().unsetDesireRight();
+
         return;
     }
 
