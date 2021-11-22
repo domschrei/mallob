@@ -15,7 +15,11 @@ class LocalScheduler {
 private:
     int _job_id;
     const Parameters& _params;
-    JobTree& _job_tree;
+    int _index;
+    int _parent_rank;
+    int _parent_index;
+    int _left_child_index;
+    int _right_child_index;
 
     std::function<void(int, int, int)> _cb_emit_directed_job_request;
     std::function<void(int, int)> _cb_emit_undirected_job_request;
@@ -32,8 +36,29 @@ private:
 
 public:
     LocalScheduler(int jobId, const Parameters& params, JobTree& jobTree) 
-        : _job_id(jobId), _params(params), _job_tree(jobTree) {
+        : _job_id(jobId), _params(params), _index(jobTree.getIndex()), 
+            _parent_rank(jobTree.getParentNodeRank()), _parent_index(jobTree.getParentIndex()), 
+            _left_child_index(jobTree.getLeftChildIndex()), _right_child_index(jobTree.getRightChildIndex()) {
         _sessions.resize(2);
+        log(V5_DEBG, "RBS OPEN #%i:%i\n", _job_id, _index);
+    }
+    LocalScheduler(LocalScheduler&& other) : 
+        _job_id(other._job_id), _params(other._params),
+        _cb_emit_directed_job_request(other._cb_emit_directed_job_request), 
+        _cb_emit_undirected_job_request(other._cb_emit_undirected_job_request), 
+        _sessions(std::move(other._sessions)), _empty_session(std::move(other._empty_session)),
+        _epoch_of_last_suspension(other._epoch_of_last_suspension), 
+        _last_update_epoch(other._last_update_epoch), _last_update_volume(other._last_update_volume), 
+        _suspending(other._suspending), _suspended(other._suspended) {
+
+        _index = other._index;
+        _parent_rank = other._parent_rank;
+        _parent_index = other._parent_index;
+        _left_child_index = other._left_child_index;
+        _right_child_index = other._right_child_index;
+    }
+    ~LocalScheduler() {
+        log(V5_DEBG, "RBS CLOSE #%i:%i\n", _job_id, _index);
     }
 
     void initCallbacks(std::function<void(int, int, int)> cbEmitDirectedJobRequest, 
@@ -50,12 +75,12 @@ public:
     - (!has && wants): begin negotiation procedure using inactive job nodes
     - (has && wants): forward update to child
     */
-    void initializeScheduling(const JobSchedulingUpdate& update) {
+    void initializeScheduling(JobSchedulingUpdate& update) {
 
         if (update.epoch <= _epoch_of_last_suspension) {
             // Past update: just send it back
-            int parentRank = _job_tree.getParentNodeRank();        
-            MyMpi::isend(parentRank, MSG_SCHED_RETURN_NODES, update);
+            update.destinationIndex = _parent_index;
+            MyMpi::isend(_parent_rank, MSG_SCHED_RETURN_NODES, update);
             return;
         }
         if (update.volume >= 0 && update.epoch > _last_update_epoch) {
@@ -64,36 +89,37 @@ public:
         }
 
         _suspended = false;
-        auto [leftUpdate, rightUpdate] = update.split(_job_tree.getIndex());
+        auto [leftUpdate, rightUpdate] = update.split(_index);
         for (size_t i = 0; i < 2; i++) {
             auto& session = _sessions[i];
             assert(!session);
             auto& childUpdate = i==0 ? leftUpdate : rightUpdate;
-            session.reset(new ChildInterface(_job_id, _job_tree, std::move(childUpdate.inactiveJobNodes), 
-                    i == 0 ? _job_tree.getLeftChildIndex() : _job_tree.getRightChildIndex(), 
-                    i == 0 ? _job_tree.getLeftChildNodeRank() : _job_tree.getRightChildNodeRank()));
+            session.reset(new ChildInterface(_job_id, std::move(childUpdate.inactiveJobNodes), 
+                    i == 0 ? _left_child_index : _right_child_index));
             if (_last_update_epoch >= 0) {
-                auto directive = session->handleBalancingUpdate(_last_update_epoch, _last_update_volume);
+                auto directive = session->handleBalancingUpdate(_last_update_epoch, _last_update_volume, 
+                    /*hasChild=*/false);
                 applyDirective(directive, session);
             }
         }
     }
 
     // called from local balancer update
-    void updateBalancing(int epoch, int volume) {
+    void updateBalancing(int epoch, int volume, bool hasLeftChild, bool hasRightChild) {
 
-        log(V5_DEBG, "RBS #%i:%i BLC e=%i\n", _job_id, _job_tree.getIndex(), epoch);
+        log(V5_DEBG, "RBS #%i:%i BLC e=%i\n", _job_id, _index, epoch);
         if (_last_update_epoch >= epoch) return;
         _last_update_epoch = epoch;
         _last_update_volume = volume;
 
-        for (auto& session : _sessions) {
+        for (size_t i = 0; i < _sessions.size(); i++) {
+            auto& session = _sessions[i];
             if (!session) continue;
-            auto directive = session->handleBalancingUpdate(epoch, volume);
+            auto directive = session->handleBalancingUpdate(epoch, volume, i==0 ? hasLeftChild : hasRightChild);
             applyDirective(directive, session);
         }
         
-        if (volume <= _job_tree.getIndex()) suspend(epoch);
+        if (volume <= _index) suspend(epoch);
     }
 
     void suspend(int epoch = -1) {
@@ -127,11 +153,11 @@ public:
         if (canReturnInactiveJobNodes()) returnInactiveJobNodesToParent();
     }
 
-    void handleRejectReactivation(int source, int epoch, int index, bool lost) {
+    void handleRejectReactivation(int source, int epoch, int index, bool lost, bool hasChild) {
         
         auto& session = getSessionByChildIndex(index);
         if (!session) return;
-        auto directive = session->handleRejectionOfPotentialChild(index, epoch, lost);
+        auto directive = session->handleRejectionOfPotentialChild(index, epoch, lost, hasChild);
         applyDirective(directive, session);
     }
 
@@ -165,7 +191,7 @@ public:
     True iff received nodes from child (if it was present) and handleSuspend() was called. 
     */
     bool canReturnInactiveJobNodes() {
-        if (_job_tree.isRoot()) return false;
+        if (_index == 0) return false;
         if (!_suspended && _suspending) {
             auto& left = _sessions[0];
             auto& right = _sessions[1];
@@ -191,7 +217,7 @@ public:
 
         // Add yourself as an inactive job node
         int epoch = std::max(_sessions[0]->getEpoch(), _sessions[1]->getEpoch());
-        auto myNode = InactiveJobNode(MyMpi::rank(MPI_COMM_WORLD), _job_tree.getIndex(), epoch);
+        auto myNode = InactiveJobNode(MyMpi::rank(MPI_COMM_WORLD), _index, epoch);
         myNode.status = InactiveJobNode::AVAILABLE;
         nodes.set.insert(myNode);
         
@@ -201,9 +227,9 @@ public:
         // Send inactive job nodes to parent
         JobSchedulingUpdate update;
         update.jobId = _job_id;
-        update.inactiveJobNodes = std::move(nodes);
-        int parentRank = _job_tree.getParentNodeRank();        
-        MyMpi::isend(parentRank, MSG_SCHED_RETURN_NODES, update);
+        update.destinationIndex = _parent_index;
+        update.inactiveJobNodes = std::move(nodes);       
+        MyMpi::isend(_parent_rank, MSG_SCHED_RETURN_NODES, update);
 
         // Update internal state (discard current child interfaces)
         _suspending = false;
@@ -224,10 +250,6 @@ public:
         auto& session = getSessionByChildIndex(index);
         if (!session) {
             log(V5_DEBG, "RBS child idx=%i not present\n", index);
-            return false;
-        }
-        if (session->hasChild()) {
-            log(V5_DEBG, "RBS child idx=%i has child\n", index);
             return false;
         }
         if (!session->wantsChild()) {

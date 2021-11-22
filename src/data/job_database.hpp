@@ -11,6 +11,7 @@
 #include "util/sys/background_worker.hpp"
 #include "balancing/collective_assignment.hpp"
 #include "data/worker_sysstate.hpp"
+#include "scheduling/local_scheduler.hpp"
 
 class JobDatabase {
 
@@ -29,6 +30,8 @@ private:
     std::atomic_int _num_stored_jobs = 0;
     robin_hood::unordered_map<int, Job*> _jobs;
     bool _has_commitment = false;
+    robin_hood::unordered_map<std::pair<int, int>, LocalScheduler, IntPairHasher> _schedulers;
+    robin_hood::unordered_map<int, int> _num_schedulers_per_job;
 
     int _load;
     Job* _current_job;
@@ -129,6 +132,10 @@ public:
     bool hasPendingRootReactivationRequest() const;
     JobRequest loadPendingRootReactivationRequest();
     void setPendingRootReactivationRequest(JobRequest&& req);
+
+    void initScheduler(JobRequest& req, std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq);
+    bool hasScheduler(int jobId, int index) const {return _schedulers.count(std::pair<int, int>(jobId, index));}
+    LocalScheduler& getScheduler(int jobId, int index) {return _schedulers.at(std::pair<int, int>(jobId, index));}
 
     std::string toStr(int j, int idx) const;
     

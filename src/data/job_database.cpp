@@ -207,8 +207,9 @@ bool JobDatabase::isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAcc
 
 void JobDatabase::commit(JobRequest& req) {
     if (has(req.jobId)) {
-        log(V3_VERB, "COMMIT %s -> #%i:%i\n", get(req.jobId).toStr(), req.jobId, req.requestedNodeIndex);
-        get(req.jobId).commit(req);
+        Job& job = get(req.jobId);
+        log(V3_VERB, "COMMIT %s -> #%i:%i\n", job.toStr(), req.jobId, req.requestedNodeIndex);
+        job.commit(req);
         _has_commitment = true;
         
         // Subscribe for volume updates for this job even if the job is not active yet
@@ -216,6 +217,32 @@ void JobDatabase::commit(JobRequest& req) {
         preregisterJobInBalancer(req.jobId);
 
         if (_coll_assign) _coll_assign->setStatusDirty();
+    }
+}
+
+void JobDatabase::initScheduler(JobRequest& req, std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq) {
+
+    auto& job = get(req.jobId);
+    auto key = std::pair<int, int>(req.jobId, req.requestedNodeIndex);
+    if (!_schedulers.count(key)) {
+        _schedulers.emplace(key, 
+            job.constructScheduler([this, emitJobReq](const JobRequest& req, int tag, bool left, int dest) {
+                emitJobReq(req, tag, left, dest);
+            })
+        );
+        _num_schedulers_per_job[req.jobId]++;
+    }
+
+    if (job.getJobTree().isRoot() && req.revision == 0) {
+        // Initialize the root's local scheduler, which in turn initializes
+        // the scheduler of each child node (recursively)
+        JobSchedulingUpdate update;
+        update.epoch = req.balancingEpoch;
+        if (update.epoch < 0) update.epoch = 0;
+        _schedulers.at(key).initializeScheduling(update);
+    } else if (!job.getJobTree().isRoot()) {
+        assert(_schedulers.at(key).canCommit());
+        _schedulers.at(key).resetRole();
     }
 }
 
@@ -262,12 +289,11 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
 
     if (has(req.jobId)) {
         Job& job = get(req.jobId);
-        if (job.getIndex() > 0 && !job.getScheduler().canCommit()) {
-            log(V4_VVER, "Reject req. %s : scheduler busy\n", 
-                            toStr(req.jobId, req.requestedNodeIndex).c_str());
-            if (_coll_assign) _coll_assign->setStatusDirty();
-            return REJECT;
-        }
+        if (job.getIndex() > 0 && hasScheduler(req.jobId, req.requestedNodeIndex))
+            assert(getScheduler(req.jobId, req.requestedNodeIndex).canCommit() || 
+                log_return_false("[ERROR] %s : Scheduler #%i:%i not suspended!\n", 
+                    req.toStr().c_str(), req.jobId, req.requestedNodeIndex));
+        
         if (req.balancingEpoch < getGlobalBalancingEpoch() 
                 && hasVolume(req.jobId) && getVolume(req.jobId) <= req.requestedNodeIndex) {
             // Job is known to have shrunk since the request spawned
@@ -359,6 +385,17 @@ void JobDatabase::reactivate(const JobRequest& req, int source) {
 void JobDatabase::suspend(int jobId) {
     assert(has(jobId) && get(jobId).getState() == ACTIVE);
     Job& job = get(jobId);
+
+    // Suspend (and possibly erase) job scheduler
+    auto key = std::pair<int, int>(jobId, job.getIndex());
+    if (_schedulers.count(key)) {
+        if (_schedulers.at(key).isActive()) _schedulers.at(key).suspend();
+        if (job.getIndex() > 0 && _schedulers.at(key).canCommit()) {
+            _schedulers.erase(key);
+            _num_schedulers_per_job[jobId]--;
+        }
+    }
+    
     job.suspend();
     setLoad(0, jobId);
     log(V3_VERB, "SUSPEND %s\n", job.toStr());
@@ -409,6 +446,23 @@ void JobDatabase::terminate(int jobId) {
 
 void JobDatabase::forgetOldJobs() {
 
+    // Scan inactive schedulers
+    auto it = _schedulers.begin();
+    while (it != _schedulers.end()) {
+        auto& [id, idx] = it->first;
+        if (has(id) && (get(id).getState() == ACTIVE || get(id).hasCommitment())) {
+            ++it;
+            continue;
+        }
+        LocalScheduler& scheduler = it->second;
+        // Condition for a scheduler to be deleted:
+        // Either job is not present (any more) or non-root
+        if ((!has(id) || idx > 0) && scheduler.canCommit()) {
+            it = _schedulers.erase(it);
+            _num_schedulers_per_job[id]--;
+        } else ++it;
+    }
+
     // Find "forgotten" jobs in destruction queue which can now be destructed
     for (auto it = _job_destruct_queue.begin(); it != _job_destruct_queue.end(); ) {
         Job* job = *it;
@@ -440,7 +494,7 @@ void JobDatabase::forgetOldJobs() {
             continue;
         }
         // Suspended job: Forget w.r.t. age, but only if there is a limit on the job cache
-        if (job.getState() == SUSPENDED && job.canBeTerminated() && jobCacheSize > 0) {
+        if (job.getState() == SUSPENDED && _num_schedulers_per_job[id] == 0 && jobCacheSize > 0) {
             // Job must not be rooted here
             if (job.getJobTree().isRoot()) continue;
             // Insert job into PQ according to its age

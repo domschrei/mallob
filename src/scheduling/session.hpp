@@ -5,7 +5,6 @@ class ChildInterface {
 
 private:
     int jobId;
-    JobTree& tree;
     InactiveJobNodeList nodes;
 
     int epoch = -1;
@@ -18,8 +17,8 @@ private:
     bool childHasNodes = false;
 
 public:
-    ChildInterface(int jobId, JobTree& tree, InactiveJobNodeList&& nodes, int childIndex, int childRank) : 
-            jobId(jobId), tree(tree), nodes(nodes), childIndex(childIndex), childRank(childRank) {
+    ChildInterface(int jobId, InactiveJobNodeList&& nodes, int childIndex) : 
+            jobId(jobId), nodes(nodes), childIndex(childIndex) {
         log(V5_DEBG, "RBS OPEN_CHILD #%i:%i\n", jobId, childIndex);
     }
 
@@ -29,7 +28,7 @@ public:
 
     // called from local balancer update
     enum MsgDirective {DO_NOTHING, EMIT_DIRECTED_REQUEST, EMIT_UNDIRECTED_REQUEST};
-    MsgDirective handleBalancingUpdate(int newEpoch, int newVolume) {
+    MsgDirective handleBalancingUpdate(int newEpoch, int newVolume, bool hasChild) {
         log(V5_DEBG, "RBS CHILD #%i:%i e=%i->%i v=%i->%i\n", jobId, childIndex, epoch, newEpoch, volume, newVolume);
         if (newEpoch <= epoch) return DO_NOTHING; 
         numQueriedJobNodes = 0;
@@ -51,7 +50,7 @@ public:
             }
         }
 
-        if (!hasChild() && wantsChild()) {
+        if (!hasChild && wantsChild()) {
             // Emit a (new) request with up-to-date epoch.
             return recruitChild();
         }
@@ -68,17 +67,16 @@ public:
         log(V5_DEBG, "RBS ADDED_NODES inactives={%s}\n", nodes.toStr().c_str());
     }
 
-    MsgDirective handleRejectionOfPotentialChild(int index, int epoch, bool lost) {
+    MsgDirective handleRejectionOfPotentialChild(int index, int epoch, bool lost, bool hasChild) {
         assert(index == childIndex || log_return_false("ERROR %i != %i\n", index, childIndex));
         findAndUpdateNode(childRank, childIndex, epoch, lost ? InactiveJobNode::LOST : InactiveJobNode::BUSY);
-        if (!hasChild() && wantsChild()) return recruitChild();
+        if (!hasChild && wantsChild()) return recruitChild();
         return DO_NOTHING;
     }
 
     void handleChildJoining(int source, int index, int epoch) {
 
         assert(index == childIndex || log_return_false("ERROR %i != %i\n", index, childIndex));
-        assert(hasChild());
 
         childRank = source;
         log(V5_DEBG, "RBS #%i:%i INIT_CHILD e=%i inactives={%s} => [%i]\n", 
@@ -88,6 +86,7 @@ public:
         // Transfer the appropriately scoped job nodes for this child
         JobSchedulingUpdate update;
         update.jobId = jobId;
+        update.destinationIndex = childIndex;
         update.epoch = epoch;
         update.volume = volume;
         update.inactiveJobNodes = nodes.extractSubtree(index, /*excludeRoot=*/true);
@@ -115,11 +114,8 @@ public:
         return std::move(nodes);
     }
 
-    bool hasChild() const {
-        return (tree.getLeftChildIndex() == childIndex) ? tree.hasLeftChild() : tree.hasRightChild();
-    }
     bool wantsChild() const {
-        return ((tree.getLeftChildIndex() == childIndex) ? tree.getLeftChildIndex() : tree.getRightChildIndex()) < volume;
+        return childIndex < volume;
     }
 
     int getEpoch() const {
@@ -139,7 +135,7 @@ private:
             }
             // Query node for adoption
             childRank = node.rank;
-            tree.updateJobNode(childIndex, childRank);
+            //tree.updateJobNode(childIndex, childRank);
             numQueriedJobNodes++;
             return EMIT_DIRECTED_REQUEST; // wait for response 
         }

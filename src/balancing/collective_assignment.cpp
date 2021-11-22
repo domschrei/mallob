@@ -83,6 +83,11 @@ void CollectiveAssignment::resolveRequests() {
     std::vector<JobRequest> requestsToKeep;
     robin_hood::unordered_map<int, std::vector<JobRequest>> requestsPerDestination;
 
+    // TODO if a request is digested locally but fails (e.g. because scheduler is busy),
+    // it should not be added concurrently to the request list via addJobRequest.
+    // It should be handled separately in some way, and there should be an explicit "retry"
+    // as soon as the scheduler is not busy any longer.
+
     for (const auto& req : _request_list) {
         int id = req.jobId;
         int destination = -1;

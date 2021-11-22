@@ -113,7 +113,7 @@ for line in open(sys.argv[1], "r").readlines():
     except ValueError:
         continue
 
-    words[0] = str(t + offsets[r])
+    words[0] = "%.4f" % (t + offsets[r])
     fOut.write(" ".join(words) + "\n")
 fOut.close()
 print("Wrote to", sys.argv[1] + ".harmonized")

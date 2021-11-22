@@ -187,6 +187,7 @@ struct InactiveJobNodeList : public Serializable {
 struct JobSchedulingUpdate : public Serializable {
 
     int jobId = -1;
+    int destinationIndex = -1;
     int epoch = -1;
     int volume = -1;
     InactiveJobNodeList inactiveJobNodes;
@@ -196,9 +197,10 @@ struct JobSchedulingUpdate : public Serializable {
         : jobId(jobId), epoch(epoch), volume(volume), inactiveJobNodes(std::move(inactiveJobNodes)) {}
 
     std::vector<uint8_t> serialize() const override {
-        std::vector<uint8_t> packed(3*sizeof(int) + inactiveJobNodes.set.size()*sizeof(InactiveJobNode));
+        std::vector<uint8_t> packed(4*sizeof(int) + inactiveJobNodes.set.size()*sizeof(InactiveJobNode));
         int i = 0, n = sizeof(int);
         memcpy(packed.data()+i, &jobId, n); i += n;
+        memcpy(packed.data()+i, &destinationIndex, n); i += n;
         memcpy(packed.data()+i, &epoch, n); i += n;
         memcpy(packed.data()+i, &volume, n); i += n;
         n = sizeof(InactiveJobNode);
@@ -211,6 +213,7 @@ struct JobSchedulingUpdate : public Serializable {
     Serializable& deserialize(const std::vector<uint8_t>& packed) override {
         int i = 0, n = sizeof(int);
         memcpy(&jobId, packed.data()+i, n); i += n;
+        memcpy(&destinationIndex, packed.data()+i, n); i += n;
         memcpy(&epoch, packed.data()+i, n); i += n;
         memcpy(&volume, packed.data()+i, n); i += n;
         n = sizeof(InactiveJobNode);

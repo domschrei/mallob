@@ -171,7 +171,6 @@ private:
 
     JobTree _job_tree;
     JobComm _comm;
-    LocalScheduler _scheduler;
     
     int _volume = 1;
     float _priority = 0.01;
@@ -250,7 +249,6 @@ public:
     int getLastDemand() const {return _last_demand;}
     void setLastDemand(int demand) {_last_demand = demand;}
 
-    bool canBeTerminated() const {return _scheduler.canCommit();}
     // Returns whether the job is easily and quickly destructible as of now. 
     // (calls appl_isDestructible())
     bool isDestructible();
@@ -262,7 +260,6 @@ public:
     JobTree& getJobTree() {return _job_tree;}
     const JobTree& getJobTree() const {return _job_tree;}
     const JobComm& getJobComm() const {return _comm;}
-    LocalScheduler& getScheduler() {return _scheduler;}
     std::list<std::pair<int, int>>& getWaitingRankRevisionPairs() {return _waiting_rank_revision_pairs;}
 
     // Updates the job's resource usage based on the period of time which passed
@@ -308,7 +305,7 @@ public:
         return false;
     }
 
-    void initScheduler(std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq);
+    LocalScheduler constructScheduler(std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq);
 
     // Marks the job to be indestructible as long as pending is true.
     void addChildWaitingForRevision(int rank, int revision) {_waiting_rank_revision_pairs.emplace_back(rank, revision);}

@@ -16,8 +16,7 @@ Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
             _time_of_arrival(Timer::elapsedSeconds()), 
             _state(INACTIVE),
             _job_tree(commSize, worldRank, jobId), 
-            _comm(_id, _job_tree, params.jobCommUpdatePeriod()),
-            _scheduler(_id, _params, _job_tree) {
+            _comm(_id, _job_tree, params.jobCommUpdatePeriod()) {
     
     _growth_period = _params.growthPeriod();
     _continuous_growth = _params.continuousGrowth();
@@ -25,8 +24,9 @@ Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
     _threads_per_job = _params.numThreadsPerProcess();
 }
 
-void Job::initScheduler(std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq) {
-    _scheduler.initCallbacks(
+LocalScheduler Job::constructScheduler(std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq) {
+    LocalScheduler scheduler(_id, _params, _job_tree);
+    scheduler.initCallbacks(
         // callback to emit a directed job request message to a specific PE
         [this, emitJobReq](int epoch, int requestedIndex, int rank) {
             JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
@@ -48,6 +48,7 @@ void Job::initScheduler(std::function<void(const JobRequest& req, int tag, bool 
             emitJobReq(req, MSG_REQUEST_NODE, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), -1);
         }
     );
+    return scheduler;
 }
 
 void Job::updateJobTree(int index, int rootRank, int parentRank) {
@@ -64,16 +65,6 @@ void Job::commit(const JobRequest& req) {
     _balancing_epoch_of_last_commitment = req.balancingEpoch;
     _job_tree.clearJobNodeUpdates();
     updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
-    if (_job_tree.isRoot() && req.revision == 0) {
-        // Initialize the root's local scheduler, which in turn initializes
-        // the scheduler of each child node (recursively)
-        JobSchedulingUpdate update;
-        update.epoch = req.balancingEpoch;
-        if (update.epoch < 0) update.epoch = 0;
-        getScheduler().initializeScheduling(update);
-    } else if (!_job_tree.isRoot()) {
-        getScheduler().resetRole();
-    }
 }
 
 void Job::uncommit() {
@@ -118,7 +109,6 @@ void Job::start() {
 
 void Job::suspend() {
     assertState(ACTIVE);
-    if (_scheduler.isActive()) _scheduler.suspend();
     _state = SUSPENDED;
     appl_suspend();
     _job_tree.unsetLeftChild();

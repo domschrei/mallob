@@ -112,12 +112,15 @@ void Worker::init() {
     });
 
     auto localSchedulerCb = [&](MessageHandle& handle) {
-        int jobId = Serializable::get<int>(handle.getRecvData());
-        if (_job_db.has(jobId)) _job_db.get(jobId).getScheduler().handle(handle);
+        auto [jobId, index] = Serializable::get<IntPair>(handle.getRecvData());
+        if (_job_db.hasScheduler(jobId, index)) 
+            _job_db.getScheduler(jobId, index).handle(handle);
         else if (handle.tag == MSG_SCHED_INITIALIZE_CHILD_WITH_NODES) {
             // A scheduling package for an unknown job arrived:
             // it is important to return this package to the sender
-            MyMpi::isend(handle.source, MSG_SCHED_RETURN_NODES, handle.moveRecvData());
+            JobSchedulingUpdate update; update.deserialize(handle.getRecvData());
+            update.destinationIndex = (update.destinationIndex-1) / 2;
+            MyMpi::isend(handle.source, MSG_SCHED_RETURN_NODES, update);
         }
     };
     q.registerCallback(MSG_SCHED_INITIALIZE_CHILD_WITH_NODES, localSchedulerCb);
@@ -471,9 +474,11 @@ void Worker::handleRejectOneshot(MessageHandle& handle) {
     if (!_job_db.has(req.jobId)) return;
 
     Job& job = _job_db.get(req.jobId);
-    if (_params.reactivationScheduling()) {
-        job.getScheduler().handleRejectReactivation(handle.source, req.balancingEpoch, 
-            req.requestedNodeIndex, !rej.isChildStillDormant);
+    if (_params.reactivationScheduling() && _job_db.hasScheduler(req.jobId, job.getIndex())) {
+        bool hasChild = req.requestedNodeIndex == job.getJobTree().getLeftChildIndex() ?
+            job.getJobTree().hasLeftChild() : job.getJobTree().hasRightChild();
+        _job_db.getScheduler(req.jobId, job.getIndex()).handleRejectReactivation(handle.source, req.balancingEpoch, 
+            req.requestedNodeIndex, !rej.isChildStillDormant, hasChild);
         return;
     }
 
@@ -569,11 +574,11 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
         if (!_job_db.has(req.jobId)) {
             // Job is not known yet: create instance
             Job& job = _job_db.createJob(MyMpi::size(_comm), _world_rank, req.jobId, req.application);
-            job.initScheduler([this](const JobRequest& req, int tag, bool left, int dest) {
-                sendJobRequest(req, tag, left, dest);
-            });
         }
         _job_db.commit(req);
+        _job_db.initScheduler(req, [this](const JobRequest& req, int tag, bool left, int dest) {
+            sendJobRequest(req, tag, left, dest);
+        });
         MyMpi::isend(req.requestingNodeRank, 
             req.requestedNodeIndex == 0 ? MSG_OFFER_ADOPTION_OF_ROOT : MSG_OFFER_ADOPTION,
             req);
@@ -637,8 +642,13 @@ void Worker::handleOfferAdoption(MessageHandle& handle) {
         // Retrieve concerned job
         Job &job = _job_db.get(req.jobId);
 
+        bool obsolete = _job_db.isAdoptionOfferObsolete(req);
+        if (!obsolete) obsolete = _params.reactivationScheduling() 
+            && _job_db.hasScheduler(job.getId(), job.getIndex()) 
+            && !_job_db.getScheduler(job.getId(), job.getIndex()).acceptsChild(req.requestedNodeIndex);
+
         // Check if node should be adopted or rejected
-        if (_job_db.isAdoptionOfferObsolete(req) || !job.getScheduler().acceptsChild(req.requestedNodeIndex)) {
+        if (obsolete) {
             // Obsolete request
             log(LOG_ADD_SRCRANK | V3_VERB, "REJECT %s", handle.source, req.toStr().c_str());
             reject = true;
@@ -658,12 +668,16 @@ void Worker::handleOfferAdoption(MessageHandle& handle) {
         
         if (!_job_db.has(req.jobId)) return;
         Job& job = _job_db.get(req.jobId);
+        if (!_job_db.hasScheduler(req.jobId, job.getIndex())) return;
+        auto& scheduler = _job_db.getScheduler(req.jobId, job.getIndex());
 
         if (!reject) {
-            job.getScheduler().handleChildJoining(handle.source, req.balancingEpoch, req.requestedNodeIndex);
+            scheduler.handleChildJoining(handle.source, req.balancingEpoch, req.requestedNodeIndex);
         } else {
-            job.getScheduler().handleRejectReactivation(handle.source, req.balancingEpoch, 
-                req.requestedNodeIndex, false);
+            bool hasChild = req.requestedNodeIndex == job.getJobTree().getLeftChildIndex() ?
+                job.getJobTree().hasLeftChild() : job.getJobTree().hasRightChild();
+            scheduler.handleRejectReactivation(handle.source, req.balancingEpoch, 
+                req.requestedNodeIndex, /*lost=*/false, hasChild);
         }
     }
 }
@@ -938,7 +952,8 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
 
         // Update reactivation-based scheduling if the job is committed, too
         if (job.hasCommitment() && _params.reactivationScheduling()) {
-            job.getScheduler().updateBalancing(balancingEpoch, volume);
+            _job_db.getScheduler(jobId, job.getIndex()).updateBalancing(balancingEpoch, volume, 
+                job.getJobTree().hasLeftChild(), job.getJobTree().hasRightChild());
         } 
         
         // If I am committed with the job and the job is shrinking accordingly, uncommit
@@ -974,8 +989,9 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
         }
     }
     
-    if (_params.reactivationScheduling())
-        job.getScheduler().updateBalancing(balancingEpoch, volume);
+    if (_params.reactivationScheduling() && _job_db.hasScheduler(jobId, job.getIndex()))
+        _job_db.getScheduler(jobId, job.getIndex()).updateBalancing(balancingEpoch, volume, 
+            job.getJobTree().hasLeftChild(), job.getJobTree().hasRightChild());
 
     // Prepare volume update to propagate down the job tree
     IntVec payload{jobId, volume, balancingEpoch};
