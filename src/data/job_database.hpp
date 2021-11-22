@@ -136,6 +136,7 @@ public:
     void initScheduler(JobRequest& req, std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq);
     bool hasScheduler(int jobId, int index) const {return _schedulers.count(std::pair<int, int>(jobId, index));}
     LocalScheduler& getScheduler(int jobId, int index) {return _schedulers.at(std::pair<int, int>(jobId, index));}
+    void suspendScheduler(Job& job);
 
     std::string toStr(int j, int idx) const;
     

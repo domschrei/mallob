@@ -32,7 +32,7 @@ LocalScheduler Job::constructScheduler(std::function<void(const JobRequest& req,
             JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
                 _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, -2);
             req.application = getApplication();
-            req.revision = std::max(0, getRevision());
+            req.revision = std::max(0, getDesiredRevision());
             log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", rank, req.toStr().c_str());
             emitJobReq(req, MSG_REQUEST_NODE_ONESHOT, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), rank);
         },
@@ -41,7 +41,7 @@ LocalScheduler Job::constructScheduler(std::function<void(const JobRequest& req,
             JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
                 _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, 0);
             req.application = getApplication();
-            req.revision = std::max(0, getRevision());
+            req.revision = std::max(0, getDesiredRevision());
             int dest = _job_tree.getLeftChildIndex() == requestedIndex ? 
                 _job_tree.getLeftChildNodeRank() : _job_tree.getRightChildNodeRank();
             log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", dest, req.toStr().c_str());

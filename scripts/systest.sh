@@ -94,10 +94,10 @@ function test_incremental_scheduling() {
     test 8 -t=1 -l=1 -satsolver=LgC -v=5 -J=3 -incrementaltest -checksums=1
 }
 
-test_oscillating
-exit
-test_dry_scheduling
 test_incremental_scheduling
+exit
+test_oscillating
+test_dry_scheduling
 test_mono
 test_scheduling
 test_incremental

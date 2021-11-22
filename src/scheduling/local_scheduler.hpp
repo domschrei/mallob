@@ -33,6 +33,7 @@ private:
 
     bool _suspending = false;
     bool _suspended = true;
+    bool _resuming = false;
 
 public:
     LocalScheduler(int jobId, const Parameters& params, JobTree& jobTree) 
@@ -77,7 +78,7 @@ public:
     */
     void initializeScheduling(JobSchedulingUpdate& update) {
 
-        if (update.epoch <= _epoch_of_last_suspension) {
+        if (_index > 0 && update.epoch <= _epoch_of_last_suspension) {
             // Past update: just send it back
             update.destinationIndex = _parent_index;
             MyMpi::isend(_parent_rank, MSG_SCHED_RETURN_NODES, update);
@@ -111,6 +112,8 @@ public:
         if (_last_update_epoch >= epoch) return;
         _last_update_epoch = epoch;
         _last_update_volume = volume;
+        
+        if (_suspending || _suspended) return;
 
         for (size_t i = 0; i < _sessions.size(); i++) {
             auto& session = _sessions[i];
@@ -119,10 +122,11 @@ public:
             applyDirective(directive, session);
         }
         
-        if (volume <= _index) suspend(epoch);
+        if (volume <= _index && _index > 0) beginSuspension(epoch);
     }
 
-    void suspend(int epoch = -1) {
+    void beginSuspension(int epoch = -1) {
+        log(V5_DEBG, "RBS #%i:%i SUSPEND\n", _job_id, _index);
         if (epoch == -1) epoch = std::max(_last_update_epoch, _epoch_of_last_suspension);
         // Suspend (if not already suspended), remember this epoch as most recent suspension
         _epoch_of_last_suspension = epoch;
@@ -151,6 +155,7 @@ public:
         }
 
         if (canReturnInactiveJobNodes()) returnInactiveJobNodesToParent();
+        if (canResumeAsRoot()) resumeAsRoot();
     }
 
     void handleRejectReactivation(int source, int epoch, int index, bool lost, bool hasChild) {
@@ -169,22 +174,32 @@ public:
         session->handleChildJoining(source, index, epoch);
     }
 
-    /*
-    A suspending child transfers inactive job nodes to its parent.
-    In the session:
-    - Store in local inactive job nodes
-    If scheduler is suspended and all children have reported: 
-      send up all local inactive job nodes(including yourself) to the parent
-    If "new" children (maybe the same ranks) are present and have not yet received scheduling update:
-      send scheduling update down to the children
-    */
-    void handleChildReturningInactiveJobNodes(int childRank, const InactiveJobNodeList& nodes) {
-        auto& session = getSessionByChildRank(childRank);
-        if (!session) {
-            log(V5_DEBG, "RBS discarding inactives={%s}\n", nodes.toStr().c_str());
-            return;
-        }
-        session->addJobNodesFromSuspendedChild(childRank, nodes);
+    void beginResumptionAsRoot() {
+        assert(_index == 0);
+        log(V5_DEBG, "RBS #%i:%i RESUMING\n", _job_id, _index);
+        assert(_suspending && !_suspended);
+        _resuming = true;
+        if (canResumeAsRoot()) resumeAsRoot();
+    }
+
+    void resumeAsRoot() {
+        log(V5_DEBG, "RBS #%i:%i RESUME\n", _job_id, _index);
+        assert(canResumeAsRoot());
+        _resuming = false;
+        _suspending = false;
+
+        JobSchedulingUpdate update;
+        update.epoch = std::max(_last_update_epoch, _epoch_of_last_suspension);
+        update.volume = _last_update_volume;
+        update.inactiveJobNodes.set.clear();
+        update.inactiveJobNodes.mergePreferringNewer(_sessions[0]->returnJobNodes());
+        update.inactiveJobNodes.mergePreferringNewer(_sessions[1]->returnJobNodes());
+        update.inactiveJobNodes.cleanUpStatuses();
+        
+        _sessions.clear();
+        _sessions.resize(2);
+
+        initializeScheduling(update);
     }
 
     /*
@@ -200,6 +215,10 @@ public:
             }
         }
         return false;
+    }
+
+    bool canResumeAsRoot() {
+        return _resuming && !_sessions[0]->doesChildHaveNodes() && !_sessions[1]->doesChildHaveNodes();
     }
 
     /*

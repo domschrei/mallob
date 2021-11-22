@@ -10,7 +10,7 @@ private:
     int epoch = -1;
     int volume = -1;
     int childIndex;
-    int childRank;
+    int childRank = -1;
 
     int numQueriedJobNodes = 0;
     bool notifiedInactiveNodes = false;

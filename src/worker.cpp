@@ -433,6 +433,7 @@ void Worker::handleAnswerAdoptionOffer(MessageHandle& handle) {
         log(LOG_ADD_SRCRANK | V4_VVER, "Rejected to become %s : uncommitting", handle.source, job.toStr());
         _job_db.uncommit(req.jobId);
         _job_db.unregisterJobFromBalancer(req.jobId);
+        _job_db.suspendScheduler(job);
     }
 }
 
@@ -737,6 +738,7 @@ void Worker::handleSendJobDescription(MessageHandle& handle) {
         if (_job_db.hasCommitment(jobId)) {
             _job_db.uncommit(jobId);
             _job_db.unregisterJobFromBalancer(jobId);
+            if (_job_db.has(jobId)) _job_db.suspendScheduler(_job_db.get(jobId));
         }
         return;
     }
@@ -961,6 +963,7 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
             log(V4_VVER, "%s shrunk : uncommitting\n", job.toStr());
             _job_db.uncommit(jobId);
             _job_db.unregisterJobFromBalancer(jobId);
+            _job_db.suspendScheduler(job);
             if (!_params.reactivationScheduling())
                 MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, 
                     IntVec({jobId, job.getIndex(), job.getJobTree().getRootNodeRank()}));

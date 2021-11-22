@@ -233,16 +233,32 @@ void JobDatabase::initScheduler(JobRequest& req, std::function<void(const JobReq
         _num_schedulers_per_job[req.jobId]++;
     }
 
-    if (job.getJobTree().isRoot() && req.revision == 0) {
-        // Initialize the root's local scheduler, which in turn initializes
-        // the scheduler of each child node (recursively)
-        JobSchedulingUpdate update;
-        update.epoch = req.balancingEpoch;
-        if (update.epoch < 0) update.epoch = 0;
-        _schedulers.at(key).initializeScheduling(update);
-    } else if (!job.getJobTree().isRoot()) {
+    if (job.getJobTree().isRoot()) {
+        if (req.revision == 0) {
+            // Initialize the root's local scheduler, which in turn initializes
+            // the scheduler of each child node (recursively)
+            JobSchedulingUpdate update;
+            update.epoch = req.balancingEpoch;
+            if (update.epoch < 0) update.epoch = 0;
+            _schedulers.at(key).initializeScheduling(update);
+        } else {
+            _schedulers.at(key).beginResumptionAsRoot();
+        }
+    } else {
         assert(_schedulers.at(key).canCommit());
         _schedulers.at(key).resetRole();
+    }
+}
+
+void JobDatabase::suspendScheduler(Job& job) {
+    auto key = std::pair<int, int>(job.getId(), job.getIndex());
+    if (_schedulers.count(key)) {
+        auto& sched = _schedulers.at(key);
+        if (sched.isActive()) sched.beginSuspension();
+        if (job.getIndex() > 0 && sched.canCommit()) {
+            _schedulers.erase(key);
+            _num_schedulers_per_job[job.getId()]--;
+        }
     }
 }
 
@@ -385,17 +401,8 @@ void JobDatabase::reactivate(const JobRequest& req, int source) {
 void JobDatabase::suspend(int jobId) {
     assert(has(jobId) && get(jobId).getState() == ACTIVE);
     Job& job = get(jobId);
-
     // Suspend (and possibly erase) job scheduler
-    auto key = std::pair<int, int>(jobId, job.getIndex());
-    if (_schedulers.count(key)) {
-        if (_schedulers.at(key).isActive()) _schedulers.at(key).suspend();
-        if (job.getIndex() > 0 && _schedulers.at(key).canCommit()) {
-            _schedulers.erase(key);
-            _num_schedulers_per_job[jobId]--;
-        }
-    }
-    
+    suspendScheduler(job);    
     job.suspend();
     setLoad(0, jobId);
     log(V3_VERB, "SUSPEND %s\n", job.toStr());
