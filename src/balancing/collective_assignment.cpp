@@ -176,8 +176,6 @@ void CollectiveAssignment::advance(int epoch) {
         _child_statuses.clear();
         _status_dirty = true;
     }
-
-    if (_num_workers <= 1) return;
     
     resolveRequests();
 
