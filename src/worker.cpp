@@ -150,11 +150,10 @@ void Worker::createExpanderGraph() {
     // Pick fixed number k of bounce destinations
     int numBounceAlternatives = _params.numBounceAlternatives();
     int numWorkers = MyMpi::size(_comm);
-    if (numWorkers == 1) return; // no hops
-
+    
     // Check validity of num bounce alternatives
     if (2*numBounceAlternatives > numWorkers) {
-        numBounceAlternatives = numWorkers / 2;
+        numBounceAlternatives = std::max(1, numWorkers / 2);
         log(V1_WARN, "[WARN] Num bounce alternatives must be at most half the number of workers!\n");
         log(V1_WARN, "[WARN] Falling back to safe value r=%i.\n", numBounceAlternatives);
     }  
