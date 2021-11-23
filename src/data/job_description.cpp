@@ -137,6 +137,7 @@ void JobDescription::deserialize() {
     size_t i = 0, n;
 
     // Basic data
+    // TODO gracefully handle "holes" in data: go to max. revision r such that [0, r] is valid range.
     auto& latestData = _data_per_revision.back();
     n = sizeof(int);         memcpy(&_id, latestData->data()+i, n);              i += n;
     n = sizeof(int);         memcpy(&_revision, latestData->data()+i, n);        i += n;
@@ -164,4 +165,11 @@ const std::shared_ptr<std::vector<uint8_t>>& JobDescription::getSerialization(in
 
 void JobDescription::clearPayload(int revision) {
     getRevisionData(revision).reset();
+}
+
+int JobDescription::getMaxConsecutiveRevision() const {
+    for (int r = 0; r < _data_per_revision.size(); r++) {
+        if (!_data_per_revision[r]) return r-1;
+    }
+    return _data_per_revision.size()-1;
 }

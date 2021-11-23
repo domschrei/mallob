@@ -83,10 +83,16 @@ bool JobDatabase::appendRevision(int jobId, const std::shared_ptr<std::vector<ui
     }
     auto& job = get(jobId);
     int rev = JobDescription::readRevisionIndex(*description);
-    if (job.hasDescription() && job.getRevision() >= rev) {
-        // Revision data is already present
-        log(V1_WARN, "[WARN] #%i rev. %i already present : discard desc. of size %i\n", jobId, rev, description->size());
-        return false;
+    if (job.hasDescription()) {
+        if (rev != job.getMaxConsecutiveRevision()+1) {
+            // Revision data would cause a "hole" in the list of job revision data
+            log(V1_WARN, "[WARN] #%i rev. %i inconsistent w/ max. consecutive rev. %i : discard desc. of size %i\n", 
+                jobId, rev, job.getMaxConsecutiveRevision(), description->size());
+            return false;
+        }
+    } else if (rev != 0) {
+        log(V1_WARN, "[WARN] #%i invalid \"first\" rev. %i : discard desc. of size %i\n", jobId, rev, description->size());
+            return false;
     }
 
     // Push revision description

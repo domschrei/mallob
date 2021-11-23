@@ -150,6 +150,8 @@ public:
     const std::shared_ptr<std::vector<uint8_t>>& getSerialization(int revision) const;
     void clearPayload(int revision);
 
+    int getMaxConsecutiveRevision() const;
+
     size_t getNumFormulaLiterals() const {return _f_size;}
     size_t getNumAssumptionLiterals() const {return _a_size;}
 

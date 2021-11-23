@@ -234,6 +234,7 @@ public:
     int getId() const {return _id;};
     int getIndex() const {return _job_tree.getIndex();};
     int getRevision() const {return !hasDescription() ? -1 : getDescription().getRevision();};
+    int getMaxConsecutiveRevision() const {return !hasDescription() ? -1 : getDescription().getMaxConsecutiveRevision();};
     int getDesiredRevision() const {return _desired_revision;}
     const JobResult& getResult();
     // Elapsed seconds since the job's constructor call.
