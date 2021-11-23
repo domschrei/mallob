@@ -50,7 +50,7 @@ for (sendRank, recvRank) in msgPairs:
     # 0.655+o2 2 Sending warmup msg <= [4]
     # 0.631+o4 4 Received warmup msg <= [2]
     # o4-o2 >= 0.655-0.631
-    epsilon = 0.000
+    epsilon = 0.0005
     solver.Add(vars[recvRank] - vars[sendRank] + epsilon >= (sendTime - recvTime))
 
 print('Number of variables =', solver.NumVariables())

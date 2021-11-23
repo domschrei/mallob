@@ -41,27 +41,28 @@ public:
             if (node.status == InactiveJobNode::BUSY) {
                 // This node was busy in the last epoch; it may be available now.
                 node.status = InactiveJobNode::AVAILABLE;
-                notifiedInactiveNodes = false;
             }
             if (node.status == InactiveJobNode::AVAILABLE && node.originalIndex >= newVolume) {
                 // Node which is not desired for this epoch:
                 // No need to notify it later, so mark it busy now.
                 node.status = InactiveJobNode::BUSY;
             }
+            if (node.status == InactiveJobNode::AVAILABLE) notifiedInactiveNodes = false;
         }
 
         if (!hasChild && wantsChild()) {
             // Emit a (new) request with up-to-date epoch.
             return recruitChild();
+        } else {
+            notifyRemainingInactiveNodes();
+            return DO_NOTHING;
         }
-        return DO_NOTHING;
     }
 
     // a suspended child returns its inactive job nodes
-    void addJobNodesFromSuspendedChild(int rank, const InactiveJobNodeList& newNodes) {
+    void addJobNodesFromSuspendedChild(int rank, InactiveJobNodeList& newNodes) {
         nodes.mergePreferringNewer(newNodes);
-        nodes.cleanUpStatuses();
-        notifiedInactiveNodes = false;
+        //notifiedInactiveNodes = false;
         childHasNodes = false;
         findAndUpdateNode(rank, childIndex, epoch, InactiveJobNode::AVAILABLE);
         log(V5_DEBG, "RBS ADDED_NODES inactives={%s}\n", nodes.toStr().c_str());
@@ -109,7 +110,6 @@ public:
     }
 
     InactiveJobNodeList&& returnJobNodes() {
-        notifyRemainingInactiveNodes();
         log(V5_DEBG, "RBS RETURNING_NODES inactives={%s}\n", nodes.toStr().c_str());
         return std::move(nodes);
     }
@@ -140,14 +140,15 @@ private:
             return EMIT_DIRECTED_REQUEST; // wait for response 
         }
 
-        notifyRemainingInactiveNodes();
+        notifyRemainingInactiveNodes(childIndex);
         return EMIT_UNDIRECTED_REQUEST;
     }
 
-    void notifyRemainingInactiveNodes() {
+    void notifyRemainingInactiveNodes(int particularIndex = -1) {
         if (notifiedInactiveNodes) return;
         for (auto& node : nodes.set) {
-            if (node.status == InactiveJobNode::AVAILABLE) {
+            if (node.status == InactiveJobNode::AVAILABLE 
+                    && (particularIndex == -1 || node.originalIndex == particularIndex)) {
                 MyMpi::isend(node.rank, MSG_SCHED_RELEASE_FROM_WAITING, IntPair(jobId, epoch));
             }
         }

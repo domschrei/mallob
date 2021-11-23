@@ -238,7 +238,7 @@ public:
         nodes.mergePreferringNewer(_sessions[1]->returnJobNodes());
 
         // Add yourself as an inactive job node
-        int epoch = std::max(_sessions[0]->getEpoch(), _sessions[1]->getEpoch());
+        int epoch = _last_update_epoch;
         auto myNode = InactiveJobNode(MyMpi::rank(MPI_COMM_WORLD), _index, epoch);
         myNode.status = InactiveJobNode::AVAILABLE;
         nodes.set.insert(myNode);
