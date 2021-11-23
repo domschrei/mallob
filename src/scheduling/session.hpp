@@ -77,9 +77,7 @@ public:
         assert(index == childIndex || log_return_false("ERROR %i != %i\n", index, childIndex));
 
         childRank = source;
-        log(V5_DEBG, "RBS #%i:%i INIT_CHILD e=%i inactives={%s} => [%i]\n", 
-            jobId, childIndex, epoch, 
-            nodes.toStr().c_str(), source);
+        childHasNodes = true;
 
         // Transfer the appropriately scoped job nodes for this child
         JobSchedulingUpdate update;
@@ -88,11 +86,15 @@ public:
         update.epoch = epoch;
         update.volume = volume;
         update.inactiveJobNodes = nodes.extractSubtree(index, /*excludeRoot=*/true);
+        update.inactiveJobNodes.cleanUpStatuses();
         MyMpi::isend(childRank, MSG_SCHED_INITIALIZE_CHILD_WITH_NODES, update);
-        childHasNodes = true;
+
+        log(V5_DEBG, "RBS #%i:%i INIT_CHILD e=%i inactives={%s} => [%i]\n", 
+            jobId, childIndex, epoch, update.inactiveJobNodes.toStr().c_str(), source);
 
         // If you can find the job node of this rank, set it to BUSY.
         findAndUpdateNode(source, index, epoch, InactiveJobNode::BUSY);
+        // Any left job nodes which are still available must be released from waiting
         notifyRemainingInactiveNodes();
     }
 
