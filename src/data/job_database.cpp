@@ -300,6 +300,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
         || !get(req.jobId).getJobTree().isRoot() 
         || get(req.jobId).getState() != SUSPENDED
     )) {
+        log(V4_VVER, "Reject %s : dormant root present\n", req.toStr().c_str());
         return REJECT;
     }
 

@@ -42,9 +42,7 @@ LocalScheduler Job::constructScheduler(std::function<void(const JobRequest& req,
                 _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, 0);
             req.application = getApplication();
             req.revision = std::max(0, getDesiredRevision());
-            int dest = _job_tree.getLeftChildIndex() == requestedIndex ? 
-                _job_tree.getLeftChildNodeRank() : _job_tree.getRightChildNodeRank();
-            log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", dest, req.toStr().c_str());
+            log(V5_DEBG, "RBS EMIT_REQ %s\n", req.toStr().c_str());
             emitJobReq(req, MSG_REQUEST_NODE, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), -1);
         }
     );

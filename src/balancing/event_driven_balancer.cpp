@@ -105,7 +105,7 @@ void EventDrivenBalancer::onSuspend(const Job& job) {
 
     assert(_job_root_epochs.at(job.getId()) > 0);
     pushEvent(Event({
-        job.getId(), ++_job_root_epochs[job.getId()], /*demand=*/0, job.getPriority()
+        job.getId(), ++_job_root_epochs[job.getId()], /*demand=*/1, job.getPriority()
     }));
 }
 
