@@ -121,6 +121,15 @@ public:
         return epoch;
     }
 
+    void removeNode(int rank, int epoch, int index) {
+        InactiveJobNode node(rank, index, epoch);
+        if (nodes.set.count(node)) {
+            log(V5_DEBG, "RBS #%i:%i DELETE (%i,%i,%i)\n", 
+                jobId, childIndex, rank, index, epoch);
+            nodes.set.erase(node);
+        }
+    }
+
 private:
     /* --- helpers --- */
     MsgDirective recruitChild() {
@@ -154,7 +163,7 @@ private:
                     && (particularIndex == -1 || node.originalIndex == particularIndex)) {
                 log(V5_DEBG, "RBS #%i:%i e=%i RELEASE (%i,%i,%i,%s)\n", jobId, childIndex, epoch,
                         node.rank, node.originalIndex, node.lastEpoch, InactiveJobNode::STATUS_STR[node.status]);
-                MyMpi::isend(node.rank, MSG_SCHED_RELEASE_FROM_WAITING, IntPair(jobId, epoch));
+                MyMpi::isend(node.rank, MSG_SCHED_RELEASE_FROM_WAITING, IntVec({jobId, node.originalIndex, epoch}));
                 node.status = InactiveJobNode::BUSY;
             }
         }

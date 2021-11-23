@@ -177,6 +177,13 @@ public:
         session->handleChildJoining(source, index, epoch);
     }
 
+    void handleNodeFreed(int rank, int epoch, int index) {
+        for (auto& session : _sessions) {
+            if (!session) continue;
+            session->removeNode(rank, epoch, index);
+        }
+    }
+
     void beginResumptionAsRoot() {
         assert(_index == 0);
         log(V5_DEBG, "RBS #%i:%i RESUMING\n", _job_id, _index);

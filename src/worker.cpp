@@ -126,12 +126,31 @@ void Worker::init() {
     q.registerCallback(MSG_SCHED_INITIALIZE_CHILD_WITH_NODES, localSchedulerCb);
     q.registerCallback(MSG_SCHED_RETURN_NODES, localSchedulerCb);
     q.registerCallback(MSG_SCHED_RELEASE_FROM_WAITING, [&](MessageHandle& handle) {
-        IntPair idEpoch = Serializable::get<IntPair>(handle.getRecvData());
-        auto& [jobId, epoch] = idEpoch;
-        if (_job_db.has(jobId)) {
+        IntVec vec = Serializable::get<IntVec>(handle.getRecvData());
+        int jobId = vec[0];
+        int index = vec[1];
+        int epoch = vec[2];
+        if (_job_db.has(jobId) && 
+                (_job_db.get(jobId).getState() != INACTIVE || _job_db.get(jobId).hasCommitment())) {
+            // Job present: release this worker from waiting for that job
             _job_db.get(jobId).getJobTree().stopWaitingForReactivation(epoch);
             if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
-        }        
+        } else {
+            // Job not present any more: Let sender know
+            MyMpi::isend(handle.source, MSG_SCHED_NODE_FREED, IntVec({jobId, _world_rank, index, epoch}));
+        }
+    });
+    q.registerCallback(MSG_SCHED_NODE_FREED, [&](MessageHandle& handle) {
+        IntVec vec = Serializable::get<IntVec>(handle.getRecvData());
+        int jobId = vec[0];
+        int rank = vec[1];
+        int index = vec[2];
+        int epoch = vec[3];
+        // If an active job scheduler is present, erase the freed node from local inactive nodes
+        // (may not always succeed if the job has shrunk in the meantime, but is not essential for correctness)
+        if (_job_db.hasScheduler(jobId, index)) {
+            _job_db.getScheduler(jobId, index).handleNodeFreed(rank, epoch, index);
+        }
     });
 
     // Send warm-up messages with your pseudorandom bounce destinations

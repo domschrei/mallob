@@ -147,6 +147,7 @@ const int MSG_OFFER_ADOPTION_OF_ROOT = 42;
 const int MSG_SCHED_INITIALIZE_CHILD_WITH_NODES = 51; // downwards
 const int MSG_SCHED_RETURN_NODES = 52; // upwards
 const int MSG_SCHED_RELEASE_FROM_WAITING = 53;
+const int MSG_SCHED_NODE_FREED = 54;
 
 const int MSG_OFFSET_BATCHED = 10000;
 
