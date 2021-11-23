@@ -13,13 +13,12 @@ private:
     int childRank = -1;
 
     int numQueriedJobNodes = 0;
-    bool notifiedInactiveNodes = false;
     bool childHasNodes = false;
 
 public:
     ChildInterface(int jobId, InactiveJobNodeList&& nodes, int childIndex) : 
             jobId(jobId), nodes(nodes), childIndex(childIndex) {
-        log(V5_DEBG, "RBS OPEN_CHILD #%i:%i\n", jobId, childIndex);
+        log(V5_DEBG, "RBS OPEN_CHILD #%i:%i inactives={%s}\n", jobId, childIndex, nodes.toStr().c_str());
     }
 
     ~ChildInterface() {
@@ -47,7 +46,6 @@ public:
                 // No need to notify it later, so mark it busy now.
                 node.status = InactiveJobNode::BUSY;
             }
-            if (node.status == InactiveJobNode::AVAILABLE) notifiedInactiveNodes = false;
         }
 
         if (!hasChild && wantsChild()) {
@@ -64,8 +62,7 @@ public:
         nodes.mergePreferringNewer(newNodes);
         //notifiedInactiveNodes = false;
         childHasNodes = false;
-        findAndUpdateNode(rank, childIndex, epoch, InactiveJobNode::AVAILABLE);
-        log(V5_DEBG, "RBS ADDED_NODES inactives={%s}\n", nodes.toStr().c_str());
+        log(V5_DEBG, "RBS #%i:%i ADDED_NODES inactives={%s}\n", jobId, childIndex, nodes.toStr().c_str());
     }
 
     MsgDirective handleRejectionOfPotentialChild(int index, int epoch, bool lost, bool hasChild, bool suspended) {
@@ -110,7 +107,7 @@ public:
     }
 
     InactiveJobNodeList&& returnJobNodes() {
-        log(V5_DEBG, "RBS RETURNING_NODES inactives={%s}\n", nodes.toStr().c_str());
+        log(V5_DEBG, "RBS #%i:%i RETURNING_NODES inactives={%s}\n", jobId, childIndex, nodes.toStr().c_str());
         return std::move(nodes);
     }
 
@@ -133,6 +130,10 @@ private:
                 // Node is known to be lost or busy: do not query
                 continue;
             }
+            if (node.originalIndex != childIndex) {
+                // Node does not have the correct index to become this node's child
+                continue;
+            }
             // Query node for adoption
             childRank = node.rank;
             //tree.updateJobNode(childIndex, childRank);
@@ -140,19 +141,21 @@ private:
             return EMIT_DIRECTED_REQUEST; // wait for response 
         }
 
+        // No success: Notify remaining nodes and emit an undirected request
         notifyRemainingInactiveNodes(childIndex);
         return EMIT_UNDIRECTED_REQUEST;
     }
 
     void notifyRemainingInactiveNodes(int particularIndex = -1) {
-        if (notifiedInactiveNodes) return;
         for (auto& node : nodes.set) {
             if (node.status == InactiveJobNode::AVAILABLE 
                     && (particularIndex == -1 || node.originalIndex == particularIndex)) {
+                log(V5_DEBG, "RBS #%i:%i e=%i RELEASE (%i,%i,%i,%s)\n", jobId, childIndex, epoch,
+                        node.rank, node.originalIndex, node.lastEpoch, InactiveJobNode::STATUS_STR[node.status]);
                 MyMpi::isend(node.rank, MSG_SCHED_RELEASE_FROM_WAITING, IntPair(jobId, epoch));
+                node.status = InactiveJobNode::BUSY;
             }
         }
-        notifiedInactiveNodes = true;
     }
 
     bool findAndUpdateNode(int rank, int index, int epoch, InactiveJobNode::Status status) {
@@ -172,11 +175,11 @@ private:
             node.lastEpoch = epoch;
             node.status = status;
             nodes.set.insert(node);
-            log(V5_DEBG, "RBS Update (%i,%i,%i) -> status %i\n", rank, index, epoch, status);
+            log(V5_DEBG, "RBS #%i:%i Update (%i,%i,%i) -> status %i\n", jobId, childIndex, rank, index, epoch, status);
             return true;
         }
 
-        log(V5_DEBG, "RBS (%i,%i,%i) not found\n", rank, index, epoch);
+        log(V5_DEBG, "RBS #%i:%i (%i,%i,%i) not found\n", jobId, childIndex, rank, index, epoch);
         return false;
     }
 };
