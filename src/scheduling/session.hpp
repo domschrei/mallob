@@ -67,10 +67,10 @@ public:
         log(V5_DEBG, "RBS ADDED_NODES inactives={%s}\n", nodes.toStr().c_str());
     }
 
-    MsgDirective handleRejectionOfPotentialChild(int index, int epoch, bool lost, bool hasChild) {
+    MsgDirective handleRejectionOfPotentialChild(int index, int epoch, bool lost, bool hasChild, bool suspended) {
         assert(index == childIndex || log_return_false("ERROR %i != %i\n", index, childIndex));
         findAndUpdateNode(childRank, childIndex, epoch, lost ? InactiveJobNode::LOST : InactiveJobNode::BUSY);
-        if (!hasChild && wantsChild()) return recruitChild();
+        if (!hasChild && !suspended && wantsChild()) return recruitChild();
         return DO_NOTHING;
     }
 

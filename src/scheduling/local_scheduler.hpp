@@ -164,7 +164,8 @@ public:
         
         auto& session = getSessionByChildIndex(index);
         if (!session) return;
-        auto directive = session->handleRejectionOfPotentialChild(index, epoch, lost, hasChild);
+        auto directive = session->handleRejectionOfPotentialChild(index, epoch, lost, 
+            hasChild, _suspended || _suspending);
         applyDirective(directive, session);
     }
 
