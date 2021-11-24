@@ -859,15 +859,15 @@ void Worker::handleNotifyResultFound(MessageHandle& handle) {
     log(LOG_ADD_SRCRANK | V3_VERB, "#%i rev. %i solved", handle.source, jobId, revision);
     _job_db.get(jobId).setRevisionSolved(revision);
 
+    // Notify client
+    sendJobDoneWithStatsToClient(jobId, revision, handle.source);
+
     // Terminate job and propagate termination message
     if (_job_db.get(jobId).getDescription().isIncremental()) {
         handleInterrupt(handle);
     } else {
         handleNotifyJobTerminating(handle);
     }
-
-    // Notify client
-    sendJobDoneWithStatsToClient(jobId, revision, handle.source);
 }
 
 void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
