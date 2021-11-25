@@ -126,6 +126,13 @@ void Client::handleNewJob(JobMetadata&& data) {
         _recently_done_jobs.insert(jobId);
         return;
     }
+    if (data.interrupt) {
+        // Interrupt job (-> abort entire job if non-incremental, abort iteration if incremental)
+        int jobId = data.description->getId();
+        auto lock = _jobs_to_interrupt_lock.getLock();
+        _jobs_to_interrupt.insert(jobId);
+        return;
+    }
 
     // Introduce new job into "incoming" queue
     data.description->setClientRank(_world_rank);
@@ -188,6 +195,22 @@ void Client::advance() {
             MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
             finishJob(jobId, /*hasIncrementalSuccessors=*/false);
         }
+    }
+
+    if (_jobs_to_interrupt_lock.tryLock()) {
+        
+        auto it = _jobs_to_interrupt.begin();
+        while (it != _jobs_to_interrupt.end()) {
+            int jobId = *it;
+            if (_done_jobs.count(jobId)) {
+                it = _jobs_to_interrupt.erase(it);
+            } else if (_root_nodes.count(jobId)) {
+                log(V2_INFO, "Interrupt #%i\n", jobId);
+                MyMpi::isend(_root_nodes.at(jobId), MSG_NOTIFY_JOB_ABORTING, IntVec({jobId}));
+                it = _jobs_to_interrupt.erase(it);
+            } else ++it;
+        }
+        _jobs_to_interrupt_lock.unlock();
     }
 
     // Process arrival times chronologically; if at least one "happened", notify reader

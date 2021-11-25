@@ -395,14 +395,20 @@ void Worker::handleNotifyJobAborting(MessageHandle& handle) {
 
     int jobId = Serializable::get<int>(handle.getRecvData());
     if (!_job_db.has(jobId)) return;
-    
-    if (_job_db.get(jobId).getJobTree().isRoot()) {
+
+    log(V3_VERB, "Acknowledge #%i aborting\n", jobId);
+    auto& job = _job_db.get(jobId);    
+    if (job.getJobTree().isRoot()) {
         // Forward information on aborted job to client
-        MyMpi::isend(_job_db.get(jobId).getJobTree().getParentNodeRank(), 
+        MyMpi::isend(job.getJobTree().getParentNodeRank(), 
             MSG_NOTIFY_CLIENT_JOB_ABORTING, handle.moveRecvData());
     }
 
-    interruptJob(jobId, /*terminate=*/true, /*reckless=*/true);
+    if (job.isIncremental()) {
+        interruptJob(jobId, /*terminate=*/false, /*reckless=*/false);
+    } else {
+        interruptJob(jobId, /*terminate=*/true, /*reckless=*/true);
+    }
 }
 
 void Worker::handleAnswerAdoptionOffer(MessageHandle& handle) {
@@ -1085,7 +1091,7 @@ void Worker::spawnJobRequest(int jobId, bool left, int balancingEpoch) {
     int index = left ? job.getJobTree().getLeftChildIndex() : job.getJobTree().getRightChildIndex();
     if (_params.monoFilename.isSet()) job.getJobTree().updateJobNode(index, index);
 
-    JobRequest req(jobId, job.getDescription().getApplication(), job.getJobTree().getRootNodeRank(), 
+    JobRequest req(jobId, job.getApplication(), job.getJobTree().getRootNodeRank(), 
             _world_rank, index, Timer::elapsedSeconds(), balancingEpoch, 0);
     req.revision = job.getDesiredRevision();
     int tag = MSG_REQUEST_NODE;    
@@ -1122,8 +1128,9 @@ void Worker::interruptJob(int jobId, bool terminate, bool reckless) {
     Job& job = _job_db.get(jobId);
 
     // Ignore if this job node is already in the goal state
-    // (also implying that it already forwarded such a request downwards)
-    if (!terminate && job.getState() == SUSPENDED) return;
+    // (also implying that it already forwarded such a request downwards if necessary)
+    if (!terminate && !job.hasCommitment() && (job.getState() == SUSPENDED || job.getState() == INACTIVE)) 
+        return;
 
     // Propagate message down the job tree
     int msgTag;
@@ -1143,6 +1150,13 @@ void Worker::interruptJob(int jobId, bool terminate, bool reckless) {
         log(LOG_ADD_DESTRANK | V4_VVER, "Propagate interruption of %s (past child) ...", childRank, job.toStr());
     }
     if (terminate) job.getJobTree().getPastChildren().clear();
+
+    // Uncommit job if committed
+    if (job.hasCommitment()) {
+        _job_db.uncommit(jobId);
+        _job_db.unregisterJobFromBalancer(jobId);
+        _job_db.suspendScheduler(job);
+    }
 
     // Suspend or terminate the job
     if (terminate) _job_db.terminate(jobId);

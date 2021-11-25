@@ -40,7 +40,6 @@ void JobDescription::writeMetadata() {
     n = sizeof(size_t);      memcpy(data->data()+i, &_a_size, n); i += n;
     n = sizeof(int);         memcpy(data->data()+i, &_root_rank, n); i += n;
     n = sizeof(float);       memcpy(data->data()+i, &_priority, n); i += n;
-    n = sizeof(bool);        memcpy(data->data()+i, &_incremental, n); i += n;
     n = sizeof(int);         memcpy(data->data()+i, &_num_vars, n); i += n;
     n = sizeof(float);       memcpy(data->data()+i, &_wallclock_limit, n); i += n;
     n = sizeof(float);       memcpy(data->data()+i, &_cpu_limit, n); i += n;
@@ -90,7 +89,6 @@ size_t JobDescription::getTransferSize(int revision) const {
 constexpr int JobDescription::getMetadataSize() const {
     return 6*sizeof(int)
            +3*sizeof(float)
-           +sizeof(bool)
            +2*sizeof(size_t)
            +sizeof(Checksum)
            +sizeof(Application);
@@ -146,7 +144,6 @@ void JobDescription::deserialize() {
     n = sizeof(size_t);      memcpy(&_a_size, latestData->data()+i, n);          i += n;
     n = sizeof(int);         memcpy(&_root_rank, latestData->data()+i, n);       i += n;
     n = sizeof(float);       memcpy(&_priority, latestData->data()+i, n);        i += n;
-    n = sizeof(bool);        memcpy(&_incremental, latestData->data()+i, n);     i += n;
     n = sizeof(int);         memcpy(&_num_vars, latestData->data()+i, n);        i += n;
     n = sizeof(float);       memcpy(&_wallclock_limit, latestData->data()+i, n); i += n;
     n = sizeof(float);       memcpy(&_cpu_limit, latestData->data()+i, n);       i += n;

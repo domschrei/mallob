@@ -41,7 +41,7 @@ void testSatInstances() {
 
 void testIncrementalExample() {
 
-    JobDescription desc(1, 1, true, true);
+    JobDescription desc(1, 1, JobDescription::Application::INCREMENTAL_SAT, true);
     std::string f = "instances/incremental/entertainment08-0.cnf";
     SatReader r(f);
     r.read(desc);
@@ -51,7 +51,7 @@ void testIncrementalExample() {
 
     auto exported = desc.getSerialization(0);
 
-    JobDescription imported(1, 1, true, true);
+    JobDescription imported(1, 1, JobDescription::Application::INCREMENTAL_SAT, true);
     imported.deserialize(exported);
     assert(imported.getNumFormulaLiterals() == 6);
     assert(imported.getNumAssumptionLiterals() == 1);
@@ -67,12 +67,12 @@ void testIncrementalExample() {
 
     f = "instances/incremental/entertainment08-1.cnf";
     r = SatReader(f);
-    JobDescription update(1, 1, true, true);
+    JobDescription update(1, 1, JobDescription::Application::INCREMENTAL_SAT, true);
     update.setRevision(1);
     r.read(update);
     log(V2_INFO, "Update: %i lits, %i assumptions\n", update.getNumFormulaLiterals(), update.getNumAssumptionLiterals());
     exported = update.getSerialization(1);
-    JobDescription imported1(1, 1, true, true);
+    JobDescription imported1(1, 1, JobDescription::Application::INCREMENTAL_SAT, true);
     imported1.deserialize(exported);
     
     assert(imported1.getNumAssumptionLiterals() == update.getNumAssumptionLiterals());

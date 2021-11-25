@@ -8,13 +8,11 @@
 class BaseSatJob : public Job {
 
 public:
-    BaseSatJob(const Parameters& params, int commSize, int worldRank, int jobId) : 
-        Job(params, commSize, worldRank, jobId) {}
+    BaseSatJob(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl) : 
+        Job(params, commSize, worldRank, jobId, appl) {}
     virtual ~BaseSatJob() {}
 
     // Methods common to all BaseSatJob instances
-
-    virtual JobDescription::Application getApplication() const override {return JobDescription::SAT;}
 
     virtual bool isInitialized() = 0;
     virtual void prepareSharing(int maxSize) = 0;

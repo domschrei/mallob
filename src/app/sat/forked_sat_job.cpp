@@ -15,8 +15,8 @@
 
 std::atomic_int ForkedSatJob::_static_subprocess_index = 1;
 
-ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId) : 
-        BaseSatJob(params, commSize, worldRank, jobId), _job_comm_period(params.appCommPeriod()) {
+ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl) : 
+        BaseSatJob(params, commSize, worldRank, jobId, appl), _job_comm_period(params.appCommPeriod()) {
 }
 
 void ForkedSatJob::appl_start() {

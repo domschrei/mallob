@@ -19,8 +19,8 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
     nlohmann::json j;
     std::string userFile, jobName;
     int id;
-    float userPrio, arrival;
-    bool incremental;
+    float userPrio, arrival, priority;
+    JobDescription::Application appl;
 
     {
         auto lock = _job_map_mutex.getLock();
@@ -47,6 +47,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         std::string user = j["user"].get<std::string>();
         std::string name = j["name"].get<std::string>();
         jobName = user + "." + name + ".json";
+        bool incremental = j.contains("incremental") ? j["incremental"].get<bool>() : false;
 
         // Get user definition
         userFile = getUserFilePath(user);
@@ -68,8 +69,36 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         }
 
         userPrio = jUser["priority"].get<float>();
+        priority = userPrio * (j.contains("priority") ? j["priority"].get<float>() : 1.0f);
+        if (_params.jitterJobPriorities()) {
+            // Jitter job priority
+            priority *= 0.99 + 0.01 * Random::rand();
+        }
+        appl = JobDescription::Application::DUMMY;
+        if (j.contains("application")) {
+            auto appStr = j["application"].get<std::string>();
+            appl = appStr == "SAT" ? 
+                (incremental ? JobDescription::Application::INCREMENTAL_SAT : JobDescription::Application::ONESHOT_SAT)
+                : JobDescription::Application::DUMMY;
+        }
+
+        if (j.contains("interrupt") && j["interrupt"].get<bool>()) {
+            if (!_job_name_to_id_rev.count(jobName)) {
+                log.log(V1_WARN, "[WARN] Cannot interrupt unknown job \"%s\"\n", jobName.c_str());
+                return;
+            }
+            auto [id, rev] = _job_name_to_id_rev.at(jobName);
+
+            // Interrupt a job which is already present
+            JobMetadata data;
+            data.description = std::shared_ptr<JobDescription>(new JobDescription(id, 0, appl));
+            data.interrupt = true;
+            _new_job_callback(std::move(data));
+            FileUtils::rm(eventFile);
+            return;
+        }
+
         arrival = j.contains("arrival") ? std::max(Timer::elapsedSeconds(), j["arrival"].get<float>()) : Timer::elapsedSeconds();
-        incremental = j.contains("incremental") ? j["incremental"].get<bool>() : false;
 
         if (incremental && j.contains("precursor")) {
 
@@ -94,7 +123,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
 
                 // Notify client that this incremental job is done
                 JobMetadata data;
-                data.description = std::shared_ptr<JobDescription>(new JobDescription(id, 0, true));
+                data.description = std::shared_ptr<JobDescription>(new JobDescription(id, 0, appl));
                 data.done = true;
                 _new_job_callback(std::move(data));
                 FileUtils::rm(eventFile);
@@ -146,12 +175,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
     }
 
     // Initialize new job
-    float priority = userPrio * (j.contains("priority") ? j["priority"].get<float>() : 1.0f);
-    if (_params.jitterJobPriorities()) {
-        // Jitter job priority
-        priority *= 0.99 + 0.01 * Random::rand();
-    }
-    JobDescription* job = new JobDescription(id, priority, incremental);
+    JobDescription* job = new JobDescription(id, priority, appl);
     job->setRevision(_job_id_to_latest_rev[id]);
     if (j.contains("wallclock-limit")) {
         float limit = TimePeriod(j["wallclock-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS);
@@ -167,10 +191,6 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         int maxDemand = j["max-demand"].get<int>();
         job->setMaxDemand(maxDemand);
         log.log(V4_VVER, "Job #%i : max demand %i\n", id, maxDemand);
-    }
-    if (j.contains("application")) {
-        auto app = j["application"].get<std::string>();
-        job->setApplication(app == "SAT" ? JobDescription::Application::SAT : JobDescription::Application::DUMMY);
     }
     if (j.contains("assumptions")) {
         job->setPreloadedAssumptions(j["assumptions"].get<std::vector<int>>());

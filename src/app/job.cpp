@@ -9,10 +9,11 @@
 #include "util/permutation.hpp"
 
 
-Job::Job(const Parameters& params, int commSize, int worldRank, int jobId) :
+Job::Job(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl) :
             _params(params), 
             _id(jobId),
             _name("#" + std::to_string(jobId)),
+            _appl(appl),
             _time_of_arrival(Timer::elapsedSeconds()), 
             _state(INACTIVE),
             _job_tree(commSize, worldRank, jobId), 
@@ -29,18 +30,16 @@ LocalScheduler Job::constructScheduler(std::function<void(const JobRequest& req,
     scheduler.initCallbacks(
         // callback to emit a directed job request message to a specific PE
         [this, emitJobReq](int epoch, int requestedIndex, int rank) {
-            JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
+            JobRequest req(_id, _appl, _job_tree.getRootNodeRank(), 
                 _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, -2);
-            req.application = getApplication();
             req.revision = std::max(0, getDesiredRevision());
             log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", rank, req.toStr().c_str());
             emitJobReq(req, MSG_REQUEST_NODE_ONESHOT, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), rank);
         },
         // callback to emit a certain, undirected job request message
         [this, emitJobReq](int epoch, int requestedIndex) {
-            JobRequest req(_id, _description.getApplication(), _job_tree.getRootNodeRank(), 
+            JobRequest req(_id, _appl, _job_tree.getRootNodeRank(), 
                 _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, 0);
-            req.application = getApplication();
             req.revision = std::max(0, getDesiredRevision());
             log(V5_DEBG, "RBS EMIT_REQ %s\n", req.toStr().c_str());
             emitJobReq(req, MSG_REQUEST_NODE, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), -1);

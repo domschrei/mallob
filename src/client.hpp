@@ -65,6 +65,9 @@ private:
     // Safeguards _done_jobs.
     Mutex _done_job_lock; 
 
+    robin_hood::unordered_set<int> _jobs_to_interrupt;
+    Mutex _jobs_to_interrupt_lock;
+
     std::map<int, int> _root_nodes;
     std::set<int> _client_ranks;
     SysState<4> _sys_state;

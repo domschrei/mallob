@@ -56,8 +56,6 @@ public:
       terminated after appl_terminate().
     */
 
-    virtual JobDescription::Application getApplication() const = 0;
-
     /*
     Begin, or continue, to process the job.
     At the first call of appl_start(), you can safely assume that the job description
@@ -142,6 +140,8 @@ public:
 private:
     int _id;
     std::string _name;
+    JobDescription::Application _appl;
+
     std::atomic_bool _has_description = false;
     JobDescription _description;
     int _desired_revision = 0;
@@ -185,7 +185,7 @@ public:
     // (NOT to be called by your application code implementing above methods!)
 
     // Constructor
-    Job(const Parameters& params, int commSize, int worldRank, int jobId);
+    Job(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl);
     
     // Mark the job as being subject of a commitment to the given job request.
     // Requires the job to be not active and not committed.
@@ -226,6 +226,8 @@ public:
     void assertState(JobState state) const {assert(_state == state || log_return_false("State of %s : %s\n", toStr(), jobStateToStr()));};
     int getVolume() const {return _volume;}
     float getPriority() const {return _priority;}
+    JobDescription::Application getApplication() const {return _appl;}
+    bool isIncremental() const {return JobDescription::isApplicationIncremental(_appl);}
     bool hasDescription() const {return _has_description;};
     const JobDescription& getDescription() const {assert(hasDescription()); return _description;};
     const std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription(int revision) {return _description.getSerialization(revision);};

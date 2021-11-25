@@ -13,6 +13,7 @@ struct JobMetadata {
     std::string file;
     std::vector<int> dependencies;
     bool done = false;
+    bool interrupt = false;
 
     bool operator==(const JobMetadata& other) const {
         if (!description != !(other.description)) return false;

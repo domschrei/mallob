@@ -26,6 +26,7 @@ void introduceMonoJob(Parameters& params, Client& client) {
     ofs << "{ \"user\": \"admin\", \"name\": \"mono-job\", \"file\": \"";
     ofs << params.monoFilename();
     ofs << "\", \"priority\": 1.000 ";
+    ofs << ", \"application\": \"SAT\" ";
     if (params.jobWallclockLimit() > 0)
         ofs << ", \"wallclock-limit\": \"" << params.jobWallclockLimit() << "s\" ";
     if (params.jobCpuLimit() > 0)

@@ -117,7 +117,8 @@ void EventDrivenBalancer::onTerminate(const Job& job) {
         _local_jobs.erase(job.getId());
     } 
     if (!job.getJobTree().isRoot()) return;
-
+    
+    if (!_job_root_epochs.count(job.getId())) return;
     assert(_job_root_epochs.at(job.getId()) > 0);
     pushEvent(Event({
         job.getId(), /*jobEpoch=*/INT_MAX, /*demand=*/0, /*priority=*/0 

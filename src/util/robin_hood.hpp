@@ -122,11 +122,11 @@ static Counts& counts() {
 #endif
 
 // exceptions
-#if !defined(__cpp_exceptions) && !defined(__EXCEPTIONS) && !defined(_CPPUNWIND)
+// #if !defined(__cpp_exceptions) && !defined(__EXCEPTIONS) && !defined(_CPPUNWIND)
 #    define ROBIN_HOOD_PRIVATE_DEFINITION_HAS_EXCEPTIONS() 0
-#else
-#    define ROBIN_HOOD_PRIVATE_DEFINITION_HAS_EXCEPTIONS() 1
-#endif
+// #else
+// #    define ROBIN_HOOD_PRIVATE_DEFINITION_HAS_EXCEPTIONS() 1
+// #endif
 
 // count leading/trailing bits
 #ifdef _MSC_VER

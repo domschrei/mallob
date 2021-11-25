@@ -12,8 +12,7 @@ class DummyJob : public Job {
 
 public:
     DummyJob(const Parameters& params, int commSize, int worldRank, int jobId) 
-        : Job(params, commSize, worldRank, jobId) {}
-    JobDescription::Application getApplication() const override {return JobDescription::DUMMY;}
+        : Job(params, commSize, worldRank, jobId, JobDescription::Application::DUMMY) {}
     void appl_start() override {}
     void appl_suspend() override {}
     void appl_resume() override {}

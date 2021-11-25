@@ -17,7 +17,11 @@ typedef std::shared_ptr<std::vector<int>> VecPtr;
 class JobDescription : public Serializable {
 
 public:
-    enum Application {SAT, DUMMY};
+    enum Application {ONESHOT_SAT, INCREMENTAL_SAT, DUMMY};
+    static bool isApplicationIncremental(Application appl) {
+        return appl == INCREMENTAL_SAT;
+    }
+
     struct Statistics {
         float timeOfScheduling;
         float parseTime;
@@ -34,13 +38,12 @@ private:
     int _id;
     int _root_rank;
     float _priority = 1.0;
-    bool _incremental;
     int _revision = -1;
     int _client_rank = -1;
     float _wallclock_limit = 0; // in seconds
     float _cpu_limit = 0; // in CPU seconds
     int _max_demand = 0;
-    Application _application = SAT;
+    Application _application;
 
     Checksum _checksum;
     const bool _use_checksums = false;
@@ -81,8 +84,8 @@ private:
 public:
 
     JobDescription() = default;
-    JobDescription(int id, float priority, bool incremental, bool computeChecksums = false) : _id(id), _root_rank(-1),
-                _priority(priority), _incremental(incremental), _revision(0), 
+    JobDescription(int id, float priority, Application appl, bool computeChecksums = false) : _id(id), _root_rank(-1),
+                _priority(priority), _application(appl), _revision(0), 
                 _use_checksums(computeChecksums) {}
     ~JobDescription() {
         if (_stats != nullptr) delete _stats;
@@ -126,7 +129,7 @@ public:
     Application getApplication() const {return _application;}
     
     float getArrival() const {return _arrival;}
-    bool isIncremental() const {return _incremental;}
+    bool isIncremental() const {return isApplicationIncremental(_application);}
     constexpr int getMetadataSize() const;
     
     size_t getFullNonincrementalTransferSize() const {return _data_per_revision[0]->size();}

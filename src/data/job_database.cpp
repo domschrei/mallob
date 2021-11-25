@@ -61,11 +61,12 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sys
 Job& JobDatabase::createJob(int commSize, int worldRank, int jobId, JobDescription::Application application) {
 
     switch (application) {
-    case JobDescription::Application::SAT:
+    case JobDescription::Application::ONESHOT_SAT:
+    case JobDescription::Application::INCREMENTAL_SAT:
         if (_params.applicationSpawnMode() == "fork") {
-            _jobs[jobId] = new ForkedSatJob(_params, commSize, worldRank, jobId);
+            _jobs[jobId] = new ForkedSatJob(_params, commSize, worldRank, jobId, application);
         } else {
-            _jobs[jobId] = new ThreadedSatJob(_params, commSize, worldRank, jobId);
+            _jobs[jobId] = new ThreadedSatJob(_params, commSize, worldRank, jobId, application);
         }
         break;
     case JobDescription::Application::DUMMY:
