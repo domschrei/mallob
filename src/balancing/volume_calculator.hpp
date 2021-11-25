@@ -73,7 +73,8 @@ private:
 
         int availableVolume = _num_workers * _params.loadFactor();
 
-        if (availableVolume - _entries.size() <= 0) {
+        log(_verbosity, "BLC #av=%i #j=%i\n", availableVolume, _entries.size());
+        if (availableVolume <= _entries.size()) {
             log(_verbosity, "BLC too many jobs, bailing out\n");
             return;
         }

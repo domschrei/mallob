@@ -11,6 +11,7 @@
 #define V3_VERB 3
 #define V4_VVER 4
 #define V5_DEBG 5
+#define V6_DEBGV 6
 
 #define LOG_ADD_DESTRANK 8
 #define LOG_ADD_SRCRANK 16

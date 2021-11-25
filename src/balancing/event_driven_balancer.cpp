@@ -220,12 +220,12 @@ void EventDrivenBalancer::computeBalancingResult() {
 
     float now = Timer::elapsedSeconds();
     int rank = MyMpi::rank(MPI_COMM_WORLD);
-    int verb = rank == 0 ? V4_VVER : V5_DEBG;
+    int verb = rank == 0 ? V4_VVER : V6_DEBGV;
     _job_volumes.clear();
 
     if (_states.isEmpty()) return;
 
-    log(V5_DEBG, "BLC: calc result\n");
+    log(verb, "BLC: calc result\n");
 
     VolumeCalculator calc(_states, _params, MyMpi::size(_comm), verb);
     calc.calculateResult();
@@ -263,7 +263,7 @@ void EventDrivenBalancer::computeBalancingResult() {
             _volume_update_callback(entry.jobId, 0, 0);
     }
     
-    log(rank == 0 ? V3_VERB : V4_VVER, "BLC %s\n", msg.c_str());
+    log(verb-1, "BLC RESULT %s\n", msg.c_str());
     if (_balancing_done_callback) _balancing_done_callback();
 }
 
