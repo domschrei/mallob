@@ -14,14 +14,14 @@ function test_mono() {
         for slv in lgc; do
 
             instancefile="instances/r3sat_300.cnf"
-            test 1 -t=1 -mono=$instancefile -satsolver=$slv -appmode=$mode -v=4 -assertresult=SAT
-            test 1 -t=8 -mono=$instancefile -satsolver=$slv -appmode=$mode -v=4 -assertresult=SAT
-            test 8 -t=2 -mono=$instancefile -satsolver=$slv -appmode=$mode -v=4 -assertresult=SAT
+            test 1 -t=1 -mono=$instancefile -satsolver=$slv -appmode=$mode -assertresult=SAT $@
+            test 1 -t=8 -mono=$instancefile -satsolver=$slv -appmode=$mode -assertresult=SAT $@
+            test 8 -t=2 -mono=$instancefile -satsolver=$slv -appmode=$mode -assertresult=SAT $@
 
             instancefile="instances/r3unsat_300.cnf"
-            test 1 -t=1 -mono=$instancefile -satsolver=$slv -appmode=$mode -v=4 -assertresult=UNSAT
-            test 1 -t=8 -mono=$instancefile -satsolver=$slv -appmode=$mode -v=4 -assertresult=UNSAT
-            test 8 -t=2 -mono=$instancefile -satsolver=$slv -appmode=$mode -v=4 -assertresult=UNSAT
+            test 1 -t=1 -mono=$instancefile -satsolver=$slv -appmode=$mode -assertresult=UNSAT $@
+            test 1 -t=8 -mono=$instancefile -satsolver=$slv -appmode=$mode -assertresult=UNSAT $@
+            test 8 -t=2 -mono=$instancefile -satsolver=$slv -appmode=$mode -assertresult=UNSAT $@
         done
     done
 }
@@ -34,7 +34,7 @@ function test_scheduling() {
                 introduce_job sat-$c instances/r3sat_300.cnf
                 introduce_job unsat-$c instances/r3unsat_300.cnf
             done
-            test 10 -t=2 -lbc=$lbc -J=8 -l=1 -satsolver=$slv -v=5 -checkjsonresults -checksums=1
+            test 10 -c=1 -t=2 -lbc=$lbc -J=8 -satsolver=$slv -checkjsonresults -checksums=1 $@
         done
     done
 }
@@ -47,14 +47,14 @@ function test_dry_scheduling() {
         t=$(echo "$t+0.1"|bc -l)
     done
     echo "400 jobs set up."
-    test 32 -c=1 -J=400 -v=5 -checksums=1
+    test 32 -c=1 -J=400 -checksums=1 $@
 }
 
 function test_incremental() {
     for test in entertainment08 roverg10 transportg29 ; do
         for slv in lgc LgC; do
             introduce_incremental_job $test 
-            test 4 -t=2 -l=1 -satsolver=$slv -v=5 -J=1 -incrementaltest -checksums=1
+            test 4 -c=1 -t=2 -satsolver=$slv -J=1 -incrementaltest -checksums=1 $@
         done
     done
 }
@@ -63,7 +63,7 @@ function test_many_incremental() {
     for i in {1..10}; do
         introduce_incremental_job entertainment08
     done
-    test 4 -t=2 -l=1 -satsolver=LgC -v=5 -J=10 -lbc=1 -incrementaltest -checksums=1
+    test 4 -c=1 -t=2 -satsolver=LgC -J=10 -lbc=1 -incrementaltest -checksums=1 $@
 }
 
 function test_oscillating() {
@@ -84,23 +84,70 @@ function test_oscillating() {
     wclimit=60 application=$app priority=0.2 introduce_job sat-main-2 instances/r3sat_500.cnf
     wclimit=60 application=$app priority=0.3 introduce_job sat-main-3 instances/r3sat_500.cnf
     wclimit=60 application=$app priority=0.4 introduce_job sat-main-4 instances/r3sat_500.cnf
-    nocleanup=1 test 32 -t=1 -c=1 -J=$((n+4)) -l=1 -satsolver=lgc -v=5 -checkjsonresults -checksums=1 -rs -jc=2 -warmup
+    nocleanup=1 test 32 -t=1 -c=1 -J=$((n+4)) -satsolver=lgc -checkjsonresults -checksums=1 $@
 }
 
 function test_incremental_scheduling() {
-    for test in entertainment08 roverg10 transportg29 ; do
+    for test in entertainment08 roverg10 transportg29 towers05 ; do
         introduce_incremental_job $test
     done
-    test 8 -t=1 -l=1 -satsolver=LgC -v=5 -J=3 -incrementaltest -checksums=1
+    test 8 -t=1 -c=1 -satsolver=LgC -J=4 -incrementaltest -checksums=1 $@
 }
 
-test_incremental_scheduling
-exit
-test_oscillating
-test_dry_scheduling
-test_mono
-test_scheduling
-test_incremental
-test_many_incremental
+
+if [ -z "$1" ]; then
+    echo "No tests specified."
+    exit 0
+fi
+
+if [ "$1" == "-h" ]; then
+    echo "Valid options: all mono sched incsched osc drysched inc manyinc"
+    exit 0
+fi
+
+progopts=""
+while [ ! -z "$1" ]; do
+    arg="$1"
+    case $arg in
+        all)
+            test_mono $progopts
+            test_dry_scheduling $progopts
+            test_scheduling $progopts
+            test_oscillating $progopts
+            test_incremental $progopts
+            test_many_incremental $progopts
+            test_incremental_scheduling $progopts
+            ;;
+        mono)
+            test_mono $progopts
+            ;;
+        sched)
+            test_scheduling $progopts
+            ;;
+        incsched)
+            test_incremental_scheduling $progopts
+            ;;
+        osc)
+            test_oscillating $progopts
+            ;;
+        drysched)
+            test_dry_scheduling $progopts
+            ;;
+        inc)
+            test_incremental $progopts
+            ;;
+        manyinc)
+            test_many_incremental $progopts
+            ;;
+        -*)
+            echo "Adding program option \"$arg\""
+            progopts="$progopts $arg"
+            ;;
+        *)
+            echo "Unknown argument $1"
+            exit 1
+    esac
+    shift 1
+done
 
 echo "All tests done."

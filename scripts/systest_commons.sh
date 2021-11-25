@@ -133,11 +133,11 @@ function introduce_incremental_job() {
         revname=${jobname}-${r}-$result
         cnfname=${instance}-${r}.cnf
         if [ $r == 0 ] ; then
-            echo '{"cpu-limit": "0", "file": "'$cnfname'", "incremental": true,
+            echo '{"cpu-limit": "0", "file": "'$cnfname'", "incremental": true, "application": "SAT",
             "name": "'$revname'", "priority": 1.0, "user": "admin",
             "wallclock-limit": "0"}' > .api/jobs.0/introduced/${revname}.json
         else
-            echo '{"cpu-limit": "0", "file": "'$cnfname'", "incremental": true,
+            echo '{"cpu-limit": "0", "file": "'$cnfname'", "incremental": true, "application": "SAT",
             "name": "'$revname'", "precursor": "admin.'$last_revname'", "priority": 1.0, "user": "admin",
             "wallclock-limit": "0"}' > .api/jobs.0/introduced/${revname}.json    
         fi
@@ -147,7 +147,7 @@ function introduce_incremental_job() {
     done < instances/incremental/$1
 
     revname=${jobname}-${r}-$result
-    echo '{"cpu-limit": "0", "file": "NONE", "incremental": true, "done": true,
+    echo '{"cpu-limit": "0", "file": "NONE", "incremental": true, "done": true, "application": "SAT",
         "name": "'$revname'", "precursor": "admin.'$last_revname'", "priority": 1.0, "user": "admin",
         "wallclock-limit": "0"}' > .api/jobs.0/introduced/${revname}.json
     echo ${revname}.json >> _incremental_jobs-$globalcount
