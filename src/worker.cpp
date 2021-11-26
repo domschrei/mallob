@@ -228,12 +228,12 @@ void Worker::advance(float time) {
             // Recompute stats for next query time
             // (concurrently because computation of PSS is expensive)
             _node_stats_calculated.store(false, std::memory_order_relaxed);
-            auto pid = Proc::getPid();
-            ProcessWideThreadPool::get().addTask([&, pid]() {
+            auto tid = Proc::getTid();
+            ProcessWideThreadPool::get().addTask([&, tid]() {
                 auto memoryKbs = Proc::getRecursiveProportionalSetSizeKbs(Proc::getPid());
                 auto memoryGbs = memoryKbs / 1024.f / 1024.f;
                 _node_memory_gbs = memoryGbs;
-                Proc::getThreadCpuRatio(Proc::getTid(), _mainthread_cpu_share, _mainthread_sys_share);
+                Proc::getThreadCpuRatio(tid, _mainthread_cpu_share, _mainthread_sys_share);
                 _node_stats_calculated.store(true, std::memory_order_release);
             });
         }
