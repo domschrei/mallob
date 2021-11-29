@@ -13,11 +13,11 @@ private:
     Socket* _socket;
 
 public:
-    SocketConnector(Parameters& params, JsonInterface& interface) {
+    SocketConnector(Parameters& params, JsonInterface& interface, std::string socketPath) {
 
         // Settings for the local socket
         Socket::SocketSettings settings;
-        settings.address = "/tmp/mallob_" + std::to_string(Proc::getPid()) + ".sk";
+        settings.address = socketPath;
         settings.maxNumConnections = params.activeJobsPerClient();
         settings.maxMsgSize = 65536;
 
@@ -26,12 +26,13 @@ public:
             // Callback to return an answer for the request being submitted
             auto cb = [&conn](nlohmann::json& result) {
                 // Send result over the associated connection
-                conn.send(result);
+                bool sent = conn.send(result);
+                if (!sent) log(V1_WARN, "[WARN] IPC socket send unsuccessful!\n");
             };
             // Submit the request to the JSON interface
             auto result = interface.handle(json, cb);
             // Close the associated connection if appropriate
-            if (result == JsonInterface::CONCLUDE) conn.close();
+            if (result == JsonInterface::ACCEPT_CONCLUDE) conn.close();
         };
 
         // Create socket object and start listening / processing

@@ -23,14 +23,14 @@ public:
 
     FilesystemConnector(JsonInterface& interface, const Parameters& params, Logger&& logger, const std::string& basePath) :
         _interface(interface), _params(params), _logger(std::move(logger)),
-        _watcher(_base_path + "/new/", (int) (IN_MOVED_TO | IN_MODIFY | IN_CLOSE_WRITE), 
+        _watcher(basePath + "/in/", (int) (IN_MOVED_TO | IN_MODIFY | IN_CLOSE_WRITE), 
             [&](const FileWatcher::Event& event, Logger& log) {
                 // Receiving a certain file event
                 handleEvent(event, log);
             },
             _logger, FileWatcher::InitialFilesHandling::TRIGGER_CREATE_EVENT),
         _base_path(basePath) {
-        
+
         FileUtils::mkdir(_base_path + "/in/");
         FileUtils::mkdir(_base_path + "/out/");
 

@@ -21,17 +21,26 @@
 #endif
 
 void introduceMonoJob(Parameters& params, Client& client) {
+
     // Write a job JSON for the singular job to solve
-    std::ofstream ofs(client.getApiPath() + "new/mono-job.json");
-    ofs << "{ \"user\": \"admin\", \"name\": \"mono-job\", \"file\": \"";
-    ofs << params.monoFilename();
-    ofs << "\", \"priority\": 1.000 ";
-    ofs << ", \"application\": \"SAT\" ";
+    nlohmann::json json = {
+        {"user", "admin"},
+        {"name", "mono-job"},
+        {"file", params.monoFilename()},
+        {"priority", 1.000},
+        {"application", "SAT"}
+    };
     if (params.jobWallclockLimit() > 0)
-        ofs << ", \"wallclock-limit\": \"" << params.jobWallclockLimit() << "s\" ";
-    if (params.jobCpuLimit() > 0)
-        ofs << ", \"cpu-limit\": \"" << params.jobCpuLimit() << "s\" ";
-    ofs << "}";
+        json["wallclock-limit"] = std::to_string(params.jobWallclockLimit()) + "s";
+    if (params.jobCpuLimit() > 0) {
+        json["cpu-limit"] = std::to_string(params.jobCpuLimit()) + "s";
+    }
+
+    auto result = client.getAPI().submit(json, APIConnector::CALLBACK_IGNORE);
+    if (result != JsonInterface::Result::ACCEPT) {
+        log(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
+        abort();
+    }
 }
 
 void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& params) {
@@ -45,10 +54,6 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     // Create worker and client as necessary
     Worker* worker = isWorker ? new Worker(commWorkers, params) : nullptr;
     Client* client = isClient ? new Client(commClients, params) : nullptr;
-
-    // If mono solving mode is enabled, introduce the singular job to solve
-    if (params.monoFilename.isSet() && isClient && MyMpi::rank(commClients) == 0)
-        introduceMonoJob(params, *client);
     
     // Initialize worker and client as necessary (background threads, callbacks, ...)
     if (isWorker) worker->init();
@@ -71,6 +76,10 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     log(V5_DEBG, "Global init barrier ...\n");
     MPI_Barrier(MPI_COMM_WORLD);
     log(V5_DEBG, "Passed global init barrier\n");
+
+    // If mono solving mode is enabled, introduce the singular job to solve
+    if (params.monoFilename.isSet() && isClient && MyMpi::rank(commClients) == 0)
+        introduceMonoJob(params, *client);
 
     // Main loop
     while (!Terminator::isTerminating(/*fromMainthread*/true)) {

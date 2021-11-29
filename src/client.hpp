@@ -10,11 +10,12 @@
 #include "util/params.hpp"
 #include "data/job_description.hpp"
 #include "util/sys/threading.hpp"
-#include "data/job_file_adapter.hpp"
+#include "interface/json_interface.hpp"
 #include "data/job_metadata.hpp"
 #include "comm/sysstate.hpp"
 #include "util/sys/background_worker.hpp"
 #include "util/periodic_event.hpp"
+#include "interface/api/api_connector.hpp"
 
 #define SYSSTATE_ENTERED_JOBS 0
 #define SYSSTATE_PARSED_JOBS 1
@@ -72,8 +73,10 @@ private:
     std::set<int> _client_ranks;
     SysState<4> _sys_state;
 
+    std::unique_ptr<JsonInterface> _json_interface;
+    std::vector<Connector*> _interface_connectors;
+    APIConnector* _api_connector;
     BackgroundWorker _instance_reader;
-    std::unique_ptr<JobFileAdapter> _file_adapter;
 
     // Number of jobs with a loaded description (taking memory!)
     std::atomic_int _num_loaded_jobs = 0;
@@ -94,7 +97,9 @@ public:
     void handleNewJob(JobMetadata&& data);
 
     int getInternalRank();
-    std::string getApiPath();
+    std::string getFilesystemInterfacePath();
+    std::string getSocketPath();
+    APIConnector& getAPI();
 
 private:
     void readIncomingJobs();

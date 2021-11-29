@@ -14,6 +14,7 @@
 #include "connection.hpp"
 #include "util/sys/background_worker.hpp"
 #include "util/sys/thread_pool.hpp"
+#include "util/sys/fileutils.hpp"
 
 class Socket {
 
@@ -75,25 +76,30 @@ public:
 
                 auto optConn = openConnection();
                 if (!optConn) continue;
+                if (!optConn.value().valid()) continue;
 
-                Connection& conn = optConn.value();
-                if (!conn.valid()) continue;
-
-                _thread_pool.addTask([this, connection{std::move(conn)}]() mutable {
+                Connection* connection = new Connection(std::move(optConn.value()));
+                auto task = [this, connection]() {
                     while (true) {
-                        if (!connection.valid()) return;
-                        auto optJson = connection.receive();
+                        if (!connection->valid()) return;
+                        auto optJson = connection->receive();
                         if (!optJson) continue;
                         auto json = optJson.value();
-                        _recv_callback(connection, json);
+                        _recv_callback(*connection, json);
                     }
-                });
+                    delete connection;
+                };
+                _thread_pool.addTask(std::move(task));
             }
         });
     }
 
     ~Socket() {
         // TODO somehow interrupt blocking wait for a connection in _server_thread
+        if (_socket_fd != -1) {
+            ::close(_socket_fd);
+            unlink(_socket_address.c_str());
+        } 
     }
 
     std::optional<Connection> openConnection() {

@@ -1,6 +1,8 @@
 
 #include "api_connector.hpp"
 
+std::function<void(nlohmann::json&)> APIConnector::CALLBACK_IGNORE = [](nlohmann::json&) {};
+
 nlohmann::json APIConnector::processBlocking(const nlohmann::json& input) {
     auto promise = processAsync(input);
     return promise.get_future().get();

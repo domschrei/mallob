@@ -20,6 +20,10 @@
 #include "data/job_reader.hpp"
 #include "util/sys/thread_pool.hpp"
 
+#include "interface/socket/socket_connector.hpp"
+#include "interface/filesystem/filesystem_connector.hpp"
+#include "interface/api/api_connector.hpp"
+
 // Executed by a separate worker thread
 void Client::readIncomingJobs() {
 
@@ -151,17 +155,38 @@ void Client::handleNewJob(JobMetadata&& data) {
 
 void Client::init() {
 
-    _file_adapter = std::unique_ptr<JobFileAdapter>(
-        new JobFileAdapter(getInternalRank(), _params, 
-            Logger::getMainInstance().copy("API", "#0."),
-            getApiPath(), [&](JobMetadata&& data) {handleNewJob(std::move(data));}
+    // Set up generic JSON interface to communicate with this client
+    _json_interface = std::unique_ptr<JsonInterface>(
+        new JsonInterface(getInternalRank(), _params, 
+            Logger::getMainInstance().copy("I", ".i"),
+            [&](JobMetadata&& data) {handleNewJob(std::move(data));}
         )
     );
+
+    // Set up various interfaces as bridges between the outside and the JSON interface
+    if (_params.useFilesystemInterface()) {
+        std::string path = getFilesystemInterfacePath();
+        log(V2_INFO, "Set up filesystem interface at %s\n", path.c_str());
+        auto logger = Logger::getMainInstance().copy("I-FS", ".i-fs");
+        auto conn = new FilesystemConnector(*_json_interface, _params, 
+            std::move(logger), path);
+        _interface_connectors.push_back(conn);
+    }
+    if (_params.useIPCSocketInterface()) {
+        std::string path = getSocketPath();
+        log(V2_INFO, "Set up IPC socket interface at %s\n", path.c_str());
+        _interface_connectors.push_back(new SocketConnector(_params, *_json_interface, path));
+    }
+    _api_connector = new APIConnector(*_json_interface, _params, Logger::getMainInstance().copy("I-API", ".i.api"));
+    _interface_connectors.push_back(_api_connector);
+    log(V2_INFO, "Set up API at %s\n", "src/interface/api/api_connector.hpp");
+
+    // Set up concurrent instance reader
     _instance_reader.run([this]() {
         readIncomingJobs();
     });
-    log(V3_VERB, "Client main thread started\n");
 
+    // Set up callbacks for client-specific MPI messages
     auto& q = MyMpi::getMessageQueue();
     q.registerCallback(MSG_NOTIFY_JOB_DONE, [&](MessageHandle& h) {handleJobDone(h);});
     q.registerCallback(MSG_SEND_JOB_RESULT, [&](MessageHandle& h) {handleSendJobResult(h);});
@@ -173,8 +198,16 @@ int Client::getInternalRank() {
     return MyMpi::rank(_comm) + _params.firstApiIndex();
 }
 
-std::string Client::getApiPath() {
+std::string Client::getFilesystemInterfacePath() {
     return ".api/jobs." + std::to_string(getInternalRank()) + "/";
+}
+
+std::string Client::getSocketPath() {
+    return "/tmp/mallob_" + std::to_string(Proc::getPid()) + "." + std::to_string(getInternalRank()) + ".sk";
+} 
+
+APIConnector& Client::getAPI() {
+    return *_api_connector;
 }
 
 void Client::advance() {
@@ -402,8 +435,8 @@ void Client::handleSendJobResult(MessageHandle& handle) {
         log(LOG_NO_PREFIX | V0_CRIT, modelString.str().c_str());
     }
 
-    if (_file_adapter) {
-        _file_adapter->handleJobDone(jobResult, desc.getStatistics());
+    if (_json_interface) {
+        _json_interface->handleJobDone(jobResult, desc.getStatistics());
     }
 
     finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
@@ -416,12 +449,12 @@ void Client::handleAbort(MessageHandle& handle) {
     log(LOG_ADD_SRCRANK | V2_INFO, "TIMEOUT #%i %.6f", handle.source, jobId, 
             Timer::elapsedSeconds() - _active_jobs[jobId]->getArrival());
     
-    if (_file_adapter) {
+    if (_json_interface) {
         JobResult result;
         result.id = jobId;
         result.revision = _active_jobs[result.id]->getRevision();
         result.result = 0;
-        _file_adapter->handleJobDone(result, _active_jobs[result.id]->getStatistics());
+        _json_interface->handleJobDone(result, _active_jobs[result.id]->getStatistics());
     }
 
     finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
@@ -449,10 +482,13 @@ void Client::handleExit(MessageHandle& handle) {
 }
 
 Client::~Client() {
+
+    for (Connector* conn : _interface_connectors) delete conn;
+
     _instance_reader.stopWithoutWaiting();
     _incoming_job_cond_var.notify();
     _instance_reader.stop();
-    _file_adapter.reset();
+    _json_interface.reset();
 
     // Merge logs from instance reader
     Logger::getMainInstance().mergeJobLogs(0);
