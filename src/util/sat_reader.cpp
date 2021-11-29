@@ -14,12 +14,16 @@
 bool SatReader::read(JobDescription& desc) {
 
 	FILE* pipe = nullptr;
+	int namedpipe = -1;
 	if ((_filename.size() > 3 && _filename.substr(_filename.size()-3, 3) == ".xz")
 		|| (_filename.size() > 5 && _filename.substr(_filename.size()-5, 5) == ".lzma")) {
 		// Decompress, read output
 		auto command = "xz -c -d " + _filename;
 		pipe = popen(command.c_str(), "r");
 		if (pipe == nullptr) return false;
+	} else if (_filename.size() > 5 && _filename.substr(_filename.size()-5, 5) == ".pipe") {
+		// Named pipe!
+		namedpipe = open(_filename.c_str(), O_RDONLY);
 	}
 	
 	desc.beginInitialization(desc.getRevision());
@@ -31,7 +35,7 @@ bool SatReader::read(JobDescription& desc) {
 	_num = 0;
 	_max_var = desc.getNumVars();
 
-	if (pipe == nullptr) {
+	if (pipe == nullptr && namedpipe == -1) {
 		// Read file with mmap
 		int fd = open(_filename.c_str(), O_RDONLY);
 		if (fd == -1) return false;
@@ -50,6 +54,20 @@ bool SatReader::read(JobDescription& desc) {
 		}
 		munmap(f, size);
 		close(fd);
+
+	} else if (namedpipe != -1) {
+		// Read formula over named pipe
+		int iteration = 0;
+		char buffer[4096] = {'\0'};
+		while (iteration ^ 511 != 0 || !Terminator::isTerminating()) {
+			int numRead = ::read(namedpipe, buffer, sizeof(buffer));
+			if (numRead <= 0) break;
+			for (int i = 0; i < numRead; i++) {
+				int c = buffer[i];
+				process(c, desc);
+			}
+			iteration++;
+		}
 
 	} else {
 		// Read every character of the formula (in a buffered manner)
@@ -71,6 +89,7 @@ bool SatReader::read(JobDescription& desc) {
 	desc.endInitialization();
 
 	if (pipe != nullptr) pclose(pipe);
+	if (namedpipe != -1) close(namedpipe);
 
 	return true;
 }
