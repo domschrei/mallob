@@ -82,7 +82,7 @@ void Client::readIncomingJobs() {
                 int id = foundJob.description->getId();
                 float time = Timer::elapsedSeconds();
                 log.log(V3_VERB, "[T] Reading job #%i rev. %i (%s) ...\n", id, foundJob.description->getRevision(), foundJob.file.c_str());
-                bool success = JobReader::read(foundJob.file, *foundJob.description);
+                bool success = JobReader::read(foundJob.file, foundJob.contentMode, *foundJob.description);
                 if (!success) {
                     log.log(V1_WARN, "[T] [WARN] File %s could not be opened - skipping #%i\n", foundJob.file.c_str(), id);
                 } else {

@@ -18,6 +18,10 @@ private:
     int _connection_fd;
     int _max_msg_size;
 
+    std::vector<char> _buffer;
+
+    bool _flip_endian = false;
+
 public:
     Connection(int id, int fd, int maxMsgSize) : _id(id), _connection_fd(fd), _max_msg_size(maxMsgSize) {}
     ~Connection() {
@@ -39,7 +43,7 @@ public:
         std::string serializedJson = json.dump();
 
         int payloadSize = serializedJson.size();
-        int flippedPayloadSize = flipEndian(payloadSize);
+        int flippedPayloadSize = _flip_endian ? flipEndian(payloadSize) : payloadSize;
         int msgSize = sizeof(int)+payloadSize;
         char msg[msgSize];
         memcpy(msg, &flippedPayloadSize, sizeof(int));
@@ -53,36 +57,84 @@ public:
     std::optional<nlohmann::json> receive() {
         if (!valid()) return std::optional<nlohmann::json>();
 
-        char msg[_max_msg_size];
-	    msg[_max_msg_size-1] = '\0';
-        memset(msg, 0, _max_msg_size-1);
+        // Remember old buffer size and enlarge
+        int sizeBefore = _buffer.size();
+        _buffer.resize(sizeBefore + _max_msg_size);
         
-        auto size = recv(_connection_fd, msg, _max_msg_size, 0);
-        if (size <= 0) return std::optional<nlohmann::json>();
+        // Attempt to receive a block of message(s)
+        auto size = recv(_connection_fd, _buffer.data()+sizeBefore, _max_msg_size, 0);
 
-        if (size == sizeof(int)+1 && (int) msg[sizeof(int)] == 24) {
-            // Goodbye message
-            close();
-            return std::optional<nlohmann::json>();
+        // Trim buffer to only contain actual data
+        _buffer.resize(sizeBefore + size);
+
+        auto result = std::optional<nlohmann::json>();
+
+        // Received nothing?
+        if (size <= 0) return result;
+
+        // Try to read a message from the buffer
+        int begin = 0;
+        while (true) {
+
+            // How large is the message advertised to be? (Try to be lenient with byte ordering)
+            int payloadSize = *((int*) (_buffer.data()+begin));
+            if (_flip_endian || payloadSize < 0 || payloadSize >= INT32_MAX/2) {
+                payloadSize = flipEndian(payloadSize);
+                _flip_endian = true;
+            }
+            assert(payloadSize >= 0 && payloadSize < INT32_MAX/2);
+            
+            // Proceed to actual payload
+            begin += sizeof(int);
+
+            // Single CANCEL byte?
+            if (payloadSize == 1 && (int) _buffer[begin] == 24) {
+
+                // Goodbye message (ignore any following messages)
+                close();
+                break;
+
+            } else if (payloadSize > _buffer.size()-begin) {
+
+                // Message has not been read completely: wait for next batch
+                begin -= sizeof(int);
+                break;
+
+            } else {
+                // Parse printable ASCII string
+                std::string msgStr = "";
+                //std::string fullStringAsInts = "";
+                for (int i = 0; i < payloadSize; i++) {
+                    assert(begin < _buffer.size());
+                    const char c = _buffer[begin];
+                    //fullStringAsInts += std::to_string((int) c) + ",";
+                    if (isprint(c)) msgStr += std::string(1, c);
+                    begin++;
+                }
+
+                //fullStringAsInts = fullStringAsInts.substr(0, fullStringAsInts.size()-1);
+                
+                log(V5_DEBG, "Received msg len=%i/%i \"%s\"\n", msgStr.size(), size, msgStr.c_str());
+                
+                // Attempt to parse JSON
+                try {
+                    auto json = nlohmann::json::parse(msgStr);
+
+                    // Parsing successful!
+                    result = json;
+                    break;
+
+                } catch (const nlohmann::detail::parse_error& e) {
+                    log(V1_WARN, "[WARN] Parse error on \"%s\": %s\n", msgStr.c_str(), e.what());
+                }
+            }
         }
 
-        std::string msgStr = "";
-        //std::string fullStringAsInts = "";
-        for (int i = sizeof(int); i < size; i++) {
-            const char c = msg[i];
-            //fullStringAsInts += std::to_string((int) c) + ",";
-            if (isprint(c)) msgStr += std::string(1, c);
-        }
-        //fullStringAsInts = fullStringAsInts.substr(0, fullStringAsInts.size()-1);
-        
-        log(V5_DEBG, "Received msg len=%i/%i \"%s\"\n", msgStr.size(), size, msgStr.c_str());
-        
-        try {
-            return std::optional<nlohmann::json>(nlohmann::json::parse(msgStr));
-        } catch (const nlohmann::detail::parse_error& e) {
-            log(V1_WARN, "[WARN] Parse error on \"%s\": %s\n", msgStr.c_str(), e.what());
-            return std::optional<nlohmann::json>();
-        }
+        // Rearrange buffer to begin at beginning of next message
+        auto newbuf = std::vector<char>(_buffer.data()+begin, _buffer.data()+_buffer.size());
+        _buffer = std::move(newbuf);
+
+        return result;
     }
 
     bool valid() {

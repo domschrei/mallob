@@ -39,7 +39,6 @@ bool SatReader::read(JobDescription& desc) {
 		// Read file with mmap
 		int fd = open(_filename.c_str(), O_RDONLY);
 		if (fd == -1) return false;
-		char* f;
 
 		off_t size;
     	struct stat s;
@@ -47,36 +46,71 @@ bool SatReader::read(JobDescription& desc) {
 		if (status == -1) return false;
 		size = s.st_size;
 		desc.reserveSize(size / sizeof(int));
+		void* mmapped = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
 
-		f = (char *) mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
-		for (long i = 0; i < size; i++) {
-			process(f[i], desc);
+		if (_content_mode == RAW) {
+			int* f = (int*) mmapped;
+			for (long i = 0; i < size; i++) {
+				processInt(f[i], desc);
+			}
+		} else {
+			char* f = (char*) mmapped;
+			for (long i = 0; i < size; i++) {
+				process(f[i], desc);
+			}
 		}
-		munmap(f, size);
+		munmap(mmapped, size);
 		close(fd);
 
 	} else if (namedpipe != -1) {
 		// Read formula over named pipe
 		int iteration = 0;
-		char buffer[4096] = {'\0'};
-		while (iteration ^ 511 != 0 || !Terminator::isTerminating()) {
-			int numRead = ::read(namedpipe, buffer, sizeof(buffer));
-			if (numRead <= 0) break;
-			for (int i = 0; i < numRead; i++) {
-				int c = buffer[i];
-				process(c, desc);
+		if (_content_mode == RAW) {
+			int buffer[1024] = {0};
+			while (iteration ^ 511 != 0 || !Terminator::isTerminating()) {
+				int numRead = ::read(namedpipe, buffer, sizeof(buffer));
+				if (numRead <= 0) break;
+				numRead /= sizeof(int);
+				for (int i = 0; i < numRead; i++) {
+					processInt(buffer[i], desc);
+				}
+				iteration++;
 			}
-			iteration++;
+		} else {
+			char buffer[4096] = {'\0'};
+			while (iteration ^ 511 != 0 || !Terminator::isTerminating()) {
+				int numRead = ::read(namedpipe, buffer, sizeof(buffer));
+				if (numRead <= 0) break;
+				for (int i = 0; i < numRead; i++) {
+					int c = buffer[i];
+					process(c, desc);
+				}
+				iteration++;
+			}
 		}
 
 	} else {
-		// Read every character of the formula (in a buffered manner)
-		char buffer[4096] = {'\0'};
-		while (!Terminator::isTerminating() && fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-			size_t pos = 0;
-			while (buffer[pos] != '\0') {
-				int c = buffer[pos++];
-				process(c, desc);
+		// Read file over pipe
+		if (_content_mode == RAW) {
+			int iteration = 0;
+			int buffer[1024] = {0};
+			while (iteration ^ 511 != 0 || !Terminator::isTerminating()) {
+				int numRead = ::read(fileno(pipe), buffer, sizeof(buffer));
+				if (numRead <= 0) break;
+				for (int i = 0; i < numRead; i++) {
+					int c = buffer[i];
+					processInt(c, desc);
+				}
+				iteration++;
+			}
+		} else {
+			char buffer[4096] = {'\0'};
+			while (!Terminator::isTerminating() && fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+				size_t pos = 0;
+				while (buffer[pos] != '\0') {
+					int c = buffer[pos++];
+					process(c, desc);
+				}
 			}
 		}
 	}

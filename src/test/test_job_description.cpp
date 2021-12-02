@@ -19,7 +19,7 @@ void testSatInstances() {
         auto f = std::string("instances/") + file;
         log(V2_INFO, "Reading test CNF %s ...\n", f.c_str());
         float time = Timer::elapsedSeconds();
-        SatReader r(f);
+        SatReader r(f, SatReader::ContentMode::ASCII);
         JobDescription d;
         bool success = r.read(d);
         assert(success);
@@ -43,7 +43,7 @@ void testIncrementalExample() {
 
     JobDescription desc(1, 1, JobDescription::Application::INCREMENTAL_SAT, true);
     std::string f = "instances/incremental/entertainment08-0.cnf";
-    SatReader r(f);
+    SatReader r(f, SatReader::ContentMode::ASCII);
     r.read(desc);
     log(V2_INFO, "Base: %i lits, %i assumptions\n", desc.getNumFormulaLiterals(), desc.getNumAssumptionLiterals());
     assert(desc.getNumFormulaLiterals() == 6);
@@ -66,7 +66,7 @@ void testIncrementalExample() {
     }
 
     f = "instances/incremental/entertainment08-1.cnf";
-    r = SatReader(f);
+    r = SatReader(f, SatReader::ContentMode::ASCII);
     JobDescription update(1, 1, JobDescription::Application::INCREMENTAL_SAT, true);
     update.setRevision(1);
     r.read(update);

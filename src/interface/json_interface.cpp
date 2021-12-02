@@ -148,6 +148,7 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
     }
     job->setArrival(arrival);
     std::string file = json["file"].get<std::string>();
+
     
     // Translate dependencies (if any) to internal job IDs
     std::vector<int> idDependencies;
@@ -169,7 +170,11 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
     }
 
     // Callback to client: New job arrival.
-    _job_callback(JobMetadata{std::shared_ptr<JobDescription>(job), file, idDependencies});
+    SatReader::ContentMode contentMode = SatReader::ContentMode::ASCII;
+    if (json.contains("content-mode") && json["content-mode"] == "raw") {
+        contentMode = SatReader::ContentMode::RAW;
+    }
+    _job_callback(JobMetadata{std::shared_ptr<JobDescription>(job), file, contentMode, idDependencies});
 
     return ACCEPT;
 }

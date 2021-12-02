@@ -23,7 +23,7 @@ int main() {
         auto f = std::string("instances/") + file;
         log(V2_INFO, "Reading test CNF %s ...\n", f.c_str());
         float time = Timer::elapsedSeconds();
-        SatReader r(f);
+        SatReader r(f, SatReader::ContentMode::ASCII);
         JobDescription d;
         bool success = r.read(d);
         assert(success);

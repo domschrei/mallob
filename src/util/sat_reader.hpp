@@ -9,11 +9,18 @@
 
 #include "data/job_description.hpp"
 
+#include <iostream>
+
 class SatReader {
+
+public:
+    enum ContentMode {ASCII, RAW};
 
 private:
     std::string _filename;
+    ContentMode _content_mode;
 
+    // Content mode: ASCII
     int _sign = 1;
 	bool _comment = false;
 	bool _began_num = false;
@@ -21,9 +28,33 @@ private:
 	int _num = 0;
 	int _max_var = 0;
 
+    // Content mode: RAW
+    bool _traversing_clauses = false;
+    bool _traversing_assumptions = false;
+
 public:
-    SatReader(std::string filename) : _filename(filename) {}
+    SatReader(const std::string& filename, ContentMode contentMode) : _filename(filename), _content_mode(contentMode) {}
     bool read(JobDescription& desc);
+    inline void processInt(int x, JobDescription& desc) {
+        
+        std::cout << x << std::endl;
+
+        if (_num == 0) {
+            _num = x;
+            if (!_traversing_clauses && !_traversing_assumptions) {
+                _traversing_clauses = true;
+            } else if (!_traversing_assumptions) {
+                _traversing_clauses = false;
+                _traversing_assumptions = true;
+            }
+            return;
+        }
+
+        assert(_num > 0);
+        if (_traversing_clauses) desc.addLiteral(x);
+        else desc.addAssumption(x);        
+        _num--;
+    }
     inline void process(char c, JobDescription& desc) {
 
         if (_comment && c != '\n') return;

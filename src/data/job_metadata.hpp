@@ -7,10 +7,13 @@
 #include <memory>
 
 #include "data/job_description.hpp"
+#include "util/sat_reader.hpp"
 
 struct JobMetadata {
     std::shared_ptr<JobDescription> description;
     std::string file;
+    SatReader::ContentMode contentMode;
+
     std::vector<int> dependencies;
     bool done = false;
     bool interrupt = false;
