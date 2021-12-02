@@ -69,15 +69,16 @@ public:
         }
 
         // Import first revision
+        _last_imported_revision = 0;
+        _desired_revision = _config.firstrev;
         {
             int* fPtr = (int*) accessMemory(_shmem_id + ".formulae.0", sizeof(int) * _hsm->fSize);
             int* aPtr = (int*) accessMemory(_shmem_id + ".assumptions.0", sizeof(int) * _hsm->aSize);
-            _hlib.appendRevision(0, _hsm->fSize, fPtr, _hsm->aSize, aPtr);
+            _hlib.appendRevision(0, _hsm->fSize, fPtr, _hsm->aSize, aPtr, 
+                /*finalRevisionForNow=*/_desired_revision == 0);
             updateChecksum(fPtr, _hsm->fSize);
         }
         // Import subsequent revisions
-        _last_imported_revision = 0;
-        _desired_revision = _config.firstrev;
         importRevisions();
         
         // Start solver threads
@@ -258,7 +259,7 @@ private:
             }
         }
 
-        _hlib.appendRevision(revision, *fSizePtr, fPtr, *aSizePtr, aPtr);
+        _hlib.appendRevision(revision, *fSizePtr, fPtr, *aSizePtr, aPtr, /*finalRevisionForNow=*/revision == _desired_revision);
     }
 
     void doSleep() {

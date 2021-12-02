@@ -56,7 +56,8 @@ public:
 	~HordeLib();
 
 	void solve();
-    void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits);
+    void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, 
+		bool lastRevisionForNow = true);
 
 	bool isFullyInitialized();
     int solveLoop();

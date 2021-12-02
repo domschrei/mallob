@@ -32,6 +32,7 @@ OPT_BOOL(warmup,                         "warmup", "",                      fals
 OPT_BOOL(workRequests,                   "wr", "",                          false,                      "Send around work requests similarly to job requests")
 OPT_BOOL(yield,                          "yield", "",                       false,                      "Yield manager thread whenever there are no new messages")
 OPT_BOOL(zeroOnlyLogging,                "0o", "",                          false,                      "Only PE of rank zero does logging")
+OPT_BOOL(abortNonincrementalSubprocess,  "ans", "abort-noninc-subproc",     false,                      "Abort (hence restart) each sub-process which works (partially) non-incrementally upon the arrival of a new revision")
 
 OPT_INT(activeJobsPerClient,             "ajpc", "lbc",                     0,    0, LARGE_INT,         "Make each client have up to this many active jobs at any given time")
 OPT_INT(bufferedImportedClsGenerations,  "bicg", "",                        4,    1, LARGE_INT,         "Number of subsequent full clause sharings to fit in each solver's import buffer")

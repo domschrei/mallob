@@ -148,7 +148,7 @@ std::shared_ptr<PortfolioSolverInterface> HordeLib::createSolver(const SolverSet
 	return solver;
 }
 
-void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits) {
+void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, bool lastRevisionForNow) {
 	
 	_logger.log(V4_VVER, "Import rev. %i: %i lits, %i assumptions\n", revision, fSize, aSize);
 	assert(_revision+1 == revision);
@@ -166,6 +166,17 @@ void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size
 				// True incremental SAT solving
 				_solver_threads[i]->appendRevision(revision, fSize, fLits, aSize, aLits);
 			} else {
+				if (!lastRevisionForNow) {
+					// Another revision will be imported momentarily: 
+					// Wait with restarting a whole new solver thread
+					continue;
+				}
+				if (_solvers_started && _params.abortNonincrementalSubprocess()) {
+					// Non-incremental solver being "restarted" with a new revision:
+					// Abort (but do not create a thread trace) such that a new, fresh
+					// process will be initialized
+					raise(SIGUSR2);
+				}
 				// Pseudo-incremental SAT solving: 
 				// Phase out old solver thread
 				_sharing_manager->stopClauseImport(i);

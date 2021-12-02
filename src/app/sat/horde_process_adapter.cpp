@@ -259,7 +259,7 @@ HordeProcessAdapter::SubprocessStatus HordeProcessAdapter::check() {
     int exitStatus;
     if (Process::didChildExit(_child_pid, &exitStatus) && exitStatus != 0) {
         // Child exited!
-        log(V1_WARN, "Child %ld exited unexpectedly (status %i)\n", _child_pid, exitStatus);
+        log(V1_WARN, "[WARN] Child %ld exited unexpectedly (status %i)\n", _child_pid, exitStatus);
         // Notify to restart solver engine
         return CRASHED;
     }
