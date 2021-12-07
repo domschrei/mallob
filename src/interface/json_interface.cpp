@@ -231,7 +231,13 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
             int fd = open(solutionFile.c_str(), O_WRONLY);
             log(V4_VVER, "Writing solution: %i ints (%i,%i,...,%i,%i)\n", sol.size(), 
                 sol[0], sol[1], sol[sol.size()-2], sol[sol.size()-1]);
-            write(fd, sol.data(), sol.size() * sizeof(int));
+            int numWritten = 0;
+            while (numWritten < sol.size()*sizeof(int)) {
+                int n = write(fd, ((char*)sol.data())+numWritten, 
+                    sol.size() * sizeof(int) - numWritten);
+                if (n < 0) break;
+                numWritten += n;
+            }
             close(fd);
         });
     }
