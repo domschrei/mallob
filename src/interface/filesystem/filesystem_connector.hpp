@@ -40,6 +40,9 @@ public:
 
     void handleEvent(const FileWatcher::Event& event, Logger& log) {
 
+        if (event.type != IN_CLOSE_WRITE && event.type != IN_MOVED_FROM)
+            return;
+
         std::string eventFile = _base_path + "/in/" + event.name;
 
         // Valid file?

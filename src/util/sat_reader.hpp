@@ -29,31 +29,29 @@ private:
 	int _max_var = 0;
 
     // Content mode: RAW
-    bool _traversing_clauses = false;
+    bool _traversing_clauses = true;
     bool _traversing_assumptions = false;
+    bool _empty_clause = true;
 
 public:
     SatReader(const std::string& filename, ContentMode contentMode) : _filename(filename), _content_mode(contentMode) {}
     bool read(JobDescription& desc);
     inline void processInt(int x, JobDescription& desc) {
         
-        std::cout << x << std::endl;
+        //std::cout << x << std::endl;
 
-        if (_num == 0) {
-            _num = x;
-            if (!_traversing_clauses && !_traversing_assumptions) {
-                _traversing_clauses = true;
-            } else if (!_traversing_assumptions) {
-                _traversing_clauses = false;
-                _traversing_assumptions = true;
-            }
+        if (_empty_clause && x == 0) {
+            // Received an empty clause: switch to assumptions
+            _traversing_clauses = false;
+            _traversing_assumptions = true;
             return;
         }
-
-        assert(_num > 0);
+        
         if (_traversing_clauses) desc.addLiteral(x);
-        else desc.addAssumption(x);        
-        _num--;
+        else desc.addAssumption(x);
+
+        _max_var = std::max(_max_var, std::abs(x));
+        _empty_clause = (x == 0);
     }
     inline void process(char c, JobDescription& desc) {
 

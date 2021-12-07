@@ -436,7 +436,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     }
 
     if (_json_interface) {
-        _json_interface->handleJobDone(jobResult, desc.getStatistics());
+        _json_interface->handleJobDone(std::move(jobResult), desc.getStatistics());
     }
 
     finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
@@ -454,7 +454,7 @@ void Client::handleAbort(MessageHandle& handle) {
         result.id = jobId;
         result.revision = _active_jobs[result.id]->getRevision();
         result.result = 0;
-        _json_interface->handleJobDone(result, _active_jobs[result.id]->getStatistics());
+        _json_interface->handleJobDone(std::move(result), _active_jobs[result.id]->getStatistics());
     }
 
     finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());

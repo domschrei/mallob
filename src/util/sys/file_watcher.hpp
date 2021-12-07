@@ -94,7 +94,7 @@ public:
                         // Trigger CREATE event
                         //logger.log(V4_VVER, "FileWatcher: File event\n");
                         ProcessWideThreadPool::get().addTask([this, entry, &sublogger] () {
-                            _callback(FileWatcher::Event{IN_CREATE, entry}, sublogger);
+                            _callback(FileWatcher::Event{IN_MOVED_FROM, entry}, sublogger);
                         });
                     }
                     if (!_worker.continueRunning()) return;

@@ -1,5 +1,8 @@
 
 #include <string>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "json_interface.hpp"
 
@@ -8,6 +11,7 @@
 #include "util/random.hpp"
 #include "util/sys/time_period.hpp"
 #include "app/sat/sat_constants.h"
+#include "util/sys/thread_pool.hpp"
 
 JsonInterface::Result JsonInterface::handle(const nlohmann::json& json, 
     std::function<void(nlohmann::json&)> feedback) {
@@ -179,7 +183,7 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
     return ACCEPT;
 }
 
-void JsonInterface::handleJobDone(const JobResult& result, const JobDescription::Statistics& stats) {
+void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Statistics& stats) {
 
     if (Terminator::isTerminating()) return;
 
@@ -188,14 +192,25 @@ void JsonInterface::handleJobDone(const JobResult& result, const JobDescription:
     auto& img = _job_id_rev_to_image[std::pair<int, int>(result.id, result.revision)];
     auto& j = img.baseJson;
 
+    bool useSolutionFile = result.solution.size() > 65536;
+    auto solutionFile = "/tmp/mallob-job-result." 
+        + std::to_string(result.id) + "." 
+        + std::to_string(result.revision) + ".pipe";
+
     // Pack job result into JSON
     j["internal_id"] = result.id;
     j["internal_revision"] = result.revision;
     j["result"] = { 
         { "resultcode", result.result }, 
-        { "resultstring", result.result == RESULT_SAT ? "SAT" : result.result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN" }, 
-        { "solution", result.solution },
+        { "resultstring", result.result == RESULT_SAT ? "SAT" : result.result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN" }
     };
+    if (useSolutionFile) {
+        j["result"]["solution-file"] = solutionFile;
+        j["result"]["solution-size"] = result.solution.size();
+        mkfifo(solutionFile.c_str(), 0666);
+    } else {
+        j["result"]["solution"] = result.solution;
+    }
     j["stats"] = {
         { "time", {
             { "parsing", stats.parseTime },
@@ -210,6 +225,16 @@ void JsonInterface::handleJobDone(const JobResult& result, const JobDescription:
 
     // Send back feedback over whichever connection the job arrived
     img.feedback(j);
+
+    if (useSolutionFile) {
+        ProcessWideThreadPool::get().addTask([solutionFile, sol = std::move(result.solution)]() {
+            int fd = open(solutionFile.c_str(), O_WRONLY);
+            log(V4_VVER, "Writing solution: %i ints (%i,%i,...,%i,%i)\n", sol.size(), 
+                sol[0], sol[1], sol[sol.size()-2], sol[sol.size()-1]);
+            write(fd, sol.data(), sol.size() * sizeof(int));
+            close(fd);
+        });
+    }
 
     if (!img.incremental) {
         _job_name_to_id_rev.erase(img.userQualifiedName);
