@@ -33,17 +33,32 @@ private:
     bool _traversing_assumptions = false;
     bool _empty_clause = true;
 
+    bool _valid_input = false;
+
 public:
     SatReader(const std::string& filename, ContentMode contentMode) : _filename(filename), _content_mode(contentMode) {}
     bool read(JobDescription& desc);
+
     inline void processInt(int x, JobDescription& desc) {
         
         //std::cout << x << std::endl;
 
+        if (_valid_input) {
+            // Already WAS valid input: additional numbers will make it invalid!
+            _valid_input = false;
+            return;
+        }
+
         if (_empty_clause && x == 0) {
-            // Received an empty clause: switch to assumptions
-            _traversing_clauses = false;
-            _traversing_assumptions = true;
+            // Received an "empty clause" (zero without a preceding non-zero literal)
+            if (_traversing_clauses) {
+                // switch to assumptions
+                _traversing_clauses = false;
+                _traversing_assumptions = true;
+            } else if (_traversing_assumptions) {
+                // End of assumptions: done.
+                _valid_input = true;
+            }
             return;
         }
         
@@ -51,8 +66,9 @@ public:
         else desc.addAssumption(x);
 
         _max_var = std::max(_max_var, std::abs(x));
-        _empty_clause = (x == 0);
+        _empty_clause = _traversing_assumptions || (x == 0);
     }
+
     inline void process(char c, JobDescription& desc) {
 
         if (_comment && c != '\n') return;
@@ -97,6 +113,10 @@ public:
             _began_num = true;
             break;
         }
+    }
+
+    bool isValidInput() const {
+        return _content_mode != RAW || _valid_input;
     }
 };
 
