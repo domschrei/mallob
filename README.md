@@ -40,10 +40,10 @@ In addition, you can use the following Mallob-specific build options:
 
 | Usage                       | Description                                                                                                |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| -DMALLOB_ASSERT=<0|1>       | Turn on assertions (even on release builds). Setting to 0 limits assertions to debug builds.               |
-| -DMALLOB_USE_ASAN=<0|1>     | Compile with Address Sanitizer for debugging purposes.                                                     |
-| -DMALLOB_USE_GLUCOSE=<0|1>  | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
-| -DMALLOB_USE_MERGESAT=<0|1> | Compile with support for MergeSAT SAT solver (disabled by default due to experimental state of interface). |
+| -DMALLOB_ASSERT=<0/1>       | Turn on assertions (even on release builds). Setting to 0 limits assertions to debug builds.               |
+| -DMALLOB_USE_ASAN=<0/1>     | Compile with Address Sanitizer for debugging purposes.                                                     |
+| -DMALLOB_USE_GLUCOSE=<0/1>  | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
+| -DMALLOB_USE_MERGESAT=<0/1> | Compile with support for MergeSAT SAT solver (disabled by default due to experimental state of interface). |
 
 ### Docker
 
@@ -99,14 +99,9 @@ In case of many concurrent jobs, it is best to distribute your jobs evenly (or u
 The number of worker PEs and client PEs can be set manually with the `-w=<#workers>` and `-c=<#clients>` options to enforce that some PEs are exclusively clients or exclusively workers.
 The first `#workers` ranks are assigned worker roles, and the last `#clients` ranks are assigned client roles. These may overlap, and setting one/both of the options to -1 means that _all_ PEs are assigned the respective role(s).
 
-**Users**
-
-The API distinguishes jobs by the user which introduced them. By default there is a user `admin` defined in `.api/users/admin.json`.
-You can just use this user or create a new one and save it under `.api/users/<user-id>.json`. The priority must be larger than zero and no larger than one; a higher number gives more importance to the user's jobs.
-
 **Introducing a Job**
 
-To introduce a job to the system, drop a JSON file in `.api/jobs.<i>/new/` (e.g., `.api/jobs.0/new/`) on the filesystem of the according PE structured like this:  
+To introduce a job to the system, drop a JSON file in `.api/jobs.<i>/in/` (e.g., `.api/jobs.0/in/`) on the filesystem of the according PE structured like this:  
 ```
 { 
     "user": "admin", 
@@ -127,14 +122,16 @@ Here is a brief overview of all required and optional fields in the JSON API:
 | ----------------- | :-------: | -----------: | -------------------------------------------------------------------------------------------------------------- |
 | user              | **yes**   | String       | A user which is present at `.api/users/<user>.json`                                                            |
 | name              | **yes**   | String       | A user-unique name for this job (increment)                                                                    |
-| file              | **yes***  | String       | File path of the input formula to solve                                                                        |
+| file              | **yes***  | String       | File path of the input to solve. For SAT, this may be a text file, a compressed file, or a named pipe.         |
 | priority          | **yes***  | Float (0,1)  | Priority of the job (higher is more important)                                                                 |
-| application       | no        | String       | Which kind of problem is being solved; currently either of "SAT" or "DUMMY" (default: SAT)                     |
+| application       | no        | String       | Which kind of problem is being solved; currently either of "SAT" or "DUMMY" (default: DUMMY)                   |
 | wallclock-limit   | no        | String       | Job wallclock limit: combination of a number and a unit (ms/s/m/h/d)                                           |
 | cpu-limit         | no        | String       | Job CPU time limit: combination of a number and a unit (ms/s/m/h/d)                                            |
 | arrival           | no        | Float >= 0   | Job's arrival time (seconds) since program start; ignore job until then                                        |
 | max-demand        | no        | Int >= 0     | Override the max. number of MPI processes this job should receive at any point in time                         |
 | dependencies      | no        | String array | User-qualified job names (using "." as a separator) which must exit **before** this job is introduced          |
+| content-mode      | no        | String       | If "raw", the input file will be read as a binary file and not as a text file.                                 |
+| interrupt         | no        | Bool         | If `true`, the job given by "user" and "name" is interrupted (for incremental jobs, just the current revision).|
 | incremental       | no        | Bool         | Whether this job has multiple _increments_ / _revisions_ and should be treated as such                         |
 | precursor         | no        | String       | _(Only for incremental jobs)_ User-qualified job name (`<user>.<jobname>`) of this job's previous increment    |
 | assumptions       | no        | Int array    | _(Only for incremental jobs)_ You can specify the set of assumptions for this increment directly in the JSON.  |
@@ -142,22 +139,24 @@ Here is a brief overview of all required and optional fields in the JSON API:
 
 *) Not needed if `done` is set to `true`.
 
-In the above example, a job is introduced with effective priority `<user-prio> * <job-prio> = 1.0 * 0.7 = 0.7`, with a wallclock limit of five minutes and a CPU limit of 10 CPUh.
-The formula file must be a valid CNF file. For incremental jobs, Mallob uses the common iCNF extension: The file may contain a single line of the form:
+In the above example, a job is introduced with priority 0.7, with a wallclock limit of five minutes and a CPU limit of 10 CPUh.
 
-`a <lit1> <lit2> ... 0`
+For SAT solving, the input can be provided (a) as a plain file, (b) as a compressed (.lzma / .xz) file, or (c) as a named (UNIX) pipe.
+In each case, you have the option of providing the payload (i) in text form (i.e., a valid CNF description), or, with field `content-mode: "raw"`, in binary form (i.e., a sequence of bytes representing integers).  
+For text files, Mallob uses the common iCNF extension for incremental formulae: The file may contain a single line of the form `a <lit1> <lit2> ... 0` where `<lit1>`, `<lit2>` etc. are assumption literals.   
+For binary files, Mallob reads clauses as integer sequences with separation zeroes in between.
+Two zeroes in a row (i.e., an "empty clause") signal the end of clause literals, after which a number of assumption integers may be specified. Another zero signals that the description is complete.  
+If providing a named pipe, make sure that (a) the named pipe is already created when submitting the job and (b) your application pipes the formula _after_ submitting the job (else it will hang indefinitely except if this is done in a separate thread).
 
-where `<lit1>`, `<lit2>` etc. are assumption literals.
-Alternatively, you can specify the assumptions directly in the JSON describing the job via the `assumptions` field (without any trailing zero).
-This way, an incremental application can maintain a single text file with a monotonically growing set of clauses and there is no need to edit away the previous assumptions every time.
+Assumptions can also be specified directly in the JSON describing the job via the `assumptions` field (without any trailing zero). This way, an incremental application could maintain a single text file with a monotonically growing set of clauses.
 
 The "arrival" and "dependencies" fields are useful to test a particular preset scenario of jobs: The "arrival" field ensures that the job will be scheduled only after Mallob ran for the specified amount of seconds. The "dependencies" field ensures that the job is scheduled only if all specified other jobs are already processed.
 
-Mallob is notified by the kernel as soon as the file is placed in `.api/jobs.0/new/` and will immediately move the job description to `.api/jobs/pending/` and schedule the job.
+Mallob is notified by the kernel as soon as a valid file is placed in `.api/jobs.0/in/` and will immediately remove the file and schedule the job.
 
 **Retrieving a Job Result**
 
-Upon completion of a job, Mallob writes a result JSON file under `.api/jobs.0/done/<user-name>.<job-name>.json` (you can repeatedly query the directory contents or employ a kernel-level mechanism like `inotify`).
+Upon completion of a job, Mallob writes a result JSON file under `.api/jobs.0/out/<user-name>.<job-name>.json` (you can repeatedly query the directory contents or employ a kernel-level mechanism like `inotify`).
 Such a file may look like this:
 ```
 {
@@ -190,12 +189,12 @@ Such a file may look like this:
     "user": "admin",
     "wallclock-limit": "5m"
 }
-
 ```
 The result code is 0 is unknown, 10 if SAT, and 20 if UNSAT.
 In case of SAT, the solution field contains the found satisfying assignment; in case of UNSAT, the result for an incremental job contains the set of failed assumptions.
+Instead of the "solution" field, the response may also contain the fields "solution-size" and "solution-file" if the solution is large. In that case, your application has to read `solution-size` integers (as bytes) representing the solution from the named pipe located at `solution-file`.
 
-### Options Overview
+### Options
 
 All command-line options of Mallob can be seen by executing Mallob with the `-h` option. This also works without the `mpirun` prefix.
 
@@ -256,15 +255,15 @@ If you make use of Mallob in an academic setting, please cite this SAT'21 confer
 If you want to specifically cite Mallob in the scope of an International SAT Competition, please cite: 
 ```
 @article{schreiber2020engineering,
-  title={Engineering HordeSat Towards Malleability: mallob-mono in the SAT 2020 Cloud Track},
+  title={Engineering HordeSat Towards Malleability: mallob-mono in the {SAT} 2020 Cloud Track},
   author={Schreiber, Dominik},
   journal={SAT Competition 2020},
   pages={45}
 }
 @article{schreiber2021mallob,
-  title={Mallob in the SAT Competition 2021},
+  title={Mallob in the {SAT} Competition 2021},
   author={Schreiber, Dominik},
   journal={SAT Competition 2021},
-  note={To appear.}
+  pages={38}
 }
 ```
