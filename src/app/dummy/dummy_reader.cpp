@@ -1,7 +1,7 @@
 
 #include "dummy_reader.hpp"
 
-bool DummyReader::read(const std::string& filename, JobDescription& desc) {
+bool DummyReader::read(const std::vector<std::string>& filenames, JobDescription& desc) {
 
     // allocate necessary structs for the revision to read
     desc.beginInitialization(desc.getRevision());

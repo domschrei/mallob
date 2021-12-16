@@ -151,8 +151,7 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
         job->setPreloadedAssumptions(json["assumptions"].get<std::vector<int>>());
     }
     job->setArrival(arrival);
-    std::string file = json["file"].get<std::string>();
-
+    std::vector<std::string> files = json["files"].get<std::vector<std::string>>();
     
     // Translate dependencies (if any) to internal job IDs
     std::vector<int> idDependencies;
@@ -178,7 +177,7 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
     if (json.contains("content-mode") && json["content-mode"] == "raw") {
         contentMode = SatReader::ContentMode::RAW;
     }
-    _job_callback(JobMetadata{std::shared_ptr<JobDescription>(job), file, contentMode, idDependencies});
+    _job_callback(JobMetadata{std::shared_ptr<JobDescription>(job), files, contentMode, idDependencies});
 
     return ACCEPT;
 }

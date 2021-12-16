@@ -119,7 +119,7 @@ function introduce_job() {
     if [ -z $application ]; then application="SAT"; fi
     if [ -z $maxdemand ]; then maxdemand="0"; fi
     if [ -z $priority ]; then priority="1"; fi
-    echo '{ "application": "'$application'", "arrival": '$arrival', "dependencies": ['$dependency'], "user": "admin", "name": "'$jobname'", "file": "'$instance'", "priority": '$priority', "wallclock-limit": "'$wclimit'", "cpu-limit": "0", "max-demand": '$maxdemand' }' > .api/jobs.0/new/$1.json
+    echo '{ "application": "'$application'", "arrival": '$arrival', "dependencies": ['$dependency'], "user": "admin", "name": "'$jobname'", "files": ["'$instance'"], "priority": '$priority', "wallclock-limit": "'$wclimit'", "cpu-limit": "0", "max-demand": '$maxdemand' }' > .api/jobs.0/new/$1.json
     cp .api/jobs.0/new/$1.json .api/jobs.0/introduced/admin.$1.json
 }
 
@@ -133,11 +133,11 @@ function introduce_incremental_job() {
         revname=${jobname}-${r}-$result
         cnfname=${instance}-${r}.cnf
         if [ $r == 0 ] ; then
-            echo '{"cpu-limit": "0", "file": "'$cnfname'", "incremental": true, "application": "SAT",
+            echo '{"cpu-limit": "0", "files": ["'$cnfname'"], "incremental": true, "application": "SAT",
             "name": "'$revname'", "priority": 1.0, "user": "admin",
             "wallclock-limit": "0"}' > .api/jobs.0/introduced/${revname}.json
         else
-            echo '{"cpu-limit": "0", "file": "'$cnfname'", "incremental": true, "application": "SAT",
+            echo '{"cpu-limit": "0", "files": ["'$cnfname'"], "incremental": true, "application": "SAT",
             "name": "'$revname'", "precursor": "admin.'$last_revname'", "priority": 1.0, "user": "admin",
             "wallclock-limit": "0"}' > .api/jobs.0/introduced/${revname}.json    
         fi
@@ -147,7 +147,7 @@ function introduce_incremental_job() {
     done < instances/incremental/$1
 
     revname=${jobname}-${r}-$result
-    echo '{"cpu-limit": "0", "file": "NONE", "incremental": true, "done": true, "application": "SAT",
+    echo '{"cpu-limit": "0", "files": ["NONE"], "incremental": true, "done": true, "application": "SAT",
         "name": "'$revname'", "precursor": "admin.'$last_revname'", "priority": 1.0, "user": "admin",
         "wallclock-limit": "0"}' > .api/jobs.0/introduced/${revname}.json
     echo ${revname}.json >> _incremental_jobs-$globalcount

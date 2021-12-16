@@ -51,6 +51,7 @@ bool SatReader::read(JobDescription& desc) {
 			for (long i = 0; i < size; i++) {
 				process(f[i], desc);
 			}
+			process(EOF, desc);
 		}
 		munmap(mmapped, size);
 		close(fd);
@@ -80,6 +81,7 @@ bool SatReader::read(JobDescription& desc) {
 				}
 				iteration++;
 			}
+			process(EOF, desc);
 		}
 
 	} else {
@@ -105,6 +107,7 @@ bool SatReader::read(JobDescription& desc) {
 					process(c, desc);
 				}
 			}
+			process(EOF, desc);
 		}
 	}
 

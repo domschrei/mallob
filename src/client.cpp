@@ -81,14 +81,15 @@ void Client::readIncomingJobs() {
                 // Read job
                 int id = foundJob.description->getId();
                 float time = Timer::elapsedSeconds();
-                log.log(V3_VERB, "[T] Reading job #%i rev. %i (%s) ...\n", id, foundJob.description->getRevision(), foundJob.file.c_str());
-                bool success = JobReader::read(foundJob.file, foundJob.contentMode, *foundJob.description);
+                auto filesList = foundJob.getFilesList();
+                log.log(V3_VERB, "[T] Reading job #%i rev. %i %s ...\n", id, foundJob.description->getRevision(), filesList.c_str());
+                bool success = JobReader::read(foundJob.files, foundJob.contentMode, *foundJob.description);
                 if (!success) {
-                    log.log(V1_WARN, "[T] [WARN] File %s could not be opened - skipping #%i\n", foundJob.file.c_str(), id);
+                    log.log(V1_WARN, "[T] [WARN] Unsuccessful read - skipping #%i\n", id);
                 } else {
                     time = Timer::elapsedSeconds() - time;
-                    log.log(V3_VERB, "[T] Initialized job #%i (%s) in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
-                            id, foundJob.file.c_str(), time, foundJob.description->getNumFormulaLiterals(), 
+                    log.log(V3_VERB, "[T] Initialized job #%i %s in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
+                            id, filesList.c_str(), time, foundJob.description->getNumFormulaLiterals(), 
                             foundJob.description->getNumAssumptionLiterals());
                     foundJob.description->getStatistics().parseTime = time;
                     

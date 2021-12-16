@@ -106,7 +106,7 @@ To introduce a job to the system, drop a JSON file in `.api/jobs.<i>/in/` (e.g.,
 { 
     "user": "admin", 
     "name": "test-job-1", 
-    "file": "/path/to/difficult/formula.cnf", 
+    "files": ["/path/to/difficult/formula.cnf"], 
     "priority": 0.7, 
     "wallclock-limit": "5m", 
     "cpu-limit": "10h",
@@ -122,7 +122,7 @@ Here is a brief overview of all required and optional fields in the JSON API:
 | ----------------- | :-------: | -----------: | -------------------------------------------------------------------------------------------------------------- |
 | user              | **yes**   | String       | A user which is present at `.api/users/<user>.json`                                                            |
 | name              | **yes**   | String       | A user-unique name for this job (increment)                                                                    |
-| file              | **yes***  | String       | File path of the input to solve. For SAT, this may be a text file, a compressed file, or a named pipe.         |
+| files             | **yes***  | String array | File paths of the input to solve. For SAT, this must be a single (text file or compressed file or named pipe). |
 | priority          | **yes***  | Float (0,1)  | Priority of the job (higher is more important)                                                                 |
 | application       | no        | String       | Which kind of problem is being solved; currently either of "SAT" or "DUMMY" (default: DUMMY)                   |
 | wallclock-limit   | no        | String       | Job wallclock limit: combination of a number and a unit (ms/s/m/h/d)                                           |

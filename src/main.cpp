@@ -26,7 +26,7 @@ void introduceMonoJob(Parameters& params, Client& client) {
     nlohmann::json json = {
         {"user", "admin"},
         {"name", "mono-job"},
-        {"file", params.monoFilename()},
+        {"files", {params.monoFilename()}},
         {"priority", 1.000},
         {"application", "SAT"}
     };

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <stdio.h> 
 #include "util/assert.hpp"
 
 #include "data/job_description.hpp"
@@ -75,6 +76,7 @@ public:
 
         switch (c) {
         case '\n':
+        case EOF:
             _comment = false;
             if (_began_num) {
                 assert(_num == 0);

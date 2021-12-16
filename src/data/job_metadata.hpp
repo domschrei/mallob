@@ -11,7 +11,7 @@
 
 struct JobMetadata {
     std::shared_ptr<JobDescription> description;
-    std::string file;
+    std::vector<std::string> files;
     SatReader::ContentMode contentMode;
 
     std::vector<int> dependencies;
@@ -20,13 +20,19 @@ struct JobMetadata {
 
     bool operator==(const JobMetadata& other) const {
         if (!description != !(other.description)) return false;
-        if (!description) return file == other.file;
+        if (!description) return files == other.files;
         if (description->getId() != other.description->getId()) return false;
         if (description->getRevision() != other.description->getRevision()) return false;
         return true;
     }
     bool operator!=(const JobMetadata& other) const {
         return !(*this == other);
+    }
+
+    std::string getFilesList() const {
+        std::string list = "{";
+        for (auto& file : files) list += file + ",";
+        return list.substr(0, list.size()-(files.empty()?0:1)) + "}";
     }
 };
 
