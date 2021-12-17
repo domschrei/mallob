@@ -216,7 +216,7 @@ void Worker::advance(float time) {
     // Reset watchdog
     _watchdog.reset(time);
     
-    if (_periodic_stats_check.ready()) {
+    if (_periodic_stats_check.ready(time)) {
         // Print stats
 
         // For this process and subprocesses
@@ -239,7 +239,7 @@ void Worker::advance(float time) {
         }
 
         // Print further stats?
-        if (_periodic_big_stats_check.ready()) {
+        if (_periodic_big_stats_check.ready(time)) {
 
             // For the current job
             if (_job_db.hasActiveJob()) {
@@ -257,8 +257,8 @@ void Worker::advance(float time) {
     }
 
     // Advance load balancing operations
-    if (_periodic_balance_check.ready()) {
-        _job_db.advanceBalancing();
+    if (_periodic_balance_check.ready(time)) {
+        _job_db.advanceBalancing(time);
 
         // Advance collective assignment of nodes
         if (_params.hopsUntilCollectiveAssignment() >= 0) {
@@ -267,7 +267,7 @@ void Worker::advance(float time) {
     }
 
     // Do diverse periodic maintenance tasks
-    if (_periodic_maintenance.ready()) {
+    if (_periodic_maintenance.ready(time)) {
         
         // Forget jobs that are old or wasting memory
         _job_db.forgetOldJobs();
@@ -279,7 +279,7 @@ void Worker::advance(float time) {
     }
 
     // Check active job
-    if (_periodic_job_check.ready()) {
+    if (_periodic_job_check.ready(time)) {
         
         // Load and try to adopt pending root reactivation request
         if (_job_db.hasPendingRootReactivationRequest()) {

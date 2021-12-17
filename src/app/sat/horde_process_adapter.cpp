@@ -17,8 +17,8 @@
 #include "util/sys/thread_pool.hpp"
 
 HordeProcessAdapter::HordeProcessAdapter(Parameters&& params, HordeConfig&& config, ForkedSatJob* job,
-    size_t fSize, const int* fLits, size_t aSize, const int* aLits) :    
-        _params(std::move(params)), _config(std::move(config)), _job(job),
+    size_t fSize, const int* fLits, size_t aSize, const int* aLits, AnytimeSatClauseCommunicator* comm) :    
+        _params(std::move(params)), _config(std::move(config)), _job(job), _clause_comm(comm),
         _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits) {
 
     _written_revision = -1;
@@ -34,7 +34,8 @@ void HordeProcessAdapter::run() {
 
 void HordeProcessAdapter::doInitialize() {
 
-    _clause_comm = new AnytimeSatClauseCommunicator(_params, _job);
+    if (_clause_comm == nullptr)
+        _clause_comm = new AnytimeSatClauseCommunicator(_params, _job);
 
     // Initialize "management" shared memory
     _shmem_id = _config.getSharedMemId(Proc::getPid());
@@ -211,8 +212,7 @@ std::vector<int> HordeProcessAdapter::getCollectedClauses(Checksum& checksum) {
 }
 
 void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses, const Checksum& checksum) {
-    if (!_initialized) return;
-    if (_hsm->doImport) {
+    if (!_initialized || _hsm->doImport) {
         // Cannot import right now -- defer into temporary storage 
         _temp_clause_buffers.emplace_back(clauses, checksum);
         return;

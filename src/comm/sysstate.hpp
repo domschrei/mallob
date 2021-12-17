@@ -21,7 +21,7 @@ public:
     void setLocal(int pos, float val);
     void setLocal(std::initializer_list<float> elems);
     void addLocal(int pos, float val);
-    bool aggregate(float elapsedTime = Timer::elapsedSeconds());
+    bool aggregate(float elapsedTime = -1);
     float* getGlobal();
 };
 

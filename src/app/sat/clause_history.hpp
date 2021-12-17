@@ -82,13 +82,20 @@ public:
             msg.tag = MSG_CLAUSE_HISTORY_SEND_CLAUSES;
             msg.payload = _history[subscription.nextIndex].clauses.at(0);
             if (_use_checksums) setChecksum(msg);
-            MyMpi::isend(subscription.correspondingRank, MSG_SEND_APPLICATION_MESSAGE, msg);
-            log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Send batch of index %i", subscription.correspondingRank, _job.toStr(), subscription.nextIndex);
+            log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Send batch of index %i", rank, _job.toStr(), subscription.nextIndex);
+            
+            if (rank == MyMpi::rank(MPI_COMM_WORLD)) {
+                // message to self: digest clauses directly
+                _job.digestSharing(msg.payload, msg.checksum);
+            } else {
+                // message to another worker
+                MyMpi::isend(rank, MSG_SEND_APPLICATION_MESSAGE, msg);
+            }
 
             subscription.nextIndex++;
             if (subscription.nextIndex >= subscription.endIndex) {
                 // Erase completed subscription
-                log(V4_VVER, "CLSHIST %s Subscription [%i] finished\n", _job.toStr(), subscription.correspondingRank);    
+                log(V4_VVER, "CLSHIST %s Subscription [%i] finished\n", _job.toStr(), rank);    
                 subscribersToDelete.push_back(rank);
             }
         }
@@ -211,9 +218,11 @@ public:
         auto prevLatestEpoch = _latest_epoch;
         _latest_epoch = std::max(_latest_epoch, epoch);
 
+        int oldIndex = epochToIndexAndOffset(prevLatestEpoch).first;
+        int newIndex = epochToIndexAndOffset(_latest_epoch).first;
         // If necessary, reduce a batch from Shorttermmemory-Size to Longtermmemory-Size
-        if (_latest_epoch > prevLatestEpoch && _latest_epoch >= _num_stm_slots) {
-            int indexToReduce = _latest_epoch - _num_stm_slots;
+        if (newIndex > oldIndex && newIndex >= _num_stm_slots) {
+            int indexToReduce = newIndex - _num_stm_slots;
             if (isBatchComplete(indexToReduce) && _history[indexToReduce].clauses[0].size() > _ltm_buffer_size) {
                 // Reduce this batch
                 _history[indexToReduce].clauses[0].resize(_ltm_buffer_size);
@@ -266,6 +275,13 @@ public:
             log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Unsubscribe", _subscription.correspondingRank, _job.toStr());
             _subscription = Subscription();
         }
+    }
+
+    void feedHistoryIntoSolver() {
+        int myRank = MyMpi::rank(MPI_COMM_WORLD);
+        int lastIndex = epochToIndexAndOffset(_latest_epoch).first + 1;
+        log(V4_VVER, "CLSHIST %s self-subscribing [%i,%i]\n", _job.toStr(), 0, lastIndex);
+        _subscribers[myRank] = Subscription{myRank, 0, lastIndex};
     }
 
 private:

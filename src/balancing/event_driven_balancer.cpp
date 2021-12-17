@@ -150,12 +150,14 @@ void EventDrivenBalancer::pushEvent(const Event& event) {
     }
 }
 
-void EventDrivenBalancer::advance() {
+void EventDrivenBalancer::advance(float time) {
     // Have anything to reduce?
     if (_diffs.isEmpty()) return;
 
+    if (time < 0) time = Timer::elapsedSeconds();
+
     // Is ready to perform balancing again?
-    if (!_periodic_balancing.ready()) return;
+    if (!_periodic_balancing.ready(time)) return;
 
     EventMap m = std::move(_diffs);
     _diffs.clear();

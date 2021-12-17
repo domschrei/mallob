@@ -19,6 +19,7 @@
 #include "util/sys/terminator.hpp"
 #include "data/job_reader.hpp"
 #include "util/sys/thread_pool.hpp"
+#include "util/sys/atomics.hpp"
 
 #include "interface/socket/socket_connector.hpp"
 #include "interface/filesystem/filesystem_connector.hpp"
@@ -96,8 +97,8 @@ void Client::readIncomingJobs() {
                     // Enqueue in ready jobs
                     auto lock = _ready_job_lock.getLock();
                     _ready_job_queue.emplace_back(foundJob.description);
-                    _num_ready_jobs++;
-                    _num_loaded_jobs++;
+                    atomics::incrementRelaxed(_num_ready_jobs);
+                    atomics::incrementRelaxed(_num_loaded_jobs);
                     _sys_state.addLocal(SYSSTATE_PARSED_JOBS, 1);
                 }
             });
@@ -136,6 +137,7 @@ void Client::handleNewJob(JobMetadata&& data) {
         int jobId = data.description->getId();
         auto lock = _jobs_to_interrupt_lock.getLock();
         _jobs_to_interrupt.insert(jobId);
+        atomics::incrementRelaxed(_num_jobs_to_interrupt);
         return;
     }
 
@@ -144,6 +146,7 @@ void Client::handleNewJob(JobMetadata&& data) {
     {
         auto lock = _arrival_times_lock.getLock();
         _arrival_times.insert(data.description->getArrival());
+        _next_arrival_time_millis.store(1000 * *_arrival_times.begin(), std::memory_order_relaxed);
     }
     {
         auto lock = _incoming_job_lock.getLock();
@@ -216,7 +219,7 @@ void Client::advance() {
     float time = Timer::elapsedSeconds();
     
     // Send notification messages for recently done jobs
-    if (_periodic_check_done_jobs.ready()) {
+    if (_periodic_check_done_jobs.ready(time)) {
         robin_hood::unordered_flat_set<int, robin_hood::hash<int>> doneJobs;
         {
             auto lock = _done_job_lock.getLock();
@@ -231,7 +234,7 @@ void Client::advance() {
         }
     }
 
-    if (_jobs_to_interrupt_lock.tryLock()) {
+    if (_num_jobs_to_interrupt.load(std::memory_order_relaxed) > 0 && _jobs_to_interrupt_lock.tryLock()) {
         
         auto it = _jobs_to_interrupt.begin();
         while (it != _jobs_to_interrupt.end()) {
@@ -242,17 +245,23 @@ void Client::advance() {
                 log(V2_INFO, "Interrupt #%i\n", jobId);
                 MyMpi::isend(_root_nodes.at(jobId), MSG_NOTIFY_JOB_ABORTING, IntVec({jobId}));
                 it = _jobs_to_interrupt.erase(it);
+                atomics::decrementRelaxed(_num_jobs_to_interrupt);
             } else ++it;
         }
         _jobs_to_interrupt_lock.unlock();
     }
 
     // Process arrival times chronologically; if at least one "happened", notify reader
-    if (_arrival_times_lock.tryLock()) {
+    auto nextArrival = 0.001f * _next_arrival_time_millis.load(std::memory_order_relaxed);
+    if (nextArrival >= 0 && time >= nextArrival && _arrival_times_lock.tryLock()) {
         bool notify = false;
+        _next_arrival_time_millis.store(-1, std::memory_order_relaxed);
         for (auto it = _arrival_times.begin(); it != _arrival_times.end(); ++it) {
             float arr = *it;
-            if (arr > time) break;
+            if (arr > time) {
+                _next_arrival_time_millis.store(1000*arr, std::memory_order_relaxed);
+                break;
+            }
             
             notify = true;
             it = _arrival_times.erase(it);
@@ -302,7 +311,7 @@ void Client::introduceNextJob() {
         return;
 
     // Are there any non-introduced jobs left?
-    if (_num_ready_jobs == 0) return;
+    if (_num_ready_jobs.load(std::memory_order_relaxed) == 0) return;
     
     // To check if there is space for another active job in this client's "bucket"
     size_t lbc = getMaxNumParallelJobs();
@@ -325,7 +334,7 @@ void Client::introduceNextJob() {
         if (jobPtr) _ready_job_queue.erase(it);
     }
     if (!jobPtr) return;
-    _num_ready_jobs--;
+    atomics::decrementRelaxed(_num_ready_jobs);
 
     // Store as an active job
     JobDescription& job = *jobPtr;

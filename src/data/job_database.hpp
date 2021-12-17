@@ -98,7 +98,7 @@ public:
     void preregisterJobInBalancer(int jobId);
     void setBalancerVolumeUpdateCallback(std::function<void(int, int, float)> cb) {_balancer->setVolumeUpdateCallback(cb);}
     void setBalancingDoneCallback(std::function<void()> cb) {_balancer->setBalancingDoneCallback(cb);}
-    void advanceBalancing() {_balancer->advance();}
+    void advanceBalancing(float time) {_balancer->advance(time);}
     void handleBalancingMessage(MessageHandle& handle) {_balancer->handle(handle);}
     int getGlobalBalancingEpoch() const {return _balancer->getGlobalEpoch();}
     void unregisterJobFromBalancer(int jobId) {_balancer->onTerminate(get(jobId));}

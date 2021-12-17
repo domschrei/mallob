@@ -50,6 +50,7 @@ public:
     void sendClausesToParent();
     void handle(int source, JobMessage& msg);
     void suspend();
+    void feedHistoryIntoSolver();
 
 private:
     

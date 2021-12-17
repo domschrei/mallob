@@ -11,7 +11,8 @@ class Job; // forward definition
 
 struct HordeConfig {
 
-    float starttime;
+    long starttimeSecs;
+    long starttimeNsecs;
     int apprank;
     int mpirank;
     int mpisize;
@@ -28,7 +29,8 @@ struct HordeConfig {
     HordeConfig(const std::string& packed) {
         std::stringstream s_stream(packed);
         std::string substr;
-        getline(s_stream, substr, ','); starttime = atof(substr.c_str());
+        getline(s_stream, substr, ','); starttimeSecs = atol(substr.c_str());
+        getline(s_stream, substr, ','); starttimeNsecs = atol(substr.c_str());
         getline(s_stream, substr, ','); apprank = atoi(substr.c_str());
         getline(s_stream, substr, ','); mpirank = atoi(substr.c_str());
         getline(s_stream, substr, ','); mpisize = atoi(substr.c_str());
@@ -44,7 +46,8 @@ struct HordeConfig {
 
     std::string toString() const {
         std::string out = "";
-        out += std::to_string(starttime) + ",";
+        out += std::to_string(starttimeSecs) + ",";
+        out += std::to_string(starttimeNsecs) + ",";
         out += std::to_string(apprank) + ",";
         out += std::to_string(mpirank) + ",";
         out += std::to_string(mpisize) + ",";

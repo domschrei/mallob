@@ -46,6 +46,7 @@ private:
     Mutex _incoming_job_lock;
     ConditionVariable _incoming_job_cond_var;
     
+    std::atomic_long _next_arrival_time_millis = -1;
     std::set<float> _arrival_times;
     Mutex _arrival_times_lock;
 
@@ -66,6 +67,7 @@ private:
     // Safeguards _done_jobs.
     Mutex _done_job_lock; 
 
+    std::atomic_int _num_jobs_to_interrupt = 0;
     robin_hood::unordered_set<int> _jobs_to_interrupt;
     Mutex _jobs_to_interrupt_lock;
 

@@ -11,9 +11,9 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         log(LOG_ADD_SRCRANK | V1_WARN, "[WARN] %s : stray job message meant for #%i\n", source, _job->toStr(), msg.jobId);
         return;
     }
-    // Discard messages from a revision inconsistent with
-    // the current local revision
-    if (msg.revision != _job->getRevision()) return;
+    
+    // Discard messages from a revision "from the future"
+    if (msg.revision > _job->getRevision()) return;
 
     if (_use_checksums) {
         Checksum chk;
@@ -348,4 +348,8 @@ bool AnytimeSatClauseCommunicator::testConsistency(std::vector<int>& buffer, siz
         abort();
     }
     return consistent == 0;
+}
+
+void AnytimeSatClauseCommunicator::feedHistoryIntoSolver() {
+    if (_use_cls_history) _cls_history.feedHistoryIntoSolver();
 }

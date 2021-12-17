@@ -15,7 +15,7 @@
 #include "util/ringbuffer.hpp"
 
 MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize), 
-    _fragmented_queue(1024), _fused_queue(1024), _garbage_queue(1024) {
+    _fragmented_queue(1024), _garbage_queue(1024) {
     
     MPI_Comm_rank(MPI_COMM_WORLD, &_my_rank);
     _recv_data = (uint8_t*) malloc(maxMsgSize+20);
@@ -129,7 +129,11 @@ void MessageQueue::runFragmentedMessageAssembler() {
         }
         h.setReceive(std::move(outData));
         // Put into finished queue
-        while (!_fused_queue.produce(std::move(h))) {}
+        {
+            auto lock = _fused_mutex.getLock();
+            _fused_queue.push_back(std::move(h));
+            atomics::incrementRelaxed(_num_fused);
+        }
     }
 }
 
@@ -238,30 +242,35 @@ void MessageQueue::processSelfReceived() {
 }
 
 void MessageQueue::processAssembledReceived() {
-    // Process fully assembled batched messages
-    auto opt = _fused_queue.consume();
-    int consumed = 0;
-    while (opt.has_value()) {
-        auto& h = opt.value();
 
-        log(V5_DEBG, "MQ FUSED t=%i\n", h.tag);
-        _callbacks.at(h.tag)(h);
-        
-        if (h.getRecvData().size() > _max_msg_size) {
-            // Concurrent deallocation of large chunk of data
-            while (!_garbage_queue.produce(
-                DataPtr(
-                    new std::vector<uint8_t>(
-                        h.moveRecvData()
+    int numFused = _num_fused.load(std::memory_order_relaxed);
+    if (numFused > 0 && _fused_mutex.tryLock()) {
+
+        int consumed = 0;
+        while (!_fused_queue.empty() && consumed < 4) {
+
+            auto& h = _fused_queue.front();
+            log(V5_DEBG, "MQ FUSED t=%i\n", h.tag);
+            _callbacks.at(h.tag)(h);
+            
+            if (h.getRecvData().size() > _max_msg_size) {
+                // Concurrent deallocation of large chunk of data
+                while (!_garbage_queue.produce(
+                    DataPtr(
+                        new std::vector<uint8_t>(
+                            h.moveRecvData()
+                        )
                     )
-                )
-            )) {}
+                )) {}
+            }
+            _fused_queue.pop_front();
+            atomics::decrementRelaxed(_num_fused);
+
+            consumed++;
+            if (consumed >= 4) break;
         }
 
-        consumed++;
-        if (consumed >= 4) break;
-
-        opt = _fused_queue.consume();
+        _fused_mutex.unlock();
     }
 }
 

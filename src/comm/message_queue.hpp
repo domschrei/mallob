@@ -14,6 +14,7 @@
 #include "util/logger.hpp"
 #include "comm/msgtags.h"
 #include "util/ringbuffer.hpp"
+#include "util/sys/atomics.hpp"
 
 typedef std::shared_ptr<std::vector<uint8_t>> DataPtr;
 typedef std::shared_ptr<const std::vector<uint8_t>> ConstDataPtr; 
@@ -117,7 +118,9 @@ private:
     // Fragmented messages stuff
     robin_hood::unordered_map<std::pair<int, int>, ReceiveFragment, IntPairHasher> _fragmented_messages;
     SPSCRingBuffer<ReceiveFragment> _fragmented_queue;
-    SPSCRingBuffer<MessageHandle> _fused_queue;
+    std::atomic_int _num_fused = 0;
+    Mutex _fused_mutex;
+    std::list<MessageHandle> _fused_queue;
 
     // Send stuff
     std::list<SendHandle> _send_queue;

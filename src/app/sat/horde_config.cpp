@@ -4,7 +4,9 @@
 #include "util/sys/proc.hpp"
 
 HordeConfig::HordeConfig(const Parameters& params, const Job& job, int recoveryIndex) {
-    starttime = Timer::elapsedSeconds();
+    auto t = Timer::getStartTime();
+    starttimeSecs = t.tv_sec;
+    starttimeNsecs = t.tv_nsec;
     apprank = job.getIndex();
     mpirank = job.getMyMpiRank();
     mpisize = job.getGlobalNumWorkers();

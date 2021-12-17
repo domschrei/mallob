@@ -714,6 +714,7 @@ JobDatabase::~JobDatabase() {
         forgetOldJobs();
         _janitor_cond_var.notify();
         watchdog.reset();
+        usleep(10*1000); // 10 milliseconds
     }
 
     _janitor.stopWithoutWaiting();

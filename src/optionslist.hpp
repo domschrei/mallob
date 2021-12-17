@@ -40,7 +40,7 @@ OPT_INT(activeJobsPerClient,             "ajpc", "lbc",                     0,  
 OPT_INT(bufferedImportedClsGenerations,  "bicg", "",                        4,    1, LARGE_INT,         "Number of subsequent full clause sharings to fit in each solver's import buffer")
 OPT_INT(clauseBufferBaseSize,            "cbbs", "",                        1500, 0, MAX_INT,           "Clause buffer base size in integers")
 OPT_INT(clauseHistoryAggregationFactor,  "chaf", "",                        5,    1, LARGE_INT,         "Aggregate historic clause batches by this factor")
-OPT_INT(clauseHistoryShortTermMemSize,   "chstms", "",                      60,   1, LARGE_INT,         "Save this many \"full\" aggregated epochs until reducing them")
+OPT_INT(clauseHistoryShortTermMemSize,   "chstms", "",                      10,   1, LARGE_INT,         "Save this many \"full\" aggregated epochs until reducing them")
 OPT_INT(finalHardLbdLimit,               "fhlbd", "",                       LARGE_INT, 0, LARGE_INT,    "After max. number of clause prod. increases, this MUST be fulfilled for any clause to be shared")
 OPT_INT(finalSoftLbdLimit,               "fslbd", "",                       LARGE_INT, 0, LARGE_INT,    "After max. number of clause prod. increases, this must be fulfilled for any clause to be shared except for special cases")
 OPT_INT(firstApiIndex,                   "fapii", "",                       0,    0, LARGE_INT,         "1st API index: with c clients, uses .api/jobs.{<index>..<index>+c-1}/ as directories")

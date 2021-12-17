@@ -41,12 +41,19 @@ void ForkedSatJob::doStartSolver() {
         desc.getFormulaPayloadSize(0), 
         desc.getFormulaPayload(0), 
         desc.getAssumptionsSize(0),
-        desc.getAssumptionsPayload(0)
+        desc.getAssumptionsPayload(0),
+        (AnytimeSatClauseCommunicator*)_clause_comm
     ));
     loadIncrements();
 
     //log(V5_DEBG, "%s : beginning to solve\n", toStr());
     _solver->run();
+
+    if (_initialized) {
+        // solver was already initialized before and was then restarted: 
+        // Re-learn all historic clauses which the communicator still remembers
+        ((AnytimeSatClauseCommunicator*)_clause_comm)->feedHistoryIntoSolver();
+    }
 }
 
 void ForkedSatJob::loadIncrements() {
@@ -113,12 +120,14 @@ int ForkedSatJob::appl_solved() {
         // Subprocess crashed for whatever reason: try to recover
 
         // Release "old" solver / clause comm from ownership, clean up concurrently
+        checkClauseComm(); // store clause comm in this job instance (if present)
+        _solver->releaseClauseComm(); // release clause comm from ownership of the solver
         HordeProcessAdapter* solver = _solver.release();
         ProcessWideThreadPool::get().addTask([solver]() {
+            // clean up solver (without the clause comm)
             solver->freeSharedMemory();
             delete solver;
         });
-        _clause_comm = nullptr;
 
         // Start new solver (with renamed shared memory segments)
         doStartSolver();

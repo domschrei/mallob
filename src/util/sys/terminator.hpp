@@ -34,7 +34,7 @@ public:
             return true;
         }
         
-        return _exit;
+        return _exit.load(std::memory_order_relaxed);
     }
 
 };

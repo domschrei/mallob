@@ -32,7 +32,7 @@ void SysState<N>::addLocal(int pos, float val) {
 template <int N>
 bool SysState<N>::aggregate(float elapsedTime) {
 
-    float time = elapsedTime;
+    float time = elapsedTime < 0 ? Timer::elapsedSeconds() : elapsedTime;
     if (time-_last_check > 0.1) {
         _last_check = time;
         float timeSinceLast = time-_last_aggregation;

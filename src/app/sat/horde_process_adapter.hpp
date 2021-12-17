@@ -86,8 +86,9 @@ private:
     Mutex _state_mutex;
 
 public:
-    HordeProcessAdapter(Parameters&& params, HordeConfig&& config, ForkedSatJob* job,
-            size_t fSize, const int* fLits, size_t aSize, const int* aLits);
+    HordeProcessAdapter(Parameters&& params, HordeConfig&& config, ForkedSatJob* job, 
+        size_t fSize, const int* fLits, size_t aSize, const int* aLits,
+        AnytimeSatClauseCommunicator* comm = nullptr);
     ~HordeProcessAdapter();
 
     void run();
@@ -100,6 +101,7 @@ public:
 
     bool hasClauseComm();
     AnytimeSatClauseCommunicator* getClauseComm() {return _clause_comm;}
+    void releaseClauseComm() {_clause_comm = nullptr;}
 
     void collectClauses(int maxSize);
     bool hasCollectedClauses();

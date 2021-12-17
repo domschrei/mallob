@@ -75,6 +75,9 @@ void CollectiveAssignment::deserialize(const std::vector<uint8_t>& packed, int s
 }
 
 void CollectiveAssignment::resolveRequests() {
+
+    if(_request_list.empty()) return;
+
     // Guard against recursive calls (would be illegal due to iteration over map)
     static bool resolving = false;
     assert(!resolving);
@@ -179,8 +182,8 @@ void CollectiveAssignment::advance(int epoch) {
     
     resolveRequests();
 
-    auto status = getAggregatedStatus();
     if (_status_dirty) {
+        auto status = getAggregatedStatus();
         if (MyMpi::rank(MPI_COMM_WORLD) == getCurrentRoot()) {
             log(V3_VERB, "[CA] Root: %i requests, %i idle (epoch=%i)\n", _request_list.size(), status.numIdle, _epoch);
         } else {

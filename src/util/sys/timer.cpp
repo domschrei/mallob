@@ -1,31 +1,23 @@
 
-#include <chrono>
+#include <sys/time.h>
 
 #include "timer.hpp"
 #include "util/params.hpp"
 
-using namespace std::chrono;
-double startTime;
+timespec Timer::timespecStart;
+timespec Timer::timespecEnd;
 
-double Timer::now() {
-    return 0.001 * 0.001 * 0.001 * system_clock::now().time_since_epoch().count();
+void Timer::init() {
+    clock_gettime(CLOCK_MONOTONIC_RAW, &timespecStart);
 }
-
-void Timer::init(double start) {
-    startTime = start == -1 ? now() : now()-start;
-}
-
-/**
- * Returns elapsed time since program start (since MyMpi::init) in seconds.
- */
-float Timer::elapsedSeconds() {
-    return now() - startTime;
+void Timer::init(timespec start) {
+    timespecStart = start;
 }
 
 bool Timer::globalTimelimReached(Parameters& params) {
     return params.timeLimit() > 0 && elapsedSeconds() > params.timeLimit();
 }
 
-double Timer::getStartTime() {
-    return startTime;
+timespec Timer::getStartTime() {
+    return timespecStart;
 }

@@ -24,20 +24,16 @@ bool ClauseFilter::registerClause(const int* begin, int size) {
 	if (_clear.compare_exchange_weak(isClearSet, false, std::memory_order_relaxed))
 		clear();
 
-	size_t h1 = ClauseHasher::hash(begin, size, 1) % NUM_BITS;
-	size_t h2 = ClauseHasher::hash(begin, size, 2) % NUM_BITS;
-	size_t h3 = ClauseHasher::hash(begin, size, 3) % NUM_BITS;
-	size_t h4 = ClauseHasher::hash(begin, size, 4) % NUM_BITS;
-
-	if (_bitset.test(h1) && _bitset.test(h2) && _bitset.test(h3) && _bitset.test(h4)) {
-		return false;
-	} else {
-		_bitset.set(h1, true);
-		_bitset.set(h2, true);
-		_bitset.set(h3, true);
-		_bitset.set(h4, true);
-		return true;
+	// Check all four hash functions
+	bool admitted = false;
+	for (int i = 1; i <= 4; i++) {
+		size_t h = ClauseHasher::hash(begin, size, i) % NUM_BITS;
+		// If not yet admitted, check if the bit is unset
+		if (!admitted) admitted = !_bitset.test(h, std::memory_order_relaxed);
+		// If admitted, set the bit
+		if (admitted) _bitset.set(h, true, std::memory_order_relaxed);
 	}
+	return admitted;
 }
 
 void ClauseFilter::clear() {

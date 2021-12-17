@@ -34,7 +34,10 @@ int main(int argc, char *argv[]) {
     params.init(argc, argv);
     HordeConfig config(params.hordeConfig());
 
-    Timer::init(config.starttime);
+    timespec t;
+    t.tv_sec = config.starttimeSecs;
+    t.tv_nsec = config.starttimeNsecs;
+    Timer::init(t);
 
     int rankOfParent = config.mpirank;
 
