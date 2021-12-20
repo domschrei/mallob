@@ -45,6 +45,8 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 	_global_name = "<h-" + _job_name + "_S" + std::to_string(_global_id) + ">";
 	_stats.histProduced = new ClauseHistogram(setup.hardMaxClauseLength);
 	_stats.histDigested = new ClauseHistogram(setup.hardMaxClauseLength);
+
+	_logger.log(V4_VVER, "Diversification index %i\n", getDiversificationIndex());
 }
 
 void PortfolioSolverInterface::interrupt() {

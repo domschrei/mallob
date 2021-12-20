@@ -152,6 +152,17 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
     }
     job->setArrival(arrival);
     std::vector<std::string> files = json["files"].get<std::vector<std::string>>();
+
+    // Application-specific configuration
+    AppConfiguration config;
+    config.deserialize(_params.applicationConfiguration());
+    if (json.contains("configuration")) {
+        auto& jConfig = json["configuration"];
+        for (auto it = jConfig.begin(); it != jConfig.end(); ++it) {
+            config.map[it.key()] = it.value();
+        }
+    }
+    job->setAppConfiguration(std::move(config));
     
     // Translate dependencies (if any) to internal job IDs
     std::vector<int> idDependencies;

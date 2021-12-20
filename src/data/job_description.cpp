@@ -46,6 +46,11 @@ void JobDescription::writeMetadata() {
     n = sizeof(int);         memcpy(data->data()+i, &_max_demand, n); i += n;
     n = sizeof(Application); memcpy(data->data()+i, &_application, n); i += n;
     n = sizeof(Checksum);    memcpy(data->data()+i, &_checksum, n); i += n;
+    
+    auto configSerialized = _app_config.serialize();
+    n = configSerialized.size();
+    memcpy(data->data()+i, &n, sizeof(int)); i += sizeof(int); // size of config
+    memcpy(data->data()+i, configSerialized.c_str(), n); i += n; // bytes of config
 }
 
 const std::shared_ptr<std::vector<uint8_t>>& JobDescription::getRevisionData(int revision) const {
@@ -86,12 +91,13 @@ size_t JobDescription::getTransferSize(int revision) const {
 
 
 
-constexpr int JobDescription::getMetadataSize() const {
+int JobDescription::getMetadataSize() const {
     return 6*sizeof(int)
            +3*sizeof(float)
            +2*sizeof(size_t)
            +sizeof(Checksum)
-           +sizeof(Application);
+           +sizeof(Application)
+           + sizeof(int)+_app_config.getSerializedSize();
 }
 
 
@@ -150,6 +156,11 @@ void JobDescription::deserialize() {
     n = sizeof(int);         memcpy(&_max_demand, latestData->data()+i, n);      i += n;
     n = sizeof(Application); memcpy(&_application, latestData->data()+i, n);     i += n;
     n = sizeof(Checksum);    memcpy(&_checksum, latestData->data()+i, n);        i += n;
+    // size of config
+    memcpy(&n, latestData->data()+i, sizeof(int)); i += sizeof(int);
+    // bytes of config
+    std::string configSerialized = std::string((const char*) (latestData->data()+i), n);
+    _app_config.deserialize(configSerialized);
 }
 
 std::vector<uint8_t> JobDescription::serialize() const {

@@ -39,27 +39,29 @@ void Cadical::diversify(int seed) {
 		bool okay = solver->set("seed", seed);
 		assert(okay);
 		switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-		case 1: okay = solver->configure ("plain"); break;
-		case 2: okay = solver->set("walk", 0); break;
-		case 3: okay = solver->set("inprocessing", 0); break;
-		case 4: okay = solver->set("restartint", 100); break;
-		case 5: okay = solver->set("phase", 0); break;
-		case 6: okay = solver->set("decompose", 0); break;
-		case 7: okay = solver->set("elim", 0); break;
-		case 0: default: break;
-		//case 6: solver->set("cover", 1); break;
-		//case 7: solver->set("chrono", 0); break;
+		case 0: okay = solver->configure("default"); break;
+		case 1: okay = solver->configure("plain"); break;
+		case 2: okay = solver->configure("sat"); break;
+		case 3: okay = solver->configure("unsat"); break;
+		//case 4: okay = solver->set("chronoalways", 1); break;
+		//case 5: okay = solver->set("condition", 1); break;
+		//case 6: okay = solver->set("cover", 1); break;
+		//case 7: okay = solver->set("restartint", 100); break;
+		//case 8: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
+		//case 9: okay = solver->set("walk", 0); break;
+		//case 10: okay = solver->set("inprocessing", 0); break;
+		//case 11: okay = solver->set("phase", 0); break;
+		//case 12: okay = solver->set("decompose", 0); break;
+		//case 13: okay = solver->set("elim", 0); break;
+		//case 14: okay = solver->set("minimize", 0); break;
 		}
-		assert(okay);
-		if (getDiversificationIndex() >= getNumOriginalDiversifications()) 
-			okay = solver->set("shuffle", 1);
 		assert(okay);
 		seedSet = true;
 	}
 }
 
 int Cadical::getNumOriginalDiversifications() {
-	return 8;
+	return 4;
 }
 
 void Cadical::setPhase(const int var, const bool phase) {

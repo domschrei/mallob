@@ -8,6 +8,7 @@
 
 #include "data/serializable.hpp"
 #include "data/checksum.hpp"
+#include "data/app_configuration.hpp"
 
 typedef std::shared_ptr<std::vector<int>> VecPtr;
 
@@ -49,6 +50,9 @@ private:
     const bool _use_checksums = false;
 
     float _arrival; // only for introducing a job
+
+    // configuration options
+    AppConfiguration _app_config;
 
     // Payload (logic to solve)
     int _num_vars = -1;
@@ -127,10 +131,11 @@ public:
     float getCpuLimit() const {return _cpu_limit;}
     int getMaxDemand() const {return _max_demand;}
     Application getApplication() const {return _application;}
+    const AppConfiguration& getAppConfiguration() const {return _app_config;}
     
     float getArrival() const {return _arrival;}
     bool isIncremental() const {return isApplicationIncremental(_application);}
-    constexpr int getMetadataSize() const;
+    int getMetadataSize() const;
     
     size_t getFullNonincrementalTransferSize() const {return _data_per_revision[0]->size();}
     int getNumVars() {return _num_vars;}
@@ -144,6 +149,7 @@ public:
     void setNumVars(int numVars) {_num_vars = numVars;}
     void setArrival(float arrival) {_arrival = arrival;};
     void setApplication(Application app) {_application = app;}
+    void setAppConfiguration(AppConfiguration&& appConfig) {_app_config = std::move(appConfig);}
     void setPreloadedAssumptions(std::vector<int>&& asmpt) {_preloaded_assumptions = std::move(asmpt);}
 
     Checksum getChecksum() const {return _checksum;}

@@ -4,6 +4,7 @@
 #include "util/sys/proc.hpp"
 
 HordeConfig::HordeConfig(const Parameters& params, const Job& job, int recoveryIndex) {
+
     auto t = Timer::getStartTime();
     starttimeSecs = t.tv_sec;
     starttimeNsecs = t.tv_nsec;

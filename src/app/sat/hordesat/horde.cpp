@@ -8,6 +8,7 @@
 #include "utilities/debug_utils.hpp"
 #include "sharing/default_sharing_manager.hpp"
 #include "util/sys/timer.hpp"
+#include "data/app_configuration.hpp"
 #include "solvers/cadical.hpp"
 #include "solvers/lingeling.hpp"
 #if MALLOB_USE_MERGESAT
@@ -47,6 +48,11 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 	int numGlu = 0;
 	int numCdc = 0;
 	int numMrg = 0;
+
+	// Read options from app config
+	AppConfiguration appConfig; appConfig.deserialize(params.applicationConfiguration());
+	std::string key = "diversification-offset";
+	int diversificationOffset = appConfig.map.count(key) ? atoi(appConfig.map[key].c_str()) : 0;
 
 	// Add solvers from full cycles on previous ranks
 	// and from the begun cycle on the previous rank
@@ -98,6 +104,7 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 		case 'm': case 'M': setup.diversificationIndex = numMrg++; break;
 		case 'g': case 'G': setup.diversificationIndex = numGlu++; break;
 		}
+		setup.diversificationIndex += diversificationOffset;
 		_solver_interfaces.emplace_back(createSolver(setup));
 		cyclePos = (cyclePos+1) % solverChoices.size();
 	}

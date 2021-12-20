@@ -84,6 +84,7 @@ OPT_FLOAT(loadFactor,                    "l", "load-factor",                1,  
 OPT_FLOAT(requestTimeout,                "rto", "request-timeout",          0,    0, LARGE_INT,         "Request timeout: discard non-root job requests when older than this many seconds")
 OPT_FLOAT(timeLimit,                     "T", "time-limit",                 0,    0, LARGE_INT,         "Run entire system for at most this many seconds")
 
+OPT_STRING(applicationConfiguration,     "app-config", "",                  "",                         "Application configuration: structured as (-key=value;)*")
 OPT_STRING(applicationSpawnMode,         "appmode", "",                     "fork",                     "Application mode: \"fork\" (spawn child process for each job on each MPI process) or \"thread\" (execute jobs in separate threads but within the same process)")
 OPT_STRING(hordeConfig,                  "hConf", "",                       "",                         "Supply Horde config for solver subprocess [internal option, do not use]")
 OPT_STRING(logDirectory,                 "log", "log-directory",            "",                         "Directory to save logs in")
