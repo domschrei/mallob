@@ -19,13 +19,13 @@ function run_incremental() {
         result=$(echo $line|awk '{print $2}')
         
         echo "$BASHPID: Initiate $file"
-        cp .api/jobs.0/{introduced,new}/$file
+        cp .api/jobs.0/{introduced,in}/$file
 
         if [ "$result" == "" ] ; then
             continue
         fi
 
-        donefile=.api/jobs.0/done/admin.$file
+        donefile=.api/jobs.0/out/admin.$file
         while [ ! -f $donefile ]; do sleep 0.1 ; done
         
         echo "$BASHPID: Found $donefile"
@@ -51,7 +51,7 @@ function run() {
     np=$1
     shift 1
     if echo "$@"|grep -q "incrementaltest"; then
-        RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob $@ 2>&1 > _systest &
+        RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob -pls=0 $@ 2>&1 > _systest &
         waitpids=$!
         for f in _incremental_jobs-* ; do
             run_incremental "$f" &
@@ -82,15 +82,15 @@ function check() {
     if grep -q "checkjsonresults" _systest; then
         cd .api/jobs.0/introduced
         for f in *.json; do
-            if [ ! -f ../done/$f ]; then
+            if [ ! -f ../out/$f ]; then
                 error "No result JSON reported for $f."
             fi
             if echo $f|grep -qi unsat ; then
-                if ! grep -q '"resultstring": "UNSAT"' ../done/$f ; then
+                if ! grep -q '"resultstring": "UNSAT"' ../out/$f ; then
                     error "Expected result UNSAT for $f was not found."
                 fi
             else
-                if ! grep -q '"resultstring": "SAT"' ../done/$f ; then
+                if ! grep -q '"resultstring": "SAT"' ../out/$f ; then
                     error "Expected result SAT for $f was not found."
                 fi
             fi
@@ -119,8 +119,9 @@ function introduce_job() {
     if [ -z $application ]; then application="SAT"; fi
     if [ -z $maxdemand ]; then maxdemand="0"; fi
     if [ -z $priority ]; then priority="1"; fi
-    echo '{ "application": "'$application'", "arrival": '$arrival', "dependencies": ['$dependency'], "user": "admin", "name": "'$jobname'", "files": ["'$instance'"], "priority": '$priority', "wallclock-limit": "'$wclimit'", "cpu-limit": "0", "max-demand": '$maxdemand' }' > .api/jobs.0/new/$1.json
-    cp .api/jobs.0/new/$1.json .api/jobs.0/introduced/admin.$1.json
+    if [ -z "$appconfig" ]; then appconfig=""; fi
+    echo '{ "application": "'$application'", "arrival": '$arrival', "dependencies": ['$dependency'], "user": "admin", "name": "'$jobname'", "files": ["'$instance'"], "priority": '$priority', "wallclock-limit": "'$wclimit'", "cpu-limit": "0", "max-demand": '$maxdemand', "configuration": '"$appconfig"' }' > .api/jobs.0/in/$1.json
+    cp .api/jobs.0/in/$1.json .api/jobs.0/introduced/admin.$1.json
 }
 
 globalcount=1

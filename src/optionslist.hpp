@@ -27,6 +27,7 @@ OPT_BOOL(jitterJobPriorities,            "jjp", "jitter-job-priorities",    fals
 OPT_BOOL(latencyMonkey,                  "latencymonkey", "",               false,                      "Block all MPI_Isend operations by a small randomized amount of time")
 OPT_BOOL(monitorMpi,                     "mmpi", "monitor-mpi",             false,                      "Launch an additional thread per process checking when the main thread is inside an MPI call")
 OPT_BOOL(phaseDiversification,           "phasediv", "",                    true,                       "Diversify solvers based on phase in addition to native diversification")
+OPT_BOOL(pipeLargeSolutions,             "pls", "",                         true,                       "Provide large solutions over a named pipe instead of directly writing them into the response JSON")
 OPT_BOOL(quiet,                          "q", "quiet",                      false,                      "Do not log to stdout besides critical information")
 OPT_BOOL(reactivationScheduling,         "rs", "",                          true,                       "Perform reactivation-based scheduling")
 OPT_BOOL(useChecksums,                   "checksums", "",                   false,                      "Compute and verify checksum for every job description transfer")

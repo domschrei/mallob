@@ -202,7 +202,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
     auto& img = _job_id_rev_to_image[std::pair<int, int>(result.id, result.revision)];
     auto& j = img.baseJson;
 
-    bool useSolutionFile = result.solution.size() > 65536;
+    bool useSolutionFile = _params.pipeLargeSolutions() && result.solution.size() > 65536;
     auto solutionFile = "/tmp/mallob-job-result." 
         + std::to_string(result.id) + "." 
         + std::to_string(result.revision) + ".pipe";

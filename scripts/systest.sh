@@ -6,7 +6,7 @@ testcount=1
 source $(dirname "$0")/systest_commons.sh
 
 mkdir -p .api/jobs.0/
-mkdir -p .api/jobs.0/{introduced,new,pending,done}/
+mkdir -p .api/jobs.0/{in,out}/
 cleanup
 
 function test_mono() {
