@@ -31,12 +31,12 @@ for i in $(seq 0 $(($numconfigs-1))); do
     shuf "$benchmarkfile" -o _shuf
     while read -r line; do
 
-        wclimit=1000 maxdemand=1 application=SAT appconfig='{"diversification-offset": "'$i'"}' introduce_job sat-main-1 instances/$line
+	    wclimit=1000 maxdemand=1 application=SAT appconfig='{"diversification-offset": "'$i'"}' introduce_job cadical-$i-job-$(date +%s-%N) instances/$line
 
     done < _shuf
 
 done
 
-RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $(($1+1)) --map-by numa:PE=1 --oversubscribe build/mallob \
--t=1 -c=1 -w=$1 -J=$(( $numconfigs * $(cat "$benchmarkfile"|wc -l) )) -satsolver=c -pls=0 -lbc=$1 -checksums=1 \
+RDMAV_FORK_SAFE=1 PATH=build/:$PATH nohup mpirun -np $(($1+1)) --map-by numa:PE=1 build/mallob \
+-t=1 -c=1 -w=$1 -J=$(( $numconfigs * $(cat "$benchmarkfile"|wc -l) )) -satsolver=c -pls=0 -lbc=$1 -s=0 -checksums=1 \
 -checkjsonresults 2>&1 > _systest &
