@@ -40,6 +40,7 @@ void Client::readIncomingJobs() {
                 || (_num_incoming_jobs > 0 && _num_loaded_jobs < 32);
         });
         if (!_instance_reader.continueRunning()) break;
+        if (_num_loaded_jobs >= 32) continue;
 
         // Obtain lock, measure time
         auto lock = _incoming_job_lock.getLock();
