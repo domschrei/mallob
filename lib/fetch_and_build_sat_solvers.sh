@@ -3,7 +3,7 @@
 set -e
 
 if [ -z $1 ]; then
-    solvers="cglmy"
+    solvers="cglmyk"
     echo "Defaulting to solvers $solvers (supply another string to override solvers to build)"
 else
     solvers="$1"
@@ -70,5 +70,15 @@ if echo $solvers|grep -q "c" && [ ! -f cadical/libcadical.a ]; then
     ./configure
     make
     cp build/libcadical.a .
+    cd ..
+fi
+
+if echo $solvers|grep -q "k" && [ ! -f kissat/libkissat.a ]; then
+    echo "Building kissat ..."
+
+    cd kissat
+    ./configure -g
+    make
+    cp build/libkissat.a .
     cd ..
 fi

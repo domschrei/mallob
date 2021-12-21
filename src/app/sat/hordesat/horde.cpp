@@ -11,6 +11,7 @@
 #include "data/app_configuration.hpp"
 #include "solvers/cadical.hpp"
 #include "solvers/lingeling.hpp"
+#include "solvers/kissat.hpp"
 #if MALLOB_USE_MERGESAT
 #include "solvers/mergesat.hpp"
 #endif
@@ -48,6 +49,7 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 	int numGlu = 0;
 	int numCdc = 0;
 	int numMrg = 0;
+	int numKis = 0;
 
 	// Read options from app config
 	AppConfiguration appConfig; appConfig.deserialize(params.applicationConfiguration());
@@ -68,6 +70,7 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 		case 'g': case 'G': solverToAdd = &numGlu; break;
 		case 'c': case 'C': solverToAdd = &numCdc; break;
 		case 'm': case 'M': solverToAdd = &numMrg; break;
+		case 'k': case 'K': solverToAdd = &numKis; break;
 		}
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
 	}
@@ -103,6 +106,7 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 		case 'c': case 'C': setup.diversificationIndex = numCdc++; break;
 		case 'm': case 'M': setup.diversificationIndex = numMrg++; break;
 		case 'g': case 'G': setup.diversificationIndex = numGlu++; break;
+		case 'k': case 'K': setup.diversificationIndex = numKis++; break;
 		}
 		setup.diversificationIndex += diversificationOffset;
 		_solver_interfaces.emplace_back(createSolver(setup));
@@ -128,6 +132,12 @@ std::shared_ptr<PortfolioSolverInterface> HordeLib::createSolver(const SolverSet
 		// Cadical
 		_logger.log(V4_VVER, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new Cadical(setup));
+		break;
+	case 'k':
+	//case 'K': // no support for incremental mode as of now
+		// Kissat
+		_logger.log(V4_VVER, "S%i : Kissat-%i\n", setup.globalId, setup.diversificationIndex);
+		solver.reset(new Kissat(setup));
 		break;
 #ifdef MALLOB_USE_MERGESAT
 	case 'm':

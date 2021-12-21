@@ -149,22 +149,20 @@ std::vector<int> AdaptiveClauseDatabase::exportBuffer(int sizeLimit, int& numExp
 
     BucketLabel bucket;
     int bufIdx = 0;
+    int lastPushedCounterIdx = -1;
     while ((sizeLimit < 0 || selection.size() < sizeLimit) 
             && bufIdx < _slots.size()) {
         
         // Get size and LBD of current bucket
         int clauseSize = bucket.size;
         int clauseLbd = bucket.lbd;
-        
-        // The counter for the clauses of this bucket goes here
-        selection.push_back(0);
 
         // Check that this bucket has the desired clause length
         if ((minClauseLength < 0 || clauseSize >= minClauseLength) 
             && (maxClauseLength < 0 || clauseSize <= maxClauseLength)) {
 
             // Counter integer for the clauses of this bucket
-            int counterPos = selection.size()-1;
+            int counterPos;
             bool partitionedByLbd = clauseSize <= _max_lbd_partitioned_size;
 
             // Fetch correct buffer list
@@ -174,11 +172,23 @@ std::vector<int> AdaptiveClauseDatabase::exportBuffer(int sizeLimit, int& numExp
             // Fetch as many clauses as available and as there is space
             if (sizeLimit < 0 || selection.size()+effectiveClsLen <= sizeLimit) {
                 // Write next clauses
+                
+                // Initialize clause counter(s) as necessary
+                while (lastPushedCounterIdx < bufIdx) {
+                    selection.push_back(0);
+                    counterPos = selection.size()-1;
+                    lastPushedCounterIdx++;
+                }
+                
+                // Fetch clauses
                 size_t sizeBefore = selection.size();
                 int numDesired = sizeLimit < 0 ? -1 : (sizeLimit - selection.size()) / effectiveClsLen;
                 int received = buf.getClauses(selection, numDesired);
+                
+                // Update clause counter and stats
                 selection[counterPos] += received;
                 numExportedClauses += received;
+                
                 if (_use_checksum) {
                     for (size_t pos = sizeBefore; pos < selection.size(); pos += effectiveClsLen) {
                         hash_combine(hash, ClauseHasher::hash(
