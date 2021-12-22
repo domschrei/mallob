@@ -110,8 +110,13 @@ bool Kissat::shouldTerminate() {
 std::vector<int> Kissat::getSolution() {
 	std::vector<int> result = {0};
 
-	for (int i = 1; i <= getVariablesCount(); i++)
-		result.push_back(kissat_value(solver, i));
+	for (int i = 1; i <= getVariablesCount(); i++) {
+        int val = kissat_value(solver, i);
+		assert(val == i || val == -i || val == 0 || 
+            log_return_false("[ERROR] value of variable %i/%i returned %i\n", 
+            i, getVariablesCount(), val));
+        result.push_back(val == 0 ? -i : val);
+    }
 
 	return result;
 }
