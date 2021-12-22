@@ -65,6 +65,8 @@ private:
     volatile bool _initialized = false;
     volatile bool _terminate = false;
     volatile bool _bg_writer_running = false;
+
+    std::future<void> _bg_initializer;
     std::future<void> _bg_writer;
 
     int* _export_buffer;
@@ -76,7 +78,7 @@ private:
     pid_t _child_pid = -1;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
 
-    std::atomic_int _written_revision = -1;
+    std::atomic_int _written_revision = 0;
     int _published_revision = 0;
     int _desired_revision = -1;
 
@@ -93,9 +95,7 @@ public:
 
     void run();
     bool isFullyInitialized();
-
     void appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision);
-    void startBackgroundWriterIfNecessary();
 
     void setSolvingState(SolvingStates::SolvingState state);
 
@@ -120,8 +120,8 @@ public:
 
 private:
     void doInitialize();
-    void doWriteNextRevision();
-
+    void doWriteRevisions();
+    
     void applySolvingState();
     void doDigest(const std::vector<int>& clauses, const Checksum& checksum);
     void doReturnClauses(const std::vector<int>& clauses);

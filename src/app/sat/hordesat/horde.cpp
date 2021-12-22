@@ -192,6 +192,7 @@ void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size
 					// Non-incremental solver being "restarted" with a new revision:
 					// Abort (but do not create a thread trace) such that a new, fresh
 					// process will be initialized
+					_logger.log(V3_VERB, "Restarting this non-incremental subprocess\n");
 					raise(SIGUSR2);
 				}
 				// Pseudo-incremental SAT solving: 

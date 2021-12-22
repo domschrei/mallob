@@ -21,13 +21,48 @@ HordeProcessAdapter::HordeProcessAdapter(Parameters&& params, HordeConfig&& conf
         _params(std::move(params)), _config(std::move(config)), _job(job), _clause_comm(comm),
         _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits) {
 
-    _written_revision = -1;
     _desired_revision = _config.firstrev;
+    _shmem_id = _config.getSharedMemId(Proc::getPid());
+}
+
+void HordeProcessAdapter::doWriteRevisions() {
+
+    auto task = [this]() {
+        while (!_terminate && _num_revisions_to_write > 0) {
+            RevisionData revData;
+            {
+                auto lock = _revisions_mutex.getLock();
+                if (_revisions_to_write.empty()) break;
+                revData = _revisions_to_write.front();
+                _revisions_to_write.erase(_revisions_to_write.begin());
+                _num_revisions_to_write--;
+            }
+            log(V4_VVER, "DBG Writing next revision\n");
+            auto revStr = std::to_string(revData.revision);
+            createSharedMemoryBlock("fsize."       + revStr, sizeof(size_t),              (void*)&revData.fSize);
+            createSharedMemoryBlock("asize."       + revStr, sizeof(size_t),              (void*)&revData.aSize);
+            createSharedMemoryBlock("formulae."    + revStr, sizeof(int) * revData.fSize, (void*)revData.fLits);
+            createSharedMemoryBlock("assumptions." + revStr, sizeof(int) * revData.aSize, (void*)revData.aLits);
+            createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
+            _written_revision = revData.revision;
+            log(V4_VVER, "DBG Done writing next revision %i\n", revData.revision);
+        }
+        auto lock = _revisions_mutex.getLock();
+        _bg_writer_running = false;
+    };
+
+    if (!_initialized || !_revisions_mutex.tryLock()) return;
+    if (!_bg_writer_running) {
+        if (_bg_writer.valid()) _bg_writer.get();
+        _bg_writer = ProcessWideThreadPool::get().addTask(task);
+        _bg_writer_running = true;
+    }
+    _revisions_mutex.unlock();
 }
 
 void HordeProcessAdapter::run() {
     _running = true;
-    ProcessWideThreadPool::get().addTask(
+    _bg_initializer = ProcessWideThreadPool::get().addTask(
         std::bind(&HordeProcessAdapter::doInitialize, this)
     );
 }
@@ -38,7 +73,6 @@ void HordeProcessAdapter::doInitialize() {
         _clause_comm = new AnytimeSatClauseCommunicator(_params, _job);
 
     // Initialize "management" shared memory
-    _shmem_id = _config.getSharedMemId(Proc::getPid());
     //log(V4_VVER, "Setup base shmem: %s\n", _shmem_id.c_str());
     void* mainShmem = SharedMemory::create(_shmem_id, sizeof(HordeSharedMemory));
     _shmem.insert(ShmemObject{_shmem_id, mainShmem, sizeof(HordeSharedMemory)});
@@ -83,7 +117,8 @@ void HordeProcessAdapter::doInitialize() {
     // Allocate shared memory for formula, assumptions of initial revision
     createSharedMemoryBlock("formulae.0", sizeof(int) * _f_size, (void*)_f_lits);
     createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
-    _written_revision = 0;
+
+    if (_terminate) return;
 
     // Assemble c-style program arguments
     char* const* argv = _params.asCArgs("mallob_sat_process");
@@ -114,43 +149,6 @@ void HordeProcessAdapter::doInitialize() {
     }
 }
 
-void HordeProcessAdapter::startBackgroundWriterIfNecessary() {
-    if (!_initialized || _num_revisions_to_write == 0) return;
-    {
-        auto lock = _state_mutex.getLock();
-        if (!_bg_writer_running) {
-            _bg_writer_running = true;
-            _bg_writer = ProcessWideThreadPool::get().addTask(
-                std::bind(&HordeProcessAdapter::doWriteNextRevision, this)
-            );
-        }
-    }
-}
-
-void HordeProcessAdapter::doWriteNextRevision() {
-    
-    while (true) {
-        RevisionData revData;
-        {
-            auto lock = _revisions_mutex.getLock();
-            if (_revisions_to_write.empty()) break;
-            revData = _revisions_to_write.front();
-            _revisions_to_write.erase(_revisions_to_write.begin());
-            _num_revisions_to_write--;
-        }
-        auto revStr = std::to_string(revData.revision);
-        createSharedMemoryBlock("fsize."       + revStr, sizeof(size_t),              (void*)&revData.fSize);
-        createSharedMemoryBlock("asize."       + revStr, sizeof(size_t),              (void*)&revData.aSize);
-        createSharedMemoryBlock("formulae."    + revStr, sizeof(int) * revData.fSize, (void*)revData.fLits);
-        createSharedMemoryBlock("assumptions." + revStr, sizeof(int) * revData.aSize, (void*)revData.aLits);
-        createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
-        _written_revision = revData.revision;
-    }
-
-    auto lock = _state_mutex.getLock();
-    _bg_writer_running = false;
-}
-
 bool HordeProcessAdapter::hasClauseComm() {
     return _initialized;
 }
@@ -160,10 +158,13 @@ bool HordeProcessAdapter::isFullyInitialized() {
 }
 
 void HordeProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision) {
-    auto lock = _revisions_mutex.getLock();
-    _revisions_to_write.insert(_revisions_to_write.end(), revisions.begin(), revisions.end());
-    _desired_revision = desiredRevision;
-    _num_revisions_to_write++;
+    {
+        auto lock = _revisions_mutex.getLock();
+        _revisions_to_write.insert(_revisions_to_write.end(), revisions.begin(), revisions.end());
+        _desired_revision = desiredRevision;
+        _num_revisions_to_write += revisions.size();
+    }
+    doWriteRevisions();
 }
 
 void HordeProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
@@ -259,12 +260,16 @@ HordeProcessAdapter::SubprocessStatus HordeProcessAdapter::check() {
     int exitStatus;
     if (Process::didChildExit(_child_pid, &exitStatus) && exitStatus != 0) {
         // Child exited!
-        log(V1_WARN, "[WARN] Child %ld exited unexpectedly (status %i)\n", _child_pid, exitStatus);
+        if (exitStatus == SIGUSR2) {
+            log(V3_VERB, "Restarting non-incremental child %ld\n", _child_pid);
+        } else {
+            log(V1_WARN, "[WARN] Child %ld exited unexpectedly (status %i)\n", _child_pid, exitStatus);
+        }
         // Notify to restart solver engine
         return CRASHED;
     }
 
-    startBackgroundWriterIfNecessary();
+    doWriteRevisions();
 
     if (_hsm->didImport)            _hsm->doImport            = false;
     if (_hsm->didReturnClauses)     _hsm->doReturnClauses     = false;
@@ -274,7 +279,6 @@ HordeProcessAdapter::SubprocessStatus HordeProcessAdapter::check() {
     if (!_hsm->doStartNextRevision 
         && !_hsm->didStartNextRevision 
         && _published_revision < _written_revision) {
-        
         _published_revision++;
         _hsm->desiredRevision = _desired_revision;
         _hsm->doStartNextRevision = true;
@@ -333,6 +337,7 @@ void* HordeProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_
         memcpy(shmem, data, size);
     }
     _shmem.insert(ShmemObject{id, shmem, size});
+    //log(V4_VVER, "DBG set up shmem %s\n", id.c_str());
     return shmem;
 }
 
@@ -342,8 +347,15 @@ HordeProcessAdapter::~HordeProcessAdapter() {
 }
 
 void HordeProcessAdapter::freeSharedMemory() {
-    _terminate = true;
-    if (_bg_writer_running) _bg_writer.get(); // wait for termination of background writer
+    
+    if (!_terminate) {
+        _terminate = true;
+
+        // wait for termination of background threads
+        if (_bg_initializer.valid()) _bg_initializer.get();
+        if (_bg_writer.valid()) _bg_writer.get();
+    }
+
     if (_hsm != nullptr) {
         for (int rev = 0; rev <= _written_revision; rev++) {
             size_t* solSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));
@@ -355,7 +367,9 @@ void HordeProcessAdapter::freeSharedMemory() {
         }
         _hsm = nullptr;
     }
+
     for (auto& shmemObj : _shmem) {
+        //log(V4_VVER, "DBG deleting %s\n", shmemObj.id.c_str());
         SharedMemory::free(shmemObj.id, (char*)shmemObj.data, shmemObj.size);
     }
     _shmem.clear();

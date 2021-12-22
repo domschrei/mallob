@@ -126,7 +126,6 @@ int ForkedSatJob::appl_solved() {
         HordeProcessAdapter* solver = _solver.release();
         ProcessWideThreadPool::get().addTask([solver]() {
             // clean up solver (without the clause comm)
-            solver->freeSharedMemory();
             delete solver;
         });
 
