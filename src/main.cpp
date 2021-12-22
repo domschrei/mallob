@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
     Parameters params;
     params.init(argc, argv);
 
-    ProcessWideThreadPool::init(params.numThreadsPerProcess());
+    ProcessWideThreadPool::init(std::max(4, 2*params.numThreadsPerProcess()));
 
     bool quiet = params.quiet();
     if (params.zeroOnlyLogging() && rank > 0) quiet = true;
