@@ -222,7 +222,7 @@ Mallob can be extended in the following ways:
 ## Licensing
 
 In its default configuration, the source code of Mallob can be used, changed and redistributed under the terms of the Lesser General Public License (LGPLv3), one notable exception being the source file `src/app/sat/hordesat/solvers/glucose.cpp` (see below).
-The used versions of Lingeling and YalSAT are MIT-licensed, as is HordeSat.
+The used versions of Lingeling, YalSAT, CaDiCaL, and Kissat are MIT-licensed, as is HordeSat.
 
 The Glucose interface of Mallob, unfortunately, is non-free software due to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE). Notably, its usage in competitive events is restricted. So when compiling Mallob with `MALLOB_USE_GLUCOSE=1` make sure that you have read and understood these restrictions.
 
@@ -230,7 +230,7 @@ The Glucose interface of Mallob, unfortunately, is non-free software due to the 
 
 ## Remarks
 
-Many thanks to Armin Biere et al. for the SAT solvers Lingeling and YalSAT this system uses by default and to Tomáš Balyo for HordeSat, the portfolio solver this project's solver engine is built upon.
+Many thanks to Armin Biere et al. for the SAT solvers Lingeling, YalSAT, CaDiCaL, and Kissat which this system uses by default, and to Tomáš Balyo for HordeSat, the portfolio solver this project's solver engine is built upon.
 
 Furthermore, in our implementation we make thankful use of the following projects:
 

@@ -90,7 +90,7 @@ OPT_STRING(applicationSpawnMode,         "appmode", "",                     "for
 OPT_STRING(hordeConfig,                  "hConf", "",                       "",                         "Supply Horde config for solver subprocess [internal option, do not use]")
 OPT_STRING(logDirectory,                 "log", "log-directory",            "",                         "Directory to save logs in")
 OPT_STRING(monoFilename,                 "mono", "",                        "",                         "Mono instance: Solve the provided CNF instance with full power, then exit")
-OPT_STRING(satSolverSequence,            "satsolver",  "",                  "L",                        "Sequence of SAT solvers to cycle through for each job, one character per solver (capital letter for true incremental solver, lowercase for pseudo-incremental solving): l=lingeling c=cadical g=glucose m=mergesat")
+OPT_STRING(satSolverSequence,            "satsolver",  "",                  "L",                        "Sequence of SAT solvers to cycle through for each job, one character per solver (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:lingeling C|c:cadical g:glucose k:kissat m:mergesat")
 OPT_STRING(solutionToFile,               "s2f", "solution-to-file",         "",                         "Write solutions to file with provided base name + job ID")
 OPT_STRING(subprocessPrefix,             "subproc-prefix", "",              "",                         "Execute SAT subprocess with this prefix (e.g., \"valgrind\")")
 
