@@ -28,7 +28,7 @@ MGlucose::MGlucose(const SolverSetup& setup)
 	suspendSolver = false;
 	maxvar = 0;
 
-	numDiversifications = 14;
+	numDiversifications = 8;
 	softMaxLbd = _setup.softInitialMaxLbd;
 	hardMaxLbd = _setup.hardInitialMaxLbd;
 }
@@ -61,6 +61,13 @@ void MGlucose::diversify(int seed) {
 	random_seed = (std::abs(seed) % UINT16_MAX) + 1;
 	adaptStrategies = false;
 
+	if (rank >= 3) {
+		// For all but the first few solvers, randomize initial
+		// activity and DFS until first conflict
+		randomizeFirstDescent = true;
+		rnd_init_act = true;
+	}
+
 	switch (rank % numDiversifications) {
 	case 0:
 		// adaptive solver with simplification
@@ -68,35 +75,13 @@ void MGlucose::diversify(int seed) {
 		use_simplification = true;
 		break;
 	case 1:
-		// adaptive solver without simplification
-		adaptStrategies = true;
-		use_simplification = false;
+		// special case for low successive conflicts
+		luby_restart = true;
+        luby_restart_factor = 100;
+        var_decay = 0.999;
+        max_var_decay = 0.999;
 		break;
 	case 2:
-		// non-adaptive solver with simplification
-		adaptStrategies = false;
-		use_simplification = true;
-		break;
-	case 3:
-		// non-adaptive solver without simplification
-		adaptStrategies = false;
-		use_simplification = false;
-		break;
-	case 4:
-		// Glucose 2.0 (+ blocked restarts)
-		var_decay = 0.95;
-		max_var_decay = 0.95;
-		firstReduceDB = 4000;
-		lbdQueue.growTo(100);
-		sizeLBDQueue = 100;
-		K = 0.7;
-		incReduceDB = 500;
-		break;
-	case 5:
-		// Chanseok strategy for clause deletion
-		chanseokStrategy = true;
-		break;
-	case 6:
 		// special case for low decision levels
 		chanseokStrategy = true;
         coLBDBound = 4;
@@ -106,14 +91,31 @@ void MGlucose::diversify(int seed) {
         curRestart = (conflicts / nbclausesbeforereduce) + 1;
         incReduceDB = 0;
 		break;
-	case 7:
-		// special case for low successive conflicts
-		luby_restart = true;
-        luby_restart_factor = 100;
-        var_decay = 0.999;
-        max_var_decay = 0.999;
+	case 3:
+		// Glucose 2.0 (+ blocked restarts)
+		var_decay = 0.95;
+		max_var_decay = 0.95;
+		firstReduceDB = 4000;
+		lbdQueue.growTo(100);
+		sizeLBDQueue = 100;
+		K = 0.7;
+		incReduceDB = 500;
 		break;
-	case 8:
+	case 4:
+		// non-adaptive solver without simplification
+		adaptStrategies = false;
+		use_simplification = false;
+		break;
+	case 5:
+		// Chanseok strategy for clause deletion
+		chanseokStrategy = true;
+		break;
+	case 6:
+		// adaptive solver without simplification
+		adaptStrategies = true;
+		use_simplification = false;
+		break;
+	case 7:
 		// special case for high successive conflicts
 		chanseokStrategy = true;
         glureduce = true;
@@ -123,37 +125,15 @@ void MGlucose::diversify(int seed) {
         max_var_decay = 0.99;
         randomize_on_restarts = 1;
 		break;
-	case 9:
-		// special case for large number of "true" glue clauses
-		var_decay = 0.91;
-        max_var_decay = 0.91;
-		break;
-	case 10:
-	case 11:
-	case 12:
-	case 13:
+	
+	// unused
+	case 8:
 		// randomize "var_decay" measure
 		std::mt19937 rng = std::mt19937(rank%numDiversifications);
 		std::uniform_real_distribution<float> dist = std::uniform_real_distribution<float>(0, 1);
 		//firstReduceDB += -50 + 100 * dist(rng);
 		var_decay = std::min(var_decay -0.02 + 0.04 * dist(rng), max_var_decay);
-
-		// Randomize initial activity and DFS until first conflict
-		randomizeFirstDescent = true;
-		rnd_init_act = true;
 		break;
-	}
-
-	if (rank > numDiversifications) {
-		// randomize "firstReduceDB" and "var_decay" measures
-		std::mt19937 rng = std::mt19937(rank);
-		std::uniform_real_distribution<float> dist = std::uniform_real_distribution<float>(0, 1);
-		firstReduceDB += -50 + 100 * dist(rng);
-		var_decay = std::min(var_decay -0.01 + 0.02 * dist(rng), max_var_decay);
-
-		// Randomize initial activity and DFS until first conflict
-		randomizeFirstDescent = true;
-		rnd_init_act = true;
 	}
 }
 
