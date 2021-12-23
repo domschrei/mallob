@@ -60,7 +60,10 @@ int Kissat::getNumOriginalDiversifications() {
 }
 
 void Kissat::setPhase(const int var, const bool phase) {
-	// TODO not implemented yet.
+    assert(!initialVariablePhasesLocked);
+	if (var >= initialVariablePhases.size())
+        initialVariablePhases.resize(var+1);
+    initialVariablePhases[var] = phase ? 1 : -1;
 }
 
 // Solve the formula with a given set of assumptions
@@ -69,6 +72,10 @@ SatResult Kissat::solve(size_t numAssumptions, const int* assumptions) {
 
 	// TODO handle assumptions?
     assert(numAssumptions == 0);
+
+    // Push the initial variable phases to kissat
+    initialVariablePhasesLocked = true;
+    kissat_set_initial_variable_phases (solver, initialVariablePhases.data(), initialVariablePhases.size());
 
 	// start solving
 	int res = kissat_solve(solver);
@@ -145,14 +152,15 @@ void Kissat::produceClause(int size, int lbd) {
 void Kissat::consumeClause(int** clause, int* size, int* lbd) {
     Clause c;
     // Only import unit clauses for now
-    bool success = fetchLearnedClause(c, ImportBuffer::UNITS_ONLY);
+    bool success = fetchLearnedClause(c, ImportBuffer::ANY);
     if (success) {
         assert(c.begin != nullptr);
-        assert(c.size == 1);
-        producedUnit = *c.begin;
-        *clause = &producedUnit;
-        *size = 1;
-        *lbd = 1;
+        assert(c.size >= 1);
+        producedClause.resize(c.size);
+        memcpy(producedClause.data(), c.begin, c.size*sizeof(int));
+        *clause = producedClause.data();
+        *size = c.size;
+        *lbd = c.lbd;
     } else {
         *clause = 0;
         *size = 0;

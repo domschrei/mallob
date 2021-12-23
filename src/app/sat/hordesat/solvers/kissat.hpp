@@ -14,13 +14,16 @@ private:
 
     LearnedClauseCallback callback;
     int learntClauseBuffer[100];
-    int producedUnit;
+    std::vector<int> producedClause;
 
     bool interrupted = false;
     bool suspended = false;
     Mutex suspendMutex;
     ConditionVariable suspendCondVar;
     unsigned int glueLimit;
+
+	std::vector<signed char> initialVariablePhases;
+	bool initialVariablePhasesLocked = false;
 
 public:
 	Kissat(const SolverSetup& setup);
