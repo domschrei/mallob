@@ -2,12 +2,7 @@
 
 function gettrueresult() {
     trueresult=$(cat instances/metadata|grep "$1"|awk '{print $3}')
-    if [ -z $trueresult ]; then
-        echo " Internal error: Instance $1 not found ..."
-        exit 1
-    fi
-    #echo $trueresult
-    if [ $trueresult != sat ] && [ $trueresult != unsat ] && [ $trueresult != unknown ]; then
+    if [ "$trueresult" != sat ] && [ "$trueresult" != unsat ] && [ "$trueresult" != unknown ]; then
         echo " Internal error: Instance $1 not found - skipping"
         exit 1
     fi

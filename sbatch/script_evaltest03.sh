@@ -10,7 +10,7 @@
 
 logdir="mallob_logs/mallob_evaltest03_40x10x4_3600s"
 clients="2"
-options="scenarios/scenario_multiprio_c$clients -appmode=fork -ba=8 -c=$clients -cbbs=1500 -cbdf=0.75 -cfhl=300 -cg -cpuh-per-instance=1.5 -derandomize -g=1 -jc=4 -jjp -l=0.95 -lbc0=0 -lbc1=1 -log=$logdir -mcl=5 -md=0 -p=0.1 -q -r=bisec -s=1 -s2f=$logdir/solution -sleep=100 -T=3590 -t=4 -time-per-instance=0 -v=3 -warmup"
+options="scenarios/scenario_multiprio_c$clients -appmode=fork -ba=8 -c=$clients -cbbs=1500 -cbdf=0.75 -cfhl=300 -cg -cpuh-per-instance=1.5 -derandomize -g=1 -jc=4 -jjp -l=0.95 -ajpc0=0 -ajpc1=1 -log=$logdir -mcl=5 -md=0 -p=0.1 -q -r=bisec -s=1 -s2f=$logdir/solution -sleep=100 -T=3590 -t=4 -time-per-instance=0 -v=3 -warmup"
 
 mkdir -p $logdir
 module load mpi/impi/2019

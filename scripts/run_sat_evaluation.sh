@@ -40,7 +40,7 @@ done < $benchmarkfile
 num_procs=$1
 num_active_workers=$(($num_procs-1))
 num_parallel_jobs=$(($num_active_workers/$procs_per_job))
-options="-c=1 -w=$num_active_workers -lbc=$num_parallel_jobs -J=$n -t=3 -satsolver=kkkkkc -v=4 -pls=0 -mlpt=0"
+options="-c=1 -w=$num_active_workers -ajpc=$num_parallel_jobs -J=$n -t=3 -satsolver=kkkkkc -v=4 -pls=0 -mlpt=0"
 
 # Launch Mallob
 runid="sateval_$(hostname)_$(git rev-parse --short HEAD)_np${1}_"$(echo $options|sed 's/-//g'|sed 's/=//g'|sed 's/ /_/g')

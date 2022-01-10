@@ -45,7 +45,7 @@ cat _combinations|while read -r line; do
 done
 
 RDMAV_FORK_SAFE=1 PATH=build/:$PATH nohup mpirun -np $(($1+1)) --map-by numa:PE=1 build/mallob \
--t=1 -c=1 -w=$1 -J=$(( $numconfigs * $(cat "$benchmarkfile"|wc -l) )) -satsolver=k -aold -pls=0 -lbc=$1 -s=0 -checksums=1 \
+-t=1 -c=1 -w=$1 -J=$(( $numconfigs * $(cat "$benchmarkfile"|wc -l) )) -satsolver=k -aold -pls=0 -ajpc=$1 -s=0 -checksums=1 \
 -checkjsonresults 2>&1 > _systest &
 
 sleep 2

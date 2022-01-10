@@ -34,7 +34,7 @@ function test_scheduling() {
                 introduce_job sat-$c instances/r3sat_300.cnf
                 introduce_job unsat-$c instances/r3unsat_300.cnf
             done
-            test 10 -c=1 -t=2 -lbc=$lbc -J=8 -satsolver=$slv -checkjsonresults -checksums=1 $@
+            test 10 -c=1 -t=2 -ajpc=$lbc -J=8 -satsolver=$slv -checkjsonresults -checksums=1 $@
         done
     done
 }
@@ -63,7 +63,7 @@ function test_many_incremental() {
     for i in {1..10}; do
         introduce_incremental_job entertainment08
     done
-    test 4 -c=1 -t=2 -satsolver=LgC -J=10 -lbc=1 -incrementaltest -checksums=1 $@
+    test 4 -c=1 -t=2 -satsolver=LgC -J=10 -ajpc=1 -incrementaltest -checksums=1 $@
 }
 
 function test_oscillating() {

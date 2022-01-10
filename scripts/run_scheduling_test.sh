@@ -92,7 +92,7 @@ numjobs=$(create_job_chains)
 echo "Generated $numjobs jobs"
 
 # Set options
-options="-t=4 -c=1 -lbc=$(($1-2)) -satsolver=cccllg -v=5 -J=$numjobs -s=1 -mlbdps=5 -checksums=0 -huca=0 -sleep=100"
+options="-t=4 -c=1 -ajpc=$(($1-2)) -satsolver=cccllg -v=5 -J=$numjobs -s=1 -mlbdps=5 -checksums=0 -huca=0 -sleep=100"
 
 # Launch Mallob with a unique run ID for a logging directory
 runid="sched_$(hostname)_$(git rev-parse --short HEAD)_np${1}_"$(echo $options|sed 's/-//g'|sed 's/=//g'|sed 's/ /_/g')

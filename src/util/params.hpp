@@ -16,6 +16,7 @@ public:
 	void init(int argc, char** argv);
 	void expand();
 
+	void printBanner() const;
 	void printUsage() const;
 	void printParams() const;
 	

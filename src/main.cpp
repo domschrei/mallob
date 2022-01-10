@@ -116,6 +116,7 @@ int main(int argc, char *argv[]) {
 
     Parameters params;
     params.init(argc, argv);
+    if (rank == 0) params.printBanner();
 
     ProcessWideThreadPool::init(std::max(4, 2*params.numThreadsPerProcess()));
 

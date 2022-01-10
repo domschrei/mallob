@@ -9,7 +9,9 @@
 #include "params.hpp"
 #include "logger.hpp"
 
-const char* USAGE = "Usage: [mpiexec -np <num-mpi-processes> [mpi-options]] mallob [options]\n";
+const char* BANNER = "\nMallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nDesigned by P. Sanders and D. Schreiber 2018-2022\nDeveloped by D. Schreiber 2019-2022\n";
+const char* BANNER_C_PREFIXED = "c \nc Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nc Designed by P. Sanders and D. Schreiber 2018-2022\nc Developed by D. Schreiber 2019-2022\nc ";
+const char* USAGE = "Usage: [RDMAV_FORK_SAFE=1] [PATH=path/to/mallob_sat_process:$PATH] [mpiexec -np <num-mpi-processes> [mpi-options]] mallob [options]";
 
 Parameters::Parameters(const Parameters& other) {
     for (const auto& [id, opt] : other._map) {
@@ -18,7 +20,7 @@ Parameters::Parameters(const Parameters& other) {
 }
 
 /**
- * Taken from Hordesat:ParameterProcessor.h by Tomas Balyo.
+ * Taken partially from Hordesat:ParameterProcessor.h by Tomas Balyo.
  */
 void Parameters::init(int argc, char** argv) {
 
@@ -30,21 +32,31 @@ void Parameters::init(int argc, char** argv) {
         }
     }
 
+    // Iterate over all arguments
     for (int i = 1; i < argc; i++) {
         char* arg = argv[i];
+        
+        // first option dash
         if (arg[0] != '-') {
+            log(V1_WARN, "[WARN] Invalid argument \"%s\"\n", arg);
             continue;
         }
+        arg = arg+1;
+        // optional second option dash
+        if (arg[0] == '-') arg = arg+1;
+
         char* eq = strchr(arg, '=');
         if (eq == NULL) {
-            const char* left = arg+1;
+            // No equals sign in this argument: set arg to 1 implicitly
+            const char* left = arg;
             if (longToShortOpt.count(left)) left = longToShortOpt[left].c_str();
             if (_map.count(left)) {
                 _map.at(left)->setValAsString("1");
             }
         } else {
+            // Divide string at equals sign, set arg to given value
             *eq = 0;
-            const char* left = arg+1;
+            const char* left = arg;
             const char* right = eq+1;
             if (longToShortOpt.count(left)) left = longToShortOpt[left].c_str();
             if (_map.count(left)) {
@@ -52,7 +64,10 @@ void Parameters::init(int argc, char** argv) {
             }
         }
     }
+
+    // Expand and propagate options as necessary
     expand();
+
 }
 
 void Parameters::expand() {
@@ -70,8 +85,14 @@ void Parameters::expand() {
     }
 }
 
+void Parameters::printBanner() const {
+    // Output program banner (only the PE of rank zero)
+    log(V2_INFO | LOG_NO_PREFIX, "%s\n", monoFilename.isSet() ? BANNER_C_PREFIXED : BANNER);
+}
+
 void Parameters::printUsage() const {
     log(V2_INFO, USAGE);
+    log(V2_INFO, "Each option must be given as \"-key=value\" or \"--key=value\" or (for boolean options only) just \"-[-]key\".");
     
     std::map<std::string, Option*> sortedMap;
     for (const auto& [id, opt] : _map) {
