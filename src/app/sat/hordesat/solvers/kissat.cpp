@@ -49,14 +49,15 @@ void Kissat::diversify(int seed) {
     case 0: kissat_set_configuration(solver, "default"); break;
     case 1: kissat_set_configuration(solver, "sat"); break;
     case 2: kissat_set_configuration(solver, "unsat"); break;
-    case 3: kissat_set_configuration(solver, "plain"); break;
+    case 3: kissat_set_option(solver, "eliminate", 0); break;
+    case 4: kissat_set_option(solver, "restartint", 100); break;
     }
 
     seedSet = true;
 }
 
 int Kissat::getNumOriginalDiversifications() {
-	return 4;
+	return 5;
 }
 
 void Kissat::setPhase(const int var, const bool phase) {
