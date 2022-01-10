@@ -33,8 +33,6 @@ struct SolverSetup {
 	unsigned int softMaxClauseLength;
 	unsigned int softInitialMaxLbd;
 	unsigned int softFinalMaxLbd;
-	// For lingeling ("use old diversification")
-	bool useAdditionalDiversification;
 
 	size_t clauseBaseBufferSize;
 	size_t anticipatedLitsToImportPerCycle;

@@ -13,7 +13,6 @@ OptMap _map;
 
 //  TYPE  member name                    option ID (short, long)            default (, min, max)        description
 
-OPT_BOOL(addOldLglDiversifiers,          "aold", "",                        false,                      "Add additional old diversifiers to Lingeling")
 OPT_BOOL(collectClauseHistory,           "ch", "",                          false,                      "Employ clause history collection mechanism")
 OPT_BOOL(coloredOutput,                  "colors", "",                      false,                      "Colored terminal output based on messages' verbosity")
 OPT_BOOL(continuousGrowth,               "cg", "",                          true,                       "Continuous growth of job demands")

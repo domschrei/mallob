@@ -80,7 +80,6 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 	setup.logger = &_logger;
 	setup.jobname = config.getJobStr();
 	setup.isJobIncremental = config.incremental;
-	setup.useAdditionalDiversification = params.addOldLglDiversifiers();
 	setup.hardInitialMaxLbd = params.initialHardLbdLimit();
 	setup.hardFinalMaxLbd = params.finalHardLbdLimit();
 	setup.softInitialMaxLbd = params.initialSoftLbdLimit();
