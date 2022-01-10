@@ -89,5 +89,6 @@ int main() {
     Random::init(rand(), rand());
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
 
+    testSatInstances();
     testIncrementalExample();
 }

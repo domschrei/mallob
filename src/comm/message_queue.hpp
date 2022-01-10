@@ -143,6 +143,7 @@ public:
 
     void registerCallback(int tag, const MsgCallback& cb);
     void registerSentCallback(std::function<void(int)> callback);
+    void clearCallbacks();
 
     int send(DataPtr data, int dest, int tag);
     void advance();

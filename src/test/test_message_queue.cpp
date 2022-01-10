@@ -19,8 +19,10 @@ const int TAG_PINGPONG = 114;
 
 void testSelfMessages() {
 
+    Terminator::reset();
     int rank = MyMpi::rank(MPI_COMM_WORLD);
     auto& q = MyMpi::getMessageQueue();
+    q.clearCallbacks();
     
     int numReceived = 0;
     int sumReceived = 0;
@@ -43,8 +45,10 @@ void testSelfMessages() {
 
 void testSimpleP2P() {
 
+    Terminator::reset();
     int rank = MyMpi::rank(MPI_COMM_WORLD);
     auto& q = MyMpi::getMessageQueue();
+    q.clearCallbacks();
 
     int totalSum = 0;
     int numReceived = 0;
@@ -84,6 +88,8 @@ void testSimpleP2P() {
 
 void testBigP2P() {
 
+    Terminator::reset();
+
     const bool verifyData = true;
     const int N[] = {10, 249999, 250000, 250001, 900000, 1249999, 1250000, 1250001, 100000000};
     //const int N[] = {10, 249999, 250000, 250001, 900000};
@@ -99,6 +105,7 @@ void testBigP2P() {
 
     int rank = MyMpi::rank(MPI_COMM_WORLD);
     auto& q = MyMpi::getMessageQueue();
+    q.clearCallbacks();
     size_t msgIdx = 0;
 
     auto sendNextVec = [&]() {
@@ -110,12 +117,14 @@ void testBigP2P() {
         log(V2_INFO, "#%i received\n", msgIdx);
         
         if (verifyData) {
+            log(V2_INFO, "#%i verifying ...\n", msgIdx);
             assert(h.tag == TAG_INT_VEC);
             auto vec = Serializable::get<IntVec>(h.getRecvData()).data;
             assert(vec.size() == N[msgIdx] || log_return_false("Wrong size: %i != %i\n", vec.size(), N[msgIdx]));
             for (size_t i = 0; i < vec.size(); i++) {
                 assert(vec[i] == i || log_return_false("Data at pos. %i: %i\n", i, vec[i]));
             }
+            log(V2_INFO, "#%i verified\n", msgIdx);
         }
         
         msgIdx++;
@@ -181,8 +190,8 @@ int main(int argc, char *argv[]) {
     params.init(argc, argv);
     MyMpi::setOptions(params);
 
-    //testSelfMessages();
-    //testSimpleP2P();
+    testSelfMessages();
+    testSimpleP2P();
     testBigP2P();
 
     MPI_Finalize();

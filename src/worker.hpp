@@ -21,6 +21,10 @@
 #include "util/periodic_event.hpp"
 #include "util/sys/watchdog.hpp"
 
+/*
+Primary actor in the system who is responsible for participating in the scheduling and execution of jobs.
+There is at most one Worker instance for each PE.
+*/
 class Worker {
 
 private:

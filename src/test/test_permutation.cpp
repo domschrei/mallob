@@ -100,8 +100,5 @@ int main() {
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
 
     testBestOutgoingEdges();
-    exit(0);
     testPermutations();
-
-    return 0;
 }

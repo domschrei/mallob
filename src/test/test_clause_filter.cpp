@@ -77,8 +77,6 @@ void test() {
         
         delete filters.back();
     }
-
-
 }
 
 

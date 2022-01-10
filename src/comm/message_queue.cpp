@@ -44,6 +44,11 @@ void MessageQueue::registerSentCallback(std::function<void(int)> callback) {
     _send_done_callback = callback;
 }
 
+void MessageQueue::clearCallbacks() {
+    _callbacks.clear();
+    _send_done_callback = [](int) {};
+}
+
 int MessageQueue::send(DataPtr data, int dest, int tag) {
 
     // Initialize send handle

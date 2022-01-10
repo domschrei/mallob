@@ -16,6 +16,13 @@
 #include "app/sat/hordesat/sharing/lockfree_clause_database.hpp"
 #include "app/sat/hordesat/sharing/adaptive_clause_database.hpp"
 
+bool insertUntilSuccess(AdaptiveClauseDatabase& cdb, size_t prodId, Clause& c) {
+    auto result = AdaptiveClauseDatabase::AddClauseResult::TRY_LATER;
+    while (result == AdaptiveClauseDatabase::AddClauseResult::TRY_LATER)
+        result = cdb.addClause(prodId, c);
+    return result == AdaptiveClauseDatabase::AddClauseResult::SUCCESS;
+}
+
 void testUniform() {
     log(V2_INFO, "Testing lock-free clause database, uniform setting ...\n");
 
@@ -37,15 +44,16 @@ void testUniform() {
             if (b.size <= maxLbdPartitionedSize) {
                 std::vector<int> lits;
                 for (size_t j = 0; j < b.size; j++) lits.push_back(100*b.size+b.lbd);
-                bool success = cdb.addClause(i, Clause{lits.data(), b.size, b.lbd});
-                assert(success);
+                Clause c{lits.data(), b.size, b.lbd};
+                assert(insertUntilSuccess(cdb, i, c));
             } else {
                 for (int lbd = 1; lbd <= 3; lbd++) {
                     for (int crep = 0; crep < 1; crep++) {
                         std::vector<int> lits;
                         for (size_t j = 0; j < b.size; j++) lits.push_back(100*b.size+lbd);
-                        bool success = cdb.addClause(i, Clause{lits.data(), b.size, lbd});
-                        assert(success == (b.size <= maxClauseSize) || log_return_false("Failed to add cls of size %i, lbd %i\n", b.size, lbd));
+                        Clause c{lits.data(), b.size, lbd};
+                        assert(insertUntilSuccess(cdb, i, c) == (b.size <= maxClauseSize) 
+                            || log_return_false("Failed to add cls of size %i, lbd %i\n", b.size, lbd));
                     }
                 }
             }
@@ -203,8 +211,6 @@ void testRandomClauses() {
     }
 
     log(V3_VERB, "Read %i clauses from merged buffer\n", readClauses);
-
-    //assert(merged == out);
 }
 
 Clause produceClause(std::function<float()> normalRng, float meanLength) {
@@ -330,6 +336,7 @@ int main() {
     Process::init(0);
     ProcessWideThreadPool::init(1);
 
-    //testUniform();
+    testUniform();
+    testRandomClauses();
     testConcurrentClauseAddition();
 }

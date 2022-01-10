@@ -30,6 +30,10 @@ struct JobByArrivalComparator {
     }
 };
 
+/*
+Primary actor in the system who is responsible for introducing jobs from an external interface
+and reporting results back over this interface. There is at most one Client instance for each PE.
+*/
 class Client {
 
 private:

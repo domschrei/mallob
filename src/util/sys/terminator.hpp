@@ -36,6 +36,9 @@ public:
         
         return _exit.load(std::memory_order_relaxed);
     }
+    static void reset() {
+        _exit = false;
+    }
 
 };
 
