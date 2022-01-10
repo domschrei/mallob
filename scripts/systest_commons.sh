@@ -119,7 +119,7 @@ function introduce_job() {
     if [ -z $application ]; then application="SAT"; fi
     if [ -z $maxdemand ]; then maxdemand="0"; fi
     if [ -z $priority ]; then priority="1"; fi
-    if [ -z "$appconfig" ]; then appconfig=""; fi
+    if [ -z "$appconfig" ]; then appconfig="{}"; fi
     echo '{ "application": "'$application'", "arrival": '$arrival', "dependencies": ['$dependency'], "user": "admin", "name": "'$jobname'", "files": ["'$instance'"], "priority": '$priority', "wallclock-limit": "'$wclimit'", "cpu-limit": "0", "max-demand": '$maxdemand', "configuration": '"$appconfig"' }' > .api/jobs.0/in/$1.json
     cp .api/jobs.0/in/$1.json .api/jobs.0/introduced/admin.$1.json
 }
