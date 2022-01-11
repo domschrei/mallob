@@ -74,6 +74,27 @@ void CollectiveAssignment::deserialize(const std::vector<uint8_t>& packed, int s
     }
 }
 
+int CollectiveAssignment::getDestination() {
+    int destination = -1;
+    // Is there an optimal fit for this request?
+    // -- self?
+    if (isIdle()) {
+        // self is optimal fit
+        destination = MyMpi::rank(MPI_COMM_WORLD);
+    } else {
+        // -- other PE? (choose at random)
+        std::vector<int> viableDestinations;
+        for (const auto& [rank, status] : _child_statuses) {
+            if (status.numIdle > 0) {
+                viableDestinations.push_back(rank);
+            }
+        }
+        if (!viableDestinations.empty())
+            destination = Random::choice(viableDestinations);
+    }
+    return destination;
+}
+
 void CollectiveAssignment::resolveRequests() {
 
     if(_request_list.empty()) return;
@@ -92,30 +113,12 @@ void CollectiveAssignment::resolveRequests() {
     // as soon as the scheduler is not busy any longer.
 
     for (const auto& req : _request_list) {
-        int id = req.jobId;
-        int destination = -1;
         if (req.balancingEpoch < _epoch && req.requestedNodeIndex > 0) {
             // Obsolete request: Discard
             continue;
         }
-
-        // Is there an optimal fit for this request?
-        // -- self?
-        if (isIdle()) {
-            // self is optimal fit
-            destination = MyMpi::rank(MPI_COMM_WORLD);
-        } else {
-            // -- other PE? (choose at random)
-            std::vector<int> viableDestinations;
-            for (const auto& [rank, status] : _child_statuses) {
-                if (status.numIdle > 0) {
-                    viableDestinations.push_back(rank);
-                }
-            }
-            if (!viableDestinations.empty())
-                destination = Random::choice(viableDestinations);
-        }
-
+        int id = req.jobId;
+        int destination = getDestination();
         if (destination < 0) {
             // No fit found
             if (getCurrentRoot() == MyMpi::rank(MPI_COMM_WORLD)) {
@@ -141,8 +144,10 @@ void CollectiveAssignment::resolveRequests() {
         }
     }
 
+    // Re-insert requests which should be kept
     _request_list.clear();
     for (auto& req : requestsToKeep) _request_list.insert(std::move(req));
+    // Send away requests for which some destination was found
     for (auto& [rank, requests] : requestsPerDestination) {
         auto packed = serialize(requests);
         MyMpi::isend(rank, MSG_NOTIFY_ASSIGNMENT_UPDATE, std::move(packed));

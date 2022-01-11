@@ -53,6 +53,10 @@ public:
     int getCurrentParent();
 
     bool isIdle();
+
+private:
+    int getDestination();
+
 };
 
 #endif
