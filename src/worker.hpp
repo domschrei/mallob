@@ -85,14 +85,26 @@ private:
     void handleNotifyNeighborStatus(MessageHandle& handle);
     void handleNotifyNeighborIdleDistance(MessageHandle& handle);
     void handleRequestWork(MessageHandle& handle);
-    
+    void handleSchedReleaseFromWaiting(MessageHandle& handle);
+    void handleSchedNodeFreed(MessageHandle& handle);
+
     void sendRevisionDescription(int jobId, int revision, int dest);
     void bounceJobRequest(JobRequest& request, int senderRank);
-    
+
+    void checkStats(float time);
+    void checkJobs();
+    void checkActiveJob();
+    void publishAndResetSysState();
+
+    void tryAdoptRequest(JobRequest& req, int source, JobDatabase::JobRequestMode mode);
+
     void initiateVolumeUpdate(int jobId);
     void updateVolume(int jobId, int volume, int balancingEpoch, float eventLatency);
     void spawnJobRequest(int jobId, bool left, int balancingEpoch);
     void sendJobRequest(const JobRequest& req, int tag, bool left, int dest);
+    void activateRootRequest(int jobId);
+    void updatedVolumeOfInactiveJob(int jobId, int prevVolume, int balancingEpoch);
+    void propagateVolumeUpdate(Job& job, int volume, int balancingEpoch);
 
     void interruptJob(int jobId, bool terminate, bool reckless);
     void sendJobDoneWithStatsToClient(int jobId, int revision, int successfulRank);

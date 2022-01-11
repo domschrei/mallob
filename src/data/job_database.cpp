@@ -17,7 +17,7 @@
 #include "util/sys/watchdog.hpp"
 #include "util/sys/proc.hpp"
 
-JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sysstate): 
+JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sysstate):
         _params(params), _comm(comm), _sys_state(sysstate) {
     _wcsecs_per_instance = params.jobWallclockLimit();
     _cpusecs_per_instance = params.jobCpuLimit();
@@ -30,32 +30,8 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sys
 
     // Initialize balancer
     _balancer = std::unique_ptr<EventDrivenBalancer>(new EventDrivenBalancer(_comm, _params));
-
-    _janitor.run([this]() {
-        auto lg = Logger::getMainInstance().copy("<Janitor>", ".janitor");
-        lg.log(V3_VERB, "tid=%lu\n", Proc::getTid());
-        while (_janitor.continueRunning() || _num_stored_jobs > 0) {
-            std::list<Job*> copy;
-            {
-                auto lock = _janitor_mutex.getLock();
-                _janitor_cond_var.waitWithLockedMutex(lock, [&]() {
-                    return !_janitor.continueRunning() || !_jobs_to_free.empty();
-                });
-                if (!_janitor.continueRunning() && _jobs_to_free.empty())
-                    break;
-                for (Job* job : _jobs_to_free) copy.push_back(job);
-                _jobs_to_free.clear();
-            }
-            lg.log(V5_DEBG, "Found %i job(s) to delete\n", copy.size());
-            for (Job* job : copy) {
-                int id = job->getId();
-                lg.log(V4_VVER, "DELETE #%i\n", id);
-                delete job;
-                Logger::getMainInstance().mergeJobLogs(id);
-                _num_stored_jobs--;
-            }
-        }
-    });
+    // Initialize janitor (cleaning up old jobs)
+    _janitor.run([this]() {runJanitor();});
 }
 
 Job& JobDatabase::createJob(int commSize, int worldRank, int jobId, JobDescription::Application application) {
@@ -145,7 +121,7 @@ bool JobDatabase::isRequestObsolete(const JobRequest& req) {
     // Requests for a job root never become obsolete
     if (req.requestedNodeIndex == 0) return false;
 
-    if (req.balancingEpoch < _balancer->getGlobalEpoch()) {
+    if (req.balancingEpoch < getGlobalBalancingEpoch()) {
         // Request from a past balancing epoch
         log(V4_VVER, "%s : past epoch\n", req.toStr().c_str());
         return true;
@@ -311,23 +287,6 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
         return REJECT;
     }
 
-    if (has(req.jobId)) {
-        Job& job = get(req.jobId);
-        if (job.getIndex() > 0 && hasScheduler(req.jobId, req.requestedNodeIndex))
-            assert(getScheduler(req.jobId, req.requestedNodeIndex).canCommit() || 
-                log_return_false("[ERROR] %s : Scheduler #%i:%i not suspended!\n", 
-                    req.toStr().c_str(), req.jobId, req.requestedNodeIndex));
-        
-        if (req.balancingEpoch < getGlobalBalancingEpoch() 
-                && hasVolume(req.jobId) && getVolume(req.jobId) <= req.requestedNodeIndex) {
-            // Job is known to have shrunk since the request spawned
-            log(V4_VVER, "Reject req. %s : job shrunk\n", 
-                            toStr(req.jobId, req.requestedNodeIndex).c_str());
-            if (_coll_assign) _coll_assign->setStatusDirty();
-            return REJECT;
-        }
-    }
-
     bool isThisDormantRoot = has(req.jobId) && get(req.jobId).getJobTree().isRoot();
     if (isThisDormantRoot) {
         if (req.requestedNodeIndex > 0) {
@@ -344,7 +303,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
         }
     }
 
-    // Node is idle and not committed to another job
+    // Is node idle and not committed to another job?
     if (!isBusyOrCommitted()) {
         if (mode != TARGETED_REJOIN) return ADOPT_FROM_IDLE;
         // Oneshot request: Job must be present and suspended
@@ -355,6 +314,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
             return REJECT;
         }
     }
+    // -- node is busy in some form
 
     // Request for a root node:
     // Possibly adopt the job while dismissing the active job
@@ -688,6 +648,41 @@ std::optional<JobRequest> JobDatabase::getRootRequest(int jobId) {
     list.pop_front();
     if (list.empty()) _root_requests.erase(jobId);
     return optReq;
+}
+
+void JobDatabase::runJanitor() {
+
+    auto lg = Logger::getMainInstance().copy("<Janitor>", ".janitor");
+    lg.log(V3_VERB, "tid=%lu\n", Proc::getTid());
+    
+    while (_janitor.continueRunning() || _num_stored_jobs > 0) {
+    
+        std::list<Job*> copy;
+        {
+            // Try to fetch the current jobs to free
+            auto lock = _janitor_mutex.getLock();
+            _janitor_cond_var.waitWithLockedMutex(lock, [&]() {
+                return !_janitor.continueRunning() || !_jobs_to_free.empty();
+            });
+            if (!_janitor.continueRunning() && _jobs_to_free.empty())
+                break;
+            
+            // Copy jobs to free to local list
+            for (Job* job : _jobs_to_free) copy.push_back(job);
+            _jobs_to_free.clear();
+        }
+
+        lg.log(V5_DEBG, "Found %i job(s) to delete\n", copy.size());
+        
+        // Free each job
+        for (Job* job : copy) {
+            int id = job->getId();
+            lg.log(V4_VVER, "DELETE #%i\n", id);
+            delete job;
+            Logger::getMainInstance().mergeJobLogs(id);
+            _num_stored_jobs--;
+        }
+    }
 }
 
 JobDatabase::~JobDatabase() {

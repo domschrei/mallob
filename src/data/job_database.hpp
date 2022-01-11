@@ -139,6 +139,9 @@ public:
     void suspendScheduler(Job& job);
 
     std::string toStr(int j, int idx) const;
+
+private:
+    void runJanitor();
     
 };
 
