@@ -158,10 +158,6 @@ void Cadical::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 	solver->connect_learner(&learner);
 }
 
-void Cadical::increaseClauseProduction() {
-	learner.incGlueLimit();
-}
-
 int Cadical::getVariablesCount() {
 	return solver->vars();
 }

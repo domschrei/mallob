@@ -16,19 +16,19 @@
 DefaultSharingManager::DefaultSharingManager(
 		std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, 
 		const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver, int jobIndex)
-	: _solvers(solvers), _process_filter(/*maxClauseLen=*/params.hardMaxClauseLength()), 
+	: _solvers(solvers), _process_filter(/*maxClauseLen=*/params.strictClauseLengthLimit()), 
 	_max_deferred_lits_per_solver(maxDeferredLitsPerSolver), 
 	_params(params), _logger(logger), _job_index(jobIndex),
 	_cdb(
-		/*maxClauseSize=*/_params.hardMaxClauseLength(),
+		/*maxClauseSize=*/_params.strictClauseLengthLimit(),
 		/*maxLbdPartitionedSize=*/_params.maxLbdPartitioningSize(),
 		/*baseBufferSize=*/_params.clauseBufferBaseSize(),
 		/*numChunks=*/_params.numChunksForExport(),
 		/*numProducers=*/_solvers.size()+1
-	), _hist_produced(params.hardMaxClauseLength()), 
-	_hist_admitted_to_db(params.hardMaxClauseLength()), 
-	_hist_dropped_before_db(params.hardMaxClauseLength()),
-	_hist_returned_to_db(params.hardMaxClauseLength()) {
+	), _hist_produced(params.strictClauseLengthLimit()), 
+	_hist_admitted_to_db(params.strictClauseLengthLimit()), 
+	_hist_dropped_before_db(params.strictClauseLengthLimit()),
+	_hist_returned_to_db(params.strictClauseLengthLimit()) {
 
 	_stats.histProduced = &_hist_produced;
 	_stats.histAdmittedToDb = &_hist_admitted_to_db;
@@ -39,7 +39,7 @@ DefaultSharingManager::DefaultSharingManager(
 	auto callback = getCallback();
 	
     for (size_t i = 0; i < _solvers.size(); i++) {
-		_solver_filters.emplace_back(/*maxClauseLen=*/params.hardMaxClauseLength());
+		_solver_filters.emplace_back(/*maxClauseLen=*/params.strictClauseLengthLimit());
 		_solvers[i]->setExtLearnedClauseCallback(callback);
 		_solver_revisions.push_back(_solvers[i]->getSolverSetup().solverRevision);
 		_deferred_admitted_clauses.emplace_back();
@@ -62,11 +62,6 @@ int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
 	_logger.log(V5_DEBG, "prepared %i clauses, size %i\n", numExportedClauses, buffer.size());
 	_stats.exportedClauses += numExportedClauses;
 	float usedRatio = ((float)buffer.size())/maxSize;
-	if (usedRatio < _params.increaseClauseProductionRatio()) {
-		int increaser = lastInc++ % _solvers.size();
-		_solvers[increaser]->increaseClauseProduction();
-		_logger.log(V3_VERB, "prod. increase no. %d (sid %d)\n", prodInc++, increaser);
-	}
 	_logger.log(V5_DEBG, "buffer fillratio=%.3f\n", usedRatio);
 	
 	return buffer.size();
@@ -82,7 +77,7 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 	int verb = _job_index == 0 ? V3_VERB : V5_DEBG;
 	float cfci = _params.clauseFilterClearInterval();
 	float time = Timer::elapsedSeconds();
-	ClauseHistogram hist(_params.hardMaxClauseLength());
+	ClauseHistogram hist(_params.strictClauseLengthLimit());
 
 	digestDeferredFutureClauses();
 

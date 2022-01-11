@@ -185,10 +185,6 @@ void MergeSatBackend::setLearnedClauseCallback(const LearnedClauseCallback& call
 	solver->issuer = this;
 }
 
-void MergeSatBackend::increaseClauseProduction() {
-	if (lbdLimit < _setup.softFinalMaxLbd) lbdLimit++;
-}
-
 SolvingStatistics MergeSatBackend::getStatistics() {
 	SolvingStatistics st;
 	st.conflicts = solver->conflicts;

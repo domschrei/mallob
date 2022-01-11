@@ -80,12 +80,10 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 	setup.logger = &_logger;
 	setup.jobname = config.getJobStr();
 	setup.isJobIncremental = config.incremental;
-	setup.hardInitialMaxLbd = params.initialHardLbdLimit();
-	setup.hardFinalMaxLbd = params.finalHardLbdLimit();
-	setup.softInitialMaxLbd = params.initialSoftLbdLimit();
-	setup.softFinalMaxLbd = params.finalSoftLbdLimit();
-	setup.hardMaxClauseLength = params.hardMaxClauseLength();
-	setup.softMaxClauseLength = params.softMaxClauseLength();
+	setup.strictClauseLengthLimit = params.strictClauseLengthLimit();
+	setup.strictLbdLimit = params.strictLbdLimit();
+	setup.qualityClauseLengthLimit = params.qualityClauseLengthLimit();
+	setup.qualityLbdLimit = params.qualityLbdLimit();
 	setup.clauseBaseBufferSize = params.clauseBufferBaseSize();
 	setup.anticipatedLitsToImportPerCycle = config.maxBroadcastedLitsPerCycle;
 	setup.hasPseudoincrementalSolvers = setup.isJobIncremental && hasPseudoincrementalSolvers;

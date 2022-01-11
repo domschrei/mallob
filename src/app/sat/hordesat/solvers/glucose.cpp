@@ -29,8 +29,6 @@ MGlucose::MGlucose(const SolverSetup& setup)
 	maxvar = 0;
 
 	numDiversifications = 8;
-	softMaxLbd = _setup.softInitialMaxLbd;
-	hardMaxLbd = _setup.hardInitialMaxLbd;
 }
 
 void MGlucose::addLiteral(int lit) {
@@ -199,11 +197,6 @@ void MGlucose::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 	this->learnedClauseCallback = callback;
 }
 
-void MGlucose::increaseClauseProduction() {
-	if (hardMaxLbd < _setup.hardFinalMaxLbd) hardMaxLbd++;
-	else if (softMaxLbd < _setup.softFinalMaxLbd) softMaxLbd++;
-}
-
 int MGlucose::getVariablesCount() {
 	return maxvar;
 }
@@ -304,12 +297,13 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 	assert(c.getExported() <= 3);
 	
 	// Clause does not pass the hard quality limits? Discard.
-	if (c.size() > (int)_setup.hardMaxClauseLength || c.lbd() > hardMaxLbd) return;
+	if (c.size() > (int)_setup.strictClauseLengthLimit || c.lbd() > _setup.strictLbdLimit) 
+		return;
 		
 	// A clause has "very good quality" iff it satisfies the *soft* limits
 	// (soft because they are not strict for exporting a clause).
-	bool veryGoodQuality = c.size() <= (int)_setup.softMaxClauseLength 
-						&& c.lbd() <= softMaxLbd;
+	bool veryGoodQuality = c.size() <= (int)_setup.qualityClauseLengthLimit 
+						&& c.lbd() <= _setup.qualityLbdLimit;
 
 	// Accept the clause if seen for the 1st time with very good quality
 	// or if seen for the second time with normal quality.

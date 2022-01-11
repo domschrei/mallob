@@ -26,7 +26,7 @@ Kissat::Kissat(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup), solver(kissat_init()) {
 
     kissat_set_terminate(solver, this, &terminate_callback);
-    glueLimit = _setup.softInitialMaxLbd;
+    glueLimit = _setup.strictLbdLimit;
 }
 
 void Kissat::addLiteral(int lit) {
@@ -146,13 +146,13 @@ std::set<int> Kissat::getFailedAssumptions() {
 
 void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 	this->callback = callback;
-    kissat_set_clause_export_callback(solver, this, learntClauseBuffer, _setup.softMaxClauseLength, &produce_clause);
+    kissat_set_clause_export_callback(solver, this, learntClauseBuffer, _setup.strictClauseLengthLimit, &produce_clause);
     kissat_set_clause_import_callback(solver, this, &consume_clause);
 }
 
 void Kissat::produceClause(int size, int lbd) {
     Clause c;
-    if (size > _setup.hardMaxClauseLength || lbd > _setup.hardFinalMaxLbd) 
+    if (size > _setup.strictClauseLengthLimit || lbd > _setup.strictLbdLimit) 
         return;
     c.size = size;
     c.lbd = lbd;
@@ -176,10 +176,6 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
         *clause = 0;
         *size = 0;
     }
-}
-
-void Kissat::increaseClauseProduction() {
-	glueLimit = std::min(glueLimit+1, _setup.softFinalMaxLbd);
 }
 
 int Kissat::getVariablesCount() {

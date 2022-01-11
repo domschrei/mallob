@@ -19,6 +19,12 @@ extern "C" {
 	#include "lglib.h"
 }
 
+#ifndef LGL_UNKNOWN
+#define LGL_UNKNOWN 0
+#define LGL_SATISFIABLE 10
+#define LGL_UNSATISFIABLE 20
+#endif
+
 /***************************** CALLBACKS *****************************/
 
 int cbCheckTerminate(void* solverPtr) {
@@ -84,8 +90,8 @@ Lingeling::Lingeling(const SolverSetup& setup)
 
 	lglsetime(solver, getTime);
 	lglseterm(solver, cbCheckTerminate, this);
-	glueLimit = _setup.softInitialMaxLbd;
-	sizeLimit = _setup.softMaxClauseLength;
+	sizeLimit = _setup.strictClauseLengthLimit;
+	glueLimit = _setup.strictLbdLimit;
 
     suspendSolver = false;
     maxvar = 0;
@@ -268,12 +274,6 @@ void Lingeling::setLearnedClauseCallback(const LearnedClauseCallback& callback) 
 	lglsetconsumeunits(solver, cbConsumeUnits, this);
 	lglsetconsumecls(solver, cbConsumeCls, this);
 }
-
-void Lingeling::increaseClauseProduction() {
-	if (glueLimit != 0 && glueLimit < _setup.softFinalMaxLbd) 
-		glueLimit++;
-}
-
 
 std::vector<int> Lingeling::getSolution() {
 	std::vector<int> result;

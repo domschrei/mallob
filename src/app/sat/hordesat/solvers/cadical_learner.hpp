@@ -15,11 +15,11 @@ private:
 	unsigned long _num_produced;
 	
 public:
-	HordeLearner(const SolverSetup& setup) : _setup(setup), _glue_limit(_setup.softInitialMaxLbd) {}
+	HordeLearner(const SolverSetup& setup) : _setup(setup), _glue_limit(_setup.strictLbdLimit) {}
 	~HordeLearner() override {}
 
   	bool learning(int size) override {
-		return size > 0 && size <= _setup.softMaxClauseLength;
+		return size > 0 && size <= _setup.strictClauseLengthLimit;
 	}
 
 	void learn(int lit) override {
@@ -57,10 +57,6 @@ public:
 			_curr_clause.clear();
 		}
 	}
-
-    void incGlueLimit() {
-        if (_glue_limit < (int)_setup.softFinalMaxLbd) _glue_limit++;
-    }
 
     void setCallback(const LearnedClauseCallback& callback) {
         _callback = callback;

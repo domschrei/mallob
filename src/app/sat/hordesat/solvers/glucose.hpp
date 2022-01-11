@@ -41,8 +41,6 @@ private:
     ConditionVariable suspendCond;
 
 	int numDiversifications;
-	unsigned int softMaxLbd;
-	unsigned int hardMaxLbd;
 
 	// Clause statistics
 	unsigned long numProduced = 0;
@@ -70,9 +68,6 @@ public:
 
 	// Set a function that should be called for each learned clause
 	void setLearnedClauseCallback(const LearnedClauseCallback& callback) override;
-
-	// Request the solver to produce more clauses
-	void increaseClauseProduction() override;
 	
 	// Get the number of variables of the formula
 	int getVariablesCount() override;

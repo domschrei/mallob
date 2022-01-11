@@ -78,9 +78,6 @@ public:
 	// Set a function that should be called for each learned clause
 	virtual void setLearnedClauseCallback(const LearnedClauseCallback& callback) = 0;
 
-	// Request the solver to produce more clauses
-	virtual void increaseClauseProduction() = 0;
-
 	// Get solver statistics
 	virtual void writeStatistics(SolvingStatistics& stats) = 0;
 

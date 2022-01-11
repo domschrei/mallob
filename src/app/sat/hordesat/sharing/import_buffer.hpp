@@ -24,7 +24,7 @@ private:
 public:
     ImportBuffer(const SolverSetup& setup, SolvingStatistics& stats) : _stats(stats), 
         _cdb(
-			setup.hardMaxClauseLength, 
+			setup.strictClauseLengthLimit,
             2, 
 			setup.clauseBaseBufferSize, 
 			std::max(
