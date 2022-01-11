@@ -15,6 +15,10 @@ using namespace Mallob;
 #include "util/logger.hpp"
 #include "app/sat/hordesat/sharing/import_buffer.hpp"
 
+#ifndef INCREMENTAL
+#define INCREMENTAL 1
+#endif
+
 #include "simp/SimpSolver.h"
 
 class MGlucose : Glucose::SimpSolver, public PortfolioSolverInterface {
@@ -81,7 +85,7 @@ public:
 	// Get solver statistics
 	void writeStatistics(SolvingStatistics& stats) override;
 
-	bool supportsIncrementalSat() override {return false;}
+	bool supportsIncrementalSat() override {return true;}
 	bool exportsConditionalClauses() override {return true;}
 
 private:

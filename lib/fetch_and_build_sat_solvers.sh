@@ -27,7 +27,12 @@ if echo $solvers|grep -q "g" && [ ! -f glucose/libglucose.a ]; then
     tar xzvf glucose-syrup-4.1.tgz
     rm ._glucose-syrup-4.1
     mv glucose-syrup-4.1 glucose
+    # Patch bug in solver
     patch glucose/core/Solver.cc < Glucose_Solver.cc.patch
+    # Add INCREMENTAL definition to compile flags
+    sed -i 's/ -D __STDC_FORMAT_MACROS/ -D __STDC_FORMAT_MACROS -D INCREMENTAL/g' glucose/mtl/template.mk
+    # Fix typo in a preprocessor definition
+    sed -i 's/INCREMNENTAL/INCREMENTAL/g' glucose/core/SolverTypes.h
     
     cd glucose/simp
     make libr

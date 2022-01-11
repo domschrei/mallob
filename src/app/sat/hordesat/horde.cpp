@@ -148,7 +148,7 @@ std::shared_ptr<PortfolioSolverInterface> HordeLib::createSolver(const SolverSet
 #endif
 #ifdef MALLOB_USE_GLUCOSE
 	case 'g':
-	//case 'G': // no support for incremental mode as of now
+	case 'G':
 		// Glucose
 		_logger.log(V4_VVER, "S%i: Glucose-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new MGlucose(setup));

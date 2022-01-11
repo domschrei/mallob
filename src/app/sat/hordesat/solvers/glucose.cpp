@@ -19,7 +19,7 @@ MGlucose::MGlucose(const SolverSetup& setup)
 		setIncrementalMode();
 
 	verbosity = -1;
-	verbEveryConflicts = 10000000;
+	verbEveryConflicts = 0;
 	parsing = 0;
 
 	stopSolver = 0;
@@ -328,7 +328,7 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 	for (int j = 0; j < c.size(); j++) {
 		vcls[j] = decodeLit(c[j]);
 		assert(vcls[j] != 0);
-		assert(std::abs(vcls[j]) <= maxvar || log_return_false("Literal %i exported!\n", vcls[j]));
+		assert(std::abs(vcls[j]) <= maxvar || log_return_false("Literal %i/%i exported!\n", vcls[j], maxvar));
 	}
 	
 	// export clause
