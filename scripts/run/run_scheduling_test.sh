@@ -28,7 +28,7 @@ source $(dirname "$0")/systest_commons.sh
 
 # Directory setup
 mkdir -p .api/jobs.0/
-mkdir -p .api/jobs.0/{introduced,new,pending,done}/
+mkdir -p .api/jobs.0/{introduced,in,out}/
 cleanup
 
 function create_independent_jobs() {
@@ -87,12 +87,13 @@ function create_job_chains() {
 
 # Generate chain of independent jobs
 #create_independent_jobs
+
 # Generate clients, each with a chain of dependent jobs
 numjobs=$(create_job_chains)
 echo "Generated $numjobs jobs"
 
 # Set options
-options="-t=4 -c=1 -ajpc=$(($1-2)) -satsolver=cccllg -v=5 -J=$numjobs -s=1 -mlbdps=5 -checksums=0 -huca=0 -sleep=100"
+options="-t=4 -c=1 -ajpc=$(($1-2)) -satsolver=kkccllg -v=5 -J=$numjobs"
 
 # Launch Mallob with a unique run ID for a logging directory
 runid="sched_$(hostname)_$(git rev-parse --short HEAD)_np${1}_"$(echo $options|sed 's/-//g'|sed 's/=//g'|sed 's/ /_/g')
