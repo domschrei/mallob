@@ -46,28 +46,30 @@ void Kissat::diversify(int seed) {
     kissat_set_option(solver, "check", 0); // do not check model or derived clauses
 
     switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-    case 0: kissat_set_configuration(solver, "default"); break;
-    case 1: kissat_set_configuration(solver, "sat"); break;
-    case 2: kissat_set_configuration(solver, "unsat"); break;
-    case 3: kissat_set_configuration(solver, "plain"); break;
-    case 4: kissat_set_option(solver, "eliminate", 0); break;
-    case 5: kissat_set_option(solver, "restartint", 100); break;
-    case 6: kissat_set_option(solver, "restartint", 1000); break;
-    case 7: kissat_set_option(solver, "tier2", 3); break;
-    case 8: kissat_set_option(solver, "tier2", 8); break;
+    case 0: kissat_set_option(solver, "eliminate", 0); break;
+    case 1: kissat_set_option(solver, "delay", 10); break;
+    case 2: kissat_set_option(solver, "restartint", 100); break;
+    case 3: kissat_set_option(solver, "walkinitially", 1); break;
+    case 4: kissat_set_option(solver, "restartint", 1000); break;
+    case 5: kissat_set_option(solver, "sweep", 0); break;
+    case 6: kissat_set_configuration(solver, "unsat"); break;
+    case 7: kissat_set_configuration(solver, "sat"); break;
+    case 8: kissat_set_option(solver, "probe", 0); break;
     case 9: kissat_set_option(solver, "tier1", 3); kissat_set_option(solver, "tier2", 8); break;
-    case 10: kissat_set_option(solver, "walkinitially", 1); break;
-    case 11: kissat_set_option(solver, "walkinitially", 1); kissat_set_option(solver, "walkeffort", 1e6); break;
-    case 12: kissat_set_option(solver, "sweep", 0); break;
-    case 13: kissat_set_option(solver, "probe", 0); break;
-    case 14: kissat_set_option(solver, "delay", 10); break;
+
+    // unused
+    case 10: kissat_set_option(solver, "walkinitially", 1); kissat_set_option(solver, "walkeffort", 1e6); break;
+    case 11: kissat_set_option(solver, "tier2", 8); break;
+    case 12: kissat_set_configuration(solver, "plain"); break;
+    case 13: kissat_set_option(solver, "tier2", 3); break;
+    case 14: kissat_set_configuration(solver, "default"); break;
     }
 
     seedSet = true;
 }
 
 int Kissat::getNumOriginalDiversifications() {
-	return 15;
+	return 10;
 }
 
 void Kissat::setPhase(const int var, const bool phase) {
