@@ -1,3 +1,9 @@
+"""
+Takes one or multiple log files of a single Mallob run with displayed warmup messages.
+Computes small shifts in the individual workers' log timestamps
+such that all warmup messages are temporally coherent.
+Writes the adapted file of each given file to "<arg>_harmonized".
+"""
 
 import sys
 from ortools.linear_solver import pywraplp
@@ -5,32 +11,33 @@ from ortools.linear_solver import pywraplp
 msgPairs = dict()
 OFFSET_ABS_VAR = 10000
 
-for line in open(sys.argv[1], "r").readlines():
-    line = line.rstrip()
-    if "warmup msg" not in line:
-        continue
-    
-    # 0.655 2 Received warmup msg <= [4]
-    #print(line)
-    words = line.split(" ")
-    try:
-        time = float(words[0])
-        rank = int(words[1])
-        otherRankStr = words[6]
-        otherRank = int(otherRankStr[1:len(otherRankStr)-1])
-        received = words[2] == "Received"
+for arg in sys.argv[1:]:
+    for line in open(arg, "r").readlines():
+        line = line.rstrip()
+        if "warmup msg" not in line:
+            continue
+        
+        # 0.655 2 Received warmup msg <= [4]
+        #print(line)
+        words = line.split(" ")
+        try:
+            time = float(words[0])
+            rank = int(words[1])
+            otherRankStr = words[6]
+            otherRank = int(otherRankStr[1:len(otherRankStr)-1])
+            received = words[2] == "Received"
 
-        recvRank = rank if received else otherRank
-        sendRank = otherRank if received else rank
+            recvRank = rank if received else otherRank
+            sendRank = otherRank if received else rank
 
-        if (sendRank, recvRank) not in msgPairs:
-            # Key: (sending rank, receiving rank)
-            # Value: (sending time, receiving time)
-            msgPairs[(sendRank, recvRank)] = [None, None]
-        msgPairs[(sendRank, recvRank)][1 if received else 0] = time
-    except ValueError:
-        print("WARN: Did not manage to parse", line)
-        continue
+            if (sendRank, recvRank) not in msgPairs:
+                # Key: (sending rank, receiving rank)
+                # Value: (sending time, receiving time)
+                msgPairs[(sendRank, recvRank)] = [None, None]
+            msgPairs[(sendRank, recvRank)][1 if received else 0] = time
+        except ValueError:
+            print("WARN: Did not manage to parse", line)
+            continue
 
 solver = pywraplp.Solver.CreateSolver('GLOP')
 vars = dict()
@@ -101,19 +108,20 @@ fOffsets.close()
 print("Min. offset:", minRank, "->", minOffset)
 print("Max. offset:", maxRank, "->", maxOffset)
 
-fOut = open(sys.argv[1] + ".harmonized", 'w')
-for line in open(sys.argv[1], "r").readlines():
-    line = line.rstrip()
+for arg in sys.argv[1:]:
+    fOut = open(arg + ".harmonized", 'w')
+    for line in open(arg, "r").readlines():
+        line = line.rstrip()
 
-    words = line.split(" ")
+        words = line.split(" ")
 
-    try:
-        t = float(words[0])
-        r = int(words[1])
-    except ValueError:
-        continue
+        try:
+            t = float(words[0])
+            r = int(words[1])
+        except ValueError:
+            continue
 
-    words[0] = "%.4f" % (t + offsets[r])
-    fOut.write(" ".join(words) + "\n")
-fOut.close()
-print("Wrote to", sys.argv[1] + ".harmonized")
+        words[0] = "%.4f" % (t + offsets[r])
+        fOut.write(" ".join(words) + "\n")
+    fOut.close()
+    print("Wrote to", arg + ".harmonized")

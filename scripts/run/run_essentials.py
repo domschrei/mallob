@@ -23,7 +23,7 @@ hardness_factor = 1000
 j = {
     "user": "admin", 
     "name": "job-1",
-    "file": "instances/r3sat_200.cnf", 
+    "files": ["instances/r3sat_200.cnf"], 
     #"file": "instances/incremental_sat_01.cnf", 
     "priority": 1.000, 
     "wallclock-limit": "0", 
