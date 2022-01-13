@@ -4,10 +4,11 @@
 
 #include "balancing/volume_calculator.hpp"
 
+double runtime = 0;
+
 void testFunction(Parameters& params) {
     BalancingEntry entry(1, 10, 1);
     entry.fairShare = 5;
-    entry.remainder = 0.4;
 
     std::vector<double> multipliers;
     multipliers.push_back(1.0 / entry.fairShare);
@@ -21,19 +22,26 @@ void testFunction(Parameters& params) {
 
 std::vector<BalancingEntry> testEventMap(Parameters& params, EventMap& map, int numWorkers, int expectedUtilization) {
     int sum = 0;
-    VolumeCalculator calc(map, params, numWorkers, 1);
+    runtime = Timer::elapsedSeconds();
+    VolumeCalculator calc(map, params, numWorkers, V4_VVER);
     calc.calculateResult();
+    runtime = Timer::elapsedSeconds() - runtime;
+    bool allDemandsMet = true;
     for (const auto& entry : calc.getEntries()) {
         assert(entry.volume <= entry.demand);
         assert(entry.demand == 0 || entry.volume >= 1);
         sum += entry.volume;
+        allDemandsMet = allDemandsMet && entry.volume == entry.originalDemand;
     }
-    assert(sum == expectedUtilization || log_return_false("%i != %i\n", sum, expectedUtilization));
+    for (const auto& entry : calc.getEntries()) {
+        log(V5_DEBG, "  #%i : fair share %.4f ~> volume %i\n", entry.jobId, entry.fairShare, entry.volume);
+    }
+    assert(allDemandsMet || sum == expectedUtilization || log_return_false("%i != %i\n", sum, expectedUtilization));
     return calc.getEntries();
 }
 
-void test1(Parameters& params) {
-    log(V2_INFO, "#### Test 1 ####\n");
+void testUniformUnderutilization(Parameters& params) {
+    log(V2_INFO, "#### Test uniform underutilization ####\n");
     EventMap map;
     // ID, epoch, demand, priority
     map.insertIfNovel(Event({/*ID=*/1, /*epoch=*/1, /*demand=*/10, /*priority=*/1}));
@@ -51,8 +59,8 @@ void test1(Parameters& params) {
     }
 }
 
-void test2(Parameters& params) {
-    log(V2_INFO, "#### Test 2 ####\n");
+void testUniform(Parameters& params) {
+    log(V2_INFO, "#### Test uniform ####\n");
     EventMap map;
     // ID, epoch, demand, priority
     map.insertIfNovel(Event({/*ID=*/1, /*epoch=*/1, /*demand=*/10000, /*priority=*/1}));
@@ -70,8 +78,8 @@ void test2(Parameters& params) {
     }
 }
 
-void test3(Parameters& params) {
-    log(V2_INFO, "#### Test 3 ####\n");
+void testSimilarPriorities(Parameters& params) {
+    log(V2_INFO, "#### Test similar priorities ####\n");
     EventMap map;
     // ID, epoch, demand, priority
     map.insertIfNovel(Event({/*ID=*/1, /*epoch=*/1, /*demand=*/10000, /*priority=*/0.501}));
@@ -84,9 +92,7 @@ void test3(Parameters& params) {
     map.insertIfNovel(Event({/*ID=*/8, /*epoch=*/1, /*demand=*/10000, /*priority=*/0.508}));
 
     auto result = testEventMap(params, map, /*numWorkers=*/100, /*expectedUtilization=*/100);
-    for (const auto& entry : result) {
-        log(V2_INFO, "  #%i : %i\n", entry.jobId, entry.volume);
-    }
+
     for (const auto& entry : result) {
         assert(entry.volume == 12 || entry.volume == 13);
         if (entry.volume == 12) assert(entry.priority <= 0.504f);
@@ -94,51 +100,72 @@ void test3(Parameters& params) {
     }
 }
 
-void test4(Parameters& params) {
-    log(V2_INFO, "#### Test 4 ####\n");
+void testPerformance(Parameters& params) {
+    log(V2_INFO, "#### Test performance ####\n");
+
+    float minPriority = 0.001;
+    int numWorkers = 1 << 23;
 
     std::vector<int> numJobsVec;
-    for (int i = 1; i < 1 << 20; i*=2) numJobsVec.push_back(i);
-    //numJobsVec.push_back(1000);
-    std::vector<float> times;
+    for (float i = 64; i <= 1 << 20; i*=2) {
+        if (i <= numWorkers) numJobsVec.push_back((int)std::ceil(i));
+    }
+    //for (int i = 10000; i <= 1e6; i+=10000) for (int rep = 1; rep <= numReps; rep++) numJobsVec.push_back(i);
     
-    for (int numJobs : numJobsVec) {
-        log(V2_INFO, "nJobs = %i\n", numJobs);
-        float time = Timer::elapsedSeconds();
+    std::map<int, int> numRuntimesPerSize;
+    std::map<int, float> runtimesPerSize;
 
-        EventMap map;
-        for (size_t i = 0; i < numJobs; i++) {
-            map.insertIfNovel(Event({/*ID=*/(int)(i+1), /*epoch=*/1, /*demand=*/(int)(1+Random::rand()*99), /*priority=*/Random::rand()}));
+    for (int rep = 1; rep <= 3; rep++) {
+        for (int i = 0; i < numJobsVec.size(); i++) {
+            int numJobs = numJobsVec[i];
+
+            int maxDemand = numWorkers - numJobs + 1;
+            //float log2MaxDemand = log2(maxDemand);
+
+            EventMap map;
+            unsigned long long sumOfDemands = 0;
+            for (size_t i = 0; i < numJobs; i++) {
+                //int demand = (int) std::round(std::pow(2, log2MaxDemand*Random::rand()));
+                int demand = (int) std::round(1 + Random::rand() * (maxDemand-1));
+                Event ev{/*ID=*/(int)(i+1), /*epoch=*/1, /*demand=*/demand, 
+                    /*priority=*/minPriority+(1-minPriority)*Random::rand()};
+                assert(ev.demand >= 1);
+                assert(ev.demand <= maxDemand);
+                assert(ev.priority > minPriority);
+                assert(ev.priority <= 1);
+                map.insertIfNovel(ev);
+                sumOfDemands += ev.demand;
+            }
+                
+            log(V2_INFO, "nJobs=%i nWorkers=%i minPriority=%.6f maxDemand=%i sumOfDemands=%llu\n", 
+                numJobs, numWorkers, minPriority, maxDemand, sumOfDemands);
+
+            auto result = testEventMap(params, map, numWorkers, /*expectedUtilization=*/numWorkers);
+            numRuntimesPerSize[numJobs]++;
+            runtimesPerSize[numJobs] += runtime;
         }
-
-        auto result = testEventMap(params, map, /*numWorkers=*/numJobs*10, /*expectedUtilization=*/numJobs*10);
-        time = Timer::elapsedSeconds() - time;
-        times.push_back(time);
     }
 
     float totalTime = 0;
-    for (size_t i = 0; i < numJobsVec.size(); i++) {
-        totalTime += times[i];
-        log(V2_INFO, "nJobs=%i time=%.5fs\n", numJobsVec[i], times[i]);
+    for (auto& [numJobs, runtimes] : runtimesPerSize) {
+        totalTime += runtimes;
+        log(V2_INFO, "nJobs=%i avgTime=%.6fs\n", numJobs, runtimes/numRuntimesPerSize[numJobs]);
     }
     log(V2_INFO, "Total time: %.5fs\n", totalTime);
 }
 
-void test5(Parameters& params) {
-    log(V2_INFO, "#### Test 5 ####\n");
+void testSmall(Parameters& params) {
+    log(V2_INFO, "#### Test small ####\n");
     EventMap map;
     map.insertIfNovel(Event({/*ID=*/1, /*epoch=*/1, /*demand=*/10, /*priority=*/0.1}));
     map.insertIfNovel(Event({/*ID=*/2, /*epoch=*/1, /*demand=*/10, /*priority=*/0.05}));
     map.insertIfNovel(Event({/*ID=*/3, /*epoch=*/1, /*demand=*/10, /*priority=*/0.025}));
 
     auto result = testEventMap(params, map, /*numWorkers=*/15, /*expectedUtilization=*/15);
-    for (const auto& entry : result) {
-        log(V2_INFO, "  #%i : fair share %.4f ~> volume %i\n", entry.jobId, entry.fairShare, entry.volume);
-    }
 }
 
-void test6(Parameters& params) {
-    log(V2_INFO, "#### Test 6 ####\n");
+void testDivergentDemandPriorityRatio(Parameters& params) {
+    log(V2_INFO, "#### Test divergent demand/priority ratio ####\n");
     EventMap map;
     map.insertIfNovel(Event({/*ID=*/1, /*epoch=*/1, /*demand=*/128, /*priority=*/1}));
     map.insertIfNovel(Event({/*ID=*/2, /*epoch=*/1, /*demand=*/64, /*priority=*/2}));
@@ -150,13 +177,10 @@ void test6(Parameters& params) {
     map.insertIfNovel(Event({/*ID=*/8, /*epoch=*/1, /*demand=*/1, /*priority=*/8}));
 
     auto result = testEventMap(params, map, /*numWorkers=*/40, /*expectedUtilization=*/40);
-    for (const auto& entry : result) {
-        log(V2_INFO, "  #%i : fair share %.4f ~> volume %i\n", entry.jobId, entry.fairShare, entry.volume);
-    }
 }
 
-void test7(Parameters& params) {
-    log(V2_INFO, "#### Test 7 ####\n");
+void testConvergentDemandPriorityRatio(Parameters& params) {
+    log(V2_INFO, "#### Test convergent demand/priority ratio ####\n");
     EventMap map;
     map.insertIfNovel(Event({/*ID=*/1, /*epoch=*/1, /*demand=*/1, /*priority=*/1}));
     map.insertIfNovel(Event({/*ID=*/2, /*epoch=*/1, /*demand=*/2, /*priority=*/2}));
@@ -168,26 +192,45 @@ void test7(Parameters& params) {
     map.insertIfNovel(Event({/*ID=*/8, /*epoch=*/1, /*demand=*/8, /*priority=*/8}));
 
     auto result = testEventMap(params, map, /*numWorkers=*/20, /*expectedUtilization=*/20);
-    for (const auto& entry : result) {
-        log(V2_INFO, "  #%i : fair share %.4f ~> volume %i\n", entry.jobId, entry.fairShare, entry.volume);
-    }
+}
+
+void testHugeModifier(Parameters& params) {
+    log(V2_INFO, "#### Test Huge Modifier ####\n");
+    EventMap map;
+    map.insertIfNovel(Event({/*ID=*/1, /*epoch=*/1, /*demand=*/2, /*priority=*/1000}));
+    map.insertIfNovel(Event({/*ID=*/2, /*epoch=*/1, /*demand=*/100000, /*priority=*/1}));
+
+    auto result = testEventMap(params, map, /*numWorkers=*/100000, /*expectedUtilization=*/100000);
+}
+
+void testTinyModifier(Parameters& params) {
+    log(V2_INFO, "#### Test Tiny Modifier ####\n");
+    EventMap map;
+    for (int j = 0; j < 97; j++)
+        map.insertIfNovel(Event({/*ID=*/j+1, /*epoch=*/1, /*demand=*/100, /*priority=*/0.01}));
+    map.insertIfNovel(Event({/*ID=*/98, /*epoch=*/1, /*demand=*/100, /*priority=*/0.5}));
+    map.insertIfNovel(Event({/*ID=*/99, /*epoch=*/1, /*demand=*/100, /*priority=*/0.5}));
+
+    auto result = testEventMap(params, map, /*numWorkers=*/100, /*expectedUtilization=*/100);
 }
 
 int main(int argc, char *argv[]) {
     Timer::init();
-    Random::init(rand(), rand());
-    Logger::init(0, V5_DEBG, false, false, false, nullptr);
-
     Parameters params;
     params.init(argc, argv);
+    Random::init(params.seed(), params.seed());
+
+    Logger::init(0, params.verbosity(), false, false, false, nullptr);
 
     testFunction(params);
-    test1(params);
-    test2(params);
-    test3(params);
-    test4(params);
-    test5(params);
-    test6(params);
-    test7(params);
+    testUniformUnderutilization(params);
+    testUniform(params);
+    testSimilarPriorities(params);
+    testSmall(params);
+    testConvergentDemandPriorityRatio(params);
+    testDivergentDemandPriorityRatio(params);
+    testTinyModifier(params);
+    testHugeModifier(params);
+    testPerformance(params);
 }
 

@@ -60,6 +60,7 @@ OPT_INT(numThreadsPerProcess,            "t", "threads-per-process",            
 OPT_INT(maxLiteralsPerThread,            "mlpt", "max-lits-per-thread",               50000000, 0, MAX_INT,    "If formula is larger than threshold, reduce #threads per PE until #threads=1 or until limit is met \"on average\"")
 OPT_INT(qualityClauseLengthLimit,        "qcll", "quality-clause-length-limit",       8,    0, LARGE_INT,      "Clauses up to this length are considered \"high quality\"")
 OPT_INT(qualityLbdLimit,                 "qlbdl", "quality-lbd-limit",                2,    0, LARGE_INT,      "Clauses with an LBD score up to this value are considered \"high quality\"")
+OPT_INT(seed,                            "seed", "",                                  0,    0, MAX_INT,        "Random seed")
 OPT_INT(sleepMicrosecs,                  "sleep", "",                                 100,  0, LARGE_INT,      "Sleep this many microseconds between loop cycles of worker main thread")
 OPT_INT(strictClauseLengthLimit,         "scll", "strict-clause-length-limit",        30,   0, LARGE_INT,      "Only clauses up to this length will be shared")
 OPT_INT(strictLbdLimit,                  "slbdl", "strict-lbd-limit",                 30,   0, LARGE_INT,      "Only clauses with an LBD score up to this value will be shared")

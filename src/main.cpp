@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
 
     // Global and local seed, such that all nodes have access to a synchronized randomness
     // as well as to an individual randomness that differs among nodes
-    Random::init(numNodes, rank);
+    Random::init(numNodes+params.seed(), rank+params.seed());
 
     auto isWorker = [&](int rank) {
         if (params.numWorkers() == -1) return true; 
