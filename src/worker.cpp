@@ -28,7 +28,7 @@
 
 Worker::Worker(MPI_Comm comm, Parameters& params) :
     _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
-    _params(params), _job_db(_params, _comm, _sys_state), _sys_state(_comm), 
+    _params(params), _job_db(_params, _comm, _sys_state), _sys_state(_comm, params.sysstatePeriod()), 
     _watchdog(/*checkIntervMillis=*/200, Timer::elapsedSeconds())
 {
     _global_timeout = _params.timeLimit();

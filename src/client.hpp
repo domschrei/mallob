@@ -94,7 +94,7 @@ private:
 public:
     Client(MPI_Comm comm, Parameters& params)
         : _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
-        _params(params), _sys_state(_comm) {}
+        _params(params), _sys_state(_comm, params.sysstatePeriod()) {}
     ~Client();
     void init();
     void advance();

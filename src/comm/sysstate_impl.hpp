@@ -5,7 +5,7 @@
 #include "sysstate.hpp"
 
 template <int N>
-SysState<N>::SysState(MPI_Comm& comm): _comm(comm) {
+SysState<N>::SysState(MPI_Comm& comm, float period): _comm(comm), _period(period) {
     for (int i = 0; i < N; i++) {
         _local_state[i] = 0.0f;
     }
@@ -33,10 +33,10 @@ template <int N>
 bool SysState<N>::aggregate(float elapsedTime) {
 
     float time = elapsedTime < 0 ? Timer::elapsedSeconds() : elapsedTime;
-    if (time-_last_check > 0.1) {
+    if (time-_last_check > _period/5) {
         _last_check = time;
         float timeSinceLast = time-_last_aggregation;
-        if (!_aggregating && timeSinceLast >= 1.0) {
+        if (!_aggregating && timeSinceLast >= _period) {
             _last_aggregation = time;
             _request = MyMpi::iallreduce(_comm, _local_state, _global_state, N);
             _aggregating = true;

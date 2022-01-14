@@ -80,6 +80,7 @@ OPT_FLOAT(jobCpuLimit,                   "jcl", "job-cpu-limit",                
 OPT_FLOAT(jobWallclockLimit,             "jwl", "job-wallclock-limit",                0,    0, LARGE_INT,      "Timeout an instance after x seconds wall clock time")
 OPT_FLOAT(loadFactor,                    "l", "load-factor",                          1,    0, 1,              "Load factor to be aimed at")
 OPT_FLOAT(requestTimeout,                "rto", "request-timeout",                    0,    0, LARGE_INT,      "Request timeout: discard non-root job requests when older than this many seconds")
+OPT_FLOAT(sysstatePeriod,                "y", "sysstate-period",                      1,    0.1, 50,           "Period for aggregating and logging global system state")
 OPT_FLOAT(timeLimit,                     "T", "time-limit",                           0,    0, LARGE_INT,      "Run entire system for at most this many seconds")
 
 OPT_STRING(applicationConfiguration,     "app-config", "",                            "",                      "Application configuration: structured as (-key=value;)*")
