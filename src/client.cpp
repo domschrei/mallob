@@ -112,9 +112,8 @@ void Client::readIncomingJobs() {
             _incoming_job_queue.erase(foundJob);
             _num_incoming_jobs--;
         } else {
-            // No eligible jobs right now -- sleep for a while
+            // No eligible jobs right now
             lock.unlock();
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
 

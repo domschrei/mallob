@@ -40,7 +40,7 @@ cat _combinations|while read -r line; do
 	config=$(echo $line|awk '{print $1}')
 	instance=$(echo $line|awk '{print $2}')
 	echo $config $instidx $instance
-	wclimit=1000 maxdemand=1 application=SAT appconfig='{"diversification-offset": "'$config'"}' introduce_job kissat-$(date +%s-%N)-$config-$instidx instances/$instance
+	wclimit=1000s maxdemand=1 application=SAT appconfig='{"diversification-offset": "'$config'"}' introduce_job kissat-$(date +%s-%N)-$config-$instidx instances/$instance
 	instidx=$((instidx+1))
 done
 

@@ -35,9 +35,11 @@ function create_independent_jobs() {
     i=1
     while read -r instance; do
         # Parameters: job name, instance path, wallclock limit, arrival, dependencies, application (SAT or DUMMY)
-        wclimit=300 introduce_job solve-$i instances/$instance
+        wclimit=300s introduce_job solve-$i instances/$instance
+        echo "solve-$i : $instance"
         i=$((i+1))
     done < $benchmarkfile
+    export numjobs=$i
 }
 
 function sample_exponential() {
@@ -50,7 +52,7 @@ function create_job_chains() {
     ninstances=$(cat $benchmarkfile|wc -l)
     interarrivaltime=1
     jobsperclient_lambda=1.5
-    timeperjob=30
+    timeperjob=10
     maxtime=300
     
     instno=1
@@ -60,14 +62,18 @@ function create_job_chains() {
     
     while true; do
         if (( $(echo "$t > $maxtime" |bc -l) )); then break; fi
-        jobsthisclient=$(sample_exponential $jobsperclient_lambda)
         
+        #jobsthisclient=$(sample_exponential $jobsperclient_lambda)
+        jobsthisclient=1
+
         added=false
         for k in $(seq 1 $jobsthisclient); do
             added=true
             dep=""
-            if [ $k -gt 1 ]; then dep="\"admin.solve-$c-$(($k-1))\"" ; fi 
-            wclimit=$timeperjob arrival=$t dependency="$dep" introduce_job solve-$c-$k instances/$(sed "${instno}q;d" $benchmarkfile)
+            if [ $k -gt 1 ]; then dep="\"admin.solve-$c-$(($k-1))\"" ; fi
+            instance=instances/$(sed "${instno}q;d" $benchmarkfile)
+            echo "solve-$c-$k : arrival@$t deps=$dep $instance"
+            application=SAT wclimit=${timeperjob}s arrival=$t dependency="$dep" introduce_job solve-$c-$k "$instance"
             i=$(($i+1))
             instno=$(($instno+1))
             if [ $instno -gt $ninstances ]; then 
@@ -81,7 +87,7 @@ function create_job_chains() {
         fi
     done
 
-    echo $i
+    export numjobs=$i
 }
 
 
@@ -89,7 +95,8 @@ function create_job_chains() {
 #create_independent_jobs
 
 # Generate clients, each with a chain of dependent jobs
-numjobs=$(create_job_chains)
+create_job_chains
+
 echo "Generated $numjobs jobs"
 
 # Set options

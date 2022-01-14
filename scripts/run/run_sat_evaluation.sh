@@ -31,7 +31,7 @@ n=0
 i=1
 while read -r instance; do
     # wallclock limit, arrival, dependencies, application
-    wclimit=1000 application=SAT maxdemand=$procs_per_job introduce_job solve-$i instances/$instance
+    wclimit=1000s application=SAT maxdemand=$procs_per_job introduce_job solve-$i instances/$instance
     n=$((n+1))
     i=$((i+1))
 done < $benchmarkfile
