@@ -11,11 +11,14 @@ if [ ! -z "$2" ]; then
     outfile="$2"
 fi
 
+# Merge log files
+bash scripts/eval/merge_rank_log_files.sh $logdir
+
 # Extract "LOAD" and "warmup msg" events from the directory
-cat $logdir/*/*|grep -E "LOAD|warmup msg" > runlog
+cat $logdir/*/*.log|grep -E "LOAD|warmup msg" > runlog
 
 # Harmonize timestamps using warmup messages, write into runlog.harmonized
-python3 scripts/harmonize_timestamps.py runlog
+python3 scripts/eval/harmonize_timestamps.py runlog
 
 # Format and stable sort harmonized load events
 export LC_ALL=C

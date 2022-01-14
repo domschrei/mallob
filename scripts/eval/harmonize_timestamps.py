@@ -114,6 +114,8 @@ for arg in sys.argv[1:]:
         line = line.rstrip()
 
         words = line.split(" ")
+        if len(words) < 2:
+            continue
 
         try:
             t = float(words[0])
@@ -121,7 +123,8 @@ for arg in sys.argv[1:]:
         except ValueError:
             continue
 
-        words[0] = "%.4f" % (t + offsets[r])
-        fOut.write(" ".join(words) + "\n")
+        if r in offsets:
+            words[0] = "%.4f" % (t + offsets[r])
+            fOut.write(" ".join(words) + "\n")
     fOut.close()
     print("Wrote to", arg + ".harmonized")
