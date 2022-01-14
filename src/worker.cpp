@@ -384,6 +384,10 @@ void Worker::publishAndResetSysState() {
                 (int)result[SYSSTATE_NUMJOBS], result[SYSSTATE_GLOBALMEM], (int)result[SYSSTATE_SPAWNEDREQUESTS], 
                 (int)result[SYSSTATE_NUMHOPS]);
     
+    if (!_job_db.isBusyOrCommitted()) {
+        log(V4_VVER, "I am idle\n");
+    }
+
     // Reset fields which are added to incrementally
     _sys_state.setLocal(SYSSTATE_NUMHOPS, 0);
     _sys_state.setLocal(SYSSTATE_SPAWNEDREQUESTS, 0);
