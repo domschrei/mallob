@@ -54,7 +54,7 @@ OPT_INT(messageBatchingThreshold,        "mbt", "message-batching-threshold",   
 OPT_INT(minNumChunksForImportPerSolver,  "mcips", "min-import-chunks-per-solver",     10,   1, LARGE_INT,      "Min. number of cbbs-sized chunks for buffering produced clauses for export")
 OPT_INT(numBounceAlternatives,           "ba", "bounce-alternatives",                 4,    1, LARGE_INT,      "Number of bounce alternatives per PE (only relevant if -derandomize)")
 OPT_INT(numChunksForExport,              "nce", "export-chunks",                      20,   1, LARGE_INT,      "Number of cbbs-sized chunks for buffering produced clauses for export")
-OPT_INT(numClients,                      "c", "clients",                              1,    -1, LARGE_INT,     "Number of client PEs to initialize (beginning from last rank), -1: all PEs are clients")
+OPT_INT(numClients,                      "c", "clients",                              1,    -1, LARGE_INT,     "Number of client PEs to initialize (counting backwards from last rank), -1: all PEs are clients")
 OPT_INT(numJobs,                         "J", "jobs",                                 0,    0, LARGE_INT,      "Exit as soon as this number of jobs has been processed")
 OPT_INT(numThreadsPerProcess,            "t", "threads-per-process",                  1,    0, LARGE_INT,      "Number of worker threads per node")
 OPT_INT(maxLiteralsPerThread,            "mlpt", "max-lits-per-thread",               50000000, 0, MAX_INT,    "If formula is larger than threshold, reduce #threads per PE until #threads=1 or until limit is met \"on average\"")
@@ -65,7 +65,7 @@ OPT_INT(sleepMicrosecs,                  "sleep", "",                           
 OPT_INT(strictClauseLengthLimit,         "scll", "strict-clause-length-limit",        30,   0, LARGE_INT,      "Only clauses up to this length will be shared")
 OPT_INT(strictLbdLimit,                  "slbdl", "strict-lbd-limit",                 30,   0, LARGE_INT,      "Only clauses with an LBD score up to this value will be shared")
 OPT_INT(verbosity,                       "v", "verbosity",                            2,    0, 6,              "Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB 5=DEBG")
-OPT_INT(numWorkers,                      "w", "workers",                              1,   -1, LARGE_INT,      "Number of worker PEs to initialize (beginning from rank #0), -1: all PEs are workers")
+OPT_INT(numWorkers,                      "w", "workers",                              -1,   -1, LARGE_INT,     "Number of worker PEs to initialize (beginning from rank #0), -1: all PEs are workers")
 OPT_INT(watchdogAbortMillis,             "wam", "watchdog-abort-millis",              60000, 1, MAX_INT,       "Interval (in milliseconds) after which an un-reset watchdog in a worker's main thread will invoke a crash")
 
 OPT_FLOAT(appCommPeriod,                 "s", "app-comm-period",                      1,    0, LARGE_INT,      "Do job-internal communication every t seconds") 
