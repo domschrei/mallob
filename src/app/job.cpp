@@ -224,7 +224,14 @@ void Job::communicate() {
 }
 
 void Job::communicate(int source, JobMessage& msg) {
-    if (!_comm.handle(msg)) {
+    if (_comm.handle(msg)) {
+        if (msg.tag == MSG_BROADCAST_RANKLIST && _job_tree.isRoot()) {
+            // Check size of job comm compared to scheduler's job volume
+            if (_comm.size() != getVolume()) {
+                log(V1_WARN, "[WARN] %s job tree has size %i/%i\n", toStr(), _comm.size(), getVolume());
+            }
+        }
+    } else {
         appl_communicate(source, msg);
     }
 }
