@@ -78,10 +78,12 @@ int MessageQueue::send(DataPtr data, int dest, int tag) {
     SendHandle& h = _send_queue.back();
     if (h.data->size() > _max_msg_size+3*sizeof(int)) {
         // Batch data, only send first batch
+        log(V5_DEBG, "MQ initialized handle for large msg\n");
         h.sizePerBatch = _max_msg_size;
         h.sentBatches = 0;
         h.totalNumBatches = h.getTotalNumBatches();
         int sendTag = h.prepareForNextBatch();
+        log(V5_DEBG, "MQ sending batch %i/%i\n", 0, h.totalNumBatches);
         MPI_Isend(h.tempStorage.data(), h.tempStorage.size(), MPI_BYTE, dest, 
             sendTag, MPI_COMM_WORLD, &h.request);
         log(V4_VVER, "MQ sent batch %i/%i\n", 0, h.totalNumBatches);

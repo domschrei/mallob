@@ -66,6 +66,7 @@ private:
             sizePerBatch = moved.sizePerBatch;
             tempStorage = std::move(moved.tempStorage);
             
+            moved.data = DataPtr();
             moved.request = MPI_REQUEST_NULL;
         }
         SendHandle& operator=(SendHandle&& moved) {
@@ -79,6 +80,7 @@ private:
             sizePerBatch = moved.sizePerBatch;
             tempStorage = std::move(moved.tempStorage);
             
+            moved.data = DataPtr();
             moved.request = MPI_REQUEST_NULL;
             return *this;
         }
