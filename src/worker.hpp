@@ -103,7 +103,6 @@ private:
     void spawnJobRequest(int jobId, bool left, int balancingEpoch);
     void sendJobRequest(const JobRequest& req, int tag, bool left, int dest);
     void activateRootRequest(int jobId);
-    void updatedVolumeOfInactiveJob(int jobId, int prevVolume, int balancingEpoch);
     void propagateVolumeUpdate(Job& job, int volume, int balancingEpoch);
 
     void interruptJob(int jobId, bool terminate, bool reckless);

@@ -1021,52 +1021,71 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
     Job &job = _job_db.get(jobId);
     int thisIndex = job.getIndex();
     int prevVolume = job.getVolume();
-    log(prevVolume == volume || thisIndex > 0 ? V4_VVER : V3_VERB, "%s : update v=%i epoch=%i lastreqsepoch=%i evlat=%.5f\n", 
-        job.toStr(), volume, balancingEpoch, job.getJobTree().getBalancingEpochOfLastRequests(), eventLatency);
-    
+    auto& tree = job.getJobTree();
+
+    log(prevVolume == volume || thisIndex > 0 ? V4_VVER : V3_VERB, 
+        "%s : update v=%i epoch=%i lastreqsepoch=%i evlat=%.5f\n", 
+        job.toStr(), volume, balancingEpoch, tree.getBalancingEpochOfLastRequests(), eventLatency);
+
     // Apply volume update to local job structure
     job.updateVolumeAndUsedCpu(volume);
-    job.getJobTree().stopWaitingForReactivation(balancingEpoch-1);
+    tree.stopWaitingForReactivation(balancingEpoch-1);
     
-    if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
+    if (job.getState() == ACTIVE || job.hasCommitment()) {
 
-    if (job.getState() != ACTIVE) {
-        // Job is not active right now: apply triggers for an inactive job
-        updatedVolumeOfInactiveJob(jobId, prevVolume, balancingEpoch);        
-        return;
-    }
+        if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
 
-    // Active root of a job updated for the 1st time
-    if (job.getJobTree().isRoot()) {
-        if (job.getJobTree().getBalancingEpochOfLastRequests() == -1) {
-            // Job's volume is updated for the first time since its activation
-            job.setTimeOfFirstVolumeUpdate(Timer::elapsedSeconds());
+        // Root of a job updated for the 1st time
+        if (tree.isRoot()) {
+            if (tree.getBalancingEpochOfLastRequests() == -1) {
+                // Job's volume is updated for the first time
+                job.setTimeOfFirstVolumeUpdate(Timer::elapsedSeconds());
+            }
         }
-    }
-    
-    // Apply volume update to the job's local scheduler
-    if (_params.reactivationScheduling() && _job_db.hasScheduler(jobId, job.getIndex()))
-        _job_db.getScheduler(jobId, job.getIndex()).updateBalancing(balancingEpoch, volume, 
-            job.getJobTree().hasLeftChild(), job.getJobTree().hasRightChild());
+        
+        // Apply volume update to the job's local scheduler
+        if (_params.reactivationScheduling() && _job_db.hasScheduler(jobId, job.getIndex()))
+            _job_db.getScheduler(jobId, job.getIndex()).updateBalancing(balancingEpoch, volume, 
+                tree.hasLeftChild(), tree.hasRightChild());
 
-    // Handle child relationships with respect to the new volume
-    propagateVolumeUpdate(job, volume, balancingEpoch);
+        // Handle child relationships with respect to the new volume
+        propagateVolumeUpdate(job, volume, balancingEpoch);
 
-    // Update balancing epoch
-    job.getJobTree().setBalancingEpochOfLastRequests(balancingEpoch);
+        // Update balancing epoch
+        tree.setBalancingEpochOfLastRequests(balancingEpoch);
+        
+        // Shrink (and pause solving) yourself, if necessary
+        if (thisIndex > 0 && thisIndex >= volume) {
+            log(V3_VERB, "%s shrinking\n", job.toStr());
+            if (job.getState() == ACTIVE) {
+                _job_db.suspend(jobId);
+            } else {
+                _job_db.uncommit(jobId);
+                _job_db.unregisterJobFromBalancer(jobId);
+                _job_db.suspendScheduler(job);
+            }
+            if (!_params.reactivationScheduling()) {
+                // Send explicit leaving message if not doing reactivation-based scheduling
+                MyMpi::isend(tree.getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, 
+                    IntVec({jobId, thisIndex, tree.getRootNodeRank()}));
+            }
+        }
 
-    // Shrink (and pause solving) yourself, if necessary
-    if (thisIndex > 0 && thisIndex >= volume) {
-        log(V3_VERB, "%s shrinking\n", job.toStr());
-        _job_db.suspend(jobId);
-        if (!_params.reactivationScheduling()) {
-            // Send explicit leaving message if not doing reactivation-based scheduling
-            MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, 
-                IntVec({jobId, thisIndex, job.getJobTree().getRootNodeRank()}));
+    } else if (job.getState() == SUSPENDED) {
+        
+        bool wasWaiting = tree.isWaitingForReactivation();
+        // If the volume WAS and IS larger than my index and I WAS waiting,
+        // then I will KEEP waiting.
+        if (job.getIndex() < prevVolume && job.getIndex() < volume && wasWaiting) {
+            tree.setWaitingForReactivation(balancingEpoch);
+        }
+        // If the volume WASN'T but now IS larger than my index,
+        // then I will START waiting
+        if (job.getIndex() >= prevVolume && job.getIndex() < volume) {
+            tree.setWaitingForReactivation(balancingEpoch);
         }
     }
 }
-
 
 void Worker::activateRootRequest(int jobId) {
     auto optReq = _job_db.getRootRequest(jobId);
@@ -1075,81 +1094,45 @@ void Worker::activateRootRequest(int jobId) {
     bounceJobRequest(optReq.value(), optReq.value().requestingNodeRank);
 }
 
-void Worker::updatedVolumeOfInactiveJob(int jobId, int prevVolume, int balancingEpoch) {
-
-    Job &job = _job_db.get(jobId);
-    bool wasWaiting = job.getJobTree().isWaitingForReactivation();
-    int volume = job.getVolume();
-
-    // Update reactivation-based scheduling if the job is committed, too
-    if (job.hasCommitment() && _params.reactivationScheduling()) {
-        _job_db.getScheduler(jobId, job.getIndex()).updateBalancing(balancingEpoch, volume, 
-            job.getJobTree().hasLeftChild(), job.getJobTree().hasRightChild());
-    } 
-    
-    // If I am committed with the job and the job is shrinking accordingly, uncommit
-    if (job.hasCommitment() && job.getIndex() > 0 && job.getIndex() >= volume) {
-        log(V4_VVER, "%s shrunk : uncommitting\n", job.toStr());
-        _job_db.uncommit(jobId);
-        _job_db.unregisterJobFromBalancer(jobId);
-        _job_db.suspendScheduler(job);
-        if (!_params.reactivationScheduling())
-            MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, 
-                IntVec({jobId, job.getIndex(), job.getJobTree().getRootNodeRank()}));
-    }
-
-    if (job.getState() == SUSPENDED) {
-        // If the volume WAS and IS larger than my index and I WAS waiting,
-        // then I will KEEP waiting.
-        if (job.getIndex() < prevVolume && job.getIndex() < volume && wasWaiting) {
-            job.getJobTree().setWaitingForReactivation(balancingEpoch);
-        }
-        // If the volume WASN'T but now IS larger than my index,
-        // then I will START waiting
-        if (job.getIndex() >= prevVolume && job.getIndex() < volume) {
-            job.getJobTree().setWaitingForReactivation(balancingEpoch);
-        }
-    }
-
-    // Unset any previous desires if the job volume decreased accordingly
-    if (!job.getJobTree().hasLeftChild() && job.getJobTree().getLeftChildIndex() >= volume)
-        job.getJobTree().unsetDesireLeft();
-    if (!job.getJobTree().hasRightChild() && job.getJobTree().getRightChildIndex() >= volume)
-        job.getJobTree().unsetDesireRight();
-}
-
 void Worker::propagateVolumeUpdate(Job& job, int volume, int balancingEpoch) {
 
     // Prepare volume update to propagate down the job tree
     int jobId = job.getId();
     int thisIndex = job.getIndex();
+    auto& tree = job.getJobTree();
     IntVec payload{jobId, volume, balancingEpoch};
 
     // For each potential child (left, right):
-    bool has[2] = {job.getJobTree().hasLeftChild(), job.getJobTree().hasRightChild()};
-    int indices[2] = {job.getJobTree().getLeftChildIndex(), job.getJobTree().getRightChildIndex()};
+    bool has[2] = {tree.hasLeftChild(), tree.hasRightChild()};
+    int indices[2] = {tree.getLeftChildIndex(), tree.getRightChildIndex()};
     int ranks[2] = {-1, -1};
     for (int i = 0; i < 2; i++) {
         int nextIndex = indices[i];
         if (has[i]) {
-            ranks[i] = i == 0 ? job.getJobTree().getLeftChildNodeRank() : job.getJobTree().getRightChildNodeRank();
+            ranks[i] = i == 0 ? tree.getLeftChildNodeRank() : tree.getRightChildNodeRank();
             if (_params.explicitVolumeUpdates()) {
                 // Propagate volume update
                 MyMpi::isend(ranks[i], MSG_NOTIFY_VOLUME_UPDATE, payload);
             }
             if (_params.reactivationScheduling() && nextIndex >= volume) {
                 // Child leaves
-                job.getJobTree().prune(ranks[i], nextIndex);
+                tree.prune(ranks[i], nextIndex);
             }
         } else if (nextIndex < volume 
-                && job.getJobTree().getBalancingEpochOfLastRequests() < balancingEpoch) {
+                && tree.getBalancingEpochOfLastRequests() < balancingEpoch) {
             if (_job_db.hasDormantRoot()) {
                 // Becoming an inner node is not acceptable
                 // because then the dormant root cannot be restarted seamlessly
                 log(V4_VVER, "%s cannot grow due to dormant root\n", job.toStr());
-                _job_db.suspend(jobId);
-                MyMpi::isend(job.getJobTree().getParentNodeRank(), 
-                    MSG_NOTIFY_NODE_LEAVING_JOB, IntVec({jobId, thisIndex, job.getJobTree().getRootNodeRank()}));
+                if (job.getState() == ACTIVE) {
+                    _job_db.suspend(jobId);
+                } else {
+                    _job_db.uncommit(jobId);
+                    _job_db.unregisterJobFromBalancer(jobId);
+                    _job_db.suspendScheduler(job);
+                }
+                MyMpi::isend(tree.getParentNodeRank(), 
+                    MSG_NOTIFY_NODE_LEAVING_JOB, IntVec({jobId, thisIndex, tree.getRootNodeRank()}));
                 break;
             }
             if (!_params.reactivationScheduling()) {
@@ -1158,8 +1141,8 @@ void Worker::propagateVolumeUpdate(Job& job, int volume, int balancingEpoch) {
             }
         } else {
             // Job does not want to grow - any more (?) - so unset any previous desire
-            if (i == 0) job.getJobTree().unsetDesireLeft();
-            else job.getJobTree().unsetDesireRight();
+            if (i == 0) tree.unsetDesireLeft();
+            else tree.unsetDesireRight();
         }
     }
 }
