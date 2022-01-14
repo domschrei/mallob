@@ -236,6 +236,9 @@ private:
         auto elapsed = time - member;
         _sum_desire_latencies += elapsed;
         _desire_latencies.push_back(elapsed);
+        if (elapsed > 0.1) {
+            log(V4_VVER, "LATENCY %.4f born: %.4f\n", elapsed, member);
+        }
         member = -1; // no desire any more
     }
 
