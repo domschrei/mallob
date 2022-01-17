@@ -23,12 +23,16 @@ if(MALLOB_USE_ASAN)
     set(MY_DEBUG_OPTIONS "${MY_DEBUG_OPTIONS} -fno-omit-frame-pointer -fsanitize=address -static-libasan") 
 endif()
 
+if(MALLOB_USE_TBB_MALLOC_PROXY)
+    set(BASE_LIBS ${BASE_LIBS} tbbmalloc_proxy)
+endif()
+
 
 # Libraries and includes
 
 # Add new default solvers here
 link_directories(lib/lingeling lib/yalsat lib/cadical lib/kissat)
-set(BASE_LIBS ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} m z lgl yals pthread cadical kissat rt dl)
+set(BASE_LIBS ${BASE_LIBS} ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} m z lgl yals pthread cadical kissat rt dl)
 set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib/lingeling lib)
 
 set(MALLOB_SOLVERS "lingeling yalsat cadical kissat") # add new default solvers here
@@ -124,3 +128,4 @@ new_test(variable_translator)
 new_test(job_description)
 new_test(message_queue)
 new_test(volume_calculator)
+new_test(concurrent_malloc)
