@@ -99,6 +99,11 @@ create_job_chains
 
 echo "Generated $numjobs jobs"
 
+if [ -z $1 ] || [ $1 == 0 ]; then
+    echo "Not running (#workers missing)"
+    exit 0
+fi
+
 # Set options
 options="-t=4 -c=1 -ajpc=$(($1-2)) -satsolver=kkccllg -v=5 -J=$numjobs -warmup -y=0.1"
 
