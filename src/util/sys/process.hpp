@@ -43,6 +43,7 @@ public:
     /* 0: running, -1: error, childpid: exited */
     static bool didChildExit(pid_t childpid, int* exitStatusOut = nullptr);
 
+    static inline bool wasSignalCaught() {return _exit_signal_caught;}
     struct SignalInfo {
         int signum;
         pid_t pid;

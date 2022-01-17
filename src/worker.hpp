@@ -31,7 +31,6 @@ private:
     MPI_Comm _comm;
     int _world_rank;
     Parameters& _params;
-    float _global_timeout;
 
     JobDatabase _job_db;
     WorkerSysState _sys_state;
@@ -59,7 +58,6 @@ public:
     ~Worker();
     void init();
     void advance(float time = -1);
-    bool checkTerminate(float time);
 
 private:
     void handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMode mode);

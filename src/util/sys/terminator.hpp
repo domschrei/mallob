@@ -18,22 +18,25 @@ public:
     static void setTerminating() {
         _exit = true;
     }
-    static bool isTerminating(bool fromMainThread = false) {
+    static inline bool isTerminating(bool fromMainThread = false) {
         
-        auto optSignalInfo = Process::getCaughtSignal();
-        if (optSignalInfo) {
+        if (Process::wasSignalCaught()) {
 
-            int signum = optSignalInfo.value().signum;
-            log(V2_INFO, "Caught signal %i\n", signum);
-            setTerminating();
+            auto optSignalInfo = Process::getCaughtSignal();
+            if (optSignalInfo) {
 
-            if (fromMainThread) {
-                Process::handleTerminationSignal(optSignalInfo.value());
+                int signum = optSignalInfo.value().signum;
+                log(V2_INFO, "Caught signal %i\n", signum);
+                setTerminating();
+
+                if (fromMainThread) {
+                    Process::handleTerminationSignal(optSignalInfo.value());
+                }
+
+                return true;
             }
-
-            return true;
         }
-        
+
         return _exit.load(std::memory_order_relaxed);
     }
     static void reset() {

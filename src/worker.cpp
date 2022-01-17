@@ -31,7 +31,6 @@ Worker::Worker(MPI_Comm comm, Parameters& params) :
     _params(params), _job_db(_params, _comm, _sys_state), _sys_state(_comm, params.sysstatePeriod()), 
     _watchdog(/*checkIntervMillis=*/200, Timer::elapsedSeconds())
 {
-    _global_timeout = _params.timeLimit();
     _watchdog.setWarningPeriod(100); // warn after 0.1s without a reset
     _watchdog.setAbortPeriod(_params.watchdogAbortMillis()); // abort after X ms without a reset
 
@@ -1262,20 +1261,6 @@ void Worker::timeoutJob(int jobId) {
 int Worker::getWeightedRandomNeighbor() {
     int rand = (int) (_hop_destinations.size()*Random::rand());
     return _hop_destinations[rand];
-}
-
-bool Worker::checkTerminate(float time) {
-    bool terminate = false;
-    if (Terminator::isTerminating(/*fromMainThread=*/true)) terminate = true;
-    if (_global_timeout > 0 && time > _global_timeout) {
-        terminate = true;
-    }
-    if (terminate) {
-        log(_world_rank == 0 ? V2_INFO : V3_VERB, "Terminating.\n");
-        Terminator::setTerminating();
-        return true;
-    }
-    return false;
 }
 
 int Worker::getRandomNonSelfWorkerNode() {

@@ -43,6 +43,21 @@ void introduceMonoJob(Parameters& params, Client& client) {
     }
 }
 
+inline bool doTerminate(Parameters& params, int rank) {
+    
+    bool terminate = false;
+    if (Terminator::isTerminating(/*fromMainThread=*/true)) terminate = true;
+    if (params.timeLimit() > 0 && Timer::elapsedSeconds() > params.timeLimit()) {
+        terminate = true;
+    }
+    if (terminate) {
+        log(rank == 0 ? V2_INFO : V3_VERB, "Terminating.\n");
+        Terminator::setTerminating();
+        return true;
+    }
+    return false;
+}
+
 void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& params) {
 
     // Determine which role(s) this PE has
@@ -58,13 +73,13 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     // Initialize worker and client as necessary (background threads, callbacks, ...)
     if (isWorker) worker->init();
     if (isClient) client->init();
+    int myRank = MyMpi::rank(MPI_COMM_WORLD);
     
     // Register global callback for exiting msg (not specific to worker nor client)
-    MyMpi::getMessageQueue().registerCallback(MSG_DO_EXIT, [](MessageHandle& h) {
+    MyMpi::getMessageQueue().registerCallback(MSG_DO_EXIT, [myRank](MessageHandle& h) {
         log(LOG_ADD_SRCRANK | V3_VERB, "Received exit signal", h.source);
 
         // Forward exit signal
-        int myRank = MyMpi::rank(MPI_COMM_WORLD);
         if (myRank*2+1 < MyMpi::size(MPI_COMM_WORLD))
             MyMpi::isendCopy(myRank*2+1, MSG_DO_EXIT, h.getRecvData());
         if (myRank*2+2 < MyMpi::size(MPI_COMM_WORLD))
@@ -92,7 +107,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
         MyMpi::getMessageQueue().advance();
 
         // Check termination, sleep, and/or yield thread
-        if (isWorker && worker->checkTerminate(Timer::elapsedSeconds())) 
+        if (doTerminate(params, myRank)) 
             break;
         if (params.sleepMicrosecs() > 0) usleep(params.sleepMicrosecs());
         if (params.yield()) std::this_thread::yield();
