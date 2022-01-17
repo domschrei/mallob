@@ -210,6 +210,7 @@ void MessageQueue::processReceived() {
         fragment.receivedFragments++;
         if (fragment.receivedFragments == totalNumBatches) {
             while (!_fragmented_queue.produce(std::move(fragment))) {}
+            _fragmented_messages.erase(key);
         }
     } else {
         // Single message
