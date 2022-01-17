@@ -63,7 +63,7 @@ void EventDrivenBalancer::onProbe(int jobId) {
     _local_jobs.insert(jobId);
     pushEvent(Event({
         jobId, /*jobRootEpoch=*/1, /*demand=*/1, /*priority=*/0.01
-    }));
+    }), /*recordLatency=*/false);
 }
 
 void EventDrivenBalancer::onActivate(const Job& job, int demand) {
@@ -122,7 +122,7 @@ void EventDrivenBalancer::onTerminate(const Job& job) {
     assert(_job_root_epochs.at(job.getId()) > 0);
     pushEvent(Event({
         job.getId(), /*jobEpoch=*/INT_MAX, /*demand=*/0, /*priority=*/0 
-    }));
+    }), /*recordLatency=*/false);
     _job_root_epochs.erase(job.getId());
 
     if (!_balancing_latencies.count(job.getId())) return;
@@ -136,7 +136,7 @@ void EventDrivenBalancer::onTerminate(const Job& job) {
     _balancing_latencies.erase(job.getId());
 }
 
-void EventDrivenBalancer::pushEvent(const Event& event) {
+void EventDrivenBalancer::pushEvent(const Event& event, bool recordLatency) {
     bool inserted = _diffs.insertIfNovel(event);
     if (inserted) {
         if (_pending_entries.count(event.jobId)) {
@@ -144,8 +144,10 @@ void EventDrivenBalancer::pushEvent(const Event& event) {
             // attribute max. latency
             _balancing_latencies[event.jobId].push_back(Timer::elapsedSeconds() - _pending_entries[event.jobId].second);
         }
-        _pending_entries[event.jobId] = std::pair<int, float>(event.epoch, Timer::elapsedSeconds());
-        log(V1_WARN, "[WARN] insert (%i,%i,%.3f)\n", event.jobId, event.demand, event.priority);
+        if (recordLatency) {
+            _pending_entries[event.jobId] = std::pair<int, float>(event.epoch, Timer::elapsedSeconds());
+        }
+        log(V1_WARN, "BLC insert (%i,%i,%.3f)\n", event.jobId, event.demand, event.priority);
         advance();
     }
 }

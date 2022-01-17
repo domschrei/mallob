@@ -616,9 +616,11 @@ void Worker::tryAdoptRequest(JobRequest& req, int source, JobDatabase::JobReques
             Job& job = _job_db.createJob(MyMpi::size(_comm), _world_rank, req.jobId, req.application);
         }
         _job_db.commit(req);
-        _job_db.initScheduler(req, [this](const JobRequest& req, int tag, bool left, int dest) {
-            sendJobRequest(req, tag, left, dest);
-        });
+        if (_params.reactivationScheduling()) {
+            _job_db.initScheduler(req, [this](const JobRequest& req, int tag, bool left, int dest) {
+                sendJobRequest(req, tag, left, dest);
+            });
+        }
         MyMpi::isend(req.requestingNodeRank, 
             req.requestedNodeIndex == 0 ? MSG_OFFER_ADOPTION_OF_ROOT : MSG_OFFER_ADOPTION,
             req);

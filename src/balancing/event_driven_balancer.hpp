@@ -66,7 +66,7 @@ private:
     int _parent_rank;
     std::vector<int> _child_ranks;
 
-    void pushEvent(const Event& event);
+    void pushEvent(const Event& event, bool recordLatency = true);
 
     void handleData(EventMap& data, int tag, bool checkedReady);
     void reduce(EventMap& data);
