@@ -90,13 +90,19 @@ void MessageQueue::runFragmentedMessageAssembler() {
 
     while (_batch_assembler.continueRunning()) {
 
-        usleep(1000); // 1 ms
-        if (_fragmented_queue.empty()) continue;
+        _fragmented_cond_var.wait(_fragmented_mutex, [&]() {return !_fragmented_queue.empty();});
 
-        auto opt = _fragmented_queue.consume();
-        if (!opt.has_value()) continue;
-        ReceiveFragment& data = opt.value();
-
+        ReceiveFragment data;
+        {
+            if (!_fragmented_mutex.tryLock()) continue;
+            if (_fragmented_queue.empty()) {
+                _fragmented_mutex.unlock();
+                continue;
+            }
+            data = std::move(_fragmented_queue.front());
+            _fragmented_queue.pop_front();
+            _fragmented_mutex.unlock();
+        }
         if (data.dataFragments.empty()) continue;
 
         // Assemble fragments
@@ -128,12 +134,12 @@ void MessageQueue::runFragmentedMessageAssembler() {
 void MessageQueue::runGarbageCollector() {
 
     while (_gc.continueRunning()) {
-        usleep(1000*1000); // 1s            
+        usleep(1000*1000); // 1s
+        auto lock = _garbage_mutex.getLock();
         if (_garbage_queue.empty()) continue;
-        auto opt = _garbage_queue.consume();
-        if (!opt.has_value()) continue;
-        auto& dataPtr = opt.value();
+        auto& dataPtr = _garbage_queue.front();
         dataPtr.reset();
+        _garbage_queue.pop_front();
     }
 }
 
@@ -170,8 +176,12 @@ void MessageQueue::processReceived() {
         fragment.receiveNext(source, tag, _recv_data, msglen);
 
         if (fragment.isFinished()) {
-            while (!_fragmented_queue.produce(std::move(fragment))) {}
-            _fragmented_messages.erase(key);
+            {
+                auto lock = _fragmented_mutex.getLock();
+                _fragmented_queue.push_back(std::move(fragment));
+                _fragmented_messages.erase(key);
+            }
+            _fragmented_cond_var.notify();
         }
     } else {
         // Single message
@@ -222,13 +232,14 @@ void MessageQueue::processAssembledReceived() {
             
             if (h.getRecvData().size() > _max_msg_size) {
                 // Concurrent deallocation of large chunk of data
-                while (!_garbage_queue.produce(
+                auto lock = _garbage_mutex.getLock();
+                _garbage_queue.push_back(
                     DataPtr(
                         new std::vector<uint8_t>(
                             h.moveRecvData()
                         )
                     )
-                )) {}
+                );
             }
             _fused_queue.pop_front();
             atomics::decrementRelaxed(_num_fused);
@@ -284,7 +295,8 @@ void MessageQueue::processSent() {
 
             if (h.data->size() > _max_msg_size) {
                 // Concurrent deallocation of SendHandle's large chunk of data
-                while (!_garbage_queue.produce(std::move(h.data))) {}
+                auto lock = _garbage_mutex.getLock();
+                _garbage_queue.push_back(std::move(h.data));
             }
             
             // Remove handle

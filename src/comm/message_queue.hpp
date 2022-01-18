@@ -196,7 +196,9 @@ private:
 
     // Fragmented messages stuff
     robin_hood::unordered_map<std::pair<int, int>, ReceiveFragment, IntPairHasher> _fragmented_messages;
-    SPSCRingBuffer<ReceiveFragment> _fragmented_queue;
+    Mutex _fragmented_mutex;
+    ConditionVariable _fragmented_cond_var;
+    std::list<ReceiveFragment> _fragmented_queue;
     std::atomic_int _num_fused = 0;
     Mutex _fused_mutex;
     std::list<MessageHandle> _fused_queue;
@@ -206,7 +208,8 @@ private:
     int _running_send_id = 1;
 
     // Garbage collection
-    SPSCRingBuffer<DataPtr> _garbage_queue;
+    Mutex _garbage_mutex;
+    std::list<DataPtr> _garbage_queue;
 
     // Callbacks
     typedef std::function<void(MessageHandle&)> MsgCallback;
