@@ -190,8 +190,8 @@ int main(int argc, char *argv[]) {
     params.init(argc, argv);
     MyMpi::setOptions(params);
 
-    testSelfMessages();
-    testSimpleP2P();
+    //testSelfMessages();
+    //testSimpleP2P();
     testBigP2P();
 
     MPI_Finalize();

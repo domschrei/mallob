@@ -287,6 +287,11 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
         return REJECT;
     }
 
+    if (hasScheduler(req.jobId, req.requestedNodeIndex) && !getScheduler(req.jobId, req.requestedNodeIndex).canCommit()) {
+        log(V1_WARN, "%s : still have an active scheduler of this node!\n", req.toStr().c_str());
+        return REJECT;
+    }
+
     bool isThisDormantRoot = has(req.jobId) && get(req.jobId).getJobTree().isRoot();
     if (isThisDormantRoot) {
         if (req.requestedNodeIndex > 0) {

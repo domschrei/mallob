@@ -23,7 +23,6 @@ public:
         _terminate = false;
         _thread = std::thread(runnable);
         time = Timer::elapsedSeconds() - time;
-        log(V5_DEBG, "starting bg worker took %.5fs\n");
     }
     bool continueRunning() const {
         return !Terminator::isTerminating() && !_terminate;

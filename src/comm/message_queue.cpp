@@ -53,11 +53,7 @@ int MessageQueue::send(DataPtr data, int dest, int tag) {
 
     // Initialize send handle
     {
-        SendHandle handle;
-        handle.id = _running_send_id++;
-        handle.data = data;
-        handle.dest = dest;
-        handle.tag = tag;
+        SendHandle handle(_running_send_id++, dest, tag, data, _max_msg_size);
 
         int msglen = handle.data->size();
         log(V5_DEBG, "MQ SEND n=%i d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", handle.data->size(), dest, tag, 
@@ -76,22 +72,7 @@ int MessageQueue::send(DataPtr data, int dest, int tag) {
     }
 
     SendHandle& h = _send_queue.back();
-    if (h.data->size() > _max_msg_size+3*sizeof(int)) {
-        // Batch data, only send first batch
-        log(V5_DEBG, "MQ initialized handle for large msg\n");
-        h.sizePerBatch = _max_msg_size;
-        h.sentBatches = 0;
-        h.totalNumBatches = h.getTotalNumBatches();
-        int sendTag = h.prepareForNextBatch();
-        log(V5_DEBG, "MQ sending batch %i/%i\n", 0, h.totalNumBatches);
-        MPI_Isend(h.tempStorage.data(), h.tempStorage.size(), MPI_BYTE, dest, 
-            sendTag, MPI_COMM_WORLD, &h.request);
-        log(V4_VVER, "MQ sent batch %i/%i\n", 0, h.totalNumBatches);
-    } else {
-        // Directly send entire message
-        MPI_Isend(h.data->data(), h.data->size(), MPI_BYTE, dest, tag, MPI_COMM_WORLD, &h.request);
-    }
-
+    h.sendNext();
     return h.id;
 }
 
@@ -177,38 +158,18 @@ void MessageQueue::processReceived() {
 
     if (tag >= MSG_OFFSET_BATCHED) {
         // Fragment of a message
+
         tag -= MSG_OFFSET_BATCHED;
-        int id, sentBatch, totalNumBatches;
-        // Read meta data from end of message
-        memcpy(&id,              _recv_data+msglen - 3*sizeof(int), sizeof(int));
-        memcpy(&sentBatch,       _recv_data+msglen - 2*sizeof(int), sizeof(int));
-        memcpy(&totalNumBatches, _recv_data+msglen - 1*sizeof(int), sizeof(int));
-        msglen -= 3*sizeof(int);
-        
-        // Store data in fragments structure
-        
-        //log(V5_DEBG, "MQ STORE (%i,%i) %i/%i\n", source, id, sentBatch, totalNumBatches);
+        int id = ReceiveFragment::readId(_recv_data, msglen);
         auto key = std::pair<int, int>(source, id);
+        
         if (!_fragmented_messages.count(key)) {
-            auto& fragment = _fragmented_messages[key];
-            fragment.source = source;
-            fragment.tag = tag;
+            _fragmented_messages[key] = ReceiveFragment(source, id, tag);
         }
         auto& fragment = _fragmented_messages[key];
+        fragment.receiveNext(source, tag, _recv_data, msglen);
 
-        assert(fragment.source == source);
-        assert(fragment.tag == tag);
-        assert(sentBatch < totalNumBatches || log_return_false("Invalid batch %i/%i!\n", sentBatch, totalNumBatches));
-        if (sentBatch >= fragment.dataFragments.size()) fragment.dataFragments.resize(sentBatch+1);
-
-        //log(V5_DEBG, "MQ STORE alloc\n");
-        assert(fragment.dataFragments[sentBatch] == nullptr || log_return_false("Batch %i/%i already present!\n", sentBatch, totalNumBatches));
-        fragment.dataFragments[sentBatch].reset(new std::vector<uint8_t>(_recv_data, _recv_data+msglen));
-        
-        //log(V5_DEBG, "MQ STORE produce\n");
-        // All fragments of the message received?
-        fragment.receivedFragments++;
-        if (fragment.receivedFragments == totalNumBatches) {
+        if (fragment.isFinished()) {
             while (!_fragmented_queue.produce(std::move(fragment))) {}
             _fragmented_messages.erase(key);
         }
@@ -219,9 +180,7 @@ void MessageQueue::processReceived() {
         h.setReceive(std::vector<uint8_t>(_recv_data, _recv_data+msglen));
         h.tag = tag;
         h.source = source;
-        //log(V5_DEBG, "MQ cb\n");
         _callbacks.at(h.tag)(h);
-        //log(V5_DEBG, "MQ dealloc\n");
     }
 
     // Reset recv handle
@@ -289,15 +248,10 @@ void MessageQueue::processSent() {
 
     // Test each send handle
     while (it != _send_queue.end()) {
-        if (numTested == 4) break; // limit number of tests per call
-
+        
         SendHandle& h = *it;
-        assert(h.request != MPI_REQUEST_NULL);
-        int flag = false;
-        MPI_Test(&h.request, &flag, MPI_STATUS_IGNORE);
-        numTested++;
 
-        if (!flag) {
+        if (!h.test()) {
             it++; // go to next handle
             continue;
         }
@@ -315,14 +269,11 @@ void MessageQueue::processSent() {
                 *(int*)(h.tempStorage.data()+h.tempStorage.size()-3*sizeof(int)), 
                 *(int*)(h.tempStorage.data()+h.tempStorage.size()-2*sizeof(int)),
                 *(int*)(h.tempStorage.data()+h.tempStorage.size()-1*sizeof(int)));
-            h.sentBatches++;
 
             // More batches yet to send?
             if (!h.isFinished()) {
                 // Send next batch
-                int sendTag = h.prepareForNextBatch();
-                MPI_Isend(h.tempStorage.data(), h.tempStorage.size(), MPI_BYTE, h.dest, 
-                    sendTag, MPI_COMM_WORLD, &h.request);
+                h.sendNext();
                 completed = false;
             }
         }

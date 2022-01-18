@@ -23,38 +23,94 @@ class MessageQueue {
     
 private:
     struct ReceiveFragment {
-        int source;
+        
+        int source = -1;
+        int id;
         int tag;
         int receivedFragments = 0;
         std::vector<DataPtr> dataFragments;
+        
         ReceiveFragment() = default;
+        ReceiveFragment(int source, int id, int tag) : source(source), id(id), tag(tag) {}
+
         ReceiveFragment(ReceiveFragment&& moved) {
             source = moved.source;
+            id = moved.id;
             tag = moved.tag;
             receivedFragments = moved.receivedFragments;
             dataFragments = std::move(moved.dataFragments);
         }
         ReceiveFragment& operator=(ReceiveFragment&& moved) {
             source = moved.source;
+            id = moved.id;
             tag = moved.tag;
             receivedFragments = moved.receivedFragments;
             dataFragments = std::move(moved.dataFragments);
             return *this;
         }
+
+        static int readId(uint8_t* data, int msglen) {
+            return * (int*) (data+msglen - 3*sizeof(int));
+        }
+
+        void receiveNext(int source, int tag, uint8_t* data, int msglen) {
+            assert(this->source >= 0);
+
+            int id, sentBatch, totalNumBatches;
+            // Read meta data from end of message
+            memcpy(&id,              data+msglen - 3*sizeof(int), sizeof(int));
+            memcpy(&sentBatch,       data+msglen - 2*sizeof(int), sizeof(int));
+            memcpy(&totalNumBatches, data+msglen - 1*sizeof(int), sizeof(int));
+            msglen -= 3*sizeof(int);
+            
+            // Store data in fragments structure
+            
+            //log(V5_DEBG, "MQ STORE (%i,%i) %i/%i\n", source, id, sentBatch, totalNumBatches);
+
+            assert(this->source == source);
+            assert(this->id == id || log_return_false("%i != %i\n", this->id, id));
+            assert(this->tag == tag);
+            assert(sentBatch < totalNumBatches || log_return_false("Invalid batch %i/%i!\n", sentBatch, totalNumBatches));
+            if (sentBatch >= dataFragments.size()) dataFragments.resize(sentBatch+1);
+            assert(receivedFragments >= 0 || log_return_false("Batched message was already completed!\n"));
+
+            //log(V5_DEBG, "MQ STORE alloc\n");
+            assert(dataFragments[sentBatch] == nullptr || log_return_false("Batch %i/%i already present!\n", sentBatch, totalNumBatches));
+            dataFragments[sentBatch].reset(new std::vector<uint8_t>(data, data+msglen));
+            
+            //log(V5_DEBG, "MQ STORE produce\n");
+            // All fragments of the message received?
+            receivedFragments++;
+            if (receivedFragments == totalNumBatches)
+                receivedFragments = -1;
+        }
+
+        bool isFinished() {
+            return receivedFragments == -1;
+        }
     };
 
     struct SendHandle {
+
         int id;
         int dest;
         int tag;
-        MPI_Request request;
+        MPI_Request request = MPI_REQUEST_NULL;
         DataPtr data;
         int sentBatches = -1;
         int totalNumBatches;
         int sizePerBatch;
         std::vector<uint8_t> tempStorage;
         
-        SendHandle() = default;
+        SendHandle(int id, int dest, int tag, DataPtr data, int maxMsgSize) 
+            : id(id), dest(dest), tag(tag), data(data) {
+
+            sizePerBatch = maxMsgSize;
+            sentBatches = 0;
+            totalNumBatches = data->size() <= sizePerBatch+3*sizeof(int) ? 1 
+                : std::ceil(data->size() / (float)sizePerBatch);
+        }
+        
         SendHandle(SendHandle&& moved) {
             id = moved.id;
             dest = moved.dest;
@@ -85,8 +141,25 @@ private:
             return *this;
         }
 
-        int prepareForNextBatch() {
-            assert(!isFinished() || log_return_false("Batched handle (n=%i) already finished!\n", sentBatches));
+        bool test() {
+            assert(request != MPI_REQUEST_NULL);
+            int flag = false;
+            MPI_Test(&request, &flag, MPI_STATUS_IGNORE);
+            return flag;
+        }
+
+        bool isFinished() const {return sentBatches == totalNumBatches;}
+
+        void sendNext() {
+            assert(!isFinished() || log_return_false("Handle (n=%i) already finished!\n", sentBatches));
+            
+            if (!isBatched()) {
+                // Send first and only message
+                //log(V5_DEBG, "MQ SEND SINGLE id=%i\n", id);
+                MPI_Isend(data->data(), data->size(), MPI_BYTE, dest, tag, MPI_COMM_WORLD, &request);
+                sentBatches = 1;
+                return;
+            }
 
             size_t begin = sentBatches*sizePerBatch;
             size_t end = std::min(data->size(), (size_t)(sentBatches+1)*sizePerBatch);
@@ -101,11 +174,15 @@ private:
             memcpy(tempStorage.data()+(end-begin)+sizeof(int), &sentBatches, sizeof(int));
             memcpy(tempStorage.data()+(end-begin)+2*sizeof(int), &totalNumBatches, sizeof(int));
 
-            return tag + MSG_OFFSET_BATCHED;
+            MPI_Isend(tempStorage.data(), tempStorage.size(), MPI_BYTE, dest, 
+                    tag+MSG_OFFSET_BATCHED, MPI_COMM_WORLD, &request);
+            
+            sentBatches++;
+            //log(V5_DEBG, "MQ SEND BATCHED id=%i %i/%i\n", id, sentBatches, totalNumBatches);
         }
-        bool isBatched() const {return sentBatches >= 0;}
-        size_t getTotalNumBatches() const {assert(isBatched()); return std::ceil(data->size() / (float)sizePerBatch);}
-        bool isFinished() const {assert(isBatched()); return sentBatches == totalNumBatches;}
+
+        bool isBatched() const {return totalNumBatches > 1;}
+        size_t getTotalNumBatches() const {assert(isBatched()); return totalNumBatches;}
     };
 
     size_t _max_msg_size;
