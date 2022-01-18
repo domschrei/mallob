@@ -23,10 +23,16 @@ if(MALLOB_USE_ASAN)
     set(MY_DEBUG_OPTIONS "${MY_DEBUG_OPTIONS} -fno-omit-frame-pointer -fsanitize=address -static-libasan") 
 endif()
 
-if(MALLOB_USE_TBB_MALLOC_PROXY)
-    set(BASE_LIBS ${BASE_LIBS} tbbmalloc_proxy)
+if(MALLOB_USE_TBBMALLOC)
+    set(BASE_LIBS tbbmalloc_proxy ${BASE_LIBS})
 endif()
 
+if(MALLOB_USE_JEMALLOC)
+    if(MALLOB_JEMALLOC_DIR)
+        link_directories(${MALLOB_JEMALLOC_DIR})
+    endif()
+    set(BASE_LIBS jemalloc ${BASE_LIBS})
+endif()
 
 # Libraries and includes
 
