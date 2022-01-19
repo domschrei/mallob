@@ -227,7 +227,7 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
     _clause_buffers.push_back(std::move(selfClauses));
 
     // Merge all collected buffer into a single buffer
-    log(V5_DEBG, "%s : merge n=%i s<=%i\n", 
+    log(V4_VVER, "%s : merge n=%i s<=%i\n", 
                 _job->toStr(), _clause_buffers.size(), totalSize);
     std::vector<int> vec = merge(totalSize);
     //testConsistency(vec, totalSize, /*sortByLbd=*/false);
@@ -239,8 +239,6 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
         _job->returnClauses(_excess_clauses_from_merge);
     }
 
-    // Reset clause buffers
-    _clause_buffers.clear();
     return vec;
 }
 
@@ -250,9 +248,26 @@ void AnytimeSatClauseCommunicator::suspend() {
 
 std::vector<int> AnytimeSatClauseCommunicator::merge(size_t maxSize) {
     auto merger = _cdb.getBufferMerger();
-    for (auto& buffer : _clause_buffers) 
+    int numBuffersMerging = 0;
+    for (auto& buffer : _clause_buffers) {
         merger.add(_cdb.getBufferReader(buffer.data(), buffer.size()));
-    return merger.merge(maxSize, &_excess_clauses_from_merge);
+        numBuffersMerging++;
+        if (numBuffersMerging >= 4) break;
+    }
+    
+    if (numBuffersMerging >= 4) {
+        log(V1_WARN, "[WARN] %s : merging %i/%i local buffers\n", 
+            _job->toStr(), numBuffersMerging, _clause_buffers.size());
+    }
+
+    std::vector<int> result = merger.merge(maxSize, &_excess_clauses_from_merge);
+
+    // Remove merged clause buffers
+    for (size_t i = 0; i < numBuffersMerging; i++) {
+        _clause_buffers.pop_front();
+    }
+
+    return result;
 }
 
 bool AnytimeSatClauseCommunicator::testConsistency(std::vector<int>& buffer, size_t maxSize, bool sortByLbd) {

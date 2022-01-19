@@ -205,8 +205,7 @@ std::vector<int> HordeProcessAdapter::getCollectedClauses(Checksum& checksum) {
     if (!_initialized || !_hsm->didExport) {
         return std::vector<int>();
     }
-    std::vector<int> clauses(_hsm->exportBufferTrueSize);
-    memcpy(clauses.data(), _export_buffer, clauses.size()*sizeof(int));
+    std::vector<int> clauses(_export_buffer, _export_buffer+_hsm->exportBufferTrueSize);
     checksum = _hsm->exportChecksum;
     _hsm->doExport = false;
     return clauses;
@@ -243,7 +242,8 @@ void HordeProcessAdapter::returnClauses(const std::vector<int>& clauses) {
 
 void HordeProcessAdapter::doReturnClauses(const std::vector<int>& clauses) {
     _hsm->returnedBufferSize = clauses.size();
-    memcpy(_returned_buffer, clauses.data(), clauses.size()*sizeof(int));
+    memcpy(_returned_buffer, clauses.data(),
+        std::min((size_t)_hsm->importBufferMaxSize, clauses.size()) * sizeof(int));
     _hsm->doReturnClauses = true;
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }

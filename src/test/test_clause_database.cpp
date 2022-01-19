@@ -23,6 +23,42 @@ bool insertUntilSuccess(AdaptiveClauseDatabase& cdb, size_t prodId, Clause& c) {
     return result == AdaptiveClauseDatabase::AddClauseResult::SUCCESS;
 }
 
+void testMerge() {
+    log(V2_INFO, "Testing merge of clause buffers ...\n");
+
+    int maxClauseSize = 12;
+    int maxLbdPartitionedSize = 5;
+    int numBuffers = 16;
+    int numClausesPerBuffer = 100000;
+
+    std::vector<std::vector<int>> buffers;
+    std::vector<std::vector<int>> clauseLits;
+    for (int i = 0; i < numBuffers; i++) {
+        AdaptiveClauseDatabase cdb(maxClauseSize, maxLbdPartitionedSize, 1500, 1000, 1);
+        for (int j = 0; j < numClausesPerBuffer; j++) {
+            std::vector<int> lits;
+            int clauseSize = 1 + Random::rand() * (maxClauseSize-1);
+            for (int l = 0; l < clauseSize; l++) {
+                lits.push_back((Random::rand() < 0.5 ? -1 : 1) * (1 + Random::rand()*1000000));
+            }
+            clauseLits.push_back(std::move(lits));
+            int glue = 2 + Random::rand()*(clauseSize-2);
+            Clause c{clauseLits.back().data(), clauseSize, glue};
+            assert(insertUntilSuccess(cdb, 0, c));
+        }
+        int numExported;
+        buffers.push_back(cdb.exportBuffer(200000, numExported));
+    }
+
+    AdaptiveClauseDatabase cdb(maxClauseSize, maxLbdPartitionedSize, 1500, 20, 1);
+    log(V2_INFO, "Merging ...\n");
+    auto merger = cdb.getBufferMerger();
+    for (auto& buffer : buffers) merger.add(cdb.getBufferReader(buffer.data(), buffer.size()));
+    std::vector<int> excess;
+    auto merged = merger.merge(1500000, &excess);
+    log(V2_INFO, "Merged into buffer of size %ld, excess buffer has size %ld\n", merged.size(), excess.size());
+}
+
 void testUniform() {
     log(V2_INFO, "Testing lock-free clause database, uniform setting ...\n");
 
@@ -31,7 +67,6 @@ void testUniform() {
     int baseBufferSize = 1000;
     int numProducers = 16;
     int numClauses = 1000;
-
 
     AdaptiveClauseDatabase cdb(maxClauseSize, maxLbdPartitionedSize, baseBufferSize, 20, numProducers);
 
@@ -92,7 +127,6 @@ void testUniform() {
     }
     log(LOG_NO_PREFIX | V4_VVER, "\n");
 
-
     auto merger = cdb.getBufferMerger();
     for (int n = 0; n < 10; n++) merger.add(cdb.getBufferReader(out.data(), out.size()));
     auto merged = merger.merge(10000);
@@ -110,6 +144,8 @@ void testUniform() {
     }
 
     assert(merged == out);
+
+    log(V2_INFO, "Done.\n");
 }
 
 void testRandomClauses() {
@@ -332,10 +368,11 @@ void testConcurrentClauseAddition() {
 int main() {
     Timer::init();
     Random::init(rand(), rand());
-    Logger::init(0, V5_DEBG, false, false, false, nullptr);
+    Logger::init(0, V2_INFO, false, false, false, nullptr);
     Process::init(0);
     ProcessWideThreadPool::init(1);
 
+    testMerge();
     testUniform();
     testRandomClauses();
     testConcurrentClauseAddition();
