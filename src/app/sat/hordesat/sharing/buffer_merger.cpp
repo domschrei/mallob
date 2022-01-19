@@ -25,6 +25,8 @@ std::vector<int> BufferMerger::merge(int sizeLimit, std::vector<int>* excessClau
         //numFiltered[i] = 0;
     }
 
+    log(V4_VVER, "MERGE setup\n");
+
     std::vector<int> out;
     out.reserve(sizeLimit);
     for (int i = 0; i < sizeof(size_t)/sizeof(int); i++)
@@ -34,9 +36,14 @@ std::vector<int> BufferMerger::merge(int sizeLimit, std::vector<int>* excessClau
     _bucket = BucketLabel();
     _counter_pos = out.size()-1;
 
+    log(V4_VVER, "MERGE begin\n");
+
     // Merge as many clauses as possible into the out buffer
-    while (mergeRound(out, sizeLimit)) {}
+    int numRounds = 0;
+    while (mergeRound(out, sizeLimit)) {numRounds++;}
     memcpy(out.data(), &_hash, sizeof(size_t));
+
+    log(V4_VVER, "MERGE rounds=%i\n", numRounds);
 
     // If requested, merge all excess (but unique) clauses
     // into the excess buffer
@@ -61,6 +68,8 @@ std::vector<int> BufferMerger::merge(int sizeLimit, std::vector<int>* excessClau
         while (lastNonzeroIdx > 0 && excessClauses->at(lastNonzeroIdx) == 0) lastNonzeroIdx--;
         excessClauses->resize(lastNonzeroIdx+1);
     }
+
+    log(V4_VVER, "MERGE end\n");
 
     return out;
 }

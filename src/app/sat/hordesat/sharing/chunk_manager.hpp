@@ -46,7 +46,7 @@ public:
 
     ~ChunkManager() {
         for (size_t i = 0; i < _chunks.size(); i++) {
-            if (_chunks[i]) delete _chunks[i];
+            if (_chunks[i]) free(_chunks[i]);
             delete _chunk_states[i];
         }
     }
