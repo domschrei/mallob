@@ -13,10 +13,10 @@ Interface to some process-related information from the /proc filesystem.
 class Proc {
 
 private:
-    struct CpuInfo { 
-        double uticks = 0;
-        double sticks = 0;
-        double passedSecs = 0;
+    struct CpuInfo {
+        unsigned long long userTicksSinceStart = 0;
+        unsigned long long systemTicksSinceStart = 0;
+        double elapsedSecsSinceStart = 0;
     };
     static std::map<long, CpuInfo> _cpu_info_per_tid;
     static Mutex _cpu_info_lock;

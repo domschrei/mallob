@@ -100,49 +100,89 @@ bool Proc::getThreadCpuRatio(long tid, double& cpuRatio, float& sysShare) {
     using std::ios_base;
     using std::ifstream;
     using std::string;
-
     static unsigned long hertz = sysconf(_SC_CLK_TCK);
+    /*
+    See `man proc`, section `/proc/[PID]/stat`:
+    Field "comm" is in parentheses and may contain whitespaces, 
+    so it can break word-by-word reading
+               1     2    3
+    pid (comm) state ppid pgrp
+    4       5      6     7     8
+    session tty_nr tpgid flags minflt
+    9       10     11      12!   13!
+    cminflt majflt cmajflt utime ctime
+    14     15     16       17   18
+    cutime cstime priority nice O 
+    19          20!
+    itrealvalue starttime
+    */
+    static const int postCommIdxUserTicks = 12;
+    static const int postCommIdxSystemTicks = 13;
 
-    double uptime = getUptime();
-
-    // Get stats of interest
+    // Get stream for the stats of interest
     std::string filepath = "/proc/" + std::to_string(getPid()) + "/task/" + std::to_string(tid) + "/stat";
     ifstream stat_stream(filepath, ios_base::in);
     if (!stat_stream.good()) return false;
 
-    // dummy vars for leading entries
-    string pid, comm, state, ppid, pgrp, session, tty_nr;
-    string tpgid, flags, minflt, cminflt, majflt, cmajflt;
-    string cutime, cstime, priority, nice;
-    string O, itrealvalue;
-
-    double uticks = 0, sticks = 0, starttime = 0;
-    stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
-                >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
-                >> uticks >> sticks >> cutime >> cstime >> priority >> nice
-                >> O >> itrealvalue >> starttime;
+    // Read stats carefully
+    unsigned long long userTicksSinceStart = 0, systemTicksSinceStart = 0, starttime = 0;
+    bool endedComm = false;
+    int readWordsAfterComm = 0;
+    bool readEverything = false;
+    string word;
+    string wholeLine;
+    while (stat_stream >> word) {
+        wholeLine += word + "|";
+        if (word[word.size()-1] == ')') {
+            endedComm = true;
+        } else if (endedComm) {
+            readWordsAfterComm++;
+            if (readWordsAfterComm == postCommIdxUserTicks) {
+                userTicksSinceStart = std::stoull(word);
+            } else if (readWordsAfterComm == postCommIdxSystemTicks) {
+                systemTicksSinceStart = std::stoull(word);
+                readEverything = true;
+                break;
+            }
+        }
+    }
     stat_stream.close();
+    wholeLine = wholeLine.substr(0, wholeLine.size()-1);
+    log(V5_DEBG, "cpu %s\n", wholeLine.c_str());
+    if (!readEverything) return false;
 
+    // Get elapsed seconds of this program (only used relatively)
+    double elapsedSecsSinceStart = Timer::elapsedSeconds();
+    
+    // Fetch previous CPU info for this thread 
     auto lock = _cpu_info_lock.getLock();
+    bool prevInfoPresent = _cpu_info_per_tid.count(tid);
+    if (prevInfoPresent) {
+        // Read previous CPU info
+        CpuInfo& info = _cpu_info_per_tid[tid];
 
+        // Compute delta since previous query
+        double deltaSecs = elapsedSecsSinceStart - info.elapsedSecsSinceStart;
+        unsigned long long deltaUserTicks = userTicksSinceStart - info.userTicksSinceStart;
+        unsigned long long deltaSystemTicks = systemTicksSinceStart - info.systemTicksSinceStart;
+        unsigned long long deltaOverallTicks = deltaUserTicks+deltaSystemTicks;
+
+        // Infer CPU ratio and system time share
+        double deltaSecsTimesHertz = deltaSecs*hertz;
+        cpuRatio = deltaSecsTimesHertz == 0 ? 0 : 
+            (deltaOverallTicks / deltaSecsTimesHertz);
+        sysShare = deltaOverallTicks == 0 ? 0 : 
+            ((double)deltaSystemTicks / deltaOverallTicks);
+    }
+
+    // Write current values to the thread's CPU info struct
     CpuInfo& info = _cpu_info_per_tid[tid];
+    info.elapsedSecsSinceStart = elapsedSecsSinceStart;
+    info.userTicksSinceStart = userTicksSinceStart;
+    info.systemTicksSinceStart = systemTicksSinceStart;
 
-    auto ticks = uticks + sticks;
-    auto ticksDiff = ticks - (info.uticks + info.sticks);
-    auto sTicksDiff = sticks - info.sticks;
-
-    auto passedSecs = uptime - (starttime / hertz);
-    auto passedSecsDiff = passedSecs - info.passedSecs;
-    //log(V4_VVER, "PROC tid=%lu spent %.2f ticks over %.2f secs\n", tid, ticksDiff, passedSecsDiff);
-
-    cpuRatio = passedSecsDiff == 0 ? 0 : ((ticksDiff / hertz) / passedSecsDiff);
-    sysShare = ticksDiff == 0 ? 0 : sTicksDiff / ticksDiff;
-
-    info.uticks = uticks;
-    info.sticks = sticks;
-    info.passedSecs = passedSecs;
-
-    return true;
+    // Successful iff previous CPU info was available
+    return prevInfoPresent;
 }
 
 std::vector<pid_t> Proc::getChildren(pid_t pid) {
