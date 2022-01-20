@@ -68,7 +68,7 @@ public:
 
     std::vector<int> getUnitsBuffer() {
         int numUnits = 0;
-        auto buf = _cdb.exportBuffer(-1, numUnits, 1, 1);
+        auto buf = _cdb.exportBuffer(-1, numUnits, 1, 1, /*sortClauses=*/false);
         _plain_units_out = std::vector<int>(buf.data()+(buf.size()-numUnits), buf.data()+buf.size());
         assert(_plain_units_out.size() == numUnits);
         for (int i = 0; i < _plain_units_out.size(); i++) assert(_plain_units_out[i] != 0);
@@ -100,7 +100,7 @@ public:
 
         _ready_to_import_reader.releaseBuffer();
         int numClauses = 0;
-        _ready_to_import_buffer = _cdb.exportBuffer(-1, numClauses, minLength, maxLength);
+        _ready_to_import_buffer = _cdb.exportBuffer(-1, numClauses, minLength, maxLength, /*sortClauses=*/false);
         if (numClauses == 0) return _clause_out;
         
         _ready_to_import_reader = _cdb.getBufferReader(_ready_to_import_buffer.data(), _ready_to_import_buffer.size());

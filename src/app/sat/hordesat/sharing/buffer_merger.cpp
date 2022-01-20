@@ -1,4 +1,6 @@
 
+#include <algorithm>
+
 #include "buffer_merger.hpp"
 
 BufferMerger::BufferMerger(int maxLbdPartitionedSize, bool useChecksum) : 
@@ -8,6 +10,11 @@ void BufferMerger::add(BufferReader&& reader) {_readers.push_back(std::move(read
 
 std::vector<int> BufferMerger::merge(int sizeLimit, std::vector<int>* excessClauses) {
     
+    // New implementation, faster in most cases (especially many short clauses).
+    return fastMerge(sizeLimit, excessClauses);
+    
+    // Legacy code of old implementation follows.
+
     _clause_filter = ExactSortedClauseFilter();
     _next_clauses.resize(_readers.size());
     _selected.resize(_readers.size());
@@ -73,6 +80,158 @@ std::vector<int> BufferMerger::merge(int sizeLimit, std::vector<int>* excessClau
 
     return out;
 }
+
+std::vector<int> BufferMerger::fastMerge(int sizeLimit, std::vector<int>* excessClauses) {
+    
+    _hash = 1;
+    InputClauseComparator inputCompare;
+
+    for (size_t i = 0; i < _readers.size(); i++) {
+
+        Clause* c = _readers[i].getCurrentClausePointer();
+        _readers[i].getNextIncomingClause();
+        if (c->begin == nullptr) continue;
+        InputClause inputClause(c, i);
+
+        if (_merger.empty()) _merger.insert_after(_merger.before_begin(), inputClause);
+        else {
+            auto it = _merger.before_begin(); 
+            auto nextIt = it; ++nextIt;
+            while (nextIt != _merger.end() && inputCompare(inputClause, *nextIt)) {
+                ++it;
+                ++nextIt;
+            }
+            _merger.insert_after(it, inputClause);
+        }
+    }
+
+    log(V4_VVER, "MERGE setup\n");
+
+    std::vector<int> out;
+    out.reserve(sizeLimit);
+    for (int i = 0; i < sizeof(size_t)/sizeof(int); i++)
+        out.push_back(0); // placeholder for checksum
+    out.push_back(0); // counter for clauses of first bucket
+
+    if (excessClauses != nullptr) {
+        excessClauses->clear();
+        for (int i = 0; i < sizeof(size_t)/sizeof(int); i++)
+            excessClauses->push_back(0); // placeholder for checksum
+        excessClauses->push_back(0); // counter for clauses of first bucket
+    }
+
+    _bucket = BucketLabel();
+    _counter_pos = out.size()-1;
+    std::vector<int>* outputVector = &out;
+    bool fillingMainVector = true;
+
+    // For checking duplicates
+    Clause lastSeenClause;
+    ClauseComparator compare;
+
+    log(V4_VVER, "MERGE begin\n");
+
+    while (!_merger.empty()) {
+
+        //for (auto it = _merger.begin(); it != _merger.end(); ++it) {
+        //    auto& [clause, readerId] = *it;
+        //    log(V5_DEBG, "MERGER reader=%i %s\n", readerId, clause->toStr().c_str());
+        //}
+
+        // Fetch next best clause
+        auto& [clause, readerId] = _merger.front();
+
+        //log(V5_DEBG, "CLAUSE reader=%i %s\n", readerId, clause.toStr().c_str());
+        
+        // Duplicate?
+        if (lastSeenClause.begin == nullptr || compare(lastSeenClause, *clause)) {
+            // -- not a duplicate
+            lastSeenClause = *clause;
+
+            // Check if size of buffer would be exceeded with next clause
+            if (fillingMainVector && outputVector->size() + clause->size + (clause->size <= _max_lbd_partitioned_size ? 0:1) > sizeLimit) {
+                // Size exceeded: finalize vector
+                memcpy(out.data(), &_hash, sizeof(size_t));
+                if (excessClauses == nullptr) break;
+                // Switch from normal output to excess clauses output
+                fillingMainVector = false;
+                outputVector = excessClauses;
+                _bucket = BucketLabel();
+                _counter_pos = excessClauses->size()-1;
+                _hash = 1;
+                size_t remainingSize = 0;
+                for (auto& [clause, readerId] : _merger) {
+                    remainingSize += _readers[readerId].getRemainingSize();
+                }
+                outputVector->reserve(remainingSize);
+            }
+            
+            // Update bucket
+            while (clause->size > _bucket.size || (clause->size <= _max_lbd_partitioned_size && clause->lbd > _bucket.lbd)) {
+                _bucket.next(_max_lbd_partitioned_size);
+                outputVector->push_back(0);
+                _counter_pos = outputVector->size()-1;
+            }
+
+            // Insert clause
+            //log(V5_DEBG, "INSERT %s\n", clause.toStr().c_str());
+            size_t sizeBefore = outputVector->size();
+            if (clause->size > _max_lbd_partitioned_size) outputVector->push_back(clause->lbd);
+            if (clause->size == 1) outputVector->push_back(*clause->begin);
+            else outputVector->insert(outputVector->end(), clause->begin, clause->begin+clause->size);
+            
+            if (_use_checksum) {
+                hash_combine(_hash, ClauseHasher::hash(
+                    outputVector->data()+sizeBefore,
+                    clause->size+(clause->size <= _max_lbd_partitioned_size ? 0 : 1), 3
+                ));
+            }
+            outputVector->at(_counter_pos)++;
+        } else {
+            // Duplicate!
+            assert(!compare(*clause, lastSeenClause)); // must be the same
+        }
+
+        // Refill merger
+        _readers[readerId].getNextIncomingClause();
+        if (clause->begin == nullptr) {
+            // No clauses left for this reader
+            _merger.erase_after(_merger.before_begin());
+        } else {
+            // Insert clause at the correct position in the merger
+            auto it = _merger.begin(); 
+            auto nextIt = it; ++nextIt;
+            while (nextIt != _merger.end() && inputCompare(_merger.front(), *nextIt)) {
+                ++it;
+                ++nextIt;
+            }
+            if (it != _merger.begin()) {
+                // Move element
+                auto elem = _merger.front();
+                _merger.erase_after(_merger.before_begin());
+                _merger.insert_after(it, elem);
+            } // Else: element is already at the right place
+        }
+    }
+
+    if (fillingMainVector) {
+        memcpy(out.data(), &_hash, sizeof(size_t));
+        _hash = 1;
+    }
+
+    if (excessClauses != nullptr) {
+        memcpy(excessClauses->data(), &_hash, sizeof(size_t));
+        
+        // Remove trailing zeroes
+        size_t lastNonzeroIdx = excessClauses->size()-1;
+        while (lastNonzeroIdx > 0 && excessClauses->at(lastNonzeroIdx) == 0) lastNonzeroIdx--;
+        excessClauses->resize(lastNonzeroIdx+1);
+    }
+
+    log(V4_VVER, "MERGE end\n");
+    return out;
+}
+
 
 bool BufferMerger::mergeRound(std::vector<int>& out, int sizeLimit) {
     BucketLabel newBucket = _bucket;

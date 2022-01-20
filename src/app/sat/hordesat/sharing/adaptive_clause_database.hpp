@@ -24,6 +24,25 @@ public:
     enum AddClauseResult {SUCCESS, TRY_LATER, DROP};
 
 private:
+
+    // Compares two clauses alphanumerically.
+    // The clauses are given as pointers to the raw literals, possibly
+    // both with an LBD score at the front.
+    // The effective size of the clauses must be equal to the member
+    // supplied in the construction of the comparator.
+    struct InplaceClauseComparator {
+        int clauseSizeIncludingLbd;
+        InplaceClauseComparator(int clauseSizeIncludingLbd) 
+            : clauseSizeIncludingLbd(clauseSizeIncludingLbd) {}
+        bool operator()(const int* left, const int* right) const {
+            if (left == right) return false;
+            for (size_t i = 0; i < clauseSizeIncludingLbd; i++) {
+                if (left[i] != right[i]) return left[i] < right[i];
+            }
+            return false;
+        }
+    };
+
     /*
     Initially all chunks are part of this manager (virtually and not yet allocated).
     Queries for new chunks go here, and unneeded chunks are returned here.
@@ -91,7 +110,8 @@ public:
     getBufferMerger.
     */
     std::vector<int> exportBuffer(int sizeLimit, int& numExportedClauses, 
-            const int minClauseLength = -1, const int maxClauseLength = -1);
+            const int minClauseLength = -1, const int maxClauseLength = -1, 
+            bool sortClauses = true);
 
     /*
     Allows to iterate over the clauses contained in a flat vector of integers

@@ -134,7 +134,7 @@ void AdaptiveClauseDatabase::printChunks(int nextExportSize) {
 }
 
 std::vector<int> AdaptiveClauseDatabase::exportBuffer(int sizeLimit, int& numExportedClauses, 
-        const int minClauseLength, const int maxClauseLength) {
+        const int minClauseLength, const int maxClauseLength, bool sortClauses) {
 
     int zero = 0;
     numExportedClauses = 0;
@@ -184,10 +184,29 @@ std::vector<int> AdaptiveClauseDatabase::exportBuffer(int sizeLimit, int& numExp
                 size_t sizeBefore = selection.size();
                 int numDesired = sizeLimit < 0 ? -1 : (sizeLimit - selection.size()) / effectiveClsLen;
                 int received = buf.getClauses(selection, numDesired);
+                assert(selection.size()-sizeBefore == received*effectiveClsLen);
                 
                 // Update clause counter and stats
                 selection[counterPos] += received;
                 numExportedClauses += received;
+
+                if (sortClauses) {
+                    // Sort clauses alphanumerically
+                    assert((selection.size()-sizeBefore) % effectiveClsLen == 0);
+                    std::vector<int> clausesCopy(selection.data()+sizeBefore, selection.data()+selection.size());
+                    std::vector<int*> clausePointers(received);
+                    for (size_t i = 0; i < clausePointers.size(); i++) {
+                        clausePointers[i] = clausesCopy.data()+i*effectiveClsLen;
+                    }
+                    std::sort(clausePointers.begin(), clausePointers.end(), 
+                        InplaceClauseComparator(effectiveClsLen));
+                    for (size_t i = 0; i < clausePointers.size(); i++) {
+                        int* lits = clausePointers[i];
+                        for (size_t x = 0; x < effectiveClsLen; x++) {
+                            selection[sizeBefore+(effectiveClsLen*i)+x] = lits[x];
+                        }
+                    }
+                }
                 
                 if (_use_checksum) {
                     for (size_t pos = sizeBefore; pos < selection.size(); pos += effectiveClsLen) {
