@@ -80,6 +80,8 @@ void Client::readIncomingJobs() {
             // Job can be read: Enqueue reader task into thread pool
             foundJob = data;
             auto future = ProcessWideThreadPool::get().addTask([this, &log, foundJob]() {
+                if (!_instance_reader.continueRunning()) return;
+                
                 // Read job
                 int id = foundJob.description->getId();
                 float time = Timer::elapsedSeconds();
