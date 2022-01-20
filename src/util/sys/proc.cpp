@@ -130,9 +130,9 @@ bool Proc::getThreadCpuRatio(long tid, double& cpuRatio, float& sysShare) {
     int readWordsAfterComm = 0;
     bool readEverything = false;
     string word;
-    string wholeLine;
+    //string wholeLine;
     while (stat_stream >> word) {
-        wholeLine += word + "|";
+        //wholeLine += word + "|";
         if (word[word.size()-1] == ')') {
             endedComm = true;
         } else if (endedComm) {
@@ -147,8 +147,8 @@ bool Proc::getThreadCpuRatio(long tid, double& cpuRatio, float& sysShare) {
         }
     }
     stat_stream.close();
-    wholeLine = wholeLine.substr(0, wholeLine.size()-1);
-    log(V5_DEBG, "cpu %s\n", wholeLine.c_str());
+    //wholeLine = wholeLine.substr(0, wholeLine.size()-1);
+    //log(V5_DEBG, "cpu %s\n", wholeLine.c_str());
     if (!readEverything) return false;
 
     // Get elapsed seconds of this program (only used relatively)
