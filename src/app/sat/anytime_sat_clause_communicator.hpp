@@ -2,6 +2,8 @@
 #ifndef DOMPASCH_MALLOB_ANYTIME_SAT_CLAUSE_COMMUNICATOR_H
 #define DOMPASCH_MALLOB_ANYTIME_SAT_CLAUSE_COMMUNICATOR_H
 
+#include <future>
+
 #include "util/params.hpp"
 #include "util/hashing.hpp"
 #include "hordesat/sharing/lockfree_clause_database.hpp"
@@ -28,7 +30,12 @@ private:
     ClauseHistory _cls_history;
 
     std::list<std::vector<int>> _clause_buffers;
+    std::list<std::vector<int>> _clause_buffers_being_merged;
     std::vector<int> _excess_clauses_from_merge;
+    bool _is_merging = false;
+    bool _is_done_merging = false;
+    std::future<void> _merge_future;
+
     int _num_aggregated_nodes;
     int _current_epoch = 0;
 
@@ -46,6 +53,9 @@ public:
 
         _initialized = true;
     }
+    ~AnytimeSatClauseCommunicator() {
+        if (_is_merging) _merge_future.get();
+    }
     bool canSendClauses();
     void sendClausesToParent();
     void handle(int source, JobMessage& msg);
@@ -56,7 +66,9 @@ private:
     
     size_t getBufferLimit(int numAggregatedNodes, MyMpi::BufferQueryMode mode);
 
-    std::vector<int> prepareClauses();
+    void initiateMergeOfClauseBuffers();
+    std::vector<int> getMergedClauseBuffer();
+
     void broadcastAndLearn(std::vector<int>& clauses);
     void learnClauses(std::vector<int>& clauses);
     void sendClausesToChildren(std::vector<int>& clauses);

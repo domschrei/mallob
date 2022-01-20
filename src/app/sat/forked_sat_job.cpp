@@ -23,6 +23,7 @@ void ForkedSatJob::appl_start() {
     assert(!_initialized);
     doStartSolver();
     _time_of_start_solving = Timer::elapsedSeconds();
+    _time_of_last_comm = _time_of_start_solving;
     _initialized = true;
 }
 
@@ -168,11 +169,7 @@ bool ForkedSatJob::appl_wantsToBeginCommunication() {
     if (Timer::elapsedSeconds()-_time_of_last_comm < _job_comm_period) return false;
     // Time has come: Prepare a new buffer of clauses
     bool wants = ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses();
-    if (getJobTree().isLeaf()) {
-        // Leaf node: At least half a second since initialization / reactivation
-        return wants && (getAgeSinceActivation() >= 0.5 * _job_comm_period);
-    }
-    return false; // non-leaves do not begin the communication on their own
+    return wants && (getAgeSinceActivation() >= 0.5 * _job_comm_period);
 }
 
 void ForkedSatJob::appl_beginCommunication() {
@@ -187,11 +184,13 @@ void ForkedSatJob::appl_communicate(int source, JobMessage& msg) {
     if (!checkClauseComm()) return;
     log(V5_DEBG, "comm\n");
     ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, msg);
+    if (appl_wantsToBeginCommunication()) appl_beginCommunication();
 }
 
 bool ForkedSatJob::isInitialized() {
     return _initialized && _solver->isFullyInitialized();
 }
+
 void ForkedSatJob::prepareSharing(int maxSize) {
     if (!_initialized) return;
     _solver->collectClauses(maxSize);
@@ -202,9 +201,12 @@ bool ForkedSatJob::hasPreparedSharing() {
 }
 std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum) {
     if (!_initialized) return std::vector<int>();
-    _time_of_last_comm = Timer::elapsedSeconds();
     return _solver->getCollectedClauses(checksum);
 }
+void ForkedSatJob::resetLastCommTime() {
+    _time_of_last_comm += _job_comm_period;
+}
+
 void ForkedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& checksum) {
     if (!_initialized) return;
     _solver->digestClauses(clauses, checksum);

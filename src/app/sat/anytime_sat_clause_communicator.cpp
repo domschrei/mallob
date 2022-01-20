@@ -4,6 +4,7 @@
 #include "util/logger.hpp"
 #include "comm/mympi.hpp"
 #include "hordesat/utilities/clause_filter.hpp"
+#include "util/sys/thread_pool.hpp"
 
 void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
 
@@ -49,8 +50,6 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         _clause_buffers.push_back(clauses);
         _num_aggregated_nodes += numAggregated;
 
-        if (canSendClauses()) sendClausesToParent();
-
     } else if (msg.tag == MSG_DISTRIBUTE_CLAUSES) {
         _current_epoch = msg.epoch;
 
@@ -67,6 +66,12 @@ size_t AnytimeSatClauseCommunicator::getBufferLimit(int numAggregatedNodes, MyMp
 bool AnytimeSatClauseCommunicator::canSendClauses() {
     if (!_initialized || _job->getState() != ACTIVE) return false;
 
+    // Done merging?
+    if (_is_merging && _is_done_merging) {
+        assert(_clause_buffers_being_merged.size() == 1);
+        return true;
+    }
+    
     // Prepare sharing: "Order" a buffer of clauses from the solver engine
     if (!_job->hasPreparedSharing()) {
         int limit = getBufferLimit(_num_aggregated_nodes+1, MyMpi::SELF);
@@ -77,25 +82,49 @@ bool AnytimeSatClauseCommunicator::canSendClauses() {
     // Must have received clauses from each existing children
     if (_job->getJobTree().hasLeftChild()) numChildren++;
     if (_job->getJobTree().hasRightChild()) numChildren++;
-
     if (_clause_buffers.size() >= numChildren) {
+        // Done preparing sharing?
         if (_job->hasPreparedSharing()) {
-            return true;
+            // Able to perform a merge?
+            if (!_is_merging && _clause_buffers_being_merged.empty()) 
+                initiateMergeOfClauseBuffers();
         }
     }
 
     return false;
 }
 
+std::vector<int> AnytimeSatClauseCommunicator::getMergedClauseBuffer() {
+
+    assert(_merge_future.valid());
+    _merge_future.get();
+    _is_merging = false;
+    _is_done_merging = false;
+
+    assert(_clause_buffers_being_merged.size() == 1);
+
+    std::vector<int> result = std::move(_clause_buffers_being_merged.front());
+    _clause_buffers_being_merged.clear();
+
+    // Some clauses may have been left behind during merge
+    if (_excess_clauses_from_merge.size() > sizeof(size_t)/sizeof(int)) {
+        // Add them as produced clauses to your local solver
+        // so that they can be re-exported (if they are good enough)
+        _job->returnClauses(_excess_clauses_from_merge);
+    }
+
+    return result;
+}
+
 void AnytimeSatClauseCommunicator::sendClausesToParent() {
 
     // Merge all collected clauses, reset buffers
-    std::vector<int> clausesToShare = prepareClauses();
+    std::vector<int> clausesToShare = getMergedClauseBuffer();
 
     if (_job->getJobTree().isRoot()) {
         // Rank zero: proceed to broadcast
         log(V3_VERB, "%s epoch %i: Broadcast clauses from %i sources\n", _job->toStr(), 
-            _current_epoch, _num_aggregated_nodes+1);
+            _current_epoch, _num_aggregated_nodes);
         // Share complete set of clauses to children
         broadcastAndLearn(clausesToShare);
         _current_epoch++;
@@ -118,6 +147,7 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
     }
 
     _num_aggregated_nodes = 0;
+    _job->resetLastCommTime();
 }
 
 void AnytimeSatClauseCommunicator::broadcastAndLearn(std::vector<int>& clauses) {
@@ -189,7 +219,7 @@ void AnytimeSatClauseCommunicator::sendClausesToChildren(std::vector<int>& claus
     }
 }
 
-std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
+void AnytimeSatClauseCommunicator::initiateMergeOfClauseBuffers() {
 
     // +1 for local clauses, but at most as many contributions as there are nodes
     _num_aggregated_nodes = std::min(_num_aggregated_nodes+1, _job->getJobTree().getCommSize());
@@ -219,55 +249,54 @@ std::vector<int> AnytimeSatClauseCommunicator::prepareClauses() {
             if (checksum.get() != chk.get()) {
                 log(V1_WARN, "[WARN] %s : checksum fail in clsbuf (expected count: %ld, actual count: %ld)\n", 
                 _job->toStr(), checksum.count(), chk.count());
-                return getEmptyBuffer();
+                selfClauses = getEmptyBuffer();
             }
         }
         //testConsistency(selfClauses, 0 /*do not check buffer's size limit*/, /*sortByLbd=*/_sort_by_lbd);
     }
     _clause_buffers.push_back(std::move(selfClauses));
 
-    // Merge all collected buffer into a single buffer
-    log(V4_VVER, "%s : merge n=%i s<=%i\n", 
-                _job->toStr(), _clause_buffers.size(), totalSize);
-    std::vector<int> vec = merge(totalSize);
-    //testConsistency(vec, totalSize, /*sortByLbd=*/false);
+    assert(!_is_merging);
+    assert(!_is_done_merging);
+    assert(_clause_buffers_being_merged.empty());
 
-    // Some clauses may have been left behind during merge
-    if (_excess_clauses_from_merge.size() > sizeof(size_t)/sizeof(int)) {
-        // Add them as produced clauses to your local solver
-        // so that they can be re-exported (if they are good enough)
-        _job->returnClauses(_excess_clauses_from_merge);
-    }
-
-    return vec;
-}
-
-void AnytimeSatClauseCommunicator::suspend() {
-    if (_use_cls_history) _cls_history.onSuspend();
-}
-
-std::vector<int> AnytimeSatClauseCommunicator::merge(size_t maxSize) {
-    auto merger = _cdb.getBufferMerger();
     int numBuffersMerging = 0;
     for (auto& buffer : _clause_buffers) {
-        merger.add(_cdb.getBufferReader(buffer.data(), buffer.size()));
+        _clause_buffers_being_merged.push_back(std::move(buffer));
         numBuffersMerging++;
         if (numBuffersMerging >= 4) break;
     }
-    
+
     if (numBuffersMerging >= 4) {
         log(V1_WARN, "[WARN] %s : merging %i/%i local buffers\n", 
             _job->toStr(), numBuffersMerging, _clause_buffers.size());
     }
 
-    std::vector<int> result = merger.merge(maxSize, &_excess_clauses_from_merge);
-
     // Remove merged clause buffers
     for (size_t i = 0; i < numBuffersMerging; i++) {
         _clause_buffers.pop_front();
     }
+    
+    // Merge all collected buffer into a single buffer
+    log(V4_VVER, "%s : merge n=%i s<=%i\n", 
+                _job->toStr(), numBuffersMerging, totalSize);
+    
+    // Start asynchronous task to merge the clause buffers 
+    _is_merging = true;
+    _merge_future = ProcessWideThreadPool::get().addTask([this, totalSize]() {
+        auto merger = _cdb.getBufferMerger();
+        for (auto& buffer : _clause_buffers_being_merged) {
+            merger.add(_cdb.getBufferReader(buffer.data(), buffer.size()));
+        }    
+        std::vector<int> result = merger.merge(totalSize, &_excess_clauses_from_merge);
+        _clause_buffers_being_merged.resize(1);
+        _clause_buffers_being_merged.front() = std::move(result);
+        _is_done_merging = true;
+    });
+}
 
-    return result;
+void AnytimeSatClauseCommunicator::suspend() {
+    if (_use_cls_history) _cls_history.onSuspend();
 }
 
 bool AnytimeSatClauseCommunicator::testConsistency(std::vector<int>& buffer, size_t maxSize, bool sortByLbd) {

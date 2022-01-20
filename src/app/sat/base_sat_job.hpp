@@ -15,9 +15,12 @@ public:
     // Methods common to all BaseSatJob instances
 
     virtual bool isInitialized() = 0;
+    
     virtual void prepareSharing(int maxSize) = 0;
     virtual bool hasPreparedSharing() = 0;
     virtual std::vector<int> getPreparedClauses(Checksum& checksum) = 0;
+    virtual void resetLastCommTime() = 0;
+
     virtual void digestSharing(std::vector<int>& clauses, const Checksum& checksum) = 0;
     virtual void returnClauses(std::vector<int>& clauses) = 0;
 

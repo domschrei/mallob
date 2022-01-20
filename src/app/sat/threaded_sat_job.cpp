@@ -46,6 +46,7 @@ void ThreadedSatJob::appl_start() {
     _solver->solve();
     //log(V4_VVER, "%s : finished horde initialization\n", toStr());
     _time_of_start_solving = Timer::elapsedSeconds();
+    _time_of_last_comm = _time_of_start_solving;
     _initialized = true;
 }
 
@@ -147,24 +148,20 @@ bool ThreadedSatJob::appl_wantsToBeginCommunication() {
     // At least X seconds since last communication 
     if (Timer::elapsedSeconds()-_time_of_last_comm < _job_comm_period) return false;
     bool wants = ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses();
-    if (getJobTree().isLeaf()) {
-        // At least half a second since initialization / reactivation
-        return wants && (getAgeSinceActivation() < 0.5 * _job_comm_period);
-    }
-    return false;
+    return wants && (getAgeSinceActivation() < 0.5 * _job_comm_period);
 }
 
 void ThreadedSatJob::appl_beginCommunication() {
     if (!_initialized || getState() != ACTIVE) return;
     log(V5_DEBG, "begincomm\n");
     ((AnytimeSatClauseCommunicator*) _clause_comm)->sendClausesToParent();
-    if (getJobTree().isLeaf()) _time_of_last_comm = Timer::elapsedSeconds();
 }
 
 void ThreadedSatJob::appl_communicate(int source, JobMessage& msg) {
     if (!_initialized || getState() != ACTIVE) return;
     log(V5_DEBG, "comm\n");
     ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, msg);
+    if (appl_wantsToBeginCommunication()) appl_beginCommunication();
 }
 
 bool ThreadedSatJob::isInitialized() {
@@ -186,6 +183,10 @@ std::vector<int> ThreadedSatJob::getPreparedClauses(Checksum& checksum) {
     checksum = _clause_checksum;
     return out;
 }
+void ThreadedSatJob::resetLastCommTime() {
+    _time_of_last_comm += _job_comm_period;
+}
+
 void ThreadedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& checksum) {
     _solver->digestSharing(clauses, checksum);
     if (getJobTree().isRoot()) {
