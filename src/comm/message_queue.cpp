@@ -20,6 +20,8 @@ MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize),
     MPI_Comm_rank(MPI_COMM_WORLD, &_my_rank);
     _recv_data = (uint8_t*) malloc(maxMsgSize+20);
 
+    _current_tag = &_default_tag_var;
+
     MPI_Irecv(_recv_data, maxMsgSize+20, MPI_BYTE, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &_recv_request);
 
     _batch_assembler.run([&]() {runFragmentedMessageAssembler();});
@@ -191,6 +193,7 @@ void MessageQueue::processReceived() {
         h.setReceive(std::vector<uint8_t>(_recv_data, _recv_data+msglen));
         h.tag = tag;
         h.source = source;
+        *_current_tag = h.tag;
         _callbacks.at(h.tag)(h);
     }
 
@@ -214,6 +217,7 @@ void MessageQueue::processSelfReceived() {
         h.tag = sh.tag;
         h.source = sh.dest;
         h.setReceive(std::move(*sh.data));
+        *_current_tag = h.tag;
         _callbacks.at(h.tag)(h);
         _send_done_callback(sh.id); // notify completion
     }
@@ -229,6 +233,7 @@ void MessageQueue::processAssembledReceived() {
 
             auto& h = _fused_queue.front();
             log(V5_DEBG, "MQ FUSED t=%i\n", h.tag);
+            *_current_tag = h.tag;
             _callbacks.at(h.tag)(h);
             
             if (h.getRecvData().size() > _max_msg_size) {

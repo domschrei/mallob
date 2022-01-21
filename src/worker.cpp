@@ -29,9 +29,9 @@
 Worker::Worker(MPI_Comm comm, Parameters& params) :
     _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
     _params(params), _job_db(_params, _comm, _sys_state), _sys_state(_comm, params.sysstatePeriod()), 
-    _watchdog(/*checkIntervMillis=*/200, Timer::elapsedSeconds())
+    _watchdog(/*checkIntervMillis=*/100, Timer::elapsedSeconds())
 {
-    _watchdog.setWarningPeriod(100); // warn after 0.1s without a reset
+    _watchdog.setWarningPeriod(50); // warn after 50ms without a reset
     _watchdog.setAbortPeriod(_params.watchdogAbortMillis()); // abort after X ms without a reset
 
     // Set callback which is called whenever a job's volume is updated
@@ -60,8 +60,12 @@ void Worker::init() {
         createExpanderGraph();
     }
 
-    // Begin listening to an incoming message
     auto& q = MyMpi::getMessageQueue();
+    
+    // Write tag of currently handled message into watchdog
+    q.setCurrentTagPointer(_watchdog.activityTag());
+
+    // Begin listening to incoming messages
     q.registerCallback(MSG_ANSWER_ADOPTION_OFFER,
         [&](auto& h) {handleAnswerAdoptionOffer(h);});
     q.registerCallback(MSG_NOTIFY_JOB_ABORTING, 
@@ -197,18 +201,22 @@ void Worker::advance(float time) {
 
     // Reset watchdog
     _watchdog.reset(time);
+    (*_watchdog.activityTag()) = 0;
     
     // Check & print stats
     if (_periodic_stats_check.ready(time)) {
+        _watchdog.setActivity(Watchdog::STATS);
         checkStats(time);
     }
 
     // Advance load balancing operations
     if (_periodic_balance_check.ready(time)) {
+        _watchdog.setActivity(Watchdog::BALANCING);
         _job_db.advanceBalancing(time);
 
         // Advance collective assignment of nodes
         if (_params.hopsUntilCollectiveAssignment() >= 0) {
+            _watchdog.setActivity(Watchdog::COLLECTIVE_ASSIGNMENT);
             _coll_assign.advance(_job_db.getGlobalBalancingEpoch());
         }
     }
@@ -217,9 +225,11 @@ void Worker::advance(float time) {
     if (_periodic_maintenance.ready(time)) {
         
         // Forget jobs that are old or wasting memory
+        _watchdog.setActivity(Watchdog::FORGET_OLD_JOBS);
         _job_db.forgetOldJobs();
 
         // Continue to bounce requests which were deferred earlier
+        _watchdog.setActivity(Watchdog::THAW_JOB_REQUESTS);
         for (auto& [req, senderRank] : _job_db.getDeferredRequestsToForward(time)) {
             bounceJobRequest(req, senderRank);
         }
@@ -227,13 +237,17 @@ void Worker::advance(float time) {
 
     // Check jobs
     if (_periodic_job_check.ready(time)) {
+        _watchdog.setActivity(Watchdog::CHECK_JOBS);
         checkJobs();
     }
 
     // Advance an all-reduction of the current system state
     if (_sys_state.aggregate(time)) {
+        _watchdog.setActivity(Watchdog::SYSSTATE);
         publishAndResetSysState();
     }
+
+    _watchdog.setActivity(Watchdog::IDLE_OR_HANDLING_MSG);
 }
 
 void Worker::checkStats(float time) {

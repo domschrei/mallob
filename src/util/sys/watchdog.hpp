@@ -10,8 +10,23 @@
 
 class Watchdog {
 
+public:
+    enum Activity {
+        IDLE_OR_HANDLING_MSG, 
+        STATS, 
+        BALANCING, 
+        COLLECTIVE_ASSIGNMENT, 
+        FORGET_OLD_JOBS, 
+        THAW_JOB_REQUESTS, 
+        CHECK_JOBS, 
+        SYSSTATE
+    };
+
 private:
     BackgroundWorker _worker;
+
+    Activity _activity;
+    int _activity_tag;
 
     std::atomic_int _last_reset_millis = 0;
     std::atomic_int _warning_period_millis = 0;
@@ -22,6 +37,10 @@ public:
     void setWarningPeriod(int periodMillis);
     void setAbortPeriod(int periodMillis);
     void reset(float time = Timer::elapsedSeconds());
+    inline void setActivity(Activity a) {
+        _activity = a;
+    }
+    int* activityTag() {return &_activity_tag;}
     void stop();
 };
 
