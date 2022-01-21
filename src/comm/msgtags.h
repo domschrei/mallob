@@ -17,17 +17,6 @@ Data type: JobRequest
 */
 const int MSG_REQUEST_NODE = 3;
 /*
-The receiver is queried to begin working as the i-th node of job j.
-The sender hopes that the receiver still remembers job j as the 
-receiver was associated with it in the past.
-Data type: JobRequest
-*/
-const int MSG_REQUEST_NODE_ONESHOT = 32;
-/*
-The sender declines a job request that was directed specifically to him.
-*/
-const int MSG_REJECT_ONESHOT = 33;
-/*
 The sender asks the receiver to become the sender's parent for some job j
 of which a corresponding child position was advertised.
 Data type: JobRequest
@@ -124,6 +113,17 @@ Tag for the job-internal, application-specific communication inside a job.
 The payload should contain another job-internal message tag.
 */
 const int MSG_SEND_APPLICATION_MESSAGE = 30;
+/*
+The receiver is queried to begin working as the i-th node of job j.
+The sender hopes that the receiver still remembers job j as the 
+receiver was associated with it in the past.
+Data type: JobRequest
+*/
+const int MSG_REQUEST_NODE_ONESHOT = 32;
+/*
+The sender declines a job request that was directed specifically to him.
+*/
+const int MSG_REJECT_ONESHOT = 33;
 /*
 The sender notifies the receiver that the job result the receiver just sent
 is obsolete and will not be needed. It does not need to be preserved.
