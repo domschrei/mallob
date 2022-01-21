@@ -167,7 +167,7 @@ private:
     std::optional<JobRequest> _commitment;
     int _balancing_epoch_of_last_commitment = -1;
     std::optional<JobResult> _result;
-    std::list<std::pair<int, int>> _waiting_rank_revision_pairs;
+    robin_hood::unordered_node_set<std::pair<int, int>, IntPairHasher> _waiting_rank_revision_pairs;
 
     JobTree _job_tree;
     JobComm _comm;
@@ -263,7 +263,9 @@ public:
     JobTree& getJobTree() {return _job_tree;}
     const JobTree& getJobTree() const {return _job_tree;}
     const JobComm& getJobComm() const {return _comm;}
-    std::list<std::pair<int, int>>& getWaitingRankRevisionPairs() {return _waiting_rank_revision_pairs;}
+    robin_hood::unordered_node_set<std::pair<int, int>, IntPairHasher>& getWaitingRankRevisionPairs() {
+        return _waiting_rank_revision_pairs;
+    }
 
     // Updates the job's resource usage based on the period of time which passed
     // since the last call (or the job's activation) and the old volume of the job,
@@ -311,7 +313,7 @@ public:
     LocalScheduler constructScheduler(std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq);
 
     // Marks the job to be indestructible as long as pending is true.
-    void addChildWaitingForRevision(int rank, int revision) {_waiting_rank_revision_pairs.emplace_back(rank, revision);}
+    void addChildWaitingForRevision(int rank, int revision) {_waiting_rank_revision_pairs.insert(std::pair<int, int>(rank, revision));}
     void setDesiredRevision(int revision) {_desired_revision = revision;}
     bool isRevisionSolved(int revision) {return _last_solved_revision >= revision;}
     void setRevisionSolved(int revision) {_last_solved_revision = revision;}

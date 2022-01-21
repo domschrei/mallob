@@ -348,9 +348,13 @@ void Worker::checkActiveJob() {
 
         // Handle child PEs waiting for the transfer of a revision of this job
         auto& waitingRankRevPairs = job.getWaitingRankRevisionPairs();
-        for (auto it = waitingRankRevPairs.begin(); it != waitingRankRevPairs.end(); ++it) {
+        auto it = waitingRankRevPairs.begin();
+        while (it != waitingRankRevPairs.end()) {
             auto& [rank, rev] = *it;
-            if (rev > job.getRevision()) continue;
+            if (rev > job.getRevision()) {
+                ++it;
+                continue;
+            }
             if (job.getJobTree().hasLeftChild() && job.getJobTree().getLeftChildNodeRank() == rank) {
                 // Left child
                 sendRevisionDescription(id, rev, rank);
@@ -360,7 +364,6 @@ void Worker::checkActiveJob() {
             } // else: obsolete request
             // Remove processed request
             it = waitingRankRevPairs.erase(it);
-            it--;
         }
     }
 
@@ -799,7 +802,14 @@ void Worker::handleSendJobDescription(MessageHandle& handle) {
         new std::vector<uint8_t>(handle.moveRecvData())
     );
     bool valid = _job_db.appendRevision(jobId, dataPtr, handle.source);
-    if (!valid) return;
+    if (!valid) {
+        // Need to clean up shared pointer concurrently 
+        // because it might take too much time in the main thread
+        ProcessWideThreadPool::get().addTask([sharedPtr = std::move(dataPtr)]() mutable {
+            sharedPtr.reset();
+        });
+        return;
+    }
 
     // If job has not started yet, execute it now
     if (_job_db.hasCommitment(jobId)) {
