@@ -170,9 +170,10 @@ void MessageQueue::processReceived() {
         auto key = std::pair<int, int>(source, id);
         
         if (!_fragmented_messages.count(key)) {
-            _fragmented_messages[key] = ReceiveFragment(source, id, tag);
+            _fragmented_messages.emplace(key, ReceiveFragment(source, id, tag));
         }
         auto& fragment = _fragmented_messages[key];
+
         fragment.receiveNext(source, tag, _recv_data, msglen);
 
         if (fragment.isFinished()) {

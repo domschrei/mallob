@@ -25,8 +25,8 @@ private:
     struct ReceiveFragment {
         
         int source = -1;
-        int id;
-        int tag;
+        int id = -1;
+        int tag = -1;
         int receivedFragments = 0;
         std::vector<DataPtr> dataFragments;
         
@@ -39,6 +39,7 @@ private:
             tag = moved.tag;
             receivedFragments = moved.receivedFragments;
             dataFragments = std::move(moved.dataFragments);
+            moved.id = -1;
         }
         ReceiveFragment& operator=(ReceiveFragment&& moved) {
             source = moved.source;
@@ -46,8 +47,11 @@ private:
             tag = moved.tag;
             receivedFragments = moved.receivedFragments;
             dataFragments = std::move(moved.dataFragments);
+            moved.id = -1;
             return *this;
         }
+
+        bool valid() {return id != -1;}
 
         static int readId(uint8_t* data, int msglen) {
             return * (int*) (data+msglen - 3*sizeof(int));
@@ -55,6 +59,7 @@ private:
 
         void receiveNext(int source, int tag, uint8_t* data, int msglen) {
             assert(this->source >= 0);
+            assert(valid());
 
             int id, sentBatch, totalNumBatches;
             // Read meta data from end of message
@@ -62,7 +67,9 @@ private:
             memcpy(&sentBatch,       data+msglen - 2*sizeof(int), sizeof(int));
             memcpy(&totalNumBatches, data+msglen - 1*sizeof(int), sizeof(int));
             msglen -= 3*sizeof(int);
-            
+
+            log(V4_VVER, "RECVB %i %i/%i %i\n", id, sentBatch+1, totalNumBatches, source);
+
             // Store data in fragments structure
             
             //log(V5_DEBG, "MQ STORE (%i,%i) %i/%i\n", source, id, sentBatch, totalNumBatches);
@@ -86,13 +93,14 @@ private:
         }
 
         bool isFinished() {
+            assert(valid());
             return receivedFragments == -1;
         }
     };
 
     struct SendHandle {
 
-        int id;
+        int id = -1;
         int dest;
         int tag;
         MPI_Request request = MPI_REQUEST_NULL;
@@ -110,8 +118,11 @@ private:
             totalNumBatches = data->size() <= sizePerBatch+3*sizeof(int) ? 1 
                 : std::ceil(data->size() / (float)sizePerBatch);
         }
+
+        bool valid() {return id != -1;}
         
         SendHandle(SendHandle&& moved) {
+            assert(moved.valid());
             id = moved.id;
             dest = moved.dest;
             tag = moved.tag;
@@ -122,10 +133,12 @@ private:
             sizePerBatch = moved.sizePerBatch;
             tempStorage = std::move(moved.tempStorage);
             
+            moved.id = -1;
             moved.data = DataPtr();
             moved.request = MPI_REQUEST_NULL;
         }
         SendHandle& operator=(SendHandle&& moved) {
+            assert(moved.valid());
             id = moved.id;
             dest = moved.dest;
             tag = moved.tag;
@@ -136,12 +149,14 @@ private:
             sizePerBatch = moved.sizePerBatch;
             tempStorage = std::move(moved.tempStorage);
             
+            moved.id = -1;
             moved.data = DataPtr();
             moved.request = MPI_REQUEST_NULL;
             return *this;
         }
 
         bool test() {
+            assert(valid());
             assert(request != MPI_REQUEST_NULL);
             int flag = false;
             MPI_Test(&request, &flag, MPI_STATUS_IGNORE);
@@ -151,6 +166,7 @@ private:
         bool isFinished() const {return sentBatches == totalNumBatches;}
 
         void sendNext() {
+            assert(valid());
             assert(!isFinished() || log_return_false("Handle (n=%i) already finished!\n", sentBatches));
             
             if (!isBatched()) {
@@ -176,8 +192,10 @@ private:
 
             MPI_Isend(tempStorage.data(), tempStorage.size(), MPI_BYTE, dest, 
                     tag+MSG_OFFSET_BATCHED, MPI_COMM_WORLD, &request);
+
             
             sentBatches++;
+            log(V4_VVER, "SENDB %i %i/%i %i\n", id, sentBatches, totalNumBatches, dest);
             //log(V5_DEBG, "MQ SEND BATCHED id=%i %i/%i\n", id, sentBatches, totalNumBatches);
         }
 
@@ -195,7 +213,7 @@ private:
     std::list<SendHandle> _self_recv_queue;
 
     // Fragmented messages stuff
-    robin_hood::unordered_map<std::pair<int, int>, ReceiveFragment, IntPairHasher> _fragmented_messages;
+    robin_hood::unordered_node_map<std::pair<int, int>, ReceiveFragment, IntPairHasher> _fragmented_messages;
     Mutex _fragmented_mutex;
     ConditionVariable _fragmented_cond_var;
     std::list<ReceiveFragment> _fragmented_queue;
