@@ -289,12 +289,13 @@ void Client::advance() {
     if (_sys_state.aggregate(time)) {
         float* result = _sys_state.getGlobal();
         int processed = (int)result[SYSSTATE_PROCESSED_JOBS];
-        int verb = (MyMpi::rank(_comm) == 0 ? V2_INFO : V5_DEBG);
-        log(verb, "sysstate entered=%i parsed=%i scheduled=%i processed=%i\n", 
-                    (int)result[SYSSTATE_ENTERED_JOBS], 
-                    (int)result[SYSSTATE_PARSED_JOBS], 
-                    (int)result[SYSSTATE_SCHEDULED_JOBS], 
-                    processed);
+        if (MyMpi::rank(_comm) == 0) {
+            LOG(V2_INFO, "sysstate entered=%i parsed=%i scheduled=%i processed=%i\n", 
+                (int)result[SYSSTATE_ENTERED_JOBS], 
+                (int)result[SYSSTATE_PARSED_JOBS], 
+                (int)result[SYSSTATE_SCHEDULED_JOBS], 
+                processed);
+        }
     }
 
     int jobLimit = _params.numJobs();

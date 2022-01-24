@@ -200,15 +200,15 @@ void EventDrivenBalancer::handleData(EventMap& data, int tag, bool checkedReady)
 
 void EventDrivenBalancer::digest(const EventMap& data) {
     
-    LOG(V4_VVER, "BLC DIGEST epoch=%ld size=%ld\n", data.getGlobalEpoch(), data.getEntries().size());
-    LOG(V4_VVER, "BLC DIGEST diff=%s\n", _diffs.toStr().c_str());
-    LOG(V4_VVER, "BLC DIGEST data=%s\n", data.toStr().c_str());
-    LOG(V4_VVER, "BLC DIGEST states_pre=%s\n", _states.toStr().c_str());
+    LOG(V5_DEBG, "BLC DIGEST epoch=%ld size=%ld\n", data.getGlobalEpoch(), data.getEntries().size());
+    LOG(V5_DEBG, "BLC DIGEST diff=%s\n", _diffs.toStr().c_str());
+    LOG(V5_DEBG, "BLC DIGEST data=%s\n", data.toStr().c_str());
+    LOG(V5_DEBG, "BLC DIGEST states_pre=%s\n", _states.toStr().c_str());
 
     _states.updateBy(data);
     _balancing_epoch = data.getGlobalEpoch();
 
-    LOG(V4_VVER, "BLC DIGEST states_post=%s\n", _states.toStr().c_str());
+    LOG(V5_DEBG, "BLC DIGEST states_post=%s\n", _states.toStr().c_str());
 
     computeBalancingResult();
 
@@ -216,7 +216,7 @@ void EventDrivenBalancer::digest(const EventMap& data) {
     size_t diffSize = _diffs.getEntries().size();
     _diffs.filterBy(_states);
 
-    LOG(V4_VVER, "BLC digest %i diffs, %i/%i local diffs remaining\n", 
+    LOG(V5_DEBG, "BLC digest %i diffs, %i/%i local diffs remaining\n", 
             data.getEntries().size(), _diffs.getEntries().size(), diffSize);
     _states.removeOldZeros();
 }
