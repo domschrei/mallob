@@ -629,6 +629,7 @@ std::optional<MessageHandle> JobDatabase::getArrivedFutureRequest() {
     for (auto& [epoch, msgs] : _future_request_msgs) {
         if (epoch <= presentEpoch) {
             // found a candidate message
+            assert(!msgs.empty());
             auto optHandle = std::optional<MessageHandle>(std::move(msgs.front()));
             msgs.pop_front();
             if (msgs.empty()) _future_request_msgs.erase(epoch);

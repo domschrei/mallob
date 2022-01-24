@@ -46,6 +46,7 @@ Worker::Worker(MPI_Comm comm, Parameters& params) :
             auto optHandle = _job_db.getArrivedFutureRequest();
             if (!optHandle.has_value()) break;
             auto& h = optHandle.value();
+            log(LOG_ADD_SRCRANK | V4_VVER, "From the future: tag=%i", h.source, h.tag);
             handleRequestNode(h, h.tag == MSG_REQUEST_NODE ? 
                 JobDatabase::JobRequestMode::NORMAL : 
                 JobDatabase::JobRequestMode::TARGETED_REJOIN);
@@ -583,6 +584,7 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
 
     if (req.balancingEpoch > _job_db.getGlobalBalancingEpoch()) {
         // Job request is "from the future": defer it until it is from the present
+        log(V4_VVER, "Defer future req. %s\n", req.toStr().c_str());
         _job_db.addFutureRequestMessage(req.balancingEpoch, std::move(handle));
         return;
     }
