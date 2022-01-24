@@ -175,7 +175,7 @@ void EventDrivenBalancer::handleData(EventMap& data, int tag, bool checkedReady)
     if (tag == MSG_REDUCE_DATA) {
         _diffs.updateBy(data);
         if (checkedReady || _periodic_balancing.ready()) {
-            if (isRoot(MyMpi::rank(MPI_COMM_WORLD))) {
+            if (isRoot(MyMpi::rank(_comm))) {
                 // Switch to broadcast, continue below @ other branch
                 _diffs.setGlobalEpoch(_balancing_epoch+1);
                 tag = MSG_BROADCAST_DATA;
@@ -188,9 +188,10 @@ void EventDrivenBalancer::handleData(EventMap& data, int tag, bool checkedReady)
         }
     } else if (tag == MSG_BROADCAST_DATA) {
         // Inner node: Broadcast further downwards
-        if (!isLeaf(MyMpi::rank(MPI_COMM_WORLD))) {
-            for (auto child : getChildRanks()) { // TODO inefficient calculation of children
-                MyMpi::isend(child, MSG_BROADCAST_DATA, data);
+        if (!isLeaf(MyMpi::rank(_comm))) {
+            const auto packed = data.serialize(); 
+            for (auto child : getChildRanks()) {
+                MyMpi::isendCopy(child, MSG_BROADCAST_DATA, packed);
             }
         }
         // Digest locally
@@ -224,7 +225,7 @@ void EventDrivenBalancer::digest(const EventMap& data) {
 void EventDrivenBalancer::computeBalancingResult() {
 
     float now = Timer::elapsedSeconds();
-    int rank = MyMpi::rank(MPI_COMM_WORLD);
+    int rank = MyMpi::rank(_comm);
     //int verb = rank == 0 ? V4_VVER : V6_DEBGV;
     _job_volumes.clear();
 

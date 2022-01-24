@@ -22,7 +22,7 @@ MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize),
 
     _current_tag = &_default_tag_var;
 
-    MPI_Irecv(_recv_data, maxMsgSize+20, MPI_BYTE, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &_recv_request);
+    resetReceiveHandle();
 
     _batch_assembler.run([&]() {runFragmentedMessageAssembler();});
     _gc.run([&]() {runGarbageCollector();});
@@ -178,6 +178,8 @@ void MessageQueue::processReceived() {
 
         fragment.receiveNext(source, tag, _recv_data, msglen);
 
+        resetReceiveHandle();
+
         if (fragment.isFinished()) {
             {
                 auto lock = _fragmented_mutex.getLock();
@@ -186,17 +188,24 @@ void MessageQueue::processReceived() {
             }
             _fragmented_cond_var.notify();
         }
-    } else {
-        // Single message
-        //log(V5_DEBG, "MQ singlerecv\n");
-        MessageHandle h;
-        h.setReceive(std::vector<uint8_t>(_recv_data, _recv_data+msglen));
-        h.tag = tag;
-        h.source = source;
-        *_current_tag = h.tag;
-        _callbacks.at(h.tag)(h);
+
+        return;
     }
 
+    // Single message
+    //log(V5_DEBG, "MQ singlerecv\n");
+    MessageHandle h;
+    h.setReceive(std::vector<uint8_t>(_recv_data, _recv_data+msglen));
+    h.tag = tag;
+    h.source = source;
+
+    resetReceiveHandle();
+
+    *_current_tag = h.tag;
+    _callbacks.at(h.tag)(h);
+}
+
+void MessageQueue::resetReceiveHandle() {
     // Reset recv handle
     //log(V5_DEBG, "MQ MPI_Irecv\n");
     MPI_Irecv(_recv_data, _max_msg_size+20, MPI_BYTE, MPI_ANY_SOURCE, 

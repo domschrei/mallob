@@ -261,6 +261,8 @@ private:
     void processSelfReceived();
     void processAssembledReceived();
     void processSent();
+
+    void resetReceiveHandle();
 };
 
 #endif
