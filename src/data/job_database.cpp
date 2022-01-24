@@ -631,7 +631,7 @@ std::list<MessageHandle> JobDatabase::getArrivedFutureRequests() {
         if (epoch <= presentEpoch) {
             // found a candidate message
             assert(!msgs.empty());
-            out.merge(std::move(msgs));
+            out.splice(out.end(), std::move(msgs));
             _future_request_msgs.erase(epoch);
         }
     }
