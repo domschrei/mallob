@@ -74,4 +74,6 @@ private:
 void log(int options, const char* str, ...);
 bool log_return_false(const char* str, ...);
 
+#include "logger_defs.h"
+
 #endif
