@@ -18,6 +18,7 @@ private:
     nlohmann::json _json_template;
     bool _valid = false;
 
+    int _job_counter = 1;
     BackgroundWorker _bg_worker;
     std::atomic_int _num_active_jobs = 0;
     Mutex _submit_mutex;
@@ -45,6 +46,7 @@ public:
         }
 
         _bg_worker.run([&]() {
+            std::string baseJobName = _json_template["name"];
             while (_bg_worker.continueRunning()) {
 
                 _submit_cond_var.wait(_submit_mutex, [&]() {
@@ -54,6 +56,7 @@ public:
                 if (!_bg_worker.continueRunning()) break;
 
                 while (_num_active_jobs < _params.activeJobsPerClient()) {
+                    _json_template["name"] = baseJobName + "-" + std::to_string(_job_counter++);
                     _num_active_jobs++;
                     _api.submit(_json_template, [&](nlohmann::json& result) {
                         _num_active_jobs--;

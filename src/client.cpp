@@ -37,10 +37,10 @@ void Client::readIncomingJobs() {
         // Wait for a nonempty incoming job queue
         _incoming_job_cond_var.wait(_incoming_job_lock, [&]() {
             return !_instance_reader.continueRunning() 
-                || (_num_incoming_jobs > 0 && _num_loaded_jobs < 32);
+                || (_num_incoming_jobs > 0 && _num_loaded_jobs < _params.loadedJobsPerClient());
         });
         if (!_instance_reader.continueRunning()) break;
-        if (_num_loaded_jobs >= 32) continue;
+        if (_num_loaded_jobs >= _params.loadedJobsPerClient()) continue;
 
         // Obtain lock, measure time
         auto lock = _incoming_job_lock.getLock();

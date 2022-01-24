@@ -46,6 +46,7 @@ OPT_INT(hopsBetweenBfs,                  "hbbfs", "hops-between-bfs",           
 OPT_INT(hopsUntilBfs,                    "hubfs", "hops-until-bfs",                   LARGE_INT, 0, MAX_INT,   "After a job request hopped this many times, perform a \"hill climbing\" BFS")
 OPT_INT(hopsUntilCollectiveAssignment,   "huca", "hops-until-collective-assignment",  0,    -1, LARGE_INT,     "After a job request hopped this many times, add it to collective negotiation of requests and idle nodes (0: immediately, -1: never");
 OPT_INT(jobCacheSize,                    "jc", "job-cache-size",                      4,    0, LARGE_INT,      "Size of job cache per PE for suspended yet unfinished job nodes")
+OPT_INT(loadedJobsPerClient,             "ljpc", "loaded-jobs-per-client",            32,   0, LARGE_INT,      "Limit for how many job descriptions each client is allowed to have loaded at the same time")
 OPT_INT(maxBfsDepth,                     "mbfsd", "max-bfs-depth",                    4,    0, LARGE_INT,      "Max. depth to explore with hill climbing BFS for job requests")
 OPT_INT(maxDemand,                       "md", "max-demand",                          0,    0, LARGE_INT,      "Limit any job's demand to this value")
 OPT_INT(maxIdleDistance,                 "mid", "max-idle-distance",                  0,    0, LARGE_INT,      "Propagate idle distance of workers up to this limit through worker graph to weight randomness in request bouncing")
