@@ -28,7 +28,7 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
         
         // Check and read essential fields from JSON
         if (!json.contains("user") || !json.contains("name")) {
-            _logger.log(V1_WARN, "[WARN] Job file missing essential field(s). Ignoring this file.\n");
+            LOGGER(_logger, V1_WARN, "[WARN] Job file missing essential field(s). Ignoring this file.\n");
             return DISCARD;
         }
         std::string user = json["user"].get<std::string>();
@@ -51,7 +51,7 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
 
         if (json.contains("interrupt") && json["interrupt"].get<bool>()) {
             if (!_job_name_to_id_rev.count(jobName)) {
-                _logger.log(V1_WARN, "[WARN] Cannot interrupt unknown job \"%s\"\n", jobName.c_str());
+                LOGGER(_logger, V1_WARN, "[WARN] Cannot interrupt unknown job \"%s\"\n", jobName.c_str());
                 return DISCARD;
             }
             auto [id, rev] = _job_name_to_id_rev.at(jobName);
@@ -72,7 +72,7 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
             // This is a new increment of a former job - assign SAME internal ID
             auto precursorName = json["precursor"].get<std::string>() + ".json";
             if (!_job_name_to_id_rev.count(precursorName)) {
-                _logger.log(V1_WARN, "[WARN] Unknown precursor job \"%s\"!\n", precursorName.c_str());
+                LOGGER(_logger, V1_WARN, "[WARN] Unknown precursor job \"%s\"!\n", precursorName.c_str());
                 return DISCARD;
             }
             auto [jobId, rev] = _job_name_to_id_rev[precursorName];
@@ -81,7 +81,7 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
             if (json.contains("done") && json["done"].get<bool>()) {
 
                 // Incremental job is notified to be done
-                _logger.log(V3_VERB, "Incremental job #%i is done\n", jobId);
+                LOGGER(_logger, V3_VERB, "Incremental job #%i is done\n", jobId);
                 _job_name_to_id_rev.erase(precursorName);
                 for (int rev = 0; rev <= _job_id_to_latest_rev[id]; rev++) {
                     _job_id_rev_to_image.erase(std::pair<int, int>(id, rev));
@@ -113,11 +113,11 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
                 _job_name_to_id_rev[jobName] = std::pair<int, int>(_running_id++, 0);
             auto pair = _job_name_to_id_rev[jobName];
             id = pair.first;
-            _logger.log(V3_VERB, "Mapping job \"%s\" to internal ID #%i\n", jobName.c_str(), id);
+            LOGGER(_logger, V3_VERB, "Mapping job \"%s\" to internal ID #%i\n", jobName.c_str(), id);
 
             // Was job already parsed before?
             if (_job_id_rev_to_image.count(std::pair<int, int>(id, 0))) {
-                _logger.log(V1_WARN, "[WARN] Modification of a file I already parsed! Ignoring.\n");
+                LOGGER(_logger, V1_WARN, "[WARN] Modification of a file I already parsed! Ignoring.\n");
                 return DISCARD;
             }
 
@@ -135,17 +135,17 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
     if (json.contains("wallclock-limit")) {
         float limit = TimePeriod(json["wallclock-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS);
         job->setWallclockLimit(limit);
-        _logger.log(V4_VVER, "Job #%i : wallclock time limit %.3f secs\n", id, limit);
+        LOGGER(_logger, V4_VVER, "Job #%i : wallclock time limit %.3f secs\n", id, limit);
     }
     if (json.contains("cpu-limit")) {
         float limit = TimePeriod(json["cpu-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS);
         job->setCpuLimit(limit);
-        _logger.log(V4_VVER, "Job #%i : CPU time limit %.3f CPU secs\n", id, limit);
+        LOGGER(_logger, V4_VVER, "Job #%i : CPU time limit %.3f CPU secs\n", id, limit);
     }
     if (json.contains("max-demand")) {
         int maxDemand = json["max-demand"].get<int>();
         job->setMaxDemand(maxDemand);
-        _logger.log(V4_VVER, "Job #%i : max demand %i\n", id, maxDemand);
+        LOGGER(_logger, V4_VVER, "Job #%i : max demand %i\n", id, maxDemand);
     }
     if (json.contains("assumptions")) {
         job->setPreloadedAssumptions(json["assumptions"].get<std::vector<int>>());
@@ -182,7 +182,7 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
         auto lock = _job_map_mutex.getLock();
         if (!_job_name_to_id_rev.count(name)) {
             _job_name_to_id_rev[name] = std::pair<int, int>(_running_id++, 0);
-            _logger.log(V3_VERB, "Forward mapping job \"%s\" to internal ID #%i\n", name.c_str(), _job_name_to_id_rev[name].first);
+            LOGGER(_logger, V3_VERB, "Forward mapping job \"%s\" to internal ID #%i\n", name.c_str(), _job_name_to_id_rev[name].first);
         }
         idDependencies.push_back(_job_name_to_id_rev[name].first); // TODO inexact: introduce dependencies for job revisions
     }
@@ -243,7 +243,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
     if (useSolutionFile) {
         ProcessWideThreadPool::get().addTask([solutionFile, sol = std::move(result.solution)]() {
             int fd = open(solutionFile.c_str(), O_WRONLY);
-            log(V4_VVER, "Writing solution: %i ints (%i,%i,...,%i,%i)\n", sol.size(), 
+            LOG(V4_VVER, "Writing solution: %i ints (%i,%i,...,%i,%i)\n", sol.size(), 
                 sol[0], sol[1], sol[sol.size()-2], sol[sol.size()-1]);
             int numWritten = 0;
             while (numWritten < sol.size()*sizeof(int)) {

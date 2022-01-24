@@ -31,7 +31,7 @@ public:
 
         // Valid file?
         if (!FileUtils::isRegularFile(jsonTemplateFile)) {
-            log(V1_WARN, "Job template file %s does not exist\n", jsonTemplateFile.c_str());        
+            LOG(V1_WARN, "Job template file %s does not exist\n", jsonTemplateFile.c_str());        
             return;
         }
 
@@ -41,7 +41,7 @@ public:
             i >> _json_template;
             _valid = true;
         } catch (const nlohmann::detail::parse_error& e) {
-            log(V1_WARN, "[WARN] Parse error on job template file %s: %s\n", 
+            LOG(V1_WARN, "[WARN] Parse error on job template file %s: %s\n", 
                 jsonTemplateFile.c_str(), e.what());
         }
 

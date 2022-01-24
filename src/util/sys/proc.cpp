@@ -81,7 +81,7 @@ Proc::RuntimeInfo Proc::getRuntimeInfo(pid_t pid, SubprocessMode mode) {
         info.residentSetSize += childInfo.residentSetSize;
         numChildren++;
     }
-    log(V5_DEBG, "%i : %i children\n", pid, numChildren);
+    LOG(V5_DEBG, "%i : %i children\n", pid, numChildren);
 
     return info;
 }

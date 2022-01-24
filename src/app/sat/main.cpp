@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
     
     auto log = getLog(params, config);
     pid_t pid = Proc::getPid();
-    log.log(V3_VERB, "Mallob SAT engine %s pid=%lu\n", MALLOB_VERSION, pid);
+    LOGGER(log, V3_VERB, "Mallob SAT engine %s pid=%lu\n", MALLOB_VERSION, pid);
     
     try {
         // Launch program
@@ -63,11 +63,11 @@ int main(int argc, char *argv[]) {
         p.run(); // does not return
 
     } catch (const std::exception &ex) {
-        log.log(V0_CRIT, "[ERROR] uncaught \"%s\"\n", ex.what());
+        LOGGER(log, V0_CRIT, "[ERROR] uncaught \"%s\"\n", ex.what());
         log.flush();
         Process::doExit(1);
     } catch (...) {
-        log.log(V0_CRIT, "[ERROR] uncaught exception\n");
+        LOGGER(log, V0_CRIT, "[ERROR] uncaught exception\n");
         log.flush();
         Process::doExit(1);
     }

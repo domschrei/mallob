@@ -36,7 +36,7 @@ MessageQueue::~MessageQueue() {
 
 void MessageQueue::registerCallback(int tag, const MsgCallback& cb) {
     if (_callbacks.count(tag)) {
-        log(V0_CRIT, "More than one callback for tag %i!\n", tag);
+        LOG(V0_CRIT, "More than one callback for tag %i!\n", tag);
         abort();
     }
     _callbacks[tag] = cb;
@@ -58,7 +58,7 @@ int MessageQueue::send(DataPtr data, int dest, int tag) {
         SendHandle handle(_running_send_id++, dest, tag, data, _max_msg_size);
 
         int msglen = handle.data->size();
-        log(V5_DEBG, "MQ SEND n=%i d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", handle.data->size(), dest, tag, 
+        LOG(V5_DEBG, "MQ SEND n=%i d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", handle.data->size(), dest, tag, 
             msglen>=1*sizeof(int) ? *(int*)(handle.data->data()) : 0, 
             msglen>=3*sizeof(int) ? *(int*)(handle.data->data()+msglen - 3*sizeof(int)) : 0, 
             msglen>=2*sizeof(int) ? *(int*)(handle.data->data()+msglen - 2*sizeof(int)) : 0, 
@@ -114,7 +114,7 @@ void MessageQueue::runFragmentedMessageAssembler() {
         size_t sumOfSizes = 0;
         for (size_t i = 0; i < data.dataFragments.size(); i++) {
             const auto& frag = data.dataFragments[i];
-            assert(frag || log_return_false("No valid fragment %i found!\n", i));
+            assert(frag || LOG_RETURN_FALSE("No valid fragment %i found!\n", i));
             sumOfSizes += frag->size();
         }
         std::vector<uint8_t> outData(sumOfSizes);
@@ -158,7 +158,7 @@ void MessageQueue::processReceived() {
     int tag = status.MPI_TAG;
     int msglen;
     MPI_Get_count(&status, MPI_BYTE, &msglen);
-    log(V5_DEBG, "MQ RECV n=%i s=[%i] t=%i c=(%i,...,%i,%i,%i)\n", msglen, source, tag, 
+    LOG(V5_DEBG, "MQ RECV n=%i s=[%i] t=%i c=(%i,...,%i,%i,%i)\n", msglen, source, tag, 
             msglen>=1*sizeof(int) ? *(int*)(_recv_data) : 0, 
             msglen>=3*sizeof(int) ? *(int*)(_recv_data+msglen - 3*sizeof(int)) : 0, 
             msglen>=2*sizeof(int) ? *(int*)(_recv_data+msglen - 2*sizeof(int)) : 0, 
@@ -232,7 +232,7 @@ void MessageQueue::processAssembledReceived() {
         while (!_fused_queue.empty() && consumed < 4) {
 
             auto& h = _fused_queue.front();
-            log(V5_DEBG, "MQ FUSED t=%i\n", h.tag);
+            LOG(V5_DEBG, "MQ FUSED t=%i\n", h.tag);
             *_current_tag = h.tag;
             _callbacks.at(h.tag)(h);
             
@@ -280,7 +280,7 @@ void MessageQueue::processSent() {
         // Batched?
         if (h.isBatched()) {
             // Batch of a large message sent
-            log(V5_DEBG, "MQ SENT id=%i %i/%i n=%i d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", h.id, h.sentBatches, 
+            LOG(V5_DEBG, "MQ SENT id=%i %i/%i n=%i d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", h.id, h.sentBatches, 
                 h.totalNumBatches, h.data->size(), h.dest, h.tag, 
                 *(int*)(h.tempStorage.data()), 
                 *(int*)(h.tempStorage.data()+h.tempStorage.size()-3*sizeof(int)), 

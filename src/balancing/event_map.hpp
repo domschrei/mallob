@@ -145,11 +145,11 @@ public:
                 auto& otherEv = otherMap.getEntries().at(jobId);
                 if (otherEv.epoch == ev.epoch) {
                     if (otherEv.priority != ev.priority) {
-                        log(V0_CRIT, "[ERROR] #%i e=%i : prio %.2f != %.2f!\n", jobId, ev.epoch, ev.priority, otherEv.priority);
+                        LOG(V0_CRIT, "[ERROR] #%i e=%i : prio %.2f != %.2f!\n", jobId, ev.epoch, ev.priority, otherEv.priority);
                         abort();
                     }
                     if (otherEv.demand != ev.demand) {
-                        log(V0_CRIT, "[ERROR] #%i e=%i : demand %i != %i!\n", jobId, ev.epoch, ev.demand, otherEv.demand);
+                        LOG(V0_CRIT, "[ERROR] #%i e=%i : demand %i != %i!\n", jobId, ev.epoch, ev.demand, otherEv.demand);
                         abort();
                     }
                 }

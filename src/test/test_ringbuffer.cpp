@@ -59,7 +59,7 @@ void testSPSCRingBuffer() {
     const int bufferSize = 128;
     const int numInsertions = 10000;
 
-    log(V2_INFO, "Testing spsc ringbuffer ...\n");
+    LOG(V2_INFO, "Testing spsc ringbuffer ...\n");
     SPSCRingBuffer<DataObj> r(bufferSize);
     std::thread producer([&r]() {
         int numInserted = 0;
@@ -70,10 +70,10 @@ void testSPSCRingBuffer() {
             o.c.resize(numInserted);
             if (r.produce(std::move(o))) {
                 numInserted++;
-                log(V2_INFO, "Prod.: %i\n", numInserted);
+                LOG(V2_INFO, "Prod.: %i\n", numInserted);
             }
         }
-        log(V2_INFO, "Prod.: Done!\n");
+        LOG(V2_INFO, "Prod.: Done!\n");
     });
 
     // Consume
@@ -83,23 +83,23 @@ void testSPSCRingBuffer() {
         if (opt.has_value()) {
             auto& o = opt.value();
             assert(o.c.size() == numConsumed
-                || log_return_false("%i != %i!\n", o.c.size(), numConsumed));
+                || LOG_RETURN_FALSE("%i != %i!\n", o.c.size(), numConsumed));
             numConsumed++;
         }
     }
-    log(V2_INFO, "Cons.: Done!\n");
+    LOG(V2_INFO, "Cons.: Done!\n");
 
     producer.join();
 
-    log(V2_INFO, "default constructed: %i\n", (int)numDefaultConstructed);
-    log(V2_INFO, "copy constructed: %i\n", (int)numCopyConstructed);
-    log(V2_INFO, "move constructed: %i\n", (int)numMoveConstructed);
-    log(V2_INFO, "copy assigned: %i\n", (int)numCopyAssigned);
-    log(V2_INFO, "move assigned: %i\n", (int)numMoveAssigned);
+    LOG(V2_INFO, "default constructed: %i\n", (int)numDefaultConstructed);
+    LOG(V2_INFO, "copy constructed: %i\n", (int)numCopyConstructed);
+    LOG(V2_INFO, "move constructed: %i\n", (int)numMoveConstructed);
+    LOG(V2_INFO, "copy assigned: %i\n", (int)numCopyAssigned);
+    LOG(V2_INFO, "move assigned: %i\n", (int)numMoveAssigned);
 }
 
 void testMixedRingbuffer() {
-    log(V2_INFO, "Testing mixed non-unit ringbuffer ...\n");
+    LOG(V2_INFO, "Testing mixed non-unit ringbuffer ...\n");
 
     MixedNonunitClauseRingBuffer r(20, 3);
 
@@ -109,7 +109,7 @@ void testMixedRingbuffer() {
         while (numInserted < 300) {
             if (r.insertClause(c, 0)) numInserted++;
         }
-        log(V2_INFO, "Prod. 1: Done!\n");
+        LOG(V2_INFO, "Prod. 1: Done!\n");
     });
     std::thread producer2([&r]() {
         int v[] = {-4, -5}; Clause c{v, 2, /*lbd=*/2};
@@ -117,7 +117,7 @@ void testMixedRingbuffer() {
         while (numInserted < 300) {
             if (r.insertClause(c, 1)) numInserted++;
         }
-        log(V2_INFO, "Prod. 2: Done!\n");
+        LOG(V2_INFO, "Prod. 2: Done!\n");
     });
     std::thread producer3([&r]() {
         int v[] = {-6, 7, -8, 9}; Clause c{v, 4, /*lbd=*/4};
@@ -125,7 +125,7 @@ void testMixedRingbuffer() {
         while (numInserted < 300) {
             if (r.insertClause(c, 2)) numInserted++;
         }
-        log(V2_INFO, "Prod. 3: Done!\n");
+        LOG(V2_INFO, "Prod. 3: Done!\n");
     });
 
     // Consume clauses
@@ -133,7 +133,7 @@ void testMixedRingbuffer() {
     int expectedSize = 300*5+300*4+300*6;
     while (clauses.size() < expectedSize) {
         bool success = r.getClause(clauses);
-        if (success) log(V3_VERB, "Read %i lits\n", clauses.size());
+        if (success) LOG(V3_VERB, "Read %i lits\n", clauses.size());
     }
     assert(clauses.size() == expectedSize);
 
@@ -141,12 +141,12 @@ void testMixedRingbuffer() {
     producer2.join();
     producer3.join();
 
-    for (int lit : clauses) log(LOG_NO_PREFIX | V4_VVER, "%i ", lit);
-    log(LOG_NO_PREFIX | V4_VVER, "\n");
+    for (int lit : clauses) LOG_OMIT_PREFIX(V4_VVER, "%i ", lit);
+    LOG_OMIT_PREFIX(V4_VVER, "\n");
 }
 
 void testUnitBuffer() {
-    log(V2_INFO, "Testing unit ringbuffer ...\n");
+    LOG(V2_INFO, "Testing unit ringbuffer ...\n");
     UnitClauseRingBuffer r(20, 4);
 
     std::vector<std::thread> threads;
@@ -164,7 +164,7 @@ void testUnitBuffer() {
         bool success = r.getUnits(buf);
         if (success) {
             numbers.insert(buf.begin(), buf.end());
-            log(V3_VERB, "Got %i units\n", numbers.size());
+            LOG(V3_VERB, "Got %i units\n", numbers.size());
         }
     }
 
@@ -175,7 +175,7 @@ void testUnitBuffer() {
 }
 
 void testUniformClauseBuffer() {
-    log(V2_INFO, "Testing uniform clause ringbuffer ...\n");
+    LOG(V2_INFO, "Testing uniform clause ringbuffer ...\n");
 
     int clauseSize = 10;
     int numThreads = 100;
@@ -194,19 +194,19 @@ void testUniformClauseBuffer() {
     while (out.size() < numThreads * 10 * clauseSize) {
         bool success = r.getClause(out);
         if (success) {
-            log(V3_VERB, "Got %i lits\n", out.size());
+            LOG(V3_VERB, "Got %i lits\n", out.size());
         }
     }
     assert(!r.getClause(out));
 
     for (auto& thread : threads) thread.join();
 
-    for (int lit : out) log(LOG_NO_PREFIX | V4_VVER, "%i ", lit);
-    log(LOG_NO_PREFIX | V4_VVER, "\n");
+    for (int lit : out) LOG_OMIT_PREFIX(V4_VVER, "%i ", lit);
+    LOG_OMIT_PREFIX(V4_VVER, "\n");
 }
 
 void testUniformSizeClauseBuffer() {
-    log(V2_INFO, "Testing uniform size clause ringbuffer ...\n");
+    LOG(V2_INFO, "Testing uniform size clause ringbuffer ...\n");
 
     int clauseSize = 10;
     int numThreads = 100;
@@ -228,15 +228,15 @@ void testUniformSizeClauseBuffer() {
         if (success) {
             assert(buf.size() == clauseSize+1);
             out.insert(out.end(), buf.begin(), buf.end());
-            log(V3_VERB, "Got %i lits\n", out.size());
+            LOG(V3_VERB, "Got %i lits\n", out.size());
         } else assert(buf.empty());
     }
     assert(!r.getClause(out));
 
     for (auto& thread : threads) thread.join();
 
-    for (int lit : out) log(LOG_NO_PREFIX | V4_VVER, "%i ", lit);
-    log(LOG_NO_PREFIX | V4_VVER, "\n");
+    for (int lit : out) LOG_OMIT_PREFIX(V4_VVER, "%i ", lit);
+    LOG_OMIT_PREFIX(V4_VVER, "\n");
 }
 
 int main() {

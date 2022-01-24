@@ -27,7 +27,7 @@ public:
             auto cb = [&conn](nlohmann::json& result) {
                 // Send result over the associated connection
                 bool sent = conn.send(result);
-                if (!sent) log(V1_WARN, "[WARN] IPC socket send unsuccessful!\n");
+                if (!sent) LOG(V1_WARN, "[WARN] IPC socket send unsuccessful!\n");
             };
             // Submit the request to the JSON interface
             auto result = interface.handle(json, cb);

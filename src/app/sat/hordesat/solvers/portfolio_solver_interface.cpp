@@ -46,7 +46,7 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 	_stats.histProduced = new ClauseHistogram(setup.strictClauseLengthLimit);
 	_stats.histDigested = new ClauseHistogram(setup.strictClauseLengthLimit);
 
-	_logger.log(V4_VVER, "Diversification index %i\n", getDiversificationIndex());
+	LOGGER(_logger, V4_VVER, "Diversification index %i\n", getDiversificationIndex());
 }
 
 void PortfolioSolverInterface::interrupt() {

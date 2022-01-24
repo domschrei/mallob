@@ -25,7 +25,7 @@ BufferReader::BufferReader(int* buffer, int size, int maxLbdPartitionedSize, boo
 const Mallob::Clause& BufferReader::endReading() {
     // Verify checksum
     if (_use_checksum && _hash != _true_hash) {
-        log(V0_CRIT, "[ERROR] Checksum fail\n");
+        LOG(V0_CRIT, "[ERROR] Checksum fail\n");
         abort();
     }
     _buffer = nullptr;

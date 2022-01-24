@@ -68,21 +68,21 @@ private:
             memcpy(&totalNumBatches, data+msglen - 1*sizeof(int), sizeof(int));
             msglen -= 3*sizeof(int);
 
-            log(V4_VVER, "RECVB %i %i/%i %i\n", id, sentBatch+1, totalNumBatches, source);
+            LOG(V4_VVER, "RECVB %i %i/%i %i\n", id, sentBatch+1, totalNumBatches, source);
 
             // Store data in fragments structure
             
             //log(V5_DEBG, "MQ STORE (%i,%i) %i/%i\n", source, id, sentBatch, totalNumBatches);
 
             assert(this->source == source);
-            assert(this->id == id || log_return_false("%i != %i\n", this->id, id));
+            assert(this->id == id || LOG_RETURN_FALSE("%i != %i\n", this->id, id));
             assert(this->tag == tag);
-            assert(sentBatch < totalNumBatches || log_return_false("Invalid batch %i/%i!\n", sentBatch, totalNumBatches));
+            assert(sentBatch < totalNumBatches || LOG_RETURN_FALSE("Invalid batch %i/%i!\n", sentBatch, totalNumBatches));
             if (sentBatch >= dataFragments.size()) dataFragments.resize(sentBatch+1);
-            assert(receivedFragments >= 0 || log_return_false("Batched message was already completed!\n"));
+            assert(receivedFragments >= 0 || LOG_RETURN_FALSE("Batched message was already completed!\n"));
 
             //log(V5_DEBG, "MQ STORE alloc\n");
-            assert(dataFragments[sentBatch] == nullptr || log_return_false("Batch %i/%i already present!\n", sentBatch, totalNumBatches));
+            assert(dataFragments[sentBatch] == nullptr || LOG_RETURN_FALSE("Batch %i/%i already present!\n", sentBatch, totalNumBatches));
             dataFragments[sentBatch].reset(new std::vector<uint8_t>(data, data+msglen));
             
             //log(V5_DEBG, "MQ STORE produce\n");
@@ -167,7 +167,7 @@ private:
 
         void sendNext() {
             assert(valid());
-            assert(!isFinished() || log_return_false("Handle (n=%i) already finished!\n", sentBatches));
+            assert(!isFinished() || LOG_RETURN_FALSE("Handle (n=%i) already finished!\n", sentBatches));
             
             if (!isBatched()) {
                 // Send first and only message
@@ -179,7 +179,7 @@ private:
 
             size_t begin = sentBatches*sizePerBatch;
             size_t end = std::min(data->size(), (size_t)(sentBatches+1)*sizePerBatch);
-            assert(end>begin || log_return_false("%ld <= %ld\n", end, begin));
+            assert(end>begin || LOG_RETURN_FALSE("%ld <= %ld\n", end, begin));
             size_t msglen = (end-begin)+3*sizeof(int);
             tempStorage.resize(msglen);
 
@@ -195,7 +195,7 @@ private:
 
             
             sentBatches++;
-            log(V4_VVER, "SENDB %i %i/%i %i\n", id, sentBatches, totalNumBatches, dest);
+            LOG(V4_VVER, "SENDB %i %i/%i %i\n", id, sentBatches, totalNumBatches, dest);
             //log(V5_DEBG, "MQ SEND BATCHED id=%i %i/%i\n", id, sentBatches, totalNumBatches);
         }
 

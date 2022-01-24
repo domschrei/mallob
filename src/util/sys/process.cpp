@@ -63,7 +63,7 @@ void Process::handleTerminationSignal(const SignalInfo& info) {
         if (Proc::getTid() == Process::_main_tid) {
             // Main thread: handle crash directly
             long tid = info.tid;
-            log(V0_CRIT, "[ERROR] pid=%ld tid=%ld signal=%d\n", 
+            LOG(V0_CRIT, "[ERROR] pid=%ld tid=%ld signal=%d\n", 
                     Proc::getPid(), tid, info.signum);
             // Try to write a trace of the concerned thread with gdb
             Process::writeTrace(tid);
@@ -109,7 +109,7 @@ pid_t Process::createChild() {
         _children.insert(res);
     } else if (res == -1) {
         // fork failed
-        log(V0_CRIT, "[ERROR] fork failed, errno %i\n", (int)errno);
+        LOG(V0_CRIT, "[ERROR] fork failed, errno %i\n", (int)errno);
         abort();
     }
 
@@ -148,7 +148,7 @@ void Process::forwardTerminateToChildren() {
 void Process::sendSignal(pid_t childpid, int signum) {
     int result = kill(childpid, signum);
     if (result == -1) {
-        log(V1_WARN, "[WARN] kill -%i %i returned -1\n", signum, childpid);
+        LOG(V1_WARN, "[WARN] kill -%i %i returned -1\n", signum, childpid);
     }
 }
 

@@ -66,7 +66,7 @@ void ForkedSatJob::loadIncrements() {
         _last_imported_revision++;
         size_t numLits = desc.getFormulaPayloadSize(_last_imported_revision);
         size_t numAssumptions = desc.getAssumptionsSize(_last_imported_revision);
-        log(V4_VVER, "%s : Forward rev. %i : %i lits, %i assumptions\n", toStr(), 
+        LOG(V4_VVER, "%s : Forward rev. %i : %i lits, %i assumptions\n", toStr(), 
                 _last_imported_revision, numLits, numAssumptions);
         revisions.emplace_back(HordeProcessAdapter::RevisionData {
             _last_imported_revision,
@@ -111,7 +111,7 @@ int ForkedSatJob::appl_solved() {
     if (status == HordeProcessAdapter::FOUND_RESULT) {
         auto solution = _solver->getSolution();
         result = solution.first;
-        log(LOG_ADD_DESTRANK | V2_INFO, "%s rev. %i : found result %s", getJobTree().getRootNodeRank(), toStr(), getRevision(), 
+        LOG_ADD_DEST(V2_INFO, "%s rev. %i : found result %s", getJobTree().getRootNodeRank(), toStr(), getRevision(), 
                             result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         _internal_result.id = getId();
         _internal_result.result = result;
@@ -175,14 +175,14 @@ bool ForkedSatJob::appl_wantsToBeginCommunication() {
 void ForkedSatJob::appl_beginCommunication() {
     if (!_initialized || getState() != ACTIVE) return;
     if (!checkClauseComm()) return;
-    log(V5_DEBG, "begincomm\n");
+    LOG(V5_DEBG, "begincomm\n");
     ((AnytimeSatClauseCommunicator*) _clause_comm)->sendClausesToParent();
 }
 
 void ForkedSatJob::appl_communicate(int source, JobMessage& msg) {
     if (!_initialized || getState() != ACTIVE) return;
     if (!checkClauseComm()) return;
-    log(V5_DEBG, "comm\n");
+    LOG(V5_DEBG, "comm\n");
     ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, msg);
     if (appl_wantsToBeginCommunication()) appl_beginCommunication();
 }
@@ -211,7 +211,7 @@ void ForkedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& chec
     if (!_initialized) return;
     _solver->digestClauses(clauses, checksum);
     if (getJobTree().isRoot()) {
-        log(V3_VERB, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
+        LOG(V3_VERB, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
     }
 }
 void ForkedSatJob::returnClauses(std::vector<int>& clauses) {
@@ -222,22 +222,22 @@ void ForkedSatJob::returnClauses(std::vector<int>& clauses) {
 void ForkedSatJob::startDestructThreadIfNecessary() {
     // Ensure concurrent destruction of shared memory
     if (!_destruction.valid() && !_shmem_freed) {
-        log(V4_VVER, "%s : FSJ freeing mem\n", toStr());
+        LOG(V4_VVER, "%s : FSJ freeing mem\n", toStr());
         _destruction = ProcessWideThreadPool::get().addTask([this]() {
             _solver->waitUntilChildExited();
             _solver->freeSharedMemory();
-            log(V4_VVER, "%s : FSJ mem freed\n", toStr());
+            LOG(V4_VVER, "%s : FSJ mem freed\n", toStr());
             _shmem_freed = true;
         });
     }
 }
 
 ForkedSatJob::~ForkedSatJob() {
-    log(V5_DEBG, "%s : enter FSJ destructor\n", toStr());
+    LOG(V5_DEBG, "%s : enter FSJ destructor\n", toStr());
 
     if (_initialized) _solver->setSolvingState(SolvingStates::ABORTING);
     if (_destruction.valid()) _destruction.get();
     if (_initialized) _solver = NULL;
 
-    log(V5_DEBG, "%s : destructed FSJ\n", toStr());
+    LOG(V5_DEBG, "%s : destructed FSJ\n", toStr());
 }

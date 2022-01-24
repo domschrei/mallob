@@ -34,19 +34,19 @@ int cbCheckTerminate(void* solverPtr) {
 	lp->lastTermCallbackTime = Timer::elapsedSeconds();
     
 	if (lp->stopSolver) {
-		lp->_logger.log(V3_VERB, "STOP (%.2fs since last cb)", elapsed);
+		lp->LOGGER(_logger, V3_VERB, "STOP (%.2fs since last cb)", elapsed);
 		return 1;
 	}
 
     if (lp->suspendSolver) {
         // Stay inside this function call as long as solver is suspended
-		lp->_logger.log(V3_VERB, "SUSPEND (%.2fs since last cb)", elapsed);
+		lp->LOGGER(_logger, V3_VERB, "SUSPEND (%.2fs since last cb)", elapsed);
 
 		lp->suspendCond.wait(lp->suspendMutex, [&lp]{return !lp->suspendSolver;});
-		lp->_logger.log(V4_VVER, "RESUME");
+		lp->LOGGER(_logger, V4_VVER, "RESUME");
 
 		if (lp->stopSolver) {
-			lp->_logger.log(V4_VVER, "STOP after suspension", elapsed);
+			lp->LOGGER(_logger, V4_VVER, "STOP after suspension", elapsed);
 			return 1;
 		}
     }
@@ -258,7 +258,7 @@ void Lingeling::doConsume(int** clause, int* glue) {
 		int lit = c.begin[i];
 		//str += std::to_string(lit) + " ";
 		assert(i == 0 || std::abs(lit) <= maxvar 
-			|| log_return_false("ERROR: tried to import lit %i (max. var: %i)!\n", lit, maxvar));
+			|| LOG_RETURN_FALSE("ERROR: tried to import lit %i (max. var: %i)!\n", lit, maxvar));
 		zeroTerminatedClause[i] = lit;
 	}
 	zeroTerminatedClause[c.size] = 0;

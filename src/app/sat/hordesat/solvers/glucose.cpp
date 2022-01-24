@@ -276,7 +276,7 @@ void MGlucose::parallelExportUnaryClause(Glucose::Lit p) {
 	std::vector<int> vcls;
 	int lit = decodeLit(p);
 	assert(lit != 0);
-	assert(std::abs(lit) <= maxvar || log_return_false("Literal %i exported!\n", lit));
+	assert(std::abs(lit) <= maxvar || LOG_RETURN_FALSE("Literal %i exported!\n", lit));
 	Clause c{&lit, 1, 1};
 	numProduced++;
 	learnedClauseCallback(c, getLocalId());
@@ -322,7 +322,7 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 	for (int j = 0; j < c.size(); j++) {
 		vcls[j] = decodeLit(c[j]);
 		assert(vcls[j] != 0);
-		assert(std::abs(vcls[j]) <= maxvar || log_return_false("Literal %i/%i exported!\n", vcls[j], maxvar));
+		assert(std::abs(vcls[j]) <= maxvar || LOG_RETURN_FALSE("Literal %i/%i exported!\n", vcls[j], maxvar));
 	}
 	
 	// export clause

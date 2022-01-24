@@ -117,7 +117,7 @@ private:
         if (_deferred.empty()) return;
         std::vector<Mallob::Clause> copiedVec(_deferred.begin(), _deferred.end());
         _deferred.clear();
-        log(V2_INFO, "bulk add deferred cls, size %i\n", copiedVec.size());
+        LOG(V2_INFO, "bulk add deferred cls, size %i\n", copiedVec.size());
         _cdb.bulkAddClauses(0, copiedVec, _deferred, _stats);
         for (auto& cls : copiedVec) free(cls.begin);
     }

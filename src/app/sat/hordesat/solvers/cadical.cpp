@@ -35,7 +35,7 @@ void Cadical::diversify(int seed) {
 
 	// Options may only be set in the initialization phase, so the seed cannot be re-set
 	if (!seedSet) {
-		_logger.log(V3_VERB, "Diversifying %i\n", getDiversificationIndex());
+		LOGGER(_logger, V3_VERB, "Diversifying %i\n", getDiversificationIndex());
 		bool okay = solver->set("seed", seed);
 		assert(okay);
 		switch (getDiversificationIndex() % getNumOriginalDiversifications()) {

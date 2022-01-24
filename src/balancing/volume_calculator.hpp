@@ -22,7 +22,7 @@ private:
     std::vector<BalancingEntry> _zero_entries;
     int _epoch;
     int _num_workers;
-    int _verbosity;
+    bool _logging;
 
     double _sum_of_priorities = 0;
     int _available_volume = 0;
@@ -39,17 +39,18 @@ private:
     int _max_volume_diff_between_bounds = 0;
 
 public:
-    VolumeCalculator(const EventMap& events, Parameters& params, int numWorkers, int verbosity) : 
-            _params(params), _epoch(events.getGlobalEpoch()), _num_workers(numWorkers), _verbosity(verbosity) {
+    VolumeCalculator(const EventMap& events, Parameters& params, int numWorkers, bool logging) : 
+            _params(params), _epoch(events.getGlobalEpoch()), _num_workers(numWorkers),
+            _logging(logging) {
 
         // For each event
-        log(_verbosity, "BLC Collecting %i entries\n", events.getEntries().size());
+        if (_logging) LOG(V5_DEBG, "BLC Collecting %i entries\n", events.getEntries().size());
         _entries.reserve(events.getEntries().size());
         for (const auto& [jobId, ev] : events.getEntries()) {
             assert(ev.demand >= 0);
             if (ev.demand == 0) _zero_entries.emplace_back(ev.jobId, ev.demand, ev.priority); // job has no demand
             else {
-                assert((ev.priority > 0) || log_return_false("#%i has priority %.2f!\n", ev.jobId, ev.priority));
+                assert((ev.priority > 0) || LOG_RETURN_FALSE("#%i has priority %.2f!\n", ev.jobId, ev.priority));
                 _entries.emplace_back(ev.jobId, ev.demand, ev.priority);
                 _sum_of_priorities += ev.priority;
             }
@@ -61,9 +62,9 @@ public:
     void calculateResult() {
 
         // Check if there are enough workers for the active jobs
-        log(_verbosity, "BLC #av=%i #j=%i\n", _available_volume, _entries.size());
+        if (_logging) LOG(V5_DEBG, "BLC #av=%i #j=%i\n", _available_volume, _entries.size());
         if (_available_volume <= _entries.size()) {
-            log(_verbosity, "BLC too many jobs, bailing out\n");
+            if (_logging) LOG(V5_DEBG, "BLC too many jobs, bailing out\n");
             return;
         }
 
@@ -132,10 +133,10 @@ private:
             _max_multiplier = std::max(_max_multiplier, ub);
             _sum_of_demands += job.demand;
 
-            assert(1 == job.getVolume(1 / job.fairShare) || log_return_false("ERROR #%i 1 != %i\n", job.jobId, job.getVolume(1 / job.fairShare)));
+            assert(1 == job.getVolume(1 / job.fairShare) || LOG_RETURN_FALSE("ERROR #%i 1 != %i\n", job.jobId, job.getVolume(1 / job.fairShare)));
             assert(job.demand == job.getVolume(job.demand / job.fairShare + EPSILON) 
-                || log_return_false("ERROR #%i %i != %i\n", job.jobId, job.demand, job.getVolume(job.demand / job.fairShare)));
-            log(_verbosity+1, "BLC #%i : fair share %.3f\n", job.jobId, job.fairShare);
+                || LOG_RETURN_FALSE("ERROR #%i %i != %i\n", job.jobId, job.demand, job.getVolume(job.demand / job.fairShare)));
+            if (_logging) LOG(V6_DEBGV, "BLC #%i : fair share %.3f\n", job.jobId, job.fairShare);
         }
 
         _max_multiplier += EPSILON;
@@ -154,12 +155,14 @@ private:
         double upper = _max_multiplier; // All demands are fully assigned -> OVERutilization or best you can do
         double mid = 1; // Except for pathological cases, a factor of 1 is a pretty good initialization
         double best;
-        log(_verbosity, "BLC Finding opt. multiplier, starting range [%.4f, %.4f]\n", lower, upper);
+        if (_logging) LOG(V5_DEBG, "BLC Finding opt. multiplier, starting range [%.4f, %.4f]\n", lower, upper);
 
         int bestExcess = -1;
         int excessAtLeft = _available_volume - _entries.size(); // needed for base case
+        int numIterations = 0;
         while (true) {
 
+            numIterations++;
             int excess = calculateExcessVolumeOrNegative(mid, lower, upper);
 
             // Update best excess found so far, if necessary
@@ -182,16 +185,14 @@ private:
                 excess = excessAtLeft;
                 int numRemainingJobs = _entries.size() - _num_dismissed_jobs;
 
-                log(_verbosity, "BLC trying finalization at multiplier %.6f, excess %i, %i jobs remaining\n", 
-                    best, excess, numRemainingJobs);
 
                 assert(numRemainingJobs > 0);
                 int stillAvailable = excess;
                 assert(stillAvailable > 0);
                 
-                log(_verbosity, "BLC Distributing v=%i over %i remaining jobs\n", 
-                    stillAvailable, numRemainingJobs);
-
+                if (_logging) LOG(V4_VVER, "BLC FINALIZE %.6f it=%i excess=%i, V=%i J=%i\n", 
+                    best, numIterations, excess, stillAvailable, numRemainingJobs);
+                
                 // Sort the remaining jobs here because they may have been
                 // shuffled by dismissed jobs in earlier iterations.
                 // TODO QuickSelect could be used instead to find the "threshold job"
@@ -233,7 +234,7 @@ private:
 
         // "Perfect" multiplier to use
         double fairShareMultiplier = best;
-        log(_verbosity, "BLC found multiplier %.6f (excess %i)\n", best, (int)bestExcess);
+        if (_logging) LOG(V4_VVER, "BLC FINALIZED alpha=%.6f excess=%i\n", best, (int)bestExcess);
     }
 
     int calculateExcessVolumeOrNegative(double fairShareMultiplier, double left, double right) {
@@ -281,7 +282,7 @@ private:
             }
         }
 
-        log(_verbosity, "BLC util @ multiplier %.6f : %i (%i jobs left)\n", fairShareMultiplier, utilization, 
+        if (_logging) LOG(V5_DEBG, "BLC util @ multiplier %.6f : %i (%i jobs left)\n", fairShareMultiplier, utilization, 
             _entries.size()-_num_dismissed_jobs);
         _prev_lb = left;
         _prev_ub = right;

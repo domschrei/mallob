@@ -50,7 +50,7 @@ public:
         memcpy(msg+sizeof(int), serializedJson.c_str(), payloadSize);
         
         int size = ::send(_connection_fd, msg, msgSize, 0);
-        log(V5_DEBG, "Sending msg len=%i/%i \"%s\"\n", size, msgSize, serializedJson.c_str());
+        LOG(V5_DEBG, "Sending msg len=%i/%i \"%s\"\n", size, msgSize, serializedJson.c_str());
         return size >= 0;
     }
     
@@ -114,7 +114,7 @@ public:
 
                 //fullStringAsInts = fullStringAsInts.substr(0, fullStringAsInts.size()-1);
                 
-                log(V5_DEBG, "Received msg len=%i/%i \"%s\"\n", msgStr.size(), size, msgStr.c_str());
+                LOG(V5_DEBG, "Received msg len=%i/%i \"%s\"\n", msgStr.size(), size, msgStr.c_str());
                 
                 // Attempt to parse JSON
                 try {
@@ -125,7 +125,7 @@ public:
                     break;
 
                 } catch (const nlohmann::detail::parse_error& e) {
-                    log(V1_WARN, "[WARN] Parse error on \"%s\": %s\n", msgStr.c_str(), e.what());
+                    LOG(V1_WARN, "[WARN] Parse error on \"%s\": %s\n", msgStr.c_str(), e.what());
                 }
             }
         }

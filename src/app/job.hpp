@@ -223,7 +223,7 @@ public:
     // Getter methods and simple queries
 
     JobState getState() const {return _state;};
-    void assertState(JobState state) const {assert(_state == state || log_return_false("State of %s : %s\n", toStr(), jobStateToStr()));};
+    void assertState(JobState state) const {assert(_state == state || LOG_RETURN_FALSE("State of %s : %s\n", toStr(), jobStateToStr()));};
     int getVolume() const {return _volume;}
     float getPriority() const {return _priority;}
     JobDescription::Application getApplication() const {return _appl;}
@@ -295,7 +295,7 @@ public:
             || (hasDescription() && getDescription().getCpuLimit() > 0 && 
                 usedCpuSecs > getDescription().getCpuLimit())) {
             // Job exceeded its cpu time limit
-            log(V2_INFO, "#%i CPU TIMEOUT: aborting\n", _id);
+            LOG(V2_INFO, "#%i CPU TIMEOUT: aborting\n", _id);
             return true;
         }
 
@@ -303,7 +303,7 @@ public:
             || (hasDescription() && getDescription().getWallclockLimit() > 0 && 
                 usedWcSecs > getDescription().getWallclockLimit())) {
             // Job exceeded its wall clock time limit
-            log(V2_INFO, "#%i WALLCLOCK TIMEOUT: aborting\n", _id);
+            LOG(V2_INFO, "#%i WALLCLOCK TIMEOUT: aborting\n", _id);
             return true;
         }
 

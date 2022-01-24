@@ -72,7 +72,7 @@ public:
     static void init(size_t size) {pool = new ThreadPool(size);}
     static ThreadPool& get() {
         if (pool == nullptr) {
-            log(V0_CRIT, "[ERROR] Process-wide thread pool was requested, but is not initialized!\n");
+            LOG(V0_CRIT, "[ERROR] Process-wide thread pool was requested, but is not initialized!\n");
             exit(1);
         }
         return *pool;

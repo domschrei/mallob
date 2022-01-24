@@ -75,7 +75,7 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 	buffer[0] = used-1;
 
 	if (used >= size) {
-		logger.log(-1, "ERROR: vip clauses exceeded the buffer size.");
+		LOGGER(logger, V0_CRIT, "ERROR: vip clauses exceeded the buffer size.");
 		addClauseLock.unlock();
 		*selectedCount = 0;
 		return used;
@@ -111,9 +111,9 @@ unsigned int ClauseDatabase::giveSelection(int* buffer, unsigned int size, int* 
 	addClauseLock.unlock();
 	int all = fitting + notFitting;
 	if (all > 0) {
-		logger.log(V5_DEBG, "%d fit %d (%d%%) didn't \n", fitting, notFitting, notFitting*100/(all));
+		LOGGER(logger, V5_DEBG, "%d fit %d (%d%%) didn't \n", fitting, notFitting, notFitting*100/(all));
 	} else {
-		logger.log(V5_DEBG, "no clauses\n");
+		LOGGER(logger, V5_DEBG, "no clauses\n");
 	}
 	if (selectedCount != NULL) {
 		*selectedCount = fitting;
@@ -157,12 +157,12 @@ int* ClauseDatabase::getNextIncomingClause(int& size) {
 		remainingClsOfCurrentSize = incomingBuffer[currentPos++];
 	}
 	if (remainingClsOfCurrentSize <= 0) {
-		logger.log(-1, "ERROR: %i remaining clauses of size %i at position %i\nBuffer:", remainingClsOfCurrentSize, currentSize, currentPos);
+		LOGGER(logger, V0_CRIT, "ERROR: %i remaining clauses of size %i at position %i\nBuffer:", remainingClsOfCurrentSize, currentSize, currentPos);
 		std::string buffer;
 		for (size_t i = 0; i < bufferSize; i++) {
 			buffer += " " + std::to_string(incomingBuffer[i]);
 		}
-		logger.log(-1, "%s\n", buffer.c_str());
+		LOGGER(logger, V0_CRIT, "%s\n", buffer.c_str());
 		logger.flush();
         abort();
 	}

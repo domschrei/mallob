@@ -68,7 +68,7 @@ public:
 
         std::vector<int> subscribersToDelete;
         for (auto& [rank, subscription] : _subscribers) {
-            log(V4_VVER, "CLSHIST %s Subscriber [%i]: [%i,%i) %i/%i\n", _job.toStr(), subscription.correspondingRank, 
+            LOG(V4_VVER, "CLSHIST %s Subscriber [%i]: [%i,%i) %i/%i\n", _job.toStr(), subscription.correspondingRank, 
                 subscription.nextIndex, subscription.endIndex, 
                 subscription.nextIndex < _history.size() ? _history[subscription.nextIndex].numAggregated() : 0, _aggregation_factor);
 
@@ -82,7 +82,7 @@ public:
             msg.tag = MSG_CLAUSE_HISTORY_SEND_CLAUSES;
             msg.payload = _history[subscription.nextIndex].clauses.at(0);
             if (_use_checksums) setChecksum(msg);
-            log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Send batch of index %i", rank, _job.toStr(), subscription.nextIndex);
+            LOG_ADD_DEST(V4_VVER, "CLSHIST %s Send batch of index %i", rank, _job.toStr(), subscription.nextIndex);
             
             if (rank == MyMpi::rank(MPI_COMM_WORLD)) {
                 // message to self: digest clauses directly
@@ -95,7 +95,7 @@ public:
             subscription.nextIndex++;
             if (subscription.nextIndex >= subscription.endIndex) {
                 // Erase completed subscription
-                log(V4_VVER, "CLSHIST %s Subscription [%i] finished\n", _job.toStr(), rank);    
+                LOG(V4_VVER, "CLSHIST %s Subscription [%i] finished\n", _job.toStr(), rank);    
                 subscribersToDelete.push_back(rank);
             }
         }
@@ -117,7 +117,7 @@ public:
         msg.payload.push_back(_subscription.endIndex);
         if (_use_checksums) setChecksum(msg);
         MyMpi::isend(_subscription.correspondingRank, MSG_SEND_APPLICATION_MESSAGE, msg);
-        log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Subscribe for indices [%i,%i)", _subscription.correspondingRank, _job.toStr(), 
+        LOG_ADD_DEST(V4_VVER, "CLSHIST %s Subscribe for indices [%i,%i)", _subscription.correspondingRank, _job.toStr(), 
             msg.payload[0], msg.payload[1]);
     }
 
@@ -125,8 +125,8 @@ public:
     void addEpoch(int epoch, std::vector<int>& clauses, bool entireIndex) {
         auto [index, offset] = epochToIndexAndOffset(epoch);
 
-        if (entireIndex) log(V4_VVER, "CLSHIST Received cls, index %i\n", index);
-        else log(V4_VVER, "CLSHIST Received cls, epoch %i\n", epoch);
+        if (entireIndex) LOG(V4_VVER, "CLSHIST Received cls, index %i\n", index);
+        else LOG(V4_VVER, "CLSHIST Received cls, epoch %i\n", epoch);
         
         // Insert clauses into history vector
         bool alreadyPresent = entireIndex ? isBatchComplete(index) : isEpochPresent(epoch);
@@ -155,14 +155,14 @@ public:
             
             if (isBatchComplete(index)) {
                 // Merge with prior clauses at that index
-                log(V4_VVER, "CLSHIST Merging index ...\n");
+                LOG(V4_VVER, "CLSHIST Merging index ...\n");
                 auto merger = _cdb.getBufferMerger();
                 for (auto& clsbuf : _history[index].clauses)
                     merger.add(_cdb.getBufferReader(clsbuf.data(), clsbuf.size(), /*useChecksums=*/false));
                 auto merged = merger.merge(isShorttermMemory(index) ? _stm_buffer_size : _ltm_buffer_size);
                 _history[index].clauses.resize(1);
                 _history[index].clauses[0] = std::move(merged);
-                log(V3_VERB, "CLSHIST %s : Merged index %i (epochs %i..%i) into buf size %i\n", 
+                LOG(V3_VERB, "CLSHIST %s : Merged index %i (epochs %i..%i) into buf size %i\n", 
                     _job.toStr(), index, indexToFirstEpoch(index), indexToFirstEpoch(index+1)-1, 
                     _history[index].clauses[0].size());
             }
@@ -235,7 +235,7 @@ public:
             for (auto [from, to] : _missing_epoch_ranges) {
                 out += "[" + std::to_string(from) + "," + std::to_string(to) + ") ";
             }
-            log(V4_VVER, "CLSHIST %s missing ranges: %s\n", _job.toStr(), out.c_str());
+            LOG(V4_VVER, "CLSHIST %s missing ranges: %s\n", _job.toStr(), out.c_str());
         }
         /*
         std::string out = "";
@@ -246,19 +246,19 @@ public:
             }
             out += "]";
         }
-        log(V4_VVER, "CLSHIST history flagfield: %s\n", out.c_str());
+        LOG(V4_VVER, "CLSHIST history flagfield: %s\n", out.c_str());
         */
     }
 
     // Reaction to MSG_CLAUSE_HISTORY_SUBSCRIBE
     void onSubscribe(int source, int beginIndex, int endIndex) {
-        log(V4_VVER, "CLSHIST %s [%i] subscribed\n", _job.toStr(), source);
+        LOG(V4_VVER, "CLSHIST %s [%i] subscribed\n", _job.toStr(), source);
         _subscribers[source] = Subscription{source, beginIndex, endIndex};
     }
 
     // Reaction to MSG_CLAUSE_HISTORY_UNSUBSCRIBE
     void onUnsubscribe(int source) {
-        log(V4_VVER, "CLSHIST %s [%i] unsubscribed\n", _job.toStr(), source);
+        LOG(V4_VVER, "CLSHIST %s [%i] unsubscribed\n", _job.toStr(), source);
         _subscribers.erase(source);
     }
 
@@ -272,7 +272,7 @@ public:
             msg.tag = MSG_CLAUSE_HISTORY_UNSUBSCRIBE;
             if (_use_checksums) setChecksum(msg);
             MyMpi::isend(_subscription.correspondingRank, MSG_SEND_APPLICATION_MESSAGE, msg);
-            log(LOG_ADD_DESTRANK | V4_VVER, "CLSHIST %s Unsubscribe", _subscription.correspondingRank, _job.toStr());
+            LOG_ADD_DEST(V4_VVER, "CLSHIST %s Unsubscribe", _subscription.correspondingRank, _job.toStr());
             _subscription = Subscription();
         }
     }
@@ -280,7 +280,7 @@ public:
     void feedHistoryIntoSolver() {
         int myRank = MyMpi::rank(MPI_COMM_WORLD);
         int lastIndex = epochToIndexAndOffset(_latest_epoch).first + 1;
-        log(V4_VVER, "CLSHIST %s self-subscribing [%i,%i]\n", _job.toStr(), 0, lastIndex);
+        LOG(V4_VVER, "CLSHIST %s self-subscribing [%i,%i]\n", _job.toStr(), 0, lastIndex);
         _subscribers[myRank] = Subscription{myRank, 0, lastIndex};
     }
 

@@ -45,10 +45,10 @@ EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params) : _
         }
     }
 
-    log(V5_DEBG, "BLC_TREE parent: %i\n", getParentRank());
-    log(V5_DEBG, "BLC_TREE children: ");
-    for (int child : getChildRanks()) log(LOG_NO_PREFIX | V5_DEBG, "%i ", child);
-    log(LOG_NO_PREFIX | V5_DEBG, ".\n");
+    LOG(V5_DEBG, "BLC_TREE parent: %i\n", getParentRank());
+    LOG(V5_DEBG, "BLC_TREE children: ");
+    for (int child : getChildRanks()) LOG_OMIT_PREFIX(V5_DEBG, "%i ", child);
+    LOG_OMIT_PREFIX(V5_DEBG, ".\n");
 }
 
 void EventDrivenBalancer::setVolumeUpdateCallback(std::function<void(int, int, float)> callback) {
@@ -130,7 +130,7 @@ void EventDrivenBalancer::onTerminate(const Job& job) {
     if (!latencies.empty()) {
         std::sort(latencies.begin(), latencies.end());
         float avgLatency = std::accumulate(latencies.begin(), latencies.end(), 0.0f) / latencies.size();
-        log(V3_VERB, "%s balancing latency={num:%i min:%.5f med:%.5f avg:%.5f max:%.5f}\n", 
+        LOG(V3_VERB, "%s balancing latency={num:%i min:%.5f med:%.5f avg:%.5f max:%.5f}\n", 
             job.toStr(), latencies.size(), latencies.front(), latencies[latencies.size()/2], avgLatency, latencies.back());
     }
     _balancing_latencies.erase(job.getId());
@@ -147,7 +147,7 @@ void EventDrivenBalancer::pushEvent(const Event& event, bool recordLatency) {
         if (recordLatency) {
             _pending_entries[event.jobId] = std::pair<int, float>(event.epoch, Timer::elapsedSeconds());
         }
-        log(V1_WARN, "BLC insert (%i,%i,%.3f)\n", event.jobId, event.demand, event.priority);
+        LOG(V1_WARN, "BLC insert (%i,%i,%.3f)\n", event.jobId, event.demand, event.priority);
         advance();
     }
 }
@@ -200,15 +200,15 @@ void EventDrivenBalancer::handleData(EventMap& data, int tag, bool checkedReady)
 
 void EventDrivenBalancer::digest(const EventMap& data) {
     
-    log(V4_VVER, "BLC DIGEST epoch=%ld size=%ld\n", data.getGlobalEpoch(), data.getEntries().size());
-    log(V4_VVER, "BLC DIGEST diff=%s\n", _diffs.toStr().c_str());
-    log(V4_VVER, "BLC DIGEST data=%s\n", data.toStr().c_str());
-    log(V4_VVER, "BLC DIGEST states_pre=%s\n", _states.toStr().c_str());
+    LOG(V4_VVER, "BLC DIGEST epoch=%ld size=%ld\n", data.getGlobalEpoch(), data.getEntries().size());
+    LOG(V4_VVER, "BLC DIGEST diff=%s\n", _diffs.toStr().c_str());
+    LOG(V4_VVER, "BLC DIGEST data=%s\n", data.toStr().c_str());
+    LOG(V4_VVER, "BLC DIGEST states_pre=%s\n", _states.toStr().c_str());
 
     _states.updateBy(data);
     _balancing_epoch = data.getGlobalEpoch();
 
-    log(V4_VVER, "BLC DIGEST states_post=%s\n", _states.toStr().c_str());
+    LOG(V4_VVER, "BLC DIGEST states_post=%s\n", _states.toStr().c_str());
 
     computeBalancingResult();
 
@@ -216,7 +216,7 @@ void EventDrivenBalancer::digest(const EventMap& data) {
     size_t diffSize = _diffs.getEntries().size();
     _diffs.filterBy(_states);
 
-    log(V4_VVER, "BLC digest %i diffs, %i/%i local diffs remaining\n", 
+    LOG(V4_VVER, "BLC digest %i diffs, %i/%i local diffs remaining\n", 
             data.getEntries().size(), _diffs.getEntries().size(), diffSize);
     _states.removeOldZeros();
 }
@@ -225,14 +225,14 @@ void EventDrivenBalancer::computeBalancingResult() {
 
     float now = Timer::elapsedSeconds();
     int rank = MyMpi::rank(MPI_COMM_WORLD);
-    int verb = rank == 0 ? V4_VVER : V6_DEBGV;
+    //int verb = rank == 0 ? V4_VVER : V6_DEBGV;
     _job_volumes.clear();
 
     if (_states.isEmpty()) return;
 
-    log(verb, "BLC: calc result\n");
+    if (rank == 0) LOG(V5_DEBG, "BLC: calc result\n");
 
-    VolumeCalculator calc(_states, _params, MyMpi::size(_comm), verb);
+    VolumeCalculator calc(_states, _params, MyMpi::size(_comm), /*logging=*/rank == 0);
     calc.calculateResult();
 
     std::string msg = "";
@@ -268,7 +268,7 @@ void EventDrivenBalancer::computeBalancingResult() {
             _volume_update_callback(entry.jobId, 0, 0);
     }
     
-    log(verb-1, "BLC RESULT %s\n", msg.c_str());
+    if (rank == 0) LOG(V5_DEBG, "BLC RESULT %s\n", msg.c_str());
     if (_balancing_done_callback) _balancing_done_callback();
 }
 

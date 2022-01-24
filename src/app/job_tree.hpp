@@ -209,11 +209,11 @@ public:
     const std::vector<float>& getDesireLatencies() const {return _desire_latencies;}
     
     void setWaitingForReactivation(int epoch) {
-        log(V5_DEBG, "RBS WAIT\n");
+        LOG(V5_DEBG, "RBS WAIT\n");
         _wait_epoch = std::max(_wait_epoch, epoch);
     }
     void stopWaitingForReactivation(int epoch) {
-        if (_stop_wait_epoch < epoch) log(V5_DEBG, "RBS STOPWAIT\n");
+        if (_stop_wait_epoch < epoch) LOG(V5_DEBG, "RBS STOPWAIT\n");
         _stop_wait_epoch = std::max(_stop_wait_epoch, epoch);
     }
     bool isWaitingForReactivation() const {
@@ -237,7 +237,7 @@ private:
         _sum_desire_latencies += elapsed;
         _desire_latencies.push_back(elapsed);
         if (elapsed > 0.1) {
-            log(V4_VVER, "LATENCY %.4f born: %.4f\n", elapsed, member);
+            LOG(V4_VVER, "LATENCY %.4f born: %.4f\n", elapsed, member);
         }
         member = -1; // no desire any more
     }

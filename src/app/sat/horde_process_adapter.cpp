@@ -37,7 +37,7 @@ void HordeProcessAdapter::doWriteRevisions() {
                 _revisions_to_write.erase(_revisions_to_write.begin());
                 _num_revisions_to_write--;
             }
-            log(V4_VVER, "DBG Writing next revision\n");
+            LOG(V4_VVER, "DBG Writing next revision\n");
             auto revStr = std::to_string(revData.revision);
             createSharedMemoryBlock("fsize."       + revStr, sizeof(size_t),              (void*)&revData.fSize);
             createSharedMemoryBlock("asize."       + revStr, sizeof(size_t),              (void*)&revData.aSize);
@@ -45,7 +45,7 @@ void HordeProcessAdapter::doWriteRevisions() {
             createSharedMemoryBlock("assumptions." + revStr, sizeof(int) * revData.aSize, (void*)revData.aLits);
             createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
             _written_revision = revData.revision;
-            log(V4_VVER, "DBG Done writing next revision %i\n", revData.revision);
+            LOG(V4_VVER, "DBG Done writing next revision %i\n", revData.revision);
         }
         auto lock = _revisions_mutex.getLock();
         _bg_writer_running = false;
@@ -131,7 +131,7 @@ void HordeProcessAdapter::doInitialize() {
         int result = execvp(argv[0], argv);
         
         // If this is reached, something went wrong with execvp
-        log(V0_CRIT, "[ERROR] execvp returned %i with errno %i\n", result, (int)errno);
+        LOG(V0_CRIT, "[ERROR] execvp returned %i with errno %i\n", result, (int)errno);
         abort();
     }
 
@@ -261,9 +261,9 @@ HordeProcessAdapter::SubprocessStatus HordeProcessAdapter::check() {
     if (Process::didChildExit(_child_pid, &exitStatus) && exitStatus != 0) {
         // Child exited!
         if (exitStatus == SIGUSR2) {
-            log(V3_VERB, "Restarting non-incremental child %ld\n", _child_pid);
+            LOG(V3_VERB, "Restarting non-incremental child %ld\n", _child_pid);
         } else {
-            log(V1_WARN, "[WARN] Child %ld exited unexpectedly (status %i)\n", _child_pid, exitStatus);
+            LOG(V1_WARN, "[WARN] Child %ld exited unexpectedly (status %i)\n", _child_pid, exitStatus);
         }
         // Notify to restart solver engine
         return CRASHED;

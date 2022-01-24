@@ -63,7 +63,7 @@ public:
         }
 
         assert(_buffer[_current_pos] != 0 || 
-            log_return_false("ERROR: Buffer is zero @ pos %i/%i (bucket (%i,%i))!\n", 
+            LOG_RETURN_FALSE("ERROR: Buffer is zero @ pos %i/%i (bucket (%i,%i))!\n", 
                 _current_pos, _size, _bucket.size, _bucket.lbd));
 
         if (_use_checksum) {

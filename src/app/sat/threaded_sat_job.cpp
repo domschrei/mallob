@@ -112,7 +112,7 @@ int ThreadedSatJob::appl_solved() {
     // Did a solver find a result?
     if (result >= 0) {
         _done_locally = true;
-        log(LOG_ADD_DESTRANK | V2_INFO, "%s : found result %s", getJobTree().getRootNodeRank(), toStr(), 
+        LOG_ADD_DEST(V2_INFO, "%s : found result %s", getJobTree().getRootNodeRank(), toStr(), 
                             result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         _result_code = result;
 
@@ -134,7 +134,7 @@ void ThreadedSatJob::appl_dumpStats() {
         if (threadTids[i] < 0) continue;
         double cpuRatio; float sysShare;
         bool ok = Proc::getThreadCpuRatio(threadTids[i], cpuRatio, sysShare);
-        if (ok) log(V3_VERB, "%s td.%ld cpuratio=%.3f sys=%.3f\n", 
+        if (ok) LOG(V3_VERB, "%s td.%ld cpuratio=%.3f sys=%.3f\n", 
                 toStr(), threadTids[i], cpuRatio, 100*sysShare);
     }
 }
@@ -153,13 +153,13 @@ bool ThreadedSatJob::appl_wantsToBeginCommunication() {
 
 void ThreadedSatJob::appl_beginCommunication() {
     if (!_initialized || getState() != ACTIVE) return;
-    log(V5_DEBG, "begincomm\n");
+    LOG(V5_DEBG, "begincomm\n");
     ((AnytimeSatClauseCommunicator*) _clause_comm)->sendClausesToParent();
 }
 
 void ThreadedSatJob::appl_communicate(int source, JobMessage& msg) {
     if (!_initialized || getState() != ACTIVE) return;
-    log(V5_DEBG, "comm\n");
+    LOG(V5_DEBG, "comm\n");
     ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, msg);
     if (appl_wantsToBeginCommunication()) appl_beginCommunication();
 }
@@ -190,7 +190,7 @@ void ThreadedSatJob::resetLastCommTime() {
 void ThreadedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& checksum) {
     _solver->digestSharing(clauses, checksum);
     if (getJobTree().isRoot()) {
-        log(V3_VERB, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
+        LOG(V3_VERB, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
     }
 }
 
@@ -200,8 +200,8 @@ void ThreadedSatJob::returnClauses(std::vector<int>& clauses) {
 
 ThreadedSatJob::~ThreadedSatJob() {
     if (!_initialized) return;
-    log(V5_DEBG, "%s : enter TSJ destructor\n", toStr());
+    LOG(V5_DEBG, "%s : enter TSJ destructor\n", toStr());
     if (!_destroy_future.valid()) appl_terminate();
     _destroy_future.get();
-    log(V5_DEBG, "%s : destructed TSJ\n", toStr());
+    LOG(V5_DEBG, "%s : destructed TSJ\n", toStr());
 }

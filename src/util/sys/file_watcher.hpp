@@ -51,7 +51,7 @@ public:
         FileUtils::mkdir(_directory);
         _inotify_fd = inotify_init();
         if (_inotify_fd < 0) {
-            logger.log(V0_CRIT, "[ERROR] Failed to set up inotify, errno %i\n", errno);
+            LOGGER(logger, V0_CRIT, "[ERROR] Failed to set up inotify, errno %i\n", errno);
             logger.flush();
             abort();
         }
@@ -65,7 +65,7 @@ public:
             // Initialize watcher
             _inotify_wd = inotify_add_watch(_inotify_fd, _directory.c_str(), events);
             if (_inotify_wd < 0) {
-                logger.log(V0_CRIT, "[ERROR] Failed to add inotify watch, errno %i\n", errno);
+                LOGGER(logger, V0_CRIT, "[ERROR] Failed to add inotify watch, errno %i\n", errno);
                 logger.flush();
                 abort();
             }
@@ -92,7 +92,7 @@ public:
                     const auto filenameStr = _directory + "/" + entry;
                     if (FileUtils::isRegularFile(filenameStr)) {
                         // Trigger CREATE event
-                        //logger.log(V4_VVER, "FileWatcher: File event\n");
+                        //LOGGER(logger, V4_VVER, "FileWatcher: File event\n");
                         ProcessWideThreadPool::get().addTask([this, entry, &sublogger] () {
                             _callback(FileWatcher::Event{IN_MOVED_FROM, entry}, sublogger);
                         });
@@ -121,7 +121,7 @@ public:
                     // digest event
                     inotify_event* event = (inotify_event*) &buffer[i];
                     Event ev{event->mask, std::string(event->name, event->len)};
-                    //logger.log(V4_VVER, "FileWatcher: File event\n");
+                    //LOGGER(logger, V4_VVER, "FileWatcher: File event\n");
                     ProcessWideThreadPool::get().addTask([this, ev, &sublogger] () {_callback(ev, sublogger);});
                     i += eventSize + event->len;
                 }

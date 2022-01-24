@@ -19,19 +19,19 @@ void test() {
         for (size_t i = 0; i < 1; i++) filters.push_back(new AtomicWideBitset(NUM_BITS));
         time = Timer::elapsedSeconds() - time;
         auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::FLAT);
-        log(V2_INFO, "AtomicWideBitset initialization took %.5fs, RSS %.3f\n", time, info.residentSetSize);
+        LOG(V2_INFO, "AtomicWideBitset initialization took %.5fs, RSS %.3f\n", time, info.residentSetSize);
         
         time = Timer::elapsedSeconds();
         for (size_t i = 0; i < numSets; i++) {
             filters.back()->set((int) (Random::rand()*NUM_BITS));
         }
         time = Timer::elapsedSeconds() - time;
-        log(V2_INFO, "AtomicWideBitset set took %.8fs\n", time/numSets);
+        LOG(V2_INFO, "AtomicWideBitset set took %.8fs\n", time/numSets);
 
         time = Timer::elapsedSeconds();
         filters.back()->reset();
         time = Timer::elapsedSeconds() - time;
-        log(V2_INFO, "AtomicWideBitset reset took %.5fs\n", time);
+        LOG(V2_INFO, "AtomicWideBitset reset took %.5fs\n", time);
         
         delete filters.back();
     }
@@ -41,18 +41,18 @@ void test() {
         for (size_t i = 0; i < 1; i++) filters.push_back(new atomicbitvector::atomic_bv_t(NUM_BITS));
         time = Timer::elapsedSeconds() - time;
         auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::FLAT);
-        log(V2_INFO, "atomicbitvector::atomic_bv_t initialization took %.5fs, RSS %.3f\n", time, info.residentSetSize);
+        LOG(V2_INFO, "atomicbitvector::atomic_bv_t initialization took %.5fs, RSS %.3f\n", time, info.residentSetSize);
         time = Timer::elapsedSeconds();
         for (size_t i = 0; i < numSets; i++) {
             filters.back()->set((int) (Random::rand()*NUM_BITS));
         }
         time = Timer::elapsedSeconds() - time;
-        log(V2_INFO, "atomicbitvector::atomic_bv_t set took %.8fs\n", time/numSets);
+        LOG(V2_INFO, "atomicbitvector::atomic_bv_t set took %.8fs\n", time/numSets);
 
         time = Timer::elapsedSeconds();
         filters.back()->reset();
         time = Timer::elapsedSeconds() - time;
-        log(V2_INFO, "atomicbitvector::atomic_bv_t reset took %.5fs\n", time);
+        LOG(V2_INFO, "atomicbitvector::atomic_bv_t reset took %.5fs\n", time);
         
         delete filters.back();
     }
@@ -62,18 +62,18 @@ void test() {
         for (size_t i = 0; i < 1; i++) filters.push_back(new std::bitset<NUM_BITS>());
         time = Timer::elapsedSeconds() - time;
         auto info = Proc::getRuntimeInfo(Proc::getPid(), Proc::FLAT);
-        log(V2_INFO, "std::bitset initialization took %.5fs, RSS %.3f\n", time, info.residentSetSize);
+        LOG(V2_INFO, "std::bitset initialization took %.5fs, RSS %.3f\n", time, info.residentSetSize);
         time = Timer::elapsedSeconds();
         for (size_t i = 0; i < numSets; i++) {
             filters.back()->set((int) (Random::rand()*NUM_BITS));
         }
         time = Timer::elapsedSeconds() - time;
-        log(V2_INFO, "std::bitset set took %.8fs\n", time/numSets);
+        LOG(V2_INFO, "std::bitset set took %.8fs\n", time/numSets);
 
         time = Timer::elapsedSeconds();
         filters.back()->reset();
         time = Timer::elapsedSeconds() - time;
-        log(V2_INFO, "std::bitset reset took %.5fs\n", time);
+        LOG(V2_INFO, "std::bitset reset took %.5fs\n", time);
         
         delete filters.back();
     }

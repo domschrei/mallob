@@ -34,7 +34,7 @@ public:
         FileUtils::mkdir(_base_path + "/in/");
         FileUtils::mkdir(_base_path + "/out/");
 
-        _logger.log(V2_INFO, "operational at %s\n", _base_path.c_str());
+        LOGGER(_logger, V2_INFO, "operational at %s\n", _base_path.c_str());
     }
     ~FilesystemConnector() {}
 
@@ -47,7 +47,7 @@ public:
 
         // Valid file?
         if (!FileUtils::isRegularFile(eventFile)) {
-            log.log(V3_VERB, "Job file %s does not exist (any more)\n", eventFile.c_str());        
+            LOGGER(log, V3_VERB, "Job file %s does not exist (any more)\n", eventFile.c_str());        
             return; // File does not exist (any more)
         }
 
@@ -76,7 +76,7 @@ public:
             FileUtils::rm(eventFile);
 
         } catch (const nlohmann::detail::parse_error& e) {
-            log.log(V1_WARN, "[WARN] Parse error on %s: %s\n", eventFile.c_str(), e.what());
+            LOGGER(log, V1_WARN, "[WARN] Parse error on %s: %s\n", eventFile.c_str(), e.what());
             return;
         }
     }

@@ -87,7 +87,7 @@ public:
         msg.request = req;
         auto packed = msg.serialize();
         for (int rank : _my_successors) {
-            log(LOG_ADD_DESTRANK | V5_DEBG, "BFS (d=%i) query", rank, msg.depth);
+            LOG_ADD_DEST(V5_DEBG, "BFS (d=%i) query", rank, msg.depth);
             MyMpi::isend(rank, MSG_REQUEST_IDLE_NODE_BFS, std::move(packed));
         }
     }
@@ -109,7 +109,7 @@ public:
                     // This message comes from an equally deep or deeper parent
                     // than the previous message: Just send back negative answer
                     msg.answer = -1;
-                    log(LOG_ADD_DESTRANK | V5_DEBG, "BFS (d=%i) answer %i", handle.source, msg.depth, msg.answer);
+                    LOG_ADD_DEST(V5_DEBG, "BFS (d=%i) answer %i", handle.source, msg.depth, msg.answer);
                     MyMpi::isend(handle.source, MSG_ANSWER_IDLE_NODE_BFS, msg);
                     return;
                 }
@@ -132,7 +132,7 @@ public:
             } else {
                 // Explore successor nodes
                 for (int rank : _my_successors) {
-                    log(LOG_ADD_DESTRANK | V5_DEBG, "BFS (d=%i) query %s", rank, msg.depth, msg.request.toStr().c_str());
+                    LOG_ADD_DEST(V5_DEBG, "BFS (d=%i) query %s", rank, msg.depth, msg.request.toStr().c_str());
                     MyMpi::isend(rank, MSG_REQUEST_IDLE_NODE_BFS, msg);
                 }
             }
@@ -144,7 +144,7 @@ public:
             // Past, obsolete BFS? Discard.
             if (!_open_searches.count(msg.request) || _open_searches[msg.request].depth != msg.depth
                 || _open_searches[msg.request].completed) {
-                log(LOG_ADD_SRCRANK | V5_DEBG, "Obsolete BFS %s", handle.source, msg.request.toStr().c_str());
+                LOG_ADD_SRC(V5_DEBG, "Obsolete BFS %s", handle.source, msg.request.toStr().c_str());
                 return;
             }
 
@@ -173,7 +173,7 @@ public:
                 _result_callback(msg.request, _open_searches[msg.request].answer);
             } else {
                 // Go back to predecessor node
-                log(LOG_ADD_DESTRANK | V5_DEBG, "BFS (d=%i) answer %i", parent, msg.depth, msg.answer);
+                LOG_ADD_DEST(V5_DEBG, "BFS (d=%i) answer %i", parent, msg.depth, msg.answer);
                 MyMpi::isend(parent, MSG_ANSWER_IDLE_NODE_BFS, msg);
             }
         }

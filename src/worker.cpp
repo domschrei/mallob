@@ -46,7 +46,7 @@ Worker::Worker(MPI_Comm comm, Parameters& params) :
             auto optHandle = _job_db.getArrivedFutureRequest();
             if (!optHandle.has_value()) break;
             auto& h = optHandle.value();
-            log(LOG_ADD_SRCRANK | V4_VVER, "From the future: tag=%i", h.source, h.tag);
+            LOG_ADD_SRC(V4_VVER, "From the future: tag=%i", h.source, h.tag);
             handleRequestNode(h, h.tag == MSG_REQUEST_NODE ? 
                 JobDatabase::JobRequestMode::NORMAL : 
                 JobDatabase::JobRequestMode::TARGETED_REJOIN);
@@ -110,7 +110,7 @@ void Worker::init() {
     q.registerCallback(MSG_SCHED_NODE_FREED, 
         [&](auto& h) {handleSchedNodeFreed(h);});
     q.registerCallback(MSG_WARMUP, [&](auto& h) {
-        log(LOG_ADD_SRCRANK | V4_VVER, "Received warmup msg", h.source);
+        LOG_ADD_SRC(V4_VVER, "Received warmup msg", h.source);
     });
     
     // Balancer message handling
@@ -142,7 +142,7 @@ void Worker::init() {
         IntVec payload({1, 2, 3, 4, 5, 6, 7, 8});
         for (auto rank : _hop_destinations) {
             MyMpi::isend(rank, MSG_WARMUP, payload);
-            log(LOG_ADD_DESTRANK | V4_VVER, "Sending warmup msg", rank);
+            LOG_ADD_DEST(V4_VVER, "Sending warmup msg", rank);
             MyMpi::getMessageQueue().advance();
         }
     }
@@ -157,8 +157,8 @@ void Worker::createExpanderGraph() {
     // Check validity of num bounce alternatives
     if (2*numBounceAlternatives > numWorkers) {
         numBounceAlternatives = std::max(1, numWorkers / 2);
-        log(V1_WARN, "[WARN] Num bounce alternatives must be at most half the number of workers!\n");
-        log(V1_WARN, "[WARN] Falling back to safe value r=%i.\n", numBounceAlternatives);
+        LOG(V1_WARN, "[WARN] Num bounce alternatives must be at most half the number of workers!\n");
+        LOG(V1_WARN, "[WARN] Falling back to safe value r=%i.\n", numBounceAlternatives);
     }  
 
     // Create graph, get outgoing edges from this node
@@ -191,7 +191,7 @@ void Worker::createExpanderGraph() {
     for (size_t i = 0; i < _hop_destinations.size(); i++) {
         info += std::to_string(_hop_destinations[i]) + " ";
     }
-    log(V3_VERB, "My bounce alternatives: %s\n", info.c_str());
+    LOG(V3_VERB, "My bounce alternatives: %s\n", info.c_str());
     assert((int)_hop_destinations.size() == numBounceAlternatives);
 }
 
@@ -257,7 +257,7 @@ void Worker::checkStats(float time) {
     if (_node_stats_calculated.load(std::memory_order_acquire)) {
         
         _sys_state.setLocal(SYSSTATE_GLOBALMEM, _node_memory_gbs);
-        log(V4_VVER, "mem=%.2fGB mt_cpu=%.3f mt_sys=%.3f\n", _node_memory_gbs, _mainthread_cpu_share, _mainthread_sys_share);
+        LOG(V4_VVER, "mem=%.2fGB mt_cpu=%.3f mt_sys=%.3f\n", _node_memory_gbs, _mainthread_cpu_share, _mainthread_sys_share);
 
         // Recompute stats for next query time
         // (concurrently because computation of PSS is expensive)
@@ -284,7 +284,7 @@ void Worker::checkStats(float time) {
                 for (size_t i = 0; i < job.getJobComm().size(); i++) {
                     commStr += " " + std::to_string(job.getJobComm()[i]);
                 }
-                if (!commStr.empty()) log(V4_VVER, "%s job comm:%s\n", job.toStr(), commStr.c_str());
+                if (!commStr.empty()) LOG(V4_VVER, "%s job comm:%s\n", job.toStr(), commStr.c_str());
             }
         }
     }
@@ -346,7 +346,7 @@ void Worker::checkActiveJob() {
                 auto resultStruct = job.getResult();
                 auto key = std::pair<int, int>(id, resultStruct.revision);
                 payload = IntVec({id, resultStruct.revision, result});
-                log(LOG_ADD_DESTRANK | V4_VVER, "%s rev. %i: sending finished info", jobRootRank, job.toStr(), key.second);
+                LOG_ADD_DEST(V4_VVER, "%s rev. %i: sending finished info", jobRootRank, job.toStr(), key.second);
                 _pending_results[key] = std::move(resultStruct);
             }
             MyMpi::isend(jobRootRank, MSG_NOTIFY_RESULT_FOUND, payload);
@@ -388,21 +388,21 @@ void Worker::checkActiveJob() {
 
 void Worker::publishAndResetSysState() {
 
-    float* result = _sys_state.getGlobal();
-    int verb = (_world_rank == 0 ? V2_INFO : V5_DEBG);
+    if (_world_rank == 0) {
+        float* result = _sys_state.getGlobal();
+        int numDesires = result[SYSSTATE_NUMDESIRES];
+        int numFulfilledDesires = result[SYSSTATE_NUMFULFILLEDDESIRES];
+        float ratioFulfilled = numDesires <= 0 ? 0 : (float)numFulfilledDesires / numDesires;
+        float latency = numFulfilledDesires <= 0 ? 0 : result[SYSSTATE_SUMDESIRELATENCIES] / numFulfilledDesires;
 
-    int numDesires = result[SYSSTATE_NUMDESIRES];
-    int numFulfilledDesires = result[SYSSTATE_NUMFULFILLEDDESIRES];
-    float ratioFulfilled = numDesires <= 0 ? 0 : (float)numFulfilledDesires / numDesires;
-    float latency = numFulfilledDesires <= 0 ? 0 : result[SYSSTATE_SUMDESIRELATENCIES] / numFulfilledDesires;
-
-    log(verb, "sysstate busyratio=%.3f cmtdratio=%.3f jobs=%i globmem=%.2fGB newreqs=%i hops=%i\n", 
-                result[SYSSTATE_BUSYRATIO]/MyMpi::size(_comm), result[SYSSTATE_COMMITTEDRATIO]/MyMpi::size(_comm), 
-                (int)result[SYSSTATE_NUMJOBS], result[SYSSTATE_GLOBALMEM], (int)result[SYSSTATE_SPAWNEDREQUESTS], 
-                (int)result[SYSSTATE_NUMHOPS]);
+        LOG(V2_INFO, "sysstate busyratio=%.3f cmtdratio=%.3f jobs=%i globmem=%.2fGB newreqs=%i hops=%i\n", 
+                    result[SYSSTATE_BUSYRATIO]/MyMpi::size(_comm), result[SYSSTATE_COMMITTEDRATIO]/MyMpi::size(_comm), 
+                    (int)result[SYSSTATE_NUMJOBS], result[SYSSTATE_GLOBALMEM], (int)result[SYSSTATE_SPAWNEDREQUESTS], 
+                    (int)result[SYSSTATE_NUMHOPS]);
+    }
     
     if (!_job_db.isBusyOrCommitted()) {
-        log(V4_VVER, "I am idle\n");
+        LOG(V4_VVER, "I am idle\n");
     }
 
     // Reset fields which are added to incrementally
@@ -418,7 +418,7 @@ void Worker::handleNotifyJobAborting(MessageHandle& handle) {
     int jobId = Serializable::get<int>(handle.getRecvData());
     if (!_job_db.has(jobId)) return;
 
-    log(V3_VERB, "Acknowledge #%i aborting\n", jobId);
+    LOG(V3_VERB, "Acknowledge #%i aborting\n", jobId);
     auto& job = _job_db.get(jobId);    
     if (job.getJobTree().isRoot()) {
         // Forward information on aborted job to client
@@ -441,7 +441,7 @@ void Worker::handleAnswerAdoptionOffer(MessageHandle& handle) {
 
     // Retrieve according job commitment
     if (!_job_db.hasCommitment(jobId)) {
-        log(V1_WARN, "[WARN] Job commitment for #%i not present despite adoption accept msg\n", jobId);
+        LOG(V1_WARN, "[WARN] Job commitment for #%i not present despite adoption accept msg\n", jobId);
         return;
     }
     const JobRequest& req = _job_db.getCommitment(jobId);
@@ -476,7 +476,7 @@ void Worker::handleAnswerAdoptionOffer(MessageHandle& handle) {
         
     } else {
         // Rejected
-        log(LOG_ADD_SRCRANK | V4_VVER, "Rejected to become %s : uncommitting", handle.source, job.toStr());
+        LOG_ADD_SRC(V4_VVER, "Rejected to become %s : uncommitting", handle.source, job.toStr());
         _job_db.uncommit(req.jobId);
         _job_db.unregisterJobFromBalancer(req.jobId);
         _job_db.suspendScheduler(job);
@@ -506,16 +506,16 @@ void Worker::sendRevisionDescription(int jobId, int revision, int dest) {
     auto& job = _job_db.get(jobId);
     const auto& descPtr = job.getSerializedDescription(revision);
     assert(descPtr->size() == job.getDescription().getTransferSize(revision) 
-        || log_return_false("%i != %i\n", descPtr->size(), job.getDescription().getTransferSize(revision)));
+        || LOG_RETURN_FALSE("%i != %i\n", descPtr->size(), job.getDescription().getTransferSize(revision)));
     MyMpi::isend(dest, MSG_SEND_JOB_DESCRIPTION, descPtr);
-    log(LOG_ADD_DESTRANK | V4_VVER, "Sent job desc. of %s rev. %i, size %i", dest, 
+    LOG_ADD_DEST(V4_VVER, "Sent job desc. of %s rev. %i, size %i", dest, 
             job.toStr(), revision, descPtr->size());
 }
 
 void Worker::handleRejectOneshot(MessageHandle& handle) {
     OneshotJobRequestRejection rej = Serializable::get<OneshotJobRequestRejection>(handle.getRecvData());
     JobRequest& req = rej.request;
-    log(LOG_ADD_SRCRANK | V5_DEBG, "%s rejected by dormant child", handle.source, 
+    LOG_ADD_SRC(V5_DEBG, "%s rejected by dormant child", handle.source, 
             _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
 
     if (!_job_db.has(req.jobId)) return;
@@ -551,13 +551,13 @@ void Worker::handleRejectOneshot(MessageHandle& handle) {
             req.numHops++;
             _sys_state.addLocal(SYSSTATE_NUMHOPS, 1);
             MyMpi::isend(rank, MSG_REQUEST_NODE_ONESHOT, req);
-            log(LOG_ADD_DESTRANK | V4_VVER, "%s : query dormant child", rank, job.toStr());
+            LOG_ADD_DEST(V4_VVER, "%s : query dormant child", rank, job.toStr());
             _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
         }
     }
 
     if (doNormalHopping) {
-        log(V4_VVER, "%s : switch to normal hops\n", job.toStr());
+        LOG(V4_VVER, "%s : switch to normal hops\n", job.toStr());
         req.numHops = -1;
         bounceJobRequest(req, handle.source);
     }
@@ -569,7 +569,7 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
 
     // Discard request if it has become obsolete
     if (_job_db.isRequestObsolete(req)) {
-        log(LOG_ADD_SRCRANK | V3_VERB, "DISCARD %s mode=%i", handle.source, 
+        LOG_ADD_SRC(V3_VERB, "DISCARD %s mode=%i", handle.source, 
                 req.toStr().c_str(), mode);
         if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
         return;
@@ -584,7 +584,7 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
 
     if (req.balancingEpoch > _job_db.getGlobalBalancingEpoch()) {
         // Job request is "from the future": defer it until it is from the present
-        log(V4_VVER, "Defer future req. %s\n", req.toStr().c_str());
+        LOG(V4_VVER, "Defer future req. %s\n", req.toStr().c_str());
         _job_db.addFutureRequestMessage(req.balancingEpoch, std::move(handle));
         return;
     }
@@ -626,8 +626,8 @@ void Worker::tryAdoptRequest(JobRequest& req, int source, JobDatabase::JobReques
 
         // Adoption takes place
         std::string jobstr = _job_db.toStr(req.jobId, req.requestedNodeIndex);
-        log(LOG_ADD_SRCRANK | V3_VERB, "ADOPT %s mode=%i", source, req.toStr().c_str(), mode);
-        assert(!_job_db.isBusyOrCommitted() || log_return_false("Adopting a job, but not idle!\n"));
+        LOG_ADD_SRC(V3_VERB, "ADOPT %s mode=%i", source, req.toStr().c_str(), mode);
+        assert(!_job_db.isBusyOrCommitted() || LOG_RETURN_FALSE("Adopting a job, but not idle!\n"));
 
         // Commit on the job, send a request to the parent
         if (!_job_db.has(req.jobId)) {
@@ -650,12 +650,12 @@ void Worker::tryAdoptRequest(JobRequest& req, int source, JobDatabase::JobReques
         if (req.requestedNodeIndex == 0 && _job_db.has(req.jobId) && _job_db.get(req.jobId).getJobTree().isRoot()) {
             // I have the dormant root of this request, but cannot adopt right now:
             // defer until I can (e.g., until a made commitment can be broken)
-            log(V4_VVER, "Defer pending root reactivation %s\n", req.toStr().c_str());
+            LOG(V4_VVER, "Defer pending root reactivation %s\n", req.toStr().c_str());
             _job_db.setPendingRootReactivationRequest(std::move(req));
         } else if (mode == JobDatabase::TARGETED_REJOIN) {
             // Send explicit rejection message
             OneshotJobRequestRejection rej(req, _job_db.hasDormantJob(req.jobId));
-            log(LOG_ADD_DESTRANK | V5_DEBG, "REJECT %s myepoch=%i", source, 
+            LOG_ADD_DEST(V5_DEBG, "REJECT %s myepoch=%i", source, 
                         req.toStr().c_str(), _job_db.getGlobalBalancingEpoch());
             MyMpi::isend(source, MSG_REJECT_ONESHOT, rej);
         } else if (mode == JobDatabase::NORMAL) {
@@ -668,7 +668,7 @@ void Worker::tryAdoptRequest(JobRequest& req, int source, JobDatabase::JobReques
 void Worker::handleIncrementalJobFinished(MessageHandle& handle) {
     int jobId = Serializable::get<int>(handle.getRecvData());
     if (_job_db.has(jobId)) {
-        log(V3_VERB, "Incremental job %s done\n", _job_db.get(jobId).toStr());
+        LOG(V3_VERB, "Incremental job %s done\n", _job_db.get(jobId).toStr());
         interruptJob(Serializable::get<int>(handle.getRecvData()), /*terminate=*/true, /*reckless=*/false);
     }
 }
@@ -683,7 +683,7 @@ void Worker::handleSendApplicationMessage(MessageHandle& handle) {
     JobMessage msg = Serializable::get<JobMessage>(handle.getRecvData());
     int jobId = msg.jobId;
     if (!_job_db.has(jobId)) {
-        log(V1_WARN, "[WARN] Job message from unknown job #%i\n", jobId);
+        LOG(V1_WARN, "[WARN] Job message from unknown job #%i\n", jobId);
         return;
     }
     // Give message to corresponding job
@@ -694,7 +694,7 @@ void Worker::handleSendApplicationMessage(MessageHandle& handle) {
 void Worker::handleOfferAdoption(MessageHandle& handle) {
 
     JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
-    log(LOG_ADD_SRCRANK | V4_VVER, "Adoption offer for %s", handle.source, 
+    LOG_ADD_SRC(V4_VVER, "Adoption offer for %s", handle.source, 
                     _job_db.toStr(req.jobId, req.requestedNodeIndex).c_str());
 
     bool reject = false;
@@ -715,7 +715,7 @@ void Worker::handleOfferAdoption(MessageHandle& handle) {
         // Check if node should be adopted or rejected
         if (obsolete) {
             // Obsolete request
-            log(LOG_ADD_SRCRANK | V3_VERB, "REJECT %s", handle.source, req.toStr().c_str());
+            LOG_ADD_SRC(V3_VERB, "REJECT %s", handle.source, req.toStr().c_str());
             reject = true;
 
         } else {
@@ -759,7 +759,7 @@ void Worker::handleQueryJobResult(MessageHandle& handle) {
     JobStatistics stats; stats.deserialize(handle.getRecvData());
     int jobId = stats.jobId;
     auto key = std::pair<int, int>(jobId, stats.revision);
-    log(LOG_ADD_DESTRANK | V3_VERB, "Send result of #%i rev. %i to client", handle.source, jobId, stats.revision);
+    LOG_ADD_DEST(V3_VERB, "Send result of #%i rev. %i to client", handle.source, jobId, stats.revision);
     assert(_pending_results.count(key));
     JobResult& result = _pending_results.at(key);
     MyMpi::isend(handle.source, MSG_SEND_JOB_RESULT, result);
@@ -787,7 +787,7 @@ void Worker::handleQueryVolume(MessageHandle& handle) {
 
     // Send response
     IntVec response({jobId, volume, _job_db.getGlobalBalancingEpoch()});
-    log(LOG_ADD_DESTRANK | V4_VVER, "Answer #%i volume query with v=%i", handle.source, jobId, volume);
+    LOG_ADD_DEST(V4_VVER, "Answer #%i volume query with v=%i", handle.source, jobId, volume);
     MyMpi::isend(handle.source, MSG_NOTIFY_VOLUME_UPDATE, response);
 }
 
@@ -795,14 +795,14 @@ void Worker::handleNotifyResultObsolete(MessageHandle& handle) {
     IntVec res = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = res[0];
     int revision = res[1];
-    log(LOG_ADD_SRCRANK | V4_VVER, "job result for #%i rev. %i unwanted", handle.source, jobId, revision);
+    LOG_ADD_SRC(V4_VVER, "job result for #%i rev. %i unwanted", handle.source, jobId, revision);
     _pending_results.erase(std::pair<int, int>(jobId, revision));
 }
 
 void Worker::handleSendJobDescription(MessageHandle& handle) {
     const auto& data = handle.getRecvData();
     int jobId = data.size() >= sizeof(int) ? Serializable::get<int>(data) : -1;
-    log(LOG_ADD_SRCRANK | V4_VVER, "Got desc. of size %i for job #%i", handle.source, data.size(), jobId);
+    LOG_ADD_SRC(V4_VVER, "Got desc. of size %i for job #%i", handle.source, data.size(), jobId);
     if (jobId == -1 || !_job_db.has(jobId)) {
         if (_job_db.hasCommitment(jobId)) {
             _job_db.uncommit(jobId);
@@ -858,7 +858,7 @@ void Worker::handleNotifyVolumeUpdate(MessageHandle& handle) {
     int volume = recv[1];
     int balancingEpoch = recv[2];
     if (!_job_db.has(jobId)) {
-        log(V1_WARN, "[WARN] Volume update for unknown #%i\n", jobId);
+        LOG(V1_WARN, "[WARN] Volume update for unknown #%i\n", jobId);
         return;
     }
 
@@ -885,7 +885,7 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
 
     // If necessary, find replacement
     if (pruned != JobTree::TreeRelative::NONE && index < job.getVolume()) {
-        log(V4_VVER, "%s : look for replacement for %s\n", job.toStr(), _job_db.toStr(jobId, index).c_str());
+        LOG(V4_VVER, "%s : look for replacement for %s\n", job.toStr(), _job_db.toStr(jobId, index).c_str());
         spawnJobRequest(jobId, pruned==JobTree::LEFT_CHILD, _job_db.getGlobalBalancingEpoch());
     }
 
@@ -904,17 +904,17 @@ void Worker::handleNotifyResultFound(MessageHandle& handle) {
     bool obsolete = false;
     if (!_job_db.has(jobId) || !_job_db.get(jobId).getJobTree().isRoot()) {
         obsolete = true;
-        log(V1_WARN, "[WARN] Invalid adressee for job result of #%i\n", jobId);
+        LOG(V1_WARN, "[WARN] Invalid adressee for job result of #%i\n", jobId);
     } else if (_job_db.get(jobId).getRevision() > revision || _job_db.get(jobId).isRevisionSolved(revision)) {
         obsolete = true;
-        log(LOG_ADD_SRCRANK | V4_VVER, "Discard obsolete result for job #%i rev. %i", handle.source, jobId, revision);
+        LOG_ADD_SRC(V4_VVER, "Discard obsolete result for job #%i rev. %i", handle.source, jobId, revision);
     }
     if (obsolete) {
         MyMpi::isendCopy(handle.source, MSG_NOTIFY_RESULT_OBSOLETE, handle.getRecvData());
         return;
     }
     
-    log(LOG_ADD_SRCRANK | V3_VERB, "#%i rev. %i solved", handle.source, jobId, revision);
+    LOG_ADD_SRC(V3_VERB, "#%i rev. %i solved", handle.source, jobId, revision);
     _job_db.get(jobId).setRevisionSolved(revision);
 
     // Notify client
@@ -968,7 +968,7 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
 
     // Show warning if #hops is a large power of two
     if ((num >= 512) && ((num & (num - 1)) == 0)) {
-        log(V1_WARN, "[WARN] %s\n", request.toStr().c_str());
+        LOG(V1_WARN, "[WARN] %s\n", request.toStr().c_str());
     }
 
     // If hopped enough for collective assignment to be enabled
@@ -1006,7 +1006,7 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
     }
 
     // Send request to "next" worker node
-    log(LOG_ADD_DESTRANK | V5_DEBG, "Hop %s", nextRank, _job_db.toStr(request.jobId, request.requestedNodeIndex).c_str());
+    LOG_ADD_DEST(V5_DEBG, "Hop %s", nextRank, _job_db.toStr(request.jobId, request.requestedNodeIndex).c_str());
     MyMpi::isend(nextRank, MSG_REQUEST_NODE, request);
 }
 
@@ -1050,9 +1050,13 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
     int prevVolume = job.getVolume();
     auto& tree = job.getJobTree();
 
-    log(prevVolume == volume || thisIndex > 0 ? V4_VVER : V3_VERB, 
-        "%s : update v=%i epoch=%i lastreqsepoch=%i evlat=%.5f\n", 
-        job.toStr(), volume, balancingEpoch, tree.getBalancingEpochOfLastRequests(), eventLatency);
+    if (prevVolume == volume || thisIndex > 0) {
+        LOG(V4_VVER, "%s : update v=%i epoch=%i lastreqsepoch=%i evlat=%.5f\n", 
+            job.toStr(), volume, balancingEpoch, tree.getBalancingEpochOfLastRequests(), eventLatency);
+    } else {
+        LOG(V3_VERB, "%s : update v=%i epoch=%i lastreqsepoch=%i evlat=%.5f\n", 
+            job.toStr(), volume, balancingEpoch, tree.getBalancingEpochOfLastRequests(), eventLatency);
+    }
 
     // Apply volume update to local job structure
     job.updateVolumeAndUsedCpu(volume);
@@ -1083,7 +1087,7 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
         
         // Shrink (and pause solving) yourself, if necessary
         if (thisIndex > 0 && thisIndex >= volume) {
-            log(V3_VERB, "%s shrinking\n", job.toStr());
+            LOG(V3_VERB, "%s shrinking\n", job.toStr());
             if (job.getState() == ACTIVE) {
                 _job_db.suspend(jobId);
             } else {
@@ -1117,7 +1121,7 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
 void Worker::activateRootRequest(int jobId) {
     auto optReq = _job_db.getRootRequest(jobId);
     if (!optReq.has_value()) return;
-    log(V3_VERB, "Activate %s\n", optReq.value().toStr().c_str());
+    LOG(V3_VERB, "Activate %s\n", optReq.value().toStr().c_str());
     bounceJobRequest(optReq.value(), optReq.value().requestingNodeRank);
 }
 
@@ -1150,7 +1154,7 @@ void Worker::propagateVolumeUpdate(Job& job, int volume, int balancingEpoch) {
             if (_job_db.hasDormantRoot()) {
                 // Becoming an inner node is not acceptable
                 // because then the dormant root cannot be restarted seamlessly
-                log(V4_VVER, "%s cannot grow due to dormant root\n", job.toStr());
+                LOG(V4_VVER, "%s cannot grow due to dormant root\n", job.toStr());
                 if (job.getState() == ACTIVE) {
                     _job_db.suspend(jobId);
                 } else {
@@ -1202,7 +1206,7 @@ void Worker::sendJobRequest(const JobRequest& req, int tag, bool left, int dest)
         dest = nextNodeRank;
     }
 
-    log(LOG_ADD_DESTRANK | V3_VERB, "%s growing: %s", dest, 
+    LOG_ADD_DEST(V3_VERB, "%s growing: %s", dest, 
                 job.toStr(), req.toStr().c_str());
     
     MyMpi::isend(dest, tag, req);
@@ -1229,15 +1233,15 @@ void Worker::interruptJob(int jobId, bool terminate, bool reckless) {
     else msgTag = MSG_INTERRUPT;
     if (job.getJobTree().hasLeftChild()) {
         MyMpi::isend(job.getJobTree().getLeftChildNodeRank(), msgTag, IntVec({jobId}));
-        log(LOG_ADD_DESTRANK | V4_VVER, "Propagate interruption of %s ...", job.getJobTree().getLeftChildNodeRank(), job.toStr());
+        LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s ...", job.getJobTree().getLeftChildNodeRank(), job.toStr());
     }
     if (job.getJobTree().hasRightChild()) {
         MyMpi::isend(job.getJobTree().getRightChildNodeRank(), msgTag, IntVec({jobId}));
-        log(LOG_ADD_DESTRANK | V4_VVER, "Propagate interruption of %s ...", job.getJobTree().getRightChildNodeRank(), job.toStr());
+        LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s ...", job.getJobTree().getRightChildNodeRank(), job.toStr());
     }
     for (auto childRank : job.getJobTree().getPastChildren()) {
         MyMpi::isend(childRank, msgTag, IntVec({jobId}));
-        log(LOG_ADD_DESTRANK | V4_VVER, "Propagate interruption of %s (past child) ...", childRank, job.toStr());
+        LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s (past child) ...", childRank, job.toStr());
     }
     if (terminate) job.getJobTree().getPastChildren().clear();
 
@@ -1257,7 +1261,7 @@ void Worker::sendJobDoneWithStatsToClient(int jobId, int revision, int successfu
     auto& job = _job_db.get(jobId);
 
     int clientRank = job.getDescription().getClientRank();
-    log(LOG_ADD_DESTRANK | V4_VVER, "%s : inform client job is done", clientRank, job.toStr());
+    LOG_ADD_DEST(V4_VVER, "%s : inform client job is done", clientRank, job.toStr());
     job.updateVolumeAndUsedCpu(job.getVolume());
     JobStatistics stats;
     stats.jobId = jobId;
@@ -1309,7 +1313,7 @@ Worker::~Worker() {
     _watchdog.stop();
     Terminator::setTerminating();
 
-    log(V4_VVER, "Destruct worker\n");
+    LOG(V4_VVER, "Destruct worker\n");
 
     if (_params.monoFilename.isSet() && _params.applicationSpawnMode() != "fork") {
         // Terminate directly without destructing resident job

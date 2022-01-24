@@ -120,8 +120,8 @@ public:
     bool produce(const int* data, size_t size, int prefixOrZero, bool appendZero, int producerId = 0) {
         
         bool addPrefix = prefixOrZero != 0;
-        assert(producerId >= 0 || log_return_false("producer ID %i\n", producerId));
-        assert(producerId < _producers.size() || log_return_false("producer ID %i\n", producerId));
+        assert(producerId >= 0 || LOG_RETURN_FALSE("producer ID %i\n", producerId));
+        assert(producerId < _producers.size() || LOG_RETURN_FALSE("producer ID %i\n", producerId));
 
         ssize_t offset = ringbuf_acquire(_ringbuf, _producers[producerId], size + (addPrefix?1:0) + (appendZero?1:0));
         if (offset == -1) return false;

@@ -12,7 +12,7 @@
 #include "app/sat/hordesat/utilities/variable_translator.hpp"
 
 void test() {
-    log(V2_INFO, "Testing variable translator ...\n");
+    LOG(V2_INFO, "Testing variable translator ...\n");
     
     VariableTranslator vt;
     int maxVar = 10;
@@ -29,9 +29,9 @@ void test() {
     extraVars.push_back(vt.getTldLit(maxVar)+1);
     maxVar = 20;
 
-    log(V2_INFO, "Extra variables: ");
-    for (int lit : vt.getExtraVariables()) log(LOG_NO_PREFIX | V2_INFO, "%i ", lit);
-    log(LOG_NO_PREFIX | V2_INFO, "\n");
+    LOG(V2_INFO, "Extra variables: ");
+    for (int lit : vt.getExtraVariables()) LOG_OMIT_PREFIX(V2_INFO, "%i ", lit);
+    LOG_OMIT_PREFIX(V2_INFO, "\n");
     assert(extraVars == vt.getExtraVariables());
 
     assert(vt.getTldLit(1) == 1);
@@ -54,9 +54,9 @@ void test() {
     extraVars.push_back(vt.getTldLit(maxVar)+1);
     maxVar = 30;
 
-    log(V2_INFO, "Extra variables: ");
-    for (int lit : vt.getExtraVariables()) log(LOG_NO_PREFIX | V2_INFO, "%i ", lit);
-    log(LOG_NO_PREFIX | V2_INFO, "\n");
+    LOG(V2_INFO, "Extra variables: ");
+    for (int lit : vt.getExtraVariables()) LOG_OMIT_PREFIX(V2_INFO, "%i ", lit);
+    LOG_OMIT_PREFIX(V2_INFO, "\n");
     assert(extraVars == vt.getExtraVariables());
     for (int extraVar : extraVars) assert(vt.getOrigLitOrZero(extraVar) == 0);
     // extra var 11
@@ -76,9 +76,9 @@ void test() {
     extraVars.push_back(vt.getExtraVariables().back());
     maxVar = 40;
 
-    log(V2_INFO, "Extra variables: ");
-    for (int lit : vt.getExtraVariables()) log(LOG_NO_PREFIX | V2_INFO, "%i ", lit);
-    log(LOG_NO_PREFIX | V2_INFO, "\n");
+    LOG(V2_INFO, "Extra variables: ");
+    for (int lit : vt.getExtraVariables()) LOG_OMIT_PREFIX(V2_INFO, "%i ", lit);
+    LOG_OMIT_PREFIX(V2_INFO, "\n");
     assert(extraVars == vt.getExtraVariables());
     for (int extraVar : extraVars) assert(vt.getOrigLitOrZero(extraVar) == 0);
     // extra vars 33, 34

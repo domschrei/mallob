@@ -95,11 +95,11 @@ void MergeSatBackend::addInternalClausesToSolver(bool firstTime) {
 			mcls.push(MINI_LIT(lit));
 		}
 		if (!solver->addClause(mcls)) {
-			_logger.log(V4_VVER, "[MS] unsat when adding cls\n");
+			LOGGER(_logger, V4_VVER, "[MS] unsat when adding cls\n");
 			break;
 		}
 	}
-	if (clausesToAdd.size() > 0) _logger.log(V4_VVER, "[MS] received %lu clauses\n", clausesToAdd.size());
+	if (clausesToAdd.size() > 0) LOGGER(_logger, V4_VVER, "[MS] received %lu clauses\n", clausesToAdd.size());
 	clausesToAdd.clear();
 
 	// Redundant learned clauses
@@ -109,7 +109,7 @@ void MergeSatBackend::addInternalClausesToSolver(bool firstTime) {
 		for (size_t i = 1; i < cls.size(); i++) mcls.push(MINI_LIT(cls[i]));
 		solver->addLearnedClause(mcls);
 	}
-	if (learnedClausesToAdd.size() > 0) _logger.log(V4_VVER, "[MS] received %lu learned clauses\n", learnedClausesToAdd.size());
+	if (learnedClausesToAdd.size() > 0) LOGGER(_logger, V4_VVER, "[MS] received %lu learned clauses\n", learnedClausesToAdd.size());
 	learnedClausesToAdd.clear();
 }
 

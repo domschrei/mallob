@@ -22,7 +22,7 @@ void testConcurrentAllocation() {
 
     for (int i = 0; i < nThreads; i++) {
         threads.emplace_back([nThreads, i]() {
-            log(V2_INFO, "Thread #%i: alloc+free\n", i);
+            LOG(V2_INFO, "Thread #%i: alloc+free\n", i);
             // allocate
             std::list<void*> memory;
             for (int j = 0; j < nAllocs; j++) {
@@ -38,14 +38,14 @@ void testConcurrentAllocation() {
                 free(memory.front());
                 memory.pop_front();
             }
-            log(V2_INFO, "Thread #%i: done\n", i);
+            LOG(V2_INFO, "Thread #%i: done\n", i);
         });
     }
 
     for (auto& thread : threads) thread.join();
     
     time = Timer::elapsedSeconds() - time;
-    log(V2_INFO, "Time: %.6fs\n", time);
+    LOG(V2_INFO, "Time: %.6fs\n", time);
 }
 
 int main(int argc, char *argv[]) {

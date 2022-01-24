@@ -33,7 +33,7 @@ LocalScheduler Job::constructScheduler(std::function<void(const JobRequest& req,
             JobRequest req(_id, _appl, _job_tree.getRootNodeRank(), 
                 _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, -2);
             req.revision = std::max(0, getDesiredRevision());
-            log(V5_DEBG | LOG_ADD_DESTRANK, "RBS EMIT_REQ %s", rank, req.toStr().c_str());
+            LOG_ADD_DEST(V5_DEBG, "RBS EMIT_REQ %s", rank, req.toStr().c_str());
             emitJobReq(req, MSG_REQUEST_NODE_ONESHOT, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), rank);
         },
         // callback to emit a certain, undirected job request message
@@ -41,7 +41,7 @@ LocalScheduler Job::constructScheduler(std::function<void(const JobRequest& req,
             JobRequest req(_id, _appl, _job_tree.getRootNodeRank(), 
                 _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, 0);
             req.revision = std::max(0, getDesiredRevision());
-            log(V5_DEBG, "RBS EMIT_REQ %s\n", req.toStr().c_str());
+            LOG(V5_DEBG, "RBS EMIT_REQ %s\n", req.toStr().c_str());
             emitJobReq(req, MSG_REQUEST_NODE, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), -1);
         }
     );
@@ -87,7 +87,7 @@ void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
         long maxAllowedLiterals = _threads_per_job * _params.maxLiteralsPerThread();
         int optNumThreads = std::floor((float)maxAllowedLiterals / _description.getNumFormulaLiterals());
         _threads_per_job = std::max(1, optNumThreads);
-        log(V3_VERB, "%s : literal threshold exceeded - cut down #threads to %i\n", toStr(), _threads_per_job);
+        LOG(V3_VERB, "%s : literal threshold exceeded - cut down #threads to %i\n", toStr(), _threads_per_job);
     }
 
     _has_description = true;
@@ -100,7 +100,7 @@ void Job::start() {
     _time_of_last_limit_check = Timer::elapsedSeconds();
     _volume = std::max(1, _volume);
     _state = ACTIVE;
-    log(V4_VVER, "%s : new job node starting\n", toStr());
+    LOG(V4_VVER, "%s : new job node starting\n", toStr());
     appl_start();
 }
 
@@ -110,7 +110,7 @@ void Job::suspend() {
     appl_suspend();
     _job_tree.unsetLeftChild();
     _job_tree.unsetRightChild();
-    log(V4_VVER, "%s : suspended solver\n", toStr());
+    LOG(V4_VVER, "%s : suspended solver\n", toStr());
     updateVolumeAndUsedCpu(getVolume());
 }
 
@@ -119,7 +119,7 @@ void Job::resume() {
     _volume = std::max(1, _volume);
     _state = ACTIVE;
     appl_resume();
-    log(V4_VVER, "%s : resumed solving threads\n", toStr());
+    LOG(V4_VVER, "%s : resumed solving threads\n", toStr());
     _time_of_last_limit_check = Timer::elapsedSeconds();
 }
 
@@ -135,7 +135,7 @@ void Job::terminate() {
     _job_tree.unsetRightChild();
 
     _time_of_abort = Timer::elapsedSeconds();
-    log(V4_VVER, "%s : terminated\n", toStr());
+    LOG(V4_VVER, "%s : terminated\n", toStr());
 }
 
 bool Job::isDestructible() {
@@ -228,7 +228,7 @@ void Job::communicate(int source, JobMessage& msg) {
         if (msg.tag == MSG_BROADCAST_RANKLIST && _job_tree.isRoot()) {
             // Check size of job comm compared to scheduler's job volume
             if (_comm.size() != getVolume()) {
-                log(V1_WARN, "[WARN] %s job tree has size %i/%i\n", toStr(), _comm.size(), getVolume());
+                LOG(V1_WARN, "[WARN] %s job tree has size %i/%i\n", toStr(), _comm.size(), getVolume());
             }
         }
     } else {

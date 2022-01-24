@@ -16,7 +16,7 @@ void testFunction(Parameters& params) {
     multipliers.push_back(entry.demand / entry.fairShare);
 
     for (double x : multipliers) {
-        log(V2_INFO, "x=%.4f cont_v(x)=%.4f v_j(x)=%i\n", x, entry.fairShare*x, entry.getVolume(x));
+        LOG(V2_INFO, "x=%.4f cont_v(x)=%.4f v_j(x)=%i\n", x, entry.fairShare*x, entry.getVolume(x));
     }
 }
 
@@ -34,14 +34,14 @@ std::vector<BalancingEntry> testEventMap(Parameters& params, EventMap& map, int 
         allDemandsMet = allDemandsMet && entry.volume == entry.originalDemand;
     }
     for (const auto& entry : calc.getEntries()) {
-        log(V5_DEBG, "  #%i : fair share %.4f ~> volume %i\n", entry.jobId, entry.fairShare, entry.volume);
+        LOG(V5_DEBG, "  #%i : fair share %.4f ~> volume %i\n", entry.jobId, entry.fairShare, entry.volume);
     }
-    assert(allDemandsMet || sum == expectedUtilization || log_return_false("%i != %i\n", sum, expectedUtilization));
+    assert(allDemandsMet || sum == expectedUtilization || LOG_RETURN_FALSE("%i != %i\n", sum, expectedUtilization));
     return calc.getEntries();
 }
 
 void testUniformUnderutilization(Parameters& params) {
-    log(V2_INFO, "#### Test uniform underutilization ####\n");
+    LOG(V2_INFO, "#### Test uniform underutilization ####\n");
     EventMap map;
     // ID, epoch, demand, priority
     map.insertIfNovel(Event({/*ID=*/1, /*epoch=*/1, /*demand=*/10, /*priority=*/1}));
@@ -60,7 +60,7 @@ void testUniformUnderutilization(Parameters& params) {
 }
 
 void testUniform(Parameters& params) {
-    log(V2_INFO, "#### Test uniform ####\n");
+    LOG(V2_INFO, "#### Test uniform ####\n");
     EventMap map;
     // ID, epoch, demand, priority
     map.insertIfNovel(Event({/*ID=*/1, /*epoch=*/1, /*demand=*/10000, /*priority=*/1}));
@@ -79,7 +79,7 @@ void testUniform(Parameters& params) {
 }
 
 void testSimilarPriorities(Parameters& params) {
-    log(V2_INFO, "#### Test similar priorities ####\n");
+    LOG(V2_INFO, "#### Test similar priorities ####\n");
     EventMap map;
     // ID, epoch, demand, priority
     map.insertIfNovel(Event({/*ID=*/1, /*epoch=*/1, /*demand=*/10000, /*priority=*/0.501}));
@@ -101,7 +101,7 @@ void testSimilarPriorities(Parameters& params) {
 }
 
 void testPerformance(Parameters& params) {
-    log(V2_INFO, "#### Test performance ####\n");
+    LOG(V2_INFO, "#### Test performance ####\n");
 
     float minPriority = 0.001;
     int numWorkers = 1 << 23;
@@ -137,7 +137,7 @@ void testPerformance(Parameters& params) {
                 sumOfDemands += ev.demand;
             }
                 
-            log(V2_INFO, "nJobs=%i nWorkers=%i minPriority=%.6f maxDemand=%i sumOfDemands=%llu\n", 
+            LOG(V2_INFO, "nJobs=%i nWorkers=%i minPriority=%.6f maxDemand=%i sumOfDemands=%llu\n", 
                 numJobs, numWorkers, minPriority, maxDemand, sumOfDemands);
 
             auto result = testEventMap(params, map, numWorkers, /*expectedUtilization=*/numWorkers);
@@ -149,13 +149,13 @@ void testPerformance(Parameters& params) {
     float totalTime = 0;
     for (auto& [numJobs, runtimes] : runtimesPerSize) {
         totalTime += runtimes;
-        log(V2_INFO, "nJobs=%i avgTime=%.6fs\n", numJobs, runtimes/numRuntimesPerSize[numJobs]);
+        LOG(V2_INFO, "nJobs=%i avgTime=%.6fs\n", numJobs, runtimes/numRuntimesPerSize[numJobs]);
     }
-    log(V2_INFO, "Total time: %.5fs\n", totalTime);
+    LOG(V2_INFO, "Total time: %.5fs\n", totalTime);
 }
 
 void testSmall(Parameters& params) {
-    log(V2_INFO, "#### Test small ####\n");
+    LOG(V2_INFO, "#### Test small ####\n");
     EventMap map;
     map.insertIfNovel(Event({/*ID=*/1, /*epoch=*/1, /*demand=*/10, /*priority=*/0.1}));
     map.insertIfNovel(Event({/*ID=*/2, /*epoch=*/1, /*demand=*/10, /*priority=*/0.05}));
@@ -165,7 +165,7 @@ void testSmall(Parameters& params) {
 }
 
 void testDivergentDemandPriorityRatio(Parameters& params) {
-    log(V2_INFO, "#### Test divergent demand/priority ratio ####\n");
+    LOG(V2_INFO, "#### Test divergent demand/priority ratio ####\n");
     EventMap map;
     map.insertIfNovel(Event({/*ID=*/1, /*epoch=*/1, /*demand=*/128, /*priority=*/1}));
     map.insertIfNovel(Event({/*ID=*/2, /*epoch=*/1, /*demand=*/64, /*priority=*/2}));
@@ -180,7 +180,7 @@ void testDivergentDemandPriorityRatio(Parameters& params) {
 }
 
 void testConvergentDemandPriorityRatio(Parameters& params) {
-    log(V2_INFO, "#### Test convergent demand/priority ratio ####\n");
+    LOG(V2_INFO, "#### Test convergent demand/priority ratio ####\n");
     EventMap map;
     map.insertIfNovel(Event({/*ID=*/1, /*epoch=*/1, /*demand=*/1, /*priority=*/1}));
     map.insertIfNovel(Event({/*ID=*/2, /*epoch=*/1, /*demand=*/2, /*priority=*/2}));
@@ -195,7 +195,7 @@ void testConvergentDemandPriorityRatio(Parameters& params) {
 }
 
 void testHugeModifier(Parameters& params) {
-    log(V2_INFO, "#### Test Huge Modifier ####\n");
+    LOG(V2_INFO, "#### Test Huge Modifier ####\n");
     EventMap map;
     map.insertIfNovel(Event({/*ID=*/1, /*epoch=*/1, /*demand=*/2, /*priority=*/1000}));
     map.insertIfNovel(Event({/*ID=*/2, /*epoch=*/1, /*demand=*/100000, /*priority=*/1}));
@@ -204,7 +204,7 @@ void testHugeModifier(Parameters& params) {
 }
 
 void testTinyModifier(Parameters& params) {
-    log(V2_INFO, "#### Test Tiny Modifier ####\n");
+    LOG(V2_INFO, "#### Test Tiny Modifier ####\n");
     EventMap map;
     for (int j = 0; j < 97; j++)
         map.insertIfNovel(Event({/*ID=*/j+1, /*epoch=*/1, /*demand=*/100, /*priority=*/0.01}));

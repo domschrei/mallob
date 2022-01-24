@@ -99,7 +99,7 @@ void MyMpi::latencyMonkey() {
 void MyMpi::delayMonkey() {
     if ((_monkey_flags & MONKEY_DELAY) && Random::rand() * 100 <= 1) { // chance of 1:100
         float duration = 1000 * 1000 * Random::rand(); // Sleep for up to one second
-        log(V5_DEBG, "DELAY_MONKEY %.3fs\n", 0.001 * 0.001 * duration);
+        LOG(V5_DEBG, "DELAY_MONKEY %.3fs\n", 0.001 * 0.001 * duration);
         usleep(duration); 
     }
 }

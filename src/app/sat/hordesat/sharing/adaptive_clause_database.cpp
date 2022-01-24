@@ -59,7 +59,7 @@ AdaptiveClauseDatabase::AddClauseResult AdaptiveClauseDatabase::addClause(int pr
     // Find correct clause slot, attempt to insert
     size_t slotIdx = getSlotIdx(c.size, c.lbd);
     if (slotIdx < 0 || slotIdx >= _slots.size()) {
-        log(V1_WARN, "[WARN] %s -> invalid slot index %i\n", c.toStr().c_str(), slotIdx);
+        LOG(V1_WARN, "[WARN] %s -> invalid slot index %i\n", c.toStr().c_str(), slotIdx);
         return DROP; // clause is not acceptable
     }
     auto& slot = _slots[slotIdx];
@@ -127,7 +127,7 @@ void AdaptiveClauseDatabase::printChunks(int nextExportSize) {
             
             out += "] ";
         }
-        log(V2_INFO, "CDB (%i,%i) %i \t%s\n", l.size, l.lbd, slot.getNumActiveChunks(), out.c_str());
+        LOG(V2_INFO, "CDB (%i,%i) %i \t%s\n", l.size, l.lbd, slot.getNumActiveChunks(), out.c_str());
         i++;
         l.next(_max_lbd_partitioned_size);
     }

@@ -59,10 +59,10 @@ int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
 	assert(buffer.size() <= maxSize);
 	memcpy(begin, buffer.data(), buffer.size()*sizeof(int));
 
-	_logger.log(V5_DEBG, "prepared %i clauses, size %i\n", numExportedClauses, buffer.size());
+	LOGGER(_logger, V5_DEBG, "prepared %i clauses, size %i\n", numExportedClauses, buffer.size());
 	_stats.exportedClauses += numExportedClauses;
 	float usedRatio = ((float)buffer.size())/maxSize;
-	_logger.log(V5_DEBG, "buffer fillratio=%.3f\n", usedRatio);
+	LOGGER(_logger, V5_DEBG, "buffer fillratio=%.3f\n", usedRatio);
 	
 	return buffer.size();
 }
@@ -186,7 +186,7 @@ void DefaultSharingManager::processClause(int solverId, int solverRevision, cons
 	if (_params.crashMonkeyProbability() > 0) {
 		if (Random::rand() < _params.crashMonkeyProbability()) {
 			// Crash!
-			_logger.log(V3_VERB, "Simulating a crash!\n");
+			LOGGER(_logger, V3_VERB, "Simulating a crash!\n");
 			raise(SIGSEGV); // causes crash
 		}
 	}

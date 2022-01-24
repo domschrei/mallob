@@ -17,19 +17,19 @@ struct HordeTerminator : public CaDiCaL::Terminator {
         _lastTermCallbackTime = time;
 
         if (_stop) {
-            _logger.log(V3_VERB, "STOP (%.2fs since last cb)\n", elapsed);
+            LOGGER(_logger, V3_VERB, "STOP (%.2fs since last cb)\n", elapsed);
             return true;
         }
 
         if (_suspend) {
             // Stay inside this function call as long as solver is suspended
-            _logger.log(V3_VERB, "SUSPEND (%.2fs since last cb)\n", elapsed);
+            LOGGER(_logger, V3_VERB, "SUSPEND (%.2fs since last cb)\n", elapsed);
 
             _suspendCond.wait(_suspendMutex, [this] { return !_suspend; });
-            _logger.log(V4_VVER, "RESUME\n");
+            LOGGER(_logger, V4_VVER, "RESUME\n");
 
             if (_stop) {
-                _logger.log(V4_VVER, "STOP after suspension\n", elapsed);
+                LOGGER(_logger, V4_VVER, "STOP after suspension\n", elapsed);
                 return true;
             }
         }

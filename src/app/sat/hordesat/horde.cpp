@@ -35,7 +35,7 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 	
     int appRank = config.apprank;
 
-	_logger.log(V4_VVER, "Hlib engine for %s\n", config.getJobStr().c_str());
+	LOGGER(_logger, V4_VVER, "Hlib engine for %s\n", config.getJobStr().c_str());
 	//params.printParams();
 	_num_solvers = config.threads;
 	_job_id = config.jobid;
@@ -112,7 +112,7 @@ HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&&
 
 	_sharing_manager.reset(new DefaultSharingManager(_solver_interfaces, _params, _logger, 
 		/*max. deferred literals per solver=*/5*config.maxBroadcastedLitsPerCycle, config.apprank));
-	_logger.log(V5_DEBG, "initialized\n");
+	LOGGER(_logger, V5_DEBG, "initialized\n");
 }
 
 std::shared_ptr<PortfolioSolverInterface> HordeLib::createSolver(const SolverSetup& setup) {
@@ -121,26 +121,26 @@ std::shared_ptr<PortfolioSolverInterface> HordeLib::createSolver(const SolverSet
 	case 'l':
 	case 'L':
 		// Lingeling
-		_logger.log(V4_VVER, "S%i : Lingeling-%i\n", setup.globalId, setup.diversificationIndex);
+		LOGGER(_logger, V4_VVER, "S%i : Lingeling-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new Lingeling(setup));
 		break;
 	case 'c':
 	case 'C':
 		// Cadical
-		_logger.log(V4_VVER, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
+		LOGGER(_logger, V4_VVER, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new Cadical(setup));
 		break;
 	case 'k':
 	//case 'K': // no support for incremental mode as of now
 		// Kissat
-		_logger.log(V4_VVER, "S%i : Kissat-%i\n", setup.globalId, setup.diversificationIndex);
+		LOGGER(_logger, V4_VVER, "S%i : Kissat-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new Kissat(setup));
 		break;
 #ifdef MALLOB_USE_MERGESAT
 	case 'm':
 	//case 'M': // no support for incremental mode as of now
 		// MergeSat
-		_logger.log(V4_VVER, "S%i : MergeSat-%i\n", setup.globalId, setup.diversificationIndex);
+		LOGGER(_logger, V4_VVER, "S%i : MergeSat-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new MergeSatBackend(setup));
 		break;
 #endif
@@ -148,13 +148,13 @@ std::shared_ptr<PortfolioSolverInterface> HordeLib::createSolver(const SolverSet
 	case 'g':
 	case 'G':
 		// Glucose
-		_logger.log(V4_VVER, "S%i: Glucose-%i\n", setup.globalId, setup.diversificationIndex);
+		LOGGER(_logger, V4_VVER, "S%i: Glucose-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new MGlucose(setup));
 		break;
 #endif
 	default:
 		// Invalid solver
-		_logger.log(V0_CRIT, "[ERROR] Invalid solver \"%c\" assigned\n", setup.solverType);
+		LOGGER(_logger, V0_CRIT, "[ERROR] Invalid solver \"%c\" assigned\n", setup.solverType);
 		_logger.flush();
 		abort();
 		break;
@@ -164,7 +164,7 @@ std::shared_ptr<PortfolioSolverInterface> HordeLib::createSolver(const SolverSet
 
 void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, bool lastRevisionForNow) {
 	
-	_logger.log(V4_VVER, "Import rev. %i: %i lits, %i assumptions\n", revision, fSize, aSize);
+	LOGGER(_logger, V4_VVER, "Import rev. %i: %i lits, %i assumptions\n", revision, fSize, aSize);
 	assert(_revision+1 == revision);
 	_revision_data.push_back(RevisionData{fSize, fLits, aSize, aLits});
 	_sharing_manager->setRevision(revision);
@@ -189,7 +189,7 @@ void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size
 					// Non-incremental solver being "restarted" with a new revision:
 					// Abort (but do not create a thread trace) such that a new, fresh
 					// process will be initialized
-					_logger.log(V3_VERB, "Restarting this non-incremental subprocess\n");
+					LOGGER(_logger, V3_VERB, "Restarting this non-incremental subprocess\n");
 					raise(SIGUSR2);
 				}
 				// Pseudo-incremental SAT solving: 
@@ -227,7 +227,7 @@ void HordeLib::solve() {
 	_result.result = UNKNOWN;
 	if (!_solvers_started) {
 		// Need to start threads
-		_logger.log(V4_VVER, "starting threads\n");
+		LOGGER(_logger, V4_VVER, "starting threads\n");
 		for (auto& thread : _solver_threads) thread->start();
 		_solvers_started = true;
 	}
@@ -259,7 +259,7 @@ int HordeLib::solveLoop() {
 	}
 
 	if (done) {
-		_logger.log(V5_DEBG, "Returning result\n");
+		LOGGER(_logger, V5_DEBG, "Returning result\n");
 		return _result.result;
 	}
     return -1; // no result yet
@@ -267,7 +267,7 @@ int HordeLib::solveLoop() {
 
 int HordeLib::prepareSharing(int* begin, int maxSize, Checksum& checksum) {
 	if (isCleanedUp()) return 0;
-	_logger.log(V5_DEBG, "collecting clauses on this node\n");
+	LOGGER(_logger, V5_DEBG, "collecting clauses on this node\n");
 	int size = _sharing_manager->prepareSharing(begin, maxSize);
 
 	if (_params.useChecksums()) {
@@ -286,7 +286,7 @@ void HordeLib::digestSharing(std::vector<int>& result, const Checksum& checksum)
 		chk.combine(_job_id);
 		for (int lit : result) chk.combine(lit);
 		if (chk.get() != checksum.get()) {
-			_logger.log(V1_WARN, "[WARN] Checksum fail (expected count: %ld, actual count: %ld)\n", checksum.count(), chk.count());
+			LOGGER(_logger, V1_WARN, "[WARN] Checksum fail (expected count: %ld, actual count: %ld)\n", checksum.count(), chk.count());
 			return;
 		}
 	}
@@ -302,7 +302,7 @@ void HordeLib::digestSharing(int* begin, int size, const Checksum& checksum) {
 		chk.combine(_job_id);
 		for (int i = 0; i < size; i++) chk.combine(begin[i]);
 		if (chk.get() != checksum.get()) {
-			_logger.log(V1_WARN, "[WARN] Checksum fail (expected count: %ld, actual count: %ld)\n", checksum.count(), chk.count());
+			LOGGER(_logger, V1_WARN, "[WARN] Checksum fail (expected count: %ld, actual count: %ld)\n", checksum.count(), chk.count());
 			return;
 		}
 	}
@@ -318,7 +318,7 @@ void HordeLib::returnClauses(int* begin, int size) {
 void HordeLib::dumpStats(bool final) {
 	if (isCleanedUp() || !isFullyInitialized()) return;
 
-	int verb = final ? V2_INFO : V3_VERB;
+	int verb = final ? V2_INFO : V4_VVER;
 
 	// Solver statistics
 	SolvingStatistics solveStats;
@@ -377,7 +377,7 @@ void HordeLib::terminateSolvers() {
 void HordeLib::cleanUp() {
 	double time = Timer::elapsedSeconds();
 
-	_logger.log(V5_DEBG, "[hlib-cleanup] enter\n");
+	LOGGER(_logger, V5_DEBG, "[hlib-cleanup] enter\n");
 
 	// Terminate any remaining running threads
 	terminateSolvers();
@@ -388,14 +388,14 @@ void HordeLib::cleanUp() {
 	_solver_threads.clear();
 	_obsolete_solver_threads.clear();
 
-	_logger.log(V5_DEBG, "[hlib-cleanup] joined threads\n");
+	LOGGER(_logger, V5_DEBG, "[hlib-cleanup] joined threads\n");
 
 	// delete solvers
 	_solver_interfaces.clear();
-	_logger.log(V5_DEBG, "[hlib-cleanup] cleared solvers\n");
+	LOGGER(_logger, V5_DEBG, "[hlib-cleanup] cleared solvers\n");
 
 	time = Timer::elapsedSeconds() - time;
-	_logger.log(V4_VVER, "[hlib-cleanup] done, took %.3f s\n", time);
+	LOGGER(_logger, V4_VVER, "[hlib-cleanup] done, took %.3f s\n", time);
 	_logger.flush();
 
 	_cleaned_up = true;

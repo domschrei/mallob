@@ -18,17 +18,17 @@ private:
 public:
     ChildInterface(int jobId, InactiveJobNodeList&& nodes, int childIndex) : 
             jobId(jobId), nodes(nodes), childIndex(childIndex) {
-        log(V5_DEBG, "RBS OPEN_CHILD #%i:%i inactives={%s}\n", jobId, childIndex, nodes.toStr().c_str());
+        LOG(V5_DEBG, "RBS OPEN_CHILD #%i:%i inactives={%s}\n", jobId, childIndex, nodes.toStr().c_str());
     }
 
     ~ChildInterface() {
-        log(V5_DEBG, "RBS CLOSE_CHILD #%i:%i\n", jobId, childIndex);
+        LOG(V5_DEBG, "RBS CLOSE_CHILD #%i:%i\n", jobId, childIndex);
     }
 
     // called from local balancer update
     enum MsgDirective {DO_NOTHING, EMIT_DIRECTED_REQUEST, EMIT_UNDIRECTED_REQUEST};
     MsgDirective handleBalancingUpdate(int newEpoch, int newVolume, bool hasChild) {
-        log(V5_DEBG, "RBS CHILD #%i:%i e=%i->%i v=%i->%i\n", jobId, childIndex, epoch, newEpoch, volume, newVolume);
+        LOG(V5_DEBG, "RBS CHILD #%i:%i e=%i->%i v=%i->%i\n", jobId, childIndex, epoch, newEpoch, volume, newVolume);
         if (newEpoch <= epoch) return DO_NOTHING; 
         numQueriedJobNodes = 0;
         
@@ -62,11 +62,11 @@ public:
         nodes.mergePreferringNewer(newNodes);
         //notifiedInactiveNodes = false;
         childHasNodes = false;
-        log(V5_DEBG, "RBS #%i:%i ADDED_NODES inactives={%s}\n", jobId, childIndex, nodes.toStr().c_str());
+        LOG(V5_DEBG, "RBS #%i:%i ADDED_NODES inactives={%s}\n", jobId, childIndex, nodes.toStr().c_str());
     }
 
     MsgDirective handleRejectionOfPotentialChild(int index, int epoch, bool lost, bool hasChild, bool suspended) {
-        assert(index == childIndex || log_return_false("ERROR %i != %i\n", index, childIndex));
+        assert(index == childIndex || LOG_RETURN_FALSE("ERROR %i != %i\n", index, childIndex));
         findAndUpdateNode(childRank, childIndex, epoch, lost ? InactiveJobNode::LOST : InactiveJobNode::BUSY);
         if (!hasChild && !suspended && wantsChild()) return recruitChild();
         return DO_NOTHING;
@@ -74,7 +74,7 @@ public:
 
     void handleChildJoining(int source, int index, int epoch) {
 
-        assert(index == childIndex || log_return_false("ERROR %i != %i\n", index, childIndex));
+        assert(index == childIndex || LOG_RETURN_FALSE("ERROR %i != %i\n", index, childIndex));
 
         childRank = source;
         childHasNodes = true;
@@ -89,7 +89,7 @@ public:
         update.inactiveJobNodes.cleanUpStatuses();
         MyMpi::isend(childRank, MSG_SCHED_INITIALIZE_CHILD_WITH_NODES, update);
 
-        log(V5_DEBG, "RBS #%i:%i INIT_CHILD e=%i inactives={%s} => [%i]\n", 
+        LOG(V5_DEBG, "RBS #%i:%i INIT_CHILD e=%i inactives={%s} => [%i]\n", 
             jobId, childIndex, epoch, update.inactiveJobNodes.toStr().c_str(), source);
 
         // If you can find the job node of this rank, set it to BUSY.
@@ -109,7 +109,7 @@ public:
     }
 
     InactiveJobNodeList&& returnJobNodes() {
-        log(V5_DEBG, "RBS #%i:%i RETURNING_NODES inactives={%s}\n", jobId, childIndex, nodes.toStr().c_str());
+        LOG(V5_DEBG, "RBS #%i:%i RETURNING_NODES inactives={%s}\n", jobId, childIndex, nodes.toStr().c_str());
         return std::move(nodes);
     }
 
@@ -124,7 +124,7 @@ public:
     void removeNode(int rank, int epoch, int index) {
         InactiveJobNode node(rank, index, epoch);
         if (nodes.set.count(node)) {
-            log(V5_DEBG, "RBS #%i:%i DELETE (%i,%i,%i)\n", 
+            LOG(V5_DEBG, "RBS #%i:%i DELETE (%i,%i,%i)\n", 
                 jobId, childIndex, rank, index, epoch);
             nodes.set.erase(node);
         }
@@ -161,7 +161,7 @@ private:
         for (auto& node : nodes.set) {
             if (node.status == InactiveJobNode::AVAILABLE 
                     && (particularIndex == -1 || node.originalIndex == particularIndex)) {
-                log(V5_DEBG, "RBS #%i:%i e=%i RELEASE (%i,%i,%i,%s)\n", jobId, childIndex, epoch,
+                LOG(V5_DEBG, "RBS #%i:%i e=%i RELEASE (%i,%i,%i,%s)\n", jobId, childIndex, epoch,
                         node.rank, node.originalIndex, node.lastEpoch, InactiveJobNode::STATUS_STR[node.status]);
                 MyMpi::isend(node.rank, MSG_SCHED_RELEASE_FROM_WAITING, IntVec({jobId, node.originalIndex, epoch}));
                 node.status = InactiveJobNode::BUSY;
@@ -186,11 +186,11 @@ private:
             node.lastEpoch = epoch;
             node.status = status;
             nodes.set.insert(node);
-            log(V5_DEBG, "RBS #%i:%i Update (%i,%i,%i) -> status %i\n", jobId, childIndex, rank, index, epoch, status);
+            LOG(V5_DEBG, "RBS #%i:%i Update (%i,%i,%i) -> status %i\n", jobId, childIndex, rank, index, epoch, status);
             return true;
         }
 
-        log(V5_DEBG, "RBS #%i:%i (%i,%i,%i) not found\n", jobId, childIndex, rank, index, epoch);
+        LOG(V5_DEBG, "RBS #%i:%i (%i,%i,%i) not found\n", jobId, childIndex, rank, index, epoch);
         return false;
     }
 };

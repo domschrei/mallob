@@ -39,7 +39,7 @@ void introduceMonoJob(Parameters& params, Client& client) {
 
     auto result = client.getAPI().submit(json, APIConnector::CALLBACK_IGNORE);
     if (result != JsonInterface::Result::ACCEPT) {
-        log(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
+        LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
         abort();
     }
 }
@@ -52,7 +52,11 @@ inline bool doTerminate(Parameters& params, int rank) {
         terminate = true;
     }
     if (terminate) {
-        log(rank == 0 ? V2_INFO : V3_VERB, "Terminating.\n");
+        if (rank == 0) {
+            LOG(V2_INFO, "Terminating.\n");
+        } else {
+            LOG(V3_VERB, "Terminating.\n");
+        }
         Terminator::setTerminating();
         return true;
     }
@@ -64,8 +68,8 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     // Determine which role(s) this PE has
     bool isWorker = commWorkers != MPI_COMM_NULL;
     bool isClient = commClients != MPI_COMM_NULL;
-    if (isWorker) log(V4_VVER, "I am worker #%i\n", MyMpi::rank(commWorkers));
-    if (isClient) log(V4_VVER, "I am client #%i\n", MyMpi::rank(commClients));
+    if (isWorker) LOG(V4_VVER, "I am worker #%i\n", MyMpi::rank(commWorkers));
+    if (isClient) LOG(V4_VVER, "I am client #%i\n", MyMpi::rank(commClients));
 
     // Create worker and client as necessary
     Worker* worker = isWorker ? new Worker(commWorkers, params) : nullptr;
@@ -78,7 +82,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     
     // Register global callback for exiting msg (not specific to worker nor client)
     MyMpi::getMessageQueue().registerCallback(MSG_DO_EXIT, [myRank](MessageHandle& h) {
-        log(LOG_ADD_SRCRANK | V3_VERB, "Received exit signal", h.source);
+        LOG_ADD_SRC(V3_VERB, "Received exit signal", h.source);
 
         // Forward exit signal
         if (myRank*2+1 < MyMpi::size(MPI_COMM_WORLD))
@@ -89,9 +93,9 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
         Terminator::setTerminating();
     });
 
-    log(V5_DEBG, "Global init barrier ...\n");
+    LOG(V5_DEBG, "Global init barrier ...\n");
     MPI_Barrier(MPI_COMM_WORLD);
-    log(V5_DEBG, "Passed global init barrier\n");
+    LOG(V5_DEBG, "Passed global init barrier\n");
 
     // If mono solving mode is enabled, introduce the singular job to solve
     if (params.monoFilename.isSet() && isClient && MyMpi::rank(commClients) == 0)
@@ -165,7 +169,7 @@ int main(int argc, char *argv[]) {
 
     char hostname[1024];
 	gethostname(hostname, 1024);
-    log(V3_VERB, "Mallob %s pid=%lu on host %s\n", MALLOB_VERSION, Proc::getPid(), hostname);
+    LOG(V3_VERB, "Mallob %s pid=%lu on host %s\n", MALLOB_VERSION, Proc::getPid(), hostname);
 
     // Global and local seed, such that all nodes have access to a synchronized randomness
     // as well as to an individual randomness that differs among nodes
@@ -187,7 +191,7 @@ int main(int argc, char *argv[]) {
         if (isWorker(i)) workerRanks.push_back(i);
         if (isClient(i)) clientRanks.push_back(i);
     }
-    if (rank == 0) log(V3_VERB, "%i workers, %i clients\n", workerRanks.size(), clientRanks.size());
+    if (rank == 0) LOG(V3_VERB, "%i workers, %i clients\n", workerRanks.size(), clientRanks.size());
     
     MPI_Comm clientComm, workerComm;
     {
@@ -209,16 +213,16 @@ int main(int argc, char *argv[]) {
     try {
         doMainProgram(workerComm, clientComm, params);
     } catch (const std::exception& ex) {
-        log(V0_CRIT, "[ERROR] uncaught \"%s\"\n", ex.what());
+        LOG(V0_CRIT, "[ERROR] uncaught \"%s\"\n", ex.what());
         Process::doExit(1);
     } catch (...) {
-        log(V0_CRIT, "[ERROR] uncaught exception\n");
+        LOG(V0_CRIT, "[ERROR] uncaught exception\n");
         Process::doExit(1);
     }
 
     // Exit properly
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
-    log(V2_INFO, "Exiting happily\n");
+    LOG(V2_INFO, "Exiting happily\n");
     Process::doExit(0);
 }

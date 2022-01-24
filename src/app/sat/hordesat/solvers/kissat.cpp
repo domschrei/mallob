@@ -39,7 +39,7 @@ void Kissat::diversify(int seed) {
     if (seedSet) return;
 
 	// Options may only be set in the initialization phase, so the seed cannot be re-set
-    _logger.log(V3_VERB, "Diversifying %i\n", getDiversificationIndex());
+    LOGGER(_logger, V3_VERB, "Diversifying %i\n", getDiversificationIndex());
 
     kissat_set_option(solver, "seed", seed);
     kissat_set_option(solver, "quiet", 1);
@@ -133,7 +133,7 @@ std::vector<int> Kissat::getSolution() {
 	for (int i = 1; i <= getVariablesCount(); i++) {
         int val = kissat_value(solver, i);
 		assert(val == i || val == -i || val == 0 || 
-            log_return_false("[ERROR] value of variable %i/%i returned %i\n", 
+            LOG_RETURN_FALSE("[ERROR] value of variable %i/%i returned %i\n", 
             i, getVariablesCount(), val));
         result.push_back(val == 0 ? -i : val);
     }

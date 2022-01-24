@@ -16,9 +16,9 @@ void testPermutations() {
         for (int n : ns) {
             if (n < 2*r) continue;
 
-            log(V2_INFO, "n=%i, r=%i\n", n, r);
+            LOG(V2_INFO, "n=%i, r=%i\n", n, r);
             for (int rank = 0; rank < n; rank++) {
-                log(V2_INFO, " rank=%i\n", rank);
+                LOG(V2_INFO, " rank=%i\n", rank);
                 auto permutations = AdjustablePermutation::getPermutations(n, r);
                 std::vector<int> outgoingEdges = AdjustablePermutation::createExpanderGraph(permutations, rank);
                 
@@ -40,11 +40,11 @@ void testBestOutgoingEdges() {
 
     int r = 4;
     int n = 1000;
-    log(V2_INFO, "n=%i, r=%i\n", n, r);
+    LOG(V2_INFO, "n=%i, r=%i\n", n, r);
     auto permutations = AdjustablePermutation::getPermutations(n, r);
     std::vector<std::vector<int>> allEdges;
     for (size_t i = 0; i < n; i++) {
-        log(V2_INFO, " rank=%i\n", i);
+        LOG(V2_INFO, " rank=%i\n", i);
         auto edges = AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, i);
         allEdges.push_back(std::move(edges));
     }
@@ -65,7 +65,7 @@ void testBestOutgoingEdges() {
         int visited = 0;
         while (!nodeStack.empty()) {
             std::vector<int> newNodeStack;
-            log(V2_INFO, "%i nodes on level %i\n", nodeStack.size(), level);
+            LOG(V2_INFO, "%i nodes on level %i\n", nodeStack.size(), level);
             nodesPerLevel[level] += nodeStack.size();
             for (int node : nodeStack) {
                 visited++;
@@ -76,7 +76,7 @@ void testBestOutgoingEdges() {
             nodeStack = newNodeStack;
             level++;
         }
-        log(V2_INFO, "root=%i : %i visited\n", root, visited);
+        LOG(V2_INFO, "root=%i : %i visited\n", root, visited);
 
         /*
         for (const auto& [src, dests] : graph) {
@@ -84,12 +84,12 @@ void testBestOutgoingEdges() {
             std::string str;
             for (int d : dests) str += std::to_string(d) + " ";
             str = str.substr(0, str.size()-1);
-            log(V2_INFO, "%i -> {%s}\n", src, str.c_str());
+            LOG(V2_INFO, "%i -> {%s}\n", src, str.c_str());
         }*/
     }
 
     for (size_t i = 0; i < nodesPerLevel.size(); i++) {
-        log(V2_INFO, "l=%i n=%.3f\n", i, nodesPerLevel[i] / (float)n);
+        LOG(V2_INFO, "l=%i n=%.3f\n", i, nodesPerLevel[i] / (float)n);
     }
 }
 

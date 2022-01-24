@@ -5,7 +5,7 @@
 
 void chkerr(int err) {
     if (err != 0) {
-        log(V0_CRIT, "[ERROR] MPI errcode=%i\n", err);
+        LOG(V0_CRIT, "[ERROR] MPI errcode=%i\n", err);
         Logger::getMainInstance().flush();
         abort();
     }

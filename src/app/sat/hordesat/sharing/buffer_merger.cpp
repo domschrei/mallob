@@ -32,7 +32,7 @@ std::vector<int> BufferMerger::merge(int sizeLimit, std::vector<int>* excessClau
         //numFiltered[i] = 0;
     }
 
-    log(V4_VVER, "MERGE setup\n");
+    LOG(V4_VVER, "MERGE setup\n");
 
     std::vector<int> out;
     out.reserve(sizeLimit);
@@ -43,14 +43,14 @@ std::vector<int> BufferMerger::merge(int sizeLimit, std::vector<int>* excessClau
     _bucket = BucketLabel();
     _counter_pos = out.size()-1;
 
-    log(V4_VVER, "MERGE begin\n");
+    LOG(V4_VVER, "MERGE begin\n");
 
     // Merge as many clauses as possible into the out buffer
     int numRounds = 0;
     while (mergeRound(out, sizeLimit)) {numRounds++;}
     memcpy(out.data(), &_hash, sizeof(size_t));
 
-    log(V4_VVER, "MERGE rounds=%i\n", numRounds);
+    LOG(V4_VVER, "MERGE rounds=%i\n", numRounds);
 
     // If requested, merge all excess (but unique) clauses
     // into the excess buffer
@@ -76,7 +76,7 @@ std::vector<int> BufferMerger::merge(int sizeLimit, std::vector<int>* excessClau
         excessClauses->resize(lastNonzeroIdx+1);
     }
 
-    log(V4_VVER, "MERGE end\n");
+    LOG(V4_VVER, "MERGE end\n");
 
     return out;
 }
@@ -105,7 +105,7 @@ std::vector<int> BufferMerger::fastMerge(int sizeLimit, std::vector<int>* excess
         }
     }
 
-    log(V4_VVER, "MERGE setup\n");
+    LOG(V4_VVER, "MERGE setup\n");
 
     std::vector<int> out;
     out.reserve(sizeLimit);
@@ -129,13 +129,13 @@ std::vector<int> BufferMerger::fastMerge(int sizeLimit, std::vector<int>* excess
     Clause lastSeenClause;
     ClauseComparator compare;
 
-    log(V4_VVER, "MERGE begin\n");
+    LOG(V4_VVER, "MERGE begin\n");
 
     while (!_merger.empty()) {
 
         //for (auto it = _merger.begin(); it != _merger.end(); ++it) {
         //    auto& [clause, readerId] = *it;
-        //    log(V5_DEBG, "MERGER reader=%i %s\n", readerId, clause->toStr().c_str());
+        //    LOG(V5_DEBG, "MERGER reader=%i %s\n", readerId, clause->toStr().c_str());
         //}
 
         // Fetch next best clause
@@ -228,7 +228,7 @@ std::vector<int> BufferMerger::fastMerge(int sizeLimit, std::vector<int>* excess
         excessClauses->resize(lastNonzeroIdx+1);
     }
 
-    log(V4_VVER, "MERGE end\n");
+    LOG(V4_VVER, "MERGE end\n");
     return out;
 }
 
@@ -282,12 +282,12 @@ bool BufferMerger::mergeRound(std::vector<int>& out, int sizeLimit) {
         return false;
 
     assert(_bucket.size <= newBucket.size
-            || log_return_false("lbd-partitioned: %s, (%i,%i) => (%i,%i)\n", 
+            || LOG_RETURN_FALSE("lbd-partitioned: %s, (%i,%i) => (%i,%i)\n", 
                 isLbdPartitioned?"true":"false", _bucket.size, _bucket.lbd, 
                 newBucket.size, newBucket.lbd));
     if (_bucket.size == newBucket.size) 
         assert(!isLbdPartitioned || _bucket.lbd <= newBucket.lbd
-            || log_return_false("lbd-partitioned: %s, (%i,%i) => (%i,%i)\n", 
+            || LOG_RETURN_FALSE("lbd-partitioned: %s, (%i,%i) => (%i,%i)\n", 
                 isLbdPartitioned?"true":"false", _bucket.size, _bucket.lbd, 
                 newBucket.size, newBucket.lbd));
 

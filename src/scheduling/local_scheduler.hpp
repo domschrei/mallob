@@ -41,7 +41,7 @@ public:
             _parent_rank(jobTree.getParentNodeRank()), _parent_index(jobTree.getParentIndex()), 
             _left_child_index(jobTree.getLeftChildIndex()), _right_child_index(jobTree.getRightChildIndex()) {
         _sessions.resize(2);
-        log(V5_DEBG, "RBS OPEN #%i:%i\n", _job_id, _index);
+        LOG(V5_DEBG, "RBS OPEN #%i:%i\n", _job_id, _index);
     }
     LocalScheduler(LocalScheduler&& other) : 
         _job_id(other._job_id), _params(other._params),
@@ -59,7 +59,7 @@ public:
         _right_child_index = other._right_child_index;
     }
     ~LocalScheduler() {
-        log(V5_DEBG, "RBS CLOSE #%i:%i\n", _job_id, _index);
+        LOG(V5_DEBG, "RBS CLOSE #%i:%i\n", _job_id, _index);
     }
 
     void initCallbacks(std::function<void(int, int, int)> cbEmitDirectedJobRequest, 
@@ -110,7 +110,7 @@ public:
     // called from local balancer update
     void updateBalancing(int epoch, int volume, bool hasLeftChild, bool hasRightChild) {
 
-        log(V5_DEBG, "RBS #%i:%i BLC e=%i\n", _job_id, _index, epoch);
+        LOG(V5_DEBG, "RBS #%i:%i BLC e=%i\n", _job_id, _index, epoch);
         if (_last_update_epoch >= epoch) return;
         _last_update_epoch = epoch;
         _last_update_volume = volume;
@@ -128,7 +128,7 @@ public:
     }
 
     void beginSuspension(int epoch = -1) {
-        log(V5_DEBG, "RBS #%i:%i SUSPEND\n", _job_id, _index);
+        LOG(V5_DEBG, "RBS #%i:%i SUSPEND\n", _job_id, _index);
         if (epoch == -1) epoch = std::max(_last_update_epoch, _epoch_of_last_suspension);
         // Suspend (if not already suspended), remember this epoch as most recent suspension
         _epoch_of_last_suspension = epoch;
@@ -173,7 +173,7 @@ public:
         
         auto& session = getSessionByChildIndex(index);
         if (!session) return;
-        log(V5_DEBG, "RBS Child %i found\n", source);
+        LOG(V5_DEBG, "RBS Child %i found\n", source);
         session->handleChildJoining(source, index, epoch);
     }
 
@@ -186,14 +186,14 @@ public:
 
     void beginResumptionAsRoot() {
         assert(_index == 0);
-        log(V5_DEBG, "RBS #%i:%i RESUMING\n", _job_id, _index);
+        LOG(V5_DEBG, "RBS #%i:%i RESUMING\n", _job_id, _index);
         assert(_suspending && !_suspended);
         _resuming = true;
         if (canResumeAsRoot()) resumeAsRoot();
     }
 
     void resumeAsRoot() {
-        log(V5_DEBG, "RBS #%i:%i RESUME\n", _job_id, _index);
+        LOG(V5_DEBG, "RBS #%i:%i RESUME\n", _job_id, _index);
         assert(canResumeAsRoot());
         _resuming = false;
         _suspending = false;
@@ -278,11 +278,11 @@ public:
     bool acceptsChild(int index) {
         auto& session = getSessionByChildIndex(index);
         if (!session) {
-            log(V5_DEBG, "RBS child idx=%i not present\n", index);
+            LOG(V5_DEBG, "RBS child idx=%i not present\n", index);
             return false;
         }
         if (!session->wantsChild()) {
-            log(V5_DEBG, "RBS child idx=%i wants no child\n", index);
+            LOG(V5_DEBG, "RBS child idx=%i wants no child\n", index);
             return false;
         }
         return true;

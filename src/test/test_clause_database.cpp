@@ -25,7 +25,7 @@ bool insertUntilSuccess(AdaptiveClauseDatabase& cdb, size_t prodId, Clause& c) {
 }
 
 void testMerge() {
-    log(V2_INFO, "Testing merge of clause buffers ...\n");
+    LOG(V2_INFO, "Testing merge of clause buffers ...\n");
 
     int maxClauseSize = 3;
     int maxLbdPartitionedSize = 5;
@@ -60,7 +60,7 @@ void testMerge() {
             //log(V5_DEBG, "i=%i #%i %s\n", i, clsIdx, cls.toStr().c_str());
             if (lastClause.begin != nullptr) {
                 assert(compare(lastClause, cls) || !compare(cls, lastClause) 
-                    || log_return_false("%s > %s!\n", lastClause.toStr().c_str(), cls.toStr().c_str()));
+                    || LOG_RETURN_FALSE("%s > %s!\n", lastClause.toStr().c_str(), cls.toStr().c_str()));
             }
             lastClause = cls;
             clsIdx++;
@@ -69,16 +69,16 @@ void testMerge() {
     }
 
     AdaptiveClauseDatabase cdb(maxClauseSize, maxLbdPartitionedSize, 1500, 20, 1);
-    log(V2_INFO, "Merging ...\n");
+    LOG(V2_INFO, "Merging ...\n");
     auto merger = cdb.getBufferMerger();
     for (auto& buffer : buffers) merger.add(cdb.getBufferReader(buffer.data(), buffer.size()));
     std::vector<int> excess;
     auto merged = merger.merge(300000, &excess);
-    log(V2_INFO, "Merged into buffer of size %ld, excess buffer has size %ld\n", merged.size(), excess.size());
+    LOG(V2_INFO, "Merged into buffer of size %ld, excess buffer has size %ld\n", merged.size(), excess.size());
 }
 
 void testUniform() {
-    log(V2_INFO, "Testing lock-free clause database, uniform setting ...\n");
+    LOG(V2_INFO, "Testing lock-free clause database, uniform setting ...\n");
 
     int maxClauseSize = 30;
     int maxLbdPartitionedSize = 5;
@@ -106,7 +106,7 @@ void testUniform() {
                         for (size_t j = 0; j < b.size; j++) lits.push_back(100*b.size+lbd);
                         Clause c{lits.data(), b.size, lbd};
                         assert(insertUntilSuccess(cdb, i, c) == (b.size <= maxClauseSize) 
-                            || log_return_false("Failed to add cls of size %i, lbd %i\n", b.size, lbd));
+                            || LOG_RETURN_FALSE("Failed to add cls of size %i, lbd %i\n", b.size, lbd));
                     }
                 }
             }
@@ -132,42 +132,42 @@ void testUniform() {
     auto out = cdb.exportBuffer(1000000, numExported);
     //assert(numExported == numProducers);
 
-    for (int lit : out) log(LOG_NO_PREFIX | V4_VVER, "%i ", lit);
-    log(LOG_NO_PREFIX | V4_VVER, "\n");
+    for (int lit : out) LOG_OMIT_PREFIX(V4_VVER, "%i ", lit);
+    LOG_OMIT_PREFIX(V4_VVER, "\n");
 
     auto reader = cdb.getBufferReader(out.data(), out.size());
     Clause c = reader.getNextIncomingClause();
     while (c.begin != nullptr) {
-        log(LOG_NO_PREFIX | V4_VVER, "lbd=%i ", c.lbd);
-        for (size_t i = 0; i < c.size; i++) log(LOG_NO_PREFIX | V4_VVER, "%i ", c.begin[i]);
-        log(LOG_NO_PREFIX | V4_VVER, "0\n");
+        LOG_OMIT_PREFIX(V4_VVER, "lbd=%i ", c.lbd);
+        for (size_t i = 0; i < c.size; i++) LOG_OMIT_PREFIX(V4_VVER, "%i ", c.begin[i]);
+        LOG_OMIT_PREFIX(V4_VVER, "0\n");
         c = reader.getNextIncomingClause();
     }
-    log(LOG_NO_PREFIX | V4_VVER, "\n");
+    LOG_OMIT_PREFIX(V4_VVER, "\n");
 
     auto merger = cdb.getBufferMerger();
     for (int n = 0; n < 10; n++) merger.add(cdb.getBufferReader(out.data(), out.size()));
     auto merged = merger.merge(10000);
 
-    for (int lit : merged) log(LOG_NO_PREFIX | V4_VVER, "%i ", lit);
-    log(LOG_NO_PREFIX | V4_VVER, "\n");
+    for (int lit : merged) LOG_OMIT_PREFIX(V4_VVER, "%i ", lit);
+    LOG_OMIT_PREFIX(V4_VVER, "\n");
 
     reader = cdb.getBufferReader(merged.data(), merged.size());
     c = reader.getNextIncomingClause();
     while (c.begin != nullptr) {
-        log(LOG_NO_PREFIX | V4_VVER, "lbd=%i ", c.lbd);
-        for (size_t i = 0; i < c.size; i++) log(LOG_NO_PREFIX | V4_VVER, "%i ", c.begin[i]);
-        log(LOG_NO_PREFIX | V4_VVER, "0\n");
+        LOG_OMIT_PREFIX(V4_VVER, "lbd=%i ", c.lbd);
+        for (size_t i = 0; i < c.size; i++) LOG_OMIT_PREFIX(V4_VVER, "%i ", c.begin[i]);
+        LOG_OMIT_PREFIX(V4_VVER, "0\n");
         c = reader.getNextIncomingClause();
     }
 
     assert(merged == out);
 
-    log(V2_INFO, "Done.\n");
+    LOG(V2_INFO, "Done.\n");
 }
 
 void testRandomClauses() {
-    log(V2_INFO, "Testing lock-free clause database ...\n");
+    LOG(V2_INFO, "Testing lock-free clause database ...\n");
 
     int maxClauseSize = 30;
     int maxLbdPartitionedSize = 5;
@@ -175,7 +175,7 @@ void testRandomClauses() {
     int numProducers = 4;
     int numClauses = 10000;
 
-    log(V2_INFO, "Generating %i clauses ...\n", numClauses);
+    LOG(V2_INFO, "Generating %i clauses ...\n", numClauses);
 
     // Generate clauses
     std::vector<std::vector<int>> inputClauses;
@@ -200,14 +200,14 @@ void testRandomClauses() {
         inputClauses.push_back(std::move(cls));
     }
 
-    log(V2_INFO, "Generated %i distinct clauses.\n", numDistinct);
+    LOG(V2_INFO, "Generated %i distinct clauses.\n", numDistinct);
 
-    log(V2_INFO, "Setting up clause database ...\n");
+    LOG(V2_INFO, "Setting up clause database ...\n");
 
     AdaptiveClauseDatabase cdb(maxClauseSize, maxLbdPartitionedSize, baseBufferSize, 20, numProducers);
     std::vector<std::vector<int>> buffers;
 
-    log(V2_INFO, "Performing multi-threaded addition of clauses ...\n");
+    LOG(V2_INFO, "Performing multi-threaded addition of clauses ...\n");
 
     for (size_t rep = 0; rep < 3; rep++) {
 
@@ -236,9 +236,9 @@ void testRandomClauses() {
         // Export buffer from database
         int numExported = 0;
         auto out = cdb.exportBuffer(1000000, numExported);
-        log(V2_INFO, " - %i/%i added, %i exported into buffer\n", (int)numAdded, (int)numRejected, numExported);
+        LOG(V2_INFO, " - %i/%i added, %i exported into buffer\n", (int)numAdded, (int)numRejected, numExported);
 
-        //for (int lit : out) log(LOG_NO_PREFIX | V4_VVER, "%i ", lit);
+        //for (int lit : out) LOG_OMIT_PREFIX(V4_VVER, "%i ", lit);
         //log(LOG_NO_PREFIX | V4_VVER, "\n");
         buffers.push_back(std::move(out));
     }
@@ -246,11 +246,11 @@ void testRandomClauses() {
     auto merger = cdb.getBufferMerger();
     for (auto& out : buffers) merger.add(cdb.getBufferReader(out.data(), out.size()));
 
-    log(V2_INFO, "Merging buffers ...\n");
+    LOG(V2_INFO, "Merging buffers ...\n");
     auto merged = merger.merge(1000000);
-    log(V2_INFO, "Merged buffers into buffer of size %i\n", merged.size());
+    LOG(V2_INFO, "Merged buffers into buffer of size %i\n", merged.size());
     
-    //for (int lit : merged) log(LOG_NO_PREFIX | V4_VVER, "%i ", lit);
+    //for (int lit : merged) LOG_OMIT_PREFIX(V4_VVER, "%i ", lit);
     //log(LOG_NO_PREFIX | V4_VVER, "\n");
 
     auto reader = cdb.getBufferReader(merged.data(), merged.size());
@@ -259,12 +259,12 @@ void testRandomClauses() {
     while (c.begin != nullptr) {
         readClauses++;
         //log(LOG_NO_PREFIX | V4_VVER, "lbd=%i ", c.lbd);
-        //for (size_t i = 0; i < c.size; i++) log(LOG_NO_PREFIX | V4_VVER, "%i ", c.begin[i]);
+        //for (size_t i = 0; i < c.size; i++) LOG_OMIT_PREFIX(V4_VVER, "%i ", c.begin[i]);
         //log(LOG_NO_PREFIX | V4_VVER, "0\n");
         c = reader.getNextIncomingClause();
     }
 
-    log(V3_VERB, "Read %i clauses from merged buffer\n", readClauses);
+    LOG(V3_VERB, "Read %i clauses from merged buffer\n", readClauses);
 }
 
 Clause produceClause(std::function<float()> normalRng, float meanLength) {
@@ -285,7 +285,7 @@ Clause produceClause(std::function<float()> normalRng, float meanLength) {
 }
 
 void testConcurrentClauseAddition() {
-    log(V2_INFO, "Testing lock-free clause database ...\n");
+    LOG(V2_INFO, "Testing lock-free clause database ...\n");
 
     int maxClauseSize = 30;
     int maxLbdPartitionedSize = 5;
@@ -345,7 +345,7 @@ void testConcurrentClauseAddition() {
                 usleep(1000);
             }
 
-            log(V2_INFO, "Thread %i : %i passed, %i dropped, %i deferred (%.4f initially, %.4f eventually passed)\n", 
+            LOG(V2_INFO, "Thread %i : %i passed, %i dropped, %i deferred (%.4f initially, %.4f eventually passed)\n", 
                 i, passed, dropped, deferred, ((float)initiallyPassed)/produced, ((float)passed)/produced);
             numFinished++;
         });
@@ -372,13 +372,13 @@ void testConcurrentClauseAddition() {
         totalExported += numExported;
         float meanLength = ((float)buffers.back().size()/numExported);
 
-        log(V2_INFO, "Exported %i clauses, bufsize %i (mean length %.3f)\n", numExported, buffers.back().size(), meanLength);
+        LOG(V2_INFO, "Exported %i clauses, bufsize %i (mean length %.3f)\n", numExported, buffers.back().size(), meanLength);
     }
 
     float producedMeanLength = ((int)sumOfProducedLengths / (float)(numProducers*numClausesPerThread));
     float exportedMeanLength = totalBufsize / (float)totalExported;
-    log(V2_INFO, "Exported %i clauses in total (%.3f dropped or left back)\n", totalExported, 1 - (float)totalExported / (numProducers*numClausesPerThread));
-    log(V2_INFO, "Produced mean length: %.3f ; exported mean length: %.3f\n", producedMeanLength, exportedMeanLength);
+    LOG(V2_INFO, "Exported %i clauses in total (%.3f dropped or left back)\n", totalExported, 1 - (float)totalExported / (numProducers*numClausesPerThread));
+    LOG(V2_INFO, "Produced mean length: %.3f ; exported mean length: %.3f\n", producedMeanLength, exportedMeanLength);
  
     for (auto& thread : threads) thread.join();
 }

@@ -45,7 +45,7 @@ public:
 
         // Set up "management" block of shared memory created by the parent
         _shmem_id = _config.getSharedMemId(Proc::getParentPid());
-        log.log(V4_VVER, "Access base shmem: %s\n", _shmem_id.c_str());
+        LOGGER(log, V4_VVER, "Access base shmem: %s\n", _shmem_id.c_str());
         _hsm = (HordeSharedMemory*) accessMemory(_shmem_id, sizeof(HordeSharedMemory));
         
         _checksum = params.useChecksums() ? new Checksum() : nullptr;
@@ -97,7 +97,7 @@ public:
 
             // Terminate
             if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true)) {
-                _log.log(V5_DEBG, "DO terminate\n");
+                LOGGER(_log, V5_DEBG, "DO terminate\n");
                 _hlib.dumpStats(/*final=*/true);
                 break;
             }
@@ -107,7 +107,7 @@ public:
 
             // Dump stats
             if (_hsm->doDumpStats && !_hsm->didDumpStats) {
-                _log.log(V5_DEBG, "DO dump stats\n");
+                LOGGER(_log, V5_DEBG, "DO dump stats\n");
                 
                 _hlib.dumpStats(/*final=*/false);
 
@@ -115,7 +115,7 @@ public:
                 double cpuShare; float sysShare;
                 bool success = Proc::getThreadCpuRatio(Proc::getTid(), cpuShare, sysShare);
                 if (success) {
-                    _log.log(V3_VERB, "child_main cpuratio=%.3f sys=%.3f\n", cpuShare, sysShare);
+                    LOGGER(_log, V3_VERB, "child_main cpuratio=%.3f sys=%.3f\n", cpuShare, sysShare);
                 }
 
                 // For each solver thread
@@ -125,7 +125,7 @@ public:
                     
                     success = Proc::getThreadCpuRatio(threadTids[i], cpuShare, sysShare);
                     if (success) {
-                        _log.log(V3_VERB, "td.%ld cpuratio=%.3f sys=%.3f\n", threadTids[i], cpuShare, sysShare);
+                        LOGGER(_log, V3_VERB, "td.%ld cpuratio=%.3f sys=%.3f\n", threadTids[i], cpuShare, sysShare);
                     }
                 }
 
@@ -135,7 +135,7 @@ public:
 
             // Check if clauses should be exported
             if (_hsm->doExport && !_hsm->didExport) {
-                _log.log(V5_DEBG, "DO export clauses\n");
+                LOGGER(_log, V5_DEBG, "DO export clauses\n");
                 // Collect local clauses, put into shared memory
                 _hsm->exportChecksum = Checksum();
                 _hsm->exportBufferTrueSize = _hlib.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize, _hsm->exportChecksum);
@@ -145,7 +145,7 @@ public:
 
             // Check if clauses should be imported (must not be "from the future")
             if (_hsm->doImport && !_hsm->didImport && _hsm->importBufferRevision <= _last_imported_revision) {
-                _log.log(V5_DEBG, "DO import clauses\n");
+                LOGGER(_log, V5_DEBG, "DO import clauses\n");
                 // Write imported clauses from shared memory into vector
                 assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
                 _hlib.digestSharing(_import_buffer, _hsm->importBufferSize, _hsm->importChecksum);
@@ -155,7 +155,7 @@ public:
 
             // Re-insert returned clauses into the local clause database to be exported later
             if (_hsm->doReturnClauses && !_hsm->didReturnClauses) {
-                _log.log(V5_DEBG, "DO return clauses\n");
+                LOGGER(_log, V5_DEBG, "DO return clauses\n");
                 _hlib.returnClauses(_returned_buffer, _hsm->returnedBufferSize);
                 _hsm->didReturnClauses = true;
             }
@@ -163,7 +163,7 @@ public:
 
             // Check initialization state
             if (!_hsm->isInitialized && _hlib.isFullyInitialized()) {
-                _log.log(V5_DEBG, "DO set initialized\n");
+                LOGGER(_log, V5_DEBG, "DO set initialized\n");
                 _hsm->isInitialized = true;
             }
 
@@ -185,7 +185,7 @@ public:
 
                 solutionVec = result.solution;
                 _hsm->solutionRevision = result.revision;
-                _log.log(V5_DEBG, "DO write solution\n");
+                LOGGER(_log, V5_DEBG, "DO write solution\n");
                 _hsm->result = SatResult(result.result);
                 size_t* solutionSize = (size_t*) SharedMemory::create(_shmem_id + ".solutionsize." + std::to_string(_hsm->solutionRevision), sizeof(size_t));
                 *solutionSize = solutionVec.size();
@@ -197,7 +197,7 @@ public:
                     memcpy(solutionShmem, solutionVec.data(), solutionShmemSize);
                 }
                 lastSolvedRevision = result.revision;
-                _log.log(V5_DEBG, "DONE write solution\n");
+                LOGGER(_log, V5_DEBG, "DONE write solution\n");
                 _hsm->hasSolution = true;
             }
         }
@@ -211,7 +211,7 @@ private:
     void* accessMemory(const std::string& shmemId, size_t size) {
         void* ptr = SharedMemory::access(shmemId, size);
         if (ptr == nullptr) {
-            _log.log(V0_CRIT, "[ERROR] Could not access shmem %s\n", shmemId.c_str());  
+            LOGGER(_log, V0_CRIT, "[ERROR] Could not access shmem %s\n", shmemId.c_str());  
             Process::doExit(0);  
         }
         return ptr;
@@ -241,7 +241,7 @@ private:
     void importRevision(int revision, Checksum* checksum) {
         size_t* fSizePtr = (size_t*) accessMemory(_shmem_id + ".fsize." + std::to_string(revision), sizeof(size_t));
         size_t* aSizePtr = (size_t*) accessMemory(_shmem_id + ".asize." + std::to_string(revision), sizeof(size_t));
-        _log.log(V4_VVER, "Read rev. %i/%i : %i lits, %i assumptions\n", revision, _desired_revision, *fSizePtr, *aSizePtr);
+        LOGGER(_log, V4_VVER, "Read rev. %i/%i : %i lits, %i assumptions\n", revision, _desired_revision, *fSizePtr, *aSizePtr);
         int* fPtr = (int*) accessMemory(_shmem_id + ".formulae." + std::to_string(revision), sizeof(int) * (*fSizePtr));
         int* aPtr = (int*) accessMemory(_shmem_id + ".assumptions." + std::to_string(revision), sizeof(int) * (*aSizePtr));
         
@@ -253,7 +253,7 @@ private:
             if (chk->count() > 0) {
                 // Check checksum
                 if (checksum->get() != chk->get()) {
-                    _log.log(V0_CRIT, "[ERROR] Checksum fail at rev. %i. Incoming count: %ld ; local count: %ld\n", revision, chk->count(), checksum->count());
+                    LOGGER(_log, V0_CRIT, "[ERROR] Checksum fail at rev. %i. Incoming count: %ld ; local count: %ld\n", revision, chk->count(), checksum->count());
                     abort();
                 }
             }
@@ -268,7 +268,7 @@ private:
         float time = Timer::elapsedSeconds();
         int sleepStatus = usleep(1000 /*1 millisecond*/);
         time = Timer::elapsedSeconds() - time;
-        if (sleepStatus != 0) _log.log(V5_DEBG, "Woken up after %i us\n", (int) (1000*1000*time));
+        if (sleepStatus != 0) LOGGER(_log, V5_DEBG, "Woken up after %i us\n", (int) (1000*1000*time));
     }
 
     void doTerminate() {

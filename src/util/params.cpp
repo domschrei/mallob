@@ -38,7 +38,7 @@ void Parameters::init(int argc, char** argv) {
         
         // first option dash
         if (arg[0] != '-') {
-            log(V1_WARN, "[WARN] Invalid argument \"%s\"\n", arg);
+            LOG(V1_WARN, "[WARN] Invalid argument \"%s\"\n", arg);
             continue;
         }
         arg = arg+1;
@@ -87,12 +87,12 @@ void Parameters::expand() {
 
 void Parameters::printBanner() const {
     // Output program banner (only the PE of rank zero)
-    log(V2_INFO | LOG_NO_PREFIX, "%s\n", monoFilename.isSet() ? BANNER_C_PREFIXED : BANNER);
+    LOG_OMIT_PREFIX(V2_INFO, "%s\n", monoFilename.isSet() ? BANNER_C_PREFIXED : BANNER);
 }
 
 void Parameters::printUsage() const {
-    log(V2_INFO, USAGE);
-    log(V2_INFO, "Each option must be given as \"-key=value\" or \"--key=value\" or (for boolean options only) just \"-[-]key\".");
+    LOG(V2_INFO, USAGE);
+    LOG(V2_INFO, "Each option must be given as \"-key=value\" or \"--key=value\" or (for boolean options only) just \"-[-]key\".");
     
     std::map<std::string, Option*> sortedMap;
     for (const auto& [id, opt] : _map) {
@@ -106,10 +106,10 @@ void Parameters::printUsage() const {
         const char* typeStr = opt->getTypeString();
 
         if (opt->hasLongOption()) {
-            log(LOG_NO_PREFIX | V2_INFO, "-%s , -%s (%s%s)\n\t\t%s\n", 
+            LOG_OMIT_PREFIX(V2_INFO, "-%s , -%s (%s%s)\n\t\t%s\n", 
                 id.c_str(), opt->longid.c_str(), typeStr, defaultVal.c_str(), opt->desc.c_str());
         } else {
-            log(LOG_NO_PREFIX | V2_INFO, "-%s (%s%s)\n\t\t%s\n", 
+            LOG_OMIT_PREFIX(V2_INFO, "-%s (%s%s)\n\t\t%s\n", 
                 id.c_str(), typeStr, defaultVal.c_str(), opt->desc.c_str());
         }
     }
@@ -126,7 +126,7 @@ void Parameters::printParams() const {
             out += "-" + it.first + "=" + it.second + " ";
         }
     }
-    log(V2_INFO, "Program options: %s\n", out.c_str());
+    LOG(V2_INFO, "Program options: %s\n", out.c_str());
 }
 
 char* const* Parameters::asCArgs(const char* execName) const {

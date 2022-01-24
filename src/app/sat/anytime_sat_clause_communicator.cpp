@@ -9,7 +9,7 @@
 void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
 
     if (msg.jobId != _job->getId()) {
-        log(LOG_ADD_SRCRANK | V1_WARN, "[WARN] %s : stray job message meant for #%i\n", source, _job->toStr(), msg.jobId);
+        LOG_ADD_SRC(V1_WARN, "[WARN] %s : stray job message meant for #%i\n", source, _job->toStr(), msg.jobId);
         return;
     }
     
@@ -21,7 +21,7 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         chk.combine(msg.jobId);
         for (int& lit : msg.payload) chk.combine(lit);
         if (chk.get() != msg.checksum.get()) {
-            log(V1_WARN, "[WARN] %s : checksum fail in job msg (expected count: %ld, actual count: %ld)\n", 
+            LOG(V1_WARN, "[WARN] %s : checksum fail in job msg (expected count: %ld, actual count: %ld)\n", 
                 _job->toStr(), msg.checksum.count(), chk.count());
             return;
         }
@@ -44,7 +44,7 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         std::vector<int>& clauses = msg.payload;
         //testConsistency(clauses, getBufferLimit(numAggregated, BufferMode::ALL), /*sortByLbd=*/false);
         
-        log(V5_DEBG, "%s : receive s=%i\n", _job->toStr(), clauses.size());
+        LOG(V5_DEBG, "%s : receive s=%i\n", _job->toStr(), clauses.size());
         
         // Add received clauses to local set of collected clauses
         _clause_buffers.push_back(clauses);
@@ -123,7 +123,7 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
 
     if (_job->getJobTree().isRoot()) {
         // Rank zero: proceed to broadcast
-        log(V3_VERB, "%s epoch %i: Broadcast clauses from %i sources\n", _job->toStr(), 
+        LOG(V3_VERB, "%s epoch %i: Broadcast clauses from %i sources\n", _job->toStr(), 
             _current_epoch, _num_aggregated_nodes);
         // Share complete set of clauses to children
         broadcastAndLearn(clausesToShare);
@@ -137,7 +137,7 @@ void AnytimeSatClauseCommunicator::sendClausesToParent() {
         msg.epoch = 0; // unused
         msg.tag = MSG_GATHER_CLAUSES;
         msg.payload = clausesToShare;
-        log(LOG_ADD_DESTRANK | V4_VVER, "%s : gather s=%i", parentRank, _job->toStr(), msg.payload.size());
+        LOG_ADD_DEST(V4_VVER, "%s : gather s=%i", parentRank, _job->toStr(), msg.payload.size());
         msg.payload.push_back(_num_aggregated_nodes);
         if (_use_checksums) {
             msg.checksum.combine(msg.jobId);
@@ -157,14 +157,14 @@ void AnytimeSatClauseCommunicator::broadcastAndLearn(std::vector<int>& clauses) 
 }
 
 void AnytimeSatClauseCommunicator::learnClauses(std::vector<int>& clauses) {
-    log(V4_VVER, "%s : learn s=%i\n", _job->toStr(), clauses.size());
+    LOG(V4_VVER, "%s : learn s=%i\n", _job->toStr(), clauses.size());
     
     if (clauses.size() > 0) {
         // Locally learn clauses
         
         // If not active or not fully initialized yet: discard clauses
         if (_job->getState() != ACTIVE || !_job->isInitialized()) {
-            log(V4_VVER, "%s : discard buffer, job is not (yet?) active\n", 
+            LOG(V4_VVER, "%s : discard buffer, job is not (yet?) active\n", 
                     _job->toStr());
             return;
         }
@@ -177,9 +177,9 @@ void AnytimeSatClauseCommunicator::learnClauses(std::vector<int>& clauses) {
         }
 
         // Locally digest clauses
-        log(V4_VVER, "%s : digest\n", _job->toStr());
+        LOG(V4_VVER, "%s : digest\n", _job->toStr());
         _job->digestSharing(clauses, checksum);
-        log(V4_VVER, "%s : digested\n", _job->toStr());
+        LOG(V4_VVER, "%s : digested\n", _job->toStr());
     }
 }
 
@@ -201,12 +201,12 @@ void AnytimeSatClauseCommunicator::sendClausesToChildren(std::vector<int>& claus
     int childRank;
     if (_job->getJobTree().hasLeftChild()) {
         childRank = _job->getJobTree().getLeftChildNodeRank();
-        log(LOG_ADD_DESTRANK | V4_VVER, "%s : broadcast s=%i", childRank, _job->toStr(), msg.payload.size());
+        LOG_ADD_DEST(V4_VVER, "%s : broadcast s=%i", childRank, _job->toStr(), msg.payload.size());
         MyMpi::isend(childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
     if (_job->getJobTree().hasRightChild()) {
         childRank = _job->getJobTree().getRightChildNodeRank();
-        log(LOG_ADD_DESTRANK | V4_VVER, "%s : broadcast s=%i", childRank, _job->toStr(), msg.payload.size());
+        LOG_ADD_DEST(V4_VVER, "%s : broadcast s=%i", childRank, _job->toStr(), msg.payload.size());
         MyMpi::isend(childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
 
@@ -227,7 +227,7 @@ void AnytimeSatClauseCommunicator::initiateMergeOfClauseBuffers() {
     assert(_num_aggregated_nodes > 0);
     int totalSize = getBufferLimit(_num_aggregated_nodes, MyMpi::ALL);
     int selfSize = getBufferLimit(_num_aggregated_nodes, MyMpi::SELF);
-    log(V5_DEBG, "%s : aggr=%i max_self=%i max_total=%i\n", _job->toStr(), 
+    LOG(V5_DEBG, "%s : aggr=%i max_self=%i max_total=%i\n", _job->toStr(), 
             _num_aggregated_nodes, selfSize, totalSize);
 
     // Locally collect clauses from own solvers, add to clause buffer
@@ -237,7 +237,7 @@ void AnytimeSatClauseCommunicator::initiateMergeOfClauseBuffers() {
         selfClauses = getEmptyBuffer();
     } else {
         // Else, retrieve clauses from solvers
-        log(V4_VVER, "%s : collect s<=%i\n", 
+        LOG(V4_VVER, "%s : collect s<=%i\n", 
                     _job->toStr(), selfSize);
         Checksum checksum;
         selfClauses = _job->getPreparedClauses(checksum);
@@ -247,7 +247,7 @@ void AnytimeSatClauseCommunicator::initiateMergeOfClauseBuffers() {
             chk.combine(_job->getId());
             for (int lit : selfClauses) chk.combine(lit);
             if (checksum.get() != chk.get()) {
-                log(V1_WARN, "[WARN] %s : checksum fail in clsbuf (expected count: %ld, actual count: %ld)\n", 
+                LOG(V1_WARN, "[WARN] %s : checksum fail in clsbuf (expected count: %ld, actual count: %ld)\n", 
                 _job->toStr(), checksum.count(), chk.count());
                 selfClauses = getEmptyBuffer();
             }
@@ -268,7 +268,7 @@ void AnytimeSatClauseCommunicator::initiateMergeOfClauseBuffers() {
     }
 
     if (numBuffersMerging >= 4) {
-        log(V1_WARN, "[WARN] %s : merging %i/%i local buffers\n", 
+        LOG(V1_WARN, "[WARN] %s : merging %i/%i local buffers\n", 
             _job->toStr(), numBuffersMerging, _clause_buffers.size());
     }
 
@@ -278,7 +278,7 @@ void AnytimeSatClauseCommunicator::initiateMergeOfClauseBuffers() {
     }
     
     // Merge all collected buffer into a single buffer
-    log(V4_VVER, "%s : merge n=%i s<=%i\n", 
+    LOG(V4_VVER, "%s : merge n=%i s<=%i\n", 
                 _job->toStr(), numBuffersMerging, totalSize);
     
     // Start asynchronous task to merge the clause buffers 
@@ -303,7 +303,7 @@ bool AnytimeSatClauseCommunicator::testConsistency(std::vector<int>& buffer, siz
     if (buffer.empty()) return true;
 
     if (maxSize > 0 && buffer.size() > maxSize) {
-        log(V0_CRIT, "[ERROR] Clause buffer too full (%i/%i)\n", buffer.size(), maxSize);
+        LOG(V0_CRIT, "[ERROR] Clause buffer too full (%i/%i)\n", buffer.size(), maxSize);
         Logger::getMainInstance().flush();
         abort();
     }
@@ -356,7 +356,7 @@ bool AnytimeSatClauseCommunicator::testConsistency(std::vector<int>& buffer, siz
             int currentLbd = 0;
             for (int clsIndex : clsIndices) {
                 assert(currentLbd <= originalClauses[clsIndex*length] 
-                    || log_return_false("%i %i %i\n", length, currentLbd, originalClauses[clsIndex*length]));
+                    || LOG_RETURN_FALSE("%i %i %i\n", length, currentLbd, originalClauses[clsIndex*length]));
                 currentLbd = originalClauses[clsIndex*length];
                 assert(currentLbd >= 2);
                 // For each clause literal:
@@ -382,12 +382,12 @@ bool AnytimeSatClauseCommunicator::testConsistency(std::vector<int>& buffer, siz
     }
 
     if (consistent > 0) {
-        log(V0_CRIT, "[ERROR] Inconsistency %i in clause buffer at position %i: \n", consistent, pos);
+        LOG(V0_CRIT, "[ERROR] Inconsistency %i in clause buffer at position %i: \n", consistent, pos);
         for (size_t p = 0; p < buffer.size(); p++) {
-            if (p == pos) log(LOG_NO_PREFIX | V0_CRIT, "(%i) ", buffer[p]);
-            else          log(LOG_NO_PREFIX | V0_CRIT, "%i ", buffer[p]);
+            if (p == pos) LOG_OMIT_PREFIX(V0_CRIT, "(%i) ", buffer[p]);
+            else          LOG_OMIT_PREFIX(V0_CRIT, "%i ", buffer[p]);
         }
-        log(LOG_NO_PREFIX | V0_CRIT, "\n");
+        LOG_OMIT_PREFIX(V0_CRIT, "\n");
         Logger::getMainInstance().flush();
         abort();
     }

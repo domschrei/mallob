@@ -73,10 +73,10 @@ public:
         FileUtils::mkdir(_base_path + "/pending/");
         FileUtils::mkdir(_base_path + "/done/");
 
-        _logger.log(V2_INFO, "operational at %s\n", _base_path.c_str());
+        LOGGER(_logger, V2_INFO, "operational at %s\n", _base_path.c_str());
     }
     ~JobFileAdapter() {
-        _logger.log(V2_INFO, "shut down\n");
+        LOGGER(_logger, V2_INFO, "shut down\n");
     }
 
     // FileWatcher events

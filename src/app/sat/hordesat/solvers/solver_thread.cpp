@@ -34,7 +34,7 @@ void SolverThread::start() {
 
 void SolverThread::init() {
     _tid = Proc::getTid();
-    _logger.log(V5_DEBG, "tid %ld\n", _tid);
+    LOGGER(_logger, V5_DEBG, "tid %ld\n", _tid);
     _initialized = true;
     
     _active_revision = 0;
@@ -70,7 +70,7 @@ void* SolverThread::run() {
         runOnce();
     }
 
-    _logger.log(V4_VVER, "exiting\n");
+    LOGGER(_logger, V4_VVER, "exiting\n");
     return NULL;
 }
 
@@ -86,7 +86,7 @@ bool SolverThread::readFormula() {
 
         // Shuffle input if necessary
         if (_imported_lits_curr_revision == 0 && _shuffle) {
-            _logger.log(V4_VVER, "Shuffling input rev. %i\n", (int)_active_revision);
+            LOGGER(_logger, V4_VVER, "Shuffling input rev. %i\n", (int)_active_revision);
             {
                 auto lock = _state_mutex.getLock();
                 assert(_active_revision < (int)_pending_formulae.size());
@@ -108,7 +108,7 @@ bool SolverThread::readFormula() {
             aLits = _pending_assumptions[_active_revision].second;
         }
 
-        _logger.log(V4_VVER, "Reading rev. %i, start %i\n", (int)_active_revision, (int)_imported_lits_curr_revision);
+        LOGGER(_logger, V4_VVER, "Reading rev. %i, start %i\n", (int)_active_revision, (int)_imported_lits_curr_revision);
         
         // Read the formula in batches from the point where you left off
         for (size_t start = _imported_lits_curr_revision; start < fSize; start += batchSize) {
@@ -116,7 +116,7 @@ bool SolverThread::readFormula() {
             size_t end = std::min(start+batchSize, fSize);
             for (size_t i = start; i < end; i++) {
                 if (std::abs(fLits[i]) > 134217723) {
-                    _logger.log(V0_CRIT, "[ERROR] Invalid literal at rev. %i pos. %ld/%ld. Last %i literals: %i %i %i %i %i\n", 
+                    LOGGER(_logger, V0_CRIT, "[ERROR] Invalid literal at rev. %i pos. %ld/%ld. Last %i literals: %i %i %i %i %i\n", 
                         (int)_active_revision, i, fSize,
                         (int) std::min(i+1, (size_t)5),
                         i >= 4 ? fLits[i-4] : 0,
@@ -148,7 +148,7 @@ bool SolverThread::readFormula() {
             if (_has_pseudoincremental_solvers && _active_revision >= _vt.getExtraVariables().size()) {
                 _vt.addExtraVariable(_max_var);
                 int aEquivVar = _vt.getExtraVariables().back();
-                _logger.log(V4_VVER, "Encoding equivalence for %i assumptions of rev. %i/%i @ var. %i\n", 
+                LOGGER(_logger, V4_VVER, "Encoding equivalence for %i assumptions of rev. %i/%i @ var. %i\n", 
                     aSize, (int)_active_revision, (int)_latest_revision, (int)aEquivVar);
                 
                 // Make clause exporter append this condition
@@ -177,7 +177,7 @@ bool SolverThread::readFormula() {
             
             // No formula left to read?
             if (_active_revision == _latest_revision) {
-                _logger.log(V4_VVER, "Reading done @ rev. %i\n", (int)_active_revision);                
+                LOGGER(_logger, V4_VVER, "Reading done @ rev. %i\n", (int)_active_revision);                
                 return true;
             }
             _active_revision++;
@@ -190,13 +190,13 @@ void SolverThread::appendRevision(int revision, size_t fSize, const int* fLits, 
     {
         auto lock = _state_mutex.getLock();
         _pending_formulae.emplace_back(fSize, fLits);
-        _logger.log(V4_VVER, "Received %i literals\n", fSize);
+        LOGGER(_logger, V4_VVER, "Received %i literals\n", fSize);
         _pending_assumptions.emplace_back(aSize, aLits);
-        _logger.log(V4_VVER, "Received %i assumptions\n", aSize);
+        LOGGER(_logger, V4_VVER, "Received %i assumptions\n", aSize);
         _latest_revision = revision;
         _found_result = false;
         assert(_latest_revision+1 == (int)_pending_formulae.size() 
-            || log_return_false("%i != %i", _latest_revision+1, _pending_formulae.size()));
+            || LOG_RETURN_FALSE("%i != %i", _latest_revision+1, _pending_formulae.size()));
         if (revision > 0) {
             _solver.interrupt();
             _interrupted = true;
@@ -262,7 +262,7 @@ void SolverThread::runOnce() {
     }
 
     // Perform solving (blocking)
-    _logger.log(V4_VVER, "BEGSOL rev. %i (%i assumptions)\n", revision, aSize);
+    LOGGER(_logger, V4_VVER, "BEGSOL rev. %i (%i assumptions)\n", revision, aSize);
     //std::ofstream ofs("DBG_" + std::to_string(_solver.getGlobalId()) + "_" + std::to_string(_active_revision));
     //ofs << _dbg_lits << "\n";
     //ofs.close();
@@ -283,7 +283,7 @@ void SolverThread::runOnce() {
         _solver.uninterrupt();
         _interrupted = false;
     }
-    _logger.log(V4_VVER, "ENDSOL\n");
+    LOGGER(_logger, V4_VVER, "ENDSOL\n");
 
     // Report result, if present
     reportResult(res, revision);
@@ -309,11 +309,11 @@ void SolverThread::reportResult(int res, int revision) {
     auto lock = _state_mutex.getLock();
 
     if (revision != _latest_revision) {
-        _logger.log(V4_VVER, "discard obsolete result %s for rev. %i\n", resultString, revision);
+        LOGGER(_logger, V4_VVER, "discard obsolete result %s for rev. %i\n", resultString, revision);
         return;
     }
 
-    _logger.log(V3_VERB, "found result %s for rev. %i\n", resultString, revision);
+    LOGGER(_logger, V3_VERB, "found result %s for rev. %i\n", resultString, revision);
     _result.result = SatResult(res);
     _result.revision = revision;
     if (res == SAT) { 

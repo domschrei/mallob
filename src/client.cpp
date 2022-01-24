@@ -29,7 +29,7 @@
 void Client::readIncomingJobs() {
 
     Logger log = Logger::getMainInstance().copy("<Reader>", "#-1.");
-    log.log(V3_VERB, "Starting\n");
+    LOGGER(log, V3_VERB, "Starting\n");
 
     std::vector<std::future<void>> taskFutures;
 
@@ -88,17 +88,17 @@ void Client::readIncomingJobs() {
                 bool success = true;
                 auto filesList = foundJob.getFilesList();
                 if (foundJob.hasFiles()) {
-                    log.log(V3_VERB, "[T] Reading job #%i rev. %i %s ...\n", id, foundJob.description->getRevision(), filesList.c_str());
+                    LOGGER(log, V3_VERB, "[T] Reading job #%i rev. %i %s ...\n", id, foundJob.description->getRevision(), filesList.c_str());
                     success = JobReader::read(foundJob.files, foundJob.contentMode, *foundJob.description);
                 } else {
                     foundJob.description->beginInitialization(foundJob.description->getRevision());
                     foundJob.description->endInitialization();
                 }
                 if (!success) {
-                    log.log(V1_WARN, "[T] [WARN] Unsuccessful read - skipping #%i\n", id);
+                    LOGGER(log, V1_WARN, "[T] [WARN] Unsuccessful read - skipping #%i\n", id);
                 } else {
                     time = Timer::elapsedSeconds() - time;
-                    log.log(V3_VERB, "[T] Initialized job #%i %s in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
+                    LOGGER(log, V3_VERB, "[T] Initialized job #%i %s in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
                             id, filesList.c_str(), time, foundJob.description->getNumFormulaLiterals(), 
                             foundJob.description->getNumAssumptionLiterals());
                     foundJob.description->getStatistics().parseTime = time;
@@ -125,7 +125,7 @@ void Client::readIncomingJobs() {
         }
     }
 
-    log.log(V3_VERB, "Stopping\n");
+    LOGGER(log, V3_VERB, "Stopping\n");
     // Wait for all tasks to finish
     for (auto& future : taskFutures) future.get();
     log.flush();
@@ -178,7 +178,7 @@ void Client::init() {
     // Set up various interfaces as bridges between the outside and the JSON interface
     if (_params.useFilesystemInterface()) {
         std::string path = getFilesystemInterfacePath();
-        log(V2_INFO, "Set up filesystem interface at %s\n", path.c_str());
+        LOG(V2_INFO, "Set up filesystem interface at %s\n", path.c_str());
         auto logger = Logger::getMainInstance().copy("I-FS", ".i-fs");
         auto conn = new FilesystemConnector(*_json_interface, _params, 
             std::move(logger), path);
@@ -186,12 +186,12 @@ void Client::init() {
     }
     if (_params.useIPCSocketInterface()) {
         std::string path = getSocketPath();
-        log(V2_INFO, "Set up IPC socket interface at %s\n", path.c_str());
+        LOG(V2_INFO, "Set up IPC socket interface at %s\n", path.c_str());
         _interface_connectors.push_back(new SocketConnector(_params, *_json_interface, path));
     }
     _api_connector = new APIConnector(*_json_interface, _params, Logger::getMainInstance().copy("I-API", ".i.api"));
     _interface_connectors.push_back(_api_connector);
-    log(V2_INFO, "Set up API at %s\n", "src/interface/api/api_connector.hpp");
+    LOG(V2_INFO, "Set up API at %s\n", "src/interface/api/api_connector.hpp");
 
     // Set up concurrent instance reader
     _instance_reader.run([this]() {
@@ -235,7 +235,7 @@ void Client::advance() {
             _recently_done_jobs.clear();
         }
         for (int jobId : doneJobs) {
-            log(LOG_ADD_DESTRANK | V3_VERB, "Notify #%i:0 that job is done", _root_nodes[jobId], jobId);
+            LOG_ADD_DEST(V3_VERB, "Notify #%i:0 that job is done", _root_nodes[jobId], jobId);
             IntVec payload({jobId});
             MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
             finishJob(jobId, /*hasIncrementalSuccessors=*/false);
@@ -250,7 +250,7 @@ void Client::advance() {
             if (_done_jobs.count(jobId)) {
                 it = _jobs_to_interrupt.erase(it);
             } else if (_root_nodes.count(jobId)) {
-                log(V2_INFO, "Interrupt #%i\n", jobId);
+                LOG(V2_INFO, "Interrupt #%i\n", jobId);
                 MyMpi::isend(_root_nodes.at(jobId), MSG_NOTIFY_JOB_ABORTING, IntVec({jobId}));
                 it = _jobs_to_interrupt.erase(it);
                 atomics::decrementRelaxed(_num_jobs_to_interrupt);
@@ -299,7 +299,7 @@ void Client::advance() {
 
     int jobLimit = _params.numJobs();
     if (jobLimit > 0 && (int)_sys_state.getGlobal()[SYSSTATE_PROCESSED_JOBS] >= jobLimit) {
-        log(V2_INFO, "Job limit reached.\n");
+        LOG(V2_INFO, "Job limit reached.\n");
         // Job limit reached - exit
         Terminator::setTerminating();
         // Send MSG_EXIT to worker of rank 0, which will broadcast it
@@ -361,7 +361,7 @@ void Client::introduceNextJob() {
     } else {
         // Find the job's canonical initial node
         int n = _params.numWorkers() >= 0 ? _params.numWorkers() : MyMpi::size(MPI_COMM_WORLD);
-        log(V5_DEBG, "Creating permutation of size %i ...\n", n);
+        LOG(V5_DEBG, "Creating permutation of size %i ...\n", n);
         AdjustablePermutation p(n, jobId);
         nodeRank = p.get(0);
     }
@@ -371,32 +371,32 @@ void Client::introduceNextJob() {
     req.revision = job.getRevision();
     req.timeOfBirth = job.getArrival();
 
-    log(LOG_ADD_DESTRANK | V2_INFO, "Introducing job #%i rev. %i : %s", nodeRank, jobId, req.revision, req.toStr().c_str());
+    LOG_ADD_DEST(V2_INFO, "Introducing job #%i rev. %i : %s", nodeRank, jobId, req.revision, req.toStr().c_str());
     MyMpi::isend(nodeRank, MSG_REQUEST_NODE, req);
 }
 
 void Client::handleOfferAdoption(MessageHandle& handle) {
     JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
     float schedulingTime = Timer::elapsedSeconds() - req.timeOfBirth;
-    log(V3_VERB, "Scheduling %s on [%i] (latency: %.5fs)\n", req.toStr().c_str(), handle.source, schedulingTime);
+    LOG(V3_VERB, "Scheduling %s on [%i] (latency: %.5fs)\n", req.toStr().c_str(), handle.source, schedulingTime);
     
     JobDescription& desc = *_active_jobs[req.jobId];
     desc.getStatistics().schedulingTime = schedulingTime;
     desc.getStatistics().timeOfScheduling = Timer::elapsedSeconds();
-    assert(desc.getId() == req.jobId || log_return_false("%i != %i\n", desc.getId(), req.jobId));
+    assert(desc.getId() == req.jobId || LOG_RETURN_FALSE("%i != %i\n", desc.getId(), req.jobId));
 
     // Send job description
-    log(LOG_ADD_DESTRANK | V4_VVER, "Sending job desc. of #%i rev. %i of size %i", handle.source, desc.getId(), 
+    LOG_ADD_DEST(V4_VVER, "Sending job desc. of #%i rev. %i of size %i", handle.source, desc.getId(), 
         desc.getRevision(), desc.getTransferSize(desc.getRevision()));
     const auto& data = desc.getSerialization(desc.getRevision());
     int msgId = MyMpi::isend(handle.source, MSG_SEND_JOB_DESCRIPTION, data);
-    log(LOG_ADD_DESTRANK | V4_VVER, "Sent job desc. of #%i of size %i", handle.source, req.jobId, data->size());
+    LOG_ADD_DEST(V4_VVER, "Sent job desc. of #%i of size %i", handle.source, req.jobId, data->size());
     
     // Remember transaction
     _root_nodes[req.jobId] = handle.source;
 
     // Clean up job description from this side (copy of shared_ptr will remain in message_queue until sent)
-    log(V4_VVER, "Clear description of #%i rev. %i\n", req.jobId, desc.getRevision());
+    LOG(V4_VVER, "Clear description of #%i rev. %i\n", req.jobId, desc.getRevision());
     desc.clearPayload(desc.getRevision());
     _num_loaded_jobs--;
     _incoming_job_cond_var.notify(); // waiting instance reader might be able to continue now
@@ -404,7 +404,7 @@ void Client::handleOfferAdoption(MessageHandle& handle) {
 
 void Client::handleJobDone(MessageHandle& handle) {
     JobStatistics stats = Serializable::get<JobStatistics>(handle.getRecvData());
-    log(LOG_ADD_SRCRANK | V4_VVER, "Will receive job result for job #%i rev. %i", handle.source, stats.jobId, stats.revision);
+    LOG_ADD_SRC(V4_VVER, "Will receive job result for job #%i rev. %i", handle.source, stats.jobId, stats.revision);
     MyMpi::isendCopy(stats.successfulRank, MSG_QUERY_JOB_RESULT, handle.getRecvData());
     JobDescription& desc = *_active_jobs[stats.jobId];
     desc.getStatistics().usedWallclockSeconds = stats.usedWallclockSeconds;
@@ -419,13 +419,13 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     int resultCode = jobResult.result;
     int revision = jobResult.revision;
 
-    log(LOG_ADD_SRCRANK | V4_VVER, "Received result of job #%i rev. %i, code: %i", handle.source, jobId, revision, resultCode);
+    LOG_ADD_SRC(V4_VVER, "Received result of job #%i rev. %i, code: %i", handle.source, jobId, revision, resultCode);
     JobDescription& desc = *_active_jobs[jobId];
     desc.getStatistics().processingTime = Timer::elapsedSeconds() - desc.getStatistics().timeOfScheduling;
 
     // Output response time and solution header
-    log(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, Timer::elapsedSeconds()-desc.getArrival(), revision);
-    log(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId, resultCode == RESULT_SAT ? "SAT" : "UNSAT", revision);
+    LOG(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, Timer::elapsedSeconds()-desc.getArrival(), revision);
+    LOG(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId, resultCode == RESULT_SAT ? "SAT" : "UNSAT", revision);
 
     std::string resultString = "s " + std::string(resultCode == RESULT_SAT ? "SATISFIABLE" 
                         : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN") + "\n";
@@ -442,15 +442,15 @@ void Client::handleSendJobResult(MessageHandle& handle) {
         std::ofstream file;
         file.open(_params.solutionToFile());
         if (!file.is_open()) {
-            log(V0_CRIT, "[ERROR] Could not open solution file\n");
+            LOG(V0_CRIT, "[ERROR] Could not open solution file\n");
         } else {
             file << resultString;
             file << modelString.str();
             file.close();
         }
     } else if (_params.monoFilename.isSet()) {
-        log(LOG_NO_PREFIX | V0_CRIT, resultString.c_str());
-        log(LOG_NO_PREFIX | V0_CRIT, modelString.str().c_str());
+        LOG_OMIT_PREFIX(V0_CRIT, resultString.c_str());
+        LOG_OMIT_PREFIX(V0_CRIT, modelString.str().c_str());
     }
 
     if (_json_interface) {
@@ -464,7 +464,7 @@ void Client::handleAbort(MessageHandle& handle) {
 
     IntVec request = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = request[0];
-    log(LOG_ADD_SRCRANK | V2_INFO, "TIMEOUT #%i %.6f", handle.source, jobId, 
+    LOG_ADD_SRC(V2_INFO, "TIMEOUT #%i %.6f", handle.source, jobId, 
             Timer::elapsedSeconds() - _active_jobs[jobId]->getArrival());
     
     if (_json_interface) {
@@ -512,5 +512,5 @@ Client::~Client() {
     Logger::getMainInstance().mergeJobLogs(0);
     Logger::getMainInstance().mergeJobLogs(-1);
 
-    log(V4_VVER, "Leaving client destructor\n");
+    LOG(V4_VVER, "Leaving client destructor\n");
 }

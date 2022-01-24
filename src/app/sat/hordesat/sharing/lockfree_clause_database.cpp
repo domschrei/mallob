@@ -70,7 +70,7 @@ LockfreeClauseDatabase::AddClauseResult LockfreeClauseDatabase::addClause(int pr
 
     // Create buffer
     size_t factor = 1 << i;
-    log(V4_VVER, "Create ringbuf of size %ld for clslen %i (lbd %i)\n", factor*_base_buffer_size, c.size, c.lbd);
+    LOG(V4_VVER, "Create ringbuf of size %ld for clslen %i (lbd %i)\n", factor*_base_buffer_size, c.size, c.lbd);
     auto createdBuffer = createBuffer(c.size, factor);
     bufs.push_back(createdBuffer);
     (*_safe_buffer_sizes[bufIdx])++;

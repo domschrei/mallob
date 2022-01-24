@@ -14,7 +14,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
 
     if (Terminator::isTerminating()) return;
 
-    log.log(V3_VERB, "New job file event: type %i, name \"%s\"\n", event.type, event.name.c_str());
+    LOGGER(log, V3_VERB, "New job file event: type %i, name \"%s\"\n", event.type, event.name.c_str());
 
     nlohmann::json j;
     std::string userFile, jobName;
@@ -28,20 +28,20 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         // Attempt to read job file
         std::string eventFile = getJobFilePath(event, NEW);
         if (!FileUtils::isRegularFile(eventFile)) {
-            log.log(V3_VERB, "Job file %s does not exist (any more)\n", eventFile.c_str());        
+            LOGGER(log, V3_VERB, "Job file %s does not exist (any more)\n", eventFile.c_str());        
             return; // File does not exist (any more)
         }
         try {
             std::ifstream i(eventFile);
             i >> j;
         } catch (const nlohmann::detail::parse_error& e) {
-            log.log(V1_WARN, "[WARN] Parse error on %s: %s\n", eventFile.c_str(), e.what());
+            LOGGER(log, V1_WARN, "[WARN] Parse error on %s: %s\n", eventFile.c_str(), e.what());
             return;
         }
 
         // Check and read essential fields from JSON
         if (!j.contains("user") || !j.contains("name")) {
-            log.log(V1_WARN, "[WARN] Job file missing essential field(s). Ignoring this file.\n");
+            LOGGER(log, V1_WARN, "[WARN] Job file missing essential field(s). Ignoring this file.\n");
             return;
         }
         std::string user = j["user"].get<std::string>();
@@ -56,15 +56,15 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
             std::ifstream i(userFile);
             i >> jUser;
         } catch (const nlohmann::detail::parse_error& e) {
-            log.log(V1_WARN, "[WARN] Unknown user or invalid user definition: %s\n", e.what());
+            LOGGER(log, V1_WARN, "[WARN] Unknown user or invalid user definition: %s\n", e.what());
             return;
         }
         if (!jUser.contains("id") || !jUser.contains("priority")) {
-            log.log(V1_WARN, "[WARN] User file %s missing essential field(s). Ignoring job file with this user.\n", userFile.c_str());
+            LOGGER(log, V1_WARN, "[WARN] User file %s missing essential field(s). Ignoring job file with this user.\n", userFile.c_str());
             return;
         }
         if (jUser["id"].get<std::string>() != user) {
-            log.log(V1_WARN, "[WARN] User file %s has inconsistent user ID. Ignoring job file with this user.\n", userFile.c_str());
+            LOGGER(log, V1_WARN, "[WARN] User file %s has inconsistent user ID. Ignoring job file with this user.\n", userFile.c_str());
             return;
         }
 
@@ -84,7 +84,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
 
         if (j.contains("interrupt") && j["interrupt"].get<bool>()) {
             if (!_job_name_to_id_rev.count(jobName)) {
-                log.log(V1_WARN, "[WARN] Cannot interrupt unknown job \"%s\"\n", jobName.c_str());
+                LOGGER(log, V1_WARN, "[WARN] Cannot interrupt unknown job \"%s\"\n", jobName.c_str());
                 return;
             }
             auto [id, rev] = _job_name_to_id_rev.at(jobName);
@@ -105,7 +105,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
             // This is a new increment of a former job - assign SAME internal ID
             auto precursorName = j["precursor"].get<std::string>() + ".json";
             if (!_job_name_to_id_rev.count(precursorName)) {
-                log.log(V1_WARN, "[WARN] Unknown precursor job \"%s\"!\n", precursorName.c_str());
+                LOGGER(log, V1_WARN, "[WARN] Unknown precursor job \"%s\"!\n", precursorName.c_str());
                 return;
             }
             auto [jobId, rev] = _job_name_to_id_rev[precursorName];
@@ -114,7 +114,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
             if (j.contains("done") && j["done"].get<bool>()) {
 
                 // Incremental job is notified to be done
-                log.log(V3_VERB, "Incremental job #%i is done\n", jobId);
+                LOGGER(log, V3_VERB, "Incremental job #%i is done\n", jobId);
                 _job_name_to_id_rev.erase(precursorName);
                 for (int rev = 0; rev <= _job_id_to_latest_rev[id]; rev++) {
                     _job_id_rev_to_image.erase(std::pair<int, int>(id, rev));
@@ -146,11 +146,11 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
                 _job_name_to_id_rev[jobName] = std::pair<int, int>(_running_id++, 0);
             auto pair = _job_name_to_id_rev[jobName];
             id = pair.first;
-            log.log(V3_VERB, "Mapping job \"%s\" to internal ID #%i\n", jobName.c_str(), id);
+            LOGGER(log, V3_VERB, "Mapping job \"%s\" to internal ID #%i\n", jobName.c_str(), id);
 
             // Was job already parsed before?
             if (_job_id_rev_to_image.count(std::pair<int, int>(id, 0))) {
-                log.log(V1_WARN, "[WARN] Modification of a file I already parsed! Ignoring.\n");
+                LOGGER(log, V1_WARN, "[WARN] Modification of a file I already parsed! Ignoring.\n");
                 return;
             }
 
@@ -163,7 +163,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         // Remove original file, move to "pending"
         {
             std::string pendingFile = getJobFilePath(id, _job_id_to_latest_rev[id], PENDING);
-            log.log(V4_VVER, "Move %s to %s\n", eventFile.c_str(), pendingFile.c_str());
+            LOGGER(log, V4_VVER, "Move %s to %s\n", eventFile.c_str(), pendingFile.c_str());
             std::ofstream o(pendingFile);
             o << std::setw(4) << j << std::endl;
         }
@@ -180,17 +180,17 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
     if (j.contains("wallclock-limit")) {
         float limit = TimePeriod(j["wallclock-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS);
         job->setWallclockLimit(limit);
-        log.log(V4_VVER, "Job #%i : wallclock time limit %.3f secs\n", id, limit);
+        LOGGER(log, V4_VVER, "Job #%i : wallclock time limit %.3f secs\n", id, limit);
     }
     if (j.contains("cpu-limit")) {
         float limit = TimePeriod(j["cpu-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS);
         job->setCpuLimit(limit);
-        log.log(V4_VVER, "Job #%i : CPU time limit %.3f CPU secs\n", id, limit);
+        LOGGER(log, V4_VVER, "Job #%i : CPU time limit %.3f CPU secs\n", id, limit);
     }
     if (j.contains("max-demand")) {
         int maxDemand = j["max-demand"].get<int>();
         job->setMaxDemand(maxDemand);
-        log.log(V4_VVER, "Job #%i : max demand %i\n", id, maxDemand);
+        LOGGER(log, V4_VVER, "Job #%i : max demand %i\n", id, maxDemand);
     }
     if (j.contains("assumptions")) {
         job->setPreloadedAssumptions(j["assumptions"].get<std::vector<int>>());
@@ -211,7 +211,7 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         auto lock = _job_map_mutex.getLock();
         if (!_job_name_to_id_rev.count(name)) {
             _job_name_to_id_rev[name] = std::pair<int, int>(_running_id++, 0);
-            log.log(V3_VERB, "Forward mapping job \"%s\" to internal ID #%i\n", name.c_str(), _job_name_to_id_rev[name].first);
+            LOGGER(log, V3_VERB, "Forward mapping job \"%s\" to internal ID #%i\n", name.c_str(), _job_name_to_id_rev[name].first);
         }
         idDependencies.push_back(_job_name_to_id_rev[name].first); // TODO inexact: introduce dependencies for job revisions
     }
@@ -227,10 +227,10 @@ void JobFileAdapter::handleJobDone(const JobResult& result, const JobDescription
     auto lock = _job_map_mutex.getLock();
 
     std::string eventFile = getJobFilePath(result.id, result.revision, PENDING);
-    _logger.log(V3_VERB, "Job done event for #%i rev. %i : %s\n", result.id, result.revision, eventFile.c_str());
+    LOGGER(_logger, V3_VERB, "Job done event for #%i rev. %i : %s\n", result.id, result.revision, eventFile.c_str());
 
     if (!FileUtils::isRegularFile(eventFile)) {
-        _logger.log(V1_WARN, "[WARN] Pending job file %s gone!\n", eventFile.c_str());
+        LOGGER(_logger, V1_WARN, "[WARN] Pending job file %s gone!\n", eventFile.c_str());
         return; // File does not exist (any more)
     }
     std::ifstream i(eventFile);
@@ -238,7 +238,7 @@ void JobFileAdapter::handleJobDone(const JobResult& result, const JobDescription
     try {
         i >> j;
     } catch (const nlohmann::detail::parse_error& e) {
-        _logger.log(V1_WARN, "[WARN] Parse error on %s: %s\n", eventFile.c_str(), e.what());
+        LOGGER(_logger, V1_WARN, "[WARN] Parse error on %s: %s\n", eventFile.c_str(), e.what());
         return;
     }
     
@@ -274,14 +274,14 @@ void JobFileAdapter::handleJobResultDeleted(const FileWatcher::Event& event, Log
 
     if (Terminator::isTerminating()) return;
 
-    log.log(V4_VVER, "Result file deletion event: type %i, name \"%s\"\n", event.type, event.name.c_str());
+    LOGGER(log, V4_VVER, "Result file deletion event: type %i, name \"%s\"\n", event.type, event.name.c_str());
 
     auto lock = _job_map_mutex.getLock();
 
     std::string jobName = event.name;
     jobName.erase(std::find(jobName.begin(), jobName.end(), '\0'), jobName.end());
     if (!_job_name_to_id_rev.contains(jobName)) {
-        log.log(V1_WARN, "[WARN] Cannot clean up job \"%s\" : not known\n", jobName.c_str());
+        LOGGER(log, V1_WARN, "[WARN] Cannot clean up job \"%s\" : not known\n", jobName.c_str());
         return;
     }
 
@@ -291,7 +291,7 @@ void JobFileAdapter::handleJobResultDeleted(const FileWatcher::Event& event, Log
     auto [id, rev] = _job_name_to_id_rev.at(jobName);
     _job_name_to_id_rev.erase(jobName);
     _job_id_rev_to_image.erase(std::pair<int, int>(id, rev));
-    log.log(V4_VVER, "Cleaned up \"%s\"\n", event.name.c_str());
+    LOGGER(log, V4_VVER, "Cleaned up \"%s\"\n", event.name.c_str());
 }
 
 std::string getDirectory(JobFileAdapter::Status status) {

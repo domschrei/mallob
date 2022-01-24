@@ -53,14 +53,14 @@ void testSimpleP2P() {
     int totalSum = 0;
     int numReceived = 0;
     q.registerCallback(TAG_INT_VEC, [&](MessageHandle& h) {
-        log(V2_INFO, "received ...\n");
+        LOG(V2_INFO, "received ...\n");
         auto vec = Serializable::get<IntVec>(h.getRecvData()).data;
         size_t sum = 0; for (int x : vec) sum += x;
-        log(V2_INFO, "Received %i ints, sum: %i\n", vec.size(), sum);
+        LOG(V2_INFO, "Received %i ints, sum: %i\n", vec.size(), sum);
         totalSum += sum;
         numReceived++;
         if (totalSum == 900 && numReceived == 100) {
-            log(V2_INFO, "All correct, bye\n");
+            LOG(V2_INFO, "All correct, bye\n");
             Terminator::setTerminating();
         }
     });
@@ -73,13 +73,13 @@ void testSimpleP2P() {
             vec.data.push_back(3);
             vec.data.push_back(3);
             MyMpi::isend(1, TAG_INT_VEC, vec);
-            log(V2_INFO, "sent ...\n");
+            LOG(V2_INFO, "sent ...\n");
         } else {
             IntVec vec;
             vec.data.push_back(4);
             vec.data.push_back(5);
             MyMpi::isend(0, TAG_INT_VEC, vec);
-            log(V2_INFO, "sent ...\n");
+            LOG(V2_INFO, "sent ...\n");
         }
     }
 
@@ -110,21 +110,21 @@ void testBigP2P() {
 
     auto sendNextVec = [&]() {
         MyMpi::isend(1-rank, TAG_INT_VEC, std::move(vectors[msgIdx]));
-        log(V2_INFO, "#%i sent (n=%i)\n", msgIdx, N[msgIdx]);
+        LOG(V2_INFO, "#%i sent (n=%i)\n", msgIdx, N[msgIdx]);
     };
 
     q.registerCallback(TAG_INT_VEC, [&](MessageHandle& h) {
-        log(V2_INFO, "#%i received\n", msgIdx);
+        LOG(V2_INFO, "#%i received\n", msgIdx);
         
         if (verifyData) {
-            log(V2_INFO, "#%i verifying ...\n", msgIdx);
+            LOG(V2_INFO, "#%i verifying ...\n", msgIdx);
             assert(h.tag == TAG_INT_VEC);
             auto vec = Serializable::get<IntVec>(h.getRecvData()).data;
-            assert(vec.size() == N[msgIdx] || log_return_false("Wrong size: %i != %i\n", vec.size(), N[msgIdx]));
+            assert(vec.size() == N[msgIdx] || LOG_RETURN_FALSE("Wrong size: %i != %i\n", vec.size(), N[msgIdx]));
             for (size_t i = 0; i < vec.size(); i++) {
-                assert(vec[i] == i || log_return_false("Data at pos. %i: %i\n", i, vec[i]));
+                assert(vec[i] == i || LOG_RETURN_FALSE("Data at pos. %i: %i\n", i, vec[i]));
             }
-            log(V2_INFO, "#%i verified\n", msgIdx);
+            LOG(V2_INFO, "#%i verified\n", msgIdx);
         }
         
         msgIdx++;
@@ -152,7 +152,7 @@ void testBigP2P() {
         float time = Timer::elapsedSeconds();
         if (time - lastPing > maxDelay) {
             maxDelay = time - lastPing;
-            log(V2_INFO, "New max. delay %.4fs\n", maxDelay);
+            LOG(V2_INFO, "New max. delay %.4fs\n", maxDelay);
         }
         lastPing = time;
     });
@@ -167,12 +167,12 @@ void testBigP2P() {
         float time = Timer::elapsedSeconds();
         if (time - lastPing > maxDelay) {
             maxDelay = time - lastPing;
-            log(V2_INFO, "New max. delay %.4fs\n", maxDelay);
+            LOG(V2_INFO, "New max. delay %.4fs\n", maxDelay);
         }
         lastPing = time;
     }
 
-    log(V2_INFO, "Max delay: %.4f s\n", maxDelay);
+    LOG(V2_INFO, "Max delay: %.4f s\n", maxDelay);
 }
 
 int main(int argc, char *argv[]) {

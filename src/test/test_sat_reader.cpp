@@ -21,24 +21,24 @@ int main() {
 
     for (const auto& file : files) {
         auto f = std::string("instances/") + file;
-        log(V2_INFO, "Reading test CNF %s ...\n", f.c_str());
+        LOG(V2_INFO, "Reading test CNF %s ...\n", f.c_str());
         float time = Timer::elapsedSeconds();
         SatReader r(f, SatReader::ContentMode::ASCII);
         JobDescription d;
         bool success = r.read(d);
         assert(success);
         time = Timer::elapsedSeconds() - time;
-        log(V2_INFO, " - done, took %.3fs\n", time);
+        LOG(V2_INFO, " - done, took %.3fs\n", time);
         assert(d.getNumFormulaLiterals() > 0);
 
-        log(V2_INFO, "Only decompressing CNF %s for comparison ...\n", f.c_str());
+        LOG(V2_INFO, "Only decompressing CNF %s for comparison ...\n", f.c_str());
         float time2 = Timer::elapsedSeconds();
         auto cmd = "xz -c -d " + f + " > /tmp/tmpfile";
         int retval = system(cmd.c_str());
         time2 = Timer::elapsedSeconds() - time2;
-        log(V2_INFO, " - done, took %.3fs\n", time2);
+        LOG(V2_INFO, " - done, took %.3fs\n", time2);
         assert(retval == 0);
 
-        log(V2_INFO, " -- difference: %.3fs\n", time - time2);
+        LOG(V2_INFO, " -- difference: %.3fs\n", time - time2);
     }
 }

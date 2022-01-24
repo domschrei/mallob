@@ -50,7 +50,7 @@ public:
 
         // Make a socket file
         if ((_socket_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-            log(V1_WARN, "Could not instantiate socket \"%s\"\n", _socket_address.c_str());
+            LOG(V1_WARN, "Could not instantiate socket \"%s\"\n", _socket_address.c_str());
             return;
         }
 
@@ -58,7 +58,7 @@ public:
         // Naming the socket so other process can address it
         unlink(_socket_address.c_str());
         if (bind(_socket_fd, (sockaddr*) &address, sizeof(address)) == -1) {
-            log(V1_WARN, "Could not bind socket \"%s\"\n", _socket_address.c_str());
+            LOG(V1_WARN, "Could not bind socket \"%s\"\n", _socket_address.c_str());
             return;
         }
 
@@ -67,7 +67,7 @@ public:
         // On the other side connect() will succeed immediately if
         // the queue is not full.
         if (listen(_socket_fd, _max_num_connections) == -1) {
-            log(V1_WARN, "Could not bind socket \"%s\"\n", _socket_address.c_str());
+            LOG(V1_WARN, "Could not bind socket \"%s\"\n", _socket_address.c_str());
             return;
         }
 
@@ -110,7 +110,7 @@ public:
 
         int fd = -1;
         if ((fd = accept(_socket_fd, (sockaddr*) &agent, &agent_length)) == -1) {
-            log(V1_WARN, "Cannot accept connection!\n");
+            LOG(V1_WARN, "Cannot accept connection!\n");
             return std::optional<Connection>();
         }
 
