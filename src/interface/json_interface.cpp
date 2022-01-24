@@ -150,8 +150,12 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
     if (json.contains("assumptions")) {
         job->setPreloadedAssumptions(json["assumptions"].get<std::vector<int>>());
     }
+    if (json.contains("literals")) {
+        job->setPreloadedLiterals(json["literals"].get<std::vector<int>>());
+    }
     job->setArrival(arrival);
-    std::vector<std::string> files = json["files"].get<std::vector<std::string>>();
+    std::vector<std::string> files = json.contains("files") ? 
+        json["files"].get<std::vector<std::string>>() : std::vector<std::string>();
 
     // Application-specific configuration
     AppConfiguration config;

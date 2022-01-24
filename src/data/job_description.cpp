@@ -20,8 +20,10 @@ void JobDescription::reserveSize(size_t size) {
 }
 
 void JobDescription::endInitialization() {
-    // Add preloaded assumptions (if any)
+    // Add preloaded literals and assumptions (if any)
+    for (int l : _preloaded_literals) addLiteral(l);
     for (int a : _preloaded_assumptions) addAssumption(a);
+    _preloaded_literals.clear();
     _preloaded_assumptions.clear();
 
     writeMetadata();

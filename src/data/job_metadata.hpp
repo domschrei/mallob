@@ -29,6 +29,10 @@ struct JobMetadata {
         return !(*this == other);
     }
 
+    bool hasFiles() const {
+        return !files.empty();
+    }
+
     std::string getFilesList() const {
         std::string list = "{";
         for (auto& file : files) list += file + ",";

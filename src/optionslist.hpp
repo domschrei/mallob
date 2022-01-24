@@ -86,6 +86,7 @@ OPT_FLOAT(timeLimit,                     "T", "time-limit",                     
 OPT_STRING(applicationConfiguration,     "app-config", "",                            "",                      "Application configuration: structured as (-key=value;)*")
 OPT_STRING(applicationSpawnMode,         "appmode", "app-spawn-mode",                 "fork",                  "Application mode: \"fork\" (spawn child process for each job on each MPI process) or \"thread\" (execute jobs in separate threads but within the same process)")
 OPT_STRING(hordeConfig,                  "hConf", "horde-config",                     "",                      "Supply Horde config for solver subprocess [internal option, do not use]")
+OPT_STRING(jobTemplate,                  "job-template", "",                          "",                      "JSON template file which each client uses to instantiate jobs indeterminately")
 OPT_STRING(logDirectory,                 "log", "log-directory",                      "",                      "Directory to save logs in")
 OPT_STRING(monoFilename,                 "mono", "",                                  "",                      "Mono instance: Solve the provided CNF instance with full power, then exit")
 OPT_STRING(satSolverSequence,            "satsolver",  "",                            "L",                     "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")

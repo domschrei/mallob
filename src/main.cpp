@@ -15,6 +15,7 @@
 #include "worker.hpp"
 #include "client.hpp"
 #include "util/sys/thread_pool.hpp"
+#include "interface/api/job_streamer.hpp"
 
 #ifndef MALLOB_VERSION
 #define MALLOB_VERSION "(dbg)"
@@ -96,6 +97,12 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     if (params.monoFilename.isSet() && isClient && MyMpi::rank(commClients) == 0)
         introduceMonoJob(params, *client);
 
+    // If job streaming is enabled, initialize a corresponding job streamer
+    JobStreamer* streamer = nullptr;
+    if (params.jobTemplate.isSet() && isClient) {
+        streamer = new JobStreamer(params, client->getAPI());
+    }
+
     // Main loop
     while (!Terminator::isTerminating(/*fromMainthread*/true)) {
 
@@ -114,6 +121,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     }
 
     // Clean up
+    if (streamer != nullptr) delete streamer;
     if (isWorker) delete worker;
     if (isClient) delete client;
 }

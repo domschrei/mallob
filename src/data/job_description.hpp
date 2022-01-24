@@ -73,6 +73,7 @@ private:
     };
 
     // just for parsing
+    std::vector<int> _preloaded_literals;
     std::vector<int> _preloaded_assumptions;
 
     // just for scheduling
@@ -150,6 +151,7 @@ public:
     void setArrival(float arrival) {_arrival = arrival;};
     void setApplication(Application app) {_application = app;}
     void setAppConfiguration(AppConfiguration&& appConfig) {_app_config = std::move(appConfig);}
+    void setPreloadedLiterals(std::vector<int>&& lits) {_preloaded_literals = std::move(lits);}
     void setPreloadedAssumptions(std::vector<int>&& asmpt) {_preloaded_assumptions = std::move(asmpt);}
 
     Checksum getChecksum() const {return _checksum;}
