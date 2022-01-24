@@ -17,15 +17,15 @@ Watchdog::Watchdog(int checkIntervalMillis, float time) {
             int timeMillis = (int) (1000*Timer::elapsedSeconds());
             auto elapsed = timeMillis - _last_reset_millis;
             if (_abort_period_millis > 0 && elapsed > _abort_period_millis) {   
-                LOG(V0_CRIT, "[ERROR] Watchdog: Timeout detected! (last=%.3f activity=%i tag=%i) Writing trace ...\n", 
-                    0.001*_last_reset_millis, _activity, _activity_tag);
+                LOG(V0_CRIT, "[ERROR] Watchdog: TIMEOUT (last=%.3f activity=%i recvtag=%i sendtag=%i)\n", 
+                    0.001*_last_reset_millis, _activity, _activity_recv_tag, _activity_send_tag);
                 Process::writeTrace(parentTid);
                 Logger::getMainInstance().flush();
                 raise(SIGABRT);
             }
             if (_warning_period_millis > 0 && elapsed > _warning_period_millis) {
-                LOG(V1_WARN, "[WARN] Watchdog: No reset for %i ms! (activity=%i tag=%i)\n", elapsed, 
-                    _activity, _activity_tag);
+                LOG(V1_WARN, "[WARN] Watchdog: No reset for %i ms (activity=%i recvtag=%i sendtag=%i)\n", 
+                    elapsed, _activity, _activity_recv_tag, _activity_send_tag);
             }
             usleep(1000 * checkIntervalMillis);
         }

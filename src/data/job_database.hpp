@@ -125,7 +125,7 @@ public:
     bool hasInactiveJobsWaitingForReactivation() const;
 
     void addFutureRequestMessage(int epoch, MessageHandle&& h);
-    std::optional<MessageHandle> getArrivedFutureRequest();
+    std::list<MessageHandle> getArrivedFutureRequests();
     void addRootRequest(const JobRequest& req);
     std::optional<JobRequest> getRootRequest(int jobId);
 

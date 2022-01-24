@@ -12,21 +12,22 @@ class Watchdog {
 
 public:
     enum Activity {
-        IDLE_OR_HANDLING_MSG, 
-        STATS, 
-        BALANCING, 
-        COLLECTIVE_ASSIGNMENT, 
-        FORGET_OLD_JOBS, 
-        THAW_JOB_REQUESTS, 
-        CHECK_JOBS, 
-        SYSSTATE
+        /*0*/ IDLE_OR_HANDLING_MSG, 
+        /*1*/ STATS, 
+        /*2*/ BALANCING, 
+        /*3*/ COLLECTIVE_ASSIGNMENT, 
+        /*4*/ FORGET_OLD_JOBS, 
+        /*5*/ THAW_JOB_REQUESTS, 
+        /*6*/ CHECK_JOBS, 
+        /*7*/ SYSSTATE
     };
 
 private:
     BackgroundWorker _worker;
 
     Activity _activity;
-    int _activity_tag;
+    int _activity_recv_tag;
+    int _activity_send_tag;
 
     std::atomic_int _last_reset_millis = 0;
     std::atomic_int _warning_period_millis = 0;
@@ -40,7 +41,8 @@ public:
     inline void setActivity(Activity a) {
         _activity = a;
     }
-    int* activityTag() {return &_activity_tag;}
+    int* activityRecvTag() {return &_activity_recv_tag;}
+    int* activitySendTag() {return &_activity_send_tag;}
     void stop();
 };
 

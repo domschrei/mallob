@@ -42,10 +42,7 @@ Worker::Worker(MPI_Comm comm, Parameters& params) :
     _job_db.setBalancingDoneCallback([&]() {
         // apply any job requests which have arrived from a "future epoch"
         // which has now become the present (or a past) epoch
-        while (true) {
-            auto optHandle = _job_db.getArrivedFutureRequest();
-            if (!optHandle.has_value()) break;
-            auto& h = optHandle.value();
+        for (auto& h : _job_db.getArrivedFutureRequests()) {
             LOG_ADD_SRC(V4_VVER, "From the future: tag=%i", h.source, h.tag);
             handleRequestNode(h, h.tag == MSG_REQUEST_NODE ? 
                 JobDatabase::JobRequestMode::NORMAL : 
@@ -64,7 +61,7 @@ void Worker::init() {
     auto& q = MyMpi::getMessageQueue();
     
     // Write tag of currently handled message into watchdog
-    q.setCurrentTagPointer(_watchdog.activityTag());
+    q.setCurrentTagPointers(_watchdog.activityRecvTag(), _watchdog.activitySendTag());
 
     // Begin listening to incoming messages
     q.registerCallback(MSG_ANSWER_ADOPTION_OFFER,
@@ -202,7 +199,6 @@ void Worker::advance(float time) {
 
     // Reset watchdog
     _watchdog.reset(time);
-    (*_watchdog.activityTag()) = 0;
     
     // Check & print stats
     if (_periodic_stats_check.ready(time)) {
@@ -1206,8 +1202,7 @@ void Worker::sendJobRequest(const JobRequest& req, int tag, bool left, int dest)
         dest = nextNodeRank;
     }
 
-    LOG_ADD_DEST(V3_VERB, "%s growing: %s", dest, 
-                job.toStr(), req.toStr().c_str());
+    LOG_ADD_DEST(V3_VERB, "%s growing: %s", dest, job.toStr(), req.toStr().c_str());
     
     MyMpi::isend(dest, tag, req);
     

@@ -20,7 +20,8 @@ MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize),
     MPI_Comm_rank(MPI_COMM_WORLD, &_my_rank);
     _recv_data = (uint8_t*) malloc(maxMsgSize+20);
 
-    _current_tag = &_default_tag_var;
+    _current_recv_tag = &_default_tag_var;
+    _current_send_tag = &_default_tag_var;
 
     resetReceiveHandle();
 
@@ -53,6 +54,8 @@ void MessageQueue::clearCallbacks() {
 
 int MessageQueue::send(DataPtr data, int dest, int tag) {
 
+    *_current_send_tag = tag;
+
     // Initialize send handle
     {
         SendHandle handle(_running_send_id++, dest, tag, data, _max_msg_size);
@@ -75,6 +78,8 @@ int MessageQueue::send(DataPtr data, int dest, int tag) {
 
     SendHandle& h = _send_queue.back();
     h.sendNext();
+
+    *_current_send_tag = 0;
     return h.id;
 }
 
@@ -201,8 +206,9 @@ void MessageQueue::processReceived() {
 
     resetReceiveHandle();
 
-    *_current_tag = h.tag;
+    *_current_recv_tag = h.tag;
     _callbacks.at(h.tag)(h);
+    *_current_recv_tag = 0;
 }
 
 void MessageQueue::resetReceiveHandle() {
@@ -226,9 +232,10 @@ void MessageQueue::processSelfReceived() {
         h.tag = sh.tag;
         h.source = sh.dest;
         h.setReceive(std::move(*sh.data));
-        *_current_tag = h.tag;
+        *_current_recv_tag = h.tag;
         _callbacks.at(h.tag)(h);
         _send_done_callback(sh.id); // notify completion
+        *_current_recv_tag = 0;
     }
 }
 
@@ -242,8 +249,9 @@ void MessageQueue::processAssembledReceived() {
 
             auto& h = _fused_queue.front();
             LOG(V5_DEBG, "MQ FUSED t=%i\n", h.tag);
-            *_current_tag = h.tag;
+            *_current_recv_tag = h.tag;
             _callbacks.at(h.tag)(h);
+            *_current_recv_tag = 0;
             
             if (h.getRecvData().size() > _max_msg_size) {
                 // Concurrent deallocation of large chunk of data

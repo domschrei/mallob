@@ -238,7 +238,9 @@ void EventDrivenBalancer::computeBalancingResult() {
 
     std::string msg = "";
     for (const auto& entry : calc.getEntries()) {
-        msg += std::to_string(entry.jobId) + ":" + std::to_string(entry.volume) + " ";
+        if (rank == 0)
+            msg += std::to_string(entry.jobId) + ":" + std::to_string(entry.volume) + " ";
+        
         _job_volumes[entry.jobId] = entry.volume;
         float elapsed = 0;
 

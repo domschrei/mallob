@@ -234,7 +234,8 @@ private:
     robin_hood::unordered_map<int, MsgCallback> _callbacks;
     std::function<void(int)> _send_done_callback = [](int) {};
     int _default_tag_var = 0;
-    int* _current_tag = nullptr;
+    int* _current_recv_tag = nullptr;
+    int* _current_send_tag = nullptr;
 
     BackgroundWorker _batch_assembler;
     BackgroundWorker _gc;
@@ -246,8 +247,9 @@ public:
     void registerCallback(int tag, const MsgCallback& cb);
     void registerSentCallback(std::function<void(int)> callback);
     void clearCallbacks();
-    void setCurrentTagPointer(int* tag) {
-        _current_tag = tag;
+    void setCurrentTagPointers(int* recvTag, int* sendTag) {
+        _current_recv_tag = recvTag;
+        _current_send_tag = sendTag;
     }
 
     int send(DataPtr data, int dest, int tag);

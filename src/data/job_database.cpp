@@ -624,19 +624,18 @@ void JobDatabase::addFutureRequestMessage(int epoch, MessageHandle&& h) {
     _future_request_msgs[epoch].push_back(std::move(h));
 }
 
-std::optional<MessageHandle> JobDatabase::getArrivedFutureRequest() {
+std::list<MessageHandle> JobDatabase::getArrivedFutureRequests() {
     int presentEpoch = getGlobalBalancingEpoch();
+    std::list<MessageHandle> out;
     for (auto& [epoch, msgs] : _future_request_msgs) {
         if (epoch <= presentEpoch) {
             // found a candidate message
             assert(!msgs.empty());
-            auto optHandle = std::optional<MessageHandle>(std::move(msgs.front()));
-            msgs.pop_front();
-            if (msgs.empty()) _future_request_msgs.erase(epoch);
-            return optHandle;
+            out.merge(std::move(msgs));
+            _future_request_msgs.erase(epoch);
         }
     }
-    return std::optional<MessageHandle>();
+    return out;
 }
 
 void JobDatabase::addRootRequest(const JobRequest& req) {
