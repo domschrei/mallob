@@ -272,7 +272,7 @@ public:
     // and then updates the volume itself.
     void updateVolumeAndUsedCpu(int newVolume) {
 
-        if (_job_tree.isRoot()) {
+        if (getState() == ACTIVE && _job_tree.isRoot()) {
             // Compute used CPU time within last time slice
             float time = Timer::elapsedSeconds();
             _used_cpu_seconds += (time - _time_of_last_limit_check) * _threads_per_job * _volume;
