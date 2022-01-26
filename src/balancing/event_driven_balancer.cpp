@@ -5,6 +5,7 @@
 #include "util/random.hpp"
 #include "app/job.hpp"
 #include "volume_calculator.hpp"
+#include "util/data_statistics.hpp"
 
 EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params) : _comm(comm), _params(params) {
 
@@ -132,6 +133,7 @@ void EventDrivenBalancer::onTerminate(const Job& job) {
         float avgLatency = std::accumulate(latencies.begin(), latencies.end(), 0.0f) / latencies.size();
         LOG(V3_VERB, "%s balancing latency={num:%i min:%.5f med:%.5f avg:%.5f max:%.5f}\n", 
             job.toStr(), latencies.size(), latencies.front(), latencies[latencies.size()/2], avgLatency, latencies.back());
+        _past_balancing_latencies.push_back(std::move(latencies));
     }
     _balancing_latencies.erase(job.getId());
 }
@@ -309,4 +311,17 @@ float EventDrivenBalancer::getPriority(int jobId) {
 
 size_t EventDrivenBalancer::getGlobalEpoch() const {
     return _states.getGlobalEpoch();
+}
+
+EventDrivenBalancer::~EventDrivenBalancer() {
+
+    for (auto& [id, latencies] : _balancing_latencies) {
+        if (!latencies.empty())
+            _past_balancing_latencies.push_back(std::move(latencies));
+    }
+    DataStatistics stats(std::move(_past_balancing_latencies));
+    stats.computeStats();
+    LOG(V3_VERB, "STATS balancing_latencies num:%ld min:%.6f max:%.6f med:%.6f mean:%.6f\n", 
+        stats.num(), stats.min(), stats.max(), stats.median(), stats.mean());
+    stats.logFullDataIntoFile(".balancing-latencies");
 }

@@ -62,6 +62,8 @@ private:
     float _total_busy_time = 0;
     float _time_of_last_adoption = 0;
 
+    std::list<std::vector<float>> _desire_latencies;
+
 public:
     JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sysstate);
     ~JobDatabase();

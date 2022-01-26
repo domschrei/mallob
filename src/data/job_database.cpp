@@ -16,6 +16,7 @@
 #include "balancing/event_driven_balancer.hpp"
 #include "util/sys/watchdog.hpp"
 #include "util/sys/proc.hpp"
+#include "util/data_statistics.hpp"
 
 JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sysstate):
         _params(params), _comm(comm), _sys_state(sysstate) {
@@ -385,12 +386,12 @@ void JobDatabase::suspend(int jobId) {
 void JobDatabase::terminate(int jobId) {
     assert(has(jobId));
     Job& job = get(jobId);
-    bool wasTerminated = job.getState() == JobState::PAST;
+    bool wasTerminatedBefore = job.getState() == JobState::PAST;
     if (hasActiveJob() && getActive().getId() == jobId) {
         setLoad(0, jobId);
     }
 
-    if (!wasTerminated) {
+    if (!wasTerminatedBefore) {
         // Gather statistics
         auto numDesires = job.getJobTree().getNumDesires();
         auto numFulfilledDesires = job.getJobTree().getNumFulfiledDesires();
@@ -398,7 +399,7 @@ void JobDatabase::terminate(int jobId) {
         float desireFulfilmentRatio = numDesires == 0 ? 0 : (float)numFulfilledDesires / numDesires;
         float meanFulfilmentLatency = numFulfilledDesires == 0 ? 0 : sumDesireLatencies / numFulfilledDesires;
 
-        auto latencies = job.getJobTree().getDesireLatencies();
+        auto& latencies = job.getJobTree().getDesireLatencies();
         float meanLatency = 0, minLatency = 0, maxLatency = 0, medianLatency = 0;
         if (!latencies.empty()) {
             std::sort(latencies.begin(), latencies.end());
@@ -418,7 +419,7 @@ void JobDatabase::terminate(int jobId) {
 
     job.terminate();
     if (job.hasCommitment()) uncommit(jobId);
-    if (!wasTerminated) _balancer->onTerminate(job);
+    if (!wasTerminatedBefore) _balancer->onTerminate(job);
 
     LOG(V4_VVER, "Delete %s\n", job.toStr());
     forget(jobId);
@@ -504,6 +505,9 @@ void JobDatabase::forget(int jobId) {
         if (job.getState() != PAST) job.terminate();
         assert(job.getState() == PAST);
         jobPtr = &job;
+
+        if (!job.getJobTree().getDesireLatencies().empty())
+            _desire_latencies.push_back(std::move(job.getJobTree().getDesireLatencies()));
     }
     _job_destruct_queue.push_back(jobPtr);
     _jobs.erase(jobId);
@@ -721,4 +725,10 @@ JobDatabase::~JobDatabase() {
     _janitor_cond_var.notify();
     watchdog.stop();
     _janitor.stop();
+
+    DataStatistics stats(std::move(_desire_latencies));
+    stats.computeStats();
+    LOG(V3_VERB, "STATS treegrowth_latencies num:%ld min:%.6f max:%.6f med:%.6f mean:%.6f\n", 
+        stats.num(), stats.min(), stats.max(), stats.median(), stats.mean());
+    stats.logFullDataIntoFile(".treegrowth-latencies");
 }

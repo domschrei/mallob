@@ -66,6 +66,8 @@ public:
     friend void log(int options, const char* str, ...);
     friend bool log_return_false(const char* str, ...);
 
+    void setQuiet();
+
 private:
 
     void log(va_list& args, unsigned int options, const char* str) const;

@@ -147,6 +147,10 @@ Logger Logger::copy(const std::string& linePrefix, const std::string& filenameSu
     return c;
 }
 
+void Logger::setQuiet() {
+    _quiet = true;
+}
+
 void Logger::log(unsigned int options, const char* str, ...) const {
     va_list args;
     va_start(args, str);

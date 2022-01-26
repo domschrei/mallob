@@ -206,7 +206,7 @@ public:
     float getNumDesires() const {return _num_desires;}
     float getNumFulfiledDesires() const {return _num_fulfilled_desires;}
     float getSumOfDesireLatencies() const {return _sum_desire_latencies;}
-    const std::vector<float>& getDesireLatencies() const {return _desire_latencies;}
+    std::vector<float>& getDesireLatencies() {return _desire_latencies;}
     
     void setWaitingForReactivation(int epoch) {
         LOG(V5_DEBG, "RBS WAIT\n");

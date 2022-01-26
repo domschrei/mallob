@@ -20,7 +20,7 @@ class EventDrivenBalancer {
 
 public:
     EventDrivenBalancer(MPI_Comm& comm, Parameters& params);
-    ~EventDrivenBalancer() {}
+    ~EventDrivenBalancer();
 
     void setVolumeUpdateCallback(std::function<void(int, int, float)> callback);
     void setBalancingDoneCallback(std::function<void()> callback);
@@ -54,7 +54,9 @@ private:
     robin_hood::unordered_set<int> _local_jobs;
     robin_hood::unordered_map<int, int> _job_root_epochs;
     robin_hood::unordered_map<int, int> _job_volumes;
+
     robin_hood::unordered_map<int, std::vector<float>> _balancing_latencies;
+    std::list<std::vector<float>> _past_balancing_latencies;
 
     // Maps a job ID to a pair of (time of last balancing event, associated job epoch)
     robin_hood::unordered_map<int, std::pair<int, float>> _pending_entries;
