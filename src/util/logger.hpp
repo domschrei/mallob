@@ -27,7 +27,8 @@ private:
     Logger(const Logger& other) = delete;
     Logger& operator=(const Logger& other) = delete;
 public:
-    static void init(int rank, int verbosity, bool coloredOutput, bool quiet, bool cPrefix, std::string* logDirOrNull);
+    static void init(int rank, int verbosity, bool coloredOutput, bool quiet, bool cPrefix, 
+        std::string* logDirOrNull, std::string* logFilenameOrNull = nullptr);
     static Logger& getMainInstance() {
         return _main_instance;
     }
@@ -67,6 +68,7 @@ public:
     friend bool log_return_false(const char* str, ...);
 
     void setQuiet();
+    void setLinePrefix(const std::string& linePrefix);
 
 private:
 

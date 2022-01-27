@@ -673,7 +673,7 @@ void JobDatabase::runJanitor() {
             _janitor_cond_var.waitWithLockedMutex(lock, [&]() {
                 return !_janitor.continueRunning() || !_jobs_to_free.empty();
             });
-            if (!_janitor.continueRunning() && _jobs_to_free.empty())
+            if (!_janitor.continueRunning() && _num_stored_jobs == 0)
                 break;
             
             // Copy jobs to free to local list

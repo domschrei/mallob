@@ -65,7 +65,8 @@ bool log_return_false(const char* str, ...) {
     return false;
 }
 
-void Logger::init(int rank, int verbosity, bool coloredOutput, bool quiet, bool cPrefix, std::string* logDirOrNull) {
+void Logger::init(int rank, int verbosity, bool coloredOutput, bool quiet, bool cPrefix, 
+        std::string* logDirOrNull, std::string* logFilenameOrNull) {
     _main_instance._rank = rank;
     _main_instance._verbosity = std::min(7, verbosity);
     _main_instance._colored_output = coloredOutput;
@@ -73,7 +74,7 @@ void Logger::init(int rank, int verbosity, bool coloredOutput, bool quiet, bool 
     _main_instance._c_prefix = cPrefix;
 
     // Create logging directory as necessary
-    if (logDirOrNull != nullptr) {
+    if (logDirOrNull != nullptr && logFilenameOrNull != nullptr) {
         std::string& logDir = *logDirOrNull;
 
         _main_instance._log_directory = (logDir.size() == 0 ? "." : logDir) + "/" + std::to_string(rank) + "/";
@@ -84,11 +85,11 @@ void Logger::init(int rank, int verbosity, bool coloredOutput, bool quiet, bool 
         }
 
         // Open logging files
-        _main_instance._log_filename = _main_instance._log_directory + "log" + std::string(".") + std::to_string(rank);
+        _main_instance._log_filename = _main_instance._log_directory + *logFilenameOrNull;
         _main_instance._log_cfile = fopen(_main_instance._log_filename.c_str(), "a");
         if (_main_instance._log_cfile == nullptr) {
-            LOGGER(_main_instance, V0_CRIT, "[ERROR] cannot open log file \"%s\"\n", 
-                _main_instance._log_filename.c_str());
+            LOGGER(_main_instance, V0_CRIT, "[ERROR] cannot open log file \"%s\", errno=%i\n", 
+                _main_instance._log_filename.c_str(), errno);
         }
     }
 }
@@ -120,7 +121,7 @@ Logger::~Logger() {
 }
 
 void Logger::mergeJobLogs(int jobId) {
-    std::string globstring = _log_filename + "#" + std::to_string(jobId) + ".*";
+    std::string globstring = _log_directory + "*.#" + std::to_string(jobId) + ".S*";
     std::string dest = _log_directory + "jobs." + std::to_string(_rank);
     int status = FileUtils::mergeFiles(globstring, dest, true);
     if (status != 0) {
@@ -135,7 +136,7 @@ Logger Logger::copy(const std::string& linePrefix, const std::string& filenameSu
         c._log_filename = _log_filename + filenameSuffix;
         c._log_cfile = fopen(c._log_filename.c_str(), "a");
         if (c._log_cfile == nullptr) {
-            LOG(V0_CRIT, "[ERROR] cannot open child log file \"%s\"", c._log_filename.c_str());
+            LOG(V0_CRIT, "[ERROR] cannot open child log file \"%s\", errno=%i\n", c._log_filename.c_str(), errno);
         }
     }
     c._line_prefix = _line_prefix + " " + linePrefix;
@@ -149,6 +150,10 @@ Logger Logger::copy(const std::string& linePrefix, const std::string& filenameSu
 
 void Logger::setQuiet() {
     _quiet = true;
+}
+
+void Logger::setLinePrefix(const std::string& linePrefix) {
+    _line_prefix = linePrefix;
 }
 
 void Logger::log(unsigned int options, const char* str, ...) const {

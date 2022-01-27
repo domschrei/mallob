@@ -41,7 +41,7 @@ private:
 
 public:
     HordeProcess(const Parameters& params, const HordeConfig& config, Logger& log) 
-        : _params(params), _config(config), _log(log), _hlib(_params, _config, _log.copy("H", "H")) {
+        : _params(params), _config(config), _log(log), _hlib(_params, _config, _log) {
 
         // Set up "management" block of shared memory created by the parent
         _shmem_id = _config.getSharedMemId(Proc::getParentPid());

@@ -26,7 +26,7 @@ private:
 
 	Parameters _params;
 	HordeConfig _config;
-	Logger _logger;
+	Logger& _logger;
 	int _job_id;
 	
 	size_t _num_solvers;
@@ -52,7 +52,7 @@ private:
 
 public:
 
-    HordeLib(const Parameters& params, const HordeConfig& config, Logger&& loggingInterface);
+    HordeLib(const Parameters& params, const HordeConfig& config, Logger& loggingInterface);
 	~HordeLib();
 
 	void solve();

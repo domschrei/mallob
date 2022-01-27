@@ -24,10 +24,6 @@
 #define MALLOB_VERSION "(dbg)"
 #endif
 
-Logger getLog(const Parameters& params, const HordeConfig& config) {
-    return Logger::getMainInstance().copy("<" + config.getJobStr() + ">", "#" + std::to_string(config.jobid) + ".");
-}
-
 int main(int argc, char *argv[]) {
     
     Parameters params;
@@ -49,26 +45,28 @@ int main(int argc, char *argv[]) {
     Process::init(rankOfParent, /*leafProcess=*/true);
 
     std::string logdir = params.logDirectory();
+    std::string logFilename = "subproc" + std::string(".") + std::to_string(rankOfParent);
     Logger::init(rankOfParent, params.verbosity(), params.coloredOutput(), 
             params.quiet(), /*cPrefix=*/params.monoFilename.isSet(),
-            !logdir.empty() ? &logdir : nullptr);
+            !logdir.empty() ? &logdir : nullptr,
+            &logFilename);
+    Logger::getMainInstance().setLinePrefix(" <" + config.getJobStr() + ">");
     
-    auto log = getLog(params, config);
     pid_t pid = Proc::getPid();
-    LOGGER(log, V3_VERB, "Mallob SAT engine %s pid=%lu\n", MALLOB_VERSION, pid);
+    LOG(V3_VERB, "Mallob SAT engine %s pid=%lu\n", MALLOB_VERSION, pid);
     
     try {
         // Launch program
-        HordeProcess p(params, config, log);
+        HordeProcess p(params, config, Logger::getMainInstance());
         p.run(); // does not return
 
     } catch (const std::exception &ex) {
-        LOGGER(log, V0_CRIT, "[ERROR] uncaught \"%s\"\n", ex.what());
-        log.flush();
+        LOG(V0_CRIT, "[ERROR] uncaught \"%s\"\n", ex.what());
+        Logger::getMainInstance().flush();
         Process::doExit(1);
     } catch (...) {
-        LOGGER(log, V0_CRIT, "[ERROR] uncaught exception\n");
-        log.flush();
+        LOG(V0_CRIT, "[ERROR] uncaught exception\n");
+        Logger::getMainInstance().flush();
         Process::doExit(1);
     }
 }

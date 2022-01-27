@@ -28,7 +28,7 @@
 // Executed by a separate worker thread
 void Client::readIncomingJobs() {
 
-    Logger log = Logger::getMainInstance().copy("<Reader>", "#-1.");
+    Logger log = Logger::getMainInstance().copy("<Reader>", ".reader");
     LOGGER(log, V3_VERB, "Starting\n");
 
     std::vector<std::future<void>> taskFutures;
@@ -508,10 +508,6 @@ Client::~Client() {
     _incoming_job_cond_var.notify();
     _instance_reader.stop();
     _json_interface.reset();
-
-    // Merge logs from instance reader
-    Logger::getMainInstance().mergeJobLogs(0);
-    Logger::getMainInstance().mergeJobLogs(-1);
 
     LOG(V4_VVER, "Leaving client destructor\n");
 }

@@ -35,7 +35,7 @@ double getTime() {
 PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup) 
 		: _logger(setup.logger->copy(
 				"S"+std::to_string(setup.globalId)+"."+std::to_string(setup.solverRevision), 
-				"S"+std::to_string(setup.globalId)+"."+std::to_string(setup.solverRevision)
+				"." + setup.jobname + ".S"+std::to_string(setup.globalId)
 		  )), 
 		  _setup(setup), _job_name(setup.jobname), 
 		  _global_id(setup.globalId), _local_id(setup.localId), 

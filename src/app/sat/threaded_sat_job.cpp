@@ -25,11 +25,9 @@ void ThreadedSatJob::appl_start() {
     Parameters hParams(_params);
     hParams.applicationConfiguration.set(getDescription().getAppConfiguration().serialize());
     HordeConfig config(_params, *this, /*recoveryIndex=*/0);
-    _solver = std::unique_ptr<HordeLib>(new HordeLib(hParams, config, 
-        Logger::getMainInstance().copy(
-            "<h-" + std::string(toStr()) + ">", "#" + std::to_string(getId()) + "."
-        )
-    ));
+    _solver = std::unique_ptr<HordeLib>(
+        new HordeLib(hParams, config, Logger::getMainInstance())
+    );
     _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
 
     //log(V5_DEBG, "%s : beginning to solve\n", toStr());

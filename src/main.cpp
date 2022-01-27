@@ -150,9 +150,10 @@ int main(int argc, char *argv[]) {
     bool quiet = params.quiet();
     if (params.zeroOnlyLogging() && rank > 0) quiet = true;
     std::string logdir = params.logDirectory();
+    std::string logFilename = "log." + std::to_string(rank);
     Logger::init(rank, params.verbosity(), params.coloredOutput(), 
             quiet, /*cPrefix=*/params.monoFilename.isSet(), 
-            !logdir.empty() ? &logdir : nullptr);
+            !logdir.empty() ? &logdir : nullptr, &logFilename);
 
     MyMpi::setOptions(params);
 

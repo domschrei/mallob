@@ -30,8 +30,8 @@
 
 using namespace SolvingStates;
 
-HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger&& loggingInterface) : 
-			_params(params), _config(config), _logger(std::move(loggingInterface)), _state(INITIALIZING) {
+HordeLib::HordeLib(const Parameters& params, const HordeConfig& config, Logger& loggingInterface) : 
+			_params(params), _config(config), _logger(loggingInterface), _state(INITIALIZING) {
 	
     int appRank = config.apprank;
 
