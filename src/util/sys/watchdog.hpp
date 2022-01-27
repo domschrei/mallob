@@ -25,16 +25,16 @@ public:
 private:
     BackgroundWorker _worker;
 
-    Activity _activity;
-    int _activity_recv_tag;
-    int _activity_send_tag;
+    Activity _activity = Activity::IDLE_OR_HANDLING_MSG;
+    int _activity_recv_tag = 0;
+    int _activity_send_tag = 0;
 
     std::atomic_int _last_reset_millis = 0;
     std::atomic_int _warning_period_millis = 0;
     std::atomic_int _abort_period_millis = 0;
 
 public:
-    Watchdog(int checkIntervalMillis, float time = Timer::elapsedSeconds());
+    Watchdog(bool enabled, int checkIntervalMillis, float time = Timer::elapsedSeconds());
     void setWarningPeriod(int periodMillis);
     void setAbortPeriod(int periodMillis);
     void reset(float time = Timer::elapsedSeconds());

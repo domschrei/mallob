@@ -25,6 +25,7 @@
 #include "interface/filesystem/filesystem_connector.hpp"
 #include "interface/api/api_connector.hpp"
 
+
 // Executed by a separate worker thread
 void Client::readIncomingJobs() {
 
@@ -47,7 +48,7 @@ void Client::readIncomingJobs() {
         float time = Timer::elapsedSeconds();
 
         // Find a single job eligible for parsing
-        JobMetadata foundJob;
+        bool foundAJob = false;
         for (auto& data : _incoming_job_queue) {
             
             // Jobs are sorted by arrival:
@@ -78,8 +79,11 @@ void Client::readIncomingJobs() {
             if (!dependenciesSatisfied) continue;
 
             // Job can be read: Enqueue reader task into thread pool
-            foundJob = data;
-            auto future = ProcessWideThreadPool::get().addTask([this, &log, foundJob]() {
+            auto node = _incoming_job_queue.extract(data);
+            auto future = ProcessWideThreadPool::get().addTask(
+                [this, &log, foundJobPtr = new JobMetadata(std::move(node.value()))]() mutable {
+                
+                auto& foundJob = *foundJobPtr;
                 if (!_instance_reader.continueRunning()) return;
                 
                 // Read job
@@ -105,19 +109,20 @@ void Client::readIncomingJobs() {
                     
                     // Enqueue in ready jobs
                     auto lock = _ready_job_lock.getLock();
-                    _ready_job_queue.emplace_back(foundJob.description);
+                    _ready_job_queue.push_back(std::move(foundJob.description));
                     atomics::incrementRelaxed(_num_ready_jobs);
                     atomics::incrementRelaxed(_num_loaded_jobs);
                     _sys_state.addLocal(SYSSTATE_PARSED_JOBS, 1);
                 }
+
+                delete foundJobPtr;
             });
             taskFutures.push_back(std::move(future));
+            foundAJob = true;
             break;
         }
 
-        if (foundJob.description) {
-            // If a job was found, delete it from incoming queue
-            _incoming_job_queue.erase(foundJob);
+        if (foundAJob) {
             _num_incoming_jobs--;
         } else {
             // No eligible jobs right now
@@ -326,7 +331,7 @@ void Client::introduceNextJob() {
     size_t lbc = getMaxNumParallelJobs();
 
     // Remove first eligible job from ready queue
-    std::shared_ptr<JobDescription> jobPtr;
+    std::unique_ptr<JobDescription> jobPtr;
     {
         auto lock = _ready_job_lock.getLock();
         auto it = _ready_job_queue.begin(); 
@@ -336,7 +341,7 @@ void Client::introduceNextJob() {
             // or the job must be incremental and already active
             if (lbc <= 0 || _active_jobs.size() < lbc || 
                 (j->isIncremental() && _active_jobs.count(j->getId()))) {
-                jobPtr = j;
+                jobPtr = std::move(j);
                 break;
             }
         }
@@ -348,7 +353,7 @@ void Client::introduceNextJob() {
     // Store as an active job
     JobDescription& job = *jobPtr;
     int jobId = job.getId();
-    _active_jobs[jobId] = jobPtr;
+    _active_jobs[jobId] = std::move(jobPtr);
     _sys_state.addLocal(SYSSTATE_SCHEDULED_JOBS, 1);
 
     // Set actual job arrival

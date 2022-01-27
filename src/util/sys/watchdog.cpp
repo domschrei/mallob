@@ -7,7 +7,8 @@
 #include "util/sys/proc.hpp"
 #include "util/sys/process.hpp"
 
-Watchdog::Watchdog(int checkIntervalMillis, float time) {
+Watchdog::Watchdog(bool enabled, int checkIntervalMillis, float time) {
+    if (!enabled) return;
 
     reset(time);
     auto parentTid = Proc::getTid();

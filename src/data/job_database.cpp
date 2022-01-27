@@ -631,12 +631,16 @@ void JobDatabase::addFutureRequestMessage(int epoch, MessageHandle&& h) {
 std::list<MessageHandle> JobDatabase::getArrivedFutureRequests() {
     int presentEpoch = getGlobalBalancingEpoch();
     std::list<MessageHandle> out;
-    for (auto& [epoch, msgs] : _future_request_msgs) {
+    auto it = _future_request_msgs.begin();
+    while (it != _future_request_msgs.end()) {
+        auto& [epoch, msgs] = *it;
         if (epoch <= presentEpoch) {
             // found a candidate message
             assert(!msgs.empty());
             out.splice(out.end(), std::move(msgs));
-            _future_request_msgs.erase(epoch);
+            it = _future_request_msgs.erase(it);
+        } else {
+            ++it;
         }
     }
     return out;
@@ -673,7 +677,7 @@ void JobDatabase::runJanitor() {
             _janitor_cond_var.waitWithLockedMutex(lock, [&]() {
                 return !_janitor.continueRunning() || !_jobs_to_free.empty();
             });
-            if (!_janitor.continueRunning() && _num_stored_jobs == 0)
+            if (!_janitor.continueRunning() && _jobs_to_free.empty() && _num_stored_jobs == 0)
                 break;
             
             // Copy jobs to free to local list
@@ -699,7 +703,7 @@ JobDatabase::~JobDatabase() {
     LOG(V3_VERB, "busytime=%.3f\n", _total_busy_time);
 
     // Setup a watchdog to get feedback on hanging destructors
-    Watchdog watchdog(/*checkIntervMillis=*/200, Timer::elapsedSeconds());
+    Watchdog watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/200, Timer::elapsedSeconds());
     watchdog.setWarningPeriod(500);
     watchdog.setAbortPeriod(10*1000);
 

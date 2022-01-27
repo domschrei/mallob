@@ -43,7 +43,7 @@ private:
 public:
 
     ThreadedSatJob(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl);
-    ~ThreadedSatJob() override;
+    virtual ~ThreadedSatJob() override;
 
     void appl_start() override;
     void appl_suspend() override;

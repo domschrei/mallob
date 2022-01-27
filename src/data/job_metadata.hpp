@@ -10,13 +10,26 @@
 #include "util/sat_reader.hpp"
 
 struct JobMetadata {
-    std::shared_ptr<JobDescription> description;
+
+    std::unique_ptr<JobDescription> description;
     std::vector<std::string> files;
     SatReader::ContentMode contentMode;
-
     std::vector<int> dependencies;
     bool done = false;
     bool interrupt = false;
+
+    JobMetadata() {}
+    JobMetadata(JobMetadata&& other) : 
+        description(std::move(other.description)), 
+        files(std::move(other.files)), 
+        contentMode(other.contentMode), 
+        dependencies(std::move(other.dependencies)),
+        done(other.done), interrupt(other.interrupt) {}
+    
+    JobMetadata& operator=(JobMetadata&& other) {
+        *this = JobMetadata(std::move(other));
+        return *this;
+    }
 
     bool operator==(const JobMetadata& other) const {
         if (!description != !(other.description)) return false;

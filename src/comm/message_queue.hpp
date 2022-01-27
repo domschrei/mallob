@@ -226,6 +226,7 @@ private:
     int _running_send_id = 1;
 
     // Garbage collection
+    std::atomic_int _num_garbage = 0;
     Mutex _garbage_mutex;
     std::list<DataPtr> _garbage_queue;
 

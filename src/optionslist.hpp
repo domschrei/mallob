@@ -13,6 +13,7 @@ OptMap _map;
 
 //  TYPE  member name                    option ID (short, long)                      default (, min, max)     description
 
+OPT_BOOL(abortNonincrementalSubprocess,  "ans", "abort-noninc-subproc",               false,                   "Abort (hence restart) each sub-process which works (partially) non-incrementally upon the arrival of a new revision")
 OPT_BOOL(collectClauseHistory,           "ch", "collect-clause-history",              false,                   "Employ clause history collection mechanism")
 OPT_BOOL(coloredOutput,                  "colors", "",                                false,                   "Colored terminal output based on messages' verbosity")
 OPT_BOOL(continuousGrowth,               "cg", "continuous-growth",                   true,                    "Continuous growth of job demands")
@@ -30,11 +31,11 @@ OPT_BOOL(pipeLargeSolutions,             "pls", "pipe-large-solutions",         
 OPT_BOOL(quiet,                          "q", "quiet",                                false,                   "Do not log to stdout besides critical information")
 OPT_BOOL(reactivationScheduling,         "rs", "use-reactivation-scheduling",         true,                    "Perform reactivation-based scheduling")
 OPT_BOOL(useChecksums,                   "checksums", "",                             false,                   "Compute and verify checksum for every job description transfer")
+OPT_BOOL(watchdog,                       "watchdog", "",                              true,                    "Employ watchdog threads to detect unresponsive program flow")
 OPT_BOOL(warmup,                         "warmup", "",                                false,                   "Do one explicit All-To-All warmup among all nodes in the beginning")
 OPT_BOOL(workRequests,                   "wr", "use-work-requests",                   false,                   "Send around work requests similarly to job requests")
 OPT_BOOL(yield,                          "yield", "",                                 false,                   "Yield manager thread whenever there are no new messages")
 OPT_BOOL(zeroOnlyLogging,                "0o", "zero-only-logging",                   false,                   "Only PE of rank zero does logging")
-OPT_BOOL(abortNonincrementalSubprocess,  "ans", "abort-noninc-subproc",               false,                   "Abort (hence restart) each sub-process which works (partially) non-incrementally upon the arrival of a new revision")
 
 OPT_INT(activeJobsPerClient,             "ajpc", "active-jobs-per-client",            0,         0, LARGE_INT, "Make each client have up to this many active jobs at any given time")
 OPT_INT(bufferedImportedClsGenerations,  "bicg", "buffered-imported-cls-generations", 4,         1, LARGE_INT, "Number of subsequent full clause sharings to fit in each solver's import buffer")

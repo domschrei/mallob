@@ -14,8 +14,7 @@
 #include "comm/msgtags.h"
 #include "util/ringbuffer.hpp"
 
-MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize), 
-    _fragmented_queue(1024), _garbage_queue(1024) {
+MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize) {
     
     MPI_Comm_rank(MPI_COMM_WORLD, &_my_rank);
     _recv_data = (uint8_t*) malloc(maxMsgSize+20);
@@ -142,11 +141,16 @@ void MessageQueue::runGarbageCollector() {
 
     while (_gc.continueRunning()) {
         usleep(1000*1000); // 1s
-        auto lock = _garbage_mutex.getLock();
-        if (_garbage_queue.empty()) continue;
-        auto& dataPtr = _garbage_queue.front();
-        dataPtr.reset();
-        _garbage_queue.pop_front();
+        while (_num_garbage > 0) {
+            DataPtr dataPtr;
+            {
+                auto lock = _garbage_mutex.getLock();
+                dataPtr = std::move(_garbage_queue.front());
+                _garbage_queue.pop_front();
+            }
+            dataPtr.reset();
+            atomics::decrementRelaxed(_num_garbage);
+        }
     }
 }
 
@@ -263,6 +267,7 @@ void MessageQueue::processAssembledReceived() {
                         )
                     )
                 );
+                atomics::incrementRelaxed(_num_garbage);
             }
             _fused_queue.pop_front();
             atomics::decrementRelaxed(_num_fused);
@@ -320,6 +325,7 @@ void MessageQueue::processSent() {
                 // Concurrent deallocation of SendHandle's large chunk of data
                 auto lock = _garbage_mutex.getLock();
                 _garbage_queue.push_back(std::move(h.data));
+                atomics::incrementRelaxed(_num_garbage);
             }
             
             // Remove handle

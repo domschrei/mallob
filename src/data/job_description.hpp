@@ -94,6 +94,8 @@ public:
                 _use_checksums(computeChecksums) {}
     ~JobDescription() {
         if (_stats != nullptr) delete _stats;
+        for (auto& data : _data_per_revision)
+            data.reset();
     }
 
     // Parse (initial) job description into this object

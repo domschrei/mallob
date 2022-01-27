@@ -56,13 +56,13 @@ private:
 
     // For jobs which have been fully read and initialized
     // and whose prerequisites for activation are met.
-    std::list<std::shared_ptr<JobDescription>> _ready_job_queue;
+    std::list<std::unique_ptr<JobDescription>> _ready_job_queue;
     std::atomic_int _num_ready_jobs = 0;
     // Safeguards _ready_job_queue.
     Mutex _ready_job_lock;
 
     // For active jobs in the system. ONLY ACCESSIBLE FROM CLIENT'S MAIN THREAD.
-    std::map<int, std::shared_ptr<JobDescription>> _active_jobs;
+    std::map<int, std::unique_ptr<JobDescription>> _active_jobs;
     
     // Collection of job IDs which finished (for checking dependencies) and their corresponding revision.
     struct DoneInfo {int revision; Checksum lastChecksum;};

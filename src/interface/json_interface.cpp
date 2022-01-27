@@ -58,7 +58,7 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
 
             // Interrupt a job which is already present
             JobMetadata data;
-            data.description = std::shared_ptr<JobDescription>(new JobDescription(id, 0, appl));
+            data.description = std::unique_ptr<JobDescription>(new JobDescription(id, 0, appl));
             data.interrupt = true;
             _job_callback(std::move(data));
             return ACCEPT;
@@ -90,7 +90,7 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
 
                 // Notify client that this incremental job is done
                 JobMetadata data;
-                data.description = std::shared_ptr<JobDescription>(new JobDescription(id, 0, appl));
+                data.description = std::unique_ptr<JobDescription>(new JobDescription(id, 0, appl));
                 data.done = true;
                 _job_callback(std::move(data));
                 return ACCEPT_CONCLUDE;
@@ -192,7 +192,12 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
     if (json.contains("content-mode") && json["content-mode"] == "raw") {
         contentMode = SatReader::ContentMode::RAW;
     }
-    _job_callback(JobMetadata{std::shared_ptr<JobDescription>(job), files, contentMode, idDependencies});
+    JobMetadata metadata;
+    metadata.description = std::unique_ptr<JobDescription>(job);
+    metadata.files = std::move(files);
+    metadata.contentMode = contentMode;
+    metadata.dependencies = std::move(idDependencies);
+    _job_callback(std::move(metadata));
 
     return ACCEPT;
 }
