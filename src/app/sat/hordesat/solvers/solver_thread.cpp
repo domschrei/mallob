@@ -115,7 +115,8 @@ bool SolverThread::readFormula() {
 
             size_t end = std::min(start+batchSize, fSize);
             for (size_t i = start; i < end; i++) {
-                if (std::abs(fLits[i]) > 134217723) {
+                int lit = fLits[i];
+                if (std::abs(lit) > 134217723) {
                     LOGGER(_logger, V0_CRIT, "[ERROR] Invalid literal at rev. %i pos. %ld/%ld. Last %i literals: %i %i %i %i %i\n", 
                         (int)_active_revision, i, fSize,
                         (int) std::min(i+1, (size_t)5),
@@ -123,15 +124,28 @@ bool SolverThread::readFormula() {
                         i >= 3 ? fLits[i-3] : 0,
                         i >= 2 ? fLits[i-2] : 0,
                         i >= 1 ? fLits[i-1] : 0,
-                        fLits[i]
+                        lit
                     );
                     abort();
                 }
-                _solver.addLiteral(_vt.getTldLit(fLits[i]));
-                _max_var = std::max(_max_var, std::abs(fLits[i]));
+                if (lit == 0 && _last_read_lit_zero) {
+                    LOGGER(_logger, V0_CRIT, "[ERROR] Empty clause at rev. %i pos. %ld/%ld. Last %i literals: %i %i %i %i %i\n", 
+                        (int)_active_revision, i, fSize,
+                        (int) std::min(i+1, (size_t)5),
+                        i >= 4 ? fLits[i-4] : 0,
+                        i >= 3 ? fLits[i-3] : 0,
+                        i >= 2 ? fLits[i-2] : 0,
+                        i >= 1 ? fLits[i-1] : 0,
+                        lit
+                    );
+                    abort();
+                }
+                _solver.addLiteral(_vt.getTldLit(lit));
+                _max_var = std::max(_max_var, std::abs(lit));
+                _last_read_lit_zero = lit == 0;
                 _imported_lits_curr_revision++;
-                //_dbg_lits += std::to_string(fLits[i]) + " ";
-                //if (fLits[i] == 0) _dbg_lits += "\n";
+                //_dbg_lits += std::to_string(lit]) + " ";
+                //if (lit == 0) _dbg_lits += "\n";
             }
             
             waitWhileSuspended();
