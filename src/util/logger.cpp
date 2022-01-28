@@ -80,16 +80,21 @@ void Logger::init(int rank, int verbosity, bool coloredOutput, bool quiet, bool 
         _main_instance._log_directory = (logDir.size() == 0 ? "." : logDir) + "/" + std::to_string(rank) + "/";
         int status = FileUtils::mkdir(_main_instance._log_directory);
         if (status != 0) {
+            _main_instance._log_cfile = nullptr;
+            _main_instance._quiet = false;
             LOGGER(_main_instance, V0_CRIT, "[ERROR] status %i while trying to create / access log directory \"%s\"\n", 
                 status, _main_instance._log_directory.c_str());
+            abort();
         }
 
         // Open logging files
         _main_instance._log_filename = _main_instance._log_directory + *logFilenameOrNull;
         _main_instance._log_cfile = fopen(_main_instance._log_filename.c_str(), "a");
         if (_main_instance._log_cfile == nullptr) {
+            _main_instance._quiet = false;
             LOGGER(_main_instance, V0_CRIT, "[ERROR] cannot open log file \"%s\", errno=%i\n", 
                 _main_instance._log_filename.c_str(), errno);
+            abort();
         }
     }
 }
@@ -136,7 +141,9 @@ Logger Logger::copy(const std::string& linePrefix, const std::string& filenameSu
         c._log_filename = _log_filename + filenameSuffix;
         c._log_cfile = fopen(c._log_filename.c_str(), "a");
         if (c._log_cfile == nullptr) {
+            c._quiet = false;
             LOG(V0_CRIT, "[ERROR] cannot open child log file \"%s\", errno=%i\n", c._log_filename.c_str(), errno);
+            abort();
         }
     }
     c._line_prefix = _line_prefix + " " + linePrefix;
