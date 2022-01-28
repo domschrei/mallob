@@ -13,7 +13,7 @@
 #include "app/sat/sat_constants.h"
 #include "util/sys/thread_pool.hpp"
 
-JsonInterface::Result JsonInterface::handle(const nlohmann::json& json, 
+JsonInterface::Result JsonInterface::handle(const nlohmann::json& inputJson, 
     std::function<void(nlohmann::json&)> feedback) {
 
     if (Terminator::isTerminating()) return DISCARD;
@@ -22,34 +22,35 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
     int id;
     float userPrio, arrival, priority;
     JobDescription::Application appl;
+    JobImage* img = nullptr;
 
     {
         auto lock = _job_map_mutex.getLock();
         
         // Check and read essential fields from JSON
-        if (!json.contains("user") || !json.contains("name")) {
+        if (!inputJson.contains("user") || !inputJson.contains("name")) {
             LOGGER(_logger, V1_WARN, "[WARN] Job file missing essential field(s). Ignoring this file.\n");
             return DISCARD;
         }
-        std::string user = json["user"].get<std::string>();
-        std::string name = json["name"].get<std::string>();
+        std::string user = inputJson["user"].get<std::string>();
+        std::string name = inputJson["name"].get<std::string>();
         jobName = user + "." + name + ".json";
-        bool incremental = json.contains("incremental") ? json["incremental"].get<bool>() : false;
+        bool incremental = inputJson.contains("incremental") ? inputJson["incremental"].get<bool>() : false;
 
-        priority = json.contains("priority") ? json["priority"].get<float>() : 1.0f;
+        priority = inputJson.contains("priority") ? inputJson["priority"].get<float>() : 1.0f;
         if (_params.jitterJobPriorities()) {
             // Jitter job priority
             priority *= 0.99 + 0.01 * Random::rand();
         }
         appl = JobDescription::Application::DUMMY;
-        if (json.contains("application")) {
-            auto appStr = json["application"].get<std::string>();
+        if (inputJson.contains("application")) {
+            auto appStr = inputJson["application"].get<std::string>();
             appl = appStr == "SAT" ? 
                 (incremental ? JobDescription::Application::INCREMENTAL_SAT : JobDescription::Application::ONESHOT_SAT)
                 : JobDescription::Application::DUMMY;
         }
 
-        if (json.contains("interrupt") && json["interrupt"].get<bool>()) {
+        if (inputJson.contains("interrupt") && inputJson["interrupt"].get<bool>()) {
             if (!_job_name_to_id_rev.count(jobName)) {
                 LOGGER(_logger, V1_WARN, "[WARN] Cannot interrupt unknown job \"%s\"\n", jobName.c_str());
                 return DISCARD;
@@ -64,13 +65,13 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
             return ACCEPT;
         }
 
-        arrival = json.contains("arrival") ? std::max(Timer::elapsedSeconds(), json["arrival"].get<float>()) 
+        arrival = inputJson.contains("arrival") ? std::max(Timer::elapsedSeconds(), inputJson["arrival"].get<float>()) 
             : Timer::elapsedSeconds();
 
-        if (incremental && json.contains("precursor")) {
+        if (incremental && inputJson.contains("precursor")) {
 
             // This is a new increment of a former job - assign SAME internal ID
-            auto precursorName = json["precursor"].get<std::string>() + ".json";
+            auto precursorName = inputJson["precursor"].get<std::string>() + ".json";
             if (!_job_name_to_id_rev.count(precursorName)) {
                 LOGGER(_logger, V1_WARN, "[WARN] Unknown precursor job \"%s\"!\n", precursorName.c_str());
                 return DISCARD;
@@ -78,13 +79,16 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
             auto [jobId, rev] = _job_name_to_id_rev[precursorName];
             id = jobId;
 
-            if (json.contains("done") && json["done"].get<bool>()) {
+            if (inputJson.contains("done") && inputJson["done"].get<bool>()) {
 
                 // Incremental job is notified to be done
                 LOGGER(_logger, V3_VERB, "Incremental job #%i is done\n", jobId);
                 _job_name_to_id_rev.erase(precursorName);
                 for (int rev = 0; rev <= _job_id_to_latest_rev[id]; rev++) {
-                    _job_id_rev_to_image.erase(std::pair<int, int>(id, rev));
+                    auto key = std::pair<int, int>(id, rev);
+                    JobImage* foundImg = _job_id_rev_to_image.at(key);
+                    _job_id_rev_to_image.erase(key);
+                    delete foundImg;
                 }
                 _job_id_to_latest_rev.erase(id);
 
@@ -100,9 +104,9 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
                 // Job is not done -- add increment to job
                 _job_id_to_latest_rev[id] = rev+1;
                 _job_name_to_id_rev[jobName] = std::pair<int, int>(id, rev+1);
-                JobImage img = JobImage(id, jobName, arrival, feedback);
-                img.incremental = true;
-                img.baseJson = json;
+                img = new JobImage(id, jobName, arrival, feedback);
+                img->incremental = true;
+                img->baseJson = std::move(inputJson);
                 _job_id_rev_to_image[std::pair<int, int>(id, rev+1)] = img;
             }
 
@@ -121,13 +125,17 @@ JsonInterface::Result JsonInterface::handle(const nlohmann::json& json,
                 return DISCARD;
             }
 
-            JobImage img(id, jobName, arrival, feedback);
-            img.incremental = incremental;
-            img.baseJson = json;
+            img = new JobImage(id, jobName, arrival, feedback);
+            img->incremental = incremental;
+            img->baseJson = std::move(inputJson);
             _job_id_rev_to_image[std::pair<int, int>(id, 0)] = std::move(img);
             _job_id_to_latest_rev[id] = 0;
         }
     }
+
+    // From here on, use the json inside the JobImage because the parameter JSON has been moved
+    assert(img->baseJson != nullptr);
+    auto& json = img->baseJson;
 
     // Initialize new job
     JobDescription* job = new JobDescription(id, priority, appl);
@@ -208,8 +216,8 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
 
     auto lock = _job_map_mutex.getLock();
     
-    auto& img = _job_id_rev_to_image[std::pair<int, int>(result.id, result.revision)];
-    auto& j = img.baseJson;
+    JobImage* img = _job_id_rev_to_image[std::pair<int, int>(result.id, result.revision)];
+    auto& j = img->baseJson;
 
     bool useSolutionFile = _params.pipeLargeSolutions() && result.solution.size() > 65536;
     auto solutionFile = "/tmp/mallob-job-result." 
@@ -236,14 +244,14 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
             { "scheduling", stats.schedulingTime },
             { "first_balancing_latency", stats.latencyOf1stVolumeUpdate },
             { "processing", stats.processingTime },
-            { "total", Timer::elapsedSeconds() - img.arrivalTime }
+            { "total", Timer::elapsedSeconds() - img->arrivalTime }
         } },
         { "used_wallclock_seconds" , stats.usedWallclockSeconds },
         { "used_cpu_seconds" , stats.usedCpuSeconds }
     };
 
     // Send back feedback over whichever connection the job arrived
-    img.feedback(j);
+    img->feedback(j);
 
     if (useSolutionFile) {
         ProcessWideThreadPool::get().addTask([solutionFile, sol = std::move(result.solution)]() {
@@ -261,8 +269,9 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
         });
     }
 
-    if (!img.incremental) {
-        _job_name_to_id_rev.erase(img.userQualifiedName);
+    if (!img->incremental) {
+        _job_name_to_id_rev.erase(img->userQualifiedName);
         _job_id_rev_to_image.erase(std::pair<int, int>(result.id, result.revision));
+        delete img;
     }
 }

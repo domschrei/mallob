@@ -46,7 +46,7 @@ private:
     
     robin_hood::unordered_node_map<std::string, std::pair<int, int>> _job_name_to_id_rev;
     robin_hood::unordered_node_map<int, int> _job_id_to_latest_rev;
-    robin_hood::unordered_node_map<std::pair<int, int>, JobImage, IntPairHasher> _job_id_rev_to_image;
+    robin_hood::unordered_node_map<std::pair<int, int>, JobImage*, IntPairHasher> _job_id_rev_to_image;
 
 public:
     JsonInterface(int clientRank, const Parameters& params, Logger&& logger, 
