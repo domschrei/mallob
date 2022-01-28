@@ -60,7 +60,7 @@ public:
 
     // User-side events
     enum Result {ACCEPT, ACCEPT_CONCLUDE, DISCARD};
-    Result handle(const nlohmann::json& json, std::function<void(nlohmann::json&)> feedback);
+    Result handle(nlohmann::json& json, std::function<void(nlohmann::json&)> feedback);
 
     // Mallob-side events
     void handleJobDone(JobResult&& result, const JobDescription::Statistics& stats);

@@ -13,7 +13,7 @@
 #include "app/sat/sat_constants.h"
 #include "util/sys/thread_pool.hpp"
 
-JsonInterface::Result JsonInterface::handle(const nlohmann::json& inputJson, 
+JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson, 
     std::function<void(nlohmann::json&)> feedback) {
 
     if (Terminator::isTerminating()) return DISCARD;
