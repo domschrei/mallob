@@ -431,21 +431,31 @@ void Worker::handleNotifyJobAborting(MessageHandle& handle) {
 
 void Worker::handleAnswerAdoptionOffer(MessageHandle& handle) {
 
-    IntPair pair = Serializable::get<IntPair>(handle.getRecvData());
-    int jobId = pair.first;
-    bool accepted = pair.second == 1;
+    IntVec vec = Serializable::get<IntVec>(handle.getRecvData());
+    int jobId = vec[0];
+    int requestedNodeIndex = vec[1];
+    bool accepted = vec[2] == 1;
 
     // Retrieve according job commitment
     if (!_job_db.hasCommitment(jobId)) {
-        LOG(V1_WARN, "[WARN] Job commitment for #%i not present despite adoption accept msg\n", jobId);
+        LOG(V4_VVER, "Job commitment for #%i not present despite adoption accept msg\n", jobId);
         return;
     }
     const JobRequest& req = _job_db.getCommitment(jobId);
+
+    if (req.requestedNodeIndex != requestedNodeIndex || req.requestingNodeRank != handle.source) {
+        // Adoption offer answer from invalid rank and/or index
+        LOG_ADD_SRC(V4_VVER, "Ignore invalid adoption offer answer concerning #%i:%i\n", 
+            handle.source, jobId, requestedNodeIndex);
+        return;
+    }
+
+    // Retrieve job
     assert(_job_db.has(jobId));
     Job &job = _job_db.get(jobId);
 
     if (accepted) {
-        // Accepted
+        // Adoption offer accepted
     
         // Check and apply (if possible) the job's current volume
         initiateVolumeUpdate(req.jobId);
@@ -724,7 +734,8 @@ void Worker::handleOfferAdoption(MessageHandle& handle) {
     }
 
     // Answer the adoption offer
-    MyMpi::isend(handle.source, MSG_ANSWER_ADOPTION_OFFER, IntPair(req.jobId, reject ? 0 : 1));
+    MyMpi::isend(handle.source, MSG_ANSWER_ADOPTION_OFFER, 
+        IntVec({req.jobId, req.requestedNodeIndex, reject ? 0 : 1}));
 
     // Triggers for reactivation-based scheduling
     if (_params.reactivationScheduling()) {
