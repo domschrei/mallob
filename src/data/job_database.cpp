@@ -700,6 +700,9 @@ void JobDatabase::runJanitor() {
 
 JobDatabase::~JobDatabase() {
 
+    // Suspend current job (if applicable) to compute last slice of busy time
+    if (_load == 1) setLoad(0, getActive().getId());
+    // Output total busy time
     LOG(V3_VERB, "busytime=%.3f\n", _total_busy_time);
 
     // Setup a watchdog to get feedback on hanging destructors
