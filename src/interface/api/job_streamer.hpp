@@ -32,6 +32,7 @@ private:
     BackgroundWorker _bg_deleter;
     std::atomic_int _num_jsons_to_delete = 0;
     Mutex _delete_mutex;
+    ConditionVariable _delete_cond_var;
     std::vector<nlohmann::json> _jsons_to_delete;
 
 public:
@@ -79,6 +80,7 @@ public:
         // Run concurrent submission of jobs
         _bg_worker.run([&]() {
             std::string baseJobName = _json_template["name"];
+            Logger logger = Logger::getMainInstance().copy("Streamer", ".streamer");
 
             while (_bg_worker.continueRunning()) {
 
@@ -101,17 +103,22 @@ public:
                         _job_description_index = (_job_description_index+1) % _job_descriptions.size();
                     }
 
+                    LOGGER(logger, V3_VERB, "SUBMIT %s\n", jsonCopy["name"].get<std::string>().c_str());
                     _num_active_jobs++;
                     _api.submit(jsonCopy, [&](nlohmann::json& result) {
                         // Result for the job arrived.
                         {
-                            // Garbage collect JSON
+                            auto lock = _submit_mutex.getLock();
+                            _num_active_jobs--;
+                        }
+                        _submit_cond_var.notify();
+                        // Garbage collect JSON
+                        {
                             auto lock = _delete_mutex.getLock();
                             _jsons_to_delete.emplace_back(std::move(result));
+                            _num_jsons_to_delete++;
                         }
-                        _num_active_jobs--;
-                        _num_jsons_to_delete++;
-                        _submit_cond_var.notify();
+                        _delete_cond_var.notify();
                     });
                 }
             }
@@ -120,7 +127,7 @@ public:
         _bg_deleter.run([&]() {
             while (_bg_deleter.continueRunning()) {
 
-                _submit_cond_var.wait(_delete_mutex, [&]() {
+                _delete_cond_var.wait(_delete_mutex, [&]() {
                     return !_bg_deleter.continueRunning() ||
                         _num_jsons_to_delete > 0;
                 });
@@ -145,6 +152,7 @@ public:
         _bg_worker.stopWithoutWaiting();
         _bg_deleter.stopWithoutWaiting();
         _submit_cond_var.notify();
+        _delete_cond_var.notify();
         _bg_worker.stop();
         _bg_deleter.stop();
     }
