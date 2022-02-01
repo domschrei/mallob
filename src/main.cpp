@@ -104,7 +104,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     // If job streaming is enabled, initialize a corresponding job streamer
     JobStreamer* streamer = nullptr;
     if (params.jobTemplate.isSet() && isClient) {
-        streamer = new JobStreamer(params, client->getAPI());
+        streamer = new JobStreamer(params, client->getAPI(), client->getInternalRank());
     }
 
     // Main loop
