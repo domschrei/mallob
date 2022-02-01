@@ -124,9 +124,6 @@ void Client::readIncomingJobs() {
 
         if (foundAJob) {
             _num_incoming_jobs--;
-        } else {
-            // No eligible jobs right now
-            lock.unlock();
         }
     }
 
@@ -164,8 +161,8 @@ void Client::handleNewJob(JobMetadata&& data) {
     {
         auto lock = _incoming_job_lock.getLock();
         _incoming_job_queue.insert(std::move(data));
+        _num_incoming_jobs++;
     }
-    _num_incoming_jobs++;
     _incoming_job_cond_var.notify();
     _sys_state.addLocal(SYSSTATE_ENTERED_JOBS, 1);
 }
@@ -282,7 +279,10 @@ void Client::advance() {
             --it;
         }
         _arrival_times_lock.unlock();
-        if (notify) _incoming_job_cond_var.notify();
+        if (notify) {
+            {auto lock = _incoming_job_lock.getLock();}
+            _incoming_job_cond_var.notify();
+        }
     }
 
     // Introduce next job(s) as applicable
@@ -404,7 +404,10 @@ void Client::handleOfferAdoption(MessageHandle& handle) {
     // Clean up job description from this side (copy of shared_ptr will remain in message_queue until sent)
     LOG(V4_VVER, "Clear description of #%i rev. %i\n", req.jobId, desc.getRevision());
     desc.clearPayload(desc.getRevision());
-    _num_loaded_jobs--;
+    {
+        auto lock = _incoming_job_lock.getLock();
+        _num_loaded_jobs--;
+    }
     _incoming_job_cond_var.notify(); // waiting instance reader might be able to continue now
 }
 
@@ -510,6 +513,7 @@ Client::~Client() {
     for (Connector* conn : _interface_connectors) delete conn;
 
     _instance_reader.stopWithoutWaiting();
+    {auto lock = _incoming_job_lock.getLock();}
     _incoming_job_cond_var.notify();
     _instance_reader.stop();
     _json_interface.reset();

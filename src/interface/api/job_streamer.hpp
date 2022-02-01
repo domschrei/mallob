@@ -120,6 +120,7 @@ public:
                         }
                         _delete_cond_var.notify();
                     });
+                    logger.flush();
                 }
             }
         });
@@ -151,7 +152,9 @@ public:
     ~JobStreamer() {
         _bg_worker.stopWithoutWaiting();
         _bg_deleter.stopWithoutWaiting();
+        {auto lock = _submit_mutex.getLock();}
         _submit_cond_var.notify();
+        {auto lock = _delete_mutex.getLock();}
         _delete_cond_var.notify();
         _bg_worker.stop();
         _bg_deleter.stop();
