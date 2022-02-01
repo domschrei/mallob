@@ -79,6 +79,7 @@ void Client::readIncomingJobs() {
             if (!dependenciesSatisfied) continue;
 
             // Job can be read: Enqueue reader task into thread pool
+            LOGGER(log, V4_VVER, "ENQUEUE #%i\n", data.description->getId());
             auto node = _incoming_job_queue.extract(data);
             auto future = ProcessWideThreadPool::get().addTask(
                 [this, &log, foundJobPtr = new JobMetadata(std::move(node.value()))]() mutable {
