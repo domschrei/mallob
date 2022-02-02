@@ -253,6 +253,7 @@ void MessageQueue::processAssembledReceived() {
 
             auto& h = _fused_queue.front();
             LOG(V5_DEBG, "MQ FUSED t=%i\n", h.tag);
+            
             *_current_recv_tag = h.tag;
             _callbacks.at(h.tag)(h);
             *_current_recv_tag = 0;

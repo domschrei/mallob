@@ -17,6 +17,7 @@
 #include "util/sys/atomics.hpp"
 
 typedef std::shared_ptr<std::vector<uint8_t>> DataPtr;
+typedef std::unique_ptr<std::vector<uint8_t>> UniqueDataPtr;
 typedef std::shared_ptr<const std::vector<uint8_t>> ConstDataPtr; 
 
 class MessageQueue {
@@ -28,7 +29,7 @@ private:
         int id = -1;
         int tag = -1;
         int receivedFragments = 0;
-        std::vector<DataPtr> dataFragments;
+        std::vector<UniqueDataPtr> dataFragments;
         
         ReceiveFragment() = default;
         ReceiveFragment(int source, int id, int tag) : source(source), id(id), tag(tag) {}
@@ -78,7 +79,7 @@ private:
             assert(this->id == id || LOG_RETURN_FALSE("%i != %i\n", this->id, id));
             assert(this->tag == tag);
             assert(sentBatch < totalNumBatches || LOG_RETURN_FALSE("Invalid batch %i/%i!\n", sentBatch, totalNumBatches));
-            if (sentBatch >= dataFragments.size()) dataFragments.resize(sentBatch+1);
+            if (totalNumBatches > dataFragments.size()) dataFragments.resize(totalNumBatches);
             assert(receivedFragments >= 0 || LOG_RETURN_FALSE("Batched message was already completed!\n"));
 
             //log(V5_DEBG, "MQ STORE alloc\n");
@@ -181,7 +182,7 @@ private:
             size_t end = std::min(data->size(), (size_t)(sentBatches+1)*sizePerBatch);
             assert(end>begin || LOG_RETURN_FALSE("%ld <= %ld\n", end, begin));
             size_t msglen = (end-begin)+3*sizeof(int);
-            tempStorage.resize(msglen);
+            if (msglen > tempStorage.size()) tempStorage.resize(msglen);
 
             // Copy actual data
             memcpy(tempStorage.data(), data->data()+begin, end-begin);
@@ -190,10 +191,9 @@ private:
             memcpy(tempStorage.data()+(end-begin)+sizeof(int), &sentBatches, sizeof(int));
             memcpy(tempStorage.data()+(end-begin)+2*sizeof(int), &totalNumBatches, sizeof(int));
 
-            MPI_Isend(tempStorage.data(), tempStorage.size(), MPI_BYTE, dest, 
+            MPI_Isend(tempStorage.data(), msglen, MPI_BYTE, dest, 
                     tag+MSG_OFFSET_BATCHED, MPI_COMM_WORLD, &request);
 
-            
             sentBatches++;
             LOG(V4_VVER, "SENDB %i %i/%i %i\n", id, sentBatches, totalNumBatches, dest);
             //log(V5_DEBG, "MQ SEND BATCHED id=%i %i/%i\n", id, sentBatches, totalNumBatches);
