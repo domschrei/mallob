@@ -10,6 +10,7 @@
 #include "util/sys/fileutils.hpp"
 #include "util/sys/background_worker.hpp"
 #include "util/shuffle.hpp"
+#include "interface/api/client_template.hpp"
 
 class JobStreamer {
 
@@ -19,6 +20,7 @@ private:
     int _internal_rank;
     nlohmann::json _json_template;
     bool _valid = false;
+    ClientTemplate _client_template;
 
     int _job_counter = 1;
     int _job_description_index = 0;
@@ -37,7 +39,8 @@ private:
 
 public:
     JobStreamer(const Parameters& params, APIConnector& api, int internalRank) : 
-            _params(params), _api(api), _internal_rank(internalRank) {
+            _params(params), _api(api), _internal_rank(internalRank), 
+            _client_template(_params.seed(), _params.clientTemplate()) {
         
         std::string jsonTemplateFile = _params.jobTemplate();
         // Check if a client-specific template file is present
@@ -102,8 +105,19 @@ public:
                         jsonCopy["files"] = std::vector<std::string>(1, _job_descriptions[_job_description_index]);
                         _job_description_index = (_job_description_index+1) % _job_descriptions.size();
                     }
+                    if (_client_template.valid()) {
+                        jsonCopy["arrival"] = _client_template.getNextArrival();
+                        jsonCopy["priority"] = _client_template.getNextPriority();
+                        jsonCopy["wallclock-limit"] = std::to_string(_client_template.getNextWallclockLimit())+"s";
+                        jsonCopy["max-demand"] = _client_template.getNextMaxDemand();
+                    }
 
-                    LOGGER(logger, V3_VERB, "SUBMIT %s\n", jsonCopy["name"].get<std::string>().c_str());
+                    LOGGER(logger, V3_VERB, "SUBMIT %s arr=%.3f prio=%.3f wclim=%s maxdem=%i\n", 
+                            jsonCopy["name"].get<std::string>().c_str(),
+                            jsonCopy["arrival"].get<double>(),
+                            jsonCopy["priority"].get<double>(),
+                            jsonCopy["wallclock-limit"].get<std::string>().c_str(),
+                            jsonCopy["max-demand"].get<int>());
                     _num_active_jobs++;
                     _api.submit(jsonCopy, [&](nlohmann::json& result) {
                         // Result for the job arrived.
