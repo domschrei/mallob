@@ -40,7 +40,7 @@ private:
 public:
     JobStreamer(const Parameters& params, APIConnector& api, int internalRank) : 
             _params(params), _api(api), _internal_rank(internalRank), 
-            _client_template(_params.seed(), _params.clientTemplate()) {
+            _client_template(_params.seed()+_internal_rank, _params.clientTemplate()) {
         
         std::string jsonTemplateFile = _params.jobTemplate();
         // Check if a client-specific template file is present
