@@ -1057,13 +1057,17 @@ void Worker::updateVolume(int jobId, int volume, int balancingEpoch, float event
     int prevVolume = job.getVolume();
     auto& tree = job.getJobTree();
 
-    if (prevVolume == volume || thisIndex > 0) {
-        LOG(V4_VVER, "%s : update v=%i epoch=%i lastreqsepoch=%i evlat=%.5f\n", 
-            job.toStr(), volume, balancingEpoch, tree.getBalancingEpochOfLastRequests(), eventLatency);
+    // Print out volume update with a certain verbosity
+#define LOG_VOL_UPDATE(verb) LOG(verb, "%s : update v=%i epoch=%i lastreqsepoch=%i evlat=%.5f\n", \
+job.toStr(), volume, balancingEpoch, tree.getBalancingEpochOfLastRequests(), eventLatency);
+    if (job.getState() == ACTIVE && prevVolume != volume && thisIndex == 0) {
+        LOG_VOL_UPDATE(V3_VERB)
+    } else if (job.getState() == ACTIVE) {
+        LOG_VOL_UPDATE(V4_VVER)
     } else {
-        LOG(V3_VERB, "%s : update v=%i epoch=%i lastreqsepoch=%i evlat=%.5f\n", 
-            job.toStr(), volume, balancingEpoch, tree.getBalancingEpochOfLastRequests(), eventLatency);
+        LOG_VOL_UPDATE(V5_DEBG)
     }
+#undef LOG_VOL_UPDATE
 
     // Apply volume update to local job structure
     job.updateVolumeAndUsedCpu(volume);

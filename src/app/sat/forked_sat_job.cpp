@@ -91,6 +91,7 @@ void ForkedSatJob::appl_suspend() {
 
 void ForkedSatJob::appl_resume() {
     if (!_initialized) return;
+    _time_of_last_comm = Timer::elapsedSeconds()-_job_comm_period;
     _solver->setSolvingState(SolvingStates::ACTIVE);
 }
 
