@@ -126,18 +126,18 @@ void CollectiveAssignment::resolveRequests() {
                 requestsToKeep.push_back(req);
             } else {
                 // Send job request upwards
-                LOG_ADD_DEST(V4_VVER, "[CA] Send %s to parent", getCurrentParent(), req.toStr().c_str());
+                LOG_ADD_DEST(V5_DEBG, "[CA] Send %s to parent", getCurrentParent(), req.toStr().c_str());
                 requestsPerDestination[getCurrentParent()].push_back(req);
             }
         } else {
             // Fit found: send to respective child
-            LOG_ADD_DEST(V4_VVER, "[CA] Send %s to dest.", destination, 
-                req.toStr().c_str());
             // Update status
             if (destination == MyMpi::rank(MPI_COMM_WORLD)) {
                 LOG(V4_VVER, "[CA] Digest %s locally\n", req.toStr().c_str());
                 _local_request_callback(req, destination);
             } else {
+                LOG_ADD_DEST(V4_VVER, "[CA] Send %s to dest.", destination, 
+                    req.toStr().c_str());
                 requestsPerDestination[destination].push_back(req);
                 _child_statuses[destination].numIdle--;
             }
@@ -162,7 +162,7 @@ void CollectiveAssignment::setStatusDirty() {
 
 void CollectiveAssignment::addJobRequest(JobRequest& req) {
     if (req.balancingEpoch < _epoch && req.requestedNodeIndex > 0) return; // discard
-    LOG(V4_VVER, "[CA] Add req. %s\n", req.toStr().c_str());
+    LOG(V5_DEBG, "[CA] Add req. %s\n", req.toStr().c_str());
     _request_list.insert(req);
 }
 
@@ -193,7 +193,7 @@ void CollectiveAssignment::advance(int epoch) {
             LOG(V3_VERB, "[CA] Root: %i requests, %i idle (epoch=%i)\n", _request_list.size(), status.numIdle, _epoch);
         } else {
             auto packedStatus = serialize(status);
-            LOG_ADD_DEST(V4_VVER, "[CA] Prop. status: %i idle (epoch=%i)", getCurrentParent(), status.numIdle, _epoch);
+            LOG_ADD_DEST(V5_DEBG, "[CA] Prop. status: %i idle (epoch=%i)", getCurrentParent(), status.numIdle, _epoch);
             MyMpi::isend(getCurrentParent(), MSG_NOTIFY_ASSIGNMENT_UPDATE, std::move(packedStatus));
         }
         _status_dirty = false;
