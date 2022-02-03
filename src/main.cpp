@@ -132,8 +132,8 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
 
 int main(int argc, char *argv[]) {
     
+    MyMpi::init();
     Timer::init();
-    MyMpi::init(argc, argv);
 
     int numNodes = MyMpi::size(MPI_COMM_WORLD);
     int rank = MyMpi::rank(MPI_COMM_WORLD);

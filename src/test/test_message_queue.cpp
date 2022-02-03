@@ -177,8 +177,8 @@ void testBigP2P() {
 
 int main(int argc, char *argv[]) {
 
+    MyMpi::init();
     Timer::init();
-    MyMpi::init(argc, argv);
     int rank = MyMpi::rank(MPI_COMM_WORLD);
 
     Process::init(rank);

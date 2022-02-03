@@ -26,7 +26,7 @@ public:
             if (optSignalInfo) {
 
                 int signum = optSignalInfo.value().signum;
-                LOG(V2_INFO, "Caught signal %i\n", signum);
+                if (!_exit) LOG(V2_INFO, "Caught signal %i\n", signum);
                 setTerminating();
 
                 if (fromMainThread) {

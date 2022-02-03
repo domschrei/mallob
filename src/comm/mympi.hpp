@@ -29,7 +29,7 @@ public:
     */
     static MessageQueue* _msg_queue;
 
-    static void init(int argc, char *argv[]);
+    static void init();
     static void setOptions(const Parameters& params);
 
     static int isend(int recvRank, int tag, const Serializable& object);
