@@ -69,7 +69,11 @@ private:
             memcpy(&totalNumBatches, data+msglen - 1*sizeof(int), sizeof(int));
             msglen -= 3*sizeof(int);
 
-            LOG(V4_VVER, "RECVB %i %i/%i %i\n", id, sentBatch+1, totalNumBatches, source);
+            if (sentBatch == 0 || sentBatch+1 == totalNumBatches) {
+                LOG(V4_VVER, "RECVB %i %i/%i %i\n", id, sentBatch+1, totalNumBatches, source);
+            } else {
+                LOG(V5_DEBG, "RECVB %i %i/%i %i\n", id, sentBatch+1, totalNumBatches, source);
+            }
 
             // Store data in fragments structure
             
@@ -195,7 +199,11 @@ private:
                     tag+MSG_OFFSET_BATCHED, MPI_COMM_WORLD, &request);
 
             sentBatches++;
-            LOG(V4_VVER, "SENDB %i %i/%i %i\n", id, sentBatches, totalNumBatches, dest);
+            if (sentBatches == 1 || sentBatches == totalNumBatches) {
+                LOG(V4_VVER, "SENDB %i %i/%i %i\n", id, sentBatches, totalNumBatches, dest);
+            } else {
+                LOG(V5_DEBG, "SENDB %i %i/%i %i\n", id, sentBatches, totalNumBatches, dest);
+            }
             //log(V5_DEBG, "MQ SEND BATCHED id=%i %i/%i\n", id, sentBatches, totalNumBatches);
         }
 
