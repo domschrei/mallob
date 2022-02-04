@@ -53,7 +53,7 @@ void handleSignal(int signum) {
 }
 
 bool Process::isCrash(int signum) {
-    return signum == SIGABRT || signum == SIGFPE || signum == SIGSEGV;
+    return signum == SIGABRT || signum == SIGFPE || signum == SIGSEGV || signum == SIGBUS;
 }
 
 void Process::handleTerminationSignal(const SignalInfo& info) {
@@ -92,6 +92,7 @@ void Process::init(int rank, bool leafProcess) {
     signal(SIGSEGV, handleSignal);
     signal(SIGABRT, handleSignal);
     signal(SIGFPE, handleSignal);
+    signal(SIGBUS, handleSignal);
     signal(SIGTERM, handleSignal);
     signal(SIGINT,  handleSignal);
 
