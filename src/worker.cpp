@@ -63,6 +63,17 @@ void Worker::init() {
     // Write tag of currently handled message into watchdog
     q.setCurrentTagPointers(_watchdog.activityRecvTag(), _watchdog.activitySendTag());
 
+    q.registerSentCallback(MSG_SEND_JOB_DESCRIPTION, [&](int sendId) {
+        auto it = _send_id_to_job_id.find(sendId);
+        if (it != _send_id_to_job_id.end()) {
+            int jobId = it->second;
+            if (_job_db.has(jobId)) {
+                _job_db.get(jobId).getJobTree().clearSendHandle(sendId);
+            }
+            _send_id_to_job_id.erase(sendId);
+        }
+    });
+
     // Begin listening to incoming messages
     q.registerCallback(MSG_ANSWER_ADOPTION_OFFER,
         [&](auto& h) {handleAnswerAdoptionOffer(h);});
@@ -513,9 +524,11 @@ void Worker::sendRevisionDescription(int jobId, int revision, int dest) {
     const auto& descPtr = job.getSerializedDescription(revision);
     assert(descPtr->size() == job.getDescription().getTransferSize(revision) 
         || LOG_RETURN_FALSE("%i != %i\n", descPtr->size(), job.getDescription().getTransferSize(revision)));
-    MyMpi::isend(dest, MSG_SEND_JOB_DESCRIPTION, descPtr);
-    LOG_ADD_DEST(V4_VVER, "Sent job desc. of %s rev. %i, size %i", dest, 
-            job.toStr(), revision, descPtr->size());
+    int sendId = MyMpi::isend(dest, MSG_SEND_JOB_DESCRIPTION, descPtr);
+    LOG_ADD_DEST(V4_VVER, "Sent job desc. of %s rev. %i, size %lu, id=%i", dest, 
+            job.toStr(), revision, descPtr->size(), sendId);
+    job.getJobTree().addSendHandle(dest, sendId);
+    _send_id_to_job_id[sendId] = jobId;
 }
 
 void Worker::handleRejectOneshot(MessageHandle& handle) {

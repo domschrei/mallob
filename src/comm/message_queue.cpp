@@ -42,13 +42,17 @@ void MessageQueue::registerCallback(int tag, const MsgCallback& cb) {
     _callbacks[tag] = cb;
 }
 
-void MessageQueue::registerSentCallback(std::function<void(int)> callback) {
-    _send_done_callback = callback;
+void MessageQueue::registerSentCallback(int tag, const SendDoneCallback& cb) {
+    if (_send_done_callbacks.count(tag)) {
+        LOG(V0_CRIT, "More than one callback for tag %i!\n", tag);
+        abort();
+    }
+    _send_done_callbacks[tag] = cb;
 }
 
 void MessageQueue::clearCallbacks() {
     _callbacks.clear();
-    _send_done_callback = [](int) {};
+    _send_done_callbacks.clear();
 }
 
 int MessageQueue::send(DataPtr data, int dest, int tag) {
@@ -82,6 +86,17 @@ int MessageQueue::send(DataPtr data, int dest, int tag) {
     return h.id;
 }
 
+void MessageQueue::cancelSend(int sendId) {
+
+    for (auto& h : _send_queue) {
+        if (h.id != sendId) continue;
+
+        // Found fitting handle
+        h.cancel();
+        break;
+    }
+}
+
 void MessageQueue::advance() {
     //log(V5_DEBG, "BEGADV\n");
     _iteration++;
@@ -110,6 +125,18 @@ void MessageQueue::runFragmentedMessageAssembler() {
             _fragmented_mutex.unlock();
         }
         if (data.dataFragments.empty()) continue;
+
+        if (data.isCancelled()) {
+            // Receive message was cancelled in between batches: 
+            // concurrently clean up any fragments already received
+            LOG(V4_VVER, "MSG id=%i cancelled\n", data.id);
+            auto lock = _garbage_mutex.getLock();
+            for (auto& frag : data.dataFragments) if (frag != nullptr) {
+                std::vector<uint8_t>* ptr = frag.release();
+                _garbage_queue.push_back(DataPtr(ptr));
+            }
+            continue;
+        }
 
         // Assemble fragments
         MessageHandle h;
@@ -189,7 +216,7 @@ void MessageQueue::processReceived() {
 
         resetReceiveHandle();
 
-        if (fragment.isFinished()) {
+        if (fragment.isCancelled() || fragment.isFinished()) {
             {
                 auto lock = _fragmented_mutex.getLock();
                 _fragmented_queue.push_back(std::move(fragment));
@@ -222,6 +249,14 @@ void MessageQueue::resetReceiveHandle() {
         MPI_ANY_TAG, MPI_COMM_WORLD, &_recv_request);
 }
 
+void MessageQueue::signalCompletion(int tag, int id) {
+    auto it = _send_done_callbacks.find(tag);
+    if (it != _send_done_callbacks.end()) {
+        auto& callback = it->second;
+        callback(id);
+    }
+}
+
 void MessageQueue::processSelfReceived() {
     if (_self_recv_queue.empty()) return;
     // copy content of queue due to concurrent modification in callback
@@ -238,7 +273,7 @@ void MessageQueue::processSelfReceived() {
         h.setReceive(std::move(*sh.data));
         *_current_recv_tag = h.tag;
         _callbacks.at(h.tag)(h);
-        _send_done_callback(sh.id); // notify completion
+        signalCompletion(h.tag, sh.id);
         *_current_recv_tag = 0;
     }
 }
@@ -320,7 +355,7 @@ void MessageQueue::processSent() {
 
         if (completed) {
             // Notify completion
-            _send_done_callback(h.id); 
+            signalCompletion(h.tag, h.id);
 
             if (h.data->size() > _max_msg_size) {
                 // Concurrent deallocation of SendHandle's large chunk of data

@@ -30,6 +30,7 @@ private:
         int tag = -1;
         int receivedFragments = 0;
         std::vector<UniqueDataPtr> dataFragments;
+        bool cancelled = false;
         
         ReceiveFragment() = default;
         ReceiveFragment(int source, int id, int tag) : source(source), id(id), tag(tag) {}
@@ -40,6 +41,7 @@ private:
             tag = moved.tag;
             receivedFragments = moved.receivedFragments;
             dataFragments = std::move(moved.dataFragments);
+            cancelled = moved.cancelled;
             moved.id = -1;
         }
         ReceiveFragment& operator=(ReceiveFragment&& moved) {
@@ -48,11 +50,13 @@ private:
             tag = moved.tag;
             receivedFragments = moved.receivedFragments;
             dataFragments = std::move(moved.dataFragments);
+            cancelled = moved.cancelled;
             moved.id = -1;
             return *this;
         }
 
-        bool valid() {return id != -1;}
+        bool valid() const {return id != -1;}
+        bool isCancelled() const {return cancelled;}
 
         static int readId(uint8_t* data, int msglen) {
             return * (int*) (data+msglen - 3*sizeof(int));
@@ -68,6 +72,12 @@ private:
             memcpy(&sentBatch,       data+msglen - 2*sizeof(int), sizeof(int));
             memcpy(&totalNumBatches, data+msglen - 1*sizeof(int), sizeof(int));
             msglen -= 3*sizeof(int);
+            
+            if (msglen == 0 && sentBatch == 0 && totalNumBatches == 0) {
+                // Message was cancelled!
+                cancelled = true;
+                return;
+            }
 
             if (sentBatch == 0 || sentBatch+1 == totalNumBatches) {
                 LOG(V4_VVER, "RECVB %i %i/%i %i\n", id, sentBatch+1, totalNumBatches, source);
@@ -182,6 +192,18 @@ private:
                 return;
             }
 
+            if (isCancelled()) {
+                int zero = 0;
+                if (tempStorage.size() < 3*sizeof(int)) tempStorage.resize(3*sizeof(int));
+                memcpy(tempStorage.data(), &id, sizeof(int));
+                memcpy(tempStorage.data()+sizeof(int), &zero, sizeof(int));
+                memcpy(tempStorage.data()+2*sizeof(int), &zero, sizeof(int));
+                MPI_Isend(tempStorage.data(), 3*sizeof(int), MPI_BYTE, 
+                    dest, tag+MSG_OFFSET_BATCHED, MPI_COMM_WORLD, &request);
+                sentBatches = totalNumBatches; // mark as finished
+                return;
+            }
+
             size_t begin = sentBatches*sizePerBatch;
             size_t end = std::min(data->size(), (size_t)(sentBatches+1)*sizePerBatch);
             assert(end>begin || LOG_RETURN_FALSE("%ld <= %ld\n", end, begin));
@@ -207,7 +229,12 @@ private:
             //log(V5_DEBG, "MQ SEND BATCHED id=%i %i/%i\n", id, sentBatches, totalNumBatches);
         }
 
+        void cancel() {
+            sizePerBatch = -1;
+        }
+
         bool isBatched() const {return totalNumBatches > 1;}
+        bool isCancelled() const {return sizePerBatch == -1;}
         size_t getTotalNumBatches() const {assert(isBatched()); return totalNumBatches;}
     };
 
@@ -240,8 +267,9 @@ private:
 
     // Callbacks
     typedef std::function<void(MessageHandle&)> MsgCallback;
+    typedef std::function<void(int)> SendDoneCallback;
     robin_hood::unordered_map<int, MsgCallback> _callbacks;
-    std::function<void(int)> _send_done_callback = [](int) {};
+    robin_hood::unordered_map<int, SendDoneCallback> _send_done_callbacks;
     int _default_tag_var = 0;
     int* _current_recv_tag = nullptr;
     int* _current_send_tag = nullptr;
@@ -254,7 +282,7 @@ public:
     ~MessageQueue();
 
     void registerCallback(int tag, const MsgCallback& cb);
-    void registerSentCallback(std::function<void(int)> callback);
+    void registerSentCallback(int tag, const SendDoneCallback& cb);
     void clearCallbacks();
     void setCurrentTagPointers(int* recvTag, int* sendTag) {
         _current_recv_tag = recvTag;
@@ -262,6 +290,7 @@ public:
     }
 
     int send(DataPtr data, int dest, int tag);
+    void cancelSend(int sendId);
     void advance();
 
 private:
@@ -274,6 +303,7 @@ private:
     void processSent();
 
     void resetReceiveHandle();
+    void signalCompletion(int tag, int id);
 };
 
 #endif

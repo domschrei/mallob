@@ -53,6 +53,8 @@ private:
 
     robin_hood::unordered_map<std::pair<int, int>, JobResult, IntPairHasher> _pending_results;
 
+    robin_hood::unordered_map<int, int> _send_id_to_job_id;
+
 public:
     Worker(MPI_Comm comm, Parameters& params);
     ~Worker();

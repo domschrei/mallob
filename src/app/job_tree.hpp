@@ -11,6 +11,7 @@
 #include "data/job_transfer.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
+#include "comm/mympi.hpp"
 
 class JobTree {
 
@@ -49,6 +50,9 @@ private:
     size_t _num_fulfilled_desires = 0;
     float _sum_desire_latencies = 0;
     std::vector<float> _desire_latencies;
+
+    std::list<int> _send_handles_left;
+    std::list<int> _send_handles_right;
 
     int _wait_epoch = -1;
     int _stop_wait_epoch = -1;
@@ -127,12 +131,41 @@ public:
         updateJobNode(getRightChildIndex(), rank);
         fulfilDesireRight(Timer::elapsedSeconds());
     }
+    void addSendHandle(int dest, int sendId) {
+        if (dest == getLeftChildNodeRank())
+            _send_handles_left.push_back(sendId);
+        else if (dest == getRightChildNodeRank()) {
+            _send_handles_right.push_back(sendId);
+        }
+    }
+    void clearSendHandle(int sendId) {
+        auto it = _send_handles_left.begin();
+        while (it != _send_handles_left.end()) {
+            if (*it == sendId) {
+                _send_handles_left.erase(it);
+                return;
+            }
+            ++it;
+        }
+        it = _send_handles_right.begin();
+        while (it != _send_handles_right.end()) {
+            if (*it == sendId) {
+                _send_handles_right.erase(it);
+                return;
+            }
+            ++it;
+        }
+    }
     void unsetLeftChild() {
         if (!_has_left_child) return; 
         int rank = getLeftChildNodeRank();
         _past_children.insert(rank);
         addDormantChild(rank);
         _has_left_child = false;
+        for (int id : _send_handles_left) {
+            MyMpi::getMessageQueue().cancelSend(id);
+        }
+        _send_handles_left.clear();
     }
     void unsetRightChild() {
         if (!_has_right_child) return;
@@ -140,6 +173,10 @@ public:
         _past_children.insert(rank); 
         addDormantChild(rank);
         _has_right_child = false;
+        for (int id : _send_handles_right) {
+            MyMpi::getMessageQueue().cancelSend(id);
+        }
+        _send_handles_right.clear();
     }
     void update(int index, int rootRank, int parentRank) {    
         _index = index;
