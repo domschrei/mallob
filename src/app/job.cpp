@@ -160,11 +160,13 @@ int Job::getDemand() const {
             float t = Timer::elapsedSeconds()-_time_of_activation;
             
             // Continuous growth
-            float numPeriods = t/_growth_period;
+            float numPeriods = std::min(t/_growth_period, 28.f); // overflow protection
             if (!_continuous_growth) {
                 // Discrete periodic growth
-                numPeriods = std::floor(numPeriods);
-                demand = std::min(commSize, (1 << (int)(numPeriods + 1)) - 1);
+                int intPeriods = std::floor(numPeriods);
+                demand = 1;
+                for (int i = 0; demand < commSize && i < intPeriods; i++) demand = 2*demand+1;
+                demand = std::min(commSize, demand);
             } else {
                 // d(0) := 1; d := 2d+1 every <growthPeriod> seconds
                 demand = std::min(commSize, (int)std::pow(2, numPeriods + 1) - 1);
