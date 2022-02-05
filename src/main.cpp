@@ -130,6 +130,11 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     if (isClient) delete client;
 }
 
+void longStartupWarnMsg(int rank, const char* msg) {
+    if (Timer::elapsedSeconds() >= 10) 
+        std::cout << Timer::elapsedSeconds() << " " << rank << " " << std::string(msg) << std::endl;
+}
+
 int main(int argc, char *argv[]) {
     
     MyMpi::init();
@@ -138,14 +143,22 @@ int main(int argc, char *argv[]) {
     int numNodes = MyMpi::size(MPI_COMM_WORLD);
     int rank = MyMpi::rank(MPI_COMM_WORLD);
 
+    longStartupWarnMsg(rank, "Init'd MPI");
+
     // Initialize bookkeeping of child processes and signals
     Process::init(rank);
+
+    longStartupWarnMsg(rank, "Init'd process");
 
     Parameters params;
     params.init(argc, argv);
     if (rank == 0) params.printBanner();
 
+    longStartupWarnMsg(rank, "Init'd params");
+
     ProcessWideThreadPool::init(std::max(4, 2*params.numThreadsPerProcess()));
+
+    longStartupWarnMsg(rank, "Init'd thread pool");
 
     bool quiet = params.quiet();
     if (params.zeroOnlyLogging() && rank > 0) quiet = true;
@@ -155,7 +168,11 @@ int main(int argc, char *argv[]) {
             quiet, /*cPrefix=*/params.monoFilename.isSet(), 
             !logdir.empty() ? &logdir : nullptr, &logFilename);
 
+    longStartupWarnMsg(rank, "Init'd logger");
+
     MyMpi::setOptions(params);
+
+    longStartupWarnMsg(rank, "Init'd message queue");
 
     if (rank == 0)
         params.printParams();
@@ -202,6 +219,7 @@ int main(int argc, char *argv[]) {
         MPI_Group_incl(worldGroup, clientRanks.size(), clientRanks.data(), &clientGroup);
         MPI_Comm_create(MPI_COMM_WORLD, clientGroup, &clientComm);
     }
+    if (rank == 0) LOG(V3_VERB, "Created client communicator\n");
     {
         MPI_Group worldGroup;
         MPI_Comm_group(MPI_COMM_WORLD, &worldGroup);
@@ -209,6 +227,7 @@ int main(int argc, char *argv[]) {
         MPI_Group_incl(worldGroup, workerRanks.size(), workerRanks.data(), &workerGroup);
         MPI_Comm_create(MPI_COMM_WORLD, workerGroup, &workerComm);
     }
+    if (rank == 0) LOG(V3_VERB, "Created worker communicator\n");
     
     // Execute main program
     try {
