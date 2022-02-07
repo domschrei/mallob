@@ -395,21 +395,23 @@ void Client::handleOfferAdoption(MessageHandle& handle) {
     // Send job description
     LOG_ADD_DEST(V4_VVER, "Sending job desc. of #%i rev. %i of size %i", handle.source, desc.getId(), 
         desc.getRevision(), desc.getTransferSize(desc.getRevision()));
-    const auto& data = desc.getSerialization(desc.getRevision());
+    
+    auto data = desc.getSerialization(desc.getRevision());
+    desc.clearPayload(desc.getRevision());
     int msgId = MyMpi::isend(handle.source, MSG_SEND_JOB_DESCRIPTION, data);
-    LOG_ADD_DEST(V4_VVER, "Sent job desc. of #%i of size %i", handle.source, req.jobId, data->size());
+    LOG_ADD_DEST(V4_VVER, "Sent job desc. of #%i of size %i\n", 
+        handle.source, req.jobId, data->size());
+    //LOG(V4_VVER, "%p : use count %i\n", data.get(), data.use_count());
     
     // Remember transaction
     _root_nodes[req.jobId] = handle.source;
 
-    // Clean up job description from this side (copy of shared_ptr will remain in message_queue until sent)
-    LOG(V4_VVER, "Clear description of #%i rev. %i\n", req.jobId, desc.getRevision());
-    desc.clearPayload(desc.getRevision());
+    // waiting instance reader might be able to continue now
     {
         auto lock = _incoming_job_lock.getLock();
         _num_loaded_jobs--;
     }
-    _incoming_job_cond_var.notify(); // waiting instance reader might be able to continue now
+    _incoming_job_cond_var.notify(); 
 }
 
 void Client::handleJobDone(MessageHandle& handle) {

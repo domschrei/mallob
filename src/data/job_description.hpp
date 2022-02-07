@@ -98,6 +98,41 @@ public:
             data.reset();
     }
 
+    // Moving job descriptions is okay
+    JobDescription& operator=(JobDescription&& other) {
+        _id = other._id;
+        _root_rank = other._root_rank;
+        _priority = std::move(other._priority);
+        _revision = std::move(other._revision);
+        _client_rank = std::move(other._client_rank);
+        _wallclock_limit = std::move(other._wallclock_limit);
+        _cpu_limit = std::move(other._cpu_limit);
+        _max_demand = std::move(other._max_demand);
+        _application = std::move(other._application);
+        _checksum = std::move(other._checksum);
+        _arrival = std::move(other._arrival);
+        _app_config = std::move(other._app_config);
+        _num_vars = std::move(other._num_vars);
+        _f_size = std::move(other._f_size);
+        _a_size = std::move(other._a_size);
+        _data_per_revision = std::move(other._data_per_revision);
+        _preloaded_literals = std::move(other._preloaded_literals);
+        _preloaded_assumptions = std::move(other._preloaded_assumptions);
+        _stats = std::move(other._stats);
+        other._id = -1;
+        other._data_per_revision.clear();
+        other._stats = nullptr;
+        return *this;
+    }
+    JobDescription(JobDescription&& other) {
+        *this = std::move(other);
+    }
+    
+    // Copying is NOT okay
+    JobDescription(const JobDescription& other) = delete;
+    JobDescription& operator=(const JobDescription& other) = delete;
+
+
     // Parse (initial) job description into this object
 
     void beginInitialization(int revision);

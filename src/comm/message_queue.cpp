@@ -129,12 +129,15 @@ void MessageQueue::runFragmentedMessageAssembler() {
         if (data.isCancelled()) {
             // Receive message was cancelled in between batches: 
             // concurrently clean up any fragments already received
-            LOG(V4_VVER, "MSG id=%i cancelled\n", data.id);
             auto lock = _garbage_mutex.getLock();
+            int numFragments = 0;
             for (auto& frag : data.dataFragments) if (frag != nullptr) {
                 std::vector<uint8_t>* ptr = frag.release();
                 _garbage_queue.push_back(DataPtr(ptr));
+                atomics::incrementRelaxed(_num_garbage);
+                numFragments++;
             }
+            LOG(V4_VVER, "MSG id=%i cancelled (%i fragments)\n", data.id, numFragments);
             continue;
         }
 
@@ -175,6 +178,9 @@ void MessageQueue::runGarbageCollector() {
                 dataPtr = std::move(_garbage_queue.front());
                 _garbage_queue.pop_front();
             }
+            //if (dataPtr.use_count() > 0) {
+            //    LOG(V4_VVER, "GC %p : use count %i\n", dataPtr.get(), dataPtr.use_count());
+            //}
             dataPtr.reset();
             atomics::decrementRelaxed(_num_garbage);
         }
@@ -362,6 +368,9 @@ void MessageQueue::processSent() {
                 auto lock = _garbage_mutex.getLock();
                 _garbage_queue.push_back(std::move(h.data));
                 atomics::incrementRelaxed(_num_garbage);
+            } else {
+                // Direct deallocation of SendHandle's data
+                h.data.reset();
             }
             
             // Remove handle
