@@ -62,7 +62,7 @@ public:
         nodes.mergePreferringNewer(newNodes);
         //notifiedInactiveNodes = false;
         childHasNodes = false;
-        LOG(V5_DEBG, "RBS #%i:%i ADDED_NODES inactives={%s}\n", jobId, childIndex, nodes.toStr().c_str());
+        LOG(V4_VVER, "RBS #%i:%i SHRINK #inactives=%i <= [%i]\n", jobId, childIndex, nodes.set.size(), rank);
     }
 
     MsgDirective handleRejectionOfPotentialChild(int index, int epoch, bool lost, bool hasChild, bool suspended) {
@@ -89,8 +89,8 @@ public:
         update.inactiveJobNodes.cleanUpStatuses();
         MyMpi::isend(childRank, MSG_SCHED_INITIALIZE_CHILD_WITH_NODES, update);
 
-        LOG(V5_DEBG, "RBS #%i:%i INIT_CHILD e=%i inactives={%s} => [%i]\n", 
-            jobId, childIndex, epoch, update.inactiveJobNodes.toStr().c_str(), source);
+        LOG(V4_VVER, "RBS #%i:%i EXPAND e=%i #inactives=%i => [%i]\n", 
+            jobId, childIndex, epoch, update.inactiveJobNodes.set.size(), source);
 
         // If you can find the job node of this rank, set it to BUSY.
         findAndUpdateNode(source, index, epoch, InactiveJobNode::BUSY);
