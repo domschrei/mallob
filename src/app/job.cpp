@@ -16,7 +16,7 @@ Job::Job(const Parameters& params, int commSize, int worldRank, int jobId, JobDe
             _appl(appl),
             _time_of_arrival(Timer::elapsedSeconds()), 
             _state(INACTIVE),
-            _job_tree(commSize, worldRank, jobId), 
+            _job_tree(commSize, worldRank, jobId, params.useDormantChildren()), 
             _comm(_id, _job_tree, params.jobCommUpdatePeriod()) {
     
     _growth_period = _params.growthPeriod();

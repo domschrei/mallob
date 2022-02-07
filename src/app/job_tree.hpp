@@ -25,6 +25,7 @@ private:
     int _client_rank;
     robin_hood::unordered_set<int> _past_children;
 
+    bool _use_dormant_children;
     struct DormantChild {
         int rank;
         int numUses = 0;
@@ -58,8 +59,11 @@ private:
     int _stop_wait_epoch = -1;
 
 public:
-    JobTree(int commSize, int rank, int seed) : _comm_size(commSize), _rank(rank), _job_node_ranks(commSize, seed) {
-        _it_dormant_children = _dormant_children.begin();
+    JobTree(int commSize, int rank, int seed, bool useDormantChildren) : 
+        _comm_size(commSize), _rank(rank), _job_node_ranks(commSize, seed), 
+        _use_dormant_children(useDormantChildren) {
+        
+        if (_use_dormant_children) _it_dormant_children = _dormant_children.begin();
     }
 
     int getIndex() const {return _index;}
@@ -201,6 +205,7 @@ public:
         }
     }
     void addDormantChild(int rank) {
+        if (!_use_dormant_children) return;
         removeDormantChild(rank);
         _dormant_children.insert(_it_dormant_children, rank);
     }
