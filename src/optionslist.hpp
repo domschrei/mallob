@@ -19,7 +19,7 @@ OPT_BOOL(coloredOutput,                  "colors", "",                          
 OPT_BOOL(continuousGrowth,               "cg", "continuous-growth",                   true,                    "Continuous growth of job demands")
 OPT_BOOL(delayMonkey,                    "delaymonkey", "",                           false,                   "Small chance for each MPI call to block for some random amount of time")
 OPT_BOOL(derandomize,                    "derandomize", "",                           true,                    "Derandomize job bouncing and build a <bounce-alternatives>-regular message graph instead")
-OPT_BOOL(useDormantChildren,             "dormant-children", "dc",                    false,                   "Simple strategy of maintaining local set of dormant child job contexts which the parent tries to reactivate")
+OPT_BOOL(useDormantChildren,             "dc", "dormant-children",                    false,                   "Simple strategy of maintaining local set of dormant child job contexts which the parent tries to reactivate")
 OPT_BOOL(explicitVolumeUpdates,          "evu", "explicit-volume-updates",            false,                   "Broadcast volume updates through job tree instead of letting each PE compute it itself")
 OPT_BOOL(help,                           "h", "help",                                 false,                   "Print help and exit")
 OPT_BOOL(useFilesystemInterface,         "interface-fs", "",                          true,                    "Use filesystem interface (.api/{in,out}/*.json)")
