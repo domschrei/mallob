@@ -129,6 +129,9 @@ public:
                     }
                 }
 
+                auto rtInfo = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::FLAT);
+                LOGGER(_log, V3_VERB, "child_mem=%.3fGB\n", 0.001*0.001*rtInfo.residentSetSize);
+
                 _hsm->didDumpStats = true;
             }
             if (!_hsm->doDumpStats) _hsm->didDumpStats = false;
