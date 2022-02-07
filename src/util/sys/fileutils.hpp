@@ -12,7 +12,9 @@ public:
     static int mergeFiles(const std::string& globstr, const std::string& dest, bool removeOriginals);
     static int append(const std::string& srcFile, const std::string& destFile);
     static int rm(const std::string& file);
+
     static bool isRegularFile(const std::string& file);
+    static bool isDirectory(const std::string& dirpath);
 
     static std::vector<std::string> glob(const std::string& pattern);
 };

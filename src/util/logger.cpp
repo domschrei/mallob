@@ -77,14 +77,18 @@ void Logger::init(int rank, int verbosity, bool coloredOutput, bool quiet, bool 
     if (logDirOrNull != nullptr && logFilenameOrNull != nullptr) {
         std::string& logDir = *logDirOrNull;
 
-        _main_instance._log_directory = (logDir.size() == 0 ? "." : logDir) + "/" + std::to_string(rank) + "/";
-        int status = FileUtils::mkdir(_main_instance._log_directory);
-        if (status != 0) {
-            _main_instance._log_cfile = nullptr;
-            _main_instance._quiet = false;
-            LOGGER(_main_instance, V0_CRIT, "[ERROR] status %i while trying to create / access log directory \"%s\"\n", 
-                status, _main_instance._log_directory.c_str());
-            abort();
+        _main_instance._log_directory = (logDir.size() == 0 ? "." : logDir) + "/" + std::to_string(rank);
+        bool dirExists = FileUtils::isDirectory(_main_instance._log_directory);
+        _main_instance._log_directory += "/";
+        if (!dirExists) {
+            int status = FileUtils::mkdir(_main_instance._log_directory);
+            if (status != 0) {
+                _main_instance._log_cfile = nullptr;
+                _main_instance._quiet = false;
+                LOGGER(_main_instance, V0_CRIT, "[ERROR] status %i while trying to create / access log directory \"%s\"\n", 
+                    status, _main_instance._log_directory.c_str());
+                abort();
+            }
         }
 
         // Open logging files

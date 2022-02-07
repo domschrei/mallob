@@ -16,6 +16,11 @@ bool FileUtils::isRegularFile(const std::string& file) {
     return stat(file.c_str(), &sb) == 0 && S_ISREG(sb.st_mode);
 }
 
+bool FileUtils::isDirectory(const std::string& dirpath) {
+    struct stat sb;
+    return stat(dirpath.c_str(), &sb) == 0 && S_ISDIR(sb.st_mode);
+}
+
 int FileUtils::mkdir(const std::string& dir) {
     for (size_t i = 0; i < dir.size(); i++) {
         if (dir[i] == '/' && i > 0 && i+1 < dir.size()) {
