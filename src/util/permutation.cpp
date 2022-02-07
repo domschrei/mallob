@@ -272,6 +272,10 @@ void AdjustablePermutation::adjust(int x, int new_x) {
     if (get(x) != new_x) _adjusted_values[x] = new_x;
 }
 
+void AdjustablePermutation::clear(int x) {
+    _adjusted_values.erase(x);
+}
+
 void AdjustablePermutation::clear() {
     _adjusted_values.clear();
 }

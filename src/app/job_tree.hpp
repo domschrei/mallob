@@ -170,6 +170,7 @@ public:
             MyMpi::getMessageQueue().cancelSend(id);
         }
         _send_handles_left.clear();
+        _job_node_ranks.clear(getLeftChildIndex());
     }
     void unsetRightChild() {
         if (!_has_right_child) return;
@@ -181,6 +182,7 @@ public:
             MyMpi::getMessageQueue().cancelSend(id);
         }
         _send_handles_right.clear();
+        _job_node_ranks.clear(getRightChildIndex());
     }
     void update(int index, int rootRank, int parentRank) {    
         _index = index;
