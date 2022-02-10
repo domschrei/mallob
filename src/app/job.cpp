@@ -207,10 +207,10 @@ double Job::getTemperature() const {
     }
 }
 
-const JobResult& Job::getResult() {
-    if (!_result.has_value()) _result = appl_getResult();
+JobResult& Job::getResult() {
+    if (!_result.has_value()) _result = std::move(appl_getResult());
     JobResult& result = _result.value();
-    assert(result.id >= 0);
+    assert(result.id >= 1);
     return result;
 }
 

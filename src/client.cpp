@@ -432,7 +432,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     int revision = jobResult.revision;
 
     LOG_ADD_SRC(V4_VVER, "Received result of job #%i rev. %i, code: %i", handle.source, jobId, revision, resultCode);
-    JobDescription& desc = *_active_jobs[jobId];
+    JobDescription& desc = *_active_jobs.at(jobId);
     desc.getStatistics().processingTime = Timer::elapsedSeconds() - desc.getStatistics().timeOfScheduling;
 
     // Output response time and solution header

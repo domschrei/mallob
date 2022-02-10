@@ -70,12 +70,12 @@ void ThreadedSatJob::appl_terminate() {
     });
 }
 
-JobResult ThreadedSatJob::appl_getResult() {
-    if (_result.id != 0) return _result;
+JobResult&& ThreadedSatJob::appl_getResult() {
+    if (_result.id != 0) return std::move(_result);
     _result = getSolver()->getResult();
     _result.id = getId();
     assert(_result.revision == getRevision());
-    return _result;
+    return std::move(_result);
 }
 
 int ThreadedSatJob::appl_solved() {

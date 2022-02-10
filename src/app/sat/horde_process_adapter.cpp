@@ -295,23 +295,50 @@ HordeProcessAdapter::SubprocessStatus HordeProcessAdapter::check() {
         _temp_returned_clauses.erase(_temp_returned_clauses.begin());
     }
     
-    if (_hsm->hasSolution) return _hsm->solutionRevision == _desired_revision ? FOUND_RESULT : NORMAL;
+    // Solution preparation just ended?
+    if (!_solution_in_preparation && _solution_prepare_future.valid()) {
+        _solution_prepare_future.get();
+    }
+    if (_hsm->hasSolution && _hsm->solutionRevision == _desired_revision) {
+        // Preparation still going on?
+        if (_solution_in_preparation) return NORMAL;
+        // Correct solution prepared successfully?
+        if (_solution_revision_in_preparation == _desired_revision)
+            return FOUND_RESULT;
+        // No preparation going on yet?
+        if (!_solution_prepare_future.valid()) {
+            // Begin preparation of solution
+            _solution_revision_in_preparation = _desired_revision;
+            _solution_in_preparation = true;
+            _solution_prepare_future = ProcessWideThreadPool::get().addTask([&]() {
+                doPrepareSolution();
+            });
+        }
+    } 
     return NORMAL;
 }
 
-std::pair<SatResult, std::vector<int>> HordeProcessAdapter::getSolution() {
+void HordeProcessAdapter::doPrepareSolution() {
 
-    int rev = _hsm->solutionRevision;
+    int rev = _solution_revision_in_preparation;
     size_t* solutionSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));
-    if (*solutionSize == 0) return std::pair<SatResult, std::vector<int>>(_hsm->result, std::vector<int>()); 
-
-    std::vector<int> solution(*solutionSize);
+    if (*solutionSize == 0) {
+        _solution.result = _hsm->result;
+        _solution.setSolutionToSerialize(nullptr, 0);
+        _solution_in_preparation = false;
+        return;
+    } 
 
     // ACCESS the existing shared memory segment to the solution vector
-    int* shmemSolution = (int*) SharedMemory::access(_shmem_id + ".solution." + std::to_string(rev), solution.size()*sizeof(int));
-    memcpy(solution.data(), shmemSolution, solution.size()*sizeof(int));
+    int* shmemSolution = (int*) SharedMemory::access(_shmem_id + ".solution." + std::to_string(rev), *solutionSize*sizeof(int));
     
-    return std::pair<SatResult, std::vector<int>>(_hsm->result, solution);
+    _solution.result = _hsm->result;
+    _solution.setSolutionToSerialize(shmemSolution, *solutionSize);
+    _solution_in_preparation = false;
+}
+
+JobResult& HordeProcessAdapter::getSolution() {
+    return _solution;
 }
 
 void HordeProcessAdapter::waitUntilChildExited() {
@@ -354,6 +381,7 @@ void HordeProcessAdapter::freeSharedMemory() {
         // wait for termination of background threads
         if (_bg_initializer.valid()) _bg_initializer.get();
         if (_bg_writer.valid()) _bg_writer.get();
+        if (_solution_prepare_future.valid()) _solution_prepare_future.get();
     }
 
     if (_hsm != nullptr) {

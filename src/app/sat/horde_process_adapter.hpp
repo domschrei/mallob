@@ -12,6 +12,7 @@
 #include "horde_shared_memory.hpp"
 #include "data/checksum.hpp"
 #include "util/sys/background_worker.hpp"
+#include "data/job_result.hpp"
 
 class ForkedSatJob; // fwd
 class AnytimeSatClauseCommunicator;
@@ -87,6 +88,11 @@ private:
     Mutex _revisions_mutex;
     Mutex _state_mutex;
 
+    bool _solution_in_preparation = false;
+    int _solution_revision_in_preparation = -1;
+    JobResult _solution;
+    std::future<void> _solution_prepare_future;
+
 public:
     HordeProcessAdapter(Parameters&& params, HordeConfig&& config, ForkedSatJob* job, 
         size_t fSize, const int* fLits, size_t aSize, const int* aLits,
@@ -113,7 +119,7 @@ public:
     
     enum SubprocessStatus {NORMAL, FOUND_RESULT, CRASHED};
     SubprocessStatus check();
-    std::pair<SatResult, std::vector<int>> getSolution();
+    JobResult& getSolution();
 
     void waitUntilChildExited();
     void freeSharedMemory();
@@ -121,6 +127,7 @@ public:
 private:
     void doInitialize();
     void doWriteRevisions();
+    void doPrepareSolution();
     
     void applySolvingState();
     void doDigest(const std::vector<int>& clauses, const Checksum& checksum);

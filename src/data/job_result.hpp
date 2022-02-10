@@ -21,7 +21,6 @@ private:
 
 public:
     JobResult() {}
-    JobResult(int id, int result, std::vector<int> solution) : id(id), result(result), solution(solution) {}
     JobResult(std::vector<uint8_t>&& packedData);
 
     int getTransferSize() const {return sizeof(int)*3 + sizeof(int)*solution.size();}
@@ -29,8 +28,11 @@ public:
     JobResult& deserialize(const std::vector<uint8_t>& packed) override;
 
     std::vector<uint8_t> serialize() const override;
+    std::vector<uint8_t>&& moveSerialization();
+    void updateSerialization();
 
     void setSolution(std::vector<int>&& solution);
+    void setSolutionToSerialize(const int* begin, size_t size);
 
     size_t getSolutionSize() const;
     inline int getSolution(size_t pos) const {

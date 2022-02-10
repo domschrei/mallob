@@ -18,7 +18,7 @@ public:
     void appl_resume() override {}
     void appl_terminate() override {}
     int appl_solved() override {return -1;}
-    JobResult appl_getResult() override {return JobResult();}
+    JobResult&& appl_getResult() override {return JobResult();}
     bool appl_wantsToBeginCommunication() override {return false;}
     void appl_beginCommunication() override {}
     void appl_communicate(int source, JobMessage& msg) override {}

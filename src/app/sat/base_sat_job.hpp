@@ -32,7 +32,7 @@ public:
     virtual void appl_terminate() = 0;
 
     virtual int appl_solved() = 0;
-    virtual JobResult appl_getResult() = 0;
+    virtual JobResult&& appl_getResult() = 0;
     
     virtual bool appl_wantsToBeginCommunication() = 0;
     virtual void appl_beginCommunication() = 0;

@@ -89,7 +89,7 @@ public:
     appl_solved() returned a result >= 0; return a fitting JobResult instance at this point.
     This method must only be valid once after a solution has been found.
     */
-    virtual JobResult appl_getResult() = 0;
+    virtual JobResult&& appl_getResult() = 0;
     /*
     Signal if this job instance would like to initiate a new job communication phase.
     */
@@ -238,7 +238,7 @@ public:
     int getRevision() const {return !hasDescription() ? -1 : getDescription().getRevision();};
     int getMaxConsecutiveRevision() const {return !hasDescription() ? -1 : getDescription().getMaxConsecutiveRevision();};
     int getDesiredRevision() const {return _desired_revision;}
-    const JobResult& getResult();
+    JobResult& getResult();
     // Elapsed seconds since the job's constructor call.
     float getAge() const {return Timer::elapsedSeconds() - _time_of_arrival;}
     // Elapsed seconds since initialization was ended.

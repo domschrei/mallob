@@ -110,14 +110,12 @@ int ForkedSatJob::appl_solved() {
     // Did a solver find a result?
     auto status = _solver->check();
     if (status == HordeProcessAdapter::FOUND_RESULT) {
-        auto solution = _solver->getSolution();
-        result = solution.first;
+        _internal_result = std::move(_solver->getSolution());
+        result = _internal_result.result;
         LOG_ADD_DEST(V2_INFO, "%s rev. %i : found result %s", getJobTree().getRootNodeRank(), toStr(), getRevision(), 
                             result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         _internal_result.id = getId();
-        _internal_result.result = result;
         _internal_result.revision = getRevision();
-        _internal_result.setSolution(std::move(solution.second));
         _done_locally = true;
     } else if (status == HordeProcessAdapter::CRASHED) {
         // Subprocess crashed for whatever reason: try to recover
@@ -137,8 +135,8 @@ int ForkedSatJob::appl_solved() {
     return result;
 }
 
-JobResult ForkedSatJob::appl_getResult() {
-    return _internal_result;
+JobResult&& ForkedSatJob::appl_getResult() {
+    return std::move(_internal_result);
 }
 
 void ForkedSatJob::appl_dumpStats() {

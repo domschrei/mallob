@@ -46,7 +46,7 @@ public:
     void appl_terminate() override;
 
     int appl_solved() override;
-    JobResult appl_getResult() override;
+    JobResult&& appl_getResult() override;
 
     bool appl_wantsToBeginCommunication() override;
     void appl_beginCommunication() override;

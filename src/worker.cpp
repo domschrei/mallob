@@ -350,7 +350,8 @@ void Worker::checkActiveJob() {
             int jobRootRank = job.getJobTree().getRootNodeRank();
             IntVec payload;
             {
-                auto resultStruct = job.getResult();
+                auto& resultStruct = job.getResult();
+                assert(resultStruct.id == id);
                 auto key = std::pair<int, int>(id, resultStruct.revision);
                 payload = IntVec({id, resultStruct.revision, result});
                 LOG_ADD_DEST(V4_VVER, "%s rev. %i: sending finished info", jobRootRank, job.toStr(), key.second);
@@ -782,7 +783,9 @@ void Worker::handleQueryJobResult(MessageHandle& handle) {
     LOG_ADD_DEST(V3_VERB, "Send result of #%i rev. %i to client", handle.source, jobId, stats.revision);
     assert(_pending_results.count(key));
     JobResult& result = _pending_results.at(key);
-    MyMpi::isend(handle.source, MSG_SEND_JOB_RESULT, result);
+    assert(result.id == jobId);
+    result.updateSerialization();
+    MyMpi::isend(handle.source, MSG_SEND_JOB_RESULT, result.moveSerialization());
     _pending_results.erase(key);
 }
 
