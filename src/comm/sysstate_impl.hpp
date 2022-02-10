@@ -8,6 +8,7 @@ template <int N>
 SysState<N>::SysState(MPI_Comm& comm, float period): _comm(comm), _period(period) {
     for (int i = 0; i < N; i++) {
         _local_state[i] = 0.0f;
+        _global_state[i] = 0.0f;
     }
 }
 
