@@ -71,6 +71,8 @@ private:
     // Safeguards _done_jobs.
     Mutex _done_job_lock; 
 
+    std::list<std::future<void>> _done_job_futures;
+
     std::atomic_int _num_jobs_to_interrupt = 0;
     robin_hood::unordered_set<int> _jobs_to_interrupt;
     Mutex _jobs_to_interrupt_lock;

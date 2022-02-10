@@ -426,7 +426,7 @@ void Client::handleJobDone(MessageHandle& handle) {
 
 void Client::handleSendJobResult(MessageHandle& handle) {
 
-    JobResult jobResult = Serializable::get<JobResult>(handle.getRecvData());
+    JobResult jobResult(handle.moveRecvData());
     int jobId = jobResult.id;
     int resultCode = jobResult.result;
     int revision = jobResult.revision;
@@ -445,14 +445,14 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     if ((_params.solutionToFile.isSet() || _params.monoFilename.isSet()) 
             && resultCode == RESULT_SAT) {
         modelString << "v ";
-        for (size_t x = 1; x < jobResult.solution.size(); x++) {
-            modelString << std::to_string(jobResult.solution[x]) << " ";
+        for (size_t x = 1; x < jobResult.getSolutionSize(); x++) {
+            modelString << std::to_string(jobResult.getSolution(x)) << " ";
         }
         modelString << "0\n";
     }
     if (_params.solutionToFile.isSet()) {
         std::ofstream file;
-        file.open(_params.solutionToFile());
+        file.open(_params.solutionToFile(), std::ofstream::out);
         if (!file.is_open()) {
             LOG(V0_CRIT, "[ERROR] Could not open solution file\n");
         } else {
@@ -466,7 +466,14 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     }
 
     if (_json_interface) {
-        _json_interface->handleJobDone(std::move(jobResult), desc.getStatistics());
+        auto fut = ProcessWideThreadPool::get().addTask(
+            [interface = _json_interface.get(), 
+            result = std::move(jobResult), 
+            stats = desc.getStatistics()]() mutable {
+            
+            interface->handleJobDone(std::move(result), stats);
+        });
+        _done_job_futures.push_back(std::move(fut));
     }
 
     finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
@@ -512,6 +519,8 @@ void Client::handleExit(MessageHandle& handle) {
 }
 
 Client::~Client() {
+
+    for (auto& fut : _done_job_futures) fut.get();
 
     for (Connector* conn : _interface_connectors) delete conn;
 

@@ -117,7 +117,7 @@ int ForkedSatJob::appl_solved() {
         _internal_result.id = getId();
         _internal_result.result = result;
         _internal_result.revision = getRevision();
-        _internal_result.solution = std::move(solution.second);
+        _internal_result.setSolution(std::move(solution.second));
         _done_locally = true;
     } else if (status == HordeProcessAdapter::CRASHED) {
         // Subprocess crashed for whatever reason: try to recover

@@ -331,29 +331,29 @@ void SolverThread::reportResult(int res, int revision) {
     _result.result = SatResult(res);
     _result.revision = revision;
     if (res == SAT) { 
-        _result.solution = _solver.getSolution();
+        _result.setSolution(_solver.getSolution());
     } else {
         auto failed = _solver.getFailedAssumptions();
-        _result.solution = std::vector<int>(failed.begin(), failed.end());
+        _result.setSolution(std::vector<int>(failed.begin(), failed.end()));
     }
 
     // If necessary, convert solution back to original variable domain
     if (!_vt.getExtraVariables().empty()) {
         std::vector<int> origSolution;
-        for (size_t i = 0; i < _result.solution.size(); i++) {
+        for (size_t i = 0; i < _result.getSolutionSize(); i++) {
             if (res == UNSAT) {
                 // Failed assumption
-                origSolution.push_back(_vt.getOrigLitOrZero(_result.solution[i]));
+                origSolution.push_back(_vt.getOrigLitOrZero(_result.getSolution(i)));
             } else if (i > 0) {
                 // Assignment: v or -v at position v
-                assert(_result.solution[i] == i || _result.solution[i] == -i);
-                int origLit = _vt.getOrigLitOrZero(_result.solution[i]);
+                assert(_result.getSolution(i) == i || _result.getSolution(i) == -i);
+                int origLit = _vt.getOrigLitOrZero(_result.getSolution(i));
                 if (origLit != 0) origSolution.push_back(origLit);
                 assert(origSolution[origSolution.size()-1] == origSolution.size()-1 
                     || origSolution[origSolution.size()-1] == 1-origSolution.size());
             } else origSolution.push_back(0); // position zero
         }
-        _result.solution = std::move(origSolution);
+        _result.setSolution(std::move(origSolution));
     }
 
     _found_result = true;

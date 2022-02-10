@@ -219,7 +219,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
     JobImage* img = _job_id_rev_to_image[std::pair<int, int>(result.id, result.revision)];
     auto& j = img->baseJson;
 
-    bool useSolutionFile = _params.pipeLargeSolutions() && result.solution.size() > 65536;
+    bool useSolutionFile = _params.pipeLargeSolutions() && result.getSolutionSize() > 65536;
     auto solutionFile = "/tmp/mallob-job-result." 
         + std::to_string(result.id) + "." 
         + std::to_string(result.revision) + ".pipe";
@@ -233,10 +233,10 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
     };
     if (useSolutionFile) {
         j["result"]["solution-file"] = solutionFile;
-        j["result"]["solution-size"] = result.solution.size();
+        j["result"]["solution-size"] = result.getSolutionSize();
         mkfifo(solutionFile.c_str(), 0666);
     } else {
-        j["result"]["solution"] = result.solution;
+        j["result"]["solution"] = result.extractSolution();
     }
     j["stats"] = {
         { "time", {
@@ -254,7 +254,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
     img->feedback(j);
 
     if (useSolutionFile) {
-        ProcessWideThreadPool::get().addTask([solutionFile, sol = std::move(result.solution)]() {
+        ProcessWideThreadPool::get().addTask([solutionFile, sol = result.extractSolution()]() {
             int fd = open(solutionFile.c_str(), O_WRONLY);
             LOG(V4_VVER, "Writing solution: %i ints (%i,%i,...,%i,%i)\n", sol.size(), 
                 sol[0], sol[1], sol[sol.size()-2], sol[sol.size()-1]);

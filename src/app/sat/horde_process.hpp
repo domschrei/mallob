@@ -186,7 +186,7 @@ public:
                 }
                 assert(result.revision == _last_imported_revision);
 
-                solutionVec = result.solution;
+                solutionVec = result.extractSolution();
                 _hsm->solutionRevision = result.revision;
                 LOGGER(_log, V5_DEBG, "DO write solution\n");
                 _hsm->result = SatResult(result.result);
