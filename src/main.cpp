@@ -156,10 +156,6 @@ int main(int argc, char *argv[]) {
 
     longStartupWarnMsg(rank, "Init'd params");
 
-    ProcessWideThreadPool::init(std::max(4, 2*params.numThreadsPerProcess()));
-
-    longStartupWarnMsg(rank, "Init'd thread pool");
-
     bool quiet = params.quiet();
     if (params.zeroOnlyLogging() && rank > 0) quiet = true;
     std::string logdir = params.logDirectory();
@@ -210,6 +206,11 @@ int main(int argc, char *argv[]) {
         if (isClient(i)) clientRanks.push_back(i);
     }
     if (rank == 0) LOG(V3_VERB, "%i workers, %i clients\n", workerRanks.size(), clientRanks.size());
+
+    // Initialize thread pool
+    int threadPoolSize = std::max(4, 2*params.numThreadsPerProcess());
+    if (isClient(rank) && isWorker(rank)) threadPoolSize *= 2;
+    ProcessWideThreadPool::init(threadPoolSize);
     
     MPI_Comm clientComm, workerComm;
     {
