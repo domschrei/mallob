@@ -85,6 +85,8 @@ public:
             std::string baseJobName = _json_template["name"];
             Logger logger = Logger::getMainInstance().copy("Streamer", ".streamer");
 
+            int numIntroducedJobs = 0;
+
             while (_bg_worker.continueRunning()) {
 
                 // Wait until there is work
@@ -96,6 +98,10 @@ public:
 
                 // Submit new jobs
                 while (_num_active_jobs < _params.activeJobsPerClient()) {
+                    
+                    // Already submitted enough jobs?
+                    if (_params.maxJobsPerStreamer() != 0 && numIntroducedJobs == _params.maxJobsPerStreamer())
+                        break;
 
                     // Prepare JSON
                     auto jsonCopy = _json_template;
@@ -135,6 +141,7 @@ public:
                         _delete_cond_var.notify();
                     });
                     logger.flush();
+                    numIntroducedJobs++;
                 }
             }
         });

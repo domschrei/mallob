@@ -53,6 +53,7 @@ OPT_INT(loadedJobsPerClient,             "ljpc", "loaded-jobs-per-client",      
 OPT_INT(maxBfsDepth,                     "mbfsd", "max-bfs-depth",                    4,    0, LARGE_INT,      "Max. depth to explore with hill climbing BFS for job requests")
 OPT_INT(maxDemand,                       "md", "max-demand",                          0,    0, LARGE_INT,      "Limit any job's demand to this value")
 OPT_INT(maxIdleDistance,                 "mid", "max-idle-distance",                  0,    0, LARGE_INT,      "Propagate idle distance of workers up to this limit through worker graph to weight randomness in request bouncing")
+OPT_INT(maxJobsPerStreamer,              "mjps", "max-jobs-per-streamer",             0,    0, LARGE_INT,      "Maximum number of jobs to introduce per streamer")
 OPT_INT(maxLbdPartitioningSize,          "mlbdps", "max-lbd-partition-size",          8,    1, LARGE_INT,      "Store clauses with up to this LBD in separate buckets")
 OPT_INT(messageBatchingThreshold,        "mbt", "message-batching-threshold",         1000000, 1000, MAX_INT,  "Employ batching of messages in batches of provided size")
 OPT_INT(minNumChunksForImportPerSolver,  "mcips", "min-import-chunks-per-solver",     10,   1, LARGE_INT,      "Min. number of cbbs-sized chunks for buffering produced clauses for export")
