@@ -1,6 +1,10 @@
 
 # Mallob 
 
+**Technical notes and experimental data for our Euro-Par 2022 submission will be made available here shortly.**
+
+<hr/>
+
 Short links: [Experimental data of our SAT21 paper](https://github.com/domschrei/mallob-experimental-data) · [Animallob: Interactive visualization of experiments](https://dominikschreiber.de/animallob)
 
 <hr/>
