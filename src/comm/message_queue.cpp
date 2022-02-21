@@ -80,7 +80,10 @@ int MessageQueue::send(DataPtr data, int dest, int tag) {
     }
 
     SendHandle& h = _send_queue.back();
-    h.sendNext();
+    if (_num_concurrent_sends < _max_concurrent_sends) {
+        h.sendNext();
+        _num_concurrent_sends++;
+    }
 
     *_current_send_tag = 0;
     return h.id;
@@ -188,64 +191,82 @@ void MessageQueue::runGarbageCollector() {
 }
 
 void MessageQueue::processReceived() {
-    // Test receive
-    //log(V5_DEBG, "MQ TEST\n");
-    int flag = false;
-    MPI_Status status;
-    MPI_Test(&_recv_request, &flag, &status);
-    if (!flag) return;
 
-    // Message finished
-    const int source = status.MPI_SOURCE;
-    int tag = status.MPI_TAG;
-    int msglen;
-    MPI_Get_count(&status, MPI_BYTE, &msglen);
-    LOG(V5_DEBG, "MQ RECV n=%i s=[%i] t=%i c=(%i,...,%i,%i,%i)\n", msglen, source, tag, 
-            msglen>=1*sizeof(int) ? *(int*)(_recv_data) : 0, 
-            msglen>=3*sizeof(int) ? *(int*)(_recv_data+msglen - 3*sizeof(int)) : 0, 
-            msglen>=2*sizeof(int) ? *(int*)(_recv_data+msglen - 2*sizeof(int)) : 0, 
-            msglen>=1*sizeof(int) ? *(int*)(_recv_data+msglen - 1*sizeof(int)) : 0);
+    int k = 0;
+    while (k < _num_receives_per_loop) {
+        k++;
 
-    if (tag >= MSG_OFFSET_BATCHED) {
-        // Fragment of a message
-
-        tag -= MSG_OFFSET_BATCHED;
-        int id = ReceiveFragment::readId(_recv_data, msglen);
-        auto key = std::pair<int, int>(source, id);
-        
-        if (!_fragmented_messages.count(key)) {
-            _fragmented_messages.emplace(key, ReceiveFragment(source, id, tag));
+        // Test receive
+        //log(V5_DEBG, "MQ TEST\n");
+        int flag = false;
+        MPI_Status status;
+        MPI_Test(&_recv_request, &flag, &status);
+        if (!flag) {
+            // Handle is not finished:
+            // reset #receives per loop
+            _num_receives_per_loop = _base_num_receives_per_loop;
+            return;
         }
-        auto& fragment = _fragmented_messages[key];
 
-        fragment.receiveNext(source, tag, _recv_data, msglen);
+        // Message finished
+        const int source = status.MPI_SOURCE;
+        int tag = status.MPI_TAG;
+        int msglen;
+        MPI_Get_count(&status, MPI_BYTE, &msglen);
+        LOG(V5_DEBG, "MQ RECV n=%i s=[%i] t=%i c=(%i,...,%i,%i,%i)\n", msglen, source, tag, 
+                msglen>=1*sizeof(int) ? *(int*)(_recv_data) : 0, 
+                msglen>=3*sizeof(int) ? *(int*)(_recv_data+msglen - 3*sizeof(int)) : 0, 
+                msglen>=2*sizeof(int) ? *(int*)(_recv_data+msglen - 2*sizeof(int)) : 0, 
+                msglen>=1*sizeof(int) ? *(int*)(_recv_data+msglen - 1*sizeof(int)) : 0);
+
+        if (tag >= MSG_OFFSET_BATCHED) {
+            // Fragment of a message
+
+            tag -= MSG_OFFSET_BATCHED;
+            int id = ReceiveFragment::readId(_recv_data, msglen);
+            auto key = std::pair<int, int>(source, id);
+            
+            if (!_fragmented_messages.count(key)) {
+                _fragmented_messages.emplace(key, ReceiveFragment(source, id, tag));
+            }
+            auto& fragment = _fragmented_messages[key];
+
+            fragment.receiveNext(source, tag, _recv_data, msglen);
+
+            resetReceiveHandle();
+
+            if (fragment.isCancelled() || fragment.isFinished()) {
+                {
+                    auto lock = _fragmented_mutex.getLock();
+                    _fragmented_queue.push_back(std::move(fragment));
+                    _fragmented_messages.erase(key);
+                }
+                _fragmented_cond_var.notify();
+            }
+
+            // Receive next message
+            continue;
+        }
+
+        // Single message
+        //log(V5_DEBG, "MQ singlerecv\n");
+        MessageHandle h;
+        h.setReceive(std::vector<uint8_t>(_recv_data, _recv_data+msglen));
+        h.tag = tag;
+        h.source = source;
 
         resetReceiveHandle();
 
-        if (fragment.isCancelled() || fragment.isFinished()) {
-            {
-                auto lock = _fragmented_mutex.getLock();
-                _fragmented_queue.push_back(std::move(fragment));
-                _fragmented_messages.erase(key);
-            }
-            _fragmented_cond_var.notify();
-        }
-
-        return;
+        // Process message according to its tag-specific callback
+        *_current_recv_tag = h.tag;
+        _callbacks.at(h.tag)(h);
+        *_current_recv_tag = 0;
     }
 
-    // Single message
-    //log(V5_DEBG, "MQ singlerecv\n");
-    MessageHandle h;
-    h.setReceive(std::vector<uint8_t>(_recv_data, _recv_data+msglen));
-    h.tag = tag;
-    h.source = source;
-
-    resetReceiveHandle();
-
-    *_current_recv_tag = h.tag;
-    _callbacks.at(h.tag)(h);
-    *_current_recv_tag = 0;
+    // Increase #receives per loop for the next time, if necessary
+    if (k == _num_receives_per_loop && _num_receives_per_loop < 1000) {
+        _num_receives_per_loop *= 2;
+    }
 }
 
 void MessageQueue::resetReceiveHandle() {
@@ -324,13 +345,19 @@ void MessageQueue::processAssembledReceived() {
 
 void MessageQueue::processSent() {
 
-    int numTested = 0;
     auto it = _send_queue.begin();
+    bool uninitiatedHandlesPresent = false;
 
     // Test each send handle
     while (it != _send_queue.end()) {
         
         SendHandle& h = *it;
+
+        if (!h.isInitiated()) {
+            // Message has not been sent yet
+            uninitiatedHandlesPresent = true;
+            continue;
+        }
 
         if (!h.test()) {
             it++; // go to next handle
@@ -362,6 +389,7 @@ void MessageQueue::processSent() {
         if (completed) {
             // Notify completion
             signalCompletion(h.tag, h.id);
+            _num_concurrent_sends--;
 
             if (h.data->size() > _max_msg_size) {
                 // Concurrent deallocation of SendHandle's large chunk of data
@@ -377,6 +405,19 @@ void MessageQueue::processSent() {
             it = _send_queue.erase(it); // go to next handle
         } else {
             it++; // go to next handle
+        }
+    }
+
+    if (!uninitiatedHandlesPresent) return;
+
+    // Initiate sending messages which have not been initiated yet
+    // as long as there is a "send slot" available to do so
+    it = _send_queue.begin();
+    while (_num_concurrent_sends < _max_concurrent_sends && it != _send_queue.end()) {
+        SendHandle& h = *it;
+        if (!h.isInitiated()) {
+            h.sendNext();
+            _num_concurrent_sends++;
         }
     }
 }

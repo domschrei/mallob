@@ -75,6 +75,8 @@ void Parameters::expand() {
         // Single instance solving
         hopsUntilCollectiveAssignment.set(-1); // no collective assignments
         numClients.set(1); // 1 client
+        useFilesystemInterface.set(false); // no fs interface
+        useIPCSocketInterface.set(false); // no socket interface
         numWorkers.set(-1); // all workers
         collectClauseHistory.set(false); // no clause history
         growthPeriod.set(0); // instantaneous growth of job demand

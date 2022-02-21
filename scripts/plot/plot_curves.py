@@ -17,6 +17,7 @@ pltysize = 5
 files = []
 data = []
 labels = []
+use_twin_axis = []
 explicit_xvals = False
 colorvals = False
 do_markers = True
@@ -29,10 +30,13 @@ logx = False
 logy = False
 xlabel = None
 ylabel = None
+y2label = None
 xmin = None
 xmax = None
 ymin = None
 ymax = None
+y2min = None
+y2max = None
 confidence_area = False
 legend_right = False
 rectangular = False
@@ -80,6 +84,8 @@ for arg in sys.argv[1:]:
         xlabel = arg[8:]
     elif arg.startswith("-ylabel="):
         ylabel = arg[8:]
+    elif arg.startswith("-y2label="):
+        y2label = arg[9:]
     elif arg.startswith("-xmin="):
         xmin = float(arg[6:])
     elif arg.startswith("-xmax="):
@@ -88,10 +94,16 @@ for arg in sys.argv[1:]:
         ymin = float(arg[6:])
     elif arg.startswith("-ymax="):
         ymax = float(arg[6:])
+    elif arg.startswith("-y2min="):
+        y2min = float(arg[7:])
+    elif arg.startswith("-y2max="):
+        y2max = float(arg[7:])
     elif arg.startswith("-lw="):
         linewidth = float(arg[4:])
     elif arg.startswith("-title="):
         heading = arg[7:]
+    elif arg.startswith("-y2"):
+        use_twin_axis[-1] = True
     elif arg.startswith("-o="):
         outfile = arg[3:]
     elif arg.startswith("-confidence") or arg.startswith("--confidence"):
@@ -108,6 +120,7 @@ for arg in sys.argv[1:]:
         colors = arg[len("-colors="):].split(",")
     else:
         files += [arg]
+        use_twin_axis += [False]
 
 import matplotlib
 if outfile:
@@ -205,6 +218,11 @@ elif do_ygrid:
 if confidence_area:
     plt.fill_between(data[1][0], data[1][1], data[2][1], color='#ccccff')
 
+twin_axis_used = sum([x for x in use_twin_axis if x]) > 0
+if twin_axis_used:
+    ax = plt.gca()
+    ax2 = ax.twinx()
+
 i = 0
 for d in data:
     print(i)
@@ -237,21 +255,35 @@ for d in data:
     if linewidth:
         kwargs['lw'] = linewidth
     
-    plt.plot(d[0], d[1], **kwargs)
+    if twin_axis_used:
+        if use_twin_axis[i]:
+            ax2.plot(d[0], d[1], **kwargs)
+        else:
+            ax.plot(d[0], d[1], **kwargs)
+    else:
+        plt.plot(d[0], d[1], **kwargs)
     i += 1
 
 if heading:
     plt.title(heading)
-if xlabel:
-    plt.xlabel(xlabel)
-if ylabel:
-    plt.ylabel(ylabel)
-plt.ylim(ymin, ymax)
-plt.xlim(xmin, xmax)
 if logx:
     plt.xscale("log")
 if logy:
     plt.yscale("log")
+if twin_axis_used:
+    ax.set_xlabel(xlabel)
+    ax.set_ylim(ymin, ymax)
+    ax.set_ylabel(ylabel)
+    ax2.set_ylim(y2min, y2max)
+    ax2.set_ylabel(y2label)
+else:
+    if xlabel:
+        plt.xlabel(xlabel)
+    if ylabel:
+        plt.ylabel(ylabel)
+    plt.ylim(ymin, ymax)
+    plt.xlim(xmin, xmax)
+
 if do_legend:
     if legend_right:
         plt.legend(bbox_to_anchor=(1.05, 0.5), loc='center left', edgecolor="black")
