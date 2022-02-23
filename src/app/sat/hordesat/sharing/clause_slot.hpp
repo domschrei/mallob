@@ -70,9 +70,9 @@ public:
     ClauseSlot& operator=(ClauseSlot&& other);
     void setChunkSource(std::function<std::pair<SlotResult, int*>(void)> chunkSource);
     void setChunkSink(std::function<void(int*)> chunkSink);
-    SlotResult insert(int producerId, const Clause& clause);
-    void insert(int producerId, const Clause*& begin, const Clause* end, std::list<Clause>& deferred,
-            SolvingStatistics& stats, std::function<bool(const Clause& c)> conditional = [](const Clause&) {return true;});
+    bool insert(int producerId, const Clause& clause);
+    bool insert(int producerId, const Clause*& begin, const Clause* end, SolvingStatistics& stats, 
+        std::function<bool(const Clause& c)> conditional = [](const Clause&) {return true;});
 
     SlotResult insert(int producerId, std::function<bool(Chunk&)> inserter, bool isSecondTry = false);
     int getClauses(std::vector<int>& selection, int maxNumClauses);

@@ -8,7 +8,7 @@
 
 #include "util/params.hpp"
 #include "app/sat/base_sat_job.hpp"
-#include "app/sat/hordesat/sharing/lockfree_clause_database.hpp"
+#include "app/sat/hordesat/sharing/adaptive_clause_database.hpp"
 #include "util/logger.hpp"
 
 class ClauseHistory {
@@ -47,14 +47,14 @@ private:
     std::list<std::pair<int, int>> _missing_epoch_ranges;
     int _latest_epoch = -1;
 
-    LockfreeClauseDatabase& _cdb;
+    AdaptiveClauseDatabase& _cdb;
     BaseSatJob& _job;
 
     robin_hood::unordered_flat_map<int, Subscription> _subscribers;
     Subscription _subscription;
 
 public:
-    ClauseHistory(Parameters& params, int stmBufferSizePerEpoch, BaseSatJob& job, LockfreeClauseDatabase& cdb) : 
+    ClauseHistory(Parameters& params, int stmBufferSizePerEpoch, BaseSatJob& job, AdaptiveClauseDatabase& cdb) : 
         _aggregation_factor(params.clauseHistoryAggregationFactor()), 
         _num_stm_slots(params.clauseHistoryShortTermMemSize()), 
         _stm_buffer_size(stmBufferSizePerEpoch), 

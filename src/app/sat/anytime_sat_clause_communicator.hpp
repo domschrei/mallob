@@ -6,7 +6,7 @@
 
 #include "util/params.hpp"
 #include "util/hashing.hpp"
-#include "hordesat/sharing/lockfree_clause_database.hpp"
+#include "hordesat/sharing/adaptive_clause_database.hpp"
 #include "data/job_transfer.hpp"
 #include "app/job.hpp"
 #include "base_sat_job.hpp"
@@ -26,7 +26,7 @@ private:
     const bool _use_checksums;
     const bool _use_cls_history;
 
-    LockfreeClauseDatabase _cdb;
+    AdaptiveClauseDatabase _cdb;
     ClauseHistory _cls_history;
 
     std::list<std::vector<int>> _clause_buffers;
@@ -47,7 +47,7 @@ public:
         _clause_buf_discount_factor(_params.clauseBufferDiscountFactor()),
         _use_checksums(params.useChecksums()),
         _use_cls_history(params.collectClauseHistory()),
-        _cdb(_params.strictClauseLengthLimit(), _params.maxLbdPartitioningSize(), _clause_buf_base_size, 1),
+        _cdb(_params.strictClauseLengthLimit(), _params.maxLbdPartitioningSize(), _clause_buf_base_size, 0, 0),
         _cls_history(_params, getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job, _cdb),
         _num_aggregated_nodes(0) {
 

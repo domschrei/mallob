@@ -4,8 +4,9 @@
 
 #include <list>
 
-#include "clause_slot.hpp"
-#include "chunk_manager.hpp"
+//#include "clause_slot.hpp"
+//#include "chunk_manager.hpp"
+#include "database/buffer_slot.hpp"
 #include "bucket_label.hpp"
 #include "buffer_reader.hpp"
 #include "buffer_merger.hpp"
@@ -43,18 +44,17 @@ private:
         }
     };
 
-    /*
-    Initially all chunks are part of this manager (virtually and not yet allocated).
-    Queries for new chunks go here, and unneeded chunks are returned here.
-    */
-    ChunkManager _chunk_mgr;
+    std::atomic_int _num_free_chunks{0};
+    Mutex _free_chunks_mutex;
+    std::list<uint8_t*> _free_chunks;
+
     /*
     There is one slot for each length-LBD combination up to a certain clause length
     (_max_lbd_partitioned_size) and then one slot for each clause length.
-    A slot itself consists of a flexible number of memory chunks with one lock-free
-    MPSC ring buffer operating on each chunk.
+    A slot itself consists of exactly one lock-free MPSC ring buffer and a flexible
+    number of filled memory chunks.
     */
-    std::vector<ClauseSlot> _slots;
+    std::vector<BufferSlot> _slots;
 
     int _max_lbd_partitioned_size;
     int _chunk_size;
@@ -69,16 +69,13 @@ public:
 
     /*
     Insert a clause from a certain producer (0 <= ID < #producers).
-    SUCCESS: The clause has been inserted.
-    TRY_LATER: A spurious failure occurred due to the internal lock-free
-    data structures: The clause should be deferred and inserted at a
-    later time.
-    DROP: The clause has been rejected due to lack of space relative 
+    true: The clause has been inserted.
+    false: The clause has been rejected due to lack of space relative 
     to the clause's importance and can be discarded (although it may 
     be possible to insert it later).
-    In all cases, c can be freed or reused after calling this method.
+    In both cases, c can be freed or reused after calling this method.
     */
-    AddClauseResult addClause(int producerId, const Clause& c);
+    bool addClause(int producerId, const Clause& c);
 
     /*
     Add multiple clauses at once. More efficient than addClause for a series of clauses
@@ -86,13 +83,12 @@ public:
     The clauses *must* be sorted with respect to the buckets of this instance, i.e.,
     best clauses come first, as retrieved by calling exportBuffer and then iterating
     over the clauses via getBufferReader.
-    As in adding a single clause, spurious failures may occur causing a clause to be
-    deferred - each such clause will be returned to the caller via the supplied clause list.
     A conditional can be supplied to this function which decides for each clause whether
     it should be inserted or not. It is ensured that this conditional is only called once
     for each clause.
+    Returns: Number of successfully added clauses.
     */
-    void bulkAddClauses(int producerId, const std::vector<Clause>& clauses, std::list<Clause>& deferredOut, 
+    int bulkAddClauses(int producerId, const std::vector<Clause>& clauses,
             SolvingStatistics& stats, std::function<bool(const Clause& c)> conditional = [](const Clause&) {return true;});
 
     void printChunks(int nextExportSize = -1);

@@ -116,6 +116,13 @@ public:
         }
         if (_data == nullptr) _data = (uint8_t*)malloc(sizeof(int)*size);
     }
+    RingBuffer(RingBuffer&& moved) : _data(moved._data), _ringbuf(moved._ringbuf), 
+        _producers(std::move(moved._producers)), _capacity(moved._capacity), 
+        _consumed_buffer(std::move(moved._consumed_buffer)), _consumed_size(moved._consumed_size) {
+        
+        moved._data = nullptr;
+        moved._ringbuf = nullptr;
+    }
 
     bool produce(const int* data, size_t size, int prefixOrZero, bool appendZero, int producerId = 0) {
         
@@ -188,6 +195,24 @@ public:
         return out;
     }
 
+    size_t flushBufferUnsafe(uint8_t* otherBuffer) {
+
+        // Flush ring buffer into provided swap buffer
+        size_t offset;
+        size_t consumedSize = ringbuf_consume(_ringbuf, &offset);
+        size_t writePosition = 0;
+        while (consumedSize > 0) {
+            memcpy((void*)(otherBuffer+sizeof(int)*writePosition), 
+                    (void*)(_data+sizeof(int)*offset), 
+                    consumedSize*sizeof(int));
+            writePosition += consumedSize;
+            ringbuf_release(_ringbuf, consumedSize);
+            consumedSize = ringbuf_consume(_ringbuf, &offset);
+        }
+        // Return end of written data
+        return writePosition;
+    }
+
     size_t getCapacity() const {
         return _capacity;
     }
@@ -212,6 +237,7 @@ public:
     UniformSizeClauseRingBuffer() {}
     UniformSizeClauseRingBuffer(size_t ringbufSize, int clauseSize, int numProducers = 1, uint8_t* data = nullptr) : 
         _ringbuf(ringbufSize, numProducers, data), _clause_size(clauseSize) {}
+    UniformSizeClauseRingBuffer(UniformSizeClauseRingBuffer&& moved) : _ringbuf(std::move(moved._ringbuf)), _clause_size(moved._clause_size) {}
     
     bool isNull() {return _ringbuf.isNull();}
     virtual bool insertClause(const Clause& c, int producerId = 0) {
@@ -224,6 +250,9 @@ public:
     uint8_t* releaseBuffer() {
         return _ringbuf.releaseBuffer();
     }
+    auto flushBufferUnsafe(uint8_t* otherBuffer) {
+        return _ringbuf.flushBufferUnsafe(otherBuffer);
+    }
 };
 
 class UniformClauseRingBuffer : public UniformSizeClauseRingBuffer {
@@ -231,12 +260,17 @@ class UniformClauseRingBuffer : public UniformSizeClauseRingBuffer {
 public:
     UniformClauseRingBuffer(size_t ringbufSize, int clauseSize, int numProducers = 1, uint8_t* data = nullptr) : 
         UniformSizeClauseRingBuffer(ringbufSize, clauseSize, numProducers, data) {}
+    UniformClauseRingBuffer(UniformClauseRingBuffer&& moved) : UniformSizeClauseRingBuffer(std::move(moved)) {}
+
     bool insertClause(const Clause& c, int producerId = 0) override {
         assert(c.size == _clause_size);
         return _ringbuf.produce(c.begin, _clause_size, 0, false, producerId);
     }
     bool getClause(std::vector<int>& out) override {
-        return _ringbuf.consume(_clause_size, out);
+        size_t sizeBefore = out.size();
+        bool success = _ringbuf.consume(_clause_size, out);
+        if (success) assert(out.size() == sizeBefore+_clause_size);
+        return success;
     }
 };
 

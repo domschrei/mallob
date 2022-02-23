@@ -71,9 +71,9 @@ void ThreadedSatJob::appl_terminate() {
 }
 
 JobResult&& ThreadedSatJob::appl_getResult() {
-    if (_result.id != 0) return std::move(_result);
-    _result = getSolver()->getResult();
+    _result = std::move(getSolver()->getResult());
     _result.id = getId();
+    _result.updateSerialization();
     assert(_result.revision == getRevision());
     return std::move(_result);
 }
@@ -113,9 +113,6 @@ int ThreadedSatJob::appl_solved() {
         LOG_ADD_DEST(V2_INFO, "%s : found result %s", getJobTree().getRootNodeRank(), toStr(), 
                             result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         _result_code = result;
-
-        // Extract result
-        appl_getResult();
     }
     return result;
 }

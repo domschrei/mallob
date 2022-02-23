@@ -331,10 +331,12 @@ void SolverThread::reportResult(int res, int revision) {
     _result.result = SatResult(res);
     _result.revision = revision;
     if (res == SAT) { 
-        _result.setSolution(_solver.getSolution());
+        auto solution = _solver.getSolution();
+        _result.setSolutionToSerialize(solution.data(), solution.size());
     } else {
         auto failed = _solver.getFailedAssumptions();
-        _result.setSolution(std::vector<int>(failed.begin(), failed.end()));
+        auto failedVec = std::vector<int>(failed.begin(), failed.end());
+        _result.setSolutionToSerialize(failedVec.data(), failedVec.size());
     }
 
     // If necessary, convert solution back to original variable domain
@@ -353,7 +355,7 @@ void SolverThread::reportResult(int res, int revision) {
                     || origSolution[origSolution.size()-1] == 1-origSolution.size());
             } else origSolution.push_back(0); // position zero
         }
-        _result.setSolution(std::move(origSolution));
+        _result.setSolutionToSerialize(origSolution.data(), origSolution.size());
     }
 
     _found_result = true;

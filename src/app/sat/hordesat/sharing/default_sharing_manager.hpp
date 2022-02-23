@@ -36,11 +36,7 @@ protected:
 	
 	std::vector<int> _solver_revisions;
 
-	// clause export
-	std::vector<std::list<Clause>> _deferred_admitted_clauses;
-
 	SolvingStatistics _returned_clauses_stats;
-	std::list<Clause> _deferred_returned_clauses;
 
 	// clause importing / digestion
 	struct DeferredClauseList {

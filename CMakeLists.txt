@@ -70,7 +70,7 @@ set(BASE_SOURCES ${BASE_SOURCES}
     src/app/dummy/dummy_reader.cpp
     src/app/sat/anytime_sat_clause_communicator.cpp src/app/sat/forked_sat_job.cpp src/app/sat/horde_config.cpp src/app/sat/horde_process_adapter.cpp 
     src/app/sat/hordesat/horde.cpp 
-    src/app/sat/hordesat/sharing/adaptive_clause_database.cpp src/app/sat/hordesat/sharing/buffer_merger.cpp src/app/sat/hordesat/sharing/buffer_reader.cpp src/app/sat/hordesat/sharing/clause_slot.cpp src/app/sat/hordesat/sharing/lockfree_clause_database.cpp src/app/sat/hordesat/sharing/default_sharing_manager.cpp 
+    src/app/sat/hordesat/sharing/adaptive_clause_database.cpp src/app/sat/hordesat/sharing/buffer_merger.cpp src/app/sat/hordesat/sharing/buffer_reader.cpp src/app/sat/hordesat/sharing/default_sharing_manager.cpp 
     src/app/sat/hordesat/solvers/cadical.cpp src/app/sat/hordesat/solvers/lingeling.cpp src/app/sat/hordesat/solvers/kissat.cpp src/app/sat/hordesat/solvers/portfolio_solver_interface.cpp src/app/sat/hordesat/solvers/solver_thread.cpp src/app/sat/hordesat/solvers/solving_state.cpp 
     src/app/sat/hordesat/utilities/buffer_manager.cpp src/app/sat/hordesat/utilities/clause_database.cpp src/app/sat/hordesat/utilities/clause_filter.cpp 
     src/app/sat/threaded_sat_job.cpp 

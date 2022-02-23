@@ -8,6 +8,7 @@
 #include "util/logger.hpp"
 #include "util/assert.hpp"
 #include "util/sys/atomics.hpp"
+#include "database/buffer_chunk.hpp"
 
 #define CHUNK_STATE_INVALID 0
 #define CHUNK_STATE_VALID 1

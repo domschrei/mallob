@@ -16,12 +16,45 @@
 #include "app/sat/hordesat/sharing/lockfree_clause_database.hpp"
 #include "app/sat/hordesat/sharing/adaptive_clause_database.hpp"
 #include "app/sat/hordesat/sharing/buffer_merger.hpp"
+#include "util/sys/terminator.hpp"
 
 bool insertUntilSuccess(AdaptiveClauseDatabase& cdb, size_t prodId, Clause& c) {
-    auto result = AdaptiveClauseDatabase::AddClauseResult::TRY_LATER;
-    while (result == AdaptiveClauseDatabase::AddClauseResult::TRY_LATER)
-        result = cdb.addClause(prodId, c);
-    return result == AdaptiveClauseDatabase::AddClauseResult::SUCCESS;
+    return cdb.addClause(prodId, c);
+}
+
+void testMinimal() {
+    LOG(V2_INFO, "Minimal test ...\n");
+
+    AdaptiveClauseDatabase cdb(/*maxClauseSize=*/10, /*maxLbdPartitionSize=*/5, 
+        /*chunkSize=*/1500, /*numChunks=*/1, /*numProducers=*/1);
+    
+    {
+        std::vector<int> lits = {100, 200, 300, 400};
+        Clause c{lits.data(), lits.size(), 2};
+        bool success = cdb.addClause(/*producer=*/0, c);
+        assert(success);
+    }
+    for (int k = 0; k < 2; k++) {
+        for (int x = 1; x < 150; x++) {
+            std::vector<int> lits = {100, 200, 300, 400, 500, 600, 700, 800, 900};
+            Clause c{lits.data(), lits.size(), 4};
+            bool success = cdb.addClause(/*producer=*/0, c);
+            assert(success);
+        }
+    }
+    {
+        std::vector<int> lits = {100, 200, 300, 400, 500, 600, 700, 800, 900};
+        Clause c{lits.data(), lits.size(), 4};
+        bool success = cdb.addClause(/*producer=*/0, c);
+        assert(!success);
+    }
+
+    int numExported;
+    auto buf = cdb.exportBuffer(100000, numExported);
+
+    std::string out = "";
+    for (int lit : buf) out += std::to_string(lit) + " ";
+    LOG(V2_INFO, "BUF: %s\n", out.c_str());
 }
 
 void testMerge() {
@@ -45,7 +78,7 @@ void testMerge() {
             clauseLits.push_back(std::move(lits));
             int glue = (int)std::round(2 + Random::rand()*(clauseSize-2));
             Clause c{clauseLits.back().data(), clauseSize, glue};
-            //log(V5_DEBG, "CLS %s\n", c.toStr().c_str());
+            //log(V5_DEBG, "CLS #%i %s\n", j, c.toStr().c_str());
             assert(insertUntilSuccess(cdb, 0, c));
         }
         int numExported;
@@ -60,7 +93,7 @@ void testMerge() {
             //log(V5_DEBG, "i=%i #%i %s\n", i, clsIdx, cls.toStr().c_str());
             if (lastClause.begin != nullptr) {
                 assert(compare(lastClause, cls) || !compare(cls, lastClause) 
-                    || LOG_RETURN_FALSE("%s > %s!\n", lastClause.toStr().c_str(), cls.toStr().c_str()));
+                    || log_return_false("%s > %s!\n", lastClause.toStr().c_str(), cls.toStr().c_str()));
             }
             lastClause = cls;
             clsIdx++;
@@ -75,6 +108,17 @@ void testMerge() {
     std::vector<int> excess;
     auto merged = merger.merge(300000, &excess);
     LOG(V2_INFO, "Merged into buffer of size %ld, excess buffer has size %ld\n", merged.size(), excess.size());
+
+    {
+        std::string out = "";
+        for (int lit : merged) out += std::to_string(lit) + " ";
+        LOG(V2_INFO, "MERGED: %s\n", out.c_str());
+    }
+    {
+        std::string out = "";
+        for (int lit : excess) out += std::to_string(lit) + " ";
+        LOG(V2_INFO, "EXCESS: %s\n", out.c_str());
+    }
 }
 
 void testUniform() {
@@ -305,48 +349,38 @@ void testConcurrentClauseAddition() {
             std::normal_distribution<float> distribution(0.5, 0.5);
             auto rng = [&]() {return distribution(generator);};
 
-            std::vector<Clause> deferredClauses;
-
             int produced = 0;
             int initiallyPassed = 0;
             int passed = 0;
             int dropped = 0;
             int deferred = 0;
-            while (produced < numClausesPerThread || !deferredClauses.empty()) {
+            while (produced < numClausesPerThread) {
                 
+                if (Terminator::isTerminating()) break;
+
                 Clause c;
-                if (produced < numClausesPerThread) {
-                    float doneRatio = (float)produced / numClausesPerThread;
-                    float meanLength = 1;
-                    if (doneRatio <= 0.5) meanLength += doneRatio * 15;
-                    else meanLength += (1-doneRatio) * 15;
-                    
-                    c = produceClause(rng, meanLength);
-                } else {
-                    c = deferredClauses.back();
-                    deferredClauses.pop_back();
-                }
+                float doneRatio = (float)produced / numClausesPerThread;
+                float meanLength = 1;
+                if (doneRatio <= 0.5) meanLength += doneRatio * 15;
+                else meanLength += (1-doneRatio) * 15;
+                
+                c = produceClause(rng, meanLength);
 
-                auto result = cdb.addClause(i, c);
-
-                if (result == AdaptiveClauseDatabase::TRY_LATER) {
-                    deferredClauses.push_back(c);
-                    deferred++;
-                } else {
-                    free(c.begin);
-                    (result == AdaptiveClauseDatabase::SUCCESS ? passed : dropped)++;
-                }
+                bool success = cdb.addClause(i, c);
+                free(c.begin);
+                (success ? passed : dropped)++;
 
                 produced++;
                 sumOfProducedLengths += c.size + (c.size > maxLbdPartitionedSize ? 1 : 0);
                 if (produced == numClausesPerThread) {
                     initiallyPassed = passed;
                 }
+                
                 usleep(1000);
             }
 
-            LOG(V2_INFO, "Thread %i : %i passed, %i dropped, %i deferred (%.4f initially, %.4f eventually passed)\n", 
-                i, passed, dropped, deferred, ((float)initiallyPassed)/produced, ((float)passed)/produced);
+            LOG(V2_INFO, "Thread %i : %i passed, %i dropped (%.4f passed)\n", 
+                i, passed, dropped, ((float)passed)/produced);
             numFinished++;
         });
     }
@@ -363,7 +397,7 @@ void testConcurrentClauseAddition() {
 
         if (numFinished == numProducers) continueExporting = false;
         
-        cdb.printChunks(/*nextExportSize=*/sizePerExport);
+        //cdb.printChunks(/*nextExportSize=*/sizePerExport);
 
         int numExported = 0;
         buffers.push_back(cdb.exportBuffer(sizePerExport, numExported));
@@ -390,8 +424,9 @@ int main() {
     Process::init(0);
     ProcessWideThreadPool::init(1);
 
+    testMinimal();
     testMerge();
     testUniform();
     testRandomClauses();
-    //testConcurrentClauseAddition();
+    testConcurrentClauseAddition();
 }

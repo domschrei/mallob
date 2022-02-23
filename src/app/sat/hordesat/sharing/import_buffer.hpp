@@ -13,7 +13,6 @@ class ImportBuffer {
 private:
     SolvingStatistics& _stats;
     AdaptiveClauseDatabase _cdb;
-    std::list<Mallob::Clause> _deferred;
 
     std::vector<int> _ready_to_import_buffer;
 	BufferReader _ready_to_import_reader;
@@ -37,33 +36,20 @@ public:
             1
 		) {}
 
-    ~ImportBuffer() {
-        for (auto& c : _deferred) {
-            free(c.begin);
-        }
-    }
-
     void add(const Mallob::Clause& c) {
         _stats.receivedClauses++;
-        auto result = _cdb.addClause(0, c);
-        if (result == AdaptiveClauseDatabase::DROP) {
-            _stats.discardedClauses++;
-        } else if (result == AdaptiveClauseDatabase::TRY_LATER) {
-            // defer clause
-            _stats.deferredClauses++;
-            _deferred.push_back(c.copy());
-        } else {
+        bool success = _cdb.addClause(0, c);
+        if (success) {
             _stats.receivedClausesInserted++;
-            // success: also try to insert clauses deferred earlier
-            addDeferredClauses();
+        } else {
+            _stats.discardedClauses++;
         }
     }
 
     void bulkAdd(const std::vector<Mallob::Clause>& clauses, std::function<bool(const Mallob::Clause&)> conditional) {
         _stats.receivedClauses += clauses.size();
-        addDeferredClauses();
         //for (auto& c : clauses) add(c);
-        _cdb.bulkAddClauses(0, clauses, _deferred, _stats, conditional);
+        _cdb.bulkAddClauses(0, clauses, _stats, conditional);
     }
 
     std::vector<int> getUnitsBuffer() {
@@ -110,16 +96,6 @@ public:
             _stats.histDigested->increment(_clause_out.size);
         }
         return _clause_out;
-    }
-
-private:
-    void addDeferredClauses() {
-        if (_deferred.empty()) return;
-        std::vector<Mallob::Clause> copiedVec(_deferred.begin(), _deferred.end());
-        _deferred.clear();
-        LOG(V2_INFO, "bulk add deferred cls, size %i\n", copiedVec.size());
-        _cdb.bulkAddClauses(0, copiedVec, _deferred, _stats);
-        for (auto& cls : copiedVec) free(cls.begin);
     }
 
 };

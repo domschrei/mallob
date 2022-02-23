@@ -7,54 +7,52 @@ AdaptiveClauseDatabase::AdaptiveClauseDatabase(int maxClauseSize, int maxLbdPart
     _chunk_size(baseBufferSize), 
     _use_checksum(useChecksum),
     _hist_deleted_in_slots(maxClauseSize) {
-        
-    _chunk_mgr = ChunkManager(numChunks, baseBufferSize);
-    
+
     // Initialize a clause slot for each length-LBD bucket
     BucketLabel l;
     while (l.size <= maxClauseSize) {
 
-        _slots.push_back(ClauseSlot(l.size, l.lbd, l.size <= maxLbdPartitionedSize, _chunk_size, numProducers));
-        int slotIdx = _slots.size()-1;
-        auto& slot = _slots.back();
+        int slotIdx = _slots.size();
+        LOG(V5_DEBG, "SLOT (%i,%i)\n", l.size, l.lbd);
+        _slots.push_back(BufferSlot(_chunk_size, l.size+(l.size>maxLbdPartitionedSize?1:0), l.size, l.lbd, numProducers));
 
-        // Connect clause slot with clause manager for returning unused chunks
-        slot.setChunkSink([&](int* data) {
-            _chunk_mgr.insertChunk(data);
+        _slots.back().setChunkSource([&, slotIdx]() {
+            if (_num_free_chunks.load(std::memory_order_relaxed) > 0) {
+                auto lock = _free_chunks_mutex.getLock();
+                if (!_free_chunks.empty()) {
+                    auto memory = _free_chunks.front();
+                    _free_chunks.pop_front();
+                    atomics::decrementRelaxed(_num_free_chunks);
+                    return memory;
+                } 
+            }
+            for (size_t i = _slots.size()-1; i > slotIdx; i--) {
+                uint8_t* memory = _slots[i].tryStealChunk();
+                if (memory != nullptr) return memory;
+            }
+            return (uint8_t*)nullptr;
         });
 
-        // Connect clause slot with a means to retrieve "new" chunks
-        slot.setChunkSource([this, slotIdx]() {
-            std::pair<ClauseSlot::SlotResult, int*> pair {ClauseSlot::TOTAL_FAIL, nullptr};
-
-            // First try to get a chunk from the chunk manager
-            int* chunk = _chunk_mgr.getChunkOrNullptr();
-            if (chunk == nullptr) {
-                // No chunks available right now.
-                // Try to steal chunk from a slot to the right 
-                // (which is, consequently, less important than this one).
-                for (size_t i = _slots.size()-1; i > slotIdx; i--) {
-                    auto result = _slots[i].releaseChunk(chunk);
-                    // Try another slot on total fail; stop otherwise
-                    if (result != ClauseSlot::TOTAL_FAIL) {
-                        pair.first = result;
-                        break;
-                    }
-                }
-            } else pair.first = ClauseSlot::SUCCESS;
-
-            pair.second = chunk;
-            return pair;
+        _slots.back().setChunkSink([&](uint8_t* data) {
+            auto lock = _free_chunks_mutex.getLock();
+            _free_chunks.push_back(data);
+            atomics::incrementRelaxed(_num_free_chunks);
         });
 
-        slot.setDeletedClausesHistogram(_hist_deleted_in_slots);
+        //slot.setDeletedClausesHistogram(_hist_deleted_in_slots);
 
         l.next(maxLbdPartitionedSize);
+    }
+
+    // Allocate free chunks
+    for (int i = 0; i < numChunks; i++) {
+        _free_chunks.push_back((uint8_t*) malloc(_chunk_size * sizeof(int)));
+        atomics::incrementRelaxed(_num_free_chunks);
     }
 }
 
 
-AdaptiveClauseDatabase::AddClauseResult AdaptiveClauseDatabase::addClause(int producerId, const Clause& c) {
+bool AdaptiveClauseDatabase::addClause(int producerId, const Clause& c) {
 
     // Find correct clause slot, attempt to insert
     size_t slotIdx = getSlotIdx(c.size, c.lbd);
@@ -63,34 +61,41 @@ AdaptiveClauseDatabase::AddClauseResult AdaptiveClauseDatabase::addClause(int pr
         return DROP; // clause is not acceptable
     }
     auto& slot = _slots[slotIdx];
-    auto result = slot.insert(producerId, c);
-    if (result == ClauseSlot::SlotResult::SUCCESS) return SUCCESS;
-    // Fail spuriously if a resource inside was busy
-    if (result == ClauseSlot::SlotResult::SPURIOUS_FAIL) return TRY_LATER;
-    return DROP; // total failure
+    return slot.insert(c, producerId);
 }
 
-void AdaptiveClauseDatabase::bulkAddClauses(int producerId, const std::vector<Clause>& clauses, 
-        std::list<Clause>& deferredOut, SolvingStatistics& stats,
-        std::function<bool(const Clause& c)> conditional) {
+int AdaptiveClauseDatabase::bulkAddClauses(int producerId, const std::vector<Clause>& clauses, 
+        SolvingStatistics& stats, std::function<bool(const Clause& c)> conditional) {
+
+    int numAdded = 0;
 
     // As long as there are clauses left:
     const Clause* cPtr = clauses.data();
+    BucketLabel l;
+    int slotIdx = 0;
     while (cPtr != clauses.data()+clauses.size()) {
         auto& clause = *cPtr;
         assert(clause.begin != nullptr);
 
-        // Find correct slot to insert
-        size_t slotIdx = getSlotIdx(clause.size, clause.lbd);
-        if (slotIdx < 0 || slotIdx >= _slots.size()) {
+        // Find correct slot for the clause
+        while (l.size != clause.size || (l.size <= _max_lbd_partitioned_size && l.lbd != clause.lbd)) {
+            l.next(_max_lbd_partitioned_size);
+            slotIdx++;
+        }
+        if (slotIdx < 0 || slotIdx >= _slots.size() || !conditional(clause)) {
             cPtr++;
             continue;
         }
+
         // Insert as many clauses as you can, setting cPtr to the first clause *not* added
-        _slots[slotIdx].insert(producerId, cPtr, clauses.data()+clauses.size(), deferredOut, stats, conditional);
+        bool success = _slots[slotIdx].insert(clause, producerId);
+        if (success) numAdded++;
     }
+
+    return numAdded;
 }
 
+/*
 void AdaptiveClauseDatabase::printChunks(int nextExportSize) {
     size_t i = 0;
     BucketLabel l;
@@ -131,7 +136,7 @@ void AdaptiveClauseDatabase::printChunks(int nextExportSize) {
         i++;
         l.next(_max_lbd_partitioned_size);
     }
-}
+}*/
 
 std::vector<int> AdaptiveClauseDatabase::exportBuffer(int sizeLimit, int& numExportedClauses, 
         const int minClauseLength, const int maxClauseLength, bool sortClauses) {
@@ -183,8 +188,9 @@ std::vector<int> AdaptiveClauseDatabase::exportBuffer(int sizeLimit, int& numExp
                 // Fetch clauses
                 size_t sizeBefore = selection.size();
                 int numDesired = sizeLimit < 0 ? -1 : (sizeLimit - selection.size()) / effectiveClsLen;
-                int received = buf.getClauses(selection, numDesired);
-                assert(selection.size()-sizeBefore == received*effectiveClsLen);
+                int received = buf.flush(numDesired, selection);
+                assert(selection.size()-sizeBefore == received*effectiveClsLen 
+                    || log_return_false("%i != %i!\n", selection.size()-sizeBefore, received*effectiveClsLen));
                 
                 // Update clause counter and stats
                 selection[counterPos] += received;
@@ -221,12 +227,6 @@ std::vector<int> AdaptiveClauseDatabase::exportBuffer(int sizeLimit, int& numExp
 
         // Proceed to next bucket
         bucket.next(_max_lbd_partitioned_size);
-        bufIdx++;
-    }
-
-    // Also iterate over all subsequent clause slots to recognize unused / stale chunks
-    while (bufIdx < _slots.size()) {
-        _slots[bufIdx].getClauses(selection, /*maxNumClauses=*/0);
         bufIdx++;
     }
 
