@@ -65,25 +65,22 @@ bool AdaptiveClauseDatabase::addClause(int producerId, const Clause& c) {
 }
 
 int AdaptiveClauseDatabase::bulkAddClauses(int producerId, const std::vector<Clause>& clauses, 
-        SolvingStatistics& stats, std::function<bool(const Clause& c)> conditional) {
+        std::function<bool(const Clause& c)> conditional) {
 
     int numAdded = 0;
 
     // As long as there are clauses left:
-    const Clause* cPtr = clauses.data();
     BucketLabel l;
     int slotIdx = 0;
-    while (cPtr != clauses.data()+clauses.size()) {
-        auto& clause = *cPtr;
+    for (auto& clause : clauses) {
         assert(clause.begin != nullptr);
 
         // Find correct slot for the clause
-        while (l.size != clause.size || (l.size <= _max_lbd_partitioned_size && l.lbd != clause.lbd)) {
+        while (l.size < clause.size || (l.size <= _max_lbd_partitioned_size && l.lbd < clause.lbd)) {
             l.next(_max_lbd_partitioned_size);
             slotIdx++;
         }
         if (slotIdx < 0 || slotIdx >= _slots.size() || !conditional(clause)) {
-            cPtr++;
             continue;
         }
 

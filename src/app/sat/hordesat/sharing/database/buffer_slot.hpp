@@ -90,7 +90,7 @@ public:
         int numFullChunks = _num_full_chunks.load();
 
         // Loop over all available full chunks as long as remaining size permits
-        while (desiredElems > 0 && _num_full_chunks.load(std::memory_order_relaxed) > 0) {
+        while (desiredElems != 0 && _num_full_chunks.load(std::memory_order_relaxed) > 0) {
             
             // Try to fetch a full chunk
             int memSize = 0;
@@ -107,7 +107,8 @@ public:
             if (mem == nullptr) break; // no full chunks left
 
             // How much to read from this chunk?
-            int size = std::min(desiredElems*_elem_length, memSize);
+            int size = memSize;
+            if (desiredElems != 0) size = std::min(desiredElems*_elem_length, size);
 
             // For each element in the memory of the chunk:
             size_t i = 0;
@@ -139,7 +140,7 @@ public:
         }
 
         // Also flush the current working chunk as far as possible
-        while (desiredElems > 0) {
+        while (desiredElems != 0) {
             bool success = _working_chunk.fetch(out);
             if (!success) break; // no clauses left
             read++;

@@ -15,10 +15,8 @@
 struct SharingStatistics {
 	unsigned long exportedClauses = 0;
 	unsigned long clausesDroppedAtExport = 0;
-	unsigned long clausesDeferredAtExport = 0;
 	unsigned long clausesProcessFilteredAtExport = 0;
 	unsigned long clausesSolverFilteredAtExport = 0;
-	unsigned long importedClauses = 0;
 	ClauseHistogram* histProduced;
 	ClauseHistogram* histAdmittedToDb;
 	ClauseHistogram* histDroppedBeforeDb;
@@ -33,10 +31,8 @@ struct SharingStatistics {
 		return "exp:" + std::to_string(exportedClauses) + "/" + std::to_string(exportedWithFailed)
 			+ " drp:" + std::to_string(clausesDroppedAtExport) 
 					+ "(" + std::to_string((float) (0.01 * (int)(droppedRatio*100))) + ")"
-			+ " dfr:" + std::to_string(clausesDeferredAtExport)
 			+ " pflt:" + std::to_string(clausesProcessFilteredAtExport)
-			+ " sflt:" + std::to_string(clausesSolverFilteredAtExport)
-			+ " imp:" + std::to_string(importedClauses);
+			+ " sflt:" + std::to_string(clausesSolverFilteredAtExport);
 	}
 };
 

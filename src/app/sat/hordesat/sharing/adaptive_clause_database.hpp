@@ -89,7 +89,7 @@ public:
     Returns: Number of successfully added clauses.
     */
     int bulkAddClauses(int producerId, const std::vector<Clause>& clauses,
-            SolvingStatistics& stats, std::function<bool(const Clause& c)> conditional = [](const Clause&) {return true;});
+            std::function<bool(const Clause& c)> conditional = [](const Clause&) {return true;});
 
     void printChunks(int nextExportSize = -1);
     

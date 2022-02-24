@@ -258,7 +258,7 @@ void DefaultSharingManager::returnClauses(int* begin, int buflen) {
 	}
 
 	// Add clauses to clause database
-	_cdb.bulkAddClauses(_solvers.size(), clauseVec, _returned_clauses_stats, [&](const Clause& c) {
+	_cdb.bulkAddClauses(_solvers.size(), clauseVec, [&](const Clause& c) {
 		return _process_filter.registerClause(c.begin, c.size);
 	});
 }

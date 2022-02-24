@@ -19,7 +19,6 @@ struct SolvingStatistics {
 	unsigned long producedClauses = 0;
 	unsigned long producedClausesProcessFiltered = 0;
 	unsigned long producedClausesSolverFiltered = 0;
-	unsigned long producedClausesDeferred = 0;
 	unsigned long producedClausesAdmitted = 0;
 	unsigned long producedClausesDropped = 0;
 
@@ -28,7 +27,6 @@ struct SolvingStatistics {
 	unsigned long receivedClauses = 0;
 	unsigned long receivedClausesInserted = 0;
 	unsigned long receivedClausesFiltered = 0;
-	unsigned long deferredClauses = 0;
 	unsigned long digestedClauses = 0;
 	unsigned long discardedClauses = 0;
 
@@ -41,12 +39,10 @@ struct SolvingStatistics {
 			+ " admd:" + std::to_string(producedClausesAdmitted)
 			+ " pfltr:" + std::to_string(producedClausesProcessFiltered)
 			+ " sfltr:" + std::to_string(producedClausesSolverFiltered)
-			+ " pdefr:" + std::to_string(producedClausesDeferred)
 			+ " drpd:" + std::to_string(producedClausesDropped)
 			+ " recv:" + std::to_string(receivedClauses)
 			+ " rfltr:" + std::to_string(receivedClausesFiltered)
 			+ " digd:" + std::to_string(digestedClauses)
-			+ " defr:" + std::to_string(deferredClauses)
 			+ " disc:" + std::to_string(discardedClauses);
 	}
 
@@ -63,7 +59,6 @@ struct SolvingStatistics {
 		producedClausesDropped += other.producedClausesDropped;
 		receivedClauses += other.receivedClauses;
 		receivedClausesFiltered += other.receivedClausesFiltered;
-		deferredClauses += other.deferredClauses;
 		digestedClauses += other.digestedClauses;
 		discardedClauses += other.discardedClauses;
 	}

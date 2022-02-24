@@ -158,7 +158,7 @@ public:
 	void addLearnedClause(const Mallob::Clause& c);
 
 	// Add a bulk of learned clauses, but only the ones for which conditional returns true
-	void addLearnedClauses(const std::vector<Mallob::Clause>& clauses, 
+	int addLearnedClauses(const std::vector<Mallob::Clause>& clauses, 
 		std::function<bool(const Clause&)> conditional);
 
 	// Within the solver, fetch a clause that was previously added as a learned clause.

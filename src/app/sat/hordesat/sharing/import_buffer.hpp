@@ -46,10 +46,12 @@ public:
         }
     }
 
-    void bulkAdd(const std::vector<Mallob::Clause>& clauses, std::function<bool(const Mallob::Clause&)> conditional) {
+    int bulkAdd(const std::vector<Mallob::Clause>& clauses, std::function<bool(const Mallob::Clause&)> conditional) {
         _stats.receivedClauses += clauses.size();
-        //for (auto& c : clauses) add(c);
-        _cdb.bulkAddClauses(0, clauses, _stats, conditional);
+        int admitted = _cdb.bulkAddClauses(0, clauses, conditional);
+        _stats.receivedClausesInserted += admitted;
+        _stats.receivedClausesFiltered += clauses.size()-admitted;
+        return admitted;
     }
 
     std::vector<int> getUnitsBuffer() {
