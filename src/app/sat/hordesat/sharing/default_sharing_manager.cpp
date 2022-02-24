@@ -26,11 +26,13 @@ DefaultSharingManager::DefaultSharingManager(
 		/*numChunks=*/_params.numChunksForExport(),
 		/*numProducers=*/_solvers.size()+1
 	), _hist_produced(params.strictClauseLengthLimit()), 
+	_hist_failed_filter(params.strictClauseLengthLimit()),
 	_hist_admitted_to_db(params.strictClauseLengthLimit()), 
 	_hist_dropped_before_db(params.strictClauseLengthLimit()),
 	_hist_returned_to_db(params.strictClauseLengthLimit()) {
 
 	_stats.histProduced = &_hist_produced;
+	_stats.histFailedFilter = &_hist_failed_filter;
 	_stats.histAdmittedToDb = &_hist_admitted_to_db;
 	_stats.histDroppedBeforeDb = &_hist_dropped_before_db;
 	_stats.histDeletedInSlots = &_cdb.getDeletedClausesHistogram();
@@ -223,6 +225,7 @@ void DefaultSharingManager::processClause(int solverId, int solverRevision, cons
 		success = false;
 	}
 	if (!success) {
+		_hist_failed_filter.increment(clauseSize);
 		if (tldClauseVec) delete tldClauseVec;
 		return;
 	}
@@ -231,16 +234,15 @@ void DefaultSharingManager::processClause(int solverId, int solverRevision, cons
 	std::sort(clauseBegin, clauseBegin+clauseSize);
 	Clause tldClause(clauseBegin, clauseSize, clauseSize == 1 ? 1 : (clauseSize == 2 ? 2 : clause.lbd));
 	success = _cdb.addClause(solverId, tldClause);
-	if (!success) {
+	if (success) {
+		success = true;
+		_hist_admitted_to_db.increment(clauseSize);
+		if (solverStats) solverStats->producedClausesAdmitted++;
+	} else {
 		// completely dropping the clause
 		_stats.clausesDroppedAtExport++;
 		if (solverStats) solverStats->producedClausesDropped++;
 		_hist_dropped_before_db.increment(clauseSize);
-	} else {
-		// success
-		success = true;
-		_hist_admitted_to_db.increment(clauseSize);
-		if (solverStats) solverStats->producedClausesAdmitted++;
 	}
 	if (tldClauseVec) delete tldClauseVec;
 }

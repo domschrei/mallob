@@ -39,7 +39,7 @@ AdaptiveClauseDatabase::AdaptiveClauseDatabase(int maxClauseSize, int maxLbdPart
             atomics::incrementRelaxed(_num_free_chunks);
         });
 
-        //slot.setDeletedClausesHistogram(_hist_deleted_in_slots);
+        _slots.back().setDeletedClausesHistogram(_hist_deleted_in_slots);
 
         l.next(maxLbdPartitionedSize);
     }

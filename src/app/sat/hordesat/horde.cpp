@@ -343,6 +343,7 @@ void HordeLib::dumpStats(bool final) {
 	if (final) {
 		// Histogram over clause lengths (do not print trailing zeroes)
 		_logger.log(verb, "clenhist prod %s\n", shareStats.histProduced->getReport().c_str());
+		_logger.log(verb, "clenhist flfl %s\n", shareStats.histFailedFilter->getReport().c_str());
 		_logger.log(verb, "clenhist admt %s\n", shareStats.histAdmittedToDb->getReport().c_str());
 		_logger.log(verb, "clenhist drpd %s\n", shareStats.histDroppedBeforeDb->getReport().c_str());
 		_logger.log(verb, "clenhist dltd %s\n", shareStats.histDeletedInSlots->getReport().c_str());

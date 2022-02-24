@@ -18,6 +18,7 @@ struct SharingStatistics {
 	unsigned long clausesProcessFilteredAtExport = 0;
 	unsigned long clausesSolverFilteredAtExport = 0;
 	ClauseHistogram* histProduced;
+	ClauseHistogram* histFailedFilter;
 	ClauseHistogram* histAdmittedToDb;
 	ClauseHistogram* histDroppedBeforeDb;
 	ClauseHistogram* histDeletedInSlots;

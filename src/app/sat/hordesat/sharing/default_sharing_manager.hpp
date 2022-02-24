@@ -59,6 +59,7 @@ protected:
 	float _last_buffer_clear = 0;
 
 	ClauseHistogram _hist_produced;
+	ClauseHistogram _hist_failed_filter;
 	ClauseHistogram _hist_admitted_to_db;
 	ClauseHistogram _hist_dropped_before_db;
 	ClauseHistogram _hist_returned_to_db;

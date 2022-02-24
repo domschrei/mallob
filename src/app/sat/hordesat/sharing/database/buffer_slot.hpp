@@ -6,6 +6,7 @@
 
 #include "buffer_chunk.hpp"
 #include "app/sat/hordesat/utilities/clause_filter.hpp"
+#include "app/sat/hordesat/sharing/clause_histogram.hpp"
 
 class BufferSlot {
 
@@ -23,6 +24,8 @@ private:
     std::atomic_bool _replacing_chunk {false};
     std::function<uint8_t*()> _chunk_source;
     std::function<void(uint8_t*)> _chunk_sink;
+
+    ClauseHistogram* _hist_deleted_in_slots = nullptr;
 
 public:
     BufferSlot() {}
@@ -48,6 +51,7 @@ public:
             // Not successful: chunk is (or was) full.
             // Try to replace it with a new chunk yourself:
             bool replacingChunk = false;
+            bool triedToAcquireChunk = false;
             if (_replacing_chunk.compare_exchange_strong(replacingChunk, true, std::memory_order_acquire)) {
                 // Acquired exclusive right to replace chunk
 
@@ -56,6 +60,7 @@ public:
                 size_t flushedSize;
                 {
                     flushedMemory = _chunk_source();
+                    triedToAcquireChunk = true;
                     if (flushedMemory != nullptr) {
                         // Flush the working chunk's buffer into the acquired chunk
                         flushedSize = _working_chunk.flushBuffer(flushedMemory);
@@ -69,17 +74,21 @@ public:
                 LOG(V5_DEBG, "(%i,%i) FETCH CHUNK success=%i\n", 
                     _template_clause.size, _template_clause.lbd, flushedMemory == nullptr ? 0 : 1);
                 
-                // Did not get a chunk? Give up on inserting.
-                if (flushedMemory == nullptr) return false;
-
                 // Move the extracted full buffer to the list of full chunks
-                auto lock = _full_chunks_mutex.getLock();
-                _full_chunks.push_back(std::pair<size_t, uint8_t*>(flushedSize, flushedMemory));
-                atomics::incrementRelaxed(_num_full_chunks);
+                if (flushedMemory != nullptr) {
+                    auto lock = _full_chunks_mutex.getLock();
+                    _full_chunks.push_back(std::pair<size_t, uint8_t*>(flushedSize, flushedMemory));
+                    _num_full_chunks.fetch_add(1, std::memory_order_acq_rel);
+                }
             }
 
-            // Retry to insert
+            // Retry insertion
             success = _working_chunk.tryInsert(c, producerId);
+            
+            // No success at retry AND personally attempted to acquire a new chunk? Return failure.
+            if (!success && triedToAcquireChunk) {
+                return false;
+            }
         }
         return true;
     }
@@ -87,7 +96,7 @@ public:
     int flush(int desiredElems, std::vector<int>& out) {
 
         int read = 0;
-        int numFullChunks = _num_full_chunks.load();
+        int numFullChunks = _num_full_chunks.load(std::memory_order_relaxed);
 
         // Loop over all available full chunks as long as remaining size permits
         while (desiredElems != 0 && _num_full_chunks.load(std::memory_order_relaxed) > 0) {
@@ -101,7 +110,7 @@ public:
                     memSize = (int)_full_chunks.front().first;
                     mem = (int*)_full_chunks.front().second;
                     _full_chunks.pop_front();
-                    atomics::decrementRelaxed(_num_full_chunks);
+                    _num_full_chunks.fetch_sub(1, std::memory_order_acq_rel);
                 }
             }
             if (mem == nullptr) break; // no full chunks left
@@ -154,23 +163,28 @@ public:
 
     uint8_t* tryStealChunk() {
 
-        if (_num_full_chunks.load(std::memory_order_relaxed) == 0)
+        if (_num_full_chunks.load(std::memory_order_acq_rel) == 0)
             return nullptr;
-        if (!_full_chunks_mutex.tryLock())
-            return nullptr;
-        if (_full_chunks.empty()) {
-            _full_chunks_mutex.unlock();
-            return nullptr;
-        }
+
+        auto lock = _full_chunks_mutex.getLock();
+        if (_full_chunks.empty()) return nullptr;
 
         auto [size, memory] = _full_chunks.front();
         _full_chunks.pop_front();
-        atomics::decrementRelaxed(_num_full_chunks);
-        _full_chunks_mutex.unlock();
+        _num_full_chunks.fetch_sub(1, std::memory_order_acq_rel);
+
+        // At this point, clauses are implicitly deleted! => Fill histogram
+        if (_hist_deleted_in_slots)
+            _hist_deleted_in_slots->increase(_template_clause.size, size/_template_clause.size);
+
         return memory;
     }
 
     int getNumFullChunks() const {
         return _num_full_chunks.load(std::memory_order_relaxed);
+    }
+
+    void setDeletedClausesHistogram(ClauseHistogram& hist) {
+        _hist_deleted_in_slots = &hist;
     }
 };

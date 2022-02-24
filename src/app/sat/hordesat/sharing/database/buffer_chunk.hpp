@@ -56,22 +56,30 @@ public:
     }
 
     bool fetch(std::vector<int>& vec) {
+
+        // Acquire reader status in memory state (busy waiting)
+        acquireReaderStatus();
+
         size_t sizeBefore = vec.size();
         bool success = _ringbuf->getClause(vec);
         if (success) assert(vec.size() == sizeBefore+_elem_length || log_return_false("%i != %i+%i\n", vec.size(), sizeBefore, _elem_length));
+
+        // Release reader status in memory state
+        releaseReaderStatus();
+
         return success;
     }
 
     size_t flushBuffer(uint8_t* swappedMemory) {
 
         // Acquire writer status in memory state (busy waiting)
-        acquireWriterStatus();
+        acquireReaderStatus();
 
         // Swap out the current memory with the provided "empty" swap memory
         size_t size = _ringbuf->flushBufferUnsafe(swappedMemory);
 
         // Release writer status in memory state
-        releaseWriterStatus();
+        releaseReaderStatus();
 
         return size;
     }
