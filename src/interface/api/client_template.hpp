@@ -106,6 +106,9 @@ public:
         return (int)_dist_wallclock_limit.sample();
     }
     double getNextArrival() {
+        if (_dist_arrival.type == Distribution::CONSTANT && _dist_arrival.params[0] == 0) {
+            return 0;
+        }
         while (_remaining_jobs_from_burst == 0) {
             _remaining_jobs_from_burst = (int)std::max(1.0, std::ceil(_dist_burst_size.sample()));
             _last_arrival += _dist_arrival.sample();
