@@ -108,7 +108,7 @@ public:
 
             // How much to read from this chunk?
             int size = memSize;
-            if (desiredElems != 0) size = std::min(desiredElems*_elem_length, size);
+            if (desiredElems > 0) size = std::min(desiredElems*_elem_length, size);
 
             // For each element in the memory of the chunk:
             size_t i = 0;
