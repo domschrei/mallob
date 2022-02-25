@@ -10,6 +10,7 @@
 #include <list>
 #include <atomic>
 
+#include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 #include "app/sat/hordesat/utilities/clause.hpp"
 using namespace Mallob;
@@ -104,6 +105,8 @@ private:
     std::vector<int> _consumed_buffer;
     int _consumed_size = 0;
 
+    Mutex _consume_mutex;
+
 public:
     RingBuffer() {}
     RingBuffer(size_t size, int numProducers = 1, uint8_t* data = nullptr) : _data(data), _capacity(size) {
@@ -155,15 +158,19 @@ public:
 
         if (_consumed_size == 0) {
             // Fetch batch of clauses from ringbuffer
+            if (!_consume_mutex.tryLock()) return false;
             size_t offset;
             _consumed_size = ringbuf_consume(_ringbuf, &offset);
-            if (_consumed_size <= 0) return false;
-            if (_consumed_buffer.size() < _consumed_size) 
-                _consumed_buffer.resize(_consumed_size);
-            memcpy(_consumed_buffer.data(), 
-                    _data+sizeof(int)*offset, 
-                    _consumed_size*sizeof(int));
-            ringbuf_release(_ringbuf, _consumed_size);
+            if (_consumed_size > 0) {
+                if (_consumed_buffer.size() < _consumed_size) 
+                    _consumed_buffer.resize(_consumed_size);
+                memcpy(_consumed_buffer.data(), 
+                        _data+sizeof(int)*offset, 
+                        _consumed_size*sizeof(int));
+                ringbuf_release(_ringbuf, _consumed_size);   
+            }
+            _consume_mutex.unlock();
+            if (_consumed_size <= 0) return false; 
         }
         
         // Extract a clause from the consumed buffer
@@ -195,7 +202,9 @@ public:
         return out;
     }
 
-    size_t flushBufferUnsafe(uint8_t* otherBuffer) {
+    size_t flushBuffer(uint8_t* otherBuffer) {
+
+        auto lock = _consume_mutex.getLock();
 
         // Flush ring buffer into provided swap buffer
         size_t offset;
@@ -251,7 +260,7 @@ public:
         return _ringbuf.releaseBuffer();
     }
     auto flushBufferUnsafe(uint8_t* otherBuffer) {
-        return _ringbuf.flushBufferUnsafe(otherBuffer);
+        return _ringbuf.flushBuffer(otherBuffer);
     }
 };
 
