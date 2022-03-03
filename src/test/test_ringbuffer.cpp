@@ -98,6 +98,7 @@ void testSPSCRingBuffer() {
     LOG(V2_INFO, "move assigned: %i\n", (int)numMoveAssigned);
 }
 
+#ifdef COMMENTED_OUT
 void testMixedRingbuffer() {
     LOG(V2_INFO, "Testing mixed non-unit ringbuffer ...\n");
 
@@ -144,6 +145,7 @@ void testMixedRingbuffer() {
     for (int lit : clauses) LOG_OMIT_PREFIX(V4_VVER, "%i ", lit);
     LOG_OMIT_PREFIX(V4_VVER, "\n");
 }
+#endif
 
 void testUnitBuffer() {
     LOG(V2_INFO, "Testing unit ringbuffer ...\n");
@@ -239,12 +241,70 @@ void testUniformSizeClauseBuffer() {
     LOG_OMIT_PREFIX(V4_VVER, "\n");
 }
 
+
+void testRingBufferV2() {
+
+    {
+        RingBufferV2 rb(/*size=*/1500, /*sizePerElem=*/3, /*numProducers=*/1);
+        bool success;
+        
+        std::vector<int> data = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+        success = rb.produce(data.data()+0, /*prodId=*/0); assert(success);
+        success = rb.produce(data.data()+3, /*prodId=*/0); assert(success);
+        success = rb.produce(data.data()+6, /*prodId=*/0); assert(success);
+        success = rb.produce(data.data()+9, /*prodId=*/0); assert(success);
+
+        std::vector<int> out; 
+        success = rb.consume(out); assert(success);
+        for (int lit : out) LOG(V2_INFO, "%i\n", lit);
+        success = rb.consume(out); assert(success);
+        for (int lit : out) LOG(V2_INFO, "%i\n", lit);
+        success = rb.consume(out); assert(success);
+        for (int lit : out) LOG(V2_INFO, "%i\n", lit);
+        success = rb.consume(out); assert(success);
+        for (int lit : out) LOG(V2_INFO, "%i\n", lit);
+        success = rb.consume(out); assert(!success);
+        for (int lit : out) LOG(V2_INFO, "%i\n", lit);
+
+        assert(out == data);
+    }
+
+    {
+        RingBufferV2 rb(/*size=*/1500);
+        bool success;
+        
+        // Assume that we insert clauses with the following size-LBD combinations:
+        // (8,2) (7,3) (6,4) (5,5)
+        std::vector<int> vec1 = {1, 2, 3, 4, 5};
+        std::vector<int> vec2 = {1, 2, 3, 4, 5, 6};
+        std::vector<int> vec3 = {1, 2, 3, 4, 5, 6, 7};
+        std::vector<int> vec4 = {1, 2, 3, 4, 5, 6, 7, 8};
+        success = rb.produce(vec1.data(), /*prodId=*/0, /*numIntegers=*/vec1.size(), /*headerByte=*/5); assert(success);
+        success = rb.produce(vec2.data(), /*prodId=*/0, /*numIntegers=*/vec2.size(), /*headerByte=*/4); assert(success);
+        success = rb.produce(vec3.data(), /*prodId=*/0, /*numIntegers=*/vec3.size(), /*headerByte=*/3); assert(success);
+        success = rb.produce(vec4.data(), /*prodId=*/0, /*numIntegers=*/vec4.size(), /*headerByte=*/2); assert(success);
+
+        std::vector<int> out;
+        while (true) {
+            uint8_t header;
+            success = rb.getNextHeaderByte(header);
+            if (!success) break;
+            success = rb.consume(10-header, out);
+            assert(success);
+        }
+        for (int lit : out) LOG(V2_INFO, "%i\n", lit);
+    }
+}
+
 int main() {
     Timer::init();
     Random::init(rand(), rand());
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
     
-    testMixedRingbuffer();
+    //testMixedRingbuffer();
+    testRingBufferV2();
+    exit(0);
+
     testUnitBuffer();
     testUniformClauseBuffer();
     testUniformSizeClauseBuffer();

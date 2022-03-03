@@ -31,13 +31,29 @@ private:
     // both with an LBD score at the front.
     // The effective size of the clauses must be equal to the member
     // supplied in the construction of the comparator.
-    struct InplaceClauseComparator {
+    struct InplaceClauseComparatorUniformSize {
         int clauseSizeIncludingLbd;
-        InplaceClauseComparator(int clauseSizeIncludingLbd) 
+        InplaceClauseComparatorUniformSize(int clauseSizeIncludingLbd) 
             : clauseSizeIncludingLbd(clauseSizeIncludingLbd) {}
         bool operator()(const int* left, const int* right) const {
             if (left == right) return false;
             for (size_t i = 0; i < clauseSizeIncludingLbd; i++) {
+                if (left[i] != right[i]) return left[i] < right[i];
+            }
+            return false;
+        }
+    };
+
+    struct InplaceClauseComparatorUniformSizeLbdSum {
+        int sumOfLengthAndLbd;
+        InplaceClauseComparatorUniformSizeLbdSum(int sumOfLengthAndLbd) 
+            : sumOfLengthAndLbd(sumOfLengthAndLbd) {}
+        bool operator()(const int* left, const int* right) const {
+            if (left == right) return false;
+            int sizeLeft = sumOfLengthAndLbd - left[0] + 1;
+            int sizeRight = sumOfLengthAndLbd - right[0] + 1;
+            if (sizeLeft != sizeRight) return sizeLeft < sizeRight;
+            for (size_t i = 0; i < sizeLeft; i++) {
                 if (left[i] != right[i]) return left[i] < right[i];
             }
             return false;
@@ -55,16 +71,32 @@ private:
     number of filled memory chunks.
     */
     std::vector<BufferSlot> _slots;
+    std::vector<int> _slot_lbd;
+    robin_hood::unordered_flat_map<std::pair<int, int>, int, IntPairHasher> _size_lbd_to_slot_idx;
 
     int _max_lbd_partitioned_size;
+    int _max_clause_length;
+    bool _slots_for_sum_of_length_and_lbd;
+
     int _chunk_size;
     bool _use_checksum;
+    BucketLabel _bucket_iterator;
 
     ClauseHistogram _hist_deleted_in_slots;
 
-public: 
-    AdaptiveClauseDatabase(int maxClauseSize, int maxLbdPartitionedSize, int baseBufferSize, 
-        int numChunks, int numProducers, bool useChecksum = false);
+public:
+    struct Setup {
+        int numProducers = 1;
+        int numChunks = 0;
+        int chunkSize = 1500;
+        int maxClauseLength = 20;
+        bool useChecksums = false;
+
+        bool slotsForSumOfLengthAndLbd = false;
+        int maxLbdPartitionedSize = 2;
+    };
+
+    AdaptiveClauseDatabase(Setup setup);
     ~AdaptiveClauseDatabase() = default;
 
     /*
@@ -93,6 +125,7 @@ public:
 
     void printChunks(int nextExportSize = -1);
     
+    enum ExportMode {UNITS, NONUNITS, ANY};
     /*
     Flushes the clauses of highest priority and writes them into a flat buffer.
     The buffer first contains a hash value of type size_t and then integers only.
@@ -106,8 +139,7 @@ public:
     getBufferMerger.
     */
     std::vector<int> exportBuffer(int sizeLimit, int& numExportedClauses, 
-            const int minClauseLength = -1, const int maxClauseLength = -1, 
-            bool sortClauses = true);
+            ExportMode mode = ANY, bool sortClauses = true);
 
     /*
     Allows to iterate over the clauses contained in a flat vector of integers
@@ -116,12 +148,13 @@ public:
     Throughout the life time of the BufferReader, the underlying vector must be valid.
     */
     BufferReader getBufferReader(int* begin, size_t size, bool useChecksums = false);
-    BufferMerger getBufferMerger();
+    BufferMerger getBufferMerger(int sizeLimit);
 
     ClauseHistogram& getDeletedClausesHistogram();
 
 private:
     size_t getSlotIdx(int clauseSize, int lbd);
+    BucketLabel getBucketIterator();
 
 };
 

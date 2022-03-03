@@ -5,7 +5,7 @@
 #include <cstring>
 
 #include "util/assert.hpp"
-#include "bucket_label.hpp"
+#include "database/buffer_iterator.hpp"
 #include "app/sat/hordesat/utilities/clause.hpp"
 #include "util/hashing.hpp"
 #include "util/logger.hpp"
@@ -14,12 +14,10 @@ class BufferReader {
 private:
     int* _buffer = nullptr;
     size_t _size;
-    int _max_lbd_partitioned_size;
 
     size_t _current_pos = 0;
-    BucketLabel _bucket;
+    BufferIterator _it;
     size_t _remaining_cls_of_bucket = 0;
-    int _effective_clause_size;
     Mallob::Clause _current_clause;
 
     bool _use_checksum;
@@ -28,7 +26,7 @@ private:
 
 public:
     BufferReader() = default;
-    BufferReader(int* buffer, int size, int maxLbdPartitionedSize, bool useChecksum = false);
+    BufferReader(int* buffer, int size, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);
     void releaseBuffer() {_buffer = nullptr;}
     Mallob::Clause* getCurrentClausePointer() {return &_current_clause;}
     size_t getRemainingSize() const {return _size - _current_pos;}
@@ -47,39 +45,36 @@ public:
                 }
 
                 // Go to next bucket
-                _bucket.next(_max_lbd_partitioned_size);
+                _it.nextLengthLbdGroup();
                 _remaining_cls_of_bucket = _buffer[_current_pos++];
                 assert(_remaining_cls_of_bucket >= 0);
             }
             // Update clause data
-            _effective_clause_size = _bucket.size + (_bucket.size <= _max_lbd_partitioned_size ? 0 : 1);
-            _current_clause.size = _bucket.size;
-            _current_clause.lbd = _bucket.lbd;
+            _current_clause.size = _it.clauseLength;
+            _current_clause.lbd = _it.lbd;
         }
 
         // Does clause exceed bounds of the buffer?
-        if (_current_pos+_effective_clause_size > _size) {
+        if (_current_pos+_current_clause.size > _size) {
             return endReading();
         }
 
-        assert(_buffer[_current_pos] != 0 || 
-            LOG_RETURN_FALSE("ERROR: Buffer is zero @ pos %i/%i (bucket (%i,%i))!\n", 
-                _current_pos, _size, _bucket.size, _bucket.lbd));
+        if (_buffer[_current_pos] == 0) {
+            std::string str; for (size_t i = 0; i < _size; i++) str += std::to_string(_buffer[i]) + " ";
+            LOG(V0_CRIT, "ERROR: Buffer is zero @ pos %i/%i (bucket (%i,%i))! ===> %s\n", 
+                _current_pos, _size, _it.clauseLength, _it.lbd, str.c_str());
+            abort();
+        }
 
         if (_use_checksum) {
             hash_combine(_hash, Mallob::ClauseHasher::hash(
-                _buffer+_current_pos, _effective_clause_size, 3
+                _buffer+_current_pos, _current_clause.size, 3
             ));
         }
 
-        if (_effective_clause_size > _bucket.size) {
-            // Set explicit LBD value
-            _current_clause.lbd = *(_buffer+_current_pos);
-            _current_pos++;
-        }
         // Set pointer to literals
         _current_clause.begin = _buffer+_current_pos;
-        _current_pos += _bucket.size;
+        _current_pos += _it.clauseLength;
 
         // Decrement remaining clauses
         _remaining_cls_of_bucket--;

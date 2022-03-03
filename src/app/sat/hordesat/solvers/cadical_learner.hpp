@@ -38,8 +38,10 @@ public:
 			bool eligible = true;
 			if (_curr_clause.size() > 1) {
 				assert(_curr_clause.size() >= 3); // glue value plus at least two literals
-				// Non-unit clause: First integer is glue value
+				// Non-unit clause: First integer is glue value.
 				int& glue = _curr_clause[0];
+				// In CaDiCaL, LBD scores are represented from 1 to len-1. => Increment LBD.
+				glue++;
 				if (glue > _glue_limit) eligible = false;
 				assert(glue > 0);
 			}

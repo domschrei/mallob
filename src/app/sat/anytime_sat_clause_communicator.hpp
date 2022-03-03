@@ -47,7 +47,16 @@ public:
         _clause_buf_discount_factor(_params.clauseBufferDiscountFactor()),
         _use_checksums(params.useChecksums()),
         _use_cls_history(params.collectClauseHistory()),
-        _cdb(_params.strictClauseLengthLimit(), _params.maxLbdPartitioningSize(), _clause_buf_base_size, 0, 0),
+        _cdb([&]() {
+            AdaptiveClauseDatabase::Setup setup;
+            setup.maxClauseLength = _params.strictClauseLengthLimit();
+            setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
+            setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
+            setup.chunkSize = _clause_buf_base_size;
+            setup.numProducers = 0;
+            setup.numChunks = 0;
+            return setup;
+        }()),
         _cls_history(_params, getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job, _cdb),
         _num_aggregated_nodes(0) {
 

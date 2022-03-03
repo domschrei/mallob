@@ -1,51 +1,89 @@
 
 #include "adaptive_clause_database.hpp"
 
-AdaptiveClauseDatabase::AdaptiveClauseDatabase(int maxClauseSize, int maxLbdPartitionedSize, 
-        int baseBufferSize, int numChunks, int numProducers, bool useChecksum):
-    _max_lbd_partitioned_size(maxLbdPartitionedSize), 
-    _chunk_size(baseBufferSize), 
-    _use_checksum(useChecksum),
-    _hist_deleted_in_slots(maxClauseSize) {
+AdaptiveClauseDatabase::AdaptiveClauseDatabase(Setup setup):
+    _max_lbd_partitioned_size(setup.maxLbdPartitionedSize),
+    _max_clause_length(setup.maxClauseLength),
+    _slots_for_sum_of_length_and_lbd(setup.slotsForSumOfLengthAndLbd),
+    _chunk_size(setup.chunkSize), 
+    _use_checksum(setup.useChecksums),
+    _bucket_iterator(setup.slotsForSumOfLengthAndLbd ? 
+        BucketLabel::MINIMIZE_SUM_OF_SIZE_AND_LBD : BucketLabel::MINIMIZE_SIZE, 
+        setup.maxLbdPartitionedSize),
+    _hist_deleted_in_slots(setup.maxClauseLength) {
 
-    // Initialize a clause slot for each length-LBD bucket
-    BucketLabel l;
-    while (l.size <= maxClauseSize) {
+    // Choose max. sum such that the largest legal clauses will be admitted iff they have LBD 2. 
+    int maxSumOfLengthAndLbd = setup.maxClauseLength+2;
 
-        int slotIdx = _slots.size();
-        LOG(V5_DEBG, "SLOT (%i,%i)\n", l.size, l.lbd);
-        _slots.push_back(BufferSlot(_chunk_size, l.size+(l.size>maxLbdPartitionedSize?1:0), l.size, l.lbd, numProducers));
+    // Iterate over all possible clause length - LBD combinations
+    for (int clauseLength = 1; clauseLength <= setup.maxClauseLength; clauseLength++) {
+        for (int lbd = std::min(clauseLength, 2); lbd <= clauseLength; lbd++) {
 
-        _slots.back().setChunkSource([&, slotIdx]() {
-            if (_num_free_chunks.load(std::memory_order_relaxed) > 0) {
-                auto lock = _free_chunks_mutex.getLock();
-                if (!_free_chunks.empty()) {
-                    auto memory = _free_chunks.front();
-                    _free_chunks.pop_front();
-                    atomics::decrementRelaxed(_num_free_chunks);
-                    return memory;
-                } 
+            std::pair<int, int> lengthLbdPair(clauseLength, lbd);
+            std::pair<int, int> representantKey;
+            BufferChunk::Mode opMode;
+
+            // Decide what kind of slot we need for this combination
+            int sumOfLengthAndLbd = clauseLength+lbd;
+            if (setup.slotsForSumOfLengthAndLbd && sumOfLengthAndLbd >= 6 
+                    && sumOfLengthAndLbd <= maxSumOfLengthAndLbd) {
+                // Shared slot for all clauses of this length+lbd sum
+                opMode = BufferChunk::SAME_SUM;
+                representantKey = std::pair<int, int>(sumOfLengthAndLbd-2, 2);
+            } else if (clauseLength > setup.maxLbdPartitionedSize) {
+                // Slot for all clauses of this length
+                opMode = BufferChunk::SAME_SIZE;
+                representantKey = std::pair<int, int>(clauseLength, clauseLength);
+            } else {
+                // Exclusive slot for this length-lbd combination
+                opMode = BufferChunk::SAME_SIZE_AND_LBD;
+                representantKey = lengthLbdPair;
             }
-            for (size_t i = _slots.size()-1; i > slotIdx; i--) {
-                uint8_t* memory = _slots[i].tryStealChunk();
-                if (memory != nullptr) return memory;
+
+            if (!_size_lbd_to_slot_idx.count(representantKey)) {
+                // Create new slot
+
+                int slotIdx = _slots.size();
+                _slots.push_back(BufferSlot(_chunk_size, opMode, 
+                    opMode==BufferChunk::SAME_SUM ? sumOfLengthAndLbd : clauseLength, 
+                    setup.numProducers));
+                _slot_lbd.push_back(opMode == BufferChunk::SAME_SIZE_AND_LBD ? representantKey.second : -1);
+                _size_lbd_to_slot_idx[representantKey] = slotIdx;
+
+                _slots.back().setChunkSource([&, slotIdx]() {
+                    if (_num_free_chunks.load(std::memory_order_relaxed) > 0) {
+                        auto lock = _free_chunks_mutex.getLock();
+                        if (!_free_chunks.empty()) {
+                            auto memory = _free_chunks.front();
+                            _free_chunks.pop_front();
+                            atomics::decrementRelaxed(_num_free_chunks);
+                            return memory;
+                        } 
+                    }
+                    for (size_t i = _slots.size()-1; i > slotIdx; i--) {
+                        uint8_t* memory = _slots[i].tryStealChunk();
+                        if (memory != nullptr) return memory;
+                    }
+                    return (uint8_t*)nullptr;
+                });
+
+                _slots.back().setChunkSink([&](uint8_t* data) {
+                    auto lock = _free_chunks_mutex.getLock();
+                    _free_chunks.push_back(data);
+                    atomics::incrementRelaxed(_num_free_chunks);
+                });
+
+                _slots.back().setDeletedClausesHistogram(_hist_deleted_in_slots);
             }
-            return (uint8_t*)nullptr;
-        });
 
-        _slots.back().setChunkSink([&](uint8_t* data) {
-            auto lock = _free_chunks_mutex.getLock();
-            _free_chunks.push_back(data);
-            atomics::incrementRelaxed(_num_free_chunks);
-        });
-
-        _slots.back().setDeletedClausesHistogram(_hist_deleted_in_slots);
-
-        l.next(maxLbdPartitionedSize);
+            // May be a no-op
+            _size_lbd_to_slot_idx[lengthLbdPair] = _size_lbd_to_slot_idx[representantKey];
+            //LOG(V2_INFO, "SLOT (%i,%i) ~> %i\n", lengthLbdPair.first, lengthLbdPair.second, _size_lbd_to_slot_idx[representantKey]);
+        }
     }
 
     // Allocate free chunks
-    for (int i = 0; i < numChunks; i++) {
+    for (int i = 0; i < setup.numChunks; i++) {
         _free_chunks.push_back((uint8_t*) malloc(_chunk_size * sizeof(int)));
         atomics::incrementRelaxed(_num_free_chunks);
     }
@@ -54,14 +92,21 @@ AdaptiveClauseDatabase::AdaptiveClauseDatabase(int maxClauseSize, int maxLbdPart
 
 bool AdaptiveClauseDatabase::addClause(int producerId, const Clause& c) {
 
+    Clause _clause = c;
+    if (_clause.lbd < 2 && _clause.size > 1) {
+        //LOG(V1_WARN, "Length-LBD combination (%i,%i) learned!\n", _clause.size, _clause.lbd);
+        _clause.lbd = 2;
+    }
+
     // Find correct clause slot, attempt to insert
-    size_t slotIdx = getSlotIdx(c.size, c.lbd);
+    size_t slotIdx = getSlotIdx(_clause.size, _clause.lbd);
+    //LOG(V2_INFO, "(%i,%i) ~> %i\n", c.size, c.lbd, slotIdx);
     if (slotIdx < 0 || slotIdx >= _slots.size()) {
-        LOG(V1_WARN, "[WARN] %s -> invalid slot index %i\n", c.toStr().c_str(), slotIdx);
-        return DROP; // clause is not acceptable
+        LOG(V1_WARN, "[WARN] %s -> invalid slot index %i\n", _clause.toStr().c_str(), slotIdx);
+        return false; // clause is not acceptable
     }
     auto& slot = _slots[slotIdx];
-    return slot.insert(c, producerId);
+    return slot.insert(_clause, producerId);
 }
 
 int AdaptiveClauseDatabase::bulkAddClauses(int producerId, const std::vector<Clause>& clauses, 
@@ -69,23 +114,29 @@ int AdaptiveClauseDatabase::bulkAddClauses(int producerId, const std::vector<Cla
 
     int numAdded = 0;
 
+    std::pair<int, int> slotKey;
+    int slotIdx = -1;
     // As long as there are clauses left:
-    BucketLabel l;
-    int slotIdx = 0;
-    for (auto& clause : clauses) {
-        assert(clause.begin != nullptr);
-
-        // Find correct slot for the clause
-        while (l.size < clause.size || (l.size <= _max_lbd_partitioned_size && l.lbd < clause.lbd)) {
-            l.next(_max_lbd_partitioned_size);
-            slotIdx++;
+    for (auto& c : clauses) {
+        Clause _clause = c;
+        if (_clause.lbd < 2 && _clause.size > 1) {
+            //LOG(V1_WARN, "Length-LBD combination (%i,%i) learned!\n", _clause.size, _clause.lbd);
+            _clause.lbd = 2;
         }
-        if (slotIdx < 0 || slotIdx >= _slots.size() || !conditional(clause)) {
-            continue;
+        assert(_clause.begin != nullptr);
+        assert(_clause.lbd <= _clause.size);
+
+        std::pair<int, int> lengthLbdPair(_clause.size, _clause.lbd);
+        if (lengthLbdPair != slotKey) {
+            slotKey = lengthLbdPair;
+            slotIdx = getSlotIdx(_clause.size, _clause.lbd);
         }
 
-        // Insert as many clauses as you can, setting cPtr to the first clause *not* added
-        bool success = _slots[slotIdx].insert(clause, producerId);
+        if (!conditional(_clause)) continue;
+
+        // Insert
+        //LOG(V2_INFO, "INSERT %s ~> %i\n", _clause.toStr().c_str(), slotIdx);
+        bool success = _slots[slotIdx].insert(_clause, producerId);
         if (success) numAdded++;
     }
 
@@ -135,115 +186,114 @@ void AdaptiveClauseDatabase::printChunks(int nextExportSize) {
     }
 }*/
 
-std::vector<int> AdaptiveClauseDatabase::exportBuffer(int sizeLimit, int& numExportedClauses, 
-        const int minClauseLength, const int maxClauseLength, bool sortClauses) {
+std::vector<int> AdaptiveClauseDatabase::exportBuffer(int totalLiteralLimit, int& numExportedClauses, 
+        ExportMode mode, bool sortClauses) {
 
-    int zero = 0;
     numExportedClauses = 0;
+    int numAddedLits = 0;
                 
-    std::vector<int> selection;
-    if (sizeLimit > 0) selection.reserve(sizeLimit);
-    size_t hash = 1;
+    BufferBuilder builder(totalLiteralLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
+    BufferIterator it(_max_clause_length, _slots_for_sum_of_length_and_lbd);
 
-    // Reserve space for checksum at the beginning of the buffer
-    int numInts = (sizeof(size_t)/sizeof(int));
-    for (int i = 0; i < numInts; i++) selection.push_back(0);
+    for (int slotIdx = 0; slotIdx < _slots.size(); slotIdx++) {
+        auto& slot = _slots[slotIdx];
 
-    BucketLabel bucket;
-    int bufIdx = 0;
-    int lastPushedCounterIdx = -1;
-    while ((sizeLimit < 0 || selection.size() < sizeLimit) 
-            && bufIdx < _slots.size()) {
+        int modeParam = slot.getModeParam();
+        if (mode == ExportMode::NONUNITS && modeParam == 1) continue;
+        if (mode == ExportMode::UNITS && modeParam != 1) break;
+
+        auto opMode = slot.getOperationMode();
+        bool differentLbdValues = opMode != BufferChunk::SAME_SIZE_AND_LBD;
+
+        // Fetch clauses
+        std::vector<int> exportedClauseInts;
+        int numDesiredLits = totalLiteralLimit == -1 ? -1 : totalLiteralLimit - numAddedLits;
+        int receivedClauses = slot.flush(numDesiredLits, exportedClauseInts);
+
+        //std::string str;
+        //for (int lit : exportedClauseInts) str += std::to_string(lit) + " ";
+        //LOG(V2_INFO, "EXP %s\n", str.c_str());
         
-        // Get size and LBD of current bucket
-        int clauseSize = bucket.size;
-        int clauseLbd = bucket.lbd;
+        if (differentLbdValues || sortClauses) {
+            // Sort clauses alphanumerically.
 
-        // Check that this bucket has the desired clause length
-        if ((minClauseLength < 0 || clauseSize >= minClauseLength) 
-            && (maxClauseLength < 0 || clauseSize <= maxClauseLength)) {
+            std::vector<int*> clausePointers(receivedClauses);
+            size_t pos = 0;
+            for (size_t i = 0; i < clausePointers.size(); i++) {
+                clausePointers[i] = exportedClauseInts.data()+pos;
+                int clauseLength = slot.getEffectiveExportedClauseLength(exportedClauseInts[pos]);
+                assert(clauseLength > 0);
+                assert(clauseLength <= 255);
+                pos += clauseLength;
+            }
 
-            // Counter integer for the clauses of this bucket
-            int counterPos;
-            bool partitionedByLbd = clauseSize <= _max_lbd_partitioned_size;
+            // Sort
+            if (opMode == BufferChunk::SAME_SUM) {
+                std::sort(clausePointers.begin(), clausePointers.end(), 
+                    InplaceClauseComparatorUniformSizeLbdSum(modeParam));
+            } else {
+                std::sort(clausePointers.begin(), clausePointers.end(), 
+                    InplaceClauseComparatorUniformSize(
+                        opMode == BufferChunk::SAME_SIZE_AND_LBD ? modeParam : modeParam+1
+                    )
+                );
+            }
 
-            // Fetch correct buffer list
-            int effectiveClsLen = clauseSize + (partitionedByLbd ? 0 : 1);
-            auto& buf = _slots[bufIdx];
-
-            // Fetch as many clauses as available and as there is space
-            if (sizeLimit < 0 || selection.size()+effectiveClsLen <= sizeLimit) {
-                // Write next clauses
+            // Insert clauses according to sorted pointers
+            for (size_t i = 0; i < clausePointers.size(); i++) {
                 
-                // Initialize clause counter(s) as necessary
-                while (lastPushedCounterIdx < bufIdx) {
-                    selection.push_back(0);
-                    counterPos = selection.size()-1;
-                    lastPushedCounterIdx++;
+                int* lits = clausePointers[i];
+                assert(!differentLbdValues || (lits[0] > 0 && lits[0] <= _max_clause_length));
+                int effectiveLength = slot.getEffectiveExportedClauseLength(lits[0]);
+                int trueLength = slot.getTrueExportedClauseLength(lits[0]);
+                assert(effectiveLength - trueLength <= 1);
+                int lbd = differentLbdValues ? lits[0] : _slot_lbd[slotIdx];
+                assert(lbd > 0 && lbd <= trueLength);
+                Clause c {lits+effectiveLength-trueLength, trueLength, lbd};
+
+                while (it.clauseLength != trueLength || it.lbd != lbd) {
+                    //LOG(V2_INFO, "%s GROUP (%i,%i)\n", c.toStr().c_str(), it.clauseLength, it.lbd);
+                    it.nextLengthLbdGroup();
+                    assert(it.clauseLength < 256);
                 }
-                
-                // Fetch clauses
-                size_t sizeBefore = selection.size();
-                int numDesired = sizeLimit < 0 ? -1 : (sizeLimit - selection.size()) / effectiveClsLen;
-                int received = buf.flush(numDesired, selection);
-                assert(selection.size()-sizeBefore == received*effectiveClsLen 
-                    || log_return_false("%i != %i!\n", selection.size()-sizeBefore, received*effectiveClsLen));
-                
-                // Update clause counter and stats
-                selection[counterPos] += received;
-                numExportedClauses += received;
 
-                if (sortClauses) {
-                    // Sort clauses alphanumerically
-                    assert((selection.size()-sizeBefore) % effectiveClsLen == 0);
-                    std::vector<int> clausesCopy(selection.data()+sizeBefore, selection.data()+selection.size());
-                    std::vector<int*> clausePointers(received);
-                    for (size_t i = 0; i < clausePointers.size(); i++) {
-                        clausePointers[i] = clausesCopy.data()+i*effectiveClsLen;
-                    }
-                    std::sort(clausePointers.begin(), clausePointers.end(), 
-                        InplaceClauseComparator(effectiveClsLen));
-                    for (size_t i = 0; i < clausePointers.size(); i++) {
-                        int* lits = clausePointers[i];
-                        for (size_t x = 0; x < effectiveClsLen; x++) {
-                            selection[sizeBefore+(effectiveClsLen*i)+x] = lits[x];
-                        }
-                    }
-                }
-                
-                if (_use_checksum) {
-                    for (size_t pos = sizeBefore; pos < selection.size(); pos += effectiveClsLen) {
-                        hash_combine(hash, ClauseHasher::hash(
-                            selection.data()+pos,
-                            clauseSize+(partitionedByLbd ? 0 : 1), 3
-                        ));
-                    }
-                }
+                numAddedLits += c.size;
+                assert(totalLiteralLimit == -1 || numAddedLits <= totalLiteralLimit);
+                bool success = builder.append(c);
+                assert(success);
+                numExportedClauses++;
+            }
+
+        } else if (!exportedClauseInts.empty()) {
+
+            // Insert clauses one by one
+            Clause c {nullptr, modeParam, _slot_lbd[slotIdx]};
+            assert(c.lbd > 0);
+            while (it.clauseLength != c.size || it.lbd != c.lbd) {
+                //LOG(V2_INFO, "len=%i lbd=%i: GROUP (%i,%i)\n", c.size, c.lbd, it.clauseLength, it.lbd);
+                it.nextLengthLbdGroup();
+                assert(it.clauseLength < 256);
+            }
+            for (size_t i = 0; i+c.size <= exportedClauseInts.size(); i += c.size) {
+                numAddedLits += c.size;
+                assert(totalLiteralLimit == -1 || numAddedLits <= totalLiteralLimit);
+                c.begin = exportedClauseInts.data() + i;
+                bool success = builder.append(c);
+                assert(success);
+                numExportedClauses++;
             }
         }
-
-        // Proceed to next bucket
-        bucket.next(_max_lbd_partitioned_size);
-        bufIdx++;
     }
 
-    // Remove trailing zeroes
-    size_t lastNonzeroIdx = selection.size()-1;
-    while (lastNonzeroIdx > 0 && selection[lastNonzeroIdx] == 0) lastNonzeroIdx--;
-    selection.resize(lastNonzeroIdx+1);
-
-    // Write final hash checksum
-    memcpy(selection.data(), &hash, sizeof(size_t));
-
-    return selection;
+    return builder.extractBuffer();
 }
 
 BufferReader AdaptiveClauseDatabase::getBufferReader(int* begin, size_t size, bool useChecksums) {
-    return BufferReader(begin, size, _max_lbd_partitioned_size, useChecksums);
+    return BufferReader(begin, size, _max_clause_length, _slots_for_sum_of_length_and_lbd, useChecksums);
 }
 
-BufferMerger AdaptiveClauseDatabase::getBufferMerger() {
-    return BufferMerger(_max_lbd_partitioned_size, _use_checksum);
+BufferMerger AdaptiveClauseDatabase::getBufferMerger(int sizeLimit) {
+    return BufferMerger(sizeLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd, _use_checksum);
 }
 
 ClauseHistogram& AdaptiveClauseDatabase::getDeletedClausesHistogram() {
@@ -251,17 +301,15 @@ ClauseHistogram& AdaptiveClauseDatabase::getDeletedClausesHistogram() {
 }
 
 size_t AdaptiveClauseDatabase::getSlotIdx(int clauseSize, int lbd) {
-    
-    const int mlbdps = _max_lbd_partitioned_size;
-    const int numPartitionedLengthsBefore = std::min(clauseSize-1, mlbdps);
-    const int numPartitionedSlotsBefore = numPartitionedLengthsBefore == 0 ? 
-        0 : 1 + numPartitionedLengthsBefore*(numPartitionedLengthsBefore-1) / 2;
-    const int numNonpartitionedSlotsBefore = std::max(0, clauseSize - mlbdps - 1);
-    const bool isLbdPartitioned = clauseSize <= mlbdps;
-    
-    const size_t index = numPartitionedSlotsBefore + numNonpartitionedSlotsBefore 
-        + (isLbdPartitioned ? std::max(lbd, 2)-2 : 0);
-    
-    if (index < _slots.size()) return index;
-    else return -1;
+    assert(lbd >= 1);
+    assert(clauseSize == 1 || lbd >= 2 || log_return_false("(%i,%i) invalid length-clause combination!\n", clauseSize, lbd));
+    assert(lbd <= clauseSize);
+    auto pair = std::pair<int, int>(clauseSize, lbd);
+    assert(_size_lbd_to_slot_idx.count(pair) 
+        || log_return_false("(%i,%i) not a valid slot!\n", pair.first, pair.second));
+    return _size_lbd_to_slot_idx.at(pair);
+}
+
+BucketLabel AdaptiveClauseDatabase::getBucketIterator() {
+    return _bucket_iterator;
 }

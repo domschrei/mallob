@@ -156,10 +156,10 @@ public:
             if (isBatchComplete(index)) {
                 // Merge with prior clauses at that index
                 LOG(V4_VVER, "CLSHIST Merging index ...\n");
-                auto merger = _cdb.getBufferMerger();
+                auto merger = _cdb.getBufferMerger(isShorttermMemory(index) ? _stm_buffer_size : _ltm_buffer_size);
                 for (auto& clsbuf : _history[index].clauses)
                     merger.add(_cdb.getBufferReader(clsbuf.data(), clsbuf.size(), /*useChecksums=*/false));
-                auto merged = merger.merge(isShorttermMemory(index) ? _stm_buffer_size : _ltm_buffer_size);
+                auto merged = merger.merge();
                 _history[index].clauses.resize(1);
                 _history[index].clauses[0] = std::move(merged);
                 LOG(V3_VERB, "CLSHIST %s : Merged index %i (epochs %i..%i) into buf size %i\n", 

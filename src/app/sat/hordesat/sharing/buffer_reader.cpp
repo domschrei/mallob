@@ -2,9 +2,8 @@
 #include "buffer_reader.hpp"
 #include "util/logger.hpp"
 
-BufferReader::BufferReader(int* buffer, int size, int maxLbdPartitionedSize, bool useChecksum) : 
-        _buffer(buffer), _size(size), 
-        _max_lbd_partitioned_size(maxLbdPartitionedSize), _use_checksum(useChecksum) {
+BufferReader::BufferReader(int* buffer, int size, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) : 
+        _buffer(buffer), _size(size), _it(maxClauseLength, slotsForSumOfLengthAndLbd), _use_checksum(useChecksum) {
     
     int numInts = sizeof(size_t)/sizeof(int);
     if (_use_checksum && _size > 0) {
@@ -17,9 +16,8 @@ BufferReader::BufferReader(int* buffer, int size, int maxLbdPartitionedSize, boo
     assert(_remaining_cls_of_bucket >= 0);
     _current_pos = numInts+1;
     _hash = 1;
-    _effective_clause_size = _bucket.size;
-    _current_clause.size = _bucket.size;
-    _current_clause.lbd = _bucket.lbd;
+    _current_clause.size = _it.clauseLength;
+    _current_clause.lbd = _it.lbd;
 }
 
 const Mallob::Clause& BufferReader::endReading() {

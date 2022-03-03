@@ -19,13 +19,16 @@ DefaultSharingManager::DefaultSharingManager(
 	: _solvers(solvers), _process_filter(/*maxClauseLen=*/params.strictClauseLengthLimit()), 
 	_max_deferred_lits_per_solver(maxDeferredLitsPerSolver), 
 	_params(params), _logger(logger), _job_index(jobIndex),
-	_cdb(
-		/*maxClauseSize=*/_params.strictClauseLengthLimit(),
-		/*maxLbdPartitionedSize=*/_params.maxLbdPartitioningSize(),
-		/*baseBufferSize=*/_params.clauseBufferBaseSize(),
-		/*numChunks=*/_params.numChunksForExport(),
-		/*numProducers=*/_solvers.size()+1
-	), _hist_produced(params.strictClauseLengthLimit()), 
+	_cdb([&]() {
+		AdaptiveClauseDatabase::Setup setup;
+		setup.maxClauseLength = _params.strictClauseLengthLimit();
+		setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
+		setup.chunkSize = _params.clauseBufferBaseSize();
+		setup.numChunks = _params.numChunksForExport();
+		setup.numProducers = _solvers.size()+1;
+		setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
+		return setup;
+	}()), _hist_produced(params.strictClauseLengthLimit()), 
 	_hist_failed_filter(params.strictClauseLengthLimit()),
 	_hist_admitted_to_db(params.strictClauseLengthLimit()), 
 	_hist_dropped_before_db(params.strictClauseLengthLimit()),
@@ -49,22 +52,19 @@ DefaultSharingManager::DefaultSharingManager(
 	_last_buffer_clear = Timer::elapsedSeconds();
 }
 
-int DefaultSharingManager::prepareSharing(int* begin, int maxSize) {
+int DefaultSharingManager::prepareSharing(int* begin, int totalLiteralLimit) {
 
     //log(V5_DEBG, "Sharing clauses among %i nodes\n", size);
     static int prodInc = 1;
 	static int lastInc = 0;
 
 	int numExportedClauses = 0;
-	auto buffer = _cdb.exportBuffer(maxSize, numExportedClauses);
-	assert(buffer.size() <= maxSize);
+	auto buffer = _cdb.exportBuffer(totalLiteralLimit, numExportedClauses);
+	//assert(buffer.size() <= maxSize);
 	memcpy(begin, buffer.data(), buffer.size()*sizeof(int));
 
 	LOGGER(_logger, V5_DEBG, "prepared %i clauses, size %i\n", numExportedClauses, buffer.size());
 	_stats.exportedClauses += numExportedClauses;
-	float usedRatio = ((float)buffer.size())/maxSize;
-	LOGGER(_logger, V5_DEBG, "buffer fillratio=%.3f\n", usedRatio);
-	
 	return buffer.size();
 }
 
@@ -208,6 +208,25 @@ void DefaultSharingManager::processClause(int solverId, int solverRevision, cons
 		clauseSize++;
 	}
 
+	/*
+	if (clauseSize == 1 && clause.lbd != 1) {
+		_logger.log(V1_WARN, "Observed unit LBD of %i\n", clause.lbd);
+	}
+	if (clauseSize > 1) {
+		_observed_nonunit_lbd_of_zero |= clause.lbd == 0;
+		_observed_nonunit_lbd_of_one |= clause.lbd == 1;
+		_observed_nonunit_lbd_of_two |= clause.lbd == 2;
+		_observed_nonunit_lbd_of_length_minus_one |= clause.lbd == clause.size-1;
+		_observed_nonunit_lbd_of_length |= clause.lbd == clause.size;
+	}
+	*/
+
+	if (clauseSize == 1) assert(clause.lbd == 1);
+	else {
+		assert(clause.lbd >= 2);
+		assert(clause.lbd <= clause.size);
+	}
+
 	// Add clause length to statistics
 	_hist_produced.increment(clauseSize);
 
@@ -232,7 +251,7 @@ void DefaultSharingManager::processClause(int solverId, int solverRevision, cons
 	
 	// Sort and write clause into database if possible
 	std::sort(clauseBegin, clauseBegin+clauseSize);
-	Clause tldClause(clauseBegin, clauseSize, clauseSize == 1 ? 1 : (clauseSize == 2 ? 2 : clause.lbd));
+	Clause tldClause(clauseBegin, clauseSize, clause.lbd);
 	success = _cdb.addClause(solverId, tldClause);
 	if (success) {
 		success = true;
@@ -266,6 +285,14 @@ void DefaultSharingManager::returnClauses(int* begin, int buflen) {
 }
 
 SharingStatistics DefaultSharingManager::getStatistics() {
+	/*
+	_logger.log(V2_INFO, "Observed non-unit LBDs: 0:%i 1:%i 2:%i len-1:%i len:%i\n", 
+		_observed_nonunit_lbd_of_zero, 
+		_observed_nonunit_lbd_of_one, 
+		_observed_nonunit_lbd_of_two, 
+		_observed_nonunit_lbd_of_length_minus_one, 
+		_observed_nonunit_lbd_of_length);
+	*/
 	return _stats;
 }
 
@@ -281,3 +308,5 @@ void DefaultSharingManager::continueClauseImport(int solverId) {
 	_solvers[solverId]->setExtLearnedClauseCallback(getCallback());
 	_solver_stats[solverId] = &_solvers[solverId]->getSolverStatsRef();
 }
+
+DefaultSharingManager::~DefaultSharingManager() {}

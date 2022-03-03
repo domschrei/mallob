@@ -45,7 +45,7 @@
 
 // Log macros for users where the static log function is used
 #define LOG(VERB, ...) LOGGER_LOG(Logger::getMainInstance().log, VERB, VERB, __VA_ARGS__)
-#define LOG_RETURN_FALSE(...) LOGGER_LOG(log_return_false, 0, 0, __VA_ARGS__)
+#define LOG_RETURN_FALSE(...) log_return_false(__VA_ARGS__)
 #define LOG_ADD_DEST(VERB, ...) LOGGER_LOG(Logger::getMainInstance().log, VERB, VERB | LOG_ADD_DESTRANK, __VA_ARGS__)
 #define LOG_ADD_SRC(VERB, ...) LOGGER_LOG(Logger::getMainInstance().log, VERB, VERB | LOG_ADD_SRCRANK, __VA_ARGS__)
 #define LOG_OMIT_PREFIX(VERB, ...) LOGGER_LOG(Logger::getMainInstance().log, VERB, VERB | LOG_NO_PREFIX, __VA_ARGS__)

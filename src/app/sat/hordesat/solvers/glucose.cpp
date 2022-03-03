@@ -336,7 +336,7 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 bool MGlucose::parallelImportClauses() {
 
 	Mallob::Clause importedClause;
-	while (fetchLearnedClause(importedClause, ImportBuffer::NONUNITS_ONLY)) {
+	while (fetchLearnedClause(importedClause, AdaptiveClauseDatabase::NONUNITS)) {
 		assert(importedClause.size > 1);
 
 		// Assemble Glucose-style clause

@@ -86,7 +86,7 @@ int PortfolioSolverInterface::addLearnedClauses(const std::vector<Mallob::Clause
 	return _import_buffer.bulkAdd(clauses, conditional);
 }
 
-bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, ImportBuffer::GetMode mode) {
+bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, AdaptiveClauseDatabase::ExportMode mode) {
 	clauseOut = _import_buffer.get(mode);
 	return clauseOut.begin != nullptr && clauseOut.size >= 1;
 }

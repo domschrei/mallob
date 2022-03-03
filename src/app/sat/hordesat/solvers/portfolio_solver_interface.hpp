@@ -162,7 +162,7 @@ public:
 		std::function<bool(const Clause&)> conditional);
 
 	// Within the solver, fetch a clause that was previously added as a learned clause.
-	bool fetchLearnedClause(Mallob::Clause& clauseOut, ImportBuffer::GetMode mode = ImportBuffer::ANY);
+	bool fetchLearnedClause(Mallob::Clause& clauseOut, AdaptiveClauseDatabase::ExportMode mode = AdaptiveClauseDatabase::ANY);
 	std::vector<int> fetchLearnedUnitClauses();
 
 

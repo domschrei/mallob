@@ -14,27 +14,31 @@
 
 class BufferChunk {
 
+public:
+    enum Mode {SAME_SUM, SAME_SIZE, SAME_SIZE_AND_LBD};
+
 private:
-    UniformSizeClauseRingBuffer* _ringbuf = nullptr;
+    Mode _mode;
+    int _mode_param;
+
+    RingBufferV2* _ringbuf = nullptr;
     int _size;
-    int _elem_length;
     int _num_producers;
 
     std::atomic_int _edit_memory_state {MEM_STATE_AVAILABLE};
 
 public:
     BufferChunk() {}
-    BufferChunk(int size, int elemLength, bool explicitLbd, int numProducers) :  
-        _ringbuf(explicitLbd ? 
-            new UniformSizeClauseRingBuffer(size, elemLength-1, numProducers+1) : 
-            new UniformClauseRingBuffer(size, elemLength, numProducers+1)
-        ), _size(size), _elem_length(elemLength), _num_producers(numProducers) {
-
-        LOG(V5_DEBG, "size=%i elemLen=%i explicitLbd=%i\n", size, elemLength, explicitLbd?1:0);
-    }
+    BufferChunk(int size, Mode mode, int modeParam, int numProducers) :  
+        _mode(mode),
+        _mode_param(modeParam),
+        _ringbuf(mode == SAME_SIZE_AND_LBD ? 
+            new RingBufferV2(size, /*elemLength=*/modeParam, numProducers+1) : 
+            new RingBufferV2(size, numProducers+1, nullptr)
+        ), _size(size), _num_producers(numProducers) {}
     BufferChunk(BufferChunk&& moved) : 
-        _ringbuf(moved._ringbuf), _size(moved._size), 
-        _elem_length(moved._elem_length), _num_producers(moved._num_producers) {
+        _mode(moved._mode), _mode_param(moved._mode_param), _ringbuf(moved._ringbuf), 
+        _size(moved._size), _num_producers(moved._num_producers) {
         moved._size = 0;
         moved._ringbuf = nullptr;
     }
@@ -42,12 +46,20 @@ public:
         if (_ringbuf != nullptr) delete _ringbuf;
     }
     
-    bool tryInsert(const Mallob::Clause& c, int producerId) {
+    bool tryInsert(const int* data, int producerId, int lbd = 0) {
 
         // Acquire reader status in memory state (busy waiting)
         acquireReaderStatus();
 
-        bool success = _ringbuf->insertClause(c, producerId);
+        bool success;
+        if (useHeaderBytePerClause()) {
+            assert(lbd > 0);
+            uint8_t headerByte = (uint8_t) lbd;
+            int length = getNumLiterals(lbd);
+            success = _ringbuf->produce(data, producerId, length, headerByte);
+        } else {
+            success = _ringbuf->produce(data, producerId);
+        }
 
         // Release reader status in memory state
         releaseReaderStatus();
@@ -55,14 +67,27 @@ public:
         return success;
     }
 
-    bool fetch(std::vector<int>& vec) {
+    bool fetch(std::vector<int>& vec, int maxNumLiterals = -1) {
 
         // Acquire reader status in memory state (busy waiting)
         acquireReaderStatus();
 
-        size_t sizeBefore = vec.size();
-        bool success = _ringbuf->getClause(vec);
-        if (success) assert(vec.size() == sizeBefore+_elem_length || log_return_false("%i != %i+%i\n", vec.size(), sizeBefore, _elem_length));
+        bool success;
+        if (useHeaderBytePerClause()) {
+            uint8_t lbd;
+            success = _ringbuf->getNextHeaderByte(lbd);
+            if (success) {
+                int elemLength = getNumLiterals(lbd);
+                if (maxNumLiterals == -1 || elemLength <= maxNumLiterals) {
+                    success = _ringbuf->consume(elemLength, vec);
+                    assert(success);
+                } else success = false;
+            }
+        } else {
+            if (maxNumLiterals == -1 || _mode_param <= maxNumLiterals) 
+                success = _ringbuf->consume(vec);
+            else success = false;
+        }
 
         // Release reader status in memory state
         releaseReaderStatus();
@@ -76,15 +101,93 @@ public:
         acquireReaderStatus();
 
         // Swap out the current memory with the provided "empty" swap memory
-        size_t size = _ringbuf->flushBufferUnsafe(swappedMemory);
+        size_t numBytes = _ringbuf->flushBuffer(swappedMemory);
 
         // Release writer status in memory state
         releaseReaderStatus();
 
-        return size;
+        return numBytes;
+    }
+
+    int extractFromChunkAndInsertRemaining(int* data, size_t numBytesInData, 
+            std::vector<int>& out, int& totalLiteralLimit) {
+        
+        int read = 0;
+        
+        if (useHeaderBytePerClause()) {
+            // Extract mixed clauses where a single header byte contains the LBD
+            // and also encodes the clause's size 
+            uint8_t* bytes = (uint8_t*) data;
+            int byteCounter = 0;
+            while (byteCounter < numBytesInData) {
+                uint8_t lbd = bytes[byteCounter];
+                int elemLength = getNumLiterals(lbd);
+                if (totalLiteralLimit == -1 || elemLength <= totalLiteralLimit) {
+                    // Fits
+                    out.push_back((int)lbd);
+                    out.insert(out.end(), (int*)(bytes+byteCounter+1), ((int*)(bytes+byteCounter+1))+elemLength);
+                    read++;
+                    if (totalLiteralLimit != -1) totalLiteralLimit -= elemLength;
+                } else {
+                    // Does not fit any more: Try to insert into local chunk
+                    tryInsert((int*) (bytes+byteCounter+1), _num_producers, lbd);
+                }
+                byteCounter += 1+elemLength*sizeof(int);
+            }
+        } else {
+            // Extract clauses of fixed uniform size
+            const int elemLength = _mode_param;
+            int intCounter = 0;
+            // While provided data buffer is not fully read
+            while (sizeof(int)*(intCounter+elemLength) <= numBytesInData) {
+                // Does next clause fit?
+                if (totalLiteralLimit == -1 || elemLength <= totalLiteralLimit) {
+                    // Fits
+                    out.insert(out.end(), data+intCounter, data+intCounter+elemLength);
+                    read++;
+                    if (totalLiteralLimit != -1) totalLiteralLimit -= elemLength;
+                } else {
+                    // Does not fit any more: Try to insert into local chunk 
+                    tryInsert(data+intCounter, _num_producers);
+                }
+                intCounter += elemLength;
+            }
+        }
+
+        return read;
+    }
+
+    inline Mode getOperationMode() const {return _mode;}
+    inline int getModeParam() const {return _mode_param;}
+
+    inline int getTrueExportedClauseLength(int firstInt) const {
+        if (_mode == BufferChunk::SAME_SUM) {
+            return _mode_param - firstInt;
+        }
+        return _mode_param;
+    }
+
+    inline int getEffectiveExportedClauseLength(int firstInt) const {
+        if (_mode == BufferChunk::SAME_SUM) {
+            return _mode_param - firstInt + 1;
+        }
+        return _mode_param + (_mode == BufferChunk::SAME_SIZE_AND_LBD ? 0 : 1);
     }
 
 private:
+
+    inline bool useHeaderBytePerClause() const {
+        return _mode != SAME_SIZE_AND_LBD;
+    }
+
+    inline int getNumLiterals(int lbd) const {
+        if (_mode == BufferChunk::SAME_SUM) {
+            int numLits = _mode_param - lbd;
+            assert(lbd <= numLits || log_return_false("LBD=%i at SAME_SUM param=%i!\n", lbd, _mode_param));
+            return numLits;
+        }
+        return _mode_param;
+    }
 
     void acquireReaderStatus() {
         // Want to go from a number equal or larger than AVAILABLE to that number +1 

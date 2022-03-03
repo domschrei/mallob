@@ -288,7 +288,8 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
         return REJECT;
     }
 
-    if (hasScheduler(req.jobId, req.requestedNodeIndex) && !getScheduler(req.jobId, req.requestedNodeIndex).canCommit()) {
+    if (req.requestedNodeIndex > 0 && hasScheduler(req.jobId, req.requestedNodeIndex) 
+            && !getScheduler(req.jobId, req.requestedNodeIndex).canCommit()) {
         LOG(V1_WARN, "%s : still have an active scheduler of this node!\n", req.toStr().c_str());
         return REJECT;
     }

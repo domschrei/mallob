@@ -69,13 +69,19 @@ protected:
 
 	int _current_revision = -1;
 
+	bool _observed_nonunit_lbd_of_zero = false;
+	bool _observed_nonunit_lbd_of_one = false;
+	bool _observed_nonunit_lbd_of_two = false;
+	bool _observed_nonunit_lbd_of_length = false;
+	bool _observed_nonunit_lbd_of_length_minus_one = false;
+
 public:
 	DefaultSharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
 			const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver,
 			int jobIndex);
-	~DefaultSharingManager() = default;
+	~DefaultSharingManager();
 
-    int prepareSharing(int* begin, int maxSize);
+    int prepareSharing(int* begin, int totalLiteralLimit);
     void returnClauses(int* begin, int buflen);
 
 	void digestSharing(std::vector<int>& result);

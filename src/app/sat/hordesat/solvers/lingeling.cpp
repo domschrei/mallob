@@ -212,7 +212,8 @@ void Lingeling::doProduce(int* cls, int glue) {
 		doProduceUnit(cls[0]);
 		return;
 	}
-	
+	// In Lingeling, LBD scores are represented from 1 to len-1. => Increment LBD.
+	glue++;
 	// LBD score check
 	if (glueLimit != 0 && glue > (int)glueLimit) {
 		return;
@@ -223,7 +224,8 @@ void Lingeling::doProduce(int* cls, int glue) {
 	while (cls[i++] != 0) size++;
 	assert(size > 1);
 	if (size > sizeLimit) return;
-	
+	assert(glue <= size);
+
 	// export clause
 	numProduced++;
 	callback(Clause(cls, size, glue), getLocalId());
@@ -246,7 +248,7 @@ void Lingeling::doConsume(int** clause, int* glue) {
 	*clause = nullptr;
 
 	Mallob::Clause c;
-	bool success = fetchLearnedClause(c, ImportBuffer::NONUNITS_ONLY);
+	bool success = fetchLearnedClause(c, AdaptiveClauseDatabase::NONUNITS);
 	if (!success) return;
 
 	// Assemble a zero-terminated array of all the literals
@@ -263,7 +265,8 @@ void Lingeling::doConsume(int** clause, int* glue) {
 	}
 	zeroTerminatedClause[c.size] = 0;
 
-	*glue = c.lbd;
+	// In Lingeling, LBD scores are represented from 1 to len-1. => Decrement LBD.
+	*glue = c.lbd-1;
 	*clause = zeroTerminatedClause.data();
 }
 

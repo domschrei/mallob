@@ -284,11 +284,11 @@ void AnytimeSatClauseCommunicator::initiateMergeOfClauseBuffers() {
     // Start asynchronous task to merge the clause buffers 
     _is_merging = true;
     _merge_future = ProcessWideThreadPool::get().addTask([this, totalSize]() {
-        auto merger = _cdb.getBufferMerger();
+        auto merger = _cdb.getBufferMerger(totalSize);
         for (auto& buffer : _clause_buffers_being_merged) {
             merger.add(_cdb.getBufferReader(buffer.data(), buffer.size()));
         }    
-        std::vector<int> result = merger.merge(totalSize, &_excess_clauses_from_merge);
+        std::vector<int> result = merger.merge(&_excess_clauses_from_merge);
         _clause_buffers_being_merged.resize(1);
         _clause_buffers_being_merged.front() = std::move(result);
         _is_done_merging = true;

@@ -19,7 +19,7 @@ Cadical::Cadical(const SolverSetup& setup)
 	  solver(new CaDiCaL::Solver), terminator(*setup.logger), 
 	  learner(_setup), learnSource(_setup, [this]() {
 		  Mallob::Clause c;
-		  fetchLearnedClause(c, ImportBuffer::ANY);
+		  fetchLearnedClause(c, AdaptiveClauseDatabase::ANY);
 		  return c;
 	  }) {
 	
