@@ -216,7 +216,7 @@ public:
         return out;
     }
 
-    size_t flushBuffer(uint8_t* otherBuffer) {
+    size_t flushBuffer(uint8_t* out) {
 
         auto lock = _consume_mutex.getLock();
 

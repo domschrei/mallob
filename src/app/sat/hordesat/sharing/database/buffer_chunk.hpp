@@ -54,7 +54,7 @@ public:
         bool success;
         if (useHeaderBytePerClause()) {
             
-            assert(lbd > 0 || log_return_false("[ERROR] lbd=%i @ insert - slot mode=%i param=%i\n", 
+            assert((lbd > 0 && lbd <= 255) || log_return_false("[ERROR] lbd=%i @ insert - slot mode=%i param=%i\n", 
                     (int)lbd, _mode, _mode_param));
 
             uint8_t headerByte = (uint8_t) lbd;
@@ -98,13 +98,13 @@ public:
         return success;
     }
 
-    size_t flushBuffer(uint8_t* swappedMemory) {
+    size_t flushBuffer(uint8_t* out) {
 
         // Acquire writer status in memory state (busy waiting)
         acquireReaderStatus();
 
         // Swap out the current memory with the provided "empty" swap memory
-        size_t numBytes = _ringbuf->flushBuffer(swappedMemory);
+        size_t numBytes = _ringbuf->flushBuffer(out);
 
         // Release writer status in memory state
         releaseReaderStatus();
@@ -125,8 +125,12 @@ public:
             while (byteCounter < numBytesInData) {
                 uint8_t lbd = bytes[byteCounter];
                 
-                assert(lbd > 0 || log_return_false("[ERROR] lbd=%i @ byte %i/%i of full chunk - slot mode=%i param=%i\n", 
-                    (int)lbd, byteCounter, numBytesInData, _mode, _mode_param));
+                if (lbd <= 0) {
+                    std::string out;
+                    for (size_t i = 0; i < numBytesInData; i++) out += std::to_string(bytes[i]) + " ";
+                    assert(lbd > 0 || log_return_false("[ERROR] lbd=%i @ byte %i/%i of full chunk - slot mode=%i param=%i - %s\n", 
+                        (int)lbd, byteCounter, numBytesInData, _mode, _mode_param, out.c_str()));
+                }
 
                 int elemLength = getNumLiterals(lbd);
                 if (totalLiteralLimit == -1 || elemLength <= totalLiteralLimit) {
