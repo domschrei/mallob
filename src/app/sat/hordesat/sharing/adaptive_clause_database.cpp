@@ -208,6 +208,7 @@ std::vector<int> AdaptiveClauseDatabase::exportBuffer(int totalLiteralLimit, int
         // Fetch clauses
         std::vector<int> exportedClauseInts;
         int numDesiredLits = totalLiteralLimit == -1 ? -1 : totalLiteralLimit - numAddedLits;
+        assert(numDesiredLits >= -1);
         int receivedClauses = slot.flush(numDesiredLits, exportedClauseInts);
 
         //std::string str;

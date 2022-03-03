@@ -53,7 +53,10 @@ public:
 
         bool success;
         if (useHeaderBytePerClause()) {
-            assert(lbd > 0);
+            
+            assert(lbd > 0 || log_return_false("[ERROR] lbd=%i @ insert - slot mode=%i param=%i\n", 
+                    (int)lbd, _mode, _mode_param));
+
             uint8_t headerByte = (uint8_t) lbd;
             int length = getNumLiterals(lbd);
             success = _ringbuf->produce(data, producerId, length, headerByte);
@@ -121,6 +124,10 @@ public:
             int byteCounter = 0;
             while (byteCounter < numBytesInData) {
                 uint8_t lbd = bytes[byteCounter];
+                
+                assert(lbd > 0 || log_return_false("[ERROR] lbd=%i @ byte %i/%i of full chunk - slot mode=%i param=%i\n", 
+                    (int)lbd, byteCounter, numBytesInData, _mode, _mode_param));
+
                 int elemLength = getNumLiterals(lbd);
                 if (totalLiteralLimit == -1 || elemLength <= totalLiteralLimit) {
                     // Fits
