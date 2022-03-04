@@ -149,7 +149,7 @@ public:
             numIntegers = _bytes_per_elem/sizeof(int);
         } else {
             assert(_mode == OperationMode::INDIVIDUAL_SIZES);
-            assert(0 <= numIntegers && numIntegers <= 255);
+            assert(0 < numIntegers && numIntegers <= 255);
         }
         assert(producerId >= 0 || LOG_RETURN_FALSE("producer ID %i\n", producerId));
         assert(producerId < _producers.size() || LOG_RETURN_FALSE("producer ID %i\n", producerId));
@@ -173,6 +173,8 @@ public:
     // If no elements are ready for consumption, returns false.
     bool getNextHeaderByte(uint8_t& peekedNumber) {
         assert(_mode == OperationMode::INDIVIDUAL_SIZES);
+        
+        auto lock = _consume_mutex.getLock();
         refillConsumeBuffer();
         if (_num_consumed_bytes == 0) return false;
         
@@ -186,6 +188,7 @@ public:
     // from the result of getNextHeaderByte). The provided vector will append an integer
     // containing the header byte followed by numIntegers integers with the actual payload.
     bool consume(int numIntegers, std::vector<int>& out) {
+        auto lock = _consume_mutex.getLock();
         refillConsumeBuffer();
         if (_num_consumed_bytes == 0) return false;
 
@@ -201,9 +204,27 @@ public:
         _num_consumed_bytes -= indicatorIndivSizes+numIntegers*sizeof(int); // "resize" consume buffer
         return true;
     }
+    bool consume(int numIntegers, uint8_t*& out) {
+        auto lock = _consume_mutex.getLock();
+        refillConsumeBuffer();
+        if (_num_consumed_bytes == 0) return false;
 
+        int start = _consumed_buffer.size() - _num_consumed_bytes;
+        int indicatorIndivSizes = (_mode == INDIVIDUAL_SIZES ? 1:0);
+        if (_mode == INDIVIDUAL_SIZES) out[0] = _consumed_buffer[start];
+        memcpy(out+indicatorIndivSizes, _consumed_buffer.data()+start+indicatorIndivSizes, 
+            numIntegers*sizeof(int));
+        _num_consumed_bytes -= indicatorIndivSizes+numIntegers*sizeof(int); // "resize" consume buffer
+        out += indicatorIndivSizes+numIntegers*sizeof(int);
+        return true;
+    }
+    
     // Only for UNIFORM_SIZE: Consume the next element and append it to the provided vector.
     bool consume(std::vector<int>& out) {
+        assert(_mode == UNIFORM_SIZE);
+        return consume(_bytes_per_elem/sizeof(int), out);
+    }
+    bool consume(uint8_t*& out) {
         assert(_mode == UNIFORM_SIZE);
         return consume(_bytes_per_elem/sizeof(int), out);
     }
@@ -214,26 +235,6 @@ public:
         free(_ringbuf);
         _ringbuf = nullptr;
         return out;
-    }
-
-    size_t flushBuffer(uint8_t* out) {
-
-        auto lock = _consume_mutex.getLock();
-
-        // Flush ring buffer into provided swap buffer
-        size_t offset;
-        size_t consumedSize = ringbuf_consume(_ringbuf, &offset);
-        size_t writePosition = 0;
-        while (consumedSize > 0) {
-            memcpy((void*)(otherBuffer+writePosition), 
-                    (void*)(_data+offset), 
-                    consumedSize);
-            writePosition += consumedSize;
-            ringbuf_release(_ringbuf, consumedSize);
-            consumedSize = ringbuf_consume(_ringbuf, &offset);
-        }
-        // Return end of written data
-        return writePosition;
     }
 
     size_t getCapacity() const {
@@ -259,11 +260,11 @@ private:
             _producers.push_back(ringbuf_register(_ringbuf, /*worker_id=*/i));
         }
         if (_data == nullptr) _data = (uint8_t*)malloc(_capacity_bytes);
+        _consumed_buffer.reserve(_capacity_bytes);
     }
     void refillConsumeBuffer() {
         if (_num_consumed_bytes > 0) return;
         // Fetch batch of clauses from ringbuffer
-        if (!_consume_mutex.tryLock()) return;
         size_t offset;
         _num_consumed_bytes = ringbuf_consume(_ringbuf, &offset);
         if (_num_consumed_bytes > 0) {
@@ -273,7 +274,6 @@ private:
                     _num_consumed_bytes);
             ringbuf_release(_ringbuf, _num_consumed_bytes);   
         }
-        _consume_mutex.unlock();
     }
 };
 

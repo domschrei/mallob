@@ -70,7 +70,8 @@ public:
         return success;
     }
 
-    bool fetch(std::vector<int>& vec, int maxNumLiterals = -1) {
+    template <typename T>
+    bool fetch(T& output, int maxNumLiterals = -1) {
 
         // Acquire reader status in memory state (busy waiting)
         acquireReaderStatus();
@@ -82,13 +83,13 @@ public:
             if (success) {
                 int elemLength = getNumLiterals(lbd);
                 if (maxNumLiterals == -1 || elemLength <= maxNumLiterals) {
-                    success = _ringbuf->consume(elemLength, vec);
+                    success = _ringbuf->consume(elemLength, output);
                     assert(success);
                 } else success = false;
             }
         } else {
             if (maxNumLiterals == -1 || _mode_param <= maxNumLiterals) 
-                success = _ringbuf->consume(vec);
+                success = _ringbuf->consume(output);
             else success = false;
         }
 
@@ -103,13 +104,21 @@ public:
         // Acquire writer status in memory state (busy waiting)
         acquireReaderStatus();
 
-        // Swap out the current memory with the provided "empty" swap memory
-        size_t numBytes = _ringbuf->flushBuffer(out);
+        uint8_t* currentPointer = out;
+        uint8_t* end = out + sizeof(int)*_size;
+        while (true) {
+            auto remainingBytes = end - currentPointer;
+            int remainingLits = (remainingBytes-1) / sizeof(int);
+            if (remainingLits <= 0) break;
+            bool success = fetch(currentPointer, remainingLits);
+            if (!success) break;
+        }
+        assert(end - currentPointer >= 0);
 
         // Release writer status in memory state
         releaseReaderStatus();
 
-        return numBytes;
+        return currentPointer - out;
     }
 
     int extractFromChunkAndInsertRemaining(int* data, size_t numBytesInData, 
