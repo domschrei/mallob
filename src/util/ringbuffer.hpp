@@ -174,13 +174,13 @@ public:
     bool getNextHeaderByte(uint8_t& peekedNumber) {
         assert(_mode == OperationMode::INDIVIDUAL_SIZES);
         
-        auto lock = _consume_mutex.getLock();
         refillConsumeBuffer();
-        if (_num_consumed_bytes == 0) return false;
-        
-        int start = _consumed_buffer.size() - _num_consumed_bytes;
-        peekedNumber = _consumed_buffer[start];
-        return true;
+        if (_num_consumed_bytes != 0) {
+            int start = _consumed_buffer.size() - _num_consumed_bytes;
+            peekedNumber = _consumed_buffer[start];
+            return true;
+        }
+        return false;
     }
 
     // Only for INDIVIDUAL_SIZES: Consume the next element. The size of this element
@@ -188,35 +188,38 @@ public:
     // from the result of getNextHeaderByte). The provided vector will append an integer
     // containing the header byte followed by numIntegers integers with the actual payload.
     bool consume(int numIntegers, std::vector<int>& out) {
-        auto lock = _consume_mutex.getLock();
+        
         refillConsumeBuffer();
-        if (_num_consumed_bytes == 0) return false;
-
-        int start = _consumed_buffer.size() - _num_consumed_bytes;
-        assert(start >= 0);
-        auto oldSize = out.size();
-        int indicatorIndivSizes = (_mode == INDIVIDUAL_SIZES ? 1:0);
-        out.resize(out.size()+indicatorIndivSizes+numIntegers);
-        if (_mode == INDIVIDUAL_SIZES) out[oldSize] = (int) _consumed_buffer[start];
-        memcpy(((uint8_t*)out.data())+(oldSize+indicatorIndivSizes)*sizeof(int), 
-            _consumed_buffer.data()+start+indicatorIndivSizes, 
-            numIntegers*sizeof(int));
-        _num_consumed_bytes -= indicatorIndivSizes+numIntegers*sizeof(int); // "resize" consume buffer
-        return true;
+        bool success = _num_consumed_bytes != 0;
+        if (success) {
+            int start = _consumed_buffer.size() - _num_consumed_bytes;
+            assert(start >= 0);
+            auto oldSize = out.size();
+            int indicatorIndivSizes = (_mode == INDIVIDUAL_SIZES ? 1:0);
+            out.resize(out.size()+indicatorIndivSizes+numIntegers);
+            if (_mode == INDIVIDUAL_SIZES) out[oldSize] = (int) _consumed_buffer[start];
+            memcpy(((uint8_t*)out.data())+(oldSize+indicatorIndivSizes)*sizeof(int), 
+                _consumed_buffer.data()+start+indicatorIndivSizes, 
+                numIntegers*sizeof(int));
+            _num_consumed_bytes -= indicatorIndivSizes+numIntegers*sizeof(int); // "resize" consume buffer
+        }
+        return success;
     }
     bool consume(int numIntegers, uint8_t*& out) {
-        auto lock = _consume_mutex.getLock();
+        
         refillConsumeBuffer();
-        if (_num_consumed_bytes == 0) return false;
-
-        int start = _consumed_buffer.size() - _num_consumed_bytes;
-        int indicatorIndivSizes = (_mode == INDIVIDUAL_SIZES ? 1:0);
-        if (_mode == INDIVIDUAL_SIZES) out[0] = _consumed_buffer[start];
-        memcpy(out+indicatorIndivSizes, _consumed_buffer.data()+start+indicatorIndivSizes, 
-            numIntegers*sizeof(int));
-        _num_consumed_bytes -= indicatorIndivSizes+numIntegers*sizeof(int); // "resize" consume buffer
-        out += indicatorIndivSizes+numIntegers*sizeof(int);
-        return true;
+        bool success = _num_consumed_bytes != 0;
+        if (success) {
+            int start = _consumed_buffer.size() - _num_consumed_bytes;
+            assert(start >= 0);
+            int indicatorIndivSizes = (_mode == INDIVIDUAL_SIZES ? 1:0);
+            if (_mode == INDIVIDUAL_SIZES) out[0] = _consumed_buffer[start];
+            memcpy(out+indicatorIndivSizes, _consumed_buffer.data()+start+indicatorIndivSizes, 
+                numIntegers*sizeof(int));
+            _num_consumed_bytes -= indicatorIndivSizes+numIntegers*sizeof(int); // "resize" consume buffer
+            out += indicatorIndivSizes+numIntegers*sizeof(int);
+        }
+        return success;
     }
     
     // Only for UNIFORM_SIZE: Consume the next element and append it to the provided vector.
@@ -227,6 +230,13 @@ public:
     bool consume(uint8_t*& out) {
         assert(_mode == UNIFORM_SIZE);
         return consume(_bytes_per_elem/sizeof(int), out);
+    }
+
+    void acquireConsumeLock() {
+        _consume_mutex.lock();
+    }
+    void releaseConsumeLock() {
+        _consume_mutex.unlock();
     }
 
     uint8_t* releaseBuffer() {

@@ -77,6 +77,7 @@ public:
         acquireReaderStatus();
 
         bool success;
+        _ringbuf->acquireConsumeLock();
         if (useHeaderBytePerClause()) {
             uint8_t lbd;
             success = _ringbuf->getNextHeaderByte(lbd);
@@ -92,6 +93,7 @@ public:
                 success = _ringbuf->consume(output);
             else success = false;
         }
+        _ringbuf->releaseConsumeLock();
 
         // Release reader status in memory state
         releaseReaderStatus();
