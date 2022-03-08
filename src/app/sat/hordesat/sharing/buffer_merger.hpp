@@ -80,7 +80,6 @@ private:
         }
     };
     std::forward_list<InputClause> _merger;
-    ExactSortedClauseFilter _clause_filter;
 
 public:
     BufferMerger(int sizeLimit, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);

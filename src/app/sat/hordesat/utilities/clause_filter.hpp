@@ -19,6 +19,22 @@ using namespace Mallob;
 #include "util/logger.hpp"
 #include "util/atomic_bitset/atomic_bitset.hpp"
 
+class ExactSortedClauseFilter {
+
+private:
+	robin_hood::unordered_set<Clause, ClauseHasher, SortedClauseExactEquals> _set;
+public:
+	ExactSortedClauseFilter() {}
+	bool registerClause(const Clause& c) {
+		if (_set.count(c)) return false;
+		_set.insert(c);
+		return true;
+	}
+	void clear() {
+		_set.clear();
+	}
+};
+
 /*
 Comment D. Schreiber 09/2021
 
@@ -53,22 +69,6 @@ clause in a filter if there is (probably) still space for the clause in the data
 
 //#define NUM_BITS 268435399 // 32MB
 #define NUM_BITS 26843543 // 3,2MB
-
-class ExactSortedClauseFilter {
-
-private:
-	robin_hood::unordered_set<Clause, ClauseHasher, SortedClauseExactEquals> _set;
-public:
-	ExactSortedClauseFilter() {}
-	bool registerClause(const Clause& c) {
-		if (_set.count(c)) return false;
-		_set.insert(c);
-		return true;
-	}
-	void clear() {
-		_set.clear();
-	}
-};
 
 class ClauseFilter {
 
