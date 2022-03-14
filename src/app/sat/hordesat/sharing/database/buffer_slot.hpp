@@ -22,6 +22,7 @@ private:
     std::atomic_bool _replacing_chunk {false};
     std::function<uint8_t*()> _chunk_source;
     std::function<void(uint8_t*)> _chunk_sink;
+    std::function<void(Clause&)> _clause_deleter;
 
     ClauseHistogram* _hist_deleted_in_slots = nullptr;
 
@@ -146,10 +147,9 @@ public:
         _full_chunks.pop_front();
         _num_full_chunks.fetch_sub(1, std::memory_order_acq_rel);
 
-        // TODO At this point, clauses are implicitly deleted! => Fill histogram
-        //if (_hist_deleted_in_slots)
-        //    _hist_deleted_in_slots->increase(_template_clause.size, size/_template_clause.size);
-
+        // At this point, clauses are deleted!
+        _working_chunk.extractFromChunkAndConsume((int*)memory, size, _clause_deleter);
+        
         return memory;
     }
 
@@ -157,8 +157,8 @@ public:
         return _num_full_chunks.load(std::memory_order_relaxed);
     }
 
-    void setDeletedClausesHistogram(ClauseHistogram& hist) {
-        _hist_deleted_in_slots = &hist;
+    void setClauseDeleter(std::function<void(Clause&)> clauseDeleter) {
+        _clause_deleter = clauseDeleter;
     }
 
     BufferChunk::Mode getOperationMode() const {return _working_chunk.getOperationMode();}

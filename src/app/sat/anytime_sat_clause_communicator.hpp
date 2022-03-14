@@ -52,9 +52,8 @@ public:
             setup.maxClauseLength = _params.strictClauseLengthLimit();
             setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
             setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
-            setup.chunkSize = _clause_buf_base_size;
+            setup.numLiterals = 0;
             setup.numProducers = 0;
-            setup.numChunks = 0;
             return setup;
         }()),
         _cls_history(_params, getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job, _cdb),

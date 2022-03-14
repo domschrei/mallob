@@ -104,7 +104,7 @@ void HordeProcessAdapter::doInitialize() {
 
     // Allocate import and export buffers
     _export_buffer = (int*) createSharedMemoryBlock("clauseexport", 
-            _params.clauseBufferBaseSize() * sizeof(int), nullptr);
+            _params.clauseBufferBaseSize() * sizeof(int) + 400, nullptr);
     _hsm->importBufferMaxSize = _params.clauseHistoryAggregationFactor() * MyMpi::getBinaryTreeBufferLimit(
         _hsm->config.mpisize, _params.clauseBufferBaseSize(), _params.clauseBufferDiscountFactor(), 
         MyMpi::ALL

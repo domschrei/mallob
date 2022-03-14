@@ -17,6 +17,7 @@ OPT_BOOL(abortNonincrementalSubprocess,  "ans", "abort-noninc-subproc",         
 OPT_BOOL(collectClauseHistory,           "ch", "collect-clause-history",              false,                   "Employ clause history collection mechanism")
 OPT_BOOL(coloredOutput,                  "colors", "",                                false,                   "Colored terminal output based on messages' verbosity")
 OPT_BOOL(continuousGrowth,               "cg", "continuous-growth",                   true,                    "Continuous growth of job demands")
+OPT_BOOL(distributedDuplicateDetection,  "ddd", "",                                   false,                   "Distributed duplicate detection for clauses")
 OPT_BOOL(delayMonkey,                    "delaymonkey", "",                           false,                   "Small chance for each MPI call to block for some random amount of time")
 OPT_BOOL(derandomize,                    "derandomize", "",                           true,                    "Derandomize job bouncing and build a <bounce-alternatives>-regular message graph instead")
 OPT_BOOL(useDormantChildren,             "dc", "dormant-children",                    false,                   "Simple strategy of maintaining local set of dormant child job contexts which the parent tries to reactivate")

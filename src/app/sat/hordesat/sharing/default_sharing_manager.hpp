@@ -45,6 +45,7 @@ protected:
 		std::vector<bool> involvedSolvers;
 		std::vector<int> buffer;
 		std::vector<Mallob::Clause> clauses;
+		std::vector<uint16_t> producersPerClause;
 	};
 	std::list<DeferredClauseList> _future_clauses;
 	size_t _max_deferred_lits_per_solver;
@@ -104,6 +105,7 @@ private:
 	void tryReinsertDeferredClauses(int solverId, std::list<Clause>& clauses, SolvingStatistics* stats);
 	void digestDeferredFutureClauses();
 
+	void importClausesToSolver(int solverId, const std::vector<Clause>& clauses, const std::vector<uint16_t>& producersPerClause);
 
 };
 

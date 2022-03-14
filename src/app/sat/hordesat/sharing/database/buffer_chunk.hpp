@@ -179,6 +179,44 @@ public:
         return read;
     }
 
+    void extractFromChunkAndConsume(int* data, size_t numBytesInData, std::function<void(Clause&)> consumer) {
+
+        if (useHeaderBytePerClause()) {
+            // Extract mixed clauses where a single header byte contains the LBD
+            // and also encodes the clause's size 
+            uint8_t* bytes = (uint8_t*) data;
+            int byteCounter = 0;
+            while (byteCounter < numBytesInData) {
+                uint8_t lbd = bytes[byteCounter];
+                
+                if (lbd <= 0) {
+                    std::string out;
+                    for (size_t i = 0; i < numBytesInData; i++) out += std::to_string(bytes[i]) + " ";
+                    assert(lbd > 0 || log_return_false("[ERROR] lbd=%i @ byte %i/%i of full chunk - slot mode=%i param=%i - %s\n", 
+                        (int)lbd, byteCounter, numBytesInData, _mode, _mode_param, out.c_str()));
+                }
+
+                int elemLength = getNumLiterals(lbd);
+                Clause c((int*)(bytes+byteCounter+1), elemLength, lbd);
+                consumer(c);
+                
+                byteCounter += 1+elemLength*sizeof(int);
+            }
+        } else {
+            // Extract clauses of fixed uniform size
+            const int elemLength = _mode_param;
+            int intCounter = 0;
+            // While provided data buffer is not fully read
+            while (sizeof(int)*(intCounter+elemLength) <= numBytesInData) {
+                
+                Clause c(data+intCounter, elemLength, /*lbd=*/0);
+                consumer(c);
+            
+                intCounter += elemLength;
+            }
+        }
+    }
+
     inline Mode getOperationMode() const {return _mode;}
     inline int getModeParam() const {return _mode_param;}
 

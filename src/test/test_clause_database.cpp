@@ -20,7 +20,7 @@
 #include "util/sys/terminator.hpp"
 
 bool insertUntilSuccess(AdaptiveClauseDatabase& cdb, size_t prodId, Clause& c) {
-    return cdb.addClause(prodId, c);
+    return cdb.addClause(prodId, c) == SUCCESS;
 }
 
 void testSumBucketLabel() {
@@ -39,8 +39,7 @@ void testMinimal() {
     AdaptiveClauseDatabase::Setup setup;
     setup.maxClauseLength = 10;
     setup.maxLbdPartitionedSize = 5;
-    setup.chunkSize = 1500;
-    setup.numChunks = 0;
+    setup.numLiterals = 1500;
     setup.numProducers = 1;
     setup.slotsForSumOfLengthAndLbd = true;
 
@@ -48,28 +47,13 @@ void testMinimal() {
     bool success = true;
     int numAttempted = 0;
     while (success && numAttempted < 10000) {
-        std::vector<int> lits = {100, 200, 300, 400};
+        std::vector<int> lits = {100+numAttempted, 200+numAttempted, 300+numAttempted, 400+numAttempted};
         LOG(V2_INFO, "%i\n", numAttempted);
         Clause c{lits.data(), lits.size(), 2};
-        success = cdb.addClause(/*producer=*/0, c);
+        success = cdb.addClause(/*producer=*/0, c) == SUCCESS;
         numAttempted++;
     }
     assert(numAttempted < 10000);
-
-    /*for (int k = 0; k < 2; k++) {
-        for (int x = 1; x < 150; x++) {
-            std::vector<int> lits = {100, 200, 300, 400, 500, 600, 700, 800, 900};
-            Clause c{lits.data(), lits.size(), 4};
-            bool success = cdb.addClause(0, c);
-            assert(success);
-        }
-    }
-    {
-        std::vector<int> lits = {100, 200, 300, 400, 500, 600, 700, 800, 900};
-        Clause c{lits.data(), lits.size(), 4};
-        bool success = cdb.addClause(0, c);
-        assert(!success);
-    }*/
 
     int numExported;
     auto buf = cdb.exportBuffer(100000, numExported);
@@ -85,8 +69,7 @@ void testMerge() {
     AdaptiveClauseDatabase::Setup setup;
     setup.maxClauseLength = 3;
     setup.maxLbdPartitionedSize = 5;
-    setup.chunkSize = 1500;
-    setup.numChunks = 1000;
+    setup.numLiterals = 1'500'000;
     setup.numProducers = 1;
     setup.slotsForSumOfLengthAndLbd = true;
     int numBuffers = 4;
@@ -107,16 +90,16 @@ void testMerge() {
             glue = std::min(glue, clauseSize);
             Clause c{clauseLits.back().data(), clauseSize, glue};
             //log(V5_DEBG, "CLS #%i %s\n", j, c.toStr().c_str());
-            assert(insertUntilSuccess(cdb, 0, c));
+            insertUntilSuccess(cdb, 0, c);
         }
         int numExported;
         auto buf = cdb.exportBuffer(100000, numExported);
 
         auto reader = cdb.getBufferReader(buf.data(), buf.size());
         Clause lastClause;
-        BufferMerger::ClauseComparator compare(setup.slotsForSumOfLengthAndLbd ?
-            (BufferMerger::AbstractClauseThreewayComparator*) new BufferMerger::LengthLbdSumClauseThreewayComparator(setup.maxClauseLength+2) :
-            (BufferMerger::AbstractClauseThreewayComparator*) new BufferMerger::LexicographicClauseThreewayComparator()
+        ClauseComparator compare(setup.slotsForSumOfLengthAndLbd ?
+            (AbstractClauseThreewayComparator*) new LengthLbdSumClauseThreewayComparator(setup.maxClauseLength+2) :
+            (AbstractClauseThreewayComparator*) new LexicographicClauseThreewayComparator()
         );;
         int clsIdx = 0;
         while (true) {
@@ -134,7 +117,7 @@ void testMerge() {
         LOG(V2_INFO, "Buffer %i : exported %i clauses\n", i, clsIdx);
     }
 
-    setup.numChunks = 20;
+    setup.numLiterals = 30'000;
     AdaptiveClauseDatabase cdb(setup);
     LOG(V2_INFO, "Merging ...\n");
     auto merger = cdb.getBufferMerger(300000);
@@ -174,9 +157,8 @@ void testUniform() {
     AdaptiveClauseDatabase::Setup setup;
     setup.maxClauseLength = 30;
     setup.maxLbdPartitionedSize = 5;
-    setup.chunkSize = 1000;
     setup.numProducers = 16;
-    setup.numChunks = 20;
+    setup.numLiterals = 200'000;
     setup.slotsForSumOfLengthAndLbd = false;
     int numClauses = 1000;
 
@@ -290,8 +272,7 @@ void testRandomClauses() {
     AdaptiveClauseDatabase::Setup setup;
     setup.maxClauseLength = maxClauseSize;
     setup.maxLbdPartitionedSize = maxLbdPartitionedSize;
-    setup.chunkSize = baseBufferSize;
-    setup.numChunks = 20;
+    setup.numLiterals = 20*baseBufferSize;
     setup.numProducers = numProducers;
     setup.slotsForSumOfLengthAndLbd = true;
     AdaptiveClauseDatabase cdb(setup);
@@ -305,28 +286,34 @@ void testRandomClauses() {
         std::vector<std::thread> threads(numProducers);
         std::atomic_int numAdded = 0;
         std::atomic_int numRejected = 0;
+        std::atomic_int numDuplicates = 0;
         for (size_t i = 0; i < threads.size(); i++) {
-            threads[i] = std::thread([i, &inputClauses, &cdb, &numAdded, &numRejected]() {
-                auto rng = std::mt19937(i);
+            threads[i] = std::thread([i, rep, &inputClauses, &cdb, &numAdded, &numDuplicates, &numRejected]() {
+                auto rng = std::mt19937(1000*rep + i);
                 auto dist = std::uniform_real_distribution<float>(0, 1);
                 for (int n = 0; n < 10000; n++) {
                     auto& clause = inputClauses[(int) (dist(rng) * inputClauses.size())];
                     Clause c{clause.data()+1, (int)clause.size()-1, clause[0]};
                     //log(V2_INFO, "add cls %s\n", c.toStr().c_str());
                     assert(c.lbd <= c.size);
-                    bool success = cdb.addClause(i, c);
-                    (success ? numAdded : numRejected)++;
+                    auto result = cdb.addClause(i, c);
+                    if (result == SUCCESS) numAdded++;
+                    if (result == DUPLICATE) numDuplicates++;
+                    if (result == NO_BUDGET) numRejected++;
                 }
             });
         }
 
         // Wait for streams to finish
         for (auto& thread : threads) thread.join();
+        LOG(V2_INFO, " - %i/%i literals in CDB\n", cdb.getCurrentlyUsedLiterals(), setup.numLiterals);
 
         // Export buffer from database
         int numExported = 0;
         auto out = cdb.exportBuffer(1000000, numExported);
-        LOG(V2_INFO, " - %i/%i added, %i exported into buffer\n", (int)numAdded, (int)numRejected, numExported);
+        LOG(V2_INFO, " - %i/%i/%i added/rejected/duplicate, %i exported into buffer of size %i\n", 
+            (int)numAdded, (int)numRejected, (int)numDuplicates, numExported, out.size());
+        LOG(V2_INFO, " - %i/%i literals remaining in CDB\n", cdb.getCurrentlyUsedLiterals(), setup.numLiterals);
 
         //for (int lit : out) LOG_OMIT_PREFIX(V4_VVER, "%i ", lit);
         //log(LOG_NO_PREFIX | V4_VVER, "\n");
@@ -387,9 +374,8 @@ void testConcurrentClauseAddition() {
     AdaptiveClauseDatabase::Setup setup;
     setup.maxClauseLength = maxClauseSize;
     setup.maxLbdPartitionedSize = maxLbdPartitionedSize;
-    setup.chunkSize = baseBufferSize;
+    setup.numLiterals = 20*baseBufferSize;
     setup.numProducers = numProducers;
-    setup.numChunks = 20;
     setup.slotsForSumOfLengthAndLbd = true;
     AdaptiveClauseDatabase cdb(setup);
 
@@ -420,7 +406,7 @@ void testConcurrentClauseAddition() {
                 
                 c = produceClause(rng, meanLength);
 
-                bool success = cdb.addClause(i, c);
+                bool success = cdb.addClause(i, c) == SUCCESS;
                 free(c.begin);
                 (success ? passed : dropped)++;
 
@@ -478,11 +464,12 @@ int main() {
     Process::init(0);
     ProcessWideThreadPool::init(1);
 
-    //testSumBucketLabel();
-    testConcurrentClauseAddition();
-    exit(0);
-    testMinimal();
-    testMerge();
-    testUniform();
     testRandomClauses();
+    exit(0);
+    
+    //testSumBucketLabel();
+    testMinimal();
+    testUniform();
+    testMerge();
+    testConcurrentClauseAddition();
 }

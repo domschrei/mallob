@@ -13,9 +13,7 @@ class ImportBuffer {
 private:
     SolvingStatistics& _stats;
     AdaptiveClauseDatabase _cdb;
-
-    std::vector<int> _ready_to_import_buffer;
-	std::unique_ptr<BufferReader> _ready_to_import_reader;
+    int _max_clause_length;
 
     std::vector<int> _plain_units_out;
     Mallob::Clause _clause_out;
@@ -24,10 +22,9 @@ public:
     ImportBuffer(const SolverSetup& setup, SolvingStatistics& stats) : _stats(stats), 
         _cdb([&]() {
             AdaptiveClauseDatabase::Setup cdbSetup;
-            cdbSetup.chunkSize = setup.clauseBaseBufferSize;
             cdbSetup.maxClauseLength = setup.strictClauseLengthLimit;
             cdbSetup.maxLbdPartitionedSize = 2;
-            cdbSetup.numChunks = std::max(
+            cdbSetup.numLiterals = setup.clauseBaseBufferSize * std::max(
                 setup.minNumChunksPerSolver, 
                 (int) (
                     ((float) setup.numBufferedClsGenerations) * 
@@ -38,27 +35,16 @@ public:
             cdbSetup.slotsForSumOfLengthAndLbd = false;
             cdbSetup.useChecksums = false;
             return cdbSetup;
-        }()) {
-
-        _ready_to_import_reader.reset(new BufferReader());
-    }
+        }()), _max_clause_length(setup.strictClauseLengthLimit) {}
 
     void add(const Mallob::Clause& c) {
         _stats.receivedClauses++;
-        bool success = _cdb.addClause(0, c);
-        if (success) {
+        auto result = _cdb.addClause(0, c);
+        if (result == SUCCESS) {
             _stats.receivedClausesInserted++;
         } else {
             _stats.discardedClauses++;
         }
-    }
-
-    int bulkAdd(const std::vector<Mallob::Clause>& clauses, std::function<bool(const Mallob::Clause&)> conditional) {
-        _stats.receivedClauses += clauses.size();
-        int admitted = _cdb.bulkAddClauses(0, clauses, conditional);
-        _stats.receivedClausesInserted += admitted;
-        _stats.receivedClausesFiltered += clauses.size()-admitted;
-        return admitted;
     }
 
     std::vector<int> getUnitsBuffer() {
@@ -74,29 +60,27 @@ public:
 
     Mallob::Clause& get(AdaptiveClauseDatabase::ExportMode mode) {
 
-        _clause_out = _ready_to_import_reader->getNextIncomingClause();
         if (_clause_out.begin != nullptr) {
-            _stats.digestedClauses++;
-            _stats.histDigested->increment(_clause_out.size);
-            return _clause_out;
+            free(_clause_out.begin);
+            _clause_out.begin = nullptr;
         }
 
-        // Refill buffer with clauses from import database
-        _ready_to_import_reader->releaseBuffer();
-        int numClauses = 0;
-        _ready_to_import_buffer = _cdb.exportBuffer(-1, numClauses, mode, /*sortClauses=*/false);
-        if (numClauses == 0) return _clause_out;
-        
-        _ready_to_import_reader.reset(new BufferReader(_cdb.getBufferReader(_ready_to_import_buffer.data(), _ready_to_import_buffer.size())));
-        _clause_out = _ready_to_import_reader->getNextIncomingClause();
+        if (_cdb.getCurrentlyUsedLiterals() == 0) return _clause_out;
+
+        _clause_out = _cdb.popFront(mode);
         if (_clause_out.begin != nullptr) {
             _stats.digestedClauses++;
             _stats.histDigested->increment(_clause_out.size);
+            assert(_clause_out.size > 0);
+            assert(_clause_out.lbd > 0);
+            assert(_clause_out.begin[0] != 0);
         }
         return _clause_out;
     }
 
+    ~ImportBuffer() {
+        if (_clause_out.begin != nullptr) free(_clause_out.begin);
+    }
 };
-
 
 #endif

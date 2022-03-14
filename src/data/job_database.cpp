@@ -696,6 +696,8 @@ void JobDatabase::runJanitor() {
             Logger::getMainInstance().mergeJobLogs(id);
             _num_stored_jobs--;
         }
+
+        if (!_janitor.continueRunning()) usleep(100 * 1000); // wait for last jobs to finish
     }
 }
 

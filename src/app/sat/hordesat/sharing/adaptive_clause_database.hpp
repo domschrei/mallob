@@ -6,7 +6,8 @@
 
 //#include "clause_slot.hpp"
 //#include "chunk_manager.hpp"
-#include "database/buffer_slot.hpp"
+//#include "database/buffer_slot.hpp"
+#include "database/clause_slot_set.hpp"
 #include "bucket_label.hpp"
 #include "buffer_reader.hpp"
 #include "buffer_merger.hpp"
@@ -21,11 +22,7 @@ can be moved freely from one length-LBD slot to another as necessary.
 */
 class AdaptiveClauseDatabase {
 
-public:
-    enum AddClauseResult {SUCCESS, TRY_LATER, DROP};
-
 private:
-
     // Compares two clauses alphanumerically.
     // The clauses are given as pointers to the raw literals, possibly
     // both with an LBD score at the front.
@@ -60,35 +57,32 @@ private:
         }
     };
 
-    std::atomic_int _num_free_chunks{0};
-    Mutex _free_chunks_mutex;
-    std::list<uint8_t*> _free_chunks;
+    int _total_literal_limit;
+    std::atomic_int _num_free_literals {0};
 
-    /*
-    There is one slot for each length-LBD combination up to a certain clause length
-    (_max_lbd_partitioned_size) and then one slot for each clause length.
-    A slot itself consists of exactly one lock-free MPSC ring buffer and a flexible
-    number of filled memory chunks.
-    */
-    std::vector<BufferSlot> _slots;
-    std::vector<int> _slot_lbd;
+    ClauseSlotSet<ProducedUnitClause>* _unit_slot;
+    ClauseSlotSet<ProducedBinaryClause>* _binary_slot;
+    std::vector<ClauseSlotSet<ProducedLargeClause>*> _large_slots;
+
     robin_hood::unordered_flat_map<std::pair<int, int>, int, IntPairHasher> _size_lbd_to_slot_idx;
+    std::atomic_int _max_nonempty_slot;
 
     int _max_lbd_partitioned_size;
     int _max_clause_length;
     bool _slots_for_sum_of_length_and_lbd;
 
-    int _chunk_size;
     bool _use_checksum;
     BucketLabel _bucket_iterator;
 
     ClauseHistogram _hist_deleted_in_slots;
 
+    std::vector<int> _last_exported_buffer;
+    std::vector<uint16_t> _last_exported_buffer_producers;
+
 public:
     struct Setup {
         int numProducers = 1;
-        int numChunks = 0;
-        int chunkSize = 1500;
+        int numLiterals = 1000;
         int maxClauseLength = 20;
         bool useChecksums = false;
 
@@ -97,7 +91,7 @@ public:
     };
 
     AdaptiveClauseDatabase(Setup setup);
-    ~AdaptiveClauseDatabase() = default;
+    ~AdaptiveClauseDatabase() {}
 
     /*
     Insert a clause from a certain producer (0 <= ID < #producers).
@@ -107,21 +101,7 @@ public:
     be possible to insert it later).
     In both cases, c can be freed or reused after calling this method.
     */
-    bool addClause(int producerId, const Clause& c);
-
-    /*
-    Add multiple clauses at once. More efficient than addClause for a series of clauses
-    because the search for a fitting slot and chunk for each clause is not done redundantly.
-    The clauses *must* be sorted with respect to the buckets of this instance, i.e.,
-    best clauses come first, as retrieved by calling exportBuffer and then iterating
-    over the clauses via getBufferReader.
-    A conditional can be supplied to this function which decides for each clause whether
-    it should be inserted or not. It is ensured that this conditional is only called once
-    for each clause.
-    Returns: Number of successfully added clauses.
-    */
-    int bulkAddClauses(int producerId, const std::vector<Clause>& clauses,
-            std::function<bool(const Clause& c)> conditional = [](const Clause&) {return true;});
+    ClauseSlotInsertResult addClause(int producerId, const Clause& c);
 
     void printChunks(int nextExportSize = -1);
     
@@ -138,8 +118,10 @@ public:
     The buffer can be parsed via getBufferReader or merged with other buffers via
     getBufferMerger.
     */
-    std::vector<int> exportBuffer(int sizeLimit, int& numExportedClauses, 
+    const std::vector<int>& exportBuffer(int sizeLimit, int& numExportedClauses, 
             ExportMode mode = ANY, bool sortClauses = true);
+
+    Mallob::Clause popFront(ExportMode mode = ANY);
 
     /*
     Allows to iterate over the clauses contained in a flat vector of integers
@@ -149,12 +131,24 @@ public:
     */
     BufferReader getBufferReader(int* begin, size_t size, bool useChecksums = false);
     BufferMerger getBufferMerger(int sizeLimit);
+    BufferReader getReaderForLastExportedBuffer();
+    const std::vector<uint16_t>& getProducersOfLastExportedBuffer() const {return _last_exported_buffer_producers;}
+
+    int getCurrentlyUsedLiterals() const {
+        return _total_literal_limit - _num_free_literals.load(std::memory_order_relaxed);
+    }
 
     ClauseHistogram& getDeletedClausesHistogram();
 
 private:
     size_t getSlotIdx(int clauseSize, int lbd);
     BucketLabel getBucketIterator();
+
+    int freeLowPriorityLiterals(int callingSlot);
+
+    template <typename T>
+    void handleFlushedClauses(std::vector<T>& flushedClauses, ClauseSlotMode slotMode, 
+        bool sortClauses, BufferBuilder& builder);
 
 };
 
