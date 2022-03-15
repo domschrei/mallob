@@ -339,7 +339,11 @@ std::vector<int> AnytimeSatClauseCommunicator::applyFilter(const std::vector<int
         clause = reader.getNextIncomingClause();
     }
 
-    LOG(V4_VVER, "%s : %i/%i passed global filter\n", _job->toStr(), writer.getNumAddedClauses(), clsIdx);
+    if (_job->getJobTree().isRoot()) {
+        LOG(V3_VERB, "%s : %i/%i passed global filter\n", _job->toStr(), writer.getNumAddedClauses(), clsIdx);       
+    } else {
+        LOG(V4_VVER, "%s : %i/%i passed global filter\n", _job->toStr(), writer.getNumAddedClauses(), clsIdx);
+    }
 
     // Conclude this sharing epoch
     _time_of_last_epoch_conclusion = Timer::elapsedSeconds();
