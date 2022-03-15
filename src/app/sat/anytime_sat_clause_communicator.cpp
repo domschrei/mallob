@@ -45,7 +45,7 @@ void AnytimeSatClauseCommunicator::communicate() {
             // Done preparing sharing?
             if (_job->hasPreparedSharing()) {
                 // Able to perform a merge?
-                if (_clause_buffers_being_merged.empty()) {
+                if (_clause_buffers_being_merged.empty() && !_merge_future.valid()) {
                     _stage = MERGING;
                     initiateMergeOfClauseBuffers();
                 }

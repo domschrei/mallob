@@ -86,12 +86,13 @@ void ForkedSatJob::loadIncrements() {
 void ForkedSatJob::appl_suspend() {
     if (!_initialized) return;
     _solver->setSolvingState(SolvingStates::SUSPENDED);
-    ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
+    if (checkClauseComm()) ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
 }
 
 void ForkedSatJob::appl_resume() {
     if (!_initialized) return;
     _solver->setSolvingState(SolvingStates::ACTIVE);
+    if (checkClauseComm()) ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
 }
 
 void ForkedSatJob::appl_terminate() {
