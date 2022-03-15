@@ -109,6 +109,8 @@ void Worker::init() {
         [&](auto& h) {handleRequestNode(h, JobDatabase::JobRequestMode::TARGETED_REJOIN);});
     q.registerCallback(MSG_SEND_APPLICATION_MESSAGE, 
         [&](auto& h) {handleSendApplicationMessage(h);});
+    q.registerCallback(MSG_RETURN_APPLICATION_MESSAGE, 
+        [&](auto& h) {handleSendApplicationMessage(h);});
     q.registerCallback(MSG_SEND_JOB_DESCRIPTION, 
         [&](auto& h) {handleSendJobDescription(h);});
     q.registerCallback(MSG_NOTIFY_ASSIGNMENT_UPDATE, 
@@ -712,7 +714,7 @@ void Worker::handleSendApplicationMessage(MessageHandle& handle) {
             MyMpi::isend(handle.source, MSG_RETURN_APPLICATION_MESSAGE, msg);
         return;
     }
-    
+
     // Give message to corresponding job
     Job& job = _job_db.get(jobId);
     job.communicate(handle.source, msg);
