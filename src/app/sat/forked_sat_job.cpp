@@ -16,14 +16,13 @@
 std::atomic_int ForkedSatJob::_static_subprocess_index = 1;
 
 ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl) : 
-        BaseSatJob(params, commSize, worldRank, jobId, appl), _job_comm_period(params.appCommPeriod()) {
+        BaseSatJob(params, commSize, worldRank, jobId, appl) {
 }
 
 void ForkedSatJob::appl_start() {
     assert(!_initialized);
     doStartSolver();
     _time_of_start_solving = Timer::elapsedSeconds();
-    _time_of_last_comm = _time_of_start_solving;
     _initialized = true;
 }
 
@@ -87,11 +86,11 @@ void ForkedSatJob::loadIncrements() {
 void ForkedSatJob::appl_suspend() {
     if (!_initialized) return;
     _solver->setSolvingState(SolvingStates::SUSPENDED);
+    ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
 }
 
 void ForkedSatJob::appl_resume() {
     if (!_initialized) return;
-    _time_of_last_comm = Timer::elapsedSeconds()-_job_comm_period;
     _solver->setSolvingState(SolvingStates::ACTIVE);
 }
 
@@ -161,29 +160,16 @@ bool ForkedSatJob::checkClauseComm() {
     return _clause_comm != nullptr;
 }
 
-bool ForkedSatJob::appl_wantsToBeginCommunication() {
-    if (!_initialized || getState() != ACTIVE || _job_comm_period <= 0) return false;
-    if (!checkClauseComm()) return false;
-    // Special "timed" condition: At least X seconds since last communication 
-    if (Timer::elapsedSeconds()-_time_of_last_comm < _job_comm_period) return false;
-    // Time has come: Prepare a new buffer of clauses
-    bool wants = ((AnytimeSatClauseCommunicator*) _clause_comm)->canSendClauses();
-    return wants && (getAgeSinceActivation() >= 0.5 * _job_comm_period);
-}
-
-void ForkedSatJob::appl_beginCommunication() {
+void ForkedSatJob::appl_communicate() {
     if (!_initialized || getState() != ACTIVE) return;
     if (!checkClauseComm()) return;
-    LOG(V5_DEBG, "begincomm\n");
-    ((AnytimeSatClauseCommunicator*) _clause_comm)->sendClausesToParent();
+    ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
 }
 
 void ForkedSatJob::appl_communicate(int source, JobMessage& msg) {
     if (!_initialized || getState() != ACTIVE) return;
     if (!checkClauseComm()) return;
-    LOG(V5_DEBG, "comm\n");
     ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, msg);
-    if (appl_wantsToBeginCommunication()) appl_beginCommunication();
 }
 
 bool ForkedSatJob::isInitialized() {
@@ -201,9 +187,6 @@ bool ForkedSatJob::hasPreparedSharing() {
 std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum) {
     if (!_initialized) return std::vector<int>();
     return _solver->getCollectedClauses(checksum);
-}
-void ForkedSatJob::resetLastCommTime() {
-    _time_of_last_comm += _job_comm_period;
 }
 
 void ForkedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& checksum) {

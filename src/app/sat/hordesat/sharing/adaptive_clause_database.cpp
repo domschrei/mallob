@@ -213,6 +213,10 @@ BufferMerger AdaptiveClauseDatabase::getBufferMerger(int sizeLimit) {
     return BufferMerger(sizeLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd, _use_checksum);
 }
 
+BufferBuilder AdaptiveClauseDatabase::getBufferBuilder(std::vector<int>* out) {
+    return BufferBuilder(-1, _max_clause_length, _slots_for_sum_of_length_and_lbd, out);
+}
+
 BufferReader AdaptiveClauseDatabase::getReaderForLastExportedBuffer() {
     return BufferReader(_last_exported_buffer.data(), _last_exported_buffer.size(), _max_clause_length, _slots_for_sum_of_length_and_lbd, _use_checksum);
 }

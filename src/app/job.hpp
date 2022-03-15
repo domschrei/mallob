@@ -91,13 +91,9 @@ public:
     */
     virtual JobResult&& appl_getResult() = 0;
     /*
-    Signal if this job instance would like to initiate a new job communication phase.
+    Perform job-internal communication from this node.
     */
-    virtual bool appl_wantsToBeginCommunication() = 0;
-    /*
-    Begin a job communication phase from this node.
-    */
-    virtual void appl_beginCommunication() = 0;
+    virtual void appl_communicate() = 0;
     /*
     Advance a job communication phase by processing the given message.
     */
@@ -202,12 +198,9 @@ public:
     // Resume all internal solvers given that they were suspended.
     void resume();
 
-    // Returns true if communicate() should be called.
-    bool wantsToCommunicate();
     // Initiate a communication with other nodes in the associated job tree.
-    void communicate();
-
-    void communicate(int source, JobMessage& msg);
+    void communicate(); // outgoing
+    void communicate(int source, JobMessage& msg); // incoming (+ outgoing)
 
     // Interrupt the execution of solvers and withdraw the associated solvers 
     // and the job's payload. Only leaves behind the job's meta data.

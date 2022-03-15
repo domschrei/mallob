@@ -113,6 +113,7 @@ Tag for the job-internal, application-specific communication inside a job.
 The payload should contain another job-internal message tag.
 */
 const int MSG_SEND_APPLICATION_MESSAGE = 30;
+const int MSG_RETURN_APPLICATION_MESSAGE = 31;
 /*
 The receiver is queried to begin working as the i-th node of job j.
 The sender hopes that the receiver still remembers job j as the 
@@ -148,6 +149,14 @@ const int MSG_SCHED_INITIALIZE_CHILD_WITH_NODES = 51; // downwards
 const int MSG_SCHED_RETURN_NODES = 52; // upwards
 const int MSG_SCHED_RELEASE_FROM_WAITING = 53;
 const int MSG_SCHED_NODE_FREED = 54;
+
+const int MSG_GATHER_CLAUSES = 417;
+const int MSG_DISTRIBUTE_CLAUSES = 418;
+const int MSG_GATHER_FILTER = 419;
+const int MSG_DISTRIBUTE_FILTER = 420; // blaze it
+
+const int MSG_AGGREGATE_RANKLIST = 430;
+const int MSG_BROADCAST_RANKLIST = 431;
 
 const int MSG_OFFSET_BATCHED = 10000;
 

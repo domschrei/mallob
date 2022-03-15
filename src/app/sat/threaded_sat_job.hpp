@@ -37,8 +37,6 @@ private:
     Mutex _solver_lock;
 
     float _time_of_start_solving = 0;
-    float _time_of_last_comm = 0;
-    float _job_comm_period;
 
 public:
 
@@ -53,8 +51,7 @@ public:
     int appl_solved() override;
     JobResult&& appl_getResult() override;
 
-    bool appl_wantsToBeginCommunication() override;
-    void appl_beginCommunication() override;
+    void appl_communicate() override;
     void appl_communicate(int source, JobMessage& msg) override;
 
     void appl_dumpStats() override;
@@ -71,7 +68,6 @@ public:
     void prepareSharing(int maxSize) override;
     bool hasPreparedSharing() override;
     std::vector<int> getPreparedClauses(Checksum& checksum) override;
-    void resetLastCommTime() override;
     
     void digestSharing(std::vector<int>& clauses, const Checksum& checksum) override;
     void returnClauses(std::vector<int>& clauses) override;

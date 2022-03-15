@@ -29,6 +29,7 @@ public:
     BufferReader(int* buffer, int size, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);
     void releaseBuffer() {_buffer = nullptr;}
     Mallob::Clause* getCurrentClausePointer() {return &_current_clause;}
+    size_t getCurrentBufferPosition() const {return _current_pos;} 
     size_t getRemainingSize() const {return _size - _current_pos;}
     
     inline const Mallob::Clause& getNextIncomingClause() {

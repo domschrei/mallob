@@ -391,7 +391,7 @@ void Worker::checkActiveJob() {
     }
 
     // Job communication (e.g. clause sharing)
-    if (job.wantsToCommunicate()) job.communicate();
+    job.communicate();
 }
 
 void Worker::publishAndResetSysState() {
@@ -701,14 +701,21 @@ void Worker::handleSendApplicationMessage(MessageHandle& handle) {
 
     // Deserialize job-specific message
     JobMessage msg = Serializable::get<JobMessage>(handle.getRecvData());
+    if (handle.tag == MSG_RETURN_APPLICATION_MESSAGE) {
+        msg.returnedToSender = true;
+    }
+
     int jobId = msg.jobId;
     if (!_job_db.has(jobId)) {
         LOG(V1_WARN, "[WARN] Job message from unknown job #%i\n", jobId);
+        if (!msg.returnedToSender)
+            MyMpi::isend(handle.source, MSG_RETURN_APPLICATION_MESSAGE, msg);
         return;
     }
+    
     // Give message to corresponding job
     Job& job = _job_db.get(jobId);
-    if (job.getState() == ACTIVE) job.communicate(handle.source, msg);
+    job.communicate(handle.source, msg);
 }
 
 void Worker::handleOfferAdoption(MessageHandle& handle) {
@@ -913,7 +920,7 @@ void Worker::handleNotifyNodeLeavingJob(MessageHandle& handle) {
     }
 
     // Initiate communication if the job now became willing to communicate
-    if (job.wantsToCommunicate()) job.communicate();
+    job.communicate();
 }
 
 void Worker::handleNotifyResultFound(MessageHandle& handle) {

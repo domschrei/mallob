@@ -184,7 +184,6 @@ void HordeProcessAdapter::applySolvingState() {
     }
     if (_state == SolvingStates::SUSPENDED || _state == SolvingStates::STANDBY) {
         Process::suspend(_child_pid); // Stop (suspend) process.
-        ((AnytimeSatClauseCommunicator*)_clause_comm)->suspend();
     }
     if (_state == SolvingStates::ACTIVE) {
         Process::resume(_child_pid); // Continue (resume) process.
@@ -199,12 +198,10 @@ void HordeProcessAdapter::collectClauses(int maxSize) {
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 bool HordeProcessAdapter::hasCollectedClauses() {
-    return _initialized && _hsm->didExport;
+    return _initialized && _hsm->doExport && _hsm->didExport;
 }
 std::vector<int> HordeProcessAdapter::getCollectedClauses(Checksum& checksum) {
-    if (!_initialized || !_hsm->didExport) {
-        return std::vector<int>();
-    }
+    if (!hasCollectedClauses()) return std::vector<int>();
     std::vector<int> clauses(_export_buffer, _export_buffer+_hsm->exportBufferTrueSize);
     checksum = _hsm->exportChecksum;
     _hsm->doExport = false;

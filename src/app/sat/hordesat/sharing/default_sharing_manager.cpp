@@ -274,7 +274,7 @@ void DefaultSharingManager::processClause(int solverId, int solverRevision, cons
 
 	if (clauseSize == 1) assert(clause.lbd == 1);
 	else {
-		assert(clause.lbd >= 2);
+		assert(clause.lbd >= 1 || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", clause.size, clause.lbd));
 		assert(clause.lbd <= clause.size);
 	}
 
@@ -283,7 +283,7 @@ void DefaultSharingManager::processClause(int solverId, int solverRevision, cons
 
 	// Sort and write clause into database if possible
 	std::sort(clauseBegin, clauseBegin+clauseSize);
-	Clause tldClause(clauseBegin, clauseSize, clause.lbd);
+	Clause tldClause(clauseBegin, clauseSize, clauseSize == 1 ? 1 : std::max(2, clause.lbd));
 	auto result = _cdb.addClause(solverId, tldClause);
 
 	if (result == SUCCESS) {

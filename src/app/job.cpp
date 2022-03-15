@@ -214,19 +214,14 @@ JobResult& Job::getResult() {
     return result;
 }
 
-bool Job::wantsToCommunicate() {
-    if (_state != ACTIVE) return false;
-    if (_comm.wantsToAggregate()) return true;
-    return appl_wantsToBeginCommunication();
-}
-
 void Job::communicate() {
-    if (_comm.isAggregating()) _comm.beginAggregation();
-    else appl_beginCommunication();
+    if (_state != ACTIVE) return;
+    if (_comm.wantsToAggregate() && _comm.isAggregating()) _comm.beginAggregation();
+    appl_communicate();
 }
 
 void Job::communicate(int source, JobMessage& msg) {
-    if (_comm.handle(msg)) {
+    if (_state == ACTIVE && _comm.handle(msg)) {
         if (msg.tag == MSG_BROADCAST_RANKLIST && _job_tree.isRoot()) {
             // Check size of job comm compared to scheduler's job volume
             if (_comm.size() != getVolume()) {

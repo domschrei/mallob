@@ -131,6 +131,7 @@ public:
     */
     BufferReader getBufferReader(int* begin, size_t size, bool useChecksums = false);
     BufferMerger getBufferMerger(int sizeLimit);
+    BufferBuilder getBufferBuilder(std::vector<int>* out = nullptr);
     BufferReader getReaderForLastExportedBuffer();
     const std::vector<uint16_t>& getProducersOfLastExportedBuffer() const {return _last_exported_buffer_producers;}
 

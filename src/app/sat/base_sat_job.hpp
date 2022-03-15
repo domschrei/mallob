@@ -19,7 +19,6 @@ public:
     virtual void prepareSharing(int maxSize) = 0;
     virtual bool hasPreparedSharing() = 0;
     virtual std::vector<int> getPreparedClauses(Checksum& checksum) = 0;
-    virtual void resetLastCommTime() = 0;
 
     virtual void digestSharing(std::vector<int>& clauses, const Checksum& checksum) = 0;
     virtual void returnClauses(std::vector<int>& clauses) = 0;
@@ -34,8 +33,7 @@ public:
     virtual int appl_solved() = 0;
     virtual JobResult&& appl_getResult() = 0;
     
-    virtual bool appl_wantsToBeginCommunication() = 0;
-    virtual void appl_beginCommunication() = 0;
+    virtual void appl_communicate() = 0;
     virtual void appl_communicate(int source, JobMessage& msg) = 0;
     
     virtual void appl_dumpStats() = 0;

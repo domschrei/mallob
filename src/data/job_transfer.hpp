@@ -110,6 +110,7 @@ struct JobMessage : public Serializable {
     int revision;
     int tag;
     int epoch;
+    bool returnedToSender = false;
     Checksum checksum;
     std::vector<int> payload;
 

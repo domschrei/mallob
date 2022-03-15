@@ -11,9 +11,6 @@
 #include "comm/mympi.hpp"
 #include "util/sys/threading.hpp"
 
-#define MSG_AGGREGATE_RANKLIST 420
-#define MSG_BROADCAST_RANKLIST 421
-
 class JobComm {
 
 public:
@@ -131,6 +128,8 @@ public:
     }
 
     bool handle(JobMessage& msg) {
+
+        if (msg.returnedToSender) return false;
 
         if (msg.tag == MSG_AGGREGATE_RANKLIST) {
 

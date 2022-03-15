@@ -19,8 +19,7 @@ public:
     void appl_terminate() override {}
     int appl_solved() override {return -1;}
     JobResult&& appl_getResult() override {return JobResult();}
-    bool appl_wantsToBeginCommunication() override {return false;}
-    void appl_beginCommunication() override {}
+    void appl_communicate() override {}
     void appl_communicate(int source, JobMessage& msg) override {}
     void appl_dumpStats() override {}
     bool appl_isDestructible() override {return true;}
