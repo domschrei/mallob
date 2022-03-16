@@ -264,6 +264,13 @@ public:
         return _wait_epoch > _stop_wait_epoch;
     }
 
+    int getNumChildren() const {
+        int numChildren = 0;
+        if (hasLeftChild()) numChildren++;
+        if (hasRightChild()) numChildren++;
+        return numChildren;
+    }
+
 private:
     void setDesire(float& member, float time) {
         if (member == -1) {

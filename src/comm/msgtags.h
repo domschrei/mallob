@@ -150,14 +150,19 @@ const int MSG_SCHED_RETURN_NODES = 52; // upwards
 const int MSG_SCHED_RELEASE_FROM_WAITING = 53;
 const int MSG_SCHED_NODE_FREED = 54;
 
+const int MSG_OFFSET_BATCHED = 10000;
+
+// Application message tags
+const int MSG_INITIATE_CLAUSE_SHARING = 416;
 const int MSG_GATHER_CLAUSES = 417;
 const int MSG_DISTRIBUTE_CLAUSES = 418;
 const int MSG_GATHER_FILTER = 419;
 const int MSG_DISTRIBUTE_FILTER = 420; // blaze it
-
 const int MSG_AGGREGATE_RANKLIST = 430;
 const int MSG_BROADCAST_RANKLIST = 431;
 
-const int MSG_OFFSET_BATCHED = 10000;
+const int MSG_REDUCE_APPLICATION_DATA = 432;
+const int MSG_BROADCAST_APPLICATION_DATA = 433;
+
 
 #endif

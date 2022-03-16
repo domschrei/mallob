@@ -38,6 +38,15 @@ public:
     
     virtual void appl_dumpStats() = 0;
     virtual bool appl_isDestructible() = 0;
+
+    // Helper methods
+
+    size_t getBufferLimit(int numAggregatedNodes, MyMpi::BufferQueryMode mode) {
+        if (mode == MyMpi::SELF) return _params.clauseBufferBaseSize();
+        return MyMpi::getBinaryTreeBufferLimit(numAggregatedNodes, _params.clauseBufferBaseSize(), 
+            _params.clauseBufferDiscountFactor(), mode);
+    }
+
 };
 
 #endif

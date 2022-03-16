@@ -54,7 +54,7 @@ private:
     Subscription _subscription;
 
 public:
-    ClauseHistory(Parameters& params, int stmBufferSizePerEpoch, BaseSatJob& job, AdaptiveClauseDatabase& cdb) : 
+    ClauseHistory(const Parameters& params, int stmBufferSizePerEpoch, BaseSatJob& job, AdaptiveClauseDatabase& cdb) : 
         _aggregation_factor(params.clauseHistoryAggregationFactor()), 
         _num_stm_slots(params.clauseHistoryShortTermMemSize()), 
         _stm_buffer_size(stmBufferSizePerEpoch), 

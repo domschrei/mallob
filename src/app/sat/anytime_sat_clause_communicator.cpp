@@ -6,6 +6,31 @@
 #include "hordesat/utilities/clause_filter.hpp"
 #include "util/sys/thread_pool.hpp"
 
+void advanceCollective(BaseSatJob* job, JobMessage& msg, int broadcastTag) {
+    if (job->getJobTree().isRoot() && msg.tag != broadcastTag) {
+        // Self message: Switch from reduce to broadcast
+        int oldTag = msg.tag;
+        msg.tag = broadcastTag;
+        MyMpi::isend(job->getJobTree().getRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+        msg.tag = oldTag;
+    } else if (msg.tag == broadcastTag) {
+        // Broadcast to children
+        if (job->getJobTree().hasLeftChild())
+            MyMpi::isend(job->getJobTree().getLeftChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+        if (job->getJobTree().hasRightChild())
+            MyMpi::isend(job->getJobTree().getRightChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+    } else {
+        // Reduce to parent
+        MyMpi::isend(job->getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+    }
+}
+
+
+
+
+
+
+
 void AnytimeSatClauseCommunicator::communicate() {
 
     // inactive?
@@ -21,52 +46,64 @@ void AnytimeSatClauseCommunicator::communicate() {
     }
 
     // no communication at all?
-    if (_params.appCommPeriod() <= 0) return; 
-    // no communication yet?
-    if (Timer::elapsedSeconds() - _time_of_last_epoch_conclusion < _params.appCommPeriod()) return;
+    if (_params.appCommPeriod() <= 0) return;
 
     // update role in distributed filter
     _filter.update(_job->getJobTree().getIndex(), _job->getVolume());
 
-    // Prepare sharing: "Order" a buffer of clauses from the solver engine
-    if (_stage == IDLE && !_job->hasPreparedSharing()) {
-        int limit = getBufferLimit(_num_aggregated_nodes+1, MyMpi::SELF);
-        _job->prepareSharing(limit);
-        _stage = PREPARING_CLAUSES;
+    // clean up old sessions
+    while (_sessions.size() > 1) {
+        auto& session = _sessions.front();
+        if (!session.isDestructible()) break;
+        // can be deleted
+        _sessions.pop_front();
     }
 
+    // root: initiate sharing
+    if (_job->getJobTree().isRoot() && 
+            _time_of_last_epoch_conclusion > 0 &&
+            Timer::elapsedSeconds() - _time_of_last_epoch_initiation >= _params.appCommPeriod()) {
+        JobMessage msg;
+        msg.jobId = _job->getId();
+        _current_epoch++;
+        msg.epoch = _current_epoch;
+        msg.revision = _job->getRevision();
+        msg.tag = MSG_INITIATE_CLAUSE_SHARING;
+        _time_of_last_epoch_initiation = Timer::elapsedSeconds();
+        _time_of_last_epoch_conclusion = 0;
+        // Self message to initiate clause sharing
+        MyMpi::isend(_job->getJobTree().getRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+    }
+
+    if (_sessions.empty()) return;
+    auto& session = currentSession();
+
     // Enough clause buffers prepared / arrived?
-    if (_stage == PREPARING_CLAUSES) {
-        size_t numChildren = 0;
-        // Must have received clauses from each existing children
-        if (_job->getJobTree().hasLeftChild()) numChildren++;
-        if (_job->getJobTree().hasRightChild()) numChildren++;
-        if (_clause_buffers.size() >= numChildren) {
+    if (session._stage == PREPARING_CLAUSES) {
+        // Must have received clauses from each existing child
+        if (session._clause_buffers.size() >= session._desired_num_child_buffers) {
             // Done preparing sharing?
             if (_job->hasPreparedSharing()) {
-                // Able to perform a merge?
-                if (_clause_buffers_being_merged.empty() && !_merge_future.valid()) {
-                    _stage = MERGING;
-                    initiateMergeOfClauseBuffers();
-                }
+                session.storePreparedClauseBuffer();
+                session.initiateMergeOfClauseBuffers();
             }
         }
     }
 
     // Done merging?
-    if (_stage == MERGING && _is_done_merging) {
-        assert(_clause_buffers_being_merged.size() == 1);
-        _stage = WAITING_FOR_CLAUSE_BCAST;
-        publishMergedClauses();
+    if (session._stage == MERGING && session._is_done_merging) {
+        assert(session._clause_buffers_being_merged.size() == 1);
+        session._stage = WAITING_FOR_CLAUSE_BCAST;
+        session.publishMergedClauses();
     }
 
     // Done filtering?
-    if (_stage == PREPARING_FILTER && _is_done_filtering) {
-        assert(_filter_future.valid());
-        _filter_future.get();
-        _is_done_filtering = false;
+    if (session._stage == PREPARING_FILTER && session._is_done_filtering) {
+        assert(session._filter_future.valid());
+        session._filter_future.get();
+        session._is_done_filtering = false;
         LOG(V4_VVER, "%s : %i clauses in local filter section\n", _job->toStr(), _filter.size());
-        addFilter(_local_filter_bitset);
+        session.addFilter(session._local_filter_bitset);
     }
 }
 
@@ -83,37 +120,51 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         return;
     }
 
+    // Process unsuccessful, returned messages
     if (msg.returnedToSender) {
+        msg.returnedToSender = false;
         if (_params.distributedDuplicateDetection() && msg.tag == MSG_DISTRIBUTE_CLAUSES) {
             // Distribution of clauses hit an inactive (?) child:
             // Pretend that it sent an empty filter
             msg.tag = MSG_GATHER_FILTER;
             msg.payload.clear();
+        } else if (msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
+            // Initiation signal hit an inactive (?) child:
+            // Pretend that it sent an empty set of clauses
+            msg.tag = MSG_GATHER_CLAUSES;
+            msg.payload.resize(1);
+            msg.payload[0] = 1; // num aggregated nodes
         } else return;
     }
     
     // Discard messages from a revision "from the future"
     if (msg.revision > _job->getRevision()) return;
 
-    if (_use_checksums) {
-        Checksum chk;
-        chk.combine(msg.jobId);
-        for (int& lit : msg.payload) chk.combine(lit);
-        if (chk.get() != msg.checksum.get()) {
-            LOG(V1_WARN, "[WARN] %s : checksum fail in job msg (expected count: %ld, actual count: %ld)\n", 
-                _job->toStr(), msg.checksum.count(), chk.count());
-            return;
-        }
-    }
-
     if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_SEND_CLAUSES) {
         _cls_history.addEpoch(msg.epoch, msg.payload, /*entireIndex=*/true);
-        learnClauses(msg.payload);
+        learnClauses(msg.payload, msg.epoch, /*writeIntoClauseHistory=*/false);
     }
     if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_SUBSCRIBE)
         _cls_history.onSubscribe(source, msg.payload[0], msg.payload[1]);
     if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_UNSUBSCRIBE)
         _cls_history.onUnsubscribe(source);
+
+    // discard old messages
+    if (msg.epoch < _current_epoch) return;
+
+
+
+    if (msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
+        _current_epoch = msg.epoch;
+        _sessions.emplace_back(_params, _job, _cdb, _filter, _current_epoch);
+        // TODO what if a job has to prepare for multiple sessions at once ... ?
+        if (!_job->hasPreparedSharing()) {
+            int limit = _job->getBufferLimit(1, MyMpi::SELF);
+            _job->prepareSharing(limit);
+        }
+        advanceCollective(_job, msg, MSG_INITIATE_CLAUSE_SHARING);
+        currentSession()._desired_num_child_buffers = _job->getJobTree().getNumChildren();
+    }
 
     if (msg.tag == MSG_GATHER_CLAUSES) {
         // Gather received clauses, send to parent
@@ -126,38 +177,117 @@ void AnytimeSatClauseCommunicator::handle(int source, JobMessage& msg) {
         LOG(V5_DEBG, "%s : receive s=%i\n", _job->toStr(), clauses.size());
         
         // Add received clauses to local set of collected clauses
-        _clause_buffers.push_back(clauses);
-        _num_aggregated_nodes += numAggregated;
+        currentSession()._clause_buffers.push_back(clauses);
+        currentSession()._num_aggregated_nodes += numAggregated;
     }
     
     if (msg.tag == MSG_DISTRIBUTE_CLAUSES) {
-        _current_epoch = msg.epoch;
+        
+        if (!_params.distributedDuplicateDetection()) {
+            // Import the clauses and conclude this epoch
+            learnClauses(msg.payload, msg.epoch, /*writeIntoClauseHistory=*/_use_cls_history);
+            _time_of_last_epoch_conclusion = Timer::elapsedSeconds();
+        }
 
-        // Learn received clauses, send them to children
-        broadcastAndProcess(msg.payload);
+        // Send clause buffer to children
+        advanceCollective(_job, msg, MSG_DISTRIBUTE_CLAUSES);
+        // Process clauses, begin filtering
+        currentSession().processBroadcastClauses(msg.payload);
     }
 
     if (msg.tag == MSG_GATHER_FILTER) {
-        addFilter(msg.payload);
+        currentSession().addFilter(msg.payload);
     }
+    
     if (msg.tag == MSG_DISTRIBUTE_FILTER) {
         // Forward filter to children
-        if (_job->getJobTree().hasLeftChild())
-            MyMpi::isend(_job->getJobTree().getLeftChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
-        if (_job->getJobTree().hasRightChild())
-            MyMpi::isend(_job->getJobTree().getRightChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+        advanceCollective(_job, msg, MSG_DISTRIBUTE_FILTER);
         // Digest final clauses
-        auto finalClauseBuffer = applyFilter(msg.payload, _clause_buffer_being_filtered);
-        learnClauses(finalClauseBuffer);
+        auto finalClauseBuffer = currentSession().applyGlobalFilter(msg.payload, currentSession()._clause_buffer_being_filtered);
+        learnClauses(finalClauseBuffer, currentSession()._epoch, /*writeIntoClauseHistory=*/_use_cls_history);
+        _time_of_last_epoch_conclusion = Timer::elapsedSeconds();
     }
 }
 
-size_t AnytimeSatClauseCommunicator::getBufferLimit(int numAggregatedNodes, MyMpi::BufferQueryMode mode) {
-    if (mode == MyMpi::SELF) return _clause_buf_base_size;
-    return MyMpi::getBinaryTreeBufferLimit(numAggregatedNodes, _clause_buf_base_size, _clause_buf_discount_factor, mode);
+void AnytimeSatClauseCommunicator::feedHistoryIntoSolver() {
+    if (_use_cls_history) _cls_history.feedHistoryIntoSolver();
 }
 
-std::vector<int> AnytimeSatClauseCommunicator::getMergedClauseBuffer() {
+
+
+
+
+
+
+void AnytimeSatClauseCommunicator::Session::storePreparedClauseBuffer() {
+
+    // +1 for local clauses
+    _num_aggregated_nodes++;
+
+    assert(_num_aggregated_nodes > 0);
+    int totalSize = _job->getBufferLimit(_num_aggregated_nodes, MyMpi::ALL);
+    int selfSize = _job->getBufferLimit(_num_aggregated_nodes, MyMpi::SELF);
+    LOG(V5_DEBG, "%s : aggr=%i max_self=%i max_total=%i\n", _job->toStr(), 
+            _num_aggregated_nodes, selfSize, totalSize);
+
+    // Locally collect clauses from own solvers, add to clause buffer
+    std::vector<int> selfClauses;
+    // If not fully initialized yet, broadcast an empty set of clauses
+    if (_job->getState() != ACTIVE || !_job->isInitialized() || !_job->hasPreparedSharing()) {
+        selfClauses = std::vector<int>();
+    } else {
+        // Else, retrieve clauses from solvers
+        LOG(V4_VVER, "%s : collect s<=%i\n", 
+                    _job->toStr(), selfSize);
+        Checksum checksum;
+        selfClauses = _job->getPreparedClauses(checksum);
+    }
+    _clause_buffers.push_back(std::move(selfClauses));
+}
+
+void AnytimeSatClauseCommunicator::Session::initiateMergeOfClauseBuffers() {
+
+    assert(!_is_done_merging);
+    assert(_clause_buffers_being_merged.empty());
+
+    _stage = MERGING;
+
+    int numBuffersMerging = 0;
+    for (auto& buffer : _clause_buffers) {
+        _clause_buffers_being_merged.push_back(std::move(buffer));
+        numBuffersMerging++;
+        if (numBuffersMerging >= 4) break;
+    }
+
+    if (numBuffersMerging >= 4) {
+        LOG(V1_WARN, "[WARN] %s : merging %i/%i local buffers\n", 
+            _job->toStr(), numBuffersMerging, _clause_buffers.size());
+    }
+
+    // Remove merged clause buffers
+    for (size_t i = 0; i < numBuffersMerging; i++) {
+        _clause_buffers.pop_front();
+    }
+    
+    // Merge all collected buffer into a single buffer
+    int totalSize = _job->getBufferLimit(_num_aggregated_nodes, MyMpi::ALL);
+    LOG(V4_VVER, "%s : merge n=%i s<=%i\n", 
+                _job->toStr(), numBuffersMerging, totalSize);
+    
+    // Start asynchronous task to merge the clause buffers 
+    _merge_future = ProcessWideThreadPool::get().addTask([this, totalSize]() {
+        auto merger = _cdb.getBufferMerger(totalSize);
+        for (auto& buffer : _clause_buffers_being_merged) {
+            merger.add(_cdb.getBufferReader(buffer.data(), buffer.size()));
+        }    
+        std::vector<int> result = merger.merge(&_excess_clauses_from_merge);
+        _clause_buffers_being_merged.resize(1);
+        _clause_buffers_being_merged.front() = std::move(result);
+        _is_done_merging = true;
+    });
+}
+
+std::vector<int> AnytimeSatClauseCommunicator::Session::getMergedClauseBuffer() {
 
     assert(_merge_future.valid());
     _merge_future.get();
@@ -178,55 +308,28 @@ std::vector<int> AnytimeSatClauseCommunicator::getMergedClauseBuffer() {
     return result;
 }
 
-void AnytimeSatClauseCommunicator::publishMergedClauses() {
+void AnytimeSatClauseCommunicator::Session::publishMergedClauses() {
 
-    // Merge all collected clauses, reset buffers
-    std::vector<int> clausesToShare = getMergedClauseBuffer();
-
-    if (_job->getJobTree().isRoot()) {
-        // Rank zero: proceed to broadcast
-        _current_epoch++;
-        LOG(V3_VERB, "%s epoch %i: Broadcast clauses from %i sources\n", _job->toStr(), 
-            _current_epoch, _num_aggregated_nodes);
-        // Share complete set of clauses to children
-        broadcastAndProcess(clausesToShare);
-    } else {
-        // Send set of clauses to parent
-        int parentRank = _job->getJobTree().getParentNodeRank();
-        JobMessage msg;
-        msg.jobId = _job->getId();
-        msg.revision = _job->getRevision();
-        msg.epoch = 0; // unused
-        msg.tag = MSG_GATHER_CLAUSES;
-        msg.payload = clausesToShare;
-        LOG_ADD_DEST(V4_VVER, "%s : gather s=%i", parentRank, _job->toStr(), msg.payload.size());
-        msg.payload.push_back(_num_aggregated_nodes);
-        if (_use_checksums) {
-            msg.checksum.combine(msg.jobId);
-            for (int& lit : msg.payload) msg.checksum.combine(lit);
-        }
-        MyMpi::isend(parentRank, MSG_SEND_APPLICATION_MESSAGE, msg);
-    }
-
+    // Send set of clauses to parent (possibly yourself, if root)
+    JobMessage msg;
+    msg.jobId = _job->getId();
+    msg.revision = _job->getRevision();
+    msg.epoch = _epoch;
+    msg.tag = MSG_GATHER_CLAUSES;
+    msg.payload = getMergedClauseBuffer();
+    msg.payload.push_back(_num_aggregated_nodes);
+    advanceCollective(_job, msg, MSG_DISTRIBUTE_CLAUSES);
+    
     _num_aggregated_nodes = 0;
 }
 
-void AnytimeSatClauseCommunicator::broadcastAndProcess(std::vector<int>& clauses) {
-
-    sendClausesToChildren(clauses);
-
-    if (!_params.distributedDuplicateDetection()) {
-        // Just import the clauses and conclude this epoch
-        learnClauses(clauses);
-        _time_of_last_epoch_conclusion = Timer::elapsedSeconds();
-        _stage = IDLE;
-        return;
-    }
+void AnytimeSatClauseCommunicator::Session::processBroadcastClauses(std::vector<int>& clauses) {
 
     // Filter the clauses
     assert(!_is_done_filtering);
     _clause_buffer_being_filtered = std::move(clauses);
     _stage = PREPARING_FILTER;
+    _desired_num_child_buffers = _job->getJobTree().getNumChildren();
     _filter_future = ProcessWideThreadPool::get().addTask([&]() {
         
         auto reader = _cdb.getBufferReader(_clause_buffer_being_filtered.data(), _clause_buffer_being_filtered.size());
@@ -242,7 +345,7 @@ void AnytimeSatClauseCommunicator::broadcastAndProcess(std::vector<int>& clauses
                 shift = 0;
             }
             
-            if (!_filter.passClause(clause, _current_epoch)) {
+            if (!_filter.passClause(clause, _epoch)) {
                 auto bitFiltered = 1 << shift;
                 _local_filter_bitset.back() |= bitFiltered;
             }
@@ -255,7 +358,7 @@ void AnytimeSatClauseCommunicator::broadcastAndProcess(std::vector<int>& clauses
     });
 }
 
-void AnytimeSatClauseCommunicator::addFilter(std::vector<int>& filter) {
+void AnytimeSatClauseCommunicator::Session::addFilter(std::vector<int>& filter) {
     
     LOG(V4_VVER, "adding filter\n");
 
@@ -269,54 +372,28 @@ void AnytimeSatClauseCommunicator::addFilter(std::vector<int>& filter) {
     _num_aggregated_filters++;
 
     // All necessary filters aggregated?
-    int numDesiredFilters = 1;
-    if (_job->getJobTree().hasLeftChild()) numDesiredFilters++;
-    if (_job->getJobTree().hasRightChild()) numDesiredFilters++;
-    if (_num_aggregated_filters == numDesiredFilters) {
+    int numDesiredFilters = 1 + _desired_num_child_buffers;
+    if (_num_aggregated_filters >= numDesiredFilters) {
         // Can now publish the completed filter
         _stage = WAITING_FOR_FILTER_BCAST;
-        publishAggregatedFilter();
+        publishLocalAggregatedFilter();
     }
 }
 
-void AnytimeSatClauseCommunicator::publishAggregatedFilter() {
+void AnytimeSatClauseCommunicator::Session::publishLocalAggregatedFilter() {
 
     JobMessage msg;
     msg.jobId = _job->getId();
-    msg.epoch = _current_epoch;
+    msg.epoch = _epoch;
     msg.revision = _job->getRevision();
     msg.payload = std::move(_aggregated_filter_bitset);
-
-    if (_job->getJobTree().isRoot()) {
-
-        std::string str;
-        for (size_t i = 0; i < msg.payload.size(); i++) {
-            for (int shift = 0; shift < 32; shift++) {
-                str += ((msg.payload[i] & (1 << shift)) == 0) ? "0" : "1";
-            }
-        }
-        LOG(V4_VVER, "Filter: %s\n", str.c_str());
-
-        // Broadcast filter
-        msg.tag = MSG_DISTRIBUTE_FILTER;
-        if (_job->getJobTree().hasLeftChild())
-            MyMpi::isend(_job->getJobTree().getLeftChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
-        if (_job->getJobTree().hasRightChild())
-            MyMpi::isend(_job->getJobTree().getRightChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
-        // Digest clauses with filter applied
-        auto finalClauseBuffer = applyFilter(msg.payload, _clause_buffer_being_filtered);
-        learnClauses(finalClauseBuffer);
-    } else {
-        // Send filter upwards
-        msg.tag = MSG_GATHER_FILTER;
-        int dest = _job->getJobTree().getParentNodeRank();
-        MyMpi::isend(dest, MSG_SEND_APPLICATION_MESSAGE, msg);
-    }
+    msg.tag = MSG_GATHER_FILTER;
+    advanceCollective(_job, msg, MSG_DISTRIBUTE_FILTER);
 
     _num_aggregated_filters = 0;
 }
 
-std::vector<int> AnytimeSatClauseCommunicator::applyFilter(const std::vector<int>& filter, std::vector<int>& clauses) {
+std::vector<int> AnytimeSatClauseCommunicator::Session::applyGlobalFilter(const std::vector<int>& filter, std::vector<int>& clauses) {
 
     size_t clsIdx = 0;
     size_t filterIdx = 0;
@@ -345,14 +422,10 @@ std::vector<int> AnytimeSatClauseCommunicator::applyFilter(const std::vector<int
         LOG(V4_VVER, "%s : %i/%i passed global filter\n", _job->toStr(), writer.getNumAddedClauses(), clsIdx);
     }
 
-    // Conclude this sharing epoch
-    _time_of_last_epoch_conclusion = Timer::elapsedSeconds();
-    _stage = IDLE;
-
     return writer.extractBuffer();
 }
 
-void AnytimeSatClauseCommunicator::learnClauses(std::vector<int>& clauses) {
+void AnytimeSatClauseCommunicator::learnClauses(std::vector<int>& clauses, int epoch, bool writeIntoClauseHistory) {
     LOG(V4_VVER, "%s : learn s=%i\n", _job->toStr(), clauses.size());
     
     if (clauses.size() > 0) {
@@ -365,131 +438,18 @@ void AnytimeSatClauseCommunicator::learnClauses(std::vector<int>& clauses) {
             return;
         }
 
-        // Compute checksum for this set of clauses
-        Checksum checksum;
-        if (_use_checksums) {
-            checksum.combine(_job->getId());
-            for (int lit : clauses) checksum.combine(lit);
-        }
-
         // Locally digest clauses
         LOG(V4_VVER, "%s : digest\n", _job->toStr());
+        Checksum checksum;
         _job->digestSharing(clauses, checksum);
         LOG(V4_VVER, "%s : digested\n", _job->toStr());
     }
-}
 
-void AnytimeSatClauseCommunicator::sendClausesToChildren(std::vector<int>& clauses) {
-    
-    // Send clauses to children
-    JobMessage msg;
-    msg.jobId = _job->getId();
-    msg.revision = _job->getRevision();
-    msg.epoch = _current_epoch;
-    msg.tag = MSG_DISTRIBUTE_CLAUSES;
-    msg.payload = clauses;
-
-    if (_use_checksums) {
-        msg.checksum.combine(msg.jobId);
-        for (int& lit : msg.payload) msg.checksum.combine(lit);
-    }
-
-    int childRank;
-    if (_job->getJobTree().hasLeftChild()) {
-        childRank = _job->getJobTree().getLeftChildNodeRank();
-        LOG_ADD_DEST(V4_VVER, "%s : broadcast s=%i", childRank, _job->toStr(), msg.payload.size());
-        MyMpi::isend(childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
-    }
-    if (_job->getJobTree().hasRightChild()) {
-        childRank = _job->getJobTree().getRightChildNodeRank();
-        LOG_ADD_DEST(V4_VVER, "%s : broadcast s=%i", childRank, _job->toStr(), msg.payload.size());
-        MyMpi::isend(childRank, MSG_SEND_APPLICATION_MESSAGE, msg);
-    }
-
-    if (_use_cls_history) {
+    if (writeIntoClauseHistory) {
         // Add clause batch to history
-        _cls_history.addEpoch(msg.epoch, msg.payload, /*entireIndex=*/false);
+        _cls_history.addEpoch(epoch, clauses, /*entireIndex=*/false);
 
         // Send next batches of historic clauses to subscribers as necessary
         _cls_history.sendNextBatches();
     }
-}
-
-void AnytimeSatClauseCommunicator::initiateMergeOfClauseBuffers() {
-
-    // +1 for local clauses, but at most as many contributions as there are nodes
-    _num_aggregated_nodes = std::min(_num_aggregated_nodes+1, _job->getJobTree().getCommSize());
-
-    assert(_num_aggregated_nodes > 0);
-    int totalSize = getBufferLimit(_num_aggregated_nodes, MyMpi::ALL);
-    int selfSize = getBufferLimit(_num_aggregated_nodes, MyMpi::SELF);
-    LOG(V5_DEBG, "%s : aggr=%i max_self=%i max_total=%i\n", _job->toStr(), 
-            _num_aggregated_nodes, selfSize, totalSize);
-
-    // Locally collect clauses from own solvers, add to clause buffer
-    std::vector<int> selfClauses;
-    // If not fully initialized yet, broadcast an empty set of clauses
-    if (_job->getState() != ACTIVE || !_job->isInitialized() || !_job->hasPreparedSharing()) {
-        selfClauses = getEmptyBuffer();
-    } else {
-        // Else, retrieve clauses from solvers
-        LOG(V4_VVER, "%s : collect s<=%i\n", 
-                    _job->toStr(), selfSize);
-        Checksum checksum;
-        selfClauses = _job->getPreparedClauses(checksum);
-        if (_use_checksums) {
-            // Verify checksum of clause buffer from solver backend
-            Checksum chk;
-            chk.combine(_job->getId());
-            for (int lit : selfClauses) chk.combine(lit);
-            if (checksum.get() != chk.get()) {
-                LOG(V1_WARN, "[WARN] %s : checksum fail in clsbuf (expected count: %ld, actual count: %ld)\n", 
-                _job->toStr(), checksum.count(), chk.count());
-                selfClauses = getEmptyBuffer();
-            }
-        }
-        //testConsistency(selfClauses, 0 /*do not check buffer's size limit*/, /*sortByLbd=*/_sort_by_lbd);
-    }
-    _clause_buffers.push_back(std::move(selfClauses));
-
-    assert(!_is_done_merging);
-    assert(_clause_buffers_being_merged.empty());
-
-    int numBuffersMerging = 0;
-    for (auto& buffer : _clause_buffers) {
-        _clause_buffers_being_merged.push_back(std::move(buffer));
-        numBuffersMerging++;
-        if (numBuffersMerging >= 4) break;
-    }
-
-    if (numBuffersMerging >= 4) {
-        LOG(V1_WARN, "[WARN] %s : merging %i/%i local buffers\n", 
-            _job->toStr(), numBuffersMerging, _clause_buffers.size());
-    }
-
-    // Remove merged clause buffers
-    for (size_t i = 0; i < numBuffersMerging; i++) {
-        _clause_buffers.pop_front();
-    }
-    
-    // Merge all collected buffer into a single buffer
-    LOG(V4_VVER, "%s : merge n=%i s<=%i\n", 
-                _job->toStr(), numBuffersMerging, totalSize);
-    
-    // Start asynchronous task to merge the clause buffers 
-    assert(_stage == MERGING);
-    _merge_future = ProcessWideThreadPool::get().addTask([this, totalSize]() {
-        auto merger = _cdb.getBufferMerger(totalSize);
-        for (auto& buffer : _clause_buffers_being_merged) {
-            merger.add(_cdb.getBufferReader(buffer.data(), buffer.size()));
-        }    
-        std::vector<int> result = merger.merge(&_excess_clauses_from_merge);
-        _clause_buffers_being_merged.resize(1);
-        _clause_buffers_being_merged.front() = std::move(result);
-        _is_done_merging = true;
-    });
-}
-
-void AnytimeSatClauseCommunicator::feedHistoryIntoSolver() {
-    if (_use_cls_history) _cls_history.feedHistoryIntoSolver();
 }
