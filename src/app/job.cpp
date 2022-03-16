@@ -220,7 +220,7 @@ void Job::communicate() {
     appl_communicate();
 }
 
-void Job::communicate(int source, JobMessage& msg) {
+void Job::communicate(int source, int mpiTag, JobMessage& msg) {
     if (_state == ACTIVE && _comm.handle(msg)) {
         if (msg.tag == MSG_BROADCAST_RANKLIST && _job_tree.isRoot()) {
             // Check size of job comm compared to scheduler's job volume
@@ -229,6 +229,6 @@ void Job::communicate(int source, JobMessage& msg) {
             }
         }
     } else {
-        appl_communicate(source, msg);
+        appl_communicate(source, mpiTag, msg);
     }
 }

@@ -12,6 +12,7 @@
 #include "base_sat_job.hpp"
 #include "clause_history.hpp"
 #include "distributed_clause_filter.hpp"
+#include "comm/job_tree_all_reduction.hpp"
 
 class AnytimeSatClauseCommunicator {
 
@@ -44,29 +45,55 @@ private:
         AdaptiveClauseDatabase& _cdb;
         DistributedClauseFilter& _filter;
         int _epoch;
-        Stage _stage = PREPARING_CLAUSES;
 
-        int _num_aggregated_nodes = 0;
-        std::list<std::vector<int>> _clause_buffers;
-        int _desired_num_child_buffers;
-
-        std::list<std::vector<int>> _clause_buffers_being_merged;
         std::vector<int> _excess_clauses_from_merge;
-        bool _is_done_merging = false;
-        std::future<void> _merge_future;
-        
-        std::vector<int> _clause_buffer_being_filtered;
-        std::vector<int> _local_filter_bitset;
-        bool _is_done_filtering = false;
-        std::future<void> _filter_future;
+        std::vector<int> _broadcast_clause_buffer;
 
-        std::vector<int> _aggregated_filter_bitset;
-        int _num_aggregated_filters = 0;
-
-
+        JobTreeAllReduction _allreduce_clauses;
+        JobTreeAllReduction _allreduce_filter;
 
         Session(const Parameters& params, BaseSatJob* job, AdaptiveClauseDatabase& cdb, DistributedClauseFilter& filter, int epoch) : 
-            _params(params), _job(job), _cdb(cdb), _filter(filter), _epoch(epoch) {}
+            _params(params), _job(job), _cdb(cdb), _filter(filter), _epoch(epoch),
+            _allreduce_clauses(
+                job->getJobTree(),
+                // Base message 
+                JobMessage(_job->getId(), _job->getRevision(), epoch, MSG_ALLREDUCE_CLAUSES),
+                // Neutral element
+                std::vector<int>(1, 1), 
+                // Aggregator for local + incoming elements
+                [&](std::list<std::vector<int>>& elems) {
+                    int numAggregated = 0;
+                    for (auto& elem : elems) {
+                        numAggregated += elem.back();
+                        elem.pop_back();
+                    }
+                    auto merger = _cdb.getBufferMerger(_job->getBufferLimit(numAggregated, MyMpi::ALL));
+                    for (auto& elem : elems) {
+                        merger.add(_cdb.getBufferReader(elem.data(), elem.size()));
+                    }
+                    return merger.merge(&_excess_clauses_from_merge);
+                }
+            ),
+            _allreduce_filter(
+                job->getJobTree(), 
+                // Base message
+                JobMessage(_job->getId(), _job->getRevision(), epoch, MSG_ALLREDUCE_FILTER),
+                // Neutral element
+                std::vector<int>(),
+                // Aggregator for local + incoming elements
+                [&](std::list<std::vector<int>>& elems) {
+                    std::vector<int> filter = std::move(elems.front());
+                    elems.pop_front();
+                    for (auto& elem : elems) {
+                        if (filter.size() < elem.size()) 
+                            filter.resize(elem.size());
+                        for (size_t i = 0; i < elem.size(); i++) {
+                            filter[i] |= elem[i];
+                        }
+                    }
+                    return filter;
+                }
+            ) { }
 
         void storePreparedClauseBuffer();
 
@@ -83,14 +110,7 @@ private:
         std::vector<int> merge(size_t maxSize);
 
         bool isDestructible() {
-            if (_merge_future.valid() && !_is_done_merging) return false;
-            if (_filter_future.valid() && !_is_done_filtering) return false;
-            return true;
-        }
-
-        ~Session() {
-            if (_merge_future.valid()) _merge_future.get();
-            if (_filter_future.valid()) _filter_future.get();
+            return _allreduce_clauses.isDestructible() && _allreduce_filter.isDestructible();
         }
     };
 
@@ -124,7 +144,7 @@ public:
     ~AnytimeSatClauseCommunicator() {}
 
     void communicate();
-    void handle(int source, JobMessage& msg);
+    void handle(int source, int mpiTag, JobMessage& msg);
     void feedHistoryIntoSolver();
     bool isDestructible() {
         for (auto& session : _sessions) if (!session.isDestructible()) return false;

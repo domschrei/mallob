@@ -111,6 +111,10 @@ void Worker::init() {
         [&](auto& h) {handleSendApplicationMessage(h);});
     q.registerCallback(MSG_RETURN_APPLICATION_MESSAGE, 
         [&](auto& h) {handleSendApplicationMessage(h);});
+    q.registerCallback(MSG_JOB_TREE_REDUCTION, 
+        [&](auto& h) {handleSendApplicationMessage(h);});
+    q.registerCallback(MSG_JOB_TREE_BROADCAST, 
+        [&](auto& h) {handleSendApplicationMessage(h);});
     q.registerCallback(MSG_SEND_JOB_DESCRIPTION, 
         [&](auto& h) {handleSendJobDescription(h);});
     q.registerCallback(MSG_NOTIFY_ASSIGNMENT_UPDATE, 
@@ -705,6 +709,7 @@ void Worker::handleSendApplicationMessage(MessageHandle& handle) {
     JobMessage msg = Serializable::get<JobMessage>(handle.getRecvData());
     if (handle.tag == MSG_RETURN_APPLICATION_MESSAGE) {
         msg.returnedToSender = true;
+        handle.tag = MSG_SEND_APPLICATION_MESSAGE;
     }
 
     int jobId = msg.jobId;
@@ -717,7 +722,7 @@ void Worker::handleSendApplicationMessage(MessageHandle& handle) {
 
     // Give message to corresponding job
     Job& job = _job_db.get(jobId);
-    job.communicate(handle.source, msg);
+    job.communicate(handle.source, handle.tag, msg);
 }
 
 void Worker::handleOfferAdoption(MessageHandle& handle) {

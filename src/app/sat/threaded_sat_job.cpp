@@ -142,9 +142,9 @@ void ThreadedSatJob::appl_communicate() {
     ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
 }
 
-void ThreadedSatJob::appl_communicate(int source, JobMessage& msg) {
+void ThreadedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
     if (!_initialized || getState() != ACTIVE) return;
-    ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, msg);
+    ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, mpiTag, msg);
 }
 
 bool ThreadedSatJob::isInitialized() {

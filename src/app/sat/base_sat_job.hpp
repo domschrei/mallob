@@ -34,7 +34,7 @@ public:
     virtual JobResult&& appl_getResult() = 0;
     
     virtual void appl_communicate() = 0;
-    virtual void appl_communicate(int source, JobMessage& msg) = 0;
+    virtual void appl_communicate(int source, int mpiTag, JobMessage& msg) = 0;
     
     virtual void appl_dumpStats() = 0;
     virtual bool appl_isDestructible() = 0;

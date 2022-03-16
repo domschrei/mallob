@@ -97,7 +97,7 @@ public:
     /*
     Advance a job communication phase by processing the given message.
     */
-    virtual void appl_communicate(int source, JobMessage& msg) = 0;
+    virtual void appl_communicate(int source, int mpiTag, JobMessage& msg) = 0;
     /*
     Output some statistics about this job instance's solving attempt. 
     This can include CPU utilization per thread,
@@ -200,7 +200,7 @@ public:
 
     // Initiate a communication with other nodes in the associated job tree.
     void communicate(); // outgoing
-    void communicate(int source, JobMessage& msg); // incoming (+ outgoing)
+    void communicate(int source, int mpiTag, JobMessage& msg); // incoming (+ outgoing)
 
     // Interrupt the execution of solvers and withdraw the associated solvers 
     // and the job's payload. Only leaves behind the job's meta data.
