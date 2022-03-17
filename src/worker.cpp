@@ -109,8 +109,6 @@ void Worker::init() {
         [&](auto& h) {handleRequestNode(h, JobDatabase::JobRequestMode::TARGETED_REJOIN);});
     q.registerCallback(MSG_SEND_APPLICATION_MESSAGE, 
         [&](auto& h) {handleSendApplicationMessage(h);});
-    q.registerCallback(MSG_RETURN_APPLICATION_MESSAGE, 
-        [&](auto& h) {handleSendApplicationMessage(h);});
     q.registerCallback(MSG_JOB_TREE_REDUCTION, 
         [&](auto& h) {handleSendApplicationMessage(h);});
     q.registerCallback(MSG_JOB_TREE_BROADCAST, 
@@ -707,16 +705,13 @@ void Worker::handleSendApplicationMessage(MessageHandle& handle) {
 
     // Deserialize job-specific message
     JobMessage msg = Serializable::get<JobMessage>(handle.getRecvData());
-    if (handle.tag == MSG_RETURN_APPLICATION_MESSAGE) {
-        msg.returnedToSender = true;
-        handle.tag = MSG_SEND_APPLICATION_MESSAGE;
-    }
 
     int jobId = msg.jobId;
     if (!_job_db.has(jobId)) {
         LOG(V1_WARN, "[WARN] Job message from unknown job #%i\n", jobId);
         if (!msg.returnedToSender)
-            MyMpi::isend(handle.source, MSG_RETURN_APPLICATION_MESSAGE, msg);
+            msg.returnedToSender = true;
+            MyMpi::isend(handle.source, handle.tag, msg);
         return;
     }
 

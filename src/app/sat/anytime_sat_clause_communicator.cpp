@@ -202,6 +202,7 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
     // Initial signal to initiate a sharing epoch
     if (msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
         _current_epoch = msg.epoch;
+        LOG(V5_DEBG, "%s : INIT COMM e=%i\n", _job->toStr(), _current_epoch);
         _sessions.emplace_back(_params, _job, _cdb, _filter, _current_epoch);
         if (!_job->hasPreparedSharing()) {
             int limit = _job->getBufferLimit(1, MyMpi::SELF);

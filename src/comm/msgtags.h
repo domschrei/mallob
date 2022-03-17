@@ -113,7 +113,6 @@ Tag for the job-internal, application-specific communication inside a job.
 The payload should contain another job-internal message tag.
 */
 const int MSG_SEND_APPLICATION_MESSAGE = 30;
-const int MSG_RETURN_APPLICATION_MESSAGE = 31;
 /*
 The receiver is queried to begin working as the i-th node of job j.
 The sender hopes that the receiver still remembers job j as the 
