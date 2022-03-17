@@ -59,15 +59,21 @@ void AnytimeSatClauseCommunicator::communicate() {
     }
 
     // root: initiate sharing
-    if (_job->getJobTree().isRoot() && 
-            _time_of_last_epoch_conclusion > 0 &&
-            Timer::elapsedSeconds() - _time_of_last_epoch_initiation >= _params.appCommPeriod()) {
-        _current_epoch++;
-        JobMessage msg(_job->getId(), _job->getRevision(), _current_epoch, MSG_INITIATE_CLAUSE_SHARING);
-        _time_of_last_epoch_initiation = Timer::elapsedSeconds();
-        _time_of_last_epoch_conclusion = 0;
-        // Self message to initiate clause sharing
-        MyMpi::isend(_job->getJobTree().getRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+    if (_job->getJobTree().isRoot()) {
+        bool nextEpochDue = Timer::elapsedSeconds() - _time_of_last_epoch_initiation >= _params.appCommPeriod();
+        bool lastEpochDone = _time_of_last_epoch_conclusion > 0;
+        if (nextEpochDue && !lastEpochDone) {
+            LOG(V1_WARN, "[WARN] %s : Next epoch over-due!\n", _job->toStr());
+        }
+        if (nextEpochDue && lastEpochDone) {
+            _current_epoch++;
+            JobMessage msg(_job->getId(), _job->getRevision(), _current_epoch, MSG_INITIATE_CLAUSE_SHARING);
+            _time_of_last_epoch_initiation = Timer::elapsedSeconds();
+            _time_of_last_epoch_conclusion = 0;
+            // Self message to initiate clause sharing
+            MyMpi::isend(_job->getJobTree().getRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+            return;
+        }
     }
 
     if (_sessions.empty()) return;
