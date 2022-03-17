@@ -10,7 +10,7 @@
 class DistributedClauseFilter {
 
 private:
-    robin_hood::unordered_flat_map<Mallob::Clause, int, ClauseHasher, SortedClauseExactEquals> _filter;
+    robin_hood::unordered_flat_map<Mallob::Clause, int, NonCommutativeClauseHasher, SortedClauseExactEquals> _filter;
 
     int _last_index = -1;
     int _last_volume = -1;

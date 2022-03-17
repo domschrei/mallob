@@ -236,7 +236,7 @@ template <typename T>
 struct ProducedClauseHasher {
     std::size_t inline operator()(const T& producedClause) const {
         assert(producedClause.valid());
-        return Mallob::ClauseHasher::hash(prod_cls::data(producedClause), prod_cls::size(producedClause), 3);
+        return Mallob::nonCommutativeHash(prod_cls::data(producedClause), prod_cls::size(producedClause), 3);
     }
 };
 

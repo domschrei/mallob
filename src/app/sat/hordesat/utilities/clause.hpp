@@ -38,7 +38,7 @@ namespace Mallob {
         }
     };
 
-    inline size_t fastHash(const int* begin, int size, int which = 3) {
+    inline size_t commutativeHash(const int* begin, int size, int which = 3) {
         static unsigned const int primes [] = 
             {2038072819, 2038073287, 2038073761, 2038074317,
             2038072823,	2038073321,	2038073767, 2038074319,
@@ -53,6 +53,7 @@ namespace Mallob {
         return res;
     }
 
+    /*
     inline size_t qualityHash(const int* begin, int size, int which = 3) {
         size_t res = robin_hood::hash_int(size + which);
         for (auto it = begin; it != begin+size; it++) {
@@ -61,10 +62,20 @@ namespace Mallob {
         }
         return res;
     }
+    */
 
-    struct QualityClauseHasher {
+    inline size_t nonCommutativeHash(const int* begin, int size, int which = 3) {
+        
+        size_t res = robin_hood::hash_int(size * which);
+        for (size_t i = 0; i < size; i++) {
+            hash_combine(res, begin[i]);
+        }
+        return res;
+    }
+
+    struct NonCommutativeClauseHasher {
         std::size_t inline operator()(const Clause& cls) const {
-            return qualityHash(cls.begin, cls.size);
+            return nonCommutativeHash(cls.begin, cls.size);
         }
     };
 
@@ -79,7 +90,7 @@ namespace Mallob {
 
         static inline size_t hash(const int* begin, int size, int which) {
             //return Mallob::fastHash(begin, size, which);
-            return Mallob::qualityHash(begin, size, which);
+            return Mallob::commutativeHash(begin, size, which);
         }
 
         std::size_t inline operator()(const std::vector<int>& cls) const {

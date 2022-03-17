@@ -90,7 +90,7 @@ void AnytimeSatClauseCommunicator::communicate() {
     if (!session.isValid()) return;
 
     // Done preparing sharing?
-    if (_job->hasPreparedSharing()) {
+    if (!session._allreduce_clauses.hasProducer() && _job->hasPreparedSharing()) {
         // Produce contribution to all-reduction of clauses
         LOG(V5_DEBG, "%s : PRODUCE e=%i\n", _job->toStr(), session._epoch);
         session._allreduce_clauses.produce([&]() {
