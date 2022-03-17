@@ -138,12 +138,18 @@ bool ThreadedSatJob::appl_isDestructible() {
 }
 
 void ThreadedSatJob::appl_communicate() {
-    if (!_initialized || getState() != ACTIVE) return;
+    if (!_initialized) return;
     ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
 }
 
 void ThreadedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    if (!_initialized || getState() != ACTIVE) return;
+    if (!_initialized) {
+        if (!msg.returnedToSender) {
+            msg.returnedToSender = true;
+            MyMpi::isend(source, mpiTag, msg);
+        }
+        return;
+    }
     ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, mpiTag, msg);
 }
 
