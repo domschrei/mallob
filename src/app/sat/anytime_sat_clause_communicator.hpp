@@ -38,7 +38,7 @@ private:
     ClauseHistory _cls_history;
     DistributedClauseFilter _filter;
     float _compensation_factor = 1.0f;
-    float _compensation_decay = 0.9;
+    float _compensation_decay = 0.6;
 
     struct Session {
 
