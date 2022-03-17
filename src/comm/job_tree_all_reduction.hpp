@@ -28,6 +28,7 @@ private:
     std::function<AllReduceElement(std::list<AllReduceElement>&)> _aggregator;
     std::optional<AllReduceElement> _aggregated_elem;
 
+    bool _has_producer = false;
     bool _reduction_locally_done = false;
     bool _finished = false;
     bool _valid = true;
@@ -42,6 +43,8 @@ public:
     // This function is invoked immediately in a separate thread.
     void produce(std::function<AllReduceElement()> localProducer) {
 
+        assert(!_has_producer);
+        _has_producer = true;
         assert(!_producing);
         assert(!_future_produce.valid());
 
@@ -127,6 +130,7 @@ public:
         _valid = false;
     }
 
+    bool hasProducer() const {return _has_producer;}
     bool isValid() const {return _valid;}
 
     // Whether the final result to the all-reduction is present.

@@ -198,9 +198,10 @@ void HordeProcessAdapter::collectClauses(int maxSize) {
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 bool HordeProcessAdapter::hasCollectedClauses() {
-    return _initialized && _hsm->doExport && _hsm->didExport;
+    return !_initialized || (_hsm->doExport && _hsm->didExport);
 }
 std::vector<int> HordeProcessAdapter::getCollectedClauses(Checksum& checksum) {
+    if (!_initialized) return std::vector<int>();
     if (!hasCollectedClauses()) return std::vector<int>();
     std::vector<int> clauses(_export_buffer, _export_buffer+_hsm->exportBufferTrueSize);
     checksum = _hsm->exportChecksum;

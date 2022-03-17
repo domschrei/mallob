@@ -87,6 +87,9 @@ void AnytimeSatClauseCommunicator::communicate() {
             Checksum checksum;
             return _job->getPreparedClauses(checksum);
         });
+    } else if (!session._allreduce_clauses.hasProducer()) {
+        // No sharing prepared yet: Retry
+        _job->prepareSharing(_job->getBufferLimit(1, MyMpi::SELF));
     }
     
     // Advance all-reduction of clauses

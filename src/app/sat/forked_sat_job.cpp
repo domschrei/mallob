@@ -182,11 +182,12 @@ void ForkedSatJob::prepareSharing(int maxSize) {
     _solver->collectClauses(maxSize);
 }
 bool ForkedSatJob::hasPreparedSharing() {
-    if (!_initialized) return false;
+    if (!_initialized) return true;
     return _solver->hasCollectedClauses();
 }
 std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum) {
-    if (!_initialized) return std::vector<int>();
+    if (!_initialized || !_solver->hasCollectedClauses()) 
+        return std::vector<int>();
     return _solver->getCollectedClauses(checksum);
 }
 

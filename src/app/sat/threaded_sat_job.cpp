@@ -152,6 +152,9 @@ bool ThreadedSatJob::isInitialized() {
     return _solver->isFullyInitialized();
 }
 void ThreadedSatJob::prepareSharing(int maxSize) {
+    // Already prepared sharing?
+    if (!_clause_buffer.empty()) return;
+    
     _clause_buffer.resize(maxSize);
     _clause_checksum = Checksum();
     int actualSize = _solver->prepareSharing(_clause_buffer.data(), maxSize, _clause_checksum);
