@@ -32,6 +32,11 @@ void AnytimeSatClauseCommunicator::communicate() {
         // suspended!
         _suspended = true;
         if (_use_cls_history) _cls_history.onSuspend();
+        // cancel any active sessions, sending neutral element upwards
+        for (auto& session : _sessions) {
+            session._allreduce_clauses.cancel();
+            session._allreduce_filter.cancel();
+        }
         return;
     }
     if (_suspended) {
@@ -67,6 +72,7 @@ void AnytimeSatClauseCommunicator::communicate() {
 
     if (_sessions.empty()) return;
     auto& session = currentSession();
+    if (!session.isValid()) return;
 
     // Done preparing sharing?
     if (_job->hasPreparedSharing()) {
@@ -196,11 +202,11 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
 
     // Advance all-reductions
     bool success;
-    if (!_sessions.empty() && msg.tag == MSG_ALLREDUCE_CLAUSES) {
+    if (!_sessions.empty() && msg.tag == MSG_ALLREDUCE_CLAUSES && currentSession()._allreduce_clauses.isValid()) {
         success = currentSession()._allreduce_clauses.receive(source, mpiTag, msg);
         currentSession()._allreduce_clauses.advance();
     }
-    if (!_sessions.empty() && msg.tag == MSG_ALLREDUCE_FILTER) {
+    if (!_sessions.empty() && msg.tag == MSG_ALLREDUCE_FILTER && currentSession()._allreduce_filter.isValid()) {
         success = currentSession()._allreduce_filter.receive(source, mpiTag, msg);
         currentSession()._allreduce_filter.advance();
     }

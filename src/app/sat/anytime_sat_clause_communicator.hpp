@@ -109,6 +109,10 @@ private:
 
         std::vector<int> merge(size_t maxSize);
 
+        bool isValid() const {
+            return _allreduce_clauses.isValid() || _allreduce_filter.isValid();
+        }
+
         bool isDestructible() {
             return _allreduce_clauses.isDestructible() && _allreduce_filter.isDestructible();
         }

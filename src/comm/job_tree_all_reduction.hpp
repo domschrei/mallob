@@ -28,6 +28,7 @@ private:
     std::function<AllReduceElement(std::list<AllReduceElement>&)> _aggregator;
     std::optional<AllReduceElement> _aggregated_elem;
 
+    bool _reduction_locally_done = false;
     bool _finished = false;
     bool _valid = true;
 
@@ -99,6 +100,7 @@ public:
         if (!_aggregating && _future_aggregate.valid()) {
             // Aggregation done
             _future_aggregate.get();
+            _reduction_locally_done = true;
             
             if (_tree.isRoot()) {
                 // Begin broadcast
@@ -110,6 +112,22 @@ public:
             }
         }
     }
+
+    void cancel() {
+
+        if (_finished) return;
+
+        if (!_reduction_locally_done) {
+            // Aggregation upwards was not performed yet: Send neutral element upwards
+            _base_msg.payload = _neutral_elem;
+            MyMpi::isend(_tree.getParentNodeRank(), MSG_JOB_TREE_REDUCTION, _base_msg);
+        }
+        // finished but not valid
+        _finished = true;
+        _valid = false;
+    }
+
+    bool isValid() const {return _valid;}
 
     // Whether the final result to the all-reduction is present.
     bool hasResult() const {return _finished && _valid;}
