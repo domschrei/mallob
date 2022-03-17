@@ -419,5 +419,6 @@ void MessageQueue::processSent() {
             h.sendNext();
             _num_concurrent_sends++;
         }
+        ++it;
     }
 }
