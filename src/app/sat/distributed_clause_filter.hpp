@@ -23,7 +23,8 @@ private:
     int _num_remembered_epochs;
 
 public:
-    DistributedClauseFilter(int numRememberedEpochs) : _num_remembered_epochs(numRememberedEpochs) {}
+    DistributedClauseFilter(int numRememberedEpochs) : 
+        _num_remembered_epochs(numRememberedEpochs >= 0 ? numRememberedEpochs : INT32_MAX) {}
 
     void update(int index, int volume) {
         if (index == _last_index && volume == _last_volume) return;

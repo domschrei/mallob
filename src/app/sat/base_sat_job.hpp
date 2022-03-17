@@ -39,12 +39,20 @@ public:
     virtual void appl_dumpStats() = 0;
     virtual bool appl_isDestructible() = 0;
 
+private:
+    float _compensation_factor = 1.0f;
+
+public:
     // Helper methods
 
+    void setSharingCompensationFactor(float compensationFactor) {
+        _compensation_factor = compensationFactor;
+    }
+
     size_t getBufferLimit(int numAggregatedNodes, MyMpi::BufferQueryMode mode) {
-        if (mode == MyMpi::SELF) return _params.clauseBufferBaseSize();
-        return MyMpi::getBinaryTreeBufferLimit(numAggregatedNodes, _params.clauseBufferBaseSize(), 
-            _params.clauseBufferDiscountFactor(), mode);
+        if (mode == MyMpi::SELF) return _compensation_factor * _params.clauseBufferBaseSize();
+        return _compensation_factor * MyMpi::getBinaryTreeBufferLimit(numAggregatedNodes, 
+            _params.clauseBufferBaseSize(), _params.clauseBufferDiscountFactor(), mode);
     }
 
 };

@@ -37,6 +37,8 @@ private:
     AdaptiveClauseDatabase _cdb;
     ClauseHistory _cls_history;
     DistributedClauseFilter _filter;
+    float _compensation_factor = 1.0f;
+    float _compensation_decay = 0.9;
 
     struct Session {
 
@@ -48,6 +50,8 @@ private:
 
         std::vector<int> _excess_clauses_from_merge;
         std::vector<int> _broadcast_clause_buffer;
+        int _num_broadcast_clauses;
+        int _num_admitted_clauses;
 
         JobTreeAllReduction _allreduce_clauses;
         JobTreeAllReduction _allreduce_filter;

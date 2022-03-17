@@ -60,7 +60,8 @@ void AnytimeSatClauseCommunicator::communicate() {
 
     // root: initiate sharing
     if (_job->getJobTree().isRoot()) {
-        bool nextEpochDue = Timer::elapsedSeconds() - _time_of_last_epoch_initiation >= _params.appCommPeriod();
+        auto time = Timer::elapsedSeconds();
+        bool nextEpochDue = time - _time_of_last_epoch_initiation >= _params.appCommPeriod();
         bool lastEpochDone = _time_of_last_epoch_conclusion > 0;
         if (nextEpochDue && !lastEpochDone) {
             LOG(V1_WARN, "[WARN] %s : Next epoch over-due!\n", _job->toStr());
@@ -68,8 +69,16 @@ void AnytimeSatClauseCommunicator::communicate() {
         if (nextEpochDue && lastEpochDone) {
             _current_epoch++;
             JobMessage msg(_job->getId(), _job->getRevision(), _current_epoch, MSG_INITIATE_CLAUSE_SHARING);
-            _time_of_last_epoch_initiation = Timer::elapsedSeconds();
+
+            // Advance initiation time exactly by the specified period 
+            // in order to lose no time for the subsequent epoch
+            _time_of_last_epoch_initiation += _params.appCommPeriod();
+            // If an epoch has already been skipped, just set the initiation to the current time
+            if (time - _time_of_last_epoch_initiation >= _params.appCommPeriod())
+                _time_of_last_epoch_initiation = time;
+            
             _time_of_last_epoch_conclusion = 0;
+            
             // Self message to initiate clause sharing
             MyMpi::isend(_job->getJobTree().getRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
             return;
@@ -149,6 +158,21 @@ void AnytimeSatClauseCommunicator::communicate() {
         auto filter = session._allreduce_filter.extractResult();
         auto clausesToLearn = session.applyGlobalFilter(filter, session._broadcast_clause_buffer);
         learnClauses(clausesToLearn, session._epoch, /*writeIntoClauseHistory=*/_use_cls_history);
+
+        float admittedRatio = session._num_broadcast_clauses == 0 ? 1 : 
+            ((float)session._num_admitted_clauses) / session._num_broadcast_clauses;
+        admittedRatio = std::max(0.01f, admittedRatio);
+
+        float newCompensationFactor = std::max(1.f, std::min(
+            (float)_params.clauseHistoryAggregationFactor(), 1.f/admittedRatio
+        ));
+        _compensation_factor = _compensation_decay * _compensation_factor + (1-_compensation_decay) * newCompensationFactor;
+        _job->setSharingCompensationFactor(_compensation_factor);
+
+        if (_job->getJobTree().isRoot()) {
+            LOG(V3_VERB, "%s : %i/%i globally passed: c=%.3f\n", _job->toStr(), 
+                session._num_admitted_clauses, session._num_broadcast_clauses, _compensation_factor);       
+        }
 
         // Conclude this sharing epoch
         _time_of_last_epoch_conclusion = Timer::elapsedSeconds();
@@ -259,11 +283,8 @@ std::vector<int> AnytimeSatClauseCommunicator::Session::applyGlobalFilter(const 
         clause = reader.getNextIncomingClause();
     }
 
-    if (_job->getJobTree().isRoot()) {
-        LOG(V3_VERB, "%s : %i/%i passed global filter\n", _job->toStr(), writer.getNumAddedClauses(), clsIdx);       
-    } else {
-        LOG(V4_VVER, "%s : %i/%i passed global filter\n", _job->toStr(), writer.getNumAddedClauses(), clsIdx);
-    }
+    _num_broadcast_clauses = clsIdx;
+    _num_admitted_clauses = writer.getNumAddedClauses();
 
     return writer.extractBuffer();
 }
