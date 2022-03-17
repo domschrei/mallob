@@ -133,7 +133,7 @@ JobSignature& JobSignature::deserialize(const std::vector<uint8_t>& packed) {
 }
 
 std::vector<uint8_t> JobMessage::serialize() const {
-    int size = 4*sizeof(int) + payload.size()*sizeof(int) + sizeof(Checksum);
+    int size = 4*sizeof(int) + sizeof(bool) + payload.size()*sizeof(int) + sizeof(Checksum);
     std::vector<uint8_t> packed(size);
 
     int i = 0, n;
@@ -141,6 +141,7 @@ std::vector<uint8_t> JobMessage::serialize() const {
     n = sizeof(int); memcpy(packed.data()+i, &revision, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &tag, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &epoch, n); i += n;
+    n = sizeof(bool); memcpy(packed.data()+i, &returnedToSender, n); i += n;
     n = sizeof(Checksum); memcpy(packed.data()+i, &checksum, n); i += n;
     n = payload.size()*sizeof(int); memcpy(packed.data()+i, payload.data(), n); i += n;
     return packed;
@@ -152,6 +153,7 @@ JobMessage& JobMessage::deserialize(const std::vector<uint8_t>& packed) {
     n = sizeof(int); memcpy(&revision, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&tag, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&epoch, packed.data()+i, n); i += n;
+    n = sizeof(bool); memcpy(&returnedToSender, packed.data()+i, n); i += n;
     n = sizeof(Checksum); memcpy(&checksum, packed.data()+i, n); i += n;
     n = packed.size()-i; payload.resize(n/sizeof(int)); 
     memcpy(payload.data(), packed.data()+i, n); i += n;
