@@ -122,7 +122,7 @@ private:
 
     int _current_epoch = 0;
     float _time_of_last_epoch_initiation = 0;
-    float _time_of_last_epoch_conclusion = 0.1;
+    float _time_of_last_epoch_conclusion = 0.000001f;
 
 public:
     AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : _params(params), _job(job), 
