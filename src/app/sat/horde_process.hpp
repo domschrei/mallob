@@ -61,7 +61,7 @@ public:
 
         // Set up export and import buffers for clause exchanges
         {
-            int maxExportBufferSize = (1024 + _params.clauseHistoryAggregationFactor() * _params.clauseBufferBaseSize()) * sizeof(int);
+            int maxExportBufferSize = _hsm->exportBufferAllocatedSize * sizeof(int);
             _export_buffer = (int*) accessMemory(_shmem_id + ".clauseexport", maxExportBufferSize);
             int maxImportBufferSize = _hsm->importBufferMaxSize * sizeof(int);
             _import_buffer = (int*) accessMemory(_shmem_id + ".clauseimport", maxImportBufferSize);
@@ -142,6 +142,7 @@ public:
                 // Collect local clauses, put into shared memory
                 _hsm->exportChecksum = Checksum();
                 _hsm->exportBufferTrueSize = _hlib.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize, _hsm->exportChecksum);
+                assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
                 _hsm->didExport = true;
             }
             if (!_hsm->doExport) _hsm->didExport = false;

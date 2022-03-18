@@ -103,13 +103,13 @@ void HordeProcessAdapter::doInitialize() {
     _hsm->config = _config;
 
     // Allocate import and export buffers
-    _export_buffer = (int*) createSharedMemoryBlock("clauseexport", 
-            (1024 + _params.clauseHistoryAggregationFactor() * _params.clauseBufferBaseSize()) * sizeof(int), 
-            nullptr);
-    _hsm->importBufferMaxSize = _params.clauseHistoryAggregationFactor() * MyMpi::getBinaryTreeBufferLimit(
+    _hsm->exportBufferAllocatedSize = 2 * _params.clauseHistoryAggregationFactor() * _params.clauseBufferBaseSize() + 1024;
+    _hsm->importBufferMaxSize = 2 * _params.clauseHistoryAggregationFactor() * MyMpi::getBinaryTreeBufferLimit(
         _hsm->config.mpisize, _params.clauseBufferBaseSize(), _params.clauseBufferDiscountFactor(), 
         MyMpi::ALL
     ) + 1024;
+    _export_buffer = (int*) createSharedMemoryBlock("clauseexport", 
+            sizeof(int)*_hsm->exportBufferAllocatedSize, nullptr);
     _import_buffer = (int*) createSharedMemoryBlock("clauseimport", 
             sizeof(int)*_hsm->importBufferMaxSize, nullptr);
     _returned_buffer = (int*) createSharedMemoryBlock("returnedclauses",
@@ -204,6 +204,7 @@ bool HordeProcessAdapter::hasCollectedClauses() {
 std::vector<int> HordeProcessAdapter::getCollectedClauses(Checksum& checksum) {
     if (!_initialized) return std::vector<int>();
     if (!hasCollectedClauses()) return std::vector<int>();
+    assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
     std::vector<int> clauses(_export_buffer, _export_buffer+_hsm->exportBufferTrueSize);
     checksum = _hsm->exportChecksum;
     _hsm->doExport = false;

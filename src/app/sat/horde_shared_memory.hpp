@@ -41,6 +41,7 @@ struct HordeSharedMemory {
     int solutionRevision;
     
     // Clause buffers: parent->child
+    int exportBufferAllocatedSize;
     int exportBufferMaxSize;
     int importBufferMaxSize;
     int importBufferSize;
