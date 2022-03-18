@@ -27,6 +27,7 @@ private:
 	std::string name;
 	int stopSolver;
 	LearnedClauseCallback learnedClauseCallback;
+	Mallob::Clause learntClause;
 
 	Glucose::vec<Glucose::Lit> clause;
 	Glucose::vec<Glucose::Lit> assumptions;

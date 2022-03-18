@@ -14,6 +14,7 @@ private:
 
     LearnedClauseCallback callback;
     int learntClauseBuffer[100];
+	Clause learntClause;
     std::vector<int> producedClause;
 
     bool interrupted = false;
@@ -24,6 +25,7 @@ private:
 
 	std::vector<signed char> initialVariablePhases;
 	bool initialVariablePhasesLocked = false;
+
 
 public:
 	Kissat(const SolverSetup& setup);

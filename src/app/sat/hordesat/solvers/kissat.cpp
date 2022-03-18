@@ -153,19 +153,17 @@ void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 }
 
 void Kissat::produceClause(int size, int lbd) {
-    Clause c;
     if (size > _setup.strictClauseLengthLimit) return;
-    c.size = size;
+    learntClause.size = size;
     // In Kissat, LBD scores are represented from 1 to len-1. => Increment LBD.
-    c.lbd = c.size == 1 ? 1 : lbd+1; 
-    if (c.lbd > _setup.strictLbdLimit) return;
-    c.begin = learntClauseBuffer;
-    callback(c, _setup.localId);
+    learntClause.lbd = learntClause.size == 1 ? 1 : lbd+1; 
+    if (learntClause.lbd > _setup.strictLbdLimit) return;
+    learntClause.begin = learntClauseBuffer;
+    callback(learntClause, _setup.localId);
 }
 
 void Kissat::consumeClause(int** clause, int* size, int* lbd) {
     Clause c;
-    // Only import unit clauses for now
     bool success = fetchLearnedClause(c, AdaptiveClauseDatabase::ANY);
     if (success) {
         assert(c.begin != nullptr);

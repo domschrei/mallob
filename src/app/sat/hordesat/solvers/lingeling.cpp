@@ -200,9 +200,11 @@ void Lingeling::unsetSolverSuspend() {
 
 void Lingeling::doProduceUnit(int lit) {
 	assert(lit != 0);
-	Clause c(&lit, 1, 1);
 	numProduced++;
-	callback(c, getLocalId());
+	producedClause.begin = &lit;
+	producedClause.size = 1;
+	producedClause.lbd = 1;
+	callback(producedClause, getLocalId());
 }
 
 void Lingeling::doProduce(int* cls, int glue) {
@@ -228,7 +230,10 @@ void Lingeling::doProduce(int* cls, int glue) {
 
 	// export clause
 	numProduced++;
-	callback(Clause(cls, size, glue), getLocalId());
+	producedClause.begin = cls;
+	producedClause.size = size;
+	producedClause.lbd = glue;
+	callback(producedClause, getLocalId());
 }
 
 void Lingeling::doConsumeUnits(int** start, int** end) {

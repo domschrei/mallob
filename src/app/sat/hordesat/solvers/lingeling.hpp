@@ -43,6 +43,8 @@ private:
 	std::vector<int> unitsToAdd;
 	// importing a learnt clause
 	std::vector<int> zeroTerminatedClause;
+	// exporting a clause
+	Clause producedClause;
 
 	//MixedNonunitClauseRingBuffer learnedClauses;
 	//UnitClauseRingBuffer learnedUnits;
