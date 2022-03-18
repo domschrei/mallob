@@ -709,9 +709,10 @@ void Worker::handleSendApplicationMessage(MessageHandle& handle) {
     int jobId = msg.jobId;
     if (!_job_db.has(jobId)) {
         LOG(V1_WARN, "[WARN] Job message from unknown job #%i\n", jobId);
-        if (!msg.returnedToSender)
+        if (!msg.returnedToSender) {
             msg.returnedToSender = true;
             MyMpi::isend(handle.source, handle.tag, msg);
+        }
         return;
     }
 
