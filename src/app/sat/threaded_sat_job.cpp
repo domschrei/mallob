@@ -144,7 +144,7 @@ void ThreadedSatJob::appl_communicate() {
 
 void ThreadedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
     if (!_initialized) {
-        if (getState() == ACTIVE && !msg.returnedToSender) {
+        if (!msg.returnedToSender) {
             msg.returnedToSender = true;
             MyMpi::isend(source, mpiTag, msg);
         }
