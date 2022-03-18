@@ -236,7 +236,7 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
     }
 
     // Advance all-reductions
-    bool success;
+    bool success = false;
     if (!_sessions.empty() && msg.tag == MSG_ALLREDUCE_CLAUSES && currentSession()._allreduce_clauses.isValid()) {
         success = currentSession()._allreduce_clauses.receive(source, mpiTag, msg);
         currentSession()._allreduce_clauses.advance();
