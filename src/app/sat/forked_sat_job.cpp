@@ -169,7 +169,7 @@ void ForkedSatJob::appl_communicate() {
 
 void ForkedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
     if (!_initialized || !checkClauseComm()) {
-        if (!msg.returnedToSender) {
+        if (getState() == ACTIVE && !msg.returnedToSender) {
             msg.returnedToSender = true;
             MyMpi::isend(source, mpiTag, msg);
         }
