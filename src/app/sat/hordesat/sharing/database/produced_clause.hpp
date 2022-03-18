@@ -1,6 +1,7 @@
 
 #include "app/sat/hordesat/utilities/clause.hpp"
 #include "util/assert.hpp"
+#include "util/tsl/robin_set.h"
 
 struct ProducedUnitClause {
     uint16_t producers = 0;
@@ -12,6 +13,13 @@ struct ProducedUnitClause {
         assert(cls.lbd == 1);
         producers = 1 << producer;
         literal = cls.begin[0];
+    }
+
+    ProducedUnitClause extractUnsafe() const {
+        ProducedUnitClause c;
+        c.producers = producers;
+        c.literal = literal;
+        return c;
     }
 
     bool valid() const {return literal != 0;}
@@ -43,6 +51,14 @@ struct ProducedBinaryClause {
         literals[1] = cls.begin[1];
     }
 
+    ProducedBinaryClause extractUnsafe() const {
+        ProducedBinaryClause c;
+        c.producers = producers;
+        c.literals[0] = literals[0];
+        c.literals[1] = literals[1];
+        return c;
+    }
+
     bool valid() const {return literals[0] != 0;}
 
     bool operator<(const ProducedBinaryClause& other) const {
@@ -59,10 +75,12 @@ struct ProducedBinaryClause {
 };
 
 struct ProducedLargeClause {
+    
     uint16_t producers = 0;
     uint8_t size;
     uint8_t lbd;
-    int* data = nullptr;
+    // This member is marked mutable in order to allow extraction of a clause from a hash table.
+    mutable int* data = nullptr;
 
     ProducedLargeClause() = default;
     ProducedLargeClause(const Mallob::Clause& cls, int producer) {
@@ -75,6 +93,17 @@ struct ProducedLargeClause {
     }
     ProducedLargeClause(ProducedLargeClause&& moved) {
         *this = std::move(moved);
+    }
+
+    // This method allows for the extraction of a clause from a hash table.
+    ProducedLargeClause extractUnsafe() const {
+        ProducedLargeClause c;
+        c.producers = producers;
+        c.size = size;
+        c.lbd = lbd;
+        c.data = data;
+        data = nullptr;
+        return c;
     }
 
     bool valid() const {return data != nullptr;}
@@ -255,4 +284,5 @@ struct ProducedClauseEqualsIgnoringLBD {
 };
 
 template <typename T>
-using ProducedClauseSet = robin_hood::unordered_flat_set<T, ProducedClauseHasher<T>, ProducedClauseEqualsIgnoringLBD<T>>;
+//using ProducedClauseSet = robin_hood::unordered_flat_set<T, ProducedClauseHasher<T>, ProducedClauseEqualsIgnoringLBD<T>>;
+using ProducedClauseSet = tsl::robin_set<T, ProducedClauseHasher<T>, ProducedClauseEqualsIgnoringLBD<T>>;

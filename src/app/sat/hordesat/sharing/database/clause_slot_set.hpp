@@ -75,16 +75,21 @@ public:
 
         auto lock = _set_mutex.getLock();
 
-        // Attempt insertion
-        auto [it, inserted] = _set.insert(std::move(producedClause));
-        _last_it = it;
+        // Query if clause is already present
+        auto it = _set.find(producedClause);
+        bool alreadyPresent = it != _set.end();
         
         // Clause already contained?
-        if (!inserted) {
-            // -- yes: set additional producer, return budget, return failure
-            prod_cls::addProducer(*it, producerId);
+        if (alreadyPresent) {
+            // -- yes: erase and re-insert with additional producer, return budget, return failure
+            producedClause.producers |= it.key().producers;
+            it = _set.erase(it);
+            _last_it = _set.emplace_hint(it, std::move(producedClause));
             _literals_budget.fetch_add(len, std::memory_order_relaxed);
             return DUPLICATE;
+        } else {
+            // -- no: just insert
+            _last_it = _set.emplace(std::move(producedClause)).first;
         }
 
         // Clause was inserted successfully
@@ -219,9 +224,9 @@ private:
             return T();
         }
         
-        if (prod_cls::size(*_last_it) > totalLiteralLimit) return T();
+        if (prod_cls::size(_last_it.key()) > totalLiteralLimit) return T();
         
-        T clause = std::move(*_last_it);
+        T clause = _last_it.key().extractUnsafe();
         _last_it = _set.erase(_last_it);
 
         if (_set.empty()) {
