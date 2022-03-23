@@ -4,6 +4,7 @@
 #include "produced_clause.hpp"
 #include "util/sys/atomics.hpp"
 #include "util/sys/threading.hpp"
+#include "util/logger.hpp"
 
 enum ClauseSlotMode {SAME_SUM_OF_SIZE_AND_LBD, SAME_SIZE, SAME_SIZE_AND_LBD};
 enum ClauseSlotInsertResult {SUCCESS, NO_BUDGET, DUPLICATE};
@@ -43,26 +44,27 @@ public:
         // Try to acquire budget
         bool acquired = tryAcquireBudget(len);
         int numFreedLits = 0;
-        while (!acquired) {
+        if (!acquired) {
 
             // No success: Try to steal memory from a less important slot
             numFreedLits = _free_low_priority_literals();
             
-            // Freed some amount of memory?
+            // Freed enough memory?
             if (numFreedLits >= len) {
                 // Steal successful: use len freed lits for this clause implicitly
                 acquired = true;
                 // Release the freed budget which you DO NOT need for this clause insertion
-                _literals_budget.fetch_add(numFreedLits-len, std::memory_order_relaxed);
-                break;
+                if (numFreedLits != len)
+                    _literals_budget.fetch_add(numFreedLits-len, std::memory_order_relaxed);
+                
             } else if (numFreedLits > 0) {
                 // Return insufficient freed budget to global storage
                 _literals_budget.fetch_add(numFreedLits, std::memory_order_relaxed);
             }
             
-            // Retry acquisition explicitly
-            acquired = tryAcquireBudget(len);
-            if (numFreedLits == 0 && !acquired) {
+            // Retry acquisition explicitly, if necessary
+            acquired = acquired || tryAcquireBudget(len);
+            if (!acquired) {
                 // No success at all : There is no memory left to free - 
                 // this clause is not important enough to be stored right now. Discard it.
                 return NO_BUDGET;
@@ -99,9 +101,9 @@ public:
             _empty.store(false, std::memory_order_relaxed);
             
             // If current max. nonempty slot is lower than this slot, update it
-            int maxNonemptySlot = _max_nonempty_slot.load(std::memory_order_relaxed);
-            while (maxNonemptySlot < _slot_idx && !_max_nonempty_slot.compare_exchange_strong(
-                maxNonemptySlot, _slot_idx, std::memory_order_relaxed)) {}
+            //int maxNonemptySlot = _max_nonempty_slot.load(std::memory_order_relaxed);
+            //while (maxNonemptySlot < _slot_idx && !_max_nonempty_slot.compare_exchange_strong(
+            //    maxNonemptySlot, _slot_idx, std::memory_order_relaxed)) {}
         }
 
         return SUCCESS;
@@ -160,36 +162,18 @@ public:
         return flushedClauses;
     }
 
-    int free(int numLiterals, bool& emptyAfterCall) {
+    int free(int numLiterals) {
 
         if (_empty.load(std::memory_order_relaxed)) {
-            emptyAfterCall = true;
+            //LOG(V2_INFO, "%i ALREADY EMPTY\n", _slot_idx);
             return 0;
         }
 
         _set_mutex.lock();
 
+        // Drop clauses while possible and while within desired number of freed literals
         int numFreedLiterals = 0;
-        int numIterations = 0;
-        emptyAfterCall = false;
-        while (numFreedLiterals < numLiterals) {
-                    
-            // yield lock from time to time
-            numIterations++;
-            if (numIterations % 16 == 0) {
-                _set_mutex.unlock();
-                _set_mutex.lock();
-            }
-
-            T clause = popClause(INT32_MAX);
-            if (!clause.valid()) {
-                emptyAfterCall = true;
-                break;
-            }
-            
-            int len = prod_cls::size(clause);
-            numFreedLiterals += len;
-        }
+        while (numFreedLiterals < numLiterals && dropClause(numFreedLiterals)) {}
 
         _set_mutex.unlock();
 
@@ -198,19 +182,21 @@ public:
 
     ClauseSlotMode getSlotMode() const {return _slot_mode;}
 
-    bool tryDecreaseNonemptySlotIdx() {
+    bool tryDecreaseNonemptySlotIdx(bool lockHeld) {
 
-        if (!_set_mutex.tryLock()) return false;
+        if (!lockHeld && !_set_mutex.tryLock()) return false;
 
         bool success = false;
-        if (_set.empty()) {
+        bool empty = _set.empty();
+        if (empty) {
             int maxNonemptySlot = _max_nonempty_slot.load(std::memory_order_relaxed);
             while (maxNonemptySlot == _slot_idx && !_max_nonempty_slot.compare_exchange_strong(
-                maxNonemptySlot, _max_slot-1)) {}
-            if (maxNonemptySlot == _slot_idx) success = true;
+                maxNonemptySlot, _slot_idx-1)) {}
+            success = _max_nonempty_slot.load(std::memory_order_relaxed) < _slot_idx;
         }
 
-        _set_mutex.unlock();
+        if (!lockHeld) _set_mutex.unlock();
+        //LOG(V2_INFO, "%i : TRYDECREASE:%i (mnes=%i empty=%i)\n", _slot_idx, success?1:0, (int)_max_nonempty_slot, empty?1:0);
         return success;
     }
 
@@ -233,16 +219,34 @@ private:
             // Slot just became empty
             _empty.store(true, std::memory_order_relaxed);
 
-            // If max. nonempty slot is THIS slot, decrease the max. nonempty slot index
-            // conservatively by one.
-            int maxNonemptySlot = _max_nonempty_slot.load(std::memory_order_relaxed);
-            while (maxNonemptySlot == _slot_idx && !_max_nonempty_slot.compare_exchange_strong(maxNonemptySlot, _max_slot-1)) {}
-
         } else if (_last_it == end) {
             _last_it = _set.begin();
         }
         
         return clause;
+    }
+
+    inline bool dropClause(int& droppedLiterals) {
+
+        auto end = _set.end();
+        if (_last_it == end) {
+            _empty.store(true, std::memory_order_relaxed);
+            return false;
+        }
+        
+        auto size = prod_cls::size(_last_it.key());
+        _last_it = _set.erase(_last_it);
+        droppedLiterals += size;
+
+        if (_set.empty()) {
+            // Slot just became empty
+            _empty.store(true, std::memory_order_relaxed);
+
+        } else if (_last_it == end) {
+            _last_it = _set.begin();
+        }
+
+        return true;
     }
 
     bool tryAcquireBudget(int len) {

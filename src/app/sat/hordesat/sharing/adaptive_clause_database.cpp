@@ -181,27 +181,21 @@ int AdaptiveClauseDatabase::freeLowPriorityLiterals(int callingSlot) {
     int lb = std::max(-1, callingSlot);
     int ub = _max_nonempty_slot.load(std::memory_order_relaxed);
 
-    // TODO check correct functionality of producer flags, matching of clause producers at import.
-
-    bool shiftingNonemptyIdx = true;
-    bool slotEmpty;
-    for (int slotIdx = ub; slotIdx > lb; slotIdx--) {
-        int numLiterals = _large_slots[slotIdx]->free(numDesired, /*out param:*/ slotEmpty);
-        shiftingNonemptyIdx &= slotEmpty;
-        if (shiftingNonemptyIdx) shiftingNonemptyIdx &= _large_slots[slotIdx]->tryDecreaseNonemptySlotIdx();
+    for (int slotIdx = ub; numFreed < _max_clause_length && slotIdx > lb; slotIdx--) {
+        int numLiterals = _large_slots[slotIdx]->free(numDesired);
         //if (numLiterals > 0) LOG(V2_INFO, "%i -> %i : Freed %i lits\n", callingSlot, slotIdx, numLiterals);
-        numFreed += numLiterals;
         numDesired -= numLiterals;
-        if (numFreed >= numDesired) return numFreed;
+        numFreed += numLiterals;
     }
 
-    if (callingSlot == -2) {
-        int numLiterals = _binary_slot->free(numDesired, /*out param:*/ slotEmpty);
-        if (shiftingNonemptyIdx && slotEmpty) _binary_slot->tryDecreaseNonemptySlotIdx();
+    if (numFreed < _max_clause_length && callingSlot == -2) {
+        int numLiterals = _binary_slot->free(numDesired);
         //if (numLiterals > 0) LOG(V2_INFO, "%i -> %i : Freed %i lits\n", callingSlot, -2, numLiterals);
         numFreed += numLiterals;
-        numDesired -= numLiterals;
     }
+
+    int newUb = _max_nonempty_slot.load(std::memory_order_relaxed);
+    //if (ub != newUb) LOG(V2_INFO, "FREELOWPRIO %i ~> %i\n", ub, newUb);
     return numFreed;
 }
 
