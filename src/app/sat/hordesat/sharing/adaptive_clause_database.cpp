@@ -103,18 +103,19 @@ ClauseSlotInsertResult AdaptiveClauseDatabase::addClause(int producerId, const C
 
 Mallob::Clause AdaptiveClauseDatabase::popFront(ExportMode mode) {
 
+    uint32_t ignoredProducers;
     if (mode != ExportMode::NONUNITS) {
-        auto cls = _unit_slot->pop();
+        auto cls = _unit_slot->pop(INT32_MAX, ignoredProducers, /*allowSpuriousFailure=*/true);
         if (cls.valid()) return prod_cls::toMallobClause(std::move(cls));
     }
     if (mode == ExportMode::UNITS) return Mallob::Clause();
 
-    auto cls = _binary_slot->pop();
+    auto cls = _binary_slot->pop(INT32_MAX, ignoredProducers, /*allowSpuriousFailure=*/true);
     if (cls.valid()) return prod_cls::toMallobClause(std::move(cls));
 
     for (int slotIdx = 0; slotIdx < _large_slots.size(); slotIdx++) {
         auto& slot = *_large_slots[slotIdx];
-        auto cls = slot.pop();
+        auto cls = slot.pop(INT32_MAX, ignoredProducers, /*allowSpuriousFailure=*/true);
         if (cls.valid()) return prod_cls::toMallobClause(std::move(cls));
     }
 
@@ -122,18 +123,47 @@ Mallob::Clause AdaptiveClauseDatabase::popFront(ExportMode mode) {
 }
 
 template <typename T> 
-void AdaptiveClauseDatabase::handleFlushedClauses(std::vector<T>& flushedClauses, 
-    ClauseSlotMode slotMode, bool sortClauses, BufferBuilder& builder) {
+void AdaptiveClauseDatabase::flushClauses(ClauseSlotSet<T>& slot, bool sortClauses, BufferBuilder& builder, 
+        ProducedClauseMap<T>& exportedMap) {
     
+    // Flush clauses one by one
+    std::vector<T> flushedClauses;
+    slot.acquireLock();
+    int added = 0;
+    int remainingLits = builder.getMaxRemainingLits();
+    while (remainingLits > 0) {
+        added++;
+        if (added % 32 == 0) {
+            slot.releaseLock();
+            slot.acquireLock();
+        }
+        uint32_t producers;
+        T clause = slot.popUnsafe(remainingLits, producers);
+        if (!clause.valid()) break;
+
+        // insert clause to exported clauses map
+        if constexpr (std::is_base_of<ProducedUnitClause, T>())
+            _last_exported_units[clause] |= producers;
+        if constexpr (std::is_base_of<ProducedBinaryClause, T>())
+            _last_exported_binaries[clause] |= producers;
+        if constexpr (std::is_base_of<ProducedLargeClause, T>())
+            _last_exported_large_clauses[clause] |= producers;
+
+        // insert clause to export buffer
+        flushedClauses.push_back(std::move(clause));
+        remainingLits -= prod_cls::size(clause);
+    }
+    slot.releaseLock();
+
+    ClauseSlotMode slotMode = slot.getSlotMode();
     bool differentLbdValues = slotMode != ClauseSlotMode::SAME_SIZE_AND_LBD;
     if (differentLbdValues || sortClauses) {
         // Sort
         std::sort(flushedClauses.begin(), flushedClauses.end());
     }
 
-    // Append clauses to buffer builder
+    // Append clause to buffer builder
     for (auto& producedClause : flushedClauses) {
-        _last_exported_buffer_producers.push_back(producedClause.producers);
         Clause c = prod_cls::toMallobClause(producedClause);
         bool success = builder.append(c);
         assert(success);
@@ -145,29 +175,28 @@ const std::vector<int>& AdaptiveClauseDatabase::exportBuffer(int totalLiteralLim
         ExportMode mode, bool sortClauses) {
 
     _last_exported_buffer.clear();
-    _last_exported_buffer_producers.clear();
+
+    _last_exported_units.clear();
+    _last_exported_binaries.clear();
+    _last_exported_large_clauses.clear();
 
     BufferBuilder builder(totalLiteralLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd,
         &_last_exported_buffer);
 
     if (mode != ExportMode::NONUNITS) {
         // Export unit clauses.
-        std::vector<ProducedUnitClause> flushedClauses = _unit_slot->flush(builder.getMaxRemainingLits());
-        handleFlushedClauses(flushedClauses, _unit_slot->getSlotMode(), sortClauses, builder);
+        flushClauses(*_unit_slot, sortClauses, builder, _last_exported_units);
     }
     if (mode != ExportMode::UNITS) {
         // Export all other clauses.
 
         // Binary clauses first.
-        std::vector<ProducedBinaryClause> flushedBClauses = _binary_slot->flush(builder.getMaxRemainingLits());
-        handleFlushedClauses(flushedBClauses, _binary_slot->getSlotMode(), sortClauses, builder);
+        flushClauses(*_binary_slot, sortClauses, builder, _last_exported_binaries);
 
         // All other clauses.
-        std::vector<ProducedLargeClause> flushedClauses;
         for (int slotIdx = 0; slotIdx < _large_slots.size(); slotIdx++) {
             auto& slot = *_large_slots[slotIdx];
-            flushedClauses = slot.flush(builder.getMaxRemainingLits());
-            handleFlushedClauses(flushedClauses, slot.getSlotMode(), sortClauses, builder);
+            flushClauses(slot, sortClauses, builder, _last_exported_large_clauses);
         }
     }
 

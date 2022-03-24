@@ -21,9 +21,9 @@ private:
     std::atomic_int& _max_nonempty_slot;
     std::atomic_bool _empty {true};
     
-    Mutex _set_mutex;
-    ProducedClauseSet<T> _set;
-    typename ProducedClauseSet<T>::iterator _last_it;
+    Mutex _map_mutex;
+    ProducedClauseMap<T> _map;
+    typename ProducedClauseMap<T>::iterator _last_it;
 
     std::function<int()> _free_low_priority_literals;
 
@@ -32,7 +32,10 @@ public:
     ClauseSlotSet(int slotIdx, ClauseSlotMode mode, std::atomic_int& literalsBudget, std::atomic_int& maxNonemptySlot,
             std::function<int()> freeLowPriorityLiterals) : 
         _slot_idx(slotIdx), _slot_mode(mode), _literals_budget(literalsBudget), 
-        _max_nonempty_slot(maxNonemptySlot), _free_low_priority_literals(freeLowPriorityLiterals) {}
+        _max_nonempty_slot(maxNonemptySlot), _free_low_priority_literals(freeLowPriorityLiterals) {
+
+        _last_it = _map.end();
+    }
 
     void setMaxSlotIdx(int maxSlotIdx) {_max_slot = maxSlotIdx;}
 
@@ -72,26 +75,25 @@ public:
         }
 
         // Budget has been acquired successfully: create clause
-        T producedClause(c, producerId);
+        T producedClause(c);
         assert(producedClause.valid());
 
-        auto lock = _set_mutex.getLock();
+        auto lock = _map_mutex.getLock();
 
         // Query if clause is already present
-        auto it = _set.find(producedClause);
-        bool alreadyPresent = it != _set.end();
+        auto it = _map.find(producedClause);
+        bool alreadyPresent = it != _map.end();
+        uint32_t producerFlag = 1 << producerId;
         
         // Clause already contained?
         if (alreadyPresent) {
-            // -- yes: erase and re-insert with additional producer, return budget, return failure
-            producedClause.producers |= it.key().producers;
-            it = _set.erase(it);
-            _last_it = _set.emplace_hint(it, std::move(producedClause));
+            // -- yes: add additional producer, return budget, return failure
+            it.value() |= producerFlag;
             _literals_budget.fetch_add(len, std::memory_order_relaxed);
             return DUPLICATE;
         } else {
             // -- no: just insert
-            _last_it = _set.emplace(std::move(producedClause)).first;
+            _last_it = _map.insert({std::move(producedClause), producerFlag}).first;
         }
 
         // Clause was inserted successfully
@@ -109,57 +111,27 @@ public:
         return SUCCESS;
     }
 
-    T pop(bool allowSpuriousFailure = false) {
+    T pop(int literalLimit, uint32_t& producers, bool allowSpuriousFailure = false) {
 
         if (_empty.load(std::memory_order_relaxed)) return T();
 
-        if (allowSpuriousFailure && !_set_mutex.tryLock()) return T();
-        if (!allowSpuriousFailure) _set_mutex.lock();
+        if (allowSpuriousFailure && !_map_mutex.tryLock()) return T();
+        if (!allowSpuriousFailure) _map_mutex.lock();
 
-        T clause = popClause(INT32_MAX);
+        T clause = popUnsafe(literalLimit, producers);
 
-        _set_mutex.unlock();
-
-        if (clause.valid()) {
-            int len = prod_cls::size(clause);
-            _literals_budget.fetch_add(len, std::memory_order_relaxed);
-        }
+        _map_mutex.unlock();
 
         return clause;
     }
 
-    std::vector<T> flush(int totalLiteralLimit) {
-        
-        std::vector<T> flushedClauses;
-        if (_empty.load(std::memory_order_relaxed)) return flushedClauses;
-
-        if (totalLiteralLimit < 0) totalLiteralLimit = INT32_MAX;
-
-        _set_mutex.lock();
-
-        int numIterations = 0;
-        while (true) {
-        
-            // yield lock from time to time
-            numIterations++;
-            if (numIterations % 16 == 0) {
-                _set_mutex.unlock();
-                _set_mutex.lock();
-            }
-
-            T clause = popClause(totalLiteralLimit);
-            if (!clause.valid()) break;
-
+    T popUnsafe(int literalLimit, uint32_t& producers) {
+        T clause = popClause(literalLimit, producers);
+        if (clause.valid()) {
             int len = prod_cls::size(clause);
-            flushedClauses.push_back(std::move(clause));
-            
             _literals_budget.fetch_add(len, std::memory_order_relaxed);
-            totalLiteralLimit -= len;
         }
-
-        _set_mutex.unlock();
-
-        return flushedClauses;
+        return clause;
     }
 
     int free(int numLiterals) {
@@ -169,42 +141,27 @@ public:
             return 0;
         }
 
-        _set_mutex.lock();
+        _map_mutex.lock();
 
         // Drop clauses while possible and while within desired number of freed literals
         int numFreedLiterals = 0;
         while (numFreedLiterals < numLiterals && dropClause(numFreedLiterals)) {}
 
-        _set_mutex.unlock();
+        _map_mutex.unlock();
 
         return numFreedLiterals;
     }
 
+    void acquireLock() {_map_mutex.lock();}
+    void releaseLock() {_map_mutex.unlock();}
+
     ClauseSlotMode getSlotMode() const {return _slot_mode;}
-
-    bool tryDecreaseNonemptySlotIdx(bool lockHeld) {
-
-        if (!lockHeld && !_set_mutex.tryLock()) return false;
-
-        bool success = false;
-        bool empty = _set.empty();
-        if (empty) {
-            int maxNonemptySlot = _max_nonempty_slot.load(std::memory_order_relaxed);
-            while (maxNonemptySlot == _slot_idx && !_max_nonempty_slot.compare_exchange_strong(
-                maxNonemptySlot, _slot_idx-1)) {}
-            success = _max_nonempty_slot.load(std::memory_order_relaxed) < _slot_idx;
-        }
-
-        if (!lockHeld) _set_mutex.unlock();
-        //LOG(V2_INFO, "%i : TRYDECREASE:%i (mnes=%i empty=%i)\n", _slot_idx, success?1:0, (int)_max_nonempty_slot, empty?1:0);
-        return success;
-    }
 
 private:
 
-    inline T popClause(int totalLiteralLimit) {
+    inline T popClause(int totalLiteralLimit, uint32_t& producers) {
         
-        auto end = _set.end();
+        auto end = _map.end();
         if (_last_it == end) {
             _empty.store(true, std::memory_order_relaxed);
             return T();
@@ -212,15 +169,16 @@ private:
         
         if (prod_cls::size(_last_it.key()) > totalLiteralLimit) return T();
         
+        producers = _last_it.value();
         T clause = _last_it.key().extractUnsafe();
-        _last_it = _set.erase(_last_it);
+        _last_it = _map.erase(_last_it);
 
-        if (_set.empty()) {
+        if (_map.empty()) {
             // Slot just became empty
             _empty.store(true, std::memory_order_relaxed);
 
         } else if (_last_it == end) {
-            _last_it = _set.begin();
+            _last_it = _map.begin();
         }
         
         return clause;
@@ -228,22 +186,22 @@ private:
 
     inline bool dropClause(int& droppedLiterals) {
 
-        auto end = _set.end();
+        auto end = _map.end();
         if (_last_it == end) {
             _empty.store(true, std::memory_order_relaxed);
             return false;
         }
         
         auto size = prod_cls::size(_last_it.key());
-        _last_it = _set.erase(_last_it);
+        _last_it = _map.erase(_last_it);
         droppedLiterals += size;
 
-        if (_set.empty()) {
+        if (_map.empty()) {
             // Slot just became empty
             _empty.store(true, std::memory_order_relaxed);
 
         } else if (_last_it == end) {
-            _last_it = _set.begin();
+            _last_it = _map.begin();
         }
 
         return true;

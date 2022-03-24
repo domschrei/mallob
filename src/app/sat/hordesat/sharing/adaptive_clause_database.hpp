@@ -77,7 +77,9 @@ private:
     ClauseHistogram _hist_deleted_in_slots;
 
     std::vector<int> _last_exported_buffer;
-    std::vector<uint16_t> _last_exported_buffer_producers;
+    ProducedClauseMap<ProducedUnitClause> _last_exported_units;
+    ProducedClauseMap<ProducedBinaryClause> _last_exported_binaries;
+    ProducedClauseMap<ProducedLargeClause> _last_exported_large_clauses;
 
 public:
     struct Setup {
@@ -133,13 +135,34 @@ public:
     BufferMerger getBufferMerger(int sizeLimit);
     BufferBuilder getBufferBuilder(std::vector<int>* out = nullptr);
     BufferReader getReaderForLastExportedBuffer();
-    const std::vector<uint16_t>& getProducersOfLastExportedBuffer() const {return _last_exported_buffer_producers;}
 
     int getCurrentlyUsedLiterals() const {
         return _total_literal_limit - _num_free_literals.load(std::memory_order_relaxed);
     }
 
     ClauseHistogram& getDeletedClausesHistogram();
+
+    inline uint32_t getProducers(const Clause& c) const {
+        if (c.size == 1) {
+            ProducedUnitClause pc(c);
+            auto it = _last_exported_units.find(pc);
+            if (it == _last_exported_units.end()) return 0;
+            return it->second;
+        } else if (c.size == 2) {
+            ProducedBinaryClause pc(c);
+            auto it = _last_exported_binaries.find(pc);
+            if (it == _last_exported_binaries.end()) return 0;
+            return it->second;
+        } else {
+            ProducedLargeClause pc; // default constructor to avoid copying
+            pc.size = c.size;
+            pc.data = c.begin;
+            auto it = _last_exported_large_clauses.find(pc);
+            uint32_t producers = it == _last_exported_large_clauses.end() ? 0 : it->second;
+            pc.data = nullptr; // removing pointer to data to avoid freeing memory
+            return producers;
+        }
+    }
 
 private:
     size_t getSlotIdx(int clauseSize, int lbd);
@@ -148,8 +171,7 @@ private:
     int freeLowPriorityLiterals(int callingSlot);
 
     template <typename T>
-    void handleFlushedClauses(std::vector<T>& flushedClauses, ClauseSlotMode slotMode, 
-        bool sortClauses, BufferBuilder& builder);
+    void flushClauses(ClauseSlotSet<T>& slot, bool sortClauses, BufferBuilder& builder, ProducedClauseMap<T>& exportedMap);
 
 };
 

@@ -83,40 +83,19 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 
 	// Get all clauses
 	auto reader = _cdb.getBufferReader(begin, buflen);
-	auto exportedReader = _cdb.getReaderForLastExportedBuffer();
-	auto exportedProducers = _cdb.getProducersOfLastExportedBuffer();
-
-	// Get comparator
-	AbstractClauseThreewayComparator* threewayCompare = _params.groupClausesByLengthLbdSum() ?
-        (AbstractClauseThreewayComparator*) new LengthLbdSumClauseThreewayComparator(_params.strictClauseLengthLimit()+2) :
-        (AbstractClauseThreewayComparator*) new LexicographicClauseThreewayComparator();
-    ClauseComparator compare(threewayCompare);
 
 	// Convert clauses to plain format
 	std::vector<Mallob::Clause> clauses;
-	std::vector<uint16_t> producersPerClause;
+	std::vector<uint32_t> producersPerClause;
 	{
 		auto clause = reader.getNextIncomingClause();
-		auto exportedClause = exportedReader.getNextIncomingClause();
 		size_t producerPos = 0;
 
 		while (clause.begin != nullptr) {
 			hist.increment(clause.size);
 			for (size_t i = 0; i < clause.size; i++) assert(clause.begin[i] != 0);
-
-			// Try to find the clause in the "exported" buffer
-			while (exportedClause.begin != nullptr && compare(exportedClause, clause)) {
-				exportedClause = exportedReader.getNextIncomingClause();
-				producerPos++;
-			}
-			if (exportedClause.begin != nullptr && !compare(clause, exportedClause)) {
-				// Two clauses are equal: "clause" has been produced by some solver on this PE!
-				producersPerClause.push_back(exportedProducers[producerPos]);
-			} else {
-				producersPerClause.push_back(0);
-			}
-
 			clauses.push_back(clause);
+			producersPerClause.push_back(_cdb.getProducers(clause));
 			clause = reader.getNextIncomingClause();
 		}
 	}
@@ -172,8 +151,6 @@ void DefaultSharingManager::digestSharing(int* begin, int buflen) {
 	// Process-wide stats
 	time = Timer::elapsedSeconds() - time;
 	_logger.log(verb, "sharing time:%.4f %s\n", time, hist.getReport().c_str());
-
-	delete threewayCompare;
 }
 
 void DefaultSharingManager::digestDeferredFutureClauses() {
@@ -202,18 +179,37 @@ void DefaultSharingManager::digestDeferredFutureClauses() {
 	}
 }
 
-void DefaultSharingManager::importClausesToSolver(int solverId, const std::vector<Clause>& clauses, const std::vector<uint16_t>& producersPerClause) {
+void DefaultSharingManager::importClausesToSolver(int solverId, const std::vector<Clause>& clauses, const std::vector<uint32_t>& producersPerClause) {
 
 	assert(clauses.size() == producersPerClause.size());
 
 	uint32_t producerFlag = 1 << solverId;
 	assert(producerFlag >= 1 && producerFlag < 256);
+
 	for (size_t cIdx = 0; cIdx < clauses.size(); cIdx++) {
 		auto& c = clauses[cIdx];
 		uint16_t producers = producersPerClause[cIdx];
 		if ((producers & producerFlag) != 0) {
 			// Clause was produced by this solver!
-			//log(V2_INFO, "%i : FILTERED %s\n", solverId, c.toStr().c_str());
+			log(V2_INFO, "%i : FILTERED (%u & %u != 0) %s\n", solverId, producers, producerFlag, c.toStr().c_str());
+
+			// TODO This mirroring filter sometimes does not work if different solvers export a clause
+			// with different LBD values - the producer of the lower LBD clause will be acknowledged
+			// while the producer of the higher LBD clause may be neglected (because the buffer export did not reach that clause), 
+			// so it may be mirrored the clause.
+			// This MAY be considered a feature - the mirrored clause is of a better LBD value than the exported one.
+			// But this is not consistent because clauses are not generally re-shared if a better LBD is found.
+			// Possible solution: change map [size,lbd,data]->producers to [size,data]->[lbd,producers].
+
+			// Also, the mirroring filter is based on a snapshot during buffer export, so the clause may have been
+			// exported by additional solvers in the meantime.
+
+			// Could think about integrating the mirroring filter into the clause slots themselves: Do not directly
+			// delete clauses at export, but keep them until the next import. At import, clauses can be checked
+			// by whom they have already been exported (as of NOW) and given to the remaining solvers. If SOME producer
+			// was found, delete the clause, otherwise keep it. => You only remove clauses from the database if they were
+			// shared successfully (or to make room for better clauses). This renders the "returnClauses" mechanic obsolete as well.
+
 			continue;
 		}
 		// Old solver filter
@@ -221,7 +217,7 @@ void DefaultSharingManager::importClausesToSolver(int solverId, const std::vecto
 			continue;
 
 		_solvers[solverId]->addLearnedClause(c);
-		//log(V2_INFO, "%i : IMPORTED %s\n", solverId, c.toStr().c_str());
+		log(V2_INFO, "%i : IMPORTED (%u & %u == 0) %s\n", solverId, producers, producerFlag, c.toStr().c_str());
 	}
 }
 
@@ -300,6 +296,7 @@ void DefaultSharingManager::processClause(int solverId, int solverRevision, cons
 		_stats.clausesProcessFilteredAtExport++;
 		if (solverStats) solverStats->producedClausesSolverFiltered++;
 	}
+	if (result != NO_BUDGET) log(V2_INFO, "%i : EXPORTED %s\n", solverId, tldClause.toStr().c_str());
 
 	if (tldClauseVec) delete tldClauseVec;
 }

@@ -23,6 +23,8 @@ public:
     BufferBuilder(int totalLiteralLimit, int maxClauseLength, bool slotsForSumOfLengthAndLbd, std::vector<int>* out = nullptr) :
         _out(out), _total_literal_limit(totalLiteralLimit), _it(maxClauseLength, slotsForSumOfLengthAndLbd) {
 
+        if (_total_literal_limit < 0) _total_literal_limit = INT32_MAX;
+
         if (_out == nullptr) {
             _out = new std::vector<int>();
             _owning_vector = true;
@@ -70,8 +72,8 @@ public:
         return _num_added_lits;
     }
 
-    int getMaxRemainingLits() const {
-        return _total_literal_limit < 0 ? INT32_MAX : _total_literal_limit - _num_added_lits;
+    inline int getMaxRemainingLits() const {
+        return _total_literal_limit - _num_added_lits;
     }
 
     std::vector<int>&& extractBuffer() {

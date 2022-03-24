@@ -1,23 +1,20 @@
 
 #include "app/sat/hordesat/utilities/clause.hpp"
 #include "util/assert.hpp"
-#include "util/tsl/robin_set.h"
+#include "util/tsl/robin_map.h"
 
 struct ProducedUnitClause {
-    uint16_t producers = 0;
     int literal = 0;
 
     ProducedUnitClause() = default;
-    ProducedUnitClause(const Mallob::Clause& cls, int producer) {
+    ProducedUnitClause(const Mallob::Clause& cls) {
         assert(cls.size == 1);
         assert(cls.lbd == 1);
-        producers = 1 << producer;
         literal = cls.begin[0];
     }
 
     ProducedUnitClause extractUnsafe() const {
         ProducedUnitClause c;
-        c.producers = producers;
         c.literal = literal;
         return c;
     }
@@ -36,24 +33,21 @@ struct ProducedUnitClause {
 };
 
 struct ProducedBinaryClause {
-    uint16_t producers = 0;
     int literals[2];
     
     ProducedBinaryClause() {
         literals[0] = 0;
         literals[1] = 1;
     }
-    ProducedBinaryClause(const Mallob::Clause& cls, int producer) {
+    ProducedBinaryClause(const Mallob::Clause& cls) {
         assert(cls.size == 2);
         assert(cls.lbd == 2);
-        producers = 1 << producer;
         literals[0] = cls.begin[0];
         literals[1] = cls.begin[1];
     }
 
     ProducedBinaryClause extractUnsafe() const {
         ProducedBinaryClause c;
-        c.producers = producers;
         c.literals[0] = literals[0];
         c.literals[1] = literals[1];
         return c;
@@ -76,17 +70,16 @@ struct ProducedBinaryClause {
 
 struct ProducedLargeClause {
     
-    uint16_t producers = 0;
-    uint8_t size;
-    uint8_t lbd;
+    uint16_t size;
+    uint16_t lbd;
     // This member is marked mutable in order to allow extraction of a clause from a hash table.
     mutable int* data = nullptr;
 
     ProducedLargeClause() = default;
-    ProducedLargeClause(const Mallob::Clause& cls, int producer) {
-        producers = 1 << producer;
+    ProducedLargeClause(const Mallob::Clause& cls) {
         assert(cls.size < 256);
         size = cls.size;
+        assert(cls.lbd < 256);
         lbd = cls.lbd;
         data = (int*) malloc(sizeof(int) * size);
         memcpy(data, cls.begin, sizeof(int) * size);
@@ -94,11 +87,16 @@ struct ProducedLargeClause {
     ProducedLargeClause(ProducedLargeClause&& moved) {
         *this = std::move(moved);
     }
+    ProducedLargeClause(const ProducedLargeClause& other) {
+        size = other.size;
+        lbd = other.lbd;
+        data = (int*) malloc(sizeof(int) * size);
+        memcpy(data, other.data, sizeof(int) * size);
+    }
 
     // This method allows for the extraction of a clause from a hash table.
     ProducedLargeClause extractUnsafe() const {
         ProducedLargeClause c;
-        c.producers = producers;
         c.size = size;
         c.lbd = lbd;
         c.data = data;
@@ -109,7 +107,6 @@ struct ProducedLargeClause {
     bool valid() const {return data != nullptr;}
 
     ProducedLargeClause& operator=(ProducedLargeClause&& moved) {
-        producers = moved.producers;
         size = moved.size;
         lbd = moved.lbd;
         data = moved.data;
@@ -142,18 +139,6 @@ struct ProducedLargeClause {
 };
 
 namespace prod_cls {
-
-    template<typename T>
-    bool producedBy(const T& producedClause, int producerId) {
-        uint16_t producerFlag = 1 << producerId;
-        return (producedClause.producers & producerFlag) != 0;
-    }
-
-    template<typename T>
-    void addProducer(T& producedClause, int producerId) {
-        uint16_t producerFlag = 1 << producerId;
-        producedClause.producers |= producerFlag;
-    }
 
     template<typename T>
     uint8_t size(const T& producedClause) {
@@ -285,4 +270,4 @@ struct ProducedClauseEqualsIgnoringLBD {
 
 template <typename T>
 //using ProducedClauseSet = robin_hood::unordered_flat_set<T, ProducedClauseHasher<T>, ProducedClauseEqualsIgnoringLBD<T>>;
-using ProducedClauseSet = tsl::robin_set<T, ProducedClauseHasher<T>, ProducedClauseEqualsIgnoringLBD<T>>;
+using ProducedClauseMap = tsl::robin_map<T, uint32_t, ProducedClauseHasher<T>, ProducedClauseEqualsIgnoringLBD<T>>;
