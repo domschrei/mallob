@@ -159,7 +159,9 @@ Mallob::Clause AdaptiveClauseDatabase::popMallobClause(Slot<T>& slot) {
     T packed = std::move(slot.list.front());
     slot.list.pop_front();
     if (slot.list.empty()) slot.empty = true;
-    return getMallobClause(packed, slot.implicitLbdOrZero).copy();
+    auto mc = getMallobClause(packed, slot.implicitLbdOrZero);
+    _num_free_literals.fetch_add(mc.size, std::memory_order_relaxed);
+    return mc.copy();
 }
 
 template <typename T>
@@ -197,6 +199,7 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, Buffe
     // Create clauses one by one
     std::vector<Mallob::Clause> flushedClauses;
     int remainingLits = builder.getMaxRemainingLits();
+    int collectedLits = 0;
     auto it = swappedSlot.begin();
     for (; it != swappedSlot.end(); ++it) {
         T& elem = *it;
@@ -204,9 +207,13 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, Buffe
         if (clause.size > remainingLits) break;
 
         // insert clause to export buffer
-        flushedClauses.push_back(std::move(clause));
         remainingLits -= clause.size;
+        collectedLits += clause.size;
+        flushedClauses.push_back(std::move(clause));
     }
+
+    // Return budget of extracted literals
+    _num_free_literals.fetch_add(collectedLits, std::memory_order_relaxed); 
 
     if (it != swappedSlot.end()) {
         // Re-insert swapped clauses which remained unused

@@ -131,10 +131,6 @@ void DefaultSharingManager::onProduceClause(int solverId, int solverRevision, co
 
 int DefaultSharingManager::prepareSharing(int* begin, int totalLiteralLimit) {
 
-    //log(V5_DEBG, "Sharing clauses among %i nodes\n", size);
-    static int prodInc = 1;
-	static int lastInc = 0;
-
 	int numExportedClauses = 0;
 	auto buffer = _cdb.exportBuffer(totalLiteralLimit, numExportedClauses);
 	//assert(buffer.size() <= maxSize);
