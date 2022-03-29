@@ -75,7 +75,9 @@ private:
                         merger.add(_cdb.getBufferReader(elem.data(), elem.size()));
                     }
                     std::vector<int> merged = merger.merge(&_excess_clauses_from_merge);
-                    LOG(V4_VVER, "%s : merged into buffer of size %i\n", _job->toStr(), merged.size());
+                    LOG(V4_VVER, "%s : merged %i contribs ~> len=%i\n", 
+                        _job->toStr(), numAggregated, merged.size());
+                    merged.push_back(numAggregated);
                     return merged;
                 }
             ),

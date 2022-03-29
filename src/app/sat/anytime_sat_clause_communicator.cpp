@@ -97,7 +97,9 @@ void AnytimeSatClauseCommunicator::communicate() {
         LOG(V4_VVER, "%s CS produce cls\n", _job->toStr());
         session._allreduce_clauses.produce([&]() {
             Checksum checksum;
-            return _job->getPreparedClauses(checksum);
+            auto clauses = _job->getPreparedClauses(checksum);
+            clauses.push_back(1); // # aggregated workers
+            return clauses;
         });
     
         // Calculate new sharing compensation factor from last sharing statistics
