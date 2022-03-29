@@ -79,7 +79,9 @@ void HordeProcessAdapter::doInitialize() {
     _hsm = new ((char*)mainShmem) HordeSharedMemory();
     _hsm->doBegin = false;
     _hsm->doExport = false;
-    _hsm->doImport = false;
+    _hsm->doFilterImport = false;
+    _hsm->doDigestImportWithFilter = false;
+    _hsm->doDigestImportWithoutFilter = false;
     _hsm->doReturnClauses = false;
     _hsm->doDumpStats = false;
     _hsm->doStartNextRevision = false;
@@ -87,7 +89,8 @@ void HordeProcessAdapter::doInitialize() {
     _hsm->exportBufferMaxSize = 0;
     _hsm->importBufferSize = 0;
     _hsm->didExport = false;
-    _hsm->didImport = false;
+    _hsm->didFilterImport = false;
+    _hsm->didDigestImport = false;
     _hsm->didReturnClauses = false;
     _hsm->didDumpStats = false;
     _hsm->didStartNextRevision = false;
@@ -112,6 +115,8 @@ void HordeProcessAdapter::doInitialize() {
             sizeof(int)*_hsm->exportBufferAllocatedSize, nullptr);
     _import_buffer = (int*) createSharedMemoryBlock("clauseimport", 
             sizeof(int)*_hsm->importBufferMaxSize, nullptr);
+    _filter_buffer = (int*) createSharedMemoryBlock("clausefilter", 
+            _hsm->importBufferMaxSize/8 + 1, nullptr);
     _returned_buffer = (int*) createSharedMemoryBlock("returnedclauses",
             sizeof(int)*_hsm->importBufferMaxSize, nullptr);
 
@@ -201,33 +206,70 @@ void HordeProcessAdapter::collectClauses(int maxSize) {
 bool HordeProcessAdapter::hasCollectedClauses() {
     return !_initialized || (_hsm->doExport && _hsm->didExport);
 }
-std::vector<int> HordeProcessAdapter::getCollectedClauses(Checksum& checksum) {
+std::vector<int> HordeProcessAdapter::getCollectedClauses() {
     if (!_initialized) return std::vector<int>();
     if (!hasCollectedClauses()) return std::vector<int>();
     assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
     std::vector<int> clauses(_export_buffer, _export_buffer+_hsm->exportBufferTrueSize);
-    checksum = _hsm->exportChecksum;
+    _last_admitted_clause_share = std::pair<int, int>(_hsm->lastNumAdmittedClausesToImport, _hsm->lastNumClausesToImport);
     _hsm->doExport = false;
     return clauses;
 }
-
-void HordeProcessAdapter::digestClauses(const std::vector<int>& clauses, const Checksum& checksum) {
-    if (!_initialized || _hsm->doImport) {
-        // Cannot import right now -- defer into temporary storage 
-        _temp_clause_buffers.emplace_back(clauses, checksum);
-        return;
-    }
-    doDigest(clauses, checksum);
+std::pair<int, int> HordeProcessAdapter::getLastAdmittedClauseShare() {
+    return _last_admitted_clause_share;
 }
 
-void HordeProcessAdapter::doDigest(const std::vector<int>& clauses, const Checksum& checksum) {
-    _hsm->importChecksum = checksum;
-    _hsm->importBufferSize = clauses.size();
-    _hsm->importBufferRevision = _desired_revision;
-    assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
-    memcpy(_import_buffer, clauses.data(), clauses.size()*sizeof(int));
-    _hsm->doImport = true;
-    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
+bool HordeProcessAdapter::process(const std::vector<int>& buffer, BufferTask task) {
+
+    if (!_initialized || _hsm->doFilterImport || _hsm->doDigestImportWithFilter || _hsm->doDigestImportWithoutFilter) {
+        return false;
+    }
+
+    if (task == FILTER_CLAUSES) {
+        _hsm->importBufferSize = buffer.size();
+        _hsm->importBufferRevision = _desired_revision;
+        assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
+        memcpy(_import_buffer, buffer.data(), buffer.size()*sizeof(int));
+        _hsm->doFilterImport = true;
+
+    } else if (task == APPLY_FILTER) {
+        memcpy(_filter_buffer, buffer.data(), buffer.size()*sizeof(int));
+        _hsm->doDigestImportWithFilter = true;
+
+    } else if (task == DIGEST_WITHOUT_FILTER) {
+        _hsm->importBufferSize = buffer.size();
+        _hsm->importBufferRevision = _desired_revision;
+        assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
+        memcpy(_import_buffer, buffer.data(), buffer.size()*sizeof(int));
+        _hsm->doDigestImportWithoutFilter = true;
+    }
+
+    Process::wakeUp(_child_pid);
+    return true;
+}
+
+void HordeProcessAdapter::filterClauses(const std::vector<int>& clauses) {
+    if (!process(clauses, FILTER_CLAUSES)) _pending_tasks.emplace_back(clauses, FILTER_CLAUSES);
+}
+
+void HordeProcessAdapter::applyFilter(const std::vector<int>& filter) {
+    if (!process(filter, APPLY_FILTER)) _pending_tasks.emplace_back(filter, APPLY_FILTER);
+}
+
+void HordeProcessAdapter::digestClausesWithoutFilter(const std::vector<int>& clauses) {
+    if (!process(clauses, DIGEST_WITHOUT_FILTER)) _pending_tasks.emplace_back(clauses, DIGEST_WITHOUT_FILTER);
+}
+
+bool HordeProcessAdapter::hasFilteredClauses() {
+    return _hsm->doFilterImport && _hsm->didFilterImport;
+}
+std::vector<int> HordeProcessAdapter::getLocalFilter() {
+    if (!_hsm->doFilterImport || !_hsm->didFilterImport) return std::vector<int>();
+    std::vector<int> filter;
+    filter.resize(_hsm->filterSize);
+    memcpy(filter.data(), _filter_buffer, _hsm->filterSize*sizeof(int));
+    _hsm->doFilterImport = false;
+    return filter;
 }
 
 void HordeProcessAdapter::returnClauses(const std::vector<int>& clauses) {
@@ -271,10 +313,13 @@ HordeProcessAdapter::SubprocessStatus HordeProcessAdapter::check() {
 
     doWriteRevisions();
 
-    if (_hsm->didImport)            _hsm->doImport            = false;
     if (_hsm->didReturnClauses)     _hsm->doReturnClauses     = false;
     if (_hsm->didStartNextRevision) _hsm->doStartNextRevision = false;
     if (_hsm->didDumpStats)         _hsm->doDumpStats         = false;
+    if (_hsm->didDigestImport) {
+        _hsm->doDigestImportWithFilter = false;
+        _hsm->doDigestImportWithoutFilter = false;
+    }
 
     if (!_hsm->doStartNextRevision 
         && !_hsm->didStartNextRevision 
@@ -284,15 +329,13 @@ HordeProcessAdapter::SubprocessStatus HordeProcessAdapter::check() {
         _hsm->doStartNextRevision = true;
     }
 
-    if (!_hsm->doImport && !_hsm->didImport && !_temp_clause_buffers.empty()) {
-        // Digest next clause buffer from intermediate storage
-        doDigest(_temp_clause_buffers.front().first, _temp_clause_buffers.front().second);
-        _temp_clause_buffers.erase(_temp_clause_buffers.begin());
+    if (!_pending_tasks.empty() && process(_pending_tasks.front().first, _pending_tasks.front().second)) {
+        _pending_tasks.pop_front();
     }
 
     if (!_hsm->doReturnClauses && !_hsm->didReturnClauses && !_temp_returned_clauses.empty()) {
         doReturnClauses(_temp_returned_clauses.front());
-        _temp_returned_clauses.erase(_temp_returned_clauses.begin());
+        _temp_returned_clauses.pop_front();
     }
     
     // Solution preparation just ended?

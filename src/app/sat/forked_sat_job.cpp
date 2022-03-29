@@ -193,12 +193,33 @@ bool ForkedSatJob::hasPreparedSharing() {
 std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum) {
     if (!_initialized || !_solver->hasCollectedClauses()) 
         return std::vector<int>();
-    return _solver->getCollectedClauses(checksum);
+    return _solver->getCollectedClauses();
+}
+std::pair<int, int> ForkedSatJob::getLastAdmittedClauseShare() {
+    if (!_initialized) return std::pair<int, int>();
+    return _solver->getLastAdmittedClauseShare();
 }
 
-void ForkedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& checksum) {
+void ForkedSatJob::filterSharing(std::vector<int>& clauses) {
     if (!_initialized) return;
-    _solver->digestClauses(clauses, checksum);
+    _solver->filterClauses(clauses);
+}
+bool ForkedSatJob::hasFilteredSharing() {
+    if (!_initialized) return false;
+    return _solver->hasFilteredClauses();
+}
+std::vector<int> ForkedSatJob::getLocalFilter() {
+    if (!_initialized) return std::vector<int>();
+    return _solver->getLocalFilter();
+}
+void ForkedSatJob::applyFilter(std::vector<int>& filter) {
+    if (!_initialized) return;
+    _solver->applyFilter(filter);
+}
+
+void ForkedSatJob::digestSharingWithoutFilter(std::vector<int>& clauses) {
+    if (!_initialized) return;
+    _solver->digestClausesWithoutFilter(clauses);
     if (getJobTree().isRoot()) {
         LOG(V3_VERB, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
     }

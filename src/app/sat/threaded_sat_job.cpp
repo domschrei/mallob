@@ -163,7 +163,7 @@ void ThreadedSatJob::prepareSharing(int maxSize) {
     
     _clause_buffer.resize(maxSize);
     _clause_checksum = Checksum();
-    int actualSize = _solver->prepareSharing(_clause_buffer.data(), maxSize, _clause_checksum);
+    int actualSize = _solver->prepareSharing(_clause_buffer.data(), maxSize);
     _clause_buffer.resize(actualSize);
 }
 bool ThreadedSatJob::hasPreparedSharing() {
@@ -175,9 +175,29 @@ std::vector<int> ThreadedSatJob::getPreparedClauses(Checksum& checksum) {
     checksum = _clause_checksum;
     return out;
 }
+std::pair<int, int> ThreadedSatJob::getLastAdmittedClauseShare() {
+    return _solver->getLastAdmittedClauseShare();
+}
 
-void ThreadedSatJob::digestSharing(std::vector<int>& clauses, const Checksum& checksum) {
-    _solver->digestSharing(clauses, checksum);
+void ThreadedSatJob::filterSharing(std::vector<int>& clauses) {
+    auto maxFilterSize = clauses.size()/(8*sizeof(int))+1;
+    if (_filter.size() < maxFilterSize) _filter.resize(maxFilterSize);
+    int filterSize = _solver->filterSharing(clauses.data(), clauses.size(), _filter.data());
+    _filter.resize(filterSize);
+    _clauses_to_filter = clauses;
+}
+bool ThreadedSatJob::hasFilteredSharing() {
+    return !_filter.empty();
+}
+std::vector<int> ThreadedSatJob::getLocalFilter() {
+    return _filter;
+}
+void ThreadedSatJob::applyFilter(std::vector<int>& filter) {
+    _solver->digestSharingWithFilter(_clauses_to_filter.data(), _clauses_to_filter.size(), filter.data());
+}
+
+void ThreadedSatJob::digestSharingWithoutFilter(std::vector<int>& clauses) {
+    _solver->digestSharingWithoutFilter(clauses.data(), clauses.size());
     if (getJobTree().isRoot()) {
         LOG(V3_VERB, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
     }

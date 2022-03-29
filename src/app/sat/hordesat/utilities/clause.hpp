@@ -36,6 +36,15 @@ namespace Mallob {
             }
             return out.substr(0, out.size()-1);
         }
+
+        bool operator<(const Clause& other) const {
+            if (size != other.size) return size < other.size;
+            if (lbd != other.lbd) return lbd < other.lbd;
+            for (int i = 0; i < size; i++) {
+                if (begin[i] != other.begin[i]) return begin[i] < other.begin[i];
+            }
+            return false;
+        }
     };
 
     inline size_t commutativeHash(const int* begin, int size, int which = 3) {

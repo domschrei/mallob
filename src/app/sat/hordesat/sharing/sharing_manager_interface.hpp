@@ -37,22 +37,4 @@ struct SharingStatistics {
 	}
 };
 
-class SharingManagerInterface {
-
-public:
-	virtual int prepareSharing(int* begin, int maxSize) = 0;
-    virtual void digestSharing(std::vector<int>& result) = 0;
-    virtual void digestSharing(int* begin, int size) = 0;
-	virtual void returnClauses(int* begin, int buflen) = 0;
-
-    virtual SharingStatistics getStatistics() = 0;
-	virtual ~SharingManagerInterface() {};
-
-	virtual void stopClauseImport(int solverId) = 0;
-	virtual void continueClauseImport(int solverId) = 0;
-	virtual void setRevision(int revision) = 0;
-};
-
-
-
 #endif /* SHARING_SHARINGMANAGERINTERFACE_H_ */

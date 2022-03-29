@@ -72,9 +72,12 @@ private:
 
     int* _export_buffer;
     int* _import_buffer;
+    int* _filter_buffer;
     int* _returned_buffer;
-    std::list<std::pair<std::vector<int>, Checksum>> _temp_clause_buffers;
+    enum BufferTask {FILTER_CLAUSES, APPLY_FILTER, DIGEST_WITHOUT_FILTER};
+    std::list<std::pair<std::vector<int>, BufferTask>> _pending_tasks;
     std::list<std::vector<int>> _temp_returned_clauses;
+    std::pair<int, int> _last_admitted_clause_share;
 
     pid_t _child_pid = -1;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
@@ -111,8 +114,15 @@ public:
 
     void collectClauses(int maxSize);
     bool hasCollectedClauses();
-    std::vector<int> getCollectedClauses(Checksum& checksum);
-    void digestClauses(const std::vector<int>& clauses, const Checksum& checksum);
+    std::vector<int> getCollectedClauses();
+    std::pair<int, int> getLastAdmittedClauseShare();
+
+    void filterClauses(const std::vector<int>& clauses);
+    bool hasFilteredClauses();
+    std::vector<int> getLocalFilter();
+
+    void applyFilter(const std::vector<int>& filter);
+    void digestClausesWithoutFilter(const std::vector<int>& clauses);
     void returnClauses(const std::vector<int>& clauses);
 
     void dumpStats();
@@ -128,9 +138,10 @@ private:
     void doInitialize();
     void doWriteRevisions();
     void doPrepareSolution();
+
+    bool process(const std::vector<int>& clauses, BufferTask task);
     
     void applySolvingState();
-    void doDigest(const std::vector<int>& clauses, const Checksum& checksum);
     void doReturnClauses(const std::vector<int>& clauses);
     void initSharedMemory(HordeConfig&& config);
     void* createSharedMemoryBlock(std::string shmemSubId, size_t size, void* data);

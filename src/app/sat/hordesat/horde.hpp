@@ -13,6 +13,7 @@
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 #include "sharing/sharing_manager_interface.hpp"
+#include "sharing/default_sharing_manager.hpp"
 #include "solvers/solver_thread.hpp"
 #include "solvers/solving_state.hpp"
 #include "util/params.hpp"
@@ -31,7 +32,7 @@ private:
 	
 	size_t _num_solvers;
 	
-	std::unique_ptr<SharingManagerInterface> _sharing_manager;
+	std::unique_ptr<DefaultSharingManager> _sharing_manager;
 	std::vector<std::shared_ptr<PortfolioSolverInterface>> _solver_interfaces;
 	std::vector<std::shared_ptr<SolverThread>> _solver_threads;
 	std::vector<std::shared_ptr<SolverThread>> _obsolete_solver_threads;
@@ -63,10 +64,12 @@ public:
     int solveLoop();
 	JobResult& getResult() {return _result;}
 
-    int prepareSharing(int* begin, int maxSize, Checksum& checksum);
-    void digestSharing(std::vector<int>& result, const Checksum& checksum);
-	void digestSharing(int* begin, int size, const Checksum& checksum);
+    int prepareSharing(int* begin, int maxSize);
+	int filterSharing(int* begin, int size, int* filterOut);
+	void digestSharingWithFilter(int* begin, int size, const int* filter);
+	void digestSharingWithoutFilter(int* begin, int size);
 	void returnClauses(int* begin, int size);
+	std::pair<int, int> getLastAdmittedClauseShare();
 
     void setPaused();
     void unsetPaused();

@@ -16,219 +16,40 @@
 DefaultSharingManager::DefaultSharingManager(
 		std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, 
 		const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver, int jobIndex)
-	: _solvers(solvers), _process_filter(/*maxClauseLen=*/params.strictClauseLengthLimit()), 
+	: _solvers(solvers),
 	_max_deferred_lits_per_solver(maxDeferredLitsPerSolver), 
 	_params(params), _logger(logger), _job_index(jobIndex),
+	_filter(params.clauseFilterClearInterval()),
 	_cdb([&]() {
 		AdaptiveClauseDatabase::Setup setup;
 		setup.maxClauseLength = _params.strictClauseLengthLimit();
 		setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
 		setup.numLiterals = _params.clauseBufferBaseSize()*_params.numChunksForExport();
-		setup.numProducers = _solvers.size()+1;
 		setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
 		return setup;
-	}()), _hist_produced(params.strictClauseLengthLimit()), 
-	_hist_failed_filter(params.strictClauseLengthLimit()),
-	_hist_admitted_to_db(params.strictClauseLengthLimit()), 
-	_hist_dropped_before_db(params.strictClauseLengthLimit()),
+	}()), 
+	_export_buffer(_filter, _cdb, params.strictClauseLengthLimit()),
+	_hist_produced(params.strictClauseLengthLimit()), 
 	_hist_returned_to_db(params.strictClauseLengthLimit()) {
 
 	_stats.histProduced = &_hist_produced;
-	_stats.histFailedFilter = &_hist_failed_filter;
-	_stats.histAdmittedToDb = &_hist_admitted_to_db;
-	_stats.histDroppedBeforeDb = &_hist_dropped_before_db;
+	_stats.histFailedFilter = &_export_buffer.getFailedFilterHistogram();
+	_stats.histAdmittedToDb = &_export_buffer.getAdmittedHistogram();
+	_stats.histDroppedBeforeDb = &_export_buffer.getDroppedHistogram();
 	_stats.histDeletedInSlots = &_cdb.getDeletedClausesHistogram();
 	_stats.histReturnedToDb = &_hist_returned_to_db;
 
 	auto callback = getCallback();
 	
     for (size_t i = 0; i < _solvers.size(); i++) {
-		_solver_filters.emplace_back(/*maxClauseLen=*/params.strictClauseLengthLimit());
 		_solvers[i]->setExtLearnedClauseCallback(callback);
 		_solver_revisions.push_back(_solvers[i]->getSolverSetup().solverRevision);
 		_solver_stats.push_back(&_solvers[i]->getSolverStatsRef());
 	}
-	_last_buffer_clear = Timer::elapsedSeconds();
 }
 
-int DefaultSharingManager::prepareSharing(int* begin, int totalLiteralLimit) {
-
-    //log(V5_DEBG, "Sharing clauses among %i nodes\n", size);
-    static int prodInc = 1;
-	static int lastInc = 0;
-
-	int numExportedClauses = 0;
-	auto buffer = _cdb.exportBuffer(totalLiteralLimit, numExportedClauses);
-	//assert(buffer.size() <= maxSize);
-	memcpy(begin, buffer.data(), buffer.size()*sizeof(int));
-
-	LOGGER(_logger, V5_DEBG, "prepared %i clauses, size %i\n", numExportedClauses, buffer.size());
-	_stats.exportedClauses += numExportedClauses;
-	return buffer.size();
-}
-
-void DefaultSharingManager::digestSharing(std::vector<int>& result) {
-
-	digestSharing(result.data(), result.size());
-}
-
-void DefaultSharingManager::digestSharing(int* begin, int buflen) {
-
-	int verb = _job_index == 0 ? V3_VERB : V5_DEBG;
-	float cfci = _params.clauseFilterClearInterval();
-	float time = Timer::elapsedSeconds();
-	ClauseHistogram hist(_params.strictClauseLengthLimit());
-
-	digestDeferredFutureClauses();
-
-	// Get all clauses
-	auto reader = _cdb.getBufferReader(begin, buflen);
-
-	// Convert clauses to plain format
-	std::vector<Mallob::Clause> clauses;
-	std::vector<uint32_t> producersPerClause;
-	{
-		auto clause = reader.getNextIncomingClause();
-		size_t producerPos = 0;
-
-		while (clause.begin != nullptr) {
-			hist.increment(clause.size);
-			for (size_t i = 0; i < clause.size; i++) assert(clause.begin[i] != 0);
-			clauses.push_back(clause);
-			producersPerClause.push_back(_cdb.getProducers(clause));
-			clause = reader.getNextIncomingClause();
-		}
-	}
-
-	// Any solvers not ready for import yet?
-	bool deferringFutureClauses = false;
-	for (int sid = 0; sid < _solvers.size(); sid++) {	
+void DefaultSharingManager::onProduceClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero) {
 		
-		auto& solver = _solvers[sid];
-
-		// Defer clause "from the future"
-		if (solver->getCurrentRevision() < _current_revision) {
-			
-			// Allocate a new entry in the deferred list with separate buffer
-			// and clause objects (because the original buffer will go out of scope)
-			if (!deferringFutureClauses) {
-				deferringFutureClauses = true;
-				_future_clauses.emplace_back();
-				
-				auto& d = _future_clauses.back();
-				d.buffer = std::vector<int>(begin, begin+buflen);
-				d.revision = _current_revision;
-				d.involvedSolvers.resize(_solvers.size(), false);
-				d.producersPerClause = producersPerClause;
-
-				auto dReader = _cdb.getBufferReader(d.buffer.data(), buflen);
-				auto clause = dReader.getNextIncomingClause();
-				while (clause.begin != nullptr) {
-					d.clauses.push_back(clause);
-					clause = dReader.getNextIncomingClause();	
-				}
-				assert(d.clauses.size() == d.producersPerClause.size());
-			}
-
-			_future_clauses.back().involvedSolvers[sid] = true;
-			continue;
-		}
-
-		// Import each clause passing the solver's filter
-		importClausesToSolver(sid, clauses, producersPerClause);
-	}
-	
-	// Clear all filters if necessary
-	if (!_params.distributedDuplicateDetection()) {
-		if (cfci == 0 || (cfci > 0 && Timer::elapsedSeconds() - _last_buffer_clear > cfci)) {
-			_logger.log(verb, "clear filters\n");
-			_process_filter.clear();
-			for (auto& filter : _solver_filters) filter.setClear();
-			_last_buffer_clear = Timer::elapsedSeconds();
-		}
-	}
-
-	// Process-wide stats
-	time = Timer::elapsedSeconds() - time;
-	_logger.log(verb, "sharing time:%.4f %s\n", time, hist.getReport().c_str());
-}
-
-void DefaultSharingManager::digestDeferredFutureClauses() {
-
-	for (auto it = _future_clauses.begin(); it != _future_clauses.end(); ++it) {
-		auto& d = *it;
-		bool solversRemaining = false;
-		bool progress = false;
-		for (size_t sid = 0; sid < _solvers.size(); sid++) {
-			if (!d.involvedSolvers[sid]) continue;
-			if (d.revision > _solvers[sid]->getCurrentRevision()) {
-				// Not ready yet
-				solversRemaining = true;
-				continue;
-			}
-			// Ready to import
-			importClausesToSolver(sid, d.clauses, d.producersPerClause);
-			progress = true;
-		}
-		if (!solversRemaining) {
-			// Erase this entry
-			it = _future_clauses.erase(it);
-			it--;
-		}
-		if (!progress) break;
-	}
-}
-
-void DefaultSharingManager::importClausesToSolver(int solverId, const std::vector<Clause>& clauses, const std::vector<uint32_t>& producersPerClause) {
-
-	assert(clauses.size() == producersPerClause.size());
-
-	uint32_t producerFlag = 1 << solverId;
-	assert(producerFlag >= 1 && producerFlag < 256);
-
-	for (size_t cIdx = 0; cIdx < clauses.size(); cIdx++) {
-		auto& c = clauses[cIdx];
-		uint16_t producers = producersPerClause[cIdx];
-		if ((producers & producerFlag) != 0) {
-			// Clause was produced by this solver!
-			log(V2_INFO, "%i : FILTERED (%u & %u != 0) %s\n", solverId, producers, producerFlag, c.toStr().c_str());
-
-			// TODO This mirroring filter sometimes does not work if different solvers export a clause
-			// with different LBD values - the producer of the lower LBD clause will be acknowledged
-			// while the producer of the higher LBD clause may be neglected (because the buffer export did not reach that clause), 
-			// so it may be mirrored the clause.
-			// This MAY be considered a feature - the mirrored clause is of a better LBD value than the exported one.
-			// But this is not consistent because clauses are not generally re-shared if a better LBD is found.
-			// Possible solution: change map [size,lbd,data]->producers to [size,data]->[lbd,producers].
-
-			// Also, the mirroring filter is based on a snapshot during buffer export, so the clause may have been
-			// exported by additional solvers in the meantime.
-
-			// Could think about integrating the mirroring filter into the clause slots themselves: Do not directly
-			// delete clauses at export, but keep them until the next import. At import, clauses can be checked
-			// by whom they have already been exported (as of NOW) and given to the remaining solvers. If SOME producer
-			// was found, delete the clause, otherwise keep it. => You only remove clauses from the database if they were
-			// shared successfully (or to make room for better clauses). This renders the "returnClauses" mechanic obsolete as well.
-
-			continue;
-		}
-		// Old solver filter
-		if (!_params.distributedDuplicateDetection() && !_solver_filters[solverId].registerClause(c.begin, c.size)) 
-			continue;
-
-		_solvers[solverId]->addLearnedClause(c);
-		log(V2_INFO, "%i : IMPORTED (%u & %u == 0) %s\n", solverId, producers, producerFlag, c.toStr().c_str());
-	}
-}
-
-void DefaultSharingManager::processClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero) {
-	
-	auto& solverStats = _solver_stats[solverId];
-	if (solverStats) {
-		solverStats->producedClauses++;
-		solverStats->histProduced->increment(clause.size);
-	}
-	
 	if (_solver_revisions[solverId] != solverRevision) return;
 
 	if (_params.crashMonkeyProbability() > 0) {
@@ -273,13 +94,20 @@ void DefaultSharingManager::processClause(int solverId, int solverRevision, cons
 		assert(clause.lbd >= 1 || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", clause.size, clause.lbd));
 		assert(clause.lbd <= clause.size);
 	}
+	int clauseLbd = clauseSize == 1 ? 1 : std::max(2, clause.lbd);
 
 	// Add clause length to statistics
 	_hist_produced.increment(clauseSize);
+	auto& solverStats = _solver_stats[solverId];
+	if (solverStats) {
+		solverStats->producedClauses++;
+		solverStats->histProduced->increment(clause.size);
+	}
 
-	// Sort and write clause into database if possible
-	std::sort(clauseBegin, clauseBegin+clauseSize);
-	Clause tldClause(clauseBegin, clauseSize, clauseSize == 1 ? 1 : std::max(2, clause.lbd));
+	_export_buffer.produce(clauseBegin, clauseSize, clauseLbd, solverId, _internal_epoch);
+	//log(V6_DEBGV, "%i : PRODUCED %s\n", solverId, tldClause.toStr().c_str());
+
+	/*
 	auto result = _cdb.addClause(solverId, tldClause);
 
 	if (result == SUCCESS) {
@@ -296,9 +124,27 @@ void DefaultSharingManager::processClause(int solverId, int solverRevision, cons
 		_stats.clausesProcessFilteredAtExport++;
 		if (solverStats) solverStats->producedClausesSolverFiltered++;
 	}
-	if (result != NO_BUDGET) log(V2_INFO, "%i : EXPORTED %s\n", solverId, tldClause.toStr().c_str());
+	*/
 
 	if (tldClauseVec) delete tldClauseVec;
+}
+
+int DefaultSharingManager::prepareSharing(int* begin, int totalLiteralLimit) {
+
+    //log(V5_DEBG, "Sharing clauses among %i nodes\n", size);
+    static int prodInc = 1;
+	static int lastInc = 0;
+
+	int numExportedClauses = 0;
+	auto buffer = _cdb.exportBuffer(totalLiteralLimit, numExportedClauses);
+	//assert(buffer.size() <= maxSize);
+	memcpy(begin, buffer.data(), buffer.size()*sizeof(int));
+
+	LOGGER(_logger, V5_DEBG, "prepared %i clauses, size %i\n", numExportedClauses, buffer.size());
+	_stats.exportedClauses += numExportedClauses;
+	_internal_epoch++;
+
+	return buffer.size();
 }
 
 void DefaultSharingManager::returnClauses(int* begin, int buflen) {
@@ -306,12 +152,113 @@ void DefaultSharingManager::returnClauses(int* begin, int buflen) {
 	auto reader = _cdb.getBufferReader(begin, buflen);
 	auto c = reader.getNextIncomingClause();
 	while (c.begin != nullptr) {
-		if (_params.distributedDuplicateDetection() || _process_filter.registerClause(c.begin, c.size)) {
-			_cdb.addClause(_solvers.size(), c);
-			_hist_returned_to_db.increment(c.size);
-		}
+		bool success = _cdb.addClause(c);
+		if (success) _hist_returned_to_db.increment(c.size);
 		c = reader.getNextIncomingClause();
 	}
+}
+
+int DefaultSharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
+
+	auto reader = _cdb.getBufferReader(begin, buflen);
+	
+	constexpr auto bitsPerElem = 8*sizeof(int);
+	int shift = bitsPerElem;
+	auto clause = reader.getNextIncomingClause();
+	int filterPos = -1;
+	int nbFiltered = 0;
+	int nbTotal = 0;
+
+	_filter.acquireLock();
+	while (clause.begin != nullptr) {
+		++nbTotal;
+
+		if (shift == bitsPerElem) {
+			++filterPos;
+			filterOut[filterPos] = 0;
+			shift = 0;
+		}
+		
+		if (!_filter.admitSharing(clause, _internal_epoch)) {
+			// filtered!
+			auto bitFiltered = 1 << shift;
+			filterOut[filterPos] |= bitFiltered;
+			++nbFiltered;
+		}
+		
+		++shift;
+		clause = reader.getNextIncomingClause();
+	}
+	_filter.releaseLock();
+
+	_logger.log(V4_VVER, "filtered %i/%i\n", nbFiltered, nbTotal);
+	return filterPos+1;
+}
+
+void DefaultSharingManager::digestSharingWithFilter(int* begin, int buflen, const int* filter) {
+
+	int verb = _job_index == 0 ? V3_VERB : V5_DEBG;
+	float time = Timer::elapsedSeconds();
+	ClauseHistogram hist(_params.strictClauseLengthLimit());
+
+	// Get all clauses
+	auto reader = _cdb.getBufferReader(begin, buflen);
+
+	_logger.log(verb, "digesting len=%ld\n", buflen);
+
+	std::vector<PortfolioSolverInterface*> importingSolvers;
+	for (auto& solver : _solvers) {
+		if (solver->getCurrentRevision() == _current_revision) {
+			importingSolvers.push_back(solver.get());
+		}
+	}
+
+	const int bitsPerElem = sizeof(int)*8;
+	int shift = bitsPerElem;
+	int filterPos = -1;
+	_last_num_cls_to_import = 0;
+	_last_num_admitted_cls_to_import = 0;
+
+	_filter.acquireLock();
+	auto clause = reader.getNextIncomingClause();
+	while (clause.begin != nullptr) {
+		
+		_last_num_cls_to_import++;
+		if (shift == bitsPerElem) {
+			filterPos++;
+			shift = 0;
+		}
+
+		auto bit = 1 << shift;
+		if (filter == nullptr || ((filter[filterPos] & bit) == 0)) {
+
+			// admitted
+			
+			_last_num_admitted_cls_to_import++;
+			hist.increment(clause.size);
+			auto producers = _filter.getInfo(clause, _internal_epoch).producers;
+
+			for (auto solver : importingSolvers) {
+				int sid = solver->getLocalId();
+				uint8_t producerFlag = 1 << sid;
+				if ((producers & producerFlag) != 0) continue; // filtered
+				_solvers[sid]->addLearnedClause(clause);
+			}
+		}
+
+		clause = reader.getNextIncomingClause();
+		shift++;
+	}
+	_filter.releaseLock();
+	
+	// Process-wide stats
+	time = Timer::elapsedSeconds() - time;
+	_logger.log(verb, "sharing time:%.4f adm:%i/%i %s\n", time, 
+		_last_num_admitted_cls_to_import, _last_num_cls_to_import, hist.getReport().c_str());
+}
+
+void DefaultSharingManager::digestSharingWithoutFilter(int* begin, int buflen) {
+	digestSharingWithFilter(begin, buflen, nullptr);
 }
 
 SharingStatistics DefaultSharingManager::getStatistics() {

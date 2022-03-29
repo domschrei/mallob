@@ -18,21 +18,16 @@
 #include "app/sat/hordesat/utilities/clause_filter.hpp"
 #include "app/sat/hordesat/solvers/portfolio_solver_interface.hpp"
 #include "util/params.hpp"
+#include "produced_clause_filter.hpp"
+#include "export_buffer.hpp"
 
 #define CLAUSE_LEN_HIST_LENGTH 256
 
-class DefaultSharingManager : public SharingManagerInterface {
+class DefaultSharingManager {
 
 protected:
 	// associated solvers
 	std::vector<std::shared_ptr<PortfolioSolverInterface>>& _solvers;
-
-	// The process-wide clause filter has the purpose of preventing 
-	// duplicate clauses in the database of exported clauses.
-	ClauseFilter _process_filter;
-	// Each solver clause filter has the purpose of preventing the 
-	// solver's own clauses being mirrored back to itself.
-	std::vector<ClauseFilter> _solver_filters;
 	
 	std::vector<int> _solver_revisions;
 
@@ -55,14 +50,14 @@ protected:
 	const Logger& _logger;
 	int _job_index;
 
+	ProducedClauseFilter _filter;
 	AdaptiveClauseDatabase _cdb;
+	ExportBuffer _export_buffer;
 	
-	float _last_buffer_clear = 0;
+	int _last_num_cls_to_import = 0;
+	int _last_num_admitted_cls_to_import = 0;
 
 	ClauseHistogram _hist_produced;
-	ClauseHistogram _hist_failed_filter;
-	ClauseHistogram _hist_admitted_to_db;
-	ClauseHistogram _hist_dropped_before_db;
 	ClauseHistogram _hist_returned_to_db;
 
 	SharingStatistics _stats;
@@ -76,6 +71,8 @@ protected:
 	bool _observed_nonunit_lbd_of_length = false;
 	bool _observed_nonunit_lbd_of_length_minus_one = false;
 
+	int _internal_epoch = 0;
+
 public:
 	DefaultSharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
 			const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver,
@@ -83,22 +80,27 @@ public:
 	~DefaultSharingManager();
 
     int prepareSharing(int* begin, int totalLiteralLimit);
-    void returnClauses(int* begin, int buflen);
-
-	void digestSharing(std::vector<int>& result);
-	void digestSharing(int* begin, int buflen);
+	int filterSharing(int* begin, int buflen, int* filterOut);
+	void digestSharingWithFilter(int* begin, int buflen, const int* filter);
+    void digestSharingWithoutFilter(int* begin, int buflen);
+	void returnClauses(int* begin, int buflen);
 
 	SharingStatistics getStatistics();
 
-	void setRevision(int revision) override {_current_revision = revision;}
-	void stopClauseImport(int solverId) override;
-	void continueClauseImport(int solverId) override;
+	void setRevision(int revision) {_current_revision = revision;}
+	void stopClauseImport(int solverId);
+
+	void continueClauseImport(int solverId);
+	int getLastNumClausesToImport() const {return _last_num_cls_to_import;}
+	int getLastNumAdmittedClausesToImport() const {return _last_num_admitted_cls_to_import;}
 
 private:
-	void processClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero);
+	
+	void onProduceClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero);
+
 	ExtLearnedClauseCallback getCallback() {
 		return [this](const Clause& c, int solverId, int solverRevision, int condVarOrZero) {
-			processClause(solverId, solverRevision, c, condVarOrZero);
+			onProduceClause(solverId, solverRevision, c, condVarOrZero);
 		};
 	};
 

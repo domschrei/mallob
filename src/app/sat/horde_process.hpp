@@ -33,6 +33,7 @@ private:
     HordeSharedMemory* _hsm;
     int* _export_buffer;
     int* _import_buffer;
+    int* _filter_buffer;
     int* _returned_buffer;
 
     int _last_imported_revision;
@@ -65,6 +66,8 @@ public:
             _export_buffer = (int*) accessMemory(_shmem_id + ".clauseexport", maxExportBufferSize);
             int maxImportBufferSize = _hsm->importBufferMaxSize * sizeof(int);
             _import_buffer = (int*) accessMemory(_shmem_id + ".clauseimport", maxImportBufferSize);
+            int maxFilterSize = _hsm->importBufferMaxSize/8 + 1;
+            _filter_buffer = (int*) accessMemory(_shmem_id + ".clausefilter", maxFilterSize);
             _returned_buffer = (int*) accessMemory(_shmem_id + ".returnedclauses", maxImportBufferSize);
         }
 
@@ -141,21 +144,38 @@ public:
                 LOGGER(_log, V5_DEBG, "DO export clauses\n");
                 // Collect local clauses, put into shared memory
                 _hsm->exportChecksum = Checksum();
-                _hsm->exportBufferTrueSize = _hlib.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize, _hsm->exportChecksum);
+                _hsm->exportBufferTrueSize = _hlib.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize);
+                auto [admitted, total] = _hlib.getLastAdmittedClauseShare();
+                _hsm->lastNumAdmittedClausesToImport = admitted;
+                _hsm->lastNumClausesToImport = total;
                 assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
                 _hsm->didExport = true;
             }
             if (!_hsm->doExport) _hsm->didExport = false;
 
-            // Check if clauses should be imported (must not be "from the future")
-            if (_hsm->doImport && !_hsm->didImport && _hsm->importBufferRevision <= _last_imported_revision) {
+            // Check if clauses should be filtered
+            if (_hsm->doFilterImport && !_hsm->didFilterImport) {
+                LOGGER(_log, V5_DEBG, "DO filter clauses\n");
+                _hsm->filterSize = _hlib.filterSharing(_import_buffer, _hsm->importBufferSize, _filter_buffer);
+                _hsm->didFilterImport = true;
+            }
+            if (!_hsm->doFilterImport) _hsm->didFilterImport = false;
+
+            // Check if clauses should be digested (must not be "from the future")
+            if ((_hsm->doDigestImportWithFilter || _hsm->doDigestImportWithoutFilter) 
+                    && !_hsm->didDigestImport && _hsm->importBufferRevision <= _last_imported_revision) {
                 LOGGER(_log, V5_DEBG, "DO import clauses\n");
                 // Write imported clauses from shared memory into vector
                 assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
-                _hlib.digestSharing(_import_buffer, _hsm->importBufferSize, _hsm->importChecksum);
-                _hsm->didImport = true;
+                if (_hsm->doDigestImportWithFilter) {
+                    _hlib.digestSharingWithFilter(_import_buffer, _hsm->importBufferSize, _filter_buffer);
+                } else {
+                    _hlib.digestSharingWithoutFilter(_import_buffer, _hsm->importBufferSize);
+                }
+                _hsm->didDigestImport = true;
             }
-            if (!_hsm->doImport) _hsm->didImport = false;
+            if (!_hsm->doDigestImportWithFilter && !_hsm->doDigestImportWithoutFilter) 
+                _hsm->didDigestImport = false;
 
             // Re-insert returned clauses into the local clause database to be exported later
             if (_hsm->doReturnClauses && !_hsm->didReturnClauses) {

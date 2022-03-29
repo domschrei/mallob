@@ -62,8 +62,14 @@ public:
     void prepareSharing(int maxSize) override;
     bool hasPreparedSharing() override;
     std::vector<int> getPreparedClauses(Checksum& checksum) override;
+    std::pair<int, int> getLastAdmittedClauseShare() override;
 
-    void digestSharing(std::vector<int>& clauses, const Checksum& checksum) override;
+    virtual void filterSharing(std::vector<int>& clauses) override;
+    virtual bool hasFilteredSharing() override;
+    virtual std::vector<int> getLocalFilter() override;
+    virtual void applyFilter(std::vector<int>& filter) override;
+    
+    virtual void digestSharingWithoutFilter(std::vector<int>& clauses) override;
     void returnClauses(std::vector<int>& clauses) override;
 
 private:

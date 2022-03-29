@@ -2,12 +2,14 @@
 #ifndef DOMPASCH_MALLOB_WAITFREE_CLAUSE_DATABASE_HPP
 #define DOMPASCH_MALLOB_WAITFREE_CLAUSE_DATABASE_HPP
 
-#include <list>
+#include <forward_list>
+#include <memory>
 
 //#include "clause_slot.hpp"
 //#include "chunk_manager.hpp"
 //#include "database/buffer_slot.hpp"
-#include "database/clause_slot_set.hpp"
+//#include "database/clause_slot_set.hpp"
+#include "database/produced_clause.hpp"
 #include "bucket_label.hpp"
 #include "buffer_reader.hpp"
 #include "buffer_merger.hpp"
@@ -60,12 +62,20 @@ private:
     int _total_literal_limit;
     std::atomic_int _num_free_literals {0};
 
-    ClauseSlotSet<ProducedUnitClause>* _unit_slot;
-    ClauseSlotSet<ProducedBinaryClause>* _binary_slot;
-    std::vector<ClauseSlotSet<ProducedLargeClause>*> _large_slots;
+    template <typename T>
+    struct Slot {
+        int implicitLbdOrZero;
+        bool empty = true;
+        std::unique_ptr<Mutex> mtx;
+        std::forward_list<T> list;
+    };
 
-    robin_hood::unordered_flat_map<std::pair<int, int>, int, IntPairHasher> _size_lbd_to_slot_idx;
-    std::atomic_int _max_nonempty_slot;
+    Slot<int> _unit_slot;
+    Slot<std::pair<int, int>> _binary_slot;
+    std::vector<Slot<std::vector<int>>> _large_slots;
+    
+    enum ClauseSlotMode {SAME_SUM_OF_SIZE_AND_LBD, SAME_SIZE, SAME_SIZE_AND_LBD};
+    robin_hood::unordered_flat_map<std::pair<int, int>, std::pair<int, ClauseSlotMode>, IntPairHasher> _size_lbd_to_slot_idx_mode;
 
     int _max_lbd_partitioned_size;
     int _max_clause_length;
@@ -76,14 +86,8 @@ private:
 
     ClauseHistogram _hist_deleted_in_slots;
 
-    std::vector<int> _last_exported_buffer;
-    ProducedClauseMap<ProducedUnitClause> _last_exported_units;
-    ProducedClauseMap<ProducedBinaryClause> _last_exported_binaries;
-    ProducedClauseMap<ProducedLargeClause> _last_exported_large_clauses;
-
 public:
     struct Setup {
-        int numProducers = 1;
         int numLiterals = 1000;
         int maxClauseLength = 20;
         bool useChecksums = false;
@@ -103,7 +107,8 @@ public:
     be possible to insert it later).
     In both cases, c can be freed or reused after calling this method.
     */
-    ClauseSlotInsertResult addClause(int producerId, const Clause& c);
+    bool addClause(const Clause& c);
+    bool addClause(int* cBegin, int cSize, int cLbd, bool sortLargeClause = false);
 
     void printChunks(int nextExportSize = -1);
     
@@ -120,7 +125,7 @@ public:
     The buffer can be parsed via getBufferReader or merged with other buffers via
     getBufferMerger.
     */
-    const std::vector<int>& exportBuffer(int sizeLimit, int& numExportedClauses, 
+    std::vector<int> exportBuffer(int sizeLimit, int& numExportedClauses, 
             ExportMode mode = ANY, bool sortClauses = true);
 
     Mallob::Clause popFront(ExportMode mode = ANY);
@@ -134,7 +139,6 @@ public:
     BufferReader getBufferReader(int* begin, size_t size, bool useChecksums = false);
     BufferMerger getBufferMerger(int sizeLimit);
     BufferBuilder getBufferBuilder(std::vector<int>* out = nullptr);
-    BufferReader getReaderForLastExportedBuffer();
 
     int getCurrentlyUsedLiterals() const {
         return _total_literal_limit - _num_free_literals.load(std::memory_order_relaxed);
@@ -142,36 +146,28 @@ public:
 
     ClauseHistogram& getDeletedClausesHistogram();
 
-    inline uint32_t getProducers(const Clause& c) const {
-        if (c.size == 1) {
-            ProducedUnitClause pc(c);
-            auto it = _last_exported_units.find(pc);
-            if (it == _last_exported_units.end()) return 0;
-            return it->second;
-        } else if (c.size == 2) {
-            ProducedBinaryClause pc(c);
-            auto it = _last_exported_binaries.find(pc);
-            if (it == _last_exported_binaries.end()) return 0;
-            return it->second;
-        } else {
-            ProducedLargeClause pc; // default constructor to avoid copying
-            pc.size = c.size;
-            pc.data = c.begin;
-            auto it = _last_exported_large_clauses.find(pc);
-            uint32_t producers = it == _last_exported_large_clauses.end() ? 0 : it->second;
-            pc.data = nullptr; // removing pointer to data to avoid freeing memory
-            return producers;
-        }
-    }
-
 private:
-    size_t getSlotIdx(int clauseSize, int lbd);
-    BucketLabel getBucketIterator();
-
-    int freeLowPriorityLiterals(int callingSlot);
+    template <typename T>
+    bool addClause(const Mallob::Clause& clause, Slot<T>& slot, int slotIdx);
 
     template <typename T>
-    void flushClauses(ClauseSlotSet<T>& slot, bool sortClauses, BufferBuilder& builder, ProducedClauseMap<T>& exportedMap);
+    Mallob::Clause popMallobClause(Slot<T>& slot);
+
+    template <typename T>
+    Mallob::Clause getMallobClause(T& elem, int implicitLbdOrZero);
+
+    template <typename T>
+    int dropClauses(Slot<T>& slot, int desiredLiterals);
+
+    template <typename T>
+    void flushClauses(Slot<T>& slot, bool sortClauses, BufferBuilder& builder);
+    
+    std::pair<int, ClauseSlotMode> getSlotIdxAndMode(int clauseSize, int lbd);
+    BucketLabel getBucketIterator();
+
+    bool tryAcquireBudget(int len);
+    int freeLowPriorityLiterals(int callingSlot);
+
 
 };
 

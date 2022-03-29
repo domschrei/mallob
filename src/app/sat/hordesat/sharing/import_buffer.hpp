@@ -31,7 +31,6 @@ public:
                     setup.anticipatedLitsToImportPerCycle / setup.clauseBaseBufferSize
                 )
             );
-            cdbSetup.numProducers = 1;
             cdbSetup.slotsForSumOfLengthAndLbd = false;
             cdbSetup.useChecksums = false;
             return cdbSetup;
@@ -39,8 +38,8 @@ public:
 
     void add(const Mallob::Clause& c) {
         _stats.receivedClauses++;
-        auto result = _cdb.addClause(0, c);
-        if (result == SUCCESS) {
+        bool success = _cdb.addClause(c);
+        if (success) {
             _stats.receivedClausesInserted++;
         } else {
             _stats.discardedClauses++;

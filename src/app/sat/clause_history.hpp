@@ -86,7 +86,7 @@ public:
             
             if (rank == MyMpi::rank(MPI_COMM_WORLD)) {
                 // message to self: digest clauses directly
-                _job.digestSharing(msg.payload, msg.checksum);
+                _job.digestSharingWithoutFilter(msg.payload);
             } else {
                 // message to another worker
                 MyMpi::isend(rank, MSG_SEND_APPLICATION_MESSAGE, msg);

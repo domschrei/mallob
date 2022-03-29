@@ -265,49 +265,26 @@ int HordeLib::solveLoop() {
     return -1; // no result yet
 }
 
-int HordeLib::prepareSharing(int* begin, int maxSize, Checksum& checksum) {
+int HordeLib::prepareSharing(int* begin, int maxSize) {
 	if (isCleanedUp()) return 0;
 	LOGGER(_logger, V5_DEBG, "collecting clauses on this node\n");
 	int size = _sharing_manager->prepareSharing(begin, maxSize);
-
-	if (_params.useChecksums()) {
-		checksum.combine(_job_id);
-		for (int i = 0; i < size; i++) checksum.combine(begin[i]);
-	}
-
 	return size;
 }
 
-void HordeLib::digestSharing(std::vector<int>& result, const Checksum& checksum) {
-	if (isCleanedUp()) return;
-
-	if (_params.useChecksums()) {
-		Checksum chk;
-		chk.combine(_job_id);
-		for (int lit : result) chk.combine(lit);
-		if (chk.get() != checksum.get()) {
-			LOGGER(_logger, V1_WARN, "[WARN] Checksum fail (expected count: %ld, actual count: %ld)\n", checksum.count(), chk.count());
-			return;
-		}
-	}
-
-	_sharing_manager->digestSharing(result);
+int HordeLib::filterSharing(int* begin, int size, int* filterOut) {
+	if (isCleanedUp()) return 0;
+	return _sharing_manager->filterSharing(begin, size, filterOut);
 }
 
-void HordeLib::digestSharing(int* begin, int size, const Checksum& checksum) {
+void HordeLib::digestSharingWithFilter(int* begin, int size, const int* filter) {
 	if (isCleanedUp()) return;
+	_sharing_manager->digestSharingWithFilter(begin, size, filter);
+}
 
-	if (_params.useChecksums()) {
-		Checksum chk;
-		chk.combine(_job_id);
-		for (int i = 0; i < size; i++) chk.combine(begin[i]);
-		if (chk.get() != checksum.get()) {
-			LOGGER(_logger, V1_WARN, "[WARN] Checksum fail (expected count: %ld, actual count: %ld)\n", checksum.count(), chk.count());
-			return;
-		}
-	}
-
-	_sharing_manager->digestSharing(begin, size);
+void HordeLib::digestSharingWithoutFilter(int* begin, int size) {
+	if (isCleanedUp()) return;
+	_sharing_manager->digestSharingWithoutFilter(begin, size);
 }
 
 void HordeLib::returnClauses(int* begin, int size) {
@@ -373,6 +350,13 @@ void HordeLib::terminateSolvers() {
 			solver->setTerminate();
 		}
 	}
+}
+
+std::pair<int, int> HordeLib::getLastAdmittedClauseShare() {
+	return std::pair<int, int>(
+		_sharing_manager->getLastNumAdmittedClausesToImport(), 
+		_sharing_manager->getLastNumClausesToImport()
+	);
 }
 
 void HordeLib::cleanUp() {

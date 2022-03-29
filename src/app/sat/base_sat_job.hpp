@@ -19,8 +19,14 @@ public:
     virtual void prepareSharing(int maxSize) = 0;
     virtual bool hasPreparedSharing() = 0;
     virtual std::vector<int> getPreparedClauses(Checksum& checksum) = 0;
+    virtual std::pair<int, int> getLastAdmittedClauseShare() = 0;
 
-    virtual void digestSharing(std::vector<int>& clauses, const Checksum& checksum) = 0;
+    virtual void filterSharing(std::vector<int>& clauses) = 0;
+    virtual bool hasFilteredSharing() = 0;
+    virtual std::vector<int> getLocalFilter() = 0;
+    virtual void applyFilter(std::vector<int>& filter) = 0;
+    
+    virtual void digestSharingWithoutFilter(std::vector<int>& clauses) = 0;
     virtual void returnClauses(std::vector<int>& clauses) = 0;
 
     // Methods common to all Job instances

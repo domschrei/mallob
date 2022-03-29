@@ -11,7 +11,7 @@
 #include "app/job.hpp"
 #include "base_sat_job.hpp"
 #include "clause_history.hpp"
-#include "distributed_clause_filter.hpp"
+//#include "distributed_clause_filter.hpp"
 #include "comm/job_tree_all_reduction.hpp"
 
 class AnytimeSatClauseCommunicator {
@@ -36,7 +36,7 @@ private:
 
     AdaptiveClauseDatabase _cdb;
     ClauseHistory _cls_history;
-    DistributedClauseFilter _filter;
+    //DistributedClauseFilter _filter;
     float _compensation_factor = 1.0f;
     float _compensation_decay = 0.6;
 
@@ -45,7 +45,6 @@ private:
         const Parameters& _params;
         BaseSatJob* _job;
         AdaptiveClauseDatabase& _cdb;
-        DistributedClauseFilter& _filter;
         int _epoch;
 
         std::vector<int> _excess_clauses_from_merge;
@@ -56,14 +55,14 @@ private:
         JobTreeAllReduction _allreduce_clauses;
         JobTreeAllReduction _allreduce_filter;
 
-        Session(const Parameters& params, BaseSatJob* job, AdaptiveClauseDatabase& cdb, DistributedClauseFilter& filter, int epoch) : 
-            _params(params), _job(job), _cdb(cdb), _filter(filter), _epoch(epoch),
+        Session(const Parameters& params, BaseSatJob* job, AdaptiveClauseDatabase& cdb, int epoch) : 
+            _params(params), _job(job), _cdb(cdb), _epoch(epoch),
             _allreduce_clauses(
                 job->getJobTree(),
                 // Base message 
                 JobMessage(_job->getId(), _job->getRevision(), epoch, MSG_ALLREDUCE_CLAUSES),
                 // Neutral element
-                std::vector<int>(1, 1), 
+                std::vector<int>(1, 1), // only integer: number of aggregated job tree nodes
                 // Aggregator for local + incoming elements
                 [&](std::list<std::vector<int>>& elems) {
                     int numAggregated = 0;
@@ -92,7 +91,7 @@ private:
                         if (filter.size() < elem.size()) 
                             filter.resize(elem.size());
                         for (size_t i = 0; i < elem.size(); i++) {
-                            filter[i] |= elem[i];
+                            filter[i] |= elem[i]; // bitwise OR
                         }
                     }
                     return filter;
@@ -139,17 +138,17 @@ public:
             setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
             setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
             setup.numLiterals = 0;
-            setup.numProducers = 0;
             return setup;
         }()),
-        _cls_history(_params, _job->getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job, _cdb),
-        _filter(params.clauseFilterClearInterval()) {
+        _cls_history(_params, _job->getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job, _cdb) {
 
         _time_of_last_epoch_initiation = Timer::elapsedSeconds();
         _time_of_last_epoch_conclusion = Timer::elapsedSeconds();
     }
 
-    ~AnytimeSatClauseCommunicator() {}
+    ~AnytimeSatClauseCommunicator() {
+        _sessions.clear();
+    }
 
     void communicate();
     void handle(int source, int mpiTag, JobMessage& msg);
@@ -161,7 +160,7 @@ public:
 
 private:
     inline Session& currentSession() {return _sessions.back();}
-    void learnClauses(std::vector<int>& clauses, int epoch, bool writeIntoClauseHistory);
+    void addToClauseHistory(std::vector<int>& clauses, int epoch);
 };
 
 #endif

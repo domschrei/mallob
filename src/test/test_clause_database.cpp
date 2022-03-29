@@ -362,6 +362,37 @@ Clause produceClause(std::function<float()> normalRng, float meanLength) {
     return c;
 }
 
+void testTreeMapVsHashMap() {
+
+    std::default_random_engine generator(1);
+    std::normal_distribution<float> distribution(0.5, 0.5);
+    auto rng = [&]() {return distribution(generator);};
+
+    std::vector<Clause> clauses;
+    for (size_t i = 0; i < 10000; i++) {
+        auto c = produceClause(rng, 5);
+        while (c.size < 3) c = produceClause(rng, 5);
+        clauses.push_back(c);
+    }
+
+    std::map<ProducedLargeClause, int> treeMap;
+    tsl::robin_map<ProducedLargeClause, int, ProducedClauseHasher<ProducedLargeClause>, 
+        ProducedClauseEqualsIgnoringLBD<ProducedLargeClause>> hashMap;
+    float time;
+
+    time = Timer::elapsedSeconds();
+    for (auto& c : clauses) {
+        treeMap.insert({ProducedLargeClause(c), 0});
+    }
+    LOG(V2_INFO, "10000 clauses in tree map: %.5fs\n", Timer::elapsedSeconds()-time);
+
+    time = Timer::elapsedSeconds();
+    for (auto& c : clauses) {
+        hashMap.insert({ProducedLargeClause(c), 0});
+    }
+    LOG(V2_INFO, "10000 clauses in hash map: %.5fs\n", Timer::elapsedSeconds()-time);
+}
+
 void testConcurrentClauseAddition() {
     LOG(V2_INFO, "Testing concurrent clause addition ...\n");
 
@@ -464,8 +495,10 @@ int main() {
     Process::init(0);
     ProcessWideThreadPool::init(1);
 
-    testRandomClauses();
+    testTreeMapVsHashMap();
+
     exit(0);
+    testRandomClauses();
     
     //testSumBucketLabel();
     testMinimal();

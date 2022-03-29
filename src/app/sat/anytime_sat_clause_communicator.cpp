@@ -48,7 +48,7 @@ void AnytimeSatClauseCommunicator::communicate() {
     if (_params.appCommPeriod() <= 0) return;
 
     // update role in distributed filter
-    _filter.update(_job->getJobTree().getIndex(), _job->getVolume());
+    //_filter.update(_job->getJobTree().getIndex(), _job->getVolume());
 
     // clean up old sessions
     while (_sessions.size() > 1) {
@@ -81,6 +81,7 @@ void AnytimeSatClauseCommunicator::communicate() {
             
             // Self message to initiate clause sharing
             MyMpi::isend(_job->getJobTree().getRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+            LOG(V4_VVER, "%s CS init\n", _job->toStr());
             return;
         }
     }
@@ -91,12 +92,28 @@ void AnytimeSatClauseCommunicator::communicate() {
 
     // Done preparing sharing?
     if (!session._allreduce_clauses.hasProducer() && _job->hasPreparedSharing()) {
+
         // Produce contribution to all-reduction of clauses
-        LOG(V5_DEBG, "%s : PRODUCE e=%i\n", _job->toStr(), session._epoch);
+        LOG(V4_VVER, "%s CS produce cls\n", _job->toStr());
         session._allreduce_clauses.produce([&]() {
             Checksum checksum;
             return _job->getPreparedClauses(checksum);
         });
+    
+        // Calculate new sharing compensation factor from last sharing statistics
+        auto [nbAdmitted, nbBroadcast] = _job->getLastAdmittedClauseShare();
+        float admittedRatio = nbBroadcast == 0 ? 1 : ((float)nbAdmitted) / nbBroadcast;
+        admittedRatio = std::max(0.01f, admittedRatio);
+        float newCompensationFactor = std::max(1.f, std::min(
+            (float)_params.clauseHistoryAggregationFactor(), 1.f/admittedRatio
+        ));
+        _compensation_factor = _compensation_decay * _compensation_factor + (1-_compensation_decay) * newCompensationFactor;
+        _job->setSharingCompensationFactor(_compensation_factor);
+        if (_job->getJobTree().isRoot()) {
+            LOG(V3_VERB, "%s CS last sharing: %i/%i globally passed ~> c=%.3f\n", _job->toStr(), 
+                nbAdmitted, nbBroadcast, _compensation_factor);       
+        }
+    
     } else if (!session._allreduce_clauses.hasProducer()) {
         // No sharing prepared yet: Retry
         _job->prepareSharing(_job->getBufferLimit(1, MyMpi::SELF));
@@ -108,6 +125,8 @@ void AnytimeSatClauseCommunicator::communicate() {
     // All-reduction of clauses finished?
     if (session._allreduce_clauses.hasResult()) {
 
+        LOG(V4_VVER, "%s CS filter\n", _job->toStr());
+
         // Some clauses may have been left behind during merge
         if (session._excess_clauses_from_merge.size() > sizeof(size_t)/sizeof(int)) {
             // Add them as produced clauses to your local solver
@@ -117,35 +136,15 @@ void AnytimeSatClauseCommunicator::communicate() {
 
         // Fetch initial clause buffer (result of all-reduction of clauses)
         session._broadcast_clause_buffer = session._allreduce_clauses.extractResult();
-        
-        // Initiate production of local filter element for 2nd all-reduction 
-        session._allreduce_filter.produce([&, clauseBuffer = &session._broadcast_clause_buffer]() {
-            
-            std::vector<int> bitset; // filter will be written into this object
-            auto reader = _cdb.getBufferReader(clauseBuffer->data(), clauseBuffer->size());
-            
-            // Iterate over all clauses and mark the ones which do not pass the filter
-            constexpr auto bitsPerElem = 8*sizeof(int);
-            int shift = bitsPerElem;
-            auto clause = reader.getNextIncomingClause();
-            while (clause.begin != nullptr) {
-                
-                if (shift == bitsPerElem) {
-                    bitset.push_back(0);
-                    shift = 0;
-                }
-                
-                if (!_filter.passClause(clause, session._epoch)) {
-                    auto bitFiltered = 1 << shift;
-                    bitset.back() |= bitFiltered;
-                }
-                
-                shift++;
-                clause = reader.getNextIncomingClause();
-            }
 
-            return bitset;
-        });
+        // Initiate production of local filter element for 2nd all-reduction 
+        _job->filterSharing(session._broadcast_clause_buffer);
+    }
+
+    // Supply calculated local filter to the 2nd all-reduction
+    if (!session._allreduce_filter.hasProducer() && _job->hasFilteredSharing()) {
+        LOG(V4_VVER, "%s CS produce filter\n", _job->toStr());
+        session._allreduce_filter.produce([&]() {return _job->getLocalFilter();});        
     }
 
     // Advance all-reduction of filter
@@ -154,24 +153,14 @@ void AnytimeSatClauseCommunicator::communicate() {
     // All-reduction of clause filter finished?
     if (session._allreduce_filter.hasResult()) {
         
+        LOG(V4_VVER, "%s CS apply filter\n", _job->toStr());
+
         // Extract and digest result
         auto filter = session._allreduce_filter.extractResult();
-        auto clausesToLearn = session.applyGlobalFilter(filter, session._broadcast_clause_buffer);
-        learnClauses(clausesToLearn, session._epoch, /*writeIntoClauseHistory=*/_use_cls_history);
-
-        float admittedRatio = session._num_broadcast_clauses == 0 ? 1 : 
-            ((float)session._num_admitted_clauses) / session._num_broadcast_clauses;
-        admittedRatio = std::max(0.01f, admittedRatio);
-
-        float newCompensationFactor = std::max(1.f, std::min(
-            (float)_params.clauseHistoryAggregationFactor(), 1.f/admittedRatio
-        ));
-        _compensation_factor = _compensation_decay * _compensation_factor + (1-_compensation_decay) * newCompensationFactor;
-        _job->setSharingCompensationFactor(_compensation_factor);
-
-        if (_job->getJobTree().isRoot()) {
-            LOG(V3_VERB, "%s : %i/%i globally passed: c=%.3f\n", _job->toStr(), 
-                session._num_admitted_clauses, session._num_broadcast_clauses, _compensation_factor);       
+        _job->applyFilter(filter);
+        if (_use_cls_history) {
+            auto filteredClauses = session.applyGlobalFilter(filter, session._broadcast_clause_buffer);
+            addToClauseHistory(filteredClauses, session._epoch);
         }
 
         // Conclude this sharing epoch
@@ -197,7 +186,7 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
 
     if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_SEND_CLAUSES) {
         _cls_history.addEpoch(msg.epoch, msg.payload, /*entireIndex=*/true);
-        learnClauses(msg.payload, msg.epoch, /*writeIntoClauseHistory=*/false);
+        _cls_history.sendNextBatches();
     }
     if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_SUBSCRIBE)
         _cls_history.onSubscribe(source, msg.payload[0], msg.payload[1]);
@@ -227,7 +216,7 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
     if (msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
         _current_epoch = msg.epoch;
         LOG(V5_DEBG, "%s : INIT COMM e=%i\n", _job->toStr(), _current_epoch);
-        _sessions.emplace_back(_params, _job, _cdb, _filter, _current_epoch);
+        _sessions.emplace_back(_params, _job, _cdb, _current_epoch);
         if (!_job->hasPreparedSharing()) {
             int limit = _job->getBufferLimit(1, MyMpi::SELF);
             _job->prepareSharing(limit);
@@ -289,31 +278,12 @@ std::vector<int> AnytimeSatClauseCommunicator::Session::applyGlobalFilter(const 
     return writer.extractBuffer();
 }
 
-void AnytimeSatClauseCommunicator::learnClauses(std::vector<int>& clauses, int epoch, bool writeIntoClauseHistory) {
+void AnytimeSatClauseCommunicator::addToClauseHistory(std::vector<int>& clauses, int epoch) {
     LOG(V4_VVER, "%s : learn s=%i\n", _job->toStr(), clauses.size());
     
-    if (clauses.size() > 0) {
-        // Locally learn clauses
-        
-        // If not active or not fully initialized yet: discard clauses
-        if (_job->getState() != ACTIVE || !_job->isInitialized()) {
-            LOG(V4_VVER, "%s : discard buffer, job is not (yet?) active\n", 
-                    _job->toStr());
-            return;
-        }
+    // Add clause batch to history
+    _cls_history.addEpoch(epoch, clauses, /*entireIndex=*/false);
 
-        // Locally digest clauses
-        LOG(V4_VVER, "%s : digest\n", _job->toStr());
-        Checksum checksum;
-        _job->digestSharing(clauses, checksum);
-        LOG(V4_VVER, "%s : digested\n", _job->toStr());
-    }
-
-    if (writeIntoClauseHistory) {
-        // Add clause batch to history
-        _cls_history.addEpoch(epoch, clauses, /*entireIndex=*/false);
-
-        // Send next batches of historic clauses to subscribers as necessary
-        _cls_history.sendNextBatches();
-    }
+    // Send next batches of historic clauses to subscribers as necessary
+    _cls_history.sendNextBatches();
 }
