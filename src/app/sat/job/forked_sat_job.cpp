@@ -29,7 +29,7 @@ void ForkedSatJob::doStartSolver() {
 
     SatProcessConfig config(_params, *this, _static_subprocess_index++);
     Parameters hParams(_params);
-    hParams.hordeConfig.set(config.toString());
+    hParams.satEngineConfig.set(config.toString());
     hParams.applicationConfiguration.set(getDescription().getAppConfiguration().serialize());
     if (_params.verbosity() >= V5_DEBG) hParams.printParams();
     _last_imported_revision = 0;

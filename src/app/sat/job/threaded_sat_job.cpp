@@ -20,12 +20,12 @@ void ThreadedSatJob::appl_start() {
 
     assert(!_initialized);
     
-    // Initialize Hordesat instance
+    // Initialize SAT engine
     Parameters hParams(_params);
     hParams.applicationConfiguration.set(getDescription().getAppConfiguration().serialize());
     SatProcessConfig config(_params, *this, /*recoveryIndex=*/0);
-    _solver = std::unique_ptr<HordeLib>(
-        new HordeLib(hParams, config, Logger::getMainInstance())
+    _solver = std::unique_ptr<SatEngine>(
+        new SatEngine(hParams, config, Logger::getMainInstance())
     );
     _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
 
@@ -41,7 +41,7 @@ void ThreadedSatJob::appl_start() {
         );
     }
     _solver->solve();
-    //log(V4_VVER, "%s : finished horde initialization\n", toStr());
+    //log(V4_VVER, "%s : finished SAT engine initialization\n", toStr());
     _time_of_start_solving = Timer::elapsedSeconds();
     _initialized = true;
 }

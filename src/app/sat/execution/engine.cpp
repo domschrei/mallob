@@ -25,12 +25,12 @@
 
 using namespace SolvingStates;
 
-HordeLib::HordeLib(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface) : 
+SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface) : 
 			_params(params), _config(config), _logger(loggingInterface), _state(INITIALIZING) {
 	
     int appRank = config.apprank;
 
-	LOGGER(_logger, V4_VVER, "Hlib engine for %s\n", config.getJobStr().c_str());
+	LOGGER(_logger, V4_VVER, "SAT engine for %s\n", config.getJobStr().c_str());
 	//params.printParams();
 	_num_solvers = config.threads;
 	_job_id = config.jobid;
@@ -110,7 +110,7 @@ HordeLib::HordeLib(const Parameters& params, const SatProcessConfig& config, Log
 	LOGGER(_logger, V5_DEBG, "initialized\n");
 }
 
-std::shared_ptr<PortfolioSolverInterface> HordeLib::createSolver(const SolverSetup& setup) {
+std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSetup& setup) {
 	std::shared_ptr<PortfolioSolverInterface> solver;
 	switch (setup.solverType) {
 	case 'l':
@@ -157,7 +157,7 @@ std::shared_ptr<PortfolioSolverInterface> HordeLib::createSolver(const SolverSet
 	return solver;
 }
 
-void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, bool lastRevisionForNow) {
+void SatEngine::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, bool lastRevisionForNow) {
 	
 	LOGGER(_logger, V4_VVER, "Import rev. %i: %i lits, %i assumptions\n", revision, fSize, aSize);
 	assert(_revision+1 == revision);
@@ -217,7 +217,7 @@ void HordeLib::appendRevision(int revision, size_t fSize, const int* fLits, size
 	_revision = revision;
 }
 
-void HordeLib::solve() {
+void SatEngine::solve() {
 	assert(_revision >= 0);
 	_result.result = UNKNOWN;
 	if (!_solvers_started) {
@@ -229,7 +229,7 @@ void HordeLib::solve() {
 	_state = ACTIVE;
 }
 
-bool HordeLib::isFullyInitialized() {
+bool SatEngine::isFullyInitialized() {
 	if (_state == INITIALIZING) return false;
 	for (size_t i = 0; i < _solver_threads.size(); i++) {
 		if (!_solver_threads[i]->isInitialized()) return false;
@@ -237,7 +237,7 @@ bool HordeLib::isFullyInitialized() {
 	return true;
 }
 
-int HordeLib::solveLoop() {
+int SatEngine::solveLoop() {
 	if (isCleanedUp()) return -1;
 
     // Solving done?
@@ -260,34 +260,34 @@ int HordeLib::solveLoop() {
     return -1; // no result yet
 }
 
-int HordeLib::prepareSharing(int* begin, int maxSize) {
+int SatEngine::prepareSharing(int* begin, int maxSize) {
 	if (isCleanedUp()) return 0;
 	LOGGER(_logger, V5_DEBG, "collecting clauses on this node\n");
 	int size = _sharing_manager->prepareSharing(begin, maxSize);
 	return size;
 }
 
-int HordeLib::filterSharing(int* begin, int size, int* filterOut) {
+int SatEngine::filterSharing(int* begin, int size, int* filterOut) {
 	if (isCleanedUp()) return 0;
 	return _sharing_manager->filterSharing(begin, size, filterOut);
 }
 
-void HordeLib::digestSharingWithFilter(int* begin, int size, const int* filter) {
+void SatEngine::digestSharingWithFilter(int* begin, int size, const int* filter) {
 	if (isCleanedUp()) return;
 	_sharing_manager->digestSharingWithFilter(begin, size, filter);
 }
 
-void HordeLib::digestSharingWithoutFilter(int* begin, int size) {
+void SatEngine::digestSharingWithoutFilter(int* begin, int size) {
 	if (isCleanedUp()) return;
 	_sharing_manager->digestSharingWithoutFilter(begin, size);
 }
 
-void HordeLib::returnClauses(int* begin, int size) {
+void SatEngine::returnClauses(int* begin, int size) {
 	if (isCleanedUp()) return;
 	_sharing_manager->returnClauses(begin, size);
 }
 
-void HordeLib::dumpStats(bool final) {
+void SatEngine::dumpStats(bool final) {
 	if (isCleanedUp() || !isFullyInitialized()) return;
 
 	int verb = final ? V2_INFO : V4_VVER;
@@ -327,17 +327,17 @@ void HordeLib::dumpStats(bool final) {
 	}
 }
 
-void HordeLib::setPaused() {
+void SatEngine::setPaused() {
 	_state = SUSPENDED;
 	for (auto& solver : _solver_threads) solver->setSuspend(true);
 }
 
-void HordeLib::unsetPaused() {
+void SatEngine::unsetPaused() {
 	_state = ACTIVE;
 	for (auto& solver : _solver_threads) solver->setSuspend(false);
 }
 
-void HordeLib::terminateSolvers() {
+void SatEngine::terminateSolvers() {
 	if (_state != ABORTING) {
 		dumpStats(/*final=*/true);
 		for (auto& solver : _solver_threads) {
@@ -347,17 +347,17 @@ void HordeLib::terminateSolvers() {
 	}
 }
 
-std::pair<int, int> HordeLib::getLastAdmittedClauseShare() {
+std::pair<int, int> SatEngine::getLastAdmittedClauseShare() {
 	return std::pair<int, int>(
 		_sharing_manager->getLastNumAdmittedClausesToImport(), 
 		_sharing_manager->getLastNumClausesToImport()
 	);
 }
 
-void HordeLib::cleanUp() {
+void SatEngine::cleanUp() {
 	double time = Timer::elapsedSeconds();
 
-	LOGGER(_logger, V5_DEBG, "[hlib-cleanup] enter\n");
+	LOGGER(_logger, V5_DEBG, "[engine-cleanup] enter\n");
 
 	// Terminate any remaining running threads
 	terminateSolvers();
@@ -368,19 +368,19 @@ void HordeLib::cleanUp() {
 	_solver_threads.clear();
 	_obsolete_solver_threads.clear();
 
-	LOGGER(_logger, V5_DEBG, "[hlib-cleanup] joined threads\n");
+	LOGGER(_logger, V5_DEBG, "[engine-cleanup] joined threads\n");
 
 	// delete solvers
 	_solver_interfaces.clear();
-	LOGGER(_logger, V5_DEBG, "[hlib-cleanup] cleared solvers\n");
+	LOGGER(_logger, V5_DEBG, "[engine-cleanup] cleared solvers\n");
 
 	time = Timer::elapsedSeconds() - time;
-	LOGGER(_logger, V4_VVER, "[hlib-cleanup] done, took %.3f s\n", time);
+	LOGGER(_logger, V4_VVER, "[engine-cleanup] done, took %.3f s\n", time);
 	_logger.flush();
 
 	_cleaned_up = true;
 }
 
-HordeLib::~HordeLib() {
+SatEngine::~SatEngine() {
 	if (!_cleaned_up) cleanUp();
 }

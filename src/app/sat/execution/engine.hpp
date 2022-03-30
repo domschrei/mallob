@@ -15,7 +15,7 @@
 #include "data/job_result.hpp"
 #include "../job/sat_process_config.hpp"
 
-class HordeLib {
+class SatEngine {
 
 private:
 
@@ -47,8 +47,8 @@ private:
 
 public:
 
-    HordeLib(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface);
-	~HordeLib();
+    SatEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface);
+	~SatEngine();
 
 	void solve();
     void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, 

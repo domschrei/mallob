@@ -27,7 +27,7 @@ private:
     const Parameters& _params;
     const SatProcessConfig& _config;
     Logger& _log;
-    HordeLib _hlib;
+    SatEngine _engine;
 
     std::string _shmem_id;
     SatSharedMemory* _hsm;
@@ -42,7 +42,7 @@ private:
 
 public:
     SatProcess(const Parameters& params, const SatProcessConfig& config, Logger& log) 
-        : _params(params), _config(config), _log(log), _hlib(_params, _config, _log) {
+        : _params(params), _config(config), _log(log), _engine(_params, _config, _log) {
 
         // Set up "management" block of shared memory created by the parent
         _shmem_id = _config.getSharedMemId(Proc::getParentPid());
@@ -77,7 +77,7 @@ public:
         {
             int* fPtr = (int*) accessMemory(_shmem_id + ".formulae.0", sizeof(int) * _hsm->fSize);
             int* aPtr = (int*) accessMemory(_shmem_id + ".assumptions.0", sizeof(int) * _hsm->aSize);
-            _hlib.appendRevision(0, _hsm->fSize, fPtr, _hsm->aSize, aPtr, 
+            _engine.appendRevision(0, _hsm->fSize, fPtr, _hsm->aSize, aPtr, 
                 /*finalRevisionForNow=*/_desired_revision == 0);
             updateChecksum(fPtr, _hsm->fSize);
         }
@@ -85,7 +85,7 @@ public:
         importRevisions();
         
         // Start solver threads
-        _hlib.solve();
+        _engine.solve();
         
         std::vector<int> solutionVec;
         std::string solutionShmemId = "";
@@ -101,7 +101,7 @@ public:
             // Terminate
             if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true)) {
                 LOGGER(_log, V5_DEBG, "DO terminate\n");
-                _hlib.dumpStats(/*final=*/true);
+                _engine.dumpStats(/*final=*/true);
                 break;
             }
 
@@ -112,7 +112,7 @@ public:
             if (_hsm->doDumpStats && !_hsm->didDumpStats) {
                 LOGGER(_log, V5_DEBG, "DO dump stats\n");
                 
-                _hlib.dumpStats(/*final=*/false);
+                _engine.dumpStats(/*final=*/false);
 
                 // For this management thread
                 double cpuShare; float sysShare;
@@ -122,7 +122,7 @@ public:
                 }
 
                 // For each solver thread
-                std::vector<long> threadTids = _hlib.getSolverTids();
+                std::vector<long> threadTids = _engine.getSolverTids();
                 for (size_t i = 0; i < threadTids.size(); i++) {
                     if (threadTids[i] < 0) continue;
                     
@@ -144,8 +144,8 @@ public:
                 LOGGER(_log, V5_DEBG, "DO export clauses\n");
                 // Collect local clauses, put into shared memory
                 _hsm->exportChecksum = Checksum();
-                _hsm->exportBufferTrueSize = _hlib.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize);
-                auto [admitted, total] = _hlib.getLastAdmittedClauseShare();
+                _hsm->exportBufferTrueSize = _engine.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize);
+                auto [admitted, total] = _engine.getLastAdmittedClauseShare();
                 _hsm->lastNumAdmittedClausesToImport = admitted;
                 _hsm->lastNumClausesToImport = total;
                 assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
@@ -156,7 +156,7 @@ public:
             // Check if clauses should be filtered
             if (_hsm->doFilterImport && !_hsm->didFilterImport) {
                 LOGGER(_log, V5_DEBG, "DO filter clauses\n");
-                _hsm->filterSize = _hlib.filterSharing(_import_buffer, _hsm->importBufferSize, _filter_buffer);
+                _hsm->filterSize = _engine.filterSharing(_import_buffer, _hsm->importBufferSize, _filter_buffer);
                 _hsm->didFilterImport = true;
             }
             if (!_hsm->doFilterImport) _hsm->didFilterImport = false;
@@ -168,9 +168,9 @@ public:
                 // Write imported clauses from shared memory into vector
                 assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
                 if (_hsm->doDigestImportWithFilter) {
-                    _hlib.digestSharingWithFilter(_import_buffer, _hsm->importBufferSize, _filter_buffer);
+                    _engine.digestSharingWithFilter(_import_buffer, _hsm->importBufferSize, _filter_buffer);
                 } else {
-                    _hlib.digestSharingWithoutFilter(_import_buffer, _hsm->importBufferSize);
+                    _engine.digestSharingWithoutFilter(_import_buffer, _hsm->importBufferSize);
                 }
                 _hsm->didDigestImport = true;
             }
@@ -180,13 +180,13 @@ public:
             // Re-insert returned clauses into the local clause database to be exported later
             if (_hsm->doReturnClauses && !_hsm->didReturnClauses) {
                 LOGGER(_log, V5_DEBG, "DO return clauses\n");
-                _hlib.returnClauses(_returned_buffer, _hsm->returnedBufferSize);
+                _engine.returnClauses(_returned_buffer, _hsm->returnedBufferSize);
                 _hsm->didReturnClauses = true;
             }
             if (!_hsm->doReturnClauses) _hsm->didReturnClauses = false;
 
             // Check initialization state
-            if (!_hsm->isInitialized && _hlib.isFullyInitialized()) {
+            if (!_hsm->isInitialized && _engine.isFullyInitialized()) {
                 LOGGER(_log, V5_DEBG, "DO set initialized\n");
                 _hsm->isInitialized = true;
             }
@@ -196,10 +196,10 @@ public:
             if (lastSolvedRevision == _last_imported_revision) continue;
 
             // Check solved state
-            int resultCode = _hlib.solveLoop();
+            int resultCode = _engine.solveLoop();
             if (resultCode >= 0) {
                 // Solution found!
-                auto& result = _hlib.getResult();
+                auto& result = _engine.getResult();
                 result.id = _config.jobid;
                 if (_hsm->doTerminate || result.revision < _desired_revision) {
                     // Result obsolete
@@ -283,7 +283,7 @@ private:
             }
         }
 
-        _hlib.appendRevision(revision, *fSizePtr, fPtr, *aSizePtr, aPtr, /*finalRevisionForNow=*/revision == _desired_revision);
+        _engine.appendRevision(revision, *fSizePtr, fPtr, *aSizePtr, aPtr, /*finalRevisionForNow=*/revision == _desired_revision);
     }
 
     void doSleep() {

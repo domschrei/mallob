@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
     
     Parameters params;
     params.init(argc, argv);
-    SatProcessConfig config(params.hordeConfig());
+    SatProcessConfig config(params.satEngineConfig());
 
     timespec t;
     t.tv_sec = config.starttimeSecs;

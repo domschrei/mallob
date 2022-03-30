@@ -19,7 +19,7 @@
 #include "variable_translator.hpp"
 
 // Forward declarations
-class HordeLib;
+class SatEngine;
 
 class SolverThread {
 

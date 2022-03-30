@@ -15,14 +15,14 @@
 #include "sat_constants.h"
 #include "base_sat_job.hpp"
 
-class HordeLib; // forward declaration
+class SatEngine; // forward declaration
 
 class ThreadedSatJob : public BaseSatJob {
 
 private:
     std::atomic_bool _initialized = false;
 
-    std::unique_ptr<HordeLib> _solver;
+    std::unique_ptr<SatEngine> _solver;
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
     std::vector<int> _clause_buffer;
     Checksum _clause_checksum;
@@ -79,7 +79,7 @@ public:
     virtual void digestSharingWithoutFilter(std::vector<int>& clauses) override;
     void returnClauses(std::vector<int>& clauses) override;
 
-    std::unique_ptr<HordeLib>& getSolver() {
+    std::unique_ptr<SatEngine>& getSolver() {
         assert(_solver != NULL);
         return _solver;
     }
