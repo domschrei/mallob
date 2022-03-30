@@ -1,6 +1,6 @@
 
 #include "util/hashing.hpp"
-#include "app/sat/hordesat/utilities/clause.hpp"
+#include "app/sat/data/clause.hpp"
 
 #include <unordered_set>
 #include <iostream>

@@ -9,7 +9,7 @@
 #include "util/random.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
-#include "app/sat/hordesat/utilities/variable_translator.hpp"
+#include "app/sat/execution/variable_translator.hpp"
 
 void test() {
     LOG(V2_INFO, "Testing variable translator ...\n");

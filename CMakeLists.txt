@@ -49,14 +49,14 @@ set(MALLOB_SOLVERS "lingeling yalsat cadical kissat") # add new default solvers 
 if(MALLOB_USE_GLUCOSE)
     set(MALLOB_SOLVERS "${MALLOB_SOLVERS} glucose")
     link_directories(lib/glucose)
-    set(BASE_SOURCES ${BASE_SOURCES} src/app/sat/hordesat/solvers/glucose.cpp)
+    set(BASE_SOURCES ${BASE_SOURCES} src/app/sat/solvers/glucose.cpp)
     set(BASE_LIBS ${BASE_LIBS} glucose)
     set(BASE_INCLUDES ${BASE_INCLUDES} lib/glucose)
     add_definitions(-DMALLOB_USE_GLUCOSE)
 endif()    
 if(MALLOB_USE_MERGESAT)
     link_directories(lib/mergesat)
-    set(BASE_SOURCES ${BASE_SOURCES} src/app/sat/hordesat/solvers/mergesat.cpp)
+    set(BASE_SOURCES ${BASE_SOURCES} src/app/sat/solvers/mergesat.cpp)
     set(BASE_LIBS ${BASE_LIBS} mergesat)
     add_definitions(-DMALLOB_USE_MERGESAT)
 endif()    
@@ -68,12 +68,12 @@ endif()
 set(BASE_SOURCES ${BASE_SOURCES}
     src/app/job.cpp 
     src/app/dummy/dummy_reader.cpp
-    src/app/sat/anytime_sat_clause_communicator.cpp src/app/sat/forked_sat_job.cpp src/app/sat/horde_config.cpp src/app/sat/horde_process_adapter.cpp 
-    src/app/sat/hordesat/horde.cpp 
-    src/app/sat/hordesat/sharing/adaptive_clause_database.cpp src/app/sat/hordesat/sharing/buffer_merger.cpp src/app/sat/hordesat/sharing/buffer_reader.cpp src/app/sat/hordesat/sharing/default_sharing_manager.cpp 
-    src/app/sat/hordesat/solvers/cadical.cpp src/app/sat/hordesat/solvers/lingeling.cpp src/app/sat/hordesat/solvers/kissat.cpp src/app/sat/hordesat/solvers/portfolio_solver_interface.cpp src/app/sat/hordesat/solvers/solver_thread.cpp src/app/sat/hordesat/solvers/solving_state.cpp 
-    src/app/sat/hordesat/utilities/buffer_manager.cpp src/app/sat/hordesat/utilities/clause_database.cpp src/app/sat/hordesat/utilities/clause_filter.cpp 
-    src/app/sat/threaded_sat_job.cpp 
+    src/app/sat/execution/engine.cpp src/app/sat/execution/solver_thread.cpp src/app/sat/execution/solving_state.cpp
+    src/app/sat/job/anytime_sat_clause_communicator.cpp src/app/sat/job/forked_sat_job.cpp src/app/sat/job/threaded_sat_job.cpp src/app/sat/job/sat_process_adapter.cpp src/app/sat/job/sat_process_config.cpp 
+    src/app/sat/sharing/buffer/adaptive_clause_database.cpp src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp
+    src/app/sat/sharing/filter/clause_filter.cpp
+    src/app/sat/sharing/sharing_manager.cpp
+    src/app/sat/solvers/cadical.cpp src/app/sat/solvers/kissat.cpp src/app/sat/solvers/lingeling.cpp src/app/sat/solvers/portfolio_solver_interface.cpp
     src/balancing/collective_assignment.cpp src/balancing/event_driven_balancer.cpp 
     src/comm/message_queue.cpp src/comm/mpi_base.cpp src/comm/mympi.cpp 
     src/data/job_database.cpp src/data/job_description.cpp src/data/job_reader.cpp src/data/job_result.cpp src/data/job_transfer.cpp 

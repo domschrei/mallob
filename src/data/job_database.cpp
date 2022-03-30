@@ -7,8 +7,8 @@
 #include <utility>
 #include <climits>
 
-#include "app/sat/forked_sat_job.hpp"
-#include "app/sat/threaded_sat_job.hpp"
+#include "app/sat/job/forked_sat_job.hpp"
+#include "app/sat/job/threaded_sat_job.hpp"
 #include "app/dummy/dummy_job.hpp"
 
 #include "util/sys/timer.hpp"

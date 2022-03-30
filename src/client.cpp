@@ -15,7 +15,7 @@
 #include "data/job_transfer.hpp"
 #include "data/job_result.hpp"
 #include "util/random.hpp"
-#include "app/sat/sat_constants.h"
+#include "app/sat/job/sat_constants.h"
 #include "util/sys/terminator.hpp"
 #include "data/job_reader.hpp"
 #include "util/sys/thread_pool.hpp"

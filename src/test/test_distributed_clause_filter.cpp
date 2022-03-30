@@ -16,7 +16,7 @@
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/terminator.hpp"
-#include "app/sat/distributed_clause_filter.hpp"
+#include "app/sat/job/distributed_clause_filter.hpp"
 
 
 int main() {

@@ -9,10 +9,6 @@
 
 #include "worker.hpp"
 
-#include "app/sat/threaded_sat_job.hpp"
-#include "app/sat/forked_sat_job.hpp"
-#include "app/sat/sat_constants.h"
-
 #include "balancing/event_driven_balancer.hpp"
 #include "data/serializable.hpp"
 #include "data/job_description.hpp"

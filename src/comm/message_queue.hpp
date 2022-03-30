@@ -13,7 +13,6 @@
 #include "util/sys/background_worker.hpp"
 #include "util/logger.hpp"
 #include "comm/msgtags.h"
-#include "util/ringbuffer.hpp"
 #include "util/sys/atomics.hpp"
 
 typedef std::shared_ptr<std::vector<uint8_t>> DataPtr;

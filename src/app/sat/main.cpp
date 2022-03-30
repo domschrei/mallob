@@ -15,10 +15,7 @@
 #include "util/sys/proc.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "data/checksum.hpp"
-#include "app/sat/horde_process.hpp"
-
-#include "app/sat/horde_process_adapter.hpp"
-#include "hordesat/horde.hpp"
+#include "execution/sat_process.hpp"
 
 #ifndef MALLOB_VERSION
 #define MALLOB_VERSION "(dbg)"
@@ -28,7 +25,7 @@ int main(int argc, char *argv[]) {
     
     Parameters params;
     params.init(argc, argv);
-    HordeConfig config(params.hordeConfig());
+    SatProcessConfig config(params.hordeConfig());
 
     timespec t;
     t.tv_sec = config.starttimeSecs;
@@ -57,7 +54,7 @@ int main(int argc, char *argv[]) {
     
     try {
         // Launch program
-        HordeProcess p(params, config, Logger::getMainInstance());
+        SatProcess p(params, config, Logger::getMainInstance());
         p.run(); // does not return
 
     } catch (const std::exception &ex) {

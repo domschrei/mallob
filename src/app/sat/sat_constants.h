@@ -1,9 +1,0 @@
-
-#ifndef DOMPASCH_MALLOB_SAT_CONSTANTS_H
-#define DOMPASCH_MALLOB_SAT_CONSTANTS_H
-
-const int RESULT_UNKNOWN = 0;
-const int RESULT_SAT = 10;
-const int RESULT_UNSAT = 20;
-
-#endif

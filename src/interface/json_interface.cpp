@@ -10,7 +10,7 @@
 #include "util/params.hpp"
 #include "util/random.hpp"
 #include "util/sys/time_period.hpp"
-#include "app/sat/sat_constants.h"
+#include "app/sat/job/sat_constants.h"
 #include "util/sys/thread_pool.hpp"
 
 JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson, 

@@ -12,6 +12,7 @@
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "util/ringbuffer.hpp"
+#include "app/sat/data/clause_ringbuffer.hpp"
 
 std::atomic_int numDefaultConstructed = 0;
 std::atomic_int numCopyConstructed = 0;
