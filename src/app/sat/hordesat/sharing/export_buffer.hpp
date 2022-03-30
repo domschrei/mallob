@@ -6,6 +6,7 @@
 #include "util/sys/threading.hpp"
 #include "produced_clause_filter.hpp"
 #include "adaptive_clause_database.hpp"
+#include "../solvers/solver_statistics.hpp"
 
 class ExportBuffer {
 
@@ -15,14 +16,16 @@ private:
 
     ProducedClauseFilter& _filter;
     AdaptiveClauseDatabase& _cdb;
+    std::vector<SolvingStatistics*>& _solver_stats;
 
     ClauseHistogram _hist_failed_filter;
 	ClauseHistogram _hist_admitted_to_db;
 	ClauseHistogram _hist_dropped_before_db;
 
 public:
-    ExportBuffer(ProducedClauseFilter& filter, AdaptiveClauseDatabase& cdb, int maxClauseLength) : 
-        _filter(filter), _cdb(cdb), 
+    ExportBuffer(ProducedClauseFilter& filter, AdaptiveClauseDatabase& cdb, 
+            std::vector<SolvingStatistics*>& solverStats, int maxClauseLength) : 
+        _filter(filter), _cdb(cdb), _solver_stats(solverStats),
         _hist_failed_filter(maxClauseLength), 
         _hist_admitted_to_db(maxClauseLength), 
         _hist_dropped_before_db(maxClauseLength) {}
@@ -36,7 +39,7 @@ public:
                 ProducedClauseCandidate(begin, size, lbd, producerId, epoch), 
                 _cdb
             );
-            handleResult(result, size);
+            handleResult(producerId, result, size);
 
             // Also decrease backlog size by some amount
             for (size_t i = 0; i < 32; i++) {
@@ -49,8 +52,9 @@ public:
                 _export_backlog.pop_front();
                 _backlog_mutex.unlock();
                 int clauseLength = pcc.size;
+                int producerId = pcc.producerId;
                 result = _filter.tryRegisterAndInsert(std::move(pcc), _cdb);
-                handleResult(result, clauseLength);
+                handleResult(producerId, result, clauseLength);
             }
 
             _filter.releaseLock();
@@ -68,13 +72,17 @@ public:
 	ClauseHistogram& getDroppedHistogram() {return _hist_dropped_before_db;}
 
 private:
-    void handleResult(ProducedClauseFilter::ExportResult result, int clauseLength) {
+    void handleResult(int producerId, ProducedClauseFilter::ExportResult result, int clauseLength) {
+        auto solverStats = _solver_stats.at(producerId);
         if (result == ProducedClauseFilter::ADMITTED) {
             _hist_admitted_to_db.increment(clauseLength);
+            if (solverStats) solverStats->producedClausesAdmitted++;
         } else if (result == ProducedClauseFilter::FILTERED) {
             _hist_failed_filter.increment(clauseLength);
+            if (solverStats) solverStats->producedClausesFiltered++;
         } else if (result == ProducedClauseFilter::DROPPED) {
             _hist_dropped_before_db.increment(clauseLength);
+            if (solverStats) solverStats->producedClausesDropped++;
         }
     }
 

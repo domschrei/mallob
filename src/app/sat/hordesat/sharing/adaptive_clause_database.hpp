@@ -109,6 +109,7 @@ public:
     */
     bool addClause(const Clause& c);
     bool addClause(int* cBegin, int cSize, int cLbd, bool sortLargeClause = false);
+    int addUniformClauses(BufferReader& reader);
 
     void printChunks(int nextExportSize = -1);
     
@@ -148,7 +149,7 @@ public:
 
 private:
     template <typename T>
-    bool addClause(const Mallob::Clause& clause, Slot<T>& slot, int slotIdx);
+    void addUniformClausesToSlot(BufferReader& reader, Slot<T>& slot);
 
     template <typename T>
     Mallob::Clause popMallobClause(Slot<T>& slot);
@@ -166,7 +167,7 @@ private:
     BucketLabel getBucketIterator();
 
     bool tryAcquireBudget(int len);
-    int freeLowPriorityLiterals(int callingSlot);
+    int freeLowPriorityLiterals(int callingSlot, int desiredLits);
 
 
 };

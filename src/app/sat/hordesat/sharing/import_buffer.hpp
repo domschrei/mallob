@@ -37,13 +37,8 @@ public:
         }()), _max_clause_length(setup.strictClauseLengthLimit) {}
 
     void add(const Mallob::Clause& c) {
-        _stats.receivedClauses++;
         bool success = _cdb.addClause(c);
-        if (success) {
-            _stats.receivedClausesInserted++;
-        } else {
-            _stats.discardedClauses++;
-        }
+        if (!success) _stats.receivedClausesDropped++;
     }
 
     std::vector<int> getUnitsBuffer() {
@@ -52,7 +47,7 @@ public:
         _plain_units_out = std::vector<int>(buf.data()+(buf.size()-numUnits), buf.data()+buf.size());
         assert(_plain_units_out.size() == numUnits);
         for (int i = 0; i < _plain_units_out.size(); i++) assert(_plain_units_out[i] != 0);
-        _stats.digestedClauses += numUnits;
+        _stats.receivedClausesDigested += numUnits;
         _stats.histDigested->increase(1, numUnits);
         return _plain_units_out;
     }
@@ -68,7 +63,7 @@ public:
 
         _clause_out = _cdb.popFront(mode);
         if (_clause_out.begin != nullptr) {
-            _stats.digestedClauses++;
+            _stats.receivedClausesDigested++;
             _stats.histDigested->increment(_clause_out.size);
             assert(_clause_out.size > 0);
             assert(_clause_out.lbd > 0);

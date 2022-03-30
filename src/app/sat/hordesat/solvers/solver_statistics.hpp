@@ -17,18 +17,16 @@ struct SolvingStatistics {
 	// clause export
 	ClauseHistogram* histProduced;
 	unsigned long producedClauses = 0;
-	unsigned long producedClausesProcessFiltered = 0;
-	unsigned long producedClausesSolverFiltered = 0;
+	unsigned long producedClausesFiltered = 0;
 	unsigned long producedClausesAdmitted = 0;
 	unsigned long producedClausesDropped = 0;
 
 	// clause import
 	ClauseHistogram* histDigested;
 	unsigned long receivedClauses = 0;
-	unsigned long receivedClausesInserted = 0;
 	unsigned long receivedClausesFiltered = 0;
-	unsigned long digestedClauses = 0;
-	unsigned long discardedClauses = 0;
+	unsigned long receivedClausesDigested = 0;
+	unsigned long receivedClausesDropped = 0;
 
 	std::string getReport() const {
 		return "pps:" + std::to_string(propagations)
@@ -36,14 +34,14 @@ struct SolvingStatistics {
 			+ " cfs:" + std::to_string(conflicts)
 			+ " rst:" + std::to_string(restarts)
 			+ " prod:" + std::to_string(producedClauses)
-			+ " admd:" + std::to_string(producedClausesAdmitted)
-			+ " pfltr:" + std::to_string(producedClausesProcessFiltered)
-			+ " sfltr:" + std::to_string(producedClausesSolverFiltered)
-			+ " drpd:" + std::to_string(producedClausesDropped)
-			+ " recv:" + std::to_string(receivedClauses)
-			+ " rfltr:" + std::to_string(receivedClausesFiltered)
-			+ " digd:" + std::to_string(digestedClauses)
-			+ " disc:" + std::to_string(discardedClauses);
+			+ " (flt:" + std::to_string(producedClausesFiltered)
+			+ " adm:" + std::to_string(producedClausesAdmitted)
+			+ " drp:" + std::to_string(producedClausesDropped)
+			+ ") recv:" + std::to_string(receivedClauses)
+			+ " (flt:" + std::to_string(receivedClausesFiltered)
+			+ " digd:" + std::to_string(receivedClausesDigested)
+			+ " drp:" + std::to_string(receivedClausesDropped)
+			+ ")";
 	}
 
 	void aggregate(const SolvingStatistics& other) {
@@ -54,13 +52,12 @@ struct SolvingStatistics {
 		memPeak += other.memPeak;
 		producedClauses += other.producedClauses;
 		producedClausesAdmitted += other.producedClausesAdmitted;
-		producedClausesProcessFiltered += other.producedClausesProcessFiltered;
-		producedClausesSolverFiltered += other.producedClausesSolverFiltered;
+		producedClausesFiltered += other.producedClausesFiltered;
 		producedClausesDropped += other.producedClausesDropped;
 		receivedClauses += other.receivedClauses;
 		receivedClausesFiltered += other.receivedClausesFiltered;
-		digestedClauses += other.digestedClauses;
-		discardedClauses += other.discardedClauses;
+		receivedClausesDigested += other.receivedClausesDigested;
+		receivedClausesDropped += other.receivedClausesDropped;
 	}
 };
 

@@ -31,6 +31,7 @@ public:
     Mallob::Clause* getCurrentClausePointer() {return &_current_clause;}
     size_t getCurrentBufferPosition() const {return _current_pos;} 
     size_t getRemainingSize() const {return _size - _current_pos;}
+    size_t getNumRemainingClausesInBucket() const {return _remaining_cls_of_bucket;}
     
     inline const Mallob::Clause& getNextIncomingClause() {
         // No buffer?

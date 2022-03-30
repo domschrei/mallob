@@ -28,7 +28,7 @@ DefaultSharingManager::DefaultSharingManager(
 		setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
 		return setup;
 	}()), 
-	_export_buffer(_filter, _cdb, params.strictClauseLengthLimit()),
+	_export_buffer(_filter, _cdb, _solver_stats, params.strictClauseLengthLimit()),
 	_hist_produced(params.strictClauseLengthLimit()), 
 	_hist_returned_to_db(params.strictClauseLengthLimit()) {
 
@@ -229,16 +229,23 @@ void DefaultSharingManager::digestSharingWithFilter(int* begin, int buflen, cons
 		if (filter == nullptr || ((filter[filterPos] & bit) == 0)) {
 
 			// admitted
-			
 			_last_num_admitted_cls_to_import++;
 			hist.increment(clause.size);
 			auto producers = _filter.getInfo(clause, _internal_epoch).producers;
 
 			for (auto solver : importingSolvers) {
 				int sid = solver->getLocalId();
+				auto& solverStats = _solver_stats[sid];
+				solverStats->receivedClauses++;
 				uint8_t producerFlag = 1 << sid;
-				if ((producers & producerFlag) != 0) continue; // filtered
-				_solvers[sid]->addLearnedClause(clause);
+				if ((producers & producerFlag) != 0) {
+					// filtered
+					solverStats->receivedClausesFiltered++;
+					continue;
+				} else {
+					// admitted
+					_solvers[sid]->addLearnedClause(clause);
+				}
 			}
 		}
 
