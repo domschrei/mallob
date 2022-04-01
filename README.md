@@ -38,12 +38,13 @@ make
 As CMake options, specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
 In addition, you can use the following Mallob-specific build options:
 
-| Usage                       | Description                                                                                                |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| -DMALLOB_ASSERT=<0/1>       | Turn on assertions (even on release builds). Setting to 0 limits assertions to debug builds.               |
-| -DMALLOB_USE_ASAN=<0/1>     | Compile with Address Sanitizer for debugging purposes.                                                     |
-| -DMALLOB_USE_GLUCOSE=<0/1>  | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
-| -DMALLOB_USE_MERGESAT=<0/1> | Compile with support for MergeSAT SAT solver (disabled by default due to experimental state of interface). |
+| Usage                         | Description                                                                                                |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| -DMALLOB_ASSERT=<0/1>         | Turn on assertions (even on release builds). Setting to 0 limits assertions to debug builds.               |
+| -DMALLOB_USE_ASAN=<0/1>       | Compile with Address Sanitizer for debugging purposes.                                                     |
+| -DMALLOB_USE_GLUCOSE=<0/1>    | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
+| -DMALLOB_USE_JEMALLOC=<0/1>   | Compile with Address Sanitizer for debugging purposes.                                                     |
+| -DMALLOB_LOG_VERBOSITY=<0..6> | Only compile logging messages of the provided maximum verbosity and discard more verbose log calls.        |
 
 ### Docker
 
@@ -72,7 +73,7 @@ To "daemonize" Mallob, i.e., to let it run in the background as a server for you
 ```
 RDMAV_FORK_SAFE=1 PATH=build/:$PATH nohup mpirun <mpi-options> ./mallob <options> 2>&1 > OUT &
 ```
-where `OUT` is a text file to create for Mallob's output. (If you do not want such a file, use the "quiet" option, `-q=1`, instead.)
+where `OUT` is a text file to create for Mallob's output. (If you do not want such a file, use the "quiet" option `-q` instead.)
 If running in the background, do not forget to `kill` Mallob (i.e., SIGTERM the `mpirun` process) after you are done.
 Alternatively you can specify the number of jobs to process (with `-J=<num-jobs>`) and/or the time to pass (with `-T=<timelim-secs>`) before Mallob should terminate on its own.
 
@@ -84,20 +85,14 @@ Instead, specify a logging directory with `-log=<log-dir>` where separate sub-di
 Call Mallob with the option `-mono=<cnf-file>`.
 Mallob will run in single instance solving mode on the provided CNF file: All available MPI processes (if any) are used with full power to resolve the formula in parallel. This option overrides a couple of options concerning balancing and job demands.
 
-For instance, the `Mallob-mono` configuration for the SC 2020 Cloud Track roughly corresponds to the following parameter combination:
-```
--mono=<input_cnf> -log=<logdir> -T=<timelim_secs> -appmode=thread -cbdf=0.75 -cfhl=300 -mcl=5 -sleep=1000 -t=4 -v=3 -satsolver=l
-```
-This runs four solver threads for each MPI process and writes all output to stdout as well as to the specified log directory, with moderate verbosity.
-
 ### Scheduling and solving many instances
 
 Launch Mallob without any particular options regarding its mode of operation. Each PE of rank i then spins up a JSON client interface which can be used over the PE's file system under `<mallob base directory>/.api/jobs.<i>/`.
-On a shared-memory machine, the easiest option is to just always use the directory `.api/jobs.0/` to introduce your jobs, leaving all other client interfaces idle (with minimum overhead).
+On a shared-memory machine, the easiest option is to just always use the directory `.api/jobs.0/` to introduce your jobs, leaving all other client interfaces idle.
 In case of many concurrent jobs, it is best to distribute your jobs evenly (or uniformly @ random) across all existing client interfaces in order to minimize response times.
 
 The number of worker PEs and client PEs can be set manually with the `-w=<#workers>` and `-c=<#clients>` options to enforce that some PEs are exclusively clients or exclusively workers.
-The first `#workers` ranks are assigned worker roles, and the last `#clients` ranks are assigned client roles. These may overlap, and setting one/both of the options to -1 means that _all_ PEs are assigned the respective role(s).
+The first `#workers` ranks are assigned worker roles, and the last `#clients` ranks are assigned client roles. These may overlap, and setting one/both of the options to -1 means that _all_ PEs are assigned the respective role(s). Use `-c=1` if you only use `.api/jobs.0/` in order to minimize overhead.
 
 **Introducing a Job**
 
@@ -120,19 +115,20 @@ Here is a brief overview of all required and optional fields in the JSON API:
 
 | Field name        | Required? | Value type   | Description                                                                                                    |
 | ----------------- | :-------: | -----------: | -------------------------------------------------------------------------------------------------------------- |
-| user              | **yes**   | String       | A user which is present at `.api/users/<user>.json`                                                            |
+| user              | **yes**   | String       | A string specifying the user who is submitting the job                                                         |
 | name              | **yes**   | String       | A user-unique name for this job (increment)                                                                    |
 | files             | **yes***  | String array | File paths of the input to solve. For SAT, this must be a single (text file or compressed file or named pipe). |
-| priority          | **yes***  | Float (0,1)  | Priority of the job (higher is more important)                                                                 |
+| priority          | **yes***  | Float > 0    | Priority of the job (higher is more important)                                                                 |
 | application       | no        | String       | Which kind of problem is being solved; currently either of "SAT" or "DUMMY" (default: DUMMY)                   |
 | wallclock-limit   | no        | String       | Job wallclock limit: combination of a number and a unit (ms/s/m/h/d)                                           |
 | cpu-limit         | no        | String       | Job CPU time limit: combination of a number and a unit (ms/s/m/h/d)                                            |
 | arrival           | no        | Float >= 0   | Job's arrival time (seconds) since program start; ignore job until then                                        |
-| max-demand        | no        | Int >= 0     | Override the max. number of MPI processes this job should receive at any point in time                         |
+| max-demand        | no        | Int >= 0     | Override the max. number of MPI processes this job should receive at any point in time (0: no limit)           |
 | dependencies      | no        | String array | User-qualified job names (using "." as a separator) which must exit **before** this job is introduced          |
 | content-mode      | no        | String       | If "raw", the input file will be read as a binary file and not as a text file.                                 |
 | interrupt         | no        | Bool         | If `true`, the job given by "user" and "name" is interrupted (for incremental jobs, just the current revision).|
 | incremental       | no        | Bool         | Whether this job has multiple _increments_ / _revisions_ and should be treated as such                         |
+| literals          | no        | Int array    | You can specify the set of SAT literals (for this increment) directly in the JSON.                             |
 | precursor         | no        | String       | _(Only for incremental jobs)_ User-qualified job name (`<user>.<jobname>`) of this job's previous increment    |
 | assumptions       | no        | Int array    | _(Only for incremental jobs)_ You can specify the set of assumptions for this increment directly in the JSON.  |
 | done              | no        | Bool         | _(Only for incremental jobs)_ If `true`, the incremental job given by "precursor" is finalized and cleaned up. |
@@ -207,8 +203,8 @@ Mallob can be extended in the following ways:
 * New options to the application (or a subsystem thereof) can be added in `src/optionslist.hpp`.
 * To add a new SAT solver to be used in a SAT solver engine, do the following:
     - Add a subclass of `PortfolioSolverInterface`. (You can use the existing implementation for any of the existing solvers and adapt it to your solver.)
-    - Add your solver to the portfolio initialization in `src/app/sat/hordesat/horde.cpp`.
-* To extend Mallob by adding another kind of job solving engine (like combinatorial search, planning, SMT, ...), do the following:
+    - Add your solver to the portfolio initialization in `src/app/sat/execution/engine.cpp`.
+* To extend Mallob by adding another kind of application (like combinatorial search, planning, SMT, ...), do the following:
     - Extend the enumeration `JobDescription::Application` by a corresponding item.
     - In `JobReader::read`, add a parser for your application.
     - In `JobFileAdapter::handleNewJob`, add a new case for the `application` field in JSON files.
