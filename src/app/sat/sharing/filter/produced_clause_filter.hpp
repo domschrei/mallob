@@ -100,21 +100,21 @@ public:
         }
     }
 
-    ClauseInfo getInfo(Mallob::Clause& c, int epoch) {
+    uint8_t getProducers(Mallob::Clause& c, int epoch) {
 
         if (c.size == 1) {
             ProducedUnitClause pc(c);
-            return getInfo(pc, _map_units, epoch);
+            return getProducers(pc, _map_units, epoch);
 
         } else if (c.size == 2) {
             ProducedBinaryClause pc(c);
-            return getInfo(pc, _map_binaries, epoch);
+            return getProducers(pc, _map_binaries, epoch);
 
         } else {
             ProducedLargeClause pc;
             pc.size = c.size;
             pc.data = c.begin;
-            auto info = getInfo(pc, _map_large_clauses, epoch);
+            auto info = getProducers(pc, _map_large_clauses, epoch);
             pc.data = nullptr;
             return info;
         }
@@ -178,5 +178,18 @@ private:
             return _empty_clause_info;
         }
         return info;
+    }
+
+    template <typename T>
+    inline uint8_t getProducers(const T& pc, ProducedMap<T>& map, int epoch) {
+        auto it = map.find(pc);
+        if (it == map.end()) return 0;
+        ClauseInfo& info = it.value();
+        if (epoch - info.epoch > _epoch_horizon) {
+            // Clause grew too old: erase
+            map.erase(it);
+            return 0;
+        }
+        return info.producers;
     }
 };

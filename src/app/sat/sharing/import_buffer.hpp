@@ -35,14 +35,31 @@ public:
             return cdbSetup;
         }()), _max_clause_length(setup.strictClauseLengthLimit) {}
 
+    int getLiteralBudget(int clauseLength, int lbd) {
+        return _cdb.reserveLiteralBudget(clauseLength, lbd);
+    }
+
+    template <typename T>
+    void performImport(int clauseLength, int lbd, std::forward_list<T>& clauses, int nbLiterals) {
+        _cdb.addReservedUniformClauses(clauseLength, lbd, clauses, nbLiterals);
+    }
+
     void add(const Mallob::Clause& c) {
         bool success = _cdb.addClause(c);
         if (!success) _stats.receivedClausesDropped++;
     }
 
-    std::vector<int> getUnitsBuffer() {
+    const std::vector<int>& getUnitsBuffer() {
+
+        if (_cdb.getNumLiterals(1, 1) == 0) {
+            _plain_units_out.clear();
+            return _plain_units_out;
+        }
+
         int numUnits = 0;
-        auto buf = _cdb.exportBuffer(-1, numUnits, AdaptiveClauseDatabase::UNITS, /*sortClauses=*/false);
+        std::vector<int> buf;
+        buf = _cdb.exportBuffer(-1, numUnits, AdaptiveClauseDatabase::UNITS, /*sortClauses=*/false);
+
         _plain_units_out = std::vector<int>(buf.data()+(buf.size()-numUnits), buf.data()+buf.size());
         assert(_plain_units_out.size() == numUnits);
         for (int i = 0; i < _plain_units_out.size(); i++) assert(_plain_units_out[i] != 0);
@@ -60,14 +77,14 @@ public:
 
         if (_cdb.getCurrentlyUsedLiterals() == 0) return _clause_out;
 
-        _clause_out = _cdb.popFront(mode);
-        if (_clause_out.begin != nullptr) {
+        if (_cdb.popFrontWeak(mode, _clause_out)) {
             _stats.receivedClausesDigested++;
             _stats.histDigested->increment(_clause_out.size);
             assert(_clause_out.size > 0);
             assert(_clause_out.lbd > 0);
             assert(_clause_out.begin[0] != 0);
         }
+
         return _clause_out;
     }
 

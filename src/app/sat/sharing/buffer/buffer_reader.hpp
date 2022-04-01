@@ -26,11 +26,14 @@ private:
 public:
     BufferReader() = default;
     BufferReader(int* buffer, int size, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);
+
     void releaseBuffer() {_buffer = nullptr;}
+    
     Mallob::Clause* getCurrentClausePointer() {return &_current_clause;}
     size_t getCurrentBufferPosition() const {return _current_pos;} 
     size_t getRemainingSize() const {return _size - _current_pos;}
     size_t getNumRemainingClausesInBucket() const {return _remaining_cls_of_bucket;}
+    const BufferIterator& getCurrentBufferIterator() const {return _it;} 
     
     inline const Mallob::Clause& getNextIncomingClause() {
         // No buffer?
@@ -38,8 +41,7 @@ public:
 
         // Find first bucket with some clauses left
         if (_remaining_cls_of_bucket == 0) {
-            while (_remaining_cls_of_bucket == 0) {
-                
+            do {    
                 // Nothing left to read?
                 if (_current_pos >= _size) {
                     return endReading();
@@ -49,7 +51,9 @@ public:
                 _it.nextLengthLbdGroup();
                 _remaining_cls_of_bucket = _buffer[_current_pos++];
                 assert(_remaining_cls_of_bucket >= 0);
-            }
+            
+            } while (_remaining_cls_of_bucket == 0);
+
             // Update clause data
             _current_clause.size = _it.clauseLength;
             _current_clause.lbd = _it.lbd;

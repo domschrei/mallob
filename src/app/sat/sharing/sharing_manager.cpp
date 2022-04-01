@@ -12,6 +12,7 @@
 #include "sharing_manager.hpp"
 #include "util/sys/timer.hpp"
 #include "util/shuffle.hpp"
+#include "buffer/buffer_reducer.hpp"
 
 SharingManager::SharingManager(
 		std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, 
@@ -197,9 +198,6 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	float time = Timer::elapsedSeconds();
 	ClauseHistogram hist(_params.strictClauseLengthLimit());
 
-	// Get all clauses
-	auto reader = _cdb.getBufferReader(begin, buflen);
-
 	_logger.log(verb, "digesting len=%ld\n", buflen);
 
 	std::vector<PortfolioSolverInterface*> importingSolvers;
@@ -209,49 +207,125 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		}
 	}
 
-	const int bitsPerElem = sizeof(int)*8;
-	int shift = bitsPerElem;
-	int filterPos = -1;
 	_last_num_cls_to_import = 0;
 	_last_num_admitted_cls_to_import = 0;
 
-	_filter.acquireLock();
+	// Apply provided global filter to buffer (in-place operation)
+	if (filter != nullptr) {
+		const int bitsPerElem = sizeof(int)*8;
+		int shift = bitsPerElem;
+		int filterPos = -1;
+		BufferReducer reducer(begin, buflen, _params.strictClauseLengthLimit(), _params.groupClausesByLengthLbdSum());
+		buflen = reducer.reduce([&]() {
+			_last_num_cls_to_import++;
+			if (shift == bitsPerElem) {
+				filterPos++;
+				shift = 0;
+			}
+			bool admitted = ((filter[filterPos] & (1 << shift)) == 0);
+			if (admitted) {
+				_last_num_admitted_cls_to_import++;
+			}
+			shift++;
+			return admitted;
+		});
+	}
+
+	// Prepare to traverse clauses not filtered yet
+	std::vector<std::forward_list<int>> unitLists(importingSolvers.size());
+	std::vector<std::forward_list<std::pair<int, int>>> binaryLists(importingSolvers.size());
+	std::vector<std::forward_list<std::vector<int>>> largeLists(importingSolvers.size());
+	std::vector<int> currentCapacities(importingSolvers.size(), -1);
+	std::vector<int> currentAddedLiterals(importingSolvers.size(), 0);
+	auto reader = _cdb.getBufferReader(begin, buflen);
+	BufferIterator it(_params.strictClauseLengthLimit(), /*slotsForSumOfLengthAndLbd=*/false);
 	auto clause = reader.getNextIncomingClause();
+	bool explicitLbds = false;
+
+	// Method to publish completed clause lists
+	auto doPublishClauseLists = [&]() {
+		if (it.clauseLength == 1) {
+			// Publish unit lists
+			for (size_t i = 0; i < importingSolvers.size(); i++) {
+				if (!unitLists[i].empty()) {
+					importingSolvers[i]->addLearnedClauses(it.clauseLength, it.lbd, unitLists[i], currentAddedLiterals[i]);
+				}
+			}
+		} else if (it.clauseLength == 2) {
+			// Publish binary lists
+			for (size_t i = 0; i < importingSolvers.size(); i++) {
+				if (!binaryLists[i].empty()) {
+					importingSolvers[i]->addLearnedClauses(it.clauseLength, it.lbd, binaryLists[i], currentAddedLiterals[i]);
+				}
+			}
+		} else {
+			// Publish large lists
+			for (size_t i = 0; i < importingSolvers.size(); i++) {
+				if (!largeLists[i].empty()) {
+					importingSolvers[i]->addLearnedClauses(it.clauseLength, it.lbd, largeLists[i], currentAddedLiterals[i]);
+				}
+			}
+		}
+	};
+
+	// Traverse clauses
+	bool initialized = false;
+	_filter.acquireLock();
 	while (clause.begin != nullptr) {
 		
-		_last_num_cls_to_import++;
-		if (shift == bitsPerElem) {
-			filterPos++;
-			shift = 0;
+		if (!initialized || clause.size != it.clauseLength || clause.lbd != it.lbd) {
+			initialized = true;
+
+			doPublishClauseLists();
+
+			while (clause.size != it.clauseLength || clause.lbd != it.lbd) {
+				it.nextLengthLbdGroup();
+				explicitLbds = it.storeWithExplicitLbd(/*maxLbdPartitioningSize=*/2);
+			}
+
+			for (size_t i = 0; i < importingSolvers.size(); i++) {
+				currentCapacities[i] = importingSolvers[i]->getClauseImportBudget(clause.size, clause.lbd);
+				currentAddedLiterals[i] = 0;
+			}
 		}
 
-		auto bit = 1 << shift;
-		if (filter == nullptr || ((filter[filterPos] & bit) == 0)) {
+		hist.increment(clause.size);
+		uint8_t producers = _filter.getProducers(clause, _internal_epoch);
 
-			// admitted
-			_last_num_admitted_cls_to_import++;
-			hist.increment(clause.size);
-			auto producers = _filter.getInfo(clause, _internal_epoch).producers;
-
-			for (auto solver : importingSolvers) {
-				int sid = solver->getLocalId();
-				auto& solverStats = _solver_stats[sid];
-				solverStats->receivedClauses++;
-				uint8_t producerFlag = 1 << sid;
-				if ((producers & producerFlag) != 0) {
-					// filtered
-					solverStats->receivedClausesFiltered++;
-					continue;
-				} else {
-					// admitted
-					_solvers[sid]->addLearnedClause(clause);
+		for (size_t i = 0; i < importingSolvers.size(); i++) {
+			auto& solver = *importingSolvers[i];
+			int sid = solver.getLocalId();
+			auto& solverStats = _solver_stats[sid];
+			solverStats->receivedClauses++;
+			if (currentCapacities[i] < clause.size) {
+				// No import budget left
+				solverStats->receivedClausesDropped++;
+				continue;
+			}
+			uint8_t producerFlag = 1 << sid;
+			if ((producers & (1 << sid)) != 0) {
+				// filtered by solver filter
+				solverStats->receivedClausesFiltered++;
+				continue;
+			} else {
+				// admitted by solver filter
+				if (clause.size == 1) unitLists[i].push_front(clause.begin[0]);
+				else if (clause.size == 2) binaryLists[i].emplace_front(clause.begin[0], clause.begin[1]);
+				else {
+					std::vector<int> clauseVec((explicitLbds ? 1 : 0) + clause.size);
+					size_t idx = 0;
+					if (explicitLbds) clauseVec[idx++] = clause.lbd;
+					for (size_t k = 0; k < clause.size; k++) clauseVec[idx++] = clause.begin[k];
+					largeLists[i].emplace_front(std::move(clauseVec));
 				}
+				currentCapacities[i] -= clause.size;
+				currentAddedLiterals[i] += clause.size;
 			}
 		}
 
 		clause = reader.getNextIncomingClause();
-		shift++;
 	}
+	doPublishClauseLists();
 	_filter.releaseLock();
 	
 	// Process-wide stats

@@ -32,6 +32,21 @@ void reset() {
     lbd = 1;
 }
 
+bool storeWithExplicitLbd(int maxLbdPartitionedSize) const {
+    
+    if (slotsForSumOfLengthAndLbd && (clauseLength+lbd) >= 6 
+            && (clauseLength+lbd) <= maxSumOfLengthAndLbd) {
+        // Shared slot for all clauses of this length+lbd sum
+        return true;
+    } else if (clauseLength > maxLbdPartitionedSize) {
+        // Slot for all clauses of this length
+        return true;
+    } else {
+        // Exclusive slot for this length-lbd combination
+        return false;
+    }
+}
+
 void nextLengthLbdGroup() {
 
     if (slotsForSumOfLengthAndLbd && clauseLength+lbd <= maxSumOfLengthAndLbd) {

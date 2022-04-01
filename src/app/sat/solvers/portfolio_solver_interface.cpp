@@ -81,6 +81,10 @@ void PortfolioSolverInterface::addLearnedClause(const Mallob::Clause& c) {
 	_import_buffer.add(c);
 }
 
+int PortfolioSolverInterface::getClauseImportBudget(int clauseLength, int lbd) {
+	return _import_buffer.getLiteralBudget(clauseLength, lbd);
+}
+
 bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, AdaptiveClauseDatabase::ExportMode mode) {
 	clauseOut = _import_buffer.get(mode);
 	return clauseOut.begin != nullptr && clauseOut.size >= 1;

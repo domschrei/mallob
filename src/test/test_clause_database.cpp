@@ -14,13 +14,13 @@
 #include "util/random.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
-#include "app/sat/hordesat/sharing/lockfree_clause_database.hpp"
-#include "app/sat/hordesat/sharing/adaptive_clause_database.hpp"
-#include "app/sat/hordesat/sharing/buffer_merger.hpp"
+#include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
+#include "app/sat/sharing/buffer/buffer_merger.hpp"
+#include "app/sat/sharing/buffer/buffer_reducer.hpp"
 #include "util/sys/terminator.hpp"
 
 bool insertUntilSuccess(AdaptiveClauseDatabase& cdb, size_t prodId, Clause& c) {
-    return cdb.addClause(prodId, c) == SUCCESS;
+    return cdb.addClause(c);
 }
 
 void testSumBucketLabel() {
@@ -40,7 +40,6 @@ void testMinimal() {
     setup.maxClauseLength = 10;
     setup.maxLbdPartitionedSize = 5;
     setup.numLiterals = 1500;
-    setup.numProducers = 1;
     setup.slotsForSumOfLengthAndLbd = true;
 
     AdaptiveClauseDatabase cdb(setup);
@@ -50,7 +49,7 @@ void testMinimal() {
         std::vector<int> lits = {100+numAttempted, 200+numAttempted, 300+numAttempted, 400+numAttempted};
         LOG(V2_INFO, "%i\n", numAttempted);
         Clause c{lits.data(), lits.size(), 2};
-        success = cdb.addClause(/*producer=*/0, c) == SUCCESS;
+        success = cdb.addClause(c);
         numAttempted++;
     }
     assert(numAttempted < 10000);
@@ -70,7 +69,6 @@ void testMerge() {
     setup.maxClauseLength = 3;
     setup.maxLbdPartitionedSize = 5;
     setup.numLiterals = 1'500'000;
-    setup.numProducers = 1;
     setup.slotsForSumOfLengthAndLbd = true;
     int numBuffers = 4;
     int numClausesPerBuffer = 100000;
@@ -151,6 +149,122 @@ void testMerge() {
     }*/
 }
 
+void testReduce() {
+
+    LOG(V2_INFO, "Test in-place buffer reduction ...\n");
+
+    AdaptiveClauseDatabase::Setup setup;
+    setup.maxClauseLength = 10;
+    setup.maxLbdPartitionedSize = 5;
+    setup.numLiterals = 1500;
+    setup.slotsForSumOfLengthAndLbd = true;
+
+    AdaptiveClauseDatabase cdb(setup);
+    bool success = true;
+    
+    const int nbMaxClausesPerSlot = 10;
+    int nbClausesThisSlot = 0;
+    BufferIterator it(setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+
+    while (success) {
+        std::vector<int> lits(it.clauseLength);
+        for (size_t i = 0; i < lits.size(); i++) {
+            lits[i] = 100*nbClausesThisSlot + i + 1;
+        }
+        Clause c{lits.data(), lits.size(), it.lbd};
+        success = cdb.addClause(c);
+        nbClausesThisSlot++;
+        if (nbClausesThisSlot == nbMaxClausesPerSlot) {
+            it.nextLengthLbdGroup();
+            nbClausesThisSlot = 0;
+        }
+    }
+
+    int numExported;
+    auto buf = cdb.exportBuffer(100000, numExported);
+
+    {
+        auto copiedBuf = buf;
+        BufferReducer reducer(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        int newSize = reducer.reduce([&](const Mallob::Clause& c) {
+            return true;
+        });
+        copiedBuf.resize(newSize);
+        assert(copiedBuf == buf);
+
+        BufferReader reader(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        int nbClauses = 0;
+        while (reader.getNextIncomingClause().begin != nullptr) nbClauses++;
+        assert(nbClauses == numExported);
+    }
+    {
+        auto copiedBuf = buf;
+        BufferReducer reducer(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        int newSize = reducer.reduce([&](const Mallob::Clause& c) {
+            return false;
+        });
+        copiedBuf.resize(newSize);
+
+        BufferReader reader(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        int nbClauses = 0;
+        while (reader.getNextIncomingClause().begin != nullptr) nbClauses++;
+        assert(nbClauses == 0);
+    }
+    {
+        auto copiedBuf = buf;
+        BufferReducer reducer(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        auto reductor = [&](const Mallob::Clause& c) {
+            return c.size == 4 && c.lbd == 3 && c.begin[0] == 1 && c.begin[1] == 2 && c.begin[2] == 3 && c.begin[3] == 4;
+        };
+        int newSize = reducer.reduce(reductor);
+        copiedBuf.resize(newSize);
+
+        BufferReader reader(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        int nbClauses = 0;
+        while (reader.getNextIncomingClause().begin != nullptr) {
+            nbClauses++;
+            assert(reductor(*reader.getCurrentClausePointer()));
+        }
+        assert(nbClauses == 1);
+    }
+    {
+        auto copiedBuf = buf;
+        BufferReducer reducer(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        auto reductor = [&](const Mallob::Clause& c) {
+            return c.size >= 4;
+        };
+        int newSize = reducer.reduce(reductor);
+        copiedBuf.resize(newSize);
+
+        BufferReader reader(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        int nbClauses = 0;
+        while (reader.getNextIncomingClause().begin != nullptr) {
+            nbClauses++;
+            assert(reductor(*reader.getCurrentClausePointer()));
+        }
+        assert(nbClauses == numExported - 40);
+    }
+
+    //std::string out = "";
+    //for (int lit : buf) out += std::to_string(lit) + " ";
+    //LOG(V2_INFO, "BUF: %s\n", out.c_str());
+}
+
+int main() {
+    Timer::init();
+    Random::init(rand(), rand());
+    Logger::init(0, V5_DEBG, false, false, false, nullptr);
+    Process::init(0);
+    ProcessWideThreadPool::init(1);
+
+    testSumBucketLabel();
+    testMinimal();
+    testMerge();
+    testReduce();
+}
+
+
+#ifdef MALLOB_COMMENTED_OUT
 void testUniform() {
     LOG(V2_INFO, "Testing lock-free clause database, uniform setting ...\n");
 
@@ -487,22 +601,4 @@ void testConcurrentClauseAddition() {
  
     for (auto& thread : threads) thread.join();
 }
-
-int main() {
-    Timer::init();
-    Random::init(rand(), rand());
-    Logger::init(0, V5_DEBG, false, false, false, nullptr);
-    Process::init(0);
-    ProcessWideThreadPool::init(1);
-
-    testTreeMapVsHashMap();
-
-    exit(0);
-    testRandomClauses();
-    
-    //testSumBucketLabel();
-    testMinimal();
-    testUniform();
-    testMerge();
-    testConcurrentClauseAddition();
-}
+#endif

@@ -145,6 +145,11 @@ public:
 	// Add a learned clause to the formula
 	// The learned clauses might be added later or possibly never
 	void addLearnedClause(const Mallob::Clause& c);
+	int getClauseImportBudget(int clauseLength, int lbd);
+	template <typename T>
+	void addLearnedClauses(int clauseLength, int lbd, std::forward_list<T>& list, int numLiterals) {
+		_import_buffer.performImport<T>(clauseLength, lbd, list, numLiterals);
+	}
 
 	// Within the solver, fetch a clause that was previously added as a learned clause.
 	bool fetchLearnedClause(Mallob::Clause& clauseOut, AdaptiveClauseDatabase::ExportMode mode = AdaptiveClauseDatabase::ANY);

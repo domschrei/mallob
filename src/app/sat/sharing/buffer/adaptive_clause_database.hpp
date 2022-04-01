@@ -60,9 +60,15 @@ private:
     template <typename T>
     struct Slot {
         int implicitLbdOrZero;
-        bool empty = true;
-        std::unique_ptr<Mutex> mtx;
+        std::atomic_int nbLiterals {0};
+        std::shared_ptr<Mutex> mtx;
         std::forward_list<T> list;
+        Slot() = default;
+        Slot(Slot&& other) :
+            implicitLbdOrZero(other.implicitLbdOrZero), 
+            nbLiterals(other.nbLiterals.load(std::memory_order_relaxed)), 
+            mtx(std::move(other.mtx)),
+            list(other.list) {}
     };
 
     Slot<int> _unit_slot;
@@ -85,10 +91,9 @@ public:
     struct Setup {
         int numLiterals = 1000;
         int maxClauseLength = 20;
-        bool useChecksums = false;
-
-        bool slotsForSumOfLengthAndLbd = false;
         int maxLbdPartitionedSize = 2;
+        bool useChecksums = false;
+        bool slotsForSumOfLengthAndLbd = false;
     };
 
     AdaptiveClauseDatabase(Setup setup);
@@ -104,7 +109,41 @@ public:
     */
     bool addClause(const Clause& c);
     bool addClause(int* cBegin, int cSize, int cLbd, bool sortLargeClause = false);
-    int addUniformClauses(BufferReader& reader);
+
+    int reserveLiteralBudget(int cSize, int cLbd);
+
+    template <typename T>
+    void addReservedUniformClauses(int cSize, int cLbd, std::forward_list<T>& clauses, int nbLiterals) {
+        auto [slotIdx, mode] = getSlotIdxAndMode(cSize, cLbd);
+        int freed = tryAcquireBudget(slotIdx, nbLiterals);
+        assert(freed >= nbLiterals);
+        if (freed > nbLiterals) {
+            // return excess
+            _num_free_literals.fetch_add(freed-nbLiterals, std::memory_order_relaxed);
+        }
+
+        T& clause = clauses.front();
+
+        if constexpr (std::is_same<T, int>::value) {
+            _unit_slot.list.splice_after(_unit_slot.list.before_begin(), clauses);
+            atomics::addRelaxed(_unit_slot.nbLiterals, nbLiterals);
+        } else if constexpr (std::is_same<T, std::pair<int, int>>::value) {
+            _binary_slot.list.splice_after(_binary_slot.list.before_begin(), clauses);
+            atomics::addRelaxed(_binary_slot.nbLiterals, nbLiterals);
+        } else if constexpr (std::is_same<T, std::vector<int>>::value) {
+            auto& slot = _large_slots[slotIdx];
+            if (slot.implicitLbdOrZero == 0) {
+                // Explicit LBD
+                assert(clause.size() == cSize+1);
+                assert(clause[0] == cLbd);
+            } else {
+                // Implicit LBD
+                assert(clause.size() == cSize);
+            }
+            slot.list.splice_after(slot.list.before_begin(), clauses);
+            atomics::addRelaxed(slot.nbLiterals, nbLiterals);
+        }
+    }
 
     void printChunks(int nextExportSize = -1);
     
@@ -124,7 +163,7 @@ public:
     std::vector<int> exportBuffer(int sizeLimit, int& numExportedClauses, 
             ExportMode mode = ANY, bool sortClauses = true);
 
-    Mallob::Clause popFront(ExportMode mode = ANY);
+    bool popFrontWeak(ExportMode mode, Mallob::Clause& out);
 
     /*
     Allows to iterate over the clauses contained in a flat vector of integers
@@ -139,15 +178,19 @@ public:
     int getCurrentlyUsedLiterals() const {
         return _total_literal_limit - _num_free_literals.load(std::memory_order_relaxed);
     }
+    int getNumLiterals(int clauseLength, int lbd) {
+        if (clauseLength == 1) return _unit_slot.nbLiterals.load(std::memory_order_relaxed);
+        if (clauseLength == 2) return _binary_slot.nbLiterals.load(std::memory_order_relaxed);
+        auto [slotIdx, mode] = getSlotIdxAndMode(clauseLength, lbd);
+        return _large_slots[slotIdx].nbLiterals.load(std::memory_order_relaxed);
+    }
 
     ClauseHistogram& getDeletedClausesHistogram();
 
 private:
-    template <typename T>
-    void addUniformClausesToSlot(BufferReader& reader, Slot<T>& slot);
 
     template <typename T>
-    Mallob::Clause popMallobClause(Slot<T>& slot);
+    bool popMallobClause(Slot<T>& slot, bool giveUpOnLock, Mallob::Clause& out);
 
     template <typename T>
     Mallob::Clause getMallobClause(T& elem, int implicitLbdOrZero);
@@ -161,8 +204,5 @@ private:
     std::pair<int, ClauseSlotMode> getSlotIdxAndMode(int clauseSize, int lbd);
     BucketLabel getBucketIterator();
 
-    bool tryAcquireBudget(int len);
-    int freeLowPriorityLiterals(int callingSlot, int desiredLits);
-
-
+    int tryAcquireBudget(int callingSlot, int desiredLits, float freeingFactor = 1.0f);
 };
