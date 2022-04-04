@@ -42,15 +42,17 @@ public:
             handleResult(producerId, result, size);
 
             // Also decrease backlog size by some amount
-            for (size_t i = 0; i < 32; i++) {
-                _backlog_mutex.lock();
-                if (_export_backlog.empty()) {
-                    _backlog_mutex.unlock();
-                    break;
+            std::list<ProducedClauseCandidate> backlogSplice;
+            {
+                auto lock = _backlog_mutex.getLock();
+                if (!_export_backlog.empty()) {
+                    backlogSplice.splice(backlogSplice.begin(), _export_backlog, 
+                        _export_backlog.begin(),
+                        std::next(_export_backlog.begin(), std::min(16ul, _export_backlog.size()))
+                    );
                 }
-                ProducedClauseCandidate pcc(std::move(_export_backlog.front()));
-                _export_backlog.pop_front();
-                _backlog_mutex.unlock();
+            }
+            for (auto& pcc : backlogSplice) {
                 int clauseLength = pcc.size;
                 int producerId = pcc.producerId;
                 result = _filter.tryRegisterAndInsert(std::move(pcc), _cdb);

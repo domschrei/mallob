@@ -100,6 +100,7 @@ std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses) {
     // Fill provided excess clauses buffer with result from according builder
     if (excessClauses != nullptr) {
         *excessClauses = excessBuilder->extractBuffer();
+        delete excessBuilder;
     }
 
     delete threewayCompare;

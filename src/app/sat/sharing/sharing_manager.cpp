@@ -237,6 +237,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	std::vector<std::forward_list<std::vector<int>>> largeLists(importingSolvers.size());
 	std::vector<int> currentCapacities(importingSolvers.size(), -1);
 	std::vector<int> currentAddedLiterals(importingSolvers.size(), 0);
+	
 	auto reader = _cdb.getBufferReader(begin, buflen);
 	BufferIterator it(_params.strictClauseLengthLimit(), /*slotsForSumOfLengthAndLbd=*/false);
 	auto clause = reader.getNextIncomingClause();
@@ -275,6 +276,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		
 		if (!initialized || clause.size != it.clauseLength || clause.lbd != it.lbd) {
 			initialized = true;
+			_filter.releaseLock();
 
 			doPublishClauseLists();
 
@@ -287,6 +289,8 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 				currentCapacities[i] = importingSolvers[i]->getClauseImportBudget(clause.size, clause.lbd);
 				currentAddedLiterals[i] = 0;
 			}
+
+			_filter.acquireLock();
 		}
 
 		hist.increment(clause.size);
@@ -325,8 +329,8 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 		clause = reader.getNextIncomingClause();
 	}
-	doPublishClauseLists();
 	_filter.releaseLock();
+	doPublishClauseLists();
 	
 	// Process-wide stats
 	time = Timer::elapsedSeconds() - time;
