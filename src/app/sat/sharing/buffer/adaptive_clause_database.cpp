@@ -177,12 +177,13 @@ bool AdaptiveClauseDatabase::popMallobClause(Slot<T>& slot, bool giveUpOnLock, M
         return false;
     }
     assert(!slot.list.empty());
+    int nbLiteralsBefore = slot.nbLiterals.load(std::memory_order_relaxed);
     T packed = std::move(slot.list.front());
     slot.list.pop_front();
     auto mc = getMallobClause(packed, slot.implicitLbdOrZero);
     atomics::subRelaxed(slot.nbLiterals, mc.size);
     _num_free_literals.fetch_add(mc.size, std::memory_order_relaxed);
-    assert_heavy(checkNbLiterals(slot));
+    assert_heavy(checkNbLiterals(slot, "popMallobClause(): " + mc.toStr() + "; " + std::to_string(nbLiteralsBefore) + " lits before"));
     slot.mtx->unlock();
     out = mc.copy(); // copy
     return true;
