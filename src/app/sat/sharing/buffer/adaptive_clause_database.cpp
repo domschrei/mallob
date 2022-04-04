@@ -1,8 +1,6 @@
 
 #include "adaptive_clause_database.hpp"
 
-#include <numeric>
-
 AdaptiveClauseDatabase::AdaptiveClauseDatabase(Setup setup):
     _total_literal_limit(setup.numLiterals),
     _max_lbd_partitioned_size(setup.maxLbdPartitionedSize),
@@ -401,28 +399,6 @@ std::pair<int, AdaptiveClauseDatabase::ClauseSlotMode> AdaptiveClauseDatabase::g
 
 BucketLabel AdaptiveClauseDatabase::getBucketIterator() {
     return _bucket_iterator;
-}
-
-template <typename T>
-bool AdaptiveClauseDatabase::checkNbLiterals(Slot<T>& slot, std::string additionalInfo) {
-
-    int nbAdvertised = slot.nbLiterals.load(std::memory_order_relaxed);
-    int nbActual = 0;
-    for (auto elem : slot.list) {
-        if constexpr (std::is_same<int, T>::value) {
-            nbActual++;
-        }
-        if constexpr (std::is_same<std::pair<int, int>, T>::value) {
-            nbActual += 2;
-        }
-        if constexpr (std::is_same<std::vector<int>, T>::value) {
-            nbActual += elem.size() - (slot.implicitLbdOrZero==0 ? 1:0);
-        }
-    }
-    if (nbAdvertised != nbActual) 
-        LOG(V0_CRIT, "[ERROR] Slot advertised %i literals - found %i literals (%s)\n", 
-            nbAdvertised, nbActual, additionalInfo.c_str());
-    return nbAdvertised == nbActual;
 }
 
 /*

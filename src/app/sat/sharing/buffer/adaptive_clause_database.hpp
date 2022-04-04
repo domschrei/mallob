@@ -3,6 +3,8 @@
 
 #include <forward_list>
 #include <memory>
+#include <numeric>
+
 
 #include "../../data/produced_clause.hpp"
 #include "bucket_label.hpp"
@@ -125,11 +127,15 @@ public:
         T& clause = clauses.front();
 
         if constexpr (std::is_same<T, int>::value) {
+            auto lock = _unit_slot.mtx->getLock();
             _unit_slot.list.splice_after(_unit_slot.list.before_begin(), clauses);
             atomics::addRelaxed(_unit_slot.nbLiterals, nbLiterals);
+            assert_heavy(checkNbLiterals(_unit_slot));
         } else if constexpr (std::is_same<T, std::pair<int, int>>::value) {
+            auto lock = _binary_slot.mtx->getLock();
             _binary_slot.list.splice_after(_binary_slot.list.before_begin(), clauses);
             atomics::addRelaxed(_binary_slot.nbLiterals, nbLiterals);
+            assert_heavy(checkNbLiterals(_binary_slot));
         } else if constexpr (std::is_same<T, std::vector<int>>::value) {
             auto& slot = _large_slots[slotIdx];
             if (slot.implicitLbdOrZero == 0) {
@@ -140,8 +146,10 @@ public:
                 // Implicit LBD
                 assert(clause.size() == cSize);
             }
+            auto lock = slot.mtx->getLock();
             slot.list.splice_after(slot.list.before_begin(), clauses);
             atomics::addRelaxed(slot.nbLiterals, nbLiterals);
+            assert_heavy(checkNbLiterals(slot));
         }
     }
 
@@ -188,9 +196,27 @@ public:
     ClauseHistogram& getDeletedClausesHistogram();
 
 private:
-
     template <typename T>
-    bool checkNbLiterals(Slot<T>& slot, std::string additionalInfo = "");
+    bool checkNbLiterals(Slot<T>& slot, std::string additionalInfo = "") {
+
+        int nbAdvertised = slot.nbLiterals.load(std::memory_order_relaxed);
+        int nbActual = 0;
+        for (auto elem : slot.list) {
+            if constexpr (std::is_same<int, T>::value) {
+                nbActual++;
+            }
+            if constexpr (std::is_same<std::pair<int, int>, T>::value) {
+                nbActual += 2;
+            }
+            if constexpr (std::is_same<std::vector<int>, T>::value) {
+                nbActual += elem.size() - (slot.implicitLbdOrZero==0 ? 1:0);
+            }
+        }
+        if (nbAdvertised != nbActual) 
+            LOG(V0_CRIT, "[ERROR] Slot advertised %i literals - found %i literals (%s)\n", 
+                nbAdvertised, nbActual, additionalInfo.c_str());
+        return nbAdvertised == nbActual;
+    }
 
     template <typename T>
     bool popMallobClause(Slot<T>& slot, bool giveUpOnLock, Mallob::Clause& out);
