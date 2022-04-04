@@ -1,6 +1,8 @@
 
 #include "adaptive_clause_database.hpp"
 
+#include <numeric>
+
 AdaptiveClauseDatabase::AdaptiveClauseDatabase(Setup setup):
     _total_literal_limit(setup.numLiterals),
     _max_lbd_partitioned_size(setup.maxLbdPartitionedSize),
@@ -103,11 +105,13 @@ bool AdaptiveClauseDatabase::addClause(int* cBegin, int cSize, int cLbd, bool so
         _unit_slot.mtx->lock();
         _unit_slot.list.push_front(*cBegin);
         atomics::incrementRelaxed(_unit_slot.nbLiterals);
+        assert_heavy(checkNbLiterals(_unit_slot));
         _unit_slot.mtx->unlock();
     } else if (cSize == 2) {
         _binary_slot.mtx->lock();
         _binary_slot.list.emplace_front(cBegin[0], cBegin[1]);
         atomics::addRelaxed(_binary_slot.nbLiterals, 2);
+        assert_heavy(checkNbLiterals(_binary_slot));
         _binary_slot.mtx->unlock();
     } else {
         // Sort clause if necessary
@@ -122,8 +126,10 @@ bool AdaptiveClauseDatabase::addClause(int* cBegin, int cSize, int cLbd, bool so
         slot.mtx->lock();
         slot.list.push_front(std::move(vec));
         atomics::addRelaxed(slot.nbLiterals, cSize);
+        assert_heavy(checkNbLiterals(slot));
         slot.mtx->unlock();
     }
+
     return true;
 }
 
@@ -176,6 +182,7 @@ bool AdaptiveClauseDatabase::popMallobClause(Slot<T>& slot, bool giveUpOnLock, M
     auto mc = getMallobClause(packed, slot.implicitLbdOrZero);
     atomics::subRelaxed(slot.nbLiterals, mc.size);
     _num_free_literals.fetch_add(mc.size, std::memory_order_relaxed);
+    assert_heavy(checkNbLiterals(slot));
     slot.mtx->unlock();
     out = mc.copy(); // copy
     return true;
@@ -221,8 +228,9 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, Buffe
     std::vector<Mallob::Clause> flushedClauses;
     int remainingLits = builder.getMaxRemainingLits();
     int collectedLits = 0;
+    auto itBefore = swappedSlot.before_begin();
     auto it = swappedSlot.begin();
-    for (; it != swappedSlot.end(); ++it) {
+    for (; it != swappedSlot.end(); ++it, ++itBefore) {
         T& elem = *it;
         Mallob::Clause clause = getMallobClause(elem, slot.implicitLbdOrZero);
         if (clause.size > remainingLits) break;
@@ -239,11 +247,13 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, Buffe
     if (it != swappedSlot.end()) {
         // Re-insert swapped clauses which remained unused
         auto lock = slot.mtx->getLock();
-        slot.list.splice_after(slot.list.before_begin(), swappedSlot, it, swappedSlot.end());
+        slot.list.splice_after(slot.list.before_begin(), swappedSlot, itBefore, swappedSlot.end());
         atomics::addRelaxed(slot.nbLiterals, nbSwappedLits - collectedLits);
+        assert_heavy(checkNbLiterals(slot));
     } else {
         assert(nbSwappedLits == collectedLits || 
-            log_return_false("[ERROR] %i != %i\n", nbSwappedLits, collectedLits));
+            log_return_false("[ERROR] slot advertised %i lits, collected %i lits\n", 
+            nbSwappedLits, collectedLits));
     }
 
     bool differentLbdValues = slot.implicitLbdOrZero == 0;
@@ -323,8 +333,11 @@ int AdaptiveClauseDatabase::dropClauses(Slot<T>& slot, int desiredLiterals) {
     if (slot.nbLiterals.load(std::memory_order_relaxed) == 0) return 0;
 
     auto lock = slot.mtx->getLock();
+    assert_heavy(checkNbLiterals(slot, "before dropClauses()"));
+    int nbLiteralsBefore = slot.nbLiterals.load(std::memory_order_relaxed);
 
     int nbCollectedLits = 0;
+    int nbCollectedClauses = 0;
     auto it = slot.list.begin();
     while (nbCollectedLits < desiredLiterals && it != slot.list.end()) {
         if constexpr (std::is_same<int, T>::value) {
@@ -340,6 +353,7 @@ int AdaptiveClauseDatabase::dropClauses(Slot<T>& slot, int desiredLiterals) {
             nbCollectedLits += clslen;
             _hist_deleted_in_slots.increment(clslen);
         }
+        nbCollectedClauses++;
         ++it;
     }
 
@@ -349,8 +363,12 @@ int AdaptiveClauseDatabase::dropClauses(Slot<T>& slot, int desiredLiterals) {
 
     // Extract part of the list
     std::forward_list<T> swappedList;
-    swappedList.splice_after(swappedList.before_begin(), slot.list, slot.list.begin(), it);
+    swappedList.splice_after(swappedList.before_begin(), slot.list, slot.list.before_begin(), it);
     atomics::subRelaxed(slot.nbLiterals, nbCollectedLits);
+    assert_heavy(checkNbLiterals(slot, "dropClauses(): collected " 
+        + std::to_string(nbCollectedLits) + " literals from " 
+        + std::to_string(nbCollectedClauses) + " clauses; " 
+        + std::to_string(nbLiteralsBefore) + " lits before"));
     
     // Elements are cleaned up automatically
     return nbCollectedLits;
@@ -382,6 +400,28 @@ std::pair<int, AdaptiveClauseDatabase::ClauseSlotMode> AdaptiveClauseDatabase::g
 
 BucketLabel AdaptiveClauseDatabase::getBucketIterator() {
     return _bucket_iterator;
+}
+
+template <typename T>
+bool AdaptiveClauseDatabase::checkNbLiterals(Slot<T>& slot, std::string additionalInfo) {
+
+    int nbAdvertised = slot.nbLiterals.load(std::memory_order_relaxed);
+    int nbActual = 0;
+    for (auto elem : slot.list) {
+        if constexpr (std::is_same<int, T>::value) {
+            nbActual++;
+        }
+        if constexpr (std::is_same<std::pair<int, int>, T>::value) {
+            nbActual += 2;
+        }
+        if constexpr (std::is_same<std::vector<int>, T>::value) {
+            nbActual += elem.size() - (slot.implicitLbdOrZero==0 ? 1:0);
+        }
+    }
+    if (nbAdvertised != nbActual) 
+        LOG(V0_CRIT, "[ERROR] Slot advertised %i literals - found %i literals (%s)\n", 
+            nbAdvertised, nbActual, additionalInfo.c_str());
+    return nbAdvertised == nbActual;
 }
 
 /*

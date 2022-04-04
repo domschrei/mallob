@@ -190,6 +190,9 @@ public:
 private:
 
     template <typename T>
+    bool checkNbLiterals(Slot<T>& slot, std::string additionalInfo = "");
+
+    template <typename T>
     bool popMallobClause(Slot<T>& slot, bool giveUpOnLock, Mallob::Clause& out);
 
     template <typename T>
