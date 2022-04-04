@@ -20,6 +20,11 @@ namespace atomics {
     void addRelaxed(std::atomic<T>& var, T by) {
         var.fetch_add(by, std::memory_order_relaxed);
     }
+
+    template <typename T>
+    void subRelaxed(std::atomic<T>& var, T by) {
+        var.fetch_sub(by, std::memory_order_relaxed);
+    }
 };
 
 #endif

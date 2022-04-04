@@ -47,7 +47,7 @@ private:
     ConditionVariable _state_cond;
 
     std::atomic_int _latest_revision = 0;
-    std::atomic_int _active_revision;
+    std::atomic_int _active_revision = 0;
     unsigned long _imported_lits_curr_revision = 0;
     bool _last_read_lit_zero = true;
     int _max_var = 0;
@@ -94,7 +94,7 @@ public:
     }
     bool hasFoundResult(int revision) {
         auto lock = _state_mutex.getLock();
-        return _active_revision == revision && _found_result;
+        return _initialized && _active_revision == revision && _found_result;
     }
     JobResult& getSatResult() {
         return _result;

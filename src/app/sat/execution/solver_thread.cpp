@@ -35,10 +35,11 @@ void SolverThread::start() {
 void SolverThread::init() {
     _tid = Proc::getTid();
     LOGGER(_logger, V5_DEBG, "tid %ld\n", _tid);
-    _initialized = true;
     
     _active_revision = 0;
     _imported_lits_curr_revision = 0;
+    
+    _initialized = true;
 }
 
 void* SolverThread::run() {

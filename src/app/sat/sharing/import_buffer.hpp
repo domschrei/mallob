@@ -41,6 +41,7 @@ public:
 
     template <typename T>
     void performImport(int clauseLength, int lbd, std::forward_list<T>& clauses, int nbLiterals) {
+        if (clauses.empty()) return;
         _cdb.addReservedUniformClauses(clauseLength, lbd, clauses, nbLiterals);
     }
 
@@ -86,6 +87,13 @@ public:
         }
 
         return _clause_out;
+    }
+
+    bool empty() const {
+        int litsInUse = _cdb.getCurrentlyUsedLiterals();
+        assert(litsInUse >= 0);
+        if (litsInUse > 0) return false;
+        return true;
     }
 
     ~ImportBuffer() {

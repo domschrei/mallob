@@ -170,10 +170,11 @@ bool AdaptiveClauseDatabase::popMallobClause(Slot<T>& slot, bool giveUpOnLock, M
         slot.mtx->unlock();
         return false;
     }
+    assert(!slot.list.empty());
     T packed = std::move(slot.list.front());
     slot.list.pop_front();
     auto mc = getMallobClause(packed, slot.implicitLbdOrZero);
-    atomics::addRelaxed(slot.nbLiterals, -mc.size);
+    atomics::subRelaxed(slot.nbLiterals, mc.size);
     _num_free_literals.fetch_add(mc.size, std::memory_order_relaxed);
     slot.mtx->unlock();
     out = mc.copy(); // copy
@@ -207,15 +208,13 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, Buffe
     std::forward_list<T> swappedSlot;
     int nbSwappedLits;
     {
-        slot.mtx->lock();
+        auto lock = slot.mtx->getLock();
         if (slot.nbLiterals.load(std::memory_order_relaxed) == 0) {
-            slot.mtx->unlock();
             return;
         }
         swappedSlot.swap(slot.list);
         nbSwappedLits = slot.nbLiterals.load(std::memory_order_relaxed);
         slot.nbLiterals.store(0, std::memory_order_relaxed);
-        slot.mtx->unlock();
     }
 
     // Create clauses one by one
@@ -239,10 +238,12 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, Buffe
 
     if (it != swappedSlot.end()) {
         // Re-insert swapped clauses which remained unused
-        slot.mtx->lock();
+        auto lock = slot.mtx->getLock();
         slot.list.splice_after(slot.list.before_begin(), swappedSlot, it, swappedSlot.end());
         atomics::addRelaxed(slot.nbLiterals, nbSwappedLits - collectedLits);
-        slot.mtx->unlock();
+    } else {
+        assert(nbSwappedLits == collectedLits || 
+            log_return_false("[ERROR] %i != %i\n", nbSwappedLits, collectedLits));
     }
 
     bool differentLbdValues = slot.implicitLbdOrZero == 0;
@@ -321,45 +322,38 @@ int AdaptiveClauseDatabase::dropClauses(Slot<T>& slot, int desiredLiterals) {
     
     if (slot.nbLiterals.load(std::memory_order_relaxed) == 0) return 0;
 
-    std::forward_list<T> swappedList;
-    int numCollectedLits = 0;
+    auto lock = slot.mtx->getLock();
 
-    slot.mtx->lock();
+    int nbCollectedLits = 0;
     auto it = slot.list.begin();
-    while (numCollectedLits < desiredLiterals && it != slot.list.end()) {
+    while (nbCollectedLits < desiredLiterals && it != slot.list.end()) {
         if constexpr (std::is_same<int, T>::value) {
-            ++numCollectedLits;
+            ++nbCollectedLits;
             _hist_deleted_in_slots.increment(1);
         }
         if constexpr (std::is_same<std::pair<int, int>, T>::value) {
-            numCollectedLits += 2;
+            nbCollectedLits += 2;
             _hist_deleted_in_slots.increment(2);
         }
         if constexpr (std::is_same<std::vector<int>, T>::value) {
             int clslen = it->size() - (slot.implicitLbdOrZero==0 ? 1 : 0);
-            numCollectedLits += clslen;
+            nbCollectedLits += clslen;
             _hist_deleted_in_slots.increment(clslen);
         }
         ++it;
     }
 
-    if (numCollectedLits == 0) {
-        slot.mtx->unlock();
+    if (nbCollectedLits == 0) {
         return 0;
     }
-    if (it == slot.list.end()) {
-        // Swap the entire list
-        swappedList.swap(slot.list);
-        slot.nbLiterals.store(0, std::memory_order_relaxed);
-    } else {
-        // Extract part of the list
-        swappedList.splice_after(swappedList.before_begin(), slot.list, slot.list.begin(), it);
-        slot.nbLiterals.fetch_sub(numCollectedLits, std::memory_order_relaxed);
-    }
 
+    // Extract part of the list
+    std::forward_list<T> swappedList;
+    swappedList.splice_after(swappedList.before_begin(), slot.list, slot.list.begin(), it);
+    atomics::subRelaxed(slot.nbLiterals, nbCollectedLits);
+    
     // Elements are cleaned up automatically
-    slot.mtx->unlock();
-    return numCollectedLits;
+    return nbCollectedLits;
 }
 
 BufferReader AdaptiveClauseDatabase::getBufferReader(int* begin, size_t size, bool useChecksums) {
