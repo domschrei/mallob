@@ -157,7 +157,7 @@ public:
         }
         timeInsert = Timer::elapsedSeconds() - timeInsert;
 
-        LOG(V5_DEBG, "DG (%i,%i) %.4fs free, %.4fs insert\n", cSize, cLbd, timeFree, timeInsert);
+        LOG(V6_DEBGV, "DG (%i,%i) %.4fs free, %.4fs insert\n", cSize, cLbd, timeFree, timeInsert);
     }
 
     void printChunks(int nextExportSize = -1);

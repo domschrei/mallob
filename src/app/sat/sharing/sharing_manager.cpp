@@ -198,7 +198,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	float time = Timer::elapsedSeconds();
 	ClauseHistogram hist(_params.strictClauseLengthLimit());
 
-	_logger.log(verb, "DG digesting len=%ld\n", buflen);
+	_logger.log(verb, "digesting len=%ld\n", buflen);
 
 	std::vector<PortfolioSolverInterface*> importingSolvers;
 	for (auto& solver : _solvers) {
@@ -212,7 +212,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 	// Apply provided global filter to buffer (in-place operation)
 	if (filter != nullptr) {
-		_logger.log(verb, "DG apply global filter\n");
+		_logger.log(verb+1, "DG apply global filter\n");
 		const int bitsPerElem = sizeof(int)*8;
 		int shift = bitsPerElem;
 		int filterPos = -1;
@@ -270,13 +270,13 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		}
 	};
 
-	_logger.log(verb, "DG prepare import\n");
+	_logger.log(verb+1, "DG prepare import\n");
 
 	// Traverse clauses
 	bool initialized = false;
 	_filter.acquireLock();
 
-	_logger.log(verb, "DG import\n");
+	_logger.log(verb+1, "DG import\n");
 
 	while (clause.begin != nullptr) {
 		
@@ -299,7 +299,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 			_filter.acquireLock();
 			publishTime = Timer::elapsedSeconds() - publishTime;
-			_logger.log(verb, "DG published clause lists (%.4f s)\n", publishTime);
+			_logger.log(verb+1, "DG published clause lists (%.4f s)\n", publishTime);
 		}
 
 		hist.increment(clause.size);
@@ -343,7 +343,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	
 	// Process-wide stats
 	time = Timer::elapsedSeconds() - time;
-	_logger.log(verb, "DG sharing time:%.4f adm:%i/%i %s\n", time, 
+	_logger.log(verb, "sharing time:%.4f adm:%i/%i %s\n", time, 
 		_last_num_admitted_cls_to_import, _last_num_cls_to_import, hist.getReport().c_str());
 }
 
