@@ -37,14 +37,19 @@ bool KMeansReader::read(const std::string &filename) {
         }
         points.push_back(p);
     } 
+
+    
+    // verify that the scores were stored correctly:
     
     std::cout << "K: " << k << std::endl;
     std::cout << "dim: " << dim << std::endl;
     std::cout << "count: " << count << std::endl;
-    // verify that the scores were stored correctly:
-    for (int i = 0; i < points.size(); ++i) {
-        std::cout << points[i][0] << std::endl;
-    }
+    for (int point = 0; point < count; ++point) {
+        for (int entry = 0; entry < dim; ++entry) {
+            std::cout << points[point][entry] << ' ';
+        }
+        std::cout << std::endl;
+    } 
 
     // finalize revision
     //desc.endInitialization();
