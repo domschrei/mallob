@@ -12,6 +12,6 @@
 #endif
 
 int main(int argc, char *argv[]) {
-    KMeansReader::read("example.txt");
+    KMeansReader::read("benign_traffic.csv");
     
 }

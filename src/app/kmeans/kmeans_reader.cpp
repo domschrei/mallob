@@ -22,10 +22,15 @@ bool KMeansReader::read(const std::string &filename) {
 
     int k = 0;
     int dim = 0;
+    int col = 0;
     int count = 0;
+    int skipCols = 0;
+
     ifile >> k;
     ifile >> dim;
+    ifile >> col;
     ifile >> count;
+    skipCols = col - dim;
     
     double num = 0.0;
     // keep storing values from the text file so long as data exists:
@@ -35,14 +40,19 @@ bool KMeansReader::read(const std::string &filename) {
             ifile >> num;
             p.push_back(num);
         }
+        for (int skip = 0; skip < skipCols; ++skip) {
+            ifile >> num;
+        }
         points.push_back(p);
     } 
 
-    
+    ifile.close();
     // verify that the scores were stored correctly:
-    
+    /*
+    */
     std::cout << "K: " << k << std::endl;
     std::cout << "dim: " << dim << std::endl;
+    std::cout << "cols: " << col << std::endl;
     std::cout << "count: " << count << std::endl;
     for (int point = 0; point < count; ++point) {
         for (int entry = 0; entry < dim; ++entry) {
@@ -50,7 +60,6 @@ bool KMeansReader::read(const std::string &filename) {
         }
         std::cout << std::endl;
     } 
-
     // finalize revision
     //desc.endInitialization();
 
