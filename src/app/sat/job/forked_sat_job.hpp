@@ -26,6 +26,7 @@ private:
 
     std::future<void> _destruction;
     std::atomic_bool _shmem_freed = false;
+    std::list<std::future<void>> _old_solver_destructions;
 
     float _time_of_start_solving = 0;
 

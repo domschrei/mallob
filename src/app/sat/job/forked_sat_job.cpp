@@ -123,10 +123,11 @@ int ForkedSatJob::appl_solved() {
         checkClauseComm(); // store clause comm in this job instance (if present)
         _solver->releaseClauseComm(); // release clause comm from ownership of the solver
         SatProcessAdapter* solver = _solver.release();
-        ProcessWideThreadPool::get().addTask([solver]() {
+        auto future = ProcessWideThreadPool::get().addTask([solver]() {
             // clean up solver (without the clause comm)
             delete solver;
         });
+        _old_solver_destructions.push_back(std::move(future));
 
         // Start new solver (with renamed shared memory segments)
         doStartSolver();
@@ -256,6 +257,11 @@ ForkedSatJob::~ForkedSatJob() {
     if (_initialized) _solver->setSolvingState(SolvingStates::ABORTING);
     if (_destruction.valid()) _destruction.get();
     if (_initialized) _solver = NULL;
+
+    // Wait for destruction of old solvers
+    for (auto& future : _old_solver_destructions) {
+        if (future.valid()) future.get();
+    }
 
     LOG(V5_DEBG, "%s : destructed FSJ\n", toStr());
 }

@@ -433,6 +433,7 @@ void SatProcessAdapter::freeSharedMemory() {
         if (_solution_prepare_future.valid()) _solution_prepare_future.get();
     }
 
+    // Clean up found solutions in shared memory
     if (_hsm != nullptr) {
         for (int rev = 0; rev <= _written_revision; rev++) {
             size_t* solSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));
@@ -445,6 +446,7 @@ void SatProcessAdapter::freeSharedMemory() {
         _hsm = nullptr;
     }
 
+    // Clean up shared memory objects created here
     for (auto& shmemObj : _shmem) {
         //log(V4_VVER, "DBG deleting %s\n", shmemObj.id.c_str());
         SharedMemory::free(shmemObj.id, (char*)shmemObj.data, shmemObj.size);
