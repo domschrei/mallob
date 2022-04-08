@@ -263,8 +263,19 @@ void Worker::checkStats(float time) {
     // For this process and subprocesses
     if (_node_stats_calculated.load(std::memory_order_acquire)) {
         
+        // Update local sysstate, log update
         _sys_state.setLocal(SYSSTATE_GLOBALMEM, _node_memory_gbs);
         LOG(V4_VVER, "mem=%.2fGB mt_cpu=%.3f mt_sys=%.3f\n", _node_memory_gbs, _mainthread_cpu_share, _mainthread_sys_share);
+
+        // Update host-internal communicator
+        if (_host_comm) {
+            _host_comm->setRamUsageThisWorkerGbs(_node_memory_gbs);
+            if (_job_db.hasActiveJob()) {
+                _host_comm->setActiveJobIndex(_job_db.getActive().getIndex());
+            } else {
+                _host_comm->unsetActiveJobIndex();
+            }
+        }
 
         // Recompute stats for next query time
         // (concurrently because computation of PSS is expensive)
@@ -276,14 +287,6 @@ void Worker::checkStats(float time) {
             _node_memory_gbs = memoryGbs;
             Proc::getThreadCpuRatio(tid, _mainthread_cpu_share, _mainthread_sys_share);
             _node_stats_calculated.store(true, std::memory_order_release);
-            if (_host_comm) {
-                _host_comm->setRamUsageThisWorkerGbs(memoryGbs);
-                if (_job_db.hasActiveJob()) {
-                    _host_comm->setActiveJobIndex(_job_db.getActive().getIndex());
-                } else {
-                    _host_comm->unsetActiveJobIndex();
-                }
-            }
         });
     }
 
