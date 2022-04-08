@@ -244,7 +244,7 @@ bool SatProcessAdapter::process(const std::vector<int>& buffer, BufferTask task)
         _hsm->doDigestImportWithoutFilter = true;
     }
 
-    Process::wakeUp(_child_pid);
+    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
     return true;
 }
 
