@@ -72,6 +72,7 @@ public:
         }
 
         _server_thread.run([this]() {
+            Proc::nameThisThread("SocketServer");
             while (_server_thread.continueRunning()) {
 
                 auto optConn = openConnection();

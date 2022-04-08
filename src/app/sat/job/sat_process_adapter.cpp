@@ -261,10 +261,12 @@ void SatProcessAdapter::digestClausesWithoutFilter(const std::vector<int>& claus
 }
 
 bool SatProcessAdapter::hasFilteredClauses() {
+    if (!_initialized) return true;
     return _hsm->doFilterImport && _hsm->didFilterImport;
 }
 std::vector<int> SatProcessAdapter::getLocalFilter() {
-    if (!_hsm->doFilterImport || !_hsm->didFilterImport) return std::vector<int>();
+    if (!_initialized || !_hsm->doFilterImport || !_hsm->didFilterImport) 
+        return std::vector<int>();
     std::vector<int> filter;
     filter.resize(_hsm->filterSize);
     memcpy(filter.data(), _filter_buffer, _hsm->filterSize*sizeof(int));
@@ -409,6 +411,10 @@ void* SatProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_t 
     _shmem.insert(ShmemObject{id, shmem, size});
     //log(V4_VVER, "DBG set up shmem %s\n", id.c_str());
     return shmem;
+}
+
+void SatProcessAdapter::crash() {
+    _hsm->doCrash = true;
 }
 
 SatProcessAdapter::~SatProcessAdapter() {

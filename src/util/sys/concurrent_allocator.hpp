@@ -56,6 +56,7 @@ public:
         _thread_done = false;
         // Spawn new thread
         _worker.run([this]() {
+            Proc::nameThisThread("MsgAllocator");
             while (_worker.continueRunning() && _num_open > 0) {
                 
                 _work_mutex.lock();

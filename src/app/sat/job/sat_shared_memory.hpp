@@ -26,6 +26,7 @@ struct SatSharedMemory {
     bool doDumpStats;
     bool doStartNextRevision;
     bool doTerminate;
+    bool doCrash;
 
     // Responses child->parent
     bool didExport;

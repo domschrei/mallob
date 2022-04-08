@@ -117,7 +117,7 @@ void Parameters::printUsage() const {
     }
 }
 
-void Parameters::printParams() const {
+std::string Parameters::getParamsAsString() const {
     std::string out = "";
     std::map<std::string, std::string> sortedParams;
     for (const auto& [id, opt] : _map) {
@@ -128,7 +128,7 @@ void Parameters::printParams() const {
             out += "-" + it.first + "=" + it.second + " ";
         }
     }
-    LOG(V2_INFO, "Program options: %s\n", out.c_str());
+    return out;
 }
 
 char* const* Parameters::asCArgs(const char* execName) const {

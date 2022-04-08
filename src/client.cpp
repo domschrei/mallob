@@ -198,6 +198,7 @@ void Client::init() {
 
     // Set up concurrent instance reader
     _instance_reader.run([this]() {
+        Proc::nameThisThread("InstanceReader");
         readIncomingJobs();
     });
 

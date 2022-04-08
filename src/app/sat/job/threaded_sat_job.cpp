@@ -27,7 +27,7 @@ void ThreadedSatJob::appl_start() {
     _solver = std::unique_ptr<SatEngine>(
         new SatEngine(hParams, config, Logger::getMainInstance())
     );
-    _clause_comm = (void*) new AnytimeSatClauseCommunicator(hParams, this);
+    _clause_comm = (void*) new AnytimeSatClauseCommunicator(_params, this);
 
     //log(V5_DEBG, "%s : beginning to solve\n", toStr());
     const JobDescription& desc = getDescription();
@@ -133,8 +133,9 @@ void ThreadedSatJob::appl_dumpStats() {
 }
 
 bool ThreadedSatJob::appl_isDestructible() {
-    return !_initialized || 
-        (((AnytimeSatClauseCommunicator*)_clause_comm)->isDestructible() && _solver->isCleanedUp());
+    if (!_initialized) return true;
+    return ((AnytimeSatClauseCommunicator*) _clause_comm)->isDestructible() 
+        && _solver->isCleanedUp();
 }
 
 void ThreadedSatJob::appl_communicate() {
@@ -153,6 +154,10 @@ void ThreadedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
     ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, mpiTag, msg);
 }
 
+void ThreadedSatJob::appl_memoryPanic() {
+    // TODO
+}
+
 bool ThreadedSatJob::isInitialized() {
     if (!_initialized) return false;
     return _solver->isFullyInitialized();
@@ -161,7 +166,7 @@ void ThreadedSatJob::prepareSharing(int maxSize) {
     // Already prepared sharing?
     if (!_clause_buffer.empty()) return;
     
-    _clause_buffer.resize(maxSize);
+    _clause_buffer.resize(2*maxSize+100);
     _clause_checksum = Checksum();
     int actualSize = _solver->prepareSharing(_clause_buffer.data(), maxSize);
     _clause_buffer.resize(actualSize);
@@ -170,7 +175,7 @@ bool ThreadedSatJob::hasPreparedSharing() {
     return !_clause_buffer.empty();
 }
 std::vector<int> ThreadedSatJob::getPreparedClauses(Checksum& checksum) {
-    std::vector<int> out = _clause_buffer;
+    std::vector<int> out = std::move(_clause_buffer);
     _clause_buffer.clear();
     checksum = _clause_checksum;
     return out;
@@ -185,12 +190,16 @@ void ThreadedSatJob::filterSharing(std::vector<int>& clauses) {
     int filterSize = _solver->filterSharing(clauses.data(), clauses.size(), _filter.data());
     _filter.resize(filterSize);
     _clauses_to_filter = clauses;
+    _did_filter = true;
 }
 bool ThreadedSatJob::hasFilteredSharing() {
-    return !_filter.empty();
+    return _did_filter;
 }
 std::vector<int> ThreadedSatJob::getLocalFilter() {
-    return _filter;
+    std::vector<int> filter = std::move(_filter);
+    _filter.clear();
+    _did_filter = false;
+    return filter;
 }
 void ThreadedSatJob::applyFilter(std::vector<int>& filter) {
     _solver->digestSharingWithFilter(_clauses_to_filter.data(), _clauses_to_filter.size(), filter.data());

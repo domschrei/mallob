@@ -82,6 +82,7 @@ public:
 
         // Run concurrent submission of jobs
         _bg_worker.run([&]() {
+            Proc::nameThisThread("JobStreamer");
             std::string baseJobName = _json_template["name"];
             Logger logger = Logger::getMainInstance().copy("Streamer", ".streamer");
 
@@ -147,6 +148,7 @@ public:
         });
 
         _bg_deleter.run([&]() {
+            Proc::nameThisThread("JobDeleter");
             while (_bg_deleter.continueRunning()) {
 
                 _delete_cond_var.wait(_delete_mutex, [&]() {

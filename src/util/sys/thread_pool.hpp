@@ -9,6 +9,7 @@
 
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
+#include "util/sys/proc.hpp"
 
 class ThreadPool {
 
@@ -28,7 +29,7 @@ private:
 public:
     ThreadPool(size_t size) : _threads(size) {
         for (size_t i = 0; i < _threads.size(); i++) {
-            _threads[i] = std::thread([&]() {runThread();});
+            _threads[i] = std::thread([&, i]() {runThread(i);});
         }
     }
     ~ThreadPool() {
@@ -50,7 +51,10 @@ public:
     }
 
 private:
-    void runThread() {
+    void runThread(int id) {
+        std::string threadName = "ThreadPool#" + std::to_string(id);
+        Proc::nameThisThread(threadName.c_str());
+
         Runnable r;
         while (!_terminate) {
             {

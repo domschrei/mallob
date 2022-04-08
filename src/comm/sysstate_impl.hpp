@@ -5,12 +5,16 @@
 #include "sysstate.hpp"
 
 template <int N>
-SysState<N>::SysState(MPI_Comm& comm, float period): _comm(comm), _period(period) {
+SysState<N>::SysState(MPI_Comm& comm, float period, MPI_Op operation): 
+        _comm(comm), _period(period), _op(operation) {
     for (int i = 0; i < N; i++) {
         _local_state[i] = 0.0f;
         _global_state[i] = 0.0f;
     }
 }
+
+template <int N>
+bool SysState<N>::isAggregating() const {return _aggregating;}
 
 template <int N>
 void SysState<N>::setLocal(std::initializer_list<float> elems) {
@@ -39,7 +43,7 @@ bool SysState<N>::aggregate(float elapsedTime) {
         float timeSinceLast = time-_last_aggregation;
         if (!_aggregating && timeSinceLast >= _period) {
             _last_aggregation = time;
-            _request = MyMpi::iallreduce(_comm, _local_state, _global_state, N);
+            _request = MyMpi::iallreduce(_comm, _local_state, _global_state, N, _op);
             _aggregating = true;
         } else if (_aggregating) {
             MPI_Status status;
@@ -61,6 +65,11 @@ bool SysState<N>::aggregate(float elapsedTime) {
 template <int N>
 float* SysState<N>::getGlobal() {
     return _global_state;
+}
+
+template <int N>
+float* SysState<N>::getLocal() {
+    return _local_state;
 }
 
 #endif

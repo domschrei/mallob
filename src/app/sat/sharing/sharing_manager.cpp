@@ -212,7 +212,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 	// Apply provided global filter to buffer (in-place operation)
 	if (filter != nullptr) {
-		_logger.log(verb+1, "DG apply global filter\n");
+		_logger.log(verb+2, "DG apply global filter\n");
 		const int bitsPerElem = sizeof(int)*8;
 		int shift = bitsPerElem;
 		int filterPos = -1;
@@ -270,13 +270,13 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		}
 	};
 
-	_logger.log(verb+1, "DG prepare import\n");
+	_logger.log(verb+2, "DG prepare import\n");
 
 	// Traverse clauses
 	bool initialized = false;
 	_filter.acquireLock();
 
-	_logger.log(verb+1, "DG import\n");
+	_logger.log(verb+2, "DG import\n");
 
 	while (clause.begin != nullptr) {
 		
@@ -299,7 +299,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 			_filter.acquireLock();
 			publishTime = Timer::elapsedSeconds() - publishTime;
-			_logger.log(verb+1, "DG published clause lists (%.4f s)\n", publishTime);
+			_logger.log(verb+2, "DG published clause lists (%.4f s)\n", publishTime);
 		}
 
 		hist.increment(clause.size);

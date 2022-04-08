@@ -43,6 +43,7 @@ public:
     
     virtual void appl_dumpStats() = 0;
     virtual bool appl_isDestructible() = 0;
+    virtual void appl_memoryPanic() = 0;
 
 private:
     float _compensation_factor = 1.0f;

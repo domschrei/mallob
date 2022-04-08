@@ -72,7 +72,6 @@ public:
         }
 
         // Import first revision
-        _last_imported_revision = 0;
         _desired_revision = _config.firstrev;
         {
             int* fPtr = (int*) accessMemory(_shmem_id + ".formulae.0", sizeof(int) * _hsm->fSize);
@@ -81,6 +80,7 @@ public:
                 /*finalRevisionForNow=*/_desired_revision == 0);
             updateChecksum(fPtr, _hsm->fSize);
         }
+        _last_imported_revision = 0;
         // Import subsequent revisions
         importRevisions();
         
@@ -190,6 +190,12 @@ public:
                 LOGGER(_log, V5_DEBG, "DO set initialized\n");
                 _hsm->isInitialized = true;
             }
+            
+            // Terminate "improperly" in order to be restarted automatically
+            if (_hsm->doCrash) {
+                LOGGER(_log, V3_VERB, "Restarting this subprocess\n");
+                raise(SIGUSR2);
+            }
 
             // Do not check solved state if the current 
             // revision has already been solved
@@ -283,7 +289,8 @@ private:
             }
         }
 
-        _engine.appendRevision(revision, *fSizePtr, fPtr, *aSizePtr, aPtr, /*finalRevisionForNow=*/revision == _desired_revision);
+        _engine.appendRevision(revision, *fSizePtr, fPtr, *aSizePtr, aPtr, 
+            /*finalRevisionForNow=*/revision == _desired_revision);
     }
 
     void doSleep() {

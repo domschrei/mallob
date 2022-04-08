@@ -104,12 +104,14 @@ public:
     void run();
     bool isFullyInitialized();
     void appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision);
+    void crash();
 
     void setSolvingState(SolvingStates::SolvingState state);
 
     bool hasClauseComm();
     AnytimeSatClauseCommunicator* getClauseComm() {return _clause_comm;}
     void releaseClauseComm() {_clause_comm = nullptr;}
+    int getStartedNumThreads() const {return _config.threads;}
 
     void collectClauses(int maxSize);
     bool hasCollectedClauses();

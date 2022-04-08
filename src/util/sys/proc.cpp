@@ -5,6 +5,7 @@
 #include <sched.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
+#include <sys/sysinfo.h>
 #include <map>
 #include "util/assert.hpp"
 #include <ios>
@@ -12,6 +13,7 @@
 #include <fstream>
 #include <string>
 #include <set>
+#include <pthread.h>
 
 #include "util/sys/fileutils.hpp"
 #include "proc.hpp"
@@ -31,6 +33,10 @@ pid_t Proc::getParentPid() {
 
 long Proc::getTid() {
     return syscall(SYS_gettid);
+}
+
+void Proc::nameThisThread(const char* nameMax16Chars) {
+    pthread_setname_np(pthread_self(), nameMax16Chars);
 }
 
 // https://stackoverflow.com/a/671389
@@ -84,6 +90,17 @@ Proc::RuntimeInfo Proc::getRuntimeInfo(pid_t pid, SubprocessMode mode) {
     LOG(V5_DEBG, "%i : %i children\n", pid, numChildren);
 
     return info;
+}
+
+std::pair<unsigned long, unsigned long> Proc::getMachineFreeAndTotalRamKbs() {
+    std::pair<unsigned long, unsigned long> freeAndTotalRamKbs;
+    struct sysinfo info;
+    int result = sysinfo(&info);
+    if (result == 0) {
+        freeAndTotalRamKbs.first = (info.freeram * info.mem_unit) / 1024;
+        freeAndTotalRamKbs.second = (info.totalram * info.mem_unit) / 1024;
+    }
+    return freeAndTotalRamKbs;
 }
 
 float Proc::getUptime() {

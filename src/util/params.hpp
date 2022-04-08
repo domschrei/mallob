@@ -18,7 +18,7 @@ public:
 
 	void printBanner() const;
 	void printUsage() const;
-	void printParams() const;
+	std::string getParamsAsString() const;
 	
 	char* const* asCArgs(const char* execName) const;
 };

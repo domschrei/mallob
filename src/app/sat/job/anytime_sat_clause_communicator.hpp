@@ -53,6 +53,7 @@ private:
 
         JobTreeAllReduction _allreduce_clauses;
         JobTreeAllReduction _allreduce_filter;
+        bool _filtering = false;
 
         Session(const Parameters& params, BaseSatJob* job, AdaptiveClauseDatabase& cdb, int epoch) : 
             _params(params), _job(job), _cdb(cdb), _epoch(epoch),
@@ -100,20 +101,14 @@ private:
                     return filter;
                 }
             ) { }
+        ~Session() {
+            _allreduce_clauses.destroy();
+            _allreduce_filter.destroy();
+        }
 
-        void storePreparedClauseBuffer();
-
-        void initiateMergeOfClauseBuffers();
-        std::vector<int> getMergedClauseBuffer();
-        void publishMergedClauses();
-
-        void processBroadcastClauses(std::vector<int>& clauses);
-
-        void addFilter(std::vector<int>& filter);
-        void publishLocalAggregatedFilter();
+        void setFiltering() {_filtering = true;}
+        bool isFiltering() const {return _filtering;}
         std::vector<int> applyGlobalFilter(const std::vector<int>& filter, std::vector<int>& clauses);
-
-        std::vector<int> merge(size_t maxSize);
 
         bool isValid() const {
             return _allreduce_clauses.isValid() || _allreduce_filter.isValid();

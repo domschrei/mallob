@@ -16,6 +16,7 @@
 #include "client.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "interface/api/job_streamer.hpp"
+#include "comm/host_comm.hpp"
 
 #ifndef MALLOB_VERSION
 #define MALLOB_VERSION "(dbg)"
@@ -93,9 +94,17 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
         Terminator::setTerminating();
     });
 
+    // Deposit information to coordinate the creation of an intra-machine communicator
+    HostComm hostComm(commWorkers, params);
+    hostComm.depositInformation();
+
     LOG(V5_DEBG, "Global init barrier ...\n");
     MPI_Barrier(MPI_COMM_WORLD);
     LOG(V5_DEBG, "Passed global init barrier\n");
+
+    // Create intra-machine communicator (collective operation)
+    hostComm.create();
+    if (isWorker) worker->setHostComm(hostComm);
 
     // If mono solving mode is enabled, introduce the singular job to solve
     if (params.monoFilename.isSet() && isClient && MyMpi::rank(commClients) == 0)
@@ -139,6 +148,7 @@ int main(int argc, char *argv[]) {
     
     MyMpi::init();
     Timer::init();
+    Proc::nameThisThread("MainThread");
 
     int numNodes = MyMpi::size(MPI_COMM_WORLD);
     int rank = MyMpi::rank(MPI_COMM_WORLD);
@@ -171,7 +181,7 @@ int main(int argc, char *argv[]) {
     longStartupWarnMsg(rank, "Init'd message queue");
 
     if (rank == 0)
-        params.printParams();
+        LOG(V2_INFO, "Program options: %s\n", params.getParamsAsString().c_str());
     if (params.help()) {
         // Help requested or no job input provided
         if (rank == 0) {

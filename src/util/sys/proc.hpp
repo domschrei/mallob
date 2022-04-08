@@ -27,12 +27,15 @@ public:
     static pid_t getParentPid();
     static long getTid();
 
+    static void nameThisThread(const char* nameMax16Chars);
+
     struct RuntimeInfo {int cpu = -1; double vmUsage = 0; double residentSetSize = 0;};
     enum SubprocessMode {RECURSE, FLAT};
     static RuntimeInfo getRuntimeInfo(pid_t pid, SubprocessMode mode);
 
     static std::vector<pid_t> getChildren(pid_t pid);
 
+    static std::pair<unsigned long, unsigned long> getMachineFreeAndTotalRamKbs();
     static long getRecursiveProportionalSetSizeKbs(pid_t pid);
 
     /*

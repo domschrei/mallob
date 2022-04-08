@@ -24,8 +24,14 @@ MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize) {
 
     resetReceiveHandle();
 
-    _batch_assembler.run([&]() {runFragmentedMessageAssembler();});
-    _gc.run([&]() {runGarbageCollector();});
+    _batch_assembler.run([&]() {
+        Proc::nameThisThread("MsgAssembler");
+        runFragmentedMessageAssembler();
+    });
+    _gc.run([&]() {
+        Proc::nameThisThread("MsgGarbColl");
+        runGarbageCollector();
+    });
 }
 
 MessageQueue::~MessageQueue() {

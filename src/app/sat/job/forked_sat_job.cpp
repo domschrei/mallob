@@ -31,7 +31,7 @@ void ForkedSatJob::doStartSolver() {
     Parameters hParams(_params);
     hParams.satEngineConfig.set(config.toString());
     hParams.applicationConfiguration.set(getDescription().getAppConfiguration().serialize());
-    if (_params.verbosity() >= V5_DEBG) hParams.printParams();
+    if (_params.verbosity() >= V5_DEBG) LOG(V5_DEBG, "Program options: %s\n", hParams.getParamsAsString().c_str());
     _last_imported_revision = 0;
 
     const JobDescription& desc = getDescription();
@@ -151,6 +151,15 @@ bool ForkedSatJob::appl_isDestructible() {
     startDestructThreadIfNecessary();
     // Everything cleaned up?
     return _shmem_freed;
+}
+
+void ForkedSatJob::appl_memoryPanic() {
+    if (!_initialized) return;
+    int nbThreads = getNumThreads();
+    if (nbThreads > 0 && _solver->getStartedNumThreads() == nbThreads) 
+        setNumThreads(nbThreads-1);
+    LOG(V1_WARN, "[WARN] %s : memory panic triggered - restarting solver with %i threads\n", toStr(), getNumThreads());
+    _solver->crash();
 }
 
 bool ForkedSatJob::checkClauseComm() {

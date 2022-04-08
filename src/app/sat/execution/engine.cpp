@@ -33,6 +33,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	LOGGER(_logger, V4_VVER, "SAT engine for %s\n", config.getJobStr().c_str());
 	//params.printParams();
 	_num_solvers = config.threads;
+	int numOrigSolvers = params.numThreadsPerProcess();
 	_job_id = config.jobid;
 	
 	// Retrieve the string defining the cycle of solver choices, one character per solver
@@ -53,8 +54,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 
 	// Add solvers from full cycles on previous ranks
 	// and from the begun cycle on the previous rank
-	int numFullCycles = (appRank * _num_solvers) / solverChoices.size();
-	int begunCyclePos = (appRank * _num_solvers) % solverChoices.size();
+	int numFullCycles = (appRank * numOrigSolvers) / solverChoices.size();
+	int begunCyclePos = (appRank * numOrigSolvers) % solverChoices.size();
 	bool hasPseudoincrementalSolvers = false;
 	for (size_t i = 0; i < solverChoices.size(); i++) {
 		int* solverToAdd;
@@ -89,7 +90,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
 	for (setup.localId = 0; setup.localId < _num_solvers; setup.localId++) {
-		setup.globalId = appRank * _num_solvers + setup.localId;
+		setup.globalId = appRank * numOrigSolvers + setup.localId;
 		// Which solver?
 		setup.solverType = solverChoices[cyclePos];
 		setup.doIncrementalSolving = setup.isJobIncremental && !islower(setup.solverType);
@@ -261,7 +262,7 @@ int SatEngine::solveLoop() {
 }
 
 int SatEngine::prepareSharing(int* begin, int maxSize) {
-	if (isCleanedUp()) return 0;
+	if (isCleanedUp()) return sizeof(size_t) / sizeof(int); // checksum, nothing else
 	LOGGER(_logger, V5_DEBG, "collecting clauses on this node\n");
 	int size = _sharing_manager->prepareSharing(begin, maxSize);
 	return size;

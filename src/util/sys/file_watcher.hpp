@@ -57,6 +57,7 @@ public:
         }
 
         _worker.run([events, this, &logger]() {
+            Proc::nameThisThread("FileWatcher");
 
             // Make inotify nonblocking
             //int flags = fcntl(_inotify_fd, F_GETFL, 0);

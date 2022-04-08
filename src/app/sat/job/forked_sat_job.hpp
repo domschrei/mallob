@@ -50,6 +50,7 @@ public:
 
     void appl_dumpStats() override;
     bool appl_isDestructible() override;
+    void appl_memoryPanic() override;
 
     // Methods that are not overridden, but use the default implementation:
     // int getDemand(int prevVolume) const override;
