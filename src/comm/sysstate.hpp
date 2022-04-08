@@ -14,7 +14,7 @@ private:
 
     float _local_state[N];
     float _global_state[N];
-    MPI_Request _request = nullptr;
+    MPI_Request _request = MPI_REQUEST_NULL;
     bool _aggregating = false;
 
     float _last_aggregation = 0;

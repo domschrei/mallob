@@ -37,6 +37,8 @@ public:
 
     void depositInformation() {
         if (_parent_comm == MPI_COMM_NULL) return;
+        // Regular layout? -> No deposit of information necessary.
+        if (_params.regularProcessDistribution() && _params.processesPerHost() > 0) return;
 
         // Hash of the program arguments
         auto paramsHash = robin_hood::hash<std::string>()(_params.getParamsAsString());
@@ -50,26 +52,35 @@ public:
 
     void create() {
         if (_parent_comm == MPI_COMM_NULL) return;
-
-        // List temporary files and extract corresponding ranks
-        auto files = FileUtils::glob(_base_filename + "*");
-        int nbWorkersThisMachine = files.size();
-        static constexpr ctll::fixed_string REGEX_COLLEAGUE_RECOGNITION = 
-            ctll::fixed_string{ "(/tmp/mallob\\.colleaguerecognition\\.[0-9a-f]+\\.)([0-9\\.]+)" };
-        int minRank = MyMpi::size(MPI_COMM_WORLD);
-        for (auto& file : files) {
-            auto match = ctre::match<REGEX_COLLEAGUE_RECOGNITION>(file);
-            if (match.get<1>().to_string() == _base_filename) {
-                int rank = std::stoi(match.get<2>().to_string());
-                minRank = std::min(minRank, rank);
+        
+        // Determine this rank's color
+        int color;
+        if (_params.regularProcessDistribution() && _params.processesPerHost() > 0) {
+            // Regular layout: Compute color directly from rank and number of processes per host 
+            int myRank = MyMpi::rank(_parent_comm);
+            color = myRank / _params.processesPerHost();
+        } else {
+            // List temporary files and extract corresponding ranks
+            auto files = FileUtils::glob(_base_filename + "*");
+            int nbWorkersThisMachine = files.size();
+            static constexpr ctll::fixed_string REGEX_COLLEAGUE_RECOGNITION = 
+                ctll::fixed_string{ "(/tmp/mallob\\.colleaguerecognition\\.[0-9a-f]+\\.)([0-9\\.]+)" };
+            int minRank = MyMpi::size(MPI_COMM_WORLD);
+            for (auto& file : files) {
+                auto match = ctre::match<REGEX_COLLEAGUE_RECOGNITION>(file);
+                if (match.get<1>().to_string() == _base_filename) {
+                    int rank = std::stoi(match.get<2>().to_string());
+                    minRank = std::min(minRank, rank);
+                }
             }
+            color = minRank;
         }
 
         // Create communicator using the minimum found rank as its "color"
-        MPI_Comm_split(_parent_comm, minRank, MyMpi::rank(_parent_comm), &_comm);
+        MPI_Comm_split(_parent_comm, color, MyMpi::rank(_parent_comm), &_comm);
 
-        LOG(V2_INFO, "On a machine with %i total workers (my rank: %i)\n", 
-            MyMpi::size(_comm), MyMpi::rank(_comm));
+        LOG(V2_INFO, "Machine color %i with %i total workers (my rank: %i)\n", 
+            color, MyMpi::size(_comm), MyMpi::rank(_comm));
         
         _sysstate = new SysState<1>(_comm, /*periodSeconds=*/1, MPI_MAX);
     }
