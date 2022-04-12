@@ -362,11 +362,12 @@ void MessageQueue::processSent() {
         if (!h.isInitiated()) {
             // Message has not been sent yet
             uninitiatedHandlesPresent = true;
+            ++it; // go to next handle
             continue;
         }
 
         if (!h.test()) {
-            it++; // go to next handle
+            ++it; // go to next handle
             continue;
         }
         
@@ -410,7 +411,7 @@ void MessageQueue::processSent() {
             // Remove handle
             it = _send_queue.erase(it); // go to next handle
         } else {
-            it++; // go to next handle
+            ++it; // go to next handle
         }
     }
 
