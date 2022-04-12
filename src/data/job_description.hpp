@@ -143,6 +143,13 @@ public:
         _f_size++;
         if (_use_checksums) _checksum.combine(lit);
     }
+    inline void addFloatData(float data) {
+        static_assert(sizeof(float) == sizeof(int));
+        push_obj<float>(_data_per_revision[_revision], data);
+        _f_size++;
+        if (_use_checksums) _checksum.combine(data);
+    }
+
     inline void addAssumption(int lit) {
         // Push literal to raw data, update counter
         push_obj<int>(_data_per_revision[_revision], lit);

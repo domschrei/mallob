@@ -24,8 +24,14 @@ MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize) {
 
     resetReceiveHandle();
 
-    _batch_assembler.run([&]() {runFragmentedMessageAssembler();});
-    _gc.run([&]() {runGarbageCollector();});
+    _batch_assembler.run([&]() {
+        Proc::nameThisThread("MsgAssembler");
+        runFragmentedMessageAssembler();
+    });
+    _gc.run([&]() {
+        Proc::nameThisThread("MsgGarbColl");
+        runGarbageCollector();
+    });
 }
 
 MessageQueue::~MessageQueue() {
@@ -356,11 +362,12 @@ void MessageQueue::processSent() {
         if (!h.isInitiated()) {
             // Message has not been sent yet
             uninitiatedHandlesPresent = true;
+            ++it; // go to next handle
             continue;
         }
 
         if (!h.test()) {
-            it++; // go to next handle
+            ++it; // go to next handle
             continue;
         }
         
@@ -404,7 +411,7 @@ void MessageQueue::processSent() {
             // Remove handle
             it = _send_queue.erase(it); // go to next handle
         } else {
-            it++; // go to next handle
+            ++it; // go to next handle
         }
     }
 

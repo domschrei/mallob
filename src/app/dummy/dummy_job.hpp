@@ -23,6 +23,7 @@ public:
     void appl_communicate(int source, int mpiTag, JobMessage& msg) override {}
     void appl_dumpStats() override {}
     bool appl_isDestructible() override {return true;}
+    void appl_memoryPanic() override {}
 };
 
 #endif

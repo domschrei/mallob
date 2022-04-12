@@ -14,6 +14,8 @@ Watchdog::Watchdog(bool enabled, int checkIntervalMillis, float time) {
     auto parentTid = Proc::getTid();
 
     _worker.run([&, parentTid, checkIntervalMillis]() {
+        Proc::nameThisThread("Watchdog");
+
         while (_worker.continueRunning()) {
             int timeMillis = (int) (1000*Timer::elapsedSeconds());
             auto elapsed = timeMillis - _last_reset_millis;

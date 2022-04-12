@@ -35,6 +35,8 @@ void SolverThread::start() {
 void SolverThread::init() {
     _tid = Proc::getTid();
     LOGGER(_logger, V5_DEBG, "tid %ld\n", _tid);
+    std::string threadName = "SATSolver#" + std::to_string(_local_id);
+    Proc::nameThisThread(threadName.c_str());
     
     _active_revision = 0;
     _imported_lits_curr_revision = 0;

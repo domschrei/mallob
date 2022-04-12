@@ -263,8 +263,19 @@ void Worker::checkStats(float time) {
     // For this process and subprocesses
     if (_node_stats_calculated.load(std::memory_order_acquire)) {
         
+        // Update local sysstate, log update
         _sys_state.setLocal(SYSSTATE_GLOBALMEM, _node_memory_gbs);
         LOG(V4_VVER, "mem=%.2fGB mt_cpu=%.3f mt_sys=%.3f\n", _node_memory_gbs, _mainthread_cpu_share, _mainthread_sys_share);
+
+        // Update host-internal communicator
+        if (_host_comm) {
+            _host_comm->setRamUsageThisWorkerGbs(_node_memory_gbs);
+            if (_job_db.hasActiveJob()) {
+                _host_comm->setActiveJobIndex(_job_db.getActive().getIndex());
+            } else {
+                _host_comm->unsetActiveJobIndex();
+            }
+        }
 
         // Recompute stats for next query time
         // (concurrently because computation of PSS is expensive)
@@ -294,6 +305,16 @@ void Worker::checkStats(float time) {
                 if (!commStr.empty()) LOG(V4_VVER, "%s job comm:%s\n", job.toStr(), commStr.c_str());
             }
         }
+    }
+
+    if (_host_comm && _host_comm->advanceAndCheckMemoryPanic(time)) {
+        // Memory panic!
+        // Aggressively remove inactive cached jobs
+        _job_db.setMemoryPanic(true);
+        _job_db.forgetOldJobs();
+        _job_db.setMemoryPanic(false);
+        // Trigger memory panic in the active job
+        if (_job_db.hasActiveJob()) _job_db.getActive().appl_memoryPanic();
     }
 }
 

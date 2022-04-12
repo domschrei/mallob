@@ -26,6 +26,7 @@ private:
     void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
     std::vector<int> _clause_buffer;
     Checksum _clause_checksum;
+    bool _did_filter = false;
     std::vector<int> _filter;
     std::vector<int> _clauses_to_filter;
 
@@ -57,6 +58,7 @@ public:
 
     void appl_dumpStats() override;
     bool appl_isDestructible() override;
+    void appl_memoryPanic() override;
 
     // Methods that are not overridden, but use the default implementation:
     // int getDemand(int prevVolume) const override;

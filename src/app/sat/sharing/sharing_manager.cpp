@@ -212,6 +212,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 	// Apply provided global filter to buffer (in-place operation)
 	if (filter != nullptr) {
+		_logger.log(verb+2, "DG apply global filter\n");
 		const int bitsPerElem = sizeof(int)*8;
 		int shift = bitsPerElem;
 		int filterPos = -1;
@@ -237,6 +238,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	std::vector<std::forward_list<std::vector<int>>> largeLists(importingSolvers.size());
 	std::vector<int> currentCapacities(importingSolvers.size(), -1);
 	std::vector<int> currentAddedLiterals(importingSolvers.size(), 0);
+
 	auto reader = _cdb.getBufferReader(begin, buflen);
 	BufferIterator it(_params.strictClauseLengthLimit(), /*slotsForSumOfLengthAndLbd=*/false);
 	auto clause = reader.getNextIncomingClause();
@@ -268,13 +270,20 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		}
 	};
 
+	_logger.log(verb+2, "DG prepare import\n");
+
 	// Traverse clauses
 	bool initialized = false;
 	_filter.acquireLock();
+
+	_logger.log(verb+2, "DG import\n");
+
 	while (clause.begin != nullptr) {
 		
 		if (!initialized || clause.size != it.clauseLength || clause.lbd != it.lbd) {
 			initialized = true;
+			float publishTime = Timer::elapsedSeconds();
+			_filter.releaseLock();
 
 			doPublishClauseLists();
 
@@ -287,6 +296,10 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 				currentCapacities[i] = importingSolvers[i]->getClauseImportBudget(clause.size, clause.lbd);
 				currentAddedLiterals[i] = 0;
 			}
+
+			_filter.acquireLock();
+			publishTime = Timer::elapsedSeconds() - publishTime;
+			_logger.log(verb+2, "DG published clause lists (%.4f s)\n", publishTime);
 		}
 
 		hist.increment(clause.size);
@@ -325,8 +338,8 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 		clause = reader.getNextIncomingClause();
 	}
-	doPublishClauseLists();
 	_filter.releaseLock();
+	doPublishClauseLists();
 	
 	// Process-wide stats
 	time = Timer::elapsedSeconds() - time;

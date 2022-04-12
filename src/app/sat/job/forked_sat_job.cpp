@@ -31,7 +31,7 @@ void ForkedSatJob::doStartSolver() {
     Parameters hParams(_params);
     hParams.satEngineConfig.set(config.toString());
     hParams.applicationConfiguration.set(getDescription().getAppConfiguration().serialize());
-    if (_params.verbosity() >= V5_DEBG) hParams.printParams();
+    if (_params.verbosity() >= V5_DEBG) LOG(V5_DEBG, "Program options: %s\n", hParams.getParamsAsString().c_str());
     _last_imported_revision = 0;
 
     const JobDescription& desc = getDescription();
@@ -123,10 +123,11 @@ int ForkedSatJob::appl_solved() {
         checkClauseComm(); // store clause comm in this job instance (if present)
         _solver->releaseClauseComm(); // release clause comm from ownership of the solver
         SatProcessAdapter* solver = _solver.release();
-        ProcessWideThreadPool::get().addTask([solver]() {
+        auto future = ProcessWideThreadPool::get().addTask([solver]() {
             // clean up solver (without the clause comm)
             delete solver;
         });
+        _old_solver_destructions.push_back(std::move(future));
 
         // Start new solver (with renamed shared memory segments)
         doStartSolver();
@@ -151,6 +152,15 @@ bool ForkedSatJob::appl_isDestructible() {
     startDestructThreadIfNecessary();
     // Everything cleaned up?
     return _shmem_freed;
+}
+
+void ForkedSatJob::appl_memoryPanic() {
+    if (!_initialized) return;
+    int nbThreads = getNumThreads();
+    if (nbThreads > 0 && _solver->getStartedNumThreads() == nbThreads) 
+        setNumThreads(nbThreads-1);
+    LOG(V1_WARN, "[WARN] %s : memory panic triggered - restarting solver with %i threads\n", toStr(), getNumThreads());
+    _solver->crash();
 }
 
 bool ForkedSatJob::checkClauseComm() {
@@ -247,6 +257,11 @@ ForkedSatJob::~ForkedSatJob() {
     if (_initialized) _solver->setSolvingState(SolvingStates::ABORTING);
     if (_destruction.valid()) _destruction.get();
     if (_initialized) _solver = NULL;
+
+    // Wait for destruction of old solvers
+    for (auto& future : _old_solver_destructions) {
+        if (future.valid()) future.get();
+    }
 
     LOG(V5_DEBG, "%s : destructed FSJ\n", toStr());
 }

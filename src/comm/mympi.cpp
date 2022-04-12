@@ -53,21 +53,21 @@ int MyMpi::isend(int recvRank, int tag, const DataPtr& object) {
     return _msg_queue->send(object, recvRank, tag);
 }
 
-MPI_Request MyMpi::iallreduce(MPI_Comm communicator, float* contribution, float* result) {
+MPI_Request MyMpi::iallreduce(MPI_Comm communicator, float* contribution, float* result, MPI_Op operation) {
     MPI_Request req;
-    MPICALL(MPI_Iallreduce(contribution, result, 1, MPI_FLOAT, MPI_SUM, communicator, &req), std::string("iallreduce"))
+    MPICALL(MPI_Iallreduce(contribution, result, 1, MPI_FLOAT, operation, communicator, &req), std::string("iallreduce"))
     return req;
 }
 
-MPI_Request MyMpi::iallreduce(MPI_Comm communicator, float* contribution, float* result, int numFloats) {
+MPI_Request MyMpi::iallreduce(MPI_Comm communicator, float* contribution, float* result, int numFloats, MPI_Op operation) {
     MPI_Request req;
-    MPICALL(MPI_Iallreduce(contribution, result, numFloats, MPI_FLOAT, MPI_SUM, communicator, &req), std::string("iallreduce"));
+    MPICALL(MPI_Iallreduce(contribution, result, numFloats, MPI_FLOAT, operation, communicator, &req), std::string("iallreduce"));
     return req;
 }
 
-MPI_Request MyMpi::ireduce(MPI_Comm communicator, float* contribution, float* result, int rootRank) {
+MPI_Request MyMpi::ireduce(MPI_Comm communicator, float* contribution, float* result, int rootRank, MPI_Op operation) {
     MPI_Request req;
-    MPICALL(MPI_Ireduce(contribution, result, 1, MPI_FLOAT, MPI_SUM, rootRank, communicator, &req), std::string("ireduce"))
+    MPICALL(MPI_Ireduce(contribution, result, 1, MPI_FLOAT, operation, rootRank, communicator, &req), std::string("ireduce"))
     return req;
 }
 

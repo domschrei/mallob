@@ -16,10 +16,7 @@ private:
     JobMessage _base_msg;
     AllReduceElement _neutral_elem;
     
-    bool _producing = false;
-    std::future<void> _future_produce;
     std::optional<AllReduceElement> _local_elem;
-
     std::list<AllReduceElement> _child_elems;
     int _num_expected_child_elems;
 
@@ -42,17 +39,9 @@ public:
     // Set the function to compute the local contribution for the all-reduction.
     // This function is invoked immediately in a separate thread.
     void produce(std::function<AllReduceElement()> localProducer) {
-
         assert(!_has_producer);
         _has_producer = true;
-        assert(!_producing);
-        assert(!_future_produce.valid());
-
-        _producing = true;
-        _future_produce = ProcessWideThreadPool::get().addTask([&, localProducer]() {
-            _local_elem = localProducer();
-            _producing = false;
-        });
+        _local_elem = localProducer();
     }
 
     // Process an incoming message and advance the all-reduction accordingly. 
@@ -70,6 +59,7 @@ public:
         if (tag == MSG_JOB_TREE_REDUCTION) {
             if (!_aggregating) {
                 _child_elems.push_back(std::move(msg.payload));
+                LOG_ADD_SRC(V5_DEBG, "CS got %i/%i elems", source, _child_elems.size(), _num_expected_child_elems);
                 advance();
             }
         }
@@ -85,19 +75,17 @@ public:
 
         if (_finished) return;
 
-        if (_child_elems.size() == _num_expected_child_elems) {
-            if (_future_produce.valid() && !_producing) {
-                
-                _future_produce.get();
-                _child_elems.push_front(_local_elem.value());
+        if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
+             
+            _child_elems.push_front(std::move(_local_elem.value()));
+            _local_elem.reset();
 
-                assert(!_future_aggregate.valid());
-                _aggregating = true;
-                _future_aggregate = ProcessWideThreadPool::get().addTask([&]() {
-                    _aggregated_elem = _aggregator(_child_elems);
-                    _aggregating = false;
-                });
-            }
+            assert(!_future_aggregate.valid());
+            _aggregating = true;
+            _future_aggregate = ProcessWideThreadPool::get().addTask([&]() {
+                _aggregated_elem = _aggregator(_child_elems);
+                _aggregating = false;
+            });
         }
 
         if (!_aggregating && _future_aggregate.valid()) {
@@ -147,14 +135,16 @@ public:
     // Whether this object can be destructed at this point in time 
     // without waiting for another thread.
     bool isDestructible() const {
-        if (_future_produce.valid() && _producing) return false;
         if (_future_aggregate.valid() && _aggregating) return false;
         return true;
     }
 
-    ~JobTreeAllReduction() {
-        if (_future_produce.valid()) _future_produce.get();
+    void destroy() {
         if (_future_aggregate.valid()) _future_aggregate.get();
+    }
+
+    ~JobTreeAllReduction() {
+        destroy();
     }
 
 private:

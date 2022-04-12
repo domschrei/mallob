@@ -244,7 +244,7 @@ bool SatProcessAdapter::process(const std::vector<int>& buffer, BufferTask task)
         _hsm->doDigestImportWithoutFilter = true;
     }
 
-    Process::wakeUp(_child_pid);
+    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
     return true;
 }
 
@@ -261,10 +261,12 @@ void SatProcessAdapter::digestClausesWithoutFilter(const std::vector<int>& claus
 }
 
 bool SatProcessAdapter::hasFilteredClauses() {
+    if (!_initialized) return true;
     return _hsm->doFilterImport && _hsm->didFilterImport;
 }
 std::vector<int> SatProcessAdapter::getLocalFilter() {
-    if (!_hsm->doFilterImport || !_hsm->didFilterImport) return std::vector<int>();
+    if (!_initialized || !_hsm->doFilterImport || !_hsm->didFilterImport) 
+        return std::vector<int>();
     std::vector<int> filter;
     filter.resize(_hsm->filterSize);
     memcpy(filter.data(), _filter_buffer, _hsm->filterSize*sizeof(int));
@@ -411,6 +413,10 @@ void* SatProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_t 
     return shmem;
 }
 
+void SatProcessAdapter::crash() {
+    _hsm->doCrash = true;
+}
+
 SatProcessAdapter::~SatProcessAdapter() {
     freeSharedMemory();
     if (_clause_comm != nullptr) delete _clause_comm;
@@ -427,6 +433,7 @@ void SatProcessAdapter::freeSharedMemory() {
         if (_solution_prepare_future.valid()) _solution_prepare_future.get();
     }
 
+    // Clean up found solutions in shared memory
     if (_hsm != nullptr) {
         for (int rev = 0; rev <= _written_revision; rev++) {
             size_t* solSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));
@@ -439,6 +446,7 @@ void SatProcessAdapter::freeSharedMemory() {
         _hsm = nullptr;
     }
 
+    // Clean up shared memory objects created here
     for (auto& shmemObj : _shmem) {
         //log(V4_VVER, "DBG deleting %s\n", shmemObj.id.c_str());
         SharedMemory::free(shmemObj.id, (char*)shmemObj.data, shmemObj.size);

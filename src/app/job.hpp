@@ -105,6 +105,17 @@ public:
     */
     virtual void appl_dumpStats() = 0;
     /*
+    Return true iff the instance can be quickly deleted without any errors
+    (i.e., no running concurrent thread of unknown residual life time depends 
+    on the instance any more, and the destructor will return immediately).
+    */
+    virtual bool appl_isDestructible() = 0;
+    /*
+    Perform measures to immediately reduce memory usage as far as possible,
+    even if it reduces the performance of local job processing significantly.
+    */
+    virtual void appl_memoryPanic() = 0;
+    /*
     Return how many processes this job would like to run on based on its meta data 
     and its previous volume.
     This method must return an integer greater than 0 and no greater than _comm_size. 
@@ -112,13 +123,6 @@ public:
     */
     virtual int getDemand() const;
 
-    /*
-    Return true iff the instance can be quickly deleted without any errors
-    (i.e., no running concurrent thread of unknown residual life time depends 
-    on the instance any more, and the destructor will return immediately).
-    */
-    virtual bool appl_isDestructible() = 0;
-    
     /*
     Measure for the age of a job -- decreases with time.
     Do not reimplement for now.
@@ -241,6 +245,7 @@ public:
     float getLatencyOfFirstVolumeUpdate() const {return _time_of_first_volume_update < 0 ? -1 : _time_of_first_volume_update - _time_of_activation;}
     float getUsedCpuSeconds() const {return _used_cpu_seconds;}
     int getNumThreads() const {return _threads_per_job;}
+    void setNumThreads(int nbThreads) {_threads_per_job = nbThreads;} 
     int getBalancingEpochOfLastCommitment() const {return _balancing_epoch_of_last_commitment;}
     int getLastDemand() const {return _last_demand;}
     void setLastDemand(int demand) {_last_demand = demand;}

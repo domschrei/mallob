@@ -71,8 +71,8 @@ AdaptiveClauseDatabase::AdaptiveClauseDatabase(Setup setup):
     _num_free_literals.store(setup.numLiterals, std::memory_order_relaxed);
 }
 
-bool AdaptiveClauseDatabase::addClause(const Clause& c) {
-    return addClause(c.begin, c.size, c.lbd);
+bool AdaptiveClauseDatabase::addClause(const Clause& c, bool sortLargeClause) {
+    return addClause(c.begin, c.size, c.lbd, sortLargeClause);
 }
 
 bool AdaptiveClauseDatabase::addClause(int* cBegin, int cSize, int cLbd, bool sortLargeClause) {

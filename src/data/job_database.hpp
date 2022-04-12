@@ -64,6 +64,8 @@ private:
 
     std::list<std::vector<float>> _desire_latencies;
 
+    bool _memory_panic = false;
+
 public:
     JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sysstate);
     ~JobDatabase();
@@ -94,6 +96,7 @@ public:
 
     void forgetOldJobs();
     void forget(int jobId);
+    void setMemoryPanic(bool panic) {_memory_panic = panic;}
     
     std::vector<std::pair<JobRequest, int>> getDeferredRequestsToForward(float time);
 

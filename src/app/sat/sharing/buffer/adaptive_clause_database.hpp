@@ -109,13 +109,15 @@ public:
     be possible to insert it later).
     In both cases, c can be freed or reused after calling this method.
     */
-    bool addClause(const Clause& c);
+    bool addClause(const Clause& c, bool sortLargeClause = false);
     bool addClause(int* cBegin, int cSize, int cLbd, bool sortLargeClause = false);
 
     int reserveLiteralBudget(int cSize, int cLbd);
 
     template <typename T>
     void addReservedUniformClauses(int cSize, int cLbd, std::forward_list<T>& clauses, int nbLiterals) {
+        
+        float timeFree = Timer::elapsedSeconds();
         auto [slotIdx, mode] = getSlotIdxAndMode(cSize, cLbd);
         int freed = tryAcquireBudget(slotIdx, nbLiterals);
         assert(freed >= nbLiterals);
@@ -123,7 +125,9 @@ public:
             // return excess
             _num_free_literals.fetch_add(freed-nbLiterals, std::memory_order_relaxed);
         }
+        timeFree = Timer::elapsedSeconds() - timeFree;
 
+        float timeInsert = Timer::elapsedSeconds();
         T& clause = clauses.front();
 
         if constexpr (std::is_same<T, int>::value) {
@@ -151,6 +155,9 @@ public:
             atomics::addRelaxed(slot.nbLiterals, nbLiterals);
             assert_heavy(checkNbLiterals(slot));
         }
+        timeInsert = Timer::elapsedSeconds() - timeInsert;
+
+        LOG(V6_DEBGV, "DG (%i,%i) %.4fs free, %.4fs insert\n", cSize, cLbd, timeFree, timeInsert);
     }
 
     void printChunks(int nextExportSize = -1);
