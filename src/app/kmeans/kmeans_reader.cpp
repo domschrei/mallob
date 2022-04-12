@@ -3,21 +3,34 @@
 #include <vector>
 #include <cstdlib>
 #include <iostream>
-typedef std::vector<double> Point;
-//bool KMeansReader::read(const std::string &filename, JobDescription &desc) {
-bool KMeansReader::read(const std::string &filename) {
-    // allocate necessary structs for the revision to read
-    //desc.beginInitialization(desc.getRevision());
+bool KMeansReader::read(const std::string &filename, JobDescription &desc) {
+    /* 
+    files have to be in format: 
+    k = k of kmeans
+    dim = dimension of points
+    col = number of columns (often there are more than wanted)
+    count = count of points
 
-    // Read file with mmap
+    k dim col count
+    0.0 0.1 0.2 
+    1.0 1.1 1.2
+    one point per row
+    */
+
+    // allocate necessary structs for the revision to read
+
+    
+  
+    std::cout << "this gets printed\n";
+    desc.beginInitialization(desc.getRevision());
+    std::cout << "this wont get printed\n";
+
     std::ifstream ifile(filename.c_str(), std::ios::in);
-    std::vector<Point> points;
-    off_t size;
 
     // check to see that the file was opened correctly:
     if (!ifile.is_open()) {
         std::cerr << "There was a problem opening the input file!\n";
-        exit(1); // exit or do additional error checking
+        return false;
     }
 
     int k = 0;
@@ -32,37 +45,23 @@ bool KMeansReader::read(const std::string &filename) {
     ifile >> count;
     skipCols = col - dim;
     
-    double num = 0.0;
-    // keep storing values from the text file so long as data exists:
+    desc.addFloatData(*((float*) &k));
+    desc.addFloatData(*((float*) &dim));
+    desc.addFloatData(*((float*) &count));
+    
+    float num = 0.0;
     for (int point = 0; point < count; ++point) {
-        Point p;
         for (int entry = 0; entry < dim; ++entry) {
             ifile >> num;
-            p.push_back(num);
+            desc.addFloatData(num);
         }
         for (int skip = 0; skip < skipCols; ++skip) {
             ifile >> num;
         }
-        points.push_back(p);
     } 
 
     ifile.close();
-    // verify that the scores were stored correctly:
-    /*
-    */
-    std::cout << "K: " << k << std::endl;
-    std::cout << "dim: " << dim << std::endl;
-    std::cout << "cols: " << col << std::endl;
-    std::cout << "count: " << count << std::endl;
-    for (int point = 0; point < count; ++point) {
-        for (int entry = 0; entry < dim; ++entry) {
-            std::cout << points[point][entry] << ' ';
-        }
-        std::cout << std::endl;
-    } 
-    // finalize revision
-    //desc.endInitialization();
-
+    desc.endInitialization();
     // success
     return true;
 }

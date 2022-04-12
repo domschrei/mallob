@@ -10,6 +10,7 @@
 #include "app/sat/job/forked_sat_job.hpp"
 #include "app/sat/job/threaded_sat_job.hpp"
 #include "app/dummy/dummy_job.hpp"
+#include "app/kmeans/kmeans_job.hpp"
 
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
@@ -48,6 +49,9 @@ Job& JobDatabase::createJob(int commSize, int worldRank, int jobId, JobDescripti
         } else {
             _jobs[jobId] = new ThreadedSatJob(_params, commSize, worldRank, jobId, application);
         }
+        break;
+    case JobDescription::Application::KMEANS:
+        _jobs[jobId] = new KMeansJob(_params, commSize, worldRank, jobId);
         break;
     case JobDescription::Application::DUMMY:
         _jobs[jobId] = new DummyJob(_params, commSize, worldRank, jobId);

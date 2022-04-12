@@ -4,14 +4,14 @@
 
 #include <string>
 
-//#include "data/job_description.hpp"
+#include "data/job_description.hpp"
 
 namespace KMeansReader {
     /*
     Read a revision of a job of the "dummy" application.
     */
-    //bool read(const std::string& filename, JobDescription& desc);
-    bool read(const std::string& filename);
+    bool read(const std::string& filename, JobDescription& desc);
+    
 };
 
 #endif

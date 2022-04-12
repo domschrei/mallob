@@ -77,9 +77,11 @@ void JobFileAdapter::handleNewJob(const FileWatcher::Event& event, Logger& log) 
         appl = JobDescription::Application::DUMMY;
         if (j.contains("application")) {
             auto appStr = j["application"].get<std::string>();
-            appl = appStr == "SAT" ? 
-                (incremental ? JobDescription::Application::INCREMENTAL_SAT : JobDescription::Application::ONESHOT_SAT)
-                : JobDescription::Application::DUMMY;
+            appl = 
+                appStr == "SAT" && incremental ? JobDescription::Application::INCREMENTAL_SAT :
+                appStr == "SAT" && !incremental ? JobDescription::Application::ONESHOT_SAT : 
+                appStr == "KMEANS" ? JobDescription::Application::KMEANS : 
+                JobDescription::Application::DUMMY;
         }
 
         if (j.contains("interrupt") && j["interrupt"].get<bool>()) {
@@ -249,7 +251,11 @@ void JobFileAdapter::handleJobDone(const JobResult& result, const JobDescription
     j["internal_revision"] = result.revision;
     j["result"] = { 
         { "resultcode", result.result }, 
-        { "resultstring", result.result == RESULT_SAT ? "SAT" : result.result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN" }, 
+        { "resultstring", 
+            result.result == RESULT_SAT ? "SAT" : 
+            result.result == RESULT_UNSAT ? "UNSAT" : 
+            result.result == RESULT_KMEANS ? "KMEANS" : 
+            "UNKNOWN" }, 
         { "solution", result.solution },
     };
     j["stats"] = {
