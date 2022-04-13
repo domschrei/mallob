@@ -111,8 +111,10 @@ public:
                 // Locally, this worker is the most critical one.
                 // Is memory usage too high on this host?
                 auto [freeKbs, totalKbs] = Proc::getMachineFreeAndTotalRamKbs();
-                if (((float) freeKbs) / totalKbs < 0.1) {
+                auto usedRatio = ((float) freeKbs) / totalKbs;
+                if (usedRatio < 0.1) {
                     // Using more than 90% of available RAM!
+                    LOG(V3_VERB, "Trigger memory panic (criticality %.4f, %.3f%% mem usage)\n", maxCriticality, usedRatio);
                     memoryPanic = true;
                 }
             }
