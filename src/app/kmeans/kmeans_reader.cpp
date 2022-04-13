@@ -18,12 +18,8 @@ bool KMeansReader::read(const std::string &filename, JobDescription &desc) {
     */
 
     // allocate necessary structs for the revision to read
-
-    
   
-    std::cout << "this gets printed\n";
-    desc.beginInitialization(desc.getRevision());
-    std::cout << "this wont get printed\n";
+    desc.beginInitialization(0);
 
     std::ifstream ifile(filename.c_str(), std::ios::in);
 
@@ -33,25 +29,25 @@ bool KMeansReader::read(const std::string &filename, JobDescription &desc) {
         return false;
     }
 
-    int k = 0;
-    int dim = 0;
+    int numClusters = 0;
+    int dimension = 0;
     int col = 0;
     int count = 0;
     int skipCols = 0;
 
-    ifile >> k;
-    ifile >> dim;
+    ifile >> numClusters;
+    ifile >> dimension;
     ifile >> col;
     ifile >> count;
-    skipCols = col - dim;
+    skipCols = col - dimension;
     
-    desc.addFloatData(*((float*) &k));
-    desc.addFloatData(*((float*) &dim));
-    desc.addFloatData(*((float*) &count));
+    desc.addLiteral(numClusters);
+    desc.addLiteral(dimension);
+    desc.addLiteral(count);
     
     float num = 0.0;
     for (int point = 0; point < count; ++point) {
-        for (int entry = 0; entry < dim; ++entry) {
+        for (int entry = 0; entry < dimension; ++entry) {
             ifile >> num;
             desc.addFloatData(num);
         }

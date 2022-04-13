@@ -10,9 +10,9 @@ Edit and extend for your application.
 */
 typedef std::vector<float> Point;
 class KMeansJob : public Job {
-
-public:
+private:
     std::vector<Point> points;
+public:
     KMeansJob(const Parameters& params, int commSize, int worldRank, int jobId) 
         : Job(params, commSize, worldRank, jobId, JobDescription::Application::KMEANS) {}
     void appl_start() override {
@@ -32,7 +32,7 @@ public:
             points.push_back(p);
             payload = payload + n*d;
         } 
-
+        // ProcesswideThreadpool(work, data)
         /*
         std::cout << "K: " << k << std::endl;
         std::cout << "dim: " << dim << std::endl;
@@ -49,7 +49,7 @@ public:
     void appl_suspend() override {}
     void appl_resume() override {}
     void appl_terminate() override {}
-    int appl_solved() override {return -1;}
+    int appl_solved() override {return -1;} //atomic bool
     JobResult&& appl_getResult() override {return JobResult();}
     void appl_communicate() override {}
     void appl_communicate(int source, int mpiTag, JobMessage& msg) override {}
