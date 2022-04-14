@@ -294,7 +294,7 @@ void Client::advance() {
     
     // Advance an all-reduction of the current system state
     if (_sys_state.aggregate(time)) {
-        float* result = _sys_state.getGlobal();
+        const std::vector<float>& result = _sys_state.getGlobal();
         int processed = (int)result[SYSSTATE_PROCESSED_JOBS];
         if (MyMpi::rank(_comm) == 0) {
             LOG(V2_INFO, "sysstate entered=%i parsed=%i scheduled=%i processed=%i\n", 

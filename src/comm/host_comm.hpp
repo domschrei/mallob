@@ -24,8 +24,15 @@ private:
 
     std::string _base_filename;
 
-    SysState<1>* _sysstate = nullptr;
+    SysState<4>* _sysstate = nullptr;
+    const int SYSSTATE_PROCESS_USED_MEMORY = 0;
+    const int SYSSTATE_MACHINE_FREE_MEMORY = 1;
+    const int SYSSTATE_MACHINE_TOTAL_MEMORY = 2;
+    const int SYSSTATE_WORKER_INDEX = 3;  
+
     std::atomic<float> _ram_usage_this_worker_gb = 0;
+    std::atomic<float> _free_machine_memory_kb = 0;
+    std::atomic<float> _total_machine_memory_kb = 0;
     int _active_job_index = -1;
     float _last_contributed_criticality = 0;
 
@@ -82,61 +89,92 @@ public:
         LOG(V2_INFO, "Machine color %i with %i total workers (my rank: %i)\n", 
             color, MyMpi::size(_comm), MyMpi::rank(_comm));
         
-        _sysstate = new SysState<1>(_comm, /*periodSeconds=*/1, MPI_MAX);
+        _sysstate = new SysState<4>(_comm, /*periodSeconds=*/1, SysState<4>::ALLGATHER);
     }
 
     void setRamUsageThisWorkerGbs(float ramGbs) {
         _ram_usage_this_worker_gb = ramGbs;
-        updateCriticalityRating();
+    }
+    void setFreeAndTotalMachineMemoryKbs(unsigned long freeKbs, unsigned long totalKbs) {
+        _free_machine_memory_kb = freeKbs;
+        _total_machine_memory_kb = totalKbs;
     }
     void setActiveJobIndex(int index) {
         _active_job_index = index;
-        updateCriticalityRating();
     }
     void unsetActiveJobIndex() {
-        _active_job_index = -1;
-        updateCriticalityRating();
+        _active_job_index = MyMpi::size(MPI_COMM_WORLD);
     }
 
     bool advanceAndCheckMemoryPanic(float time) {
         if (_sysstate == nullptr) return false;
 
-        bool memoryPanic = false;
-        bool done = _sysstate->aggregate(time);
-        if (done) {
-
-            // Extract result
-            float maxCriticality = _sysstate->getGlobal()[0];
-            if (maxCriticality == _last_contributed_criticality) {
-                // Locally, this worker is the most critical one.
-                // Is memory usage too high on this host?
-                auto [freeKbs, totalKbs] = Proc::getMachineFreeAndTotalRamKbs();
-                auto usedRatio = ((float) freeKbs) / totalKbs;
-                if (usedRatio < 0.1) {
-                    // Using more than 90% of available RAM!
-                    LOG(V3_VERB, "Trigger memory panic (criticality %.4f, %.3f%% mem usage)\n", maxCriticality, usedRatio);
-                    memoryPanic = true;
-                }
-            }
-
+        if (_sysstate->canStartAggregating(time)) {
             // Re-set local contribution
-            updateCriticalityRating();
+            _sysstate->setLocal(SYSSTATE_PROCESS_USED_MEMORY, 1024*1024*_ram_usage_this_worker_gb.load(std::memory_order_relaxed));
+            _sysstate->setLocal(SYSSTATE_WORKER_INDEX, _active_job_index);
+            _sysstate->setLocal(SYSSTATE_MACHINE_FREE_MEMORY, _free_machine_memory_kb.load(std::memory_order_relaxed));
+            _sysstate->setLocal(SYSSTATE_MACHINE_TOTAL_MEMORY, _total_machine_memory_kb.load(std::memory_order_relaxed));
         }
 
-        return memoryPanic;
-    }
+        bool done = _sysstate->aggregate(time);
+        if (!done) return false;
 
-private:
-    void updateCriticalityRating() {
-        if (_sysstate && !_sysstate->isAggregating())
-            _sysstate->setLocal(0, getCriticalityRating());
-    }
+        const auto& memoryInformation = _sysstate->getGlobal();
 
-    float getCriticalityRating() {
-        float usedRamGbs = _ram_usage_this_worker_gb.load(std::memory_order_relaxed);
-        float indexRating = _active_job_index < 0 ? MyMpi::size(MPI_COMM_WORLD) : _active_job_index+1;
-        _last_contributed_criticality = usedRamGbs * sqrt(indexRating);
-        return _last_contributed_criticality;
-    }
+        float machineMinFreeMem = 0;
+        float machineMinTotalMem = 0;
+        struct ProcessInfo {size_t procIdx; float usedMem; float utility;};
+        std::vector<ProcessInfo> processInfo;
+        size_t i = 0;
+        for (size_t procIdx = 0; procIdx < MyMpi::size(_comm); procIdx++) {
+            // Extract data
+            float procUsedMem = memoryInformation[i+SYSSTATE_PROCESS_USED_MEMORY];
+            float workerIndex = memoryInformation[i+SYSSTATE_WORKER_INDEX];
+            float machineFreeMem = memoryInformation[i+SYSSTATE_MACHINE_FREE_MEMORY];
+            float machineTotalMem = memoryInformation[i+SYSSTATE_MACHINE_TOTAL_MEMORY];
+            i += 4;
 
+            // Update current machine memory
+            if (procIdx == 0) {
+                machineMinFreeMem = machineFreeMem;
+                machineMinTotalMem = machineTotalMem; 
+            } else {
+                machineMinFreeMem = std::min(machineMinFreeMem, machineFreeMem);
+                machineMinTotalMem = std::min(machineMinTotalMem, machineTotalMem);
+            }
+
+            // Calculate panic utility for this process 
+            processInfo.push_back(ProcessInfo{procIdx, procUsedMem, procUsedMem * (1.0f - (float)std::pow(1.5, -workerIndex))});
+        }
+
+        if (machineMinTotalMem <= 0) return false;
+        if (machineMinFreeMem / machineMinTotalMem >= 0.1) return false;
+        
+        // Panic necessary!
+        LOG(V3_VERB, "Memory panic on this machine (%.4f/%.4fGB / %.3f%% free)\n", 
+            machineMinFreeMem / 1024.0f / 1024.0f, 
+            machineMinTotalMem / 1024.0f / 1024.0f, 
+            100 * machineMinFreeMem/machineMinTotalMem);
+
+        // Sort by utility in descending order
+        std::sort(processInfo.begin(), processInfo.end(), 
+            [&](const auto& left, const auto& right) {return left.utility > right.utility;});
+        
+        // Iterate over processes and make them panic until enough memory is freed
+        i = 0;
+        while (i < processInfo.size() && machineMinFreeMem/machineMinTotalMem < 0.3) {
+            auto info = processInfo[i];
+            if (info.utility <= 0) break;
+            machineMinFreeMem += 0.5 * info.usedMem;
+            LOG(V3_VERB, "Enable memory panic for proc. %i on this machine (util=%.4f)\n", info.procIdx, info.utility);
+            if (info.procIdx == MyMpi::rank(_comm)) {
+                // That's me!
+                return true;
+            }
+            i++;
+        }
+
+        return false;
+    }
 };

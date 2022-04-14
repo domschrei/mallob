@@ -71,6 +71,12 @@ MPI_Request MyMpi::ireduce(MPI_Comm communicator, float* contribution, float* re
     return req;
 }
 
+MPI_Request MyMpi::iallgather(MPI_Comm communicator, float* contribution, float* result, int numFloats) {
+    MPI_Request req;
+    MPICALL(MPI_Iallgather(contribution, numFloats, MPI_FLOAT, result, numFloats, MPI_FLOAT, communicator, &req), std::string("iallgather"));
+    return req;
+}
+
 int MyMpi::size(MPI_Comm comm) {
     int size = 0;
     MPICALL(MPI_Comm_size(comm, &size), std::string("commSize"))

@@ -41,6 +41,8 @@ public:
     static MPI_Request iallreduce(MPI_Comm communicator, float* contribution, float* result, MPI_Op operation = MPI_SUM);
     static MPI_Request iallreduce(MPI_Comm communicator, float* contribution, float* result, int numFloats, MPI_Op operation = MPI_SUM);
 
+    static MPI_Request iallgather(MPI_Comm communicator, float* contribution, float* result, int numFloats);
+
     enum BufferQueryMode {SELF, ALL};
     static size_t getBinaryTreeBufferLimit(int numWorkers, int baseSize, float discountFactor, BufferQueryMode mode);
 

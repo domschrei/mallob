@@ -51,6 +51,8 @@ private:
     float _node_memory_gbs = 0;
     double _mainthread_cpu_share = 0;
     float _mainthread_sys_share = 0;
+    unsigned long _machine_free_kbs = 0;
+    unsigned long _machine_total_kbs = 0;
 
     robin_hood::unordered_map<std::pair<int, int>, JobResult, IntPairHasher> _pending_results;
 
