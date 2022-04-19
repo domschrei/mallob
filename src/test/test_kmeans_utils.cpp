@@ -35,9 +35,26 @@ int main() {
         for (auto e : instance.data[instance.pointsCount - 1]) {  // iterate over last point
             lastPoint << e << " ";
         }
-        LOG(V2_INFO, "Last Point is: \n %s \n", lastPoint.str().c_str());
+        KMeansUtils::ClusterCenters clusterCenters;
+        clusterCenters.resize(instance.numClusters);
+        for (int i = 0; i < instance.numClusters; ++i) {
+            for (int j = 0; j < instance.dimension; ++j) {
+                clusterCenters[i].push_back(i * instance.dimension + j);
+            }
+        }
+
+        LOG(V2_INFO, "Start clusters: \n%s\n", KMeansUtils::pointsToString(clusterCenters).c_str());
+
+        KMeansUtils::ClusterMembership clusterMembership;
+        clusterMembership = KMeansUtils::calcNearestCenter(instance.data,
+                                                           clusterCenters, 
+                                                           instance.pointsCount, 
+                                                           instance.numClusters,
+                                                           KMeansUtils::eukild);
+        LOG(V2_INFO, "Start clusters: \n%s\n", KMeansUtils::pointsToString(clusterCenters).c_str());
         time = Timer::elapsedSeconds() - time;
         LOG(V2_INFO, " - done, took %.3fs\n", time);
         assert(desc.getNumFormulaLiterals() > 0);
     }
 }
+
