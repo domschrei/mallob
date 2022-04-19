@@ -3,6 +3,10 @@
 #include <numeric>
 #include <cmath>
 #include <vector>
+
+#include <iostream>
+#include "util/logger.hpp"
+#include "util/assert.hpp"
 namespace KMeansUtils {
 KMeansInstance loadPoints(JobDescription& desc) {
     const int* payload = desc.getFormulaPayload(0);
@@ -52,12 +56,14 @@ ClusterMembership calcNearestCenter(KMeansData dataPoints, ClusterCenters cluste
 
 ClusterCenters calcCurrentClusterCenters(KMeansData dataPoints, ClusterMembership clusters,
                                          int numDataPoints, int numClusters, int dimension) {
+                                             
+    Logger::init(0, 5, false, false, false, nullptr);
     typedef std::vector<float> Dimension;                             // transposed data to reduce dimension by dimension
     typedef std::vector<std::vector<Dimension>> ClusteredDataPoints;  // ClusteredDataPoints[i] contains the points belonging to cluster i
     ClusteredDataPoints clusterdPoints;
     clusterdPoints.resize(numClusters);
-    for (auto cluster : clusterdPoints) {
-        cluster.resize(dimension);
+    for (int cluster = 0; cluster < numClusters; ++cluster) {
+        clusterdPoints[cluster].resize(dimension);
     }
     for (int pointID = 0; pointID < numDataPoints; ++pointID) {
         for (int d = 0; d < dimension; ++d) {
