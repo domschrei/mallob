@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <iterator>
 
 #include "app/kmeans/kmeans_reader.hpp"
 #include "app/kmeans/kmeans_utils.hpp"
@@ -30,11 +31,6 @@ int main() {
         LOG(V2_INFO, "Dimension %d \n", instance.dimension);
         LOG(V2_INFO, "Count of points %d \n", instance.pointsCount);
 
-        std::stringstream lastPoint;
-
-        for (auto e : instance.data[instance.pointsCount - 1]) {  // iterate over last point
-            lastPoint << e << " ";
-        }
         KMeansUtils::ClusterCenters clusterCenters;
         clusterCenters.resize(instance.numClusters);
         for (int i = 0; i < instance.numClusters; ++i) {
@@ -42,7 +38,10 @@ int main() {
                 clusterCenters[i].push_back(i * instance.dimension + j);
             }
         }
-
+        clusterCenters[0] = instance.data[3];
+        clusterCenters[1] = instance.data[30];
+        clusterCenters[2] = instance.data[60];
+        clusterCenters[3] = instance.data[90];
         LOG(V2_INFO, "Start clusters: \n%s\n", KMeansUtils::pointsToString(clusterCenters).c_str());
 
         KMeansUtils::ClusterMembership clusterMembership;
@@ -51,7 +50,14 @@ int main() {
                                                            instance.pointsCount, 
                                                            instance.numClusters,
                                                            KMeansUtils::eukild);
-        LOG(V2_INFO, "Start clusters: \n%s\n", KMeansUtils::pointsToString(clusterCenters).c_str());
+        std::vector<int> countMembers(instance.numClusters, 0);
+        for (int clusterID : clusterMembership) {
+            LOG(V2_INFO, "clusterMembership: %d\n", clusterID);
+            countMembers[clusterID] += 1;
+        }
+        std::stringstream countMembersString;
+        std::copy(countMembers.begin(), countMembers.end(), std::ostream_iterator<int>(countMembersString, " "));
+        LOG(V2_INFO, "clusterMemberships: \n%s\n", countMembersString.str().c_str());
         time = Timer::elapsedSeconds() - time;
         LOG(V2_INFO, " - done, took %.3fs\n", time);
         assert(desc.getNumFormulaLiterals() > 0);

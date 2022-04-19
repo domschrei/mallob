@@ -33,10 +33,11 @@ ClusterMembership calcNearestCenter(KMeansData dataPoints, ClusterCenters cluste
     } currentNearestCenter;
 
     ClusterMembership memberships;
+    memberships.resize(numDataPoints);
     float distanceToCluster;
     for (int pointID = 0; pointID < numDataPoints; ++pointID) {
         currentNearestCenter.cluster = -1;
-        currentNearestCenter.distance = -1;
+        currentNearestCenter.distance = std::numeric_limits<float>::infinity();
         for (int clusterID = 0; clusterID < numClusters; ++clusterID) {
             distanceToCluster = metric(dataPoints[pointID], clusters[clusterID]);
             if (distanceToCluster < currentNearestCenter.distance) {
@@ -46,6 +47,7 @@ ClusterMembership calcNearestCenter(KMeansData dataPoints, ClusterCenters cluste
         }
         memberships[pointID] = currentNearestCenter.cluster;
     }
+    return memberships;
 }
 
 ClusterCenters calcCurrentClusterCenters(KMeansData dataPoints, ClusterMembership clusters,
