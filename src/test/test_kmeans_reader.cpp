@@ -6,13 +6,14 @@
 
 #include "util/random.hpp"
 #include "app/kmeans/kmeans_reader.hpp"
+#include "app/kmeans/kmeans_utils.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 
 int main() {
     Timer::init();
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
-    auto files = {"benign_traffic.csv"};
+    auto files = {"mnist784.csv"}; //"benign_traffic.csv", 
     
     for (const auto& file : files) {
         auto f = std::string("instances/") + file;
@@ -22,33 +23,19 @@ int main() {
         bool success = KMeansReader::read(f, desc);
         assert(success);
         const int* payload = desc.getFormulaPayload(0);
-        int numClusters = payload[0]; 
-        int dimension = payload[1];  
-        int pointsCount = payload[2];
+        
+        KMeansUtils::KMeansInstance instance = KMeansUtils::loadPoints(desc);
 
-        LOG(V2_INFO, "K: %d \n", numClusters);
-        LOG(V2_INFO, "Dimension %d \n", dimension);
-        LOG(V2_INFO, "Count of points %d \n", pointsCount);
+        LOG(V2_INFO, "K: %d \n", instance.numClusters);
+        LOG(V2_INFO, "Dimension %d \n", instance.dimension);
+        LOG(V2_INFO, "Count of points %d \n", instance.pointsCount);
 
-        typedef std::vector<float> Point;
-        std::vector<Point> points;
-        std::string lastPoint;
-        payload += 3; //pointer start at first point instead of metadata
+        std::stringstream lastPoint;
 
-        for (int point = 0; point < pointsCount; ++point) {
-            Point p;
-            for (int entry = 0; entry < dimension; ++entry) {
-                p.push_back(*( (float*) (payload + entry)));
-            }
-            points.push_back(p);
-            payload = payload + dimension;
-        } 
-
-        lastPoint = "";
-        for (int i = 0; i < std::min(5, pointsCount); ++i) {
-            lastPoint.append(std::to_string(points[pointsCount-1][i]));
+        for (auto e : instance.data[instance.pointsCount-1]) { // iterate over last point
+            lastPoint << e << " ";
         }
-        LOG(V2_INFO, "Last Point is: \n %s \n", lastPoint);
+        LOG(V2_INFO, "Last Point is: \n %s \n", lastPoint.str().c_str());
         time = Timer::elapsedSeconds() - time;
         LOG(V2_INFO, " - done, took %.3fs\n", time);
         assert(desc.getNumFormulaLiterals() > 0);
