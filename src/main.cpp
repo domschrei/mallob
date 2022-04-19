@@ -17,6 +17,7 @@
 #include "util/sys/thread_pool.hpp"
 #include "interface/api/job_streamer.hpp"
 #include "comm/host_comm.hpp"
+#include "data/job_transfer.hpp"
 
 #ifndef MALLOB_VERSION
 #define MALLOB_VERSION "(dbg)"
@@ -38,7 +39,10 @@ void introduceMonoJob(Parameters& params, Client& client) {
         json["cpu-limit"] = std::to_string(params.jobCpuLimit()) + "s";
     }
 
-    auto result = client.getAPI().submit(json, APIConnector::CALLBACK_IGNORE);
+    auto result = client.getAPI().submit(json, [&](nlohmann::json& response) {
+        // Job done? => Terminate all processes
+        MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
+    });
     if (result != JsonInterface::Result::ACCEPT) {
         LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
         abort();
