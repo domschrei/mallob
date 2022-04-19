@@ -28,7 +28,7 @@ KMeansInstance loadPoints(JobDescription& desc) {
     return result;
 }
 
-ClusterMembership calcNearestCenter(KMeansData dataPoints, ClusterCenters clusters,
+ClusterMembership calcNearestCenter(KMeansData& dataPoints, ClusterCenters clusters,
                                     int numDataPoints, int numClusters,
                                     float metric(Point, Point)) {
     struct centerDistance {
@@ -54,7 +54,7 @@ ClusterMembership calcNearestCenter(KMeansData dataPoints, ClusterCenters cluste
     return memberships;
 }
 
-ClusterCenters calcCurrentClusterCenters(KMeansData dataPoints, ClusterMembership clusters,
+ClusterCenters calcCurrentClusterCenters(KMeansData& dataPoints, ClusterMembership clusters,
                                          int numDataPoints, int numClusters, int dimension) {
                                              
     Logger::init(0, 5, false, false, false, nullptr);

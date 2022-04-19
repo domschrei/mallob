@@ -14,7 +14,13 @@
 int main() {
     Timer::init();
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
-    auto files = {"benign_traffic.csv","mnist784.csv", "covtype.csv"};
+    auto files = {"mnist784.csv",
+                  "benign_traffic.csv",
+                  "covtype.csv",
+                  "2d-10c.arff",
+                  "birch-rg1.arff",
+                  "birch-rg2.arff",
+                  "birch-rg3.arff"};
 
     for (const auto& file : files) {
         auto f = std::string("../kMeansData/") + file;
@@ -38,7 +44,7 @@ int main() {
         }
 
         LOG(V2_INFO, "Start clusterCenters: \n%s\n", KMeansUtils::pointsToString(clusterCenters).c_str());
-        for (int i = 0; i < 10; ++i) {
+        for (int i = 0; i < 5; ++i) {
             KMeansUtils::ClusterMembership clusterMembership;
             clusterMembership = KMeansUtils::calcNearestCenter(instance.data,
                                                                clusterCenters,
@@ -51,16 +57,15 @@ int main() {
             }
             std::stringstream countMembersString;
             std::copy(countMembers.begin(), countMembers.end(), std::ostream_iterator<int>(countMembersString, " "));
-            LOG(V2_INFO, "clusterMemberships: \n%s\n", countMembersString.str().c_str());
+            LOG(V2_INFO, "cluster membership counts: \n%s\n", countMembersString.str().c_str());
             clusterCenters = KMeansUtils::calcCurrentClusterCenters(instance.data,
                                                                     clusterMembership,
                                                                     instance.pointsCount,
                                                                     instance.numClusters,
                                                                     instance.dimension);
-            LOG(V2_INFO, "new clusterCenters: \n%s\n", KMeansUtils::pointsToString(clusterCenters).c_str());
+            // LOG(V2_INFO, "new clusterCenters: \n%s\n", KMeansUtils::pointsToString(clusterCenters).c_str());
         }
         time = Timer::elapsedSeconds() - time;
         LOG(V2_INFO, " - done, took %.3fs\n", time);
-        assert(desc.getNumFormulaLiterals() > 0);
     }
 }

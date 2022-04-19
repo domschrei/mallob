@@ -15,10 +15,10 @@ typedef struct KMeansInstance {
 };
 
 KMeansInstance loadPoints(JobDescription& desc);
-ClusterMembership calcNearestCenter(KMeansData dataPoints, ClusterCenters clusters,
+ClusterMembership calcNearestCenter(KMeansData& dataPoints, ClusterCenters clusters,
                                     int numDataPoints, int numClusters,
                                     float metric(Point, Point));
-ClusterCenters calcCurrentClusterCenters(KMeansData dataPoints, ClusterMembership clusters,
+ClusterCenters calcCurrentClusterCenters(KMeansData& dataPoints, ClusterMembership clusters,
                                          int numDataPoints, int numClusters, int dimension);
 std::string pointsToString(KMeansData dataPoints);
 float eukild(KMeansUtils::Point p1, KMeansUtils::Point p2);
