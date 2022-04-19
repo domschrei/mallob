@@ -59,6 +59,8 @@ if echo $solvers|grep -q "l" && [ ! -f lingeling/liblgl.a ]; then
 
     #tar xzvf lingeling-bcj-78ebb86-180517.tar.gz
     #mv lingeling-bcj-78ebb86-180517 lingeling
+    unzip lingeling-isc22.zip
+    mv lingeling-*/ lingeling
     cd lingeling
     for f in *.c *.h ; do
         sed -i 's/exit ([01])/abort()/g' $f
@@ -71,6 +73,8 @@ fi
 if echo $solvers|grep -q "c" && [ ! -f cadical/libcadical.a ]; then
     echo "Building CaDiCaL ..."
 
+    unzip cadical-isc22.zip
+    mv cadical-*/ cadical
     cd cadical
     ./configure
     make
@@ -81,6 +85,8 @@ fi
 if echo $solvers|grep -q "k" && [ ! -f kissat/libkissat.a ]; then
     echo "Building kissat ..."
 
+    unzip kissat-isc22.zip
+    mv kissat-*/ kissat
     cd kissat
     ./configure --quiet
     make
