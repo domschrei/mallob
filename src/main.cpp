@@ -159,16 +159,16 @@ int main(int argc, char *argv[]) {
 
     longStartupWarnMsg(rank, "Init'd MPI");
 
-    // Initialize bookkeeping of child processes and signals
-    Process::init(rank);
-
-    longStartupWarnMsg(rank, "Init'd process");
-
     Parameters params;
     params.init(argc, argv);
     if (rank == 0) params.printBanner();
 
     longStartupWarnMsg(rank, "Init'd params");
+
+    // Initialize bookkeeping of child processes and signals
+    Process::init(rank, params.traceDirectory());
+
+    longStartupWarnMsg(rank, "Init'd process");
 
     bool quiet = params.quiet();
     if (params.zeroOnlyLogging() && rank > 0) quiet = true;

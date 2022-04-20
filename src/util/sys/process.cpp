@@ -20,6 +20,7 @@
 #include "util/sys/thread_pool.hpp"
 
 int Process::_rank;
+std::string Process::_trace_dir;
 
 Mutex Process::_children_mutex;
 std::set<pid_t> Process::_children;
@@ -82,8 +83,9 @@ void Process::doExit(int retval) {
 }
 
 
-void Process::init(int rank, bool leafProcess) {
+void Process::init(int rank, const std::string& traceDir, bool leafProcess) {
     _rank = rank;
+    _trace_dir = traceDir;
     _exit_signal_caught = false;
     _main_process = !leafProcess;
     _main_tid = Proc::getTid();
@@ -185,7 +187,7 @@ void Process::writeTrace(long tid) {
     long callingTid = Proc::getTid();
     std::string command = "kill -20 " + std::to_string(tid) 
             + " && gdb --q --n --ex bt --batch --pid " + std::to_string(tid) 
-            + " > mallob_thread_trace_of_" + std::to_string(tid) 
+            + " > " + _trace_dir + "/mallob_thread_trace_of_" + std::to_string(tid) 
             + "_from_" + std::to_string(callingTid) + " 2>&1"
             + " && kill -18 " + std::to_string(tid);
     // Execute GDB in separate thread to avoid self-tracing

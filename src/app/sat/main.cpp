@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
     ProcessWideThreadPool::init(1);
 
     // Initialize signal handlers
-    Process::init(rankOfParent, /*leafProcess=*/true);
+    Process::init(rankOfParent, params.traceDirectory(), /*leafProcess=*/true);
 
     std::string logdir = params.logDirectory();
     std::string logFilename = "subproc" + std::string(".") + std::to_string(rankOfParent);
