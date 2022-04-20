@@ -23,6 +23,7 @@
 #define MALLOB_VERSION "(dbg)"
 #endif
 
+bool monoJobDone = false;
 void introduceMonoJob(Parameters& params, Client& client) {
 
     // Write a job JSON for the singular job to solve
@@ -41,7 +42,7 @@ void introduceMonoJob(Parameters& params, Client& client) {
 
     auto result = client.getAPI().submit(json, [&](nlohmann::json& response) {
         // Job done? => Terminate all processes
-        MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
+        monoJobDone = true;
     });
     if (result != JsonInterface::Result::ACCEPT) {
         LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
@@ -135,6 +136,10 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
             break;
         if (params.sleepMicrosecs() > 0) usleep(params.sleepMicrosecs());
         if (params.yield()) std::this_thread::yield();
+        if (monoJobDone) {
+            // Terminate all processes
+            MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
+        }
     }
 
     // Clean up
