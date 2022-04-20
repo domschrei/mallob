@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "app/kmeans/kmeans_reader.hpp"
-#include "app/kmeans/kmeans_utils.hpp"
+#include "app/kmeans/kmeans_job.hpp"
 #include "util/assert.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
@@ -30,27 +30,27 @@ int main() {
         bool success = KMeansReader::read(f, desc);
         assert(success);
         const int* payload = desc.getFormulaPayload(0);
-
-        KMeansUtils::KMeansInstance instance = KMeansUtils::loadPoints(desc);
+        KMeansJob job(Parameters(), 1, 0, 0);
+        KMeansJob::KMeansInstance instance = job.loadPoints(desc);
 
         LOG(V2_INFO, "K: %d \n", instance.numClusters);
         LOG(V2_INFO, "Dimension %d \n", instance.dimension);
         LOG(V2_INFO, "Count of points %d \n", instance.pointsCount);
 
-        KMeansUtils::ClusterCenters clusterCenters;
+        KMeansJob::ClusterCenters clusterCenters;
         clusterCenters.resize(instance.numClusters);
         for (int i = 0; i < instance.numClusters; ++i) {
             clusterCenters[i] = instance.data[static_cast<int>((static_cast<float>(i) / static_cast<float>(instance.numClusters)) * (instance.pointsCount - 1))];
         }
 
-        LOG(V2_INFO, "Start clusterCenters: \n%s\n", KMeansUtils::pointsToString(clusterCenters).c_str());
+        LOG(V2_INFO, "Start clusterCenters: \n%s\n", job.pointsToString(clusterCenters).c_str());
         for (int i = 0; i < 5; ++i) {
-            KMeansUtils::ClusterMembership clusterMembership;
-            clusterMembership = KMeansUtils::calcNearestCenter(instance.data,
+            KMeansJob::ClusterMembership clusterMembership;
+            clusterMembership = job.calcNearestCenter(instance.data,
                                                                clusterCenters,
                                                                instance.pointsCount,
                                                                instance.numClusters,
-                                                               [&](KMeansUtils::Point p1, KMeansUtils::Point p2) {return KMeansUtils::eukild(p1, p2);} );
+                                                               [&](KMeansJob::Point p1, KMeansJob::Point p2) {return job.eukild(p1, p2);} );
             std::vector<int> countMembers(instance.numClusters, 0);
             for (int clusterID : clusterMembership) {
                 countMembers[clusterID] += 1;
@@ -58,12 +58,12 @@ int main() {
             std::stringstream countMembersString;
             std::copy(countMembers.begin(), countMembers.end(), std::ostream_iterator<int>(countMembersString, " "));
             LOG(V2_INFO, "cluster membership counts: \n%s\n", countMembersString.str().c_str());
-            clusterCenters = KMeansUtils::calcCurrentClusterCenters(instance.data,
+            clusterCenters = job.calcCurrentClusterCenters(instance.data,
                                                                     clusterMembership,
                                                                     instance.pointsCount,
                                                                     instance.numClusters,
                                                                     instance.dimension);
-            // LOG(V2_INFO, "new clusterCenters: \n%s\n", KMeansUtils::pointsToString(clusterCenters).c_str());
+            // LOG(V2_INFO, "new clusterCenters: \n%s\n", job.pointsToString(clusterCenters).c_str());
         }
         time = Timer::elapsedSeconds() - time;
         LOG(V2_INFO, " - done, took %.3fs\n", time);
