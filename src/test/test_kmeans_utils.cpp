@@ -50,7 +50,7 @@ int main() {
                                                                clusterCenters,
                                                                instance.pointsCount,
                                                                instance.numClusters,
-                                                               KMeansUtils::eukild);
+                                                               [&](KMeansUtils::Point p1, KMeansUtils::Point p2) {return KMeansUtils::eukild(p1, p2);} );
             std::vector<int> countMembers(instance.numClusters, 0);
             for (int clusterID : clusterMembership) {
                 countMembers[clusterID] += 1;

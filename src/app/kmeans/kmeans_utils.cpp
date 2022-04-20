@@ -3,12 +3,13 @@
 #include <numeric>
 #include <cmath>
 #include <vector>
+#include <functional>
 
 #include <iostream>
 #include "util/logger.hpp"
 #include "util/assert.hpp"
 namespace KMeansUtils {
-KMeansInstance loadPoints(JobDescription& desc) {
+KMeansInstance loadPoints(const JobDescription& desc) {
     const int* payload = desc.getFormulaPayload(0);
     KMeansInstance result;
     result.numClusters = payload[0];
@@ -28,9 +29,9 @@ KMeansInstance loadPoints(JobDescription& desc) {
     return result;
 }
 
-ClusterMembership calcNearestCenter(KMeansData& dataPoints, ClusterCenters clusters,
+ClusterMembership calcNearestCenter(const KMeansData& dataPoints, ClusterCenters clusters,
                                     int numDataPoints, int numClusters,
-                                    float metric(Point, Point)) {
+                                    std::function<float(Point, Point)> metric) {
     struct centerDistance {
         int cluster;
         float distance;
@@ -54,10 +55,9 @@ ClusterMembership calcNearestCenter(KMeansData& dataPoints, ClusterCenters clust
     return memberships;
 }
 
-ClusterCenters calcCurrentClusterCenters(KMeansData& dataPoints, ClusterMembership clusters,
+ClusterCenters calcCurrentClusterCenters(const KMeansData& dataPoints, ClusterMembership clusters,
                                          int numDataPoints, int numClusters, int dimension) {
                                              
-    Logger::init(0, 5, false, false, false, nullptr);
     typedef std::vector<float> Dimension;                             // transposed data to reduce dimension by dimension
     typedef std::vector<std::vector<Dimension>> ClusteredDataPoints;  // ClusteredDataPoints[i] contains the points belonging to cluster i
     ClusteredDataPoints clusterdPoints;
@@ -70,6 +70,8 @@ ClusterCenters calcCurrentClusterCenters(KMeansData& dataPoints, ClusterMembersh
             clusterdPoints[clusters[pointID]][d].push_back(dataPoints[pointID][d]);
         }
     }
+
+    
     ClusterCenters clusterCenters;
     clusterCenters.resize(numClusters);
     for (int cluster = 0; cluster < numClusters; ++cluster) {
