@@ -12,4 +12,4 @@ if echo $solvers|grep -q "y"; then wget -nc http://fmv.jku.at/yalsat/yalsat-03v.
 
 if echo $solvers|grep -q "l" && [ ! -d lingeling ]; then wget -nc https://dominikschreiber.de/share/lingeling-isc22.zip ; fi
 if echo $solvers|grep -q "c" && [ ! -d cadical ]; then wget -nc https://dominikschreiber.de/share/cadical-isc22.zip ; fi
-if echo $solvers|grep -q "k" && [ ! -d kissat ]; then wget -nc https://dominikschreiber.de/share/kissat-isc22.zip ; fi
+if echo $solvers|grep -q "k" && [ ! -d kissat ]; then wget -nc https://github.com/domschrei/kissat/archive/refs/heads/master.zip && mv master.zip kissat-isc22.zip ; fi
