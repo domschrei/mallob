@@ -127,7 +127,8 @@ void SatProcessAdapter::doInitialize() {
     if (_terminate) return;
 
     // Assemble c-style program arguments
-    char* const* argv = _params.asCArgs("mallob_sat_process");
+    std::string executable = _params.subprocessDirectory() + "/mallob_sat_process";
+    char* const* argv = _params.asCArgs(executable.c_str());
 
     // FORK: Create a child process
     pid_t res = Process::createChild();
