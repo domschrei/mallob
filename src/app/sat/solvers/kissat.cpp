@@ -195,6 +195,10 @@ void Kissat::writeStatistics(SolverStatistics& stats) {
     stats.decisions = kstats.decisions;
     stats.propagations = kstats.propagations;
     stats.restarts = kstats.restarts;
+    stats.imported = kstats.imported;
+    stats.discarded = kstats.discarded;
+    LOGGER(_logger, V4_VVER, "KISSAT_DISC_REASONS r_ee:%ld,r_ed:%ld,r_pb:%ld,r_ss:%ld,r_sw:%ld,r_tr:%ld,r_fx:%ld,r_ia:%ld,r_tl:%ld\n",
+        kstats.r_ee, kstats.r_ed, kstats.r_pb, kstats.r_ss, kstats.r_sw, kstats.r_tr, kstats.r_fx, kstats.r_ia, kstats.r_tl);
 }
 
 Kissat::~Kissat() {
