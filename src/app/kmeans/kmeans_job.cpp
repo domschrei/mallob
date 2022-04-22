@@ -17,7 +17,7 @@ KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int 
 
 void KMeansJob::appl_start() {
     calculating = ProcessWideThreadPool::get().addTask([&]() {
-        //payload = getDescription().getFormulaPayload(0);
+        // payload = getDescription().getFormulaPayload(0);
         loadInstance();
         setRandomStartCenters();
         calcNearestCenter(
@@ -29,12 +29,9 @@ void KMeansJob::appl_start() {
 void KMeansJob::appl_suspend() {}
 void KMeansJob::appl_resume() {}
 void KMeansJob::appl_terminate() {}
-int KMeansJob::appl_solved() { return -1; }  // atomic bool
-JobResult&& KMeansJob::appl_getResult() { return JobResult(); }
 void KMeansJob::appl_communicate() {}
 void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {}
 void KMeansJob::appl_dumpStats() {}
-bool KMeansJob::appl_isDestructible() { return true; }
 void KMeansJob::appl_memoryPanic() {}
 void KMeansJob::loadInstance() {
     numClusters = payload[0];
@@ -117,8 +114,19 @@ std::string KMeansJob::dataToString(std::vector<Point> data) {
     }
     return result.str();
 }
+std::string KMeansJob::dataToString(std::vector<int> data) {
+    std::stringstream result;
+
+    for (auto entry : sumMembers) {
+        result << entry << " ";
+    }
+    result << "\n";
+    return result.str();
+}
 
 void KMeansJob::countMembers() {
+    std::stringstream result;
+    sumMembers.clear();
     sumMembers.resize(numClusters, 0);
     for (int clusterID : clusterMembership) {
         sumMembers[clusterID] += 1;

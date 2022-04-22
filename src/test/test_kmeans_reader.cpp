@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "app/kmeans/kmeans_reader.hpp"
+#include "app/kmeans/kmeans_job.hpp"
 #include "app/kmeans/kmeans_utils.hpp"
 #include "util/assert.hpp"
 #include "util/logger.hpp"
@@ -22,17 +23,17 @@ int main() {
         JobDescription desc;
         bool success = KMeansReader::read(f, desc);
         assert(success);
-        const int* payload = desc.getFormulaPayload(0);
+        KMeansJob job(Parameters(), 1, 0, 0, desc.getFormulaPayload(0));
 
-        KMeansUtils::KMeansInstance instance = KMeansUtils::loadPoints(desc);
+        job.loadInstance();
 
-        LOG(V2_INFO, "K: %d \n", instance.numClusters);
-        LOG(V2_INFO, "Dimension %d \n", instance.dimension);
-        LOG(V2_INFO, "Count of points %d \n", instance.pointsCount);
+        LOG(V2_INFO, "K: %d \n", job.getNumClusters());
+        LOG(V2_INFO, "Dimension %d \n", job.getDimension());
+        LOG(V2_INFO, "Count of points %d \n", job.getPointsCount());
 
         std::stringstream lastPoint;
 
-        for (auto e : instance.data[instance.pointsCount - 1]) {  // iterate over last point
+        for (auto e : job.getKMeansData()[job.getPointsCount() - 1]) {  // iterate over last point
             lastPoint << e << " ";
         }
         LOG(V2_INFO, "Last Point is: \n %s \n", lastPoint.str().c_str());

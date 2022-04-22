@@ -32,26 +32,26 @@ class KMeansJob : public Job {
     int getPointsCount() { return pointsCount; };
     std::vector<Point> getKMeansData() { return kMeansData; };
     const int* getPayload() { return payload; };
-    const int* setPayload(const int* newPayload) { payload = newPayload; };
+    void setPayload(const int* newPayload) { payload = newPayload; };
 
-    typedef std::vector<float> Point;
     KMeansJob(const Parameters& params, int commSize, int worldRank, int jobId, const int* newPayload);
-    void appl_start() override {}
-    void appl_suspend() override {}
-    void appl_resume() override {}
-    void appl_terminate() override {}
+    void appl_start() override;
+    void appl_suspend() override ;
+    void appl_resume() override ;
+    void appl_terminate() override ;
     int appl_solved() override { return -1; }  // atomic bool
     JobResult&& appl_getResult() override { return JobResult(); }
-    void appl_communicate() override {}
-    void appl_communicate(int source, int mpiTag, JobMessage& msg) override {}
-    void appl_dumpStats() override {}
+    void appl_communicate() override;
+    void appl_communicate(int source, int mpiTag, JobMessage& msg) override;
+    void appl_dumpStats() override;
     bool appl_isDestructible() override { return true; }
-    void appl_memoryPanic() override {}
+    void appl_memoryPanic() override;
 
     void loadInstance();
     void setRandomStartCenters();
     void calcNearestCenter(std::function<float(Point, Point)> metric);
     void calcCurrentClusterCenters();
     std::string dataToString(std::vector<Point> data);
+    std::string dataToString(std::vector<int> data);
     void countMembers();
 };

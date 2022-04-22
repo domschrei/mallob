@@ -41,6 +41,8 @@ JobDatabase::JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sys
 
 Job& JobDatabase::createJob(int commSize, int worldRank, int jobId, JobDescription::Application application) {
 
+    int i = 0; //TODO DELETE
+
     switch (application) {
     case JobDescription::Application::ONESHOT_SAT:
     case JobDescription::Application::INCREMENTAL_SAT:
@@ -51,7 +53,7 @@ Job& JobDatabase::createJob(int commSize, int worldRank, int jobId, JobDescripti
         }
         break;
     case JobDescription::Application::KMEANS:
-        _jobs[jobId] = new KMeansJob(_params, commSize, worldRank, jobId);
+        _jobs[jobId] = new KMeansJob(_params, commSize, worldRank, jobId, &i);
         break;
     case JobDescription::Application::DUMMY:
         _jobs[jobId] = new DummyJob(_params, commSize, worldRank, jobId);

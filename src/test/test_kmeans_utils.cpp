@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "app/kmeans/kmeans_reader.hpp"
 #include "app/kmeans/kmeans_job.hpp"
+#include "app/kmeans/kmeans_reader.hpp"
 #include "app/kmeans/kmeans_utils.hpp"
 #include "util/assert.hpp"
 #include "util/logger.hpp"
@@ -14,16 +14,17 @@
 typedef std::vector<float> Point;
 
 int main() {
-    
     Timer::init();
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
-    auto files = {"mnist784.csv",
-                  "benign_traffic.csv",
-                  "covtype.csv",
-                  "2d-10c.arff",
-                  "birch-rg1.arff",
-                  "birch-rg2.arff",
-                  "birch-rg3.arff"};
+    auto files = {
+        //"mnist784.csv",
+        //"benign_traffic.csv",
+        "covtype.csv",
+        //"2d-10c.arff",
+        //"birch-rg1.arff",
+        //"birch-rg2.arff",
+        //"birch-rg3.arff"
+    };
 
     for (const auto& file : files) {
         auto f = std::string("../kMeansData/") + file;
@@ -43,20 +44,15 @@ int main() {
         job.setRandomStartCenters();
 
         LOG(V2_INFO, "Start clusterCenters: \n%s\n", job.dataToString(job.getClusterCenters()).c_str());
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < 5; ++i) {
             job.calcNearestCenter(
-            [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); });
+                [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); });
 
             std::stringstream countMembersString;
             job.countMembers();
-            std::copy(job.getSumMembers().begin(), job.getSumMembers().end(), std::ostream_iterator<int>(countMembersString, " "));
-            LOG(V2_INFO, "cluster membership counts: \n%s\n", countMembersString.str().c_str());
-            
-            clusterCenters = job.calcCurrentClusterCenters(instance.data,
-                                                                    clusterMembership,
-                                                                    instance.pointsCount,
-                                                                    instance.numClusters,
-                                                                    instance.dimension);
+            LOG(V2_INFO, "cluster membership counts: \n%s\n", job.dataToString(job.getClusterMembership()).c_str());
+
+            job.calcCurrentClusterCenters();
             // LOG(V2_INFO, "new clusterCenters: \n%s\n", job.pointsToString(clusterCenters).c_str());
         }
         time = Timer::elapsedSeconds() - time;
