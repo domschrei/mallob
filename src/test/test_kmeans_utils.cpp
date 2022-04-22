@@ -18,12 +18,12 @@ int main() {
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
     auto files = {
         "mnist784.csv",
-        //"benign_traffic.csv",
+        "benign_traffic.csv",
         "covtype.csv",
-        //"2d-10c.arff",
-        //"birch-rg1.arff",
-        //"birch-rg2.arff",
-        //"birch-rg3.arff"
+        "2d-10c.arff",
+        "birch-rg1.arff",
+        "birch-rg2.arff",
+        "birch-rg3.arff"
     };
 
     for (const auto& file : files) {
@@ -44,7 +44,9 @@ int main() {
         job.setRandomStartCenters();
 
         LOG(V2_INFO, "Start clusterCenters: \n%s\n", job.dataToString(job.getClusterCenters()).c_str());
-        for (int i = 0; i < 5; ++i) {
+        while (1 / 1000 < job.calculateDifference(
+                              [&](Point p1, Point p2) 
+                              { return KMeansUtils::eukild(p1, p2); })) {
             job.calcNearestCenter(
                 [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); });
 

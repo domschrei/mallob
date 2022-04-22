@@ -1,0 +1,26 @@
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Program received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=139728758232832, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=139728758232832, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007f155103c047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x0000556ecd943cf0 in Process::writeTrace (tid=<optimized out>) at /mnt/s/Projekte/mallob/src/util/sys/process.cpp:196
+#3  0x0000556ecd9442c8 in handleSignal (signum=6) at /usr/include/c++/9/bits/atomic_base.h:413
+#4  <signal handler called>
+#5  __GI_raise (sig=sig@entry=6) at ../sysdeps/unix/sysv/linux/raise.c:50
+#6  0x00007f1550d78859 in __GI_abort () at abort.c:79
+#7  0x00007f1550d78729 in __assert_fail_base (fmt=0x7f1550f0e588 "%s%s%s:%u: %s%sAssertion `%s' failed.\n%n", assertion=0x556ecdae068e "_num == 0", file=0x556ecdae06d0 "/mnt/s/Projekte/mallob/src/util/sat_reader.hpp", line=82, function=<optimized out>) at assert.c:92
+#8  0x00007f1550d8a006 in __GI___assert_fail (assertion=assertion@entry=0x556ecdae068e "_num == 0", file=file@entry=0x556ecdae06d0 "/mnt/s/Projekte/mallob/src/util/sat_reader.hpp", line=line@entry=82, function=function@entry=0x556ecdae06a0 "void SatReader::process(char, JobDescription&)") at assert.c:101
+#9  0x0000556ecd9422bf in SatReader::process (desc=..., c=<optimized out>, this=<optimized out>) at /mnt/s/Projekte/mallob/src/util/robin_hood.hpp:842
+#10 SatReader::read (this=this@entry=0x7f1549336be0, desc=...) at /mnt/s/Projekte/mallob/src/util/sat_reader.cpp:52
+#11 0x0000556ecd91d35b in JobReader::read (files=..., contentMode=SatReader::ASCII, desc=...) at /usr/include/c++/9/bits/char_traits.h:300
+#12 0x0000556ecd898274 in Client::<lambda()>::operator() (__closure=0x7f1518000bb0) at /usr/include/c++/9/bits/unique_ptr.h:360
+#13 std::_Function_handler<void(), Client::readIncomingJobs()::<lambda()> >::_M_invoke(const std::_Any_data &) (__functor=...) at /usr/include/c++/9/bits/std_function.h:300
+#14 0x0000556ecd8a379d in std::function<void ()>::operator()() const (this=0x7f1549336e60) at /usr/include/c++/9/bits/std_function.h:683
+#15 ThreadPool::runThread (this=0x556ecdfcffa0, id=<optimized out>) at /mnt/s/Projekte/mallob/src/util/sys/thread_pool.hpp:66
+#16 0x00007f155103bde4 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#17 0x00007f15512a8609 in start_thread (arg=<optimized out>) at pthread_create.c:477
+#18 0x00007f1550e75163 in clone () at ../sysdeps/unix/sysv/linux/x86_64/clone.S:95
+[Inferior 1 (process 21628) detached]

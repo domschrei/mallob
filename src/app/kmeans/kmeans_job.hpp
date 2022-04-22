@@ -14,11 +14,13 @@ class KMeansJob : public Job {
    private:
     typedef std::vector<float> Point;
     std::vector<Point> clusterCenters;   // The centers of cluster 0..n
+    std::vector<Point> oldClusterCenters;
     std::vector<int> clusterMembership;  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
     std::vector<int> sumMembers;
     int numClusters;
     int dimension;
     int pointsCount;
+    int iterationsDone = 0;
     std::vector<Point> kMeansData;
     const int* payload;
     std::future<void> calculating;
@@ -30,6 +32,7 @@ class KMeansJob : public Job {
     int getNumClusters() { return numClusters; };
     int getDimension() { return dimension; };
     int getPointsCount() { return pointsCount; };
+    int getIterationsDone() { return iterationsDone; };
     std::vector<Point> getKMeansData() { return kMeansData; };
     const int* getPayload() { return payload; };
     void setPayload(const int* newPayload) { payload = newPayload; };
@@ -40,6 +43,7 @@ class KMeansJob : public Job {
     void appl_resume() override ;
     void appl_terminate() override ;
     int appl_solved() override { return -1; }  // atomic bool
+    int getDemand() const  {return 1;}
     JobResult&& appl_getResult() override { return JobResult(); }
     void appl_communicate() override;
     void appl_communicate(int source, int mpiTag, JobMessage& msg) override;
@@ -54,4 +58,5 @@ class KMeansJob : public Job {
     std::string dataToString(std::vector<Point> data);
     std::string dataToString(std::vector<int> data);
     void countMembers();
+    float calculateDifference(std::function<float(Point, Point)> metric);
 };
