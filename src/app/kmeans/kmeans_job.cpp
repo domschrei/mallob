@@ -1,5 +1,6 @@
 #include "kmeans_job.hpp"
 
+#include <iostream>
 #include <thread>
 
 #include "app/job.hpp"
@@ -11,7 +12,6 @@
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
-
 KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int jobId, const int* newPayload)
     : Job(params, commSize, worldRank, jobId, JobDescription::Application::KMEANS) { setPayload(newPayload); }
 
@@ -62,7 +62,7 @@ void KMeansJob::calcNearestCenter(std::function<float(Point, Point)> metric) {
         int cluster;
         float distance;
     } currentNearestCenter;
-
+    clusterMembership.clear();
     clusterMembership.resize(pointsCount);
     float distanceToCluster;
     for (int pointID = 0; pointID < pointsCount; ++pointID) {
@@ -92,7 +92,7 @@ void KMeansJob::calcCurrentClusterCenters() {
             clusterdPoints[clusterMembership[pointID]][d].push_back(kMeansData[pointID][d]);
         }
     }
-
+    clusterCenters.clear();
     clusterCenters.resize(numClusters);
     for (int cluster = 0; cluster < numClusters; ++cluster) {
         for (int d = 0; d < dimension; ++d) {

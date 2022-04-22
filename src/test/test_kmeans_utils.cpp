@@ -17,7 +17,7 @@ int main() {
     Timer::init();
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
     auto files = {
-        //"mnist784.csv",
+        "mnist784.csv",
         //"benign_traffic.csv",
         "covtype.csv",
         //"2d-10c.arff",
@@ -53,7 +53,8 @@ int main() {
             LOG(V2_INFO, "cluster membership counts: \n%s\n", job.dataToString(job.getClusterMembership()).c_str());
 
             job.calcCurrentClusterCenters();
-            // LOG(V2_INFO, "new clusterCenters: \n%s\n", job.pointsToString(clusterCenters).c_str());
+
+            //LOG(V2_INFO, "New clusterCenters: \n%s\n", job.dataToString(job.getClusterCenters()).c_str());
         }
         time = Timer::elapsedSeconds() - time;
         LOG(V2_INFO, " - done, took %.3fs\n", time);
