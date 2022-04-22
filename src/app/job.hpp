@@ -27,6 +27,7 @@ protected:
     The parameters the application was started with.
     */
     const Parameters& _params;
+    JobDescription _description;
     
 public:
     // BEGIN of interface to implement as an application.
@@ -143,7 +144,6 @@ private:
     JobDescription::Application _appl;
 
     std::atomic_bool _has_description = false;
-    JobDescription _description;
     int _desired_revision = 0;
     int _last_solved_revision = -1;
 

@@ -1,70 +1,126 @@
-#include "app/job.hpp"
 #include "kmeans_job.hpp"
 
-/*
-Minimally compiling example "application" for a Mallob job.
-Edit and extend for your application.
-*/
-typedef std::vector<float> Point;
-class KMeansJob : public Job {
-   private:
-    std::vector<Point> points;
+#include <thread>
 
-   public:
-    KMeansJob(const Parameters& params, int commSize, int worldRank, int jobId)
-        : Job(params, commSize, worldRank, jobId, JobDescription::Application::KMEANS) {}
-    void appl_start() override {
-        const JobDescription& desc = getDescription();
-        const int* payload = desc.getFormulaPayload(0);
-        KMeansJob::KMeansInstance instance = KMeansUtils::loadPoints(desc);
+#include "app/job.hpp"
+#include "comm/mympi.hpp"
+#include "kmeans_utils.hpp"
+#include "util/assert.hpp"
+#include "util/logger.hpp"
+#include "util/sys/proc.hpp"
+#include "util/sys/process.hpp"
+#include "util/sys/thread_pool.hpp"
+#include "util/sys/timer.hpp"
 
-        KMeansUtils::ClusterCenters clusterCenters;
-        clusterCenters.resize(instance.numClusters);
-        for (int i = 0; i < instance.numClusters; ++i) {
-            clusterCenters[i] = instance.data[static_cast<int>((static_cast<float>(i) / static_cast<float>(instance.numClusters)) * (instance.pointsCount - 1))];
-        }
+KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int jobId, const int* newPayload)
+    : Job(params, commSize, worldRank, jobId, JobDescription::Application::KMEANS) { setPayload(newPayload); }
 
-        for (int i = 0; i < 5; ++i) {
-            KMeansUtils::ClusterMembership clusterMembership;
-            clusterMembership = KMeansUtils::calcNearestCenter(instance.data,
-                                                               clusterCenters,
-                                                               instance.pointsCount,
-                                                               instance.numClusters,
-                                                               KMeansUtils::eukild);
-            std::vector<int> countMembers(instance.numClusters, 0);
-            for (int clusterID : clusterMembership) {
-                countMembers[clusterID] += 1;
-            }
-            std::stringstream countMembersString;
-            std::copy(countMembers.begin(), countMembers.end(), std::ostream_iterator<int>(countMembersString, " "));
-            clusterCenters = KMeansUtils::calcCurrentClusterCenters(instance.data,
-                                                                    clusterMembership,
-                                                                    instance.pointsCount,
-                                                                    instance.numClusters,
-                                                                    instance.dimension);
+void KMeansJob::appl_start() {
+    calculating = ProcessWideThreadPool::get().addTask([&]() {
+        //payload = getDescription().getFormulaPayload(0);
+        loadInstance();
+        setRandomStartCenters();
+        calcNearestCenter(
+            [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); });
+
+        calcCurrentClusterCenters();
+    });
+}
+void KMeansJob::appl_suspend() {}
+void KMeansJob::appl_resume() {}
+void KMeansJob::appl_terminate() {}
+int KMeansJob::appl_solved() { return -1; }  // atomic bool
+JobResult&& KMeansJob::appl_getResult() { return JobResult(); }
+void KMeansJob::appl_communicate() {}
+void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {}
+void KMeansJob::appl_dumpStats() {}
+bool KMeansJob::appl_isDestructible() { return true; }
+void KMeansJob::appl_memoryPanic() {}
+void KMeansJob::loadInstance() {
+    numClusters = payload[0];
+    dimension = payload[1];
+    pointsCount = payload[2];
+    kMeansData.reserve(pointsCount);
+    payload += 3;  // pointer start at first datapoint instead of metadata
+    for (int point = 0; point < pointsCount; ++point) {
+        Point p;
+        p.reserve(dimension);
+        for (int entry = 0; entry < dimension; ++entry) {
+            p.push_back(*((float*)(payload + entry)));
         }
-        // ProcesswideThreadpool(work, data)
-        /*
-        std::cout << "K: " << k << std::endl;
-        std::cout << "dim: " << dim << std::endl;
-        std::cout << "cols: " << col << std::endl;
-        std::cout << "count: " << count << std::endl;
-        for (int point = 0; point < count; ++point) {
-            for (int entry = 0; entry < dim; ++entry) {
-                std::cout << points[point][entry] << ' ';
-            }
-            std::cout << std::endl;
-        }
-        */
+        kMeansData.push_back(p);
+        payload = payload + dimension;
     }
-    void appl_suspend() override {}
-    void appl_resume() override {}
-    void appl_terminate() override {}
-    int appl_solved() override { return -1; }  // atomic bool
-    JobResult&& appl_getResult() override { return JobResult(); }
-    void appl_communicate() override {}
-    void appl_communicate(int source, int mpiTag, JobMessage& msg) override {}
-    void appl_dumpStats() override {}
-    bool appl_isDestructible() override { return true; }
-    void appl_memoryPanic() override {}
-};
+}
+
+void KMeansJob::setRandomStartCenters() {
+    clusterCenters.resize(numClusters);
+    for (int i = 0; i < numClusters; ++i) {
+        clusterCenters[i] = kMeansData[static_cast<int>((static_cast<float>(i) / static_cast<float>(numClusters)) * (pointsCount - 1))];
+    }
+}
+
+void KMeansJob::calcNearestCenter(std::function<float(Point, Point)> metric) {
+    struct centerDistance {
+        int cluster;
+        float distance;
+    } currentNearestCenter;
+
+    clusterMembership.resize(pointsCount);
+    float distanceToCluster;
+    for (int pointID = 0; pointID < pointsCount; ++pointID) {
+        currentNearestCenter.cluster = -1;
+        currentNearestCenter.distance = std::numeric_limits<float>::infinity();
+        for (int clusterID = 0; clusterID < numClusters; ++clusterID) {
+            distanceToCluster = metric(kMeansData[pointID], clusterCenters[clusterID]);
+            if (distanceToCluster < currentNearestCenter.distance) {
+                currentNearestCenter.cluster = clusterID;
+                currentNearestCenter.distance = distanceToCluster;
+            }
+        }
+        clusterMembership[pointID] = currentNearestCenter.cluster;
+    }
+}
+
+void KMeansJob::calcCurrentClusterCenters() {
+    typedef std::vector<float> Dimension;                             // transposed data to reduce dimension by dimension
+    typedef std::vector<std::vector<Dimension>> ClusteredDataPoints;  // ClusteredDataPoints[i] contains the points belonging to cluster i
+    ClusteredDataPoints clusterdPoints;
+    clusterdPoints.resize(numClusters);
+    for (int cluster = 0; cluster < numClusters; ++cluster) {
+        clusterdPoints[cluster].resize(dimension);
+    }
+    for (int pointID = 0; pointID < pointsCount; ++pointID) {
+        for (int d = 0; d < dimension; ++d) {
+            clusterdPoints[clusterMembership[pointID]][d].push_back(kMeansData[pointID][d]);
+        }
+    }
+
+    clusterCenters.resize(numClusters);
+    for (int cluster = 0; cluster < numClusters; ++cluster) {
+        for (int d = 0; d < dimension; ++d) {
+            clusterCenters[cluster].push_back(std::reduce(clusterdPoints[cluster][d].begin(),
+                                                          clusterdPoints[cluster][d].end()) /
+                                              static_cast<float>(clusterdPoints[cluster][0].size()));
+        }
+    }
+}
+
+std::string KMeansJob::dataToString(std::vector<Point> data) {
+    std::stringstream result;
+
+    for (auto point : data) {
+        for (auto entry : point) {
+            result << entry << " ";
+        }
+        result << "\n";
+    }
+    return result.str();
+}
+
+void KMeansJob::countMembers() {
+    sumMembers.resize(numClusters, 0);
+    for (int clusterID : clusterMembership) {
+        sumMembers[clusterID] += 1;
+    }
+}

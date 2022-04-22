@@ -6,12 +6,15 @@
 
 #include "app/kmeans/kmeans_reader.hpp"
 #include "app/kmeans/kmeans_job.hpp"
+#include "app/kmeans/kmeans_utils.hpp"
 #include "util/assert.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
 #include "util/sys/timer.hpp"
+typedef std::vector<float> Point;
 
 int main() {
+    
     Timer::init();
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
     auto files = {"mnist784.csv",
@@ -29,35 +32,26 @@ int main() {
         JobDescription desc;
         bool success = KMeansReader::read(f, desc);
         assert(success);
-        const int* payload = desc.getFormulaPayload(0);
-        KMeansJob job(Parameters(), 1, 0, 0);
-        KMeansJob::KMeansInstance instance = job.loadPoints(desc);
+        KMeansJob job(Parameters(), 1, 0, 0, desc.getFormulaPayload(0));
 
-        LOG(V2_INFO, "K: %d \n", instance.numClusters);
-        LOG(V2_INFO, "Dimension %d \n", instance.dimension);
-        LOG(V2_INFO, "Count of points %d \n", instance.pointsCount);
+        job.loadInstance();
 
-        KMeansJob::ClusterCenters clusterCenters;
-        clusterCenters.resize(instance.numClusters);
-        for (int i = 0; i < instance.numClusters; ++i) {
-            clusterCenters[i] = instance.data[static_cast<int>((static_cast<float>(i) / static_cast<float>(instance.numClusters)) * (instance.pointsCount - 1))];
-        }
+        LOG(V2_INFO, "K: %d \n", job.getNumClusters());
+        LOG(V2_INFO, "Dimension %d \n", job.getDimension());
+        LOG(V2_INFO, "Count of points %d \n", job.getPointsCount());
 
-        LOG(V2_INFO, "Start clusterCenters: \n%s\n", job.pointsToString(clusterCenters).c_str());
-        for (int i = 0; i < 5; ++i) {
-            KMeansJob::ClusterMembership clusterMembership;
-            clusterMembership = job.calcNearestCenter(instance.data,
-                                                               clusterCenters,
-                                                               instance.pointsCount,
-                                                               instance.numClusters,
-                                                               [&](KMeansJob::Point p1, KMeansJob::Point p2) {return job.eukild(p1, p2);} );
-            std::vector<int> countMembers(instance.numClusters, 0);
-            for (int clusterID : clusterMembership) {
-                countMembers[clusterID] += 1;
-            }
+        job.setRandomStartCenters();
+
+        LOG(V2_INFO, "Start clusterCenters: \n%s\n", job.dataToString(job.getClusterCenters()).c_str());
+        for (int i = 0; i < 3; ++i) {
+            job.calcNearestCenter(
+            [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); });
+
             std::stringstream countMembersString;
-            std::copy(countMembers.begin(), countMembers.end(), std::ostream_iterator<int>(countMembersString, " "));
+            job.countMembers();
+            std::copy(job.getSumMembers().begin(), job.getSumMembers().end(), std::ostream_iterator<int>(countMembersString, " "));
             LOG(V2_INFO, "cluster membership counts: \n%s\n", countMembersString.str().c_str());
+            
             clusterCenters = job.calcCurrentClusterCenters(instance.data,
                                                                     clusterMembership,
                                                                     instance.pointsCount,
