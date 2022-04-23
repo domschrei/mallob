@@ -34,7 +34,7 @@ int main() {
         bool success = KMeansReader::read(f, desc);
         assert(success);
         KMeansJob job(Parameters(), 1, 0, 0, desc.getFormulaPayload(0));
-
+        
         job.loadInstance();
 
         LOG(V2_INFO, "K: %d \n", job.getNumClusters());
@@ -52,7 +52,7 @@ int main() {
 
             std::stringstream countMembersString;
             job.countMembers();
-            LOG(V2_INFO, "cluster membership counts: \n%s\n", job.dataToString(job.getClusterMembership()).c_str());
+            LOG(V2_INFO, "cluster membership counts: \n%s\n", job.dataToString(job.getSumMembers()).c_str());
 
             job.calcCurrentClusterCenters();
 

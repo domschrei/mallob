@@ -8,6 +8,7 @@
 #include <thread>
 
 #include "app/job.hpp"
+#include "app/sat/job/sat_constants.h"
 #include "util/params.hpp"
 
 class KMeansJob : public Job {
@@ -24,6 +25,8 @@ class KMeansJob : public Job {
     std::vector<Point> kMeansData;
     const int* payload;
     std::future<void> calculating;
+    bool finished = false;
+    JobResult internal_result;
 
    public:
     std::vector<Point> getClusterCenters() { return clusterCenters; };      // The centers of cluster 0..n
@@ -42,9 +45,9 @@ class KMeansJob : public Job {
     void appl_suspend() override ;
     void appl_resume() override ;
     void appl_terminate() override ;
-    int appl_solved() override { return -1; }  // atomic bool
+    int appl_solved() override { return finished ? RESULT_KMEANS : -1; }  // atomic bool
     int getDemand() const  {return 1;}
-    JobResult&& appl_getResult() override { return JobResult(); }
+    JobResult&& appl_getResult() override ;
     void appl_communicate() override;
     void appl_communicate(int source, int mpiTag, JobMessage& msg) override;
     void appl_dumpStats() override;

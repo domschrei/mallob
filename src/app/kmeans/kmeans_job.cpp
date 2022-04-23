@@ -17,7 +17,7 @@ KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int 
 
 void KMeansJob::appl_start() {
     calculating = ProcessWideThreadPool::get().addTask([&]() {
-        // payload = getDescription().getFormulaPayload(0);
+        payload = getDescription().getFormulaPayload(0);
         loadInstance();
         setRandomStartCenters();
         while (1 / 1000 < calculateDifference(
@@ -27,10 +27,19 @@ void KMeansJob::appl_start() {
 
             calcCurrentClusterCenters();
         }
+        internal_result.result = RESULT_KMEANS;
+        internal_result.id = getId();
+        internal_result.revision = getRevision();
+        std::vector<int> example(5, 42);
+        internal_result.setSolutionToSerialize(example.data(),5);
+        finished = true;
     });
 }
 void KMeansJob::appl_suspend() {}
 void KMeansJob::appl_resume() {}
+JobResult&& KMeansJob::appl_getResult() {
+    return std::move(internal_result);
+}
 void KMeansJob::appl_terminate() {}
 void KMeansJob::appl_communicate() {}
 void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {}
@@ -146,7 +155,7 @@ float KMeansJob::calculateDifference(std::function<float(Point, Point)> metric) 
     Point v0(dimension, 0);
     for (int k = 0; k < numClusters; ++k) {
         sumOldvec += metric(v0, clusterCenters[k]);
-        
+
         sumDifference += metric(clusterCenters[k], oldClusterCenters[k]);
     }
     return sumDifference / sumOldvec;

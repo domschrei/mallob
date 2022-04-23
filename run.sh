@@ -15,7 +15,7 @@ if echo "$1" | grep -qE "^[0-9]+$" ; then
     NP="$1"
     shift 1
 else
-    NP="9"
+    NP="8"
     echo "Defaulting to $NP nodes."
 fi
 
