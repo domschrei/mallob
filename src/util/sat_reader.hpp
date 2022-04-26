@@ -76,6 +76,7 @@ public:
 
         switch (c) {
         case '\n':
+        case '\r':
         case EOF:
             _comment = false;
             if (_began_num) {
