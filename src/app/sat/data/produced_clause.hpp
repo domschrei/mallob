@@ -161,6 +161,19 @@ namespace prod_cls {
     }
 
     template<typename T>
+    int* data(T& producedClause) {
+        if constexpr (std::is_base_of<ProducedUnitClause, T>()) {
+            return &producedClause.literal;
+        }
+        if constexpr (std::is_base_of<ProducedBinaryClause, T>()) {
+            return producedClause.literals;
+        }
+        if constexpr (std::is_base_of<ProducedLargeClause, T>()) {
+            return producedClause.data;
+        }
+    }
+
+    template<typename T>
     Mallob::Clause toMallobClause(T& producedClause) {
         if constexpr (std::is_base_of<ProducedUnitClause, T>()) {
             return Mallob::Clause(&producedClause.literal, 1, 1);
