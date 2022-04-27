@@ -1,7 +1,7 @@
 { 
     "user": "admin", 
     "name": "test-job-1", 
-    "files": ["/mnt/s/Projekte/mallob/instances/mnist784.csv"], 
+    "files": ["./instances/mnist784.csv"], 
     "priority": 1, 
     "application": "KMEANS"
 }

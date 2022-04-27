@@ -31,7 +31,7 @@ void KMeansJob::appl_start() {
         internal_result.id = getId();
         internal_result.revision = getRevision();
         std::vector<int> example(5, 42);
-        internal_result.setSolutionToSerialize(example.data(),5);
+        internal_result.setSolutionToSerialize(example.data(), 5);
         finished = true;
     });
 }
@@ -105,13 +105,19 @@ void KMeansJob::calcCurrentClusterCenters() {
             clusterdPoints[clusterMembership[pointID]][d].push_back(kMeansData[pointID][d]);
         }
     }
+    for (int cluster = 0; cluster < numClusters; ++cluster) {
+        for (int d = 0; d < dimension; ++d) {
+            for (int elem = 0; elem < clusterdPoints[cluster][0].size(); ++elem) {
+                clusterdPoints[cluster][d][elem] /= static_cast<float>(clusterdPoints[cluster][0].size());
+            }
+        }
+    }
     clusterCenters.clear();
     clusterCenters.resize(numClusters);
     for (int cluster = 0; cluster < numClusters; ++cluster) {
         for (int d = 0; d < dimension; ++d) {
             clusterCenters[cluster].push_back(std::reduce(clusterdPoints[cluster][d].begin(),
-                                                          clusterdPoints[cluster][d].end()) /
-                                              static_cast<float>(clusterdPoints[cluster][0].size()));
+                                                          clusterdPoints[cluster][d].end()));
         }
     }
     ++iterationsDone;
