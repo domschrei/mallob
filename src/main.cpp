@@ -30,7 +30,7 @@ void introduceMonoJob(Parameters& params, Client& client) {
         {"name", "mono-job"},
         {"files", {params.monoFilename()}},
         {"priority", 1.000},
-        {"application", "SAT"}
+        {"application", params.monoApplication()}
     };
     if (params.jobWallclockLimit() > 0)
         json["wallclock-limit"] = std::to_string(params.jobWallclockLimit()) + "s";

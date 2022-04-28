@@ -103,5 +103,6 @@ OPT_STRING(monoFilename,                 "mono", "",                            
 OPT_STRING(satSolverSequence,            "satsolver",  "",                            "L",                     "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
 OPT_STRING(solutionToFile,               "s2f", "solution-to-file",                   "",                      "Write solutions to file with provided base name + job ID")
 OPT_STRING(subprocessPrefix,             "subproc-prefix", "",                        "",                      "Execute SAT subprocess with this prefix (e.g., \"valgrind\")")
+OPT_STRING(monoApplication,              "mono-application", "",                        "",                      "TD")
 
 #endif

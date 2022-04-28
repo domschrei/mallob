@@ -27,11 +27,13 @@ void KMeansJob::appl_start() {
 
             calcCurrentClusterCenters();
         }
-        internal_result.result = RESULT_KMEANS;
+        internal_result.result = RESULT_SAT;
+        
+
         internal_result.id = getId();
         internal_result.revision = getRevision();
         std::vector<int> example(5, 42);
-        internal_result.setSolutionToSerialize(example.data(), 5);
+        internal_result.setSolutionToSerialize(sumMembers.data(), sumMembers.size());
         finished = true;
     });
 }
@@ -96,6 +98,7 @@ void KMeansJob::calcCurrentClusterCenters() {
     typedef std::vector<float> Dimension;                             // transposed data to reduce dimension by dimension
     typedef std::vector<std::vector<Dimension>> ClusteredDataPoints;  // ClusteredDataPoints[i] contains the points belonging to cluster i
     ClusteredDataPoints clusterdPoints;
+
     clusterdPoints.resize(numClusters);
     for (int cluster = 0; cluster < numClusters; ++cluster) {
         clusterdPoints[cluster].resize(dimension);
