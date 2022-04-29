@@ -34,6 +34,7 @@ OPT_BOOL(pipeLargeSolutions,             "pls", "pipe-large-solutions",         
 OPT_BOOL(quiet,                          "q", "quiet",                                false,                   "Do not log to stdout besides critical information")
 OPT_BOOL(reactivationScheduling,         "rs", "use-reactivation-scheduling",         true,                    "Perform reactivation-based scheduling")
 OPT_BOOL(regularProcessDistribution,     "rpa", "regular-process-allocation",         false,                   "Signal that processes have been allocated regularly, i.e., the i-th machine hosts ranks c*i through c*i + c-1")
+OPT_BOOL(reshareImprovedLbd,             "ril", "reshare-improved-lbd",               false,                   "Reshare clauses (regardless of their last sharing epoch) if their LBD improved")
 OPT_BOOL(shuffleJobDescriptions,         "sjd", "shuffle-job-descriptions",           false,                   "Shuffle job descriptions given via -job-desc-template option")
 OPT_BOOL(useChecksums,                   "checksums", "",                             false,                   "Compute and verify checksum for every job description transfer")
 OPT_BOOL(watchdog,                       "watchdog", "",                              true,                    "Employ watchdog threads to detect unresponsive program flow")

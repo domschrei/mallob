@@ -47,11 +47,13 @@ private:
     Mutex _map_mutex;
 
     const int _epoch_horizon;
+    const bool _reshare_improved_lbd;
 
     ClauseInfo _empty_clause_info;
 
 public:
-    ProducedClauseFilter(int epochHorizon) : _epoch_horizon(epochHorizon) {}
+    ProducedClauseFilter(int epochHorizon, bool reshareImprovedLbd) : 
+        _epoch_horizon(epochHorizon), _reshare_improved_lbd(reshareImprovedLbd) {}
 
     enum ExportResult {ADMITTED, FILTERED, DROPPED};
     ExportResult tryRegisterAndInsert(ProducedClauseCandidate&& c, AdaptiveClauseDatabase& cdb) {
@@ -176,6 +178,10 @@ private:
             // Clause was shared before
             if (epoch - info.lastSharedEpoch <= _epoch_horizon) {
                 // Clause was shared at some recent point in time
+                if (!_reshare_improved_lbd) {
+                    // Never reshare recent clauses, even with improved LBD
+                    return false;
+                }
                 if (info.minSharedLbd <= lbd) {
                     // Clause was shared with this LBD or better: filter
                     return false; 

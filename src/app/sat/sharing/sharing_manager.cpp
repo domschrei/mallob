@@ -20,7 +20,7 @@ SharingManager::SharingManager(
 	: _solvers(solvers),
 	_max_deferred_lits_per_solver(maxDeferredLitsPerSolver), 
 	_params(params), _logger(logger), _job_index(jobIndex),
-	_filter(params.clauseFilterClearInterval()),
+	_filter(params.clauseFilterClearInterval(), params.reshareImprovedLbd()),
 	_cdb([&]() {
 		AdaptiveClauseDatabase::Setup setup;
 		setup.maxClauseLength = _params.strictClauseLengthLimit();
