@@ -28,12 +28,24 @@ void KMeansJob::appl_start() {
             calcCurrentClusterCenters();
         }
         internal_result.result = RESULT_SAT;
-        
 
         internal_result.id = getId();
         internal_result.revision = getRevision();
-        std::vector<int> example(5, 42);
-        internal_result.setSolutionToSerialize(sumMembers.data(), sumMembers.size());
+        std::vector<int> transformSolution;
+        /*
+        transformSolution.reserve(clusterMembership.size() + 1);
+        transformSolution.push_back(-42);
+        for (auto element : clusterMembership){
+            transformSolution.push_back(element);
+        }
+        internal_result.setSolutionToSerialize(transformSolution.data(), clusterMembership.size());
+        */
+        transformSolution.reserve(sumMembers.size() + 1);
+        transformSolution.push_back(-42);
+        for (auto element : sumMembers) {
+            transformSolution.push_back(element);
+        }
+        internal_result.setSolutionToSerialize(transformSolution.data(), sumMembers.size() +1);
         finished = true;
     });
 }
@@ -97,30 +109,17 @@ void KMeansJob::calcCurrentClusterCenters() {
     oldClusterCenters = clusterCenters;
     typedef std::vector<float> Dimension;                             // transposed data to reduce dimension by dimension
     typedef std::vector<std::vector<Dimension>> ClusteredDataPoints;  // ClusteredDataPoints[i] contains the points belonging to cluster i
-    ClusteredDataPoints clusterdPoints;
 
-    clusterdPoints.resize(numClusters);
+    countMembers();
+
     for (int cluster = 0; cluster < numClusters; ++cluster) {
-        clusterdPoints[cluster].resize(dimension);
+        clusterCenters[cluster].clear();
+        clusterCenters[cluster].assign(dimension, 0);
     }
     for (int pointID = 0; pointID < pointsCount; ++pointID) {
         for (int d = 0; d < dimension; ++d) {
-            clusterdPoints[clusterMembership[pointID]][d].push_back(kMeansData[pointID][d]);
-        }
-    }
-    for (int cluster = 0; cluster < numClusters; ++cluster) {
-        for (int d = 0; d < dimension; ++d) {
-            for (int elem = 0; elem < clusterdPoints[cluster][0].size(); ++elem) {
-                clusterdPoints[cluster][d][elem] /= static_cast<float>(clusterdPoints[cluster][0].size());
-            }
-        }
-    }
-    clusterCenters.clear();
-    clusterCenters.resize(numClusters);
-    for (int cluster = 0; cluster < numClusters; ++cluster) {
-        for (int d = 0; d < dimension; ++d) {
-            clusterCenters[cluster].push_back(std::reduce(clusterdPoints[cluster][d].begin(),
-                                                          clusterdPoints[cluster][d].end()));
+            clusterCenters[clusterMembership[pointID]][d] +=
+                kMeansData[pointID][d] / static_cast<float>(sumMembers[clusterMembership[pointID]]);
         }
     }
     ++iterationsDone;
