@@ -34,6 +34,12 @@ struct ClauseInfo {
     }
 };
 
+// Exact data structure which remembers clauses which were successfully exported by a solver.
+// For each incoming clause, the structure can then be used to decide (a) if the clause should 
+// be discarded ("filtered") because it was shared before (or too recently) and (b) which
+// subset of solvers should receive the clauses (because they did not export it themselves).
+// The structure takes space linear in the number of clauses successfully added to the
+// AdaptiveClauseDatabase instance which is used for tryRegisterAndInsert. 
 class ProducedClauseFilter {
 
 template <typename T>
