@@ -1,0 +1,7 @@
+{ 
+    "user": "admin", 
+    "name": "covtype", 
+    "files": ["../kMeansData/covtype.csv"], 
+    "priority": 1, 
+    "application": "KMEANS"
+}

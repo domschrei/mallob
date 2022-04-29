@@ -1,0 +1,7 @@
+{ 
+    "user": "admin", 
+    "name": "2d-10c", 
+    "files": ["../kMeansData/2d-10c.arff"], 
+    "priority": 1, 
+    "application": "KMEANS"
+}

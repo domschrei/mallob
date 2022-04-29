@@ -33,19 +33,14 @@ void KMeansJob::appl_start() {
         internal_result.revision = getRevision();
         std::vector<int> transformSolution;
         /*
-        transformSolution.reserve(clusterMembership.size() + 1);
-        transformSolution.push_back(-42);
-        for (auto element : clusterMembership){
-            transformSolution.push_back(element);
-        }
-        internal_result.setSolutionToSerialize(transformSolution.data(), clusterMembership.size());
-        */
         transformSolution.reserve(sumMembers.size() + 1);
         transformSolution.push_back(-42);
         for (auto element : sumMembers) {
             transformSolution.push_back(element);
         }
-        internal_result.setSolutionToSerialize(transformSolution.data(), sumMembers.size() +1);
+        */
+        
+        internal_result.setSolutionToSerialize(sumMembers.data(), sumMembers.size());
         finished = true;
     });
 }
@@ -107,13 +102,10 @@ void KMeansJob::calcNearestCenter(std::function<float(Point, Point)> metric) {
 
 void KMeansJob::calcCurrentClusterCenters() {
     oldClusterCenters = clusterCenters;
-    typedef std::vector<float> Dimension;                             // transposed data to reduce dimension by dimension
-    typedef std::vector<std::vector<Dimension>> ClusteredDataPoints;  // ClusteredDataPoints[i] contains the points belonging to cluster i
-
+    
     countMembers();
 
     for (int cluster = 0; cluster < numClusters; ++cluster) {
-        clusterCenters[cluster].clear();
         clusterCenters[cluster].assign(dimension, 0);
     }
     for (int pointID = 0; pointID < pointsCount; ++pointID) {

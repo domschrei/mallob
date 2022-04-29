@@ -1,0 +1,7 @@
+{ 
+    "user": "admin", 
+    "name": "mnist784", 
+    "files": ["../kMeansData/mnist784.csv"], 
+    "priority": 1, 
+    "application": "KMEANS"
+}
