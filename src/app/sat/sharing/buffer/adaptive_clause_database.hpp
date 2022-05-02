@@ -227,7 +227,7 @@ public:
 
     ClauseHistogram& getDeletedClausesHistogram();
 
-    void checkTotalLiterals() {
+    bool checkTotalLiterals() {
 
         assert(checkNbLiterals(_unit_slot));
         assert(checkNbLiterals(_binary_slot));
@@ -235,13 +235,20 @@ public:
         int nbUsedAdvertised = _nb_used_literals;
         
         int nbUsedActual = _unit_slot.nbLiterals + _binary_slot.nbLiterals;
+        int foundBudget = _unit_slot.freeLocalBudget + _binary_slot.freeLocalBudget;
         for (auto& slot : _large_slots) {
             assert(checkNbLiterals(slot));
             nbUsedActual += slot.nbLiterals;
+            foundBudget += slot.freeLocalBudget;
         }
         
         assert(nbUsedAdvertised == nbUsedActual || 
             log_return_false("Mismatch in used literals: %i advertised, %i actual\n", nbUsedAdvertised, nbUsedActual));
+        assert(_nb_used_literals + foundBudget == _total_literal_limit || 
+            log_return_false("Mismatch in literal budget: %i used, total local budget %i, total literal limit %i\n", 
+            _nb_used_literals.load(), foundBudget, _total_literal_limit)
+        );
+        return true;
     }
 
 private:

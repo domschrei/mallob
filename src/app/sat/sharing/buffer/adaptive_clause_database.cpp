@@ -212,16 +212,31 @@ Mallob::Clause AdaptiveClauseDatabase::getMallobClause(T& elem, int implicitLbdO
 template <typename T> 
 void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, BufferBuilder& builder) {
     
-    if (slot.nbLiterals.load(std::memory_order_relaxed) == 0) return;
+    if (slot.nbLiterals.load(std::memory_order_relaxed) == 0
+        && slot.freeLocalBudget.load(std::memory_order_relaxed) == 0) 
+        return;
     
     // Swap current clause information in the slot to another list
     std::forward_list<T> swappedSlot;
     int nbSwappedLits;
+    int litsToStore = 0;
     {
         auto lock = slot.mtx->getLock();
+
+        // Transfer local free budget to global budget, if necessary
+        int freeBudget = slot.freeLocalBudget;
+        if (freeBudget > 0) {
+            slot.freeLocalBudget.store(0, std::memory_order_relaxed);
+            litsToStore += freeBudget;
+        }
+
+        // Nothing to extract?
         if (slot.nbLiterals.load(std::memory_order_relaxed) == 0) {
+            if (litsToStore > 0) storeGlobalBudget(litsToStore);
             return;
         }
+        
+        // Extract clauses
         swappedSlot.swap(slot.list);
         nbSwappedLits = slot.nbLiterals.load(std::memory_order_relaxed);
         slot.nbLiterals.store(0, std::memory_order_relaxed);
@@ -245,8 +260,9 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, Buffe
     }
 
     // Return budget of extracted literals
-    storeGlobalBudget(collectedLits);
-    _nb_used_literals.fetch_sub(collectedLits, std::memory_order_relaxed); 
+    litsToStore += collectedLits;
+    storeGlobalBudget(litsToStore);
+    _nb_used_literals.fetch_sub(collectedLits, std::memory_order_relaxed);
 
     if (it != swappedSlot.end()) {
         // Re-insert swapped clauses which remained unused
@@ -279,6 +295,15 @@ std::vector<int> AdaptiveClauseDatabase::exportBuffer(int totalLiteralLimit, int
 
     BufferBuilder builder(totalLiteralLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
 
+    /*
+    std::string out = "lim=" + std::to_string(totalLiteralLimit) + " FREE LOCAL BUDGETS: ";
+    out += std::to_string(_unit_slot.freeLocalBudget.load()) + " ";
+    out += std::to_string(_binary_slot.freeLocalBudget.load()) + " ";
+    for (auto& slot : _large_slots) 
+        out += std::to_string(slot.freeLocalBudget.load()) + " ";
+    LOG(V2_INFO, "%s\n", out.c_str());
+    */
+
     if (mode != ExportMode::NONUNITS) {
         // Export unit clauses.
         flushClauses(_unit_slot, sortClauses, builder);
@@ -303,6 +328,7 @@ std::vector<int> AdaptiveClauseDatabase::exportBuffer(int totalLiteralLimit, int
 int AdaptiveClauseDatabase::tryAcquireBudget(int callingSlot, int numDesired, float freeingFactor) {
 
     int numFreed = 0;
+    numDesired *= freeingFactor;
     /*
     // First fetch up to numDesired free literals from global budget, use to initialize numFreed
     int freeLits = _num_free_literals.load(std::memory_order_relaxed);
@@ -315,23 +341,24 @@ int AdaptiveClauseDatabase::tryAcquireBudget(int callingSlot, int numDesired, fl
     }
     */
 
-    int lb = std::max(0, callingSlot);
-    int ub = _large_slots.size()-1;
-    numDesired *= freeingFactor;
+   // First of all, try to get budget from this slot's "internal budget"
+   {
+       if (callingSlot == -2) numFreed += stealBudgetFromSlot(_unit_slot, numDesired, /*dropClauses=*/false);
+       else if (callingSlot == -1) numFreed += stealBudgetFromSlot(_binary_slot, numDesired, /*dropClauses=*/false);
+       else numFreed += stealBudgetFromSlot(_large_slots[callingSlot], numDesired, /*dropClauses=*/false);
+   }
+   if (numFreed >= numDesired) return numFreed;
 
-    for (int slotIdx = ub; numFreed < numDesired && slotIdx >= lb; slotIdx--) {
+    // Steal from a less important slot
+    int lb = std::max(-1, callingSlot);
+    int ub = _large_slots.size()-1;
+    for (int slotIdx = ub; numFreed < numDesired && slotIdx > lb; slotIdx--) {
         auto& slot = _large_slots[slotIdx];
-        numFreed += stealBudgetFromSlot(slot, numDesired-numFreed, /*dropClauses=*/callingSlot < slotIdx);
+        numFreed += stealBudgetFromSlot(slot, numDesired-numFreed, /*dropClauses=*/true);
         //if (numLiterals > 0) LOG(V2_INFO, "%i -> %i : Freed %i lits\n", callingSlot, slotIdx, numLiterals);
     }
-
-    if (numFreed < numDesired && callingSlot <= -1) {
-        numFreed += stealBudgetFromSlot(_binary_slot, numDesired-numFreed, /*dropClauses=*/callingSlot == -2);
-        //if (numLiterals > 0) LOG(V2_INFO, "%i -> %i : Freed %i lits\n", callingSlot, -2, numLiterals);
-    }
-
     if (numFreed < numDesired && callingSlot == -2) {
-        numFreed += stealBudgetFromSlot(_unit_slot, numDesired-numFreed, /*dropClauses=*/false);
+        numFreed += stealBudgetFromSlot(_binary_slot, numDesired-numFreed, /*dropClauses=*/true);
         //if (numLiterals > 0) LOG(V2_INFO, "%i -> %i : Freed %i lits\n", callingSlot, -2, numLiterals);
     }
 
