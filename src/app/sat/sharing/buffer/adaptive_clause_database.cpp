@@ -381,9 +381,11 @@ int AdaptiveClauseDatabase::stealBudgetFromSlot(Slot<T>& slot, int desiredLitera
     // Extract part of the list
     std::forward_list<T> swappedList;
     swappedList.splice_after(swappedList.before_begin(), slot.list, slot.list.before_begin(), it);
+    
     atomics::subRelaxed(slot.nbLiterals, nbCollectedLits);
     atomics::subRelaxed(slot.freeLocalBudget, freeBudget);
     atomics::subRelaxed(_nb_used_literals, nbCollectedLits);
+
     assert_heavy(checkNbLiterals(slot, "dropClauses(): collected " 
         + std::to_string(nbCollectedLits) + " literals from " 
         + std::to_string(nbCollectedClauses) + " clauses; " 

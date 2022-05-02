@@ -45,12 +45,15 @@ void testMinimal() {
     AdaptiveClauseDatabase cdb(setup);
     bool success = true;
     int numAttempted = 0;
+    cdb.checkTotalLiterals();
+
     while (success && numAttempted < 10000) {
         std::vector<int> lits = {100+numAttempted, 200+numAttempted, 300+numAttempted, 400+numAttempted};
         LOG(V2_INFO, "%i\n", numAttempted);
         Clause c{lits.data(), lits.size(), 2};
         success = cdb.addClause(c);
         numAttempted++;
+        cdb.checkTotalLiterals();
     }
     assert(numAttempted > 1);
     assert(numAttempted < 10000);
@@ -61,6 +64,8 @@ void testMinimal() {
     std::string out = "";
     for (int lit : buf) out += std::to_string(lit) + " ";
     LOG(V2_INFO, "BUF: %s\n", out.c_str());
+
+    cdb.checkTotalLiterals();
 }
 
 void testMerge() {
@@ -77,6 +82,7 @@ void testMerge() {
     std::vector<std::vector<int>> buffers;
     std::vector<std::vector<int>> clauseLits;
     for (int i = 0; i < numBuffers; i++) {
+
         AdaptiveClauseDatabase cdb(setup);
         for (int j = 0; j < numClausesPerBuffer; j++) {
             std::vector<int> lits;
@@ -91,8 +97,10 @@ void testMerge() {
             //log(V5_DEBG, "CLS #%i %s\n", j, c.toStr().c_str());
             insertUntilSuccess(cdb, 0, c);
         }
+        
         int numExported;
         auto buf = cdb.exportBuffer(100000, numExported);
+        cdb.checkTotalLiterals();
 
         auto reader = cdb.getBufferReader(buf.data(), buf.size());
         Clause lastClause;
@@ -181,8 +189,10 @@ void testReduce() {
         }
     }
 
+    cdb.checkTotalLiterals();
     int numExported;
     auto buf = cdb.exportBuffer(100000, numExported);
+    cdb.checkTotalLiterals();
 
     {
         auto copiedBuf = buf;

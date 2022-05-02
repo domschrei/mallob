@@ -57,7 +57,7 @@ private:
     };
 
     int _total_literal_limit;
-    std::atomic_int _nb_used_literals;
+    std::atomic_int _nb_used_literals {0};
 
     template <typename T>
     struct Slot {
@@ -226,6 +226,23 @@ public:
     }
 
     ClauseHistogram& getDeletedClausesHistogram();
+
+    void checkTotalLiterals() {
+
+        assert(checkNbLiterals(_unit_slot));
+        assert(checkNbLiterals(_binary_slot));
+
+        int nbUsedAdvertised = _nb_used_literals;
+        
+        int nbUsedActual = _unit_slot.nbLiterals + _binary_slot.nbLiterals;
+        for (auto& slot : _large_slots) {
+            assert(checkNbLiterals(slot));
+            nbUsedActual += slot.nbLiterals;
+        }
+        
+        assert(nbUsedAdvertised == nbUsedActual || 
+            log_return_false("Mismatch in used literals: %i advertised, %i actual\n", nbUsedAdvertised, nbUsedActual));
+    }
 
 private:
     template <typename T>
