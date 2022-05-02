@@ -52,6 +52,7 @@ void testMinimal() {
         success = cdb.addClause(c);
         numAttempted++;
     }
+    assert(numAttempted > 1);
     assert(numAttempted < 10000);
 
     int numExported;
