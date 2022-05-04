@@ -17,18 +17,17 @@ KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int 
 
 void KMeansJob::appl_start() {
     calculating = ProcessWideThreadPool::get().addTask([&]() {
+        auto metric = [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
         payload = getDescription().getFormulaPayload(0);
         loadInstance();
         setRandomStartCenters();
-        while (1 / 1000 < calculateDifference(
-                              [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); })) {
-            calcNearestCenter(
-                [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); });
 
+        while (1 / 1000 < calculateDifference(metric)) {
+            calcNearestCenter(metric);
             calcCurrentClusterCenters();
         }
-        internal_result.result = RESULT_SAT;
 
+        internal_result.result = RESULT_SAT;
         internal_result.id = getId();
         internal_result.revision = getRevision();
         std::vector<int> transformSolution;
@@ -39,7 +38,7 @@ void KMeansJob::appl_start() {
             transformSolution.push_back(element);
         }
         */
-        
+
         internal_result.setSolutionToSerialize(sumMembers.data(), sumMembers.size());
         finished = true;
     });
@@ -102,7 +101,7 @@ void KMeansJob::calcNearestCenter(std::function<float(Point, Point)> metric) {
 
 void KMeansJob::calcCurrentClusterCenters() {
     oldClusterCenters = clusterCenters;
-    
+
     countMembers();
 
     for (int cluster = 0; cluster < numClusters; ++cluster) {
