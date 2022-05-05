@@ -39,7 +39,8 @@ void KMeansJob::appl_start() {
         }
         */
         internal_result.encodedType = JobResult::EncodedType::FLOAT;
-        internal_result.setSolutionToSerialize((int*)(clusterCenters[0].data()), clusterCenters[0].size());
+        auto solution = clusterCentersToSolution();
+        internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
         finished = true;
     });
 }
@@ -158,4 +159,17 @@ float KMeansJob::calculateDifference(std::function<float(Point, Point)> metric) 
         sumDifference += metric(clusterCenters[k], oldClusterCenters[k]);
     }
     return sumDifference / sumOldvec;
+}
+
+std::vector<float> KMeansJob::clusterCentersToSolution() {
+    std::vector<float> result;
+    result.push_back((float)numClusters);
+    result.push_back((float)dimension);
+
+    for (auto point : clusterCenters) {
+        for (auto entry : point) {
+            result.push_back(entry);
+        }
+    }
+    return result;
 }

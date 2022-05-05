@@ -62,4 +62,5 @@ class KMeansJob : public Job {
     std::string dataToString(std::vector<int> data);
     void countMembers();
     float calculateDifference(std::function<float(Point, Point)> metric);
+    std::vector<float> clusterCentersToSolution();
 };
