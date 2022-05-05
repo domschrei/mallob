@@ -38,8 +38,8 @@ void KMeansJob::appl_start() {
             transformSolution.push_back(element);
         }
         */
-
-        internal_result.setSolutionToSerialize(sumMembers.data(), sumMembers.size());
+        internal_result.encodedType = JobResult::EncodedType::FLOAT;
+        internal_result.setSolutionToSerialize((int*)(clusterCenters[0].data()), clusterCenters[0].size());
         finished = true;
     });
 }
