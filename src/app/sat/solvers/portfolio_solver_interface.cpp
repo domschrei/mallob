@@ -70,7 +70,7 @@ void PortfolioSolverInterface::setTerminate() {
 
 void PortfolioSolverInterface::setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback) {
 	setLearnedClauseCallback([callback, this](const Mallob::Clause& c, int solverId) {
-		if (_terminated) return;
+		if (_terminated || _clause_sharing_disabled) return;
 		int condVar = _current_cond_var_or_zero;
 		assert(condVar >= 0);
 		callback(c, solverId, getSolverSetup().solverRevision, condVar);
@@ -78,18 +78,22 @@ void PortfolioSolverInterface::setExtLearnedClauseCallback(const ExtLearnedClaus
 }
 
 void PortfolioSolverInterface::addLearnedClause(const Mallob::Clause& c) {
+	if (_clause_sharing_disabled) return;
 	_import_buffer.add(c);
 }
 
 int PortfolioSolverInterface::getClauseImportBudget(int clauseLength, int lbd) {
+	if (_clause_sharing_disabled) return 0;
 	return _import_buffer.getLiteralBudget(clauseLength, lbd);
 }
 
 bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, AdaptiveClauseDatabase::ExportMode mode) {
+	if (_clause_sharing_disabled) return false;
 	clauseOut = _import_buffer.get(mode);
 	return clauseOut.begin != nullptr && clauseOut.size >= 1;
 }
 
 std::vector<int> PortfolioSolverInterface::fetchLearnedUnitClauses() {
+	if (_clause_sharing_disabled) return std::vector<int>();
 	return _import_buffer.getUnitsBuffer();
 }

@@ -117,6 +117,18 @@ public:
 	 * Equal to the global ID minus the number of solvers of a different type.
 	 */
 	int getDiversificationIndex() {return _diversification_index;}
+	
+	void setClauseSharing(int numOriginalDiversifications) {
+		// Skip clause sharing occasionally after original diversification is exhausted
+		if (_setup.skipClauseSharingDiagonally && getDiversificationIndex() >= numOriginalDiversifications) {
+			int depth = getDiversificationIndex() / numOriginalDiversifications;
+			int divCycleIdx = getDiversificationIndex() % numOriginalDiversifications;
+			if (divCycleIdx+1 == depth) {
+				LOGGER(_logger, V4_VVER, "Skip clause sharing\n");
+				_clause_sharing_disabled = true;
+			}
+		}
+	}
 
 	void setCurrentCondVarOrZero(int condVarOrZero) {_current_cond_var_or_zero = condVarOrZero;}
 	void setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback);
@@ -162,6 +174,7 @@ private:
 	int _global_id;
 	int _local_id;
 	int _diversification_index;
+	bool _clause_sharing_disabled = false;
 	std::atomic_int _current_cond_var_or_zero = 0;
 	std::atomic_int _current_revision = 0;
 	std::atomic_bool _terminated = false;

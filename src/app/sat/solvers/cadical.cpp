@@ -68,6 +68,7 @@ void Cadical::diversify(int seed) {
 		}
 		assert(okay);
 		seedSet = true;
+		setClauseSharing(getNumOriginalDiversifications());
 	}
 }
 

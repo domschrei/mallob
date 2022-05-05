@@ -66,6 +66,7 @@ void Kissat::diversify(int seed) {
     }
 
     seedSet = true;
+    setClauseSharing(getNumOriginalDiversifications());
 }
 
 int Kissat::getNumOriginalDiversifications() {

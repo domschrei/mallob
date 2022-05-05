@@ -151,6 +151,8 @@ void Lingeling::diversify(int seed) {
 			lglsetopt (solver, "cce", 0); 
 			break;
 	}
+
+	setClauseSharing(getNumOriginalDiversifications());
 }
 
 // Set initial phase for a given variable
