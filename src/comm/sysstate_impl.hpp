@@ -5,16 +5,21 @@
 #include "sysstate.hpp"
 
 template <int N>
-SysState<N>::SysState(MPI_Comm& comm, float period, MPI_Op operation): 
-        _comm(comm), _period(period), _op(operation) {
-    for (int i = 0; i < N; i++) {
+SysState<N>::SysState(MPI_Comm& comm, float period, SysStateCollective collective, MPI_Op operation): 
+        _comm(comm), _period(period), _collective(collective), _op(operation) {
+    
+    _global_state.resize(N * (_collective == ALLGATHER ? MyMpi::size(comm) : 1), 0);
+    for (size_t i = 0; i < N; i++)
         _local_state[i] = 0.0f;
-        _global_state[i] = 0.0f;
-    }
 }
 
 template <int N>
 bool SysState<N>::isAggregating() const {return _aggregating;}
+
+template <int N>
+bool SysState<N>::canStartAggregating(float time) const {
+    return !isAggregating() && time-_last_aggregation >= _period;
+}
 
 template <int N>
 void SysState<N>::setLocal(std::initializer_list<float> elems) {
@@ -43,7 +48,11 @@ bool SysState<N>::aggregate(float elapsedTime) {
         float timeSinceLast = time-_last_aggregation;
         if (!_aggregating && timeSinceLast >= _period) {
             _last_aggregation = time;
-            _request = MyMpi::iallreduce(_comm, _local_state, _global_state, N, _op);
+            if (_collective == ALLREDUCE) {
+                _request = MyMpi::iallreduce(_comm, _local_state, _global_state.data(), N, _op);
+            } else /*allgather*/ {
+                _request = MyMpi::iallgather(_comm, _local_state, _global_state.data(), N);
+            }
             _aggregating = true;
         } else if (_aggregating) {
             MPI_Status status;
@@ -63,7 +72,7 @@ bool SysState<N>::aggregate(float elapsedTime) {
 }
 
 template <int N>
-float* SysState<N>::getGlobal() {
+const std::vector<float>& SysState<N>::getGlobal() {
     return _global_state;
 }
 

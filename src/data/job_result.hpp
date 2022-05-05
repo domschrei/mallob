@@ -14,6 +14,7 @@ struct JobResult : public Serializable {
     int id = 0;
     int revision;
     int result;
+    enum EncodedType {INT, FLOAT} encodedType = INT;
 
 private:
     std::vector<int> solution;
@@ -37,13 +38,15 @@ public:
     size_t getSolutionSize() const;
     inline int getSolution(size_t pos) const {
         assert(pos < getSolutionSize());
+        static_assert(sizeof(int) == sizeof(EncodedType));
         if (!packedData.empty()) {
             return *(
-                (int*) (packedData.data() + (3+pos)*sizeof(int))
+                (int*) (packedData.data() + (4+pos)*sizeof(int))
             );
         }
         return solution[pos];
     }
+
     std::vector<int> extractSolution();
 };
 

@@ -12,6 +12,8 @@ struct SolverStatistics {
 	unsigned long conflicts = 0;
 	unsigned long restarts = 0;
 	double memPeak = 0;
+	unsigned long imported = 0;
+	unsigned long discarded = 0;
 	
 	// clause export
 	ClauseHistogram* histProduced;
@@ -40,7 +42,7 @@ struct SolverStatistics {
 			+ " (flt:" + std::to_string(receivedClausesFiltered)
 			+ " digd:" + std::to_string(receivedClausesDigested)
 			+ " drp:" + std::to_string(receivedClausesDropped)
-			+ ")";
+			+ ") + intim:" + std::to_string(imported) + "/" + std::to_string(imported+discarded);
 	}
 
 	void aggregate(const SolverStatistics& other) {

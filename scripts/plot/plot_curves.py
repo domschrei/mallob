@@ -118,6 +118,8 @@ for arg in sys.argv[1:]:
         linestyles = arg[len("-linestyles="):].split(",")
     elif arg.startswith("-colors="):
         colors = arg[len("-colors="):].split(",")
+    elif arg.startswith("-linewidths="):
+        linewidth = arg[len("-linewidths="):].split(",")
     else:
         files += [arg]
         use_twin_axis += [False]
@@ -253,7 +255,10 @@ for d in data:
         kwargs['linestyle'] = linestyles[i%len(linestyles)]
     
     if linewidth:
-        kwargs['lw'] = linewidth
+        if type(linewidth) is list:
+            kwargs['lw'] = linewidth[i%len(linewidth)]
+        else:
+            kwargs['lw'] = linewidth
     
     if twin_axis_used:
         if use_twin_axis[i]:

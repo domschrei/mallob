@@ -35,4 +35,6 @@ struct SolverSetup {
 
 	size_t clauseBaseBufferSize;
 	size_t anticipatedLitsToImportPerCycle;
+
+	bool skipClauseSharingDiagonally;
 };

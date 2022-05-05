@@ -35,12 +35,14 @@ void ForkedSatJob::doStartSolver() {
     _last_imported_revision = 0;
 
     const JobDescription& desc = getDescription();
+    // do not copy the entire job description if the spawned job is an empty dummy
+    bool dummyJob = config.threads == 0; 
 
     _solver.reset(new SatProcessAdapter(
         std::move(hParams), std::move(config), this,
-        desc.getFormulaPayloadSize(0), 
+        dummyJob ? std::min(1ul, desc.getFormulaPayloadSize(0)) : desc.getFormulaPayloadSize(0), 
         desc.getFormulaPayload(0), 
-        desc.getAssumptionsSize(0),
+        dummyJob ? std::min(1ul, desc.getAssumptionsSize(0)) : desc.getAssumptionsSize(0),
         desc.getAssumptionsPayload(0),
         (AnytimeSatClauseCommunicator*)_clause_comm
     ));

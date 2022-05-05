@@ -33,19 +33,19 @@ int cbCheckTerminate(void* solverPtr) {
 	lp->lastTermCallbackTime = Timer::elapsedSeconds();
     
 	if (lp->stopSolver) {
-		lp->LOGGER(_logger, V3_VERB, "STOP (%.2fs since last cb)", elapsed);
+		LOGGER(lp->_logger, V3_VERB, "STOP (%.2fs since last cb)", elapsed);
 		return 1;
 	}
 
     if (lp->suspendSolver) {
         // Stay inside this function call as long as solver is suspended
-		lp->LOGGER(_logger, V3_VERB, "SUSPEND (%.2fs since last cb)", elapsed);
+		LOGGER(lp->_logger, V3_VERB, "SUSPEND (%.2fs since last cb)", elapsed);
 
 		lp->suspendCond.wait(lp->suspendMutex, [&lp]{return !lp->suspendSolver;});
-		lp->LOGGER(_logger, V4_VVER, "RESUME");
+		LOGGER(lp->_logger, V4_VVER, "RESUME");
 
 		if (lp->stopSolver) {
-			lp->LOGGER(_logger, V4_VVER, "STOP after suspension", elapsed);
+			LOGGER(lp->_logger, V4_VVER, "STOP after suspension", elapsed);
 			return 1;
 		}
     }
@@ -151,6 +151,8 @@ void Lingeling::diversify(int seed) {
 			lglsetopt (solver, "cce", 0); 
 			break;
 	}
+
+	setClauseSharing(getNumOriginalDiversifications());
 }
 
 // Set initial phase for a given variable

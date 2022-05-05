@@ -57,17 +57,19 @@ private:
     };
 
     int _total_literal_limit;
-    std::atomic_int _num_free_literals {0};
+    std::atomic_int _nb_used_literals {0};
 
     template <typename T>
     struct Slot {
         int implicitLbdOrZero;
         std::atomic_int nbLiterals {0};
+        std::atomic_int freeLocalBudget {0};
         std::shared_ptr<Mutex> mtx;
         std::forward_list<T> list;
         Slot() = default;
         Slot(Slot&& other) :
-            implicitLbdOrZero(other.implicitLbdOrZero), 
+            implicitLbdOrZero(other.implicitLbdOrZero),
+            freeLocalBudget(other.freeLocalBudget.load(std::memory_order_relaxed)), 
             nbLiterals(other.nbLiterals.load(std::memory_order_relaxed)), 
             mtx(std::move(other.mtx)),
             list(other.list) {}
@@ -114,6 +116,28 @@ public:
 
     int reserveLiteralBudget(int cSize, int cLbd);
 
+    int getLocalBudget(int slotIdx) const {
+        if (slotIdx == -2) {
+            return _unit_slot.freeLocalBudget.load(std::memory_order_relaxed);
+        } else if (slotIdx == -1) {
+            return _binary_slot.freeLocalBudget.load(std::memory_order_relaxed);
+        } else {
+            return _large_slots[slotIdx].freeLocalBudget.load(std::memory_order_relaxed);
+        }
+    }
+    void storeLocalBudget(int slotIdx, int amount) {
+        if (slotIdx == -2) {
+            _unit_slot.freeLocalBudget.fetch_add(amount, std::memory_order_relaxed);
+        } else if (slotIdx == -1) {
+            _binary_slot.freeLocalBudget.fetch_add(amount, std::memory_order_relaxed);
+        } else {
+            _large_slots[slotIdx].freeLocalBudget.fetch_add(amount, std::memory_order_relaxed);
+        }
+    }
+    void storeGlobalBudget(int amount) {
+        _large_slots.back().freeLocalBudget.fetch_add(amount, std::memory_order_relaxed);
+    }
+
     template <typename T>
     void addReservedUniformClauses(int cSize, int cLbd, std::forward_list<T>& clauses, int nbLiterals) {
         
@@ -123,10 +147,11 @@ public:
         assert(freed >= nbLiterals);
         if (freed > nbLiterals) {
             // return excess
-            _num_free_literals.fetch_add(freed-nbLiterals, std::memory_order_relaxed);
+            storeGlobalBudget(freed-nbLiterals);
         }
         timeFree = Timer::elapsedSeconds() - timeFree;
 
+        atomics::addRelaxed(_nb_used_literals, nbLiterals);
         float timeInsert = Timer::elapsedSeconds();
         T& clause = clauses.front();
 
@@ -191,7 +216,7 @@ public:
     BufferBuilder getBufferBuilder(std::vector<int>* out = nullptr);
 
     int getCurrentlyUsedLiterals() const {
-        return _total_literal_limit - _num_free_literals.load(std::memory_order_relaxed);
+        return _nb_used_literals.load(std::memory_order_relaxed);
     }
     int getNumLiterals(int clauseLength, int lbd) {
         if (clauseLength == 1) return _unit_slot.nbLiterals.load(std::memory_order_relaxed);
@@ -201,6 +226,30 @@ public:
     }
 
     ClauseHistogram& getDeletedClausesHistogram();
+
+    bool checkTotalLiterals() {
+
+        assert(checkNbLiterals(_unit_slot));
+        assert(checkNbLiterals(_binary_slot));
+
+        int nbUsedAdvertised = _nb_used_literals;
+        
+        int nbUsedActual = _unit_slot.nbLiterals + _binary_slot.nbLiterals;
+        int foundBudget = _unit_slot.freeLocalBudget + _binary_slot.freeLocalBudget;
+        for (auto& slot : _large_slots) {
+            assert(checkNbLiterals(slot));
+            nbUsedActual += slot.nbLiterals;
+            foundBudget += slot.freeLocalBudget;
+        }
+        
+        assert(nbUsedAdvertised == nbUsedActual || 
+            log_return_false("Mismatch in used literals: %i advertised, %i actual\n", nbUsedAdvertised, nbUsedActual));
+        assert(_nb_used_literals + foundBudget == _total_literal_limit || 
+            log_return_false("Mismatch in literal budget: %i used, total local budget %i, total literal limit %i\n", 
+            _nb_used_literals.load(), foundBudget, _total_literal_limit)
+        );
+        return true;
+    }
 
 private:
     template <typename T>
@@ -232,7 +281,7 @@ private:
     Mallob::Clause getMallobClause(T& elem, int implicitLbdOrZero);
 
     template <typename T>
-    int dropClauses(Slot<T>& slot, int desiredLiterals);
+    int stealBudgetFromSlot(Slot<T>& slot, int desiredLiterals, bool dropClauses);
 
     template <typename T>
     void flushClauses(Slot<T>& slot, bool sortClauses, BufferBuilder& builder);

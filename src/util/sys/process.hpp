@@ -14,6 +14,7 @@ class Process {
 
 public:
     static int _rank;
+    static std::string _trace_dir;
 
     static Mutex _children_mutex;
     static std::set<pid_t> _children;
@@ -25,7 +26,7 @@ public:
     static std::atomic_long _signal_tid;
     static std::atomic_bool _exit_signal_digested;
 
-    static void init(int rank, bool leafProcess = false);
+    static void init(int rank, const std::string& traceDir = ".", bool leafProcess = false);
     
     static int createChild();
     

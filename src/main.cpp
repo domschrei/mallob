@@ -17,11 +17,13 @@
 #include "util/sys/thread_pool.hpp"
 #include "interface/api/job_streamer.hpp"
 #include "comm/host_comm.hpp"
+#include "data/job_transfer.hpp"
 
 #ifndef MALLOB_VERSION
 #define MALLOB_VERSION "(dbg)"
 #endif
 
+bool monoJobDone = false;
 void introduceMonoJob(Parameters& params, Client& client) {
 
     // Write a job JSON for the singular job to solve
@@ -38,7 +40,10 @@ void introduceMonoJob(Parameters& params, Client& client) {
         json["cpu-limit"] = std::to_string(params.jobCpuLimit()) + "s";
     }
 
-    auto result = client.getAPI().submit(json, APIConnector::CALLBACK_IGNORE);
+    auto result = client.getAPI().submit(json, [&](nlohmann::json& response) {
+        // Job done? => Terminate all processes
+        monoJobDone = true;
+    });
     if (result != JsonInterface::Result::ACCEPT) {
         LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
         abort();
@@ -131,6 +136,10 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
             break;
         if (params.sleepMicrosecs() > 0) usleep(params.sleepMicrosecs());
         if (params.yield()) std::this_thread::yield();
+        if (monoJobDone) {
+            // Terminate all processes
+            MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
+        }
     }
 
     // Clean up
@@ -155,16 +164,16 @@ int main(int argc, char *argv[]) {
 
     longStartupWarnMsg(rank, "Init'd MPI");
 
-    // Initialize bookkeeping of child processes and signals
-    Process::init(rank);
-
-    longStartupWarnMsg(rank, "Init'd process");
-
     Parameters params;
     params.init(argc, argv);
     if (rank == 0) params.printBanner();
 
     longStartupWarnMsg(rank, "Init'd params");
+
+    // Initialize bookkeeping of child processes and signals
+    Process::init(rank, params.traceDirectory());
+
+    longStartupWarnMsg(rank, "Init'd process");
 
     bool quiet = params.quiet();
     if (params.zeroOnlyLogging() && rank > 0) quiet = true;

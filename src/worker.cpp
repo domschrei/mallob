@@ -24,7 +24,7 @@
 
 Worker::Worker(MPI_Comm comm, Parameters& params) :
     _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
-    _params(params), _job_db(_params, _comm, _sys_state), _sys_state(_comm, params.sysstatePeriod()), 
+    _params(params), _job_db(_params, _comm, _sys_state), _sys_state(_comm, params.sysstatePeriod(), SysState<9>::ALLREDUCE), 
     _watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/100, Timer::elapsedSeconds())
 {
     _watchdog.setWarningPeriod(50); // warn after 50ms without a reset
@@ -270,6 +270,7 @@ void Worker::checkStats(float time) {
         // Update host-internal communicator
         if (_host_comm) {
             _host_comm->setRamUsageThisWorkerGbs(_node_memory_gbs);
+            _host_comm->setFreeAndTotalMachineMemoryKbs(_machine_free_kbs, _machine_total_kbs);
             if (_job_db.hasActiveJob()) {
                 _host_comm->setActiveJobIndex(_job_db.getActive().getIndex());
             } else {
@@ -286,6 +287,9 @@ void Worker::checkStats(float time) {
             auto memoryGbs = memoryKbs / 1024.f / 1024.f;
             _node_memory_gbs = memoryGbs;
             Proc::getThreadCpuRatio(tid, _mainthread_cpu_share, _mainthread_sys_share);
+            auto [freeKbs, totalKbs] = Proc::getMachineFreeAndTotalRamKbs();
+            _machine_free_kbs = freeKbs;
+            _machine_total_kbs = totalKbs;
             _node_stats_calculated.store(true, std::memory_order_release);
         });
     }
@@ -418,7 +422,7 @@ void Worker::checkActiveJob() {
 void Worker::publishAndResetSysState() {
 
     if (_world_rank == 0) {
-        float* result = _sys_state.getGlobal();
+        const auto& result = _sys_state.getGlobal();
         int numDesires = result[SYSSTATE_NUMDESIRES];
         int numFulfilledDesires = result[SYSSTATE_NUMFULFILLEDDESIRES];
         float ratioFulfilled = numDesires <= 0 ? 0 : (float)numFulfilledDesires / numDesires;

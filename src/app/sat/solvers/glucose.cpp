@@ -132,6 +132,8 @@ void MGlucose::diversify(int seed) {
 		var_decay = std::min(var_decay -0.02 + 0.04 * dist(rng), max_var_decay);
 		break;
 	}
+
+	setClauseSharing(getNumOriginalDiversifications());
 }
 
 // Set initial phase for a given variable
