@@ -45,7 +45,7 @@ JobResult& JobResult::deserialize(const std::vector<uint8_t>& packed) {
     n = sizeof(int); memcpy(&id, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&result, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&revision, packed.data()+i, n); i += n;
-    n = sizeof(EncodedType); memcpy(&encodedType, packedData.data()+i, n); i += n;
+    n = sizeof(EncodedType); memcpy(&encodedType, packed.data()+i, n); i += n;
     n = packed.size()-i; solution.resize(n/sizeof(int));
     memcpy(solution.data(), packed.data()+i, n); i += n;
     return *this;
