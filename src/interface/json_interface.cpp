@@ -224,6 +224,16 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
         + std::to_string(result.id) + "." 
         + std::to_string(result.revision) + ".pipe";
 
+    // Function to "reinterpret" integer vector as a float vector 
+    auto intVecToFloatVec = [](const std::vector<int>& intVec) {
+        static_assert(sizeof(int) == sizeof(float));
+        std::vector<float> floatVec(intVec.size());
+        for (size_t i = 0; i < intVec.size(); ++i) {
+            floatVec[i] = *reinterpret_cast<const float*>(intVec.data()+i);
+        }
+        return floatVec;
+    };
+
     // Pack job result into JSON
     j["internal_id"] = result.id;
     j["internal_revision"] = result.revision;
@@ -236,7 +246,14 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
         j["result"]["solution-size"] = result.getSolutionSize();
         mkfifo(solutionFile.c_str(), 0666);
     } else {
-        j["result"]["solution"] = result.extractSolution();
+        auto solution = result.extractSolution();
+        if (result.encodedType == JobResult::INT) {
+            j["result"]["solution"] = std::move(solution);
+        }
+        if (result.encodedType == JobResult::FLOAT) {
+            // Convert result from integers to floats
+            j["result"]["solution"] = intVecToFloatVec(solution);
+        }
     }
     j["stats"] = {
         { "time", {
@@ -255,10 +272,12 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
 
     if (useSolutionFile) {
         ProcessWideThreadPool::get().addTask([solutionFile, sol = result.extractSolution()]() {
+            
             int fd = open(solutionFile.c_str(), O_WRONLY);
             LOG(V4_VVER, "Writing solution: %i ints (%i,%i,...,%i,%i)\n", sol.size(), 
                 sol[0], sol[1], sol[sol.size()-2], sol[sol.size()-1]);
             int numWritten = 0;
+
             while (numWritten < sol.size()*sizeof(int)) {
                 int n = write(fd, ((char*)sol.data())+numWritten, 
                     sol.size() * sizeof(int) - numWritten);
