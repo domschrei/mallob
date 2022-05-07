@@ -69,5 +69,5 @@ class KMeansJob : public Job {
     float calculateDifference(std::function<float(Point, Point)> metric);
     std::vector<float> clusterCentersToSolution();
     std::vector<int> KMeansJob::clusterCentersToReduce();
-    std::vector<std::vector<float>> KMeansJob::reduceToclusterCenters();
+    std::tuple<std::vector<std::vector<float>>,std::vector<int>> KMeansJob::reduceToclusterCenters();
 };

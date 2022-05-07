@@ -207,5 +207,7 @@ std::vector<int> KMeansJob::clusterCentersToReduce() {
     return result;
 }
 
-std::vector<std::vector<float>> KMeansJob::reduceToclusterCenters() {
+std::tuple<std::vector<std::vector<float>>,std::vector<int>> KMeansJob::reduceToclusterCenters() {
+    //auto [centers, counts] = reduceToclusterCenters(); //call example
 }
+
