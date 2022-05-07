@@ -30,18 +30,18 @@ bool KMeansReader::read(const std::string &filename, JobDescription &desc) {
         return false;
     }
 
-    int numClusters = 0;
+    int countClusters = 0;
     int dimension = 0;
     int columnsInFile = 0;
     int pointsCount = 0;
     int skipCols = columnsInFile - dimension;  // dont read the last few columns
 
-    ifile >> numClusters;
+    ifile >> countClusters;
     ifile >> dimension;
     ifile >> columnsInFile;
     ifile >> pointsCount;
 
-    desc.addLiteral(numClusters);
+    desc.addLiteral(countClusters);
     desc.addLiteral(dimension);
     desc.addLiteral(pointsCount);
 

@@ -9,30 +9,35 @@
 
 #include "app/job.hpp"
 #include "app/sat/job/sat_constants.h"
+#include "comm/job_tree_all_reduction.hpp"
 #include "util/params.hpp"
 
 class KMeansJob : public Job {
    private:
     typedef std::vector<float> Point;
     std::vector<Point> clusterCenters;   // The centers of cluster 0..n
+    std::vector<Point> localClusterCenters;   // The centers of cluster 0..n
     std::vector<Point> oldClusterCenters;
     std::vector<int> clusterMembership;  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
     std::vector<int> sumMembers;
-    int numClusters;
+    std::vector<int> localSumMembers;
+    int countClusters;
     int dimension;
     int pointsCount;
+    int allReduceElementSize;
     int iterationsDone = 0;
     std::vector<Point> kMeansData;
     const int* payload;
     std::future<void> calculating;
     bool finished = false;
     JobResult internal_result;
+    JobTreeAllReduction* reducer;
 
    public:
     std::vector<Point> getClusterCenters() { return clusterCenters; };      // The centers of cluster 0..n
     std::vector<int> getClusterMembership() { return clusterMembership; };  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
     std::vector<int> getSumMembers() { return sumMembers; };
-    int getNumClusters() { return numClusters; };
+    int getNumClusters() { return countClusters; };
     int getDimension() { return dimension; };
     int getPointsCount() { return pointsCount; };
     int getIterationsDone() { return iterationsDone; };
@@ -63,4 +68,6 @@ class KMeansJob : public Job {
     void countMembers();
     float calculateDifference(std::function<float(Point, Point)> metric);
     std::vector<float> clusterCentersToSolution();
+    std::vector<int> KMeansJob::clusterCentersToReduce();
+    std::vector<std::vector<float>> KMeansJob::reduceToclusterCenters();
 };

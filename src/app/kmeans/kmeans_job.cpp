@@ -4,6 +4,8 @@
 #include <thread>
 
 #include "app/job.hpp"
+#include "app/job_tree.hpp"
+#include "comm/job_tree_all_reduction.hpp"
 #include "comm/mympi.hpp"
 #include "kmeans_utils.hpp"
 #include "util/assert.hpp"
@@ -13,13 +15,29 @@
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
 KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int jobId, const int* newPayload)
-    : Job(params, commSize, worldRank, jobId, JobDescription::Application::KMEANS) { setPayload(newPayload); }
+    : Job(params, commSize, worldRank, jobId, JobDescription::Application::KMEANS) {
+    setPayload(newPayload);
+    auto folder =
+        [&](std::list<std::vector<int>>& elems) {
+            return std::vector<int>(0, 0);
+        };
+    JobTreeAllReduction red(getJobTree(),
+                            JobMessage(getId(),
+                                       getRevision(),
+                                       0,
+                                       MSG_ALLREDUCE_CLAUSES),
+                            std::vector<int>(0, 0),
+                            folder);
+    reducer = &red;
+}
 
 void KMeansJob::appl_start() {
+    LOG(V0_CRIT, "commSize: %i worldRank: %i \n", getGlobalNumWorkers(), getMyMpiRank());
     calculating = ProcessWideThreadPool::get().addTask([&]() {
         auto metric = [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
         payload = getDescription().getFormulaPayload(0);
         loadInstance();
+        allReduceElementSize =  dimension * (countClusters + 1);
         setRandomStartCenters();
 
         while (1 / 1000 < calculateDifference(metric)) {
@@ -55,7 +73,7 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {}
 void KMeansJob::appl_dumpStats() {}
 void KMeansJob::appl_memoryPanic() {}
 void KMeansJob::loadInstance() {
-    numClusters = payload[0];
+    countClusters = payload[0];
     dimension = payload[1];
     pointsCount = payload[2];
     kMeansData.reserve(pointsCount);
@@ -73,9 +91,9 @@ void KMeansJob::loadInstance() {
 
 void KMeansJob::setRandomStartCenters() {
     clusterCenters.clear();
-    clusterCenters.resize(numClusters);
-    for (int i = 0; i < numClusters; ++i) {
-        clusterCenters[i] = kMeansData[static_cast<int>((static_cast<float>(i) / static_cast<float>(numClusters)) * (pointsCount - 1))];
+    clusterCenters.resize(countClusters);
+    for (int i = 0; i < countClusters; ++i) {
+        clusterCenters[i] = kMeansData[static_cast<int>((static_cast<float>(i) / static_cast<float>(countClusters)) * (pointsCount - 1))];
     }
 }
 
@@ -89,7 +107,7 @@ void KMeansJob::calcNearestCenter(std::function<float(Point, Point)> metric) {
     for (int pointID = 0; pointID < pointsCount; ++pointID) {
         currentNearestCenter.cluster = -1;
         currentNearestCenter.distance = std::numeric_limits<float>::infinity();
-        for (int clusterID = 0; clusterID < numClusters; ++clusterID) {
+        for (int clusterID = 0; clusterID < countClusters; ++clusterID) {
             distanceToCluster = metric(kMeansData[pointID], clusterCenters[clusterID]);
             if (distanceToCluster < currentNearestCenter.distance) {
                 currentNearestCenter.cluster = clusterID;
@@ -105,7 +123,7 @@ void KMeansJob::calcCurrentClusterCenters() {
 
     countMembers();
 
-    for (int cluster = 0; cluster < numClusters; ++cluster) {
+    for (int cluster = 0; cluster < countClusters; ++cluster) {
         clusterCenters[cluster].assign(dimension, 0);
     }
     for (int pointID = 0; pointID < pointsCount; ++pointID) {
@@ -140,7 +158,7 @@ std::string KMeansJob::dataToString(std::vector<int> data) {
 
 void KMeansJob::countMembers() {
     std::stringstream result;
-    sumMembers.assign(numClusters, 0);
+    sumMembers.assign(countClusters, 0);
     for (int clusterID : clusterMembership) {
         sumMembers[clusterID] += 1;
     }
@@ -153,7 +171,7 @@ float KMeansJob::calculateDifference(std::function<float(Point, Point)> metric) 
     float sumOldvec = 0.0;
     float sumDifference = 0.0;
     Point v0(dimension, 0);
-    for (int k = 0; k < numClusters; ++k) {
+    for (int k = 0; k < countClusters; ++k) {
         sumOldvec += metric(v0, clusterCenters[k]);
 
         sumDifference += metric(clusterCenters[k], oldClusterCenters[k]);
@@ -163,7 +181,7 @@ float KMeansJob::calculateDifference(std::function<float(Point, Point)> metric) 
 
 std::vector<float> KMeansJob::clusterCentersToSolution() {
     std::vector<float> result;
-    result.push_back((float)numClusters);
+    result.push_back((float)countClusters);
     result.push_back((float)dimension);
 
     for (auto point : clusterCenters) {
@@ -172,4 +190,22 @@ std::vector<float> KMeansJob::clusterCentersToSolution() {
         }
     }
     return result;
+}
+
+std::vector<int> KMeansJob::clusterCentersToReduce() {
+    std::vector<int> result;
+    result.reserve(allReduceElementSize);
+    for (auto entry : localSumMembers) {
+        result.push_back(entry);
+    }
+    for (auto point : localClusterCenters) {
+        auto centerData = point.data();
+        for (int entry = 0; entry < dimension; ++entry) {
+            result.push_back(*((int*)(centerData + entry)));
+        }
+    }
+    return result;
+}
+
+std::vector<std::vector<float>> KMeansJob::reduceToclusterCenters() {
 }
