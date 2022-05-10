@@ -37,7 +37,6 @@ void KMeansJob::appl_start() {
         auto metric = [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
         payload = getDescription().getFormulaPayload(0);
         loadInstance();
-        allReduceElementSize =  dimension * (countClusters + 1);
         setRandomStartCenters();
 
         while (1 / 1000 < calculateDifference(metric)) {
@@ -87,6 +86,7 @@ void KMeansJob::loadInstance() {
         kMeansData.push_back(p);
         payload = payload + dimension;
     }
+    allReduceElementSize =  dimension * (countClusters + 1);
 }
 
 void KMeansJob::setRandomStartCenters() {
@@ -207,7 +207,26 @@ std::vector<int> KMeansJob::clusterCentersToReduce() {
     return result;
 }
 
-std::tuple<std::vector<std::vector<float>>,std::vector<int>> KMeansJob::reduceToclusterCenters() {
+std::tuple<std::vector<std::vector<float>>,std::vector<int>> KMeansJob::reduceToclusterCenters(std::vector<int>* reduce) {
     //auto [centers, counts] = reduceToclusterCenters(); //call example
+    std::vector<int> localSumMembersResult;
+    std::vector<Point> localClusterCentersResult;
+    const int elementsCount = allReduceElementSize-countClusters;
+
+    int* reduceData = reduce->data();
+
+    localSumMembersResult.assign(countClusters,0);
+    for (int i = 0; i < countClusters; ++i){
+        localSumMembers[i] = reduceData[i];
+    }
+
+    reduceData += countClusters;
+    localSumMembersResult.assign(elementsCount,0);
+    for (int i = 0; i < elementsCount; ++i){
+        localClusterCentersResult[i/countClusters][i%dimension] = *((float*)(reduceData + i));
+    }
+
+    return std::make_tuple(localClusterCentersResult, localSumMembersResult);
+
 }
 
