@@ -15,8 +15,8 @@
 class KMeansJob : public Job {
    private:
     typedef std::vector<float> Point;
-    std::vector<Point> clusterCenters;   // The centers of cluster 0..n
-    std::vector<Point> localClusterCenters;   // The centers of cluster 0..n
+    std::vector<Point> clusterCenters;       // The centers of cluster 0..n
+    std::vector<Point> localClusterCenters;  // The centers of cluster 0..n
     std::vector<Point> oldClusterCenters;
     std::vector<int> clusterMembership;  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
     std::vector<int> sumMembers;
@@ -47,12 +47,12 @@ class KMeansJob : public Job {
 
     KMeansJob(const Parameters& params, int commSize, int worldRank, int jobId, const int* newPayload);
     void appl_start() override;
-    void appl_suspend() override ;
-    void appl_resume() override ;
-    void appl_terminate() override ;
+    void appl_suspend() override;
+    void appl_resume() override;
+    void appl_terminate() override;
     int appl_solved() override { return finished ? RESULT_SAT : -1; }  // atomic bool
-    int getDemand() const  {return 1;}
-    JobResult&& appl_getResult() override ;
+    int getDemand() const { return 1; }
+    JobResult&& appl_getResult() override;
     void appl_communicate() override;
     void appl_communicate(int source, int mpiTag, JobMessage& msg) override;
     void appl_dumpStats() override;
@@ -69,5 +69,6 @@ class KMeansJob : public Job {
     float calculateDifference(std::function<float(Point, Point)> metric);
     std::vector<float> clusterCentersToSolution();
     std::vector<int> clusterCentersToReduce();
-    std::tuple<std::vector<std::vector<float>>,std::vector<int>> reduceToclusterCenters(std::vector<int>*);
+    std::tuple<std::vector<std::vector<float>>, std::vector<int>> reduceToclusterCenters(std::vector<int>*);
+    std::vector<int> aggregate(std::list<std::vector<int>>);
 };

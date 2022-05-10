@@ -33,7 +33,7 @@ int main() {
     Timer::init();
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
     auto files = {
-        //"mnist784.csv",
+        "mnist784.csv",
         "benign_traffic.csv",
         "covtype.csv",
         "2d-10c.arff",

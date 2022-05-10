@@ -231,3 +231,27 @@ std::tuple<std::vector<std::vector<float>>, std::vector<int>> KMeansJob::reduceT
 
     return std::make_tuple(localClusterCentersResult, localSumMembersResult);
 }
+
+std::vector<int> KMeansJob::aggregate(std::list<std::vector<int>> messages) {
+    std::vector<std::vector<KMeansJob::Point>> centers;
+    std::vector<std::vector<int>> counts;
+    centers.resize(messages.size());
+    counts.resize(messages.size());
+    for (int i = 0; i < messages.size(); ++i) {
+        auto [centersData, countsData] = reduceToclusterCenters(&messages.front());
+        messages.pop_front();
+        centers[i] = centersData;
+        counts[i] = countsData;
+    }
+
+    localSumMembers.assign(countClusters, 0);
+    for (int i = 0; i < messages.size(); ++i) {
+        for (int j = 0; j < countClusters; ++j) {
+            localSumMembers[j] += counts[i][j];
+        }
+    }
+
+    //add up clusterCenters
+
+    return clusterCentersToReduce(); //localSumMembers, localClusterCenters
+}
