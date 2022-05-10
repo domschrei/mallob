@@ -33,7 +33,7 @@ int main() {
     Timer::init();
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
     auto files = {
-        "mnist784.csv",
+        //"mnist784.csv",
         "benign_traffic.csv",
         "covtype.csv",
         "2d-10c.arff",
@@ -75,6 +75,8 @@ int main() {
             auto [centers, counts] = job.reduceToclusterCenters(&reduceData);
             if (!equalsPointVectors(&centers, &origCenters)) {
                 LOG(V2_INFO, "WRONG clusterCenters: \n%s\n", job.dataToString(centers).c_str());
+            } else {
+                LOG(V2_INFO, "Right clusterCenters\n");
             }
             // LOG(V2_INFO, "New clusterCenters: \n%s\n", job.dataToString(job.getClusterCenters()).c_str());
         }

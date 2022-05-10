@@ -86,7 +86,7 @@ void KMeansJob::loadInstance() {
         kMeansData.push_back(p);
         payload = payload + dimension;
     }
-    allReduceElementSize =  dimension * (countClusters + 1);
+    allReduceElementSize = (dimension + 1) * countClusters;
 }
 
 void KMeansJob::setRandomStartCenters() {
@@ -194,11 +194,10 @@ std::vector<float> KMeansJob::clusterCentersToSolution() {
 
 std::vector<int> KMeansJob::clusterCentersToReduce() {
     std::vector<int> result;
-    result.reserve(allReduceElementSize);
-    for (auto entry : localSumMembers) {
+    for (auto entry : sumMembers) {
         result.push_back(entry);
     }
-    for (auto point : localClusterCenters) {
+    for (auto point : clusterCenters) {
         auto centerData = point.data();
         for (int entry = 0; entry < dimension; ++entry) {
             result.push_back(*((int*)(centerData + entry)));
@@ -207,26 +206,28 @@ std::vector<int> KMeansJob::clusterCentersToReduce() {
     return result;
 }
 
-std::tuple<std::vector<std::vector<float>>,std::vector<int>> KMeansJob::reduceToclusterCenters(std::vector<int>* reduce) {
-    //auto [centers, counts] = reduceToclusterCenters(); //call example
+std::tuple<std::vector<std::vector<float>>, std::vector<int>> KMeansJob::reduceToclusterCenters(std::vector<int>* reduce) {
+    // auto [centers, counts] = reduceToclusterCenters(); //call example
     std::vector<int> localSumMembersResult;
     std::vector<Point> localClusterCentersResult;
-    const int elementsCount = allReduceElementSize-countClusters;
+    const int elementsCount = allReduceElementSize - countClusters;
 
     int* reduceData = reduce->data();
 
-    localSumMembersResult.assign(countClusters,0);
-    for (int i = 0; i < countClusters; ++i){
-        localSumMembers[i] = reduceData[i];
+    localSumMembersResult.assign(countClusters, 0);
+    for (int i = 0; i < countClusters; ++i) {
+        localSumMembersResult[i] = reduceData[i];
     }
 
     reduceData += countClusters;
-    localSumMembersResult.assign(elementsCount,0);
-    for (int i = 0; i < elementsCount; ++i){
-        localClusterCentersResult[i/countClusters][i%dimension] = *((float*)(reduceData + i));
+    localClusterCentersResult.clear();
+    localClusterCentersResult.resize(countClusters);
+    for (int i = 0; i < countClusters; ++i) {
+        localClusterCentersResult[i].assign(dimension, 0);
+    }
+    for (int i = 0; i < elementsCount; ++i) {
+        localClusterCentersResult[i / dimension][i % dimension] = *((float*)(reduceData + i));
     }
 
     return std::make_tuple(localClusterCentersResult, localSumMembersResult);
-
 }
-
