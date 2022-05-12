@@ -139,20 +139,12 @@ void SatProcessAdapter::doInitialize() {
         
         // If this is reached, something went wrong with execvp
         LOG(V0_CRIT, "[ERROR] execvp returned %i with errno %i\n", result, (int)errno);
-        
-        std::string fallbackExecutable = _params.subprocessDirectory() + "/mallob_sat_process";
-        char* const* fallbackArgv = _params.asCArgs(fallbackExecutable.c_str());
-
-        result = execvp(fallbackArgv[0], fallbackArgv);
-
-        LOG(V0_CRIT, "[ERROR] fallback execvp returned %i with errno %i\n", result, (int)errno);
         abort();
     }
 
     // [parent process]
     int i = 0;
-    while (argv[i] != nullptr) free(argv[i++]);
-    delete[] argv;
+    delete[] ((const char**) argv);
 
     {
         auto lock = _state_mutex.getLock();

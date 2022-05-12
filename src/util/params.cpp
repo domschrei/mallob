@@ -131,49 +131,35 @@ std::string Parameters::getParamsAsString() const {
     return out;
 }
 
-char* const* Parameters::asCArgs(const char* execName) const {
+std::list<std::string>& Parameters::getArgList(const char* execName) {
+    
+    _list_for_c_args.clear();
 
-    size_t numArgs = 0;
-    for (const auto& [id, opt] : _map) if (!opt->getValAsString().empty()) numArgs++;
-    std::vector<std::string> words;
+    // Subprocess prefix (can be multiple words)
     if (subprocessPrefix.isSet()) {
         std::istringstream buffer(subprocessPrefix()); 
-        words = std::vector<std::string>{std::istream_iterator<std::string>(buffer), {}};
-        numArgs += words.size();
+        std::vector<std::string> words = std::vector<std::string>{std::istream_iterator<std::string>(buffer), {}};
+        for (auto& word : words) _list_for_c_args.push_back(word);
+    }
+    // Executable name
+    _list_for_c_args.push_back(execName);
+    // Options
+    for (const auto& [id, opt] : _map) if (!opt->getValAsString().empty()) {
+        _list_for_c_args.push_back("-" + id + "=" + opt->getValAsString());
     }
 
-    const char** argv = new const char*[numArgs+2];
-    int i = 0;
-    
-    while (i < words.size()) {
-        auto wordlen = words[i].size();
-        char* arg = (char*) malloc(wordlen * sizeof(char));
-        strncpy(arg, words[i].c_str(), wordlen);
-        argv[i] = arg;
-        i++;
+    return _list_for_c_args;
+}
+
+char* const* Parameters::asCArgs(const char* execName) {
+
+    auto& list = getArgList(execName);
+    const char** argv = new const char*[list.size()+1];
+    size_t i = 0;
+    for (auto it = list.begin(); it != list.end(); ++it) {
+        argv[i++] = it->c_str();
     }
-
-    char* arg = (char*) malloc((strlen(execName)+1) * sizeof(char));
-    strcpy(arg, execName);
-    argv[i] = arg;
-    i++;
-
-    for (const auto& [id, opt] : _map) {
-        std::string val = opt->getValAsString();
-        if (val.empty()) continue;
-        size_t argsize = 1 + id.size() + (!val.empty() ? 1 + val.size() : 0) + 1;
-        char* arg = (char*) malloc(argsize * sizeof(char));
-        arg[0] = '-';
-        strncpy(arg+1, id.c_str(), id.size());
-        if (!val.empty()) {
-            arg[1+id.size()] = '=';
-            strncpy(arg+(1+id.size()+1), val.c_str(), val.size());
-        }
-        arg[argsize-1] = '\0';
-
-        argv[i] = arg;
-        i++;
-    }
-    argv[i] = nullptr;
+    argv[i++] = nullptr;
+    assert(i == list.size()+1);
     return (char* const*) argv;
 }

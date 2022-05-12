@@ -2,6 +2,8 @@
 #ifndef DOMPASCH_PARAMETERPROCESSOR_H_
 #define DOMPASCH_PARAMETERPROCESSOR_H_
 
+#include <list>
+
 #include "util/option.hpp"
 
 class Parameters {
@@ -20,7 +22,12 @@ public:
 	void printUsage() const;
 	std::string getParamsAsString() const;
 	
-	char* const* asCArgs(const char* execName) const;
+	std::list<std::string>& getArgList(const char* execName);
+	char* const* asCArgs(const char* execName);
+
+private:
+	std::list<std::string> _list_for_c_args;
+
 };
 
 #endif
