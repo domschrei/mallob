@@ -137,10 +137,12 @@ void SatProcessAdapter::doInitialize() {
     pid_t res = Process::createChild();
     if (res == 0) {
         // [child process]
-        execlp(MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher", (char*) 0);
+        execl(MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher", 
+              MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher", 
+              (char*) 0);
         
         // If this is reached, something went wrong with execvp
-        LOG(V0_CRIT, "[ERROR] execlp returned errno %i\n", (int)errno);
+        LOG(V0_CRIT, "[ERROR] execl returned errno %i\n", (int)errno);
         abort();
     }
 
