@@ -129,55 +129,22 @@ void SatProcessAdapter::doInitialize() {
 
     if (_terminate) return;
 
-    // Assemble c-style program arguments
-    std::string executable = _params.subprocessDirectory() + "/mallob_sat_process";
-    //char* const* argv = _params.asCArgs(executable.c_str());
-    std::string command = _params.getSubprocCommandAsString(executable.c_str());
-
     // FORK: Create a child process
     pid_t res = Process::createChild();
     if (res == 0) {
         // [child process]
-
-        // Read command from tmp file
-        pid_t myPid = Proc::getPid();
-        std::string commandOutfile = "/tmp/mallob_subproc_cmd_" + std::to_string(myPid);
-        std::ifstream ifs(commandOutfile);
-        while (!ifs.is_open()) {
-            usleep(100);
-            ifs = std::ifstream(commandOutfile);
-        }
-        std::string command((std::istreambuf_iterator<char>(ifs)),
-                       (std::istreambuf_iterator<char>()));
-
-        // Assemble arguments list
-        int numArgs = 0;
-        for (size_t i = 0; i < command.size(); ++i) {
-            if (command[i] == '\n') break;
-            if (command[i] == ' ') numArgs++;
-        }
-        char* argv[numArgs+1];
-        size_t argvIdx = 0;
-        size_t argBegin = 0;
-        for (size_t i = 0; i < command.size(); ++i) {
-            if (command[i] == '\n') break;
-            if (command[i] == ' ') {
-                command[i] = '\0';
-                argv[argvIdx++] = command.data()+argBegin;
-                argBegin = i+1;
-            }
-        }
-        argv[argvIdx++] = nullptr;
-        assert(argvIdx == numArgs+1);
-
-        // Execute the SAT process.
-        int result = execvp(argv[0], argv);
+        execlp("mallob_process_dispatcher", (char*) 0);
         
         // If this is reached, something went wrong with execvp
-        LOG(V0_CRIT, "[ERROR] execvp returned %i with errno %i\n", result, (int)errno);
+        LOG(V0_CRIT, "[ERROR] execvp returned errno %i\n", (int)errno);
         abort();
     }
 
+    // Assemble SAT subprocess command
+    std::string executable = /*_params.subprocessDirectory() + "/*/ "mallob_sat_process";
+    //char* const* argv = _params.asCArgs(executable.c_str());
+    std::string command = _params.getSubprocCommandAsString(executable.c_str());
+    
     // Write command to tmp file
     std::string commandOutfile = "/tmp/mallob_subproc_cmd_" + std::to_string(res) + "~";
     std::ofstream ofs(commandOutfile);

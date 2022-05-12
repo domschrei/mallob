@@ -97,19 +97,23 @@ target_compile_options(mallob_commons PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_commons ${BASE_LIBS})
 
 
-# Executables: mallob and mallob_sat_process
+# Executables
 
 add_executable(mallob src/client.cpp src/worker.cpp src/main.cpp)
 add_executable(mallob_sat_process src/app/sat/main.cpp)
+add_executable(mallob_process_dispatcher src/app/sat/process_dispatcher.cpp)
 
 target_include_directories(mallob PRIVATE ${BASE_INCLUDES})
 target_include_directories(mallob_sat_process PRIVATE ${BASE_INCLUDES})
+target_include_directories(mallob_process_dispatcher PRIVATE ${BASE_INCLUDES})
 
 target_compile_options(mallob PRIVATE ${BASE_COMPILEFLAGS})
 target_compile_options(mallob_sat_process PRIVATE ${BASE_COMPILEFLAGS})
+target_compile_options(mallob_process_dispatcher PRIVATE ${BASE_COMPILEFLAGS})
 
 target_link_libraries(mallob ${BASE_LIBS} mallob_commons)
-target_link_libraries(mallob_sat_process ${BASE_LIBS} mallob_commons) 
+target_link_libraries(mallob_sat_process ${BASE_LIBS} mallob_commons)
+target_link_libraries(mallob_process_dispatcher ${BASE_LIBS} mallob_commons) 
 
 
 # Debug flags to find line numbers in stack traces etc.
