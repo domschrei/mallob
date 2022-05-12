@@ -189,8 +189,12 @@ int main(int argc, char *argv[]) {
 
     longStartupWarnMsg(rank, "Init'd message queue");
 
-    if (rank == 0)
+    if (rank == 0) {
         LOG(V2_INFO, "Program options: %s\n", params.getParamsAsString().c_str());
+        std::string checkCommand = "echo $(date) RDMAV_FORK_SAFE=$RDMAV_FORK_SAFE RDMAV_HUGEPAGES_SAFE=$RDMAV_HUGEPAGES_SAFE >> "
+            + params.traceDirectory() + "/_rdmav";
+        system(checkCommand.c_str());
+    }
     if (params.help()) {
         // Help requested or no job input provided
         if (rank == 0) {
