@@ -131,6 +131,26 @@ std::string Parameters::getParamsAsString() const {
     return out;
 }
 
+std::string Parameters::getSubprocCommandAsString(const char* execName) {
+
+    std::string out;
+
+    // Subprocess prefix (can be multiple words)
+    if (subprocessPrefix.isSet()) {
+        std::istringstream buffer(subprocessPrefix()); 
+        std::vector<std::string> words = std::vector<std::string>{std::istream_iterator<std::string>(buffer), {}};
+        for (auto& word : words) out += word + " ";
+    }
+    // Executable name
+    out += execName + std::string(" ");
+    // Options
+    for (const auto& [id, opt] : _map) if (!opt->getValAsString().empty()) {
+        out += ("-" + id + "=" + opt->getValAsString()) + " ";
+    }
+
+    return out.substr(0, out.size()-1);
+}
+
 std::list<std::string>& Parameters::getArgList(const char* execName) {
     
     _list_for_c_args.clear();
