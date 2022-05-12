@@ -25,6 +25,10 @@ if(MALLOB_LOG_VERBOSITY)
     add_definitions(-DLOGGER_STATIC_VERBOSITY=${MALLOB_LOG_VERBOSITY})
 endif()
 
+if(MALLOB_SUBPROC_DISPATCH_PATH)
+    add_definitions(-DMALLOB_SUBPROC_DISPATCH_PATH=${MALLOB_SUBPROC_DISPATCH_PATH})
+endif()
+
 if(MALLOB_USE_ASAN)
     set(MY_DEBUG_OPTIONS "${MY_DEBUG_OPTIONS} -fno-omit-frame-pointer -fsanitize=address -static-libasan") 
 endif()

@@ -19,6 +19,10 @@
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/fileutils.hpp"
 
+#ifndef MALLOB_SUBPROC_DISPATCH_PATH
+#define MALLOB_SUBPROC_DISPATCH_PATH ""
+#endif
+
 SatProcessAdapter::SatProcessAdapter(Parameters&& params, SatProcessConfig&& config, ForkedSatJob* job,
     size_t fSize, const int* fLits, size_t aSize, const int* aLits, AnytimeSatClauseCommunicator* comm) :    
         _params(std::move(params)), _config(std::move(config)), _job(job), _clause_comm(comm),
@@ -133,15 +137,15 @@ void SatProcessAdapter::doInitialize() {
     pid_t res = Process::createChild();
     if (res == 0) {
         // [child process]
-        execlp("mallob_process_dispatcher", (char*) 0);
+        execlp(MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher", (char*) 0);
         
         // If this is reached, something went wrong with execvp
-        LOG(V0_CRIT, "[ERROR] execvp returned errno %i\n", (int)errno);
+        LOG(V0_CRIT, "[ERROR] execlp returned errno %i\n", (int)errno);
         abort();
     }
 
     // Assemble SAT subprocess command
-    std::string executable = /*_params.subprocessDirectory() + "/*/ "mallob_sat_process";
+    std::string executable = MALLOB_SUBPROC_DISPATCH_PATH"mallob_sat_process";
     //char* const* argv = _params.asCArgs(executable.c_str());
     std::string command = _params.getSubprocCommandAsString(executable.c_str());
     
