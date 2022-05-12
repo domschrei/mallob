@@ -72,9 +72,16 @@ int main() {
             job.calcCurrentClusterCenters();
             auto origCenters =job.getClusterCenters();
             auto reduceData = job.clusterCentersToReduce();
-            auto [centers, counts] = job.reduceToclusterCenters(&reduceData);
-            if (!equalsPointVectors(&centers, &origCenters)) {
-                LOG(V2_INFO, "WRONG clusterCenters: \n%s\n", job.dataToString(centers).c_str());
+            LOG(V2_INFO, "rS: %d\n", reduceData.size());
+            auto pairTest = job.reduceToclusterCenters(reduceData);
+            LOG(V2_INFO, "rD: %d\n", reduceData);
+            std::list<std::vector<int>> dblList;
+            //dblList.push_back(reduceData);
+            dblList.push_back(reduceData);
+            auto dbl = job.aggregate(dblList);
+            auto pair = job.reduceToclusterCenters(dbl);
+            if (!equalsPointVectors(&pair.first, &origCenters)) {
+                LOG(V2_INFO, "WRONG clusterCenters: \n%s\n", job.dataToString(pair.first).c_str());
             } else {
                 LOG(V2_INFO, "Right clusterCenters\n");
             }

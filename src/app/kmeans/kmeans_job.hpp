@@ -30,6 +30,7 @@ class KMeansJob : public Job {
     const int* payload;
     std::future<void> calculating;
     bool finished = false;
+    bool iAmRoot = false;
     JobResult internal_result;
     JobTreeAllReduction* reducer;
 
@@ -69,6 +70,6 @@ class KMeansJob : public Job {
     float calculateDifference(std::function<float(Point, Point)> metric);
     std::vector<float> clusterCentersToSolution();
     std::vector<int> clusterCentersToReduce();
-    std::tuple<std::vector<std::vector<float>>, std::vector<int>> reduceToclusterCenters(std::vector<int>*);
+    std::pair<std::vector<std::vector<float>>, std::vector<int>> reduceToclusterCenters(std::vector<int>);
     std::vector<int> aggregate(std::list<std::vector<int>>);
 };

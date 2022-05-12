@@ -32,7 +32,8 @@ KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int 
 }
 
 void KMeansJob::appl_start() {
-    LOG(V0_CRIT, "commSize: %i worldRank: %i \n", getGlobalNumWorkers(), getMyMpiRank());
+    iAmRoot = (getJobTree().getIndex() == 0);
+    LOG(V0_CRIT, "commSize: %i worldRank: %i \n", getGlobalNumWorkers(), getJobTree().getIndex());
     calculating = ProcessWideThreadPool::get().addTask([&]() {
         auto metric = [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
         payload = getDescription().getFormulaPayload(0);
@@ -194,10 +195,10 @@ std::vector<float> KMeansJob::clusterCentersToSolution() {
 
 std::vector<int> KMeansJob::clusterCentersToReduce() {
     std::vector<int> result;
-    for (auto entry : sumMembers) {
+    for (auto entry : localSumMembers) {
         result.push_back(entry);
     }
-    for (auto point : clusterCenters) {
+    for (auto point : localClusterCenters) {
         auto centerData = point.data();
         for (int entry = 0; entry < dimension; ++entry) {
             result.push_back(*((int*)(centerData + entry)));
@@ -206,16 +207,19 @@ std::vector<int> KMeansJob::clusterCentersToReduce() {
     return result;
 }
 
-std::tuple<std::vector<std::vector<float>>, std::vector<int>> KMeansJob::reduceToclusterCenters(std::vector<int>* reduce) {
+std::pair<std::vector<std::vector<float>>, std::vector<int>>
+KMeansJob::reduceToclusterCenters(std::vector<int> reduce) {
     // auto [centers, counts] = reduceToclusterCenters(); //call example
     std::vector<int> localSumMembersResult;
     std::vector<Point> localClusterCentersResult;
     const int elementsCount = allReduceElementSize - countClusters;
 
-    int* reduceData = reduce->data();
+        
+    int* reduceData = reduce.data();
 
     localSumMembersResult.assign(countClusters, 0);
     for (int i = 0; i < countClusters; ++i) {
+        LOG(V2_INFO, "i: %d\n", i);
         localSumMembersResult[i] = reduceData[i];
     }
 
@@ -229,7 +233,7 @@ std::tuple<std::vector<std::vector<float>>, std::vector<int>> KMeansJob::reduceT
         localClusterCentersResult[i / dimension][i % dimension] = *((float*)(reduceData + i));
     }
 
-    return std::make_tuple(localClusterCentersResult, localSumMembersResult);
+    return std::pair(std::move(localClusterCentersResult), std::move(localSumMembersResult));
 }
 
 std::vector<int> KMeansJob::aggregate(std::list<std::vector<int>> messages) {
@@ -238,10 +242,10 @@ std::vector<int> KMeansJob::aggregate(std::list<std::vector<int>> messages) {
     centers.resize(messages.size());
     counts.resize(messages.size());
     for (int i = 0; i < messages.size(); ++i) {
-        auto [centersData, countsData] = reduceToclusterCenters(&messages.front());
+        auto data = reduceToclusterCenters(messages.front());
         messages.pop_front();
-        centers[i] = centersData;
-        counts[i] = countsData;
+        centers[i] = data.first;
+        counts[i] = data.second;
     }
 
     localSumMembers.assign(countClusters, 0);
@@ -251,7 +255,19 @@ std::vector<int> KMeansJob::aggregate(std::list<std::vector<int>> messages) {
         }
     }
 
-    //add up clusterCenters
+    localClusterCenters.resize(countClusters);
+    for (int i = 0; i < countClusters; ++i) {
+        localClusterCenters[i].assign(dimension, 0);
+    }
+    for (int i = 0; i < messages.size(); ++i) {
+        for (int j = 0; j < countClusters; ++j) {
+            for (int k = 0; k < dimension; ++k) {
+                localClusterCenters[j][k] += centers[i][j][k] *
+                                             (static_cast<float>(counts[i][j]) /
+                                              static_cast<float>(localSumMembers[j]));
+            }
+        }
+    }
 
-    return clusterCentersToReduce(); //localSumMembers, localClusterCenters
+    return clusterCentersToReduce();  // localSumMembers, localClusterCenters
 }
