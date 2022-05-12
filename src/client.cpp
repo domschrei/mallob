@@ -400,7 +400,7 @@ void Client::handleOfferAdoption(MessageHandle& handle) {
     auto data = desc.getSerialization(desc.getRevision());
     desc.clearPayload(desc.getRevision());
     int msgId = MyMpi::isend(handle.source, MSG_SEND_JOB_DESCRIPTION, data);
-    LOG_ADD_DEST(V4_VVER, "Sent job desc. of #%i of size %i\n", 
+    LOG_ADD_DEST(V4_VVER, "Sent job desc. of #%i of size %i", 
         handle.source, req.jobId, data->size());
     //LOG(V4_VVER, "%p : use count %i\n", data.get(), data.use_count());
     
@@ -442,14 +442,27 @@ void Client::handleSendJobResult(MessageHandle& handle) {
 
     std::string resultString = "s " + std::string(resultCode == RESULT_SAT ? "SATISFIABLE" 
                         : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN") + "\n";
-    std::stringstream modelString;
+    std::vector<std::string> modelStrings;
     if ((_params.solutionToFile.isSet() || _params.monoFilename.isSet()) 
             && resultCode == RESULT_SAT) {
-        modelString << "v ";
-        for (size_t x = 1; x < jobResult.getSolutionSize(); x++) {
+        std::stringstream modelString;
+        int numAdded = 0;
+        auto solSize = jobResult.getSolutionSize();
+        for (size_t x = 1; x < solSize; x++) {
+            if (numAdded == 0) {
+                modelString << "v ";
+            }
             modelString << std::to_string(jobResult.getSolution(x)) << " ";
+            numAdded++;
+            bool done = x+1 == solSize;
+            if (numAdded == 20 || done) {
+                if (done) modelString << "0";
+                modelString << "\n";
+                modelStrings.push_back(modelString.str());
+                modelString = std::stringstream();
+                numAdded = 0;
+            }
         }
-        modelString << "0\n";
     }
     if (_params.solutionToFile.isSet()) {
         std::ofstream file;
@@ -458,12 +471,13 @@ void Client::handleSendJobResult(MessageHandle& handle) {
             LOG(V0_CRIT, "[ERROR] Could not open solution file\n");
         } else {
             file << resultString;
-            file << modelString.str();
+            for (auto& modelString : modelStrings) file << modelString;
             file.close();
         }
     } else if (_params.monoFilename.isSet()) {
         LOG_OMIT_PREFIX(V0_CRIT, resultString.c_str());
-        LOG_OMIT_PREFIX(V0_CRIT, modelString.str().c_str());
+        for (auto& modelString : modelStrings)
+            LOG_OMIT_PREFIX(V0_CRIT, modelString.c_str());
     }
 
     if (_json_interface) {

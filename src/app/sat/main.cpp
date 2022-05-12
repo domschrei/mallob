@@ -44,8 +44,10 @@ int main(int argc, char *argv[]) {
 
     std::string logdir = params.logDirectory();
     std::string logFilename = "subproc" + std::string(".") + std::to_string(rankOfParent);
+    bool quiet = params.quiet();
+    if (params.zeroOnlyLogging() && rankOfParent > 0) quiet = true;
     Logger::init(rankOfParent, params.verbosity(), params.coloredOutput(), 
-            params.quiet(), /*cPrefix=*/params.monoFilename.isSet(),
+            quiet, /*cPrefix=*/params.monoFilename.isSet(),
             !logdir.empty() ? &logdir : nullptr,
             &logFilename);
     Logger::getMainInstance().setLinePrefix(" <" + config.getJobStr() + ">");
