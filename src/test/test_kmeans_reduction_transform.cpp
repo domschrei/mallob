@@ -71,19 +71,23 @@ int main() {
 
             job.calcCurrentClusterCenters();
             auto origCenters =job.getClusterCenters();
-            auto reduceData = job.clusterCentersToReduce();
+            std::vector<int> example1;
+            example1.assign(job.getNumClusters(), 1);
+            std::vector<int> example3;
+            example3.assign(job.getNumClusters(), 3);
+            auto reduceData = job.clusterCentersToReduce(job.getSumMembers(),job.getClusterCenters());
+            auto reduceDataEX = job.clusterCentersToReduce(example3,job.getClusterCenters());
             LOG(V2_INFO, "rS: %d\n", reduceData.size());
-            auto pairTest = job.reduceToclusterCenters(reduceData);
-            LOG(V2_INFO, "rD: %d\n", reduceData);
             std::list<std::vector<int>> dblList;
-            //dblList.push_back(reduceData);
             dblList.push_back(reduceData);
+            dblList.push_back(reduceDataEX);
             auto dbl = job.aggregate(dblList);
             auto pair = job.reduceToclusterCenters(dbl);
             if (!equalsPointVectors(&pair.first, &origCenters)) {
                 LOG(V2_INFO, "WRONG clusterCenters: \n%s\n", job.dataToString(pair.first).c_str());
+                LOG(V2_INFO, "WRONG clusterCenters: \n%s\n", job.dataToString(origCenters).c_str());
             } else {
-                LOG(V2_INFO, "Right clusterCenters\n");
+                LOG(V2_INFO, "RIGHT clusterCenters: \n%s\n", job.dataToString(pair.first).c_str());
             }
             // LOG(V2_INFO, "New clusterCenters: \n%s\n", job.dataToString(job.getClusterCenters()).c_str());
         }

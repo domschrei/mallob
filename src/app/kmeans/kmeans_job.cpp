@@ -150,7 +150,7 @@ std::string KMeansJob::dataToString(std::vector<Point> data) {
 std::string KMeansJob::dataToString(std::vector<int> data) {
     std::stringstream result;
 
-    for (auto entry : sumMembers) {
+    for (auto entry : data) {
         result << entry << " ";
     }
     result << "\n";
@@ -193,16 +193,17 @@ std::vector<float> KMeansJob::clusterCentersToSolution() {
     return result;
 }
 
-std::vector<int> KMeansJob::clusterCentersToReduce() {
+std::vector<int> KMeansJob::clusterCentersToReduce(std::vector<int> reduceSumMembers, std::vector<Point> reduceClusterCenters) {
     std::vector<int> result;
-    for (auto entry : localSumMembers) {
+    for (auto entry : reduceSumMembers) {
         result.push_back(entry);
     }
-    for (auto point : localClusterCenters) {
+    for (auto point : reduceClusterCenters) {
         auto centerData = point.data();
         for (int entry = 0; entry < dimension; ++entry) {
             result.push_back(*((int*)(centerData + entry)));
         }
+        LOG(V2_INFO, "Push: \n%f\n", *(centerData));
     }
     return result;
 }
@@ -214,12 +215,11 @@ KMeansJob::reduceToclusterCenters(std::vector<int> reduce) {
     std::vector<Point> localClusterCentersResult;
     const int elementsCount = allReduceElementSize - countClusters;
 
-        
     int* reduceData = reduce.data();
 
     localSumMembersResult.assign(countClusters, 0);
     for (int i = 0; i < countClusters; ++i) {
-        LOG(V2_INFO, "i: %d\n", i);
+        //LOG(V2_INFO, "i: %d\n", i);
         localSumMembersResult[i] = reduceData[i];
     }
 
@@ -239,35 +239,46 @@ KMeansJob::reduceToclusterCenters(std::vector<int> reduce) {
 std::vector<int> KMeansJob::aggregate(std::list<std::vector<int>> messages) {
     std::vector<std::vector<KMeansJob::Point>> centers;
     std::vector<std::vector<int>> counts;
-    centers.resize(messages.size());
-    counts.resize(messages.size());
-    for (int i = 0; i < messages.size(); ++i) {
+    std::vector<int> tempSumMembers;
+    std::vector<Point> tempClusterCenters;
+    const int countMessages = messages.size();
+    centers.resize(countMessages);
+    counts.resize(countMessages);
+    LOG(V2_INFO, "countMessages : \n%d\n", countMessages);
+    for (int i = 0; i < countMessages; ++i) {
+
         auto data = reduceToclusterCenters(messages.front());
         messages.pop_front();
         centers[i] = data.first;
         counts[i] = data.second;
-    }
 
-    localSumMembers.assign(countClusters, 0);
-    for (int i = 0; i < messages.size(); ++i) {
+        LOG(V2_INFO, "centers[%d] : \n%s\n",i, dataToString(centers[i]).c_str());
+        LOG(V2_INFO, "counts[%d] : \n%s\n",i, dataToString(counts[i]).c_str());
+    }
+    tempSumMembers.assign(countClusters, 0);
+    for (int i = 0; i < countMessages; ++i) {
         for (int j = 0; j < countClusters; ++j) {
-            localSumMembers[j] += counts[i][j];
+            tempSumMembers[j] = tempSumMembers[j] + counts[i][j];
+            
+            //LOG(V2_INFO, "tempSumMembers[%d] + counts[%d][%d] : \n%d\n",j,i,j, tempSumMembers[j] + counts[i][j]);
+            //LOG(V2_INFO, "tempSumMembers[%d] : \n%d\n",j, tempSumMembers[j]);
+           //LOG(V2_INFO, "KRITcounts[%d] : \n%s\n",i, dataToString(tempSumMembers).c_str());
         }
     }
-
-    localClusterCenters.resize(countClusters);
+    LOG(V2_INFO, "tempSumMembers : \n%s\n", dataToString(tempSumMembers).c_str());
+    tempClusterCenters.resize(countClusters);
     for (int i = 0; i < countClusters; ++i) {
-        localClusterCenters[i].assign(dimension, 0);
+        tempClusterCenters[i].assign(dimension, 0);
     }
-    for (int i = 0; i < messages.size(); ++i) {
+    for (int i = 0; i < countMessages; ++i) {
         for (int j = 0; j < countClusters; ++j) {
             for (int k = 0; k < dimension; ++k) {
-                localClusterCenters[j][k] += centers[i][j][k] *
+                tempClusterCenters[j][k] += centers[i][j][k] *
                                              (static_cast<float>(counts[i][j]) /
-                                              static_cast<float>(localSumMembers[j]));
+                                              static_cast<float>(tempSumMembers[j]));
             }
         }
     }
 
-    return clusterCentersToReduce();  // localSumMembers, localClusterCenters
+    return clusterCentersToReduce(tempSumMembers, tempClusterCenters);  // localSumMembers, tempClusterCenters
 }

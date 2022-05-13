@@ -69,7 +69,7 @@ class KMeansJob : public Job {
     void countMembers();
     float calculateDifference(std::function<float(Point, Point)> metric);
     std::vector<float> clusterCentersToSolution();
-    std::vector<int> clusterCentersToReduce();
+    std::vector<int> clusterCentersToReduce(std::vector<int>, std::vector<Point>);
     std::pair<std::vector<std::vector<float>>, std::vector<int>> reduceToclusterCenters(std::vector<int>);
     std::vector<int> aggregate(std::list<std::vector<int>>);
 };
