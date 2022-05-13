@@ -443,7 +443,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     std::string resultString = "s " + std::string(resultCode == RESULT_SAT ? "SATISFIABLE" 
                         : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN") + "\n";
     std::vector<std::string> modelStrings;
-    if ((_params.solutionToFile.isSet() || _params.monoFilename.isSet()) 
+    if ((_params.solutionToFile.isSet() || (_params.monoFilename.isSet() && !_params.omitSolution())) 
             && resultCode == RESULT_SAT) {
         std::stringstream modelString;
         int numAdded = 0;
@@ -476,8 +476,10 @@ void Client::handleSendJobResult(MessageHandle& handle) {
         }
     } else if (_params.monoFilename.isSet()) {
         LOG_OMIT_PREFIX(V0_CRIT, resultString.c_str());
-        for (auto& modelString : modelStrings)
-            LOG_OMIT_PREFIX(V0_CRIT, modelString.c_str());
+        if (!_params.omitSolution()) {
+            for (auto& modelString : modelStrings)
+                LOG_OMIT_PREFIX(V0_CRIT, modelString.c_str());
+        }
     }
 
     if (_json_interface) {
