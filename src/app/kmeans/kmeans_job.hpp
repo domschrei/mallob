@@ -29,8 +29,13 @@ class KMeansJob : public Job {
     std::vector<Point> kMeansData;
     const int* payload;
     std::future<void> calculating;
+    std::vector<std::future<void>> tasks;
     bool finished = false;
     bool iAmRoot = false;
+    bool loaded = false;
+    bool initialized = false;
+    int myRank;
+    int countCurrentWorkers;
     JobResult internal_result;
     JobTreeAllReduction* reducer;
 
@@ -61,6 +66,7 @@ class KMeansJob : public Job {
     void appl_memoryPanic() override;
 
     void loadInstance();
+    void doStartWork();
     void setRandomStartCenters();
     void calcNearestCenter(std::function<float(Point, Point)> metric);
     void calcCurrentClusterCenters();
@@ -69,6 +75,8 @@ class KMeansJob : public Job {
     void countMembers();
     float calculateDifference(std::function<float(Point, Point)> metric);
     std::vector<float> clusterCentersToSolution();
+    std::vector<int> clusterCentersToBroadcast(std::vector<Point>);
+    std::vector<Point> broadcastToClusterCenters(std::vector<int>);
     std::vector<int> clusterCentersToReduce(std::vector<int>, std::vector<Point>);
     std::pair<std::vector<std::vector<float>>, std::vector<int>> reduceToclusterCenters(std::vector<int>);
     std::vector<int> aggregate(std::list<std::vector<int>>);

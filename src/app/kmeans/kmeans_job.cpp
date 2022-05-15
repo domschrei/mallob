@@ -19,7 +19,7 @@ KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int 
     setPayload(newPayload);
     auto folder =
         [&](std::list<std::vector<int>>& elems) {
-            return std::vector<int>(0, 0);
+            return aggregate(elems);
         };
     JobTreeAllReduction red(getJobTree(),
                             JobMessage(getId(),
@@ -32,12 +32,23 @@ KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int 
 }
 
 void KMeansJob::appl_start() {
-    iAmRoot = (getJobTree().getIndex() == 0);
-    LOG(V0_CRIT, "commSize: %i worldRank: %i \n", getGlobalNumWorkers(), getJobTree().getIndex());
-    calculating = ProcessWideThreadPool::get().addTask([&]() {
-        auto metric = [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
+    myRank = getJobTree().getIndex();
+    iAmRoot = (myRank == 0);
+    LOG(V0_CRIT, "commSize: %i myRank: %i \n", getGlobalNumWorkers(), getJobTree().getIndex());
+
+    ProcessWideThreadPool::get().addTask([&]() {
         payload = getDescription().getFormulaPayload(0);
         loadInstance();
+        if (iAmRoot) {
+            doStartWork();
+        }
+    });
+}
+
+void KMeansJob::doStartWork() {
+    ProcessWideThreadPool::get().addTask([&]() {
+        auto metric = [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
+
         setRandomStartCenters();
 
         while (1 / 1000 < calculateDifference(metric)) {
@@ -69,7 +80,13 @@ JobResult&& KMeansJob::appl_getResult() {
 }
 void KMeansJob::appl_terminate() {}
 void KMeansJob::appl_communicate() {}
-void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {}
+void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
+    if (msg.tag == MSG_BROADCAST_DATA && !loaded) {
+        payload = msg.payload.data();
+    }
+    if (!initialized) return;
+    (reducer)->receive(source, mpiTag, msg);
+}
 void KMeansJob::appl_dumpStats() {}
 void KMeansJob::appl_memoryPanic() {}
 void KMeansJob::loadInstance() {
@@ -88,6 +105,7 @@ void KMeansJob::loadInstance() {
         payload = payload + dimension;
     }
     allReduceElementSize = (dimension + 1) * countClusters;
+    loaded = true;
 }
 
 void KMeansJob::setRandomStartCenters() {
@@ -193,11 +211,8 @@ std::vector<float> KMeansJob::clusterCentersToSolution() {
     return result;
 }
 
-std::vector<int> KMeansJob::clusterCentersToReduce(std::vector<int> reduceSumMembers, std::vector<Point> reduceClusterCenters) {
+std::vector<int> KMeansJob::clusterCentersToBroadcast(std::vector<Point> reduceClusterCenters) {
     std::vector<int> result;
-    for (auto entry : reduceSumMembers) {
-        result.push_back(entry);
-    }
     for (auto point : reduceClusterCenters) {
         auto centerData = point.data();
         for (int entry = 0; entry < dimension; ++entry) {
@@ -206,6 +221,37 @@ std::vector<int> KMeansJob::clusterCentersToReduce(std::vector<int> reduceSumMem
         LOG(V2_INFO, "Push: \n%f\n", *(centerData));
     }
     return result;
+}
+
+std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(std::vector<int> reduce) {
+    std::vector<Point> localClusterCentersResult;
+    const int elementsCount = allReduceElementSize - countClusters;
+    int* reduceData = reduce.data();
+
+    reduceData += countClusters;
+    localClusterCentersResult.clear();
+    localClusterCentersResult.resize(countClusters);
+    for (int i = 0; i < countClusters; ++i) {
+        localClusterCentersResult[i].assign(dimension, 0);
+    }
+    for (int i = 0; i < elementsCount; ++i) {
+        localClusterCentersResult[i / dimension][i % dimension] = *((float*)(reduceData + i));
+    }
+
+    return localClusterCentersResult;
+}
+
+std::vector<int> KMeansJob::clusterCentersToReduce(std::vector<int> reduceSumMembers, std::vector<Point> reduceClusterCenters) {
+    std::vector<int> result;
+    std::vector<int> tempCenters;
+    for (auto entry : reduceSumMembers) {
+        result.push_back(entry);
+    }
+
+    tempCenters = clusterCentersToBroadcast(reduceClusterCenters);
+    result.insert(result.end(), tempCenters.begin(), tempCenters.end());
+
+    return tempCenters;
 }
 
 std::pair<std::vector<std::vector<float>>, std::vector<int>>
@@ -219,19 +265,11 @@ KMeansJob::reduceToclusterCenters(std::vector<int> reduce) {
 
     localSumMembersResult.assign(countClusters, 0);
     for (int i = 0; i < countClusters; ++i) {
-        //LOG(V2_INFO, "i: %d\n", i);
+        // LOG(V2_INFO, "i: %d\n", i);
         localSumMembersResult[i] = reduceData[i];
     }
 
-    reduceData += countClusters;
-    localClusterCentersResult.clear();
-    localClusterCentersResult.resize(countClusters);
-    for (int i = 0; i < countClusters; ++i) {
-        localClusterCentersResult[i].assign(dimension, 0);
-    }
-    for (int i = 0; i < elementsCount; ++i) {
-        localClusterCentersResult[i / dimension][i % dimension] = *((float*)(reduceData + i));
-    }
+    localClusterCentersResult = broadcastToClusterCenters(reduce);
 
     return std::pair(std::move(localClusterCentersResult), std::move(localSumMembersResult));
 }
@@ -246,23 +284,22 @@ std::vector<int> KMeansJob::aggregate(std::list<std::vector<int>> messages) {
     counts.resize(countMessages);
     LOG(V2_INFO, "countMessages : \n%d\n", countMessages);
     for (int i = 0; i < countMessages; ++i) {
-
         auto data = reduceToclusterCenters(messages.front());
         messages.pop_front();
         centers[i] = data.first;
         counts[i] = data.second;
 
-        LOG(V2_INFO, "centers[%d] : \n%s\n",i, dataToString(centers[i]).c_str());
-        LOG(V2_INFO, "counts[%d] : \n%s\n",i, dataToString(counts[i]).c_str());
+        LOG(V2_INFO, "centers[%d] : \n%s\n", i, dataToString(centers[i]).c_str());
+        LOG(V2_INFO, "counts[%d] : \n%s\n", i, dataToString(counts[i]).c_str());
     }
     tempSumMembers.assign(countClusters, 0);
     for (int i = 0; i < countMessages; ++i) {
         for (int j = 0; j < countClusters; ++j) {
             tempSumMembers[j] = tempSumMembers[j] + counts[i][j];
-            
-            //LOG(V2_INFO, "tempSumMembers[%d] + counts[%d][%d] : \n%d\n",j,i,j, tempSumMembers[j] + counts[i][j]);
-            //LOG(V2_INFO, "tempSumMembers[%d] : \n%d\n",j, tempSumMembers[j]);
-           //LOG(V2_INFO, "KRITcounts[%d] : \n%s\n",i, dataToString(tempSumMembers).c_str());
+
+            // LOG(V2_INFO, "tempSumMembers[%d] + counts[%d][%d] : \n%d\n",j,i,j, tempSumMembers[j] + counts[i][j]);
+            // LOG(V2_INFO, "tempSumMembers[%d] : \n%d\n",j, tempSumMembers[j]);
+            // LOG(V2_INFO, "KRITcounts[%d] : \n%s\n",i, dataToString(tempSumMembers).c_str());
         }
     }
     LOG(V2_INFO, "tempSumMembers : \n%s\n", dataToString(tempSumMembers).c_str());
@@ -274,8 +311,8 @@ std::vector<int> KMeansJob::aggregate(std::list<std::vector<int>> messages) {
         for (int j = 0; j < countClusters; ++j) {
             for (int k = 0; k < dimension; ++k) {
                 tempClusterCenters[j][k] += centers[i][j][k] *
-                                             (static_cast<float>(counts[i][j]) /
-                                              static_cast<float>(tempSumMembers[j]));
+                                            (static_cast<float>(counts[i][j]) /
+                                             static_cast<float>(tempSumMembers[j]));
             }
         }
     }
