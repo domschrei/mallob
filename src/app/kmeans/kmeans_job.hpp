@@ -34,10 +34,13 @@ class KMeansJob : public Job {
     bool iAmRoot = false;
     bool loaded = false;
     bool initialized = false;
+    bool cllculatingDistances = false;
     int myRank;
     int countCurrentWorkers;
+    JobMessage baseMsg;
     JobResult internal_result;
     JobTreeAllReduction* reducer;
+    std::function<float (KMeansJob::Point, KMeansJob::Point)> metric = [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
 
    public:
     std::vector<Point> getClusterCenters() { return clusterCenters; };      // The centers of cluster 0..n
@@ -76,7 +79,7 @@ class KMeansJob : public Job {
     float calculateDifference(std::function<float(Point, Point)> metric);
     std::vector<float> clusterCentersToSolution();
     std::vector<int> clusterCentersToBroadcast(std::vector<Point>);
-    std::vector<Point> broadcastToClusterCenters(std::vector<int>);
+    std::vector<Point> broadcastToClusterCenters(std::vector<int>, bool withNumWorkers = false);
     std::vector<int> clusterCentersToReduce(std::vector<int>, std::vector<Point>);
     std::pair<std::vector<std::vector<float>>, std::vector<int>> reduceToclusterCenters(std::vector<int>);
     std::vector<int> aggregate(std::list<std::vector<int>>);

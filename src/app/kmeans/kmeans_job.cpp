@@ -34,23 +34,34 @@ KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int 
 void KMeansJob::appl_start() {
     myRank = getJobTree().getIndex();
     iAmRoot = (myRank == 0);
+    baseMsg = JobMessage(getId(),
+                         getRevision(),
+                         0,
+                         MSG_ALLREDUCE_CLAUSES);
     LOG(V0_CRIT, "commSize: %i myRank: %i \n", getGlobalNumWorkers(), getJobTree().getIndex());
-
+    if (iAmRoot) {
+            loadInstance();
+            doStartWork();
+        } else {
+            // get Centers and num Workers
+        }
     ProcessWideThreadPool::get().addTask([&]() {
         payload = getDescription().getFormulaPayload(0);
-        loadInstance();
-        if (iAmRoot) {
-            doStartWork();
-        }
+        
+        
     });
 }
 
 void KMeansJob::doStartWork() {
+    setRandomStartCenters();
+    auto tree = getJobTree();
+    baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
+    if (tree.hasLeftChild())
+        MyMpi::isend(tree.getLeftChildNodeRank(), MSG_JOB_TREE_BROADCAST, baseMsg);
+    if (tree.hasRightChild())
+        MyMpi::isend(tree.getRightChildNodeRank(), MSG_JOB_TREE_BROADCAST, baseMsg);
+
     ProcessWideThreadPool::get().addTask([&]() {
-        auto metric = [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
-
-        setRandomStartCenters();
-
         while (1 / 1000 < calculateDifference(metric)) {
             calcNearestCenter(metric);
             calcCurrentClusterCenters();
@@ -79,13 +90,23 @@ JobResult&& KMeansJob::appl_getResult() {
     return std::move(internal_result);
 }
 void KMeansJob::appl_terminate() {}
-void KMeansJob::appl_communicate() {}
+void KMeansJob::appl_communicate() {
+    (reducer)->advance();
+}
 void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    if (msg.tag == MSG_BROADCAST_DATA && !loaded) {
-        payload = msg.payload.data();
-    }
     if (!initialized) return;
     (reducer)->receive(source, mpiTag, msg);
+
+    if ((reducer)->hasResult()) {
+        clusterCenters = broadcastToClusterCenters((reducer)->extractResult(), true);
+        if (myRank < countCurrentWorkers) {
+            (reducer)->produce([&]() {
+                calcNearestCenter(metric);
+                calcCurrentClusterCenters();
+                return clusterCentersToBroadcast(clusterCenters);
+            });
+        }
+    }
 }
 void KMeansJob::appl_dumpStats() {}
 void KMeansJob::appl_memoryPanic() {}
@@ -223,7 +244,7 @@ std::vector<int> KMeansJob::clusterCentersToBroadcast(std::vector<Point> reduceC
     return result;
 }
 
-std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(std::vector<int> reduce) {
+std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(std::vector<int> reduce, bool withNumWorkers) {
     std::vector<Point> localClusterCentersResult;
     const int elementsCount = allReduceElementSize - countClusters;
     int* reduceData = reduce.data();
@@ -237,6 +258,9 @@ std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(std::vector<i
     for (int i = 0; i < elementsCount; ++i) {
         localClusterCentersResult[i / dimension][i % dimension] = *((float*)(reduceData + i));
     }
+    if (withNumWorkers) {
+        countCurrentWorkers = *(reduceData + elementsCount);
+    }
 
     return localClusterCentersResult;
 }
@@ -244,14 +268,18 @@ std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(std::vector<i
 std::vector<int> KMeansJob::clusterCentersToReduce(std::vector<int> reduceSumMembers, std::vector<Point> reduceClusterCenters) {
     std::vector<int> result;
     std::vector<int> tempCenters;
+
+    tempCenters = clusterCentersToBroadcast(reduceClusterCenters);
+    if (iAmRoot) {
+        tempCenters.push_back(getGlobalNumWorkers());
+        return tempCenters;
+    }
+
     for (auto entry : reduceSumMembers) {
         result.push_back(entry);
     }
-
-    tempCenters = clusterCentersToBroadcast(reduceClusterCenters);
     result.insert(result.end(), tempCenters.begin(), tempCenters.end());
-
-    return tempCenters;
+    return result;
 }
 
 std::pair<std::vector<std::vector<float>>, std::vector<int>>
