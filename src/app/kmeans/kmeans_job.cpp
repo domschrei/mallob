@@ -39,17 +39,17 @@ void KMeansJob::appl_start() {
                          0,
                          MSG_ALLREDUCE_CLAUSES);
     LOG(V0_CRIT, "commSize: %i myRank: %i \n", getGlobalNumWorkers(), getJobTree().getIndex());
-    if (iAmRoot) {
-            loadInstance();
-            doStartWork();
-        } else {
-            // get Centers and num Workers
-        }
-    ProcessWideThreadPool::get().addTask([&]() {
         payload = getDescription().getFormulaPayload(0);
-        
-        
+    if (iAmRoot) {
+        loadInstance();
+        doStartWork();
+    } else {
+        ProcessWideThreadPool::get().addTask([&]() {
+        loadInstance();
+
     });
+    }
+    
 }
 
 void KMeansJob::doStartWork() {
@@ -91,10 +91,11 @@ JobResult&& KMeansJob::appl_getResult() {
 }
 void KMeansJob::appl_terminate() {}
 void KMeansJob::appl_communicate() {
+    if (!loaded) return;
     (reducer)->advance();
 }
 void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    if (!initialized) return;
+    if (!loaded) return;
     (reducer)->receive(source, mpiTag, msg);
 
     if ((reducer)->hasResult()) {
