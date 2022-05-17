@@ -30,11 +30,14 @@ class KMeansJob : public Job {
     const int* payload;
     std::future<void> calculating;
     std::vector<std::future<void>> tasks;
+    std::vector<int> myIntervalStarts;
     bool finished = false;
     bool iAmRoot = false;
     bool loaded = false;
     bool initialized = false;
     bool cllculatingDistances = false;
+    bool allCollected = false;
+    std::pair<bool, bool> childsFinished = {false, false};
     int myRank;
     int countCurrentWorkers;
     JobMessage baseMsg;
@@ -70,6 +73,7 @@ class KMeansJob : public Job {
 
     void loadInstance();
     void doStartWork();
+    void sendStartNotification();
     void setRandomStartCenters();
     void calcNearestCenter(std::function<float(Point, Point)> metric);
     void calcCurrentClusterCenters();
