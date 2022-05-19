@@ -25,6 +25,9 @@ private:
     std::function<AllReduceElement(std::list<AllReduceElement>&)> _aggregator;
     std::optional<AllReduceElement> _aggregated_elem;
 
+    bool _has_transformation_at_root = false;
+    std::function<AllReduceElement(const AllReduceElement&)> _transformation_at_root;
+
     bool _has_producer = false;
     bool _reduction_locally_done = false;
     bool _finished = false;
@@ -32,16 +35,21 @@ private:
 
 public:
     JobTreeAllReduction(JobTree& jobTree, JobMessage baseMsg, AllReduceElement&& neutralElem, 
-            std::function<AllReduceElement(std::list<AllReduceElement>&)> aggregator):
+            std::function<AllReduceElement(std::list<AllReduceElement>&)> aggregator) :
         _tree(jobTree), _base_msg(baseMsg), _neutral_elem(std::move(neutralElem)), 
         _num_expected_child_elems(_tree.getNumChildren()), _aggregator(aggregator) {}
 
     // Set the function to compute the local contribution for the all-reduction.
-    // This function is invoked immediately in a separate thread.
+    // This function is invoked immediately
     void produce(std::function<AllReduceElement()> localProducer) {
         assert(!_has_producer);
         _has_producer = true;
         _local_elem = localProducer();
+    }
+
+    void setTransformationOfElementAtRoot(std::function<AllReduceElement(const AllReduceElement&)> transformation) {
+        _transformation_at_root = transformation;
+        _has_transformation_at_root = true;
     }
 
     // Process an incoming message and advance the all-reduction accordingly. 
@@ -94,6 +102,10 @@ public:
             _reduction_locally_done = true;
             
             if (_tree.isRoot()) {
+                // Transform reduced element at root
+                if (_has_transformation_at_root) {
+                    _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));
+                }
                 // Begin broadcast
                 receiveAndForwardFinalElem(std::move(_aggregated_elem.value()));
             } else {

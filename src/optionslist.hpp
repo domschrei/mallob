@@ -29,6 +29,7 @@ OPT_BOOL(useIPCSocketInterface,          "interface-ipc", "",                   
 OPT_BOOL(jitterJobPriorities,            "jjp", "jitter-job-priorities",              false,                   "Jitter job priorities to break ties during rebalancing")
 OPT_BOOL(latencyMonkey,                  "latencymonkey", "",                         false,                   "Block all MPI_Isend operations by a small randomized amount of time")
 OPT_BOOL(monitorMpi,                     "mmpi", "monitor-mpi",                       false,                   "Launch an additional thread per process checking when the main thread is inside an MPI call")
+OPT_BOOL(omitSolution,                   "os", "omit-solution",                       false,                   "Do not output solution in mono mode of operation")
 OPT_BOOL(phaseDiversification,           "phasediv", "",                              true,                    "Diversify solvers based on phase in addition to native diversification")
 OPT_BOOL(pipeLargeSolutions,             "pls", "pipe-large-solutions",               true,                    "Provide large solutions over a named pipe instead of directly writing them into the response JSON")
 OPT_BOOL(quiet,                          "q", "quiet",                                false,                   "Do not log to stdout besides critical information")

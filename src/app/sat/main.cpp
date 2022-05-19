@@ -16,6 +16,7 @@
 #include "util/sys/thread_pool.hpp"
 #include "data/checksum.hpp"
 #include "execution/sat_process.hpp"
+#include "util/sys/fileutils.hpp"
 
 #ifndef MALLOB_VERSION
 #define MALLOB_VERSION "(dbg)"
@@ -43,14 +44,19 @@ int main(int argc, char *argv[]) {
 
     std::string logdir = params.logDirectory();
     std::string logFilename = "subproc" + std::string(".") + std::to_string(rankOfParent);
+    bool quiet = params.quiet();
+    if (params.zeroOnlyLogging() && rankOfParent > 0) quiet = true;
     Logger::init(rankOfParent, params.verbosity(), params.coloredOutput(), 
-            params.quiet(), /*cPrefix=*/params.monoFilename.isSet(),
+            quiet, /*cPrefix=*/params.monoFilename.isSet(),
             !logdir.empty() ? &logdir : nullptr,
             &logFilename);
     Logger::getMainInstance().setLinePrefix(" <" + config.getJobStr() + ">");
     
     pid_t pid = Proc::getPid();
     LOG(V3_VERB, "Mallob SAT engine %s pid=%lu\n", MALLOB_VERSION, pid);
+    
+    // Clean up subprocess command tmp file
+    FileUtils::rm("/tmp/mallob_subproc_cmd_" + std::to_string(pid));
     
     try {
         // Launch program

@@ -2,6 +2,8 @@
 #include "util/assert.hpp"
 #include <sys/types.h>
 #include <stdlib.h>
+#include <fstream>
+#include <cstdio>
 
 #include "sat_process_adapter.hpp"
 
@@ -15,6 +17,11 @@
 #include "forked_sat_job.hpp"
 #include "anytime_sat_clause_communicator.hpp"
 #include "util/sys/thread_pool.hpp"
+#include "util/sys/fileutils.hpp"
+
+#ifndef MALLOB_SUBPROC_DISPATCH_PATH
+#define MALLOB_SUBPROC_DISPATCH_PATH ""
+#endif
 
 SatProcessAdapter::SatProcessAdapter(Parameters&& params, SatProcessConfig&& config, ForkedSatJob* job,
     size_t fSize, const int* fLits, size_t aSize, const int* aLits, AnytimeSatClauseCommunicator* comm) :    
@@ -126,26 +133,33 @@ void SatProcessAdapter::doInitialize() {
 
     if (_terminate) return;
 
-    // Assemble c-style program arguments
-    std::string executable = _params.subprocessDirectory() + "/mallob_sat_process";
-    char* const* argv = _params.asCArgs(executable.c_str());
-
     // FORK: Create a child process
     pid_t res = Process::createChild();
     if (res == 0) {
         // [child process]
-        // Execute the SAT process.
-        int result = execvp(argv[0], argv);
+        execl(MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher", 
+              MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher", 
+              (char*) 0);
         
         // If this is reached, something went wrong with execvp
-        LOG(V0_CRIT, "[ERROR] execvp returned %i with errno %i\n", result, (int)errno);
+        LOG(V0_CRIT, "[ERROR] execl returned errno %i\n", (int)errno);
         abort();
     }
 
-    // [parent process]
-    int i = 0;
-    while (argv[i] != nullptr) free(argv[i++]);
-    delete[] argv;
+    // Assemble SAT subprocess command
+    std::string executable = MALLOB_SUBPROC_DISPATCH_PATH"mallob_sat_process";
+    //char* const* argv = _params.asCArgs(executable.c_str());
+    std::string command = _params.getSubprocCommandAsString(executable.c_str());
+    
+    // Write command to tmp file
+    std::string commandOutfile = "/tmp/mallob_subproc_cmd_" + std::to_string(res) + "~";
+    std::ofstream ofs(commandOutfile);
+    ofs << command << " " << std::endl;
+    ofs.close();
+    std::rename(commandOutfile.c_str(), commandOutfile.substr(0, commandOutfile.size()-1).c_str()); // remove tilde
+
+    //int i = 0;
+    //delete[] ((const char**) argv);
 
     {
         auto lock = _state_mutex.getLock();
