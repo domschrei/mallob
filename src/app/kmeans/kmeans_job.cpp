@@ -22,13 +22,17 @@ KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int 
 void KMeansJob::appl_start() {
     myRank = getJobTree().getIndex();
     iAmRoot = (myRank == 0);
+    LOG(V0_CRIT, "commSize: %i myRank: %i \n", getGlobalNumWorkers(), getJobTree().getIndex());
+    payload = getDescription().getFormulaPayload(0);
+    loadTask = ProcessWideThreadPool::get().addTask([&]() {
+        loadInstance();
+        loaded = true;
+    });
+    /* Init Reduction
     baseMsg = JobMessage(getId(),
                          getRevision(),
                          0,
                          MSG_ALLREDUCE_CLAUSES);
-    LOG(V0_CRIT, "commSize: %i myRank: %i \n", getGlobalNumWorkers(), getJobTree().getIndex());
-    payload = getDescription().getFormulaPayload(0);
-    loadInstance();
     auto folder =
         [&](std::list<std::vector<int>>& elems) {
             return aggregate(elems);
@@ -44,14 +48,10 @@ void KMeansJob::appl_start() {
                             std::move(neutral),
                             folder);
     reducer = std::move(&red);
+    */
     if (iAmRoot) {
-        doStartWork();
-    } else {
-        tasks.push_back(ProcessWideThreadPool::get().addTask([&]() {
-            loadInstance();
-        }));
+        doInitWork();
     }
-    initialized = true;
 }
 void KMeansJob::sendStartNotification() {
     auto tree = getJobTree();
@@ -62,58 +62,64 @@ void KMeansJob::sendStartNotification() {
     if (tree.hasRightChild())
         MyMpi::isend(tree.getRightChildNodeRank(), MSG_JOB_TREE_BROADCAST, baseMsg);
 }
-void KMeansJob::doStartWork() {
-    setRandomStartCenters();
-    sendStartNotification();
+void KMeansJob::doInitWork() {
+    initMsgTask = ProcessWideThreadPool::get().addTask([&]() {
+        setRandomStartCenters();
+        sendStartNotification();
+        initSend = true;
+    });
 
-    tasks.push_back(ProcessWideThreadPool::get().addTask([&]() {
-        calcNearestCenter(metric);
-        calcCurrentClusterCenters();
-    }));
+    /* Result
     internal_result.result = RESULT_SAT;
     internal_result.id = getId();
     internal_result.revision = getRevision();
     std::vector<int> transformSolution;
-    /*
-    transformSolution.reserve(sumMembers.size() + 1);
-    transformSolution.push_back(-42);
-    for (auto element : sumMembers) {
-        transformSolution.push_back(element);
-    }
-    */
+
     internal_result.encodedType = JobResult::EncodedType::FLOAT;
     auto solution = clusterCentersToSolution();
     internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
     finished = true;
+    */
 }
 void KMeansJob::appl_suspend() {}
 void KMeansJob::appl_resume() {}
 JobResult&& KMeansJob::appl_getResult() {
     return std::move(internal_result);
 }
-void KMeansJob::appl_terminate() {}
+void KMeansJob::appl_terminate() {
+    if (loaded && loadTask.valid()) loadTask.get();
+    if (initSend && initMsgTask.valid()) initMsgTask.get();
+}
 void KMeansJob::appl_communicate() {
-    if (!initialized) return;
+    if (!loaded) return;
+
+    if (calculatingFinished) {
+        if (calculatingTask.valid()) calculatingTask.get();
+        (reducer)->produce([&]() {
+            return clusterCentersToBroadcast(clusterCenters);
+        });
+        calculatingFinished = false;
+    };
     (reducer)->advance();
 }
 void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    if (!initialized) return;
+    if (!initSend) return;
     if (mpiTag == MSG_JOB_TREE_BROADCAST) {
         if (myRank < countCurrentWorkers) {
+            //continue broadcasting
             clusterCenters = broadcastToClusterCenters(msg.payload, true);
-            (reducer)->produce([&]() {
+            calculatingTask = ProcessWideThreadPool::get().addTask([&]() {
                 calcNearestCenter(metric);
                 calcCurrentClusterCenters();
-                return clusterCentersToBroadcast(clusterCenters);
+                calculatingFinished = true;
             });
         }
     }
-    if (mpiTag == MSG_SCHED_RETURN_NODES) { //child got suspendet
+    if (mpiTag == MSG_SCHED_RETURN_NODES) {  // child got suspended
         myIntervalStarts.push_back(msg.payload[0]);
     }
     if ((reducer)->hasResult()) {
         clusterCenters = broadcastToClusterCenters((reducer)->extractResult(), true);
-        
     }
     (reducer)->receive(source, mpiTag, msg);
 }
@@ -153,7 +159,7 @@ void KMeansJob::calcNearestCenter(std::function<float(Point, Point)> metric) {
     } currentNearestCenter;
     clusterMembership.assign(pointsCount, 0);
     float distanceToCluster;
-    //while own or child slices todo
+    // while own or child slices todo
     for (int pointID = 0; pointID < pointsCount; ++pointID) {
         currentNearestCenter.cluster = -1;
         currentNearestCenter.distance = std::numeric_limits<float>::infinity();

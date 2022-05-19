@@ -11,6 +11,7 @@
 #include "app/sat/job/sat_constants.h"
 #include "comm/job_tree_all_reduction.hpp"
 #include "util/params.hpp"
+#include "kmeans_utils.hpp"
 
 class KMeansJob : public Job {
    private:
@@ -28,14 +29,15 @@ class KMeansJob : public Job {
     int iterationsDone = 0;
     std::vector<Point> kMeansData;
     const int* payload;
-    std::future<void> calculating;
-    std::vector<std::future<void>> tasks;
+    std::future<void> calculatingTask;
+    std::future<void> loadTask;
+    std::future<void> initMsgTask;
     std::vector<int> myIntervalStarts;
-    bool finished = false;
+    bool finishedJob = false;
     bool iAmRoot = false;
     bool loaded = false;
-    bool initialized = false;
-    bool cllculatingDistances = false;
+    bool initSend = false;
+    bool calculatingFinished = false;
     bool allCollected = false;
     std::pair<bool, bool> childsFinished = {false, false};
     int myRank;
@@ -62,7 +64,7 @@ class KMeansJob : public Job {
     void appl_suspend() override;
     void appl_resume() override;
     void appl_terminate() override;
-    int appl_solved() override { return finished ? RESULT_SAT : -1; }  // atomic bool
+    int appl_solved() override { return finishedJob ? RESULT_SAT : -1; }  // atomic bool
     int getDemand() const { return 1; }
     JobResult&& appl_getResult() override;
     void appl_communicate() override;
@@ -72,7 +74,7 @@ class KMeansJob : public Job {
     void appl_memoryPanic() override;
 
     void loadInstance();
-    void doStartWork();
+    void doInitWork();
     void sendStartNotification();
     void setRandomStartCenters();
     void calcNearestCenter(std::function<float(Point, Point)> metric);
