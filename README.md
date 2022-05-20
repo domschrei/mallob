@@ -1,7 +1,7 @@
 
 # Mallob 
 
-Short links: [Experimental data of our SAT21 paper](https://github.com/domschrei/mallob-experimental-data) · [Animallob: Interactive visualization of experiments](https://dominikschreiber.de/animallob)
+**[Experimental data of our publications](https://github.com/domschrei/mallob-experimental-data)**
 
 <hr/>
 
