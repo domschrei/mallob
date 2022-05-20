@@ -41,12 +41,38 @@ void KMeansJob::appl_start() {
     });
 }
 void KMeansJob::initReducer() {
+    std::vector<int> neutral;
+    neutral.assign(allReduceElementSize, 0);
     auto folder =
         [&](std::list<std::vector<int>>& elems) {
             return aggregate(elems);
         };
-    std::vector<int> neutral;
-    neutral.assign(allReduceElementSize, 0);
+    auto rootTransform = [&](std::vector<int> payload) {
+        auto data = reduceToclusterCenters(payload);
+        
+        clusterCenters = data.first;
+        sumMembers = data.second;
+        int sum = 0;
+        for (auto i : sumMembers) {
+            sum += i;
+        }
+        if (sum == pointsCount) {
+            allCollected = true;
+
+            LOG(V2_INFO, "                           AllCollected: Good\n");
+        } else {
+            LOG(V2_INFO, "                           AllCollected: Error\n");
+        }
+        auto transformed = clusterCentersToBroadcast(clusterCenters);
+        transformed.push_back(this->getVolume());
+        if ((1 / 1000 < calculateDifference(
+                            [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
+            return transformed;
+
+        } else {
+            return neutral;
+        }
+    };
 
     JobTreeAllReduction red(getJobTree(),
                             JobMessage(getId(),
@@ -55,7 +81,9 @@ void KMeansJob::initReducer() {
                                        MSG_ALLREDUCE_CLAUSES),
                             std::move(neutral),
                             folder);
+    red.setTransformationOfElementAtRoot(rootTransform);
     reducer = std::move(&red);
+
     hasReducer = true;
 }
 
@@ -280,8 +308,8 @@ std::vector<int> KMeansJob::clusterCentersToBroadcast(std::vector<Point> reduceC
         }
         LOG(V2_INFO, "Push in: %f\n", *(centerData));
     }
-    LOG(V2_INFO, "                           reduce in clusterCentersToBroadcast: \n%s\n",
-        dataToString(result).c_str());
+    LOG(V2_INFO, "                           clusterCenters3: \n%s\n",
+        dataToString(reduceClusterCenters).c_str());
     return result;
 }
 
@@ -312,6 +340,7 @@ std::vector<int> KMeansJob::clusterCentersToReduce(std::vector<int> reduceSumMem
     std::vector<int> tempCenters;
 
     tempCenters = clusterCentersToBroadcast(reduceClusterCenters);
+    LOG(V2_INFO, "                           HERE\n");
     if (iAmRoot) {
         tempCenters.push_back(getVolume());
         return tempCenters;
@@ -322,7 +351,6 @@ std::vector<int> KMeansJob::clusterCentersToReduce(std::vector<int> reduceSumMem
     }
     result.insert(result.end(), tempCenters.begin(), tempCenters.end());
     return result;
-    
 }
 
 std::pair<std::vector<std::vector<float>>, std::vector<int>>
