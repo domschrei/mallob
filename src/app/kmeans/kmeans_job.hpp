@@ -39,6 +39,7 @@ class KMeansJob : public Job {
     bool initSend = false;
     bool calculatingFinished = false;
     bool allCollected = false;
+    bool hasReducer = false;
     std::pair<bool, bool> childsFinished = {false, false};
     int myRank;
     int countCurrentWorkers;
@@ -89,4 +90,6 @@ class KMeansJob : public Job {
     std::vector<int> clusterCentersToReduce(std::vector<int>, std::vector<Point>);
     std::pair<std::vector<std::vector<float>>, std::vector<int>> reduceToclusterCenters(std::vector<int>);
     std::vector<int> aggregate(std::list<std::vector<int>>);
+    void advanceCollective(JobMessage& msg, int broadcastTag);
+    void initReducer();
 };
