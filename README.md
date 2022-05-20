@@ -41,9 +41,9 @@ In addition, use the following Mallob-specific build options:
 | Usage                                     | Description                                                                                                |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | -DMALLOB_ASSERT=<0/1>                     | Turn on assertions (even on release builds). Setting to 0 limits assertions to debug builds.               |
-| -DMALLOB_JEMALLOC_DIR=<path>              | If necessary, provide a path to a local installation of `jemalloc` where `libjemalloc.*` is located.       |
+| -DMALLOB_JEMALLOC_DIR=path                | If necessary, provide a path to a local installation of `jemalloc` where `libjemalloc.*` is located.       |
 | -DMALLOB_LOG_VERBOSITY=<0..6>             | Only compile logging messages of the provided maximum verbosity and discard more verbose log calls.        |
-| -DMALLOB_SUBPROC_DISPATCH_PATH=\"<path>\" | Subprocess executables must be located under <path> for Mallob to find. (Use `\"build/\"` by default.)     |
+| -DMALLOB_SUBPROC_DISPATCH_PATH=\\"path\\" | Subprocess executables must be located under <path> for Mallob to find. (Use `\"build/\"` by default.)     |
 | -DMALLOB_USE_ASAN=<0/1>                   | Compile with Address Sanitizer for debugging purposes.                                                     |
 | -DMALLOB_USE_GLUCOSE=<0/1>                | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
 | -DMALLOB_USE_JEMALLOC=<0/1>               | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
