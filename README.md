@@ -36,15 +36,17 @@ make
 ```
 
 As CMake options, specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
-In addition, you can use the following Mallob-specific build options:
+In addition, use the following Mallob-specific build options:
 
-| Usage                         | Description                                                                                                |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| -DMALLOB_ASSERT=<0/1>         | Turn on assertions (even on release builds). Setting to 0 limits assertions to debug builds.               |
-| -DMALLOB_USE_ASAN=<0/1>       | Compile with Address Sanitizer for debugging purposes.                                                     |
-| -DMALLOB_USE_GLUCOSE=<0/1>    | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
-| -DMALLOB_USE_JEMALLOC=<0/1>   | Compile with Address Sanitizer for debugging purposes.                                                     |
-| -DMALLOB_LOG_VERBOSITY=<0..6> | Only compile logging messages of the provided maximum verbosity and discard more verbose log calls.        |
+| Usage                                     | Description                                                                                                |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| -DMALLOB_ASSERT=<0/1>                     | Turn on assertions (even on release builds). Setting to 0 limits assertions to debug builds.               |
+| -DMALLOB_JEMALLOC_DIR=<path>              | If necessary, provide a path to a local installation of `jemalloc` where `libjemalloc.*` is located.       |
+| -DMALLOB_LOG_VERBOSITY=<0..6>             | Only compile logging messages of the provided maximum verbosity and discard more verbose log calls.        |
+| -DMALLOB_SUBPROC_DISPATCH_PATH=\"<path>\" | Subprocess executables must be located under <path> for Mallob to find. (Use `\"build/\"` by default.)     |
+| -DMALLOB_USE_ASAN=<0/1>                   | Compile with Address Sanitizer for debugging purposes.                                                     |
+| -DMALLOB_USE_GLUCOSE=<0/1>                | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
+| -DMALLOB_USE_JEMALLOC=<0/1>               | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
 
 ### Docker
 
@@ -232,6 +234,7 @@ Furthermore, in our implementation we make thankful use of the following project
 
 * [Compile Time Regular Expressions](https://github.com/hanickadot/compile-time-regular-expressions) by Hana Dusíková, for matching particular user inputs
 * [robin_hood hashing](https://github.com/martinus/robin-hood-hashing) by Martin Ankerl, for efficient unordered maps and sets
+* [robin-map](https://github.com/Tessil/robin-map) by Thibaut Goetghebuer-Planchon, for efficient unordered maps and sets
 * [JSON for Modern C++](https://github.com/nlohmann/json) by Niels Lohmann, for reading and writing JSON files
 
 If you make use of Mallob in an academic setting, please cite this SAT'21 conference paper:
