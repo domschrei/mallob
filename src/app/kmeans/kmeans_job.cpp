@@ -49,7 +49,7 @@ void KMeansJob::initReducer() {
         };
     auto rootTransform = [&](std::vector<int> payload) {
         auto data = reduceToclusterCenters(payload);
-        
+
         clusterCenters = data.first;
         sumMembers = data.second;
         int sum = 0;
@@ -126,11 +126,20 @@ void KMeansJob::appl_communicate() {
     if (!loaded) return;
     if (initSend) sendStartNotification();
     if (calculatingFinished) {
-        if (calculatingTask.valid()) calculatingTask.get();
-        (reducer)->produce([&]() {
-            return clusterCentersToBroadcast(localClusterCenters);
-        });
         calculatingFinished = false;
+        if (calculatingTask.valid()) calculatingTask.get();
+        
+        LOG(V2_INFO, "                           shouldResult: \n%s\n",
+                dataToString(localClusterCenters).c_str());
+        auto result = std::move(clusterCentersToReduce(localSumMembers, localClusterCenters));
+        LOG(V2_INFO, "                           corruptResult: \n%s\n",
+                dataToString(reduceToclusterCenters(result).first).c_str());
+        auto producer = [&]() {           
+            
+            return std::move(result);
+        };
+            LOG(V2_INFO, "                           Problem?\n");
+        (reducer)->produce(producer);
     };
     if (hasReducer) (reducer)->advance();
 }
@@ -227,7 +236,7 @@ void KMeansJob::calcCurrentClusterCenters() {
     countMembers();
 
     LOG(V2_INFO, "                           sumMembers: %s\n",
-        dataToString(sumMembers).c_str());
+        dataToString(localSumMembers).c_str());
     localClusterCenters.clear();
     localClusterCenters.resize(countClusters);
     for (int cluster = 0; cluster < countClusters; ++cluster) {
@@ -236,7 +245,7 @@ void KMeansJob::calcCurrentClusterCenters() {
     for (int pointID = 0; pointID < pointsCount; ++pointID) {
         for (int d = 0; d < dimension; ++d) {
             localClusterCenters[clusterMembership[pointID]][d] +=
-                kMeansData[pointID][d] / static_cast<float>(sumMembers[clusterMembership[pointID]]);
+                kMeansData[pointID][d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]);
         }
     }
     ++iterationsDone;
@@ -265,9 +274,9 @@ std::string KMeansJob::dataToString(std::vector<int> data) {
 
 void KMeansJob::countMembers() {
     std::stringstream result;
-    sumMembers.assign(countClusters, 0);
+    localSumMembers.assign(countClusters, 0);
     for (int clusterID : clusterMembership) {
-        sumMembers[clusterID] += 1;
+        localSumMembers[clusterID] += 1;
     }
 }
 
@@ -310,16 +319,18 @@ std::vector<int> KMeansJob::clusterCentersToBroadcast(std::vector<Point> reduceC
     }
     LOG(V2_INFO, "                           clusterCenters3: \n%s\n",
         dataToString(reduceClusterCenters).c_str());
-    return result;
+    LOG(V2_INFO, "                           reduce in clusterCentersToBroadcast: \n%s\n",
+        dataToString(result).c_str());
+    return std::move(result);
 }
 
 std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(std::vector<int> reduce, bool withNumWorkers) {
-    LOG(V2_INFO, "                           reduce in broadcastToClusterCenters: \n%s\n",
-        dataToString(reduce).c_str());
     std::vector<Point> localClusterCentersResult;
     const int elementsCount = allReduceElementSize - countClusters;
     int* reduceData = reduce.data();
 
+    if (!withNumWorkers) reduceData += countClusters;
+    
     localClusterCentersResult.clear();
     localClusterCentersResult.resize(countClusters);
     for (int i = 0; i < countClusters; ++i) {
@@ -340,17 +351,14 @@ std::vector<int> KMeansJob::clusterCentersToReduce(std::vector<int> reduceSumMem
     std::vector<int> tempCenters;
 
     tempCenters = clusterCentersToBroadcast(reduceClusterCenters);
-    LOG(V2_INFO, "                           HERE\n");
-    if (iAmRoot) {
-        tempCenters.push_back(getVolume());
-        return tempCenters;
-    }
 
     for (auto entry : reduceSumMembers) {
         result.push_back(entry);
     }
     result.insert(result.end(), tempCenters.begin(), tempCenters.end());
-    return result;
+
+    LOG(V2_INFO, "                           HERE!\n");
+    return std::move(result);
 }
 
 std::pair<std::vector<std::vector<float>>, std::vector<int>>
