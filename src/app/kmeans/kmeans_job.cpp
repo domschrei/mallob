@@ -41,7 +41,6 @@ void KMeansJob::appl_start() {
     });
 }
 void KMeansJob::initReducer() {
-    
     auto folder =
         [&](std::list<std::vector<int>>& elems) {
             return aggregate(elems);
@@ -63,7 +62,7 @@ void KMeansJob::initReducer() {
 void KMeansJob::sendStartNotification() {
     auto tree = getJobTree();
     baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
-    baseMsg.payload.push_back(getGlobalNumWorkers());
+    baseMsg.payload.push_back(getVolume());
     baseMsg.tag = MSG_JOB_TREE_BROADCAST;
     MyMpi::isend(myRank, MSG_JOB_TREE_BROADCAST, baseMsg);
     initSend = false;
@@ -113,7 +112,12 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
         if (myRank < countCurrentWorkers) {
             advanceCollective(msg, MSG_JOB_TREE_BROADCAST);
             // continue broadcasting
+            LOG(V2_INFO, "                           clusterCenters1: \n%s\n",
+                dataToString(clusterCenters).c_str());
             clusterCenters = broadcastToClusterCenters(msg.payload, true);
+
+            LOG(V2_INFO, "                           clusterCenters2: \n%s\n",
+                dataToString(clusterCenters).c_str());
             calculatingTask = ProcessWideThreadPool::get().addTask([&]() {
                 calcNearestCenter(metric);
                 calcCurrentClusterCenters();
@@ -133,9 +137,9 @@ void KMeansJob::advanceCollective(JobMessage& msg, int broadcastTag) {
     if (msg.tag == broadcastTag) {
         // Broadcast to children
         if (getJobTree().hasLeftChild())
-            MyMpi::isend(getJobTree().getLeftChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+            MyMpi::isend(getJobTree().getLeftChildNodeRank(), MSG_JOB_TREE_BROADCAST, msg);
         if (getJobTree().hasRightChild())
-            MyMpi::isend(getJobTree().getRightChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+            MyMpi::isend(getJobTree().getRightChildNodeRank(), MSG_JOB_TREE_BROADCAST, msg);
     }
 }
 void KMeansJob::appl_dumpStats() {}
@@ -194,6 +198,10 @@ void KMeansJob::calcCurrentClusterCenters() {
 
     countMembers();
 
+    LOG(V2_INFO, "                           sumMembers: %s\n",
+        dataToString(sumMembers).c_str());
+    localClusterCenters.clear();
+    localClusterCenters.resize(countClusters);
     for (int cluster = 0; cluster < countClusters; ++cluster) {
         localClusterCenters[cluster].assign(dimension, 0);
     }
@@ -272,15 +280,18 @@ std::vector<int> KMeansJob::clusterCentersToBroadcast(std::vector<Point> reduceC
         }
         LOG(V2_INFO, "Push in: %f\n", *(centerData));
     }
+    LOG(V2_INFO, "                           reduce in clusterCentersToBroadcast: \n%s\n",
+        dataToString(result).c_str());
     return result;
 }
 
 std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(std::vector<int> reduce, bool withNumWorkers) {
+    LOG(V2_INFO, "                           reduce in broadcastToClusterCenters: \n%s\n",
+        dataToString(reduce).c_str());
     std::vector<Point> localClusterCentersResult;
     const int elementsCount = allReduceElementSize - countClusters;
     int* reduceData = reduce.data();
 
-    reduceData += countClusters;
     localClusterCentersResult.clear();
     localClusterCentersResult.resize(countClusters);
     for (int i = 0; i < countClusters; ++i) {
@@ -302,7 +313,7 @@ std::vector<int> KMeansJob::clusterCentersToReduce(std::vector<int> reduceSumMem
 
     tempCenters = clusterCentersToBroadcast(reduceClusterCenters);
     if (iAmRoot) {
-        tempCenters.push_back(getGlobalNumWorkers());
+        tempCenters.push_back(getVolume());
         return tempCenters;
     }
 
@@ -311,6 +322,7 @@ std::vector<int> KMeansJob::clusterCentersToReduce(std::vector<int> reduceSumMem
     }
     result.insert(result.end(), tempCenters.begin(), tempCenters.end());
     return result;
+    
 }
 
 std::pair<std::vector<std::vector<float>>, std::vector<int>>
