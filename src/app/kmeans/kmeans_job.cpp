@@ -128,17 +128,10 @@ void KMeansJob::appl_communicate() {
     if (calculatingFinished) {
         calculatingFinished = false;
         if (calculatingTask.valid()) calculatingTask.get();
-        
-        LOG(V2_INFO, "                           shouldResult: \n%s\n",
-                dataToString(localClusterCenters).c_str());
-        auto result = std::move(clusterCentersToReduce(localSumMembers, localClusterCenters));
-        LOG(V2_INFO, "                           corruptResult: \n%s\n",
-                dataToString(reduceToclusterCenters(result).first).c_str());
-        auto producer = [&]() {           
-            
-            return std::move(result);
+
+        auto producer = [&]() {
+            return clusterCentersToReduce(localSumMembers, localClusterCenters);
         };
-            LOG(V2_INFO, "                           Problem?\n");
         (reducer)->produce(producer);
     };
     if (hasReducer) (reducer)->advance();
@@ -149,11 +142,9 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
         if (myRank < countCurrentWorkers) {
             advanceCollective(msg, MSG_JOB_TREE_BROADCAST);
             // continue broadcasting
-            LOG(V2_INFO, "                           clusterCenters1: \n%s\n",
-                dataToString(clusterCenters).c_str());
             clusterCenters = broadcastToClusterCenters(msg.payload, true);
 
-            LOG(V2_INFO, "                           clusterCenters2: \n%s\n",
+            LOG(V2_INFO, "                           clusterCenters: \n%s\n",
                 dataToString(clusterCenters).c_str());
             calculatingTask = ProcessWideThreadPool::get().addTask([&]() {
                 calcNearestCenter(metric);
@@ -315,10 +306,7 @@ std::vector<int> KMeansJob::clusterCentersToBroadcast(std::vector<Point> reduceC
         for (int entry = 0; entry < dimension; ++entry) {
             result.push_back(*((int*)(centerData + entry)));
         }
-        LOG(V2_INFO, "Push in: %f\n", *(centerData));
     }
-    LOG(V2_INFO, "                           clusterCenters3: \n%s\n",
-        dataToString(reduceClusterCenters).c_str());
     LOG(V2_INFO, "                           reduce in clusterCentersToBroadcast: \n%s\n",
         dataToString(result).c_str());
     return std::move(result);
@@ -330,7 +318,7 @@ std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(std::vector<i
     int* reduceData = reduce.data();
 
     if (!withNumWorkers) reduceData += countClusters;
-    
+
     localClusterCentersResult.clear();
     localClusterCentersResult.resize(countClusters);
     for (int i = 0; i < countClusters; ++i) {
