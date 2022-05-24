@@ -32,6 +32,7 @@ void KMeansJob::appl_start() {
                          getRevision(),
                          0,
                          MSG_WARMUP);
+
     loadTask = ProcessWideThreadPool::get().addTask([&]() {
         loadInstance();
         loaded = true;
@@ -77,11 +78,15 @@ void KMeansJob::initReducer() {
             internal_result.id = getId();
             internal_result.revision = getRevision();
             std::vector<int> transformSolution;
+            LOG(V2_INFO, "                           AAAAAND finished\n");
 
             internal_result.encodedType = JobResult::EncodedType::FLOAT;
+            LOG(V2_INFO, "                           AAAAAND finished\n");
             auto solution = clusterCentersToSolution();
+            LOG(V2_INFO, "                           AAAAAND finished\n");
             internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
             finishedJob = true;
+            LOG(V2_INFO, "                           AAAAAND finished\n");
             return neutral;
         }
     };
@@ -150,10 +155,16 @@ void KMeansJob::appl_communicate() {
     if (hasReducer) (reducer)->advance();
 }
 void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
+    LOG(V2_INFO, "                           ------------1\n");
     if (!loaded) return;
-    if (mpiTag == MSG_JOB_TREE_BROADCAST || mpiTag == MSG_INIT_JOB_TREE_BROADCAST) {
+    LOG(V2_INFO, "                           ------------2\n");
+    if (mpiTag == MSG_JOB_TREE_BROADCAST || mpiTag == MSG_JOB_TREE_BROADCAST) {
+        LOG(V2_INFO, "                           ------------42\n");
         if (myRank < countCurrentWorkers) {
-            advanceCollective(msg, MSG_JOB_TREE_BROADCAST);
+            if (!receivedInitSend) {
+                receivedInitSend = true;
+                advanceCollective(msg, MSG_JOB_TREE_BROADCAST);
+            }
             // continue broadcasting
             clusterCenters = broadcastToClusterCenters(msg.payload, true);
 
@@ -161,13 +172,10 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
                 dataToString(clusterCenters).c_str());
             calculatingTask = ProcessWideThreadPool::get().addTask([&]() {
                 calcNearestCenter(metric);
-                LOG(V2_INFO, "                           Calc Finished1\n");
                 calcCurrentClusterCenters();
-                LOG(V2_INFO, "                           Calc Finished2\n");
                 initReducer();
-                LOG(V2_INFO, "                           Calc Finished3\n");
                 calculatingFinished = true;
-                LOG(V2_INFO, "                           Calc Finished4\n");
+                LOG(V2_INFO, "                           Calc Finished\n");
             });
         }
     }
@@ -181,11 +189,11 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 void KMeansJob::advanceCollective(JobMessage& msg, int broadcastTag) {
     // Broadcast to children
     if (msg.tag == broadcastTag) {
-    if (getJobTree().hasLeftChild())
-        MyMpi::isend(getJobTree().getLeftChildNodeRank(), broadcastTag, msg);
-    if (getJobTree().hasRightChild())
-        MyMpi::isend(getJobTree().getRightChildNodeRank(), broadcastTag, msg);
-        }
+        if (getJobTree().hasLeftChild())
+            MyMpi::isend(getJobTree().getLeftChildNodeRank(), broadcastTag, msg);
+        if (getJobTree().hasRightChild())
+            MyMpi::isend(getJobTree().getRightChildNodeRank(), broadcastTag, msg);
+    }
 }
 void KMeansJob::appl_dumpStats() {}
 void KMeansJob::appl_memoryPanic() {}
@@ -324,8 +332,8 @@ std::vector<int> KMeansJob::clusterCentersToBroadcast(std::vector<Point> reduceC
             result.push_back(*((int*)(centerData + entry)));
         }
     }
-    LOG(V2_INFO, "                           reduce in clusterCentersToBroadcast: \n%s\n",
-        dataToString(result).c_str());
+    // LOG(V2_INFO, "                           reduce in clusterCentersToBroadcast: \n%s\n",
+    //     dataToString(result).c_str());
     return std::move(result);
 }
 

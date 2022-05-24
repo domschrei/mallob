@@ -37,6 +37,7 @@ class KMeansJob : public Job {
     bool iAmRoot = false;
     bool loaded = false;
     bool initSend = false;
+    bool receivedInitSend = false;
     bool calculatingFinished = false;
     bool allCollected = false;
     bool hasReducer = false;
