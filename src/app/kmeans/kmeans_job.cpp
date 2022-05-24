@@ -67,42 +67,44 @@ void KMeansJob::initReducer() {
         transformed.push_back(this->getVolume());
         if ((1 / 1000 < calculateDifference(
                             [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
+            LOG(V2_INFO, "                           Another iter\n");
+            sendRootNotification(MSG_JOB_TREE_BROADCAST);
             return transformed;
 
         } else {
+            LOG(V2_INFO, "                           AAAAAND finished\n");
             internal_result.result = RESULT_SAT;
-    internal_result.id = getId();
-    internal_result.revision = getRevision();
-    std::vector<int> transformSolution;
+            internal_result.id = getId();
+            internal_result.revision = getRevision();
+            std::vector<int> transformSolution;
 
-    internal_result.encodedType = JobResult::EncodedType::FLOAT;
-    auto solution = clusterCentersToSolution();
-    internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
-    finishedJob = true;
+            internal_result.encodedType = JobResult::EncodedType::FLOAT;
+            auto solution = clusterCentersToSolution();
+            internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
+            finishedJob = true;
             return neutral;
         }
     };
 
-    
     reducer.reset(new JobTreeAllReduction(getJobTree(),
-                            JobMessage(getId(),
-                                       getRevision(),
-                                       0,
-                                       MSG_ALLREDUCE_CLAUSES),
-                            std::move(neutral),
-                            folder));
+                                          JobMessage(getId(),
+                                                     getRevision(),
+                                                     0,
+                                                     MSG_ALLREDUCE_CLAUSES),
+                                          std::move(neutral),
+                                          folder));
 
     reducer->setTransformationOfElementAtRoot(rootTransform);
     hasReducer = true;
 }
 
-void KMeansJob::sendStartNotification() {
+void KMeansJob::sendRootNotification(int tag) {
+    initSend = false;
     auto tree = getJobTree();
     baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
     baseMsg.payload.push_back(getVolume());
-    baseMsg.tag = MSG_JOB_TREE_BROADCAST;
-    MyMpi::isend(myRank, MSG_JOB_TREE_BROADCAST, baseMsg);
-    initSend = false;
+    baseMsg.tag = tag;
+    MyMpi::isend(myRank, tag, baseMsg);
 }
 void KMeansJob::doInitWork() {
     initMsgTask = ProcessWideThreadPool::get().addTask([&]() {
@@ -133,8 +135,10 @@ void KMeansJob::appl_terminate() {
 }
 void KMeansJob::appl_communicate() {
     if (!loaded) return;
-    if (initSend) sendStartNotification();
+    if (initSend) sendRootNotification(MSG_JOB_TREE_BROADCAST);
     if (calculatingFinished) {
+        LOG(V2_INFO, "                           Calc Finished!!!\n");
+
         calculatingFinished = false;
         if (calculatingTask.valid()) calculatingTask.get();
 
@@ -147,7 +151,7 @@ void KMeansJob::appl_communicate() {
 }
 void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
     if (!loaded) return;
-    if (mpiTag == MSG_JOB_TREE_BROADCAST) {
+    if (mpiTag == MSG_JOB_TREE_BROADCAST || mpiTag == MSG_INIT_JOB_TREE_BROADCAST) {
         if (myRank < countCurrentWorkers) {
             advanceCollective(msg, MSG_JOB_TREE_BROADCAST);
             // continue broadcasting
@@ -157,9 +161,13 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
                 dataToString(clusterCenters).c_str());
             calculatingTask = ProcessWideThreadPool::get().addTask([&]() {
                 calcNearestCenter(metric);
+                LOG(V2_INFO, "                           Calc Finished1\n");
                 calcCurrentClusterCenters();
+                LOG(V2_INFO, "                           Calc Finished2\n");
                 initReducer();
+                LOG(V2_INFO, "                           Calc Finished3\n");
                 calculatingFinished = true;
+                LOG(V2_INFO, "                           Calc Finished4\n");
             });
         }
     }
@@ -171,13 +179,13 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
     }
 }
 void KMeansJob::advanceCollective(JobMessage& msg, int broadcastTag) {
+    // Broadcast to children
     if (msg.tag == broadcastTag) {
-        // Broadcast to children
-        if (getJobTree().hasLeftChild())
-            MyMpi::isend(getJobTree().getLeftChildNodeRank(), MSG_JOB_TREE_BROADCAST, msg);
-        if (getJobTree().hasRightChild())
-            MyMpi::isend(getJobTree().getRightChildNodeRank(), MSG_JOB_TREE_BROADCAST, msg);
-    }
+    if (getJobTree().hasLeftChild())
+        MyMpi::isend(getJobTree().getLeftChildNodeRank(), broadcastTag, msg);
+    if (getJobTree().hasRightChild())
+        MyMpi::isend(getJobTree().getRightChildNodeRank(), broadcastTag, msg);
+        }
 }
 void KMeansJob::appl_dumpStats() {}
 void KMeansJob::appl_memoryPanic() {}

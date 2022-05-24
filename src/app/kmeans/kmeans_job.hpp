@@ -76,7 +76,7 @@ class KMeansJob : public Job {
 
     void loadInstance();
     void doInitWork();
-    void sendStartNotification();
+    void sendRootNotification(int tag);
     void setRandomStartCenters();
     void calcNearestCenter(std::function<float(Point, Point)> metric);
     void calcCurrentClusterCenters();

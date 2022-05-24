@@ -44,10 +44,7 @@ public:
     void produce(std::function<AllReduceElement()> localProducer) {
         assert(!_has_producer);
         _has_producer = true;
-        
-        LOG(V2_INFO, "                           will be printed: \n");
         _local_elem = localProducer();
-        LOG(V2_INFO, "                           WONT be printed: \n");
     }
 
     void setTransformationOfElementAtRoot(std::function<AllReduceElement(const AllReduceElement&)> transformation) {
