@@ -70,20 +70,29 @@ void KMeansJob::initReducer() {
             return transformed;
 
         } else {
+            internal_result.result = RESULT_SAT;
+    internal_result.id = getId();
+    internal_result.revision = getRevision();
+    std::vector<int> transformSolution;
+
+    internal_result.encodedType = JobResult::EncodedType::FLOAT;
+    auto solution = clusterCentersToSolution();
+    internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
+    finishedJob = true;
             return neutral;
         }
     };
 
-    JobTreeAllReduction red(getJobTree(),
+    
+    reducer.reset(new JobTreeAllReduction(getJobTree(),
                             JobMessage(getId(),
                                        getRevision(),
                                        0,
                                        MSG_ALLREDUCE_CLAUSES),
                             std::move(neutral),
-                            folder);
-    red.setTransformationOfElementAtRoot(rootTransform);
-    reducer = std::move(&red);
+                            folder));
 
+    reducer->setTransformationOfElementAtRoot(rootTransform);
     hasReducer = true;
 }
 

@@ -45,7 +45,7 @@ class KMeansJob : public Job {
     int countCurrentWorkers;
     JobMessage baseMsg;
     JobResult internal_result;
-    JobTreeAllReduction* reducer;
+    std::unique_ptr<JobTreeAllReduction> reducer;
     std::function<float (KMeansJob::Point, KMeansJob::Point)> metric = [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
 
    public:
