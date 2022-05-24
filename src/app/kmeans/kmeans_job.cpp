@@ -42,8 +42,7 @@ void KMeansJob::appl_start() {
     });
 }
 void KMeansJob::initReducer() {
-    std::vector<int> neutral;
-    neutral.assign(allReduceElementSize, 0);
+    std::vector<int>* neutral = new std::vector<int>(allReduceElementSize, 0);
     auto folder =
         [&](std::list<std::vector<int>>& elems) {
             return aggregate(elems);
@@ -87,7 +86,7 @@ void KMeansJob::initReducer() {
             internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
             finishedJob = true;
             LOG(V2_INFO, "                           AAAAAND finished\n");
-            return neutral;
+            return std::move(std::vector<int>(allReduceElementSize, 0));
         }
     };
 
@@ -96,7 +95,7 @@ void KMeansJob::initReducer() {
                                                      getRevision(),
                                                      0,
                                                      MSG_ALLREDUCE_CLAUSES),
-                                          std::move(neutral),
+                                          std::move(std::vector<int>(allReduceElementSize, 0)),
                                           folder));
 
     reducer->setTransformationOfElementAtRoot(rootTransform);
