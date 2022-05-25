@@ -67,7 +67,7 @@ class KMeansJob : public Job {
     void appl_resume() override;
     void appl_terminate() override;
     int appl_solved() override { return finishedJob ? RESULT_SAT : -1; }  // atomic bool
-    int getDemand() const { return 1; }
+    //int getDemand() const { return 1; }
     JobResult&& appl_getResult() override;
     void appl_communicate() override;
     void appl_communicate(int source, int mpiTag, JobMessage& msg) override;

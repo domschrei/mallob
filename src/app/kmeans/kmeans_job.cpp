@@ -65,6 +65,10 @@ void KMeansJob::initReducer() {
         }
         auto transformed = clusterCentersToBroadcast(clusterCenters);
         transformed.push_back(this->getVolume());
+        LOG(V2_INFO, "                           COMMSIZE: %i myRank: %i \n",
+        countCurrentWorkers, myRank);
+    LOG(V2_INFO, "                           Children: %i\n",
+        this->getJobTree().getNumChildren());
         if ((1 / 1000 < calculateDifference(
                             [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
             LOG(V2_INFO, "                           Another iter\n");
@@ -72,20 +76,15 @@ void KMeansJob::initReducer() {
             return transformed;
 
         } else {
-            LOG(V2_INFO, "                           AAAAAND finished\n");
             internal_result.result = RESULT_SAT;
             internal_result.id = getId();
             internal_result.revision = getRevision();
             std::vector<int> transformSolution;
-            LOG(V2_INFO, "                           AAAAAND finished\n");
 
             internal_result.encodedType = JobResult::EncodedType::FLOAT;
-            LOG(V2_INFO, "                           AAAAAND finished\n");
             auto solution = clusterCentersToSolution();
-            LOG(V2_INFO, "                           AAAAAND finished\n");
             internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
             finishedJob = true;
-            LOG(V2_INFO, "                           AAAAAND finished\n");
             return std::move(std::vector<int>(allReduceElementSize, 0));
         }
     };
@@ -231,7 +230,7 @@ void KMeansJob::calcNearestCenter(std::function<float(Point, Point)> metric) {
     clusterMembership.assign(pointsCount, 0);
     float distanceToCluster;
     // while own or child slices todo
-    for (int pointID = 0; pointID < pointsCount; ++pointID) {
+    for (int pointID = pointsCount * (myRank /countCurrentWorkers); pointID < pointsCount * ((myRank + 1) /countCurrentWorkers); ++pointID) {
         currentNearestCenter.cluster = -1;
         currentNearestCenter.distance = std::numeric_limits<float>::infinity();
         for (int clusterID = 0; clusterID < countClusters; ++clusterID) {
