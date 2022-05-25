@@ -22,9 +22,11 @@ KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int 
 void KMeansJob::appl_start() {
     myRank = getJobTree().getIndex();
     iAmRoot = (myRank == 0);
-    if (iAmRoot) countCurrentWorkers = this->getVolume();
-    else countCurrentWorkers = 0;
-    
+    if (iAmRoot)
+        countCurrentWorkers = this->getVolume();
+    else
+        countCurrentWorkers = 0;
+
     LOG(V2_INFO, "                           COMMSIZE: %i myRank: %i \n",
         countCurrentWorkers, myRank);
     LOG(V2_INFO, "                           Children: %i\n",
@@ -157,19 +159,17 @@ void KMeansJob::appl_communicate() {
 void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
     LOG(V2_INFO, "                           myRank: %i MESSAGE!\n", getJobTree().getIndex());
     if (!loaded) {
-        MyMpi::isend(getJobTree().getIndex(),mpiTag,msg);
+        MyMpi::isend(getJobTree().getIndex(), mpiTag, msg);
         return;
     }
-    LOG(V2_INFO, "                           ------------2\n");
     if (mpiTag == MSG_JOB_TREE_BROADCAST || mpiTag == MSG_JOB_TREE_BROADCAST) {
-        LOG(V2_INFO, "                           ------------42\n");
+        clusterCenters = broadcastToClusterCenters(msg.payload, true);
         if (myRank < countCurrentWorkers) {
             if (!receivedInitSend) {
                 receivedInitSend = true;
                 advanceCollective(msg, MSG_JOB_TREE_BROADCAST);
             }
             // continue broadcasting
-            clusterCenters = broadcastToClusterCenters(msg.payload, true);
 
             LOG(V2_INFO, "                           clusterCenters: \n%s\n",
                 dataToString(clusterCenters).c_str());
@@ -235,7 +235,10 @@ void KMeansJob::calcNearestCenter(std::function<float(Point, Point)> metric) {
     clusterMembership.assign(pointsCount, -1);
     float distanceToCluster;
     // while own or child slices todo
-    for (int pointID = pointsCount * (myRank / countCurrentWorkers); pointID < pointsCount * ((myRank + 1) / countCurrentWorkers); ++pointID) {
+    int startIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(myRank) / static_cast<float>(countCurrentWorkers)));
+    int endIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(myRank + 1) / static_cast<float>(countCurrentWorkers)));
+    LOG(V2_INFO, "                           MR: %i PC: %i cW: %i start:%i end:%i!!\n", myRank, pointsCount, countCurrentWorkers, startIndex,endIndex);
+    for (int pointID = startIndex; pointID < endIndex; ++pointID) {
         currentNearestCenter.cluster = -1;
         currentNearestCenter.distance = std::numeric_limits<float>::infinity();
         for (int clusterID = 0; clusterID < countClusters; ++clusterID) {
@@ -294,11 +297,14 @@ std::string KMeansJob::dataToString(std::vector<int> data) {
 }
 
 void KMeansJob::countMembers() {
-    std::stringstream result;
     localSumMembers.assign(countClusters, 0);
     for (int clusterID : clusterMembership) {
-        if (clusterID != -1) localSumMembers[clusterID] += 1;
+        if (clusterID != -1) {
+            localSumMembers[clusterID] += 1;
+        }
     }
+    LOG(V2_INFO, "                           MR: %i sumMembers: %s\n",
+        myRank, dataToString(localSumMembers).c_str());
 }
 
 float KMeansJob::calculateDifference(std::function<float(Point, Point)> metric) {
