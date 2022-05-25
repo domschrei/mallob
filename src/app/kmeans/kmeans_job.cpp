@@ -20,13 +20,15 @@ KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int 
 }
 
 void KMeansJob::appl_start() {
-    countCurrentWorkers = this->getVolume();
     myRank = getJobTree().getIndex();
+    iAmRoot = (myRank == 0);
+    if (iAmRoot) countCurrentWorkers = this->getVolume();
+    else countCurrentWorkers = 0;
+    
     LOG(V2_INFO, "                           COMMSIZE: %i myRank: %i \n",
         countCurrentWorkers, myRank);
     LOG(V2_INFO, "                           Children: %i\n",
         this->getJobTree().getNumChildren());
-    iAmRoot = (myRank == 0);
     payload = getDescription().getFormulaPayload(0);
     baseMsg = JobMessage(getId(),
                          getRevision(),
@@ -66,9 +68,9 @@ void KMeansJob::initReducer() {
         auto transformed = clusterCentersToBroadcast(clusterCenters);
         transformed.push_back(this->getVolume());
         LOG(V2_INFO, "                           COMMSIZE: %i myRank: %i \n",
-        countCurrentWorkers, myRank);
-    LOG(V2_INFO, "                           Children: %i\n",
-        this->getJobTree().getNumChildren());
+            countCurrentWorkers, myRank);
+        LOG(V2_INFO, "                           Children: %i\n",
+            this->getJobTree().getNumChildren());
         if ((1 / 1000 < calculateDifference(
                             [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
             LOG(V2_INFO, "                           Another iter\n");
@@ -153,8 +155,11 @@ void KMeansJob::appl_communicate() {
     if (hasReducer) (reducer)->advance();
 }
 void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    LOG(V2_INFO, "                           ------------1\n");
-    if (!loaded) return;
+    LOG(V2_INFO, "                           myRank: %i MESSAGE!\n", getJobTree().getIndex());
+    if (!loaded) {
+        MyMpi::isend(getJobTree().getIndex(),mpiTag,msg);
+        return;
+    }
     LOG(V2_INFO, "                           ------------2\n");
     if (mpiTag == MSG_JOB_TREE_BROADCAST || mpiTag == MSG_JOB_TREE_BROADCAST) {
         LOG(V2_INFO, "                           ------------42\n");
@@ -227,10 +232,10 @@ void KMeansJob::calcNearestCenter(std::function<float(Point, Point)> metric) {
         int cluster;
         float distance;
     } currentNearestCenter;
-    clusterMembership.assign(pointsCount, 0);
+    clusterMembership.assign(pointsCount, -1);
     float distanceToCluster;
     // while own or child slices todo
-    for (int pointID = pointsCount * (myRank /countCurrentWorkers); pointID < pointsCount * ((myRank + 1) /countCurrentWorkers); ++pointID) {
+    for (int pointID = pointsCount * (myRank / countCurrentWorkers); pointID < pointsCount * ((myRank + 1) / countCurrentWorkers); ++pointID) {
         currentNearestCenter.cluster = -1;
         currentNearestCenter.distance = std::numeric_limits<float>::infinity();
         for (int clusterID = 0; clusterID < countClusters; ++clusterID) {
@@ -249,8 +254,8 @@ void KMeansJob::calcCurrentClusterCenters() {
 
     countMembers();
 
-    LOG(V2_INFO, "                           sumMembers: %s\n",
-        dataToString(localSumMembers).c_str());
+    LOG(V2_INFO, "                           MR: %i sumMembers: %s\n",
+        myRank, dataToString(localSumMembers).c_str());
     localClusterCenters.clear();
     localClusterCenters.resize(countClusters);
     for (int cluster = 0; cluster < countClusters; ++cluster) {
@@ -258,8 +263,10 @@ void KMeansJob::calcCurrentClusterCenters() {
     }
     for (int pointID = 0; pointID < pointsCount; ++pointID) {
         for (int d = 0; d < dimension; ++d) {
-            localClusterCenters[clusterMembership[pointID]][d] +=
-                kMeansData[pointID][d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]);
+            if (clusterMembership[pointID] != -1) {
+                localClusterCenters[clusterMembership[pointID]][d] +=
+                    kMeansData[pointID][d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]);
+            }
         }
     }
     ++iterationsDone;
@@ -290,7 +297,7 @@ void KMeansJob::countMembers() {
     std::stringstream result;
     localSumMembers.assign(countClusters, 0);
     for (int clusterID : clusterMembership) {
-        localSumMembers[clusterID] += 1;
+        if (clusterID != -1) localSumMembers[clusterID] += 1;
     }
 }
 
