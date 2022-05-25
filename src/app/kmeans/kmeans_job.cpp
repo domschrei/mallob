@@ -32,13 +32,17 @@ void KMeansJob::appl_start() {
     LOG(V2_INFO, "                           Children: %i\n",
         this->getJobTree().getNumChildren());
     payload = getDescription().getFormulaPayload(0);
+            LOG(V2_INFO, "                           myRank: %i getting ready1\n",myRank);
     baseMsg = JobMessage(getId(),
                          getRevision(),
                          0,
                          MSG_WARMUP);
+            LOG(V2_INFO, "                           myRank: %i getting ready2\n",myRank);
 
     loadTask = ProcessWideThreadPool::get().addTask([&]() {
+            LOG(V2_INFO, "                           myRank: %i getting ready3\n",myRank);
         loadInstance();
+            LOG(V2_INFO, "                           myRank: %i Ready!\n",myRank);
         loaded = true;
         if (iAmRoot) {
             doInitWork();
@@ -46,7 +50,6 @@ void KMeansJob::appl_start() {
     });
 }
 void KMeansJob::initReducer() {
-    std::vector<int>* neutral = new std::vector<int>(allReduceElementSize, 0);
     auto folder =
         [&](std::list<std::vector<int>>& elems) {
             return aggregate(elems);
@@ -157,13 +160,18 @@ void KMeansJob::appl_communicate() {
     if (hasReducer) (reducer)->advance();
 }
 void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    LOG(V2_INFO, "                           myRank: %i MESSAGE!\n", getJobTree().getIndex());
     if (!loaded) {
         MyMpi::isend(getJobTree().getIndex(), mpiTag, msg);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        LOG(V2_INFO, "                           myRank: %i Not ready!\n", getJobTree().getIndex());
         return;
     }
+    LOG(V2_INFO, "                           myRank: %i MESSAGE!\n", getJobTree().getIndex());
     if (mpiTag == MSG_JOB_TREE_BROADCAST || mpiTag == MSG_JOB_TREE_BROADCAST) {
+        
+    LOG(V2_INFO, "                           myRank: %i Broadcast in!\n", getJobTree().getIndex());
         clusterCenters = broadcastToClusterCenters(msg.payload, true);
+    LOG(V2_INFO, "                           myRank: %i Workers: %i!\n",getJobTree().getIndex(), countCurrentWorkers);
         if (myRank < countCurrentWorkers) {
             if (!receivedInitSend) {
                 receivedInitSend = true;
@@ -171,7 +179,7 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
             }
             // continue broadcasting
 
-            LOG(V2_INFO, "                           clusterCenters: \n%s\n",
+            LOG(V2_INFO, "                           myRank: %i clusterCenters: \n%s\n",getJobTree().getIndex(),
                 dataToString(clusterCenters).c_str());
             calculatingTask = ProcessWideThreadPool::get().addTask([&]() {
                 calcNearestCenter(metric);
