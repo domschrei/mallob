@@ -27,6 +27,8 @@ class KMeansJob : public Job {
     int pointsCount;
     int allReduceElementSize;
     int iterationsDone = 0;
+    int epoch = 0;
+    int countReady = 0;
     std::vector<Point> kMeansData;
     const int* payload;
     std::future<void> calculatingTask;
@@ -41,9 +43,11 @@ class KMeansJob : public Job {
     bool calculatingFinished = false;
     bool allCollected = false;
     bool hasReducer = false;
+    bool registeredAtRoot = false;
     std::pair<bool, bool> childsFinished = {false, false};
     int myRank;
     int countCurrentWorkers;
+    int countNextWorkers;
     JobMessage baseMsg;
     JobResult internal_result;
     std::unique_ptr<JobTreeAllReduction> reducer;

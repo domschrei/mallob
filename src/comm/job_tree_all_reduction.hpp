@@ -82,9 +82,9 @@ public:
     void advance() {
 
         if (_finished) return;
-
+        
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
-             
+                     LOG(V2_INFO, "                           aggregate\n");
             _child_elems.push_front(std::move(_local_elem.value()));
             _local_elem.reset();
 
@@ -93,6 +93,7 @@ public:
             _future_aggregate = ProcessWideThreadPool::get().addTask([&]() {
                 _aggregated_elem = _aggregator(_child_elems);
                 _aggregating = false;
+                        LOG(V2_INFO, "                           agg task complete\n");
             });
         }
 
@@ -103,7 +104,8 @@ public:
             
             if (_tree.isRoot()) {
                 // Transform reduced element at root
-                if (_has_transformation_at_root) {
+                if (_has_transformation_at_root) {        
+                    LOG(V2_INFO, "                           Root transform\n");
                     _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));
                 }
                 // Begin broadcast
