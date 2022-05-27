@@ -43,11 +43,9 @@ class KMeansJob : public Job {
     bool calculatingFinished = false;
     bool allCollected = false;
     bool hasReducer = false;
-    bool registeredAtRoot = false;
     std::pair<bool, bool> childsFinished = {false, false};
     int myRank;
     int countCurrentWorkers;
-    int countNextWorkers;
     JobMessage baseMsg;
     JobResult internal_result;
     std::unique_ptr<JobTreeAllReduction> reducer;
@@ -83,7 +81,7 @@ class KMeansJob : public Job {
     void doInitWork();
     void sendRootNotification(int tag);
     void setRandomStartCenters();
-    void calcNearestCenter(std::function<float(Point, Point)> metric);
+    void calcNearestCenter(std::function<float(Point, Point)> metric, int intervalId);
     void calcCurrentClusterCenters();
     std::string dataToString(std::vector<Point> data);
     std::string dataToString(std::vector<int> data);

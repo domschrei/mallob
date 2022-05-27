@@ -63,7 +63,7 @@ int main() {
         while (1 / 1000 < job.calculateDifference(
                               [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); })) {
             job.calcNearestCenter(
-                [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); });
+                [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); }, 0);
 
             std::stringstream countMembersString;
             job.countMembers();
