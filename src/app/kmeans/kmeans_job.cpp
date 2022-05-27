@@ -408,7 +408,7 @@ std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(std::vector<i
     }
     if (withNumWorkers) {
         countCurrentWorkers = *(reduceData + elementsCount);
-        LOG(V2_INFO, "                         MR: %i countCurrentWorkers: %i\n", myRank, countCurrentWorkers);
+        LOG(V2_INFO, "                           MR: %i countCurrentWorkers: %i\n", myRank, countCurrentWorkers);
     }
 
     return localClusterCentersResult;
