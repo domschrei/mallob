@@ -21,29 +21,30 @@ KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int 
 
 void KMeansJob::appl_start() {
     myRank = getJobTree().getRank();
-    iAmRoot = (myRank == 0);
+    myIndex = getJobTree().getIndex();
+    iAmRoot = getJobTree().isRoot();
     if (iAmRoot)
         countCurrentWorkers = 3;
     else
         countCurrentWorkers = 3;
 
-    LOG(V2_INFO, "                           COMMSIZE: %i myRank: %i \n",
-        countCurrentWorkers, myRank);
+    LOG(V2_INFO, "                           COMMSIZE: %i myRank: %i myIndex: %i\n",
+        countCurrentWorkers, myRank, myIndex);
     LOG(V2_INFO, "                           Children: %i\n",
         this->getJobTree().getNumChildren());
     payload = getDescription().getFormulaPayload(0);
-    LOG(V2_INFO, "                           myRank: %i getting ready1\n", myRank);
+    LOG(V2_INFO, "                           myIndex: %i getting ready1\n", myIndex);
     baseMsg = JobMessage(getId(),
                          getRevision(),
                          epoch,
                          MSG_WARMUP);
-    LOG(V2_INFO, "                           myRank: %i getting ready2\n", myRank);
+    LOG(V2_INFO, "                           myIndex: %i getting ready2\n", myIndex);
 
     loadTask = ProcessWideThreadPool::get().addTask([&]() {
-        LOG(V2_INFO, "                           myRank: %i getting ready3\n", myRank);
+        LOG(V2_INFO, "                           myIndex: %i getting ready3\n", myIndex);
         loadInstance();
         clusterMembership.assign(pointsCount, -1);
-        LOG(V2_INFO, "                           myRank: %i Ready!\n", myRank);
+        LOG(V2_INFO, "                           myIndex: %i Ready!\n", myIndex);
         loaded = true;
         if (iAmRoot) {
             doInitWork();
@@ -56,7 +57,7 @@ void KMeansJob::initReducer() {
             return aggregate(elems);
         };
     auto rootTransform = [&](std::vector<int> payload) {
-        LOG(V2_INFO, "                           myRank: %i start Roottransform\n", myRank);
+        LOG(V2_INFO, "                           myIndex: %i start Roottransform\n", myIndex);
         auto data = reduceToclusterCenters(payload);
 
         clusterCenters = data.first;
@@ -74,14 +75,14 @@ void KMeansJob::initReducer() {
         }
         auto transformed = clusterCentersToBroadcast(clusterCenters);
         transformed.push_back(this->getVolume());
-        LOG(V2_INFO, "                           COMMSIZE: %i myRank: %i \n",
-            this->getVolume(), myRank);
+        LOG(V2_INFO, "                           COMMSIZE: %i myIndex: %i \n",
+            this->getVolume(), myIndex);
         LOG(V2_INFO, "                           Children: %i\n",
             this->getJobTree().getNumChildren());
-            
+
         if ((1 / 1000 < calculateDifference(
                             [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
-            LOG(V2_INFO, "                           Another iter\n");
+            LOG(V2_INFO, "                           Another iter %i\n", epoch);
             sendRootNotification(MSG_JOB_TREE_BROADCAST);
             return transformed;
 
@@ -158,7 +159,7 @@ void KMeansJob::appl_communicate() {
         LOG(V2_INFO, "                           Send Init ONCE!!!\n");
     }
     if (calculatingFinished) {
-        LOG(V2_INFO, "                           myRank: %i Calc Finished!!!\n", getJobTree().getRank());
+        LOG(V2_INFO, "                           myIndex: %i Calc Finished!!!\n", myIndex);
 
         calculatingFinished = false;
         if (calculatingTask.valid()) calculatingTask.get();
@@ -172,10 +173,9 @@ void KMeansJob::appl_communicate() {
     if (hasReducer) (reducer)->advance();
 }
 void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    LOG(V2_INFO, "                           myRank: %i source: %i mpiTag: %i\n", getJobTree().getRank(), source, mpiTag);
+    LOG(V2_INFO, "                           myIndex: %i source: %i mpiTag: %i\n", myIndex, getJobComm().getWorldToInternalMap()[source], mpiTag);
     if (!loaded) {
-
-        LOG(V2_INFO, "                           myRank: %i not Ready: %i mpiTag: %i\n", getJobTree().getRank(), source, mpiTag);
+        LOG(V2_INFO, "                           myIndex: %i not Ready: %i mpiTag: %i\n", myIndex, getJobComm().getWorldToInternalMap()[source], mpiTag);
         if (!msg.returnedToSender) {
             msg.returnedToSender = true;
             MyMpi::isend(source, mpiTag, std::move(msg));
@@ -184,45 +184,45 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
     }
     if (msg.returnedToSender) {
         msg.returnedToSender = false;
-        LOG(V2_INFO, "                           myRank: %i returnto: %i mpiTag: %i\n", getJobTree().getRank(), source, mpiTag);
+        LOG(V2_INFO, "                           myIndex: %i returnto: %i mpiTag: %i\n", myIndex, getJobComm().getWorldToInternalMap()[source], mpiTag);
         MyMpi::isend(source, mpiTag, std::move(msg));
         return;
     }
 
-    LOG(V2_INFO, "                           myRank: %i MESSAGE! %i \n", getJobTree().getRank(), mpiTag);
+    LOG(V2_INFO, "                           myIndex: %i MESSAGE! %i \n", myIndex, mpiTag);
     if (mpiTag == MSG_JOB_TREE_BROADCAST || mpiTag == MSG_JOB_TREE_BROADCAST) {
-        LOG(V2_INFO, "                           myRank: %i Broadcast in!\n", getJobTree().getRank());
+        LOG(V2_INFO, "                           myIndex: %i Broadcast in!\n", myIndex);
         clusterCenters = broadcastToClusterCenters(msg.payload, true);
-        LOG(V2_INFO, "                           myRank: %i Workers: %i!\n", getJobTree().getRank(), countCurrentWorkers);
-        if (myRank < countCurrentWorkers) {
+        LOG(V2_INFO, "                           myIndex: %i Workers: %i!\n", myIndex, countCurrentWorkers);
+        if (myIndex < countCurrentWorkers) {
+            initReducer();
             if (!receivedInitSend) {
                 receivedInitSend = true;
                 advanceCollective(msg, MSG_JOB_TREE_BROADCAST);
             }
             // continue broadcasting
 
-            // LOG(V2_INFO, "                           myRank: %i clusterCenters: \n%s\n", getJobTree().getIndex(),
+            // LOG(V2_INFO, "                           myIndex: %i clusterCenters: \n%s\n", getJobTree().getIndex(),
             //     dataToString(clusterCenters).c_str());
             calculatingTask = ProcessWideThreadPool::get().addTask([&]() {
-                LOG(V2_INFO, "                           myRank: %i Start Calc\n", getJobTree().getRank());
-                calcNearestCenter(metric, myRank);
+                LOG(V2_INFO, "                           myIndex: %i Start Calc\n", myIndex);
+                calcNearestCenter(metric, myIndex);
                 calcCurrentClusterCenters();
-                initReducer();
                 calculatingFinished = true;
-                LOG(V2_INFO, "                           myRank: %i End Calc\n", getJobTree().getRank());
+                LOG(V2_INFO, "                           myIndex: %i End Calc\n", myIndex);
             });
         }
     }
     if (hasReducer) {
-        LOG(V2_INFO, "                           myRank: %i I have Reducer\n", getJobTree().getRank());
+        LOG(V2_INFO, "                           myIndex: %i I have Reducer\n", myIndex);
         if ((reducer)->hasResult()) {
-            LOG(V2_INFO, "                           myRank: %i I have Result\n", getJobTree().getRank());
+            LOG(V2_INFO, "                           myIndex: %i I have Result\n", myIndex);
             clusterCenters = broadcastToClusterCenters((reducer)->extractResult(), true);
         }
 
-        LOG(V2_INFO, "                           myRank: %i I will Receive from %i\n", getJobTree().getRank(), source);
+        LOG(V2_INFO, "                           myIndex: %i I will Receive from %i\n", myIndex, source);
         bool answear = (reducer)->receive(source, mpiTag, msg);
-        LOG(V2_INFO, "                           myRank: %i bool:%i\n", getJobTree().getRank(), answear);
+        LOG(V2_INFO, "                           myIndex: %i bool:%i\n", myIndex, answear);
     }
 }
 void KMeansJob::advanceCollective(JobMessage& msg, int broadcastTag) {
@@ -301,14 +301,14 @@ void KMeansJob::calcCurrentClusterCenters() {
         if (clusterMembership[pointID] != -1) {
             for (int d = 0; d < dimension; ++d) {
                 if (static_cast<float>(localSumMembers[clusterMembership[pointID]]) == 0) {
-                    LOG(V2_INFO, "                           MR: %i this shouldnt happen..\n", myRank);
-                    LOG(V2_INFO, "                           MR: %i localSumMembers: %s\n", myRank, dataToString(localSumMembers).c_str());
-                    LOG(V2_INFO, "                           MR: %i clusterMembership[pointID]: %i\n", myRank, clusterMembership[pointID]);
-                    LOG(V2_INFO, "                           MR: %i d: %i\n", myRank, d);
-                    LOG(V2_INFO, "                           MR: %i localClusterCenters[clusterMembership[pointID]][d]: %i\n", myRank, localClusterCenters[clusterMembership[pointID]][d]);
-                    LOG(V2_INFO, "                           MR: %i kMeansData[pointID][d]: %i\n", myRank, kMeansData[pointID][d]);
-                    LOG(V2_INFO, "                           MR: %i localSumMembers[clusterMembership[pointID]]: %i\n", myRank, localSumMembers[clusterMembership[pointID]]);
-                    LOG(V2_INFO, "                           MR: %i kMeansData[pointID][d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]): %f\n", myRank, kMeansData[pointID][d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]));
+                    LOG(V2_INFO, "                           myIndex: %i this shouldnt happen..\n", myIndex);
+                    LOG(V2_INFO, "                           myIndex: %i localSumMembers: %s\n", myIndex, dataToString(localSumMembers).c_str());
+                    LOG(V2_INFO, "                           myIndex: %i clusterMembership[pointID]: %i\n", myIndex, clusterMembership[pointID]);
+                    LOG(V2_INFO, "                           myIndex: %i d: %i\n", myIndex, d);
+                    LOG(V2_INFO, "                           myIndex: %i localClusterCenters[clusterMembership[pointID]][d]: %i\n", myIndex, localClusterCenters[clusterMembership[pointID]][d]);
+                    LOG(V2_INFO, "                           myIndex: %i kMeansData[pointID][d]: %i\n", myIndex, kMeansData[pointID][d]);
+                    LOG(V2_INFO, "                           myIndex: %i localSumMembers[clusterMembership[pointID]]: %i\n", myIndex, localSumMembers[clusterMembership[pointID]]);
+                    LOG(V2_INFO, "                           myIndex: %i kMeansData[pointID][d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]): %f\n", myIndex, kMeansData[pointID][d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]));
                 }
                 localClusterCenters[clusterMembership[pointID]][d] +=
                     kMeansData[pointID][d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]);
@@ -346,8 +346,8 @@ void KMeansJob::countMembers() {
             localSumMembers[clusterID] += 1;
         }
     }
-    LOG(V2_INFO, "                           MR: %i sumMembers: %s\n",
-        myRank, dataToString(localSumMembers).c_str());
+    LOG(V2_INFO, "                           myIndex: %i sumMembers: %s\n",
+        myIndex, dataToString(localSumMembers).c_str());
 }
 
 float KMeansJob::calculateDifference(std::function<float(Point, Point)> metric) {
@@ -408,7 +408,7 @@ std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(std::vector<i
     }
     if (withNumWorkers) {
         countCurrentWorkers = *(reduceData + elementsCount);
-        LOG(V2_INFO, "                           MR: %i countCurrentWorkers: %i\n", myRank, countCurrentWorkers);
+        LOG(V2_INFO, "                           myIndex: %i countCurrentWorkers: %i\n", myIndex, countCurrentWorkers);
     }
 
     return localClusterCentersResult;
@@ -456,14 +456,14 @@ std::vector<int> KMeansJob::aggregate(std::list<std::vector<int>> messages) {
     const int countMessages = messages.size();
     centers.resize(countMessages);
     counts.resize(countMessages);
-    LOG(V2_INFO, "                         MR: %i countMessages: %d\n", myRank, countMessages);
+    LOG(V2_INFO, "                         myIndex: %i countMessages: %d\n", myIndex, countMessages);
     for (int i = 0; i < countMessages; ++i) {
         auto data = reduceToclusterCenters(messages.front());
         messages.pop_front();
         centers[i] = data.first;
         counts[i] = data.second;
 
-        LOG(V2_INFO, "                         MR: %i counts[%d] : \n%s\n", myRank, i, dataToString(counts[i]).c_str());
+        LOG(V2_INFO, "                         myIndex: %i counts[%d] : \n%s\n", myIndex, i, dataToString(counts[i]).c_str());
     }
     tempSumMembers.assign(countClusters, 0);
     for (int i = 0; i < countMessages; ++i) {
@@ -475,7 +475,6 @@ std::vector<int> KMeansJob::aggregate(std::list<std::vector<int>> messages) {
             // LOG(V2_INFO, "KRITcounts[%d] : \n%s\n",i, dataToString(tempSumMembers).c_str());
         }
     }
-    LOG(V2_INFO, "tempSumMembers : \n%s\n", dataToString(tempSumMembers).c_str());
     tempClusterCenters.resize(countClusters);
     for (int i = 0; i < countClusters; ++i) {
         tempClusterCenters[i].assign(dimension, 0);

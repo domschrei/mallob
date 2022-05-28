@@ -45,6 +45,7 @@ class KMeansJob : public Job {
     bool hasReducer = false;
     std::pair<bool, bool> childsFinished = {false, false};
     int myRank;
+    int myIndex;
     int countCurrentWorkers;
     JobMessage baseMsg;
     JobResult internal_result;
