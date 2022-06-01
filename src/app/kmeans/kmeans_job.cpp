@@ -156,16 +156,32 @@ void KMeansJob::appl_communicate() {
         sendRootNotification(MSG_JOB_TREE_BROADCAST);
         LOG(V2_INFO, "                           Send Init ONCE!!!\n");
     }
-    if (calculatingFinished) {
+    
+    if (!work.empty()) {
+        if (calculatingFinished) {
+            calculatingFinished = false;
+            calculatingTask.get();
+            auto currentIndex = work[work.size() - 1];
+            work.pop_back();
+            calculatingTask = ProcessWideThreadPool::get().addTask([&]() {
+                LOG(V2_INFO, "                           myIndex: %i Start Calc\n", myIndex);
+                calcNearestCenter(metric, myIndex);
+                LOG(V2_INFO, "                           myIndex: %i End Calc\n", myIndex);
+                calculatingFinished = true;
+            });
+        }
+    }
+    if (work.empty() && calculatingFinished && leftDone && rightDone) {
         LOG(V2_INFO, "                           myIndex: %i Calc Finished!!!\n", myIndex);
 
         if (calculatingTask.valid()) calculatingTask.get();
 
+        clusterMembership.assign(pointsCount, -1);
         auto producer = [&]() {
+                calcCurrentClusterCenters();
             return clusterCentersToReduce(localSumMembers, localClusterCenters);
         };
         (reducer)->produce(producer);
-        clusterMembership.assign(pointsCount, -1);
         calculatingFinished = false;
     };
     if (hasReducer) {
@@ -177,9 +193,10 @@ void KMeansJob::appl_communicate() {
     }
 }
 void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    LOG(V2_INFO, "                           myIndex: %i source: %i mpiTag: %i\n", myIndex, getJobComm().getWorldToInternalMap()[source], mpiTag);
+    int sourceIndex = getJobComm().getWorldToInternalMap()[source];
+    LOG(V2_INFO, "                           myIndex: %i source: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
     if (!loaded) {
-        LOG(V2_INFO, "                           myIndex: %i not Ready: %i mpiTag: %i\n", myIndex, getJobComm().getWorldToInternalMap()[source], mpiTag);
+        LOG(V2_INFO, "                           myIndex: %i not Ready: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
         if (!msg.returnedToSender) {
             msg.returnedToSender = true;
             MyMpi::isend(source, mpiTag, std::move(msg));
@@ -188,9 +205,16 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
     }
     if (msg.returnedToSender) {
         // I will do it
-        LOG(V2_INFO, "                           myIndex: %i returnto: %i mpiTag: %i\n", myIndex, getJobComm().getWorldToInternalMap()[source], mpiTag);
-        msg.returnedToSender = false;
-        MyMpi::isend(source, mpiTag, std::move(msg));
+        LOG(V2_INFO, "                           myIndex: %i returnto: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
+        auto grandChilds = KMeansUtils::childIndexesOf(sourceIndex, countCurrentWorkers);
+        {
+            std::lock_guard<std::mutex> lockGuard(mWork);
+            work.push_back(sourceIndex);
+            for (auto child : grandChilds) {
+                work.push_back(child);
+            }
+        }
+
         return;
     }
     if (hasReducer) {
@@ -228,7 +252,6 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
             calculatingTask = ProcessWideThreadPool::get().addTask([&]() {
                 LOG(V2_INFO, "                           myIndex: %i Start Calc\n", myIndex);
                 calcNearestCenter(metric, myIndex);
-                calcCurrentClusterCenters();
                 LOG(V2_INFO, "                           myIndex: %i End Calc\n", myIndex);
                 calculatingFinished = true;
             });

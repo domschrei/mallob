@@ -43,6 +43,12 @@ class KMeansJob : public Job {
     bool calculatingFinished = false;
     bool allCollected = false;
     bool hasReducer = false;
+    bool leftDone = false;
+    bool rightDone = false;
+    bool iDoLeft=false;
+    bool iDoRight=false;
+    std::vector<int> work;
+    std::mutex mWork;
     std::pair<bool, bool> childsFinished = {false, false};
     int myRank;
     int myIndex;
