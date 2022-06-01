@@ -35,7 +35,7 @@ void KMeansJob::appl_start() {
     baseMsg = JobMessage(getId(),
                          getRevision(),
                          epoch,
-                         MSG_WARMUP);
+                         MSG_ALLREDUCE_CLAUSES);
     LOG(V2_INFO, "                           myIndex: %i getting ready2\n", myIndex);
 
     loadTask = ProcessWideThreadPool::get().addTask([&]() {
@@ -99,16 +99,30 @@ void KMeansJob::initReducer() {
         }
     };
 
-    reducer.reset(new JobTreeAllReduction(getJobTree(),
+    auto tempJobTree = getJobTree();
+    baseMsg = JobMessage(getId(),
+                         getRevision(),
+                         epoch,
+                         MSG_ALLREDUCE_CLAUSES);
+    baseMsg.payload = std::vector<int>(allReduceElementSize, 0);
+    baseMsg.returnedToSender = true;
+
+    
+    reducer.reset(new JobTreeAllReduction(tempJobTree,
                                           JobMessage(getId(),
                                                      getRevision(),
-                                                     ++epoch,
+                                                     epoch,
                                                      MSG_ALLREDUCE_CLAUSES),
                                           std::vector<int>(allReduceElementSize, 0),
                                           folder));
 
     reducer->setTransformationOfElementAtRoot(rootTransform);
     hasReducer = true;
+    if (!tempJobTree.hasLeftChild() && (myIndex * 2 + 1 < countCurrentWorkers)) {
+        appl_communicate(myIndex * 2 + 1, MSG_JOB_TREE_BROADCAST, baseMsg);
+    } else if (!tempJobTree.hasRightChild() && (myIndex * 2 + 2 < countCurrentWorkers)) {
+        appl_communicate(myIndex * 2 + 2, MSG_JOB_TREE_BROADCAST, baseMsg);
+    }
 }
 
 void KMeansJob::sendRootNotification(int tag) {
@@ -117,7 +131,7 @@ void KMeansJob::sendRootNotification(int tag) {
     baseMsg = JobMessage(getId(),
                          getRevision(),
                          epoch,
-                         tag);
+                         MSG_ALLREDUCE_CLAUSES);
     baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
     baseMsg.payload.push_back(countCurrentWorkers);
     MyMpi::isend(getJobTree().getRootNodeRank(), tag, std::move(baseMsg));
@@ -156,7 +170,7 @@ void KMeansJob::appl_communicate() {
         sendRootNotification(MSG_JOB_TREE_BROADCAST);
         LOG(V2_INFO, "                           Send Init ONCE!!!\n");
     }
-    
+
     if (!work.empty()) {
         if (calculatingFinished) {
             calculatingFinished = false;
@@ -165,7 +179,7 @@ void KMeansJob::appl_communicate() {
             work.pop_back();
             calculatingTask = ProcessWideThreadPool::get().addTask([&]() {
                 LOG(V2_INFO, "                           myIndex: %i Start Calc\n", myIndex);
-                calcNearestCenter(metric, myIndex);
+                calcNearestCenter(metric, currentIndex);
                 LOG(V2_INFO, "                           myIndex: %i End Calc\n", myIndex);
                 calculatingFinished = true;
             });
@@ -178,7 +192,7 @@ void KMeansJob::appl_communicate() {
 
         clusterMembership.assign(pointsCount, -1);
         auto producer = [&]() {
-                calcCurrentClusterCenters();
+            calcCurrentClusterCenters();
             return clusterCentersToReduce(localSumMembers, localClusterCenters);
         };
         (reducer)->produce(producer);
@@ -207,21 +221,26 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
         // I will do it
         LOG(V2_INFO, "                           myIndex: %i returnto: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
         auto grandChilds = KMeansUtils::childIndexesOf(sourceIndex, countCurrentWorkers);
-        {
-            std::lock_guard<std::mutex> lockGuard(mWork);
-            work.push_back(sourceIndex);
-            for (auto child : grandChilds) {
-                work.push_back(child);
-            }
+
+        msg.payload = std::vector<int>(allReduceElementSize, 0);
+        (reducer)->receive(sourceIndex, MSG_JOB_TREE_REDUCTION, msg);
+        work.push_back(sourceIndex);
+        for (auto child : grandChilds) {
+            work.push_back(child);
         }
+
+        if (!leftDone) leftDone = (sourceIndex == myIndex * 2 + 1);
+        if (!rightDone) rightDone = (sourceIndex == myIndex * 2 + 2);
 
         return;
     }
-    if (hasReducer) {
-        LOG(V2_INFO, "                           myIndex: %i I have Reducer\n", myIndex);
-        if (mpiTag == MSG_JOB_TREE_BROADCAST) {
-            initReducer();
-        } else {
+
+    if (mpiTag == MSG_JOB_TREE_REDUCTION) {
+        if (!leftDone) leftDone = (sourceIndex == myIndex * 2 + 1);
+        if (!rightDone) rightDone = (sourceIndex == myIndex * 2 + 2);
+        if (hasReducer) {
+            LOG(V2_INFO, "                           myIndex: %i I have Reducer\n", myIndex);
+
             bool answear = (reducer)->receive(source, mpiTag, msg);
             LOG(V2_INFO, "                           myIndex: %i bool:%i\n", myIndex, answear);
         }
@@ -232,19 +251,10 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
         LOG(V2_INFO, "                           myIndex: %i Broadcast in!\n", myIndex);
         LOG(V2_INFO, "                           myIndex: %i Workers: %i!\n", myIndex, countCurrentWorkers);
         if (myIndex < countCurrentWorkers) {
-            if (hasReducer) {
-                (reducer)->advance();
-                if ((reducer)->hasResult()) {
-                    LOG(V2_INFO, "                           myIndex: %i received clusterCenters\n", myIndex);
-                    clusterCenters = broadcastToClusterCenters((reducer)->extractResult(), true);
-                }
-            }
-            if (!receivedInitSend) {
-                advanceCollective(msg, MSG_JOB_TREE_BROADCAST);
+            advanceCollective(msg, MSG_JOB_TREE_BROADCAST);
 
-                clusterCenters = broadcastToClusterCenters(msg.payload, true);
-                receivedInitSend = true;
-            }
+            clusterCenters = broadcastToClusterCenters(msg.payload, true);
+            initReducer();
             // continue broadcasting
 
             // LOG(V2_INFO, "                           myIndex: %i clusterCenters: \n%s\n", getJobTree().getIndex(),
