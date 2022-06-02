@@ -99,7 +99,7 @@ void KMeansJob::initReducer() {
         }
     };
 
-    auto tempJobTree = getJobTree();
+    JobTree& tempJobTree = getJobTree();
 
     int lIndex = myIndex * 2 + 1;
     int rIndex = ++lIndex;
@@ -265,11 +265,11 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
         LOG(V2_INFO, "                           myIndex: %i Workers: %i!\n", myIndex, countCurrentWorkers);
         if (myIndex < countCurrentWorkers) {
             advanceCollective(msg, MSG_JOB_TREE_BROADCAST);
+            clusterMembership.assign(pointsCount, -1);
 
             clusterCenters = broadcastToClusterCenters(msg.payload, true);
             initReducer();
 
-            clusterMembership.assign(pointsCount, -1);
             // continue broadcasting
 
             // LOG(V2_INFO, "                           myIndex: %i clusterCenters: \n%s\n", getJobTree().getIndex(),
