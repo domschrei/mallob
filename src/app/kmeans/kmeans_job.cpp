@@ -81,7 +81,6 @@ void KMeansJob::initReducer(JobMessage& msg) {
         if ((1 / 1000 < calculateDifference(
                             [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
             LOG(V2_INFO, "                           Another iter %i\n", epoch);
-            sendRootNotification(MSG_JOB_TREE_BROADCAST);
             return transformed;
 
         } else {
@@ -102,7 +101,7 @@ void KMeansJob::initReducer(JobMessage& msg) {
     JobTree& tempJobTree = getJobTree();
 
     int lIndex = myIndex * 2 + 1;
-    int rIndex = lIndex+1;
+    int rIndex = lIndex + 1;
 
     LOG(V2_INFO, "                           myIndex: %i !tempJobTree.hasLeftChild() %i lIndex in %i\n", myIndex, !tempJobTree.hasLeftChild(), (lIndex < countCurrentWorkers));
     LOG(V2_INFO, "                           myIndex: %i !tempJobTree.hasRightChild() %i rIndex in %i\n", myIndex, !tempJobTree.hasRightChild(), (rIndex < countCurrentWorkers));
@@ -110,7 +109,7 @@ void KMeansJob::initReducer(JobMessage& msg) {
     if (!tempJobTree.hasLeftChild() && (lIndex < countCurrentWorkers)) {
         auto grandChilds = KMeansUtils::childIndexesOf(lIndex, countCurrentWorkers);
         work.push_back(lIndex);
-            LOG(V2_INFO, "                           myIndex: %i push in %i\n", myIndex, lIndex);
+        LOG(V2_INFO, "                           myIndex: %i push in %i\n", myIndex, lIndex);
         for (auto child : grandChilds) {
             work.push_back(child);
             LOG(V2_INFO, "                           myIndex: %i push in %i\n", myIndex, child);
@@ -120,7 +119,7 @@ void KMeansJob::initReducer(JobMessage& msg) {
     if (!tempJobTree.hasRightChild() && (rIndex < countCurrentWorkers)) {
         auto grandChilds = KMeansUtils::childIndexesOf(rIndex, countCurrentWorkers);
         work.push_back(rIndex);
-            LOG(V2_INFO, "                           myIndex: %i push in %i\n", myIndex, rIndex);
+        LOG(V2_INFO, "                           myIndex: %i push in %i\n", myIndex, rIndex);
         for (auto child : grandChilds) {
             work.push_back(child);
             LOG(V2_INFO, "                           myIndex: %i push in %i\n", myIndex, child);
@@ -224,7 +223,24 @@ void KMeansJob::appl_communicate() {
     };
     if (hasReducer) {
         if ((reducer)->isReductionLocallyDone()) {
-            (reducer)->cancel();
+            if ((reducer)->hasResult()) {
+                LOG(V2_INFO, "                           myIndex: %i received clusterCenters\n", myIndex);
+                clusterCenters = broadcastToClusterCenters((reducer)->extractResult(), true);
+                initReducer(msg); //TODO: fake msg and cleanup code, because this looks like sh*t
+                clusterMembership.assign(pointsCount, -1);
+
+                // continue broadcasting
+
+                // LOG(V2_INFO, "                           myIndex: %i clusterCenters: \n%s\n", getJobTree().getIndex(),
+                //     dataToString(clusterCenters).c_str());
+                calculatingTask = ProcessWideThreadPool::get().addTask([&]() {
+                    LOG(V2_INFO, "                           myIndex: %i Start Calc\n", myIndex);
+                    calcNearestCenter(metric, myIndex);
+                    LOG(V2_INFO, "                           myIndex: %i End Calc\n", myIndex);
+                    calculatingFinished = true;
+                });
+                (reducer)->cancel();
+            }
         } else {
             (reducer)->advance();
         }
@@ -301,10 +317,14 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 void KMeansJob::advanceCollective(JobMessage& msg, int broadcastTag, JobTree& jobTree) {
     // Broadcast to children
 
-    if (jobTree.hasLeftChild() && jobTree.getLeftChildIndex() < countCurrentWorkers)
+    if (jobTree.hasLeftChild() && jobTree.getLeftChildIndex() < countCurrentWorkers) {
+        LOG(V2_INFO, "                           myIndex: %i sendTo %i type: %i\n", myIndex, jobTree.getLeftChildIndex(), broadcastTag);
         MyMpi::isend(getJobTree().getLeftChildNodeRank(), broadcastTag, msg);
-    if (jobTree.hasRightChild() && jobTree.getRightChildIndex() < countCurrentWorkers)
+    }
+    if (jobTree.hasRightChild() && jobTree.getRightChildIndex() < countCurrentWorkers) {
+        LOG(V2_INFO, "                           myIndex: %i sendTo %i type: %i\n", myIndex, jobTree.getRightChildIndex(), broadcastTag);
         MyMpi::isend(jobTree.getRightChildNodeRank(), broadcastTag, msg);
+    }
 }
 void KMeansJob::appl_dumpStats() {}
 void KMeansJob::appl_memoryPanic() {}
