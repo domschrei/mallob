@@ -145,6 +145,7 @@ public:
 
     // Whether the final result to the all-reduction is present.
     bool hasResult() const {return _finished && _valid;}
+    bool isReductionLocallyDone() const {return _reduction_locally_done;}
     
     // Extract the final result to the all-reduction. hasResult() must be true.
     // After this call, hasResult() returns false.

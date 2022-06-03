@@ -10,8 +10,8 @@
 #include "app/job.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "comm/job_tree_all_reduction.hpp"
-#include "util/params.hpp"
 #include "kmeans_utils.hpp"
+#include "util/params.hpp"
 
 class KMeansJob : public Job {
    private:
@@ -45,8 +45,8 @@ class KMeansJob : public Job {
     bool hasReducer = false;
     bool leftDone = false;
     bool rightDone = false;
-    bool iDoLeft=false;
-    bool iDoRight=false;
+    bool iDoLeft = false;
+    bool iDoRight = false;
     std::vector<int> work;
     std::mutex mWork;
     std::pair<bool, bool> childsFinished = {false, false};
@@ -56,7 +56,7 @@ class KMeansJob : public Job {
     JobMessage baseMsg;
     JobResult internal_result;
     std::unique_ptr<JobTreeAllReduction> reducer;
-    std::function<float (KMeansJob::Point, KMeansJob::Point)> metric = [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
+    std::function<float(KMeansJob::Point, KMeansJob::Point)> metric = [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
 
    public:
     std::vector<Point> getClusterCenters() { return clusterCenters; };      // The centers of cluster 0..n
@@ -76,7 +76,7 @@ class KMeansJob : public Job {
     void appl_resume() override;
     void appl_terminate() override;
     int appl_solved() override { return finishedJob ? RESULT_SAT : -1; }  // atomic bool
-    //int getDemand() const { return 1; }
+    // int getDemand() const { return 1; }
     JobResult&& appl_getResult() override;
     void appl_communicate() override;
     void appl_communicate(int source, int mpiTag, JobMessage& msg) override;
@@ -100,6 +100,6 @@ class KMeansJob : public Job {
     std::vector<int> clusterCentersToReduce(std::vector<int>, std::vector<Point>);
     std::pair<std::vector<std::vector<float>>, std::vector<int>> reduceToclusterCenters(std::vector<int>);
     std::vector<int> aggregate(std::list<std::vector<int>>);
-    void advanceCollective(JobMessage& msg, int broadcastTag);
-    void initReducer();
+    void advanceCollective(JobMessage& msg, int broadcastTag, JobTree& jobTree);
+    void initReducer(JobMessage& msg);
 };
