@@ -102,22 +102,28 @@ void KMeansJob::initReducer(JobMessage& msg) {
     JobTree& tempJobTree = getJobTree();
 
     int lIndex = myIndex * 2 + 1;
-    int rIndex = ++lIndex;
+    int rIndex = lIndex+1;
 
-    LOG(V2_INFO, "                           myIndex: %i !tempJobTree.hasLeftChild() %i %i\n", myIndex, !tempJobTree.hasLeftChild(), (lIndex < countCurrentWorkers));
+    LOG(V2_INFO, "                           myIndex: %i !tempJobTree.hasLeftChild() %i lIndex in %i\n", myIndex, !tempJobTree.hasLeftChild(), (lIndex < countCurrentWorkers));
+    LOG(V2_INFO, "                           myIndex: %i !tempJobTree.hasRightChild() %i rIndex in %i\n", myIndex, !tempJobTree.hasRightChild(), (rIndex < countCurrentWorkers));
+    work.clear();
     if (!tempJobTree.hasLeftChild() && (lIndex < countCurrentWorkers)) {
         auto grandChilds = KMeansUtils::childIndexesOf(lIndex, countCurrentWorkers);
         work.push_back(lIndex);
+            LOG(V2_INFO, "                           myIndex: %i push in %i\n", myIndex, lIndex);
         for (auto child : grandChilds) {
             work.push_back(child);
+            LOG(V2_INFO, "                           myIndex: %i push in %i\n", myIndex, child);
         }
         leftDone = true;
     }
-    if (!tempJobTree.hasRightChild() && (myIndex * 2 + 2 < countCurrentWorkers)) {
+    if (!tempJobTree.hasRightChild() && (rIndex < countCurrentWorkers)) {
         auto grandChilds = KMeansUtils::childIndexesOf(rIndex, countCurrentWorkers);
         work.push_back(rIndex);
+            LOG(V2_INFO, "                           myIndex: %i push in %i\n", myIndex, rIndex);
         for (auto child : grandChilds) {
             work.push_back(child);
+            LOG(V2_INFO, "                           myIndex: %i push in %i\n", myIndex, child);
         }
         rightDone = true;
     }
@@ -186,18 +192,14 @@ void KMeansJob::appl_communicate() {
             calculatingFinished = false;
             calculatingTask.get();
             const int currentIndex = work[work.size() - 1];
-            LOG(V2_INFO, "                           myIndex: %i 1currentIndex %i \n", myIndex, currentIndex);
             work.pop_back();
             calculatingTask = ProcessWideThreadPool::get().addTask([&, cI = currentIndex]() {
                 LOG(V2_INFO, "                           myIndex: %i Start Calc\n", myIndex);
-                LOG(V2_INFO, "                           myIndex: %i 2currentIndex %i \n", myIndex, cI);
                 if (!leftDone) {
                     leftDone = (cI == (myIndex * 2 + 1));
-                    LOG(V2_INFO, "                           myIndex: %i 4currentIndex %i \n", myIndex, cI);
                 }
                 if (!rightDone) rightDone = (cI == (myIndex * 2 + 2));
                 calcNearestCenter(metric, cI);
-                LOG(V2_INFO, "                           myIndex: %i 3currentIndex %i \n", myIndex, cI);
                 LOG(V2_INFO, "                           myIndex: %i End Calc\n", myIndex);
 
                 calculatingFinished = true;
