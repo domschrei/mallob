@@ -137,6 +137,7 @@ void KMeansJob::initReducer(JobMessage& msg) {
                                           folder));
 
     reducer->setTransformationOfElementAtRoot(rootTransform);
+    reducer->disableBroadcast();
     hasReducer = true;
 }
 
@@ -227,6 +228,7 @@ void KMeansJob::appl_communicate() {
                 LOG(V2_INFO, "                           myIndex: %i received clusterCenters\n", myIndex);
                 clusterCenters = broadcastToClusterCenters((reducer)->extractResult(), true);
                 initReducer(msg); //TODO: fake msg and cleanup code, because this looks like sh*t
+                // only root...?
                 clusterMembership.assign(pointsCount, -1);
 
                 // continue broadcasting

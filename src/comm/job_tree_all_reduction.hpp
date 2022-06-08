@@ -32,6 +32,7 @@ private:
     bool _reduction_locally_done = false;
     bool _finished = false;
     bool _valid = true;
+    bool _broadcastEnabled = true;
 
 public:
     JobTreeAllReduction(JobTree& jobTree, JobMessage baseMsg, AllReduceElement&& neutralElem, 
@@ -52,20 +53,19 @@ public:
         _has_transformation_at_root = true;
     }
 
+    void enableBroadcast() {
+        _broadcastEnabled = true;
+    }
+
+    void disableBroadcast() {
+        _broadcastEnabled = false;
+    }
+
     // Process an incoming message and advance the all-reduction accordingly. 
     // The element is accepted only if the provided acceptor function admits it.
     bool receive(int source, int tag, JobMessage& msg) {
 
         assert(tag == MSG_JOB_TREE_REDUCTION || tag == MSG_JOB_TREE_BROADCAST);
-        LOG(V2_INFO, "                           msg.jobId: %i\n", msg.jobId);
-        LOG(V2_INFO, "                           msg.epoch: %i\n", msg.epoch);
-        LOG(V2_INFO, "                           msg.revision: %i\n", msg.revision);
-        LOG(V2_INFO, "                           msg.tag: %i\n", msg.tag);
-        
-        LOG(V2_INFO, "                           _base_msg.jobId: %i\n", _base_msg.jobId);
-        LOG(V2_INFO, "                           _base_msg.epoch: %i\n", _base_msg.epoch);
-        LOG(V2_INFO, "                           _base_msg.revision: %i\n", _base_msg.revision);
-        LOG(V2_INFO, "                           _base_msg.tag: %i\n", _base_msg.tag);
         bool accept = msg.jobId == _base_msg.jobId 
                     && msg.epoch == _base_msg.epoch 
                     && msg.revision == _base_msg.revision 
@@ -79,7 +79,7 @@ public:
                 advance();
             }
         }
-        if (tag == MSG_JOB_TREE_BROADCAST) {
+        if (tag == MSG_JOB_TREE_BROADCAST && _broadcastEnabled) {
             receiveAndForwardFinalElem(std::move(msg.payload));
         }
         return true;
@@ -117,7 +117,9 @@ public:
                     _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));
                 }
                 // Begin broadcast
-                receiveAndForwardFinalElem(std::move(_aggregated_elem.value()));
+                if (_broadcastEnabled) {
+                    receiveAndForwardFinalElem(std::move(_aggregated_elem.value()));
+                }
             } else {
                 // Send to parent
                 _base_msg.payload = std::move(_aggregated_elem.value());
@@ -145,7 +147,6 @@ public:
 
     // Whether the final result to the all-reduction is present.
     bool hasResult() const {return _finished && _valid;}
-    bool isReductionLocallyDone() const {return _reduction_locally_done;}
     
     // Extract the final result to the all-reduction. hasResult() must be true.
     // After this call, hasResult() returns false.
