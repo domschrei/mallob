@@ -90,7 +90,8 @@ public:
     void advance() {
 
         if (_finished) return;
-        
+        LOG(V2_INFO, "                           my Rank: %i _child_elems.size() % i _num_expected_child_elems %i \n", _tree.getIndex(), _child_elems.size(), _num_expected_child_elems );
+        LOG(V2_INFO, "                           my Rank: %i _local_elem.has_value() %i \n", _tree.getIndex(), _local_elem.has_value() );
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
                      LOG(V2_INFO, "                           my Rank: %i aggregate\n", _tree.getIndex() );
             _child_elems.push_front(std::move(_local_elem.value()));
@@ -116,9 +117,11 @@ public:
                     LOG(V2_INFO, "                           Root transform\n");
                     _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));
                 }
-                // Begin broadcast
-                if (_broadcastEnabled) {
+                
+                if (_broadcastEnabled) {// receive final elem and begin broadcast
                     receiveAndForwardFinalElem(std::move(_aggregated_elem.value()));
+                } else { // only receive final elem
+                    receiveFinalElem(std::move(_aggregated_elem.value()));
                 }
             } else {
                 // Send to parent
@@ -172,9 +175,14 @@ public:
     }
 
 private:
-    void receiveAndForwardFinalElem(AllReduceElement&& elem) {
+
+    void receiveFinalElem(AllReduceElement&& elem){
         _finished = true;
         _base_msg.payload = std::move(elem);
+    }
+
+    void receiveAndForwardFinalElem(AllReduceElement&& elem) {
+        receiveFinalElem(std::move(elem));
         if (_tree.hasLeftChild()) 
             MyMpi::isend(_tree.getLeftChildNodeRank(), MSG_JOB_TREE_BROADCAST, _base_msg);
         if (_tree.hasRightChild()) 

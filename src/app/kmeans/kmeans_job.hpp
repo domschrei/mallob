@@ -86,7 +86,7 @@ class KMeansJob : public Job {
 
     void loadInstance();
     void doInitWork();
-    void sendRootNotification(int tag);
+    void sendRootNotification();
     void setRandomStartCenters();
     void calcNearestCenter(std::function<float(Point, Point)> metric, int intervalId);
     void calcCurrentClusterCenters();
@@ -100,6 +100,6 @@ class KMeansJob : public Job {
     std::vector<int> clusterCentersToReduce(std::vector<int>, std::vector<Point>);
     std::pair<std::vector<std::vector<float>>, std::vector<int>> reduceToclusterCenters(std::vector<int>);
     std::vector<int> aggregate(std::list<std::vector<int>>);
-    void advanceCollective(JobMessage& msg, int broadcastTag, JobTree& jobTree);
+    void advanceCollective(JobMessage& msg, JobTree& jobTree);
     void initReducer(JobMessage& msg);
 };
