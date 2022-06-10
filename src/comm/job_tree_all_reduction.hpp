@@ -70,10 +70,13 @@ public:
                     && msg.epoch == _base_msg.epoch 
                     && msg.revision == _base_msg.revision 
                     && msg.tag == _base_msg.tag;
+                    LOG(V2_INFO, "                           my Rank: %i rec1\n", _tree.getIndex());
         if (!accept) return false;
-
+                    LOG(V2_INFO, "                           my Rank: %i rec2\n", _tree.getIndex());
         if (tag == MSG_JOB_TREE_REDUCTION) {
+                    LOG(V2_INFO, "                           my Rank: %i rec3\n", _tree.getIndex());
             if (!_aggregating) {
+                    LOG(V2_INFO, "                           my Rank: %i rec4\n", _tree.getIndex());
                 _child_elems.push_back(std::move(msg.payload));
                 LOG_ADD_SRC(V5_DEBG, "CS got %i/%i elems", source, _child_elems.size(), _num_expected_child_elems);
                 advance();
@@ -90,8 +93,8 @@ public:
     void advance() {
 
         if (_finished) return;
-        LOG(V2_INFO, "                           my Rank: %i _child_elems.size() % i _num_expected_child_elems %i \n", _tree.getIndex(), _child_elems.size(), _num_expected_child_elems );
-        LOG(V2_INFO, "                           my Rank: %i _local_elem.has_value() %i \n", _tree.getIndex(), _local_elem.has_value() );
+        //LOG(V2_INFO, "                           my Rank: %i _child_elems.size() % i _num_expected_child_elems %i \n", _tree.getIndex(), _child_elems.size(), _num_expected_child_elems );
+        //LOG(V2_INFO, "                           my Rank: %i _local_elem.has_value() %i \n", _tree.getIndex(), _local_elem.has_value() );
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
                      LOG(V2_INFO, "                           my Rank: %i aggregate\n", _tree.getIndex() );
             _child_elems.push_front(std::move(_local_elem.value()));
