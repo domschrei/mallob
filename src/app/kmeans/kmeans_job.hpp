@@ -53,10 +53,58 @@ class KMeansJob : public Job {
     int myRank;
     int myIndex;
     int countCurrentWorkers;
+    int maxGrandchildIndex;
     JobMessage baseMsg;
     JobResult internal_result;
     std::unique_ptr<JobTreeAllReduction> reducer;
     std::function<float(KMeansJob::Point, KMeansJob::Point)> metric = [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
+    std::function<std::vector<int>(std::list<std::vector<int>>&)> folder =
+        [&](std::list<std::vector<int>>& elems) {
+            return aggregate(elems);
+        };
+    std::function<std::vector<int>(std::vector<int>)> rootTransform = [&](std::vector<int> payload) {
+        LOG(V2_INFO, "                           myIndex: %i start Roottransform\n", myIndex);
+        auto data = reduceToclusterCenters(payload);
+
+        clusterCenters = data.first;
+        sumMembers = data.second;
+        int sum = 0;
+        for (auto i : sumMembers) {
+            sum += i;
+        }
+        if (sum == pointsCount) {
+            allCollected = true;
+
+            LOG(V2_INFO, "                           AllCollected: Good\n");
+        } else {
+            LOG(V2_INFO, "                           AllCollected: Error\n");
+        }
+        auto transformed = clusterCentersToBroadcast(clusterCenters);
+        transformed.push_back(this->getVolume());
+        LOG(V2_INFO, "                           COMMSIZE: %i myIndex: %i \n",
+            this->getVolume(), myIndex);
+        LOG(V2_INFO, "                           Children: %i\n",
+            this->getJobTree().getNumChildren());
+
+        if ((1 / 1000 < calculateDifference(
+                            [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
+            LOG(V2_INFO, "                           Another iter %i\n", epoch);
+            return transformed;
+
+        } else {
+            LOG(V2_INFO, "                           Got Result\n");
+            internal_result.result = RESULT_SAT;
+            internal_result.id = getId();
+            internal_result.revision = getRevision();
+            std::vector<int> transformSolution;
+
+            internal_result.encodedType = JobResult::EncodedType::FLOAT;
+            auto solution = clusterCentersToSolution();
+            internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
+            finishedJob = true;
+            return std::move(std::vector<int>(allReduceElementSize, 0));
+        }
+    };
 
    public:
     std::vector<Point> getClusterCenters() { return clusterCenters; };      // The centers of cluster 0..n

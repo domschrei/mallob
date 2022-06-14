@@ -24,6 +24,8 @@ void KMeansJob::appl_start() {
     myIndex = getJobTree().getIndex();
     iAmRoot = getJobTree().isRoot();
 
+    maxGrandchildIndex = myIndex;
+
     countCurrentWorkers = 1;
 
     LOG(V2_INFO, "                           COMMSIZE: %i myRank: %i myIndex: %i\n",
@@ -50,54 +52,6 @@ void KMeansJob::appl_start() {
     });
 }
 void KMeansJob::initReducer(JobMessage& msg) {
-    auto folder =
-        [&](std::list<std::vector<int>>& elems) {
-            return aggregate(elems);
-        };
-    auto rootTransform = [&](std::vector<int> payload) {
-        LOG(V2_INFO, "                           myIndex: %i start Roottransform\n", myIndex);
-        auto data = reduceToclusterCenters(payload);
-
-        clusterCenters = data.first;
-        sumMembers = data.second;
-        int sum = 0;
-        for (auto i : sumMembers) {
-            sum += i;
-        }
-        if (sum == pointsCount) {
-            allCollected = true;
-
-            LOG(V2_INFO, "                           AllCollected: Good\n");
-        } else {
-            LOG(V2_INFO, "                           AllCollected: Error\n");
-        }
-        auto transformed = clusterCentersToBroadcast(clusterCenters);
-        transformed.push_back(this->getVolume());
-        LOG(V2_INFO, "                           COMMSIZE: %i myIndex: %i \n",
-            this->getVolume(), myIndex);
-        LOG(V2_INFO, "                           Children: %i\n",
-            this->getJobTree().getNumChildren());
-
-        if ((1 / 1000 < calculateDifference(
-                            [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
-            LOG(V2_INFO, "                           Another iter %i\n", epoch);
-            return transformed;
-
-        } else {
-            LOG(V2_INFO, "                           Got Result\n");
-            internal_result.result = RESULT_SAT;
-            internal_result.id = getId();
-            internal_result.revision = getRevision();
-            std::vector<int> transformSolution;
-
-            internal_result.encodedType = JobResult::EncodedType::FLOAT;
-            auto solution = clusterCentersToSolution();
-            internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
-            finishedJob = true;
-            return std::move(std::vector<int>(allReduceElementSize, 0));
-        }
-    };
-
     JobTree& tempJobTree = getJobTree();
 
     int lIndex = myIndex * 2 + 1;
@@ -131,8 +85,8 @@ void KMeansJob::initReducer(JobMessage& msg) {
             }
         }
     }
-    msg.payload = clusterCentersToBroadcast(clusterCenters);
-    msg.payload.push_back(countCurrentWorkers);
+    // msg.payload = clusterCentersToBroadcast(clusterCenters);
+    // msg.payload.push_back(countCurrentWorkers);
 
     LOG(V2_INFO, "                           myIndex: %i advanceCollective\n", myIndex);
     advanceCollective(msg, tempJobTree);
@@ -153,8 +107,8 @@ void KMeansJob::initReducer(JobMessage& msg) {
                              epoch,
                              MSG_ALLREDUCE_CLAUSES);
         baseMsg.payload = std::vector<int>(allReduceElementSize, 0);
-        
-    LOG(V2_INFO, "                           myIndex: %i send fill left\n", myIndex);
+
+        LOG(V2_INFO, "                           myIndex: %i send fill left\n", myIndex);
         reducer->receive(tempJobTree.getLeftChildNodeRank(), MSG_JOB_TREE_REDUCTION, baseMsg);
     }
     if (tempJobTree.hasRightChild() && !(rIndex < countCurrentWorkers)) {
@@ -164,7 +118,7 @@ void KMeansJob::initReducer(JobMessage& msg) {
                              epoch,
                              MSG_ALLREDUCE_CLAUSES);
         baseMsg.payload = std::vector<int>(allReduceElementSize, 0);
-    LOG(V2_INFO, "                           myIndex: %i send fill right\n", myIndex);
+        LOG(V2_INFO, "                           myIndex: %i send fill right\n", myIndex);
         reducer->receive(tempJobTree.getRightChildNodeRank(), MSG_JOB_TREE_REDUCTION, baseMsg);
     }
 
@@ -199,7 +153,14 @@ void KMeansJob::doInitWork() {
     finished = true;
     */
 }
-void KMeansJob::appl_suspend() {}
+void KMeansJob::appl_suspend() {
+    baseMsg = JobMessage(getId(),
+                         getRevision(),
+                         epoch,
+                         MSG_BROADCAST_DATA);
+    baseMsg.returnedToSender = true;
+    MyMpi::isend(getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, std::move(baseMsg));
+}
 void KMeansJob::appl_resume() {}
 JobResult&& KMeansJob::appl_getResult() {
     return std::move(internal_result);
@@ -222,13 +183,13 @@ void KMeansJob::appl_communicate() {
             calculatingFinished = false;
             calculatingTask.get();
             const int currentIndex = work[work.size() - 1];
+            if (maxGrandchildIndex < currentIndex) maxGrandchildIndex = currentIndex;
+
             work.pop_back();
             calculatingTask = ProcessWideThreadPool::get().addTask([&, cI = currentIndex]() {
+                if (!leftDone) leftDone = (currentIndex == (myIndex * 2 + 1));
+                if (!rightDone) rightDone = (currentIndex == (myIndex * 2 + 2));
                 LOG(V2_INFO, "                           myIndex: %i Start Calc\n", myIndex);
-                if (!leftDone) {
-                    leftDone = (cI == (myIndex * 2 + 1));
-                }
-                if (!rightDone) rightDone = (cI == (myIndex * 2 + 2));
                 calcNearestCenter(metric, cI);
                 LOG(V2_INFO, "                           myIndex: %i End Calc childs\n", myIndex);
 
@@ -248,6 +209,7 @@ void KMeansJob::appl_communicate() {
         rightDone = false;
         auto producer = [&]() {
             calcCurrentClusterCenters();
+            maxGrandchildIndex = myIndex;
             return clusterCentersToReduce(localSumMembers, localClusterCenters);
         };
         (reducer)->produce(producer);
@@ -430,7 +392,10 @@ void KMeansJob::calcCurrentClusterCenters() {
     for (int cluster = 0; cluster < countClusters; ++cluster) {
         localClusterCenters[cluster].assign(dimension, 0);
     }
-    for (int pointID = 0; pointID < pointsCount; ++pointID) {
+    int startIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(myIndex) / static_cast<float>(countCurrentWorkers)));
+    
+    int endIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(maxGrandchildIndex + 1) / static_cast<float>(countCurrentWorkers)));
+    for (int pointID = startIndex; pointID < endIndex; ++pointID) {
         if (clusterMembership[pointID] != -1) {
             for (int d = 0; d < dimension; ++d) {
                 if (static_cast<float>(localSumMembers[clusterMembership[pointID]]) == 0) {
