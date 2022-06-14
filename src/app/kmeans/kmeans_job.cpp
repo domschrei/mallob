@@ -157,7 +157,7 @@ void KMeansJob::appl_suspend() {
     baseMsg = JobMessage(getId(),
                          getRevision(),
                          epoch,
-                         MSG_BROADCAST_DATA);
+                         MSG_ALLREDUCE_CLAUSES);
     baseMsg.returnedToSender = true;
     MyMpi::isend(getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, std::move(baseMsg));
 }
@@ -210,6 +210,8 @@ void KMeansJob::appl_communicate() {
         auto producer = [&]() {
             calcCurrentClusterCenters();
             maxGrandchildIndex = myIndex;
+
+            LOG(V2_INFO, "clusterCenters: \n%s\n", dataToString(localClusterCenters).c_str());
             return clusterCentersToReduce(localSumMembers, localClusterCenters);
         };
         (reducer)->produce(producer);
@@ -393,12 +395,11 @@ void KMeansJob::calcCurrentClusterCenters() {
         localClusterCenters[cluster].assign(dimension, 0);
     }
     int startIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(myIndex) / static_cast<float>(countCurrentWorkers)));
-    
+
     int endIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(maxGrandchildIndex + 1) / static_cast<float>(countCurrentWorkers)));
     for (int pointID = startIndex; pointID < endIndex; ++pointID) {
         if (clusterMembership[pointID] != -1) {
             for (int d = 0; d < dimension; ++d) {
-                
                 localClusterCenters[clusterMembership[pointID]][d] +=
                     kMeansData[pointID][d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]);
             }
@@ -462,6 +463,9 @@ std::vector<float> KMeansJob::clusterCentersToSolution() {
     for (auto point : clusterCenters) {
         for (auto entry : point) {
             result.push_back(entry);
+
+            LOG(V2_INFO, "                           myIndex: %i result: %f\n",
+                myIndex, entry);
         }
     }
     return result;
@@ -553,7 +557,9 @@ std::vector<int> KMeansJob::aggregate(std::list<std::vector<int>> messages) {
         counts[i] = data.second;
 
         LOG(V2_INFO, "                         myIndex: %i counts[%d] : \n%s\n", myIndex, i, dataToString(counts[i]).c_str());
+        LOG(V2_INFO, "clusterCentersI: \n%s\n", dataToString(centers[i]).c_str());
     }
+
     tempSumMembers.assign(countClusters, 0);
     for (int i = 0; i < countMessages; ++i) {
         for (int j = 0; j < countClusters; ++j) {
@@ -571,6 +577,7 @@ std::vector<int> KMeansJob::aggregate(std::list<std::vector<int>> messages) {
     for (int i = 0; i < countMessages; ++i) {
         for (int j = 0; j < countClusters; ++j) {
             for (int k = 0; k < dimension; ++k) {
+                if (static_cast<float>(tempSumMembers[j]) != 0)
                 tempClusterCenters[j][k] += centers[i][j][k] *
                                             (static_cast<float>(counts[i][j]) /
                                              static_cast<float>(tempSumMembers[j]));

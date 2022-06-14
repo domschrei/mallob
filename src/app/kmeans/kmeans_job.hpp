@@ -85,7 +85,6 @@ class KMeansJob : public Job {
             this->getVolume(), myIndex);
         LOG(V2_INFO, "                           Children: %i\n",
             this->getJobTree().getNumChildren());
-
         if ((1 / 1000 < calculateDifference(
                             [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
             LOG(V2_INFO, "                           Another iter %i\n", epoch);
