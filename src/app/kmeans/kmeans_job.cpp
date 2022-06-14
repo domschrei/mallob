@@ -398,16 +398,7 @@ void KMeansJob::calcCurrentClusterCenters() {
     for (int pointID = startIndex; pointID < endIndex; ++pointID) {
         if (clusterMembership[pointID] != -1) {
             for (int d = 0; d < dimension; ++d) {
-                if (static_cast<float>(localSumMembers[clusterMembership[pointID]]) == 0) {
-                    LOG(V2_INFO, "                           myIndex: %i this shouldnt happen..\n", myIndex);
-                    LOG(V2_INFO, "                           myIndex: %i localSumMembers: %s\n", myIndex, dataToString(localSumMembers).c_str());
-                    LOG(V2_INFO, "                           myIndex: %i clusterMembership[pointID]: %i\n", myIndex, clusterMembership[pointID]);
-                    LOG(V2_INFO, "                           myIndex: %i d: %i\n", myIndex, d);
-                    LOG(V2_INFO, "                           myIndex: %i localClusterCenters[clusterMembership[pointID]][d]: %i\n", myIndex, localClusterCenters[clusterMembership[pointID]][d]);
-                    LOG(V2_INFO, "                           myIndex: %i kMeansData[pointID][d]: %i\n", myIndex, kMeansData[pointID][d]);
-                    LOG(V2_INFO, "                           myIndex: %i localSumMembers[clusterMembership[pointID]]: %i\n", myIndex, localSumMembers[clusterMembership[pointID]]);
-                    LOG(V2_INFO, "                           myIndex: %i kMeansData[pointID][d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]): %f\n", myIndex, kMeansData[pointID][d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]));
-                }
+                
                 localClusterCenters[clusterMembership[pointID]][d] +=
                     kMeansData[pointID][d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]);
             }
