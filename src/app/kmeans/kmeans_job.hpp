@@ -88,7 +88,7 @@ class KMeansJob : public Job {
             this->getJobTree().getNumChildren());
         diff = calculateDifference(
                             [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); });
-        if ((1 / 1000 < diff)) {
+        if ((0.001f < diff)) {
             LOG(V2_INFO, "                           Another iter %i\n", iterationsDone);
             return transformed;
 
