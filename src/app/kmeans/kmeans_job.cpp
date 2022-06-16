@@ -463,9 +463,6 @@ std::vector<float> KMeansJob::clusterCentersToSolution() {
     for (auto point : clusterCenters) {
         for (auto entry : point) {
             result.push_back(entry);
-
-            LOG(V2_INFO, "                           myIndex: %i result: %f\n",
-                myIndex, entry);
         }
     }
     return result;
