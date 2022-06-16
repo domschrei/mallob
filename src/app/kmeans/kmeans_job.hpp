@@ -93,7 +93,7 @@ class KMeansJob : public Job {
             return transformed;
 
         } else {
-            LOG(V2_INFO, "                           Got Result %i\n", iterationsDone);
+            LOG(V2_INFO, "                           Got Result after iter %i\n", iterationsDone);
             internal_result.result = RESULT_SAT;
             internal_result.id = getId();
             internal_result.revision = getRevision();
