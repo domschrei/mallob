@@ -101,6 +101,7 @@ class KMeansJob : public Job {
             auto solution = clusterCentersToSolution();
             internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
             finishedJob = true;
+            LOG(V2_INFO, "Solution clusterCenters: \n%s\n", dataToString(clusterCenters).c_str());
             return std::move(std::vector<int>(allReduceElementSize, 0));
         }
     };

@@ -211,7 +211,7 @@ void KMeansJob::appl_communicate() {
             calcCurrentClusterCenters();
             maxGrandchildIndex = myIndex;
 
-            LOG(V2_INFO, "clusterCenters: \n%s\n", dataToString(localClusterCenters).c_str());
+            //LOG(V2_INFO, "clusterCenters: \n%s\n", dataToString(localClusterCenters).c_str());
             return clusterCentersToReduce(localSumMembers, localClusterCenters);
         };
         (reducer)->produce(producer);
@@ -557,7 +557,7 @@ std::vector<int> KMeansJob::aggregate(std::list<std::vector<int>> messages) {
         counts[i] = data.second;
 
         LOG(V2_INFO, "                         myIndex: %i counts[%d] : \n%s\n", myIndex, i, dataToString(counts[i]).c_str());
-        LOG(V2_INFO, "clusterCentersI: \n%s\n", dataToString(centers[i]).c_str());
+        //LOG(V2_INFO, "clusterCentersI: \n%s\n", dataToString(centers[i]).c_str());
     }
 
     tempSumMembers.assign(countClusters, 0);
