@@ -87,11 +87,11 @@ class KMeansJob : public Job {
             this->getJobTree().getNumChildren());
         if ((1 / 1000 < calculateDifference(
                             [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
-            LOG(V2_INFO, "                           Another iter %i\n", ++iterationsDone);
+            LOG(V2_INFO, "                           Another iter %i\n", iterationsDone);
             return transformed;
 
         } else {
-            LOG(V2_INFO, "                           Got Result %i\n", ++iterationsDone);
+            LOG(V2_INFO, "                           Got Result %i\n", iterationsDone);
             internal_result.result = RESULT_SAT;
             internal_result.id = getId();
             internal_result.revision = getRevision();
