@@ -1,104 +1,107 @@
 
-# Mallob 
-
-Short links: [Experimental data of our SAT21 paper](https://github.com/domschrei/mallob-experimental-data) · [Animallob: Interactive visualization of experiments](https://dominikschreiber.de/animallob)
-
-<hr/>
-
-## Overview
+# Introduction
 
 Mallob is a platform for massively parallel and distributed on-demand processing of malleable jobs, handling their scheduling and load balancing.
 Malleability means that the CPU resources allotted to a job may vary _during its execution_ depending on the system's overall load.
+Mallob was tested on configurations with up to 6144 cores as described in our publications: [SAT 2021](https://dominikschreiber.de/papers/2021-sat-scalable.pdf), Euro-Par 2022 (coming soon!).
 
 Most notably, Mallob features an engine for distributed SAT solving. 
 According to the International SAT Competition [2020🥇](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf) and [2021🥇🥈🥈🥉](https://satcompetition.github.io/2021/slides/ISC2021.pdf), Mallob is currently the best approach for SAT solving on a large scale (800 physical cores) and one of the best approaches for SAT solving on a moderate scale (32 physical cores).
 
-More information on the design decisions and techniques of Mallob can be found in [our SAT 2021 paper](https://dominikschreiber.de/papers/2021-sat-scalable.pdf) where we also evaluated Mallob on up to 2560 physical cores.
-
 <hr/>
 
-## Installation
+# Setup
 
-There are two options on how to obtain a functional instance of Mallob: (a) by direct installation on your Linux system, or (b) via Docker.
+## Prerequisites
 
-### Build on Linux
+Note that we only support Linux as an operating system.
+(Some people have been successfully developing and experimenting with Mallob within the WSL.)
 
-Mallob is built with CMake. 
-Note that a valid MPI installation is required (e.g. OpenMPI, Intel MPI, MPICH, ...).
-In addition, before building Mallob you must first execute `cd lib && bash fetch_and_build_sat_solvers.sh` which, as the name tells, fetches and builds all supported SAT solving libraries.
+* CMake ≥ 3.11.4
+* Open MPI (or another MPI implementation)
+* GDB
+* [jemalloc](https://github.com/jemalloc/jemalloc)
 
-To build Mallob, execute the following usual steps:
+## Building
+
 ```
+( cd lib && bash fetch_and_build_sat_solvers.sh )
 mkdir -p build
 cd build
-cmake .. <cmake-options>
-make
+CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_USE_JEMALLOC=1 -DMALLOB_LOG_VERBOSITY=4 -DMALLOB_ASSERT=1 -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
+make; cd ..
 ```
 
-As CMake options, specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
-In addition, you can use the following Mallob-specific build options:
+Specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
+In addition, use the following Mallob-specific build options:
 
-| Usage                         | Description                                                                                                |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| -DMALLOB_ASSERT=<0/1>         | Turn on assertions (even on release builds). Setting to 0 limits assertions to debug builds.               |
-| -DMALLOB_USE_ASAN=<0/1>       | Compile with Address Sanitizer for debugging purposes.                                                     |
-| -DMALLOB_USE_GLUCOSE=<0/1>    | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
-| -DMALLOB_USE_JEMALLOC=<0/1>   | Compile with Address Sanitizer for debugging purposes.                                                     |
-| -DMALLOB_LOG_VERBOSITY=<0..6> | Only compile logging messages of the provided maximum verbosity and discard more verbose log calls.        |
+| Usage                                     | Description                                                                                                |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| -DMALLOB_ASSERT=<0/1>                     | Turn on assertions (even on release builds). Setting to 0 limits assertions to debug builds.               |
+| -DMALLOB_JEMALLOC_DIR=path                | If necessary, provide a path to a local installation of `jemalloc` where `libjemalloc.*` is located.       |
+| -DMALLOB_LOG_VERBOSITY=<0..6>             | Only compile logging messages of the provided maximum verbosity and discard more verbose log calls.        |
+| -DMALLOB_SUBPROC_DISPATCH_PATH=\\"path\\" | Subprocess executables must be located under <path> for Mallob to find. (Use `\"build/\"` by default.)     |
+| -DMALLOB_USE_ASAN=<0/1>                   | Compile with Address Sanitizer for debugging purposes.                                                     |
+| -DMALLOB_USE_GLUCOSE=<0/1>                | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
+| -DMALLOB_USE_JEMALLOC=<0/1>               | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
 
-### Docker
+## Docker
 
-Alternatively, you can run Mallob in a Docker container.
+We also provide a minimalistic Dockerfile using an Ubuntu 20.04 setup.
 Run `docker build .` in the base directory after setting up Docker on your machine.
 The final line of the output is the ID to run the container, e.g. by running `docker run -i -t <id> bash` and then executing Mallob interactively inside with the options of your choosing.
 
 <hr/>
 
-## Usage
+# Usage
 
-Mallob can be used in several modes of operation which are explained in the following.
+## General
 
-### Launching Mallob
+Given a single machine with two hardware threads per core, the following command executed in Mallob's base directory assigns one MPI process to each set of four physical cores (eight hardware threads) and then runs four solver threads on each MPI process.
 
-For any multinode computations, Mallob is launched with `mpirun`, `mpiexec` or some other MPI application launcher. In addition, Mallob supports spawning SAT solver engines in two ways: As a number of separate threads within the MPI process, or as its individual child process. This can be set with `-appmode=thread` or `-appmode=fork` respectively. Forked mode is the default mode and requires that (i) the executable `mallob_sat_process` (produced during the build) is located in a directory contained in the `PATH` environment variable and (ii) the environment variable `RDMAV_FORK_SAFE=1` must be set.
-
-To sum up, a command to launch Mallob is usually structured like this: 
 ```
-RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun <mpi-options> ./mallob <options>
+RDMAV_FORK_SAFE=1 NPROCS=$(($(nproc)/8)) mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=4 build/mallob -t=4 $MALLOB_OPTIONS
 ```
-If you use Mallob within Docker, replace `build/:$PATH` with `.:$PATH`.
-Each option has the syntax `-key=value`.
 
-To "daemonize" Mallob, i.e., to let it run in the background as a server for your own application(s), run
-```
-RDMAV_FORK_SAFE=1 PATH=build/:$PATH nohup mpirun <mpi-options> ./mallob <options> 2>&1 > OUT &
-```
-where `OUT` is a text file to create for Mallob's output. (If you do not want such a file, use the "quiet" option `-q` instead.)
+To "daemonize" Mallob, i.e., to let it run in the background as a server for your own application(s), you can prepend `mpirun` by `nohup` and append `2>&1 > OUT &` to the whole command, creating a text file `OUT` for Mallob's output. (If you do not want this kind of output, use the "quiet" option `-q`.)
 If running in the background, do not forget to `kill` Mallob (i.e., SIGTERM the `mpirun` process) after you are done.
-Alternatively you can specify the number of jobs to process (with `-J=<num-jobs>`) and/or the time to pass (with `-T=<timelim-secs>`) before Mallob should terminate on its own.
+Alternatively you can specify the number of jobs to process (with `-J=$NUM_JOBS`) and/or the time to pass (with `-T=$TIME_LIMIT_SECS`) before Mallob should terminate on its own.
 
 For exact and clean logging, you should not rely on a textfile in which you piped Mallob's output (like `OUT` above).
-Instead, specify a logging directory with `-log=<log-dir>` where separate sub-directories and files will be created for each worker / thread.
+Instead, specify a logging directory with `-log=<log-dir>` where separate sub-directories and files will be created for each worker / thread. Verbosity of logging can be set with the `-v` option.
+All further options of Mallob can be seen by executing Mallob with the `-h` option. (This also works without the `mpirun` prefix.)
 
-### Solving a single SAT instance
+For running Mallob on distributed clusters, please also consult [the scripts and documentation from our Euro-Par 2022 software artifact](https://doi.org/10.6084/m9.figshare.20000642) as well as the user documentation of your particular cluster.
 
-Call Mallob with the option `-mono=<cnf-file>`.
-Mallob will run in single instance solving mode on the provided CNF file: All available MPI processes (if any) are used with full power to resolve the formula in parallel. This option overrides a couple of options concerning balancing and job demands.
+## Solve a single SAT instance
 
-### Scheduling and solving many instances
+Use Mallob option `-mono=$PATH_TO_CNF` where `$PATH_TO_CNF` is the path and file name of the formula to solve (DIMACS CNF format, possibly with .xz or .lzma compression). In this mode, all processes participate in solving, overhead is minimal, and Mallob terminates immediately after the job has been processed.
 
-Launch Mallob without any particular options regarding its mode of operation. Each PE of rank i then spins up a JSON client interface which can be used over the PE's file system under `<mallob base directory>/.api/jobs.<i>/`.
-On a shared-memory machine, the easiest option is to just always use the directory `.api/jobs.0/` to introduce your jobs, leaving all other client interfaces idle.
-In case of many concurrent jobs, it is best to distribute your jobs evenly (or uniformly @ random) across all existing client interfaces in order to minimize response times.
+## Solve multiple instances in an orchestrated manner
 
-The number of worker PEs and client PEs can be set manually with the `-w=<#workers>` and `-c=<#clients>` options to enforce that some PEs are exclusively clients or exclusively workers.
-The first `#workers` ranks are assigned worker roles, and the last `#clients` ranks are assigned client roles. These may overlap, and setting one/both of the options to -1 means that _all_ PEs are assigned the respective role(s). Use `-c=1` if you only use `.api/jobs.0/` in order to minimize overhead.
+If you want to solve a fixed set of $n$ formulae or wish to evaluate Mallob's scheduling behavior with simulated jobs, follow these steps:
 
-**Introducing a Job**
+* Write the set of formulae into a text file `$INSTANCE_FILE` (one line per path).
+* Configure the base properties of a job with a JSON file `$JOB_TEMPLATE`. For a plain job with default properties you can use `templates/job-template.json`.
+* Configure the behavior of each job-introducing process ("client") with a JSON file `$CLIENT_TEMPLATE`. You can find the simplest possible configuration in `templates/client-template.json` and a more complex randomized configuration in `templates/client-template-random.json`. Both files contain all necessary documentation to adjust them as desired.
 
-To introduce a job to the system, drop a JSON file in `.api/jobs.<i>/in/` (e.g., `.api/jobs.0/in/`) on the filesystem of the according PE structured like this:  
+Then use these Mallob options:
 ```
-{ 
+-c=1 -ajpc=$MAX_PAR_JOBS -ljpc=$((2*$MAX_PAR_JOBS)) -J=$NUM_JOBS -job-desc-template=$INSTANCE_FILE -job-template=$JOB_TEMPLATE -client-template=$CLIENT_TEMPLATE -pls=0
+```
+where `$NUM_JOBS` is set to $n$ (if it is larger than $n$, a client cycles through the provided job descriptions indefinitely). You can set `-sjd=1` to shuffle the provided job descriptions. You can also increase the number of client processes introducing jobs by increasing the value of `-c`. However, note that the provided configuration for active jobs in the system is applied to each of the clients independently, hence the formulae provided in the instance file are not split up among the clients but rather duplicated.
+
+## Process jobs on demand
+
+This is the default and most general configuration of Mallob, i.e., without `-mono` or `-job-template` options.
+You can manually set the number of worker processes (`-w`) and the number of client processes introducing jobs (`-c`). By default, all processes are workers (`-w=-1`) and a single process is additionally a client (`-c=1`). The $k$ client processes are always the $k$ processes of the highest ranks, and they open up file system interfaces for introducing jobs and retrieving results at the directories `.api/jobs.0/` through `.api/jobs.`$k-1$`/`.
+
+### Introducing a Job
+
+To introduce a job to the system, drop a JSON file in `.api/jobs.`$i$`/in/` (e.g., `.api/jobs.0/in/`) on the filesystem of the according PE structured like this:  
+```
+{
+    "application": "SAT",
     "user": "admin", 
     "name": "test-job-1", 
     "files": ["/path/to/difficult/formula.cnf"], 
@@ -119,7 +122,7 @@ Here is a brief overview of all required and optional fields in the JSON API:
 | name              | **yes**   | String       | A user-unique name for this job (increment)                                                                    |
 | files             | **yes***  | String array | File paths of the input to solve. For SAT, this must be a single (text file or compressed file or named pipe). |
 | priority          | **yes***  | Float > 0    | Priority of the job (higher is more important)                                                                 |
-| application       | no        | String       | Which kind of problem is being solved; currently either of "SAT" or "DUMMY" (default: DUMMY)                   |
+| application       | **yes**   | String       | Which kind of problem is being solved; currently either of "SAT" or "DUMMY" (default: DUMMY)                   |
 | wallclock-limit   | no        | String       | Job wallclock limit: combination of a number and a unit (ms/s/m/h/d)                                           |
 | cpu-limit         | no        | String       | Job CPU time limit: combination of a number and a unit (ms/s/m/h/d)                                            |
 | arrival           | no        | Float >= 0   | Job's arrival time (seconds) since program start; ignore job until then                                        |
@@ -150,12 +153,13 @@ The "arrival" and "dependencies" fields are useful to test a particular preset s
 
 Mallob is notified by the kernel as soon as a valid file is placed in `.api/jobs.0/in/` and will immediately remove the file and schedule the job.
 
-**Retrieving a Job Result**
+### Retrieving a Job Result
 
 Upon completion of a job, Mallob writes a result JSON file under `.api/jobs.0/out/<user-name>.<job-name>.json` (you can repeatedly query the directory contents or employ a kernel-level mechanism like `inotify`).
 Such a file may look like this:
 ```
 {
+    "application": "SAT",
     "cpu-limit": "10h",
     "file": "/path/to/difficult/formula.cnf",
     "name": "test-job-1",
@@ -163,14 +167,7 @@ Such a file may look like this:
     "result": {
         "resultcode": 10,
         "resultstring": "SAT",
-        "solution": [
-            0,
-            1,
-            2,
-            3,
-            4,
-            5
-        ]
+        "solution": [0, 1, 2, 3, 4, 5]
     },
     "stats": {
         "time": {
@@ -188,15 +185,11 @@ Such a file may look like this:
 ```
 The result code is 0 is unknown, 10 if SAT, and 20 if UNSAT.
 In case of SAT, the solution field contains the found satisfying assignment; in case of UNSAT, the result for an incremental job contains the set of failed assumptions.
-Instead of the "solution" field, the response may also contain the fields "solution-size" and "solution-file" if the solution is large. In that case, your application has to read `solution-size` integers (as bytes) representing the solution from the named pipe located at `solution-file`.
-
-### Options
-
-All command-line options of Mallob can be seen by executing Mallob with the `-h` option. This also works without the `mpirun` prefix.
+Instead of the "solution" field, the response may also contain the fields "solution-size" and "solution-file" if the solution is large and if option `-pls` is set. In that case, your application has to read `solution-size` integers (as bytes) representing the solution from the named pipe located at `solution-file`.
 
 <hr/>
 
-## Programming Interfaces
+# Programming Interfaces
 
 Mallob can be extended in the following ways:
 
@@ -215,27 +208,23 @@ Mallob can be extended in the following ways:
 
 <hr/>
 
-## Licensing
+# Licensing and remarks
 
-In its default configuration, the source code of Mallob can be used, changed and redistributed under the terms of the Lesser General Public License (LGPLv3), one notable exception being the source file `src/app/sat/hordesat/solvers/glucose.cpp` (see below).
-The used versions of Lingeling, YalSAT, CaDiCaL, and Kissat are MIT-licensed, as is HordeSat.
+Mallob can be used, changed and redistributed under the terms of the Lesser General Public License (LGPLv3), one exception being the Glucose interface which is excluded from compilation by default (see below).
+**Please let us know if you require a different license for your specific use case.**
 
-The Glucose interface of Mallob, unfortunately, is non-free software due to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE). Notably, its usage in competitive events is restricted. So when compiling Mallob with `MALLOB_USE_GLUCOSE=1` make sure that you have read and understood these restrictions.
+The used versions of Lingeling, YalSAT, CaDiCaL, and Kissat are MIT-licensed, as is HordeSat (the massively parallel solver system our SAT engine was based on).
+The Glucose interface of Mallob, unfortunately, is non-free software due to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE). Notably, its usage in competitive events is restricted. So when compiling Mallob with `-DMALLOB_USE_GLUCOSE=1` make sure that you have read and understood these restrictions.
 
-<hr/>
-
-## Remarks
-
-Many thanks to Armin Biere et al. for the SAT solvers Lingeling, YalSAT, CaDiCaL, and Kissat which this system uses by default, and to Tomáš Balyo for HordeSat, the portfolio solver this project's solver engine is built upon.
-
-Furthermore, in our implementation we make thankful use of the following projects:
+Within our codebase we make thankful use of the following liberally licensed projects:
 
 * [Compile Time Regular Expressions](https://github.com/hanickadot/compile-time-regular-expressions) by Hana Dusíková, for matching particular user inputs
 * [robin_hood hashing](https://github.com/martinus/robin-hood-hashing) by Martin Ankerl, for efficient unordered maps and sets
+* [robin-map](https://github.com/Tessil/robin-map) by Thibaut Goetghebuer-Planchon, for efficient unordered maps and sets
 * [JSON for Modern C++](https://github.com/nlohmann/json) by Niels Lohmann, for reading and writing JSON files
+* [ringbuf](https://github.com/rmind/ringbuf) by Mindaugas Rasiukevicius, for lock-free ring buffers
 
-If you make use of Mallob in an academic setting, please cite this SAT'21 conference paper:
-
+If you make use of Mallob in an academic setting, please cite the following two conference papers. If you can (or want to) cite only one of them, then please cite the SAT'21 paper when focusing on our SAT engine and the Euro-Par'22 paper when focusing on the scheduling aspects of our system.
 ```
 @inproceedings{schreiber2021scalable,
   title={Scalable SAT Solving in the Cloud},
@@ -245,6 +234,14 @@ If you make use of Mallob in an academic setting, please cite this SAT'21 confer
   year={2021},
   organization={Springer},
   doi={10.1007/978-3-030-80223-3_35}
+}
+@inproceedings{sanders2022decentralized,
+  title={Decentralized Online Scheduling of Malleable {NP}-hard Jobs},
+  author={Sanders, Peter and Schreiber, Dominik},
+  booktitle={International European Conference on Parallel and Distributed Computing},
+  year={2022},
+  organization={Springer},
+  note={In press.}
 }
 ```
 
@@ -263,3 +260,9 @@ If you want to specifically cite Mallob in the scope of an International SAT Com
   pages={38}
 }
 ```
+
+Further references:
+
+* **[Mallob IPASIR Bridge for incremental SAT solving](https://github.com/domschrei/mallob-ipasir-bridge)**
+* **[Experimental data of our publications](https://github.com/domschrei/mallob-experimental-data)**
+* **[Repository of our Euro-Par 2022 software artifact](https://github.com/domschrei/europar22-artifact-mallob)**

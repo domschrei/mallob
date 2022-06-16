@@ -1,0 +1,35 @@
+{
+    "comment": [
+    "For each of the below five properties, a random distribution to draw the property from can be configured.",
+    "The type can be set as constant (just a constant value VAL), uniform (draw uniformly at random from an interval),",
+    "normal (simplified normal distribution where values are capped at provided interval borders), or",
+    "exponential (exponential distribution with lambda provided). The params describe the respective distribution.",
+    "constant: [VAL]; uniform: [MIN,MAX]; normal: [MEAN,STDDEV,MIN,MAX]; exponential: [LAMBDA]."
+    ],
+
+    "priority": {
+        "comment": "The priority of a job.",
+        "type": "uniform",
+        "params": [0.01,1]
+    },
+    "maxdemand": {
+        "comment": "The maximum demand (= number of processes) a job desires. (0 = unlimited)",
+        "type": "uniform",
+        "params": [1,1536]
+    },
+    "wallclock-limit": {
+        "comment": "The wallclock time which may be spent computing until a job is cancelled. (0 = unlimited)",
+        "type": "normal",
+        "params": [300, 100, 1, 600]
+    },
+    "arrival": {
+        "comment": "The arrival of a job given in seconds after Mallob's upstart.",
+        "type": "exponential",
+        "params": [0.2]
+    },
+    "burstsize": {
+        "comment": "The number of jobs arriving simultaneously at each arrival event.",
+        "type": "normal",
+        "params": [1, 2, 1, 8]
+    }
+}
