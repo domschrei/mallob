@@ -37,4 +37,5 @@ struct SolverSetup {
 	size_t anticipatedLitsToImportPerCycle;
 
 	bool skipClauseSharingDiagonally;
+	bool certifiedUnsat;
 };

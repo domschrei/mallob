@@ -14,6 +14,7 @@ OptMap _map;
 //  TYPE  member name                    option ID (short, long)                      default (, min, max)     description
 
 OPT_BOOL(abortNonincrementalSubprocess,  "ans", "abort-noninc-subproc",               false,                   "Abort (hence restart) each sub-process which works (partially) non-incrementally upon the arrival of a new revision")
+OPT_BOOL(certifiedUnsat,                 "cu", "certified-unsat",                     false,                   "Generate UNSAT proof (only supports mono mode + CaDiCaL solver)")
 OPT_BOOL(collectClauseHistory,           "ch", "collect-clause-history",              false,                   "Employ clause history collection mechanism")
 OPT_BOOL(coloredOutput,                  "colors", "",                                false,                   "Colored terminal output based on messages' verbosity")
 OPT_BOOL(continuousGrowth,               "cg", "continuous-growth",                   true,                    "Continuous growth of job demands")
