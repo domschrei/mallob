@@ -44,12 +44,18 @@ int main(int argc, char *argv[]) {
 
     std::string logdir = params.logDirectory();
     std::string logFilename = "subproc" + std::string(".") + std::to_string(rankOfParent);
-    bool quiet = params.quiet();
-    if (params.zeroOnlyLogging() && rankOfParent > 0) quiet = true;
-    Logger::init(rankOfParent, params.verbosity(), params.coloredOutput(), 
-            quiet, /*cPrefix=*/params.monoFilename.isSet(),
-            !logdir.empty() ? &logdir : nullptr,
-            &logFilename);
+
+    Logger::LoggerConfig logConfig;
+    logConfig.rank = rankOfParent;
+    logConfig.verbosity = params.verbosity();
+    logConfig.coloredOutput = params.coloredOutput();
+    logConfig.flushFileImmediately = params.immediateFileFlush();
+    logConfig.quiet = params.quiet();
+    if (params.zeroOnlyLogging() && rankOfParent > 0) logConfig.quiet = true;
+    logConfig.cPrefix = params.monoFilename.isSet();
+    logConfig.logDirOrNull = logdir.empty() ? nullptr : &logdir;
+    logConfig.logFilenameOrNull = &logFilename;
+    Logger::init(logConfig);
     Logger::getMainInstance().setLinePrefix(" <" + config.getJobStr() + ">");
     
     pid_t pid = Proc::getPid();

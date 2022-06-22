@@ -175,13 +175,19 @@ int main(int argc, char *argv[]) {
 
     longStartupWarnMsg(rank, "Init'd process");
 
-    bool quiet = params.quiet();
-    if (params.zeroOnlyLogging() && rank > 0) quiet = true;
-    std::string logdir = params.logDirectory();
+    Logger::LoggerConfig logConfig;
+    logConfig.rank = rank;
+    logConfig.verbosity = params.verbosity();
+    logConfig.coloredOutput = params.coloredOutput();
+    logConfig.flushFileImmediately = params.immediateFileFlush();
+    logConfig.quiet = params.quiet();
+    if (params.zeroOnlyLogging() && rank > 0) logConfig.quiet = true;
+    logConfig.cPrefix = params.monoFilename.isSet();
+    std::string logDirectory = params.logDirectory();
     std::string logFilename = "log." + std::to_string(rank);
-    Logger::init(rank, params.verbosity(), params.coloredOutput(), 
-            quiet, /*cPrefix=*/params.monoFilename.isSet(), 
-            !logdir.empty() ? &logdir : nullptr, &logFilename);
+    logConfig.logDirOrNull = logDirectory.empty() ? nullptr : &logDirectory;
+    logConfig.logFilenameOrNull = &logFilename;
+    Logger::init(logConfig);
 
     longStartupWarnMsg(rank, "Init'd logger");
 
