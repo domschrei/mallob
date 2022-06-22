@@ -35,7 +35,7 @@ public:
 
 	inline void learn(int lit) override {
 
-		if (lit != 0) {
+		if (_current_clause.size < MALLOB_CLAUSE_METADATA_SIZE || lit != 0) {
 			// Received a literal
 			assert(_current_clause.size < 1+_setup.strictClauseLengthLimit);
 			_current_lits[_current_clause.size++] = lit;
@@ -46,8 +46,8 @@ public:
 		_num_produced++;
 
 		bool eligible = true;
-		if (_current_clause.size > 1) {
-			assert(_current_clause.size >= 3); // glue value plus at least two literals
+		if (_current_clause.size > MALLOB_CLAUSE_METADATA_SIZE+1) {
+			assert(_current_clause.size >= MALLOB_CLAUSE_METADATA_SIZE+3); // glue value plus at least two literals
 			// subtract LBD value which was added to the clause length as well
 			_current_clause.size--; 
 			// Non-unit clause: First integer is glue value.
@@ -56,7 +56,10 @@ public:
 			if (_current_clause.lbd > _glue_limit) eligible = false;
 		} else {
 			_current_clause.lbd = 1;
-			_current_lits[1] = _current_lits[0]; // copy only literal to position 1
+			// copy first k+1 literals at positions 0..k to positions 1..k+1
+			for (size_t i = MALLOB_CLAUSE_METADATA_SIZE+1; i > 0; i--) {
+				_current_lits[i] = _current_lits[i-1];
+			}
 		}
 		
 		// Export clause (if eligible), reset current clause
