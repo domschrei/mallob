@@ -35,7 +35,9 @@ public:
 
 	inline void learn(int lit) override {
 
-		if (_current_clause.size < MALLOB_CLAUSE_METADATA_SIZE || lit != 0) {
+		//LOG(V5_DEBG, "LEARN %i\n", lit);
+
+		if (_current_clause.size < MALLOB_CLAUSE_METADATA_SIZE+1 || lit != 0) {
 			// Received a literal
 			assert(_current_clause.size < 1+_setup.strictClauseLengthLimit);
 			_current_lits[_current_clause.size++] = lit;
@@ -44,6 +46,11 @@ public:
 
 		// Received a zero - clause is finished
 		_num_produced++;
+
+		//std::string clauseString;
+		//for (size_t i = 0; i < _current_clause.size; ++i)
+		//	clauseString += std::to_string(_current_lits[i]) + " ";
+		//LOG(V5_DEBG, "LEARN clause of total size %i : %s\n", _current_clause.size, clauseString.c_str());
 
 		bool eligible = true;
 		if (_current_clause.size > MALLOB_CLAUSE_METADATA_SIZE+1) {

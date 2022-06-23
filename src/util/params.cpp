@@ -98,7 +98,7 @@ void Parameters::expand() {
         }
         
         // Override options
-        LOG(V2_INFO, "Certified UNSAT mode: Setting solver to non-incremental CaDiCaL only\n");
+        //LOG(V2_INFO, "Certified UNSAT mode: Setting solver to non-incremental CaDiCaL only\n");
         satSolverSequence.set("c");
         certifiedUnsat.set(true);
 

@@ -41,10 +41,6 @@ void Cadical::diversify(int seed) {
 		
 		LOGGER(_logger, V3_VERB, "Diversifying %i with certified UNSAT support\n", 
 			getDiversificationIndex());
-		
-		// Only use shuffling as native diversification
-		okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1);
-		assert(okay);
 
 		// Check that a version of CaDiCaL is used which has all the unsupported options switched off
 		auto requiredOptionsZero = {"binary", "elim", "decompose", "ternary", "vivify", "probe", "transred"};
@@ -52,6 +48,14 @@ void Cadical::diversify(int seed) {
 			assert(solver->get(option) == 0 
 				|| log_return_false("CaDiCaL is configured with option \"%s\" "
 				"which is unsupported for certified UNSAT!\n", option));
+		}
+		
+		// Only use shuffling as native diversification
+		if (getDiversificationIndex() > 0) {
+			okay = solver->set("shuffle", 1); assert(okay);
+			okay = solver->set("shufflerandom", 1); assert(okay);
+			okay = solver->set("shufflequeue", 1); assert(okay);
+			okay = solver->set("shufflescores", 1); assert(okay);
 		}
 		return;
 	}
@@ -96,6 +100,7 @@ void Cadical::diversify(int seed) {
 }
 
 int Cadical::getNumOriginalDiversifications() {
+	if (getSolverSetup().certifiedUnsat) return 1;
 	return 15;
 }
 
