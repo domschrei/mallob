@@ -30,8 +30,17 @@ public:
             for (size_t i = 0; i < _next_clause.size(); ++i) {
                 _next_clause[i] = clause.begin[i];
             }
+
+            uint64_t clauseId;
+            memcpy(&clauseId, clause.begin, sizeof(uint64_t));
+            LOG(V5_DEBG, "IMPORT ID=%ld len=%i\n", clauseId, 1);
+
             return true;
         }
+
+        uint64_t clauseId;
+        memcpy(&clauseId, clause.begin, sizeof(uint64_t));
+        LOG(V5_DEBG, "IMPORT ID=%ld len=%i\n", clauseId, clause.size-2);
 
         _next_clause.resize(clause.size+1);
         // In CaDiCaL, LBD scores are represented from 1 to len-1. => Decrement LBD.

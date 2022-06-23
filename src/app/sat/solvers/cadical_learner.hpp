@@ -61,7 +61,17 @@ public:
 			// In CaDiCaL, LBD scores are represented from 1 to len-1. => Increment LBD.
 			_current_clause.lbd = _current_lits[0]+1;
 			if (_current_clause.lbd > _glue_limit) eligible = false;
+
+			uint64_t clauseId;
+			memcpy(&clauseId, _current_lits.data()+1, sizeof(uint64_t));
+			LOG(V5_DEBG, "EXPORT ID=%ld len=%i\n", clauseId, _current_clause.size-2);
+
 		} else {
+			
+			uint64_t clauseId;
+			memcpy(&clauseId, _current_lits.data(), sizeof(uint64_t));
+			LOG(V5_DEBG, "EXPORT ID=%ld len=%i\n", clauseId, 1);
+			
 			_current_clause.lbd = 1;
 			// copy first k+1 literals at positions 0..k to positions 1..k+1
 			for (size_t i = MALLOB_CLAUSE_METADATA_SIZE+1; i > 0; i--) {
