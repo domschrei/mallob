@@ -8,6 +8,7 @@
 
 #include "params.hpp"
 #include "logger.hpp"
+#include "app/sat/data/clause_metadata_def.hpp"
 
 const char* BANNER = "\nMallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nDesigned by P. Sanders and D. Schreiber 2018-2022\nDeveloped by D. Schreiber 2019-2022\n";
 const char* BANNER_C_PREFIXED = "c \nc Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nc Designed by P. Sanders and D. Schreiber 2018-2022\nc Developed by D. Schreiber 2019-2022\nc ";
@@ -84,6 +85,37 @@ void Parameters::expand() {
         maxDemand.set(0); // no limit of max. demand
         balancingPeriod.set(0.01); // low balancing delay to immediately get full demand
         numJobs.set(1); // one job to process
+    }
+
+    // Mallob compiled with two integers of metadata per clause => certified UNSAT
+    if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+        
+        // Check that mono mode of operation is enabled
+        if (!monoFilename.isSet()) {
+            LOG(V0_CRIT, "[ERROR] Mallob was compiled with certified UNSAT support "
+                "which only works with mono mode of operation as of now\n");
+            abort();
+        }
+        
+        // Override options
+        //LOG(V2_INFO, "Certified UNSAT mode: Setting solver to non-incremental CaDiCaL only\n");
+        satSolverSequence.set("c");
+        certifiedUnsat.set(true);
+
+    } else if (MALLOB_CLAUSE_METADATA_SIZE != 0) {
+        
+        // Compiled with invalid number of metadata ints per clause
+        LOG(V0_CRIT, "[ERROR] Mallob was compiled to use %i integers of metadata "
+            "which no solver supports as of now\n", MALLOB_CLAUSE_METADATA_SIZE);
+        abort();
+    }
+
+    // If user set certified UNSAT option himself, check that the metadata size if correct
+    if (certifiedUnsat() && MALLOB_CLAUSE_METADATA_SIZE != 2) {
+        
+        LOG(V0_CRIT, "[ERROR] Certified UNSAT: Mallob was not compiled with "
+            "MALLOB_CERTIFIED_UNSAT=1 or MALLOB_CLAUSE_METADATA_SIZE=2 !\n");
+        abort();
     }
 }
 

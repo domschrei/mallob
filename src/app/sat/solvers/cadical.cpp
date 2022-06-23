@@ -30,49 +30,77 @@ void Cadical::addLiteral(int lit) {
 
 void Cadical::diversify(int seed) {
 
+	if (seedSet) return;
+
 	// Options may only be set in the initialization phase, so the seed cannot be re-set
-	if (!seedSet) {
-		LOGGER(_logger, V3_VERB, "Diversifying %i\n", getDiversificationIndex());
-		bool okay = solver->set("seed", seed);
-		assert(okay);
-		switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-		/*
-		// original diversification
-		case 0: okay = solver->configure("default"); break;
-		case 1: okay = solver->configure("plain"); break;
-		case 2: okay = solver->configure("sat"); break;
-		case 3: okay = solver->configure("unsat"); break;
-		case 4: okay = solver->set("chronoalways", 1); break;
-		case 5: okay = solver->set("condition", 1); break;
-		case 6: okay = solver->set("cover", 1); break;
-		case 7: okay = solver->set("restartint", 100); break;
-		case 8: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
-		case 9: okay = solver->set("walk", 0); break;
-		case 10: okay = solver->set("inprocessing", 0); break;
-		case 11: okay = solver->set("phase", 0); break;
-		case 12: okay = solver->set("decompose", 0); break;
-		case 13: okay = solver->set("elim", 0); break;
-		case 14: okay = solver->set("minimize", 0); break;
-		*/
-		// Greedy 10-portfolio according to tests of the above configurations on SAT2020 instances
-		case 0: okay = solver->set("phase", 0); break;
-		case 1: okay = solver->configure("sat"); break;
-		case 2: okay = solver->set("elim", 0); break;
-		case 3: okay = solver->configure("unsat"); break;
-		case 4: okay = solver->set("condition", 1); break;
-		case 5: okay = solver->set("walk", 0); break;
-		case 6: okay = solver->set("restartint", 100); break;
-		case 7: okay = solver->set("cover", 1); break;
-		case 8: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
-		case 9: okay = solver->set("inprocessing", 0); break;
+	bool okay = solver->set("seed", seed);
+	assert(okay);
+
+	// In certified UNSAT mode?
+	if (getSolverSetup().certifiedUnsat) {
+		
+		LOGGER(_logger, V3_VERB, "Diversifying %i with certified UNSAT support\n", 
+			getDiversificationIndex());
+
+		// Check that a version of CaDiCaL is used which has all the unsupported options switched off
+		auto requiredOptionsZero = {"binary", "elim", "decompose", "ternary", "vivify", "probe", "transred"};
+		for (auto& option : requiredOptionsZero) {
+			assert(solver->get(option) == 0 
+				|| log_return_false("CaDiCaL is configured with option \"%s\" "
+				"which is unsupported for certified UNSAT!\n", option));
 		}
-		assert(okay);
-		seedSet = true;
-		setClauseSharing(getNumOriginalDiversifications());
+		
+		// Only use shuffling as native diversification
+		if (getDiversificationIndex() > 0) {
+			okay = solver->set("shuffle", 1); assert(okay);
+			okay = solver->set("shufflerandom", 1); assert(okay);
+			okay = solver->set("shufflequeue", 1); assert(okay);
+			okay = solver->set("shufflescores", 1); assert(okay);
+		}
+		return;
 	}
+
+	// Normal mode of execution
+	LOGGER(_logger, V3_VERB, "Diversifying %i\n", getDiversificationIndex());
+
+	switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
+	/*
+	// original diversification
+	case 0: okay = solver->configure("default"); break;
+	case 1: okay = solver->configure("plain"); break;
+	case 2: okay = solver->configure("sat"); break;
+	case 3: okay = solver->configure("unsat"); break;
+	case 4: okay = solver->set("chronoalways", 1); break;
+	case 5: okay = solver->set("condition", 1); break;
+	case 6: okay = solver->set("cover", 1); break;
+	case 7: okay = solver->set("restartint", 100); break;
+	case 8: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
+	case 9: okay = solver->set("walk", 0); break;
+	case 10: okay = solver->set("inprocessing", 0); break;
+	case 11: okay = solver->set("phase", 0); break;
+	case 12: okay = solver->set("decompose", 0); break;
+	case 13: okay = solver->set("elim", 0); break;
+	case 14: okay = solver->set("minimize", 0); break;
+	*/
+	// Greedy 10-portfolio according to tests of the above configurations on SAT2020 instances
+	case 0: okay = solver->set("phase", 0); break;
+	case 1: okay = solver->configure("sat"); break;
+	case 2: okay = solver->set("elim", 0); break;
+	case 3: okay = solver->configure("unsat"); break;
+	case 4: okay = solver->set("condition", 1); break;
+	case 5: okay = solver->set("walk", 0); break;
+	case 6: okay = solver->set("restartint", 100); break;
+	case 7: okay = solver->set("cover", 1); break;
+	case 8: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
+	case 9: okay = solver->set("inprocessing", 0); break;
+	}
+	assert(okay);
+	seedSet = true;
+	setClauseSharing(getNumOriginalDiversifications());
 }
 
 int Cadical::getNumOriginalDiversifications() {
+	if (getSolverSetup().certifiedUnsat) return 1;
 	return 15;
 }
 

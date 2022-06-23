@@ -29,6 +29,13 @@ if(MALLOB_SUBPROC_DISPATCH_PATH)
     add_definitions(-DMALLOB_SUBPROC_DISPATCH_PATH=${MALLOB_SUBPROC_DISPATCH_PATH})
 endif()
 
+if(MALLOB_CLAUSE_METADATA_SIZE)
+    add_definitions(-DMALLOB_CLAUSE_METADATA_SIZE=${MALLOB_CLAUSE_METADATA_SIZE})
+endif()
+if(MALLOB_CERTIFIED_UNSAT)
+    add_definitions(-DMALLOB_CLAUSE_METADATA_SIZE=2)
+endif()
+
 if(MALLOB_USE_ASAN)
     set(MY_DEBUG_OPTIONS "${MY_DEBUG_OPTIONS} -fno-omit-frame-pointer -fsanitize=address -static-libasan") 
 endif()

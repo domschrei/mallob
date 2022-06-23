@@ -9,27 +9,27 @@
 
     "priority": {
         "comment": "The priority of a job.",
-        "type": "constant",
-        "params": [1]
+        "type": "uniform",
+        "params": [0.01,1]
     },
     "maxdemand": {
         "comment": "The maximum demand (= number of processes) a job desires. (0 = unlimited)",
-        "type": "constant",
-        "params": [0]
+        "type": "uniform",
+        "params": [1,1536]
     },
     "wallclock-limit": {
         "comment": "The wallclock time which may be spent computing until a job is cancelled. (0 = unlimited)",
-        "type": "constant",
-        "params": [0]
+        "type": "normal",
+        "params": [300, 100, 1, 600]
     },
     "arrival": {
         "comment": "The arrival of a job given in seconds after Mallob's upstart.",
-        "type": "constant",
-        "params": [0]
+        "type": "exponential",
+        "params": [0.2]
     },
     "burstsize": {
         "comment": "The number of jobs arriving simultaneously at each arrival event.",
-        "type": "constant",
-        "params": [1]
+        "type": "normal",
+        "params": [1, 2, 1, 8]
     }
 }

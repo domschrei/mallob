@@ -113,7 +113,7 @@ bool AdaptiveClauseDatabase::addClause(int* cBegin, int cSize, int cLbd, bool so
         _binary_slot.mtx->unlock();
     } else {
         // Sort clause if necessary
-        if (sortLargeClause) std::sort(cBegin, cBegin+cSize);
+        if (sortLargeClause) std::sort(cBegin+MALLOB_CLAUSE_METADATA_SIZE, cBegin+cSize);
         // Insert clause
         auto& slot = _large_slots.at(slotIdx);
         bool explicitLbd = slot.implicitLbdOrZero == 0;

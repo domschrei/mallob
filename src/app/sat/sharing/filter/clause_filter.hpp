@@ -38,7 +38,7 @@ struct LexicographicClauseThreewayComparator : public AbstractClauseThreewayComp
 		// Shortest LBD first
 		if (left.lbd != right.lbd) return left.lbd < right.lbd ? -1 : 1;
 		// Lexicographic comparison of literals
-		for (size_t i = 0; i < left.size; i++) {
+		for (size_t i = MALLOB_CLAUSE_METADATA_SIZE; i < left.size; i++) {
 			if (left.begin[i] != right.begin[i]) 
 				return left.begin[i] < right.begin[i] ? -1 : 1;
 		}
@@ -59,7 +59,7 @@ struct LengthLbdSumClauseThreewayComparator : public AbstractClauseThreewayCompa
 		// Shortest LBD first
 		if (left.lbd != right.lbd) return left.lbd < right.lbd ? -1 : 1;
 		// Lexicographic comparison of literals
-		for (size_t i = 0; i < left.size; i++) {
+		for (size_t i = MALLOB_CLAUSE_METADATA_SIZE; i < left.size; i++) {
 			if (left.begin[i] != right.begin[i]) 
 				return left.begin[i] < right.begin[i] ? -1 : 1;
 		}
