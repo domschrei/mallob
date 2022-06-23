@@ -113,7 +113,8 @@ void Parameters::expand() {
     // If user set certified UNSAT option himself, check that the metadata size if correct
     if (certifiedUnsat() && MALLOB_CLAUSE_METADATA_SIZE != 2) {
         
-        LOG(V0_CRIT, "[ERROR] Certified UNSAT: Mallob was not compiled with MALLOB_CLAUSE_METADATA_SIZE=2 !\n");
+        LOG(V0_CRIT, "[ERROR] Certified UNSAT: Mallob was not compiled with "
+            "MALLOB_CERTIFIED_UNSAT=1 or MALLOB_CLAUSE_METADATA_SIZE=2 !\n");
         abort();
     }
 }

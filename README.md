@@ -44,7 +44,7 @@ In addition, use the following Mallob-specific build options:
 | -DMALLOB_USE_ASAN=<0/1>                   | Compile with Address Sanitizer for debugging purposes.                                                     |
 | -DMALLOB_USE_GLUCOSE=<0/1>                | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
 | -DMALLOB_USE_JEMALLOC=<0/1>               | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
-| -DMALLOB_CLAUSE_METADATA_SIZE=$k$         | Each solver exports (and imports) $k \in \\{0, 2\\}$ literals of metadata at the beginning of each clause.   |
+| -DMALLOB_CERTIFIED_UNSAT=<0/1>            | Compile with support for certified UNSAT (only works with a special patched version of CaDiCaL)            |
 
 ## Docker
 
