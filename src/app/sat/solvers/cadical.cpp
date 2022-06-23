@@ -43,7 +43,7 @@ void Cadical::diversify(int seed) {
 			getDiversificationIndex());
 
 		// Check that a version of CaDiCaL is used which has all the unsupported options switched off
-		auto requiredOptionsZero = {"binary", "elim", "decompose", "ternary", "vivify", "probe", "transred"};
+		auto requiredOptionsZero = {"elim", "decompose", "ternary", "vivify", "probe", "transred"};
 		for (auto& option : requiredOptionsZero) {
 			assert(solver->get(option) == 0 
 				|| log_return_false("CaDiCaL is configured with option \"%s\" "

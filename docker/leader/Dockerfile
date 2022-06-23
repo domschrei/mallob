@@ -6,9 +6,6 @@ RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt install -y cmake build-essential zlib1g-dev libopenmpi-dev wget unzip build-essential zlib1g-dev cmake python3 build-essential gfortran wget curl libjemalloc-dev libjemalloc2 gdb
     
 # Build Mallob
-# This is a single command such that a change in the commit hash will make Docker re-fetch the repository
-#RUN git clone https://github.com/RandomActsOfGramar/mallob && cd mallob && git checkout interface && git checkout 35794bfa9d650f7c465c08cd0073a71833119162 && cd ..
-
 # Copy in all the files we need, rather than clone a repository
 RUN mkdir mallob
 COPY /CMakeLists.txt mallob/CMakeLists.txt
@@ -18,9 +15,9 @@ COPY /lib mallob/lib
 
 # Build Mallob
 WORKDIR mallob
-RUN cd lib && bash fetch_and_build_sat_solvers.sh kcly && cd ..
+RUN cd lib && bash fetch_and_build_sat_solvers.sh ckly && cd ..
 RUN mkdir build
-RUN cd build && cmake -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_SUBPROC_DISPATCH_PATH=\"./\" -DMALLOB_ASSERT=1 -DMALLOB_USE_GLUCOSE=0 -DMALLOB_USE_ASAN=0 -DMALLOB_USE_JEMALLOC=1 -DMALLOB_JEMALLOC_DIR=/usr/lib/x86_64-linux-gnu -DMALLOB_LOG_VERBOSITY=3 .. && VERBOSE=1 make -j4 && cd ..
+RUN cd build && cmake -DMALLOB_CERTIFIED_UNSAT=1 -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_SUBPROC_DISPATCH_PATH=\"./\" -DMALLOB_ASSERT=1 -DMALLOB_USE_GLUCOSE=0 -DMALLOB_USE_ASAN=0 -DMALLOB_USE_JEMALLOC=1 -DMALLOB_JEMALLOC_DIR=/usr/lib/x86_64-linux-gnu -DMALLOB_LOG_VERBOSITY=3 .. && VERBOSE=1 make -j4 && cd ..
 #RUN find /usr -name '*libjemalloc*'
 
 ################### Extract Mallob in run stage
