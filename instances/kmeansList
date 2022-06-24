@@ -1,3 +1,3 @@
-instances/covtype.csv
-instances/benign_traffic.csv
 instances/mnist784.csv
+instances/benign_traffic.csv
+instances/covtype.csv

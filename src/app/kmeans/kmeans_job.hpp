@@ -87,7 +87,7 @@ class KMeansJob : public Job {
         LOG(V2_INFO, "                           Children: %i\n",
             this->getJobTree().getNumChildren());
         diff = calculateDifference(
-                            [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); });
+            [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); });
         if ((0.001f < diff)) {
             LOG(V2_INFO, "                           Another iter %i\n", iterationsDone);
             return transformed;
@@ -152,4 +152,5 @@ class KMeansJob : public Job {
     std::vector<int> aggregate(std::list<std::vector<int>>);
     void advanceCollective(JobMessage& msg, JobTree& jobTree);
     void initReducer(JobMessage& msg);
+    int getIndex(int rank);
 };

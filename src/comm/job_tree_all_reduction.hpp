@@ -66,6 +66,15 @@ public:
     bool receive(int source, int tag, JobMessage& msg) {
 
         assert(tag == MSG_JOB_TREE_REDUCTION || tag == MSG_JOB_TREE_BROADCAST);
+        //LOG(V2_INFO, "                           msg.jobId: %i\n", msg.jobId);
+        //LOG(V2_INFO, "                           _base_msg.jobId: %i\n", _base_msg.jobId);
+        //LOG(V2_INFO, "                           msg.epoch: %i\n", msg.epoch);
+        //LOG(V2_INFO, "                           _base_msg.epoch : %i\n", _base_msg.epoch );
+        //LOG(V2_INFO, "                           msg.revision: %i\n", msg.revision);
+        //LOG(V2_INFO, "                           _base_msg.revision : %i\n", _base_msg.revision );
+        //LOG(V2_INFO, "                           msg.tag: %i\n", msg.tag);
+        //LOG(V2_INFO, "                           _base_msg.tag: %i\n", _base_msg.tag);
+        
         bool accept = msg.jobId == _base_msg.jobId 
                     && msg.epoch == _base_msg.epoch 
                     && msg.revision == _base_msg.revision 
