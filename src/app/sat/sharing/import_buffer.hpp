@@ -83,7 +83,7 @@ public:
             _stats.histDigested->increment(_clause_out.size);
             assert(_clause_out.size > 0);
             assert(_clause_out.lbd > 0);
-            assert(_clause_out.begin[0] != 0);
+            //assert(_clause_out.begin[0] != 0);
         }
 
         return _clause_out;
