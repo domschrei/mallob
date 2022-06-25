@@ -60,7 +60,8 @@ void KMeansJob::initReducer(JobMessage& msg) {
     LOG(V2_INFO, "                           myIndex: %i !tempJobTree.hasLeftChild() %i lIndex in %i\n", myIndex, !tempJobTree.hasLeftChild(), (lIndex < countCurrentWorkers));
     LOG(V2_INFO, "                           myIndex: %i !tempJobTree.hasRightChild() %i rIndex in %i\n", myIndex, !tempJobTree.hasRightChild(), (rIndex < countCurrentWorkers));
     work.clear();
-
+    workDone.clear();
+    workDone.push_back(myIndex);
     if (!tempJobTree.hasLeftChild()) {
         leftDone = true;
         if (lIndex < countCurrentWorkers) {
@@ -168,11 +169,9 @@ JobResult&& KMeansJob::appl_getResult() {
 void KMeansJob::appl_terminate() {
     LOG(V2_INFO, "                           start terminate\n");
     if (loaded && loadTask.valid()) loadTask.get();
-    LOG(V2_INFO, "                           terminated loadTask!\n");
     if (initSend && initMsgTask.valid()) initMsgTask.get();
-    LOG(V2_INFO, "                           terminated initMsgTask!\n");
     if (calculatingFinished && calculatingTask.valid()) calculatingTask.get();
-    LOG(V2_INFO, "                           terminated calculatingTask!\n");
+    LOG(V2_INFO, "                           end terminate\n");
 }
 void KMeansJob::appl_communicate() {
     if (!loaded) return;
@@ -189,8 +188,8 @@ void KMeansJob::appl_communicate() {
             calculatingTask.get();
             const int currentIndex = work[work.size() - 1];
             if (maxGrandchildIndex < currentIndex) maxGrandchildIndex = currentIndex;
-
             work.pop_back();
+            workDone.push_back(currentIndex);
             calculatingTask = ProcessWideThreadPool::get().addTask([&, cI = currentIndex]() {
                 if (!leftDone) leftDone = (currentIndex == (myIndex * 2 + 1));
                 if (!rightDone) rightDone = (currentIndex == (myIndex * 2 + 2));
@@ -286,7 +285,7 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
         // I will do it
         LOG(V2_INFO, "                           myIndex: %i returnFrom: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
         auto grandChilds = KMeansUtils::childIndexesOf(sourceIndex, countCurrentWorkers);
-        
+
         msg.payload = std::vector<int>(allReduceElementSize, 0);
         msg.tag = MSG_ALLREDUCE_CLAUSES;
         (reducer)->receive(source, MSG_JOB_TREE_REDUCTION, msg);
@@ -424,15 +423,17 @@ void KMeansJob::calcCurrentClusterCenters() {
     for (int cluster = 0; cluster < countClusters; ++cluster) {
         localClusterCenters[cluster].assign(dimension, 0);
     }
-    int startIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(myIndex) / static_cast<float>(countCurrentWorkers)));
+    for (auto workIndex : workDone) {
+        int startIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(workIndex) / static_cast<float>(countCurrentWorkers)));
 
-    int endIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(maxGrandchildIndex + 1) / static_cast<float>(countCurrentWorkers)));
-    for (int pointID = startIndex; pointID < endIndex; ++pointID) {
-        if (clusterMembership[pointID] != -1) {
+        int endIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(workIndex + 1) / static_cast<float>(countCurrentWorkers)));
+        for (int pointID = startIndex; pointID < endIndex; ++pointID) {
+            // if (clusterMembership[pointID] != -1) {
             for (int d = 0; d < dimension; ++d) {
                 localClusterCenters[clusterMembership[pointID]][d] +=
                     kMeansData[pointID][d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]);
             }
+            //}
         }
     }
     ++iterationsDone;

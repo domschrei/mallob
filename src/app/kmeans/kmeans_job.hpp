@@ -34,7 +34,6 @@ class KMeansJob : public Job {
     std::future<void> calculatingTask;
     std::future<void> loadTask;
     std::future<void> initMsgTask;
-    std::vector<int> myIntervalStarts;
     bool finishedJob = false;
     bool iAmRoot = false;
     bool loaded = false;
@@ -48,7 +47,7 @@ class KMeansJob : public Job {
     bool iDoLeft = false;
     bool iDoRight = false;
     std::vector<int> work;
-    std::mutex mWork;
+    std::vector<int> workDone;
     std::pair<bool, bool> childsFinished = {false, false};
     int myRank;
     int myIndex;
