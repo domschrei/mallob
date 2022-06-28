@@ -4,6 +4,8 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+
+#include "util/sys/terminator.hpp"
 bool KMeansReader::read(const std::string &filename, JobDescription &desc) {
     /*
     files have to be in format:
@@ -51,6 +53,7 @@ bool KMeansReader::read(const std::string &filename, JobDescription &desc) {
             ifile >> num;
             desc.addFloatData(num);
         }
+        if (Terminator::isTerminating()) return false;
         for (int skip = 0; skip < skipCols; ++skip) {
             ifile >> num;  // dont read the last few columns of each row
                            // num wont be read until reset
