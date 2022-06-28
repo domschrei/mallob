@@ -28,12 +28,12 @@ Note that we only support Linux as an operating system.
 ( cd lib && bash fetch_and_build_sat_solvers.sh )
 mkdir -p build
 cd build
-CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_USE_JEMALLOC=1 -DMALLOB_LOG_VERBOSITY=4 -DMALLOB_ASSERT=1 -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
+CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_APP_SAT=1 -DMALLOB_USE_JEMALLOC=1 -DMALLOB_LOG_VERBOSITY=4 -DMALLOB_ASSERT=1 -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
 make; cd ..
 ```
 
 Specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
-In addition, use the following Mallob-specific build options:
+You can use the following Mallob-specific build options:
 
 | Usage                                     | Description                                                                                                |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -44,6 +44,7 @@ In addition, use the following Mallob-specific build options:
 | -DMALLOB_USE_ASAN=<0/1>                   | Compile with Address Sanitizer for debugging purposes.                                                     |
 | -DMALLOB_USE_GLUCOSE=<0/1>                | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
 | -DMALLOB_USE_JEMALLOC=<0/1>               | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
+| -DMALLOB_APP_SAT=<0/1>                    | Compile with SAT engine. (Omit or set to zero if you have a custom application for Mallob instead.)        |
 
 ## Docker
 
@@ -196,12 +197,7 @@ Mallob can be extended in the following ways:
 * To add a new SAT solver to be used in a SAT solver engine, do the following:
     - Add a subclass of `PortfolioSolverInterface`. (You can use the existing implementation for any of the existing solvers and adapt it to your solver.)
     - Add your solver to the portfolio initialization in `src/app/sat/execution/engine.cpp`.
-* To extend Mallob by adding another kind of application (like combinatorial search, planning, SMT, ...), do the following:
-    - Extend the enumeration `JobDescription::Application` by a corresponding item.
-    - In `JobReader::read`, add a parser for your application.
-    - In `JobFileAdapter::handleNewJob`, add a new case for the `application` field in JSON files.
-    - Create a subclass of `Job` (see `src/app/job.hpp`) and implement all pure virtual methods. 
-    - Add an additional case to `JobDatabase::createJob`.
+* To extend Mallob by adding another kind of application (like combinatorial search, planning, SMT, ...), please refer to the README in the `app/` directory.
 * To add a unit test, create a class `test_*.cpp` in `src/test` and then add the test case to the bottom of `CMakeLists.txt`.
 * To add a system test, consult the files `scripts/systest_commons.sh` and/or `scripts/systest.sh`.
 
