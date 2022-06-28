@@ -44,16 +44,12 @@ class KMeansJob : public Job {
     bool hasReducer = false;
     bool leftDone = false;
     bool rightDone = false;
-    bool iDoLeft = false;
-    bool iDoRight = false;
     std::vector<int> work;
     std::vector<int> workDone;
     std::pair<bool, bool> childsFinished = {false, false};
     int myRank;
     int myIndex;
     int countCurrentWorkers;
-    int maxGrandchildIndex;
-    float diff = 1;
     JobMessage baseMsg;
     JobResult internal_result;
     std::unique_ptr<JobTreeAllReduction> reducer;
@@ -85,9 +81,9 @@ class KMeansJob : public Job {
             this->getVolume(), myIndex);
         LOG(V2_INFO, "                           Children: %i\n",
             this->getJobTree().getNumChildren());
-        diff = calculateDifference(
-            [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); });
-        if ((0.001f < diff)) {
+        
+        if ((0.001f < calculateDifference(
+            [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
             LOG(V2_INFO, "                           Another iter %i\n", iterationsDone);
             return transformed;
 

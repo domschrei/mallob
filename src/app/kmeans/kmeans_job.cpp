@@ -24,8 +24,6 @@ void KMeansJob::appl_start() {
     myIndex = getJobTree().getIndex();
     iAmRoot = getJobTree().isRoot();
 
-    maxGrandchildIndex = myIndex;
-
     countCurrentWorkers = 1;
 
     LOG(V2_INFO, "                           COMMSIZE: %i myRank: %i myIndex: %i\n",
@@ -103,10 +101,7 @@ void KMeansJob::initReducer(JobMessage& msg) {
     advanceCollective(msg, tempJobTree);
     if (tempJobTree.hasLeftChild() && !(lIndex < countCurrentWorkers)) {
         leftDone = true;
-        baseMsg = JobMessage(getId(),
-                             getRevision(),
-                             epoch,
-                             MSG_ALLREDUCE_CLAUSES);
+        baseMsg.tag = MSG_ALLREDUCE_CLAUSES;
         baseMsg.payload = std::vector<int>(allReduceElementSize, 0);
 
         LOG(V2_INFO, "                           myIndex: %i send fill left\n", myIndex);
@@ -114,10 +109,7 @@ void KMeansJob::initReducer(JobMessage& msg) {
     }
     if (tempJobTree.hasRightChild() && !(rIndex < countCurrentWorkers)) {
         rightDone = true;
-        baseMsg = JobMessage(getId(),
-                             getRevision(),
-                             epoch,
-                             MSG_ALLREDUCE_CLAUSES);
+        baseMsg.tag = MSG_ALLREDUCE_CLAUSES;
         baseMsg.payload = std::vector<int>(allReduceElementSize, 0);
         LOG(V2_INFO, "                           myIndex: %i send fill right\n", myIndex);
         reducer->receive(tempJobTree.getRightChildNodeRank(), MSG_JOB_TREE_REDUCTION, baseMsg);
@@ -128,13 +120,10 @@ void KMeansJob::initReducer(JobMessage& msg) {
 
 void KMeansJob::sendRootNotification() {
     initSend = false;
-    baseMsg = JobMessage(getId(),
-                         getRevision(),
-                         epoch,
-                         MSG_BROADCAST_DATA);
+    baseMsg.tag = MSG_BROADCAST_DATA;
     baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
     baseMsg.payload.push_back(countCurrentWorkers);
-    MyMpi::isend(getJobTree().getRootNodeRank(), MSG_SEND_APPLICATION_MESSAGE, std::move(baseMsg));
+    MyMpi::isend(getJobTree().getRootNodeRank(), MSG_SEND_APPLICATION_MESSAGE, baseMsg);
 }
 void KMeansJob::doInitWork() {
     initMsgTask = ProcessWideThreadPool::get().addTask([&]() {
@@ -155,12 +144,9 @@ void KMeansJob::doInitWork() {
     */
 }
 void KMeansJob::appl_suspend() {
-    baseMsg = JobMessage(getId(),
-                         getRevision(),
-                         epoch,
-                         MSG_ALLREDUCE_CLAUSES);
+    baseMsg.tag = MSG_ALLREDUCE_CLAUSES;
     baseMsg.returnedToSender = true;
-    MyMpi::isend(getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, std::move(baseMsg));
+    MyMpi::isend(getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, baseMsg);
 }
 void KMeansJob::appl_resume() {}
 JobResult&& KMeansJob::appl_getResult() {
@@ -187,7 +173,6 @@ void KMeansJob::appl_communicate() {
             calculatingFinished = false;
             calculatingTask.get();
             const int currentIndex = work[work.size() - 1];
-            if (maxGrandchildIndex < currentIndex) maxGrandchildIndex = currentIndex;
             work.pop_back();
             workDone.push_back(currentIndex);
             calculatingTask = ProcessWideThreadPool::get().addTask([&, cI = currentIndex]() {
@@ -214,7 +199,6 @@ void KMeansJob::appl_communicate() {
         LOG(V2_INFO, "                           myIndex: %i all work Finished2!!!\n", myIndex);
         auto producer = [&]() {
             calcCurrentClusterCenters();
-            maxGrandchildIndex = myIndex;
 
             // LOG(V2_INFO, "clusterCenters: \n%s\n", dataToString(localClusterCenters).c_str());
             return clusterCentersToReduce(localSumMembers, localClusterCenters);
@@ -230,13 +214,10 @@ void KMeansJob::appl_communicate() {
             clusterCenters = broadcastToClusterCenters((reducer)->extractResult(), true);
             clusterMembership.assign(pointsCount, -1);
 
-            baseMsg = JobMessage(getId(),
-                                 getRevision(),
-                                 epoch,
-                                 MSG_BROADCAST_DATA);
+            baseMsg.tag = MSG_BROADCAST_DATA;
             baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
             baseMsg.payload.push_back(countCurrentWorkers);
-            MyMpi::isend(getJobTree().getRootNodeRank(), MSG_SEND_APPLICATION_MESSAGE, std::move(baseMsg));
+            MyMpi::isend(getJobTree().getRootNodeRank(), MSG_SEND_APPLICATION_MESSAGE, baseMsg);
             // only root...?
 
             // continue broadcasting
@@ -397,7 +378,7 @@ void KMeansJob::calcNearestCenter(std::function<float(Point, Point)> metric, int
     // while own or child slices todo
     int startIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(intervalId) / static_cast<float>(countCurrentWorkers)));
     int endIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(intervalId + 1) / static_cast<float>(countCurrentWorkers)));
-    LOG(V2_INFO, "                           MI: %i intervalId: %i PC: %i cW: %i start:%i end:%i!!      iter:%i diff:%f\n", myIndex, intervalId, pointsCount, countCurrentWorkers, startIndex, endIndex, iterationsDone, diff);
+    LOG(V2_INFO, "                           MI: %i intervalId: %i PC: %i cW: %i start:%i end:%i!!      iter:%i \n", myIndex, intervalId, pointsCount, countCurrentWorkers, startIndex, endIndex, iterationsDone);
     for (int pointID = startIndex; pointID < endIndex; ++pointID) {
         currentNearestCenter.cluster = -1;
         currentNearestCenter.distance = std::numeric_limits<float>::infinity();
@@ -519,7 +500,6 @@ std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(std::vector<i
 
     if (!withNumWorkers) reduceData += countClusters;
 
-    localClusterCentersResult.clear();
     localClusterCentersResult.resize(countClusters);
     for (int i = 0; i < countClusters; ++i) {
         localClusterCentersResult[i].assign(dimension, 0);
