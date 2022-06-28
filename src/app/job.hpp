@@ -140,7 +140,8 @@ public:
 private:
     int _id;
     std::string _name;
-    JobDescription::Application _appl;
+    int _application_id;
+    bool _incremental;
 
     std::atomic_bool _has_description = false;
     JobDescription _description;
@@ -185,7 +186,14 @@ public:
     // (NOT to be called by your application code implementing above methods!)
 
     // Constructor
-    Job(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl);
+    struct JobSetup {
+        int commSize;
+        int worldRank;
+        int jobId;
+        int applicationId;
+        bool incremental;
+    };
+    Job(const Parameters& params, const JobSetup& setup);
     
     // Mark the job as being subject of a commitment to the given job request.
     // Requires the job to be not active and not committed.
@@ -223,8 +231,8 @@ public:
     void assertState(JobState state) const {assert(_state == state || LOG_RETURN_FALSE("State of %s : %s\n", toStr(), jobStateToStr()));};
     int getVolume() const {return _volume;}
     float getPriority() const {return _priority;}
-    JobDescription::Application getApplication() const {return _appl;}
-    bool isIncremental() const {return JobDescription::isApplicationIncremental(_appl);}
+    int getApplicationId() const {return _application_id;}
+    bool isIncremental() const {return _incremental;}
     bool hasDescription() const {return _has_description;};
     const JobDescription& getDescription() const {assert(hasDescription()); return _description;};
     const std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription(int revision) {return _description.getSerialization(revision);};

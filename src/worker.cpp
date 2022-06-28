@@ -18,7 +18,6 @@
 #include "util/sys/watchdog.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
-#include "data/job_reader.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/sys/thread_pool.hpp"
 
@@ -677,7 +676,7 @@ void Worker::tryAdoptRequest(JobRequest& req, int source, JobDatabase::JobReques
         // Commit on the job, send a request to the parent
         if (!_job_db.has(req.jobId)) {
             // Job is not known yet: create instance
-            Job& job = _job_db.createJob(MyMpi::size(_comm), _world_rank, req.jobId, req.application);
+            Job& job = _job_db.createJob(MyMpi::size(_comm), _world_rank, req.jobId, req.applicationId, req.incremental);
         }
         _job_db.commit(req);
         if (_params.reactivationScheduling()) {
@@ -1243,8 +1242,8 @@ void Worker::spawnJobRequest(int jobId, bool left, int balancingEpoch) {
     int index = left ? job.getJobTree().getLeftChildIndex() : job.getJobTree().getRightChildIndex();
     if (_params.monoFilename.isSet()) job.getJobTree().updateJobNode(index, index);
 
-    JobRequest req(jobId, job.getApplication(), job.getJobTree().getRootNodeRank(), 
-            _world_rank, index, Timer::elapsedSeconds(), balancingEpoch, 0);
+    JobRequest req(jobId, job.getApplicationId(), job.getJobTree().getRootNodeRank(), 
+            _world_rank, index, Timer::elapsedSeconds(), balancingEpoch, 0, job.isIncremental());
     req.revision = job.getDesiredRevision();
     int tag = MSG_REQUEST_NODE;    
 

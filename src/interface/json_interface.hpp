@@ -63,5 +63,5 @@ public:
     Result handle(nlohmann::json& json, std::function<void(nlohmann::json&)> feedback);
 
     // Mallob-side events
-    void handleJobDone(JobResult&& result, const JobDescription::Statistics& stats);
+    void handleJobDone(JobResult&& result, const JobDescription::Statistics& stats, int applicationId);
 };

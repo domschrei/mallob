@@ -97,10 +97,10 @@ public:
     }
 
     enum TreeRelative {LEFT_CHILD, RIGHT_CHILD, NONE};
-    JobRequest getJobRequestFor(int jobId, TreeRelative rel, int balancingEpoch, JobDescription::Application app) {
-        return JobRequest(jobId, app, getRootNodeRank(), _rank, 
+    JobRequest getJobRequestFor(int jobId, TreeRelative rel, int balancingEpoch, int appId, bool incremental) {
+        return JobRequest(jobId, appId, getRootNodeRank(), _rank, 
                 rel == LEFT_CHILD ? getLeftChildIndex() : getRightChildIndex(), 
-                Timer::elapsedSeconds(), balancingEpoch, 0);
+                Timer::elapsedSeconds(), balancingEpoch, 0, incremental);
     }
     TreeRelative prune(int leavingRank, int leavingIndex) {
         if (hasLeftChild() && getLeftChildIndex() == leavingIndex && getLeftChildNodeRank() == leavingRank) {

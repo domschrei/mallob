@@ -5,7 +5,7 @@
 #include <string>
 
 #include "util/random.hpp"
-#include "util/sat_reader.hpp"
+#include "app/sat/parse/sat_reader.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 
@@ -23,7 +23,7 @@ int main() {
         auto f = std::string("instances/") + file;
         LOG(V2_INFO, "Reading test CNF %s ...\n", f.c_str());
         float time = Timer::elapsedSeconds();
-        SatReader r(f, SatReader::ContentMode::ASCII);
+        SatReader r(f);
         JobDescription d;
         bool success = r.read(d);
         assert(success);

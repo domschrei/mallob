@@ -71,7 +71,7 @@ public:
     ~JobDatabase();
     void setCollectiveAssignment(CollectiveAssignment& collAssign) {_coll_assign = &collAssign;}
 
-    Job& createJob(int commSize, int worldRank, int jobId, JobDescription::Application application);
+    Job& createJob(int commSize, int worldRank, int jobId, int applicationId, bool incremental);
     bool appendRevision(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source);
     void execute(int jobId, int source);
 

@@ -13,6 +13,9 @@
 
 bool SatReader::read(JobDescription& desc) {
 
+	_raw_content_mode = desc.getAppConfiguration().map.count("content-mode")
+		&& desc.getAppConfiguration().map.at("content-mode") == "RAW";
+
 	FILE* pipe = nullptr;
 	int namedpipe = -1;
 	if ((_filename.size() > 3 && _filename.substr(_filename.size()-3, 3) == ".xz")
@@ -25,9 +28,7 @@ bool SatReader::read(JobDescription& desc) {
 		// Named pipe!
 		namedpipe = open(_filename.c_str(), O_RDONLY);
 	}
-	
-	desc.beginInitialization(desc.getRevision());
-	
+		
 	if (pipe == nullptr && namedpipe == -1) {
 		// Read file with mmap
 		int fd = open(_filename.c_str(), O_RDONLY);
@@ -41,7 +42,7 @@ bool SatReader::read(JobDescription& desc) {
 		desc.reserveSize(size / sizeof(int));
 		void* mmapped = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
 
-		if (_content_mode == RAW) {
+		if (_raw_content_mode) {
 			int* f = (int*) mmapped;
 			for (long i = 0; i < size; i++) {
 				processInt(f[i], desc);
@@ -59,7 +60,7 @@ bool SatReader::read(JobDescription& desc) {
 	} else if (namedpipe != -1) {
 		// Read formula over named pipe
 		int iteration = 0;
-		if (_content_mode == RAW) {
+		if (_raw_content_mode) {
 			int buffer[1024] = {0};
 			while (iteration ^ 511 != 0 || !Terminator::isTerminating()) {
 				int numRead = ::read(namedpipe, buffer, sizeof(buffer));
@@ -86,7 +87,7 @@ bool SatReader::read(JobDescription& desc) {
 
 	} else {
 		// Read file over pipe
-		if (_content_mode == RAW) {
+		if (_raw_content_mode) {
 			int iteration = 0;
 			int buffer[1024] = {0};
 			while (iteration ^ 511 != 0 || !Terminator::isTerminating()) {
@@ -110,8 +111,6 @@ bool SatReader::read(JobDescription& desc) {
 			process(EOF, desc);
 		}
 	}
-
-	desc.endInitialization();
 
 	if (pipe != nullptr) pclose(pipe);
 	if (namedpipe != -1) close(namedpipe);

@@ -128,7 +128,6 @@ Here is a brief overview of all required and optional fields in the JSON API:
 | arrival           | no        | Float >= 0   | Job's arrival time (seconds) since program start; ignore job until then                                        |
 | max-demand        | no        | Int >= 0     | Override the max. number of MPI processes this job should receive at any point in time (0: no limit)           |
 | dependencies      | no        | String array | User-qualified job names (using "." as a separator) which must exit **before** this job is introduced          |
-| content-mode      | no        | String       | If "raw", the input file will be read as a binary file and not as a text file.                                 |
 | interrupt         | no        | Bool         | If `true`, the job given by "user" and "name" is interrupted (for incremental jobs, just the current revision).|
 | incremental       | no        | Bool         | Whether this job has multiple _increments_ / _revisions_ and should be treated as such                         |
 | literals          | no        | Int array    | You can specify the set of SAT literals (for this increment) directly in the JSON.                             |

@@ -18,11 +18,6 @@ typedef std::shared_ptr<std::vector<int>> VecPtr;
 class JobDescription : public Serializable {
 
 public:
-    enum Application {ONESHOT_SAT, INCREMENTAL_SAT, DUMMY};
-    static bool isApplicationIncremental(Application appl) {
-        return appl == INCREMENTAL_SAT;
-    }
-
     struct Statistics {
         float timeOfScheduling;
         float parseTime;
@@ -44,7 +39,8 @@ private:
     float _wallclock_limit = 0; // in seconds
     float _cpu_limit = 0; // in CPU seconds
     int _max_demand = 0;
-    Application _application;
+    int _application_id; // see app_registry
+    bool _incremental = false;
 
     Checksum _checksum;
     const bool _use_checksums = false;
@@ -89,8 +85,8 @@ private:
 public:
 
     JobDescription() = default;
-    JobDescription(int id, float priority, Application appl, bool computeChecksums = false) : _id(id), _root_rank(-1),
-                _priority(priority), _application(appl), _revision(0), 
+    JobDescription(int id, float priority, int applicationId, bool computeChecksums = false) : _id(id), _root_rank(-1),
+                _priority(priority), _application_id(applicationId), _revision(0), 
                 _use_checksums(computeChecksums) {}
     ~JobDescription() {
         if (_stats != nullptr) delete _stats;
@@ -103,12 +99,13 @@ public:
         _id = other._id;
         _root_rank = other._root_rank;
         _priority = std::move(other._priority);
+        _incremental = std::move(other._incremental);
         _revision = std::move(other._revision);
         _client_rank = std::move(other._client_rank);
         _wallclock_limit = std::move(other._wallclock_limit);
         _cpu_limit = std::move(other._cpu_limit);
         _max_demand = std::move(other._max_demand);
-        _application = std::move(other._application);
+        _application_id = std::move(other._application_id);
         _checksum = std::move(other._checksum);
         _arrival = std::move(other._arrival);
         _app_config = std::move(other._app_config);
@@ -137,20 +134,20 @@ public:
 
     void beginInitialization(int revision);
     void reserveSize(size_t size);
-    inline void addLiteral(int lit) {
+    inline void addPermanentData(int lit) {
         // Push literal to raw data, update counter
         push_obj<int>(_data_per_revision[_revision], lit);
         _f_size++;
         if (_use_checksums) _checksum.combine(lit);
     }
-    inline void addFloatData(float data) {
+    inline void addPermanentData(float data) {
         static_assert(sizeof(float) == sizeof(int));
         push_obj<float>(_data_per_revision[_revision], data);
         _f_size++;
         if (_use_checksums) _checksum.combine(data);
     }
 
-    inline void addAssumption(int lit) {
+    inline void addTransientData(int lit) {
         // Push literal to raw data, update counter
         push_obj<int>(_data_per_revision[_revision], lit);
         _a_size++;
@@ -175,11 +172,12 @@ public:
     float getWallclockLimit() const {return _wallclock_limit;}
     float getCpuLimit() const {return _cpu_limit;}
     int getMaxDemand() const {return _max_demand;}
-    Application getApplication() const {return _application;}
+    int getApplicationId() const {return _application_id;}
     const AppConfiguration& getAppConfiguration() const {return _app_config;}
     
     float getArrival() const {return _arrival;}
-    bool isIncremental() const {return isApplicationIncremental(_application);}
+    void setIncremental(bool incremental) {_incremental = incremental;}
+    bool isIncremental() const {return _incremental;}
     int getMetadataSize() const;
     
     size_t getFullNonincrementalTransferSize() const {return _data_per_revision[0]->size();}
@@ -193,7 +191,6 @@ public:
     void setMaxDemand(int maxDemand) {_max_demand = maxDemand;}
     void setNumVars(int numVars) {_num_vars = numVars;}
     void setArrival(float arrival) {_arrival = arrival;};
-    void setApplication(Application app) {_application = app;}
     void setAppConfiguration(AppConfiguration&& appConfig) {_app_config = std::move(appConfig);}
     void setPreloadedLiterals(std::vector<int>&& lits) {_preloaded_literals = std::move(lits);}
     void setPreloadedAssumptions(std::vector<int>&& asmpt) {_preloaded_assumptions = std::move(asmpt);}

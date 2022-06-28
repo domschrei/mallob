@@ -19,6 +19,8 @@
 #include "comm/host_comm.hpp"
 #include "data/job_transfer.hpp"
 
+#include "app/register_includes.h"
+
 #ifndef MALLOB_VERSION
 #define MALLOB_VERSION "(dbg)"
 #endif
@@ -194,6 +196,9 @@ int main(int argc, char *argv[]) {
     MyMpi::setOptions(params);
 
     longStartupWarnMsg(rank, "Init'd message queue");
+
+    // Register all applications which were compiled into Mallob
+    #include "app/register_commands.h"
 
     if (rank == 0)
         LOG(V2_INFO, "Program options: %s\n", params.getParamsAsString().c_str());
