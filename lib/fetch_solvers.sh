@@ -11,5 +11,10 @@ if echo $solvers|grep -q "y"; then wget -nc http://fmv.jku.at/yalsat/yalsat-03v.
 #if echo $solvers|grep -q "k" && [ ! -d kissat ]; then git clone git@github.com:domschrei/kissat.git && cd kissat && git checkout clauseexport && git checkout f2d7275 && cd .. ; fi
 
 if echo $solvers|grep -q "l" && [ ! -d lingeling ]; then wget -nc https://dominikschreiber.de/share/lingeling-isc22.zip ; fi
-if echo $solvers|grep -q "c" && [ ! -d cadical ]; then git clone https://github.com/RandomActsOfGrammar/cadical.git ; fi
+if echo $solvers|grep -q "c" && [ ! -d cadical ]; then
+    git clone https://github.com/RandomActsOfGrammar/cadical.git
+    #cd cadical
+    #git checkout debugging
+    #cd ..
+fi
 if echo $solvers|grep -q "k" && [ ! -d kissat ]; then wget -nc https://github.com/domschrei/kissat/archive/refs/heads/master.zip && mv master.zip kissat-isc22.zip ; fi
