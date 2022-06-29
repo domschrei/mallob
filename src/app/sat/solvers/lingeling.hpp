@@ -37,10 +37,6 @@ private:
 	// exporting a clause
 	Clause producedClause;
 
-	//MixedNonunitClauseRingBuffer learnedClauses;
-	//UnitClauseRingBuffer learnedUnits;
-	//std::vector<int> learnedUnitsBuffer;
-
 	unsigned long numProduced = 0;
     
     volatile bool suspendSolver;

@@ -12,7 +12,6 @@
 #include "util/sys/background_worker.hpp"
 #include "util/logger.hpp"
 #include "comm/msgtags.h"
-#include "util/ringbuffer.hpp"
 
 MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize) {
     

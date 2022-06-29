@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
     params.init(argc, argv);
     Random::init(params.seed(), params.seed());
 
-    Logger::init(0, params.verbosity(), false, false, false, nullptr);
+    Logger::init(0, params.verbosity());
 
     testConcurrentAllocation();
 }

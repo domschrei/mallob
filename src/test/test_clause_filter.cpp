@@ -84,7 +84,7 @@ void test() {
 int main() {
     Timer::init();
     Random::init(rand(), rand());
-    Logger::init(0, V5_DEBG, false, false, false, nullptr);
+    Logger::init(0, V5_DEBG);
     Process::init(0);
 
     test();
