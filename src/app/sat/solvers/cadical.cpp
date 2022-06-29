@@ -39,8 +39,12 @@ void Cadical::diversify(int seed) {
 	// In certified UNSAT mode?
 	if (getSolverSetup().certifiedUnsat) {
 		
-		LOGGER(_logger, V3_VERB, "Diversifying %i with certified UNSAT support\n", 
-			getDiversificationIndex());
+		int solverRank = getSolverSetup().globalId;
+		int maxNumSolvers = getSolverSetup().maxNumSolvers;
+		LOGGER(_logger, V3_VERB, "Diversifying rank=%i size=%i DI=%i with certified UNSAT support\n", 
+			solverRank, maxNumSolvers, getDiversificationIndex());
+		okay = solver->set("solverrank", solverRank); assert(okay);
+		okay = solver->set("numsolvers", maxNumSolvers); assert(okay);
 
 		// Check that a version of CaDiCaL is used which has all the unsupported options switched off
 		auto requiredOptionsZero = {"binary", "elim", "decompose", "ternary", "vivify", "probe", "transred"};

@@ -88,6 +88,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numBufferedClsGenerations = params.bufferedImportedClsGenerations();
 	setup.skipClauseSharingDiagonally = true;
 	setup.certifiedUnsat = params.certifiedUnsat();
+	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
