@@ -27,8 +27,19 @@ private:
     Logger(const Logger& other) = delete;
     Logger& operator=(const Logger& other) = delete;
 public:
-    static void init(int rank, int verbosity, bool coloredOutput, bool quiet, bool cPrefix, 
-        std::string* logDirOrNull, std::string* logFilenameOrNull = nullptr);
+    struct LoggerConfig {
+        int rank;
+        int verbosity;
+        bool coloredOutput = false;
+        bool quiet = false;
+        bool cPrefix = false;
+        bool flushFileImmediately = false;
+        const std::string* logDirOrNull = nullptr;
+        const std::string* logFilenameOrNull = nullptr;
+    };
+
+    static void init(int rank, int verbosity);
+    static void init(const LoggerConfig& config);
     static Logger& getMainInstance() {
         return _main_instance;
     }
@@ -47,6 +58,7 @@ private:
     bool _colored_output = false;
     bool _quiet = false;
     bool _c_prefix = false;
+    bool _flush_file_immediately = false;
     mutable pid_t _associated_tid = 0;
 
 public:

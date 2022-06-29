@@ -65,19 +65,26 @@ bool log_return_false(const char* str, ...) {
     return false;
 }
 
-void Logger::init(int rank, int verbosity, bool coloredOutput, bool quiet, bool cPrefix, 
-        std::string* logDirOrNull, std::string* logFilenameOrNull) {
-    _main_instance._rank = rank;
-    _main_instance._verbosity = std::min(7, verbosity);
-    _main_instance._colored_output = coloredOutput;
-    _main_instance._quiet = quiet;
-    _main_instance._c_prefix = cPrefix;
+void Logger::init(int rank, int verbosity) {
+    LoggerConfig config;
+    config.rank = rank;
+    config.verbosity = verbosity;
+    Logger::init(config);
+}
+
+void Logger::init(const LoggerConfig& config) {
+    _main_instance._rank = config.rank;
+    _main_instance._verbosity = std::min(7, config.verbosity);
+    _main_instance._colored_output = config.coloredOutput;
+    _main_instance._quiet = config.quiet;
+    _main_instance._c_prefix = config.cPrefix;
+    _main_instance._flush_file_immediately = config.flushFileImmediately;
 
     // Create logging directory as necessary
-    if (logDirOrNull != nullptr && logFilenameOrNull != nullptr) {
-        std::string& logDir = *logDirOrNull;
+    if (config.logDirOrNull != nullptr && config.logFilenameOrNull != nullptr) {
+        const std::string& logDir = *config.logDirOrNull;
 
-        _main_instance._log_directory = (logDir.size() == 0 ? "." : logDir) + "/" + std::to_string(rank);
+        _main_instance._log_directory = (logDir.size() == 0 ? "." : logDir) + "/" + std::to_string(config.rank);
         bool dirExists = FileUtils::isDirectory(_main_instance._log_directory);
         _main_instance._log_directory += "/";
         if (!dirExists) {
@@ -92,7 +99,7 @@ void Logger::init(int rank, int verbosity, bool coloredOutput, bool quiet, bool 
         }
 
         // Open logging files
-        _main_instance._log_filename = _main_instance._log_directory + *logFilenameOrNull;
+        _main_instance._log_filename = _main_instance._log_directory + *config.logFilenameOrNull;
         _main_instance._log_cfile = fopen(_main_instance._log_filename.c_str(), "a");
         if (_main_instance._log_cfile == nullptr) {
             _main_instance._quiet = false;
@@ -106,7 +113,7 @@ Logger::Logger(Logger&& other) :
     _log_directory(std::move(other._log_directory)), _log_filename(std::move(other._log_filename)), 
     _line_prefix(std::move(other._line_prefix)), _log_cfile(other._log_cfile), _rank(other._rank), 
     _verbosity(other._verbosity), _colored_output(other._colored_output), _quiet(other._quiet), 
-    _c_prefix(other._c_prefix) {
+    _c_prefix(other._c_prefix), _flush_file_immediately(other._flush_file_immediately) {
     
     other._log_cfile = nullptr;
 }
@@ -120,6 +127,7 @@ Logger& Logger::operator=(Logger&& other) {
     _colored_output = other._colored_output;
     _quiet = other._quiet;
     _c_prefix = other._c_prefix;
+    _flush_file_immediately = other._flush_file_immediately;
 
     other._log_cfile = nullptr;
     return *this;
@@ -156,6 +164,7 @@ Logger Logger::copy(const std::string& linePrefix, const std::string& filenameSu
     c._colored_output = _colored_output;
     c._quiet = _quiet;
     c._c_prefix = _c_prefix;
+    c._flush_file_immediately = _flush_file_immediately;
     return c;
 }
 
@@ -247,7 +256,10 @@ void Logger::log(va_list& args, unsigned int options, const char* str) const {
             if (_log_cfile != nullptr) fprintf(_log_cfile, "c ");
         }
         if (!_quiet) printf("%.3f %i%s ", elapsedRel, _rank, _line_prefix.c_str());
-        if (_log_cfile != nullptr) fprintf(_log_cfile, "%.3f %i%s ", elapsedRel, _rank, _line_prefix.c_str());
+        if (_log_cfile != nullptr) {
+            fprintf(_log_cfile, "%.3f %i%s ", elapsedRel, _rank, _line_prefix.c_str());
+            if (_flush_file_immediately) fflush(_log_cfile);
+        }
     }
 
     // logging message
@@ -257,7 +269,10 @@ void Logger::log(va_list& args, unsigned int options, const char* str) const {
     if (otherRank >= 0) {
         auto arrowStr = withDestRank ? "=>" : "<=";
         if (!_quiet) printf(" %s [%i]\n", arrowStr, otherRank);
-        if (_log_cfile != nullptr) fprintf(_log_cfile, " %s [%i]\n", arrowStr, otherRank);
+        if (_log_cfile != nullptr) {
+            fprintf(_log_cfile, " %s [%i]\n", arrowStr, otherRank);
+            if (_flush_file_immediately) fflush(_log_cfile);
+        }
     }
     va_end(argsCopy); // destroy copy
 

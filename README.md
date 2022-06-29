@@ -222,7 +222,6 @@ Within our codebase we make thankful use of the following liberally licensed pro
 * [robin_hood hashing](https://github.com/martinus/robin-hood-hashing) by Martin Ankerl, for efficient unordered maps and sets
 * [robin-map](https://github.com/Tessil/robin-map) by Thibaut Goetghebuer-Planchon, for efficient unordered maps and sets
 * [JSON for Modern C++](https://github.com/nlohmann/json) by Niels Lohmann, for reading and writing JSON files
-* [ringbuf](https://github.com/rmind/ringbuf) by Mindaugas Rasiukevicius, for lock-free ring buffers
 
 If you make use of Mallob in an academic setting, please cite the following two conference papers. If you can (or want to) cite only one of them, then please cite the SAT'21 paper when focusing on our SAT engine and the Euro-Par'22 paper when focusing on the scheduling aspects of our system.
 ```
