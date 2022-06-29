@@ -42,13 +42,13 @@ Our submissions of Mallob to the International SAT Competitions [@schreiber2020e
 Each distributed SAT solving task is malleable, allowing users to submit formulae to Mallob at will with scheduling latencies in the range of milliseconds [@sanders2022decentralized]. Computational resources are allotted proportional to each job's priority and also respecting each job's (maximum) demand of resources. Our scheduling approach is fully decentralized and uses a small part of each worker's CPU time (< 5%) to perform scheduling negotiations. As such, Mallob achieves optimal system utilization, i.e., either all processes are utilized or all resource demands are fully met. We achieve this feat by arranging each active job as a binary tree of workers and growing or shrinking each job tree dynamically based on the current system state.
 For an in-depth discussion of these techniques, we refer to @schreiber2021scalable, @sanders2022artifact, and @sanders2022decentralized.
 
-![Technology stack of Mallob.\label{fig:mallob-stack}](mallob_stack.pdf){ width=65% }
+![Technology stack of Mallob.\label{fig:mallob-stack}](mallob_stack.pdf){ width=75% }
 
 The further development of Mallob is an ongoing effort. As such, we are in the process of integrating engines for NP-hard applications beyond SAT, such as k-Means clustering or hierarchical planning, into Mallob.
 
 # Acknowledgements
 
-We wish to thank the numerous people whose code we make thankful use of, including @balyo2015hordesat, @biere2020cadical, @audemard2009predicting, @een2003extensible, @lohmann2022json, @goetghebuer2022implementation, @ankerl2022robin, @dusikova2022compile, and @rasiukevicius2019lockfree.
+We wish to thank the numerous people whose code we make thankful use of, including @balyo2015hordesat, @biere2020cadical, @audemard2009predicting, @een2003extensible, @lohmann2022json, @goetghebuer2022implementation, @ankerl2022robin, and @dusikova2022compile.
 The authors gratefully acknowledge the Gauss Centre for Supercomputing e.V. (www.gauss-centre.eu) for funding this project by providing computing time on the GCS Supercomputer SuperMUC-NG at Leibniz Supercomputing Centre (www.lrz.de). Moreover, some of this work was performed on the HoreKa supercomputer funded by the Ministry of Science, Research and the Arts Baden-Württemberg and by the Federal Ministry of Education and Research.
 This project has received funding from the European Research Council (ERC) under the European Union’s Horizon 2020 research and innovation programme (grant agreement No. 882500).
 
