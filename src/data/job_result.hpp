@@ -13,8 +13,7 @@ struct JobResult : public Serializable {
 
     int id = 0;
     int revision;
-    int result;
-    enum EncodedType {INT, FLOAT} encodedType = INT;
+    int result = 0;
 
 private:
     std::vector<int> solution;
@@ -22,7 +21,22 @@ private:
 
 public:
     JobResult() {}
+    JobResult(JobResult&& moved) : id(moved.id), revision(moved.revision), result(moved.result), 
+        solution(std::move(moved.solution)), packedData(std::move(moved.packedData)) {
+        
+        moved.id = 0;
+    }
     JobResult(std::vector<uint8_t>&& packedData);
+
+    JobResult& operator=(JobResult&& moved) {
+        id = moved.id;
+        revision = moved.revision;
+        result = moved.result;
+        solution = moved.solution;
+        packedData = moved.packedData;
+        moved.id = 0;
+        return *this;
+    }
 
     int getTransferSize() const {return sizeof(int)*3 + sizeof(int)*solution.size();}
 
@@ -38,10 +52,9 @@ public:
     size_t getSolutionSize() const;
     inline int getSolution(size_t pos) const {
         assert(pos < getSolutionSize());
-        static_assert(sizeof(int) == sizeof(EncodedType));
         if (!packedData.empty()) {
             return *(
-                (int*) (packedData.data() + (4+pos)*sizeof(int))
+                (int*) (packedData.data() + (3+pos)*sizeof(int))
             );
         }
         return solution[pos];

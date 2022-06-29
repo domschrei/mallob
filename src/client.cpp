@@ -65,16 +65,7 @@ void Client::readIncomingJobs() {
                         break;
                     }
                 }
-                if (data.description->isIncremental() && data.description->getRevision() > 0) {
-                    // Check if the precursor of this incremental job is already done
-                    if (!_done_jobs.count(data.description->getId()))
-                        dependenciesSatisfied = false; // no job with this ID is done yet
-                    else if (data.description->getRevision() != _done_jobs[data.description->getId()].revision+1)
-                        dependenciesSatisfied = false; // job with correct revision not done yet
-                    else {
-                        data.description->setChecksum(_done_jobs[data.description->getId()].lastChecksum);
-                    }
-                }
+                //data.description->setChecksum(_done_jobs[data.description->getId()].lastChecksum);
             }
             if (!dependenciesSatisfied) continue;
 
@@ -140,14 +131,15 @@ void Client::handleNewJob(JobMetadata&& data) {
         // Incremental job notified to be finished
         int jobId = data.description->getId();
         auto lock = _done_job_lock.getLock();
-        _recently_done_jobs.insert(jobId);
+        _incremental_jobs_to_conclude.insert(jobId);
         return;
     }
     if (data.interrupt) {
         // Interrupt job (-> abort entire job if non-incremental, abort iteration if incremental)
         int jobId = data.description->getId();
+        int revision = data.description->getRevision();
         auto lock = _jobs_to_interrupt_lock.getLock();
-        _jobs_to_interrupt.insert(jobId);
+        _jobs_to_interrupt.emplace(jobId, revision);
         atomics::incrementRelaxed(_num_jobs_to_interrupt);
         return;
     }
@@ -230,32 +222,34 @@ void Client::advance() {
 
     float time = Timer::elapsedSeconds();
     
-    // Send notification messages for recently done jobs
-    if (_periodic_check_done_jobs.ready(time)) {
-        robin_hood::unordered_flat_set<int, robin_hood::hash<int>> doneJobs;
+    // Conclude incremental jobs
+    if (_periodic_check_incremental_jobs_to_conclude.ready(time)) {
+        robin_hood::unordered_flat_set<int, robin_hood::hash<int>> jobsToConclude;
         {
             auto lock = _done_job_lock.getLock();
-            doneJobs = std::move(_recently_done_jobs);
-            _recently_done_jobs.clear();
+            jobsToConclude = std::move(_incremental_jobs_to_conclude);
+            _incremental_jobs_to_conclude.clear();
         }
-        for (int jobId : doneJobs) {
+        for (int jobId : jobsToConclude) {
             LOG_ADD_DEST(V3_VERB, "Notify #%i:0 that job is done", _root_nodes[jobId], jobId);
             IntVec payload({jobId});
             MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
-            finishJob(jobId, /*hasIncrementalSuccessors=*/false);
+            int revision = _active_jobs[jobId]->getRevision();
+            finishJob(jobId, revision, /*hasIncrementalSuccessors=*/false);
         }
     }
 
+    // Interrupt jobs
     if (_num_jobs_to_interrupt.load(std::memory_order_relaxed) > 0 && _jobs_to_interrupt_lock.tryLock()) {
         
-        auto it = _jobs_to_interrupt.begin();
-        while (it != _jobs_to_interrupt.end()) {
-            int jobId = *it;
-            if (_done_jobs.count(jobId)) {
+        for (auto it = _jobs_to_interrupt.begin(); it != _jobs_to_interrupt.end();) {
+            auto [jobId, revision] = *it;
+            if (isRevisionDone(jobId, revision)) {
+                // Job already done
                 it = _jobs_to_interrupt.erase(it);
             } else if (_root_nodes.count(jobId)) {
                 LOG(V2_INFO, "Interrupt #%i\n", jobId);
-                MyMpi::isend(_root_nodes.at(jobId), MSG_NOTIFY_JOB_ABORTING, IntVec({jobId}));
+                MyMpi::isend(_root_nodes.at(jobId), MSG_NOTIFY_JOB_ABORTING, IntVec({jobId, revision}));
                 it = _jobs_to_interrupt.erase(it);
                 atomics::decrementRelaxed(_num_jobs_to_interrupt);
             } else ++it;
@@ -483,43 +477,47 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     }
 
     if (_json_interface) {
+        std::shared_ptr<JobResult> resultPtr(new JobResult(std::move(jobResult)));
         auto fut = ProcessWideThreadPool::get().addTask(
             [interface = _json_interface.get(), 
-            result = std::move(jobResult), 
+            resultPtr, 
             stats = desc.getStatistics()]() mutable {
             
-            interface->handleJobDone(std::move(result), stats);
+            interface->handleJobDone(std::move(*resultPtr), stats);
         });
         _done_job_futures.push_back(std::move(fut));
     }
 
-    finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
+    finishJob(jobId, revision, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
 }
 
 void Client::handleAbort(MessageHandle& handle) {
 
     IntVec request = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = request[0];
-    LOG_ADD_SRC(V2_INFO, "TIMEOUT #%i %.6f", handle.source, jobId, 
+    int revision = request[1];
+    LOG_ADD_SRC(V2_INFO, "TIMEOUT #%i rev. %i %.6f", handle.source, jobId, revision, 
             Timer::elapsedSeconds() - _active_jobs[jobId]->getArrival());
     
     if (_json_interface) {
         JobResult result;
         result.id = jobId;
-        result.revision = _active_jobs[result.id]->getRevision();
+        result.revision = revision;
         result.result = 0;
         _json_interface->handleJobDone(std::move(result), _active_jobs[result.id]->getStatistics());
     }
 
-    finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
+    finishJob(jobId, revision, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
 }
 
-void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {
+void Client::finishJob(int jobId, int revision, bool hasIncrementalSuccessors) {
 
     // Clean up job, remember as done
     {
         auto lock = _done_job_lock.getLock();
-        _done_jobs[jobId] = DoneInfo{_active_jobs[jobId]->getRevision(), _active_jobs[jobId]->getChecksum()};
+        auto revsDone = _done_jobs[jobId].revisionsDone;
+        if (revision >= revsDone.size()) revsDone.resize(revision+1);
+        revsDone[revision] = true;
     }
     if (!hasIncrementalSuccessors) {
         _root_nodes.erase(jobId);

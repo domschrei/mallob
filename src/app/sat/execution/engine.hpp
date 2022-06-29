@@ -36,13 +36,14 @@ private:
 		const int* fLits;
 		size_t aSize;
 		const int* aLits;
+		bool hasResult = false;
+		JobResult result;
 	};
 	std::vector<RevisionData> _revision_data;
 	
 	bool _solvers_started = false;
 	volatile SolvingStates::SolvingState _state;
 	int _revision = -1;
-	JobResult _result;
 	std::atomic_bool _cleaned_up = false;
 
 public:
@@ -56,7 +57,11 @@ public:
 
 	bool isFullyInitialized();
     int solveLoop();
-	JobResult& getResult() {return _result;}
+	JobResult& getResult(int revision) {
+		auto& revData = _revision_data[revision];
+		assert(revData.hasResult);
+		return revData.result;
+	}
 
     int prepareSharing(int* begin, int maxSize);
 	int filterSharing(int* begin, int size, int* filterOut);

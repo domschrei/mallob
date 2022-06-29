@@ -175,7 +175,7 @@ void SatEngine::appendRevision(int revision, size_t fSize, const int* fLits, siz
 		} else {
 			if (_solver_interfaces[i]->getSolverSetup().doIncrementalSolving) {
 				// True incremental SAT solving
-				_solver_threads[i]->appendRevision(revision, fSize, fLits, aSize, aLits);
+				_solver_threads[i]->appendTask(revision, fSize, fLits, aSize, aLits);
 			} else {
 				if (!lastRevisionForNow) {
 					// Another revision will be imported momentarily: 
@@ -206,8 +206,8 @@ void SatEngine::appendRevision(int revision, size_t fSize, const int* fLits, siz
 				));
 				// Load entire formula 
 				for (int importedRevision = 1; importedRevision <= revision; importedRevision++) {
-					auto data = _revision_data[importedRevision];
-					_solver_threads[i]->appendRevision(importedRevision, 
+					auto& data = _revision_data[importedRevision];
+					_solver_threads[i]->appendTask(importedRevision, 
 						data.fSize, data.fLits, data.aSize, data.aLits
 					);
 				}
@@ -221,7 +221,6 @@ void SatEngine::appendRevision(int revision, size_t fSize, const int* fLits, siz
 
 void SatEngine::solve() {
 	assert(_revision >= 0);
-	_result.result = UNKNOWN;
 	if (!_solvers_started) {
 		// Need to start threads
 		LOGGER(_logger, V4_VVER, "starting threads\n");
@@ -243,23 +242,22 @@ int SatEngine::solveLoop() {
 	if (isCleanedUp()) return -1;
 
     // Solving done?
-	bool done = false;
+	int solvedRevision = -1;
 	for (size_t i = 0; i < _solver_threads.size(); i++) {
-		if (_solver_threads[i]->hasFoundResult(_revision)) {
-			auto& result = _solver_threads[i]->getSatResult();
-			if (result.result > 0 && result.revision == _revision) {
-				done = true;
-				_result = std::move(result);
+		solvedRevision = _solver_threads[i]->getRevisionWithReadyResult();
+		if (solvedRevision >= 0) {
+			auto& result = _solver_threads[i]->getSatResult(solvedRevision);
+			auto& revData = _revision_data[solvedRevision];
+			if (result.result != 0 && !revData.hasResult) {
+				revData.hasResult = true;
+				revData.result = std::move(result);
 				break;
 			}
 		}
 	}
 
-	if (done) {
-		LOGGER(_logger, V5_DEBG, "Returning result\n");
-		return _result.result;
-	}
-    return -1; // no result yet
+	if (solvedRevision >= 0) LOGGER(_logger, V5_DEBG, "Returning result for rev. %i\n", solvedRevision);
+	return solvedRevision;
 }
 
 int SatEngine::prepareSharing(int* begin, int maxSize) {

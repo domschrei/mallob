@@ -14,7 +14,7 @@
 
 ThreadedSatJob::ThreadedSatJob(const Parameters& params, int commSize, int worldRank, int jobId,
     JobDescription::Application appl) : 
-        BaseSatJob(params, commSize, worldRank, jobId, appl), _done_locally(false) {}
+        BaseSatJob(params, commSize, worldRank, jobId, appl) {}
 
 void ThreadedSatJob::appl_start() {
 
@@ -68,17 +68,7 @@ void ThreadedSatJob::appl_terminate() {
     });
 }
 
-JobResult&& ThreadedSatJob::appl_getResult() {
-    _result = std::move(getSolver()->getResult());
-    _result.id = getId();
-    _result.updateSerialization();
-    assert(_result.revision == getRevision());
-    return std::move(_result);
-}
-
-int ThreadedSatJob::appl_solved() {
-
-    int result = -1;
+void ThreadedSatJob::appl_loop() {
 
     // Import new revisions as necessary
     {
@@ -92,27 +82,24 @@ int ThreadedSatJob::appl_solved() {
                 desc.getAssumptionsSize(_last_imported_revision),
                 desc.getAssumptionsPayload(_last_imported_revision)
             );
-            _done_locally = false;
-            _result = JobResult();
-            _result_code = 0;
         }
     }
 
-    // Already reported the actual result, or still initializing
-    if (_done_locally || !_initialized || getState() != ACTIVE) {
-        return result;
+    // Still initializing?
+    if (!_initialized || getState() != ACTIVE) {
+        return;
     }
 
-    result = getSolver()->solveLoop();
+    int solvedRevision = getSolver()->solveLoop();
 
     // Did a solver find a result?
-    if (result >= 0) {
-        _done_locally = true;
+    if (solvedRevision >= 0) {
+        auto& result = getSolver()->getResult(solvedRevision);
         LOG_ADD_DEST(V2_INFO, "%s : found result %s", getJobTree().getRootNodeRank(), toStr(), 
-                            result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
-        _result_code = result;
+                            result.result == RESULT_SAT ? "SAT" : 
+                            result.result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
+        publishResult(std::move(result));
     }
-    return result;
 }
 
 void ThreadedSatJob::appl_dumpStats() {

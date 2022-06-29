@@ -304,6 +304,10 @@ void MessageQueue::processSelfReceived() {
         h.tag = sh.tag;
         h.source = sh.dest;
         h.setReceive(std::move(*sh.data));
+
+        int msglen = h.getRecvData().size();
+        LOG(V5_DEBG, "MQ RECV n=%i s=[%i] t=%i\n", msglen, h.source, h.tag);
+
         *_current_recv_tag = h.tag;
         _callbacks.at(h.tag)(h);
         signalCompletion(h.tag, sh.id);

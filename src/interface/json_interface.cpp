@@ -60,6 +60,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             // Interrupt a job which is already present
             JobMetadata data;
             data.description = std::unique_ptr<JobDescription>(new JobDescription(id, 0, appl));
+            data.description->setRevision(rev);
             data.interrupt = true;
             _job_callback(std::move(data));
             return ACCEPT;
@@ -247,13 +248,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
         mkfifo(solutionFile.c_str(), 0666);
     } else {
         auto solution = result.extractSolution();
-        if (result.encodedType == JobResult::INT) {
-            j["result"]["solution"] = std::move(solution);
-        }
-        if (result.encodedType == JobResult::FLOAT) {
-            // Convert result from integers to floats
-            j["result"]["solution"] = intVecToFloatVec(solution);
-        }
+        j["result"]["solution"] = std::move(solution);
     }
     j["stats"] = {
         { "time", {

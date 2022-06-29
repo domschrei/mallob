@@ -24,17 +24,40 @@ class SatEngine;
 class SolverThread {
 
 private:
+    struct Task {
+        int revision;
+        size_t numLiterals;
+        const int* literals;
+        size_t numAssumptions;
+        const int* assumptions;
+        size_t numReadLiterals = 0;
+        bool hasResultToPublish = false;
+        JobResult result;
+
+        Task() = default;
+        Task(const Task& other) = default;
+        Task(int revision, size_t numLits, const int* lits, size_t numAsmpt, const int* asmpt) :
+            revision(revision), numLiterals(numLits), literals(lits),
+            numAssumptions(numAsmpt), assumptions(asmpt) {
+
+            result.result = UNKNOWN;
+        }
+        Task(Task&& moved) :
+            revision(moved.revision), numLiterals(moved.numLiterals), literals(moved.literals),
+            numAssumptions(moved.numAssumptions), assumptions(moved.assumptions), 
+            result(std::move(moved.result)) {}
+    };
+
     const Parameters& _params;
     std::shared_ptr<PortfolioSolverInterface> _solver_ptr;
     PortfolioSolverInterface& _solver;
     Logger& _logger;
     std::thread _thread;
 
-    std::vector<std::pair<size_t, const int*>> _pending_formulae;
-    std::vector<std::pair<size_t, const int*>> _pending_assumptions;
-    
-    ClauseShuffler _shuffler;
-    bool _shuffle;
+    // Queue of pending increments
+    Mutex _state_mutex;
+    ConditionVariable _state_cond;
+    std::vector<std::unique_ptr<Task>> _tasks;
 
     int _local_id;
     std::string _name;
@@ -43,15 +66,10 @@ private:
     int _local_solvers_count;
     long _tid = -1;
 
-    Mutex _state_mutex;
-    ConditionVariable _state_cond;
-
-    std::atomic_int _latest_revision = 0;
-    std::atomic_int _active_revision = 0;
-    unsigned long _imported_lits_curr_revision = 0;
     bool _last_read_lit_zero = true;
     int _max_var = 0;
     VariableTranslator _vt;
+
     bool _has_pseudoincremental_solvers;
 
     std::atomic_bool _initialized = false;
@@ -59,17 +77,13 @@ private:
     std::atomic_bool _suspended = false;
     std::atomic_bool _terminated = false;
 
-    bool _found_result = false;
-    JobResult _result;
-
-
 public:
     SolverThread(const Parameters& params, const SatProcessConfig& config, std::shared_ptr<PortfolioSolverInterface> solver, 
                 size_t fSize, const int* fLits, size_t aSize, const int* aLits, int localId);
     ~SolverThread();
 
     void start();
-    void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits);
+    void appendTask(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits);
     void setSuspend(bool suspend) {
         {
             auto lock = _state_mutex.getLock();
@@ -80,8 +94,11 @@ public:
         _state_cond.notify();
     }
     void setTerminate() {
-        _solver.setTerminate();
-        _terminated = true;
+        {
+            auto lock = _state_mutex.getLock();
+            _solver.setTerminate();
+            _terminated = true;
+        }
         _state_cond.notify();
     }
     void tryJoin() {if (_thread.joinable()) _thread.join();}
@@ -92,34 +109,41 @@ public:
     int getTid() const {
         return _tid;
     }
-    bool hasFoundResult(int revision) {
+    int getRevisionWithReadyResult() {
         auto lock = _state_mutex.getLock();
-        return _initialized && _active_revision == revision && _found_result;
+        for (auto& task : _tasks) {
+            if (task->hasResultToPublish) return task->revision;
+        }
+        return -1;
     }
-    JobResult& getSatResult() {
-        return _result;
+    JobResult& getSatResult(int revision) {
+        auto& task = getTask(revision);
+        assert(task.hasResultToPublish);
+        task.hasResultToPublish = false;
+        return task.result;
     }
-
-    int getActiveRevision() const {return _active_revision;}
 
 private:
     void init();
     void* run();
     
     void pin();
-    bool readFormula();
 
     void diversifyInitially();
     void diversifyAfterReading();
 
-    void runOnce();
+    void readFormula(Task& task);
+    void processTask(Task& task);
     
-    void waitWhileSolved();
     void waitWhileSuspended();
     void waitUntil(std::function<bool()> predicate);
     
-    void reportResult(int res, int revision);
+    void extractResult(int res, int revision, Task& task);
 
+    Task& getTask(int revision) {
+        auto lock = _state_mutex.getLock();
+        return *_tasks.at(revision);
+    }
     const char* toStr();
 
 };

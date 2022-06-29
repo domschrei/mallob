@@ -425,8 +425,10 @@ void JobDatabase::terminate(int jobId) {
     if (job.hasCommitment()) uncommit(jobId);
     if (!wasTerminatedBefore) _balancer->onTerminate(job);
 
-    LOG(V4_VVER, "Delete %s\n", job.toStr());
-    forget(jobId);
+    if (job.isDestructible()) {
+        LOG(V4_VVER, "Delete %s\n", job.toStr());
+        forget(jobId);
+    }
 }
 
 void JobDatabase::forgetOldJobs() {
@@ -475,6 +477,11 @@ void JobDatabase::forgetOldJobs() {
         if (job.hasCommitment()) continue;
         // Old inactive job
         if (job.getState() == INACTIVE && job.getAge() >= 10) {
+            jobsToForget.push_back(id);
+            continue;
+        }
+        // Past jobs which have become destructible
+        if (job.getState() == PAST && job.isDestructible()) {
             jobsToForget.push_back(id);
             continue;
         }

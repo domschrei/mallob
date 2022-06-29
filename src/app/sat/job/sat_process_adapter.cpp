@@ -355,18 +355,16 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         _temp_returned_clauses.pop_front();
     }
     
-    // Solution preparation just ended?
-    if (!_solution_in_preparation && _solution_prepare_future.valid()) {
-        _solution_prepare_future.get();
-    }
-    if (_hsm->hasSolution && _hsm->solutionRevision == _desired_revision) {
+    if (_hsm->hasSolution && !_solution_prepared) {
         // Preparation still going on?
         if (_solution_in_preparation) return NORMAL;
         // Correct solution prepared successfully?
-        if (_solution_revision_in_preparation == _desired_revision)
+        if (_solution_prepare_future.valid()) {
+            _solution_prepare_future.get();
+            _solution_prepared = true;
             return FOUND_RESULT;
         // No preparation going on yet?
-        if (!_solution_prepare_future.valid()) {
+        } else {
             // Begin preparation of solution
             _solution_revision_in_preparation = _desired_revision;
             _solution_in_preparation = true;
@@ -398,6 +396,8 @@ void SatProcessAdapter::doPrepareSolution() {
 }
 
 JobResult& SatProcessAdapter::getSolution() {
+    _solution_prepared = false;
+    _hsm->hasSolution = false; // ready to retrieve next solution
     return _solution;
 }
 

@@ -35,9 +35,7 @@ public:
     virtual void appl_resume() = 0;
     virtual void appl_terminate() = 0;
 
-    virtual int appl_solved() = 0;
-    virtual JobResult&& appl_getResult() = 0;
-    
+    virtual void appl_loop() = 0;    
     virtual void appl_communicate() = 0;
     virtual void appl_communicate(int source, int mpiTag, JobMessage& msg) = 0;
     
@@ -50,7 +48,6 @@ private:
 
 public:
     // Helper methods
-
     void setSharingCompensationFactor(float compensationFactor) {
         _compensation_factor = compensationFactor;
     }

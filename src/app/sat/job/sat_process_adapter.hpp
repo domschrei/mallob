@@ -91,6 +91,7 @@ private:
     Mutex _state_mutex;
 
     bool _solution_in_preparation = false;
+    bool _solution_prepared = false;
     int _solution_revision_in_preparation = -1;
     JobResult _solution;
     std::future<void> _solution_prepare_future;

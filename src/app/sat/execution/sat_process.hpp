@@ -87,11 +87,9 @@ public:
         // Start solver threads
         _engine.solve();
         
-        std::vector<int> solutionVec;
-        std::string solutionShmemId = "";
-        char* solutionShmem;
-        int solutionShmemSize = 0;
-        int lastSolvedRevision = -1;
+        int numResultsToPublish = 0;
+        // Index = revision; content = result code
+        std::vector<int> pendingResults;
 
         // Main loop
         while (true) {
@@ -197,38 +195,50 @@ public:
                 raise(SIGUSR2);
             }
 
-            // Do not check solved state if the current 
-            // revision has already been solved
-            if (lastSolvedRevision == _last_imported_revision) continue;
-
             // Check solved state
             int resultCode = _engine.solveLoop();
             if (resultCode >= 0) {
                 // Solution found!
-                auto& result = _engine.getResult();
+                int solvedRevision = resultCode;
+                auto& result = _engine.getResult(solvedRevision);
+                assert(result.revision == solvedRevision);
                 result.id = _config.jobid;
-                if (_hsm->doTerminate || result.revision < _desired_revision) {
+                bool revisionSolvedBefore = solvedRevision < pendingResults.size() && pendingResults[solvedRevision] != 0;
+                if (_hsm->doTerminate || revisionSolvedBefore) {
                     // Result obsolete
                     continue;
                 }
-                assert(result.revision == _last_imported_revision);
 
-                solutionVec = result.extractSolution();
-                _hsm->solutionRevision = result.revision;
+                std::vector<int> solutionVec = result.extractSolution();
                 LOGGER(_log, V5_DEBG, "DO write solution\n");
-                _hsm->result = SatResult(result.result);
-                size_t* solutionSize = (size_t*) SharedMemory::create(_shmem_id + ".solutionsize." + std::to_string(_hsm->solutionRevision), sizeof(size_t));
+                size_t* solutionSize = (size_t*) SharedMemory::create(_shmem_id + ".solutionsize." + std::to_string(solvedRevision), sizeof(size_t));
                 *solutionSize = solutionVec.size();
                 // Write solution
                 if (*solutionSize > 0) {
-                    solutionShmemId = _shmem_id + ".solution." + std::to_string(_hsm->solutionRevision);
-                    solutionShmemSize =  *solutionSize*sizeof(int);
-                    solutionShmem = (char*) SharedMemory::create(solutionShmemId, solutionShmemSize);
+                    std::string solutionShmemId = _shmem_id + ".solution." + std::to_string(solvedRevision);
+                    int solutionShmemSize =  *solutionSize*sizeof(int);
+                    char* solutionShmem = (char*) SharedMemory::create(solutionShmemId, solutionShmemSize);
                     memcpy(solutionShmem, solutionVec.data(), solutionShmemSize);
                 }
-                lastSolvedRevision = result.revision;
                 LOGGER(_log, V5_DEBG, "DONE write solution\n");
-                _hsm->hasSolution = true;
+
+                if (solvedRevision >= pendingResults.size()) pendingResults.resize(solvedRevision+1);
+                pendingResults[solvedRevision] = result.result;
+                numResultsToPublish++;
+            }
+
+            // Publish next result
+            if (!_hsm->hasSolution && numResultsToPublish > 0) {
+                for (int revision = 0; revision < pendingResults.size(); revision++) {
+                    if (pendingResults[revision] != 0) {
+                        _hsm->solutionRevision = revision;
+                        _hsm->result = SatResult(pendingResults[revision]);
+                        _hsm->hasSolution = true;
+                        numResultsToPublish--;
+                        pendingResults[revision] = 0;
+                        break;
+                    }
+                }
             }
         }
 
@@ -261,7 +271,6 @@ private:
                 _last_imported_revision++;
                 importRevision(_last_imported_revision, _checksum);
                 _hsm->didStartNextRevision = true;
-                _hsm->hasSolution = false;
             } else doSleep();
             if (!_hsm->doStartNextRevision) _hsm->didStartNextRevision = false;
         }

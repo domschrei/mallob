@@ -367,23 +367,8 @@ void Worker::checkActiveJob() {
         timeoutJob(id);
     } else if (job.getState() == ACTIVE) {
         
-        // Check if a result was found
-        int result = job.appl_solved();
-        if (result >= 0) {
-            // Solver done!
-            // Signal notification to root -- may be a self message
-            int jobRootRank = job.getJobTree().getRootNodeRank();
-            IntVec payload;
-            {
-                auto& resultStruct = job.getResult();
-                assert(resultStruct.id == id);
-                auto key = std::pair<int, int>(id, resultStruct.revision);
-                payload = IntVec({id, resultStruct.revision, result});
-                LOG_ADD_DEST(V4_VVER, "%s rev. %i: sending finished info", jobRootRank, job.toStr(), key.second);
-                _pending_results[key] = std::move(resultStruct);
-            }
-            MyMpi::isend(jobRootRank, MSG_NOTIFY_RESULT_FOUND, payload);
-        }
+        // Main loop of the job to check for results
+        job.appl_loop();
 
         // Update demand as necessary
         if (isRoot) {
@@ -678,6 +663,10 @@ void Worker::tryAdoptRequest(JobRequest& req, int source, JobDatabase::JobReques
         if (!_job_db.has(req.jobId)) {
             // Job is not known yet: create instance
             Job& job = _job_db.createJob(MyMpi::size(_comm), _world_rank, req.jobId, req.application);
+            job.setPublishResultCallback([this](JobResult&& result) {
+                auto key = std::pair<int, int>(result.id, result.revision);
+                _pending_results[key] = std::move(result);
+            });
         }
         _job_db.commit(req);
         if (_params.reactivationScheduling()) {
@@ -953,30 +942,27 @@ void Worker::handleNotifyResultFound(MessageHandle& handle) {
     IntVec res = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = res[0];
     int revision = res[1];
+    int successfulRank = res[2];
 
     // Is the job result invalid or obsolete?
     bool obsolete = false;
     if (!_job_db.has(jobId) || !_job_db.get(jobId).getJobTree().isRoot()) {
         obsolete = true;
         LOG(V1_WARN, "[WARN] Invalid adressee for job result of #%i\n", jobId);
-    } else if (_job_db.get(jobId).getRevision() > revision || _job_db.get(jobId).isRevisionSolved(revision)) {
-        obsolete = true;
-        LOG_ADD_SRC(V4_VVER, "Discard obsolete result for job #%i rev. %i", handle.source, jobId, revision);
     }
     if (obsolete) {
-        MyMpi::isendCopy(handle.source, MSG_NOTIFY_RESULT_OBSOLETE, handle.getRecvData());
+        MyMpi::isendCopy(successfulRank, MSG_NOTIFY_RESULT_OBSOLETE, handle.getRecvData());
         return;
     }
     
-    LOG_ADD_SRC(V3_VERB, "#%i rev. %i solved", handle.source, jobId, revision);
-    _job_db.get(jobId).setRevisionSolved(revision);
+    LOG_ADD_SRC(V3_VERB, "#%i rev. %i solved", successfulRank, jobId, revision);
 
     // Notify client
-    sendJobDoneWithStatsToClient(jobId, revision, handle.source);
+    sendJobDoneWithStatsToClient(jobId, revision, successfulRank);
 
     // Terminate job and propagate termination message
     if (_job_db.get(jobId).getDescription().isIncremental()) {
-        handleInterrupt(handle);
+        //handleInterrupt(handle); // TODO
     } else {
         handleNotifyJobTerminating(handle);
     }

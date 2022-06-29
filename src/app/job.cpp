@@ -91,7 +91,6 @@ void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
     }
 
     _has_description = true;
-    _result.reset();
 }
 
 void Job::start() {
@@ -207,13 +206,6 @@ double Job::getTemperature() const {
     }
 }
 
-JobResult& Job::getResult() {
-    if (!_result.has_value()) _result = std::move(appl_getResult());
-    JobResult& result = _result.value();
-    assert(result.id >= 1);
-    return result;
-}
-
 void Job::communicate() {
     if (_state != ACTIVE) return;
     if (_comm.wantsToAggregate() && _comm.isAggregating()) _comm.beginAggregation();
@@ -228,7 +220,79 @@ void Job::communicate(int source, int mpiTag, JobMessage& msg) {
                 LOG(V1_WARN, "[WARN] %s job tree has size %i/%i\n", toStr(), _comm.size(), getVolume());
             }
         }
+    } else if (msg.tag == MSG_AGGREGATE_SUCCESSES) {
+        handleSuccessfulRanksMessage(source, msg);
     } else {
         appl_communicate(source, mpiTag, msg);
+    }
+}
+
+void Job::publishResult(int revision, int resultCode, std::vector<int>&& solution) {
+    
+    // Create instance of JobResult
+    JobResult result;
+    result.id = getId();
+    result.revision = revision;
+    result.result = resultCode;
+    result.setSolution(std::move(solution));
+
+    publishResult(std::move(result));
+}
+
+void Job::publishResult(JobResult&& result) {
+    
+    // Result obsolete?
+    if (!isNewSuccessfulRank(result.revision, getJobTree().getRank())) return;
+    
+    // Result is locally new!
+    
+    // Store the result.
+    getPublishResultCallback()(std::move(result));
+
+    // Propagate update to parent (or self, if root)
+    JobMessage msg;
+    msg.jobId = getId();
+    msg.tag = MSG_AGGREGATE_SUCCESSES;
+    msg.payload = _successful_rank_by_revision;
+    if (result.revision >= msg.payload.size()) msg.payload.resize(result.revision+1, -1);
+    msg.payload[result.revision] = getJobTree().getRank();
+    handleSuccessfulRanksMessage(getJobTree().getRank(), msg);
+}
+
+bool Job::isNewSuccessfulRank(int revision, int rank) {
+    if (revision >= _successful_rank_by_revision.size())
+        return true;
+    return _successful_rank_by_revision[revision] < 0;
+}
+
+void Job::handleSuccessfulRanksMessage(int source, JobMessage& msg) {
+    auto& rankByRevision = msg.payload;
+    // Check for new solutions
+    bool changed = false;
+    for (int rev = 0; rev < rankByRevision.size(); ++rev) {
+        if (isNewSuccessfulRank(rev, rankByRevision[rev])) {
+            changed = true;
+            if (rev >= _successful_rank_by_revision.size())
+                _successful_rank_by_revision.resize(rev+1, -1);
+            _successful_rank_by_revision[rev] = rankByRevision[rev];
+            if (getJobTree().isRoot()) {
+                // Solution for rev is new!
+                // Send self message to handle the result.
+                LOG(V2_INFO, "%s : Report result\n", toStr());
+                MyMpi::isend(getJobTree().getRank(), MSG_NOTIFY_RESULT_FOUND, 
+                    IntVec({getId(), rev, rankByRevision[rev]}));
+            }
+        } else if (rankByRevision[rev] >= 0) {
+            // New result is obsolete: Notify origin of this result
+            MyMpi::isend(rankByRevision[rev], MSG_NOTIFY_RESULT_OBSOLETE, IntPair(getId(), rev));
+        }
+    }
+    // Message changed success list
+    if (changed && !getJobTree().isRoot()) {
+        // Propagate update to parent
+        LOG(V2_INFO, "%s : Propagate result\n", toStr());
+        int receiver = getJobTree().getParentNodeRank();
+        msg.payload = _successful_rank_by_revision;
+        MyMpi::isend(receiver, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
 }

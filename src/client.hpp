@@ -65,8 +65,8 @@ private:
     std::map<int, std::unique_ptr<JobDescription>> _active_jobs;
     
     // Collection of job IDs which finished (for checking dependencies) and their corresponding revision.
-    struct DoneInfo {int revision; Checksum lastChecksum;};
-    robin_hood::unordered_flat_set<int, robin_hood::hash<int>> _recently_done_jobs;
+    struct DoneInfo {std::vector<bool> revisionsDone;};
+    robin_hood::unordered_flat_set<int, robin_hood::hash<int>> _incremental_jobs_to_conclude;
     robin_hood::unordered_flat_map<int, DoneInfo, robin_hood::hash<int>> _done_jobs;
     // Safeguards _done_jobs.
     Mutex _done_job_lock; 
@@ -74,7 +74,7 @@ private:
     std::list<std::future<void>> _done_job_futures;
 
     std::atomic_int _num_jobs_to_interrupt = 0;
-    robin_hood::unordered_set<int> _jobs_to_interrupt;
+    robin_hood::unordered_set<std::pair<int, int>, IntPairHasher> _jobs_to_interrupt;
     Mutex _jobs_to_interrupt_lock;
 
     std::map<int, int> _root_nodes;
@@ -88,10 +88,8 @@ private:
 
     // Number of jobs with a loaded description (taking memory!)
     std::atomic_int _num_loaded_jobs = 0;
-    Mutex _finished_msg_ids_mutex;
-    std::vector<int> _finished_msg_ids;
 
-    PeriodicEvent<100> _periodic_check_done_jobs;
+    PeriodicEvent<100> _periodic_check_incremental_jobs_to_conclude;
 
 public:
     Client(MPI_Comm comm, Parameters& params)
@@ -121,7 +119,13 @@ private:
 
     int getMaxNumParallelJobs();
     void introduceNextJob();
-    void finishJob(int jobId, bool hasIncrementalSuccessors);
+    void finishJob(int jobId, int revision, bool hasIncrementalSuccessors);
+
+    bool isRevisionDone(int jobId, int revision) {
+        return _done_jobs.count(jobId) 
+            && revision < _done_jobs[jobId].revisionsDone.size() 
+            && _done_jobs[jobId].revisionsDone[revision];
+    }
     
 };
 

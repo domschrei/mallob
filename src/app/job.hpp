@@ -77,19 +77,11 @@ public:
     */
     virtual void appl_terminate() = 0;
     /*
-    Check from the main thread whether any solution was already found.
-    Return a result code if applicable, or -1 otherwise.
     This method can be used to perform further (quick) checks regarding the application
     and can be expected to be called frequently while the job is active.
-    For incremental applications, use this method to import new increments
-    of getDescription() to your application.
+    If this instance found a result, hand it to getPublishResultCallback() from this method.
     */
-    virtual int appl_solved() = 0;
-    /*
-    appl_solved() returned a result >= 0; return a fitting JobResult instance at this point.
-    This method must only be valid once after a solution has been found.
-    */
-    virtual JobResult&& appl_getResult() = 0;
+    virtual void appl_loop() = 0;
     /*
     Perform job-internal communication from this node.
     */
@@ -145,7 +137,6 @@ private:
     std::atomic_bool _has_description = false;
     JobDescription _description;
     int _desired_revision = 0;
-    int _last_solved_revision = -1;
 
     float _time_of_arrival;
     float _time_of_activation = 0;
@@ -166,7 +157,6 @@ private:
     Mutex _job_manipulation_lock;
     std::optional<JobRequest> _commitment;
     int _balancing_epoch_of_last_commitment = -1;
-    std::optional<JobResult> _result;
     robin_hood::unordered_node_set<std::pair<int, int>, IntPairHasher> _waiting_rank_revision_pairs;
 
     JobTree _job_tree;
@@ -177,6 +167,9 @@ private:
     mutable double _last_temperature = 1.0;
     mutable int _age_of_const_cooldown = -1;
     mutable int _last_demand = 0;
+
+    std::function<void(JobResult&&)> _cb_publish_job_result;
+    std::vector<int> _successful_rank_by_revision;
 
 // Public methods.
 public:
@@ -235,7 +228,6 @@ public:
     int getRevision() const {return !hasDescription() ? -1 : getDescription().getRevision();};
     int getMaxConsecutiveRevision() const {return !hasDescription() ? -1 : getDescription().getMaxConsecutiveRevision();};
     int getDesiredRevision() const {return _desired_revision;}
-    JobResult& getResult();
     // Elapsed seconds since the job's constructor call.
     float getAge() const {return Timer::elapsedSeconds() - _time_of_arrival;}
     // Elapsed seconds since initialization was ended.
@@ -249,6 +241,11 @@ public:
     int getBalancingEpochOfLastCommitment() const {return _balancing_epoch_of_last_commitment;}
     int getLastDemand() const {return _last_demand;}
     void setLastDemand(int demand) {_last_demand = demand;}
+    void setPublishResultCallback(std::function<void(JobResult&&)> cb) {_cb_publish_job_result = cb;}
+    std::function<void(JobResult&&)> getPublishResultCallback() {return _cb_publish_job_result;}
+
+    void publishResult(int revision, int resultCode, std::vector<int>&& solution);
+    void publishResult(JobResult&& result);
 
     // Returns whether the job is easily and quickly destructible as of now. 
     // (calls appl_isDestructible())
@@ -313,8 +310,6 @@ public:
     // Marks the job to be indestructible as long as pending is true.
     void addChildWaitingForRevision(int rank, int revision) {_waiting_rank_revision_pairs.insert(std::pair<int, int>(rank, revision));}
     void setDesiredRevision(int revision) {_desired_revision = revision;}
-    bool isRevisionSolved(int revision) {return _last_solved_revision >= revision;}
-    void setRevisionSolved(int revision) {_last_solved_revision = revision;}
 
     // toString methods
 
@@ -322,6 +317,10 @@ public:
         return _name.c_str();
     };
     const char* jobStateToStr() const {return JOB_STATE_STRINGS[(int)_state];};
+
+private:
+    bool isNewSuccessfulRank(int revision, int rank);
+    void handleSuccessfulRanksMessage(int source, JobMessage& msg);
 };
 
 #endif

@@ -79,8 +79,6 @@ void ForkedSatJob::loadIncrements() {
     }
     if (!revisions.empty()) {
         _solver->appendRevisions(revisions, getDesiredRevision());
-        _done_locally = false;
-        _internal_result = JobResult();
     }
 }
 
@@ -102,22 +100,23 @@ void ForkedSatJob::appl_terminate() {
     startDestructThreadIfNecessary();
 }
 
-int ForkedSatJob::appl_solved() {
-    int result = -1;
-    if (!_initialized || getState() != ACTIVE) return result;
+void ForkedSatJob::appl_loop() {
+    
+    if (!_initialized || getState() != ACTIVE) return;
     loadIncrements();
-    if (_done_locally) return result;
 
     // Did a solver find a result?
     auto status = _solver->check();
     if (status == SatProcessAdapter::FOUND_RESULT) {
-        _internal_result = std::move(_solver->getSolution());
-        result = _internal_result.result;
+
+        auto& result = _solver->getSolution();
+        int resultCode = result.result;
         LOG_ADD_DEST(V2_INFO, "%s rev. %i : found result %s", getJobTree().getRootNodeRank(), toStr(), getRevision(), 
-                            result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
-        _internal_result.id = getId();
-        _internal_result.revision = getRevision();
-        _done_locally = true;
+                            resultCode == RESULT_SAT ? "SAT" : resultCode == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
+        result.id = getId();
+        result.revision = getRevision();
+        publishResult(std::move(result));
+
     } else if (status == SatProcessAdapter::CRASHED) {
         // Subprocess crashed for whatever reason: try to recover
 
@@ -134,11 +133,6 @@ int ForkedSatJob::appl_solved() {
         // Start new solver (with renamed shared memory segments)
         doStartSolver();
     }
-    return result;
-}
-
-JobResult&& ForkedSatJob::appl_getResult() {
-    return std::move(_internal_result);
 }
 
 void ForkedSatJob::appl_dumpStats() {

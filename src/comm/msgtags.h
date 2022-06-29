@@ -41,7 +41,7 @@ const int MSG_SEND_JOB_DESCRIPTION = 9;
 /*
 The sender informs the receiver that a solution was found for the job
 of the specified ID.
-Data type: [jobId, resultCode]
+Data type: [jobId, resultCode, successfulRank]
 */
 const int MSG_NOTIFY_RESULT_FOUND = 10;
 /*
@@ -160,6 +160,8 @@ const int MSG_ALLREDUCE_CLAUSES = 417;
 const int MSG_ALLREDUCE_FILTER = 418;
 const int MSG_AGGREGATE_RANKLIST = 419;
 const int MSG_BROADCAST_RANKLIST = 420; // blaze it
+const int MSG_AGGREGATE_SUCCESSES = 421;
+const int MSG_BROADCAST_SUCCESSES = 422;
 
 
 
