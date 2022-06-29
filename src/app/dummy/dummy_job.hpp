@@ -11,8 +11,8 @@ Edit and extend for your application.
 class DummyJob : public Job {
 
 public:
-    DummyJob(const Parameters& params, int commSize, int worldRank, int jobId) 
-        : Job(params, commSize, worldRank, jobId, JobDescription::Application::DUMMY) {}
+    DummyJob(const Parameters& params, const JobSetup& setup) 
+        : Job(params, setup) {}
     void appl_start() override {}
     void appl_suspend() override {}
     void appl_resume() override {}

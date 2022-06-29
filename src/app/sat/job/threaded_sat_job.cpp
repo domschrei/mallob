@@ -12,9 +12,8 @@
 #include "sat_process_config.hpp"
 #include "util/sys/thread_pool.hpp"
 
-ThreadedSatJob::ThreadedSatJob(const Parameters& params, int commSize, int worldRank, int jobId,
-    JobDescription::Application appl) : 
-        BaseSatJob(params, commSize, worldRank, jobId, appl) {}
+ThreadedSatJob::ThreadedSatJob(const Parameters& params, const JobSetup& setup) : 
+        BaseSatJob(params, setup) {}
 
 void ThreadedSatJob::appl_start() {
 

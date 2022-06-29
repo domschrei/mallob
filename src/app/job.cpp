@@ -9,14 +9,15 @@
 #include "util/permutation.hpp"
 
 
-Job::Job(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl) :
+Job::Job(const Parameters& params, const JobSetup& setup) :
             _params(params), 
-            _id(jobId),
-            _name("#" + std::to_string(jobId)),
-            _appl(appl),
+            _id(setup.jobId),
+            _name("#" + std::to_string(setup.jobId)),
+            _application_id(setup.applicationId),
+            _incremental(setup.incremental),
             _time_of_arrival(Timer::elapsedSeconds()), 
             _state(INACTIVE),
-            _job_tree(commSize, worldRank, jobId, params.useDormantChildren()), 
+            _job_tree(setup.commSize, setup.worldRank, setup.jobId, params.useDormantChildren()), 
             _comm(_id, _job_tree, params.jobCommUpdatePeriod()) {
     
     _growth_period = _params.growthPeriod();
@@ -30,16 +31,16 @@ LocalScheduler Job::constructScheduler(std::function<void(const JobRequest& req,
     scheduler.initCallbacks(
         // callback to emit a directed job request message to a specific PE
         [this, emitJobReq](int epoch, int requestedIndex, int rank) {
-            JobRequest req(_id, _appl, _job_tree.getRootNodeRank(), 
-                _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, -2);
+            JobRequest req(_id, _application_id, _job_tree.getRootNodeRank(), 
+                _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, -2, _incremental);
             req.revision = std::max(0, getDesiredRevision());
             LOG_ADD_DEST(V5_DEBG, "RBS EMIT_REQ %s", rank, req.toStr().c_str());
             emitJobReq(req, MSG_REQUEST_NODE_ONESHOT, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), rank);
         },
         // callback to emit a certain, undirected job request message
         [this, emitJobReq](int epoch, int requestedIndex) {
-            JobRequest req(_id, _appl, _job_tree.getRootNodeRank(), 
-                _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, 0);
+            JobRequest req(_id, _application_id, _job_tree.getRootNodeRank(), 
+                _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, 0, _incremental);
             req.revision = std::max(0, getDesiredRevision());
             LOG(V5_DEBG, "RBS EMIT_REQ %s\n", req.toStr().c_str());
             emitJobReq(req, MSG_REQUEST_NODE, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), -1);

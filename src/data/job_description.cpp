@@ -21,8 +21,8 @@ void JobDescription::reserveSize(size_t size) {
 
 void JobDescription::endInitialization() {
     // Add preloaded literals and assumptions (if any)
-    for (int l : _preloaded_literals) addLiteral(l);
-    for (int a : _preloaded_assumptions) addAssumption(a);
+    for (int l : _preloaded_literals) addPermanentData(l);
+    for (int a : _preloaded_assumptions) addTransientData(a);
     _preloaded_literals.clear();
     _preloaded_assumptions.clear();
 
@@ -46,7 +46,8 @@ void JobDescription::writeMetadata() {
     n = sizeof(float);       memcpy(data->data()+i, &_wallclock_limit, n); i += n;
     n = sizeof(float);       memcpy(data->data()+i, &_cpu_limit, n); i += n;
     n = sizeof(int);         memcpy(data->data()+i, &_max_demand, n); i += n;
-    n = sizeof(Application); memcpy(data->data()+i, &_application, n); i += n;
+    n = sizeof(int);         memcpy(data->data()+i, &_application_id, n); i += n;
+    n = sizeof(bool);        memcpy(data->data()+i, &_incremental, n); i += n;
     n = sizeof(Checksum);    memcpy(data->data()+i, &_checksum, n); i += n;
     
     auto configSerialized = _app_config.serialize();
@@ -98,7 +99,8 @@ int JobDescription::getMetadataSize() const {
            +3*sizeof(float)
            +2*sizeof(size_t)
            +sizeof(Checksum)
-           +sizeof(Application)
+           +sizeof(int)
+           +sizeof(bool)
            + sizeof(int)+_app_config.getSerializedSize();
 }
 
@@ -156,7 +158,8 @@ void JobDescription::deserialize() {
     n = sizeof(float);       memcpy(&_wallclock_limit, latestData->data()+i, n); i += n;
     n = sizeof(float);       memcpy(&_cpu_limit, latestData->data()+i, n);       i += n;
     n = sizeof(int);         memcpy(&_max_demand, latestData->data()+i, n);      i += n;
-    n = sizeof(Application); memcpy(&_application, latestData->data()+i, n);     i += n;
+    n = sizeof(int);         memcpy(&_application_id, latestData->data()+i, n);  i += n;
+    n = sizeof(bool);        memcpy(&_incremental, latestData->data()+i, n);     i += n;
     n = sizeof(Checksum);    memcpy(&_checksum, latestData->data()+i, n);        i += n;
     // size of config
     memcpy(&n, latestData->data()+i, sizeof(int)); i += sizeof(int);

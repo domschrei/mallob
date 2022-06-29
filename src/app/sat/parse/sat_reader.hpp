@@ -14,12 +14,9 @@
 
 class SatReader {
 
-public:
-    enum ContentMode {ASCII, RAW};
-
 private:
     std::string _filename;
-    ContentMode _content_mode;
+    bool _raw_content_mode;
 
     // Content mode: ASCII
     int _sign = 1;
@@ -37,7 +34,7 @@ private:
     bool _valid_input = false;
 
 public:
-    SatReader(const std::string& filename, ContentMode contentMode) : _filename(filename), _content_mode(contentMode) {}
+    SatReader(const std::string& filename) : _filename(filename) {}
     bool read(JobDescription& desc);
 
     inline void processInt(int x, JobDescription& desc) {
@@ -63,8 +60,8 @@ public:
             return;
         }
         
-        if (_traversing_clauses) desc.addLiteral(x);
-        else desc.addAssumption(x);
+        if (_traversing_clauses) desc.addPermanentData(x);
+        else desc.addTransientData(x);
 
         _max_var = std::max(_max_var, std::abs(x));
         _empty_clause = _traversing_assumptions || (x == 0);
@@ -81,7 +78,7 @@ public:
             _comment = false;
             if (_began_num) {
                 assert(_num == 0);
-                if (!_assumption) desc.addLiteral(0);
+                if (!_assumption) desc.addPermanentData(0);
                 _began_num = false;
             }
             _assumption = false;
@@ -97,9 +94,9 @@ public:
             if (_began_num) {
                 _max_var = std::max(_max_var, _num);
                 if (!_assumption) {
-                    desc.addLiteral(_sign * _num);
+                    desc.addPermanentData(_sign * _num);
                 } else if (_num != 0) {
-                    desc.addAssumption(_sign * _num);
+                    desc.addTransientData(_sign * _num);
                 }
                 _num = 0;
                 _began_num = false;
@@ -119,7 +116,7 @@ public:
     }
 
     bool isValidInput() const {
-        return _content_mode != RAW || _valid_input;
+        return !_raw_content_mode || _valid_input;
     }
 };
 
