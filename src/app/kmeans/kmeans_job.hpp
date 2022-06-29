@@ -44,6 +44,7 @@ class KMeansJob : public Job {
     bool hasReducer = false;
     bool leftDone = false;
     bool rightDone = false;
+    bool terminate = false;
     std::vector<int> work;
     std::vector<int> workDone;
     std::pair<bool, bool> childsFinished = {false, false};
@@ -58,7 +59,7 @@ class KMeansJob : public Job {
         [&](std::list<std::vector<int>>& elems) {
             return aggregate(elems);
         };
-    std::function<std::vector<int>(std::vector<int>)> rootTransform = [&](std::vector<int> payload) {
+    std::function<std::vector<int>(const std::vector<int>&)> rootTransform = [&](const std::vector<int>& payload) {
         LOG(V2_INFO, "                           myIndex: %i start Roottransform\n", myIndex);
         auto data = reduceToclusterCenters(payload);
 
@@ -140,10 +141,10 @@ class KMeansJob : public Job {
     void countMembers();
     float calculateDifference(std::function<float(Point, Point)> metric);
     std::vector<float> clusterCentersToSolution();
-    std::vector<int> clusterCentersToBroadcast(std::vector<Point>);
-    std::vector<Point> broadcastToClusterCenters(std::vector<int>, bool withNumWorkers = false);
-    std::vector<int> clusterCentersToReduce(std::vector<int>, std::vector<Point>);
-    std::pair<std::vector<std::vector<float>>, std::vector<int>> reduceToclusterCenters(std::vector<int>);
+    std::vector<int> clusterCentersToBroadcast(const std::vector<Point>&);
+    std::vector<Point> broadcastToClusterCenters(const std::vector<int>&, bool withNumWorkers = false);
+    std::vector<int> clusterCentersToReduce(const std::vector<int>&, const std::vector<Point>&);
+    std::pair<std::vector<std::vector<float>>, std::vector<int>> reduceToclusterCenters(const std::vector<int>&);
     std::vector<int> aggregate(std::list<std::vector<int>>);
     void advanceCollective(JobMessage& msg, JobTree& jobTree);
     void initReducer(JobMessage& msg);

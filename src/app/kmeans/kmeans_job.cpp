@@ -41,6 +41,7 @@ void KMeansJob::appl_start() {
     loadTask = ProcessWideThreadPool::get().addTask([&]() {
         LOG(V2_INFO, "                           myIndex: %i getting ready3\n", myIndex);
         loadInstance();
+        if (terminate) return;
         clusterMembership.assign(pointsCount, -1);
         LOG(V2_INFO, "                           myIndex: %i Ready!\n", myIndex);
         loaded = true;
@@ -154,13 +155,14 @@ JobResult&& KMeansJob::appl_getResult() {
 }
 void KMeansJob::appl_terminate() {
     LOG(V2_INFO, "                           start terminate\n");
-    if (loaded && loadTask.valid()) loadTask.get();
-    if (initSend && initMsgTask.valid()) initMsgTask.get();
-    if (calculatingFinished && calculatingTask.valid()) calculatingTask.get();
+    terminate = true;
+    if (loadTask.valid()) loadTask.get();
+    if (initMsgTask.valid()) initMsgTask.get();
+    if (calculatingTask.valid()) calculatingTask.get();
     LOG(V2_INFO, "                           end terminate\n");
 }
 void KMeansJob::appl_communicate() {
-    if (!loaded) return;
+    if (!loaded  || finishedJob) return;
 
     if (iAmRoot && initSend) {
         sendRootNotification();
@@ -209,7 +211,7 @@ void KMeansJob::appl_communicate() {
         LOG(V2_INFO, "                           myIndex: %i all work Finished END!!!\n", myIndex);
     };
     if (hasReducer) {
-        if ((reducer)->hasResult() && iAmRoot) {
+        if (iAmRoot && (reducer)->hasResult()) {
             LOG(V2_INFO, "                           myIndex: %i received Result from Transform\n", myIndex);
             clusterCenters = broadcastToClusterCenters((reducer)->extractResult(), true);
             clusterMembership.assign(pointsCount, -1);
@@ -357,6 +359,7 @@ void KMeansJob::loadInstance() {
         }
         kMeansData.push_back(p);
         payload = payload + dimension;
+        if (terminate) return;
     }
     allReduceElementSize = (dimension + 1) * countClusters;
 }
@@ -380,6 +383,7 @@ void KMeansJob::calcNearestCenter(std::function<float(Point, Point)> metric, int
     int endIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(intervalId + 1) / static_cast<float>(countCurrentWorkers)));
     LOG(V2_INFO, "                           MI: %i intervalId: %i PC: %i cW: %i start:%i end:%i!!      iter:%i \n", myIndex, intervalId, pointsCount, countCurrentWorkers, startIndex, endIndex, iterationsDone);
     for (int pointID = startIndex; pointID < endIndex; ++pointID) {
+        if (terminate) return;
         currentNearestCenter.cluster = -1;
         currentNearestCenter.distance = std::numeric_limits<float>::infinity();
         for (int clusterID = 0; clusterID < countClusters; ++clusterID) {
@@ -480,7 +484,7 @@ std::vector<float> KMeansJob::clusterCentersToSolution() {
     return result;
 }
 
-std::vector<int> KMeansJob::clusterCentersToBroadcast(std::vector<Point> reduceClusterCenters) {
+std::vector<int> KMeansJob::clusterCentersToBroadcast(const std::vector<Point>& reduceClusterCenters) {
     std::vector<int> result;
     for (auto point : reduceClusterCenters) {
         auto centerData = point.data();
@@ -493,10 +497,10 @@ std::vector<int> KMeansJob::clusterCentersToBroadcast(std::vector<Point> reduceC
     return result;
 }
 
-std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(std::vector<int> reduce, bool withNumWorkers) {
+std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(const std::vector<int>& reduce, bool withNumWorkers) {
     std::vector<Point> localClusterCentersResult;
     const int elementsCount = allReduceElementSize - countClusters;
-    int* reduceData = reduce.data();
+    const int* reduceData = reduce.data();
 
     if (!withNumWorkers) reduceData += countClusters;
 
@@ -515,7 +519,7 @@ std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(std::vector<i
     return localClusterCentersResult;
 }
 
-std::vector<int> KMeansJob::clusterCentersToReduce(std::vector<int> reduceSumMembers, std::vector<Point> reduceClusterCenters) {
+std::vector<int> KMeansJob::clusterCentersToReduce(const std::vector<int>& reduceSumMembers, const std::vector<Point>& reduceClusterCenters) {
     std::vector<int> result;
     std::vector<int> tempCenters;
 
@@ -526,17 +530,17 @@ std::vector<int> KMeansJob::clusterCentersToReduce(std::vector<int> reduceSumMem
     }
     result.insert(result.end(), tempCenters.begin(), tempCenters.end());
 
-    return std::move(result);
+    return result;
 }
 
 std::pair<std::vector<std::vector<float>>, std::vector<int>>
-KMeansJob::reduceToclusterCenters(std::vector<int> reduce) {
+KMeansJob::reduceToclusterCenters(const std::vector<int>& reduce) {
     // auto [centers, counts] = reduceToclusterCenters(); //call example
     std::vector<int> localSumMembersResult;
     std::vector<Point> localClusterCentersResult;
     const int elementsCount = allReduceElementSize - countClusters;
 
-    int* reduceData = reduce.data();
+    const int* reduceData = reduce.data();
 
     localSumMembersResult.assign(countClusters, 0);
     for (int i = 0; i < countClusters; ++i) {
