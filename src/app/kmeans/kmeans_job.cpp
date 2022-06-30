@@ -156,13 +156,17 @@ JobResult&& KMeansJob::appl_getResult() {
 void KMeansJob::appl_terminate() {
     LOG(V2_INFO, "                           start terminate\n");
     terminate = true;
+}
+
+KMeansJob::~KMeansJob() {
     if (loadTask.valid()) loadTask.get();
     if (initMsgTask.valid()) initMsgTask.get();
     if (calculatingTask.valid()) calculatingTask.get();
     LOG(V2_INFO, "                           end terminate\n");
 }
+
 void KMeansJob::appl_communicate() {
-    if (!loaded  || finishedJob) return;
+    if (!loaded || finishedJob || terminate) return;
 
     if (iAmRoot && initSend) {
         sendRootNotification();
@@ -266,26 +270,30 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
     }
     if (msg.returnedToSender) {
         // I will do it
+        std::vector<int> missingChilds;
         LOG(V2_INFO, "                           myIndex: %i returnFrom: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
-        auto grandChilds = KMeansUtils::childIndexesOf(sourceIndex, countCurrentWorkers);
-
-        msg.payload = std::vector<int>(allReduceElementSize, 0);
-        msg.tag = MSG_ALLREDUCE_CLAUSES;
-        (reducer)->receive(source, MSG_JOB_TREE_REDUCTION, msg);
-        work.push_back(sourceIndex);
-        for (auto child : grandChilds) {
-            work.push_back(child);
-        }
-
-        if (!leftDone) {
-            leftDone = (sourceIndex == myIndex * 2 + 1);
+        if (!leftDone && !getJobTree().hasLeftChild() && getJobTree().getLeftChildIndex() < countCurrentWorkers) {
+            // missing left child
+            leftDone = true;
+            missingChilds.push_back(getJobTree().getLeftChildIndex());
             LOG(V2_INFO, "                           myIndex: %i LsourceIndex: %i\n", myIndex, sourceIndex);
         }
-        if (!rightDone) {
-            rightDone = (sourceIndex == myIndex * 2 + 2);
+        if (!rightDone && !getJobTree().hasRightChild() && getJobTree().getRightChildIndex() < countCurrentWorkers) {
+            // missing right child
+            rightDone = true;
+            missingChilds.push_back(getJobTree().getRightChildIndex());
             LOG(V2_INFO, "                           myIndex: %i RsourceIndex: %i\n", myIndex, sourceIndex);
         }
-
+        for (auto child : missingChilds) {
+            auto grandChilds = KMeansUtils::childIndexesOf(child, countCurrentWorkers);
+            msg.payload = std::vector<int>(allReduceElementSize, 0);
+            msg.tag = MSG_ALLREDUCE_CLAUSES;
+            (reducer)->receive(source, MSG_JOB_TREE_REDUCTION, msg);
+            work.push_back(child);
+            for (auto child : grandChilds) {
+                work.push_back(child);
+            }
+        }
         return;
     }
 
