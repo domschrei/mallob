@@ -446,7 +446,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     std::vector<std::string> modelStrings;
     if ((_params.solutionToFile.isSet() || (_params.monoFilename.isSet() && !_params.omitSolution())) 
             && resultCode == RESULT_SAT) {
-        auto json = app_registry::getJobResultFormatter(desc.getApplicationId())(jobResult);
+        auto json = app_registry::getJobSolutionFormatter(desc.getApplicationId())(jobResult);
         if (json.is_array()) {
             auto jsonArr = json.get<std::vector<std::string>>();
             for (auto&& str : jsonArr) modelStrings.push_back(std::move(str));

@@ -29,5 +29,5 @@ namespace app_registry {
 
     JobReader getJobReader(int appId);
     JobCreator getJobCreator(int appId);
-    JobSolutionFormatter getJobResultFormatter(int appId);
+    JobSolutionFormatter getJobSolutionFormatter(int appId);
 }

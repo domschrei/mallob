@@ -238,7 +238,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
         j["result"]["solution-size"] = result.getSolutionSize();
         mkfifo(solutionFile.c_str(), 0666);
     } else {
-        j["result"]["solution"] = app_registry::getJobResultFormatter(applicationId)(result);
+        j["result"]["solution"] = app_registry::getJobSolutionFormatter(applicationId)(result);
     }
     j["stats"] = {
         { "time", {
