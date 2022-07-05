@@ -5,6 +5,7 @@
 
 #include "app/job_tree.hpp"
 #include "util/sys/thread_pool.hpp"
+#include "data/job_transfer.hpp"
 
 class JobTreeAllReduction {
 
@@ -19,6 +20,7 @@ private:
     std::optional<AllReduceElement> _local_elem;
     std::list<AllReduceElement> _child_elems;
     int _num_expected_child_elems;
+    IntPair _expected_child_ranks;
 
     bool _aggregating = false;
     std::future<void> _future_aggregate;
@@ -37,7 +39,12 @@ public:
     JobTreeAllReduction(JobTree& jobTree, JobMessage baseMsg, AllReduceElement&& neutralElem, 
             std::function<AllReduceElement(std::list<AllReduceElement>&)> aggregator) :
         _tree(jobTree), _base_msg(baseMsg), _neutral_elem(std::move(neutralElem)), 
-        _num_expected_child_elems(_tree.getNumChildren()), _aggregator(aggregator) {}
+        _num_expected_child_elems(_tree.getNumChildren()), _aggregator(aggregator) {
+
+        int leftRank = _tree.hasLeftChild() ? _tree.getLeftChildNodeRank() : -1;
+        int rightRank = _tree.hasRightChild() ? _tree.getRightChildNodeRank() : -1;
+        _expected_child_ranks = IntPair(leftRank, rightRank);
+    }
 
     // Set the function to compute the local contribution for the all-reduction.
     // This function is invoked immediately
@@ -163,9 +170,9 @@ private:
     void receiveAndForwardFinalElem(AllReduceElement&& elem) {
         _finished = true;
         _base_msg.payload = std::move(elem);
-        if (_tree.hasLeftChild()) 
+        if (_tree.hasLeftChild() && _tree.getLeftChildNodeRank() == _expected_child_ranks.first) 
             MyMpi::isend(_tree.getLeftChildNodeRank(), MSG_JOB_TREE_BROADCAST, _base_msg);
-        if (_tree.hasRightChild()) 
+        if (_tree.hasRightChild() && _tree.getRightChildNodeRank() == _expected_child_ranks.second) 
             MyMpi::isend(_tree.getRightChildNodeRank(), MSG_JOB_TREE_BROADCAST, _base_msg);
     }
 
