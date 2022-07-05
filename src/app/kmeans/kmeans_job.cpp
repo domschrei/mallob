@@ -362,6 +362,8 @@ void KMeansJob::loadInstance() {
     dimension = metadata[1];
     pointsCount = metadata[2];
             LOG(V2_INFO, "                          countClusters: %i dimension %i pointsCount: %i\n", countClusters, dimension, pointsCount);
+    
+    /*
     kMeansData.reserve(pointsCount);
     float* points = (float*) (data + getDescription().getMetadataSize() + 3*sizeof(int));
     payload += 3;  // pointer start at first datapoint instead of metadata
@@ -375,6 +377,7 @@ void KMeansJob::loadInstance() {
         points += dimension;
         if (terminate) return;
     }
+    */
     allReduceElementSize = (dimension + 1) * countClusters;
 }
 
@@ -382,8 +385,12 @@ void KMeansJob::setRandomStartCenters() {
     clusterCenters.clear();
     clusterCenters.resize(countClusters);
     for (int i = 0; i < countClusters; ++i) {
-        clusterCenters[i] = kMeansData[static_cast<int>((static_cast<float>(i) / static_cast<float>(countClusters)) * (pointsCount - 1))];
-    }
+        clusterCenters[i].reserve(dimension);
+        for(int d = 0; d < dimension; d++){
+            clusterCenters[i].push_back(getKMeansData(static_cast<int>((static_cast<float>(i) / static_cast<float>(countClusters)) * (pointsCount - 1)))[d]);
+  
+        }
+          }
 }
 
 void KMeansJob::calcNearestCenter(std::function<float(const float*, Point)> metric, int intervalId) {
