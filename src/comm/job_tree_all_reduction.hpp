@@ -170,10 +170,10 @@ private:
     void receiveAndForwardFinalElem(AllReduceElement&& elem) {
         _finished = true;
         _base_msg.payload = std::move(elem);
-        if (_tree.hasLeftChild() && _tree.getLeftChildNodeRank() == _expected_child_ranks.first) 
-            MyMpi::isend(_tree.getLeftChildNodeRank(), MSG_JOB_TREE_BROADCAST, _base_msg);
-        if (_tree.hasRightChild() && _tree.getRightChildNodeRank() == _expected_child_ranks.second) 
-            MyMpi::isend(_tree.getRightChildNodeRank(), MSG_JOB_TREE_BROADCAST, _base_msg);
+        if (_expected_child_ranks.first >= 0) 
+            MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_BROADCAST, _base_msg);
+        if (_expected_child_ranks.second >= 0) 
+            MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_BROADCAST, _base_msg);
     }
 
 };
