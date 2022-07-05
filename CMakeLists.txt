@@ -53,7 +53,7 @@ set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib CACHE INTERNAL "")
 
 # Base source files
 
-set(BASE_SOURCES ${BASE_SOURCES} src/app/job.cpp src/app/app_registry.cpp src/app/dummy/dummy_reader.cpp src/balancing/collective_assignment.cpp src/balancing/event_driven_balancer.cpp src/comm/message_queue.cpp src/comm/mpi_base.cpp src/comm/mympi.cpp src/data/job_database.cpp src/data/job_description.cpp src/data/job_result.cpp src/data/job_transfer.cpp src/interface/json_interface.cpp src/interface/api/api_connector.cpp src/scheduling/job_scheduling_update.cpp src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sys/atomics.cpp src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/shared_memory.cpp src/util/sys/terminator.cpp src/util/sys/threading.cpp src/util/sys/thread_pool.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp src/util/ringbuf/ringbuf.c CACHE INTERNAL "")
+set(BASE_SOURCES ${BASE_SOURCES} src/app/job.cpp src/app/app_registry.cpp src/app/dummy/dummy_reader.cpp src/balancing/collective_assignment.cpp src/balancing/event_driven_balancer.cpp src/comm/message_queue.cpp src/comm/mpi_base.cpp src/comm/mympi.cpp src/data/job_database.cpp src/data/job_description.cpp src/data/job_result.cpp src/data/job_transfer.cpp src/interface/json_interface.cpp src/interface/api/api_connector.cpp src/scheduling/job_scheduling_update.cpp src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sys/atomics.cpp src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/shared_memory.cpp src/util/sys/terminator.cpp src/util/sys/threading.cpp src/util/sys/thread_pool.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp CACHE INTERNAL "")
 
 
 # Define test function
@@ -124,7 +124,6 @@ SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MY_DEBUG_OPTIONS}")
 enable_testing()
 
 new_test(permutation)
-new_test(ringbuffer)
 new_test(message_queue)
 new_test(volume_calculator)
 new_test(concurrent_malloc)
