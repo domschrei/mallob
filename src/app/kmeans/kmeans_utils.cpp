@@ -11,10 +11,10 @@
 namespace KMeansUtils {
 
 typedef std::vector<float> Point;
-float eukild(Point& p1, Point& p2) {
+float eukild(const float* p1, Point& p2) {
     Point difference;
     float sum = 0;
-    int dimension = p1.size();
+    int dimension = p2.size();
     difference.resize(dimension);
 
     for (int d = 0; d < dimension; ++d) {

@@ -31,6 +31,8 @@ class KMeansJob : public Job {
     int countReady = 0;
     std::vector<Point> kMeansData;
     const int* payload;
+    uint8_t* data;
+    const float* pointsStart;
     std::future<void> calculatingTask;
     std::future<void> loadTask;
     std::future<void> initMsgTask;
@@ -54,7 +56,7 @@ class KMeansJob : public Job {
     JobMessage baseMsg;
     JobResult internal_result;
     std::unique_ptr<JobTreeAllReduction> reducer;
-    std::function<float(KMeansJob::Point, KMeansJob::Point)> metric = [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
+    std::function<float(const float*, KMeansJob::Point)> metric = [&](const float* p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
     std::function<std::vector<int>(std::list<std::vector<int>>&)> folder =
         [&](std::list<std::vector<int>>& elems) {
             return aggregate(elems);
@@ -84,7 +86,7 @@ class KMeansJob : public Job {
             this->getJobTree().getNumChildren());
         
         if ((0.001f < calculateDifference(
-            [&](Point p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
+            [&](const float* p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
             LOG(V2_INFO, "                           Another iter %i\n", iterationsDone);
             return transformed;
 
@@ -135,12 +137,12 @@ class KMeansJob : public Job {
     void doInitWork();
     void sendRootNotification();
     void setRandomStartCenters();
-    void calcNearestCenter(std::function<float(Point, Point)> metric, int intervalId);
+    void calcNearestCenter(std::function<float(const float*, Point)> metric, int intervalId);
     void calcCurrentClusterCenters();
     std::string dataToString(std::vector<Point> data);
     std::string dataToString(std::vector<int> data);
     void countMembers();
-    float calculateDifference(std::function<float(Point, Point)> metric);
+    float calculateDifference(std::function<float(const float*, Point)> metric);
     std::vector<float> clusterCentersToSolution();
     std::vector<int> clusterCentersToBroadcast(const std::vector<Point>&);
     std::vector<Point> broadcastToClusterCenters(const std::vector<int>&, bool withNumWorkers = false);
@@ -150,4 +152,9 @@ class KMeansJob : public Job {
     void advanceCollective(JobMessage& msg, JobTree& jobTree);
     void initReducer(JobMessage& msg);
     int getIndex(int rank);
+    const float* getKMeansData(int point){
+        return (pointsStart + dimension * point);
+    }
+    float getEntry(int entry);
+
 };
