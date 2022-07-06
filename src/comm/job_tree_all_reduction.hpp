@@ -5,6 +5,7 @@
 
 #include "app/job_tree.hpp"
 #include "util/sys/thread_pool.hpp"
+#include "data/job_transfer.hpp"
 
 class JobTreeAllReduction {
 
@@ -19,6 +20,8 @@ private:
     std::optional<AllReduceElement> _local_elem;
     std::list<AllReduceElement> _child_elems;
     int _num_expected_child_elems;
+    IntPair _expected_child_ranks;
+    std::pair<bool, bool> _received_child_elems;
 
     bool _aggregating = false;
     std::future<void> _future_aggregate;
@@ -37,7 +40,13 @@ public:
     JobTreeAllReduction(JobTree& jobTree, JobMessage baseMsg, AllReduceElement&& neutralElem, 
             std::function<AllReduceElement(std::list<AllReduceElement>&)> aggregator) :
         _tree(jobTree), _base_msg(baseMsg), _neutral_elem(std::move(neutralElem)), 
-        _num_expected_child_elems(_tree.getNumChildren()), _aggregator(aggregator) {}
+        _num_expected_child_elems(_tree.getNumChildren()), _aggregator(aggregator) {
+
+        int leftRank = _tree.hasLeftChild() ? _tree.getLeftChildNodeRank() : -1;
+        int rightRank = _tree.hasRightChild() ? _tree.getRightChildNodeRank() : -1;
+        _expected_child_ranks = IntPair(leftRank, rightRank);
+        _received_child_elems = std::pair<bool, bool>(false, false);
+    }
 
     // Set the function to compute the local contribution for the all-reduction.
     // This function is invoked immediately
@@ -53,7 +62,6 @@ public:
     }
 
     // Process an incoming message and advance the all-reduction accordingly. 
-    // The element is accepted only if the provided acceptor function admits it.
     bool receive(int source, int tag, JobMessage& msg) {
 
         assert(tag == MSG_JOB_TREE_REDUCTION || tag == MSG_JOB_TREE_BROADCAST);
@@ -65,11 +73,22 @@ public:
         if (!accept) return false;
 
         if (tag == MSG_JOB_TREE_REDUCTION) {
-            if (!_aggregating) {
-                _child_elems.push_back(std::move(msg.payload));
-                LOG_ADD_SRC(V5_DEBG, "CS got %i/%i elems", source, _child_elems.size(), _num_expected_child_elems);
-                advance();
-            }
+
+            if (_aggregating || _future_aggregate.valid() || _reduction_locally_done) 
+                return false; // already internally aggregating elements (or already done)!
+
+            // check if this message comes from a child which didn't already send something
+            bool fromLeftChild = !_received_child_elems.first && source == _expected_child_ranks.first;
+            bool fromRightChild = !_received_child_elems.second && source == _expected_child_ranks.second;
+            accept &= fromLeftChild || fromRightChild;
+            if (!accept) return false;
+            
+            // message accepted: store and check off
+            _child_elems.push_back(std::move(msg.payload));
+            if (fromLeftChild) _received_child_elems.first = true;
+            if (fromRightChild) _received_child_elems.second = true;
+            LOG_ADD_SRC(V5_DEBG, "CS got %i/%i elems", source, _child_elems.size(), _num_expected_child_elems);
+            advance();
         }
         if (tag == MSG_JOB_TREE_BROADCAST) {
             receiveAndForwardFinalElem(std::move(msg.payload));
@@ -163,10 +182,10 @@ private:
     void receiveAndForwardFinalElem(AllReduceElement&& elem) {
         _finished = true;
         _base_msg.payload = std::move(elem);
-        if (_tree.hasLeftChild()) 
-            MyMpi::isend(_tree.getLeftChildNodeRank(), MSG_JOB_TREE_BROADCAST, _base_msg);
-        if (_tree.hasRightChild()) 
-            MyMpi::isend(_tree.getRightChildNodeRank(), MSG_JOB_TREE_BROADCAST, _base_msg);
+        if (_expected_child_ranks.first >= 0) 
+            MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_BROADCAST, _base_msg);
+        if (_expected_child_ranks.second >= 0) 
+            MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_BROADCAST, _base_msg);
     }
 
 };

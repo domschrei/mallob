@@ -61,7 +61,7 @@ The final line of the output is the ID to run the container, e.g. by running `do
 Given a single machine with two hardware threads per core, the following command executed in Mallob's base directory assigns one MPI process to each set of four physical cores (eight hardware threads) and then runs four solver threads on each MPI process.
 
 ```
-RDMAV_FORK_SAFE=1 NPROCS=$(($(nproc)/8)) mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=4 build/mallob -t=4 $MALLOB_OPTIONS
+RDMAV_FORK_SAFE=1 NPROCS="$(($(nproc)/8))" mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=4 build/mallob -t=4 $MALLOB_OPTIONS
 ```
 
 To "daemonize" Mallob, i.e., to let it run in the background as a server for your own application(s), you can prepend `mpirun` by `nohup` and append `2>&1 > OUT &` to the whole command, creating a text file `OUT` for Mallob's output. (If you do not want this kind of output, use the "quiet" option `-q`.)
