@@ -30,11 +30,9 @@ class KMeansJob : public Job {
     int epoch = 0;
     int countReady = 0;
     std::vector<Point> kMeansData;
-    const int* payload;
     uint8_t* data;
     const float* pointsStart;
     std::future<void> calculatingTask;
-    std::future<void> loadTask;
     std::future<void> initMsgTask;
     bool finishedJob = false;
     bool iAmRoot = false;
@@ -84,9 +82,9 @@ class KMeansJob : public Job {
             this->getVolume(), myIndex);
         LOG(V2_INFO, "                           Children: %i\n",
             this->getJobTree().getNumChildren());
-        
+
         if ((0.001f < calculateDifference(
-            [&](const float* p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
+                          [&](const float* p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
             LOG(V2_INFO, "                           Another iter %i\n", iterationsDone);
             return transformed;
 
@@ -115,10 +113,8 @@ class KMeansJob : public Job {
     int getPointsCount() { return pointsCount; };
     int getIterationsDone() { return iterationsDone; };
     std::vector<Point> getKMeansData() { return kMeansData; };
-    const int* getPayload() { return payload; };
-    void setPayload(const int* newPayload) { payload = newPayload; };
 
-    KMeansJob(const Parameters& params, int commSize, int worldRank, int jobId, const int* newPayload);
+    KMeansJob(const Parameters& params, int commSize, int worldRank, int jobId);
     void appl_start() override;
     void appl_suspend() override;
     void appl_resume() override;
@@ -152,9 +148,8 @@ class KMeansJob : public Job {
     void advanceCollective(JobMessage& msg, JobTree& jobTree);
     void initReducer(JobMessage& msg);
     int getIndex(int rank);
-    const float* getKMeansData(int point){
+    const float* getKMeansData(int point) {
         return (pointsStart + dimension * point);
     }
     float getEntry(int entry);
-
 };

@@ -14,9 +14,8 @@
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
-KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int jobId, const int* newPayload)
+KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int jobId)
     : Job(params, commSize, worldRank, jobId, JobDescription::Application::KMEANS) {
-    setPayload(newPayload);
 }
 
 void KMeansJob::appl_start() {
@@ -30,27 +29,21 @@ void KMeansJob::appl_start() {
         countCurrentWorkers, myRank, myIndex);
     LOG(V2_INFO, "                           Children: %i\n",
         this->getJobTree().getNumChildren());
-    payload = getDescription().getFormulaPayload(0);
     data = getSerializedDescription(0)->data();
-    LOG(V2_INFO, "                           myIndex: %i getting ready1\n", myIndex);
+    pointsStart = (float*)(data + getDescription().getMetadataSize() + 3 * sizeof(int));
+    LOG(V2_INFO, "                           myIndex: %i getting ready\n", myIndex);
     baseMsg = JobMessage(getId(),
                          getRevision(),
                          epoch,
                          MSG_BROADCAST_DATA);
-    LOG(V2_INFO, "                           myIndex: %i getting ready2\n", myIndex);
 
-    loadTask = ProcessWideThreadPool::get().addTask([&]() {
-        LOG(V2_INFO, "                           myIndex: %i getting ready3\n", myIndex);
-        loadInstance();
-        if (terminate) return;
-        pointsStart = (float*) (data + getDescription().getMetadataSize() + 3*sizeof(int));
-        clusterMembership.assign(pointsCount, -1);
-        LOG(V2_INFO, "                           myIndex: %i Ready!\n", myIndex);
-        loaded = true;
-        if (iAmRoot) {
-            doInitWork();
-        }
-    });
+    loadInstance();
+    clusterMembership.assign(pointsCount, -1);
+    LOG(V2_INFO, "                           myIndex: %i Ready!\n", myIndex);
+    loaded = true;
+    if (iAmRoot) {
+        doInitWork();
+    }
 }
 void KMeansJob::initReducer(JobMessage& msg) {
     JobTree& tempJobTree = getJobTree();
@@ -158,10 +151,10 @@ JobResult&& KMeansJob::appl_getResult() {
 void KMeansJob::appl_terminate() {
     LOG(V2_INFO, "                           start terminate\n");
     terminate = true;
+    reducer.reset();
 }
 
 KMeansJob::~KMeansJob() {
-    if (loadTask.valid()) loadTask.get();
     if (initMsgTask.valid()) initMsgTask.get();
     if (calculatingTask.valid()) calculatingTask.get();
     LOG(V2_INFO, "                           end terminate\n");
@@ -356,13 +349,12 @@ void KMeansJob::advanceCollective(JobMessage& msg, JobTree& jobTree) {
 void KMeansJob::appl_dumpStats() {}
 void KMeansJob::appl_memoryPanic() {}
 void KMeansJob::loadInstance() {
-    
-    int* metadata = (int*) (data + getDescription().getMetadataSize());
+    int* metadata = (int*)(data + getDescription().getMetadataSize());
     countClusters = metadata[0];
     dimension = metadata[1];
     pointsCount = metadata[2];
-            LOG(V2_INFO, "                          countClusters: %i dimension %i pointsCount: %i\n", countClusters, dimension, pointsCount);
-    
+    LOG(V2_INFO, "                          countClusters: %i dimension %i pointsCount: %i\n", countClusters, dimension, pointsCount);
+
     /*
     kMeansData.reserve(pointsCount);
     float* points = (float*) (data + getDescription().getMetadataSize() + 3*sizeof(int));
@@ -386,11 +378,10 @@ void KMeansJob::setRandomStartCenters() {
     clusterCenters.resize(countClusters);
     for (int i = 0; i < countClusters; ++i) {
         clusterCenters[i].reserve(dimension);
-        for(int d = 0; d < dimension; d++){
+        for (int d = 0; d < dimension; d++) {
             clusterCenters[i].push_back(getKMeansData(static_cast<int>((static_cast<float>(i) / static_cast<float>(countClusters)) * (pointsCount - 1)))[d]);
-  
         }
-          }
+    }
 }
 
 void KMeansJob::calcNearestCenter(std::function<float(const float*, Point)> metric, int intervalId) {
