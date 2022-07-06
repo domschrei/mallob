@@ -45,11 +45,6 @@ Data type: [jobId, resultCode, successfulRank]
 */
 const int MSG_NOTIFY_RESULT_FOUND = 10;
 /*
-A signal to terminate a job is propagated.
-Data type: [jobId]
-*/
-const int MSG_NOTIFY_JOB_TERMINATING = 12;
-/*
 The sender informs the receiver (a client) that a job has been finished,
 and also provides the size of the upcoming job result message.
 Data type: [jobId, sizeOfResult]
@@ -85,13 +80,13 @@ the specified job it currently computes on (leaving the possibility
 to continue computation at some later point). Possibly self message.
 Data type: [jobId, index]
 */
-const int MSG_INTERRUPT = 23;
+const int MSG_CLOSE_JOB_REVISION = 23;
 /*
-The sender informs the receiver that the receiver should abort, i.e., 
-terminate the specified job it currently computes on. Possibly self message.
+The sender (a client) informs the receiver that the receiver should abort, i.e., 
+terminate the specified job it currently computes on.
 Data type: [jobId, index]
 */
-const int MSG_NOTIFY_JOB_ABORTING = 24;
+const int MSG_CANCEL_JOB = 24;
 /*
 A message that tells some node (worker or client) to immediately exit the application.
 */

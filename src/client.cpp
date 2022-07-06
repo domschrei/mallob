@@ -250,7 +250,7 @@ void Client::advance() {
                 it = _jobs_to_interrupt.erase(it);
             } else if (_root_nodes.count(jobId)) {
                 LOG(V2_INFO, "Interrupt #%i\n", jobId);
-                MyMpi::isend(_root_nodes.at(jobId), MSG_NOTIFY_JOB_ABORTING, IntVec({jobId, revision}));
+                MyMpi::isend(_root_nodes.at(jobId), MSG_CANCEL_JOB, IntVec({jobId, revision}));
                 it = _jobs_to_interrupt.erase(it);
                 atomics::decrementRelaxed(_num_jobs_to_interrupt);
             } else ++it;

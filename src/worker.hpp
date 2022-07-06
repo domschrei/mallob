@@ -74,22 +74,22 @@ private:
     void handleQueryJobDescription(MessageHandle& handle);
     void handleSendJobDescription(MessageHandle& handle);
 
-    void handleNotifyJobAborting(MessageHandle& handle);
+    void handleCancelJob(MessageHandle& handle);
+    void handleCloseJobRevision(MessageHandle& handle);
     void handleDoExit(MessageHandle& handle);
     void handleRejectOneshot(MessageHandle& handle);
     void handleIncrementalJobFinished(MessageHandle& handle);
     void handleInterrupt(MessageHandle& handle);
-    void handleSendApplicationMessage(MessageHandle& handle);
     void handleNotifyJobDone(MessageHandle& handle);
-    void handleQueryJobResult(MessageHandle& handle);
-    void handleQueryVolume(MessageHandle& handle);
     void handleNotifyResultObsolete(MessageHandle& handle);
-    void handleNotifyJobTerminating(MessageHandle& handle);
     void handleNotifyVolumeUpdate(MessageHandle& handle);
     void handleNotifyNodeLeavingJob(MessageHandle& handle);
     void handleNotifyResultFound(MessageHandle& handle);
     void handleNotifyNeighborStatus(MessageHandle& handle);
     void handleNotifyNeighborIdleDistance(MessageHandle& handle);
+    void handleQueryJobResult(MessageHandle& handle);
+    void handleQueryVolume(MessageHandle& handle);
+    void handleSendApplicationMessage(MessageHandle& handle);
     void handleRequestWork(MessageHandle& handle);
     void handleSchedReleaseFromWaiting(MessageHandle& handle);
     void handleSchedNodeFreed(MessageHandle& handle);
@@ -111,9 +111,9 @@ private:
     void activateRootRequest(int jobId);
     void propagateVolumeUpdate(Job& job, int volume, int balancingEpoch);
 
-    void interruptJob(int jobId, bool terminate, bool reckless);
     void sendJobDoneWithStatsToClient(int jobId, int revision, int successfulRank);
     void timeoutJob(int jobId);
+    void propagateRevisionClosed(int jobId, int revision, int successfulRank);
 
     void sendStatusToNeighbors();
     int getIdleDistance();

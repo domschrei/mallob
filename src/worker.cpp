@@ -72,16 +72,14 @@ void Worker::init() {
     // Begin listening to incoming messages
     q.registerCallback(MSG_ANSWER_ADOPTION_OFFER,
         [&](auto& h) {handleAnswerAdoptionOffer(h);});
-    q.registerCallback(MSG_NOTIFY_JOB_ABORTING, 
-        [&](auto& h) {handleNotifyJobAborting(h);});
-    q.registerCallback(MSG_NOTIFY_JOB_TERMINATING, 
-        [&](auto& h) {handleNotifyJobTerminating(h);});
+    q.registerCallback(MSG_CANCEL_JOB, 
+        [&](auto& h) {handleCancelJob(h);});
     q.registerCallback(MSG_NOTIFY_RESULT_FOUND, 
         [&](auto& h) {handleNotifyResultFound(h);});
     q.registerCallback(MSG_INCREMENTAL_JOB_FINISHED,
         [&](auto& h) {handleIncrementalJobFinished(h);});
-    q.registerCallback(MSG_INTERRUPT,
-        [&](auto& h) {handleInterrupt(h);});
+    q.registerCallback(MSG_CLOSE_JOB_REVISION,
+        [&](auto& h) {handleCloseJobRevision(h);});
     q.registerCallback(MSG_NOTIFY_NODE_LEAVING_JOB, 
         [&](auto& h) {handleNotifyNodeLeavingJob(h);});
     q.registerCallback(MSG_NOTIFY_RESULT_OBSOLETE, 
@@ -430,12 +428,12 @@ void Worker::publishAndResetSysState() {
     _sys_state.setLocal(SYSSTATE_SUMDESIRELATENCIES, 0);
 }
 
-void Worker::handleNotifyJobAborting(MessageHandle& handle) {
+void Worker::handleCancelJob(MessageHandle& handle) {
 
-    int jobId = Serializable::get<int>(handle.getRecvData());
+    auto [jobId, revision] = Serializable::get<IntPair>(handle.getRecvData());
     if (!_job_db.has(jobId)) return;
 
-    LOG(V3_VERB, "Acknowledge #%i aborting\n", jobId);
+    LOG(V3_VERB, "Cancelling #%i rev. %i\n", jobId, revision);
     auto& job = _job_db.get(jobId);    
     if (job.getJobTree().isRoot()) {
         // Forward information on aborted job to client
@@ -443,11 +441,7 @@ void Worker::handleNotifyJobAborting(MessageHandle& handle) {
             MSG_NOTIFY_CLIENT_JOB_ABORTING, handle.moveRecvData());
     }
 
-    if (job.isIncremental()) {
-        interruptJob(jobId, /*terminate=*/false, /*reckless=*/false);
-    } else {
-        interruptJob(jobId, /*terminate=*/true, /*reckless=*/true);
-    }
+    propagateRevisionClosed(jobId, revision, /*successfulRank=*/-1);
 }
 
 void Worker::handleAnswerAdoptionOffer(MessageHandle& handle) {
@@ -702,12 +696,8 @@ void Worker::handleIncrementalJobFinished(MessageHandle& handle) {
     int jobId = Serializable::get<int>(handle.getRecvData());
     if (_job_db.has(jobId)) {
         LOG(V3_VERB, "Incremental job %s done\n", _job_db.get(jobId).toStr());
-        interruptJob(Serializable::get<int>(handle.getRecvData()), /*terminate=*/true, /*reckless=*/false);
+        propagateRevisionClosed(jobId, /*revision=*/-1, /*successfulRank=*/-1);
     }
-}
-
-void Worker::handleInterrupt(MessageHandle& handle) {
-    interruptJob(Serializable::get<int>(handle.getRecvData()), /*terminate=*/false, /*reckless=*/false);
 }
 
 void Worker::handleSendApplicationMessage(MessageHandle& handle) {
@@ -890,10 +880,6 @@ void Worker::handleSendJobDescription(MessageHandle& handle) {
     }
 }
 
-void Worker::handleNotifyJobTerminating(MessageHandle& handle) {
-    interruptJob(Serializable::get<int>(handle.getRecvData()), /*terminate=*/true, /*reckless=*/false);
-}
-
 void Worker::handleNotifyVolumeUpdate(MessageHandle& handle) {
     IntVec recv = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = recv[0];
@@ -960,11 +946,7 @@ void Worker::handleNotifyResultFound(MessageHandle& handle) {
     sendJobDoneWithStatsToClient(jobId, revision, successfulRank);
 
     // Terminate job and propagate termination message
-    if (_job_db.get(jobId).getDescription().isIncremental()) {
-        //handleInterrupt(handle); // TODO
-    } else {
-        handleNotifyJobTerminating(handle);
-    }
+    propagateRevisionClosed(jobId, revision, successfulRank);
 }
 
 void Worker::handleSchedReleaseFromWaiting(MessageHandle& handle) {
@@ -1258,45 +1240,53 @@ void Worker::sendJobRequest(const JobRequest& req, int tag, bool left, int dest)
     else job.getJobTree().setDesireRight(Timer::elapsedSeconds());
 }
 
-void Worker::interruptJob(int jobId, bool terminate, bool reckless) {
+void Worker::handleCloseJobRevision(MessageHandle& handle) {
+    auto data = Serializable::get<IntVec>(handle.getRecvData());
+    int jobId = data[0];
+    int revision = data[1];
+    int successfulRank = data[2];
+    propagateRevisionClosed(jobId, revision, successfulRank);
+}
+
+void Worker::propagateRevisionClosed(int jobId, int revision, int successfulRank) {
 
     if (!_job_db.has(jobId)) return;
     Job& job = _job_db.get(jobId);
 
-    // Ignore if this job node is already in the goal state
+    // Ignore if this revision has already been closed
     // (also implying that it already forwarded such a request downwards if necessary)
-    if (!terminate && !job.hasCommitment() && (job.getState() == SUSPENDED || job.getState() == INACTIVE)) 
-        return;
+    if (revision >= 0 && !job.isRevisionOpen(revision)) return;
+    if (revision == -1 && job.getState() == PAST) return;
 
     // Propagate message down the job tree
-    int msgTag;
-    if (terminate && reckless) msgTag = MSG_NOTIFY_JOB_ABORTING;
-    else if (terminate) msgTag = MSG_NOTIFY_JOB_TERMINATING;
-    else msgTag = MSG_INTERRUPT;
+    auto payload = IntVec({jobId, revision, successfulRank});
     if (job.getJobTree().hasLeftChild()) {
-        MyMpi::isend(job.getJobTree().getLeftChildNodeRank(), msgTag, IntVec({jobId}));
-        LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s ...", job.getJobTree().getLeftChildNodeRank(), job.toStr());
+        MyMpi::isend(job.getJobTree().getLeftChildNodeRank(), MSG_CLOSE_JOB_REVISION, payload);
+        LOG_ADD_DEST(V4_VVER, "Close rev. %i of %s ...", job.getJobTree().getLeftChildNodeRank(), revision, job.toStr());
     }
     if (job.getJobTree().hasRightChild()) {
-        MyMpi::isend(job.getJobTree().getRightChildNodeRank(), msgTag, IntVec({jobId}));
-        LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s ...", job.getJobTree().getRightChildNodeRank(), job.toStr());
+        MyMpi::isend(job.getJobTree().getRightChildNodeRank(), MSG_CLOSE_JOB_REVISION, payload);
+        LOG_ADD_DEST(V4_VVER, "Close rev. %i of %s ...", job.getJobTree().getRightChildNodeRank(), revision, job.toStr());
     }
     for (auto childRank : job.getJobTree().getPastChildren()) {
-        MyMpi::isend(childRank, msgTag, IntVec({jobId}));
-        LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s (past child) ...", childRank, job.toStr());
-    }
-    if (terminate) job.getJobTree().getPastChildren().clear();
-
-    // Uncommit job if committed
-    if (job.hasCommitment()) {
-        _job_db.uncommit(jobId);
-        _job_db.unregisterJobFromBalancer(jobId);
-        _job_db.suspendScheduler(job);
+        MyMpi::isend(childRank, MSG_CLOSE_JOB_REVISION, payload);
+        LOG_ADD_DEST(V4_VVER, "Close rev. %i of %s (past child) ...", childRank, revision, job.toStr());
     }
 
-    // Suspend or terminate the job
-    if (terminate) _job_db.terminate(jobId);
-    else if (job.getState() == ACTIVE) _job_db.suspend(jobId);
+    job.closeRevision(revision, successfulRank);
+
+    if (!job.isIncremental() || revision == -1) {
+        // Actually terminate the job.
+
+        // Uncommit job if committed
+        if (job.hasCommitment()) {
+            _job_db.uncommit(jobId);
+            _job_db.unregisterJobFromBalancer(jobId);
+            _job_db.suspendScheduler(job);
+        }
+        _job_db.terminate(jobId);
+        job.getJobTree().getPastChildren().clear();
+    }
 }
 
 void Worker::sendJobDoneWithStatsToClient(int jobId, int revision, int successfulRank) {
@@ -1318,13 +1308,11 @@ void Worker::sendJobDoneWithStatsToClient(int jobId, int revision, int successfu
 }
 
 void Worker::timeoutJob(int jobId) {
-    // "Virtual self message" aborting the job
-    IntVec payload({jobId});
-    MessageHandle handle;
-    handle.tag = MSG_NOTIFY_JOB_ABORTING;
-    handle.finished = true;
-    handle.receiveSelfMessage(payload.serialize(), _world_rank);
-    handleNotifyJobAborting(handle);
+
+    // TODO introduce timeouts on a per-revision basis
+    // => close the current revision, not the entire job.
+    propagateRevisionClosed(jobId, /*revision=*/-1, /*successfulRank=*/-1);
+    
     if (_params.monoFilename.isSet()) {
         // Single job hit a limit, so there is no solution to be reported:
         // begin to propagate exit signal

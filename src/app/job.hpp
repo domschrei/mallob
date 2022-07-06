@@ -171,6 +171,7 @@ private:
 
     std::function<void(JobResult&&)> _cb_publish_job_result;
     std::vector<int> _successful_rank_by_revision;
+    std::vector<bool> _open_revisions;
 
 // Public methods.
 public:
@@ -254,6 +255,14 @@ public:
 
     void publishResult(int revision, int resultCode, std::vector<int>&& solution);
     void publishResult(JobResult&& result);
+
+    void closeRevision(int revision, int successfulRank) {
+        if (revision >= _open_revisions.size()) _open_revisions.resize(revision+1, true);
+        _open_revisions[revision] = false;
+    }
+    bool isRevisionOpen(int revision) {
+        return revision >= _open_revisions.size() || _open_revisions[revision];
+    }
 
     // Returns whether the job is easily and quickly destructible as of now. 
     // (calls appl_isDestructible())
