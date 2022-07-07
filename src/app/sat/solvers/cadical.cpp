@@ -22,6 +22,12 @@ Cadical::Cadical(const SolverSetup& setup)
 	
 	solver->connect_terminator(&terminator);
 	solver->connect_learn_source(&learnSource);
+        solver->set("binary", false);
+        std::string logdir = setup.logger->getLogDir();
+        //length of the directory + space for filename
+        char *filename = new char [logdir.length() + 50];
+        sprintf(filename, "%s/proof.%d.frat", logdir.c_str(), setup.globalId);
+        solver->trace_proof(filename);
 }
 
 void Cadical::addLiteral(int lit) {
@@ -43,7 +49,8 @@ void Cadical::diversify(int seed) {
 		int maxNumSolvers = getSolverSetup().maxNumSolvers;
 		LOGGER(_logger, V3_VERB, "Diversifying rank=%i size=%i DI=%i with certified UNSAT support\n", 
 			solverRank, maxNumSolvers, getDiversificationIndex());
-		okay = solver->set("instance_num", solverRank); assert(okay);
+                //Need to do +1 so we don't start at 0
+		okay = solver->set("instance_num", solverRank + 1); assert(okay);
 		okay = solver->set("total_instances", maxNumSolvers); assert(okay);
 
 		// Check that a version of CaDiCaL is used which has all the unsupported options switched off

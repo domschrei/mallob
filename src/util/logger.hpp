@@ -54,6 +54,10 @@ public:
         return _log_filename;
     }
 
+    std::string getLogDir(){
+        return _log_directory;
+    }
+
     void mergeJobLogs(int jobId);
 
     Logger copy(const std::string& linePrefix, const std::string& filenameSuffix, int verbosityOffset = 0) const;
