@@ -53,6 +53,18 @@ The final line of the output is the ID to run the container, e.g. by running `do
 
 <hr/>
 
+# Testing
+
+In order to test that the system has been built and set up correctly, run the following command.
+```
+bash scripts/run/systest.sh mono drysched sched osc
+```
+This will locally run a suite of automated tests which cover the basic functionality of Mallob as a scheduler and as a SAT solving engine. 
+To include Glucose in the tests, prepend the above command with "GLUCOSE=1".
+Running the tests takes a few minutes and in the end "All tests done." should be output.
+
+<hr/>
+
 # Usage
 
 ## General
