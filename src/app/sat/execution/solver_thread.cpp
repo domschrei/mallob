@@ -12,7 +12,7 @@ using namespace SolvingStates;
 SolverThread::SolverThread(const Parameters& params, const SatProcessConfig& config,
          std::shared_ptr<PortfolioSolverInterface> solver, 
         size_t fSize, const int* fLits, size_t aSize, const int* aLits,
-        int localId) : 
+        int localId, bool attemptToSolve1stRev) : 
     _params(params), _solver_ptr(solver), _solver(*solver), 
     _logger(_solver.getLogger()), _local_id(localId), 
     _has_pseudoincremental_solvers(solver->getSolverSetup().hasPseudoincrementalSolvers) {
@@ -21,7 +21,7 @@ SolverThread::SolverThread(const Parameters& params, const SatProcessConfig& con
     _portfolio_size = config.mpisize;
     _local_solvers_count = config.threads;
 
-    appendTask(0, fSize, fLits, aSize, aLits);
+    appendTask(0, fSize, fLits, aSize, aLits, /*attemptToSolve=*/attemptToSolve1stRev);
 }
 
 void SolverThread::start() {
@@ -77,19 +77,11 @@ void* SolverThread::run() {
 void SolverThread::readFormula(Task& task) {
     constexpr int batchSize = 100000;
 
-    size_t fSize = 0;
-    const int* fLits;
-    size_t aSize = 0;
-    const int* aLits;
-
     // Fetch the task description to read
-    {
-        auto lock = _state_mutex.getLock();
-        fSize = task.numLiterals;
-        fLits = task.literals;
-        aSize = task.numAssumptions;
-        aLits = task.assumptions;
-    }
+    size_t fSize = task.numLiterals;
+    const int* fLits = task.literals;
+    size_t aSize = task.numAssumptions;
+    const int* aLits = task.assumptions;
 
     LOGGER(_logger, V4_VVER, "Reading rev. %i, start %i\n", (int)task.revision, (int)task.numReadLiterals);
     
@@ -170,10 +162,11 @@ void SolverThread::readFormula(Task& task) {
     }
 }
 
-void SolverThread::appendTask(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits) {
+void SolverThread::appendTask(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, bool attemptToSolve) {
     {
         auto lock = _state_mutex.getLock();
         _tasks.emplace_back(new Task(revision, fSize, fLits, aSize, aLits));
+        _tasks.back()->attemptToSolve = attemptToSolve;
         LOGGER(_logger, V4_VVER, "Received %i literals, %i assumptions\n", fSize, aSize);
         assert(revision+1 == (int)_tasks.size() || LOG_RETURN_FALSE("%i != %i", revision+1, _tasks.size()));
         //if (revision > 0) {
@@ -212,6 +205,8 @@ void SolverThread::diversifyAfterReading() {
 
 
 void SolverThread::processTask(Task& task) {
+
+    if (!task.attemptToSolve) return;
 
     // Set up correct solver state (or return if not possible)
     size_t aSize = task.numAssumptions;

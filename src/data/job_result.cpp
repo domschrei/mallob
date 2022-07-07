@@ -62,7 +62,7 @@ void JobResult::setSolutionToSerialize(const int* solutionPtr, size_t solutionSi
 }
 
 size_t JobResult::getSolutionSize() const {
-    if (!packedData.empty()) return packedData.size()/sizeof(int) - 4;
+    if (!packedData.empty()) return packedData.size()/sizeof(int) - 3;
     return solution.size();
 }
 

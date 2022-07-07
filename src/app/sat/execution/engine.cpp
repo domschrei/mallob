@@ -170,12 +170,13 @@ void SatEngine::appendRevision(int revision, size_t fSize, const int* fLits, siz
 		if (revision == 0) {
 			// Initialize solver thread
 			_solver_threads.emplace_back(new SolverThread(
-				_params, _config, _solver_interfaces[i], fSize, fLits, aSize, aLits, i
+				_params, _config, _solver_interfaces[i], fSize, fLits, aSize, aLits, i,
+				/*attemptToSolve1stRev=*/lastRevisionForNow
 			));
 		} else {
 			if (_solver_interfaces[i]->getSolverSetup().doIncrementalSolving) {
 				// True incremental SAT solving
-				_solver_threads[i]->appendTask(revision, fSize, fLits, aSize, aLits);
+				_solver_threads[i]->appendTask(revision, fSize, fLits, aSize, aLits, /*attemptToSolve=*/lastRevisionForNow);
 			} else {
 				if (!lastRevisionForNow) {
 					// Another revision will be imported momentarily: 
@@ -202,13 +203,14 @@ void SatEngine::appendRevision(int revision, size_t fSize, const int* fLits, siz
 					_params, _config, _solver_interfaces[i], 
 					_revision_data[0].fSize, _revision_data[0].fLits, 
 					_revision_data[0].aSize, _revision_data[0].aLits, 
-					i
+					i, /*attemptToSolve1stRev=*/ revision == 0 && lastRevisionForNow
 				));
-				// Load entire formula 
+				// Load entire formula
 				for (int importedRevision = 1; importedRevision <= revision; importedRevision++) {
 					auto& data = _revision_data[importedRevision];
 					_solver_threads[i]->appendTask(importedRevision, 
-						data.fSize, data.fLits, data.aSize, data.aLits
+						data.fSize, data.fLits, data.aSize, data.aLits,
+						/*attemptToSolve=*/ (importedRevision == revision) && lastRevisionForNow
 					);
 				}
 				_sharing_manager->continueClauseImport(i);

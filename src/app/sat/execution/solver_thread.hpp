@@ -25,12 +25,15 @@ class SolverThread {
 
 private:
     struct Task {
+
         int revision;
         size_t numLiterals;
         const int* literals;
         size_t numAssumptions;
         const int* assumptions;
         size_t numReadLiterals = 0;
+        
+        bool attemptToSolve = true;
         bool hasResultToPublish = false;
         JobResult result;
 
@@ -79,11 +82,12 @@ private:
 
 public:
     SolverThread(const Parameters& params, const SatProcessConfig& config, std::shared_ptr<PortfolioSolverInterface> solver, 
-                size_t fSize, const int* fLits, size_t aSize, const int* aLits, int localId);
+                size_t fSize, const int* fLits, size_t aSize, const int* aLits, int localId,
+                bool attemptToSolve1stRev);
     ~SolverThread();
 
     void start();
-    void appendTask(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits);
+    void appendTask(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, bool attemptToSolve);
     void setSuspend(bool suspend) {
         {
             auto lock = _state_mutex.getLock();

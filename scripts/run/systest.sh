@@ -51,8 +51,8 @@ function test_dry_scheduling() {
 }
 
 function test_incremental() {
-    for test in entertainment08 roverg10 transportg29 ; do
-        for slv in lgck LgCk; do
+    for test in entertainment08 roverg10 transportg29 towers05 ; do
+        for slv in LCgk LgCk ; do
             introduce_incremental_job $test 
             test 4 -c=1 -t=2 -satsolver=$slv -J=1 -incrementaltest $@
         done

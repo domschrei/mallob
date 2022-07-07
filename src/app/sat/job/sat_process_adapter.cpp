@@ -366,7 +366,7 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         // No preparation going on yet?
         } else {
             // Begin preparation of solution
-            _solution_revision_in_preparation = _desired_revision;
+            _solution_revision_in_preparation = _hsm->solutionRevision;
             _solution_in_preparation = true;
             _solution_prepare_future = ProcessWideThreadPool::get().addTask([&]() {
                 doPrepareSolution();
@@ -381,6 +381,7 @@ void SatProcessAdapter::doPrepareSolution() {
     int rev = _solution_revision_in_preparation;
     size_t* solutionSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));
     if (*solutionSize == 0) {
+        _solution.revision = rev;
         _solution.result = _hsm->result;
         _solution.setSolutionToSerialize(nullptr, 0);
         _solution_in_preparation = false;

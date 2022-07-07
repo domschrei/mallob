@@ -298,6 +298,10 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
             // (commit would overwrite job index!)
             if (_coll_assign) _coll_assign->setStatusDirty();
             return REJECT;
+        } else if (get(req.jobId).getState() == ACTIVE) {
+            // New revision incoming for this job!
+            removedJob = req.jobId;
+            return ADOPT_REPLACE_CURRENT;
         }
     } else {
         if (hasDormantRoot() && req.requestedNodeIndex == 0) {

@@ -640,11 +640,20 @@ void Worker::tryAdoptRequest(JobRequest& req, int source, JobDatabase::JobReques
     // Do I adopt the job?
     if (adoptionResult == JobDatabase::ADOPT_FROM_IDLE || adoptionResult == JobDatabase::ADOPT_REPLACE_CURRENT) {
 
-        // Replaced the current job
+        // Replacing a currently busy job?
         if (adoptionResult == JobDatabase::ADOPT_REPLACE_CURRENT) {
             Job& job = _job_db.get(removedJob);
-            MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, 
-                IntVec({job.getId(), job.getIndex(), job.getJobTree().getRootNodeRank()}));
+            if (removedJob == req.jobId) {
+                // Root received a new revision!
+                assert(req.requestedNodeIndex == 0);
+                job.setDesiredRevision(req.revision);
+                MyMpi::isend(req.requestingNodeRank, MSG_OFFER_ADOPTION_OF_ROOT, req);
+                return;
+            } else {
+                // Replaced the current job
+                MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, 
+                    IntVec({job.getId(), job.getIndex(), job.getJobTree().getRootNodeRank()}));
+            }
         }
 
         // Adoption takes place
@@ -1273,7 +1282,7 @@ void Worker::propagateRevisionClosed(int jobId, int revision, int successfulRank
         LOG_ADD_DEST(V4_VVER, "Close rev. %i of %s (past child) ...", childRank, revision, job.toStr());
     }
 
-    job.closeRevision(revision, successfulRank);
+    if (revision >= 0) job.closeRevision(revision, successfulRank);
 
     if (!job.isIncremental() || revision == -1) {
         // Actually terminate the job.
