@@ -74,13 +74,13 @@ Given a single machine with two hardware threads per core, the following command
 ```
 RDMAV_FORK_SAFE=1 NPROCS="$(($(nproc)/8))" mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=4 build/mallob -t=4 $MALLOB_OPTIONS
 ```
+You can always stop Mallob via Ctrl+C (interrupt signal) or by executing `killall mpirun`. 
+Alternatively, you can specify the number of jobs to process (with `-J=$NUM_JOBS`) and/or the time to pass (with `-T=$TIME_LIMIT_SECS`) before Mallob terminates on its own.
 
-To "daemonize" Mallob, i.e., to let it run in the background as a server for your own application(s), you can prepend `mpirun` by `nohup` and append `2>&1 > OUT &` to the whole command, creating a text file `OUT` for Mallob's output. (If you do not want this kind of output, use the "quiet" option `-q`.)
-If running in the background, do not forget to `kill` Mallob (i.e., SIGTERM the `mpirun` process) after you are done.
-Alternatively you can specify the number of jobs to process (with `-J=$NUM_JOBS`) and/or the time to pass (with `-T=$TIME_LIMIT_SECS`) before Mallob should terminate on its own.
-
-For exact and clean logging, you should not rely on a textfile in which you piped Mallob's output (like `OUT` above).
-Instead, specify a logging directory with `-log=<log-dir>` where separate sub-directories and files will be created for each worker / thread. Verbosity of logging can be set with the `-v` option.
+For exact and clean logging, you should not rely on a textfile in which you piped Mallob's output.
+Instead, specify a logging directory with `-log=<log-dir>` where separate sub-directories and files will be created for each worker / thread. 
+This can be combined with the `-q` option to suppress Mallob's output to STDOUT. 
+Verbosity of logging can be set with the `-v` option (as long as Mallob was compiled with the respective verbosity or higher, see `-DMALLOB_LOG_VERBOSITY` above).
 All further options of Mallob can be seen by executing Mallob with the `-h` option. (This also works without the `mpirun` prefix.)
 
 For running Mallob on distributed clusters, please also consult [the scripts and documentation from our Euro-Par 2022 software artifact](https://doi.org/10.6084/m9.figshare.20000642) as well as the user documentation of your particular cluster.
