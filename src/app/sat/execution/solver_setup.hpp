@@ -18,7 +18,8 @@ struct SolverSetup {
 	bool hasPseudoincrementalSolvers;
 	char solverType;
 	int solverRevision;
-	
+        int numOriginalClauses;
+
 	int minNumChunksPerSolver;
 	int numBufferedClsGenerations;
 

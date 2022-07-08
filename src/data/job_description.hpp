@@ -197,6 +197,7 @@ public:
     void setAppConfiguration(AppConfiguration&& appConfig) {_app_config = std::move(appConfig);}
     void setPreloadedLiterals(std::vector<int>&& lits) {_preloaded_literals = std::move(lits);}
     void setPreloadedAssumptions(std::vector<int>&& asmpt) {_preloaded_assumptions = std::move(asmpt);}
+    void setAppConfigurationEntry(const std::string& key, const std::string& val) {_app_config.map[key] = val;}
 
     Checksum getChecksum() const {return _checksum;}
     void setChecksum(const Checksum& checksum) {_checksum = checksum;}
@@ -222,6 +223,11 @@ public:
     Statistics& getStatistics() {
         if (_stats == nullptr) _stats = new Statistics();
         return *_stats;
+    }
+
+    void transferRevisionData(JobDescription& other, int revision) {
+        getRevisionData(revision) = other.getRevisionData(revision);
+        setRevision(std::max(getRevision(), revision));
     }
 
 private:

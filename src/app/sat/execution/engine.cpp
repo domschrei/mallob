@@ -52,6 +52,11 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	std::string key = "diversification-offset";
 	int diversificationOffset = appConfig.map.count(key) ? atoi(appConfig.map[key].c_str()) : 0;
 
+        std::string numClausesStr = appConfig.map["__NC"];
+	while (numClausesStr[numClausesStr.size()-1] == '.') 
+		numClausesStr.resize(numClausesStr.size()-1);
+	int numClauses = atoi(numClausesStr.c_str());
+
 	// Add solvers from full cycles on previous ranks
 	// and from the begun cycle on the previous rank
 	int numFullCycles = (appRank * numOrigSolvers) / solverChoices.size();
@@ -89,6 +94,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.skipClauseSharingDiagonally = true;
 	setup.certifiedUnsat = params.certifiedUnsat();
         setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
+        setup.numOriginalClauses = numClauses;
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
