@@ -28,6 +28,7 @@ private:
     bool _assumption = false;
 	int _num = 0;
 	int _max_var = 0;
+    int _num_read_clauses = 0;
 
     // Content mode: RAW
     bool _traversing_clauses = true;
@@ -63,7 +64,10 @@ public:
             return;
         }
         
-        if (_traversing_clauses) desc.addLiteral(x);
+        if (_traversing_clauses) {
+            desc.addLiteral(x);
+            if (x == 0) _num_read_clauses++;
+        }
         else desc.addAssumption(x);
 
         _max_var = std::max(_max_var, std::abs(x));
@@ -81,7 +85,10 @@ public:
             _comment = false;
             if (_began_num) {
                 assert(_num == 0);
-                if (!_assumption) desc.addLiteral(0);
+                if (!_assumption) {
+                    desc.addLiteral(0);
+                    _num_read_clauses++;
+                }
                 _began_num = false;
             }
             _assumption = false;
@@ -97,7 +104,9 @@ public:
             if (_began_num) {
                 _max_var = std::max(_max_var, _num);
                 if (!_assumption) {
-                    desc.addLiteral(_sign * _num);
+                    int lit = _sign * _num;
+                    desc.addLiteral(lit);
+                    if (lit == 0) _num_read_clauses++;
                 } else if (_num != 0) {
                     desc.addAssumption(_sign * _num);
                 }

@@ -26,6 +26,8 @@ bool SatReader::read(JobDescription& desc) {
 		namedpipe = open(_filename.c_str(), O_RDONLY);
 	}
 	
+	const std::string NC_DEFAULT_VAL = "BMMMKKK111";
+	desc.setAppConfigurationEntry("__NC", NC_DEFAULT_VAL);
 	desc.beginInitialization(desc.getRevision());
 	
 	if (pipe == nullptr && namedpipe == -1) {
@@ -110,6 +112,12 @@ bool SatReader::read(JobDescription& desc) {
 			process(EOF, desc);
 		}
 	}
+
+	std::string numClausesStr = std::to_string(_num_read_clauses);
+	assert(numClausesStr.size() < NC_DEFAULT_VAL.size());
+	while (numClausesStr.size() < NC_DEFAULT_VAL.size())
+		numClausesStr += ".";
+	desc.setAppConfigurationEntry("__NC", numClausesStr);
 
 	desc.endInitialization();
 
