@@ -46,11 +46,89 @@ function run_incremental() {
     echo "$BASHPID: Done." 
 }
 
+function run_async_incremental() {
+    echo "$BASHPID: Reading incremental job from $1"
+
+    donefiles=""
+    nintroduced=0
+    nsolved=0
+
+    endjob=$(cat $1|tail -1)
+    cat $1|head -$(($(cat $1|wc -l)-1)) > __tmp
+
+    # Introduce asynchronous incremental revisions
+    while read line; do
+                
+        file=$(echo $line|awk '{print $1}')
+        result=$(echo $line|awk '{print $2}')
+        
+        echo "$BASHPID: Initiate $file"
+        cp .api/jobs.0/{introduced,in}/$file
+
+        donefiles="$donefiles "".api/jobs.0/out/admin.${file}#$result"
+        nintroduced=$((nintroduced+1))
+    done < __tmp
+    rm __tmp
+
+    # Wait for results
+    while [ $nintroduced -gt $nsolved ]; do
+        for donefile_result in $donefiles; do
+            
+            donefile=$(echo $donefile_result|sed 's/#/ /g'|awk '{print $1}')
+            result=$(echo $donefile_result|sed 's/#/ /g'|awk '{print $2}')
+
+            if [ -f $donefile ]; then
+
+                echo "$BASHPID: Found $donefile"
+                
+                if ! grep -q '"resultstring": "UNKNOWN"' $donefile ; then
+                    if [ $result == unsat ] ; then
+                        if ! grep -q '"resultstring": "UNSAT"' $donefile ; then
+                            error "Expected result UNSAT for $file was not found."
+                        fi
+                    elif [ $result == sat ] ; then
+                        if ! grep -q '"resultstring": "SAT"' $donefile ; then
+                            error "Expected result SAT for $file was not found."
+                        fi
+                    fi
+                fi
+                rm $donefile
+                nsolved=$((nsolved+1))
+
+                echo "$BASHPID: $nsolved/$nintroduced solved"
+            fi
+        done
+    done
+
+    # Introduce stopping final job
+    file=$(echo $endjob|awk '{print $1}')
+    echo "$BASHPID: Initiate $file"
+    cp .api/jobs.0/{introduced,in}/$file
+    donefile=".api/jobs.0/out/admin.${file}"
+    while [ ! -f $donefile ]; do sleep 0.1; done
+    echo "$BASHPID: Found $donefile"
+    rm $donefile
+
+    echo "$BASHPID: Done."
+}
+
 function run() {
     echo "[$testcount] -np $@"
     np=$1
     shift 1
-    if echo "$@"|grep -q "incrementaltest"; then
+    if echo "$@"|grep -q "asyncincrementaltest"; then
+        RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob -pls=0 $@ 2>&1 > _systest &
+        waitpids=$!
+        for f in _incremental_jobs-* ; do
+            run_async_incremental "$f" &
+            newpid=$!
+            waitpids="$newpid $waitpids"
+        done
+        for pid in $waitpids; do
+            wait $pid
+            echo "Wait for $pid done"
+        done
+    elif echo "$@"|grep -q "incrementaltest"; then
         RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob -pls=0 $@ 2>&1 > _systest &
         waitpids=$!
         for f in _incremental_jobs-* ; do

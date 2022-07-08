@@ -59,6 +59,15 @@ function test_incremental() {
     done
 }
 
+function test_async_incremental() {
+    for test in unsat300cubes ; do
+        for slv in LCgk LgCk ; do
+            introduce_incremental_job $test 
+            test 4 -c=1 -t=2 -satsolver=$slv -J=1 -asyncincrementaltest $@
+        done
+    done
+}
+
 function test_many_incremental() {
     for i in {1..10}; do
         introduce_incremental_job entertainment08
@@ -138,6 +147,9 @@ while [ ! -z "$1" ]; do
             ;;
         manyinc)
             test_many_incremental $progopts
+            ;;
+        asyncinc)
+            test_async_incremental $progopts
             ;;
         -*)
             echo "Adding program option \"$arg\""

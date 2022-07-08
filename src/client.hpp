@@ -121,6 +121,8 @@ private:
     void introduceNextJob();
     void finishJob(int jobId, int revision, bool hasIncrementalSuccessors);
 
+    void sendJobDescription(JobDescription& desc, int destRank);
+
     bool isRevisionDone(int jobId, int revision) {
         return _done_jobs.count(jobId) 
             && revision < _done_jobs[jobId].revisionsDone.size() 

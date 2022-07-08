@@ -72,6 +72,8 @@ bool JobDatabase::appendRevision(int jobId, const std::shared_ptr<std::vector<ui
 
     // Push revision description
     job.pushRevision(description);
+    job.setDesiredRevision(std::max(job.getDesiredRevision(), rev));
+
     return true;
 }
 

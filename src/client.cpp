@@ -235,6 +235,7 @@ void Client::advance() {
             LOG_ADD_DEST(V3_VERB, "Notify #%i:0 that job is done", _root_nodes[jobId], jobId);
             IntVec payload({jobId});
             MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
+            assert(_active_jobs.count(jobId));
             int revision = _active_jobs[jobId]->getRevision();
             finishJob(jobId, revision, /*hasIncrementalSuccessors=*/false);
         }
@@ -350,32 +351,36 @@ void Client::introduceNextJob() {
     // Store as an active job
     JobDescription& job = *jobPtr;
     int jobId = job.getId();
-    _active_jobs[jobId] = std::move(jobPtr);
+    if (!_active_jobs.count(jobId))
+        _active_jobs[jobId] = std::move(jobPtr);
+    else {
+        _active_jobs[jobId]->transferRevisionData(job, job.getRevision());
+    }
     _sys_state.addLocal(SYSSTATE_SCHEDULED_JOBS, 1);
 
     // Set actual job arrival
     float time = Timer::elapsedSeconds();
     job.setArrival(time);
 
-    int nodeRank;
-    if (job.isIncremental()) {
-        // Incremental job: Send request to root node in standby
-        nodeRank = _root_nodes[jobId];
+    if (job.isIncremental() && job.getRevision() > 0) {
+        // Subsequent revision for incremental job: 
+        // Send job description to existing root node of this job
+        sendJobDescription(*_active_jobs[jobId], _root_nodes[jobId]);
     } else {
         // Find the job's canonical initial node
         int n = _params.numWorkers() >= 0 ? _params.numWorkers() : MyMpi::size(MPI_COMM_WORLD);
         LOG(V5_DEBG, "Creating permutation of size %i ...\n", n);
         AdjustablePermutation p(n, jobId);
-        nodeRank = p.get(0);
+        int nodeRank = p.get(0);
+
+        JobRequest req(jobId, job.getApplicationId(), /*rootRank=*/-1, /*requestingNodeRank=*/_world_rank, 
+            /*requestedNodeIndex=*/0, /*timeOfBirth=*/time, /*balancingEpoch=*/-1, /*numHops=*/0, job.isIncremental());
+        req.revision = job.getRevision();
+        req.timeOfBirth = job.getArrival();
+
+        LOG_ADD_DEST(V2_INFO, "Introducing job #%i rev. %i : %s", nodeRank, jobId, req.revision, req.toStr().c_str());
+        MyMpi::isend(nodeRank, MSG_REQUEST_NODE, req);
     }
-
-    JobRequest req(jobId, job.getApplicationId(), /*rootRank=*/-1, /*requestingNodeRank=*/_world_rank, 
-        /*requestedNodeIndex=*/0, /*timeOfBirth=*/time, /*balancingEpoch=*/-1, /*numHops=*/0, job.isIncremental());
-    req.revision = job.getRevision();
-    req.timeOfBirth = job.getArrival();
-
-    LOG_ADD_DEST(V2_INFO, "Introducing job #%i rev. %i : %s", nodeRank, jobId, req.revision, req.toStr().c_str());
-    MyMpi::isend(nodeRank, MSG_REQUEST_NODE, req);
 }
 
 void Client::handleOfferAdoption(MessageHandle& handle) {
@@ -383,21 +388,13 @@ void Client::handleOfferAdoption(MessageHandle& handle) {
     float schedulingTime = Timer::elapsedSeconds() - req.timeOfBirth;
     LOG(V3_VERB, "Scheduling %s on [%i] (latency: %.5fs)\n", req.toStr().c_str(), handle.source, schedulingTime);
     
+    assert(_active_jobs.count(req.jobId));
     JobDescription& desc = *_active_jobs[req.jobId];
     desc.getStatistics().schedulingTime = schedulingTime;
     desc.getStatistics().timeOfScheduling = Timer::elapsedSeconds();
     assert(desc.getId() == req.jobId || LOG_RETURN_FALSE("%i != %i\n", desc.getId(), req.jobId));
 
-    // Send job description
-    LOG_ADD_DEST(V4_VVER, "Sending job desc. of #%i rev. %i of size %i", handle.source, desc.getId(), 
-        desc.getRevision(), desc.getTransferSize(desc.getRevision()));
-    
-    auto data = desc.getSerialization(desc.getRevision());
-    desc.clearPayload(desc.getRevision());
-    int msgId = MyMpi::isend(handle.source, MSG_SEND_JOB_DESCRIPTION, data);
-    LOG_ADD_DEST(V4_VVER, "Sent job desc. of #%i of size %i", 
-        handle.source, req.jobId, data->size());
-    //LOG(V4_VVER, "%p : use count %i\n", data.get(), data.use_count());
+    sendJobDescription(desc, handle.source);
     
     // Remember transaction
     _root_nodes[req.jobId] = handle.source;
@@ -408,6 +405,21 @@ void Client::handleOfferAdoption(MessageHandle& handle) {
         _num_loaded_jobs--;
     }
     _incoming_job_cond_var.notify(); 
+}
+
+void Client::sendJobDescription(JobDescription& desc, int destRank) {
+
+    // Send job description
+    LOG_ADD_DEST(V4_VVER, "Sending job desc. of #%i rev. %i of size %i", destRank, desc.getId(), 
+        desc.getRevision(), desc.getTransferSize(desc.getRevision()));
+    
+    auto data = desc.getSerialization(desc.getRevision());
+    desc.clearPayload(desc.getRevision());
+    int msgId = MyMpi::isend(destRank, MSG_SEND_JOB_DESCRIPTION, data);
+
+    LOG_ADD_DEST(V4_VVER, "Sent job desc. of #%i of size %i", 
+        destRank, desc.getId(), data->size());
+    //LOG(V4_VVER, "%p : use count %i\n", data.get(), data.use_count());
 }
 
 void Client::handleJobDone(MessageHandle& handle) {
