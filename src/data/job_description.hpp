@@ -221,6 +221,11 @@ public:
         return *_stats;
     }
 
+    void transferRevisionData(JobDescription& other, int revision) {
+        getRevisionData(revision) = other.getRevisionData(revision);
+        setRevision(std::max(getRevision(), revision));
+    }
+
 private:
     std::shared_ptr<std::vector<uint8_t>>& getRevisionData(int revision);
     const std::shared_ptr<std::vector<uint8_t>>& getRevisionData(int revision) const;
