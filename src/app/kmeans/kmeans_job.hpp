@@ -60,7 +60,7 @@ class KMeansJob : public Job {
             return aggregate(elems);
         };
     std::function<std::vector<int>(const std::vector<int>&)> rootTransform = [&](const std::vector<int>& payload) {
-        LOG(V2_INFO, "                           myIndex: %i start Roottransform\n", myIndex);
+        LOG(V3_VERB, "                           myIndex: %i start Roottransform\n", myIndex);
         auto data = reduceToclusterCenters(payload);
 
         clusterCenters = data.first;
@@ -72,20 +72,20 @@ class KMeansJob : public Job {
         if (sum == pointsCount) {
             allCollected = true;
 
-            LOG(V2_INFO, "                           AllCollected: Good\n");
+            LOG(V3_VERB, "                           AllCollected: Good\n");
         } else {
-            LOG(V2_INFO, "                           AllCollected: Error\n");
+            LOG(V3_VERB, "                           AllCollected: Error\n");
         }
         auto transformed = clusterCentersToBroadcast(clusterCenters);
         transformed.push_back(this->getVolume());
-        LOG(V2_INFO, "                           COMMSIZE: %i myIndex: %i \n",
+        LOG(V3_VERB, "                           COMMSIZE: %i myIndex: %i \n",
             this->getVolume(), myIndex);
-        LOG(V2_INFO, "                           Children: %i\n",
+        LOG(V3_VERB, "                           Children: %i\n",
             this->getJobTree().getNumChildren());
 
         if ((0.001f < calculateDifference(
                           [&](const float* p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
-            LOG(V2_INFO, "                           Another iter %i\n", iterationsDone);
+            LOG(V3_VERB, "                           Another iter %i\n", iterationsDone);
             return transformed;
 
         } else {

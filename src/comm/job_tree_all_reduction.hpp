@@ -66,28 +66,15 @@ public:
     bool receive(int source, int tag, JobMessage& msg) {
 
         assert(tag == MSG_JOB_TREE_REDUCTION || tag == MSG_JOB_TREE_BROADCAST);
-        //LOG(V2_INFO, "                           msg.jobId: %i\n", msg.jobId);
-        //LOG(V2_INFO, "                           _base_msg.jobId: %i\n", _base_msg.jobId);
-        //LOG(V2_INFO, "                           msg.epoch: %i\n", msg.epoch);
-        //LOG(V2_INFO, "                           _base_msg.epoch : %i\n", _base_msg.epoch );
-        //LOG(V2_INFO, "                           msg.revision: %i\n", msg.revision);
-        //LOG(V2_INFO, "                           _base_msg.revision : %i\n", _base_msg.revision );
-        //LOG(V2_INFO, "                           msg.tag: %i\n", msg.tag);
-        //LOG(V2_INFO, "                           _base_msg.tag: %i\n", _base_msg.tag);
         
         bool accept = msg.jobId == _base_msg.jobId 
                     && msg.epoch == _base_msg.epoch 
                     && msg.revision == _base_msg.revision 
                     && msg.tag == _base_msg.tag;
-                    LOG(V2_INFO, "                           my Rank: %i rec1\n", _tree.getIndex());
         if (!accept) return false;
-                    LOG(V2_INFO, "                           my Rank: %i rec2\n", _tree.getIndex());
         if (tag == MSG_JOB_TREE_REDUCTION) {
-                    LOG(V2_INFO, "                           my Rank: %i rec3\n", _tree.getIndex());
             if (!_aggregating) {
-                    LOG(V2_INFO, "                           my Rank: %i rec4\n", _tree.getIndex());
                 _child_elems.push_back(std::move(msg.payload));
-                LOG_ADD_SRC(V5_DEBG, "CS got %i/%i elems", source, _child_elems.size(), _num_expected_child_elems);
                 advance();
             }
         }
@@ -102,10 +89,7 @@ public:
     void advance() {
 
         if (_finished) return;
-        //LOG(V2_INFO, "                           my Rank: %i _child_elems.size() % i _num_expected_child_elems %i \n", _tree.getIndex(), _child_elems.size(), _num_expected_child_elems );
-        //LOG(V2_INFO, "                           my Rank: %i _local_elem.has_value() %i \n", _tree.getIndex(), _local_elem.has_value() );
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
-                     LOG(V2_INFO, "                           my Rank: %i aggregate\n", _tree.getIndex() );
             _child_elems.push_front(std::move(_local_elem.value()));
             _local_elem.reset();
 
@@ -114,7 +98,6 @@ public:
             _future_aggregate = ProcessWideThreadPool::get().addTask([&]() {
                 _aggregated_elem = _aggregator(_child_elems);
                 _aggregating = false;
-                        LOG(V2_INFO, "                           my Rank: %i agg task complete\n", _tree.getIndex() );
             });
         }
 
@@ -126,7 +109,6 @@ public:
             if (_tree.isRoot()) {
                 // Transform reduced element at root
                 if (_has_transformation_at_root) {        
-                    LOG(V2_INFO, "                           Root transform\n");
                     _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));
                 }
                 
