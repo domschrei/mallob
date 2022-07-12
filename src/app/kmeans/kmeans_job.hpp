@@ -85,11 +85,14 @@ class KMeansJob : public Job {
 
         if ((0.001f < calculateDifference(
                           [&](const float* p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
+            if (iAmRoot && iterationsDone == 1) {
+                LOG(V0_CRIT, "                           first iteration finished\n");
+            }
             LOG(V3_VERB, "                           Another iter %i\n", iterationsDone);
             return transformed;
 
         } else {
-            LOG(V2_INFO, "                           Got Result after iter %i\n", iterationsDone);
+            LOG(V0_CRIT, "                           Got Result after iter %i\n", iterationsDone);
             internal_result.result = RESULT_SAT;
             internal_result.id = getId();
             internal_result.revision = getRevision();
@@ -99,7 +102,7 @@ class KMeansJob : public Job {
             auto solution = clusterCentersToSolution();
             internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
             finishedJob = true;
-            LOG(V2_INFO, "Solution clusterCenters: \n%s\n", dataToString(clusterCenters).c_str());
+            LOG(V3_VERB, "Solution clusterCenters: \n%s\n", dataToString(clusterCenters).c_str());
             return std::move(std::vector<int>(allReduceElementSize, 0));
         }
     };

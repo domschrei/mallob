@@ -24,7 +24,9 @@ void KMeansJob::appl_start() {
     iAmRoot = getJobTree().isRoot();
 
     countCurrentWorkers = 1;
-
+    if (iAmRoot) {
+        LOG(V0_CRIT, "                           loaded\n");
+    }
     LOG(V3_VERB, "                           COMMSIZE: %i myRank: %i myIndex: %i\n",
         countCurrentWorkers, myRank, myIndex);
     LOG(V3_VERB, "                           Children: %i\n",
