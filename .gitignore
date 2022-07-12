@@ -4,6 +4,9 @@ logs/*
 .api/jobs.*
 .api/users
 lib/*/
+lib/*.zip
+lib/*.gz
+lib/*.tgz
 build/
 instances/*.cnf
 instances/*.cnf.xz
