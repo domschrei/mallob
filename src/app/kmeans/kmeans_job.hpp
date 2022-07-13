@@ -83,7 +83,7 @@ class KMeansJob : public Job {
         LOG(V3_VERB, "                           Children: %i\n",
             this->getJobTree().getNumChildren());
 
-        if ((0.001f < calculateDifference(
+        if ((0.0f < calculateDifference(
                           [&](const float* p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
             if (iAmRoot && iterationsDone == 1) {
                 LOG(V0_CRIT, "                           first iteration finished\n");
