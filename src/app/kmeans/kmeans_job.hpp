@@ -83,7 +83,7 @@ class KMeansJob : public Job {
         LOG(V3_VERB, "                           Children: %i\n",
             this->getJobTree().getNumChildren());
 
-        if (!centersChanged(metric)) {
+        if (!centersChanged(metric, 0.001f)) {
             LOG(V0_CRIT, "                           Got Result after iter %i\n", iterationsDone);
             internal_result.result = RESULT_SAT;
             internal_result.id = getId();
@@ -142,6 +142,7 @@ class KMeansJob : public Job {
     void countMembers();
     float calculateDifference(std::function<float(const float*, Point)> metric);
     bool centersChanged(std::function<float(const float*, Point)> metric);
+    bool centersChanged(std::function<float(const float*, Point)> metric, float factor);
     std::vector<float> clusterCentersToSolution();
     std::vector<int> clusterCentersToBroadcast(const std::vector<Point>&);
     std::vector<Point> broadcastToClusterCenters(const std::vector<int>&, bool withNumWorkers = false);

@@ -499,6 +499,22 @@ bool KMeansJob::centersChanged(std::function<float(const float*, Point)> metric)
     return false;
 }
 
+bool KMeansJob::centersChanged(std::function<float(const float*, Point)> metric, float factor) {
+    if (iterationsDone == 0) {
+        return true;
+    }
+    for (int k = 0; k < countClusters; ++k) {
+        for (int d = 0; d < dimension; ++d){
+        float distance = fabs(clusterCenters[k][d] - oldClusterCenters[k][d]);
+        if (distance > factor*((clusterCenters[k][d] + oldClusterCenters[k][d])/2)) {
+            LOG(V3_VERB, "                           Dist: %f \n", distance);
+            return true;
+        }
+    }
+    }
+    return false;
+}
+
 std::vector<float> KMeansJob::clusterCentersToSolution() {
     std::vector<float> result;
     result.push_back((float)countClusters);
