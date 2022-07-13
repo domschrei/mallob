@@ -83,15 +83,7 @@ class KMeansJob : public Job {
         LOG(V3_VERB, "                           Children: %i\n",
             this->getJobTree().getNumChildren());
 
-        if ((0.0f < calculateDifference(
-                          [&](const float* p1, Point p2) { return KMeansUtils::eukild(p1, p2); }))) {
-            if (iAmRoot && iterationsDone == 1) {
-                LOG(V0_CRIT, "                           first iteration finished\n");
-            }
-            LOG(V3_VERB, "                           Another iter %i\n", iterationsDone);
-            return transformed;
-
-        } else {
+        if (!centersChanged(metric)) {
             LOG(V0_CRIT, "                           Got Result after iter %i\n", iterationsDone);
             internal_result.result = RESULT_SAT;
             internal_result.id = getId();
@@ -104,6 +96,13 @@ class KMeansJob : public Job {
             finishedJob = true;
             LOG(V3_VERB, "Solution clusterCenters: \n%s\n", dataToString(clusterCenters).c_str());
             return std::move(std::vector<int>(allReduceElementSize, 0));
+
+        } else {
+            if (iAmRoot && iterationsDone == 1) {
+                LOG(V0_CRIT, "                           first iteration finished\n");
+            }
+            LOG(V3_VERB, "                           Another iter %i\n", iterationsDone);
+            return transformed;
         }
     };
 
@@ -142,6 +141,7 @@ class KMeansJob : public Job {
     std::string dataToString(std::vector<int> data);
     void countMembers();
     float calculateDifference(std::function<float(const float*, Point)> metric);
+    bool centersChanged(std::function<float(const float*, Point)> metric);
     std::vector<float> clusterCentersToSolution();
     std::vector<int> clusterCentersToBroadcast(const std::vector<Point>&);
     std::vector<Point> broadcastToClusterCenters(const std::vector<int>&, bool withNumWorkers = false);
