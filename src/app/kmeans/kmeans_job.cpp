@@ -485,12 +485,14 @@ float KMeansJob::calculateDifference(std::function<float(const float*, Point)> m
     return sumDifference / sumOldvec;
 }
 
-bool KMeansJob::centersChanged(std::function<float(const float*, Point)> metric){
+bool KMeansJob::centersChanged(std::function<float(const float*, Point)> metric) {
     if (iterationsDone == 0) {
         return true;
     }
     for (int k = 0; k < countClusters; ++k) {
-        if (metric(clusterCenters[k].data(), oldClusterCenters[k]) > 0.0f) {
+        float distance = metric(clusterCenters[k].data(), oldClusterCenters[k]);
+        LOG(V3_VERB, "                           Dist: %f \n", distance);
+        if (distance > 0.0f) {
             return true;
         }
     }
