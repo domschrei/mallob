@@ -60,4 +60,8 @@ public:
     bool empty() const {
         return _queue.empty();
     }
+
+    size_t size() const {
+        return _queue.size();
+    }
 };
