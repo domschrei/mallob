@@ -44,12 +44,13 @@ class KMeansJob : public Job {
     bool hasReducer = false;
     bool leftDone = false;
     bool rightDone = false;
+    bool skipCurrentIter = false;
     bool terminate = false;
     std::vector<int> work;
     std::vector<int> workDone;
     std::pair<bool, bool> childsFinished = {false, false};
     int myRank;
-    int myIndex;
+    int myIndex = -2;
     int countCurrentWorkers;
     JobMessage baseMsg;
     JobResult internal_result;
@@ -77,7 +78,7 @@ class KMeansJob : public Job {
             LOG(V3_VERB, "                           AllCollected: Error\n");
         }
         auto transformed = clusterCentersToBroadcast(clusterCenters);
-        transformed.push_back(this->getVolume());
+        transformed.push_back(this->getVolume()); // will be countCurrentWorkers
         LOG(V3_VERB, "                           COMMSIZE: %i myIndex: %i \n",
             this->getVolume(), myIndex);
         LOG(V3_VERB, "                           Children: %i\n",
@@ -141,7 +142,7 @@ class KMeansJob : public Job {
     std::string dataToString(std::vector<int> data);
     void countMembers();
     float calculateDifference(std::function<float(const float*, Point)> metric);
-    bool centersChanged(std::function<float(const float*, Point)> metric);
+    bool centersChanged();
     bool centersChanged(std::function<float(const float*, Point)> metric, float factor);
     std::vector<float> clusterCentersToSolution();
     std::vector<int> clusterCentersToBroadcast(const std::vector<Point>&);

@@ -121,6 +121,7 @@ void KMeansJob::sendRootNotification() {
     baseMsg.tag = MSG_BROADCAST_DATA;
     baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
     baseMsg.payload.push_back(countCurrentWorkers);
+    LOG(V3_VERB, "                           myIndex: %i sendRootNotification0\n", myIndex);
     MyMpi::isend(getJobTree().getRootNodeRank(), MSG_SEND_APPLICATION_MESSAGE, baseMsg);
 }
 void KMeansJob::doInitWork() {
@@ -182,7 +183,9 @@ void KMeansJob::appl_communicate() {
                 if (!leftDone) leftDone = (currentIndex == (myIndex * 2 + 1));
                 if (!rightDone) rightDone = (currentIndex == (myIndex * 2 + 2));
                 LOG(V3_VERB, "                           myIndex: %i Start Calc\n", myIndex);
-                calcNearestCenter(metric, cI);
+                if (!skipCurrentIter) {
+                    calcNearestCenter(metric, cI);
+                }
                 LOG(V3_VERB, "                           myIndex: %i End Calc childs\n", myIndex);
 
                 calculatingFinished = true;
@@ -200,36 +203,53 @@ void KMeansJob::appl_communicate() {
         leftDone = false;
         rightDone = false;
         LOG(V3_VERB, "                           myIndex: %i all work Finished2!!!\n", myIndex);
-        auto producer = [&]() {
-            calcCurrentClusterCenters();
+        if (!skipCurrentIter) {
+            auto producer = [&]() {
+                calcCurrentClusterCenters();
 
-            // LOG(V3_VERB, "clusterCenters: \n%s\n", dataToString(localClusterCenters).c_str());
-            return clusterCentersToReduce(localSumMembers, localClusterCenters);
-        };
-        (reducer)->produce(producer);
-        (reducer)->advance();
+                // LOG(V3_VERB, "clusterCenters: \n%s\n", dataToString(localClusterCenters).c_str());
+                return clusterCentersToReduce(localSumMembers, localClusterCenters);
+            };
+            (reducer)->produce(producer);
+            (reducer)->advance();
+        }
         calculatingFinished = false;
         LOG(V3_VERB, "                           myIndex: %i all work Finished END!!!\n", myIndex);
     };
     if (hasReducer) {
-        if (iAmRoot && (reducer)->hasResult()) {
-            LOG(V3_VERB, "                           myIndex: %i received Result from Transform\n", myIndex);
-            clusterCenters = broadcastToClusterCenters((reducer)->extractResult(), true);
-            clusterMembership.assign(pointsCount, -1);
+        if (!skipCurrentIter) {
+            if (iAmRoot && (reducer)->hasResult()) {
+                LOG(V3_VERB, "                           myIndex: %i received Result from Transform\n", myIndex);
+                clusterCenters = broadcastToClusterCenters((reducer)->extractResult(), true);
+                clusterMembership.assign(pointsCount, -1);
 
+                baseMsg.tag = MSG_BROADCAST_DATA;
+                baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
+                baseMsg.payload.push_back(countCurrentWorkers);
+                LOG(V3_VERB, "                           myIndex: %i sendRootNotification1\n", myIndex);
+                MyMpi::isend(getJobTree().getRootNodeRank(), MSG_SEND_APPLICATION_MESSAGE, baseMsg);
+                // only root...?
+
+                // continue broadcasting
+
+                // LOG(V3_VERB, "                           myIndex: %i clusterCenters: \n%s\n", getJobTree().getIndex(),
+                //     dataToString(clusterCenters).c_str());
+            }
+            (reducer)->advance();
+        } else {
+            LOG(V3_VERB, "                           Skip Iter\n");
+            skipCurrentIter = false;
+            hasReducer = false;
+            leftDone = false;
+            rightDone = false;
+            reducer.reset();
+            clusterMembership.assign(pointsCount, -1);
             baseMsg.tag = MSG_BROADCAST_DATA;
             baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
-            baseMsg.payload.push_back(countCurrentWorkers);
+            baseMsg.payload.push_back(this->getVolume());
+            LOG(V3_VERB, "                           myIndex: %i sendRootNotification2\n", myIndex);
             MyMpi::isend(getJobTree().getRootNodeRank(), MSG_SEND_APPLICATION_MESSAGE, baseMsg);
-            // only root...?
-
-            // continue broadcasting
-
-            // LOG(V3_VERB, "                           myIndex: %i clusterCenters: \n%s\n", getJobTree().getIndex(),
-            //     dataToString(clusterCenters).c_str());
         }
-
-        (reducer)->advance();
     }
 }
 
@@ -269,13 +289,14 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
         // I will do it
         std::vector<int> missingChilds;
         LOG(V3_VERB, "                           myIndex: %i returnFrom: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
-        if (!leftDone && !getJobTree().hasLeftChild() && getJobTree().getLeftChildIndex() < countCurrentWorkers) {
+        LOG(V3_VERB, "                           !leftDone %i !getJobTree().hasLeftChild() %i getJobTree().getLeftChildIndex() < countCurrentWorkers %i\n", !leftDone, !getJobTree().hasLeftChild(), getJobTree().getLeftChildIndex() < countCurrentWorkers);
+        if (!leftDone && (sourceIndex == getJobTree().getLeftChildIndex() || !getJobTree().hasLeftChild()) && getJobTree().getLeftChildIndex() < countCurrentWorkers) {
             // missing left child
             leftDone = true;
             missingChilds.push_back(getJobTree().getLeftChildIndex());
             LOG(V3_VERB, "                           myIndex: %i LsourceIndex: %i\n", myIndex, sourceIndex);
         }
-        if (!rightDone && !getJobTree().hasRightChild() && getJobTree().getRightChildIndex() < countCurrentWorkers) {
+        if (!rightDone && (sourceIndex == getJobTree().getRightChildIndex() || !getJobTree().hasRightChild()) && getJobTree().getRightChildIndex() < countCurrentWorkers) {
             // missing right child
             rightDone = true;
             missingChilds.push_back(getJobTree().getRightChildIndex());
@@ -341,7 +362,7 @@ void KMeansJob::advanceCollective(JobMessage& msg, JobTree& jobTree) {
 
     if (jobTree.hasLeftChild() && jobTree.getLeftChildIndex() < countCurrentWorkers) {
         LOG(V3_VERB, "                           myIndex: %i sendTo %i type: %i\n", myIndex, jobTree.getLeftChildIndex(), MSG_SEND_APPLICATION_MESSAGE);
-        MyMpi::isend(getJobTree().getLeftChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+        MyMpi::isend(jobTree.getLeftChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
     }
     if (jobTree.hasRightChild() && jobTree.getRightChildIndex() < countCurrentWorkers) {
         LOG(V3_VERB, "                           myIndex: %i sendTo %i type: %i\n", myIndex, jobTree.getRightChildIndex(), MSG_SEND_APPLICATION_MESSAGE);
@@ -398,6 +419,16 @@ void KMeansJob::calcNearestCenter(std::function<float(const float*, Point)> metr
     LOG(V3_VERB, "                           MI: %i intervalId: %i PC: %i cW: %i start:%i end:%i!!      iter:%i \n", myIndex, intervalId, pointsCount, countCurrentWorkers, startIndex, endIndex, iterationsDone);
     for (int pointID = startIndex; pointID < endIndex; ++pointID) {
         if (terminate) return;
+        if ((pointID / endIndex) < 0.25 &&
+            iAmRoot &&
+            (countCurrentWorkers == 1 ||
+             (std::find(work.begin(), work.end(), 1) != work.end() && std::find(work.begin(), work.end(), 2) != work.end())) &&
+            this->getVolume() > 1) {
+            LOG(V3_VERB, "                           will skip Iter\n");
+            skipCurrentIter = true;
+            work.clear();
+            return;
+        }
         currentNearestCenter.cluster = -1;
         currentNearestCenter.distance = std::numeric_limits<float>::infinity();
         for (int clusterID = 0; clusterID < countClusters; ++clusterID) {
@@ -410,6 +441,7 @@ void KMeansJob::calcNearestCenter(std::function<float(const float*, Point)> metr
 
         clusterMembership[pointID] = currentNearestCenter.cluster;
     }
+    LOG(V3_VERB, "                           MI: %i intervalId: %i PC: %i cW: %i start:%i end:%i COMPLETED iter:%i \n", myIndex, intervalId, pointsCount, countCurrentWorkers, startIndex, endIndex, iterationsDone);
 }
 
 void KMeansJob::calcCurrentClusterCenters() {
@@ -485,15 +517,15 @@ float KMeansJob::calculateDifference(std::function<float(const float*, Point)> m
     return sumDifference / sumOldvec;
 }
 
-bool KMeansJob::centersChanged(std::function<float(const float*, Point)> metric) {
+bool KMeansJob::centersChanged() {
     if (iterationsDone == 0) {
         return true;
     }
     for (int k = 0; k < countClusters; ++k) {
-        float distance = metric(clusterCenters[k].data(), oldClusterCenters[k]);
-        LOG(V3_VERB, "                           Dist: %f \n", distance);
-        if (distance > 0.0f) {
-            return true;
+        for (int d = 0; d < dimension; ++d) {
+            if (clusterCenters[k][d] != oldClusterCenters[k][d]) {
+                return true;
+            }
         }
     }
     return false;
@@ -504,13 +536,13 @@ bool KMeansJob::centersChanged(std::function<float(const float*, Point)> metric,
         return true;
     }
     for (int k = 0; k < countClusters; ++k) {
-        for (int d = 0; d < dimension; ++d){
-        float distance = fabs(clusterCenters[k][d] - oldClusterCenters[k][d]);
-        if (distance > factor*((clusterCenters[k][d] + oldClusterCenters[k][d])/2)) {
-            LOG(V3_VERB, "                           Dist: %f \n", distance);
-            return true;
+        for (int d = 0; d < dimension; ++d) {
+            float distance = fabs(clusterCenters[k][d] - oldClusterCenters[k][d]);
+            if (distance > factor * ((clusterCenters[k][d] + oldClusterCenters[k][d]) / 2)) {
+                LOG(V3_VERB, "                           Dist: %f \n", distance);
+                return true;
+            }
         }
-    }
     }
     return false;
 }
