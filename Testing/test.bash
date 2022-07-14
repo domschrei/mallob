@@ -1,6 +1,6 @@
 #!/bin/bash
 kList=(5 10 20 30 40) # 
-npList=(64 32 16 8 4 2 1) #
+npList=(128 64 32 16 8 4 2 1) #
 for k in ${kList[@]}; do
     > ./Testing/times-${k}.txt
     for n in ${npList[@]}; do
