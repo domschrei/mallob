@@ -75,6 +75,13 @@ if(MALLOB_USE_MERGESAT)
 endif()    
 # Add new non-default solvers here
 
+# Include STXXL
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-copy")
+add_subdirectory(lib/stxxl)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${STXXL_CXX_FLAGS}")
+set(BASE_INCLUDES ${BASE_INCLUDES} ${STXXL_INCLUDE_DIRS})
+set(BASE_LIBS ${BASE_LIBS} ${STXXL_LIBRARIES})
+
 
 # Source files
 
@@ -142,7 +149,7 @@ function(new_test testname)
     add_executable(test_${testname} src/test/test_${testname}.cpp)
     target_include_directories(test_${testname} PRIVATE ${BASE_INCLUDES})
     target_compile_options(test_${testname} PRIVATE ${BASE_COMPILEFLAGS})
-    target_link_libraries(test_${testname} ${BASE_LIBS} mallob_commons)
+    target_link_libraries(test_${testname} ${BASE_LIBS} mallob_commons ${STXXL_LIBRARIES})
     add_test(NAME test_${testname} COMMAND test_${testname})
 endfunction()
 
@@ -159,3 +166,4 @@ new_test(volume_calculator)
 new_test(concurrent_malloc)
 new_test(distributed_clause_filter)
 new_test(hashing)
+new_test(ext_priority_queue)

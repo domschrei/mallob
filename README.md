@@ -25,7 +25,7 @@ Note that we only support Linux as an operating system.
 ## Building
 
 ```
-( cd lib && bash fetch_and_build_sat_solvers.sh )
+( cd lib && bash fetch_and_build_sat_solvers.sh && bash fetch_stxxl.sh )
 mkdir -p build
 cd build
 CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_USE_JEMALLOC=1 -DMALLOB_LOG_VERBOSITY=4 -DMALLOB_ASSERT=1 -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
