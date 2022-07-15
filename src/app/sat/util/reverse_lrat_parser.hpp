@@ -15,14 +15,28 @@
 #include "util/assert.hpp"
 #include "util/logger.hpp"
 
+typedef unsigned long LratClauseId;
+
 class ReverseLratParser {
 
 public:
     struct LratLine {
-        unsigned long id = -1;
+        LratClauseId id = -1;
         std::vector<int> literals;
-        std::vector<long> hints;
+        std::vector<LratClauseId> hints;
+        std::vector<bool> signsOfHints;
         bool valid() const {return id != -1;}
+        std::string toStr() const {
+            std::stringstream out;
+            out << id;
+            for (auto lit : literals) out << lit << " ";
+            out << "0 ";
+            for (size_t i = 0; i < hints.size(); i++) {
+                out << (signsOfHints[i] ? "" : "-") << hints[i] << " ";
+            }
+            out << "0\n";
+            return out.str();
+        }
     };
 
 private:
@@ -112,7 +126,7 @@ private:
         // Now our line sits at _mmap[lineSeekIdx] through _mmap[_pos] (inclusive).
         
         bool beganNum = false;
-        long num = 0;
+        unsigned long num = 0;
         int sign = 1;
 
         bool readingId = true;
@@ -122,7 +136,6 @@ private:
 
         // Function to publish a number which has been read completely
         auto publishReadNumber = [&]() {
-            num *= sign;
             if (readingId) {
                 _line.id = num;
                 readingId = false;
@@ -134,7 +147,7 @@ private:
                     readingHints = true;
                 } else {
                     // Add literal to clause
-                    _line.literals.push_back(num);
+                    _line.literals.push_back(sign * num);
                 }
             } else if (readingHints) {
                 if (num == 0) {
@@ -142,6 +155,7 @@ private:
                     success = true;
                 } else {
                     _line.hints.push_back(num);
+                    _line.signsOfHints.push_back(sign > 0);
                 }
             }
             num = 0;
@@ -179,9 +193,9 @@ private:
             LOG(V5_DEBG, "[LRAT] Interpreted line: (skipped)\n");
         else {
             std::string lits;
-            for (int lit : _line.literals) lits += std::to_string(lit) + " ";
+            for (auto lit : _line.literals) lits += std::to_string(lit) + " ";
             std::string hints;
-            for (int hint : _line.hints) hints += std::to_string(hint) + " ";
+            for (auto hint : _line.hints) hints += std::to_string(hint) + " ";
             LOG(V5_DEBG, "[LRAT] Interpreted line: id=%ld lits=(%s) hints=(%s)\n", 
                 _line.id, lits.c_str(), hints.c_str());
         }
