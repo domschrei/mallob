@@ -27,7 +27,7 @@ for k in ${kList[@]}; do
         #cat ./Testing/${folder}/out.txt |grep "Got Result"
     done
     rm ./instances/${instanceName}${k}.csv
-    t1=$(cat ./Testing/${folder}/times-${pcName}-${k}.txt | grep "1 " | awk '{print $2}')
+    t1=$(cat ./Testing/${folder}/times-${pcName}-${k}.txt | grep "^1 " | awk '{print $2}')
     > ./Testing/${folder}/relSpeedup-${pcName}-${k}.txt
     > ./Testing/${folder}/efficiency-${pcName}-${k}.txt
     for n in ${npList[@]}; do
