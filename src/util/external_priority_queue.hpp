@@ -17,11 +17,13 @@ struct ComparatorLess {
 // allow around 128MB of data in main memory
 #define EXTPQUEUE_INTERNAL_MEMORY_BYTES (1024*1024*128)
 
+// allow for write- & read-pools of size 32MB each
+#define EXTPQUEUE_MEM_FOR_POOLS_BYTES (32*1024*1024)
+
 // allow for X GB of data in external memory:
 // 1024*n * sizeof(T) = 32GB
 #define EXTPQUEUE_MAX_EXTERNAL_ELEMENTS_1024S (32*1024*1024)/sizeof(T)
 
-#define EXTPQUEUE_MEM_FOR_POOLS_BYTES (32*1024*1024)
 
 template <typename T>
 class ExternalPriorityQueue {
