@@ -7,7 +7,7 @@ lib/*/
 lib/*.zip
 lib/*.gz
 lib/*.tgz
-Testing/*.pdf
+Testing/latestResults/*.*
 build/
 instances/*.cnf
 instances/*.cnf.xz
