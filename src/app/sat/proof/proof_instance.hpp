@@ -3,7 +3,7 @@
 
 #include <algorithm>
 
-#include "app/sat/util/reverse_lrat_parser.hpp"
+#include "app/sat/proof/reverse_lrat_parser.hpp"
 #include "util/external_priority_queue.hpp"
 #include "util/sys/thread_pool.hpp"
 
@@ -29,6 +29,7 @@ private:
     std::future<void> _work_future;
     bool _work_done = true;
     std::vector<LratClauseId> _outgoing_clause_ids;
+    bool _finished = false;
 
 public:
     ProofInstance(int instanceId, int numInstances, 
@@ -53,7 +54,7 @@ public:
         _work_future = ProcessWideThreadPool::get().addTask([this, incomingClauseIds]() {
             handleIncomingClauseIds(*incomingClauseIds);
             readEpoch();
-            prepareNextOutgoingClauseIds();
+            if (!_finished) prepareNextOutgoingClauseIds();
             _work_done = true;
         });
     }
@@ -70,6 +71,8 @@ public:
 
         return std::move(_outgoing_clause_ids);
     }
+
+    bool finished() const {return _work_done && _finished;}
 
 private:
 
@@ -138,6 +141,8 @@ private:
             // -- there may not be any underived clauses left
             assert(_frontier.empty());
             assert(_backlog.empty());
+
+            _finished = true;
         }
     }
 

@@ -15,7 +15,7 @@
 #include "util/sys/timer.hpp"
 #include "util/sys/terminator.hpp"
 
-#include "app/sat/util/reverse_lrat_parser.hpp"
+#include "app/sat/proof/reverse_lrat_parser.hpp"
 #include "util/external_priority_queue.hpp"
 
 
@@ -53,7 +53,7 @@ void testWithPriorityQueue(const std::string& filename) {
         if (keep) {
             for (auto hint : line.hints) {
                 numPushed++;
-                pq.push(std::abs(hint));
+                pq.push(hint);
             }
         } else {
             numSkipped++;

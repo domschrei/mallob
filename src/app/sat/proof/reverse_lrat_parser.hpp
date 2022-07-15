@@ -11,6 +11,7 @@
 #include <sys/io.h>
 #include <sys/mman.h>
 #include <stdlib.h>
+#include <sstream>
 
 #include "util/assert.hpp"
 #include "util/logger.hpp"
