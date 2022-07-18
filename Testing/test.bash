@@ -12,7 +12,7 @@ for k in ${kList[@]}; do
     echo "$k $instanceFirstLine" > ./instances/${instanceName}${k}.csv
     cat ./instances/${instanceName}K.csv >> ./instances/${instanceName}${k}.csv
     > ./Testing/${folder}/times-${pcName}-${k}.txt
-    for n in ((i = 1 ; i < 181 ; ++i)); do #${npList[@]};
+    for ((n = 1 ; i < 181 ; ++i)); do #${npList[@]};
         # v=3 
         #PATH=build/:$PATH RDMAV_FORKSAVE=1 mpirun -np ${n} -oversubscribe build/mallob -mono-application=KMEANS -mono=./instances/${instanceName}${k}.csv -v=3
         # v=0 >> ./Testing/times-${k}.txt 
