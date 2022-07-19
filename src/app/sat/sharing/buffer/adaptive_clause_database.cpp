@@ -210,7 +210,8 @@ Mallob::Clause AdaptiveClauseDatabase::getMallobClause(T& elem, int implicitLbdO
 }
 
 template <typename T> 
-void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, BufferBuilder& builder) {
+void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, BufferBuilder& builder, 
+    std::function<void(int*)> clauseDataConverter) {
     
     if (slot.nbLiterals.load(std::memory_order_relaxed) == 0
         && slot.freeLocalBudget.load(std::memory_order_relaxed) == 0) 
@@ -254,6 +255,7 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, Buffe
         if (clause.size > remainingLits) break;
 
         // insert clause to export buffer
+        clauseDataConverter(clause.begin);
         remainingLits -= clause.size;
         collectedLits += clause.size;
         flushedClauses.push_back(std::move(clause));
@@ -291,7 +293,7 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, Buffe
 }
 
 std::vector<int> AdaptiveClauseDatabase::exportBuffer(int totalLiteralLimit, int& numExportedClauses, 
-        ExportMode mode, bool sortClauses) {
+        ExportMode mode, bool sortClauses, std::function<void(int*)> clauseDataConverter) {
 
     BufferBuilder builder(totalLiteralLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
 

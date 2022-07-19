@@ -201,7 +201,8 @@ public:
     getBufferMerger.
     */
     std::vector<int> exportBuffer(int sizeLimit, int& numExportedClauses, 
-            ExportMode mode = ANY, bool sortClauses = true);
+            ExportMode mode = ANY, bool sortClauses = true, 
+            std::function<void(int*)> clauseDataConverter = [](int*){});
 
     bool popFrontWeak(ExportMode mode, Mallob::Clause& out);
 
@@ -284,7 +285,8 @@ private:
     int stealBudgetFromSlot(Slot<T>& slot, int desiredLiterals, bool dropClauses);
 
     template <typename T>
-    void flushClauses(Slot<T>& slot, bool sortClauses, BufferBuilder& builder);
+    void flushClauses(Slot<T>& slot, bool sortClauses, BufferBuilder& builder, 
+            std::function<void(int*)> clauseDataConverter = [](int*){});
     
     std::pair<int, ClauseSlotMode> getSlotIdxAndMode(int clauseSize, int lbd);
     BucketLabel getBucketIterator();

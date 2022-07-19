@@ -86,18 +86,35 @@ private:
                 // Base message
                 JobMessage(_job->getId(), _job->getRevision(), epoch, MSG_ALLREDUCE_FILTER),
                 // Neutral element
-                std::vector<int>(),
+                std::vector<int>(MALLOB_CLAUSE_METADATA_SIZE==2 ? 2 : 0, 0),
                 // Aggregator for local + incoming elements
                 [&](std::list<std::vector<int>>& elems) {
                     std::vector<int> filter = std::move(elems.front());
                     elems.pop_front();
+
+                    unsigned long maxMinEpochId;
+                    if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+                        maxMinEpochId = metadata::readUnsignedLong(filter.data());
+                    }
+
                     for (auto& elem : elems) {
                         if (filter.size() < elem.size()) 
                             filter.resize(elem.size());
-                        for (size_t i = 0; i < elem.size(); i++) {
+
+                        if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+                            unsigned long minEpochId = metadata::readUnsignedLong(elem.data());
+                            maxMinEpochId = std::max(maxMinEpochId, minEpochId);
+                        }
+                        
+                        for (size_t i = (MALLOB_CLAUSE_METADATA_SIZE==2) ? 2 : 0; i < elem.size(); i++) {
                             filter[i] |= elem[i]; // bitwise OR
                         }
                     }
+
+                    if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+                        metadata::writeUnsignedLong(maxMinEpochId, filter.data());
+                    }
+
                     return filter;
                 }
             ) { }

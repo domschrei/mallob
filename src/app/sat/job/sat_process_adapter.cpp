@@ -281,7 +281,7 @@ bool SatProcessAdapter::hasFilteredClauses() {
 }
 std::vector<int> SatProcessAdapter::getLocalFilter() {
     if (!_initialized || !_hsm->doFilterImport || !_hsm->didFilterImport) 
-        return std::vector<int>();
+        return std::vector<int>(MALLOB_CLAUSE_METADATA_SIZE==2 ? 2 : 0, 0);
     std::vector<int> filter;
     filter.resize(_hsm->filterSize);
     memcpy(filter.data(), _filter_buffer, _hsm->filterSize*sizeof(int));

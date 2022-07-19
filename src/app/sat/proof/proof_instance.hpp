@@ -7,6 +7,17 @@
 #include "util/external_priority_queue.hpp"
 #include "util/sys/thread_pool.hpp"
 
+/*
+The contract of an instance of this class looks as follows:
+* Construct the instance
+* Call advance(ptr) where ptr points to an empty vector
+* While finished() returns false:
+  * Query ready() until true
+  * Call extractNextOutgoingClauseIds() and aggregate the result
+    with the according results from all participating processes
+    into a single (sorted) vector of unique clause IDs
+  * Call advance(ptr) with ptr pointing to the aggregated vector
+*/
 class ProofInstance {
 
 private:
