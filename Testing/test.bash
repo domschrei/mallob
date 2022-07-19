@@ -3,16 +3,17 @@ pcName="i10pc135"
 folder="latestResults"
 instanceName="benign_traffic" #   mnist784            covtypeShuffle
 instanceFirstLine="115 115 52150" #7 7 209          54 55 581012
-kList=(20) # 60 70 80
+kList=20 # 60 70 80
 # npList=(128 127 64 63 32 31 16 15 8 7 4 3 2 1) 
 countPasses=3
-for k in ${kList[@]}; do
+k=20
+#for k in ${kList[@]}; do
 
 
     echo "$k $instanceFirstLine" > ./instances/${instanceName}${k}.csv
     cat ./instances/${instanceName}K.csv >> ./instances/${instanceName}${k}.csv
-    > ./Testing/${folder}/times-${pcName}-${k}.txt
-    for ((n = 1 ; i < 181 ; ++i)); do #${npList[@]};
+#    > ./Testing/${folder}/times-${pcName}-${k}.txt
+    for ((n = 158 ; n < 181 ; ++n)); do #${npList[@]};
         # v=3 
         #PATH=build/:$PATH RDMAV_FORKSAVE=1 mpirun -np ${n} -oversubscribe build/mallob -mono-application=KMEANS -mono=./instances/${instanceName}${k}.csv -v=3
         # v=0 >> ./Testing/times-${k}.txt 
@@ -34,12 +35,12 @@ for k in ${kList[@]}; do
     t1=$(cat ./Testing/${folder}/times-${pcName}-${k}.txt | grep "^1 " | awk '{print $2}')
     > ./Testing/${folder}/relSpeedup-${pcName}-${k}.txt
     > ./Testing/${folder}/efficiency-${pcName}-${k}.txt
-    for n in ${npList[@]}; do
+    for ((n = 1; n < 181; ++n)); do
         #echo $test
         sRel=$(echo "scale=3; $t1 / $(cat ./Testing/${folder}/times-${pcName}-${k}.txt | grep "^${n} " | awk '{print $2}')" | bc)
         efficiency=$(echo "scale=3; $sRel/$n" | bc)
         echo "$n $sRel" >> ./Testing/${folder}/relSpeedup-${pcName}-${k}.txt
         echo "$n $efficiency" >> ./Testing/${folder}/efficiency-${pcName}-${k}.txt
     done
-done
+#done
 
