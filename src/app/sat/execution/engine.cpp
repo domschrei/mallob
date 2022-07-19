@@ -334,6 +334,8 @@ void SatEngine::dumpStats(bool final) {
 		// Flush logs
 		for (auto& solver : _solver_interfaces) solver->getLogger().flush();
 		_logger.flush();
+
+		if (MALLOB_CLAUSE_METADATA_SIZE == 2) writeClauseEpochs();
 	}
 }
 
@@ -362,6 +364,12 @@ std::pair<int, int> SatEngine::getLastAdmittedClauseShare() {
 		_sharing_manager->getLastNumAdmittedClausesToImport(), 
 		_sharing_manager->getLastNumClausesToImport()
 	);
+}
+
+void SatEngine::writeClauseEpochs() {
+	std::string filename = _params.logDirectory() + "/proof" 
+		+ _config.getJobStr() + "/clauseepochs." + std::to_string(_config.apprank);
+	_sharing_manager->writeClauseEpochs(filename);
 }
 
 void SatEngine::cleanUp() {

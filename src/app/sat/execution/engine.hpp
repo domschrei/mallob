@@ -85,6 +85,6 @@ public:
 
 private:
 
+	void writeClauseEpochs();
 	std::shared_ptr<PortfolioSolverInterface> createSolver(const SolverSetup& setup);
-
 };
