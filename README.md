@@ -55,6 +55,8 @@ The final line of the output is the ID to run the container, e.g. by running `do
 
 # Testing
 
+**Note:** In its current state, the test suite expects that Mallob is built and run with OpenMPI, i.e., that `mpicc` and `mpicxx` (for building) and `mpirun` (for execution) link to OpenMPI executables on your system. For other MPI implementations, you may still be able to run the tests by removing or replacing the option `--oversubscribe` from the function `run()` in `scripts/run/systest_commons.sh`.
+
 In order to test that the system has been built and set up correctly, run the following command.
 ```
 bash scripts/run/systest.sh mono drysched sched osc
