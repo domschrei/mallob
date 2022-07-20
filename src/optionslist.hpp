@@ -29,6 +29,7 @@ OPT_BOOL(useFilesystemInterface,         "interface-fs", "",                    
 OPT_BOOL(useIPCSocketInterface,          "interface-ipc", "",                         false,                   "Use IPC socket interface (.mallob.<pid>.sk)")
 OPT_BOOL(jitterJobPriorities,            "jjp", "jitter-job-priorities",              false,                   "Jitter job priorities to break ties during rebalancing")
 OPT_BOOL(latencyMonkey,                  "latencymonkey", "",                         false,                   "Block all MPI_Isend operations by a small randomized amount of time")
+OPT_BOOL(memoryPanic,                    "mempanic", "",                              true,                    "Monitor RAM usage per physical machine and switch to memory panic mode if necessary")
 OPT_BOOL(monitorMpi,                     "mmpi", "monitor-mpi",                       false,                   "Launch an additional thread per process checking when the main thread is inside an MPI call")
 OPT_BOOL(omitSolution,                   "os", "omit-solution",                       false,                   "Do not output solution in mono mode of operation")
 OPT_BOOL(phaseDiversification,           "phasediv", "",                              true,                    "Diversify solvers based on phase in addition to native diversification")
