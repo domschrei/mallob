@@ -311,7 +311,7 @@ void Worker::checkStats(float time) {
         }
     }
 
-    if (_host_comm && _host_comm->advanceAndCheckMemoryPanic(time)) {
+    if (_params.memoryPanic() && _host_comm && _host_comm->advanceAndCheckMemoryPanic(time)) {
         // Memory panic!
         // Aggressively remove inactive cached jobs
         _job_db.setMemoryPanic(true);
