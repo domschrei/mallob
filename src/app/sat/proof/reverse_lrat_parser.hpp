@@ -65,6 +65,7 @@ public:
         _pos = _file_size-1;
 
         // Parse first (last) line
+        skipToFinalLineBreak();
         readNextLine();
     }
 
@@ -93,6 +94,11 @@ public:
     }
 
 private:
+
+    void skipToFinalLineBreak() {
+        while (_pos > 0 && _mmap[_pos] != '\n') --_pos;
+    }
+
     void readNextLine() {
 
         assert(!_line.valid());
@@ -104,12 +110,12 @@ private:
 
     bool tryReadLine() {
 
-        // Advance _pos until no line breaks are read
+        // Skip over any line breaks
         while (_pos >= 0 && (_mmap[_pos] == '\n' || _mmap[_pos] == '\r')) {
             --_pos;
         }
 
-        // Find the next line
+        // Find the next line by seeking back to the previous line break
         auto lineSeekIdx = _pos;
         while (true) {
             if (lineSeekIdx == -1 || _mmap[lineSeekIdx] == '\n' || _mmap[lineSeekIdx] == '\r') {
