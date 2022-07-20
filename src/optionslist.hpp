@@ -99,6 +99,7 @@ OPTION_GROUP(grpApp, "app", "Application-specific options")
 ///////////////////////////////////////////////////////////////////////
 
 OPTION_GROUP(grpPerformance, "performance", "Performance")
+ OPT_BOOL(memoryPanic,                    "mempanic", "",                              true,                    "Monitor RAM usage per physical machine and switch to memory panic mode if necessary")
  OPT_INT(messageBatchingThreshold,        "mbt", "message-batching-threshold",         1000000, 1000, MAX_INT,  "Employ batching of messages in batches of provided size")
  OPT_INT(processesPerHost,                "pph", "processes-per-host",                 0,    0, LARGE_INT,      "Tells Mallob how many MPI processes are executed on each physical host")
  OPT_BOOL(regularProcessDistribution,     "rpa", "regular-process-allocation",         false,                   "Signal that processes have been allocated regularly, i.e., the i-th machine hosts ranks c*i through c*i + c-1")
