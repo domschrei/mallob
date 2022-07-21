@@ -149,7 +149,7 @@ class KMeansJob : public Job {
     std::vector<Point> broadcastToClusterCenters(const std::vector<int>&, bool withNumWorkers = false);
     std::vector<int> clusterCentersToReduce(const std::vector<int>&, const std::vector<Point>&);
     std::pair<std::vector<std::vector<float>>, std::vector<int>> reduceToclusterCenters(const std::vector<int>&);
-    std::vector<int> aggregate(std::list<std::vector<int>>);
+    std::vector<int> aggregate(const std::list<std::vector<int>>&);
     void advanceCollective(JobMessage& msg, JobTree& jobTree);
     void initReducer(JobMessage& msg);
     int getIndex(int rank);

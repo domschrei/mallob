@@ -630,7 +630,7 @@ KMeansJob::reduceToclusterCenters(const std::vector<int>& reduce) {
     return std::pair(std::move(localClusterCentersResult), std::move(localSumMembersResult));
 }
 
-std::vector<int> KMeansJob::aggregate(std::list<std::vector<int>> messages) {
+std::vector<int> KMeansJob::aggregate(const std::list<std::vector<int>>& messages) {
     std::vector<std::vector<KMeansJob::Point>> centers;
     std::vector<std::vector<int>> counts;
     std::vector<int> tempSumMembers;
@@ -638,10 +638,11 @@ std::vector<int> KMeansJob::aggregate(std::list<std::vector<int>> messages) {
     const int countMessages = messages.size();
     centers.resize(countMessages);
     counts.resize(countMessages);
+    auto message = messages.begin();
     LOG(V3_VERB, "                         myIndex: %i countMessages: %d\n", myIndex, countMessages);
     for (int i = 0; i < countMessages; ++i) {
-        auto data = reduceToclusterCenters(messages.front());
-        messages.pop_front();
+        auto data = reduceToclusterCenters(*message);
+        ++message;
         centers[i] = data.first;
         counts[i] = data.second;
 
