@@ -423,6 +423,7 @@ void KMeansJob::calcNearestCenter(std::function<float(const float*, Point)> metr
             iAmRoot &&
             (countCurrentWorkers == 1 ||
              (std::find(work.begin(), work.end(), 1) != work.end() && std::find(work.begin(), work.end(), 2) != work.end())) &&
+            (leftDone && rightDone) &&
             this->getVolume() > 1) {
             LOG(V3_VERB, "                           will skip Iter\n");
             skipCurrentIter = true;
