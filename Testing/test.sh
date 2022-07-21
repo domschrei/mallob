@@ -20,7 +20,7 @@ for k in ${kList[@]}; do
         meanTime=0
         for ((i = 0 ; i < $countPasses ; ++i)); do
             > ./Testing/${folder}/out.txt
-            PATH=build/:$PATH RDMAV_FORKSAVE=1 mpirun -np ${n} -oversubscribe build/mallob -mono-application=KMEANS -mono=./instances/${instanceName}${k}.csv -v=0 > ./Testing/${folder}/out.txt
+            PATH=build/:$PATH RDMAV_FORKSAVE=1 mpirun -np ${n} -oversubscribe build/mallob -mono-application=KMEANS -mono=./instances/${instanceName}${k}.csv -v=0 2>&1 > ./Testing/${folder}/out.txt
             meanTime=$(echo "scale=3; $meanTime + ($(cat ./Testing/${folder}/out.txt |grep "Got Result"|awk '{print $2}'))" | bc)
             #echo "time $(cat ./Testing/${folder}/out.txt |grep "Got Result"|awk '{print $2}')"
         done
