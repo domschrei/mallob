@@ -3,8 +3,8 @@ pcName="i10pc135"
 folder="latestResults" #latestResults
 instanceName="covtypeShuffle" #   mnist784      benign_traffic      covtypeShuffle
 instanceFirstLine="54 55 550000" #7 7 209    115 115 52150      54 55 581012
-kList=(5 10 20 30 40) # 60 70 80
-npList=(160 155 150 145 140 135 130 128 127 125 120 115 110 105 100 95 90 85 80 75 70 65 64 63 60 55 50 45 40 35 32 31 30 25 20 25 16 15 10 8 7 5 4 3 2 1) 
+kList=(10 20 30 40 50) # 60 70 80
+npList=(160 155 150 145 140 135 130 128 127 125 120 115 110 105 100 95 90 85 80 75 70 65 64 63 60 55 50 45 40 35 32 31 30 25 20 16 15 10 8 7 5 4 3 2 1) 
 countPasses=3
 #k=20
 for k in ${kList[@]}; do
@@ -20,7 +20,7 @@ for k in ${kList[@]}; do
         meanTime=0
         for ((i = 0 ; i < $countPasses ; ++i)); do
             > ./Testing/${folder}/out.txt
-            PATH=build/:$PATH RDMAV_FORKSAVE=1 mpirun -np ${n} -oversubscribe build/mallob -mono-application=KMEANS -mono=./instances/${instanceName}${k}.csv -v=0 2>&1 > ./Testing/${folder}/out.txt
+            PATH=build/:$PATH RDMAV_FORKSAVE=1 mpirun -np ${n} -oversubscribe build/mallob -mono-application=KMEANS -mono=./instances/${instanceName}${k}.csv -v=3 2>&1 > ./Testing/${folder}/out.txt
             meanTime=$(echo "scale=3; $meanTime + ($(cat ./Testing/${folder}/out.txt |grep "Got Result"|awk '{print $2}'))" | bc)
             #echo "time $(cat ./Testing/${folder}/out.txt |grep "Got Result"|awk '{print $2}')"
         done
