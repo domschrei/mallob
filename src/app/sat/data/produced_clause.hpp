@@ -4,6 +4,7 @@
 #include "clause.hpp"
 #include "util/assert.hpp"
 #include "util/tsl/robin_map.h"
+#include "util/logger.hpp"
 
 struct ProducedUnitClause {
     int literal = 0;
@@ -250,6 +251,10 @@ namespace prod_cls {
         if constexpr (std::is_base_of<ProducedLargeClause, T>()) {
             std::string out = "len=" + std::to_string(producedClause.size - MALLOB_CLAUSE_METADATA_SIZE) 
                 + " lbd=" + std::to_string(explicitLbdOrZero) + " ";
+            if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+                unsigned long id; memcpy(&id, producedClause.data, sizeof(unsigned long));
+                out += "id=" + std::to_string(id) + " ";
+            }
             for (size_t i = MALLOB_CLAUSE_METADATA_SIZE; i < producedClause.size; i++)
                 out += std::to_string(producedClause.data[i]) + " ";
             return out;
@@ -291,14 +296,15 @@ struct ProducedClauseEqualsCommutative {
         if (size != prod_cls::size(b)) return false; // only clauses of same size are equal
         
         // content comparison otherwise
-        auto dataA = prod_cls::data(a) + MALLOB_CLAUSE_METADATA_SIZE;
-        auto dataB = prod_cls::data(b) + MALLOB_CLAUSE_METADATA_SIZE;
+        auto dataA = prod_cls::data(a);
+        auto dataB = prod_cls::data(b);
 
         // Invariant: All literals of B to the left of this index are already matched
         size_t idxB = MALLOB_CLAUSE_METADATA_SIZE; 
 
         // For each literal of A:
         for (size_t i = MALLOB_CLAUSE_METADATA_SIZE; i < size; i++) {
+            assert(idxB < size);
             // Same literal as at B's current position?
             if (dataA[i] == dataB[idxB]) {
                 ++idxB; // this literal is checked, proceed to next one

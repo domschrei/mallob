@@ -99,7 +99,7 @@ public:
             doSleep();
 
             // Terminate
-            if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true)) {
+            if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/false)) {
                 LOGGER(_log, V5_DEBG, "DO terminate\n");
                 _engine.dumpStats(/*final=*/true);
                 break;

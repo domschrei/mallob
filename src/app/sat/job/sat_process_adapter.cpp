@@ -316,13 +316,19 @@ void SatProcessAdapter::dumpStats() {
 SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
     if (!_initialized) return NORMAL;
 
-    int exitStatus;
-    if (Process::didChildExit(_child_pid, &exitStatus) && exitStatus != 0) {
-        // Child exited!
+    int exitStatus = 0;
+    if ((!_hsm->doTerminate && _hsm->didTerminate) || 
+            (Process::didChildExit(_child_pid, &exitStatus) && exitStatus != 0)) {
+        // Child has exited without being told to.
         if (exitStatus == SIGUSR2) {
             LOG(V3_VERB, "Restarting non-incremental child %ld\n", _child_pid);
         } else {
             LOG(V1_WARN, "[WARN] Child %ld exited unexpectedly (status %i)\n", _child_pid, exitStatus);
+        }
+        if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+            // Certified UNSAT: Child crashing is not permitted!
+            LOG(V1_WARN, "[ERROR] Child %ld exiting renders the proofs illegal - aborting\n", _child_pid);
+            abort();
         }
         // Notify to restart solver engine
         return CRASHED;

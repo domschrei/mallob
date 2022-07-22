@@ -31,7 +31,13 @@ namespace Mallob {
         }
         std::string toStr() const {
             std::string out = "(len=" + std::to_string(size - MALLOB_CLAUSE_METADATA_SIZE) 
-                + " lbd=" + std::to_string(lbd) + ") ";
+                + " lbd=" + std::to_string(lbd);
+            if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+                unsigned long id;
+                memcpy(&id, begin, sizeof(unsigned long));
+                out += " id=" + std::to_string(id);
+            }
+            out += ") ";
             for (auto it = begin + MALLOB_CLAUSE_METADATA_SIZE; it != begin+size; it++) {
                 out += std::to_string(*it) + " ";
             }
