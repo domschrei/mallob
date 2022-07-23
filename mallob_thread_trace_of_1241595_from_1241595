@@ -1,0 +1,42 @@
+[New LWP 1241619]
+[New LWP 1241626]
+[New LWP 1241809]
+[New LWP 1241890]
+[New LWP 1241946]
+[New LWP 1241996]
+[New LWP 1242035]
+[New LWP 1242544]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=139961604818688, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=139961604818688, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007f4b77930fe7 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x00005618f520d821 in Process::writeTrace (tid=1241595) at /home/doerr/mallob/src/util/sys/process.cpp:198
+#3  0x00005618f520cefd in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:70
+#4  0x00005618f520ce1b in handleSignal (signum=15) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#5  <signal handler called>
+#6  0x00007f4b776e2749 in __lll_lock_wait_private (futex=futex@entry=0x7f4b77836b80 <main_arena>) at ./lowlevellock.c:35
+#7  0x00007f4b776e521a in _int_free (av=0x7f4b77836b80 <main_arena>, p=0x5618f707fea0, have_lock=<optimized out>) at malloc.c:4302
+#8  0x00007f4b77694ad3 in __run_exit_handlers (status=1, listp=0x7f4b77836718 <__exit_funcs>, run_list_atexit=run_list_atexit@entry=true, run_dtors=run_dtors@entry=true) at exit.c:124
+#9  0x00007f4b77694be0 in __GI_exit (status=<optimized out>) at exit.c:139
+#10 0x00005618f520cf42 in Process::doExit (retval=1) at /home/doerr/mallob/src/util/sys/process.cpp:82
+#11 0x00005618f520cf07 in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:71
+#12 0x00005618f520ce1b in handleSignal (signum=11) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#13 <signal handler called>
+#14 malloc_consolidate (av=av@entry=0x7f4b77836b80 <main_arena>) at malloc.c:4475
+#15 0x00007f4b776e5160 in _int_free (av=0x7f4b77836b80 <main_arena>, p=0x5618f72901b0, have_lock=<optimized out>) at malloc.c:4400
+#16 0x00007f4b7517c2d1 in ?? () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_coll_libnbc.so
+#17 0x00007f4b7517ced1 in NBC_Progress () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_coll_libnbc.so
+#18 0x00007f4b7517d6ae in ?? () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_coll_libnbc.so
+#19 0x00007f4b7517cdf5 in NBC_Progress () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_coll_libnbc.so
+#20 0x00007f4b7517ba88 in ompi_coll_libnbc_progress () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_coll_libnbc.so
+#21 0x00007f4b7750b854 in opal_progress () from /lib/x86_64-linux-gnu/libopen-pal.so.40
+#22 0x00007f4b77512315 in ompi_sync_wait_mt () from /lib/x86_64-linux-gnu/libopen-pal.so.40
+#23 0x00007f4b77c059f8 in ompi_request_default_wait () from /lib/x86_64-linux-gnu/libmpi.so.40
+#24 0x00007f4b77c685b4 in ompi_coll_base_barrier_intra_bruck () from /lib/x86_64-linux-gnu/libmpi.so.40
+#25 0x00007f4b77c1d730 in PMPI_Barrier () from /lib/x86_64-linux-gnu/libmpi.so.40
+#26 0x00005618f5162c21 in main (argc=4, argv=0x7ffc363cf8c8) at /home/doerr/mallob/src/main.cpp:271
+[Inferior 1 (process 1241595) detached]
