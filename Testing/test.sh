@@ -5,7 +5,7 @@ instanceName="covtypeShuffle" #   mnist784      benign_traffic      covtypeShuff
 instanceFirstLine="54 55 550000" #7 7 209    115 115 52150      54 55 581012
 kList=(30) # 60 70 80
 npList=(160 155 150 145 140 135 130 128 127 125 120 115 110 105 100 95 90 85 80 75 70) #   65 64 63 60 55 50 45 40 35 32 31 30 25 20 16 15 10 8 7 5 4 3 2 1
-countPasses=3
+countPasses=2
 #k=20
 for k in ${kList[@]}; do
 
