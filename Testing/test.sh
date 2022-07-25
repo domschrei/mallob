@@ -1,6 +1,6 @@
 #!/bin/bash
 pcName="i10pc135"
-folder="latestResults" #latestResults
+folder="strange" #latestResults
 instanceName="covtypeShuffle" #   mnist784      benign_traffic      covtypeShuffle
 instanceFirstLine="54 55 550000" #7 7 209    115 115 52150      54 55 581012
 kList=(30) # 60 70 80
