@@ -1,5 +1,5 @@
 
-set folder=strange
+set folder=dTest
 set pcName=i10pc135
 for %%t in (times relSpeedup efficiency) do (
     for %%k in (30) do ( Rem for /l %%k in (1, 1, 100) do (
