@@ -1,2 +1,2722 @@
 (standard_in) 2: syntax error
 (standard_in) 1: syntax error
+./Testing/test.sh: line 17: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 18: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 39: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 40: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-10000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-10000.txt: No such file or directory
+./Testing/test.sh: line 17: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 18: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 39: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 40: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-100000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-100000.txt: No such file or directory
+./Testing/test.sh: line 17: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 18: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 39: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 40: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-250000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-250000.txt: No such file or directory
+./Testing/test.sh: line 17: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 18: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+./Testing/test.sh: line 25: ./Testing/dTest/out.txt: No such file or directory
+./Testing/test.sh: line 26: ./Testing/dTest/out.txt: No such file or directory
+cat: ./Testing/dTest/out.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 32: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 39: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 40: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
+cat: ./Testing/dTest/times-i10pc135-30-500000.txt: No such file or directory
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 45: ./Testing/dTest/relSpeedup-i10pc135-30-500000.txt: No such file or directory
+./Testing/test.sh: line 46: ./Testing/dTest/efficiency-i10pc135-30-500000.txt: No such file or directory
