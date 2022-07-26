@@ -1,0 +1,34 @@
+[New LWP 2191894]
+[New LWP 2191904]
+[New LWP 2192212]
+[New LWP 2192308]
+[New LWP 2192402]
+[New LWP 2192496]
+[New LWP 2192582]
+[New LWP 2193164]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=140545976080128, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=140545976080128, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007fd38e46f047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x000055b95329f821 in Process::writeTrace (tid=2191877) at /home/doerr/mallob/src/util/sys/process.cpp:198
+#3  0x000055b95329eefd in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:70
+#4  0x000055b95329ee1b in handleSignal (signum=6) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#5  <signal handler called>
+#6  __GI_raise (sig=sig@entry=6) at ../sysdeps/unix/sysv/linux/raise.c:50
+#7  0x00007fd38e1ab859 in __GI_abort () at abort.c:79
+#8  0x00007fd38e21629e in __libc_message (action=action@entry=do_abort, fmt=fmt@entry=0x7fd38e340298 "%s\n") at ../sysdeps/posix/libc_fatal.c:155
+#9  0x00007fd38e21e32c in malloc_printerr (str=str@entry=0x7fd38e342ad8 "malloc(): unsorted double linked list corrupted") at malloc.c:5347
+#10 0x00007fd38e22131c in _int_malloc (av=av@entry=0x7fd38e375b80 <main_arena>, bytes=bytes@entry=128) at malloc.c:3744
+#11 0x00007fd38e224bc5 in __libc_calloc (n=<optimized out>, elem_size=<optimized out>) at malloc.c:3428
+#12 0x00007fd38d6465d6 in pmix_bfrop_buffer_extend () from /lib/x86_64-linux-gnu/libpmix.so.2
+#13 0x00007fd38d649092 in pmix_bfrops_base_pack_int32 () from /lib/x86_64-linux-gnu/libpmix.so.2
+#14 0x00007fd38d64914d in pmix_bfrops_base_pack () from /lib/x86_64-linux-gnu/libpmix.so.2
+#15 0x00007fd38d5e8d80 in PMIx_Fence_nb () from /lib/x86_64-linux-gnu/libpmix.so.2
+#16 0x00007fd38d6a708d in ext3x_fencenb () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_pmix_ext3x.so
+#17 0x00007fd38e744cab in ompi_mpi_finalize () from /lib/x86_64-linux-gnu/libmpi.so.40
+#18 0x000055b9531f4c26 in main (argc=4, argv=0x7ffd64671de8) at /home/doerr/mallob/src/main.cpp:272
+[Inferior 1 (process 2191877) detached]
