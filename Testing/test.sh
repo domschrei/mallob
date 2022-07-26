@@ -4,8 +4,8 @@ folder="dTest256core" #latestResults
 instanceName="covtypeShuffle" #   mnist784      benign_traffic      covtypeShuffle
 instanceFirstLine="54 55" #7 7 209    115 115 52150      54 55 581012
 kList=(30) # 60 70 80
-npList=(256 255 250 245 240 235 230 225 220 215 210 205 200 195 190 185 180 175 170 165 160 155 150 145 140 135 130 128 127 125 120 115 110 105 100 95 90 85 80 75 70 65 64 63 60 55 50 45 40 35 32 31 30 25 20 16 15 10 8 7 5 4 3 2 1) #   65 64 63 60 55 50 45 40 35 32 31 30 25 20 16 15 10 8 7 5 4 3 2 1
-dList=(10000 50000 100000 300000 500000)
+npList=(256 255 250) #   65 64 63 60 55 50 45 40 35 32 31 30 25 20 16 15 10 8 7 5 4 3 2 1
+dList=(500000)
 countPasses=2
 
 for k in ${kList[@]}; do
@@ -14,7 +14,7 @@ for k in ${kList[@]}; do
 
         echo "$k $instanceFirstLine $d" > ./instances/${instanceName}${k}.csv
         cat ./instances/${instanceName}K.csv >> ./instances/${instanceName}${k}.csv
-        > ./Testing/${folder}/times-${pcName}-${k}-${d}.txt
+        #> ./Testing/${folder}/times-${pcName}-${k}-${d}.txt
         > ./Testing/${folder}/out.txt
         for n in ${npList[@]}; do #((n = 158 ; n < 161 ; ++n));
             # v=3 
