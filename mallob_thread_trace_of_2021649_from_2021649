@@ -1,0 +1,41 @@
+[New LWP 2021683]
+[New LWP 2021691]
+[New LWP 2022272]
+[New LWP 2022749]
+[New LWP 2022961]
+[New LWP 2023170]
+[New LWP 2023306]
+[New LWP 2024661]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=140152583264000, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=140152583264000, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007f7820c34047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x0000557efc201821 in Process::writeTrace (tid=2021649) at /home/doerr/mallob/src/util/sys/process.cpp:198
+#3  0x0000557efc200efd in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:70
+#4  0x0000557efc200e1b in handleSignal (signum=15) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#5  <signal handler called>
+#6  0x00007f78209e25f9 in __lll_lock_wait_private (futex=futex@entry=0x7f7820b3ab80 <main_arena>) at ./lowlevellock.c:35
+#7  0x00007f78209e50ca in _int_free (av=0x7f7820b3ab80 <main_arena>, p=0x557efc852ea0, have_lock=<optimized out>) at malloc.c:4302
+#8  0x00007f7820994983 in __run_exit_handlers (status=1, listp=0x7f7820b3a718 <__exit_funcs>, run_list_atexit=run_list_atexit@entry=true, run_dtors=run_dtors@entry=true) at exit.c:124
+#9  0x00007f7820994a90 in __GI_exit (status=<optimized out>) at exit.c:139
+#10 0x0000557efc200f42 in Process::doExit (retval=1) at /home/doerr/mallob/src/util/sys/process.cpp:82
+#11 0x0000557efc200f07 in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:71
+#12 0x0000557efc200e1b in handleSignal (signum=6) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#13 <signal handler called>
+#14 __GI_raise (sig=sig@entry=6) at ../sysdeps/unix/sysv/linux/raise.c:50
+#15 0x00007f7820970859 in __GI_abort () at abort.c:79
+#16 0x00007f78209db29e in __libc_message (action=action@entry=do_abort, fmt=fmt@entry=0x7f7820b05298 "%s\n") at ../sysdeps/posix/libc_fatal.c:155
+#17 0x00007f78209e332c in malloc_printerr (str=str@entry=0x7f7820b0346a "corrupted double-linked list") at malloc.c:5347
+#18 0x00007f78209e397c in unlink_chunk (p=p@entry=0x557efcc62d10, av=0x7f7820b3ab80 <main_arena>) at malloc.c:1460
+#19 0x00007f78209e4ebb in _int_free (av=0x7f7820b3ab80 <main_arena>, p=0x557efcc62a50, have_lock=<optimized out>) at malloc.c:4342
+#20 0x00007f781c995f29 in ?? () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_pml_ob1.so
+#21 0x00007f781c9945d9 in mca_pml_ob1_del_comm () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_pml_ob1.so
+#22 0x00007f7820ee85dd in ?? () from /lib/x86_64-linux-gnu/libmpi.so.40
+#23 0x00007f7820ee9689 in ompi_comm_finalize () from /lib/x86_64-linux-gnu/libmpi.so.40
+#24 0x00007f7820f0a0dd in ompi_mpi_finalize () from /lib/x86_64-linux-gnu/libmpi.so.40
+#25 0x0000557efc156c26 in main (argc=4, argv=0x7ffc3e644338) at /home/doerr/mallob/src/main.cpp:272
+[Inferior 1 (process 2021649) detached]

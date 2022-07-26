@@ -1,0 +1,37 @@
+[New LWP 85295]
+[New LWP 85298]
+[New LWP 86245]
+[New LWP 86493]
+[New LWP 86699]
+[New LWP 86909]
+[New LWP 87103]
+[New LWP 88457]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=139762957596416, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=139762957596416, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007f1d67b58047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x000056127da71821 in Process::writeTrace (tid=85250) at /home/doerr/mallob/src/util/sys/process.cpp:198
+#3  0x000056127da70efd in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:70
+#4  0x000056127da70e1b in handleSignal (signum=15) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#5  <signal handler called>
+#6  0x00007f1d679065f9 in __lll_lock_wait_private (futex=futex@entry=0x7f1d67a5eb80 <main_arena>) at ./lowlevellock.c:35
+#7  0x00007f1d679090ca in _int_free (av=0x7f1d67a5eb80 <main_arena>, p=0x56127dd9bea0, have_lock=<optimized out>) at malloc.c:4302
+#8  0x00007f1d678b8983 in __run_exit_handlers (status=1, listp=0x7f1d67a5e718 <__exit_funcs>, run_list_atexit=run_list_atexit@entry=true, run_dtors=run_dtors@entry=true) at exit.c:124
+#9  0x00007f1d678b8a90 in __GI_exit (status=<optimized out>) at exit.c:139
+#10 0x000056127da70f42 in Process::doExit (retval=1) at /home/doerr/mallob/src/util/sys/process.cpp:82
+#11 0x000056127da70f07 in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:71
+#12 0x000056127da70e1b in handleSignal (signum=11) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#13 <signal handler called>
+#14 malloc_consolidate (av=av@entry=0x7f1d67a5eb80 <main_arena>) at malloc.c:4475
+#15 0x00007f1d67909010 in _int_free (av=0x7f1d67a5eb80 <main_arena>, p=0x56127dfb5ff0, have_lock=<optimized out>) at malloc.c:4400
+#16 0x00007f1d677292d8 in ?? () from /lib/x86_64-linux-gnu/libopen-pal.so.40
+#17 0x00007f1d67729418 in ?? () from /lib/x86_64-linux-gnu/libopen-pal.so.40
+#18 0x00007f1d64b12279 in ?? () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_osc_rdma.so
+#19 0x00007f1d67ea84a4 in ompi_osc_base_finalize () from /lib/x86_64-linux-gnu/libmpi.so.40
+#20 0x00007f1d67e2e0d1 in ompi_mpi_finalize () from /lib/x86_64-linux-gnu/libmpi.so.40
+#21 0x000056127d9c6c26 in main (argc=4, argv=0x7ffca0e18e58) at /home/doerr/mallob/src/main.cpp:272
+[Inferior 1 (process 85250) detached]

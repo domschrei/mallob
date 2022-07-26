@@ -1,0 +1,51 @@
+[New LWP 101070]
+[New LWP 101092]
+[New LWP 101964]
+[New LWP 102269]
+[New LWP 102470]
+[New LWP 102671]
+[New LWP 102856]
+[New LWP 102999]
+[New LWP 103072]
+[New LWP 103103]
+[New LWP 103124]
+[New LWP 104676]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=140310088750848, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=140310088750848, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007f9cd29fc047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x0000559ca0efc821 in Process::writeTrace (tid=101040) at /home/doerr/mallob/src/util/sys/process.cpp:198
+#3  0x0000559ca0efbefd in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:70
+#4  0x0000559ca0efbe1b in handleSignal (signum=15) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#5  <signal handler called>
+#6  0x00007f9cd27aa5f9 in __lll_lock_wait_private (futex=futex@entry=0x7f9cd2902b80 <main_arena>) at ./lowlevellock.c:35
+#7  0x00007f9cd27ad0ca in _int_free (av=0x7f9cd2902b80 <main_arena>, p=0x559ca26b0ea0, have_lock=<optimized out>) at malloc.c:4302
+#8  0x00007f9cd275c983 in __run_exit_handlers (status=1, listp=0x7f9cd2902718 <__exit_funcs>, run_list_atexit=run_list_atexit@entry=true, run_dtors=run_dtors@entry=true) at exit.c:124
+#9  0x00007f9cd275ca90 in __GI_exit (status=<optimized out>) at exit.c:139
+#10 0x0000559ca0efbf42 in Process::doExit (retval=1) at /home/doerr/mallob/src/util/sys/process.cpp:82
+#11 0x0000559ca0efbf07 in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:71
+#12 0x0000559ca0efbe1b in handleSignal (signum=6) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#13 <signal handler called>
+#14 __GI_raise (sig=sig@entry=6) at ../sysdeps/unix/sysv/linux/raise.c:50
+#15 0x00007f9cd2738859 in __GI_abort () at abort.c:79
+#16 0x00007f9cd27a329e in __libc_message (action=action@entry=do_abort, fmt=fmt@entry=0x7f9cd28cd298 "%s\n") at ../sysdeps/posix/libc_fatal.c:155
+#17 0x00007f9cd27ab32c in malloc_printerr (str=str@entry=0x7f9cd28cfad8 "malloc(): unsorted double linked list corrupted") at malloc.c:5347
+#18 0x00007f9cd27ae31c in _int_malloc (av=av@entry=0x7f9cd2902b80 <main_arena>, bytes=bytes@entry=49) at malloc.c:3744
+#19 0x00007f9cd27aee8f in _int_realloc (av=av@entry=0x7f9cd2902b80 <main_arena>, oldp=oldp@entry=0x559ca2ac6160, oldsize=oldsize@entry=48, nb=64) at malloc.c:4600
+#20 0x00007f9cd27b1186 in __GI___libc_realloc (oldmem=0x559ca2ac6170, bytes=48) at malloc.c:3235
+#21 0x00007f9cc9f50422 in ?? () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_coll_libnbc.so
+#22 0x00007f9cc9f4fdf5 in NBC_Progress () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_coll_libnbc.so
+#23 0x00007f9cc9f506ae in ?? () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_coll_libnbc.so
+#24 0x00007f9cc9f4fdf5 in NBC_Progress () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_coll_libnbc.so
+#25 0x00007f9cc9f4ea88 in ompi_coll_libnbc_progress () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_coll_libnbc.so
+#26 0x00007f9cd25d6854 in opal_progress () from /lib/x86_64-linux-gnu/libopen-pal.so.40
+#27 0x00007f9cd25dd315 in ompi_sync_wait_mt () from /lib/x86_64-linux-gnu/libopen-pal.so.40
+#28 0x00007f9cd2cd09f8 in ompi_request_default_wait () from /lib/x86_64-linux-gnu/libmpi.so.40
+#29 0x00007f9cd2d335b4 in ompi_coll_base_barrier_intra_bruck () from /lib/x86_64-linux-gnu/libmpi.so.40
+#30 0x00007f9cd2ce8730 in PMPI_Barrier () from /lib/x86_64-linux-gnu/libmpi.so.40
+#31 0x0000559ca0e51c21 in main (argc=4, argv=0x7ffed5f94c08) at /home/doerr/mallob/src/main.cpp:271
+[Inferior 1 (process 101040) detached]
