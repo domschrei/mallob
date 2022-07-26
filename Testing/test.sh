@@ -38,12 +38,13 @@ for k in ${kList[@]}; do
         t1=$(cat ./Testing/${folder}/times-${pcName}-${k}-${d}.txt | grep "^1 " | awk '{print $2}')
         > ./Testing/${folder}/relSpeedup-${pcName}-${k}-${d}.txt
         > ./Testing/${folder}/efficiency-${pcName}-${k}-${d}.txt
-        for n in ${npList[@]}; do
+        while read p; do
+            n=$(echo "$p" | awk '{print $1}')
             #echo $test
             sRel=$(echo "scale=3; $t1 / $(cat ./Testing/${folder}/times-${pcName}-${k}-${d}.txt | grep "^${n} " | awk '{print $2}')" | bc)
             efficiency=$(echo "scale=3; $sRel/$n" | bc)
             echo "$n $sRel" >> ./Testing/${folder}/relSpeedup-${pcName}-${k}-${d}.txt
             echo "$n $efficiency" >> ./Testing/${folder}/efficiency-${pcName}-${k}-${d}.txt
-        done
+        done <./Testing/${folder}/times-${pcName}-${k}-${d}.txt
     done
 done
