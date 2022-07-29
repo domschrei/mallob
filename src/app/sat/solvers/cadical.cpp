@@ -8,6 +8,7 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include <chrono>
+#include <filesystem>
 
 #include "cadical.hpp"
 
@@ -25,9 +26,13 @@ Cadical::Cadical(const SolverSetup& setup)
         solver->set("binary", false);
         std::string logdir = setup.logger->getLogDir();
         //length of the directory + space for filename
-        char *filename = new char [logdir.length() + 50];
-        sprintf(filename, "%s/proof.%d.frat", logdir.c_str(), setup.globalId);
-        solver->trace_proof(filename);
+        char *filename_alone = new char [20];
+        sprintf(filename_alone, "proof.%d.frat", setup.globalId);
+        //hanlde the joining string already being at the end
+        std::filesystem::path dir(logdir);
+        std::filesystem::path file(filename_alone);
+        std::filesystem::path full_path = dir / file;
+        solver->trace_proof(full_path.string().c_str());
 }
 
 void Cadical::addLiteral(int lit) {
