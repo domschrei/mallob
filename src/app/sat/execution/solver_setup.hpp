@@ -40,4 +40,5 @@ struct SolverSetup {
 	bool skipClauseSharingDiagonally;
 	bool certifiedUnsat;
         int maxNumSolvers;
+        std::string proofDir;
 };
