@@ -24,7 +24,7 @@ private:
 
     int _job_counter = 1;
     int _job_description_index = 0;
-    std::vector<std::string> _job_descriptions;
+    std::vector<std::vector<std::string>> _job_descriptions;
 
     BackgroundWorker _bg_worker;
     std::atomic_int _num_active_jobs = 0;
@@ -69,7 +69,16 @@ public:
             std::ifstream i(_params.jobDescriptionTemplate());
             std::string line;
             while (std::getline(i, line)) {
-                if (!line.empty()) _job_descriptions.push_back(line);
+                if (line.empty()) break;
+                std::vector<std::string> filenames;
+                size_t idx = 0;
+                while (idx < line.size()) {
+                    size_t start = idx;
+                    while (idx < line.size() && line[idx] != ' ') idx++;
+                    filenames.push_back(line.substr(start, idx-start));
+                    idx++;
+                }
+                _job_descriptions.push_back(std::move(filenames));
             }
         }
         // Shuffle job description files if desired
@@ -109,7 +118,7 @@ public:
                     jsonCopy["name"] = baseJobName + "-" + std::to_string(_job_counter++);
                     if (!_job_descriptions.empty()) {
                         assert(_job_description_index < _job_descriptions.size());
-                        jsonCopy["files"] = std::vector<std::string>(1, _job_descriptions[_job_description_index]);
+                        jsonCopy["files"] = _job_descriptions[_job_description_index];
                         _job_description_index = (_job_description_index+1) % _job_descriptions.size();
                     }
                     if (_client_template.valid()) {
