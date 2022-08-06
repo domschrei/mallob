@@ -6,8 +6,8 @@ Mallob is a platform for massively parallel and distributed on-demand processing
 Malleability means that the CPU resources allotted to a job may vary _during its execution_ depending on the system's overall load.
 Mallob was tested on configurations with up to 6144 cores as described in our publications: [SAT 2021](https://dominikschreiber.de/papers/2021-sat-scalable.pdf), Euro-Par 2022 (coming soon!).
 
-Most notably, Mallob features an engine for distributed SAT solving. 
-According to the International SAT Competition [2020🥇](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf) and [2021🥇🥈🥈🥉](https://satcompetition.github.io/2021/slides/ISC2021.pdf), Mallob is currently the best approach for SAT solving on a large scale (800 physical cores) and one of the best approaches for SAT solving on a moderate scale (32 physical cores).
+Most notably, Mallob features an engine for distributed SAT solving.
+According to the [International SAT Competitions](https://satcompetition.github.io/) 2020-2022, the premier competitive events for state-of-the-art SAT solving, Mallob is consistently the strongest SAT solving system for massively parallel and distributed systems (800 physical cores) and also a highly competitive system for moderately parallel SAT solving (32 physical cores).
 
 <hr/>
 
