@@ -8,6 +8,7 @@ wList=(40 35 32 31 30 25 20 16 15 10 8 7 5 4 3 2 1) #   65 64 63 60 55 50 45 40 
 nList=(50000)
 countPasses=2
 
+./Testing/killHung.sh ${folder} &
 for k in ${kList[@]}; do
     for n in ${nList[@]}; do
 
@@ -48,3 +49,5 @@ for k in ${kList[@]}; do
         done <./Testing/${folder}/times-${pcName}-${k}-${n}.txt
     done
 done
+
+kill -9 `ps -aux | grep "./Testing/killHung.sh" | grep -v grep | awk '{ print $2 }'`
