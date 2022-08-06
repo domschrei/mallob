@@ -1,6 +1,6 @@
 #!/bin/bash
 pcName="i10pc138"
-folder="temp" #latestResults
+folder="nTest256core100d" #latestResults
 instanceName="benign_trafficShuffle" #   mnist784      benign_trafficShuffle      covtypeShuffle
 instanceFirstLine="115 115" #              7 7 209       115 115 52150              54 55 581012
 kList=(10 30 50) # 60 70 80

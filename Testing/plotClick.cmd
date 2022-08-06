@@ -1,5 +1,5 @@
 SETLOCAL ENABLEDELAYEDEXPANSION
-set folder=temp
+set folder=nTest256core100d
 set pcName=i10pc138
 for %%t in (times relSpeedup efficiency) do (
     set cm=python ../scripts/plot/plot_curves.py -xy
