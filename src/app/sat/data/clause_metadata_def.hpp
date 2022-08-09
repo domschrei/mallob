@@ -12,12 +12,6 @@ static_assert(MALLOB_CLAUSE_METADATA_SIZE == 0 || MALLOB_CLAUSE_METADATA_SIZE >=
     "since clauses of length two including metadata are not yet supported.");
 
 namespace metadata {
-	unsigned long readUnsignedLong(const int* data) {
-		unsigned long ul;
-		memcpy(&ul, data, sizeof(unsigned long));
-		return ul;
-	}
-	void writeUnsignedLong(unsigned long ul, int* data) {
-		memcpy(data, &ul, sizeof(unsigned long));
-	}
+	unsigned long readUnsignedLong(const int* data);
+	void writeUnsignedLong(unsigned long ul, int* data);
 }

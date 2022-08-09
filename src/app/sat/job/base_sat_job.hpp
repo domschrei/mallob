@@ -48,6 +48,9 @@ public:
 private:
     float _compensation_factor = 1.0f;
 
+    struct DeferredJobMsg {int source; int mpiTag; JobMessage msg;};
+    std::vector<DeferredJobMsg> _deferred_messages;
+
 public:
     // Helper methods
 
@@ -61,4 +64,15 @@ public:
             _params.clauseBufferBaseSize(), _params.clauseBufferDiscountFactor(), mode);
     }
 
+    void deferMessage(int source, int mpiTag, JobMessage& msg) {
+        _deferred_messages.push_back(DeferredJobMsg {source, mpiTag, std::move(msg)});
+    }
+
+    bool hasDeferredMessage() const {return !_deferred_messages.empty();}
+
+    DeferredJobMsg getDeferredMessage() {
+        auto result = std::move(_deferred_messages.back());
+        _deferred_messages.pop_back();
+        return result;
+    }
 };

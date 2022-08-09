@@ -45,9 +45,9 @@ private:
 public:
     ProofInstance(int instanceId, int numInstances, 
         const std::string& proofFilename, int finalEpoch, 
-        int winningInstance, const std::vector<LratClauseId>& localEpochStarts, 
-        const std::vector<LratClauseId>& localEpochOffsets,
-        const std::string& outputFilename) :
+        int winningInstance, const std::vector<LratClauseId>& globalEpochStarts, 
+        std::vector<LratClauseId>&& localEpochStarts, 
+        std::vector<LratClauseId>&& localEpochOffsets, const std::string& outputFilename) :
             _instance_id(instanceId), _num_instances(numInstances),
             _winning_instance(winningInstance == instanceId),
             _parser(proofFilename), _local_epoch_starts(localEpochStarts), 
@@ -58,12 +58,13 @@ public:
         for (size_t i = 0; i < _global_epoch_starts.size(); ++i) {
             _global_epoch_starts[i] = _local_epoch_starts[i] + _local_epoch_offsets[i];
         }
+        assert(_global_epoch_starts == globalEpochStarts);
     }
 
-    void advance(const std::shared_ptr<std::vector<LratClauseId>>& incomingClauseIds) {
+    void advance(const LratClauseId* clauseIdsData, size_t clauseIdsSize) {
         _work_done = false;
-        _work_future = ProcessWideThreadPool::get().addTask([this, incomingClauseIds]() {
-            handleIncomingClauseIds(*incomingClauseIds);
+        _work_future = ProcessWideThreadPool::get().addTask([this, clauseIdsData, clauseIdsSize]() {
+            handleIncomingClauseIds(clauseIdsData, clauseIdsSize);
             readEpoch();
             if (!_finished) prepareNextOutgoingClauseIds();
             _work_done = true;
@@ -87,10 +88,11 @@ public:
 
 private:
 
-    void handleIncomingClauseIds(const std::vector<LratClauseId>& clauseIds) {
+    void handleIncomingClauseIds(const LratClauseId* clauseIdsData, size_t clauseIdsSize) {
         
         // Import self-produced clauses
-        for (auto id : clauseIds) {
+        for (size_t i = 0; i < clauseIdsSize; i++) {
+            LratClauseId id = clauseIdsData[i];
             if (isSelfProducedClause(id)) _frontier.push(id);
         }
     }

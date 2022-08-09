@@ -31,6 +31,7 @@ private:
     float _time_of_start_solving = 0;
 
     std::atomic_bool _done_locally = false;
+    bool _assembling_proof = false;
     JobResult _internal_result;
 
 public:

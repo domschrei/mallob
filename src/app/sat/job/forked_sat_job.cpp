@@ -106,7 +106,12 @@ int ForkedSatJob::appl_solved() {
     int result = -1;
     if (!_initialized || getState() != ACTIVE) return result;
     loadIncrements();
-    if (_done_locally) return result;
+    if (_done_locally || _assembling_proof) {
+        if (_assembling_proof && ((AnytimeSatClauseCommunicator*)_clause_comm)->isDoneAssemblingProof()) {
+            return _internal_result.result;
+        }
+        return result;
+    }
 
     // Did a solver find a result?
     auto status = _solver->check();
@@ -117,7 +122,22 @@ int ForkedSatJob::appl_solved() {
                             result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         _internal_result.id = getId();
         _internal_result.revision = getRevision();
+
+        if (MALLOB_CLAUSE_METADATA_SIZE == 2 && result == RESULT_UNSAT
+                && _params.distributedProofAssembly()) {
+            // Unsatisfiability: handle separately.
+            LOG(V2_INFO, "Initiate distributed proof assembly\n");
+            int finalEpoch = ((AnytimeSatClauseCommunicator*)_clause_comm)->getCurrentEpoch();
+            int winningInstance = getJobTree().getIndex() * getNumThreads() + _internal_result.localWinningInstanceId;
+            JobMessage msg(getId(), getRevision(), finalEpoch, MSG_NOTIFY_UNSAT_FOUND);
+            msg.payload.push_back(winningInstance);
+            MyMpi::isend(getJobTree().getRootNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+            _assembling_proof = true;
+            return -1;
+        }
+
         _done_locally = true;
+
     } else if (status == SatProcessAdapter::CRASHED) {
         // Subprocess crashed for whatever reason: try to recover
 
@@ -176,9 +196,19 @@ void ForkedSatJob::appl_communicate() {
     if (!_initialized) return;
     if (!checkClauseComm()) return;
     ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
+    while (hasDeferredMessage()) {
+        auto deferredMsg = getDeferredMessage();
+        ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(
+            deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
+    }
 }
 
 void ForkedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
+    if ((!isInitialized() || !checkClauseComm()) && MALLOB_CLAUSE_METADATA_SIZE==2 
+            && msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
+        deferMessage(source, mpiTag, msg);
+        return;
+    }
     if (!_initialized || !checkClauseComm()) {
         if (!msg.returnedToSender) {
             msg.returnedToSender = true;

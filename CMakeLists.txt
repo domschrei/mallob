@@ -88,6 +88,7 @@ set(BASE_LIBS ${BASE_LIBS} ${STXXL_LIBRARIES})
 set(BASE_SOURCES ${BASE_SOURCES}
     src/app/job.cpp 
     src/app/dummy/dummy_reader.cpp
+    src/app/sat/data/clause_metadata_def.cpp
     src/app/sat/execution/engine.cpp src/app/sat/execution/solver_thread.cpp src/app/sat/execution/solving_state.cpp
     src/app/sat/job/anytime_sat_clause_communicator.cpp src/app/sat/job/forked_sat_job.cpp src/app/sat/job/threaded_sat_job.cpp src/app/sat/job/sat_process_adapter.cpp src/app/sat/job/sat_process_config.cpp 
     src/app/sat/sharing/buffer/adaptive_clause_database.cpp src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp

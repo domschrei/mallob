@@ -58,6 +58,38 @@ void AnytimeSatClauseCommunicator::communicate() {
         _sessions.pop_front();
     }
 
+    // Distributed proof assembly methods
+    if (_proof_assembler.has_value()) {
+        
+        if (_proof_assembler->canEmitClauseIds()) {
+            // Export clause IDs via JobTreeAllReduction instance
+            auto clauseIds = _proof_assembler->emitClauseIds();
+            std::vector<int> clauseIdsIntVec((int*)clauseIds.data(), ((int*)clauseIds.data())+clauseIds.size()*2);
+            _proof_all_reduction->produce([&]() {return clauseIdsIntVec;});
+        }
+
+        if (_proof_all_reduction.has_value()) {
+            _proof_all_reduction->advance();
+            if (_proof_all_reduction->hasResult()) {
+                _proof_all_reduction_result = _proof_all_reduction->extractResult();
+                _proof_assembler->importClauseIds(
+                    (LratClauseId*) _proof_all_reduction_result.data(), 
+                    _proof_all_reduction_result.size()/2
+                );
+                _proof_all_reduction.reset();
+                createNewProofAllReduction();
+            }
+        }
+
+        if (_proof_assembler->finished()) {
+            // Proof assembly done
+            // TODO merge individual proof files into a single file
+            _proof_all_reduction.reset();
+            _proof_assembler.reset();
+            _done_assembling_proof = true;
+        }
+    }
+
     // root: initiate sharing
     if (_job->getJobTree().isRoot()) {
         auto time = Timer::elapsedSeconds();
@@ -214,8 +246,45 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         } else return;
     }
 
+    if (msg.tag == MSG_NOTIFY_UNSAT_FOUND) {
+        assert(_job->getJobTree().isRoot());
+        
+        if (_proof_assembler.has_value()) {
+            // Obsolete message
+            LOG(V2_INFO, "Obsolete UNSAT notification - already assembling a proof\n");
+            return;
+        }
+
+        // Initiate proof assembly
+        msg.tag = MSG_INITIATE_PROOF_COMBINATION;
+        msg.payload.push_back(_job->getGlobalNumWorkers());
+        msg.payload.push_back(_job->getNumThreads());
+        // vvv Advances in the next branch vvv
+    }
+    if (msg.tag == MSG_INITIATE_PROOF_COMBINATION) {
+
+        // Propagate initialization message
+        advanceCollective(_job, msg, MSG_INITIATE_PROOF_COMBINATION);  
+        
+        // Create _proof_assembler
+        int finalEpoch = msg.epoch;
+        int winningInstance = msg.payload[0];
+        int numWorkers = msg.payload[1];
+        int threadsPerWorker = msg.payload[2];
+        int thisWorkerIndex = _job->getJobTree().getIndex();
+        assert(!_proof_assembler.has_value());
+        _proof_assembler.emplace(_params, _job->getId(), numWorkers, threadsPerWorker, thisWorkerIndex, finalEpoch, winningInstance);
+        createNewProofAllReduction();
+    }
+    if (msg.tag == MSG_ALLREDUCE_PROOF_RELEVANT_CLAUSES) {
+        assert(_proof_all_reduction.has_value());
+        _proof_all_reduction->receive(source, mpiTag, msg);
+        _proof_all_reduction->advance();
+    }
+
     // Initial signal to initiate a sharing epoch
     if (msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
+
         _current_epoch = msg.epoch;
         LOG(V5_DEBG, "%s : INIT COMM e=%i nc=%i\n", _job->toStr(), _current_epoch, 
             _job->getJobTree().getNumChildren());
@@ -246,6 +315,24 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
             MyMpi::isend(source, MSG_JOB_TREE_REDUCTION, msg);
         }
     }
+}
+
+void AnytimeSatClauseCommunicator::createNewProofAllReduction() {
+    assert(!_proof_all_reduction.has_value());
+    JobMessage baseMsg(_job->getId(), _job->getRevision(), _proof_assembler->getEpoch(), MSG_ALLREDUCE_PROOF_RELEVANT_CLAUSES);
+    _proof_all_reduction.emplace(_job->getJobTree(), baseMsg, std::vector<int>(), [&](auto& list) {
+        
+        std::list<std::pair<LratClauseId*, size_t>> idArrays;
+        for (auto& vec : list) {
+            idArrays.emplace_back((LratClauseId*) vec.data(), vec.size() / 2);
+        }
+
+        auto longVecResult = _proof_assembler->mergeClauseIdVectors(idArrays);
+        int* intResultData = (int*) longVecResult.data();
+
+        std::vector<int> result(intResultData, intResultData + longVecResult.size()*2);
+        return result;
+    });
 }
 
 void AnytimeSatClauseCommunicator::feedHistoryIntoSolver() {

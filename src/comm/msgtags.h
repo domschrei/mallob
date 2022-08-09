@@ -154,13 +154,19 @@ const int MSG_JOB_TREE_BROADCAST = 62;
 
 const int MSG_OFFSET_BATCHED = 10000;
 
+
 // Application message tags
+
 const int MSG_INITIATE_CLAUSE_SHARING = 416;
 const int MSG_ALLREDUCE_CLAUSES = 417;
 const int MSG_ALLREDUCE_FILTER = 418;
+
 const int MSG_AGGREGATE_RANKLIST = 419;
 const int MSG_BROADCAST_RANKLIST = 420; // blaze it
 
+const int MSG_NOTIFY_UNSAT_FOUND = 421;
+const int MSG_INITIATE_PROOF_COMBINATION = 422;
+const int MSG_ALLREDUCE_PROOF_RELEVANT_CLAUSES = 423;
 
 
 #endif

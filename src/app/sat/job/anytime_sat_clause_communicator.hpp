@@ -12,6 +12,7 @@
 #include "clause_history.hpp"
 //#include "distributed_clause_filter.hpp"
 #include "comm/job_tree_all_reduction.hpp"
+#include "../proof/proof_assembler.hpp"
 
 class AnytimeSatClauseCommunicator {
 
@@ -142,6 +143,11 @@ private:
     float _time_of_last_epoch_initiation = 0;
     float _time_of_last_epoch_conclusion = 0.000001f;
 
+    std::optional<ProofAssembler> _proof_assembler;
+    std::optional<JobTreeAllReduction> _proof_all_reduction;
+    bool _done_assembling_proof = false;
+    std::vector<int> _proof_all_reduction_result;
+
 public:
     AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : _params(params), _job(job), 
         _clause_buf_base_size(_params.clauseBufferBaseSize()), 
@@ -172,8 +178,12 @@ public:
         for (auto& session : _sessions) if (!session.isDestructible()) return false;
         return true;
     }
+    int getCurrentEpoch() const {return _current_epoch;}
+
+    bool isDoneAssemblingProof() const {return _done_assembling_proof;}
 
 private:
     inline Session& currentSession() {return _sessions.back();}
     void addToClauseHistory(std::vector<int>& clauses, int epoch);
+    void createNewProofAllReduction();
 };
