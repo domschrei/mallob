@@ -21,6 +21,7 @@ affiliations:
    index: 1
 date: 30 June 2022
 bibliography: paper.bib
+europar-doi: 10.1007/978-3-031-12597-3_8
 ---
 
 # Summary
