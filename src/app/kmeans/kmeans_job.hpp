@@ -129,39 +129,39 @@ class KMeansJob : public Job {
     void appl_dumpStats() override;
     bool appl_isDestructible() override { return true; }
     void appl_memoryPanic() override;
-    //int getDemand() {
-    //    if (getState() != ACTIVE) {
-    //        return hasCommitment() ? 1 : 0;
-    //    }
-    //    if (!loaded) {
-    //        return Job::getDemand();
-    //    } else {
-    //        if (maxDemandCalculated) {
-    //            return maxDemand;
-    //        } else {
-    //            double problemSize = countClusters * dimension * pointsCount;
-    //            maxDemand = -330.7589 + 20.2719 * log(problemSize);  // evaluated with tests
-    //            maxDemandCalculated = true;
-    //            if (maxDemand <= 0) {
-    //                maxDemand = 1;
-    //            } else {
-    //                uint32_t positiveDemand = maxDemand;
-    //                int lowerBound = 1;
-    //                while (positiveDemand >>= 1) {
-    //                    lowerBound <<= 1;
-    //                }
-    //                int middle = lowerBound * 1.5;
-    //                if (maxDemand > middle) {
-    //                    maxDemand = lowerBound * 2 - 1;
-    //                } else {
-    //                    maxDemand = lowerBound - 1;
-    //                }
-    //            }
-    //            maxDemand = std::min(maxDemand, Job::getGlobalNumWorkers());
-    //            return maxDemand;
-    //        }
-    //    }
-    //}
+    int getDemand() {
+        if (getState() != ACTIVE) {
+            return hasCommitment() ? 1 : 0;
+        }
+        if (!loaded) {
+            return Job::getDemand();
+        } else {
+            if (maxDemandCalculated) {
+                return maxDemand;
+            } else {
+                double problemSize = countClusters * dimension * pointsCount;
+                maxDemand = -330.7589 + 20.2719 * log(problemSize);  // evaluated with tests
+                maxDemandCalculated = true;
+                if (maxDemand <= 0) {
+                    maxDemand = 1;
+                } else {
+                    uint32_t positiveDemand = maxDemand;
+                    int lowerBound = 1;
+                    while (positiveDemand >>= 1) {
+                        lowerBound <<= 1;
+                    }
+                    int middle = lowerBound * 1.5;
+                    if (maxDemand > middle) {
+                        maxDemand = lowerBound * 2 - 1;
+                    } else {
+                        maxDemand = lowerBound - 1;
+                    }
+                }
+                maxDemand = std::min(maxDemand, Job::getGlobalNumWorkers());
+                return maxDemand;
+            }
+        }
+    }
 
     void loadInstance();
     void doInitWork();
