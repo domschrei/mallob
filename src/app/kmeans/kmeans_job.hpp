@@ -27,11 +27,9 @@ class KMeansJob : public Job {
     int pointsCount;
     int allReduceElementSize;
     int iterationsDone = 0;
-    int epoch = 0;
-    int countReady = 0;
+    const int epoch = 0;  // should count the message epoch, but does not do it currently
     int maxDemand = -1;
     bool maxDemandCalculated = false;
-    std::vector<Point> kMeansData;
     uint8_t* data;
     const float* pointsStart;
     std::future<void> calculatingTask;
@@ -40,9 +38,7 @@ class KMeansJob : public Job {
     bool iAmRoot = false;
     bool loaded = false;
     bool initSend = false;
-    bool receivedInitSend = false;
     bool calculatingFinished = false;
-    bool allCollected = false;
     bool hasReducer = false;
     bool leftDone = false;
     bool rightDone = false;
@@ -50,64 +46,65 @@ class KMeansJob : public Job {
     bool terminate = false;
     std::vector<int> work;
     std::vector<int> workDone;
-    std::pair<bool, bool> childsFinished = {false, false};
     int myRank;
     int myIndex = -2;
     int countCurrentWorkers;
     JobMessage baseMsg;
     JobResult internal_result;
     std::unique_ptr<JobTreeAllReduction> reducer;
-    std::function<float(const float*, KMeansJob::Point)> metric = [&](const float* p1, Point p2) { return KMeansUtils::eukild(p1, p2); };
-    std::function<std::vector<int>(std::list<std::vector<int>>&)> folder =
+    const std::function<float(const float*, KMeansJob::Point&)> metric =
+        [&](const float* p1, Point& p2) {
+            return KMeansUtils::eukild(p1, p2);
+        };
+    const std::function<std::vector<int>(std::list<std::vector<int>>&)> folder =
         [&](std::list<std::vector<int>>& elems) {
             return aggregate(elems);
         };
-    std::function<std::vector<int>(const std::vector<int>&)> rootTransform = [&](const std::vector<int>& payload) {
-        LOG(V3_VERB, "                           myIndex: %i start Roottransform\n", myIndex);
-        auto data = reduceToclusterCenters(payload);
+    const std::function<std::vector<int>(const std::vector<int>&)> rootTransform =
+        [&](const std::vector<int>& payload) {
+            LOG(V3_VERB, "                           myIndex: %i start Roottransform\n", myIndex);
+            auto data = reduceToclusterCenters(payload);
 
-        clusterCenters = data.first;
-        sumMembers = data.second;
-        int sum = 0;
-        for (auto i : sumMembers) {
-            sum += i;
-        }
-        if (sum == pointsCount) {
-            allCollected = true;
-
-            LOG(V3_VERB, "                           AllCollected: Good\n");
-        } else {
-            LOG(V3_VERB, "                           AllCollected: Error\n");
-        }
-        auto transformed = clusterCentersToBroadcast(clusterCenters);
-        transformed.push_back(this->getVolume());  // will be countCurrentWorkers
-        LOG(V3_VERB, "                           COMMSIZE: %i myIndex: %i \n",
-            this->getVolume(), myIndex);
-        LOG(V3_VERB, "                           Children: %i\n",
-            this->getJobTree().getNumChildren());
-
-        if (!centersChanged(metric, 0.001f)) {
-            LOG(V0_CRIT, "                           Got Result after iter %i\n", iterationsDone);
-            internal_result.result = RESULT_SAT;
-            internal_result.id = getId();
-            internal_result.revision = getRevision();
-            std::vector<int> transformSolution;
-
-            internal_result.encodedType = JobResult::EncodedType::FLOAT;
-            auto solution = clusterCentersToSolution();
-            internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
-            finishedJob = true;
-            LOG(V3_VERB, "Solution clusterCenters: \n%s\n", dataToString(clusterCenters).c_str());
-            return std::move(std::vector<int>(allReduceElementSize, 0));
-
-        } else {
-            if (iAmRoot && iterationsDone == 1) {
-                LOG(V0_CRIT, "                           first iteration finished\n");
+            clusterCenters = data.first;
+            sumMembers = data.second;
+            int sum = 0;
+            for (auto i : sumMembers) {
+                sum += i;
             }
-            LOG(V3_VERB, "                           Another iter %i\n", iterationsDone);
-            return transformed;
-        }
-    };
+            if (sum == pointsCount) {
+                LOG(V3_VERB, "                           AllCollected: Good\n");
+            } else {
+                LOG(V3_VERB, "                           AllCollected: Error\n");
+            }
+            auto transformed = clusterCentersToBroadcast(clusterCenters);
+            transformed.push_back(this->getVolume());  // will be countCurrentWorkers
+            LOG(V3_VERB, "                           COMMSIZE: %i myIndex: %i \n",
+                this->getVolume(), myIndex);
+            LOG(V3_VERB, "                           Children: %i\n",
+                this->getJobTree().getNumChildren());
+
+            if (!centersChanged(metric, 0.001f)) {
+                LOG(V0_CRIT, "                           Got Result after iter %i\n", iterationsDone);
+                internal_result.result = RESULT_SAT;
+                internal_result.id = getId();
+                internal_result.revision = getRevision();
+                std::vector<int> transformSolution;
+
+                internal_result.encodedType = JobResult::EncodedType::FLOAT;
+                auto solution = clusterCentersToSolution();
+                internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
+                finishedJob = true;
+                LOG(V3_VERB, "Solution clusterCenters: \n%s\n", dataToString(clusterCenters).c_str());
+                return std::move(std::vector<int>(allReduceElementSize, 0));
+
+            } else {
+                if (iAmRoot && iterationsDone == 1) {
+                    LOG(V0_CRIT, "                           first iteration finished\n");
+                }
+                LOG(V3_VERB, "                           Another iter %i\n", iterationsDone);
+                return transformed;
+            }
+        };
 
    public:
     std::vector<Point> getClusterCenters() { return clusterCenters; };      // The centers of cluster 0..n
@@ -117,7 +114,6 @@ class KMeansJob : public Job {
     int getDimension() { return dimension; };
     int getPointsCount() { return pointsCount; };
     int getIterationsDone() { return iterationsDone; };
-    std::vector<Point> getKMeansData() { return kMeansData; };
 
     KMeansJob(const Parameters& params, int commSize, int worldRank, int jobId);
     void appl_start() override;
@@ -134,6 +130,9 @@ class KMeansJob : public Job {
     bool appl_isDestructible() override { return true; }
     void appl_memoryPanic() override;
     int getDemand() {
+        if (getState() != ACTIVE) {
+            return hasCommitment() ? 1 : 0;
+        }
         if (!loaded) {
             return Job::getDemand();
         } else {
@@ -144,8 +143,8 @@ class KMeansJob : public Job {
                 maxDemand = -330.7589 + 20.2719 * log(problemSize);  // evaluated with tests
                 maxDemandCalculated = true;
 
-                if (maxDemand < 12) {
-                    maxDemand = 7;
+                if (maxDemand <= 0) {
+                    maxDemand = 1;
                 } else {
                     uint32_t positiveDemand = maxDemand;
                     int lowerBound = 1;
@@ -170,14 +169,14 @@ class KMeansJob : public Job {
     void doInitWork();
     void sendRootNotification();
     void setRandomStartCenters();
-    void calcNearestCenter(std::function<float(const float*, Point)> metric, int intervalId);
+    void calcNearestCenter(std::function<float(const float*, Point&)> metric, int intervalId);
     void calcCurrentClusterCenters();
     std::string dataToString(std::vector<Point> data);
     std::string dataToString(std::vector<int> data);
     void countMembers();
-    float calculateDifference(std::function<float(const float*, Point)> metric);
+    float calculateDifference(std::function<float(const float*, Point&)> metric);
     bool centersChanged();
-    bool centersChanged(std::function<float(const float*, Point)> metric, float factor);
+    bool centersChanged(std::function<float(const float*, Point&)> metric, float factor);
     std::vector<float> clusterCentersToSolution();
     std::vector<int> clusterCentersToBroadcast(const std::vector<Point>&);
     std::vector<Point> broadcastToClusterCenters(const std::vector<int>&, bool withNumWorkers = false);

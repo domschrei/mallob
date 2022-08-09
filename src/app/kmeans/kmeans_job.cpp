@@ -407,7 +407,7 @@ void KMeansJob::setRandomStartCenters() {
     }
 }
 
-void KMeansJob::calcNearestCenter(std::function<float(const float*, Point)> metric, int intervalId) {
+void KMeansJob::calcNearestCenter(std::function<float(const float*, Point&)> metric, int intervalId) {
     struct centerDistance {
         int cluster;
         float distance;
@@ -503,7 +503,7 @@ void KMeansJob::countMembers() {
         myIndex, dataToString(localSumMembers).c_str());
 }
 
-float KMeansJob::calculateDifference(std::function<float(const float*, Point)> metric) {
+float KMeansJob::calculateDifference(std::function<float(const float*, Point&)> metric) {
     if (iterationsDone == 0) {
         return std::numeric_limits<float>::infinity();
     }
@@ -532,7 +532,7 @@ bool KMeansJob::centersChanged() {
     return false;
 }
 
-bool KMeansJob::centersChanged(std::function<float(const float*, Point)> metric, float factor) {
+bool KMeansJob::centersChanged(std::function<float(const float*, Point&)> metric, float factor) {
     if (iterationsDone == 0) {
         return true;
     }
