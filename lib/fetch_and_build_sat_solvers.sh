@@ -3,7 +3,7 @@
 set -e
 
 if [ -z $1 ]; then
-    solvers="cglmyk"
+    solvers="c"
     echo "Defaulting to solvers $solvers (supply another string to override solvers to build)"
 else
     solvers="$1"
@@ -73,8 +73,6 @@ fi
 if echo $solvers|grep -q "c" && [ ! -f cadical/libcadical.a ]; then
     echo "Building CaDiCaL ..."
 
-    unzip cadical-isc22.zip
-    mv cadical-*/ cadical
     cd cadical
     ./configure
     make

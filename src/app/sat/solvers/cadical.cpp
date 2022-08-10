@@ -8,6 +8,7 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include <chrono>
+#include <filesystem>
 
 #include "cadical.hpp"
 
@@ -22,6 +23,16 @@ Cadical::Cadical(const SolverSetup& setup)
 	
 	solver->connect_terminator(&terminator);
 	solver->connect_learn_source(&learnSource);
+	solver->set("binary", false);
+	std::string logdir = setup.proofDir;
+	//length of the directory + space for filename
+	char *filename_alone = new char [20];
+	sprintf(filename_alone, "proof.%d.frat", setup.globalId + 1);
+	//hanlde the joining string already being at the end
+	std::filesystem::path dir(logdir);
+	std::filesystem::path file(filename_alone);
+	std::filesystem::path full_path = dir / file;
+	solver->trace_proof(full_path.string().c_str());
 }
 
 void Cadical::addLiteral(int lit) {
@@ -38,16 +49,18 @@ void Cadical::diversify(int seed) {
 
 	// In certified UNSAT mode?
 	if (getSolverSetup().certifiedUnsat) {
-		
 		int solverRank = getSolverSetup().globalId;
 		int maxNumSolvers = getSolverSetup().maxNumSolvers;
 		LOGGER(_logger, V3_VERB, "Diversifying rank=%i size=%i DI=%i with certified UNSAT support\n", 
 			solverRank, maxNumSolvers, getDiversificationIndex());
-		okay = solver->set("solverrank", solverRank); assert(okay);
-		okay = solver->set("numsolvers", maxNumSolvers); assert(okay);
+
+        // Need to do +1 so we don't start at 0
+		okay = solver->set("instance_num", solverRank + 1); assert(okay);
+		okay = solver->set("total_instances", maxNumSolvers); assert(okay);
+        okay = solver->set("num_original_clauses", getSolverSetup().numOriginalClauses); assert(okay);
 
 		// Check that a version of CaDiCaL is used which has all the unsupported options switched off
-		auto requiredOptionsZero = {"binary", "elim", "decompose", "ternary", "vivify", "probe", "transred"};
+		auto requiredOptionsZero = {"elim", "decompose", "ternary", "vivify", "probe", "transred"};
 		for (auto& option : requiredOptionsZero) {
 			assert(solver->get(option) == 0 
 				|| log_return_false("CaDiCaL is configured with option \"%s\" "

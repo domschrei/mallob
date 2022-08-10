@@ -75,10 +75,13 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 		tldClauseVec->at(clause.size) = -condVarOrZero;
 		clauseBegin = tldClauseVec->data();
 		clauseSize++;
-
-		if (clauseSize > _params.strictClauseLengthLimit())
-			return;
-	}
+    }
+ 
+    // Check maximum size of clause
+    if (clauseSize > _params.strictClauseLengthLimit()) {
+        if (tldClauseVec) delete tldClauseVec;
+        return;
+    }
 
 	/*
 	if (clauseSize == 1 && clause.lbd != 1) {
