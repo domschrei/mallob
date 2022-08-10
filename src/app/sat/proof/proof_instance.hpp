@@ -35,6 +35,7 @@ private:
     std::vector<LratClauseId> _global_epoch_starts;
     int _current_epoch;
 
+    std::string _output_filename;
     std::ofstream _output;
 
     std::future<void> _work_future;
@@ -52,7 +53,7 @@ public:
             _winning_instance(winningInstance == instanceId),
             _parser(proofFilename), _local_epoch_starts(localEpochStarts), 
             _local_epoch_offsets(localEpochOffsets), _current_epoch(finalEpoch),
-            _output(outputFilename) {
+            _output_filename(outputFilename), _output(outputFilename) {
         
         _global_epoch_starts.resize(_local_epoch_starts.size());
         for (size_t i = 0; i < _global_epoch_starts.size(); ++i) {
@@ -85,6 +86,8 @@ public:
     }
 
     bool finished() const {return _work_done && _finished;}
+
+    std::string getOutputFilename() const {return _output_filename;}
 
 private:
 

@@ -102,6 +102,14 @@ public:
         return output;
     }
 
+    std::vector<std::string> getProofOutputFiles() const {
+        std::vector<std::string> outputs;
+        for (auto& inst : _proof_instances) {
+            outputs.push_back(inst.getOutputFilename());
+        }
+        return outputs;
+    }
+
 private:
     void createInstancesViaClauseEpochs(const std::string& filename) {
 

@@ -13,6 +13,7 @@
 //#include "distributed_clause_filter.hpp"
 #include "comm/job_tree_all_reduction.hpp"
 #include "../proof/proof_assembler.hpp"
+#include "comm/distributed_file_merger.hpp"
 
 class AnytimeSatClauseCommunicator {
 
@@ -147,6 +148,10 @@ private:
     std::optional<JobTreeAllReduction> _proof_all_reduction;
     bool _done_assembling_proof = false;
     std::vector<int> _proof_all_reduction_result;
+
+    std::unique_ptr<DistributedFileMerger> _file_merger;
+    std::vector<std::ifstream> _merger_filestreams;
+    std::vector<DistributedFileMerger::IdQualifiedLine> _merger_next_lines;
 
 public:
     AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : _params(params), _job(job), 

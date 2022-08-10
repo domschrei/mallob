@@ -27,6 +27,14 @@ void advanceCollective(BaseSatJob* job, JobMessage& msg, int broadcastTag) {
 
 void AnytimeSatClauseCommunicator::communicate() {
 
+    if (_file_merger) {
+        _file_merger->advance();
+        if (_file_merger->finished()) {
+            // Proof merging done!
+            _done_assembling_proof = true;
+        }
+    }
+
     // inactive?
     if (!_suspended && _job->getState() != ACTIVE) {
         // suspended!
@@ -83,10 +91,59 @@ void AnytimeSatClauseCommunicator::communicate() {
 
         if (_proof_assembler->finished()) {
             // Proof assembly done
-            // TODO merge individual proof files into a single file
+            auto proofFiles = _proof_assembler->getProofOutputFiles();
+            //_done_assembling_proof = true;
+
+            for (auto& filename : proofFiles) _merger_filestreams.emplace_back(filename);
+            _merger_next_lines.resize(proofFiles.size());
+                        
+            // Merge individual proof files into a single file
+            _file_merger.reset(new DistributedFileMerger(MPI_COMM_WORLD, 5, [&]() {
+
+                // Refill lines as necessary
+                for (size_t i = 0; i < _merger_next_lines.size(); i++) {
+                    if (_merger_next_lines[i].empty()) {
+                        // Refill line from stream
+                        std::string line;
+                        if (getline(_merger_filestreams[i], line)) {
+                            size_t firstWhitespacePos = 0; 
+                            while (firstWhitespacePos < line.size() && line[firstWhitespacePos] != ' ') 
+                                firstWhitespacePos++;
+                            _merger_next_lines[i].id = std::stoul(line.substr(0, firstWhitespacePos));
+                            _merger_next_lines[i].body = line.substr(firstWhitespacePos);
+                        } else {
+                            // No more lines!
+                        }
+                    }
+                }
+
+                // Find next best line
+                DistributedFileMerger::IdQualifiedLine nextLine;
+                size_t nextPos;
+                for (size_t i = 0; i < _merger_next_lines.size(); i++) {
+                    if (_merger_next_lines[i].empty()) continue;
+                    if (nextLine.empty() || _merger_next_lines[i].id > nextLine.id) {
+                        nextLine = _merger_next_lines[i];
+                        nextPos = i;
+                    }
+                }
+
+                // Return line or nothing
+                if (!nextLine.empty()) {
+                    _merger_next_lines[nextPos].body = "";
+                    return std::optional<DistributedFileMerger::IdQualifiedLine>(nextLine);
+                } else {
+                    return std::optional<DistributedFileMerger::IdQualifiedLine>();
+                }
+            }, "final-proof-output.lrat"));
+
+            MyMpi::getMessageQueue().registerCallback(MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, [&](MessageHandle& h) {
+                DistributedFileMerger::MergeMessage msg; msg.deserialize(h.getRecvData());
+                _file_merger->handle(h.source, msg);
+            });
+
             _proof_all_reduction.reset();
             _proof_assembler.reset();
-            _done_assembling_proof = true;
         }
     }
 
