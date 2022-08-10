@@ -21,6 +21,7 @@
 #include <csignal>
 #include <unistd.h>
 #include <sched.h>
+#include <filesystem>
 #include "util/assert.hpp"
 
 using namespace SolvingStates;
@@ -52,7 +53,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	std::string key = "diversification-offset";
 	int diversificationOffset = appConfig.map.count(key) ? atoi(appConfig.map[key].c_str()) : 0;
 
-	std::string numClausesStr = appConfig.map["__NC"];
+    std::string numClausesStr = appConfig.map["__NC"];
 	while (numClausesStr[numClausesStr.size()-1] == '.') 
 		numClausesStr.resize(numClausesStr.size()-1);
 	int numClauses = atoi(numClausesStr.c_str());
@@ -95,6 +96,12 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.certifiedUnsat = params.certifiedUnsat();
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numOriginalClauses = numClauses;
+	//make a directory for putting proofs in
+	std::filesystem::path base_dir(params.logDirectory());
+	std::filesystem::path proof_dir("proof");
+	std::filesystem::path full_path = base_dir / proof_dir;
+	create_directory(full_path);
+	setup.proofDir = full_path.string();
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;

@@ -19,7 +19,6 @@ struct SolverSetup {
 	char solverType;
 	int solverRevision;
 	int numOriginalClauses;
-	
 	int minNumChunksPerSolver;
 	int numBufferedClsGenerations;
 
@@ -40,4 +39,5 @@ struct SolverSetup {
 	bool skipClauseSharingDiagonally;
 	bool certifiedUnsat;
 	int maxNumSolvers;
+	std::string proofDir;
 };
