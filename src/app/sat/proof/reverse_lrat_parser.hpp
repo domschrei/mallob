@@ -84,6 +84,9 @@ public:
         
         // Parse next (previous) line
         _line.id = -1;
+        _line.literals.clear();
+        _line.hints.clear();
+        _line.signsOfHints.clear();
         readNextLine();
 
         return line;
