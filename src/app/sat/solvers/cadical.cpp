@@ -54,10 +54,10 @@ void Cadical::diversify(int seed) {
 		LOGGER(_logger, V3_VERB, "Diversifying rank=%i size=%i DI=%i with certified UNSAT support\n", 
 			solverRank, maxNumSolvers, getDiversificationIndex());
 
-        // Need to do +1 so we don't start at 0
+        	// Need to do +1 so we don't start at 0
 		okay = solver->set("instance_num", solverRank + 1); assert(okay);
 		okay = solver->set("total_instances", maxNumSolvers); assert(okay);
-        okay = solver->set("num_original_clauses", getSolverSetup().numOriginalClauses); assert(okay);
+        	okay = solver->set("num_original_clauses", getSolverSetup().numOriginalClauses); assert(okay);
 
 		// Check that a version of CaDiCaL is used which has all the unsupported options switched off
 		auto requiredOptionsZero = {"elim", "decompose", "ternary", "vivify", "probe", "transred"};
@@ -67,13 +67,14 @@ void Cadical::diversify(int seed) {
 				"which is unsupported for certified UNSAT!\n", option));
 		}
 		
-		// Only use shuffling as native diversification
-		if (getDiversificationIndex() > 0) {
-			okay = solver->set("shuffle", 1); assert(okay);
-			okay = solver->set("shufflerandom", 1); assert(okay);
-			okay = solver->set("shufflequeue", 1); assert(okay);
-			okay = solver->set("shufflescores", 1); assert(okay);
-		}
+		// Simple LRAT-safe portfolio (5/10 solvers are diversified)
+		switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
+                case 1: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); assert(okay); break;
+                case 3: okay = solver->set("phase", 0); break;
+                case 5: okay = solver->set("walk", 0); break;
+                case 7: okay = solver->set("restartint", 100); break;
+                case 9: okay = solver->set("inprocessing", 0); break;
+                }
 		return;
 	}
 
@@ -117,8 +118,7 @@ void Cadical::diversify(int seed) {
 }
 
 int Cadical::getNumOriginalDiversifications() {
-	if (getSolverSetup().certifiedUnsat) return 1;
-	return 15;
+	return 10;
 }
 
 void Cadical::setPhase(const int var, const bool phase) {
