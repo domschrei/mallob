@@ -106,6 +106,7 @@ void SatProcessAdapter::doInitialize() {
     _hsm->hasSolution = false;
     _hsm->result = UNKNOWN;
     _hsm->solutionRevision = -1;
+    _hsm->winningInstance = -1;
     _hsm->exportBufferTrueSize = 0;
     _hsm->fSize = _f_size;
     _hsm->aSize = _a_size;
@@ -390,6 +391,7 @@ void SatProcessAdapter::doPrepareSolution() {
     size_t* solutionSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));
     if (*solutionSize == 0) {
         _solution.result = _hsm->result;
+        _solution.winningInstanceId = _hsm->winningInstance;
         _solution.setSolutionToSerialize(nullptr, 0);
         _solution_in_preparation = false;
         return;
@@ -399,6 +401,7 @@ void SatProcessAdapter::doPrepareSolution() {
     int* shmemSolution = (int*) SharedMemory::access(_shmem_id + ".solution." + std::to_string(rev), *solutionSize*sizeof(int));
     
     _solution.result = _hsm->result;
+    _solution.winningInstanceId = _hsm->winningInstance;
     _solution.setSolutionToSerialize(shmemSolution, *solutionSize);
     _solution_in_preparation = false;
 }

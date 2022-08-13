@@ -126,9 +126,9 @@ int ForkedSatJob::appl_solved() {
         if (MALLOB_CLAUSE_METADATA_SIZE == 2 && result == RESULT_UNSAT
                 && _params.distributedProofAssembly()) {
             // Unsatisfiability: handle separately.
-            LOG(V2_INFO, "Query to begin distributed proof assembly\n");
             int finalEpoch = ((AnytimeSatClauseCommunicator*)_clause_comm)->getCurrentEpoch();
-            int winningInstance = getJobTree().getIndex() * getNumThreads() + _internal_result.localWinningInstanceId;
+            int winningInstance = _internal_result.winningInstanceId;
+            LOG(V2_INFO, "Query to begin distributed proof assembly with winning instance %i\n", winningInstance);
             JobMessage msg(getId(), getRevision(), finalEpoch, MSG_NOTIFY_UNSAT_FOUND);
             msg.payload.push_back(winningInstance);
             MyMpi::isend(getJobTree().getRootNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);

@@ -42,6 +42,7 @@ struct SatSharedMemory {
     bool hasSolution;
     SatResult result;
     int solutionRevision;
+    int winningInstance;
     
     // Clause buffers: parent->child
     int exportBufferAllocatedSize;

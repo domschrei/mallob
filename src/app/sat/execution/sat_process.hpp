@@ -205,7 +205,7 @@ public:
 
             // Check solved state
             int resultCode = _engine.solveLoop();
-            if (resultCode >= 0) {
+            if (resultCode >= 0 && !_hsm->hasSolution) {
                 // Solution found!
                 auto& result = _engine.getResult();
                 result.id = _config.jobid;
@@ -217,7 +217,8 @@ public:
 
                 solutionVec = result.extractSolution();
                 _hsm->solutionRevision = result.revision;
-                LOGGER(_log, V5_DEBG, "DO write solution\n");
+                _hsm->winningInstance = result.winningInstanceId;
+                LOGGER(_log, V5_DEBG, "DO write solution (winning instance: %i)\n", _hsm->winningInstance);
                 _hsm->result = SatResult(result.result);
                 size_t* solutionSize = (size_t*) SharedMemory::create(_shmem_id + ".solutionsize." + std::to_string(_hsm->solutionRevision), sizeof(size_t));
                 *solutionSize = solutionVec.size();

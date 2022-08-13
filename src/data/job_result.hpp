@@ -15,7 +15,7 @@ struct JobResult : public Serializable {
     int revision;
     int result;
     enum EncodedType {INT, FLOAT} encodedType = INT;
-    int localWinningInstanceId;
+    int winningInstanceId;
 
 private:
     std::vector<int> solution;

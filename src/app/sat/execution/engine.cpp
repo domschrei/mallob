@@ -265,7 +265,7 @@ int SatEngine::solveLoop() {
 			if (result.result > 0 && result.revision == _revision) {
 				done = true;
 				_result = std::move(result);
-				_result.localWinningInstanceId = i;
+				_result.winningInstanceId = _solver_interfaces[i]->getGlobalId();
 				break;
 			}
 		}
