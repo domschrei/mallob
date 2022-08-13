@@ -134,6 +134,9 @@ private:
                     (_current_line.literals.empty() && _winning_instance)) {
                 // Clause derivation is necessary for the combined proof
                 _num_traced_clauses++;
+                if (_current_line.literals.empty()) {
+                    LOG(V2_INFO, "Instance %i: found \"winning\" empty clause\n", _instance_id);
+                }
 
                 // Output the line
                 auto lineStr = _current_line.toStr();

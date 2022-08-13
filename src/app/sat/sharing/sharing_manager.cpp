@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <fstream>
 #include <cstdio>
+#include <unistd.h>
 
 #include "util/assert.hpp"
 
@@ -521,6 +522,58 @@ void SharingManager::writeClauseEpochs(const std::string& filename) {
 			ofs << " " << _id_offsets_per_solver[i][epoch];
 		}
 		ofs << "\n";
+	}
+
+	for (size_t i = 0; i < _solvers.size(); i++) {
+
+		auto lastRelevantId = _last_exported_clause_id[i]->load(std::memory_order_relaxed);
+		if (lastRelevantId <= _num_original_clauses) continue;
+
+		std::string proofFilename = _solvers[i]->getSolverSetup().proofDir + "/proof." 
+				+ std::to_string(_solvers[i]->getGlobalId()+1) + ".frat";
+
+		// Wait until the solver's proof file has been written up to this clause ID
+		while (true) {
+
+			std::ifstream proofFile(proofFilename, std::ios::ate);
+			assert(proofFile.is_open());
+			unsigned long size = proofFile.tellg();
+
+			size_t x = 1;
+			char c;
+			bool linebreakFound = false;
+			while (x <= size) {
+				proofFile.seekg(size-x, std::ios_base::beg);
+				proofFile.get(c);
+				x++;
+
+				if (c == '\n') {
+					if (!linebreakFound) linebreakFound = true;
+				}
+				if (linebreakFound && c == 'a') break;
+			}
+
+			if (x < size) {
+				// Stream now points to the first character of the file's last completely written line
+				while (c == 'a' || c == ' ') proofFile.get(c);
+				unsigned long writtenId = 0;
+				while (c != ' ') {
+					assert(c >= '0' && c <= '9' || log_return_false("[ERROR] Unexpected character \"%c\" (code: %i)!\n", c, c));
+					writtenId = writtenId*10 + (c-'0');
+					proofFile.get(c);
+				}
+				if (writtenId >= lastRelevantId) {
+					// Done!
+					LOG(V2_INFO, "Proof \"%s\" now contains ID %lu\n", proofFilename.c_str(), lastRelevantId);
+					break;
+				} else {
+					LOG(V2_INFO, "Still waiting for proof \"%s\" to contain ID %lu (currently at %lu)\n", 
+						proofFilename.c_str(), lastRelevantId, writtenId);
+				}
+			}
+
+			usleep(1000 * 200); // wait 0.2s
+		}
 	}
 
 	std::rename(tempFilename.c_str(), filename.c_str());
