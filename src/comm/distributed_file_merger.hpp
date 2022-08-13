@@ -63,6 +63,7 @@ private:
     int _branching_factor;
     LineSource _local_source;
     bool _local_source_exhausted = false;
+    bool _all_sources_exhausted = false;
 
     class MergeChild {
     private:
@@ -115,10 +116,13 @@ private:
     std::atomic_int _output_buffer_size = 0;
 
     // rank zero only
+    std::string _output_filename;
     std::ofstream _output_filestream;
 
     size_t numOutputLines = 0;
     float lastOutputReport = 0;
+
+    bool _began_merging = false;
 
 public:
     DistributedFileMerger(MPI_Comm comm, int branchingFactor, LineSource localSource, const std::string& outputFileAtZero) : 
@@ -143,23 +147,32 @@ public:
 
         if (myRank == 0) {
             // Create final output file
-            LOG(V3_VERB, "DFM Opening output file \"%s\"\n", outputFileAtZero.c_str());
-            _output_filestream = std::ofstream(outputFileAtZero);
+            _output_filename = outputFileAtZero;
+            std::string reverseFilename = "_inv_" + _output_filename;
+            LOG(V3_VERB, "DFM Opening output file \"%s\"\n", reverseFilename.c_str());
+            _output_filestream = std::ofstream(reverseFilename);
         }
 
         MPI_Ibarrier(_comm, &_barrier_request);
     }
 
     bool readyToMerge() {
+        if (_began_merging) return false;
         int flag;
         MPI_Test(&_barrier_request, &flag, MPI_STATUS_IGNORE);
         return flag;
     }
 
     void beginMerge() {
+        _began_merging = true;
         ProcessWideThreadPool::get().addTask([&]() {
             doMerging();
+            reverseFile();
         });
+    }
+
+    bool beganMerging() const {
+        return _began_merging;
     }
 
     void handle(int sourceWithinComm, MergeMessage& msg) {
@@ -187,7 +200,7 @@ public:
     void advance() {
 
         if (Timer::elapsedSeconds() - lastOutputReport > 1.0) {
-            LOG(V3_VERB, "DFM Output %i lines so far, exhausted: %s\n", numOutputLines, isFullyExhausted()?"yes":"no");
+            LOG(V3_VERB, "DFM Output %i lines so far, exhausted: %s\n", numOutputLines, areInputsExhausted()?"yes":"no");
             lastOutputReport = Timer::elapsedSeconds();
         }
 
@@ -213,7 +226,7 @@ public:
                 msg.lines = std::move(_output_buffer);
                 _output_buffer.clear();
                 _output_buffer_size.store(0, std::memory_order_relaxed);
-            } else if (isFullyExhausted()) {
+            } else if (_all_sources_exhausted) {
                 // If all sources are exhausted, send the final buffer content and mark as exhausted
                 auto lock = _output_buffer_mutex.getLock();
                 msg.lines = std::move(_output_buffer);
@@ -230,7 +243,7 @@ public:
     }
 
     bool finished() const {
-        return isFullyExhausted() && _output_buffer_size.load(std::memory_order_relaxed) == 0;
+        return isFullyExhausted();
     }
 
 private:
@@ -285,15 +298,16 @@ private:
             }
             if (chosenLine.empty()) {
                 // There's no line to output!
-                if (isFullyExhausted()) {
+                if (areInputsExhausted()) {
                     // Merge procedure is completely done here
+                    _all_sources_exhausted = true;
                     break;
                 }
             } else {
                 // Line to output found
                 if (MyMpi::rank(_comm) == 0) {
                     // Write into final file
-                    std::string output = std::to_string(chosenLine.id) + " " + chosenLine.body;
+                    std::string output = std::to_string(chosenLine.id) + " " + chosenLine.body + "\n";
                     _output_filestream.write(output.c_str(), output.size());
                 } else {
                     // Write into output buffer
@@ -305,13 +319,30 @@ private:
                 numOutputLines++;
             }
         }
+
+        if (MyMpi::rank(_comm) == 0) {
+            _output_filestream.flush();
+            _output_filestream.close();
+        }
     }
 
-    bool isFullyExhausted() const {
+    void reverseFile() {
+        if (MyMpi::rank(_comm) == 0) {
+            std::string cmd = "tac _inv_" + _output_filename + " > " + _output_filename 
+                + " && rm _inv_" + _output_filename;
+            system(cmd.c_str());
+        }
+    }
+
+    bool areInputsExhausted() const {
         if (!_local_source_exhausted) return false;
         for (auto& child : _children) {
             if (!child.isExhausted() || !child.isEmpty()) return false;
         }
         return true;
+    }
+
+    bool isFullyExhausted() const {
+        return _all_sources_exhausted && _output_buffer_size.load(std::memory_order_relaxed) == 0;
     }
 };

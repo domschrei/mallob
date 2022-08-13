@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <algorithm>
 #include <fstream>
+#include <cstdio>
 
 #include "util/assert.hpp"
 
@@ -44,16 +45,28 @@ SharingManager::SharingManager(
 
 	auto callback = getCallback();
 	
-	unsigned long zerothEpochIdStart = solvers.empty() ? 0 : 
-		solvers[0]->getSolverSetup().numOriginalClauses+1;
+	assert(!solvers.empty());
+	_num_original_clauses = solvers[0]->getSolverSetup().numOriginalClauses;
+	_id_offsets_per_solver.resize(_solvers.size());
+	_min_epoch_ids_per_solver.resize(_solvers.size());
+	_last_exported_clause_id.resize(_solvers.size());
+	unsigned long zerothEpochIdStart = _num_original_clauses+1;
+	
 	for (size_t i = 0; i < _solvers.size(); i++) {
 		_solvers[i]->setExtLearnedClauseCallback(callback);
 		_solver_revisions.push_back(_solvers[i]->getSolverSetup().solverRevision);
 		_solver_stats.push_back(&_solvers[i]->getSolverStatsRef());
+
+		//auto thisSolverEpochStart = _num_original_clauses + solvers[i]->getGlobalId()+1;
+
 		_id_offsets_per_solver[i].push_back(0);
-		_min_epoch_ids_per_solver[i].push_back(zerothEpochIdStart);
+		_min_epoch_ids_per_solver[i].push_back(0);
+		_last_exported_clause_id[i] = new std::atomic_ulong(0);
+
+		LOG(V2_INFO, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
+				_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), 0, _min_epoch_ids_per_solver[i].back());
 	}
-	_global_epoch_ids.push_back(zerothEpochIdStart);
+	_global_epoch_ids.push_back(0);
 }
 
 void SharingManager::onProduceClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero) {
@@ -174,12 +187,19 @@ void SharingManager::returnClauses(int* begin, int buflen) {
 	auto c = reader.getNextIncomingClause();
 	while (c.begin != nullptr) {
 
-		// Returned clauses would be aligned *again* when re-exported.
-		// => subtract the offsets again here ...
-		if (MALLOB_CLAUSE_METADATA_SIZE == 2) unalignClauseId(c.begin);
+		// For certified UNSAT we need to drop returned clauses which do not
+		// originate from this solver, since we can not un-align them to
+		// correctly insert them into the database.  
+		if (MALLOB_CLAUSE_METADATA_SIZE!=2 || isLocallyProducedClause(metadata::readUnsignedLong(c.begin))) {
 
-		bool success = _cdb.addClause(c);
-		if (success) _hist_returned_to_db.increment(c.size);
+			// Returned clauses would be aligned *again* when re-exported.
+			// => subtract the offsets again here ...
+			if (MALLOB_CLAUSE_METADATA_SIZE == 2) unalignClauseId(c.begin);
+
+			bool success = _cdb.addClause(c);
+			if (success) _hist_returned_to_db.increment(c.size);
+		}
+
 		c = reader.getNextIncomingClause();
 	}
 }
@@ -201,15 +221,18 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 		unsigned long maxMinEpochId = 0;
 		int maxNumSolvers = _solvers[0]->getSolverSetup().maxNumSolvers;
 		for (size_t i = 0; i < _solvers.size(); i++) {
-			auto& clauseIdCounter = *_last_exported_clause_id[i];
+			auto clauseIdCounter = _last_exported_clause_id[i]->load(std::memory_order_relaxed);
 			
 			auto minEpochId = _id_offsets_per_solver[i].back() 
-				+ clauseIdCounter.load(std::memory_order_relaxed) 
+				+ clauseIdCounter
 				+ maxNumSolvers;
-			minEpochId = minEpochId - (minEpochId % maxNumSolvers);
+			minEpochId = minEpochId - (minEpochId % maxNumSolvers) + maxNumSolvers;
 
-			_min_epoch_ids_per_solver[i].push_back(minEpochId);
+			_min_epoch_ids_per_solver[i].push_back(clauseIdCounter);
 			maxMinEpochId = std::max(maxMinEpochId, minEpochId);
+
+			LOG(V2_INFO, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
+				_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), clauseIdCounter, _min_epoch_ids_per_solver[i].back());
 		}
 		metadata::writeUnsignedLong(maxMinEpochId, filterOut);
 	}
@@ -271,9 +294,21 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 			// extract global min. epoch ID and compute the next ID offset
 			// for each solver from it
 			unsigned long globalMinEpochId = metadata::readUnsignedLong(filter);
+			LOG(V2_INFO, "EPOCH %i GLOBAL_MAX_OF_1ST_ID %lu\n", _min_epoch_ids_per_solver[0].size()-1, globalMinEpochId);
 			_global_epoch_ids.push_back(globalMinEpochId);
+
 			for (size_t i = 0; i < _solvers.size(); i++) {
-				_id_offsets_per_solver[i].push_back(globalMinEpochId - _min_epoch_ids_per_solver[i].back());
+
+				auto numSolvers = _solvers[i]->getSolverSetup().maxNumSolvers;
+				auto offset = globalMinEpochId - _min_epoch_ids_per_solver[i].back();
+				offset = offset - (offset % numSolvers) + numSolvers;
+				_id_offsets_per_solver[i].push_back(offset);
+				
+				auto testClauseId = _last_exported_clause_id[i]->load(std::memory_order_relaxed) + _solvers[i]->getSolverSetup().maxNumSolvers;
+				alignClauseId((int*) &testClauseId);
+				LOG(V2_INFO, "EPOCH %i instance=%i newoffset=%lu nextalignedclauseid=%lu\n", 
+					_min_epoch_ids_per_solver[i].size()-1, _solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(),
+					testClauseId);
 			}
 		}
 
@@ -447,18 +482,29 @@ void SharingManager::continueClauseImport(int solverId) {
 int SharingManager::getEpochOfUnalignedSelfClause(unsigned long id) {
 	auto producingSolver = getProducingLocalSolverIndex(id);
 	auto& epochList = _min_epoch_ids_per_solver[producingSolver];
+	// will point to 1st element >= id (or end)
 	auto it = std::lower_bound(epochList.begin(), epochList.end(), id);
+	assert(it != epochList.begin());
+	// point to last element < id
+	--it;
 	return std::distance(epochList.begin(), it);
 }
 int SharingManager::getEpochOfAlignedSelfClause(unsigned long id) {
 	auto& epochList = _global_epoch_ids;
+	// will point to 1st element >= id (or end)
 	auto it = std::lower_bound(epochList.begin(), epochList.end(), id);
+	assert(it != epochList.begin());
+	// point to last element < id
+	--it;
 	return std::distance(epochList.begin(), it);
 }
 
 void SharingManager::writeClauseEpochs(const std::string& filename) {
 	
-	std::ofstream ofs(filename);
+	std::string tempFilename = filename + "~";
+	std::ofstream ofs(tempFilename);
+	ofs << _num_original_clauses << "\n";
+
 	for (int epoch = 0; epoch < _global_epoch_ids.size(); epoch++) {
 
 		// Check if all necessary entries for this epoch are present
@@ -476,6 +522,9 @@ void SharingManager::writeClauseEpochs(const std::string& filename) {
 		}
 		ofs << "\n";
 	}
+
+	std::rename(tempFilename.c_str(), filename.c_str());
+	LOG(V2_INFO, "wrote clause epochs file for distributed proof assembly\n");
 }
 
 SharingManager::~SharingManager() {}

@@ -28,10 +28,13 @@ void advanceCollective(BaseSatJob* job, JobMessage& msg, int broadcastTag) {
 void AnytimeSatClauseCommunicator::communicate() {
 
     if (_file_merger) {
-        _file_merger->advance();
-        if (_file_merger->finished()) {
-            // Proof merging done!
-            _done_assembling_proof = true;
+        if (_file_merger->readyToMerge()) _file_merger->beginMerge();
+        if (_file_merger->beganMerging()) {
+            _file_merger->advance();
+            if (_file_merger->finished()) {
+                // Proof merging done!
+                _done_assembling_proof = true;
+            }
         }
     }
 
@@ -69,17 +72,21 @@ void AnytimeSatClauseCommunicator::communicate() {
     // Distributed proof assembly methods
     if (_proof_assembler.has_value()) {
         
-        if (_proof_assembler->canEmitClauseIds()) {
+        if ((!_proof_all_reduction.has_value() || !_proof_all_reduction->hasProducer()) 
+                && _proof_assembler->canEmitClauseIds()) {
             // Export clause IDs via JobTreeAllReduction instance
+            LOG(V2_INFO, "Emitting proof-relevant clause IDs\n");
             auto clauseIds = _proof_assembler->emitClauseIds();
             std::vector<int> clauseIdsIntVec((int*)clauseIds.data(), ((int*)clauseIds.data())+clauseIds.size()*2);
             _proof_all_reduction->produce([&]() {return clauseIdsIntVec;});
+            LOG(V2_INFO, "Emitted %i proof-relevant clause IDs\n", clauseIds.size());
         }
 
         if (_proof_all_reduction.has_value()) {
             _proof_all_reduction->advance();
             if (_proof_all_reduction->hasResult()) {
                 _proof_all_reduction_result = _proof_all_reduction->extractResult();
+                LOG(V2_INFO, "Importing proof-relevant clause IDs\n");
                 _proof_assembler->importClauseIds(
                     (LratClauseId*) _proof_all_reduction_result.data(), 
                     _proof_all_reduction_result.size()/2
@@ -90,6 +97,9 @@ void AnytimeSatClauseCommunicator::communicate() {
         }
 
         if (_proof_assembler->finished()) {
+
+            LOG(V2_INFO, "Proof assembly done, proceeding with merging\n");
+
             // Proof assembly done
             auto proofFiles = _proof_assembler->getProofOutputFiles();
             //_done_assembling_proof = true;
@@ -106,11 +116,15 @@ void AnytimeSatClauseCommunicator::communicate() {
                         // Refill line from stream
                         std::string line;
                         if (getline(_merger_filestreams[i], line)) {
-                            size_t firstWhitespacePos = 0; 
+                            size_t firstIdPos = 0;
+                            while (firstIdPos < line.size() && line[firstIdPos] == ' ') firstIdPos++;
+                            size_t firstWhitespacePos = firstIdPos;
                             while (firstWhitespacePos < line.size() && line[firstWhitespacePos] != ' ') 
                                 firstWhitespacePos++;
-                            _merger_next_lines[i].id = std::stoul(line.substr(0, firstWhitespacePos));
+                            _merger_next_lines[i].id = std::stoul(line.substr(firstIdPos, firstWhitespacePos-firstIdPos));
                             _merger_next_lines[i].body = line.substr(firstWhitespacePos);
+                            LOG(V6_DEBGV, "MERGER \"%s\" => id=%lu body=\"%s\"\n", line.c_str(), 
+                                _merger_next_lines[i].id, _merger_next_lines[i].body.c_str());
                         } else {
                             // No more lines!
                         }
@@ -303,6 +317,7 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         } else return;
     }
 
+    bool forwardedInitiateProofMessage = false;
     if (msg.tag == MSG_NOTIFY_UNSAT_FOUND) {
         assert(_job->getJobTree().isRoot());
         
@@ -317,23 +332,33 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         msg.payload.push_back(_job->getGlobalNumWorkers());
         msg.payload.push_back(_job->getNumThreads());
         // vvv Advances in the next branch vvv
+        forwardedInitiateProofMessage = true;
     }
     if (msg.tag == MSG_INITIATE_PROOF_COMBINATION) {
 
+        LOG(V2_INFO, "Initiating distributed proof assembly\n");
+
         // Propagate initialization message
         advanceCollective(_job, msg, MSG_INITIATE_PROOF_COMBINATION);  
-        
+        if (forwardedInitiateProofMessage) {
+            // send the initiation message explicitly again
+            // to ensure that the job is terminated properly
+            MyMpi::isend(_job->getMyMpiRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+        }
+
         // Create _proof_assembler
-        int finalEpoch = msg.epoch;
-        int winningInstance = msg.payload[0];
-        int numWorkers = msg.payload[1];
-        int threadsPerWorker = msg.payload[2];
-        int thisWorkerIndex = _job->getJobTree().getIndex();
-        assert(!_proof_assembler.has_value());
-        _proof_assembler.emplace(_params, _job->getId(), numWorkers, threadsPerWorker, thisWorkerIndex, finalEpoch, winningInstance);
-        createNewProofAllReduction();
+        if (!_proof_assembler.has_value()) {
+            int finalEpoch = msg.epoch;
+            int winningInstance = msg.payload[0];
+            int numWorkers = msg.payload[1];
+            int threadsPerWorker = msg.payload[2];
+            int thisWorkerIndex = _job->getJobTree().getIndex();
+            _proof_assembler.emplace(_params, _job->getId(), numWorkers, threadsPerWorker, thisWorkerIndex, finalEpoch, winningInstance);
+            createNewProofAllReduction();
+        }
     }
     if (msg.tag == MSG_ALLREDUCE_PROOF_RELEVANT_CLAUSES) {
+        LOG(V2_INFO, "Receiving %i proof-relevant clause IDs from epoch %i\n", msg.payload.size()/2, msg.epoch);
         assert(_proof_all_reduction.has_value());
         _proof_all_reduction->receive(source, mpiTag, msg);
         _proof_all_reduction->advance();

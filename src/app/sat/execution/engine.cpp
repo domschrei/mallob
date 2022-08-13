@@ -98,7 +98,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numOriginalClauses = numClauses;
 	//make a directory for putting proofs in
 	std::filesystem::path base_dir(params.logDirectory());
-	std::filesystem::path proof_dir("proof");
+	std::filesystem::path proof_dir("proof" + config.getJobStr());
 	std::filesystem::path full_path = base_dir / proof_dir;
 	create_directory(full_path);
 	setup.proofDir = full_path.string();

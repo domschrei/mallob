@@ -308,18 +308,18 @@ std::vector<int> AdaptiveClauseDatabase::exportBuffer(int totalLiteralLimit, int
 
     if (mode != ExportMode::NONUNITS) {
         // Export unit clauses.
-        flushClauses(_unit_slot, sortClauses, builder);
+        flushClauses(_unit_slot, sortClauses, builder, clauseDataConverter);
     }
     if (mode != ExportMode::UNITS) {
         // Export all other clauses.
 
         // Binary clauses first.
-        flushClauses(_binary_slot, sortClauses, builder);
+        flushClauses(_binary_slot, sortClauses, builder, clauseDataConverter);
 
         // All other clauses.
         for (int slotIdx = 0; slotIdx < _large_slots.size(); slotIdx++) {
             auto& slot = _large_slots[slotIdx];
-            flushClauses(slot, sortClauses, builder);
+            flushClauses(slot, sortClauses, builder, clauseDataConverter);
         }
     }
 

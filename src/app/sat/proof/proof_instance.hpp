@@ -23,10 +23,12 @@ class ProofInstance {
 private:
     const int _instance_id;
     const int _num_instances;
+    int _original_num_clauses;
     bool _winning_instance;
 
     ReverseLratParser _parser;
     ReverseLratParser::LratLine _current_line;
+    bool _current_line_aligned = false;
     ExternalPriorityQueue<LratClauseId> _frontier;
     ExternalPriorityQueue<LratClauseId> _backlog;
 
@@ -44,23 +46,18 @@ private:
     bool _finished = false;
 
 public:
-    ProofInstance(int instanceId, int numInstances, 
+    ProofInstance(int instanceId, int numInstances, int originalNumClauses,
         const std::string& proofFilename, int finalEpoch, 
         int winningInstance, const std::vector<LratClauseId>& globalEpochStarts, 
         std::vector<LratClauseId>&& localEpochStarts, 
         std::vector<LratClauseId>&& localEpochOffsets, const std::string& outputFilename) :
-            _instance_id(instanceId), _num_instances(numInstances),
+            _instance_id(instanceId), _num_instances(numInstances), 
+            _original_num_clauses(originalNumClauses),
             _winning_instance(winningInstance == instanceId),
             _parser(proofFilename), _local_epoch_starts(localEpochStarts), 
-            _local_epoch_offsets(localEpochOffsets), _current_epoch(finalEpoch),
-            _output_filename(outputFilename), _output(outputFilename) {
-        
-        _global_epoch_starts.resize(_local_epoch_starts.size());
-        for (size_t i = 0; i < _global_epoch_starts.size(); ++i) {
-            _global_epoch_starts[i] = _local_epoch_starts[i] + _local_epoch_offsets[i];
-        }
-        assert(_global_epoch_starts == globalEpochStarts);
-    }
+            _local_epoch_offsets(localEpochOffsets), _global_epoch_starts(globalEpochStarts),
+            _current_epoch(finalEpoch),
+            _output_filename(outputFilename), _output(outputFilename) {}
 
     void advance(const LratClauseId* clauseIdsData, size_t clauseIdsSize) {
         _work_done = false;
@@ -77,11 +74,6 @@ public:
     std::vector<LratClauseId>&& extractNextOutgoingClauseIds() {
         assert(ready());
         _work_future.get();
-
-        // Proceed with the next (earlier) epoch
-        assert(_current_epoch > 0);
-        _current_epoch--;
-
         return std::move(_outgoing_clause_ids);
     }
 
@@ -101,19 +93,38 @@ private:
     }
 
     void readEpoch() {
-        if (!_current_line.valid() && _parser.hasNext()) 
+
+        LOG(V2_INFO, "Proof instance %i reading epoch %i\n", _instance_id, _current_epoch);
+        int numReadLines = 0;
+
+        if (!_current_line.valid() && _parser.hasNext()) {
             _current_line = _parser.next();
+            _current_line_aligned = false;
+        } 
         
+        LratClauseId id = std::numeric_limits<unsigned long>::max();
         while (_current_line.valid()) {
 
-            alignSelfProducedClauseIds(_current_line);
-            auto id = _current_line.id;
+            assert(!_current_line.hints.empty());
+            auto unalignedId = _current_line.id;
+            if (!_current_line_aligned) {
+                alignSelfProducedClauseIds(_current_line, /*assertSelfProduced=*/true);
+                _current_line_aligned = true;
+            }
+            auto nextId = _current_line.id;
+            assert(nextId <= id || log_return_false("[ERROR] Instance %i: Read clause ID %lu, expected <= %lu\n", 
+                _instance_id, nextId, id));
+            id = nextId;
 
             int epoch = getClauseEpoch(id);
             if (epoch != _current_epoch) {
                 // check if it is from a future epoch (which would be an error)
-                assert(epoch < _current_epoch);
+                assert(epoch < _current_epoch || log_return_false(
+                    "[ERROR] Instance %i: clause ID=%lu (originally %lu) from epoch %i found; expected epoch %i or smaller\n", 
+                    _instance_id, id, unalignedId, epoch, _current_epoch));
                 // stop reading because a former epoch has been reached
+                LOG(V2_INFO, "Proof instance %i stopping reading epoch %i at clause with ID %lu (originally %lu) from epoch %i\n", 
+                    _instance_id, _current_epoch, id, unalignedId, epoch);
                 break; 
             }
 
@@ -143,9 +154,16 @@ private:
             }
 
             // Get next proof line
-            if (_parser.hasNext()) _current_line = _parser.next();
+            if (_parser.hasNext()) {
+                _current_line = _parser.next();
+                _current_line_aligned = false;
+            }
             else _current_line.id = -1;
+            numReadLines++;
         }
+
+        LOG(V2_INFO, "Proof instance %i: %i lines this epoch; last read ID: %lu\n", 
+            _instance_id, numReadLines, id);
 
         if (_current_epoch == 0) {
             // End of the procedure reached!
@@ -159,6 +177,9 @@ private:
             assert(_backlog.empty());
 
             _finished = true;
+            LOG(V2_INFO, "Proof instance %i finished!\n", _instance_id);
+        } else {
+            _current_epoch--;
         }
     }
 
@@ -166,13 +187,18 @@ private:
 
         _outgoing_clause_ids.clear();
 
+        long id = std::numeric_limits<long>::max();
         while (!_backlog.empty()) {
-            long id = _backlog.top();
+            long nextId = _backlog.top();
+            assert(nextId <= id);
+            id = nextId;
             
             int epoch = getClauseEpoch(id);
-            if (epoch != _current_epoch-1) {
+            if (epoch != _current_epoch) {
                 // check if it is from a future epoch (which would be an error)
-                assert(epoch < _current_epoch-1);
+                assert(epoch < _current_epoch || 
+                    log_return_false("[ERROR] Instance %i: clause ID=%lu from epoch %i found; expected epoch %i or smaller\n", 
+                    _instance_id, id, epoch, _current_epoch));
                 // stop reading because a former epoch has been reached
                 break;
             }
@@ -184,22 +210,25 @@ private:
         }
     }
 
-    void alignSelfProducedClauseIds(ReverseLratParser::LratLine& line) {
-        alignClauseId(line.id);
-        for (auto& hint : line.hints) alignClauseId(hint);
+    void alignSelfProducedClauseIds(ReverseLratParser::LratLine& line, bool assertSelfProduced) {
+        alignClauseId(line.id, assertSelfProduced);
+        for (auto& hint : line.hints) alignClauseId(hint, /*assertSelfProduced=*/false);
     }
-    void alignClauseId(LratClauseId& id) {
+    void alignClauseId(LratClauseId& id, bool assertSelfProduced) {
+        if (assertSelfProduced) assert(isSelfProducedClause(id));
         if (isSelfProducedClause(id)) {
             int epoch = getClauseEpoch(id);
             id += _local_epoch_offsets[epoch];
+            assert(isSelfProducedClause(id));
         }
     }
 
     bool isOriginalClause(LratClauseId clauseId) {
-        return clauseId < _global_epoch_starts[0];
+        return clauseId <= _original_num_clauses;
     }
     bool isSelfProducedClause(LratClauseId clauseId) {
-        return !isOriginalClause(clauseId) && clauseId % _num_instances == _instance_id;
+        if (isOriginalClause(clauseId)) return false;
+        return _instance_id == (clauseId-_original_num_clauses-1) % _num_instances;
     }
     LratClauseId convertSelfProducedClauseId(LratClauseId clauseId) {
         int epoch = _current_epoch;
@@ -208,8 +237,11 @@ private:
     }
     
     int getClauseEpoch(LratClauseId clauseId) {
+        // will point to 1st element >= clauseId (or end)
         auto it = std::lower_bound(_global_epoch_starts.begin(), _global_epoch_starts.end(), clauseId);
-        assert(it != _global_epoch_starts.end());
+        assert(it != _global_epoch_starts.begin());
+        // point to last element < id
+        --it;
         auto epoch = std::distance(std::begin(_global_epoch_starts), it);
         return epoch;
     }

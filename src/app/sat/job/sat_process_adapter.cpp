@@ -317,8 +317,8 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
     if (!_initialized) return NORMAL;
 
     int exitStatus = 0;
-    if ((!_hsm->doTerminate && _hsm->didTerminate) || 
-            (Process::didChildExit(_child_pid, &exitStatus) && exitStatus != 0)) {
+    if (!_hsm->doTerminate && (_hsm->didTerminate || 
+            Process::didChildExit(_child_pid, &exitStatus) && exitStatus != 0)) {
         // Child has exited without being told to.
         if (exitStatus == SIGUSR2) {
             LOG(V3_VERB, "Restarting non-incremental child %ld\n", _child_pid);

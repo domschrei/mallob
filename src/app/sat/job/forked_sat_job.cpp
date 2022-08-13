@@ -126,7 +126,7 @@ int ForkedSatJob::appl_solved() {
         if (MALLOB_CLAUSE_METADATA_SIZE == 2 && result == RESULT_UNSAT
                 && _params.distributedProofAssembly()) {
             // Unsatisfiability: handle separately.
-            LOG(V2_INFO, "Initiate distributed proof assembly\n");
+            LOG(V2_INFO, "Query to begin distributed proof assembly\n");
             int finalEpoch = ((AnytimeSatClauseCommunicator*)_clause_comm)->getCurrentEpoch();
             int winningInstance = getJobTree().getIndex() * getNumThreads() + _internal_result.localWinningInstanceId;
             JobMessage msg(getId(), getRevision(), finalEpoch, MSG_NOTIFY_UNSAT_FOUND);
@@ -215,6 +215,10 @@ void ForkedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
             MyMpi::isend(source, mpiTag, msg);
         }
         return;
+    }
+    if (msg.tag == MSG_INITIATE_PROOF_COMBINATION) {
+        // shut down solver
+        if (_solver) _solver->setSolvingState(SolvingStates::ABORTING);
     }
     ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, mpiTag, msg);
 }

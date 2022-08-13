@@ -7,9 +7,11 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include "sat_reader.hpp"
 #include "util/sys/terminator.hpp"
+#include "app/sat/data/clause_metadata_def.hpp"
 
 bool SatReader::read(JobDescription& desc) {
 
@@ -29,8 +31,19 @@ bool SatReader::read(JobDescription& desc) {
 	const std::string NC_DEFAULT_VAL = "BMMMKKK111";
 	desc.setAppConfigurationEntry("__NC", NC_DEFAULT_VAL);
 	desc.beginInitialization(desc.getRevision());
-	
+
 	if (pipe == nullptr && namedpipe == -1) {
+
+		if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+			// cadical input.cnf -c 0 -o removed-units.cnf
+			std::string newFilename = _filename + "_units_removed.cnf";
+			remove(newFilename.c_str()); // remove if existing (ignore errors)
+			std::string cmd = "cadical " + _filename + " -c 0 -o " + newFilename;
+			int returnCode = system(cmd.c_str());
+			assert(returnCode == 0);
+			_filename = newFilename;
+		}
+
 		// Read file with mmap
 		int fd = open(_filename.c_str(), O_RDONLY);
 		if (fd == -1) return false;
@@ -57,6 +70,10 @@ bool SatReader::read(JobDescription& desc) {
 		}
 		munmap(mmapped, size);
 		close(fd);
+
+		//if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+		//	remove(_filename.c_str());
+		//}
 
 	} else if (namedpipe != -1) {
 		// Read formula over named pipe

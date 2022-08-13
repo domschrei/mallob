@@ -57,8 +57,10 @@ public:
         while (!_hsm->doBegin) doSleep();
         
         // Terminate directly?
-        if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true)) 
-            doTerminate();
+        if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true)) {
+            doTerminate(/*gracefully=*/MALLOB_CLAUSE_METADATA_SIZE!=2);
+            return;
+        }
 
         // Set up export and import buffers for clause exchanges
         {
@@ -232,7 +234,7 @@ public:
             }
         }
 
-        doTerminate();
+        doTerminate(/*gracefully=*/MALLOB_CLAUSE_METADATA_SIZE!=2);
 
         // Shared memory will be cleaned up by the parent process.
     }
@@ -255,7 +257,7 @@ private:
     void importRevisions() {
         while ((_hsm->doStartNextRevision && !_hsm->didStartNextRevision) 
                 || _last_imported_revision < _desired_revision) {
-            if (_hsm->doTerminate) doTerminate();
+            if (_hsm->doTerminate) doTerminate(/*gracefully=*/true);
             if (_hsm->doStartNextRevision && !_hsm->didStartNextRevision) {
                 _desired_revision = _hsm->desiredRevision;
                 _last_imported_revision++;
@@ -307,9 +309,10 @@ private:
         if (sleepStatus != 0) LOGGER(_log, V5_DEBG, "Woken up after %i us\n", (int) (1000*1000*time));
     }
 
-    void doTerminate() {
+    void doTerminate(bool gracefully) {
         _hsm->didTerminate = true;
         _log.flush();   
-        Process::doExit(0);
+        if (gracefully) Process::doExit(0);
+        else Process::sendSignal(Proc::getPid(), SIGKILL);
     }
 };

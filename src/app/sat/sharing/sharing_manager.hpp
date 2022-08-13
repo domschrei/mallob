@@ -54,6 +54,7 @@ protected:
 	SharingStatistics _stats;
 	std::vector<SolverStatistics*> _solver_stats;
 
+	int _num_original_clauses;
 	std::vector<std::atomic_ulong*> _last_exported_clause_id; 
 	typedef std::vector<unsigned long> EpochIdList;
 	std::vector<EpochIdList> _min_epoch_ids_per_solver;
@@ -95,28 +96,48 @@ public:
 
 private:
 
+	bool isLocallyProducedClause(unsigned long clauseId) {
+		auto globalId = (clauseId-_num_original_clauses-1) % _solvers[0]->getSolverSetup().maxNumSolvers;
+		for (auto& solver : _solvers) if (solver->getGlobalId() == globalId) return true;
+		return false;
+	}
+
 	int getProducingLocalSolverIndex(unsigned long clauseId) {
-		return clauseId % _solvers.size();
+		return (clauseId-_num_original_clauses-1) % _solvers.size();
 	}
 	void alignClauseId(int* clauseData) {
 		unsigned long clauseId = metadata::readUnsignedLong(clauseData);
 		int localSolverId = getProducingLocalSolverIndex(clauseId);
+
 		// take the offset that belongs to the clause's epoch!
-		auto offset = _id_offsets_per_solver[localSolverId][getEpochOfUnalignedSelfClause(clauseId)];
+		int epoch = getEpochOfUnalignedSelfClause(clauseId);
+		assert(epoch >= 0 && epoch < _id_offsets_per_solver[localSolverId].size() 
+			|| log_return_false("Invalid epoch %i found for clause ID %lu\n", epoch, clauseId));
+		auto offset = _id_offsets_per_solver[localSolverId][epoch];
 		unsigned long alignedClauseId = clauseId + offset;
+
+		LOG(V5_DEBG, "ALIGN EPOCH=%i %lu => %lu\n", epoch, clauseId, alignedClauseId);
 
 		assert(getEpochOfAlignedSelfClause(alignedClauseId) == getEpochOfUnalignedSelfClause(clauseId));
 		assert(getProducingLocalSolverIndex(alignedClauseId) == getProducingLocalSolverIndex(clauseId));
 
-		metadata::writeUnsignedLong(alignedClauseId, clauseData);		
+		metadata::writeUnsignedLong(alignedClauseId, clauseData);
 	}
 	void unalignClauseId(int* clauseData) {
 		unsigned long clauseId = metadata::readUnsignedLong(clauseData);
 		int localSolverId = getProducingLocalSolverIndex(clauseId);
-		auto offset = _id_offsets_per_solver[localSolverId][getEpochOfAlignedSelfClause(clauseId)];
+
+		int epoch = getEpochOfAlignedSelfClause(clauseId);
+		assert(epoch >= 0 && epoch < _id_offsets_per_solver[localSolverId].size() 
+			|| log_return_false("Invalid epoch %i found for clause ID %lu\n", epoch, clauseId));
+		auto offset = _id_offsets_per_solver[localSolverId][epoch];
 		unsigned long unalignedClauseId = clauseId - offset;
 
-		assert(getEpochOfAlignedSelfClause(clauseId) == getEpochOfUnalignedSelfClause(unalignedClauseId));
+		LOG(V5_DEBG, "UNALIGN EPOCH=%i %lu => %lu\n", epoch, clauseId, unalignedClauseId);
+
+		assert(getEpochOfAlignedSelfClause(clauseId) == getEpochOfUnalignedSelfClause(unalignedClauseId) 
+			|| log_return_false("[ERROR] epoch of aligned clause %lu: %i; epoch of unaligned clause %lu: %i\n",
+			clauseId, getEpochOfAlignedSelfClause(clauseId), unalignedClauseId, getEpochOfUnalignedSelfClause(unalignedClauseId)));
 		assert(getProducingLocalSolverIndex(clauseId) == getProducingLocalSolverIndex(unalignedClauseId));
 
 		metadata::writeUnsignedLong(unalignedClauseId, clauseData);

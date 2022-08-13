@@ -30,12 +30,12 @@ public:
         std::string toStr() const {
             std::stringstream out;
             out << id;
-            for (auto lit : literals) out << lit << " ";
-            out << "0 ";
+            for (auto lit : literals) out << " " << lit ;
+            out << " 0";
             for (size_t i = 0; i < hints.size(); i++) {
-                out << (signsOfHints[i] ? "" : "-") << hints[i] << " ";
+                out << " " << (signsOfHints[i] ? "" : "-") << hints[i];
             }
-            out << "0\n";
+            out << " 0\n";
             return out.str();
         }
     };
@@ -167,6 +167,7 @@ private:
             }
             num = 0;
             sign = 1;
+            beganNum = false;
         };
         
         // Iterate over all characters of the found line
@@ -184,10 +185,24 @@ private:
                     sign *= -1;
                     beganNum = true;
                     break;
-                default:
+                case '0':
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                case '6':
+                case '7':
+                case '8':
+                case '9':
                     // Add digit to current number
                     num = num*10 + (_mmap[i]-'0');
                     beganNum = true;
+                    break;
+                default:
+                    LOG(V0_CRIT, "[ERROR] Unexpected character \"%c\" (code: %i) in LRAT file!\n", 
+                        _mmap[i], _mmap[i]);
+                    abort();
             }
             if (cancel) {
                 _line.id = -1;
