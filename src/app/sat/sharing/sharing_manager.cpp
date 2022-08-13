@@ -417,14 +417,16 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 				// filtered by solver filter
 				solverStats->receivedClausesFiltered++;
 				continue;
-			} else if (MALLOB_CLAUSE_METADATA_SIZE == 2 && clause.size >= 2) {
-				// check via clause ID whether this solver produced this clause
-				unsigned long clauseId = metadata::readUnsignedLong(clause.begin);
-				if (getProducingLocalSolverIndex(clauseId) == sid) {
-					// This solver produced this clause! Do not import.
-					continue;
-				}
 			} else {
+				if (MALLOB_CLAUSE_METADATA_SIZE == 2 && clause.size >= 2) {
+					// check via clause ID whether this solver produced this clause
+					unsigned long clauseId = metadata::readUnsignedLong(clause.begin);
+					if (getProducingLocalSolverIndex(clauseId) == sid) {
+						// This solver produced this clause! Do not import.
+						solverStats->receivedClausesFiltered++;
+						continue;
+					}
+				}
 				// admitted by solver filter
 				if (clause.size == 1) unitLists[i].push_front(clause.begin[0]);
 				else if (clause.size == 2) binaryLists[i].emplace_front(clause.begin[0], clause.begin[1]);
