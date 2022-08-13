@@ -185,7 +185,7 @@ private:
 
             LOG(V2_INFO, "PrAs converting \"%s.frat\" to LRAT\n", proofFilenameBase.c_str());
             std::string conversionCmd = "cat " + proofFilenameBase 
-                + ".frat | grep \"a\" | sed 's|a||' | sed 's| l ||' > " + proofFilenameBase + ".lrat";
+                + ".frat | grep \"a\" | sed 's|a||' | sed 's|l||' > " + proofFilenameBase + ".lrat";
             conversionFutures.push_back(ProcessWideThreadPool::get().addTask([conversionCmd]() {
                 int returnCode = system(conversionCmd.c_str());
                 assert(returnCode == 0);

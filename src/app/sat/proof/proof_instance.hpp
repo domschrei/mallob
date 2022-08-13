@@ -45,6 +45,8 @@ private:
     std::vector<LratClauseId> _outgoing_clause_ids;
     bool _finished = false;
 
+    unsigned long _num_traced_clauses = 0;
+
 public:
     ProofInstance(int instanceId, int numInstances, int originalNumClauses,
         const std::string& proofFilename, int finalEpoch, 
@@ -131,6 +133,7 @@ private:
             if (_frontier.top() == id || 
                     (_current_line.literals.empty() && _winning_instance)) {
                 // Clause derivation is necessary for the combined proof
+                _num_traced_clauses++;
 
                 // Output the line
                 auto lineStr = _current_line.toStr();
@@ -162,8 +165,8 @@ private:
             numReadLines++;
         }
 
-        LOG(V2_INFO, "Proof instance %i: %i lines this epoch; last read ID: %lu\n", 
-            _instance_id, numReadLines, id);
+        LOG(V2_INFO, "Proof instance %i: %i lines this epoch; last read ID: %lu; %lu traced so far\n", 
+            _instance_id, numReadLines, id, _num_traced_clauses);
 
         if (_current_epoch == 0) {
             // End of the procedure reached!
