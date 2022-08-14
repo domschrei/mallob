@@ -4,6 +4,7 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -13,26 +14,34 @@ class Runner:
         self.logger = logging.getLogger("Runner")
         self.logger.setLevel(logging.INFO)
         self.request_directory = request_directory
+        os.environ['PYTHONUNBUFFERED'] = "1"
 
-    def run(self, cmd: list):
+    def process_stream(self, stream, str_name, file_handle):
+        line = stream.readline()
+        while line != "":
+            self.logger.info(f"{str_name}: {line}")
+            file_handle.write(line)
+            line = stream.readline()
+
+    def run(self, cmd: list, is_append=False):
         self.logger.info("Running command: %s", str(cmd))
         
         stdout_target_loc = os.path.join(self.request_directory, "stdout.log")
         stderr_target_loc = os.path.join(self.request_directory, "stderr.log")
         
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        with open(os.path.join(self.request_directory, stdout_target_loc), "w") as stdout_handle:
-            for line in proc.stdout:
-                line_str = line.decode("UTF-8")
-                self.logger.info(f"STDOUT: {line_str}")
-                stdout_handle.write(line_str)
-        #with open(os.path.join(self.request_directory, stderr_target_loc), "w") as stderr_handle:
-        #    for line in proc.stderr:
-        #        line_str = line.decode("UTF-8")
-        #        self.logger.info(f"STDERR: {line_str}")
-        #        stderr_handle.write(line_str)
+        access = "a" if is_append else "w"
 
-        return_code = proc.returncode
+        with open(stdout_target_loc, access) as stdout_handle:
+            with open(stderr_target_loc, access) as stderr_handle:
+                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    universal_newlines=True, start_new_session=True)
+                stdout_t = threading.Thread(target = self.process_stream, args=(proc.stdout, "STDOUT", stdout_handle))
+                stderr_t = threading.Thread(target = self.process_stream, args=(proc.stderr, "STDERR", stderr_handle))
+                stdout_t.start()
+                stderr_t.start()
+                return_code = proc.wait()
+                stdout_t.join()
+                stderr_t.join()
        
         return {
             "stdout": stdout_target_loc,
@@ -40,6 +49,7 @@ class Runner:
             "return_code": return_code,
             "output_directory": self.request_directory
         }
+
 
     def get_input_json(self):
         input = os.path.join(self.request_directory, "input.json")
@@ -65,6 +75,19 @@ class Runner:
         run_list.append(combined_hostfile)
         run_list.append(problem_path)
 
+        return run_list
+
+    def get_check_command(self, input_json):
+        problem_path = input_json.get("problem_path")
+        worker_node_ips = input_json.get("worker_node_ips", [])
+        
+        combined_hostfile = self.create_hostfile(worker_node_ips, self.request_directory)
+
+        # run_list = ["/competition/run_checker.sh"]
+        # run_list.append(combined_hostfile)
+        # run_list.append(problem_path)
+
+        run_list = ["echo", f"Would run frat checker here with args {combined_hostfile}, {problem_path}!"]
         return run_list
 
 
@@ -102,7 +125,22 @@ if __name__ == "__main__":
     
     output = runner.run(cmd)
     result = MallobParser.get_result(output["stdout"])
-    logging.info(f"RESULT: {result}")
+    runner.logger.info(f"RESULT: {result}")
+
+    # proof check
+    if (result == "UNSATISFIABLE"):
+        proof_cmd = runner.get_check_command(input_json)
+        runner.logger.info(f"Running checker with {proof_cmd}")
+        checker_result = runner.run(proof_cmd, True)
+        if checker_result.return_code:
+            runner.logger.info(f"Checker return code was non-zero ({checker_result.return_code}).  Returning 'ERROR'.")
+            result = "ERROR"  
+        else:
+            runner.logger.info(f"Checker return code was zero.  Check successful!")
+
+    # clean up.
+    runner.run(['cleanup'], True)
+
     solver_output = {
         "return_code": output["return_code"],
         "result": result,
