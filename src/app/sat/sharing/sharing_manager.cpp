@@ -421,9 +421,10 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 				if (MALLOB_CLAUSE_METADATA_SIZE == 2 && clause.size >= 2) {
 					// check via clause ID whether this solver produced this clause
 					unsigned long clauseId = metadata::readUnsignedLong(clause.begin);
-					if (getProducingLocalSolverIndex(clauseId) == sid) {
+					if (getProducingInstanceId(clauseId) == solver.getGlobalId()) {
 						// This solver produced this clause! Do not import.
 						solverStats->receivedClausesFiltered++;
+						abort();
 						continue;
 					}
 					// Important invariant: incoming clauses must be from EARLIER epochs

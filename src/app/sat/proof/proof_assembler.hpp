@@ -100,9 +100,15 @@ public:
             for (size_t i = 0; i < pointers.size(); i++) {
                 auto& pointer = pointers[i];
                 auto& remaining = numRemaining[i];
+                // Skip all duplicate IDs
+                while (!output.empty() && remaining>0 && *pointer == output.back()) {
+                    remaining--;
+                    pointer++;
+                }
                 if (remaining == 0) continue;
+                // LARGEST ID first
                 auto clauseId = *pointer;
-                if (!anyLeft || clauseId < nextClauseId) {
+                if (!anyLeft || clauseId > nextClauseId) {
                     anyLeft = true;
                     nextVecPos = i;
                     nextClauseId = clauseId;
@@ -112,6 +118,7 @@ public:
 
             output.push_back(nextClauseId);
             numRemaining[nextVecPos]--;
+            pointers[nextVecPos]++;
         }
 
         return output;

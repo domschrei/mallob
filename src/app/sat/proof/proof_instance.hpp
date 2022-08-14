@@ -76,6 +76,9 @@ public:
     std::vector<LratClauseId>&& extractNextOutgoingClauseIds() {
         assert(ready());
         _work_future.get();
+        std::string clsStr;
+        for (auto id : _outgoing_clause_ids) clsStr += std::to_string(id) + " ";
+        LOG(V2_INFO, "Proof instance %i exporting %i IDs { %s}\n", _instance_id, _outgoing_clause_ids.size(), clsStr.c_str());
         return std::move(_outgoing_clause_ids);
     }
 

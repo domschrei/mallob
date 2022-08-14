@@ -105,6 +105,9 @@ private:
 	int getProducingLocalSolverIndex(unsigned long clauseId) {
 		return (clauseId-_num_original_clauses-1) % _solvers.size();
 	}
+	int getProducingInstanceId(unsigned long clauseId) {
+		return (clauseId-_num_original_clauses-1) % _solvers[0]->getSolverSetup().maxNumSolvers;
+	}
 	void alignClauseId(int* clauseData) {
 		unsigned long clauseId = metadata::readUnsignedLong(clauseData);
 		int localSolverId = getProducingLocalSolverIndex(clauseId);
