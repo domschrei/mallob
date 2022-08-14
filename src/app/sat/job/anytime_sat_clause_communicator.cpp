@@ -31,7 +31,7 @@ void AnytimeSatClauseCommunicator::communicate() {
         if (_file_merger->readyToMerge()) _file_merger->beginMerge();
         if (_file_merger->beganMerging()) {
             _file_merger->advance();
-            if (_file_merger->finished()) {
+            if (_file_merger->allProcessesFinished()) {
                 // Proof merging done!
                 _done_assembling_proof = true;
             }

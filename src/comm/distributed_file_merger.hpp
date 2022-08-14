@@ -124,6 +124,8 @@ private:
 
     bool _began_merging = false;
 
+    bool _began_final_barrier = false;
+
 public:
     DistributedFileMerger(MPI_Comm comm, int branchingFactor, LineSource localSource, const std::string& outputFileAtZero) : 
             _comm(comm), _branching_factor(branchingFactor), _local_source(localSource) {
@@ -244,6 +246,19 @@ public:
 
     bool finished() const {
         return isFullyExhausted();
+    }
+
+    bool allProcessesFinished() {
+        if (finished()) {
+            if (!_began_final_barrier) {
+                MPI_Ibarrier(_comm, &_barrier_request);
+                _began_final_barrier = true;
+            }
+            int flag;
+            MPI_Test(&_barrier_request, &flag, MPI_STATUS_IGNORE);
+            return flag;
+        }
+        return false;
     }
 
 private:
