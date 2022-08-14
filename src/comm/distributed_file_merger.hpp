@@ -10,32 +10,47 @@
 #include "util/sys/thread_pool.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
+#include "util/bloom_filter.hpp"
+#include "app/sat/proof/lrat_line.hpp"
 
 class DistributedFileMerger {
 
 public:
-    struct IdQualifiedLine {
-        unsigned long id;
-        std::string body;
-        size_t size() const {return body.size();}
-        bool empty() const {return body.empty();}
-    };
-    typedef std::function<std::optional<IdQualifiedLine>()> LineSource;
+    typedef std::function<std::optional<LratLine>()> LineSource;
 
     struct MergeMessage : public Serializable {
         enum Type {REQUEST, RESPONSE_SUCCESS, RESPONSE_EXHAUSTED} type;
-        std::vector<IdQualifiedLine> lines;
+        std::vector<LratLine> lines;
         virtual std::vector<uint8_t> serialize() const {
             std::vector<uint8_t> result;
             size_t i = 0, n;
             result.resize(sizeof(Type));
             n = sizeof(Type); memcpy(result.data()+i, &type, n); i += n;
             for (auto& line : lines) {
-                int lineSize = line.size();
-                result.resize(result.size() + sizeof(unsigned long) + sizeof(int) + lineSize);
+                result.resize(result.size() + line.size());
+                // ID
                 n = sizeof(unsigned long); memcpy(result.data()+i, &line.id, n); i += n;
-                n = sizeof(int); memcpy(result.data()+i, &lineSize, n); i += n;
-                n = lineSize; memcpy(result.data()+i, line.body.c_str(), n); i += n;
+                // # literals
+                int numLits = line.literals.size();
+                n = sizeof(int); memcpy(result.data()+i, &numLits, n); i += n;
+                // literals
+                for (auto lit : line.literals) {
+                    n = sizeof(int); memcpy(result.data()+i, &lit, n); i += n;    
+                }
+                // # hints
+                int numHints = line.hints.size();
+                assert(numHints > 0 && numHints < 1000);
+                n = sizeof(int); memcpy(result.data()+i, &numHints, n); i += n;
+                // hints
+                for (size_t x = 0; x < line.hints.size(); x++) {
+                    auto hint = line.hints[x];
+                    n = sizeof(LratClauseId); memcpy(result.data()+i, &hint, n); i += n;
+                }
+                // signs of hints
+                for (size_t x = 0; x < line.hints.size(); x++) {
+                    auto sign = line.signsOfHints[x];
+                    n = sizeof(bool); memcpy(result.data()+i, &sign, n); i += n;
+                }
             }
             return result;
         }
@@ -43,32 +58,56 @@ public:
             size_t i = 0, n;
             n = sizeof(Type); memcpy(&type, packed.data()+i, n); i += n;
             while (i < packed.size()) {
-                unsigned long id;
-                n = sizeof(unsigned long); memcpy(&id, packed.data()+i, n); i += n;
-                int lineSize;
-                n = sizeof(int); memcpy(&lineSize, packed.data()+i, n); i += n;
-                std::string lineBody((const char*) (packed.data()+i), lineSize);
-                i += lineSize;
-                lines.push_back(IdQualifiedLine{id, std::move(lineBody)});
+                LratLine line;
+                // ID
+                n = sizeof(unsigned long); memcpy(&line.id, packed.data()+i, n); i += n;
+                // # literals
+                int numLits;
+                n = sizeof(int); memcpy(&numLits, packed.data()+i, n); i += n;
+                assert(numLits >= 0 && numLits < 100);
+                // Literals
+                line.literals = std::vector<int>((int*) (packed.data()+i), 
+                    ((int*) (packed.data()+i)) + numLits);
+                assert(line.literals.size() == numLits);
+                i += sizeof(int) * numLits;
+                // # hints
+                int numHints;
+                n = sizeof(int); memcpy(&numHints, packed.data()+i, n); i += n;
+                assert(numHints > 0 && numHints < 1000 || log_return_false(
+                    "[ERROR] apparently, %i hints in this line... (ID %lu, %i literals)\n", 
+                    numHints, line.id, line.literals.size()));
+                // hints
+                line.hints = std::vector<LratClauseId>((LratClauseId*) (packed.data()+i), 
+                    ((LratClauseId*) (packed.data()+i)) + numHints);
+                assert(line.hints.size() == numHints);
+                i += sizeof(LratClauseId) * numHints;
+                line.signsOfHints = std::vector<bool>((bool*) (packed.data()+i), 
+                    ((bool*) (packed.data()+i) + numHints));
+                i += sizeof(bool) * numHints;
+                assert(line.signsOfHints.size() == numHints);
+
+                lines.push_back(std::move(line));
             }
             return *this;
         }
     };
 
 private:
-    const static int FULL_CHUNK_SIZE_BYTES = 500000;
+    const static int FULL_CHUNK_SIZE_BYTES = 900000;
     const static int HALF_CHUNK_SIZE_BYTES = FULL_CHUNK_SIZE_BYTES / 2;
 
     MPI_Comm _comm;
     int _branching_factor;
     LineSource _local_source;
+    int _num_original_clauses;
+    
     bool _local_source_exhausted = false;
     bool _all_sources_exhausted = false;
 
     class MergeChild {
     private:
         int rankWithinComm;
-        std::list<IdQualifiedLine> buffer;
+        std::list<LratLine> buffer;
         std::atomic_int bufferSize = 0;
         bool exhausted = false;
         bool refillRequested = false;
@@ -85,7 +124,7 @@ private:
                 && bufferSize.load(std::memory_order_relaxed) < HALF_CHUNK_SIZE_BYTES; 
         }
 
-        void add(std::vector<IdQualifiedLine>&& newLines) {
+        void add(std::vector<LratLine>&& newLines) {
             auto lock = bufferMutex.getLock();
             for (auto& line : newLines) {
                 buffer.push_back(line);
@@ -93,7 +132,7 @@ private:
             }
             refillRequested = false;
         }
-        IdQualifiedLine next() {
+        LratLine next() {
             assert(hasNext());
             auto lock = bufferMutex.getLock();
             auto line = std::move(buffer.front());
@@ -111,13 +150,14 @@ private:
     int _parent_rank = -1;
     bool _request_by_parent = false;
 
-    std::vector<IdQualifiedLine> _output_buffer;
+    std::vector<LratLine> _output_buffer;
     Mutex _output_buffer_mutex;
     std::atomic_int _output_buffer_size = 0;
 
     // rank zero only
     std::string _output_filename;
     std::ofstream _output_filestream;
+    std::unique_ptr<BloomFilter<unsigned long>> _output_id_filter;
 
     size_t numOutputLines = 0;
     float lastOutputReport = 0;
@@ -127,8 +167,8 @@ private:
     bool _began_final_barrier = false;
 
 public:
-    DistributedFileMerger(MPI_Comm comm, int branchingFactor, LineSource localSource, const std::string& outputFileAtZero) : 
-            _comm(comm), _branching_factor(branchingFactor), _local_source(localSource) {
+    DistributedFileMerger(MPI_Comm comm, int branchingFactor, LineSource localSource, const std::string& outputFileAtZero, int numOriginalClauses) : 
+            _comm(comm), _branching_factor(branchingFactor), _local_source(localSource), _num_original_clauses(numOriginalClauses) {
 
         int myRank = MyMpi::rank(comm);
         int commSize = MyMpi::size(comm);
@@ -153,6 +193,8 @@ public:
             std::string reverseFilename = "_inv_" + _output_filename;
             LOG(V3_VERB, "DFM Opening output file \"%s\"\n", reverseFilename.c_str());
             _output_filestream = std::ofstream(reverseFilename);
+            // TODO choose size relative to proof size
+            _output_id_filter.reset(new BloomFilter<unsigned long>(26843543, 4)); 
         }
 
         MPI_Ibarrier(_comm, &_barrier_request);
@@ -263,7 +305,7 @@ public:
 
 private:
     void doMerging() {
-        std::vector<IdQualifiedLine> merger(_children.size()+1);
+        std::vector<LratLine> merger(_children.size()+1);
         while (true) {
             bool canMerge = true;
             
@@ -302,7 +344,7 @@ private:
 
             // Find next line to output
             size_t chosenSource;
-            IdQualifiedLine chosenLine;
+            LratLine chosenLine;
             for (size_t i = 0; i < merger.size(); i++) {
                 if (merger[i].empty()) continue;
                 // Largest ID first!
@@ -321,8 +363,23 @@ private:
             } else {
                 // Line to output found
                 if (MyMpi::rank(_comm) == 0) {
+                    std::vector<LratClauseId> hintsToDelete;
+                    for (auto hint : chosenLine.hints) {
+                        if (hint > _num_original_clauses &&
+                                _output_id_filter->tryInsert(hint)) {
+                            // Guarantee that ID was never output before.
+                            // Can add a deletion line.
+                            hintsToDelete.push_back(hint);
+                        }
+                    }
+                    if (!chosenLine.literals.empty() && !hintsToDelete.empty()) {
+                        std::string delLine = std::to_string(chosenLine.id) + " d";
+                        for (auto hint : hintsToDelete) delLine += " " + std::to_string(hint);
+                        delLine += " 0\n";
+                        _output_filestream.write(delLine.c_str(), delLine.size());
+                    }
                     // Write into final file
-                    std::string output = std::to_string(chosenLine.id) + " " + chosenLine.body + "\n";
+                    std::string output = chosenLine.toStr();
                     _output_filestream.write(output.c_str(), output.size());
                 } else {
                     // Write into output buffer
@@ -330,7 +387,9 @@ private:
                     _output_buffer.push_back(chosenLine);
                     _output_buffer_size.fetch_add(chosenLine.size(), std::memory_order_relaxed);
                 }
-                merger[chosenSource].body = "";
+                merger[chosenSource].literals.clear();
+                merger[chosenSource].hints.clear();
+                merger[chosenSource].signsOfHints.clear();
                 numOutputLines++;
             }
         }

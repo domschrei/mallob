@@ -27,7 +27,7 @@ private:
     bool _winning_instance;
 
     ReverseLratParser _parser;
-    ReverseLratParser::LratLine _current_line;
+    LratLine _current_line;
     bool _current_line_aligned = false;
     ExternalPriorityQueue<LratClauseId> _frontier;
     ExternalPriorityQueue<LratClauseId> _backlog;
@@ -229,7 +229,7 @@ private:
         }
     }
 
-    void alignSelfProducedClauseIds(ReverseLratParser::LratLine& line, bool assertSelfProduced) {
+    void alignSelfProducedClauseIds(LratLine& line, bool assertSelfProduced) {
         alignClauseId(line.id, assertSelfProduced);
         for (auto& hint : line.hints) alignClauseId(hint, /*assertSelfProduced=*/false);
     }

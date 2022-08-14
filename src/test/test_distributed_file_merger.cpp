@@ -20,13 +20,15 @@ void testMerge(int myRank) {
 
     auto merger = DistributedFileMerger(MPI_COMM_WORLD, 5, [&]() {
         if (lineCounter == maxLineCounter) 
-            return std::optional<DistributedFileMerger::IdQualifiedLine>();
-        DistributedFileMerger::IdQualifiedLine line;
+            return std::optional<LratLine>();
+        LratLine line;
         line.id = MyMpi::size(MPI_COMM_WORLD)*(maxLineCounter - lineCounter) + myRank;
-        line.body = std::to_string(lineCounter) + "th line from rank " + std::to_string(myRank) + "\n";
+        line.literals.push_back(lineCounter);
+        line.hints.push_back(myRank);
+        line.signsOfHints.push_back(true);
         lineCounter++;
-        return std::optional<DistributedFileMerger::IdQualifiedLine>(line);
-    }, "final_output.txt");
+        return std::optional<LratLine>(line);
+    }, "final_output.txt", /*numOriginalClauses=*/0);
 
     MyMpi::getMessageQueue().registerCallback(MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, [&](MessageHandle& h) {
         DistributedFileMerger::MergeMessage msg; msg.deserialize(h.getRecvData());

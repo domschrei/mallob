@@ -116,15 +116,9 @@ void AnytimeSatClauseCommunicator::communicate() {
                         // Refill line from stream
                         std::string line;
                         if (getline(_merger_filestreams[i], line)) {
-                            size_t firstIdPos = 0;
-                            while (firstIdPos < line.size() && line[firstIdPos] == ' ') firstIdPos++;
-                            size_t firstWhitespacePos = firstIdPos;
-                            while (firstWhitespacePos < line.size() && line[firstWhitespacePos] != ' ') 
-                                firstWhitespacePos++;
-                            _merger_next_lines[i].id = std::stoul(line.substr(firstIdPos, firstWhitespacePos-firstIdPos));
-                            _merger_next_lines[i].body = line.substr(firstWhitespacePos);
-                            LOG(V6_DEBGV, "MERGER \"%s\" => id=%lu body=\"%s\"\n", line.c_str(), 
-                                _merger_next_lines[i].id, _merger_next_lines[i].body.c_str());
+                            bool success;
+                            _merger_next_lines[i] = LratLine(line.c_str(), line.size(), success);
+                            assert(success);
                         } else {
                             // No more lines!
                         }
@@ -132,7 +126,7 @@ void AnytimeSatClauseCommunicator::communicate() {
                 }
 
                 // Find next best line
-                DistributedFileMerger::IdQualifiedLine nextLine;
+                LratLine nextLine;
                 size_t nextPos;
                 for (size_t i = 0; i < _merger_next_lines.size(); i++) {
                     if (_merger_next_lines[i].empty()) continue;
@@ -144,12 +138,14 @@ void AnytimeSatClauseCommunicator::communicate() {
 
                 // Return line or nothing
                 if (!nextLine.empty()) {
-                    _merger_next_lines[nextPos].body = "";
-                    return std::optional<DistributedFileMerger::IdQualifiedLine>(nextLine);
+                    _merger_next_lines[nextPos].literals.clear();
+                    _merger_next_lines[nextPos].hints.clear();
+                    _merger_next_lines[nextPos].signsOfHints.clear();
+                    return std::optional<LratLine>(nextLine);
                 } else {
-                    return std::optional<DistributedFileMerger::IdQualifiedLine>();
+                    return std::optional<LratLine>();
                 }
-            }, "final-proof-output.lrat"));
+            }, "final-proof-output.lrat", _proof_assembler->getNumOriginalClauses()));
 
             MyMpi::getMessageQueue().registerCallback(MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, [&](MessageHandle& h) {
                 DistributedFileMerger::MergeMessage msg; msg.deserialize(h.getRecvData());
@@ -162,7 +158,7 @@ void AnytimeSatClauseCommunicator::communicate() {
     }
 
     // root: initiate sharing
-    if (_job->getJobTree().isRoot()) {
+    if (_job->getJobTree().isRoot() && !_proof_assembler.has_value() && !_file_merger) {
         auto time = Timer::elapsedSeconds();
         bool nextEpochDue = time - _time_of_last_epoch_initiation >= _params.appCommPeriod();
         bool lastEpochDone = _time_of_last_epoch_conclusion > 0;

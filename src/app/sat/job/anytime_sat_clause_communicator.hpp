@@ -151,7 +151,7 @@ private:
 
     std::unique_ptr<DistributedFileMerger> _file_merger;
     std::vector<std::ifstream> _merger_filestreams;
-    std::vector<DistributedFileMerger::IdQualifiedLine> _merger_next_lines;
+    std::vector<LratLine> _merger_next_lines;
 
 public:
     AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : _params(params), _job(job), 
