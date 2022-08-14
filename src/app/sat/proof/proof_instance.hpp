@@ -168,8 +168,8 @@ private:
             numReadLines++;
         }
 
-        LOG(V2_INFO, "Proof instance %i: %i lines this epoch; last read ID: %lu; %lu traced so far\n", 
-            _instance_id, numReadLines, id, _num_traced_clauses);
+        LOG(V2_INFO, "Proof instance %i: %i lines this epoch; last read ID: %lu; %lu traced so far; %lu in backlog\n", 
+            _instance_id, numReadLines, id, _num_traced_clauses, _backlog.size());
 
         if (_current_epoch == 0) {
             // End of the procedure reached!
@@ -243,12 +243,6 @@ private:
     }
     
     int getClauseEpoch(LratClauseId clauseId) {
-        // will point to 1st element >= clauseId (or end)
-        auto it = std::lower_bound(_global_epoch_starts.begin(), _global_epoch_starts.end(), clauseId);
-        assert(it != _global_epoch_starts.begin());
-        // point to last element < id
-        --it;
-        auto epoch = std::distance(std::begin(_global_epoch_starts), it);
-        return epoch;
+        return metadata::getEpoch(clauseId, _global_epoch_starts);
     }
 };

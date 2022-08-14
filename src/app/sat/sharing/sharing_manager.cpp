@@ -426,6 +426,15 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 						solverStats->receivedClausesFiltered++;
 						continue;
 					}
+					// Important invariant: incoming clauses must be from EARLIER epochs
+					// than your current epoch.
+					int epoch = _min_epoch_ids_per_solver[i].size()-1;
+					int clauseEpoch = metadata::getEpoch(clauseId, _global_epoch_ids);
+					if (clauseEpoch >= epoch) {
+						LOG(V0_CRIT, "[ERROR] Importing clause ID=%lu from epoch %i while I am in epoch %i myself!\n", 
+							clauseId, clauseEpoch, epoch);
+						abort();
+					}
 				}
 				// admitted by solver filter
 				if (clause.size == 1) unitLists[i].push_front(clause.begin[0]);
