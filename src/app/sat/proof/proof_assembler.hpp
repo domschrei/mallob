@@ -71,6 +71,11 @@ public:
 
     void importClauseIds(const LratClauseId* clauseIdsData, size_t clauseIdsSize) {
         _current_epoch--;
+        if (_this_worker_index == 0) {
+            std::string clsStr;
+            for (size_t i = 0; i < clauseIdsSize; i++) clsStr += clauseIdsData[i] + " ";
+            LOG(V2_INFO, "Epoch %i: received %i clause IDs { %s}\n", _current_epoch, clauseIdsSize, clsStr.c_str());
+        }
         for (auto& inst : _proof_instances) {
             inst.advance(clauseIdsData, clauseIdsSize);
         }

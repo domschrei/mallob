@@ -88,10 +88,16 @@ private:
     void handleIncomingClauseIds(const LratClauseId* clauseIdsData, size_t clauseIdsSize) {
         
         // Import self-produced clauses
+        int numSelfClauses = 0;
         for (size_t i = 0; i < clauseIdsSize; i++) {
             LratClauseId id = clauseIdsData[i];
-            if (isSelfProducedClause(id)) _frontier.push(id);
+            if (isSelfProducedClause(id)) {
+                _frontier.push(id);
+                numSelfClauses++;
+            }
         }
+        LOG(V2_INFO, "Proof instance %i accepted %i self clauses to trace\n", 
+            _instance_id, numSelfClauses);
     }
 
     void readEpoch() {
