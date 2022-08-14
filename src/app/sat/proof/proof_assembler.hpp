@@ -27,10 +27,10 @@ public:
             _params(params), _job_id(jobId), _num_workers(numWorkers), _threads_per_worker(threadsPerWorker), 
             _this_worker_index(thisWorkerIndex), _final_epoch(finalEpoch), _winning_instance(winningInstance) {
 
+        _current_epoch = _final_epoch;
         ProcessWideThreadPool::get().addTask([&]() {
             createInstancesViaClauseEpochs(_params.logDirectory() + "/proof#" + std::to_string(_job_id) 
                 + "/clauseepochs." + std::to_string(_this_worker_index));
-            _current_epoch = _final_epoch;
             beginProofAssembly();
         });
     }

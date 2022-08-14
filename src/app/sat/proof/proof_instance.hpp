@@ -147,6 +147,10 @@ private:
                     if (isSelfProducedClause(hintId)) {
                         _frontier.push(hintId);
                     } else if (!isOriginalClause(hintId)) {
+                        int hintEpoch = getClauseEpoch(hintId);
+                        assert(hintEpoch < epoch || log_return_false(
+                            "[ERROR] Found ext. hint %ld from epoch %i for clause %ld from epoch %i!\n", 
+                            hintId, hintEpoch, id, epoch));
                         _backlog.push(hintId);
                     }
                 }
@@ -223,9 +227,10 @@ private:
     void alignClauseId(LratClauseId& id, bool assertSelfProduced) {
         if (assertSelfProduced) assert(isSelfProducedClause(id));
         if (isSelfProducedClause(id)) {
-            int epoch = getClauseEpoch(id);
+            int epoch = getUnalignedClauseEpoch(id);
             id += _local_epoch_offsets[epoch];
             assert(isSelfProducedClause(id));
+            assert(getClauseEpoch(id) == epoch);
         }
     }
 
@@ -242,6 +247,9 @@ private:
         return clauseId + _local_epoch_offsets[epoch];
     }
     
+    int getUnalignedClauseEpoch(LratClauseId clauseId) {
+        return metadata::getEpoch(clauseId, _local_epoch_starts);
+    }
     int getClauseEpoch(LratClauseId clauseId) {
         return metadata::getEpoch(clauseId, _global_epoch_starts);
     }
