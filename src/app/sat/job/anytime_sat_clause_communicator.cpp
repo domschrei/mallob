@@ -55,6 +55,22 @@ void AnytimeSatClauseCommunicator::communicate() {
         else return;
     }
 
+    if (!_sent_ready_msg && _job->isInitialized()) {
+        int numExpectedReadyMsgs = 0;
+        if (2*_job->getMyMpiRank()+1 < _job->getGlobalNumWorkers()) 
+            numExpectedReadyMsgs++;
+        if (2*_job->getMyMpiRank()+2 < _job->getGlobalNumWorkers()) 
+            numExpectedReadyMsgs++;
+
+        if (numExpectedReadyMsgs == _num_ready_msgs_from_children) {
+            _sent_ready_msg = true;
+            if (!_job->getJobTree().isRoot()) {
+                JobMessage msg(_job->getId(), _job->getRevision(), 0, MSG_NOTIFY_READY_FOR_PROOF_SAFE_SHARING);
+                MyMpi::isend(_job->getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+            }
+        }
+    }
+
     // no communication at all?
     if (_params.appCommPeriod() <= 0) return;
 
@@ -158,7 +174,8 @@ void AnytimeSatClauseCommunicator::communicate() {
     }
 
     // root: initiate sharing
-    if (_job->getJobTree().isRoot() && !_proof_assembler.has_value() && !_file_merger) {
+    if (_job->getJobTree().isRoot() && !_proof_assembler.has_value() && !_file_merger && _sent_ready_msg) {
+
         auto time = Timer::elapsedSeconds();
         bool nextEpochDue = time - _time_of_last_epoch_initiation >= _params.appCommPeriod();
         bool lastEpochDone = _time_of_last_epoch_conclusion > 0;
@@ -280,6 +297,10 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         return;
     }
 
+    if (msg.tag == MSG_NOTIFY_READY_FOR_PROOF_SAFE_SHARING) {
+        _num_ready_msgs_from_children++;
+    }
+
     if (_job->getState() != ACTIVE) {
         // Not active any more: return message to sender
         if (!msg.returnedToSender) {
@@ -393,7 +414,8 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         // Special case where clauses are broadcast but message was not processed:
         // Return an empty filter to the sender such that the sharing epoch may continue
         if (msg.tag == MSG_ALLREDUCE_CLAUSES && mpiTag == MSG_JOB_TREE_BROADCAST) {
-            msg.payload.clear();
+            msg.payload.resize(MALLOB_CLAUSE_METADATA_SIZE==2 ? 2 : 0);
+            for (int& num : msg.payload) num = 0;
             msg.tag = MSG_ALLREDUCE_FILTER;
             MyMpi::isend(source, MSG_JOB_TREE_REDUCTION, msg);
         }

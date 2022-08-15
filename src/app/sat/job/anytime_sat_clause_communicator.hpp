@@ -146,6 +146,9 @@ private:
     float _time_of_last_epoch_initiation = 0;
     float _time_of_last_epoch_conclusion = 0.000001f;
 
+    bool _sent_ready_msg = MALLOB_CLAUSE_METADATA_SIZE != 2;
+    int _num_ready_msgs_from_children = 0;
+
     std::optional<ProofAssembler> _proof_assembler;
     std::optional<JobTreeAllReduction> _proof_all_reduction;
     bool _done_assembling_proof = false;
