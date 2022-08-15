@@ -373,8 +373,8 @@ std::pair<int, int> SatEngine::getLastAdmittedClauseShare() {
 void SatEngine::writeClauseEpochs() {
 	std::string filename = _params.logDirectory() + "/proof" 
 		+ _config.getJobStr() + "/clauseepochs." + std::to_string(_config.apprank);
-	_sharing_manager->writeClauseEpochs(_solver_interfaces[0]->getSolverSetup().proofDir, 
-		_solver_interfaces[0]->getGlobalId(), filename);
+	_sharing_manager->writeClauseEpochs(/*_solver_interfaces[0]->getSolverSetup().proofDir, 
+		_solver_interfaces[0]->getGlobalId(), */filename);
 }
 
 void SatEngine::cleanUp() {

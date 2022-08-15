@@ -92,7 +92,7 @@ public:
 	int getLastNumClausesToImport() const {return _last_num_cls_to_import;}
 	int getLastNumAdmittedClausesToImport() const {return _last_num_admitted_cls_to_import;}
 
-	void writeClauseEpochs(const std::string& proofDir, int firstGlobalId, 
+	void writeClauseEpochs(/*const std::string& proofDir, int firstGlobalId, */
 		const std::string& outputFilename);
 
 private:

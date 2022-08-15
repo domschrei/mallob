@@ -512,7 +512,7 @@ int SharingManager::getEpochOfAlignedSelfClause(unsigned long id) {
 	return std::distance(epochList.begin(), it);
 }
 
-void SharingManager::writeClauseEpochs(const std::string& proofDir, int firstGlobalId, 
+void SharingManager::writeClauseEpochs(/*const std::string& proofDir, int firstGlobalId, */
 		const std::string& outputFilename) {
 	
 	std::string tempFilename = outputFilename + "~";
