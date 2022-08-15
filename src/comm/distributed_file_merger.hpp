@@ -93,7 +93,7 @@ public:
     };
 
 private:
-    const static int FULL_CHUNK_SIZE_BYTES = 900000;
+    const static int FULL_CHUNK_SIZE_BYTES = 10'000'000;
     const static int HALF_CHUNK_SIZE_BYTES = FULL_CHUNK_SIZE_BYTES / 2;
 
     MPI_Comm _comm;
