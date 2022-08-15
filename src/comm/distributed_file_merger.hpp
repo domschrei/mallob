@@ -12,82 +12,64 @@
 #include "util/sys/timer.hpp"
 #include "util/bloom_filter.hpp"
 #include "app/sat/proof/lrat_line.hpp"
+#include "app/sat/proof/serialized_lrat_line.hpp"
 
 class DistributedFileMerger {
 
 public:
-    typedef std::function<std::optional<LratLine>()> LineSource;
+    typedef std::function<std::optional<SerializedLratLine>()> LineSource;
 
     struct MergeMessage : public Serializable {
+
         enum Type {REQUEST, RESPONSE_SUCCESS, RESPONSE_EXHAUSTED} type;
-        std::vector<LratLine> lines;
+        std::vector<SerializedLratLine> lines;
+
+        static Type getTypeOfMessage(const std::vector<uint8_t>& serializedMsg) {
+            Type type;
+            memcpy(&type, serializedMsg.data(), sizeof(Type));
+            return type;
+        }        
+
         virtual std::vector<uint8_t> serialize() const {
+
             std::vector<uint8_t> result;
             size_t i = 0, n;
+
             result.resize(sizeof(Type));
             n = sizeof(Type); memcpy(result.data()+i, &type, n); i += n;
-            for (auto& line : lines) {
-                result.resize(result.size() + line.size());
-                // ID
-                n = sizeof(unsigned long); memcpy(result.data()+i, &line.id, n); i += n;
-                // # literals
-                int numLits = line.literals.size();
-                n = sizeof(int); memcpy(result.data()+i, &numLits, n); i += n;
-                // literals
-                for (auto lit : line.literals) {
-                    n = sizeof(int); memcpy(result.data()+i, &lit, n); i += n;    
-                }
-                // # hints
-                int numHints = line.hints.size();
-                assert(numHints > 0 && numHints < 1000);
-                n = sizeof(int); memcpy(result.data()+i, &numHints, n); i += n;
-                // hints
-                for (size_t x = 0; x < line.hints.size(); x++) {
-                    auto hint = line.hints[x];
-                    n = sizeof(LratClauseId); memcpy(result.data()+i, &hint, n); i += n;
-                }
-                // signs of hints
-                for (size_t x = 0; x < line.hints.size(); x++) {
-                    auto sign = line.signsOfHints[x];
-                    n = sizeof(bool); memcpy(result.data()+i, &sign, n); i += n;
-                }
+
+            for (const auto& line : lines) {
+                result.insert(result.end(), line.data().begin(), line.data().end());
             }
+
             return result;
         }
+
         virtual Serializable& deserialize(const std::vector<uint8_t>& packed) {
+
             size_t i = 0, n;
             n = sizeof(Type); memcpy(&type, packed.data()+i, n); i += n;
-            while (i < packed.size()) {
-                LratLine line;
-                // ID
-                n = sizeof(unsigned long); memcpy(&line.id, packed.data()+i, n); i += n;
-                // # literals
-                int numLits;
-                n = sizeof(int); memcpy(&numLits, packed.data()+i, n); i += n;
-                assert(numLits >= 0 && numLits < 100);
-                // Literals
-                line.literals = std::vector<int>((int*) (packed.data()+i), 
-                    ((int*) (packed.data()+i)) + numLits);
-                assert(line.literals.size() == numLits);
-                i += sizeof(int) * numLits;
-                // # hints
-                int numHints;
-                n = sizeof(int); memcpy(&numHints, packed.data()+i, n); i += n;
-                assert(numHints > 0 && numHints < 1000 || log_return_false(
-                    "[ERROR] apparently, %i hints in this line... (ID %lu, %i literals)\n", 
-                    numHints, line.id, line.literals.size()));
-                // hints
-                line.hints = std::vector<LratClauseId>((LratClauseId*) (packed.data()+i), 
-                    ((LratClauseId*) (packed.data()+i)) + numHints);
-                assert(line.hints.size() == numHints);
-                i += sizeof(LratClauseId) * numHints;
-                line.signsOfHints = std::vector<bool>((bool*) (packed.data()+i), 
-                    ((bool*) (packed.data()+i) + numHints));
-                i += sizeof(bool) * numHints;
-                assert(line.signsOfHints.size() == numHints);
 
+            while (i < packed.size()) {
+
+                n = sizeof(int);
+                auto offsetNumLits = SerializedLratLine::getDataPosOfNumLits();
+                int numLits;
+                memcpy(&numLits, packed.data()+i+offsetNumLits, n);
+                auto offsetNumHints = SerializedLratLine::getDataPosOfNumHints(numLits);
+                int numHints;
+                memcpy(&numHints, packed.data()+i+offsetNumHints, n);
+
+                int lineSize = SerializedLratLine::getSize(numLits, numHints);
+                SerializedLratLine line(std::vector<uint8_t>(
+                    packed.data()+i,
+                    packed.data()+i+lineSize
+                ));
+
+                i += lineSize;
                 lines.push_back(std::move(line));
             }
+
             return *this;
         }
     };
@@ -107,7 +89,7 @@ private:
     class MergeChild {
     private:
         int rankWithinComm;
-        std::list<LratLine> buffer;
+        std::list<SerializedLratLine> buffer;
         std::atomic_int bufferSize = 0;
         bool exhausted = false;
         bool refillRequested = false;
@@ -124,15 +106,16 @@ private:
                 && bufferSize.load(std::memory_order_relaxed) < HALF_CHUNK_SIZE_BYTES; 
         }
 
-        void add(std::vector<LratLine>&& newLines) {
+        void add(std::vector<SerializedLratLine>&& newLines) {
             auto lock = bufferMutex.getLock();
+            int pos = 0;
             for (auto& line : newLines) {
-                buffer.push_back(line);
                 bufferSize += line.size();
+                buffer.push_back(std::move(line));
             }
             refillRequested = false;
         }
-        LratLine next() {
+        SerializedLratLine next() {
             assert(hasNext());
             auto lock = bufferMutex.getLock();
             auto line = std::move(buffer.front());
@@ -150,7 +133,7 @@ private:
     int _parent_rank = -1;
     bool _request_by_parent = false;
 
-    std::vector<LratLine> _output_buffer;
+    std::vector<SerializedLratLine> _output_buffer;
     Mutex _output_buffer_mutex;
     std::atomic_int _output_buffer_size = 0;
 
@@ -223,7 +206,8 @@ public:
 
         LOG(V3_VERB, "DFM Msg from [%i]\n", sourceWithinComm);
 
-        if (msg.type == MergeMessage::Type::REQUEST) {
+        auto type = msg.type;
+        if (type == MergeMessage::Type::REQUEST) {
             _request_by_parent = true;
             advance();
             return;
@@ -232,7 +216,7 @@ public:
         bool foundChild = false;
         for (auto& child : _children) if (child.getRankWithinComm() == sourceWithinComm) {
             child.add(std::move(msg.lines));
-            if (msg.type == MergeMessage::Type::RESPONSE_EXHAUSTED) {
+            if (type == MergeMessage::Type::RESPONSE_EXHAUSTED) {
                 child.conclude();
             }
             foundChild = true;
@@ -259,24 +243,25 @@ public:
             }
         }
 
+        MergeMessage msg;
+        auto writeOutputIntoMsg = [&]() {
+            auto lock = _output_buffer_mutex.getLock();
+            msg.lines = std::move(_output_buffer);
+            _output_buffer.clear();
+            _output_buffer_size.store(0, std::memory_order_relaxed);
+        };
+
         // Check if there is a refill request from the parent which can be fulfilled
         if (_request_by_parent) {
-            MergeMessage msg;
             msg.type = MergeMessage::Type::REQUEST;
             if (_output_buffer_size.load(std::memory_order_relaxed) >= HALF_CHUNK_SIZE_BYTES) {
                 // Transfer to parent
                 msg.type = MergeMessage::Type::RESPONSE_SUCCESS;
-                auto lock = _output_buffer_mutex.getLock();
-                msg.lines = std::move(_output_buffer);
-                _output_buffer.clear();
-                _output_buffer_size.store(0, std::memory_order_relaxed);
+                writeOutputIntoMsg();
             } else if (_all_sources_exhausted) {
                 // If all sources are exhausted, send the final buffer content and mark as exhausted
-                auto lock = _output_buffer_mutex.getLock();
-                msg.lines = std::move(_output_buffer);
-                _output_buffer.clear();
-                _output_buffer_size.store(0, std::memory_order_relaxed);
                 msg.type = MergeMessage::Type::RESPONSE_EXHAUSTED;
+                writeOutputIntoMsg();
             }
             if (msg.type != MergeMessage::Type::REQUEST) {
                 LOG(V3_VERB, "DFM Sending refill (%i lines) to [%i]\n", msg.lines.size(), _parent_rank);
@@ -305,7 +290,10 @@ public:
 
 private:
     void doMerging() {
-        std::vector<LratLine> merger(_children.size()+1);
+
+        std::vector<SerializedLratLine> merger(_children.size()+1);
+        std::vector<LratClauseId> hintsToDelete;
+
         while (true) {
             bool canMerge = true;
             
@@ -313,7 +301,7 @@ private:
             auto childIt = _children.begin();
             for (size_t i = 0; i < _children.size(); i++) {
 
-                if (merger[i].empty()) {
+                if (!merger[i].valid()) {
                     auto& child = *childIt;
                     if (child.hasNext()) {
                         merger[i] = child.next();
@@ -326,13 +314,13 @@ private:
                 ++childIt;
             }
 
-            if (merger.back().empty() && !_local_source_exhausted) {
+            if (!merger.back().valid() && !_local_source_exhausted) {
                 // Refill from local source
                 auto optLine = _local_source();
                 if (!optLine.has_value()) {
                     _local_source_exhausted = true;
                 } else {
-                    merger.back() = optLine.value();
+                    merger.back() = std::move(optLine.value());
                 }
             }
 
@@ -343,17 +331,18 @@ private:
             }
 
             // Find next line to output
-            size_t chosenSource;
-            LratLine chosenLine;
+            int chosenSource = -1;
+            LratClauseId chosenId;
             for (size_t i = 0; i < merger.size(); i++) {
-                if (merger[i].empty()) continue;
+                if (!merger[i].valid()) continue;
                 // Largest ID first!
-                if (chosenLine.empty() || merger[i].id > chosenLine.id) {
+                auto thisId = merger[i].getId();
+                if (chosenSource == -1 || thisId > chosenId) {
                     chosenSource = i;
-                    chosenLine = merger[i];
+                    chosenId = thisId;
                 }
             }
-            if (chosenLine.empty()) {
+            if (chosenSource == -1) {
                 // There's no line to output!
                 if (areInputsExhausted()) {
                     // Merge procedure is completely done here
@@ -362,9 +351,11 @@ private:
                 }
             } else {
                 // Line to output found
+                auto& chosenLine = merger[chosenSource];
                 if (MyMpi::rank(_comm) == 0) {
-                    std::vector<LratClauseId> hintsToDelete;
-                    for (auto hint : chosenLine.hints) {
+                    auto [ptr, numHints] = chosenLine.getUnsignedHints();
+                    for (size_t i = 0; i < numHints; i++) {
+                        auto hint = ptr[i];
                         if (hint > _num_original_clauses &&
                                 _output_id_filter->tryInsert(hint)) {
                             // Guarantee that ID was never output before.
@@ -372,11 +363,12 @@ private:
                             hintsToDelete.push_back(hint);
                         }
                     }
-                    if (!chosenLine.literals.empty() && !hintsToDelete.empty()) {
-                        std::string delLine = std::to_string(chosenLine.id) + " d";
+                    if (!hintsToDelete.empty()) {
+                        std::string delLine = std::to_string(chosenId) + " d";
                         for (auto hint : hintsToDelete) delLine += " " + std::to_string(hint);
                         delLine += " 0\n";
                         _output_filestream.write(delLine.c_str(), delLine.size());
+                        hintsToDelete.clear();
                     }
                     // Write into final file
                     std::string output = chosenLine.toStr();
@@ -387,9 +379,7 @@ private:
                     _output_buffer.push_back(chosenLine);
                     _output_buffer_size.fetch_add(chosenLine.size(), std::memory_order_relaxed);
                 }
-                merger[chosenSource].literals.clear();
-                merger[chosenSource].hints.clear();
-                merger[chosenSource].signsOfHints.clear();
+                merger[chosenSource].clear();
                 numOutputLines++;
             }
         }

@@ -141,9 +141,9 @@ void AnytimeSatClauseCommunicator::communicate() {
                     _merger_next_lines[nextPos].literals.clear();
                     _merger_next_lines[nextPos].hints.clear();
                     _merger_next_lines[nextPos].signsOfHints.clear();
-                    return std::optional<LratLine>(nextLine);
+                    return std::optional<SerializedLratLine>(nextLine);
                 } else {
-                    return std::optional<LratLine>();
+                    return std::optional<SerializedLratLine>();
                 }
             }, "final-proof-output.lrat", _proof_assembler->getNumOriginalClauses()));
 
