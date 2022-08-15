@@ -3,27 +3,21 @@
 
 #include <string>
 #include <vector>
-#include <stdio.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <sys/io.h>
-#include <sys/mman.h>
-#include <stdlib.h>
-#include <sstream>
+#include <fstream>
 
 #include "util/assert.hpp"
 #include "util/logger.hpp"
 #include "lrat_line.hpp"
 
+#define LRAT_LINE_SIZE_LIMIT 65536
+
 class ReverseLratParser {
 
 private:
-    int _fd;
-    long _file_size;
-    unsigned char* _mmap;
-    long _pos;
+    FILE* _tac_process;
+    char _buffer[LRAT_LINE_SIZE_LIMIT];
+    bool _process_done = false;
+    
     unsigned long _num_read_lines = 0;
 
     LratLine _line;
@@ -32,25 +26,11 @@ public:
     ReverseLratParser(const std::string& filename) {
 
         // Open file
-        _fd = open(filename.c_str(), O_RDONLY);
-
-        // Get file size
-        struct stat s;
-        int status = fstat(_fd, &s);
-        _file_size = s.st_size;
-
-        // Memory-map file, set position to last character
-        _mmap = (unsigned char*) mmap(0, _file_size, PROT_READ, MAP_PRIVATE, _fd, 0);
-        _pos = _file_size-1;
+        std::string cmd = "tac " + filename;
+        _tac_process = popen(cmd.c_str(), "r");
 
         // Parse first (last) line
-        skipToFinalLineBreak();
         readNextLine();
-    }
-
-    ~ReverseLratParser() {
-        munmap(_mmap, _file_size);
-        close(_fd);
     }
 
     bool hasNext() const {
@@ -77,44 +57,47 @@ public:
 
 private:
 
-    void skipToFinalLineBreak() {
-        while (_pos > 0 && _mmap[_pos] != '\n') --_pos;
+    std::string getNextLine() {
+
+        if (feof(_tac_process)) {
+            _process_done = true;
+            return "";
+        }
+        
+        // Try to refill buffer
+        if (fgets(_buffer, LRAT_LINE_SIZE_LIMIT, _tac_process) == NULL) return "";
+
+        // Read proper line from buffer
+        std::string line;
+        for (size_t i = 0; i < LRAT_LINE_SIZE_LIMIT; i++) {
+            if (_buffer[i] == '\n') break;
+            line += _buffer[i];
+        }
+
+        //LOG(V5_DEBG, "[LRAT] Line candidate: \"%s\"\n", 
+        //    line.c_str());
+        return line;
     }
 
     void readNextLine() {
 
         assert(!_line.valid());
 
-        while (_pos >= 0) {
+        while (!_process_done) {
             if (tryReadLine()) return;
         }
     }
 
     bool tryReadLine() {
 
-        // Skip over any line breaks
-        while (_pos >= 0 && (_mmap[_pos] == '\n' || _mmap[_pos] == '\r')) {
-            --_pos;
-        }
+        std::string line = getNextLine();
+        if (line.empty()) return false;
 
-        // Find the next line by seeking back to the previous line break
-        auto lineSeekIdx = _pos;
-        while (true) {
-            if (lineSeekIdx == -1 || _mmap[lineSeekIdx] == '\n' || _mmap[lineSeekIdx] == '\r') {
-                // End of the previous line (or beginning of the file)
-                // This line begins *after* this index
-                lineSeekIdx++;
-                break;
-            }
-            lineSeekIdx--;
-        }
-
-        std::string lineStr(_mmap+lineSeekIdx, _mmap+_pos+1);
-        LOG(V5_DEBG, "[LRAT] Found line: \"%s\"\n", lineStr.c_str());
+        LOG(V5_DEBG, "[LRAT] Found line: \"%s\"\n", line.c_str());
         
         // Now our line sits at _mmap[lineSeekIdx] through _mmap[_pos] (inclusive).
         bool success;
-        _line = LratLine((const char*) (_mmap+lineSeekIdx), _pos-lineSeekIdx+1, success);
+        _line = LratLine(line.c_str(), line.size(), success);
         if (_line.id == -1)
             LOG(V5_DEBG, "[LRAT] Interpreted line: (skipped)\n");
         else {
@@ -125,11 +108,6 @@ private:
             LOG(V5_DEBG, "[LRAT] Interpreted line: id=%ld lits=(%s) hints=(%s)\n", 
                 _line.id, lits.c_str(), hints.c_str());
         }
-
-        // Set new position to the index *before* the line just read
-        _pos = lineSeekIdx-1;
-        _num_read_lines++;
-
         return success;
     }
 };
