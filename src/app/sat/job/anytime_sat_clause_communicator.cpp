@@ -57,9 +57,9 @@ void AnytimeSatClauseCommunicator::communicate() {
 
     if (!_sent_ready_msg && _job->isInitialized()) {
         int numExpectedReadyMsgs = 0;
-        if (2*_job->getMyMpiRank()+1 < _job->getGlobalNumWorkers()) 
+        if (2*_job->getIndex()+1 < _job->getGlobalNumWorkers()) 
             numExpectedReadyMsgs++;
-        if (2*_job->getMyMpiRank()+2 < _job->getGlobalNumWorkers()) 
+        if (2*_job->getIndex()+2 < _job->getGlobalNumWorkers()) 
             numExpectedReadyMsgs++;
 
         if (numExpectedReadyMsgs == _num_ready_msgs_from_children) {
