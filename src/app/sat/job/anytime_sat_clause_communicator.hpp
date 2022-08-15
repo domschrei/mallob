@@ -96,6 +96,7 @@ private:
 
                     unsigned long maxMinEpochId;
                     if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+                        assert(filter.size() >= 2);
                         maxMinEpochId = metadata::readUnsignedLong(filter.data());
                     }
 
@@ -104,6 +105,7 @@ private:
                             filter.resize(elem.size());
 
                         if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+                            assert(elem.size() >= 2);
                             unsigned long minEpochId = metadata::readUnsignedLong(elem.data());
                             maxMinEpochId = std::max(maxMinEpochId, minEpochId);
                         }

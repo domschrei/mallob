@@ -254,7 +254,7 @@ bool ForkedSatJob::hasFilteredSharing() {
     return _solver->hasFilteredClauses();
 }
 std::vector<int> ForkedSatJob::getLocalFilter() {
-    if (!_initialized) return std::vector<int>();
+    if (!_initialized) return std::vector<int>(MALLOB_CLAUSE_METADATA_SIZE == 2 ? 2 : 0, 0);
     return _solver->getLocalFilter();
 }
 void ForkedSatJob::applyFilter(std::vector<int>& filter) {

@@ -245,7 +245,11 @@ void AnytimeSatClauseCommunicator::communicate() {
     // Supply calculated local filter to the 2nd all-reduction
     if (!session._allreduce_filter.hasProducer() && _job->hasFilteredSharing()) {
         LOG(V4_VVER, "%s CS produce filter\n", _job->toStr());
-        session._allreduce_filter.produce([&]() {return _job->getLocalFilter();});
+        session._allreduce_filter.produce([&]() {
+            auto elem = _job->getLocalFilter();
+            assert(elem.size() >= 2);
+            return elem;
+        });
     } 
 
     // Advance all-reduction of filter
