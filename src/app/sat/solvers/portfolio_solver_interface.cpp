@@ -66,6 +66,7 @@ void PortfolioSolverInterface::resume() {
 }
 void PortfolioSolverInterface::setTerminate() {
 	_terminated = true;
+	interrupt();
 }
 
 void PortfolioSolverInterface::setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback) {

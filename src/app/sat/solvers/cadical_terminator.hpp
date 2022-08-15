@@ -14,12 +14,15 @@ struct HordeTerminator : public CaDiCaL::Terminator {
     ~HordeTerminator() override {}
 
     bool terminate() override {
+
+        _is_in_callback = true;
         double time = Timer::elapsedSeconds();
         double elapsed = time - _lastTermCallbackTime;
         _lastTermCallbackTime = time;
 
         if (_stop) {
             LOGGER(_logger, V3_VERB, "STOP (%.2fs since last cb)\n", elapsed);
+            _is_in_callback = false;
             return true;
         }
 
@@ -32,9 +35,11 @@ struct HordeTerminator : public CaDiCaL::Terminator {
 
             if (_stop) {
                 LOGGER(_logger, V4_VVER, "STOP after suspension\n", elapsed);
+                _is_in_callback = false;
                 return true;
             }
         }
+        _is_in_callback = false;
         return false;
     }
 
@@ -48,8 +53,14 @@ struct HordeTerminator : public CaDiCaL::Terminator {
         _suspend = true;
     }
     void unsetSuspend() {
-        _suspend = false;
+        {
+            auto lock = _suspendMutex.getLock();
+            _suspend = false;
+        }
         _suspendCond.notify();
+    }
+    bool isThreadInCallback() const {
+        return _is_in_callback;
     }
 
 private:
@@ -58,6 +69,7 @@ private:
 
     int _stop = 0;
     volatile bool _suspend = false;
+    volatile bool _is_in_callback = false;
 
     Mutex _suspendMutex;
     ConditionVariable _suspendCond;

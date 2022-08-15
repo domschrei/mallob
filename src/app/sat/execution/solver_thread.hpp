@@ -81,7 +81,10 @@ public:
     }
     void setTerminate() {
         _solver.setTerminate();
-        _terminated = true;
+        {
+            auto lock = _state_mutex.getLock();
+            _terminated = true;
+        }
         _state_cond.notify();
     }
     void tryJoin() {if (_thread.joinable()) _thread.join();}

@@ -512,9 +512,10 @@ int SharingManager::getEpochOfAlignedSelfClause(unsigned long id) {
 	return std::distance(epochList.begin(), it);
 }
 
-void SharingManager::writeClauseEpochs(const std::string& filename) {
+void SharingManager::writeClauseEpochs(const std::string& proofDir, int firstGlobalId, 
+		const std::string& outputFilename) {
 	
-	std::string tempFilename = filename + "~";
+	std::string tempFilename = outputFilename + "~";
 	std::ofstream ofs(tempFilename);
 	ofs << _num_original_clauses << "\n";
 
@@ -522,73 +523,75 @@ void SharingManager::writeClauseEpochs(const std::string& filename) {
 
 		// Check if all necessary entries for this epoch are present
 		if ([&]() {
-			for (size_t i = 0; i < _solvers.size(); i++)
+			for (size_t i = 0; i < _id_offsets_per_solver.size(); i++)
 				if (epoch >= _min_epoch_ids_per_solver[i].size() || epoch >= _id_offsets_per_solver[i].size())
 					return true; // cancel writing
 			return false; // continue writing
 		}()) break;
 
 		ofs << epoch << " " << _global_epoch_ids[epoch];
-		for (size_t i = 0; i < _solvers.size(); i++) {
+		for (size_t i = 0; i < _id_offsets_per_solver.size(); i++) {
 			ofs << " " << _min_epoch_ids_per_solver[i][epoch];
 			ofs << " " << _id_offsets_per_solver[i][epoch];
 		}
 		ofs << "\n";
 	}
 
-	for (size_t i = 0; i < _solvers.size(); i++) {
+	/*
+	// Wait until all proof files are written sufficiently
+	for (size_t i = 0; i < _id_offsets_per_solver.size(); i++) {
 
 		auto lastRelevantId = _last_exported_clause_id[i]->load(std::memory_order_relaxed);
 		if (lastRelevantId <= _num_original_clauses) continue;
 
-		std::string proofFilename = _solvers[i]->getSolverSetup().proofDir + "/proof." 
-				+ std::to_string(_solvers[i]->getGlobalId()+1) + ".frat";
+		std::string proofFilename = proofDir + "/proof." 
+				+ std::to_string(firstGlobalId+i+1) + ".frat";
 
 		// Wait until the solver's proof file has been written up to this clause ID
 		while (true) {
 
-			std::ifstream proofFile(proofFilename, std::ios::ate);
-			assert(proofFile.is_open());
-			unsigned long size = proofFile.tellg();
+			// Open process which yields the last two lines of the proof file
+			std::string cmd = "tail -2 " + proofFilename;
+			FILE* tailProcess = popen(cmd.c_str(), "r");
+			char lineBuffer[65536];
+			bool doneWaiting = false;
 
-			size_t x = 1;
-			char c;
-			bool linebreakFound = false;
-			while (x <= size) {
-				proofFile.seekg(size-x, std::ios_base::beg);
-				proofFile.get(c);
-				x++;
-
-				if (c == '\n') {
-					if (!linebreakFound) linebreakFound = true;
-				}
-				if (linebreakFound && c == 'a') break;
-			}
-
-			if (x < size) {
-				// Stream now points to the first character of the file's last completely written line
-				while (c == 'a' || c == ' ') proofFile.get(c);
+			// Read output from process
+			while (!feof(tailProcess)) {
+				// Try to parse next line
+				if (fgets(lineBuffer, 65536, tailProcess) == NULL) continue;
 				unsigned long writtenId = 0;
-				while (c != ' ') {
-					assert(c >= '0' && c <= '9' || log_return_false("[ERROR] Unexpected character \"%c\" (code: %i)!\n", c, c));
-					writtenId = writtenId*10 + (c-'0');
-					proofFile.get(c);
+				for (size_t i = 0; i < 65536; i++) {
+					auto c = lineBuffer[i];
+					if (c == '\n') break; // end of line
+					if (c == ' ') {
+						if (writtenId != 0) break; // ID read completely
+						continue; // no ID read yet
+					}
+					if (c >= '0' && c <= '9') {
+						// continue to parse ID
+						writtenId = writtenId*10 + (c-'0');
+					}
 				}
-				if (writtenId >= lastRelevantId) {
-					// Done!
-					LOG(V2_INFO, "Proof \"%s\" now contains ID %lu\n", proofFilename.c_str(), lastRelevantId);
-					break;
-				} else {
-					LOG(V2_INFO, "Still waiting for proof \"%s\" to contain ID %lu (currently at %lu)\n", 
-						proofFilename.c_str(), lastRelevantId, writtenId);
-				}
+				LOG(V2_INFO, "Proof \"%s\" : ID %lu found\n", proofFilename.c_str(), writtenId);
+				if (writtenId < lastRelevantId) continue;
+				// Done!
+				doneWaiting = true;
+			}
+			if (doneWaiting) {
+				LOG(V2_INFO, "Proof \"%s\" now contains ID %lu\n", proofFilename.c_str(), lastRelevantId);
+				break;
 			}
 
+			LOG(V2_INFO, "Still waiting for proof \"%s\" to contain ID %lu\n", 
+				proofFilename.c_str(), lastRelevantId);
 			usleep(1000 * 200); // wait 0.2s
 		}
 	}
+	*/
 
-	std::rename(tempFilename.c_str(), filename.c_str());
+	LOG(V2_INFO, "renaming clause epochs file ...\n");
+	std::rename(tempFilename.c_str(), outputFilename.c_str());
 	LOG(V2_INFO, "wrote clause epochs file for distributed proof assembly\n");
 }
 

@@ -342,8 +342,6 @@ void SatEngine::dumpStats(bool final) {
 		// Flush logs
 		for (auto& solver : _solver_interfaces) solver->getLogger().flush();
 		_logger.flush();
-
-		if (MALLOB_CLAUSE_METADATA_SIZE == 2) writeClauseEpochs();
 	}
 }
 
@@ -358,13 +356,11 @@ void SatEngine::unsetPaused() {
 }
 
 void SatEngine::terminateSolvers() {
-	if (_state != ABORTING) {
-		dumpStats(/*final=*/true);
-		for (auto& solver : _solver_threads) {
-			solver->setSuspend(false);
-			solver->setTerminate();
-		}
+	for (auto& solver : _solver_threads) {
+		solver->setSuspend(false);
+		solver->setTerminate();
 	}
+	dumpStats(/*final=*/true);
 }
 
 std::pair<int, int> SatEngine::getLastAdmittedClauseShare() {
@@ -377,7 +373,8 @@ std::pair<int, int> SatEngine::getLastAdmittedClauseShare() {
 void SatEngine::writeClauseEpochs() {
 	std::string filename = _params.logDirectory() + "/proof" 
 		+ _config.getJobStr() + "/clauseepochs." + std::to_string(_config.apprank);
-	_sharing_manager->writeClauseEpochs(filename);
+	_sharing_manager->writeClauseEpochs(_solver_interfaces[0]->getSolverSetup().proofDir, 
+		_solver_interfaces[0]->getGlobalId(), filename);
 }
 
 void SatEngine::cleanUp() {
@@ -403,6 +400,8 @@ void SatEngine::cleanUp() {
 	time = Timer::elapsedSeconds() - time;
 	LOGGER(_logger, V4_VVER, "[engine-cleanup] done, took %.3f s\n", time);
 	_logger.flush();
+
+	if (MALLOB_CLAUSE_METADATA_SIZE == 2) writeClauseEpochs();
 
 	_cleaned_up = true;
 }

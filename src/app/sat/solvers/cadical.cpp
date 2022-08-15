@@ -150,6 +150,14 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 
 	// start solving
 	int res = solver->solve();
+
+	// Flush solver logs
+	_logger.flush();
+	if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+		solver->flush_proof_trace ();
+		solver->close_proof_trace ();
+	}
+
 	switch (res) {
 	case 0:
 		return UNKNOWN;
