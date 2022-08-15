@@ -82,9 +82,10 @@ struct LratLine {
                     beganNum = true;
                     break;
                 default:
-                    LOG(V0_CRIT, "[ERROR] Unexpected character \"%c\" (code: %i) in LRAT file!\n", 
+                    LOG(V0_CRIT, "[WARN] Unexpected character \"%c\" (code: %i) in LRAT file!\n", 
                         string[i], string[i]);
-                    abort();
+                    cancel = true;
+                    break;
             }
             if (cancel) {
                 id = -1;
