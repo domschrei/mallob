@@ -313,7 +313,8 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
             // Pretend that it sent an empty filter
             msg.tag = MSG_ALLREDUCE_FILTER;
             mpiTag = MSG_JOB_TREE_REDUCTION;
-            msg.payload.clear();
+            msg.payload.resize(MALLOB_CLAUSE_METADATA_SIZE==2 ? 2 : 0);
+            for (int& num : msg.payload) num = 0;
         } else return;
     }
 

@@ -287,6 +287,7 @@ std::vector<int> SatProcessAdapter::getLocalFilter() {
     filter.resize(_hsm->filterSize);
     memcpy(filter.data(), _filter_buffer, _hsm->filterSize*sizeof(int));
     _hsm->doFilterImport = false;
+    assert(filter.size() >= 2);
     return filter;
 }
 
