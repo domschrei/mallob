@@ -67,6 +67,13 @@ void AnytimeSatClauseCommunicator::communicate() {
             if (!_job->getJobTree().isRoot()) {
                 JobMessage msg(_job->getId(), _job->getRevision(), 0, MSG_NOTIFY_READY_FOR_PROOF_SAFE_SHARING);
                 MyMpi::isend(_job->getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+            } else {
+                if (!_proof_assembler.has_value() && !_msg_unsat_found.payload.empty()) {
+                    // A solver has already found UNSAT which was deferred then.
+                    // Now the message can be processed properly
+                    LOG(V2_INFO, "Now processing deferred UNSAT notification\n");
+                    MyMpi::isend(_job->getMyMpiRank(), MSG_SEND_APPLICATION_MESSAGE, _msg_unsat_found);
+                }
             }
         }
     }
@@ -343,6 +350,13 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
     if (msg.tag == MSG_NOTIFY_UNSAT_FOUND) {
         assert(_job->getJobTree().isRoot());
         
+        if (!_sent_ready_msg) {
+            // Job is not ready yet to reconstruct proofs.
+            LOG(V2_INFO, "Deferring UNSAT notification since job is not yet ready\n");
+            _msg_unsat_found = std::move(msg);
+            return;
+        }
+
         if (_proof_assembler.has_value()) {
             // Obsolete message
             LOG(V2_INFO, "Obsolete UNSAT notification - already assembling a proof\n");
