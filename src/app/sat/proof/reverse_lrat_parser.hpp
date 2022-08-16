@@ -69,10 +69,15 @@ private:
 
         // Read proper line from buffer
         std::string line;
+        bool foundLinebreak = false;
         for (size_t i = 0; i < LRAT_LINE_SIZE_LIMIT; i++) {
-            if (_buffer[i] == '\n') break;
+            if (_buffer[i] == '\n') {
+                foundLinebreak = true;
+                break;
+            }
             line += _buffer[i];
         }
+        assert(foundLinebreak);
 
         //LOG(V5_DEBG, "[LRAT] Line candidate: \"%s\"\n", 
         //    line.c_str());
@@ -95,10 +100,10 @@ private:
 
         LOG(V5_DEBG, "[LRAT] Found line: \"%s\"\n", line.c_str());
         
-        // Now our line sits at _mmap[lineSeekIdx] through _mmap[_pos] (inclusive).
         bool success;
         _line = LratLine(line.c_str(), line.size(), success);
-        if (_line.id == -1)
+        /*
+        if (!success || _line.id == -1)
             LOG(V5_DEBG, "[LRAT] Interpreted line: (skipped)\n");
         else {
             std::string lits;
@@ -108,6 +113,7 @@ private:
             LOG(V5_DEBG, "[LRAT] Interpreted line: id=%ld lits=(%s) hints=(%s)\n", 
                 _line.id, lits.c_str(), hints.c_str());
         }
+        */
         return success;
     }
 };

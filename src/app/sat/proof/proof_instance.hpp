@@ -117,6 +117,7 @@ private:
         while (_current_line.valid()) {
 
             assert(!_current_line.hints.empty());
+            for (auto& hint : _current_line.hints) assert(hint < 1000000000000000000UL);
             auto unalignedId = _current_line.id;
             if (!_current_line_aligned) {
                 alignSelfProducedClauseIds(_current_line, /*assertSelfProduced=*/true);
@@ -153,13 +154,16 @@ private:
 
                 // Traverse clause hints
                 for (auto hintId : _current_line.hints) {
+                    assert(hintId < 1000000000000000000UL);
                     if (isSelfProducedClause(hintId)) {
                         _frontier.push(hintId);
                     } else if (!isOriginalClause(hintId)) {
                         int hintEpoch = getClauseEpoch(hintId);
-                        assert(hintEpoch < epoch || log_return_false(
-                            "[ERROR] Found ext. hint %ld from epoch %i for clause %ld from epoch %i!\n", 
-                            hintId, hintEpoch, id, epoch));
+                        if (hintEpoch >= epoch) {
+                            LOG(V0_CRIT, "[ERROR] Found ext. hint %ld from epoch %i for clause %ld from epoch %i!\n", 
+                                hintId, hintEpoch, id, epoch);
+                            LOG(V0_CRIT, "[ERROR] Concerned line: %s\n", _current_line.toStr().c_str());
+                        }
                         _backlog.push(hintId);
                     }
                 }
@@ -249,11 +253,6 @@ private:
     bool isSelfProducedClause(LratClauseId clauseId) {
         if (isOriginalClause(clauseId)) return false;
         return _instance_id == (clauseId-_original_num_clauses-1) % _num_instances;
-    }
-    LratClauseId convertSelfProducedClauseId(LratClauseId clauseId) {
-        int epoch = _current_epoch;
-        while (clauseId < _local_epoch_starts[epoch]) --epoch;
-        return clauseId + _local_epoch_offsets[epoch];
     }
     
     int getUnalignedClauseEpoch(LratClauseId clauseId) {
