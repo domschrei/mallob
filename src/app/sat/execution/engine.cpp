@@ -92,7 +92,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.solverRevision = 0;
 	setup.minNumChunksPerSolver = params.minNumChunksForImportPerSolver();
 	setup.numBufferedClsGenerations = params.bufferedImportedClsGenerations();
-	setup.skipClauseSharingDiagonally = true;
+	setup.skipClauseSharingDiagonally = params.skipClauseSharingDiagonally();
 	setup.certifiedUnsat = params.certifiedUnsat();
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numOriginalClauses = numClauses;

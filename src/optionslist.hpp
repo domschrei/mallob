@@ -40,6 +40,7 @@ OPT_BOOL(reactivationScheduling,         "rs", "use-reactivation-scheduling",   
 OPT_BOOL(regularProcessDistribution,     "rpa", "regular-process-allocation",         false,                   "Signal that processes have been allocated regularly, i.e., the i-th machine hosts ranks c*i through c*i + c-1")
 OPT_BOOL(reshareImprovedLbd,             "ril", "reshare-improved-lbd",               false,                   "Reshare clauses (regardless of their last sharing epoch) if their LBD improved")
 OPT_BOOL(shuffleJobDescriptions,         "sjd", "shuffle-job-descriptions",           false,                   "Shuffle job descriptions given via -job-desc-template option")
+OPT_BOOL(skipClauseSharingDiagonally,    "scsd", "skip-clause-sharing-diagonally",    true,                    "In the ith diversification round, disable clause sharing for the (i%%numDivs)th solver")
 OPT_BOOL(useChecksums,                   "checksums", "",                             false,                   "Compute and verify checksum for every job description transfer")
 OPT_BOOL(watchdog,                       "watchdog", "",                              true,                    "Employ watchdog threads to detect unresponsive program flow")
 OPT_BOOL(warmup,                         "warmup", "",                                false,                   "Do one explicit All-To-All warmup among all nodes in the beginning")
@@ -78,6 +79,7 @@ OPT_INT(seed,                            "seed", "",                            
 OPT_INT(sleepMicrosecs,                  "sleep", "",                                 100,  0, LARGE_INT,      "Sleep this many microseconds between loop cycles of worker main thread")
 OPT_INT(strictClauseLengthLimit,         "scll", "strict-clause-length-limit",        30,   0, LARGE_INT,      "Only clauses up to this length will be shared")
 OPT_INT(strictLbdLimit,                  "slbdl", "strict-lbd-limit",                 30,   0, LARGE_INT,      "Only clauses with an LBD score up to this value will be shared")
+OPT_INT(stxxlDiskSizeGbs,                "stxxl-disk-size-gbs", "",                   1,    0, LARGE_INT,      "Disk size (in GB) for STXXL per MPI process")
 OPT_INT(verbosity,                       "v", "verbosity",                            2,    0, 6,              "Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB 5=DEBG")
 OPT_INT(numWorkers,                      "w", "workers",                              -1,   -1, LARGE_INT,     "Number of worker PEs to initialize (beginning from rank #0), -1: all PEs are workers")
 OPT_INT(watchdogAbortMillis,             "wam", "watchdog-abort-millis",              10000, 1, MAX_INT,       "Interval (in milliseconds) after which an un-reset watchdog in a worker's main thread will invoke a crash")
@@ -107,6 +109,7 @@ OPT_STRING(logDirectory,                 "log", "log-directory",                
 OPT_STRING(monoFilename,                 "mono", "",                                  "",                      "Mono instance: Solve the provided CNF instance with full power, then exit")
 OPT_STRING(satSolverSequence,            "satsolver",  "",                            "L",                     "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
 OPT_STRING(solutionToFile,               "s2f", "solution-to-file",                   "",                      "Write solutions to file with provided base name + job ID")
+OPT_STRING(stxxlDiskDirectory,           "stxxl-disk-dir", "",                        ".",                     "Directory where to create STXXL external memory files")
 OPT_STRING(subprocessPrefix,             "subproc-prefix", "",                        "",                      "Execute SAT subprocess with this prefix (e.g., \"valgrind\")")
 OPT_STRING(traceDirectory,               "trace-dir", "",                             ".",                     "Directory to write thread trace files to")
 

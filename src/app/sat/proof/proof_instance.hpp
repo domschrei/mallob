@@ -163,6 +163,8 @@ private:
                             LOG(V0_CRIT, "[ERROR] Found ext. hint %ld from epoch %i for clause %ld from epoch %i!\n", 
                                 hintId, hintEpoch, id, epoch);
                             LOG(V0_CRIT, "[ERROR] Concerned line: %s\n", _current_line.toStr().c_str());
+                            _output.flush();
+                            abort();
                         }
                         _backlog.push(hintId);
                     }

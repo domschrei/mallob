@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
 
     longStartupWarnMsg(rank, "Init'd message queue");
 
-    mallob_stxxl::init(rank);
+    mallob_stxxl::init(rank, params.stxxlDiskDirectory(), params.stxxlDiskSizeGbs());
 
     longStartupWarnMsg(rank, "Init'd STXXL");
 
