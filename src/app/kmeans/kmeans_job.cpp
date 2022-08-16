@@ -503,20 +503,20 @@ void KMeansJob::countMembers() {
         myIndex, dataToString(localSumMembers).c_str());
 }
 
-float KMeansJob::calculateDifference(std::function<float(const float*, Point&)> metric) {
-    if (iterationsDone == 0) {
-        return std::numeric_limits<float>::infinity();
-    }
-    float sumOldvec = 0.0;
-    float sumDifference = 0.0;
-    Point v0(dimension, 0);
-    for (int k = 0; k < countClusters; ++k) {
-        sumOldvec += metric(v0.data(), clusterCenters[k]);
-
-        sumDifference += metric(clusterCenters[k].data(), oldClusterCenters[k]);
-    }
-    return sumDifference / sumOldvec;
-}
+//float KMeansJob::calculateDifference(std::function<float(const float*, Point&)> metric) {
+//    if (iterationsDone == 0) {
+//        return std::numeric_limits<float>::infinity();
+//    }
+//    float sumOldvec = 0.0;
+//    float sumDifference = 0.0;
+//    Point v0(dimension, 0);
+//    for (int k = 0; k < countClusters; ++k) {
+//        sumOldvec += metric(v0.data(), clusterCenters[k]);
+//
+//        sumDifference += metric(clusterCenters[k].data(), oldClusterCenters[k]);
+//    }
+//    return sumDifference / sumOldvec;
+//}
 
 bool KMeansJob::centersChanged() {
     if (iterationsDone == 0) {
@@ -539,9 +539,9 @@ bool KMeansJob::centersChanged(std::function<float(const float*, Point&)> metric
     for (int k = 0; k < countClusters; ++k) {
         for (int d = 0; d < dimension; ++d) {
             float distance = fabs(clusterCenters[k][d] - oldClusterCenters[k][d]);
-            float f = factor * (fabs(clusterCenters[k][d] + oldClusterCenters[k][d]) / 2);
-            if (distance > f) {
-                LOG(V3_VERB, "                           Dist: %f f: %f\n", distance, f );
+            float upperBoundDistance = factor * (fabs(clusterCenters[k][d] + oldClusterCenters[k][d]) / 2);
+            if (distance > upperBoundDistance) {
+                LOG(V3_VERB, "                           Dist: %f upperBoundDistance: %f\n", distance, upperBoundDistance );
                 return true;
             }
         }
