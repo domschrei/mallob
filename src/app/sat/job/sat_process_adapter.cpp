@@ -58,7 +58,7 @@ void SatProcessAdapter::doWriteRevisions() {
         _bg_writer_running = false;
     };
 
-    if (!_initialized || !_revisions_mutex.tryLock()) return;
+    if (!_initialized || _hsm->doTerminate || !_revisions_mutex.tryLock()) return;
     if (!_bg_writer_running) {
         if (_bg_writer.valid()) _bg_writer.get();
         _bg_writer = ProcessWideThreadPool::get().addTask(task);

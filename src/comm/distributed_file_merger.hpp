@@ -141,6 +141,8 @@ private:
     std::string _output_filename;
     std::ofstream _output_filestream;
     std::unique_ptr<BloomFilter<unsigned long>> _output_id_filter;
+    std::future<void> _fut_root_prepare;
+    bool _root_prepared = false;
 
     size_t numOutputLines = 0;
     float lastOutputReport = 0;
@@ -171,20 +173,31 @@ public:
         }
 
         if (myRank == 0) {
-            // Create final output file
-            _output_filename = outputFileAtZero;
-            std::string reverseFilename = "_inv_" + _output_filename;
-            LOG(V3_VERB, "DFM Opening output file \"%s\"\n", reverseFilename.c_str());
-            _output_filestream = std::ofstream(reverseFilename);
-            // TODO choose size relative to proof size
-            _output_id_filter.reset(new BloomFilter<unsigned long>(26843543, 4)); 
+            _fut_root_prepare = ProcessWideThreadPool::get().addTask([&, outputFileAtZero]() {
+                // Create final output file
+                _output_filename = outputFileAtZero;
+                std::string reverseFilename = "_inv_" + _output_filename;
+                LOG(V3_VERB, "DFM Opening output file \"%s\"\n", reverseFilename.c_str());
+                _output_filestream = std::ofstream(reverseFilename);
+                // TODO choose size relative to proof size
+                _output_id_filter.reset(new BloomFilter<unsigned long>(26843543, 4));
+                _root_prepared = true;
+            });
+        } else {
+            MPI_Ibarrier(_comm, &_barrier_request);
         }
-
-        MPI_Ibarrier(_comm, &_barrier_request);
     }
 
     bool readyToMerge() {
         if (_began_merging) return false;
+        if (MyMpi::rank(_comm) == 0) {
+            if (!_root_prepared) return false;
+            if (_fut_root_prepare.valid()) {
+                // Root has been prepared for merging
+                _fut_root_prepare.get();
+                MPI_Ibarrier(_comm, &_barrier_request);
+            } // else: root was already prepared
+        }
         int flag;
         MPI_Test(&_barrier_request, &flag, MPI_STATUS_IGNORE);
         return flag;
