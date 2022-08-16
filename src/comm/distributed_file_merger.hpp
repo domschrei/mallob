@@ -75,7 +75,7 @@ public:
     };
 
 private:
-    const static int FULL_CHUNK_SIZE_BYTES = 10'000'000;
+    const static int FULL_CHUNK_SIZE_BYTES = 950'000;
     const static int HALF_CHUNK_SIZE_BYTES = FULL_CHUNK_SIZE_BYTES / 2;
 
     MPI_Comm _comm;
@@ -254,7 +254,7 @@ public:
         // Check if there is a refill request from the parent which can be fulfilled
         if (_request_by_parent) {
             msg.type = MergeMessage::Type::REQUEST;
-            if (_output_buffer_size.load(std::memory_order_relaxed) >= HALF_CHUNK_SIZE_BYTES) {
+            if (_output_buffer_size.load(std::memory_order_relaxed) >= 1000) {
                 // Transfer to parent
                 msg.type = MergeMessage::Type::RESPONSE_SUCCESS;
                 writeOutputIntoMsg();
