@@ -465,7 +465,6 @@ void KMeansJob::calcCurrentClusterCenters() {
                 localClusterCenters[clusterMembership[pointID]][d] +=
                     getKMeansData(pointID)[d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]);
             }
-            //}
         }
     }
     ++iterationsDone;
@@ -503,20 +502,20 @@ void KMeansJob::countMembers() {
         myIndex, dataToString(localSumMembers).c_str());
 }
 
-float KMeansJob::calculateDifference(std::function<float(const float*, Point&)> metric) {
-    if (iterationsDone == 0) {
-        return std::numeric_limits<float>::infinity();
-    }
-    float sumOldvec = 0.0;
-    float sumDifference = 0.0;
-    Point v0(dimension, 0);
-    for (int k = 0; k < countClusters; ++k) {
-        sumOldvec += metric(v0.data(), clusterCenters[k]);
-
-        sumDifference += metric(clusterCenters[k].data(), oldClusterCenters[k]);
-    }
-    return sumDifference / sumOldvec;
-}
+// float KMeansJob::calculateDifference(std::function<float(const float*, Point&)> metric) {
+//     if (iterationsDone == 0) {
+//         return std::numeric_limits<float>::infinity();
+//     }
+//     float sumOldvec = 0.0;
+//     float sumDifference = 0.0;
+//     Point v0(dimension, 0);
+//     for (int k = 0; k < countClusters; ++k) {
+//         sumOldvec += metric(v0.data(), clusterCenters[k]);
+//
+//         sumDifference += metric(clusterCenters[k].data(), oldClusterCenters[k]);
+//     }
+//     return sumDifference / sumOldvec;
+// }
 
 bool KMeansJob::centersChanged() {
     if (iterationsDone == 0) {
@@ -539,9 +538,9 @@ bool KMeansJob::centersChanged(std::function<float(const float*, Point&)> metric
     for (int k = 0; k < countClusters; ++k) {
         for (int d = 0; d < dimension; ++d) {
             float distance = fabs(clusterCenters[k][d] - oldClusterCenters[k][d]);
-            float f = factor * (fabs(clusterCenters[k][d] + oldClusterCenters[k][d]) / 2);
-            if (distance > f) {
-                LOG(V3_VERB, "                           Dist: %f f: %f\n", distance, f );
+            float upperBoundDistance = factor * (fabs(clusterCenters[k][d] + oldClusterCenters[k][d]) / 2);
+            if (distance > upperBoundDistance) {
+                LOG(V3_VERB, "                           Dist: %f upperBoundDistance: %f\n", distance, upperBoundDistance);
                 return true;
             }
         }
@@ -551,6 +550,7 @@ bool KMeansJob::centersChanged(std::function<float(const float*, Point&)> metric
 
 std::vector<float> KMeansJob::clusterCentersToSolution() {
     std::vector<float> result;
+    result.reserve(countClusters*dimension+2);
     result.push_back((float)countClusters);
     result.push_back((float)dimension);
 
@@ -564,10 +564,12 @@ std::vector<float> KMeansJob::clusterCentersToSolution() {
 
 std::vector<int> KMeansJob::clusterCentersToBroadcast(const std::vector<Point>& reduceClusterCenters) {
     std::vector<int> result;
+    result.resize(reduceClusterCenters.size() * dimension);
+    int i = 0;
     for (auto point : reduceClusterCenters) {
         auto centerData = point.data();
         for (int entry = 0; entry < dimension; ++entry) {
-            result.push_back(*((int*)(centerData + entry)));
+            result[i++]=(*((int*)(centerData + entry)));
         }
     }
     // LOG(V3_VERB, "                           reduce in clusterCentersToBroadcast: \n%s\n",
@@ -600,11 +602,13 @@ std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(const std::ve
 std::vector<int> KMeansJob::clusterCentersToReduce(const std::vector<int>& reduceSumMembers, const std::vector<Point>& reduceClusterCenters) {
     std::vector<int> result;
     std::vector<int> tempCenters;
+    int i = 0;
 
+    result.resize(reduceSumMembers.size());
     tempCenters = clusterCentersToBroadcast(reduceClusterCenters);
 
     for (auto entry : reduceSumMembers) {
-        result.push_back(entry);
+        result[i++] = entry;
     }
     result.insert(result.end(), tempCenters.begin(), tempCenters.end());
 
@@ -640,14 +644,14 @@ std::vector<int> KMeansJob::aggregate(const std::list<std::vector<int>>& message
     centers.resize(countMessages);
     counts.resize(countMessages);
     auto message = messages.begin();
-    LOG(V3_VERB, "                         myIndex: %i countMessages: %d\n", myIndex, countMessages);
+    //LOG(V3_VERB, "                         myIndex: %i countMessages: %d\n", myIndex, countMessages);
     for (int i = 0; i < countMessages; ++i) {
         auto data = reduceToclusterCenters(*message);
         ++message;
         centers[i] = data.first;
         counts[i] = data.second;
 
-        LOG(V3_VERB, "                         myIndex: %i counts[%d] : \n%s\n", myIndex, i, dataToString(counts[i]).c_str());
+        //LOG(V3_VERB, "                         myIndex: %i counts[%d] : \n%s\n", myIndex, i, dataToString(counts[i]).c_str());
         // LOG(V3_VERB, "clusterCentersI: \n%s\n", dataToString(centers[i]).c_str());
     }
 

@@ -36,27 +36,34 @@ bool KMeansReader::read(const std::string &filename, JobDescription &desc) {
     int dimension = 0;
     int columnsInFile = 0;
     int pointsCount = 0;
-    int skipCols = columnsInFile - dimension;  // dont read the last few columns
 
     ifile >> countClusters;
     ifile >> dimension;
     ifile >> columnsInFile;
     ifile >> pointsCount;
 
+    int skipCols = columnsInFile - dimension;  // dont read the last few columns
+
     desc.addLiteral(countClusters);
     desc.addLiteral(dimension);
     desc.addLiteral(pointsCount);
-
+    //LOG(V3_VERB, "                          countClusters: %i dimension %i pointsCount: %i columnsInFile: %i skipCols:%i\n", countClusters, dimension, pointsCount, columnsInFile, skipCols);
     float num = 0.0;
     for (int point = 0; point < pointsCount; ++point) {
         for (int entry = 0; entry < dimension; ++entry) {
             ifile >> num;
             desc.addFloatData(num);
+            //if (point < 10) {
+            //    LOG(V3_VERB, "                          num: %f\n", num);
+            //}
         }
         if (Terminator::isTerminating()) return false;
         for (int skip = 0; skip < skipCols; ++skip) {
             ifile >> num;  // dont read the last few columns of each row
-                           // num wont be read until reset
+            // num wont be read until reset
+            //if (point < 10) {
+            //    LOG(V3_VERB, "                          skip num: %f\n", num);
+            //}
         }
     }
 
