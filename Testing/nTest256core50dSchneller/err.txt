@@ -1,0 +1,13 @@
+c 3.343 101 BLC insert (1,1,0.010)
+c 3.416 3                            loaded
+c 3.418 3 BLC insert (1,155,1.000)
+c 3.959 146 [WARN] Watchdog: No reset for 69 ms (activity=0 recvtag=0 sendtag=0)
+c 5.364 147 [WARN] Watchdog: No reset for 101 ms (activity=6 recvtag=0 sendtag=0)
+c 5.537 3                            first iteration finished
+c 7.467 3 [ERROR] pid=711214 tid=711214 signal=11
+_________________________________________________________________
+c 5.497 101 BLC insert (1,1,0.010)
+c 5.736 15                            loaded
+c 5.739 15 BLC insert (1,145,1.000)
+c 7.148 15 [ERROR] pid=786138 tid=787228 signal=11
+_________________________________________________________________

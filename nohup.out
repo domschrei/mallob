@@ -9,3 +9,33 @@ found err
 ./Testing/test.sh: line 13: 3007395 Killed                  PATH=build/:$PATH RDMAV_FORKSAVE=1 mpirun -np ${w} -oversubscribe build/mallob -mono-application=KMEANS -mono=./instances/${instanceName}${k}.csv -v=3 2>&1 > ./Testing/${folder}/out.txt
 (standard_in) 2: syntax error
 (standard_in) 1: syntax error
+found err
+./Testing/test.sh: line 13: 711203 Killed                  PATH=build/:$PATH RDMAV_FORKSAVE=1 mpirun -np ${w} -oversubscribe build/mallob -mono-application=KMEANS -mono=./instances/${instanceName}${k}.csv -v=3 2>&1 > ./Testing/${folder}/out.txt
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+--------------------------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code. Per user-direction, the job has been aborted.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun noticed that process rank 46 with PID 0 on node i10pc138 exited on signal 11 (Segmentation fault).
+--------------------------------------------------------------------------
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+(standard_in) 2: syntax error
+(standard_in) 1: syntax error
+(standard_in) 2: syntax error
+(standard_in) 1: syntax error
+found err
+./Testing/test.sh: line 13: 786115 Killed                  PATH=build/:$PATH RDMAV_FORKSAVE=1 mpirun -np ${w} -oversubscribe build/mallob -mono-application=KMEANS -mono=./instances/${instanceName}${k}.csv -v=3 2>&1 > ./Testing/${folder}/out.txt
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+./Testing/test.sh: line 13: 830513 Killed                  PATH=build/:$PATH RDMAV_FORKSAVE=1 mpirun -np ${w} -oversubscribe build/mallob -mono-application=KMEANS -mono=./instances/${instanceName}${k}.csv -v=3 2>&1 > ./Testing/${folder}/out.txt
+(standard_in) 1: syntax error
+(standard_in) 1: syntax error
+malloc(): unsorted double linked list corrupted
+./Testing/test.sh: line 13: 835921 Killed                  PATH=build/:$PATH RDMAV_FORKSAVE=1 mpirun -np ${w} -oversubscribe build/mallob -mono-application=KMEANS -mono=./instances/${instanceName}${k}.csv -v=3 2>&1 > ./Testing/${folder}/out.txt
+(standard_in) 2: syntax error
+(standard_in) 1: syntax error
+(standard_in) 2: syntax error
+(standard_in) 1: syntax error
