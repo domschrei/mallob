@@ -168,7 +168,7 @@ void AnytimeSatClauseCommunicator::communicate() {
                 } else {
                     return std::optional<SerializedLratLine>();
                 }
-            }, "final-proof-output.lrat", _proof_assembler->getNumOriginalClauses()));
+            }, _params.proofOutputFile(), _proof_assembler->getNumOriginalClauses()));
 
             MyMpi::getMessageQueue().registerCallback(MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, [&](MessageHandle& h) {
                 DistributedFileMerger::MergeMessage msg; msg.deserialize(h.getRecvData());

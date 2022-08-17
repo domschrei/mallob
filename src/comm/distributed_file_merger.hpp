@@ -147,6 +147,7 @@ private:
     size_t numOutputLines = 0;
     float lastOutputReport = 0;
 
+    std::future<void> _fut_merging;
     bool _began_merging = false;
 
     bool _began_final_barrier = false;
@@ -176,7 +177,7 @@ public:
             _fut_root_prepare = ProcessWideThreadPool::get().addTask([&, outputFileAtZero]() {
                 // Create final output file
                 _output_filename = outputFileAtZero;
-                std::string reverseFilename = "_inv_" + _output_filename;
+                std::string reverseFilename = _output_filename + ".inv";
                 LOG(V3_VERB, "DFM Opening output file \"%s\"\n", reverseFilename.c_str());
                 _output_filestream = std::ofstream(reverseFilename);
                 // TODO choose size relative to proof size
@@ -186,6 +187,11 @@ public:
         } else {
             MPI_Ibarrier(_comm, &_barrier_request);
         }
+    }
+
+    ~DistributedFileMerger() {
+        if (_fut_root_prepare.valid()) _fut_root_prepare.get();
+        if (_fut_merging.valid()) _fut_merging.get();
     }
 
     bool readyToMerge() {
@@ -205,7 +211,7 @@ public:
 
     void beginMerge() {
         _began_merging = true;
-        ProcessWideThreadPool::get().addTask([&]() {
+        _fut_merging = ProcessWideThreadPool::get().addTask([&]() {
             doMerging();
             reverseFile();
         });
@@ -307,7 +313,7 @@ private:
         std::vector<SerializedLratLine> merger(_children.size()+1);
         std::vector<LratClauseId> hintsToDelete;
 
-        while (true) {
+        while (!Terminator::isTerminating()) {
             bool canMerge = true;
             
             // Refill next line from each child as necessary 
@@ -405,8 +411,8 @@ private:
 
     void reverseFile() {
         if (MyMpi::rank(_comm) == 0) {
-            std::string cmd = "tac _inv_" + _output_filename + " > " + _output_filename 
-                + " && rm _inv_" + _output_filename;
+            std::string cmd = "tac " + _output_filename + ".inv > " + _output_filename 
+                + " && rm " + _output_filename + ".inv";
             system(cmd.c_str());
         }
     }

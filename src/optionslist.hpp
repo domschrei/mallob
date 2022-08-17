@@ -107,6 +107,7 @@ OPT_STRING(jobDescriptionTemplate,       "job-desc-template", "",               
 OPT_STRING(jobTemplate,                  "job-template", "",                          "",                      "JSON template file which each client uses to instantiate jobs indeterminately")
 OPT_STRING(logDirectory,                 "log", "log-directory",                      "",                      "Directory to save logs in")
 OPT_STRING(monoFilename,                 "mono", "",                                  "",                      "Mono instance: Solve the provided CNF instance with full power, then exit")
+OPT_STRING(proofOutputFile,              "pof", "proof-output-file",                  "final-proof.lrat",      "Path and name of final LRAT proof file, output by rank zero")
 OPT_STRING(satSolverSequence,            "satsolver",  "",                            "L",                     "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
 OPT_STRING(solutionToFile,               "s2f", "solution-to-file",                   "",                      "Write solutions to file with provided base name + job ID")
 OPT_STRING(stxxlDiskDirectory,           "stxxl-disk-dir", "",                        ".",                     "Directory where to create STXXL external memory files")

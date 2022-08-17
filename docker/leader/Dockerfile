@@ -15,9 +15,11 @@ COPY /lib mallob/lib
 
 # Build Mallob
 WORKDIR mallob
-RUN cd lib && bash fetch_and_build_sat_solvers.sh ckly && cd ..
+RUN cd lib && bash fetch_and_build_sat_solvers.sh ckly && bash fetch_stxxl.sh && cd ..
 RUN mkdir build
-RUN cd build && cmake -DMALLOB_CERTIFIED_UNSAT=1 -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_SUBPROC_DISPATCH_PATH=\"./\" -DMALLOB_ASSERT=1 -DMALLOB_USE_GLUCOSE=0 -DMALLOB_USE_ASAN=0 -DMALLOB_USE_JEMALLOC=1 -DMALLOB_JEMALLOC_DIR=/usr/lib/x86_64-linux-gnu -DMALLOB_LOG_VERBOSITY=3 .. && VERBOSE=1 make -j4 && cd ..
+# I suspect that STXXL and jemalloc don't get along for some reason.
+# Not sure about this, but disabling jemalloc for now
+RUN cd build && cmake -DMALLOB_CERTIFIED_UNSAT=1 -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_SUBPROC_DISPATCH_PATH=\"./\" -DMALLOB_ASSERT=1 -DMALLOB_USE_GLUCOSE=0 -DMALLOB_USE_ASAN=0 -DMALLOB_USE_JEMALLOC=0 -DMALLOB_JEMALLOC_DIR=/usr/lib/x86_64-linux-gnu -DMALLOB_LOG_VERBOSITY=3 .. && VERBOSE=1 make -j4 && cd ..
 #RUN find /usr -name '*libjemalloc*'
 
 ################### Extract Mallob in run stage

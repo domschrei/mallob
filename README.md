@@ -32,6 +32,8 @@ CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_
 make; cd ..
 ```
 
+**For certified UNSAT, please use -DMALLOB_USE_JEMALLOC=0 instead since I suspect that jemalloc and STXXL do not get along for some reason.**
+
 Specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
 In addition, use the following Mallob-specific build options:
 
@@ -77,6 +79,16 @@ For running Mallob on distributed clusters, please also consult [the scripts and
 ## Solve a single SAT instance
 
 Use Mallob option `-mono=$PATH_TO_CNF` where `$PATH_TO_CNF` is the path and file name of the formula to solve (DIMACS CNF format, possibly with .xz or .lzma compression). In this mode, all processes participate in solving, overhead is minimal, and Mallob terminates immediately after the job has been processed.
+
+### Options relevant for certified UNSAT
+
+* `-dpa=1`: Turn on distributed proof assembly. If turned off, the system will terminate after each solver has written its individual proof file.
+* `-log=<logdir>`: Important option since it also sets the base location for the proof files directory on each process.
+* `-mempanic=0`: Turn off memory panic. Essential for correct functionality of proof logging.
+* `-scsd=0`: Disable the option which turns off clause sharing on some selected solvers. You can also leave it on, but for testing it's maybe better if each proof is a distributed proof. 
+* `-stxxl-disk-dir=<disk-dir>`: Set the directory where STXXL should place its virtual disk files. The disk where the specified directory lies is also the one which will be filled with the content of the external priority queues. Set this to the best performing disk which is available and still offers enough space.
+* `-stxxl-disk-size-gbs=<gbs-per-process>`: Set the maximum size of each STXXL virtual disk, in Gigabytes. So far, few testing as been done as to what is a good value here, the default is 1GB.
+* `-proof-output-file=<proof-file>`: Specify the path and name of the final LRAT output file. This file is only output at rank zero.
 
 ## Solve multiple instances in an orchestrated manner
 

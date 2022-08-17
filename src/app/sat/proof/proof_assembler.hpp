@@ -21,6 +21,8 @@ private:
 
     bool _initialized = false;
 
+    std::future<void> _fut_begin_assembly;
+
 public:
     ProofAssembler(const Parameters& params, int jobId, int numWorkers, int threadsPerWorker, 
         int thisWorkerIndex, int finalEpoch, int winningInstance) :
@@ -28,11 +30,15 @@ public:
             _this_worker_index(thisWorkerIndex), _final_epoch(finalEpoch), _winning_instance(winningInstance) {
 
         _current_epoch = _final_epoch;
-        ProcessWideThreadPool::get().addTask([&]() {
+        _fut_begin_assembly = ProcessWideThreadPool::get().addTask([&]() {
             createInstancesViaClauseEpochs(_params.logDirectory() + "/proof#" + std::to_string(_job_id) 
                 + "/clauseepochs." + std::to_string(_this_worker_index));
             beginProofAssembly();
         });
+    }
+
+    ~ProofAssembler() {
+        if (_fut_begin_assembly.valid()) _fut_begin_assembly.get();
     }
 
     int getEpoch() const {

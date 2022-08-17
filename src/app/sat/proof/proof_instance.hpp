@@ -61,6 +61,10 @@ public:
             _current_epoch(finalEpoch),
             _output_filename(outputFilename), _output(outputFilename) {}
 
+    ~ProofInstance() {
+        if (_work_future.valid()) _work_future.get();
+    }
+
     void advance(const LratClauseId* clauseIdsData, size_t clauseIdsSize) {
         _work_done = false;
         _work_future = ProcessWideThreadPool::get().addTask([this, clauseIdsData, clauseIdsSize]() {
