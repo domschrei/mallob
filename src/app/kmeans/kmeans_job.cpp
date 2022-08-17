@@ -465,7 +465,6 @@ void KMeansJob::calcCurrentClusterCenters() {
                 localClusterCenters[clusterMembership[pointID]][d] +=
                     getKMeansData(pointID)[d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]);
             }
-            //}
         }
     }
     ++iterationsDone;
@@ -503,20 +502,20 @@ void KMeansJob::countMembers() {
         myIndex, dataToString(localSumMembers).c_str());
 }
 
-//float KMeansJob::calculateDifference(std::function<float(const float*, Point&)> metric) {
-//    if (iterationsDone == 0) {
-//        return std::numeric_limits<float>::infinity();
-//    }
-//    float sumOldvec = 0.0;
-//    float sumDifference = 0.0;
-//    Point v0(dimension, 0);
-//    for (int k = 0; k < countClusters; ++k) {
-//        sumOldvec += metric(v0.data(), clusterCenters[k]);
+// float KMeansJob::calculateDifference(std::function<float(const float*, Point&)> metric) {
+//     if (iterationsDone == 0) {
+//         return std::numeric_limits<float>::infinity();
+//     }
+//     float sumOldvec = 0.0;
+//     float sumDifference = 0.0;
+//     Point v0(dimension, 0);
+//     for (int k = 0; k < countClusters; ++k) {
+//         sumOldvec += metric(v0.data(), clusterCenters[k]);
 //
-//        sumDifference += metric(clusterCenters[k].data(), oldClusterCenters[k]);
-//    }
-//    return sumDifference / sumOldvec;
-//}
+//         sumDifference += metric(clusterCenters[k].data(), oldClusterCenters[k]);
+//     }
+//     return sumDifference / sumOldvec;
+// }
 
 bool KMeansJob::centersChanged() {
     if (iterationsDone == 0) {
@@ -541,7 +540,7 @@ bool KMeansJob::centersChanged(std::function<float(const float*, Point&)> metric
             float distance = fabs(clusterCenters[k][d] - oldClusterCenters[k][d]);
             float upperBoundDistance = factor * (fabs(clusterCenters[k][d] + oldClusterCenters[k][d]) / 2);
             if (distance > upperBoundDistance) {
-                LOG(V3_VERB, "                           Dist: %f upperBoundDistance: %f\n", distance, upperBoundDistance );
+                LOG(V3_VERB, "                           Dist: %f upperBoundDistance: %f\n", distance, upperBoundDistance);
                 return true;
             }
         }
