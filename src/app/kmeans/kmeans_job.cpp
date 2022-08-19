@@ -143,11 +143,15 @@ void KMeansJob::doInitWork() {
     */
 }
 void KMeansJob::appl_suspend() {
+            LOG(V3_VERB, "                           myIndex: %i i got SUSPENDED :( iter: %i\n", myIndex, iterationsDone);
     baseMsg.tag = MSG_ALLREDUCE_CLAUSES;
     baseMsg.returnedToSender = true;
     MyMpi::isend(getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, baseMsg);
 }
-void KMeansJob::appl_resume() {}
+void KMeansJob::appl_resume() {
+            LOG(V3_VERB, "                           myIndex: %i i got RESUMED :D iter: %i\n", myIndex, iterationsDone);
+    myIndex = getJobTree().getIndex();
+}
 JobResult&& KMeansJob::appl_getResult() {
     return std::move(internal_result);
 }
@@ -277,7 +281,7 @@ int KMeansJob::getIndex(int rank) {
 void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
     int sourceIndex = getIndex(source);
     LOG(V3_VERB, "                           myIndex: %i source: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
-    if (!loaded) {
+    if (!loaded || getState() != JobState::ACTIVE) {
         LOG(V3_VERB, "                           myIndex: %i not Ready: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
 
         msg.returnedToSender = true;
