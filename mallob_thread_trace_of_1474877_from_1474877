@@ -1,0 +1,33 @@
+[New LWP 1474901]
+[New LWP 1474906]
+[New LWP 1475267]
+[New LWP 1475383]
+[New LWP 1475469]
+[New LWP 1475554]
+[New LWP 1475625]
+[New LWP 1476177]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=140421757572864, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=140421757572864, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007fb6a0e37047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x000055bf83fd019f in Process::writeTrace (tid=1474877) at /home/doerr/mallob/src/util/sys/process.cpp:198
+#3  0x000055bf83fcf87b in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:70
+#4  0x000055bf83fcf799 in handleSignal (signum=6) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#5  <signal handler called>
+#6  __GI_raise (sig=sig@entry=6) at ../sysdeps/unix/sysv/linux/raise.c:50
+#7  0x00007fb6a0b73859 in __GI_abort () at abort.c:79
+#8  0x00007fb6a0bde29e in __libc_message (action=action@entry=do_abort, fmt=fmt@entry=0x7fb6a0d08298 "%s\n") at ../sysdeps/posix/libc_fatal.c:155
+#9  0x00007fb6a0be632c in malloc_printerr (str=str@entry=0x7fb6a0d0644d "corrupted size vs. prev_size") at malloc.c:5347
+#10 0x00007fb6a0be699b in unlink_chunk (p=p@entry=0x55bf85697380, av=0x7fb6a0d3db80 <main_arena>) at malloc.c:1454
+#11 0x00007fb6a0be7ebb in _int_free (av=0x7fb6a0d3db80 <main_arena>, p=0x55bf85697220, have_lock=<optimized out>) at malloc.c:4342
+#12 0x00007fb69ae3bf29 in ?? () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_pml_ob1.so
+#13 0x00007fb69ae3a5d9 in mca_pml_ob1_del_comm () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_pml_ob1.so
+#14 0x00007fb6a10eb5dd in ?? () from /lib/x86_64-linux-gnu/libmpi.so.40
+#15 0x00007fb6a10ec541 in ompi_comm_finalize () from /lib/x86_64-linux-gnu/libmpi.so.40
+#16 0x00007fb6a110d0dd in ompi_mpi_finalize () from /lib/x86_64-linux-gnu/libmpi.so.40
+#17 0x000055bf83f26108 in main (argc=4, argv=0x7ffc9c343528) at /home/doerr/mallob/src/main.cpp:272
+[Inferior 1 (process 1474877) detached]
