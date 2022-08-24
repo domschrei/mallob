@@ -1,0 +1,2645 @@
+c 0.000 91 Mallob dbg pid=82928 on host i10pc138
+c 0.000 11 Mallob dbg pid=82692 on host i10pc138
+c 0.000 43 Mallob dbg pid=82779 on host i10pc138
+c 0.000 61 Mallob dbg pid=82835 on host i10pc138
+c 0.000 59 Mallob dbg pid=82830 on host i10pc138
+c 0.000 76 Mallob dbg pid=82889 on host i10pc138
+c 0.000 88 Mallob dbg pid=82927 on host i10pc138
+c 0.000 107 Mallob dbg pid=82978 on host i10pc138
+c 0.000 114 Mallob dbg pid=82987 on host i10pc138
+c 0.000 104 Mallob dbg pid=82973 on host i10pc138
+c 0.000 115 Mallob dbg pid=83011 on host i10pc138
+c 0.000 116 Mallob dbg pid=83001 on host i10pc138
+c 0.000 7 Mallob dbg pid=82688 on host i10pc138
+c 0.000 27 Mallob dbg pid=82728 on host i10pc138
+c 0.000 40 Mallob dbg pid=82783 on host i10pc138
+c 0.000 41 Mallob dbg pid=82782 on host i10pc138
+c 0.000 42 Mallob dbg pid=82777 on host i10pc138
+c 0.000 46 Mallob dbg pid=82785 on host i10pc138
+c 0.000 55 Mallob dbg pid=82823 on host i10pc138
+c 0.000 56 Mallob dbg pid=82833 on host i10pc138
+c 0.000 72 Mallob dbg pid=82882 on host i10pc138
+c 0.000 78 Mallob dbg pid=82877 on host i10pc138
+c 0.000 84 Mallob dbg pid=82914 on host i10pc138
+c 0.000 87 Mallob dbg pid=82918 on host i10pc138
+c 0.000 98 Mallob dbg pid=82938 on host i10pc138
+c 0.000 99 Mallob dbg pid=82951 on host i10pc138
+c 0.000 10 Mallob dbg pid=82693 on host i10pc138
+c 0.000 20 Mallob dbg pid=82715 on host i10pc138
+c 0.000 32 Mallob dbg pid=82756 on host i10pc138
+c 0.000 37 Mallob dbg pid=82770 on host i10pc138
+c 0.000 49 Mallob dbg pid=82800 on host i10pc138
+c 0.000 54 Mallob dbg pid=82806 on host i10pc138
+c 0.000 64 Mallob dbg pid=82855 on host i10pc138
+c 0.001 65 Mallob dbg pid=82845 on host i10pc138
+c 0.000 66 Mallob dbg pid=82837 on host i10pc138
+c 0.000 67 Mallob dbg pid=82852 on host i10pc138
+c 0.000 68 Mallob dbg pid=82872 on host i10pc138
+c 0.000 69 Mallob dbg pid=82860 on host i10pc138
+c 0.000 70 Mallob dbg pid=82850 on host i10pc138
+c 0.000 71 Mallob dbg pid=82870 on host i10pc138
+c 0.000 75 Mallob dbg pid=82880 on host i10pc138
+c 0.000 80 Mallob dbg pid=82898 on host i10pc138
+c 0.000 83 Mallob dbg pid=82903 on host i10pc138
+c 0.000 86 Mallob dbg pid=82901 on host i10pc138
+c 0.000 90 Mallob dbg pid=82910 on host i10pc138
+c 0.000 97 Mallob dbg pid=82943 on host i10pc138
+c 0.000 101 Mallob dbg pid=82955 on host i10pc138
+c 0.000 102 Mallob dbg pid=82947 on host i10pc138
+c 0.000 103 Mallob dbg pid=82968 on host i10pc138
+c 0.001 109 Mallob dbg pid=82983 on host i10pc138
+c 0.000 113 Mallob dbg pid=82992 on host i10pc138
+c 0.001 117 Mallob dbg pid=83005 on host i10pc138
+c 0.000 118 Mallob dbg pid=82998 on host i10pc138
+c 0.000 119 Mallob dbg pid=83017 on host i10pc138
+c 0.000 21 Mallob dbg pid=82721 on host i10pc138
+c 0.000 22 Mallob dbg pid=82711 on host i10pc138
+c 0.000 25 Mallob dbg pid=82734 on host i10pc138
+c 0.000 33 Mallob dbg pid=82751 on host i10pc138
+c 0.000 34 Mallob dbg pid=82744 on host i10pc138
+c 0.000 38 Mallob dbg pid=82762 on host i10pc138
+c 0.001 45 Mallob dbg pid=82789 on host i10pc138
+c 0.000 47 Mallob dbg pid=82791 on host i10pc138
+c 0.000 48 Mallob dbg pid=82808 on host i10pc138
+c 0.000 50 Mallob dbg pid=82794 on host i10pc138
+c 0.000 53 Mallob dbg pid=82813 on host i10pc138
+c 0.001 105 Mallob dbg pid=82971 on host i10pc138
+c 
+c Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving
+c Designed by P. Sanders and D. Schreiber 2018-2022
+c Developed by D. Schreiber 2019-2022
+c 
+c 0.001 0 Program options: -0o=0 -J=1 -T=0 -ajpc=0 -ans=0 -appmode=fork -ba=4 -bicg=4 -c=1 -cbbs=1500 -cbdf=0.9 -cfci=20 -cg=1 -ch=0 -chaf=5 -checksums=0 -chstms=10 -cmp=0 -colors=0 -dc=0 -ddd=0 -delaymonkey=0 -derandomize=1 -evu=0 -fapii=0 -g=0 -gclls=0 -h=0 -hbbfs=10 -hubfs=9999999 -huca=-1 -iff=0 -interface-fs=0 -interface-ipc=0 -isp=0 -jc=4 -jcl=0 -jcup=0 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -ljpc=32 -mbfsd=4 -mbt=1000000 -mcips=10 -md=0 -mid=0 -mjps=0 -mlbdps=8 -mlpt=50000000 -mmpi=0 -mono=./instances/covtypeShuffle50.csv -mono-application=KMEANS -nce=20 -os=0 -p=0.01 -phasediv=1 -pls=1 -pph=0 -q=0 -qcll=8 -qlbdl=2 -ril=0 -rpa=0 -rs=1 -rto=0 -s=1 -satsolver=L -scll=30 -seed=0 -sjd=0 -slbdl=30 -sleep=100 -subproc-dir=build -t=1 -trace-dir=. -v=3 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -wr=0 -y=1 -yield=0 
+c 0.001 0 Mallob dbg pid=82676 on host i10pc138
+c 0.001 0 120 workers, 1 clients
+c 0.000 1 Mallob dbg pid=82677 on host i10pc138
+c 0.001 5 Mallob dbg pid=82690 on host i10pc138
+c 0.000 6 Mallob dbg pid=82689 on host i10pc138
+c 0.001 8 Mallob dbg pid=82695 on host i10pc138
+c 0.000 13 Mallob dbg pid=82699 on host i10pc138
+c 0.001 77 Mallob dbg pid=82886 on host i10pc138
+c 0.000 85 Mallob dbg pid=82905 on host i10pc138
+c 0.000 100 Mallob dbg pid=82961 on host i10pc138
+c 0.001 74 Mallob dbg pid=82866 on host i10pc138
+c 0.001 2 Mallob dbg pid=82678 on host i10pc138
+c 0.001 44 Mallob dbg pid=82797 on host i10pc138
+c 0.001 112 Mallob dbg pid=82989 on host i10pc138
+c 0.001 12 Mallob dbg pid=82698 on host i10pc138
+c 0.001 24 Mallob dbg pid=82733 on host i10pc138
+c 0.002 95 Mallob dbg pid=82942 on host i10pc138
+c 0.002 111 Mallob dbg pid=82994 on host i10pc138
+c 0.002 63 Mallob dbg pid=82841 on host i10pc138
+c 0.002 51 Mallob dbg pid=82803 on host i10pc138
+c 0.001 26 Mallob dbg pid=82731 on host i10pc138
+c 0.002 29 Mallob dbg pid=82742 on host i10pc138
+c 0.002 94 Mallob dbg pid=82923 on host i10pc138
+c 0.002 9 Mallob dbg pid=82694 on host i10pc138
+c 0.002 60 Mallob dbg pid=82843 on host i10pc138
+c 0.002 92 Mallob dbg pid=82937 on host i10pc138
+c 0.002 31 Mallob dbg pid=82738 on host i10pc138
+c 0.002 57 Mallob dbg pid=82827 on host i10pc138
+c 0.002 73 Mallob dbg pid=82874 on host i10pc138
+c 0.002 79 Mallob dbg pid=82892 on host i10pc138
+c 0.002 89 Mallob dbg pid=82920 on host i10pc138
+c 0.002 52 Mallob dbg pid=82825 on host i10pc138
+c 0.002 82 Mallob dbg pid=82888 on host i10pc138
+c 0.002 96 Mallob dbg pid=82945 on host i10pc138
+c 0.002 3 Mallob dbg pid=82679 on host i10pc138
+c 0.002 15 Mallob dbg pid=82696 on host i10pc138
+c 0.002 4 Mallob dbg pid=82691 on host i10pc138
+c 0.002 16 Mallob dbg pid=82702 on host i10pc138
+c 0.002 18 Mallob dbg pid=82701 on host i10pc138
+c 0.002 19 Mallob dbg pid=82700 on host i10pc138
+c 0.002 35 Mallob dbg pid=82749 on host i10pc138
+c 0.002 28 Mallob dbg pid=82739 on host i10pc138
+c 0.002 93 Mallob dbg pid=82931 on host i10pc138
+c 0.002 14 Mallob dbg pid=82697 on host i10pc138
+c 0.002 30 Mallob dbg pid=82736 on host i10pc138
+c 0.002 36 Mallob dbg pid=82773 on host i10pc138
+c 0.002 39 Mallob dbg pid=82765 on host i10pc138
+c 0.002 58 Mallob dbg pid=82818 on host i10pc138
+c 0.002 62 Mallob dbg pid=82829 on host i10pc138
+c 0.002 108 Mallob dbg pid=82980 on host i10pc138
+c 0.002 110 Mallob dbg pid=82976 on host i10pc138
+c 0.002 81 Mallob dbg pid=82895 on host i10pc138
+c 0.002 106 Mallob dbg pid=82965 on host i10pc138
+c 0.002 17 Mallob dbg pid=82703 on host i10pc138
+c 0.002 23 Mallob dbg pid=82704 on host i10pc138
+c 0.004 0 Created client communicator
+c 0.004 0 Created worker communicator
+c 0.004 110 <Janitor> tid=83760
+c 0.005 47 <Janitor> tid=83762
+c 0.005 57 <Janitor> tid=83765
+c 0.005 14 <Janitor> tid=83771
+c 0.005 110 My bounce alternatives: 86 5 112 96 
+c 0.005 90 <Janitor> tid=83797
+c 0.005 23 My bounce alternatives: 32 28 35 57 
+c 0.005 23 <Janitor> tid=83770
+c 0.005 119 <Janitor> tid=83780
+c 0.006 87 <Janitor> tid=83785
+c 0.005 103 <Janitor> tid=83789
+c 0.006 95 <Janitor> tid=83818
+c 0.006 22 <Janitor> tid=83781
+c 0.006 26 <Janitor> tid=83810
+c 0.006 92 <Janitor> tid=83806
+c 0.006 34 <Janitor> tid=83804
+c 0.007 40 <Janitor> tid=83769
+c 0.007 40 My bounce alternatives: 39 27 113 31 
+c 0.006 41 <Janitor> tid=83807
+c 0.007 11 <Janitor> tid=83826
+c 0.006 2 <Janitor> tid=83845
+c 0.006 38 <Janitor> tid=83809
+c 0.007 42 <Janitor> tid=83802
+c 0.006 63 <Janitor> tid=83815
+c 0.006 89 <Janitor> tid=83799
+c 0.006 50 <Janitor> tid=83848
+c 0.006 49 <Janitor> tid=83790
+c 0.007 55 <Janitor> tid=83842
+c 0.006 31 <Janitor> tid=83828
+c 0.006 39 <Janitor> tid=83832
+c 0.007 61 <Janitor> tid=83774
+c 0.006 9 <Janitor> tid=83822
+c 0.005 58 <Janitor> tid=83811
+c 0.006 111 <Janitor> tid=83887
+c 0.006 54 <Janitor> tid=83778
+c 0.006 66 <Janitor> tid=83792
+c 0.006 68 <Janitor> tid=83787
+c 0.006 69 <Janitor> tid=83784
+c 0.006 70 <Janitor> tid=83888
+c 0.006 47 My bounce alternatives: 8 99 58 63 
+c 0.006 71 <Janitor> tid=83841
+c 0.007 59 <Janitor> tid=83805
+c 0.006 13 <Janitor> tid=83777
+c 0.007 72 <Janitor> tid=83766
+c 0.007 72 My bounce alternatives: 89 52 88 46 
+c 0.006 73 <Janitor> tid=83795
+c 0.006 75 <Janitor> tid=83850
+c 0.007 78 <Janitor> tid=83858
+c 0.007 77 <Janitor> tid=83772
+c 0.007 77 My bounce alternatives: 64 3 74 52 
+c 0.007 84 <Janitor> tid=83873
+c 0.007 76 <Janitor> tid=83838
+c 0.006 79 <Janitor> tid=83768
+c 0.006 79 My bounce alternatives: 119 21 65 64 
+c 0.006 86 <Janitor> tid=83837
+c 0.006 28 <Janitor> tid=83839
+c 0.006 29 <Janitor> tid=83827
+c 0.006 24 <Janitor> tid=83825
+c 0.006 82 <Janitor> tid=83834
+c 0.007 98 <Janitor> tid=83868
+c 0.005 85 <Janitor> tid=83844
+c 0.006 101 <Janitor> tid=83782
+c 0.007 101 My bounce alternatives: 61 119 70 69 
+c 0.006 102 <Janitor> tid=83779
+c 0.007 102 My bounce alternatives: 78 18 31 72 
+c 0.007 114 <Janitor> tid=83824
+c 0.007 88 <Janitor> tid=83829
+c 0.006 62 <Janitor> tid=83849
+c 0.006 44 <Janitor> tid=83798
+c 0.007 107 <Janitor> tid=83857
+c 0.007 104 <Janitor> tid=83816
+c 0.006 117 <Janitor> tid=83783
+c 0.007 117 My bounce alternatives: 30 15 25 11 
+c 0.006 118 <Janitor> tid=83846
+c 0.006 105 <Janitor> tid=83812
+c 0.006 74 <Janitor> tid=83764
+c 0.007 74 My bounce alternatives: 98 94 38 114 
+c 0.006 15 <Janitor> tid=83817
+c 0.006 116 <Janitor> tid=83803
+c 0.005 6 <Janitor> tid=83788
+c 0.007 91 <Janitor> tid=83820
+c 0.006 8 <Janitor> tid=83813
+c 0.006 4 <Janitor> tid=83786
+c 0.006 106 <Janitor> tid=83823
+c 0.006 18 <Janitor> tid=83833
+c 0.007 10 <Janitor> tid=83763
+c 0.007 10 My bounce alternatives: 79 37 84 77 
+c 0.006 21 <Janitor> tid=83877
+c 0.005 17 <Janitor> tid=83791
+c 0.006 12 <Janitor> tid=83843
+c 0.007 22 My bounce alternatives: 29 76 8 97 
+c 0.006 57 My bounce alternatives: 80 47 95 0 
+c 0.007 20 <Janitor> tid=83872
+c 0.007 33 <Janitor> tid=83864
+c 0.007 45 <Janitor> tid=83773
+c 0.007 45 My bounce alternatives: 54 115 75 76 
+c 0.006 14 My bounce alternatives: 49 42 9 10 
+c 0.007 37 <Janitor> tid=83796
+c 0.007 61 My bounce alternatives: 107 53 26 85 
+c 0.007 43 My bounce alternatives: 41 67 100 93 
+c 0.007 65 <Janitor> tid=83840
+c 0.007 54 My bounce alternatives: 17 100 28 9 
+c 0.007 68 My bounce alternatives: 22 87 6 98 
+c 0.007 69 My bounce alternatives: 59 73 46 74 
+c 0.006 100 <Janitor> tid=83854
+c 0.006 13 My bounce alternatives: 15 6 76 59 
+c 0.006 52 <Janitor> tid=83855
+c 0.006 119 My bounce alternatives: 40 91 99 73 
+c 0.007 97 <Janitor> tid=83881
+c 0.006 53 <Janitor> tid=83847
+c 0.006 81 <Janitor> tid=83885
+c 0.007 87 My bounce alternatives: 100 35 106 101 
+c 0.007 113 <Janitor> tid=83874
+c 0.007 1 <Janitor> tid=83853
+c 0.007 5 <Janitor> tid=83801
+c 0.006 94 <Janitor> tid=83814
+c 0.006 112 <Janitor> tid=83794
+c 0.006 93 <Janitor> tid=83776
+c 0.006 93 My bounce alternatives: 116 111 18 84 
+c 0.006 16 <Janitor> tid=83793
+c 0.007 51 <Janitor> tid=83871
+c 0.007 51 My bounce alternatives: 31 90 98 66 
+c 0.007 35 <Janitor> tid=83880
+c 0.007 35 My bounce alternatives: 106 55 101 21 
+c 0.007 25 My bounce alternatives: 60 30 103 95 
+c 0.006 30 <Janitor> tid=83831
+c 0.007 30 My bounce alternatives: 6 22 49 48 
+c 0.007 32 <Janitor> tid=83861
+c 0.007 32 My bounce alternatives: 11 40 87 55 
+c 0.007 92 My bounce alternatives: 3 93 86 118 
+c 0.008 27 My bounce alternatives: 62 81 117 41 
+c 0.007 34 My bounce alternatives: 37 107 15 100 
+c 0.007 41 My bounce alternatives: 81 83 97 26 
+c 0.008 11 My bounce alternatives: 108 43 110 82 
+c 0.007 38 My bounce alternatives: 73 75 22 19 
+c 0.007 33 My bounce alternatives: 66 101 63 6 
+c 0.007 48 <Janitor> tid=83860
+c 0.007 48 My bounce alternatives: 104 72 29 116 
+c 0.008 42 My bounce alternatives: 88 36 115 18 
+c 0.007 63 My bounce alternatives: 51 88 80 111 
+c 0.007 89 My bounce alternatives: 14 105 10 44 
+c 0.007 46 <Janitor> tid=83819
+c 0.008 46 My bounce alternatives: 68 109 27 71 
+c 0.007 49 My bounce alternatives: 84 117 2 40 
+c 0.008 55 My bounce alternatives: 2 63 93 54 
+c 0.007 31 My bounce alternatives: 9 78 11 104 
+c 0.007 39 My bounce alternatives: 85 77 20 110 
+c 0.007 37 My bounce alternatives: 57 48 23 68 
+c 0.007 9 My bounce alternatives: 74 118 44 62 
+c 0.006 58 My bounce alternatives: 34 4 64 94 
+c 0.007 111 My bounce alternatives: 36 61 107 28 
+c 0.007 64 <Janitor> tid=83862
+c 0.007 64 My bounce alternatives: 58 23 13 16 
+c 0.008 43 <Janitor> tid=83767
+c 0.008 65 My bounce alternatives: 63 106 33 103 
+c 0.007 67 My bounce alternatives: 76 80 45 7 
+c 0.007 66 My bounce alternatives: 13 44 91 45 
+c 0.008 56 My bounce alternatives: 52 49 67 90 
+c 0.007 70 My bounce alternatives: 33 12 41 75 
+c 0.007 71 My bounce alternatives: 21 46 59 70 
+c 0.008 59 My bounce alternatives: 24 65 32 53 
+c 0.006 100 My bounce alternatives: 25 45 105 8 
+c 0.007 73 My bounce alternatives: 53 108 7 39 
+c 0.007 0 <Janitor> tid=83852
+c 0.007 0 My bounce alternatives: 45 1 57 43 
+c 0.007 80 My bounce alternatives: 56 7 60 24 
+c 0.007 75 My bounce alternatives: 117 114 108 99 
+c 0.008 78 My bounce alternatives: 55 97 72 22 
+c 0.007 83 <Janitor> tid=83875
+c 0.007 83 My bounce alternatives: 110 89 73 78 
+c 0.008 84 My bounce alternatives: 83 26 3 50 
+c 0.008 76 My bounce alternatives: 20 71 48 80 
+c 0.007 60 <Janitor> tid=83866
+c 0.007 60 My bounce alternatives: 26 2 61 29 
+c 0.007 86 My bounce alternatives: 43 19 77 4 
+c 0.007 28 My bounce alternatives: 27 38 47 102 
+c 0.007 29 My bounce alternatives: 16 79 1 105 
+c 0.007 24 My bounce alternatives: 12 102 42 25 
+c 0.007 52 My bounce alternatives: 28 58 81 92 
+c 0.007 82 My bounce alternatives: 69 116 24 36 
+c 0.008 98 My bounce alternatives: 111 0 19 67 
+c 0.007 97 My bounce alternatives: 18 10 102 42 
+c 0.008 114 My bounce alternatives: 0 32 109 27 
+c 0.008 88 My bounce alternatives: 10 74 92 109 
+c 0.007 81 My bounce alternatives: 101 60 21 115 
+c 0.006 108 <Janitor> tid=83859
+c 0.007 108 My bounce alternatives: 5 59 85 51 
+c 0.006 103 My bounce alternatives: 50 96 104 15 
+c 0.007 62 My bounce alternatives: 42 39 96 12 
+c c 0.007 109 <Janitor> tid=83865
+0.007 109 My bounce alternatives: 1 16 12 5 
+c 0.007 44 My bounce alternatives: 87 8 52 34 
+c 0.008 107 My bounce alternatives: 95 98 43 89 
+c 0.007 115 <Janitor> tid=83867
+c 0.007 115 My bounce alternatives: 67 85 17 106 
+c 0.008 104 My bounce alternatives: 91 69 66 87 
+c 0.007 16 My bounce alternatives: 103 24 56 1 
+c 0.006 90 My bounce alternatives: 44 29 89 17 
+c 0.007 96 <Janitor> tid=83878
+c 0.007 96 My bounce alternatives: 77 70 71 91 
+c 0.007 116 My bounce alternatives: 70 20 78 60 
+c 0.007 5 My bounce alternatives: 113 11 69 37 
+c 0.007 99 <Janitor> tid=83851
+c 0.007 99 My bounce alternatives: 82 110 40 108 
+c 0.006 6 My bounce alternatives: 71 9 119 13 
+c 0.007 94 My bounce alternatives: 48 64 0 79 
+c 0.007 112 My bounce alternatives: 114 34 51 32 
+c 0.007 3 <Janitor> tid=83876
+c 0.007 3 My bounce alternatives: 38 57 111 83 
+c 0.007 8 My bounce alternatives: 105 82 116 86 
+c 0.006 4 My bounce alternatives: 72 25 54 56 
+c 0.006 17 My bounce alternatives: 92 84 30 88 
+c 0.007 95 My bounce alternatives: 23 113 94 49 
+c 0.007 0 Set up API at src/interface/api/api_connector.hpp
+c 0.007 85 My bounce alternatives: 109 66 53 23 
+c 0.007 53 My bounce alternatives: 118 31 55 58 
+c 0.007 118 My bounce alternatives: 46 51 4 113 
+c 0.007 105 My bounce alternatives: 7 17 68 2 
+c 0.007 113 My bounce alternatives: 112 68 82 119 
+c 0.007 1 My bounce alternatives: 99 50 114 38 
+c 0.007 15 My bounce alternatives: 47 104 62 107 
+c 0.008 91 My bounce alternatives: 65 112 79 81 
+c 0.007 106 My bounce alternatives: 93 13 36 33 
+c 0.007 18 My bounce alternatives: 102 41 14 61 
+c 0.007 21 My bounce alternatives: 19 56 90 112 
+c 0.008 7 My bounce alternatives: 115 54 118 14 
+c 0.007 12 My bounce alternatives: 94 33 37 3 
+c 0.007 26 My bounce alternatives: 75 86 39 65 
+c 0.007 20 My bounce alternatives: 90 92 50 117 
+c 0.007 19 My bounce alternatives: 97 14 5 20 
+c 0.007 36 My bounce alternatives: 35 62 83 47 
+c 0.007 2 My bounce alternatives: 4 95 16 30 
+c 0.007 50 My bounce alternatives: 96 103 34 35 
+c 0.008 7 <Janitor> tid=83886
+c 0.010 19 <Janitor> tid=83882
+c 0.010 67 <Janitor> tid=83879
+c 0.014 36 <Janitor> tid=83884
+c 0.017 62 Machine color 0 with 120 total workers (my rank: 62)
+c 0.018 109 Machine color 0 with 120 total workers (my rank: 109)
+c 0.018 44 Machine color 0 with 120 total workers (my rank: 44)
+c 0.018 107 Machine color 0 with 120 total workers (my rank: 107)
+c 0.018 87 Machine color 0 with 120 total workers (my rank: 87)
+c 0.018 115 Machine color 0 with 120 total workers (my rank: 115)
+c 0.018 117 Machine color 0 with 120 total workers (my rank: 117)
+c 0.017 36 Machine color 0 with 120 total workers (my rank: 36)
+c 0.017 53 Machine color 0 with 120 total workers (my rank: 53)
+c 0.017 16 Machine color 0 with 120 total workers (my rank: 16)
+c 0.018 118 Machine color 0 with 120 total workers (my rank: 118)
+c 0.017 90 Machine color 0 with 120 total workers (my rank: 90)
+c 0.018 74 Machine color 0 with 120 total workers (my rank: 74)
+c 0.017 105 Machine color 0 with 120 total workers (my rank: 105)
+c 0.018 113 Machine color 0 with 120 total workers (my rank: 113)
+c 0.018 1 Machine color 0 with 120 total workers (my rank: 1)
+c 0.017 96 Machine color 0 with 120 total workers (my rank: 96)
+c 0.018 116 Machine color 0 with 120 total workers (my rank: 116)
+c 0.018 5 Machine color 0 with 120 total workers (my rank: 5)
+c 0.018 99 Machine color 0 with 120 total workers (my rank: 99)
+c 0.017 6 Machine color 0 with 120 total workers (my rank: 6)
+c 0.017 15 Machine color 0 with 120 total workers (my rank: 15)
+c 0.018 94 Machine color 0 with 120 total workers (my rank: 94)
+c 0.017 112 Machine color 0 with 120 total workers (my rank: 112)
+c 0.017 3 Machine color 0 with 120 total workers (my rank: 3)
+c 0.018 8 Machine color 0 with 120 total workers (my rank: 8)
+c 0.017 93 Machine color 0 with 120 total workers (my rank: 93)
+c 0.018 91 Machine color 0 with 120 total workers (my rank: 91)
+c 0.017 106 Machine color 0 with 120 total workers (my rank: 106)
+c 0.017 23 Machine color 0 with 120 total workers (my rank: 23)
+c 0.018 10 Machine color 0 with 120 total workers (my rank: 10)
+c 0.017 18 Machine color 0 with 120 total workers (my rank: 18)
+c 0.017 4 Machine color 0 with 120 total workers (my rank: 4)
+c 0.017 17 Machine color 0 with 120 total workers (my rank: 17)
+c 0.018 104 Machine color 0 with 120 total workers (my rank: 104)
+c 0.018 21 Machine color 0 with 120 total workers (my rank: 21)
+c 0.018 51 Machine color 0 with 120 total workers (my rank: 51)
+c 0.017 50 Machine color 0 with 120 total workers (my rank: 50)
+c 0.018 22 Machine color 0 with 120 total workers (my rank: 22)
+c 0.018 12 Machine color 0 with 120 total workers (my rank: 12)
+c 0.017 57 Machine color 0 with 120 total workers (my rank: 57)
+c 0.017 35 Machine color 0 with 120 total workers (my rank: 35)
+c 0.017 26 Machine color 0 with 120 total workers (my rank: 26)
+c 0.018 20 Machine color 0 with 120 total workers (my rank: 20)
+c 0.017 25 Machine color 0 with 120 total workers (my rank: 25)
+c 0.018 25 <Janitor> tid=83808
+c 0.017 30 Machine color 0 with 120 total workers (my rank: 30)
+c 0.018 32 Machine color 0 with 120 total workers (my rank: 32)
+c 0.018 7 Machine color 0 with 120 total workers (my rank: 7)
+c 0.018 92 Machine color 0 with 120 total workers (my rank: 92)
+c 0.018 27 Machine color 0 with 120 total workers (my rank: 27)
+c 0.018 27 <Janitor> tid=83821
+c 0.018 40 Machine color 0 with 120 total workers (my rank: 40)
+c 0.017 34 Machine color 0 with 120 total workers (my rank: 34)
+c 0.018 41 Machine color 0 with 120 total workers (my rank: 41)
+c 0.018 67 Machine color 0 with 120 total workers (my rank: 67)
+c 0.018 11 Machine color 0 with 120 total workers (my rank: 11)
+c 0.018 38 Machine color 0 with 120 total workers (my rank: 38)
+c 0.018 45 Machine color 0 with 120 total workers (my rank: 45)
+c 0.017 14 Machine color 0 with 120 total workers (my rank: 14)
+c 0.018 33 Machine color 0 with 120 total workers (my rank: 33)
+c 0.017 48 Machine color 0 with 120 total workers (my rank: 48)
+c 0.018 42 Machine color 0 with 120 total workers (my rank: 42)
+c 0.018 63 Machine color 0 with 120 total workers (my rank: 63)
+c 0.018 2 Machine color 0 with 120 total workers (my rank: 2)
+c 0.017 89 Machine color 0 with 120 total workers (my rank: 89)
+c 0.018 46 Machine color 0 with 120 total workers (my rank: 46)
+c 0.018 49 Machine color 0 with 120 total workers (my rank: 49)
+c 0.018 55 Machine color 0 with 120 total workers (my rank: 55)
+c 0.017 31 Machine color 0 with 120 total workers (my rank: 31)
+c 0.017 39 Machine color 0 with 120 total workers (my rank: 39)
+c 0.018 61 Machine color 0 with 120 total workers (my rank: 61)
+c 0.018 37 Machine color 0 with 120 total workers (my rank: 37)
+c 0.018 9 Machine color 0 with 120 total workers (my rank: 9)
+c 0.017 58 Machine color 0 with 120 total workers (my rank: 58)
+c 0.018 111 Machine color 0 with 120 total workers (my rank: 111)
+c 0.018 64 Machine color 0 with 120 total workers (my rank: 64)
+c 0.018 43 Machine color 0 with 120 total workers (my rank: 43)
+c 0.018 65 Machine color 0 with 120 total workers (my rank: 65)
+c 0.017 19 Machine color 0 with 120 total workers (my rank: 19)
+c 0.018 54 Machine color 0 with 120 total workers (my rank: 54)
+c 0.018 68 Machine color 0 with 120 total workers (my rank: 68)
+c 0.018 66 Machine color 0 with 120 total workers (my rank: 66)
+c 0.018 56 Machine color 0 with 120 total workers (my rank: 56)
+c 0.018 56 <Janitor> tid=83800
+c 0.018 69 Machine color 0 with 120 total workers (my rank: 69)
+c 0.018 47 Machine color 0 with 120 total workers (my rank: 47)
+c 0.017 70 Machine color 0 with 120 total workers (my rank: 70)
+c 0.018 71 Machine color 0 with 120 total workers (my rank: 71)
+c 0.018 59 Machine color 0 with 120 total workers (my rank: 59)
+c 0.018 72 Machine color 0 with 120 total workers (my rank: 72)
+c 0.017 100 Machine color 0 with 120 total workers (my rank: 100)
+c 0.017 73 Machine color 0 with 120 total workers (my rank: 73)
+c 0.017 13 Machine color 0 with 120 total workers (my rank: 13)
+c 0.018 95 Machine color 0 with 120 total workers (my rank: 95)
+c 0.017 80 Machine color 0 with 120 total workers (my rank: 80)
+c 0.017 80 <Janitor> tid=83863
+c 0.018 75 Machine color 0 with 120 total workers (my rank: 75)
+c 0.018 78 Machine color 0 with 120 total workers (my rank: 78)
+c 0.018 77 Machine color 0 with 120 total workers (my rank: 77)
+c 0.018 83 Machine color 0 with 120 total workers (my rank: 83)
+c 0.018 84 Machine color 0 with 120 total workers (my rank: 84)
+c 0.017 79 Machine color 0 with 120 total workers (my rank: 79)
+c 0.018 76 Machine color 0 with 120 total workers (my rank: 76)
+c 0.017 60 Machine color 0 with 120 total workers (my rank: 60)
+c 0.018 86 Machine color 0 with 120 total workers (my rank: 86)
+c 0.017 28 Machine color 0 with 120 total workers (my rank: 28)
+c 0.018 29 Machine color 0 with 120 total workers (my rank: 29)
+c 0.017 110 Machine color 0 with 120 total workers (my rank: 110)
+c 0.018 24 Machine color 0 with 120 total workers (my rank: 24)
+c 0.017 52 Machine color 0 with 120 total workers (my rank: 52)
+c 0.017 82 Machine color 0 with 120 total workers (my rank: 82)
+c 0.017 119 Machine color 0 with 120 total workers (my rank: 119)
+c 0.017 0 Machine color 0 with 120 total workers (my rank: 0)
+c 0.017 0 <Reader> Starting
+c 0.017 0 I Mapping job "admin.mono-job.json" to internal ID #1
+c 0.017 0 <Reader> [T] Reading job #1 rev. 0 {./instances/covtypeShuffle50.csv} ...
+c 0.018 101 Machine color 0 with 120 total workers (my rank: 101)
+c 0.018 102 Machine color 0 with 120 total workers (my rank: 102)
+c 0.018 98 Machine color 0 with 120 total workers (my rank: 98)
+c 0.017 85 Machine color 0 with 120 total workers (my rank: 85)
+c 0.018 97 Machine color 0 with 120 total workers (my rank: 97)
+c 0.018 114 Machine color 0 with 120 total workers (my rank: 114)
+c 0.018 88 Machine color 0 with 120 total workers (my rank: 88)
+c 0.017 81 Machine color 0 with 120 total workers (my rank: 81)
+c 0.017 108 Machine color 0 with 120 total workers (my rank: 108)
+c 0.017 103 Machine color 0 with 120 total workers (my rank: 103)
+c 1.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs=0 hops=0
+c 1.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 2.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs=0 hops=0
+c 2.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 3.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.45GB newreqs=0 hops=0
+c 3.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 3.326 0 <Reader> [T] Initialized job #1 {./instances/covtypeShuffle50.csv} in 3.309s: 16200003 lits w/ separators, 0 assumptions
+c 3.326 0 Introducing job #1 rev. 0 : r.#1:0 rev. 0 <- [0] born=3.326 hops=0 epoch=-1 => [77]
+c 3.327 77 BLC insert (1,1,0.010)
+c 3.328 77 Activate r.#1:0 rev. 0 <- [0] born=3.326 hops=0 epoch=-1
+c 3.328 52 ADOPT r.#1:0 rev. 0 <- [0] born=3.326 hops=1 epoch=-1 mode=1 <= [77]
+c 3.328 52 COMMIT #1 -> #1:0
+c 3.328 0 Scheduling r.#1:0 rev. 0 <- [0] born=3.326 hops=1 epoch=-1 on [52] (latency: 0.00177s)
+c 3.397 52 UNCOMMIT #1:0
+c 3.397 52 LOAD 1 (+#1:0)
+c 3.397 52 EXECUTE #1:0 <= [0]
+c 3.397 52                            loaded
+c 3.397 52                            COMMSIZE: 1 myRank: 52 myIndex: 0
+c 3.397 52                            Children: 0
+c 3.397 52                            myIndex: 0 getting ready
+c 3.397 52                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.397 52                            myIndex: 0 Ready!
+c 3.398 52 BLC insert (1,120,1.000)
+c 3.398 52 #1:0 : update v=120 epoch=2 lastreqsepoch=1 evlat=0.00072
+c 3.398 52 #1:0 growing: r.#1:1 rev. 0 <- [52] born=3.398 hops=0 epoch=2 => [46]
+c 3.398 52 #1:0 growing: r.#1:2 rev. 0 <- [52] born=3.398 hops=0 epoch=2 => [85]
+c 3.398 85 ADOPT r.#1:2 rev. 0 <- [52] born=3.398 hops=0 epoch=2 mode=1 <= [52]
+c 3.398 85 COMMIT #1 -> #1:2
+c 3.399 52                            myIndex: 0 sendRootNotification0
+c 3.399 52                            Send Init ONCE!!!
+c 3.399 52                            myIndex: 0 source: 0 mpiTag: 30
+c 3.399 52                            myIndex: 0 MSG_BROADCAST_DATA 
+c 3.399 52                            myIndex: 0 Workers: 1!
+c 3.399 46 ADOPT r.#1:1 rev. 0 <- [52] born=3.398 hops=0 epoch=2 mode=1 <= [52]
+c 3.399 46 COMMIT #1 -> #1:1
+c 3.399 52                            myIndex: 0 countCurrentWorkers: 1
+c 3.399 52                            myIndex: 0 !tempJobTree.hasLeftChild() 1 lIndex in 0
+c 3.399 52                            myIndex: 0 !tempJobTree.hasRightChild() 0 rIndex in 0
+c 3.399 52                            myIndex: 0 advanceCollective
+c 3.399 52                            myIndex: 0 send fill right
+c 3.398 85 #1:2 growing: r.#1:5 rev. 0 <- [85] born=3.398 hops=0 epoch=2 => [25]
+c 3.398 85 #1:2 growing: r.#1:6 rev. 0 <- [85] born=3.398 hops=0 epoch=2 => [49]
+c 3.399 49 ADOPT r.#1:6 rev. 0 <- [85] born=3.398 hops=0 epoch=2 mode=1 <= [85]
+c 3.399 49 COMMIT #1 -> #1:6
+c 3.399 25 ADOPT r.#1:5 rev. 0 <- [85] born=3.398 hops=0 epoch=2 mode=1 <= [85]
+c 3.399 25 COMMIT #1 -> #1:5
+c 3.399 52                            myIndex: 0 Start Calc
+c 3.399 52                            MI: 0 intervalId: 0 PC: 300000 cW: 1 start:0 end:300000!!      iter:0 
+c 3.399 52                            will skip Iter
+c 3.399 52                            myIndex: 0 End Calc basic
+c 3.399 25 #1:5 growing: r.#1:11 rev. 0 <- [25] born=3.399 hops=0 epoch=2 => [102]
+c 3.399 25 #1:5 growing: r.#1:12 rev. 0 <- [25] born=3.399 hops=0 epoch=2 => [97]
+c 3.400 49 #1:6 growing: r.#1:13 rev. 0 <- [49] born=3.400 hops=0 epoch=2 => [65]
+c 3.400 49 #1:6 growing: r.#1:14 rev. 0 <- [49] born=3.400 hops=0 epoch=2 => [0]
+c 3.400 46 #1:1 growing: r.#1:3 rev. 0 <- [46] born=3.400 hops=0 epoch=2 => [108]
+c 3.400 46 #1:1 growing: r.#1:4 rev. 0 <- [46] born=3.400 hops=0 epoch=2 => [76]
+c 3.400 65 ADOPT r.#1:13 rev. 0 <- [49] born=3.400 hops=0 epoch=2 mode=1 <= [49]
+c 3.400 65 COMMIT #1 -> #1:13
+c 3.399 0 ADOPT r.#1:14 rev. 0 <- [49] born=3.400 hops=0 epoch=2 mode=1 <= [49]
+c 3.399 0 COMMIT #1 -> #1:14
+c 3.400 76 ADOPT r.#1:4 rev. 0 <- [46] born=3.400 hops=0 epoch=2 mode=1 <= [46]
+c 3.400 76 COMMIT #1 -> #1:4
+c 3.400 102 ADOPT r.#1:11 rev. 0 <- [25] born=3.399 hops=0 epoch=2 mode=1 <= [25]
+c 3.400 102 COMMIT #1 -> #1:11
+c 3.400 97 ADOPT r.#1:12 rev. 0 <- [25] born=3.399 hops=0 epoch=2 mode=1 <= [25]
+c 3.400 97 COMMIT #1 -> #1:12
+c 3.399 108 ADOPT r.#1:3 rev. 0 <- [46] born=3.400 hops=0 epoch=2 mode=1 <= [46]
+c 3.399 108 COMMIT #1 -> #1:3
+c 3.401 65 #1:13 growing: r.#1:27 rev. 0 <- [65] born=3.401 hops=0 epoch=2 => [15]
+c 3.401 65 #1:13 growing: r.#1:28 rev. 0 <- [65] born=3.401 hops=0 epoch=2 => [54]
+c 3.401 76 #1:4 growing: r.#1:9 rev. 0 <- [76] born=3.401 hops=0 epoch=2 => [95]
+c 3.401 76 #1:4 growing: r.#1:10 rev. 0 <- [76] born=3.401 hops=0 epoch=2 => [34]
+c 3.400 102 #1:11 growing: r.#1:23 rev. 0 <- [102] born=3.400 hops=0 epoch=2 => [105]
+c 3.400 102 #1:11 growing: r.#1:24 rev. 0 <- [102] born=3.400 hops=0 epoch=2 => [53]
+c 3.400 97 #1:12 growing: r.#1:25 rev. 0 <- [97] born=3.400 hops=0 epoch=2 => [80]
+c 3.400 97 #1:12 growing: r.#1:26 rev. 0 <- [97] born=3.400 hops=0 epoch=2 => [35]
+c 3.400 54 ADOPT r.#1:28 rev. 0 <- [65] born=3.401 hops=0 epoch=2 mode=1 <= [65]
+c 3.400 95 ADOPT r.#1:9 rev. 0 <- [76] born=3.401 hops=0 epoch=2 mode=1 <= [76]
+c 3.400 95 COMMIT #1 -> #1:9
+c 3.400 108 #1:3 growing: r.#1:7 rev. 0 <- [108] born=3.400 hops=0 epoch=2 => [94]
+c 3.400 108 #1:3 growing: r.#1:8 rev. 0 <- [108] born=3.400 hops=0 epoch=2 => [92]
+c 3.400 0 #1:14 growing: r.#1:29 rev. 0 <- [0] born=3.400 hops=0 epoch=2 => [110]
+c 3.400 0 #1:14 growing: r.#1:30 rev. 0 <- [0] born=3.400 hops=0 epoch=2 => [89]
+c 3.400 54 COMMIT #1 -> #1:28
+c 3.400 105 ADOPT r.#1:23 rev. 0 <- [102] born=3.400 hops=0 epoch=2 mode=1 <= [102]
+c 3.400 105 COMMIT #1 -> #1:23
+c 3.400 15 ADOPT r.#1:27 rev. 0 <- [65] born=3.401 hops=0 epoch=2 mode=1 <= [65]
+c 3.400 15 COMMIT #1 -> #1:27
+c 3.400 35 ADOPT r.#1:26 rev. 0 <- [97] born=3.400 hops=0 epoch=2 mode=1 <= [97]
+c 3.400 89 ADOPT r.#1:30 rev. 0 <- [0] born=3.400 hops=0 epoch=2 mode=1 <= [0]
+c 3.400 80 ADOPT r.#1:25 rev. 0 <- [97] born=3.400 hops=0 epoch=2 mode=1 <= [97]
+c 3.400 80 COMMIT #1 -> #1:25
+c 3.400 35 COMMIT #1 -> #1:26
+c 3.400 53 ADOPT r.#1:24 rev. 0 <- [102] born=3.400 hops=0 epoch=2 mode=1 <= [102]
+c 3.400 53 COMMIT #1 -> #1:24
+c 3.400 94 ADOPT r.#1:7 rev. 0 <- [108] born=3.400 hops=0 epoch=2 mode=1 <= [108]
+c 3.400 94 COMMIT #1 -> #1:7
+c 3.400 89 COMMIT #1 -> #1:30
+c 3.400 110 ADOPT r.#1:29 rev. 0 <- [0] born=3.400 hops=0 epoch=2 mode=1 <= [0]
+c 3.400 92 ADOPT r.#1:8 rev. 0 <- [108] born=3.400 hops=0 epoch=2 mode=1 <= [108]
+c 3.400 92 COMMIT #1 -> #1:8
+c 3.400 34 ADOPT r.#1:10 rev. 0 <- [76] born=3.401 hops=0 epoch=2 mode=1 <= [76]
+c 3.400 34 COMMIT #1 -> #1:10
+c 3.401 94 #1:7 growing: r.#1:15 rev. 0 <- [94] born=3.401 hops=0 epoch=2 => [59]
+c 3.401 94 #1:7 growing: r.#1:16 rev. 0 <- [94] born=3.401 hops=0 epoch=2 => [83]
+c 3.401 95 #1:9 growing: r.#1:19 rev. 0 <- [95] born=3.401 hops=0 epoch=2 => [41]
+c 3.401 95 #1:9 growing: r.#1:20 rev. 0 <- [95] born=3.401 hops=0 epoch=2 => [24]
+c 3.400 28 ADOPT r.#1:47 rev. 0 <- [105] born=3.400 hops=0 epoch=2 mode=1 <= [105]
+c 3.401 89 #1:30 growing: r.#1:61 rev. 0 <- [89] born=3.401 hops=0 epoch=2 => [104]
+c 3.401 89 #1:30 growing: r.#1:62 rev. 0 <- [89] born=3.401 hops=0 epoch=2 => [7]
+c 3.401 54 #1:28 growing: r.#1:57 rev. 0 <- [54] born=3.401 hops=0 epoch=2 => [33]
+c 3.401 54 #1:28 growing: r.#1:58 rev. 0 <- [54] born=3.401 hops=0 epoch=2 => [42]
+c 3.400 105 #1:23 growing: r.#1:47 rev. 0 <- [105] born=3.400 hops=0 epoch=2 => [28]
+c 3.400 105 #1:23 growing: r.#1:48 rev. 0 <- [105] born=3.400 hops=0 epoch=2 => [67]
+c 3.400 15 #1:27 growing: r.#1:55 rev. 0 <- [15] born=3.400 hops=0 epoch=2 => [118]
+c 3.400 15 #1:27 growing: r.#1:56 rev. 0 <- [15] born=3.400 hops=0 epoch=2 => [98]
+c 3.400 110 COMMIT #1 -> #1:29
+c 3.401 33 ADOPT r.#1:57 rev. 0 <- [54] born=3.401 hops=0 epoch=2 mode=1 <= [54]
+c 3.401 33 COMMIT #1 -> #1:57
+c 3.400 80 #1:25 growing: r.#1:51 rev. 0 <- [80] born=3.400 hops=0 epoch=2 => [51]
+c 3.400 80 #1:25 growing: r.#1:52 rev. 0 <- [80] born=3.400 hops=0 epoch=2 => [20]
+c 3.400 34 #1:10 growing: r.#1:21 rev. 0 <- [34] born=3.400 hops=0 epoch=2 => [45]
+c 3.400 34 #1:10 growing: r.#1:22 rev. 0 <- [34] born=3.400 hops=0 epoch=2 => [19]
+c 3.400 28 COMMIT #1 -> #1:47
+c 3.401 24 ADOPT r.#1:20 rev. 0 <- [95] born=3.401 hops=0 epoch=2 mode=1 <= [95]
+c 3.401 109 ADOPT r.#1:53 rev. 0 <- [35] born=3.400 hops=0 epoch=2 mode=1 <= [35]
+c 3.400 35 #1:26 growing: r.#1:53 rev. 0 <- [35] born=3.400 hops=0 epoch=2 => [109]
+c 3.400 35 #1:26 growing: r.#1:54 rev. 0 <- [35] born=3.400 hops=0 epoch=2 => [30]
+c 3.400 53 #1:24 growing: r.#1:49 rev. 0 <- [53] born=3.400 hops=0 epoch=2 => [68]
+c 3.400 53 #1:24 growing: r.#1:50 rev. 0 <- [53] born=3.400 hops=0 epoch=2 => [14]
+c 3.401 67 ADOPT r.#1:48 rev. 0 <- [105] born=3.400 hops=0 epoch=2 mode=1 <= [105]
+c 3.401 67 COMMIT #1 -> #1:48
+c 3.401 42 ADOPT r.#1:58 rev. 0 <- [54] born=3.401 hops=0 epoch=2 mode=1 <= [54]
+c 3.401 42 COMMIT #1 -> #1:58
+c 3.401 33 #1:57 growing: r.#1:115 rev. 0 <- [33] born=3.401 hops=0 epoch=2 => [119]
+c 3.401 33 #1:57 growing: r.#1:116 rev. 0 <- [33] born=3.401 hops=0 epoch=2 => [90]
+c 3.401 19 ADOPT r.#1:22 rev. 0 <- [34] born=3.400 hops=0 epoch=2 mode=1 <= [34]
+c 3.401 19 COMMIT #1 -> #1:22
+c 3.401 68 ADOPT r.#1:49 rev. 0 <- [53] born=3.400 hops=0 epoch=2 mode=1 <= [53]
+c 3.401 68 COMMIT #1 -> #1:49
+c 3.401 68 #1:49 growing: r.#1:99 rev. 0 <- [68] born=3.401 hops=0 epoch=2 => [39]
+c 3.401 68 #1:49 growing: r.#1:100 rev. 0 <- [68] born=3.401 hops=0 epoch=2 => [29]
+c 3.401 71 ADOPT r.#1:18 rev. 0 <- [92] born=3.401 hops=0 epoch=2 mode=1 <= [92]
+c 3.401 71 COMMIT #1 -> #1:18
+c 3.401 59 ADOPT r.#1:15 rev. 0 <- [94] born=3.401 hops=0 epoch=2 mode=1 <= [94]
+c 3.402 59 COMMIT #1 -> #1:15
+c 3.402 59 #1:15 growing: r.#1:31 rev. 0 <- [59] born=3.402 hops=0 epoch=2 => [38]
+c 3.402 59 #1:15 growing: r.#1:32 rev. 0 <- [59] born=3.402 hops=0 epoch=2 => [62]
+c 3.401 73 ADOPT r.#1:17 rev. 0 <- [92] born=3.401 hops=0 epoch=2 mode=1 <= [92]
+c 3.401 73 COMMIT #1 -> #1:17
+c 3.401 83 ADOPT r.#1:16 rev. 0 <- [94] born=3.401 hops=0 epoch=2 mode=1 <= [94]
+c 3.401 83 COMMIT #1 -> #1:16
+c 3.401 83 #1:16 growing: r.#1:33 rev. 0 <- [83] born=3.401 hops=0 epoch=2 => [79]
+c 3.401 83 #1:16 growing: r.#1:34 rev. 0 <- [83] born=3.401 hops=0 epoch=2 => [72]
+c 3.401 28 #1:47 growing: r.#1:95 rev. 0 <- [28] born=3.401 hops=0 epoch=2 => [5]
+c 3.401 28 #1:47 growing: r.#1:96 rev. 0 <- [28] born=3.401 hops=0 epoch=2 => [50]
+c 3.400 119 ADOPT r.#1:115 rev. 0 <- [33] born=3.401 hops=0 epoch=2 mode=1 <= [33]
+c 3.401 119 COMMIT #1 -> #1:115
+c 3.401 98 ADOPT r.#1:56 rev. 0 <- [15] born=3.400 hops=0 epoch=2 mode=1 <= [15]
+c 3.401 98 COMMIT #1 -> #1:56
+c 3.402 98 #1:56 growing: r.#1:113 rev. 0 <- [98] born=3.402 hops=0 epoch=2 => [18]
+c 3.402 98 #1:56 growing: r.#1:114 rev. 0 <- [98] born=3.402 hops=0 epoch=2 => [96]
+c 3.401 24 COMMIT #1 -> #1:20
+c 3.401 24 #1:20 growing: r.#1:41 rev. 0 <- [24] born=3.401 hops=0 epoch=2 => [115]
+c 3.401 24 #1:20 growing: r.#1:42 rev. 0 <- [24] born=3.401 hops=0 epoch=2 => [99]
+c 3.402 42 #1:58 growing: r.#1:117 rev. 0 <- [42] born=3.402 hops=0 epoch=2 => [70]
+c 3.402 42 #1:58 growing: r.#1:118 rev. 0 <- [42] born=3.402 hops=0 epoch=2 => [60]
+c 3.401 109 COMMIT #1 -> #1:53
+c 3.402 109 #1:53 growing: r.#1:107 rev. 0 <- [109] born=3.402 hops=0 epoch=2 => [21]
+c 3.402 109 #1:53 growing: r.#1:108 rev. 0 <- [109] born=3.402 hops=0 epoch=2 => [75]
+c 3.401 118 ADOPT r.#1:55 rev. 0 <- [15] born=3.400 hops=0 epoch=2 mode=1 <= [15]
+c 3.401 118 COMMIT #1 -> #1:55
+c 3.401 118 #1:55 growing: r.#1:111 rev. 0 <- [118] born=3.401 hops=0 epoch=2 => [32]
+c 3.401 118 #1:55 growing: r.#1:112 rev. 0 <- [118] born=3.401 hops=0 epoch=2 => [56]
+c 3.400 23 ADOPT r.#1:59 rev. 0 <- [110] born=3.400 hops=0 epoch=2 mode=1 <= [110]
+c 3.400 23 COMMIT #1 -> #1:59
+c 3.400 23 #1:59 growing: r.#1:119 rev. 0 <- [23] born=3.400 hops=0 epoch=2 => [58]
+c 3.401 104 ADOPT r.#1:61 rev. 0 <- [89] born=3.401 hops=0 epoch=2 mode=1 <= [89]
+c 3.402 104 COMMIT #1 -> #1:61
+c 3.401 51 ADOPT r.#1:51 rev. 0 <- [80] born=3.400 hops=0 epoch=2 mode=1 <= [80]
+c 3.401 51 COMMIT #1 -> #1:51
+c 3.401 20 ADOPT r.#1:52 rev. 0 <- [80] born=3.400 hops=0 epoch=2 mode=1 <= [80]
+c 3.401 20 COMMIT #1 -> #1:52
+c 3.402 20 #1:52 growing: r.#1:105 rev. 0 <- [20] born=3.401 hops=0 epoch=2 => [2]
+c 3.402 20 #1:52 growing: r.#1:106 rev. 0 <- [20] born=3.402 hops=0 epoch=2 => [82]
+c 3.400 30 ADOPT r.#1:54 rev. 0 <- [35] born=3.400 hops=0 epoch=2 mode=1 <= [35]
+c 3.400 30 COMMIT #1 -> #1:54
+c 3.401 30 #1:54 growing: r.#1:109 rev. 0 <- [30] born=3.401 hops=0 epoch=2 => [88]
+c 3.401 30 #1:54 growing: r.#1:110 rev. 0 <- [30] born=3.401 hops=0 epoch=2 => [66]
+c 3.401 7 ADOPT r.#1:62 rev. 0 <- [89] born=3.401 hops=0 epoch=2 mode=1 <= [89]
+c 3.402 7 COMMIT #1 -> #1:62
+c 3.401 92 #1:8 growing: r.#1:17 rev. 0 <- [92] born=3.401 hops=0 epoch=2 => [73]
+c 3.401 92 #1:8 growing: r.#1:18 rev. 0 <- [92] born=3.401 hops=0 epoch=2 => [71]
+c 3.401 41 ADOPT r.#1:19 rev. 0 <- [95] born=3.401 hops=0 epoch=2 mode=1 <= [95]
+c 3.401 41 COMMIT #1 -> #1:19
+c 3.402 41 #1:19 growing: r.#1:39 rev. 0 <- [41] born=3.402 hops=0 epoch=2 => [114]
+c 3.402 41 #1:19 growing: r.#1:40 rev. 0 <- [41] born=3.402 hops=0 epoch=2 => [91]
+c 3.401 45 ADOPT r.#1:21 rev. 0 <- [34] born=3.400 hops=0 epoch=2 mode=1 <= [34]
+c 3.401 45 COMMIT #1 -> #1:21
+c 3.400 14 ADOPT r.#1:50 rev. 0 <- [53] born=3.400 hops=0 epoch=2 mode=1 <= [53]
+c 3.401 14 COMMIT #1 -> #1:50
+c 3.401 14 #1:50 growing: r.#1:101 rev. 0 <- [14] born=3.401 hops=0 epoch=2 => [107]
+c 3.401 14 #1:50 growing: r.#1:102 rev. 0 <- [14] born=3.401 hops=0 epoch=2 => [100]
+c 3.400 110 #1:29 growing: r.#1:59 rev. 0 <- [110] born=3.400 hops=0 epoch=2 => [23]
+c 3.400 110 #1:29 growing: r.#1:60 rev. 0 <- [110] born=3.400 hops=0 epoch=2 => [6]
+c 3.401 96 ADOPT r.#1:114 rev. 0 <- [98] born=3.402 hops=0 epoch=2 mode=1 <= [98]
+c 3.401 96 COMMIT #1 -> #1:114
+c 3.402 5 ADOPT r.#1:95 rev. 0 <- [28] born=3.401 hops=0 epoch=2 mode=1 <= [28]
+c 3.402 5 COMMIT #1 -> #1:95
+c 3.400 6 ADOPT r.#1:60 rev. 0 <- [110] born=3.400 hops=0 epoch=2 mode=1 <= [110]
+c 3.401 6 COMMIT #1 -> #1:60
+c 3.402 91 ADOPT r.#1:40 rev. 0 <- [41] born=3.402 hops=0 epoch=2 mode=1 <= [41]
+c 3.402 91 COMMIT #1 -> #1:40
+c 3.402 91 #1:40 growing: r.#1:81 rev. 0 <- [91] born=3.402 hops=0 epoch=2 => [86]
+c 3.402 91 #1:40 growing: r.#1:82 rev. 0 <- [91] born=3.402 hops=0 epoch=2 => [26]
+c 3.401 18 ADOPT r.#1:113 rev. 0 <- [98] born=3.402 hops=0 epoch=2 mode=1 <= [98]
+c 3.401 18 COMMIT #1 -> #1:113
+c 3.402 21 ADOPT r.#1:107 rev. 0 <- [109] born=3.402 hops=0 epoch=2 mode=1 <= [109]
+c 3.402 21 COMMIT #1 -> #1:107
+c 3.401 50 ADOPT r.#1:96 rev. 0 <- [28] born=3.401 hops=0 epoch=2 mode=1 <= [28]
+c 3.401 50 COMMIT #1 -> #1:96
+c 3.402 32 ADOPT r.#1:111 rev. 0 <- [118] born=3.401 hops=0 epoch=2 mode=1 <= [118]
+c 3.402 32 COMMIT #1 -> #1:111
+c 3.402 40 ADOPT r.#1:97 rev. 0 <- [67] born=3.401 hops=0 epoch=2 mode=1 <= [67]
+c 3.402 40 COMMIT #1 -> #1:97
+c 3.402 11 ADOPT r.#1:98 rev. 0 <- [67] born=3.401 hops=0 epoch=2 mode=1 <= [67]
+c 3.402 11 COMMIT #1 -> #1:98
+c 3.401 38 ADOPT r.#1:31 rev. 0 <- [59] born=3.402 hops=0 epoch=2 mode=1 <= [59]
+c 3.402 38 COMMIT #1 -> #1:31
+c 3.402 38 #1:31 growing: r.#1:63 rev. 0 <- [38] born=3.402 hops=0 epoch=2 => [57]
+c 3.402 38 #1:31 growing: r.#1:64 rev. 0 <- [38] born=3.402 hops=0 epoch=2 => [3]
+c 3.401 67 #1:48 growing: r.#1:97 rev. 0 <- [67] born=3.401 hops=0 epoch=2 => [40]
+c 3.401 67 #1:48 growing: r.#1:98 rev. 0 <- [67] born=3.401 hops=0 epoch=2 => [11]
+c 3.402 2 ADOPT r.#1:105 rev. 0 <- [20] born=3.401 hops=0 epoch=2 mode=1 <= [20]
+c 3.402 2 COMMIT #1 -> #1:105
+c 3.401 39 ADOPT r.#1:99 rev. 0 <- [68] born=3.401 hops=0 epoch=2 mode=1 <= [68]
+c 3.401 39 COMMIT #1 -> #1:99
+c 3.401 19 #1:22 growing: r.#1:45 rev. 0 <- [19] born=3.401 hops=0 epoch=2 => [93]
+c 3.401 19 #1:22 growing: r.#1:46 rev. 0 <- [19] born=3.401 hops=0 epoch=2 => [4]
+c 3.402 66 ADOPT r.#1:110 rev. 0 <- [30] born=3.401 hops=0 epoch=2 mode=1 <= [30]
+c 3.402 66 COMMIT #1 -> #1:110
+c 3.402 56 ADOPT r.#1:112 rev. 0 <- [118] born=3.401 hops=0 epoch=2 mode=1 <= [118]
+c 3.402 56 COMMIT #1 -> #1:112
+c 3.401 70 ADOPT r.#1:117 rev. 0 <- [42] born=3.402 hops=0 epoch=2 mode=1 <= [42]
+c 3.401 70 COMMIT #1 -> #1:117
+c 3.402 71 #1:18 growing: r.#1:37 rev. 0 <- [71] born=3.402 hops=0 epoch=2 => [84]
+c 3.402 71 #1:18 growing: r.#1:38 rev. 0 <- [71] born=3.402 hops=0 epoch=2 => [10]
+c 3.402 72 ADOPT r.#1:34 rev. 0 <- [83] born=3.401 hops=0 epoch=2 mode=1 <= [83]
+c 3.402 72 COMMIT #1 -> #1:34
+c 3.401 100 ADOPT r.#1:102 rev. 0 <- [14] born=3.401 hops=0 epoch=2 mode=1 <= [14]
+c 3.401 100 COMMIT #1 -> #1:102
+c 3.402 75 ADOPT r.#1:108 rev. 0 <- [109] born=3.402 hops=0 epoch=2 mode=1 <= [109]
+c 3.402 75 COMMIT #1 -> #1:108
+c 3.402 78 ADOPT r.#1:43 rev. 0 <- [45] born=3.402 hops=0 epoch=2 mode=1 <= [45]
+c 3.402 78 COMMIT #1 -> #1:43
+c 3.401 73 #1:17 growing: r.#1:35 rev. 0 <- [73] born=3.401 hops=0 epoch=2 => [8]
+c 3.401 73 #1:17 growing: r.#1:36 rev. 0 <- [73] born=3.401 hops=0 epoch=2 => [31]
+c 3.402 84 ADOPT r.#1:37 rev. 0 <- [71] born=3.402 hops=0 epoch=2 mode=1 <= [71]
+c 3.402 84 COMMIT #1 -> #1:37
+c 3.401 79 ADOPT r.#1:33 rev. 0 <- [83] born=3.401 hops=0 epoch=2 mode=1 <= [83]
+c 3.401 79 COMMIT #1 -> #1:33
+c 3.402 79 #1:33 growing: r.#1:67 rev. 0 <- [79] born=3.402 hops=0 epoch=2 => [27]
+c 3.402 79 #1:33 growing: r.#1:68 rev. 0 <- [79] born=3.402 hops=0 epoch=2 => [9]
+c 3.401 60 ADOPT r.#1:118 rev. 0 <- [42] born=3.402 hops=0 epoch=2 mode=1 <= [42]
+c 3.401 60 COMMIT #1 -> #1:118
+c 3.401 29 ADOPT r.#1:100 rev. 0 <- [68] born=3.401 hops=0 epoch=2 mode=1 <= [68]
+c 3.401 29 COMMIT #1 -> #1:100
+c 3.401 82 ADOPT r.#1:106 rev. 0 <- [20] born=3.402 hops=0 epoch=2 mode=1 <= [20]
+c 3.401 82 COMMIT #1 -> #1:106
+c 3.402 114 ADOPT r.#1:39 rev. 0 <- [41] born=3.402 hops=0 epoch=2 mode=1 <= [41]
+c 3.402 114 COMMIT #1 -> #1:39
+c 3.402 114 #1:39 growing: r.#1:79 rev. 0 <- [114] born=3.402 hops=0 epoch=2 => [52]
+c 3.402 114 #1:39 growing: r.#1:80 rev. 0 <- [114] born=3.402 hops=0 epoch=2 => [117]
+c 3.402 88 ADOPT r.#1:109 rev. 0 <- [30] born=3.401 hops=0 epoch=2 mode=1 <= [30]
+c 3.402 88 COMMIT #1 -> #1:109
+c 3.401 62 ADOPT r.#1:32 rev. 0 <- [59] born=3.402 hops=0 epoch=2 mode=1 <= [59]
+c 3.401 62 COMMIT #1 -> #1:32
+c 3.401 62 #1:32 growing: r.#1:65 rev. 0 <- [62] born=3.401 hops=0 epoch=2 => [48]
+c 3.401 62 #1:32 growing: r.#1:66 rev. 0 <- [62] born=3.401 hops=0 epoch=2 => [37]
+c 3.402 107 ADOPT r.#1:101 rev. 0 <- [14] born=3.401 hops=0 epoch=2 mode=1 <= [14]
+c 3.402 107 COMMIT #1 -> #1:101
+c 3.402 115 ADOPT r.#1:41 rev. 0 <- [24] born=3.401 hops=0 epoch=2 mode=1 <= [24]
+c 3.402 115 COMMIT #1 -> #1:41
+c 3.402 115 #1:41 growing: r.#1:83 rev. 0 <- [115] born=3.402 hops=0 epoch=2 => [16]
+c 3.402 115 #1:41 growing: r.#1:84 rev. 0 <- [115] born=3.402 hops=0 epoch=2 => [61]
+c 3.400 90 ADOPT r.#1:116 rev. 0 <- [33] born=3.401 hops=0 epoch=2 mode=1 <= [33]
+c 3.400 90 COMMIT #1 -> #1:116
+c 3.402 8 ADOPT r.#1:35 rev. 0 <- [73] born=3.401 hops=0 epoch=2 mode=1 <= [73]
+c 3.402 8 COMMIT #1 -> #1:35
+c 3.402 8 #1:35 growing: r.#1:71 rev. 0 <- [8] born=3.402 hops=0 epoch=2 => [116]
+c 3.402 8 #1:35 growing: r.#1:72 rev. 0 <- [8] born=3.402 hops=0 epoch=2 => [13]
+c 3.401 93 ADOPT r.#1:45 rev. 0 <- [19] born=3.401 hops=0 epoch=2 mode=1 <= [19]
+c 3.401 93 COMMIT #1 -> #1:45
+c 3.402 93 #1:45 growing: r.#1:91 rev. 0 <- [93] born=3.402 hops=0 epoch=2 => [103]
+c 3.402 93 #1:45 growing: r.#1:92 rev. 0 <- [93] born=3.402 hops=0 epoch=2 => [64]
+c 3.402 10 ADOPT r.#1:38 rev. 0 <- [71] born=3.402 hops=0 epoch=2 mode=1 <= [71]
+c 3.402 10 COMMIT #1 -> #1:38
+c 3.403 10 #1:38 growing: r.#1:77 rev. 0 <- [10] born=3.403 hops=0 epoch=2 => [44]
+c 3.403 10 #1:38 growing: r.#1:78 rev. 0 <- [10] born=3.403 hops=0 epoch=2 => [69]
+c 3.401 4 ADOPT r.#1:46 rev. 0 <- [19] born=3.401 hops=0 epoch=2 mode=1 <= [19]
+c 3.401 4 COMMIT #1 -> #1:46
+c 3.402 4 #1:46 growing: r.#1:93 rev. 0 <- [4] born=3.402 hops=0 epoch=2 => [63]
+c 3.402 4 #1:46 growing: r.#1:94 rev. 0 <- [4] born=3.402 hops=0 epoch=2 => [43]
+c 3.402 22 ADOPT r.#1:69 rev. 0 <- [72] born=3.402 hops=0 epoch=2 mode=1 <= [72]
+c 3.402 22 COMMIT #1 -> #1:69
+c 3.402 57 ADOPT r.#1:63 rev. 0 <- [38] born=3.402 hops=0 epoch=2 mode=1 <= [38]
+c 3.402 57 COMMIT #1 -> #1:63
+c 3.401 26 ADOPT r.#1:82 rev. 0 <- [91] born=3.402 hops=0 epoch=2 mode=1 <= [91]
+c 3.401 26 COMMIT #1 -> #1:82
+c 3.401 51 #1:51 growing: r.#1:103 rev. 0 <- [51] born=3.401 hops=0 epoch=2 => [36]
+c 3.402 51 #1:51 growing: r.#1:104 rev. 0 <- [51] born=3.402 hops=0 epoch=2 => [81]
+c 3.403 27 ADOPT r.#1:67 rev. 0 <- [79] born=3.402 hops=0 epoch=2 mode=1 <= [79]
+c 3.403 27 COMMIT #1 -> #1:67
+c 3.402 45 #1:21 growing: r.#1:43 rev. 0 <- [45] born=3.402 hops=0 epoch=2 => [78]
+c 3.402 45 #1:21 growing: r.#1:44 rev. 0 <- [45] born=3.402 hops=0 epoch=2 => [55]
+c 3.402 48 ADOPT r.#1:65 rev. 0 <- [62] born=3.401 hops=0 epoch=2 mode=1 <= [62]
+c 3.402 48 COMMIT #1 -> #1:65
+c 3.402 63 ADOPT r.#1:93 rev. 0 <- [4] born=3.402 hops=0 epoch=2 mode=1 <= [4]
+c 3.402 63 COMMIT #1 -> #1:93
+c 3.402 55 ADOPT r.#1:44 rev. 0 <- [45] born=3.402 hops=0 epoch=2 mode=1 <= [45]
+c 3.402 55 COMMIT #1 -> #1:44
+c 3.403 55 #1:44 growing: r.#1:89 rev. 0 <- [55] born=3.403 hops=0 epoch=2 => [47]
+c 3.403 55 #1:44 growing: r.#1:90 rev. 0 <- [55] born=3.403 hops=0 epoch=2 => [12]
+c 3.401 31 ADOPT r.#1:36 rev. 0 <- [73] born=3.401 hops=0 epoch=2 mode=1 <= [73]
+c 3.402 31 COMMIT #1 -> #1:36
+c 3.402 31 #1:36 growing: r.#1:73 rev. 0 <- [31] born=3.402 hops=0 epoch=2 => [106]
+c 3.402 31 #1:36 growing: r.#1:74 rev. 0 <- [31] born=3.402 hops=0 epoch=2 => [17]
+c 3.403 61 ADOPT r.#1:84 rev. 0 <- [115] born=3.402 hops=0 epoch=2 mode=1 <= [115]
+c 3.403 61 COMMIT #1 -> #1:84
+c 3.402 37 ADOPT r.#1:66 rev. 0 <- [62] born=3.401 hops=0 epoch=2 mode=1 <= [62]
+c 3.402 37 COMMIT #1 -> #1:66
+c 3.402 9 ADOPT r.#1:68 rev. 0 <- [79] born=3.402 hops=0 epoch=2 mode=1 <= [79]
+c 3.402 9 COMMIT #1 -> #1:68
+c 3.401 58 ADOPT r.#1:119 rev. 0 <- [23] born=3.400 hops=0 epoch=2 mode=1 <= [23]
+c 3.401 58 COMMIT #1 -> #1:119
+c 3.402 111 ADOPT r.#1:86 rev. 0 <- [99] born=3.402 hops=0 epoch=2 mode=1 <= [99]
+c 3.402 111 COMMIT #1 -> #1:86
+c 3.402 64 ADOPT r.#1:92 rev. 0 <- [93] born=3.402 hops=0 epoch=2 mode=1 <= [93]
+c 3.402 64 COMMIT #1 -> #1:92
+c 3.403 43 ADOPT r.#1:94 rev. 0 <- [4] born=3.402 hops=0 epoch=2 mode=1 <= [4]
+c 3.403 43 COMMIT #1 -> #1:94
+c 3.402 72 #1:34 growing: r.#1:69 rev. 0 <- [72] born=3.402 hops=0 epoch=2 => [22]
+c 3.402 72 #1:34 growing: r.#1:70 rev. 0 <- [72] born=3.402 hops=0 epoch=2 => [1]
+c 3.402 13 ADOPT r.#1:72 rev. 0 <- [8] born=3.402 hops=0 epoch=2 mode=1 <= [8]
+c 3.402 13 COMMIT #1 -> #1:72
+c 3.403 78 #1:43 growing: r.#1:87 rev. 0 <- [78] born=3.402 hops=0 epoch=2 => [112]
+c 3.403 78 #1:43 growing: r.#1:88 rev. 0 <- [78] born=3.403 hops=0 epoch=2 => [101]
+c 3.403 84 #1:37 growing: r.#1:75 rev. 0 <- [84] born=3.403 hops=0 epoch=2 => [74]
+c 3.403 84 #1:37 growing: r.#1:76 rev. 0 <- [84] born=3.403 hops=0 epoch=2 => [113]
+c 3.402 86 ADOPT r.#1:81 rev. 0 <- [91] born=3.402 hops=0 epoch=2 mode=1 <= [91]
+c 3.402 86 COMMIT #1 -> #1:81
+c 3.402 103 ADOPT r.#1:91 rev. 0 <- [93] born=3.402 hops=0 epoch=2 mode=1 <= [93]
+c 3.402 103 COMMIT #1 -> #1:91
+c 3.402 101 ADOPT r.#1:88 rev. 0 <- [78] born=3.403 hops=0 epoch=2 mode=1 <= [78]
+c 3.402 101 COMMIT #1 -> #1:88
+c 3.401 81 ADOPT r.#1:104 rev. 0 <- [51] born=3.402 hops=0 epoch=2 mode=1 <= [51]
+c 3.401 81 COMMIT #1 -> #1:104
+c 3.403 117 ADOPT r.#1:80 rev. 0 <- [114] born=3.402 hops=0 epoch=2 mode=1 <= [114]
+c 3.403 117 COMMIT #1 -> #1:80
+c 3.402 44 ADOPT r.#1:77 rev. 0 <- [10] born=3.403 hops=0 epoch=2 mode=1 <= [10]
+c 3.402 44 COMMIT #1 -> #1:77
+c 3.402 87 ADOPT r.#1:85 rev. 0 <- [99] born=3.402 hops=0 epoch=2 mode=1 <= [99]
+c 3.403 87 COMMIT #1 -> #1:85
+c 3.401 36 ADOPT r.#1:103 rev. 0 <- [51] born=3.401 hops=0 epoch=2 mode=1 <= [51]
+c 3.401 36 COMMIT #1 -> #1:103
+c 3.402 99 ADOPT r.#1:42 rev. 0 <- [24] born=3.401 hops=0 epoch=2 mode=1 <= [24]
+c 3.402 99 COMMIT #1 -> #1:42
+c 3.402 99 #1:42 growing: r.#1:85 rev. 0 <- [99] born=3.402 hops=0 epoch=2 => [87]
+c 3.402 99 #1:42 growing: r.#1:86 rev. 0 <- [99] born=3.402 hops=0 epoch=2 => [111]
+c 3.402 3 ADOPT r.#1:64 rev. 0 <- [38] born=3.402 hops=0 epoch=2 mode=1 <= [38]
+c 3.402 3 COMMIT #1 -> #1:64
+c 3.402 69 ADOPT r.#1:78 rev. 0 <- [10] born=3.403 hops=0 epoch=2 mode=1 <= [10]
+c 3.402 69 COMMIT #1 -> #1:78
+c 3.402 47 ADOPT r.#1:89 rev. 0 <- [55] born=3.403 hops=0 epoch=2 mode=1 <= [55]
+c 3.402 47 COMMIT #1 -> #1:89
+c 3.402 16 ADOPT r.#1:83 rev. 0 <- [115] born=3.402 hops=0 epoch=2 mode=1 <= [115]
+c 3.402 16 COMMIT #1 -> #1:83
+c 3.403 74 ADOPT r.#1:75 rev. 0 <- [84] born=3.403 hops=0 epoch=2 mode=1 <= [84]
+c 3.403 74 COMMIT #1 -> #1:75
+c 3.402 113 ADOPT r.#1:76 rev. 0 <- [84] born=3.403 hops=0 epoch=2 mode=1 <= [84]
+c 3.403 113 COMMIT #1 -> #1:76
+c 3.402 1 ADOPT r.#1:70 rev. 0 <- [72] born=3.402 hops=0 epoch=2 mode=1 <= [72]
+c 3.402 1 COMMIT #1 -> #1:70
+c 3.402 116 ADOPT r.#1:71 rev. 0 <- [8] born=3.402 hops=0 epoch=2 mode=1 <= [8]
+c 3.403 116 COMMIT #1 -> #1:71
+c 3.402 112 ADOPT r.#1:87 rev. 0 <- [78] born=3.402 hops=0 epoch=2 mode=1 <= [78]
+c 3.402 112 COMMIT #1 -> #1:87
+c 3.402 106 ADOPT r.#1:73 rev. 0 <- [31] born=3.402 hops=0 epoch=2 mode=1 <= [31]
+c 3.402 106 COMMIT #1 -> #1:73
+c 3.402 17 ADOPT r.#1:74 rev. 0 <- [31] born=3.402 hops=0 epoch=2 mode=1 <= [31]
+c 3.402 17 COMMIT #1 -> #1:74
+c 3.402 12 ADOPT r.#1:90 rev. 0 <- [55] born=3.403 hops=0 epoch=2 mode=1 <= [55]
+c 3.402 12 COMMIT #1 -> #1:90
+c 3.406 77 ADOPT r.#1:79 rev. 0 <- [114] born=3.402 hops=43 epoch=2 mode=1 <= [10]
+c 3.406 77 COMMIT #1 -> #1:79
+c 3.409 52                            myIndex: 0 all work Finished!!!
+c 3.409 52                            myIndex: 0 all work Finished2!!!
+c 3.409 52                            myIndex: 0 all work Finished END!!!
+c 3.409 52                            Skip Iter
+c 3.410 52                            myIndex: 0 sendRootNotification2
+c 3.410 52                            myIndex: 0 source: 0 mpiTag: 30
+c 3.410 52                            myIndex: 0 MSG_BROADCAST_DATA 
+c 3.410 52                            myIndex: 0 Workers: 1!
+c 3.410 52                            myIndex: 0 countCurrentWorkers: 120
+c 3.410 52                            myIndex: 0 !tempJobTree.hasLeftChild() 0 lIndex in 1
+c 3.410 52                            myIndex: 0 !tempJobTree.hasRightChild() 0 rIndex in 1
+c 3.410 52                            myIndex: 0 advanceCollective
+c 3.410 52                            myIndex: 0 sendTo 1 type: 30
+c 3.410 52                            myIndex: 0 sendTo 2 type: 30
+c 3.409 85                            myIndex: -2 source: 0 mpiTag: 30
+c 3.409 85                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.411 46                            myIndex: -2 source: 0 mpiTag: 30
+c 3.411 46                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.410 52                            myIndex: 0 Start Calc
+c 3.410 52                            MI: 0 intervalId: 0 PC: 300000 cW: 120 start:0 end:2500!!      iter:0 
+c 3.411 52                            myIndex: 0 source: 1 mpiTag: 30
+c 3.411 52                            myIndex: 0 returnFrom: 1 mpiTag: 30
+c 3.411 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.411 52                            myIndex: 0 LsourceIndex: 1
+c 3.411 52                            myIndex: 0 source: 2 mpiTag: 30
+c 3.411 52                            myIndex: 0 returnFrom: 2 mpiTag: 30
+c 3.411 52                            !leftDone 0 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.411 52                            myIndex: 0 RsourceIndex: 2
+c 3.411 52                            will skip Iter
+c 3.411 52                            myIndex: 0 End Calc basic
+c 3.419 52                            myIndex: 0 all work Finished!!!
+c 3.419 52                            myIndex: 0 all work Finished2!!!
+c 3.419 52                            myIndex: 0 all work Finished END!!!
+c 3.419 52                            Skip Iter
+c 3.420 52                            myIndex: 0 sendRootNotification2
+c 3.420 52                            myIndex: 0 source: 0 mpiTag: 30
+c 3.420 52                            myIndex: 0 MSG_BROADCAST_DATA 
+c 3.420 52                            myIndex: 0 Workers: 120!
+c 3.420 52                            myIndex: 0 countCurrentWorkers: 120
+c 3.420 52                            myIndex: 0 !tempJobTree.hasLeftChild() 0 lIndex in 1
+c 3.420 52                            myIndex: 0 !tempJobTree.hasRightChild() 0 rIndex in 1
+c 3.420 52                            myIndex: 0 advanceCollective
+c 3.420 52                            myIndex: 0 sendTo 1 type: 30
+c 3.420 52                            myIndex: 0 sendTo 2 type: 30
+c 3.419 85                            myIndex: -2 source: 0 mpiTag: 30
+c 3.419 85                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.421 46                            myIndex: -2 source: 0 mpiTag: 30
+c 3.421 46                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.420 52                            myIndex: 0 Start Calc
+c 3.420 52                            MI: 0 intervalId: 0 PC: 300000 cW: 120 start:0 end:2500!!      iter:0 
+c 3.422 52                            myIndex: 0 source: 2 mpiTag: 30
+c 3.422 52                            myIndex: 0 returnFrom: 2 mpiTag: 30
+c 3.422 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.422 52                            myIndex: 0 RsourceIndex: 2
+c 3.422 52                            myIndex: 0 source: 1 mpiTag: 30
+c 3.422 52                            myIndex: 0 returnFrom: 1 mpiTag: 30
+c 3.422 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.422 52                            myIndex: 0 LsourceIndex: 1
+c 3.422 52                            will skip Iter
+c 3.422 52                            myIndex: 0 End Calc basic
+c 3.430 52                            myIndex: 0 all work Finished!!!
+c 3.430 52                            myIndex: 0 all work Finished2!!!
+c 3.430 52                            myIndex: 0 all work Finished END!!!
+c 3.430 52                            Skip Iter
+c 3.430 52                            myIndex: 0 sendRootNotification2
+c 3.430 52                            myIndex: 0 source: 0 mpiTag: 30
+c 3.430 52                            myIndex: 0 MSG_BROADCAST_DATA 
+c 3.430 52                            myIndex: 0 Workers: 120!
+c 3.430 52                            myIndex: 0 countCurrentWorkers: 120
+c 3.430 52                            myIndex: 0 !tempJobTree.hasLeftChild() 0 lIndex in 1
+c 3.430 52                            myIndex: 0 !tempJobTree.hasRightChild() 0 rIndex in 1
+c 3.430 52                            myIndex: 0 advanceCollective
+c 3.430 52                            myIndex: 0 sendTo 1 type: 30
+c 3.430 52                            myIndex: 0 sendTo 2 type: 30
+c 3.430 85                            myIndex: -2 source: 0 mpiTag: 30
+c 3.430 85                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.431 46                            myIndex: -2 source: 0 mpiTag: 30
+c 3.431 46                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.430 52                            myIndex: 0 Start Calc
+c 3.430 52                            MI: 0 intervalId: 0 PC: 300000 cW: 120 start:0 end:2500!!      iter:0 
+c 3.431 52                            myIndex: 0 source: 2 mpiTag: 30
+c 3.431 52                            myIndex: 0 returnFrom: 2 mpiTag: 30
+c 3.431 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.431 52                            myIndex: 0 RsourceIndex: 2
+c 3.431 52                            myIndex: 0 source: 1 mpiTag: 30
+c 3.431 52                            myIndex: 0 returnFrom: 1 mpiTag: 30
+c 3.431 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.431 52                            myIndex: 0 LsourceIndex: 1
+c 3.431 52                            will skip Iter
+c 3.431 52                            myIndex: 0 End Calc basic
+c 3.440 52                            myIndex: 0 all work Finished!!!
+c 3.440 52                            myIndex: 0 all work Finished2!!!
+c 3.440 52                            myIndex: 0 all work Finished END!!!
+c 3.440 52                            Skip Iter
+c 3.440 52                            myIndex: 0 sendRootNotification2
+c 3.441 52                            myIndex: 0 source: 0 mpiTag: 30
+c 3.441 52                            myIndex: 0 MSG_BROADCAST_DATA 
+c 3.441 52                            myIndex: 0 Workers: 120!
+c 3.441 52                            myIndex: 0 countCurrentWorkers: 120
+c 3.441 52                            myIndex: 0 !tempJobTree.hasLeftChild() 0 lIndex in 1
+c 3.441 52                            myIndex: 0 !tempJobTree.hasRightChild() 0 rIndex in 1
+c 3.441 52                            myIndex: 0 advanceCollective
+c 3.441 52                            myIndex: 0 sendTo 1 type: 30
+c 3.441 52                            myIndex: 0 sendTo 2 type: 30
+c 3.441 46                            myIndex: -2 source: 0 mpiTag: 30
+c 3.441 46                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.440 85                            myIndex: -2 source: 0 mpiTag: 30
+c 3.440 85                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.441 52                            myIndex: 0 Start Calc
+c 3.441 52                            MI: 0 intervalId: 0 PC: 300000 cW: 120 start:0 end:2500!!      iter:0 
+c 3.443 52                            myIndex: 0 source: 2 mpiTag: 30
+c 3.443 52                            myIndex: 0 returnFrom: 2 mpiTag: 30
+c 3.443 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.443 52                            myIndex: 0 RsourceIndex: 2
+c 3.443 52                            myIndex: 0 source: 1 mpiTag: 30
+c 3.443 52                            myIndex: 0 returnFrom: 1 mpiTag: 30
+c 3.443 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.443 52                            myIndex: 0 LsourceIndex: 1
+c 3.443 52                            will skip Iter
+c 3.443 52                            myIndex: 0 End Calc basic
+c 3.450 52                            myIndex: 0 all work Finished!!!
+c 3.450 52                            myIndex: 0 all work Finished2!!!
+c 3.450 52                            myIndex: 0 all work Finished END!!!
+c 3.450 52                            Skip Iter
+c 3.450 52                            myIndex: 0 sendRootNotification2
+c 3.450 52                            myIndex: 0 source: 0 mpiTag: 30
+c 3.450 52                            myIndex: 0 MSG_BROADCAST_DATA 
+c 3.450 52                            myIndex: 0 Workers: 120!
+c 3.450 52                            myIndex: 0 countCurrentWorkers: 120
+c 3.450 52                            myIndex: 0 !tempJobTree.hasLeftChild() 0 lIndex in 1
+c 3.450 52                            myIndex: 0 !tempJobTree.hasRightChild() 0 rIndex in 1
+c 3.450 52                            myIndex: 0 advanceCollective
+c 3.450 52                            myIndex: 0 sendTo 1 type: 30
+c 3.450 52                            myIndex: 0 sendTo 2 type: 30
+c 3.450 85                            myIndex: -2 source: 0 mpiTag: 30
+c 3.450 85                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.451 46                            myIndex: -2 source: 0 mpiTag: 30
+c 3.451 46                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.451 52                            myIndex: 0 Start Calc
+c 3.451 52                            MI: 0 intervalId: 0 PC: 300000 cW: 120 start:0 end:2500!!      iter:0 
+c 3.451 52                            myIndex: 0 source: 2 mpiTag: 30
+c 3.451 52                            myIndex: 0 returnFrom: 2 mpiTag: 30
+c 3.451 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.451 52                            myIndex: 0 RsourceIndex: 2
+c 3.451 52                            myIndex: 0 source: 1 mpiTag: 30
+c 3.451 52                            myIndex: 0 returnFrom: 1 mpiTag: 30
+c 3.451 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.451 52                            myIndex: 0 LsourceIndex: 1
+c 3.452 52                            will skip Iter
+c 3.452 52                            myIndex: 0 End Calc basic
+c 3.460 52                            myIndex: 0 all work Finished!!!
+c 3.460 52                            myIndex: 0 all work Finished2!!!
+c 3.460 52                            myIndex: 0 all work Finished END!!!
+c 3.460 52                            Skip Iter
+c 3.461 52                            myIndex: 0 sendRootNotification2
+c 3.461 52                            myIndex: 0 source: 0 mpiTag: 30
+c 3.461 52                            myIndex: 0 MSG_BROADCAST_DATA 
+c 3.461 52                            myIndex: 0 Workers: 120!
+c 3.461 52                            myIndex: 0 countCurrentWorkers: 120
+c 3.461 52                            myIndex: 0 !tempJobTree.hasLeftChild() 0 lIndex in 1
+c 3.461 52                            myIndex: 0 !tempJobTree.hasRightChild() 0 rIndex in 1
+c 3.461 52                            myIndex: 0 advanceCollective
+c 3.461 52                            myIndex: 0 sendTo 1 type: 30
+c 3.461 52                            myIndex: 0 sendTo 2 type: 30
+c 3.462 46                            myIndex: -2 source: 0 mpiTag: 30
+c 3.462 46                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.461 85                            myIndex: -2 source: 0 mpiTag: 30
+c 3.461 85                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.462 52                            myIndex: 0 Start Calc
+c 3.462 52                            MI: 0 intervalId: 0 PC: 300000 cW: 120 start:0 end:2500!!      iter:0 
+c 3.462 52                            myIndex: 0 source: 2 mpiTag: 30
+c 3.462 52                            myIndex: 0 returnFrom: 2 mpiTag: 30
+c 3.462 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.462 52                            myIndex: 0 RsourceIndex: 2
+c 3.462 52                            myIndex: 0 source: 1 mpiTag: 30
+c 3.462 52                            myIndex: 0 returnFrom: 1 mpiTag: 30
+c 3.462 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.462 52                            myIndex: 0 LsourceIndex: 1
+c 3.463 52                            will skip Iter
+c 3.463 52                            myIndex: 0 End Calc basic
+c 3.471 52                            myIndex: 0 all work Finished!!!
+c 3.471 52                            myIndex: 0 all work Finished2!!!
+c 3.471 52                            myIndex: 0 all work Finished END!!!
+c 3.471 52                            Skip Iter
+c 3.471 52                            myIndex: 0 sendRootNotification2
+c 3.471 52                            myIndex: 0 source: 0 mpiTag: 30
+c 3.471 52                            myIndex: 0 MSG_BROADCAST_DATA 
+c 3.471 52                            myIndex: 0 Workers: 120!
+c 3.472 52                            myIndex: 0 countCurrentWorkers: 120
+c 3.472 52                            myIndex: 0 !tempJobTree.hasLeftChild() 0 lIndex in 1
+c 3.472 52                            myIndex: 0 !tempJobTree.hasRightChild() 0 rIndex in 1
+c 3.472 52                            myIndex: 0 advanceCollective
+c 3.472 52                            myIndex: 0 sendTo 1 type: 30
+c 3.472 52                            myIndex: 0 sendTo 2 type: 30
+c 3.471 85                            myIndex: -2 source: 0 mpiTag: 30
+c 3.471 85                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.473 46                            myIndex: -2 source: 0 mpiTag: 30
+c 3.473 46                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.472 52                            myIndex: 0 Start Calc
+c 3.472 52                            MI: 0 intervalId: 0 PC: 300000 cW: 120 start:0 end:2500!!      iter:0 
+c 3.473 52                            myIndex: 0 source: 2 mpiTag: 30
+c 3.473 52                            myIndex: 0 returnFrom: 2 mpiTag: 30
+c 3.473 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.473 52                            myIndex: 0 RsourceIndex: 2
+c 3.473 52                            myIndex: 0 source: 1 mpiTag: 30
+c 3.473 52                            myIndex: 0 returnFrom: 1 mpiTag: 30
+c 3.473 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.473 52                            myIndex: 0 LsourceIndex: 1
+c 3.473 52                            will skip Iter
+c 3.473 52                            myIndex: 0 End Calc basic
+c 3.481 52                            myIndex: 0 all work Finished!!!
+c 3.481 52                            myIndex: 0 all work Finished2!!!
+c 3.481 52                            myIndex: 0 all work Finished END!!!
+c 3.481 52                            Skip Iter
+c 3.481 52                            myIndex: 0 sendRootNotification2
+c 3.481 52                            myIndex: 0 source: 0 mpiTag: 30
+c 3.481 52                            myIndex: 0 MSG_BROADCAST_DATA 
+c 3.481 52                            myIndex: 0 Workers: 120!
+c 3.482 52                            myIndex: 0 countCurrentWorkers: 120
+c 3.482 52                            myIndex: 0 !tempJobTree.hasLeftChild() 0 lIndex in 1
+c 3.482 52                            myIndex: 0 !tempJobTree.hasRightChild() 0 rIndex in 1
+c 3.482 52                            myIndex: 0 advanceCollective
+c 3.482 52                            myIndex: 0 sendTo 1 type: 30
+c 3.482 52                            myIndex: 0 sendTo 2 type: 30
+c 3.482 46                            myIndex: -2 source: 0 mpiTag: 30
+c 3.482 46                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.481 85                            myIndex: -2 source: 0 mpiTag: 30
+c 3.481 85                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.482 52                            myIndex: 0 Start Calc
+c 3.482 52                            MI: 0 intervalId: 0 PC: 300000 cW: 120 start:0 end:2500!!      iter:0 
+c 3.483 52                            myIndex: 0 source: 2 mpiTag: 30
+c 3.483 52                            myIndex: 0 returnFrom: 2 mpiTag: 30
+c 3.483 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.483 52                            myIndex: 0 RsourceIndex: 2
+c 3.483 52                            myIndex: 0 source: 1 mpiTag: 30
+c 3.483 52                            myIndex: 0 returnFrom: 1 mpiTag: 30
+c 3.483 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.483 52                            myIndex: 0 LsourceIndex: 1
+c 3.483 52                            will skip Iter
+c 3.483 52                            myIndex: 0 End Calc basic
+c 3.483 85 UNCOMMIT #1:2
+c 3.483 85 LOAD 1 (+#1:2)
+c 3.483 85 EXECUTE #1:2 <= [52]
+c 3.483 85                            COMMSIZE: 1 myRank: 85 myIndex: 2
+c 3.483 85                            Children: 2
+c 3.483 85                            myIndex: 2 getting ready
+c 3.483 85                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.484 85                            myIndex: 2 Ready!
+c 3.491 52                            myIndex: 0 all work Finished!!!
+c 3.491 52                            myIndex: 0 all work Finished2!!!
+c 3.491 52                            myIndex: 0 all work Finished END!!!
+c 3.491 52                            Skip Iter
+c 3.492 52                            myIndex: 0 sendRootNotification2
+c 3.492 52                            myIndex: 0 source: 0 mpiTag: 30
+c 3.492 52                            myIndex: 0 MSG_BROADCAST_DATA 
+c 3.492 52                            myIndex: 0 Workers: 120!
+c 3.492 52                            myIndex: 0 countCurrentWorkers: 120
+c 3.492 52                            myIndex: 0 !tempJobTree.hasLeftChild() 0 lIndex in 1
+c 3.492 52                            myIndex: 0 !tempJobTree.hasRightChild() 0 rIndex in 1
+c 3.492 52                            myIndex: 0 advanceCollective
+c 3.492 52                            myIndex: 0 sendTo 1 type: 30
+c 3.493 46                            myIndex: -2 source: 0 mpiTag: 30
+c 3.493 46                            myIndex: -2 not Ready: 0 mpiTag: 30
+c 3.492 52                            myIndex: 0 sendTo 2 type: 30
+c 3.491 85                            myIndex: 2 source: 0 mpiTag: 30
+c 3.491 85                            myIndex: 2 MSG_BROADCAST_DATA 
+c 3.491 85                            myIndex: 2 Workers: 1!
+c 3.491 85                            myIndex: 2 countCurrentWorkers: 120
+c 3.491 85                            myIndex: 2 !tempJobTree.hasLeftChild() 0 lIndex in 1
+c 3.491 85                            myIndex: 2 !tempJobTree.hasRightChild() 0 rIndex in 1
+c 3.492 85                            myIndex: 2 advanceCollective
+c 3.492 85                            myIndex: 2 sendTo 5 type: 30
+c 3.492 85                            myIndex: 2 sendTo 6 type: 30
+c 3.493 52                            myIndex: 0 Start Calc
+c 3.493 52                            MI: 0 intervalId: 0 PC: 300000 cW: 120 start:0 end:2500!!      iter:0 
+c 3.493 52                            myIndex: 0 source: 1 mpiTag: 30
+c 3.493 52                            myIndex: 0 returnFrom: 1 mpiTag: 30
+c 3.493 52                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.493 52                            myIndex: 0 LsourceIndex: 1
+c 3.492 85                            myIndex: 2 Start Calc
+c 3.492 85                            MI: 2 intervalId: 2 PC: 300000 cW: 120 start:5000 end:7500!!      iter:0 
+c 3.493 49                            myIndex: -2 source: 2 mpiTag: 30
+c 3.493 49                            myIndex: -2 not Ready: 2 mpiTag: 30
+c 3.493 85                            myIndex: 2 source: 6 mpiTag: 30
+c 3.493 85                            myIndex: 2 returnFrom: 6 mpiTag: 30
+c 3.493 85                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.493 85                            myIndex: 2 RsourceIndex: 6
+c 3.494 25                            myIndex: -2 source: 2 mpiTag: 30
+c 3.494 25                            myIndex: -2 not Ready: 2 mpiTag: 30
+c 3.494 85                            myIndex: 2 source: 5 mpiTag: 30
+c 3.494 85                            myIndex: 2 returnFrom: 5 mpiTag: 30
+c 3.494 85                            !leftDone 1 !getJobTree().hasLeftChild() 0 getJobTree().getLeftChildIndex() < countCurrentWorkers 1
+c 3.494 85                            myIndex: 2 LsourceIndex: 5
+c 3.511 46 UNCOMMIT #1:1
+c 3.511 46 LOAD 1 (+#1:1)
+c 3.511 46 EXECUTE #1:1 <= [52]
+c 3.511 46                            COMMSIZE: 1 myRank: 46 myIndex: 1
+c 3.511 46                            Children: 2
+c 3.511 46                            myIndex: 1 getting ready
+c 3.511 46                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.512 46                            myIndex: 1 Ready!
+c 3.573 49 UNCOMMIT #1:6
+c 3.573 49 LOAD 1 (+#1:6)
+c 3.573 49 EXECUTE #1:6 <= [85]
+c 3.573 49                            COMMSIZE: 1 myRank: 49 myIndex: 6
+c 3.573 49                            Children: 2
+c 3.573 49                            myIndex: 6 getting ready
+c 3.573 49                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.574 49                            myIndex: 6 Ready!
+c 3.595 25 UNCOMMIT #1:5
+c 3.595 25 LOAD 1 (+#1:5)
+c 3.595 25 EXECUTE #1:5 <= [85]
+c 3.595 25                            COMMSIZE: 1 myRank: 25 myIndex: 5
+c 3.595 25                            Children: 2
+c 3.595 25                            myIndex: 5 getting ready
+c 3.595 25                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.596 76 UNCOMMIT #1:4
+c 3.596 76 LOAD 1 (+#1:4)
+c 3.596 76 EXECUTE #1:4 <= [46]
+c 3.596 76                            COMMSIZE: 1 myRank: 76 myIndex: 4
+c 3.596 76                            Children: 2
+c 3.596 76                            myIndex: 4 getting ready
+c 3.596 76                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.596 108 UNCOMMIT #1:3
+c 3.596 108 LOAD 1 (+#1:3)
+c 3.596 108 EXECUTE #1:3 <= [46]
+c 3.596 108                            COMMSIZE: 1 myRank: 108 myIndex: 3
+c 3.596 108                            Children: 2
+c 3.596 108                            myIndex: 3 getting ready
+c 3.596 108                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.596 25                            myIndex: 5 Ready!
+c 3.598 76                            myIndex: 4 Ready!
+c 3.597 108                            myIndex: 3 Ready!
+c 3.621 85                            MI: 2 intervalId: 2 PC: 300000 cW: 120 start:5000 end:7500 COMPLETED iter:0 
+c 3.621 85                            myIndex: 2 End Calc basic
+c 3.622 85                            myIndex: 2 calculatingFinished TRUE
+c 3.622 85                            myIndex: 2 Start Calc
+c 3.622 85                            MI: 2 intervalId: 95 PC: 300000 cW: 120 start:237500 end:240000!!      iter:0 
+c 3.627 52                            MI: 0 intervalId: 0 PC: 300000 cW: 120 start:0 end:2500 COMPLETED iter:0 
+c 3.627 52                            myIndex: 0 End Calc basic
+c 3.632 52                            myIndex: 0 calculatingFinished TRUE
+c 3.632 52                            myIndex: 0 Start Calc
+c 3.632 52                            MI: 0 intervalId: 63 PC: 300000 cW: 120 start:157500 end:160000!!      iter:0 
+c 3.644 65 UNCOMMIT #1:13
+c 3.644 65 LOAD 1 (+#1:13)
+c 3.644 65 EXECUTE #1:13 <= [49]
+c 3.644 65                            COMMSIZE: 1 myRank: 65 myIndex: 13
+c 3.644 65                            Children: 2
+c 3.644 65                            myIndex: 13 getting ready
+c 3.644 65                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.644 65                            myIndex: 13 Ready!
+c 3.649 0 UNCOMMIT #1:14
+c 3.649 0 LOAD 1 (+#1:14)
+c 3.649 0 EXECUTE #1:14 <= [49]
+c 3.649 0                            COMMSIZE: 1 myRank: 0 myIndex: 14
+c 3.649 0                            Children: 2
+c 3.649 0                            myIndex: 14 getting ready
+c 3.649 0                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.649 0                            myIndex: 14 Ready!
+c 3.675 92 UNCOMMIT #1:8
+c 3.675 92 LOAD 1 (+#1:8)
+c 3.675 92 EXECUTE #1:8 <= [108]
+c 3.675 92                            COMMSIZE: 1 myRank: 92 myIndex: 8
+c 3.675 92                            Children: 2
+c 3.675 92                            myIndex: 8 getting ready
+c 3.675 92                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.676 102 UNCOMMIT #1:11
+c 3.676 102 LOAD 1 (+#1:11)
+c 3.676 102 EXECUTE #1:11 <= [25]
+c 3.676 102                            COMMSIZE: 1 myRank: 102 myIndex: 11
+c 3.676 102                            Children: 2
+c 3.676 102                            myIndex: 11 getting ready
+c 3.676 102                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.677 97 UNCOMMIT #1:12
+c 3.677 97 LOAD 1 (+#1:12)
+c 3.677 97 EXECUTE #1:12 <= [25]
+c 3.677 97                            COMMSIZE: 1 myRank: 97 myIndex: 12
+c 3.677 97                            Children: 2
+c 3.677 97                            myIndex: 12 getting ready
+c 3.677 97                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.677 102                            myIndex: 11 Ready!
+c 3.677 92                            myIndex: 8 Ready!
+c 3.678 97                            myIndex: 12 Ready!
+c 3.678 94 UNCOMMIT #1:7
+c 3.678 94 LOAD 1 (+#1:7)
+c 3.679 94 EXECUTE #1:7 <= [108]
+c 3.679 94                            COMMSIZE: 1 myRank: 94 myIndex: 7
+c 3.679 94                            Children: 2
+c 3.679 94                            myIndex: 7 getting ready
+c 3.679 94                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.680 94                            myIndex: 7 Ready!
+c 3.681 34 UNCOMMIT #1:10
+c 3.681 34 LOAD 1 (+#1:10)
+c 3.681 34 EXECUTE #1:10 <= [76]
+c 3.681 34                            COMMSIZE: 1 myRank: 34 myIndex: 10
+c 3.681 34                            Children: 2
+c 3.681 34                            myIndex: 10 getting ready
+c 3.681 34                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.682 34                            myIndex: 10 Ready!
+c 3.684 95 UNCOMMIT #1:9
+c 3.684 95 LOAD 1 (+#1:9)
+c 3.684 95 EXECUTE #1:9 <= [76]
+c 3.684 95                            COMMSIZE: 1 myRank: 95 myIndex: 9
+c 3.684 95                            Children: 2
+c 3.684 95                            myIndex: 9 getting ready
+c 3.684 95                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.686 95                            myIndex: 9 Ready!
+c 3.724 54 UNCOMMIT #1:28
+c 3.724 54 LOAD 1 (+#1:28)
+c 3.724 54 EXECUTE #1:28 <= [65]
+c 3.724 54                            COMMSIZE: 1 myRank: 54 myIndex: 28
+c 3.724 54                            Children: 2
+c 3.724 54                            myIndex: 28 getting ready
+c 3.724 54                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.725 54                            myIndex: 28 Ready!
+c 3.727 15 UNCOMMIT #1:27
+c 3.727 15 LOAD 1 (+#1:27)
+c 3.727 15 EXECUTE #1:27 <= [65]
+c 3.727 15                            COMMSIZE: 1 myRank: 15 myIndex: 27
+c 3.727 15                            Children: 2
+c 3.727 15                            myIndex: 27 getting ready
+c 3.727 15                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.728 15                            myIndex: 27 Ready!
+c 3.740 110 UNCOMMIT #1:29
+c 3.740 110 LOAD 1 (+#1:29)
+c 3.740 110 EXECUTE #1:29 <= [0]
+c 3.740 110                            COMMSIZE: 1 myRank: 110 myIndex: 29
+c 3.740 110                            Children: 2
+c 3.740 110                            myIndex: 29 getting ready
+c 3.740 110                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.740 110                            myIndex: 29 Ready!
+c 3.743 89 UNCOMMIT #1:30
+c 3.743 89 LOAD 1 (+#1:30)
+c 3.743 89 EXECUTE #1:30 <= [0]
+c 3.743 89                            COMMSIZE: 1 myRank: 89 myIndex: 30
+c 3.743 89                            Children: 2
+c 3.743 89                            myIndex: 30 getting ready
+c 3.743 89                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.744 89                            myIndex: 30 Ready!
+c 3.747 85                            MI: 2 intervalId: 95 PC: 300000 cW: 120 start:237500 end:240000 COMPLETED iter:0 
+c 3.747 85                            myIndex: 2 End Calc childs
+c 3.747 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 3.749 80 UNCOMMIT #1:25
+c 3.749 80 LOAD 1 (+#1:25)
+c 3.749 80 EXECUTE #1:25 <= [97]
+c 3.749 80                            COMMSIZE: 1 myRank: 80 myIndex: 25
+c 3.749 80                            Children: 2
+c 3.749 80                            myIndex: 25 getting ready
+c 3.749 80                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.749 53 UNCOMMIT #1:24
+c 3.749 53 LOAD 1 (+#1:24)
+c 3.749 53 EXECUTE #1:24 <= [102]
+c 3.749 53                            COMMSIZE: 1 myRank: 53 myIndex: 24
+c 3.749 53                            Children: 2
+c 3.749 53                            myIndex: 24 getting ready
+c 3.749 53                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.750 80                            myIndex: 25 Ready!
+c 3.750 53                            myIndex: 24 Ready!
+c 3.753 85                            myIndex: 2 calculatingFinished TRUE
+c 3.753 85                            myIndex: 2 Start Calc
+c 3.753 85                            MI: 2 intervalId: 96 PC: 300000 cW: 120 start:240000 end:242500!!      iter:0 
+c 3.756 35 UNCOMMIT #1:26
+c 3.756 35 LOAD 1 (+#1:26)
+c 3.756 35 EXECUTE #1:26 <= [97]
+c 3.756 35                            COMMSIZE: 1 myRank: 35 myIndex: 26
+c 3.756 35                            Children: 2
+c 3.756 35                            myIndex: 26 getting ready
+c 3.756 35                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.757 71 UNCOMMIT #1:18
+c 3.757 71 LOAD 1 (+#1:18)
+c 3.757 71 EXECUTE #1:18 <= [92]
+c 3.757 71                            COMMSIZE: 1 myRank: 71 myIndex: 18
+c 3.757 71                            Children: 2
+c 3.757 71                            myIndex: 18 getting ready
+c 3.757 71                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.757 35                            myIndex: 26 Ready!
+c 3.758 71                            myIndex: 18 Ready!
+c 3.759 45 UNCOMMIT #1:21
+c 3.759 45 LOAD 1 (+#1:21)
+c 3.759 45 EXECUTE #1:21 <= [34]
+c 3.759 45                            COMMSIZE: 1 myRank: 45 myIndex: 21
+c 3.759 45                            Children: 2
+c 3.759 45                            myIndex: 21 getting ready
+c 3.759 45                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.759 19 UNCOMMIT #1:22
+c 3.759 19 LOAD 1 (+#1:22)
+c 3.759 19 EXECUTE #1:22 <= [34]
+c 3.759 19                            COMMSIZE: 1 myRank: 19 myIndex: 22
+c 3.759 19                            Children: 2
+c 3.759 19                            myIndex: 22 getting ready
+c 3.759 19                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.760 19                            myIndex: 22 Ready!
+c 3.761 45                            myIndex: 21 Ready!
+c 3.762 73 UNCOMMIT #1:17
+c 3.762 73 LOAD 1 (+#1:17)
+c 3.762 73 EXECUTE #1:17 <= [92]
+c 3.762 73                            COMMSIZE: 1 myRank: 73 myIndex: 17
+c 3.762 73                            Children: 2
+c 3.762 73                            myIndex: 17 getting ready
+c 3.762 73                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.762 52                            MI: 0 intervalId: 63 PC: 300000 cW: 120 start:157500 end:160000 COMPLETED iter:0 
+c 3.762 52                            myIndex: 0 End Calc childs
+c 3.762 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 3.763 52                            myIndex: 0 calculatingFinished TRUE
+c 3.763 52                            myIndex: 0 Start Calc
+c 3.763 52                            MI: 0 intervalId: 64 PC: 300000 cW: 120 start:160000 end:162500!!      iter:0 
+c 3.765 59 UNCOMMIT #1:15
+c 3.765 59 LOAD 1 (+#1:15)
+c 3.765 59 EXECUTE #1:15 <= [94]
+c 3.765 59                            COMMSIZE: 1 myRank: 59 myIndex: 15
+c 3.765 59                            Children: 2
+c 3.765 59                            myIndex: 15 getting ready
+c 3.765 59                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.765 73                            myIndex: 17 Ready!
+c 3.767 59                            myIndex: 15 Ready!
+c 3.770 83 UNCOMMIT #1:16
+c 3.770 83 LOAD 1 (+#1:16)
+c 3.770 83 EXECUTE #1:16 <= [94]
+c 3.770 83                            COMMSIZE: 1 myRank: 83 myIndex: 16
+c 3.770 83                            Children: 2
+c 3.770 83                            myIndex: 16 getting ready
+c 3.770 83                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.771 83                            myIndex: 16 Ready!
+c 3.774 105 UNCOMMIT #1:23
+c 3.774 105 LOAD 1 (+#1:23)
+c 3.774 105 EXECUTE #1:23 <= [102]
+c 3.774 105                            COMMSIZE: 1 myRank: 105 myIndex: 23
+c 3.774 105                            Children: 2
+c 3.774 105                            myIndex: 23 getting ready
+c 3.774 105                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.775 105                            myIndex: 23 Ready!
+c 3.776 41 UNCOMMIT #1:19
+c 3.776 41 LOAD 1 (+#1:19)
+c 3.776 41 EXECUTE #1:19 <= [95]
+c 3.776 41                            COMMSIZE: 1 myRank: 41 myIndex: 19
+c 3.776 41                            Children: 2
+c 3.776 41                            myIndex: 19 getting ready
+c 3.776 41                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.777 24 UNCOMMIT #1:20
+c 3.777 24 LOAD 1 (+#1:20)
+c 3.777 24 EXECUTE #1:20 <= [95]
+c 3.777 24                            COMMSIZE: 1 myRank: 24 myIndex: 20
+c 3.777 24                            Children: 2
+c 3.777 24                            myIndex: 20 getting ready
+c 3.777 24                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.777 41                            myIndex: 19 Ready!
+c 3.778 24                            myIndex: 20 Ready!
+c 3.817 33 UNCOMMIT #1:57
+c 3.817 33 LOAD 1 (+#1:57)
+c 3.817 33 EXECUTE #1:57 <= [54]
+c 3.817 33                            COMMSIZE: 1 myRank: 33 myIndex: 57
+c 3.817 33                            Children: 2
+c 3.817 33                            myIndex: 57 getting ready
+c 3.817 33                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.818 33                            myIndex: 57 Ready!
+c 3.824 42 UNCOMMIT #1:58
+c 3.824 42 LOAD 1 (+#1:58)
+c 3.824 42 EXECUTE #1:58 <= [54]
+c 3.824 42                            COMMSIZE: 1 myRank: 42 myIndex: 58
+c 3.824 42                            Children: 2
+c 3.824 42                            myIndex: 58 getting ready
+c 3.824 42                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.825 42                            myIndex: 58 Ready!
+c 3.828 118 UNCOMMIT #1:55
+c 3.828 118 LOAD 1 (+#1:55)
+c 3.828 118 EXECUTE #1:55 <= [15]
+c 3.828 118                            COMMSIZE: 1 myRank: 118 myIndex: 55
+c 3.828 118                            Children: 2
+c 3.828 118                            myIndex: 55 getting ready
+c 3.828 118                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.829 118                            myIndex: 55 Ready!
+c 3.830 98 UNCOMMIT #1:56
+c 3.830 98 LOAD 1 (+#1:56)
+c 3.830 98 EXECUTE #1:56 <= [15]
+c 3.830 98                            COMMSIZE: 1 myRank: 98 myIndex: 56
+c 3.830 98                            Children: 2
+c 3.830 98                            myIndex: 56 getting ready
+c 3.830 98                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.831 98                            myIndex: 56 Ready!
+c 3.834 20 UNCOMMIT #1:52
+c 3.834 20 LOAD 1 (+#1:52)
+c 3.835 20 EXECUTE #1:52 <= [80]
+c 3.835 20                            COMMSIZE: 1 myRank: 20 myIndex: 52
+c 3.835 20                            Children: 2
+c 3.835 20                            myIndex: 52 getting ready
+c 3.835 20                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.836 20                            myIndex: 52 Ready!
+c 3.836 68 UNCOMMIT #1:49
+c 3.836 68 LOAD 1 (+#1:49)
+c 3.836 68 EXECUTE #1:49 <= [53]
+c 3.836 68                            COMMSIZE: 1 myRank: 68 myIndex: 49
+c 3.836 68                            Children: 2
+c 3.836 68                            myIndex: 49 getting ready
+c 3.836 68                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.836 10 UNCOMMIT #1:38
+c 3.836 10 LOAD 1 (+#1:38)
+c 3.836 10 EXECUTE #1:38 <= [71]
+c 3.836 10                            COMMSIZE: 1 myRank: 10 myIndex: 38
+c 3.836 10                            Children: 2
+c 3.836 10                            myIndex: 38 getting ready
+c 3.836 10                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.837 10                            myIndex: 38 Ready!
+c 3.837 68                            myIndex: 49 Ready!
+c 3.837 51 UNCOMMIT #1:51
+c 3.838 51 LOAD 1 (+#1:51)
+c 3.838 51 EXECUTE #1:51 <= [80]
+c 3.838 51                            COMMSIZE: 1 myRank: 51 myIndex: 51
+c 3.838 51                            Children: 2
+c 3.838 51                            myIndex: 51 getting ready
+c 3.838 51                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.838 14 UNCOMMIT #1:50
+c 3.838 14 LOAD 1 (+#1:50)
+c 3.838 14 EXECUTE #1:50 <= [53]
+c 3.838 14                            COMMSIZE: 1 myRank: 14 myIndex: 50
+c 3.838 14                            Children: 2
+c 3.838 14                            myIndex: 50 getting ready
+c 3.838 14                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.838 51                            myIndex: 51 Ready!
+c 3.839 14                            myIndex: 50 Ready!
+c 3.841 84 UNCOMMIT #1:37
+c 3.841 84 LOAD 1 (+#1:37)
+c 3.841 84 EXECUTE #1:37 <= [71]
+c 3.841 84                            COMMSIZE: 1 myRank: 84 myIndex: 37
+c 3.841 84                            Children: 2
+c 3.841 84                            myIndex: 37 getting ready
+c 3.841 84                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.842 84                            myIndex: 37 Ready!
+c 3.845 104 UNCOMMIT #1:61
+c 3.845 104 LOAD 1 (+#1:61)
+c 3.845 104 EXECUTE #1:61 <= [89]
+c 3.845 104                            COMMSIZE: 1 myRank: 104 myIndex: 61
+c 3.845 104                            Children: 0
+c 3.845 104                            myIndex: 61 getting ready
+c 3.845 104                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.844 23 UNCOMMIT #1:59
+c 3.844 23 LOAD 1 (+#1:59)
+c 3.844 23 EXECUTE #1:59 <= [110]
+c 3.844 23                            COMMSIZE: 1 myRank: 23 myIndex: 59
+c 3.844 23                            Children: 1
+c 3.844 23                            myIndex: 59 getting ready
+c 3.844 23                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.847 104                            myIndex: 61 Ready!
+c 3.845 23                            myIndex: 59 Ready!
+c 3.854 8 UNCOMMIT #1:35
+c 3.854 8 LOAD 1 (+#1:35)
+c 3.854 8 EXECUTE #1:35 <= [73]
+c 3.854 8                            COMMSIZE: 1 myRank: 8 myIndex: 35
+c 3.854 8                            Children: 2
+c 3.854 8                            myIndex: 35 getting ready
+c 3.854 8                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.853 6 UNCOMMIT #1:60
+c 3.853 6 LOAD 1 (+#1:60)
+c 3.853 6 EXECUTE #1:60 <= [110]
+c 3.853 6                            COMMSIZE: 1 myRank: 6 myIndex: 60
+c 3.853 6                            Children: 0
+c 3.853 6                            myIndex: 60 getting ready
+c 3.853 6                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.855 8                            myIndex: 35 Ready!
+c 3.855 7 UNCOMMIT #1:62
+c 3.855 7 LOAD 1 (+#1:62)
+c 3.855 7 EXECUTE #1:62 <= [89]
+c 3.855 7                            COMMSIZE: 1 myRank: 7 myIndex: 62
+c 3.855 7                            Children: 0
+c 3.855 7                            myIndex: 62 getting ready
+c 3.855 7                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.854 6                            myIndex: 60 Ready!
+c 3.856 7                            myIndex: 62 Ready!
+c 3.859 31 UNCOMMIT #1:36
+c 3.859 31 LOAD 1 (+#1:36)
+c 3.859 31 EXECUTE #1:36 <= [73]
+c 3.859 31                            COMMSIZE: 1 myRank: 31 myIndex: 36
+c 3.859 31                            Children: 2
+c 3.859 31                            myIndex: 36 getting ready
+c 3.860 31                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.861 78 UNCOMMIT #1:43
+c 3.861 78 LOAD 1 (+#1:43)
+c 3.861 78 EXECUTE #1:43 <= [45]
+c 3.861 78                            COMMSIZE: 1 myRank: 78 myIndex: 43
+c 3.861 78                            Children: 2
+c 3.861 78                            myIndex: 43 getting ready
+c 3.861 78                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.861 31                            myIndex: 36 Ready!
+c 3.861 55 UNCOMMIT #1:44
+c 3.861 55 LOAD 1 (+#1:44)
+c 3.861 55 EXECUTE #1:44 <= [45]
+c 3.861 55                            COMMSIZE: 1 myRank: 55 myIndex: 44
+c 3.861 55                            Children: 2
+c 3.861 55                            myIndex: 44 getting ready
+c 3.861 55                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.862 78                            myIndex: 43 Ready!
+c 3.862 55                            myIndex: 44 Ready!
+c 3.865 109 UNCOMMIT #1:53
+c 3.865 109 LOAD 1 (+#1:53)
+c 3.865 109 EXECUTE #1:53 <= [35]
+c 3.865 109                            COMMSIZE: 1 myRank: 109 myIndex: 53
+c 3.865 109                            Children: 2
+c 3.865 109                            myIndex: 53 getting ready
+c 3.865 109                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.865 62 UNCOMMIT #1:32
+c 3.865 62 LOAD 1 (+#1:32)
+c 3.865 62 EXECUTE #1:32 <= [59]
+c 3.865 62                            COMMSIZE: 1 myRank: 62 myIndex: 32
+c 3.865 62                            Children: 2
+c 3.865 62                            myIndex: 32 getting ready
+c 3.865 62                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.866 109                            myIndex: 53 Ready!
+c 3.866 62                            myIndex: 32 Ready!
+c 3.868 72 UNCOMMIT #1:34
+c 3.868 72 LOAD 1 (+#1:34)
+c 3.868 72 EXECUTE #1:34 <= [83]
+c 3.868 72                            COMMSIZE: 1 myRank: 72 myIndex: 34
+c 3.868 72                            Children: 2
+c 3.868 72                            myIndex: 34 getting ready
+c 3.868 72                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.869 72                            myIndex: 34 Ready!
+c 3.871 4 UNCOMMIT #1:46
+c 3.871 4 LOAD 1 (+#1:46)
+c 3.871 4 EXECUTE #1:46 <= [19]
+c 3.871 4                            COMMSIZE: 1 myRank: 4 myIndex: 46
+c 3.871 4                            Children: 2
+c 3.871 4                            myIndex: 46 getting ready
+c 3.871 4                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.872 4                            myIndex: 46 Ready!
+c 3.872 30 UNCOMMIT #1:54
+c 3.872 30 LOAD 1 (+#1:54)
+c 3.872 30 EXECUTE #1:54 <= [35]
+c 3.872 30                            COMMSIZE: 1 myRank: 30 myIndex: 54
+c 3.872 30                            Children: 2
+c 3.872 30                            myIndex: 54 getting ready
+c 3.872 30                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.873 38 UNCOMMIT #1:31
+c 3.873 38 LOAD 1 (+#1:31)
+c 3.873 38 EXECUTE #1:31 <= [59]
+c 3.873 38                            COMMSIZE: 1 myRank: 38 myIndex: 31
+c 3.873 38                            Children: 2
+c 3.873 38                            myIndex: 31 getting ready
+c 3.873 38                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.873 30                            myIndex: 54 Ready!
+c 3.873 93 UNCOMMIT #1:45
+c 3.873 93 LOAD 1 (+#1:45)
+c 3.873 93 EXECUTE #1:45 <= [19]
+c 3.873 93                            COMMSIZE: 1 myRank: 93 myIndex: 45
+c 3.873 93                            Children: 2
+c 3.873 93                            myIndex: 45 getting ready
+c 3.873 93                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.874 91 UNCOMMIT #1:40
+c 3.874 91 LOAD 1 (+#1:40)
+c 3.874 91 EXECUTE #1:40 <= [41]
+c 3.874 91                            COMMSIZE: 1 myRank: 91 myIndex: 40
+c 3.874 91                            Children: 2
+c 3.874 91                            myIndex: 40 getting ready
+c 3.874 91                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.874 38                            myIndex: 31 Ready!
+c 3.874 93                            myIndex: 45 Ready!
+c 3.875 91                            myIndex: 40 Ready!
+c 3.876 28 UNCOMMIT #1:47
+c 3.876 28 LOAD 1 (+#1:47)
+c 3.876 28 EXECUTE #1:47 <= [105]
+c 3.876 28                            COMMSIZE: 1 myRank: 28 myIndex: 47
+c 3.876 28                            Children: 2
+c 3.876 28                            myIndex: 47 getting ready
+c 3.876 28                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.878 28                            myIndex: 47 Ready!
+c 3.880 79 UNCOMMIT #1:33
+c 3.880 79 LOAD 1 (+#1:33)
+c 3.880 79 EXECUTE #1:33 <= [83]
+c 3.880 79                            COMMSIZE: 1 myRank: 79 myIndex: 33
+c 3.880 79                            Children: 2
+c 3.880 79                            myIndex: 33 getting ready
+c 3.880 79                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.881 79                            myIndex: 33 Ready!
+c 3.888 85                            MI: 2 intervalId: 96 PC: 300000 cW: 120 start:240000 end:242500 COMPLETED iter:0 
+c 3.888 85                            myIndex: 2 End Calc childs
+c 3.888 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 3.893 85                            myIndex: 2 calculatingFinished TRUE
+c 3.893 85                            myIndex: 2 Start Calc
+c 3.893 85                            MI: 2 intervalId: 47 PC: 300000 cW: 120 start:117500 end:120000!!      iter:0 
+c 3.906 114 UNCOMMIT #1:39
+c 3.906 114 LOAD 1 (+#1:39)
+c 3.906 114 EXECUTE #1:39 <= [41]
+c 3.906 114                            COMMSIZE: 1 myRank: 114 myIndex: 39
+c 3.906 114                            Children: 2
+c 3.906 114                            myIndex: 39 getting ready
+c 3.906 114                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.908 114                            myIndex: 39 Ready!
+c 3.908 119 UNCOMMIT #1:115
+c 3.908 119 LOAD 1 (+#1:115)
+c 3.908 119 EXECUTE #1:115 <= [33]
+c 3.908 119                            COMMSIZE: 1 myRank: 119 myIndex: 115
+c 3.908 119                            Children: 0
+c 3.908 119                            myIndex: 115 getting ready
+c 3.908 119                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.908 90 UNCOMMIT #1:116
+c 3.908 90 LOAD 1 (+#1:116)
+c 3.908 90 EXECUTE #1:116 <= [33]
+c 3.908 90                            COMMSIZE: 1 myRank: 90 myIndex: 116
+c 3.908 90                            Children: 0
+c 3.908 90                            myIndex: 116 getting ready
+c 3.908 90                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.909 90                            myIndex: 116 Ready!
+c 3.912 119                            myIndex: 115 Ready!
+c 3.915 67 UNCOMMIT #1:48
+c 3.915 67 LOAD 1 (+#1:48)
+c 3.915 67 EXECUTE #1:48 <= [105]
+c 3.915 67                            COMMSIZE: 1 myRank: 67 myIndex: 48
+c 3.915 67                            Children: 2
+c 3.915 67                            myIndex: 48 getting ready
+c 3.915 67                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.916 99 UNCOMMIT #1:42
+c 3.916 99 LOAD 1 (+#1:42)
+c 3.916 99 EXECUTE #1:42 <= [24]
+c 3.916 99                            COMMSIZE: 1 myRank: 99 myIndex: 42
+c 3.916 99                            Children: 2
+c 3.916 99                            myIndex: 42 getting ready
+c 3.916 99                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.916 115 UNCOMMIT #1:41
+c 3.916 115 LOAD 1 (+#1:41)
+c 3.916 115 EXECUTE #1:41 <= [24]
+c 3.916 115                            COMMSIZE: 1 myRank: 115 myIndex: 41
+c 3.916 115                            Children: 2
+c 3.916 115                            myIndex: 41 getting ready
+c 3.916 115                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.916 67                            myIndex: 48 Ready!
+c 3.917 115                            myIndex: 41 Ready!
+c 3.917 96 UNCOMMIT #1:114
+c 3.917 96 LOAD 1 (+#1:114)
+c 3.917 96 EXECUTE #1:114 <= [98]
+c 3.917 96                            COMMSIZE: 1 myRank: 96 myIndex: 114
+c 3.917 96                            Children: 0
+c 3.917 96                            myIndex: 114 getting ready
+c 3.917 96                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.918 99                            myIndex: 42 Ready!
+c 3.918 96                            myIndex: 114 Ready!
+c 3.923 56 UNCOMMIT #1:112
+c 3.923 56 LOAD 1 (+#1:112)
+c 3.923 56 EXECUTE #1:112 <= [118]
+c 3.923 56                            COMMSIZE: 1 myRank: 56 myIndex: 112
+c 3.923 56                            Children: 0
+c 3.923 56                            myIndex: 112 getting ready
+c 3.923 56                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.924 56                            myIndex: 112 Ready!
+c 3.925 70 UNCOMMIT #1:117
+c 3.925 70 LOAD 1 (+#1:117)
+c 3.925 70 EXECUTE #1:117 <= [42]
+c 3.925 70                            COMMSIZE: 1 myRank: 70 myIndex: 117
+c 3.925 70                            Children: 0
+c 3.925 70                            myIndex: 117 getting ready
+c 3.925 70                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.927 70                            myIndex: 117 Ready!
+c 3.927 52                            MI: 0 intervalId: 64 PC: 300000 cW: 120 start:160000 end:162500 COMPLETED iter:0 
+c 3.927 52                            myIndex: 0 End Calc childs
+c 3.927 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 3.934 32 UNCOMMIT #1:111
+c 3.934 32 LOAD 1 (+#1:111)
+c 3.934 32 EXECUTE #1:111 <= [118]
+c 3.934 32                            COMMSIZE: 1 myRank: 32 myIndex: 111
+c 3.934 32                            Children: 0
+c 3.934 32                            myIndex: 111 getting ready
+c 3.934 32                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.935 32                            myIndex: 111 Ready!
+c 3.935 52                            myIndex: 0 calculatingFinished TRUE
+c 3.935 52                            myIndex: 0 Start Calc
+c 3.935 52                            MI: 0 intervalId: 31 PC: 300000 cW: 120 start:77500 end:80000!!      iter:0 
+c 3.935 69 UNCOMMIT #1:78
+c 3.935 69 LOAD 1 (+#1:78)
+c 3.935 69 EXECUTE #1:78 <= [10]
+c 3.935 69                            COMMSIZE: 1 myRank: 69 myIndex: 78
+c 3.935 69                            Children: 0
+c 3.935 69                            myIndex: 78 getting ready
+c 3.935 69                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.936 69                            myIndex: 78 Ready!
+c 3.943 60 UNCOMMIT #1:118
+c 3.943 60 LOAD 1 (+#1:118)
+c 3.943 60 EXECUTE #1:118 <= [42]
+c 3.943 60                            COMMSIZE: 1 myRank: 60 myIndex: 118
+c 3.943 60                            Children: 0
+c 3.943 60                            myIndex: 118 getting ready
+c 3.943 60                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.944 60                            myIndex: 118 Ready!
+c 3.946 39 UNCOMMIT #1:99
+c 3.946 39 LOAD 1 (+#1:99)
+c 3.946 39 EXECUTE #1:99 <= [68]
+c 3.946 39                            COMMSIZE: 1 myRank: 39 myIndex: 99
+c 3.946 39                            Children: 0
+c 3.946 39                            myIndex: 99 getting ready
+c 3.946 39                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.947 39                            myIndex: 99 Ready!
+c 3.950 18 UNCOMMIT #1:113
+c 3.950 18 LOAD 1 (+#1:113)
+c 3.950 18 EXECUTE #1:113 <= [98]
+c 3.950 18                            COMMSIZE: 1 myRank: 18 myIndex: 113
+c 3.950 18                            Children: 0
+c 3.950 18                            myIndex: 113 getting ready
+c 3.950 18                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.951 18                            myIndex: 113 Ready!
+c 3.953 22 UNCOMMIT #1:69
+c 3.953 22 LOAD 1 (+#1:69)
+c 3.953 22 EXECUTE #1:69 <= [72]
+c 3.953 22                            COMMSIZE: 1 myRank: 22 myIndex: 69
+c 3.953 22                            Children: 0
+c 3.953 22                            myIndex: 69 getting ready
+c 3.953 22                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.954 44 UNCOMMIT #1:77
+c 3.954 44 LOAD 1 (+#1:77)
+c 3.954 44 EXECUTE #1:77 <= [10]
+c 3.954 44                            COMMSIZE: 1 myRank: 44 myIndex: 77
+c 3.954 44                            Children: 0
+c 3.954 44                            myIndex: 77 getting ready
+c 3.954 44                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.954 22                            myIndex: 69 Ready!
+c 3.954 47 UNCOMMIT #1:89
+c 3.954 47 LOAD 1 (+#1:89)
+c 3.954 47 EXECUTE #1:89 <= [55]
+c 3.954 47                            COMMSIZE: 1 myRank: 47 myIndex: 89
+c 3.954 47                            Children: 0
+c 3.954 47                            myIndex: 89 getting ready
+c 3.954 47                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.955 44                            myIndex: 77 Ready!
+c 3.955 2 UNCOMMIT #1:105
+c 3.955 2 LOAD 1 (+#1:105)
+c 3.955 2 EXECUTE #1:105 <= [20]
+c 3.955 2                            COMMSIZE: 1 myRank: 2 myIndex: 105
+c 3.955 2                            Children: 0
+c 3.955 2                            myIndex: 105 getting ready
+c 3.955 2                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.955 82 UNCOMMIT #1:106
+c 3.955 82 LOAD 1 (+#1:106)
+c 3.955 82 EXECUTE #1:106 <= [20]
+c 3.955 82                            COMMSIZE: 1 myRank: 82 myIndex: 106
+c 3.955 82                            Children: 0
+c 3.955 82                            myIndex: 106 getting ready
+c 3.955 82                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.955 47                            myIndex: 89 Ready!
+c 3.956 2                            myIndex: 105 Ready!
+c 3.956 82                            myIndex: 106 Ready!
+c 3.958 29 UNCOMMIT #1:100
+c 3.958 29 LOAD 1 (+#1:100)
+c 3.958 29 EXECUTE #1:100 <= [68]
+c 3.958 29                            COMMSIZE: 1 myRank: 29 myIndex: 100
+c 3.958 29                            Children: 0
+c 3.958 29                            myIndex: 100 getting ready
+c 3.958 29                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.959 29                            myIndex: 100 Ready!
+c 3.960 13 UNCOMMIT #1:72
+c 3.960 13 LOAD 1 (+#1:72)
+c 3.960 13 EXECUTE #1:72 <= [8]
+c 3.960 13                            COMMSIZE: 1 myRank: 13 myIndex: 72
+c 3.960 13                            Children: 0
+c 3.960 13                            myIndex: 72 getting ready
+c 3.960 13                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.961 113 UNCOMMIT #1:76
+c 3.961 113 LOAD 1 (+#1:76)
+c 3.961 113 EXECUTE #1:76 <= [84]
+c 3.961 113                            COMMSIZE: 1 myRank: 113 myIndex: 76
+c 3.961 113                            Children: 0
+c 3.961 113                            myIndex: 76 getting ready
+c 3.961 113                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.961 116 UNCOMMIT #1:71
+c 3.961 116 LOAD 1 (+#1:71)
+c 3.961 116 EXECUTE #1:71 <= [8]
+c 3.961 116                            COMMSIZE: 1 myRank: 116 myIndex: 71
+c 3.961 116                            Children: 0
+c 3.961 116                            myIndex: 71 getting ready
+c 3.961 116                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.961 13                            myIndex: 72 Ready!
+c 3.962 113                            myIndex: 76 Ready!
+c 3.962 116                            myIndex: 71 Ready!
+c 3.963 86 UNCOMMIT #1:81
+c 3.963 86 LOAD 1 (+#1:81)
+c 3.963 86 EXECUTE #1:81 <= [91]
+c 3.963 86                            COMMSIZE: 1 myRank: 86 myIndex: 81
+c 3.963 86                            Children: 0
+c 3.963 86                            myIndex: 81 getting ready
+c 3.963 86                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.963 58 UNCOMMIT #1:119
+c 3.963 58 LOAD 1 (+#1:119)
+c 3.963 58 EXECUTE #1:119 <= [23]
+c 3.963 58                            COMMSIZE: 1 myRank: 58 myIndex: 119
+c 3.963 58                            Children: 0
+c 3.963 58                            myIndex: 119 getting ready
+c 3.963 58                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.964 86                            myIndex: 81 Ready!
+c 3.964 74 UNCOMMIT #1:75
+c 3.964 74 LOAD 1 (+#1:75)
+c 3.964 74 EXECUTE #1:75 <= [84]
+c 3.964 74                            COMMSIZE: 1 myRank: 74 myIndex: 75
+c 3.964 74                            Children: 0
+c 3.964 74                            myIndex: 75 getting ready
+c 3.964 74                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.965 74                            myIndex: 75 Ready!
+c 3.965 58                            myIndex: 119 Ready!
+c 3.966 12 UNCOMMIT #1:90
+c 3.966 12 LOAD 1 (+#1:90)
+c 3.966 12 EXECUTE #1:90 <= [55]
+c 3.967 12                            COMMSIZE: 1 myRank: 12 myIndex: 90
+c 3.967 12                            Children: 0
+c 3.967 12                            myIndex: 90 getting ready
+c 3.967 12                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.968 12                            myIndex: 90 Ready!
+c 3.969 57 UNCOMMIT #1:63
+c 3.969 57 LOAD 1 (+#1:63)
+c 3.969 57 EXECUTE #1:63 <= [38]
+c 3.969 57                            COMMSIZE: 1 myRank: 57 myIndex: 63
+c 3.969 57                            Children: 0
+c 3.969 57                            myIndex: 63 getting ready
+c 3.969 57                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.971 57                            myIndex: 63 Ready!
+c 3.972 1 UNCOMMIT #1:70
+c 3.972 1 LOAD 1 (+#1:70)
+c 3.972 1 EXECUTE #1:70 <= [72]
+c 3.972 1                            COMMSIZE: 1 myRank: 1 myIndex: 70
+c 3.972 1                            Children: 0
+c 3.972 1                            myIndex: 70 getting ready
+c 3.972 1                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.973 1                            myIndex: 70 Ready!
+c 3.974 100 UNCOMMIT #1:102
+c 3.974 100 LOAD 1 (+#1:102)
+c 3.974 100 EXECUTE #1:102 <= [14]
+c 3.974 100                            COMMSIZE: 1 myRank: 100 myIndex: 102
+c 3.974 100                            Children: 0
+c 3.974 100                            myIndex: 102 getting ready
+c 3.974 100                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.975 9 UNCOMMIT #1:68
+c 3.975 9 LOAD 1 (+#1:68)
+c 3.975 9 EXECUTE #1:68 <= [79]
+c 3.975 9                            COMMSIZE: 1 myRank: 9 myIndex: 68
+c 3.975 9                            Children: 0
+c 3.975 9                            myIndex: 68 getting ready
+c 3.975 9                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.976 9                            myIndex: 68 Ready!
+c 3.975 100                            myIndex: 102 Ready!
+c 3.978 88 UNCOMMIT #1:109
+c 3.978 88 LOAD 1 (+#1:109)
+c 3.978 88 EXECUTE #1:109 <= [30]
+c 3.978 88                            COMMSIZE: 1 myRank: 88 myIndex: 109
+c 3.978 88                            Children: 0
+c 3.978 88                            myIndex: 109 getting ready
+c 3.978 88                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.978 107 UNCOMMIT #1:101
+c 3.978 107 LOAD 1 (+#1:101)
+c 3.978 107 EXECUTE #1:101 <= [14]
+c 3.978 107                            COMMSIZE: 1 myRank: 107 myIndex: 101
+c 3.978 107                            Children: 0
+c 3.978 107                            myIndex: 101 getting ready
+c 3.978 107                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.979 88                            myIndex: 109 Ready!
+c 3.980 107                            myIndex: 101 Ready!
+c 3.979 36 UNCOMMIT #1:103
+c 3.979 36 LOAD 1 (+#1:103)
+c 3.979 36 EXECUTE #1:103 <= [51]
+c 3.979 36                            COMMSIZE: 1 myRank: 36 myIndex: 103
+c 3.979 36                            Children: 0
+c 3.979 36                            myIndex: 103 getting ready
+c 3.979 36                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.980 36                            myIndex: 103 Ready!
+c 3.982 3 UNCOMMIT #1:64
+c 3.982 3 LOAD 1 (+#1:64)
+c 3.982 3 EXECUTE #1:64 <= [38]
+c 3.982 3                            COMMSIZE: 1 myRank: 3 myIndex: 64
+c 3.982 3                            Children: 0
+c 3.982 3                            myIndex: 64 getting ready
+c 3.982 3                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.982 106 UNCOMMIT #1:73
+c 3.982 106 LOAD 1 (+#1:73)
+c 3.982 106 EXECUTE #1:73 <= [31]
+c 3.982 106                            COMMSIZE: 1 myRank: 106 myIndex: 73
+c 3.982 106                            Children: 0
+c 3.982 106                            myIndex: 73 getting ready
+c 3.982 106                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.983 103 UNCOMMIT #1:91
+c 3.983 103 LOAD 1 (+#1:91)
+c 3.983 103 EXECUTE #1:91 <= [93]
+c 3.983 103                            COMMSIZE: 1 myRank: 103 myIndex: 91
+c 3.983 103                            Children: 0
+c 3.983 103                            myIndex: 91 getting ready
+c 3.983 103                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.983 3                            myIndex: 64 Ready!
+c 3.983 106                            myIndex: 73 Ready!
+c 3.984 103                            myIndex: 91 Ready!
+c 3.986 26 UNCOMMIT #1:82
+c 3.986 26 LOAD 1 (+#1:82)
+c 3.986 26 EXECUTE #1:82 <= [91]
+c 3.986 26                            COMMSIZE: 1 myRank: 26 myIndex: 82
+c 3.986 26                            Children: 0
+c 3.986 26                            myIndex: 82 getting ready
+c 3.986 26                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.987 26                            myIndex: 82 Ready!
+c 3.988 48 UNCOMMIT #1:65
+c 3.988 48 LOAD 1 (+#1:65)
+c 3.988 48 EXECUTE #1:65 <= [62]
+c 3.988 48                            COMMSIZE: 1 myRank: 48 myIndex: 65
+c 3.988 48                            Children: 0
+c 3.988 48                            myIndex: 65 getting ready
+c 3.988 48                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.988 63 UNCOMMIT #1:93
+c 3.988 63 LOAD 1 (+#1:93)
+c 3.988 63 EXECUTE #1:93 <= [4]
+c 3.988 63                            COMMSIZE: 1 myRank: 63 myIndex: 93
+c 3.988 63                            Children: 0
+c 3.988 63                            myIndex: 93 getting ready
+c 3.988 63                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.989 63                            myIndex: 93 Ready!
+c 3.989 112 UNCOMMIT #1:87
+c 3.989 112 LOAD 1 (+#1:87)
+c 3.989 112 EXECUTE #1:87 <= [78]
+c 3.989 112                            COMMSIZE: 1 myRank: 112 myIndex: 87
+c 3.989 112                            Children: 0
+c 3.989 112                            myIndex: 87 getting ready
+c 3.989 112                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.990 48                            myIndex: 65 Ready!
+c 3.990 112                            myIndex: 87 Ready!
+c 3.991 37 UNCOMMIT #1:66
+c 3.991 37 LOAD 1 (+#1:66)
+c 3.991 37 EXECUTE #1:66 <= [62]
+c 3.991 37                            COMMSIZE: 1 myRank: 37 myIndex: 66
+c 3.991 37                            Children: 0
+c 3.991 37                            myIndex: 66 getting ready
+c 3.991 37                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.991 81 UNCOMMIT #1:104
+c 3.991 81 LOAD 1 (+#1:104)
+c 3.991 81 EXECUTE #1:104 <= [51]
+c 3.991 81                            COMMSIZE: 1 myRank: 81 myIndex: 104
+c 3.991 81                            Children: 0
+c 3.991 81                            myIndex: 104 getting ready
+c 3.991 81                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.993 37                            myIndex: 66 Ready!
+c 3.992 81                            myIndex: 104 Ready!
+c 3.993 27 UNCOMMIT #1:67
+c 3.994 27 LOAD 1 (+#1:67)
+c 3.994 27 EXECUTE #1:67 <= [79]
+c 3.994 27                            COMMSIZE: 1 myRank: 27 myIndex: 67
+c 3.994 27                            Children: 0
+c 3.994 27                            myIndex: 67 getting ready
+c 3.994 27                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.993 101 UNCOMMIT #1:88
+c 3.993 101 LOAD 1 (+#1:88)
+c 3.993 101 EXECUTE #1:88 <= [78]
+c 3.993 101                            COMMSIZE: 1 myRank: 101 myIndex: 88
+c 3.993 101                            Children: 0
+c 3.993 101                            myIndex: 88 getting ready
+c 3.993 101                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.995 27                            myIndex: 67 Ready!
+c 3.995 101                            myIndex: 88 Ready!
+c 3.994 50 UNCOMMIT #1:96
+c 3.994 50 LOAD 1 (+#1:96)
+c 3.994 50 EXECUTE #1:96 <= [28]
+c 3.994 50                            COMMSIZE: 1 myRank: 50 myIndex: 96
+c 3.994 50                            Children: 0
+c 3.994 50                            myIndex: 96 getting ready
+c 3.994 50                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.995 50                            myIndex: 96 Ready!
+c 3.996 17 UNCOMMIT #1:74
+c 3.996 17 LOAD 1 (+#1:74)
+c 3.996 17 EXECUTE #1:74 <= [31]
+c 3.996 17                            COMMSIZE: 1 myRank: 17 myIndex: 74
+c 3.996 17                            Children: 0
+c 3.996 17                            myIndex: 74 getting ready
+c 3.996 17                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.998 5 UNCOMMIT #1:95
+c 3.998 5 LOAD 1 (+#1:95)
+c 3.998 5 EXECUTE #1:95 <= [28]
+c 3.998 5                            COMMSIZE: 1 myRank: 5 myIndex: 95
+c 3.998 5                            Children: 0
+c 3.998 5                            myIndex: 95 getting ready
+c 3.998 5                           countClusters: 50 dimension 54 pointsCount: 300000
+c 3.997 17                            myIndex: 74 Ready!
+c 3.999 5                            myIndex: 95 Ready!
+c 4.000 64 UNCOMMIT #1:92
+c 4.000 64 LOAD 1 (+#1:92)
+c 4.000 64 EXECUTE #1:92 <= [93]
+c 4.000 64                            COMMSIZE: 1 myRank: 64 myIndex: 92
+c 4.000 64                            Children: 0
+c 4.000 64                            myIndex: 92 getting ready
+c 4.000 64                           countClusters: 50 dimension 54 pointsCount: 300000
+c 4.001 64                            myIndex: 92 Ready!
+c 4.003 21 UNCOMMIT #1:107
+c 4.003 21 LOAD 1 (+#1:107)
+c 4.003 21 EXECUTE #1:107 <= [109]
+c 4.003 21                            COMMSIZE: 1 myRank: 21 myIndex: 107
+c 4.003 21                            Children: 0
+c 4.003 21                            myIndex: 107 getting ready
+c 4.003 21                           countClusters: 50 dimension 54 pointsCount: 300000
+c 4.003 87 UNCOMMIT #1:85
+c 4.003 87 LOAD 1 (+#1:85)
+c 4.003 87 EXECUTE #1:85 <= [99]
+c 4.003 87                            COMMSIZE: 1 myRank: 87 myIndex: 85
+c 4.003 87                            Children: 0
+c 4.003 87                            myIndex: 85 getting ready
+c 4.003 87                           countClusters: 50 dimension 54 pointsCount: 300000
+c 4.004 87                            myIndex: 85 Ready!
+c 4.004 21                            myIndex: 107 Ready!
+c 4.005 66 UNCOMMIT #1:110
+c 4.005 66 LOAD 1 (+#1:110)
+c 4.005 66 EXECUTE #1:110 <= [30]
+c 4.005 66                            COMMSIZE: 1 myRank: 66 myIndex: 110
+c 4.005 66                            Children: 0
+c 4.005 66                            myIndex: 110 getting ready
+c 4.005 66                           countClusters: 50 dimension 54 pointsCount: 300000
+c 4.005 75 UNCOMMIT #1:108
+c 4.005 75 LOAD 1 (+#1:108)
+c 4.005 75 EXECUTE #1:108 <= [109]
+c 4.005 75                            COMMSIZE: 1 myRank: 75 myIndex: 108
+c 4.005 75                            Children: 0
+c 4.005 75                            myIndex: 108 getting ready
+c 4.005 75                           countClusters: 50 dimension 54 pointsCount: 300000
+c 4.005 66                            myIndex: 110 Ready!
+c 4.006 111 UNCOMMIT #1:86
+c 4.006 111 LOAD 1 (+#1:86)
+c 4.006 111 EXECUTE #1:86 <= [99]
+c 4.006 111                            COMMSIZE: 1 myRank: 111 myIndex: 86
+c 4.006 111                            Children: 0
+c 4.006 111                            myIndex: 86 getting ready
+c 4.006 111                           countClusters: 50 dimension 54 pointsCount: 300000
+c 4.006 75                            myIndex: 108 Ready!
+c 4.007 111                            myIndex: 86 Ready!
+c 4.013 43 UNCOMMIT #1:94
+c 4.013 43 LOAD 1 (+#1:94)
+c 4.013 43 EXECUTE #1:94 <= [4]
+c 4.013 43                            COMMSIZE: 1 myRank: 43 myIndex: 94
+c 4.013 43                            Children: 0
+c 4.013 43                            myIndex: 94 getting ready
+c 4.013 43                           countClusters: 50 dimension 54 pointsCount: 300000
+c 4.013 43                            myIndex: 94 Ready!
+c 4.017 61 UNCOMMIT #1:84
+c 4.017 61 LOAD 1 (+#1:84)
+c 4.017 61 EXECUTE #1:84 <= [115]
+c 4.017 61                            COMMSIZE: 1 myRank: 61 myIndex: 84
+c 4.017 61                            Children: 0
+c 4.017 61                            myIndex: 84 getting ready
+c 4.017 61                           countClusters: 50 dimension 54 pointsCount: 300000
+c 4.018 61                            myIndex: 84 Ready!
+c 4.019 16 UNCOMMIT #1:83
+c 4.019 16 LOAD 1 (+#1:83)
+c 4.019 16 EXECUTE #1:83 <= [115]
+c 4.019 16                            COMMSIZE: 1 myRank: 16 myIndex: 83
+c 4.019 16                            Children: 0
+c 4.019 16                            myIndex: 83 getting ready
+c 4.019 16                           countClusters: 50 dimension 54 pointsCount: 300000
+c 4.020 16                            myIndex: 83 Ready!
+c 4.021 40 UNCOMMIT #1:97
+c 4.021 40 LOAD 1 (+#1:97)
+c 4.021 40 EXECUTE #1:97 <= [67]
+c 4.021 40                            COMMSIZE: 1 myRank: 40 myIndex: 97
+c 4.021 40                            Children: 0
+c 4.021 40                            myIndex: 97 getting ready
+c 4.021 40                           countClusters: 50 dimension 54 pointsCount: 300000
+c 4.022 40                            myIndex: 97 Ready!
+c 4.022 77 UNCOMMIT #1:79
+c 4.022 77 LOAD 1 (+#1:79)
+c 4.022 77 EXECUTE #1:79 <= [114]
+c 4.022 77                            COMMSIZE: 1 myRank: 77 myIndex: 79
+c 4.022 77                            Children: 0
+c 4.022 77                            myIndex: 79 getting ready
+c 4.022 77                           countClusters: 50 dimension 54 pointsCount: 300000
+c 4.023 77                            myIndex: 79 Ready!
+c 4.026 117 UNCOMMIT #1:80
+c 4.026 117 LOAD 1 (+#1:80)
+c 4.026 117 EXECUTE #1:80 <= [114]
+c 4.027 117                            COMMSIZE: 1 myRank: 117 myIndex: 80
+c 4.027 117                            Children: 0
+c 4.027 117                            myIndex: 80 getting ready
+c 4.027 117                           countClusters: 50 dimension 54 pointsCount: 300000
+c 4.028 117                            myIndex: 80 Ready!
+c 4.029 11 UNCOMMIT #1:98
+c 4.029 11 LOAD 1 (+#1:98)
+c 4.029 11 EXECUTE #1:98 <= [67]
+c 4.029 11                            COMMSIZE: 1 myRank: 11 myIndex: 98
+c 4.029 11                            Children: 0
+c 4.029 11                            myIndex: 98 getting ready
+c 4.029 11                           countClusters: 50 dimension 54 pointsCount: 300000
+c 4.029 11                            myIndex: 98 Ready!
+c 4.036 85                            MI: 2 intervalId: 47 PC: 300000 cW: 120 start:117500 end:120000 COMPLETED iter:0 
+c 4.036 85                            myIndex: 2 End Calc childs
+c 4.036 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 4.044 85                            myIndex: 2 calculatingFinished TRUE
+c 4.044 85                            myIndex: 2 Start Calc
+c 4.044 85                            MI: 2 intervalId: 97 PC: 300000 cW: 120 start:242500 end:245000!!      iter:0 
+c 4.064 52                            MI: 0 intervalId: 31 PC: 300000 cW: 120 start:77500 end:80000 COMPLETED iter:0 
+c 4.064 52                            myIndex: 0 End Calc childs
+c 4.064 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 4.066 52                            myIndex: 0 calculatingFinished TRUE
+c 4.066 52                            myIndex: 0 Start Calc
+c 4.066 52                            MI: 0 intervalId: 65 PC: 300000 cW: 120 start:162500 end:165000!!      iter:0 
+c 4.176 85                            MI: 2 intervalId: 97 PC: 300000 cW: 120 start:242500 end:245000 COMPLETED iter:0 
+c 4.176 85                            myIndex: 2 End Calc childs
+c 4.176 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 4.186 85                            myIndex: 2 calculatingFinished TRUE
+c 4.186 85                            myIndex: 2 Start Calc
+c 4.186 85                            MI: 2 intervalId: 98 PC: 300000 cW: 120 start:245000 end:247500!!      iter:0 
+c 4.198 52                            MI: 0 intervalId: 65 PC: 300000 cW: 120 start:162500 end:165000 COMPLETED iter:0 
+c 4.198 52                            myIndex: 0 End Calc childs
+c 4.198 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 4.202 0 sysstate busyratio=1.000 cmtdratio=0.125 jobs=1 globmem=0.49GB newreqs=119 hops=44
+c 4.202 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 4.207 52                            myIndex: 0 calculatingFinished TRUE
+c 4.207 52                            myIndex: 0 Start Calc
+c 4.207 52                            MI: 0 intervalId: 66 PC: 300000 cW: 120 start:165000 end:167500!!      iter:0 
+c 4.317 85                            MI: 2 intervalId: 98 PC: 300000 cW: 120 start:245000 end:247500 COMPLETED iter:0 
+c 4.317 85                            myIndex: 2 End Calc childs
+c 4.317 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 4.326 85                            myIndex: 2 calculatingFinished TRUE
+c 4.327 85                            myIndex: 2 Start Calc
+c 4.327 85                            MI: 2 intervalId: 48 PC: 300000 cW: 120 start:120000 end:122500!!      iter:0 
+c 4.340 52                            MI: 0 intervalId: 66 PC: 300000 cW: 120 start:165000 end:167500 COMPLETED iter:0 
+c 4.340 52                            myIndex: 0 End Calc childs
+c 4.340 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 4.347 52                            myIndex: 0 calculatingFinished TRUE
+c 4.347 52                            myIndex: 0 Start Calc
+c 4.347 52                            MI: 0 intervalId: 32 PC: 300000 cW: 120 start:80000 end:82500!!      iter:0 
+c 4.455 85                            MI: 2 intervalId: 48 PC: 300000 cW: 120 start:120000 end:122500 COMPLETED iter:0 
+c 4.455 85                            myIndex: 2 End Calc childs
+c 4.455 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 4.458 85                            myIndex: 2 calculatingFinished TRUE
+c 4.458 85                            myIndex: 2 Start Calc
+c 4.458 85                            MI: 2 intervalId: 23 PC: 300000 cW: 120 start:57500 end:60000!!      iter:0 
+c 4.475 52                            MI: 0 intervalId: 32 PC: 300000 cW: 120 start:80000 end:82500 COMPLETED iter:0 
+c 4.475 52                            myIndex: 0 End Calc childs
+c 4.475 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 4.478 52                            myIndex: 0 calculatingFinished TRUE
+c 4.478 52                            myIndex: 0 Start Calc
+c 4.478 52                            MI: 0 intervalId: 15 PC: 300000 cW: 120 start:37500 end:40000!!      iter:0 
+c 4.587 85                            MI: 2 intervalId: 23 PC: 300000 cW: 120 start:57500 end:60000 COMPLETED iter:0 
+c 4.587 85                            myIndex: 2 End Calc childs
+c 4.587 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 4.589 85                            myIndex: 2 calculatingFinished TRUE
+c 4.589 85                            myIndex: 2 Start Calc
+c 4.589 85                            MI: 2 intervalId: 99 PC: 300000 cW: 120 start:247500 end:250000!!      iter:0 
+c 4.609 52                            MI: 0 intervalId: 15 PC: 300000 cW: 120 start:37500 end:40000 COMPLETED iter:0 
+c 4.609 52                            myIndex: 0 End Calc childs
+c 4.609 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 4.609 52                            myIndex: 0 calculatingFinished TRUE
+c 4.609 52                            myIndex: 0 Start Calc
+c 4.609 52                            MI: 0 intervalId: 67 PC: 300000 cW: 120 start:167500 end:170000!!      iter:0 
+c 4.712 85                            MI: 2 intervalId: 99 PC: 300000 cW: 120 start:247500 end:250000 COMPLETED iter:0 
+c 4.712 85                            myIndex: 2 End Calc childs
+c 4.712 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 4.720 85                            myIndex: 2 calculatingFinished TRUE
+c 4.720 85                            myIndex: 2 Start Calc
+c 4.720 85                            MI: 2 intervalId: 100 PC: 300000 cW: 120 start:250000 end:252499!!      iter:0 
+c 4.738 52                            MI: 0 intervalId: 67 PC: 300000 cW: 120 start:167500 end:170000 COMPLETED iter:0 
+c 4.738 52                            myIndex: 0 End Calc childs
+c 4.738 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 4.740 52                            myIndex: 0 calculatingFinished TRUE
+c 4.740 52                            myIndex: 0 Start Calc
+c 4.740 52                            MI: 0 intervalId: 68 PC: 300000 cW: 120 start:170000 end:172500!!      iter:0 
+c 4.847 85                            MI: 2 intervalId: 100 PC: 300000 cW: 120 start:250000 end:252499 COMPLETED iter:0 
+c 4.847 85                            myIndex: 2 End Calc childs
+c 4.847 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 4.851 85                            myIndex: 2 calculatingFinished TRUE
+c 4.851 85                            myIndex: 2 Start Calc
+c 4.851 85                            MI: 2 intervalId: 49 PC: 300000 cW: 120 start:122500 end:125000!!      iter:0 
+c 4.872 52                            MI: 0 intervalId: 68 PC: 300000 cW: 120 start:170000 end:172500 COMPLETED iter:0 
+c 4.872 52                            myIndex: 0 End Calc childs
+c 4.872 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 4.881 52                            myIndex: 0 calculatingFinished TRUE
+c 4.881 52                            myIndex: 0 Start Calc
+c 4.881 52                            MI: 0 intervalId: 33 PC: 300000 cW: 120 start:82500 end:85000!!      iter:0 
+c 4.977 85                            MI: 2 intervalId: 49 PC: 300000 cW: 120 start:122500 end:125000 COMPLETED iter:0 
+c 4.977 85                            myIndex: 2 End Calc childs
+c 4.977 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 4.983 85                            myIndex: 2 calculatingFinished TRUE
+c 4.983 85                            myIndex: 2 Start Calc
+c 4.983 85                            MI: 2 intervalId: 101 PC: 300000 cW: 120 start:252499 end:255000!!      iter:0 
+c 5.009 52                            MI: 0 intervalId: 33 PC: 300000 cW: 120 start:82500 end:85000 COMPLETED iter:0 
+c 5.009 52                            myIndex: 0 End Calc childs
+c 5.009 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 5.012 52                            myIndex: 0 calculatingFinished TRUE
+c 5.012 52                            myIndex: 0 Start Calc
+c 5.012 52                            MI: 0 intervalId: 69 PC: 300000 cW: 120 start:172500 end:175000!!      iter:0 
+c 5.109 85                            MI: 2 intervalId: 101 PC: 300000 cW: 120 start:252499 end:255000 COMPLETED iter:0 
+c 5.109 85                            myIndex: 2 End Calc childs
+c 5.109 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 5.114 85                            myIndex: 2 calculatingFinished TRUE
+c 5.114 85                            myIndex: 2 Start Calc
+c 5.114 85                            MI: 2 intervalId: 102 PC: 300000 cW: 120 start:255000 end:257500!!      iter:0 
+c 5.140 52                            MI: 0 intervalId: 69 PC: 300000 cW: 120 start:172500 end:175000 COMPLETED iter:0 
+c 5.140 52                            myIndex: 0 End Calc childs
+c 5.140 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 5.143 52                            myIndex: 0 calculatingFinished TRUE
+c 5.144 52                            myIndex: 0 Start Calc
+c 5.144 52                            MI: 0 intervalId: 70 PC: 300000 cW: 120 start:175000 end:177499!!      iter:0 
+c 5.202 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=1.02GB newreqs=0 hops=0
+c 5.203 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 5.240 85                            MI: 2 intervalId: 102 PC: 300000 cW: 120 start:255000 end:257500 COMPLETED iter:0 
+c 5.240 85                            myIndex: 2 End Calc childs
+c 5.240 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 5.245 85                            myIndex: 2 calculatingFinished TRUE
+c 5.245 85                            myIndex: 2 Start Calc
+c 5.245 85                            MI: 2 intervalId: 50 PC: 300000 cW: 120 start:125000 end:127500!!      iter:0 
+c 5.270 52                            MI: 0 intervalId: 70 PC: 300000 cW: 120 start:175000 end:177499 COMPLETED iter:0 
+c 5.270 52                            myIndex: 0 End Calc childs
+c 5.270 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 5.275 52                            myIndex: 0 calculatingFinished TRUE
+c 5.275 52                            myIndex: 0 Start Calc
+c 5.275 52                            MI: 0 intervalId: 34 PC: 300000 cW: 120 start:85000 end:87500!!      iter:0 
+c 5.375 85                            MI: 2 intervalId: 50 PC: 300000 cW: 120 start:125000 end:127500 COMPLETED iter:0 
+c 5.375 85                            myIndex: 2 End Calc childs
+c 5.375 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 5.376 85                            myIndex: 2 calculatingFinished TRUE
+c 5.376 85                            myIndex: 2 Start Calc
+c 5.376 85                            MI: 2 intervalId: 24 PC: 300000 cW: 120 start:60000 end:62500!!      iter:0 
+c 5.404 52                            MI: 0 intervalId: 34 PC: 300000 cW: 120 start:85000 end:87500 COMPLETED iter:0 
+c 5.404 52                            myIndex: 0 End Calc childs
+c 5.404 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 5.406 52                            myIndex: 0 calculatingFinished TRUE
+c 5.406 52                            myIndex: 0 Start Calc
+c 5.406 52                            MI: 0 intervalId: 16 PC: 300000 cW: 120 start:40000 end:42500!!      iter:0 
+c 5.502 85                            MI: 2 intervalId: 24 PC: 300000 cW: 120 start:60000 end:62500 COMPLETED iter:0 
+c 5.502 85                            myIndex: 2 End Calc childs
+c 5.502 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 5.507 85                            myIndex: 2 calculatingFinished TRUE
+c 5.507 85                            myIndex: 2 Start Calc
+c 5.507 85                            MI: 2 intervalId: 11 PC: 300000 cW: 120 start:27500 end:30000!!      iter:0 
+c 5.535 52                            MI: 0 intervalId: 16 PC: 300000 cW: 120 start:40000 end:42500 COMPLETED iter:0 
+c 5.535 52                            myIndex: 0 End Calc childs
+c 5.535 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 5.537 52                            myIndex: 0 calculatingFinished TRUE
+c 5.537 52                            myIndex: 0 Start Calc
+c 5.537 52                            MI: 0 intervalId: 7 PC: 300000 cW: 120 start:17500 end:20000!!      iter:0 
+c 5.636 85                            MI: 2 intervalId: 11 PC: 300000 cW: 120 start:27500 end:30000 COMPLETED iter:0 
+c 5.636 85                            myIndex: 2 End Calc childs
+c 5.636 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 5.638 85                            myIndex: 2 calculatingFinished TRUE
+c 5.638 85                            myIndex: 2 Start Calc
+c 5.638 85                            MI: 2 intervalId: 103 PC: 300000 cW: 120 start:257500 end:260000!!      iter:0 
+c 5.668 52                            MI: 0 intervalId: 7 PC: 300000 cW: 120 start:17500 end:20000 COMPLETED iter:0 
+c 5.668 52                            myIndex: 0 End Calc childs
+c 5.668 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 5.678 52                            myIndex: 0 calculatingFinished TRUE
+c 5.678 52                            myIndex: 0 Start Calc
+c 5.678 52                            MI: 0 intervalId: 71 PC: 300000 cW: 120 start:177499 end:180000!!      iter:0 
+c 5.764 85                            MI: 2 intervalId: 103 PC: 300000 cW: 120 start:257500 end:260000 COMPLETED iter:0 
+c 5.764 85                            myIndex: 2 End Calc childs
+c 5.764 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 5.769 85                            myIndex: 2 calculatingFinished TRUE
+c 5.770 85                            myIndex: 2 Start Calc
+c 5.770 85                            MI: 2 intervalId: 104 PC: 300000 cW: 120 start:260000 end:262500!!      iter:0 
+c 5.807 52                            MI: 0 intervalId: 71 PC: 300000 cW: 120 start:177499 end:180000 COMPLETED iter:0 
+c 5.807 52                            myIndex: 0 End Calc childs
+c 5.807 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 5.808 52                            myIndex: 0 calculatingFinished TRUE
+c 5.808 52                            myIndex: 0 Start Calc
+c 5.808 52                            MI: 0 intervalId: 72 PC: 300000 cW: 120 start:180000 end:182500!!      iter:0 
+c 5.899 85                            MI: 2 intervalId: 104 PC: 300000 cW: 120 start:260000 end:262500 COMPLETED iter:0 
+c 5.899 85                            myIndex: 2 End Calc childs
+c 5.899 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 5.901 85                            myIndex: 2 calculatingFinished TRUE
+c 5.901 85                            myIndex: 2 Start Calc
+c 5.901 85                            MI: 2 intervalId: 51 PC: 300000 cW: 120 start:127500 end:130000!!      iter:0 
+c 5.938 52                            MI: 0 intervalId: 72 PC: 300000 cW: 120 start:180000 end:182500 COMPLETED iter:0 
+c 5.938 52                            myIndex: 0 End Calc childs
+c 5.938 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 5.940 52                            myIndex: 0 calculatingFinished TRUE
+c 5.940 52                            myIndex: 0 Start Calc
+c 5.940 52                            MI: 0 intervalId: 35 PC: 300000 cW: 120 start:87500 end:90000!!      iter:0 
+c 6.029 85                            MI: 2 intervalId: 51 PC: 300000 cW: 120 start:127500 end:130000 COMPLETED iter:0 
+c 6.029 85                            myIndex: 2 End Calc childs
+c 6.029 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 6.032 85                            myIndex: 2 calculatingFinished TRUE
+c 6.032 85                            myIndex: 2 Start Calc
+c 6.032 85                            MI: 2 intervalId: 105 PC: 300000 cW: 120 start:262500 end:265000!!      iter:0 
+c 6.066 52                            MI: 0 intervalId: 35 PC: 300000 cW: 120 start:87500 end:90000 COMPLETED iter:0 
+c 6.066 52                            myIndex: 0 End Calc childs
+c 6.066 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 6.071 52                            myIndex: 0 calculatingFinished TRUE
+c 6.071 52                            myIndex: 0 Start Calc
+c 6.071 52                            MI: 0 intervalId: 73 PC: 300000 cW: 120 start:182500 end:185000!!      iter:0 
+c 6.160 85                            MI: 2 intervalId: 105 PC: 300000 cW: 120 start:262500 end:265000 COMPLETED iter:0 
+c 6.160 85                            myIndex: 2 End Calc childs
+c 6.160 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 6.163 85                            myIndex: 2 calculatingFinished TRUE
+c 6.163 85                            myIndex: 2 Start Calc
+c 6.163 85                            MI: 2 intervalId: 106 PC: 300000 cW: 120 start:265000 end:267500!!      iter:0 
+c 6.202 52                            MI: 0 intervalId: 73 PC: 300000 cW: 120 start:182500 end:185000 COMPLETED iter:0 
+c 6.202 52                            myIndex: 0 End Calc childs
+c 6.202 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 6.203 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=8.39GB newreqs=0 hops=0
+c 6.203 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 6.212 52                            myIndex: 0 calculatingFinished TRUE
+c 6.212 52                            myIndex: 0 Start Calc
+c 6.212 52                            MI: 0 intervalId: 74 PC: 300000 cW: 120 start:185000 end:187500!!      iter:0 
+c 6.289 85                            MI: 2 intervalId: 106 PC: 300000 cW: 120 start:265000 end:267500 COMPLETED iter:0 
+c 6.289 85                            myIndex: 2 End Calc childs
+c 6.289 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 6.295 85                            myIndex: 2 calculatingFinished TRUE
+c 6.295 85                            myIndex: 2 Start Calc
+c 6.295 85                            MI: 2 intervalId: 52 PC: 300000 cW: 120 start:130000 end:132500!!      iter:0 
+c 6.346 52                            MI: 0 intervalId: 74 PC: 300000 cW: 120 start:185000 end:187500 COMPLETED iter:0 
+c 6.346 52                            myIndex: 0 End Calc childs
+c 6.346 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 6.353 52                            myIndex: 0 calculatingFinished TRUE
+c 6.353 52                            myIndex: 0 Start Calc
+c 6.353 52                            MI: 0 intervalId: 36 PC: 300000 cW: 120 start:90000 end:92500!!      iter:0 
+c 6.420 85                            MI: 2 intervalId: 52 PC: 300000 cW: 120 start:130000 end:132500 COMPLETED iter:0 
+c 6.420 85                            myIndex: 2 End Calc childs
+c 6.420 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 6.426 85                            myIndex: 2 calculatingFinished TRUE
+c 6.426 85                            myIndex: 2 Start Calc
+c 6.426 85                            MI: 2 intervalId: 25 PC: 300000 cW: 120 start:62500 end:65000!!      iter:0 
+c 6.483 52                            MI: 0 intervalId: 36 PC: 300000 cW: 120 start:90000 end:92500 COMPLETED iter:0 
+c 6.483 52                            myIndex: 0 End Calc childs
+c 6.483 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 6.485 52                            myIndex: 0 calculatingFinished TRUE
+c 6.485 52                            myIndex: 0 Start Calc
+c 6.485 52                            MI: 0 intervalId: 17 PC: 300000 cW: 120 start:42500 end:45000!!      iter:0 
+c 6.554 85                            MI: 2 intervalId: 25 PC: 300000 cW: 120 start:62500 end:65000 COMPLETED iter:0 
+c 6.554 85                            myIndex: 2 End Calc childs
+c 6.554 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 6.558 85                            myIndex: 2 calculatingFinished TRUE
+c 6.558 85                            myIndex: 2 Start Calc
+c 6.558 85                            MI: 2 intervalId: 107 PC: 300000 cW: 120 start:267500 end:270000!!      iter:0 
+c 6.612 52                            MI: 0 intervalId: 17 PC: 300000 cW: 120 start:42500 end:45000 COMPLETED iter:0 
+c 6.612 52                            myIndex: 0 End Calc childs
+c 6.612 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 6.616 52                            myIndex: 0 calculatingFinished TRUE
+c 6.616 52                            myIndex: 0 Start Calc
+c 6.616 52                            MI: 0 intervalId: 75 PC: 300000 cW: 120 start:187500 end:190000!!      iter:0 
+c 6.685 85                            MI: 2 intervalId: 107 PC: 300000 cW: 120 start:267500 end:270000 COMPLETED iter:0 
+c 6.685 85                            myIndex: 2 End Calc childs
+c 6.685 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 6.689 85                            myIndex: 2 calculatingFinished TRUE
+c 6.689 85                            myIndex: 2 Start Calc
+c 6.689 85                            MI: 2 intervalId: 108 PC: 300000 cW: 120 start:270000 end:272500!!      iter:0 
+c 6.742 52                            MI: 0 intervalId: 75 PC: 300000 cW: 120 start:187500 end:190000 COMPLETED iter:0 
+c 6.742 52                            myIndex: 0 End Calc childs
+c 6.742 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 6.747 52                            myIndex: 0 calculatingFinished TRUE
+c 6.747 52                            myIndex: 0 Start Calc
+c 6.748 52                            MI: 0 intervalId: 76 PC: 300000 cW: 120 start:190000 end:192500!!      iter:0 
+c 6.817 85                            MI: 2 intervalId: 108 PC: 300000 cW: 120 start:270000 end:272500 COMPLETED iter:0 
+c 6.817 85                            myIndex: 2 End Calc childs
+c 6.817 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 6.819 85                            myIndex: 2 calculatingFinished TRUE
+c 6.819 85                            myIndex: 2 Start Calc
+c 6.819 85                            MI: 2 intervalId: 53 PC: 300000 cW: 120 start:132500 end:135000!!      iter:0 
+c 6.878 52                            MI: 0 intervalId: 76 PC: 300000 cW: 120 start:190000 end:192500 COMPLETED iter:0 
+c 6.878 52                            myIndex: 0 End Calc childs
+c 6.878 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 6.879 52                            myIndex: 0 calculatingFinished TRUE
+c 6.879 52                            myIndex: 0 Start Calc
+c 6.879 52                            MI: 0 intervalId: 37 PC: 300000 cW: 120 start:92500 end:95000!!      iter:0 
+c 6.943 85                            MI: 2 intervalId: 53 PC: 300000 cW: 120 start:132500 end:135000 COMPLETED iter:0 
+c 6.943 85                            myIndex: 2 End Calc childs
+c 6.943 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 6.950 85                            myIndex: 2 calculatingFinished TRUE
+c 6.950 85                            myIndex: 2 Start Calc
+c 6.950 85                            MI: 2 intervalId: 109 PC: 300000 cW: 120 start:272500 end:275000!!      iter:0 
+c 7.006 52                            MI: 0 intervalId: 37 PC: 300000 cW: 120 start:92500 end:95000 COMPLETED iter:0 
+c 7.006 52                            myIndex: 0 End Calc childs
+c 7.006 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 7.011 52                            myIndex: 0 calculatingFinished TRUE
+c 7.011 52                            myIndex: 0 Start Calc
+c 7.011 52                            MI: 0 intervalId: 77 PC: 300000 cW: 120 start:192500 end:195000!!      iter:0 
+c 7.076 85                            MI: 2 intervalId: 109 PC: 300000 cW: 120 start:272500 end:275000 COMPLETED iter:0 
+c 7.076 85                            myIndex: 2 End Calc childs
+c 7.076 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 7.081 85                            myIndex: 2 calculatingFinished TRUE
+c 7.081 85                            myIndex: 2 Start Calc
+c 7.081 85                            MI: 2 intervalId: 110 PC: 300000 cW: 120 start:275000 end:277500!!      iter:0 
+c 7.137 52                            MI: 0 intervalId: 77 PC: 300000 cW: 120 start:192500 end:195000 COMPLETED iter:0 
+c 7.137 52                            myIndex: 0 End Calc childs
+c 7.137 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 7.142 52                            myIndex: 0 calculatingFinished TRUE
+c 7.142 52                            myIndex: 0 Start Calc
+c 7.142 52                            MI: 0 intervalId: 78 PC: 300000 cW: 120 start:195000 end:197500!!      iter:0 
+c 7.203 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=8.03GB newreqs=0 hops=0
+c 7.203 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 7.204 85                            MI: 2 intervalId: 110 PC: 300000 cW: 120 start:275000 end:277500 COMPLETED iter:0 
+c 7.204 85                            myIndex: 2 End Calc childs
+c 7.204 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 7.213 85                            myIndex: 2 calculatingFinished TRUE
+c 7.213 85                            myIndex: 2 Start Calc
+c 7.213 85                            MI: 2 intervalId: 54 PC: 300000 cW: 120 start:135000 end:137500!!      iter:0 
+c 7.274 52                            MI: 0 intervalId: 78 PC: 300000 cW: 120 start:195000 end:197500 COMPLETED iter:0 
+c 7.274 52                            myIndex: 0 End Calc childs
+c 7.274 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 7.283 52                            myIndex: 0 calculatingFinished TRUE
+c 7.283 52                            myIndex: 0 Start Calc
+c 7.283 52                            MI: 0 intervalId: 38 PC: 300000 cW: 120 start:95000 end:97500!!      iter:0 
+c 7.343 85                            MI: 2 intervalId: 54 PC: 300000 cW: 120 start:135000 end:137500 COMPLETED iter:0 
+c 7.343 85                            myIndex: 2 End Calc childs
+c 7.343 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 7.343 85                            myIndex: 2 calculatingFinished TRUE
+c 7.343 85                            myIndex: 2 Start Calc
+c 7.343 85                            MI: 2 intervalId: 26 PC: 300000 cW: 120 start:65000 end:67500!!      iter:0 
+c 7.418 52                            MI: 0 intervalId: 38 PC: 300000 cW: 120 start:95000 end:97500 COMPLETED iter:0 
+c 7.418 52                            myIndex: 0 End Calc childs
+c 7.418 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 7.424 52                            myIndex: 0 calculatingFinished TRUE
+c 7.425 52                            myIndex: 0 Start Calc
+c 7.425 52                            MI: 0 intervalId: 18 PC: 300000 cW: 120 start:45000 end:47500!!      iter:0 
+c 7.469 85                            MI: 2 intervalId: 26 PC: 300000 cW: 120 start:65000 end:67500 COMPLETED iter:0 
+c 7.469 85                            myIndex: 2 End Calc childs
+c 7.469 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 7.475 85                            myIndex: 2 calculatingFinished TRUE
+c 7.475 85                            myIndex: 2 Start Calc
+c 7.475 85                            MI: 2 intervalId: 12 PC: 300000 cW: 120 start:30000 end:32500!!      iter:0 
+c 7.557 52                            MI: 0 intervalId: 18 PC: 300000 cW: 120 start:45000 end:47500 COMPLETED iter:0 
+c 7.557 52                            myIndex: 0 End Calc childs
+c 7.557 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 7.566 52                            myIndex: 0 calculatingFinished TRUE
+c 7.566 52                            myIndex: 0 Start Calc
+c 7.566 52                            MI: 0 intervalId: 8 PC: 300000 cW: 120 start:20000 end:22500!!      iter:0 
+c 7.605 85                            MI: 2 intervalId: 12 PC: 300000 cW: 120 start:30000 end:32500 COMPLETED iter:0 
+c 7.605 85                            myIndex: 2 End Calc childs
+c 7.605 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 7.606 85                            myIndex: 2 calculatingFinished TRUE
+c 7.606 85                            myIndex: 2 Start Calc
+c 7.606 85                            MI: 2 intervalId: 5 PC: 300000 cW: 120 start:12500 end:15000!!      iter:0 
+c 7.696 52                            MI: 0 intervalId: 8 PC: 300000 cW: 120 start:20000 end:22500 COMPLETED iter:0 
+c 7.696 52                            myIndex: 0 End Calc childs
+c 7.696 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 7.697 52                            myIndex: 0 calculatingFinished TRUE
+c 7.697 52                            myIndex: 0 Start Calc
+c 7.697 52                            MI: 0 intervalId: 3 PC: 300000 cW: 120 start:7500 end:10000!!      iter:0 
+c 7.732 85                            MI: 2 intervalId: 5 PC: 300000 cW: 120 start:12500 end:15000 COMPLETED iter:0 
+c 7.732 85                            myIndex: 2 End Calc childs
+c 7.732 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 7.737 85                            myIndex: 2 calculatingFinished TRUE
+c 7.737 85                            myIndex: 2 Start Calc
+c 7.737 85                            MI: 2 intervalId: 111 PC: 300000 cW: 120 start:277500 end:280000!!      iter:0 
+c 7.826 52                            MI: 0 intervalId: 3 PC: 300000 cW: 120 start:7500 end:10000 COMPLETED iter:0 
+c 7.826 52                            myIndex: 0 End Calc childs
+c 7.826 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 7.827 52                            myIndex: 0 calculatingFinished TRUE
+c 7.827 52                            myIndex: 0 Start Calc
+c 7.827 52                            MI: 0 intervalId: 79 PC: 300000 cW: 120 start:197500 end:200000!!      iter:0 
+c 7.867 85                            MI: 2 intervalId: 111 PC: 300000 cW: 120 start:277500 end:280000 COMPLETED iter:0 
+c 7.867 85                            myIndex: 2 End Calc childs
+c 7.867 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 7.877 85                            myIndex: 2 calculatingFinished TRUE
+c 7.877 85                            myIndex: 2 Start Calc
+c 7.878 85                            MI: 2 intervalId: 112 PC: 300000 cW: 120 start:280000 end:282500!!      iter:0 
+c 7.957 52                            MI: 0 intervalId: 79 PC: 300000 cW: 120 start:197500 end:200000 COMPLETED iter:0 
+c 7.957 52                            myIndex: 0 End Calc childs
+c 7.957 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 7.958 52                            myIndex: 0 calculatingFinished TRUE
+c 7.958 52                            myIndex: 0 Start Calc
+c 7.958 52                            MI: 0 intervalId: 80 PC: 300000 cW: 120 start:200000 end:202500!!      iter:0 
+c 8.009 85                            MI: 2 intervalId: 112 PC: 300000 cW: 120 start:280000 end:282500 COMPLETED iter:0 
+c 8.009 85                            myIndex: 2 End Calc childs
+c 8.009 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 8.009 85                            myIndex: 2 calculatingFinished TRUE
+c 8.009 85                            myIndex: 2 Start Calc
+c 8.009 85                            MI: 2 intervalId: 55 PC: 300000 cW: 120 start:137500 end:140000!!      iter:0 
+c 8.089 52                            MI: 0 intervalId: 80 PC: 300000 cW: 120 start:200000 end:202500 COMPLETED iter:0 
+c 8.089 52                            myIndex: 0 End Calc childs
+c 8.089 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 8.089 52                            myIndex: 0 calculatingFinished TRUE
+c 8.089 52                            myIndex: 0 Start Calc
+c 8.089 52                            MI: 0 intervalId: 39 PC: 300000 cW: 120 start:97500 end:100000!!      iter:0 
+c 8.136 85                            MI: 2 intervalId: 55 PC: 300000 cW: 120 start:137500 end:140000 COMPLETED iter:0 
+c 8.136 85                            myIndex: 2 End Calc childs
+c 8.136 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 8.140 85                            myIndex: 2 calculatingFinished TRUE
+c 8.140 85                            myIndex: 2 Start Calc
+c 8.140 85                            MI: 2 intervalId: 113 PC: 300000 cW: 120 start:282500 end:285000!!      iter:0 
+c 8.204 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=8.03GB newreqs=0 hops=0
+c 8.204 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 8.220 52                            MI: 0 intervalId: 39 PC: 300000 cW: 120 start:97500 end:100000 COMPLETED iter:0 
+c 8.220 52                            myIndex: 0 End Calc childs
+c 8.220 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 8.230 52                            myIndex: 0 calculatingFinished TRUE
+c 8.230 52                            myIndex: 0 Start Calc
+c 8.230 52                            MI: 0 intervalId: 81 PC: 300000 cW: 120 start:202500 end:205000!!      iter:0 
+c 8.270 85                            MI: 2 intervalId: 113 PC: 300000 cW: 120 start:282500 end:285000 COMPLETED iter:0 
+c 8.270 85                            myIndex: 2 End Calc childs
+c 8.270 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 8.271 85                            myIndex: 2 calculatingFinished TRUE
+c 8.271 85                            myIndex: 2 Start Calc
+c 8.271 85                            MI: 2 intervalId: 114 PC: 300000 cW: 120 start:285000 end:287500!!      iter:0 
+c 8.357 52                            MI: 0 intervalId: 81 PC: 300000 cW: 120 start:202500 end:205000 COMPLETED iter:0 
+c 8.357 52                            myIndex: 0 End Calc childs
+c 8.357 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 8.361 52                            myIndex: 0 calculatingFinished TRUE
+c 8.361 52                            myIndex: 0 Start Calc
+c 8.361 52                            MI: 0 intervalId: 82 PC: 300000 cW: 120 start:205000 end:207500!!      iter:0 
+c 8.403 85                            MI: 2 intervalId: 114 PC: 300000 cW: 120 start:285000 end:287500 COMPLETED iter:0 
+c 8.403 85                            myIndex: 2 End Calc childs
+c 8.403 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 8.413 85                            myIndex: 2 calculatingFinished TRUE
+c 8.413 85                            myIndex: 2 Start Calc
+c 8.413 85                            MI: 2 intervalId: 56 PC: 300000 cW: 120 start:140000 end:142500!!      iter:0 
+c 8.489 52                            MI: 0 intervalId: 82 PC: 300000 cW: 120 start:205000 end:207500 COMPLETED iter:0 
+c 8.489 52                            myIndex: 0 End Calc childs
+c 8.489 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 8.492 52                            myIndex: 0 calculatingFinished TRUE
+c 8.492 52                            myIndex: 0 Start Calc
+c 8.492 52                            MI: 0 intervalId: 40 PC: 300000 cW: 120 start:100000 end:102500!!      iter:0 
+c 8.543 85                            MI: 2 intervalId: 56 PC: 300000 cW: 120 start:140000 end:142500 COMPLETED iter:0 
+c 8.543 85                            myIndex: 2 End Calc childs
+c 8.543 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 8.544 85                            myIndex: 2 calculatingFinished TRUE
+c 8.544 85                            myIndex: 2 Start Calc
+c 8.544 85                            MI: 2 intervalId: 27 PC: 300000 cW: 120 start:67500 end:70000!!      iter:0 
+c 8.622 52                            MI: 0 intervalId: 40 PC: 300000 cW: 120 start:100000 end:102500 COMPLETED iter:0 
+c 8.622 52                            myIndex: 0 End Calc childs
+c 8.622 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 8.623 52                            myIndex: 0 calculatingFinished TRUE
+c 8.623 52                            myIndex: 0 Start Calc
+c 8.623 52                            MI: 0 intervalId: 19 PC: 300000 cW: 120 start:47500 end:50000!!      iter:0 
+c 8.671 85                            MI: 2 intervalId: 27 PC: 300000 cW: 120 start:67500 end:70000 COMPLETED iter:0 
+c 8.671 85                            myIndex: 2 End Calc childs
+c 8.671 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 8.676 85                            myIndex: 2 calculatingFinished TRUE
+c 8.676 85                            myIndex: 2 Start Calc
+c 8.676 85                            MI: 2 intervalId: 115 PC: 300000 cW: 120 start:287500 end:290000!!      iter:0 
+c 8.750 52                            MI: 0 intervalId: 19 PC: 300000 cW: 120 start:47500 end:50000 COMPLETED iter:0 
+c 8.750 52                            myIndex: 0 End Calc childs
+c 8.750 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 8.754 52                            myIndex: 0 calculatingFinished TRUE
+c 8.754 52                            myIndex: 0 Start Calc
+c 8.754 52                            MI: 0 intervalId: 83 PC: 300000 cW: 120 start:207500 end:210000!!      iter:0 
+c 8.803 85                            MI: 2 intervalId: 115 PC: 300000 cW: 120 start:287500 end:290000 COMPLETED iter:0 
+c 8.803 85                            myIndex: 2 End Calc childs
+c 8.803 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 8.807 85                            myIndex: 2 calculatingFinished TRUE
+c 8.807 85                            myIndex: 2 Start Calc
+c 8.807 85                            MI: 2 intervalId: 116 PC: 300000 cW: 120 start:290000 end:292500!!      iter:0 
+c 8.885 52                            MI: 0 intervalId: 83 PC: 300000 cW: 120 start:207500 end:210000 COMPLETED iter:0 
+c 8.885 52                            myIndex: 0 End Calc childs
+c 8.885 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 8.894 52                            myIndex: 0 calculatingFinished TRUE
+c 8.894 52                            myIndex: 0 Start Calc
+c 8.894 52                            MI: 0 intervalId: 84 PC: 300000 cW: 120 start:210000 end:212500!!      iter:0 
+c 8.934 85                            MI: 2 intervalId: 116 PC: 300000 cW: 120 start:290000 end:292500 COMPLETED iter:0 
+c 8.934 85                            myIndex: 2 End Calc childs
+c 8.934 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 8.938 85                            myIndex: 2 calculatingFinished TRUE
+c 8.938 85                            myIndex: 2 Start Calc
+c 8.938 85                            MI: 2 intervalId: 57 PC: 300000 cW: 120 start:142500 end:145000!!      iter:0 
+c 9.029 52                            MI: 0 intervalId: 84 PC: 300000 cW: 120 start:210000 end:212500 COMPLETED iter:0 
+c 9.029 52                            myIndex: 0 End Calc childs
+c 9.029 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 9.035 52                            myIndex: 0 calculatingFinished TRUE
+c 9.035 52                            myIndex: 0 Start Calc
+c 9.035 52                            MI: 0 intervalId: 41 PC: 300000 cW: 120 start:102500 end:105000!!      iter:0 
+c 9.064 85                            MI: 2 intervalId: 57 PC: 300000 cW: 120 start:142500 end:145000 COMPLETED iter:0 
+c 9.064 85                            myIndex: 2 End Calc childs
+c 9.064 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 9.069 85                            myIndex: 2 calculatingFinished TRUE
+c 9.069 85                            myIndex: 2 Start Calc
+c 9.069 85                            MI: 2 intervalId: 117 PC: 300000 cW: 120 start:292500 end:295000!!      iter:0 
+c 9.164 52                            MI: 0 intervalId: 41 PC: 300000 cW: 120 start:102500 end:105000 COMPLETED iter:0 
+c 9.164 52                            myIndex: 0 End Calc childs
+c 9.164 52                            myIndex: 0 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 0 
+c 9.166 52                            myIndex: 0 calculatingFinished TRUE
+c 9.166 52                            myIndex: 0 Start Calc
+c 9.166 52                            MI: 0 intervalId: 85 PC: 300000 cW: 120 start:212500 end:214999!!      iter:0 
+c 9.194 85                            MI: 2 intervalId: 117 PC: 300000 cW: 120 start:292500 end:295000 COMPLETED iter:0 
+c 9.194 85                            myIndex: 2 End Calc childs
+c 9.195 85                            myIndex: 2 work.empty() 0 calculatingFinished 1 leftDone 1 rightDone 1 
+c 9.200 85                            myIndex: 2 calculatingFinished TRUE
+c 9.200 85                            myIndex: 2 Start Calc
+c 9.200 85                            MI: 2 intervalId: 118 PC: 300000 cW: 120 start:295000 end:297500!!      iter:0 
+c 9.204 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=8.03GB newreqs=0 hops=0
+c 9.204 0 sysstate entered=1 parsed=1 scheduled=1 processed=0

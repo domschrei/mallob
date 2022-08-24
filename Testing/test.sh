@@ -5,7 +5,7 @@ instanceName="covtypeShuffle" #   mnist784      benign_trafficShuffle      covty
 instanceFirstLine="54 55" #              7 7 209       115 115 52150              54 55 581012
 kList=(30 50) # 60 70 80 70 100
 wList=(128 127 125 120 110 100 90 80 75 70 65 64 63 60 55 50 45 40 35 32 31 30 25 20 16) #   65 64 63 60 55 50 45 40 35 32 31 30 25 20 16 15 10 8 7 5 4 3 2 1
-nList=(100000 300000)# 500000
+nList=(100000 300000) # 500000
 countPasses=1
 
 ./Testing/killHung.sh ${folder} &
