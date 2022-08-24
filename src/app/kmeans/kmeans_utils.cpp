@@ -12,17 +12,11 @@ namespace KMeansUtils {
 
 typedef std::vector<float> Point;
 float eukild(const float* p1, Point& p2) {
-    Point difference;
     float sum = 0;
-    int dimension = p2.size();
-    difference.resize(dimension);
-
-    for (int d = 0; d < dimension; ++d) {
-        difference[d] = p1[d] - p2[d];
-    }
-
-    for (auto entry : difference) {
-        sum += entry * entry;
+    float diff;
+    for (int d = 0; d < p2.size(); ++d) {
+        diff = p1[d] - p2[d];
+        sum += diff*diff;
     }
 
     return std::sqrt(sum);
