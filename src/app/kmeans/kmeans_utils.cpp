@@ -11,15 +11,15 @@
 namespace KMeansUtils {
 
 typedef std::vector<float> Point;
-float eukild(const float* p1, Point& p2) {
+float eukild(const float* p1, const float* p2, const size_t dim) {
     float sum = 0;
     float diff;
-    for (int d = 0; d < p2.size(); ++d) {
+    for (int d = 0; d < dim; ++d) {
         diff = p1[d] - p2[d];
         sum += diff*diff;
     }
 
-    return std::sqrt(sum);
+    return sum;
 }
 // childIndexesOf(1, 12) = [3, 4, 7, 8, 9, 10]
 std::vector<int> childIndexesOf(int parentIndex, int jobVolume) {

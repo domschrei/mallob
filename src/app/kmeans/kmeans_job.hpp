@@ -52,9 +52,9 @@ class KMeansJob : public Job {
     JobMessage baseMsg;
     JobResult internal_result;
     std::unique_ptr<JobTreeAllReduction> reducer;
-    const std::function<float(const float*, KMeansJob::Point&)> metric =
-        [&](const float* p1, Point& p2) {
-            return KMeansUtils::eukild(p1, p2);
+    const std::function<float(const float* p1, const float* p2, const size_t dim)> metric =
+        [&](const float* p1, const float* p2, const size_t dim) {
+            return KMeansUtils::eukild(p1, p2, dim);
         };
     const std::function<std::vector<int>(std::list<std::vector<int>>&)> folder =
         [&](std::list<std::vector<int>>& elems) {
@@ -83,7 +83,7 @@ class KMeansJob : public Job {
             LOG(V3_VERB, "                           Children: %i\n",
                 this->getJobTree().getNumChildren());
 
-            if (!centersChanged(metric, 0.001f)) {
+            if (!centersChanged(0.001f)) {
                 LOG(V0_CRIT, "                           Got Result after iter %i\n", iterationsDone);
                 internal_result.result = RESULT_SAT;
                 internal_result.id = getId();
@@ -167,14 +167,14 @@ class KMeansJob : public Job {
     void doInitWork();
     void sendRootNotification();
     void setRandomStartCenters();
-    void calcNearestCenter(std::function<float(const float*, Point&)> metric, int intervalId);
+    void calcNearestCenter(std::function<float(const float* p1, const float* p2, const size_t dim)> metric, int intervalId);
     void calcCurrentClusterCenters();
     std::string dataToString(std::vector<Point> data);
     std::string dataToString(std::vector<int> data);
     void countMembers();
-    float calculateDifference(std::function<float(const float*, Point&)> metric);
+    float calculateDifference(std::function<float(const float* p1, const float* p2, const size_t dim)> metric);
     bool centersChanged();
-    bool centersChanged(std::function<float(const float*, Point&)> metric, float factor);
+    bool centersChanged(float factor);
     std::vector<float> clusterCentersToSolution();
     std::vector<int> clusterCentersToBroadcast(const std::vector<Point>&);
     std::vector<Point> broadcastToClusterCenters(const std::vector<int>&, bool withNumWorkers = false);

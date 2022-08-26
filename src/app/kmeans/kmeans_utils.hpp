@@ -4,6 +4,6 @@
 
 namespace KMeansUtils {
     typedef std::vector<float> Point;
-    float eukild(const float* p1, Point& p2);
+    float eukild(const float* p1, const float* p2, const size_t dim);
     std::vector<int> childIndexesOf(int parentIndex, int jobVolume);
 };  // namespace KMeansUtils

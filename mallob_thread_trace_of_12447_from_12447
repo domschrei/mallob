@@ -1,0 +1,37 @@
+[New LWP 12465]
+[New LWP 12476]
+[New LWP 12501]
+[New LWP 12519]
+[New LWP 12526]
+[New LWP 12536]
+[New LWP 12544]
+[New LWP 12598]
+[New LWP 12715]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=140105427650304, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=140105427650304, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007f6cea8a3047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x000055d7233e017f in Process::writeTrace (tid=12447) at /mnt/c/Projekte/mallob/src/util/sys/process.cpp:198
+#3  0x000055d7233df85b in Process::handleTerminationSignal (info=...) at /mnt/c/Projekte/mallob/src/util/sys/process.cpp:70
+#4  0x000055d7233df779 in handleSignal (signum=11) at /mnt/c/Projekte/mallob/src/util/sys/process.cpp:53
+#5  <signal handler called>
+#6  0x000055d723374ffa in std::vector<float, std::allocator<float> >::capacity (this=0x0) at /usr/include/c++/9/bits/stl_vector.h:996
+#7  0x000055d7233f0e4a in std::vector<float, std::allocator<float> >::_M_fill_assign (this=0x0, __n=54, __val=@0x7ffd1cf85018: 0) at /usr/include/c++/9/bits/vector.tcc:260
+#8  0x000055d7233ef181 in std::vector<float, std::allocator<float> >::assign (this=0x0, __n=54, __val=@0x7ffd1cf85018: 0) at /usr/include/c++/9/bits/stl_vector.h:747
+#9  0x000055d7233ea0ce in KMeansJob::calcCurrentClusterCenters (this=0x55d724daf6b0) at /mnt/c/Projekte/mallob/src/app/kmeans/kmeans_job.cpp:459
+#10 0x000055d7233e8244 in KMeansJob::<lambda()>::operator()(void) const (__closure=0x7ffd1cf85190) at /mnt/c/Projekte/mallob/src/app/kmeans/kmeans_job.cpp:212
+#11 0x000055d7233ebfa3 in std::_Function_handler<std::vector<int, std::allocator<int> >(), KMeansJob::appl_communicate()::<lambda()> >::_M_invoke(const std::_Any_data &) (__functor=...) at /usr/include/c++/9/bits/std_function.h:286
+#12 0x000055d7233ee076 in std::function<std::vector<int, std::allocator<int> > ()>::operator()() const (this=0x7ffd1cf85190) at /usr/include/c++/9/bits/std_function.h:688
+#13 0x000055d7233eccae in JobTreeAllReduction::produce(std::function<std::vector<int, std::allocator<int> > ()>) (this=0x55d724db2000, localProducer=...) at /mnt/c/Projekte/mallob/src/comm/job_tree_all_reduction.hpp:48
+#14 0x000055d7233e862c in KMeansJob::appl_communicate (this=0x55d724daf6b0) at /mnt/c/Projekte/mallob/src/app/kmeans/kmeans_job.cpp:217
+#15 0x000055d723360254 in Job::communicate (this=0x55d724daf6b0) at /mnt/c/Projekte/mallob/src/app/job.cpp:220
+#16 0x000055d723310346 in Worker::checkActiveJob (this=0x55d724d982f0) at /mnt/c/Projekte/mallob/src/worker.cpp:419
+#17 0x000055d72330fdc8 in Worker::checkJobs (this=0x55d724d982f0) at /mnt/c/Projekte/mallob/src/worker.cpp:348
+#18 0x000055d72330f53d in Worker::advance (this=0x55d724d982f0, time=6.27402878) at /mnt/c/Projekte/mallob/src/worker.cpp:249
+#19 0x000055d7233354eb in doMainProgram (commWorkers=@0x7ffd1cf85580: 0x55d724d49240, commClients=@0x7ffd1cf85578: 0x55d7236aacc0 <ompi_mpi_comm_null>, params=...) at /mnt/c/Projekte/mallob/src/main.cpp:128
+#20 0x000055d7233360d7 in main (argc=4, argv=0x7ffd1cf88768) at /mnt/c/Projekte/mallob/src/main.cpp:261
+[Inferior 1 (process 12447) detached]

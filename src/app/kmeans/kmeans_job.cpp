@@ -411,11 +411,10 @@ void KMeansJob::setRandomStartCenters() {
     }
 }
 
-void KMeansJob::calcNearestCenter(std::function<float(const float*, Point&)> metric, int intervalId) {
-    struct centerDistance {
-        int cluster;
-        float distance;
-    } currentNearestCenter;
+void KMeansJob::calcNearestCenter(std::function<float(const float* p1, const float* p2, const size_t dim)> metric, int intervalId) {
+    
+        int currentCluster;
+        float currentDistance;
     float distanceToCluster;
     // while own or child slices todo
     int startIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(intervalId) / static_cast<float>(countCurrentWorkers)));
@@ -434,23 +433,23 @@ void KMeansJob::calcNearestCenter(std::function<float(const float*, Point&)> met
             work.clear();
             return;
         }
-        currentNearestCenter.cluster = -1;
-        currentNearestCenter.distance = std::numeric_limits<float>::infinity();
+        currentCluster = -1;
+        currentDistance = std::numeric_limits<float>::infinity();
         for (int clusterID = 0; clusterID < countClusters; ++clusterID) {
-            distanceToCluster = metric(getKMeansData(pointID), clusterCenters[clusterID]);
-            if (distanceToCluster < currentNearestCenter.distance) {
-                currentNearestCenter.cluster = clusterID;
-                currentNearestCenter.distance = distanceToCluster;
+            distanceToCluster = metric(getKMeansData(pointID), clusterCenters[clusterID].data(), dimension);
+            if (distanceToCluster < currentDistance) {
+                currentCluster = clusterID;
+                currentDistance = distanceToCluster;
             }
         }
 
-        clusterMembership[pointID] = currentNearestCenter.cluster;
+        clusterMembership[pointID] = currentCluster;
     }
     LOG(V3_VERB, "                           MI: %i intervalId: %i PC: %i cW: %i start:%i end:%i COMPLETED iter:%i \n", myIndex, intervalId, pointsCount, countCurrentWorkers, startIndex, endIndex, iterationsDone);
 }
 
 void KMeansJob::calcCurrentClusterCenters() {
-    oldClusterCenters = clusterCenters;
+    oldClusterCenters = std::move(clusterCenters);
 
     countMembers();
 
@@ -535,7 +534,7 @@ bool KMeansJob::centersChanged() {
     return false;
 }
 
-bool KMeansJob::centersChanged(std::function<float(const float*, Point&)> metric, float factor) {
+bool KMeansJob::centersChanged(float factor) {
     if (iterationsDone == 0) {
         return true;
     }
