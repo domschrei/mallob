@@ -41,6 +41,13 @@ void KMeansJob::appl_start() {
 
     loadInstance();
     clusterMembership.assign(pointsCount, -1);
+
+    localClusterCenters.resize(countClusters);
+    clusterCenters.resize(countClusters);
+    for (int cluster = 0; cluster < countClusters; ++cluster) {
+        localClusterCenters[cluster].assign(dimension, 0);
+        clusterCenters[cluster].resize(dimension);
+    }
     LOG(V3_VERB, "                           myIndex: %i Ready!\n", myIndex);
     loaded = true;
     if (iAmRoot) {
@@ -143,13 +150,13 @@ void KMeansJob::doInitWork() {
     */
 }
 void KMeansJob::appl_suspend() {
-            LOG(V3_VERB, "                           myIndex: %i i got SUSPENDED :( iter: %i\n", myIndex, iterationsDone);
+    LOG(V3_VERB, "                           myIndex: %i i got SUSPENDED :( iter: %i\n", myIndex, iterationsDone);
     baseMsg.tag = MSG_ALLREDUCE_CLAUSES;
     baseMsg.returnedToSender = true;
     MyMpi::isend(getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, baseMsg);
 }
 void KMeansJob::appl_resume() {
-            LOG(V3_VERB, "                           myIndex: %i i got RESUMED :D iter: %i\n", myIndex, iterationsDone);
+    LOG(V3_VERB, "                           myIndex: %i i got RESUMED :D iter: %i\n", myIndex, iterationsDone);
     myIndex = getJobTree().getIndex();
 }
 JobResult&& KMeansJob::appl_getResult() {
@@ -224,7 +231,7 @@ void KMeansJob::appl_communicate() {
         if (!skipCurrentIter) {
             if (iAmRoot && (reducer)->hasResult()) {
                 LOG(V3_VERB, "                           myIndex: %i received Result from Transform\n", myIndex);
-                clusterCenters = broadcastToClusterCenters((reducer)->extractResult(), true);
+                setClusterCenters((reducer)->extractResult());
                 clusterMembership.assign(pointsCount, -1);
 
                 baseMsg.tag = MSG_BROADCAST_DATA;
@@ -336,7 +343,7 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
     if (msg.tag == MSG_BROADCAST_DATA) {
         LOG(V3_VERB, "                           myIndex: %i MSG_BROADCAST_DATA \n", myIndex);
         LOG(V3_VERB, "                           myIndex: %i Workers: %i!\n", myIndex, countCurrentWorkers);
-        clusterCenters = broadcastToClusterCenters(msg.payload, true);
+        setClusterCenters(msg.payload);
         if (myIndex < countCurrentWorkers) {
             initReducer(msg);
             clusterMembership.assign(pointsCount, -1);
@@ -412,9 +419,8 @@ void KMeansJob::setRandomStartCenters() {
 }
 
 void KMeansJob::calcNearestCenter(std::function<float(const float* p1, const float* p2, const size_t dim)> metric, int intervalId) {
-    
-        int currentCluster;
-        float currentDistance;
+    int currentCluster;
+    float currentDistance;
     float distanceToCluster;
     // while own or child slices todo
     int startIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(intervalId) / static_cast<float>(countCurrentWorkers)));
@@ -449,14 +455,15 @@ void KMeansJob::calcNearestCenter(std::function<float(const float* p1, const flo
 }
 
 void KMeansJob::calcCurrentClusterCenters() {
-    oldClusterCenters = std::move(clusterCenters);
+    oldClusterCenters = clusterCenters;
 
     countMembers();
 
-    localClusterCenters.clear();
-    localClusterCenters.resize(countClusters);
     for (int cluster = 0; cluster < countClusters; ++cluster) {
-        localClusterCenters[cluster].assign(dimension, 0);
+        auto currentCenter = localClusterCenters[cluster].data();
+        for (int d = 0; d < dimension; ++d) {
+            currentCenter[d] = 0;
+        }
     }
     for (auto workIndex : workDone) {
         int startIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(workIndex) / static_cast<float>(countCurrentWorkers)));
@@ -464,9 +471,12 @@ void KMeansJob::calcCurrentClusterCenters() {
         int endIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(workIndex + 1) / static_cast<float>(countCurrentWorkers)));
         for (int pointID = startIndex; pointID < endIndex; ++pointID) {
             // if (clusterMembership[pointID] != -1) {
+            int clusterId = clusterMembership[pointID];
+            auto currentCenter = localClusterCenters[clusterId].data();
+            float divisor = static_cast<float>(localSumMembers[clusterId]);
+            auto currentDataPoint = getKMeansData(pointID);
             for (int d = 0; d < dimension; ++d) {
-                localClusterCenters[clusterMembership[pointID]][d] +=
-                    getKMeansData(pointID)[d] / static_cast<float>(localSumMembers[clusterMembership[pointID]]);
+                currentCenter[d] += currentDataPoint[d] / divisor;
             }
         }
     }
@@ -580,26 +590,39 @@ std::vector<int> KMeansJob::clusterCentersToBroadcast(const std::vector<Point>& 
     return result;
 }
 
-std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(const std::vector<int>& reduce, bool withNumWorkers) {
+std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(const std::vector<int>& reduce) {
     std::vector<Point> localClusterCentersResult;
     const int elementsCount = allReduceElementSize - countClusters;
     const int* reduceData = reduce.data();
 
-    if (!withNumWorkers) reduceData += countClusters;
+    reduceData += countClusters;
 
     localClusterCentersResult.resize(countClusters);
-    for (int i = 0; i < countClusters; ++i) {
-        localClusterCentersResult[i].assign(dimension, 0);
+    for (int k = 0; k < countClusters; ++k) {
+        localClusterCentersResult[k].resize(dimension);
+        auto currentCenter = localClusterCentersResult[k].data();
+        auto receivedCenter = reduceData + k*dimension;
+        for (int d = 0; d < dimension; ++d) {
+            currentCenter[d] = *((float*)(receivedCenter + d));
+        }
     }
-    for (int i = 0; i < elementsCount; ++i) {
-        localClusterCentersResult[i / dimension][i % dimension] = *((float*)(reduceData + i));
-    }
-    if (withNumWorkers) {
-        countCurrentWorkers = *(reduceData + elementsCount);
-        LOG(V3_VERB, "                           myIndex: %i countCurrentWorkers: %i\n", myIndex, countCurrentWorkers);
-    }
+    
 
     return localClusterCentersResult;
+}
+void KMeansJob::setClusterCenters(const std::vector<int>& reduce) {
+    const int elementsCount = allReduceElementSize - countClusters;
+    const int* reduceData = reduce.data();
+    for (int k = 0; k < countClusters; ++k) {
+        auto currentCenter = clusterCenters[k].data();
+        auto receivedCenter = reduceData + k*dimension;
+        for (int d = 0; d < dimension; ++d) {
+            currentCenter[d] = *((float*)(receivedCenter + d));
+        }
+    }
+
+    countCurrentWorkers = *(reduceData + elementsCount);
+    LOG(V3_VERB, "                           myIndex: %i countCurrentWorkers: %i\n", myIndex, countCurrentWorkers);
 }
 
 std::vector<int> KMeansJob::clusterCentersToReduce(const std::vector<int>& reduceSumMembers, const std::vector<Point>& reduceClusterCenters) {

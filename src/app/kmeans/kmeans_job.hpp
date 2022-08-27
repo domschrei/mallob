@@ -177,7 +177,8 @@ class KMeansJob : public Job {
     bool centersChanged(float factor);
     std::vector<float> clusterCentersToSolution();
     std::vector<int> clusterCentersToBroadcast(const std::vector<Point>&);
-    std::vector<Point> broadcastToClusterCenters(const std::vector<int>&, bool withNumWorkers = false);
+    std::vector<Point> broadcastToClusterCenters(const std::vector<int>&);
+    void setClusterCenters(const std::vector<int>&);
     std::vector<int> clusterCentersToReduce(const std::vector<int>&, const std::vector<Point>&);
     std::pair<std::vector<std::vector<float>>, std::vector<int>> reduceToclusterCenters(const std::vector<int>&);
     std::vector<int> aggregate(const std::list<std::vector<int>>&);
