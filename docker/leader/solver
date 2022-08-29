@@ -5,8 +5,12 @@ import os
 import subprocess
 import sys
 import threading
+import glob
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+def reverse_function(x):
+    return x[::-1]
 
 
 class Runner:
@@ -60,8 +64,8 @@ class Runner:
         hostfile_path = os.path.join(request_dir, 'combined_hostfile')
         with open(hostfile_path, 'w+') as f:
             for ip in ips:
-                #f.write(f'{ip} slots=4') # Cloud track
-                f.write(f'{ip} slots=16') # Parallel track
+                f.write(f'{ip} slots=4') # Cloud track
+                # f.write(f'{ip} slots=16') # Parallel track
                 f.write('\n')
             return hostfile_path
 
@@ -77,19 +81,35 @@ class Runner:
 
         return run_list
 
+    def determine_proof_files(self): 
+        rootdir = '/logs/processes'
+        proof_files = []
+        for path in glob.glob(f'{rootdir}/*/proof.*.frat'):
+            print(f"An expected proof file path is: {path}")
+            proof_files.append(path)
+
+        # silly trick so that the proof file numbers are 'first' in the sort.
+        reversed_files = [reverse_function(str) for str in proof_files]
+        reversed_files.sort()
+        proof_files = [reverse_function(str) for str in reversed_files]
+
+        print(f"The list of proof files is: {proof_files}")
+        return proof_files
+
+
+    def get_combine_command(self, input_json):
+        problem_path = input_json.get("problem_path")
+
+        proof_files = self.determine_proof_files()
+        args = ['/compose-proofs', problem_path, '/logs/processes/combined.lrat']
+        args.extend(proof_files)
+        return args
+
     def get_check_command(self, input_json):
         problem_path = input_json.get("problem_path")
-        worker_node_ips = input_json.get("worker_node_ips", [])
-        
-        combined_hostfile = self.create_hostfile(worker_node_ips, self.request_directory)
-
-        # run_list = ["/competition/run_checker.sh"]
-        # run_list.append(combined_hostfile)
-        # run_list.append(problem_path)
-
-        run_list = ["echo", f"Would run frat checker here with args {combined_hostfile}, {problem_path}!"]
-        return run_list
-
+        # run_list = ["echo", f"Would be running /lrat-check /logs/processes/combined.lrat"]
+        args = ['/lrat-check', problem_path, '/logs/processes/combined.lrat']
+        return args
 
 class MallobParser:
     @staticmethod
@@ -112,6 +132,7 @@ class MallobParser:
             else:
                 return "UNKNOWN"
 
+
 if __name__ == "__main__":
     
     request_directory = sys.argv[1]
@@ -129,18 +150,25 @@ if __name__ == "__main__":
 
     # proof check
     if (result == "UNSATISFIABLE"):
-        proof_cmd = runner.get_check_command(input_json)
-        runner.logger.info(f"Running checker with {proof_cmd}")
-        checker_result = runner.run(proof_cmd, True)
-        if checker_result.return_code:
-            runner.logger.info(f"Checker return code was non-zero ({checker_result.return_code}).  Returning 'ERROR'.")
+        combine_cmd = runner.get_combine_command(input_json)
+        runner.logger.info(f"Running combiner with {combine_cmd}")
+        combiner_result = runner.run(combine_cmd, True)
+        if combiner_result["return_code"]:
+            runner.logger.info(f"Combiner return code was non-zero ({combiner_result.return_code}).  Returning 'ERROR'.")
             result = "ERROR"  
         else:
-            runner.logger.info(f"Checker return code was zero.  Check successful!")
-
+            check_cmd = runner.get_check_command(input_json)
+            runner.logger.info(f"Running proof checker with {check_cmd}")
+            checker_result = runner.run(check_cmd, True)
+            if checker_result["return_code"]:
+                runner.logger.info(f"Checker return code was non-zero ({checker_result.return_code}).  Returning 'ERROR'.")
+                result = "ERROR"  
+            else:
+                runner.logger.info(f"Checker return code was zero.  Check successful!")
+    
     # clean up.
-    runner.run(['cleanup'], True)
-
+    runner.run(['/competition/cleanup'], True)
+    
     solver_output = {
         "return_code": output["return_code"],
         "result": result,

@@ -11,15 +11,10 @@ fi
 
 bash fetch_solvers.sh $solvers
 
-echo "Building frat-rs (for proof checking) ..."
-export PATH="/root/.cargo/bin:$PATH"
-cd frat
+echo "Making drat-trim"
+cd drat-trim
 make
 cd ..
-echo "*****  looking for frat!"
-find / -name "frat*"
-find / -name "frat-rs"
-
 
 if echo $solvers|grep -q "m" && [ ! -f mergesat/libmergesat.a ]; then
     echo "Building MergeSAT"

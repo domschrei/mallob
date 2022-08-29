@@ -21,5 +21,6 @@ if ls /competition|grep -q mallob_thread_trace; then
     done
 fi
 
-echo "Cleaning up: Killing all mpi processes"
+echo "Cleaning up: Killing all mpi processes and deleting logs"
 cleanup 2>&1 > /dev/null
+rm -Rf /logs/*

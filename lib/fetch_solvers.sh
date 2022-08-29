@@ -2,8 +2,9 @@
 
 solvers=$1
 
-echo "Cloning FRAT proof checker - eventually we will want to choose proof checker"
-git clone https://github.com/digama0/frat.git
+echo "Cloning drat-trim proof checker - eventually we will want to choose proof checker"
+git clone https://github.com/marijnheule/drat-trim.git
+
 
 if echo $solvers|grep -q "m"; then wget -nc https://dominikschreiber.de/mergesat-patched.tar.gz ; fi
 if echo $solvers|grep -q "g"; then wget -nc https://www.labri.fr/perso/lsimon/downloads/softwares/glucose-syrup-4.1.tgz ; fi

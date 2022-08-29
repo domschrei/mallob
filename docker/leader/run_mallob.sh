@@ -10,13 +10,24 @@ mallob -mono=$2 \
 `# General options` \
 -zero-only-logging -sleep=1000 -t=4 -appmode=fork -nolog -v=3 -interface-fs=0 -trace-dir=competition -pipe-large-solutions=0 -processes-per-host=$processes_per_host -regular-process-allocation \
 `# SAT solving options` \
--max-lits-per-thread=50000000 -strict-clause-length-limit=20 -clause-filter-clear-interval=500 -max-lbd-partition-size=2 -export-chunks=20 \
+-max-lits-per-thread=50000000 -strict-clause-length-limit=20 -clause-filter-clear-interval=500 -max-lbd-partition-size=2 -export-chunks=20 -clause-buffer-discount=1.0 -satsolver=k"
+
 `# Kicaliglu portfolio` \
 `#-clause-buffer-discount=0.9 -satsolver=kkclkkclkkclkkclccgg # 8 Kissat, 6 CaDiCaL, 4 Lingeling, 2 Glucose` \
-`# Ki, Kiki portfolio` \
-`-clause-buffer-discount=1.0 -satsolver=k`"
+`# Ki, Kiki portfolio` 
 
-echo "run_mallob.sh : $num_hosts hosts, $processes_per_host processes per host => $(($num_hosts * $processes_per_host)) MPI processes"
+# Replace that ^^^ command with the one that works with proofs below.
+
+echo "Cleaning up previous proofs..."
+short_log_name=${1##*/} 
+rm -rf "/logs/processes"
+mkdir "/logs/processes"
+mkdir -p "/logs/tracedir"
+command="mpirun -np $processes_per_host /mallob -mono="$2" \
+       	-log-directory="/logs/processes" \
+	-trace-dir="/logs/tracedir/" -mempanic=0"
+
+# echo "run_mallob.sh : $num_hosts hosts, $processes_per_host processes per host => $(($num_hosts * $processes_per_host)) MPI processes"
 echo "run_mallob.sh : EXECUTE $command"
 
 # Workaround for MPI error messages: Read -1, expected <some number>, errno = 1
@@ -31,5 +42,3 @@ export RDMAV_FORK_SAFE=1
 OMPI_MCA_btl_vader_single_copy_mechanism=none RDMAV_FORK_SAFE=1 $command
 
 echo "run_mallob.sh : DONE"
-
-/competition/cleanup
