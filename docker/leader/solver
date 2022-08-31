@@ -6,6 +6,7 @@ import subprocess
 import sys
 import threading
 import glob
+import time
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -37,6 +38,7 @@ class Runner:
 
         with open(stdout_target_loc, access) as stdout_handle:
             with open(stderr_target_loc, access) as stderr_handle:
+                start = time.monotonic()
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                     universal_newlines=True, start_new_session=True)
                 stdout_t = threading.Thread(target = self.process_stream, args=(proc.stdout, "STDOUT", stdout_handle))
@@ -46,7 +48,10 @@ class Runner:
                 return_code = proc.wait()
                 stdout_t.join()
                 stderr_t.join()
-       
+                stop = time.monotonic()
+                timing = f">>>>>{cmd[0]} : {stop-start} seconds<<<<<\n"
+                self.logger.info(f"STDERR: {timing}")
+                stderr_handle.write(timing)
         return {
             "stdout": stdout_target_loc,
             "stderr": stderr_target_loc,
@@ -96,19 +101,27 @@ class Runner:
         print(f"The list of proof files is: {proof_files}")
         return proof_files
 
+    def get_wc_command(self):
+        args = ['/competition/proof_line_count.sh']
+        return args
 
     def get_combine_command(self, input_json):
         problem_path = input_json.get("problem_path")
 
         proof_files = self.determine_proof_files()
-        args = ['/compose-proofs', problem_path, '/logs/processes/combined.lrat']
+        args = ['/compose-proofs', '--loose', '--keep-temps', problem_path, '/logs/processes/combined.lrat']
         args.extend(proof_files)
+        return args
+
+    def get_renumber_command(self, input_json):
+        problem_path = input_json.get("problem_path")
+        args = ['/renumber-proofs', problem_path, '/logs/processes/renumbered.lrat', '/logs/processes/combined.lrat']
         return args
 
     def get_check_command(self, input_json):
         problem_path = input_json.get("problem_path")
-        # run_list = ["echo", f"Would be running /lrat-check /logs/processes/combined.lrat"]
-        args = ['/lrat-check', problem_path, '/logs/processes/combined.lrat']
+        # run_list = ["echo", f"Would be running /lrat-check /logs/processes/renumbered.lrat"]
+        args = ['/lrat-check', problem_path, '/logs/processes/renumbered.lrat']
         return args
 
 class MallobParser:
@@ -157,14 +170,23 @@ if __name__ == "__main__":
             runner.logger.info(f"Combiner return code was non-zero ({combiner_result.return_code}).  Returning 'ERROR'.")
             result = "ERROR"  
         else:
-            check_cmd = runner.get_check_command(input_json)
-            runner.logger.info(f"Running proof checker with {check_cmd}")
-            checker_result = runner.run(check_cmd, True)
-            if checker_result["return_code"]:
-                runner.logger.info(f"Checker return code was non-zero ({checker_result.return_code}).  Returning 'ERROR'.")
-                result = "ERROR"  
-            else:
-                runner.logger.info(f"Checker return code was zero.  Check successful!")
+            renumber_cmd = runner.get_renumber_command(input_json)
+            runner.logger.info(f"Running proof renumbering tool with {renumber_cmd}")
+            renumber_result = runner.run(renumber_cmd, True)
+            if renumber_result["return_code"]:
+                runner.logger.info(f"Reunumber return code was non-zero ({renumber_result.return_code}).  Returning 'ERROR'.")
+                result = "ERROR"
+            else: 
+                runner.run(runner.get_wc_command(), True)
+                
+                check_cmd = runner.get_check_command(input_json)
+                runner.logger.info(f"Running proof checker with {check_cmd}")
+                checker_result = runner.run(check_cmd, True)
+                if checker_result["return_code"]:
+                    runner.logger.info(f"Checker return code was non-zero ({checker_result.return_code}).  Returning 'ERROR'.")
+                    result = "ERROR"  
+                else:
+                    runner.logger.info(f"Checker return code was zero.  Check successful!")
     
     # clean up.
     runner.run(['/competition/cleanup'], True)

@@ -29,7 +29,7 @@ RUN cd build \
 WORKDIR /
 RUN git clone https://github.com/RandomActsOfGrammar/distributed-unsat-composition.git
 WORKDIR /distributed-unsat-composition
-RUN git checkout post-process-renumber-mww && \
+RUN git checkout lrat-input && \
     make && \
     cd ..
 
@@ -52,8 +52,9 @@ COPY --from=builder /mallob/build/mallob_process_dispatcher mallob_process_dispa
 COPY --from=builder /mallob/lib/drat-trim/lrat-check lrat-check
 
 COPY --from=builder /distributed-unsat-composition/build/compose-proofs compose-proofs 
-# COPY compose-proofs compose-proofs
+COPY --from=builder /distributed-unsat-composition/build/renumber-proofs renumber-proofs
 COPY --chown=ecs-user /docker/leader/run_mallob.sh /competition
+COPY --chown=ecs-user /docker/leader/proof_line_count.sh /competition
 COPY --chown=ecs-user /docker/leader/solver /competition
 COPY /docker/leader/cleanup /competition
 USER root
@@ -61,3 +62,4 @@ RUN chmod +x /competition/cleanup
 USER ecs-user
 RUN chmod +x /competition/run_mallob.sh
 RUN chmod +x /competition/solver
+RUN chmod +x /competition/proof_line_count.sh
