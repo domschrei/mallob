@@ -19,8 +19,8 @@ class KMeansJob : public Job {
     std::vector<Point> clusterCenters;       // The centers of cluster 0..n
     std::vector<Point> localClusterCenters;  // The centers of cluster 0..n
     std::vector<Point> oldClusterCenters;
-    std::vector<int> clusterMembership;  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
-    std::vector<int> sumMembers;
+    int* clusterMembership;  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
+    
     std::vector<int> localSumMembers;
     int countClusters;
     int dimension;
@@ -64,12 +64,13 @@ class KMeansJob : public Job {
         [&](const std::vector<int>& payload) {
             LOG(V3_VERB, "                           myIndex: %i start Roottransform\n", myIndex);
             auto data = reduceToclusterCenters(payload);
+            const int* sumMembers;
 
             clusterCenters = data.first;
-            sumMembers = data.second;
+            sumMembers = data.second.data();
             int sum = 0;
-            for (auto i : sumMembers) {
-                sum += i;
+            for (int i = 0; i < countClusters; ++i) {
+                sum += sumMembers[i];
             }
             if (sum == pointsCount) {
                 LOG(V3_VERB, "                           AllCollected: Good\n");
@@ -108,8 +109,8 @@ class KMeansJob : public Job {
 
    public:
     std::vector<Point> getClusterCenters() { return clusterCenters; };      // The centers of cluster 0..n
-    std::vector<int> getClusterMembership() { return clusterMembership; };  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
-    std::vector<int> getSumMembers() { return sumMembers; };
+    const int* getClusterMembership() { return clusterMembership; };  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
+    //const int* getSumMembers() { return sumMembers; };
     int getNumClusters() { return countClusters; };
     int getDimension() { return dimension; };
     int getPointsCount() { return pointsCount; };

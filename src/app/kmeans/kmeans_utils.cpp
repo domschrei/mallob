@@ -18,7 +18,6 @@ float eukild(const float* p1, const float* p2, const size_t dim) {
     //const int d4 = dim / vecLen;
     float sum = 0;
     float diff;
-    const float* const p1End = p1 + dim;
     //float sumArr[d4 + vecLen -1];
     //__m128 v1, v2, vd;
     //for (int i = 0; i < d4; ++i) {
@@ -36,7 +35,7 @@ float eukild(const float* p1, const float* p2, const size_t dim) {
     //    sum += sumArr[j];
     //}
 
-     for( ; p1 < p1End; ++p1, ++p2 ) {
+     for(const float* const p1End = p1 + dim; p1 < p1End; ++p1, ++p2 ) {
         diff = p1[0] - p2[0];
         sum += diff*diff;
     }

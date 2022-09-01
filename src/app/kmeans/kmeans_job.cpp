@@ -40,8 +40,9 @@ void KMeansJob::appl_start() {
                          MSG_BROADCAST_DATA);
 
     loadInstance();
-    clusterMembership.assign(pointsCount, -1);
-
+    clusterMembership = new int[pointsCount];
+    std::fill(clusterMembership, clusterMembership+pointsCount, -1);
+    
     localClusterCenters.resize(countClusters);
     clusterCenters.resize(countClusters);
     for (int cluster = 0; cluster < countClusters; ++cluster) {
@@ -171,6 +172,7 @@ void KMeansJob::appl_terminate() {
 KMeansJob::~KMeansJob() {
     if (initMsgTask.valid()) initMsgTask.get();
     if (calculatingTask.valid()) calculatingTask.get();
+    delete [] clusterMembership;
     LOG(V3_VERB, "                           end terminate\n");
 }
 
@@ -232,7 +234,7 @@ void KMeansJob::appl_communicate() {
             if (iAmRoot && (reducer)->hasResult()) {
                 LOG(V3_VERB, "                           myIndex: %i received Result from Transform\n", myIndex);
                 setClusterCenters((reducer)->extractResult());
-                clusterMembership.assign(pointsCount, -1);
+                std::fill(clusterMembership, clusterMembership+pointsCount, -1);
 
                 baseMsg.tag = MSG_BROADCAST_DATA;
                 baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
@@ -254,7 +256,7 @@ void KMeansJob::appl_communicate() {
             leftDone = false;
             rightDone = false;
             reducer.reset();
-            clusterMembership.assign(pointsCount, -1);
+            std::fill(clusterMembership, clusterMembership+pointsCount, -1);
             baseMsg.tag = MSG_BROADCAST_DATA;
             baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
             baseMsg.payload.push_back(this->getVolume());
@@ -346,7 +348,7 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
         setClusterCenters(msg.payload);
         if (myIndex < countCurrentWorkers) {
             initReducer(msg);
-            clusterMembership.assign(pointsCount, -1);
+            std::fill(clusterMembership, clusterMembership+pointsCount, -1);
 
             // continue broadcasting
 
@@ -506,7 +508,8 @@ std::string KMeansJob::dataToString(std::vector<int> data) {
 
 void KMeansJob::countMembers() {
     localSumMembers.assign(countClusters, 0);
-    for (int clusterID : clusterMembership) {
+    for (int i = 0; i < pointsCount; ++i) {
+        int clusterID = clusterMembership[i];
         if (clusterID != -1) {
             localSumMembers[clusterID] += 1;
         }
