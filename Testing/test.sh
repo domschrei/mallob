@@ -17,6 +17,7 @@ for k in ${kList[@]}; do
         cat ./instances/${instanceName}K.csv >> ./instances/${instanceName}${k}.csv
         > ./Testing/${folder}/times-${pcName}-${k}-${n}.txt
         > ./Testing/${folder}/out.txt
+        echo "$pcName $instanceName $countPasses"> ./Testing/${folder}/info.txt
         for w in ${wList[@]}; do #((w = 158 ; w < 161 ; ++w));
             # v=3 
             #PATH=build/:$PATH RDMAV_FORKSAVE=1 mpirun -np ${w} -oversubscribe build/mallob -mono-application=KMEANS -mono=./instances/${instanceName}${k}.csv -v=3
@@ -30,6 +31,7 @@ for k in ${kList[@]}; do
             done
             meanTime=$(echo "scale=3; $meanTime / $countPasses" | bc)
             #echo "$w $meanTime"
+            echo "k=$k n=$n w=$w iters=$(cat ./Testing/${folder}/out.txt |grep "Got Result"|awk '{print $8}')" >> ./Testing/${folder}/info.txt
             echo "$w $meanTime" >> ./Testing/${folder}/times-${pcName}-${k}-${n}.txt
             #cat ./Testing/${folder}/out.txt |grep "Got Result"
         done
