@@ -25,15 +25,13 @@ RUN cd build \
   && VERBOSE=1 make -j4 \
   && cd ..
 
-# Build Dawn's combiner tools
-WORKDIR /
-RUN git clone https://github.com/RandomActsOfGrammar/distributed-unsat-composition.git
-WORKDIR /distributed-unsat-composition
-RUN git checkout lrat-input && \
-    make && \
-    cd ..
+# Copy in Dawn's composition tools
 
-WORKDIR /
+COPY /tools tools
+RUN cd tools/composition && \
+    make && \
+    cd ../..
+
 
 ################### Extract Mallob in run stage
 FROM satcomp-base:leader AS mallob_liaison
@@ -51,8 +49,8 @@ COPY --from=builder /mallob/build/mallob_sat_process mallob_sat_process
 COPY --from=builder /mallob/build/mallob_process_dispatcher mallob_process_dispatcher
 COPY --from=builder /mallob/lib/drat-trim/lrat-check lrat-check
 
-COPY --from=builder /distributed-unsat-composition/build/compose-proofs compose-proofs 
-COPY --from=builder /distributed-unsat-composition/build/renumber-proofs renumber-proofs
+COPY --from=builder /mallob/tools/composition/build/compose-proofs compose-proofs 
+COPY --from=builder /mallob/tools/composition/build/renumber-proofs renumber-proofs
 COPY --chown=ecs-user /docker/leader/run_mallob.sh /competition
 COPY --chown=ecs-user /docker/leader/proof_line_count.sh /competition
 COPY --chown=ecs-user /docker/leader/solver /competition
