@@ -11,7 +11,7 @@ According to the International SAT Competition [2020🥇](https://satcompetition
 ## Distributed UNSAT Proof Production
 This fork of Mallob is written to produce proofs of unsatisfiability for distributed SAT solvers using a modified version of [CaDiCaL](https://github.com/RandomActsOfGrammar/cadical).
 Each CaDiCaL instance produces a log of the clauses it learned in the LRAT format.
-These are then combined into a single LRAT by our [proof composer](https://github.com/RandomActsOfGrammar/distributed-unsat-composition) to form a single, checkable LRAT proof.
+These are then combined into a single LRAT by our proof composer (in the `tools` directory) to form a single, checkable LRAT proof.
 
 Our proof combination relies on a particular formula being used to generate clause identifiers in each instance, described [here](https://github.com/RandomActsOfGrammar/distributed-unsat-composition#clause-id-formula).
 We use this to ensure each clause identifier is unique across all solvers.
