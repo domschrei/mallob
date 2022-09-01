@@ -102,7 +102,7 @@ class KMeansJob : public Job {
                 if (iAmRoot && iterationsDone == 1) {
                     LOG(V0_CRIT, "                           first iteration finished\n");
                 }
-                LOG(V3_VERB, "                           Another iter %i\n", iterationsDone);
+                LOG(V2_VERB, "                           Another iter %i\n", iterationsDone);
                 return transformed;
             }
         };
