@@ -8,6 +8,17 @@ Mallob was tested on configurations with up to 6144 cores as described in our pu
 Most notably, Mallob features an engine for distributed SAT solving. 
 According to the International SAT Competition [2020🥇](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf) and [2021🥇🥈🥈🥉](https://satcompetition.github.io/2021/slides/ISC2021.pdf), Mallob is currently the best approach for SAT solving on a large scale (800 physical cores) and one of the best approaches for SAT solving on a moderate scale (32 physical cores).
 
+## Distributed UNSAT Proof Production
+This fork of Mallob is written to produce proofs of unsatisfiability for distributed SAT solvers using a modified version of [CaDiCaL](https://github.com/RandomActsOfGrammar/cadical).
+Each CaDiCaL instance produces a log of the clauses it learned in the LRAT format.
+These are then combined into a single LRAT by our [proof composer](https://github.com/RandomActsOfGrammar/distributed-unsat-composition) to form a single, checkable LRAT proof.
+
+Our proof combination relies on a particular formula being used to generate clause identifiers in each instance, described [here](https://github.com/RandomActsOfGrammar/distributed-unsat-composition#clause-id-formula).
+We use this to ensure each clause identifier is unique across all solvers.
+Currently, CaDiCaL is the only solver producing LRAT proofs with clause identifiers produced according to this formula, and thus is the only solver that can be used for distributed proof production.
+Other solvers could be modified to write LRAT proofs with clause identifiers produced according to this format, in which case they could be used to add more diversity to the solver portfolio while still producing proofs.
+
+
 <hr/>
 
 # Setup
