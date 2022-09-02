@@ -13,7 +13,7 @@ This fork of Mallob is written to produce proofs of unsatisfiability for distrib
 Each CaDiCaL instance produces a log of the clauses it learned in the LRAT format.
 These are then combined into a single LRAT by our proof composer (in the `tools` directory) to form a single, checkable LRAT proof.
 
-Our proof combination relies on a particular formula being used to generate clause identifiers in each instance, described [here](https://github.com/RandomActsOfGrammar/distributed-unsat-composition#clause-id-formula).
+Our proof combination relies on a particular formula being used to generate clause identifiers in each instance, described [here](https://github.com/RandomActsOfGrammar/cadical#distributed-solver-implementation-notes).
 We use this to ensure each clause identifier is unique across all solvers.
 Currently, CaDiCaL is the only solver producing LRAT proofs with clause identifiers produced according to this formula, and thus is the only solver that can be used for distributed proof production.
 Other solvers could be modified to write LRAT proofs with clause identifiers produced according to this format, in which case they could be used to add more diversity to the solver portfolio while still producing proofs.
