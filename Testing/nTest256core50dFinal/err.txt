@@ -1,0 +1,1054 @@
+c 
+c Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving
+c Designed by P. Sanders and D. Schreiber 2018-2022
+c Developed by D. Schreiber 2019-2022
+c 
+c 0.000 0 Program options: -0o=0 -J=1 -T=0 -ajpc=0 -ans=0 -appmode=fork -ba=4 -bicg=4 -c=1 -cbbs=1500 -cbdf=0.9 -cfci=20 -cg=1 -ch=0 -chaf=5 -checksums=0 -chstms=10 -cmp=0 -colors=0 -dc=0 -ddd=0 -delaymonkey=0 -derandomize=1 -evu=0 -fapii=0 -g=0 -gclls=0 -h=0 -hbbfs=10 -hubfs=9999999 -huca=-1 -iff=0 -interface-fs=0 -interface-ipc=0 -isp=0 -jc=4 -jcl=0 -jcup=0 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -ljpc=32 -mbfsd=4 -mbt=1000000 -mcips=10 -md=0 -mid=0 -mjps=0 -mlbdps=8 -mlpt=50000000 -mmpi=0 -mono=./instances/covtypeShuffle100.csv -mono-application=KMEANS -nce=20 -os=0 -p=0.01 -phasediv=1 -pls=1 -pph=0 -q=0 -qcll=8 -qlbdl=2 -ril=0 -rpa=0 -rs=1 -rto=0 -s=1 -satsolver=L -scll=30 -seed=0 -sjd=0 -slbdl=30 -sleep=100 -subproc-dir=build -t=1 -trace-dir=. -v=2 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -wr=0 -y=1 -yield=0 
+c 0.005 0 Set up API at src/interface/api/api_connector.hpp
+c 0.013 9 Machine color 0 with 63 total workers (my rank: 9)
+c 0.013 10 Machine color 0 with 63 total workers (my rank: 10)
+c 0.012 11 Machine color 0 with 63 total workers (my rank: 11)
+c 0.012 12 Machine color 0 with 63 total workers (my rank: 12)
+c 0.013 13 Machine color 0 with 63 total workers (my rank: 13)
+c 0.013 14 Machine color 0 with 63 total workers (my rank: 14)
+c 0.012 15 Machine color 0 with 63 total workers (my rank: 15)
+c 0.013 16 Machine color 0 with 63 total workers (my rank: 16)
+c 0.013 17 Machine color 0 with 63 total workers (my rank: 17)
+c 0.012 18 Machine color 0 with 63 total workers (my rank: 18)
+c 0.013 19 Machine color 0 with 63 total workers (my rank: 19)
+c 0.012 20 Machine color 0 with 63 total workers (my rank: 20)
+c 0.012 21 Machine color 0 with 63 total workers (my rank: 21)
+c 0.012 22 Machine color 0 with 63 total workers (my rank: 22)
+c 0.013 23 Machine color 0 with 63 total workers (my rank: 23)
+c 0.012 24 Machine color 0 with 63 total workers (my rank: 24)
+c 0.013 25 Machine color 0 with 63 total workers (my rank: 25)
+c 0.013 26 Machine color 0 with 63 total workers (my rank: 26)
+c 0.012 27 Machine color 0 with 63 total workers (my rank: 27)
+c 0.012 28 Machine color 0 with 63 total workers (my rank: 28)
+c 0.013 29 Machine color 0 with 63 total workers (my rank: 29)
+c 0.013 30 Machine color 0 with 63 total workers (my rank: 30)
+c 0.012 31 Machine color 0 with 63 total workers (my rank: 31)
+c 0.013 32 Machine color 0 with 63 total workers (my rank: 32)
+c 0.013 33 Machine color 0 with 63 total workers (my rank: 33)
+c 0.012 34 Machine color 0 with 63 total workers (my rank: 34)
+c 0.013 35 Machine color 0 with 63 total workers (my rank: 35)
+c 0.013 36 Machine color 0 with 63 total workers (my rank: 36)
+c 0.012 37 Machine color 0 with 63 total workers (my rank: 37)
+c 0.012 38 Machine color 0 with 63 total workers (my rank: 38)
+c 0.013 39 Machine color 0 with 63 total workers (my rank: 39)
+c 0.012 40 Machine color 0 with 63 total workers (my rank: 40)
+c 0.013 41 Machine color 0 with 63 total workers (my rank: 41)
+c 0.013 42 Machine color 0 with 63 total workers (my rank: 42)
+c 0.012 43 Machine color 0 with 63 total workers (my rank: 43)
+c 0.013 44 Machine color 0 with 63 total workers (my rank: 44)
+c 0.013 45 Machine color 0 with 63 total workers (my rank: 45)
+c 0.012 46 Machine color 0 with 63 total workers (my rank: 46)
+c 0.012 47 Machine color 0 with 63 total workers (my rank: 47)
+c 0.013 48 Machine color 0 with 63 total workers (my rank: 48)
+c 0.013 49 Machine color 0 with 63 total workers (my rank: 49)
+c 0.013 50 Machine color 0 with 63 total workers (my rank: 50)
+c 0.013 51 Machine color 0 with 63 total workers (my rank: 51)
+c 0.012 52 Machine color 0 with 63 total workers (my rank: 52)
+c 0.012 53 Machine color 0 with 63 total workers (my rank: 53)
+c 0.012 54 Machine color 0 with 63 total workers (my rank: 54)
+c 0.013 55 Machine color 0 with 63 total workers (my rank: 55)
+c 0.012 56 Machine color 0 with 63 total workers (my rank: 56)
+c 0.013 57 Machine color 0 with 63 total workers (my rank: 57)
+c 0.013 58 Machine color 0 with 63 total workers (my rank: 58)
+c 0.012 59 Machine color 0 with 63 total workers (my rank: 59)
+c 0.013 60 Machine color 0 with 63 total workers (my rank: 60)
+c 0.013 61 Machine color 0 with 63 total workers (my rank: 61)
+c 0.012 62 Machine color 0 with 63 total workers (my rank: 62)
+c 0.013 0 Machine color 0 with 63 total workers (my rank: 0)
+c 0.012 1 Machine color 0 with 63 total workers (my rank: 1)
+c 0.013 2 Machine color 0 with 63 total workers (my rank: 2)
+c 0.013 3 Machine color 0 with 63 total workers (my rank: 3)
+c 0.013 4 Machine color 0 with 63 total workers (my rank: 4)
+c 0.012 5 Machine color 0 with 63 total workers (my rank: 5)
+c 0.012 6 Machine color 0 with 63 total workers (my rank: 6)
+c 0.013 7 Machine color 0 with 63 total workers (my rank: 7)
+c 0.012 8 Machine color 0 with 63 total workers (my rank: 8)
+c 1.200 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs=0 hops=0
+c 1.200 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 2.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs=0 hops=0
+c 2.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 3.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.23GB newreqs=0 hops=0
+c 3.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 4.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.25GB newreqs=0 hops=0
+c 4.202 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 5.199 0 Introducing job #1 rev. 0 : r.#1:0 rev. 0 <- [0] born=5.199 hops=0 epoch=-1 => [28]
+c 5.199 28 BLC insert (1,1,0.010)
+c 5.202 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.28GB newreqs=0 hops=0
+c 5.203 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 5.343 54                            loaded
+c 5.345 54 BLC insert (1,63,1.000)
+c 6.202 0 sysstate busyratio=1.000 cmtdratio=0.397 jobs=1 globmem=0.30GB newreqs=62 hops=138
+c 6.203 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 7.202 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.93GB newreqs=0 hops=0
+c 7.204 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 8.203 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=8.55GB newreqs=0 hops=0
+c 8.204 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 9.203 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.85GB newreqs=0 hops=0
+c 9.205 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 10.204 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.85GB newreqs=0 hops=0
+c 10.205 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 11.204 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.85GB newreqs=0 hops=0
+c 11.205 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 11.810 54                            first iteration finished
+c 11.810 54                            Another iter 1
+c 12.132 54                            Another iter 2
+c 12.204 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.85GB newreqs=0 hops=0
+c 12.206 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 12.444 54                            Another iter 3
+c 12.747 54                            Another iter 4
+c 13.059 54                            Another iter 5
+c 13.205 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.85GB newreqs=0 hops=0
+c 13.206 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 13.371 54                            Another iter 6
+c 13.694 54                            Another iter 7
+c 14.006 54                            Another iter 8
+c 14.205 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.86GB newreqs=0 hops=0
+c 14.207 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 14.319 54                            Another iter 9
+c 14.632 54                            Another iter 10
+c 14.954 54                            Another iter 11
+c 15.205 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.87GB newreqs=0 hops=0
+c 15.207 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 15.276 54                            Another iter 12
+c 15.588 54                            Another iter 13
+c 15.900 54                            Another iter 14
+c 16.208 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.88GB newreqs=0 hops=0
+c 16.208 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 16.223 54                            Another iter 15
+c 16.535 54                            Another iter 16
+c 16.859 54                            Another iter 17
+c 17.171 54                            Another iter 18
+c 17.208 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.88GB newreqs=0 hops=0
+c 17.208 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 17.494 54                            Another iter 19
+c 17.817 54                            Another iter 20
+c 18.139 54                            Another iter 21
+c 18.208 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.88GB newreqs=0 hops=0
+c 18.208 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 18.462 54                            Another iter 22
+c 18.785 54                            Another iter 23
+c 19.098 54                            Another iter 24
+c 19.209 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.88GB newreqs=0 hops=0
+c 19.209 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 19.420 54                            Another iter 25
+c 19.742 54                            Another iter 26
+c 20.065 54                            Another iter 27
+c 20.209 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.88GB newreqs=0 hops=0
+c 20.209 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 20.378 54                            Another iter 28
+c 20.700 54                            Another iter 29
+c 21.023 54                            Another iter 30
+c 21.209 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.88GB newreqs=0 hops=0
+c 21.209 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 21.337 54                            Another iter 31
+c 21.659 54                            Another iter 32
+c 21.973 54                            Another iter 33
+c 22.210 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.88GB newreqs=0 hops=0
+c 22.210 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 22.285 54                            Another iter 34
+c 22.597 54                            Another iter 35
+c 22.910 54                            Another iter 36
+c 23.211 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.88GB newreqs=0 hops=0
+c 23.211 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 23.222 54                            Another iter 37
+c 23.535 54                            Another iter 38
+c 23.858 54                            Another iter 39
+c 24.181 54                            Another iter 40
+c 24.211 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.88GB newreqs=0 hops=0
+c 24.211 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 24.498 54                            Another iter 41
+c 24.811 54                            Another iter 42
+c 25.123 54                            Another iter 43
+c 25.211 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.88GB newreqs=0 hops=0
+c 25.212 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 25.436 54                            Another iter 44
+c 25.748 54                            Another iter 45
+c 26.071 54                            Another iter 46
+c 26.212 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.88GB newreqs=0 hops=0
+c 26.212 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 26.393 54                            Another iter 47
+c 26.705 54                            Another iter 48
+c 27.028 54                            Another iter 49
+c 27.212 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.88GB newreqs=0 hops=0
+c 27.212 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 27.360 54                            Another iter 50
+c 27.673 54                            Another iter 51
+c 27.986 54                            Another iter 52
+c 28.213 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.88GB newreqs=0 hops=0
+c 28.213 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 28.299 54                            Another iter 53
+c 28.611 54                            Another iter 54
+c 28.924 54                            Another iter 55
+c 29.213 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.88GB newreqs=0 hops=0
+c 29.213 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 29.247 54                            Another iter 56
+c 29.559 54                            Another iter 57
+c 29.871 54                            Another iter 58
+c 30.194 54                            Another iter 59
+c 30.213 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 30.214 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 30.506 54                            Another iter 60
+c 30.829 54                            Another iter 61
+c 31.151 54                            Another iter 62
+c 31.214 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 31.214 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 31.464 54                            Another iter 63
+c 31.776 54                            Another iter 64
+c 32.099 54                            Another iter 65
+c 32.214 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 32.215 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 32.421 54                            Another iter 66
+c 32.744 54                            Another iter 67
+c 33.066 54                            Another iter 68
+c 33.215 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 33.215 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 33.389 54                            Another iter 69
+c 33.712 54                            Another iter 70
+c 34.035 54                            Another iter 71
+c 34.215 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 34.216 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 34.358 54                            Another iter 72
+c 34.680 54                            Another iter 73
+c 35.003 54                            Another iter 74
+c 35.215 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 35.216 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 35.326 54                            Another iter 75
+c 35.638 54                            Another iter 76
+c 35.961 54                            Another iter 77
+c 36.216 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 36.217 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 36.273 54                            Another iter 78
+c 36.586 54                            Another iter 79
+c 36.908 54                            Another iter 80
+c 37.216 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 37.217 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 37.231 54                            Another iter 81
+c 37.554 54                            Another iter 82
+c 37.876 54                            Another iter 83
+c 38.198 54                            Another iter 84
+c 38.217 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 38.218 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 38.521 54                            Another iter 85
+c 38.833 54                            Another iter 86
+c 39.146 54                            Another iter 87
+c 39.217 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 39.218 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 39.458 54                            Another iter 88
+c 39.770 54                            Another iter 89
+c 40.082 54                            Another iter 90
+c 40.217 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 40.219 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 40.395 54                            Another iter 91
+c 40.717 54                            Another iter 92
+c 41.029 54                            Another iter 93
+c 41.218 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 41.219 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 41.342 54                            Another iter 94
+c 41.654 54                            Another iter 95
+c 41.967 54                            Another iter 96
+c 42.218 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 42.219 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 42.280 54                            Another iter 97
+c 42.592 54                            Another iter 98
+c 42.905 54                            Another iter 99
+c 43.218 54                            Another iter 100
+c 43.219 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 43.220 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 43.531 54                            Another iter 101
+c 43.843 54                            Another iter 102
+c 44.146 54                            Another iter 103
+c 44.219 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 44.220 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 44.448 54                            Another iter 104
+c 44.750 54                            Another iter 105
+c 45.063 54                            Another iter 106
+c 45.219 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 45.220 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 45.375 54                            Another iter 107
+c 45.687 54                            Another iter 108
+c 46.010 54                            Another iter 109
+c 46.220 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 46.221 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 46.322 54                            Another iter 110
+c 46.634 54                            Another iter 111
+c 46.947 54                            Another iter 112
+c 47.220 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 47.221 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 47.270 54                            Another iter 113
+c 47.582 54                            Another iter 114
+c 47.894 54                            Another iter 115
+c 48.207 54                            Another iter 116
+c 48.220 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 48.221 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 48.519 54                            Another iter 117
+c 48.832 54                            Another iter 118
+c 49.154 54                            Another iter 119
+c 49.224 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 49.224 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 49.467 54                            Another iter 120
+c 49.780 54                            Another iter 121
+c 50.093 54                            Another iter 122
+c 50.225 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 50.225 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 50.405 54                            Another iter 123
+c 50.728 54                            Another iter 124
+c 51.051 54                            Another iter 125
+c 51.225 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 51.225 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 51.373 54                            Another iter 126
+c 51.696 54                            Another iter 127
+c 52.018 54                            Another iter 128
+c 52.225 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 52.226 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 52.331 54                            Another iter 129
+c 52.643 54                            Another iter 130
+c 52.956 54                            Another iter 131
+c 53.226 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 53.226 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 53.268 54                            Another iter 132
+c 53.591 54                            Another iter 133
+c 53.913 54                            Another iter 134
+c 54.226 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 54.225 54                            Another iter 135
+c 54.226 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 54.538 54                            Another iter 136
+c 54.850 54                            Another iter 137
+c 55.162 54                            Another iter 138
+c 55.227 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 55.227 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 55.475 54                            Another iter 139
+c 55.787 54                            Another iter 140
+c 56.099 54                            Another iter 141
+c 56.227 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 56.227 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 56.412 54                            Another iter 142
+c 56.725 54                            Another iter 143
+c 57.037 54                            Another iter 144
+c 57.228 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 57.228 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 57.350 54                            Another iter 145
+c 57.662 54                            Another iter 146
+c 57.975 54                            Another iter 147
+c 58.229 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 58.229 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 58.297 54                            Another iter 148
+c 58.610 54                            Another iter 149
+c 58.932 54                            Another iter 150
+c 59.229 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 59.229 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 59.255 54                            Another iter 151
+c 59.588 54                            Another iter 152
+c 59.900 54                            Another iter 153
+c 60.213 54                            Another iter 154
+c 60.229 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 60.230 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 60.536 54                            Another iter 155
+c 60.848 54                            Another iter 156
+c 61.161 54                            Another iter 157
+c 61.230 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 61.231 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 61.484 54                            Another iter 158
+c 61.796 54                            Another iter 159
+c 62.119 54                            Another iter 160
+c 62.231 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 62.231 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 62.441 54                            Another iter 161
+c 62.754 54                            Another iter 162
+c 63.066 54                            Another iter 163
+c 63.231 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 63.232 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 63.379 54                            Another iter 164
+c 63.693 54                            Another iter 165
+c 64.006 54                            Another iter 166
+c 64.232 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 64.232 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 64.319 54                            Another iter 167
+c 64.633 54                            Another iter 168
+c 64.946 54                            Another iter 169
+c 65.232 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 65.232 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 65.258 54                            Another iter 170
+c 65.571 54                            Another iter 171
+c 65.893 54                            Another iter 172
+c 66.216 54                            Another iter 173
+c 66.232 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 66.233 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 66.528 54                            Another iter 174
+c 66.851 54                            Another iter 175
+c 67.174 54                            Another iter 176
+c 67.233 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 67.233 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 67.485 54                            Another iter 177
+c 67.798 54                            Another iter 178
+c 68.111 54                            Another iter 179
+c 68.233 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 68.234 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 68.413 54                            Another iter 180
+c 68.726 54                            Another iter 181
+c 69.048 54                            Another iter 182
+c 69.235 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 69.235 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 69.371 54                            Another iter 183
+c 69.693 54                            Another iter 184
+c 70.015 54                            Another iter 185
+c 70.237 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 70.238 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 70.328 54                            Another iter 186
+c 70.641 54                            Another iter 187
+c 70.954 54                            Another iter 188
+c 71.238 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 71.238 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 71.266 54                            Another iter 189
+c 71.590 54                            Another iter 190
+c 71.912 54                            Another iter 191
+c 72.235 54                            Another iter 192
+c 72.238 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 72.238 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 72.558 54                            Another iter 193
+c 72.871 54                            Another iter 194
+c 73.184 54                            Another iter 195
+c 73.238 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 73.239 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 73.496 54                            Another iter 196
+c 73.808 54                            Another iter 197
+c 74.121 54                            Another iter 198
+c 74.239 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 74.239 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 74.443 54                            Another iter 199
+c 74.756 54                            Another iter 200
+c 75.068 54                            Another iter 201
+c 75.239 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 75.239 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 75.390 54                            Another iter 202
+c 75.702 54                            Another iter 203
+c 76.024 54                            Another iter 204
+c 76.240 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 76.240 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 76.347 54                            Another iter 205
+c 76.669 54                            Another iter 206
+c 76.991 54                            Another iter 207
+c 77.240 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 77.240 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 77.314 54                            Another iter 208
+c 77.637 54                            Another iter 209
+c 77.959 54                            Another iter 210
+c 78.240 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 78.241 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 78.272 54                            Another iter 211
+c 78.584 54                            Another iter 212
+c 78.896 54                            Another iter 213
+c 79.209 54                            Another iter 214
+c 79.241 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 79.241 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 79.512 54                            Another iter 215
+c 79.824 54                            Another iter 216
+c 80.136 54                            Another iter 217
+c 80.242 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 80.242 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 80.458 54                            Another iter 218
+c 80.781 54                            Another iter 219
+c 81.093 54                            Another iter 220
+c 81.243 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 81.243 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 81.416 54                            Another iter 221
+c 81.738 54                            Another iter 222
+c 82.051 54                            Another iter 223
+c 82.243 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 82.243 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 82.383 54                            Another iter 224
+c 82.706 54                            Another iter 225
+c 83.029 54                            Another iter 226
+c 83.244 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 83.244 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 83.351 54                            Another iter 227
+c 83.674 54                            Another iter 228
+c 83.987 54                            Another iter 229
+c 84.244 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 84.244 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 84.299 54                            Another iter 230
+c 84.622 54                            Another iter 231
+c 84.944 54                            Another iter 232
+c 85.245 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 85.245 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 85.257 54                            Another iter 233
+c 85.579 54                            Another iter 234
+c 85.901 54                            Another iter 235
+c 86.224 54                            Another iter 236
+c 86.245 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 86.245 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 86.546 54                            Another iter 237
+c 86.868 54                            Another iter 238
+c 87.191 54                            Another iter 239
+c 87.246 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 87.246 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 87.513 54                            Another iter 240
+c 87.835 54                            Another iter 241
+c 88.158 54                            Another iter 242
+c 88.246 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 88.246 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 88.470 54                            Another iter 243
+c 88.782 54                            Another iter 244
+c 89.095 54                            Another iter 245
+c 89.247 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 89.247 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 89.417 54                            Another iter 246
+c 89.740 54                            Another iter 247
+c 90.052 54                            Another iter 248
+c 90.247 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 90.247 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 90.375 54                            Another iter 249
+c 90.687 54                            Another iter 250
+c 91.000 54                            Another iter 251
+c 91.247 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 91.247 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 91.322 54                            Another iter 252
+c 91.644 54                            Another iter 253
+c 91.966 54                            Another iter 254
+c 92.248 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 92.248 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 92.289 54                            Another iter 255
+c 92.611 54                            Another iter 256
+c 92.934 54                            Another iter 257
+c 93.247 54                            Another iter 258
+c 93.248 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 93.248 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 93.569 54                            Another iter 259
+c 93.892 54                            Another iter 260
+c 94.204 54                            Another iter 261
+c 94.249 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 94.249 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 94.517 54                            Another iter 262
+c 94.839 54                            Another iter 263
+c 95.162 54                            Another iter 264
+c 95.249 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 95.249 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 95.484 54                            Another iter 265
+c 95.807 54                            Another iter 266
+c 96.120 54                            Another iter 267
+c 96.250 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 96.250 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 96.432 54                            Another iter 268
+c 96.755 54                            Another iter 269
+c 97.067 54                            Another iter 270
+c 97.250 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 97.250 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 97.379 54                            Another iter 271
+c 97.691 54                            Another iter 272
+c 98.003 54                            Another iter 273
+c 98.250 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 98.250 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 98.317 54                            Another iter 274
+c 98.639 54                            Another iter 275
+c 98.962 54                            Another iter 276
+c 99.252 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 99.252 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 99.284 54                            Another iter 277
+c 99.607 54                            Another iter 278
+c 99.919 54                            Another iter 279
+c 100.242 54                            Another iter 280
+c 100.252 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 100.252 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 100.554 54                            Another iter 281
+c 100.867 54                            Another iter 282
+c 101.189 54                            Another iter 283
+c 101.252 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 101.252 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 101.512 54                            Another iter 284
+c 101.834 54                            Another iter 285
+c 102.157 54                            Another iter 286
+c 102.253 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 102.253 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 102.469 54                            Another iter 287
+c 102.782 54                            Another iter 288
+c 103.094 54                            Another iter 289
+c 103.253 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 103.253 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 103.406 54                            Another iter 290
+c 103.718 54                            Another iter 291
+c 104.040 54                            Another iter 292
+c 104.254 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 104.254 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 104.352 54                            Another iter 293
+c 104.675 54                            Another iter 294
+c 104.987 54                            Another iter 295
+c 105.255 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 105.255 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 105.320 54                            Another iter 296
+c 105.644 54                            Another iter 297
+c 105.966 54                            Another iter 298
+c 106.256 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 106.256 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 106.289 54                            Another iter 299
+c 106.601 54                            Another iter 300
+c 106.913 54                            Another iter 301
+c 107.236 54                            Another iter 302
+c 107.256 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 107.256 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 107.559 54                            Another iter 303
+c 107.872 54                            Another iter 304
+c 108.184 54                            Another iter 305
+c 108.257 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 108.257 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 108.497 54                            Another iter 306
+c 108.810 54                            Another iter 307
+c 109.122 54                            Another iter 308
+c 109.257 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 109.258 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 109.445 54                            Another iter 309
+c 109.768 54                            Another iter 310
+c 110.081 54                            Another iter 311
+c 110.259 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 110.259 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 110.403 54                            Another iter 312
+c 110.716 54                            Another iter 313
+c 111.029 54                            Another iter 314
+c 111.259 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 111.259 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 111.341 54                            Another iter 315
+c 111.663 54                            Another iter 316
+c 111.985 54                            Another iter 317
+c 112.260 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 112.260 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 112.298 54                            Another iter 318
+c 112.620 54                            Another iter 319
+c 112.933 54                            Another iter 320
+c 113.245 54                            Another iter 321
+c 113.260 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 113.260 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 113.568 54                            Another iter 322
+c 113.891 54                            Another iter 323
+c 114.203 54                            Another iter 324
+c 114.260 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 114.260 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 114.516 54                            Another iter 325
+c 114.838 54                            Another iter 326
+c 115.150 54                            Another iter 327
+c 115.261 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 115.261 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 115.463 54                            Another iter 328
+c 115.785 54                            Another iter 329
+c 116.108 54                            Another iter 330
+c 116.261 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 116.261 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 116.431 54                            Another iter 331
+c 116.754 54                            Another iter 332
+c 117.067 54                            Another iter 333
+c 117.263 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 117.264 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 117.389 54                            Another iter 334
+c 117.701 54                            Another iter 335
+c 118.014 54                            Another iter 336
+c 118.264 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 118.264 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 118.337 54                            Another iter 337
+c 118.659 54                            Another iter 338
+c 118.970 54                            Another iter 339
+c 119.264 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 119.265 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 119.283 54                            Another iter 340
+c 119.605 54                            Another iter 341
+c 119.928 54                            Another iter 342
+c 120.240 54                            Another iter 343
+c 120.265 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 120.265 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 120.553 54                            Another iter 344
+c 120.876 54                            Another iter 345
+c 121.198 54                            Another iter 346
+c 121.265 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 121.265 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 121.510 54                            Another iter 347
+c 121.822 54                            Another iter 348
+c 122.134 54                            Another iter 349
+c 122.265 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 122.266 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 122.447 54                            Another iter 350
+c 122.759 54                            Another iter 351
+c 123.071 54                            Another iter 352
+c 123.266 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 123.266 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 123.393 54                            Another iter 353
+c 123.705 54                            Another iter 354
+c 124.017 54                            Another iter 355
+c 124.266 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 124.266 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 124.330 54                            Another iter 356
+c 124.652 54                            Another iter 357
+c 124.974 54                            Another iter 358
+c 125.266 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 125.267 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 125.297 54                            Another iter 359
+c 125.609 54                            Another iter 360
+c 125.921 54                            Another iter 361
+c 126.244 54                            Another iter 362
+c 126.267 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 126.267 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 126.556 54                            Another iter 363
+c 126.869 54                            Another iter 364
+c 127.191 54                            Another iter 365
+c 127.267 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 127.268 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 127.514 54                            Another iter 366
+c 127.826 54                            Another iter 367
+c 128.149 54                            Another iter 368
+c 128.268 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 128.268 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 128.462 54                            Another iter 369
+c 128.785 54                            Another iter 370
+c 129.108 54                            Another iter 371
+c 129.268 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 129.269 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 129.430 54                            Another iter 372
+c 129.753 54                            Another iter 373
+c 130.075 54                            Another iter 374
+c 130.269 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 130.269 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=6.89GB newreqs=0 hops=0
+c 130.409 54                            Another iter 375
+c 130.731 54                            Another iter 376
+c 131.054 54                            Got Result after iter 377
+c 131.064 54 BLC insert (1,0,0.000)
+c 131.065 0 RESPONSE_TIME #1 125.865509 rev. 0
+c 131.065 0 SOLUTION #1 SAT rev. 0
+s SATISFIABLE
+v 1113063424 1161901274 1128844993 1092174238 1133399229 1106098151 1169277336 1129328192 1131334236 1126586238 1157912458 1065353213 0 0 0 0 0 0 0 0 
+v 0 0 0 0 0 0 0 0 0 0 1001131314 0 0 1024695494 1016755347 0 1049901360 1044195504 0 0 
+v 0 0 0 1052143660 1038081230 0 0 0 0 0 0 0 0 0 0 1162218416 1125360859 1096020614 1135600892 1116107929 
+v 1167649547 1129617432 1130158220 1124923002 1162500301 1061337212 0 1047862798 0 0 0 0 0 0 0 0 999093401 0 0 0 
+v 0 0 0 0 1017636640 0 0 977731318 991248184 0 1034583665 1036077993 0 0 0 0 0 1054451421 1040527012 0 
+v 1015327226 1010470662 0 1005614100 0 0 1035636486 1014546100 1036587422 1162158529 1120533620 1096596075 1135822462 1114634512 1155040921 1130228232 1129961684 1123822728 1161464365 1053229262 
+v 1039027190 1056795700 0 0 0 0 0 0 0 0 0 0 0 973196209 1009763286 0 0 0 0 0 
+v 0 0 0 0 1028135430 1041080386 1028224038 0 1006750641 0 0 1041213297 1018772144 1034375314 1036922770 1044015498 0 1008522785 0 0 
+v 1035261386 1035859484 1020898716 1160997143 1123028099 1093829568 1129118498 1107426972 1161742922 1130103602 1130277457 1124505486 1170436979 1065353213 0 0 0 0 0 0 
+v 0 0 0 0 0 0 0 0 1050561578 0 0 0 1024931236 0 0 0 1035505802 0 0 0 
+v 0 0 0 0 0 1055898954 1036234454 0 0 0 0 0 0 0 0 0 0 1161991811 1124697806 1094988828 
+v 1132619494 1108236992 1166859479 1130059000 1130324328 1124590190 1160025944 1062892748 0 1041640650 0 0 0 0 0 0 0 0 0 0 
+v 0 0 0 0 0 0 974512602 0 0 1007760074 0 0 1030983426 1035036240 0 0 0 0 0 1058595326 
+v 1032311981 0 1022134380 1035803637 0 966123992 0 0 1026302304 1015995203 0 1161262078 1124425721 1094910244 1126539520 1104439802 1158110932 1130030292 1130315376 1124600766 
+v 1160524714 1058105036 0 1054683751 0 0 1001946230 0 1018990148 0 0 0 0 0 1002657435 1005146652 1035367310 0 0 0 
+v 993557622 1019612452 0 1012646254 1015167421 0 1006213460 1039434514 1025022889 0 1027023153 0 0 1048234289 1038123230 1020234756 1038812210 1032789192 0 0 
+v 0 0 1006213462 1021034862 1000523820 1162304138 1124697894 1095801862 1143128668 1122316440 1150565340 1129918250 1130403384 1124774412 1159576954 1048084138 1028233671 1060456122 0 0 
+v 0 0 0 0 0 0 0 0 0 1021338606 962618349 1019500399 0 0 0 0 0 0 0 0 
+v 1025648694 1034726630 0 0 990658164 0 0 1041075978 0 1031622862 1053155358 1044091784 0 0 0 0 1021108829 1018466408 997091883 1158918726 
+v 1127644892 1101420826 1128528802 1114800974 1144734384 1128405570 1129365588 1125077254 1139230022 1039883980 0 1040254540 1061180052 1030102659 1030858702 1027834526 1023457429 1018092998 1041975536 0 
+v 0 1014956907 1055218742 1000042444 1009704390 988358577 1011773564 0 1011296062 1016421742 0 0 993563844 0 991017167 1011932730 0 0 0 0 
+v 0 1026282646 1021355925 0 0 1018331748 0 0 0 0 0 0 0 1162356214 1127279978 1096520918 1140993926 1120454847 1143199142 1129536801 
+v 1130377115 1125182826 1143670794 1040057954 1056290863 1053476408 0 0 0 0 0 0 0 0 0 0 988372179 986672886 0 997610436 
+v 0 0 0 0 0 974885688 984973591 0 1040653702 1035730062 1026013880 0 0 0 0 1025535954 1011838710 1033685598 1049420668 1043866432 
+v 0 0 0 0 1034668003 1010139415 1027872484 1161875111 1124153504 1096656522 1148532469 1127261980 1161250996 1130054230 1130646441 1124840510 1151326252 1019206516 0 1064960290 
+v 0 0 0 0 0 0 0 0 0 0 1040025232 989044948 1000233918 1029391347 0 0 0 0 0 0 
+v 0 0 1015009094 0 1033039924 0 1023503729 0 0 989044950 0 1032640763 1042576118 1042925384 1041303793 0 1017609874 995836914 1038179115 1002628881 
+v 1016611974 1161948186 1121290550 1095168737 1133207195 1107346926 1166522168 1130139126 1130027010 1124199702 1165822774 1061909036 0 1045575495 0 0 0 0 0 0 
+v 0 0 999808640 0 0 0 1023949902 0 0 0 993176425 0 0 989471533 1014344624 0 1016439490 1049554824 987129675 0 
+v 0 0 0 1055217363 1015122194 0 0 1025120830 0 999223176 0 0 1027462688 1024535366 1030024096 1162190938 1126461536 1095674702 1132122580 1111229820 
+v 1163165358 1129946624 1130957500 1125281735 1140044688 1052750759 0 1059071533 0 0 0 0 0 0 0 0 0 0 1012754377 0 
+v 0 999362312 0 0 0 0 0 1023715074 1017140220 0 1040429747 1035387200 1012504204 0 0 0 0 1044807772 0 1025466284 
+v 1035137027 1043650720 1018766344 0 985086824 0 1037544942 1032697842 997478197 1161860940 1126467736 1095833312 1133753155 1111056752 1168365656 1129766676 1130661823 1125218632 1152856016 1065353217 
+v 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+v 0 1014997772 1015390429 0 1029934649 1028221231 0 0 0 0 0 1059677520 1045331612 0 0 0 0 0 0 0 
+v 0 0 0 1162621018 1126780307 1098423740 1138123020 1116716725 1144505022 1130387229 1131447058 1125097720 1166713206 0 1065353216 0 0 0 0 0 
+v 0 0 0 0 0 0 0 0 0 0 0 0 1004768824 0 0 975535797 0 0 1052960954 1018495638 
+v 0 1034510254 0 0 0 0 0 0 1048279432 1036204922 0 1011801698 0 0 1042093894 0 0 1161886572 1128434340 1097388208 
+v 1132484018 1108062368 1164494610 1128895224 1130637014 1126132386 1150929877 1060203636 0 1050486554 0 0 0 0 0 0 0 0 0 0 
+v 0 0 1022071214 1028390202 0 0 0 0 0 1013458864 0 0 1040832402 1035464321 987398070 0 0 0 0 1052542192 
+v 1034205768 1005517743 0 1031186987 1021288115 0 0 1001490370 1007194064 1038624689 1009655236 1161092890 1124561650 1093318476 1130564469 1104862512 1164814453 1129932866 1130424518 1124912251 
+v 1169631332 1065353216 0 0 0 0 0 0 0 0 0 0 1006834287 0 0 0 1047770694 0 0 0 
+v 1023544393 0 0 985963430 1041579901 0 0 0 0 0 0 0 0 1055874090 1037838582 0 0 0 0 0 
+v 0 0 0 0 0 1161711680 1124753384 1097372926 1132430564 1110110442 1160348858 1129783540 1130086262 1124547138 1160512845 1058331544 0 1054230736 0 0 
+v 0 0 0 0 0 0 0 0 1014201116 1018878850 1040728078 0 0 0 987922030 973596021 0 968176113 0 0 
+v 1016745096 1033707856 1033916593 0 1013644485 0 0 1047975881 1033939785 1034241293 1033035259 1039969958 0 0 0 0 999132932 1025412020 959787504 1158771704 
+v 1129462628 1101793712 1125318138 1113573332 1151074131 1127952516 1129549972 1125757652 1146816245 999826863 0 1041204410 1062923911 1018450584 1034881580 1035989481 1031593938 1013754984 1040419648 0 
+v 0 0 1056771303 1011908480 0 0 1012277780 0 1013939632 1027900931 0 0 992546158 0 0 0 981941745 0 0 0 
+v 990330353 994023360 0 0 0 994023361 0 0 0 0 0 0 0 1159546500 1124991016 1099640858 1132638646 1113302686 1145482033 1129453632 
+v 1129706020 1124373636 1148979958 1040863194 0 1056479160 1052917854 1016172748 1038380554 1030201434 1036205095 1015914916 1039121820 0 0 1026914074 1048667652 1035254338 1029041189 1013198614 
+v 1005325671 0 1001973852 1005325670 964413959 0 1006099168 0 990749092 999653364 1009846798 0 0 0 0 1014874522 1011264874 1006357000 968677254 1028171006 
+v 994358741 0 0 0 0 0 0 1161596217 1126186672 1095383250 1134087450 1112725585 1160818154 1129655782 1130570163 1125277785 1155658600 1050341756 0 1060276033 
+v 0 0 0 0 1010872799 0 0 0 0 0 1025140516 1015861441 1026233363 1026111936 0 0 990533714 0 0 993771778 
+v 1015132876 0 1027852395 1025707177 1017804279 0 1019423310 1005722256 0 1044356398 999569934 1033488648 1047614700 1035107680 0 0 0 0 1028257152 1019423310 
+v 1021204246 1161657804 1125921563 1097347125 1129878767 1109272106 1160321038 1129459122 1130522144 1125357298 1151226046 1037200501 0 1063629426 0 0 1015624009 0 1028791642 0 
+v 0 0 0 0 1028710642 997019220 0 1028184140 0 0 0 0 0 0 1009098412 0 1026726132 1044637354 1033332730 0 
+v 0 1010394420 0 1027617136 971853398 1037544752 1041053085 1042622467 1007802404 997019221 977649992 0 1016677015 1012500430 980242005 1160824941 1125695966 1097150426 1128398976 1108120572 
+v 1155617768 1129741964 1130556226 1125051490 1148619932 1049495975 1004109670 1060582502 966667804 0 1020805900 1014118044 1029235001 0 0 0 0 0 1033391974 1029801918 
+v 1037826078 1038473984 0 0 0 1007638985 0 997016874 1015055735 1007800962 997016874 1033614692 1001518048 0 0 0 0 1036044338 1026764859 1039283868 
+v 1035538161 1033695680 993777345 0 0 0 966667803 1006991080 966667804 1162135524 1128090671 1096506828 1132471526 1110804477 1163623699 1129067193 1130553908 1125939483 1155725912 1057132379 
+v 0 1056629062 0 0 976143165 0 1010842923 0 0 0 0 0 1002454315 0 1025472655 1021593764 0 0 0 0 
+v 0 989113073 1009268101 0 1029445500 1031485610 1027369599 0 1011272420 0 0 1046625370 1019374696 1034809736 1040594519 1024041000 0 986822424 0 970045207 
+v 1033431766 1041489305 1013563070 1162296960 1129566683 1096391462 1141072640 1117522092 1157173468 1128997746 1130741178 1126221250 1145723556 1035787846 982060058 1063788466 0 0 0 0 
+v 0 0 0 0 0 0 970671760 1027651844 0 1034356416 0 0 0 0 0 1000633580 0 0 1032812715 1034945828 
+v 1023361060 0 0 0 0 1029560420 1007450420 1045720155 1046674442 1024901250 999286350 0 0 0 1031830360 1030795380 1019656178 1161871474 1127863350 1096840954 
+v 1128568838 1109412152 1166092813 1129382328 1130195215 1125155434 1143745990 1059992670 0 1050908484 0 0 0 0 0 0 0 0 0 0 
+v 0 0 1007840853 0 0 0 0 0 0 1022627128 1007041145 0 1028083472 1038771242 1034939306 0 0 0 0 1054090656 
+v 1032073684 0 1033073319 1030482598 1019828149 0 0 0 1028883180 1001051662 1013438812 1162309554 1124652365 1096097690 1135135848 1110814306 1154326778 1130197186 1130488786 1124503854 
+v 1152162524 1049866297 1044507374 1057336616 0 0 0 0 999293347 0 0 0 0 0 0 0 0 1021754574 0 0 
+v 0 0 0 991762703 0 985090022 978417342 1037298467 1016928528 0 0 0 0 1045794319 1003154185 1042536738 1040391829 1040740377 0 991762703 
+v 0 0 1034376027 1031802135 1030464919 1160400988 1126806148 1099928608 1124837185 1107654040 1153185312 1129004425 1130219890 1125368464 1151600847 1042591828 0 1062654958 0 0 
+v 1025715921 1030524792 1037352312 0 0 0 0 0 1036293642 1031807756 1023849792 1039738802 0 0 1002200905 1018475702 0 1000765420 1023598584 965488408 
+v 991228426 1033332957 1024639309 0 0 0 994673586 1033745658 1018403926 1030847776 1025500600 1037944448 0 0 0 0 0 0 0 1161360280 
+v 1124576194 1091033552 1132491373 1106519122 1167372296 1130080188 1130609101 1125027902 1169694738 1065353214 0 0 0 0 0 0 0 0 0 0 
+v 0 0 0 0 1059286427 0 0 0 994030112 0 0 1025719728 1040337682 0 0 0 992459740 0 0 0 
+v 0 1039506489 1032685186 0 0 0 0 0 0 0 0 0 0 1160830918 1125239092 1097255496 1128053500 1107958781 1152085432 1129570230 
+v 1130228438 1124946272 1155342552 1049955754 1015251349 1060199710 0 0 1023468957 0 1033003264 0 0 0 0 0 1032182465 1036064160 1032370564 1035174961 
+v 0 0 0 1005998124 0 1011513936 1017029747 998337333 1023571558 1032028565 1029898550 0 0 0 997335917 1038680457 1029009350 1025828754 1035756360 1033841162 
+v 999978932 0 0 0 998610933 0 0 1160701243 1124584732 1096126366 1130512254 1108740010 1156856624 1129895446 1130369886 1124756484 1157932343 1049941586 0 1060476120 
+v 0 0 1025882129 0 1028704164 0 0 0 0 0 1041173500 1030500006 1040884883 1032282485 0 0 1003196276 1026309710 0 991044953 
+v 1010216624 0 1010558690 1024941451 1020486590 0 1023829740 0 0 1040128599 1014321403 1024941451 1035190037 1033714882 0 0 0 0 0 0 
+v 0 1161919464 1124396044 1092404344 1133831852 1101936792 1163696169 1129998073 1130411756 1124870804 1166289819 1065353212 0 0 0 0 0 0 0 0 
+v 0 0 0 0 0 0 1046389188 0 0 0 0 0 0 1016010006 1010000650 0 1001052218 1045304530 0 0 
+v 0 0 0 1051488832 1022028111 0 0 0 0 0 0 0 1035866252 1031807531 1021048420 1162202296 1125594286 1097018360 1129582441 1108407864 
+v 1152825495 1129855378 1130234603 1124649484 1159253178 1056986151 1011687668 1056501416 0 0 0 0 0 0 0 0 0 0 0 0 
+v 0 993876352 0 0 0 0 0 981235540 1004677862 990429348 1038318470 1040149689 1024716268 0 0 0 0 1048659482 1031876880 1014272922 
+v 1040351663 1043701722 0 0 0 0 1014445271 1029542074 1009791816 1161399521 1124465142 1095644480 1130132642 1107932554 1150258028 1129860913 1130365843 1124827842 1161027418 1053733058 
+v 1032192834 1057482551 0 0 0 0 1017645697 0 0 0 0 0 1009036834 1037038438 1029007744 998665934 0 0 0 999106444 
+v 0 0 1016324169 0 1040553910 1042467374 1026364687 0 1001308990 0 0 1040994420 1029833700 1033844746 1032743471 1038167243 0 0 0 0 
+v 991158344 0 975262148 1160729625 1125860290 1095867790 1127216156 1106092126 1159624718 1129765594 1130451193 1125016868 1158560630 1056904108 0 1056994856 0 0 1014970750 0 
+v 1025901470 0 0 0 0 0 1034328796 1034096486 1040307177 1020494188 0 0 1008775787 1014970750 0 957824643 1022042928 0 1024120418 1034657905 
+v 1025475567 0 1024430167 0 0 1047799209 1030392818 999457936 1023888108 1028766640 0 0 0 0 0 0 0 1161263036 1127139678 1096504961 
+v 1124186359 1103417530 1156490403 1129601014 1130918996 1125615720 1136415256 1039965532 0 1063283798 0 0 1016670218 0 1033080218 0 0 0 0 0 
+v 1027629344 1015813379 1002585925 1029159414 0 0 993218073 0 0 1002096304 0 0 1015568568 1043534420 994197317 0 0 0 0 1008771232 
+v 0 1043580322 1048656329 1033661645 986787954 1025181231 0 0 0 1022790498 0 1161598222 1126181928 1096039768 1126457975 1105433092 1161952185 1129485530 1130328254 1125230273 
+v 1158616051 1059578468 0 1051736890 0 0 1005697317 0 1004429991 0 0 0 0 0 1015583448 1021920078 1041105708 1007432465 0 0 
+v 0 0 0 0 1018276516 0 1023734433 1039390364 1029001756 0 992873069 0 0 1050014117 1019227010 1033845813 1020573544 1026229482 0 1007590880 
+v 0 1005380486 1020969584 1028090867 1011551274 1162051967 1126487276 1096414546 1134619172 1112871040 1161815014 1129527204 1130797710 1125610594 1147269031 1040722779 0 1063122218 0 0 
+v 0 0 0 0 0 0 0 0 1030175523 0 0 1025587242 0 0 0 0 0 986548710 1001305398 0 
+v 1023302310 1036775122 1034291557 0 0 0 0 1034102133 0 1025250486 1051531810 1042364458 1012556420 1019429633 1000968643 0 1001642154 1013398306 1009357253 1161437356 
+v 1129438285 1094778007 1136460832 1116950944 1169278311 1128824946 1131050462 1126792366 1167891199 1065353213 0 0 0 0 0 0 0 0 0 0 
+v 0 0 0 0 1046095276 0 0 0 1021305676 0 0 1011035950 1011035950 0 0 1022998682 1045225258 0 0 0 
+v 0 1054248744 1034979047 0 0 0 0 0 0 0 0 0 0 1161607120 1126111357 1098989642 1134300402 1112502790 1136420157 1129655492 
+v 1130009066 1124519768 1157107712 1054678338 1044957866 1052352177 1008457372 0 0 0 1009439393 0 1006886137 0 0 0 1031077612 0 998890338 1007671754 
+v 0 0 0 0 0 0 977259790 0 1042993824 1046602751 1024743576 0 0 991680155 0 1041263012 1042380060 994822623 1028917166 1039220714 
+v 0 0 0 0 0 0 1009635796 1161544605 1124295321 1095793653 1131812362 1108194937 1163003656 1130040758 1130278376 1124536720 1161205242 1060231752 0 1050430324 
+v 0 0 0 0 0 0 0 0 0 0 1027484642 1024305802 1043504990 0 0 0 0 0 0 0 
+v 1020256564 0 1021871213 1041083018 1037109466 0 0 0 0 1046065724 1038925947 1017733674 1028796546 1001965614 0 0 0 985995722 0 1024659007 
+v 1005194912 1162428352 1126487684 1096674370 1132520783 1108717600 1155584904 1129547145 1130195662 1125017242 1156824203 1050297906 1043962591 1057257006 0 0 0 0 0 0 
+v 0 0 0 0 0 0 0 1013880561 0 0 0 0 0 1003163156 0 998838248 1002165101 1040833270 1021603800 0 
+v 0 958558634 0 1036280938 1017029376 1033182807 1041436262 1044336862 0 1019025488 0 0 1035615568 1038318636 1031872858 1160687374 1123411208 1095615041 1124506380 1102145440 
+v 1151568074 1129904674 1130166176 1124589540 1158652922 1055861462 0 1057516180 0 0 0 0 1018427724 0 0 0 0 0 1022693916 1036459704 
+v 1038132719 1021439154 0 0 1003574478 1025645221 0 985124244 1032862718 0 1000228444 1031249826 1010959276 0 0 0 0 1047336922 1028823952 1031291651 
+v 1026690856 1040014863 1006776734 0 0 0 0 0 0 1161818302 1122821213 1092097406 1127695981 1100942179 1168198854 1130164978 1130404230 1124649834 1159765902 1065344828 
+v 0 973275562 0 0 0 0 0 0 0 0 1000587796 0 0 0 0 0 0 0 1026491448 0 
+v 0 1029241538 0 0 1045666607 1049946852 0 0 0 0 0 1051330280 1032700108 0 973275562 0 0 0 0 0 
+v 0 0 0 1161402696 1126849264 1095698914 1127648428 1105402486 1168240060 1129673311 1130585368 1125247040 1166554849 1064042167 0 1033898547 0 0 0 0 
+v 0 0 0 1003227374 1009944528 0 0 0 990827277 0 0 0 1029563216 0 0 1010613109 1022678914 0 0 1026053162 
+v 1033814975 0 0 0 0 1058056276 1039957568 0 0 0 0 986450156 0 0 1033564256 980735876 0 1160506746 1126137919 1097963596 
+v 1127690914 1108249934 1147448298 1129209222 1130073236 1125202733 1156728580 1056521837 0 1057185992 0 0 0 0 1029787651 0 0 0 0 0 
+v 1025776056 1028251296 1038133583 1030939918 0 0 999073876 1019350570 0 967226507 1027824530 0 1006950367 1018155626 1035829050 0 0 0 1010705902 1042809332 
+v 1040472790 1027227059 1021484398 1038218936 958837899 0 0 0 0 0 0 1162245621 1126981229 1097004373 1142648364 1122093664 1150459274 1129279392 1130268846 1125362500 
+v 1156298344 1044592650 1040917360 1059875106 0 0 0 0 0 0 0 0 0 0 999456501 998427848 1009045204 1018462464 0 0 
+v 0 0 0 1003571112 0 0 1024322301 1032903782 1032175153 0 0 958884998 1018033859 1037061253 1015462228 1028222610 1046939264 1045310564 0 989536968 
+v 0 0 1034425330 1020776932 1030151332 1158821486 1126614792 1101453442 1128075178 1112579492 1136199385 1128890842 1129598536 1124703926 1146545188 1025828148 0 1050691388 1059425807 1033611588 
+v 1037134533 1039663273 1040908731 1025698469 1028205596 0 0 0 1051793658 1024099096 1020984099 0 1008099953 0 1008272858 1018217614 0 0 1011730965 0 
+v 0 989677435 981288826 0 0 0 0 996682801 981288827 998846819 0 1001267492 0 0 0 0 0 0 0 1161187702 
+v 1122961848 1094466238 1121641223 1092213018 1158959291 1130138854 1130155263 1124322305 1166388681 1061477548 1047301452 0 0 0 0 0 0 0 0 0 
+v 0 0 0 0 1049785522 0 0 0 0 0 0 1015996988 1031889823 0 1028651430 1049759510 1004005830 0 0 0 
+v 0 1039797225 1028547386 0 0 1021823494 0 1014891512 0 0 999844040 1029275698 1015580808 1161507857 1126282144 1094589242 1137724566 1115978320 1169669486 1129995392 
+v 1130880263 1125214284 1165144904 1065270860 0 1000396978 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+v 0 0 974059906 0 0 0 1027466081 0 0 1010835271 1033768403 0 0 0 0 1060709399 1040930860 0 0 0 
+v 0 0 0 0 0 0 1000396978 1162123300 1128523400 1094046364 1128667444 1105524893 1167103329 1129345538 1130513668 1125678766 1149162314 1062845280 0 1041830522 
+v 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1018394308 
+v 1001478724 0 1035724998 1037765938 986361933 0 0 0 0 1057375390 1031954449 0 1035794183 981934132 0 0 0 0 1020331470 1031072349 
+v 1002032198 1162128782 1125505208 1098425764 1128247224 1104392594 1158499908 1130014222 1130648274 1124745928 1163194329 1058024978 1041539814 1049973352 0 0 0 0 0 0 
+v 0 0 0 0 0 0 1035631394 0 0 0 0 973891779 0 0 1011184465 0 1033726322 1036961350 1030046478 0 
+v 1031124821 0 0 1044199725 1000207834 1032899593 1031821250 1040263774 0 1010896907 0 0 1032971483 1024007758 1024942322 1161741692 1125209069 1097008938 1128579334 1105135208 
+v 1144534010 1129925754 1130210057 1124509270 1154520504 1053527709 1035728151 1057143308 0 0 0 0 1001824628 0 0 0 0 0 995297846 1014069874 
+v 956423909 1016607030 0 0 0 0 0 973201127 977456729 990510292 1041822724 1045139101 1035927634 0 0 973201125 0 1044091824 1026026292 1016274560 
+v 1042171816 1038105304 0 0 0 0 956423911 1001558652 977456729 1161835958 1128110835 1097224924 1129253560 1108511984 1162296554 1129010583 1130840518 1126156804 1152334486 1047820270 
+v 0 1061347844 0 0 992931846 0 1028277640 0 0 0 0 0 1016395878 0 1019351624 1032859606 0 0 995798025 0 
+v 0 973288452 1013829194 0 1024112726 1043655356 1022396938 0 0 0 0 1039823521 976154631 1032613294 1048685161 1029531593 976154631 976154631 0 994364935 
+v 1010246472 1023382186 1023575316 1162105948 1126998102 1093747897 1130151206 1109597192 1168790580 1129407879 1130724553 1125803798 1146415611 1065353217 0 0 0 0 0 0 
+v 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1026396876 1016865294 0 1040915358 1026886720 
+v 0 0 0 0 0 1055474660 1039194094 0 0 0 0 0 0 0 1041704553 1025145046 0 1160639766 1126065238 1099211454 
+v 1125846987 1109456615 1158653412 1129512590 1130269897 1124918956 1143062191 1033860832 0 1064046886 0 0 1032295758 0 1036688062 0 0 0 0 0 
+v 1044584430 1025068334 0 1042628087 0 0 0 0 0 991160498 1011370780 0 982771890 1031278144 1020567168 0 0 0 0 1024210067 
+v 1022687590 1039691994 1029107235 1037571572 0 0 0 0 0 0 0 1161849126 1123801630 1096711646 1127909534 1108037830 1164698788 1130293511 1130083498 1123846083 
+v 1159725883 1062298082 0 1044019325 0 0 0 0 0 0 0 0 0 0 0 1021880608 1009007398 0 0 0 
+v 0 0 0 992742707 1007726081 0 1013876394 1041712958 1025464284 0 0 0 0 1053449001 1039618808 1026809664 964313533 1025015824 0 976990542 
+v 0 1023798574 1023798574 1032251248 1017139743 1160522668 1123319863 1099746620 1129440313 1112573672 1151075172 1129864848 1129684722 1123602122 1146280165 1047217200 0 1061353298 1007544350 977742548 
+v 1026768933 1020582956 1021235588 0 1006728560 0 0 977742548 1007218033 1032465436 1026687354 1040154250 0 0 987436419 997782921 0 0 1007707507 0 
+v 1008196980 1036381224 1025341302 0 0 0 1021480324 1032730568 1031011037 1034770042 1033383199 1043382992 993214501 0 0 0 0 0 0 1160688276 
+v 1120692714 1092279516 1130634526 1102922306 1145831970 1130362680 1130374020 1124378278 1169307784 1059982862 1050928101 0 0 0 0 0 0 0 0 0 
+v 0 0 0 0 1032621197 0 0 0 1023443072 0 1042786216 981500033 0 0 1040384772 1039200498 1024758932 0 0 0 
+v 0 1054151957 991994016 0 0 0 0 0 0 0 0 0 1024364175 1159626326 1126583656 1099795568 1129918570 1113166262 1149079090 1128907383 
+v 1129976780 1125274528 1152242902 1039978019 0 1058625944 1049499976 1002673064 1034206582 1026200310 1040191944 999177431 1032331322 0 0 992536640 1047310654 1036882927 1025909006 1025981834 
+v 0 0 1000342642 1019377454 0 0 1018357894 0 0 1024998686 1009459508 0 0 0 1024525319 1017047032 1024707384 1004129578 0 1032131052 
+v 0 0 0 0 0 0 0 1161496596 1128071458 1090963411 1142844620 1116222568 1169236378 1129481350 1131361070 1126479194 1169946122 1065353215 0 0 
+v 0 0 0 0 0 0 0 0 0 0 0 0 1049576704 0 0 0 1029846797 0 0 998553212 
+v 1030340970 0 0 1009709196 0 0 0 0 0 1058156804 1018493142 0 0 0 0 0 0 0 0 0 
+v 0 1161920967 1126842410 1095975568 1129283166 1107801254 1152538885 1129360942 1130591398 1125619162 1141270261 1041632600 1031745456 1061849518 0 0 0 0 0 0 
+v 0 0 0 0 0 0 0 1040192726 0 0 0 0 0 982635036 0 1016445445 1034417224 1045173628 1033883936 0 
+v 0 0 990341036 997167114 990341035 1041461948 1046346860 1019687832 986730682 1008142164 0 0 1025943291 1028033776 995801896 1161760414 1123398928 1093404352 1129572807 1106990902 
+v 1167367102 1130132426 1130376739 1124608318 1156417694 1065290534 0 997514267 0 0 0 0 0 0 0 0 0 0 0 0 
+v 1014763455 0 0 0 963015886 0 0 1034059099 1009571738 0 1038218374 1041946234 992794522 0 0 0 0 1057455020 1034413080 0 
+v 0 0 0 0 0 0 1016898404 0 0 1159201135 1127094570 1100303884 1124945874 1110424771 1152005319 1129139054 1129888608 1124856560 1138165562 1043334436 
+v 0 1048832114 1058146944 1025013519 1023361058 1032728514 1037836758 1002429886 1038089364 0 0 1023441752 1051975650 1023666290 982060057 970671759 1014411105 0 1021227946 1015951296 
+v 0 0 994939430 0 1018645756 1025462596 975467755 0 0 0 0 1026360749 1021003408 1013288414 0 1014860181 0 0 0 0 
+v 0 0 0 1162598617 1124065331 1088731966 1127418446 1099367031 1169945300 1130035098 1130736126 1125216166 1141589810 1065353216 0 0 0 0 0 0 
+v 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1021428616 0 0 1057742555 1041897406 
+v 0 0 0 0 0 1020489209 0 0 0 0 0 0 0 0 1048473254 984351409 0 1162207189 1129231974 1096833296 
+v 1142545502 1122611644 1150620953 1129175478 1130335334 1125546370 1148668972 1044754790 1050571358 1056879854 0 0 0 0 0 0 0 0 0 0 
+v 0 0 0 1013337582 0 0 0 0 0 998345686 1008385116 994673713 1024867543 1045049579 1026754196 0 0 998817350 1007913453 1037854868 
+v 1018778294 1040480340 1040215029 1041969027 0 0 0 0 1019132041 1027166902 1033256150 1161021017 1126029690 1097485776 1127017764 1107535841 1156030146 1129444227 1130416125 1125257782 
+v 1153688205 1049870885 1011696152 1060301286 0 0 1012656994 977501158 1032618252 0 0 0 0 0 1029874596 1009774466 1029314105 1039964696 0 0 
+v 993637810 1015040334 0 1011055590 980063404 1011696152 1009454184 1040896764 1008653482 0 0 0 0 1042027756 1020164830 1035480764 1035020359 1038823695 999143892 0 
+v 0 0 984608640 971674796 0 1162165481 1123620182 1096248866 1132497430 1108552547 1165753179 1130030451 1130112504 1124337325 1163186456 1060012274 0 1050869276 0 0 
+v 0 0 0 0 0 0 0 0 0 0 1030692559 0 0 0 0 0 0 1006764503 1015051681 0 
+v 1042093966 1040242862 1021746084 0 0 0 0 1051078477 1025722472 0 996884553 1033705358 0 1010415996 0 0 1023541719 1026939636 1033933576 1161328297 
+v 1124155364 1097579578 1133477708 1110784612 1140497330 1130097156 1130216124 1124289376 1159907876 1056349799 1044596572 1051180520 0 0 0 0 987173224 0 0 0 
+v 0 0 1000035247 1031999131 1018084900 1024564852 0 0 0 1017106102 1005908036 1016029424 1013905126 0 1029409904 1041219718 1037088883 1017399742 0 0 
+v 0 1047618612 1032782170 1034739767 1034030137 1021706454 0 0 0 0 0 0 974086384 1162133482 1124335498 1094930032 1136219027 1114608330 1161781192 1129908640 
+v 1130397428 1124846664 1163254962 1059912419 0 1051068982 0 0 0 0 0 0 0 0 0 0 0 0 1033433598 0 
+v 0 0 0 0 0 0 1008954308 0 1032300812 1034497727 1034635034 0 0 0 0 1042989315 1045443680 1033708210 1034840994 1025250950 
+v 0 973477578 0 0 1011425838 1031223810 1025662872 1161402859 1125143423 1097487506 1131721710 1110314606 1158769214 1129725742 1130475921 1124960606 1155302905 1046825262 0 1061596594 
+v 0 0 0 0 1016457007 0 0 0 0 0 1017784581 992618757 1034263094 1037416082 0 0 985823238 1000741850 0 991556698 
+v 1011652848 0 1015328568 1034312876 1027036112 0 1015195812 1025575780 0 1036619538 1018315611 1032670005 1044219898 1043157840 1002069424 0 0 0 991556698 985823238 
+v 983699118 1161059900 1122185484 1097058963 1134339314 1098340671 1145314868 1130649694 1130131446 1123078065 1164003020 1056858267 1053749861 1036694524 0 0 0 0 0 0 
+v 0 0 0 0 0 0 1012379422 0 0 0 0 0 1048760050 0 1017103382 0 1037283486 1025753751 1036498204 1034207800 
+v 0 0 0 1045802974 0 985643034 1043218088 0 0 0 0 0 1009238295 0 0 1162025465 1129439928 1096467938 1128164656 1108003070 
+v 1159473322 1129080512 1130818067 1126133560 1146340201 1047340380 0 1061467817 0 0 0 0 1007131742 0 0 0 0 0 1006179521 967909332 
+v 0 1029758312 0 0 0 0 0 981784542 1007131742 1010940624 1038759061 1048621343 1024725147 0 0 0 0 1034292694 1005816771 1027763183 
+v 1046150104 1031436034 0 1010577873 0 0 1015157600 1028624716 1015701725 1162325062 1125658357 1098942897 1146050330 1124686580 1161426440 1129586374 1130775797 1125386409 1158638456 1019062742 
+v 0 1064964785 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+v 0 0 0 0 0 998460977 1040583293 0 1029244106 1026734245 0 998460977 0 1041061360 1042883997 1050047555 0 0 0 0 
+v 1028287968 1036915611 1015955295 1162766615 1128539864 1097524224 1144927246 1124455236 1165653207 1128788870 1130693257 1126362869 1159322522 1057223844 0 1056446136 0 0 0 0 
+v 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1017693692 986691738 0 1005170603 1045837405 
+v 0 0 0 1034417731 0 1041104688 1024912414 1034045495 1021522406 1034577260 0 0 0 0 1041131276 1023636177 1041370570 1161502980 1121408458 1093552330 
+v 1125585872 1099117306 1162309142 1130280864 1130300888 1124381760 1168090889 1065353214 0 0 0 0 0 0 0 0 0 0 0 0 
+v 0 0 1043052730 0 0 0 998512626 0 0 1006592380 1038343294 0 0 0 1021061094 0 0 0 0 1057196810 
+v 1039172912 0 0 0 0 0 0 0 0 1026708358 1006015256 1161933390 1124541392 1094500373 1129247646 1104491284 1148036350 1129979599 1130445692 1124813384 
+v 1158235502 1058286920 1040907279 1049765734 0 0 0 0 0 0 0 0 0 0 0 1004146500 1014023728 1015564682 0 0 
+v 0 1005039673 990994307 1009409005 0 0 1039524492 1049686650 1026483944 0 0 0 0 1048368986 1023305509 1013726004 1035040022 1026521160 1000573811 0 
+v 0 0 1024697600 1018765216 1010004453 1161688820 1125792513 1098239752 1141797184 1121282707 1142773892 1129708220 1129958636 1124459336 1152497452 1050599413 1041780166 1057651860 0 0 
+v 0 0 1026347958 0 0 0 0 0 1017959352 1040623930 0 982139641 0 0 0 0 0 1010325835 0 0 
+v 1038913173 1036789475 1032211726 0 0 1019375150 998539310 1040895292 1037568164 1012024794 1040930687 1034972534 0 0 0 0 0 1004202506 986670198 1160993324 
+v 1125171906 1098073840 1129478372 1108769555 1147465093 1129890090 1130466449 1124743039 1137698844 1048193888 984338478 1061224202 973134882 0 1023818405 1010383986 1012847100 0 973134882 0 
+v 0 1009856176 1019476340 1014958340 959172653 1038188861 0 0 988560960 0 0 0 0 973134882 1019740246 1042179050 1029096506 0 0 0 
+v 0 1035549810 1036033636 1031921115 1041431320 1041409328 1010911796 0 0 0 0 981523491 0 1161390305 1127341517 1097187778 1129453172 1109371097 1158202306 1129101827 
+v 1130618263 1125897431 1151194843 1049246269 0 1060823778 0 0 959095695 0 1000689266 0 0 0 0 0 1026859812 1010301014 1032430830 1040895884 
+v 0 0 0 1004183951 0 991951189 1011524154 1017641217 1025199837 1040426286 1013271496 0 0 996144810 0 1039704142 1021922205 1037825749 1035838148 1038699422 
+v 1006981064 0 0 0 1003485014 1023407446 984261518 1161974111 1127897924 1092521240 1138408860 1111136618 1169438098 1129596300 1131511631 1126418040 1161386486 1065353214 0 0 
+v 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1015516203 
+v 1022138258 0 1040782972 1031930014 0 0 0 0 0 1058610026 1042478864 0 0 0 0 0 0 0 0 0 
+v 0 1162111614 1127886846 1096642626 1135003242 1111489586 1166218166 1129104447 1130756334 1126038198 1152356856 1060401797 0 1050090230 0 0 0 0 0 0 
+v 0 0 0 0 0 0 1021082384 1023616485 0 0 0 0 0 1006298194 0 0 1040533836 1040736252 1005799938 0 
+v 1007462088 0 0 1049926741 1022826282 1015352440 997411331 1040132896 0 0 0 0 1034932348 1034340668 1018341976 1160829677 1124727246 1096728524 1127803642 1107499681 
+v 1154742170 1129742013 1130053438 1124616354 1159974084 1052635004 0 1059129410 0 0 1014679177 0 1026994250 0 0 0 0 0 1027215148 1022714348 
+v 1037768558 1018296384 0 0 1010791368 1019179976 0 1005760413 1024564370 0 999045108 1030926237 1018561461 0 1029645027 0 0 1043870868 1022802706 1008847464 
+v 1040226050 1043362802 0 0 0 0 0 0 0 1161807290 1124259994 1096349956 1132568048 1107269590 1154213808 1129834320 1130531102 1124977592 1164072350 1057024606 
+v 1049298198 1046891612 0 0 0 0 0 0 0 0 0 0 0 0 1041025142 0 0 0 0 0 
+v 0 0 1016019312 0 1036174192 1040598490 1030025510 0 1006352970 0 0 1043318398 1005784099 1029314422 1030878816 1040776260 0 1033365396 0 0 
+v 1029741076 982180445 0 1158158405 1127372481 1102787134 1125940018 1114768063 1133716894 1128203312 1129021642 1124749175 1137804922 1003441805 0 1032639838 1064093368 1042459042 1033267454 1026097161 
+v 1025543382 1033839693 1033156698 0 0 0 1056251614 1015862621 976503886 0 1016674831 957363877 996825292 1015124248 0 0 0 0 0 0 
+v 0 0 0 0 0 990327610 0 0 0 0 0 0 0 0 0 0 0 1162224728 1122951918 1094261468 
+v 1143534360 1120809950 1156649914 1129849186 1130120776 1124681572 1159352952 1033841438 1035520774 1062535484 0 0 0 0 0 0 0 0 0 0 
+v 0 0 0 0 0 0 0 0 0 989613532 972836316 0 0 1021876167 1038847152 0 0 0 0 1026453974 
+v 0 1046331502 1050190746 1044248479 0 0 0 0 1032452756 1025226766 1002773715 1162153169 1130094812 1094789086 1139989394 1116224604 1169923907 1128827075 1131326344 1127066484 
+v 1153309924 1065353213 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+v 0 0 0 1019663054 1007861802 0 1042211224 1017181132 0 0 0 0 0 1059967636 1038573173 0 0 0 0 0 
+v 0 0 0 0 0 1161391110 1125411522 1098714314 1130807112 1111075480 1133232306 1129885462 1129751986 1123937420 1151105327 1056959812 1035601332 1053921609 0 0 
+v 0 0 0 0 0 0 0 0 998028706 1032706891 1011278921 1010972226 0 0 993121574 1003043661 0 1007445224 971022709 0 
+v 1038687458 1042226440 1033416126 0 0 0 0 1045513834 1041910159 1023194530 1040491692 1020127573 0 0 0 0 0 0 976957750 1160291678 
+v 1122176994 1094012847 1126565908 1102142564 1157460061 1129772494 1130144226 1124766819 1170768844 1065353216 0 0 0 0 0 0 0 0 0 0 
+v 0 0 0 0 1058578136 0 0 0 1030150558 0 0 0 1016904016 0 0 0 0 0 0 0 
+v 0 1050406400 1019402382 0 0 0 0 0 0 0 0 0 0 1162075038 1125678291 1096973301 1128071544 1105914425 1150359815 1129672207 
+v 1130173351 1124762382 1151733977 1047401246 1048795090 1057148752 0 0 972817772 0 0 0 0 0 0 0 982713128 993854480 0 1015321305 
+v 0 0 0 0 0 0 1009427371 1017213816 1032765201 1044293656 1034335125 0 0 0 982713128 1042218347 1016181538 1026806749 1042874274 1035754509 
+v 0 1002587182 0 0 1022203162 1031990992 1025215320 1162846699 1124419564 1098921357 1144582198 1126478070 1159206066 1129908363 1130046472 1124285850 1153095268 1055074546 0 1057909638 
+v 0 0 0 0 1004192214 0 0 0 0 0 1009295382 982636175 0 1035618576 0 0 0 1010191410 0 0 
+v 0 0 0 993414194 1032034458 0 1004789566 0 0 0 0 1025400575 1042513802 1033154495 1009295380 1032370470 0 974247566 1033901186 1011684792 
+v 1052489128 1161918718 1126096448 1096358290 1128437300 1108439792 1167736603 1129625554 1130191936 1124893781 1136937983 1065353212 0 0 0 0 0 0 0 0 
+v 0 0 0 0 0 0 0 0 0 0 0 0 0 1011795872 1008912570 0 1034330684 1024608548 0 0 
+v 0 0 0 1054243490 1049341877 0 0 0 0 0 0 0 1041872322 1014679176 995306988 1161988230 1125351812 1094291302 1131433778 1107040788 
+v 1166187468 1129864520 1130503123 1125042724 1157653978 1061174407 0 1048514019 0 0 0 0 0 0 0 0 0 0 0 0 
+v 1029635981 969663061 0 0 0 0 0 1015401608 1019159600 0 1036719730 1042903127 1021038596 0 1016445494 0 0 1050417482 1035780234 1002382384 
+v 1007221777 1024677520 0 0 0 969663061 1037920201 1024677520 998624392 1161908102 1128315412 1097012152 1129021360 1105484220 1144247664 1129541588 1130362094 1125127346 1149462938 1045438434 
+v 1053865950 1053243439 0 0 0 0 0 0 0 0 0 0 0 0 0 1025470852 0 0 1003728837 0 
+v 0 1009271682 993561628 0 1041936814 1043993322 1038795080 0 0 0 0 1037550058 1023647786 1019083171 1042614905 1038283732 0 0 0 0 
+v 976072971 1019349962 1024981738 1161786471 1122537980 1091664340 1130725342 1086708334 1171035533 1130455366 1130779748 1124701594 1161262326 1065353216 0 0 0 0 0 0 
+v 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1045058764 0 0 0 
+v 994973322 0 0 0 0 1060473051 1035509468 0 0 0 0 0 0 0 0 0 0 1161274508 1124427181 1093784162 
+v 1132735027 1107500866 1166432666 1130129498 1130420249 1124645651 1167902863 1065353214 0 0 0 0 0 0 0 0 0 1016017448 1006846799 0 
+v 0 0 1048270514 0 0 0 1014667206 0 0 1017060169 1029098298 0 0 1026426328 1010235642 0 0 0 0 1054101198 
+v 1043447931 0 0 0 0 0 0 0 0 0 0 1161099106 1124114722 1098128828 1128832620 1108265228 1135059838 1130068588 1129887475 1123895813 
+v 1141850614 1053321070 1041903244 1055444702 995702348 0 1000362687 1016377303 1006463493 0 995702348 0 0 0 1022393375 1033281618 967147189 1004429891 0 0 
+v 998329085 1015021568 0 1002396288 998329086 0 1043989804 1036226104 1023410176 0 0 0 0 1040483958 1040367450 1035696521 1032455468 1036162554 1005107759 0 
+v 0 0 0 0 0 1161864522 1129916481 1096735718 1131806744 1108745362 1160547136 1128797650 1130701943 1126360209 1137156889 1043643636 0 1062392005 0 0 
+v 0 0 0 0 0 0 0 0 1032383549 960164349 0 1024641024 0 0 0 0 0 1007433085 1010304565 1006318892 
+v 1033005703 1039562248 1009538837 0 0 0 0 1034608946 1010878861 1025311036 1046742440 1045246878 991421598 1011644588 0 0 1032144258 1021947516 991421598 1160544205 
+v 1121677494 1094644384 1126084687 1101114562 1153351914 1130058367 1130111596 1124406492 1167525404 1061234002 1048275640 0 0 0 0 0 0 0 0 0 
+v 0 0 0 0 1040723748 0 0 0 1030419582 0 1048781348 1009621228 988770772 0 1045088154 0 1016832920 0 0 0 
+v 0 1049161394 1025417680 0 0 0 0 0 0 0 988770772 1013544290 988770772 1162290950 1125536502 1095125391 1133963883 1111773207 1158649964 1129667551 
+v 1130108608 1124839602 1158773045 1051387102 1025442278 1059102068 0 0 0 0 0 0 0 0 0 0 0 0 991274864 0 
+v 0 0 0 0 0 0 1005793301 0 1019301274 1022366188 1034367246 0 0 0 0 1037253374 1028047456 1022774845 1051942616 1036052949 
+v 0 0 0 0 1031418862 1035771998 1033652098 1159533482 1125664530 1098726318 1126896302 1108243776 1139433068 1129398264 1129945690 1124760523 1153017917 1051974790 0 1046585982 
+v 1054560824 1016248088 1025700666 1020976839 1030311198 1015775213 1041019850 0 0 1025897696 1048901102 1018848902 1040960740 1016484526 993446640 0 1015617588 1001835248 990924640 0 
+v 1023927384 0 0 1015696401 0 0 0 0 0 1034601554 1026685822 1005618249 0 1014164482 0 0 0 0 0 0 
+v 0 0
+c 131.069 26 [WARN] Job message from unknown job #1
+c 131.069 0 Job limit reached.
+c 131.069 0 Terminating.
+c 131.220 21 Exiting happily
+c 131.221 2 Exiting happily
+c 131.220 1 Exiting happily
+c 131.220 6 Exiting happily
+c 131.220 37 Exiting happily
+c 131.220 5 Exiting happily
+c 131.220 22 Exiting happily
+c 131.220 8 Exiting happily
+c 131.220 11 Exiting happily
+c 131.220 27 Exiting happily
+c 131.261 10 Exiting happily
+c 131.261 55 Exiting happily
+c 131.262 44 Exiting happily
+c 131.261 28 Exiting happily
+c 131.262 39 Exiting happily
+c 131.262 50 Exiting happily
+c 131.262 51 Exiting happily
+c 131.262 23 Exiting happily
+c 131.262 25 Exiting happily
+c 131.262 26 Exiting happily
+c 131.262 53 Exiting happily
+c 131.262 29 Exiting happily
+c 131.261 34 Exiting happily
+c 131.262 40 Exiting happily
+c 131.263 42 Exiting happily
+c 131.263 43 Exiting happily
+c 131.264 45 Exiting happily
+c 131.263 46 Exiting happily
+c 131.264 47 Exiting happily
+c 131.264 48 Exiting happily
+c 131.264 49 Exiting happily
+c 131.262 60 Exiting happily
+c 131.262 3 Exiting happily
+c 131.262 7 Exiting happily
+c 131.262 56 Exiting happily
+c 131.262 9 Exiting happily
+c 131.262 17 Exiting happily
+c 131.261 18 Exiting happily
+c 131.262 19 Exiting happily
+c 131.263 54 Exiting happily
+c 131.263 24 Exiting happily
+c 131.264 30 Exiting happily
+c 131.264 31 Exiting happily
+c 131.265 32 Exiting happily
+c 131.264 33 Exiting happily
+c 131.263 35 Exiting happily
+c 131.266 36 Exiting happily
+c 131.264 52 Exiting happily
+c 131.263 38 Exiting happily
+c 131.264 41 Exiting happily
+c 131.265 59 Exiting happily
+c 131.264 4 Exiting happily
+c 131.265 58 Exiting happily
+c 131.264 57 Exiting happily
+c 131.265 62 Exiting happily
+c 131.264 13 Exiting happily
+c 131.265 14 Exiting happily
+c 131.264 15 Exiting happily
+c 131.264 16 Exiting happily
+c 131.266 20 Exiting happily
+c 131.263 61 Exiting happily
+c 131.267 0 Exiting happily
+c 132.319 12 [ERROR] pid=1116039 tid=1116039 signal=11
+_________________________________________________________________

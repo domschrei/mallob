@@ -1,0 +1,32 @@
+[New LWP 549300]
+[New LWP 549311]
+[New LWP 549495]
+[New LWP 549633]
+[New LWP 549691]
+[New LWP 549731]
+[New LWP 549758]
+[New LWP 550084]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=139903459391232, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=139903459391232, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007f3dfa1c7047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x0000556db040c17f in Process::writeTrace (tid=549271) at /home/doerr/mallob/src/util/sys/process.cpp:198
+#3  0x0000556db040b85b in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:70
+#4  0x0000556db040b779 in handleSignal (signum=11) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#5  <signal handler called>
+#6  malloc_consolidate (av=av@entry=0x7f3dfa0cdb80 <main_arena>) at malloc.c:4475
+#7  0x00007f3df9f78010 in _int_free (av=0x7f3dfa0cdb80 <main_arena>, p=0x556db20855f0, have_lock=<optimized out>) at malloc.c:4400
+#8  0x00007f3df9d98418 in ?? () from /lib/x86_64-linux-gnu/libopen-pal.so.40
+#9  0x00007f3df820a289 in ?? () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_btl_vader.so
+#10 0x00007f3df9dc3a0f in mca_base_component_close () from /lib/x86_64-linux-gnu/libopen-pal.so.40
+#11 0x00007f3df9dc3a9e in mca_base_components_close () from /lib/x86_64-linux-gnu/libopen-pal.so.40
+#12 0x00007f3df9de63a8 in ?? () from /lib/x86_64-linux-gnu/libopen-pal.so.40
+#13 0x00007f3df9dce0fc in mca_base_framework_close () from /lib/x86_64-linux-gnu/libopen-pal.so.40
+#14 0x00007f3df9dce0fc in mca_base_framework_close () from /lib/x86_64-linux-gnu/libopen-pal.so.40
+#15 0x00007f3dfa49d365 in ompi_mpi_finalize () from /lib/x86_64-linux-gnu/libmpi.so.40
+#16 0x0000556db03620e8 in main (argc=4, argv=0x7ffdf7890dd8) at /home/doerr/mallob/src/main.cpp:272
+[Inferior 1 (process 549271) detached]

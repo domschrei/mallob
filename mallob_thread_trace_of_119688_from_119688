@@ -1,0 +1,28 @@
+[New LWP 119719]
+[New LWP 119728]
+[New LWP 120077]
+[New LWP 120238]
+[New LWP 120300]
+[New LWP 120329]
+[New LWP 120342]
+[New LWP 120381]
+[New LWP 120524]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=139836450928384, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=139836450928384, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007f2e58afc047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x0000560d1666717f in Process::writeTrace (tid=119688) at /home/doerr/mallob/src/util/sys/process.cpp:198
+#3  0x0000560d1666685b in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:70
+#4  0x0000560d16666779 in handleSignal (signum=11) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#5  <signal handler called>
+#6  __memmove_avx_unaligned_erms () at ../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:262
+#7  0x0000560d16609868 in MessageQueue::SendHandle::sendNext (this=0x560d17355290) at /home/doerr/mallob/src/comm/message_queue.hpp:217
+#8  0x0000560d16607dd4 in MessageQueue::processSent (this=0x560d17357eb0) at /home/doerr/mallob/src/comm/message_queue.cpp:390
+#9  0x0000560d16606a04 in MessageQueue::advance (this=0x560d17357eb0) at /home/doerr/mallob/src/comm/message_queue.cpp:114
+#10 0x0000560d165bc510 in doMainProgram (commWorkers=@0x7ffda90957b0: 0x560d172b6560, commClients=@0x7ffda90957a8: 0x560d16931cc0 <ompi_mpi_comm_null>, params=...) at /home/doerr/mallob/src/main.cpp:132
+#11 0x0000560d165bd0d7 in main (argc=4, argv=0x7ffda9098998) at /home/doerr/mallob/src/main.cpp:261
+[Inferior 1 (process 119688) detached]

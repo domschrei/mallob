@@ -1,0 +1,29 @@
+[New LWP 1116078]
+[New LWP 1116087]
+[New LWP 1116324]
+[New LWP 1116455]
+[New LWP 1116518]
+[New LWP 1116560]
+[New LWP 1116582]
+[New LWP 1117656]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=140626443937536, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=140626443937536, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007fe6429d9047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x0000557d8dc9217f in Process::writeTrace (tid=1116039) at /home/doerr/mallob/src/util/sys/process.cpp:198
+#3  0x0000557d8dc9185b in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:70
+#4  0x0000557d8dc91779 in handleSignal (signum=11) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#5  <signal handler called>
+#6  malloc_consolidate (av=av@entry=0x7fe6428dfb80 <main_arena>) at malloc.c:4475
+#7  0x00007fe64278a010 in _int_free (av=0x7fe6428dfb80 <main_arena>, p=0x557d8fff6ff0, have_lock=<optimized out>) at malloc.c:4400
+#8  0x00007fe6425aa2d8 in ?? () from /lib/x86_64-linux-gnu/libopen-pal.so.40
+#9  0x00007fe6425aa418 in ?? () from /lib/x86_64-linux-gnu/libopen-pal.so.40
+#10 0x00007fe6400f5279 in ?? () from /usr/lib/x86_64-linux-gnu/openmpi/lib/openmpi3/mca_osc_rdma.so
+#11 0x00007fe642d294a4 in ompi_osc_base_finalize () from /lib/x86_64-linux-gnu/libmpi.so.40
+#12 0x00007fe642caf0d1 in ompi_mpi_finalize () from /lib/x86_64-linux-gnu/libmpi.so.40
+#13 0x0000557d8dbe80e8 in main (argc=4, argv=0x7ffc99623d18) at /home/doerr/mallob/src/main.cpp:272
+[Inferior 1 (process 1116039) detached]
