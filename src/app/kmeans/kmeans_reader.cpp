@@ -11,7 +11,7 @@ bool KMeansReader::read(const std::string &filename, JobDescription &desc) {
     files have to be in format:
     k = k of kmeans
     dim = dimension of points
-    col = number of columns (often there are more than wanted)
+    col = number of columns (often there are more than wanted. (clo - dim) last colums are cut off)
     count = count of points
 
     k dim col count
