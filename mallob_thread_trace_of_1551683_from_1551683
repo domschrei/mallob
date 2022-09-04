@@ -1,0 +1,16 @@
+[New LWP 1551703]
+[New LWP 1551713]
+[New LWP 1552016]
+[New LWP 1552127]
+[New LWP 1552217]
+[New LWP 1552303]
+[New LWP 1552388]
+[New LWP 1552454]
+[New LWP 1552489]
+[New LWP 1552510]
+[New LWP 1552512]
+[New LWP 1552859]
+Couldn't get CS register: No such process.
+Python Exception <class 'gdb.error'> Couldn't get registers: No such process.: 
+Couldn't get registers: No such process.
+[Inferior 1 (process 1551683) detached]
