@@ -84,7 +84,7 @@ class KMeansJob : public Job {
             LOG(V3_VERB, "                           Children: %i\n",
                 this->getJobTree().getNumChildren());
 
-            if (!centersChanged() || iterationsDone >= 300) {
+            if (iterationsDone >= 150) {
                 LOG(V0_CRIT, "                           Got Result after iter %i\n", iterationsDone);
                 internal_result.result = RESULT_SAT;
                 internal_result.id = getId();
