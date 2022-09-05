@@ -1,5 +1,5 @@
 SETLOCAL ENABLEDELAYEDEXPANSION
-set folder=nTest256core50dmax150
+set folder=nTest256core50d150exact
 set pcName=i10pc138
 for %%t in (times relSpeedup efficiency) do (
     for %%n in (100000 300000 500000) do ( Rem  50000 10000
