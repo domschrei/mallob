@@ -198,7 +198,8 @@ private:
         }
         LOG(V2_INFO, "PrAs clause epochs file read\n");
 
-        // Create proof instances
+        /*
+        // Convert FRAT proofs to LRAT
         std::list<std::future<void>> conversionFutures;
         for (size_t i = 0; i < localIdStartsPerInstance.size(); i++) {
             int instanceId = _this_worker_index * _threads_per_worker + i;
@@ -215,6 +216,7 @@ private:
         }
         for (auto& fut : conversionFutures) fut.get();
         LOG(V2_INFO, "PrAs all FRAT2LRAT conversions done\n");
+        */
 
         for (size_t i = 0; i < localIdStartsPerInstance.size(); i++) {
             int instanceId = _this_worker_index * _threads_per_worker + i;

@@ -23,11 +23,12 @@ Cadical::Cadical(const SolverSetup& setup)
 	
 	solver->connect_terminator(&terminator);
 	solver->connect_learn_source(&learnSource);
-	solver->set("binary", false);
+	//solver->set("binary", false);
+	auto ok = solver->set("proofdelete", false); assert(ok);
 	std::string logdir = setup.proofDir;
 	//length of the directory + space for filename
 	char *filename_alone = new char [20];
-	sprintf(filename_alone, "proof.%d.frat", setup.globalId + 1);
+	sprintf(filename_alone, "proof.%d.lrat", setup.globalId + 1);
 	//hanlde the joining string already being at the end
 	std::filesystem::path dir(logdir);
 	std::filesystem::path file(filename_alone);

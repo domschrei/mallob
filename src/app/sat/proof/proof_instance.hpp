@@ -3,7 +3,7 @@
 
 #include <algorithm>
 
-#include "app/sat/proof/reverse_lrat_parser.hpp"
+#include "app/sat/proof/reverse_binary_lrat_parser.hpp"
 #include "util/external_priority_queue.hpp"
 #include "util/sys/thread_pool.hpp"
 
@@ -26,7 +26,7 @@ private:
     int _original_num_clauses;
     bool _winning_instance;
 
-    ReverseLratParser _parser;
+    ReverseBinaryLratParser _parser;
     LratLine _current_line;
     bool _current_line_aligned = false;
     ExternalPriorityQueue<LratClauseId> _frontier;
@@ -112,8 +112,7 @@ private:
         LOG(V2_INFO, "Proof instance %i reading epoch %i\n", _instance_id, _current_epoch);
         int numReadLines = 0;
 
-        if (!_current_line.valid() && _parser.hasNext()) {
-            _current_line = _parser.next();
+        if (!_current_line.valid() && _parser.getNextLine(_current_line)) {
             _current_line_aligned = false;
         } 
         
@@ -183,8 +182,7 @@ private:
             }
 
             // Get next proof line
-            if (_parser.hasNext()) {
-                _current_line = _parser.next();
+            if (_parser.getNextLine(_current_line)) {
                 _current_line_aligned = false;
             }
             else _current_line.id = -1;
@@ -199,7 +197,7 @@ private:
             
             // -- the proof file must have been read completely
             assert(!_current_line.valid());
-            assert(!_parser.hasNext());
+            assert(!_parser.getNextLine(_current_line));
 
             // -- there may not be any underived clauses left
             assert(_frontier.empty());
