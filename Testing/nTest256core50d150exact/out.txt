@@ -14,408 +14,551 @@ c 2.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs
 c 2.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
 c 3.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.03GB newreqs=0 hops=0
 c 3.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 4.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.05GB newreqs=0 hops=0
 c 4.203 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
-c 4.203 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.08GB newreqs=0 hops=0
-c 4.609 0 Introducing job #1 rev. 0 : r.#1:0 rev. 0 <- [0] born=4.609 hops=0 epoch=-1 => [0]
-c 4.609 0 BLC insert (1,1,0.010)
-c 4.610 0                            loaded
-c 4.611 0 BLC insert (1,1,1.000)
-c 5.204 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 5.204 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.10GB newreqs=0 hops=1
-c 5.731 0                            first iteration finished
-c 5.731 0                            Another iter 1
-c 6.204 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 4.420 0 Introducing job #1 rev. 0 : r.#1:0 rev. 0 <- [0] born=4.420 hops=0 epoch=-1 => [0]
+c 4.420 0 BLC insert (1,1,0.010)
+c 4.421 0                            loaded
+c 4.422 0 BLC insert (1,1,1.000)
+c 5.203 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.10GB newreqs=0 hops=1
+c 5.203 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 5.546 0                            first iteration finished
+c 5.546 0                            Another iter 1
 c 6.204 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 6.851 0                            Another iter 2
-c 7.251 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 7.251 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 7.968 0                            Another iter 3
-c 8.251 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 8.252 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 9.090 0                            Another iter 4
-c 9.290 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 9.290 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 10.232 0                            Another iter 5
-c 10.291 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 10.291 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 11.332 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 11.332 0                            Another iter 6
-c 11.332 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 12.333 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 12.333 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 12.472 0                            Another iter 7
-c 13.333 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 13.333 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 13.592 0                            Another iter 8
-c 14.333 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 14.334 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 14.712 0                            Another iter 9
-c 15.334 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 15.334 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 15.822 0                            Another iter 10
-c 16.334 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 16.334 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 16.945 0                            Another iter 11
-c 17.345 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 17.346 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 18.071 0                            Another iter 12
-c 18.346 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 18.346 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 19.190 0                            Another iter 13
-c 19.390 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 19.390 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 20.301 0                            Another iter 14
-c 20.390 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 20.390 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 21.410 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 21.410 0                            Another iter 15
-c 21.410 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 22.410 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 22.410 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 22.519 0                            Another iter 16
-c 23.410 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 23.410 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 23.628 0                            Another iter 17
-c 24.429 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 24.429 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 24.738 0                            Another iter 18
-c 25.429 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 25.429 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 25.847 0                            Another iter 19
-c 26.447 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 26.447 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 26.956 0                            Another iter 20
-c 27.447 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 27.447 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 28.115 0 [WARN] Watchdog: No reset for 51 ms (activity=6 recvtag=0 sendtag=30)
-c 28.131 0                            Another iter 21
-c 28.448 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 28.448 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 29.244 0                            Another iter 22
-c 29.448 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 29.448 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 30.371 0                            Another iter 23
-c 30.448 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 30.448 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 31.480 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 31.480 0                            Another iter 24
-c 31.480 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 32.480 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 32.480 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 32.617 0 [WARN] Watchdog: No reset for 66 ms (activity=6 recvtag=0 sendtag=30)
-c 32.619 0                            Another iter 25
-c 33.481 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 33.481 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 33.751 0                            Another iter 26
-c 34.481 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 34.481 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 34.878 0                            Another iter 27
-c 35.482 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 35.482 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 35.999 0                            Another iter 28
-c 36.482 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 36.482 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 37.142 0                            Another iter 29
-c 37.542 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 37.542 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 38.265 0                            Another iter 30
-c 38.542 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 38.543 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 39.374 0                            Another iter 31
-c 39.574 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 39.574 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 40.517 0                            Another iter 32
-c 40.575 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 40.575 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 41.575 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 41.575 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 41.666 0                            Another iter 33
-c 42.575 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 42.576 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 42.792 0                            Another iter 34
-c 43.592 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 43.592 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 43.922 0 [WARN] Watchdog: No reset for 52 ms (activity=6 recvtag=0 sendtag=30)
-c 43.938 0                            Another iter 35
-c 44.592 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 44.592 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 45.081 0                            Another iter 36
-c 45.593 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 45.593 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 46.205 0                            Another iter 37
-c 46.605 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 46.605 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 47.324 0 [WARN] Watchdog: No reset for 51 ms (activity=6 recvtag=0 sendtag=30)
-c 47.327 0                            Another iter 38
-c 47.607 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 47.608 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 48.446 0                            Another iter 39
-c 48.646 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 48.646 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 49.588 0                            Another iter 40
-c 49.646 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 49.646 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 50.646 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 50.647 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 50.709 0                            Another iter 41
-c 51.647 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 51.647 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 51.828 0                            Another iter 42
-c 52.647 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 52.647 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 52.948 0                            Another iter 43
-c 53.647 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 53.648 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 54.069 0                            Another iter 44
-c 54.669 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 54.669 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 55.184 0                            Another iter 45
-c 55.669 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 55.669 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 56.294 0                            Another iter 46
-c 56.694 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 56.694 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 57.417 0                            Another iter 47
-c 57.694 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 57.695 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 58.548 0                            Another iter 48
-c 58.695 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 58.695 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 59.673 0                            Another iter 49
-c 59.695 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 59.695 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 60.696 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 60.696 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 60.794 0                            Another iter 50
-c 61.696 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 61.696 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 61.903 0                            Another iter 51
-c 62.704 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 62.704 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 63.023 0                            Another iter 52
-c 63.704 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 63.704 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 64.144 0                            Another iter 53
-c 64.744 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 64.744 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 65.253 0                            Another iter 54
-c 65.744 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 65.744 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 66.373 0                            Another iter 55
-c 66.773 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 66.773 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 67.492 0                            Another iter 56
-c 67.773 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 67.774 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 68.612 0                            Another iter 57
-c 68.812 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 68.812 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 69.725 0                            Another iter 58
-c 69.812 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 69.813 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 70.835 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 70.835 0                            Another iter 59
-c 70.835 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 71.835 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 71.835 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 71.955 0                            Another iter 60
-c 72.835 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 72.836 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 73.085 0                            Another iter 61
-c 73.885 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 73.885 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 74.204 0                            Another iter 62
-c 74.885 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 74.886 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 75.316 0                            Another iter 63
-c 75.916 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 75.916 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 76.426 0                            Another iter 64
-c 76.917 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 76.917 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 77.545 0                            Another iter 65
-c 77.945 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 77.945 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 78.684 0                            Another iter 66
-c 78.946 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 78.946 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 79.796 0                            Another iter 67
-c 79.996 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 79.996 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 80.906 0                            Another iter 68
-c 80.996 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 80.997 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 82.025 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 82.025 0                            Another iter 69
-c 82.025 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 83.025 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 83.026 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 83.148 0                            Another iter 70
-c 84.028 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 84.028 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 84.258 0                            Another iter 71
-c 85.058 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 85.058 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 85.381 0                            Another iter 72
-c 86.058 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 86.058 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 86.500 0                            Another iter 73
-c 87.100 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 87.100 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 87.637 0                            Another iter 74
-c 88.101 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 88.101 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 88.757 0                            Another iter 75
-c 89.101 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 89.101 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 89.900 0                            Another iter 76
-c 90.102 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 90.102 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 91.022 0                            Another iter 77
-c 91.102 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 91.102 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 92.144 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 92.144 0 [WARN] Watchdog: No reset for 55 ms (activity=0 recvtag=0 sendtag=30)
-c 92.145 0                            Another iter 78
-c 92.145 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 93.145 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 93.145 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 93.254 0                            Another iter 79
-c 94.145 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 94.145 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 94.373 0                            Another iter 80
-c 95.174 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 95.174 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 95.497 0                            Another iter 81
-c 96.174 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 96.174 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 96.617 0                            Another iter 82
-c 97.217 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 97.217 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 97.740 0                            Another iter 83
-c 98.217 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 98.217 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 98.859 0                            Another iter 84
-c 99.259 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 99.259 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 99.978 0                            Another iter 85
-c 100.260 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 100.260 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 101.132 0                            Another iter 86
-c 101.260 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 101.260 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 102.258 0                            Another iter 87
-c 102.261 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 102.261 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 103.261 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 103.261 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 103.382 0                            Another iter 88
-c 104.261 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 104.261 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 104.520 0                            Another iter 89
-c 105.320 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 105.320 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 105.651 0 [WARN] Watchdog: No reset for 52 ms (activity=6 recvtag=0 sendtag=30)
-c 105.687 0                            Another iter 90
-c 106.320 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 106.321 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 106.816 0                            Another iter 91
-c 107.321 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 107.321 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 107.942 0                            Another iter 92
-c 108.342 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 108.342 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 109.052 0 [WARN] Watchdog: No reset for 52 ms (activity=6 recvtag=0 sendtag=30)
-c 109.056 0                            Another iter 93
-c 109.342 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 109.343 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 110.176 0                            Another iter 94
-c 110.376 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 110.376 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 111.298 0                            Another iter 95
-c 111.377 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 111.377 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 112.420 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 112.420 0                            Another iter 96
-c 112.420 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 113.420 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 113.420 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 113.541 0                            Another iter 97
-c 114.420 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 114.420 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 114.660 0                            Another iter 98
-c 115.460 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 115.461 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 115.779 0                            Another iter 99
-c 116.461 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 116.461 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 116.902 0                            Another iter 100
-c 117.502 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 117.502 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 118.022 0                            Another iter 101
-c 118.502 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 118.502 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 119.141 0                            Another iter 102
-c 119.541 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 119.542 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 120.262 0                            Another iter 103
-c 120.542 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 120.542 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 121.383 0                            Another iter 104
-c 121.583 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 121.583 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 122.504 0                            Another iter 105
-c 122.584 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 122.584 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 123.625 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 123.625 0                            Another iter 106
-c 123.625 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 124.625 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
-c 124.625 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
-c 124.746 0                            Got Result after iter 107
-c 124.746 0 Solution clusterCenters: 
-3071.2 155.412 11.4254 307.842 44.3024 5469.61 215.303 229.239 147.005 3354.4 0.926593 0 0.0735707 0 0 0 0 0 0 0 0 0.00286645 0 0 0 0.0037785 0 0 0 0.0136374 0 0 0.0110749 0.034658 0 0.0839504 0.10054 0.0357003 0 0 0 0 0.523794 0.124861 0 0.00451683 0.00260586 0 0.00238871 0 0 0.0300544 0.00464712 0.0208904 
-2955.89 138.142 10.445 289.384 35.2774 4170.71 217.865 226.66 142.068 5475.57 0.994049 0 0.0061076 0 0 0 0 0 0 0 0.00360191 0.0034453 0 0 0 0.274401 0 0 0 0.0255656 0 0 0.011393 0.0817888 0 0 0.0369197 0.0154647 0 0 0 0 0.441616 0.0937304 0 0 0.000900477 0 0.000274058 0 0 0 0.00642081 0.00450239 
-3095.46 175.589 13.9507 306.332 53.8903 3120.85 208.363 228.602 152.424 1234.63 0.317902 0 0.682138 0 0 0.00352579 0 0.0147581 0 0 0 0 0 0.0324211 0.00312284 0.0179146 0.0446609 0 0 0.000604422 0 0 0.00582594 0.00915028 0.00100737 0.0642711 0.104675 0.0426293 0 0.00632962 0.00319 0 0.151621 0.0154297 0.0535931 0.170413 0.11322 0.014926 0.00523831 0.00166216 0.000957003 0.044728 0.0473976 0.0267125 
-2885.82 119.814 11.7515 222.539 24.5785 1581.72 221.278 225.35 135.564 4884.52 0.673977 0.325989 0 0 0 0 0 0 0 0 0 0 0 0 0 0.218501 0 0 0 0.0253029 0 0.101498 0.00555075 0.0189591 0 0.121826 0.0879461 0.0136967 0.0146338 0 0 0 0.226575 0.017229 0 0.0539218 0.0242936 0 0.012327 0 0 0.0292677 0.0197521 0.00872261 
-2947.92 166.834 14.9522 237.077 43.7272 1844.7 209.896 225.401 146.423 1044.8 0.209293 0.0339263 0.738245 0.0184371 0.000704701 0.0200047 0.0118935 0.0416214 0 0.00189838 0 0 8.629e-05 0.0584068 0.0243479 0.0311647 0.0947451 0.000230107 0 0.00198467 0.00700384 0 0.0040844 0.0095206 0.0070326 0.0245061 0.115682 0.0274543 0 0 0.0036961 0.00158198 0.0882024 0.0202923 0.115035 0.120168 0.0922862 0.00266061 0.00841323 0 0 0.0180057 0.0291226 0.0181495 
-3016.49 137.143 13.5525 273.796 45.2629 2039.16 216.167 221.947 137.087 2538.92 0.391797 0.0442378 0.563867 0 0 0.006771 0 0.0176325 0 0 0 0 0 0.0291993 0.0195086 0.0670487 0.0190431 0 0 0.00299051 0.0109746 0 0.00220056 0.0138098 0.00047961 0.0341226 0.0834516 0.0513622 0 0.0235993 0.000239805 0 0.162524 0.0398644 0.0612516 0.129376 0.136884 0.000253911 0.00471148 0 0 0.0289031 0.0370429 0.0167579 
-2671.61 163.494 17.4887 238.42 53.5528 712.151 206.823 215.758 138.16 832.746 0.186402 0.0911151 0.392413 0.329922 0.0292514 0.0448283 0.0350743 0.0440693 0.0151926 0.0561002 0 0 0.011114 0.199426 0.0436841 0.0195655 0.0249013 0.00553993 1.13291e-05 0.00668417 0.0121676 0.000192595 0.00257171 0.00603841 0.000555128 0.0511383 0.0714648 0.0308035 0 0 0.000237912 0.00319481 0.0628635 0.042404 0.0270537 0.0696969 0.0654926 0.00175602 0 0 0 0.00561924 0.00397652 0.00730727 
-2973.95 149.507 14.2735 286.145 49.1432 931.424 213.3 221.593 139.424 2023.16 0.390515 0.102972 0.488273 0.0185455 0 0.00552269 0.00242725 0.0235091 0.000259089 0.00767724 0 0 4.09087e-05 0.0281592 0.0419578 0.0364903 0.0287046 0 0 0.00126817 0.00805906 0.00283633 0.00458178 0.0156409 0.0013909 0.0725264 0.130678 0.0564377 0.00276815 0.000204544 0.00205907 0.00552269 0.16621 0.0629004 0.0343906 0.115012 0.0989639 0.00171816 0.00043636 0 0 0.0180273 0.0120818 0.0114818 
-3104.1 142.298 13.1323 293.005 44.9326 3654.73 216.043 223.017 138.722 2854.2 0.696531 0 0.303564 0 0 2.555e-05 0 0.00135415 0 0 0 0 0 0.0103477 0.0140014 0.0811474 2.555e-05 0 0 0.00017885 0 0 0.00677073 0.0144613 0 0.045071 0.132961 0.0471152 0 0.00367919 0.00779273 0 0.288853 0.0748115 0.0407272 0.0354125 0.0569271 0 0.00319374 0 0.00503334 0.0511779 0.0466041 0.0323463 
-3118.09 170.078 11.4781 259.201 38.4874 5105.67 211.494 228.488 150.639 1253.74 0.942672 0 0.0569041 0 0 0 0 0 0 0 0 0 0 0 0 0.00561965 0.00152029 0 0 0.00171033 0 0 0.034071 0.0102348 0 0.150164 0.103656 0.00442513 0 0.000461518 0 0 0.460976 0.10857 0.00122166 0.0177277 0.00931178 0 0 0 0 0.0689315 0.0194923 0.00195466 
+c 6.204 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 6.672 0                            Another iter 2
+c 7.204 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 7.204 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 7.795 0                            Another iter 3
+c 8.205 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 8.205 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 8.942 0                            Another iter 4
+c 9.205 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 9.205 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 10.053 0                            Another iter 5
+c 10.253 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 10.253 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 11.178 0                            Another iter 6
+c 11.255 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 11.256 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 12.303 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 12.303 0                            Another iter 7
+c 12.303 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 13.304 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 13.304 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 13.419 0                            Another iter 8
+c 14.304 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 14.304 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 14.535 0                            Another iter 9
+c 15.335 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 15.335 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 15.660 0                            Another iter 10
+c 16.336 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 16.336 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 16.786 0                            Another iter 11
+c 17.386 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 17.386 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 17.932 0                            Another iter 12
+c 18.386 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 18.387 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 19.059 0                            Another iter 13
+c 19.387 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 19.387 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 20.176 0                            Another iter 14
+c 20.387 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 20.388 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 21.302 0                            Another iter 15
+c 21.388 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 21.388 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 22.411 0 [WARN] Watchdog: No reset for 52 ms (activity=6 recvtag=0 sendtag=30)
+c 22.415 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 22.415 0                            Another iter 16
+c 22.415 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 23.415 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 23.415 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 23.530 0                            Another iter 17
+c 24.416 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 24.416 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 24.654 0                            Another iter 18
+c 25.454 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 25.454 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 25.802 0                            Another iter 19
+c 26.454 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 26.455 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 26.906 0                            Another iter 20
+c 27.506 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 27.506 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 28.019 0                            Another iter 21
+c 28.506 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 28.506 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 29.133 0                            Another iter 22
+c 29.533 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 29.533 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 30.255 0                            Another iter 23
+c 30.533 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 30.533 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 31.387 0                            Another iter 24
+c 31.587 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 31.587 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 32.513 0                            Another iter 25
+c 32.587 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 32.587 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 33.626 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 33.626 0                            Another iter 26
+c 33.626 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 34.626 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 34.627 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 34.767 0                            Another iter 27
+c 35.627 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 35.627 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 35.908 0                            Another iter 28
+c 36.627 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 36.627 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 37.024 0                            Another iter 29
+c 37.628 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 37.628 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 38.151 0                            Another iter 30
+c 38.628 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 38.628 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 39.270 0                            Another iter 31
+c 39.670 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 39.670 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 40.394 0                            Another iter 32
+c 40.671 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 40.671 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 41.509 0                            Another iter 33
+c 41.709 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 41.709 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 42.642 0                            Another iter 34
+c 42.709 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 42.710 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 43.756 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 43.756 0                            Another iter 35
+c 43.756 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 44.756 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 44.756 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 44.889 0                            Another iter 36
+c 45.756 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 45.757 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 46.158 0                            Another iter 37
+c 46.758 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 46.758 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 47.311 0                            Another iter 38
+c 47.758 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 47.758 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 48.453 0                            Another iter 39
+c 48.759 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 48.759 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 49.584 0                            Another iter 40
+c 49.783 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 49.784 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 50.721 0                            Another iter 41
+c 50.784 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 50.784 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 51.784 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 51.784 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 51.851 0                            Another iter 42
+c 52.785 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 52.785 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 52.988 0                            Another iter 43
+c 53.789 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 53.790 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 54.095 0                            Another iter 44
+c 54.790 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 54.790 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 55.218 0                            Another iter 45
+c 55.818 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 55.818 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 56.327 0 [WARN] Watchdog: No reset for 51 ms (activity=6 recvtag=0 sendtag=30)
+c 56.330 0                            Another iter 46
+c 56.818 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 56.818 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 57.445 0                            Another iter 47
+c 57.845 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 57.845 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 58.557 0                            Another iter 48
+c 58.845 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 58.845 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 59.686 0                            Another iter 49
+c 59.886 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 59.887 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 60.810 0                            Another iter 50
+c 60.887 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 60.887 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 61.929 0 [WARN] Watchdog: No reset for 51 ms (activity=6 recvtag=0 sendtag=30)
+c 61.933 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 61.933 0                            Another iter 51
+c 61.933 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 62.933 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 62.933 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 63.057 0                            Another iter 52
+c 63.934 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 63.934 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 64.173 0                            Another iter 53
+c 64.973 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 64.973 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 65.319 0                            Another iter 54
+c 65.973 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 65.974 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 66.442 0                            Another iter 55
+c 66.974 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 66.974 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 67.567 0                            Another iter 56
+c 67.975 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 67.975 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 68.700 0                            Another iter 57
+c 68.975 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 68.975 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 69.822 0                            Another iter 58
+c 70.022 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 70.022 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 70.947 0                            Another iter 59
+c 71.022 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 71.023 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 72.074 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 72.074 0                            Another iter 60
+c 72.074 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 73.074 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 73.074 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 73.204 0                            Another iter 61
+c 74.074 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 74.075 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 74.327 0                            Another iter 62
+c 75.127 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 75.127 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 75.451 0                            Another iter 63
+c 76.128 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 76.128 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 76.576 0                            Another iter 64
+c 77.176 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 77.176 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 77.700 0                            Another iter 65
+c 78.176 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 78.176 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 78.823 0                            Another iter 66
+c 79.223 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 79.223 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 79.945 0                            Another iter 67
+c 80.223 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 80.223 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 81.071 0                            Another iter 68
+c 81.271 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 81.271 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 82.198 0                            Another iter 69
+c 82.271 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 82.271 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 83.320 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 83.321 0                            Another iter 70
+c 83.321 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 84.321 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 84.321 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 84.440 0 [WARN] Watchdog: No reset for 51 ms (activity=6 recvtag=0 sendtag=30)
+c 84.447 0                            Another iter 71
+c 85.321 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 85.321 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 85.572 0                            Another iter 72
+c 86.372 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 86.372 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 86.695 0                            Another iter 73
+c 87.373 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 87.373 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 87.822 0                            Another iter 74
+c 88.423 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 88.423 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 88.942 0 [WARN] Watchdog: No reset for 51 ms (activity=6 recvtag=0 sendtag=30)
+c 88.945 0                            Another iter 75
+c 89.423 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 89.423 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 90.071 0                            Another iter 76
+c 90.471 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 90.472 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 91.195 0                            Another iter 77
+c 91.472 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 91.472 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 92.343 0                            Another iter 78
+c 92.472 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 92.473 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 93.460 0                            Another iter 79
+c 93.473 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 93.473 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 94.473 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 94.473 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 94.574 0                            Another iter 80
+c 95.474 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 95.474 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 95.697 0                            Another iter 81
+c 96.497 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 96.497 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 96.811 0                            Another iter 82
+c 97.498 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 97.498 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 98.014 0                            Another iter 83
+c 98.498 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 98.498 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 99.176 0                            Another iter 84
+c 99.499 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 99.499 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 100.315 0                            Another iter 85
+c 100.515 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 100.515 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 101.448 0 [WARN] Watchdog: No reset for 62 ms (activity=6 recvtag=0 sendtag=30)
+c 101.449 0                            Another iter 86
+c 101.515 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 101.515 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 102.516 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 102.516 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 102.576 0                            Another iter 87
+c 103.516 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 103.516 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 103.716 0                            Another iter 88
+c 104.517 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 104.518 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 104.832 0                            Another iter 89
+c 105.517 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 105.518 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 105.990 0                            Another iter 90
+c 106.518 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 106.518 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 107.123 0                            Another iter 91
+c 107.523 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 107.523 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 108.250 0                            Another iter 92
+c 108.526 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 108.526 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 109.376 0                            Another iter 93
+c 109.576 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 109.577 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 110.502 0                            Another iter 94
+c 110.577 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 110.577 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 111.624 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 111.624 0                            Another iter 95
+c 111.624 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 112.625 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 112.625 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 112.737 0                            Another iter 96
+c 113.625 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 113.625 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 113.863 0                            Another iter 97
+c 114.663 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 114.663 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 114.990 0                            Another iter 98
+c 115.663 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 115.663 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 116.116 0                            Another iter 99
+c 116.716 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 116.717 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 117.235 0                            Another iter 100
+c 117.717 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 117.717 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 118.355 0 [WARN] Watchdog: No reset for 53 ms (activity=6 recvtag=0 sendtag=30)
+c 118.360 0                            Another iter 101
+c 118.760 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 118.760 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 119.475 0                            Another iter 102
+c 119.760 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 119.760 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 120.590 0                            Another iter 103
+c 120.790 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 120.790 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 121.720 0                            Another iter 104
+c 121.790 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 121.790 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 122.842 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 122.842 0                            Another iter 105
+c 122.842 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 123.842 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 123.843 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 123.968 0                            Another iter 106
+c 124.843 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 124.843 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 125.093 0                            Another iter 107
+c 125.893 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 125.893 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 126.215 0                            Another iter 108
+c 126.894 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 126.894 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 127.338 0                            Another iter 109
+c 127.938 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 127.939 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 128.460 0 [WARN] Watchdog: No reset for 54 ms (activity=6 recvtag=0 sendtag=30)
+c 128.464 0                            Another iter 110
+c 128.939 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 128.939 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 129.587 0                            Another iter 111
+c 129.987 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 129.987 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 130.716 0                            Another iter 112
+c 130.987 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 130.988 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 131.843 0                            Another iter 113
+c 132.043 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 132.043 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 132.962 0 [WARN] Watchdog: No reset for 51 ms (activity=6 recvtag=0 sendtag=30)
+c 132.969 0                            Another iter 114
+c 133.043 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 133.044 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 134.095 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 134.095 0                            Another iter 115
+c 134.095 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 135.095 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 135.095 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 135.219 0                            Another iter 116
+c 136.096 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 136.096 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 136.348 0                            Another iter 117
+c 137.148 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 137.148 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 137.471 0                            Another iter 118
+c 138.149 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 138.149 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 138.596 0                            Another iter 119
+c 139.196 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 139.196 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 139.719 0                            Another iter 120
+c 140.197 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 140.197 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 140.850 0                            Another iter 121
+c 141.251 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 141.251 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 141.975 0                            Another iter 122
+c 142.251 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 142.251 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 143.100 0                            Another iter 123
+c 143.300 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 143.300 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 144.224 0                            Another iter 124
+c 144.300 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 144.300 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 145.349 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 145.349 0                            Another iter 125
+c 145.349 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 146.349 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 146.349 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 146.469 0 [WARN] Watchdog: No reset for 51 ms (activity=6 recvtag=0 sendtag=30)
+c 146.487 0                            Another iter 126
+c 147.350 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 147.350 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 147.638 0                            Another iter 127
+c 148.350 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 148.350 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 148.763 0                            Another iter 128
+c 149.363 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 149.363 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 149.887 0                            Another iter 129
+c 150.364 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 150.364 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 151.013 0                            Another iter 130
+c 151.413 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 151.414 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 152.139 0                            Another iter 131
+c 152.414 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 152.414 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 153.262 0                            Another iter 132
+c 153.462 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 153.463 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 154.385 0                            Another iter 133
+c 154.463 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 154.463 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 155.509 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 155.510 0                            Another iter 134
+c 155.510 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 156.510 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 156.510 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 156.633 0                            Another iter 135
+c 157.510 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 157.511 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 157.748 0                            Another iter 136
+c 158.549 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 158.549 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 158.874 0                            Another iter 137
+c 159.549 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 159.549 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 160.166 0                            Another iter 138
+c 160.566 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 160.566 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 161.355 0                            Another iter 139
+c 161.569 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 161.569 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 162.514 0                            Another iter 140
+c 162.569 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 162.569 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 163.569 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 163.570 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 163.665 0                            Another iter 141
+c 164.570 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 164.570 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 164.805 0                            Another iter 142
+c 165.605 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 165.605 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 165.943 0                            Another iter 143
+c 166.605 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 166.605 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 167.078 0 [WARN] Watchdog: No reset for 64 ms (activity=6 recvtag=0 sendtag=30)
+c 167.079 0                            Another iter 144
+c 167.606 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 167.606 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 168.207 0                            Another iter 145
+c 168.607 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 168.607 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 169.331 0                            Another iter 146
+c 169.610 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 169.610 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 170.443 0                            Another iter 147
+c 170.643 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 170.643 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 171.571 0                            Another iter 148
+c 171.644 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 171.644 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 172.696 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 172.696 0                            Another iter 149
+c 172.696 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 173.696 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 173.697 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.11GB newreqs=0 hops=0
+c 173.822 0                            Got Result after iter 150
+c 173.822 0 Solution clusterCenters: 
+3070.65 155.45 11.4466 307.998 44.4012 5468.71 215.273 229.228 147.011 3364.55 0.925825 0 0.073979 0 0 0 0 0 0 0 0 0.00286869 0 0 0 0.00386839 0 0 0 0.013648 0 0 0.011127 0.0347286 0 0.0828462 0.100407 0.0364238 0 0 0 0 0.523678 0.125183 0 0.0044769 0.00252097 0 0.00243404 0 0 0.0300777 0.00465076 0.0209935 
+2955.34 138.016 10.4365 288.995 35.1859 4162.62 217.895 226.651 142.027 5479.6 0.994063 0 0.00583558 0 0 0 0 0 0 0 0.00360318 0.00344652 0 0 0 0.27555 0 0 0 0.0256141 0 0 0.0112795 0.0820123 0 0 0.0365019 0.0150002 0 0 0 0 0.441081 0.0937627 0 0 0.00086163 0 0.000274155 0 0 0 0.00642305 0.00454313 
+3095.54 175.605 13.9506 306.286 53.8798 3122.11 208.359 228.609 152.431 1234.34 0.318178 0 0.682099 0 0 0.00352734 0 0.0147475 0 0 0 0 0 0.0323678 0.00312422 0.0178045 0.0445963 0 0 0.000604686 0 0 0.00584531 0.00915426 0.00100781 0.0642991 0.104772 0.0425974 0 0.00629882 0.0031914 0 0.151794 0.0154193 0.0535828 0.170368 0.113169 0.0149322 0.00522383 0.00166289 0.000957421 0.0447978 0.0474518 0.0266567 
+2886.43 119.637 11.7595 223.082 24.5422 1574.01 221.332 225.346 135.49 4875.23 0.671919 0.328131 0 0 0 0 0 0 0 0 0 0 0 0 0 0.217518 0 0 0 0.0252296 0 0.102003 0.0055664 0.0187234 0 0.122751 0.0882673 0.0135184 0.0147474 0 0 0 0.225686 0.0166992 0 0.0545792 0.0244344 0 0.0125064 0 0 0.0294225 0.0196632 0.00867492 
+2947.96 166.843 14.9539 237.07 43.7281 1845.32 209.89 225.403 146.428 1044.12 0.209316 0.0338433 0.738152 0.0184325 0.000705077 0.0199865 0.0118855 0.0416 0 0.00189939 0 0 8.63359e-05 0.0584804 0.0243463 0.0311235 0.0947656 0.000230229 0 0.00198572 0.00699324 0 0.00408658 0.00949694 0.00702201 0.0245334 0.115756 0.0274543 0 0 0.00369806 0.00158282 0.0881907 0.0202886 0.115051 0.120188 0.0921903 0.00266203 0.00841777 0 0 0.0179864 0.0291234 0.0181591 
+3016.44 137.153 13.5547 273.784 45.2696 2039.98 216.168 221.948 137.089 2537.73 0.391668 0.0440806 0.564161 0 0 0.00679692 0 0.0176409 0 0 0 0 0 0.0291905 0.0195023 0.0670793 0.0191357 0 0 0.00298949 0.0109568 0 0.00219982 0.013777 0.000479447 0.0340835 0.0833834 0.0513845 0 0.0236202 0.000239724 0 0.162473 0.0398787 0.0612547 0.129346 0.13693 0.000267926 0.00469578 0 0 0.0288802 0.0370446 0.0167806 
+2671.63 163.496 17.4883 238.432 53.5563 712.168 206.818 215.752 138.159 832.771 0.18636 0.0911066 0.392416 0.32988 0.0292504 0.0448273 0.0350847 0.0440796 0.0151916 0.0560992 0 0 0.0111133 0.199372 0.0436831 0.0195758 0.0249229 0.00553967 1.13285e-05 0.00668386 0.0121669 0.000192584 0.00257157 0.00603813 0.000555096 0.0511373 0.0714352 0.0307911 0 0 0.000237898 0.00319465 0.0628736 0.0423916 0.027064 0.0697139 0.0654897 0.00175592 0 0 0 0.00561897 0.00397632 0.00731826 
+2973.96 149.527 14.274 286.098 49.1537 931.847 213.295 221.594 139.432 2022.83 0.390262 0.102902 0.48816 0.018548 0 0.00551936 0.00242579 0.0235225 0.000258933 0.00767259 0 0 4.08842e-05 0.02817 0.0419611 0.0364694 0.0286607 0 0 0.00126741 0.00808143 0.00279375 0.00457902 0.0156723 0.00140369 0.0724313 0.130718 0.056474 0.00275287 0.000204421 0.00205784 0.00551936 0.166208 0.0628923 0.0344117 0.114989 0.0990451 0.00170351 0.000436098 0 0 0.018071 0.0121017 0.0114884 
+3104.12 142.321 13.131 293.039 44.9346 3655.02 216.05 223.022 138.718 2854.59 0.696856 0 0.303277 0 0 2.55611e-05 0 0.00135474 0 0 0 0 0 0.0103522 0.0139819 0.0811555 2.55611e-05 0 0 0.000178927 0 0 0.00677369 0.014442 0 0.0449609 0.132893 0.0470568 0 0.0036808 0.00779613 0 0.289034 0.0748415 0.0407181 0.0354018 0.0570249 0 0.00316957 0 0.00503553 0.0511463 0.0466223 0.0323091 
+3118.04 170.055 11.4692 259.257 38.4647 5107.3 211.503 228.503 150.646 1256.88 0.94369 0 0.0566809 0 0 0 0 0 0 0 0 0 0 0 0 0.00560855 0.00151729 0 0 0.00173404 0 0 0.0340302 0.0102146 0 0.150648 0.103803 0.0043893 0 0.000460605 0 0 0.46094 0.10841 0.00121925 0.0176654 0.00926629 0 0 0 0 0.0687115 0.0193995 0.0019508 
 
-c 124.756 0 BLC insert (1,0,0.000)
-c 124.756 0 RESPONSE_TIME #1 120.147079 rev. 0
-c 124.756 0 SOLUTION #1 SAT rev. 0
+c 173.832 0 BLC insert (1,0,0.000)
+c 173.833 0 RESPONSE_TIME #1 169.412628 rev. 0
+c 173.833 0 SOLUTION #1 SAT rev. 0
 s SATISFIABLE
-v 1113063424 1161818929 1125869950 1094110872 1134160835 1110521255 1168829657 1129794948 1130708260 1125319015 1162978919 1064121643 0 1033284674 0 0 0 0 0 0 
-v 0 0 993778445 0 0 0 997695680 0 0 0 1012887360 0 0 1010135954 1024324995 0 1034677805 1036904483 1024604787 0 
-v 0 0 0 1057363813 1040168723 0 999555556 992659235 0 991726560 0 0 1022768290 999835357 1017848403 1161346633 1124738151 1093082789 1133556008 1108155402 
-v 1166169515 1129962894 1130539253 1124995463 1168841871 1065253381 0 1002971707 0 0 0 0 0 0 0 996937214 996264602 0 0 0 
-v 1049394776 0 0 0 1020358405 0 0 1010477485 1034387681 0 0 1024932118 1014849437 0 0 0 0 1055005556 1035990456 0 
-v 0 980160002 0 965717887 0 0 0 1003644323 999524550 1161918286 1127192261 1096758824 1134111374 1113034664 1162022304 1129340150 1130666542 1125674138 1150964745 1050854402 
-v 0 1060020377 0 0 996610291 0 1014090745 0 0 0 0 0 1023724530 994879651 1016250788 1027010133 0 0 975073818 0 
-v 0 1002366857 1008069393 981731781 1032036494 1037459465 1026464786 0 1003448507 995168091 0 1041973915 1014811865 1029407857 1043235028 1038606242 1014271025 1001104932 987356400 981131100 
-v 1027028161 1027744774 1020974124 1161059606 1123000484 1094452784 1130269208 1103405262 1153808169 1130186520 1130453423 1124569193 1167631405 1059883454 1051125783 0 0 0 0 0 
-v 0 0 0 0 0 0 0 0 1046462108 0 0 0 1020217335 0 1037033002 1001775884 1016811559 0 1039761352 1035214102 
-v 1012951058 1013957310 0 0 0 1047003964 1015882711 0 1029496102 1019675507 0 1011480382 0 0 1022345945 1017237281 1007610182 1161313974 1126618488 1097808916 
-v 1131221931 1110370473 1155962441 1129440636 1130456718 1125280873 1149409689 1045844213 1024128597 1060961693 1016531314 976796596 1017372903 1011014950 1026194232 0 989385511 0 0 951383698 
-v 1030700019 1019704645 1023364399 1036126654 963725505 0 989991241 1004896379 0 998626927 1008467020 1004958147 1019789576 1038936734 1021372381 0 0 997341752 986667675 1035248504 
-v 1017527323 1038849884 1039538894 1035796624 992894384 1007277986 0 0 1016299684 1022268017 1016376894 1161594842 1124672672 1096341279 1133045203 1110773039 1157555524 1129851561 1130230366 1124669006 
-v 1159638700 1053333927 1026896557 1058036119 0 0 1004396349 0 1016099340 0 0 0 0 0 1022309200 1017106549 1032409299 1016856640 0 0 
-v 994311299 1010028199 0 990918483 1013072545 972780569 1024181278 1034610858 1028808992 0 1019302719 964391961 0 1042705587 1025722587 1031463679 1040481084 1040984888 965025625 999973571 
-v 0 0 1022150167 1024965187 1015629814 1160182231 1126399639 1099688160 1131309977 1112946196 1144129964 1129239184 1129824790 1124739306 1146105783 1044308027 1035639431 1053354594 1051257754 1022337210 
-v 1027055068 1024436767 1026851321 1014557289 1030080863 0 0 1010177889 1045182027 1026747927 1017137100 1020001722 1001752658 926814787 1004209887 1011309234 961147749 992512567 1002823134 974226938 
-v 1028748905 1033002017 1023170444 0 0 964261877 995188757 1031847578 1026404294 1021157302 1032764741 1032200450 988162620 0 0 0 1001922961 998395256 1005547982 1161420581 
-v 1125482966 1097097312 1133449878 1111790247 1147722527 1129663694 1130207154 1124822134 1157424423 1053290906 1037230901 1056571102 1016589486 0 1001715629 991892079 1019254330 965203526 1006342501 0 
-v 0 942380391 1021750791 1026284517 1024816857 1022043631 0 0 983972024 1006897706 993649089 999695033 1015030113 985026230 1033144511 1040568427 1030171437 993356254 961968830 990310770 
-v 1001715629 1042952917 1031852531 1024253217 1038846791 1036692881 987837446 971294520 0 0 1016311288 1011217096 1010572848 1161953689 1125010528 1095900670 1133674646 1110686466 1164209064 1129843431 
-v 1130300505 1124776162 1160930109 1060261845 0 1050373307 0 0 936793121 0 984710578 0 0 0 0 0 1009355130 1013278192 1034301598 936793121 
-v 0 0 960203165 0 0 1004395779 1013772004 0 1027120234 1040721657 1027668954 0 997269149 1006590499 0 1049879675 1033451206 1025954204 1024527532 1030302810 
-v 0 995184165 0 1000664755 1028759535 1027531774 1023704452 1162010993 1126831084 1094166088 1132566965 1108996892 1168084318 1129545355 1130659079 1125557119 1151121360 1064391417 0 1030296641 
-v 0 0 0 0 0 0 0 0 0 0 0 0 1001923848 986137742 0 0 987770142 0 0 1024167433 
-v 1009233904 0 1041876122 1037322680 999358648 0 972158933 0 0 1055655189 1037982244 983572542 1016150436 1008242804 0 0 0 0 1032662004 1017097811 
-v 989862343 0
-c 124.757 0 Terminating.
-c 124.915 0 Exiting happily
+v 1113063424 1161816670 1125872432 1094133058 1134165951 1110547148 1168827828 1129793013 1130707581 1125319372 1163020508 1064108761 0 1033339467 0 0 0 0 0 0 
+v 0 0 993788080 0 0 0 998081743 0 0 0 1012898754 0 0 1010191894 1024343946 0 1034529603 1036886539 1024798998 0 
+v 0 0 0 1057361866 1040199655 0 999469808 992294632 0 991921270 0 0 1022780791 999843168 1017903776 1161344372 1124729885 1093073898 1133543258 1108131409 
+v 1166152949 1129964824 1130538651 1124992713 1168850125 1065253606 0 1002387550 0 0 0 0 0 0 0 996942663 996269815 0 0 0 
+v 1049433332 0 0 0 1020384422 0 0 1010355622 1034417687 0 0 1024819985 1014350657 0 0 0 0 1054987610 1035994787 0 
+v 0 979492614 0 965721206 0 0 0 1003649140 999612052 1161918641 1127193299 1096758667 1134109861 1113031908 1162027450 1129339909 1130666956 1125674611 1150962388 1050863681 
+v 0 1060019726 0 0 996616952 0 1014079314 0 0 0 0 0 1023710236 994885544 1016191691 1026992788 0 0 975078354 0 
+v 0 1002408450 1008073659 981735561 1032040261 1037472401 1026456217 0 1003382367 995174112 0 1041985497 1014800714 1029405103 1043231959 1038599401 1014277699 1001073823 987362637 981138282 
+v 1027046896 1027759318 1020944177 1161062132 1122977341 1094461135 1130304742 1103386245 1153744956 1130190062 1130453168 1124564305 1167612381 1059848933 1051197628 0 0 0 0 0 
+v 0 0 0 0 0 0 0 0 1046396145 0 0 0 1020177992 0 1037100783 1001809505 1016685002 0 1039885544 1035257213 
+v 1012759652 1014079226 0 0 0 1046944308 1015598294 0 1029672556 1019751071 0 1011672944 0 0 1022429030 1017189545 1007558978 1161314153 1126619073 1097810708 
+v 1131221502 1110370696 1155967538 1129440197 1130456848 1125281178 1149404091 1045845741 1024106323 1060960129 1016528814 976803047 1017363114 1011006309 1026188480 0 989394150 0 0 951390013 
+v 1030719779 1019703789 1023342264 1036129403 963733924 0 989995757 1004873602 0 998631600 1008441609 1004935404 1019804214 1038946732 1021372389 0 0 997350195 986674884 1035246936 
+v 1017525339 1038852113 1039541480 1035783754 992900451 1007282859 0 0 1016289339 1022268489 1016382039 1161594633 1124673325 1096343571 1133044835 1110774793 1157562190 1129851659 1130230461 1124669125 
+v 1159633843 1053329577 1026854361 1058041049 0 0 1004452012 0 1016103831 0 0 0 0 0 1022304480 1017103203 1032413402 1016906357 0 0 
+v 994306917 1010009117 0 990915277 1013037317 972774993 1024170796 1034601710 1028814991 0 1019313935 964386385 0 1042702140 1025726431 1031464491 1040479040 1040987988 965507193 999939845 
+v 0 0 1022137918 1024965646 1015642000 1160182284 1126399733 1099687950 1131310741 1112947103 1144130243 1129238881 1129824397 1124739257 1146106194 1044305202 1035638292 1053354701 1051256341 1022336673 
+v 1027054799 1024439539 1026854093 1014556254 1030080594 0 0 1010177214 1045178442 1026747658 1017142645 1020013349 1001752093 926814081 1004209221 1011308466 961147001 992511962 1002822525 974226399 
+v 1028748636 1032998052 1023163825 0 0 964260953 995188042 1031848932 1026400984 1021162847 1032767012 1032200052 988161734 0 0 0 1001922389 998394829 1005571589 1161420616 
+v 1125484281 1097097794 1133448331 1111792984 1147729455 1129663341 1130207249 1124822669 1157421692 1053282400 1037221385 1056567316 1016590824 0 1001708476 991885836 1019261529 965198188 1006332504 0 
+v 0 942373648 1021756626 1026285410 1024811236 1022020038 0 0 983965487 1006921722 993466200 999689122 1015046937 985136127 1033131741 1040571093 1030181180 993290604 961960403 990305472 
+v 1001708476 1042952838 1031851441 1024258878 1038843708 1036703778 987711535 971285529 0 0 1016334729 1011238457 1010579972 1161953760 1125011994 1095899296 1133675775 1110686976 1164210269 1129843936 
+v 1130300839 1124775913 1160931693 1060267304 0 1050363665 0 0 936799224 0 984715630 0 0 0 0 0 1009359981 1013257313 1034302684 936799224 
+v 0 0 960208505 0 0 1004402123 1013751341 0 1027090678 1040717056 1027653280 0 997276031 1006597803 0 1049885759 1033455227 1025951752 1024524664 1030329070 
+v 0 995080351 0 1000669467 1028751040 1027536643 1023694483 1162010783 1126829589 1094156806 1132568803 1108990929 1168087647 1129545957 1130660068 1125557632 1151147049 1064408487 0 1030236718 
+v 0 0 0 0 0 0 0 0 0 0 0 0 1001900021 986111913 0 0 987973825 0 0 1024156490 
+v 1009212171 0 1041908603 1037342387 999281696 0 972127568 0 0 1055653988 1037960677 983551784 1016117020 1008193951 0 0 0 0 1032632472 1017047964 
+v 989835737 0
+c 173.833 0 Terminating.
+c 174.034 0 Exiting happily

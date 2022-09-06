@@ -1,0 +1,19 @@
+[New LWP 1159600]
+[New LWP 1159606]
+[New LWP 1160045]
+[New LWP 1160151]
+[New LWP 1160363]
+[New LWP 1160549]
+[New LWP 1160733]
+[New LWP 1161936]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=140159239833344, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=140159239833344, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007f799f524047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x0000561a9d4c617f in Process::writeTrace (tid=<error reading variable: Cannot access memory at address 0x7fff3295d748>) at /home/doerr/mallob/src/util/sys/process.cpp:198
+Backtrace stopped: Cannot access memory at address 0x7fff3295d9b8
+[Inferior 1 (process 1159580) detached]

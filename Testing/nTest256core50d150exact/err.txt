@@ -1,0 +1,1484 @@
+c 
+c Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving
+c Designed by P. Sanders and D. Schreiber 2018-2022
+c Developed by D. Schreiber 2019-2022
+c 
+c 0.000 0 Program options: -0o=0 -J=1 -T=0 -ajpc=0 -ans=0 -appmode=fork -ba=4 -bicg=4 -c=1 -cbbs=1500 -cbdf=0.9 -cfci=20 -cg=1 -ch=0 -chaf=5 -checksums=0 -chstms=10 -cmp=0 -colors=0 -dc=0 -ddd=0 -delaymonkey=0 -derandomize=1 -evu=0 -fapii=0 -g=0 -gclls=0 -h=0 -hbbfs=10 -hubfs=9999999 -huca=-1 -iff=0 -interface-fs=0 -interface-ipc=0 -isp=0 -jc=4 -jcl=0 -jcup=0 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -ljpc=32 -mbfsd=4 -mbt=1000000 -mcips=10 -md=0 -mid=0 -mjps=0 -mlbdps=8 -mlpt=50000000 -mmpi=0 -mono=./instances/covtypeShuffle30.csv -mono-application=KMEANS -nce=20 -os=0 -p=0.01 -phasediv=1 -pls=1 -pph=0 -q=0 -qcll=8 -qlbdl=2 -ril=0 -rpa=0 -rs=1 -rto=0 -s=1 -satsolver=L -scll=30 -seed=0 -sjd=0 -slbdl=30 -sleep=100 -subproc-dir=build -t=1 -trace-dir=. -v=2 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -wr=0 -y=1 -yield=0 
+c 0.017 0 Set up API at src/interface/api/api_connector.hpp
+c 0.032 42 Machine color 0 with 170 total workers (my rank: 42)
+c 0.032 43 Machine color 0 with 170 total workers (my rank: 43)
+c 0.031 44 Machine color 0 with 170 total workers (my rank: 44)
+c 0.031 45 Machine color 0 with 170 total workers (my rank: 45)
+c 0.032 46 Machine color 0 with 170 total workers (my rank: 46)
+c 0.031 47 Machine color 0 with 170 total workers (my rank: 47)
+c 0.032 48 Machine color 0 with 170 total workers (my rank: 48)
+c 0.032 49 Machine color 0 with 170 total workers (my rank: 49)
+c 0.032 50 Machine color 0 with 170 total workers (my rank: 50)
+c 0.030 51 Machine color 0 with 170 total workers (my rank: 51)
+c 0.032 52 Machine color 0 with 170 total workers (my rank: 52)
+c 0.032 53 Machine color 0 with 170 total workers (my rank: 53)
+c 0.032 54 Machine color 0 with 170 total workers (my rank: 54)
+c 0.031 55 Machine color 0 with 170 total workers (my rank: 55)
+c 0.031 56 Machine color 0 with 170 total workers (my rank: 56)
+c 0.031 57 Machine color 0 with 170 total workers (my rank: 57)
+c 0.032 58 Machine color 0 with 170 total workers (my rank: 58)
+c 0.032 59 Machine color 0 with 170 total workers (my rank: 59)
+c 0.032 60 Machine color 0 with 170 total workers (my rank: 60)
+c 0.032 61 Machine color 0 with 170 total workers (my rank: 61)
+c 0.031 62 Machine color 0 with 170 total workers (my rank: 62)
+c 0.031 63 Machine color 0 with 170 total workers (my rank: 63)
+c 0.032 64 Machine color 0 with 170 total workers (my rank: 64)
+c 0.031 65 Machine color 0 with 170 total workers (my rank: 65)
+c 0.032 66 Machine color 0 with 170 total workers (my rank: 66)
+c 0.032 67 Machine color 0 with 170 total workers (my rank: 67)
+c 0.032 68 Machine color 0 with 170 total workers (my rank: 68)
+c 0.032 69 Machine color 0 with 170 total workers (my rank: 69)
+c 0.032 70 Machine color 0 with 170 total workers (my rank: 70)
+c 0.031 71 Machine color 0 with 170 total workers (my rank: 71)
+c 0.032 72 Machine color 0 with 170 total workers (my rank: 72)
+c 0.032 73 Machine color 0 with 170 total workers (my rank: 73)
+c 0.032 74 Machine color 0 with 170 total workers (my rank: 74)
+c 0.030 75 Machine color 0 with 170 total workers (my rank: 75)
+c 0.032 76 Machine color 0 with 170 total workers (my rank: 76)
+c 0.031 77 Machine color 0 with 170 total workers (my rank: 77)
+c 0.032 78 Machine color 0 with 170 total workers (my rank: 78)
+c 0.031 79 Machine color 0 with 170 total workers (my rank: 79)
+c 0.031 80 Machine color 0 with 170 total workers (my rank: 80)
+c 0.032 81 Machine color 0 with 170 total workers (my rank: 81)
+c 0.032 82 Machine color 0 with 170 total workers (my rank: 82)
+c 0.032 83 Machine color 0 with 170 total workers (my rank: 83)
+c 0.031 84 Machine color 0 with 170 total workers (my rank: 84)
+c 0.032 85 Machine color 0 with 170 total workers (my rank: 85)
+c 0.032 86 Machine color 0 with 170 total workers (my rank: 86)
+c 0.032 87 Machine color 0 with 170 total workers (my rank: 87)
+c 0.031 88 Machine color 0 with 170 total workers (my rank: 88)
+c 0.031 89 Machine color 0 with 170 total workers (my rank: 89)
+c 0.032 90 Machine color 0 with 170 total workers (my rank: 90)
+c 0.031 91 Machine color 0 with 170 total workers (my rank: 91)
+c 0.030 92 Machine color 0 with 170 total workers (my rank: 92)
+c 0.031 93 Machine color 0 with 170 total workers (my rank: 93)
+c 0.031 94 Machine color 0 with 170 total workers (my rank: 94)
+c 0.031 95 Machine color 0 with 170 total workers (my rank: 95)
+c 0.032 96 Machine color 0 with 170 total workers (my rank: 96)
+c 0.032 97 Machine color 0 with 170 total workers (my rank: 97)
+c 0.031 98 Machine color 0 with 170 total workers (my rank: 98)
+c 0.031 99 Machine color 0 with 170 total workers (my rank: 99)
+c 0.031 100 Machine color 0 with 170 total workers (my rank: 100)
+c 0.031 101 Machine color 0 with 170 total workers (my rank: 101)
+c 0.032 102 Machine color 0 with 170 total workers (my rank: 102)
+c 0.031 103 Machine color 0 with 170 total workers (my rank: 103)
+c 0.032 104 Machine color 0 with 170 total workers (my rank: 104)
+c 0.032 105 Machine color 0 with 170 total workers (my rank: 105)
+c 0.031 106 Machine color 0 with 170 total workers (my rank: 106)
+c 0.031 107 Machine color 0 with 170 total workers (my rank: 107)
+c 0.032 108 Machine color 0 with 170 total workers (my rank: 108)
+c 0.032 109 Machine color 0 with 170 total workers (my rank: 109)
+c 0.032 110 Machine color 0 with 170 total workers (my rank: 110)
+c 0.031 111 Machine color 0 with 170 total workers (my rank: 111)
+c 0.031 112 Machine color 0 with 170 total workers (my rank: 112)
+c 0.032 113 Machine color 0 with 170 total workers (my rank: 113)
+c 0.032 114 Machine color 0 with 170 total workers (my rank: 114)
+c 0.032 115 Machine color 0 with 170 total workers (my rank: 115)
+c 0.032 116 Machine color 0 with 170 total workers (my rank: 116)
+c 0.032 117 Machine color 0 with 170 total workers (my rank: 117)
+c 0.030 118 Machine color 0 with 170 total workers (my rank: 118)
+c 0.032 119 Machine color 0 with 170 total workers (my rank: 119)
+c 0.031 120 Machine color 0 with 170 total workers (my rank: 120)
+c 0.031 121 Machine color 0 with 170 total workers (my rank: 121)
+c 0.032 122 Machine color 0 with 170 total workers (my rank: 122)
+c 0.031 123 Machine color 0 with 170 total workers (my rank: 123)
+c 0.031 124 Machine color 0 with 170 total workers (my rank: 124)
+c 0.031 125 Machine color 0 with 170 total workers (my rank: 125)
+c 0.031 126 Machine color 0 with 170 total workers (my rank: 126)
+c 0.031 127 Machine color 0 with 170 total workers (my rank: 127)
+c 0.032 128 Machine color 0 with 170 total workers (my rank: 128)
+c 0.031 129 Machine color 0 with 170 total workers (my rank: 129)
+c 0.032 130 Machine color 0 with 170 total workers (my rank: 130)
+c 0.032 131 Machine color 0 with 170 total workers (my rank: 131)
+c 0.031 132 Machine color 0 with 170 total workers (my rank: 132)
+c 0.032 133 Machine color 0 with 170 total workers (my rank: 133)
+c 0.032 134 Machine color 0 with 170 total workers (my rank: 134)
+c 0.032 135 Machine color 0 with 170 total workers (my rank: 135)
+c 0.032 136 Machine color 0 with 170 total workers (my rank: 136)
+c 0.031 137 Machine color 0 with 170 total workers (my rank: 137)
+c 0.032 138 Machine color 0 with 170 total workers (my rank: 138)
+c 0.030 139 Machine color 0 with 170 total workers (my rank: 139)
+c 0.032 140 Machine color 0 with 170 total workers (my rank: 140)
+c 0.031 141 Machine color 0 with 170 total workers (my rank: 141)
+c 0.030 142 Machine color 0 with 170 total workers (my rank: 142)
+c 0.032 143 Machine color 0 with 170 total workers (my rank: 143)
+c 0.031 144 Machine color 0 with 170 total workers (my rank: 144)
+c 0.031 145 Machine color 0 with 170 total workers (my rank: 145)
+c 0.032 146 Machine color 0 with 170 total workers (my rank: 146)
+c 0.032 147 Machine color 0 with 170 total workers (my rank: 147)
+c 0.031 148 Machine color 0 with 170 total workers (my rank: 148)
+c 0.031 149 Machine color 0 with 170 total workers (my rank: 149)
+c 0.031 150 Machine color 0 with 170 total workers (my rank: 150)
+c 0.030 151 Machine color 0 with 170 total workers (my rank: 151)
+c 0.031 152 Machine color 0 with 170 total workers (my rank: 152)
+c 0.031 153 Machine color 0 with 170 total workers (my rank: 153)
+c 0.032 154 Machine color 0 with 170 total workers (my rank: 154)
+c 0.031 155 Machine color 0 with 170 total workers (my rank: 155)
+c 0.031 156 Machine color 0 with 170 total workers (my rank: 156)
+c 0.031 157 Machine color 0 with 170 total workers (my rank: 157)
+c 0.032 158 Machine color 0 with 170 total workers (my rank: 158)
+c 0.031 159 Machine color 0 with 170 total workers (my rank: 159)
+c 0.031 160 Machine color 0 with 170 total workers (my rank: 160)
+c 0.032 161 Machine color 0 with 170 total workers (my rank: 161)
+c 0.030 162 Machine color 0 with 170 total workers (my rank: 162)
+c 0.031 163 Machine color 0 with 170 total workers (my rank: 163)
+c 0.031 164 Machine color 0 with 170 total workers (my rank: 164)
+c 0.032 165 Machine color 0 with 170 total workers (my rank: 165)
+c 0.031 166 Machine color 0 with 170 total workers (my rank: 166)
+c 0.030 167 Machine color 0 with 170 total workers (my rank: 167)
+c 0.030 168 Machine color 0 with 170 total workers (my rank: 168)
+c 0.032 169 Machine color 0 with 170 total workers (my rank: 169)
+c 0.031 0 Machine color 0 with 170 total workers (my rank: 0)
+c 0.031 1 Machine color 0 with 170 total workers (my rank: 1)
+c 0.031 2 Machine color 0 with 170 total workers (my rank: 2)
+c 0.032 3 Machine color 0 with 170 total workers (my rank: 3)
+c 0.032 4 Machine color 0 with 170 total workers (my rank: 4)
+c 0.031 5 Machine color 0 with 170 total workers (my rank: 5)
+c 0.032 6 Machine color 0 with 170 total workers (my rank: 6)
+c 0.031 7 Machine color 0 with 170 total workers (my rank: 7)
+c 0.032 8 Machine color 0 with 170 total workers (my rank: 8)
+c 0.032 9 Machine color 0 with 170 total workers (my rank: 9)
+c 0.032 10 Machine color 0 with 170 total workers (my rank: 10)
+c 0.032 11 Machine color 0 with 170 total workers (my rank: 11)
+c 0.032 12 Machine color 0 with 170 total workers (my rank: 12)
+c 0.032 13 Machine color 0 with 170 total workers (my rank: 13)
+c 0.032 14 Machine color 0 with 170 total workers (my rank: 14)
+c 0.032 15 Machine color 0 with 170 total workers (my rank: 15)
+c 0.032 16 Machine color 0 with 170 total workers (my rank: 16)
+c 0.032 17 Machine color 0 with 170 total workers (my rank: 17)
+c 0.032 18 Machine color 0 with 170 total workers (my rank: 18)
+c 0.032 19 Machine color 0 with 170 total workers (my rank: 19)
+c 0.031 20 Machine color 0 with 170 total workers (my rank: 20)
+c 0.032 21 Machine color 0 with 170 total workers (my rank: 21)
+c 0.032 22 Machine color 0 with 170 total workers (my rank: 22)
+c 0.032 23 Machine color 0 with 170 total workers (my rank: 23)
+c 0.031 24 Machine color 0 with 170 total workers (my rank: 24)
+c 0.031 25 Machine color 0 with 170 total workers (my rank: 25)
+c 0.031 26 Machine color 0 with 170 total workers (my rank: 26)
+c 0.032 27 Machine color 0 with 170 total workers (my rank: 27)
+c 0.031 28 Machine color 0 with 170 total workers (my rank: 28)
+c 0.032 29 Machine color 0 with 170 total workers (my rank: 29)
+c 0.022 30 Machine color 0 with 170 total workers (my rank: 30)
+c 0.031 31 Machine color 0 with 170 total workers (my rank: 31)
+c 0.031 32 Machine color 0 with 170 total workers (my rank: 32)
+c 0.031 33 Machine color 0 with 170 total workers (my rank: 33)
+c 0.032 34 Machine color 0 with 170 total workers (my rank: 34)
+c 0.031 35 Machine color 0 with 170 total workers (my rank: 35)
+c 0.031 36 Machine color 0 with 170 total workers (my rank: 36)
+c 0.030 37 Machine color 0 with 170 total workers (my rank: 37)
+c 0.031 38 Machine color 0 with 170 total workers (my rank: 38)
+c 0.031 39 Machine color 0 with 170 total workers (my rank: 39)
+c 0.031 40 Machine color 0 with 170 total workers (my rank: 40)
+c 0.031 41 Machine color 0 with 170 total workers (my rank: 41)
+c 1.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs=0 hops=0
+c 1.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 2.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs=0 hops=0
+c 2.202 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 3.202 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.94GB newreqs=0 hops=0
+c 3.202 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 4.202 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.98GB newreqs=0 hops=0
+c 4.203 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 5.202 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=1.00GB newreqs=0 hops=0
+c 5.203 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 5.391 0 Introducing job #1 rev. 0 : r.#1:0 rev. 0 <- [0] born=5.391 hops=0 epoch=-1 => [133]
+c 5.393 133 BLC insert (1,1,0.010)
+c 5.567 88                            loaded
+c 5.573 88 BLC insert (1,170,1.000)
+c 6.204 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 7.156 88 Caught signal 6
+c 7.173 88 [ERROR] pid=1012737 tid=1012737 signal=6
+c 7.204 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+_________________________________________________________________
+c 
+c Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving
+c Designed by P. Sanders and D. Schreiber 2018-2022
+c Developed by D. Schreiber 2019-2022
+c 
+c 0.000 0 Program options: -0o=0 -J=1 -T=0 -ajpc=0 -ans=0 -appmode=fork -ba=4 -bicg=4 -c=1 -cbbs=1500 -cbdf=0.9 -cfci=20 -cg=1 -ch=0 -chaf=5 -checksums=0 -chstms=10 -cmp=0 -colors=0 -dc=0 -ddd=0 -delaymonkey=0 -derandomize=1 -evu=0 -fapii=0 -g=0 -gclls=0 -h=0 -hbbfs=10 -hubfs=9999999 -huca=-1 -iff=0 -interface-fs=0 -interface-ipc=0 -isp=0 -jc=4 -jcl=0 -jcup=0 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -ljpc=32 -mbfsd=4 -mbt=1000000 -mcips=10 -md=0 -mid=0 -mjps=0 -mlbdps=8 -mlpt=50000000 -mmpi=0 -mono=./instances/covtypeShuffle10.csv -mono-application=KMEANS -nce=20 -os=0 -p=0.01 -phasediv=1 -pls=1 -pph=0 -q=0 -qcll=8 -qlbdl=2 -ril=0 -rpa=0 -rs=1 -rto=0 -s=1 -satsolver=L -scll=30 -seed=0 -sjd=0 -slbdl=30 -sleep=100 -subproc-dir=build -t=1 -trace-dir=. -v=2 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -wr=0 -y=1 -yield=0 
+c 0.125 0 Set up API at src/interface/api/api_connector.hpp
+c 0.118 111 Machine color 0 with 200 total workers (my rank: 111)
+c 0.143 112 Machine color 0 with 200 total workers (my rank: 112)
+c 0.142 113 Machine color 0 with 200 total workers (my rank: 113)
+c 0.142 114 Machine color 0 with 200 total workers (my rank: 114)
+c 0.141 115 Machine color 0 with 200 total workers (my rank: 115)
+c 0.142 116 Machine color 0 with 200 total workers (my rank: 116)
+c 0.141 117 Machine color 0 with 200 total workers (my rank: 117)
+c 0.143 118 Machine color 0 with 200 total workers (my rank: 118)
+c 0.141 119 Machine color 0 with 200 total workers (my rank: 119)
+c 0.143 120 Machine color 0 with 200 total workers (my rank: 120)
+c 0.142 121 Machine color 0 with 200 total workers (my rank: 121)
+c 0.142 122 Machine color 0 with 200 total workers (my rank: 122)
+c 0.142 123 Machine color 0 with 200 total workers (my rank: 123)
+c 0.142 124 Machine color 0 with 200 total workers (my rank: 124)
+c 0.142 125 Machine color 0 with 200 total workers (my rank: 125)
+c 0.143 126 Machine color 0 with 200 total workers (my rank: 126)
+c 0.142 127 Machine color 0 with 200 total workers (my rank: 127)
+c 0.142 128 Machine color 0 with 200 total workers (my rank: 128)
+c 0.143 129 Machine color 0 with 200 total workers (my rank: 129)
+c 0.143 130 Machine color 0 with 200 total workers (my rank: 130)
+c 0.142 131 Machine color 0 with 200 total workers (my rank: 131)
+c 0.141 132 Machine color 0 with 200 total workers (my rank: 132)
+c 0.142 133 Machine color 0 with 200 total workers (my rank: 133)
+c 0.142 134 Machine color 0 with 200 total workers (my rank: 134)
+c 0.142 135 Machine color 0 with 200 total workers (my rank: 135)
+c 0.143 136 Machine color 0 with 200 total workers (my rank: 136)
+c 0.143 137 Machine color 0 with 200 total workers (my rank: 137)
+c 0.142 138 Machine color 0 with 200 total workers (my rank: 138)
+c 0.143 139 Machine color 0 with 200 total workers (my rank: 139)
+c 0.143 140 Machine color 0 with 200 total workers (my rank: 140)
+c 0.142 141 Machine color 0 with 200 total workers (my rank: 141)
+c 0.142 142 Machine color 0 with 200 total workers (my rank: 142)
+c 0.143 143 Machine color 0 with 200 total workers (my rank: 143)
+c 0.143 144 Machine color 0 with 200 total workers (my rank: 144)
+c 0.142 145 Machine color 0 with 200 total workers (my rank: 145)
+c 0.142 146 Machine color 0 with 200 total workers (my rank: 146)
+c 0.142 147 Machine color 0 with 200 total workers (my rank: 147)
+c 0.143 148 Machine color 0 with 200 total workers (my rank: 148)
+c 0.142 149 Machine color 0 with 200 total workers (my rank: 149)
+c 0.142 150 Machine color 0 with 200 total workers (my rank: 150)
+c 0.142 151 Machine color 0 with 200 total workers (my rank: 151)
+c 0.143 152 Machine color 0 with 200 total workers (my rank: 152)
+c 0.142 153 Machine color 0 with 200 total workers (my rank: 153)
+c 0.143 154 Machine color 0 with 200 total workers (my rank: 154)
+c 0.143 155 Machine color 0 with 200 total workers (my rank: 155)
+c 0.139 156 Machine color 0 with 200 total workers (my rank: 156)
+c 0.142 157 Machine color 0 with 200 total workers (my rank: 157)
+c 0.142 158 Machine color 0 with 200 total workers (my rank: 158)
+c 0.143 159 Machine color 0 with 200 total workers (my rank: 159)
+c 0.143 160 Machine color 0 with 200 total workers (my rank: 160)
+c 0.142 161 Machine color 0 with 200 total workers (my rank: 161)
+c 0.141 162 Machine color 0 with 200 total workers (my rank: 162)
+c 0.142 163 Machine color 0 with 200 total workers (my rank: 163)
+c 0.143 164 Machine color 0 with 200 total workers (my rank: 164)
+c 0.142 165 Machine color 0 with 200 total workers (my rank: 165)
+c 0.142 166 Machine color 0 with 200 total workers (my rank: 166)
+c 0.141 167 Machine color 0 with 200 total workers (my rank: 167)
+c 0.142 168 Machine color 0 with 200 total workers (my rank: 168)
+c 0.143 169 Machine color 0 with 200 total workers (my rank: 169)
+c 0.123 170 Machine color 0 with 200 total workers (my rank: 170)
+c 0.141 171 Machine color 0 with 200 total workers (my rank: 171)
+c 0.143 172 Machine color 0 with 200 total workers (my rank: 172)
+c 0.142 173 Machine color 0 with 200 total workers (my rank: 173)
+c 0.143 174 Machine color 0 with 200 total workers (my rank: 174)
+c 0.141 175 Machine color 0 with 200 total workers (my rank: 175)
+c 0.143 176 Machine color 0 with 200 total workers (my rank: 176)
+c 0.142 177 Machine color 0 with 200 total workers (my rank: 177)
+c 0.142 178 Machine color 0 with 200 total workers (my rank: 178)
+c 0.142 179 Machine color 0 with 200 total workers (my rank: 179)
+c 0.143 180 Machine color 0 with 200 total workers (my rank: 180)
+c 0.138 181 Machine color 0 with 200 total workers (my rank: 181)
+c 0.143 182 Machine color 0 with 200 total workers (my rank: 182)
+c 0.136 183 Machine color 0 with 200 total workers (my rank: 183)
+c 0.142 184 Machine color 0 with 200 total workers (my rank: 184)
+c 0.141 185 Machine color 0 with 200 total workers (my rank: 185)
+c 0.142 186 Machine color 0 with 200 total workers (my rank: 186)
+c 0.141 187 Machine color 0 with 200 total workers (my rank: 187)
+c 0.142 188 Machine color 0 with 200 total workers (my rank: 188)
+c 0.143 189 Machine color 0 with 200 total workers (my rank: 189)
+c 0.141 190 Machine color 0 with 200 total workers (my rank: 190)
+c 0.142 191 Machine color 0 with 200 total workers (my rank: 191)
+c 0.142 192 Machine color 0 with 200 total workers (my rank: 192)
+c 0.141 193 Machine color 0 with 200 total workers (my rank: 193)
+c 0.142 194 Machine color 0 with 200 total workers (my rank: 194)
+c 0.141 195 Machine color 0 with 200 total workers (my rank: 195)
+c 0.142 196 Machine color 0 with 200 total workers (my rank: 196)
+c 0.142 197 Machine color 0 with 200 total workers (my rank: 197)
+c 0.141 198 Machine color 0 with 200 total workers (my rank: 198)
+c 0.141 199 Machine color 0 with 200 total workers (my rank: 199)
+c 0.143 0 Machine color 0 with 200 total workers (my rank: 0)
+c 0.135 1 Machine color 0 with 200 total workers (my rank: 1)
+c 0.142 2 Machine color 0 with 200 total workers (my rank: 2)
+c 0.142 3 Machine color 0 with 200 total workers (my rank: 3)
+c 0.142 4 Machine color 0 with 200 total workers (my rank: 4)
+c 0.143 5 Machine color 0 with 200 total workers (my rank: 5)
+c 0.142 6 Machine color 0 with 200 total workers (my rank: 6)
+c 0.143 7 Machine color 0 with 200 total workers (my rank: 7)
+c 0.143 8 Machine color 0 with 200 total workers (my rank: 8)
+c 0.143 9 Machine color 0 with 200 total workers (my rank: 9)
+c 0.141 10 Machine color 0 with 200 total workers (my rank: 10)
+c 0.143 11 Machine color 0 with 200 total workers (my rank: 11)
+c 0.143 12 Machine color 0 with 200 total workers (my rank: 12)
+c 0.143 13 Machine color 0 with 200 total workers (my rank: 13)
+c 0.142 14 Machine color 0 with 200 total workers (my rank: 14)
+c 0.143 15 Machine color 0 with 200 total workers (my rank: 15)
+c 0.142 16 Machine color 0 with 200 total workers (my rank: 16)
+c 0.143 17 Machine color 0 with 200 total workers (my rank: 17)
+c 0.143 18 Machine color 0 with 200 total workers (my rank: 18)
+c 0.119 19 Machine color 0 with 200 total workers (my rank: 19)
+c 0.135 20 Machine color 0 with 200 total workers (my rank: 20)
+c 0.143 21 Machine color 0 with 200 total workers (my rank: 21)
+c 0.143 22 Machine color 0 with 200 total workers (my rank: 22)
+c 0.142 23 Machine color 0 with 200 total workers (my rank: 23)
+c 0.143 24 Machine color 0 with 200 total workers (my rank: 24)
+c 0.142 25 Machine color 0 with 200 total workers (my rank: 25)
+c 0.143 26 Machine color 0 with 200 total workers (my rank: 26)
+c 0.143 27 Machine color 0 with 200 total workers (my rank: 27)
+c 0.143 28 Machine color 0 with 200 total workers (my rank: 28)
+c 0.142 29 Machine color 0 with 200 total workers (my rank: 29)
+c 0.142 30 Machine color 0 with 200 total workers (my rank: 30)
+c 0.143 31 Machine color 0 with 200 total workers (my rank: 31)
+c 0.141 32 Machine color 0 with 200 total workers (my rank: 32)
+c 0.135 33 Machine color 0 with 200 total workers (my rank: 33)
+c 0.142 34 Machine color 0 with 200 total workers (my rank: 34)
+c 0.143 35 Machine color 0 with 200 total workers (my rank: 35)
+c 0.142 36 Machine color 0 with 200 total workers (my rank: 36)
+c 0.142 37 Machine color 0 with 200 total workers (my rank: 37)
+c 0.143 38 Machine color 0 with 200 total workers (my rank: 38)
+c 0.143 39 Machine color 0 with 200 total workers (my rank: 39)
+c 0.143 40 Machine color 0 with 200 total workers (my rank: 40)
+c 0.143 41 Machine color 0 with 200 total workers (my rank: 41)
+c 0.142 42 Machine color 0 with 200 total workers (my rank: 42)
+c 0.142 43 Machine color 0 with 200 total workers (my rank: 43)
+c 0.143 44 Machine color 0 with 200 total workers (my rank: 44)
+c 0.142 45 Machine color 0 with 200 total workers (my rank: 45)
+c 0.127 46 Machine color 0 with 200 total workers (my rank: 46)
+c 0.142 47 Machine color 0 with 200 total workers (my rank: 47)
+c 0.142 48 Machine color 0 with 200 total workers (my rank: 48)
+c 0.142 49 Machine color 0 with 200 total workers (my rank: 49)
+c 0.143 50 Machine color 0 with 200 total workers (my rank: 50)
+c 0.141 51 Machine color 0 with 200 total workers (my rank: 51)
+c 0.142 52 Machine color 0 with 200 total workers (my rank: 52)
+c 0.141 53 Machine color 0 with 200 total workers (my rank: 53)
+c 0.140 54 Machine color 0 with 200 total workers (my rank: 54)
+c 0.142 55 Machine color 0 with 200 total workers (my rank: 55)
+c 0.127 56 Machine color 0 with 200 total workers (my rank: 56)
+c 0.143 57 Machine color 0 with 200 total workers (my rank: 57)
+c 0.143 58 Machine color 0 with 200 total workers (my rank: 58)
+c 0.141 59 Machine color 0 with 200 total workers (my rank: 59)
+c 0.143 60 Machine color 0 with 200 total workers (my rank: 60)
+c 0.143 61 Machine color 0 with 200 total workers (my rank: 61)
+c 0.123 62 Machine color 0 with 200 total workers (my rank: 62)
+c 0.141 63 Machine color 0 with 200 total workers (my rank: 63)
+c 0.143 64 Machine color 0 with 200 total workers (my rank: 64)
+c 0.142 65 Machine color 0 with 200 total workers (my rank: 65)
+c 0.143 66 Machine color 0 with 200 total workers (my rank: 66)
+c 0.143 67 Machine color 0 with 200 total workers (my rank: 67)
+c 0.143 68 Machine color 0 with 200 total workers (my rank: 68)
+c 0.142 69 Machine color 0 with 200 total workers (my rank: 69)
+c 0.142 70 Machine color 0 with 200 total workers (my rank: 70)
+c 0.143 71 Machine color 0 with 200 total workers (my rank: 71)
+c 0.142 72 Machine color 0 with 200 total workers (my rank: 72)
+c 0.142 73 Machine color 0 with 200 total workers (my rank: 73)
+c 0.143 74 Machine color 0 with 200 total workers (my rank: 74)
+c 0.131 75 Machine color 0 with 200 total workers (my rank: 75)
+c 0.143 76 Machine color 0 with 200 total workers (my rank: 76)
+c 0.143 77 Machine color 0 with 200 total workers (my rank: 77)
+c 0.143 78 Machine color 0 with 200 total workers (my rank: 78)
+c 0.143 79 Machine color 0 with 200 total workers (my rank: 79)
+c 0.142 80 Machine color 0 with 200 total workers (my rank: 80)
+c 0.142 81 Machine color 0 with 200 total workers (my rank: 81)
+c 0.143 82 Machine color 0 with 200 total workers (my rank: 82)
+c 0.142 83 Machine color 0 with 200 total workers (my rank: 83)
+c 0.143 84 Machine color 0 with 200 total workers (my rank: 84)
+c 0.142 85 Machine color 0 with 200 total workers (my rank: 85)
+c 0.143 86 Machine color 0 with 200 total workers (my rank: 86)
+c 0.142 87 Machine color 0 with 200 total workers (my rank: 87)
+c 0.142 88 Machine color 0 with 200 total workers (my rank: 88)
+c 0.143 89 Machine color 0 with 200 total workers (my rank: 89)
+c 0.142 90 Machine color 0 with 200 total workers (my rank: 90)
+c 0.143 91 Machine color 0 with 200 total workers (my rank: 91)
+c 0.143 92 Machine color 0 with 200 total workers (my rank: 92)
+c 0.143 93 Machine color 0 with 200 total workers (my rank: 93)
+c 0.142 94 Machine color 0 with 200 total workers (my rank: 94)
+c 0.142 95 Machine color 0 with 200 total workers (my rank: 95)
+c 0.143 96 Machine color 0 with 200 total workers (my rank: 96)
+c 0.142 97 Machine color 0 with 200 total workers (my rank: 97)
+c 0.143 98 Machine color 0 with 200 total workers (my rank: 98)
+c 0.143 99 Machine color 0 with 200 total workers (my rank: 99)
+c 0.142 100 Machine color 0 with 200 total workers (my rank: 100)
+c 0.143 101 Machine color 0 with 200 total workers (my rank: 101)
+c 0.143 102 Machine color 0 with 200 total workers (my rank: 102)
+c 0.143 103 Machine color 0 with 200 total workers (my rank: 103)
+c 0.143 104 Machine color 0 with 200 total workers (my rank: 104)
+c 0.143 105 Machine color 0 with 200 total workers (my rank: 105)
+c 0.142 106 Machine color 0 with 200 total workers (my rank: 106)
+c 0.143 107 Machine color 0 with 200 total workers (my rank: 107)
+c 0.142 108 Machine color 0 with 200 total workers (my rank: 108)
+c 0.143 109 Machine color 0 with 200 total workers (my rank: 109)
+c 0.141 110 Machine color 0 with 200 total workers (my rank: 110)
+c 1.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs=0 hops=0
+c 1.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 2.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs=0 hops=0
+c 2.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 3.202 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=1.15GB newreqs=0 hops=0
+c 3.202 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 3.348 0 Introducing job #1 rev. 0 : r.#1:0 rev. 0 <- [0] born=3.348 hops=0 epoch=-1 => [100]
+c 3.348 100 BLC insert (1,1,0.010)
+c 3.456 35                            loaded
+c 3.457 35 BLC insert (1,200,1.000)
+c 4.023 32 [WARN] Watchdog: No reset for 58 ms (activity=0 recvtag=0 sendtag=0)
+c 4.220 0 sysstate busyratio=1.000 cmtdratio=0.640 jobs=1 globmem=1.23GB newreqs=199 hops=153
+c 4.220 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 4.854 35                            first iteration finished
+c 4.854 35                            Another iter 1
+c 5.015 35                            Another iter 2
+c 5.176 35                            Another iter 3
+c 5.220 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=1.27GB newreqs=0 hops=0
+c 5.220 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 5.337 35                            Another iter 4
+c 5.499 35                            Another iter 5
+c 5.661 35                            Another iter 6
+c 5.822 35                            Another iter 7
+c 5.984 35                            Another iter 8
+c 6.145 35                            Another iter 9
+c 6.221 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.47GB newreqs=0 hops=0
+c 6.221 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 6.306 35                            Another iter 10
+c 6.467 35                            Another iter 11
+c 6.628 35                            Another iter 12
+c 6.790 35                            Another iter 13
+c 6.951 35                            Another iter 14
+c 7.113 35                            Another iter 15
+c 7.221 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.72GB newreqs=0 hops=0
+c 7.221 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 7.285 35                            Another iter 16
+c 7.446 35                            Another iter 17
+c 7.607 35                            Another iter 18
+c 7.768 35                            Another iter 19
+c 7.930 35                            Another iter 20
+c 8.091 35                            Another iter 21
+c 8.221 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.73GB newreqs=0 hops=0
+c 8.221 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 8.252 35                            Another iter 22
+c 8.413 35                            Another iter 23
+c 8.574 35                            Another iter 24
+c 8.735 35                            Another iter 25
+c 8.896 35                            Another iter 26
+c 9.058 35                            Another iter 27
+c 9.219 35                            Another iter 28
+c 9.222 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.73GB newreqs=0 hops=0
+c 9.222 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 9.380 35                            Another iter 29
+c 9.541 35                            Another iter 30
+c 9.702 35                            Another iter 31
+c 9.863 35                            Another iter 32
+c 10.025 35                            Another iter 33
+c 10.186 35                            Another iter 34
+c 10.222 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.73GB newreqs=0 hops=0
+c 10.223 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 10.347 35                            Another iter 35
+c 10.509 35                            Another iter 36
+c 10.670 35                            Another iter 37
+c 10.821 35                            Another iter 38
+c 10.972 35                            Another iter 39
+c 11.144 35                            Another iter 40
+c 11.223 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.74GB newreqs=0 hops=0
+c 11.223 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 11.305 35                            Another iter 41
+c 11.466 35                            Another iter 42
+c 11.627 35                            Another iter 43
+c 11.788 35                            Another iter 44
+c 11.949 35                            Another iter 45
+c 12.110 35                            Another iter 46
+c 12.223 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.74GB newreqs=0 hops=0
+c 12.223 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 12.282 35                            Another iter 47
+c 12.454 35                            Another iter 48
+c 12.615 35                            Another iter 49
+c 12.786 35                            Another iter 50
+c 12.947 35                            Another iter 51
+c 13.108 35                            Another iter 52
+c 13.223 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.74GB newreqs=0 hops=0
+c 13.224 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 13.272 35                            Another iter 53
+c 13.433 35                            Another iter 54
+c 13.594 35                            Another iter 55
+c 13.766 35                            Another iter 56
+c 13.937 35                            Another iter 57
+c 14.109 35                            Another iter 58
+c 14.224 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.74GB newreqs=0 hops=0
+c 14.224 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 14.280 35                            Another iter 59
+c 14.452 35                            Another iter 60
+c 14.623 35                            Another iter 61
+c 14.794 35                            Another iter 62
+c 14.956 35                            Another iter 63
+c 15.117 35                            Another iter 64
+c 15.224 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.74GB newreqs=0 hops=0
+c 15.224 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 15.279 35                            Another iter 65
+c 15.440 35                            Another iter 66
+c 15.601 35                            Another iter 67
+c 15.762 35                            Another iter 68
+c 15.923 35                            Another iter 69
+c 16.094 35                            Another iter 70
+c 16.225 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.74GB newreqs=0 hops=0
+c 16.225 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 16.256 35                            Another iter 71
+c 16.418 35                            Another iter 72
+c 16.579 35                            Another iter 73
+c 16.741 35                            Another iter 74
+c 16.912 35                            Another iter 75
+c 17.083 35                            Another iter 76
+c 17.225 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.74GB newreqs=0 hops=0
+c 17.225 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 17.244 35                            Another iter 77
+c 17.405 35                            Another iter 78
+c 17.567 35                            Another iter 79
+c 17.718 35                            Another iter 80
+c 17.869 35                            Another iter 81
+c 18.019 35                            Another iter 82
+c 18.171 35                            Another iter 83
+c 18.225 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.74GB newreqs=0 hops=0
+c 18.225 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 18.322 35                            Another iter 84
+c 18.483 35                            Another iter 85
+c 18.644 35                            Another iter 86
+c 18.805 35                            Another iter 87
+c 18.967 35                            Another iter 88
+c 19.128 35                            Another iter 89
+c 19.226 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.74GB newreqs=0 hops=0
+c 19.226 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 19.289 35                            Another iter 90
+c 19.450 35                            Another iter 91
+c 19.611 35                            Another iter 92
+c 19.782 35                            Another iter 93
+c 19.943 35                            Another iter 94
+c 20.115 35                            Another iter 95
+c 20.227 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.75GB newreqs=0 hops=0
+c 20.227 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 20.276 35                            Another iter 96
+c 20.437 35                            Another iter 97
+c 20.598 35                            Another iter 98
+c 20.759 35                            Another iter 99
+c 20.921 35                            Another iter 100
+c 21.082 35                            Another iter 101
+c 21.227 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.75GB newreqs=0 hops=0
+c 21.227 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 21.243 35                            Another iter 102
+c 21.405 35                            Another iter 103
+c 21.566 35                            Another iter 104
+c 21.726 35                            Another iter 105
+c 21.888 35                            Another iter 106
+c 22.049 35                            Another iter 107
+c 22.210 35                            Another iter 108
+c 22.228 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.75GB newreqs=0 hops=0
+c 22.228 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 22.381 35                            Another iter 109
+c 22.552 35                            Another iter 110
+c 22.724 35                            Another iter 111
+c 22.895 35                            Another iter 112
+c 23.066 35                            Another iter 113
+c 23.227 35                            Another iter 114
+c 23.228 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.75GB newreqs=0 hops=0
+c 23.228 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 23.389 35                            Another iter 115
+c 23.549 35                            Another iter 116
+c 23.711 35                            Another iter 117
+c 23.872 35                            Another iter 118
+c 24.044 35                            Another iter 119
+c 24.205 35                            Another iter 120
+c 24.228 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.75GB newreqs=0 hops=0
+c 24.228 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 24.377 35                            Another iter 121
+c 24.538 35                            Another iter 122
+c 24.699 35                            Another iter 123
+c 24.860 35                            Another iter 124
+c 25.021 35                            Another iter 125
+c 25.182 35                            Another iter 126
+c 25.229 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.75GB newreqs=0 hops=0
+c 25.229 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 25.344 35                            Another iter 127
+c 25.505 35                            Another iter 128
+c 25.666 35                            Another iter 129
+c 25.827 35                            Another iter 130
+c 25.988 35                            Another iter 131
+c 26.150 35                            Another iter 132
+c 26.229 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.75GB newreqs=0 hops=0
+c 26.229 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 26.301 35                            Another iter 133
+c 26.472 35                            Another iter 134
+c 26.633 35                            Another iter 135
+c 26.785 35                            Another iter 136
+c 26.936 35                            Another iter 137
+c 27.087 35                            Another iter 138
+c 27.229 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.75GB newreqs=0 hops=0
+c 27.229 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 27.248 35                            Another iter 139
+c 27.420 35                            Another iter 140
+c 27.581 35                            Another iter 141
+c 27.744 35                            Another iter 142
+c 27.907 35                            Another iter 143
+c 28.069 35                            Another iter 144
+c 28.230 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=13.75GB newreqs=0 hops=0
+c 28.230 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 28.231 35                            Another iter 145
+c 28.392 35                            Another iter 146
+c 28.554 35                            Another iter 147
+c 28.716 35                            Another iter 148
+c 28.880 35                            Another iter 149
+c 29.041 35                            Got Result after iter 150
+c 29.042 35 Solution clusterCenters: 
+3118.56 170.403 11.4744 260.284 38.555 5109.63 211.518 228.44 150.567 1263.51 0.940602 0 0.059398 0 0 0 0 0 0 0 0 0 0 0 0 0.00568894 0.00156782 0 0 0.00210536 0 0 0.0331034 0.010482 0 0.151451 0.102446 0.00407633 0 0.000447948 0 0 0.460625 0.109568 0.00129905 0.0196649 0.00873499 0 0 0 0 0.0674162 0.0194858 0.00183659 
+2972.98 150.304 14.286 286.714 49.3409 927.118 213.073 221.59 139.671 2012.87 0.385097 0.102859 0.492869 0.0191752 0 0.00566385 0.00232013 0.023406 0.000432182 0.00793849 0 0 4.54928e-05 0.0290699 0.0421036 0.0363942 0.0288197 0 0 0.0012738 0.00752906 0.00257034 0.00461752 0.0153766 0.00134204 0.0725155 0.130655 0.0579123 0.00288879 0.000159225 0.00222915 0.00536815 0.16432 0.0625981 0.0341878 0.116007 0.0988104 0.00184246 0.000454928 0 0 0.0176285 0.0118964 0.0116234 
+3069.69 156.184 11.4234 309.974 44.7999 5477.95 215.088 229.409 147.431 3368.61 0.928991 0 0.0710094 0 0 0 0 0 0 0 0 0.00311572 0 0 0 0.00362293 0 0 0 0.013115 0 0 0.0108688 0.0353598 0 0.0852837 0.0992682 0.0373886 0 0 0 0 0.524817 0.124049 0 0.00449243 0.00239113 0 0.00260851 0 0 0.0276067 0.00434751 0.0216651 
+2672.47 163.205 17.4924 238.554 53.7476 716.632 206.898 215.734 138.039 827.764 0.185236 0.0924004 0.392187 0.330177 0.029011 0.0451702 0.0357393 0.0445087 0.0152331 0.0549791 0 0 0.0112264 0.19958 0.04294 0.0195045 0.0249287 0.0056321 0 0.00697398 0.0122092 0.000170097 0.00249476 0.0057077 0.00054809 0.051048 0.0717809 0.031071 0 0 0.000170097 0.00296725 0.0634273 0.0412769 0.0272344 0.0698721 0.0657897 0.00173877 0 0 0 0.00599119 0.00396893 0.00710627 
+3095.87 175.08 13.9313 305.805 53.8425 3122.93 208.563 228.489 152.061 1239.42 0.318465 0 0.681535 0 0 0.00368684 0 0.0149708 0 0 0 0 0 0.0320644 0.00321202 0.0179873 0.0434321 0 0 0.000586543 0 0 0.00566992 0.00944055 0.000949641 0.0637935 0.1046 0.042287 0 0.00650784 0.00340754 0 0.151579 0.0161718 0.053152 0.171382 0.112309 0.0152501 0.0051113 0.00167584 0.000782057 0.045108 0.0475938 0.0272882 
+2884.11 120.336 11.7601 221.739 24.6594 1578.14 221.2 225.424 135.725 4892.63 0.675021 0.324979 0 0 0 0 0 0 0 0 0 0 0 0 0 0.217997 0 0 0 0.0272649 0 0.100868 0.00611322 0.0190732 0 0.119452 0.0879081 0.0132045 0.014794 0 0 0 0.226678 0.0185842 0 0.0504952 0.0245751 0 0.0113706 0 0 0.0315442 0.0195623 0.0105147 
+3016.34 137.278 13.5371 274.411 45.4079 2026.28 216.13 221.959 137.158 2539.15 0.390714 0.0439997 0.565287 0 0 0.00635915 0 0.0172539 0 0 0 0 0 0.0300423 0.0193814 0.0666074 0.0188904 0 0 0.00287565 0.010848 0 0.00222103 0.0143782 0.000374068 0.0337596 0.082856 0.051598 0 0.0230519 0.000163655 0 0.162486 0.0394875 0.0611601 0.130947 0.138639 0.000210413 0.00469923 0 0 0.0271667 0.0371028 0.0174409 
+3103.78 142.305 13.1134 295.536 45.359 3644.28 216.116 223.114 138.746 2859.11 0.699762 0 0.300237 0 0 0 0 0.00131423 0 0 0 0 0 0.0105562 0.0136934 0.0841106 0 0 0 0.000169578 0 0 0.00691029 0.0147533 0 0.0434543 0.131084 0.0481177 0 0.00398508 0.00780058 0 0.288621 0.0731304 0.0404443 0.0358233 0.0570205 0 0.00262845 0 0.0052993 0.0521028 0.0450229 0.0339579 
+2956.67 137.769 10.4575 288.516 34.7403 4169.06 218.041 226.662 141.839 5472.36 0.993348 0 0.00665174 0 0 0 0 0 0 0 0.00381981 0.00355637 0 0 0 0.269626 0 0 0 0.0268704 0 0 0.0108667 0.0822576 0 0 0.0395811 0.0146207 0 0 0 0 0.441254 0.095627 0 0 0.000856164 0 0.000263435 0 0 0 0.00652002 0.00428082 
+2950.07 167.244 14.9406 237.156 43.7688 1854.15 209.868 225.458 146.514 1043.54 0.209167 0.0336838 0.74003 0.0171192 0.000795679 0.0208082 0.0117905 0.0412065 0 0.00178425 0 0 7.23345e-05 0.0571683 0.0238222 0.0314414 0.0947582 0.000192892 0 0.00192892 0.00677533 0 0.00446063 0.00962048 0.00675122 0.0244249 0.115253 0.0271495 0 0 0.00412307 0.0016878 0.0878864 0.0209047 0.114192 0.119569 0.0943724 0.00301394 0.00935526 0 0 0.0173603 0.0286927 0.0186382 
+
+c 29.051 35 BLC insert (1,0,0.000)
+c 29.051 0 RESPONSE_TIME #1 25.702814 rev. 0
+c 29.051 0 SOLUTION #1 SAT rev. 0
+c 29.051 90 [WARN] Job message from unknown job #1
+c 29.052 92 [WARN] Job message from unknown job #1
+s SATISFIABLE
+v 1113063424 1162012938 1126852376 1094162190 1132602459 1109014611 1168092429 1129546878 1130655934 1125552395 1151201366 1064356684 0 1030966086 0 0 0 0 0 0 
+v 0 0 0 0 0 0 1002072660 986545994 0 0 990509577 0 0 1023907690 1009499306 0 1041962512 1037160219 998609598 0 
+v 971692702 0 0 1055643412 1038116168 984237286 1017190492 1007623480 0 0 0 0 1032458631 1017094294 988854703 1161416620 1125535192 1097110354 1133468500 1111842080 
+v 1147651982 1129648844 1130206965 1124838368 1157340131 1053109092 1037215707 1056725334 1016927576 0 1002018776 991432031 1019198986 971150958 1006768245 0 0 943640453 1022239742 1026323663 
+v 1024791073 1022105413 0 0 984020372 1006024273 992506676 999771791 1014754816 984606542 1033143044 1040566914 1030567290 993874406 958854550 991041251 1001383760 1042826112 1031811950 1024198796 
+v 1038980324 1036672279 988905126 971932520 0 0 1016097168 1011017978 1010724894 1161812738 1125920528 1094108708 1134230686 1110651665 1168846755 1129780884 1130719442 1125346920 1163037121 1064161877 
+v 0 1032940890 0 0 0 0 0 0 0 0 994849036 0 0 0 997027482 0 0 0 1012326468 0 
+v 0 1009914614 1024513380 0 1034856757 1036733724 1025057994 0 0 0 0 1057380968 1040059748 0 999503160 991736966 0 992670588 0 0 
+v 1021454192 999191954 1018264320 1160185715 1126380678 1099690111 1131318735 1112997263 1144203378 1129244154 1129823178 1124731395 1146024162 1044229734 1035811953 1053346998 1051266295 1022208113 1027146850 1024615253 
+v 1026969282 1014600798 1029779912 0 0 1010298607 1045192400 1026548195 1017104332 1020016429 1001950586 0 1004832243 1011353862 959601679 992182028 1002112933 974106038 1028724658 1033044448 
+v 1023314100 0 0 959601678 994211365 1031923239 1026101742 1021254324 1032788244 1032240324 988014440 0 0 0 1002721733 998378954 1005116348 1161919974 1127158886 1096738422 
+v 1134094079 1113022137 1162030816 1129353228 1130659123 1125650319 1151004029 1050873303 0 1060010264 0 0 997302002 0 1014319140 0 0 0 0 0 
+v 1023628778 995262663 1016289829 1026680287 0 0 974766652 0 0 1002031796 1008381066 981004631 1031972400 1037449373 1026372887 0 1003831214 996102391 0 1041971111 
+v 1015315145 1029289442 1043300054 1038484038 1014619044 1000832186 987473860 978125564 1027130142 1027797425 1021283209 1161052613 1123068966 1094461809 1130216733 1103447652 1153778850 1130181429 1130458284 1124579715 
+v 1167648002 1059900980 1051091865 0 0 0 0 0 0 0 0 0 0 0 0 0 1046428336 0 0 0 
+v 1021270717 0 1036948461 1002983776 1016872826 0 1039442786 1035208996 1012422627 1014129272 0 0 0 1047010892 1016610265 0 1028576262 1019826634 0 1010453423 
+v 0 0 1023489149 1017135386 1009534461 1161594238 1124681512 1096325148 1133065369 1110811056 1157449956 1129849166 1130231179 1124673673 1159639662 1053297573 1026832653 1058059936 0 0 
+v 1003511920 0 1015896064 0 0 0 0 0 1022761805 1017038262 1032350076 1016774677 0 0 993817941 1009892265 0 991006376 1013682858 969154182 
+v 1024083846 1034530920 1028872293 0 1019008868 959158965 0 1042703013 1025621420 1031439102 1040586495 1041102680 962372182 999947256 0 0 1021217955 1024981287 1015996476 1161952386 
+v 1125010936 1095880789 1133757594 1110798237 1164166285 1129848247 1130306855 1124777728 1160950222 1060316066 0 1050261688 0 0 0 0 984367656 0 0 0 
+v 0 0 1009579002 1012947532 1034699305 0 0 0 959565998 0 0 1004695486 1014085548 0 1026686242 1040595655 1027938061 0 998413632 1006607354 
+v 0 1049871917 1033225574 1025878250 1024637812 1030327896 0 992756264 0 1001235914 1029007797 1027107308 1024137085 1161349808 1124713664 1093095937 1133527566 1108014614 1166166149 1129974422 
+v 1130539356 1124980414 1168835304 1065241618 0 1004140243 0 0 0 0 0 0 0 997873096 996741649 0 0 0 1049234537 0 
+v 0 0 1021058891 0 0 1009912384 1034450610 0 0 1025646549 1013943158 0 0 0 0 1054993418 1036245012 0 0 979398712 
+v 0 965352877 0 0 0 1003857382 999048738 1161322774 1126645396 1097796776 1131227148 1110381369 1156039889 1129438792 1130460452 1125286796 1149399373 1045835755 1024063482 1060991642 
+v 1015823738 978359584 1017804287 1010904325 1026082864 0 988405122 0 0 94946567c 29.050 51 [WARN] Job message from unknown job #1
+c 29.051 60 [WARN] Job message from unknown job #1
+c 29.052 78 [WARN] Job message from unknown job #1
+c 29.051 141 [WARN] Job message from unknown job #1
+c 29.051 141 [WARN] Job message from unknown job #1
+c 29.051 146 [WARN] Job message from unknown job #1
+c 29.051 146 [WARN] Job message from unknown job #1
+c 29.051 168 [WARN] Job message from unknown job #1
+c 29.052 169 [WARN] Job message from unknown job #1
+c 29.032 170 [WARN] Job message from unknown job #1
+c 29.051 177 [WARN] Job message from unknown job #1
+c 29.051 178 [WARN] Job message from unknown job #1
+c 29.051 192 [WARN] Job message from unknown job #1
+c 29.051 194 [WARN] Job message from unknown job #1
+c 29.050 195 [WARN] Job message from unknown job #1
+c 29.050 110 [WARN] Job message from unknown job #1
+c 29.051 110 [WARN] Job message from unknown job #1
+c 29.028 19 [WARN] Job message from unknown job #1
+c 29.052 31 [WARN] Job message from unknown job #1
+c 29.051 34 [WARN] Job message from unknown job #1
+c 29.051 47 [WARN] Job message from unknown job #1
+1 1030367579 1019422382 1023461551 1036128400 961168136 0 989647818 1004405653 0 999434866 
+v 1008574269 1004353872 1019746000 1038879162 1021208759 0 0 998709959 987576657 1035206088 1017856065 1038736770 1039458440 1036076622 994411894 1008289484 0 0 1015953186 1022037223 
+v 1016639258 0
+c 29.052 0 Terminating.
+c 29.051 65 [WARN] Job message from unknown job #1
+c 29.052 71 [WARN] Job message from unknown job #1
+c 29.052 74 [WARN] Job message from unknown job #1
+c 29.052 84 [WARN] Job message from unknown job #1
+c 29.051 87 [WARN] Job message from unknown job #1
+c 29.052 91 [WARN] Job message from unknown job #1
+c 29.052 98 [WARN] Job message from unknown job #1
+c 29.050 32 [WARN] Job message from unknown job #1
+c 29.051 32 [WARN] Job message from unknown job #1
+c 29.052 104 [WARN] Job message from unknown job #1
+c 29.052 106 [WARN] Job message from unknown job #1
+c 29.052 106 [WARN] Job message from unknown job #1
+c 29.051 131 [WARN] Job message from unknown job #1
+c 29.051 131 [WARN] Job message from unknown job #1
+c 29.052 186 [WARN] Job message from unknown job #1
+c 29.051 190 [WARN] Job message from unknown job #1
+c 29.051 190 [WARN] Job message from unknown job #1
+c 29.325 15 Exiting happily
+c 29.325 60 Exiting happily
+c 29.326 37 Exiting happily
+c 29.326 87 Exiting happily
+c 29.326 178 Exiting happily
+c 29.327 59 Exiting happily
+c 29.327 72 Exiting happily
+c 29.316 75 Exiting happily
+c 29.327 76 Exiting happily
+c 29.327 142 Exiting happily
+c 29.328 101 Exiting happily
+c 29.327 119 Exiting happily
+c 29.328 151 Exiting happily
+c 29.328 2 Exiting happily
+c 29.328 16 Exiting happily
+c 29.328 49 Exiting happily
+c 29.329 168 Exiting happily
+c 29.329 173 Exiting happily
+c 29.330 18 Exiting happily
+c 29.332 130 Exiting happily
+c 29.339 106 Exiting happily
+c 29.330 132 Exiting happily
+c 29.333 133 Exiting happily
+c 29.330 134 Exiting happily
+c 29.331 137 Exiting happily
+c 29.331 138 Exiting happily
+c 29.339 140 Exiting happily
+c 29.341 78 Exiting happily
+c 29.338 143 Exiting happily
+c 29.336 141 Exiting happily
+c 29.333 147 Exiting happily
+c 29.331 148 Exiting happily
+c 29.333 149 Exiting happily
+c 29.334 152 Exiting happily
+c 29.334 153 Exiting happily
+c 29.332 154 Exiting happily
+c 29.335 155 Exiting happily
+c 29.341 157 Exiting happily
+c 29.331 159 Exiting happily
+c 29.332 161 Exiting happily
+c 29.336 162 Exiting happily
+c 29.332 163 Exiting happily
+c 29.338 164 Exiting happily
+c 29.331 165 Exiting happily
+c 29.338 166 Exiting happily
+c 29.330 167 Exiting happily
+c 29.331 146 Exiting happily
+c 29.341 169 Exiting happily
+c 29.333 171 Exiting happily
+c 29.333 175 Exiting happily
+c 29.311 170 Exiting happily
+c 29.332 177 Exiting happily
+c 29.331 179 Exiting happily
+c 29.333 180 Exiting happily
+c 29.335 182 Exiting happily
+c 29.327 183 Exiting happily
+c 29.331 184 Exiting happily
+c 29.336 185 Exiting happily
+c 29.335 187 Exiting happily
+c 29.332 188 Exiting happily
+c 29.337 186 Exiting happily
+c 29.307 19 Exiting happily
+c 29.331 31 Exiting happily
+c 29.330 36 Exiting happily
+c 29.335 39 Exiting happily
+c 29.337 40 Exiting happily
+c 29.341 41 Exiting happily
+c 29.333 42 Exiting happily
+c 29.336 43 Exiting happily
+c 29.333 44 Exiting happily
+c 29.333 45 Exiting happily
+c 29.316 46 Exiting happily
+c 29.332 34 Exiting happily
+c 29.336 48 Exiting happily
+c 29.331 50 Exiting happily
+c 29.331 47 Exiting happily
+c 29.331 52 Exiting happily
+c 29.329 53 Exiting happily
+c 29.336 54 Exiting happily
+c 29.330 55 Exiting happily
+c 29.333 57 Exiting happily
+c 29.332 58 Exiting happily
+c 29.329 197 Exiting happily
+c 29.329 51 Exiting happily
+c 29.330 61 Exiting happily
+c 29.316 62 Exiting happily
+c 29.332 63 Exiting happily
+c 29.331 0 Exiting happily
+c 29.339 68 Exiting happily
+c 29.330 69 Exiting happily
+c 29.338 73 Exiting happily
+c 29.331 71 Exiting happily
+c 29.332 77 Exiting happily
+c 29.332 198 Exiting happily
+c 29.332 79 Exiting happily
+c 29.339 80 Exiting happily
+c 29.333 81 Exiting happily
+c 29.333 82 Exiting happily
+c 29.338 83 Exiting happily
+c 29.332 74 Exiting happily
+c 29.333 85 Exiting happily
+c 29.332 86 Exiting happily
+c 29.340 84 Exiting happily
+c 29.338 88 Exiting happily
+c 29.334 89 Exiting happily
+c 29.338 92 Exiting happily
+c 29.331 90 Exiting happily
+c 29.340 94 Exiting happily
+c 29.331 95 Exiting happily
+c 29.332 91 Exiting happily
+c 29.337 99 Exiting happily
+c 29.334 98 Exiting happily
+c 29.339 102 Exiting happily
+c 29.330 103 Exiting happily
+c 29.331 32 Exiting happily
+c 29.335 105 Exiting happily
+c 29.333 104 Exiting happily
+c 29.334 107 Exiting happily
+c 29.339 108 Exiting happily
+c 29.305 111 Exiting happily
+c 29.333 112 Exiting happily
+c 29.331 113 Exiting happily
+c 29.334 114 Exiting happily
+c 29.329 115 Exiting happily
+c 29.338 116 Exiting happily
+c 29.332 121 Exiting happily
+c 29.341 122 Exiting happily
+c 29.337 123 Exiting happily
+c 29.339 124 Exiting happily
+c 29.329 125 Exiting happily
+c 29.333 126 Exiting happily
+c 29.330 128 Exiting happily
+c 29.336 129 Exiting happily
+c 29.338 110 Exiting happily
+c 29.328 20 Exiting happily
+c 29.343 21 Exiting happily
+c 29.334 22 Exiting happily
+c 29.339 23 Exiting happily
+c 29.344 24 Exiting happily
+c 29.332 25 Exiting happily
+c 29.346 26 Exiting happily
+c 29.334 27 Exiting happily
+c 29.343 29 Exiting happily
+c 29.339 30 Exiting happily
+c 29.339 35 Exiting happily
+c 29.329 33 Exiting happily
+c 29.332 100 Exiting happily
+c 29.338 181 Exiting happily
+c 29.343 38 Exiting happily
+c 29.328 56 Exiting happily
+c 29.344 176 Exiting happily
+c 29.345 66 Exiting happily
+c 29.343 67 Exiting happily
+c 29.344 70 Exiting happily
+c 29.344 131 Exiting happily
+c 29.345 192 Exiting happily
+c 29.344 93 Exiting happily
+c 29.343 97 Exiting happily
+c 29.345 109 Exiting happily
+c 29.344 117 Exiting happily
+c 29.345 118 Exiting happily
+c 29.343 120 Exiting happily
+c 29.346 136 Exiting happily
+c 29.347 139 Exiting happily
+c 29.342 144 Exiting happily
+c 29.343 145 Exiting happily
+c 29.343 191 Exiting happily
+c 29.345 150 Exiting happily
+c 29.340 156 Exiting happily
+c 29.345 158 Exiting happily
+c 29.343 3 Exiting happily
+c 29.344 4 Exiting happily
+c 29.345 6 Exiting happily
+c 29.339 7 Exiting happily
+c 29.342 8 Exiting happily
+c 29.338 9 Exiting happily
+c 29.331 10 Exiting happily
+c 29.339 11 Exiting happily
+c 29.341 13 Exiting happily
+c 29.336 14 Exiting happily
+c 29.344 17 Exiting happily
+c 29.346 127 Exiting happily
+c 29.340 1 Exiting happily
+c 29.348 135 Exiting happily
+c 29.348 5 Exiting happily
+c 29.347 65 Exiting happily
+c 29.347 12 Exiting happily
+c 29.347 160 Exiting happily
+c 29.348 28 Exiting happily
+c 29.401 174 Exiting happily
+c 29.397 199 Exiting happily
+c 29.399 195 Exiting happily
+c 29.400 193 Exiting happily
+c 29.400 172 Exiting happily
+c 29.399 194 Exiting happily
+c 29.399 190 Exiting happily
+c 29.400 189 Exiting happily
+c 29.398 196 Exiting happily
+c 30.373 96 [ERROR] pid=1159658 tid=1159658 signal=11
+c 30.417 64 [ERROR] pid=1159580 tid=1159580 signal=11
+_________________________________________________________________
+c 
+c Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving
+c Designed by P. Sanders and D. Schreiber 2018-2022
+c Developed by D. Schreiber 2019-2022
+c 
+c 0.001 0 Program options: -0o=0 -J=1 -T=0 -ajpc=0 -ans=0 -appmode=fork -ba=4 -bicg=4 -c=1 -cbbs=1500 -cbdf=0.9 -cfci=20 -cg=1 -ch=0 -chaf=5 -checksums=0 -chstms=10 -cmp=0 -colors=0 -dc=0 -ddd=0 -delaymonkey=0 -derandomize=1 -evu=0 -fapii=0 -g=0 -gclls=0 -h=0 -hbbfs=10 -hubfs=9999999 -huca=-1 -iff=0 -interface-fs=0 -interface-ipc=0 -isp=0 -jc=4 -jcl=0 -jcup=0 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -ljpc=32 -mbfsd=4 -mbt=1000000 -mcips=10 -md=0 -mid=0 -mjps=0 -mlbdps=8 -mlpt=50000000 -mmpi=0 -mono=./instances/covtypeShuffle10.csv -mono-application=KMEANS -nce=20 -os=0 -p=0.01 -phasediv=1 -pls=1 -pph=0 -q=0 -qcll=8 -qlbdl=2 -ril=0 -rpa=0 -rs=1 -rto=0 -s=1 -satsolver=L -scll=30 -seed=0 -sjd=0 -slbdl=30 -sleep=100 -subproc-dir=build -t=1 -trace-dir=. -v=2 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -wr=0 -y=1 -yield=0 
+c 0.011 0 Set up API at src/interface/api/api_connector.hpp
+c 0.025 64 Machine color 0 with 160 total workers (my rank: 64)
+c 0.025 65 Machine color 0 with 160 total workers (my rank: 65)
+c 0.025 66 Machine color 0 with 160 total workers (my rank: 66)
+c 0.025 67 Machine color 0 with 160 total workers (my rank: 67)
+c 0.025 68 Machine color 0 with 160 total workers (my rank: 68)
+c 0.026 69 Machine color 0 with 160 total workers (my rank: 69)
+c 0.025 70 Machine color 0 with 160 total workers (my rank: 70)
+c 0.026 71 Machine color 0 with 160 total workers (my rank: 71)
+c 0.025 72 Machine color 0 with 160 total workers (my rank: 72)
+c 0.025 73 Machine color 0 with 160 total workers (my rank: 73)
+c 0.025 74 Machine color 0 with 160 total workers (my rank: 74)
+c 0.025 75 Machine color 0 with 160 total workers (my rank: 75)
+c 0.025 76 Machine color 0 with 160 total workers (my rank: 76)
+c 0.025 77 Machine color 0 with 160 total workers (my rank: 77)
+c 0.025 78 Machine color 0 with 160 total workers (my rank: 78)
+c 0.025 79 Machine color 0 with 160 total workers (my rank: 79)
+c 0.025 80 Machine color 0 with 160 total workers (my rank: 80)
+c 0.025 81 Machine color 0 with 160 total workers (my rank: 81)
+c 0.025 82 Machine color 0 with 160 total workers (my rank: 82)
+c 0.025 83 Machine color 0 with 160 total workers (my rank: 83)
+c 0.025 84 Machine color 0 with 160 total workers (my rank: 84)
+c 0.025 85 Machine color 0 with 160 total workers (my rank: 85)
+c 0.025 86 Machine color 0 with 160 total workers (my rank: 86)
+c 0.025 87 Machine color 0 with 160 total workers (my rank: 87)
+c 0.024 88 Machine color 0 with 160 total workers (my rank: 88)
+c 0.025 89 Machine color 0 with 160 total workers (my rank: 89)
+c 0.025 90 Machine color 0 with 160 total workers (my rank: 90)
+c 0.025 91 Machine color 0 with 160 total workers (my rank: 91)
+c 0.025 92 Machine color 0 with 160 total workers (my rank: 92)
+c 0.025 93 Machine color 0 with 160 total workers (my rank: 93)
+c 0.026 94 Machine color 0 with 160 total workers (my rank: 94)
+c 0.024 95 Machine color 0 with 160 total workers (my rank: 95)
+c 0.022 96 Machine color 0 with 160 total workers (my rank: 96)
+c 0.025 97 Machine color 0 with 160 total workers (my rank: 97)
+c 0.025 98 Machine color 0 with 160 total workers (my rank: 98)
+c 0.024 99 Machine color 0 with 160 total workers (my rank: 99)
+c 0.026 100 Machine color 0 with 160 total workers (my rank: 100)
+c 0.024 101 Machine color 0 with 160 total workers (my rank: 101)
+c 0.025 102 Machine color 0 with 160 total workers (my rank: 102)
+c 0.025 103 Machine color 0 with 160 total workers (my rank: 103)
+c 0.025 104 Machine color 0 with 160 total workers (my rank: 104)
+c 0.025 105 Machine color 0 with 160 total workers (my rank: 105)
+c 0.025 106 Machine color 0 with 160 total workers (my rank: 106)
+c 0.025 107 Machine color 0 with 160 total workers (my rank: 107)
+c 0.025 108 Machine color 0 with 160 total workers (my rank: 108)
+c 0.025 109 Machine color 0 with 160 total workers (my rank: 109)
+c 0.025 110 Machine color 0 with 160 total workers (my rank: 110)
+c 0.026 111 Machine color 0 with 160 total workers (my rank: 111)
+c 0.025 112 Machine color 0 with 160 total workers (my rank: 112)
+c 0.024 113 Machine color 0 with 160 total workers (my rank: 113)
+c 0.025 114 Machine color 0 with 160 total workers (my rank: 114)
+c 0.025 115 Machine color 0 with 160 total workers (my rank: 115)
+c 0.025 116 Machine color 0 with 160 total workers (my rank: 116)
+c 0.024 117 Machine color 0 with 160 total workers (my rank: 117)
+c 0.025 118 Machine color 0 with 160 total workers (my rank: 118)
+c 0.025 119 Machine color 0 with 160 total workers (my rank: 119)
+c 0.025 120 Machine color 0 with 160 total workers (my rank: 120)
+c 0.025 121 Machine color 0 with 160 total workers (my rank: 121)
+c 0.025 122 Machine color 0 with 160 total workers (my rank: 122)
+c 0.025 123 Machine color 0 with 160 total workers (my rank: 123)
+c 0.025 124 Machine color 0 with 160 total workers (my rank: 124)
+c 0.025 125 Machine color 0 with 160 total workers (my rank: 125)
+c 0.024 126 Machine color 0 with 160 total workers (my rank: 126)
+c 0.024 127 Machine color 0 with 160 total workers (my rank: 127)
+c 0.025 128 Machine color 0 with 160 total workers (my rank: 128)
+c 0.025 129 Machine color 0 with 160 total workers (my rank: 129)
+c 0.025 130 Machine color 0 with 160 total workers (my rank: 130)
+c 0.025 131 Machine color 0 with 160 total workers (my rank: 131)
+c 0.025 132 Machine color 0 with 160 total workers (my rank: 132)
+c 0.025 133 Machine color 0 with 160 total workers (my rank: 133)
+c 0.026 134 Machine color 0 with 160 total workers (my rank: 134)
+c 0.025 135 Machine color 0 with 160 total workers (my rank: 135)
+c 0.025 136 Machine color 0 with 160 total workers (my rank: 136)
+c 0.025 137 Machine color 0 with 160 total workers (my rank: 137)
+c 0.025 138 Machine color 0 with 160 total workers (my rank: 138)
+c 0.025 139 Machine color 0 with 160 total workers (my rank: 139)
+c 0.025 140 Machine color 0 with 160 total workers (my rank: 140)
+c 0.025 141 Machine color 0 with 160 total workers (my rank: 141)
+c 0.025 142 Machine color 0 with 160 total workers (my rank: 142)
+c 0.025 143 Machine color 0 with 160 total workers (my rank: 143)
+c 0.025 144 Machine color 0 with 160 total workers (my rank: 144)
+c 0.026 145 Machine color 0 with 160 total workers (my rank: 145)
+c 0.024 146 Machine color 0 with 160 total workers (my rank: 146)
+c 0.025 147 Machine color 0 with 160 total workers (my rank: 147)
+c 0.024 148 Machine color 0 with 160 total workers (my rank: 148)
+c 0.025 149 Machine color 0 with 160 total workers (my rank: 149)
+c 0.025 150 Machine color 0 with 160 total workers (my rank: 150)
+c 0.026 151 Machine color 0 with 160 total workers (my rank: 151)
+c 0.025 152 Machine color 0 with 160 total workers (my rank: 152)
+c 0.026 153 Machine color 0 with 160 total workers (my rank: 153)
+c 0.025 154 Machine color 0 with 160 total workers (my rank: 154)
+c 0.026 155 Machine color 0 with 160 total workers (my rank: 155)
+c 0.025 156 Machine color 0 with 160 total workers (my rank: 156)
+c 0.024 157 Machine color 0 with 160 total workers (my rank: 157)
+c 0.025 158 Machine color 0 with 160 total workers (my rank: 158)
+c 0.024 159 Machine color 0 with 160 total workers (my rank: 159)
+c 0.025 0 Machine color 0 with 160 total workers (my rank: 0)
+c 0.025 1 Machine color 0 with 160 total workers (my rank: 1)
+c 0.026 2 Machine color 0 with 160 total workers (my rank: 2)
+c 0.026 3 Machine color 0 with 160 total workers (my rank: 3)
+c 0.025 4 Machine color 0 with 160 total workers (my rank: 4)
+c 0.025 5 Machine color 0 with 160 total workers (my rank: 5)
+c 0.025 6 Machine color 0 with 160 total workers (my rank: 6)
+c 0.026 7 Machine color 0 with 160 total workers (my rank: 7)
+c 0.025 8 Machine color 0 with 160 total workers (my rank: 8)
+c 0.026 9 Machine color 0 with 160 total workers (my rank: 9)
+c 0.025 10 Machine color 0 with 160 total workers (my rank: 10)
+c 0.025 11 Machine color 0 with 160 total workers (my rank: 11)
+c 0.026 12 Machine color 0 with 160 total workers (my rank: 12)
+c 0.024 13 Machine color 0 with 160 total workers (my rank: 13)
+c 0.025 14 Machine color 0 with 160 total workers (my rank: 14)
+c 0.025 15 Machine color 0 with 160 total workers (my rank: 15)
+c 0.024 16 Machine color 0 with 160 total workers (my rank: 16)
+c 0.025 17 Machine color 0 with 160 total workers (my rank: 17)
+c 0.025 18 Machine color 0 with 160 total workers (my rank: 18)
+c 0.024 19 Machine color 0 with 160 total workers (my rank: 19)
+c 0.025 20 Machine color 0 with 160 total workers (my rank: 20)
+c 0.025 21 Machine color 0 with 160 total workers (my rank: 21)
+c 0.025 22 Machine color 0 with 160 total workers (my rank: 22)
+c 0.025 23 Machine color 0 with 160 total workers (my rank: 23)
+c 0.025 24 Machine color 0 with 160 total workers (my rank: 24)
+c 0.025 25 Machine color 0 with 160 total workers (my rank: 25)
+c 0.025 26 Machine color 0 with 160 total workers (my rank: 26)
+c 0.025 27 Machine color 0 with 160 total workers (my rank: 27)
+c 0.026 28 Machine color 0 with 160 total workers (my rank: 28)
+c 0.025 29 Machine color 0 with 160 total workers (my rank: 29)
+c 0.026 30 Machine color 0 with 160 total workers (my rank: 30)
+c 0.025 31 Machine color 0 with 160 total workers (my rank: 31)
+c 0.026 32 Machine color 0 with 160 total workers (my rank: 32)
+c 0.025 33 Machine color 0 with 160 total workers (my rank: 33)
+c 0.025 34 Machine color 0 with 160 total workers (my rank: 34)
+c 0.025 35 Machine color 0 with 160 total workers (my rank: 35)
+c 0.025 36 Machine color 0 with 160 total workers (my rank: 36)
+c 0.025 37 Machine color 0 with 160 total workers (my rank: 37)
+c 0.025 38 Machine color 0 with 160 total workers (my rank: 38)
+c 0.025 39 Machine color 0 with 160 total workers (my rank: 39)
+c 0.025 40 Machine color 0 with 160 total workers (my rank: 40)
+c 0.025 41 Machine color 0 with 160 total workers (my rank: 41)
+c 0.025 42 Machine color 0 with 160 total workers (my rank: 42)
+c 0.025 43 Machine color 0 with 160 total workers (my rank: 43)
+c 0.024 44 Machine color 0 with 160 total workers (my rank: 44)
+c 0.024 45 Machine color 0 with 160 total workers (my rank: 45)
+c 0.025 46 Machine color 0 with 160 total workers (my rank: 46)
+c 0.025 47 Machine color 0 with 160 total workers (my rank: 47)
+c 0.025 48 Machine color 0 with 160 total workers (my rank: 48)
+c 0.026 49 Machine color 0 with 160 total workers (my rank: 49)
+c 0.026 50 Machine color 0 with 160 total workers (my rank: 50)
+c 0.025 51 Machine color 0 with 160 total workers (my rank: 51)
+c 0.026 52 Machine color 0 with 160 total workers (my rank: 52)
+c 0.025 53 Machine color 0 with 160 total workers (my rank: 53)
+c 0.025 54 Machine color 0 with 160 total workers (my rank: 54)
+c 0.024 55 Machine color 0 with 160 total workers (my rank: 55)
+c 0.026 56 Machine color 0 with 160 total workers (my rank: 56)
+c 0.025 57 Machine color 0 with 160 total workers (my rank: 57)
+c 0.025 58 Machine color 0 with 160 total workers (my rank: 58)
+c 0.024 59 Machine color 0 with 160 total workers (my rank: 59)
+c 0.025 60 Machine color 0 with 160 total workers (my rank: 60)
+c 0.025 61 Machine color 0 with 160 total workers (my rank: 61)
+c 0.026 62 Machine color 0 with 160 total workers (my rank: 62)
+c 0.025 63 Machine color 0 with 160 total workers (my rank: 63)
+c 1.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs=0 hops=0
+c 1.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 2.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs=0 hops=0
+c 2.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 3.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.91GB newreqs=0 hops=0
+c 3.202 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 3.234 0 Introducing job #1 rev. 0 : r.#1:0 rev. 0 <- [0] born=3.234 hops=0 epoch=-1 => [101]
+c 3.234 101 BLC insert (1,1,0.010)
+c 3.332 26                            loaded
+c 3.333 26 BLC insert (1,160,1.000)
+c 4.202 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 4.997 26 Caught signal 6
+c 5.019 26 [ERROR] pid=1177783 tid=1177783 signal=6
+c 5.202 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 6.203 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+_________________________________________________________________
+c 
+c Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving
+c Designed by P. Sanders and D. Schreiber 2018-2022
+c Developed by D. Schreiber 2019-2022
+c 
+c 0.002 0 Program options: -0o=0 -J=1 -T=0 -ajpc=0 -ans=0 -appmode=fork -ba=4 -bicg=4 -c=1 -cbbs=1500 -cbdf=0.9 -cfci=20 -cg=1 -ch=0 -chaf=5 -checksums=0 -chstms=10 -cmp=0 -colors=0 -dc=0 -ddd=0 -delaymonkey=0 -derandomize=1 -evu=0 -fapii=0 -g=0 -gclls=0 -h=0 -hbbfs=10 -hubfs=9999999 -huca=-1 -iff=0 -interface-fs=0 -interface-ipc=0 -isp=0 -jc=4 -jcl=0 -jcup=0 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -ljpc=32 -mbfsd=4 -mbt=1000000 -mcips=10 -md=0 -mid=0 -mjps=0 -mlbdps=8 -mlpt=50000000 -mmpi=0 -mono=./instances/covtypeShuffle10.csv -mono-application=KMEANS -nce=20 -os=0 -p=0.01 -phasediv=1 -pls=1 -pph=0 -q=0 -qcll=8 -qlbdl=2 -ril=0 -rpa=0 -rs=1 -rto=0 -s=1 -satsolver=L -scll=30 -seed=0 -sjd=0 -slbdl=30 -sleep=100 -subproc-dir=build -t=1 -trace-dir=. -v=2 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -wr=0 -y=1 -yield=0 
+c 0.005 0 Set up API at src/interface/api/api_connector.hpp
+c 0.014 25 Machine color 0 with 65 total workers (my rank: 25)
+c 0.013 26 Machine color 0 with 65 total workers (my rank: 26)
+c 0.013 27 Machine color 0 with 65 total workers (my rank: 27)
+c 0.014 28 Machine color 0 with 65 total workers (my rank: 28)
+c 0.014 29 Machine color 0 with 65 total workers (my rank: 29)
+c 0.013 30 Machine color 0 with 65 total workers (my rank: 30)
+c 0.013 31 Machine color 0 with 65 total workers (my rank: 31)
+c 0.013 32 Machine color 0 with 65 total workers (my rank: 32)
+c 0.013 33 Machine color 0 with 65 total workers (my rank: 33)
+c 0.013 34 Machine color 0 with 65 total workers (my rank: 34)
+c 0.013 35 Machine color 0 with 65 total workers (my rank: 35)
+c 0.013 36 Machine color 0 with 65 total workers (my rank: 36)
+c 0.013 37 Machine color 0 with 65 total workers (my rank: 37)
+c 0.013 38 Machine color 0 with 65 total workers (my rank: 38)
+c 0.013 39 Machine color 0 with 65 total workers (my rank: 39)
+c 0.013 40 Machine color 0 with 65 total workers (my rank: 40)
+c 0.013 41 Machine color 0 with 65 total workers (my rank: 41)
+c 0.013 42 Machine color 0 with 65 total workers (my rank: 42)
+c 0.013 43 Machine color 0 with 65 total workers (my rank: 43)
+c 0.014 44 Machine color 0 with 65 total workers (my rank: 44)
+c 0.013 45 Machine color 0 with 65 total workers (my rank: 45)
+c 0.013 46 Machine color 0 with 65 total workers (my rank: 46)
+c 0.013 47 Machine color 0 with 65 total workers (my rank: 47)
+c 0.013 48 Machine color 0 with 65 total workers (my rank: 48)
+c 0.013 49 Machine color 0 with 65 total workers (my rank: 49)
+c 0.013 50 Machine color 0 with 65 total workers (my rank: 50)
+c 0.013 51 Machine color 0 with 65 total workers (my rank: 51)
+c 0.013 52 Machine color 0 with 65 total workers (my rank: 52)
+c 0.013 53 Machine color 0 with 65 total workers (my rank: 53)
+c 0.013 54 Machine color 0 with 65 total workers (my rank: 54)
+c 0.013 55 Machine color 0 with 65 total workers (my rank: 55)
+c 0.013 56 Machine color 0 with 65 total workers (my rank: 56)
+c 0.013 57 Machine color 0 with 65 total workers (my rank: 57)
+c 0.013 58 Machine color 0 with 65 total workers (my rank: 58)
+c 0.013 59 Machine color 0 with 65 total workers (my rank: 59)
+c 0.013 60 Machine color 0 with 65 total workers (my rank: 60)
+c 0.014 61 Machine color 0 with 65 total workers (my rank: 61)
+c 0.013 62 Machine color 0 with 65 total workers (my rank: 62)
+c 0.013 63 Machine color 0 with 65 total workers (my rank: 63)
+c 0.013 64 Machine color 0 with 65 total workers (my rank: 64)
+c 0.013 0 Machine color 0 with 65 total workers (my rank: 0)
+c 0.013 1 Machine color 0 with 65 total workers (my rank: 1)
+c 0.013 2 Machine color 0 with 65 total workers (my rank: 2)
+c 0.013 3 Machine color 0 with 65 total workers (my rank: 3)
+c 0.013 4 Machine color 0 with 65 total workers (my rank: 4)
+c 0.013 5 Machine color 0 with 65 total workers (my rank: 5)
+c 0.013 6 Machine color 0 with 65 total workers (my rank: 6)
+c 0.013 7 Machine color 0 with 65 total workers (my rank: 7)
+c 0.013 8 Machine color 0 with 65 total workers (my rank: 8)
+c 0.013 9 Machine color 0 with 65 total workers (my rank: 9)
+c 0.013 10 Machine color 0 with 65 total workers (my rank: 10)
+c 0.013 11 Machine color 0 with 65 total workers (my rank: 11)
+c 0.014 12 Machine color 0 with 65 total workers (my rank: 12)
+c 0.013 13 Machine color 0 with 65 total workers (my rank: 13)
+c 0.013 14 Machine color 0 with 65 total workers (my rank: 14)
+c 0.013 15 Machine color 0 with 65 total workers (my rank: 15)
+c 0.013 16 Machine color 0 with 65 total workers (my rank: 16)
+c 0.013 17 Machine color 0 with 65 total workers (my rank: 17)
+c 0.013 18 Machine color 0 with 65 total workers (my rank: 18)
+c 0.013 19 Machine color 0 with 65 total workers (my rank: 19)
+c 0.013 20 Machine color 0 with 65 total workers (my rank: 20)
+c 0.013 21 Machine color 0 with 65 total workers (my rank: 21)
+c 0.013 22 Machine color 0 with 65 total workers (my rank: 22)
+c 0.013 23 Machine color 0 with 65 total workers (my rank: 23)
+c 0.013 24 Machine color 0 with 65 total workers (my rank: 24)
+c 1.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs=0 hops=0
+c 1.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 2.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs=0 hops=0
+c 2.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 3.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.23GB newreqs=0 hops=0
+c 3.202 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 4.202 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.26GB newreqs=0 hops=0
+c 4.202 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 5.202 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.28GB newreqs=0 hops=0
+c 5.202 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 5.285 0 Introducing job #1 rev. 0 : r.#1:0 rev. 0 <- [0] born=5.285 hops=0 epoch=-1 => [41]
+c 5.286 41 BLC insert (1,1,0.010)
+c 5.430 5                            loaded
+c 5.432 5 BLC insert (1,65,1.000)
+c 6.202 0 sysstate busyratio=1.000 cmtdratio=0.631 jobs=1 globmem=0.30GB newreqs=64 hops=25
+c 6.204 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 6.599 5                            first iteration finished
+c 6.599 5                            Another iter 1
+c 6.751 5                            Another iter 2
+c 6.892 5                            Another iter 3
+c 7.033 5                            Another iter 4
+c 7.184 5                            Another iter 5
+c 7.203 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.75GB newreqs=0 hops=0
+c 7.204 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 7.326 5                            Another iter 6
+c 7.467 5                            Another iter 7
+c 7.609 5                            Another iter 8
+c 7.750 5                            Another iter 9
+c 7.901 5                            Another iter 10
+c 8.043 5                            Another iter 11
+c 8.183 5                            Another iter 12
+c 8.203 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=5.11GB newreqs=0 hops=0
+c 8.205 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 8.325 5                            Another iter 13
+c 8.466 5                            Another iter 14
+c 8.607 5                            Another iter 15
+c 8.748 5                            Another iter 16
+c 8.889 5                            Another iter 17
+c 9.025 5                            Another iter 18
+c 9.165 5                            Another iter 19
+c 9.204 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 9.205 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 9.306 5                            Another iter 20
+c 9.438 5                            Another iter 21
+c 9.569 5                            Another iter 22
+c 9.710 5                            Another iter 23
+c 9.851 5                            Another iter 24
+c 9.993 5                            Another iter 25
+c 10.133 5                            Another iter 26
+c 10.204 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 10.205 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 10.285 5                            Another iter 27
+c 10.426 5                            Another iter 28
+c 10.568 5                            Another iter 29
+c 10.719 5                            Another iter 30
+c 10.871 5                            Another iter 31
+c 11.012 5                            Another iter 32
+c 11.164 5                            Another iter 33
+c 11.205 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 11.206 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 11.305 5                            Another iter 34
+c 11.446 5                            Another iter 35
+c 11.598 5                            Another iter 36
+c 11.739 5                            Another iter 37
+c 11.880 5                            Another iter 38
+c 12.042 5                            Another iter 39
+c 12.183 5                            Another iter 40
+c 12.205 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 12.206 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 12.324 5                            Another iter 41
+c 12.466 5                            Another iter 42
+c 12.607 5                            Another iter 43
+c 12.749 5                            Another iter 44
+c 12.890 5                            Another iter 45
+c 13.031 5                            Another iter 46
+c 13.182 5                            Another iter 47
+c 13.205 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 13.206 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 13.334 5                            Another iter 48
+c 13.475 5                            Another iter 49
+c 13.616 5                            Another iter 50
+c 13.757 5                            Another iter 51
+c 13.888 5                            Another iter 52
+c 14.029 5                            Another iter 53
+c 14.170 5                            Another iter 54
+c 14.206 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 14.207 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 14.311 5                            Another iter 55
+c 14.462 5                            Another iter 56
+c 14.603 5                            Another iter 57
+c 14.744 5                            Another iter 58
+c 14.886 5                            Another iter 59
+c 15.037 5                            Another iter 60
+c 15.188 5                            Another iter 61
+c 15.209 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 15.210 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 15.339 5                            Another iter 62
+c 15.490 5                            Another iter 63
+c 15.651 5                            Another iter 64
+c 15.802 5                            Another iter 65
+c 15.953 5                            Another iter 66
+c 16.095 5                            Another iter 67
+c 16.210 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 16.210 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 16.236 5                            Another iter 68
+c 16.377 5                            Another iter 69
+c 16.518 5                            Another iter 70
+c 16.659 5                            Another iter 71
+c 16.800 5                            Another iter 72
+c 16.941 5                            Another iter 73
+c 17.082 5                            Another iter 74
+c 17.210 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 17.210 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 17.233 5                            Another iter 75
+c 17.374 5                            Another iter 76
+c 17.515 5                            Another iter 77
+c 17.657 5                            Another iter 78
+c 17.798 5                            Another iter 79
+c 17.939 5                            Another iter 80
+c 18.081 5                            Another iter 81
+c 18.212 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 18.212 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 18.222 5                            Another iter 82
+c 18.363 5                            Another iter 83
+c 18.504 5                            Another iter 84
+c 18.645 5                            Another iter 85
+c 18.786 5                            Another iter 86
+c 18.927 5                            Another iter 87
+c 19.068 5                            Another iter 88
+c 19.209 5                            Another iter 89
+c 19.212 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 19.212 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 19.351 5                            Another iter 90
+c 19.492 5                            Another iter 91
+c 19.634 5                            Another iter 92
+c 19.775 5                            Another iter 93
+c 19.916 5                            Another iter 94
+c 20.057 5                            Another iter 95
+c 20.198 5                            Another iter 96
+c 20.212 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 20.213 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 20.339 5                            Another iter 97
+c 20.480 5                            Another iter 98
+c 20.621 5                            Another iter 99
+c 20.762 5                            Another iter 100
+c 20.903 5                            Another iter 101
+c 21.044 5                            Another iter 102
+c 21.185 5                            Another iter 103
+c 21.213 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 21.213 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 21.326 5                            Another iter 104
+c 21.467 5                            Another iter 105
+c 21.608 5                            Another iter 106
+c 21.749 5                            Another iter 107
+c 21.890 5                            Another iter 108
+c 22.031 5                            Another iter 109
+c 22.172 5                            Another iter 110
+c 22.213 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 22.213 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 22.313 5                            Another iter 111
+c 22.444 5                            Another iter 112
+c 22.585 5                            Another iter 113
+c 22.726 5                            Another iter 114
+c 22.867 5                            Another iter 115
+c 23.008 5                            Another iter 116
+c 23.149 5                            Another iter 117
+c 23.213 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 23.214 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 23.290 5                            Another iter 118
+c 23.431 5                            Another iter 119
+c 23.572 5                            Another iter 120
+c 23.723 5                            Another iter 121
+c 23.874 5                            Another iter 122
+c 24.015 5                            Another iter 123
+c 24.156 5                            Another iter 124
+c 24.215 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 24.215 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 24.297 5                            Another iter 125
+c 24.428 5                            Another iter 126
+c 24.569 5                            Another iter 127
+c 24.720 5                            Another iter 128
+c 24.871 5                            Another iter 129
+c 25.012 5                            Another iter 130
+c 25.163 5                            Another iter 131
+c 25.215 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 25.215 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 25.315 5                            Another iter 132
+c 25.456 5                            Another iter 133
+c 25.598 5                            Another iter 134
+c 25.749 5                            Another iter 135
+c 25.900 5                            Another iter 136
+c 26.051 5                            Another iter 137
+c 26.202 5                            Another iter 138
+c 26.215 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 26.216 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 26.354 5                            Another iter 139
+c 26.505 5                            Another iter 140
+c 26.656 5                            Another iter 141
+c 26.798 5                            Another iter 142
+c 26.949 5                            Another iter 143
+c 27.101 5                            Another iter 144
+c 27.216 0 sysstate entered=1 parsed=1 scheduled=1 processed=0
+c 27.216 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=7.06GB newreqs=0 hops=0
+c 27.252 5                            Another iter 145
+c 27.403 5                            Another iter 146
+c 27.554 5                            Another iter 147
+c 27.706 5                            Another iter 148
+c 27.857 5                            Another iter 149
+c 28.009 5                            Got Result after iter 150
+c 28.009 5 Solution clusterCenters: 
+3070.66 155.461 11.4468 308.012 44.4072 5468.83 215.274 229.232 147.016 3364.76 0.926007 0 0.0739936 0 0 0 0 0 0 0 0 0.00286932 0 0 0 0.00386923 0 0 0 0.013651 0 0 0.0111295 0.0347361 0 0.0828189 0.100426 0.0364316 0 0 0 0 0.523694 0.125207 0 0.00447787 0.00252152 0 0.00243457 0 0 0.0300843 0.00465177 0.0209982 
+2955.34 138.016 10.4365 288.986 35.1858 4162.62 217.894 226.65 142.029 5479.62 0.994164 0 0.00583559 0 0 0 0 0 0 0 0.00360318 0.00344652 0 0 0 0.275565 0 0 0 0.0256139 0 0 0.0112795 0.0820115 0 0 0.0365018 0.0150002 0 0 0 0 0.441116 0.093761 0 0 0.00086163 0 0.000274155 0 0 0 0.00642306 0.00454314 
+3095.55 175.605 13.9506 306.282 53.8789 3122.05 208.36 228.612 152.433 1234.3 0.318123 0 0.681878 0 0 0.00352686 0 0.0147456 0 0 0 0 0 0.0323968 0.00312379 0.0178023 0.0446064 0 0 0.000604605 0 0 0.00584452 0.00915305 0.00100768 0.0642897 0.104781 0.0425911 0 0.00629797 0.00319097 0 0.151789 0.0154174 0.0535747 0.170431 0.113162 0.0149304 0.00522312 0.00166266 0.000957291 0.0447912 0.0474447 0.026653 
+2886.43 119.637 11.7597 223.081 24.5423 1574.01 221.333 225.348 135.49 4875.23 0.671872 0.328128 0 0 0 0 0 0 0 0 0 0 0 0 0 0.217523 0 0 0 0.0252295 0 0.102002 0.0055664 0.0187233 0 0.12275 0.0882672 0.0135184 0.0147473 0 0 0 0.225692 0.0166992 0 0.0545796 0.0244343 0 0.0125063 0 0 0.0294224 0.0196631 0.00867491 
+2948.01 166.836 14.9531 237.071 43.7367 1845.04 209.893 225.391 146.422 1044.36 0.209273 0.0338934 0.738405 0.0184285 0.000704914 0.0199822 0.0118828 0.0416043 0 0.00189895 0 0 8.6316e-05 0.0584359 0.0243411 0.0311169 0.0947462 0.000230176 0 0.00198527 0.00700598 0 0.00408563 0.00950915 0.00703476 0.0245281 0.115735 0.0274773 0 0 0.0036972 0.00158246 0.0881862 0.0202843 0.115059 0.120181 0.0922143 0.00266141 0.00841581 0 0 0.0180113 0.0291317 0.0181839 
+3016.42 137.156 13.5542 273.754 45.2684 2039.97 216.17 221.952 137.091 2537.78 0.391742 0.0440816 0.564176 0 0 0.00679697 0 0.0176411 0 0 0 0 0 0.0291903 0.0195025 0.0670813 0.0191359 0 0 0.00298954 0.0109569 0 0.00219985 0.0137773 0.000479454 0.0340835 0.0833827 0.0513862 0 0.0236202 0.000239727 0 0.162479 0.0398793 0.0612573 0.12934 0.136926 0.00026793 0.00469583 0 0 0.0288801 0.0370449 0.0167668 
+2671.61 163.502 17.4883 238.442 53.5526 712.157 206.822 215.758 138.165 832.804 0.186403 0.0911058 0.392507 0.329984 0.0292508 0.0448279 0.0350851 0.0440802 0.0151919 0.0561 0 0 0.0111135 0.199431 0.0436836 0.0195761 0.0249119 0.00553976 1.13287e-05 0.00668396 0.0121671 0.000192589 0.00257163 0.00603822 0.000555109 0.051138 0.0714504 0.0307915 0 0 0.000237904 0.00319471 0.0628632 0.0424035 0.0270531 0.0697058 0.0654915 0.00175596 0 0 0 0.00561906 0.00397639 0.00730704 
+2973.95 149.514 14.274 286.102 49.1508 931.685 213.3 221.599 139.428 2022.94 0.390392 0.102894 0.488174 0.0185395 0 0.00552094 0.00242649 0.0235151 0.000259007 0.00767479 0 0 4.08959e-05 0.0281636 0.0419728 0.0364791 0.028668 0 0 0.00126777 0.00807012 0.00279455 0.00458034 0.0156631 0.00139046 0.0724539 0.130731 0.0564636 0.00275366 0.000204479 0.00205843 0.00552095 0.166242 0.0628979 0.0344071 0.114972 0.0990362 0.001704 0.000436223 0 0 0.0180487 0.0120916 0.0114917 
+3104.11 142.321 13.1318 293.047 44.9347 3655.08 216.05 223.021 138.72 2854.58 0.696734 0 0.303267 0 0 2.55598e-05 0 0.00135467 0 0 0 0 0 0.0103517 0.0139812 0.0811522 2.55598e-05 0 0 0.000178918 0 0 0.00677334 0.0144413 0 0.0449596 0.132885 0.0470555 0 0.00368061 0.00779573 0 0.289081 0.074839 0.0407167 0.0354003 0.0570238 0 0.00316941 0 0.00503527 0.0511451 0.046621 0.0323075 
+3118.12 170.044 11.4693 259.241 38.4633 5107.32 211.504 228.501 150.645 1256.98 0.943324 0 0.0566769 0 0 0 0 0 0 0 0 0 0 0 0 0.00560808 0.00151716 0 0 0.0017339 0 0 0.0340278 0.0102138 0 0.15066 0.10379 0.00438894 0 0.000460567 0 0 0.461001 0.108396 0.00121915 0.0176641 0.00926553 0 0 0 0 0.0687058 0.019398 0.00195064 
+
+c 28.019 5 BLC insert (1,0,0.000)
+c 28.018 0 RESPONSE_TIME #1 22.733040 rev. 0
+c 28.018 0 SOLUTION #1 SAT rev. 0
+c 28.019 28 [WARN] Job message from unknown job #1
+c 28.018 39 [WARN] Job message from unknown job #1
+c 28.019 40 [WARN] Job message from unknown job #1
+c 28.019 59 [WARN] Job message from unknown job #1
+c 28.019 21 [WARN] Job message from unknown job #1
+c 28.019 11 [WARN] Job message from unknown job #1
+c 28.020 29 [WARN] Job message from unknown job #1
+c 28.019 46 [WARN] Job message from unknown job #1
+s SATISFIABLE
+v 1113063424 1161816710 1125873168 1094133260 1134166420 1110548723 1168828076 1129793056 1130707822 1125319688 1163021364 1064111814 0 1033341424 0 0 0 0 0 0 
+v 0 0 993790753 0 0 0 998085346 0 0 0 1012901988 0 0 1010194526 1024345971 0 1034525938 1036889131 1024801104 0 
+v 0 0 0 1057362121 1040201250 0 999471900 992296980 0 991923538 0 0 1022784366 999845342 1017906268 1161344351 1124729866 1093073846 1133542968 1108131384 
+v 1166152960 1129964790 1130538623 1124992849 1168850168 1065255310 0 1002387568 0 0 0 0 0 0 0 996942676 996269828 0 0 0 
+v 1049433818 0 0 0 1020384324 0 0 1010355646 1034417574 0 0 1024819940 1014350690 0 0 0 0 1054988776 1035994565 0 
+v 0 979492612 0 965721208 0 0 0 1003649161 999612064 1161918658 1127193345 1096758686 1134109708 1113031687 1162027196 1129339922 1130667179 1125674730 1150962094 1050861828 
+v 0 1060016008 0 0 996614897 0 1014077368 0 0 0 0 0 1023718006 994883724 1016190476 1026995511 0 0 975076956 0 
+v 0 1002406746 1008072364 981734391 1032038990 1037473702 1026454520 0 1003380530 995172252 0 1041985202 1014798690 1029402923 1043236244 1038598514 1014275732 1001072300 987360702 981136060 
+v 1027045103 1027757408 1020942184 1161062104 1122977320 1094461377 1130304720 1103386248 1153744944 1130190147 1130453265 1124564318 1167612380 1059848136 1051197553 0 0 0 0 0 
+v 0 0 0 0 0 0 0 0 1046396526 0 0 0 1020177957 0 1037100714 1001809495 1016684978 0 1039885395 1035257196 
+v 1012759622 1014079192 0 0 0 1046944730 1015598274 0 1029672676 1019751038 0 1011672917 0 0 1022428988 1017189520 1007558964 1161314334 1126618652 1097809877 
+v 1131221542 1110372949 1155965282 1129440393 1130456106 1125280766 1149406094 1045842876 1024119765 1060964375 1016526670 976800255 1017360800 1011003454 1026189644 0 989390406 0 0 951387281 
+v 1030707848 1019700999 1023338734 1036126800 963730285 0 989993800 1004900982 0 998629558 1008454723 1004962769 1019801404 1038943922 1021384708 0 0 997346504 986671760 1035246330 
+v 1017522992 1038853171 1039540556 1035786970 992897808 1007280763 0 0 1016302692 1022272901 1016395372 1161594570 1124673549 1096343037 1133043836 1110774498 1157562110 1129851802 1130230720 1124669284 
+v 1159634034 1053332076 1026854623 1058041310 0 0 1004452116 0 1016103946 0 0 0 0 0 1022304378 1017103282 1032413670 1016906444 0 0 
+v 994307098 1010009270 0 990915410 1013037562 972775226 1024170798 1034601612 1028815442 0 1019313936 964386618 0 1042702532 1025726584 1031465198 1040478630 1040987762 965507322 999939960 
+v 0 0 1022137820 1024965725 1015634560 1160182198 1126400120 1099687972 1131311418 1112946143 1144130064 1129239153 1129824779 1124739615 1146106740 1044308092 1035638186 1053357752 1051259812 1022336881 
+v 1027054954 1024439662 1026854245 1014556480 1030080786 0 0 1010177385 1045182390 1026747808 1017142788 1020007445 1001752283 926814363 1004209443 1011308651 961147301 992512186 1002822729 974226616 
+v 1028748810 1033000086 1023164042 0 0 964261322 995188299 1031847534 1026404172 1021156958 1032765927 1032200294 988162075 0 0 0 1001922582 998394978 1005547500 1161420606 
+v 1125483412 1097097830 1133448449 1111792240 1147726802 1129663703 1130207550 1124822414 1157422612 1053286777 1037220382 1056567802 1016586262 0 1001711883 991888829 1019257553 965200735 1006337240 0 
+v 0 942376864 1021753198 1026288560 1024813862 1022023986 0 0 983968612 1006909580 993469648 999691949 1015042037 985022492 1033134773 1040571960 1030178399 993294000 961964426 990308010 
+v 1001711884 1042955078 1031852187 1024257648 1038841453 1036702592 987715738 971289814 0 0 1016322792 1011227557 1010583520 1161953740 1125012028 1095900084 1133676037 1110687016 1164210504 1129843894 
+v 1130300788 1124776024 1160931648 1060265250 0 1050363328 0 0 936798507 0 984715031 0 0 0 0 0 1009359408 1013256538 1034302246 936798504 
+v 0 0 960207878 0 0 1004401372 1013750540 0 1027090324 1040716558 1027652936 0 997275216 1006596939 0 1049887336 1033454894 1025951373 1024524255 1030328784 
+v 0 995079649 0 1000668910 1028750721 1027536297 1023694056 1162011133 1126828870 1094156828 1132568270 1108990566 1168087694 1129545969 1130659878 1125557566 1151147834 1064402344 0 1030235650 
+v 0 0 0 0 0 0 0 0 0 0 0 0 1001899013 986110858 0 0 987972620 0 0 1024155836 
+v 1009211290 0 1041909386 1037340663 999280911 0 972126284 0 0 1055656006 1037958826 983550936 1016116308 1008193140 0 0 0 0 1032631714 1017047188 
+v 989834382 0
+c 28.019 0 Terminating.
+c 28.199 40 Exiting happily
+c 28.199 60 Exiting happily
+c 28.199 63 Exiting happily
+c 28.199 8 Exiting happily
+c 28.199 12 Exiting happily
+c 28.199 44 Exiting happily
+c 28.199 26 Exiting happily
+c 28.199 42 Exiting happily
+c 28.199 43 Exiting happily
+c 28.199 64 Exiting happily
+c 28.199 36 Exiting happily
+c 28.199 49 Exiting happily
+c 28.199 51 Exiting happily
+c 28.200 53 Exiting happily
+c 28.199 19 Exiting happily
+c 28.199 3 Exiting happily
+c 28.199 10 Exiting happily
+c 28.200 15 Exiting happily
+c 28.200 17 Exiting happily
+c 28.201 59 Exiting happily
+c 28.200 23 Exiting happily
+c 28.200 25 Exiting happily
+c 28.205 27 Exiting happily
+c 28.205 46 Exiting happily
+c 28.201 11 Exiting happily
+c 28.206 30 Exiting happily
+c 28.201 31 Exiting happily
+c 28.206 32 Exiting happily
+c 28.201 33 Exiting happily
+c 28.200 34 Exiting happily
+c 28.199 35 Exiting happily
+c 28.203 37 Exiting happily
+c 28.206 38 Exiting happily
+c 28.204 39 Exiting happily
+c 28.200 5 Exiting happily
+c 28.205 45 Exiting happily
+c 28.205 29 Exiting happily
+c 28.199 47 Exiting happily
+c 28.202 50 Exiting happily
+c 28.201 52 Exiting happily
+c 28.199 54 Exiting happily
+c 28.205 55 Exiting happily
+c 28.206 56 Exiting happily
+c 28.201 57 Exiting happily
+c 28.200 58 Exiting happily
+c 28.199 0 Exiting happily
+c 28.206 61 Exiting happily
+c 28.200 62 Exiting happily
+c 28.206 9 Exiting happily
+c 28.210 21 Exiting happily
+c 28.205 13 Exiting happily
+c 28.200 14 Exiting happily
+c 28.210 16 Exiting happily
+c 28.205 18 Exiting happily
+c 28.205 20 Exiting happily
+c 28.209 22 Exiting happily
+c 28.209 48 Exiting happily
+c 28.206 1 Exiting happily
+c 28.209 2 Exiting happily
+c 28.200 4 Exiting happily
+c 28.206 41 Exiting happily
+c 28.200 6 Exiting happily
+c 28.205 7 Exiting happily
+c 29.192 28 [ERROR] pid=1292910 tid=1292910 signal=11
+c 29.195 24 [ERROR] pid=1292900 tid=1292900 signal=11
+_________________________________________________________________
