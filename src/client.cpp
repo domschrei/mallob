@@ -101,6 +101,9 @@ void Client::readIncomingJobs() {
                 }
                 if (!success) {
                     LOGGER(log, V1_WARN, "[T] [WARN] Unsuccessful read - skipping #%i\n", id);
+                    auto lock = _failed_job_lock.getLock();
+                    _failed_job_queue.push_back(foundJob.jobName);
+                    atomics::incrementRelaxed(_num_failed_jobs);
                 } else {
                     time = Timer::elapsedSeconds() - time;
                     LOGGER(log, V3_VERB, "[T] Initialized job #%i %s in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
@@ -261,6 +264,14 @@ void Client::advance() {
             } else ++it;
         }
         _jobs_to_interrupt_lock.unlock();
+    }
+
+    if (_num_failed_jobs.load(std::memory_order_relaxed) > 0 && _failed_job_lock.tryLock()) {
+        for (auto& jobname : _failed_job_queue) {
+            LOG(V1_WARN, "[WARN] Rejecting submission %s - reason: Error while parsing description.\n", jobname.c_str());
+        }
+        _failed_job_queue.clear();
+        _failed_job_lock.unlock();
     }
 
     // Process arrival times chronologically; if at least one "happened", notify reader

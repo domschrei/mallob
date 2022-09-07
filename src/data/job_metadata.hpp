@@ -11,6 +11,7 @@
 
 struct JobMetadata {
 
+    std::string jobName;
     std::unique_ptr<JobDescription> description;
     std::vector<std::string> files;
     SatReader::ContentMode contentMode;
@@ -19,7 +20,8 @@ struct JobMetadata {
     bool interrupt = false;
 
     JobMetadata() {}
-    JobMetadata(JobMetadata&& other) : 
+    JobMetadata(JobMetadata&& other) :
+        jobName(std::move(other.jobName)),
         description(std::move(other.description)), 
         files(std::move(other.files)), 
         contentMode(other.contentMode), 

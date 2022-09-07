@@ -24,12 +24,14 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     JobDescription::Application appl;
     JobImage* img = nullptr;
 
+    auto baseErrorMsg = "[WARN] Rejecting submission %s - reason: %s\n";
+
     {
         auto lock = _job_map_mutex.getLock();
         
         // Check and read essential fields from JSON
         if (!inputJson.contains("user") || !inputJson.contains("name")) {
-            LOGGER(_logger, V1_WARN, "[WARN] Job file missing essential field(s). Ignoring this file.\n");
+            LOGGER(_logger, V1_WARN, baseErrorMsg, "?.?", "Job file missing essential field(s) \"user\" and/or \"name\".");
             return DISCARD;
         }
         std::string user = inputJson["user"].get<std::string>();
@@ -37,11 +39,17 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
         jobName = user + "." + name + ".json";
         bool incremental = inputJson.contains("incremental") ? inputJson["incremental"].get<bool>() : false;
 
+        // Check priority
         priority = inputJson.contains("priority") ? inputJson["priority"].get<float>() : 1.0f;
         if (_params.jitterJobPriorities()) {
             // Jitter job priority
             priority *= 0.99 + 0.01 * Random::rand();
         }
+        if (priority <= 0) {
+            LOGGER(_logger, V1_WARN, baseErrorMsg, jobName.c_str(), "Priority negative.");
+            return DISCARD;
+        }
+
         appl = JobDescription::Application::DUMMY;
         if (inputJson.contains("application")) {
             auto appStr = inputJson["application"].get<std::string>();
@@ -52,13 +60,14 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
 
         if (inputJson.contains("interrupt") && inputJson["interrupt"].get<bool>()) {
             if (!_job_name_to_id_rev.count(jobName)) {
-                LOGGER(_logger, V1_WARN, "[WARN] Cannot interrupt unknown job \"%s\"\n", jobName.c_str());
+                LOGGER(_logger, V1_WARN, baseErrorMsg, jobName.c_str(), "Cannot interrupt unknown job.");
                 return DISCARD;
             }
             auto [id, rev] = _job_name_to_id_rev.at(jobName);
 
             // Interrupt a job which is already present
             JobMetadata data;
+            data.jobName = jobName;
             data.description = std::unique_ptr<JobDescription>(new JobDescription(id, 0, appl));
             data.interrupt = true;
             _job_callback(std::move(data));
@@ -73,7 +82,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             // This is a new increment of a former job - assign SAME internal ID
             auto precursorName = inputJson["precursor"].get<std::string>() + ".json";
             if (!_job_name_to_id_rev.count(precursorName)) {
-                LOGGER(_logger, V1_WARN, "[WARN] Unknown precursor job \"%s\"!\n", precursorName.c_str());
+                LOGGER(_logger, V1_WARN, baseErrorMsg, jobName.c_str(), "Unknown precursor job \"" + precursorName + "\".");
                 return DISCARD;
             }
             auto [jobId, rev] = _job_name_to_id_rev[precursorName];
@@ -94,6 +103,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
 
                 // Notify client that this incremental job is done
                 JobMetadata data;
+                data.jobName = jobName;
                 data.description = std::unique_ptr<JobDescription>(new JobDescription(id, 0, appl));
                 data.done = true;
                 _job_callback(std::move(data));
@@ -201,6 +211,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
         contentMode = SatReader::ContentMode::RAW;
     }
     JobMetadata metadata;
+    metadata.jobName = jobName;
     metadata.description = std::unique_ptr<JobDescription>(job);
     metadata.files = std::move(files);
     metadata.contentMode = contentMode;

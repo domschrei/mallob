@@ -37,7 +37,9 @@ private:
     bool _valid_input = false;
 
 public:
-    SatReader(const std::string& filename, ContentMode contentMode) : _filename(filename), _content_mode(contentMode) {}
+    SatReader(const std::string& filename, ContentMode contentMode) : _filename(filename), _content_mode(contentMode) {
+        _valid_input = _content_mode == ASCII;
+    }
     bool read(JobDescription& desc);
 
     inline void processInt(int x, JobDescription& desc) {
@@ -80,7 +82,10 @@ public:
         case EOF:
             _comment = false;
             if (_began_num) {
-                assert(_num == 0);
+                if (_num != 0) {
+                    _valid_input = false;
+                    return;
+                }
                 if (!_assumption) desc.addLiteral(0);
                 _began_num = false;
             }
@@ -119,7 +124,7 @@ public:
     }
 
     bool isValidInput() const {
-        return _content_mode != RAW || _valid_input;
+        return _valid_input;
     }
 };
 
