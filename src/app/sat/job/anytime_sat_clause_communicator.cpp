@@ -137,14 +137,7 @@ void AnytimeSatClauseCommunicator::communicate() {
                 for (size_t i = 0; i < _merger_next_lines.size(); i++) {
                     if (_merger_next_lines[i].empty()) {
                         // Refill line from stream
-                        std::string line;
-                        if (getline(_merger_filestreams[i], line)) {
-                            bool success;
-                            _merger_next_lines[i] = LratLine(line.c_str(), line.size(), success);
-                            assert(success);
-                        } else {
-                            // No more lines!
-                        }
+                        lrat_utils::readLine(_merger_filestreams[i], _merger_next_lines[i]);
                     }
                 }
 

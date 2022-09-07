@@ -4,6 +4,9 @@
 #include <vector>
 #include <sstream>
 
+#include "util/assert.hpp"
+#include "util/logger.hpp"
+
 typedef unsigned long LratClauseId;
 
 struct LratLine {

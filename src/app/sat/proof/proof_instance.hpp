@@ -6,6 +6,7 @@
 #include "app/sat/proof/reverse_binary_lrat_parser.hpp"
 #include "util/external_priority_queue.hpp"
 #include "util/sys/thread_pool.hpp"
+#include "app/sat/proof/lrat_utils.hpp"
 
 /*
 The contract of an instance of this class looks as follows:
@@ -58,8 +59,8 @@ public:
             _winning_instance(winningInstance == instanceId),
             _parser(proofFilename), _local_epoch_starts(localEpochStarts), 
             _local_epoch_offsets(localEpochOffsets), _global_epoch_starts(globalEpochStarts),
-            _current_epoch(finalEpoch),
-            _output_filename(outputFilename), _output(outputFilename) {}
+            _current_epoch(finalEpoch), _output_filename(outputFilename), 
+            _output(outputFilename, std::ofstream::binary) {}
 
     ~ProofInstance() {
         if (_work_future.valid()) _work_future.get();
@@ -152,8 +153,7 @@ private:
                 }
 
                 // Output the line
-                auto lineStr = _current_line.toStr();
-                _output.write(lineStr.c_str(), lineStr.size());
+                lrat_utils::writeLine(_output, _current_line);
 
                 // Traverse clause hints
                 for (auto hintId : _current_line.hints) {

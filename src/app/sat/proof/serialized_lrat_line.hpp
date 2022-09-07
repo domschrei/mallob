@@ -78,6 +78,13 @@ public:
             getNumHints()
         );
     }
+    const bool* getSignsOfHints() const {
+        return (const bool*) (_data.data()
+            + getDataPosOfNumHints(getNumLiterals())
+            + sizeof(int)
+            + sizeof(LratClauseId)*getNumHints()
+        );
+    }
 
     std::string toStr() const {
         std::string out = std::to_string(getId());
@@ -121,14 +128,4 @@ public:
             + sizeof(int)
             + sizeof(int)*numLits;
     }
-
-private:
-    const bool* getSignsOfHints() const {
-        return (const bool*) (_data.data()
-            + getDataPosOfNumHints(getNumLiterals())
-            + sizeof(int)
-            + sizeof(LratClauseId)*getNumHints()
-        );
-    }
-
 };

@@ -91,6 +91,7 @@ set(BASE_SOURCES ${BASE_SOURCES}
     src/app/sat/data/clause_metadata_def.cpp
     src/app/sat/execution/engine.cpp src/app/sat/execution/solver_thread.cpp src/app/sat/execution/solving_state.cpp
     src/app/sat/job/anytime_sat_clause_communicator.cpp src/app/sat/job/forked_sat_job.cpp src/app/sat/job/threaded_sat_job.cpp src/app/sat/job/sat_process_adapter.cpp src/app/sat/job/sat_process_config.cpp 
+    src/app/sat/proof/lrat_utils.cpp
     src/app/sat/sharing/buffer/adaptive_clause_database.cpp src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp
     src/app/sat/sharing/filter/clause_filter.cpp
     src/app/sat/sharing/sharing_manager.cpp
@@ -171,3 +172,4 @@ new_test(ext_priority_queue)
 new_test(reverse_lrat_parser)
 new_test(distributed_file_merger)
 new_test(reverse_file_reader)
+new_test(lrat_utils)

@@ -13,6 +13,8 @@
 #include "util/bloom_filter.hpp"
 #include "app/sat/proof/lrat_line.hpp"
 #include "app/sat/proof/serialized_lrat_line.hpp"
+#include "app/sat/proof/lrat_utils.hpp"
+#include "app/sat/proof/reverse_binary_lrat_parser.hpp"
 
 class DistributedFileMerger {
 
@@ -136,6 +138,7 @@ private:
     std::vector<SerializedLratLine> _output_buffer;
     Mutex _output_buffer_mutex;
     std::atomic_int _output_buffer_size = 0;
+    bool _binary_output = true;
 
     // rank zero only
     std::string _output_filename;
@@ -179,7 +182,11 @@ public:
                 _output_filename = outputFileAtZero;
                 std::string reverseFilename = _output_filename + ".inv";
                 LOG(V3_VERB, "DFM Opening output file \"%s\"\n", reverseFilename.c_str());
-                _output_filestream = std::ofstream(reverseFilename);
+                if (_binary_output) {
+                    _output_filestream = std::ofstream(reverseFilename, std::ofstream::binary);
+                } else {
+                    _output_filestream = std::ofstream(reverseFilename);
+                }
                 // TODO choose size relative to proof size
                 _output_id_filter.reset(new BloomFilter<unsigned long>(26843543, 4));
                 _root_prepared = true;
@@ -383,15 +390,23 @@ private:
                         }
                     }
                     if (!hintsToDelete.empty()) {
-                        std::string delLine = std::to_string(chosenId) + " d";
-                        for (auto hint : hintsToDelete) delLine += " " + std::to_string(hint);
-                        delLine += " 0\n";
-                        _output_filestream.write(delLine.c_str(), delLine.size());
+                        if (_binary_output) {
+                            lrat_utils::writeDeletionLine(_output_filestream, chosenId, hintsToDelete, lrat_utils::REVERSED);
+                        } else {
+                            std::string delLine = std::to_string(chosenId) + " d";
+                            for (auto hint : hintsToDelete) delLine += " " + std::to_string(hint);
+                            delLine += " 0\n";
+                            _output_filestream.write(delLine.c_str(), delLine.size());
+                        }
                         hintsToDelete.clear();
                     }
                     // Write into final file
-                    std::string output = chosenLine.toStr();
-                    _output_filestream.write(output.c_str(), output.size());
+                    if (_binary_output) {
+                        lrat_utils::writeLine(_output_filestream, chosenLine, lrat_utils::REVERSED);
+                    } else {
+                        std::string output = chosenLine.toStr();
+                        _output_filestream.write(output.c_str(), output.size());
+                    }
                 } else {
                     // Write into output buffer
                     auto lock = _output_buffer_mutex.getLock();
@@ -410,11 +425,23 @@ private:
     }
 
     void reverseFile() {
-        if (MyMpi::rank(_comm) == 0) {
-            std::string cmd = "tac " + _output_filename + ".inv > " + _output_filename 
-                + " && rm " + _output_filename + ".inv";
+        if (MyMpi::rank(_comm) != 0) return;
+        if (_binary_output) {
+            // Read binary file in reverse order, output lines into new file
+            std::ofstream ofs(_output_filename, std::ofstream::binary);
+            ReverseFileReader reader(_output_filename + ".inv");
+            char c;
+            while (reader.nextAsChar(c)) {
+                ofs.put(c);
+            }
+        } else {
+            // Just "tac" the text file
+            std::string cmd = "tac " + _output_filename + ".inv > " + _output_filename;
             system(cmd.c_str());
         }
+        // remove original (reversed) file
+        std::string cmd = "rm " + _output_filename + ".inv";
+        system(cmd.c_str());
     }
 
     bool areInputsExhausted() const {
