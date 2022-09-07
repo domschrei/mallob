@@ -1,0 +1,12 @@
+[New LWP 2082997]
+[New LWP 2083005]
+[New LWP 2083574]
+[New LWP 2083941]
+[New LWP 2084137]
+[New LWP 2084329]
+[New LWP 2084514]
+[New LWP 2085437]
+Couldn't get CS register: No such process.
+Python Exception <class 'gdb.error'> Couldn't get registers: No such process.: 
+Couldn't get registers: No such process.
+[Inferior 1 (process 2082949) detached]
