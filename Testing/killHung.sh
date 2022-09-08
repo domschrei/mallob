@@ -2,7 +2,7 @@
 > ./Testing/${1}/err.txt
 while true; do
     #echo "$(cat ./Testing/${1}/out.txt | grep "ERROR")"
-    echo "$(cat ./Testing/${1}/out.txt | grep "c 10000." | head -1 | awk '{print $4}')"
+    #echo "$(cat ./Testing/${1}/out.txt | grep "c 10000." | head -1 | awk '{print $4}')"
     sleep 5
     if [ "$(cat ./Testing/${1}/out.txt | grep "c 10000." | head -1 | awk '{print $4}')" == "sysstate" ] || [ "$(cat ./Testing/${1}/out.txt | grep "ERROR" | head -1 | awk '{print $4}')" == "[ERROR]" ]; then
         echo "found err"
