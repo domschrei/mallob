@@ -4,17 +4,20 @@ instances/benign_traffic.csv
 instances/covtypeShuffle20.csv
 instances/birch-rg1.arff
 instances/birch-rg2.arff
+instances/benign_traffic.csv
 instances/birch-rg3.arff
 instances/covtypeShuffle5.csv
 instances/covtypeShuffle20.csv
 instances/2d-10c.arff
 instances/mnist784K10.csv
+instances/benign_traffic.csv
 instances/rl/arrhythmia.arff
 instances/rl/balance-scale.arff
 instances/rl/cpu.arff
 instances/covtypeShuffle20.csv
 instances/rl/dermatology.arff
 instances/rl/ecoli.arff
+instances/benign_traffic.csv
 instances/rl/iono.arff
 instances/rl/letter.arff
 instances/covtypeShuffle5.csv
@@ -22,5 +25,6 @@ instances/covtypeShuffle20.csv
 instances/covtypeShuffle15.csv
 instances/rl/sonar.arff
 instances/rl/vehicle.arff
+instances/benign_traffic.csv
 instances/rl/wine.arff
 instances/rl/zoo.arff
