@@ -136,7 +136,7 @@ class KMeansJob : public Job {
         if (!loaded) {
             return Job::getDemand();
         } else {
-            return maxDemand;
+            return Job::getDemand();
         }
     }
 
