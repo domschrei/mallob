@@ -131,10 +131,10 @@ class KMeansJob : public Job {
     void appl_dumpStats() override;
     bool appl_isDestructible() override { return true; }
     void appl_memoryPanic() override;
-    int getDemand() {
+    int getDemand() override {
         LOG(V2_INFO, "                                                                                    ask Demand\n");
         if (!loaded) {
-            return 1;
+            return Job::getDemand();
         } else {
             if (maxDemandCalculated) {
                 return maxDemand;

@@ -143,7 +143,7 @@ bool Job::isDestructible() {
     return appl_isDestructible();
 }
 
-int Job::getDemand() const {
+int Job::getDemand() {
     
     if (_state != ACTIVE) {
         return _commitment.has_value() ? 1 : 0;
