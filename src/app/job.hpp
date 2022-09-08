@@ -122,7 +122,7 @@ public:
     This method must return an integer greater than 0 and no greater than _comm_size. 
     It has a valid default implementation, so it does not need to be re-implemented.
     */
-    virtual int getDemand() const;
+    virtual int getDemand() ;
 
     /*
     Measure for the age of a job -- decreases with time.
