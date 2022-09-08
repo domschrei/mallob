@@ -425,7 +425,7 @@ void KMeansJob::calcNearestCenter(std::function<float(const float* p1, const flo
     // while own or child slices todo
     int startIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(intervalId) / static_cast<float>(countCurrentWorkers)));
     int endIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(intervalId + 1) / static_cast<float>(countCurrentWorkers)));
-    LOG(V3_VERB, "                           MI: %i intervalId: %i PC: %i cW: %i start:%i end:%i!!      iter:%i \n", myIndex, intervalId, pointsCount, countCurrentWorkers, startIndex, endIndex, iterationsDone);
+    LOG(V3_VERB, "                           MI: %i intervalId: %i PC: %i cW: %i start:%i end:%i!!      iter:%i k:%i \n", myIndex, intervalId, pointsCount, countCurrentWorkers, startIndex, endIndex, iterationsDone, countClusters);
     for (int pointID = startIndex; pointID < endIndex; ++pointID) {
         if (terminate) return;
         if ((pointID / endIndex) < 0.25 &&
