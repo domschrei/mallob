@@ -105,7 +105,7 @@ private:
         bool hasNext() const {return !isEmpty();}
         bool isRefillDesired() const {
             return !isExhausted() && !refillRequested 
-                && bufferSize.load(std::memory_order_relaxed) < HALF_CHUNK_SIZE_BYTES; 
+                && bufferSize.load(std::memory_order_relaxed) < FULL_CHUNK_SIZE_BYTES; 
         }
 
         void add(std::vector<SerializedLratLine>&& newLines) {
@@ -154,6 +154,9 @@ private:
     bool _began_merging = false;
 
     bool _began_final_barrier = false;
+
+    float _timepoint_merge_begin;
+    float _time_active = 0;
 
 public:
     DistributedFileMerger(MPI_Comm comm, int branchingFactor, LineSource localSource, const std::string& outputFileAtZero, int numOriginalClauses) : 
@@ -218,6 +221,7 @@ public:
 
     void beginMerge() {
         _began_merging = true;
+        _timepoint_merge_begin = Timer::elapsedSeconds();
         _fut_merging = ProcessWideThreadPool::get().addTask([&]() {
             doMerging();
             reverseFile();
@@ -254,7 +258,10 @@ public:
     void advance() {
 
         if (Timer::elapsedSeconds() - lastOutputReport > 1.0) {
-            LOG(V3_VERB, "DFM Output %i lines so far, exhausted: %s\n", numOutputLines, areInputsExhausted()?"yes":"no");
+            LOG(V3_VERB, "DFM outputlines:%i efficiency:%.4f exhausted:%s\n", 
+                numOutputLines, 
+                _time_active/(Timer::elapsedSeconds()-_timepoint_merge_begin), 
+                areInputsExhausted()?"yes":"no");
             lastOutputReport = Timer::elapsedSeconds();
         }
 
@@ -280,7 +287,7 @@ public:
         // Check if there is a refill request from the parent which can be fulfilled
         if (_request_by_parent) {
             msg.type = MergeMessage::Type::REQUEST;
-            if (_output_buffer_size.load(std::memory_order_relaxed) >= 1000) {
+            if (_output_buffer_size.load(std::memory_order_relaxed) >= 100) {
                 // Transfer to parent
                 msg.type = MergeMessage::Type::RESPONSE_SUCCESS;
                 writeOutputIntoMsg();
@@ -320,9 +327,13 @@ private:
         std::vector<SerializedLratLine> merger(_children.size()+1);
         std::vector<LratClauseId> hintsToDelete;
 
+        bool countedRefillTime = false;
+
         while (!Terminator::isTerminating()) {
             bool canMerge = true;
             
+            float time = countedRefillTime ? 0 : Timer::elapsedSeconds();
+
             // Refill next line from each child as necessary 
             auto childIt = _children.begin();
             for (size_t i = 0; i < _children.size(); i++) {
@@ -350,11 +361,19 @@ private:
                 }
             }
 
+            if (!countedRefillTime) {
+                time = Timer::elapsedSeconds() - time;
+                _time_active += time;
+                countedRefillTime = true;
+            }
+
             if (!canMerge || _output_buffer_size >= FULL_CHUNK_SIZE_BYTES) {
                 // Sleep (for simplicity; TODO use condition variable instead)
-                usleep(1000 * 10);
+                usleep(1000 * 1);
                 continue;
             }
+
+            time = Timer::elapsedSeconds();
 
             // Find next line to output
             int chosenSource = -1;
@@ -416,6 +435,10 @@ private:
                 merger[chosenSource].clear();
                 numOutputLines++;
             }
+
+            time = Timer::elapsedSeconds() - time;
+            _time_active += time;
+            countedRefillTime = false;
         }
 
         if (MyMpi::rank(_comm) == 0) {
