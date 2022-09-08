@@ -429,17 +429,17 @@ void KMeansJob::calcNearestCenter(std::function<float(const float* p1, const flo
     LOG(V3_VERB, "                           MI: %i intervalId: %i PC: %i cW: %i start:%i end:%i!!      iter:%i k:%i \n", myIndex, intervalId, pointsCount, countCurrentWorkers, startIndex, endIndex, iterationsDone, countClusters);
     for (int pointID = startIndex; pointID < endIndex; ++pointID) {
         if (terminate) return;
-        if ((pointID / endIndex) < 0.25 &&
-            iAmRoot &&
-            (countCurrentWorkers == 1 ||
-             (std::find(work.begin(), work.end(), 1) != work.end() && std::find(work.begin(), work.end(), 2) != work.end())) &&
-            (leftDone && rightDone) &&
-            this->getVolume() > 1) {
-            LOG(V3_VERB, "                           will skip Iter\n");
-            skipCurrentIter = true;
-            work.clear();
-            return;
-        }
+        //if ((pointID / endIndex) < 0.25 &&
+        //    iAmRoot &&
+        //    (countCurrentWorkers == 1 ||
+        //     (std::find(work.begin(), work.end(), 1) != work.end() && std::find(work.begin(), work.end(), 2) != work.end())) &&
+        //    (leftDone && rightDone) &&
+        //    this->getVolume() > 1) {
+        //    LOG(V3_VERB, "                           will skip Iter\n");
+        //    skipCurrentIter = true;
+        //    work.clear();
+        //    return;
+        //}
         currentCluster = -1;
         currentDistance = std::numeric_limits<float>::infinity();
         for (int clusterID = 0; clusterID < countClusters; ++clusterID) {
