@@ -47,7 +47,7 @@ private:
         
         // Check by how far you can go back
         auto sizeBefore = _file_size;
-        _file_size = std::max(0, (int)sizeBefore - MALLOB_REVERSE_READER_BUF_SIZE);
+        _file_size = std::max(0LL, ((long long) sizeBefore) - MALLOB_REVERSE_READER_BUF_SIZE);
         int numDesired = sizeBefore - _file_size;
 
         // Go back and read the corresponding chunk of data
