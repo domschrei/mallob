@@ -3,6 +3,8 @@ CFLAGS=-Wall
 
 all: build/renumber-proofs build/compose-proofs
 
+# to build static: -Wl,-Bstatic -l boost_program_options -Wl,-Bdynamic
+
 build/renumber-proofs: src/renumber.cpp build/parse.o build/util.o
 	mkdir -p build
 	g++ $(CFLAGS) build/*.o -o build/renumber-proofs src/renumber.cpp -l boost_program_options

@@ -7,12 +7,36 @@ import sys
 import threading
 import glob
 import time
+from threading import Timer
+
+import signal
+from subprocess import Popen
+from subprocess import TimeoutExpired
+from typing import Callable
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 def reverse_function(x):
     return x[::-1]
 
+# total time to run in seconds.  This allows ~1 minute of gracetime before ATS would pull the plug.
+TOTAL_TIME = 4940
+
+# total number of slots (nodes)
+SLOTS = 16
+
+# total number of proof files (same as SLOTS for parallel)
+PROOF_FILES = SLOTS
+
+# Class to help identify when a timeout has been triggered
+class _TimeoutRecorder:
+    __timed_out: bool = False
+
+    def record_timeout(self):
+        self.__timed_out = True
+
+    def is_timed_out(self) -> bool:
+        return self.__timed_out
 
 class Runner:
     def __init__(self, request_directory: str):
@@ -20,6 +44,28 @@ class Runner:
         self.logger.setLevel(logging.INFO)
         self.request_directory = request_directory
         os.environ['PYTHONUNBUFFERED'] = "1"
+        self.sigterm_grace_seconds = 10
+
+    def killpg_if_running(self, process: Popen, sigkill_grace_seconds: int, post_kill_hook: Callable[[], None] = None) -> None:
+        self.__sendpg_signal(process, signal.SIGTERM, post_kill_hook)
+        try:
+            process.wait(sigkill_grace_seconds)
+        except TimeoutExpired:
+            self.__sendpg_signal(process, signal.SIGKILL)
+
+
+    def __sendpg_signal(self, proc: Popen, proc_signal: signal.Signals, post_kill_hook: Callable[[], None] = None) -> None:
+        try:
+            pg_id = os.getpgid(proc.pid)
+            self.logger.info("Sending %s to process group %d for process %d", proc_signal, pg_id, proc.pid)
+            os.killpg(pg_id, proc_signal)
+            if post_kill_hook:
+                post_kill_hook()
+        except ProcessLookupError:
+            # Process not found, so we can assume it has already ended. This can happen because of
+            # race-conditions around when the process finishes, this method is called, and timeout
+            # cancelled
+            self.logger.debug("No process group for process %d found. Ignoring %s.", proc.pid, proc_signal)
 
     def process_stream(self, stream, str_name, file_handle):
         line = stream.readline()
@@ -28,7 +74,7 @@ class Runner:
             file_handle.write(line)
             line = stream.readline()
 
-    def run(self, cmd: list, is_append=False):
+    def run(self, cmd: list, timeout_seconds, is_append=False):
         self.logger.info("Running command: %s", str(cmd))
         
         stdout_target_loc = os.path.join(self.request_directory, "stdout.log")
@@ -45,17 +91,37 @@ class Runner:
                 stderr_t = threading.Thread(target = self.process_stream, args=(proc.stderr, "STDERR", stderr_handle))
                 stdout_t.start()
                 stderr_t.start()
-                return_code = proc.wait()
-                stdout_t.join()
-                stderr_t.join()
+                timeout_recorder = _TimeoutRecorder()
+                timeout_timer = Timer(
+                    timeout_seconds + self.sigterm_grace_seconds,
+                    lambda: self.killpg_if_running(process=proc,
+                                                        # Arbitrarily picked to fail fast
+                                                        sigkill_grace_seconds=3,
+                                                        post_kill_hook=timeout_recorder.record_timeout))
+                try: 
+                    timeout_timer.start()
+                    return_code = proc.wait()
+                except Exception as e:
+                    self.logger.info(f"Exception occurred during job run: {e}")
+                    if not return_code:
+                        return_code = -1
+                finally:
+                    timeout_timer.cancel()
+                    stdout_t.join()
+                    stderr_t.join()
+
                 stop = time.monotonic()
-                timing = f">>>>>{cmd[0]} : {stop-start} seconds<<<<<\n"
-                self.logger.info(f"STDERR: {timing}")
-                stderr_handle.write(timing)
+                timing = stop-start
+                timing_str = f">>>>>{cmd[0]} : {timing} seconds<<<<<\n"
+                self.logger.info(f"STDERR: {timing_str}")
+                stderr_handle.write(timing_str)
+                
         return {
             "stdout": stdout_target_loc,
             "stderr": stderr_target_loc,
             "return_code": return_code,
+            "time": timing,
+            "timed_out": timeout_recorder.is_timed_out(),
             "output_directory": self.request_directory
         }
 
@@ -69,8 +135,7 @@ class Runner:
         hostfile_path = os.path.join(request_dir, 'combined_hostfile')
         with open(hostfile_path, 'w+') as f:
             for ip in ips:
-                f.write(f'{ip} slots=4') # Cloud track
-                # f.write(f'{ip} slots=16') # Parallel track
+                f.write(f'{ip} slots={SLOTS}') # Parallel track
                 f.write('\n')
             return hostfile_path
 
@@ -87,17 +152,8 @@ class Runner:
         return run_list
 
     def determine_proof_files(self): 
-        rootdir = '/logs/processes'
-        proof_files = []
-        for path in glob.glob(f'{rootdir}/*/proof.*.frat'):
-            print(f"An expected proof file path is: {path}")
-            proof_files.append(path)
-
-        # silly trick so that the proof file numbers are 'first' in the sort.
-        reversed_files = [reverse_function(str) for str in proof_files]
-        reversed_files.sort()
-        proof_files = [reverse_function(str) for str in reversed_files]
-
+        rootdir = '/logs/processes/proof'
+        proof_files = [f'/logs/processes/proof/proof.{x+1}.frat' for x in range(PROOF_FILES)]
         print(f"The list of proof files is: {proof_files}")
         return proof_files
 
@@ -109,7 +165,7 @@ class Runner:
         problem_path = input_json.get("problem_path")
 
         proof_files = self.determine_proof_files()
-        args = ['/compose-proofs', '--loose', '--keep-temps', problem_path, '/logs/processes/combined.lrat']
+        args = ['/competition/proof_compose.sh', problem_path, '/logs/processes/combined.lrat']
         args.extend(proof_files)
         return args
 
@@ -146,8 +202,7 @@ class MallobParser:
                 return "UNKNOWN"
 
 
-if __name__ == "__main__":
-    
+def main():
     request_directory = sys.argv[1]
     runner = Runner(request_directory)
     runner.logger.info("Hello from /competition/solver")
@@ -156,43 +211,41 @@ if __name__ == "__main__":
     cmd = runner.get_command(input_json)
     
     runner.logger.info("Running solver ...")
-    
-    output = runner.run(cmd)
-    result = MallobParser.get_result(output["stdout"])
-    runner.logger.info(f"RESULT: {result}")
+    time_remaining = TOTAL_TIME
 
+    unsat_sequence = [lambda: runner.get_combine_command(input_json),
+                      lambda: runner.get_renumber_command(input_json), 
+                      lambda: runner.get_wc_command(),
+                      lambda: runner.get_check_command(input_json)]
+
+    output = runner.run(cmd, time_remaining)
+    result = MallobParser.get_result(output["stdout"])
+    return_code = output["return_code"]
+    runner.logger.info(f"RESULT: {result}")
+    time_remaining = time_remaining - output["time"]
     # proof check
-    if (result == "UNSATISFIABLE"):
-        combine_cmd = runner.get_combine_command(input_json)
-        runner.logger.info(f"Running combiner with {combine_cmd}")
-        combiner_result = runner.run(combine_cmd, True)
-        if combiner_result["return_code"]:
-            runner.logger.info(f"Combiner return code was non-zero ({combiner_result.return_code}).  Returning 'ERROR'.")
-            result = "ERROR"  
-        else:
-            renumber_cmd = runner.get_renumber_command(input_json)
-            runner.logger.info(f"Running proof renumbering tool with {renumber_cmd}")
-            renumber_result = runner.run(renumber_cmd, True)
-            if renumber_result["return_code"]:
-                runner.logger.info(f"Reunumber return code was non-zero ({renumber_result.return_code}).  Returning 'ERROR'.")
+    if (result == "UNSATISFIABLE" and not output["timed_out"]):
+        for call in unsat_sequence: 
+            cmd = call()
+            result = runner.run(cmd, time_remaining, True)
+            time_remaining = time_remaining - result["time"]
+            return_code = result["return_code"]
+            if return_code:
+                runner.logger.info(f"Cmd: {cmd} return code was non-zero ({return_code}).  Returning 'ERROR'.")
                 result = "ERROR"
-            else: 
-                runner.run(runner.get_wc_command(), True)
-                
-                check_cmd = runner.get_check_command(input_json)
-                runner.logger.info(f"Running proof checker with {check_cmd}")
-                checker_result = runner.run(check_cmd, True)
-                if checker_result["return_code"]:
-                    runner.logger.info(f"Checker return code was non-zero ({checker_result.return_code}).  Returning 'ERROR'.")
-                    result = "ERROR"  
-                else:
-                    runner.logger.info(f"Checker return code was zero.  Check successful!")
-    
+                break
+            elif output["timed_out"]:
+                runner.logger.info(f"Time-out during cmd {cmd}.  Returning 'UNKNOWN'.")
+                result = "UNKNOWN"
+                break
+        if result == "UNSATISFIABLE": 
+            runner.logger.info(f"Checker return code was zero.  Check successful!")
+                    
     # clean up.
     runner.run(['/competition/cleanup'], True)
     
     solver_output = {
-        "return_code": output["return_code"],
+        "return_code": return_code,
         "result": result,
         "artifacts": {
             "stdout_path": output["stdout"],
@@ -202,3 +255,6 @@ if __name__ == "__main__":
     
     with open(os.path.join(request_directory, "solver_out.json"), "w+") as f:
         f.write(json.dumps(solver_output))
+
+if __name__ == "__main__":
+    main()

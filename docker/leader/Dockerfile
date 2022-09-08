@@ -5,8 +5,10 @@ USER root
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt install -y cmake build-essential zlib1g-dev libopenmpi-dev wget unzip build-essential zlib1g-dev cmake python3 build-essential gfortran wget curl libjemalloc-dev libjemalloc2 gdb libboost-all-dev
 
+
 # Build Mallob
 # Copy in all the files we need, rather than clone a repository
+WORKDIR /
 RUN mkdir mallob
 COPY /CMakeLists.txt mallob/CMakeLists.txt
 COPY /src mallob/src
@@ -25,12 +27,14 @@ RUN cd build \
   && VERBOSE=1 make -j4 \
   && cd ..
 
-# Copy in Dawn's composition tools
-
+# Build Dawn's composition tools
+WORKDIR /
 COPY /tools tools
-RUN cd tools/composition && \
-    make && \
-    cd ../..
+WORKDIR tools/composition
+# Just in case - causes problems later if you have built outside Docker.
+RUN rm -Rf build
+RUN make 
+
 
 
 ################### Extract Mallob in run stage
@@ -49,10 +53,11 @@ COPY --from=builder /mallob/build/mallob_sat_process mallob_sat_process
 COPY --from=builder /mallob/build/mallob_process_dispatcher mallob_process_dispatcher
 COPY --from=builder /mallob/lib/drat-trim/lrat-check lrat-check
 
-COPY --from=builder /mallob/tools/composition/build/compose-proofs compose-proofs 
-COPY --from=builder /mallob/tools/composition/build/renumber-proofs renumber-proofs
+COPY --from=builder /tools/composition/build/compose-proofs compose-proofs 
+COPY --from=builder /tools/composition/build/renumber-proofs renumber-proofs
 COPY --chown=ecs-user /docker/leader/run_mallob.sh /competition
 COPY --chown=ecs-user /docker/leader/proof_line_count.sh /competition
+COPY --chown=ecs-user /docker/leader/proof_compose.sh /competition
 COPY --chown=ecs-user /docker/leader/solver /competition
 COPY /docker/leader/cleanup /competition
 USER root
@@ -61,3 +66,4 @@ USER ecs-user
 RUN chmod +x /competition/run_mallob.sh
 RUN chmod +x /competition/solver
 RUN chmod +x /competition/proof_line_count.sh
+RUN chmod +x /competition/proof_compose.sh

@@ -12,7 +12,6 @@
 #include "reverse.hpp"
 #include "prune.hpp"
 
-
 void print_usage(char *name, boost::program_options::options_description desc){
     printf("Usage:  %s [options] PROBLEM.dimacs OUTPUT.lrat INPUT.frat...\n", name);
     printf("\n");
