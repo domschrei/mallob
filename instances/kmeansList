@@ -15,7 +15,6 @@ instances/rl/arrhythmia.arff
 instances/rl/balance-scale.arff
 instances/rl/cpu.arff
 instances/covtypeShuffle20.csv
-instances/rl/dermatology.arff
 instances/rl/ecoli.arff
 instances/benign_traffic.csv
 instances/rl/iono.arff
