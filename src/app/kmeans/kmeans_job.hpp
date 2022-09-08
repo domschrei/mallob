@@ -102,7 +102,7 @@ class KMeansJob : public Job {
                 if (iAmRoot && iterationsDone == 1) {
                     LOG(V0_CRIT, "                           first iteration finished\n");
                 }
-                LOG(V2_INFO, "                           Another iter %i k:%i\n", iterationsDone, countClusters);
+                LOG(V2_INFO, "                           Another iter %i k:%i w:%i\n", iterationsDone, countClusters, this->getVolume());
                 return transformed;
             }
         };
