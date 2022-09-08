@@ -8,7 +8,7 @@ jobDescTemplate="instances/kmeansTest"
 jobTemplate="templates/job-template-kmeans.json" 
 clientTemplate="templates/client-template-KR.json"
 v="2"
-time="30"
+time="120"
 
 mkdir -p ./Testing/${folder}
 echo "pcName:$pcName np:$np J:$J ajpc:$ajpc $jobDescTemplate $jobTemplate $clientTemplate v:$v time:$time"> ./Testing/${folder}/info.txt

@@ -49728,3 +49728,6 @@ found err
 
 
 
+There was a problem opening the input file!
+./Testing/orchestrated.sh: line 20: 79531 Killed                  PATH=build/:$PATH RDMAV_FORKSAVE=1 mpirun -np $np --use-hwthread-cpus --map-by numa:PE=2 --bind-to hwthread build/mallob -c=1 -J=$J -ajpc=$ajpc -job-desc-template=$jobDescTemplate -job-template=$jobTemplate -client-template=$clientTemplate -pls=0 -v=$v 2>&1 > ./Testing/${folder}/out.txt
+kill: usage: kill [-s sigspec | -n signum | -sigspec] pid | jobspec ... or kill -l [sigspec]
