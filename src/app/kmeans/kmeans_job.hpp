@@ -131,6 +131,7 @@ class KMeansJob : public Job {
     bool appl_isDestructible() override { return true; }
     void appl_memoryPanic() override;
     int getDemand() {
+        LOG(V2_INFO, "                                                            ask Demand\n");
         if (!loaded) {
             return 1;
         } else {
