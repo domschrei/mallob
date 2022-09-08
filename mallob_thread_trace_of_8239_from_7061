@@ -1,0 +1,7 @@
+Could not attach to process.  If your uid matches the uid of the target
+process, check the setting of /proc/sys/kernel/ya[Inferior 1 (process 8239) detached]
+Exception ignored in: <gdb._GdbOutputFile object at 0x7f7877ce0bb0>
+Traceback (most recent call last):
+  File "/usr/share/gdb/python/gdb/__init__.py", line 43, in flush
+    def flush(self):
+KeyboardInterrupt: 
