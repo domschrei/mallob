@@ -132,7 +132,7 @@ class KMeansJob : public Job {
     void appl_memoryPanic() override;
     int getDemand() {
         if (!loaded) {
-            return Job::getDemand();
+            return 1;
         } else {
             if (maxDemandCalculated) {
                 return maxDemand;
