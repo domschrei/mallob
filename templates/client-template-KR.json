@@ -24,8 +24,8 @@
     },
     "arrival": {
         "comment": "The arrival of a job given in seconds after Mallob's upstart.",
-        "type": "exponential",
-        "params": [0.2]
+        "type": "constant",
+        "params": [0]
     },
     "burstsize": {
         "comment": "The number of jobs arriving simultaneously at each arrival event.",
