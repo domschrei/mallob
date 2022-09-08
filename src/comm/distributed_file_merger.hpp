@@ -152,8 +152,8 @@ private:
 
     std::future<void> _fut_merging;
     bool _began_merging = false;
-
     bool _began_final_barrier = false;
+    bool _reversed_file = false;
 
     float _timepoint_merge_begin;
     float _time_active = 0;
@@ -305,7 +305,10 @@ public:
     }
 
     bool finished() const {
-        return isFullyExhausted();
+        if (!isFullyExhausted()) return false;
+        if (MyMpi::rank(_comm) == 0) {
+            return _reversed_file;
+        } else return true;
     }
 
     bool allProcessesFinished() {
@@ -465,6 +468,8 @@ private:
         // remove original (reversed) file
         std::string cmd = "rm " + _output_filename + ".inv";
         system(cmd.c_str());
+
+        _reversed_file = true;
     }
 
     bool areInputsExhausted() const {
