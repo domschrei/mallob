@@ -405,6 +405,7 @@ void KMeansJob::loadInstance() {
     }
     */
     allReduceElementSize = (dimension + 1) * countClusters;
+    setMaxDemand();
 }
 
 void KMeansJob::setRandomStartCenters() {

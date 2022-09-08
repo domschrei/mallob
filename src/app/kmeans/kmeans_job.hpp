@@ -131,15 +131,17 @@ class KMeansJob : public Job {
     void appl_dumpStats() override;
     bool appl_isDestructible() override { return true; }
     void appl_memoryPanic() override;
-    int getDemand() override {
-        LOG(V2_INFO, "                                                                                    ask Demand\n");
+    int getDemand() const override {
+        //LOG(V2_INFO, "                                                                                    ask Demand\n");
         if (!loaded) {
             return Job::getDemand();
         } else {
-            if (maxDemandCalculated) {
-                return maxDemand;
-            } else {
-                double problemSize = countClusters * dimension * pointsCount;
+            return maxDemand;
+        }
+    }
+
+    void setMaxDemand() {
+        double problemSize = countClusters * dimension * pointsCount;
                 maxDemand = 0.00005410212640549420 * pow(problemSize, 0.68207843808596479995);  // evaluated with tests
                 maxDemandCalculated = true;
                 if (maxDemand <= 0) {
@@ -158,9 +160,6 @@ class KMeansJob : public Job {
                     }
                 }
                 maxDemand = std::min(maxDemand, Job::getGlobalNumWorkers());
-                return maxDemand;
-            }
-        }
     }
 
     void loadInstance();
