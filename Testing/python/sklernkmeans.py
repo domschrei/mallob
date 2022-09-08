@@ -5,6 +5,7 @@ def main():
     import time
     import numpy as np
     from sklearn.datasets import make_blobs
+    
     np.set_printoptions(suppress=True)
 
        
@@ -16,7 +17,7 @@ def main():
                 floats.append(float(number))
 
     
-    k, dimension, skipCols, pointsCount = 20, 54, 55, 581012
+    k, dimension, skipCols, pointsCount = 50, 54, 55, 581012
     X = np.ndarray([pointsCount,dimension])
     for point in range(pointsCount):
         for entry in range(dimension):

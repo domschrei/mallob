@@ -84,7 +84,7 @@ class KMeansJob : public Job {
             LOG(V3_VERB, "                           Children: %i\n",
                 this->getJobTree().getNumChildren());
 
-            if (iterationsDone >= 150) {
+            if (!centersChanged(0.001f)) {//iterationsDone >= 150
                 LOG(V0_CRIT, "                           Got Result after iter %i\n", iterationsDone);
                 internal_result.result = RESULT_SAT;
                 internal_result.id = getId();
@@ -141,7 +141,7 @@ class KMeansJob : public Job {
                 return maxDemand;
             } else {
                 double problemSize = countClusters * dimension * pointsCount;
-                maxDemand = -330.7589 + 20.2719 * log(problemSize);  // evaluated with tests
+                maxDemand = 0.00005410212640549420 * pow(problemSize, 0.68207843808596479995);  // evaluated with tests
                 maxDemandCalculated = true;
                 if (maxDemand <= 0) {
                     maxDemand = 1;
