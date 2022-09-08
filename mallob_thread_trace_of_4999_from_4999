@@ -1,0 +1,44 @@
+[New LWP 5024]
+[New LWP 5031]
+[New LWP 5317]
+[New LWP 5478]
+[New LWP 5545]
+[New LWP 5608]
+[New LWP 5655]
+[New LWP 5778]
+[New LWP 5856]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=139964809193216, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=139964809193216, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007f4c3b7d5047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x0000556e4e6c617f in Process::writeTrace (tid=4999) at /home/doerr/mallob/src/util/sys/process.cpp:198
+#3  0x0000556e4e6c585b in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:70
+#4  0x0000556e4e6c5779 in handleSignal (signum=11) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#5  <signal handler called>
+#6  tcache_get (tc_idx=<optimized out>) at malloc.c:2937
+#7  __GI___libc_malloc (bytes=134) at malloc.c:3051
+#8  0x0000556e4e6138b3 in robin_hood::detail::Table<true, 80ul, int, int, robin_hood::hash<int, void>, std::equal_to<int> >::initData (this=0x556e4f61fe08, max_elements=8) at /home/doerr/mallob/src/util/robin_hood.hpp:2330
+#9  0x0000556e4e60fd89 in robin_hood::detail::Table<true, 80ul, int, int, robin_hood::hash<int, void>, std::equal_to<int> >::increase_size (this=0x556e4f61fe08) at /home/doerr/mallob/src/util/robin_hood.hpp:2431
+#10 0x0000556e4e60bf2b in robin_hood::detail::Table<true, 80ul, int, int, robin_hood::hash<int, void>, std::equal_to<int> >::insertKeyPrepareEmptySpot<int const&> (this=0x556e4f61fe08, key=@0x7fff4135bfe4: 0) at /home/doerr/mallob/src/util/robin_hood.hpp:2366
+#11 0x0000556e4e607f45 in robin_hood::detail::Table<true, 80ul, int, int, robin_hood::hash<int, void>, std::equal_to<int> >::operator[]<int> (this=0x556e4f61fe08, key=@0x7fff4135bfe4: 0) at /home/doerr/mallob/src/util/robin_hood.hpp:1731
+#12 0x0000556e4e6bffac in AdjustablePermutation::adjust (this=0x556e4f61ea60, x=0, new_x=3) at /home/doerr/mallob/src/util/permutation.cpp:272
+#13 0x0000556e4e60286a in JobTree::updateJobNode (this=0x556e4f61ea50, index=0, newRank=3) at /home/doerr/mallob/src/app/job_tree.hpp:195
+#14 0x0000556e4e646fef in JobTree::update (this=0x556e4f61ea50, index=33, rootRank=3, parentRank=56) at /home/doerr/mallob/src/app/job_tree.hpp:190
+#15 0x0000556e4e6456d2 in Job::updateJobTree (this=0x556e4f61e7f0, index=33, rootRank=3, parentRank=56) at /home/doerr/mallob/src/app/job.cpp:55
+#16 0x0000556e4e645828 in Job::commit (this=0x556e4f61e7f0, req=...) at /home/doerr/mallob/src/app/job.cpp:64
+#17 0x0000556e4e675f96 in JobDatabase::commit (this=0x556e4f5b52a8, req=...) at /home/doerr/mallob/src/data/job_database.cpp:203
+#18 0x0000556e4e5f762f in Worker::tryAdoptRequest (this=0x556e4f5b5290, req=..., source=19, mode=JobDatabase::NORMAL) at /home/doerr/mallob/src/worker.cpp:682
+#19 0x0000556e4e5f7261 in Worker::handleRequestNode (this=0x556e4f5b5290, handle=..., mode=JobDatabase::NORMAL) at /home/doerr/mallob/src/worker.cpp:644
+#20 0x0000556e4e5f4cd9 in Worker::<lambda(const JobRequest&, int)>::operator()(const JobRequest &, int) const (__closure=0x556e4f5b5600, req=..., rank=19) at /home/doerr/mallob/src/worker.cpp:190
+#21 0x0000556e4e5fee62 in std::_Function_handler<void(const JobRequest&, int), Worker::createExpanderGraph()::<lambda(const JobRequest&, int)> >::_M_invoke(const std::_Any_data &, const JobRequest &, int &&) (__functor=..., __args#0=..., __args#1=@0x7fff4135c44c: 19) at /usr/include/c++/9/bits/std_function.h:300
+#22 0x0000556e4e64c1fa in std::function<void (JobRequest const&, int)>::operator()(JobRequest const&, int) const (this=0x556e4f5b5600, __args#0=..., __args#1=19) at /usr/include/c++/9/bits/std_function.h:688
+#23 0x0000556e4e64ad4c in CollectiveAssignment::resolveRequests (this=0x556e4f5b55f8) at /home/doerr/mallob/src/balancing/collective_assignment.cpp:137
+#24 0x0000556e4e64b18e in CollectiveAssignment::advance (this=0x556e4f5b55f8, epoch=10) at /home/doerr/mallob/src/balancing/collective_assignment.cpp:188
+#25 0x0000556e4e5f53dc in Worker::advance (this=0x556e4f5b5290, time=39.2762794) at /home/doerr/mallob/src/worker.cpp:228
+#26 0x0000556e4e61b4eb in doMainProgram (commWorkers=@0x7fff4135c7d0: 0x556e4f542210, commClients=@0x7fff4135c7c8: 0x556e4e990cc0 <ompi_mpi_comm_null>, params=...) at /home/doerr/mallob/src/main.cpp:128
+#27 0x0000556e4e61c0d7 in main (argc=10, argv=0x7fff4135f9b8) at /home/doerr/mallob/src/main.cpp:261
+[Inferior 1 (process 4999) detached]
