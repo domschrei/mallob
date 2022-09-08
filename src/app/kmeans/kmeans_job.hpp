@@ -102,7 +102,8 @@ class KMeansJob : public Job {
                 if (iAmRoot && iterationsDone == 1) {
                     LOG(V0_CRIT, "                           first iteration finished\n");
                 }
-                LOG(V2_INFO, "                           Another iter %i    k:%i    w:%i   dem:%i\n", iterationsDone, countClusters, this->getVolume(), this->getDemand());
+                LOG(V2_INFO, "                           Another iter %i    k:%i    w:%i\n", iterationsDone, countClusters, this->getVolume());
+                //LOG(V2_INFO, "                           Another iter %i    k:%i    w:%i   dem:%i\n", iterationsDone, countClusters, this->getVolume(), this->getDemand());
                 return transformed;
             }
         };
@@ -131,7 +132,7 @@ class KMeansJob : public Job {
     bool appl_isDestructible() override { return true; }
     void appl_memoryPanic() override;
     int getDemand() {
-        LOG(V2_INFO, "                                                            ask Demand\n");
+        LOG(V2_INFO, "                                                                                    ask Demand\n");
         if (!loaded) {
             return 1;
         } else {
