@@ -1,0 +1,36 @@
+[New LWP 11174]
+[New LWP 11179]
+[New LWP 11311]
+[New LWP 11438]
+[New LWP 11505]
+[New LWP 11575]
+[New LWP 11631]
+[New LWP 11845]
+[New LWP 11891]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=139801722353408, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=139801722353408, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007f264eeff047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x00005618e1ac717f in Process::writeTrace (tid=11143) at /home/doerr/mallob/src/util/sys/process.cpp:198
+#3  0x00005618e1ac685b in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:70
+#4  0x00005618e1ac6779 in handleSignal (signum=11) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#5  <signal handler called>
+#6  tcache_get (tc_idx=<optimized out>) at malloc.c:2937
+#7  __GI___libc_malloc (bytes=128) at malloc.c:3051
+#8  0x00007f264eed2b39 in operator new(unsigned long) () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#9  0x00005618e1a1a31c in __gnu_cxx::new_allocator<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo>::allocate(unsigned long, void const*) (this=0x7ffebb8c4bd0, __n=8) at /usr/include/c++/9/ext/new_allocator.h:114
+#10 0x00005618e1a18cf0 in std::allocator_traits<std::allocator<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo> >::allocate(std::allocator<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo>&, unsigned long) (__a=..., __n=8) at /usr/include/c++/9/bits/alloc_traits.h:443
+#11 0x00005618e1a16a26 in std::_Vector_base<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo, std::allocator<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo> >::_M_allocate(unsigned long) (this=0x7ffebb8c4bd0, __n=8) at /usr/include/c++/9/bits/stl_vector.h:343
+#12 0x00005618e1a1367f in std::vector<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo, std::allocator<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo> >::_M_realloc_insert<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo>(__gnu_cxx::__normal_iterator<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo*, std::vector<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo, std::allocator<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo> > >, HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo&&) (this=0x7ffebb8c4bd0, __position={procIdx = 140732044954352, usedMem = 1.35925951e-43, utility = 0}) at /usr/include/c++/9/bits/vector.tcc:440
+#13 0x00005618e1a0f074 in std::vector<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo, std::allocator<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo> >::emplace_back<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo>(HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo&&) (this=0x7ffebb8c4bd0) at /usr/include/c++/9/bits/vector.tcc:121
+#14 0x00005618e1a0a8f2 in std::vector<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo, std::allocator<HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo> >::push_back(HostComm::advanceAndCheckMemoryPanic(float)::ProcessInfo&&) (this=0x7ffebb8c4bd0, __x=...) at /usr/include/c++/9/bits/stl_vector.h:1201
+#15 0x00005618e1a08130 in HostComm::advanceAndCheckMemoryPanic (this=0x7ffebb8c4df0, time=64.0582733) at /home/doerr/mallob/src/comm/host_comm.hpp:148
+#16 0x00005618e19f6ab5 in Worker::checkStats (this=0x5618e2f90e40, time=64.0582733) at /home/doerr/mallob/src/worker.cpp:314
+#17 0x00005618e19f6331 in Worker::advance (this=0x5618e2f90e40, time=64.0582733) at /home/doerr/mallob/src/worker.cpp:217
+#18 0x00005618e1a1c4eb in doMainProgram (commWorkers=@0x7ffebb8c4ec0: 0x5618e2f04450, commClients=@0x7ffebb8c4eb8: 0x5618e1d91cc0 <ompi_mpi_comm_null>, params=...) at /home/doerr/mallob/src/main.cpp:128
+#19 0x00005618e1a1d0d7 in main (argc=10, argv=0x7ffebb8c80a8) at /home/doerr/mallob/src/main.cpp:261
+[Inferior 1 (process 11143) detached]
