@@ -1,0 +1,43 @@
+[New LWP 17122]
+[New LWP 17127]
+[New LWP 17270]
+[New LWP 17331]
+[New LWP 17367]
+[New LWP 17416]
+[New LWP 17483]
+[New LWP 17727]
+[New LWP 17885]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=140495594190592, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=140495594190592, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007fc7d0a52047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x000055e69cc4d17f in Process::writeTrace (tid=17096) at /home/doerr/mallob/src/util/sys/process.cpp:198
+#3  0x000055e69cc4c85b in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:70
+#4  0x000055e69cc4c779 in handleSignal (signum=11) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#5  <signal handler called>
+#6  tcache_get (tc_idx=<optimized out>) at malloc.c:2937
+#7  __GI___libc_malloc (bytes=72) at malloc.c:3051
+#8  0x00007fc7d0a25b39 in operator new(unsigned long) () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#9  0x000055e69cb6f146 in __gnu_cxx::new_allocator<std::_List_node<ThreadPool::Runnable> >::allocate (this=0x55e69e9b6e48, __n=1) at /usr/include/c++/9/ext/new_allocator.h:114
+#10 0x000055e69cb67890 in std::allocator_traits<std::allocator<std::_List_node<ThreadPool::Runnable> > >::allocate (__a=..., __n=1) at /usr/include/c++/9/bits/alloc_traits.h:443
+#11 0x000055e69cb5c8e1 in std::__cxx11::_List_base<ThreadPool::Runnable, std::allocator<ThreadPool::Runnable> >::_M_get_node (this=0x55e69e9b6e48) at /usr/include/c++/9/bits/stl_list.h:438
+#12 0x000055e69cb4b256 in std::__cxx11::list<ThreadPool::Runnable, std::allocator<ThreadPool::Runnable> >::_M_create_node<ThreadPool::Runnable> (this=0x55e69e9b6e48) at /usr/include/c++/9/bits/stl_list.h:630
+#13 0x000055e69cb417fc in std::__cxx11::list<ThreadPool::Runnable, std::allocator<ThreadPool::Runnable> >::_M_insert<ThreadPool::Runnable> (this=0x55e69e9b6e48, __position=Python Exception <class 'AttributeError'> 'NoneType' object has no attribute 'pointer': 
+) at /usr/include/c++/9/bits/stl_list.h:1907
+#14 0x000055e69cb3a365 in std::__cxx11::list<ThreadPool::Runnable, std::allocator<ThreadPool::Runnable> >::push_back (this=0x55e69e9b6e48, __x=...) at /usr/include/c++/9/bits/stl_list.h:1213
+#15 0x000055e69cb33a20 in ThreadPool::addTask(std::function<void ()>&&) (this=0x55e69e9b6e30, function=...) at /home/doerr/mallob/src/util/sys/thread_pool.hpp:46
+#16 0x000055e69cc56778 in KMeansJob::appl_communicate (this=0x55e69eaa3710, source=42, mpiTag=30, msg=...) at /home/doerr/mallob/src/app/kmeans/kmeans_job.cpp:355
+#17 0x000055e69cbcd39d in Job::communicate (this=0x55e69eaa3710, source=42, mpiTag=30, msg=...) at /home/doerr/mallob/src/app/job.cpp:232
+#18 0x000055e69cb7ea91 in Worker::handleSendApplicationMessage (this=0x55e69ea71b30, handle=...) at /home/doerr/mallob/src/worker.cpp:742
+#19 0x000055e69cb7ad72 in Worker::<lambda(auto:19&)>::operator()<MessageHandle>(MessageHandle &) const (__closure=0x55e69ea73238, h=...) at /home/doerr/mallob/src/worker.cpp:107
+#20 0x000055e69cb84fa6 in std::_Function_handler<void(MessageHandle&), Worker::init()::<lambda(auto:19&)> >::_M_invoke(const std::_Any_data &, MessageHandle &) (__functor=..., __args#0=...) at /usr/include/c++/9/bits/std_function.h:300
+#21 0x000055e69cbf19a5 in std::function<void (MessageHandle&)>::operator()(MessageHandle&) const (this=0x55e69ea73238, __args#0=...) at /usr/include/c++/9/bits/std_function.h:688
+#22 0x000055e69cbed9af in MessageQueue::processSelfReceived (this=0x55e69ea68f70) at /home/doerr/mallob/src/comm/message_queue.cpp:307
+#23 0x000055e69cbec9ec in MessageQueue::advance (this=0x55e69ea68f70) at /home/doerr/mallob/src/comm/message_queue.cpp:112
+#24 0x000055e69cba2510 in doMainProgram (commWorkers=@0x7ffeefebd5d0: 0x55e69e9ce4d0, commClients=@0x7ffeefebd5c8: 0x55e69cf17cc0 <ompi_mpi_comm_null>, params=...) at /home/doerr/mallob/src/main.cpp:132
+#25 0x000055e69cba30d7 in main (argc=10, argv=0x7ffeefec07b8) at /home/doerr/mallob/src/main.cpp:261
+[Inferior 1 (process 17096) detached]

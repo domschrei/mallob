@@ -1,0 +1,546 @@
+c 
+c Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving
+c Designed by P. Sanders and D. Schreiber 2018-2022
+c Developed by D. Schreiber 2019-2022
+c 
+c 0.000 96 Mallob dbg pid=20201 on host i10pc135
+c 0.000 19 Mallob dbg pid=19962 on host i10pc135
+c 0.000 24 Mallob dbg pid=19982 on host i10pc135
+c 0.000 39 Mallob dbg pid=20023 on host i10pc135
+c 0.001 84 Mallob dbg pid=20171 on host i10pc135
+c 0.001 101 Mallob dbg pid=20220 on host i10pc135
+c 0.000 104 Mallob dbg pid=20230 on host i10pc135
+c 0.001 25 Mallob dbg pid=19985 on host i10pc135
+c 0.000 26 Mallob dbg pid=19994 on host i10pc135
+c 0.001 40 Mallob dbg pid=20030 on host i10pc135
+c 0.001 45 Mallob dbg pid=20046 on host i10pc135
+c 0.000 50 Mallob dbg pid=20052 on host i10pc135
+c 0.001 46 Mallob dbg pid=20039 on host i10pc135
+c 0.000 53 Mallob dbg pid=20080 on host i10pc135
+c 0.000 57 Mallob dbg pid=20089 on host i10pc135
+c 0.001 1 Mallob dbg pid=19938 on host i10pc135
+c 0.001 12 Mallob dbg pid=19949 on host i10pc135
+c 0.001 15 Mallob dbg pid=19952 on host i10pc135
+c 0.001 0 Program options: -0o=0 -J=1 -T=0 -ajpc=0 -ans=0 -appmode=fork -ba=4 -bicg=4 -c=1 -cbbs=1500 -cbdf=0.9 -cfci=20 -cg=1 -ch=0 -chaf=5 -checksums=0 -chstms=10 -cmp=0 -colors=0 -dc=0 -ddd=0 -delaymonkey=0 -derandomize=1 -evu=0 -fapii=0 -g=0 -gclls=0 -h=0 -hbbfs=10 -hubfs=9999999 -huca=-1 -iff=0 -interface-fs=0 -interface-ipc=0 -isp=0 -jc=4 -jcl=0 -jcup=0 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -ljpc=32 -mbfsd=4 -mbt=1000000 -mcips=10 -md=0 -mid=0 -mjps=0 -mlbdps=8 -mlpt=50000000 -mmpi=0 -mono=./instances/covtypeShuffle20.csv -mono-application=KMEANS -nce=20 -os=0 -p=0.01 -phasediv=1 -pls=1 -pph=0 -q=0 -qcll=8 -qlbdl=2 -ril=0 -rpa=0 -rs=1 -rto=0 -s=1 -satsolver=L -scll=30 -seed=0 -sjd=0 -slbdl=30 -sleep=100 -subproc-dir=build -t=1 -trace-dir=. -v=3 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -wr=0 -y=1 -yield=0 
+c 0.001 0 Mallob dbg pid=19937 on host i10pc135
+c 0.001 0 127 workers, 1 clients
+c 0.001 29 Mallob dbg pid=20002 on host i10pc135
+c 0.001 49 Mallob dbg pid=20060 on host i10pc135
+c 0.001 54 Mallob dbg pid=20062 on host i10pc135
+c 0.001 13 Mallob dbg pid=19950 on host i10pc135
+c 0.001 16 Mallob dbg pid=19953 on host i10pc135
+c 0.001 41 Mallob dbg pid=20038 on host i10pc135
+c 0.001 109 Mallob dbg pid=20244 on host i10pc135
+c 0.001 110 Mallob dbg pid=20234 on host i10pc135
+c 0.001 23 Mallob dbg pid=19977 on host i10pc135
+c 0.001 27 Mallob dbg pid=19996 on host i10pc135
+c 0.001 34 Mallob dbg pid=20013 on host i10pc135
+c 0.001 62 Mallob dbg pid=20090 on host i10pc135
+c 0.001 6 Mallob dbg pid=19943 on host i10pc135
+c 0.001 56 Mallob dbg pid=20087 on host i10pc135
+c 0.000 33 Mallob dbg pid=20015 on host i10pc135
+c 0.001 47 Mallob dbg pid=20044 on host i10pc135
+c 0.001 61 Mallob dbg pid=20098 on host i10pc135
+c 0.001 66 Mallob dbg pid=20102 on host i10pc135
+c 0.001 68 Mallob dbg pid=20146 on host i10pc135
+c 0.001 106 Mallob dbg pid=20228 on host i10pc135
+c 0.001 97 Mallob dbg pid=20205 on host i10pc135
+c 0.001 103 Mallob dbg pid=20224 on host i10pc135
+c 0.001 2 Mallob dbg pid=19939 on host i10pc135
+c 0.001 93 Mallob dbg pid=20190 on host i10pc135
+c 0.001 64 Mallob dbg pid=20104 on host i10pc135
+c 0.001 70 Mallob dbg pid=20111 on host i10pc135
+c 0.001 91 Mallob dbg pid=20187 on host i10pc135
+c 0.001 116 Mallob dbg pid=20265 on host i10pc135
+c 0.001 126 Mallob dbg pid=20283 on host i10pc135
+c 0.001 37 Mallob dbg pid=20028 on host i10pc135
+c 0.001 58 Mallob dbg pid=20083 on host i10pc135
+c 0.001 86 Mallob dbg pid=20159 on host i10pc135
+c 0.001 99 Mallob dbg pid=20207 on host i10pc135
+c 0.001 113 Mallob dbg pid=20256 on host i10pc135
+c 0.001 123 Mallob dbg pid=20287 on host i10pc135
+c 0.001 11 Mallob dbg pid=19948 on host i10pc135
+c 0.001 17 Mallob dbg pid=19954 on host i10pc135
+c 0.001 31 Mallob dbg pid=20006 on host i10pc135
+c 0.001 32 Mallob dbg pid=20009 on host i10pc135
+c 0.001 51 Mallob dbg pid=20057 on host i10pc135
+c 0.001 52 Mallob dbg pid=20069 on host i10pc135
+c 0.001 117 Mallob dbg pid=20267 on host i10pc135
+c 0.001 5 Mallob dbg pid=19942 on host i10pc135
+c 0.001 38 Mallob dbg pid=20022 on host i10pc135
+c 0.001 44 Mallob dbg pid=20043 on host i10pc135
+c 0.001 71 Mallob dbg pid=20147 on host i10pc135
+c 0.001 78 Mallob dbg pid=20148 on host i10pc135
+c 0.001 82 Mallob dbg pid=20152 on host i10pc135
+c 0.001 87 Mallob dbg pid=20175 on host i10pc135
+c 0.001 42 Mallob dbg pid=20031 on host i10pc135
+c 0.000 65 Mallob dbg pid=20110 on host i10pc135
+c 0.001 8 Mallob dbg pid=19945 on host i10pc135
+c 0.001 9 Mallob dbg pid=19946 on host i10pc135
+c 0.001 21 Mallob dbg pid=19971 on host i10pc135
+c 0.001 72 Mallob dbg pid=20150 on host i10pc135
+c 0.001 95 Mallob dbg pid=20193 on host i10pc135
+c 0.001 108 Mallob dbg pid=20242 on host i10pc135
+c 0.001 121 Mallob dbg pid=20285 on host i10pc135
+c 0.001 80 Mallob dbg pid=20157 on host i10pc135
+c 0.001 102 Mallob dbg pid=20209 on host i10pc135
+c 0.001 105 Mallob dbg pid=20231 on host i10pc135
+c 0.001 125 Mallob dbg pid=20294 on host i10pc135
+c 0.001 77 Mallob dbg pid=20153 on host i10pc135
+c 0.001 124 Mallob dbg pid=20291 on host i10pc135
+c 0.002 14 Mallob dbg pid=19951 on host i10pc135
+c 0.002 81 Mallob dbg pid=20156 on host i10pc135
+c 0.001 35 Mallob dbg pid=20017 on host i10pc135
+c 0.002 75 Mallob dbg pid=20151 on host i10pc135
+c 0.002 76 Mallob dbg pid=20154 on host i10pc135
+c 0.002 7 Mallob dbg pid=19944 on host i10pc135
+c 0.001 63 Mallob dbg pid=20092 on host i10pc135
+c 0.002 67 Mallob dbg pid=20105 on host i10pc135
+c 0.002 83 Mallob dbg pid=20164 on host i10pc135
+c 0.002 3 Mallob dbg pid=19940 on host i10pc135
+c 0.002 115 Mallob dbg pid=20261 on host i10pc135
+c 0.002 79 Mallob dbg pid=20155 on host i10pc135
+c 0.002 4 Mallob dbg pid=19941 on host i10pc135
+c 0.001 89 Mallob dbg pid=20178 on host i10pc135
+c 0.002 10 Mallob dbg pid=19947 on host i10pc135
+c 0.002 30 Mallob dbg pid=20003 on host i10pc135
+c 0.002 69 Mallob dbg pid=20145 on host i10pc135
+c 0.002 98 Mallob dbg pid=20198 on host i10pc135
+c 0.002 122 Mallob dbg pid=20270 on host i10pc135
+c 0.002 36 Mallob dbg pid=20020 on host i10pc135
+c 0.002 43 Mallob dbg pid=20035 on host i10pc135
+c 0.002 60 Mallob dbg pid=20096 on host i10pc135
+c 0.002 92 Mallob dbg pid=20192 on host i10pc135
+c 0.002 114 Mallob dbg pid=20247 on host i10pc135
+c 0.002 20 Mallob dbg pid=19970 on host i10pc135
+c 0.002 85 Mallob dbg pid=20167 on host i10pc135
+c 0.002 88 Mallob dbg pid=20180 on host i10pc135
+c 0.002 118 Mallob dbg pid=20258 on host i10pc135
+c 0.002 119 Mallob dbg pid=20273 on host i10pc135
+c 0.002 28 Mallob dbg pid=19998 on host i10pc135
+c 0.002 48 Mallob dbg pid=20053 on host i10pc135
+c 0.002 55 Mallob dbg pid=20073 on host i10pc135
+c 0.002 59 Mallob dbg pid=20086 on host i10pc135
+c 0.002 73 Mallob dbg pid=20149 on host i10pc135
+c 0.002 74 Mallob dbg pid=20144 on host i10pc135
+c 0.002 90 Mallob dbg pid=20173 on host i10pc135
+c 0.002 94 Mallob dbg pid=20184 on host i10pc135
+c 0.002 100 Mallob dbg pid=20216 on host i10pc135
+c 0.002 107 Mallob dbg pid=20236 on host i10pc135
+c 0.002 111 Mallob dbg pid=20249 on host i10pc135
+c 0.002 112 Mallob dbg pid=20252 on host i10pc135
+c 0.002 120 Mallob dbg pid=20281 on host i10pc135
+c 0.002 18 Mallob dbg pid=19960 on host i10pc135
+c 0.002 22 Mallob dbg pid=19975 on host i10pc135
+c 0.005 0 Created client communicator
+c 0.006 0 Created worker communicator
+c 0.005 87 <Janitor> tid=21084
+c 0.004 85 <Janitor> tid=21090
+c 0.005 79 <Janitor> tid=21087
+c 0.004 108 <Janitor> tid=21095
+c 0.005 98 <Janitor> tid=21097
+c 0.005 36 <Janitor> tid=21093
+c 0.006 34 <Janitor> tid=21098
+c 0.005 21 <Janitor> tid=21096
+c 0.004 73 <Janitor> tid=21107
+c 0.004 112 <Janitor> tid=21103
+c 0.005 92 <Janitor> tid=21115
+c 0.005 91 <Janitor> tid=21102
+c 0.006 1 <Janitor> tid=21113
+c 0.005 43 <Janitor> tid=21101
+c 0.005 30 <Janitor> tid=21108
+c 0.005 14 <Janitor> tid=21099
+c 0.004 20 <Janitor> tid=21111
+c 0.006 16 <Janitor> tid=21125
+c 0.006 50 <Janitor> tid=21085
+c 0.006 53 <Janitor> tid=21088
+c 0.005 67 <Janitor> tid=21114
+c 0.005 4 <Janitor> tid=21128
+c 0.006 84 <Janitor> tid=21100
+c 0.005 11 <Janitor> tid=21122
+c 0.005 9 <Janitor> tid=21118
+c 0.005 81 <Janitor> tid=21126
+c 0.005 22 <Janitor> tid=21109
+c 0.006 27 <Janitor> tid=21124
+c 0.005 122 <Janitor> tid=21121
+c 0.006 5 <Janitor> tid=21092
+c 0.006 38 <Janitor> tid=21123
+c 0.006 45 <Janitor> tid=21137
+c 0.005 55 <Janitor> tid=21116
+c 0.005 72 <Janitor> tid=21136
+c 0.006 15 <Janitor> tid=21105
+c 0.005 106 <Janitor> tid=21129
+c 0.005 94 <Janitor> tid=21127
+c 0.005 83 <Janitor> tid=21138
+c 0.005 89 <Janitor> tid=21135
+c 0.006 13 <Janitor> tid=21104
+c 0.005 90 <Janitor> tid=21112
+c 0.005 118 <Janitor> tid=21143
+c 0.005 123 <Janitor> tid=21150
+c 0.005 65 <Janitor> tid=21086
+c 0.005 119 <Janitor> tid=21151
+c 0.006 49 <Janitor> tid=21147
+c 0.006 44 <Janitor> tid=21106
+c 0.005 121 <Janitor> tid=21120
+c 0.005 59 <Janitor> tid=21182
+c 0.006 2 <Janitor> tid=21144
+c 0.006 99 <Janitor> tid=21209
+c 0.007 57 <Janitor> tid=21160
+c 0.006 3 <Janitor> tid=21252
+c 0.006 79 My bounce alternatives: 65 37 23 89 
+c 0.006 83 My bounce alternatives: 103 50 124 19 
+c 0.005 65 My bounce alternatives: 120 0 40 21 
+c 0.006 17 <Janitor> tid=21224
+c 0.006 33 <Janitor> tid=21211
+c 0.006 32 <Janitor> tid=21197
+c 0.007 50 My bounce alternatives: 3 94 2 100 
+c 0.006 71 <Janitor> tid=21194
+c 0.006 78 <Janitor> tid=21161
+c 0.006 58 <Janitor> tid=21212
+c 0.006 87 My bounce alternatives: 11 56 20 45 
+c 0.006 69 <Janitor> tid=21229
+c 0.006 86 <Janitor> tid=21193
+c 0.007 19 <Janitor> tid=21094
+c 0.007 104 <Janitor> tid=21180
+c 0.007 56 <Janitor> tid=21235
+c 0.007 26 <Janitor> tid=21145
+c 0.007 0 <Janitor> tid=21215
+c 0.007 29 <Janitor> tid=21202
+c 0.007 51 <Janitor> tid=21222
+c 0.007 46 <Janitor> tid=21205
+c 0.006 48 <Janitor> tid=21223
+c 0.007 47 <Janitor> tid=21153
+c 0.006 7 <Janitor> tid=21216
+c 0.006 42 <Janitor> tid=21230
+c 0.007 61 <Janitor> tid=21157
+c 0.006 63 <Janitor> tid=21210
+c 0.007 64 <Janitor> tid=21130
+c 0.006 21 My bounce alternatives: 107 27 85 47 
+c 0.006 35 <Janitor> tid=21132
+c 0.007 53 My bounce alternatives: 123 32 67 113 
+c 0.007 39 <Janitor> tid=21117
+c 0.006 60 <Janitor> tid=21253
+c 0.007 101 <Janitor> tid=21089
+c 0.007 101 My bounce alternatives: 27 49 75 56 
+c 0.005 102 <Janitor> tid=21263
+c 0.007 68 <Janitor> tid=21243
+c 0.006 95 <Janitor> tid=21213
+c 0.007 109 <Janitor> tid=21226
+c 0.005 107 <Janitor> tid=21245
+c 0.006 88 <Janitor> tid=21241
+c 0.006 90 My bounce alternatives: 72 62 110 28 
+c 0.006 108 My bounce alternatives: 106 17 98 80 
+c 0.006 103 <Janitor> tid=21131
+c 0.005 85 My bounce alternatives: 100 59 121 14 
+c 0.007 62 <Janitor> tid=21239
+c 0.007 54 <Janitor> tid=21218
+c 0.007 12 <Janitor> tid=21186
+c 0.007 96 <Janitor> tid=21246
+c 0.007 6 <Janitor> tid=21259
+c 0.007 37 <Janitor> tid=21225
+c 0.008 45 My bounce alternatives: 10 72 91 115 
+c 0.007 1 My bounce alternatives: 85 57 6 22 
+c 0.006 36 My bounce alternatives: 116 64 52 73 
+c 0.007 93 <Janitor> tid=21166
+c 0.007 66 <Janitor> tid=21206
+c 0.006 43 My bounce alternatives: 36 33 48 41 
+c 0.007 49 My bounce alternatives: 74 21 112 44 
+c 0.007 34 My bounce alternatives: 111 25 13 64 
+c 0.006 121 My bounce alternatives: 62 8 1 81 
+c 0.007 64 My bounce alternatives: 4 1 103 32 
+c 0.006 125 <Janitor> tid=21217
+c 0.006 115 My bounce alternatives: 119 66 81 104 
+c 0.007 115 <Janitor> tid=21141
+c 0.007 44 My bounce alternatives: 21 73 54 42 
+c 0.006 30 My bounce alternatives: 83 15 26 58 
+c 0.006 35 My bounce alternatives: 117 53 39 106 
+c 0.007 14 My bounce alternatives: 79 30 15 6 
+c 0.006 82 <Janitor> tid=21190
+c 0.006 67 My bounce alternatives: 60 12 37 48 
+c 0.007 70 <Janitor> tid=21234
+c 0.008 39 My bounce alternatives: 51 46 106 83 
+c 0.007 13 My bounce alternatives: 98 124 53 70 
+c 0.006 55 My bounce alternatives: 99 58 27 96 
+c 0.007 15 My bounce alternatives: 13 126 96 79 
+c 0.007 106 My bounce alternatives: 95 44 34 16 
+c 0.006 4 My bounce alternatives: 38 121 93 116 
+c 0.007 80 My bounce alternatives: 57 90 61 66 
+c 0.007 80 <Janitor> tid=21133
+c 0.007 97 <Janitor> tid=21260
+c 0.007 41 <Janitor> tid=21228
+c 0.007 2 My bounce alternatives: 34 40 24 1 
+c 0.006 112 My bounce alternatives: 69 98 55 102 
+c 0.008 57 My bounce alternatives: 2 71 120 117 
+c 0.006 92 My bounce alternatives: 73 70 43 61 
+c 0.007 52 <Janitor> tid=21179
+c 0.006 73 My bounce alternatives: 81 41 105 62 
+c 0.006 113 <Janitor> tid=21139
+c 0.007 113 My bounce alternatives: 66 99 42 7 
+c 0.006 105 <Janitor> tid=21200
+c 0.006 94 My bounce alternatives: 44 61 3 118 
+c 0.006 76 <Janitor> tid=21148
+c 0.006 76 My bounce alternatives: 78 48 77 29 
+c 0.006 8 My bounce alternatives: 18 87 84 110 
+c 0.007 8 <Janitor> tid=21110
+c 0.006 91 My bounce alternatives: 77 6 73 120 
+c 0.007 124 <Janitor> tid=21221
+c 0.007 124 My bounce alternatives: 48 20 125 27 
+c 0.007 84 My bounce alternatives: 20 28 107 85 
+c 0.006 114 <Janitor> tid=21256
+c 0.007 11 My bounce alternatives: 124 42 113 36 
+c 0.006 18 My bounce alternatives: 15 113 126 65 
+c 0.006 18 <Janitor> tid=21091
+c 0.007 19 My bounce alternatives: 80 109 56 54 
+c 0.007 25 <Janitor> tid=21232
+c 0.007 23 <Janitor> tid=21257
+c 0.007 81 My bounce alternatives: 26 43 12 121 
+c 0.006 10 <Janitor> tid=21171
+c 0.007 10 My bounce alternatives: 87 65 32 88 
+c 0.007 31 <Janitor> tid=21248
+c 0.006 22 My bounce alternatives: 6 117 71 38 
+c 0.006 9 My bounce alternatives: 118 75 25 63 
+c 0.007 27 My bounce alternatives: 76 47 68 60 
+c 0.006 126 <Janitor> tid=21220
+c 0.007 126 My bounce alternatives: 17 120 38 0 
+c 0.006 122 My bounce alternatives: 75 7 114 126 
+c 0.006 20 My bounce alternatives: 46 26 31 68 
+c 0.008 26 My bounce alternatives: 125 60 45 92 
+c 0.006 98 My bounce alternatives: 43 51 9 53 
+c 0.007 5 My bounce alternatives: 102 38 83 105 
+c 0.007 40 My bounce alternatives: 94 74 57 108 
+c 0.007 40 <Janitor> tid=21119
+c 0.007 16 My bounce alternatives: 50 35 74 51 
+c 0.006 28 <Janitor> tid=21247
+c 0.007 38 My bounce alternatives: 84 107 44 50 
+c 0.007 123 My bounce alternatives: 121 2 63 55 
+c 0.006 118 My bounce alternatives: 0 10 70 86 
+c 0.006 89 My bounce alternatives: 71 39 59 3 
+c 0.006 120 <Janitor> tid=21173
+c 0.006 120 My bounce alternatives: 40 4 76 59 
+c 0.008 12 My bounce alternatives: 61 116 4 93 
+c 0.007 86 My bounce alternatives: 39 31 90 101 
+c 0.008 104 My bounce alternatives: 25 101 30 69 
+c 0.007 31 My bounce alternatives: 92 76 41 95 
+c 0.007 28 My bounce alternatives: 108 78 104 123 
+c 0.007 29 My bounce alternatives: 12 14 36 13 
+c 0.006 119 My bounce alternatives: 24 95 101 39 
+c 0.007 32 My bounce alternatives: 54 34 66 67 
+c 0.007 37 My bounce alternatives: 122 5 11 23 
+c 0.007 47 My bounce alternatives: 96 3 62 10 
+c 0.007 7 My bounce alternatives: 33 79 50 18 
+c 0.007 61 My bounce alternatives: 114 125 14 82 
+c 0.007 93 My bounce alternatives: 91 36 17 43 
+c 0.007 71 My bounce alternatives: 9 108 5 25 
+c 0.007 78 My bounce alternatives: 31 123 86 9 
+c 0.007 82 My bounce alternatives: 52 68 18 124 
+c 0.007 59 My bounce alternatives: 101 63 35 30 
+c 0.006 72 My bounce alternatives: 70 13 123 125 
+c 0.006 100 <Janitor> tid=21240
+c 0.006 111 <Janitor> tid=21244
+c 0.006 107 My bounce alternatives: 89 93 72 5 
+c 0.007 52 My bounce alternatives: 86 85 79 26 
+c 0.006 77 <Janitor> tid=21249
+c 0.007 116 <Janitor> tid=21261
+c 0.007 103 My bounce alternatives: 110 54 80 90 
+c 0.007 69 My bounce alternatives: 41 23 0 112 
+c 0.007 60 My bounce alternatives: 58 69 111 74 
+c 0.007 102 My bounce alternatives: 105 110 122 99 
+c 0.008 68 My bounce alternatives: 45 82 94 111 
+c 0.008 97 My bounce alternatives: 35 88 115 98 
+c 0.007 95 My bounce alternatives: 37 89 22 11 
+c 0.008 109 My bounce alternatives: 47 100 88 12 
+c 0.006 100 My bounce alternatives: 16 67 49 24 
+c 0.008 41 My bounce alternatives: 88 18 99 46 
+c 0.007 88 My bounce alternatives: 5 105 51 114 
+c 0.007 3 My bounce alternatives: 126 96 58 71 
+c 0.006 77 My bounce alternatives: 30 16 92 20 
+c 0.007 99 My bounce alternatives: 22 91 64 40 
+c 0.006 105 My bounce alternatives: 67 84 29 31 
+c 0.008 62 My bounce alternatives: 32 102 116 119 
+c 0.008 54 My bounce alternatives: 7 52 78 75 
+c 0.007 114 My bounce alternatives: 14 86 60 34 
+c 0.008 110 My bounce alternatives: 63 104 87 97 
+c 0.008 110 <Janitor> tid=21219
+c 0.008 25 My bounce alternatives: 93 77 7 2 
+c 0.008 23 My bounce alternatives: 1 92 10 84 
+c 0.008 24 My bounce alternatives: 29 115 82 109 
+c 0.008 56 My bounce alternatives: 115 114 89 37 
+c 0.008 17 My bounce alternatives: 56 118 21 76 
+c 0.007 33 My bounce alternatives: 23 45 28 8 
+c 0.008 51 My bounce alternatives: 90 122 109 35 
+c 0.008 46 My bounce alternatives: 113 19 65 87 
+c 0.008 96 My bounce alternatives: 42 22 46 49 
+c 0.008 6 My bounce alternatives: 28 97 16 17 
+c 0.007 48 My bounce alternatives: 53 103 118 52 
+c 0.007 42 My bounce alternatives: 64 29 97 122 
+c 0.007 66 My bounce alternatives: 68 112 102 77 
+c 0.007 63 My bounce alternatives: 112 55 117 91 
+c 0.007 75 My bounce alternatives: 104 11 108 107 
+c 0.006 125 My bounce alternatives: 19 83 100 103 
+c 0.008 58 My bounce alternatives: 8 119 33 94 
+c 0.006 74 My bounce alternatives: 55 9 95 15 
+c 0.008 70 My bounce alternatives: 59 111 47 4 
+c 0.007 111 My bounce alternatives: 109 24 69 33 
+c 0.008 116 My bounce alternatives: 97 80 119 78 
+c 0.008 117 My bounce alternatives: 82 81 8 57 
+c 0.008 117 <Janitor> tid=21237
+c 0.008 0 My bounce alternatives: 49 106 19 72 
+c 0.009 0 Set up API at src/interface/api/api_connector.hpp
+c 0.007 75 <Janitor> tid=21262
+c 0.010 74 <Janitor> tid=21199
+c 0.012 0 <Reader> Starting
+c 0.020 24 <Janitor> tid=21250
+c 0.059 71 Machine color 0 with 127 total workers (my rank: 71)
+c 0.059 14 Machine color 0 with 127 total workers (my rank: 14)
+c 0.058 125 Machine color 0 with 127 total workers (my rank: 125)
+c 0.058 78 Machine color 0 with 127 total workers (my rank: 78)
+c 0.059 58 Machine color 0 with 127 total workers (my rank: 58)
+c 0.058 67 Machine color 0 with 127 total workers (my rank: 67)
+c 0.058 75 Machine color 0 with 127 total workers (my rank: 75)
+c 0.058 82 Machine color 0 with 127 total workers (my rank: 82)
+c 0.059 39 Machine color 0 with 127 total workers (my rank: 39)
+c 0.059 13 Machine color 0 with 127 total workers (my rank: 13)
+c 0.058 59 Machine color 0 with 127 total workers (my rank: 59)
+c 0.058 55 Machine color 0 with 127 total workers (my rank: 55)
+c 0.059 87 Machine color 0 with 127 total workers (my rank: 87)
+c 0.059 103 Machine color 0 with 127 total workers (my rank: 103)
+c 0.059 15 Machine color 0 with 127 total workers (my rank: 15)
+c 0.059 106 Machine color 0 with 127 total workers (my rank: 106)
+c 0.058 4 Machine color 0 with 127 total workers (my rank: 4)
+c 0.059 80 Machine color 0 with 127 total workers (my rank: 80)
+c 0.058 69 Machine color 0 with 127 total workers (my rank: 69)
+c 0.059 101 Machine color 0 with 127 total workers (my rank: 101)
+c 0.058 60 Machine color 0 with 127 total workers (my rank: 60)
+c 0.058 72 Machine color 0 with 127 total workers (my rank: 72)
+c 0.058 102 Machine color 0 with 127 total workers (my rank: 102)
+c 0.059 68 Machine color 0 with 127 total workers (my rank: 68)
+c 0.059 97 Machine color 0 with 127 total workers (my rank: 97)
+c 0.058 95 Machine color 0 with 127 total workers (my rank: 95)
+c 0.059 109 Machine color 0 with 127 total workers (my rank: 109)
+c 0.058 100 Machine color 0 with 127 total workers (my rank: 100)
+c 0.059 2 Machine color 0 with 127 total workers (my rank: 2)
+c 0.058 112 Machine color 0 with 127 total workers (my rank: 112)
+c 0.059 57 Machine color 0 with 127 total workers (my rank: 57)
+c 0.058 92 Machine color 0 with 127 total workers (my rank: 92)
+c 0.059 70 Machine color 0 with 127 total workers (my rank: 70)
+c 0.059 41 Machine color 0 with 127 total workers (my rank: 41)
+c 0.058 107 Machine color 0 with 127 total workers (my rank: 107)
+c 0.058 88 Machine color 0 with 127 total workers (my rank: 88)
+c 0.058 90 Machine color 0 with 127 total workers (my rank: 90)
+c 0.058 73 Machine color 0 with 127 total workers (my rank: 73)
+c 0.059 52 Machine color 0 with 127 total workers (my rank: 52)
+c 0.058 113 Machine color 0 with 127 total workers (my rank: 113)
+c 0.058 3 Machine color 0 with 127 total workers (my rank: 3)
+c 0.059 24 Machine color 0 with 127 total workers (my rank: 24)
+c 0.058 77 Machine color 0 with 127 total workers (my rank: 77)
+c 0.058 108 Machine color 0 with 127 total workers (my rank: 108)
+c 0.058 99 Machine color 0 with 127 total workers (my rank: 99)
+c 0.058 111 Machine color 0 with 127 total workers (my rank: 111)
+c 0.059 116 Machine color 0 with 127 total workers (my rank: 116)
+c 0.058 85 Machine color 0 with 127 total workers (my rank: 85)
+c 0.058 94 Machine color 0 with 127 total workers (my rank: 94)
+c 0.059 38 Machine color 0 with 127 total workers (my rank: 38)
+c 0.058 76 Machine color 0 with 127 total workers (my rank: 76)
+c 0.058 79 Machine color 0 with 127 total workers (my rank: 79)
+c 0.058 123 Machine color 0 with 127 total workers (my rank: 123)
+c 0.059 8 Machine color 0 with 127 total workers (my rank: 8)
+c 0.058 105 Machine color 0 with 127 total workers (my rank: 105)
+c 0.058 91 Machine color 0 with 127 total workers (my rank: 91)
+c 0.059 62 Machine color 0 with 127 total workers (my rank: 62)
+c 0.058 118 Machine color 0 with 127 total workers (my rank: 118)
+c 0.059 124 Machine color 0 with 127 total workers (my rank: 124)
+c 0.058 89 Machine color 0 with 127 total workers (my rank: 89)
+c 0.058 120 Machine color 0 with 127 total workers (my rank: 120)
+c 0.059 84 Machine color 0 with 127 total workers (my rank: 84)
+c 0.059 54 Machine color 0 with 127 total workers (my rank: 54)
+c 0.059 11 Machine color 0 with 127 total workers (my rank: 11)
+c 0.058 114 Machine color 0 with 127 total workers (my rank: 114)
+c 0.059 12 Machine color 0 with 127 total workers (my rank: 12)
+c 0.058 18 Machine color 0 with 127 total workers (my rank: 18)
+c 0.059 19 Machine color 0 with 127 total workers (my rank: 19)
+c 0.059 110 Machine color 0 with 127 total workers (my rank: 110)
+c 0.058 83 Machine color 0 with 127 total workers (my rank: 83)
+c 0.059 25 Machine color 0 with 127 total workers (my rank: 25)
+c 0.058 81 Machine color 0 with 127 total workers (my rank: 81)
+c 0.058 65 Machine color 0 with 127 total workers (my rank: 65)
+c 0.058 10 Machine color 0 with 127 total workers (my rank: 10)
+c 0.059 86 Machine color 0 with 127 total workers (my rank: 86)
+c 0.059 104 Machine color 0 with 127 total workers (my rank: 104)
+c 0.058 22 Machine color 0 with 127 total workers (my rank: 22)
+c 0.058 9 Machine color 0 with 127 total workers (my rank: 9)
+c 0.059 27 Machine color 0 with 127 total workers (my rank: 27)
+c 0.058 126 Machine color 0 with 127 total workers (my rank: 126)
+c 0.059 23 Machine color 0 with 127 total workers (my rank: 23)
+c 0.060 0 Machine color 0 with 127 total workers (my rank: 0)
+c 0.060 0 I Mapping job "admin.mono-job.json" to internal ID #1
+c 0.060 0 <Reader> [T] Reading job #1 rev. 0 {./instances/covtypeShuffle20.csv} ...
+c 0.058 122 Machine color 0 with 127 total workers (my rank: 122)
+c 0.058 20 Machine color 0 with 127 total workers (my rank: 20)
+c 0.059 26 Machine color 0 with 127 total workers (my rank: 26)
+c 0.058 98 Machine color 0 with 127 total workers (my rank: 98)
+c 0.059 5 Machine color 0 with 127 total workers (my rank: 5)
+c 0.059 40 Machine color 0 with 127 total workers (my rank: 40)
+c 0.059 56 Machine color 0 with 127 total workers (my rank: 56)
+c 0.059 16 Machine color 0 with 127 total workers (my rank: 16)
+c 0.059 117 Machine color 0 with 127 total workers (my rank: 117)
+c 0.059 31 Machine color 0 with 127 total workers (my rank: 31)
+c 0.059 17 Machine color 0 with 127 total workers (my rank: 17)
+c 0.058 28 Machine color 0 with 127 total workers (my rank: 28)
+c 0.059 33 Machine color 0 with 127 total workers (my rank: 33)
+c 0.059 29 Machine color 0 with 127 total workers (my rank: 29)
+c 0.059 51 Machine color 0 with 127 total workers (my rank: 51)
+c 0.059 46 Machine color 0 with 127 total workers (my rank: 46)
+c 0.058 119 Machine color 0 with 127 total workers (my rank: 119)
+c 0.059 96 Machine color 0 with 127 total workers (my rank: 96)
+c 0.059 32 Machine color 0 with 127 total workers (my rank: 32)
+c 0.059 45 Machine color 0 with 127 total workers (my rank: 45)
+c 0.059 6 Machine color 0 with 127 total workers (my rank: 6)
+c 0.059 1 Machine color 0 with 127 total workers (my rank: 1)
+c 0.059 37 Machine color 0 with 127 total workers (my rank: 37)
+c 0.058 36 Machine color 0 with 127 total workers (my rank: 36)
+c 0.059 47 Machine color 0 with 127 total workers (my rank: 47)
+c 0.058 48 Machine color 0 with 127 total workers (my rank: 48)
+c 0.058 7 Machine color 0 with 127 total workers (my rank: 7)
+c 0.059 61 Machine color 0 with 127 total workers (my rank: 61)
+c 0.059 42 Machine color 0 with 127 total workers (my rank: 42)
+c 0.059 66 Machine color 0 with 127 total workers (my rank: 66)
+c 0.058 43 Machine color 0 with 127 total workers (my rank: 43)
+c 0.059 49 Machine color 0 with 127 total workers (my rank: 49)
+c 0.059 34 Machine color 0 with 127 total workers (my rank: 34)
+c 0.058 121 Machine color 0 with 127 total workers (my rank: 121)
+c 0.059 21 Machine color 0 with 127 total workers (my rank: 21)
+c 0.058 63 Machine color 0 with 127 total workers (my rank: 63)
+c 0.059 64 Machine color 0 with 127 total workers (my rank: 64)
+c 0.059 50 Machine color 0 with 127 total workers (my rank: 50)
+c 0.058 74 Machine color 0 with 127 total workers (my rank: 74)
+c 0.058 115 Machine color 0 with 127 total workers (my rank: 115)
+c 0.059 44 Machine color 0 with 127 total workers (my rank: 44)
+c 0.059 93 Machine color 0 with 127 total workers (my rank: 93)
+c 0.058 30 Machine color 0 with 127 total workers (my rank: 30)
+c 0.059 53 Machine color 0 with 127 total workers (my rank: 53)
+c 0.058 35 Machine color 0 with 127 total workers (my rank: 35)
+c 1.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs=0 hops=0
+c 1.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 2.201 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.00GB newreqs=0 hops=0
+c 2.201 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 3.202 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.62GB newreqs=0 hops=0
+c 3.202 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 4.202 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.66GB newreqs=0 hops=0
+c 4.202 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 5.203 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.69GB newreqs=0 hops=0
+c 5.203 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 6.203 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.69GB newreqs=0 hops=0
+c 6.203 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 7.203 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.71GB newreqs=0 hops=0
+c 7.204 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 8.204 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.72GB newreqs=0 hops=0
+c 8.204 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 9.204 0 sysstate busyratio=0.000 cmtdratio=0.000 jobs=0 globmem=0.73GB newreqs=0 hops=0
+c 9.204 0 sysstate entered=1 parsed=0 scheduled=0 processed=0
+c 9.374 0 <Reader> [T] Initialized job #1 {./instances/covtypeShuffle20.csv} in 9.314s: 31374651 lits w/ separators, 0 assumptions
+c 9.375 0 Introducing job #1 rev. 0 : r.#1:0 rev. 0 <- [0] born=9.374 hops=0 epoch=-1 => [40]
+c 9.375 40 BLC insert (1,1,0.010)
+c 9.375 40 Activate r.#1:0 rev. 0 <- [0] born=9.374 hops=0 epoch=-1
+c 9.374 74 ADOPT r.#1:0 rev. 0 <- [0] born=9.374 hops=1 epoch=-1 mode=1 <= [40]
+c 9.374 74 COMMIT #1 -> #1:0
+c 9.376 0 Scheduling r.#1:0 rev. 0 <- [0] born=9.374 hops=1 epoch=-1 on [74] (latency: 0.00162s)
