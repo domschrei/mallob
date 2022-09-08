@@ -1,0 +1,43 @@
+[New LWP 31481]
+[New LWP 31485]
+[New LWP 31581]
+[New LWP 31723]
+[New LWP 31789]
+[New LWP 31850]
+[New LWP 31906]
+[New LWP 32034]
+[New LWP 32149]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+__pthread_clockjoin_ex (threadid=140557334345472, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+145	pthread_join_common.c: No such file or directory.
+#0  __pthread_clockjoin_ex (threadid=140557334345472, thread_return=0x0, clockid=<optimized out>, abstime=<optimized out>, block=<optimized out>) at pthread_join_common.c:145
+#1  0x00007fd630a78047 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#2  0x00005637b0bb917f in Process::writeTrace (tid=31476) at /home/doerr/mallob/src/util/sys/process.cpp:198
+#3  0x00005637b0bb885b in Process::handleTerminationSignal (info=...) at /home/doerr/mallob/src/util/sys/process.cpp:70
+#4  0x00005637b0bb8779 in handleSignal (signum=11) at /home/doerr/mallob/src/util/sys/process.cpp:53
+#5  <signal handler called>
+#6  tcache_get (tc_idx=<optimized out>) at malloc.c:2937
+#7  __GI___libc_malloc (bytes=40) at malloc.c:3051
+#8  0x00007fd630a4bb39 in operator new(unsigned long) () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#9  0x00005637b0bcd64e in __gnu_cxx::new_allocator<std::_List_node<std::vector<int, std::allocator<int> > > >::allocate (this=0x5637b217fc08, __n=1) at /usr/include/c++/9/ext/new_allocator.h:114
+#10 0x00005637b0bcce72 in std::allocator_traits<std::allocator<std::_List_node<std::vector<int, std::allocator<int> > > > >::allocate (__a=..., __n=1) at /usr/include/c++/9/bits/alloc_traits.h:443
+#11 0x00005637b0bcc2cb in std::__cxx11::_List_base<std::vector<int, std::allocator<int> >, std::allocator<std::vector<int, std::allocator<int> > > >::_M_get_node (this=0x5637b217fc08) at /usr/include/c++/9/bits/stl_list.h:438
+#12 0x00005637b0bcacb8 in std::__cxx11::list<std::vector<int, std::allocator<int> >, std::allocator<std::vector<int, std::allocator<int> > > >::_M_create_node<std::vector<int, std::allocator<int> > > (this=0x5637b217fc08) at /usr/include/c++/9/bits/stl_list.h:630
+#13 0x00005637b0bc8e82 in std::__cxx11::list<std::vector<int, std::allocator<int> >, std::allocator<std::vector<int, std::allocator<int> > > >::_M_insert<std::vector<int, std::allocator<int> > > (this=0x5637b217fc08, __position=Python Exception <class 'AttributeError'> 'NoneType' object has no attribute 'pointer': 
+) at /usr/include/c++/9/bits/stl_list.h:1907
+#14 0x00005637b0bc7481 in std::__cxx11::list<std::vector<int, std::allocator<int> >, std::allocator<std::vector<int, std::allocator<int> > > >::push_back (this=0x5637b217fc08, __x=...) at /usr/include/c++/9/bits/stl_list.h:1213
+#15 0x00005637b0bc5f60 in JobTreeAllReduction::receive (this=0x5637b217fb80, source=37, tag=61, msg=...) at /home/doerr/mallob/src/comm/job_tree_all_reduction.hpp:77
+#16 0x00005637b0bc2345 in KMeansJob::appl_communicate (this=0x5637b21815a0, source=37, mpiTag=30, msg=...) at /home/doerr/mallob/src/app/kmeans/kmeans_job.cpp:320
+#17 0x00005637b0b3939d in Job::communicate (this=0x5637b21815a0, source=37, mpiTag=30, msg=...) at /home/doerr/mallob/src/app/job.cpp:232
+#18 0x00005637b0aeaa91 in Worker::handleSendApplicationMessage (this=0x5637b2146800, handle=...) at /home/doerr/mallob/src/worker.cpp:742
+#19 0x00005637b0ae6d72 in Worker::<lambda(auto:19&)>::operator()<MessageHandle>(MessageHandle &) const (__closure=0x5637b2147f08, h=...) at /home/doerr/mallob/src/worker.cpp:107
+#20 0x00005637b0af0fa6 in std::_Function_handler<void(MessageHandle&), Worker::init()::<lambda(auto:19&)> >::_M_invoke(const std::_Any_data &, MessageHandle &) (__functor=..., __args#0=...) at /usr/include/c++/9/bits/std_function.h:300
+#21 0x00005637b0b5d9a5 in std::function<void (MessageHandle&)>::operator()(MessageHandle&) const (this=0x5637b2147f08, __args#0=...) at /usr/include/c++/9/bits/std_function.h:688
+#22 0x00005637b0b595f4 in MessageQueue::processReceived (this=0x5637b213e440) at /home/doerr/mallob/src/comm/message_queue.cpp:267
+#23 0x00005637b0b589e0 in MessageQueue::advance (this=0x5637b213e440) at /home/doerr/mallob/src/comm/message_queue.cpp:111
+#24 0x00005637b0b0e510 in doMainProgram (commWorkers=@0x7ffdd77a6d80: 0x5637b20bfea0, commClients=@0x7ffdd77a6d78: 0x5637b0e83cc0 <ompi_mpi_comm_null>, params=...) at /home/doerr/mallob/src/main.cpp:132
+#25 0x00005637b0b0f0d7 in main (argc=10, argv=0x7ffdd77a9f68) at /home/doerr/mallob/src/main.cpp:261
+[Inferior 1 (process 31476) detached]
