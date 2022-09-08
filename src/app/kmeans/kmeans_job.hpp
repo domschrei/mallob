@@ -19,7 +19,7 @@ class KMeansJob : public Job {
     std::vector<Point> clusterCenters;       // The centers of cluster 0..n
     std::vector<Point> localClusterCenters;  // The centers of cluster 0..n
     std::vector<Point> oldClusterCenters;
-    int* clusterMembership;  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
+    std::vector<int> clusterMembership;  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
     
     std::vector<int> localSumMembers;
     int countClusters;
@@ -109,7 +109,7 @@ class KMeansJob : public Job {
 
    public:
     std::vector<Point> getClusterCenters() { return clusterCenters; };      // The centers of cluster 0..n
-    const int* getClusterMembership() { return clusterMembership; };  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
+    std::vector<int> getClusterMembership() { return clusterMembership; };  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
     //const int* getSumMembers() { return sumMembers; };
     int getNumClusters() { return countClusters; };
     int getDimension() { return dimension; };
