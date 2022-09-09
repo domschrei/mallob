@@ -6,7 +6,7 @@ import re
 
 colors = ['#377eb8', '#ff7f00', '#e41a1c', '#f781bf', '#a65628', '#4daf4a', '#984ea3', '#999999', '#dede00', '#377eb8']
 markers = ['^', 's', 'o', '+', 'x', '*']
-linestyles = ["-.", ":", "--", "-"]
+linestyles = ["-.", ":", "--", "-", "."]
 
 lim = -1
 
