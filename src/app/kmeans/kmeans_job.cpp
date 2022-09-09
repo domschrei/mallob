@@ -153,6 +153,7 @@ void KMeansJob::appl_suspend() {
     LOG(V3_VERB, "                           myIndex: %i i got SUSPENDED :( iter: %i\n", myIndex, iterationsDone);
     baseMsg.tag = MSG_ALLREDUCE_CLAUSES;
     baseMsg.returnedToSender = true;
+    baseMsg.payload.assign(1,myIndex);
     MyMpi::isend(getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, baseMsg);
 }
 void KMeansJob::appl_resume() {
@@ -292,6 +293,7 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
         LOG(V3_VERB, "                           myIndex: %i not Ready: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
 
         msg.returnedToSender = true;
+        msg.payload.assign(1,myIndex);
         MyMpi::isend(source, mpiTag, std::move(msg));
 
         return;
@@ -301,13 +303,13 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
         std::vector<int> missingChilds;
         LOG(V3_VERB, "                           myIndex: %i returnFrom: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
         LOG(V3_VERB, "                           !leftDone %i !getJobTree().hasLeftChild() %i getJobTree().getLeftChildIndex() < countCurrentWorkers %i\n", !leftDone, !getJobTree().hasLeftChild(), getJobTree().getLeftChildIndex() < countCurrentWorkers);
-        if (!leftDone && (sourceIndex == getJobTree().getLeftChildIndex() || !getJobTree().hasLeftChild()) && getJobTree().getLeftChildIndex() < countCurrentWorkers) {
+        if (!leftDone && (msg.payload[0] == getJobTree().getLeftChildIndex() || !getJobTree().hasLeftChild()) && getJobTree().getLeftChildIndex() < countCurrentWorkers) {
             // missing left child
             leftDone = true;
             missingChilds.push_back(getJobTree().getLeftChildIndex());
             LOG(V3_VERB, "                           myIndex: %i LsourceIndex: %i\n", myIndex, sourceIndex);
         }
-        if (!rightDone && (sourceIndex == getJobTree().getRightChildIndex() || !getJobTree().hasRightChild()) && getJobTree().getRightChildIndex() < countCurrentWorkers) {
+        if (!rightDone && (msg.payload[0] == getJobTree().getRightChildIndex() || !getJobTree().hasRightChild()) && getJobTree().getRightChildIndex() < countCurrentWorkers) {
             // missing right child
             rightDone = true;
             missingChilds.push_back(getJobTree().getRightChildIndex());
@@ -362,6 +364,7 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
             LOG(V3_VERB, "                           myIndex: %i not in range\n", myIndex);
 
             msg.returnedToSender = true;
+            msg.payload.assign(1,myIndex);
             MyMpi::isend(source, mpiTag, std::move(msg));
 
             return;
