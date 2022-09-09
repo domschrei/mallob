@@ -1,6 +1,6 @@
 #!/bin/bash
 pcName="i10pc138"
-folder="maxDemandDefaultTest138" #latestResults
+folder="maxDemandDefaultTest138Version2" #latestResults
 np="128"
 J="10000"
 ajpc="10"
@@ -8,7 +8,7 @@ jobDescTemplate="instances/kmeansTest"
 jobTemplate="templates/job-template-kmeans.json" 
 clientTemplate="templates/client-template-KR.json"
 v="2"
-demand="Unrestricted" #Unrestricted Restricted
+demand="Restricted" #Unrestricted Restricted
 time="3000"
 
 mkdir -p ./Testing/${folder}
