@@ -1,7 +1,9 @@
 SETLOCAL ENABLEDELAYEDEXPANSION
-set folder=maxDemandDefaultTest138
+set folder=maxDemandDefaultTest138Version2
 set pcName=i10pc138
-set cm=python ../scripts/plot/plot_curves.py -nomarkers -linestyles="-,--" -xy -xlabel="seconds" -ylabel="solved jobs" 
+set cores=128
+
+set cm=python ../scripts/plot/plot_curves.py -nomarkers -linestyles="-,--" -xy -xlabel="seconds" -ylabel="solved jobs" -title="%cores% cores"
 
 for %%t in (Restricted Unrestricted) do (
     set cm=!cm! .\%folder%\cdf-runtimes%%t.txt -l="%%t"
