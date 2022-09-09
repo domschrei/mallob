@@ -1,9 +1,9 @@
 #!/bin/bash
-pcName="i10pc135"
-folder="maxDemandDefaultTest" #latestResults
-np="80"
+pcName="i10pc138"
+folder="maxDemandDefaultTest138" #latestResults
+np="128"
 J="10000"
-ajpc="6"
+ajpc="10"
 jobDescTemplate="instances/kmeansTest" 
 jobTemplate="templates/job-template-kmeans.json" 
 clientTemplate="templates/client-template-KR.json"
