@@ -8,7 +8,7 @@ jobDescTemplate="instances/kmeansTest"
 jobTemplate="templates/job-template-kmeans.json" 
 clientTemplate="templates/client-template-KR.json"
 v="2"
-demand="Restricted" #Unrestricted Restricted
+demand="Unrestricted" #Unrestricted Restricted
 time="3000"
 
 mkdir -p ./Testing/${folder}
