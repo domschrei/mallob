@@ -132,7 +132,8 @@ class KMeansJob : public Job {
     bool appl_isDestructible() override { return true; }
     void appl_memoryPanic() override;
     int getDemand() const override {
-        //LOG(V2_INFO, "                                                                                    ask Demand\n");
+        
+        return Job::getDemand();
         if (!loaded) {
             return Job::getDemand();
         } else {
