@@ -2,7 +2,7 @@ instances/benign_traffic.csv
 instances/rl/cpu.arff
 instances/rl/sonar.arff
 instances/mnist784K10.csv
-instances/benign_traffic25.csv
+instances/benign_traffic10.csv
 instances/rl/balance-scale.arff
 instances/covtypeShuffle20.csv
 instances/mnist784K20.csv
@@ -11,7 +11,7 @@ instances/rl/ecoli.arff
 instances/benign_traffic10.csv
 instances/rl/iono.arff
 instances/rl/letter.arff
-instances/benign_traffic40.csv
+instances/benign_traffic25.csv
 instances/covtypeShuffle40.csv
 instances/rl/vehicle.arff
 instances/benign_traffic15.csv
