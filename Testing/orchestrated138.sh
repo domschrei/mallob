@@ -3,12 +3,12 @@ pcName="i10pc138"
 folder="maxDemandDefaultTest138Version5" #latestResults
 np="128"
 J="10000"
-ajpc="12"
+ajpc="9"
 jobDescTemplate="instances/kmeansTest" 
 jobTemplate="templates/job-template-kmeans.json" 
 clientTemplate="templates/client-template-KR.json"
 v="2"
-demand="Unrestricted" #Unrestricted Restricted
+demand="Restricted" #Unrestricted Restricted
 time="200"
 
 mkdir -p ./Testing/${folder}

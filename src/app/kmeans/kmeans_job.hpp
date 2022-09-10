@@ -84,7 +84,7 @@ class KMeansJob : public Job {
             LOG(V3_VERB, "                           Children: %i\n",
                 this->getJobTree().getNumChildren());
 
-            if (!centersChanged(0.01f)||iterationsDone >= 150) {
+            if (!centersChanged(0.0001f)||iterationsDone >= 150) {
                 LOG(V0_CRIT, "                           Got Result after iter %i\n", iterationsDone);
                 internal_result.result = RESULT_SAT;
                 internal_result.id = getId();
@@ -132,7 +132,7 @@ class KMeansJob : public Job {
     bool appl_isDestructible() override { return true; }
     void appl_memoryPanic() override;
     int getDemand() const override {
-        return Job::getDemand();
+        //return Job::getDemand();
         if (!loaded) {
             return Job::getDemand();
         } else {
