@@ -162,6 +162,7 @@ class KMeansJob : public Job {
                 maxDemand = std::min(maxDemand, Job::getGlobalNumWorkers());
     }
 
+    void reset();
     void loadInstance();
     void doInitWork();
     void sendRootNotification();
