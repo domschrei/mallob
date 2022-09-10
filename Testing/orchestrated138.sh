@@ -3,13 +3,13 @@ pcName="i10pc138"
 folder="maxDemandDefaultTest138Version5" #latestResults
 np="128"
 J="10000"
-ajpc="7"
+ajpc="12"
 jobDescTemplate="instances/kmeansTest" 
 jobTemplate="templates/job-template-kmeans.json" 
 clientTemplate="templates/client-template-KR.json"
 v="2"
-demand="Restricted" #Unrestricted Restricted
-time="2000"
+demand="Unrestricted" #Unrestricted Restricted
+time="200"
 
 mkdir -p ./Testing/${folder}
 echo "pcName:$pcName np:$np J:$J ajpc:$ajpc $jobDescTemplate $jobTemplate $clientTemplate v:$v time:$time"> ./Testing/${folder}/info${demand}.txt
