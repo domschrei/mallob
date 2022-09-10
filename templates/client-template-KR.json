@@ -20,7 +20,7 @@
     "wallclock-limit": {
         "comment": "The wallclock time which may be spent computing until a job is cancelled. (0 = unlimited)",
         "type": "constant",
-        "params": [180]
+        "params": [120]
     },
     "arrival": {
         "comment": "The arrival of a job given in seconds after Mallob's upstart.",
