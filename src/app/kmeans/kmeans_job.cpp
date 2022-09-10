@@ -158,8 +158,38 @@ void KMeansJob::appl_suspend() {
 }
 void KMeansJob::appl_resume() {
     LOG(V3_VERB, "                           myIndex: %i i got RESUMED :D iter: %i\n", myIndex, iterationsDone);
-    myIndex = getJobTree().getIndex();
+    
+    reset();
+
 }
+
+
+void KMeansJob::reset() {
+    iterationsDone = 0;
+    maxDemand = -1;
+    maxDemandCalculated = false;
+    finishedJob = false;
+    iAmRoot = false;
+    loaded = false;
+    initSend = false;
+    calculatingFinished = false;
+    hasReducer = false;
+    leftDone = false;
+    rightDone = false;
+    skipCurrentIter = false;
+    myIndex = -2;
+    work.clear();
+    workDone.clear();
+    terminate = true;
+    if (initMsgTask.valid()) initMsgTask.get();
+    if (calculatingTask.valid()) calculatingTask.get();
+    reducer.reset();
+
+    terminate = false;
+    appl_start();
+}
+
+
 JobResult&& KMeansJob::appl_getResult() {
     return std::move(internal_result);
 }
