@@ -9,7 +9,7 @@ jobTemplate="templates/job-template-kmeans.json"
 clientTemplate="templates/client-template-KR.json"
 v="2"
 demand="Unrestricted" #Unrestricted Restricted
-time="200"
+time="2000"
 
 mkdir -p ./Testing/${folder}
 echo "pcName:$pcName np:$np J:$J ajpc:$ajpc $jobDescTemplate $jobTemplate $clientTemplate v:$v time:$time"> ./Testing/${folder}/info${demand}.txt
