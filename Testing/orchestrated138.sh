@@ -3,7 +3,7 @@ pcName="i10pc138"
 folder="maxDemandDefaultTest138Version5" #latestResults
 np="128"
 J="10000"
-ajpc="7"
+ajpc="6"
 jobDescTemplate="instances/kmeansTest" 
 jobTemplate="templates/job-template-kmeans.json" 
 clientTemplate="templates/client-template-KR.json"
@@ -22,4 +22,4 @@ cat ./Testing/${folder}/out${demand}.txt |grep "Got Result"|awk '{print $1}' > .
 cat ./Testing/${folder}/plain-runtimes${demand}.txt | sort -g | awk '{print $1,NR}' > ./Testing/${folder}/cdf-runtimes${demand}.txt
 
 
-#kill -9 `ps -aux | grep "./Testing/killHung.sh" | grep -v grep | awk '{ print $2 }'`
+#kill -9 `ps -aux | grep "./Testing/killAfter.sh" | grep -v grep | awk '{ print $2 }'`
