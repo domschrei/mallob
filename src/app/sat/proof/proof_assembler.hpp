@@ -227,8 +227,8 @@ private:
             _proof_instances.emplace_back(
                 instanceId, numInstances, _num_original_clauses, proofFilenameBase + ".lrat", 
                 _final_epoch, _winning_instance, globalIdStarts,
-                std::move(localIdStartsPerInstance[i]), std::move(localIdOffsetsPerInstance[i]), 
-                proofFilenameBase + ".filtered.lrat"
+                std::move(localIdStartsPerInstance[i]), std::move(localIdOffsetsPerInstance[i]),
+                _params.extMemDiskDirectory(), proofFilenameBase + ".filtered.lrat"
             );
         }
     }

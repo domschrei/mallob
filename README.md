@@ -25,14 +25,12 @@ Note that we only support Linux as an operating system.
 ## Building
 
 ```
-( cd lib && bash fetch_and_build_sat_solvers.sh && bash fetch_stxxl.sh )
+( cd lib && bash fetch_and_build_sat_solvers.sh )
 mkdir -p build
 cd build
 CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_USE_JEMALLOC=1 -DMALLOB_LOG_VERBOSITY=4 -DMALLOB_ASSERT=1 -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
 make; cd ..
 ```
-
-**For certified UNSAT, please use -DMALLOB_USE_JEMALLOC=0 instead since I suspect that jemalloc and STXXL do not get along for some reason.**
 
 Specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
 In addition, use the following Mallob-specific build options:
@@ -86,8 +84,7 @@ Use Mallob option `-mono=$PATH_TO_CNF` where `$PATH_TO_CNF` is the path and file
 * `-log=<logdir>`: Important option since it also sets the base location for the proof files directory on each process.
 * `-mempanic=0`: Turn off memory panic. Essential for correct functionality of proof logging.
 * `-scsd=0`: Disable the option which turns off clause sharing on some selected solvers. You can also leave it on, but for testing it's maybe better if each proof is a distributed proof. 
-* `-stxxl-disk-dir=<disk-dir>`: Set the directory where STXXL should place its virtual disk files. The disk where the specified directory lies is also the one which will be filled with the content of the external priority queues. Set this to the best performing disk which is available and still offers enough space.
-* `-stxxl-disk-size-gbs=<gbs-per-process>`: Set the maximum size of each STXXL virtual disk, in Gigabytes. So far, few testing as been done as to what is a good value here, the default is 1GB.
+* `-extmem-disk-dir=<disk-dir>`: Set the directory where virtual disk files should be placed. The disk where the specified directory lies is also the one which will be filled with the content of the external priority queues. Set this to a directory on the best performing disk which is available and still offers enough space.
 * `-proof-output-file=<proof-file>`: Specify the path and name of the final LRAT output file. This file is only output at rank zero.
 
 ## Solve multiple instances in an orchestrated manner

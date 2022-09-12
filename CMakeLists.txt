@@ -76,11 +76,11 @@ endif()
 # Add new non-default solvers here
 
 # Include STXXL
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-copy")
-add_subdirectory(lib/stxxl)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${STXXL_CXX_FLAGS}")
-set(BASE_INCLUDES ${BASE_INCLUDES} ${STXXL_INCLUDE_DIRS})
-set(BASE_LIBS ${BASE_LIBS} ${STXXL_LIBRARIES})
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-copy")
+#add_subdirectory(lib/stxxl)
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${STXXL_CXX_FLAGS}")
+#set(BASE_INCLUDES ${BASE_INCLUDES} ${STXXL_INCLUDE_DIRS})
+#set(BASE_LIBS ${BASE_LIBS} ${STXXL_LIBRARIES})
 
 
 # Source files
@@ -102,9 +102,10 @@ set(BASE_SOURCES ${BASE_SOURCES}
     src/interface/json_interface.cpp src/interface/api/api_connector.cpp
     src/scheduling/job_scheduling_update.cpp
     src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sat_reader.cpp 
-    src/util/sys/atomics.cpp src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/shared_memory.cpp src/util/sys/stxxl.cpp src/util/sys/terminator.cpp src/util/sys/threading.cpp src/util/sys/thread_pool.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp
+    src/util/sys/atomics.cpp src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/shared_memory.cpp src/util/sys/terminator.cpp src/util/sys/threading.cpp src/util/sys/thread_pool.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp
     src/util/ringbuf/ringbuf.c
 )
+# src/util/sys/stxxl.cpp
 
 
 # Library with source files common to mallob and mallob_sat_process
@@ -168,8 +169,9 @@ new_test(volume_calculator)
 new_test(concurrent_malloc)
 new_test(distributed_clause_filter)
 new_test(hashing)
-new_test(ext_priority_queue)
-new_test(reverse_lrat_parser)
+#new_test(ext_priority_queue)
+#new_test(reverse_lrat_parser)
 new_test(distributed_file_merger)
 new_test(reverse_file_reader)
 new_test(lrat_utils)
+new_test(categorized_external_memory)

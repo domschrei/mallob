@@ -4,7 +4,7 @@
 #include <algorithm>
 
 #include "app/sat/proof/reverse_binary_lrat_parser.hpp"
-#include "util/external_priority_queue.hpp"
+#include "external_id_priority_queue.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "app/sat/proof/lrat_utils.hpp"
 
@@ -30,8 +30,8 @@ private:
     ReverseBinaryLratParser _parser;
     LratLine _current_line;
     bool _current_line_aligned = false;
-    ExternalPriorityQueue<LratClauseId> _frontier;
-    ExternalPriorityQueue<LratClauseId> _backlog;
+    ExternalIdPriorityQueue _frontier;
+    ExternalIdPriorityQueue _backlog;
 
     std::vector<LratClauseId> _local_epoch_starts;
     std::vector<LratClauseId> _local_epoch_offsets;
@@ -53,11 +53,15 @@ public:
         const std::string& proofFilename, int finalEpoch, 
         int winningInstance, const std::vector<LratClauseId>& globalEpochStarts, 
         std::vector<LratClauseId>&& localEpochStarts, 
-        std::vector<LratClauseId>&& localEpochOffsets, const std::string& outputFilename) :
+        std::vector<LratClauseId>&& localEpochOffsets, const std::string& extMemDiskDir, 
+        const std::string& outputFilename) :
             _instance_id(instanceId), _num_instances(numInstances), 
             _original_num_clauses(originalNumClauses),
             _winning_instance(winningInstance == instanceId),
-            _parser(proofFilename), _local_epoch_starts(localEpochStarts), 
+            _parser(proofFilename), 
+            _frontier(extMemDiskDir + "/disk." + std::to_string(instanceId) + ".frontier", finalEpoch),
+            _backlog(extMemDiskDir + "/disk." + std::to_string(instanceId) + ".backlog", finalEpoch),
+            _local_epoch_starts(localEpochStarts), 
             _local_epoch_offsets(localEpochOffsets), _global_epoch_starts(globalEpochStarts),
             _current_epoch(finalEpoch), _output_filename(outputFilename), 
             _output(outputFilename, std::ofstream::binary) {}
@@ -98,7 +102,7 @@ private:
         for (size_t i = 0; i < clauseIdsSize; i++) {
             LratClauseId id = clauseIdsData[i];
             if (isSelfProducedClause(id)) {
-                _frontier.push(id);
+                _frontier.push(id, getClauseEpoch(id));
                 numSelfClauses++;
             }
         }
@@ -142,7 +146,7 @@ private:
                 break; 
             }
 
-            if (_frontier.top() == id || 
+            if ((!_frontier.empty() && _frontier.top() == id) || 
                     (_current_line.literals.empty() && _winning_instance)) {
                 // Clause derivation is necessary for the combined proof
                 _num_traced_clauses++;
@@ -156,10 +160,10 @@ private:
                 // Traverse clause hints
                 for (auto hintId : _current_line.hints) {
                     assert(hintId < 1000000000000000000UL);
+                    int hintEpoch = getClauseEpoch(hintId);
                     if (isSelfProducedClause(hintId)) {
-                        _frontier.push(hintId);
+                        _frontier.push(hintId, hintEpoch);
                     } else if (!isOriginalClause(hintId)) {
-                        int hintEpoch = getClauseEpoch(hintId);
                         if (hintEpoch >= epoch) {
                             LOG(V0_CRIT, "[ERROR] Found ext. hint %ld from epoch %i for clause %ld from epoch %i!\n", 
                                 hintId, hintEpoch, id, epoch);
@@ -167,16 +171,17 @@ private:
                             _output.flush();
                             abort();
                         }
-                        _backlog.push(hintId);
+                        _backlog.push(hintId, hintEpoch);
                     }
                 }
 
                 // Remove all instances of this ID from the frontier
-                while (_frontier.top() == id) _frontier.pop();
+                while (!_frontier.empty() && _frontier.top() == id) 
+                    _frontier.pop();
             } else {
                 // Next necessary clause ID must be smaller -
                 // Ignore this line
-                assert(_frontier.top() < id);
+                assert(_frontier.empty() || _frontier.top() < id);
             }
 
             // Get next proof line
@@ -231,7 +236,8 @@ private:
             // Found an external clause ID from the prior epoch
             _outgoing_clause_ids.push_back(id);
 
-            while (_backlog.top() == id) _backlog.pop();
+            while (!_backlog.empty() && _backlog.top() == id) 
+                _backlog.pop();
         }
     }
 

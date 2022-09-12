@@ -14,15 +14,14 @@ struct ComparatorLess {
     }
 };
     
-// allow around 128MB of data in main memory
-#define EXTPQUEUE_INTERNAL_MEMORY_BYTES (1024*1024*128)
+// Allowed data in main memory.
+#define EXTPQUEUE_INTERNAL_MEMORY_BYTES (128*1024*1024) // 128 MiB
 
-// allow for write- & read-pools of size 32MB each
-#define EXTPQUEUE_MEM_FOR_POOLS_BYTES (32*1024*1024)
-
+// Max. number of elements overall.
 // allow for X GB of data in external memory:
-// 1024*n * sizeof(T) = 32GB
-#define EXTPQUEUE_MAX_EXTERNAL_ELEMENTS_1024S (32*1024*1024)/sizeof(T)
+// 1024*n * sizeof(T) = X GiB
+// n = X GiB / (1024 * sizeof(T)) = X MiB / sizeof(T)
+#define EXTPQUEUE_MAX_EXTERNAL_ELEMENTS_1024S ((32*1024*1024)/sizeof(T)) // leads to 32GiB
 
 
 template <typename T>
@@ -36,10 +35,7 @@ private:
     pqueue_type _queue;
 
 public:
-    ExternalPriorityQueue() : _pool(
-            (EXTPQUEUE_MEM_FOR_POOLS_BYTES / 2) / block_type::raw_size, 
-            (EXTPQUEUE_MEM_FOR_POOLS_BYTES / 2) / block_type::raw_size
-        ), _queue(_pool) {}
+    ExternalPriorityQueue() : _pool(32, 32), _queue(_pool) {}
     
     void push(const T& elem) {
         _queue.push(elem);

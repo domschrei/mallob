@@ -18,7 +18,7 @@
 #include "interface/api/job_streamer.hpp"
 #include "comm/host_comm.hpp"
 #include "data/job_transfer.hpp"
-#include "util/sys/stxxl.hpp"
+//#include "util/sys/stxxl.hpp"
 
 #ifndef MALLOB_VERSION
 #define MALLOB_VERSION "(dbg)"
@@ -190,9 +190,8 @@ int main(int argc, char *argv[]) {
 
     longStartupWarnMsg(rank, "Init'd message queue");
 
-    mallob_stxxl::init(rank, params.stxxlDiskDirectory(), params.stxxlDiskSizeGbs());
-
-    longStartupWarnMsg(rank, "Init'd STXXL");
+    //mallob_stxxl::init(rank, params.stxxlDiskDirectory(), params.stxxlDiskSizeGbs());
+    //longStartupWarnMsg(rank, "Init'd STXXL");
 
     if (rank == 0)
         LOG(V2_INFO, "Program options: %s\n", params.getParamsAsString().c_str());

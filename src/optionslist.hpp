@@ -79,7 +79,6 @@ OPT_INT(seed,                            "seed", "",                            
 OPT_INT(sleepMicrosecs,                  "sleep", "",                                 100,  0, LARGE_INT,      "Sleep this many microseconds between loop cycles of worker main thread")
 OPT_INT(strictClauseLengthLimit,         "scll", "strict-clause-length-limit",        30,   0, LARGE_INT,      "Only clauses up to this length will be shared")
 OPT_INT(strictLbdLimit,                  "slbdl", "strict-lbd-limit",                 30,   0, LARGE_INT,      "Only clauses with an LBD score up to this value will be shared")
-OPT_INT(stxxlDiskSizeGbs,                "stxxl-disk-size-gbs", "",                   1,    0, LARGE_INT,      "Disk size (in GB) for STXXL per MPI process")
 OPT_INT(verbosity,                       "v", "verbosity",                            2,    0, 6,              "Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB 5=DEBG")
 OPT_INT(numWorkers,                      "w", "workers",                              -1,   -1, LARGE_INT,     "Number of worker PEs to initialize (beginning from rank #0), -1: all PEs are workers")
 OPT_INT(watchdogAbortMillis,             "wam", "watchdog-abort-millis",              10000, 1, MAX_INT,       "Interval (in milliseconds) after which an un-reset watchdog in a worker's main thread will invoke a crash")
@@ -110,7 +109,7 @@ OPT_STRING(monoFilename,                 "mono", "",                            
 OPT_STRING(proofOutputFile,              "pof", "proof-output-file",                  "final-proof.lrat",      "Path and name of final LRAT proof file, output by rank zero")
 OPT_STRING(satSolverSequence,            "satsolver",  "",                            "L",                     "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
 OPT_STRING(solutionToFile,               "s2f", "solution-to-file",                   "",                      "Write solutions to file with provided base name + job ID")
-OPT_STRING(stxxlDiskDirectory,           "stxxl-disk-dir", "",                        ".",                     "Directory where to create STXXL external memory files")
+OPT_STRING(extMemDiskDirectory,          "extmem-disk-dir", "",                       ".",                     "Directory where to create external memory files")
 OPT_STRING(subprocessPrefix,             "subproc-prefix", "",                        "",                      "Execute SAT subprocess with this prefix (e.g., \"valgrind\")")
 OPT_STRING(traceDirectory,               "trace-dir", "",                             ".",                     "Directory to write thread trace files to")
 
