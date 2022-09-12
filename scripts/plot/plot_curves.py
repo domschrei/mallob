@@ -6,7 +6,7 @@ import re
 
 colors = ['#377eb8', '#ff7f00', '#e41a1c', '#f781bf', '#a65628', '#4daf4a', '#984ea3', '#999999', '#dede00', '#377eb8']
 markers = ['^', 's', 'o', '+', 'x', '*']
-linestyles = ["-.", ":", "--", "-", "."]
+linestyles = ["-.", ":", "--", "-"]
 
 lim = -1
 
@@ -238,8 +238,11 @@ for d in data:
         kwargs['color'] = [colors[x%len(colors)] for x in d[2]]
     else:
         kwargs['color'] = colors[i%len(colors)]
-        
+    
     if do_markers:
+        if "^^" in markers:
+            markers.insert(markers.index("^^") ,"^")
+            markers.remove("^^")
         kwargs['marker'] = markers[i%len(markers)]
         if kwargs['marker'] in ['+', 'x']:
             kwargs['markerfacecolor'] = kwargs['color']
