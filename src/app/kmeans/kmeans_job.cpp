@@ -455,13 +455,16 @@ void KMeansJob::setRandomStartCenters() {  // use RNG with seed
     std::vector<int> selectedPoints;
     selectedPoints.reserve(countClusters);
     int randomNumber;
-    std::mt19937 gen(42);  // seed 42, what else?
+    std::random_device rd;
+    //std::mt19937 gen(42);  // seed 42 for testing?
+    std::mt19937 gen(rd());  
     std::uniform_int_distribution<> distr(0, pointsCount - 1);
     for (int i = 0; i < countClusters; ++i) {
         randomNumber = distr(gen);
         while (std::find(selectedPoints.begin(), selectedPoints.end(), randomNumber) != selectedPoints.end()) {
             randomNumber = distr(gen);
         }
+        LOG(V2_INFO, "                          randomNumber: %i\n", randomNumber);
         selectedPoints.push_back(randomNumber);
         clusterCenters[i].reserve(dimension);
         for (int d = 0; d < dimension; d++) {
