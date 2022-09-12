@@ -1,6 +1,7 @@
 #include "kmeans_job.hpp"
 
 #include <iostream>
+#include <random>
 #include <thread>
 
 #include "app/job.hpp"
@@ -41,7 +42,7 @@ void KMeansJob::appl_start() {
 
     loadInstance();
     clusterMembership.assign(pointsCount, -1);
-    
+
     localClusterCenters.resize(countClusters);
     clusterCenters.resize(countClusters);
     for (int cluster = 0; cluster < countClusters; ++cluster) {
@@ -153,16 +154,17 @@ void KMeansJob::appl_suspend() {
     LOG(V3_VERB, "                           myIndex: %i i got SUSPENDED :( iter: %i\n", myIndex, iterationsDone);
     baseMsg.tag = MSG_ALLREDUCE_CLAUSES;
     baseMsg.returnedToSender = true;
-    baseMsg.payload.assign(1,myIndex);
+    if (myIndex < 0) {
+        myIndex = getJobTree().getIndex();
+    }
+    baseMsg.payload.assign(1, myIndex);
     MyMpi::isend(getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, baseMsg);
 }
 void KMeansJob::appl_resume() {
     LOG(V3_VERB, "                           myIndex: %i i got RESUMED :D iter: %i\n", myIndex, iterationsDone);
-    
+
     reset();
-
 }
-
 
 void KMeansJob::reset() {
     iterationsDone = 0;
@@ -188,7 +190,6 @@ void KMeansJob::reset() {
     terminate = false;
     appl_start();
 }
-
 
 JobResult&& KMeansJob::appl_getResult() {
     return std::move(internal_result);
@@ -323,7 +324,10 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
         LOG(V3_VERB, "                           myIndex: %i not Ready: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
 
         msg.returnedToSender = true;
-        msg.payload.assign(1,myIndex);
+        if (myIndex < 0) {
+            myIndex = getJobTree().getIndex();
+        }
+        msg.payload.assign(1, myIndex);
         MyMpi::isend(source, mpiTag, std::move(msg));
 
         return;
@@ -333,6 +337,7 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
         std::vector<int> missingChilds;
         LOG(V3_VERB, "                           myIndex: %i returnFrom: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
         LOG(V3_VERB, "                           !leftDone %i !getJobTree().hasLeftChild() %i getJobTree().getLeftChildIndex() < countCurrentWorkers %i\n", !leftDone, !getJobTree().hasLeftChild(), getJobTree().getLeftChildIndex() < countCurrentWorkers);
+        LOG(V3_VERB, "                           !leftDone %i\n", msg.payload[0]);
         if (!leftDone && (msg.payload[0] == getJobTree().getLeftChildIndex() || !getJobTree().hasLeftChild()) && getJobTree().getLeftChildIndex() < countCurrentWorkers) {
             // missing left child
             leftDone = true;
@@ -394,7 +399,10 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
             LOG(V3_VERB, "                           myIndex: %i not in range\n", myIndex);
 
             msg.returnedToSender = true;
-            msg.payload.assign(1,myIndex);
+            msg.payload.assign(1, myIndex);
+            if (myIndex < 0) {
+                myIndex = getJobTree().getIndex();
+            }
             MyMpi::isend(source, mpiTag, std::move(msg));
 
             return;
@@ -441,13 +449,23 @@ void KMeansJob::loadInstance() {
     setMaxDemand();
 }
 
-void KMeansJob::setRandomStartCenters() {
+void KMeansJob::setRandomStartCenters() {  // use RNG with seed
     clusterCenters.clear();
     clusterCenters.resize(countClusters);
+    std::vector<int> selectedPoints;
+    selectedPoints.reserve(countClusters);
+    int randomNumber;
+    std::mt19937 gen(42);  // seed 42, what else?
+    std::uniform_int_distribution<> distr(0, pointsCount - 1);
     for (int i = 0; i < countClusters; ++i) {
+        randomNumber = distr(gen);
+        while (std::find(selectedPoints.begin(), selectedPoints.end(), randomNumber) != selectedPoints.end()) {
+            randomNumber = distr(gen);
+        }
+        selectedPoints.push_back(randomNumber);
         clusterCenters[i].reserve(dimension);
         for (int d = 0; d < dimension; d++) {
-            clusterCenters[i].push_back(getKMeansData(static_cast<int>((static_cast<float>(i) / static_cast<float>(countClusters)) * (pointsCount - 1)))[d]);
+            clusterCenters[i].push_back(getKMeansData(randomNumber)[d]);
         }
     }
 }
@@ -462,17 +480,20 @@ void KMeansJob::calcNearestCenter(std::function<float(const float* p1, const flo
     LOG(V3_VERB, "                           MI: %i intervalId: %i PC: %i cW: %i start:%i end:%i!!      iter:%i k:%i \n", myIndex, intervalId, pointsCount, countCurrentWorkers, startIndex, endIndex, iterationsDone, countClusters);
     for (int pointID = startIndex; pointID < endIndex; ++pointID) {
         if (terminate) return;
-        //if ((pointID / endIndex) < 0.25 &&
-        //    iAmRoot &&
-        //    (countCurrentWorkers == 1 ||
-        //     (std::find(work.begin(), work.end(), 1) != work.end() && std::find(work.begin(), work.end(), 2) != work.end())) &&
-        //    (leftDone && rightDone) &&
-        //    this->getVolume() > 1) {
-        //    LOG(V3_VERB, "                           will skip Iter\n");
-        //    skipCurrentIter = true;
-        //    work.clear();
-        //    return;
-        //}
+        // LOG(V1_WARN, "(pointID / endIndex) < 0.25: %i iAmRoot: %i countCurrentWorkers == 1: %i std::find(work.begin(), work.end(), 1) != work.end() && std::find(work.begin(), work.end(), 2) != work.end()): %i leftDone && rightDone:%i this->getVolume() > 1:%i\n", (pointID / endIndex) < 0.25, iAmRoot, countCurrentWorkers == 1, std::find(work.begin(), work.end(), 1) != work.end() && std::find(work.begin(), work.end(), 2) != work.end(), leftDone && rightDone,  this->getVolume() > 1);
+
+        if ((pointID / endIndex) < 0.25 &&
+            iAmRoot &&
+            (countCurrentWorkers == 1 ||
+             (std::find(work.begin(), work.end(), 1) != work.end() && std::find(work.begin(), work.end(), 2) != work.end())) &&
+            (leftDone && rightDone) &&
+            this->getVolume() > 1) {
+            LOG(V2_INFO, "                           will skip Iter\n");
+            skipCurrentIter = true;
+            work.clear();
+            workDone.clear();
+            return;
+        }
         currentCluster = -1;
         currentDistance = std::numeric_limits<float>::infinity();
         for (int clusterID = 0; clusterID < countClusters; ++clusterID) {
@@ -636,12 +657,11 @@ std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(const std::ve
     for (int k = 0; k < countClusters; ++k) {
         localClusterCentersResult[k].resize(dimension);
         auto currentCenter = localClusterCentersResult[k].data();
-        auto receivedCenter = reduceData + k*dimension;
+        auto receivedCenter = reduceData + k * dimension;
         for (int d = 0; d < dimension; ++d) {
             currentCenter[d] = *((float*)(receivedCenter + d));
         }
     }
-    
 
     return localClusterCentersResult;
 }
@@ -650,7 +670,7 @@ void KMeansJob::setClusterCenters(const std::vector<int>& reduce) {
     const int* reduceData = reduce.data();
     for (int k = 0; k < countClusters; ++k) {
         auto currentCenter = clusterCenters[k].data();
-        auto receivedCenter = reduceData + k*dimension;
+        auto receivedCenter = reduceData + k * dimension;
         for (int d = 0; d < dimension; ++d) {
             currentCenter[d] = *((float*)(receivedCenter + d));
         }
