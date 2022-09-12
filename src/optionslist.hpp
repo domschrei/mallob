@@ -32,7 +32,7 @@ OPT_BOOL(latencyMonkey,                  "latencymonkey", "",                   
 OPT_BOOL(monitorMpi,                     "mmpi", "monitor-mpi",                       false,                   "Launch an additional thread per process checking when the main thread is inside an MPI call")
 OPT_BOOL(omitSolution,                   "os", "omit-solution",                       false,                   "Do not output solution in mono mode of operation")
 OPT_BOOL(phaseDiversification,           "phasediv", "",                              true,                    "Diversify solvers based on phase in addition to native diversification")
-OPT_BOOL(pipeLargeSolutions,             "pls", "pipe-large-solutions",               true,                    "Provide large solutions over a named pipe instead of directly writing them into the response JSON")
+OPT_BOOL(pipeLargeSolutions,             "pls", "pipe-large-solutions",               false,                   "Provide large solutions over a named pipe instead of directly writing them into the response JSON")
 OPT_BOOL(quiet,                          "q", "quiet",                                false,                   "Do not log to stdout besides critical information")
 OPT_BOOL(reactivationScheduling,         "rs", "use-reactivation-scheduling",         true,                    "Perform reactivation-based scheduling")
 OPT_BOOL(regularProcessDistribution,     "rpa", "regular-process-allocation",         false,                   "Signal that processes have been allocated regularly, i.e., the i-th machine hosts ranks c*i through c*i + c-1")
