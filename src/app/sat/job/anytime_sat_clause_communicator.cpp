@@ -128,6 +128,7 @@ void AnytimeSatClauseCommunicator::communicate() {
             //_done_assembling_proof = true;
 
             for (auto& filename : proofFiles) _merger_filestreams.emplace_back(filename);
+            for (auto& ifs : _merger_filestreams) _merger_filebuffers.emplace_back(ifs);
             _merger_next_lines.resize(proofFiles.size());
                         
             // Merge individual proof files into a single file
@@ -137,27 +138,25 @@ void AnytimeSatClauseCommunicator::communicate() {
                 for (size_t i = 0; i < _merger_next_lines.size(); i++) {
                     if (_merger_next_lines[i].empty()) {
                         // Refill line from stream
-                        lrat_utils::readLine(_merger_filestreams[i], _merger_next_lines[i]);
+                        lrat_utils::readLine(_merger_filebuffers[i], _merger_next_lines[i]);
                     }
                 }
 
                 // Find next best line
-                LratLine nextLine;
-                size_t nextPos;
+                int nextPos = -1;
+                LratClauseId nextId = 0;
                 for (size_t i = 0; i < _merger_next_lines.size(); i++) {
                     if (_merger_next_lines[i].empty()) continue;
-                    if (nextLine.empty() || _merger_next_lines[i].id > nextLine.id) {
-                        nextLine = _merger_next_lines[i];
+                    auto id = _merger_next_lines[i].getId();
+                    if (nextPos < 0 || id > nextId) {
+                        nextId = id;
                         nextPos = i;
                     }
                 }
 
                 // Return line or nothing
-                if (!nextLine.empty()) {
-                    _merger_next_lines[nextPos].literals.clear();
-                    _merger_next_lines[nextPos].hints.clear();
-                    _merger_next_lines[nextPos].signsOfHints.clear();
-                    return std::optional<SerializedLratLine>(nextLine);
+                if (nextPos >= 0) {
+                    return std::optional<SerializedLratLine>(std::move(_merger_next_lines[nextPos]));
                 } else {
                     return std::optional<SerializedLratLine>();
                 }

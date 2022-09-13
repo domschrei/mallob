@@ -21,23 +21,28 @@ public:
     }
 
     bool nextAsChar(char& c) {
-        if (_buffer_pos < 0) refillBuffer();
-        if (_buffer_pos < 0) return false;
+        if (_buffer_pos < 0) {
+            refillBuffer();
+            if (_buffer_pos < 0) return false;
+        }
         c = _buffer[_buffer_pos];
         _buffer_pos--;
         return true;
     }
 
     bool nextAsInt(int& c) {
-        if (_buffer_pos < 0) refillBuffer();
-        if (_buffer_pos < 0) return false;
+        if (_buffer_pos < 0) {
+            refillBuffer();
+            if (_buffer_pos < 0) return false;
+        }
         c = (int) _buffer[_buffer_pos];
         _buffer_pos--;
         return true;
     }
 
     bool done() {
-        if (_buffer_pos < 0) refillBuffer();
+        if (_buffer_pos >= 0) return false;
+        refillBuffer();
         return _buffer_pos < 0;
     }
 

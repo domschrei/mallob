@@ -3,231 +3,178 @@
 #include "util/assert.hpp"
 
 
-
-void writeLineHeader(std::ofstream& ofs) {
-    char header = 'a';
-    ofs.write((const char*) &header, 1);
-}
-
-void writeDeletionLineHeader(std::ofstream& ofs) {
-    char header = 'd';
-    ofs.write((const char*) &header, 1);
-}
-
-void writeSeparator(std::ofstream& ofs) {
-    char zero = '\0';
-    ofs.write((const char*) &zero, 1);
-}
-
-void writeVariableLengthUnsigned(std::ofstream& ofs, int64_t n) {
-    assert (n > 0);
-    unsigned char ch;
-    while (n & ~0x7f) {
-        ch = (n & 0x7f) | 0x80;
-        ofs.write((const char*) &ch, 1);
-        n >>= 7;
-    }
-    ch = n;
-    ofs.write((const char*) &ch, 1);
-}
-
-void writeVariableLengthUnsignedReversed(std::ofstream& ofs, int64_t n) {
-    assert (n > 0);
-    
-    auto original = n;
-    int numIterations = 0;
-    while (n & ~0x7f) {
-        numIterations++;
-        n >>= 7;
-    }
-
-    unsigned char ch = n;
-    ofs.write((const char*) &ch, 1);
-
-    for (int i = 1; i <= numIterations; i++) {
-        n = original >> (7*(numIterations - i));
-        ch = (n & 0x7f) | 0x80;
-        ofs.write((const char*) &ch, 1);
-    }
-}
-
-void writeVariableLengthSigned(std::ofstream& ofs, int64_t n) {
-    writeVariableLengthUnsigned(ofs, 2*std::abs(n) + (n < 0));
-}
-
-void writeVariableLengthSignedReversed(std::ofstream& ofs, int64_t n) {
-    writeVariableLengthUnsignedReversed(ofs, 2*std::abs(n) + (n < 0));
-}
-
-void writeSignedClauseId(std::ofstream& ofs, int64_t id, lrat_utils::WriteMode mode) {
-    if (mode == lrat_utils::REVERSED) {
-        writeVariableLengthSignedReversed(ofs, id);
-    } else {
-        writeVariableLengthSigned(ofs, id);
-    }
-}
-
-void writeLiteral(std::ofstream& ofs, int lit, lrat_utils::WriteMode mode) {
-    if (mode == lrat_utils::REVERSED) {
-        writeVariableLengthSignedReversed(ofs, lit);
-    } else {
-        writeVariableLengthSigned(ofs, lit);
-    }
-}
-
-
-
-bool readSignedClauseId(std::ifstream& ifs, int64_t& id) {
-    int64_t unadjusted = 0;
-    int64_t coefficient = 1;
-    int32_t tmp = ifs.get();
-    if (tmp == 0) return false;
-    while (tmp) {
-        // continuation bit set?
-        if (tmp & 0b10000000) {
-            unadjusted += coefficient * (tmp & 0b01111111); // remove first bit
-        } else {
-            // last byte
-            unadjusted += coefficient * tmp; // first bit is 0, so can leave it
-            break;
-        }
-        coefficient *= 128; // 2^7 because we essentially have 7-bit bytes
-        tmp = ifs.get(); //*((unsigned char*) (_num_buffer+i));
-    }
-    if (unadjusted % 2) { // odds map to negatives
-        id = -(unadjusted - 1) / 2;
-    } else {
-        id = unadjusted / 2;
-    }
-    return true;
-}
-
-bool readLiteral(std::ifstream& ifs, int32_t& lit) {
-    int32_t unadjusted = 0;
-    int32_t coefficient = 1;
-    int32_t tmp = ifs.get();
-    if (tmp == 0) return false;
-    while (tmp >= 0) {
-        // continuation bit set?
-        if (tmp & 0b10000000) {
-            unadjusted += coefficient * (tmp & 0b01111111); // remove first bit
-        } else {
-            // last byte
-            unadjusted += coefficient * tmp; // first bit is 0, so can leave it
-            break;
-        }
-        coefficient *= 128; // 2^7 because we essentially have 7-bit bytes
-        tmp = ifs.get();
-    }
-    if (unadjusted % 2) { // odds map to negatives
-        lit = -(unadjusted - 1) / 2;
-    } else {
-        lit = unadjusted / 2;
-    }
-    return true;
-}
-
-
-
 namespace lrat_utils {
 
-    void writeLine(std::ofstream& ofs, const LratLine& line) {
-        writeLineHeader(ofs);
+    void writeLine(WriteBuffer& buf, const LratLine& line) {
+        buf.writeLineHeader();
         int64_t signedId = line.id;
-        writeSignedClauseId(ofs, signedId, WriteMode::NORMAL);
+        buf.writeSignedClauseId(signedId, WriteMode::NORMAL);
         for (int lit : line.literals) {
-            writeLiteral(ofs, lit, WriteMode::NORMAL);
+            buf.writeLiteral(lit, WriteMode::NORMAL);
         }
-        writeSeparator(ofs);
+        buf.writeSeparator();
         for (size_t i = 0; i < line.hints.size(); i++) {
             int64_t signedId = (line.signsOfHints[i] ? 1 : -1) * line.hints[i];
-            writeSignedClauseId(ofs, signedId, WriteMode::NORMAL);
+            buf.writeSignedClauseId(signedId, WriteMode::NORMAL);
         }
-        writeSeparator(ofs);
+        buf.writeSeparator();
+        buf.flush();
     }
 
-    void writeLine(std::ofstream& ofs, const SerializedLratLine& line, WriteMode mode) {
+    void writeLine(WriteBuffer& buf, const SerializedLratLine& line, WriteMode mode) {
         if (mode == REVERSED) {
-            writeSeparator(ofs);
+            buf.writeSeparator();
             auto [hints, numHints] = line.getUnsignedHints();
             auto signs = line.getSignsOfHints();
             for (int i = numHints-1; i >= 0; i--) {
                 int64_t signedId = (signs[i] ? 1 : -1) * hints[i];
-                writeSignedClauseId(ofs, signedId, mode);
+                buf.writeSignedClauseId(signedId, mode);
             }
-            writeSeparator(ofs);
+            buf.writeSeparator();
             auto [lits, size] = line.getLiterals();
             for (int i = size-1; i >= 0; i--) {
-                writeLiteral(ofs, lits[i], mode);
+                buf.writeLiteral(lits[i], mode);
             }
             int64_t signedId = line.getId();
-            writeSignedClauseId(ofs, signedId, mode);
-            writeLineHeader(ofs);
+            buf.writeSignedClauseId(signedId, mode);
+            buf.writeLineHeader();
         } else {
-            writeLineHeader(ofs);
+            buf.writeLineHeader();
             int64_t signedId = line.getId();
-            writeSignedClauseId(ofs, signedId, mode);
+            buf.writeSignedClauseId(signedId, mode);
             auto [lits, size] = line.getLiterals();
             for (size_t i = 0; i < size; i++) {
-                writeLiteral(ofs, lits[i], mode);
+                buf.writeLiteral(lits[i], mode);
             }
-            writeSeparator(ofs);
+            buf.writeSeparator();
             auto [hints, numHints] = line.getUnsignedHints();
             auto signs = line.getSignsOfHints();
             for (size_t i = 0; i < numHints; i++) {
                 int64_t signedId = (signs[i] ? 1 : -1) * hints[i];
-                writeSignedClauseId(ofs, signedId, mode);
+                buf.writeSignedClauseId(signedId, mode);
             }
-            writeSeparator(ofs);
+            buf.writeSeparator();
         }
+        buf.flush();
     }
 
-    void writeDeletionLine(std::ofstream& ofs, LratClauseId headerId, 
+    void writeDeletionLine(WriteBuffer& buf, LratClauseId headerId, 
             const std::vector<unsigned long>& ids, WriteMode mode) {
         if (mode == REVERSED) {
-            writeSeparator(ofs);
+            buf.writeSeparator();
             for (int i = ids.size()-1; i >= 0; i--) {
-                writeSignedClauseId(ofs, ids[i], mode);
+                buf.writeSignedClauseId(ids[i], mode);
             }
-            writeDeletionLineHeader(ofs);
+            buf.writeDeletionLineHeader();
         } else {
-            writeDeletionLineHeader(ofs);
+            buf.writeDeletionLineHeader();
             for (auto id : ids) {
-                writeSignedClauseId(ofs, id, mode);
+                buf.writeSignedClauseId(id, mode);
             }
-            writeSeparator(ofs);
+            buf.writeSeparator();
         }
+        buf.flush();
     }
 
-    bool readLine(std::ifstream& ifs, LratLine& line) {
+    bool readLine(ReadBuffer& buf, LratLine& line) {
         
-        if (!ifs.good() || ifs.eof()) return false;
+        if (buf.eof) return false;
 
         line.id = -1;
         line.literals.clear();
         line.hints.clear();
         line.signsOfHints.clear();
 
-        int header = ifs.get();
+        int header = buf.get();
         if (header != 'a') return false;
 
         int64_t signedId;
-        if (!readSignedClauseId(ifs, signedId)) return false;
+        if (!buf.readSignedClauseId(signedId)) return false;
         assert(signedId > 0);
         line.id = signedId;
 
         int lit;
-        while (readLiteral(ifs, lit)) {
+        while (buf.readLiteral(lit)) {
             line.literals.push_back(lit);
         }
         // separator zero was read by "readLiteral" call that returned zero
 
-        while (readSignedClauseId(ifs, signedId)) {
+        while (buf.readSignedClauseId(signedId)) {
             line.hints.push_back(std::abs(signedId));
             line.signsOfHints.push_back(signedId>0);
         }
         // line termination zero was read by "readLiteral" call that returned zero
 
+        return true;
+    }
+
+    template <typename T>
+    void backInsert(std::vector<uint8_t>& data, const T& thing) {
+        auto pos = data.size();
+        data.resize(pos + sizeof(T));
+        memcpy(data.data()+pos, &thing, sizeof(T));
+    }
+
+    bool readLine(ReadBuffer& buf, SerializedLratLine& line) {
+
+        if (buf.eof) return false;
+
+        int header = buf.get();
+        if (header != 'a') return false;
+
+        // LratClauseId id;
+        // int numLiterals;
+        // int literals[numLiterals];
+        // int numHints;
+        // LratClauseId hints[numHints];
+        // bool signsOfHints[numHints];
+        std::vector<uint8_t> data;
+
+        int64_t signedId;
+        if (!buf.readSignedClauseId(signedId)) return false;
+        assert(signedId > 0);
+        backInsert(data, (unsigned long) signedId);
+
+        // literals counter
+        int litCounterPos = data.size();
+        backInsert(data, (int)0);
+
+        // actual literals
+        int numLiterals = 0;
+        int lit;
+        while (buf.readLiteral(lit)) {
+            backInsert(data, lit);
+            numLiterals++;
+        }
+        // separator zero was read by "readLiteral" call that returned zero
+
+        // update literals counter
+        memcpy(data.data()+litCounterPos, &numLiterals, sizeof(int));
+
+        // hints counter
+        int hintCounterPos = data.size();
+        backInsert(data, (int)0);
+
+        // actual hints
+        int numHints = 0;
+        while (buf.readSignedClauseId(signedId)) {
+            backInsert(data, signedId);
+            numHints++;
+        }
+        // line termination zero was read by "readLiteral" call that returned zero
+
+        // update hints counter
+        memcpy(data.data()+hintCounterPos, &numHints, sizeof(int));
+
+        // separate and append signs of hints from hints
+        for (int i = 0; i < numHints; i++) {
+            long* hint = (long*) (data.data()+hintCounterPos+sizeof(int)+i*sizeof(long));
+            bool sign = *hint > 0;
+            *hint = (unsigned long) std::abs(*hint);
+            backInsert(data, (char) (sign ? 1 : 0));
+        }
+
+        line = SerializedLratLine(std::move(data));
         return true;
     }
 }

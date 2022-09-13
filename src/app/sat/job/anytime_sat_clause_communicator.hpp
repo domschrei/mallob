@@ -158,7 +158,8 @@ private:
 
     std::unique_ptr<DistributedFileMerger> _file_merger;
     std::vector<std::ifstream> _merger_filestreams;
-    std::vector<LratLine> _merger_next_lines;
+    std::vector<lrat_utils::ReadBuffer> _merger_filebuffers;
+    std::vector<SerializedLratLine> _merger_next_lines;
 
 public:
     AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : _params(params), _job(job), 

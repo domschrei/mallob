@@ -16,19 +16,19 @@
 void testMerge(int myRank) {
 
     int lineCounter = 0;
-    int maxLineCounter = 1000000;
+    int maxLineCounter = 10000;
 
     auto merger = DistributedFileMerger(MPI_COMM_WORLD, 5, [&]() {
         if (lineCounter == maxLineCounter) 
             return std::optional<LratLine>();
-        LratLine line;
-        line.id = MyMpi::size(MPI_COMM_WORLD)*(maxLineCounter - lineCounter) + myRank;
-        line.literals.push_back(lineCounter);
-        line.hints.push_back(myRank);
-        line.signsOfHints.push_back(true);
         lineCounter++;
+        LratLine line;
+        line.id = MyMpi::size(MPI_COMM_WORLD)*(maxLineCounter - lineCounter + 1) + myRank + 1;
+        line.literals.push_back(lineCounter);
+        line.hints.push_back(myRank+1);
+        line.signsOfHints.push_back(true);
         return std::optional<LratLine>(line);
-    }, "final_output.txt", /*numOriginalClauses=*/0);
+    }, "final_output.txt", /*numOriginalClauses=*/1);
 
     MyMpi::getMessageQueue().registerCallback(MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, [&](MessageHandle& h) {
         DistributedFileMerger::MergeMessage msg; msg.deserialize(h.getRecvData());
@@ -42,7 +42,7 @@ void testMerge(int myRank) {
     while (true) {
         MyMpi::getMessageQueue().advance();
         merger.advance();
-        if (merger.finished()) break;
+        if (merger.finished() && merger.allProcessesFinished()) break;
         watchdog.reset(Timer::elapsedSeconds());
     }
     LOG(V2_INFO, "Done, exiting\n");

@@ -21,7 +21,30 @@ private:
 
 public:
     SerializedLratLine() {}
-    SerializedLratLine(std::vector<uint8_t>&& data) : _data(std::move(data)) {}
+    SerializedLratLine(std::vector<uint8_t>&& data) : _data(std::move(data)) {
+        // Some sanity checks
+        /*
+        assert(getId() < 100000000L);
+        auto [lits, numLits] = getLiterals();
+        assert(numLits >= 0 && numLits < 100);
+        for (size_t i = 0; i < numLits; i++) {
+            assert(std::abs(lits[i]) < 1000000);
+        }
+        auto [hints, numHints] = getUnsignedHints();
+        char* signs = (char*) getSignsOfHints();
+        assert(numHints >= 0 && numHints < 1000);
+        for (size_t i = 0; i < numHints; i++) {
+            assert(hints[i] < 100000000L);
+            if (signs[i] != 0 && signs[i] != 1) {
+                std::string out;
+                for (auto byte : _data) out += std::to_string(byte) + ",";
+                out = out.substr(0, out.size()-1);
+                LOG(V0_CRIT, "[ERROR] invalid sign in serialized lrat line: %s\n", out.c_str());
+                abort();
+            }
+        }
+        */
+    }
 
     SerializedLratLine(const LratLine& line) {
         _data.resize(sizeof(LratClauseId) 
@@ -43,6 +66,8 @@ public:
         }
         assert(i == _data.size());
     }
+
+    bool empty() const {return _data.empty();}
 
     void clear() {
         _data.clear();

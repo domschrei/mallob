@@ -40,6 +40,7 @@ private:
 
     std::string _output_filename;
     std::ofstream _output;
+    lrat_utils::WriteBuffer _output_buf;
 
     std::future<void> _work_future;
     bool _work_done = true;
@@ -64,7 +65,8 @@ public:
             _local_epoch_starts(localEpochStarts), 
             _local_epoch_offsets(localEpochOffsets), _global_epoch_starts(globalEpochStarts),
             _current_epoch(finalEpoch), _output_filename(outputFilename), 
-            _output(outputFilename, std::ofstream::binary) {}
+            _output(outputFilename, std::ofstream::binary),
+            _output_buf(_output) {}
 
     ~ProofInstance() {
         if (_work_future.valid()) _work_future.get();
@@ -155,7 +157,7 @@ private:
                 }
 
                 // Output the line
-                lrat_utils::writeLine(_output, _current_line);
+                lrat_utils::writeLine(_output_buf, _current_line);
 
                 // Traverse clause hints
                 for (auto hintId : _current_line.hints) {

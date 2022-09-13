@@ -134,6 +134,7 @@ private:
 
     int _parent_rank = -1;
     bool _request_by_parent = false;
+    bool _is_root;
 
     std::vector<SerializedLratLine> _output_buffer;
     Mutex _output_buffer_mutex;
@@ -164,18 +165,27 @@ public:
 
         int myRank = MyMpi::rank(comm);
         int commSize = MyMpi::size(comm);
+        _is_root = myRank == 0;
 
-        if (myRank > 0) {
-            _parent_rank = (myRank-1) / branchingFactor;
-            LOG(V3_VERB, "DFM Adding parent [%i]\n", _parent_rank);
+        if (myRank == 1) {
+            _parent_rank = 0;
+        } else if (myRank > 1) {
+            _parent_rank = ((myRank-2) / branchingFactor) + 1;
         }
+        LOG(V3_VERB, "DFM Adding parent [%i]\n", _parent_rank);
 
         // Compute children of this rank
-        for (int childRank = branchingFactor*myRank+1; childRank <= branchingFactor*(myRank+1); childRank++) {
-            if (childRank < commSize) {
-                // Create child
-                _children.emplace_back(childRank);
-                LOG(V3_VERB, "DFM Adding child [%i]\n", childRank);
+        if (myRank == 0) {
+            _children.emplace_back(1);
+            LOG(V3_VERB, "DFM Adding child [%i]\n", 1);
+        } else {
+            auto adjRank = myRank-1;
+            for (int childRank = branchingFactor*adjRank+1; childRank <= branchingFactor*(adjRank+1); childRank++) {
+                if (childRank+1 < commSize) {
+                    // Create child
+                    _children.emplace_back(childRank+1);
+                    LOG(V3_VERB, "DFM Adding child [%i]\n", childRank+1);
+                }
             }
         }
 
@@ -206,7 +216,7 @@ public:
 
     bool readyToMerge() {
         if (_began_merging) return false;
-        if (MyMpi::rank(_comm) == 0) {
+        if (_is_root) {
             if (!_root_prepared) return false;
             if (_fut_root_prepare.valid()) {
                 // Root has been prepared for merging
@@ -306,7 +316,7 @@ public:
 
     bool finished() const {
         if (!isFullyExhausted()) return false;
-        if (MyMpi::rank(_comm) == 0) {
+        if (_is_root) {
             return _reversed_file;
         } else return true;
     }
@@ -331,6 +341,8 @@ private:
         std::vector<LratClauseId> hintsToDelete;
 
         bool countedRefillTime = false;
+
+        lrat_utils::WriteBuffer writeBuf(_output_filestream);
 
         while (!Terminator::isTerminating()) {
             bool canMerge = true;
@@ -400,7 +412,7 @@ private:
             } else {
                 // Line to output found
                 auto& chosenLine = merger[chosenSource];
-                if (MyMpi::rank(_comm) == 0) {
+                if (_is_root) {
                     auto [ptr, numHints] = chosenLine.getUnsignedHints();
                     for (size_t i = 0; i < numHints; i++) {
                         auto hint = ptr[i];
@@ -413,7 +425,7 @@ private:
                     }
                     if (!hintsToDelete.empty()) {
                         if (_binary_output) {
-                            lrat_utils::writeDeletionLine(_output_filestream, chosenId, hintsToDelete, lrat_utils::REVERSED);
+                            lrat_utils::writeDeletionLine(writeBuf, chosenId, hintsToDelete, lrat_utils::REVERSED);
                         } else {
                             std::string delLine = std::to_string(chosenId) + " d";
                             for (auto hint : hintsToDelete) delLine += " " + std::to_string(hint);
@@ -424,7 +436,7 @@ private:
                     }
                     // Write into final file
                     if (_binary_output) {
-                        lrat_utils::writeLine(_output_filestream, chosenLine, lrat_utils::REVERSED);
+                        lrat_utils::writeLine(writeBuf, chosenLine, lrat_utils::REVERSED);
                     } else {
                         std::string output = chosenLine.toStr();
                         _output_filestream.write(output.c_str(), output.size());
@@ -444,14 +456,14 @@ private:
             countedRefillTime = false;
         }
 
-        if (MyMpi::rank(_comm) == 0) {
+        if (_is_root) {
             _output_filestream.flush();
             _output_filestream.close();
         }
     }
 
     void reverseFile() {
-        if (MyMpi::rank(_comm) != 0) return;
+        if (!_is_root) return;
         if (_binary_output) {
             // Read binary file in reverse order, output lines into new file
             std::ofstream ofs(_output_filename, std::ofstream::binary);
@@ -463,11 +475,13 @@ private:
         } else {
             // Just "tac" the text file
             std::string cmd = "tac " + _output_filename + ".inv > " + _output_filename;
-            system(cmd.c_str());
+            int result = system(cmd.c_str());
+            assert(result == 0);
         }
         // remove original (reversed) file
         std::string cmd = "rm " + _output_filename + ".inv";
-        system(cmd.c_str());
+        int result = system(cmd.c_str());
+        assert(result == 0);
 
         _reversed_file = true;
     }
