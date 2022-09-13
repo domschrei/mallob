@@ -25,7 +25,7 @@ varied = datasets.make_blobs(
 # ============
 plt.figure(figsize=(9 * 2 + 3, 18))
 plt.subplots_adjust(
-    left=0.02, right=0.98, bottom=0.001, top=0.95, wspace=0.05, hspace=0.01
+    left=0.01, right=0.99, bottom=0.01, top=0.99, wspace=0.02, hspace=0.02
 )
 
 plot_num = 1
