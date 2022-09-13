@@ -110,6 +110,10 @@ private:
 		return (clauseId-_num_original_clauses-1) % _solvers[0]->getSolverSetup().maxNumSolvers;
 	}
 	void alignClauseId(int* clauseData) {
+
+		// Only align clause IDs if distributed proof assembly is done
+		if (!_params.distributedProofAssembly()) return;
+
 		unsigned long clauseId = metadata::readUnsignedLong(clauseData);
 		int localSolverId = getProducingLocalSolverIndex(clauseId);
 
@@ -128,6 +132,10 @@ private:
 		metadata::writeUnsignedLong(alignedClauseId, clauseData);
 	}
 	void unalignClauseId(int* clauseData) {
+
+		// Only align clause IDs if distributed proof assembly is done
+		if (!_params.distributedProofAssembly()) return;
+
 		unsigned long clauseId = metadata::readUnsignedLong(clauseData);
 		int localSolverId = getProducingLocalSolverIndex(clauseId);
 

@@ -48,6 +48,7 @@ SharingManager::SharingManager(
 	
 	assert(!solvers.empty());
 	_num_original_clauses = solvers[0]->getSolverSetup().numOriginalClauses;
+
 	_id_offsets_per_solver.resize(_solvers.size());
 	_min_epoch_ids_per_solver.resize(_solvers.size());
 	_last_exported_clause_id.resize(_solvers.size());
@@ -58,14 +59,15 @@ SharingManager::SharingManager(
 		_solver_revisions.push_back(_solvers[i]->getSolverSetup().solverRevision);
 		_solver_stats.push_back(&_solvers[i]->getSolverStatsRef());
 
-		//auto thisSolverEpochStart = _num_original_clauses + solvers[i]->getGlobalId()+1;
+		if (_params.distributedProofAssembly()) {
 
-		_id_offsets_per_solver[i].push_back(0);
-		_min_epoch_ids_per_solver[i].push_back(0);
-		_last_exported_clause_id[i] = new std::atomic_ulong(0);
+			_id_offsets_per_solver[i].push_back(0);
+			_min_epoch_ids_per_solver[i].push_back(0);
+			_last_exported_clause_id[i] = new std::atomic_ulong(0);
 
-		LOG(V2_INFO, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
-				_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), 0, _min_epoch_ids_per_solver[i].back());
+			LOG(V2_INFO, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
+					_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), 0, _min_epoch_ids_per_solver[i].back());
+		}
 	}
 	_global_epoch_ids.push_back(0);
 }
@@ -84,8 +86,10 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 
 	if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
 		unsigned long clauseId = metadata::readUnsignedLong(clause.begin);
-		_last_exported_clause_id[solverId]->store(clauseId, std::memory_order_relaxed);
 		assert(getProducingLocalSolverIndex(clauseId) == solverId);
+		if (_params.distributedProofAssembly()) {
+			_last_exported_clause_id[solverId]->store(clauseId, std::memory_order_relaxed);
+		}
 	}
 
 	auto clauseBegin = clause.begin;
@@ -216,7 +220,7 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 	int nbFiltered = 0;
 	int nbTotal = 0;
 
-	if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+	if (MALLOB_CLAUSE_METADATA_SIZE == 2 && _params.distributedProofAssembly()) {
 		// Proceed with the next epoch.
 		// Find max. first clause ID
 		unsigned long maxMinEpochId = 0;
@@ -291,7 +295,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		int shift = bitsPerElem;
 		int filterPos = -1 + (MALLOB_CLAUSE_METADATA_SIZE == 2 ? 2 : 0);
 		
-		if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+		if (MALLOB_CLAUSE_METADATA_SIZE == 2 && _params.distributedProofAssembly()) {
 			// extract global min. epoch ID and compute the next ID offset
 			// for each solver from it
 			unsigned long globalMinEpochId = metadata::readUnsignedLong(filter);
@@ -418,7 +422,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 				solverStats->receivedClausesFiltered++;
 				continue;
 			} else {
-				if (MALLOB_CLAUSE_METADATA_SIZE == 2 && clause.size >= 2) {
+				if (MALLOB_CLAUSE_METADATA_SIZE == 2 && _params.distributedProofAssembly() && clause.size >= 2) {
 					// check via clause ID whether this solver produced this clause
 					unsigned long clauseId = metadata::readUnsignedLong(clause.begin);
 					if (getProducingInstanceId(clauseId) == solver.getGlobalId()) {
@@ -515,6 +519,9 @@ int SharingManager::getEpochOfAlignedSelfClause(unsigned long id) {
 void SharingManager::writeClauseEpochs(/*const std::string& proofDir, int firstGlobalId, */
 		const std::string& outputFilename) {
 	
+	// Only write clause epochs if distributed proof assembly is done
+	if (!_params.distributedProofAssembly()) return;
+
 	std::string tempFilename = outputFilename + "~";
 	std::ofstream ofs(tempFilename);
 	ofs << _num_original_clauses << "\n";
