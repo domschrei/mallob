@@ -11,24 +11,11 @@ from itertools import cycle, islice
 
 np.random.seed(0)
 
-# ============
-# Generate datasets. We choose the size big enough to see the scalability
-# of the algorithms, but not too big to avoid too long running times
-# ============
-n_samples = 500
-noisy_circles = datasets.make_circles(n_samples=n_samples, factor=0.5, noise=0.05)
-noisy_moons = datasets.make_moons(n_samples=n_samples, noise=0.05)
-blobs = datasets.make_blobs(n_samples=n_samples, random_state=8)
-no_structure = np.random.rand(n_samples, 2), None
-
-# Anisotropicly distributed data
-random_state = 170
-X, y = datasets.make_blobs(n_samples=n_samples, random_state=random_state)
-transformation = [[0.6, -0.6], [-0.4, 0.8]]
-X_aniso = np.dot(X, transformation)
-aniso = (X_aniso, y)
 
 # blobs with varied variances
+n_samples = 500
+random_state = 170
+blobs = datasets.make_blobs(n_samples=n_samples, random_state=8)
 varied = datasets.make_blobs(
     n_samples=n_samples, cluster_std=[1.0, 2.5, 0.5], random_state=random_state
 )
@@ -45,6 +32,7 @@ plot_num = 1
 
 default_base = {
     "quantile": 0.3,
+    "max_iter":1,
     "eps": 0.3,
     "damping": 0.9,
     "preference": -200,
@@ -57,27 +45,6 @@ default_base = {
 
 datasets = [
     (
-        noisy_circles,
-        {
-            "damping": 0.77,
-            "preference": -240,
-            "quantile": 0.2,
-            "n_clusters": 2,
-            "min_samples": 7,
-            "xi": 0.08,
-        },
-    ),
-    (
-        noisy_moons,
-        {
-            "damping": 0.75,
-            "preference": -220,
-            "n_clusters": 2,
-            "min_samples": 7,
-            "xi": 0.1,
-        },
-    ),
-    (
         varied,
         {
             "eps": 0.18,
@@ -87,18 +54,6 @@ datasets = [
             "min_cluster_size": 0.2,
         },
     ),
-    (
-        aniso,
-        {
-            "eps": 0.15,
-            "n_neighbors": 2,
-            "min_samples": 7,
-            "xi": 0.1,
-            "min_cluster_size": 0.2,
-        },
-    ),
-    (blobs, {"min_samples": 7, "xi": 0.1, "min_cluster_size": 0.2}),
-    (no_structure, {}),
 ]
 
 for i_dataset, (dataset, algo_params) in enumerate(datasets):
@@ -124,51 +79,31 @@ for i_dataset, (dataset, algo_params) in enumerate(datasets):
     # ============
     # Create cluster objects
     # ============
-    ms = cluster.MeanShift(bandwidth=bandwidth, bin_seeding=True)
-    two_means = cluster.KMeans(n_clusters=params["n_clusters"])
-    ward = cluster.AgglomerativeClustering(
-        n_clusters=params["n_clusters"], linkage="ward", connectivity=connectivity
-    )
-    spectral = cluster.SpectralClustering(
-        n_clusters=params["n_clusters"],
-        eigen_solver="arpack",
-        affinity="nearest_neighbors",
-    )
-    dbscan = cluster.DBSCAN(eps=params["eps"])
-    optics = cluster.OPTICS(
-        min_samples=params["min_samples"],
-        xi=params["xi"],
-        min_cluster_size=params["min_cluster_size"],
-    )
-    affinity_propagation = cluster.AffinityPropagation(
-        damping=params["damping"], preference=params["preference"], random_state=0
-    )
-    average_linkage = cluster.AgglomerativeClustering(
-        linkage="average",
-        affinity="cityblock",
-        n_clusters=params["n_clusters"],
-        connectivity=connectivity,
-    )
-    birch = cluster.Birch(n_clusters=params["n_clusters"])
-    gmm = mixture.GaussianMixture(
-        n_components=params["n_clusters"], covariance_type="full"
-    )
+    iterations = 4
+    centroids = None
+    two_means = cluster.KMeans(n_clusters=params["n_clusters"], max_iter=1,n_init=1, init=("random"))
 
     clustering_algorithms = (
-        ("K-Means", two_means),
+        ("", two_means),
+        ("", two_means),
+        ("", two_means),
+        ("", two_means),
         #("Affinity\nPropagation", affinity_propagation),
         #("MeanShift", ms),
         #("Spectral\nClustering", spectral),
         #("Ward", ward),
         #("Agglomerative\nClustering", average_linkage),
-        ("DBSCAN", dbscan),
-        ("OPTICS", optics),
-        ("BIRCH", birch),
-        ("Gaussian Mixture", gmm),
+        #("DBSCAN", dbscan),
+        #("OPTICS", optics),
+        #("BIRCH", birch),
+        #("Gaussian Mixture", gmm),
     )
 
+    i=1
+    maxIter=2
     for name, algorithm in clustering_algorithms:
         t0 = time.time()
+        algorithm = cluster.KMeans(n_clusters=params["n_clusters"], max_iter=maxIter,n_init=1, init=(centroids if centroids is not None else 'random'))
 
         # catch warnings related to kneighbors_graph
         with warnings.catch_warnings():
@@ -185,7 +120,9 @@ for i_dataset, (dataset, algo_params) in enumerate(datasets):
                 + " may not work as expected.",
                 category=UserWarning,
             )
-            algorithm.fit(X)
+            result = algorithm.fit(X)
+            centroids = algorithm.cluster_centers_
+            print(result.n_iter_)
 
         t1 = time.time()
         if hasattr(algorithm, "labels_"):
@@ -193,7 +130,7 @@ for i_dataset, (dataset, algo_params) in enumerate(datasets):
         else:
             y_pred = algorithm.predict(X)
 
-        plt.subplot(len(datasets), len(clustering_algorithms), plot_num)
+        plt.subplot(int(len(clustering_algorithms)/2), int(len(clustering_algorithms)/2), plot_num)
         if i_dataset == 0:
             plt.title(name, size=30)
 
@@ -217,9 +154,25 @@ for i_dataset, (dataset, algo_params) in enumerate(datasets):
                 )
             )
         )
+        markers = np.array(
+            list(
+                islice(
+                    cycle(
+                        [
+                            "^",
+                            "o",
+                            "s",
+                        ]
+                    ),
+                    int(max(y_pred) + 1),
+                )
+            )
+        )
         # add black color for outliers (if any)
         colors = np.append(colors, ["#000000"])
-        plt.scatter(X[:, 0], X[:, 1], s=10, color=colors[y_pred])
+        plt.scatter(X[:, 0][y_pred==0], X[:, 1][y_pred==0], s=300, color="#377eb8", marker="^")
+        plt.scatter(X[:, 0][y_pred==1], X[:, 1][y_pred==1], s=300, color="#ff7f00", marker="s")
+        plt.scatter(X[:, 0][y_pred==2], X[:, 1][y_pred==2], s=300, color="#4daf4a", marker="o")
 
         plt.xlim(-2.5, 2.5)
         plt.ylim(-2.5, 2.5)
@@ -228,11 +181,11 @@ for i_dataset, (dataset, algo_params) in enumerate(datasets):
         plt.text(
             0.99,
             0.01,
-            ("%.2fs" % (t1 - t0)).lstrip("0"),
+            "iteration: "+ str(maxIter*(plot_num-1)),
             transform=plt.gca().transAxes,
-            size=30,
+            size=50,
             horizontalalignment="right",
         )
         plot_num += 1
 
-plt.savefig("clusteringExamples.pdf", dpi=300)
+plt.savefig("KMeansExample.pdf", dpi=300)
