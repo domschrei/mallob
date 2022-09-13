@@ -164,30 +164,9 @@ public:
             _comm(comm), _branching_factor(branchingFactor), _local_source(localSource), _num_original_clauses(numOriginalClauses) {
 
         int myRank = MyMpi::rank(comm);
-        int commSize = MyMpi::size(comm);
         _is_root = myRank == 0;
 
-        if (myRank == 1) {
-            _parent_rank = 0;
-        } else if (myRank > 1) {
-            _parent_rank = ((myRank-2) / branchingFactor) + 1;
-        }
-        LOG(V3_VERB, "DFM Adding parent [%i]\n", _parent_rank);
-
-        // Compute children of this rank
-        if (myRank == 0) {
-            _children.emplace_back(1);
-            LOG(V3_VERB, "DFM Adding child [%i]\n", 1);
-        } else {
-            auto adjRank = myRank-1;
-            for (int childRank = branchingFactor*adjRank+1; childRank <= branchingFactor*(adjRank+1); childRank++) {
-                if (childRank+1 < commSize) {
-                    // Create child
-                    _children.emplace_back(childRank+1);
-                    LOG(V3_VERB, "DFM Adding child [%i]\n", childRank+1);
-                }
-            }
-        }
+        setUpMergeTree();
 
         if (myRank == 0) {
             _fut_root_prepare = ProcessWideThreadPool::get().addTask([&, outputFileAtZero]() {
@@ -335,6 +314,51 @@ public:
     }
 
 private:
+
+    void setUpMergeTree() {
+        const int numChildrenOfRoot = 3;
+
+        int myRank = MyMpi::rank(_comm);
+        int commSize = MyMpi::size(_comm);
+        _is_root = myRank == 0;
+
+        int numChildRanks = commSize - 1;
+        int numChildRanksPerTree = (int) std::ceil(((float)numChildRanks) / numChildrenOfRoot);
+        int myTreeIdx = (myRank - 1) / numChildRanksPerTree;
+        int rankOffset = 1 + myTreeIdx * numChildRanksPerTree;
+        int myRankWithinTree = (myRank - 1) - numChildRanksPerTree * myTreeIdx;
+
+        if (myRankWithinTree == 0) {
+            // Root is the parent of each such child
+            _parent_rank = 0;
+        } else {
+            _parent_rank = (myRankWithinTree-1) / _branching_factor + rankOffset;
+        }
+
+        LOG(V2_INFO, "DFM Tree #%i, internal rank %i, offset %i, parent [%i]\n", 
+            myTreeIdx, myRankWithinTree, rankOffset, _parent_rank);
+
+        // Compute children of this rank
+        if (_is_root) {
+            for (int i = 0; i < numChildrenOfRoot; i++) {
+                int childRank = numChildRanksPerTree*i + 1;
+                _children.emplace_back(childRank);
+                LOG(V3_VERB, "DFM Adding child [%i]\n", childRank);
+            }
+        } else {
+            for (int childRank = _branching_factor*myRankWithinTree+1; 
+                    childRank <= _branching_factor*(myRankWithinTree+1); 
+                    childRank++) {
+                int adjChildRank = childRank + rankOffset;
+                if (adjChildRank < std::min(commSize, 1 + (myTreeIdx+1) * numChildRanksPerTree)) {
+                    // Create child
+                    _children.emplace_back(adjChildRank);
+                    LOG(V3_VERB, "DFM Adding child [%i]\n", adjChildRank);
+                }
+            }
+        }
+    }
+
     void doMerging() {
 
         std::vector<SerializedLratLine> merger(_children.size()+1);
