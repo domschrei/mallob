@@ -175,9 +175,9 @@ for i_dataset, (dataset, algo_params) in enumerate(datasets):
         plt.scatter(X[:, 0][y_pred==2], X[:, 1][y_pred==2], s=300, color="#4daf4a", marker="o")
 
         
-        plt.scatter(centroids[0, 0], centroids[0, 1], s=500, color="#000000", marker="^")
-        plt.scatter(centroids[1, 0], centroids[1, 1], s=500, color="#000000", marker="s")
-        plt.scatter(centroids[2, 0], centroids[2, 1], s=500, color="#000000", marker="o")
+        plt.scatter(centroids[0, 0], centroids[0, 1], s=1000, color="#000000", marker="^")
+        plt.scatter(centroids[1, 0], centroids[1, 1], s=1000, color="#000000", marker="s")
+        plt.scatter(centroids[2, 0], centroids[2, 1], s=1000, color="#000000", marker="o")
 
         plt.xlim(-2.5, 2.5)
         plt.ylim(-2.5, 2.5)

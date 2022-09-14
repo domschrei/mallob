@@ -4,11 +4,14 @@
 def main():
     import time
     import numpy as np
+    import sklearn
     from sklearn.datasets import make_blobs
     
     np.set_printoptions(suppress=True)
 
+    print('The scikit-learn version is {}.'.format(sklearn.__version__))
        
+    print("start")
     floats = []
     with open("/mnt/c/Projekte/mallob/instances/covtypeShuffleK.csv") as f:
         for line in f:
@@ -47,7 +50,6 @@ def main():
         tol=0, random_state=0, algorithm="lloyd"
     )
 
-    print("start")
     start_time = time.time() 
     y_km = km.fit(X)
     end_time = time.time()
