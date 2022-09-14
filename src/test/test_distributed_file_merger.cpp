@@ -18,16 +18,18 @@ void testMerge(int myRank) {
     int lineCounter = 0;
     int maxLineCounter = 10000;
 
-    auto merger = DistributedFileMerger(MPI_COMM_WORLD, 5, [&]() {
-        if (lineCounter == maxLineCounter) 
-            return std::optional<LratLine>();
+    auto merger = DistributedFileMerger(MPI_COMM_WORLD, 5, [&](SerializedLratLine& out) {
+        if (lineCounter == maxLineCounter) {
+            return false;
+        }
         lineCounter++;
         LratLine line;
         line.id = MyMpi::size(MPI_COMM_WORLD)*(maxLineCounter - lineCounter + 1) + myRank + 1;
         line.literals.push_back(lineCounter);
         line.hints.push_back(myRank+1);
         line.signsOfHints.push_back(true);
-        return std::optional<LratLine>(line);
+        out = SerializedLratLine(line);
+        return true;
     }, "final_output.txt", /*numOriginalClauses=*/1);
 
     MyMpi::getMessageQueue().registerCallback(MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, [&](MessageHandle& h) {

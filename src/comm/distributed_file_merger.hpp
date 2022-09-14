@@ -19,7 +19,7 @@
 class DistributedFileMerger {
 
 public:
-    typedef std::function<std::optional<bool>(SerializedLratLine&)> LineSource;
+    typedef std::function<bool(SerializedLratLine&)> LineSource;
 
     struct MergeMessage : public Serializable {
 
@@ -120,7 +120,7 @@ private:
         SerializedLratLine next() {
             assert(hasNext());
             auto lock = bufferMutex.getLock();
-            auto line = std::move(buffer.front());
+            SerializedLratLine line(std::move(buffer.front()));
             buffer.pop_front();
             bufferSize.fetch_sub(line.size(), std::memory_order_relaxed);
             return line;
@@ -223,20 +223,22 @@ public:
 
     void handle(int sourceWithinComm, MergeMessage& msg) {
 
-        LOG(V3_VERB, "DFM Msg from [%i]\n", sourceWithinComm);
-
         auto type = msg.type;
         if (type == MergeMessage::Type::REQUEST) {
+            LOG(V3_VERB, "DFM Msg from [%i] requesting lines\n", sourceWithinComm);
             _request_by_parent = true;
             advance();
             return;
         }
+
+        LOG(V3_VERB, "DFM Msg from [%i] responding to request\n", sourceWithinComm);
 
         bool foundChild = false;
         for (auto& child : _children) if (child.getRankWithinComm() == sourceWithinComm) {
             child.add(std::move(msg.lines));
             if (type == MergeMessage::Type::RESPONSE_EXHAUSTED) {
                 child.conclude();
+                LOG(V2_INFO, "DFM child [%i] marked exhausted\n", child.getRankWithinComm());
             }
             foundChild = true;
             break;
@@ -286,7 +288,9 @@ public:
                 writeOutputIntoMsg();
             }
             if (msg.type != MergeMessage::Type::REQUEST) {
-                LOG(V3_VERB, "DFM Sending refill (%i lines) to [%i]\n", msg.lines.size(), _parent_rank);
+                LOG(V3_VERB, "DFM Sending refill (%i lines) to [%i], exhausted:%s\n", 
+                    msg.lines.size(), _parent_rank, 
+                    msg.type == MergeMessage::Type::RESPONSE_EXHAUSTED ? "yes":"no");
                 MyMpi::isend(_parent_rank, MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, msg);
                 _request_by_parent = false;
             }
@@ -325,7 +329,7 @@ private:
         int numChildRanks = commSize - 1;
         int numChildRanksPerTree = (int) std::ceil(((float)numChildRanks) / numChildrenOfRoot);
         int myTreeIdx = (myRank - 1) / numChildRanksPerTree;
-        int rankOffset = 1 + myTreeIdx * numChildRanksPerTree;
+        int rankOffset = _is_root ? 0 : 1 + myTreeIdx * numChildRanksPerTree;
         int myRankWithinTree = (myRank - 1) - numChildRanksPerTree * myTreeIdx;
 
         if (myRankWithinTree == 0) {
@@ -342,8 +346,10 @@ private:
         if (_is_root) {
             for (int i = 0; i < numChildrenOfRoot; i++) {
                 int childRank = numChildRanksPerTree*i + 1;
-                _children.emplace_back(childRank);
-                LOG(V3_VERB, "DFM Adding child [%i]\n", childRank);
+                if (childRank < commSize) {
+                    _children.emplace_back(childRank);
+                    LOG(V3_VERB, "DFM Adding child [%i]\n", childRank);
+                }
             }
         } else {
             for (int childRank = _branching_factor*myRankWithinTree+1; 
@@ -362,6 +368,8 @@ private:
     void doMerging() {
 
         std::vector<SerializedLratLine> merger(_children.size()+1);
+        std::vector<bool> childrenDone(_children.size(), false);
+
         std::vector<LratClauseId> hintsToDelete;
         lrat_utils::WriteBuffer writeBuf(_output_filestream);
 
@@ -375,32 +383,36 @@ private:
             // Refill next line from each child as necessary 
             auto childIt = _children.begin();
             for (size_t i = 0; i < _children.size(); i++) {
-
-                if (!merger[i].valid()) {
+                auto& childLine = merger[i];
+                if (!childLine.valid()) {
                     auto& child = *childIt;
                     if (child.hasNext()) {
-                        merger[i] = child.next();
+                        childLine = child.next();
                     } else if (!child.isExhausted()) {
                         // Child COULD have more lines but they are not available.
                         canMerge = false;
+                    } else if (!childrenDone[i]) {
+                        LOG(V2_INFO, "DFM child [%i] completely done\n", child.getRankWithinComm());
+                        childrenDone[i] = true;
                     }
                 }
-
                 ++childIt;
             }
 
-            if (!merger.back().valid() && !_local_source_exhausted) {
+            auto& localSourceLine = merger.back();
+            if (!localSourceLine.valid() && !_local_source_exhausted) {
                 // Refill from local source
-                if (_local_source(bufferLine)) {
-                    merger.back() = std::move(bufferLine);
-                } else {
+                if (!_local_source(localSourceLine)) {
+                    localSourceLine.clear();
                     _local_source_exhausted = true;
+                    LOG(V2_INFO, "DFM local sources exhausted\n");
                 }
             }
 
             if (!canMerge || _output_buffer_size >= FULL_CHUNK_SIZE_BYTES) {
                 // Sleep (for simplicity; TODO use condition variable instead)
                 if (inactiveTimeStart <= 0) inactiveTimeStart = Timer::elapsedSeconds();
+                //LOG(V2_INFO, "DFM cannot merge - waiting for input\n");
                 usleep(1);
                 continue;
             }
@@ -461,15 +473,20 @@ private:
                         std::string output = chosenLine.toStr();
                         _output_filestream.write(output.c_str(), output.size());
                     }
+                    chosenLine.clear();
                 } else {
                     // Write into output buffer
                     auto lock = _output_buffer_mutex.getLock();
-                    _output_buffer.push_back(chosenLine);
                     _output_buffer_size.fetch_add(chosenLine.size(), std::memory_order_relaxed);
+                    _output_buffer.emplace_back(std::move(chosenLine));
                 }
-                merger[chosenSource].clear();
                 numOutputLines++;
             }
+        }
+
+        if (inactiveTimeStart > 0) {
+            _time_inactive += Timer::elapsedSeconds() - inactiveTimeStart;
+            inactiveTimeStart = 0;
         }
 
         if (_is_root) {

@@ -21,6 +21,7 @@ private:
 
 public:
     SerializedLratLine() {}
+    SerializedLratLine(SerializedLratLine&& moved) : _data(std::move(moved._data)) {}
     SerializedLratLine(std::vector<uint8_t>&& data) : _data(std::move(data)) {
         // Some sanity checks
         /*
@@ -65,6 +66,11 @@ public:
             n = sizeof(bool); memcpy(_data.data()+i, &sign, n); i += n;
         }
         assert(i == _data.size());
+    }
+
+    SerializedLratLine& operator=(SerializedLratLine&& moved) {
+        _data = std::move(moved._data);
+        return *this;
     }
 
     bool empty() const {return _data.empty();}
