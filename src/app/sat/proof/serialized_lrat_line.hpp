@@ -73,6 +73,10 @@ public:
         _data.clear();
     }
 
+    std::vector<uint8_t>& data() {
+        return _data;
+    }
+
     LratClauseId getId() const {
         LratClauseId id;
         memcpy(&id, _data.data(), sizeof(LratClauseId));

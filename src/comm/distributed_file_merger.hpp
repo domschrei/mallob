@@ -19,7 +19,7 @@
 class DistributedFileMerger {
 
 public:
-    typedef std::function<std::optional<SerializedLratLine>()> LineSource;
+    typedef std::function<std::optional<bool>(SerializedLratLine&)> LineSource;
 
     struct MergeMessage : public Serializable {
 
@@ -157,7 +157,7 @@ private:
     bool _reversed_file = false;
 
     float _timepoint_merge_begin;
-    float _time_active = 0;
+    float _time_inactive = 0;
 
 public:
     DistributedFileMerger(MPI_Comm comm, int branchingFactor, LineSource localSource, const std::string& outputFileAtZero, int numOriginalClauses) : 
@@ -249,7 +249,7 @@ public:
         if (Timer::elapsedSeconds() - lastOutputReport > 1.0) {
             LOG(V3_VERB, "DFM outputlines:%i efficiency:%.4f exhausted:%s\n", 
                 numOutputLines, 
-                _time_active/(Timer::elapsedSeconds()-_timepoint_merge_begin), 
+                1 - _time_inactive/(Timer::elapsedSeconds()-_timepoint_merge_begin), 
                 areInputsExhausted()?"yes":"no");
             lastOutputReport = Timer::elapsedSeconds();
         }
@@ -316,7 +316,7 @@ public:
 private:
 
     void setUpMergeTree() {
-        const int numChildrenOfRoot = 3;
+        const int numChildrenOfRoot = 6;
 
         int myRank = MyMpi::rank(_comm);
         int commSize = MyMpi::size(_comm);
@@ -363,16 +363,15 @@ private:
 
         std::vector<SerializedLratLine> merger(_children.size()+1);
         std::vector<LratClauseId> hintsToDelete;
-
-        bool countedRefillTime = false;
-
         lrat_utils::WriteBuffer writeBuf(_output_filestream);
+
+        SerializedLratLine bufferLine;
+
+        float inactiveTimeStart = 0;
 
         while (!Terminator::isTerminating()) {
             bool canMerge = true;
             
-            float time = countedRefillTime ? 0 : Timer::elapsedSeconds();
-
             // Refill next line from each child as necessary 
             auto childIt = _children.begin();
             for (size_t i = 0; i < _children.size(); i++) {
@@ -392,27 +391,24 @@ private:
 
             if (!merger.back().valid() && !_local_source_exhausted) {
                 // Refill from local source
-                auto optLine = _local_source();
-                if (!optLine.has_value()) {
-                    _local_source_exhausted = true;
+                if (_local_source(bufferLine)) {
+                    merger.back() = std::move(bufferLine);
                 } else {
-                    merger.back() = std::move(optLine.value());
+                    _local_source_exhausted = true;
                 }
-            }
-
-            if (!countedRefillTime) {
-                time = Timer::elapsedSeconds() - time;
-                _time_active += time;
-                countedRefillTime = true;
             }
 
             if (!canMerge || _output_buffer_size >= FULL_CHUNK_SIZE_BYTES) {
                 // Sleep (for simplicity; TODO use condition variable instead)
-                usleep(1000 * 1);
+                if (inactiveTimeStart <= 0) inactiveTimeStart = Timer::elapsedSeconds();
+                usleep(1);
                 continue;
             }
 
-            time = Timer::elapsedSeconds();
+            if (inactiveTimeStart > 0) {
+                _time_inactive += Timer::elapsedSeconds() - inactiveTimeStart;
+                inactiveTimeStart = 0;
+            }
 
             // Find next line to output
             int chosenSource = -1;
@@ -474,10 +470,6 @@ private:
                 merger[chosenSource].clear();
                 numOutputLines++;
             }
-
-            time = Timer::elapsedSeconds() - time;
-            _time_active += time;
-            countedRefillTime = false;
         }
 
         if (_is_root) {

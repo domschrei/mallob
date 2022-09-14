@@ -132,7 +132,9 @@ void AnytimeSatClauseCommunicator::communicate() {
             _merger_next_lines.resize(proofFiles.size());
                         
             // Merge individual proof files into a single file
-            _file_merger.reset(new DistributedFileMerger(MPI_COMM_WORLD, 5, [&]() {
+            _file_merger.reset(new DistributedFileMerger(MPI_COMM_WORLD, /*branchingFactor=*/6, 
+            // Function to get a proof line from the local source(s)
+            [&](SerializedLratLine& out) {
 
                 // Refill lines as necessary
                 for (size_t i = 0; i < _merger_next_lines.size(); i++) {
@@ -156,9 +158,10 @@ void AnytimeSatClauseCommunicator::communicate() {
 
                 // Return line or nothing
                 if (nextPos >= 0) {
-                    return std::optional<SerializedLratLine>(std::move(_merger_next_lines[nextPos]));
+                    out = std::move(_merger_next_lines[nextPos]);
+                    return true;
                 } else {
-                    return std::optional<SerializedLratLine>();
+                    return false;
                 }
             }, _params.proofOutputFile(), _proof_assembler->getNumOriginalClauses()));
 

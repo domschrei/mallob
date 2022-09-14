@@ -128,7 +128,8 @@ namespace lrat_utils {
         // int numHints;
         // LratClauseId hints[numHints];
         // bool signsOfHints[numHints];
-        std::vector<uint8_t> data;
+        std::vector<uint8_t>& data = line.data();
+        data.clear();
 
         int64_t signedId;
         if (!buf.readSignedClauseId(signedId)) return false;
@@ -173,8 +174,7 @@ namespace lrat_utils {
             *hint = (unsigned long) std::abs(*hint);
             backInsert(data, (char) (sign ? 1 : 0));
         }
-
-        line = SerializedLratLine(std::move(data));
+        
         return true;
     }
 }
