@@ -7,6 +7,7 @@
 #include "external_id_priority_queue.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "app/sat/proof/lrat_utils.hpp"
+#include "proof_merge_connector.hpp"
 
 /*
 The contract of an instance of this class looks as follows:
@@ -49,13 +50,16 @@ private:
 
     unsigned long _num_traced_clauses = 0;
 
+    bool _interleave_merging {false};
+    ProofMergeConnector* _merge_connector;
+
 public:
     ProofInstance(int instanceId, int numInstances, int originalNumClauses,
         const std::string& proofFilename, int finalEpoch, 
         int winningInstance, const std::vector<LratClauseId>& globalEpochStarts, 
         std::vector<LratClauseId>&& localEpochStarts, 
         std::vector<LratClauseId>&& localEpochOffsets, const std::string& extMemDiskDir, 
-        const std::string& outputFilename) :
+        const std::string& outputFilenameOrEmpty) :
             _instance_id(instanceId), _num_instances(numInstances), 
             _original_num_clauses(originalNumClauses),
             _winning_instance(winningInstance == instanceId),
@@ -64,12 +68,21 @@ public:
             _backlog(extMemDiskDir + "/disk." + std::to_string(instanceId) + ".backlog", finalEpoch),
             _local_epoch_starts(localEpochStarts), 
             _local_epoch_offsets(localEpochOffsets), _global_epoch_starts(globalEpochStarts),
-            _current_epoch(finalEpoch), _output_filename(outputFilename), 
-            _output(outputFilename, std::ofstream::binary),
-            _output_buf(_output) {}
+            _current_epoch(finalEpoch), 
+            _output_filename(outputFilenameOrEmpty),
+            _output([&](){
+                if (outputFilenameOrEmpty.empty()) return std::ofstream(); 
+                else return std::ofstream(outputFilenameOrEmpty, std::ofstream::binary);
+            }()),
+            _output_buf(_output),
+            _interleave_merging(outputFilenameOrEmpty.empty()) {}
 
     ~ProofInstance() {
         if (_work_future.valid()) _work_future.get();
+    }
+
+    void setProofMergeConnector(ProofMergeConnector& conn) {
+        _merge_connector = &conn;
     }
 
     void advance(const LratClauseId* clauseIdsData, size_t clauseIdsSize) {
@@ -156,9 +169,6 @@ private:
                     LOG(V2_INFO, "Instance %i: found \"winning\" empty clause\n", _instance_id);
                 }
 
-                // Output the line
-                lrat_utils::writeLine(_output_buf, _current_line);
-
                 // Traverse clause hints
                 for (auto hintId : _current_line.hints) {
                     assert(hintId < 1000000000000000000UL);
@@ -175,6 +185,13 @@ private:
                         }
                         _backlog.push(hintId, hintEpoch);
                     }
+                }
+
+                // Output the line
+                if (_interleave_merging) {
+                    _merge_connector->pushBlocking(SerializedLratLine(_current_line));
+                } else {
+                    lrat_utils::writeLine(_output_buf, _current_line);
                 }
 
                 // Remove all instances of this ID from the frontier
@@ -207,6 +224,8 @@ private:
             // -- there may not be any underived clauses left
             assert(_frontier.empty());
             assert(_backlog.empty());
+
+            if (_interleave_merging) _merge_connector->markExhausted();
 
             _finished = true;
             LOG(V2_INFO, "Proof instance %i finished!\n", _instance_id);

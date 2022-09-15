@@ -28,6 +28,7 @@ OPT_BOOL(groupClausesByLengthLbdSum,     "gclls", "group-by-length-lbd-sum",    
 OPT_BOOL(help,                           "h", "help",                                 false,                   "Print help and exit")
 OPT_BOOL(useFilesystemInterface,         "interface-fs", "",                          true,                    "Use filesystem interface (.api/{in,out}/*.json)")
 OPT_BOOL(useIPCSocketInterface,          "interface-ipc", "",                         false,                   "Use IPC socket interface (.mallob.<pid>.sk)")
+OPT_BOOL(interleaveProofMerging,        "ipm", "interleave-proof-merging",            false,                   "Interleave filtering and merging of proof lines")
 OPT_BOOL(jitterJobPriorities,            "jjp", "jitter-job-priorities",              false,                   "Jitter job priorities to break ties during rebalancing")
 OPT_BOOL(latencyMonkey,                  "latencymonkey", "",                         false,                   "Block all MPI_Isend operations by a small randomized amount of time")
 OPT_BOOL(memoryPanic,                    "mempanic", "",                              true,                    "Monitor RAM usage per physical machine and switch to memory panic mode if necessary")

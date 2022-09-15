@@ -30,10 +30,19 @@ public:
             _this_worker_index(thisWorkerIndex), _final_epoch(finalEpoch), _winning_instance(winningInstance) {
 
         _current_epoch = _final_epoch;
-        _fut_begin_assembly = ProcessWideThreadPool::get().addTask([&]() {
+    }
+
+    void start() {
+        startWithInterleavedMerging(nullptr);
+    }
+
+    void startWithInterleavedMerging(std::vector<ProofMergeConnector>* connectors) {
+        _fut_begin_assembly = ProcessWideThreadPool::get().addTask([&, connectors]() {
             createInstancesViaClauseEpochs(_params.logDirectory() + "/proof#" + std::to_string(_job_id) 
                 + "/clauseepochs." + std::to_string(_this_worker_index));
-            beginProofAssembly();
+            if (connectors) assert(connectors->size() == _proof_instances.size() 
+                || log_return_false("%i != %i\n", connectors->size(), _proof_instances.size()));
+            beginProofAssembly(connectors);
         });
     }
 
@@ -228,13 +237,16 @@ private:
                 instanceId, numInstances, _num_original_clauses, proofFilenameBase + ".lrat", 
                 _final_epoch, _winning_instance, globalIdStarts,
                 std::move(localIdStartsPerInstance[i]), std::move(localIdOffsetsPerInstance[i]),
-                _params.extMemDiskDirectory(), proofFilenameBase + ".filtered.lrat"
+                _params.extMemDiskDirectory(), 
+                _params.interleaveProofMerging() ? "" : proofFilenameBase + ".filtered.lrat"
             );
         }
     }
 
-    void beginProofAssembly() {
+    void beginProofAssembly(std::vector<ProofMergeConnector>* conns) {
+        int i = 0;
         for (auto& inst : _proof_instances) {
+            if (conns) inst.setProofMergeConnector(conns->at(i++));
             inst.advance(nullptr, 0);
         }
         _initialized = true;

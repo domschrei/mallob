@@ -121,59 +121,9 @@ void AnytimeSatClauseCommunicator::communicate() {
 
         if (_proof_assembler->finished()) {
 
-            LOG(V2_INFO, "Proof assembly done, proceeding with merging\n");
-
-            // Proof assembly done
-            auto proofFiles = _proof_assembler->getProofOutputFiles();
-            //_done_assembling_proof = true;
-
-            for (auto& filename : proofFiles) _merger_filestreams.emplace_back(filename);
-            for (auto& ifs : _merger_filestreams) _merger_filebuffers.emplace_back(ifs);
-            _merger_next_lines.resize(proofFiles.size());
-                        
-            // Merge individual proof files into a single file
-            _file_merger.reset(new DistributedFileMerger(MPI_COMM_WORLD, /*branchingFactor=*/6, 
-            // Function to get a proof line from the local source(s)
-            [&](SerializedLratLine& out) {
-
-                assert(out.empty());
-
-                // Refill lines as necessary
-                for (size_t i = 0; i < _merger_next_lines.size(); i++) {
-                    if (_merger_next_lines[i].valid()) continue;
-                    if (_merger_filebuffers[i].eof) continue;
-                    // Refill line from stream
-                    bool success = lrat_utils::readLine(_merger_filebuffers[i], _merger_next_lines[i]);
-                    if (!success) {
-                        _merger_next_lines[i].clear();
-                    }
-                }
-
-                // Find next best line
-                int nextPos = -1;
-                LratClauseId nextId = 0;
-                for (size_t i = 0; i < _merger_next_lines.size(); i++) {
-                    if (_merger_next_lines[i].empty()) continue;
-                    auto id = _merger_next_lines[i].getId();
-                    if (nextPos < 0 || id > nextId) {
-                        nextId = id;
-                        nextPos = i;
-                    }
-                }
-
-                // Return line or nothing
-                if (nextPos >= 0) {
-                    out.data().swap(_merger_next_lines[nextPos].data());
-                    return true;
-                } else {
-                    return false;
-                }
-            }, _params.proofOutputFile(), _proof_assembler->getNumOriginalClauses()));
-
-            MyMpi::getMessageQueue().registerCallback(MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, [&](MessageHandle& h) {
-                DistributedFileMerger::MergeMessage msg; msg.deserialize(h.getRecvData());
-                _file_merger->handle(h.source, msg);
-            });
+            if (!_params.interleaveProofMerging()) {
+                setUpProofMerger(-1);
+            }
 
             _proof_all_reduction.reset();
             _proof_assembler.reset();
@@ -391,6 +341,13 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
             int thisWorkerIndex = _job->getJobTree().getIndex();
             _proof_assembler.emplace(_params, _job->getId(), numWorkers, threadsPerWorker, thisWorkerIndex, finalEpoch, winningInstance);
             createNewProofAllReduction();
+
+            if (_params.interleaveProofMerging()) {
+                setUpProofMerger(threadsPerWorker);
+                _proof_assembler->startWithInterleavedMerging(&_merger_connectors);
+            } else {
+                _proof_assembler->start();
+            }
         }
     }
     if (msg.tag == MSG_ALLREDUCE_PROOF_RELEVANT_CLAUSES) {
@@ -495,4 +452,107 @@ void AnytimeSatClauseCommunicator::addToClauseHistory(std::vector<int>& clauses,
 
     // Send next batches of historic clauses to subscribers as necessary
     _cls_history.sendNextBatches();
+}
+
+void AnytimeSatClauseCommunicator::setUpProofMerger(int threadsPerWorker) {
+    
+    if (_params.interleaveProofMerging()) {
+
+        assert(threadsPerWorker > 0);
+        _merger_next_lines.resize(threadsPerWorker);
+        for (size_t i = 0; i < _merger_next_lines.size(); i++) {
+            _merger_connectors.emplace_back(32768);
+        }
+
+        // Merge proof lines output by proof instances into a single file
+        _file_merger.reset(new DistributedFileMerger(MPI_COMM_WORLD, /*branchingFactor=*/6, 
+        // Function to get a proof line from the local source(s)
+        [&](SerializedLratLine& out) {
+
+            assert(out.empty());
+
+            // Refill lines as necessary
+            for (size_t i = 0; i < _merger_next_lines.size(); i++) {
+                if (_merger_next_lines[i].valid()) continue;
+                bool success = _merger_connectors[i].poll(_merger_next_lines[i]);
+                if (!success) {
+                    LOG(V2_INFO, "DFM local connector %i exhausted\n", i);
+                    _merger_next_lines[i].clear();
+                }
+            }
+
+            // Find next best line
+            int nextPos = -1;
+            LratClauseId nextId = 0;
+            for (size_t i = 0; i < _merger_next_lines.size(); i++) {
+                if (_merger_next_lines[i].empty()) continue;
+                auto id = _merger_next_lines[i].getId();
+                if (nextPos < 0 || id > nextId) {
+                    nextId = id;
+                    nextPos = i;
+                }
+            }
+
+            // Return line or nothing
+            if (nextPos >= 0) {
+                out.data().swap(_merger_next_lines[nextPos].data());
+                return true;
+            } else {
+                return false;
+            }
+        }, _params.proofOutputFile(), _proof_assembler->getNumOriginalClauses()));
+
+    } else {
+
+        auto proofFiles = _proof_assembler->getProofOutputFiles();
+        
+        for (auto& filename : proofFiles) _merger_filestreams.emplace_back(filename);
+        for (auto& ifs : _merger_filestreams) _merger_filebuffers.emplace_back(ifs);
+        _merger_next_lines.resize(proofFiles.size());
+                    
+        // Merge individual proof files into a single file
+        _file_merger.reset(new DistributedFileMerger(MPI_COMM_WORLD, /*branchingFactor=*/6, 
+        // Function to get a proof line from the local source(s)
+        [&](SerializedLratLine& out) {
+
+            assert(out.empty());
+
+            // Refill lines as necessary
+            for (size_t i = 0; i < _merger_next_lines.size(); i++) {
+                if (_merger_next_lines[i].valid()) continue;
+                if (_merger_filebuffers[i].eof) continue;
+                // Refill line from stream
+                bool success = lrat_utils::readLine(_merger_filebuffers[i], _merger_next_lines[i]);
+                if (!success) {
+                    _merger_next_lines[i].clear();
+                }
+            }
+
+            // Find next best line
+            int nextPos = -1;
+            LratClauseId nextId = 0;
+            for (size_t i = 0; i < _merger_next_lines.size(); i++) {
+                if (_merger_next_lines[i].empty()) continue;
+                auto id = _merger_next_lines[i].getId();
+                if (nextPos < 0 || id > nextId) {
+                    nextId = id;
+                    nextPos = i;
+                }
+            }
+
+            // Return line or nothing
+            if (nextPos >= 0) {
+                out.data().swap(_merger_next_lines[nextPos].data());
+                return true;
+            } else {
+                return false;
+            }
+        }, _params.proofOutputFile(), _proof_assembler->getNumOriginalClauses()));
+    }
+
+
+    MyMpi::getMessageQueue().registerCallback(MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, [&](MessageHandle& h) {
+        DistributedFileMerger::MergeMessage msg; msg.deserialize(h.getRecvData());
+        _file_merger->handle(h.source, msg);
+    });
 }

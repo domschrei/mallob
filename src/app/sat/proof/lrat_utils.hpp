@@ -108,7 +108,8 @@ namespace lrat_utils {
             write_buffer[write_pos++] = c;
         }
         void flush() {
-            stream.write((const char*) write_buffer, write_pos);
+            if (stream.good())
+                stream.write((const char*) write_buffer, write_pos);
             write_pos = 0;
         }
     };
