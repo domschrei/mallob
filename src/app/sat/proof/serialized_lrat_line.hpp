@@ -48,6 +48,10 @@ public:
     }
 
     SerializedLratLine(const LratLine& line) {
+        reset(line);
+    }
+
+    void reset(const LratLine& line) {
         _data.resize(sizeof(LratClauseId) 
             + sizeof(int) 
             + line.literals.size()*sizeof(int) 
@@ -89,6 +93,10 @@ public:
         return id;
     }
 
+    LratClauseId& getId() {
+        return *( (LratClauseId*) _data.data() );
+    }
+
     int getNumLiterals() const {
         int numLits;
         memcpy(&numLits, _data.data() + getDataPosOfNumLits(), sizeof(int));
@@ -107,9 +115,9 @@ public:
             getNumLiterals()
         );
     }
-    std::pair<const LratClauseId*, int> getUnsignedHints() const {
-        return std::pair<const LratClauseId*, int>(
-            (const LratClauseId*) (_data.data()+getDataPosOfNumHints(getNumLiterals())+sizeof(int)), 
+    std::pair<LratClauseId*, int> getUnsignedHints() {
+        return std::pair<LratClauseId*, int>(
+            (LratClauseId*) (_data.data()+getDataPosOfNumHints(getNumLiterals())+sizeof(int)), 
             getNumHints()
         );
     }
@@ -121,7 +129,7 @@ public:
         );
     }
 
-    std::string toStr() const {
+    std::string toStr() {
         std::string out = std::to_string(getId());
         auto [literals, numLits] = getLiterals();
         for (size_t i = 0; i < numLits; i++) out += " " + std::to_string(literals[i]);

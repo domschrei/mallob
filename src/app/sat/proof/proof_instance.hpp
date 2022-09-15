@@ -29,7 +29,7 @@ private:
     bool _winning_instance;
 
     ReverseBinaryLratParser _parser;
-    LratLine _current_line;
+    SerializedLratLine _current_line;
     bool _current_line_aligned = false;
     ExternalIdPriorityQueue _frontier;
     ExternalIdPriorityQueue _backlog;
@@ -137,14 +137,16 @@ private:
         LratClauseId id = std::numeric_limits<unsigned long>::max();
         while (_current_line.valid()) {
 
-            assert(!_current_line.hints.empty());
-            for (auto& hint : _current_line.hints) assert(hint < 1000000000000000000UL);
-            auto unalignedId = _current_line.id;
+            auto& alignedId = _current_line.getId();
+            auto unalignedId = alignedId;
+            auto [hints, numHints] = _current_line.getUnsignedHints();
+            auto [lits, numLits] = _current_line.getLiterals();
+
             if (!_current_line_aligned) {
-                alignSelfProducedClauseIds(_current_line, /*assertSelfProduced=*/true);
+                alignSelfProducedClauseIds(alignedId, hints, numHints, /*assertSelfProduced=*/true);
                 _current_line_aligned = true;
             }
-            auto nextId = _current_line.id;
+            auto nextId = alignedId;
             assert(nextId <= id || log_return_false("[ERROR] Instance %i: Read clause ID %lu, expected <= %lu\n", 
                 _instance_id, nextId, id));
             id = nextId;
@@ -162,16 +164,16 @@ private:
             }
 
             if ((!_frontier.empty() && _frontier.top() == id) || 
-                    (_current_line.literals.empty() && _winning_instance)) {
+                    (numLits == 0 && _winning_instance)) {
                 // Clause derivation is necessary for the combined proof
                 _num_traced_clauses++;
-                if (_current_line.literals.empty()) {
+                if (numLits == 0) {
                     LOG(V2_INFO, "Instance %i: found \"winning\" empty clause\n", _instance_id);
                 }
 
                 // Traverse clause hints
-                for (auto hintId : _current_line.hints) {
-                    assert(hintId < 1000000000000000000UL);
+                for (size_t i = 0; i < numHints; i++) {
+                    auto hintId = hints[i];
                     int hintEpoch = getClauseEpoch(hintId);
                     if (isSelfProducedClause(hintId)) {
                         _frontier.push(hintId, hintEpoch);
@@ -189,7 +191,7 @@ private:
 
                 // Output the line
                 if (_interleave_merging) {
-                    _merge_connector->pushBlocking(SerializedLratLine(_current_line));
+                    _merge_connector->pushBlocking(std::move(_current_line));
                 } else {
                     lrat_utils::writeLine(_output_buf, _current_line);
                 }
@@ -207,7 +209,6 @@ private:
             if (_parser.getNextLine(_current_line)) {
                 _current_line_aligned = false;
             }
-            else _current_line.id = -1;
             numReadLines++;
         }
 
@@ -262,9 +263,11 @@ private:
         }
     }
 
-    void alignSelfProducedClauseIds(LratLine& line, bool assertSelfProduced) {
-        alignClauseId(line.id, assertSelfProduced);
-        for (auto& hint : line.hints) alignClauseId(hint, /*assertSelfProduced=*/false);
+    void alignSelfProducedClauseIds(LratClauseId& id, LratClauseId* hints, int numHints, bool assertSelfProduced) {
+        alignClauseId(id, assertSelfProduced);
+        for (size_t i = 0; i < numHints; i++) {
+            alignClauseId(*(hints+i), /*assertSelfProduced=*/false);
+        }
     }
     void alignClauseId(LratClauseId& id, bool assertSelfProduced) {
         if (assertSelfProduced) assert(isSelfProducedClause(id));

@@ -3,6 +3,7 @@
 
 #include "util/reverse_file_reader.hpp"
 #include "lrat_line.hpp"
+#include "serialized_lrat_line.hpp"
 #include "util/assert.hpp"
 
 class ReverseBinaryLratParser {
@@ -23,15 +24,18 @@ private:
         PARSING_LITS_AND_ID_MAYBE_ENDING
     } _state = PARSING_ZERO;
 
+    LratLine _line;
+    SerializedLratLine _sline;
+
 public:
     ReverseBinaryLratParser(const std::string& filename) : _reader(filename) {}
 
-    bool getNextLine(LratLine& line) {
+    bool getNextLine(SerializedLratLine& out) {
 
-        line.hints.clear();
-        line.signsOfHints.clear();
-        line.literals.clear();
-        line.id = -1;
+        out.clear();
+        _line.literals.clear();
+        _line.hints.clear();
+        _line.signsOfHints.clear();
 
         if (_exhausted) return false;
 
@@ -49,7 +53,7 @@ public:
                 if (_state == PARSING_LITS_AND_ID_MAYBE_ENDING) {
                     // File has been read completely!
                     // Finalize last read line
-                    publishNumbers(line, PublishNumbersMode::LITERALS_THEN_ID);
+                    publishNumbers(PublishNumbersMode::LITERALS_THEN_ID);
                     readCompleteLine = true;
                 }
                 _exhausted = true;
@@ -86,7 +90,7 @@ public:
                     _state = PARSING_HINTS;
                 } else {
                     // Indeed transitioned to parsing literals / ID
-                    publishNumbers(line, PublishNumbersMode::HINTS);
+                    publishNumbers(PublishNumbersMode::HINTS);
                     _state = PARSING_LITS_AND_ID;
                 }
                 handleByteOfNumber(byte);
@@ -113,7 +117,7 @@ public:
                 } else {
                     // Indeed transitioned to the line's beginning.
                     // Finalize completely read line
-                    publishNumbers(line, PublishNumbersMode::LITERALS_THEN_ID);
+                    publishNumbers(PublishNumbersMode::LITERALS_THEN_ID);
                     readCompleteLine = true;
                     // Begin to handle next (earlier) line
                     _state = PARSING_HINTS;
@@ -122,7 +126,13 @@ public:
             }
         }
 
-        return readCompleteLine;
+        if (readCompleteLine) {
+            _sline.reset(_line);
+            _sline.data().swap(out.data());
+            return true;
+        } else {
+            return false;
+        }
     }
 
 private:
@@ -138,7 +148,7 @@ private:
     }
 
     enum PublishNumbersMode {HINTS, LITERALS_THEN_ID};
-    void publishNumbers(LratLine& line, PublishNumbersMode mode) {
+    void publishNumbers(PublishNumbersMode mode) {
         // The buffer contains the parsed bytes in reverse order.
         // => Traverse the featured NUMBERS from the buffer's end towards its start
         //    and handle the BYTES of each number from right to left.
@@ -155,20 +165,20 @@ private:
                     // Publish hint
                     auto hint = readSignedClauseId(numberLeftIdx, numberRightIdx);
                     LOG(V6_DEBGV, "PUSH_HINT %ld [%i,%i]\n", hint, numberLeftIdx, numberRightIdx);
-                    line.hints.push_back(std::abs(hint));
-                    line.signsOfHints.push_back(hint>0);
+                    _line.hints.push_back(std::abs(hint));
+                    _line.signsOfHints.push_back(hint>0);
                 } else if (firstNum) {
                     // Publish ID
                     auto id = readSignedClauseId(numberLeftIdx, numberRightIdx);
                     assert(id > 0);
                     LOG(V6_DEBGV, "PUSH_ID %ld [%i,%i]\n", id, numberLeftIdx, numberRightIdx);
-                    line.id = id;
+                    _line.id = id;
                     firstNum = false;
                 } else {
                     // Publish literal
                     auto lit = readLiteral(numberLeftIdx, numberRightIdx);
                     LOG(V6_DEBGV, "PUSH_LIT %i [%i,%i]\n", lit, numberLeftIdx, numberRightIdx);
-                    line.literals.push_back(lit);
+                    _line.literals.push_back(lit);
                 }
 
                 numberRightIdx = i-1;

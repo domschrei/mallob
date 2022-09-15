@@ -20,7 +20,7 @@ namespace lrat_utils {
         buf.writeSeparator();
     }
 
-    void writeLine(WriteBuffer& buf, const SerializedLratLine& line, WriteMode mode) {
+    void writeLine(WriteBuffer& buf, SerializedLratLine& line, WriteMode mode) {
         if (mode == REVERSED) {
             buf.writeSeparator();
             auto [hints, numHints] = line.getUnsignedHints();
