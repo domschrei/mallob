@@ -75,7 +75,7 @@ namespace lrat_utils {
 
     bool readLine(ReadBuffer& buf, LratLine& line) {
         
-        if (buf.eof) return false;
+        if (buf.endOfFile()) return false;
 
         line.id = -1;
         line.literals.clear();
@@ -121,7 +121,7 @@ namespace lrat_utils {
 
     bool readLine(ReadBuffer& buf, SerializedLratLine& line) {
 
-        if (buf.eof) return false;
+        if (buf.endOfFile()) return false;
 
         int header = buf.get();
         if (header != 'a') return false;

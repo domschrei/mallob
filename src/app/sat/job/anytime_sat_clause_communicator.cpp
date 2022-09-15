@@ -520,7 +520,7 @@ void AnytimeSatClauseCommunicator::setUpProofMerger(int threadsPerWorker) {
             // Refill lines as necessary
             for (size_t i = 0; i < _merger_next_lines.size(); i++) {
                 if (_merger_next_lines[i].valid()) continue;
-                if (_merger_filebuffers[i].eof) continue;
+                if (_merger_filebuffers[i].endOfFile()) continue;
                 // Refill line from stream
                 bool success = lrat_utils::readLine(_merger_filebuffers[i], _merger_next_lines[i]);
                 if (!success) {

@@ -15,6 +15,7 @@
 #include "app/sat/proof/serialized_lrat_line.hpp"
 #include "app/sat/proof/lrat_utils.hpp"
 #include "app/sat/proof/reverse_binary_lrat_parser.hpp"
+#include "util/sys/buffered_io.hpp"
 
 class DistributedFileMerger {
 
@@ -512,10 +513,11 @@ private:
         if (_binary_output) {
             // Read binary file in reverse order, output lines into new file
             std::ofstream ofs(_output_filename, std::ofstream::binary);
+            BufferedFileWriter writer(ofs);
             ReverseFileReader reader(_output_filename + ".inv");
             char c;
             while (reader.nextAsChar(c)) {
-                ofs.put(c);
+                writer.put(c);
             }
         } else {
             // Just "tac" the text file

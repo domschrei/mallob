@@ -5,8 +5,7 @@
 
 #include "lrat_line.hpp"
 #include "serialized_lrat_line.hpp"
-
-#define LRAT_READ_BUFFER_SIZE 131072
+#include "util/sys/buffered_io.hpp"
 
 namespace lrat_utils {
 
@@ -14,26 +13,24 @@ namespace lrat_utils {
     
     struct WriteBuffer {
     
-        std::ofstream& stream;
-        unsigned char write_buffer[LRAT_READ_BUFFER_SIZE];
-        size_t write_pos {0};
+        BufferedFileWriter writer;
 
-        WriteBuffer(std::ofstream& stream) : stream(stream) {}
+        WriteBuffer(std::ofstream& stream) : writer(stream) {}
 
         void writeLineHeader() {
-            put('a');
+            writer.put('a');
             //char header = 'a';
             //ofs.write((const char*) &header, 1);
         }
 
         void writeDeletionLineHeader() {
-            put('d');
+            writer.put('d');
             //char header = 'd';
             //ofs.write((const char*) &header, 1);
         }
 
         void writeSeparator() {
-            put('\0');
+            writer.put('\0');
             //char zero = '\0';
             //ofs.write((const char*) &zero, 1);
         }
@@ -43,12 +40,12 @@ namespace lrat_utils {
             unsigned char ch;
             while (n & ~0x7f) {
                 ch = (n & 0x7f) | 0x80;
-                put(ch);
+                writer.put(ch);
                 //ofs.write((const char*) &ch, 1);
                 n >>= 7;
             }
             ch = n;
-            put(ch);
+            writer.put(ch);
             //ofs.write((const char*) &ch, 1);
         }
 
@@ -63,13 +60,13 @@ namespace lrat_utils {
             }
 
             unsigned char ch = n;
-            put(ch);
+            writer.put(ch);
             //ofs.write((const char*) &ch, 1);
 
             for (int i = 1; i <= numIterations; i++) {
                 n = original >> (7*(numIterations - i));
                 ch = (n & 0x7f) | 0x80;
-                put(ch);
+                writer.put(ch);
                 //ofs.write((const char*) &ch, 1);
             }
         }
@@ -97,52 +94,26 @@ namespace lrat_utils {
                 writeVariableLengthSigned(lit);
             }
         }
-
-        ~WriteBuffer() {
-            flush();
-        }
-
-    private:
-        void put(unsigned char c) {
-            if (write_pos == LRAT_READ_BUFFER_SIZE) flush();
-            write_buffer[write_pos++] = c;
-        }
-        void flush() {
-            if (stream.good())
-                stream.write((const char*) write_buffer, write_pos);
-            write_pos = 0;
-        }
     };
 
     struct ReadBuffer {
 
-        std::ifstream& ifs;
-        unsigned char read_buffer[LRAT_READ_BUFFER_SIZE];
-        int read_pos {0};
-        int max_pos {-1};
-        bool eof {false};
+        BufferedFileReader reader;
 
-        ReadBuffer(std::ifstream& ifs) : ifs(ifs) {}
+        ReadBuffer(std::ifstream& ifs) : reader(ifs) {}
 
-        unsigned char get() {
-            if (read_pos > max_pos) {
-                // refill
-                ifs.read((char*) read_buffer, LRAT_READ_BUFFER_SIZE);
-                if (ifs.eof()) max_pos = ifs.gcount()-1;
-                else max_pos = LRAT_READ_BUFFER_SIZE-1;
-                read_pos = 0;
-                if (read_pos > max_pos) {
-                    eof = true;
-                    return 0;
-                }
-            }
-            return read_buffer[read_pos++];
+        char get() {
+            return reader.get();
+        }
+
+        bool endOfFile() const {
+            return reader.endOfFile();
         }
 
         bool readSignedClauseId(int64_t& id) {
             int64_t unadjusted = 0;
             int64_t coefficient = 1;
-            int32_t tmp = get();
+            int32_t tmp = reader.get();
             if (tmp == 0) return false;
             while (tmp) {
                 // continuation bit set?
@@ -154,7 +125,7 @@ namespace lrat_utils {
                     break;
                 }
                 coefficient *= 128; // 2^7 because we essentially have 7-bit bytes
-                tmp = get(); //*((unsigned char*) (_num_buffer+i));
+                tmp = reader.get(); //*((unsigned char*) (_num_buffer+i));
             }
             if (unadjusted % 2) { // odds map to negatives
                 id = -(unadjusted - 1) / 2;
@@ -167,7 +138,7 @@ namespace lrat_utils {
         bool readLiteral(int32_t& lit) {
             int32_t unadjusted = 0;
             int32_t coefficient = 1;
-            int32_t tmp = get();
+            int32_t tmp = reader.get();
             if (tmp == 0) return false;
             while (tmp >= 0) {
                 // continuation bit set?
@@ -179,7 +150,7 @@ namespace lrat_utils {
                     break;
                 }
                 coefficient *= 128; // 2^7 because we essentially have 7-bit bytes
-                tmp = get();
+                tmp = reader.get();
             }
             if (unadjusted % 2) { // odds map to negatives
                 lit = -(unadjusted - 1) / 2;
