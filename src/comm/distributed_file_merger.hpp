@@ -79,6 +79,7 @@ public:
 private:
     const static int FULL_CHUNK_SIZE_BYTES = 950'000;
     const static int HALF_CHUNK_SIZE_BYTES = FULL_CHUNK_SIZE_BYTES / 2;
+    const static int MERGE_CHILD_BUFFER_SIZE = 100'000;
 
     MPI_Comm _comm;
     int _branching_factor;
@@ -91,13 +92,16 @@ private:
     class MergeChild {
     private:
         int rankWithinComm;
-        std::list<SerializedLratLine> buffer;
+        std::vector<SerializedLratLine> buffer;
         std::atomic_int bufferSize = 0;
+        std::atomic_int readPos = 0;
+        std::atomic_int writePos = 0;
         bool exhausted = false;
         bool refillRequested = false;
-        Mutex bufferMutex;
     public:
-        MergeChild(int rankWithinComm) : rankWithinComm(rankWithinComm) {}
+        MergeChild(int rankWithinComm) : rankWithinComm(rankWithinComm) {
+            buffer.resize(MERGE_CHILD_BUFFER_SIZE);
+        }
 
         int getRankWithinComm() const {return rankWithinComm;}
         bool isEmpty() const {return bufferSize.load(std::memory_order_relaxed) == 0;}
@@ -109,21 +113,26 @@ private:
         }
 
         void add(std::vector<SerializedLratLine>&& newLines) {
-            auto lock = bufferMutex.getLock();
-            int pos = 0;
+            int pos = writePos.load(std::memory_order_relaxed);
+            int size = 0;
             for (auto& line : newLines) {
-                bufferSize += line.size();
-                buffer.push_back(std::move(line));
+                size += line.size();
+                buffer[pos].data().swap(line.data());
+                pos++;
+                if (pos == MERGE_CHILD_BUFFER_SIZE) pos = 0;
             }
+            bufferSize.fetch_add(size, std::memory_order_relaxed);
+            writePos.store(pos, std::memory_order_relaxed);
             refillRequested = false;
         }
-        SerializedLratLine next() {
+        void next(SerializedLratLine& line) {
             assert(hasNext());
-            auto lock = bufferMutex.getLock();
-            SerializedLratLine line(std::move(buffer.front()));
-            buffer.pop_front();
+            int pos = readPos.load(std::memory_order_relaxed);
+            line.data().swap(buffer[pos].data());
+            pos++;
+            if (pos == MERGE_CHILD_BUFFER_SIZE) pos = 0;
+            readPos.store(pos, std::memory_order_relaxed);
             bufferSize.fetch_sub(line.size(), std::memory_order_relaxed);
-            return line;
         }
         void conclude() {exhausted = true;}
         void setRefillRequested(bool requested) {refillRequested = requested;}
@@ -213,6 +222,7 @@ public:
         _timepoint_merge_begin = Timer::elapsedSeconds();
         _fut_merging = ProcessWideThreadPool::get().addTask([&]() {
             doMerging();
+            concludeMerging();
             reverseFile();
         });
     }
@@ -387,7 +397,7 @@ private:
                 if (!childLine.valid()) {
                     auto& child = *childIt;
                     if (child.hasNext()) {
-                        childLine = child.next();
+                        child.next(childLine);
                     } else if (!child.isExhausted()) {
                         // Child COULD have more lines but they are not available.
                         canMerge = false;
@@ -488,7 +498,9 @@ private:
             _time_inactive += Timer::elapsedSeconds() - inactiveTimeStart;
             inactiveTimeStart = 0;
         }
+    }
 
+    void concludeMerging() {
         if (_is_root) {
             _output_filestream.flush();
             _output_filestream.close();

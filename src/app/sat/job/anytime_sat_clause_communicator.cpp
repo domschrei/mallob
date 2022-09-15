@@ -136,6 +136,8 @@ void AnytimeSatClauseCommunicator::communicate() {
             // Function to get a proof line from the local source(s)
             [&](SerializedLratLine& out) {
 
+                assert(out.empty());
+
                 // Refill lines as necessary
                 for (size_t i = 0; i < _merger_next_lines.size(); i++) {
                     if (_merger_next_lines[i].valid()) continue;
@@ -161,7 +163,7 @@ void AnytimeSatClauseCommunicator::communicate() {
 
                 // Return line or nothing
                 if (nextPos >= 0) {
-                    out = std::move(_merger_next_lines[nextPos]);
+                    out.data().swap(_merger_next_lines[nextPos].data());
                     return true;
                 } else {
                     return false;

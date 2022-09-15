@@ -18,7 +18,6 @@ namespace lrat_utils {
             buf.writeSignedClauseId(signedId, WriteMode::NORMAL);
         }
         buf.writeSeparator();
-        buf.flush();
     }
 
     void writeLine(WriteBuffer& buf, const SerializedLratLine& line, WriteMode mode) {
@@ -55,7 +54,6 @@ namespace lrat_utils {
             }
             buf.writeSeparator();
         }
-        buf.flush();
     }
 
     void writeDeletionLine(WriteBuffer& buf, LratClauseId headerId, 
@@ -73,7 +71,6 @@ namespace lrat_utils {
             }
             buf.writeSeparator();
         }
-        buf.flush();
     }
 
     bool readLine(ReadBuffer& buf, LratLine& line) {
@@ -108,11 +105,18 @@ namespace lrat_utils {
         return true;
     }
 
+    /*
     template <typename T>
     void backInsert(std::vector<uint8_t>& data, const T& thing) {
         auto pos = data.size();
         data.resize(pos + sizeof(T));
         memcpy(data.data()+pos, &thing, sizeof(T));
+    }
+    */
+    
+    template <typename T>
+    void backInsert(std::vector<uint8_t>& data, const T& thing) {
+        data.insert(data.end(), (uint8_t*) &thing, ((uint8_t*) (&thing))+sizeof(T));
     }
 
     bool readLine(ReadBuffer& buf, SerializedLratLine& line) {

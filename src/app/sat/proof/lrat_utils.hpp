@@ -15,18 +15,10 @@ namespace lrat_utils {
     struct WriteBuffer {
     
         std::ofstream& stream;
-        unsigned char write_buffer[131072];
+        unsigned char write_buffer[LRAT_READ_BUFFER_SIZE];
         size_t write_pos {0};
 
         WriteBuffer(std::ofstream& stream) : stream(stream) {}
-
-        void put(unsigned char c) {
-            write_buffer[write_pos++] = c;
-        }
-        void flush() {
-            stream.write((const char*) write_buffer, write_pos);
-            write_pos = 0;
-        }
 
         void writeLineHeader() {
             put('a');
@@ -104,6 +96,20 @@ namespace lrat_utils {
             } else {
                 writeVariableLengthSigned(lit);
             }
+        }
+
+        ~WriteBuffer() {
+            flush();
+        }
+
+    private:
+        void put(unsigned char c) {
+            if (write_pos == LRAT_READ_BUFFER_SIZE) flush();
+            write_buffer[write_pos++] = c;
+        }
+        void flush() {
+            stream.write((const char*) write_buffer, write_pos);
+            write_pos = 0;
         }
     };
 
