@@ -23,6 +23,8 @@ The contract of an instance of this class looks as follows:
 class ProofInstance {
 
 private:
+    Logger _log;
+
     const int _instance_id;
     const int _num_instances;
     int _original_num_clauses;
@@ -60,6 +62,7 @@ public:
         std::vector<LratClauseId>&& localEpochStarts, 
         std::vector<LratClauseId>&& localEpochOffsets, const std::string& extMemDiskDir, 
         const std::string& outputFilenameOrEmpty) :
+            _log(Logger::getMainInstance().copy("Proof", ".proof")),
             _instance_id(instanceId), _num_instances(numInstances), 
             _original_num_clauses(originalNumClauses),
             _winning_instance(winningInstance == instanceId),
@@ -100,7 +103,7 @@ public:
     std::vector<LratClauseId>&& extractNextOutgoingClauseIds() {
         assert(ready());
         _work_future.get();
-        LOG(V3_VERB, "Proof %i ~> %i IDs\n", _instance_id, _outgoing_clause_ids.size());
+        LOGGER(_log, V3_VERB, "%i ~> %i IDs\n", _instance_id, _outgoing_clause_ids.size());
         return std::move(_outgoing_clause_ids);
     }
 
@@ -121,12 +124,12 @@ private:
                 numSelfClauses++;
             }
         }
-        LOG(V3_VERB, "Proof %i <~ %i self IDs\n", _instance_id, numSelfClauses);
+        LOGGER(_log, V3_VERB, "%i <~ %i self IDs\n", _instance_id, numSelfClauses);
     }
 
     void readEpoch() {
 
-        LOG(V4_VVER, "Proof %i reading e.%i\n", _instance_id, _current_epoch);
+        LOGGER(_log, V4_VVER, "%i reading e.%i\n", _instance_id, _current_epoch);
         int numReadLines = 0;
 
         if (!_current_line.valid() && _parser.getNextLine(_current_line)) {
@@ -157,7 +160,7 @@ private:
                     "[ERROR] Proof %i: clause ID=%lu (originally %lu) from epoch %i found; expected epoch %i or smaller\n", 
                     _instance_id, id, unalignedId, epoch, _current_epoch));
                 // stop reading because a former epoch has been reached
-                LOG(V4_VVER, "Proof %i stopping e.%i @ ID %lu (orig. %lu) from e.%i\n", 
+                LOGGER(_log, V4_VVER, "%i stopping e.%i @ ID %lu (orig. %lu) from e.%i\n", 
                     _instance_id, _current_epoch, id, unalignedId, epoch);
                 break; 
             }
@@ -167,7 +170,7 @@ private:
                 // Clause derivation is necessary for the combined proof
                 _num_traced_clauses++;
                 if (numLits == 0) {
-                    LOG(V3_VERB, "Proof %i found \"winning\" empty clause\n", _instance_id);
+                    LOGGER(_log, V3_VERB, "%i found \"winning\" empty clause\n", _instance_id);
                 }
 
                 // Traverse clause hints
@@ -178,9 +181,9 @@ private:
                         _frontier.push(hintId, hintEpoch);
                     } else if (!isOriginalClause(hintId)) {
                         if (hintEpoch >= epoch) {
-                            LOG(V0_CRIT, "[ERROR] Proof %i found ext. hint %ld from epoch %i for clause %ld from epoch %i!\n", 
+                            LOGGER(_log, V0_CRIT, "[ERROR] Proof %i found ext. hint %ld from epoch %i for clause %ld from epoch %i!\n", 
                                 _instance_id, hintId, hintEpoch, id, epoch);
-                            LOG(V0_CRIT, "[ERROR] Concerned line: %s\n", _current_line.toStr().c_str());
+                            LOGGER(_log, V0_CRIT, "[ERROR] Concerned line: %s\n", _current_line.toStr().c_str());
                             _output.flush();
                             abort();
                         }
@@ -211,7 +214,7 @@ private:
             numReadLines++;
         }
 
-        LOG(V3_VERB, "Proof %i e.%i: %i lines; last ID %lu; %lu traced; %lu in blg\n", 
+        LOGGER(_log, V3_VERB, "%i e.%i: %i lines; last ID %lu; %lu traced; %lu in blg\n", 
             _instance_id, _current_epoch, numReadLines, id, _num_traced_clauses, _backlog.size());
 
         if (_current_epoch == 0) {
@@ -228,7 +231,7 @@ private:
             if (_interleave_merging) _merge_connector->markExhausted();
 
             _finished = true;
-            LOG(V3_VERB, "Proof %i finished pruning\n", _instance_id);
+            LOGGER(_log, V3_VERB, "%i finished pruning\n", _instance_id);
         } else {
             _current_epoch--;
         }

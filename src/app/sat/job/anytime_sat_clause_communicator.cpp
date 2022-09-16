@@ -481,7 +481,7 @@ void AnytimeSatClauseCommunicator::setUpProofMerger(int threadsPerWorker) {
                 if (_merger_next_lines[i].valid()) continue;
                 bool success = _merger_connectors[i].poll(_merger_next_lines[i]);
                 if (!success) {
-                    LOG(V3_VERB, "DFM local connector %i exhausted\n", i);
+                    LOGGER(_file_merger->_log, V3_VERB, "local connector %i exhausted\n", i);
                     _merger_next_lines[i].clear();
                 }
             }

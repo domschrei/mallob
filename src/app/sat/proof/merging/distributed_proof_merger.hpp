@@ -24,6 +24,7 @@ class DistributedProofMerger {
 
 public:
     typedef std::function<bool(SerializedLratLine&)> LineSource;
+    Logger _log;
 
 private:
     const static int FULL_CHUNK_SIZE_BYTES = 950'000;
@@ -69,6 +70,7 @@ private:
 
 public:
     DistributedProofMerger(MPI_Comm comm, int branchingFactor, LineSource localSource, const std::string& outputFileAtZero) : 
+            _log(Logger::getMainInstance().copy("DFM", ".proofmerge")),
             _comm(comm), _branching_factor(branchingFactor), _local_source(localSource) {
 
         int myRank = MyMpi::rank(comm);
@@ -81,7 +83,7 @@ public:
                 // Create final output file
                 _output_filename = outputFileAtZero;
                 std::string reverseFilename = _output_filename + ".inv";
-                LOG(V3_VERB, "DFM Opening output file \"%s\"\n", reverseFilename.c_str());
+                LOGGER(_log, V3_VERB, "Opening output file \"%s\"\n", reverseFilename.c_str());
                 _proof_writer.reset(new ProofWriter(reverseFilename, _binary_output));
                 // TODO choose size relative to proof size
                 _output_id_filter.reset(new BloomFilter<unsigned long>(268435399, 4));
@@ -134,20 +136,20 @@ public:
 
         auto type = msg.type;
         if (type == MergeMessage::Type::REQUEST) {
-            LOG(V5_DEBG, "DFM Msg from [%i] requesting lines\n", sourceWithinComm);
+            LOGGER(_log, V5_DEBG, "Msg from [%i] requesting lines\n", sourceWithinComm);
             _request_by_parent = true;
             advance();
             return;
         }
 
-        LOG(V5_DEBG, "DFM Msg from [%i] responding to request\n", sourceWithinComm);
+        LOGGER(_log, V5_DEBG, "Msg from [%i] responding to request\n", sourceWithinComm);
 
         bool foundChild = false;
         for (auto& child : _children) if (child.getRankWithinComm() == sourceWithinComm) {
             child.add(std::move(msg.lines));
             if (type == MergeMessage::Type::RESPONSE_EXHAUSTED) {
                 child.conclude();
-                LOG(V3_VERB, "DFM child [%i] marked exhausted\n", child.getRankWithinComm());
+                LOGGER(_log, V3_VERB, "child [%i] marked exhausted\n", child.getRankWithinComm());
             }
             foundChild = true;
             break;
@@ -158,7 +160,7 @@ public:
     void advance() {
 
         if (Timer::elapsedSeconds() - lastOutputReport > 1.0) {
-            LOG(V3_VERB, "DFM outputlines:%i efficiency:%.4f exhausted:%s\n", 
+            LOGGER(_log, V3_VERB, "outputlines:%i efficiency:%.4f exhausted:%s\n", 
                 numOutputLines, 
                 1 - _time_inactive/(Timer::elapsedSeconds()-_timepoint_merge_begin), 
                 areInputsExhausted()?"yes":"no");
@@ -172,7 +174,7 @@ public:
                 msg.type = MergeMessage::REQUEST;
                 MyMpi::isend(child.getRankWithinComm(), MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, msg);
                 child.setRefillRequested(true);
-                LOG(V5_DEBG, "DFM Requesting refill from [%i]\n", child.getRankWithinComm());
+                LOGGER(_log, V5_DEBG, "Requesting refill from [%i]\n", child.getRankWithinComm());
             }
         }
 
@@ -197,7 +199,7 @@ public:
                 writeOutputIntoMsg();
             }
             if (msg.type != MergeMessage::Type::REQUEST) {
-                LOG(V5_DEBG, "DFM Sending refill (%i lines) to [%i], exhausted:%s\n", 
+                LOGGER(_log, V5_DEBG, "Sending refill (%i lines) to [%i], exhausted:%s\n", 
                     msg.lines.size(), _parent_rank, 
                     msg.type == MergeMessage::Type::RESPONSE_EXHAUSTED ? "yes":"no");
                 MyMpi::isend(_parent_rank, MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, msg);
@@ -247,7 +249,7 @@ private:
             _parent_rank = (myRankWithinTree-1) / _branching_factor + rankOffset;
         }
 
-        LOG(V3_VERB, "DFM Tree #%i, internal rank %i, offset %i, parent [%i]\n", 
+        LOGGER(_log, V3_VERB, "Tree #%i, internal rank %i, offset %i, parent [%i]\n", 
             myTreeIdx, myRankWithinTree, rankOffset, _parent_rank);
 
         // Compute children of this rank
@@ -256,7 +258,7 @@ private:
                 int childRank = numChildRanksPerTree*i + 1;
                 if (childRank < commSize) {
                     _children.emplace_back(childRank, FULL_CHUNK_SIZE_BYTES);
-                    LOG(V4_VVER, "DFM Adding child [%i]\n", childRank);
+                    LOGGER(_log, V4_VVER, "Adding child [%i]\n", childRank);
                 }
             }
         } else {
@@ -267,7 +269,7 @@ private:
                 if (adjChildRank < std::min(commSize, 1 + (myTreeIdx+1) * numChildRanksPerTree)) {
                     // Create child
                     _children.emplace_back(adjChildRank, FULL_CHUNK_SIZE_BYTES);
-                    LOG(V4_VVER, "DFM Adding child [%i]\n", adjChildRank);
+                    LOGGER(_log, V4_VVER, "Adding child [%i]\n", adjChildRank);
                 }
             }
         }
@@ -301,7 +303,7 @@ private:
                         // Child COULD have more lines but they are not available.
                         canMerge = false;
                     } else if (!childrenDone[i]) {
-                        LOG(V3_VERB, "DFM child [%i] completely done\n", child.getRankWithinComm());
+                        LOGGER(_log, V3_VERB, "child [%i] completely done\n", child.getRankWithinComm());
                         childrenDone[i] = true;
                     }
                 }
@@ -314,14 +316,14 @@ private:
                 if (!_local_source(localSourceLine)) {
                     localSourceLine.clear();
                     _local_source_exhausted = true;
-                    LOG(V3_VERB, "DFM local sources exhausted\n");
+                    LOGGER(_log, V3_VERB, "local sources exhausted\n");
                 }
             }
 
             if (!canMerge || _output_buffer_size >= FULL_CHUNK_SIZE_BYTES) {
                 // Sleep (for simplicity; TODO use condition variable instead)
                 if (inactiveTimeStart <= 0) inactiveTimeStart = Timer::elapsedSeconds();
-                //LOG(V5_DEBG, "DFM cannot merge - waiting for input\n");
+                //LOGGER(_log, V5_DEBG, "cannot merge - waiting for input\n");
                 usleep(1);
                 continue;
             }

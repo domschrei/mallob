@@ -91,7 +91,7 @@ public:
         if (_this_worker_index == 0) {
             //std::string clsStr;
             //for (size_t i = 0; i < clauseIdsSize; i++) clsStr += std::to_string(clauseIdsData[i]) + " ";
-            LOG(V2_INFO, "e.%i: %i shared IDs\n", _current_epoch, clauseIdsSize);
+            LOG(V2_INFO, "Proof e.%i: %i shared IDs\n", _current_epoch, clauseIdsSize);
         }
         for (auto& inst : _proof_instances) {
             inst.advance(clauseIdsData, clauseIdsSize);
