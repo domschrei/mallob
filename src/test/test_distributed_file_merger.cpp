@@ -10,7 +10,7 @@
 #include "util/sys/timer.hpp"
 #include "comm/mympi.hpp"
 #include "util/params.hpp"
-#include "comm/distributed_file_merger.hpp"
+#include "app/sat/proof/merging/distributed_proof_merger.hpp"
 #include "util/sys/watchdog.hpp"
 
 void testMerge(int myRank) {
@@ -18,7 +18,7 @@ void testMerge(int myRank) {
     int lineCounter = 0;
     int maxLineCounter = 10000;
 
-    auto merger = DistributedFileMerger(MPI_COMM_WORLD, 5, [&](SerializedLratLine& out) {
+    auto merger = DistributedProofMerger(MPI_COMM_WORLD, 5, [&](SerializedLratLine& out) {
         if (lineCounter == maxLineCounter) {
             return false;
         }
@@ -30,10 +30,11 @@ void testMerge(int myRank) {
         line.signsOfHints.push_back(true);
         out = SerializedLratLine(line);
         return true;
-    }, "final_output.txt", /*numOriginalClauses=*/1);
+    }, "final_output.txt");
+    merger.setNumOriginalClauses(1);
 
     MyMpi::getMessageQueue().registerCallback(MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, [&](MessageHandle& h) {
-        DistributedFileMerger::MergeMessage msg; msg.deserialize(h.getRecvData());
+        MergeMessage msg; msg.deserialize(h.getRecvData());
         merger.handle(h.source, msg);
     });
 

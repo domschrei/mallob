@@ -13,8 +13,8 @@
 //#include "distributed_clause_filter.hpp"
 #include "comm/job_tree_all_reduction.hpp"
 #include "../proof/proof_assembler.hpp"
-#include "comm/distributed_file_merger.hpp"
-#include "../proof/proof_merge_connector.hpp"
+#include "../proof/merging/distributed_proof_merger.hpp"
+#include "../proof/merging/proof_merge_connector.hpp"
 
 class AnytimeSatClauseCommunicator {
 
@@ -158,7 +158,7 @@ private:
     std::vector<int> _proof_all_reduction_result;
 
     std::vector<ProofMergeConnector> _merger_connectors;
-    std::unique_ptr<DistributedFileMerger> _file_merger;
+    std::unique_ptr<DistributedProofMerger> _file_merger;
     std::vector<std::ifstream> _merger_filestreams;
     std::vector<lrat_utils::ReadBuffer> _merger_filebuffers;
     std::vector<SerializedLratLine> _merger_next_lines;

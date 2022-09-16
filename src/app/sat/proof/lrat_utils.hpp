@@ -164,6 +164,7 @@ namespace lrat_utils {
     void writeLine(WriteBuffer& ofs, const LratLine& line);
     void writeLine(WriteBuffer& ofs, SerializedLratLine& line, WriteMode mode = NORMAL);
     void writeDeletionLine(WriteBuffer& ofs, LratClauseId headerId, const std::vector<unsigned long>& ids, WriteMode mode = NORMAL);
+    void writeDeletionLine(WriteBuffer& ofs, LratClauseId headerId, const unsigned long* hints, int numHints, WriteMode mode = NORMAL);
     
     bool readLine(ReadBuffer& ifs, LratLine& line);
     bool readLine(ReadBuffer& ifs, SerializedLratLine& line);

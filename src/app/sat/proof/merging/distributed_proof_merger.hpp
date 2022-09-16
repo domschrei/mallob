@@ -5,7 +5,7 @@
 #include <string>
 #include <fstream>
 
-#include "mympi.hpp"
+#include "comm/mympi.hpp"
 #include "data/serializable.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/logger.hpp"
@@ -16,128 +16,26 @@
 #include "app/sat/proof/lrat_utils.hpp"
 #include "app/sat/proof/reverse_binary_lrat_parser.hpp"
 #include "util/sys/buffered_io.hpp"
+#include "merge_message.hpp"
+#include "merge_child.hpp"
+#include "proof_writer.hpp"
 
-class DistributedFileMerger {
+class DistributedProofMerger {
 
 public:
     typedef std::function<bool(SerializedLratLine&)> LineSource;
 
-    struct MergeMessage : public Serializable {
-
-        enum Type {REQUEST, RESPONSE_SUCCESS, RESPONSE_EXHAUSTED} type;
-        std::vector<SerializedLratLine> lines;
-
-        static Type getTypeOfMessage(const std::vector<uint8_t>& serializedMsg) {
-            Type type;
-            memcpy(&type, serializedMsg.data(), sizeof(Type));
-            return type;
-        }        
-
-        virtual std::vector<uint8_t> serialize() const {
-
-            std::vector<uint8_t> result;
-            size_t i = 0, n;
-
-            result.resize(sizeof(Type));
-            n = sizeof(Type); memcpy(result.data()+i, &type, n); i += n;
-
-            for (const auto& line : lines) {
-                result.insert(result.end(), line.data().begin(), line.data().end());
-            }
-
-            return result;
-        }
-
-        virtual Serializable& deserialize(const std::vector<uint8_t>& packed) {
-
-            size_t i = 0, n;
-            n = sizeof(Type); memcpy(&type, packed.data()+i, n); i += n;
-
-            while (i < packed.size()) {
-
-                n = sizeof(int);
-                auto offsetNumLits = SerializedLratLine::getDataPosOfNumLits();
-                int numLits;
-                memcpy(&numLits, packed.data()+i+offsetNumLits, n);
-                auto offsetNumHints = SerializedLratLine::getDataPosOfNumHints(numLits);
-                int numHints;
-                memcpy(&numHints, packed.data()+i+offsetNumHints, n);
-
-                int lineSize = SerializedLratLine::getSize(numLits, numHints);
-                SerializedLratLine line(std::vector<uint8_t>(
-                    packed.data()+i,
-                    packed.data()+i+lineSize
-                ));
-
-                i += lineSize;
-                lines.push_back(std::move(line));
-            }
-
-            return *this;
-        }
-    };
-
 private:
     const static int FULL_CHUNK_SIZE_BYTES = 950'000;
     const static int HALF_CHUNK_SIZE_BYTES = FULL_CHUNK_SIZE_BYTES / 2;
-    const static int MERGE_CHILD_BUFFER_SIZE = 100'000;
 
     MPI_Comm _comm;
     int _branching_factor;
     LineSource _local_source;
-    int _num_original_clauses;
+    int _num_original_clauses = 0;
     
     bool _local_source_exhausted = false;
     bool _all_sources_exhausted = false;
-
-    class MergeChild {
-    private:
-        int rankWithinComm;
-        std::vector<SerializedLratLine> buffer;
-        std::atomic_int bufferSize = 0;
-        std::atomic_int readPos = 0;
-        std::atomic_int writePos = 0;
-        bool exhausted = false;
-        bool refillRequested = false;
-    public:
-        MergeChild(int rankWithinComm) : rankWithinComm(rankWithinComm) {
-            buffer.resize(MERGE_CHILD_BUFFER_SIZE);
-        }
-
-        int getRankWithinComm() const {return rankWithinComm;}
-        bool isEmpty() const {return bufferSize.load(std::memory_order_relaxed) == 0;}
-        bool isExhausted() const {return exhausted;}
-        bool hasNext() const {return !isEmpty();}
-        bool isRefillDesired() const {
-            return !isExhausted() && !refillRequested 
-                && bufferSize.load(std::memory_order_relaxed) < FULL_CHUNK_SIZE_BYTES; 
-        }
-
-        void add(std::vector<SerializedLratLine>&& newLines) {
-            int pos = writePos.load(std::memory_order_relaxed);
-            int size = 0;
-            for (auto& line : newLines) {
-                size += line.size();
-                buffer[pos].data().swap(line.data());
-                pos++;
-                if (pos == MERGE_CHILD_BUFFER_SIZE) pos = 0;
-            }
-            bufferSize.fetch_add(size, std::memory_order_relaxed);
-            writePos.store(pos, std::memory_order_relaxed);
-            refillRequested = false;
-        }
-        void next(SerializedLratLine& line) {
-            assert(hasNext());
-            int pos = readPos.load(std::memory_order_relaxed);
-            line.data().swap(buffer[pos].data());
-            pos++;
-            if (pos == MERGE_CHILD_BUFFER_SIZE) pos = 0;
-            readPos.store(pos, std::memory_order_relaxed);
-            bufferSize.fetch_sub(line.size(), std::memory_order_relaxed);
-        }
-        void conclude() {exhausted = true;}
-        void setRefillRequested(bool requested) {refillRequested = requested;}
-    };
 
     std::list<MergeChild> _children;
     MPI_Request _barrier_request;
@@ -153,7 +51,7 @@ private:
 
     // rank zero only
     std::string _output_filename;
-    std::ofstream _output_filestream;
+    std::unique_ptr<ProofWriter> _proof_writer;
     std::unique_ptr<BloomFilter<unsigned long>> _output_id_filter;
     std::future<void> _fut_root_prepare;
     bool _root_prepared = false;
@@ -166,12 +64,12 @@ private:
     bool _began_final_barrier = false;
     bool _reversed_file = false;
 
-    float _timepoint_merge_begin;
-    float _time_inactive = 0;
+    float _timepoint_merge_begin {0};
+    float _time_inactive {0};
 
 public:
-    DistributedFileMerger(MPI_Comm comm, int branchingFactor, LineSource localSource, const std::string& outputFileAtZero, int numOriginalClauses) : 
-            _comm(comm), _branching_factor(branchingFactor), _local_source(localSource), _num_original_clauses(numOriginalClauses) {
+    DistributedProofMerger(MPI_Comm comm, int branchingFactor, LineSource localSource, const std::string& outputFileAtZero) : 
+            _comm(comm), _branching_factor(branchingFactor), _local_source(localSource) {
 
         int myRank = MyMpi::rank(comm);
         _is_root = myRank == 0;
@@ -184,11 +82,7 @@ public:
                 _output_filename = outputFileAtZero;
                 std::string reverseFilename = _output_filename + ".inv";
                 LOG(V3_VERB, "DFM Opening output file \"%s\"\n", reverseFilename.c_str());
-                if (_binary_output) {
-                    _output_filestream = std::ofstream(reverseFilename, std::ofstream::binary);
-                } else {
-                    _output_filestream = std::ofstream(reverseFilename);
-                }
+                _proof_writer.reset(new ProofWriter(reverseFilename, _binary_output));
                 // TODO choose size relative to proof size
                 _output_id_filter.reset(new BloomFilter<unsigned long>(26843543, 4));
                 _root_prepared = true;
@@ -198,9 +92,13 @@ public:
         }
     }
 
-    ~DistributedFileMerger() {
+    ~DistributedProofMerger() {
         if (_fut_root_prepare.valid()) _fut_root_prepare.get();
         if (_fut_merging.valid()) _fut_merging.get();
+    }
+
+    void setNumOriginalClauses(int numOriginalClauses) {
+        _num_original_clauses = numOriginalClauses;
     }
 
     bool readyToMerge() {
@@ -310,9 +208,8 @@ public:
 
     bool finished() const {
         if (!isFullyExhausted()) return false;
-        if (_is_root) {
-            return _reversed_file;
-        } else return true;
+        if (_is_root) return _reversed_file;
+        return true;
     }
 
     bool allProcessesFinished() {
@@ -358,7 +255,7 @@ private:
             for (int i = 0; i < numChildrenOfRoot; i++) {
                 int childRank = numChildRanksPerTree*i + 1;
                 if (childRank < commSize) {
-                    _children.emplace_back(childRank);
+                    _children.emplace_back(childRank, FULL_CHUNK_SIZE_BYTES);
                     LOG(V3_VERB, "DFM Adding child [%i]\n", childRank);
                 }
             }
@@ -369,7 +266,7 @@ private:
                 int adjChildRank = childRank + rankOffset;
                 if (adjChildRank < std::min(commSize, 1 + (myTreeIdx+1) * numChildRanksPerTree)) {
                     // Create child
-                    _children.emplace_back(adjChildRank);
+                    _children.emplace_back(adjChildRank, FULL_CHUNK_SIZE_BYTES);
                     LOG(V3_VERB, "DFM Adding child [%i]\n", adjChildRank);
                 }
             }
@@ -378,11 +275,12 @@ private:
 
     void doMerging() {
 
+        assert(_num_original_clauses > 0);
+
         std::vector<SerializedLratLine> merger(_children.size()+1);
         std::vector<bool> childrenDone(_children.size(), false);
 
         std::vector<LratClauseId> hintsToDelete;
-        lrat_utils::WriteBuffer writeBuf(_output_filestream);
 
         SerializedLratLine bufferLine;
 
@@ -467,23 +365,11 @@ private:
                         }
                     }
                     if (!hintsToDelete.empty()) {
-                        if (_binary_output) {
-                            lrat_utils::writeDeletionLine(writeBuf, chosenId, hintsToDelete, lrat_utils::REVERSED);
-                        } else {
-                            std::string delLine = std::to_string(chosenId) + " d";
-                            for (auto hint : hintsToDelete) delLine += " " + std::to_string(hint);
-                            delLine += " 0\n";
-                            _output_filestream.write(delLine.c_str(), delLine.size());
-                        }
+                        _proof_writer->pushDeletionBlocking(chosenId, hintsToDelete);
                         hintsToDelete.clear();
                     }
                     // Write into final file
-                    if (_binary_output) {
-                        lrat_utils::writeLine(writeBuf, chosenLine, lrat_utils::REVERSED);
-                    } else {
-                        std::string output = chosenLine.toStr();
-                        _output_filestream.write(output.c_str(), output.size());
-                    }
+                    _proof_writer->pushAdditionBlocking(chosenLine);
                     chosenLine.clear();
                 } else {
                     // Write into output buffer
@@ -503,8 +389,9 @@ private:
 
     void concludeMerging() {
         if (_is_root) {
-            _output_filestream.flush();
-            _output_filestream.close();
+            _proof_writer->markExhausted();
+            while (!_proof_writer->isDone()) usleep(1000*10);
+            _proof_writer.reset(); // internally waits for writer to finish
         }
     }
 

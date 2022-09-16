@@ -46,6 +46,8 @@ public:
         });
     }
 
+    bool initialized() const {return _initialized;}
+
     ~ProofAssembler() {
         if (_fut_begin_assembly.valid()) _fut_begin_assembly.get();
     }

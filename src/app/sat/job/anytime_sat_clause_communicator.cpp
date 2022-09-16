@@ -28,7 +28,12 @@ void advanceCollective(BaseSatJob* job, JobMessage& msg, int broadcastTag) {
 void AnytimeSatClauseCommunicator::communicate() {
 
     if (_file_merger) {
-        if (_file_merger->readyToMerge()) _file_merger->beginMerge();
+        if (_file_merger->readyToMerge() && (!_params.interleaveProofMerging() || _proof_assembler->initialized())) {
+            if (_params.interleaveProofMerging()) 
+                _file_merger->setNumOriginalClauses(_proof_assembler->getNumOriginalClauses());
+            _file_merger->beginMerge();
+        } 
+        
         if (_file_merger->beganMerging()) {
             _file_merger->advance();
             if (_file_merger->allProcessesFinished()) {
@@ -123,6 +128,7 @@ void AnytimeSatClauseCommunicator::communicate() {
 
             if (!_params.interleaveProofMerging()) {
                 setUpProofMerger(-1);
+                _file_merger->setNumOriginalClauses(_proof_assembler->getNumOriginalClauses());
             }
 
             _proof_all_reduction.reset();
@@ -465,7 +471,7 @@ void AnytimeSatClauseCommunicator::setUpProofMerger(int threadsPerWorker) {
         }
 
         // Merge proof lines output by proof instances into a single file
-        _file_merger.reset(new DistributedFileMerger(MPI_COMM_WORLD, /*branchingFactor=*/6, 
+        _file_merger.reset(new DistributedProofMerger(MPI_COMM_WORLD, /*branchingFactor=*/6, 
         // Function to get a proof line from the local source(s)
         [&](SerializedLratLine& out) {
 
@@ -500,7 +506,7 @@ void AnytimeSatClauseCommunicator::setUpProofMerger(int threadsPerWorker) {
             } else {
                 return false;
             }
-        }, _params.proofOutputFile(), _proof_assembler->getNumOriginalClauses()));
+        }, _params.proofOutputFile()));
 
     } else {
 
@@ -511,7 +517,7 @@ void AnytimeSatClauseCommunicator::setUpProofMerger(int threadsPerWorker) {
         _merger_next_lines.resize(proofFiles.size());
                     
         // Merge individual proof files into a single file
-        _file_merger.reset(new DistributedFileMerger(MPI_COMM_WORLD, /*branchingFactor=*/6, 
+        _file_merger.reset(new DistributedProofMerger(MPI_COMM_WORLD, /*branchingFactor=*/6, 
         // Function to get a proof line from the local source(s)
         [&](SerializedLratLine& out) {
 
@@ -547,12 +553,12 @@ void AnytimeSatClauseCommunicator::setUpProofMerger(int threadsPerWorker) {
             } else {
                 return false;
             }
-        }, _params.proofOutputFile(), _proof_assembler->getNumOriginalClauses()));
+        }, _params.proofOutputFile()));
     }
 
 
     MyMpi::getMessageQueue().registerCallback(MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, [&](MessageHandle& h) {
-        DistributedFileMerger::MergeMessage msg; msg.deserialize(h.getRecvData());
+        MergeMessage msg; msg.deserialize(h.getRecvData());
         _file_merger->handle(h.source, msg);
     });
 }

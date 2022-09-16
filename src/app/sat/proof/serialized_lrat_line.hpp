@@ -116,10 +116,11 @@ public:
         );
     }
     std::pair<LratClauseId*, int> getUnsignedHints() {
-        return std::pair<LratClauseId*, int>(
-            (LratClauseId*) (_data.data()+getDataPosOfNumHints(getNumLiterals())+sizeof(int)), 
-            getNumHints()
-        );
+        int dataStartIdx = getDataPosOfNumHints(getNumLiterals())+sizeof(int);
+        int numHints = getNumHints();
+        assert(dataStartIdx+(sizeof(LratClauseId)+sizeof(bool))*numHints <= _data.size());
+        LratClauseId* ptr = (LratClauseId*) (_data.data()+dataStartIdx);
+        return std::pair<LratClauseId*, int>(ptr, numHints);
     }
     const bool* getSignsOfHints() const {
         return (const bool*) (_data.data()
@@ -170,5 +171,9 @@ public:
         return sizeof(LratClauseId)
             + sizeof(int)
             + sizeof(int)*numLits;
+    }
+
+    void swap(SerializedLratLine& other) {
+        _data.swap(other._data);
     }
 };

@@ -58,15 +58,23 @@ namespace lrat_utils {
 
     void writeDeletionLine(WriteBuffer& buf, LratClauseId headerId, 
             const std::vector<unsigned long>& ids, WriteMode mode) {
+        
+        writeDeletionLine(buf, headerId, ids.data(), ids.size(), mode);
+    }
+
+    void writeDeletionLine(WriteBuffer& buf, LratClauseId headerId, 
+        const unsigned long* ids, int numHints, WriteMode mode) {
+
         if (mode == REVERSED) {
             buf.writeSeparator();
-            for (int i = ids.size()-1; i >= 0; i--) {
+            for (int i = numHints-1; i >= 0; i--) {
                 buf.writeSignedClauseId(ids[i], mode);
             }
             buf.writeDeletionLineHeader();
         } else {
             buf.writeDeletionLineHeader();
-            for (auto id : ids) {
+            for (int i = 0; i < numHints; i++) {
+                auto id = ids[i];
                 buf.writeSignedClauseId(id, mode);
             }
             buf.writeSeparator();

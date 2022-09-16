@@ -7,7 +7,7 @@
 #include "external_id_priority_queue.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "app/sat/proof/lrat_utils.hpp"
-#include "proof_merge_connector.hpp"
+#include "merging/proof_merge_connector.hpp"
 
 /*
 The contract of an instance of this class looks as follows:
@@ -191,7 +191,7 @@ private:
 
                 // Output the line
                 if (_interleave_merging) {
-                    _merge_connector->pushBlocking(std::move(_current_line));
+                    _merge_connector->pushBlocking(_current_line);
                 } else {
                     lrat_utils::writeLine(_output_buf, _current_line);
                 }
