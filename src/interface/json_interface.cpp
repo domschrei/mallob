@@ -123,8 +123,9 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
         } else {
 
             // Create new internal ID for this job
-            if (!_job_name_to_id_rev.count(jobName)) 
-                _job_name_to_id_rev[jobName] = std::pair<int, int>(_running_id++, 0);
+            if (!_job_name_to_id_rev.count(jobName)) {
+                _job_name_to_id_rev[jobName] = std::pair<int, int>(_job_id_allocator.getNext(), 0);
+            }
             auto pair = _job_name_to_id_rev[jobName];
             id = pair.first;
             LOGGER(_logger, V3_VERB, "Mapping job \"%s\" to internal ID #%i\n", jobName.c_str(), id);
@@ -199,7 +200,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
         // that will be used by the job later
         auto lock = _job_map_mutex.getLock();
         if (!_job_name_to_id_rev.count(name)) {
-            _job_name_to_id_rev[name] = std::pair<int, int>(_running_id++, 0);
+            _job_name_to_id_rev[name] = std::pair<int, int>(_job_id_allocator.getNext(), 0);
             LOGGER(_logger, V3_VERB, "Forward mapping job \"%s\" to internal ID #%i\n", name.c_str(), _job_name_to_id_rev[name].first);
         }
         idDependencies.push_back(_job_name_to_id_rev[name].first); // TODO inexact: introduce dependencies for job revisions

@@ -173,11 +173,15 @@ void Client::handleNewJob(JobMetadata&& data) {
 
 void Client::init() {
 
+    // Get ID allocator this client should use
+    JobIdAllocator jobIdAllocator(getInternalRank(), getFilesystemInterfacePath());
+
     // Set up generic JSON interface to communicate with this client
     _json_interface = std::unique_ptr<JsonInterface>(
         new JsonInterface(getInternalRank(), _params, 
             Logger::getMainInstance().copy("I", ".i"),
-            [&](JobMetadata&& data) {handleNewJob(std::move(data));}
+            [&](JobMetadata&& data) {handleNewJob(std::move(data));},
+            std::move(jobIdAllocator)
         )
     );
 
