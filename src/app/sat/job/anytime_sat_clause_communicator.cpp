@@ -103,18 +103,17 @@ void AnytimeSatClauseCommunicator::communicate() {
         if ((!_proof_all_reduction.has_value() || !_proof_all_reduction->hasProducer()) 
                 && _proof_assembler->canEmitClauseIds()) {
             // Export clause IDs via JobTreeAllReduction instance
-            LOG(V2_INFO, "Emitting proof-relevant clause IDs\n");
             auto clauseIds = _proof_assembler->emitClauseIds();
             std::vector<int> clauseIdsIntVec((int*)clauseIds.data(), ((int*)clauseIds.data())+clauseIds.size()*2);
             _proof_all_reduction->produce([&]() {return clauseIdsIntVec;});
-            LOG(V2_INFO, "Emitted %i proof-relevant clause IDs\n", clauseIds.size());
+            LOG(V5_DEBG, "Emitted %i proof-relevant clause IDs\n", clauseIds.size());
         }
 
         if (_proof_all_reduction.has_value()) {
             _proof_all_reduction->advance();
             if (_proof_all_reduction->hasResult()) {
                 _proof_all_reduction_result = _proof_all_reduction->extractResult();
-                LOG(V2_INFO, "Importing proof-relevant clause IDs\n");
+                LOG(V5_DEBG, "Importing proof-relevant clause IDs\n");
                 _proof_assembler->importClauseIds(
                     (LratClauseId*) _proof_all_reduction_result.data(), 
                     _proof_all_reduction_result.size()/2
@@ -328,7 +327,7 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
     }
     if (msg.tag == MSG_INITIATE_PROOF_COMBINATION) {
 
-        LOG(V2_INFO, "Initiating distributed proof assembly\n");
+        LOG(V2_INFO, "Initiate proof assembly\n");
 
         // Propagate initialization message
         advanceCollective(_job, msg, MSG_INITIATE_PROOF_COMBINATION);  
@@ -357,7 +356,7 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         }
     }
     if (msg.tag == MSG_ALLREDUCE_PROOF_RELEVANT_CLAUSES) {
-        LOG(V2_INFO, "Receiving %i proof-relevant clause IDs from epoch %i\n", msg.payload.size()/2, msg.epoch);
+        LOG(V5_DEBG, "Receiving %i proof-relevant clause IDs from epoch %i\n", msg.payload.size()/2, msg.epoch);
         assert(_proof_all_reduction.has_value());
         _proof_all_reduction->receive(source, mpiTag, msg);
         _proof_all_reduction->advance();
@@ -482,7 +481,7 @@ void AnytimeSatClauseCommunicator::setUpProofMerger(int threadsPerWorker) {
                 if (_merger_next_lines[i].valid()) continue;
                 bool success = _merger_connectors[i].poll(_merger_next_lines[i]);
                 if (!success) {
-                    LOG(V2_INFO, "DFM local connector %i exhausted\n", i);
+                    LOG(V3_VERB, "DFM local connector %i exhausted\n", i);
                     _merger_next_lines[i].clear();
                 }
             }

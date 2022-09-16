@@ -544,59 +544,6 @@ void SharingManager::writeClauseEpochs(/*const std::string& proofDir, int firstG
 		ofs << "\n";
 	}
 
-	/*
-	// Wait until all proof files are written sufficiently
-	for (size_t i = 0; i < _id_offsets_per_solver.size(); i++) {
-
-		auto lastRelevantId = _last_exported_clause_id[i]->load(std::memory_order_relaxed);
-		if (lastRelevantId <= _num_original_clauses) continue;
-
-		std::string proofFilename = proofDir + "/proof." 
-				+ std::to_string(firstGlobalId+i+1) + ".frat";
-
-		// Wait until the solver's proof file has been written up to this clause ID
-		while (true) {
-
-			// Open process which yields the last two lines of the proof file
-			std::string cmd = "tail -2 " + proofFilename;
-			FILE* tailProcess = popen(cmd.c_str(), "r");
-			char lineBuffer[65536];
-			bool doneWaiting = false;
-
-			// Read output from process
-			while (!feof(tailProcess)) {
-				// Try to parse next line
-				if (fgets(lineBuffer, 65536, tailProcess) == NULL) continue;
-				unsigned long writtenId = 0;
-				for (size_t i = 0; i < 65536; i++) {
-					auto c = lineBuffer[i];
-					if (c == '\n') break; // end of line
-					if (c == ' ') {
-						if (writtenId != 0) break; // ID read completely
-						continue; // no ID read yet
-					}
-					if (c >= '0' && c <= '9') {
-						// continue to parse ID
-						writtenId = writtenId*10 + (c-'0');
-					}
-				}
-				LOG(V2_INFO, "Proof \"%s\" : ID %lu found\n", proofFilename.c_str(), writtenId);
-				if (writtenId < lastRelevantId) continue;
-				// Done!
-				doneWaiting = true;
-			}
-			if (doneWaiting) {
-				LOG(V2_INFO, "Proof \"%s\" now contains ID %lu\n", proofFilename.c_str(), lastRelevantId);
-				break;
-			}
-
-			LOG(V2_INFO, "Still waiting for proof \"%s\" to contain ID %lu\n", 
-				proofFilename.c_str(), lastRelevantId);
-			usleep(1000 * 200); // wait 0.2s
-		}
-	}
-	*/
-
 	LOG(V2_INFO, "renaming clause epochs file ...\n");
 	std::rename(tempFilename.c_str(), outputFilename.c_str());
 	LOG(V2_INFO, "wrote clause epochs file for distributed proof assembly\n");

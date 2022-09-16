@@ -84,7 +84,7 @@ public:
                 LOG(V3_VERB, "DFM Opening output file \"%s\"\n", reverseFilename.c_str());
                 _proof_writer.reset(new ProofWriter(reverseFilename, _binary_output));
                 // TODO choose size relative to proof size
-                _output_id_filter.reset(new BloomFilter<unsigned long>(26843543, 4));
+                _output_id_filter.reset(new BloomFilter<unsigned long>(268435399, 4));
                 _root_prepared = true;
             });
         } else {
@@ -134,20 +134,20 @@ public:
 
         auto type = msg.type;
         if (type == MergeMessage::Type::REQUEST) {
-            LOG(V3_VERB, "DFM Msg from [%i] requesting lines\n", sourceWithinComm);
+            LOG(V5_DEBG, "DFM Msg from [%i] requesting lines\n", sourceWithinComm);
             _request_by_parent = true;
             advance();
             return;
         }
 
-        LOG(V3_VERB, "DFM Msg from [%i] responding to request\n", sourceWithinComm);
+        LOG(V5_DEBG, "DFM Msg from [%i] responding to request\n", sourceWithinComm);
 
         bool foundChild = false;
         for (auto& child : _children) if (child.getRankWithinComm() == sourceWithinComm) {
             child.add(std::move(msg.lines));
             if (type == MergeMessage::Type::RESPONSE_EXHAUSTED) {
                 child.conclude();
-                LOG(V2_INFO, "DFM child [%i] marked exhausted\n", child.getRankWithinComm());
+                LOG(V3_VERB, "DFM child [%i] marked exhausted\n", child.getRankWithinComm());
             }
             foundChild = true;
             break;
@@ -172,7 +172,7 @@ public:
                 msg.type = MergeMessage::REQUEST;
                 MyMpi::isend(child.getRankWithinComm(), MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, msg);
                 child.setRefillRequested(true);
-                LOG(V3_VERB, "DFM Requesting refill from [%i]\n", child.getRankWithinComm());
+                LOG(V5_DEBG, "DFM Requesting refill from [%i]\n", child.getRankWithinComm());
             }
         }
 
@@ -197,7 +197,7 @@ public:
                 writeOutputIntoMsg();
             }
             if (msg.type != MergeMessage::Type::REQUEST) {
-                LOG(V3_VERB, "DFM Sending refill (%i lines) to [%i], exhausted:%s\n", 
+                LOG(V5_DEBG, "DFM Sending refill (%i lines) to [%i], exhausted:%s\n", 
                     msg.lines.size(), _parent_rank, 
                     msg.type == MergeMessage::Type::RESPONSE_EXHAUSTED ? "yes":"no");
                 MyMpi::isend(_parent_rank, MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, msg);
@@ -247,7 +247,7 @@ private:
             _parent_rank = (myRankWithinTree-1) / _branching_factor + rankOffset;
         }
 
-        LOG(V2_INFO, "DFM Tree #%i, internal rank %i, offset %i, parent [%i]\n", 
+        LOG(V3_VERB, "DFM Tree #%i, internal rank %i, offset %i, parent [%i]\n", 
             myTreeIdx, myRankWithinTree, rankOffset, _parent_rank);
 
         // Compute children of this rank
@@ -256,7 +256,7 @@ private:
                 int childRank = numChildRanksPerTree*i + 1;
                 if (childRank < commSize) {
                     _children.emplace_back(childRank, FULL_CHUNK_SIZE_BYTES);
-                    LOG(V3_VERB, "DFM Adding child [%i]\n", childRank);
+                    LOG(V4_VVER, "DFM Adding child [%i]\n", childRank);
                 }
             }
         } else {
@@ -267,7 +267,7 @@ private:
                 if (adjChildRank < std::min(commSize, 1 + (myTreeIdx+1) * numChildRanksPerTree)) {
                     // Create child
                     _children.emplace_back(adjChildRank, FULL_CHUNK_SIZE_BYTES);
-                    LOG(V3_VERB, "DFM Adding child [%i]\n", adjChildRank);
+                    LOG(V4_VVER, "DFM Adding child [%i]\n", adjChildRank);
                 }
             }
         }
@@ -301,7 +301,7 @@ private:
                         // Child COULD have more lines but they are not available.
                         canMerge = false;
                     } else if (!childrenDone[i]) {
-                        LOG(V2_INFO, "DFM child [%i] completely done\n", child.getRankWithinComm());
+                        LOG(V3_VERB, "DFM child [%i] completely done\n", child.getRankWithinComm());
                         childrenDone[i] = true;
                     }
                 }
@@ -314,14 +314,14 @@ private:
                 if (!_local_source(localSourceLine)) {
                     localSourceLine.clear();
                     _local_source_exhausted = true;
-                    LOG(V2_INFO, "DFM local sources exhausted\n");
+                    LOG(V3_VERB, "DFM local sources exhausted\n");
                 }
             }
 
             if (!canMerge || _output_buffer_size >= FULL_CHUNK_SIZE_BYTES) {
                 // Sleep (for simplicity; TODO use condition variable instead)
                 if (inactiveTimeStart <= 0) inactiveTimeStart = Timer::elapsedSeconds();
-                //LOG(V2_INFO, "DFM cannot merge - waiting for input\n");
+                //LOG(V5_DEBG, "DFM cannot merge - waiting for input\n");
                 usleep(1);
                 continue;
             }
