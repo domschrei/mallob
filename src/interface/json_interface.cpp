@@ -92,7 +92,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
 
                 // Incremental job is notified to be done
                 LOGGER(_logger, V3_VERB, "Incremental job #%i is done\n", jobId);
-                //_job_name_to_id_rev.erase(precursorName);
+                _job_name_to_id_rev.erase(precursorName);
                 for (int rev = 0; rev <= _job_id_to_latest_rev[id]; rev++) {
                     auto key = std::pair<int, int>(id, rev);
                     JobImage* foundImg = _job_id_rev_to_image.at(key);
@@ -301,7 +301,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
     }
 
     if (!img->incremental) {
-        //_job_name_to_id_rev.erase(img->userQualifiedName);
+        _job_name_to_id_rev.erase(img->userQualifiedName);
         _job_id_rev_to_image.erase(std::pair<int, int>(result.id, result.revision));
         delete img;
     }
