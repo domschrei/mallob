@@ -8,7 +8,7 @@
 #include "interface/json_interface.hpp"
 #include "util/sys/file_watcher.hpp"
 
-class FilesystemConnector : public Connector {
+class InotifyFilesystemConnector : public Connector {
 
 private:
     JsonInterface& _interface;
@@ -21,7 +21,7 @@ private:
 
 public:
 
-    FilesystemConnector(JsonInterface& interface, const Parameters& params, Logger&& logger, const std::string& basePath) :
+    InotifyFilesystemConnector(JsonInterface& interface, const Parameters& params, Logger&& logger, const std::string& basePath) :
         _interface(interface), _params(params), _logger(std::move(logger)),
         _watcher(basePath + "/in/", (int) (IN_MOVED_TO | IN_MODIFY | IN_CLOSE_WRITE), 
             [&](const FileWatcher::Event& event, Logger& log) {
@@ -36,7 +36,7 @@ public:
 
         LOGGER(_logger, V2_INFO, "operational at %s\n", _base_path.c_str());
     }
-    ~FilesystemConnector() {}
+    ~InotifyFilesystemConnector() {}
 
     void handleEvent(const FileWatcher::Event& event, Logger& log) {
 

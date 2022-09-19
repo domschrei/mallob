@@ -25,6 +25,7 @@ OPT_BOOL(explicitVolumeUpdates,          "evu", "explicit-volume-updates",      
 OPT_BOOL(groupClausesByLengthLbdSum,     "gclls", "group-by-length-lbd-sum",          false,                   "Group and prioritize clauses in buffers by the sum of clause length and LBD score")
 OPT_BOOL(help,                           "h", "help",                                 false,                   "Print help and exit")
 OPT_BOOL(immediateFileFlush,             "iff", "immediate-file-flush",               false,                   "Flush log files after each line instead of buffering")
+OPT_BOOL(inotify,                        "inotify", "",                               true,                    "Use inotify for filesystem interface (otherwise, use naive directory polling)")
 OPT_BOOL(useFilesystemInterface,         "interface-fs", "",                          true,                    "Use filesystem interface (.api/{in,out}/*.json)")
 OPT_BOOL(useIPCSocketInterface,          "interface-ipc", "",                         false,                   "Use IPC socket interface (.mallob.<pid>.sk)")
 OPT_BOOL(jitterJobPriorities,            "jjp", "jitter-job-priorities",              false,                   "Jitter job priorities to break ties during rebalancing")
