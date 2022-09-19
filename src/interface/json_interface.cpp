@@ -133,6 +133,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             // Was job already parsed before?
             if (_job_id_rev_to_image.count(std::pair<int, int>(id, 0))) {
                 LOGGER(_logger, V1_WARN, "[WARN] Modification of a file I already parsed! Ignoring.\n");
+                throw std::invalid_argument("File was already parsed before");
                 return DISCARD;
             }
 
