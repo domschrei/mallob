@@ -40,7 +40,7 @@ public:
 
     void handleEvent(const FileWatcher::Event& event, Logger& log) {
 
-        if (event.type != IN_CLOSE_WRITE && event.type != IN_MOVED_FROM)
+        if (event.type != IN_CLOSE_WRITE && event.type != IN_MOVED_TO)
             return;
 
         std::string eventFile = _base_path + "/in/" + event.name;
@@ -49,6 +49,11 @@ public:
         if (!FileUtils::isRegularFile(eventFile)) {
             LOGGER(log, V3_VERB, "Job file %s does not exist (any more)\n", eventFile.c_str());        
             return; // File does not exist (any more)
+        }
+
+        // Skip files beginning with "~" ("unfinished" / temporary files)
+        if (event.name.empty() || event.name[0] == '~') {
+            return;
         }
 
         // Attempt to parse JSON from file
