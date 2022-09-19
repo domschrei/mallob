@@ -84,8 +84,8 @@ public:
         if (_work_future.valid()) _work_future.get();
     }
 
-    void setProofMergeConnector(ProofMergeConnector& conn) {
-        _merge_connector = &conn;
+    void setProofMergeConnector(ProofMergeConnector* conn) {
+        _merge_connector = conn;
     }
 
     void advance(const LratClauseId* clauseIdsData, size_t clauseIdsSize) {
@@ -137,6 +137,8 @@ private:
         } 
         
         LratClauseId id = std::numeric_limits<unsigned long>::max();
+        auto formerId = id;
+        int nextIdEpoch = -1;
         while (_current_line.valid()) {
 
             auto& alignedId = _current_line.getId();
@@ -151,6 +153,7 @@ private:
             auto nextId = alignedId;
             assert(nextId <= id || log_return_false("[ERROR] Instance %i: Read clause ID %lu, expected <= %lu\n", 
                 _instance_id, nextId, id));
+            formerId = id;
             id = nextId;
 
             int epoch = getClauseEpoch(id);
@@ -162,6 +165,7 @@ private:
                 // stop reading because a former epoch has been reached
                 LOGGER(_log, V4_VVER, "%i stopping e.%i @ ID %lu (orig. %lu) from e.%i\n", 
                     _instance_id, _current_epoch, id, unalignedId, epoch);
+                nextIdEpoch = epoch;
                 break; 
             }
 
@@ -204,7 +208,9 @@ private:
             } else {
                 // Next necessary clause ID must be smaller -
                 // Ignore this line
-                assert(_frontier.empty() || _frontier.top() < id);
+                assert(_frontier.empty() || _frontier.top() < id || log_return_false(
+                    "[ERROR] Proof %i: clause ID=%lu found; expected ID smaller than %lu\n", 
+                    _instance_id, _frontier.top(), id));
             }
 
             // Get next proof line
@@ -215,7 +221,7 @@ private:
         }
 
         LOGGER(_log, V3_VERB, "%i e.%i: %i lines; last ID %lu; %lu traced; %lu in blg\n", 
-            _instance_id, _current_epoch, numReadLines, id, _num_traced_clauses, _backlog.size());
+            _instance_id, _current_epoch, numReadLines, formerId, _num_traced_clauses, _backlog.size());
 
         if (_current_epoch == 0) {
             // End of the procedure reached!
@@ -232,7 +238,20 @@ private:
 
             _finished = true;
             LOGGER(_log, V3_VERB, "%i finished pruning\n", _instance_id);
+
         } else {
+            
+            // Insert sentinel element / "stub" line to signal end of epoch
+            if (_interleave_merging) {
+                assert(nextIdEpoch >= 0);
+                assert(nextIdEpoch+1 < _global_epoch_starts.size());
+                auto sentinelId = _global_epoch_starts[nextIdEpoch+1]-1;
+                SerializedLratLine sentinelLine(sentinelId);
+                _merge_connector->pushBlocking(sentinelLine);
+                LOGGER(_log, V4_VVER, "%i e.%i: push sentinel %lu\n", 
+                    _instance_id, _current_epoch, sentinelId);
+            }
+
             _current_epoch--;
         }
     }

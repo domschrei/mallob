@@ -19,11 +19,11 @@
 #include "merge_message.hpp"
 #include "merge_child.hpp"
 #include "proof_writer.hpp"
+#include "util/small_merger.hpp"
 
 class DistributedProofMerger {
 
 public:
-    typedef std::function<bool(SerializedLratLine&)> LineSource;
     Logger _log;
 
 private:
@@ -32,7 +32,7 @@ private:
 
     MPI_Comm _comm;
     int _branching_factor;
-    LineSource _local_source;
+    MergeSourceInterface<SerializedLratLine>* _local_source;
     int _num_original_clauses = 0;
     
     bool _local_source_exhausted = false;
@@ -48,6 +48,7 @@ private:
     std::vector<SerializedLratLine> _output_buffer;
     Mutex _output_buffer_mutex;
     std::atomic_int _output_buffer_size = 0;
+    bool _sentinel_ending_output {false};
     bool _binary_output = true;
 
     // rank zero only
@@ -69,7 +70,8 @@ private:
     float _time_inactive {0};
 
 public:
-    DistributedProofMerger(MPI_Comm comm, int branchingFactor, LineSource localSource, const std::string& outputFileAtZero) : 
+    DistributedProofMerger(MPI_Comm comm, int branchingFactor, 
+        MergeSourceInterface<SerializedLratLine>* localSource, const std::string& outputFileAtZero) : 
             _log(Logger::getMainInstance().copy("DFM", ".proofmerge")),
             _comm(comm), _branching_factor(branchingFactor), _local_source(localSource) {
 
@@ -163,7 +165,7 @@ public:
             LOGGER(_log, V3_VERB, "outputlines:%i efficiency:%.4f exhausted:%s\n", 
                 numOutputLines, 
                 1 - _time_inactive/(Timer::elapsedSeconds()-_timepoint_merge_begin), 
-                areInputsExhausted()?"yes":"no");
+                _all_sources_exhausted ? "yes":"no");
             lastOutputReport = Timer::elapsedSeconds();
         }
 
@@ -180,16 +182,18 @@ public:
 
         MergeMessage msg;
         auto writeOutputIntoMsg = [&]() {
-            auto lock = _output_buffer_mutex.getLock();
             msg.lines = std::move(_output_buffer);
             _output_buffer.clear();
             _output_buffer_size.store(0, std::memory_order_relaxed);
+            _sentinel_ending_output = false;
         };
 
         // Check if there is a refill request from the parent which can be fulfilled
         if (_request_by_parent) {
             msg.type = MergeMessage::Type::REQUEST;
-            if (_output_buffer_size.load(std::memory_order_relaxed) >= 100) {
+            auto lock = _output_buffer_mutex.getLock();
+            int lowerBound = _sentinel_ending_output ? 0 : 100;
+            if (_output_buffer_size.load(std::memory_order_relaxed) >= lowerBound) {
                 // Transfer to parent
                 msg.type = MergeMessage::Type::RESPONSE_SUCCESS;
                 writeOutputIntoMsg();
@@ -279,48 +283,20 @@ private:
 
         assert(_num_original_clauses > 0);
 
-        std::vector<SerializedLratLine> merger(_children.size()+1);
-        std::vector<bool> childrenDone(_children.size(), false);
-
+        std::vector<MergeSourceInterface<SerializedLratLine>*> mergeSources;
+        mergeSources.push_back(_local_source);
+        for (auto& child : _children) {
+            mergeSources.push_back(&child);
+        }
+        SmallMerger<SerializedLratLine> merger(mergeSources);
+        
         std::vector<LratClauseId> hintsToDelete;
-
         SerializedLratLine bufferLine;
-
         float inactiveTimeStart = 0;
 
         while (!Terminator::isTerminating()) {
-            bool canMerge = true;
             
-            // Refill next line from each child as necessary 
-            auto childIt = _children.begin();
-            for (size_t i = 0; i < _children.size(); i++) {
-                auto& childLine = merger[i];
-                if (!childLine.valid()) {
-                    auto& child = *childIt;
-                    if (child.hasNext()) {
-                        child.next(childLine);
-                    } else if (!child.isExhausted()) {
-                        // Child COULD have more lines but they are not available.
-                        canMerge = false;
-                    } else if (!childrenDone[i]) {
-                        LOGGER(_log, V3_VERB, "child [%i] completely done\n", child.getRankWithinComm());
-                        childrenDone[i] = true;
-                    }
-                }
-                ++childIt;
-            }
-
-            auto& localSourceLine = merger.back();
-            if (!localSourceLine.valid() && !_local_source_exhausted) {
-                // Refill from local source
-                if (!_local_source(localSourceLine)) {
-                    localSourceLine.clear();
-                    _local_source_exhausted = true;
-                    LOGGER(_log, V3_VERB, "local sources exhausted\n");
-                }
-            }
-
-            if (!canMerge || _output_buffer_size >= FULL_CHUNK_SIZE_BYTES) {
+            if (_output_buffer_size >= FULL_CHUNK_SIZE_BYTES) {
                 // Sleep (for simplicity; TODO use condition variable instead)
                 if (inactiveTimeStart <= 0) inactiveTimeStart = Timer::elapsedSeconds();
                 //LOGGER(_log, V5_DEBG, "cannot merge - waiting for input\n");
@@ -328,59 +304,52 @@ private:
                 continue;
             }
 
+            bool success = merger.pollBlocking(bufferLine);
+            if (!success) {
+                // Merging is done!
+                _all_sources_exhausted = true;
+                break;
+            }     
+
             if (inactiveTimeStart > 0) {
                 _time_inactive += Timer::elapsedSeconds() - inactiveTimeStart;
                 inactiveTimeStart = 0;
             }
 
-            // Find next line to output
-            int chosenSource = -1;
-            LratClauseId chosenId;
-            for (size_t i = 0; i < merger.size(); i++) {
-                if (!merger[i].valid()) continue;
-                // Largest ID first!
-                auto thisId = merger[i].getId();
-                if (chosenSource == -1 || thisId > chosenId) {
-                    chosenSource = i;
-                    chosenId = thisId;
-                }
-            }
-            if (chosenSource == -1) {
-                // There's no line to output!
-                if (areInputsExhausted()) {
-                    // Merge procedure is completely done here
-                    _all_sources_exhausted = true;
-                    break;
-                }
-            } else {
-                // Line to output found
-                auto& chosenLine = merger[chosenSource];
-                if (_is_root) {
-                    auto [ptr, numHints] = chosenLine.getUnsignedHints();
-                    for (size_t i = 0; i < numHints; i++) {
-                        auto hint = ptr[i];
-                        if (hint > _num_original_clauses &&
-                                _output_id_filter->tryInsert(hint)) {
-                            // Guarantee that ID was never output before.
-                            // Can add a deletion line.
-                            hintsToDelete.push_back(hint);
-                        }
-                    }
-                    if (!hintsToDelete.empty()) {
-                        _proof_writer->pushDeletionBlocking(chosenId, hintsToDelete);
-                        hintsToDelete.clear();
-                    }
-                    // Write into final file
-                    _proof_writer->pushAdditionBlocking(chosenLine);
+            // Line to output found
+            auto& chosenLine = bufferLine;
+            auto chosenId = chosenLine.getId();
+
+            if (_is_root) {
+                if (chosenLine.isStub()) {
                     chosenLine.clear();
-                } else {
-                    // Write into output buffer
-                    auto lock = _output_buffer_mutex.getLock();
-                    _output_buffer_size.fetch_add(chosenLine.size(), std::memory_order_relaxed);
-                    _output_buffer.emplace_back(std::move(chosenLine));
+                    continue;
                 }
-                numOutputLines++;
+                auto [ptr, numHints] = chosenLine.getUnsignedHints();
+                for (size_t i = 0; i < numHints; i++) {
+                    auto hint = ptr[i];
+                    if (hint > _num_original_clauses &&
+                            _output_id_filter->tryInsert(hint)) {
+                        // Guarantee that ID was never output before.
+                        // Can add a deletion line.
+                        hintsToDelete.push_back(hint);
+                    }
+                }
+                if (!hintsToDelete.empty()) {
+                    _proof_writer->pushDeletionBlocking(chosenId, hintsToDelete);
+                    hintsToDelete.clear();
+                }
+                // Write into final file
+                _proof_writer->pushAdditionBlocking(chosenLine);
+                chosenLine.clear();
+            } else {
+                // Write into output buffer
+                auto lock = _output_buffer_mutex.getLock();
+                _sentinel_ending_output = chosenLine.isStub();
+                _output_buffer_size.fetch_add(chosenLine.size(), std::memory_order_relaxed);
+                _output_buffer.emplace_back(std::move(chosenLine));
             }
+            numOutputLines++;
         }
 
         if (inactiveTimeStart > 0) {
@@ -420,14 +389,6 @@ private:
         assert(result == 0);
 
         _reversed_file = true;
-    }
-
-    bool areInputsExhausted() const {
-        if (!_local_source_exhausted) return false;
-        for (auto& child : _children) {
-            if (!child.isExhausted() || !child.isEmpty()) return false;
-        }
-        return true;
     }
 
     bool isFullyExhausted() const {

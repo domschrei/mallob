@@ -13,24 +13,37 @@
 #include "app/sat/proof/merging/distributed_proof_merger.hpp"
 #include "util/sys/watchdog.hpp"
 
+template<typename T>
+class LambdaMergeSource : public MergeSourceInterface<T> {
+private:
+    std::function<bool(T&)> source;
+public:
+    LambdaMergeSource(std::function<bool(T&)> source) : source(source) {}
+    bool pollBlocking(T& output) override {
+        return source(output);
+    }
+};
+
 void testMerge(int myRank) {
 
     int lineCounter = 0;
     int maxLineCounter = 10000;
 
-    auto merger = DistributedProofMerger(MPI_COMM_WORLD, 5, [&](SerializedLratLine& out) {
-        if (lineCounter == maxLineCounter) {
-            return false;
+    auto merger = DistributedProofMerger(MPI_COMM_WORLD, 5, new LambdaMergeSource<SerializedLratLine>(
+        [&](SerializedLratLine& out) {
+            if (lineCounter == maxLineCounter) {
+                return false;
+            }
+            lineCounter++;
+            LratLine line;
+            line.id = MyMpi::size(MPI_COMM_WORLD)*(maxLineCounter - lineCounter + 1) + myRank + 1;
+            line.literals.push_back(lineCounter);
+            line.hints.push_back(myRank+1);
+            line.signsOfHints.push_back(true);
+            out = SerializedLratLine(line);
+            return true;
         }
-        lineCounter++;
-        LratLine line;
-        line.id = MyMpi::size(MPI_COMM_WORLD)*(maxLineCounter - lineCounter + 1) + myRank + 1;
-        line.literals.push_back(lineCounter);
-        line.hints.push_back(myRank+1);
-        line.signsOfHints.push_back(true);
-        out = SerializedLratLine(line);
-        return true;
-    }, "final_output.txt");
+    ), "final_output.txt");
     merger.setNumOriginalClauses(1);
 
     MyMpi::getMessageQueue().registerCallback(MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, [&](MessageHandle& h) {

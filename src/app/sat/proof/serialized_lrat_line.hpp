@@ -21,6 +21,17 @@ private:
 
 public:
     SerializedLratLine() {}
+    SerializedLratLine(LratClauseId stubId) {
+        _data.resize(sizeof(LratClauseId));
+        memcpy(_data.data(), &stubId, sizeof(LratClauseId));
+        int numLitsAndHints = 0;
+        _data.insert(_data.end(), 
+            (uint8_t*) &numLitsAndHints, 
+            ((uint8_t*) &numLitsAndHints) + sizeof(int));
+        _data.insert(_data.end(), 
+            (uint8_t*) &numLitsAndHints, 
+            ((uint8_t*) &numLitsAndHints) + sizeof(int));
+    }
     SerializedLratLine(SerializedLratLine&& moved) : _data(std::move(moved._data)) {}
     SerializedLratLine(std::vector<uint8_t>&& data) : _data(std::move(data)) {
         // Some sanity checks
@@ -72,6 +83,13 @@ public:
         assert(i == _data.size());
     }
 
+    bool operator<(const SerializedLratLine& other) {
+        return getId() < other.getId();
+    }
+    bool operator>(const SerializedLratLine& other) {
+        return getId() > other.getId();
+    }
+
     SerializedLratLine& operator=(SerializedLratLine&& moved) {
         _data = std::move(moved._data);
         return *this;
@@ -95,6 +113,10 @@ public:
 
     LratClauseId& getId() {
         return *( (LratClauseId*) _data.data() );
+    }
+
+    bool isStub() const {
+        return _data.size() == sizeof(LratClauseId)+2*sizeof(int);
     }
 
     int getNumLiterals() const {
@@ -153,7 +175,7 @@ public:
     }
 
     size_t size() const {
-        return getSize(getNumLiterals(), getNumHints());
+        return _data.size();
     }
 
     static size_t getSize(int numLits, int numHints) {

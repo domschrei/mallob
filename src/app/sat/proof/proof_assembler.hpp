@@ -36,7 +36,7 @@ public:
         startWithInterleavedMerging(nullptr);
     }
 
-    void startWithInterleavedMerging(std::vector<ProofMergeConnector>* connectors) {
+    void startWithInterleavedMerging(std::vector<ProofMergeConnector*>* connectors) {
         _fut_begin_assembly = ProcessWideThreadPool::get().addTask([&, connectors]() {
             createInstancesViaClauseEpochs(_params.logDirectory() + "/proof#" + std::to_string(_job_id) 
                 + "/clauseepochs." + std::to_string(_this_worker_index));
@@ -245,7 +245,7 @@ private:
         }
     }
 
-    void beginProofAssembly(std::vector<ProofMergeConnector>* conns) {
+    void beginProofAssembly(std::vector<ProofMergeConnector*>* conns) {
         int i = 0;
         for (auto& inst : _proof_instances) {
             if (conns) inst.setProofMergeConnector(conns->at(i++));

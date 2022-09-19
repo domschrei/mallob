@@ -4,9 +4,10 @@
 #include <vector>
 #include "util/sys/atomics.hpp"
 #include "util/sys/threading.hpp"
+#include "merge_source_interface.hpp"
 
 template <typename T>
-class SPSCBlockingRingbuffer {
+class SPSCBlockingRingbuffer : public MergeSourceInterface<T> {
 
 private:
     std::atomic_int _num_elems {0};
@@ -60,7 +61,7 @@ public:
         }
     }
 
-    bool poll(T& out) {
+    bool pollBlocking(T& out) override {
 
         int numElems = _num_elems.load(std::memory_order_relaxed);
         if (numElems == 0) {
@@ -99,6 +100,18 @@ public:
         }
         _buffer_cond_var.notify();
         //LOG(V2_INFO, "SPSC notify exhausted\n");
+    }
+
+    int size() const {
+        return _num_elems.load(std::memory_order_relaxed);
+    }
+
+    bool empty() const {
+        return _num_elems.load(std::memory_order_relaxed) == 0;
+    }
+
+    bool exhausted() const {
+        return _input_exhausted;
     }
 
 private:

@@ -15,6 +15,7 @@
 #include "../proof/proof_assembler.hpp"
 #include "../proof/merging/distributed_proof_merger.hpp"
 #include "../proof/merging/proof_merge_connector.hpp"
+#include "util/small_merger.hpp"
 
 class AnytimeSatClauseCommunicator {
 
@@ -157,11 +158,10 @@ private:
     bool _done_assembling_proof = false;
     std::vector<int> _proof_all_reduction_result;
 
-    std::vector<ProofMergeConnector> _merger_connectors;
     std::unique_ptr<DistributedProofMerger> _file_merger;
-    std::vector<std::ifstream> _merger_filestreams;
-    std::vector<lrat_utils::ReadBuffer> _merger_filebuffers;
-    std::vector<SerializedLratLine> _merger_next_lines;
+    std::vector<std::unique_ptr<MergeSourceInterface<SerializedLratLine>>> _local_merge_inputs;
+    std::unique_ptr<SmallMerger<SerializedLratLine>> _local_merger;
+    std::vector<ProofMergeConnector*> _merge_connectors;
 
 public:
     AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : _params(params), _job(job), 
@@ -199,7 +199,7 @@ public:
 
 private:
 
-    void setUpProofMerger(int threadsPerWorker);
+    std::vector<ProofMergeConnector*> setUpProofMerger(int threadsPerWorker);
 
     inline Session& currentSession() {return _sessions.back();}
     void addToClauseHistory(std::vector<int>& clauses, int epoch);

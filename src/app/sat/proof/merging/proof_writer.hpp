@@ -80,7 +80,7 @@ private:
             {
                 lrat_utils::WriteBuffer out(_ofs);
 
-                while (_worker.continueRunning() && _buffer.poll(line)) {
+                while (_worker.continueRunning() && _buffer.pollBlocking(line)) {
                     
                     if (line.type == LratOutputLine::ADD) {
                         // write ADD line
