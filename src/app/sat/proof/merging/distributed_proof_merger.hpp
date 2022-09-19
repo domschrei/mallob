@@ -58,8 +58,9 @@ private:
     std::future<void> _fut_root_prepare;
     bool _root_prepared = false;
 
-    size_t numOutputLines = 0;
     float lastOutputReport = 0;
+    size_t numArrivedLines = 0;
+    size_t numOutputLines = 0;
 
     std::future<void> _fut_merging;
     bool _began_merging = false;
@@ -148,6 +149,7 @@ public:
 
         bool foundChild = false;
         for (auto& child : _children) if (child.getRankWithinComm() == sourceWithinComm) {
+            numArrivedLines += msg.lines.size();
             child.add(std::move(msg.lines));
             if (type == MergeMessage::Type::RESPONSE_EXHAUSTED) {
                 child.conclude();
@@ -162,8 +164,8 @@ public:
     void advance() {
 
         if (Timer::elapsedSeconds() - lastOutputReport > 1.0) {
-            LOGGER(_log, V3_VERB, "outputlines:%i efficiency:%.4f exhausted:%s\n", 
-                numOutputLines, 
+            LOGGER(_log, V3_VERB, "narrv:%ld noutp:%ld eff:%.4f exh:%s\n", 
+                numArrivedLines, numOutputLines, 
                 1 - _time_inactive/(Timer::elapsedSeconds()-_timepoint_merge_begin), 
                 _all_sources_exhausted ? "yes":"no");
             lastOutputReport = Timer::elapsedSeconds();

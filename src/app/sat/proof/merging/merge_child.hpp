@@ -29,10 +29,10 @@ public:
     }
 
     void add(std::vector<SerializedLratLine>&& newLines) {
+        refillRequested = false;
         for (auto& line : newLines) {
             buffer.pushBlocking(line);
         }
-        refillRequested = false;
     }
     void next(SerializedLratLine& line) {
         buffer.pollBlocking(line);
