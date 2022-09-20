@@ -168,6 +168,7 @@ public:
                 numArrivedLines, numOutputLines, 
                 1 - _time_inactive/(Timer::elapsedSeconds()-_timepoint_merge_begin), 
                 _all_sources_exhausted ? "yes":"no");
+            if (_proof_writer) _proof_writer->reportProgress();
             lastOutputReport = Timer::elapsedSeconds();
         }
 
@@ -195,7 +196,7 @@ public:
             msg.type = MergeMessage::Type::REQUEST;
             auto lock = _output_buffer_mutex.getLock();
             int lowerBound = _sentinel_ending_output ? 0 : 100;
-            if (_output_buffer_size.load(std::memory_order_relaxed) >= lowerBound) {
+            if (_output_buffer_size.load(std::memory_order_relaxed) > lowerBound) {
                 // Transfer to parent
                 msg.type = MergeMessage::Type::RESPONSE_SUCCESS;
                 writeOutputIntoMsg();
@@ -263,7 +264,7 @@ private:
             for (int i = 0; i < numChildrenOfRoot; i++) {
                 int childRank = numChildRanksPerTree*i + 1;
                 if (childRank < commSize) {
-                    _children.emplace_back(childRank, FULL_CHUNK_SIZE_BYTES);
+                    _children.emplace_back(childRank);
                     LOGGER(_log, V4_VVER, "Adding child [%i]\n", childRank);
                 }
             }
@@ -274,7 +275,7 @@ private:
                 int adjChildRank = childRank + rankOffset;
                 if (adjChildRank < std::min(commSize, 1 + (myTreeIdx+1) * numChildRanksPerTree)) {
                     // Create child
-                    _children.emplace_back(adjChildRank, FULL_CHUNK_SIZE_BYTES);
+                    _children.emplace_back(adjChildRank);
                     LOGGER(_log, V4_VVER, "Adding child [%i]\n", adjChildRank);
                 }
             }

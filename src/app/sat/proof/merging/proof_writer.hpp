@@ -66,6 +66,11 @@ public:
         return _done;
     }
 
+    void reportProgress() {
+        LOG(V2_INFO, "Proof output: got %ld, wrote %ld lines\n", 
+            _num_pushed_lines, _num_written_lines);
+    }
+
     ~ProofWriter() {
         _worker.stop();
         LOG(V2_INFO, "Proof writer wrote %lu/%lu lines\n", _num_written_lines, _num_pushed_lines);

@@ -10,14 +10,12 @@ class MergeChild : public MergeSourceInterface<SerializedLratLine> {
 private:
     const static int MERGE_CHILD_BUFFER_SIZE = 100'000;
     const int rankWithinComm;
-    const int fullChunkSize;
     SPSCBlockingRingbuffer<SerializedLratLine> buffer;
     bool refillRequested = false;
 
 public:
-    MergeChild(int rankWithinComm, int fullChunkSize) : 
-            rankWithinComm(rankWithinComm), fullChunkSize(fullChunkSize), 
-            buffer(MERGE_CHILD_BUFFER_SIZE) {}
+    MergeChild(int rankWithinComm) : 
+            rankWithinComm(rankWithinComm), buffer(MERGE_CHILD_BUFFER_SIZE) {}
 
     int getRankWithinComm() const {return rankWithinComm;}
     bool isEmpty() const {return buffer.empty();}
@@ -25,7 +23,7 @@ public:
     bool hasNext() const {return !isEmpty();}
     bool isRefillDesired() const {
         return !isExhausted() && !refillRequested 
-            && buffer.size() < fullChunkSize; 
+            && buffer.size() < 5'000; 
     }
 
     void add(std::vector<SerializedLratLine>&& newLines) {
@@ -43,4 +41,8 @@ public:
 
     void conclude() {buffer.markExhausted();}
     void setRefillRequested(bool requested) {refillRequested = requested;}
+
+    int getNumLinesInBuffer() const {
+        return buffer.size();
+    }
 };
