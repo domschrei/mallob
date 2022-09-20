@@ -8,12 +8,9 @@
 
 class ReverseBinaryLratParser {
 
-#define BUF_MAX_SIZE 65536
-
 private:
     ReverseFileReader _reader;
-    char _num_buffer[BUF_MAX_SIZE];
-    int _num_buffer_idx = 0;
+    std::vector<char> _num_buffer;
     bool _exhausted = false;
 
     enum LineParseState {
@@ -138,13 +135,11 @@ public:
 private:
 
     void handleByteOfNumber(char byte) {
-        assert(_num_buffer_idx < BUF_MAX_SIZE);
         // Last byte in a number (= first read byte) must be the final byte
-        if (_num_buffer_idx == 0) 
+        if (_num_buffer.empty()) 
             assert(!isNonFinalByteOfNumber(byte));
         // Append byte
-        _num_buffer[_num_buffer_idx] = byte;
-        _num_buffer_idx++;
+        _num_buffer.push_back(byte);
     }
 
     enum PublishNumbersMode {HINTS, LITERALS_THEN_ID};
@@ -152,7 +147,7 @@ private:
         // The buffer contains the parsed bytes in reverse order.
         // => Traverse the featured NUMBERS from the buffer's end towards its start
         //    and handle the BYTES of each number from right to left.
-        int numberRightIdx = _num_buffer_idx-1;
+        int numberRightIdx = _num_buffer.size()-1;
         assert(numberRightIdx >= 0);
         int i = numberRightIdx;
         bool firstNum = true;
@@ -185,7 +180,7 @@ private:
             }
             i--;
         }
-        _num_buffer_idx = 0;
+        _num_buffer.clear();
     }
 
     bool isNonFinalByteOfNumber(char byte) {
@@ -200,7 +195,7 @@ private:
         int64_t unadjusted = 0;
         int64_t coefficient = 1;
         for (int i = rightIdx; i >= leftIdx; i--) {
-            int32_t tmp = *((unsigned char*) (_num_buffer+i));
+            int32_t tmp = *((unsigned char*) (_num_buffer.data()+i));
             // continuation bit set?
             if (tmp & 0b10000000) {
                 unadjusted += coefficient * (tmp & 0b01111111); // remove first bit
@@ -226,7 +221,7 @@ private:
         int32_t unadjusted = 0;
         int32_t coefficient = 1;
         for (int i = rightIdx; i >= leftIdx; i--) {
-            int32_t tmp = *((unsigned char*) (_num_buffer+i));
+            int32_t tmp = *((unsigned char*) (_num_buffer.data()+i));
             // continuation bit set?
             if (tmp & 0b10000000) {
                 unadjusted += coefficient * (tmp & 0b01111111); // remove first bit
