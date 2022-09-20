@@ -40,7 +40,13 @@ bool SatReader::read(JobDescription& desc) {
 			remove(newFilename.c_str()); // remove if existing (ignore errors)
 			std::string cmd = "cadical " + _filename + " -c 0 -o " + newFilename;
 			int returnCode = system(cmd.c_str());
-			assert(returnCode == 0);
+			if (returnCode == 10) {
+				LOG(V2_INFO, "external call to CaDiCaL found result SAT\n");
+				LOG(V0_CRIT, "s SATISFIABLE\n");
+			} else if (returnCode == 20) {
+				LOG(V2_INFO, "external call to CaDiCaL found result UNSAT\n");
+				LOG(V0_CRIT, "s UNSATISFIABLE\n");
+			} else assert(returnCode == 0);
 			_filename = newFilename;
 		}
 

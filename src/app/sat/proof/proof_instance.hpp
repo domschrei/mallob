@@ -220,8 +220,10 @@ private:
             numReadLines++;
         }
 
-        LOGGER(_log, V3_VERB, "%i e.%i: %i lines; last ID %lu; %lu traced; %lu in blg\n", 
-            _instance_id, _current_epoch, numReadLines, formerId, _num_traced_clauses, _backlog.size());
+        LOGGER(_log, V3_VERB, "%i e.%i: %i lines; last ID %s; %lu traced; %lu in blg\n", 
+            _instance_id, _current_epoch, numReadLines, 
+            numReadLines==0 ? "-" : std::to_string(formerId).c_str(), 
+            _num_traced_clauses, _backlog.size());
 
         if (_current_epoch == 0) {
             // End of the procedure reached!
@@ -242,8 +244,9 @@ private:
         } else {
             
             // Insert sentinel element / "stub" line to signal end of epoch
+            if (nextIdEpoch < 0) nextIdEpoch = _current_epoch-1;
             if (_interleave_merging) {
-                assert(nextIdEpoch >= 0);
+                assert(nextIdEpoch < _current_epoch);
                 assert(nextIdEpoch+1 < _global_epoch_starts.size());
                 auto sentinelId = _global_epoch_starts[nextIdEpoch+1]-1;
                 SerializedLratLine sentinelLine(sentinelId);
