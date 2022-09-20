@@ -22,6 +22,9 @@ public:
     bool pollBlocking(T& output) override {
         return source(output);
     }
+    size_t getCurrentSize() const override {
+        return 0;
+    }
 };
 
 void testMerge(int myRank) {

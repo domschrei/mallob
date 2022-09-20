@@ -19,4 +19,7 @@ public:
     bool pollBlocking(SerializedLratLine& elem) override {
         return lrat_utils::readLine(_readbuf, elem);
     }
+    size_t getCurrentSize() const override {
+        return 0;
+    }
 };

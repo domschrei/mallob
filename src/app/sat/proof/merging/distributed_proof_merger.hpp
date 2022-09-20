@@ -32,6 +32,7 @@ private:
     MPI_Comm _comm;
     int _branching_factor;
     MergeSourceInterface<SerializedLratLine>* _local_source;
+    std::unique_ptr<SmallMerger<SerializedLratLine>> _merger;
     int _num_original_clauses = 0;
     
     bool _local_source_exhausted = false;
@@ -168,6 +169,12 @@ public:
                 1 - _time_inactive/(Timer::elapsedSeconds()-_timepoint_merge_begin), 
                 _all_sources_exhausted ? "yes":"no");
             if (_proof_writer) _proof_writer->reportProgress();
+
+            if (!_all_sources_exhausted && !Terminator::isTerminating()) {
+                auto report = _merger->getReport();
+                LOGGER(_log, V3_VERB, "Merger buffers: %s\n", report.c_str());
+            }
+
             lastOutputReport = Timer::elapsedSeconds();
         }
 
@@ -290,8 +297,9 @@ private:
         for (auto& child : _children) {
             mergeSources.push_back(&child);
         }
-        SmallMerger<SerializedLratLine> merger(mergeSources);
-        
+        _merger.reset(new SmallMerger<SerializedLratLine>(mergeSources));
+        auto& merger = *_merger.get();
+
         std::vector<LratClauseId> hintsToDelete;
         SerializedLratLine bufferLine;
         float inactiveTimeStart = 0;

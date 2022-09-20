@@ -57,6 +57,22 @@ public:
         return true;
     }
 
+    size_t getCurrentSize() const override {
+        auto size = 0;
+        for (auto& [source, nextElem] : _sources) {
+            size += source->getCurrentSize();
+        }
+        return size;
+    }
+
+    std::string getReport() {
+        std::string sizes;
+        for (auto& [source, nextElem] : _sources) {
+            sizes += std::to_string(source->getCurrentSize()) + " ";
+        }
+        return sizes;
+    }
+
 private:
      void initialize() {
         // Do polling of initial elements for each merger

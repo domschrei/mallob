@@ -35,8 +35,12 @@ public:
     void next(SerializedLratLine& line) {
         buffer.pollBlocking(line);
     }
+
     bool pollBlocking(SerializedLratLine& line) override {
         return buffer.pollBlocking(line);
+    }
+    size_t getCurrentSize() const override {
+        return getNumLinesInBuffer();
     }
 
     void conclude() {buffer.markExhausted();}

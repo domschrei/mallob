@@ -102,6 +102,10 @@ public:
         //LOG(V2_INFO, "SPSC notify exhausted\n");
     }
 
+    size_t getCurrentSize() const override {
+        return size();
+    }
+
     int size() const {
         return _num_elems.load(std::memory_order_relaxed);
     }
