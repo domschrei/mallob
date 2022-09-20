@@ -10,7 +10,7 @@ private:
     const Parameters& _params;
     int _job_id;
     int _num_workers;
-    int _threads_per_worker;
+    int _orig_threads_per_worker;
     int _this_worker_index;
     int _final_epoch;
     int _winning_instance;
@@ -24,10 +24,12 @@ private:
     std::future<void> _fut_begin_assembly;
 
 public:
-    ProofAssembler(const Parameters& params, int jobId, int numWorkers, int threadsPerWorker, 
-        int thisWorkerIndex, int finalEpoch, int winningInstance) :
-            _params(params), _job_id(jobId), _num_workers(numWorkers), _threads_per_worker(threadsPerWorker), 
-            _this_worker_index(thisWorkerIndex), _final_epoch(finalEpoch), _winning_instance(winningInstance) {
+    ProofAssembler(const Parameters& params, int jobId, int numWorkers, 
+        int origThreadsPerWorker, int thisWorkerIndex, int finalEpoch, int winningInstance) :
+            _params(params), _job_id(jobId), _num_workers(numWorkers), 
+            _orig_threads_per_worker(origThreadsPerWorker), 
+            _this_worker_index(thisWorkerIndex), _final_epoch(finalEpoch), 
+            _winning_instance(winningInstance) {
 
         _current_epoch = _final_epoch;
     }
@@ -230,8 +232,8 @@ private:
         */
 
         for (size_t i = 0; i < localIdStartsPerInstance.size(); i++) {
-            int instanceId = _this_worker_index * _threads_per_worker + i;
-            int numInstances = _num_workers * _threads_per_worker;
+            int instanceId = _this_worker_index * _orig_threads_per_worker + i;
+            int numInstances = _num_workers * _orig_threads_per_worker;
             std::string proofFilenameBase = _params.logDirectory() + "/proof#" 
                 + std::to_string(_job_id) + "/proof." + std::to_string(instanceId+1);
 

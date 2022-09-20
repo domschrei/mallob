@@ -326,7 +326,10 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         // Initiate proof assembly
         msg.tag = MSG_INITIATE_PROOF_COMBINATION;
         msg.payload.push_back(_job->getGlobalNumWorkers());
-        msg.payload.push_back(_job->getNumThreads());
+        // Use *original* #threads, not adjusted #threads,
+        // since proof instance IDs are assigned that way!
+        msg.payload.push_back(_params.numThreadsPerProcess());
+        //msg.payload.push_back(_job->getNumThreads());
         // vvv Advances in the next branch vvv
         forwardedInitiateProofMessage = true;
     }

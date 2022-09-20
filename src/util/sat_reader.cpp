@@ -36,7 +36,7 @@ bool SatReader::read(JobDescription& desc) {
 
 		if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
 			// cadical input.cnf -c 0 -o removed-units.cnf
-			std::string newFilename = _filename + "_units_removed.cnf";
+			std::string newFilename = _params.logDirectory() + "/input_units_removed.cnf";
 			remove(newFilename.c_str()); // remove if existing (ignore errors)
 			std::string cmd = "cadical " + _filename + " -c 0 -o " + newFilename;
 			int returnCode = system(cmd.c_str());

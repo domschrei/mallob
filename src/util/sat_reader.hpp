@@ -9,6 +9,7 @@
 #include "util/assert.hpp"
 
 #include "data/job_description.hpp"
+#include "util/params.hpp"
 
 #include <iostream>
 
@@ -18,6 +19,7 @@ public:
     enum ContentMode {ASCII, RAW};
 
 private:
+    Parameters& _params;
     std::string _filename;
     ContentMode _content_mode;
 
@@ -38,7 +40,8 @@ private:
     bool _valid_input = false;
 
 public:
-    SatReader(const std::string& filename, ContentMode contentMode) : _filename(filename), _content_mode(contentMode) {}
+    SatReader(Parameters& params, const std::string& filename, ContentMode contentMode) : 
+        _params(params), _filename(filename), _content_mode(contentMode) {}
     bool read(JobDescription& desc);
 
     inline void processInt(int x, JobDescription& desc) {
