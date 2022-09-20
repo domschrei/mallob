@@ -220,10 +220,10 @@ private:
             numReadLines++;
         }
 
-        LOGGER(_log, V3_VERB, "%i e.%i: %i lines; last ID %s; %lu traced; %lu in blg\n", 
+        LOGGER(_log, V3_VERB, "%i e.%i: %i lines; last ID %s; %lu traced; %lu in blg; %lu in fnt\n", 
             _instance_id, _current_epoch, numReadLines, 
             numReadLines==0 ? "-" : std::to_string(formerId).c_str(), 
-            _num_traced_clauses, _backlog.size());
+            _num_traced_clauses, _backlog.size(), _frontier.size());
 
         if (_current_epoch == 0) {
             // End of the procedure reached!

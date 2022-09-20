@@ -42,10 +42,10 @@ bool SatReader::read(JobDescription& desc) {
 			int returnCode = system(cmd.c_str());
 			if (returnCode == 10) {
 				LOG(V2_INFO, "external call to CaDiCaL found result SAT\n");
-				LOG(V0_CRIT, "s SATISFIABLE\n");
+				LOG_OMIT_PREFIX(V0_CRIT, "s SATISFIABLE\n");
 			} else if (returnCode == 20) {
 				LOG(V2_INFO, "external call to CaDiCaL found result UNSAT\n");
-				LOG(V0_CRIT, "s UNSATISFIABLE\n");
+				LOG_OMIT_PREFIX(V0_CRIT, "s UNSATISFIABLE\n");
 			} else assert(returnCode == 0);
 			_filename = newFilename;
 		}

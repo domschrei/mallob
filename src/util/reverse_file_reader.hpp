@@ -10,6 +10,7 @@ class ReverseFileReader {
 private:
     std::ifstream _stream;
     size_t _file_size;
+    bool _valid {true};
 
     char _buffer[MALLOB_REVERSE_READER_BUF_SIZE];
     int _buffer_pos = -1;
@@ -20,15 +21,16 @@ public:
         if (_stream.good()) {
             _file_size = _stream.tellg();
         } else {
-            _file_size = 0;
+            _valid = false;
         }
     }
 
-    bool empty() const {
-        return _file_size == 0;
+    bool valid() const {
+        return _valid;
     }
 
     bool nextAsChar(char& c) {
+        if (!_valid) return false;
         if (_buffer_pos < 0) {
             refillBuffer();
             if (_buffer_pos < 0) return false;
@@ -39,6 +41,7 @@ public:
     }
 
     bool nextAsInt(int& c) {
+        if (!_valid) return false;
         if (_buffer_pos < 0) {
             refillBuffer();
             if (_buffer_pos < 0) return false;
@@ -49,6 +52,7 @@ public:
     }
 
     bool done() {
+        if (!_valid) return false;
         if (_buffer_pos >= 0) return false;
         refillBuffer();
         return _buffer_pos < 0;
@@ -56,7 +60,7 @@ public:
 
 private:
     void refillBuffer() {
-        if (!_stream.good()) return;
+        if (!_valid || !_stream.good()) return;
         
         // Check by how far you can go back
         auto sizeBefore = _file_size;

@@ -356,7 +356,8 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
             createNewProofAllReduction();
 
             if (_params.interleaveProofMerging()) {
-                _merge_connectors = setUpProofMerger(threadsPerWorker);
+                // # local instances is the ACTUAL # threads, not the original one.
+                _merge_connectors = setUpProofMerger(_job->getNumThreads());
                 _proof_assembler->startWithInterleavedMerging(&_merge_connectors);
             } else {
                 _proof_assembler->start();
@@ -467,15 +468,15 @@ void AnytimeSatClauseCommunicator::addToClauseHistory(std::vector<int>& clauses,
     _cls_history.sendNextBatches();
 }
 
-std::vector<ProofMergeConnector*> AnytimeSatClauseCommunicator::setUpProofMerger(int threadsPerWorker) {
+std::vector<ProofMergeConnector*> AnytimeSatClauseCommunicator::setUpProofMerger(int numLocalInstances) {
     
     std::vector<ProofMergeConnector*> connectors;
 
     if (_params.interleaveProofMerging()) {
 
         // Populate _local_merge_inputs with connectors
-        assert(threadsPerWorker > 0);
-        for (size_t i = 0; i < threadsPerWorker; i++) {
+        assert(numLocalInstances > 0);
+        for (size_t i = 0; i < numLocalInstances; i++) {
             // Each of these will be connected to the output of a ProofInstance
             connectors.push_back(new SPSCBlockingRingbuffer<SerializedLratLine>(32768));
             _local_merge_inputs.emplace_back(connectors.back());
