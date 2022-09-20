@@ -193,7 +193,6 @@ bool ForkedSatJob::checkClauseComm() {
 }
 
 void ForkedSatJob::appl_communicate() {
-    if (!_initialized) return;
     if (!checkClauseComm()) return;
     ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
     while (hasDeferredMessage()) {

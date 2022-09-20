@@ -49,7 +49,7 @@ private:
     float _compensation_factor = 1.0f;
 
     struct DeferredJobMsg {int source; int mpiTag; JobMessage msg;};
-    std::vector<DeferredJobMsg> _deferred_messages;
+    std::list<DeferredJobMsg> _deferred_messages;
 
 public:
     // Helper methods
@@ -65,12 +65,14 @@ public:
     }
 
     void deferMessage(int source, int mpiTag, JobMessage& msg) {
-        _deferred_messages.push_back(DeferredJobMsg {source, mpiTag, std::move(msg)});
+        LOG(V3_VERB, "%s : deferring application msg\n", toStr());
+        _deferred_messages.push_front(DeferredJobMsg {source, mpiTag, std::move(msg)});
     }
 
     bool hasDeferredMessage() const {return !_deferred_messages.empty();}
 
     DeferredJobMsg getDeferredMessage() {
+        LOG(V3_VERB, "%s : fetching deferred application msg\n", toStr());
         auto result = std::move(_deferred_messages.back());
         _deferred_messages.pop_back();
         return result;

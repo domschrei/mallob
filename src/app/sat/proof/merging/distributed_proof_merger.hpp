@@ -303,7 +303,7 @@ private:
                 // Sleep (for simplicity; TODO use condition variable instead)
                 if (inactiveTimeStart <= 0) inactiveTimeStart = Timer::elapsedSeconds();
                 //LOGGER(_log, V5_DEBG, "cannot merge - waiting for input\n");
-                usleep(1);
+                usleep(100);
                 continue;
             }
 

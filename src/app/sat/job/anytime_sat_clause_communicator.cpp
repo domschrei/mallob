@@ -71,13 +71,15 @@ void AnytimeSatClauseCommunicator::communicate() {
         if (numExpectedReadyMsgs == _num_ready_msgs_from_children) {
             _sent_ready_msg = true;
             if (!_job->getJobTree().isRoot()) {
+                LOG(V3_VERB, "sending comm ready msg\n");
                 JobMessage msg(_job->getId(), _job->getRevision(), 0, MSG_NOTIFY_READY_FOR_PROOF_SAFE_SHARING);
                 MyMpi::isend(_job->getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
             } else {
+                LOG(V3_VERB, "sharing enabled\n");
                 if (!_proof_assembler.has_value() && !_msg_unsat_found.payload.empty()) {
                     // A solver has already found UNSAT which was deferred then.
                     // Now the message can be processed properly
-                    LOG(V2_INFO, "Now processing deferred UNSAT notification\n");
+                    LOG(V3_VERB, "Now processing deferred UNSAT notification\n");
                     MyMpi::isend(_job->getMyMpiRank(), MSG_SEND_APPLICATION_MESSAGE, _msg_unsat_found);
                 }
             }
@@ -262,6 +264,8 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
 
     if (msg.tag == MSG_NOTIFY_READY_FOR_PROOF_SAFE_SHARING) {
         _num_ready_msgs_from_children++;
+        LOG(V3_VERB, "got comm ready msg (total:%i)\n", _num_ready_msgs_from_children);
+        return;
     }
 
     if (_job->getState() != ACTIVE) {
