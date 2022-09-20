@@ -37,7 +37,7 @@ public:
         _line.hints.clear();
         _line.signsOfHints.clear();
 
-        if (_exhausted) return false;
+        if (_exhausted || _reader.empty()) return false;
 
         // Anatomy of a binary LRAT proof line:
         // a <id> <lit1> <lit2> <lit3> 0 <proof1> <proof2> 0

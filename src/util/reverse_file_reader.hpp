@@ -17,7 +17,15 @@ private:
 public:
     ReverseFileReader(const std::string& filename) : 
             _stream(filename, std::ios_base::ate | std::ios_base::binary) {
-        _file_size = _stream.tellg();
+        if (_stream.good()) {
+            _file_size = _stream.tellg();
+        } else {
+            _file_size = 0;
+        }
+    }
+
+    bool empty() const {
+        return _file_size == 0;
     }
 
     bool nextAsChar(char& c) {
