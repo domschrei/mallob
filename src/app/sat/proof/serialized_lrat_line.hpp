@@ -31,6 +31,7 @@ public:
         _data.insert(_data.end(), 
             (uint8_t*) &numLitsAndHints, 
             ((uint8_t*) &numLitsAndHints) + sizeof(int));
+        assert(isStub());
     }
     SerializedLratLine(SerializedLratLine&& moved) : _data(std::move(moved._data)) {}
     SerializedLratLine(std::vector<uint8_t>&& data) : _data(std::move(data)) {

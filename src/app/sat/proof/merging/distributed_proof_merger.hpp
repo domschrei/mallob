@@ -27,9 +27,8 @@ public:
     Logger _log;
 
 private:
-    const static int FULL_CHUNK_SIZE_BYTES = 950'000;
-    const static int HALF_CHUNK_SIZE_BYTES = FULL_CHUNK_SIZE_BYTES / 2;
-
+    const static int FULL_CHUNK_SIZE_BYTES = 900'000;
+    
     MPI_Comm _comm;
     int _branching_factor;
     MergeSourceInterface<SerializedLratLine>* _local_source;

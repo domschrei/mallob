@@ -138,7 +138,6 @@ private:
         
         LratClauseId id = std::numeric_limits<unsigned long>::max();
         auto formerId = id;
-        int nextIdEpoch = -1;
         while (_current_line.valid()) {
 
             auto& alignedId = _current_line.getId();
@@ -165,7 +164,6 @@ private:
                 // stop reading because a former epoch has been reached
                 LOGGER(_log, V4_VVER, "%i stopping e.%i @ ID %lu (orig. %lu) from e.%i\n", 
                     _instance_id, _current_epoch, id, unalignedId, epoch);
-                nextIdEpoch = epoch;
                 break; 
             }
 
@@ -244,8 +242,8 @@ private:
         } else {
             
             // Insert sentinel element / "stub" line to signal end of epoch
-            if (nextIdEpoch < 0) nextIdEpoch = _current_epoch-1;
             if (_interleave_merging) {
+                int nextIdEpoch = _current_epoch-1;
                 assert(nextIdEpoch < _current_epoch);
                 assert(nextIdEpoch+1 < _global_epoch_starts.size());
                 auto sentinelId = _global_epoch_starts[nextIdEpoch+1]-1;

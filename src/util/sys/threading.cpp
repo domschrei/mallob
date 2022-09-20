@@ -11,6 +11,7 @@
 #include <functional>
 #include <mutex>
 #include <condition_variable>
+#include <chrono>
 
 void Mutex::lock() {
     mtx.lock();
@@ -29,6 +30,10 @@ bool Mutex::tryLock() {
 void ConditionVariable::wait(Mutex& mutex, std::function<bool()> condition) {
     auto lock = mutex.getLock();
     while (!condition()) condvar.wait(lock);
+}
+void ConditionVariable::waitWithTimeout(Mutex& mutex, int millisecs, std::function<bool()> condition) {
+    auto lock = mutex.getLock();
+    while (!condition()) condvar.wait_for(lock, std::chrono::milliseconds(millisecs));
 }
 void ConditionVariable::waitWithLockedMutex(std::unique_lock<std::mutex>& lock, std::function<bool()> condition) {
     while (!condition()) condvar.wait(lock);
