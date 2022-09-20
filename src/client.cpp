@@ -94,7 +94,7 @@ void Client::readIncomingJobs() {
                 auto filesList = foundJob.getFilesList();
                 if (foundJob.hasFiles()) {
                     LOGGER(log, V3_VERB, "[T] Reading job #%i rev. %i %s ...\n", id, foundJob.description->getRevision(), filesList.c_str());
-                    success = JobReader::read(foundJob.files, foundJob.contentMode, *foundJob.description);
+                    success = JobReader::read(_params, foundJob.files, foundJob.contentMode, *foundJob.description);
                 } else {
                     foundJob.description->beginInitialization(foundJob.description->getRevision());
                     foundJob.description->endInitialization();

@@ -9,7 +9,7 @@
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 
-void testSatInstances() {
+void testSatInstances(Parameters& params) {
 
     auto files = {"Steiner-9-5-bce.cnf.xz", "uum12.smt2.cnf.xz", 
         "LED_round_29-32_faultAt_29_fault_injections_5_seed_1579630418.cnf.xz", "SAT_dat.k80.cnf.xz", "Timetable_C_497_E_62_Cl_33_S_30.cnf.xz", 
@@ -19,7 +19,7 @@ void testSatInstances() {
         auto f = std::string("instances/") + file;
         LOG(V2_INFO, "Reading test CNF %s ...\n", f.c_str());
         float time = Timer::elapsedSeconds();
-        SatReader r(f, SatReader::ContentMode::ASCII);
+        SatReader r(params, f, SatReader::ContentMode::ASCII);
         JobDescription d;
         bool success = r.read(d);
         assert(success);
@@ -39,11 +39,11 @@ void testSatInstances() {
     }
 }
 
-void testIncrementalExample() {
+void testIncrementalExample(Parameters& params) {
 
     JobDescription desc(1, 1, JobDescription::Application::INCREMENTAL_SAT, true);
     std::string f = "instances/incremental/entertainment08-0.cnf";
-    SatReader r(f, SatReader::ContentMode::ASCII);
+    SatReader r(params, f, SatReader::ContentMode::ASCII);
     r.read(desc);
     LOG(V2_INFO, "Base: %i lits, %i assumptions\n", desc.getNumFormulaLiterals(), desc.getNumAssumptionLiterals());
     assert(desc.getNumFormulaLiterals() == 6);
@@ -66,10 +66,10 @@ void testIncrementalExample() {
     }
 
     f = "instances/incremental/entertainment08-1.cnf";
-    r = SatReader(f, SatReader::ContentMode::ASCII);
+    SatReader r2(params, f, SatReader::ContentMode::ASCII);
     JobDescription update(1, 1, JobDescription::Application::INCREMENTAL_SAT, true);
     update.setRevision(1);
-    r.read(update);
+    r2.read(update);
     LOG(V2_INFO, "Update: %i lits, %i assumptions\n", update.getNumFormulaLiterals(), update.getNumAssumptionLiterals());
     exported = update.getSerialization(1);
     JobDescription imported1(1, 1, JobDescription::Application::INCREMENTAL_SAT, true);
@@ -83,12 +83,15 @@ void testIncrementalExample() {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
 
     Timer::init();
     Random::init(rand(), rand());
     Logger::init(0, V5_DEBG, false, false, false, nullptr);
 
-    testSatInstances();
-    testIncrementalExample();
+    Parameters params;
+    params.init(argc, argv);
+
+    testSatInstances(params);
+    testIncrementalExample(params);
 }

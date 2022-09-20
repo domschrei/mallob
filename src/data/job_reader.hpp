@@ -6,7 +6,7 @@
 #include "util/sat_reader.hpp"
 
 namespace JobReader {
-    bool read(const std::vector<std::string>& files, SatReader::ContentMode contentMode, JobDescription& desc);
+    bool read(Parameters& params, const std::vector<std::string>& files, SatReader::ContentMode contentMode, JobDescription& desc);
 };
 
 #endif

@@ -96,6 +96,11 @@ void Parameters::expand() {
                 "which only works with mono mode of operation as of now\n");
             abort();
         }
+        if (!logDirectory.isSet()) {
+            LOG(V0_CRIT, "[ERROR] Mallob was compiled with certified UNSAT support "
+                "which requires providing a -logDirectory\n");
+            abort();
+        }
         
         // Override options
         //LOG(V2_INFO, "Certified UNSAT mode: Setting solver to non-incremental CaDiCaL only\n");
