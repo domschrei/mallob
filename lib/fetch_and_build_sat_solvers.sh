@@ -11,6 +11,11 @@ fi
 
 bash fetch_solvers.sh $solvers
 
+echo "Making drat-trim"
+cd drat-trim
+make
+cd ..
+
 if echo $solvers|grep -q "m" && [ ! -f mergesat/libmergesat.a ]; then
     echo "Building MergeSAT"
 
