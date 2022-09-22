@@ -60,7 +60,7 @@ public:
     size_t getCurrentSize() const override {
         auto size = 0;
         for (auto& [source, nextElem] : _sources) {
-            size += source->getCurrentSize();
+            size += source->getCurrentSize()+1;
         }
         return size;
     }
@@ -68,7 +68,7 @@ public:
     std::string getReport() {
         std::string sizes;
         for (auto& [source, nextElem] : _sources) {
-            sizes += std::to_string(source->getCurrentSize()) + " ";
+            sizes += std::to_string(source->getCurrentSize()+1) + " ";
         }
         return sizes;
     }
