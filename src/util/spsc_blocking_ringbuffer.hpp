@@ -39,8 +39,7 @@ public:
 
     void pushBlocking(T& input) {
 
-        int numElems = size();
-        if (numElems == _buffer_size) {
+        if (size() == _buffer_size) {
             // wait until space is available
             //LOG(V2_INFO, "SPSC wait nonfull\n");
             waitFor([&]() {
@@ -52,17 +51,21 @@ public:
         std::swap(_buffer[_write_pos++], input);
         if (_write_pos == _buffer_size) _write_pos = 0;
 
-        numElems = _num_elems.fetch_add(1, std::memory_order_release);
+        int numElemsBefore = _num_elems.fetch_add(1, std::memory_order_release);
         
-        _buffer_mutex.getLock(); // lock buffer and immediately release it, for cond. var.
-        _buffer_cond_var.notify();
+        // If the buffer was empty before pushing the element,
+        // then it may be possible that a notification is required.
+        // If it was NOT empty, then the other thread did not begin waiting.
+        if (numElemsBefore == 0) {
+            _buffer_mutex.getLock(); // lock buffer and immediately release it, for cond. var.
+            _buffer_cond_var.notify();
+        }
         //LOG(V2_INFO, "SPSC notify nonempty\n");
     }
 
     bool pollBlocking(T& out) override {
 
-        int numElems = size();
-        if (numElems == 0) {
+        if (empty()) {
             // no elements AND input exhausted? => fully exhausted
             if (_input_exhausted) return false;
             
@@ -74,17 +77,21 @@ public:
             //LOG(V2_INFO, "SPSC wait nonempty or exhausted done\n");
             
             // still no elements? => fully exhausted.
-            if (empty())
-                return false;
-        } // else: at least one element is present
+            if (empty()) return false;
+        }
 
         std::swap(_buffer[_read_pos++], out);
         if (_read_pos == _buffer_size) _read_pos = 0;
 
-        numElems = _num_elems.fetch_sub(1, std::memory_order_release);
+        int numElemsBefore = _num_elems.fetch_sub(1, std::memory_order_release);
         
-        _buffer_mutex.getLock(); // lock buffer and immediately release it, for cond. var.
-        _buffer_cond_var.notify();
+        // If the buffer was full before removing the element,
+        // then it may be possible that a notification is required.
+        // If it was NOT full, then the other thread did not begin waiting.
+        if (numElemsBefore == _buffer_size) {
+            _buffer_mutex.getLock(); // lock buffer and immediately release it, for cond. var.
+            _buffer_cond_var.notify();
+        }
 
         return true;
     }
