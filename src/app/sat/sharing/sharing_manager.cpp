@@ -52,8 +52,7 @@ SharingManager::SharingManager(
 	_id_offsets_per_solver.resize(_solvers.size());
 	_min_epoch_ids_per_solver.resize(_solvers.size());
 	_last_exported_clause_id.resize(_solvers.size());
-	unsigned long zerothEpochIdStart = _num_original_clauses+1;
-	
+
 	for (size_t i = 0; i < _solvers.size(); i++) {
 		_solvers[i]->setExtLearnedClauseCallback(callback);
 		_solver_revisions.push_back(_solvers[i]->getSolverSetup().solverRevision);
@@ -63,7 +62,7 @@ SharingManager::SharingManager(
 
 			_id_offsets_per_solver[i].push_back(0);
 			_min_epoch_ids_per_solver[i].push_back(0);
-			_last_exported_clause_id[i] = new std::atomic_ulong(0);
+			_last_exported_clause_id[i] = new std::atomic_ulong(_num_original_clauses+1);
 
 			LOG(V2_INFO, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
 					_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), 0, _min_epoch_ids_per_solver[i].back());
