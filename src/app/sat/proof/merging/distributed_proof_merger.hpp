@@ -186,7 +186,7 @@ public:
                 msg.type = MergeMessage::REQUEST;
                 MyMpi::isend(child.getRankWithinComm(), MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, msg);
                 child.setRefillRequested(true);
-                LOGGER(_log, V4_VVER, "Requesting refill from [%i]\n", child.getRankWithinComm());
+                LOGGER(_log, V5_DEBG, "Requesting refill from [%i]\n", child.getRankWithinComm());
             }
         }
 
@@ -213,7 +213,7 @@ public:
                 writeOutputIntoMsg();
             }
             if (msg.type != MergeMessage::Type::REQUEST) {
-                LOGGER(_log, V4_VVER, "Sending refill (%i lines) to [%i], exhausted:%s\n", 
+                LOGGER(_log, V5_DEBG, "Sending refill (%i lines) to [%i], exhausted:%s\n", 
                     msg.lines.size(), _parent_rank, 
                     msg.type == MergeMessage::Type::RESPONSE_EXHAUSTED ? "yes":"no");
                 MyMpi::isend(_parent_rank, MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, msg);
