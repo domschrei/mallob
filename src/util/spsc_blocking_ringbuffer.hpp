@@ -53,12 +53,10 @@ public:
         if (_write_pos == _buffer_size) _write_pos = 0;
 
         numElems = _num_elems.fetch_add(1, std::memory_order_release);
-        if (numElems == 1) {
-            // buffer was previously empty: notify that it isn't empty any more
-            _buffer_mutex.getLock();
-            _buffer_cond_var.notify();
-            //LOG(V2_INFO, "SPSC notify nonempty\n");
-        }
+        
+        _buffer_mutex.getLock(); // lock buffer and immediately release it, for cond. var.
+        _buffer_cond_var.notify();
+        //LOG(V2_INFO, "SPSC notify nonempty\n");
     }
 
     bool pollBlocking(T& out) override {
@@ -84,12 +82,10 @@ public:
         if (_read_pos == _buffer_size) _read_pos = 0;
 
         numElems = _num_elems.fetch_sub(1, std::memory_order_release);
-        if (numElems == _buffer_size-1) {
-            // buffer was previously full: notify that it isn't full any more
-            _buffer_mutex.getLock();
-            _buffer_cond_var.notify();
-            //LOG(V2_INFO, "SPSC notify nonfull\n");
-        }
+        
+        _buffer_mutex.getLock(); // lock buffer and immediately release it, for cond. var.
+        _buffer_cond_var.notify();
+
         return true;
     }
 
