@@ -305,6 +305,7 @@ private:
         std::vector<LratClauseId> hintsToDelete;
         SerializedLratLine bufferLine;
         float inactiveTimeStart = 0;
+        LratClauseId lastId = std::numeric_limits<LratClauseId>::max();
 
         while (!Terminator::isTerminating()) {
             
@@ -331,6 +332,12 @@ private:
             // Line to output found
             auto& chosenLine = bufferLine;
             auto chosenId = chosenLine.getId();
+            if (chosenId > lastId) {
+                LOGGER(_log, V0_CRIT, "[ERROR] Incoherent order in merge output! Got %lu, then %lu\n", 
+                    lastId, chosenId);
+                abort();
+            }
+            lastId = chosenId;
 
             if (_is_root) {
                 if (chosenLine.isStub()) {

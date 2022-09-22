@@ -38,6 +38,7 @@ public:
                 it = _sources.erase(it);
                 continue;
             }
+            source.valid = true;
 
             // Better than previous element? -> Remember
             if (bestSource == nullptr || source.nextElem > bestSource->nextElem) {
