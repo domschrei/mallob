@@ -248,6 +248,7 @@ private:
                 assert(nextIdEpoch+1 < _global_epoch_starts.size());
                 auto sentinelId = _global_epoch_starts[nextIdEpoch+1]-1;
                 SerializedLratLine sentinelLine(sentinelId);
+                assert(sentinelLine.isStub());
                 _merge_connector->pushBlocking(sentinelLine);
                 LOGGER(_log, V4_VVER, "%i e.%i: push sentinel %lu\n", 
                     _instance_id, _current_epoch, sentinelId);

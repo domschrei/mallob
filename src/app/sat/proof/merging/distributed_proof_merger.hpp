@@ -165,10 +165,11 @@ public:
     void advance() {
 
         if (Timer::elapsedSeconds() - lastOutputReport > 1.0) {
-            LOGGER(_log, V3_VERB, "narrv:%ld noutp:%ld eff:%.4f exh:%s\n", 
+            LOGGER(_log, V3_VERB, "narrv:%ld noutp:%ld eff:%.4f exh:%s outbuf:%i\n", 
                 numArrivedLines, numOutputLines, 
                 1 - _time_inactive/(Timer::elapsedSeconds()-_timepoint_merge_begin), 
-                _all_sources_exhausted ? "yes":"no");
+                _all_sources_exhausted ? "yes":"no", 
+                _output_buffer_size.load(std::memory_order_relaxed));
             if (_proof_writer) _proof_writer->reportProgress();
             if (_merger_valid) {
                 auto report = _merger->getReport();
@@ -185,7 +186,7 @@ public:
                 msg.type = MergeMessage::REQUEST;
                 MyMpi::isend(child.getRankWithinComm(), MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, msg);
                 child.setRefillRequested(true);
-                LOGGER(_log, V5_DEBG, "Requesting refill from [%i]\n", child.getRankWithinComm());
+                LOGGER(_log, V4_VVER, "Requesting refill from [%i]\n", child.getRankWithinComm());
             }
         }
 
@@ -212,7 +213,7 @@ public:
                 writeOutputIntoMsg();
             }
             if (msg.type != MergeMessage::Type::REQUEST) {
-                LOGGER(_log, V5_DEBG, "Sending refill (%i lines) to [%i], exhausted:%s\n", 
+                LOGGER(_log, V4_VVER, "Sending refill (%i lines) to [%i], exhausted:%s\n", 
                     msg.lines.size(), _parent_rank, 
                     msg.type == MergeMessage::Type::RESPONSE_EXHAUSTED ? "yes":"no");
                 MyMpi::isend(_parent_rank, MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, msg);
