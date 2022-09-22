@@ -43,6 +43,7 @@ public:
         _exit = false;
     }
 
+    static void broadcastExitSignal();
 };
 
 #endif

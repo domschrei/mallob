@@ -39,14 +39,17 @@ bool SatReader::read(JobDescription& desc) {
 			std::string newFilename = _params.logDirectory() + "/input_units_removed.cnf";
 			remove(newFilename.c_str()); // remove if existing (ignore errors)
 			std::string cmd = "cadical " + _filename + " -c 0 -o " + newFilename;
-			int returnCode = system(cmd.c_str());
+			int systemRetVal = system(cmd.c_str());
+			int returnCode = WEXITSTATUS(systemRetVal);
 			if (returnCode == 10) {
 				LOG(V2_INFO, "external call to CaDiCaL found result SAT\n");
 				LOG_OMIT_PREFIX(V0_CRIT, "s SATISFIABLE\n");
+				Terminator::broadcastExitSignal();
 			} else if (returnCode == 20) {
 				LOG(V2_INFO, "external call to CaDiCaL found result UNSAT\n");
 				LOG_OMIT_PREFIX(V0_CRIT, "s UNSATISFIABLE\n");
-			} else assert(returnCode == 0);
+				Terminator::broadcastExitSignal();
+			} else assert(returnCode == 0 || log_return_false("Unexpected return code %i\n", returnCode));
 			_filename = newFilename;
 		}
 
