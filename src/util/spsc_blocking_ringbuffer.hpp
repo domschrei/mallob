@@ -39,12 +39,12 @@ public:
 
     void pushBlocking(T& input) {
 
-        int numElems = _num_elems.load(std::memory_order_acquire);
+        int numElems = size();
         if (numElems == _buffer_size) {
             // wait until space is available
             //LOG(V2_INFO, "SPSC wait nonfull\n");
             waitFor([&]() {
-                return _num_elems.load(std::memory_order_relaxed) < _buffer_size;
+                return size() < _buffer_size;
             });
             //LOG(V2_INFO, "SPSC wait nonfull done\n");
         }
@@ -61,7 +61,7 @@ public:
 
     bool pollBlocking(T& out) override {
 
-        int numElems = _num_elems.load(std::memory_order_relaxed);
+        int numElems = size();
         if (numElems == 0) {
             // no elements AND input exhausted? => fully exhausted
             if (_input_exhausted) return false;
@@ -69,12 +69,12 @@ public:
             // wait until elements are there or the input is marked exhausted
             //LOG(V2_INFO, "SPSC wait nonempty or exhausted\n");
             waitFor([&]() {
-                return _input_exhausted || _num_elems.load(std::memory_order_relaxed) > 0;
+                return _input_exhausted || !empty();
             });
             //LOG(V2_INFO, "SPSC wait nonempty or exhausted done\n");
             
             // still no elements? => fully exhausted.
-            if (_num_elems.load(std::memory_order_relaxed) == 0)
+            if (empty())
                 return false;
         } // else: at least one element is present
 
@@ -107,7 +107,7 @@ public:
     }
 
     bool empty() const {
-        return _num_elems.load(std::memory_order_relaxed) == 0;
+        return size() == 0;
     }
 
     bool exhausted() const {

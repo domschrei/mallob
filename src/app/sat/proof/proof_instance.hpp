@@ -51,6 +51,7 @@ private:
     bool _finished = false;
 
     unsigned long _num_traced_clauses = 0;
+    unsigned long _num_output_lines = 0;
 
     bool _interleave_merging {false};
     ProofMergeConnector* _merge_connector;
@@ -199,6 +200,7 @@ private:
                 } else {
                     lrat_utils::writeLine(_output_buf, _current_line);
                 }
+                _num_output_lines++;
 
                 // Remove all instances of this ID from the frontier
                 while (!_frontier.empty() && _frontier.top() == id) 
@@ -250,8 +252,9 @@ private:
                 SerializedLratLine sentinelLine(sentinelId);
                 assert(sentinelLine.isStub());
                 _merge_connector->pushBlocking(sentinelLine);
-                LOGGER(_log, V4_VVER, "%i e.%i: push sentinel %lu\n", 
-                    _instance_id, _current_epoch, sentinelId);
+                _num_output_lines++;
+                LOGGER(_log, V4_VVER, "%i e.%i: push sentinel %lu ; outlines=%lu\n", 
+                    _instance_id, _current_epoch, sentinelId, _num_output_lines);
             }
 
             _current_epoch--;
