@@ -11,7 +11,6 @@
 
 #include "sat_reader.hpp"
 #include "util/sys/terminator.hpp"
-#include "app/sat/data/clause_metadata_def.hpp"
 
 bool SatReader::read(JobDescription& desc) {
 
@@ -34,7 +33,7 @@ bool SatReader::read(JobDescription& desc) {
 
 	if (pipe == nullptr && namedpipe == -1) {
 
-		if (MALLOB_CLAUSE_METADATA_SIZE == 2 && _params.removeUnitsPreprocessing()) {
+		if (_params.removeUnitsPreprocessing()) {
 			// cadical input.cnf -c 0 -o removed-units.cnf
 			std::string newFilename = _params.logDirectory() + "/input_units_removed.cnf";
 			remove(newFilename.c_str()); // remove if existing (ignore errors)
@@ -79,10 +78,6 @@ bool SatReader::read(JobDescription& desc) {
 		}
 		munmap(mmapped, size);
 		close(fd);
-
-		//if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
-		//	remove(_filename.c_str());
-		//}
 
 	} else if (namedpipe != -1) {
 		// Read formula over named pipe

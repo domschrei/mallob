@@ -40,6 +40,25 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	// Retrieve the string defining the cycle of solver choices, one character per solver
 	// e.g. "llgc" => lingeling lingeling glucose cadical lingeling lingeling glucose ...
 	std::string solverChoices = params.satSolverSequence();
+	std::string proofDirectory;
+
+	// Launched in certified UNSAT mode?
+    if (_params.certifiedUnsat()) {
+		
+		// Override options
+		if (solverChoices != "c") {
+			LOG(V2_INFO, "Certified UNSAT mode: Overriding portfolio to non-incremental CaDiCaL only\n");
+			solverChoices = "c";
+		}
+		ClauseMetadata::enableClauseIds();
+
+		// Create directory for partial proofs
+		std::filesystem::path base_dir(params.logDirectory());
+		std::filesystem::path proof_dir("proof" + config.getJobStr());
+		std::filesystem::path full_path = base_dir / proof_dir;
+		create_directory(full_path);
+		proofDirectory = full_path.string();
+    }
 	
 	// These numbers become the diversifier indices of the solvers on this node
 	int numLgl = 0;
@@ -96,12 +115,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.certifiedUnsat = params.certifiedUnsat();
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numOriginalClauses = numClauses;
-	//make a directory for putting proofs in
-	std::filesystem::path base_dir(params.logDirectory());
-	std::filesystem::path proof_dir("proof" + config.getJobStr());
-	std::filesystem::path full_path = base_dir / proof_dir;
-	create_directory(full_path);
-	setup.proofDir = full_path.string();
+	setup.proofDir = proofDirectory;
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
@@ -401,7 +415,7 @@ void SatEngine::cleanUp() {
 	LOGGER(_logger, V4_VVER, "[engine-cleanup] done, took %.3f s\n", time);
 	_logger.flush();
 
-	if (MALLOB_CLAUSE_METADATA_SIZE == 2) writeClauseEpochs();
+	if (ClauseMetadata::enabled()) writeClauseEpochs();
 
 	_cleaned_up = true;
 }

@@ -58,7 +58,7 @@ public:
         
         // Terminate directly?
         if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true)) {
-            doTerminate(/*gracefully=*/MALLOB_CLAUSE_METADATA_SIZE!=2);
+            doTerminate(/*gracefully=*/!ClauseMetadata::enabled());
             return;
         }
 
@@ -237,7 +237,7 @@ public:
             }
         }
 
-        doTerminate(/*gracefully=*/MALLOB_CLAUSE_METADATA_SIZE!=2);
+        doTerminate(/*gracefully=*/!ClauseMetadata::enabled());
 
         // Shared memory will be cleaned up by the parent process.
     }

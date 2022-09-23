@@ -9,9 +9,10 @@ Most notably, Mallob features an engine for distributed SAT solving.
 According to the International SAT Competition [2020🥇](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf) and [2021🥇🥈🥈🥉](https://satcompetition.github.io/2021/slides/ISC2021.pdf), Mallob is currently the best approach for SAT solving on a large scale (800 physical cores) and one of the best approaches for SAT solving on a moderate scale (32 physical cores).
 
 ## Distributed UNSAT Proof Production
+
 This fork of Mallob is written to produce proofs of unsatisfiability for distributed SAT solvers using a modified version of [CaDiCaL](https://github.com/RandomActsOfGrammar/cadical).
 Each CaDiCaL instance produces a log of the clauses it learned in the LRAT format.
-These are then combined into a single LRAT by our proof composer (in the `tools` directory) to form a single, checkable LRAT proof.
+These are then combined into a single LRAT by our proof composers (sequentially in the `tools` directory, or fully distributed within Mallob itself) to form a single, checkable LRAT proof.
 
 Our proof combination relies on a particular formula being used to generate clause identifiers in each instance, described [here](https://github.com/RandomActsOfGrammar/cadical#distributed-solver-implementation-notes).
 We use this to ensure each clause identifier is unique across all solvers.
@@ -55,7 +56,6 @@ In addition, use the following Mallob-specific build options:
 | -DMALLOB_USE_ASAN=<0/1>                   | Compile with Address Sanitizer for debugging purposes.                                                     |
 | -DMALLOB_USE_GLUCOSE=<0/1>                | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
 | -DMALLOB_USE_JEMALLOC=<0/1>               | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
-| -DMALLOB_CERTIFIED_UNSAT=<0/1>            | Compile with support for certified UNSAT (only works with a special patched version of CaDiCaL)            |
 
 ## Docker
 
@@ -91,6 +91,7 @@ Use Mallob option `-mono=$PATH_TO_CNF` where `$PATH_TO_CNF` is the path and file
 
 ### Options relevant for certified UNSAT
 
+* `-certified-unsat=1`: This option must be enabled to produce proofs.
 * `-distributed-proof-assembly=1`: Turn on distributed proof assembly. If turned off, the system will terminate after each solver has written its individual proof file.
 * `-log=<logdir>`: Important option since it also sets the base location for the proof files directory on each process.
 * `-mempanic=0`: Turn off memory panic. Essential for correct functionality of proof logging.

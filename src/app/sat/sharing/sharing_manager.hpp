@@ -114,7 +114,7 @@ private:
 		// Only align clause IDs if distributed proof assembly is done
 		if (!_params.distributedProofAssembly()) return;
 
-		unsigned long clauseId = metadata::readUnsignedLong(clauseData);
+		unsigned long clauseId = ClauseMetadata::readUnsignedLong(clauseData);
 		int localSolverId = getProducingLocalSolverIndex(clauseId);
 
 		// take the offset that belongs to the clause's epoch!
@@ -129,14 +129,14 @@ private:
 		assert(getEpochOfAlignedSelfClause(alignedClauseId) == getEpochOfUnalignedSelfClause(clauseId));
 		assert(getProducingLocalSolverIndex(alignedClauseId) == getProducingLocalSolverIndex(clauseId));
 
-		metadata::writeUnsignedLong(alignedClauseId, clauseData);
+		ClauseMetadata::writeUnsignedLong(alignedClauseId, clauseData);
 	}
 	void unalignClauseId(int* clauseData) {
 
 		// Only align clause IDs if distributed proof assembly is done
 		if (!_params.distributedProofAssembly()) return;
 
-		unsigned long clauseId = metadata::readUnsignedLong(clauseData);
+		unsigned long clauseId = ClauseMetadata::readUnsignedLong(clauseData);
 		int localSolverId = getProducingLocalSolverIndex(clauseId);
 
 		int epoch = getEpochOfAlignedSelfClause(clauseId);
@@ -152,7 +152,7 @@ private:
 			clauseId, getEpochOfAlignedSelfClause(clauseId), unalignedClauseId, getEpochOfUnalignedSelfClause(unalignedClauseId)));
 		assert(getProducingLocalSolverIndex(clauseId) == getProducingLocalSolverIndex(unalignedClauseId));
 
-		metadata::writeUnsignedLong(unalignedClauseId, clauseData);
+		ClauseMetadata::writeUnsignedLong(unalignedClauseId, clauseData);
 	}
 	int getEpochOfUnalignedSelfClause(unsigned long id);
 	int getEpochOfAlignedSelfClause(unsigned long id);

@@ -29,13 +29,6 @@ if(MALLOB_SUBPROC_DISPATCH_PATH)
     add_definitions(-DMALLOB_SUBPROC_DISPATCH_PATH=${MALLOB_SUBPROC_DISPATCH_PATH})
 endif()
 
-if(MALLOB_CLAUSE_METADATA_SIZE)
-    add_definitions(-DMALLOB_CLAUSE_METADATA_SIZE=${MALLOB_CLAUSE_METADATA_SIZE})
-endif()
-if(MALLOB_CERTIFIED_UNSAT)
-    add_definitions(-DMALLOB_CLAUSE_METADATA_SIZE=2)
-endif()
-
 if(MALLOB_USE_ASAN)
     set(MY_DEBUG_OPTIONS "${MY_DEBUG_OPTIONS} -fno-omit-frame-pointer -fsanitize=address -static-libasan") 
 endif()
@@ -75,20 +68,12 @@ if(MALLOB_USE_MERGESAT)
 endif()    
 # Add new non-default solvers here
 
-# Include STXXL
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-copy")
-#add_subdirectory(lib/stxxl)
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${STXXL_CXX_FLAGS}")
-#set(BASE_INCLUDES ${BASE_INCLUDES} ${STXXL_INCLUDE_DIRS})
-#set(BASE_LIBS ${BASE_LIBS} ${STXXL_LIBRARIES})
-
-
 # Source files
 
 set(BASE_SOURCES ${BASE_SOURCES}
     src/app/job.cpp 
     src/app/dummy/dummy_reader.cpp
-    src/app/sat/data/clause_metadata_def.cpp
+    src/app/sat/data/clause_metadata.cpp
     src/app/sat/execution/engine.cpp src/app/sat/execution/solver_thread.cpp src/app/sat/execution/solving_state.cpp
     src/app/sat/job/anytime_sat_clause_communicator.cpp src/app/sat/job/forked_sat_job.cpp src/app/sat/job/threaded_sat_job.cpp src/app/sat/job/sat_process_adapter.cpp src/app/sat/job/sat_process_config.cpp 
     src/app/sat/proof/lrat_utils.cpp

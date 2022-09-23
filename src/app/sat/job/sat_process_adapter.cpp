@@ -282,7 +282,7 @@ bool SatProcessAdapter::hasFilteredClauses() {
 }
 std::vector<int> SatProcessAdapter::getLocalFilter() {
     if (!_initialized || !_hsm->doFilterImport || !_hsm->didFilterImport) 
-        return std::vector<int>(MALLOB_CLAUSE_METADATA_SIZE==2 ? 2 : 0, 0);
+        return std::vector<int>(ClauseMetadata::numBytes(), 0);
     std::vector<int> filter;
     filter.resize(_hsm->filterSize);
     memcpy(filter.data(), _filter_buffer, _hsm->filterSize*sizeof(int));
@@ -327,7 +327,7 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         } else {
             LOG(V1_WARN, "[WARN] Child %ld exited unexpectedly (status %i)\n", _child_pid, exitStatus);
         }
-        if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+        if (ClauseMetadata::enabled()) {
             // Certified UNSAT: Child crashing is not permitted!
             LOG(V1_WARN, "[ERROR] Child %ld exiting renders the proofs illegal - aborting\n", _child_pid);
             abort();

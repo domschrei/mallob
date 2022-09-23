@@ -23,17 +23,20 @@ Cadical::Cadical(const SolverSetup& setup)
 	
 	solver->connect_terminator(&terminator);
 	solver->connect_learn_source(&learnSource);
-	//solver->set("binary", false);
-	auto ok = solver->set("proofdelete", false); assert(ok);
-	std::string logdir = setup.proofDir;
-	//length of the directory + space for filename
-	char *filename_alone = new char [20];
-	sprintf(filename_alone, "proof.%d.lrat", setup.globalId + 1);
-	//hanlde the joining string already being at the end
-	std::filesystem::path dir(logdir);
-	std::filesystem::path file(filename_alone);
-	std::filesystem::path full_path = dir / file;
-	solver->trace_proof(full_path.string().c_str());
+
+	if (setup.certifiedUnsat) {
+		//solver->set("binary", false);
+		auto ok = solver->set("proofdelete", false); assert(ok);
+		std::string logdir = setup.proofDir;
+		// length of the directory + space for filename
+		char *filename_alone = new char [20];
+		sprintf(filename_alone, "proof.%d.lrat", setup.globalId + 1);
+		// handle the joining string already being at the end
+		std::filesystem::path dir(logdir);
+		std::filesystem::path file(filename_alone);
+		std::filesystem::path full_path = dir / file;
+		solver->trace_proof(full_path.string().c_str());
+	}
 }
 
 void Cadical::addLiteral(int lit) {
@@ -50,6 +53,7 @@ void Cadical::diversify(int seed) {
 
 	// In certified UNSAT mode?
 	if (getSolverSetup().certifiedUnsat) {
+
 		int solverRank = getSolverSetup().globalId;
 		int maxNumSolvers = getSolverSetup().maxNumSolvers;
 		LOGGER(_logger, V3_VERB, "Diversifying rank=%i size=%i DI=%i with certified UNSAT support\n", 
@@ -154,7 +158,7 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 
 	// Flush solver logs
 	_logger.flush();
-	if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+	if (ClauseMetadata::enabled()) {
 		solver->flush_proof_trace ();
 		solver->close_proof_trace ();
 	}

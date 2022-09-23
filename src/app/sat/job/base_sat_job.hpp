@@ -3,12 +3,32 @@
 
 #include "app/job.hpp"
 #include "data/checksum.hpp"
+#include "app/sat/data/clause_metadata.hpp"
 
 class BaseSatJob : public Job {
 
 public:
     BaseSatJob(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl) : 
-        Job(params, commSize, worldRank, jobId, appl) {}
+        Job(params, commSize, worldRank, jobId, appl) {
+
+        // Launched in certified UNSAT mode?
+        if (params.certifiedUnsat()) {
+            
+            // Check that the restrictions of this mode are met
+            if (!params.monoFilename.isSet()) {
+                LOG(V0_CRIT, "[ERROR] Mallob was launched with certified UNSAT support "
+                    "which only supports -mono mode of operation.\n");
+                abort();
+            }
+            if (!params.logDirectory.isSet()) {
+                LOG(V0_CRIT, "[ERROR] Mallob was launched with certified UNSAT support "
+                    "which requires providing a log directory.\n");
+                abort();
+            }
+            
+            ClauseMetadata::enableClauseIds();
+        }
+    }
     virtual ~BaseSatJob() {}
 
     // Methods common to all BaseSatJob instances

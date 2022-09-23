@@ -314,9 +314,9 @@ private:
     }
     
     int getUnalignedClauseEpoch(LratClauseId clauseId) {
-        return metadata::getEpoch(clauseId, _local_epoch_starts);
+        return ClauseMetadata::getEpoch(clauseId, _local_epoch_starts);
     }
     int getClauseEpoch(LratClauseId clauseId) {
-        return metadata::getEpoch(clauseId, _global_epoch_starts);
+        return ClauseMetadata::getEpoch(clauseId, _global_epoch_starts);
     }
 };

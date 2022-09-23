@@ -83,8 +83,8 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 		}
 	}
 
-	if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
-		unsigned long clauseId = metadata::readUnsignedLong(clause.begin);
+	if (ClauseMetadata::enabled()) {
+		unsigned long clauseId = ClauseMetadata::readUnsignedLong(clause.begin);
 		assert(getProducingLocalSolverIndex(clauseId) == solverId);
 		if (_params.distributedProofAssembly()) {
 			_last_exported_clause_id[solverId]->store(clauseId, std::memory_order_relaxed);
@@ -173,7 +173,7 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit) {
 			AdaptiveClauseDatabase::ANY, /*sortClauses=*/true, [&](int* data) {
 
 		// Shift clause ID from a local solver according to the solver's offset
-		if (MALLOB_CLAUSE_METADATA_SIZE == 2) alignClauseId(data);
+		if (ClauseMetadata::enabled()) alignClauseId(data);
 	});
 	//assert(buffer.size() <= maxSize);
 	memcpy(begin, buffer.data(), buffer.size()*sizeof(int));
@@ -193,12 +193,12 @@ void SharingManager::returnClauses(int* begin, int buflen) {
 
 		// For certified UNSAT we need to drop returned clauses which do not
 		// originate from this solver, since we can not un-align them to
-		// correctly insert them into the database.  
-		if (MALLOB_CLAUSE_METADATA_SIZE!=2 || isLocallyProducedClause(metadata::readUnsignedLong(c.begin))) {
+		// correctly insert them into the database.
+		if (!ClauseMetadata::enabled() || isLocallyProducedClause(ClauseMetadata::readUnsignedLong(c.begin))) {
 
 			// Returned clauses would be aligned *again* when re-exported.
 			// => subtract the offsets again here ...
-			if (MALLOB_CLAUSE_METADATA_SIZE == 2) unalignClauseId(c.begin);
+			if (ClauseMetadata::enabled()) unalignClauseId(c.begin);
 
 			bool success = _cdb.addClause(c);
 			if (success) _hist_returned_to_db.increment(c.size);
@@ -215,11 +215,11 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 	constexpr auto bitsPerElem = 8*sizeof(int);
 	int shift = bitsPerElem;
 	auto clause = reader.getNextIncomingClause();
-	int filterPos = -1 + (MALLOB_CLAUSE_METADATA_SIZE == 2 ? 2 : 0);
+	int filterPos = -1 + ClauseMetadata::numBytes();
 	int nbFiltered = 0;
 	int nbTotal = 0;
 
-	if (MALLOB_CLAUSE_METADATA_SIZE == 2 && _params.distributedProofAssembly()) {
+	if (ClauseMetadata::enabled() && _params.distributedProofAssembly()) {
 		// Proceed with the next epoch.
 		// Find max. first clause ID
 		unsigned long maxMinEpochId = 0;
@@ -238,7 +238,7 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 			LOG(V2_INFO, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
 				_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), clauseIdCounter, _min_epoch_ids_per_solver[i].back());
 		}
-		metadata::writeUnsignedLong(maxMinEpochId, filterOut);
+		ClauseMetadata::writeUnsignedLong(maxMinEpochId, filterOut);
 	}
 
 	_filter.acquireLock();
@@ -285,19 +285,19 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	_last_num_cls_to_import = 0;
 	_last_num_admitted_cls_to_import = 0;
 
-	if (MALLOB_CLAUSE_METADATA_SIZE == 2) assert(filter != nullptr);
+	if (ClauseMetadata::enabled()) assert(filter != nullptr);
 
 	// Apply provided global filter to buffer (in-place operation)
 	if (filter != nullptr) {
 		_logger.log(verb+2, "DG apply global filter\n");
 		const int bitsPerElem = sizeof(int)*8;
 		int shift = bitsPerElem;
-		int filterPos = -1 + (MALLOB_CLAUSE_METADATA_SIZE == 2 ? 2 : 0);
+		int filterPos = -1 + ClauseMetadata::numBytes();
 		
-		if (MALLOB_CLAUSE_METADATA_SIZE == 2 && _params.distributedProofAssembly()) {
+		if (ClauseMetadata::enabled() && _params.distributedProofAssembly()) {
 			// extract global min. epoch ID and compute the next ID offset
 			// for each solver from it
-			unsigned long globalMinEpochId = metadata::readUnsignedLong(filter);
+			unsigned long globalMinEpochId = ClauseMetadata::readUnsignedLong(filter);
 			LOG(V2_INFO, "EPOCH %i GLOBAL_MAX_OF_1ST_ID %lu\n", _min_epoch_ids_per_solver[0].size()-1, globalMinEpochId);
 			_global_epoch_ids.push_back(globalMinEpochId);
 
@@ -421,9 +421,9 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 				solverStats->receivedClausesFiltered++;
 				continue;
 			} else {
-				if (MALLOB_CLAUSE_METADATA_SIZE == 2 && _params.distributedProofAssembly() && clause.size >= 2) {
+				if (ClauseMetadata::enabled() && _params.distributedProofAssembly() && clause.size >= 2) {
 					// check via clause ID whether this solver produced this clause
-					unsigned long clauseId = metadata::readUnsignedLong(clause.begin);
+					unsigned long clauseId = ClauseMetadata::readUnsignedLong(clause.begin);
 					if (getProducingInstanceId(clauseId) == solver.getGlobalId()) {
 						// This solver produced this clause! Do not import.
 						solverStats->receivedClausesFiltered++;
@@ -433,7 +433,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 					// Important invariant: incoming clauses must be from EARLIER epochs
 					// than your current epoch.
 					int epoch = _min_epoch_ids_per_solver[i].size()-1;
-					int clauseEpoch = metadata::getEpoch(clauseId, _global_epoch_ids);
+					int clauseEpoch = ClauseMetadata::getEpoch(clauseId, _global_epoch_ids);
 					if (clauseEpoch >= epoch) {
 						LOG(V0_CRIT, "[ERROR] Importing clause ID=%lu from epoch %i while I am in epoch %i myself!\n", 
 							clauseId, clauseEpoch, epoch);

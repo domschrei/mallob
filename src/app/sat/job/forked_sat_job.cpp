@@ -123,7 +123,7 @@ int ForkedSatJob::appl_solved() {
         _internal_result.id = getId();
         _internal_result.revision = getRevision();
 
-        if (MALLOB_CLAUSE_METADATA_SIZE == 2 && result == RESULT_UNSAT
+        if (ClauseMetadata::enabled() && result == RESULT_UNSAT
                 && _params.distributedProofAssembly()) {
             // Unsatisfiability: handle separately.
             int finalEpoch = ((AnytimeSatClauseCommunicator*)_clause_comm)->getCurrentEpoch();
@@ -203,7 +203,7 @@ void ForkedSatJob::appl_communicate() {
 }
 
 void ForkedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    if ((!isInitialized() || !checkClauseComm()) && MALLOB_CLAUSE_METADATA_SIZE==2 
+    if ((!isInitialized() || !checkClauseComm()) && ClauseMetadata::enabled() 
             && msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
         deferMessage(source, mpiTag, msg);
         return;
@@ -253,7 +253,7 @@ bool ForkedSatJob::hasFilteredSharing() {
     return _solver->hasFilteredClauses();
 }
 std::vector<int> ForkedSatJob::getLocalFilter() {
-    if (!_initialized) return std::vector<int>(MALLOB_CLAUSE_METADATA_SIZE == 2 ? 2 : 0, 0);
+    if (!_initialized) return std::vector<int>(ClauseMetadata::numBytes(), 0);
     return _solver->getLocalFilter();
 }
 void ForkedSatJob::applyFilter(std::vector<int>& filter) {

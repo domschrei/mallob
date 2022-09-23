@@ -24,7 +24,7 @@ mkdir -p "/logs/extmem"
 # Old command
 #command="mpirun --mca btl_tcp_if_include eth0 --allow-run-as-root --hostfile $1 --use-hwthread-cpus --map-by numa:PE=4 --bind-to hwthread --report-bindings /mallob ..."
 
-command="mpirun -np $processes_per_host /mallob -mono=$2 -log-directory=/logs/processes	-trace-dir=/logs/tracedir/ -t=4 -sleep=1000 -mempanic=0 -v=3 -max-lits-per-thread=50000000 -strict-clause-length-limit=20 -clause-filter-clear-interval=500 -max-lbd-partition-size=2 -export-chunks=20 -clause-buffer-discount=$clause_buffer_discount -satsolver=c -extmem-disk-dir=/logs/extmem/ -distributed-proof-assembly=$distributed_proof_assembly -proof-output-file=/logs/processes/proof.lrat -remove-units-preprocessing=$remove_units_preprocessing -interleave-proof-merging=1"
+command="mpirun -np $processes_per_host /mallob -mono=$2 -log-directory=/logs/processes	-trace-dir=/logs/tracedir/ -t=4 -sleep=1000 -mempanic=0 -v=3 -max-lits-per-thread=50000000 -strict-clause-length-limit=20 -clause-filter-clear-interval=500 -max-lbd-partition-size=2 -export-chunks=20 -clause-buffer-discount=$clause_buffer_discount -certified-unsat=1 -extmem-disk-dir=/logs/extmem/ -distributed-proof-assembly=$distributed_proof_assembly -proof-output-file=/logs/processes/proof.lrat -remove-units-preprocessing=$remove_units_preprocessing -interleave-proof-merging=1"
 
 # echo "run_mallob.sh : $num_hosts hosts, $processes_per_host processes per host => $(($num_hosts * $processes_per_host)) MPI processes"
 echo "run_mallob.sh : EXECUTE $command"

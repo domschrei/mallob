@@ -90,35 +90,35 @@ private:
                 // Base message
                 JobMessage(_job->getId(), _job->getRevision(), epoch, MSG_ALLREDUCE_FILTER),
                 // Neutral element
-                std::vector<int>(MALLOB_CLAUSE_METADATA_SIZE==2 ? 2 : 0, 0),
+                std::vector<int>(ClauseMetadata::numBytes(), 0),
                 // Aggregator for local + incoming elements
                 [&](std::list<std::vector<int>>& elems) {
                     std::vector<int> filter = std::move(elems.front());
                     elems.pop_front();
 
                     unsigned long maxMinEpochId;
-                    if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+                    if (ClauseMetadata::enabled()) {
                         assert(filter.size() >= 2);
-                        maxMinEpochId = metadata::readUnsignedLong(filter.data());
+                        maxMinEpochId = ClauseMetadata::readUnsignedLong(filter.data());
                     }
 
                     for (auto& elem : elems) {
                         if (filter.size() < elem.size()) 
                             filter.resize(elem.size());
 
-                        if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+                        if (ClauseMetadata::enabled()) {
                             assert(elem.size() >= 2);
-                            unsigned long minEpochId = metadata::readUnsignedLong(elem.data());
+                            unsigned long minEpochId = ClauseMetadata::readUnsignedLong(elem.data());
                             maxMinEpochId = std::max(maxMinEpochId, minEpochId);
                         }
                         
-                        for (size_t i = (MALLOB_CLAUSE_METADATA_SIZE==2) ? 2 : 0; i < elem.size(); i++) {
+                        for (size_t i = ClauseMetadata::numBytes(); i < elem.size(); i++) {
                             filter[i] |= elem[i]; // bitwise OR
                         }
                     }
 
-                    if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
-                        metadata::writeUnsignedLong(maxMinEpochId, filter.data());
+                    if (ClauseMetadata::enabled()) {
+                        ClauseMetadata::writeUnsignedLong(maxMinEpochId, filter.data());
                     }
 
                     return filter;
@@ -148,7 +148,7 @@ private:
     float _time_of_last_epoch_initiation = 0;
     float _time_of_last_epoch_conclusion = 0.000001f;
 
-    bool _sent_ready_msg = MALLOB_CLAUSE_METADATA_SIZE != 2;
+    bool _sent_ready_msg = !ClauseMetadata::enabled();
     int _num_ready_msgs_from_children = 0;
 
     JobMessage _msg_unsat_found;

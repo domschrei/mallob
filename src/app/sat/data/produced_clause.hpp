@@ -116,14 +116,14 @@ struct ProducedLargeClause {
 
     bool operator<(const ProducedLargeClause& other) const {
         if (size != other.size) return size < other.size;
-        for (uint8_t i = MALLOB_CLAUSE_METADATA_SIZE; i < size; i++) {
+        for (uint8_t i = ClauseMetadata::numBytes(); i < size; i++) {
             if (data[i] != other.data[i]) return data[i] < other.data[i];
         }
         return false;
     }
     bool operator==(const ProducedLargeClause& other) const {
         if (size != other.size) return false;
-        for (uint8_t i = MALLOB_CLAUSE_METADATA_SIZE; i < size; i++) {
+        for (uint8_t i = ClauseMetadata::numBytes(); i < size; i++) {
             if (data[i] != other.data[i]) return false;
         }
         return true;
@@ -249,13 +249,13 @@ namespace prod_cls {
             return "len=2 lbd=2 " + std::to_string(producedClause.literals[0]) + " " + std::to_string(producedClause.literals[0]) ;
         }
         if constexpr (std::is_base_of<ProducedLargeClause, T>()) {
-            std::string out = "len=" + std::to_string(producedClause.size - MALLOB_CLAUSE_METADATA_SIZE) 
+            std::string out = "len=" + std::to_string(producedClause.size - ClauseMetadata::numBytes()) 
                 + " lbd=" + std::to_string(explicitLbdOrZero) + " ";
-            if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
+            if (ClauseMetadata::enabled()) {
                 unsigned long id; memcpy(&id, producedClause.data, sizeof(unsigned long));
                 out += "id=" + std::to_string(id) + " ";
             }
-            for (size_t i = MALLOB_CLAUSE_METADATA_SIZE; i < producedClause.size; i++)
+            for (size_t i = ClauseMetadata::numBytes(); i < producedClause.size; i++)
                 out += std::to_string(producedClause.data[i]) + " ";
             return out;
         }
@@ -277,7 +277,7 @@ struct ProducedClauseEquals {
         // exact content comparison otherwise
         auto dataA = prod_cls::data(a);
         auto dataB = prod_cls::data(b);
-        for (size_t i = MALLOB_CLAUSE_METADATA_SIZE; i < prod_cls::size(a); i++) {
+        for (size_t i = ClauseMetadata::numBytes(); i < prod_cls::size(a); i++) {
             if (dataA[i] != dataB[i]) return false;
         }
         return true;
@@ -300,10 +300,10 @@ struct ProducedClauseEqualsCommutative {
         auto dataB = prod_cls::data(b);
 
         // Invariant: All literals of B to the left of this index are already matched
-        size_t idxB = MALLOB_CLAUSE_METADATA_SIZE; 
+        size_t idxB = ClauseMetadata::numBytes(); 
 
         // For each literal of A:
-        for (size_t i = MALLOB_CLAUSE_METADATA_SIZE; i < size; i++) {
+        for (size_t i = ClauseMetadata::numBytes(); i < size; i++) {
             assert(idxB < size);
             // Same literal as at B's current position?
             if (dataA[i] == dataB[idxB]) {

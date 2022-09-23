@@ -20,7 +20,7 @@ WORKDIR mallob
 RUN cd lib && bash fetch_and_build_sat_solvers.sh ckly && cd ..
 RUN mkdir build
 RUN cd build \
-  && cmake -DMALLOB_CERTIFIED_UNSAT=1 -DCMAKE_BUILD_TYPE=RELEASE \
+  && cmake -DCMAKE_BUILD_TYPE=RELEASE \
     -DMALLOB_SUBPROC_DISPATCH_PATH=\"./\" -DMALLOB_ASSERT=1 -DMALLOB_USE_GLUCOSE=0 \
     -DMALLOB_USE_ASAN=0 -DMALLOB_USE_JEMALLOC=1 -DMALLOB_JEMALLOC_DIR=/usr/lib/x86_64-linux-gnu \
     -DMALLOB_LOG_VERBOSITY=3 .. \
