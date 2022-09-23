@@ -21,7 +21,7 @@ You can then build Mallob with CMake option `-DMALLOB_APP_YOURAPPKEY=1` to inclu
 
 ## `setup.cmake`
 
-The CMake file `app/yourappkey/setup.cmake` must contain all directives necessary to build and include your application in Mallob. In principle, if your code only consists of header files transitively included by a single entry point `register.hpp` and if no additional libraries are required, this file may be completely empty (see `app/dummy/setup.cmake`). Otherwise, you should define the compilation units (.cpp files) of your application, add additional include directories and libraries as necessary, and define any external executables your application calls. Please take a look at `app/sat/setup.cmake` for a reasonably complex example including external libraries and a separate subprocess executable.
+The CMake file `app/yourappkey/setup.cmake` must contain all directives necessary to build and include your application in Mallob. In principle, if your code only consists of header files transitively included by a single entry point `register.hpp` and if no additional libraries are required, this file may be completely empty. Otherwise, you should define the compilation units (.cpp files) of your application, add additional include directories and libraries as necessary, and define any external executables your application calls. Please take a look at `app/dummy/setup.cmake` for a simple example which only adds additional compilation units and `app/sat/setup.cmake` for a reasonably complex example featuring external libraries and a separate subprocess executable.
 
 ## `register.hpp`
 
