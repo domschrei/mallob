@@ -27,10 +27,6 @@ typedef std::list<OptGroup*> GroupedOptionsList;
 #define LARGE_INT 9999999
 #define MAX_INT INT32_MAX
 
-#define ROUNDING_BISECTION "bisec"
-#define ROUNDING_PROBABILISTIC "prob"
-#define ROUNDING_FLOOR "floor"
-
 struct Option {
 	std::string id;
 	std::string longid;

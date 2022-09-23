@@ -169,28 +169,24 @@ void Worker::createExpanderGraph() {
     }  
 
     // Create graph, get outgoing edges from this node
-    if (_params.maxIdleDistance() > 0) {
-        _hop_destinations = AdjustablePermutation::createUndirectedExpanderGraph(numWorkers, numBounceAlternatives, _world_rank);        
-    } else {
-        auto permutations = AdjustablePermutation::getPermutations(numWorkers, numBounceAlternatives);
-        _hop_destinations = AdjustablePermutation::createExpanderGraph(permutations, _world_rank);
-        if (_params.hopsUntilCollectiveAssignment() >= 0) {
-            
-            // Create collective assignment structure
-            _coll_assign = CollectiveAssignment(
-                _job_db, MyMpi::size(_comm), 
-                AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, _world_rank),
-                // Callback for receiving a job request
-                [&](const JobRequest& req, int rank) {
-                    MessageHandle handle;
-                    handle.tag = MSG_REQUEST_NODE;
-                    handle.finished = true;
-                    handle.receiveSelfMessage(req.serialize(), rank);
-                    handleRequestNode(handle, JobDatabase::NORMAL);
-                }
-            );
-            _job_db.setCollectiveAssignment(_coll_assign);
-        }
+    auto permutations = AdjustablePermutation::getPermutations(numWorkers, numBounceAlternatives);
+    _hop_destinations = AdjustablePermutation::createExpanderGraph(permutations, _world_rank);
+    if (_params.hopsUntilCollectiveAssignment() >= 0) {
+        
+        // Create collective assignment structure
+        _coll_assign = CollectiveAssignment(
+            _job_db, MyMpi::size(_comm), 
+            AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, _world_rank),
+            // Callback for receiving a job request
+            [&](const JobRequest& req, int rank) {
+                MessageHandle handle;
+                handle.tag = MSG_REQUEST_NODE;
+                handle.finished = true;
+                handle.receiveSelfMessage(req.serialize(), rank);
+                handleRequestNode(handle, JobDatabase::NORMAL);
+            }
+        );
+        _job_db.setCollectiveAssignment(_coll_assign);
     }
 
     // Output found bounce alternatives

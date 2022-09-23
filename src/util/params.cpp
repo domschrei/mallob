@@ -102,8 +102,9 @@ void Parameters::printUsage() const {
         // Output group header, formatted based on num. levels in the group's ID
         int numLevels = 0;
         for (auto c : group->groupId) if (c == '/') numLevels++;
-        if (numLevels == 0) LOG_OMIT_PREFIX(V2_INFO, "\n=== %s ===\n\n", group->desc.c_str());
-        else if (numLevels == 1) LOG_OMIT_PREFIX(V2_INFO, "\n* %s *\n\n", group->desc.c_str());
+        const char* secondLinebreak = group->map.empty() ? "" : "\n";
+        if (numLevels == 0) LOG_OMIT_PREFIX(V2_INFO, "\n=== %s ===%s\n", group->desc.c_str(), secondLinebreak);
+        else if (numLevels == 1) LOG_OMIT_PREFIX(V2_INFO, "\n* %s *%s\n", group->desc.c_str(), secondLinebreak);
         else LOG_OMIT_PREFIX(V2_INFO, "\n%s:\n", group->desc.c_str());
 
         auto& map = group->map;
@@ -120,10 +121,10 @@ void Parameters::printUsage() const {
             const char* typeStr = opt->getTypeString();
 
             if (opt->hasLongOption()) {
-                LOG_OMIT_PREFIX(V2_INFO, "-%s , -%s (%s%s)\n\t\t%s\n", 
+                LOG_OMIT_PREFIX(V2_INFO, "-%s , -%s (%s%s)\n\t%s\n", 
                     id.c_str(), opt->longid.c_str(), typeStr, defaultVal.c_str(), opt->desc.c_str());
             } else {
-                LOG_OMIT_PREFIX(V2_INFO, "-%s (%s%s)\n\t\t%s\n", 
+                LOG_OMIT_PREFIX(V2_INFO, "-%s (%s%s)\n\t%s\n", 
                     id.c_str(), typeStr, defaultVal.c_str(), opt->desc.c_str());
             }
         }
