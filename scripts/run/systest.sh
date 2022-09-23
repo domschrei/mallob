@@ -9,9 +9,14 @@ mkdir -p .api/jobs.0/
 mkdir -p .api/jobs.0/{in,out,introduced}/
 cleanup
 
+glucose="l"
+if [ x$GLUCOSE == x1 ]; then 
+    glucose="g"
+fi
+
 function test_mono() {
     for mode in fork thread; do
-        for slv in lgck; do
+        for slv in l${glucose}ck; do
 
             instancefile="instances/r3sat_300.cnf"
             test 1 -t=1 -mono=$instancefile -satsolver=$slv -appmode=$mode -assertresult=SAT $@
@@ -28,7 +33,7 @@ function test_mono() {
 
 function test_scheduling() {
     for lbc in 4 8; do
-        for slv in lgck; do
+        for slv in l${glucose}ck; do
             # 8 jobs (4 SAT, 4 UNSAT)
             for c in {1..4}; do
                 introduce_job sat-$c instances/r3sat_300.cnf
@@ -52,7 +57,7 @@ function test_dry_scheduling() {
 
 function test_incremental() {
     for test in entertainment08 roverg10 transportg29 ; do
-        for slv in lgck LgCk; do
+        for slv in l${glucose}ck L${glucose}Ck; do
             introduce_incremental_job $test 
             test 4 -c=1 -t=2 -satsolver=$slv -J=1 -incrementaltest $@
         done
@@ -63,7 +68,7 @@ function test_many_incremental() {
     for i in {1..10}; do
         introduce_incremental_job entertainment08
     done
-    test 4 -c=1 -t=2 -satsolver=LgCk -J=10 -ajpc=1 -incrementaltest $@
+    test 4 -c=1 -t=2 -satsolver=L${glucose}Ck -J=10 -ajpc=1 -incrementaltest $@
 }
 
 function test_oscillating() {
@@ -84,14 +89,14 @@ function test_oscillating() {
     wclimit=60s application=$app priority=0.2 introduce_job sat-main-2 instances/r3sat_500.cnf
     wclimit=60s application=$app priority=0.3 introduce_job sat-main-3 instances/r3sat_500.cnf
     wclimit=60s application=$app priority=0.4 introduce_job sat-main-4 instances/r3sat_500.cnf
-    nocleanup=1 test 32 -t=1 -c=1 -J=$((n+4)) -satsolver=lgck -checkjsonresults $@
+    nocleanup=1 test 32 -t=1 -c=1 -J=$((n+4)) -satsolver=l${glucose}ck -checkjsonresults $@
 }
 
 function test_incremental_scheduling() {
     for test in entertainment08 roverg10 transportg29 towers05 ; do
         introduce_incremental_job $test
     done
-    test 8 -t=1 -c=1 -satsolver=LgCk -J=4 -incrementaltest $@
+    test 8 -t=1 -c=1 -satsolver=L${glucose}Ck -J=4 -incrementaltest $@
 }
 
 

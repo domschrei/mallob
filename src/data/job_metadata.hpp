@@ -10,6 +10,7 @@
 
 struct JobMetadata {
 
+    std::string jobName;
     std::unique_ptr<JobDescription> description;
     std::vector<std::string> files;
     std::vector<int> dependencies;
@@ -17,7 +18,8 @@ struct JobMetadata {
     bool interrupt = false;
 
     JobMetadata() {}
-    JobMetadata(JobMetadata&& other) : 
+    JobMetadata(JobMetadata&& other) :
+        jobName(std::move(other.jobName)),
         description(std::move(other.description)), 
         files(std::move(other.files)), 
         dependencies(std::move(other.dependencies)),

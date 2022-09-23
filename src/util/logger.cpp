@@ -258,7 +258,6 @@ void Logger::log(va_list& args, unsigned int options, const char* str) const {
         if (!_quiet) printf("%.3f %i%s ", elapsedRel, _rank, _line_prefix.c_str());
         if (_log_cfile != nullptr) {
             fprintf(_log_cfile, "%.3f %i%s ", elapsedRel, _rank, _line_prefix.c_str());
-            if (_flush_file_immediately) fflush(_log_cfile);
         }
     }
 
@@ -271,11 +270,13 @@ void Logger::log(va_list& args, unsigned int options, const char* str) const {
         if (!_quiet) printf(" %s [%i]\n", arrowStr, otherRank);
         if (_log_cfile != nullptr) {
             fprintf(_log_cfile, " %s [%i]\n", arrowStr, otherRank);
-            if (_flush_file_immediately) fflush(_log_cfile);
         }
     }
     va_end(argsCopy); // destroy copy
-
+    
+    // Immediate file flushing if desired
+    if (_log_cfile != nullptr && _flush_file_immediately) fflush(_log_cfile);
+    
     // Reset terminal colors
     if (!_quiet && _colored_output) {
         std::cout << Modifier(Code::FG_DEFAULT);

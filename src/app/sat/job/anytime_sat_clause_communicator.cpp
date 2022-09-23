@@ -147,7 +147,7 @@ void AnytimeSatClauseCommunicator::communicate() {
     if (!session._allreduce_filter.hasProducer() && _job->hasFilteredSharing()) {
         LOG(V4_VVER, "%s CS produce filter\n", _job->toStr());
         session._allreduce_filter.produce([&]() {return _job->getLocalFilter();});
-    } 
+    }
 
     // Advance all-reduction of filter
     session._allreduce_filter.advance();

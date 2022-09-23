@@ -133,8 +133,8 @@ void ThreadedSatJob::appl_dumpStats() {
 
 bool ThreadedSatJob::appl_isDestructible() {
     if (!_initialized) return true;
-    return ((AnytimeSatClauseCommunicator*) _clause_comm)->isDestructible() 
-        && _solver->isCleanedUp();
+    return //((AnytimeSatClauseCommunicator*) _clause_comm)->isDestructible() && 
+        _solver->isCleanedUp();
 }
 
 void ThreadedSatJob::appl_communicate() {
