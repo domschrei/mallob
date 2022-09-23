@@ -208,7 +208,8 @@ Instead of the "solution" field, the response may also contain the fields "solut
 
 Mallob can be extended in the following ways:
 
-* New options to the application (or a subsystem thereof) can be added in `src/optionslist.hpp`.
+* New options for Mallob can be added in `src/optionslist.hpp`.
+    - Options which are specific to a certain application can be found and edited in `src/app/$APPKEY/options.hpp`.
 * To add a new SAT solver to be used in a SAT solver engine, do the following:
     - Add a subclass of `PortfolioSolverInterface`. (You can use the existing implementation for any of the existing solvers and adapt it to your solver.)
     - Add your solver to the portfolio initialization in `src/app/sat/execution/engine.cpp`.
