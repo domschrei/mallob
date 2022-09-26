@@ -61,6 +61,12 @@ private:
     // Safeguards _ready_job_queue.
     Mutex _ready_job_lock;
 
+    // For jobs which could not be initialized.
+    std::list<std::string> _failed_job_queue;
+    std::atomic_int _num_failed_jobs = 0;
+    // Safeguards _failed_job_queue.
+    Mutex _failed_job_lock;
+
     // For active jobs in the system. ONLY ACCESSIBLE FROM CLIENT'S MAIN THREAD.
     std::map<int, std::unique_ptr<JobDescription>> _active_jobs;
     

@@ -41,6 +41,7 @@ public:
         else if (unit == MINUTES) return _value_seconds / 60;
         else if (unit == HOURS) return _value_seconds / (60 * 60);
         else if (unit == DAYS) return _value_seconds / (60 * 60 * 24);
+        return 0;
     }
 };
 

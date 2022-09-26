@@ -52,6 +52,7 @@ private:
                     if (params.size() > 3) result = std::min(result, params[3]);
                     return result;
             }
+            return 0;
         }
     };
 
