@@ -76,7 +76,13 @@ public:
             FileUtils::rm(eventFile);
 
         } catch (const nlohmann::detail::parse_error& e) {
-            LOGGER(log, V1_WARN, "[WARN] Parse error on %s: %s\n", eventFile.c_str(), e.what());
+            LOGGER(log, V1_WARN, "[WARN] Rejecting submission %s - reason: Parse error: %s\n", event.name.c_str(), e.what());
+            return;
+        } catch (const nlohmann::detail::type_error& e) {
+            LOGGER(log, V1_WARN, "[WARN] Rejecting submission %s - reason: Type error: %s\n", event.name.c_str(), e.what());
+            return;
+        } catch (const std::exception& e) {
+            LOGGER(log, V1_WARN, "[WARN] Rejecting submission %s - reason: Unknown error: %s\n", event.name.c_str(), e.what());
             return;
         }
     }

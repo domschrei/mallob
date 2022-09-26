@@ -77,7 +77,10 @@ public:
         case EOF:
             _comment = false;
             if (_began_num) {
-                assert(_num == 0);
+                if (_num != 0) {
+                    _valid_input = false;
+                    return;
+                }
                 if (!_assumption) desc.addPermanentData(0);
                 _began_num = false;
             }
@@ -116,7 +119,7 @@ public:
     }
 
     bool isValidInput() const {
-        return !_raw_content_mode || _valid_input;
+        return _valid_input;
     }
 };
 

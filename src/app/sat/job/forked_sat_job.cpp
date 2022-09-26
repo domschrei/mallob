@@ -173,13 +173,12 @@ bool ForkedSatJob::checkClauseComm() {
 }
 
 void ForkedSatJob::appl_communicate() {
-    if (!_initialized) return;
     if (!checkClauseComm()) return;
     ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
 }
 
 void ForkedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    if (!_initialized || !checkClauseComm()) {
+    if (!checkClauseComm()) {
         if (!msg.returnedToSender) {
             msg.returnedToSender = true;
             MyMpi::isend(source, mpiTag, msg);
