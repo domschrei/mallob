@@ -10,6 +10,9 @@ Edit and extend for your application.
 */
 class DummyJob : public Job {
 
+private:
+    JobResult _result;
+
 public:
     DummyJob(const Parameters& params, const JobSetup& setup) 
         : Job(params, setup) {}
@@ -18,7 +21,7 @@ public:
     void appl_resume() override {}
     void appl_terminate() override {}
     int appl_solved() override {return -1;}
-    JobResult&& appl_getResult() override {return JobResult();}
+    JobResult&& appl_getResult() override {return std::move(_result);}
     void appl_communicate() override {}
     void appl_communicate(int source, int mpiTag, JobMessage& msg) override {}
     void appl_dumpStats() override {}
