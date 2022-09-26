@@ -391,6 +391,7 @@ void SatProcessAdapter::doPrepareSolution() {
     // ACCESS the existing shared memory segment to the solution vector
     int* shmemSolution = (int*) SharedMemory::access(_shmem_id + ".solution." + std::to_string(rev), *solutionSize*sizeof(int));
     
+    _solution.revision = rev;
     _solution.result = _hsm->result;
     _solution.setSolutionToSerialize(shmemSolution, *solutionSize);
     _solution_in_preparation = false;

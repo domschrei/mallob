@@ -27,6 +27,7 @@ struct SatSharedMemory {
     bool doStartNextRevision;
     bool doTerminate;
     bool doCrash;
+    bool doCloseRevision;
 
     // Responses child->parent
     bool didExport;
@@ -36,6 +37,7 @@ struct SatSharedMemory {
     bool didDumpStats;
     bool didStartNextRevision;
     bool didTerminate;
+    bool didCloseRevision;
 
     // State alerts child->parent
     bool isInitialized;
@@ -43,7 +45,7 @@ struct SatSharedMemory {
     SatResult result;
     int solutionRevision;
     
-    // Clause buffers: parent->child
+    // Clause buffers & state alerts parent->child
     int exportBufferAllocatedSize;
     int exportBufferMaxSize;
     int importBufferMaxSize;
@@ -51,6 +53,7 @@ struct SatSharedMemory {
     int importBufferRevision;
     int returnedBufferSize;
     Checksum importChecksum;
+    int revisionToClose;
     
     // Clause buffers: child->parent
     int exportBufferTrueSize;
@@ -58,4 +61,5 @@ struct SatSharedMemory {
     int filterSize;
     int lastNumClausesToImport;
     int lastNumAdmittedClausesToImport;
+
 };

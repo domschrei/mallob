@@ -361,7 +361,7 @@ void Worker::checkActiveJob() {
     if (isRoot) abort = _job_db.checkComputationLimits(id);
     if (abort) {
         // Timeout (CPUh or wallclock time) hit
-        timeoutJob(id);
+        timeoutJob(job);
     } else if (job.getState() == ACTIVE) {
         
         // Main loop of the job to check for results
@@ -441,7 +441,7 @@ void Worker::handleCancelJob(MessageHandle& handle) {
             MSG_NOTIFY_CLIENT_JOB_ABORTING, handle.moveRecvData());
     }
 
-    propagateRevisionClosed(jobId, revision, /*successfulRank=*/-1);
+    propagateRevisionClosed(jobId, revision, /*successfulRank=*/job.getJobTree().getRootNodeRank());
 }
 
 void Worker::handleAnswerAdoptionOffer(MessageHandle& handle) {
@@ -704,8 +704,10 @@ void Worker::tryAdoptRequest(JobRequest& req, int source, JobDatabase::JobReques
 void Worker::handleIncrementalJobFinished(MessageHandle& handle) {
     int jobId = Serializable::get<int>(handle.getRecvData());
     if (_job_db.has(jobId)) {
-        LOG(V3_VERB, "Incremental job %s done\n", _job_db.get(jobId).toStr());
-        propagateRevisionClosed(jobId, /*revision=*/-1, /*successfulRank=*/-1);
+        Job& job = _job_db.get(jobId);
+        LOG(V3_VERB, "Incremental job %s done\n", job.toStr());
+        propagateRevisionClosed(jobId, /*revision=*/-1, 
+            /*successfulRank=*/job.getJobTree().getRootNodeRank());
     }
 }
 
@@ -883,10 +885,21 @@ void Worker::handleSendJobDescription(MessageHandle& handle) {
     if (job.getState() != ACTIVE) return;
 
     // Arrived at final revision?
-    if (_job_db.get(jobId).getRevision() < _job_db.get(jobId).getDesiredRevision()) {
+    if (job.getRevision() < job.getDesiredRevision()) {
         // No: Query next revision
-        MyMpi::isend(handle.source, MSG_QUERY_JOB_DESCRIPTION, IntPair(jobId, _job_db.get(jobId).getRevision()+1));
+        MyMpi::isend(handle.source, MSG_QUERY_JOB_DESCRIPTION, 
+            IntPair(jobId, _job_db.get(jobId).getRevision()+1));
     }
+
+    // Mark children to receive the new revision next
+    if (job.getJobTree().hasLeftChild()) 
+        job.addChildWaitingForRevision(job.getJobTree().getLeftChildNodeRank(), job.getRevision());
+    if (job.getJobTree().hasRightChild()) 
+        job.addChildWaitingForRevision(job.getJobTree().getRightChildNodeRank(), job.getRevision());
+    
+    // Perform active job checking stuff immediately
+    if (job.getJobTree().hasLeftChild() || job.getJobTree().hasRightChild())
+        checkActiveJob();
 }
 
 void Worker::handleNotifyVolumeUpdate(MessageHandle& handle) {
@@ -949,7 +962,7 @@ void Worker::handleNotifyResultFound(MessageHandle& handle) {
         return;
     }
     
-    LOG_ADD_SRC(V3_VERB, "#%i rev. %i solved", successfulRank, jobId, revision);
+    LOG(V3_VERB, "#%i rev. %i solved, successful rank [%i]\n", jobId, revision, successfulRank);
 
     // Notify client
     sendJobDoneWithStatsToClient(jobId, revision, successfulRank);
@@ -1316,11 +1329,12 @@ void Worker::sendJobDoneWithStatsToClient(int jobId, int revision, int successfu
     MyMpi::isend(clientRank, MSG_NOTIFY_JOB_DONE, stats);
 }
 
-void Worker::timeoutJob(int jobId) {
+void Worker::timeoutJob(Job& job) {
 
     // TODO introduce timeouts on a per-revision basis
     // => close the current revision, not the entire job.
-    propagateRevisionClosed(jobId, /*revision=*/-1, /*successfulRank=*/-1);
+    propagateRevisionClosed(job.getId(), /*revision=*/-1, 
+        /*successfulRank=*/job.getJobTree().getRootNodeRank());
     
     if (_params.monoFilename.isSet()) {
         // Single job hit a limit, so there is no solution to be reported:

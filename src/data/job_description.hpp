@@ -222,6 +222,7 @@ public:
     }
 
     void transferRevisionData(JobDescription& other, int revision) {
+        while (revision >= _data_per_revision.size()) _data_per_revision.emplace_back();
         getRevisionData(revision) = other.getRevisionData(revision);
         setRevision(std::max(getRevision(), revision));
     }

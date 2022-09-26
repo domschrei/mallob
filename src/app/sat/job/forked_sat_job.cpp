@@ -111,10 +111,9 @@ void ForkedSatJob::appl_loop() {
 
         auto& result = _solver->getSolution();
         int resultCode = result.result;
-        LOG_ADD_DEST(V2_INFO, "%s rev. %i : found result %s", getJobTree().getRootNodeRank(), toStr(), getRevision(), 
+        LOG_ADD_DEST(V2_INFO, "%s rev. %i : found result %s", getJobTree().getRootNodeRank(), toStr(), result.revision, 
                             resultCode == RESULT_SAT ? "SAT" : resultCode == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         result.id = getId();
-        result.revision = getRevision();
         publishResult(std::move(result));
 
     } else if (status == SatProcessAdapter::CRASHED) {
@@ -133,6 +132,12 @@ void ForkedSatJob::appl_loop() {
         // Start new solver (with renamed shared memory segments)
         doStartSolver();
     }
+
+    std::string revisionReport;
+    for (int r = 0; r <= getRevision(); r++) {
+        revisionReport += isRevisionOpen(r) ? "0" : "1";
+    }
+    LOG(V2_INFO, "%s : revisions closed: %s\n", toStr(), revisionReport.c_str());
 }
 
 void ForkedSatJob::appl_dumpStats() {

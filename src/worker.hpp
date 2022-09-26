@@ -112,7 +112,7 @@ private:
     void propagateVolumeUpdate(Job& job, int volume, int balancingEpoch);
 
     void sendJobDoneWithStatsToClient(int jobId, int revision, int successfulRank);
-    void timeoutJob(int jobId);
+    void timeoutJob(Job& job);
     void propagateRevisionClosed(int jobId, int revision, int successfulRank);
 
     void sendStatusToNeighbors();

@@ -261,6 +261,7 @@ void Job::publishResult(JobResult&& result) {
 }
 
 bool Job::isNewSuccessfulRank(int revision, int rank) {
+    if (rank < 0) return false;
     if (revision >= _successful_rank_by_revision.size())
         return true;
     return _successful_rank_by_revision[revision] < 0;

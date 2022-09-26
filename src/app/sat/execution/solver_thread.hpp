@@ -88,6 +88,13 @@ public:
 
     void start();
     void appendTask(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, bool attemptToSolve);
+    void closeTask(int revision) {
+        auto lock = _state_mutex.getLock();
+        auto& task = _tasks.at(revision);
+        assert(task->revision == revision);
+        task->attemptToSolve = false;
+        // TODO interrupt solver if this is the current revision
+    }
     void setSuspend(bool suspend) {
         {
             auto lock = _state_mutex.getLock();

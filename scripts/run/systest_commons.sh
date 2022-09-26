@@ -67,6 +67,8 @@ function run_async_incremental() {
 
         donefiles="$donefiles "".api/jobs.0/out/admin.${file}#$result"
         nintroduced=$((nintroduced+1))
+
+        while [ -f ".api/jobs.0/in/${file}" ]; do sleep 0.01; done
     done < __tmp
     rm __tmp
 
@@ -104,11 +106,8 @@ function run_async_incremental() {
     file=$(echo $endjob|awk '{print $1}')
     echo "$BASHPID: Initiate $file"
     cp .api/jobs.0/{introduced,in}/$file
-    donefile=".api/jobs.0/out/admin.${file}"
-    while [ ! -f $donefile ]; do sleep 0.1; done
-    echo "$BASHPID: Found $donefile"
-    rm $donefile
-
+    while [ -f ".api/jobs.0/in/$file" ]; do sleep 0.1; done
+    
     echo "$BASHPID: Done."
 }
 

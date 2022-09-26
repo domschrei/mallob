@@ -335,10 +335,25 @@ void Client::introduceNextJob() {
         auto it = _ready_job_queue.begin(); 
         for (; it != _ready_job_queue.end(); ++it) {
             auto& j = *it;
+
+            // Check that we are allowed to schedule this job:
             // Either there is still space for another job,
             // or the job must be incremental and already active
             if (lbc <= 0 || _active_jobs.size() < lbc || 
                 (j->isIncremental() && _active_jobs.count(j->getId()))) {
+
+                // If this incremental job was not yet scheduled
+                // and the ready job represents a revision > 0, do not introduce it yet
+                if (j->isIncremental() && !_root_nodes.count(j->getId()) && j->getRevision() > 0)
+                    continue;
+                
+                // If the ready job represents a revision whose direct predecessor
+                // has not been introduced yet, do not introduce it yet
+                if (j->isIncremental() && _root_nodes.count(j->getId()) 
+                    && j->getRevision() > _active_jobs[j->getId()]->getRevision()+1)
+                    continue;
+
+                // This job (revision) can and will be scheduled
                 jobPtr = std::move(j);
                 break;
             }
