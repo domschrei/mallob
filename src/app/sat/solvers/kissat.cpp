@@ -3,6 +3,7 @@ extern "C" {
 #include "kissat/src/kissat.h"
 }
 #include "kissat.hpp"
+#include "util/distribution.hpp"
 
 
 
@@ -41,10 +42,14 @@ void Kissat::diversify(int seed) {
 	// Options may only be set in the initialization phase, so the seed cannot be re-set
     LOGGER(_logger, V3_VERB, "Diversifying %i\n", getDiversificationIndex());
 
-    kissat_set_option(solver, "seed", seed);
+    // Basic configuration options for all solvers
     kissat_set_option(solver, "quiet", 1);
     kissat_set_option(solver, "check", 0); // do not check model or derived clauses
+    
+    // Set random seed
+    kissat_set_option(solver, "seed", seed);
 
+    // Base portfolio of different configurations
     switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
     case 0: kissat_set_option(solver, "eliminate", 0); break;
     case 1: kissat_set_option(solver, "delay", 10); break;
@@ -56,13 +61,31 @@ void Kissat::diversify(int seed) {
     case 7: kissat_set_configuration(solver, "sat"); break;
     case 8: kissat_set_option(solver, "probe", 0); break;
     case 9: kissat_set_option(solver, "tier1", 3); kissat_set_option(solver, "tier2", 8); break;
+    }
 
-    // unused
-    case 10: kissat_set_option(solver, "walkinitially", 1); kissat_set_option(solver, "walkeffort", 1e6); break;
-    case 11: kissat_set_option(solver, "tier2", 8); break;
-    case 12: kissat_set_configuration(solver, "plain"); break;
-    case 13: kissat_set_option(solver, "tier2", 3); break;
-    case 14: kissat_set_configuration(solver, "default"); break;
+    // Randomize ("jitter") certain options around their default value
+    if (getDiversificationIndex() >= getNumOriginalDiversifications()) {
+        std::mt19937 rng(seed);
+        Distribution distribution(rng);
+
+        // Randomize restart frequency
+        double meanRestarts = kissat_get_option(solver, "restartint");
+        double maxRestarts = std::min(10e4, 20*meanRestarts);
+        distribution.configure(Distribution::NORMAL, std::vector<double>{
+            /*mean=*/meanRestarts, /*stddev=*/10, /*min=*/1, /*max=*/maxRestarts
+        });
+        int restartFrequency = (int) std::round(distribution.sample());
+        kissat_set_option(solver, "restartint", restartFrequency);
+
+        // Randomize score decay
+        double meanDecay = kissat_get_option(solver, "decay");
+        distribution.configure(Distribution::NORMAL, std::vector<double>{
+            /*mean=*/meanDecay, /*stddev=*/3, /*min=*/1, /*max=*/200
+        });
+        int decay = (int) std::round(distribution.sample());
+        kissat_set_option(solver, "decay", decay);
+        
+        LOGGER(_logger, V3_VERB, "Sampled restartint=%i decay=%i\n", restartFrequency, decay);
     }
 
     seedSet = true;

@@ -13,6 +13,7 @@
 
 #include "lingeling.hpp"
 #include "util/sys/timer.hpp"
+#include "util/distribution.hpp"
 
 extern "C" {
 	#include "lglib.h"
@@ -121,11 +122,8 @@ void Lingeling::diversify(int seed) {
 	lglsetopt(solver, "seed", seed);
 	int rank = getDiversificationIndex();
 
-	// This method is based on Plingeling (mix of ayv and bcj)
-
-	lglsetopt(solver, "classify", 0); // NEW
-	//lglsetopt(solver, "flipping", 0); // OLD
-
+	// This portfolio is based on Plingeling (mix of ayv and bcj)
+	lglsetopt(solver, "classify", 0);
     switch (rank % numDiversifications) {
 		case 0: lglsetopt (solver, "gluescale", 5); break; // from 3 (value "ld" moved)
 		case 1: 
@@ -150,6 +148,22 @@ void Lingeling::diversify(int seed) {
 			lglsetopt (solver, "block", 0); 
 			lglsetopt (solver, "cce", 0); 
 			break;
+	}
+
+	if (rank >= getNumOriginalDiversifications()) {
+		std::mt19937 rng(seed);
+        Distribution distribution(rng);
+
+        // Randomize restart frequency
+        double meanRestarts = lglgetopt(solver, "restartint");
+        double maxRestarts = std::min(10e4, 20*meanRestarts);
+        distribution.configure(Distribution::NORMAL, std::vector<double>{
+            /*mean=*/meanRestarts, /*stddev=*/10, /*min=*/1, /*max=*/maxRestarts
+        });
+        int restartFrequency = (int) std::round(distribution.sample());
+        lglsetopt(solver, "restartint", restartFrequency);
+
+		LOGGER(_logger, V3_VERB, "Sampled restartint=%i\n", restartFrequency);
 	}
 
 	setClauseSharing(getNumOriginalDiversifications());
