@@ -11,3 +11,4 @@ instances/*.uri
 upload.sh
 download.sh
 src/app/register_*.h
+src/app/register_*.h~

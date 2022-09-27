@@ -74,15 +74,29 @@ endfunction()
 # Add application-specific build configuration
 
 # Setup (do not change)
-file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_includes.h" "")
-file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_commands.h" "")
-file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_options.h" "")
+file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_includes.h~" "")
+file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_commands.h~" "")
+file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_options.h~" "")
 function(register_mallob_app appkey)
     message("Registering application: ${appkey}")
-    file(APPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_includes.h" "#include \"app/${appkey}/register.hpp\"\n")
-    file(APPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_options.h" "#include \"app/${appkey}/options.hpp\"\n")
-    file(APPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_commands.h" "register_mallob_app_${appkey}();\n")
+    file(APPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_includes.h~" "#include \"app/${appkey}/register.hpp\"\n")
+    file(APPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_options.h~" "#include \"app/${appkey}/options.hpp\"\n")
+    file(APPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_commands.h~" "register_mallob_app_${appkey}();\n")
     include(${CMAKE_CURRENT_SOURCE_DIR}/src/app/${appkey}/setup.cmake)
+endfunction()
+function(publish_app_registry_changes)
+    execute_process(COMMAND ${CMAKE_COMMAND} -E compare_files 
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_options.h" 
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_options.h~" 
+        RESULT_VARIABLE compare_result)
+    if(compare_result EQUAL 0)
+        message("No changes in register options.")
+    else()
+        message("Moving changed app registry.")
+        file(RENAME "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_includes.h~" "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_includes.h")
+        file(RENAME "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_options.h~" "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_options.h")
+        file(RENAME "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_commands.h~" "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_commands.h")
+    endif() 
 endfunction()
 
 # Include applications
@@ -95,6 +109,7 @@ endif()
 #    register_mallob_app("yourapp")
 #endif()
 # ...
+publish_app_registry_changes()
 
 
 # Library with Mallob's common source files
