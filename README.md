@@ -26,6 +26,7 @@ Note that we only support Linux as an operating system.
 ## Building
 
 ```
+# For non-x86-64 architectures (ARM, POWER9, etc.), set DISABLE_FPU=1 for the bash call
 ( cd lib && bash fetch_and_build_sat_solvers.sh )
 mkdir -p build
 cd build
