@@ -10,13 +10,6 @@ elif [ x$DISABLE_FPU != x1 ]; then
     exit 1
 fi
 
-if $disable_fpu; then
-    echo "Disabling FPU"
-else
-    echo "Keeping FPU"
-fi
-exit 0
-
 if [ -z $1 ]; then
     solvers="cglyk"
     echo "Defaulting to solvers $solvers (supply another string to override solvers to build)"
