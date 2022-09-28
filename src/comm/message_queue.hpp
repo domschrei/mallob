@@ -207,8 +207,8 @@ private:
                 return;
             }
 
-            size_t begin = sentBatches*sizePerBatch;
-            size_t end = std::min(data->size(), (size_t)(sentBatches+1)*sizePerBatch);
+            size_t begin = ((size_t)sentBatches)*sizePerBatch;
+            size_t end = std::min(data->size(), ((size_t)(sentBatches+1))*sizePerBatch);
             assert(end>begin || LOG_RETURN_FALSE("%ld <= %ld\n", end, begin));
             size_t msglen = (end-begin)+3*sizeof(int);
             if (msglen > tempStorage.size()) tempStorage.resize(msglen);
