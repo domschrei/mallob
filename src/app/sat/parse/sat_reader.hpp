@@ -71,7 +71,8 @@ public:
 
         if (_comment && c != '\n') return;
 
-        switch (c) {
+        signed char uc = *((signed char*) &c);
+        switch (uc) {
         case '\n':
         case '\r':
         case EOF:
