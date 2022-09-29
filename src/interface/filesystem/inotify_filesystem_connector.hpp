@@ -69,8 +69,11 @@ public:
                 std::string name = result["name"].get<std::string>();
                 std::string jobName = user + "." + name + ".json";
                 // Write JSON to "out" directory
-                std::ofstream o(_base_path + "/out/" + jobName);
+                auto intermediateOutput = _base_path + "/~" + jobName;
+                auto finalOutput = _base_path + "/out/" + jobName;
+                std::ofstream o(intermediateOutput);
                 o << std::setw(4) << result << std::endl;
+                std::rename(intermediateOutput.c_str(), finalOutput.c_str());
             };
 
             // Handle JSON file
