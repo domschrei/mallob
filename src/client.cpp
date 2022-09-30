@@ -34,6 +34,7 @@ void Client::readIncomingJobs() {
     LOGGER(log, V3_VERB, "Starting\n");
 
     std::vector<std::future<void>> taskFutures;
+    std::set<std::pair<int, int>> unreadyJobs;
 
     while (true) {
         // Wait for a nonempty incoming job queue
@@ -48,13 +49,24 @@ void Client::readIncomingJobs() {
         auto lock = _incoming_job_lock.getLock();
         float time = Timer::elapsedSeconds();
 
+        auto checkUnready = [&](const std::unique_ptr<JobDescription>& desc) {
+            auto pair = std::pair<int, int>(desc->getId(), desc->getRevision());
+            if (!unreadyJobs.count(pair)) {
+                LOGGER(log, V2_INFO, "Deferring #%i rev. %i\n", pair.first, pair.second);
+                unreadyJobs.insert(pair);
+            }
+        };
+
         // Find a single job eligible for parsing
         bool foundAJob = false;
         for (auto& data : _incoming_job_queue) {
             
             // Jobs are sorted by arrival:
             // If this job has not arrived yet, then none have arrived yet
-            if (time < data.description->getArrival()) break;
+            if (time < data.description->getArrival()) {
+                checkUnready(data.description);
+                continue;
+            }
 
             // Check job's dependencies
             bool dependenciesSatisfied = true;
@@ -77,10 +89,15 @@ void Client::readIncomingJobs() {
                     }
                 }
             }
-            if (!dependenciesSatisfied) continue;
+            if (!dependenciesSatisfied) {
+                checkUnready(data.description);
+                continue;
+            }
 
             // Job can be read: Enqueue reader task into thread pool
             LOGGER(log, V4_VVER, "ENQUEUE #%i\n", data.description->getId());
+            unreadyJobs.erase(std::pair<int, int>(data.description->getId(), data.description->getRevision()));
+
             auto node = _incoming_job_queue.extract(data);
             auto future = ProcessWideThreadPool::get().addTask(
                 [this, &log, foundJobPtr = new JobMetadata(std::move(node.value()))]() mutable {
