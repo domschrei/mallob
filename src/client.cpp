@@ -94,6 +94,25 @@ void Client::readIncomingJobs() {
                 continue;
             }
 
+            // Check if all job descriptions are already present
+            bool jobDescriptionsPresent = true;
+            for (auto& file : data.files) {
+                if (!FileUtils::isRegularFile(file)) {
+                    jobDescriptionsPresent = false;
+                    break;
+                }
+            }
+            if (!jobDescriptionsPresent) {
+                // Print out waiting message every second
+                if (time - data.lastDescriptionAvailabilityCheck >= 1) {
+                    LOGGER(log, V2_INFO, "Waiting for a job description of #%i rev. %i\n", 
+                        data.description->getId(),
+                        data.description->getRevision());
+                    data.lastDescriptionAvailabilityCheck = time;
+                }
+                continue;
+            }
+
             // Job can be read: Enqueue reader task into thread pool
             LOGGER(log, V4_VVER, "ENQUEUE #%i\n", data.description->getId());
             unreadyJobs.erase(std::pair<int, int>(data.description->getId(), data.description->getRevision()));

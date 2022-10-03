@@ -18,6 +18,8 @@ struct JobMetadata {
     std::vector<int> dependencies;
     bool done = false;
     bool interrupt = false;
+    
+    mutable float lastDescriptionAvailabilityCheck = 0;
 
     JobMetadata() {}
     JobMetadata(JobMetadata&& other) :
