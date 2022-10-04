@@ -12,6 +12,7 @@
 #include "reverse.hpp"
 #include "prune.hpp"
 
+
 void print_usage(char *name, boost::program_options::options_description desc){
     printf("Usage:  %s [options] PROBLEM.dimacs OUTPUT.lrat INPUT.frat...\n", name);
     printf("\n");
@@ -58,10 +59,11 @@ result_code_t main_combine_input_files(char *combined_file, std::vector<std::str
 
 //Reverse startfile into revfile, displaying the type being rev_type
 //Also display messages about success/failure and time
-result_code_t main_reverse_file(char* rev_type, char *startfile, char *revfile, bool_t remove_when_done){
+result_code_t main_reverse_file(char* rev_type, char *startfile, char *revfile,
+                                bool_t remove_when_done, bool_t is_binary){
     printf("Reversing %s file...\n", rev_type);
     clock_t begin = clock();
-    result_code_t result = reverse_file(startfile, revfile);
+    result_code_t result = reverse_file(startfile, revfile, is_binary);
     clock_t end = clock();
     double time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
     if (result != SUCCESS){
@@ -78,13 +80,37 @@ result_code_t main_reverse_file(char* rev_type, char *startfile, char *revfile, 
 }
 
 
+//Turn rev_combined into unpruned_file
+//Also display messages about success/failure and time
+result_code_t main_create_unpruned_proof(char *rev_combined, char *unpruned_file,
+                                         int32_t num_infiles, int32_t num_original_clauses,
+                                         bool_t is_binary){
+    printf("Building unpruned reversed combined file...\n");
+    clock_t begin = clock();
+    result_code_t result = prune_proof(rev_combined, unpruned_file, num_infiles,
+                                       num_original_clauses, is_binary, true);
+    clock_t end = clock();
+    double time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
+    if (result != SUCCESS){
+        //all specific messages should be printed in the other function
+        printf("Unable to create unpruned file.  Quitting\n");
+    }
+    else{
+        printf("Successfully wrote unpruned proof file (%f seconds)\n", time_spent);
+    }
+    return result;
+}
+
+
 //Prune rev_combined into pruned_file
 //Also display messages about success/failure and time
 result_code_t main_prune_proof(char *rev_combined, char *pruned_file, int32_t num_infiles,
-                               int32_t num_original_clauses, bool_t remove_when_done){
+                               int32_t num_original_clauses, bool_t remove_when_done,
+                               bool_t is_binary){
     printf("Pruning reversed combined file...\n");
     clock_t begin = clock();
-    result_code_t result = prune_proof(rev_combined, pruned_file, num_infiles, num_original_clauses);
+    result_code_t result = prune_proof(rev_combined, pruned_file, num_infiles,
+                                       num_original_clauses, is_binary, false);
     clock_t end = clock();
     double time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
     if (result != SUCCESS){
@@ -108,6 +134,8 @@ int main(int argc, char **argv){
         ("help", "produce help message")
         ("binary", "read input in binary format")
         ("frat", "read input in FRAT format (defaults to reading LRAT format)")
+        ("write-unpruned", boost::program_options::value<std::string>(),
+         "write the given file with the combined file with delete lines inserted")
         ("loose", "treat parse errors as the end of the file")
         ("keep-temps", "don't remove temporary files when done with them");
     //options for holding positional arguments
@@ -130,19 +158,21 @@ int main(int argc, char **argv){
     pos_opts.add("input_files", -1);
 
     //values to be determined by commandline arguments
-    bool_t is_binary = false;
-    bool_t read_lrat = true;
-    bool_t is_loose = false;
-    bool_t remove_when_done = true;
+    bool is_binary = false;
+    bool read_lrat = true;
+    bool is_loose = false;
+    bool remove_when_done = true;
     std::string dimacsfilename;
     std::string outfilename;
     std::vector<std::string> infilenames;
+    bool write_unpruned = false;
+    std::string unprunedfilename;
 
     //variables resulting from parsing
     boost::program_options::variables_map vm;
 
     //whether the arguments parsed fine
-    bool_t good_args = true;
+    bool good_args = true;
 
     try{
         //parse the arguments
@@ -172,6 +202,11 @@ int main(int argc, char **argv){
 
         if (vm.count("keep-temps")){
             remove_when_done = false;
+        }
+
+        if (vm.count("write-unpruned")){
+            write_unpruned = true;
+            unprunedfilename = vm["write-unpruned"].as<std::string>();
         }
 
         if (vm.count("dimacs_name")){
@@ -224,6 +259,7 @@ int main(int argc, char **argv){
     std::string combined_file = output_path + "._____combined_proof_file.frat";
     std::string rev_combined = output_path + "._____rev_combined_file.frat";
     std::string pruned_file = output_path + "._____pruned_file.lrat";
+    std::string unpruned_file = output_path + "._____unpruned_file.lrat";
 
     result_code_t result;
     int32_t num_original_clauses = 0;
@@ -245,21 +281,56 @@ int main(int argc, char **argv){
     //reverse the combined file
     result = main_reverse_file((char *) "combined", (char *)combined_file.c_str(), 
                                (char *)rev_combined.c_str(),
-                               remove_when_done);
+                               remove_when_done, is_binary);
     if (result != SUCCESS){
         return result;
     }
 
+    //check whether we need an unpruned file
+    if (write_unpruned){
+        result = main_create_unpruned_proof((char *)rev_combined.c_str(),
+                                            (char *)unpruned_file.c_str(),
+                                            infilenames.size(), num_original_clauses,
+                                            is_binary);;
+        if (result != SUCCESS){
+            return result;
+        }
+        //reverse the unpruned file
+        if (is_binary){
+            result = byte_reverse_file((char *)unpruned_file.c_str(),
+                                       (char *)unprunedfilename.c_str());
+            if (remove_when_done){
+                remove((char *)unpruned_file.c_str());
+            }
+        }
+        else{
+            result = main_reverse_file((char *) "unpruned", (char *)unpruned_file.c_str(),
+                                       (char *)unprunedfilename.c_str(),
+                                       remove_when_done, is_binary);
+        }
+    }
+
     //prune the reversed combined file
-    result = main_prune_proof((char *)rev_combined.c_str(), (char *)pruned_file.c_str(), infilenames.size(),
-                              num_original_clauses, remove_when_done);
+    result = main_prune_proof((char *)rev_combined.c_str(), (char *)pruned_file.c_str(),
+                              infilenames.size(), num_original_clauses, remove_when_done,
+                              is_binary);
     if (result != SUCCESS){
         return result;
     }
 
     //reverse the pruned file
-    result = main_reverse_file((char *) "pruned", (char *)pruned_file.c_str(), (char *)outfilename.c_str(),
-                               remove_when_done);
+    if (is_binary){
+        result = byte_reverse_file((char *)pruned_file.c_str(),
+                                   (char *)outfilename.c_str());
+        if (remove_when_done){
+            remove((char *)pruned_file.c_str());
+        }
+    }
+    else{
+        result = main_reverse_file((char *) "pruned", (char *)pruned_file.c_str(),
+                                   (char *)outfilename.c_str(),
+                                   remove_when_done, is_binary);
+    }
 
     if (result == SUCCESS){
         printf("Exiting\n");

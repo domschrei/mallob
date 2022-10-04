@@ -113,7 +113,21 @@ static inline bool_t is_clause_empty(clause_t *clause){
 void print_clause(clause_t *clause);
 
 //Output a clause to a file
-result_code_t output_added_clause(clause_t *clause, FILE *outfile, bool_t frat_format);
+//Returns a code for success or the type of failure
+result_code_t output_added_clause(clause_t *clause, FILE *outfile,
+                                  bool_t frat_format, bool_t is_binary);
+
+//Output a clause to a file in binary, with the file contents in reverse byte order
+result_code_t output_lrat_binary_backward(clause_t *clause, FILE *outfile);
+
+//Write a delete line into outfile:  id  d clauses 0
+//Returns a code for success or the type of failure
+result_code_t output_delete_clauses(clause_id_t clause_id, std::vector<clause_id_t>& clauses,
+                                    FILE *outfile, bool is_binary);
+
+//Write a binary delete line into outfile in reverse byte order
+result_code_t output_backward_delete_clauses(clause_id_t id, std::vector<clause_id_t>& clauses,
+                                             FILE *outfile);
 
 
 

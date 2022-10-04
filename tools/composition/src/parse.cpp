@@ -626,6 +626,185 @@ result_code_t read_input_file_line(int32_t file_index, combine_problem_t *p,
  *                         CNF FILE PARSING                         *
  ********************************************************************/
 
+result_code_t parse_any_line(FILE *infile, clause_t *clause,
+                             std::vector<clause_id_t>& delete_clause,
+                             bool_t *wrote_add_clause){
+    char c;
+    clause_id_t id;
+    clause_id_t secondary_id;
+    int32_t lit;
+    result_code_t result = SUCCESS;
+    bool_t done = false;
+
+    while (result == SUCCESS && !done){
+        int32_t tmp = fscanf(infile, "%" SCN_CLAUSE_ID, &id);
+        if (tmp == EOF){
+            result = END_OF_FILE;
+        }
+        else if (tmp == 0){
+            c = getc(infile);
+            if (c == 'c'){ //move past a comment
+                while (c != EOF && c != '\n'){
+                    c = getc(infile);
+                }
+                if (c == EOF){
+                    result = END_OF_FILE;
+                }
+            }
+            else{
+                printf("Error:  Cannot parse next entry in LRAT file ");
+                printf("not starting with a clause ID\n");
+                result = PARSE_ERROR;
+            }
+        }
+        else{
+            tmp = fscanf(infile, " d %" SCN_CLAUSE_ID, &secondary_id);
+            if (tmp == EOF){
+                printf("Error:  Incomplete clause %" PRI_CLAUSE_ID "at end of file\n", id);
+                result = PARSE_ERROR;
+            }
+            else if (tmp == 1){ //delete
+                *wrote_add_clause = false;
+                tmp = 1;
+                while (tmp != 0 && tmp != EOF && secondary_id != 0){
+                    delete_clause.push_back(secondary_id);
+                    tmp = fscanf(infile, " %" SCN_CLAUSE_ID, &secondary_id);
+                }
+                if (tmp == 0){
+                    printf("Error:  Could not parse delete clause ");
+                    printf("starting with ID %" PRI_CLAUSE_ID "\n", id);
+                    result = PARSE_ERROR;
+                }
+                else if (tmp == EOF){
+                    printf("Error:  File ended before delete clause starting ");
+                    printf("with ID %" PRI_CLAUSE_ID " was complete\n", id);
+                    result = PARSE_ERROR;
+                }
+                else{
+                    result = SUCCESS;
+                    done = true;
+                }
+            }
+            else{ //add line
+                *wrote_add_clause = true;
+                set_clause_id(clause, id);
+                //read literals
+                tmp = fscanf(infile, " %" SCNd32, &lit);
+                while (tmp != 0 && tmp != EOF && lit != 0){
+                    add_clause_literal(clause, lit);
+                    tmp = fscanf(infile, " %" SCNd32, &lit);
+                }
+                if (tmp == 0){
+                    printf("Error:  Could not parse add clause with ");
+                    printf("ID %" PRI_CLAUSE_ID "\n", id);
+                    result = PARSE_ERROR;
+                }
+                else if (tmp == EOF){
+                    printf("Error:  File ended before add clause with ");
+                    printf("ID %" PRI_CLAUSE_ID " was complete\n", id);
+                    result = PARSE_ERROR;
+                }
+                else{
+                    //read proof hint
+                    tmp = fscanf(infile, " %" SCN_CLAUSE_ID, &secondary_id);
+                    while (tmp != 0 && tmp != EOF && secondary_id != 0){
+                        add_clause_proof_clause(clause, secondary_id);
+                        tmp = fscanf(infile, " %" SCN_CLAUSE_ID, &secondary_id);
+                    }
+                    if (tmp == 0){
+                        printf("Error:  Could not parse add clause with ");
+                        printf("ID %" PRI_CLAUSE_ID "\n", id);
+                        result = PARSE_ERROR;
+                    }
+                    else if (tmp == EOF){
+                        printf("Error:  File ended before add clause with ");
+                        printf("ID %" PRI_CLAUSE_ID " was complete\n", id);
+                        result = PARSE_ERROR;
+                    }
+                    else{
+                        result = SUCCESS;
+                        done = true;
+                    }
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
+
+result_code_t parse_any_binary_line(FILE *infile, clause_t *clause,
+                                    std::vector<clause_id_t>& delete_clause,
+                                    bool_t *wrote_add_clause){
+    char c;
+    clause_id_t id;
+    int32_t lit;
+    result_code_t result = SUCCESS;
+
+    c = getc(infile);
+    if (c == EOF){
+        return END_OF_FILE;
+    }
+
+    if (c == 'd'){
+        *wrote_add_clause = false;
+        result = read_clause_id(infile, &id);
+        while (result == SUCCESS && id != 0){
+            delete_clause.push_back(id);
+            result = read_clause_id(infile, &id);
+        }
+        if (id != 0){ //error
+            printf("Error:  Parse error in binary delete clause\n");
+            result = PARSE_ERROR;
+        }
+    }
+    else if (c == 'a'){
+        *wrote_add_clause = true;
+        result = read_clause_id(infile, &id);
+        if (result != SUCCESS){
+            printf("Error:  Parse error in binary add clause\n");
+            return PARSE_ERROR;
+        }
+        set_clause_id(clause, id);
+        //read literals
+        result = read_lit(infile, &lit);
+        while (result == SUCCESS && lit != 0){
+            clause->literals.push_back(lit);
+            result = read_lit(infile, &lit);
+        }
+        if (lit != 0){
+            printf("Error:  Parse error in literals of binary add clause ");
+            printf("with ID %" PRI_CLAUSE_ID "\n", clause->clause_id);
+        }
+        //read proof hint
+        //read literals
+        result = read_clause_id(infile, &id);
+        while (result == SUCCESS && id != 0){
+            clause->proof_clauses.push_back(id);
+            result = read_clause_id(infile, &id);
+        }
+        if (id != 0){
+            printf("Error:  Parse error in proof hint of binary add clause ");
+            printf("with ID %" PRI_CLAUSE_ID "\n", clause->clause_id);
+        }
+    }
+    else{
+        printf("Error:  Unexpected character %c in binary file\n", c);
+        result = PARSE_ERROR;
+    }
+
+    return result;
+}
+
+
+
+
+
+/********************************************************************
+ *                         CNF FILE PARSING                         *
+ ********************************************************************/
+
 result_code_t parse_cnf_file(char *filename, int32_t *num_original_clauses_loc){
     int32_t tmp;
     char c = 0;
@@ -672,28 +851,6 @@ result_code_t parse_cnf_file(char *filename, int32_t *num_original_clauses_loc){
         printf("Error:  Unable to close file %s\n", filename);
     }
 
-    return SUCCESS;
-}
-
-
-
-
-
-/********************************************************************
- *                           OUTPUT PROOF                           *
- ********************************************************************/
-
-result_code_t output_delete_clauses(clause_id_t id, std::vector<clause_id_t>& clauses, FILE *outfile){
-    //write the id and d
-    fprintf(outfile, "%" PRI_CLAUSE_ID " d", id);
-    //write the clauses to delete
-    std::vector<clause_id_t>::iterator itr = clauses.begin();
-    while(itr != clauses.end()){
-        fprintf(outfile, " %" PRI_CLAUSE_ID, *itr);
-        itr++;
-    }
-    //end the line
-    fprintf(outfile, " 0\n");
     return SUCCESS;
 }
 

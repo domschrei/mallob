@@ -6,6 +6,6 @@
 //The output file outfilename will also be in reverse order
 //Returns a result code
 result_code_t prune_proof(char *infilename, char *outfilename, int32_t num_instances,
-                          int32_t num_original_clauses);
+                          int32_t num_original_clauses, bool is_binary, bool unpruned);
 
 #endif

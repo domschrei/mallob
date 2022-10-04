@@ -18,9 +18,9 @@ typedef std::unordered_set<clause_id_t> needed_clause_store_t;
 //Returns 1 if it was found, 0 if it was not found, and -1 if a higher
 //   clause was expected
 static inline
-bool_t exists_and_remove(needed_clause_store_t *store, clause_id_t id,
-                         int32_t num_original_clauses){
-    bool_t exists = store->find(id) != store->end();
+bool exists_and_remove(needed_clause_store_t *store, clause_id_t id,
+                       int32_t num_original_clauses){
+    bool exists = store->find(id) != store->end();
     if (exists){
         store->erase(id);
     }
@@ -33,7 +33,7 @@ bool_t exists_and_remove(needed_clause_store_t *store, clause_id_t id,
 //If id is an original clause, sets already_contained to true
 static inline
 result_code_t add_clause_dependency(needed_clause_store_t *store, clause_id_t id,
-                                    bool_t *already_contained, int32_t num_original_clauses){
+                                    bool *already_contained, int32_t num_original_clauses){
     //check for original clause
     if (id <= num_original_clauses){
         *already_contained = true;
@@ -77,19 +77,27 @@ static inline clause_id_t store_nonempty(needed_clause_store_t *store){
 result_code_t handle_one_clause(FILE *infile, char *infilename, FILE *outfile,
                                 int32_t num_original_clauses, clause_t *clause,
                                 needed_clause_store_t *store,
-                                std::vector<clause_id_t>& delete_clauses){
-    bool_t already_contained;
+                                std::vector<clause_id_t>& delete_clauses,
+                                bool is_binary, bool unpruned){
+    bool already_contained;
 
     //set up and read a clause
     reset_clause(clause);
-    result_code_t result = parse_line(infile, infilename, clause, true, false);
+    result_code_t result;
+    if (is_binary){
+        result = parse_binary_line(infile, infilename, clause, true, false);
+    }
+    else{
+        result = parse_line(infile, infilename, clause, true, false);
+    }
     if (result != SUCCESS){
         return result;
     }
 
     //check if we need this clause and take it out since we found it
-    bool_t exists = exists_and_remove(store, clause->clause_id, num_original_clauses);
-    if (exists){
+    bool exists = exists_and_remove(store, clause->clause_id, num_original_clauses);
+    //include clause in the output if it is needed or we are not pruning
+    if (unpruned || exists){
         //store its dependencies
         std::vector<clause_id_t>::iterator itr;
         itr = clause->proof_clauses.begin();
@@ -105,12 +113,21 @@ result_code_t handle_one_clause(FILE *infile, char *infilename, FILE *outfile,
 
         //write out deleted clauses, if there are any
         if (delete_clauses.size() > 0){
-            output_delete_clauses(clause->clause_id, delete_clauses, outfile);
+            if (is_binary){
+                output_backward_delete_clauses(clause->clause_id, delete_clauses, outfile);
+            }
+            else{
+                output_delete_clauses(clause->clause_id, delete_clauses, outfile, false);
+            }
             delete_clauses.clear();
         }
 
-        //write it out
-        output_added_clause(clause, outfile, false);
+        if (is_binary){
+            output_lrat_binary_backward(clause, outfile);
+        }
+        else{
+            output_added_clause(clause, outfile, false, false);
+        }
     }
 
     return SUCCESS;
@@ -119,9 +136,10 @@ result_code_t handle_one_clause(FILE *infile, char *infilename, FILE *outfile,
 
 //Actually prune the file
 result_code_t prune_proof_file(FILE *infile, char *infilename, FILE *outfile,
-                               int32_t num_instances, int32_t num_original_clauses){
+                               int32_t num_instances, int32_t num_original_clauses,
+                               bool is_binary, bool unpruned){
     result_code_t result;
-    bool_t already_contained;
+    bool already_contained;
     std::vector<clause_id_t>::iterator itr;
 
     //initialze clause as empty to use for reading clauses in
@@ -136,9 +154,21 @@ result_code_t prune_proof_file(FILE *infile, char *infilename, FILE *outfile,
     delete_clauses.clear(); //otherwise it has a bunch of zeroes the first time
 
     //read the empty clause
-    result = parse_line(infile, infilename, &clause, true, false);
+    if (is_binary){
+        result = parse_binary_line(infile, infilename, &clause, true, false);
+    }
+    else{
+        result = parse_line(infile, infilename, &clause, true, false);
+    }
     if (result != SUCCESS){
-        printf("Result code for reading first clause in pruning %s:  %d\n", infilename, result);
+        if (result == END_OF_FILE){
+            printf("Parse error:  File %s ended while ", infilename);
+            printf("trying to read first clause in pruning\n");
+            result = PARSE_ERROR;
+        }
+        else{
+            printf("Result code for reading first clause in pruning %s:  %d\n", infilename, result);
+        }
         return result;
     }
     //check it is the empty clause
@@ -152,12 +182,17 @@ result_code_t prune_proof_file(FILE *infile, char *infilename, FILE *outfile,
         itr++;
     }
     //write it out
-    output_added_clause(&clause, outfile, false);
+    if (is_binary){
+        output_lrat_binary_backward(&clause, outfile);
+    }
+    else{
+        output_added_clause(&clause, outfile, false, false);
+    }
 
     //read the rest of the clauses
     while (result == SUCCESS){
         result = handle_one_clause(infile, infilename, outfile, num_original_clauses,
-                                   &clause, &store, delete_clauses);
+                                   &clause, &store, delete_clauses, is_binary, unpruned);
     }
 
     if (result == END_OF_FILE){
@@ -180,7 +215,7 @@ result_code_t prune_proof_file(FILE *infile, char *infilename, FILE *outfile,
 
 
 result_code_t prune_proof(char *infilename, char *outfilename, int32_t num_instances,
-                          int32_t num_original_clauses){
+                          int32_t num_original_clauses, bool is_binary, bool unpruned){
     FILE *infile = fopen(infilename, "r");
     if (infile == NULL){
         printf("Error:  Unable to open pruning input file %s\n", infilename);
@@ -196,7 +231,9 @@ result_code_t prune_proof(char *infilename, char *outfilename, int32_t num_insta
     }
 
     //actually prune
-    result_code_t result = prune_proof_file(infile, infilename, outfile, num_instances, num_original_clauses);
+    result_code_t result = prune_proof_file(infile, infilename, outfile,
+                                            num_instances, num_original_clauses,
+                                            is_binary, unpruned);
     switch (result){
     case SUCCESS:
         //do nothing
