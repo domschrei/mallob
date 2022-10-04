@@ -153,6 +153,7 @@ private:
 
     JobMessage _msg_unsat_found;
 
+    bool _initiated_proof_assembly = false;
     std::optional<ProofAssembler> _proof_assembler;
     std::optional<JobTreeAllReduction> _proof_all_reduction;
     bool _done_assembling_proof = false;

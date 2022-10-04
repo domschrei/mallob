@@ -335,6 +335,10 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
     }
     if (msg.tag == MSG_INITIATE_PROOF_COMBINATION) {
 
+        // Guarantee that the proof combination is not initiated more than once
+        if (_initiated_proof_assembly) return;
+        _initiated_proof_assembly = true;
+
         LOG(V2_INFO, "Initiate proof assembly\n");
 
         // Propagate initialization message

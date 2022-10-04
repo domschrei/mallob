@@ -522,25 +522,27 @@ void SharingManager::writeClauseEpochs(/*const std::string& proofDir, int firstG
 	if (!_params.distributedProofAssembly()) return;
 
 	std::string tempFilename = outputFilename + "~";
-	std::ofstream ofs(tempFilename);
-	ofs << _num_original_clauses << "\n";
+	{
+		std::ofstream ofs(tempFilename);
+		ofs << _num_original_clauses << "\n";
 
-	for (int epoch = 0; epoch < _global_epoch_ids.size(); epoch++) {
+		for (int epoch = 0; epoch < _global_epoch_ids.size(); epoch++) {
 
-		// Check if all necessary entries for this epoch are present
-		if ([&]() {
-			for (size_t i = 0; i < _id_offsets_per_solver.size(); i++)
-				if (epoch >= _min_epoch_ids_per_solver[i].size() || epoch >= _id_offsets_per_solver[i].size())
-					return true; // cancel writing
-			return false; // continue writing
-		}()) break;
+			// Check if all necessary entries for this epoch are present
+			if ([&]() {
+				for (size_t i = 0; i < _id_offsets_per_solver.size(); i++)
+					if (epoch >= _min_epoch_ids_per_solver[i].size() || epoch >= _id_offsets_per_solver[i].size())
+						return true; // cancel writing
+				return false; // continue writing
+			}()) break;
 
-		ofs << epoch << " " << _global_epoch_ids[epoch];
-		for (size_t i = 0; i < _id_offsets_per_solver.size(); i++) {
-			ofs << " " << _min_epoch_ids_per_solver[i][epoch];
-			ofs << " " << _id_offsets_per_solver[i][epoch];
+			ofs << epoch << " " << _global_epoch_ids[epoch];
+			for (size_t i = 0; i < _id_offsets_per_solver.size(); i++) {
+				ofs << " " << _min_epoch_ids_per_solver[i][epoch];
+				ofs << " " << _id_offsets_per_solver[i][epoch];
+			}
+			ofs << "\n";
 		}
-		ofs << "\n";
 	}
 
 	LOG(V2_INFO, "renaming clause epochs file ...\n");
