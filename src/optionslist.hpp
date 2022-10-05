@@ -114,5 +114,6 @@ OPT_STRING(solutionToFile,               "s2f", "solution-to-file",             
 OPT_STRING(extMemDiskDirectory,          "extmem-disk-dir", "",                       ".",                     "Directory where to create external memory files")
 OPT_STRING(subprocessPrefix,             "subproc-prefix", "",                        "",                      "Execute SAT subprocess with this prefix (e.g., \"valgrind\")")
 OPT_STRING(traceDirectory,               "trace-dir", "",                             ".",                     "Directory to write thread trace files to")
+OPT_STRING(satPreprocessor,              "sat-preprocessor", "",                      "",                      "Executable which preprocesses CNF file")
 
 #endif

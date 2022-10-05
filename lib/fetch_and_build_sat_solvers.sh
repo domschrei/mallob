@@ -13,6 +13,7 @@ bash fetch_solvers.sh $solvers
 
 echo "Making drat-trim"
 cd drat-trim
+sed -i 's/define MODE	1/define MODE	2/g' decompress.c
 make
 cd ..
 

@@ -34,11 +34,11 @@ bool SatReader::read(JobDescription& desc) {
 
 	if (pipe == nullptr && namedpipe == -1) {
 
-		if (MALLOB_CLAUSE_METADATA_SIZE == 2 && _params.removeUnitsPreprocessing()) {
-			// cadical input.cnf -c 0 -o removed-units.cnf
+		if (MALLOB_CLAUSE_METADATA_SIZE == 2 && _params.satPreprocessor.isSet()) {
 			std::string newFilename = _params.logDirectory() + "/input_units_removed.cnf";
 			remove(newFilename.c_str()); // remove if existing (ignore errors)
-			std::string cmd = "cadical " + _filename + " -c 0 -o " + newFilename;
+			//std::string cmd = "cadical " + _filename + " -c 0 -o " + newFilename;
+			std::string cmd = _params.satPreprocessor() + " " + _filename + " > " + newFilename;
 			int systemRetVal = system(cmd.c_str());
 			int returnCode = WEXITSTATUS(systemRetVal);
 			if (returnCode == 10) {

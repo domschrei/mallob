@@ -151,27 +151,20 @@ class Runner:
 
         return run_list
 
-    def determine_proof_files(self): 
-        rootdir = '/logs/processes/proof'
-        proof_files = [f'/logs/processes/proof/proof.{x+1}.frat' for x in range(PROOF_FILES)]
-        print(f"The list of proof files is: {proof_files}")
-        return proof_files
-
     def get_wc_command(self):
         args = ['/competition/proof_line_count.sh']
         return args
 
     def get_combine_command(self, input_json):
-        problem_path = input_json.get("problem_path")
-
-        proof_files = self.determine_proof_files()
+        # D.S.: *think* that we need to set the preprocessed problem here.
+        problem_path = "/logs/processes/input_units_removed.cnf" #input_json.get("problem_path")
+        # D.S.: The proof files are now gathered programmatically within the proof_compose script.
         args = ['/competition/proof_compose.sh', problem_path, '/logs/processes/combined.lrat']
-        args.extend(proof_files)
         return args
 
     def get_renumber_command(self, input_json):
         problem_path = input_json.get("problem_path")
-        args = ['/renumber-proofs', problem_path, '/logs/processes/renumbered.lrat', '/logs/processes/combined.lrat']
+        args = ['/competition/proof_renumber.sh'] # the arguments are currently baked into the script
         return args
 
     def get_check_command(self, input_json):
