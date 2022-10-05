@@ -65,6 +65,7 @@ COPY --chown=ecs-user /docker/leader/run_mallob.sh /competition
 COPY --chown=ecs-user /docker/leader/proof_line_count.sh /competition
 COPY --chown=ecs-user /docker/leader/proof_compose.sh /competition
 COPY --chown=ecs-user /docker/leader/proof_renumber.sh /competition
+COPY --chown=ecs-user /docker/leader/proof_check.sh /competition
 COPY --chown=ecs-user /docker/leader/preprocess_cnf.sh /competition
 COPY --chown=ecs-user /docker/leader/drat_compose.sh /competition
 COPY --chown=ecs-user /docker/leader/solver /competition
@@ -80,4 +81,5 @@ RUN chmod +x /competition/solver
 RUN chmod +x /competition/proof_line_count.sh
 RUN chmod +x /competition/proof_compose.sh
 RUN chmod +x /competition/proof_renumber.sh
+RUN chmod +x /competition/proof_check.sh
 RUN chmod +x /competition/drat_compose.sh

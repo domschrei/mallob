@@ -168,8 +168,7 @@ class Runner:
 
     def get_check_command(self, input_json):
         problem_path = input_json.get("problem_path")
-        # run_list = ["echo", f"Would be running /lrat-check /logs/processes/renumbered.lrat"]
-        args = ['/lrat-check', problem_path, '/logs/processes/renumbered.lrat']
+        args = ['/competition/proof_check.sh', problem_path]
         return args
     
     def get_drat_combine_command(self, input_json):
