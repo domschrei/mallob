@@ -67,11 +67,6 @@ This appears to be our most complex setup, so let's start with this one.
 4. **Output proof line counts** (see `proof_line_count.sh`)
 5. **Check LRAT proof** with `lrat-check` (see `proof_check.sh`)
     - This decompresses the compressed proof first! Otherwise lrat-check doesn't seem to work.
-6. **Compose DRAT proof** (see `drat_compose.sh`)
-    - "Dratifies" preprocessing proof and unpruned combined proof
-    - Concatenates them into `/logs/processes/final.drat`
-7. **Check DRAT proof** with `drat-trim`
-    - dratify outputs text files, so no decompression is needed here
 
 ### TODO
 
