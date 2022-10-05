@@ -250,6 +250,8 @@ private:
         int commSize = MyMpi::size(_comm);
         _is_root = myRank == 0;
 
+        if (commSize == 1) return;
+
         int numChildRanks = commSize - 1;
         int numChildRanksPerTree = (int) std::ceil(((float)numChildRanks) / numChildrenOfRoot);
         int myTreeIdx = (myRank - 1) / numChildRanksPerTree;

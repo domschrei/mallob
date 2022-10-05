@@ -13,19 +13,40 @@ import signal
 from subprocess import Popen
 from subprocess import TimeoutExpired
 from typing import Callable
+from enum import Enum
+
+
+#######################################################
+
+class PipelineMode(Enum):
+    # Single machine with 64 hwthreads, sequential proof production and DRAT proof checking
+    SINGLE_MACHINE_64HWT_SEQ_PPROD_AND_DRAT = 1
+    # Single machine with 64 hwthreads, parallel proof production
+    SINGLE_MACHINE_64HWT_PAR_PPROD = 2
+    # 100 machines with 16 hwthreads, parallel proof production
+    HUNDRED_MACHINES_16HWT_PAR_PPROD = 3
+
+# TODO Change this to the desired mode of execution.
+pipeline_mode = PipelineMode.SINGLE_MACHINE_64HWT_PAR_PPROD
+
+#######################################################
+
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 def reverse_function(x):
     return x[::-1]
 
+# total number of *local* slots (MPI processes) on this machine
+def get_num_local_slots():
+    #return 2 # only for testing!!
+    if pipeline_mode == PipelineMode.HUNDRED_MACHINES_16HWT_PAR_PPROD:
+        return 4 # distributed setup: 16/4 = 4 slots
+    else:
+        return 16 # shared-memory setup: 64/4 = 16 slots
+
 # total time to run in seconds.  This allows ~1 minute of gracetime before ATS would pull the plug.
 TOTAL_TIME = 4940
-
-# total number of slots (MPI processes)
-#SLOTS = 16 # parallel / small
-#SLOTS = 4 # distributed / large
-SLOTS = 1 # testing only
 
 # Class to help identify when a timeout has been triggered
 class _TimeoutRecorder:
@@ -134,7 +155,7 @@ class Runner:
         hostfile_path = os.path.join(request_dir, 'combined_hostfile')
         with open(hostfile_path, 'w+') as f:
             for ip in ips:
-                f.write(f'{ip} slots={SLOTS}') # Parallel track
+                f.write(f'{ip} slots={get_num_local_slots()}')
                 f.write('\n')
             return hostfile_path
 
@@ -147,6 +168,7 @@ class Runner:
         run_list = ["/competition/run_mallob.sh"]
         run_list.append(combined_hostfile)
         run_list.append(problem_path)
+        run_list.append(pipeline_mode.name) # forward mode of execution to mallob script
 
         return run_list
 
@@ -159,8 +181,7 @@ class Runner:
         return args
 
     def get_combine_command(self, input_json):
-        # D.S.: *think* that we need to set the preprocessed problem here.
-        problem_path = "/logs/processes/input_units_removed.cnf" #input_json.get("problem_path")
+        problem_path = "/logs/processes/input_units_removed.cnf"
         # D.S.: The proof files are now gathered programmatically within the proof_compose script.
         args = ['/competition/proof_compose.sh', problem_path, '/logs/processes/combined.lrat']
         return args
@@ -216,13 +237,20 @@ def main():
     runner.logger.info("Running solver ...")
     time_remaining = TOTAL_TIME
 
-    unsat_sequence = [lambda: runner.get_compress_preprocessing_proof_command(input_json),
-                      lambda: runner.get_combine_command(input_json),
-                      lambda: runner.get_renumber_command(input_json), 
-                      lambda: runner.get_wc_command(),
-                      lambda: runner.get_check_command(input_json),
-                      lambda: runner.get_drat_combine_command(input_json),
-                      lambda: runner.get_drat_check_command(input_json)]
+    if pipeline_mode == PipelineMode.SINGLE_MACHINE_64HWT_SEQ_PPROD_AND_DRAT:
+        unsat_sequence = [lambda: runner.get_compress_preprocessing_proof_command(input_json),
+                          lambda: runner.get_combine_command(input_json),
+                          lambda: runner.get_renumber_command(input_json), 
+                          lambda: runner.get_wc_command(),
+                          lambda: runner.get_check_command(input_json),
+                          lambda: runner.get_drat_combine_command(input_json),
+                          lambda: runner.get_drat_check_command(input_json)]
+    else:
+        # Pipeline for parallel proof production
+        unsat_sequence = [lambda: runner.get_compress_preprocessing_proof_command(input_json),
+                          lambda: runner.get_renumber_command(input_json), 
+                          lambda: runner.get_wc_command(),
+                          lambda: runner.get_check_command(input_json)]
 
     output = runner.run(cmd, time_remaining)
     result = MallobParser.get_result(output["stdout"])

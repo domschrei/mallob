@@ -3,12 +3,19 @@
 num_hosts=$(cat $1|wc -l)
 processes_per_host=$(cat $1|grep -oE "slots=[0-9]+"|head -1|grep -oE "[0-9]+")
 
-# Set to 1 to enable distributed proof assembly
-distributed_proof_assembly=0
-
-# Set to 0.9 for large distributed configuration ("cloud track")
-# Set to 1.0 for small parallel configuration ("parallel track")
-clause_buffer_discount=1.0
+if [ $3 == "SINGLE_MACHINE_64HWT_SEQ_PPROD_AND_DRAT" ]; then
+    distributed_proof_assembly=0
+    clause_buffer_discount=1.0
+elif [ $3 == "SINGLE_MACHINE_64HWT_PAR_PPROD" ]; then
+    distributed_proof_assembly=1
+    clause_buffer_discount=1.0
+elif [ $3 == "HUNDRED_MACHINES_16HWT_PAR_PPROD" ]; then
+    distributed_proof_assembly=1
+    clause_buffer_discount=0.9
+else
+    echo "Invalid argument $3"
+    exit 1
+fi
 
 echo "Cleaning up previous proofs..."
 short_log_name=${1##*/} 

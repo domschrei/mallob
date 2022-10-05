@@ -3,7 +3,7 @@
 
 ## Before you build + run
 
-* Edit the `SLOTS` variable in `solver`.
+* Edit the variable `pipeline_mode` to the desired mode of execution.
 * The removal of log directories in `cleanup` is commented out as of now for debugging. Re-add the command as necessary.
 
 ## Single-machine Setup, Sequential Assembly (+ DRAT)
@@ -50,8 +50,6 @@ This appears to be our most complex setup, so let's start with this one.
 
 ### Pipeline
 
-**Not implemented yet**
-
 1. Run **Mallob** **with** distributed assembly
     - Original CNF input is a parameter
     - Marijn's preprocessor (see `preprocess_cnf.sh`) is called from within Mallob
@@ -76,8 +74,15 @@ This appears to be our most complex setup, so let's start with this one.
 
 ### TODO
 
-* Do we want to execute the DRAT stuff again here or omit it?
+* Test
+* Adjust proof_line_count to work with the parallel proof combination as well
 
 ## Distributed Setup
 
-TODO
+### Pipeline
+
+Exactly the same as in the Single-machine Setup, Distributed Assembly
+
+### TODO
+
+* Test
