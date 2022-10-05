@@ -62,6 +62,7 @@ COPY --from=builder /tools/composition/build/compose-proofs compose-proofs
 COPY --from=builder /tools/composition/build/renumber-proofs renumber-proofs
 COPY --from=builder /tools/composition/build/dratify dratify
 COPY --chown=ecs-user /docker/leader/run_mallob.sh /competition
+COPY --chown=ecs-user /docker/leader/compress_preprocessing_proof.sh /competition
 COPY --chown=ecs-user /docker/leader/proof_line_count.sh /competition
 COPY --chown=ecs-user /docker/leader/proof_compose.sh /competition
 COPY --chown=ecs-user /docker/leader/proof_renumber.sh /competition
@@ -79,6 +80,7 @@ USER ecs-user
 RUN chmod +x /competition/run_mallob.sh
 RUN chmod +x /competition/solver
 RUN chmod +x /competition/proof_line_count.sh
+RUN chmod +x /competition/compress_preprocessing_proof.sh
 RUN chmod +x /competition/proof_compose.sh
 RUN chmod +x /competition/proof_renumber.sh
 RUN chmod +x /competition/proof_check.sh

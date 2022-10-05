@@ -154,6 +154,10 @@ class Runner:
         args = ['/competition/proof_line_count.sh']
         return args
 
+    def get_compress_preprocessing_proof_command(self, input_json):
+        args = ['/competition/compress_preprocessing_proof.sh']
+        return args
+
     def get_combine_command(self, input_json):
         # D.S.: *think* that we need to set the preprocessed problem here.
         problem_path = "/logs/processes/input_units_removed.cnf" #input_json.get("problem_path")
@@ -212,7 +216,8 @@ def main():
     runner.logger.info("Running solver ...")
     time_remaining = TOTAL_TIME
 
-    unsat_sequence = [lambda: runner.get_combine_command(input_json),
+    unsat_sequence = [lambda: runner.get_compress_preprocessing_proof_command(input_json),
+                      lambda: runner.get_combine_command(input_json),
                       lambda: runner.get_renumber_command(input_json), 
                       lambda: runner.get_wc_command(),
                       lambda: runner.get_check_command(input_json),
