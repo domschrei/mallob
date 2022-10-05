@@ -12,7 +12,7 @@
 
 # 1 is already done as a part of proof_compose.sh
 # 2
-/dratify --binary /logs/processes/input_units_removed.cnf /logs/processes/drat.{lrat,drat}}
+/dratify --binary /logs/processes/input_units_removed.cnf /logs/processes/drat.{lrat,drat}
 # 2.5 is done in proof_compose.sh
 # 3
 /dratify --binary $1 /logs/preprocessor/preprocessing-compressed.lrat /logs/preprocessor/preprocessing.drat

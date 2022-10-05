@@ -60,6 +60,7 @@ COPY --from=builder /mallob/lib/drat-trim/drat-trim drat-trim
 COPY --from=builder /tools/preprocess-simple/cleanup preprocess-cnf
 COPY --from=builder /tools/composition/build/compose-proofs compose-proofs 
 COPY --from=builder /tools/composition/build/renumber-proofs renumber-proofs
+COPY --from=builder /tools/composition/build/dratify dratify
 COPY --chown=ecs-user /docker/leader/run_mallob.sh /competition
 COPY --chown=ecs-user /docker/leader/proof_line_count.sh /competition
 COPY --chown=ecs-user /docker/leader/proof_compose.sh /competition
@@ -68,6 +69,8 @@ COPY --chown=ecs-user /docker/leader/preprocess_cnf.sh /competition
 COPY --chown=ecs-user /docker/leader/drat_compose.sh /competition
 COPY --chown=ecs-user /docker/leader/solver /competition
 COPY /docker/leader/cleanup /competition
+COPY /instances/r3unsat_200.cnf /competition/test.cnf
+
 USER root
 RUN chmod +x /competition/cleanup
 USER ecs-user
@@ -76,3 +79,4 @@ RUN chmod +x /competition/solver
 RUN chmod +x /competition/proof_line_count.sh
 RUN chmod +x /competition/proof_compose.sh
 RUN chmod +x /competition/proof_renumber.sh
+RUN chmod +x /competition/drat_compose.sh

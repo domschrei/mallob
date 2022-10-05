@@ -22,11 +22,10 @@ def reverse_function(x):
 # total time to run in seconds.  This allows ~1 minute of gracetime before ATS would pull the plug.
 TOTAL_TIME = 4940
 
-# total number of slots (nodes)
-SLOTS = 16
-
-# total number of proof files (same as SLOTS for parallel)
-PROOF_FILES = SLOTS
+# total number of slots (MPI processes)
+#SLOTS = 16 # parallel / small
+#SLOTS = 4 # distributed / large
+SLOTS = 1 # testing only
 
 # Class to help identify when a timeout has been triggered
 class _TimeoutRecorder:
