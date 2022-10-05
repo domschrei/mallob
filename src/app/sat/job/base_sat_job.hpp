@@ -45,8 +45,23 @@ public:
     virtual bool appl_isDestructible() = 0;
     virtual void appl_memoryPanic() = 0;
 
+    virtual bool checkResourceLimit(float wcSecsPerInstance, float cpuSecsPerInstance) override {
+        if (!_done_solving && _params.satSolvingWallclockLimit() > 0) {
+            auto age = getAgeSinceActivation();
+            if (age > _params.satSolvingWallclockLimit()) {
+                LOG(V2_INFO, "#%i SOLVING TIMEOUT: aborting\n", getId());
+                return true;
+            }
+        }
+        return Job::checkResourceLimit(wcSecsPerInstance, cpuSecsPerInstance);
+    }
+    void setSolvingDone() {
+        _done_solving = true;
+    }
+
 private:
     float _compensation_factor = 1.0f;
+    bool _done_solving = false;
 
     struct DeferredJobMsg {int source; int mpiTag; JobMessage msg;};
     std::list<DeferredJobMsg> _deferred_messages;
