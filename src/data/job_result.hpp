@@ -16,6 +16,7 @@ struct JobResult : public Serializable {
     int result;
     enum EncodedType {INT, FLOAT} encodedType = INT;
     int winningInstanceId;
+    unsigned long globalStartOfFinalEpoch;
 
 private:
     std::vector<int> solution;

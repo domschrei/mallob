@@ -14,6 +14,8 @@ private:
     int _this_worker_index;
     int _final_epoch;
     int _winning_instance;
+    unsigned long _global_start_of_final_epoch;
+
     std::list<ProofInstance> _proof_instances;
 
     unsigned long _num_original_clauses;
@@ -25,11 +27,12 @@ private:
 
 public:
     ProofAssembler(const Parameters& params, int jobId, int numWorkers, 
-        int origThreadsPerWorker, int thisWorkerIndex, int finalEpoch, int winningInstance) :
+        int origThreadsPerWorker, int thisWorkerIndex, int finalEpoch, int winningInstance,
+        unsigned long globalStartOfFinalEpoch) :
             _params(params), _job_id(jobId), _num_workers(numWorkers), 
             _orig_threads_per_worker(origThreadsPerWorker), 
             _this_worker_index(thisWorkerIndex), _final_epoch(finalEpoch), 
-            _winning_instance(winningInstance) {
+            _winning_instance(winningInstance), _global_start_of_final_epoch(globalStartOfFinalEpoch) {
 
         _current_epoch = _final_epoch;
     }
@@ -209,7 +212,15 @@ private:
 
             assert(out == line || log_return_false("\"%s\" != \"%s\"\n", out.c_str(), line.c_str()));
         }
-        LOG(V2_INFO, "PrAs clause epochs file read\n");
+
+        assert(globalIdStarts.empty() || globalIdStarts.back() <= _global_start_of_final_epoch);
+        
+        if (globalIdStarts.empty() || globalIdStarts.back() < _global_start_of_final_epoch) {
+            LOG(V2_INFO, "PrAs clause epochs file read; stitching missing final start ID to the end\n");
+            globalIdStarts.push_back(_global_start_of_final_epoch);
+        } else {
+            LOG(V2_INFO, "PrAs clause epochs file read\n");
+        }
 
         /*
         // Convert FRAT proofs to LRAT
