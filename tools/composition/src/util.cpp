@@ -24,29 +24,188 @@ void print_clause(clause_t *clause){
     printf("   0\n");
 }
 
-result_code_t output_added_clause(clause_t *clause, FILE *outfile, bool_t frat_format){
-    if (frat_format){
+//These are from CaDiCaL with FRAT/LRAT support
+//github.com/RandomActsOfGrammar/cadical:src/tracer.cpp
+inline void put_binary_zero (FILE *file) {
+    putc(0, file);
+}
+inline void put_binary_unsigned (int64_t n, FILE *file) {
+    unsigned char ch;
+    while (n & ~0x7f) {
+        ch = (n & 0x7f) | 0x80;
+        fputc(ch, file);
+        n >>= 7;
+    }
+    ch = n;
+    fputc(ch, file);
+}
+inline void put_binary_signed (int64_t n, FILE *file) {
+    put_binary_unsigned(2*abs (n) + (n < 0), file);
+}
+inline void put_binary_lit (int lit, FILE *file) {
+    put_binary_signed(lit, file);
+}
+
+result_code_t output_added_clause(clause_t *clause, FILE *outfile,
+                                  bool_t frat_format, bool_t is_binary){
+    if (is_binary){
+        fputc('a', outfile);
+    }
+    else if (frat_format){
         fprintf(outfile, "a ");
     }
     //write the clause ID
-    fprintf(outfile, "%" PRI_CLAUSE_ID " ", clause->clause_id);
-    //write the literals
-    std::vector<int32_t>::iterator lititr = clause->literals.begin();
-    while (lititr != clause->literals.end()){
-        fprintf(outfile, "%" PRId32 " ", *lititr);
-        lititr++;
+    if (is_binary){
+        if (frat_format){
+            put_binary_unsigned(clause->clause_id, outfile);
+        }
+        else{
+            put_binary_signed(clause->clause_id, outfile);
+        }
     }
-    fprintf(outfile, "0 ");
+    else{
+        fprintf(outfile, "%" PRI_CLAUSE_ID " ", clause->clause_id);
+    }
+    //write the literals
+    for (const auto & external_lit : clause->literals){
+        if (is_binary){
+            put_binary_lit(external_lit, outfile);
+        }
+        else{
+            fprintf(outfile, "%" PRId32 " ", external_lit);
+        }
+    }
+    if (is_binary){
+        put_binary_zero(outfile);
+    }
+    else{
+        fprintf(outfile, "0 ");
+    }
     //write the proof
     if (frat_format){
-        fprintf(outfile, "l ");
+        if (is_binary){
+            fputc('l', outfile);
+        }
+        else{
+            fprintf(outfile, "l ");
+        }
     }
-    std::vector<clause_id_t>::iterator pcitr = clause->proof_clauses.begin();
-    while (pcitr != clause->proof_clauses.end()){
-        fprintf(outfile, "%" PRI_CLAUSE_ID " ", *pcitr);
-        pcitr++;
+    for (const auto & c : clause->proof_clauses){
+        if (is_binary){
+            put_binary_signed (c, outfile);
+        }
+        else{
+            fprintf(outfile, "%" PRI_CLAUSE_ID " ", c);
+        }
     }
-    fprintf(outfile, "0\n");
+    if (is_binary){
+        put_binary_zero(outfile);
+    }
+    else{
+        fprintf(outfile, "0\n");
+    }
+
+    return SUCCESS;
+}
+
+
+inline void put_binary_unsigned_backward(int64_t n, FILE *file){
+    unsigned char bytes[74]; //max 74 bytes to fit n
+    int32_t next_open = 0;
+
+    //write the bytes into the buffer in order
+    unsigned char ch;
+    while (n & ~0x7f) {
+        ch = (n & 0x7f) | 0x80;
+        bytes[next_open] = ch;
+        next_open++;
+        n >>= 7;
+    }
+    ch = n;
+    bytes[next_open] = ch;
+    next_open++;
+
+    //write the bytes into the file in reverse
+    while (next_open > 0){
+        next_open--;
+        fputc(bytes[next_open], file);
+    }
+}
+inline void put_binary_signed_backward(int64_t n, FILE *file){
+    put_binary_unsigned_backward(2*abs (n) + (n < 0), file);
+}
+
+
+result_code_t output_lrat_binary_backward(clause_t *clause, FILE *outfile){
+    //final 0
+    put_binary_zero(outfile);
+
+    //proof hints backward
+    auto prf_itr = clause->proof_clauses.end();
+    while (prf_itr != clause->proof_clauses.begin()){
+        prf_itr--;
+        put_binary_signed_backward(*prf_itr, outfile);
+    }
+
+    //0 after literals
+    put_binary_zero(outfile);
+
+    //literals backward
+    auto lit_itr = clause->literals.end();
+    while (lit_itr != clause->literals.begin()){
+        lit_itr--;
+        put_binary_signed_backward(*lit_itr, outfile);
+    }
+
+    //clause ID
+    put_binary_signed_backward(clause->clause_id, outfile);
+
+    //a
+    fputc('a', outfile);
+
+    return SUCCESS;
+}
+
+result_code_t output_delete_clauses(clause_id_t id, std::vector<clause_id_t>& clauses,
+                                    FILE *outfile, bool is_binary){
+    if (is_binary){
+        fputc('d', outfile);
+        for (auto i : clauses){
+            put_binary_signed(i, outfile);
+        }
+        put_binary_zero(outfile);
+    }
+    else{
+        //write the id and d
+        fprintf(outfile, "%" PRI_CLAUSE_ID " d", id);
+        //write the clauses to delete
+        std::vector<clause_id_t>::iterator itr = clauses.begin();
+        while(itr != clauses.end()){
+            fprintf(outfile, " %" PRI_CLAUSE_ID, *itr);
+            itr++;
+        }
+        //end the line
+        fprintf(outfile, " 0\n");
+    }
+    return SUCCESS;
+}
+
+
+result_code_t output_backward_delete_clauses(clause_id_t id,
+                                             std::vector<clause_id_t>& clauses,
+                                             FILE *outfile){
+    //final 0
+    put_binary_zero(outfile);
+
+    //clauses to delete backward
+    auto itr = clauses.end();
+    while (itr != clauses.begin()){
+        itr--;
+        put_binary_signed_backward(*itr, outfile);
+    }
+
+    //d
+    fputc('d', outfile);
 
     return SUCCESS;
 }

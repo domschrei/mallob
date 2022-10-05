@@ -1,9 +1,11 @@
 
 CFLAGS=-Wall
 
-all: build/renumber-proofs build/compose-proofs
+all: build/dratify build/renumber-proofs build/compose-proofs
 
-# to build static: -Wl,-Bstatic -l boost_program_options -Wl,-Bdynamic
+build/dratify: src/dratify.cpp build/parse.o build/util.o
+	mkdir -p build
+	g++ $(CFLAGS) build/*.o -o build/dratify src/dratify.cpp -l boost_program_options
 
 build/renumber-proofs: src/renumber.cpp build/parse.o build/util.o
 	mkdir -p build

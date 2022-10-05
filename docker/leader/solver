@@ -16,6 +16,9 @@ from typing import Callable
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
+def reverse_function(x):
+    return x[::-1]
+
 # total time to run in seconds.  This allows ~1 minute of gracetime before ATS would pull the plug.
 TOTAL_TIME = 4940
 
@@ -71,7 +74,7 @@ class Runner:
             file_handle.write(line)
             line = stream.readline()
 
-    def run(self, cmd: list, timeout_seconds, is_append):
+    def run(self, cmd: list, timeout_seconds, is_append=False):
         self.logger.info("Running command: %s", str(cmd))
         
         stdout_target_loc = os.path.join(self.request_directory, "stdout.log")
@@ -215,7 +218,7 @@ def main():
                       lambda: runner.get_wc_command(),
                       lambda: runner.get_check_command(input_json)]
 
-    output = runner.run(cmd, time_remaining, False)
+    output = runner.run(cmd, time_remaining)
     result = MallobParser.get_result(output["stdout"])
     return_code = output["return_code"]
     runner.logger.info(f"RESULT: {result}")
@@ -224,9 +227,9 @@ def main():
     if (result == "UNSATISFIABLE" and not output["timed_out"]):
         for call in unsat_sequence: 
             cmd = call()
-            output = runner.run(cmd, time_remaining, True)
-            time_remaining = time_remaining - output["time"]
-            return_code = output["return_code"]
+            result = runner.run(cmd, time_remaining, True)
+            time_remaining = time_remaining - result["time"]
+            return_code = result["return_code"]
             if return_code:
                 runner.logger.info(f"Cmd: {cmd} return code was non-zero ({return_code}).  Returning 'ERROR'.")
                 result = "ERROR"
@@ -239,10 +242,10 @@ def main():
             runner.logger.info(f"Checker return code was zero.  Check successful!")
                     
     # clean up.
-    runner.run(['/competition/cleanup'], time_remaining, True)
+    runner.run(['/competition/cleanup'], True)
     
     solver_output = {
-        "return_code": output["return_code"],
+        "return_code": return_code,
         "result": result,
         "artifacts": {
             "stdout_path": output["stdout"],

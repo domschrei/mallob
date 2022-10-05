@@ -11,7 +11,7 @@ Versions of [Mallob](https://github.com/RandomActsOfGrammar/mallob) and [CaDiCaL
 
 
 ## This Repository
-This repository builds two programs:
+This repository builds three programs:
 * `compose-proofs`:
   Combines the instance proofs produced by each SAT solver into a single, sequential proof.
   This also prunes the joined file so the final result only includes clauses that will ever be needed, and tells the proof checker to delete clauses immediately after their last use.
@@ -20,6 +20,9 @@ This repository builds two programs:
   Renumbers the clauses in a proof to be sequential.
   Our proof composer does not, in general, result in the clause identifiers being in order.
   The `lrat-check` LRAT proof checker (part of the [drat-trim](https://github.com/marijnheule/drat-trim) repository) assumes the clause identifers are in order numerically, so we run this on the result of composing the instance proofs.
+* `dratify`:
+  Turn an LRAT proof into a DRAT proof.
+  This is only for testing purposes, to compare the speeds of checking the LRAT and DRAT versions of the proof.
 
 
 ## Clause ID Formula
