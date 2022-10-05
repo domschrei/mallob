@@ -56,6 +56,7 @@ COPY --from=builder /mallob/build/mallob_process_dispatcher mallob_process_dispa
 COPY --from=builder /mallob/lib/drat-trim/lrat-check lrat-check
 COPY --from=builder /mallob/lib/drat-trim/compress compress
 COPY --from=builder /mallob/lib/drat-trim/decompress decompress
+COPY --from=builder /mallob/lib/drat-trim/drat-trim drat-trim
 COPY --from=builder /tools/preprocess-simple/cleanup preprocess-cnf
 COPY --from=builder /tools/composition/build/compose-proofs compose-proofs 
 COPY --from=builder /tools/composition/build/renumber-proofs renumber-proofs
@@ -64,6 +65,7 @@ COPY --chown=ecs-user /docker/leader/proof_line_count.sh /competition
 COPY --chown=ecs-user /docker/leader/proof_compose.sh /competition
 COPY --chown=ecs-user /docker/leader/proof_renumber.sh /competition
 COPY --chown=ecs-user /docker/leader/preprocess_cnf.sh /competition
+COPY --chown=ecs-user /docker/leader/drat_compose.sh /competition
 COPY --chown=ecs-user /docker/leader/solver /competition
 COPY /docker/leader/cleanup /competition
 USER root

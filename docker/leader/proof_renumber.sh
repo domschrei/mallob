@@ -9,7 +9,6 @@
 # 1 (outputs "p.lrat")
 /renumber-proofs --binary --adjust-file /logs/preprocessor/id_map /logs/processes/input_units_removed.cnf \
   /logs/preprocessor/p.lrat /logs/processes/combined.lrat
-# 1.5
-/compress /logs/preprocessor/preprocessing.lrat > /logs/preprocessor/preprocessing-compressed.lrat
+# 1.5 is done in proof_compose.sh
 # 2
 cat /logs/preprocessor/preprocessing-compressed.lrat /logs/preprocessor/p.lrat > /logs/processes/renumbered.lrat

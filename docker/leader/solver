@@ -172,6 +172,14 @@ class Runner:
         # run_list = ["echo", f"Would be running /lrat-check /logs/processes/renumbered.lrat"]
         args = ['/lrat-check', problem_path, '/logs/processes/renumbered.lrat']
         return args
+    
+    def get_drat_combine_command(self, input_json):
+        args = ['/competition/drat_compose.sh', input_json.get("problem_path")]
+        return args
+
+    def get_drat_check_command(self, input_json):
+        args = ['/drat-trim', input_json.get("problem_path"), '/logs/processes/final.drat']
+        return args
 
 class MallobParser:
     @staticmethod
@@ -209,7 +217,9 @@ def main():
     unsat_sequence = [lambda: runner.get_combine_command(input_json),
                       lambda: runner.get_renumber_command(input_json), 
                       lambda: runner.get_wc_command(),
-                      lambda: runner.get_check_command(input_json)]
+                      lambda: runner.get_check_command(input_json),
+                      lambda: runner.get_drat_combine_command(input_json),
+                      lambda: runner.get_drat_check_command(input_json)]
 
     output = runner.run(cmd, time_remaining)
     result = MallobParser.get_result(output["stdout"])
