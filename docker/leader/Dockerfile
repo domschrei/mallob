@@ -68,8 +68,9 @@ COPY --chown=ecs-user /docker/leader/proof_renumber.sh /competition
 COPY --chown=ecs-user /docker/leader/preprocess_cnf.sh /competition
 COPY --chown=ecs-user /docker/leader/drat_compose.sh /competition
 COPY --chown=ecs-user /docker/leader/solver /competition
-COPY /docker/leader/cleanup /competition
-COPY /instances/r3unsat_200.cnf /competition/test.cnf
+COPY --chown=ecs-user /docker/leader/cleanup /competition
+COPY --chown=ecs-user /instances/r3unsat_200.cnf /competition/test.cnf
+COPY --chown=ecs-user /instances/r3unsat_300.cnf /competition/test2.cnf
 
 USER root
 RUN chmod +x /competition/cleanup
