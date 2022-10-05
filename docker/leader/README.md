@@ -42,6 +42,7 @@ This appears to be our most complex setup, so let's start with this one.
 * Inject proper timings into the scripts which can then be output
     - In proof_compose.sh, the combined LRAT proof and the unpruned "DRAT-ready" proof are output in the same command. The compose executable outputs the time needed to build the unpruned proof though.
 * Branch off a version which does not use binary proofs [if we actually want to do this]
+* Many file paths are now hardcoded in the many different scripts. -> After the pipeline is fixed, a refactoring putting all these paths into a single place would be nice.
 
 ## Single-machine Setup, Distributed Assembly
 
