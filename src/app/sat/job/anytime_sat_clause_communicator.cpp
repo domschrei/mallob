@@ -362,13 +362,13 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         if (!_proof_assembler.has_value()) {
             int finalEpoch = msg.epoch;
             int winningInstance = msg.payload[0];
-            unsigned long globalStartOfFinalEpoch;
-            memcpy(&globalStartOfFinalEpoch, msg.payload.data()+1, 2*sizeof(int));
+            unsigned long globalStartOfSuccessEpoch;
+            memcpy(&globalStartOfSuccessEpoch, msg.payload.data()+1, 2*sizeof(int));
             int numWorkers = msg.payload[3];
             int threadsPerWorker = msg.payload[4];
             int thisWorkerIndex = _job->getJobTree().getIndex();
             _proof_assembler.emplace(_params, _job->getId(), numWorkers, threadsPerWorker, thisWorkerIndex, 
-                finalEpoch, winningInstance, globalStartOfFinalEpoch);
+                finalEpoch, winningInstance, globalStartOfSuccessEpoch);
             createNewProofAllReduction();
 
             if (_params.interleaveProofMerging()) {

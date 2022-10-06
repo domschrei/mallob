@@ -393,7 +393,7 @@ void SatProcessAdapter::doPrepareSolution() {
     if (*solutionSize == 0) {
         _solution.result = _hsm->result;
         _solution.winningInstanceId = _hsm->winningInstance;
-        _solution.globalStartOfFinalEpoch = _hsm->globalStartOfFinalEpoch;
+        _solution.globalStartOfSuccessEpoch = _hsm->globalStartOfSuccessEpoch;
         _solution.setSolutionToSerialize(nullptr, 0);
         _solution_in_preparation = false;
         return;

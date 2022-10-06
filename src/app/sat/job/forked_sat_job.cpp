@@ -128,14 +128,14 @@ int ForkedSatJob::appl_solved() {
             // Unsatisfiability: handle separately.
             int finalEpoch = ((AnytimeSatClauseCommunicator*)_clause_comm)->getCurrentEpoch();
             int winningInstance = _internal_result.winningInstanceId;
-            unsigned long globalStartOfFinalEpoch = _internal_result.globalStartOfFinalEpoch;
+            unsigned long globalStartOfSuccessEpoch = _internal_result.globalStartOfSuccessEpoch;
             LOG(V2_INFO, "Query to begin distributed proof assembly with winning instance %i, gsofe=%lu\n", 
-                winningInstance, globalStartOfFinalEpoch);
+                winningInstance, globalStartOfSuccessEpoch);
             JobMessage msg(getId(), getRevision(), finalEpoch, MSG_NOTIFY_UNSAT_FOUND);
             msg.payload.push_back(winningInstance);
             int size = msg.payload.size();
             msg.payload.resize(msg.payload.size()+2);
-            memcpy(msg.payload.data()+size, &globalStartOfFinalEpoch, 2*sizeof(int));
+            memcpy(msg.payload.data()+size, &globalStartOfSuccessEpoch, 2*sizeof(int));
             MyMpi::isend(getJobTree().getRootNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
             _assembling_proof = true;
             return -1;

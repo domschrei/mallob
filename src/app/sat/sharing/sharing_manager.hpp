@@ -95,7 +95,7 @@ public:
 	void writeClauseEpochs(/*const std::string& proofDir, int firstGlobalId, */
 		const std::string& outputFilename);
 		
-	unsigned long getGlobalStartOfFinalEpoch() {
+	unsigned long getGlobalStartOfSuccessEpoch() {
 		return _global_epoch_ids.empty() ? 0 : _global_epoch_ids.back();
 	}
 

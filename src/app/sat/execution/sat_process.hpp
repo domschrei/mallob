@@ -220,7 +220,7 @@ public:
                 solutionVec = result.extractSolution();
                 _hsm->solutionRevision = result.revision;
                 _hsm->winningInstance = result.winningInstanceId;
-                _hsm->globalStartOfFinalEpoch = result.globalStartOfFinalEpoch;
+                _hsm->globalStartOfSuccessEpoch = result.globalStartOfSuccessEpoch;
                 LOGGER(_log, V5_DEBG, "DO write solution (winning instance: %i)\n", _hsm->winningInstance);
                 _hsm->result = SatResult(result.result);
                 size_t* solutionSize = (size_t*) SharedMemory::create(_shmem_id + ".solutionsize." + std::to_string(_hsm->solutionRevision), sizeof(size_t));

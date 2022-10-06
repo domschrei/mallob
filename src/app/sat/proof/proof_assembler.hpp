@@ -12,9 +12,9 @@ private:
     int _num_workers;
     int _orig_threads_per_worker;
     int _this_worker_index;
-    int _final_epoch;
+    int _success_epoch;
     int _winning_instance;
-    unsigned long _global_start_of_final_epoch;
+    unsigned long _global_start_of_success_epoch;
 
     std::list<ProofInstance> _proof_instances;
 
@@ -28,13 +28,13 @@ private:
 public:
     ProofAssembler(const Parameters& params, int jobId, int numWorkers, 
         int origThreadsPerWorker, int thisWorkerIndex, int finalEpoch, int winningInstance,
-        unsigned long globalStartOfFinalEpoch) :
+        unsigned long globalStartOfSuccessEpoch) :
             _params(params), _job_id(jobId), _num_workers(numWorkers), 
             _orig_threads_per_worker(origThreadsPerWorker), 
-            _this_worker_index(thisWorkerIndex), _final_epoch(finalEpoch), 
-            _winning_instance(winningInstance), _global_start_of_final_epoch(globalStartOfFinalEpoch) {
+            _this_worker_index(thisWorkerIndex), _success_epoch(finalEpoch), 
+            _winning_instance(winningInstance), _global_start_of_success_epoch(globalStartOfSuccessEpoch) {
 
-        _current_epoch = _final_epoch;
+        _current_epoch = _success_epoch;
     }
 
     void start() {
@@ -212,12 +212,10 @@ private:
 
             assert(out == line || log_return_false("\"%s\" != \"%s\"\n", out.c_str(), line.c_str()));
         }
-
-        assert(globalIdStarts.empty() || globalIdStarts.back() <= _global_start_of_final_epoch);
         
-        if (globalIdStarts.empty() || globalIdStarts.back() < _global_start_of_final_epoch) {
+        if (globalIdStarts.empty() || globalIdStarts.back() < _global_start_of_success_epoch) {
             LOG(V2_INFO, "PrAs clause epochs file read; stitching missing final start ID to the end\n");
-            globalIdStarts.push_back(_global_start_of_final_epoch);
+            globalIdStarts.push_back(_global_start_of_success_epoch);
         } else {
             LOG(V2_INFO, "PrAs clause epochs file read\n");
         }
@@ -250,7 +248,7 @@ private:
 
             _proof_instances.emplace_back(
                 instanceId, numInstances, _num_original_clauses, proofFilenameBase + ".lrat", 
-                _final_epoch, _winning_instance, globalIdStarts,
+                _success_epoch, _winning_instance, globalIdStarts,
                 std::move(localIdStartsPerInstance[i]), std::move(localIdOffsetsPerInstance[i]),
                 _params.extMemDiskDirectory(), 
                 _params.interleaveProofMerging() ? "" : proofFilenameBase + ".filtered.lrat"

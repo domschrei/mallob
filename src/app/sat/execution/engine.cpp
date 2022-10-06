@@ -266,7 +266,7 @@ int SatEngine::solveLoop() {
 				done = true;
 				_result = std::move(result);
 				_result.winningInstanceId = _solver_interfaces[i]->getGlobalId();
-				_result.globalStartOfFinalEpoch = _sharing_manager->getGlobalStartOfFinalEpoch();
+				_result.globalStartOfSuccessEpoch = _sharing_manager->getGlobalStartOfSuccessEpoch();
 				break;
 			}
 		}
