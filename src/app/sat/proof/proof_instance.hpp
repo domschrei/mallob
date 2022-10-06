@@ -242,22 +242,21 @@ private:
             LOGGER(_log, V3_VERB, "%i finished pruning\n", _instance_id);
 
         } else {
-            
             // Insert sentinel element / "stub" line to signal end of epoch
             if (_interleave_merging) {
                 int nextIdEpoch = _current_epoch-1;
-                assert(nextIdEpoch+1 < _global_epoch_starts.size() 
-                    || log_return_false("[ERROR] No global epoch start found for e.%i in array of size %lu!\n", 
-                    nextIdEpoch+1, _global_epoch_starts.size()));
-                auto sentinelId = _global_epoch_starts[nextIdEpoch+1]-1;
-                SerializedLratLine sentinelLine(sentinelId);
-                assert(sentinelLine.isStub());
-                _merge_connector->pushBlocking(sentinelLine);
-                _num_output_lines++;
-                LOGGER(_log, V4_VVER, "%i e.%i: push sentinel %lu ; outlines=%lu\n", 
-                    _instance_id, _current_epoch, sentinelId, _num_output_lines);
+                if (nextIdEpoch+1 >= _global_epoch_starts.size()) {
+                    LOGGER(_log, V1_WARN, "[WARN] Skipping sentinel for \"dead\" epoch %i\n", nextIdEpoch+1);
+                } else {
+                    auto sentinelId = _global_epoch_starts[nextIdEpoch+1]-1;
+                    SerializedLratLine sentinelLine(sentinelId);
+                    assert(sentinelLine.isStub());
+                    _merge_connector->pushBlocking(sentinelLine);
+                    _num_output_lines++;
+                    LOGGER(_log, V4_VVER, "%i e.%i: push sentinel %lu ; outlines=%lu\n", 
+                        _instance_id, _current_epoch, sentinelId, _num_output_lines);
+                }
             }
-
             _current_epoch--;
         }
     }
