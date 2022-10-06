@@ -39,6 +39,10 @@ void AnytimeSatClauseCommunicator::communicate() {
             _file_merger->advance();
             if (_file_merger->allProcessesFinished()) {
                 // Proof merging done!
+                if (!_done_assembling_proof && _job->getJobTree().isRoot()) {
+                    _reconstruction_time = _job->getAgeSinceActivation() - _solving_time;
+                    LOG(V2_INFO, "TIMING assembly %.3f\n", _reconstruction_time);
+                }
                 _done_assembling_proof = true;
             }
         }
@@ -340,6 +344,10 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         _initiated_proof_assembly = true;
         _job->setSolvingDone();
 
+        if (_job->getJobTree().isRoot()) {
+            _solving_time = _job->getAgeSinceActivation();
+            LOG(V2_INFO, "TIMING solving %.3f\n", _solving_time);
+        }
         LOG(V2_INFO, "Initiate proof assembly\n");
 
         // Propagate initialization message

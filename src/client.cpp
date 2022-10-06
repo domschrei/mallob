@@ -367,11 +367,16 @@ void Client::introduceNextJob() {
         // Incremental job: Send request to root node in standby
         nodeRank = _root_nodes[jobId];
     } else {
-        // Find the job's canonical initial node
-        int n = _params.numWorkers() >= 0 ? _params.numWorkers() : MyMpi::size(MPI_COMM_WORLD);
-        LOG(V5_DEBG, "Creating permutation of size %i ...\n", n);
-        AdjustablePermutation p(n, jobId);
-        nodeRank = p.get(0);
+        if (_params.monoFilename.isSet()) {
+            // Mono instance mode: Use rank 0 as the job's root
+            nodeRank = 0;
+        } else {
+            // Find the job's canonical initial node
+            int n = _params.numWorkers() >= 0 ? _params.numWorkers() : MyMpi::size(MPI_COMM_WORLD);
+            LOG(V5_DEBG, "Creating permutation of size %i ...\n", n);
+            AdjustablePermutation p(n, jobId);
+            nodeRank = p.get(0);
+        }
     }
 
     JobRequest req(jobId, job.getApplication(), /*rootRank=*/-1, /*requestingNodeRank=*/_world_rank, 

@@ -246,8 +246,9 @@ private:
             // Insert sentinel element / "stub" line to signal end of epoch
             if (_interleave_merging) {
                 int nextIdEpoch = _current_epoch-1;
-                assert(nextIdEpoch < _current_epoch);
-                assert(nextIdEpoch+1 < _global_epoch_starts.size());
+                assert(nextIdEpoch+1 < _global_epoch_starts.size() 
+                    || log_return_false("[ERROR] No global epoch start found for e.%i in array of size %lu!\n", 
+                    nextIdEpoch+1, _global_epoch_starts.size()));
                 auto sentinelId = _global_epoch_starts[nextIdEpoch+1]-1;
                 SerializedLratLine sentinelLine(sentinelId);
                 assert(sentinelLine.isStub());

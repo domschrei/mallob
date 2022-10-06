@@ -1179,8 +1179,11 @@ job.toStr(), volume, balancingEpoch, tree.getBalancingEpochOfLastRequests(), eve
 void Worker::activateRootRequest(int jobId) {
     auto optReq = _job_db.getRootRequest(jobId);
     if (!optReq.has_value()) return;
-    LOG(V3_VERB, "Activate %s\n", optReq.value().toStr().c_str());
-    bounceJobRequest(optReq.value(), optReq.value().requestingNodeRank);
+    JobRequest& req = optReq.value();
+    LOG(V3_VERB, "Activate %s\n", req.toStr().c_str());
+    req.numHops++;
+    MyMpi::isend(_world_rank, MSG_REQUEST_NODE, req);
+    //bounceJobRequest(optReq.value(), optReq.value().requestingNodeRank);
 }
 
 void Worker::propagateVolumeUpdate(Job& job, int volume, int balancingEpoch) {

@@ -148,6 +148,9 @@ private:
     float _time_of_last_epoch_initiation = 0;
     float _time_of_last_epoch_conclusion = 0.000001f;
 
+    float _solving_time = 0;
+    float _reconstruction_time = 0;
+
     bool _sent_ready_msg = MALLOB_CLAUSE_METADATA_SIZE != 2;
     int _num_ready_msgs_from_children = 0;
 
