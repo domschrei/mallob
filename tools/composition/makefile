@@ -1,5 +1,5 @@
 
-CFLAGS=-Wall
+CFLAGS=-Wall -O3 --std=c++17
 
 all: build/dratify build/renumber-proofs build/compose-proofs
 

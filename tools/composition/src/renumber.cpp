@@ -5,13 +5,16 @@
 #include "util.hpp"
 #include "parse.hpp"
 
+#include "unordered_dense.h"
+
+typedef ankerl::unordered_dense::map<clause_id_t, clause_id_t> ClauseIdMap;
 
 /*
  * Build the initial map from the adjustment file
  * Also set the number of original clauses correctly based on the adjustment
  */
 result_code_t read_adjustment_file(char *filename,
-                                   std::map<clause_id_t, clause_id_t>& clause_id_map,
+                                   ClauseIdMap& clause_id_map,
                                    int32_t *num_original_clauses){
     FILE *f = fopen(filename, "r");
     if (f == NULL){
@@ -39,7 +42,7 @@ result_code_t read_adjustment_file(char *filename,
 
 
 result_code_t run_renumbering(FILE *outfile, FILE *infile,
-                              std::map<clause_id_t, clause_id_t>& clause_id_map,
+                              ClauseIdMap& clause_id_map,
                               int32_t num_original_clauses, bool is_binary){
     clause_id_t next_id = num_original_clauses + 1;
     clause_t clause;
@@ -65,9 +68,10 @@ result_code_t run_renumbering(FILE *outfile, FILE *infile,
             set_clause_id(&clause, next_id);
             next_id++;
             //map over proof hint
-            for (uint32_t i = 0; i < clause.proof_clauses.size(); i++){
-                if (clause_id_map.count(clause.proof_clauses[i])){ //map if an entry exists
-                    clause.proof_clauses[i] = clause_id_map[clause.proof_clauses[i]];
+            for (uint32_t i = 0; i < clause.proof_clauses.size(); i++) {
+                auto it = clause_id_map.find(clause.proof_clauses[i]);
+                if (it != clause_id_map.end()){ //map if an entry exists
+                    clause.proof_clauses[i] = it->second;
                 }
             }
             //write it out
@@ -79,7 +83,10 @@ result_code_t run_renumbering(FILE *outfile, FILE *infile,
             //map over clause deletions
             for (uint32_t i = 0; i < delete_clause.size(); i++){
                 clause_id_t new_val = clause_id_map[delete_clause[i]];
-                clause_id_map.erase(delete_clause[i]); //remove for efficiency
+                // Do not remove the entry since this is expensive for this map
+                // and since lookup speed does not really depend on the map's size.
+                // As we already allocated the data once, we may as well keep it.
+                //clause_id_map.erase(delete_clause[i]);
                 delete_clause[i] = new_val;
             }
             //write it out, with last used clause ID to start line
@@ -215,7 +222,7 @@ int main(int argc, char **argv){
         return result;
     }
 
-    std::map<clause_id_t, clause_id_t> clause_id_map;
+    ClauseIdMap clause_id_map;
 
     //if there is an adjustment file, read it
     if (adjust){
