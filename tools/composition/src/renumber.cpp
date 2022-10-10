@@ -83,10 +83,7 @@ result_code_t run_renumbering(FILE *outfile, FILE *infile,
             //map over clause deletions
             for (uint32_t i = 0; i < delete_clause.size(); i++){
                 clause_id_t new_val = clause_id_map[delete_clause[i]];
-                // Do not remove the entry since this is expensive for this map
-                // and since lookup speed does not really depend on the map's size.
-                // As we already allocated the data once, we may as well keep it.
-                //clause_id_map.erase(delete_clause[i]);
+                clause_id_map.erase(delete_clause[i]);
                 delete_clause[i] = new_val;
             }
             //write it out, with last used clause ID to start line
