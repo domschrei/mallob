@@ -49,6 +49,8 @@ public:
         if (MALLOB_CLAUSE_METADATA_SIZE == 2) {
             // Perform various safety checks
             assert(c.size >= 3);
+            // Heavy safety checks with false positives!
+            /*
             unsigned long id; memcpy(&id, c.begin, sizeof(unsigned long));
             assert(id < std::numeric_limits<unsigned long>::max()/2
                     || log_return_false("Clause ID \"%lu\" found, which could be an error\n", id));
@@ -57,6 +59,7 @@ public:
                     || log_return_false("Literal \"%i\" found, error thrown for safety - "
                     "delete this assertion if your formula has >=10'000'000 variables\n", 
                     c.begin[i]));
+            */
         }
         bool success = _cdb.addClause(c);
         if (!success) _stats.receivedClausesDropped++;
