@@ -427,7 +427,6 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 					if (getProducingInstanceId(clauseId) == solver.getGlobalId()) {
 						// This solver produced this clause! Do not import.
 						solverStats->receivedClausesFiltered++;
-						abort();
 						continue;
 					}
 					// Important invariant: incoming clauses must be from EARLIER epochs
