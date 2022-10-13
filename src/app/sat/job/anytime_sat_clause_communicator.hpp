@@ -58,6 +58,7 @@ private:
         JobTreeAllReduction _allreduce_clauses;
         JobTreeAllReduction _allreduce_filter;
         bool _filtering = false;
+        bool _all_stages_done = false;
 
         Session(const Parameters& params, BaseSatJob* job, AdaptiveClauseDatabase& cdb, int epoch) : 
             _params(params), _job(job), _cdb(cdb), _epoch(epoch),
@@ -132,11 +133,12 @@ private:
         void setFiltering() {_filtering = true;}
         bool isFiltering() const {return _filtering;}
         std::vector<int> applyGlobalFilter(const std::vector<int>& filter, std::vector<int>& clauses);
+        void setAllStagesDone() {_all_stages_done = true;}
 
         bool isValid() const {
             return _allreduce_clauses.isValid() || _allreduce_filter.isValid();
         }
-
+        bool allStagesDone() const {return _all_stages_done;}
         bool isDestructible() {
             return _allreduce_clauses.isDestructible() && _allreduce_filter.isDestructible();
         }
@@ -155,6 +157,7 @@ private:
     int _num_ready_msgs_from_children = 0;
 
     JobMessage _msg_unsat_found;
+    std::list<JobMessage> _deferred_sharing_initiation_msgs;
 
     bool _initiated_proof_assembly = false;
     std::optional<ProofAssembler> _proof_assembler;
@@ -208,4 +211,7 @@ private:
     inline Session& currentSession() {return _sessions.back();}
     void addToClauseHistory(std::vector<int>& clauses, int epoch);
     void createNewProofAllReduction();
+
+    void initiateClauseSharing(JobMessage& msg);
+    void tryActivateDeferredSharingInitiation();
 };

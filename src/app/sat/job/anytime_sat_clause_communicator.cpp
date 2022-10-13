@@ -97,12 +97,16 @@ void AnytimeSatClauseCommunicator::communicate() {
     //_filter.update(_job->getJobTree().getIndex(), _job->getVolume());
 
     // clean up old sessions
-    while (_sessions.size() > 1) {
+    while (!_sessions.empty()) {
         auto& session = _sessions.front();
-        if (!session.isDestructible()) break;
+        if (!session.allStagesDone() || !session.isDestructible()) break;
         // can be deleted
         _sessions.pop_front();
     }
+
+    // If a previous sharing initiation message has been deferred,
+    // try to activate it now (if no sessions are active any more)
+    tryActivateDeferredSharingInitiation();
 
     // Distributed proof assembly methods
     if (_proof_assembler.has_value()) {
@@ -256,6 +260,7 @@ void AnytimeSatClauseCommunicator::communicate() {
 
         // Conclude this sharing epoch
         _time_of_last_epoch_conclusion = Timer::elapsedSeconds();
+        session.setAllStagesDone();
     }
 }
 
@@ -389,16 +394,8 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
 
     // Initial signal to initiate a sharing epoch
     if (msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
-
-        _current_epoch = msg.epoch;
-        LOG(V5_DEBG, "%s : INIT COMM e=%i nc=%i\n", _job->toStr(), _current_epoch, 
-            _job->getJobTree().getNumChildren());
-        _sessions.emplace_back(_params, _job, _cdb, _current_epoch);
-        if (!_job->hasPreparedSharing()) {
-            int limit = _job->getBufferLimit(1, MyMpi::SELF);
-            _job->prepareSharing(limit);
-        }
-        advanceCollective(_job, msg, MSG_INITIATE_CLAUSE_SHARING);
+        initiateClauseSharing(msg);
+        return;
     }
 
     // Advance all-reductions
@@ -421,6 +418,42 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
             MyMpi::isend(source, MSG_JOB_TREE_REDUCTION, msg);
         }
     }
+}
+
+void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg) {
+    if (!_sessions.empty() || !_deferred_sharing_initiation_msgs.empty()) {
+        // defer message until all past sessions are done
+        // and all earlier deferred initiation messages have been processed
+        LOG(V3_VERB, "%s : deferring CS initiation\n", _job->toStr());
+        _deferred_sharing_initiation_msgs.push_back(std::move(msg));
+        return;
+    }
+
+    // no current sessions active - can start new session
+    _current_epoch = msg.epoch;
+    LOG(V5_DEBG, "%s : INIT COMM e=%i nc=%i\n", _job->toStr(), _current_epoch, 
+        _job->getJobTree().getNumChildren());
+    _sessions.emplace_back(_params, _job, _cdb, _current_epoch);
+    if (!_job->hasPreparedSharing()) {
+        int limit = _job->getBufferLimit(1, MyMpi::SELF);
+        _job->prepareSharing(limit);
+    }
+    advanceCollective(_job, msg, MSG_INITIATE_CLAUSE_SHARING);
+}
+
+void AnytimeSatClauseCommunicator::tryActivateDeferredSharingInitiation() {
+    
+    // Anything to activate?
+    if (_deferred_sharing_initiation_msgs.empty()) return;
+
+    // cannot start new sharing if a session is still present
+    if (!_sessions.empty()) return;
+
+    // sessions are empty -> WILL succeed to initiate sharing
+    // -> initiation message CAN be deleted afterwards.
+    JobMessage msg = std::move(_deferred_sharing_initiation_msgs.front());
+    _deferred_sharing_initiation_msgs.pop_front();
+    initiateClauseSharing(msg);
 }
 
 void AnytimeSatClauseCommunicator::createNewProofAllReduction() {
