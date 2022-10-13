@@ -308,11 +308,8 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 				offset = offset - (offset % numSolvers) + numSolvers;
 				_id_offsets_per_solver[i].push_back(offset);
 				
-				auto testClauseId = _last_exported_clause_id[i]->load(std::memory_order_relaxed) + _solvers[i]->getSolverSetup().maxNumSolvers;
-				alignClauseId((int*) &testClauseId);
-				LOG(V2_INFO, "EPOCH %i instance=%i newoffset=%lu nextalignedclauseid=%lu\n", 
-					_min_epoch_ids_per_solver[i].size()-1, _solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(),
-					testClauseId);
+				LOG(V2_INFO, "EPOCH %i instance=%i newoffset=%lu\n", 
+					_min_epoch_ids_per_solver[i].size()-1, _solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back());
 			}
 		}
 
