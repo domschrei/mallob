@@ -48,6 +48,7 @@ SharingManager::SharingManager(
 	
 	assert(!solvers.empty());
 	_num_original_clauses = solvers[0]->getSolverSetup().numOriginalClauses;
+	int maxNumGlobalSolvers = solvers[0]->getSolverSetup().maxNumSolvers;
 
 	_id_offsets_per_solver.resize(_solvers.size());
 	_min_epoch_ids_per_solver.resize(_solvers.size());
@@ -62,10 +63,17 @@ SharingManager::SharingManager(
 
 			_id_offsets_per_solver[i].push_back(0);
 			_min_epoch_ids_per_solver[i].push_back(0);
-			_last_exported_clause_id[i] = new std::atomic_ulong(_num_original_clauses+1);
+			auto firstIdToBeLearnt = _num_original_clauses + 1 + _solvers[i]->getGlobalId();
+			_last_exported_clause_id[i] = new std::atomic_ulong(
+				maxNumGlobalSolvers > firstIdToBeLearnt ? 
+					0 : 
+					firstIdToBeLearnt - maxNumGlobalSolvers
+			);
+			assert(getProducingLocalSolverIndex(_last_exported_clause_id[i]->load(std::memory_order_relaxed)) == i);
 
 			LOG(V2_INFO, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
-					_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), 0, _min_epoch_ids_per_solver[i].back());
+					_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), _last_exported_clause_id[i]->load(std::memory_order_relaxed), 
+					_min_epoch_ids_per_solver[i].back());
 		}
 	}
 	_global_epoch_ids.push_back(0);
@@ -297,13 +305,15 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		if (MALLOB_CLAUSE_METADATA_SIZE == 2 && _params.distributedProofAssembly()) {
 			// extract global min. epoch ID and compute the next ID offset
 			// for each solver from it
+			auto numSolvers = _solvers[0]->getSolverSetup().maxNumSolvers;
 			unsigned long globalMinEpochId = metadata::readUnsignedLong(filter);
+			globalMinEpochId = std::max(globalMinEpochId, _global_epoch_ids.back() + numSolvers);
 			LOG(V2_INFO, "EPOCH %i GLOBAL_MAX_OF_1ST_ID %lu\n", _min_epoch_ids_per_solver[0].size()-1, globalMinEpochId);
+			assert(globalMinEpochId > _num_original_clauses);
 			_global_epoch_ids.push_back(globalMinEpochId);
 
 			for (size_t i = 0; i < _solvers.size(); i++) {
 
-				auto numSolvers = _solvers[i]->getSolverSetup().maxNumSolvers;
 				auto offset = globalMinEpochId - _min_epoch_ids_per_solver[i].back();
 				offset = offset - (offset % numSolvers) + numSolvers;
 				_id_offsets_per_solver[i].push_back(offset);
