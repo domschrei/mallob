@@ -230,23 +230,23 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 	if (MALLOB_CLAUSE_METADATA_SIZE == 2 && _params.distributedProofAssembly()) {
 		// Proceed with the next epoch.
 		// Find max. first clause ID
-		unsigned long maxMinEpochId = 0;
+		unsigned long maxFirstIdOfEpoch = 0;
 		int maxNumSolvers = _solvers[0]->getSolverSetup().maxNumSolvers;
 		for (size_t i = 0; i < _solvers.size(); i++) {
+
 			auto clauseIdCounter = _last_exported_clause_id[i]->load(std::memory_order_relaxed);
+			_min_epoch_ids_per_solver[i].push_back(clauseIdCounter);
 			
-			auto minEpochId = _id_offsets_per_solver[i].back() 
+			auto firstIdOfEpoch = _id_offsets_per_solver[i].back() 
 				+ clauseIdCounter
 				+ maxNumSolvers;
-			minEpochId = minEpochId - (minEpochId % maxNumSolvers) + maxNumSolvers;
-
-			_min_epoch_ids_per_solver[i].push_back(clauseIdCounter);
-			maxMinEpochId = std::max(maxMinEpochId, minEpochId);
+			firstIdOfEpoch = firstIdOfEpoch - (firstIdOfEpoch % maxNumSolvers) + maxNumSolvers;
+			maxFirstIdOfEpoch = std::max(maxFirstIdOfEpoch, firstIdOfEpoch);
 
 			LOG(V2_INFO, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
 				_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), clauseIdCounter, _min_epoch_ids_per_solver[i].back());
 		}
-		metadata::writeUnsignedLong(maxMinEpochId, filterOut);
+		metadata::writeUnsignedLong(maxFirstIdOfEpoch, filterOut);
 	}
 
 	_filter.acquireLock();
@@ -507,8 +507,10 @@ int SharingManager::getEpochOfUnalignedSelfClause(unsigned long id) {
 	// will point to 1st element >= id (or end)
 	auto it = std::lower_bound(epochList.begin(), epochList.end(), id);
 	assert(it != epochList.begin());
-	// point to last element < id
-	--it;
+	if (it == epochList.end() || *it > id) {
+		// point to last element < id
+		--it;
+	}
 	return std::distance(epochList.begin(), it);
 }
 int SharingManager::getEpochOfAlignedSelfClause(unsigned long id) {
@@ -516,8 +518,10 @@ int SharingManager::getEpochOfAlignedSelfClause(unsigned long id) {
 	// will point to 1st element >= id (or end)
 	auto it = std::lower_bound(epochList.begin(), epochList.end(), id);
 	assert(it != epochList.begin());
-	// point to last element < id
-	--it;
+	if (it == epochList.end() || *it > id) {
+		// point to last element < id
+		--it;
+	}
 	return std::distance(epochList.begin(), it);
 }
 

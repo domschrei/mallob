@@ -16,10 +16,11 @@ namespace metadata {
 		// will point to 1st element >= clauseId (or end)
 		auto it = std::lower_bound(globalIdStartsPerEpoch.begin(), globalIdStartsPerEpoch.end(), id);
 		assert(it != globalIdStartsPerEpoch.begin());
-		// point to last element < id
-		--it;
+		if (it == globalIdStartsPerEpoch.end() || *it > id) {
+			// point to last element < id
+			--it;
+		}
 		auto epoch = std::distance(std::begin(globalIdStartsPerEpoch), it);
 		return epoch;
 	}
 }
-
