@@ -95,6 +95,8 @@ public:
         int solutionShmemSize = 0;
         int lastSolvedRevision = -1;
 
+        bool sharingOngoing = false;
+
         // Main loop
         while (true) {
 
@@ -144,7 +146,7 @@ public:
             if (!_hsm->doDumpStats) _hsm->didDumpStats = false;
 
             // Check if clauses should be exported
-            if (_hsm->doExport && !_hsm->didExport) {
+            if (_hsm->doExport && !_hsm->didExport && !sharingOngoing) {
                 LOGGER(_log, V5_DEBG, "DO export clauses\n");
                 // Collect local clauses, put into shared memory
                 _hsm->exportChecksum = Checksum();
@@ -154,6 +156,7 @@ public:
                 _hsm->lastNumClausesToImport = total;
                 assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
                 _hsm->didExport = true;
+                sharingOngoing = true;
             }
             if (!_hsm->doExport) _hsm->didExport = false;
 
@@ -177,6 +180,7 @@ public:
                     _engine.digestSharingWithoutFilter(_import_buffer, _hsm->importBufferSize);
                 }
                 _hsm->didDigestImport = true;
+                sharingOngoing = false;
             }
             if (!_hsm->doDigestImportWithFilter && !_hsm->doDigestImportWithoutFilter) 
                 _hsm->didDigestImport = false;
