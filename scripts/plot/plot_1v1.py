@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import math
 import sys
 
+markers = ['v', '^', 'x']
+colors = ['#377eb8', '#ff7f00', '#e41a1c', '#f781bf', '#a65628', '#4daf4a', '#984ea3', '#999999', '#dede00', '#377eb8']
+
 lim = 3600
 out = 4000
 border_lo = 0.001
@@ -60,46 +63,31 @@ for arg in sys.argv[1:]:
     else:
         files += [arg]
 
+runtime_map_pairs_by_domain = dict()
+
 for arg in files:
-    id_runtime_map = dict()
+    domains_seen = set()
     for line in open(arg, 'r').readlines():
         words = line.rstrip().split(" ")
         id = int(words[0])
+        dom = words[1]
         val = float(words[2])
+        if dom not in runtime_map_pairs_by_domain:
+            runtime_map_pairs_by_domain[dom] = []
+        if dom not in domains_seen:
+            runtime_map_pairs_by_domain[dom] += [dict()]
+            domains_seen.add(dom)
+        id_runtime_map = runtime_map_pairs_by_domain[dom][-1]
         if val <= lim:
             id_runtime_map[id] = val
             max_id = max(max_id, id)
             if val > 0:
                 min_val = min(min_val, val)
-    runtime_maps += [id_runtime_map]
 
-if len(runtime_maps) != 2:
-    print("Need exactly two runtime files!")
-    exit(1)
-
-X = []
-Y = []
-timeouts_x = 0
-timeouts_y = 0
-for i in range(max_id+1):
-    
-    if i not in runtime_maps[0] and i not in runtime_maps[1]:
-        continue
-    
-    elif i not in runtime_maps[0]:
-        Y += [runtime_maps[1][i]]
-        X += [out]
-        timeouts_x += 1
-        print(str(i) + " : X timeout , Y " + str(runtime_maps[1][i]))
-    elif i not in runtime_maps[1]:
-        X += [runtime_maps[0][i]]
-        Y += [out]
-        timeouts_y += 1
-        print(str(i) + " : X " + str(runtime_maps[0][i]) + ", Y timeout")
-    else:
-        X += [runtime_maps[0][i]]
-        Y += [runtime_maps[1][i]]
-        print(str(i) + " : X " + str(runtime_maps[0][i]) + ", Y " + str(runtime_maps[1][i]))
+for dom in runtime_map_pairs_by_domain:
+    if len(runtime_map_pairs_by_domain[dom]) != 2:
+        print("Need exactly two runtime files for each domain!")
+        exit(1)
 
 margin = lim - out
 plt.figure(figsize=(pltxsize,pltysize))
@@ -108,7 +96,40 @@ if y2:
     plt.plot([1/y2*border_lo, 1/y2*border_hi], [border_lo, border_hi], 'black', alpha=0.3, linestyle="-.", label="y="+str(y2)+"x")
 plt.plot([border_lo, lim], [lim, lim], 'blue', alpha=0.3)
 plt.plot([lim, lim], [border_lo, lim], 'red', alpha=0.3)
-plt.plot(X, Y, 'x', color="black", markersize=msize)
+
+
+timeouts_x = 0
+timeouts_y = 0
+marker_idx = 0
+color_idx = 0
+for dom in runtime_map_pairs_by_domain:
+    runtime_maps = runtime_map_pairs_by_domain[dom]
+    
+    X = []
+    Y = []
+    for i in range(max_id+1):
+        
+        if i not in runtime_maps[0] and i not in runtime_maps[1]:
+            continue
+        
+        elif i not in runtime_maps[0]:
+            Y += [runtime_maps[1][i]]
+            X += [out]
+            timeouts_x += 1
+            print(str(i) + " : X timeout , Y " + str(runtime_maps[1][i]))
+        elif i not in runtime_maps[1]:
+            X += [runtime_maps[0][i]]
+            Y += [out]
+            timeouts_y += 1
+            print(str(i) + " : X " + str(runtime_maps[0][i]) + ", Y timeout")
+        else:
+            X += [runtime_maps[0][i]]
+            Y += [runtime_maps[1][i]]
+            print(str(i) + " : X " + str(runtime_maps[0][i]) + ", Y " + str(runtime_maps[1][i]))
+
+    plt.plot(X, Y, markers[marker_idx], color=colors[color_idx], markersize=msize, label=dom)
+    marker_idx = (marker_idx+1) % len(markers)
+    color_idx = (color_idx+1) % len(markers)
 
 plt.fill_between([border_lo, lim], [lim, lim], [border_hi, border_hi], alpha=0.2, color='blue', label=str(timeouts_y) + " timeouts of LEFT")
 plt.fill_between([lim, border_hi], [border_lo, border_lo], [lim, lim], alpha=0.2, color='red', label=str(timeouts_x) + " timeouts of BOTTOM")
