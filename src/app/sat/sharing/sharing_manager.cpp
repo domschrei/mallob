@@ -47,6 +47,7 @@ SharingManager::SharingManager(
 	auto callback = getCallback();
 	
 	assert(!solvers.empty());
+	_max_num_threads = _params.numThreadsPerProcess();
 	_num_original_clauses = solvers[0]->getSolverSetup().numOriginalClauses;
 	int maxNumGlobalSolvers = solvers[0]->getSolverSetup().maxNumSolvers;
 
