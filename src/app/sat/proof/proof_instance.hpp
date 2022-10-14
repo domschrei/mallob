@@ -50,6 +50,7 @@ private:
     std::vector<LratClauseId> _outgoing_clause_ids;
     bool _finished = false;
 
+    unsigned long _num_parsed_clauses = 0;
     unsigned long _num_traced_clauses = 0;
     unsigned long _num_output_lines = 0;
 
@@ -112,6 +113,14 @@ public:
 
     std::string getOutputFilename() const {return _output_filename;}
 
+    std::vector<unsigned long> getStats() const {
+        std::vector<unsigned long> stats;
+        stats.push_back(_parser.getNumReadBytes());
+        stats.push_back(_num_parsed_clauses);
+        stats.push_back(_num_traced_clauses);
+        return stats;
+    }
+
 private:
 
     void handleIncomingClauseIds(const LratClauseId* clauseIdsData, size_t clauseIdsSize) {
@@ -135,6 +144,7 @@ private:
 
         if (!_current_line.valid() && _parser.getNextLine(_current_line)) {
             _current_line_aligned = false;
+            numReadLines++;
         } 
         
         LratClauseId id = std::numeric_limits<unsigned long>::max();
@@ -162,9 +172,10 @@ private:
             if (epoch > _current_epoch) {
                 // TODO fail if the current epoch isn't the final one
                 numSkippedLines++;
-                if (_parser.getNextLine(_current_line))
+                if (_parser.getNextLine(_current_line)) {
                     _current_line_aligned = false;
-                numReadLines++;
+                    numReadLines++;
+                }
                 continue;
             }
             // stop reading if a former epoch has been reached
@@ -222,8 +233,8 @@ private:
             // Get next proof line
             if (_parser.getNextLine(_current_line)) {
                 _current_line_aligned = false;
+                numReadLines++;
             }
-            numReadLines++;
         }
 
         // print a warning if some lines needed to be skipped
@@ -238,6 +249,8 @@ private:
             numReadLines==0 ? "-" : std::to_string(formerId).c_str(), 
             _num_traced_clauses, _backlog.size(), _frontier.size());
 
+        _num_parsed_clauses += numReadLines;
+
         if (_current_epoch == 0) {
             // End of the procedure reached!
             
@@ -249,7 +262,21 @@ private:
             assert(_frontier.empty());
             assert(_backlog.empty());
 
-            if (_interleave_merging) _merge_connector->markExhausted();
+            if (_interleave_merging) {
+
+                // Insert final "stop" line which contains the statistics
+                LratLine statsLine;
+                statsLine.id = 0;
+                auto stats = getStats();
+                for (auto stat : stats) {
+                    statsLine.hints.push_back(stat);
+                    statsLine.signsOfHints.push_back(true);
+                }
+                SerializedLratLine serializedStatsLine(statsLine);
+                _merge_connector->pushBlocking(serializedStatsLine);
+
+                _merge_connector->markExhausted();
+            }
 
             _finished = true;
             LOGGER(_log, V3_VERB, "%i finished pruning\n", _instance_id);
@@ -272,6 +299,7 @@ private:
             }
             _current_epoch--;
         }
+
     }
 
     void prepareNextOutgoingClauseIds() {

@@ -71,6 +71,10 @@ private:
     float _timepoint_merge_begin {0};
     float _time_inactive {0};
 
+    unsigned long _total_partial_proof_bytes = 0;
+    unsigned long _total_partial_proof_clauses = 0;
+    unsigned long _total_combined_proof_clauses = 0;
+
 public:
     DistributedProofMerger(MPI_Comm comm, int branchingFactor, 
         MergeSourceInterface<SerializedLratLine>* localSource, const std::string& outputFileAtZero) : 
@@ -342,6 +346,19 @@ private:
             lastId = chosenId;
 
             if (_is_root) {
+                if (chosenLine.getId() == 0) {
+                    // final line of a certain proof instance
+                    auto [hintsPtr, numHints] = chosenLine.getUnsignedHints();
+                    assert(numHints == 3);
+                    unsigned long numBytesOfPartialProof = hintsPtr[0];
+                    unsigned long numClausesOfPartialProof = hintsPtr[1];
+                    unsigned long numTracedClauses = hintsPtr[2];
+                    _total_partial_proof_bytes += numBytesOfPartialProof;
+                    _total_partial_proof_clauses += numClausesOfPartialProof;
+                    _total_combined_proof_clauses += numTracedClauses;
+                    chosenLine.clear();
+                    continue;
+                }
                 if (chosenLine.isStub()) {
                     chosenLine.clear();
                     continue;
@@ -389,6 +406,10 @@ private:
 
     void reverseFile() {
         if (!_is_root) return;
+
+        LOG(V2_INFO, "PROOFSTATS partialproofbytes=%lu partialprooflines=%lu combinedprooflines=%lu\n",
+                    _total_partial_proof_bytes, _total_partial_proof_clauses, _total_combined_proof_clauses);
+
         if (_binary_output) {
             // Read binary file in reverse order, output lines into new file
             std::ofstream ofs(_output_filename, std::ofstream::binary);
