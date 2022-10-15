@@ -24,6 +24,10 @@
 #define MALLOB_VERSION "(dbg)"
 #endif
 
+#ifndef MALLOB_SUBPROC_DISPATCH_PATH
+#define MALLOB_SUBPROC_DISPATCH_PATH ""
+#endif
+
 bool monoJobDone = false;
 void introduceMonoJob(Parameters& params, Client& client) {
 
@@ -103,34 +107,6 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     // Deposit information to coordinate the creation of an intra-machine communicator
     HostComm hostComm(commWorkers, params);
     hostComm.depositInformation();
-
-    if (params.preCleanup()) {
-        LOG(V2_INFO, "Cleaning up directories\n");
-
-        auto doRemove = [&](const std::string& fileOrDir) {
-            LOG(V2_INFO, "Remove %s\n", fileOrDir.c_str());
-            FileUtils::rmrf(fileOrDir);
-        };
-
-        if (!params.logDirectory().empty()) {
-            for (auto file : FileUtils::glob(params.logDirectory() + "/proof#*/")) {
-                doRemove(file);
-            }
-        }
-        if (!params.extMemDiskDirectory().empty()) {
-            for (auto file : FileUtils::glob(params.extMemDiskDirectory() + "/disk.*.*")) {
-                doRemove(file);
-            }
-        }
-        if (!params.traceDirectory().empty()) {
-            for (auto file : FileUtils::glob(params.traceDirectory() + "/mallob_thread_trace_of_*")) {
-                doRemove(file);
-            }
-        }
-        for (auto file : FileUtils::glob("/dev/shm/edu.kit.iti.mallob.*")) {
-            doRemove(file);
-        }
-    }
 
     LOG(V5_DEBG, "Global init barrier ...\n");
     MPI_Barrier(MPI_COMM_WORLD);
@@ -239,6 +215,40 @@ int main(int argc, char *argv[]) {
     // Global and local seed, such that all nodes have access to a synchronized randomness
     // as well as to an individual randomness that differs among nodes
     Random::init(numNodes+params.seed(), rank+params.seed());
+
+    // Perform pre-execution cleanup of any previous runs
+    if (params.preCleanup()) {
+        LOG(V2_INFO, "Cleaning up pre-execution\n");
+
+        std::string subprocName = MALLOB_SUBPROC_DISPATCH_PATH"mallob_sat_process";
+        std::string cmd = "killall -9 " + subprocName + " 2>/dev/null";
+        LOG(V2_INFO, "Killing old subprocesses: \"%s\"\n", cmd.c_str());
+        system(cmd.c_str());
+
+        auto doRemove = [&](const std::string& fileOrDir) {
+            LOG(V2_INFO, "Remove %s\n", fileOrDir.c_str());
+            FileUtils::rmrf(fileOrDir);
+        };
+
+        if (!params.logDirectory().empty()) {
+            for (auto file : FileUtils::glob(params.logDirectory() + "/proof#*/")) {
+                doRemove(file);
+            }
+        }
+        if (!params.extMemDiskDirectory().empty()) {
+            for (auto file : FileUtils::glob(params.extMemDiskDirectory() + "/disk.*.*")) {
+                doRemove(file);
+            }
+        }
+        if (!params.traceDirectory().empty()) {
+            for (auto file : FileUtils::glob(params.traceDirectory() + "/mallob_thread_trace_of_*")) {
+                doRemove(file);
+            }
+        }
+        for (auto file : FileUtils::glob("/dev/shm/edu.kit.iti.mallob.*")) {
+            doRemove(file);
+        }
+    }
 
     auto isWorker = [&](int rank) {
         if (params.numWorkers() == -1) return true; 
