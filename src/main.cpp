@@ -112,8 +112,10 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
             FileUtils::rmrf(fileOrDir);
         };
 
-        if (!params.logDirectory().empty() && myRank == 0) {
-            doRemove(params.logDirectory() + "/proof#1/");
+        if (!params.logDirectory().empty()) {
+            for (auto file : FileUtils::glob(params.logDirectory() + "/proof#*/")) {
+                doRemove(file);
+            }
         }
         if (!params.extMemDiskDirectory().empty()) {
             for (auto file : FileUtils::glob(params.extMemDiskDirectory() + "/disk.*.*")) {
