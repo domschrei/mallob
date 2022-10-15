@@ -104,6 +104,32 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     HostComm hostComm(commWorkers, params);
     hostComm.depositInformation();
 
+    if (params.preCleanup()) {
+        LOG(V2_INFO, "Cleaning up directories\n");
+
+        auto doRemove = [&](const std::string& fileOrDir) {
+            LOG(V2_INFO, "Remove %s\n", fileOrDir.c_str());
+            FileUtils::rmrf(fileOrDir);
+        };
+
+        if (!params.logDirectory().empty() && myRank == 0) {
+            doRemove(params.logDirectory() + "/proof#1/");
+        }
+        if (!params.extMemDiskDirectory().empty()) {
+            for (auto file : FileUtils::glob(params.extMemDiskDirectory() + "/disk.*.*")) {
+                doRemove(file);
+            }
+        }
+        if (!params.traceDirectory().empty()) {
+            for (auto file : FileUtils::glob(params.traceDirectory() + "/mallob_thread_trace_of_*")) {
+                doRemove(file);
+            }
+        }
+        for (auto file : FileUtils::glob("/dev/shm/edu.kit.iti.mallob.*")) {
+            doRemove(file);
+        }
+    }
+
     LOG(V5_DEBG, "Global init barrier ...\n");
     MPI_Barrier(MPI_COMM_WORLD);
     LOG(V5_DEBG, "Passed global init barrier\n");
