@@ -92,6 +92,7 @@ for dom in runtime_map_pairs_by_domain:
 margin = lim - out
 plt.figure(figsize=(pltxsize,pltysize))
 plt.plot([border_lo, border_hi], [border_lo, border_hi], 'black', alpha=0.3, linestyle="--", label="y=x")
+plt.plot([border_lo, border_hi], [10*border_lo, 10*border_hi], 'gray', alpha=0.3, linestyle="--", label="y=10x")
 if y2:
     plt.plot([1/y2*border_lo, 1/y2*border_hi], [border_lo, border_hi], 'black', alpha=0.3, linestyle="-.", label="y="+str(y2)+"x")
 plt.plot([border_lo, lim], [lim, lim], 'blue', alpha=0.3)
@@ -155,3 +156,4 @@ if outfile:
     plt.savefig(outfile)
 else:
     plt.show() 
+
