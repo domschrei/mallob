@@ -8,6 +8,7 @@
 
 #include "params.hpp"
 #include "logger.hpp"
+#include "comm/sysstate.hpp"
 
 const char* BANNER = "\nMallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nDesigned by P. Sanders and D. Schreiber 2018-2022\nDeveloped by D. Schreiber 2019-2022\n";
 const char* BANNER_C_PREFIXED = "c \nc Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nc Designed by P. Sanders and D. Schreiber 2018-2022\nc Developed by D. Schreiber 2019-2022\nc ";
@@ -84,6 +85,11 @@ void Parameters::expand() {
         maxDemand.set(0); // no limit of max. demand
         balancingPeriod.set(0.01); // low balancing delay to immediately get full demand
         numJobs.set(1); // one job to process
+        
+        // Disable detection of unresponsive nodes since printing a huge model
+        // may lead to such timeouts. 
+        // TODO Fix the underlying issue, or move to a nicer place.
+        SysState_disableUnresponsiveNodeCrashing();
     }
 }
 

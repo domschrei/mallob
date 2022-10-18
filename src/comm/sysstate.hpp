@@ -6,6 +6,9 @@
 
 #include <vector>
 
+bool SysState_isUnresponsiveNodeCrashingEnabled();
+void SysState_disableUnresponsiveNodeCrashing();
+
 template <int N>
 class SysState {
 
@@ -25,6 +28,8 @@ private:
 
     float _last_aggregation = 0;
     float _last_check = 0;
+
+    static std::atomic_bool _crash_if_unresponsive;
 
 public:
     SysState(MPI_Comm& comm, float period, SysStateCollective collective, MPI_Op operation = MPI_SUM);
