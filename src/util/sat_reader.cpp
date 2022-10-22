@@ -102,9 +102,10 @@ bool SatReader::read(JobDescription& desc) {
 				iteration++;
 			}
 		} else {
-			char buffer[4096] = {'\0'};
+			const int bufsize = 4096;
+			char buffer[bufsize] = {'\0'};
 			while (iteration ^ 511 != 0 || !Terminator::isTerminating()) {
-				int numRead = ::read(namedpipe, buffer, sizeof(buffer));
+				int numRead = ::read(namedpipe, buffer, bufsize);
 				if (numRead <= 0) break;
 				for (int i = 0; i < numRead; i++) {
 					int c = buffer[i];
