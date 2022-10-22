@@ -8,7 +8,6 @@
 
 #include "params.hpp"
 #include "logger.hpp"
-#include "app/sat/data/clause_metadata_def.hpp"
 #include "comm/sysstate.hpp"
 
 const char* BANNER = "\nMallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nDesigned by P. Sanders and D. Schreiber 2018-2022\nDeveloped by D. Schreiber 2019-2022\n";

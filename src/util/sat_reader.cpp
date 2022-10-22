@@ -11,7 +11,6 @@
 
 #include "sat_reader.hpp"
 #include "util/sys/terminator.hpp"
-#include "app/sat/data/clause_metadata_def.hpp"
 #include "util/sys/timer.hpp"
 
 bool SatReader::read(JobDescription& desc) {
