@@ -20,6 +20,7 @@
 #include "data/job_reader.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/atomics.hpp"
+#include "util/sys/watchdog.hpp"
 
 #include "interface/socket/socket_connector.hpp"
 #include "interface/filesystem/filesystem_connector.hpp"
@@ -367,11 +368,16 @@ void Client::introduceNextJob() {
         // Incremental job: Send request to root node in standby
         nodeRank = _root_nodes[jobId];
     } else {
-        // Find the job's canonical initial node
-        int n = _params.numWorkers() >= 0 ? _params.numWorkers() : MyMpi::size(MPI_COMM_WORLD);
-        LOG(V5_DEBG, "Creating permutation of size %i ...\n", n);
-        AdjustablePermutation p(n, jobId);
-        nodeRank = p.get(0);
+        if (_params.monoFilename.isSet()) {
+            // Mono instance mode: Use rank 0 as the job's root
+            nodeRank = 0;
+        } else {
+            // Find the job's canonical initial node
+            int n = _params.numWorkers() >= 0 ? _params.numWorkers() : MyMpi::size(MPI_COMM_WORLD);
+            LOG(V5_DEBG, "Creating permutation of size %i ...\n", n);
+            AdjustablePermutation p(n, jobId);
+            nodeRank = p.get(0);
+        }
     }
 
     JobRequest req(jobId, job.getApplication(), /*rootRank=*/-1, /*requestingNodeRank=*/_world_rank, 
@@ -439,6 +445,9 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     // Output response time and solution header
     LOG(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, Timer::elapsedSeconds()-desc.getArrival(), revision);
     LOG(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId, resultCode == RESULT_SAT ? "SAT" : "UNSAT", revision);
+
+    // Disable all watchdogs to avoid crashes while printing a huge model
+    Watchdog::disableGlobally();
 
     std::string resultString = "s " + std::string(resultCode == RESULT_SAT ? "SATISFIABLE" 
                         : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN") + "\n";

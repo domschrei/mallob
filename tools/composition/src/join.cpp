@@ -19,7 +19,7 @@ result_code_t run_one_file(combine_problem_t *p, int32_t file_index,
            valid_to_output(get_file_clause(f), p)){
 
         //output the current clause
-        output_added_clause(get_file_clause(f), outfile, false);
+        output_added_clause(get_file_clause(f), outfile, false, read_binary);
         *empty_clause_output = is_clause_empty(get_file_clause(f)); //no literals
         *some_clause_output = true;
 

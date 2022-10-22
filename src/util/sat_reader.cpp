@@ -11,6 +11,8 @@
 
 #include "sat_reader.hpp"
 #include "util/sys/terminator.hpp"
+#include "app/sat/data/clause_metadata_def.hpp"
+#include "util/sys/timer.hpp"
 
 bool SatReader::read(JobDescription& desc) {
 
@@ -33,12 +35,17 @@ bool SatReader::read(JobDescription& desc) {
 
 	if (pipe == nullptr && namedpipe == -1) {
 
-		if (_params.removeUnitsPreprocessing()) {
-			// cadical input.cnf -c 0 -o removed-units.cnf
+		if (_params.satPreprocessor.isSet()) {
+
 			std::string newFilename = _params.logDirectory() + "/input_units_removed.cnf";
 			remove(newFilename.c_str()); // remove if existing (ignore errors)
-			std::string cmd = "cadical " + _filename + " -c 0 -o " + newFilename;
+			//std::string cmd = "cadical " + _filename + " -c 0 -o " + newFilename;
+
+			float time = Timer::elapsedSeconds();
+			std::string cmd = _params.satPreprocessor() + " " + _filename + " > " + newFilename;
 			int systemRetVal = system(cmd.c_str());
+			time = Timer::elapsedSeconds() - time;
+
 			int returnCode = WEXITSTATUS(systemRetVal);
 			if (returnCode == 10) {
 				LOG(V2_INFO, "external call to CaDiCaL found result SAT\n");
@@ -49,7 +56,9 @@ bool SatReader::read(JobDescription& desc) {
 				LOG_OMIT_PREFIX(V0_CRIT, "s UNSATISFIABLE\n");
 				Terminator::broadcastExitSignal();
 			} else assert(returnCode == 0 || log_return_false("Unexpected return code %i\n", returnCode));
+
 			_filename = newFilename;
+			LOG(V2_INFO, "TIMING preprocessing %.3f\n", time);
 		}
 
 		// Read file with mmap

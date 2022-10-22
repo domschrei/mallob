@@ -35,7 +35,9 @@ WORKDIR tools/composition
 RUN rm -Rf build
 RUN make 
 
-
+# Also build Marijn's certified CNF preprocessor
+WORKDIR /tools/preprocess-simple
+RUN make
 
 ################### Extract Mallob in run stage
 FROM satcomp-base:leader AS mallob_liaison
@@ -51,19 +53,35 @@ WORKDIR /
 COPY --from=builder /mallob/build/mallob mallob
 COPY --from=builder /mallob/build/mallob_sat_process mallob_sat_process
 COPY --from=builder /mallob/build/mallob_process_dispatcher mallob_process_dispatcher
-COPY --from=builder /mallob/lib/cadical/build/cadical cadical
 COPY --from=builder /mallob/lib/drat-trim/lrat-check lrat-check
+COPY --from=builder /mallob/lib/drat-trim/compress compress
+COPY --from=builder /mallob/lib/drat-trim/decompress decompress
+COPY --from=builder /mallob/lib/drat-trim/drat-trim drat-trim
+COPY --from=builder /tools/preprocess-simple/cleanup preprocess-cnf
 COPY --from=builder /tools/composition/build/compose-proofs compose-proofs 
 COPY --from=builder /tools/composition/build/renumber-proofs renumber-proofs
+COPY --from=builder /tools/composition/build/dratify dratify
 COPY --chown=ecs-user /docker/leader/run_mallob.sh /competition
+COPY --chown=ecs-user /docker/leader/compress_preprocessing_proof.sh /competition
 COPY --chown=ecs-user /docker/leader/proof_line_count.sh /competition
 COPY --chown=ecs-user /docker/leader/proof_compose.sh /competition
+COPY --chown=ecs-user /docker/leader/proof_renumber.sh /competition
+COPY --chown=ecs-user /docker/leader/proof_check.sh /competition
+COPY --chown=ecs-user /docker/leader/preprocess_cnf.sh /competition
+COPY --chown=ecs-user /docker/leader/drat_compose.sh /competition
 COPY --chown=ecs-user /docker/leader/solver /competition
-COPY /docker/leader/cleanup /competition
+COPY --chown=ecs-user /docker/leader/cleanup /competition
+COPY --chown=ecs-user /instances/r3unsat_200.cnf /competition/test.cnf
+COPY --chown=ecs-user /instances/r3unsat_300.cnf /competition/test2.cnf
+
 USER root
 RUN chmod +x /competition/cleanup
 USER ecs-user
 RUN chmod +x /competition/run_mallob.sh
 RUN chmod +x /competition/solver
 RUN chmod +x /competition/proof_line_count.sh
+RUN chmod +x /competition/compress_preprocessing_proof.sh
 RUN chmod +x /competition/proof_compose.sh
+RUN chmod +x /competition/proof_renumber.sh
+RUN chmod +x /competition/proof_check.sh
+RUN chmod +x /competition/drat_compose.sh

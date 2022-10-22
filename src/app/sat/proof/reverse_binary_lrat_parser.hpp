@@ -24,6 +24,8 @@ private:
     LratLine _line;
     SerializedLratLine _sline;
 
+    unsigned long _num_read_bytes = 0;
+
 public:
     ReverseBinaryLratParser(const std::string& filename) : _reader(filename) {}
 
@@ -56,6 +58,7 @@ public:
                 _exhausted = true;
                 break;
             }
+            _num_read_bytes++;
 
             LOG(V6_DEBGV, "HANDLE_BYTE %i tbc:%s\n", (int) *((unsigned char*)&byte), 
                 isNonFinalByteOfNumber(byte) ? "yes":"no");
@@ -130,6 +133,10 @@ public:
         } else {
             return false;
         }
+    }
+
+    unsigned long getNumReadBytes() const {
+        return _num_read_bytes;
     }
 
 private:

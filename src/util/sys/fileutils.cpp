@@ -74,6 +74,11 @@ int FileUtils::rm(const std::string& file) {
     return remove(file.c_str());
 }
 
+int FileUtils::rmrf(const std::string& dir) {
+    std::string cmd = "rm -rf \"" + dir + "\"";
+    return system(cmd.c_str());
+}
+
 std::vector<std::string> FileUtils::glob(const std::string& pattern) {
     std::vector<std::string> files;
 

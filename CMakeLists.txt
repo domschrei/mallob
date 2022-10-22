@@ -82,7 +82,7 @@ set(BASE_SOURCES ${BASE_SOURCES}
     src/app/sat/sharing/sharing_manager.cpp
     src/app/sat/solvers/cadical.cpp src/app/sat/solvers/kissat.cpp src/app/sat/solvers/lingeling.cpp src/app/sat/solvers/portfolio_solver_interface.cpp
     src/balancing/collective_assignment.cpp src/balancing/event_driven_balancer.cpp 
-    src/comm/message_queue.cpp src/comm/mpi_base.cpp src/comm/mympi.cpp 
+    src/comm/message_queue.cpp src/comm/mpi_base.cpp src/comm/mympi.cpp src/comm/sysstate_unresponsive_crash.cpp
     src/data/job_database.cpp src/data/job_description.cpp src/data/job_reader.cpp src/data/job_result.cpp src/data/job_transfer.cpp 
     src/interface/json_interface.cpp src/interface/api/api_connector.cpp
     src/scheduling/job_scheduling_update.cpp

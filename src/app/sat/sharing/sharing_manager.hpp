@@ -55,6 +55,7 @@ protected:
 	std::vector<SolverStatistics*> _solver_stats;
 
 	int _num_original_clauses;
+	int _max_num_threads;
 	std::vector<std::atomic_ulong*> _last_exported_clause_id; 
 	typedef std::vector<unsigned long> EpochIdList;
 	std::vector<EpochIdList> _min_epoch_ids_per_solver;
@@ -94,6 +95,10 @@ public:
 
 	void writeClauseEpochs(/*const std::string& proofDir, int firstGlobalId, */
 		const std::string& outputFilename);
+		
+	unsigned long getGlobalStartOfSuccessEpoch() {
+		return _global_epoch_ids.empty() ? 0 : _global_epoch_ids.back();
+	}
 
 private:
 
@@ -104,7 +109,7 @@ private:
 	}
 
 	int getProducingLocalSolverIndex(unsigned long clauseId) {
-		return (clauseId-_num_original_clauses-1) % _solvers.size();
+		return (clauseId-_num_original_clauses-1) % _max_num_threads;
 	}
 	int getProducingInstanceId(unsigned long clauseId) {
 		return (clauseId-_num_original_clauses-1) % _solvers[0]->getSolverSetup().maxNumSolvers;

@@ -283,7 +283,7 @@ public:
 
     // Updates the job's resource usage and then checks whether the job reached
     // a limit imposed by its description or by a global parameter.
-    bool checkResourceLimit(float wcSecsPerInstance, float cpuSecsPerInstance) {
+    virtual bool checkResourceLimit(float wcSecsPerInstance, float cpuSecsPerInstance) {
 
         updateVolumeAndUsedCpu(getVolume());
         float usedWcSecs = getAgeSinceActivation();

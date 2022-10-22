@@ -50,6 +50,7 @@ private:
     std::vector<LratClauseId> _outgoing_clause_ids;
     bool _finished = false;
 
+    unsigned long _num_parsed_clauses = 0;
     unsigned long _num_traced_clauses = 0;
     unsigned long _num_output_lines = 0;
 
@@ -112,6 +113,14 @@ public:
 
     std::string getOutputFilename() const {return _output_filename;}
 
+    std::vector<unsigned long> getStats() const {
+        std::vector<unsigned long> stats;
+        stats.push_back(_parser.getNumReadBytes());
+        stats.push_back(_num_parsed_clauses);
+        stats.push_back(_num_traced_clauses);
+        return stats;
+    }
+
 private:
 
     void handleIncomingClauseIds(const LratClauseId* clauseIdsData, size_t clauseIdsSize) {
@@ -135,10 +144,12 @@ private:
 
         if (!_current_line.valid() && _parser.getNextLine(_current_line)) {
             _current_line_aligned = false;
+            numReadLines++;
         } 
         
         LratClauseId id = std::numeric_limits<unsigned long>::max();
         auto formerId = id;
+        int numSkippedLines = 0;
         while (_current_line.valid()) {
 
             auto& alignedId = _current_line.getId();
@@ -157,12 +168,18 @@ private:
             id = nextId;
 
             int epoch = getClauseEpoch(id);
-            if (epoch != _current_epoch) {
-                // check if it is from a future epoch (which would be an error)
-                assert(epoch < _current_epoch || log_return_false(
-                    "[ERROR] Proof %i: clause ID=%lu (originally %lu) from epoch %i found; expected epoch %i or smaller\n", 
-                    _instance_id, id, unalignedId, epoch, _current_epoch));
-                // stop reading because a former epoch has been reached
+            // skip the line if it is a stray one from a future epoch
+            if (epoch > _current_epoch) {
+                // TODO fail if the current epoch isn't the final one
+                numSkippedLines++;
+                if (_parser.getNextLine(_current_line)) {
+                    _current_line_aligned = false;
+                    numReadLines++;
+                }
+                continue;
+            }
+            // stop reading if a former epoch has been reached
+            if (epoch < _current_epoch) {
                 LOGGER(_log, V4_VVER, "%i stopping e.%i @ ID %lu (orig. %lu) from e.%i\n", 
                     _instance_id, _current_epoch, id, unalignedId, epoch);
                 break; 
@@ -216,14 +233,23 @@ private:
             // Get next proof line
             if (_parser.getNextLine(_current_line)) {
                 _current_line_aligned = false;
+                numReadLines++;
             }
-            numReadLines++;
+        }
+
+        // print a warning if some lines needed to be skipped
+        if (numSkippedLines > 0) {
+            LOGGER(_log, V1_WARN, "[WARN] Proof %i: skipped %i lines from future epoch > %i\n", 
+                _instance_id, numSkippedLines, _current_epoch);
+            numSkippedLines = 0;
         }
 
         LOGGER(_log, V3_VERB, "%i e.%i: %i lines; last ID %s; %lu traced; %lu in blg; %lu in fnt\n", 
             _instance_id, _current_epoch, numReadLines, 
             numReadLines==0 ? "-" : std::to_string(formerId).c_str(), 
             _num_traced_clauses, _backlog.size(), _frontier.size());
+
+        _num_parsed_clauses += numReadLines;
 
         if (_current_epoch == 0) {
             // End of the procedure reached!
@@ -236,29 +262,44 @@ private:
             assert(_frontier.empty());
             assert(_backlog.empty());
 
-            if (_interleave_merging) _merge_connector->markExhausted();
+            if (_interleave_merging) {
+
+                // Insert final "stop" line which contains the statistics
+                LratLine statsLine;
+                statsLine.id = 0;
+                auto stats = getStats();
+                for (auto stat : stats) {
+                    statsLine.hints.push_back(stat);
+                    statsLine.signsOfHints.push_back(true);
+                }
+                SerializedLratLine serializedStatsLine(statsLine);
+                _merge_connector->pushBlocking(serializedStatsLine);
+
+                _merge_connector->markExhausted();
+            }
 
             _finished = true;
             LOGGER(_log, V3_VERB, "%i finished pruning\n", _instance_id);
 
         } else {
-            
             // Insert sentinel element / "stub" line to signal end of epoch
             if (_interleave_merging) {
                 int nextIdEpoch = _current_epoch-1;
-                assert(nextIdEpoch < _current_epoch);
-                assert(nextIdEpoch+1 < _global_epoch_starts.size());
-                auto sentinelId = _global_epoch_starts[nextIdEpoch+1]-1;
-                SerializedLratLine sentinelLine(sentinelId);
-                assert(sentinelLine.isStub());
-                _merge_connector->pushBlocking(sentinelLine);
-                _num_output_lines++;
-                LOGGER(_log, V4_VVER, "%i e.%i: push sentinel %lu ; outlines=%lu\n", 
-                    _instance_id, _current_epoch, sentinelId, _num_output_lines);
+                if (nextIdEpoch+1 >= _global_epoch_starts.size()) {
+                    LOGGER(_log, V1_WARN, "[WARN] Skipping sentinel for \"dead\" epoch %i\n", nextIdEpoch+1);
+                } else {
+                    auto sentinelId = _global_epoch_starts[nextIdEpoch+1]-1;
+                    SerializedLratLine sentinelLine(sentinelId);
+                    assert(sentinelLine.isStub());
+                    _merge_connector->pushBlocking(sentinelLine);
+                    _num_output_lines++;
+                    LOGGER(_log, V4_VVER, "%i e.%i: push sentinel %lu ; outlines=%lu\n", 
+                        _instance_id, _current_epoch, sentinelId, _num_output_lines);
+                }
             }
-
             _current_epoch--;
         }
+
     }
 
     void prepareNextOutgoingClauseIds() {

@@ -46,7 +46,7 @@ struct LratLine {
                     readingHints = false;
                     success = true;
                 } else {
-                    assert(num < 1000000000000000000UL);
+                    //assert(num < 1000000000000000000UL);
                     hints.push_back(num);
                     signsOfHints.push_back(sign > 0);
                 }

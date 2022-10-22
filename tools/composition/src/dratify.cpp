@@ -5,48 +5,12 @@
 #include "util.hpp"
 #include "parse.hpp"
 
-#include "unordered_dense.h"
 
-typedef ankerl::unordered_dense::map<clause_id_t, clause_id_t> ClauseIdMap;
-
-/*
- * Build the initial map from the adjustment file
- * Also set the number of original clauses correctly based on the adjustment
- */
-result_code_t read_adjustment_file(char *filename,
-                                   ClauseIdMap& clause_id_map,
-                                   int32_t *num_original_clauses){
-    FILE *f = fopen(filename, "r");
-    if (f == NULL){
-        printf("Error:  Unable to open adjustment file %s\n", filename);
-        return UNABLE_TO_OPEN;
-    }
-    int32_t max_id = *num_original_clauses;
-    clause_id_t first;
-    clause_id_t second;
-    int32_t tmp = fscanf(f, "%" SCN_CLAUSE_ID " %" SCN_CLAUSE_ID, &first, &second);
-    while (tmp == 2){
-        max_id = second > max_id ? second : max_id;
-        clause_id_map[first] = second;
-        tmp = fscanf(f, "%" SCN_CLAUSE_ID " %" SCN_CLAUSE_ID, &first, &second);
-    }
-    if (tmp == EOF){
-        *num_original_clauses = max_id;
-        return SUCCESS;
-    }
-    else{
-        printf("Error:  Could not read all entries in adjustment file %s\n", filename);
-        return PARSE_ERROR;
-    }
-}
-
-
-result_code_t run_renumbering(FILE *outfile, FILE *infile,
-                              ClauseIdMap& clause_id_map,
-                              int32_t num_original_clauses, bool is_binary){
-    clause_id_t next_id = num_original_clauses + 1;
+result_code_t dratify(FILE *outfile, FILE *infile,
+                      std::map<clause_id_t,
+                      std::vector<int32_t>>& clause_id_map, bool is_binary){
     clause_t clause;
-    std::vector<clause_id_t> delete_clause(1000);
+    std::vector<clause_id_t> delete_clause(100);
     bool_t is_add_clause;
 
     //initialize clause by resetting it
@@ -63,36 +27,33 @@ result_code_t run_renumbering(FILE *outfile, FILE *infile,
     }
     while (result == SUCCESS){
         if (is_add_clause){
-            //map new clause ID
-            clause_id_map[get_clause_id(&clause)] = next_id;
-            set_clause_id(&clause, next_id);
-            next_id++;
-            //map over proof hint
-            for (uint32_t i = 0; i < clause.proof_clauses.size(); i++) {
-                auto it = clause_id_map.find(clause.proof_clauses[i]);
-                if (it != clause_id_map.end()){ //map if an entry exists
-                    clause.proof_clauses[i] = it->second;
-                }
+            //write it to the file
+            for (int32_t lit : clause.literals){
+                fprintf(outfile, " %" PRId32, lit);
             }
-            //write it out
-            output_added_clause(&clause, outfile, false, is_binary);
+            fprintf(outfile, " 0\n");
+            //put the clause in the map
+            clause_id_map[clause.clause_id] = clause.literals;
             //clean up for next time
-            reset_clause(&clause);
+            std::vector<int32_t> new_lits(100);
+            new_lits.clear();
+            clause.literals = new_lits;
         }
         else{
-            //map over clause deletions
+            //map over clause deletions, outputting one delete for each clause
             for (uint32_t i = 0; i < delete_clause.size(); i++){
-                clause_id_t new_val = clause_id_map[delete_clause[i]];
+                std::vector<int32_t> lits = clause_id_map[delete_clause[i]];
+                fprintf(outfile, "d");
+                for (int32_t lit : lits){
+                    fprintf(outfile, " %" PRId32, lit);
+                }
+                fprintf(outfile, " 0\n");
+                //remove it from the map because we can't need it anymore
                 clause_id_map.erase(delete_clause[i]);
-                delete_clause[i] = new_val;
             }
-            //write it out, with last used clause ID to start line
-            clause_id_t last_output = next_id - 1;
-            output_delete_clauses(last_output, delete_clause, outfile, is_binary);
             //clean up for next time
             delete_clause.clear();
         }
-        //read the next line
         if (is_binary){
             result = parse_any_binary_line(infile, &clause, delete_clause, &is_add_clause);
         }
@@ -108,8 +69,70 @@ result_code_t run_renumbering(FILE *outfile, FILE *infile,
 }
 
 
+//Read the DIMACS file, building a map containing its clauses
+std::map<clause_id_t, std::vector<int32_t>> read_dimacs_into_map(FILE *file, result_code_t *result){
+    std::map<clause_id_t, std::vector<int32_t>> clause_id_map;
+    clause_id_t next_id = 1;
+    int32_t tmp;
+    char c = 0;
+    int32_t lit;
+    *result = SUCCESS;
+
+    //Remove things until we reach a line starting with p
+    c = getc(file);
+    while (c != EOF && c != 'p'){
+        //comment case, so read rest of line
+        if (c == 'c'){
+            while (c != EOF && c != '\n'){
+                c = getc(file);
+            }
+            if (c == EOF){
+                printf("Parse Error:  File ended before finding DIMACS header\n");
+                *result = PARSE_ERROR;
+                return clause_id_map;
+            }
+        }
+        c = getc(file);
+    }
+
+    //Remove the p line
+    c = getc(file);
+    while (c != EOF && c != '\n'){
+        c = getc(file);
+    }
+
+    //read the clauses
+    while (tmp != EOF){
+        std::vector<int32_t> lits(0); //let it get set based on adding lits
+        tmp = fscanf(file, " %" SCNd32, &lit);
+        while (tmp != 0 && tmp != EOF && lit != 0){
+            lits.push_back(lit);
+            tmp = fscanf(file, " %" SCNd32, &lit);
+        }
+        if (tmp == 0){
+            c = getc(file);
+            if (c == 'c'){
+                while (c != EOF && c != '\n'){
+                    c = getc(file);
+                }
+            }
+            else{
+                printf("Parse error in DIMACS file\n");
+                *result = PARSE_ERROR;
+            }
+        }
+        else if (tmp != EOF){
+            //add clause to map
+            clause_id_map[next_id] = lits;
+            next_id++;
+        }
+    }
+    return clause_id_map;
+}
+
+
 void print_usage(char *name, boost::program_options::options_description desc){
-    printf("Usage:  %s [options] PROBLEM.dimacs OUTPUT.lrat INPUT.lrat\n", name);
+    printf("Usage:  %s [options] PROBLEM.dimacs INPUT.lrat OUTPUT.drat\n", name);
     printf("\n");
     std::cout << desc << "\n";
 }
@@ -120,18 +143,16 @@ int main(int argc, char **argv){
     boost::program_options::options_description visible_opts("Allowed options");
     visible_opts.add_options()
         ("help", "produce help message")
-        ("binary", "read and write binary files")
-        ("adjust-file", boost::program_options::value<std::string>(),
-         "file for adjusting clause ID's based on preprocessing");
+        ("binary", "read binary file");
     //options for holding positional arguments
     boost::program_options::options_description hidden_opts;
     hidden_opts.add_options()
         ("dimacs_name", boost::program_options::value<std::string>(),
          "DIMACS file for the problem")
-        ("output_name", boost::program_options::value<std::string>(),
-         "output LRAT filename")
         ("input_name", boost::program_options::value<std::string>(),
-         "input LRAT filename");
+         "input LRAT filename")
+        ("output_name", boost::program_options::value<std::string>(),
+         "output DRAT filename");
     //all the options combined for parsing
     boost::program_options::options_description opts;
     opts.add(visible_opts).add(hidden_opts);
@@ -139,16 +160,13 @@ int main(int argc, char **argv){
     //telling it the positional arguments
     boost::program_options::positional_options_description pos_opts;
     pos_opts.add("dimacs_name", 1);
-    pos_opts.add("output_name", 1);
     pos_opts.add("input_name", 1);
+    pos_opts.add("output_name", 1);
 
     char *dimacsfilename;
     char *outfilename;
     char *infilename;
     bool is_binary = false;
-    bool adjust = false;
-    char *adjustfilename;
-    int32_t num_original_clauses;
 
     //variables resulting from parsing
     boost::program_options::variables_map vm;
@@ -172,11 +190,6 @@ int main(int argc, char **argv){
 
         if (vm.count("binary")){
             is_binary = true;
-        }
-
-        if (vm.count("adjust-file")){
-            adjust = true;
-            adjustfilename = (char *) vm["adjust-file"].as<std::string>().c_str();
         }
 
         if (vm.count("dimacs_name")){
@@ -213,21 +226,11 @@ int main(int argc, char **argv){
         return BAD_USAGE;
     }
 
-    //get number of original clauses from DIMACS file
-    result_code_t result = parse_cnf_file(dimacsfilename, &num_original_clauses);
-    if (result != SUCCESS){
-        return result;
-    }
-
-    ClauseIdMap clause_id_map;
-
-    //if there is an adjustment file, read it
-    if (adjust){
-        result = read_adjustment_file(adjustfilename, clause_id_map,
-                                      &num_original_clauses);
-        if (result != SUCCESS){
-            return result;
-        }
+    //open the DIMACS file
+    FILE *dimacsfile = fopen(dimacsfilename, "r");
+    if (dimacsfile == NULL){
+        printf("Error:  Unable to open output file %s\n", dimacsfilename);
+        return UNABLE_TO_OPEN;
     }
 
     //open the output file
@@ -244,7 +247,12 @@ int main(int argc, char **argv){
         return UNABLE_TO_OPEN;
     }
 
-    result = run_renumbering(outfile, infile, clause_id_map,
-                             num_original_clauses, is_binary);
+    result_code_t result;
+    auto clause_id_map = read_dimacs_into_map(dimacsfile, &result);
+    if (result != SUCCESS){
+        return result;
+    }
+
+    result = dratify(outfile, infile, clause_id_map, is_binary);
     return result;
 }

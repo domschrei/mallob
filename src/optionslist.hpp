@@ -36,6 +36,7 @@ OPT_BOOL(monitorMpi,                     "mmpi", "monitor-mpi",                 
 OPT_BOOL(omitSolution,                   "os", "omit-solution",                       false,                   "Do not output solution in mono mode of operation")
 OPT_BOOL(phaseDiversification,           "phasediv", "",                              true,                    "Diversify solvers based on phase in addition to native diversification")
 OPT_BOOL(pipeLargeSolutions,             "pls", "pipe-large-solutions",               true,                    "Provide large solutions over a named pipe instead of directly writing them into the response JSON")
+OPT_BOOL(preCleanup,                     "pre-cleanup", "",                           false,                   "Clean up shmem/proof/trace/extmem files before starting off")
 OPT_BOOL(quiet,                          "q", "quiet",                                false,                   "Do not log to stdout besides critical information")
 OPT_BOOL(reactivationScheduling,         "rs", "use-reactivation-scheduling",         true,                    "Perform reactivation-based scheduling")
 OPT_BOOL(regularProcessDistribution,     "rpa", "regular-process-allocation",         false,                   "Signal that processes have been allocated regularly, i.e., the i-th machine hosts ranks c*i through c*i + c-1")
@@ -98,6 +99,7 @@ OPT_FLOAT(loadFactor,                    "l", "load-factor",                    
 OPT_FLOAT(requestTimeout,                "rto", "request-timeout",                    0,    0, LARGE_INT,      "Request timeout: discard non-root job requests when older than this many seconds")
 OPT_FLOAT(sysstatePeriod,                "y", "sysstate-period",                      1,    0.1, 50,           "Period for aggregating and logging global system state")
 OPT_FLOAT(timeLimit,                     "T", "time-limit",                           0,    0, LARGE_INT,      "Run entire system for at most this many seconds")
+OPT_FLOAT(satSolvingWallclockLimit,      "sswl", "sat-solving-wallclock-limit",       0,    0, LARGE_INT,      "Cancel job if not done solving after this many seconds (0: no limit)")
 
 OPT_STRING(applicationConfiguration,     "app-config", "",                            "",                      "Application configuration: structured as (-key=value;)*")
 OPT_STRING(applicationSpawnMode,         "appmode", "app-spawn-mode",                 "fork",                  "Application mode: \"fork\" (spawn child process for each job on each MPI process) or \"thread\" (execute jobs in separate threads but within the same process)")
@@ -113,5 +115,6 @@ OPT_STRING(solutionToFile,               "s2f", "solution-to-file",             
 OPT_STRING(extMemDiskDirectory,          "extmem-disk-dir", "",                       ".",                     "Directory where to create external memory files")
 OPT_STRING(subprocessPrefix,             "subproc-prefix", "",                        "",                      "Execute SAT subprocess with this prefix (e.g., \"valgrind\")")
 OPT_STRING(traceDirectory,               "trace-dir", "",                             ".",                     "Directory to write thread trace files to")
+OPT_STRING(satPreprocessor,              "sat-preprocessor", "",                      "",                      "Executable which preprocesses CNF file")
 
 #endif

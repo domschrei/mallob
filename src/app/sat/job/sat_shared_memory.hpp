@@ -43,6 +43,7 @@ struct SatSharedMemory {
     SatResult result;
     int solutionRevision;
     int winningInstance;
+    unsigned long globalStartOfSuccessEpoch;
     
     // Clause buffers: parent->child
     int exportBufferAllocatedSize;

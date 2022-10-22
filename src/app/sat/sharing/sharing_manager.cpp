@@ -47,7 +47,9 @@ SharingManager::SharingManager(
 	auto callback = getCallback();
 	
 	assert(!solvers.empty());
+	_max_num_threads = _params.numThreadsPerProcess();
 	_num_original_clauses = solvers[0]->getSolverSetup().numOriginalClauses;
+	int maxNumGlobalSolvers = solvers[0]->getSolverSetup().maxNumSolvers;
 
 	_id_offsets_per_solver.resize(_solvers.size());
 	_min_epoch_ids_per_solver.resize(_solvers.size());
@@ -63,9 +65,19 @@ SharingManager::SharingManager(
 			_id_offsets_per_solver[i].push_back(0);
 			_min_epoch_ids_per_solver[i].push_back(0);
 			_last_exported_clause_id[i] = new std::atomic_ulong(_num_original_clauses+1);
+			/*
+			auto firstIdToBeLearnt = _num_original_clauses + 1 + _solvers[i]->getGlobalId();
+			_last_exported_clause_id[i] = new std::atomic_ulong(
+				maxNumGlobalSolvers > firstIdToBeLearnt ? 
+					0 : 
+					firstIdToBeLearnt - maxNumGlobalSolvers
+			);
+			assert(getProducingLocalSolverIndex(_last_exported_clause_id[i]->load(std::memory_order_relaxed)) == i);
+			*/
 
 			LOG(V2_INFO, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
-					_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), 0, _min_epoch_ids_per_solver[i].back());
+					_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), _last_exported_clause_id[i]->load(std::memory_order_relaxed), 
+					_min_epoch_ids_per_solver[i].back());
 		}
 	}
 	_global_epoch_ids.push_back(0);
@@ -222,23 +234,24 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 	if (ClauseMetadata::enabled() && _params.distributedProofAssembly()) {
 		// Proceed with the next epoch.
 		// Find max. first clause ID
-		unsigned long maxMinEpochId = 0;
+		unsigned long maxFirstIdOfEpoch = 0;
 		int maxNumSolvers = _solvers[0]->getSolverSetup().maxNumSolvers;
 		for (size_t i = 0; i < _solvers.size(); i++) {
+
 			auto clauseIdCounter = _last_exported_clause_id[i]->load(std::memory_order_relaxed);
+			_min_epoch_ids_per_solver[i].push_back(clauseIdCounter);
 			
-			auto minEpochId = _id_offsets_per_solver[i].back() 
+			auto firstIdOfEpoch = _id_offsets_per_solver[i].back() 
 				+ clauseIdCounter
 				+ maxNumSolvers;
-			minEpochId = minEpochId - (minEpochId % maxNumSolvers) + maxNumSolvers;
-
-			_min_epoch_ids_per_solver[i].push_back(clauseIdCounter);
-			maxMinEpochId = std::max(maxMinEpochId, minEpochId);
+			firstIdOfEpoch = firstIdOfEpoch - (firstIdOfEpoch % maxNumSolvers) + maxNumSolvers;
+			maxFirstIdOfEpoch = std::max(maxFirstIdOfEpoch, firstIdOfEpoch);
 
 			LOG(V2_INFO, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
 				_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), clauseIdCounter, _min_epoch_ids_per_solver[i].back());
 		}
-		ClauseMetadata::writeUnsignedLong(maxMinEpochId, filterOut);
+
+		ClauseMetadata::writeUnsignedLong(maxFirstIdOfEpoch, filterOut);
 	}
 
 	_filter.acquireLock();
@@ -297,22 +310,22 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		if (ClauseMetadata::enabled() && _params.distributedProofAssembly()) {
 			// extract global min. epoch ID and compute the next ID offset
 			// for each solver from it
+
+			auto numSolvers = _solvers[0]->getSolverSetup().maxNumSolvers;
 			unsigned long globalMinEpochId = ClauseMetadata::readUnsignedLong(filter);
+			globalMinEpochId = std::max(globalMinEpochId, _global_epoch_ids.back() + numSolvers);
 			LOG(V2_INFO, "EPOCH %i GLOBAL_MAX_OF_1ST_ID %lu\n", _min_epoch_ids_per_solver[0].size()-1, globalMinEpochId);
+			assert(globalMinEpochId > _num_original_clauses);
 			_global_epoch_ids.push_back(globalMinEpochId);
 
 			for (size_t i = 0; i < _solvers.size(); i++) {
 
-				auto numSolvers = _solvers[i]->getSolverSetup().maxNumSolvers;
 				auto offset = globalMinEpochId - _min_epoch_ids_per_solver[i].back();
 				offset = offset - (offset % numSolvers) + numSolvers;
 				_id_offsets_per_solver[i].push_back(offset);
 				
-				auto testClauseId = _last_exported_clause_id[i]->load(std::memory_order_relaxed) + _solvers[i]->getSolverSetup().maxNumSolvers;
-				alignClauseId((int*) &testClauseId);
-				LOG(V2_INFO, "EPOCH %i instance=%i newoffset=%lu nextalignedclauseid=%lu\n", 
-					_min_epoch_ids_per_solver[i].size()-1, _solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(),
-					testClauseId);
+				LOG(V2_INFO, "EPOCH %i instance=%i newoffset=%lu\n", 
+					_min_epoch_ids_per_solver[i].size()-1, _solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back());
 			}
 		}
 
@@ -427,7 +440,6 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 					if (getProducingInstanceId(clauseId) == solver.getGlobalId()) {
 						// This solver produced this clause! Do not import.
 						solverStats->receivedClausesFiltered++;
-						abort();
 						continue;
 					}
 					// Important invariant: incoming clauses must be from EARLIER epochs
@@ -501,8 +513,10 @@ int SharingManager::getEpochOfUnalignedSelfClause(unsigned long id) {
 	// will point to 1st element >= id (or end)
 	auto it = std::lower_bound(epochList.begin(), epochList.end(), id);
 	assert(it != epochList.begin());
-	// point to last element < id
-	--it;
+	//if (it == epochList.end() || *it > id) {
+		// point to last element < id
+		--it;
+	//}
 	return std::distance(epochList.begin(), it);
 }
 int SharingManager::getEpochOfAlignedSelfClause(unsigned long id) {
@@ -510,8 +524,10 @@ int SharingManager::getEpochOfAlignedSelfClause(unsigned long id) {
 	// will point to 1st element >= id (or end)
 	auto it = std::lower_bound(epochList.begin(), epochList.end(), id);
 	assert(it != epochList.begin());
-	// point to last element < id
-	--it;
+	//if (it == epochList.end() || *it > id) {
+		// point to last element < id
+		--it;
+	//}
 	return std::distance(epochList.begin(), it);
 }
 
@@ -522,25 +538,27 @@ void SharingManager::writeClauseEpochs(/*const std::string& proofDir, int firstG
 	if (!_params.distributedProofAssembly()) return;
 
 	std::string tempFilename = outputFilename + "~";
-	std::ofstream ofs(tempFilename);
-	ofs << _num_original_clauses << "\n";
+	{
+		std::ofstream ofs(tempFilename);
+		ofs << _num_original_clauses << "\n";
 
-	for (int epoch = 0; epoch < _global_epoch_ids.size(); epoch++) {
+		for (int epoch = 0; epoch < _global_epoch_ids.size(); epoch++) {
 
-		// Check if all necessary entries for this epoch are present
-		if ([&]() {
-			for (size_t i = 0; i < _id_offsets_per_solver.size(); i++)
-				if (epoch >= _min_epoch_ids_per_solver[i].size() || epoch >= _id_offsets_per_solver[i].size())
-					return true; // cancel writing
-			return false; // continue writing
-		}()) break;
+			// Check if all necessary entries for this epoch are present
+			if ([&]() {
+				for (size_t i = 0; i < _id_offsets_per_solver.size(); i++)
+					if (epoch >= _min_epoch_ids_per_solver[i].size() || epoch >= _id_offsets_per_solver[i].size())
+						return true; // cancel writing
+				return false; // continue writing
+			}()) break;
 
-		ofs << epoch << " " << _global_epoch_ids[epoch];
-		for (size_t i = 0; i < _id_offsets_per_solver.size(); i++) {
-			ofs << " " << _min_epoch_ids_per_solver[i][epoch];
-			ofs << " " << _id_offsets_per_solver[i][epoch];
+			ofs << epoch << " " << _global_epoch_ids[epoch];
+			for (size_t i = 0; i < _id_offsets_per_solver.size(); i++) {
+				ofs << " " << _min_epoch_ids_per_solver[i][epoch];
+				ofs << " " << _id_offsets_per_solver[i][epoch];
+			}
+			ofs << "\n";
 		}
-		ofs << "\n";
 	}
 
 	LOG(V2_INFO, "renaming clause epochs file ...\n");
