@@ -5,9 +5,10 @@
 #include "util/assert.hpp"
 #include <iostream>
 
-Option::Option(OptMap& map, const std::string& id, const std::string& longid, const std::string& desc):
+Option::Option(OptMap& map, GroupedOptionsList& groupedOpts, const std::string& id, const std::string& longid, const std::string& desc):
     id(id), longid(longid), desc(desc) {
     map[id] = this;
+    groupedOpts.back()->map[id] = this;
 }
 bool Option::hasLongOption() const {
     return !longid.empty();

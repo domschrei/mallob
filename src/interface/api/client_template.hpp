@@ -7,54 +7,11 @@
 #include <iostream>
 
 #include "util/json.hpp"
+#include "util/distribution.hpp"
 
 class ClientTemplate {
 
 private:
-    struct Distribution {
-        enum Type {CONSTANT, UNIFORM, EXPONENTIAL, NORMAL} type;
-        std::vector<double> params;
-        std::mt19937& _rng;
-        void* _distribution;
-
-        Distribution(std::mt19937& rng) : _rng(rng) {}
-
-        void configure(Type type, const std::vector<double>& params) {
-            this->type = type;
-            this->params = params;
-            switch (type) {
-                case CONSTANT:
-                    _distribution = nullptr;
-                    break;
-                case UNIFORM:
-                    _distribution = new std::uniform_real_distribution<double>(params[0], params[1]);
-                    break;
-                case EXPONENTIAL:
-                    _distribution = new std::exponential_distribution<double>(params[0]);
-                    break;
-                case NORMAL:
-                    _distribution = new std::normal_distribution<double>(params[0], params[1]);
-                    break;
-            }
-        }
-
-        double sample() {
-            switch (type) {
-                case CONSTANT:
-                    return params[0];
-                case UNIFORM:
-                    return (*(std::uniform_real_distribution<double>*)_distribution)(_rng);
-                case EXPONENTIAL:
-                    return (*(std::exponential_distribution<double>*)_distribution)(_rng);
-                case NORMAL:
-                    double result = (*(std::normal_distribution<double>*)_distribution)(_rng);
-                    if (params.size() > 2) result = std::max(result, params[2]);
-                    if (params.size() > 3) result = std::min(result, params[3]);
-                    return result;
-            }
-        }
-    };
-
     std::mt19937 _rng;
     Distribution _dist_priority;
     Distribution _dist_maxdemand;

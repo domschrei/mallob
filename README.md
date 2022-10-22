@@ -26,6 +26,7 @@ Note that we only support Linux as an operating system.
 ## Building
 
 ```
+# For non-x86-64 architectures (ARM, POWER9, etc.), set DISABLE_FPU=1 for the bash call
 ( cd lib && bash fetch_and_build_sat_solvers.sh )
 mkdir -p build
 cd build
@@ -208,7 +209,8 @@ Instead of the "solution" field, the response may also contain the fields "solut
 
 Mallob can be extended in the following ways:
 
-* New options to the application (or a subsystem thereof) can be added in `src/optionslist.hpp`.
+* New options for Mallob can be added in `src/optionslist.hpp`.
+    - Options which are specific to a certain application can be found and edited in `src/app/$APPKEY/options.hpp`.
 * To add a new SAT solver to be used in a SAT solver engine, do the following:
     - Add a subclass of `PortfolioSolverInterface`. (You can use the existing implementation for any of the existing solvers and adapt it to your solver.)
     - Add your solver to the portfolio initialization in `src/app/sat/execution/engine.cpp`.

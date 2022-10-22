@@ -108,9 +108,9 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
 
                 // Notify client that this incremental job is done
                 JobMetadata data;
-                data.jobName = jobName;
                 data.description = std::unique_ptr<JobDescription>(new JobDescription(id, 0, applicationId));
                 data.description->setIncremental(incremental);
+                data.jobName = jobName;
                 data.done = true;
                 _job_callback(std::move(data));
                 return ACCEPT_CONCLUDE;
@@ -129,8 +129,9 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
         } else {
 
             // Create new internal ID for this job
-            if (!_job_name_to_id_rev.count(jobName)) 
-                _job_name_to_id_rev[jobName] = std::pair<int, int>(_running_id++, 0);
+            if (!_job_name_to_id_rev.count(jobName)) {
+                _job_name_to_id_rev[jobName] = std::pair<int, int>(_job_id_allocator.getNext(), 0);
+            }
             auto pair = _job_name_to_id_rev[jobName];
             id = pair.first;
             LOGGER(_logger, V3_VERB, "Mapping job \"%s\" to internal ID #%i\n", jobName.c_str(), id);
@@ -138,6 +139,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             // Was job already parsed before?
             if (_job_id_rev_to_image.count(std::pair<int, int>(id, 0))) {
                 LOGGER(_logger, V1_WARN, "[WARN] Modification of a file I already parsed! Ignoring.\n");
+                throw std::invalid_argument("File was already parsed before");
                 return DISCARD;
             }
 
@@ -191,6 +193,10 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             config.map[it.key()] = it.value();
         }
     }
+    // legacy support for "content-mode" field at the JSON's top level
+    if (!config.map.count("content-mode") && json.contains("content-mode")) {
+        config.map["content-mode"] = json["content-mode"].get<std::string>();
+    }
     job->setAppConfiguration(std::move(config));
     
     // Translate dependencies (if any) to internal job IDs
@@ -206,7 +212,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
         // that will be used by the job later
         auto lock = _job_map_mutex.getLock();
         if (!_job_name_to_id_rev.count(name)) {
-            _job_name_to_id_rev[name] = std::pair<int, int>(_running_id++, 0);
+            _job_name_to_id_rev[name] = std::pair<int, int>(_job_id_allocator.getNext(), 0);
             LOGGER(_logger, V3_VERB, "Forward mapping job \"%s\" to internal ID #%i\n", name.c_str(), _job_name_to_id_rev[name].first);
         }
         idDependencies.push_back(_job_name_to_id_rev[name].first); // TODO inexact: introduce dependencies for job revisions

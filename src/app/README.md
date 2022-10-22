@@ -6,12 +6,13 @@ In the following we explain which steps need to be performed and how exactly the
 
 ## Overview
 
-To integrate your application into Mallob, create a subdirectory `app/yourappkey` where `yourappkey` is an all lower case identifier for your application within Mallob (e.g., `kmeans` or `smt`). In that directory, the following files are strictly required:
+To integrate your application into Mallob, create a subdirectory `app/yourappkey` where `yourappkey` is an all lower case identifier for your application within Mallob (e.g., `kmeans` or `smt`). In that directory, the following files are strictly required - each is explained in more detail further below.
 
 * `setup.cmake`: Define the build process for your application.
-* `register.hpp`: In this C++ file, define a global method `void register_mallob_app_yourappkey()` (replace "yourappkey" accordingly) where you define three particular lambda functions for your app within the `app_registry`. This bit of code programmatically connects your application code with Mallob's program flow.
+* `options.hpp`: Define custom, application-specific program options.
+* `register.hpp`: Define a global method `void register_mallob_app_yourappkey()` (replace "yourappkey" accordingly) where you define three particular lambda functions for your app within the `app_registry`. This bit of code programmatically connects your application code with Mallob's program flow.
 
-After all of this is set up, register your application within Mallob's build process by adding the following code to `CMakeLists.txt` below the line `# Include further applications here`:
+After all of this is set up, register your application within Mallob's build process by adding the following code to `CMakeLists.txt` below the line `# Include further applications here:`.
 ```cmake
 if(MALLOB_APP_YOURAPPKEY) 
     register_mallob_app("yourappkey")
@@ -21,7 +22,15 @@ You can then build Mallob with CMake option `-DMALLOB_APP_YOURAPPKEY=1` to inclu
 
 ## `setup.cmake`
 
-The CMake file `app/yourappkey/setup.cmake` must contain all directives necessary to build and include your application in Mallob. In principle, if your code only consists of header files transitively included by a single entry point `register.hpp` and if no additional libraries are required, this file may be completely empty (see `app/dummy/setup.cmake`). Otherwise, you should define the compilation units (.cpp files) of your application, add additional include directories and libraries as necessary, and define any external executables your application calls. Please take a look at `app/sat/setup.cmake` for a reasonably complex example including external libraries and a separate subprocess executable.
+The CMake file `app/yourappkey/setup.cmake` must contain all directives necessary to build and include your application in Mallob. In principle, if your code only consists of header files transitively included by a single entry point `register.hpp` and if no additional libraries are required, this file may be completely empty. Otherwise, you should define the compilation units (.cpp files) of your application, add additional include directories and libraries as necessary, and define any external executables your application calls. Please take a look at `app/dummy/setup.cmake` for a simple example which only adds additional compilation units and `app/sat/setup.cmake` for a reasonably complex example featuring external libraries and a separate subprocess executable.
+
+## `options.hpp`
+
+Options in Mallob are grouped into hierarchical categories, e.g., "app", "app/sat", "app/sat/sharing", and so on. While the base options of Mallob are defined in `src/optionslist.hpp`, you should define application-specific program options in `src/app/yourappkey/options.hpp`. In this file, create a base option group for your application like this:
+```c++
+OPTION_GROUP(grpAppYourappkey, "app/yourappkey", "Options for application XXX")
+```
+All options defined after this definition and before the next group definition are added to this group. You can create subgroups like "app/yourappkey/x" to organize your program options. Please take a look at `src/app/sat/options.hpp` for a complete example on how options are defined. The groups and options you defined will then be included in the output of `--help` automatically.
 
 ## `register.hpp`
 

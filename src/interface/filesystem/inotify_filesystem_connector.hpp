@@ -8,7 +8,7 @@
 #include "interface/json_interface.hpp"
 #include "util/sys/file_watcher.hpp"
 
-class FilesystemConnector : public Connector {
+class InotifyFilesystemConnector : public Connector {
 
 private:
     JsonInterface& _interface;
@@ -21,7 +21,7 @@ private:
 
 public:
 
-    FilesystemConnector(JsonInterface& interface, const Parameters& params, Logger&& logger, const std::string& basePath) :
+    InotifyFilesystemConnector(JsonInterface& interface, const Parameters& params, Logger&& logger, const std::string& basePath) :
         _interface(interface), _params(params), _logger(std::move(logger)),
         _watcher(basePath + "/in/", (int) (IN_MOVED_TO | IN_MODIFY | IN_CLOSE_WRITE), 
             [&](const FileWatcher::Event& event, Logger& log) {
@@ -36,11 +36,11 @@ public:
 
         LOGGER(_logger, V2_INFO, "operational at %s\n", _base_path.c_str());
     }
-    ~FilesystemConnector() {}
+    ~InotifyFilesystemConnector() {}
 
     void handleEvent(const FileWatcher::Event& event, Logger& log) {
 
-        if (event.type != IN_CLOSE_WRITE && event.type != IN_MOVED_FROM)
+        if (event.type != IN_CLOSE_WRITE && event.type != IN_MOVED_TO)
             return;
 
         std::string eventFile = _base_path + "/in/" + event.name;
@@ -49,6 +49,11 @@ public:
         if (!FileUtils::isRegularFile(eventFile)) {
             LOGGER(log, V3_VERB, "Job file %s does not exist (any more)\n", eventFile.c_str());        
             return; // File does not exist (any more)
+        }
+
+        // Skip files beginning with "~" ("unfinished" / temporary files)
+        if (event.name.empty() || event.name[0] == '~') {
+            return;
         }
 
         // Attempt to parse JSON from file

@@ -22,7 +22,8 @@
 #include "app/app_registry.hpp"
 
 #include "interface/socket/socket_connector.hpp"
-#include "interface/filesystem/filesystem_connector.hpp"
+#include "interface/filesystem/naive_filesystem_connector.hpp"
+#include "interface/filesystem/inotify_filesystem_connector.hpp"
 #include "interface/api/api_connector.hpp"
 
 
@@ -174,11 +175,15 @@ void Client::handleNewJob(JobMetadata&& data) {
 
 void Client::init() {
 
+    // Get ID allocator this client should use
+    JobIdAllocator jobIdAllocator(getInternalRank(), getFilesystemInterfacePath());
+
     // Set up generic JSON interface to communicate with this client
     _json_interface = std::unique_ptr<JsonInterface>(
         new JsonInterface(getInternalRank(), _params, 
             Logger::getMainInstance().copy("I", ".i"),
-            [&](JobMetadata&& data) {handleNewJob(std::move(data));}
+            [&](JobMetadata&& data) {handleNewJob(std::move(data));},
+            std::move(jobIdAllocator)
         )
     );
 
@@ -187,8 +192,10 @@ void Client::init() {
         std::string path = getFilesystemInterfacePath();
         LOG(V2_INFO, "Set up filesystem interface at %s\n", path.c_str());
         auto logger = Logger::getMainInstance().copy("I-FS", ".i-fs");
-        auto conn = new FilesystemConnector(*_json_interface, _params, 
-            std::move(logger), path);
+        auto conn = _params.inotify() ? 
+            (Connector*) new InotifyFilesystemConnector(*_json_interface, _params, std::move(logger), path)
+            :
+            (Connector*) new NaiveFilesystemConnector(*_json_interface, _params, std::move(logger), path);
         _interface_connectors.push_back(conn);
     }
     if (_params.useIPCSocketInterface()) {
