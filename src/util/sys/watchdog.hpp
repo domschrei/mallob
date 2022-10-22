@@ -33,6 +33,8 @@ private:
     std::atomic_int _warning_period_millis = 0;
     std::atomic_int _abort_period_millis = 0;
 
+    static std::atomic_bool _globally_enabled;
+
 public:
     Watchdog(bool enabled, int checkIntervalMillis, float time = Timer::elapsedSeconds());
     void setWarningPeriod(int periodMillis);
@@ -44,6 +46,8 @@ public:
     int* activityRecvTag() {return &_activity_recv_tag;}
     int* activitySendTag() {return &_activity_send_tag;}
     void stop();
+
+    static void disableGlobally();
 };
 
 #endif

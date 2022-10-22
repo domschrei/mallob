@@ -20,6 +20,7 @@
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/atomics.hpp"
 #include "app/app_registry.hpp"
+#include "util/sys/watchdog.hpp"
 
 #include "interface/socket/socket_connector.hpp"
 #include "interface/filesystem/naive_filesystem_connector.hpp"
@@ -34,6 +35,7 @@ void Client::readIncomingJobs() {
     LOGGER(log, V3_VERB, "Starting\n");
 
     std::vector<std::future<void>> taskFutures;
+    std::set<std::pair<int, int>> unreadyJobs;
 
     while (true) {
         // Wait for a nonempty incoming job queue
@@ -48,13 +50,24 @@ void Client::readIncomingJobs() {
         auto lock = _incoming_job_lock.getLock();
         float time = Timer::elapsedSeconds();
 
+        auto checkUnready = [&](const std::unique_ptr<JobDescription>& desc) {
+            auto pair = std::pair<int, int>(desc->getId(), desc->getRevision());
+            if (!unreadyJobs.count(pair)) {
+                LOGGER(log, V2_INFO, "Deferring #%i rev. %i\n", pair.first, pair.second);
+                unreadyJobs.insert(pair);
+            }
+        };
+
         // Find a single job eligible for parsing
         bool foundAJob = false;
         for (auto& data : _incoming_job_queue) {
             
             // Jobs are sorted by arrival:
             // If this job has not arrived yet, then none have arrived yet
-            if (time < data.description->getArrival()) break;
+            if (time < data.description->getArrival()) {
+                checkUnready(data.description);
+                continue;
+            }
 
             // Check job's dependencies
             bool dependenciesSatisfied = true;
@@ -77,10 +90,34 @@ void Client::readIncomingJobs() {
                     }
                 }
             }
-            if (!dependenciesSatisfied) continue;
+            if (!dependenciesSatisfied) {
+                checkUnready(data.description);
+                continue;
+            }
+
+            // Check if all job descriptions are already present
+            bool jobDescriptionsPresent = true;
+            for (auto& file : data.files) {
+                if (!FileUtils::isRegularFile(file)) {
+                    jobDescriptionsPresent = false;
+                    break;
+                }
+            }
+            if (!jobDescriptionsPresent) {
+                // Print out waiting message every second
+                if (time - data.lastDescriptionAvailabilityCheck >= 1) {
+                    LOGGER(log, V2_INFO, "Waiting for a job description of #%i rev. %i\n", 
+                        data.description->getId(),
+                        data.description->getRevision());
+                    data.lastDescriptionAvailabilityCheck = time;
+                }
+                continue;
+            }
 
             // Job can be read: Enqueue reader task into thread pool
             LOGGER(log, V4_VVER, "ENQUEUE #%i\n", data.description->getId());
+            unreadyJobs.erase(std::pair<int, int>(data.description->getId(), data.description->getRevision()));
+
             auto node = _incoming_job_queue.extract(data);
             auto future = ProcessWideThreadPool::get().addTask(
                 [this, &log, foundJobPtr = new JobMetadata(std::move(node.value()))]() mutable {
@@ -458,6 +495,9 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     // Output response time and solution header
     LOG(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, Timer::elapsedSeconds()-desc.getArrival(), revision);
     LOG(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId, resultCode == RESULT_SAT ? "SAT" : "UNSAT", revision);
+
+    // Disable all watchdogs to avoid crashes while printing a huge model
+    Watchdog::disableGlobally();
 
     std::string resultString = "s " + std::string(resultCode == RESULT_SAT ? "SATISFIABLE" 
                         : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN") + "\n";
