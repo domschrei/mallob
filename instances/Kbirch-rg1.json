@@ -1,7 +1,0 @@
-{ 
-    "user": "admin", 
-    "name": "birch-rg1", 
-    "files": ["../kMeansData/birch-rg1.arff"], 
-    "priority": 1, 
-    "application": "KMEANS"
-}

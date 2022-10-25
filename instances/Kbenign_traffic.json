@@ -1,7 +1,0 @@
-{ 
-    "user": "admin", 
-    "name": "benign_traffic", 
-    "files": ["../kMeansData/benign_traffic.csv"], 
-    "priority": 1, 
-    "application": "KMEANS"
-}

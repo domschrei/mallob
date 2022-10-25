@@ -4,10 +4,6 @@ logs/*
 .api/jobs.*
 .api/users
 lib/*/
-lib/*.zip
-lib/*.gz
-lib/*.tgz
-Testing/latestResults/*.*
 build/
 instances/*.cnf
 instances/*.cnf.xz
