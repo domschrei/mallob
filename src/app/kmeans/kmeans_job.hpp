@@ -117,7 +117,7 @@ class KMeansJob : public Job {
     int getPointsCount() { return pointsCount; };
     int getIterationsDone() { return iterationsDone; };
 
-    KMeansJob(const Parameters& params, int commSize, int worldRank, int jobId);
+    KMeansJob(const Parameters& params, const JobSetup& setup);
     void appl_start() override;
     void appl_suspend() override;
     void appl_resume() override;

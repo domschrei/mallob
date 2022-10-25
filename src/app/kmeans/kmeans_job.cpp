@@ -15,8 +15,8 @@
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
-KMeansJob::KMeansJob(const Parameters& params, int commSize, int worldRank, int jobId)
-    : Job(params, commSize, worldRank, jobId, JobDescription::Application::KMEANS) {
+KMeansJob::KMeansJob(const Parameters& params, const JobSetup& setup)
+    : Job(params, setup) {
 }
 
 void KMeansJob::appl_start() {
