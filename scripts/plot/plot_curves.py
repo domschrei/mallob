@@ -238,11 +238,8 @@ for d in data:
         kwargs['color'] = [colors[x%len(colors)] for x in d[2]]
     else:
         kwargs['color'] = colors[i%len(colors)]
-    
+        
     if do_markers:
-        if "^^" in markers:
-            markers.insert(markers.index("^^") ,"^")
-            markers.remove("^^")
         kwargs['marker'] = markers[i%len(markers)]
         if kwargs['marker'] in ['+', 'x']:
             kwargs['markerfacecolor'] = kwargs['color']

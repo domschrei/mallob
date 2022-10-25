@@ -18,7 +18,7 @@ typedef std::shared_ptr<std::vector<int>> VecPtr;
 class JobDescription : public Serializable {
 
 public:
-    enum Application {ONESHOT_SAT, INCREMENTAL_SAT, KMEANS, DUMMY};
+    enum Application {ONESHOT_SAT, INCREMENTAL_SAT, DUMMY};
     static bool isApplicationIncremental(Application appl) {
         return appl == INCREMENTAL_SAT;
     }

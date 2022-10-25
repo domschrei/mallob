@@ -66,15 +66,16 @@ public:
     bool receive(int source, int tag, JobMessage& msg) {
 
         assert(tag == MSG_JOB_TREE_REDUCTION || tag == MSG_JOB_TREE_BROADCAST);
-        
         bool accept = msg.jobId == _base_msg.jobId 
                     && msg.epoch == _base_msg.epoch 
                     && msg.revision == _base_msg.revision 
                     && msg.tag == _base_msg.tag;
         if (!accept) return false;
+
         if (tag == MSG_JOB_TREE_REDUCTION) {
             if (!_aggregating) {
                 _child_elems.push_back(std::move(msg.payload));
+                LOG_ADD_SRC(V5_DEBG, "CS got %i/%i elems", source, _child_elems.size(), _num_expected_child_elems);
                 advance();
             }
         }
@@ -89,7 +90,9 @@ public:
     void advance() {
 
         if (_finished) return;
+
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
+
             _child_elems.push_front(std::move(_local_elem.value()));
             _local_elem.reset();
 
@@ -108,7 +111,7 @@ public:
             
             if (_tree.isRoot()) {
                 // Transform reduced element at root
-                if (_has_transformation_at_root) {        
+                if (_has_transformation_at_root) {
                     _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));
                 }
                 
@@ -169,7 +172,6 @@ public:
     }
 
 private:
-
     void receiveFinalElem(AllReduceElement&& elem){
         _finished = true;
         _base_msg.payload = std::move(elem);

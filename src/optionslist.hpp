@@ -110,5 +110,4 @@ OPT_STRING(monoApplication,              "mono-application", "",                
 OPT_STRING(subprocessDirectory,          "subproc-dir", "",                           "build",                 "Directory where subprocess executables can be found")
 OPT_STRING(traceDirectory,               "trace-dir", "",                             ".",                     "Directory to write thread trace files to")
 
-
 #endif

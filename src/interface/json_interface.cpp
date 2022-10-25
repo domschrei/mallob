@@ -48,7 +48,6 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             appl = 
                 appStr == "SAT" && incremental ? JobDescription::Application::INCREMENTAL_SAT :
                 appStr == "SAT" && !incremental ? JobDescription::Application::ONESHOT_SAT : 
-                appStr == "KMEANS" ? JobDescription::Application::KMEANS : 
                 JobDescription::Application::DUMMY;
         }
 
