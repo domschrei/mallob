@@ -66,6 +66,7 @@ public:
     bool receive(int source, int tag, JobMessage& msg) {
 
         assert(tag == MSG_JOB_TREE_REDUCTION || tag == MSG_JOB_TREE_BROADCAST);
+
         bool accept = msg.jobId == _base_msg.jobId 
                     && msg.epoch == _base_msg.epoch 
                     && msg.revision == _base_msg.revision 
@@ -114,7 +115,7 @@ public:
                 if (_has_transformation_at_root) {
                     _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));
                 }
-                
+
                 if (_broadcastEnabled) {// receive final elem and begin broadcast
                     receiveAndForwardFinalElem(std::move(_aggregated_elem.value()));
                 } else { // only receive final elem
@@ -172,7 +173,7 @@ public:
     }
 
 private:
-    void receiveFinalElem(AllReduceElement&& elem){
+    void receiveFinalElem(AllReduceElement&& elem) {
         _finished = true;
         _base_msg.payload = std::move(elem);
     }
