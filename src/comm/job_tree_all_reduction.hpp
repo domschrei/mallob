@@ -93,7 +93,7 @@ public:
         if (_finished) return;
 
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
-            
+
             _child_elems.push_front(std::move(_local_elem.value()));
             _local_elem.reset();
 
