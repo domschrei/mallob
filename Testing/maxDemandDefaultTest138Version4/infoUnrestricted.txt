@@ -1,1 +1,0 @@
-pcName:i10pc138 np:128 J:10000 ajpc:8 instances/kmeansTest templates/job-template-kmeans.json templates/client-template-KR.json v:2 time:2000
