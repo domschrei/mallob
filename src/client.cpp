@@ -17,12 +17,14 @@
 #include "util/random.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "util/sys/terminator.hpp"
-#include "data/job_reader.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/atomics.hpp"
+#include "app/app_registry.hpp"
+#include "util/sys/watchdog.hpp"
 
 #include "interface/socket/socket_connector.hpp"
-#include "interface/filesystem/filesystem_connector.hpp"
+#include "interface/filesystem/naive_filesystem_connector.hpp"
+#include "interface/filesystem/inotify_filesystem_connector.hpp"
 #include "interface/api/api_connector.hpp"
 
 
@@ -33,6 +35,7 @@ void Client::readIncomingJobs() {
     LOGGER(log, V3_VERB, "Starting\n");
 
     std::vector<std::future<void>> taskFutures;
+    std::set<std::pair<int, int>> unreadyJobs;
 
     while (true) {
         // Wait for a nonempty incoming job queue
@@ -47,13 +50,24 @@ void Client::readIncomingJobs() {
         auto lock = _incoming_job_lock.getLock();
         float time = Timer::elapsedSeconds();
 
+        auto checkUnready = [&](const std::unique_ptr<JobDescription>& desc) {
+            auto pair = std::pair<int, int>(desc->getId(), desc->getRevision());
+            if (!unreadyJobs.count(pair)) {
+                LOGGER(log, V2_INFO, "Deferring #%i rev. %i\n", pair.first, pair.second);
+                unreadyJobs.insert(pair);
+            }
+        };
+
         // Find a single job eligible for parsing
         bool foundAJob = false;
         for (auto& data : _incoming_job_queue) {
             
             // Jobs are sorted by arrival:
             // If this job has not arrived yet, then none have arrived yet
-            if (time < data.description->getArrival()) break;
+            if (time < data.description->getArrival()) {
+                checkUnready(data.description);
+                continue;
+            }
 
             // Check job's dependencies
             bool dependenciesSatisfied = true;
@@ -76,10 +90,34 @@ void Client::readIncomingJobs() {
                     }
                 }
             }
-            if (!dependenciesSatisfied) continue;
+            if (!dependenciesSatisfied) {
+                checkUnready(data.description);
+                continue;
+            }
+
+            // Check if all job descriptions are already present
+            bool jobDescriptionsPresent = true;
+            for (auto& file : data.files) {
+                if (!FileUtils::isRegularFile(file)) {
+                    jobDescriptionsPresent = false;
+                    break;
+                }
+            }
+            if (!jobDescriptionsPresent) {
+                // Print out waiting message every second
+                if (time - data.lastDescriptionAvailabilityCheck >= 1) {
+                    LOGGER(log, V2_INFO, "Waiting for a job description of #%i rev. %i\n", 
+                        data.description->getId(),
+                        data.description->getRevision());
+                    data.lastDescriptionAvailabilityCheck = time;
+                }
+                continue;
+            }
 
             // Job can be read: Enqueue reader task into thread pool
             LOGGER(log, V4_VVER, "ENQUEUE #%i\n", data.description->getId());
+            unreadyJobs.erase(std::pair<int, int>(data.description->getId(), data.description->getRevision()));
+
             auto node = _incoming_job_queue.extract(data);
             auto future = ProcessWideThreadPool::get().addTask(
                 [this, &log, foundJobPtr = new JobMetadata(std::move(node.value()))]() mutable {
@@ -90,17 +128,21 @@ void Client::readIncomingJobs() {
                 // Read job
                 int id = foundJob.description->getId();
                 float time = Timer::elapsedSeconds();
-                bool success = true;
+                bool success = false;
                 auto filesList = foundJob.getFilesList();
+                foundJob.description->beginInitialization(foundJob.description->getRevision());
                 if (foundJob.hasFiles()) {
                     LOGGER(log, V3_VERB, "[T] Reading job #%i rev. %i %s ...\n", id, foundJob.description->getRevision(), filesList.c_str());
-                    success = JobReader::read(foundJob.files, foundJob.contentMode, *foundJob.description);
-                } else {
-                    foundJob.description->beginInitialization(foundJob.description->getRevision());
-                    foundJob.description->endInitialization();
+                    success = app_registry::getJobReader(foundJob.description->getApplicationId())(
+                        foundJob.files, *foundJob.description
+                    );
                 }
+                foundJob.description->endInitialization();
                 if (!success) {
                     LOGGER(log, V1_WARN, "[T] [WARN] Unsuccessful read - skipping #%i\n", id);
+                    auto lock = _failed_job_lock.getLock();
+                    _failed_job_queue.push_back(foundJob.jobName);
+                    atomics::incrementRelaxed(_num_failed_jobs);
                 } else {
                     time = Timer::elapsedSeconds() - time;
                     LOGGER(log, V3_VERB, "[T] Initialized job #%i %s in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
@@ -170,11 +212,15 @@ void Client::handleNewJob(JobMetadata&& data) {
 
 void Client::init() {
 
+    // Get ID allocator this client should use
+    JobIdAllocator jobIdAllocator(getInternalRank(), getFilesystemInterfacePath());
+
     // Set up generic JSON interface to communicate with this client
     _json_interface = std::unique_ptr<JsonInterface>(
         new JsonInterface(getInternalRank(), _params, 
             Logger::getMainInstance().copy("I", ".i"),
-            [&](JobMetadata&& data) {handleNewJob(std::move(data));}
+            [&](JobMetadata&& data) {handleNewJob(std::move(data));},
+            std::move(jobIdAllocator)
         )
     );
 
@@ -183,8 +229,10 @@ void Client::init() {
         std::string path = getFilesystemInterfacePath();
         LOG(V2_INFO, "Set up filesystem interface at %s\n", path.c_str());
         auto logger = Logger::getMainInstance().copy("I-FS", ".i-fs");
-        auto conn = new FilesystemConnector(*_json_interface, _params, 
-            std::move(logger), path);
+        auto conn = _params.inotify() ? 
+            (Connector*) new InotifyFilesystemConnector(*_json_interface, _params, std::move(logger), path)
+            :
+            (Connector*) new NaiveFilesystemConnector(*_json_interface, _params, std::move(logger), path);
         _interface_connectors.push_back(conn);
     }
     if (_params.useIPCSocketInterface()) {
@@ -261,6 +309,14 @@ void Client::advance() {
             } else ++it;
         }
         _jobs_to_interrupt_lock.unlock();
+    }
+
+    if (_num_failed_jobs.load(std::memory_order_relaxed) > 0 && _failed_job_lock.tryLock()) {
+        for (auto& jobname : _failed_job_queue) {
+            LOG(V1_WARN, "[WARN] Rejecting submission %s - reason: Error while parsing description.\n", jobname.c_str());
+        }
+        _failed_job_queue.clear();
+        _failed_job_lock.unlock();
     }
 
     // Process arrival times chronologically; if at least one "happened", notify reader
@@ -374,8 +430,8 @@ void Client::introduceNextJob() {
         nodeRank = p.get(0);
     }
 
-    JobRequest req(jobId, job.getApplication(), /*rootRank=*/-1, /*requestingNodeRank=*/_world_rank, 
-        /*requestedNodeIndex=*/0, /*timeOfBirth=*/time, /*balancingEpoch=*/-1, /*numHops=*/0);
+    JobRequest req(jobId, job.getApplicationId(), /*rootRank=*/-1, /*requestingNodeRank=*/_world_rank, 
+        /*requestedNodeIndex=*/0, /*timeOfBirth=*/time, /*balancingEpoch=*/-1, /*numHops=*/0, job.isIncremental());
     req.revision = job.getRevision();
     req.timeOfBirth = job.getArrival();
 
@@ -440,28 +496,20 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     LOG(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, Timer::elapsedSeconds()-desc.getArrival(), revision);
     LOG(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId, resultCode == RESULT_SAT ? "SAT" : "UNSAT", revision);
 
+    // Disable all watchdogs to avoid crashes while printing a huge model
+    Watchdog::disableGlobally();
+
     std::string resultString = "s " + std::string(resultCode == RESULT_SAT ? "SATISFIABLE" 
                         : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN") + "\n";
     std::vector<std::string> modelStrings;
     if ((_params.solutionToFile.isSet() || (_params.monoFilename.isSet() && !_params.omitSolution())) 
             && resultCode == RESULT_SAT) {
-        std::stringstream modelString;
-        int numAdded = 0;
-        auto solSize = jobResult.getSolutionSize();
-        for (size_t x = 1; x < solSize; x++) {
-            if (numAdded == 0) {
-                modelString << "v ";
-            }
-            modelString << std::to_string(jobResult.getSolution(x)) << " ";
-            numAdded++;
-            bool done = x+1 == solSize;
-            if (numAdded == 20 || done) {
-                if (done) modelString << "0";
-                modelString << "\n";
-                modelStrings.push_back(modelString.str());
-                modelString = std::stringstream();
-                numAdded = 0;
-            }
+        auto json = app_registry::getJobSolutionFormatter(desc.getApplicationId())(jobResult);
+        if (json.is_array()) {
+            auto jsonArr = json.get<std::vector<std::string>>();
+            for (auto&& str : jsonArr) modelStrings.push_back(std::move(str));
+        } else {
+            modelStrings.push_back(json.get<std::string>());
         }
     }
     if (_params.solutionToFile.isSet()) {
@@ -486,9 +534,10 @@ void Client::handleSendJobResult(MessageHandle& handle) {
         auto fut = ProcessWideThreadPool::get().addTask(
             [interface = _json_interface.get(), 
             result = std::move(jobResult), 
-            stats = desc.getStatistics()]() mutable {
+            stats = desc.getStatistics(),
+            applicationId = desc.getApplicationId()]() mutable {
             
-            interface->handleJobDone(std::move(result), stats);
+            interface->handleJobDone(std::move(result), stats, applicationId);
         });
         _done_job_futures.push_back(std::move(fut));
     }
@@ -508,7 +557,8 @@ void Client::handleAbort(MessageHandle& handle) {
         result.id = jobId;
         result.revision = _active_jobs[result.id]->getRevision();
         result.result = 0;
-        _json_interface->handleJobDone(std::move(result), _active_jobs[result.id]->getStatistics());
+        _json_interface->handleJobDone(std::move(result), _active_jobs[result.id]->getStatistics(), 
+            _active_jobs[result.id]->getApplicationId());
     }
 
     finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());

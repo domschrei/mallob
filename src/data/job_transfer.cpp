@@ -7,7 +7,7 @@
 #include "data/job_description.hpp"
 
 size_t JobRequest::getTransferSize() {
-    return 7*sizeof(int)+sizeof(float)+sizeof(JobDescription::Application);
+    return 8*sizeof(int)+sizeof(float)+sizeof(bool);
 }
 
 std::vector<uint8_t> JobRequest::serialize() const {
@@ -15,7 +15,7 @@ std::vector<uint8_t> JobRequest::serialize() const {
     std::vector<uint8_t> packed(size);
     int i = 0, n;
     n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;
-    n = sizeof(JobDescription::Application); memcpy(packed.data()+i, &application, n); i += n;
+    n = sizeof(int); memcpy(packed.data()+i, &applicationId, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &rootRank, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &requestingNodeRank, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &requestedNodeIndex, n); i += n;
@@ -23,13 +23,14 @@ std::vector<uint8_t> JobRequest::serialize() const {
     n = sizeof(float); memcpy(packed.data()+i, &timeOfBirth, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &numHops, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &balancingEpoch, n); i += n;
+    n = sizeof(bool); memcpy(packed.data()+i, &incremental, n); i += n;
     return packed;
 }
 
 JobRequest& JobRequest::deserialize(const std::vector<uint8_t> &packed) {
     int i = 0, n;
     n = sizeof(int); memcpy(&jobId, packed.data()+i, n); i += n;
-    n = sizeof(JobDescription::Application); memcpy(&application, packed.data()+i, n); i += n;
+    n = sizeof(int); memcpy(&applicationId, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&rootRank, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&requestingNodeRank, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&requestedNodeIndex, packed.data()+i, n); i += n;
@@ -37,6 +38,7 @@ JobRequest& JobRequest::deserialize(const std::vector<uint8_t> &packed) {
     n = sizeof(float); memcpy(&timeOfBirth, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&numHops, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&balancingEpoch, packed.data()+i, n); i += n;
+    n = sizeof(bool); memcpy(&incremental, packed.data()+i, n); i += n;
     return *this;
 }
 

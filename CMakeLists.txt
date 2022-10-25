@@ -44,55 +44,85 @@ if(MALLOB_USE_JEMALLOC)
     set(BASE_LIBS jemalloc ${BASE_LIBS})
 endif()
 
+# Default application
+if(NOT DEFINED MALLOB_APP_SAT)
+    set(MALLOB_APP_SAT 1)
+endif()
+
+
 # Libraries and includes
 
-# Add new default solvers here
-link_directories(lib/lingeling lib/yalsat lib/cadical lib/kissat)
-set(BASE_LIBS ${BASE_LIBS} ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} m z lgl yals pthread cadical kissat rt dl)
-set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib/lingeling lib)
-
-set(MALLOB_SOLVERS "lingeling yalsat cadical kissat") # add new default solvers here
-if(MALLOB_USE_GLUCOSE)
-    set(MALLOB_SOLVERS "${MALLOB_SOLVERS} glucose")
-    link_directories(lib/glucose)
-    set(BASE_SOURCES ${BASE_SOURCES} src/app/sat/solvers/glucose.cpp)
-    set(BASE_LIBS ${BASE_LIBS} glucose)
-    set(BASE_INCLUDES ${BASE_INCLUDES} lib/glucose)
-    add_definitions(-DMALLOB_USE_GLUCOSE)
-endif()    
-if(MALLOB_USE_MERGESAT)
-    link_directories(lib/mergesat)
-    set(BASE_SOURCES ${BASE_SOURCES} src/app/sat/solvers/mergesat.cpp)
-    set(BASE_LIBS ${BASE_LIBS} mergesat)
-    add_definitions(-DMALLOB_USE_MERGESAT)
-endif()    
-# Add new non-default solvers here
+set(BASE_LIBS ${BASE_LIBS} ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} m z rt dl CACHE INTERNAL "")
+set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib CACHE INTERNAL "")
 
 
-# Source files
+# Base source files
 
-set(BASE_SOURCES ${BASE_SOURCES}
-    src/app/job.cpp 
-    src/app/dummy/dummy_reader.cpp
-    src/app/kmeans/kmeans_reader.cpp src/app/kmeans/kmeans_job.cpp src/app/kmeans/kmeans_utils.cpp
-    src/app/sat/execution/engine.cpp src/app/sat/execution/solver_thread.cpp src/app/sat/execution/solving_state.cpp
-    src/app/sat/job/anytime_sat_clause_communicator.cpp src/app/sat/job/forked_sat_job.cpp src/app/sat/job/threaded_sat_job.cpp src/app/sat/job/sat_process_adapter.cpp src/app/sat/job/sat_process_config.cpp 
-    src/app/sat/sharing/buffer/adaptive_clause_database.cpp src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp
-    src/app/sat/sharing/filter/clause_filter.cpp
-    src/app/sat/sharing/sharing_manager.cpp
-    src/app/sat/solvers/cadical.cpp src/app/sat/solvers/kissat.cpp src/app/sat/solvers/lingeling.cpp src/app/sat/solvers/portfolio_solver_interface.cpp
-    src/balancing/collective_assignment.cpp src/balancing/event_driven_balancer.cpp 
-    src/comm/message_queue.cpp src/comm/mpi_base.cpp src/comm/mympi.cpp 
-    src/data/job_database.cpp src/data/job_description.cpp src/data/job_reader.cpp src/data/job_result.cpp src/data/job_transfer.cpp 
-    src/interface/json_interface.cpp src/interface/api/api_connector.cpp
-    src/scheduling/job_scheduling_update.cpp
-    src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sat_reader.cpp 
-    src/util/sys/atomics.cpp src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/shared_memory.cpp src/util/sys/terminator.cpp src/util/sys/threading.cpp src/util/sys/thread_pool.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp
-)
+set(BASE_SOURCES ${BASE_SOURCES} src/app/job.cpp src/app/app_registry.cpp src/balancing/collective_assignment.cpp src/balancing/event_driven_balancer.cpp src/comm/message_queue.cpp src/comm/mpi_base.cpp src/comm/mympi.cpp src/comm/sysstate_unresponsive_crash.cpp src/data/job_database.cpp src/data/job_description.cpp src/data/job_result.cpp src/data/job_transfer.cpp src/interface/json_interface.cpp src/interface/api/api_connector.cpp src/scheduling/job_scheduling_update.cpp src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sys/atomics.cpp src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/shared_memory.cpp src/util/sys/terminator.cpp src/util/sys/threading.cpp src/util/sys/thread_pool.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp CACHE INTERNAL "")
+
+# Use to debug
+#message("mallob_commons sources pre application registration: ${BASE_SOURCES}")
 
 
-# Library with source files common to mallob and mallob_sat_process
+# Define test function
 
+function(new_test testname)
+    message("Adding test: ${testname}")
+    add_executable(test_${testname} src/test/test_${testname}.cpp)
+    target_include_directories(test_${testname} PRIVATE ${BASE_INCLUDES})
+    target_compile_options(test_${testname} PRIVATE ${BASE_COMPILEFLAGS})
+    target_link_libraries(test_${testname} ${BASE_LIBS} mallob_commons)
+    add_test(NAME test_${testname} COMMAND test_${testname})
+endfunction()
+
+
+# Add application-specific build configuration
+
+# Setup (do not change)
+file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_includes.h~" "")
+file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_commands.h~" "")
+file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_options.h~" "")
+function(register_mallob_app appkey)
+    message("Registering application: ${appkey}")
+    file(APPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_includes.h~" "#include \"app/${appkey}/register.hpp\"\n")
+    file(APPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_options.h~" "#include \"app/${appkey}/options.hpp\"\n")
+    file(APPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_commands.h~" "register_mallob_app_${appkey}();\n")
+    include(${CMAKE_CURRENT_SOURCE_DIR}/src/app/${appkey}/setup.cmake)
+endfunction()
+function(publish_app_registry_changes)
+    execute_process(COMMAND ${CMAKE_COMMAND} -E compare_files 
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_options.h" 
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_options.h~" 
+        RESULT_VARIABLE compare_result)
+    if(compare_result EQUAL 0)
+        message("No changes in register options.")
+    else()
+        message("Moving changed app registry.")
+        file(RENAME "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_includes.h~" "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_includes.h")
+        file(RENAME "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_options.h~" "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_options.h")
+        file(RENAME "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_commands.h~" "${CMAKE_CURRENT_SOURCE_DIR}/src/app/register_commands.h")
+    endif() 
+endfunction()
+
+# Include applications
+register_mallob_app("dummy") # always register the "no-op" application
+if(MALLOB_APP_SAT) 
+    register_mallob_app("sat")
+endif()
+if(MALLOB_APP_KMEANS)
+    register_mallob_app("kmeans")
+endif()
+# Include further applications here:
+#if(MALLOB_APP_YOURAPP)
+#    register_mallob_app("yourapp")
+#endif()
+# ...
+publish_app_registry_changes()
+
+
+# Library with Mallob's common source files
+
+#message("mallob_commons sources post application registration: ${BASE_SOURCES}") # Use to debug
 add_library(mallob_commons
     STATIC ${BASE_SOURCES}
 )
@@ -104,19 +134,13 @@ target_link_libraries(mallob_commons ${BASE_LIBS})
 # Executables
 
 add_executable(mallob src/client.cpp src/worker.cpp src/main.cpp)
-add_executable(mallob_sat_process src/app/sat/main.cpp)
-add_executable(mallob_process_dispatcher src/app/sat/process_dispatcher.cpp)
-
 target_include_directories(mallob PRIVATE ${BASE_INCLUDES})
-target_include_directories(mallob_sat_process PRIVATE ${BASE_INCLUDES})
-target_include_directories(mallob_process_dispatcher PRIVATE ${BASE_INCLUDES})
-
 target_compile_options(mallob PRIVATE ${BASE_COMPILEFLAGS})
-target_compile_options(mallob_sat_process PRIVATE ${BASE_COMPILEFLAGS})
-target_compile_options(mallob_process_dispatcher PRIVATE ${BASE_COMPILEFLAGS})
-
 target_link_libraries(mallob ${BASE_LIBS} mallob_commons)
-target_link_libraries(mallob_sat_process ${BASE_LIBS} mallob_commons)
+
+add_executable(mallob_process_dispatcher src/app/sat/process_dispatcher.cpp)
+target_include_directories(mallob_process_dispatcher PRIVATE ${BASE_INCLUDES})
+target_compile_options(mallob_process_dispatcher PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_process_dispatcher ${BASE_LIBS} mallob_commons) 
 
 
@@ -130,24 +154,8 @@ SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MY_DEBUG_OPTIONS}")
 
 enable_testing()
 
-function(new_test testname)
-    message(Adding test: ${testname})
-    add_executable(test_${testname} src/test/test_${testname}.cpp)
-    target_include_directories(test_${testname} PRIVATE ${BASE_INCLUDES})
-    target_compile_options(test_${testname} PRIVATE ${BASE_COMPILEFLAGS})
-    target_link_libraries(test_${testname} ${BASE_LIBS} mallob_commons)
-    add_test(NAME test_${testname} COMMAND test_${testname})
-endfunction()
-
 new_test(permutation)
-new_test(sat_reader)
-new_test(clause_database)
-new_test(import_buffer)
-new_test(clause_filter)
-new_test(variable_translator)
-new_test(job_description)
 new_test(message_queue)
 new_test(volume_calculator)
 new_test(concurrent_malloc)
-new_test(distributed_clause_filter)
 new_test(hashing)

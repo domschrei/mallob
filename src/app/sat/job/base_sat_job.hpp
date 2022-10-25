@@ -7,8 +7,8 @@
 class BaseSatJob : public Job {
 
 public:
-    BaseSatJob(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl) : 
-        Job(params, commSize, worldRank, jobId, appl) {}
+    BaseSatJob(const Parameters& params, const JobSetup& setup) : 
+        Job(params, setup) {}
     virtual ~BaseSatJob() {}
 
     // Methods common to all BaseSatJob instances

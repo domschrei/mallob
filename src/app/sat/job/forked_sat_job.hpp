@@ -35,7 +35,7 @@ private:
 
 public:
 
-    ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl);
+    ForkedSatJob(const Parameters& params, const JobSetup& setup);
     virtual ~ForkedSatJob() override;
 
     void appl_start() override;

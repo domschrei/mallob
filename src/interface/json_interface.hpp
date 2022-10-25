@@ -13,6 +13,7 @@
 #include "util/sys/timer.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
+#include "api/job_id_allocator.hpp"
 
 class Parameters; // fwd declaration
 
@@ -40,7 +41,7 @@ private:
     Logger _logger;
 
     Mutex _job_map_mutex;
-    std::atomic_int _running_id;
+    JobIdAllocator _job_id_allocator;
 
     std::function<void(JobMetadata&&)> _job_callback;
     
@@ -50,11 +51,11 @@ private:
 
 public:
     JsonInterface(int clientRank, const Parameters& params, Logger&& logger, 
-            std::function<void(JobMetadata&&)> jobCallback) : 
+            std::function<void(JobMetadata&&)> jobCallback, JobIdAllocator&& jobIdAllocator) : 
         _params(params),
         _logger(std::move(logger)),
         _job_map_mutex(),
-        _running_id(clientRank * 100000 + 1),
+        _job_id_allocator(std::move(jobIdAllocator)),
         _job_callback(jobCallback) {}
     ~JsonInterface() {}
 
@@ -63,5 +64,5 @@ public:
     Result handle(nlohmann::json& json, std::function<void(nlohmann::json&)> feedback);
 
     // Mallob-side events
-    void handleJobDone(JobResult&& result, const JobDescription::Statistics& stats);
+    void handleJobDone(JobResult&& result, const JobDescription::Statistics& stats, int applicationId);
 };

@@ -1,12 +1,13 @@
+[![status](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899/status.svg)](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899)
 
 # Introduction
 
 Mallob is a platform for massively parallel and distributed on-demand processing of malleable jobs, handling their scheduling and load balancing.
 Malleability means that the CPU resources allotted to a job may vary _during its execution_ depending on the system's overall load.
-Mallob was tested on configurations with up to 6144 cores as described in our publications: [SAT 2021](https://dominikschreiber.de/papers/2021-sat-scalable.pdf), Euro-Par 2022 (coming soon!).
+Mallob was tested on configurations with up to 6144 cores as described in our publications: [SAT 2021](https://dominikschreiber.de/papers/2021-sat-scalable.pdf), [Euro-Par 2022](https://publikationen.bibliothek.kit.edu/1000149349/149124221).
 
-Most notably, Mallob features an engine for distributed SAT solving. 
-According to the International SAT Competition [2020🥇](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf) and [2021🥇🥈🥈🥉](https://satcompetition.github.io/2021/slides/ISC2021.pdf), Mallob is currently the best approach for SAT solving on a large scale (800 physical cores) and one of the best approaches for SAT solving on a moderate scale (32 physical cores).
+Most notably, Mallob features an engine for distributed SAT solving.
+According to the [International SAT Competitions](https://satcompetition.github.io/) 2020-2022, the premier competitive events for state-of-the-art SAT solving, Mallob is consistently the strongest SAT solving system for massively parallel and distributed systems (800 physical cores) and also a highly competitive system for moderately parallel SAT solving (32 physical cores).
 
 <hr/>
 
@@ -25,15 +26,16 @@ Note that we only support Linux as an operating system.
 ## Building
 
 ```
+# For non-x86-64 architectures (ARM, POWER9, etc.), set DISABLE_FPU=1 for the bash call
 ( cd lib && bash fetch_and_build_sat_solvers.sh )
 mkdir -p build
 cd build
-CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_USE_JEMALLOC=1 -DMALLOB_LOG_VERBOSITY=4 -DMALLOB_ASSERT=1 -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
+CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_APP_SAT=1 -DMALLOB_USE_JEMALLOC=1 -DMALLOB_LOG_VERBOSITY=4 -DMALLOB_ASSERT=1 -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
 make; cd ..
 ```
 
 Specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
-In addition, use the following Mallob-specific build options:
+You can use the following Mallob-specific build options:
 
 | Usage                                     | Description                                                                                                |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -44,12 +46,27 @@ In addition, use the following Mallob-specific build options:
 | -DMALLOB_USE_ASAN=<0/1>                   | Compile with Address Sanitizer for debugging purposes.                                                     |
 | -DMALLOB_USE_GLUCOSE=<0/1>                | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
 | -DMALLOB_USE_JEMALLOC=<0/1>               | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
+| -DMALLOB_APP_SAT=<0/1>                    | Compile with SAT engine. (Omit or set to zero if you have a custom application for Mallob instead.)        |
 
 ## Docker
 
 We also provide a minimalistic Dockerfile using an Ubuntu 20.04 setup.
 Run `docker build .` in the base directory after setting up Docker on your machine.
 The final line of the output is the ID to run the container, e.g. by running `docker run -i -t <id> bash` and then executing Mallob interactively inside with the options of your choosing.
+
+<hr/>
+
+# Testing
+
+**Note:** In its current state, the test suite expects that Mallob is built and run with OpenMPI, i.e., that `mpicc` and `mpicxx` (for building) and `mpirun` (for execution) link to OpenMPI executables on your system. For other MPI implementations, you may still be able to run the tests by removing or replacing the option `--oversubscribe` from the function `run()` in `scripts/run/systest_commons.sh`.
+
+In order to test that the system has been built and set up correctly, run the following command.
+```
+bash scripts/run/systest.sh mono drysched sched osc
+```
+This will locally run a suite of automated tests which cover the basic functionality of Mallob as a scheduler and as a SAT solving engine. 
+To include Glucose in the tests, prepend the above command with "GLUCOSE=1".
+Running the tests takes a few minutes and in the end "All tests done." should be output.
 
 <hr/>
 
@@ -60,15 +77,15 @@ The final line of the output is the ID to run the container, e.g. by running `do
 Given a single machine with two hardware threads per core, the following command executed in Mallob's base directory assigns one MPI process to each set of four physical cores (eight hardware threads) and then runs four solver threads on each MPI process.
 
 ```
-RDMAV_FORK_SAFE=1 NPROCS=$(($(nproc)/8)) mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=4 build/mallob -t=4 $MALLOB_OPTIONS
+RDMAV_FORK_SAFE=1 NPROCS="$(($(nproc)/8))" mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=4 build/mallob -t=4 $MALLOB_OPTIONS
 ```
+You can always stop Mallob via Ctrl+C (interrupt signal) or by executing `killall mpirun`. 
+Alternatively, you can specify the number of jobs to process (with `-J=$NUM_JOBS`) and/or the time to pass (with `-T=$TIME_LIMIT_SECS`) before Mallob terminates on its own.
 
-To "daemonize" Mallob, i.e., to let it run in the background as a server for your own application(s), you can prepend `mpirun` by `nohup` and append `2>&1 > OUT &` to the whole command, creating a text file `OUT` for Mallob's output. (If you do not want this kind of output, use the "quiet" option `-q`.)
-If running in the background, do not forget to `kill` Mallob (i.e., SIGTERM the `mpirun` process) after you are done.
-Alternatively you can specify the number of jobs to process (with `-J=$NUM_JOBS`) and/or the time to pass (with `-T=$TIME_LIMIT_SECS`) before Mallob should terminate on its own.
-
-For exact and clean logging, you should not rely on a textfile in which you piped Mallob's output (like `OUT` above).
-Instead, specify a logging directory with `-log=<log-dir>` where separate sub-directories and files will be created for each worker / thread. Verbosity of logging can be set with the `-v` option.
+For exact and clean logging, you should not rely on a textfile in which you piped Mallob's output.
+Instead, specify a logging directory with `-log=<log-dir>` where separate sub-directories and files will be created for each worker / thread. 
+This can be combined with the `-q` option to suppress Mallob's output to STDOUT. 
+Verbosity of logging can be set with the `-v` option (as long as Mallob was compiled with the respective verbosity or higher, see `-DMALLOB_LOG_VERBOSITY` above).
 All further options of Mallob can be seen by executing Mallob with the `-h` option. (This also works without the `mpirun` prefix.)
 
 For running Mallob on distributed clusters, please also consult [the scripts and documentation from our Euro-Par 2022 software artifact](https://doi.org/10.6084/m9.figshare.20000642) as well as the user documentation of your particular cluster.
@@ -128,7 +145,6 @@ Here is a brief overview of all required and optional fields in the JSON API:
 | arrival           | no        | Float >= 0   | Job's arrival time (seconds) since program start; ignore job until then                                        |
 | max-demand        | no        | Int >= 0     | Override the max. number of MPI processes this job should receive at any point in time (0: no limit)           |
 | dependencies      | no        | String array | User-qualified job names (using "." as a separator) which must exit **before** this job is introduced          |
-| content-mode      | no        | String       | If "raw", the input file will be read as a binary file and not as a text file.                                 |
 | interrupt         | no        | Bool         | If `true`, the job given by "user" and "name" is interrupted (for incremental jobs, just the current revision).|
 | incremental       | no        | Bool         | Whether this job has multiple _increments_ / _revisions_ and should be treated as such                         |
 | literals          | no        | Int array    | You can specify the set of SAT literals (for this increment) directly in the JSON.                             |
@@ -193,16 +209,12 @@ Instead of the "solution" field, the response may also contain the fields "solut
 
 Mallob can be extended in the following ways:
 
-* New options to the application (or a subsystem thereof) can be added in `src/optionslist.hpp`.
+* New options for Mallob can be added in `src/optionslist.hpp`.
+    - Options which are specific to a certain application can be found and edited in `src/app/$APPKEY/options.hpp`.
 * To add a new SAT solver to be used in a SAT solver engine, do the following:
     - Add a subclass of `PortfolioSolverInterface`. (You can use the existing implementation for any of the existing solvers and adapt it to your solver.)
     - Add your solver to the portfolio initialization in `src/app/sat/execution/engine.cpp`.
-* To extend Mallob by adding another kind of application (like combinatorial search, planning, SMT, ...), do the following:
-    - Extend the enumeration `JobDescription::Application` by a corresponding item.
-    - In `JobReader::read`, add a parser for your application.
-    - In `JobFileAdapter::handleNewJob`, add a new case for the `application` field in JSON files.
-    - Create a subclass of `Job` (see `src/app/job.hpp`) and implement all pure virtual methods. 
-    - Add an additional case to `JobDatabase::createJob`.
+* To extend Mallob by adding another kind of application (like combinatorial search, planning, SMT, ...), please refer to the README in the `app/` directory.
 * To add a unit test, create a class `test_*.cpp` in `src/test` and then add the test case to the bottom of `CMakeLists.txt`.
 * To add a system test, consult the files `scripts/systest_commons.sh` and/or `scripts/systest.sh`.
 
@@ -238,9 +250,10 @@ If you make use of Mallob in an academic setting, please cite the following two 
   title={Decentralized Online Scheduling of Malleable {NP}-hard Jobs},
   author={Sanders, Peter and Schreiber, Dominik},
   booktitle={International European Conference on Parallel and Distributed Computing},
+  pages={119--135},
   year={2022},
   organization={Springer},
-  note={In press.}
+  doi={10.1007/978-3-031-12597-3_8}
 }
 ```
 

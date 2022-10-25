@@ -18,7 +18,6 @@
 #include "util/sys/watchdog.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
-#include "data/job_reader.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/sys/thread_pool.hpp"
 
@@ -170,28 +169,24 @@ void Worker::createExpanderGraph() {
     }  
 
     // Create graph, get outgoing edges from this node
-    if (_params.maxIdleDistance() > 0) {
-        _hop_destinations = AdjustablePermutation::createUndirectedExpanderGraph(numWorkers, numBounceAlternatives, _world_rank);        
-    } else {
-        auto permutations = AdjustablePermutation::getPermutations(numWorkers, numBounceAlternatives);
-        _hop_destinations = AdjustablePermutation::createExpanderGraph(permutations, _world_rank);
-        if (_params.hopsUntilCollectiveAssignment() >= 0) {
-            
-            // Create collective assignment structure
-            _coll_assign = CollectiveAssignment(
-                _job_db, MyMpi::size(_comm), 
-                AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, _world_rank),
-                // Callback for receiving a job request
-                [&](const JobRequest& req, int rank) {
-                    MessageHandle handle;
-                    handle.tag = MSG_REQUEST_NODE;
-                    handle.finished = true;
-                    handle.receiveSelfMessage(req.serialize(), rank);
-                    handleRequestNode(handle, JobDatabase::NORMAL);
-                }
-            );
-            _job_db.setCollectiveAssignment(_coll_assign);
-        }
+    auto permutations = AdjustablePermutation::getPermutations(numWorkers, numBounceAlternatives);
+    _hop_destinations = AdjustablePermutation::createExpanderGraph(permutations, _world_rank);
+    if (_params.hopsUntilCollectiveAssignment() >= 0) {
+        
+        // Create collective assignment structure
+        _coll_assign = CollectiveAssignment(
+            _job_db, MyMpi::size(_comm), 
+            AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, _world_rank),
+            // Callback for receiving a job request
+            [&](const JobRequest& req, int rank) {
+                MessageHandle handle;
+                handle.tag = MSG_REQUEST_NODE;
+                handle.finished = true;
+                handle.receiveSelfMessage(req.serialize(), rank);
+                handleRequestNode(handle, JobDatabase::NORMAL);
+            }
+        );
+        _job_db.setCollectiveAssignment(_coll_assign);
     }
 
     // Output found bounce alternatives
@@ -677,7 +672,7 @@ void Worker::tryAdoptRequest(JobRequest& req, int source, JobDatabase::JobReques
         // Commit on the job, send a request to the parent
         if (!_job_db.has(req.jobId)) {
             // Job is not known yet: create instance
-            Job& job = _job_db.createJob(MyMpi::size(_comm), _world_rank, req.jobId, req.application);
+            Job& job = _job_db.createJob(MyMpi::size(_comm), _world_rank, req.jobId, req.applicationId, req.incremental);
         }
         _job_db.commit(req);
         if (_params.reactivationScheduling()) {
@@ -1243,8 +1238,8 @@ void Worker::spawnJobRequest(int jobId, bool left, int balancingEpoch) {
     int index = left ? job.getJobTree().getLeftChildIndex() : job.getJobTree().getRightChildIndex();
     if (_params.monoFilename.isSet()) job.getJobTree().updateJobNode(index, index);
 
-    JobRequest req(jobId, job.getApplication(), job.getJobTree().getRootNodeRank(), 
-            _world_rank, index, Timer::elapsedSeconds(), balancingEpoch, 0);
+    JobRequest req(jobId, job.getApplicationId(), job.getJobTree().getRootNodeRank(), 
+            _world_rank, index, Timer::elapsedSeconds(), balancingEpoch, 0, job.isIncremental());
     req.revision = job.getDesiredRevision();
     int tag = MSG_REQUEST_NODE;    
 

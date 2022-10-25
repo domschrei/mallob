@@ -12,9 +12,8 @@
 #include "sat_process_config.hpp"
 #include "util/sys/thread_pool.hpp"
 
-ThreadedSatJob::ThreadedSatJob(const Parameters& params, int commSize, int worldRank, int jobId,
-    JobDescription::Application appl) : 
-        BaseSatJob(params, commSize, worldRank, jobId, appl), _done_locally(false) {}
+ThreadedSatJob::ThreadedSatJob(const Parameters& params, const JobSetup& setup) : 
+        BaseSatJob(params, setup), _done_locally(false) {}
 
 void ThreadedSatJob::appl_start() {
 
@@ -134,8 +133,8 @@ void ThreadedSatJob::appl_dumpStats() {
 
 bool ThreadedSatJob::appl_isDestructible() {
     if (!_initialized) return true;
-    return ((AnytimeSatClauseCommunicator*) _clause_comm)->isDestructible() 
-        && _solver->isCleanedUp();
+    return //((AnytimeSatClauseCommunicator*) _clause_comm)->isDestructible() && 
+        _solver->isCleanedUp();
 }
 
 void ThreadedSatJob::appl_communicate() {

@@ -5,6 +5,7 @@
 #include <random>
 
 #include "glucose.hpp"
+#include "util/distribution.hpp"
 
 /*
 Note that this file (specifically MGlucose::parallelImportClauses()) is non-free licensed 
@@ -122,15 +123,22 @@ void MGlucose::diversify(int seed) {
         max_var_decay = 0.99;
         randomize_on_restarts = 1;
 		break;
-	
-	// unused
-	case 8:
-		// randomize "var_decay" measure
-		std::mt19937 rng = std::mt19937(rank%numDiversifications);
-		std::uniform_real_distribution<float> dist = std::uniform_real_distribution<float>(0, 1);
-		//firstReduceDB += -50 + 100 * dist(rng);
-		var_decay = std::min(var_decay -0.02 + 0.04 * dist(rng), max_var_decay);
-		break;
+	}
+
+	if (rank >= getNumOriginalDiversifications()) {
+		std::mt19937 rng(seed);
+        Distribution distribution(rng);
+
+		// Randomize score decay
+        double meanDecay = var_decay;
+        distribution.configure(Distribution::NORMAL, std::vector<double>{
+            /*mean=*/meanDecay, /*stddev=*/0.002, /*min=*/0.8, /*max=*/0.999
+        });
+        double decay = distribution.sample();
+        var_decay = decay;
+		max_var_decay = std::max(max_var_decay, var_decay);
+
+		LOGGER(_logger, V3_VERB, "Sampled decay=%.5f\n", decay);
 	}
 
 	setClauseSharing(getNumOriginalDiversifications());

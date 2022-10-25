@@ -23,14 +23,15 @@ struct JobRequest : public Serializable {
     float timeOfBirth;
     int numHops;
     int balancingEpoch;
-    JobDescription::Application application;
+    int applicationId;
+    bool incremental;
 
 public:
     JobRequest() = default;
 
-    JobRequest(int jobId, JobDescription::Application application, int rootRank, 
+    JobRequest(int jobId, int applicationId, int rootRank, 
             int requestingNodeRank, int requestedNodeIndex, 
-            float timeOfBirth, int balancingEpoch, int numHops) :
+            float timeOfBirth, int balancingEpoch, int numHops, bool incremental) :
         jobId(jobId),
         rootRank(rootRank),
         requestingNodeRank(requestingNodeRank),
@@ -39,7 +40,8 @@ public:
         timeOfBirth(timeOfBirth),
         numHops(numHops),
         balancingEpoch(balancingEpoch),
-        application(application) {}
+        applicationId(applicationId),
+        incremental(incremental) {}
 
     static size_t getTransferSize();
     std::vector<uint8_t> serialize() const override;

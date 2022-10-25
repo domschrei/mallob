@@ -14,8 +14,8 @@
 
 std::atomic_int ForkedSatJob::_static_subprocess_index = 1;
 
-ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl) : 
-        BaseSatJob(params, commSize, worldRank, jobId, appl) {
+ForkedSatJob::ForkedSatJob(const Parameters& params, const JobSetup& setup) : 
+        BaseSatJob(params, setup) {
 }
 
 void ForkedSatJob::appl_start() {
@@ -173,13 +173,12 @@ bool ForkedSatJob::checkClauseComm() {
 }
 
 void ForkedSatJob::appl_communicate() {
-    if (!_initialized) return;
     if (!checkClauseComm()) return;
     ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
 }
 
 void ForkedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    if (!_initialized || !checkClauseComm()) {
+    if (!checkClauseComm()) {
         if (!msg.returnedToSender) {
             msg.returnedToSender = true;
             MyMpi::isend(source, mpiTag, msg);
