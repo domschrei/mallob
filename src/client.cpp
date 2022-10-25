@@ -489,6 +489,11 @@ void Client::handleSendJobResult(MessageHandle& handle) {
             for (auto& modelString : modelStrings)
                 LOG_OMIT_PREFIX(V0_CRIT, modelString.c_str());
         }
+        {
+            std::ofstream resultFile(".mallob_result");
+            std::string resultCodeStr = std::to_string(resultCode);
+            resultFile.write(resultCodeStr.c_str(), resultCodeStr.size());
+        }
     }
 
     if (_json_interface) {

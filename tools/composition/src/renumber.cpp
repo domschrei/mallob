@@ -148,7 +148,7 @@ int main(int argc, char **argv){
     bool is_binary = false;
     bool adjust = false;
     char *adjustfilename;
-    int32_t num_original_clauses;
+    int32_t num_original_clauses = 0;
 
     //variables resulting from parsing
     boost::program_options::variables_map vm;
@@ -213,15 +213,10 @@ int main(int argc, char **argv){
         return BAD_USAGE;
     }
 
-    //get number of original clauses from DIMACS file
-    result_code_t result = parse_cnf_file(dimacsfilename, &num_original_clauses);
-    if (result != SUCCESS){
-        return result;
-    }
-
     ClauseIdMap clause_id_map;
 
     //if there is an adjustment file, read it
+    result_code_t result;
     if (adjust){
         result = read_adjustment_file(adjustfilename, clause_id_map,
                                       &num_original_clauses);
@@ -229,6 +224,16 @@ int main(int argc, char **argv){
             return result;
         }
     }
+
+    //get number of original clauses from DIMACS file
+    int numOriginalClauses = 0;
+    result = parse_cnf_file(dimacsfilename, &numOriginalClauses);
+    if (result != SUCCESS){
+        return result;
+    }
+    num_original_clauses = std::max(num_original_clauses, numOriginalClauses);
+
+    printf("%i original clauses\n", num_original_clauses);
 
     //open the output file
     FILE *outfile = fopen(outfilename, "w");

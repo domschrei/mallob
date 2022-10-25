@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <fstream>
 
 #include "sat_reader.hpp"
 #include "util/sys/terminator.hpp"
@@ -89,6 +90,7 @@ bool SatReader::read(JobDescription& desc) {
 
 	} else if (namedpipe != -1) {
 		// Read formula over named pipe
+
 		int iteration = 0;
 		if (_content_mode == RAW) {
 			int buffer[1024] = {0};
@@ -148,6 +150,12 @@ bool SatReader::read(JobDescription& desc) {
 	while (numClausesStr.size() < NC_DEFAULT_VAL.size())
 		numClausesStr += ".";
 	desc.setAppConfigurationEntry("__NC", numClausesStr);
+
+	{
+		std::ofstream ofs(".preprocessed-header.pipe", std::ofstream::app);
+		std::string out = "p cnf 0 " + std::to_string(_num_read_clauses) + "\n";
+		ofs.write(out.c_str(), out.size());
+	}
 
 	desc.endInitialization();
 

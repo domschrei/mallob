@@ -419,6 +419,8 @@ private:
             while (reader.nextAsChar(c)) {
                 writer.put(c);
             }
+            writer.flush();
+            ofs.close();
         } else {
             // Just "tac" the text file
             std::string cmd = "tac " + _output_filename + ".inv > " + _output_filename;
