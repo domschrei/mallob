@@ -47,14 +47,14 @@ bool KMeansReader::read(const std::string &filename, JobDescription &desc) {
     desc.addPermanentData(countClusters);
     desc.addPermanentData(dimension);
     desc.addPermanentData(pointsCount);
-    //LOG(V3_VERB, "                          countClusters: %i dimension %i pointsCount: %i columnsInFile: %i skipCols:%i\n", countClusters, dimension, pointsCount, columnsInFile, skipCols);
+    //LOG(V5_DEBG, "                          countClusters: %i dimension %i pointsCount: %i columnsInFile: %i skipCols:%i\n", countClusters, dimension, pointsCount, columnsInFile, skipCols);
     float num = 0.0;
     for (int point = 0; point < pointsCount; ++point) {
         for (int entry = 0; entry < dimension; ++entry) {
             ifile >> num;
             desc.addPermanentData(num);
             //if (point < 10) {
-            //    LOG(V3_VERB, "                          num: %f\n", num);
+            //    LOG(V5_DEBG, "                          num: %f\n", num);
             //}
         }
         if (Terminator::isTerminating()) return false;
@@ -62,7 +62,7 @@ bool KMeansReader::read(const std::string &filename, JobDescription &desc) {
             ifile >> num;  // dont read the last few columns of each row
             // num wont be read until reset
             //if (point < 10) {
-            //    LOG(V3_VERB, "                          skip num: %f\n", num);
+            //    LOG(V5_DEBG, "                          skip num: %f\n", num);
             //}
         }
     }

@@ -62,7 +62,7 @@ class KMeansJob : public Job {
         };
     const std::function<std::vector<int>(const std::vector<int>&)> rootTransform =
         [&](const std::vector<int>& payload) {
-            LOG(V3_VERB, "                           myIndex: %i start Roottransform\n", myIndex);
+            LOG(V5_DEBG, "                           myIndex: %i start Roottransform\n", myIndex);
             auto data = reduceToclusterCenters(payload);
             const int* sumMembers;
 
@@ -72,20 +72,16 @@ class KMeansJob : public Job {
             for (int i = 0; i < countClusters; ++i) {
                 sum += sumMembers[i];
             }
-            if (sum == pointsCount) {
-                LOG(V3_VERB, "                           AllCollected: Good\n");
-            } else {
-                LOG(V3_VERB, "                           AllCollected: Error\n");
-            }
+            
             auto transformed = clusterCentersToBroadcast(clusterCenters);
             transformed.push_back(this->getVolume());  // will be countCurrentWorkers
-            LOG(V3_VERB, "                           COMMSIZE: %i myIndex: %i \n",
+            LOG(V5_DEBG, "                           COMMSIZE: %i myIndex: %i \n",
                 this->getVolume(), myIndex);
-            LOG(V3_VERB, "                           Children: %i\n",
+            LOG(V5_DEBG, "                           Children: %i\n",
                 this->getJobTree().getNumChildren());
 
             if (!centersChanged(0.001f)) {
-                LOG(V0_CRIT, "                           Got Result after iter %i\n", iterationsDone);
+                LOG(V2_INFO, "                           Got Result after iter %i\n", iterationsDone);
                 internal_result.result = RESULT_SAT;
                 internal_result.id = getId();
                 internal_result.revision = getRevision();
@@ -95,14 +91,14 @@ class KMeansJob : public Job {
                 auto solution = clusterCentersToSolution();
                 internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
                 finishedJob = true;
-                LOG(V2_INFO, "Solution clusterCenters: \n%s\n", dataToString(clusterCenters).c_str());
+                LOG(V3_VERB, "Solution clusterCenters: \n%s\n", dataToString(clusterCenters).c_str());
                 return std::move(std::vector<int>(allReduceElementSize, 0));
 
             } else {
                 if (iAmRoot && iterationsDone == 1) {
-                    LOG(V0_CRIT, "                           first iteration finished\n");
+                    LOG(V5_DEBG, "                           first iteration finished\n");
                 }
-                LOG(V2_INFO, "                           Another iter %i    k:%i    w:%i\n", iterationsDone, countClusters, this->getVolume());
+                LOG(V3_VERB, "                           Another iter %i    k:%i    w:%i\n", iterationsDone, countClusters, this->getVolume());
                 //LOG(V2_INFO, "                           Another iter %i    k:%i    w:%i   dem:%i\n", iterationsDone, countClusters, this->getVolume(), this->getDemand());
                 return transformed;
             }
