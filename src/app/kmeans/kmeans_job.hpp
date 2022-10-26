@@ -81,7 +81,7 @@ class KMeansJob : public Job {
                 this->getJobTree().getNumChildren());
 
             if (!centersChanged(0.001f)) {
-                LOG(V2_INFO, "                           Got Result after iter %i\n", iterationsDone);
+                LOG(V2_INFO, "%s : finished after %i iterations\n", toStr(), iterationsDone);
                 internal_result.result = RESULT_SAT;
                 internal_result.id = getId();
                 internal_result.revision = getRevision();
@@ -91,14 +91,14 @@ class KMeansJob : public Job {
                 auto solution = clusterCentersToSolution();
                 internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
                 finishedJob = true;
-                LOG(V3_VERB, "Solution clusterCenters: \n%s\n", dataToString(clusterCenters).c_str());
+                LOG(V5_DEBG, "%s : solution cluster centers: \n%s\n", toStr(), dataToString(clusterCenters).c_str());
                 return std::move(std::vector<int>(allReduceElementSize, 0));
 
             } else {
                 if (iAmRoot && iterationsDone == 1) {
                     LOG(V5_DEBG, "                           first iteration finished\n");
                 }
-                LOG(V3_VERB, "                           Another iter %i    k:%i    w:%i\n", iterationsDone, countClusters, this->getVolume());
+                LOG(V3_VERB, "%s : Iteration %i - k:%i w:%i\n", toStr(), iterationsDone, countClusters, this->getVolume());
                 //LOG(V2_INFO, "                           Another iter %i    k:%i    w:%i   dem:%i\n", iterationsDone, countClusters, this->getVolume(), this->getDemand());
                 return transformed;
             }

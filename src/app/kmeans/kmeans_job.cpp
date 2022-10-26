@@ -26,11 +26,11 @@ void KMeansJob::appl_start() {
 
     countCurrentWorkers = 1;
     if (iAmRoot) {
-        LOG(V0_CRIT, "                           loaded\n");
+        LOG(V2_INFO, "%s : kmeans instance loaded\n", toStr());
     }
-    LOG(V5_DEBG, "                           COMMSIZE: %i myRank: %i myIndex: %i\n",
+    LOG(V5_DEBG, "COMMSIZE: %i myRank: %i myIndex: %i\n",
         countCurrentWorkers, myRank, myIndex);
-    LOG(V5_DEBG, "                           Children: %i\n",
+    LOG(V5_DEBG, "Children: %i\n",
         this->getJobTree().getNumChildren());
     data = getSerializedDescription(0)->data();
     pointsStart = (float*)(data + getDescription().getMetadataSize() + 3 * sizeof(int));
@@ -491,7 +491,7 @@ void KMeansJob::calcNearestCenter(std::function<float(const float* p1, const flo
              (std::find(work.begin(), work.end(), 1) != work.end() && std::find(work.begin(), work.end(), 2) != work.end())) &&
             (leftDone && rightDone) &&
             this->getVolume() > 1) {
-            LOG(V3_VERB, "                           will skip Iter\n");
+            LOG(V3_VERB, "%s : will skip Iter\n", toStr());
             skipCurrentIter = true;
             work.clear();
             workDone.clear();

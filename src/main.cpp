@@ -3,6 +3,8 @@
 #include <set>
 #include <stdlib.h>
 #include <unistd.h>
+#include <algorithm> 
+#include <string>
 
 #include "comm/mympi.hpp"
 #include "util/sys/timer.hpp"
@@ -28,13 +30,18 @@
 bool monoJobDone = false;
 void introduceMonoJob(Parameters& params, Client& client) {
 
+    // Parse application name
+    auto app = params.monoApplication();
+    std::transform(app.begin(), app.end(), app.begin(), ::toupper);
+    LOG(V2_INFO, "Assuming application \"%s\" for mono job\n", app.c_str());
+
     // Write a job JSON for the singular job to solve
     nlohmann::json json = {
         {"user", "admin"},
         {"name", "mono-job"},
         {"files", {params.monoFilename()}},
         {"priority", 1.000},
-        {"application", params.monoApplication()}
+        {"application", app}
     };
     if (params.jobWallclockLimit() > 0)
         json["wallclock-limit"] = std::to_string(params.jobWallclockLimit()) + "s";
