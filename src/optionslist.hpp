@@ -19,6 +19,7 @@ GroupedOptionsList _grouped_list;
 OPTION_GROUP(grpGeneral, "general", "General")
  OPT_BOOL(help,                           "h", "help",                                 false,                   "Print help and exit")
  OPT_STRING(monoFilename,                 "mono", "",                                  "",                      "Mono instance: Solve the provided CNF instance with full power, then exit")
+ OPT_STRING(monoApplication,              "mono-application", "",                      "SAT",                   "Application name for mono mode")
  OPT_INT(numJobs,                         "J", "jobs",                                 0,    0, LARGE_INT,      "Exit as soon as this number of jobs has been processed (set to 1 if -mono is used)")
  OPT_INT(seed,                            "seed", "",                                  0,    0, MAX_INT,        "Random seed")
  OPT_FLOAT(timeLimit,                     "T", "time-limit",                           0,    0, LARGE_INT,      "Run entire system for at most this many seconds")

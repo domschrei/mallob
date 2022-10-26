@@ -109,6 +109,9 @@ register_mallob_app("dummy") # always register the "no-op" application
 if(MALLOB_APP_SAT) 
     register_mallob_app("sat")
 endif()
+if(MALLOB_APP_KMEANS)
+    register_mallob_app("kmeans")
+endif()
 # Include further applications here:
 #if(MALLOB_APP_YOURAPP)
 #    register_mallob_app("yourapp")
