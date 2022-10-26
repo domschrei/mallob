@@ -9,6 +9,8 @@ Mallob was tested on configurations with up to 6144 cores as described in our pu
 Most notably, Mallob features an engine for distributed SAT solving.
 According to the [International SAT Competitions](https://satcompetition.github.io/) 2020-2022, the premier competitive events for state-of-the-art SAT solving, Mallob is consistently the strongest SAT solving system for massively parallel and distributed systems (800 physical cores) and also a highly competitive system for moderately parallel SAT solving (32 physical cores).
 
+Furthermore, Mallob features an engine for K-Means clustering, authored by [Michael Dörr](https://github.com/MichaelDoerr) in the scope of his Bachelor thesis.
+
 <hr/>
 
 # Setup
@@ -16,7 +18,7 @@ According to the [International SAT Competitions](https://satcompetition.github.
 ## Prerequisites
 
 Note that we only support Linux as an operating system.
-(Some people have been successfully developing and experimenting with Mallob within the WSL.)
+(Some people have been developing and experimenting with Mallob within the WSL, but there seem to be issues related to inotify.)
 
 * CMake ≥ 3.11.4
 * Open MPI (or another MPI implementation)
@@ -26,7 +28,8 @@ Note that we only support Linux as an operating system.
 ## Building
 
 ```
-# For non-x86-64 architectures (ARM, POWER9, etc.), set DISABLE_FPU=1 for the bash call
+# This call is only necessary if building with MALLOB_APP_SAT (enabled by default).
+# For non-x86-64 architectures (ARM, POWER9, etc.), prepend `DISABLE_FPU=1` to "bash".
 ( cd lib && bash fetch_and_build_sat_solvers.sh )
 mkdir -p build
 cd build
@@ -46,7 +49,8 @@ You can use the following Mallob-specific build options:
 | -DMALLOB_USE_ASAN=<0/1>                   | Compile with Address Sanitizer for debugging purposes.                                                     |
 | -DMALLOB_USE_GLUCOSE=<0/1>                | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
 | -DMALLOB_USE_JEMALLOC=<0/1>               | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
-| -DMALLOB_APP_SAT=<0/1>                    | Compile with SAT engine. (Omit or set to zero if you have a custom application for Mallob instead.)        |
+| -DMALLOB_APP_KMEANS=<0/1>                 | Compile with K-Means clustering engine.                                                                    |
+| -DMALLOB_APP_SAT=<0/1>                    | Compile with SAT solving engine.                                                                           |
 
 ## Docker
 
@@ -90,9 +94,11 @@ All further options of Mallob can be seen by executing Mallob with the `-h` opti
 
 For running Mallob on distributed clusters, please also consult [the scripts and documentation from our Euro-Par 2022 software artifact](https://doi.org/10.6084/m9.figshare.20000642) as well as the user documentation of your particular cluster.
 
-## Solve a single SAT instance
+## Solve a single problem
 
-Use Mallob option `-mono=$PATH_TO_CNF` where `$PATH_TO_CNF` is the path and file name of the formula to solve (DIMACS CNF format, possibly with .xz or .lzma compression). In this mode, all processes participate in solving, overhead is minimal, and Mallob terminates immediately after the job has been processed.
+Use Mallob option `-mono=$PROBLEM_FILE` where `$PROBLEM_FILE` is the path and file name of the problem to solve (DIMACS CNF format, possibly with .xz or .lzma compression, for SAT; whitespace-separated plain text file for K-Means). Specify the application of this instance with `-mono-app=sat` or `-mono-app=kmeans`. 
+
+In this mode, all processes participate in solving, overhead is minimal, and Mallob terminates immediately after the job has been processed.
 
 ## Solve multiple instances in an orchestrated manner
 
@@ -199,8 +205,9 @@ Such a file may look like this:
     "wallclock-limit": "5m"
 }
 ```
-The result code is 0 is unknown, 10 if SAT, and 20 if UNSAT.
-In case of SAT, the solution field contains the found satisfying assignment; in case of UNSAT, the result for an incremental job contains the set of failed assumptions.
+The result code is 0 is unknown, 10 if SAT (solved successfully), and 20 if UNSAT (no solution exists).
+The `solution` field is application-dependent.
+For SAT solving, in case of SATISFIABLE, the solution field contains the found satisfying assignment; in case of UNSAT, the result for an incremental job contains the set of failed assumptions.
 Instead of the "solution" field, the response may also contain the fields "solution-size" and "solution-file" if the solution is large and if option `-pls` is set. In that case, your application has to read `solution-size` integers (as bytes) representing the solution from the named pipe located at `solution-file`.
 
 <hr/>
@@ -263,13 +270,19 @@ If you want to specifically cite Mallob in the scope of an International SAT Com
   title={Engineering HordeSat Towards Malleability: mallob-mono in the {SAT} 2020 Cloud Track},
   author={Schreiber, Dominik},
   journal={SAT Competition 2020},
-  pages={45}
+  pages={45--46}
 }
 @article{schreiber2021mallob,
   title={Mallob in the {SAT} Competition 2021},
   author={Schreiber, Dominik},
   journal={SAT Competition 2021},
-  pages={38}
+  pages={38--39}
+}
+@article{schreiber2022mallob,
+  title={Mallob in the {SAT} Competition 2022},
+  author={Schreiber, Dominik},
+  journal={SAT Competition 2022},
+  pages={46--47}
 }
 ```
 
