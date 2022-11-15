@@ -152,6 +152,9 @@ const int MSG_SCHED_NODE_FREED = 54;
 const int MSG_JOB_TREE_REDUCTION = 61;
 const int MSG_JOB_TREE_BROADCAST = 62;
 
+const int MSG_ALL_REDUCTION_UP = 71;
+const int MSG_ALL_REDUCTION_DOWN = 72;
+
 const int MSG_OFFSET_BATCHED = 10000;
 
 // Application message tags

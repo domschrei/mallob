@@ -111,11 +111,6 @@ public:
         }
         _map = newMap;
     }
-    virtual std::unique_ptr<Reduceable> getDeserialized(const std::vector<uint8_t>& packed) const {
-        auto result = std::unique_ptr<Reduceable>(new EventMap());
-        result->deserialize(packed);
-        return result;
-    }
     virtual bool isEmpty() const {
         return _map.empty();
     }
