@@ -48,6 +48,7 @@ void JobDescription::writeMetadata() {
     n = sizeof(int);         memcpy(data->data()+i, &_max_demand, n); i += n;
     n = sizeof(int);         memcpy(data->data()+i, &_application_id, n); i += n;
     n = sizeof(bool);        memcpy(data->data()+i, &_incremental, n); i += n;
+    n = sizeof(int);         memcpy(data->data()+i, &_group_id, n); i += n;
     n = sizeof(Checksum);    memcpy(data->data()+i, &_checksum, n); i += n;
     
     auto configSerialized = _app_config.serialize();
@@ -101,6 +102,7 @@ int JobDescription::getMetadataSize() const {
            +sizeof(Checksum)
            +sizeof(int)
            +sizeof(bool)
+           +sizeof(int)
            + sizeof(int)+_app_config.getSerializedSize();
 }
 
@@ -160,6 +162,7 @@ void JobDescription::deserialize() {
     n = sizeof(int);         memcpy(&_max_demand, latestData->data()+i, n);      i += n;
     n = sizeof(int);         memcpy(&_application_id, latestData->data()+i, n);  i += n;
     n = sizeof(bool);        memcpy(&_incremental, latestData->data()+i, n);     i += n;
+    n = sizeof(int);         memcpy(&_group_id, latestData->data()+i, n);        i += n;
     n = sizeof(Checksum);    memcpy(&_checksum, latestData->data()+i, n);        i += n;
     // size of config
     memcpy(&n, latestData->data()+i, sizeof(int)); i += sizeof(int);

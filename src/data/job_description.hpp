@@ -41,6 +41,7 @@ private:
     int _max_demand = 0;
     int _application_id; // see app_registry
     bool _incremental = false;
+    int _group_id {0};
 
     Checksum _checksum;
     const bool _use_checksums = false;
@@ -100,6 +101,7 @@ public:
         _root_rank = other._root_rank;
         _priority = std::move(other._priority);
         _incremental = std::move(other._incremental);
+        _group_id = std::move(other._group_id);
         _revision = std::move(other._revision);
         _client_rank = std::move(other._client_rank);
         _wallclock_limit = std::move(other._wallclock_limit);
