@@ -180,6 +180,7 @@ public:
     float getArrival() const {return _arrival;}
     void setIncremental(bool incremental) {_incremental = incremental;}
     bool isIncremental() const {return _incremental;}
+    int getGroupId() const {return _group_id;}
     int getMetadataSize() const;
     
     size_t getFullNonincrementalTransferSize() const {return _data_per_revision[0]->size();}
@@ -196,6 +197,7 @@ public:
     void setAppConfiguration(AppConfiguration&& appConfig) {_app_config = std::move(appConfig);}
     void setPreloadedLiterals(std::vector<int>&& lits) {_preloaded_literals = std::move(lits);}
     void setPreloadedAssumptions(std::vector<int>&& asmpt) {_preloaded_assumptions = std::move(asmpt);}
+    void setGroupId(int groupId) {_group_id = groupId;}
 
     Checksum getChecksum() const {return _checksum;}
     void setChecksum(const Checksum& checksum) {_checksum = checksum;}
