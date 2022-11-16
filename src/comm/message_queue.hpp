@@ -275,7 +275,7 @@ private:
     // Callbacks
     typedef std::function<void(MessageHandle&)> MsgCallback;
     typedef std::function<void(int)> SendDoneCallback;
-    robin_hood::unordered_map<int, MsgCallback> _callbacks;
+    robin_hood::unordered_map<int, std::list<MsgCallback>> _callbacks;
     robin_hood::unordered_map<int, SendDoneCallback> _send_done_callbacks;
     int _default_tag_var = 0;
     int* _current_recv_tag = nullptr;
@@ -288,9 +288,11 @@ public:
     MessageQueue(int maxMsgSize);
     ~MessageQueue();
 
-    void registerCallback(int tag, const MsgCallback& cb);
+    typedef std::list<MsgCallback>::iterator CallbackRef;
+    CallbackRef registerCallback(int tag, const MsgCallback& cb);
     void registerSentCallback(int tag, const SendDoneCallback& cb);
     void clearCallbacks();
+    void clearCallback(int tag, const CallbackRef& ref);
     void setCurrentTagPointers(int* recvTag, int* sendTag) {
         _current_recv_tag = recvTag;
         _current_send_tag = sendTag;
@@ -299,6 +301,8 @@ public:
     int send(DataPtr data, int dest, int tag);
     void cancelSend(int sendId);
     void advance();
+
+    bool hasOpenSends();
 
 private:
     void runFragmentedMessageAssembler();
@@ -311,6 +315,8 @@ private:
 
     void resetReceiveHandle();
     void signalCompletion(int tag, int id);
+
+    void digestReceivedMessage(MessageHandle& h);
 };
 
 #endif

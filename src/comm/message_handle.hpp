@@ -23,6 +23,14 @@ public:
     float creationTime = 0;
 
     MessageHandle() = default;
+    MessageHandle(const MessageHandle& copied) {
+        tag = copied.tag;
+        source = copied.source;
+        selfMessage = copied.selfMessage;
+        finished = copied.finished;
+        creationTime = copied.creationTime;
+        data = copied.data;
+    }
     MessageHandle(MessageHandle&& moved) {
         tag = moved.tag;
         source = moved.source;

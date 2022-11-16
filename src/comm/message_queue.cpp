@@ -39,12 +39,14 @@ MessageQueue::~MessageQueue() {
     free(_recv_data);
 }
 
-void MessageQueue::registerCallback(int tag, const MsgCallback& cb) {
+MessageQueue::CallbackRef MessageQueue::registerCallback(int tag, const MsgCallback& cb) {
     if (_callbacks.count(tag)) {
-        LOG(V0_CRIT, "More than one callback for tag %i!\n", tag);
-        abort();
+        LOG(V1_WARN, "[WARN] More than one callback for tag %i!\n", tag);
     }
-    _callbacks[tag] = cb;
+    _callbacks[tag].push_back(cb);
+    auto it = _callbacks[tag].end();
+    --it;
+    return it;
 }
 
 void MessageQueue::registerSentCallback(int tag, const SendDoneCallback& cb) {
@@ -58,6 +60,10 @@ void MessageQueue::registerSentCallback(int tag, const SendDoneCallback& cb) {
 void MessageQueue::clearCallbacks() {
     _callbacks.clear();
     _send_done_callbacks.clear();
+}
+
+void MessageQueue::clearCallback(int tag, const CallbackRef& ref) {
+    _callbacks[tag].erase(ref);
 }
 
 int MessageQueue::send(DataPtr data, int dest, int tag) {
@@ -113,6 +119,10 @@ void MessageQueue::advance() {
     processAssembledReceived();
     processSent();
     //log(V5_DEBG, "ENDADV\n");
+}
+
+bool MessageQueue::hasOpenSends() {
+    return !_send_queue.empty();
 }
 
 void MessageQueue::runFragmentedMessageAssembler() {
@@ -264,7 +274,7 @@ void MessageQueue::processReceived() {
 
         // Process message according to its tag-specific callback
         *_current_recv_tag = h.tag;
-        _callbacks.at(h.tag)(h);
+        digestReceivedMessage(h);
         *_current_recv_tag = 0;
     }
 
@@ -304,7 +314,7 @@ void MessageQueue::processSelfReceived() {
         h.source = sh.dest;
         h.setReceive(std::move(*sh.data));
         *_current_recv_tag = h.tag;
-        _callbacks.at(h.tag)(h);
+        digestReceivedMessage(h);
         signalCompletion(h.tag, sh.id);
         *_current_recv_tag = 0;
     }
@@ -322,7 +332,7 @@ void MessageQueue::processAssembledReceived() {
             LOG(V5_DEBG, "MQ FUSED t=%i\n", h.tag);
             
             *_current_recv_tag = h.tag;
-            _callbacks.at(h.tag)(h);
+            digestReceivedMessage(h);
             *_current_recv_tag = 0;
             
             if (h.getRecvData().size() > _max_msg_size) {
@@ -426,5 +436,20 @@ void MessageQueue::processSent() {
             _num_concurrent_sends++;
         }
         ++it;
+    }
+}
+
+void MessageQueue::digestReceivedMessage(MessageHandle& h) {
+
+    auto& callbacks = _callbacks.at(h.tag);
+
+    if (callbacks.size() == 1) {
+        callbacks.front()(h);
+        return;
+    }
+
+    for (auto& cb : _callbacks.at(h.tag)) {
+        MessageHandle copy(h);
+        cb(copy);
     }
 }

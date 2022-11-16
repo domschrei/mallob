@@ -70,7 +70,7 @@ public:
         }
         return *this;
     }
-    virtual void merge(const Reduceable& other) {
+    virtual void aggregate(const Reduceable& other) {
 
         EventMap& otherEventMap = (EventMap&) other;
         _global_epoch = std::max(_global_epoch, otherEventMap._global_epoch);

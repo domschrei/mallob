@@ -13,7 +13,7 @@ public:
 
     virtual std::vector<uint8_t> serialize() const override = 0;
     virtual Reduceable& deserialize(const std::vector<uint8_t>& packed) override = 0;
-    virtual void merge(const Reduceable& other) = 0;
+    virtual void aggregate(const Reduceable& other) = 0;
     virtual bool isEmpty() const = 0;
 };
 
