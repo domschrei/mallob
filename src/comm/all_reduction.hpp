@@ -25,9 +25,11 @@ private:
     // ID which all corresponding AllReduction instances across the MPI processes share
     int _instance_id;
 
-    int _my_rank;
     int _comm_size;
-    std::vector<int> _world_ranks;
+    int _my_rank;
+    int _parent_rank;
+    int _left_child_rank;
+    int _right_child_rank;
 
     int _num_desired_contribs;
 
@@ -47,26 +49,15 @@ public:
 
         _my_rank = MyMpi::rank(_comm);
         _comm_size = MyMpi::size(_comm);
+        setUpCommunicationTree();
 
         // How many contributions should this process expect?
         _num_desired_contribs = 1; // yourself
-        if (getLeftChildRank(_my_rank) < _comm_size) _num_desired_contribs++;
-        if (getRightChildRank(_my_rank) < _comm_size) _num_desired_contribs++;
+        if (_left_child_rank >= 0) _num_desired_contribs++;
+        if (_right_child_rank >= 0) _num_desired_contribs++;
 
         _ref_up = msgQ.registerCallback(MSG_ALL_REDUCTION_UP, [&](auto& h) {handle(h);});
         _ref_down = msgQ.registerCallback(MSG_ALL_REDUCTION_DOWN, [&](auto& h) {handle(h);});
-
-        // Create a mapping from the communicator's ranks to world ranks
-        // (since MessageQueue works with global ranks exclusively)
-        MPI_Group groupComm;
-        MPI_Group groupWorld;
-        MPI_Comm_group(_comm, &groupComm);
-        MPI_Comm_group(MPI_COMM_WORLD, &groupWorld);
-        std::vector<int> localRanks(_comm_size);
-        for (size_t i = 0; i < _comm_size; i++) localRanks[i] = i;
-        _world_ranks.resize(_comm_size);
-        MPI_Group_translate_ranks(groupComm, localRanks.size(), localRanks.data(), 
-            groupWorld, _world_ranks.data());
     }
 
     ~AllReduction() {
@@ -119,16 +110,67 @@ public:
         // Broadcast
         if (h.tag == MSG_ALL_REDUCTION_DOWN) {
             // forward to children
-            if (getLeftChildRank(_my_rank) < _comm_size)
-                MyMpi::isendCopy(_world_ranks[getLeftChildRank(_my_rank)], MSG_ALL_REDUCTION_DOWN, data);
-            if (getRightChildRank(_my_rank) < _comm_size)
-                MyMpi::isendCopy(_world_ranks[getRightChildRank(_my_rank)], MSG_ALL_REDUCTION_DOWN, data);
+            if (_left_child_rank >= 0)
+                MyMpi::isendCopy(_left_child_rank, MSG_ALL_REDUCTION_DOWN, data);
+            if (_right_child_rank >= 0)
+                MyMpi::isendCopy(_right_child_rank, MSG_ALL_REDUCTION_DOWN, data);
             state.cbResult(elem); // publish result
             _states_by_id.erase(callId); // clean up
         }
     }
 
 private:
+
+    // Defines _parent_rank, _left_child_rank, and _right_child_rank in such a way
+    // that the communication structure is an in-order binary tree.
+    void setUpCommunicationTree() {
+
+        int parentRank = -1, leftChildRank = -1, rightChildRank = -1;
+
+        // - compute offset based the node's depth
+        int power = 1;
+        while ((_my_rank+1) % (2*power) == 0) {
+            power *= 2;
+        }
+        // Parent rank
+        if (_my_rank % (4*power) >= 2*power || _my_rank+power >= _comm_size) {
+            parentRank = _my_rank - power;
+        } else {
+            parentRank = _my_rank + power;
+        }
+        // Child ranks
+        if (power > 1) {
+            power /= 2;
+            // Left child
+            leftChildRank = _my_rank - power;
+            // Right child
+            if (_my_rank+1 < _comm_size) {
+                rightChildRank = _my_rank + power;
+                while (rightChildRank >= _comm_size) {
+                    // Find the first transitive child which is valid
+                    power /= 2;
+                    rightChildRank -= power;
+                }
+            }
+        }
+
+        // Create a mapping from the communicator's ranks to world ranks
+        // (since MessageQueue works with global ranks exclusively)
+        MPI_Group groupComm; MPI_Comm_group(_comm, &groupComm);
+        MPI_Group groupWorld; MPI_Comm_group(MPI_COMM_WORLD, &groupWorld);
+        std::vector<int> localRanks = {_my_rank, std::max(0,parentRank), std::max(0,leftChildRank), std::max(0,rightChildRank)};
+        std::vector<int> worldRanks(localRanks.size());
+        MPI_Group_translate_ranks(groupComm, localRanks.size(), localRanks.data(), 
+            groupWorld, worldRanks.data());
+        _my_rank = worldRanks[0];
+        _parent_rank = parentRank == -1 ? -1 : worldRanks[1];
+        _left_child_rank = leftChildRank == -1 ? -1 : worldRanks[2];
+        _right_child_rank = rightChildRank == -1 ? -1 : worldRanks[3];
+
+        LOG(V2_INFO, "TREE rank=%i parent=%i left=%i right=%i\n", 
+            _my_rank, _parent_rank, _left_child_rank, _right_child_rank);
+    }
+
     void forward(AllReduceState& state) {
 
         // Prepare serialized data, followed by reduction ID
@@ -138,18 +180,13 @@ private:
         memcpy(packed.data() + sizeBefore, &_instance_id, sizeof(int));
         memcpy(packed.data() + sizeBefore + sizeof(int), &state.id, sizeof(int));
 
-        if (_my_rank == 0) {
+        if (_parent_rank < 0) {
             // Root: switch to broadcast via a self message
-            MyMpi::isend(_world_ranks[_my_rank], MSG_ALL_REDUCTION_DOWN, std::move(packed));
+            MyMpi::isend(_my_rank, MSG_ALL_REDUCTION_DOWN, std::move(packed));
         } else {
             // aggregate upwards
-            MyMpi::isend(_world_ranks[getParentRank(_my_rank)], MSG_ALL_REDUCTION_UP, std::move(packed));
+            MyMpi::isend(_parent_rank, MSG_ALL_REDUCTION_UP, std::move(packed));
         }
         state.numArrivedContribs = 0;
     }
-
-    static int getLeftChildRank(int rank) {return 2*rank+1;}
-    static int getRightChildRank(int rank) {return 2*rank+2;}
-    static int getParentRank(int rank) {return (rank-1)/2;}
-
 };
