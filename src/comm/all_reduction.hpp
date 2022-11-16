@@ -5,8 +5,6 @@
 #include "mympi.hpp"
 #include "util/tsl/robin_map.h"
 
-extern unsigned long _all_reduction_running_id;
-
 // T must be a subclass of Reduceable (see data/reduceable.hpp).
 // An arbitrary number of all-reductions can be performed with a single instance of this class.
 // These all-reductions can also be performed concurrently.
