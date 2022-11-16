@@ -37,6 +37,7 @@ struct ReduceableInt : public Reduceable {
 };
 
 // String wrapper with concatenation as an aggregation operation.
+// Note that this is a non-commutative operation.
 struct ReduceableString : public Reduceable {
     std::string content;
     ReduceableString() = default;
@@ -130,7 +131,7 @@ void testIntegerSum() {
     while (!Terminator::isTerminating() || q.hasOpenSends()) q.advance();
 }
 
-// String concatenation (not commutative, hence result is nondeterministic)
+// Concatenate a number of strings.
 void testStringConcatenation() {
 
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -145,12 +146,12 @@ void testStringConcatenation() {
 
     // Local object to contribute
     ReduceableString myContrib("{" + std::to_string(rank) + "}");
+    std::string validateString;
+    for (int r = 0; r < MyMpi::size(comm); r++) validateString += "{" + std::to_string(r) + "}";
     // Initiate all-reduction
     allRed.allReduce(reductionCallCounter++, myContrib, [&](auto& result) {
         LOG(V2_INFO, "AllReduction done: result \"%s\"\n", result.content.c_str());
-        int numOpeningBraces = 0;
-        for (char c : result.content) if (c == '{') numOpeningBraces++;
-        assert(numOpeningBraces == MyMpi::size(comm));
+        assert(result.content == validateString);
         Terminator::setTerminating();
     });
 

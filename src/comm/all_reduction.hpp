@@ -37,7 +37,9 @@ private:
     struct AllReduceState {
         int id;
         std::function<void(T&)> cbResult;
-        T contrib;
+        T contribSelf;
+        T contribLeft;
+        T contribRight;
         int numArrivedContribs {0};
     };
     // Maintain a "state" struct for each active all-reduction ID.
@@ -73,7 +75,7 @@ public:
         auto& state = _states_by_id[callId];
         state.id = callId;
         state.cbResult = callbackOnResult;
-        state.contrib.aggregate(contribution);
+        state.contribSelf = contribution;
         state.numArrivedContribs++;
 
         if (state.numArrivedContribs == _num_desired_contribs) forward(state);
@@ -102,7 +104,7 @@ public:
 
         // Reduction
         if (h.tag == MSG_ALL_REDUCTION_UP) {
-            state.contrib.aggregate(elem);
+            (isFromLeftChild(h.source) ? state.contribLeft : state.contribRight) = elem;
             state.numArrivedContribs++;
             if (state.numArrivedContribs == _num_desired_contribs) forward(state);
         }
@@ -171,10 +173,30 @@ private:
             _my_rank, _parent_rank, _left_child_rank, _right_child_rank);
     }
 
+    bool isFromLeftChild(int worldRank) {
+        MPI_Group groupComm; MPI_Comm_group(_comm, &groupComm);
+        MPI_Group groupWorld; MPI_Comm_group(MPI_COMM_WORLD, &groupWorld);
+        int worldRanks[2] = {_my_rank, worldRank};
+        int localRanks[2] = {-1, -1};
+        MPI_Group_translate_ranks(groupWorld, 2, worldRanks, groupComm, localRanks);
+        return localRanks[1] < localRanks[0];
+    }
+
     void forward(AllReduceState& state) {
 
+        // Perform the aggregation respecting the correct ordering of elements
+        // since the aggregate operation is not required to be commutative
+        if (state.numArrivedContribs == 3) {
+            state.contribSelf.aggregate(state.contribRight);
+        }
+        if (state.numArrivedContribs >= 2) {
+            state.contribLeft.aggregate(state.contribSelf);
+            state.contribSelf = std::move(state.contribLeft);
+        }
+        T& aggregation = state.contribSelf;
+
         // Prepare serialized data, followed by reduction ID
-        auto packed = state.contrib.serialize();
+        auto packed = aggregation.serialize();
         auto sizeBefore = packed.size();
         packed.resize(sizeBefore + 2*sizeof(int));
         memcpy(packed.data() + sizeBefore, &_instance_id, sizeof(int));
