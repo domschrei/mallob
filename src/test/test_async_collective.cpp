@@ -11,6 +11,7 @@
 #include "comm/mympi.hpp"
 #include "util/params.hpp"
 #include "comm/async_collective.hpp"
+#include "util/sys/threading.hpp"
 
 
 // Integer wrapper with addition as an aggregation operation.
@@ -57,6 +58,41 @@ struct ReduceableString : public Reduceable {
     }
     virtual bool isEmpty() const {
         return content.empty();
+    }
+};
+
+// Wrapper for std::set<int> with union as an aggregation operation.
+struct ReduceableIntSet : public Reduceable {
+    std::set<int> set;
+    ReduceableIntSet() = default;
+    virtual std::vector<uint8_t> serialize() const override {
+        size_t i = 0;
+        size_t n = sizeof(int);
+        std::vector<uint8_t> result(set.size()*n);
+        for (auto& key : set) {
+            memcpy(result.data()+i, &key, n); i += n;
+        }
+        return result;
+    }
+    virtual ReduceableIntSet& deserialize(const std::vector<uint8_t>& packed) override {
+        set.clear();
+        size_t i = 0;
+        size_t n = sizeof(int);
+        while (i < packed.size()) {
+            int key;
+            memcpy(&key, packed.data()+i, n); i += n;
+            set.insert(key);
+        }
+        return *this;
+    }
+    virtual void aggregate(const Reduceable& other) {
+        ReduceableIntSet* otherSet = (ReduceableIntSet*) &other;
+        for (auto& key : otherSet->set) {
+            set.insert(key);
+        }
+    }
+    virtual bool isEmpty() const {
+        return set.empty();
     }
 };
 
@@ -401,6 +437,67 @@ void testStringPrefixSum() {
     while (!Terminator::isTerminating() || q.hasOpenSends()) q.advance();
 }
 
+void testSparsePrefixSum() {
+
+    MPI_Comm comm = MPI_COMM_WORLD;
+    int rank = MyMpi::rank(comm);
+    auto& q = MyMpi::getMessageQueue();
+    Terminator::reset();
+
+    // Create all-reduction object
+    AsyncCollective<ReduceableIntSet> allRed(comm, q, reductionInstanceCounter++);
+
+    MPI_Barrier(MPI_COMM_WORLD); // ensure all processes have a registered callback
+
+    MPI_Request req = MPI_REQUEST_NULL;
+
+    int numContributionsPerRank = 100;
+
+    int numContributionsReturned = 0;
+    int sumOfAllResults = 0;
+    allRed.initializeSparsePrefixSum(1, /*delaySecs=*/0.001, [&](auto& results) {
+        assert(results.size() == 3);
+        auto it = results.begin();
+        std::set<int> excl = it->set; ++it;
+        std::set<int> incl = it->set; ++it;
+        std::set<int> total = it->set;
+        //LOG(V2_INFO, "SPARSE done: result {%s,%s,%s}\n", excl.c_str(), incl.c_str(), total.c_str());
+        numContributionsReturned += incl.size() - excl.size();
+        LOG(V2_INFO, "SPARSE done: %i/%i contributions returned\n", 
+            numContributionsReturned, numContributionsPerRank);
+        if (numContributionsReturned == numContributionsPerRank && req == MPI_REQUEST_NULL) {
+            MPI_Ibarrier(comm, &req);
+        }
+    });
+
+    Mutex mtx;
+
+    std::thread contributor([&]() {
+        ReduceableIntSet rSet;
+        for (int i = 0; i < numContributionsPerRank; i++) {
+            rSet.set.clear(); 
+            rSet.set.insert(i*MyMpi::size(comm) + rank);
+            auto lock = mtx.getLock();
+            allRed.contributeToSparsePrefixSum(1, rSet);
+        }
+    });
+
+    while (!Terminator::isTerminating() || q.hasOpenSends()) {
+        {
+            auto lock = mtx.getLock();
+            q.advance();
+            allRed.advanceSparseOperations(Timer::elapsedSeconds());
+        }
+        if (req != MPI_REQUEST_NULL) {
+            int flag; MPI_Test(&req, &flag, MPI_STATUS_IGNORE);
+            if (flag) {
+                Terminator::setTerminating();
+            }
+        }
+    }
+    contributor.join();
+}
+
 int main(int argc, char *argv[]) {
 
     MyMpi::init();
@@ -424,6 +521,7 @@ int main(int argc, char *argv[]) {
     testMultipleAllReductionInstancesAndCalls();
     testIntegerPrefixSum();
     testStringPrefixSum();
+    testSparsePrefixSum();
 
     // Exit properly
     MPI_Barrier(MPI_COMM_WORLD);

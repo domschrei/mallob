@@ -36,27 +36,24 @@ public:
         _neighbor_towards_rank(std::move(neighborTowardsRank)) {}
 
     void handle(MessageHandle& handle);
+    void advance(int epoch);
+    void addJobRequest(JobRequest& request);
+    void setStatusDirty();
 
+private:
+    bool isIdle();
     Status getAggregatedStatus();
+
     std::vector<uint8_t> serialize(const Status& status);
     std::vector<uint8_t> serialize(const std::vector<JobRequest>& requests);
     void deserialize(const std::vector<uint8_t>& packed, int source);
-
-    void setStatusDirty();
-    void addJobRequest(JobRequest& request);
-
-    void advance(int epoch);
 
     void resolveRequests();
 
     int getCurrentRoot();
     int getCurrentParent();
 
-    bool isIdle();
-
-private:
     int getDestination();
-
 };
 
 #endif

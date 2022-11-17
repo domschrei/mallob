@@ -4,6 +4,7 @@
 #include "data/reduceable.hpp"
 #include "mympi.hpp"
 #include "util/tsl/robin_map.h"
+#include "util/sys/timer.hpp"
 
 // T must be a subclass of Reduceable (see data/reduceable.hpp).
 // An arbitrary number of collective operations can be performed with a single instance of this class.
@@ -20,8 +21,7 @@ private:
     MPI_Comm _comm;
     MessageQueue& _msg_q;
     // References for the message callbacks which need to be deleted at destruction
-    MessageQueue::CallbackRef _ref_up;
-    MessageQueue::CallbackRef _ref_down;
+    std::list<std::pair<int, MessageQueue::CallbackRef>> _cb_refs;
     // ID which all corresponding AsyncCollective instances across the MPI processes share
     int _instance_id;
 
@@ -35,13 +35,16 @@ private:
     // How many contributions to wait for until data is forwarded?
     int _num_desired_contribs;
 
+    float _last_time {0};
+
     // Internal distinction of operation modes
     enum Mode {
         ALLREDUCE, 
         PREFIXSUM_INCL, 
         PREFIXSUM_EXCL, 
         PREFIXSUM_INCL_EXCL,
-        PREFIXSUM_INCL_EXCL_TOTAL
+        PREFIXSUM_INCL_EXCL_TOTAL,
+        SPARSE_PREFIXSUM_INCL_EXCL_TOTAL
     };
 
     // Callback definition for returning a result
@@ -51,11 +54,13 @@ private:
     struct ReduceableList : public Serializable {
         int instanceId;
         int callId;
+        int contributionId {0};
         std::list<T> items;
         virtual std::vector<uint8_t> serialize() const override {
-            std::vector<uint8_t> packed(2*sizeof(int));
+            std::vector<uint8_t> packed(3*sizeof(int));
             memcpy(packed.data(), &instanceId, sizeof(int));
             memcpy(packed.data()+sizeof(int), &callId, sizeof(int));
+            memcpy(packed.data()+2*sizeof(int), &contributionId, sizeof(int));
             int packedSize = packed.size();
             for (auto& item : items) {
                 auto serializedItem = item.serialize();
@@ -72,6 +77,7 @@ private:
             size_t i = 0;
             memcpy(&instanceId, packed.data()+i, sizeof(int)); i += sizeof(int);
             memcpy(&callId, packed.data()+i, sizeof(int)); i += sizeof(int);
+            memcpy(&contributionId, packed.data()+i, sizeof(int)); i += sizeof(int);
             while (i < packed.size()) {
                 int itemSize;
                 memcpy(&itemSize, packed.data()+i, sizeof(int)); i += sizeof(int);
@@ -93,9 +99,46 @@ private:
         T contribRight;
         T aggregation;
         int numArrivedContribs {0};
+        T& aggregateContributions() {
+            if (numArrivedContribs >= 2)
+                aggregation.aggregate(contribLeft);
+            aggregation.aggregate(contribSelf);
+            if (numArrivedContribs == 3)
+                aggregation.aggregate(contribRight);
+            numArrivedContribs = 0;
+            return aggregation;
+        }
     };
     // Maintain a "state" struct for each ongoing operation
     tsl::robin_map<int, OperationState> _states_by_id;
+
+    struct SparseOperationBundle {
+        T contribSelf;
+        int contribIdSelf {0};
+        T contribLeft;
+        int contribIdLeft {0};
+        T contribRight;
+        int contribIdRight {0};
+        T aggregation;
+        T& aggregateContributions() {
+            if (contribIdLeft != 0)
+                aggregation.aggregate(contribLeft);
+            if (contribIdSelf != 0)
+                aggregation.aggregate(contribSelf);
+            if (contribIdRight != 0)
+                aggregation.aggregate(contribRight);
+            return aggregation;
+        }
+    };
+    struct SparseOperationState {
+        int id; // call ID
+        ResultCallback cbResult;
+        int contributionIdCounter = 1; // the ID of the contribution *currently in preparation*
+        tsl::robin_map<int, SparseOperationBundle> bundlesByContribId;
+        float delaySeconds {0};
+        float lastPublicationUpwards {0};
+    };
+    tsl::robin_map<int, SparseOperationState> _sparse_states_by_id;
 
 public:
     // @param comm The MPI communicator within which collective operations should be
@@ -117,14 +160,18 @@ public:
         if (_right_child_rank >= 0) _num_desired_contribs++;
 
         // Register callbacks in message queue
-        _ref_up = msgQ.registerCallback(MSG_ALL_REDUCTION_UP, [&](auto& h) {handle(h);});
-        _ref_down = msgQ.registerCallback(MSG_ALL_REDUCTION_DOWN, [&](auto& h) {handle(h);});
+        auto tags = {MSG_ASYNC_COLLECTIVE_UP, MSG_ASYNC_COLLECTIVE_DOWN, 
+            MSG_ASYNC_SPARSE_COLLECTIVE_UP, MSG_ASYNC_SPARSE_COLLECTIVE_DOWN};
+        for (int tag : tags) {
+            _cb_refs.emplace_back(tag, msgQ.registerCallback(tag, [&](auto& h) {handle(h);}));
+        }
     }
 
     ~AsyncCollective() {
         // Clear callbacks in message queue (to avoid "dangling lambdas")
-        _msg_q.clearCallback(MSG_ALL_REDUCTION_UP, _ref_up);
-        _msg_q.clearCallback(MSG_ALL_REDUCTION_DOWN, _ref_down);
+        for (auto& [tag, ref] : _cb_refs) {
+            _msg_q.clearCallback(tag, ref);
+        }
     }
 
     // Begin a new all-reduction with the provided local contribution
@@ -169,11 +216,65 @@ public:
         initOp(PREFIXSUM_INCL_EXCL_TOTAL, callId, contribution, callbackOnResult);
     }
 
+    // Begin a new sparse prefix sum.
+    // @param callId the ID of this collective operation call
+    // @param delaySeconds the minimum time to wait in between forwarding contributions
+    // @param callbackOnResult the function which is called whenever a new result
+    // has been received
+    void initializeSparsePrefixSum(int callId, float delaySeconds, ResultCallback callbackOnResult) {
+        auto& state = _sparse_states_by_id[callId]; 
+        state.id = callId;
+        state.cbResult = callbackOnResult;
+        state.delaySeconds = delaySeconds;
+    }
+
+    // Contribute an element to an ongoing sparse prefix sum.
+    void contributeToSparsePrefixSum(int callId, const T& contribution) {
+        auto& state = _sparse_states_by_id[callId];
+        
+        int contribId = state.contributionIdCounter;
+        while (state.bundlesByContribId[contribId].contribIdSelf != 0)
+            contribId++;
+        
+        auto& bundle = state.bundlesByContribId[contribId];
+        bundle.contribIdSelf = contribId;
+        bundle.contribSelf = contribution;
+    }
+
+    // Must be called periodically to advance sparse operations.
+    void advanceSparseOperations(float time) {
+
+        // Look for an operation which can be advanced
+        for (auto it = _sparse_states_by_id.begin(); it != _sparse_states_by_id.end(); ++it) {
+            auto callId = it->first;
+            auto& state = _sparse_states_by_id[callId];
+
+            // Is the current bundle ready to be forwarded?
+            auto& bundle = state.bundlesByContribId[state.contributionIdCounter];
+            if (bundle.contribIdSelf+bundle.contribIdLeft+bundle.contribIdRight == 0)
+                continue; // -- no: no contributions yet
+            if (time - state.lastPublicationUpwards < state.delaySeconds)
+                continue; // -- no: not enough time passed
+            // -- yes!
+
+            // Send bundle with aggregation of all present contributions
+            forward(callId, SPARSE_PREFIXSUM_INCL_EXCL_TOTAL,
+                bundle.aggregateContributions(), state.contributionIdCounter);
+            // Proceed with next bundle next time
+            state.contributionIdCounter++;
+            // Update time
+            state.lastPublicationUpwards = time;
+        }
+
+        _last_time = time;
+    }
+
 private:
     void initOp(Mode mode, int callId, const T& contribution, ResultCallback callbackOnResult) {
         auto& state = initState(mode, callId, contribution);
         state.cbResult = callbackOnResult;
-        if (state.numArrivedContribs == _num_desired_contribs) forward(state);
+        if (state.numArrivedContribs == _num_desired_contribs)
+            forward(callId, mode, state.aggregateContributions());
     }
 
     OperationState& initState(Mode mode, int callId, const T& contribution) {
@@ -188,26 +289,83 @@ private:
     // MessageHandles of tags MSG_ALL_REDUCTION_{UP,DOWN} are routed to here.
     void handle(MessageHandle& h) {
 
-        if (h.tag != MSG_ALL_REDUCTION_UP && h.tag != MSG_ALL_REDUCTION_DOWN) return;
+        if (h.tag == MSG_ASYNC_COLLECTIVE_UP || h.tag == MSG_ASYNC_COLLECTIVE_DOWN) {
 
-        // Deserialize data
-        auto data = Serializable::get<ReduceableList>(h.getRecvData());
-        if (data.instanceId != _instance_id) return; // matching instance ID?
-        
-        // Retrieve local state of the associated call
-        auto& state = _states_by_id[data.callId];
-        state.id = data.callId;
+            // Deserialize data
+            auto data = Serializable::get<ReduceableList>(h.getRecvData());
+            if (data.instanceId != _instance_id) return; // matching instance ID?
+            // Retrieve local state of the associated call
+            auto& state = _states_by_id[data.callId];
+            state.id = data.callId;
 
-        // Reduction
-        if (h.tag == MSG_ALL_REDUCTION_UP) {
-            (isFromLeftChild(h.source) ? state.contribLeft : state.contribRight) = data.items.front();
-            state.numArrivedContribs++;
-            if (state.numArrivedContribs == _num_desired_contribs) forward(state);
+            // Reduction
+            if (h.tag == MSG_ASYNC_COLLECTIVE_UP) {
+                (isFromLeftChild(h.source) ? state.contribLeft : state.contribRight) = data.items.front();
+                state.numArrivedContribs++;
+                if (state.numArrivedContribs == _num_desired_contribs)
+                    forward(state.id, state.mode, state.aggregateContributions());
+            }
+            
+            // Broadcast
+            if (h.tag == MSG_ASYNC_COLLECTIVE_DOWN) {
+                auto resultList = broadcastAndDigest(state.mode, data, state.contribLeft, state.contribSelf);
+                state.cbResult(resultList); // publish result locally
+                _states_by_id.erase(data.callId); // clean up
+            }
         }
-        
-        // Broadcast
-        if (h.tag == MSG_ALL_REDUCTION_DOWN) {
-            broadcastAndDigest(state, data);
+
+        if (h.tag == MSG_ASYNC_SPARSE_COLLECTIVE_UP || h.tag == MSG_ASYNC_SPARSE_COLLECTIVE_DOWN) {
+
+            // Deserialize data
+            auto data = Serializable::get<ReduceableList>(h.getRecvData());
+            if (data.instanceId != _instance_id) return; // matching instance ID?
+            // Retrieve local state of the associated call
+            auto& state = _sparse_states_by_id[data.callId];
+            state.id = data.callId;
+
+            // Reduction
+            if (h.tag == MSG_ASYNC_SPARSE_COLLECTIVE_UP) {
+                // Find 1st unsent bundle with a free "slot" for this child
+                int contribId = state.contributionIdCounter;
+                bool fromLeftChild = isFromLeftChild(h.source);
+                while (fromLeftChild && state.bundlesByContribId[contribId].contribIdLeft != 0)
+                    contribId++;
+                while (!fromLeftChild && state.bundlesByContribId[contribId].contribIdRight != 0)
+                    contribId++;
+                auto& bundle = state.bundlesByContribId[contribId];
+                LOG(V6_DEBGV, "SPARSE got contribution ID=%i from [%i]; adding to my contrib. ID %i (current ID: %i)\n", 
+                    data.contributionId, h.source, contribId, state.contributionIdCounter);
+                // Store received data in the found bundle
+                (fromLeftChild ? bundle.contribLeft : bundle.contribRight) = data.items.front();
+                (fromLeftChild ? bundle.contribIdLeft : bundle.contribIdRight) = data.contributionId;
+                // Perhaps the operation can be advanced now
+                advanceSparseOperations(_last_time);
+            }
+
+            // Broadcast
+            if (h.tag == MSG_ASYNC_SPARSE_COLLECTIVE_DOWN) {
+                std::list<T> resultList;
+                int contribId = data.contributionId;
+                if (contribId == 0) {
+                    // Did not contribute to this broadcast:
+                    // Just forward everything, also with contribution ID 0
+                    LOG(V6_DEBGV, "SPARSE got broadcast with no personal contribution from [%i]\n", h.source);
+                    T emptyContrib;
+                    resultList = broadcastAndDigest(SPARSE_PREFIXSUM_INCL_EXCL_TOTAL, data, emptyContrib, emptyContrib);
+                } else {
+                    // DID contribute to this broadcast
+                    LOG(V6_DEBGV, "SPARSE got broadcast with contribution ID %i from [%i]\n", contribId, h.source);
+                    auto& bundle = state.bundlesByContribId[contribId];
+                    resultList = broadcastAndDigest(SPARSE_PREFIXSUM_INCL_EXCL_TOTAL, data, bundle.contribLeft, bundle.contribSelf,
+                        /*leftContribId=*/bundle.contribIdLeft, /*rightContribId=*/bundle.contribIdRight);
+                }
+                state.cbResult(resultList); // publish result locally
+                if (contribId != 0) {
+                    LOG(V6_DEBGV, "SPARSE remove bundle with contribution ID %i\n", contribId);
+                    state.bundlesByContribId.erase(contribId); // clean up
+                }
+            }
+
         }
     }
 
@@ -220,105 +378,101 @@ private:
         return localRanks[1] < localRanks[0];
     }
 
-    void forward(OperationState& state) {
-
-        // Perform the aggregation respecting the correct ordering of elements
-        // since the aggregate operation is not required to be commutative
-        if (state.numArrivedContribs >= 2) {
-            state.aggregation.aggregate(state.contribLeft);
-        }
-        state.aggregation.aggregate(state.contribSelf);
-        if (state.numArrivedContribs == 3) {
-            state.aggregation.aggregate(state.contribRight);
-        }
-        T& aggregation = state.aggregation;
+    void forward(int callId, Mode mode, T& aggregation, int contributionId = 0) {
 
         std::vector<uint8_t> packed;
         if (_parent_rank < 0) {
             // Root: switch to broadcast via a self message
-            if (state.mode == ALLREDUCE) {
+            int msgTag = mode == SPARSE_PREFIXSUM_INCL_EXCL_TOTAL ? 
+                MSG_ASYNC_SPARSE_COLLECTIVE_DOWN : MSG_ASYNC_COLLECTIVE_DOWN;
+            if (mode == ALLREDUCE) {
                 // Forward aggregated element
-                packed = serialize(state.id, aggregation);
-            } else if (state.mode == PREFIXSUM_INCL_EXCL_TOTAL) {
+                packed = serialize(callId, aggregation);
+            } else if (mode == PREFIXSUM_INCL_EXCL_TOTAL || mode == SPARSE_PREFIXSUM_INCL_EXCL_TOTAL) {
                 // Forward neutral AND aggregated element
                 T neutralElem;
-                packed = serialize(state.id, neutralElem, aggregation);
+                packed = serialize(callId, neutralElem, aggregation, contributionId);
             } else {
                 // Forward neutral element
                 T neutralElem;
-                packed = serialize(state.id, neutralElem);
+                packed = serialize(callId, neutralElem);
             }
-            MyMpi::isend(_my_rank, MSG_ALL_REDUCTION_DOWN, std::move(packed));
+            MyMpi::isend(_my_rank, msgTag, std::move(packed));
         } else {
+            int msgTag = mode == SPARSE_PREFIXSUM_INCL_EXCL_TOTAL ? 
+                MSG_ASYNC_SPARSE_COLLECTIVE_UP : MSG_ASYNC_COLLECTIVE_UP;
             // aggregate upwards
-            packed = serialize(state.id, aggregation);
-            MyMpi::isend(_parent_rank, MSG_ALL_REDUCTION_UP, std::move(packed));
+            packed = serialize(callId, aggregation, contributionId);
+            MyMpi::isend(_parent_rank, msgTag, std::move(packed));
         }
-        state.numArrivedContribs = 0;
     }
 
-    void broadcastAndDigest(OperationState& state, ReduceableList& data) {
+    std::list<T> broadcastAndDigest(Mode mode, ReduceableList& data, T& contribLeft, T& contribSelf,
+            int leftContribId = 0, int rightContribId = 0) {
 
         std::list<T> resultList;
         auto& elem = data.items.front();
 
-        if (state.mode == ALLREDUCE) {
+        if (mode == ALLREDUCE) {
 
             // AllReduction: just forward received data to children
             if (_left_child_rank >= 0)
-                MyMpi::isend(_left_child_rank, MSG_ALL_REDUCTION_DOWN, data);
+                MyMpi::isend(_left_child_rank, MSG_ASYNC_COLLECTIVE_DOWN, data);
             if (_right_child_rank >= 0)
-                MyMpi::isend(_right_child_rank, MSG_ALL_REDUCTION_DOWN, data);
+                MyMpi::isend(_right_child_rank, MSG_ASYNC_COLLECTIVE_DOWN, data);
             // Store first and only deserialized item
             resultList.push_back(std::move(elem));
 
         } else {
 
             // Prefix sum.
+            int msgTag = mode == SPARSE_PREFIXSUM_INCL_EXCL_TOTAL ? 
+                MSG_ASYNC_SPARSE_COLLECTIVE_DOWN : MSG_ASYNC_COLLECTIVE_DOWN;
             // Send received data to left child and aggregate data with left child's data
             if (_left_child_rank >= 0) {
-                MyMpi::isend(_left_child_rank, MSG_ALL_REDUCTION_DOWN, data);
-                elem.aggregate(state.contribLeft);
+                data.contributionId = leftContribId;
+                MyMpi::isend(_left_child_rank, msgTag, data);
+                elem.aggregate(contribLeft);
             }
             // Store exclusive result
-            if (state.mode == PREFIXSUM_EXCL || state.mode == PREFIXSUM_INCL_EXCL 
-                    || state.mode == PREFIXSUM_INCL_EXCL_TOTAL) {
+            if (mode != PREFIXSUM_INCL) {
                 resultList.push_back(elem);
             }
             // Aggregate data with your own data
-            elem.aggregate(state.contribSelf);
+            elem.aggregate(contribSelf);
             // Send inclusive result to right child
             if (_right_child_rank >= 0) {
-                auto packed = state.mode == PREFIXSUM_INCL_EXCL_TOTAL ? 
-                    serialize(data.callId, elem, data.items.back()) : serialize(data.callId, elem);
-                MyMpi::isend(_right_child_rank, MSG_ALL_REDUCTION_DOWN, std::move(packed));
+                auto packed = mode == PREFIXSUM_INCL_EXCL_TOTAL || mode == SPARSE_PREFIXSUM_INCL_EXCL_TOTAL ? 
+                    serialize(data.callId, elem, data.items.back(), rightContribId) : 
+                    serialize(data.callId, elem, rightContribId);
+                MyMpi::isend(_right_child_rank, msgTag, std::move(packed));
             }
             // Store inclusive result
-            if (state.mode == PREFIXSUM_INCL || state.mode == PREFIXSUM_INCL_EXCL 
-                    || state.mode == PREFIXSUM_INCL_EXCL_TOTAL) {
+            if (mode != PREFIXSUM_EXCL) {
                 resultList.push_back(std::move(elem));
             }
             // Store total result
-            if (state.mode == PREFIXSUM_INCL_EXCL_TOTAL) {
+            if (mode == PREFIXSUM_INCL_EXCL_TOTAL || mode == SPARSE_PREFIXSUM_INCL_EXCL_TOTAL) {
                 resultList.push_back(std::move(data.items.back()));
             }
         }
 
-        state.cbResult(resultList); // publish result locally
-        _states_by_id.erase(data.callId); // clean up
+        return resultList;
     }
 
-    std::vector<uint8_t> serialize(int callId, T& elem) {
+    std::vector<uint8_t> serialize(int callId, T& elem, int contributionId = 0) {
         ReduceableList data;
         data.instanceId = _instance_id;
         data.callId = callId;
+        data.contributionId = contributionId;
         data.items.push_back(elem);
         return data.serialize();
     }
-    std::vector<uint8_t> serialize(int callId, T& elem1, T& elem2) {
+    std::vector<uint8_t> serialize(int callId, T& elem1, T& elem2, int contributionId = 0) {
         ReduceableList data;
         data.instanceId = _instance_id;
         data.callId = callId;
+        data.contributionId = contributionId;
         data.items.push_back(elem1);
         data.items.push_back(elem2);
         return data.serialize();
@@ -370,7 +524,7 @@ private:
         _left_child_rank = leftChildRank == -1 ? -1 : worldRanks[2];
         _right_child_rank = rightChildRank == -1 ? -1 : worldRanks[3];
 
-        LOG(V2_INFO, "TREE rank=%i parent=%i left=%i right=%i\n", 
+        LOG(V6_DEBGV, "TREE rank=%i parent=%i left=%i right=%i\n", 
             _my_rank, _parent_rank, _left_child_rank, _right_child_rank);
     }
 };
