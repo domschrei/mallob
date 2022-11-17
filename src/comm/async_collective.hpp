@@ -84,7 +84,7 @@ private:
     };
 
     // Internal state for each ongoing collective operation
-    struct AllReduceState {
+    struct OperationState {
         int id; // call ID
         Mode mode = ALLREDUCE; // operation mode
         ResultCallback cbResult;
@@ -95,9 +95,14 @@ private:
         int numArrivedContribs {0};
     };
     // Maintain a "state" struct for each ongoing operation
-    tsl::robin_map<int, AllReduceState> _states_by_id;
+    tsl::robin_map<int, OperationState> _states_by_id;
 
 public:
+    // @param comm The MPI communicator within which collective operations should be
+    // performed. The order in which data will be aggregated is equivalent to the
+    // ranking of MPI processes in comm.
+    // @param msqQ The message queue which distributes incoming messages.
+    // @param instanceId The ID of this instance across all participating processes. 
     AsyncCollective<T>(MPI_Comm comm, MessageQueue& msgQ, int instanceId) : 
             _comm(comm), _msg_q(msgQ), _instance_id(instanceId) {
 
@@ -171,7 +176,7 @@ private:
         if (state.numArrivedContribs == _num_desired_contribs) forward(state);
     }
 
-    AllReduceState& initState(Mode mode, int callId, const T& contribution) {
+    OperationState& initState(Mode mode, int callId, const T& contribution) {
         auto& state = _states_by_id[callId];
         state.id = callId;
         state.mode = mode;
@@ -187,7 +192,7 @@ private:
 
         // Deserialize data
         auto data = Serializable::get<ReduceableList>(h.getRecvData());
-        if (data.instanceId != _instance_id) return; // correct instance ID?
+        if (data.instanceId != _instance_id) return; // matching instance ID?
         
         // Retrieve local state of the associated call
         auto& state = _states_by_id[data.callId];
@@ -202,47 +207,7 @@ private:
         
         // Broadcast
         if (h.tag == MSG_ALL_REDUCTION_DOWN) {
-            std::list<T> resultList;
-            auto& elem = data.items.front();
-            if (state.mode == ALLREDUCE) {
-                // just forward to children
-                if (_left_child_rank >= 0)
-                    MyMpi::isendCopy(_left_child_rank, MSG_ALL_REDUCTION_DOWN, h.getRecvData());
-                if (_right_child_rank >= 0)
-                    MyMpi::isendCopy(_right_child_rank, MSG_ALL_REDUCTION_DOWN, h.getRecvData());
-                // Store first and only deserialized item
-                resultList.push_back(std::move(elem));
-            } else {
-                // Send received data to left child and aggregate data with left child's data
-                if (_left_child_rank >= 0) {
-                    MyMpi::isendCopy(_left_child_rank, MSG_ALL_REDUCTION_DOWN, h.getRecvData());
-                    elem.aggregate(state.contribLeft);
-                }
-                // Store exclusive result
-                if (state.mode == PREFIXSUM_EXCL || state.mode == PREFIXSUM_INCL_EXCL 
-                        || state.mode == PREFIXSUM_INCL_EXCL_TOTAL) {
-                    resultList.push_back(elem);
-                }
-                // Aggregate data with your own data
-                elem.aggregate(state.contribSelf);
-                // Send inclusive result to right child
-                if (_right_child_rank >= 0) {
-                    auto packed = state.mode == PREFIXSUM_INCL_EXCL_TOTAL ? 
-                        serialize(data.callId, elem, data.items.back()) : serialize(data.callId, elem);
-                    MyMpi::isend(_right_child_rank, MSG_ALL_REDUCTION_DOWN, std::move(packed));
-                }
-                // Store inclusive result
-                if (state.mode == PREFIXSUM_INCL || state.mode == PREFIXSUM_INCL_EXCL 
-                        || state.mode == PREFIXSUM_INCL_EXCL_TOTAL) {
-                    resultList.push_back(std::move(elem));
-                }
-                // Store total result
-                if (state.mode == PREFIXSUM_INCL_EXCL_TOTAL) {
-                    resultList.push_back(std::move(data.items.back()));
-                }
-            }
-            state.cbResult(resultList); // publish result
-            _states_by_id.erase(data.callId); // clean up
+            broadcastAndDigest(state, data);
         }
     }
 
@@ -255,7 +220,7 @@ private:
         return localRanks[1] < localRanks[0];
     }
 
-    void forward(AllReduceState& state) {
+    void forward(OperationState& state) {
 
         // Perform the aggregation respecting the correct ordering of elements
         // since the aggregate operation is not required to be commutative
@@ -290,6 +255,57 @@ private:
             MyMpi::isend(_parent_rank, MSG_ALL_REDUCTION_UP, std::move(packed));
         }
         state.numArrivedContribs = 0;
+    }
+
+    void broadcastAndDigest(OperationState& state, ReduceableList& data) {
+
+        std::list<T> resultList;
+        auto& elem = data.items.front();
+
+        if (state.mode == ALLREDUCE) {
+
+            // AllReduction: just forward received data to children
+            if (_left_child_rank >= 0)
+                MyMpi::isend(_left_child_rank, MSG_ALL_REDUCTION_DOWN, data);
+            if (_right_child_rank >= 0)
+                MyMpi::isend(_right_child_rank, MSG_ALL_REDUCTION_DOWN, data);
+            // Store first and only deserialized item
+            resultList.push_back(std::move(elem));
+
+        } else {
+
+            // Prefix sum.
+            // Send received data to left child and aggregate data with left child's data
+            if (_left_child_rank >= 0) {
+                MyMpi::isend(_left_child_rank, MSG_ALL_REDUCTION_DOWN, data);
+                elem.aggregate(state.contribLeft);
+            }
+            // Store exclusive result
+            if (state.mode == PREFIXSUM_EXCL || state.mode == PREFIXSUM_INCL_EXCL 
+                    || state.mode == PREFIXSUM_INCL_EXCL_TOTAL) {
+                resultList.push_back(elem);
+            }
+            // Aggregate data with your own data
+            elem.aggregate(state.contribSelf);
+            // Send inclusive result to right child
+            if (_right_child_rank >= 0) {
+                auto packed = state.mode == PREFIXSUM_INCL_EXCL_TOTAL ? 
+                    serialize(data.callId, elem, data.items.back()) : serialize(data.callId, elem);
+                MyMpi::isend(_right_child_rank, MSG_ALL_REDUCTION_DOWN, std::move(packed));
+            }
+            // Store inclusive result
+            if (state.mode == PREFIXSUM_INCL || state.mode == PREFIXSUM_INCL_EXCL 
+                    || state.mode == PREFIXSUM_INCL_EXCL_TOTAL) {
+                resultList.push_back(std::move(elem));
+            }
+            // Store total result
+            if (state.mode == PREFIXSUM_INCL_EXCL_TOTAL) {
+                resultList.push_back(std::move(data.items.back()));
+            }
+        }
+
+        state.cbResult(resultList); // publish result locally
+        _states_by_id.erase(data.callId); // clean up
     }
 
     std::vector<uint8_t> serialize(int callId, T& elem) {
