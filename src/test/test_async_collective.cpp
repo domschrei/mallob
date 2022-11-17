@@ -10,12 +10,12 @@
 #include "util/sys/timer.hpp"
 #include "comm/mympi.hpp"
 #include "util/params.hpp"
-#include "comm/all_reduction.hpp"
+#include "comm/async_collective.hpp"
 
 
 // Integer wrapper with addition as an aggregation operation.
 struct ReduceableInt : public Reduceable {
-    int content;
+    int content {0};
     ReduceableInt() = default;
     ReduceableInt(int content) : content(content) {}
     virtual std::vector<uint8_t> serialize() const override {
@@ -99,7 +99,7 @@ struct ReduceableIntToIntMap : public Reduceable {
 
 
 
-// Counter for the IDs of AllReduction instances 
+// Counter for the IDs of AsyncCollective instances 
 int reductionInstanceCounter = 1;
 // Counter for the IDs of specific allReduce calls
 int reductionCallCounter = 1;
@@ -114,14 +114,16 @@ void testIntegerSum() {
     Terminator::reset();
 
     // Create all-reduction object
-    AllReduction<ReduceableInt> allRed(comm, q, reductionInstanceCounter++);
+    AsyncCollective<ReduceableInt> allRed(comm, q, reductionInstanceCounter++);
 
     MPI_Barrier(MPI_COMM_WORLD); // ensure all processes have a registered callback
     
     // Local object to contribute
     ReduceableInt myContrib(rank);
+    
     // Initiate all-reduction
-    allRed.allReduce(reductionCallCounter++, myContrib, [&](auto& result) {
+    allRed.allReduce(reductionCallCounter++, myContrib, [&](auto& results) {
+        auto& result = results.front();
         LOG(V2_INFO, "AllReduction done: result \"%i\"\n", result.content);
         assert(result.content == (MyMpi::size(comm)*(MyMpi::size(comm)-1)/2));
         Terminator::setTerminating();
@@ -140,7 +142,7 @@ void testStringConcatenation() {
     Terminator::reset();
 
     // Create all-reduction object
-    AllReduction<ReduceableString> allRed(comm, q, reductionInstanceCounter++);
+    AsyncCollective<ReduceableString> allRed(comm, q, reductionInstanceCounter++);
     
     MPI_Barrier(MPI_COMM_WORLD); // ensure all processes have a registered callback
 
@@ -149,7 +151,8 @@ void testStringConcatenation() {
     std::string validateString;
     for (int r = 0; r < MyMpi::size(comm); r++) validateString += "{" + std::to_string(r) + "}";
     // Initiate all-reduction
-    allRed.allReduce(reductionCallCounter++, myContrib, [&](auto& result) {
+    allRed.allReduce(reductionCallCounter++, myContrib, [&](auto& results) {
+        auto& result = results.front();
         LOG(V2_INFO, "AllReduction done: result \"%s\"\n", result.content.c_str());
         assert(result.content == validateString);
         Terminator::setTerminating();
@@ -167,7 +170,7 @@ void testIntToIntMap() {
     Terminator::reset();
 
     // Create all-reduction object
-    AllReduction<ReduceableIntToIntMap> allRed(comm, q, reductionInstanceCounter++);
+    AsyncCollective<ReduceableIntToIntMap> allRed(comm, q, reductionInstanceCounter++);
 
     MPI_Barrier(comm); // ensure all processes have a registered callback
     
@@ -175,7 +178,8 @@ void testIntToIntMap() {
     ReduceableIntToIntMap myContrib;
     myContrib.map[rank] = 1;
     // Initiate all-reduction
-    allRed.allReduce(reductionCallCounter++, myContrib, [&](auto& result) {
+    allRed.allReduce(reductionCallCounter++, myContrib, [&](auto& results) {
+        auto& result = results.front();
         LOG(V2_INFO, "AllReduction done\n");
         assert(result.map.size() == MyMpi::size(comm));
         for (size_t i = 0; i < MyMpi::size(comm); i++) {
@@ -198,7 +202,7 @@ void testMultipleAllReductionCalls() {
     Terminator::reset();
     int numAllReductions = 10;
 
-    AllReduction<ReduceableInt> allred(comm, q, reductionInstanceCounter++);
+    AsyncCollective<ReduceableInt> allred(comm, q, reductionInstanceCounter++);
 
     MPI_Barrier(comm); // ensure all processes have a registered callback
 
@@ -206,7 +210,8 @@ void testMultipleAllReductionCalls() {
 
     int contrib = 1;
     for (size_t i = 0; i < numAllReductions; i++) {
-        allred.allReduce(reductionCallCounter++, contrib, [&, i](auto& result) {
+        allred.allReduce(reductionCallCounter++, contrib, [&, i](auto& results) {
+            auto& result = results.front();
             LOG(V2_INFO, "AllReduction %i done: result \"%i\"\n", i, result.content);
             assert(result.content/MyMpi::size(comm) == i+1);
             numFinished++;
@@ -229,7 +234,7 @@ void testMultipleAllReductionInstances() {
     Terminator::reset();
     int numAllReductions = 10;
 
-    std::list<AllReduction<ReduceableInt>> allreductions;
+    std::list<AsyncCollective<ReduceableInt>> allreductions;
     for (size_t i = 0; i < numAllReductions; i++) {
         // Create all-reduction object
         allreductions.emplace_back(comm, q, reductionInstanceCounter++);
@@ -241,7 +246,8 @@ void testMultipleAllReductionInstances() {
 
     int contrib = 1;
     for (auto& allred : allreductions) {
-        allred.allReduce(reductionCallCounter++, contrib, [&, contrib](auto& result) {
+        allred.allReduce(reductionCallCounter++, contrib, [&, contrib](auto& results) {
+            auto& result = results.front();
             LOG(V2_INFO, "AllReduction %i done: result \"%i\"\n", contrib, result.content);
             assert(result.content == MyMpi::size(comm)*contrib);
             numFinished++;
@@ -265,7 +271,7 @@ void testMultipleAllReductionInstancesAndCalls() {
     const int numInstances = 10;
     const int numCallsPerInstance = 10;
 
-    std::list<AllReduction<ReduceableInt>> allreductions;
+    std::list<AsyncCollective<ReduceableInt>> allreductions;
     for (size_t i = 0; i < numInstances; i++) {
         // Create all-reduction object
         allreductions.emplace_back(comm, q, reductionInstanceCounter++);
@@ -277,7 +283,8 @@ void testMultipleAllReductionInstancesAndCalls() {
     int contrib = 1;
     for (auto& allred : allreductions) {
         for (size_t i = 0; i < numCallsPerInstance; i++) {
-            allred.allReduce(reductionCallCounter++, contrib, [&, contrib, i](auto& result) {
+            allred.allReduce(reductionCallCounter++, contrib, [&, contrib, i](auto& results) {
+                auto& result = results.front();
                 numFinished++;
                 LOG(V2_INFO, "[%i/%i] AllReduction %i-%i done: result \"%i\"\n", 
                     numFinished, numInstances*numCallsPerInstance, contrib, i, result.content);
@@ -287,6 +294,108 @@ void testMultipleAllReductionInstancesAndCalls() {
         }
         contrib++;
     }
+
+    // Poll message queue until everything is done
+    while (!Terminator::isTerminating() || q.hasOpenSends()) q.advance();
+}
+
+void testIntegerPrefixSum() {
+
+    MPI_Comm comm = MPI_COMM_WORLD;
+    int rank = MyMpi::rank(comm);
+    auto& q = MyMpi::getMessageQueue();
+    Terminator::reset();
+
+    // Create all-reduction object
+    AsyncCollective<ReduceableInt> allRed(comm, q, reductionInstanceCounter++);
+
+    MPI_Barrier(MPI_COMM_WORLD); // ensure all processes have a registered callback
+    
+    // Local object to contribute
+    ReduceableInt myContrib(rank);
+    int numDone = 0; int numExpectedDone = 4;
+    // Initiate prefix sums
+    allRed.inclusivePrefixSum(reductionCallCounter++, myContrib, [&](auto& results) {
+        assert(results.size() == 1);
+        auto& result = results.front();
+        LOG(V2_INFO, "InclusivePrefixSum done: result \"%i\"\n", result.content);
+        numDone++;
+        if (numDone == numExpectedDone) Terminator::setTerminating();
+    });
+    allRed.exclusivePrefixSum(reductionCallCounter++, myContrib, [&](auto& results) {
+        assert(results.size() == 1);
+        auto& result = results.front();
+        LOG(V2_INFO, "ExclusivePrefixSum done: result \"%i\"\n", result.content);
+        numDone++;
+        if (numDone == numExpectedDone) Terminator::setTerminating();
+    });
+    allRed.inclAndExclPrefixSum(reductionCallCounter++, myContrib, [&](auto& results) {
+        assert(results.size() == 2);
+        LOG(V2_INFO, "InclExclPrefixSum done: result {%i,%i}\n", results.front().content, results.back().content);
+        numDone++;
+        if (numDone == numExpectedDone) Terminator::setTerminating();
+    });
+    allRed.inclAndExclPrefixSumWithTotal(reductionCallCounter++, myContrib, [&](auto& results) {
+        assert(results.size() == 3);
+        auto it = results.begin();
+        int excl = it->content; ++it;
+        int incl = it->content; ++it;
+        int total = it->content;
+        LOG(V2_INFO, "InclExclTotalPrefixSum done: result {%i,%i,%i}\n", excl, incl, total);
+        numDone++;
+        if (numDone == numExpectedDone) Terminator::setTerminating();
+    });
+
+    // Poll message queue until everything is done
+    while (!Terminator::isTerminating() || q.hasOpenSends()) q.advance();
+}
+
+void testStringPrefixSum() {
+
+    MPI_Comm comm = MPI_COMM_WORLD;
+    int rank = MyMpi::rank(comm);
+    auto& q = MyMpi::getMessageQueue();
+    Terminator::reset();
+
+    // Create all-reduction object
+    AsyncCollective<ReduceableString> allRed(comm, q, reductionInstanceCounter++);
+
+    MPI_Barrier(MPI_COMM_WORLD); // ensure all processes have a registered callback
+    
+    // Local object to contribute
+    ReduceableString myContrib("{" + std::to_string(rank) + "}");
+    int numDone = 0; int numExpectedDone = 4;
+    // Initiate prefix sums
+    allRed.inclusivePrefixSum(reductionCallCounter++, myContrib, [&](auto& results) {
+        assert(results.size() == 1);
+        auto& result = results.front();
+        LOG(V2_INFO, "InclusivePrefixSum done: result \"%s\"\n", result.content.c_str());
+        numDone++;
+        if (numDone == numExpectedDone) Terminator::setTerminating();
+    });
+    allRed.exclusivePrefixSum(reductionCallCounter++, myContrib, [&](auto& results) {
+        assert(results.size() == 1);
+        auto& result = results.front();
+        LOG(V2_INFO, "ExclusivePrefixSum done: result \"%s\"\n", result.content.c_str());
+        numDone++;
+        if (numDone == numExpectedDone) Terminator::setTerminating();
+    });
+    allRed.inclAndExclPrefixSum(reductionCallCounter++, myContrib, [&](auto& results) {
+        assert(results.size() == 2);
+        LOG(V2_INFO, "InclExclPrefixSum done: result {%s,%s}\n", results.front().content.c_str(), results.back().content.c_str());
+        numDone++;
+        if (numDone == numExpectedDone) Terminator::setTerminating();
+    });
+    allRed.inclAndExclPrefixSumWithTotal(reductionCallCounter++, myContrib, [&](auto& results) {
+        assert(results.size() == 3);
+        auto it = results.begin();
+        std::string excl = it->content; ++it;
+        std::string incl = it->content; ++it;
+        std::string total = it->content;
+        LOG(V2_INFO, "InclExclTotalPrefixSum done: result {%s,%s,%s}\n", excl.c_str(), incl.c_str(), total.c_str());
+        numDone++;
+        if (numDone == numExpectedDone) Terminator::setTerminating();
+    });
 
     // Poll message queue until everything is done
     while (!Terminator::isTerminating() || q.hasOpenSends()) q.advance();
@@ -313,6 +422,8 @@ int main(int argc, char *argv[]) {
     testMultipleAllReductionCalls();
     testMultipleAllReductionInstances();
     testMultipleAllReductionInstancesAndCalls();
+    testIntegerPrefixSum();
+    testStringPrefixSum();
 
     // Exit properly
     MPI_Barrier(MPI_COMM_WORLD);
