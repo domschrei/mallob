@@ -52,8 +52,8 @@ private:
 
     // Serializable struct for an ID-qualified list of reduceables
     struct ReduceableList : public Serializable {
-        int instanceId;
-        int callId;
+        int instanceId {-1};
+        int callId {-1};
         int contributionId {0};
         std::list<T> items;
         virtual std::vector<uint8_t> serialize() const override {

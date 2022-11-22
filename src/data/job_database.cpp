@@ -197,7 +197,7 @@ void JobDatabase::commit(JobRequest& req) {
         // Also reserves a PE of space for this job in case this is a root node
         preregisterJobInBalancer(req.jobId);
 
-        if (_coll_assign) _coll_assign->setStatusDirty();
+        if (_req_matcher) _req_matcher->setStatusDirty();
     }
 }
 
@@ -260,7 +260,7 @@ void JobDatabase::uncommit(int jobId) {
         LOG(V3_VERB, "UNCOMMIT %s\n", get(jobId).toStr());
         get(jobId).uncommit();
         _has_commitment = false;
-        if (_coll_assign) _coll_assign->setStatusDirty();
+        if (_req_matcher) _req_matcher->setStatusDirty();
     }
 }
 
@@ -271,7 +271,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
     
     // Already have another commitment?
     if (_has_commitment) {
-        if (_coll_assign) _coll_assign->setStatusDirty();
+        if (_req_matcher) _req_matcher->setStatusDirty();
         return REJECT;
     }
 
@@ -296,13 +296,13 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
         if (req.requestedNodeIndex > 0) {
             // Explicitly avoid to adopt a non-root node of the job of which I have a dormant root
             // (commit would overwrite job index!)
-            if (_coll_assign) _coll_assign->setStatusDirty();
+            if (_req_matcher) _req_matcher->setStatusDirty();
             return REJECT;
         }
     } else {
         if (hasDormantRoot() && req.requestedNodeIndex == 0) {
             // Cannot adopt a root node while there is still another dormant root here
-            if (_coll_assign) _coll_assign->setStatusDirty();
+            if (_req_matcher) _req_matcher->setStatusDirty();
             return REJECT;
         }
     }
@@ -314,7 +314,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
         else if (hasDormantJob(req.jobId)) {
             return ADOPT_FROM_IDLE;
         } else {
-            if (_coll_assign) _coll_assign->setStatusDirty();
+            if (_req_matcher) _req_matcher->setStatusDirty();
             return REJECT;
         }
     }
@@ -350,7 +350,7 @@ JobDatabase::AdoptionResult JobDatabase::tryAdopt(const JobRequest& req, JobRequ
         }
     }
 
-    if (_coll_assign) _coll_assign->setStatusDirty();
+    if (_req_matcher) _req_matcher->setStatusDirty();
     return REJECT;
 }
 
@@ -566,7 +566,7 @@ void JobDatabase::setLoad(int load, int whichJobId) {
         float timeBusy = Timer::elapsedSeconds() - _time_of_last_adoption;
         _total_busy_time += timeBusy;
     }
-    if (_coll_assign) _coll_assign->setStatusDirty();
+    if (_req_matcher) _req_matcher->setStatusDirty();
 }
 
 bool JobDatabase::hasActiveJob() const {

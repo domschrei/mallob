@@ -9,7 +9,7 @@
 #include "job_transfer.hpp"
 #include "balancing/event_driven_balancer.hpp"
 #include "util/sys/background_worker.hpp"
-#include "balancing/collective_assignment.hpp"
+#include "balancing/request_matcher.hpp"
 #include "data/worker_sysstate.hpp"
 #include "scheduling/local_scheduler.hpp"
 
@@ -25,7 +25,7 @@ private:
     MPI_Comm& _comm;
     std::unique_ptr<EventDrivenBalancer> _balancer;
     robin_hood::unordered_map<int, int> _current_volumes;
-    CollectiveAssignment* _coll_assign = nullptr;
+    RequestMatcher* _req_matcher = nullptr;
 
     std::atomic_int _num_stored_jobs = 0;
     robin_hood::unordered_map<int, Job*> _jobs;
@@ -69,7 +69,7 @@ private:
 public:
     JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sysstate);
     ~JobDatabase();
-    void setCollectiveAssignment(CollectiveAssignment& collAssign) {_coll_assign = &collAssign;}
+    void setRequestMatcher(RequestMatcher& reqMatcher) {_req_matcher = &reqMatcher;}
 
     Job& createJob(int commSize, int worldRank, int jobId, int applicationId, bool incremental);
     bool appendRevision(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source);

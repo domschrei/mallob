@@ -20,6 +20,8 @@
 #include "util/random.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/sys/thread_pool.hpp"
+#include "balancing/routing_tree_request_matcher.hpp"
+#include "balancing/prefix_sum_request_matcher.hpp"
 
 Worker::Worker(MPI_Comm comm, Parameters& params) :
     _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
@@ -111,7 +113,7 @@ void Worker::init() {
     q.registerCallback(MSG_SEND_JOB_DESCRIPTION, 
         [&](auto& h) {handleSendJobDescription(h);});
     q.registerCallback(MSG_NOTIFY_ASSIGNMENT_UPDATE, 
-        [&](auto& h) {_coll_assign.handle(h);});
+        [&](auto& h) {_req_matcher->handle(h);});
     q.registerCallback(MSG_SCHED_RELEASE_FROM_WAITING, 
         [&](auto& h) {handleSchedReleaseFromWaiting(h);});
     q.registerCallback(MSG_SCHED_NODE_FREED, 
@@ -172,21 +174,27 @@ void Worker::createExpanderGraph() {
     auto permutations = AdjustablePermutation::getPermutations(numWorkers, numBounceAlternatives);
     _hop_destinations = AdjustablePermutation::createExpanderGraph(permutations, _world_rank);
     if (_params.hopsUntilCollectiveAssignment() >= 0) {
-        
-        // Create collective assignment structure
-        _coll_assign = CollectiveAssignment(
-            _job_db, MyMpi::size(_comm), 
-            AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, _world_rank),
-            // Callback for receiving a job request
-            [&](const JobRequest& req, int rank) {
-                MessageHandle handle;
-                handle.tag = MSG_REQUEST_NODE;
-                handle.finished = true;
-                handle.receiveSelfMessage(req.serialize(), rank);
-                handleRequestNode(handle, JobDatabase::NORMAL);
-            }
-        );
-        _job_db.setCollectiveAssignment(_coll_assign);
+        // Create request matcher
+        // Callback for receiving a job request
+        auto cbReceiveRequest = [&](const JobRequest& req, int rank) {
+            MessageHandle handle;
+            handle.tag = MSG_REQUEST_NODE;
+            handle.finished = true;
+            handle.receiveSelfMessage(req.serialize(), rank);
+            handleRequestNode(handle, JobDatabase::NORMAL);
+        };
+        if (_params.prefixSumMatching()) {
+            // Prefix sum based request matcher
+            _req_matcher.reset(new PrefixSumRequestMatcher(_job_db, _comm, cbReceiveRequest));
+        } else {
+            // Routing tree based request matcher
+            _req_matcher.reset(new RoutingTreeRequestMatcher(
+                _job_db, _comm, 
+                AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, _world_rank),
+                cbReceiveRequest
+            ));
+        }
+        _job_db.setRequestMatcher(*_req_matcher.get());
     }
 
     // Output found bounce alternatives
@@ -220,7 +228,7 @@ void Worker::advance(float time) {
         // Advance collective assignment of nodes
         if (_params.hopsUntilCollectiveAssignment() >= 0) {
             _watchdog.setActivity(Watchdog::COLLECTIVE_ASSIGNMENT);
-            _coll_assign.advance(_job_db.getGlobalBalancingEpoch());
+            _req_matcher->advance(_job_db.getGlobalBalancingEpoch());
         }
     }
 
@@ -611,7 +619,7 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
     if (_job_db.isRequestObsolete(req)) {
         LOG_ADD_SRC(V3_VERB, "DISCARD %s mode=%i", handle.source, 
                 req.toStr().c_str(), mode);
-        if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
+        if (_params.hopsUntilCollectiveAssignment() >= 0) _req_matcher->setStatusDirty();
         return;
     }
 
@@ -633,7 +641,7 @@ void Worker::handleRequestNode(MessageHandle& handle, JobDatabase::JobRequestMod
     if (_params.reactivationScheduling() && mode == JobDatabase::TARGETED_REJOIN) {
         // Mark job as having been notified of the current scheduling and that it is not further needed.
         if (_job_db.has(req.jobId)) _job_db.get(req.jobId).getJobTree().stopWaitingForReactivation(req.balancingEpoch);
-        if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
+        if (_params.hopsUntilCollectiveAssignment() >= 0) _req_matcher->setStatusDirty();
     }
 
     tryAdoptRequest(req, handle.source, mode);
@@ -987,7 +995,7 @@ void Worker::handleSchedReleaseFromWaiting(MessageHandle& handle) {
             (_job_db.get(jobId).getState() != INACTIVE || _job_db.get(jobId).hasCommitment())) {
         // Job present: release this worker from waiting for that job
         _job_db.get(jobId).getJobTree().stopWaitingForReactivation(epoch);
-        if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
+        if (_params.hopsUntilCollectiveAssignment() >= 0) _req_matcher->setStatusDirty();
     } else {
         // Job not present any more: Let sender know
         MyMpi::isend(handle.source, MSG_SCHED_NODE_FREED, IntVec({jobId, _world_rank, index, epoch}));
@@ -1024,7 +1032,7 @@ void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
     // and if either reactivation scheduling is employed or the requested node is non-root
     if (_params.hopsUntilCollectiveAssignment() >= 0 && num >= _params.hopsUntilCollectiveAssignment()
         && (_params.reactivationScheduling() || request.requestedNodeIndex > 0)) {
-        _coll_assign.addJobRequest(request);
+        _req_matcher->addJobRequest(request);
         return;
     }
 
@@ -1117,7 +1125,7 @@ job.toStr(), volume, balancingEpoch, tree.getBalancingEpochOfLastRequests(), eve
     
     if (job.getState() == ACTIVE || job.hasCommitment()) {
 
-        if (_params.hopsUntilCollectiveAssignment() >= 0) _coll_assign.setStatusDirty();
+        if (_params.hopsUntilCollectiveAssignment() >= 0) _req_matcher->setStatusDirty();
 
         // Root of a job updated for the 1st time
         if (tree.isRoot()) {

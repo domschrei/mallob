@@ -17,7 +17,7 @@
 #include "data/worker_sysstate.hpp"
 #include "comm/distributed_bfs.hpp"
 #include "util/sys/background_worker.hpp"
-#include "balancing/collective_assignment.hpp"
+#include "balancing/request_matcher.hpp"
 #include "util/periodic_event.hpp"
 #include "util/sys/watchdog.hpp"
 #include "comm/host_comm.hpp"
@@ -37,7 +37,7 @@ private:
     WorkerSysState _sys_state;
 
     std::vector<int> _hop_destinations;
-    CollectiveAssignment _coll_assign;
+    std::unique_ptr<RequestMatcher> _req_matcher;
 
     long long _iteration = 0;
     PeriodicEvent<1000> _periodic_stats_check;

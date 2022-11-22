@@ -64,6 +64,7 @@ OPTION_GROUP(grpScheduling, "scheduling", "Scheduling")
  OPT_INT(jobCacheSize,                    "jc", "job-cache-size",                      4,    0, LARGE_INT,      "Size of job cache per PE for suspended yet unfinished job nodes")
  OPT_FLOAT(loadFactor,                    "l", "load-factor",                          1,    0, 1,              "The share of PEs which should be busy at any given time")
  OPT_INT(numBounceAlternatives,           "ba", "bounce-alternatives",                 4,    1, LARGE_INT,      "Number of bounce alternatives per PE (only relevant if -derandomize)")
+ OPT_BOOL(prefixSumMatching,              "prisma", "prefix-sum-matching",             false,                   "Match requests and idle PEs using prefix sums instead of a routing tree")
 
 ///////////////////////////////////////////////////////////////////////
 
