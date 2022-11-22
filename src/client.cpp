@@ -251,11 +251,10 @@ void Client::init() {
     });
 
     // Set up callbacks for client-specific MPI messages
-    auto& q = MyMpi::getMessageQueue();
-    q.registerCallback(MSG_NOTIFY_JOB_DONE, [&](MessageHandle& h) {handleJobDone(h);});
-    q.registerCallback(MSG_SEND_JOB_RESULT, [&](MessageHandle& h) {handleSendJobResult(h);});
-    q.registerCallback(MSG_NOTIFY_CLIENT_JOB_ABORTING, [&](MessageHandle& h) {handleAbort(h);});
-    q.registerCallback(MSG_OFFER_ADOPTION_OF_ROOT, [&](MessageHandle& h) {handleOfferAdoption(h);});
+    _subscriptions.emplace_back(MSG_NOTIFY_JOB_DONE, [&](auto& h) {handleJobDone(h);});
+    _subscriptions.emplace_back(MSG_SEND_JOB_RESULT, [&](auto& h) {handleSendJobResult(h);});
+    _subscriptions.emplace_back(MSG_NOTIFY_CLIENT_JOB_ABORTING, [&](auto& h) {handleAbort(h);});
+    _subscriptions.emplace_back(MSG_OFFER_ADOPTION_OF_ROOT, [&](auto& h) {handleOfferAdoption(h);});
 }
 
 int Client::getInternalRank() {

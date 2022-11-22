@@ -20,6 +20,7 @@
 #include "interface/api/job_streamer.hpp"
 #include "comm/host_comm.hpp"
 #include "data/job_transfer.hpp"
+#include "comm/message_subscription.hpp"
 
 #include "app/register_includes.h"
 
@@ -96,7 +97,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
     
     // Register global callback for exiting msg (not specific to worker nor client)
-    MyMpi::getMessageQueue().registerCallback(MSG_DO_EXIT, [myRank](MessageHandle& h) {
+    MessageSubscription exitSubscription(MSG_DO_EXIT, [myRank](MessageHandle& h) {
         LOG_ADD_SRC(V3_VERB, "Received exit signal", h.source);
 
         // Forward exit signal

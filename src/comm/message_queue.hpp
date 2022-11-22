@@ -20,7 +20,11 @@ typedef std::unique_ptr<std::vector<uint8_t>> UniqueDataPtr;
 typedef std::shared_ptr<const std::vector<uint8_t>> ConstDataPtr; 
 
 class MessageQueue {
-    
+
+public:
+    typedef std::function<void(MessageHandle&)> MsgCallback;
+    typedef std::function<void(int)> SendDoneCallback;
+
 private:
     struct ReceiveFragment {
         
@@ -273,8 +277,6 @@ private:
     std::list<DataPtr> _garbage_queue;
 
     // Callbacks
-    typedef std::function<void(MessageHandle&)> MsgCallback;
-    typedef std::function<void(int)> SendDoneCallback;
     robin_hood::unordered_map<int, std::list<MsgCallback>> _callbacks;
     robin_hood::unordered_map<int, SendDoneCallback> _send_done_callbacks;
     int _default_tag_var = 0;

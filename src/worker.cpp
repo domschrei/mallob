@@ -72,53 +72,53 @@ void Worker::init() {
     });
 
     // Begin listening to incoming messages
-    q.registerCallback(MSG_ANSWER_ADOPTION_OFFER,
+    _subscriptions.emplace_back(MSG_ANSWER_ADOPTION_OFFER,
         [&](auto& h) {handleAnswerAdoptionOffer(h);});
-    q.registerCallback(MSG_NOTIFY_JOB_ABORTING, 
+    _subscriptions.emplace_back(MSG_NOTIFY_JOB_ABORTING, 
         [&](auto& h) {handleNotifyJobAborting(h);});
-    q.registerCallback(MSG_NOTIFY_JOB_TERMINATING, 
+    _subscriptions.emplace_back(MSG_NOTIFY_JOB_TERMINATING, 
         [&](auto& h) {handleNotifyJobTerminating(h);});
-    q.registerCallback(MSG_NOTIFY_RESULT_FOUND, 
+    _subscriptions.emplace_back(MSG_NOTIFY_RESULT_FOUND, 
         [&](auto& h) {handleNotifyResultFound(h);});
-    q.registerCallback(MSG_INCREMENTAL_JOB_FINISHED,
+    _subscriptions.emplace_back(MSG_INCREMENTAL_JOB_FINISHED,
         [&](auto& h) {handleIncrementalJobFinished(h);});
-    q.registerCallback(MSG_INTERRUPT,
+    _subscriptions.emplace_back(MSG_INTERRUPT,
         [&](auto& h) {handleInterrupt(h);});
-    q.registerCallback(MSG_NOTIFY_NODE_LEAVING_JOB, 
+    _subscriptions.emplace_back(MSG_NOTIFY_NODE_LEAVING_JOB, 
         [&](auto& h) {handleNotifyNodeLeavingJob(h);});
-    q.registerCallback(MSG_NOTIFY_RESULT_OBSOLETE, 
+    _subscriptions.emplace_back(MSG_NOTIFY_RESULT_OBSOLETE, 
         [&](auto& h) {handleNotifyResultObsolete(h);});
-    q.registerCallback(MSG_NOTIFY_VOLUME_UPDATE, 
+    _subscriptions.emplace_back(MSG_NOTIFY_VOLUME_UPDATE, 
         [&](auto& h) {handleNotifyVolumeUpdate(h);});
-    q.registerCallback(MSG_OFFER_ADOPTION, 
+    _subscriptions.emplace_back(MSG_OFFER_ADOPTION, 
         [&](auto& h) {handleOfferAdoption(h);});
-    q.registerCallback(MSG_QUERY_JOB_DESCRIPTION,
+    _subscriptions.emplace_back(MSG_QUERY_JOB_DESCRIPTION,
         [&](auto& h) {handleQueryJobDescription(h);});
-    q.registerCallback(MSG_QUERY_JOB_RESULT, 
+    _subscriptions.emplace_back(MSG_QUERY_JOB_RESULT, 
         [&](auto& h) {handleQueryJobResult(h);});
-    q.registerCallback(MSG_QUERY_VOLUME, 
+    _subscriptions.emplace_back(MSG_QUERY_VOLUME, 
         [&](auto& h) {handleQueryVolume(h);});
-    q.registerCallback(MSG_REJECT_ONESHOT, 
+    _subscriptions.emplace_back(MSG_REJECT_ONESHOT, 
         [&](auto& h) {handleRejectOneshot(h);});
-    q.registerCallback(MSG_REQUEST_NODE, 
+    _subscriptions.emplace_back(MSG_REQUEST_NODE, 
         [&](auto& h) {handleRequestNode(h, JobDatabase::JobRequestMode::NORMAL);});
-    q.registerCallback(MSG_REQUEST_NODE_ONESHOT, 
+    _subscriptions.emplace_back(MSG_REQUEST_NODE_ONESHOT, 
         [&](auto& h) {handleRequestNode(h, JobDatabase::JobRequestMode::TARGETED_REJOIN);});
-    q.registerCallback(MSG_SEND_APPLICATION_MESSAGE, 
+    _subscriptions.emplace_back(MSG_SEND_APPLICATION_MESSAGE, 
         [&](auto& h) {handleSendApplicationMessage(h);});
-    q.registerCallback(MSG_JOB_TREE_REDUCTION, 
+    _subscriptions.emplace_back(MSG_JOB_TREE_REDUCTION, 
         [&](auto& h) {handleSendApplicationMessage(h);});
-    q.registerCallback(MSG_JOB_TREE_BROADCAST, 
+    _subscriptions.emplace_back(MSG_JOB_TREE_BROADCAST, 
         [&](auto& h) {handleSendApplicationMessage(h);});
-    q.registerCallback(MSG_SEND_JOB_DESCRIPTION, 
+    _subscriptions.emplace_back(MSG_SEND_JOB_DESCRIPTION, 
         [&](auto& h) {handleSendJobDescription(h);});
-    q.registerCallback(MSG_NOTIFY_ASSIGNMENT_UPDATE, 
+    _subscriptions.emplace_back(MSG_NOTIFY_ASSIGNMENT_UPDATE, 
         [&](auto& h) {_req_matcher->handle(h);});
-    q.registerCallback(MSG_SCHED_RELEASE_FROM_WAITING, 
+    _subscriptions.emplace_back(MSG_SCHED_RELEASE_FROM_WAITING, 
         [&](auto& h) {handleSchedReleaseFromWaiting(h);});
-    q.registerCallback(MSG_SCHED_NODE_FREED, 
+    _subscriptions.emplace_back(MSG_SCHED_NODE_FREED, 
         [&](auto& h) {handleSchedNodeFreed(h);});
-    q.registerCallback(MSG_WARMUP, [&](auto& h) {
+    _subscriptions.emplace_back(MSG_WARMUP, [&](auto& h) {
         LOG_ADD_SRC(V4_VVER, "Received warmup msg", h.source);
     });
     
@@ -126,9 +126,9 @@ void Worker::init() {
     auto balanceCb = [&](MessageHandle& handle) {
         _job_db.handleBalancingMessage(handle);
     };
-    q.registerCallback(MSG_COLLECTIVE_OPERATION, balanceCb);
-    q.registerCallback(MSG_REDUCE_DATA, balanceCb);
-    q.registerCallback(MSG_BROADCAST_DATA, balanceCb);
+    _subscriptions.emplace_back(MSG_COLLECTIVE_OPERATION, balanceCb);
+    _subscriptions.emplace_back(MSG_REDUCE_DATA, balanceCb);
+    _subscriptions.emplace_back(MSG_BROADCAST_DATA, balanceCb);
     
     // Local scheduler message handling
     auto localSchedulerCb = [&](MessageHandle& handle) {
@@ -143,8 +143,8 @@ void Worker::init() {
             MyMpi::isend(handle.source, MSG_SCHED_RETURN_NODES, update);
         }
     };
-    q.registerCallback(MSG_SCHED_INITIALIZE_CHILD_WITH_NODES, localSchedulerCb);
-    q.registerCallback(MSG_SCHED_RETURN_NODES, localSchedulerCb);
+    _subscriptions.emplace_back(MSG_SCHED_INITIALIZE_CHILD_WITH_NODES, localSchedulerCb);
+    _subscriptions.emplace_back(MSG_SCHED_RETURN_NODES, localSchedulerCb);
 
     // Send warm-up messages with your pseudorandom bounce destinations
     if (_params.derandomize() && _params.warmup()) {

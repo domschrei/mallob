@@ -21,6 +21,7 @@
 #include "util/periodic_event.hpp"
 #include "util/sys/watchdog.hpp"
 #include "comm/host_comm.hpp"
+#include "comm/message_subscription.hpp"
 
 /*
 Primary actor in the system who is responsible for participating in the scheduling and execution of jobs.
@@ -32,6 +33,8 @@ private:
     MPI_Comm _comm;
     int _world_rank;
     Parameters& _params;
+
+    std::list<MessageSubscription> _subscriptions;
 
     JobDatabase _job_db;
     WorkerSysState _sys_state;

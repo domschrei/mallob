@@ -5,6 +5,7 @@
 #include "mympi.hpp"
 #include "util/tsl/robin_map.h"
 #include "util/sys/timer.hpp"
+#include "message_subscription.hpp"
 
 // T must be a subclass of Reduceable (see data/reduceable.hpp).
 // An arbitrary number of collective operations can be performed with a single instance of this class.
@@ -21,7 +22,7 @@ private:
     MPI_Comm _comm;
     MessageQueue& _msg_q;
     // References for the message callbacks which need to be deleted at destruction
-    std::list<std::pair<int, MessageQueue::CallbackRef>> _cb_refs;
+    std::list<MessageSubscription> _subscriptions;
     // ID which all corresponding AsyncCollective instances across the MPI processes share
     int _instance_id;
 
@@ -161,16 +162,9 @@ public:
 
         // Register callbacks in message queue
         auto tags = {MSG_ASYNC_COLLECTIVE_UP, MSG_ASYNC_COLLECTIVE_DOWN, 
-            MSG_ASYNC_SPARSE_COLLECTIVE_UP, MSG_ASYNC_SPARSE_COLLECTIVE_DOWN};
+            MSG_ASYNC_SPARSE_COLLECTIVE_UP, MSG_ASYNC_SPARSE_COLLECTIVE_DOWN};        
         for (int tag : tags) {
-            _cb_refs.emplace_back(tag, msgQ.registerCallback(tag, [&](auto& h) {handle(h);}));
-        }
-    }
-
-    ~AsyncCollective() {
-        // Clear callbacks in message queue (to avoid "dangling lambdas")
-        for (auto& [tag, ref] : _cb_refs) {
-            _msg_q.clearCallback(tag, ref);
+            _subscriptions.emplace_back(tag, [&](auto& h) {handle(h);});
         }
     }
 

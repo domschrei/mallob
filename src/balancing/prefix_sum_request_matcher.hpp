@@ -4,6 +4,7 @@
 #include "request_matcher.hpp"
 #include "comm/async_collective.hpp"
 #include "data/job_transfer.hpp"
+#include "comm/message_subscription.hpp"
 
 class PrefixSumRequestMatcher : public RequestMatcher {
 
@@ -56,8 +57,7 @@ private:
     PrefixSumElement _last_contributed_elem;
     int _last_contributed_epoch {-1};
 
-    MessageQueue::CallbackRef _cb_ref_idle_token;
-    MessageQueue::CallbackRef _cb_ref_request;
+    std::list<MessageSubscription> _subscriptions;
 
 public:
     PrefixSumRequestMatcher(JobDatabase& jobDb, MPI_Comm comm, 
@@ -74,16 +74,10 @@ public:
             digestPrefixSumResult(excl, incl, total);
         });
 
-        _cb_ref_idle_token = MyMpi::getMessageQueue().registerCallback(MSG_MATCHING_SEND_IDLE_TOKEN, 
-            [&](auto& h) {handle(h);});
-        _cb_ref_request = MyMpi::getMessageQueue().registerCallback(MSG_MATCHING_SEND_REQUEST, 
-            [&](auto& h) {handle(h);});
+        _subscriptions.emplace_back(MSG_MATCHING_SEND_IDLE_TOKEN, [&](auto& h) {handle(h);});
+        _subscriptions.emplace_back(MSG_MATCHING_SEND_REQUEST, [&](auto& h) {handle(h);});
         
         _my_rank = MyMpi::rank(comm);
-    }
-    virtual ~PrefixSumRequestMatcher() {
-        MyMpi::getMessageQueue().clearCallback(MSG_MATCHING_SEND_IDLE_TOKEN, _cb_ref_idle_token);
-        MyMpi::getMessageQueue().clearCallback(MSG_MATCHING_SEND_REQUEST, _cb_ref_request);
     }
 
     virtual void addJobRequest(JobRequest& request) override {
@@ -93,19 +87,19 @@ public:
     virtual void handle(MessageHandle& h) override {
 
         if (h.tag == MSG_MATCHING_SEND_IDLE_TOKEN) {
-            _idles_to_match.push_back(Serializable::get<IntVec>(h.getRecvData())[0]);
+            _idles_to_match.insert(Serializable::get<IntVec>(h.getRecvData())[0]);
         }
         if (h.tag == MSG_MATCHING_SEND_REQUEST) {
             _requests_to_match.push_back(Serializable::get<JobRequest>(h.getRecvData()));
         }
 
         while (!_idles_to_match.empty() && !_requests_to_match.empty()) {
-            auto idleRank = _idles_to_match.front(); 
-            _idles_to_match.pop_front();
+            //auto idleRank = _idles_to_match.pop 
+            //_idles_to_match.pop_front();
             auto request = std::move(_requests_to_match.front()); 
             _requests_to_match.pop_front();
 
-            MyMpi::isend(idleRank, MSG_REQUEST_NODE, request);
+            //MyMpi::isend(idleRank, MSG_REQUEST_NODE, request);
         }
     }
 
@@ -172,8 +166,8 @@ private:
                 setStatusDirty();
                 break;
             }
-            IntVec token({MyMpi::rank(MPI_COMM_WORLD)});
-            MyMpi::isend(dest, MSG_MATCHING_SEND_IDLE_TOKEN, token);
+            IntVec tokenVec({MyMpi::rank(MPI_COMM_WORLD)});
+            MyMpi::isend(dest, MSG_MATCHING_SEND_IDLE_TOKEN, tokenVec);
         }
 
         // Forward requests
