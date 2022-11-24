@@ -63,7 +63,7 @@ public:
             int incl = it->content; ++it;
             int total = it->content; ++it;
             int id = _collective.getNumReceivedResults();
-            LOG(V5_DEBG, "PRISMA recv prefix sum #%i - requests (%i,%i,%i)\n", id, excl, incl, total);
+            LOG(V5_DEBG, "PRISMA recv prefix sum X%i - requests (%i,%i,%i)\n", id, excl, incl, total);
             _events.insert(BroadcastEvent{CALL_ID_REQUESTS, id, excl, incl, total});
         });
         _collective.initializeDifferentialSparsePrefixSum(CALL_ID_IDLES, 
@@ -73,7 +73,7 @@ public:
             int incl = it->content; ++it;
             int total = it->content; ++it;
             int id = _collective.getNumReceivedResults();
-            LOG(V5_DEBG, "PRISMA recv prefix sum #%i - idles (%i,%i,%i)\n", id, excl, incl, total);
+            LOG(V5_DEBG, "PRISMA recv prefix sum X%i - idles (%i,%i,%i)\n", id, excl, incl, total);
             _events.insert(BroadcastEvent{CALL_ID_IDLES, id, excl, incl, total});
         });
 
@@ -173,28 +173,32 @@ private:
 
     void tryMatch() {
 
-        // TODO Skip indices where you are not involved. Something like this:
-        // int stepsUntilLocalIdle = _last_idles_excl > _last_idles_matched ? _last_idles_excl - _last_idles_matched : 0;
-        // int stepsUntilLocalReq = std::max(0, _indexed_requests.empty() ? MyMpi::size(_comm) : _indexed_requests.front().first - _last_requests_matched);
+        skipMatchingStepsWithoutLocalContribution();
 
         // Use the indexed requests and the most recent prefix sum result.
         while (!doneMatching()) {
-            // A request and an idle rank can be matched!
 
+            // A request and an idle rank can be matched!
             int idlePrefixSumIndex = _last_idles_matched;
             int requestPrefixSumIndex = _requests_indexing_offset + _last_requests_matched;
             int destinationRank = _running_rank_to_perform_match % MyMpi::size(_comm);
 
-            LOG(V4_VVER, "PRISMA matching idle #%i and request #%i to rank %i\n", 
+            LOG(V4_VVER, "PRISMA matching idle I%i and request Q%i to rank %i\n", 
                 idlePrefixSumIndex, requestPrefixSumIndex, destinationRank);
 
-            if (!_indexed_requests.empty() && _indexed_requests.front().first == requestPrefixSumIndex) {
-                // THIS request is the one to be matched
-                auto [index, req] = _indexed_requests.front();
-                _indexed_requests.pop_front();
+            bool hadLocalContribution = false;
 
-                // send request
-                MyMpi::isend(destinationRank, MSG_MATCHING_SEND_REQUEST, req);
+            if (!_indexed_requests.empty()) {
+                assert(_indexed_requests.front().first >= requestPrefixSumIndex);
+                if (_indexed_requests.front().first == requestPrefixSumIndex) {
+                    // THIS request is the one to be matched
+                    auto [index, req] = _indexed_requests.front();
+                    _indexed_requests.pop_front();
+
+                    // send request
+                    MyMpi::isend(destinationRank, MSG_MATCHING_SEND_REQUEST, req);
+                    hadLocalContribution = true;
+                }
             }
 
             if (_last_idles_matched >= _last_idles_excl && _last_idles_matched < _last_idles_incl) {
@@ -203,12 +207,46 @@ private:
                 // send this rank
                 IntVec idleVec({_my_rank});
                 MyMpi::isend(destinationRank, MSG_MATCHING_SEND_IDLE_TOKEN, idleVec);
+                hadLocalContribution = true;
             }
 
+            assert(hadLocalContribution);
+
+            // Go to next step
             _last_idles_matched++;
             _last_requests_matched++;
             _running_rank_to_perform_match++;
+
+            // skip any non-local steps
+            skipMatchingStepsWithoutLocalContribution();
         }
+    }
+
+    void skipMatchingStepsWithoutLocalContribution() {
+
+        // How many steps until there is a local relevant request?        
+        bool hasRequestContribution = !_indexed_requests.empty();
+        int skippableStepsForRequests = hasRequestContribution ? 
+            _indexed_requests.front().first - (_requests_indexing_offset + _last_requests_matched) 
+            : std::numeric_limits<int>::max();
+        assert(skippableStepsForRequests >= 0);
+        skippableStepsForRequests = std::min(skippableStepsForRequests, _last_requests_total-_last_requests_matched);
+
+        // How many steps until there is a local relevant idle rank?
+        bool hasIdleContribution = _last_idles_excl < _last_idles_incl;
+        int skippableStepsForIdles = hasIdleContribution && _last_idles_matched < _last_idles_incl ?
+            std::max(_last_idles_matched, _last_idles_excl) - _last_idles_matched
+            : std::numeric_limits<int>::max();
+        assert(skippableStepsForIdles >= 0);
+        skippableStepsForIdles = std::min(skippableStepsForIdles, _last_idles_total-_last_idles_matched);
+
+        // How many steps can be skipped overall?
+        int skippableSteps = std::min(skippableStepsForIdles, skippableStepsForRequests);
+
+        // Skip.
+        _last_idles_matched += skippableSteps;
+        _last_requests_matched += skippableSteps;
+        _running_rank_to_perform_match += skippableSteps;
     }
 
     bool doneMatching() const {
@@ -233,7 +271,7 @@ private:
             reqIt = _requests_in_prefix_sum.erase(reqIt);
 
             auto reqIndex = _requests_indexing_offset + index;
-            LOG(V4_VVER, "PRISMA indexed #%i : %s\n", reqIndex, req.toStr().c_str());
+            LOG(V4_VVER, "PRISMA indexed Q%i : %s\n", reqIndex, req.toStr().c_str());
             _indexed_requests.emplace_back(reqIndex, std::move(req));
         }
 
