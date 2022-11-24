@@ -40,7 +40,7 @@ private:
     WorkerSysState _sys_state;
 
     std::vector<int> _hop_destinations;
-    std::unique_ptr<RequestMatcher> _req_matcher;
+    std::shared_ptr<RequestMatcher> _req_matcher;
 
     long long _iteration = 0;
     PeriodicEvent<1000> _periodic_stats_check;

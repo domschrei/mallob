@@ -194,7 +194,7 @@ void Worker::createExpanderGraph() {
                 cbReceiveRequest
             ));
         }
-        _job_db.setRequestMatcher(*_req_matcher.get());
+        _job_db.setRequestMatcher(_req_matcher);
     }
 
     // Output found bounce alternatives

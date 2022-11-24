@@ -1,6 +1,5 @@
 
-#ifndef DOMPASCH_MALLOB_JOB_DATABASE_HPP
-#define DOMPASCH_MALLOB_JOB_DATABASE_HPP
+#pragma once
 
 #include <list>
 
@@ -25,7 +24,7 @@ private:
     MPI_Comm& _comm;
     std::unique_ptr<EventDrivenBalancer> _balancer;
     robin_hood::unordered_map<int, int> _current_volumes;
-    RequestMatcher* _req_matcher = nullptr;
+    std::shared_ptr<RequestMatcher> _req_matcher;
 
     std::atomic_int _num_stored_jobs = 0;
     robin_hood::unordered_map<int, Job*> _jobs;
@@ -69,7 +68,7 @@ private:
 public:
     JobDatabase(Parameters& params, MPI_Comm& comm, WorkerSysState& sysstate);
     ~JobDatabase();
-    void setRequestMatcher(RequestMatcher& reqMatcher) {_req_matcher = &reqMatcher;}
+    void setRequestMatcher(std::shared_ptr<RequestMatcher>& reqMatcher) {_req_matcher = reqMatcher;}
 
     Job& createJob(int commSize, int worldRank, int jobId, int applicationId, bool incremental);
     bool appendRevision(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source);
@@ -149,5 +148,3 @@ private:
     void runJanitor();
     
 };
-
-#endif
