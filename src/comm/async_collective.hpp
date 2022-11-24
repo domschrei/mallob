@@ -119,7 +119,6 @@ private:
     tsl::robin_map<int, OperationState> _states_by_id;
 
     struct SparseOperationBundle {
-        float firstContributionTime {-1};
         T contribSelf;
         int contribIdSelf {0};
         T contribLeft;
@@ -137,12 +136,8 @@ private:
                 aggregation.aggregate(contribRight);
             return aggregation;
         }
-        void updateContributionTime(float time) {
-            if (firstContributionTime < 0)
-                firstContributionTime = time;
-        }
         bool hasContributions() const {
-            return firstContributionTime >= 0;
+            return getNumContributions() > 0;
         }
         int getNumContributions() const {
             int num = 0;
@@ -159,6 +154,7 @@ private:
         int contributionIdCounter = 1; // the ID of the contribution *currently in preparation*
         tsl::robin_map<int, SparseOperationBundle> bundlesByContribId;
         float delaySeconds {0};
+        float lastForwardTime {0};
     };
     tsl::robin_map<int, SparseOperationState> _sparse_states_by_id;
 
@@ -273,7 +269,6 @@ public:
         auto& bundle = state.bundlesByContribId[contribId];
         bundle.contribIdSelf = contribId;
         bundle.contribSelf = contribution;
-        bundle.updateContributionTime(Timer::elapsedSeconds());
     }
 
     // Must be called periodically to advance sparse operations.
@@ -290,8 +285,7 @@ public:
             // Is the current bundle ready to be forwarded?
             if (!bundle.hasContributions())
                 continue; // -- no: no contributions yet
-            if (bundle.getNumContributions() < _num_desired_contribs 
-                    && time - bundle.firstContributionTime < state.delaySeconds)
+            if (time - state.lastForwardTime < state.delaySeconds)
                 continue; // -- no: not enough time passed waiting for remaining contribs
             // -- yes!
             
@@ -317,6 +311,7 @@ public:
                 bundle.aggregateContributions(), state.contributionIdCounter);
             // Proceed with next bundle next time
             state.contributionIdCounter++;
+            state.lastForwardTime = time;
         }
 
         _last_time = time;
@@ -396,7 +391,6 @@ private:
                 // Store received data in the found bundle
                 (fromLeftChild ? bundle.contribLeft : bundle.contribRight) = data.items.front();
                 (fromLeftChild ? bundle.contribIdLeft : bundle.contribIdRight) = data.contributionId;
-                bundle.updateContributionTime(Timer::elapsedSeconds());
                 // Perhaps the operation can be advanced now
                 advanceSparseOperations(_last_time);
             }
