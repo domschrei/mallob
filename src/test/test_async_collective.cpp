@@ -13,30 +13,6 @@
 #include "comm/async_collective.hpp"
 #include "util/sys/threading.hpp"
 
-
-// Integer wrapper with addition as an aggregation operation.
-struct ReduceableInt : public Reduceable {
-    int content {0};
-    ReduceableInt() = default;
-    ReduceableInt(int content) : content(content) {}
-    virtual std::vector<uint8_t> serialize() const override {
-        std::vector<uint8_t> result(sizeof(int));
-        memcpy(result.data(), &content, sizeof(int));
-        return result;
-    }
-    virtual ReduceableInt& deserialize(const std::vector<uint8_t>& packed) override {
-        memcpy(&content, packed.data(), sizeof(int));
-        return *this;
-    }
-    virtual void aggregate(const Reduceable& other) {
-        ReduceableInt* otherInt = (ReduceableInt*) &other;
-        content += otherInt->content;
-    }
-    virtual bool isEmpty() const {
-        return content == 0;
-    }
-};
-
 // String wrapper with concatenation as an aggregation operation.
 // Note that this is a non-commutative operation.
 struct ReduceableString : public Reduceable {
@@ -498,6 +474,51 @@ void testSparsePrefixSum() {
     contributor.join();
 }
 
+void testDifferentialSparsePrefixSum() {
+
+    MPI_Comm comm = MPI_COMM_WORLD;
+    int rank = MyMpi::rank(comm);
+    int size = MyMpi::size(comm);
+    auto& q = MyMpi::getMessageQueue();
+    Terminator::reset();
+
+    // Create all-reduction object
+    AsyncCollective<ReduceableInt> allRed(comm, q, reductionInstanceCounter++);
+
+    MPI_Request req = MPI_REQUEST_NULL;
+    allRed.initializeDifferentialSparsePrefixSum(1, /*delay=*/0.1, [&](auto& results) {
+        LOG(V2_INFO, "DiffPS done: %i, total: %i\n", results.front().content, results.back().content);
+        int totalSum = results.back().content;
+        if (totalSum == size * (size-1)) {
+            LOG(V2_INFO, "All DiffPS done\n");
+            MPI_Ibarrier(comm, &req);
+        }
+    });
+    allRed.contributeToSparsePrefixSum(1, ReduceableInt(0));
+
+    MPI_Barrier(MPI_COMM_WORLD); // ensure all processes have a registered callback
+
+    float time = Timer::elapsedSeconds();
+
+    while (!Terminator::isTerminating() || q.hasOpenSends()) {
+        
+        q.advance();
+        allRed.advanceSparseOperations(Timer::elapsedSeconds());
+
+        if (Timer::elapsedSeconds() - time >= rank+1) {
+            allRed.contributeToSparsePrefixSum(1, ReduceableInt{2*rank});
+            time = 99999999;
+        }
+
+        if (req != MPI_REQUEST_NULL) {
+            int flag; MPI_Test(&req, &flag, MPI_STATUS_IGNORE);
+            if (flag) {
+                Terminator::setTerminating();
+            }
+        }
+    }
+}
+
 int main(int argc, char *argv[]) {
 
     MyMpi::init();
@@ -513,6 +534,7 @@ int main(int argc, char *argv[]) {
     params.init(argc, argv);
     MyMpi::setOptions(params);
 
+    /*
     testIntegerSum();
     testStringConcatenation();
     testIntToIntMap();
@@ -522,6 +544,9 @@ int main(int argc, char *argv[]) {
     testIntegerPrefixSum();
     testStringPrefixSum();
     testSparsePrefixSum();
+    */
+
+    testDifferentialSparsePrefixSum();
 
     // Exit properly
     MPI_Barrier(MPI_COMM_WORLD);

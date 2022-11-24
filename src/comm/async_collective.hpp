@@ -56,12 +56,14 @@ private:
         int instanceId {-1};
         int callId {-1};
         int contributionId {0};
+        int resultCounter {0};
         std::list<T> items;
         virtual std::vector<uint8_t> serialize() const override {
-            std::vector<uint8_t> packed(3*sizeof(int));
+            std::vector<uint8_t> packed(4*sizeof(int));
             memcpy(packed.data(), &instanceId, sizeof(int));
             memcpy(packed.data()+sizeof(int), &callId, sizeof(int));
             memcpy(packed.data()+2*sizeof(int), &contributionId, sizeof(int));
+            memcpy(packed.data()+3*sizeof(int), &resultCounter, sizeof(int));
             int packedSize = packed.size();
             for (auto& item : items) {
                 auto serializedItem = item.serialize();
@@ -79,6 +81,7 @@ private:
             memcpy(&instanceId, packed.data()+i, sizeof(int)); i += sizeof(int);
             memcpy(&callId, packed.data()+i, sizeof(int)); i += sizeof(int);
             memcpy(&contributionId, packed.data()+i, sizeof(int)); i += sizeof(int);
+            memcpy(&resultCounter, packed.data()+i, sizeof(int)); i += sizeof(int);
             while (i < packed.size()) {
                 int itemSize;
                 memcpy(&itemSize, packed.data()+i, sizeof(int)); i += sizeof(int);
@@ -121,12 +124,14 @@ private:
         T contribRight;
         int contribIdRight {0};
         T aggregation;
-        T& aggregateContributions() {
-            if (contribIdLeft != 0)
+        bool dirty {false};
+        T& aggregateContributions(bool differential, int numDesiredContribs) {
+            aggregation = T();
+            if ((differential && numDesiredContribs >= 2) || contribIdLeft != 0)
                 aggregation.aggregate(contribLeft);
-            if (contribIdSelf != 0)
+            if (differential || contribIdSelf != 0)
                 aggregation.aggregate(contribSelf);
-            if (contribIdRight != 0)
+            if ((differential && numDesiredContribs >= 3) || contribIdRight != 0)
                 aggregation.aggregate(contribRight);
             return aggregation;
         }
@@ -134,12 +139,16 @@ private:
     struct SparseOperationState {
         int id; // call ID
         ResultCallback cbResult;
+        bool differential;
         int contributionIdCounter = 1; // the ID of the contribution *currently in preparation*
         tsl::robin_map<int, SparseOperationBundle> bundlesByContribId;
         float delaySeconds {0};
         float lastPublicationUpwards {0};
     };
     tsl::robin_map<int, SparseOperationState> _sparse_states_by_id;
+
+    // Counts how many result broadcasts this instance already received
+    int _result_counter {0};
 
 public:
     // @param comm The MPI communicator within which collective operations should be
@@ -216,21 +225,43 @@ public:
     // @param callbackOnResult the function which is called whenever a new result
     // has been received
     void initializeSparsePrefixSum(int callId, float delaySeconds, ResultCallback callbackOnResult) {
-        auto& state = _sparse_states_by_id[callId]; 
+        auto& state = _sparse_states_by_id[callId];
         state.id = callId;
         state.cbResult = callbackOnResult;
+        state.differential = false;
         state.delaySeconds = delaySeconds;
+    }
+
+    // Begin a new sparse prefix sum.
+    // @param callId the ID of this collective operation call
+    // @param delaySeconds the minimum time to wait in between forwarding contributions
+    // @param callbackOnResult the function which is called whenever a new result
+    // has been received
+    void initializeDifferentialSparsePrefixSum(int callId, float delaySeconds, 
+            ResultCallback callbackOnResult) {
+
+        auto& state = _sparse_states_by_id[callId];
+        state.id = callId;
+        state.cbResult = callbackOnResult;
+        state.differential = true;
+        state.delaySeconds = delaySeconds;
+
+        auto& currentBundle = state.bundlesByContribId[0];
+        currentBundle.dirty = true;
     }
 
     // Contribute an element to an ongoing sparse prefix sum.
     void contributeToSparsePrefixSum(int callId, const T& contribution) {
         auto& state = _sparse_states_by_id[callId];
         
-        int contribId = state.contributionIdCounter;
-        while (state.bundlesByContribId[contribId].contribIdSelf != 0)
-            contribId++;
-        
+        int contribId = 0;
+        if (!state.differential) {
+            contribId = state.contributionIdCounter;
+            while (state.bundlesByContribId[contribId].contribIdSelf != 0)
+                contribId++;
+        }
         auto& bundle = state.bundlesByContribId[contribId];
+        bundle.dirty = true;
         bundle.contribIdSelf = contribId;
         bundle.contribSelf = contribution;
     }
@@ -244,8 +275,12 @@ public:
             auto& state = _sparse_states_by_id[callId];
 
             // Is the current bundle ready to be forwarded?
-            auto& bundle = state.bundlesByContribId[state.contributionIdCounter];
-            if (bundle.contribIdSelf+bundle.contribIdLeft+bundle.contribIdRight == 0)
+            auto& bundle = state.bundlesByContribId[
+                state.differential ? 0 : state.contributionIdCounter
+            ];
+            if (state.differential && !bundle.dirty)
+                continue; // -- no: no difference to previous bundle yet
+            if (!state.differential && bundle.contribIdSelf+bundle.contribIdLeft+bundle.contribIdRight == 0)
                 continue; // -- no: no contributions yet
             if (time - state.lastPublicationUpwards < state.delaySeconds)
                 continue; // -- no: not enough time passed
@@ -253,14 +288,20 @@ public:
 
             // Send bundle with aggregation of all present contributions
             forward(callId, SPARSE_PREFIXSUM_INCL_EXCL_TOTAL,
-                bundle.aggregateContributions(), state.contributionIdCounter);
+                bundle.aggregateContributions(state.differential, _num_desired_contribs), 
+                state.contributionIdCounter);
             // Proceed with next bundle next time
             state.contributionIdCounter++;
             // Update time
             state.lastPublicationUpwards = time;
+            bundle.dirty = false;
         }
 
         _last_time = time;
+    }
+
+    int getNumReceivedResults() const {
+        return _result_counter;
     }
 
 private:
@@ -320,18 +361,22 @@ private:
             // Reduction
             if (h.tag == MSG_ASYNC_SPARSE_COLLECTIVE_UP) {
                 // Find 1st unsent bundle with a free "slot" for this child
-                int contribId = state.contributionIdCounter;
+                int contribId = 0;
                 bool fromLeftChild = isFromLeftChild(h.source);
-                while (fromLeftChild && state.bundlesByContribId[contribId].contribIdLeft != 0)
-                    contribId++;
-                while (!fromLeftChild && state.bundlesByContribId[contribId].contribIdRight != 0)
-                    contribId++;
+                if (!state.differential) {
+                    contribId = state.contributionIdCounter;
+                    while (fromLeftChild && state.bundlesByContribId[contribId].contribIdLeft != 0)
+                        contribId++;
+                    while (!fromLeftChild && state.bundlesByContribId[contribId].contribIdRight != 0)
+                        contribId++;
+                } 
                 auto& bundle = state.bundlesByContribId[contribId];
                 LOG(V6_DEBGV, "SPARSE got contribution ID=%i from [%i]; adding to my contrib. ID %i (current ID: %i)\n", 
                     data.contributionId, h.source, contribId, state.contributionIdCounter);
                 // Store received data in the found bundle
                 (fromLeftChild ? bundle.contribLeft : bundle.contribRight) = data.items.front();
                 (fromLeftChild ? bundle.contribIdLeft : bundle.contribIdRight) = data.contributionId;
+                bundle.dirty = true;
                 // Perhaps the operation can be advanced now
                 advanceSparseOperations(_last_time);
             }
@@ -340,7 +385,7 @@ private:
             if (h.tag == MSG_ASYNC_SPARSE_COLLECTIVE_DOWN) {
                 std::list<T> resultList;
                 int contribId = data.contributionId;
-                if (contribId == 0) {
+                if (!state.differential && contribId == 0) {
                     // Did not contribute to this broadcast:
                     // Just forward everything, also with contribution ID 0
                     LOG(V6_DEBGV, "SPARSE got broadcast with no personal contribution from [%i]\n", h.source);
@@ -349,12 +394,12 @@ private:
                 } else {
                     // DID contribute to this broadcast
                     LOG(V6_DEBGV, "SPARSE got broadcast with contribution ID %i from [%i]\n", contribId, h.source);
-                    auto& bundle = state.bundlesByContribId[contribId];
+                    auto& bundle = state.bundlesByContribId[state.differential ? 0 : contribId];
                     resultList = broadcastAndDigest(SPARSE_PREFIXSUM_INCL_EXCL_TOTAL, data, bundle.contribLeft, bundle.contribSelf,
                         /*leftContribId=*/bundle.contribIdLeft, /*rightContribId=*/bundle.contribIdRight);
                 }
                 state.cbResult(resultList); // publish result locally
-                if (contribId != 0) {
+                if (contribId != 0 && !state.differential) {
                     LOG(V6_DEBGV, "SPARSE remove bundle with contribution ID %i\n", contribId);
                     state.bundlesByContribId.erase(contribId); // clean up
                 }
@@ -377,6 +422,7 @@ private:
         std::vector<uint8_t> packed;
         if (_parent_rank < 0) {
             // Root: switch to broadcast via a self message
+            _result_counter++;
             int msgTag = mode == SPARSE_PREFIXSUM_INCL_EXCL_TOTAL ? 
                 MSG_ASYNC_SPARSE_COLLECTIVE_DOWN : MSG_ASYNC_COLLECTIVE_DOWN;
             if (mode == ALLREDUCE) {
@@ -406,6 +452,7 @@ private:
 
         std::list<T> resultList;
         auto& elem = data.items.front();
+        _result_counter = data.resultCounter;
 
         if (mode == ALLREDUCE) {
 
@@ -459,6 +506,7 @@ private:
         data.instanceId = _instance_id;
         data.callId = callId;
         data.contributionId = contributionId;
+        data.resultCounter = _result_counter;
         data.items.push_back(elem);
         return data.serialize();
     }
@@ -467,6 +515,7 @@ private:
         data.instanceId = _instance_id;
         data.callId = callId;
         data.contributionId = contributionId;
+        data.resultCounter = _result_counter;
         data.items.push_back(elem1);
         data.items.push_back(elem2);
         return data.serialize();

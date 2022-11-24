@@ -75,11 +75,23 @@ int MessageQueue::send(DataPtr data, int dest, int tag) {
         SendHandle handle(_running_send_id++, dest, tag, data, _max_msg_size);
 
         int msglen = handle.data->size();
+
+#if LOGGER_STATIC_VERBOSITY >= 6
+        std::string msgContent;
+        size_t i = 0;
+        while (i + sizeof(int) <= msglen) {
+            msgContent += std::to_string(*(int*)(handle.data->data()+i)) + ",";
+            i += sizeof(int);
+        }
+        msgContent = msgContent.substr(0, msgContent.size()-1);
+        LOG(V5_DEBG, "MQ SEND n=%i d=[%i] t=%i c=(%s)\n", handle.data->size(), dest, tag, msgContent.c_str());
+#else
         LOG(V5_DEBG, "MQ SEND n=%i d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", handle.data->size(), dest, tag, 
             msglen>=1*sizeof(int) ? *(int*)(handle.data->data()) : 0, 
             msglen>=3*sizeof(int) ? *(int*)(handle.data->data()+msglen - 3*sizeof(int)) : 0, 
             msglen>=2*sizeof(int) ? *(int*)(handle.data->data()+msglen - 2*sizeof(int)) : 0, 
             msglen>=1*sizeof(int) ? *(int*)(handle.data->data()+msglen - 1*sizeof(int)) : 0);
+#endif
 
         if (dest == _my_rank) {
             // Self message
