@@ -227,8 +227,9 @@ private:
             JobRequest req = std::move(*reqIt);
             reqIt = _requests_in_prefix_sum.erase(reqIt);
 
-            LOG(V4_VVER, "PRISMA indexed %s\n", req.toStr().c_str());
-            _indexed_requests.emplace_back(_requests_indexing_offset + index, std::move(req));
+            auto reqIndex = _requests_indexing_offset + index;
+            LOG(V4_VVER, "PRISMA indexed #%i : %s\n", reqIndex, req.toStr().c_str());
+            _indexed_requests.emplace_back(reqIndex, std::move(req));
         }
 
         _last_requests_total = totalSum;
