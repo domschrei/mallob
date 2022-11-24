@@ -217,6 +217,11 @@ private:
 
     void digestRequestsPrefixSumResult(int exclusiveSum, int inclusiveSum, int totalSum) {
 
+        // Integrate the remaining requests from the last prefix sum
+        // into these new requests.
+        int numRemainingRequests = _last_requests_total - _last_requests_matched;
+        assert(numRemainingRequests >= 0);
+
         _requests_indexing_offset += _last_requests_total;
         
         auto reqIt = _requests_in_prefix_sum.begin();
@@ -233,6 +238,7 @@ private:
         }
 
         _last_requests_total = totalSum;
-        _last_requests_matched = 0;
+        // make sure to still match old remaining requests!
+        _last_requests_matched = - numRemainingRequests;
     }
 };
