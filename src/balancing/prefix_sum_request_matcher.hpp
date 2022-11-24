@@ -76,7 +76,6 @@ public:
             LOG(V5_DEBG, "PRISMA recv prefix sum #%i - idles (%i,%i,%i)\n", id, excl, incl, total);
             _events.insert(BroadcastEvent{CALL_ID_IDLES, id, excl, incl, total});
         });
-        _collective.contributeToSparsePrefixSum(CALL_ID_IDLES, ReduceableInt(1));
 
         _subscriptions.emplace_back(MSG_MATCHING_SEND_IDLE_TOKEN, [&](auto& h) {handle(h);});
         _subscriptions.emplace_back(MSG_MATCHING_SEND_REQUEST, [&](auto& h) {handle(h);});

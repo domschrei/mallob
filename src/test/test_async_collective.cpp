@@ -486,7 +486,7 @@ void testDifferentialSparsePrefixSum() {
     AsyncCollective<ReduceableInt> allRed(comm, q, reductionInstanceCounter++);
 
     MPI_Request req = MPI_REQUEST_NULL;
-    allRed.initializeDifferentialSparsePrefixSum(1, /*delay=*/0.1, [&](auto& results) {
+    allRed.initializeDifferentialSparsePrefixSum(1, /*delay=*/0.001, [&](auto& results) {
         LOG(V2_INFO, "DiffPS done: %i, total: %i\n", results.front().content, results.back().content);
         int totalSum = results.back().content;
         if (totalSum == size * (size-1)) {
