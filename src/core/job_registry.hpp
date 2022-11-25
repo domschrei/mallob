@@ -7,6 +7,8 @@
 #include "app/job.hpp"
 #include "app/app_registry.hpp"
 #include "job_garbage_collector.hpp"
+#include "util/data_statistics.hpp"
+
 
 class JobRegistry {
 
@@ -23,6 +25,7 @@ private:
 
     float _time_of_last_adoption = 0;
     float _total_busy_time = 0;
+    std::list<std::vector<float>> _desire_latencies;
 
     bool _memory_panic {false};
 
@@ -195,6 +198,10 @@ public:
 
     void erase(Job* jobPtr) {
         int jobId = jobPtr->getId();
+
+        if (!jobPtr->getJobTree().getDesireLatencies().empty())
+            _desire_latencies.push_back(std::move(jobPtr->getJobTree().getDesireLatencies()));
+
         _job_gc.orderDeletion(jobPtr);
         _jobs.erase(jobId);
     }
@@ -212,6 +219,12 @@ public:
     ~JobRegistry() {
         // Output total busy time
         LOG(V3_VERB, "busytime=%.3f\n", _total_busy_time);
-    }
 
+        // Report statistics on treegrowth ("desire") latencies
+        DataStatistics stats(std::move(_desire_latencies));
+        stats.computeStats();
+        LOG(V3_VERB, "STATS treegrowth_latencies num:%ld min:%.6f max:%.6f med:%.6f mean:%.6f\n", 
+            stats.num(), stats.min(), stats.max(), stats.median(), stats.mean());
+        stats.logFullDataIntoFile(".treegrowth-latencies");
+    }
 };

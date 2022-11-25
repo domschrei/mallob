@@ -49,6 +49,7 @@ void RoutingTreeRequestMatcher::deserialize(const std::vector<uint8_t>& packed, 
         if (epoch > _epoch) {
             // new epoch
             _epoch = epoch;
+            _tree.setEpoch(_epoch);
             _child_statuses.clear();
             _status_dirty = true;
         }
@@ -121,13 +122,13 @@ void RoutingTreeRequestMatcher::resolveRequests() {
         int destination = getDestination();
         if (destination < 0) {
             // No fit found
-            if (getCurrentRoot() == MyMpi::rank(MPI_COMM_WORLD)) {
+            if (_tree.getCurrentRoot() == MyMpi::rank(MPI_COMM_WORLD)) {
                 // I am the current root node: Keep request.
                 requestsToKeep.push_back(req);
             } else {
                 // Send job request upwards
-                LOG_ADD_DEST(V5_DEBG, "[CA] Send %s to parent", getCurrentParent(), req.toStr().c_str());
-                requestsPerDestination[getCurrentParent()].push_back(req);
+                LOG_ADD_DEST(V5_DEBG, "[CA] Send %s to parent", _tree.getCurrentParent(), req.toStr().c_str());
+                requestsPerDestination[_tree.getCurrentParent()].push_back(req);
             }
         } else {
             // Fit found: send to respective child
@@ -177,6 +178,7 @@ void RoutingTreeRequestMatcher::advance(int epoch) {
 
     if (newEpoch) {
         _epoch = epoch;
+        _tree.setEpoch(_epoch);
         _child_statuses.clear();
         _status_dirty = true;
     }
@@ -185,22 +187,13 @@ void RoutingTreeRequestMatcher::advance(int epoch) {
 
     if (_status_dirty) {
         auto status = getAggregatedStatus();
-        if (MyMpi::rank(MPI_COMM_WORLD) == getCurrentRoot()) {
+        if (MyMpi::rank(MPI_COMM_WORLD) == _tree.getCurrentRoot()) {
             LOG(V3_VERB, "[CA] Root: %i requests, %i idle (epoch=%i)\n", _request_list.size(), status.numIdle, _epoch);
         } else {
             auto packedStatus = serialize(status);
-            LOG_ADD_DEST(V5_DEBG, "[CA] Prop. status: %i idle (epoch=%i)", getCurrentParent(), status.numIdle, _epoch);
-            MyMpi::isend(getCurrentParent(), MSG_NOTIFY_ASSIGNMENT_UPDATE, std::move(packedStatus));
+            LOG_ADD_DEST(V5_DEBG, "[CA] Prop. status: %i idle (epoch=%i)", _tree.getCurrentParent(), status.numIdle, _epoch);
+            MyMpi::isend(_tree.getCurrentParent(), MSG_NOTIFY_ASSIGNMENT_UPDATE, std::move(packedStatus));
         }
         _status_dirty = false;
     }
-}
-
-int RoutingTreeRequestMatcher::getCurrentRoot() {
-    assert(_num_workers > 0);
-    return robin_hood::hash<int>()(_epoch) % _num_workers;
-}
-
-int RoutingTreeRequestMatcher::getCurrentParent() {
-    return _neighbor_towards_rank[getCurrentRoot()];
 }

@@ -12,25 +12,28 @@
 #include "balancing/event_driven_balancer.hpp"
 #include "util/sys/watchdog.hpp"
 #include "util/sys/proc.hpp"
-#include "util/data_statistics.hpp"
 #include "util/sys/thread_pool.hpp"
 
 SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm, 
+            RandomizedRoutingTree& routingTree,
             JobRegistry& jobRegistry, WorkerSysState& sysstate):
-        _params(params), _comm(comm), _sys_state(sysstate),
-        _job_registry(jobRegistry),
+        _params(params), _comm(comm), _routing_tree(routingTree),
+        _req_cache(
+            // Callback for deflecting a job request to another destination
+            [&](JobRequest& req, int source) {deflectJobRequest(req, source);}
+        ),
+        _sys_state(sysstate), _job_registry(jobRegistry),
         _reactivation_scheduler(_job_registry,
             // Callback for emitting a job request
             [&](const JobRequest& req, int tag, bool left, int dest) {
                 emitJobRequest(req, tag, left, dest);
             },
-            // Retrieving a job for a given ID
+            // Callback for retrieving a job for a given ID
             [&](int jobId) {return has(jobId) ? &get(jobId) : nullptr;}
         ) {
 
     _wcsecs_per_instance = params.jobWallclockLimit();
     _cpusecs_per_instance = params.jobCpuLimit();
-    _last_balancing_initiation = 0;
     _load_factor = params.loadFactor();
     assert(0 < _load_factor && _load_factor <= 1.0);
     _balance_period = params.balancingPeriod();       
@@ -211,10 +214,9 @@ void SchedulingManager::checkActiveJob() {
             {
                 auto& resultStruct = job.getResult();
                 assert(resultStruct.id == id);
-                auto key = std::pair<int, int>(id, resultStruct.revision);
                 payload = IntVec({id, resultStruct.revision, result});
-                LOG_ADD_DEST(V4_VVER, "%s rev. %i: sending finished info", jobRootRank, job.toStr(), key.second);
-                _pending_results[key] = std::move(resultStruct);
+                LOG_ADD_DEST(V4_VVER, "%s rev. %i: sending finished info", jobRootRank, job.toStr(), resultStruct.revision);
+                _result_store.store(id, resultStruct.revision, std::move(resultStruct));
             }
             MyMpi::isend(jobRootRank, MSG_NOTIFY_RESULT_FOUND, payload);
         }
@@ -352,7 +354,7 @@ void SchedulingManager::handleIncomingJobRequest(MessageHandle& handle, JobReque
             MyMpi::isend(source, MSG_REJECT_ONESHOT, rej);
         } else if (mode == SchedulingManager::NORMAL) {
             // Continue job finding procedure somewhere else
-            _cb_deflect_job_request(req, source);
+            deflectJobRequest(req, source);
         }
     }
 }
@@ -448,7 +450,7 @@ void SchedulingManager::handleRejectionOfDirectedRequest(MessageHandle& handle) 
     if (doNormalHopping) {
         LOG(V4_VVER, "%s : switch to normal hops\n", job.toStr());
         req.numHops = -1;
-        _cb_deflect_job_request(req, handle.source);
+        deflectJobRequest(req, handle.source);
     }
 }
 
@@ -776,14 +778,8 @@ void SchedulingManager::handleQueryForJobResult(MessageHandle& handle) {
     // and wishes to receive the full job result
     JobStatistics stats; stats.deserialize(handle.getRecvData());
     int jobId = stats.jobId;
-    auto key = std::pair<int, int>(jobId, stats.revision);
     LOG_ADD_DEST(V3_VERB, "Send result of #%i rev. %i to client", handle.source, jobId, stats.revision);
-    assert(_pending_results.count(key));
-    JobResult& result = _pending_results.at(key);
-    assert(result.id == jobId);
-    result.updateSerialization();
-    MyMpi::isend(handle.source, MSG_SEND_JOB_RESULT, result.moveSerialization());
-    _pending_results.erase(key);
+    MyMpi::isend(handle.source, MSG_SEND_JOB_RESULT, _result_store.retrieveSerialization(jobId, stats.revision));
 }
 
 void SchedulingManager::handleObsoleteJobResult(MessageHandle& handle) {
@@ -792,7 +788,7 @@ void SchedulingManager::handleObsoleteJobResult(MessageHandle& handle) {
     int jobId = res[0];
     int revision = res[1];
     LOG_ADD_SRC(V4_VVER, "job result for #%i rev. %i unwanted", handle.source, jobId, revision);
-    _pending_results.erase(std::pair<int, int>(jobId, revision));
+    _result_store.discard(jobId, revision);
 }
 
 void SchedulingManager::handleJobReleasedFromWaitingForReactivation(MessageHandle& handle) {
@@ -1053,11 +1049,45 @@ void SchedulingManager::propagateVolumeUpdate(Job& job, int volume, int balancin
     }
 }
 
+void SchedulingManager::deflectJobRequest(JobRequest& request, int senderRank) {
+
+    // Increment #hops
+    request.numHops++;
+    int num = request.numHops;
+    _sys_state.addLocal(SYSSTATE_NUMHOPS, 1);
+
+    // Show warning if #hops is a large power of two
+    if ((num >= 512) && ((num & (num - 1)) == 0)) {
+        LOG(V1_WARN, "[WARN] %s\n", request.toStr().c_str());
+    }
+
+    // If hopped enough for collective assignment to be enabled
+    // and if either reactivation scheduling is employed or the requested node is non-root
+    if (_params.hopsUntilCollectiveAssignment() >= 0 && num >= _params.hopsUntilCollectiveAssignment()
+        && (_params.reactivationScheduling() || request.requestedNodeIndex > 0)) {
+        _req_matcher->addJobRequest(request);
+        return;
+    }
+
+    // Get random choice from bounce alternatives
+    int nextRank = _routing_tree.getRandomNeighbor();
+    if (_routing_tree.getNumNeighbors() > 2) {
+        // ... if possible while skipping the requesting node and the sender
+        while (nextRank == request.requestingNodeRank || nextRank == senderRank) {
+            nextRank = _routing_tree.getRandomNeighbor();
+        }
+    }
+
+    // Send request to "next" worker node
+    LOG_ADD_DEST(V5_DEBG, "Hop %s", nextRank, toStr(request.jobId, request.requestedNodeIndex).c_str());
+    MyMpi::isend(nextRank, MSG_REQUEST_NODE, request);
+}
+
 void SchedulingManager::activateRootRequest(int jobId) {
     auto optReq = _req_cache.getRootRequest(jobId);
     if (!optReq.has_value()) return;
     LOG(V3_VERB, "Activate %s\n", optReq.value().toStr().c_str());
-    _cb_deflect_job_request(optReq.value(), optReq.value().requestingNodeRank);
+    deflectJobRequest(optReq.value(), optReq.value().requestingNodeRank);
 }
 
 void SchedulingManager::spawnJobRequest(int jobId, bool left, int balancingEpoch) {
@@ -1341,9 +1371,6 @@ void SchedulingManager::eraseJobAndQueueForDeletion(int jobId) {
         if (job.getState() != PAST) job.terminate();
         assert(job.getState() == PAST);
         jobPtr = &job;
-
-        if (!job.getJobTree().getDesireLatencies().empty())
-            _desire_latencies.push_back(std::move(job.getJobTree().getDesireLatencies()));
     }
     _job_registry.erase(jobPtr);
 }
@@ -1361,9 +1388,9 @@ std::string SchedulingManager::toStr(int j, int idx) const {
 
 void SchedulingManager::triggerMemoryPanic() {
     // Aggressively remove inactive cached jobs
-    setMemoryPanic(true);
+    _job_registry.setMemoryPanic(true);
     forgetOldJobs();
-    setMemoryPanic(false);
+    _job_registry.setMemoryPanic(false);
     // Trigger memory panic in the active job
     if (_job_registry.hasActiveJob()) _job_registry.getActive().appl_memoryPanic();
 }
@@ -1395,10 +1422,4 @@ SchedulingManager::~SchedulingManager() {
 
     // _job_gc.stop(); TODO required ???
     watchdog.stop();
-
-    DataStatistics stats(std::move(_desire_latencies));
-    stats.computeStats();
-    LOG(V3_VERB, "STATS treegrowth_latencies num:%ld min:%.6f max:%.6f med:%.6f mean:%.6f\n", 
-        stats.num(), stats.min(), stats.max(), stats.median(), stats.mean());
-    stats.logFullDataIntoFile(".treegrowth-latencies");
 }

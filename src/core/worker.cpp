@@ -9,15 +9,12 @@
 
 #include "worker.hpp"
 
-#include "balancing/event_driven_balancer.hpp"
 #include "data/serializable.hpp"
-#include "data/job_description.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/watchdog.hpp"
 #include "util/logger.hpp"
-#include "util/random.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "balancing/routing_tree_request_matcher.hpp"
@@ -25,22 +22,18 @@
 
 Worker::Worker(MPI_Comm comm, Parameters& params) :
     _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
-    _params(params), _job_registry(_params, _comm), _sched_man(_params, _comm, _job_registry, _sys_state), 
+    _params(params), _job_registry(_params, _comm), _routing_tree(_params, _comm), 
+    _sched_man(_params, _comm, _routing_tree, _job_registry, _sys_state), 
     _sys_state(_comm, params.sysstatePeriod(), SysState<9>::ALLREDUCE), 
     _watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/100, Timer::elapsedSeconds())
 {
     _watchdog.setWarningPeriod(50); // warn after 50ms without a reset
     _watchdog.setAbortPeriod(_params.watchdogAbortMillis()); // abort after X ms without a reset
-
-    _sched_man.setCallbackToDeflectJobRequest([this](JobRequest& req, int source) {
-        bounceJobRequest(req, source);
-    });
 }
 
 void Worker::init() {
     
-    // Initialize pseudo-random order of nodes
-    auto permutations = createExpanderGraph();
+    _routing_tree.init();
 
     if (_params.hopsUntilCollectiveAssignment() >= 0) {
         // Create request matcher
@@ -58,9 +51,7 @@ void Worker::init() {
         } else {
             // Routing tree based request matcher
             _req_matcher.reset(new RoutingTreeRequestMatcher(
-                _job_registry, _comm, 
-                AdjustablePermutation::getBestOutgoingEdgeForEachNode(permutations, _world_rank),
-                cbReceiveRequest
+                _job_registry, _comm, _routing_tree, cbReceiveRequest
             ));
         }
         _sched_man.setRequestMatcher(_req_matcher);
@@ -84,34 +75,6 @@ void Worker::init() {
             MyMpi::getMessageQueue().advance();
         }
     }
-}
-
-std::vector<std::vector<int>> Worker::createExpanderGraph() {
-
-    // Pick fixed number k of bounce destinations
-    int numBounceAlternatives = _params.numBounceAlternatives();
-    int numWorkers = MyMpi::size(_comm);
-    
-    // Check validity of num bounce alternatives
-    if (2*numBounceAlternatives > numWorkers) {
-        numBounceAlternatives = std::max(1, numWorkers / 2);
-        LOG(V1_WARN, "[WARN] Num bounce alternatives must be at most half the number of workers!\n");
-        LOG(V1_WARN, "[WARN] Falling back to safe value r=%i.\n", numBounceAlternatives);
-    }  
-
-    // Create graph, get outgoing edges from this node
-    auto permutations = AdjustablePermutation::getPermutations(numWorkers, numBounceAlternatives);
-    _hop_destinations = AdjustablePermutation::createExpanderGraph(permutations, _world_rank);
-    
-    // Output found bounce alternatives
-    std::string info = "";
-    for (size_t i = 0; i < _hop_destinations.size(); i++) {
-        info += std::to_string(_hop_destinations[i]) + " ";
-    }
-    LOG(V3_VERB, "My bounce alternatives: %s\n", info.c_str());
-    assert((int)_hop_destinations.size() == numBounceAlternatives);
-
-    return permutations;
 }
 
 void Worker::advance(float time) {
@@ -285,45 +248,6 @@ void Worker::publishAndResetSysState() {
     _sys_state.setLocal(SYSSTATE_NUMDESIRES, 0);
     _sys_state.setLocal(SYSSTATE_NUMFULFILLEDDESIRES, 0);
     _sys_state.setLocal(SYSSTATE_SUMDESIRELATENCIES, 0);
-}
-
-void Worker::bounceJobRequest(JobRequest& request, int senderRank) {
-
-    // Increment #hops
-    request.numHops++;
-    int num = request.numHops;
-    _sys_state.addLocal(SYSSTATE_NUMHOPS, 1);
-
-    // Show warning if #hops is a large power of two
-    if ((num >= 512) && ((num & (num - 1)) == 0)) {
-        LOG(V1_WARN, "[WARN] %s\n", request.toStr().c_str());
-    }
-
-    // If hopped enough for collective assignment to be enabled
-    // and if either reactivation scheduling is employed or the requested node is non-root
-    if (_params.hopsUntilCollectiveAssignment() >= 0 && num >= _params.hopsUntilCollectiveAssignment()
-        && (_params.reactivationScheduling() || request.requestedNodeIndex > 0)) {
-        _req_matcher->addJobRequest(request);
-        return;
-    }
-
-    // Get random choice from bounce alternatives
-    int nextRank = getWeightedRandomNeighbor();
-    if (_hop_destinations.size() > 2) {
-        // ... if possible while skipping the requesting node and the sender
-        while (nextRank == request.requestingNodeRank || nextRank == senderRank) {
-            nextRank = getWeightedRandomNeighbor();
-        }
-    }
-
-    // Send request to "next" worker node
-    LOG_ADD_DEST(V5_DEBG, "Hop %s", nextRank, _sched_man.toStr(request.jobId, request.requestedNodeIndex).c_str());
-    MyMpi::isend(nextRank, MSG_REQUEST_NODE, request);
-}
-
-int Worker::getWeightedRandomNeighbor() {
-    int rand = (int) (_hop_destinations.size()*Random::rand());
-    return _hop_destinations[rand];
 }
 
 Worker::~Worker() {

@@ -7,6 +7,7 @@
 #include "data/job_transfer.hpp"
 #include "comm/mympi.hpp"
 #include "request_matcher.hpp"
+#include "comm/randomized_routing_tree.hpp"
 
 class RoutingTreeRequestMatcher : public RequestMatcher {
 
@@ -16,14 +17,15 @@ private:
     };
     robin_hood::unordered_map<int, Status> _child_statuses;
     std::set<JobRequest> _request_list;
-    std::vector<int> _neighbor_towards_rank;
+
+    RandomizedRoutingTree& _tree;
     
 public:
     RoutingTreeRequestMatcher(JobRegistry& jobRegistry, MPI_Comm workersComm, 
-            std::vector<int>&& neighborTowardsRank, 
+            RandomizedRoutingTree& tree, 
             std::function<void(const JobRequest&, int)> localRequestCallback) : 
         RequestMatcher(jobRegistry, workersComm, localRequestCallback),
-        _neighbor_towards_rank(std::move(neighborTowardsRank)) {}
+        _tree(tree) {}
     virtual ~RoutingTreeRequestMatcher() {}
 
     virtual void handle(MessageHandle& handle) override;
@@ -38,9 +40,6 @@ private:
     void deserialize(const std::vector<uint8_t>& packed, int source);
 
     void resolveRequests();
-
-    int getCurrentRoot();
-    int getCurrentParent();
 
     int getDestination();
 };

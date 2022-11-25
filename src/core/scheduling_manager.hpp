@@ -15,6 +15,8 @@
 #include "job_registry.hpp"
 #include "reactivation_scheduler.hpp"
 #include "request_cache.hpp"
+#include "result_store.hpp"
+#include "comm/randomized_routing_tree.hpp"
 
 class SchedulingManager {
 
@@ -26,39 +28,31 @@ private:
     float _balance_period;
 
     MPI_Comm& _comm;
+    RandomizedRoutingTree& _routing_tree;
+    RequestCache _req_cache;
     std::unique_ptr<EventDrivenBalancer> _balancer;
     std::shared_ptr<RequestMatcher> _req_matcher;
     JobRegistry& _job_registry;
     ReactivationScheduler _reactivation_scheduler;
-    RequestCache _req_cache;
-
-    float _last_balancing_initiation;
-
+    ResultStore _result_store;
     WorkerSysState& _sys_state;
 
-    std::list<std::vector<float>> _desire_latencies;
-
-    DeflectJobRequestCallback _cb_deflect_job_request;
-
     robin_hood::unordered_map<int, int> _send_id_to_job_id;
-    robin_hood::unordered_map<std::pair<int, int>, JobResult, IntPairHasher> _pending_results;
 
     std::list<MessageSubscription> _subscriptions;
 
 public:
-    SchedulingManager(Parameters& params, MPI_Comm& comm, JobRegistry& jobRegistry, WorkerSysState& sysstate);
+    SchedulingManager(Parameters& params, MPI_Comm& comm, RandomizedRoutingTree& routingTree, 
+        JobRegistry& jobRegistry, WorkerSysState& sysstate);
     ~SchedulingManager();
     
     // Initialization methods
     void setRequestMatcher(std::shared_ptr<RequestMatcher>& reqMatcher) {_req_matcher = reqMatcher;}
-    void setCallbackToDeflectJobRequest(DeflectJobRequestCallback cb) {
-        _cb_deflect_job_request = cb;
-    }
 
     void checkActiveJob();
     bool checkComputationLimits(int jobId);
     void advanceBalancing(float time) {_balancer->advance(time);}
-    void forwardDeferredRequests() {_req_cache.forwardDeferredRequests(_cb_deflect_job_request);}
+    void forwardDeferredRequests() {_req_cache.forwardDeferredRequests();}
     void tryAdoptPendingRootActivationRequest();
     void forgetOldJobs();
     void triggerMemoryPanic();
@@ -94,6 +88,7 @@ private:
     void initiateVolumeUpdate(int jobId);
     void updateVolume(int jobId, int volume, int balancingEpoch, float eventLatency);
     void propagateVolumeUpdate(Job& job, int volume, int balancingEpoch);
+    void deflectJobRequest(JobRequest& request, int senderRank);
 
     void commit(JobRequest& req);
     void uncommit(int jobId);
@@ -103,7 +98,6 @@ private:
     void terminate(int jobId);
     void eraseJobAndQueueForDeletion(int jobId);
 
-    void setMemoryPanic(bool panic) {_job_registry.setMemoryPanic(panic);}
     void preregisterJobInBalancer(int jobId);
     void handleBalancingMessage(MessageHandle& handle) {_balancer->handle(handle);}
     void unregisterJobFromBalancer(int jobId) {_balancer->onTerminate(get(jobId));}

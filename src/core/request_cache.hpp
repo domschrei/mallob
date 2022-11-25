@@ -13,6 +13,8 @@ typedef std::function<void(JobRequest& req, int source)> DeflectJobRequestCallba
 class RequestCache {
 
 private:
+    DeflectJobRequestCallback _cb_deflect_request;
+
     // Requests which lay dormant (e.g., due to too many hops / too busy system)
     // and will be re-introduced to continue hopping after some time
     std::list<std::tuple<float, int, JobRequest>> _deferred_requests;
@@ -23,14 +25,14 @@ private:
     std::optional<JobRequest> _pending_root_reactivate_request;
 
 public:
-    RequestCache() {}
+    RequestCache(DeflectJobRequestCallback cb) : _cb_deflect_request(cb) {}
 
     void defer(const JobRequest& req, int sender) {
         LOG(V3_VERB, "Defer %s\n", req.toStr().c_str());
         _deferred_requests.emplace_back(Timer::elapsedSecondsCached(), sender, req);
     }
 
-    void forwardDeferredRequests(DeflectJobRequestCallback cb) {
+    void forwardDeferredRequests() {
     
         std::vector<std::pair<JobRequest, int>> result;
         for (auto& [deferredTime, senderRank, req] : _deferred_requests) {
@@ -44,7 +46,7 @@ public:
         }
 
         for (auto& [req, senderRank] : result) {
-            cb(req, senderRank);
+            _cb_deflect_request(req, senderRank);
         }
     }
 

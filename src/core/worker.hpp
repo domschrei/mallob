@@ -37,6 +37,7 @@ private:
     std::list<MessageSubscription> _subscriptions;
 
     JobRegistry _job_registry;
+    RandomizedRoutingTree _routing_tree;
     SchedulingManager _sched_man;
     WorkerSysState _sys_state;
 
@@ -68,16 +69,10 @@ public:
     void setHostComm(HostComm& hostComm) {_host_comm = &hostComm;}
 
 private:
-    std::vector<std::vector<int>> createExpanderGraph();
-
-    void bounceJobRequest(JobRequest& request, int senderRank);
-    int getWeightedRandomNeighbor();
-
     void checkStats(float time);
     void checkJobs();
     void checkActiveJob();
     void publishAndResetSysState();
-
 };
 
 #endif
