@@ -19,10 +19,10 @@ private:
     std::vector<int> _neighbor_towards_rank;
     
 public:
-    RoutingTreeRequestMatcher(JobDatabase& jobDb, MPI_Comm workersComm, 
+    RoutingTreeRequestMatcher(JobRegistry& jobRegistry, MPI_Comm workersComm, 
             std::vector<int>&& neighborTowardsRank, 
             std::function<void(const JobRequest&, int)> localRequestCallback) : 
-        RequestMatcher(jobDb, workersComm, localRequestCallback),
+        RequestMatcher(jobRegistry, workersComm, localRequestCallback),
         _neighbor_towards_rank(std::move(neighborTowardsRank)) {}
     virtual ~RoutingTreeRequestMatcher() {}
 

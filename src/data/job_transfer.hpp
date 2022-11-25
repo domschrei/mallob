@@ -1,6 +1,5 @@
 
-#ifndef DOMPASCH_JOB_TRANSFER
-#define DOMPASCH_JOB_TRANSFER
+#pragma once
 
 #include <vector>
 #include <cstring>
@@ -169,5 +168,3 @@ public:
     std::vector<uint8_t> serialize() const override;
     JobStatistics& deserialize(const std::vector<uint8_t>& packed) override;
 };
-
-#endif

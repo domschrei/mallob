@@ -19,6 +19,8 @@
 #include "comm/job_comm.hpp"
 #include "scheduling/local_scheduler.hpp"
 
+typedef std::function<void(const JobRequest& req, int tag, bool left, int dest)> EmitDirectedJobRequestCallback;
+
 class Job {
 
 // Protected fields, may be accessed by your application code.
@@ -316,7 +318,7 @@ public:
         return false;
     }
 
-    LocalScheduler constructScheduler(std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq);
+    LocalScheduler constructScheduler(EmitDirectedJobRequestCallback cb);
 
     // Marks the job to be indestructible as long as pending is true.
     void addChildWaitingForRevision(int rank, int revision) {_waiting_rank_revision_pairs.insert(std::pair<int, int>(rank, revision));}

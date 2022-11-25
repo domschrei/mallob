@@ -11,6 +11,7 @@ class Timer {
 
 private:
     static timespec timespecStart, timespecEnd;
+    static float lastTimeMeasured;
 
 public:
     static void init();
@@ -21,8 +22,13 @@ public:
      */
     static inline float elapsedSeconds() {
         clock_gettime(CLOCK_MONOTONIC_RAW, &timespecEnd);
-        return timespecEnd.tv_sec - timespecStart.tv_sec  
+        lastTimeMeasured = timespecEnd.tv_sec - timespecStart.tv_sec  
             + (0.001f * 0.001f * 0.001f) * (timespecEnd.tv_nsec - timespecStart.tv_nsec);
+        return lastTimeMeasured;
+    }
+
+    static inline float elapsedSecondsCached() {
+        return lastTimeMeasured;
     }
 
     static bool globalTimelimReached(Parameters& params);

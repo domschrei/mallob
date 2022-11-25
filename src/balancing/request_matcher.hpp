@@ -6,21 +6,22 @@
 
 #include "data/job_transfer.hpp"
 #include "comm/mympi.hpp"
+#include "core/job_registry.hpp"
 
-class JobDatabase; // forward declaration
+class SchedulingManager; // forward declaration
 
 class RequestMatcher {
 
 protected:
-    JobDatabase* _job_db = nullptr;
+    JobRegistry* _job_registry = nullptr;
     std::function<void(const JobRequest&, int)> _local_request_callback;
     int _num_workers;    
     int _epoch = -1;
     bool _status_dirty = true;
 
 public:
-    RequestMatcher(JobDatabase& jobDb, MPI_Comm workersComm, std::function<void(const JobRequest&, int)> localRequestCallback) : 
-        _job_db(&jobDb), _local_request_callback(localRequestCallback), _num_workers(MyMpi::size(workersComm)) {}
+    RequestMatcher(JobRegistry& jobRegistry, MPI_Comm workersComm, std::function<void(const JobRequest&, int)> localRequestCallback) : 
+        _job_registry(&jobRegistry), _local_request_callback(localRequestCallback), _num_workers(MyMpi::size(workersComm)) {}
 
     virtual void handle(MessageHandle& handle) = 0;
     virtual void advance(int epoch) = 0;

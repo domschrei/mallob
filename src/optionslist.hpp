@@ -59,11 +59,10 @@ OPTION_GROUP(grpOutput, "output", "Output")
 
 OPTION_GROUP(grpScheduling, "scheduling", "Scheduling")
  OPT_FLOAT(balancingPeriod,               "p", "balancing-period",                     0.1,  0, LARGE_INT,      "Minimum interval between subsequent rounds of balancing")
- OPT_BOOL(derandomize,                    "derandomize", "",                           true,                    "Derandomize hopping of requests and build a <bounce-alternatives>-regular message graph instead")
  OPT_BOOL(explicitVolumeUpdates,          "evu", "explicit-volume-updates",            false,                   "Broadcast volume updates through job tree instead of letting each PE compute it itself")
  OPT_INT(jobCacheSize,                    "jc", "job-cache-size",                      4,    0, LARGE_INT,      "Size of job cache per PE for suspended yet unfinished job nodes")
  OPT_FLOAT(loadFactor,                    "l", "load-factor",                          1,    0, 1,              "The share of PEs which should be busy at any given time")
- OPT_INT(numBounceAlternatives,           "ba", "bounce-alternatives",                 4,    1, LARGE_INT,      "Number of bounce alternatives per PE (only relevant if -derandomize)")
+ OPT_INT(numBounceAlternatives,           "ba", "bounce-alternatives",                 4,    1, LARGE_INT,      "Number of bounce alternatives per PE")
  OPT_BOOL(prefixSumMatching,              "prisma", "prefix-sum-matching",             false,                   "Match requests and idle PEs using prefix sums instead of a routing tree")
 
 ///////////////////////////////////////////////////////////////////////

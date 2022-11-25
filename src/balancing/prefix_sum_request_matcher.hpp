@@ -51,9 +51,9 @@ private:
     int _last_event_id {0};
 
 public:
-    PrefixSumRequestMatcher(JobDatabase& jobDb, MPI_Comm comm, 
+    PrefixSumRequestMatcher(JobRegistry& jobRegistry, MPI_Comm comm, 
             std::function<void(const JobRequest&, int)> localRequestCallback) :
-        _comm(comm), RequestMatcher(jobDb, comm, localRequestCallback),
+        _comm(comm), RequestMatcher(jobRegistry, comm, localRequestCallback),
         _collective(comm, MyMpi::getMessageQueue(), COLLECTIVE_ID_SPARSE_PREFIX_SUM) {
 
         _collective.initializeSparsePrefixSum(CALL_ID_REQUESTS, 
@@ -110,7 +110,7 @@ public:
 
     virtual void advance(int epoch) override {
 
-        if (_job_db == nullptr) return;
+        if (_job_registry == nullptr) return;
         bool newEpoch = epoch > _epoch;
 
         if (newEpoch) {

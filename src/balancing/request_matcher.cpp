@@ -1,8 +1,10 @@
 
 #include "request_matcher.hpp"
 
-#include "data/job_database.hpp"
+#include "core/scheduling_manager.hpp"
 
 bool RequestMatcher::isIdle() {
-    return !_job_db->isBusyOrCommitted() && !_job_db->hasInactiveJobsWaitingForReactivation() && !_job_db->hasDormantRoot();
+    return !_job_registry->isBusyOrCommitted() 
+        && !_job_registry->hasInactiveJobsWaitingForReactivation() 
+        && !_job_registry->hasDormantRoot();
 }

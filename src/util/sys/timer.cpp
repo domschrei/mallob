@@ -6,6 +6,7 @@
 
 timespec Timer::timespecStart;
 timespec Timer::timespecEnd;
+float Timer::lastTimeMeasured {0};
 
 void Timer::init() {
     clock_gettime(CLOCK_MONOTONIC_RAW, &timespecStart);

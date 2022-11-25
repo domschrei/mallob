@@ -4,7 +4,7 @@
 #include "util/assert.hpp"
 
 #include "util/logger.hpp"
-#include "data/job_database.hpp"
+#include "core/scheduling_manager.hpp"
 #include "util/random.hpp"
 
 const uint8_t COLL_ASSIGN_STATUS = 1;
@@ -172,7 +172,7 @@ RoutingTreeRequestMatcher::Status RoutingTreeRequestMatcher::getAggregatedStatus
 }
 
 void RoutingTreeRequestMatcher::advance(int epoch) {
-    if (_job_db == nullptr) return;
+    if (_job_registry == nullptr) return;
     bool newEpoch = epoch > _epoch;
 
     if (newEpoch) {
