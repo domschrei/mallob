@@ -22,6 +22,7 @@
 #include "util/sys/watchdog.hpp"
 #include "comm/host_comm.hpp"
 #include "comm/message_subscription.hpp"
+#include "comm/randomized_routing_tree.hpp"
 
 /*
 Primary actor in the system who is responsible for participating in the scheduling and execution of jobs.

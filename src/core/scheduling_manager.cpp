@@ -13,6 +13,11 @@
 #include "util/sys/watchdog.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/thread_pool.hpp"
+#include "comm/randomized_routing_tree.hpp"
+#include "job_registry.hpp"
+#include "balancing/event_driven_balancer.hpp"
+#include "balancing/request_matcher.hpp"
+#include "latency_report.hpp"
 
 SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm, 
             RandomizedRoutingTree& routingTree,
@@ -23,13 +28,12 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
             [&](JobRequest& req, int source) {deflectJobRequest(req, source);}
         ),
         _sys_state(sysstate), _job_registry(jobRegistry),
+        _desc_interface(_job_registry),
         _reactivation_scheduler(_job_registry,
             // Callback for emitting a job request
             [&](const JobRequest& req, int tag, bool left, int dest) {
                 emitJobRequest(req, tag, left, dest);
-            },
-            // Callback for retrieving a job for a given ID
-            [&](int jobId) {return has(jobId) ? &get(jobId) : nullptr;}
+            }
         ) {
 
     _wcsecs_per_instance = params.jobWallclockLimit();
@@ -54,14 +58,10 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
         }
     });
     // Balancer message handling
-    auto balanceCb = [&](auto& h) {handleBalancingMessage(h);};
+    auto balanceCb = [&](auto& h) {_balancer->handle(h);};
     _subscriptions.emplace_back(MSG_COLLECTIVE_OPERATION, balanceCb);
     _subscriptions.emplace_back(MSG_REDUCE_DATA, balanceCb);
     _subscriptions.emplace_back(MSG_BROADCAST_DATA, balanceCb);
-
-    MyMpi::getMessageQueue().registerSentCallback(MSG_SEND_JOB_DESCRIPTION, [&](int sendId) {
-        handleJobDescriptionSent(sendId);
-    });
 
     _subscriptions.emplace_back(MSG_ANSWER_ADOPTION_OFFER,
         [&](auto& h) {handleAnswerToAdoptionOffer(h);});
@@ -88,8 +88,6 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
         [&](auto& h) {handleExplicitVolumeUpdate(h);});
     _subscriptions.emplace_back(MSG_OFFER_ADOPTION, 
         [&](auto& h) {handleAdoptionOffer(h);});
-    _subscriptions.emplace_back(MSG_QUERY_JOB_DESCRIPTION,
-        [&](auto& h) {handleQueryForJobDescription(h);});
     _subscriptions.emplace_back(MSG_QUERY_JOB_RESULT, 
         [&](auto& h) {handleQueryForJobResult(h);});
     _subscriptions.emplace_back(MSG_QUERY_VOLUME, 
@@ -121,40 +119,10 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
     _subscriptions.emplace_back(MSG_SCHED_RETURN_NODES, localSchedulerCb);
 }
 
-bool SchedulingManager::appendRevision(int jobId, const std::shared_ptr<std::vector<uint8_t>>& description, int source) {
-
-    if (!has(jobId)) {
-        LOG(V1_WARN, "[WARN] Unknown job #%i : discard desc. of size %i\n", jobId, description->size());
-        return false;
-    }
-    auto& job = get(jobId);
-    int rev = JobDescription::readRevisionIndex(*description);
-    if (job.hasDescription()) {
-        if (rev != job.getMaxConsecutiveRevision()+1) {
-            // Revision data would cause a "hole" in the list of job revision data
-            LOG(V1_WARN, "[WARN] #%i rev. %i inconsistent w/ max. consecutive rev. %i : discard desc. of size %i\n", 
-                jobId, rev, job.getMaxConsecutiveRevision(), description->size());
-            return false;
-        }
-    } else if (rev != 0) {
-        LOG(V1_WARN, "[WARN] #%i invalid \"first\" rev. %i : discard desc. of size %i\n", jobId, rev, description->size());
-            return false;
-    }
-
-    // Push revision description
-    job.pushRevision(description);
-    return true;
-}
-
-void SchedulingManager::execute(int jobId, int source) {
-
-    if (!has(jobId)) {
-        LOG(V1_WARN, "[WARN] Unknown job #%i\n", jobId);
-        return;
-    }
-    auto& job = get(jobId);
+void SchedulingManager::execute(Job& job, int source) {
 
     // Execute job
+    int jobId = job.getId();
     setLoad(1, jobId);
     LOG_ADD_SRC(V3_VERB, "EXECUTE %s", source, job.toStr());
     if (job.getState() == INACTIVE) {
@@ -170,12 +138,19 @@ void SchedulingManager::execute(int jobId, int source) {
     job.setLastDemand(demand);
 }
 
-void SchedulingManager::preregisterJobInBalancer(int jobId) {
-    assert(has(jobId));
-    auto& job = get(jobId);
+void SchedulingManager::preregisterJobInBalancer(Job& job) {
     int demand = std::max(1, job.getJobTree().isRoot() ? 0 : job.getDemand());
     _balancer->onActivate(job, demand);
     if (job.getJobTree().isRoot()) job.setLastDemand(demand);
+}
+
+void SchedulingManager::unregisterJobFromBalancer(int jobId) {
+    _balancer->onTerminate(get(jobId));
+}
+
+void SchedulingManager::handleDemandUpdate(Job& job, int demand) {
+    _balancer->onDemandChange(job, demand);
+    job.setLastDemand(demand);
 }
 
 void SchedulingManager::checkActiveJob() {
@@ -230,29 +205,15 @@ void SchedulingManager::checkActiveJob() {
             }
         }
 
-        // Handle child PEs waiting for the transfer of a revision of this job
-        auto& waitingRankRevPairs = job.getWaitingRankRevisionPairs();
-        auto it = waitingRankRevPairs.begin();
-        while (it != waitingRankRevPairs.end()) {
-            auto& [rank, rev] = *it;
-            if (rev > job.getRevision()) {
-                ++it;
-                continue;
-            }
-            if (job.getJobTree().hasLeftChild() && job.getJobTree().getLeftChildNodeRank() == rank) {
-                // Left child
-                sendJobDescription(id, rev, rank);
-            } else if (job.getJobTree().hasRightChild() && job.getJobTree().getRightChildNodeRank() == rank) {
-                // Right child
-                sendJobDescription(id, rev, rank);
-            } // else: obsolete request
-            // Remove processed request
-            it = waitingRankRevPairs.erase(it);
-        }
+        _desc_interface.forwardDescriptionToWaitingChildren(job);
     }
 
     // Job communication (e.g. clause sharing)
     job.communicate();
+}
+
+void SchedulingManager::advanceBalancing(float time) {
+    _balancer->advance(time);
 }
 
 bool SchedulingManager::checkComputationLimits(int jobId) {
@@ -477,31 +438,28 @@ void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
 
     // Retrieve job
     assert(has(jobId));
-    Job &job = get(jobId);
+    Job& job = get(jobId);
 
     if (accepted) {
         // Adoption offer accepted
     
         // Check and apply (if possible) the job's current volume
-        initiateVolumeUpdate(req.jobId);
+        initiateVolumeUpdate(job);
         if (!job.hasCommitment()) {
             // Job shrunk: Commitment cancelled, abort job adoption
             return;
         }
 
-        job.setDesiredRevision(req.revision);
-        if (!job.hasDescription() || job.getRevision() < req.revision) {
-            // Transfer of at least one revision is required
-            int requestedRevision = job.hasDescription() ? job.getRevision()+1 : 0;
-            MyMpi::isend(handle.source, MSG_QUERY_JOB_DESCRIPTION, IntPair(jobId, requestedRevision));
-        }
+        // Set new revision, request next revision as needed
+        _desc_interface.updateRevisionAndDescription(job, req.revision, handle.source);
+        
         if (job.hasDescription()) {
             // At least the initial description is present: Begin to execute job
             uncommit(req.jobId);
             if (job.getState() == SUSPENDED) {
                 reactivate(req, handle.source);
             } else {
-                execute(req.jobId, handle.source);
+                execute(job, handle.source);
             }
         }
         
@@ -511,50 +469,6 @@ void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
         uncommit(req.jobId);
         unregisterJobFromBalancer(req.jobId);
         _reactivation_scheduler.suspendReactivator(job);
-    }
-}
-
-void SchedulingManager::handleQueryForJobDescription(MessageHandle& handle) {
-
-    IntPair pair = Serializable::get<IntPair>(handle.getRecvData());
-    int jobId = pair.first;
-    int revision = pair.second;
-
-    if (!has(jobId)) return;
-    Job& job = get(jobId);
-
-    if (job.getRevision() >= revision) {
-        sendJobDescription(jobId, revision, handle.source);
-    } else {
-        // This revision is not present yet: Defer this query
-        // and send the job description upon receiving it
-        job.addChildWaitingForRevision(handle.source, revision);
-        return;
-    }
-}
-
-void SchedulingManager::sendJobDescription(int jobId, int revision, int dest) {
-
-    // Retrieve and send concerned job description
-    auto& job = get(jobId);
-    const auto& descPtr = job.getSerializedDescription(revision);
-    assert(descPtr->size() == job.getDescription().getTransferSize(revision) 
-        || LOG_RETURN_FALSE("%i != %i\n", descPtr->size(), job.getDescription().getTransferSize(revision)));
-    int sendId = MyMpi::isend(dest, MSG_SEND_JOB_DESCRIPTION, descPtr);
-    LOG_ADD_DEST(V4_VVER, "Sent job desc. of %s rev. %i, size %lu, id=%i", dest, 
-            job.toStr(), revision, descPtr->size(), sendId);
-    job.getJobTree().addSendHandle(dest, sendId);
-    _send_id_to_job_id[sendId] = jobId;
-}
-
-void SchedulingManager::handleJobDescriptionSent(int sendId) {
-    auto it = _send_id_to_job_id.find(sendId);
-    if (it != _send_id_to_job_id.end()) {
-        int jobId = it->second;
-        if (has(jobId)) {
-            get(jobId).getJobTree().clearSendHandle(sendId);
-        }
-        _send_id_to_job_id.erase(sendId);
     }
 }
 
@@ -574,18 +488,7 @@ void SchedulingManager::handleIncomingJobDescription(MessageHandle& handle) {
 
     // Append revision description to job
     auto& job = get(jobId);
-    auto dataPtr = std::shared_ptr<std::vector<uint8_t>>(
-        new std::vector<uint8_t>(handle.moveRecvData())
-    );
-    bool valid = appendRevision(jobId, dataPtr, handle.source);
-    if (!valid) {
-        // Need to clean up shared pointer concurrently 
-        // because it might take too much time in the main thread
-        ProcessWideThreadPool::get().addTask([sharedPtr = std::move(dataPtr)]() mutable {
-            sharedPtr.reset();
-        });
-        return;
-    }
+    if (!_desc_interface.handleIncomingJobDescription(job, handle)) return;
 
     // If job has not started yet, execute it now
     if (_job_registry.hasCommitment(jobId)) {
@@ -594,19 +497,12 @@ void SchedulingManager::handleIncomingJobDescription(MessageHandle& handle) {
             job.setDesiredRevision(req.revision);
             uncommit(jobId);
         }
-        execute(jobId, handle.source);
-        initiateVolumeUpdate(jobId);
+        execute(job, handle.source);
+        initiateVolumeUpdate(job);
     }
     
-    // Job inactive?
-    if (job.getState() != ACTIVE) return;
-
-    // Arrived at final revision?
-    if (job.getRevision() < job.getDesiredRevision()) {
-        // No: Query next revision
-        MyMpi::isend(handle.source, MSG_QUERY_JOB_DESCRIPTION, 
-            IntPair(jobId, get(jobId).getRevision()+1));
-    }
+    if (job.getState() == ACTIVE)
+        _desc_interface.queryNextRevisionIfNeeded(job, handle.source);
 }
 
 void SchedulingManager::handleQueryForExplicitVolumeUpdate(MessageHandle& handle) {
@@ -883,10 +779,9 @@ bool SchedulingManager::isAdoptionOfferObsolete(const JobRequest& req, bool alre
     return false;
 }
 
-void SchedulingManager::initiateVolumeUpdate(int jobId) {
-
-    auto& job = get(jobId);
+void SchedulingManager::initiateVolumeUpdate(Job& job) {
     
+    int jobId = job.getId();
     if (_params.explicitVolumeUpdates()) {
         // Volume updates are propagated explicitly
         if (job.getJobTree().isRoot()) {
@@ -904,8 +799,8 @@ void SchedulingManager::initiateVolumeUpdate(int jobId) {
             return;
         }
         // Apply current volume
-        if (hasVolume(jobId)) {
-            updateVolume(jobId, getVolume(jobId), getGlobalBalancingEpoch(), 0);
+        if (_balancer->hasVolume(jobId)) {
+            updateVolume(jobId, _balancer->getVolume(jobId), getGlobalBalancingEpoch(), 0);
         }
     }
 }
@@ -1136,7 +1031,7 @@ void SchedulingManager::commit(JobRequest& req) {
         
         // Subscribe for volume updates for this job even if the job is not active yet
         // Also reserves a PE of space for this job in case this is a root node
-        preregisterJobInBalancer(req.jobId);
+        preregisterJobInBalancer(job);
 
         if (_req_matcher) _req_matcher->setStatusDirty();
     }
@@ -1274,32 +1169,6 @@ void SchedulingManager::terminate(int jobId) {
         setLoad(0, jobId);
     }
 
-    if (!wasTerminatedBefore) {
-        // Gather statistics
-        auto numDesires = job.getJobTree().getNumDesires();
-        auto numFulfilledDesires = job.getJobTree().getNumFulfiledDesires();
-        auto sumDesireLatencies = job.getJobTree().getSumOfDesireLatencies();
-        float desireFulfilmentRatio = numDesires == 0 ? 0 : (float)numFulfilledDesires / numDesires;
-        float meanFulfilmentLatency = numFulfilledDesires == 0 ? 0 : sumDesireLatencies / numFulfilledDesires;
-
-        auto& latencies = job.getJobTree().getDesireLatencies();
-        float meanLatency = 0, minLatency = 0, maxLatency = 0, medianLatency = 0;
-        if (!latencies.empty()) {
-            std::sort(latencies.begin(), latencies.end());
-            meanLatency = std::accumulate(latencies.begin(), latencies.end(), 0.0f) / latencies.size();
-            minLatency = latencies.front();
-            maxLatency = latencies.back();
-            medianLatency = latencies[latencies.size()/2];
-        }
-
-        LOG(V3_VERB, "%s desires fulfilled=%.4f latency={num:%i min:%.5f med:%.5f avg:%.5f max:%.5f}\n",
-            job.toStr(), desireFulfilmentRatio, latencies.size(), minLatency, medianLatency, meanLatency, maxLatency);
-    }
-
-    //_sys_state.addLocal(SYSSTATE_NUMDESIRES, numDesires);
-    //_sys_state.addLocal(SYSSTATE_NUMFULFILLEDDESIRES, numFulfilledDesires);
-    //_sys_state.addLocal(SYSSTATE_SUMDESIRELATENCIES, sumDesireLatencies);
-
     job.terminate();
     if (job.hasCommitment()) uncommit(jobId);
     if (!wasTerminatedBefore) _balancer->onTerminate(job);
@@ -1380,6 +1249,10 @@ Job& SchedulingManager::get(int id) const {return _job_registry.get(id);}
 void SchedulingManager::setLoad(int load, int jobId) {
     _job_registry.setLoad(load, jobId);
     if (_req_matcher) _req_matcher->setStatusDirty();
+}
+
+int SchedulingManager::getGlobalBalancingEpoch() const {
+    return _balancer->getGlobalEpoch();
 }
 
 std::string SchedulingManager::toStr(int j, int idx) const {

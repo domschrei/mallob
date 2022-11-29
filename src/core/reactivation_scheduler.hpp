@@ -15,16 +15,12 @@ private:
     robin_hood::unordered_map<std::pair<int, int>, LocalScheduler, IntPairHasher> _schedulers;
 
     EmitDirectedJobRequestCallback _cb_emit_job_request;
-    std::function<Job*(int jobId)> _retrieve_job;
 
     std::list<MessageSubscription> _subscriptions;
 
 public:
-    ReactivationScheduler(JobRegistry& jobRegistry, EmitDirectedJobRequestCallback emitJobReq,
-            std::function<Job*(int jobId)> retrieveJob) : 
-        _job_registry(jobRegistry),
-        _cb_emit_job_request(emitJobReq), 
-        _retrieve_job(retrieveJob) {
+    ReactivationScheduler(JobRegistry& jobRegistry, EmitDirectedJobRequestCallback emitJobReq) : 
+            _job_registry(jobRegistry), _cb_emit_job_request(emitJobReq) {
 
         _subscriptions.emplace_back(MSG_SCHED_NODE_FREED, 
             [&](auto& h) {handleNodeFreedFromReactivation(h);});
@@ -141,8 +137,8 @@ public:
         auto it = _schedulers.begin();
         while (it != _schedulers.end()) {
             auto& [id, idx] = it->first;
-            Job* job = _retrieve_job(id);
-            bool hasJob = job != nullptr;
+            bool hasJob = _job_registry.has(id);
+            Job* job = hasJob ? &_job_registry.get(id) : nullptr;
             if (hasJob && (job->getState() == ACTIVE || job->hasCommitment())) {
                 ++it;
                 continue;
