@@ -1293,6 +1293,5 @@ SchedulingManager::~SchedulingManager() {
         usleep(10*1000); // 10 milliseconds
     }
 
-    // _job_gc.stop(); TODO required ???
     watchdog.stop();
 }

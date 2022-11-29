@@ -56,7 +56,7 @@ public:
         return !_job_destruct_queue.empty();
     }
 
-    void stop() {
+    ~JobGarbageCollector() {
         _worker.stopWithoutWaiting();
         _cond_var.notify();
         _worker.stop();

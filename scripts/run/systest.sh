@@ -48,7 +48,7 @@ function test_dry_scheduling() {
     t=1
     for i in {1..400}; do
         # wallclock limit, arrival, dependencies, application
-        wclimit=1.5s arrival=$t application=DUMMY introduce_job dummy-$i no/such/instance.txt
+        wclimit=1.5s arrival=$t application=DUMMY introduce_job dummy-$i instances/r3sat_300.cnf
         t=$(echo "$t+0.1"|bc -l)
     done
     echo "400 jobs set up."
