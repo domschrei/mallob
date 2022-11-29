@@ -7,13 +7,18 @@
 #include "util/robin_hood.hpp"
 #include "data/job_transfer.hpp"
 #include "comm/mympi.hpp"
+#include "balancing/request_matcher.hpp"
+#include "data/worker_sysstate.hpp"
+#include "comm/randomized_routing_tree.hpp"
 
 typedef std::function<void(JobRequest& req, int source)> DeflectJobRequestCallback;
 
-class RequestCache {
+class RequestManager {
 
 private:
-    DeflectJobRequestCallback _cb_deflect_request;
+    Parameters& _params;
+    WorkerSysState& _sys_state;
+    RandomizedRoutingTree& _routing_tree;
 
     // Requests which lay dormant (e.g., due to too many hops / too busy system)
     // and will be re-introduced to continue hopping after some time
@@ -24,8 +29,85 @@ private:
     // Request to re-activate a local dormant root
     std::optional<JobRequest> _pending_root_reactivate_request;
 
+    RequestMatcher* _req_matcher;
+
 public:
-    RequestCache(DeflectJobRequestCallback cb) : _cb_deflect_request(cb) {}
+    RequestManager(Parameters& params, WorkerSysState& sysstate, RandomizedRoutingTree& tree, RequestMatcher* reqMatcher) 
+        : _params(params), _sys_state(sysstate), _routing_tree(tree), _req_matcher(reqMatcher) {}
+
+    void spawnJobRequest(Job& job, bool left, int balancingEpoch) {
+    
+        int index = left ? job.getJobTree().getLeftChildIndex() : job.getJobTree().getRightChildIndex();
+        if (_params.monoFilename.isSet()) job.getJobTree().updateJobNode(index, index);
+
+        JobRequest req(job.getId(), job.getApplicationId(), job.getJobTree().getRootNodeRank(), 
+                MyMpi::rank(MPI_COMM_WORLD), index, Timer::elapsedSeconds(), balancingEpoch, 0, job.isIncremental());
+        req.revision = job.getDesiredRevision();
+        int tag = MSG_REQUEST_NODE;    
+
+        emitJobRequest(job, req, tag, left, -1);
+    }
+
+    void emitJobRequest(Job& job, const JobRequest& req, int tag, bool left, int dest) {
+
+        if (dest == -1) {
+            int nextNodeRank = job.getJobTree().getRankOfNextDormantChild(); 
+            if (nextNodeRank < 0) {
+                tag = MSG_REQUEST_NODE;
+                nextNodeRank = left ? job.getJobTree().getLeftChildNodeRank() : job.getJobTree().getRightChildNodeRank();
+            }
+            dest = nextNodeRank;
+        }
+
+        LOG_ADD_DEST(V3_VERB, "%s growing: %s", dest, job.toStr(), req.toStr().c_str());
+        
+        MyMpi::isend(dest, tag, req);
+        
+        _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
+        if (left) job.getJobTree().setDesireLeft(Timer::elapsedSeconds());
+        else job.getJobTree().setDesireRight(Timer::elapsedSeconds());
+    }
+
+    void activateRootRequest(int jobId) {
+        auto optReq = getRootRequest(jobId);
+        if (!optReq.has_value()) return;
+        LOG(V3_VERB, "Activate %s\n", optReq.value().toStr().c_str());
+        deflectJobRequest(optReq.value(), optReq.value().requestingNodeRank);
+    }
+
+    void deflectJobRequest(JobRequest& request, int senderRank) {
+
+        // Increment #hops
+        request.numHops++;
+        int num = request.numHops;
+        _sys_state.addLocal(SYSSTATE_NUMHOPS, 1);
+
+        // Show warning if #hops is a large power of two
+        if ((num >= 512) && ((num & (num - 1)) == 0)) {
+            LOG(V1_WARN, "[WARN] %s\n", request.toStr().c_str());
+        }
+
+        // If hopped enough for collective assignment to be enabled
+        // and if either reactivation scheduling is employed or the requested node is non-root
+        if (_req_matcher && (num >= _params.hopsUntilCollectiveAssignment())
+            && (_params.reactivationScheduling() || request.requestedNodeIndex > 0)) {
+            _req_matcher->addJobRequest(request);
+            return;
+        }
+
+        // Get random choice from bounce alternatives
+        int nextRank = _routing_tree.getRandomNeighbor();
+        if (_routing_tree.getNumNeighbors() > 2) {
+            // ... if possible while skipping the requesting node and the sender
+            while (nextRank == request.requestingNodeRank || nextRank == senderRank) {
+                nextRank = _routing_tree.getRandomNeighbor();
+            }
+        }
+
+        // Send request to "next" worker node
+        LOG_ADD_DEST(V5_DEBG, "Hop %s", nextRank, Job::toStr(request.jobId, request.requestedNodeIndex).c_str());
+        MyMpi::isend(nextRank, MSG_REQUEST_NODE, request);
+    }
 
     void defer(const JobRequest& req, int sender) {
         LOG(V3_VERB, "Defer %s\n", req.toStr().c_str());
@@ -46,7 +128,7 @@ public:
         }
 
         for (auto& [req, senderRank] : result) {
-            _cb_deflect_request(req, senderRank);
+            deflectJobRequest(req, senderRank);
         }
     }
 

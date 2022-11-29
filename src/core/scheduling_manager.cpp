@@ -9,30 +9,28 @@
 
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
-#include "balancing/event_driven_balancer.hpp"
 #include "util/sys/watchdog.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "comm/randomized_routing_tree.hpp"
 #include "job_registry.hpp"
-#include "balancing/event_driven_balancer.hpp"
 #include "balancing/request_matcher.hpp"
 #include "latency_report.hpp"
+#include "balancing/routing_tree_request_matcher.hpp"
+#include "balancing/prefix_sum_request_matcher.hpp"
 
 SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm, 
             RandomizedRoutingTree& routingTree,
             JobRegistry& jobRegistry, WorkerSysState& sysstate):
         _params(params), _comm(comm), _routing_tree(routingTree),
-        _req_cache(
-            // Callback for deflecting a job request to another destination
-            [&](JobRequest& req, int source) {deflectJobRequest(req, source);}
-        ),
         _sys_state(sysstate), _job_registry(jobRegistry),
-        _desc_interface(_job_registry),
+        _req_matcher(createRequestMatcher()),
+        _req_mgr(_params, _sys_state, _routing_tree, _req_matcher.get()),
+        _balancer(_comm, _params), _desc_interface(_job_registry),
         _reactivation_scheduler(_job_registry,
             // Callback for emitting a job request
             [&](const JobRequest& req, int tag, bool left, int dest) {
-                emitJobRequest(req, tag, left, dest);
+                _req_mgr.emitJobRequest(get(req.jobId), req, tag, left, dest);
             }
         ) {
 
@@ -43,14 +41,13 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
     _balance_period = params.balancingPeriod();       
 
     // Initialize balancer
-    _balancer = std::unique_ptr<EventDrivenBalancer>(new EventDrivenBalancer(_comm, _params));
-    _balancer->setVolumeUpdateCallback([&](int jobId, int volume, float eventLatency) {
+    _balancer.setVolumeUpdateCallback([&](int jobId, int volume, float eventLatency) {
         updateVolume(jobId, volume, getGlobalBalancingEpoch(), eventLatency);
     });
-    _balancer->setBalancingDoneCallback([&]() {
+    _balancer.setBalancingDoneCallback([&]() {
         // apply any job requests which have arrived from a "future epoch"
         // which has now become the present (or a past) epoch
-        for (auto& h : _req_cache.getArrivedFutureRequests(_balancer->getGlobalEpoch())) {
+        for (auto& h : _req_mgr.getArrivedFutureRequests(getGlobalBalancingEpoch())) {
             LOG_ADD_SRC(V4_VVER, "From the future: tag=%i", h.source, h.tag);
             handleIncomingJobRequest(h, h.tag == MSG_REQUEST_NODE ? 
                 SchedulingManager::JobRequestMode::NORMAL : 
@@ -58,7 +55,7 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
         }
     });
     // Balancer message handling
-    auto balanceCb = [&](auto& h) {_balancer->handle(h);};
+    auto balanceCb = [&](auto& h) {_balancer.handle(h);};
     _subscriptions.emplace_back(MSG_COLLECTIVE_OPERATION, balanceCb);
     _subscriptions.emplace_back(MSG_REDUCE_DATA, balanceCb);
     _subscriptions.emplace_back(MSG_BROADCAST_DATA, balanceCb);
@@ -119,7 +116,31 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
     _subscriptions.emplace_back(MSG_SCHED_RETURN_NODES, localSchedulerCb);
 }
 
+RequestMatcher* SchedulingManager::createRequestMatcher() {
+
+    if (_params.hopsUntilCollectiveAssignment() < 0) 
+        return (RequestMatcher*) nullptr;
+    auto cbReceiveRequest = [&](const JobRequest& req, int rank) {
+        MessageHandle handle;
+        handle.tag = MSG_REQUEST_NODE;
+        handle.finished = true;
+        handle.receiveSelfMessage(req.serialize(), rank);
+        handleIncomingJobRequest(handle, SchedulingManager::NORMAL);
+    };
+    if (_params.prefixSumMatching()) {
+        // Prefix sum based request matcher
+        return new PrefixSumRequestMatcher(_job_registry, _comm, cbReceiveRequest);
+    } else {
+        return new RoutingTreeRequestMatcher(
+            _job_registry, _comm, _routing_tree, cbReceiveRequest
+        );
+    }
+}
+
 void SchedulingManager::execute(Job& job, int source) {
+
+    // Remove commitment
+    uncommit(job, /*leaving=*/false);
 
     // Execute job
     int jobId = job.getId();
@@ -134,22 +155,22 @@ void SchedulingManager::execute(Job& job, int source) {
     }
 
     int demand = job.getDemand();
-    _balancer->onActivate(job, demand);
+    _balancer.onActivate(job, demand);
     job.setLastDemand(demand);
 }
 
 void SchedulingManager::preregisterJobInBalancer(Job& job) {
     int demand = std::max(1, job.getJobTree().isRoot() ? 0 : job.getDemand());
-    _balancer->onActivate(job, demand);
+    _balancer.onActivate(job, demand);
     if (job.getJobTree().isRoot()) job.setLastDemand(demand);
 }
 
-void SchedulingManager::unregisterJobFromBalancer(int jobId) {
-    _balancer->onTerminate(get(jobId));
+void SchedulingManager::unregisterJobFromBalancer(Job& job) {
+    _balancer.onTerminate(job);
 }
 
 void SchedulingManager::handleDemandUpdate(Job& job, int demand) {
-    _balancer->onDemandChange(job, demand);
+    _balancer.onDemandChange(job, demand);
     job.setLastDemand(demand);
 }
 
@@ -213,7 +234,12 @@ void SchedulingManager::checkActiveJob() {
 }
 
 void SchedulingManager::advanceBalancing(float time) {
-    _balancer->advance(time);
+    _balancer.advance(time);
+
+    // Advance collective assignment of nodes
+    if (_params.hopsUntilCollectiveAssignment() >= 0) {
+        _req_matcher->advance(getGlobalBalancingEpoch());
+    }
 }
 
 bool SchedulingManager::checkComputationLimits(int jobId) {
@@ -239,15 +265,15 @@ void SchedulingManager::handleIncomingJobRequest(MessageHandle& handle, JobReque
     // Root request for the first revision of a new job?
     if (req.requestedNodeIndex == 0 && req.numHops == 0 && req.revision == 0) {
         // Probe balancer for a free spot.
-        _balancer->onProbe(req.jobId);
-        _req_cache.addRootRequest(std::move(req));
+        _balancer.onProbe(req.jobId);
+        _req_mgr.addRootRequest(std::move(req));
         return;
     }
 
     if (req.balancingEpoch > getGlobalBalancingEpoch()) {
         // Job request is "from the future": defer it until it is from the present
         LOG(V4_VVER, "Defer future req. %s\n", req.toStr().c_str());
-        _req_cache.addFutureRequestMessage(req.balancingEpoch, std::move(handle));
+        _req_mgr.addFutureRequestMessage(req.balancingEpoch, std::move(handle));
         return;
     }
 
@@ -259,8 +285,7 @@ void SchedulingManager::handleIncomingJobRequest(MessageHandle& handle, JobReque
     }
 
     // Decide whether to adopt the job.
-    SchedulingManager::AdoptionResult adoptionResult = SchedulingManager::ADOPT_FROM_IDLE;
-    int removedJob;
+    SchedulingManager::AdoptionResult adoptionResult;
     if (_params.reactivationScheduling() && mode != SchedulingManager::TARGETED_REJOIN 
             && _job_registry.hasInactiveJobsWaitingForReactivation() && req.requestedNodeIndex > 0) {
         // In reactivation-based scheduling, block incoming requests if you are still waiting
@@ -268,33 +293,23 @@ void SchedulingManager::handleIncomingJobRequest(MessageHandle& handle, JobReque
         // Does not apply for targeted requests!
         adoptionResult = SchedulingManager::REJECT;
     } else {
-        adoptionResult = tryAdopt(req, mode, source, removedJob);
+        adoptionResult = tryAdopt(req, mode, source);
     }
 
     // Do I adopt the job?
-    if (adoptionResult == SchedulingManager::ADOPT_FROM_IDLE || adoptionResult == SchedulingManager::ADOPT_REPLACE_CURRENT) {
-
-        // Replaced the current job
-        if (adoptionResult == SchedulingManager::ADOPT_REPLACE_CURRENT) {
-            Job& job = get(removedJob);
-            MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, 
-                IntVec({job.getId(), job.getIndex(), job.getJobTree().getRootNodeRank()}));
-        }
+    if (adoptionResult == SchedulingManager::ADOPT) {
 
         // Adoption takes place
-        std::string jobstr = toStr(req.jobId, req.requestedNodeIndex);
         LOG_ADD_SRC(V3_VERB, "ADOPT %s mode=%i", source, req.toStr().c_str(), mode);
         assert(!_job_registry.isBusyOrCommitted() || LOG_RETURN_FALSE("Adopting a job, but not idle!\n"));
 
         // Commit on the job, send a request to the parent
         if (!has(req.jobId)) {
             // Job is not known yet: create instance
-            Job& job = _job_registry.create(req.jobId, req.applicationId, req.incremental);
+            _job_registry.create(req.jobId, req.applicationId, req.incremental);
         }
-        commit(req);
-        if (_params.reactivationScheduling()) {
-            _reactivation_scheduler.initializeReactivator(req, get(req.jobId));
-        }
+        Job& job = get(req.jobId);
+        commit(job, req);
         MyMpi::isend(req.requestingNodeRank, 
             req.requestedNodeIndex == 0 ? MSG_OFFER_ADOPTION_OF_ROOT : MSG_OFFER_ADOPTION,
             req);
@@ -306,7 +321,7 @@ void SchedulingManager::handleIncomingJobRequest(MessageHandle& handle, JobReque
             // I have the dormant root of this request, but cannot adopt right now:
             // defer until I can (e.g., until a made commitment can be broken)
             LOG(V4_VVER, "Defer pending root reactivation %s\n", req.toStr().c_str());
-            _req_cache.setPendingRootReactivationRequest(std::move(req));
+            _req_mgr.setPendingRootReactivationRequest(std::move(req));
         } else if (mode == SchedulingManager::TARGETED_REJOIN) {
             // Send explicit rejection message
             OneshotJobRequestRejection rej(req, _job_registry.hasDormantJob(req.jobId));
@@ -315,7 +330,7 @@ void SchedulingManager::handleIncomingJobRequest(MessageHandle& handle, JobReque
             MyMpi::isend(source, MSG_REJECT_ONESHOT, rej);
         } else if (mode == SchedulingManager::NORMAL) {
             // Continue job finding procedure somewhere else
-            deflectJobRequest(req, source);
+            _req_mgr.deflectJobRequest(req, source);
         }
     }
 }
@@ -324,7 +339,7 @@ void SchedulingManager::handleAdoptionOffer(MessageHandle& handle) {
 
     JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
     LOG_ADD_SRC(V4_VVER, "Adoption offer for %s", handle.source, 
-                    toStr(req.jobId, req.requestedNodeIndex).c_str());
+                    Job::toStr(req.jobId, req.requestedNodeIndex).c_str());
 
     bool reject = false;
     if (!has(req.jobId)) {
@@ -371,7 +386,7 @@ void SchedulingManager::handleRejectionOfDirectedRequest(MessageHandle& handle) 
     OneshotJobRequestRejection rej = Serializable::get<OneshotJobRequestRejection>(handle.getRecvData());
     JobRequest& req = rej.request;
     LOG_ADD_SRC(V5_DEBG, "%s rejected by dormant child", handle.source, 
-            toStr(req.jobId, req.requestedNodeIndex).c_str());
+            Job::toStr(req.jobId, req.requestedNodeIndex).c_str());
 
     if (!has(req.jobId)) return;
 
@@ -411,7 +426,7 @@ void SchedulingManager::handleRejectionOfDirectedRequest(MessageHandle& handle) 
     if (doNormalHopping) {
         LOG(V4_VVER, "%s : switch to normal hops\n", job.toStr());
         req.numHops = -1;
-        deflectJobRequest(req, handle.source);
+        _req_mgr.deflectJobRequest(req, handle.source);
     }
 }
 
@@ -455,9 +470,8 @@ void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
         
         if (job.hasDescription()) {
             // At least the initial description is present: Begin to execute job
-            uncommit(req.jobId);
             if (job.getState() == SUSPENDED) {
-                reactivate(req, handle.source);
+                resume(job, req, handle.source);
             } else {
                 execute(job, handle.source);
             }
@@ -466,36 +480,22 @@ void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
     } else {
         // Rejected
         LOG_ADD_SRC(V4_VVER, "Rejected to become %s : uncommitting", handle.source, job.toStr());
-        uncommit(req.jobId);
-        unregisterJobFromBalancer(req.jobId);
-        _reactivation_scheduler.suspendReactivator(job);
+        uncommit(job, /*leaving=*/true);
     }
 }
 
 void SchedulingManager::handleIncomingJobDescription(MessageHandle& handle) {
 
-    const auto& data = handle.getRecvData();
-    int jobId = data.size() >= sizeof(int) ? Serializable::get<int>(data) : -1;
-    LOG_ADD_SRC(V4_VVER, "Got desc. of size %i for job #%i", handle.source, data.size(), jobId);
-    if (jobId == -1 || !has(jobId)) {
-        if (_job_registry.hasCommitment(jobId)) {
-            uncommit(jobId);
-            unregisterJobFromBalancer(jobId);
-            if (has(jobId)) _reactivation_scheduler.suspendReactivator(get(jobId));
-        }
-        return;
-    }
-
     // Append revision description to job
-    auto& job = get(jobId);
-    if (!_desc_interface.handleIncomingJobDescription(job, handle)) return;
+    int jobId;
+    if (!_desc_interface.handleIncomingJobDescription(handle, jobId)) return;
 
     // If job has not started yet, execute it now
+    Job& job = get(jobId);
     if (_job_registry.hasCommitment(jobId)) {
         {
             const auto& req = _job_registry.getCommitment(jobId);
             job.setDesiredRevision(req.revision);
-            uncommit(jobId);
         }
         execute(job, handle.source);
         initiateVolumeUpdate(job);
@@ -564,8 +564,8 @@ void SchedulingManager::handleLeavingChild(MessageHandle& handle) {
 
     // If necessary, find replacement
     if (pruned != JobTree::TreeRelative::NONE && index < job.getVolume()) {
-        LOG(V4_VVER, "%s : look for replacement for %s\n", job.toStr(), toStr(jobId, index).c_str());
-        spawnJobRequest(jobId, pruned==JobTree::LEFT_CHILD, getGlobalBalancingEpoch());
+        LOG(V4_VVER, "%s : look for replacement for %s\n", job.toStr(), Job::toStr(jobId, index).c_str());
+        _req_mgr.spawnJobRequest(job, pruned==JobTree::LEFT_CHILD, getGlobalBalancingEpoch());
     }
 
     // Initiate communication if the job now became willing to communicate
@@ -779,6 +779,21 @@ bool SchedulingManager::isAdoptionOfferObsolete(const JobRequest& req, bool alre
     return false;
 }
 
+void SchedulingManager::leaveJobTree(Job& job, bool notifyParent) {
+
+    LOG(V3_VERB, "%s shrinking\n", job.toStr());
+    if (job.getState() == ACTIVE) {
+        suspend(job);
+    } else {
+        uncommit(job, /*leaving=*/true);
+    }
+    if (notifyParent) {
+        // Send explicit leaving message if not doing reactivation-based scheduling
+        MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, 
+            IntVec({job.getId(), job.getIndex(), job.getJobTree().getRootNodeRank()}));
+    }
+}
+
 void SchedulingManager::initiateVolumeUpdate(Job& job) {
     
     int jobId = job.getId();
@@ -799,8 +814,8 @@ void SchedulingManager::initiateVolumeUpdate(Job& job) {
             return;
         }
         // Apply current volume
-        if (_balancer->hasVolume(jobId)) {
-            updateVolume(jobId, _balancer->getVolume(jobId), getGlobalBalancingEpoch(), 0);
+        if (_balancer.hasVolume(jobId)) {
+            updateVolume(jobId, _balancer.getVolume(jobId), getGlobalBalancingEpoch(), 0);
         }
     }
 }
@@ -809,7 +824,7 @@ void SchedulingManager::updateVolume(int jobId, int volume, int balancingEpoch, 
 
     // If the job is not in the database, there might be a root request to activate 
     if (!has(jobId)) {
-        activateRootRequest(jobId);
+        _req_mgr.activateRootRequest(jobId);
         return;
     }
 
@@ -860,19 +875,7 @@ job.toStr(), volume, balancingEpoch, tree.getBalancingEpochOfLastRequests(), eve
         
         // Shrink (and pause solving) yourself, if necessary
         if (thisIndex > 0 && thisIndex >= volume) {
-            LOG(V3_VERB, "%s shrinking\n", job.toStr());
-            if (job.getState() == ACTIVE) {
-                suspend(jobId);
-            } else {
-                uncommit(jobId);
-                unregisterJobFromBalancer(jobId);
-                _reactivation_scheduler.suspendReactivator(job);
-            }
-            if (!_params.reactivationScheduling()) {
-                // Send explicit leaving message if not doing reactivation-based scheduling
-                MyMpi::isend(tree.getParentNodeRank(), MSG_NOTIFY_NODE_LEAVING_JOB, 
-                    IntVec({jobId, thisIndex, tree.getRootNodeRank()}));
-            }
+            leaveJobTree(job, /*notifyParent=*/!_params.reactivationScheduling());
         }
 
     } else if (job.getState() == SUSPENDED) {
@@ -895,161 +898,78 @@ void SchedulingManager::propagateVolumeUpdate(Job& job, int volume, int balancin
 
     // Prepare volume update to propagate down the job tree
     int jobId = job.getId();
-    int thisIndex = job.getIndex();
     auto& tree = job.getJobTree();
     IntVec payload{jobId, volume, balancingEpoch};
 
-    // For each potential child (left, right):
-    bool has[2] = {tree.hasLeftChild(), tree.hasRightChild()};
-    int indices[2] = {tree.getLeftChildIndex(), tree.getRightChildIndex()};
-    int ranks[2] = {-1, -1};
-    for (int i = 0; i < 2; i++) {
-        int nextIndex = indices[i];
-        if (has[i]) {
-            ranks[i] = i == 0 ? tree.getLeftChildNodeRank() : tree.getRightChildNodeRank();
+    // Handle existing and potential children
+    struct ChildPosition {bool has; int rank; int index; bool left;};
+    std::vector<ChildPosition> children{
+        {tree.hasLeftChild(), tree.getLeftChildIndex(), tree.getLeftChildNodeRank(), true},
+        {tree.hasRightChild(), tree.getRightChildIndex(), tree.getRightChildNodeRank(), false}
+    };
+    for (auto [has, index, rank, left] : children) {
+        if (has) {
             if (_params.explicitVolumeUpdates()) {
                 // Propagate volume update
-                MyMpi::isend(ranks[i], MSG_NOTIFY_VOLUME_UPDATE, payload);
+                MyMpi::isend(rank, MSG_NOTIFY_VOLUME_UPDATE, payload);
             }
-            if (_params.reactivationScheduling() && nextIndex >= volume) {
+            if (_params.reactivationScheduling() && index >= volume) {
                 // Child leaves
-                tree.prune(ranks[i], nextIndex);
-            }
-        } else if (nextIndex < volume 
-                && tree.getBalancingEpochOfLastRequests() < balancingEpoch) {
-            if (_job_registry.hasDormantRoot()) {
-                // Becoming an inner node is not acceptable
-                // because then the dormant root cannot be restarted seamlessly
-                LOG(V4_VVER, "%s cannot grow due to dormant root\n", job.toStr());
-                if (job.getState() == ACTIVE) {
-                    suspend(jobId);
-                } else {
-                    uncommit(jobId);
-                    unregisterJobFromBalancer(jobId);
-                    _reactivation_scheduler.suspendReactivator(job);
-                }
-                MyMpi::isend(tree.getParentNodeRank(), 
-                    MSG_NOTIFY_NODE_LEAVING_JOB, IntVec({jobId, thisIndex, tree.getRootNodeRank()}));
-                break;
-            }
-            if (!_params.reactivationScheduling()) {
-                // Try to grow immediately
-                spawnJobRequest(jobId, i==0, balancingEpoch);
+                tree.prune(rank, index);
             }
         } else {
-            // Job does not want to grow - any more (?) - so unset any previous desire
-            if (i == 0) tree.unsetDesireLeft();
-            else tree.unsetDesireRight();
+            if (index < volume 
+                    && tree.getBalancingEpochOfLastRequests() < balancingEpoch) {
+                if (_job_registry.hasDormantRoot()) {
+                    // Becoming an inner node is not acceptable
+                    // because then the dormant root cannot be restarted seamlessly
+                    LOG(V4_VVER, "%s cannot grow due to dormant root\n", job.toStr());
+                    leaveJobTree(job, /*notifyParent=*/true);
+                    break;
+                }
+                if (!_params.reactivationScheduling()) {
+                    // Try to grow immediately
+                    _req_mgr.spawnJobRequest(job, left, balancingEpoch);
+                }
+            } else {
+                // Job does not want to grow - any more (?) - so unset any previous desire
+                if (left) tree.unsetDesireLeft();
+                else tree.unsetDesireRight();
+            }
         }
     }
 }
 
-void SchedulingManager::deflectJobRequest(JobRequest& request, int senderRank) {
+void SchedulingManager::commit(Job& job, JobRequest& req) {
 
-    // Increment #hops
-    request.numHops++;
-    int num = request.numHops;
-    _sys_state.addLocal(SYSSTATE_NUMHOPS, 1);
+    LOG(V3_VERB, "COMMIT %s -> #%i:%i\n", job.toStr(), req.jobId, req.requestedNodeIndex);
+    job.commit(req);
+    _job_registry.setCommitted();
 
-    // Show warning if #hops is a large power of two
-    if ((num >= 512) && ((num & (num - 1)) == 0)) {
-        LOG(V1_WARN, "[WARN] %s\n", request.toStr().c_str());
-    }
+    // Subscribe for volume updates for this job, even if the job is not active yet
+    // Also reserves a PE of space for this job in case this is a root node
+    preregisterJobInBalancer(job);
 
-    // If hopped enough for collective assignment to be enabled
-    // and if either reactivation scheduling is employed or the requested node is non-root
-    if (_params.hopsUntilCollectiveAssignment() >= 0 && num >= _params.hopsUntilCollectiveAssignment()
-        && (_params.reactivationScheduling() || request.requestedNodeIndex > 0)) {
-        _req_matcher->addJobRequest(request);
-        return;
-    }
+    if (_req_matcher) _req_matcher->setStatusDirty();
 
-    // Get random choice from bounce alternatives
-    int nextRank = _routing_tree.getRandomNeighbor();
-    if (_routing_tree.getNumNeighbors() > 2) {
-        // ... if possible while skipping the requesting node and the sender
-        while (nextRank == request.requestingNodeRank || nextRank == senderRank) {
-            nextRank = _routing_tree.getRandomNeighbor();
-        }
-    }
-
-    // Send request to "next" worker node
-    LOG_ADD_DEST(V5_DEBG, "Hop %s", nextRank, toStr(request.jobId, request.requestedNodeIndex).c_str());
-    MyMpi::isend(nextRank, MSG_REQUEST_NODE, request);
-}
-
-void SchedulingManager::activateRootRequest(int jobId) {
-    auto optReq = _req_cache.getRootRequest(jobId);
-    if (!optReq.has_value()) return;
-    LOG(V3_VERB, "Activate %s\n", optReq.value().toStr().c_str());
-    deflectJobRequest(optReq.value(), optReq.value().requestingNodeRank);
-}
-
-void SchedulingManager::spawnJobRequest(int jobId, bool left, int balancingEpoch) {
-
-    Job& job = get(jobId);
-    
-    int index = left ? job.getJobTree().getLeftChildIndex() : job.getJobTree().getRightChildIndex();
-    if (_params.monoFilename.isSet()) job.getJobTree().updateJobNode(index, index);
-
-    JobRequest req(jobId, job.getApplicationId(), job.getJobTree().getRootNodeRank(), 
-            MyMpi::rank(MPI_COMM_WORLD), index, Timer::elapsedSeconds(), balancingEpoch, 0, job.isIncremental());
-    req.revision = job.getDesiredRevision();
-    int tag = MSG_REQUEST_NODE;    
-
-    emitJobRequest(req, tag, left, -1);
-}
-
-void SchedulingManager::emitJobRequest(const JobRequest& req, int tag, bool left, int dest) {
-
-    auto& job = get(req.jobId);
-
-    if (dest == -1) {
-        int nextNodeRank = job.getJobTree().getRankOfNextDormantChild(); 
-        if (nextNodeRank < 0) {
-            tag = MSG_REQUEST_NODE;
-            nextNodeRank = left ? job.getJobTree().getLeftChildNodeRank() : job.getJobTree().getRightChildNodeRank();
-        }
-        dest = nextNodeRank;
-    }
-
-    LOG_ADD_DEST(V3_VERB, "%s growing: %s", dest, job.toStr(), req.toStr().c_str());
-    
-    MyMpi::isend(dest, tag, req);
-    
-    _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
-    if (left) job.getJobTree().setDesireLeft(Timer::elapsedSeconds());
-    else job.getJobTree().setDesireRight(Timer::elapsedSeconds());
-}
-
-void SchedulingManager::commit(JobRequest& req) {
-    if (has(req.jobId)) {
-        Job& job = get(req.jobId);
-        LOG(V3_VERB, "COMMIT %s -> #%i:%i\n", job.toStr(), req.jobId, req.requestedNodeIndex);
-        job.commit(req);
-        _job_registry.setCommitted();
-        
-        // Subscribe for volume updates for this job even if the job is not active yet
-        // Also reserves a PE of space for this job in case this is a root node
-        preregisterJobInBalancer(job);
-
-        if (_req_matcher) _req_matcher->setStatusDirty();
+    if (_params.reactivationScheduling()) {
+        _reactivation_scheduler.initializeReactivator(req, job);
     }
 }
 
-void SchedulingManager::uncommit(int jobId) {
-    if (has(jobId)) {
-        LOG(V3_VERB, "UNCOMMIT %s\n", get(jobId).toStr());
-        get(jobId).uncommit();
-        _job_registry.unsetCommitted();
-        if (_req_matcher) _req_matcher->setStatusDirty();
+void SchedulingManager::uncommit(Job& job, bool leaving) {
+    if (!job.hasCommitment()) return;
+    LOG(V3_VERB, "UNCOMMIT %s\n", job.toStr());
+    job.uncommit();
+    _job_registry.unsetCommitted();
+    if (_req_matcher) _req_matcher->setStatusDirty();
+    if (leaving) {
+        unregisterJobFromBalancer(job);
+        _reactivation_scheduler.suspendReactivator(job);
     }
 }
 
-SchedulingManager::AdoptionResult SchedulingManager::tryAdopt(const JobRequest& req, JobRequestMode mode, int sender, int& removedJob) {
-
-    // Decide whether job should be adopted or bounced to another node
-    removedJob = -1;
+SchedulingManager::AdoptionResult SchedulingManager::tryAdopt(const JobRequest& req, JobRequestMode mode, int sender) {
     
     // Already have another commitment?
     if (_job_registry.committed()) {
@@ -1090,10 +1010,10 @@ SchedulingManager::AdoptionResult SchedulingManager::tryAdopt(const JobRequest& 
 
     // Is node idle and not committed to another job?
     if (!_job_registry.isBusyOrCommitted()) {
-        if (mode != TARGETED_REJOIN) return ADOPT_FROM_IDLE;
+        if (mode != TARGETED_REJOIN) return ADOPT;
         // Oneshot request: Job must be present and suspended
         else if (_job_registry.hasDormantJob(req.jobId)) {
-            return ADOPT_FROM_IDLE;
+            return ADOPT;
         } else {
             if (_req_matcher) _req_matcher->setStatusDirty();
             return REJECT;
@@ -1115,17 +1035,15 @@ SchedulingManager::AdoptionResult SchedulingManager::tryAdopt(const JobRequest& 
                 // Inform parent node of the original job  
                 LOG(V4_VVER, "Suspend %s ...\n", job.toStr());
                 LOG(V4_VVER, "... to adopt starving %s\n", 
-                                toStr(req.jobId, req.requestedNodeIndex).c_str());
-
-                removedJob = job.getId();
-                suspend(removedJob);
-                return ADOPT_REPLACE_CURRENT;
+                                Job::toStr(req.jobId, req.requestedNodeIndex).c_str());
+                leaveJobTree(job, /*notifyParent=*/true);
+                return ADOPT;
             }
         }
 
         // Adoption did not work out: Defer the request if a certain #hops is reached
         if (req.numHops > 0 && req.numHops % std::max(32, MyMpi::size(_comm)) == 0) {
-            _req_cache.defer(req, sender);
+            _req_mgr.defer(req, sender);
             return DEFER;
         }
     }
@@ -1134,47 +1052,47 @@ SchedulingManager::AdoptionResult SchedulingManager::tryAdopt(const JobRequest& 
     return REJECT;
 }
 
-void SchedulingManager::reactivate(const JobRequest& req, int source) {
+void SchedulingManager::resume(Job& job, const JobRequest& req, int source) {
+
+    // Remove commitment
+    uncommit(job, /*leaving=*/false);
+
     // Already has job description: Directly resume job (if not terminated yet)
-    assert(has(req.jobId));
-    Job& job = get(req.jobId);
     job.updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
     setLoad(1, req.jobId);
-    assert(!_job_registry.hasCommitment(req.jobId));
     LOG_ADD_SRC(V3_VERB, "RESUME %s", source, 
-                toStr(req.jobId, req.requestedNodeIndex).c_str());
+                Job::toStr(req.jobId, req.requestedNodeIndex).c_str());
     job.resume();
 
     int demand = job.getDemand();
-    _balancer->onActivate(job, demand);
+    _balancer.onActivate(job, demand);
     job.setLastDemand(demand);
 }
 
-void SchedulingManager::suspend(int jobId) {
-    assert(has(jobId) && get(jobId).getState() == ACTIVE);
-    Job& job = get(jobId);
+void SchedulingManager::suspend(Job& job) {
+    assert(job.getState() == ACTIVE);
     // Suspend (and possibly erase) job scheduler
     _reactivation_scheduler.suspendReactivator(job);    
     job.suspend();
-    setLoad(0, jobId);
+    setLoad(0, job.getId());
     LOG(V3_VERB, "SUSPEND %s\n", job.toStr());
-    _balancer->onSuspend(job);
+    _balancer.onSuspend(job);
 }
 
-void SchedulingManager::terminate(int jobId) {
-    assert(has(jobId));
-    Job& job = get(jobId);
+void SchedulingManager::terminate(Job& job) {
+
+    int jobId = job.getId();
     bool wasTerminatedBefore = job.getState() == JobState::PAST;
     if (_job_registry.hasActiveJob() && _job_registry.getActive().getId() == jobId) {
         setLoad(0, jobId);
     }
 
     job.terminate();
-    if (job.hasCommitment()) uncommit(jobId);
-    if (!wasTerminatedBefore) _balancer->onTerminate(job);
+    if (job.hasCommitment()) uncommit(job, /*leaving=*/true);
+    if (!wasTerminatedBefore) _balancer.onTerminate(job);
 
     LOG(V4_VVER, "Forget %s\n", job.toStr());
-    eraseJobAndQueueForDeletion(jobId);
+    eraseJobAndQueueForDeletion(job);
 }
 
 void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless) {
@@ -1192,34 +1110,25 @@ void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless)
     if (doTerminate && reckless) msgTag = MSG_NOTIFY_JOB_ABORTING;
     else if (doTerminate) msgTag = MSG_NOTIFY_JOB_TERMINATING;
     else msgTag = MSG_INTERRUPT;
-    if (job.getJobTree().hasLeftChild()) {
-        MyMpi::isend(job.getJobTree().getLeftChildNodeRank(), msgTag, IntVec({jobId}));
-        LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s ...", job.getJobTree().getLeftChildNodeRank(), job.toStr());
-    }
-    if (job.getJobTree().hasRightChild()) {
-        MyMpi::isend(job.getJobTree().getRightChildNodeRank(), msgTag, IntVec({jobId}));
-        LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s ...", job.getJobTree().getRightChildNodeRank(), job.toStr());
-    }
-    for (auto childRank : job.getJobTree().getPastChildren()) {
+    auto destinations = job.getJobTree().getPastChildren();
+    if (job.getJobTree().hasLeftChild()) destinations.insert(job.getJobTree().getLeftChildNodeRank());
+    if (job.getJobTree().hasRightChild()) destinations.insert(job.getJobTree().getRightChildNodeRank());
+    for (auto childRank : destinations) {
         MyMpi::isend(childRank, msgTag, IntVec({jobId}));
-        LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s (past child) ...", childRank, job.toStr());
+        LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s ...", childRank, job.toStr());
     }
     if (doTerminate) job.getJobTree().getPastChildren().clear();
 
     // Uncommit job if committed
-    if (job.hasCommitment()) {
-        uncommit(jobId);
-        unregisterJobFromBalancer(jobId);
-        _reactivation_scheduler.suspendReactivator(job);
-    }
+    if (job.hasCommitment()) uncommit(job, /*leaving=*/true);
 
     // Suspend or terminate the job
-    if (doTerminate) terminate(jobId);
-    else if (job.getState() == ACTIVE) suspend(jobId);
+    if (doTerminate) terminate(job);
+    else if (job.getState() == ACTIVE) suspend(job);
 }
 
 void SchedulingManager::tryAdoptPendingRootActivationRequest() {
-    auto optHandle = _req_cache.tryGetPendingRootActivationRequest();
+    auto optHandle = _req_mgr.tryGetPendingRootActivationRequest();
     if (optHandle) {
         handleIncomingJobRequest(optHandle.value(), SchedulingManager::NORMAL);
     }
@@ -1229,19 +1138,14 @@ void SchedulingManager::forgetOldJobs() {
     _reactivation_scheduler.forgetInactives();
     auto jobsToForget = _job_registry.findJobsToForget();
     // Perform forgetting of jobs
-    for (int jobId : jobsToForget) eraseJobAndQueueForDeletion(jobId);
+    for (int jobId : jobsToForget) eraseJobAndQueueForDeletion(get(jobId));
 }
 
-void SchedulingManager::eraseJobAndQueueForDeletion(int jobId) {
-    Job* jobPtr;
-    {
-        Job& job = get(jobId);
-        LOG(V4_VVER, "FORGET %s\n", job.toStr());
-        if (job.getState() != PAST) job.terminate();
-        assert(job.getState() == PAST);
-        jobPtr = &job;
-    }
-    _job_registry.erase(jobPtr);
+void SchedulingManager::eraseJobAndQueueForDeletion(Job& job) {
+    LOG(V4_VVER, "FORGET %s\n", job.toStr());
+    if (job.getState() != PAST) job.terminate();
+    assert(job.getState() == PAST);
+    _job_registry.erase(&job);
 }
 
 bool SchedulingManager::has(int id) const {return _job_registry.has(id);}
@@ -1252,11 +1156,7 @@ void SchedulingManager::setLoad(int load, int jobId) {
 }
 
 int SchedulingManager::getGlobalBalancingEpoch() const {
-    return _balancer->getGlobalEpoch();
-}
-
-std::string SchedulingManager::toStr(int j, int idx) const {
-    return "#" + std::to_string(j) + ":" + std::to_string(idx);
+    return _balancer.getGlobalEpoch();
 }
 
 void SchedulingManager::triggerMemoryPanic() {
@@ -1281,7 +1181,7 @@ SchedulingManager::~SchedulingManager() {
     
     // Forget each job, move raw pointer to destruct queue
     for (int jobId : _job_registry.collectAllJobs()) {
-        eraseJobAndQueueForDeletion(jobId);
+        eraseJobAndQueueForDeletion(get(jobId));
         watchdog.reset();
     }
 

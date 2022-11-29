@@ -9,7 +9,6 @@
 
 #include "worker.hpp"
 
-#include "data/serializable.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/timer.hpp"
@@ -17,14 +16,13 @@
 #include "util/logger.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/sys/thread_pool.hpp"
-#include "balancing/routing_tree_request_matcher.hpp"
-#include "balancing/prefix_sum_request_matcher.hpp"
+#include "comm/message_warmup.hpp"
 
 Worker::Worker(MPI_Comm comm, Parameters& params) :
     _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
     _params(params), _job_registry(_params, _comm), _routing_tree(_params, _comm), 
-    _sched_man(_params, _comm, _routing_tree, _job_registry, _sys_state), 
     _sys_state(_comm, params.sysstatePeriod(), SysState<9>::ALLREDUCE), 
+    _sched_man(_params, _comm, _routing_tree, _job_registry, _sys_state), 
     _watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/100, Timer::elapsedSeconds())
 {
     _watchdog.setWarningPeriod(50); // warn after 50ms without a reset
@@ -33,47 +31,12 @@ Worker::Worker(MPI_Comm comm, Parameters& params) :
 
 void Worker::init() {
     
-    _routing_tree.init();
-
-    if (_params.hopsUntilCollectiveAssignment() >= 0) {
-        // Create request matcher
-        // Callback for receiving a job request
-        auto cbReceiveRequest = [&](const JobRequest& req, int rank) {
-            MessageHandle handle;
-            handle.tag = MSG_REQUEST_NODE;
-            handle.finished = true;
-            handle.receiveSelfMessage(req.serialize(), rank);
-            _sched_man.handleIncomingJobRequest(handle, SchedulingManager::NORMAL);
-        };
-        if (_params.prefixSumMatching()) {
-            // Prefix sum based request matcher
-            _req_matcher.reset(new PrefixSumRequestMatcher(_job_registry, _comm, cbReceiveRequest));
-        } else {
-            // Routing tree based request matcher
-            _req_matcher.reset(new RoutingTreeRequestMatcher(
-                _job_registry, _comm, _routing_tree, cbReceiveRequest
-            ));
-        }
-        _sched_man.setRequestMatcher(_req_matcher);
-    }
-
-    auto& q = MyMpi::getMessageQueue();
-    
     // Write tag of currently handled message into watchdog
-    q.setCurrentTagPointers(_watchdog.activityRecvTag(), _watchdog.activitySendTag());
+    MyMpi::getMessageQueue().setCurrentTagPointers(_watchdog.activityRecvTag(), _watchdog.activitySendTag());
 
-    _subscriptions.emplace_back(MSG_WARMUP, [&](auto& h) {
-        LOG_ADD_SRC(V4_VVER, "Received warmup msg", h.source);
-    });
-
-    // Send warm-up messages with your pseudorandom bounce destinations
+    // Send warm-up messages
     if (_params.warmup()) {
-        IntVec payload({1, 2, 3, 4, 5, 6, 7, 8});
-        for (auto rank : _hop_destinations) {
-            MyMpi::isend(rank, MSG_WARMUP, payload);
-            LOG_ADD_DEST(V4_VVER, "Sending warmup msg", rank);
-            MyMpi::getMessageQueue().advance();
-        }
+        MessageWarmup(_comm, _routing_tree.getNeighbors()).performWarmup();
     }
 }
 
@@ -95,12 +58,6 @@ void Worker::advance(float time) {
     if (_periodic_balance_check.ready(time)) {
         _watchdog.setActivity(Watchdog::BALANCING);
         _sched_man.advanceBalancing(time);
-
-        // Advance collective assignment of nodes
-        if (_params.hopsUntilCollectiveAssignment() >= 0) {
-            _watchdog.setActivity(Watchdog::COLLECTIVE_ASSIGNMENT);
-            _req_matcher->advance(_sched_man.getGlobalBalancingEpoch());
-        }
     }
 
     // Do diverse periodic maintenance tasks

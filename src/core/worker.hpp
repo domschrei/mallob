@@ -15,8 +15,6 @@
 #include "data/job_transfer.hpp"
 #include "core/scheduling_manager.hpp"
 #include "data/worker_sysstate.hpp"
-#include "comm/distributed_bfs.hpp"
-#include "util/sys/background_worker.hpp"
 #include "balancing/request_matcher.hpp"
 #include "util/periodic_event.hpp"
 #include "util/sys/watchdog.hpp"
@@ -37,13 +35,10 @@ private:
 
     std::list<MessageSubscription> _subscriptions;
 
+    WorkerSysState _sys_state;
     JobRegistry _job_registry;
     RandomizedRoutingTree _routing_tree;
     SchedulingManager _sched_man;
-    WorkerSysState _sys_state;
-
-    std::vector<int> _hop_destinations;
-    std::shared_ptr<RequestMatcher> _req_matcher;
 
     long long _iteration = 0;
     PeriodicEvent<1000> _periodic_stats_check;

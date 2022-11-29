@@ -46,12 +46,17 @@ public:
         }
     }
 
-    bool handleIncomingJobDescription(Job& job, MessageHandle& handle) {
+    bool handleIncomingJobDescription(MessageHandle& handle, int& outJobId) {
+
+        const auto& data = handle.getRecvData();
+        outJobId = data.size() >= sizeof(int) ? Serializable::get<int>(data) : -1;
+        LOG_ADD_SRC(V4_VVER, "Got desc. of size %i for job #%i", handle.source, data.size(), outJobId);
 
         auto dataPtr = std::shared_ptr<std::vector<uint8_t>>(
             new std::vector<uint8_t>(handle.moveRecvData())
         );
-        bool valid = appendRevision(job, dataPtr, handle.source);
+        bool valid = _job_registry.has(outJobId) && 
+            appendRevision(_job_registry.get(outJobId), dataPtr, handle.source);
         if (!valid) {
             // Need to clean up shared pointer concurrently 
             // because it might take too much time in the main thread

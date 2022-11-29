@@ -332,6 +332,9 @@ public:
         return _name.c_str();
     };
     const char* jobStateToStr() const {return JOB_STATE_STRINGS[(int)_state];};
+    static std::string toStr(int jobId, int jobIndex) {
+        return "#" + std::to_string(jobId) + ":" + std::to_string(jobIndex);
+    }
 };
 
 #endif

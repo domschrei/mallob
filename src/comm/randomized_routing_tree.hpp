@@ -24,6 +24,7 @@ public:
     RandomizedRoutingTree(Parameters& params, MPI_Comm& comm) : _params(params), _comm(comm) {
         _world_rank = MyMpi::rank(_comm);
         _num_workers = MyMpi::size(_comm);
+        init();
     }
 
     void init() {
@@ -73,5 +74,9 @@ public:
 
     int getNumNeighbors() {
         return _hop_destinations.size();
+    }
+
+    const std::vector<int>& getNeighbors() const {
+        return _hop_destinations;
     }
 };

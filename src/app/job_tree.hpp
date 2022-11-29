@@ -69,17 +69,23 @@ public:
     int getIndex() const {return _index;}
     int getCommSize() const {return _comm_size;}
     int getRank() const {return _rank;}
-    bool isRoot() const {return _index == 0;};
-    int getRootNodeRank() const {return _job_node_ranks[0];};
-    int getLeftChildNodeRank() const {return _job_node_ranks[getLeftChildIndex()];};
-    int getRightChildNodeRank() const {return _job_node_ranks[getRightChildIndex()];};
+    bool isRoot() const {return _index == 0;}
+    int getRootNodeRank() const {return _job_node_ranks[0];}
+    int getLeftChildNodeRank() const {
+        int index = getLeftChildIndex();
+        return index < _comm_size ? _job_node_ranks[index] : -1;
+    }
+    int getRightChildNodeRank() const {
+        int index = getRightChildIndex();
+        return index < _comm_size ? _job_node_ranks[index] : -1;
+    }
     bool isLeaf() const {return !_has_left_child && !_has_right_child;}
-    bool hasLeftChild() const {return _has_left_child;};
-    bool hasRightChild() const {return _has_right_child;};
-    int getLeftChildIndex() const {return 2*(_index+1)-1;};
-    int getRightChildIndex() const {return 2*(_index+1);};
-    int getParentNodeRank() const {return isRoot() ? _client_rank : _job_node_ranks[getParentIndex()];};
-    int getParentIndex() const {return (_index-1)/2;};
+    bool hasLeftChild() const {return _has_left_child;}
+    bool hasRightChild() const {return _has_right_child;}
+    int getLeftChildIndex() const {return 2*(_index+1)-1;}
+    int getRightChildIndex() const {return 2*(_index+1);}
+    int getParentNodeRank() const {return isRoot() ? _client_rank : _job_node_ranks[getParentIndex()];}
+    int getParentIndex() const {return (_index-1)/2;}
     robin_hood::unordered_set<int>& getPastChildren() {return _past_children;}
     int getRankOfNextDormantChild() {
         if (_dormant_children.empty()) return -1;
