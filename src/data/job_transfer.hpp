@@ -25,6 +25,10 @@ struct JobRequest : public Serializable {
     int applicationId;
     bool incremental;
 
+    int multiplicity {1};
+    int multiBegin;
+    int multiEnd;
+
 public:
     JobRequest() = default;
 
@@ -42,7 +46,8 @@ public:
         applicationId(applicationId),
         incremental(incremental) {}
 
-    static size_t getTransferSize();
+    static size_t getMaxTransferSize();
+    size_t getTransferSize() const;
     std::vector<uint8_t> serialize() const override;
     JobRequest& deserialize(const std::vector<uint8_t> &packed) override;
     std::string toStr() const;

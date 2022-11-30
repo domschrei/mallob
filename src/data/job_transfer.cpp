@@ -6,8 +6,14 @@
 
 #include "data/job_description.hpp"
 
-size_t JobRequest::getTransferSize() {
-    return 8*sizeof(int)+sizeof(float)+sizeof(bool);
+/*static!*/ size_t JobRequest::getMaxTransferSize() {
+    return 8*sizeof(int)+sizeof(float)+sizeof(bool)
+        +3*sizeof(int);
+}
+
+size_t JobRequest::getTransferSize() const {
+    return 8*sizeof(int)+sizeof(float)+sizeof(bool)
+        +(multiplicity == 1 ? 1 : 3)*sizeof(int);
 }
 
 std::vector<uint8_t> JobRequest::serialize() const {
@@ -24,6 +30,10 @@ std::vector<uint8_t> JobRequest::serialize() const {
     n = sizeof(int); memcpy(packed.data()+i, &numHops, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &balancingEpoch, n); i += n;
     n = sizeof(bool); memcpy(packed.data()+i, &incremental, n); i += n;
+    n = sizeof(int); memcpy(packed.data()+i, &multiplicity, n); i += n;
+    if (multiplicity == 1) return packed;
+    n = sizeof(int); memcpy(packed.data()+i, &multiBegin, n); i += n;
+    n = sizeof(int); memcpy(packed.data()+i, &multiEnd, n); i += n;
     return packed;
 }
 
@@ -39,6 +49,10 @@ JobRequest& JobRequest::deserialize(const std::vector<uint8_t> &packed) {
     n = sizeof(int); memcpy(&numHops, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&balancingEpoch, packed.data()+i, n); i += n;
     n = sizeof(bool); memcpy(&incremental, packed.data()+i, n); i += n;
+    n = sizeof(int); memcpy(&multiplicity, packed.data()+i, n); i += n;
+    if (multiplicity == 1) return *this;
+    n = sizeof(int); memcpy(&multiBegin, packed.data()+i, n); i += n;
+    n = sizeof(int); memcpy(&multiEnd, packed.data()+i, n); i += n;
     return *this;
 }
 
@@ -51,7 +65,11 @@ std::string JobRequest::toStr() const {
             + " rev. " + std::to_string(revision) + " <- [" 
             + std::to_string(requestingNodeRank) + "] born=" + birthStr 
             + " hops=" + std::to_string(numHops)
-            + " epoch=" + std::to_string(balancingEpoch);
+            + " epoch=" + std::to_string(balancingEpoch)
+            + (multiplicity>1 ? 
+                " x" + std::to_string(multiplicity) 
+                    + " [" + std::to_string(multiBegin) + "," + std::to_string(multiEnd) + "]" 
+                : "");
 }
 
 bool JobRequest::operator==(const JobRequest& other) const {

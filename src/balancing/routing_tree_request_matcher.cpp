@@ -61,16 +61,19 @@ void RoutingTreeRequestMatcher::deserialize(const std::vector<uint8_t>& packed, 
 
     } else if (kind == COLL_ASSIGN_REQUESTS) {
         // List of job requests
-        n = JobRequest::getTransferSize();
-        while (i+n <= packed.size()) {
-            std::vector<uint8_t> reqPacked(packed.begin()+i, packed.begin()+i+n);
-            JobRequest req = Serializable::get<JobRequest>(reqPacked);
+        size_t i = 1;
+        while (i < packed.size()) {
+            // Extract request
+            std::vector<uint8_t> data(packed.data()+i, packed.data()+i+JobRequest::getMaxTransferSize());
+            JobRequest req = Serializable::get<JobRequest>(data);
+            // Accept or discard request
             if (req.balancingEpoch >= _epoch || req.requestedNodeIndex == 0) {
                 req.numHops++;
                 LOG_ADD_SRC(V4_VVER, "[CA] got %s", source, req.toStr().c_str());
                 _request_list.insert(req);
             } else LOG_ADD_SRC(V4_VVER, "[CA] DISCARD %s", source, req.toStr().c_str());
-            i += n;
+            // Go to next request
+            i += req.getTransferSize();
         }
     }
 }
