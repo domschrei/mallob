@@ -48,15 +48,15 @@ public:
             // send notification to direct child(ren)
             auto [leftReq, rightReq] = r.getMultipliedChildRequests(-1);
             if (extent != RIGHT && leftReq.jobId != -1) {
+                LOG(V4_VVER, "CANCEL %s\n", leftReq.toStr().c_str());
                 MyMpi::isend(leftReq.multiBegin % _routing_tree.getNumWorkers(), 
                     MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION, leftReq);
             }
             if (extent != LEFT && rightReq.jobId != -1) {
+                LOG(V4_VVER, "CANCEL %s\n", rightReq.toStr().c_str());
                 MyMpi::isend(rightReq.multiBegin % _routing_tree.getNumWorkers(), 
                     MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION, rightReq);
             }
-            LOG(V2_INFO, "DROPPING/DISCARDING %s %s\n", extent==LEFT?"left":extent==RIGHT?"right":"both", 
-                r.toStr().c_str());
         });
     }
 

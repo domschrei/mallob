@@ -105,13 +105,14 @@ public:
         }
         if (h.tag == MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION) {
             // Absorb an idle token for this request, ignore the request
-            LOG(V4_VVER, "PRISMA cancel %s\n", _requests_to_match.back().toStr().c_str());
+            auto req = Serializable::get<JobRequest>(h.getRecvData());
+            LOG(V4_VVER, "PRISMA received cancelled %s\n", req.toStr().c_str());
             _num_cancelled_requests_to_match++;
             // Propagate multiplied child requests as well
-            auto req = Serializable::get<JobRequest>(h.getRecvData());
             auto [leftReq, rightReq] = req.getMultipliedChildRequests(-1);
             for (auto& childReq : {leftReq, rightReq}) {
                 if (childReq.jobId == -1) continue;
+                LOG(V4_VVER, "CANCEL %s\n", childReq.toStr().c_str());
                 MyMpi::isend(childReq.multiBegin % MyMpi::size(_comm), 
                     MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION, childReq);
             }
