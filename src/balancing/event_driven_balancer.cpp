@@ -149,7 +149,7 @@ void EventDrivenBalancer::pushEvent(const Event& event, bool recordLatency) {
         if (recordLatency) {
             _pending_entries[event.jobId] = std::pair<int, float>(event.epoch, Timer::elapsedSeconds());
         }
-        LOG(V1_WARN, "BLC insert (%i,%i,%.3f)\n", event.jobId, event.demand, event.priority);
+        LOG(V4_VVER, "BLC insert (%i,%i,%.3f)\n", event.jobId, event.demand, event.priority);
         advance();
     }
 }

@@ -236,14 +236,18 @@ void Logger::log(va_list& args, unsigned int options, const char* str) const {
 
     // Colored output, if applicable
     if (!_quiet && _colored_output) {
-        if (verbosity == V0_CRIT) {
-            std::cout << Modifier(Code::FG_LIGHT_RED);
+        if (verbosity <= V0_CRIT) {
+            std::cout << Modifier(Code::FG_LIGHT_CYAN);
         } else if (verbosity == V1_WARN) {
-            std::cout << Modifier(Code::FG_YELLOW);
+            std::cout << Modifier(Code::FG_CYAN);
         } else if (verbosity == V2_INFO) {
-            std::cout << Modifier(Code::FG_WHITE);
-        } else {
-            std::cout << Modifier(Code::FG_LIGHT_GRAY);
+            std::cout << Modifier(Code::FG_LIGHT_BLUE);
+        } else if (verbosity == V3_VERB) {
+            std::cout << Modifier(Code::FG_BLUE);
+        } else if (verbosity == V4_VVER) {
+            std::cout << Modifier(Code::FG_MAGENTA);
+        } else if (verbosity >= V5_DEBG) {
+            std::cout << Modifier(Code::FG_DARK_GRAY);
         }
     }
 
@@ -281,4 +285,8 @@ void Logger::log(va_list& args, unsigned int options, const char* str) const {
     if (!_quiet && _colored_output) {
         std::cout << Modifier(Code::FG_DEFAULT);
     }
+}
+
+int Logger::getVerbosity() const {
+    return _verbosity;
 }

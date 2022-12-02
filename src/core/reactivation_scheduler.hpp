@@ -10,6 +10,7 @@
 class ReactivationScheduler {
 
 private:
+    Parameters& _params;
     JobRegistry& _job_registry;
 
     robin_hood::unordered_map<std::pair<int, int>, LocalScheduler, IntPairHasher> _schedulers;
@@ -19,18 +20,18 @@ private:
     std::list<MessageSubscription> _subscriptions;
 
 public:
-    ReactivationScheduler(JobRegistry& jobRegistry, EmitDirectedJobRequestCallback emitJobReq) : 
-            _job_registry(jobRegistry), _cb_emit_job_request(emitJobReq) {
+    ReactivationScheduler(Parameters& params, JobRegistry& jobRegistry, EmitDirectedJobRequestCallback emitJobReq) : 
+            _params(params), _job_registry(jobRegistry), _cb_emit_job_request(emitJobReq) {
 
         _subscriptions.emplace_back(MSG_SCHED_NODE_FREED, 
             [&](auto& h) {handleNodeFreedFromReactivation(h);});
     }
 
-    void initializeReactivator(JobRequest& req, Job& job) {
+    void initializeReactivator(const JobRequest& req, Job& job) {
 
         auto key = std::pair<int, int>(req.jobId, req.requestedNodeIndex);
         if (!_schedulers.count(key)) {
-            _schedulers.emplace(key, job.constructScheduler(_cb_emit_job_request));
+            _schedulers.emplace(key, constructScheduler(job));
             _job_registry.incrementNumReactivators(req.jobId);
         }
 
@@ -154,6 +155,15 @@ public:
     }
 
 private:
+
+    LocalScheduler constructScheduler(Job& job) {
+        LocalScheduler scheduler(job.getId(), _params, job.getJobTree(), 
+        [&job, this](int epoch, bool left, int dest) {
+            JobRequest req = job.spawnJobRequest(left, epoch);
+            _cb_emit_job_request(req, dest==-1 ? MSG_REQUEST_NODE : MSG_REQUEST_NODE_ONESHOT, left, dest);
+        });
+        return scheduler;
+    }
 
     bool hasScheduler(int jobId, int index) const {return _schedulers.count(std::pair<int, int>(jobId, index));}
     LocalScheduler& getScheduler(int jobId, int index) {return _schedulers.at(std::pair<int, int>(jobId, index));}

@@ -105,6 +105,6 @@ private:
 
     bool isRequestObsolete(const JobRequest& req);
     enum AdoptionResult {ADOPT, REJECT, DEFER, DISCARD};
-    AdoptionResult tryAdopt(const JobRequest& req, JobRequestMode mode, int sender);
+    AdoptionResult tryAdopt(JobRequest& req, JobRequestMode mode, int sender);
     bool isAdoptionOfferObsolete(const JobRequest& req, bool alreadyAccepted = false);
 };

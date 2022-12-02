@@ -21,7 +21,7 @@ private:
     std::list<JobRequest> _requests_in_prefix_sum;
 
     int _requests_indexing_offset {0};
-    std::list<std::pair<int, JobRequest>> _indexed_requests;
+    std::list<std::pair<std::pair<int, int>, JobRequest>> _indexed_requests;
     int _last_requests_total {0};
     int _last_requests_matched {0};
 
@@ -33,6 +33,7 @@ private:
 
     std::list<JobRequest> _requests_to_match;
     std::list<int> _idles_to_match;
+    int _num_cancelled_requests_to_match {0};
     int _running_rank_to_perform_match {0};
 
     std::list<MessageSubscription> _subscriptions;
@@ -79,6 +80,8 @@ public:
 
         _subscriptions.emplace_back(MSG_MATCHING_SEND_IDLE_TOKEN, [&](auto& h) {handle(h);});
         _subscriptions.emplace_back(MSG_MATCHING_SEND_REQUEST, [&](auto& h) {handle(h);});
+        _subscriptions.emplace_back(MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION, 
+            [&](auto& h) {handle(h);});
         
         _my_rank = MyMpi::rank(comm);
     }
@@ -97,6 +100,18 @@ public:
             _requests_to_match.push_back(Serializable::get<JobRequest>(h.getRecvData()));
             LOG(V4_VVER, "PRISMA received %s\n", _requests_to_match.back().toStr().c_str());
         }
+        if (h.tag == MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION) {
+            // Absorb an idle token for this request, ignore the request
+            _num_cancelled_requests_to_match++;
+            // Propagate multiplied child requests as well
+            auto req = Serializable::get<JobRequest>(h.getRecvData());
+            auto [leftReq, rightReq] = req.getMultipliedChildRequests(-1);
+            for (auto& childReq : {leftReq, rightReq}) {
+                if (childReq.jobId == -1) continue;
+                MyMpi::isend(childReq.multiBegin % MyMpi::size(_comm), 
+                    MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION, childReq);
+            }
+        }
 
         while (!_idles_to_match.empty() && !_requests_to_match.empty()) {
             int idleRank = _idles_to_match.front();
@@ -104,7 +119,12 @@ public:
             auto request = std::move(_requests_to_match.front()); 
             _requests_to_match.pop_front();
 
+            LOG_ADD_DEST(V3_VERB, "PRISMA emit %s", idleRank, request.toStr().c_str());
             MyMpi::isend(idleRank, MSG_REQUEST_NODE, request);
+        }
+        while (!_idles_to_match.empty() && _num_cancelled_requests_to_match > 0) {
+            _idles_to_match.pop_front();
+            _num_cancelled_requests_to_match--;
         }
     }
 
@@ -127,7 +147,7 @@ public:
         if (!_new_requests.empty()) { // TODO wait until ready to contribute *again*
             for (auto& req : _new_requests) LOG(V4_VVER, "PRISMA contribute %s\n", req.toStr().c_str());
             // Contribute to the requests prefix sum
-            _collective.contributeToSparsePrefixSum(CALL_ID_REQUESTS, _new_requests.size());
+            _collective.contributeToSparsePrefixSum(CALL_ID_REQUESTS, getSumOfNewRequestsMultiplicities());
             // Move requests from "new" to "in prefix sum"
             _requests_in_prefix_sum.splice(_requests_in_prefix_sum.end(), _new_requests);
         }
@@ -171,9 +191,17 @@ public:
 
 private:
 
+    int getSumOfNewRequestsMultiplicities() const {
+        int sum = 0;
+        for (auto& req : _new_requests) {
+            sum += req.multiplicity;
+        }
+        return sum;
+    }
+
     void tryMatch() {
 
-        skipMatchingStepsWithoutLocalContribution();
+        //skipMatchingStepsWithoutLocalContribution();
 
         // Use the indexed requests and the most recent prefix sum result.
         while (!doneMatching()) {
@@ -189,15 +217,26 @@ private:
             bool hadLocalContribution = false;
 
             if (!_indexed_requests.empty()) {
-                assert(_indexed_requests.front().first >= requestPrefixSumIndex);
-                if (_indexed_requests.front().first == requestPrefixSumIndex) {
+                auto& [indexStart, indexEnd] = _indexed_requests.front().first;
+                if (requestPrefixSumIndex >= indexStart && requestPrefixSumIndex < indexEnd) {
                     // THIS request is the one to be matched
-                    auto [index, req] = _indexed_requests.front();
-                    _indexed_requests.pop_front();
+                    auto& req = _indexed_requests.front().second;
 
-                    // send request
-                    MyMpi::isend(destinationRank, MSG_MATCHING_SEND_REQUEST, req);
+                    // Set correct multiplicity range for this request
+                    req.multiBegin = destinationRank;
+                    req.multiEnd = destinationRank + req.multiplicity;
+
+                    // only send the first "incarnation" of a request with multiplicity > 1
+                    if (requestPrefixSumIndex == indexStart) {
+                        MyMpi::isend(destinationRank, MSG_MATCHING_SEND_REQUEST, req);
+                    }
                     hadLocalContribution = true;
+
+                    // Pop this request from indexed request structure
+                    // if it is the last "incarnation"
+                    if (requestPrefixSumIndex+1 == indexEnd) {
+                        _indexed_requests.pop_front();
+                    }
                 }
             }
 
@@ -210,7 +249,7 @@ private:
                 hadLocalContribution = true;
             }
 
-            assert(hadLocalContribution);
+            //assert(hadLocalContribution);
 
             // Go to next step
             _last_idles_matched++;
@@ -218,7 +257,7 @@ private:
             _running_rank_to_perform_match++;
 
             // skip any non-local steps
-            skipMatchingStepsWithoutLocalContribution();
+            //skipMatchingStepsWithoutLocalContribution();
         }
     }
 
@@ -227,9 +266,9 @@ private:
         // How many steps until there is a local relevant request?        
         bool hasRequestContribution = !_indexed_requests.empty();
         int skippableStepsForRequests = hasRequestContribution ? 
-            _indexed_requests.front().first - (_requests_indexing_offset + _last_requests_matched) 
+            _indexed_requests.front().first.first - (_requests_indexing_offset + _last_requests_matched) 
             : std::numeric_limits<int>::max();
-        assert(skippableStepsForRequests >= 0);
+        skippableStepsForRequests = std::max(0, skippableStepsForRequests);
         skippableStepsForRequests = std::min(skippableStepsForRequests, _last_requests_total-_last_requests_matched);
 
         // How many steps until there is a local relevant idle rank?
@@ -263,7 +302,8 @@ private:
         _requests_indexing_offset += _last_requests_total;
         
         auto reqIt = _requests_in_prefix_sum.begin();
-        for (int index = exclusiveSum; index < inclusiveSum; index++) {
+        int index = exclusiveSum;
+        while (index < inclusiveSum) {
             assert(reqIt != _requests_in_prefix_sum.end());
             
             // Extract job request
@@ -271,8 +311,11 @@ private:
             reqIt = _requests_in_prefix_sum.erase(reqIt);
 
             auto reqIndex = _requests_indexing_offset + index;
-            LOG(V4_VVER, "PRISMA indexed Q%i : %s\n", reqIndex, req.toStr().c_str());
-            _indexed_requests.emplace_back(reqIndex, std::move(req));
+            auto reqIndexEnd = reqIndex + req.multiplicity;
+            LOG(V4_VVER, "PRISMA indexed [Q%i..Q%i) : %s\n", reqIndex, reqIndexEnd, req.toStr().c_str());
+            _indexed_requests.emplace_back(std::pair<int, int>(reqIndex, reqIndexEnd), std::move(req));
+
+            index += req.multiplicity;
         }
 
         _last_requests_total = totalSum;

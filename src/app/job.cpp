@@ -26,29 +26,6 @@ Job::Job(const Parameters& params, const JobSetup& setup) :
     _threads_per_job = _params.numThreadsPerProcess();
 }
 
-LocalScheduler Job::constructScheduler(std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq) {
-    LocalScheduler scheduler(_id, _params, _job_tree);
-    scheduler.initCallbacks(
-        // callback to emit a directed job request message to a specific PE
-        [this, emitJobReq](int epoch, int requestedIndex, int rank) {
-            JobRequest req(_id, _application_id, _job_tree.getRootNodeRank(), 
-                _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, -2, _incremental);
-            req.revision = std::max(0, getDesiredRevision());
-            LOG_ADD_DEST(V5_DEBG, "RBS EMIT_REQ %s", rank, req.toStr().c_str());
-            emitJobReq(req, MSG_REQUEST_NODE_ONESHOT, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), rank);
-        },
-        // callback to emit a certain, undirected job request message
-        [this, emitJobReq](int epoch, int requestedIndex) {
-            JobRequest req(_id, _application_id, _job_tree.getRootNodeRank(), 
-                _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, 0, _incremental);
-            req.revision = std::max(0, getDesiredRevision());
-            LOG(V5_DEBG, "RBS EMIT_REQ %s\n", req.toStr().c_str());
-            emitJobReq(req, MSG_REQUEST_NODE, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), -1);
-        }
-    );
-    return scheduler;
-}
-
 void Job::updateJobTree(int index, int rootRank, int parentRank) {
 
     if (index == 0) rootRank = -1;
@@ -59,15 +36,17 @@ void Job::updateJobTree(int index, int rootRank, int parentRank) {
 void Job::commit(const JobRequest& req) {
     assert(getState() != ACTIVE);
     assert(getState() != PAST);
-    _commitment = req;
     _balancing_epoch_of_last_commitment = req.balancingEpoch;
     _job_tree.clearJobNodeUpdates();
     updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
+    _commitment = req;
 }
 
-void Job::uncommit() {
+std::optional<JobRequest> Job::uncommit() {
     assert(getState() != ACTIVE);
+    std::optional<JobRequest> optReq(std::move(_commitment));
     _commitment.reset();
+    return optReq;
 }
 
 void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
@@ -112,6 +91,8 @@ void Job::suspend() {
     _job_tree.unsetLeftChild();
     _job_tree.unsetRightChild();
     LOG(V4_VVER, "%s : suspended solver\n", toStr());
+    _request_to_multiply_left.reset();
+    _request_to_multiply_right.reset();
     updateVolumeAndUsedCpu(getVolume());
 }
 
@@ -134,6 +115,8 @@ void Job::terminate() {
 
     _job_tree.unsetLeftChild();
     _job_tree.unsetRightChild();
+    _request_to_multiply_left.reset();
+    _request_to_multiply_right.reset();
 
     _time_of_abort = Timer::elapsedSeconds();
     LOG(V4_VVER, "%s : terminated\n", toStr());
