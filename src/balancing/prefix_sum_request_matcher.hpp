@@ -36,6 +36,8 @@ private:
     int _num_cancelled_requests_to_match {0};
     int _running_rank_to_perform_match {0};
 
+    float _time_of_last_change_in_matching {0};
+
     std::list<MessageSubscription> _subscriptions;
 
     struct BroadcastEvent {
@@ -102,6 +104,7 @@ public:
         }
         if (h.tag == MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION) {
             // Absorb an idle token for this request, ignore the request
+            LOG(V4_VVER, "PRISMA cancel %s\n", _requests_to_match.back().toStr().c_str());
             _num_cancelled_requests_to_match++;
             // Propagate multiplied child requests as well
             auto req = Serializable::get<JobRequest>(h.getRecvData());
@@ -119,13 +122,17 @@ public:
             auto request = std::move(_requests_to_match.front()); 
             _requests_to_match.pop_front();
 
-            LOG_ADD_DEST(V3_VERB, "PRISMA emit %s", idleRank, request.toStr().c_str());
+            LOG(V3_VERB, "PRISMA EMIT [%i] <= %s\n", idleRank, request.toStr().c_str());
             MyMpi::isend(idleRank, MSG_REQUEST_NODE, request);
         }
         while (!_idles_to_match.empty() && _num_cancelled_requests_to_match > 0) {
+            int idleRank = _idles_to_match.front();
             _idles_to_match.pop_front();
             _num_cancelled_requests_to_match--;
+            LOG(V3_VERB, "PRISMA EMIT [%i] <= XXX\n", idleRank);
         }
+
+        _time_of_last_change_in_matching = Timer::elapsedSecondsCached();
     }
 
     virtual void advance(int epoch) override {
@@ -186,6 +193,18 @@ public:
 
             _last_event_id = event.id;
             it = _events.erase(it);
+        }
+
+        // Output requests and/or idles which have not been matched for at least a second
+        if (Timer::elapsedSecondsCached() - _time_of_last_change_in_matching >= 1.0f) {
+            if (!_idles_to_match.empty()) {
+                LOG(V1_WARN, "[WARN] PRISMA %i idles seem orphaned\n", _idles_to_match.size());
+            }
+            if (!_requests_to_match.empty()) {
+                LOG(V1_WARN, "[WARN] PRISMA %i requests seem orphaned\n", 
+                    _requests_to_match.size() + _num_cancelled_requests_to_match);
+            }
+            _time_of_last_change_in_matching = Timer::elapsedSecondsCached();
         }
     }
 
