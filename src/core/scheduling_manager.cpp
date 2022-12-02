@@ -281,7 +281,7 @@ void SchedulingManager::handleIncomingJobRequest(MessageHandle& handle, JobReque
     if (isRequestObsolete(req)) {
         LOG_ADD_SRC(V3_VERB, "DISCARD %s mode=%i", source, 
                 req.toStr().c_str(), mode);
-        if (_params.hopsUntilCollectiveAssignment() >= 0) _req_matcher->setStatusDirty();
+        if (_req_matcher) _req_matcher->setStatusDirty(RequestMatcher::DISCARD_REQUEST);
         return;
     }
 
@@ -289,7 +289,7 @@ void SchedulingManager::handleIncomingJobRequest(MessageHandle& handle, JobReque
     if (_params.reactivationScheduling() && mode == SchedulingManager::TARGETED_REJOIN) {
         // Mark job as having been notified of the current scheduling and that it is not further needed.
         if (has(req.jobId)) get(req.jobId).getJobTree().stopWaitingForReactivation(req.balancingEpoch);
-        if (_params.hopsUntilCollectiveAssignment() >= 0) _req_matcher->setStatusDirty();
+        if (_req_matcher) _req_matcher->setStatusDirty(RequestMatcher::STOP_WAIT_FOR_REACTIVATION);
     }
 
     // Decide whether to adopt the job.
@@ -340,6 +340,7 @@ void SchedulingManager::handleIncomingJobRequest(MessageHandle& handle, JobReque
             // Continue job finding procedure somewhere else
             _req_mgr.deflectJobRequest(req, source);
         }
+        if (_req_matcher) _req_matcher->setStatusDirty(RequestMatcher::REJECT_REQUEST);
     }
 }
 
@@ -707,7 +708,7 @@ void SchedulingManager::handleJobReleasedFromWaitingForReactivation(MessageHandl
             (get(jobId).getState() != INACTIVE || get(jobId).hasCommitment())) {
         // Job present: release this worker from waiting for that job
         get(jobId).getJobTree().stopWaitingForReactivation(epoch);
-        if (_params.hopsUntilCollectiveAssignment() >= 0) _req_matcher->setStatusDirty();
+        if (_req_matcher) _req_matcher->setStatusDirty(RequestMatcher::STOP_WAIT_FOR_REACTIVATION);
     } else {
         // Job not present any more: Let sender know
         MyMpi::isend(handle.source, MSG_SCHED_NODE_FREED, 
@@ -862,8 +863,6 @@ job.toStr(), volume, balancingEpoch, tree.getBalancingEpochOfLastRequests(), eve
     
     if (job.getState() == ACTIVE || job.hasCommitment()) {
 
-        if (_params.hopsUntilCollectiveAssignment() >= 0) _req_matcher->setStatusDirty();
-
         // Root of a job updated for the 1st time
         if (tree.isRoot()) {
             if (tree.getBalancingEpochOfLastRequests() == -1) {
@@ -980,7 +979,7 @@ void SchedulingManager::commit(Job& job, JobRequest& req) {
     // Also reserves a PE of space for this job in case this is a root node
     preregisterJobInBalancer(job);
 
-    if (_req_matcher) _req_matcher->setStatusDirty();
+    if (_req_matcher) _req_matcher->setStatusDirty(RequestMatcher::COMMIT_JOB);
 
     if (_params.reactivationScheduling()) {
         _reactivation_scheduler.initializeReactivator(req, job);
@@ -995,8 +994,8 @@ void SchedulingManager::uncommit(Job& job, bool leaving) {
     assert(optReq.has_value());
 
     _job_registry.unsetCommitted();
-    if (_req_matcher) _req_matcher->setStatusDirty();
     if (leaving) {
+        if (_req_matcher) _req_matcher->setStatusDirty(RequestMatcher::UNCOMMIT_JOB_LEAVING);
         unregisterJobFromBalancer(job);
         _reactivation_scheduler.suspendReactivator(job);
         LOG(V4_VVER, "destruct request(s) to multiply\n");
@@ -1009,7 +1008,6 @@ SchedulingManager::AdoptionResult SchedulingManager::tryAdopt(JobRequest& req, J
     
     // Already have another commitment?
     if (_job_registry.committed()) {
-        if (_req_matcher) _req_matcher->setStatusDirty();
         return REJECT;
     }
 
@@ -1033,13 +1031,11 @@ SchedulingManager::AdoptionResult SchedulingManager::tryAdopt(JobRequest& req, J
         if (req.requestedNodeIndex > 0) {
             // Explicitly avoid to adopt a non-root node of the job of which I have a dormant root
             // (commit would overwrite job index!)
-            if (_req_matcher) _req_matcher->setStatusDirty();
             return REJECT;
         }
     } else {
         if (_job_registry.hasDormantRoot() && req.requestedNodeIndex == 0) {
             // Cannot adopt a root node while there is still another dormant root here
-            if (_req_matcher) _req_matcher->setStatusDirty();
             return REJECT;
         }
     }
@@ -1051,7 +1047,6 @@ SchedulingManager::AdoptionResult SchedulingManager::tryAdopt(JobRequest& req, J
         else if (_job_registry.hasDormantJob(req.jobId)) {
             return ADOPT;
         } else {
-            if (_req_matcher) _req_matcher->setStatusDirty();
             return REJECT;
         }
     }
@@ -1084,7 +1079,6 @@ SchedulingManager::AdoptionResult SchedulingManager::tryAdopt(JobRequest& req, J
         }
     }
 
-    if (_req_matcher) _req_matcher->setStatusDirty();
     return REJECT;
 }
 
@@ -1188,7 +1182,7 @@ bool SchedulingManager::has(int id) const {return _job_registry.has(id);}
 Job& SchedulingManager::get(int id) const {return _job_registry.get(id);}
 void SchedulingManager::setLoad(int load, int jobId) {
     _job_registry.setLoad(load, jobId);
-    if (_req_matcher) _req_matcher->setStatusDirty();
+    if (load == 0 && _req_matcher) _req_matcher->setStatusDirty(RequestMatcher::BECOME_IDLE);
 }
 
 int SchedulingManager::getGlobalBalancingEpoch() const {

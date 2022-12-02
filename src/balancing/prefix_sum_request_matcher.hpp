@@ -17,6 +17,7 @@ private:
     AsyncCollective<ReduceableInt> _collective;
     int _my_rank;
 
+    bool _last_contribution_idle {false};
     std::list<JobRequest> _new_requests;
     std::list<JobRequest> _requests_in_prefix_sum;
 
@@ -138,16 +139,13 @@ public:
     virtual void advance(int epoch) override {
 
         if (_job_registry == nullptr) return;
-        bool newEpoch = epoch > _epoch;
+        _epoch = std::max(_epoch, epoch);
 
-        if (newEpoch) {
-            _epoch = epoch;
-            _status_dirty = true;
-        }
-
-        if (_status_dirty) {
+        auto idle = isIdle();
+        if ((idle != _last_contribution_idle) || _status_dirty) {
             LOG(V5_DEBG, "PRISMA contribute idle status\n");
             _collective.contributeToSparsePrefixSum(CALL_ID_IDLES, ReduceableInt(isIdle()?1:0));
+            _last_contribution_idle = idle;
             _status_dirty = false;
         }
 
@@ -200,12 +198,21 @@ public:
             if (!_idles_to_match.empty()) {
                 LOG(V1_WARN, "[WARN] PRISMA %i idles seem orphaned\n", _idles_to_match.size());
             }
-            if (!_requests_to_match.empty()) {
-                LOG(V1_WARN, "[WARN] PRISMA %i requests seem orphaned\n", 
-                    _requests_to_match.size() + _num_cancelled_requests_to_match);
+            if (!_requests_to_match.empty() || _num_cancelled_requests_to_match > 0) {
+                LOG(V1_WARN, "[WARN] PRISMA %i requests (%i proper, %i cancelled) seem orphaned\n", 
+                    _requests_to_match.size() + _num_cancelled_requests_to_match,
+                    _requests_to_match.size(), _num_cancelled_requests_to_match);
             }
             _time_of_last_change_in_matching = Timer::elapsedSecondsCached();
         }
+    }
+
+    virtual void setStatusDirty(StatusDirtyReason reason) override {
+        if (isIdle() && (reason == DISCARD_REQUEST || reason == REJECT_REQUEST)) {
+            // confirm that you are still idle indeed
+            _status_dirty = true;
+        }
+        // other reasons are caught by changes in the return value of isIdle()
     }
 
 private:

@@ -27,7 +27,10 @@ public:
     virtual void advance(int epoch) = 0;
     virtual void addJobRequest(JobRequest& request) = 0;
 
-    virtual void setStatusDirty() {_status_dirty = true;}
+    enum StatusDirtyReason {
+        DISCARD_REQUEST, REJECT_REQUEST, STOP_WAIT_FOR_REACTIVATION, COMMIT_JOB, UNCOMMIT_JOB_LEAVING, BECOME_IDLE
+    };
+    virtual void setStatusDirty(StatusDirtyReason reason) {_status_dirty = true;}
 
 protected:
     bool isIdle();
