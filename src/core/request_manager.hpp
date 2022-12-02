@@ -89,7 +89,7 @@ public:
             } else if (_params.bulkRequests()) {
                 // Which transitive children *below* the requested index does this job desire?
                 // Perform a depth-first search as far as the job's volume allows.
-                req.multiplicity = getCurrentDesiredRequestMultiplicity(job, req.requestedNodeIndex);
+                addMultiplicityToRequest(req, job.getVolume());
             }
         }
 
@@ -140,6 +140,22 @@ public:
         // and if either reactivation scheduling is employed or the requested node is non-root
         if (_req_matcher && (num >= _params.hopsUntilCollectiveAssignment())
             && (_params.reactivationScheduling() || request.requestedNodeIndex > 0)) {
+
+            if (_params.prefixSumMatching() && _params.bulkRequests()) {
+                // Reset multiplicity according to multiEnd-multiBegin. Example:
+                // 0.206 0 PRISMA contribute r.#3596:3 rev. 0 <- [0] born=0.203 hops=1 epoch=5 x4 [1,4]
+                // -- effectively looking for 4-1=3 workers
+                // ... prefix sum calculation ...
+                // 0.207 7 PRISMA received r.#3596:3 rev. 0 <- [0] born=0.203 hops=1 epoch=5 x4 [7,11]
+                // -- now requesting 11-7=4 workers!
+                // => Danger of increasing the desired interval!
+                if (request.multiplicity > 1 && request.multiBegin >= 0 && request.multiEnd >= 0) {
+                    request.multiplicity = request.multiEnd - request.multiBegin;
+                    request.multiBegin = -1;
+                    request.multiEnd = -1;
+                }
+            }
+
             _req_matcher->addJobRequest(request);
             return;
         }
@@ -247,8 +263,12 @@ public:
         return handle;
     }
 
+    void addMultiplicityToRequest(JobRequest& req, int jobVolume) {
+        req.multiplicity = getCurrentDesiredRequestMultiplicity(jobVolume, req.requestedNodeIndex);
+    }
+
 private:
-    int getCurrentDesiredRequestMultiplicity(Job& job, int index) {
+    int getCurrentDesiredRequestMultiplicity(int volume, int index) {
 
         // Which transitive children *below* the requested index does this job desire?
         // Perform a depth-first search as far as the job's volume allows.
@@ -263,7 +283,7 @@ private:
 
             // Expand children
             for (auto childIndex : {2*index+1, 2*index+2}) {
-                if (childIndex < job.getVolume()) {
+                if (childIndex < volume) {
                     indexStack.push_back(childIndex);
                 }
             }
