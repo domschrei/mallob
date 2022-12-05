@@ -26,6 +26,7 @@ struct JobRequest : public Serializable {
     int applicationId;
     bool incremental;
 
+    int multiBaseId {-1};
     int multiplicity {1};
     int multiBegin {-1};
     int multiEnd {-1};
@@ -60,6 +61,7 @@ public:
         balancingEpoch = other.balancingEpoch;
         applicationId = other.applicationId;
         incremental = other.incremental;
+        multiBaseId = other.multiBaseId;
         multiplicity = other.multiplicity;
         multiBegin = other.multiBegin;
         multiEnd = other.multiEnd;
@@ -77,6 +79,7 @@ public:
         balancingEpoch = other.balancingEpoch;
         applicationId = other.applicationId;
         incremental = other.incremental;
+        multiBaseId = other.multiBaseId;
         multiplicity = other.multiplicity;
         multiBegin = other.multiBegin;
         multiEnd = other.multiEnd;
@@ -100,6 +103,11 @@ public:
     bool operator!=(const JobRequest& other) const;
     bool operator<(const JobRequest& other) const;
 
+    int getMatchingId() const {
+        return multiBaseId + (multiplicity==1 ? 0 : 
+            (multiplicity - (multiEnd - multiBegin))
+        );
+    }
     std::pair<JobRequest, JobRequest> getMultipliedChildRequests(int requestingRank) {
         std::pair<JobRequest, JobRequest> result;
         if (multiplicity == 1 || multiBegin == -1 || multiEnd == -1) return result;
