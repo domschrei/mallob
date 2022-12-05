@@ -81,10 +81,11 @@ public:
             _events.insert(BroadcastEvent{CALL_ID_IDLES, id, excl, incl, total});
         });
 
-        _subscriptions.emplace_back(MSG_MATCHING_SEND_IDLE_TOKEN, [&](auto& h) {handle(h);});
-        _subscriptions.emplace_back(MSG_MATCHING_SEND_REQUEST, [&](auto& h) {handle(h);});
-        _subscriptions.emplace_back(MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION, 
-            [&](auto& h) {handle(h);});
+        auto callback = [&](auto& h) {handle(h);};
+        for (int tag : {MSG_MATCHING_SEND_IDLE_TOKEN, MSG_MATCHING_SEND_REQUEST, 
+                MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION, MSG_MATCHING_REQUEST_CANCELLED}) {
+            _subscriptions.emplace_back(tag, callback);
+        }
         
         _my_rank = MyMpi::rank(comm);
     }
@@ -117,7 +118,13 @@ public:
                     MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION, childReq);
             }
         }
+        if (h.tag == MSG_MATCHING_REQUEST_CANCELLED) {
+            // A request which THIS IDLE NODE should have received
+            // has been cancelled. Re-participate in the idles prefix sum.
+            if (isIdle()) _status_dirty = true;
+        }
 
+        // Perform matching of arrived requests and idles for as long as possible
         while (!_idles_to_match.empty() && !_requests_to_match.empty()) {
             int idleRank = _idles_to_match.front();
             _idles_to_match.pop_front();
@@ -127,11 +134,13 @@ public:
             LOG(V3_VERB, "PRISMA EMIT [%i] <= %s\n", idleRank, request.toStr().c_str());
             MyMpi::isend(idleRank, MSG_REQUEST_NODE, request);
         }
+        // Idles are also matched with cancelled requests
         while (!_idles_to_match.empty() && _num_cancelled_requests_to_match > 0) {
             int idleRank = _idles_to_match.front();
             _idles_to_match.pop_front();
             _num_cancelled_requests_to_match--;
-            LOG(V3_VERB, "PRISMA EMIT [%i] <= XXX\n", idleRank);
+            LOG(V3_VERB, "PRISMA EMIT [%i] <= (cancelled)\n", idleRank);
+            MyMpi::isend(idleRank, MSG_MATCHING_REQUEST_CANCELLED, IntVec{0});
         }
 
         _time_of_last_change_in_matching = Timer::elapsedSecondsCached();
