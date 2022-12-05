@@ -141,6 +141,7 @@ public:
         if (_req_matcher && (num >= _params.hopsUntilCollectiveAssignment())
             && (_params.reactivationScheduling() || request.requestedNodeIndex > 0)) {
 
+            request.triggerAndDestroyMultiplicityData();
             if (_params.prefixSumMatching() && _params.bulkRequests()) {
                 // Reset multiplicity according to multiEnd-multiBegin. Example:
                 // 0.206 0 PRISMA contribute r.#3596:3 rev. 0 <- [0] born=0.203 hops=1 epoch=5 x4 [1,4]
@@ -155,7 +156,6 @@ public:
                     request.multiEnd = -1;
                 }
             }
-
             _req_matcher->addJobRequest(request);
             return;
         }
