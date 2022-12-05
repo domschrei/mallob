@@ -253,11 +253,11 @@ private:
                     // only send the first "incarnation" of a request with multiplicity > 1
                     if (requestPrefixSumIndex == indexStart) {
                         MyMpi::isend(destinationRank, MSG_MATCHING_SEND_REQUEST, req);
+                        LOG(V4_VVER, "PRISMA MATCH I%i =>[%i]<= Q%i (%s)\n", 
+                            idlePrefixSumIndex, destinationRank, requestPrefixSumIndex,
+                            req.toStr().c_str());
                     }
                     hadLocalContribution = true;
-                    LOG(V4_VVER, "PRISMA MATCH I%i =>[%i]<= Q%i (%s)\n", 
-                        idlePrefixSumIndex, destinationRank, requestPrefixSumIndex,
-                        req.toStr().c_str());
 
                     // Pop this request from indexed request structure
                     // if it is the last "incarnation"
