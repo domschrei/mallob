@@ -238,9 +238,6 @@ private:
             int requestPrefixSumIndex = _requests_indexing_offset + _last_requests_matched;
             int destinationRank = _running_rank_to_perform_match % MyMpi::size(_comm);
 
-            LOG(V4_VVER, "PRISMA matching idle I%i and request Q%i to rank %i\n", 
-                idlePrefixSumIndex, requestPrefixSumIndex, destinationRank);
-
             bool hadLocalContribution = false;
 
             if (!_indexed_requests.empty()) {
@@ -258,6 +255,9 @@ private:
                         MyMpi::isend(destinationRank, MSG_MATCHING_SEND_REQUEST, req);
                     }
                     hadLocalContribution = true;
+                    LOG(V4_VVER, "PRISMA MATCH I%i =>[%i]<= Q%i (%s)\n", 
+                        idlePrefixSumIndex, destinationRank, requestPrefixSumIndex,
+                        req.toStr().c_str());
 
                     // Pop this request from indexed request structure
                     // if it is the last "incarnation"
@@ -274,6 +274,8 @@ private:
                 IntVec idleVec({_my_rank});
                 MyMpi::isend(destinationRank, MSG_MATCHING_SEND_IDLE_TOKEN, idleVec);
                 hadLocalContribution = true;
+                LOG(V4_VVER, "PRISMA MATCH I%i [%i] =>[%i]<= Q%i\n", 
+                    idlePrefixSumIndex, _my_rank, destinationRank, requestPrefixSumIndex);
             }
 
             //assert(hadLocalContribution);
