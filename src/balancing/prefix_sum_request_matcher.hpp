@@ -70,7 +70,7 @@ public:
         _collective(comm, MyMpi::getMessageQueue(), COLLECTIVE_ID_SPARSE_PREFIX_SUM) {
 
         _collective.initializeSparsePrefixSum(CALL_ID_REQUESTS, 
-                /*delaySeconds=*/0.0025, [&](auto& results) {
+                /*delaySeconds=*/0.001, [&](auto& results) {
             auto it = results.begin();
             int excl = it->content; ++it;
             int incl = it->content; ++it;
@@ -80,7 +80,7 @@ public:
             _events.insert(BroadcastEvent{CALL_ID_REQUESTS, id, excl, incl, total});
         });
         _collective.initializeSparsePrefixSum(CALL_ID_IDLES, 
-                /*delaySeconds=*/0.0025, [&](auto& results) {
+                /*delaySeconds=*/0.001, [&](auto& results) {
             auto it = results.begin();
             int excl = it->content; ++it;
             int incl = it->content; ++it;
