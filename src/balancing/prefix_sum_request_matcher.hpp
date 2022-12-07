@@ -37,6 +37,11 @@ private:
         int idleRank {-1};
         bool requestArrived {false};
         JobRequest request;
+        std::string toStr() const {
+            return "{" + std::to_string(idleRank) + "} x {" + 
+                std::string(!requestArrived ? "-" : (request.jobId == -1 ? "X" : request.toStr())) 
+                + "}";
+        }
     };
     tsl::robin_map<int, Matching> _open_matchings;
     int _running_matching_id {0};
@@ -196,8 +201,8 @@ public:
 
         // Output requests and/or idles which have not been matched for at least a second
         if (Timer::elapsedSecondsCached() - _time_of_last_change_in_matching >= 1.0f) {
-            if (!_open_matchings.empty()) {
-                LOG(V4_VVER, "PRISMA %i open matching(s)\n", _open_matchings.size());
+            for (auto& [id, matching] : _open_matchings) {
+                LOG(V4_VVER, "PRISMA open matching id=%i %s\n", id, matching.toStr().c_str());
             }
             _time_of_last_change_in_matching = Timer::elapsedSecondsCached();
         }
