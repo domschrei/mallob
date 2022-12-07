@@ -85,6 +85,7 @@ public:
                 LOG_ADD_DEST(V4_VVER, "-- becomes %s", dest, req.toStr().c_str());
 
                 reqToMultiply.dismissMultiplicityData(); // promise fulfilled
+                optReqToMultiply.reset();
 
             } else if (_params.bulkRequests()) {
                 // Which transitive children *below* the requested index does this job desire?
