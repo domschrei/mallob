@@ -258,9 +258,8 @@ void SchedulingManager::handleIncomingJobRequest(MessageHandle& handle, JobReque
 
     // Root request for the first revision of a new job?
     if (req.requestedNodeIndex == 0 && req.numHops == 0 && req.revision == 0) {
-        _req_mgr.addRootRequest(std::move(req));
-        // Probe balancer for a free spot.
         _req_mgr.addRootRequest(req);
+        // Probe balancer for a free spot.
         _balancer.onProbe(req.jobId);
         return;
     }
