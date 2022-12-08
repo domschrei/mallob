@@ -7,7 +7,7 @@
 #include "app/job.hpp"
 #include "data/job_transfer.hpp"
 #include "data/worker_sysstate.hpp"
-#include "comm/message_subscription.hpp"
+#include "comm/msg_queue/message_subscription.hpp"
 #include "reactivation_scheduler.hpp"
 #include "request_manager.hpp"
 #include "result_store.hpp"

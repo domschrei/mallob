@@ -7,7 +7,7 @@
 #include "mympi.hpp"
 #include "util/tsl/robin_map.h"
 #include "util/sys/timer.hpp"
-#include "message_subscription.hpp"
+#include "msg_queue/message_subscription.hpp"
 
 // T must be a subclass of Reduceable (see data/reduceable.hpp).
 // An arbitrary number of collective operations can be performed with a single instance of this class.

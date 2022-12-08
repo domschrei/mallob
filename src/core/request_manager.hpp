@@ -260,7 +260,6 @@ public:
 
         MessageHandle handle;
         handle.tag = MSG_REQUEST_NODE;
-        handle.finished = true;
         handle.receiveSelfMessage(loadPendingRootReactivationRequest().serialize(), MyMpi::rank(MPI_COMM_WORLD));
         return handle;
     }

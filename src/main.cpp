@@ -20,7 +20,7 @@
 #include "interface/api/job_streamer.hpp"
 #include "comm/host_comm.hpp"
 #include "data/job_transfer.hpp"
-#include "comm/message_subscription.hpp"
+#include "comm/msg_queue/message_subscription.hpp"
 
 #include "app/register_includes.h"
 

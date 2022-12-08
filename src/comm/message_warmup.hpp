@@ -2,7 +2,7 @@
 #pragma once
 
 #include "mympi.hpp"
-#include "message_subscription.hpp"
+#include "msg_queue/message_subscription.hpp"
 #include "data/job_transfer.hpp"
 
 class MessageWarmup {

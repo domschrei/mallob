@@ -4,7 +4,7 @@
 #include "app/job.hpp"
 #include "util/tsl/robin_map.h"
 #include "scheduling/local_scheduler.hpp"
-#include "comm/message_subscription.hpp"
+#include "comm/msg_queue/message_subscription.hpp"
 #include "job_registry.hpp"
 
 class ReactivationScheduler {

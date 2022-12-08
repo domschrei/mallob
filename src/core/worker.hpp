@@ -19,7 +19,7 @@
 #include "util/periodic_event.hpp"
 #include "util/sys/watchdog.hpp"
 #include "comm/host_comm.hpp"
-#include "comm/message_subscription.hpp"
+#include "comm/msg_queue/message_subscription.hpp"
 #include "comm/randomized_routing_tree.hpp"
 
 /*

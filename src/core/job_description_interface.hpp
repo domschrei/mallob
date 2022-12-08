@@ -5,7 +5,7 @@
 #include "app/job.hpp"
 #include "job_registry.hpp"
 #include "util/sys/thread_pool.hpp"
-#include "comm/message_subscription.hpp"
+#include "comm/msg_queue/message_subscription.hpp"
 
 class JobDescriptionInterface {
 

@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "mympi.hpp"
+#include "comm/mympi.hpp"
 #include "message_queue.hpp"
 
 // RAII structure for a subscription to incoming messages of a certain tag.

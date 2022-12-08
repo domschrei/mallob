@@ -16,7 +16,7 @@
 #include "util/sys/background_worker.hpp"
 #include "util/periodic_event.hpp"
 #include "interface/api/api_connector.hpp"
-#include "comm/message_subscription.hpp"
+#include "comm/msg_queue/message_subscription.hpp"
 
 #define SYSSTATE_ENTERED_JOBS 0
 #define SYSSTATE_PARSED_JOBS 1

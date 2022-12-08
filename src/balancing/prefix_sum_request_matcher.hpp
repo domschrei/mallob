@@ -4,7 +4,7 @@
 #include "request_matcher.hpp"
 #include "comm/async_collective.hpp"
 #include "data/job_transfer.hpp"
-#include "comm/message_subscription.hpp"
+#include "comm/msg_queue/message_subscription.hpp"
 #include "util/hashing.hpp"
 #include "util/tsl/robin_map.h"
 

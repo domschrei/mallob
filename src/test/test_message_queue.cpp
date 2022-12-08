@@ -10,7 +10,7 @@
 #include "comm/mympi.hpp"
 #include "util/params.hpp"
 #include "data/job_transfer.hpp"
-#include "comm/message_subscription.hpp"
+#include "comm/msg_queue/message_subscription.hpp"
 
 const int TAG_INT_VEC = 111;
 const int TAG_ACK = 112;

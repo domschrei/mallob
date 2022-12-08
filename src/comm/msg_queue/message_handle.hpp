@@ -1,11 +1,11 @@
 
-#ifndef DOMPASCH_MALLOB_MESSAGE_HANDLE_HPP
-#define DOMPASCH_MALLOB_MESSAGE_HANDLE_HPP
+#pragma once
 
 #include <vector>
-#include <memory>
+#include <cstring>
 
 #include "comm/mpi_base.hpp"
+#include "data/serializable.hpp"
 
 /*
 Represents a single message that is being sent or received.
@@ -18,25 +18,16 @@ private:
 public:
     int tag;
     int source;
-    bool selfMessage = false;
-    bool finished = false;
-    float creationTime = 0;
 
     MessageHandle() = default;
     MessageHandle(const MessageHandle& copied) {
         tag = copied.tag;
         source = copied.source;
-        selfMessage = copied.selfMessage;
-        finished = copied.finished;
-        creationTime = copied.creationTime;
         data = copied.data;
     }
     MessageHandle(MessageHandle&& moved) {
         tag = moved.tag;
         source = moved.source;
-        selfMessage = moved.selfMessage;
-        finished = moved.finished;
-        creationTime = moved.creationTime;
         data = std::move(moved.data);
     }
     ~MessageHandle() = default;
@@ -44,16 +35,20 @@ public:
     MessageHandle& operator=(MessageHandle&& moved) {
         tag = moved.tag;
         source = moved.source;
-        selfMessage = moved.selfMessage;
-        finished = moved.finished;
-        creationTime = moved.creationTime;
         data = std::move(moved.data);
         return *this;
     }
 
     const std::vector<uint8_t>& getRecvData() const { return data;}
-    void setReceive(std::vector<uint8_t>&& buf) {data = std::move(buf);}
     std::vector<uint8_t>&& moveRecvData() { return std::move(data);}
+
+    void setReceive(size_t msgSize, uint8_t* recvData) {
+        data.resize(msgSize);
+        memcpy(data.data(), recvData, msgSize);
+    }
+    void setReceive(std::vector<uint8_t>&& recvData) {
+        data = std::move(recvData);
+    }
 
     void receiveSelfMessage(const std::vector<uint8_t>& recvData, int rank) {
         receiveSelfMessage(std::vector<uint8_t>(recvData), rank);
@@ -61,10 +56,5 @@ public:
     void receiveSelfMessage(std::vector<uint8_t>&& recvData, int rank) {
         data = std::move(recvData);
         source = rank;
-        selfMessage = true;
     }
 };
-
-typedef std::unique_ptr<MessageHandle> MessageHandlePtr;
-
-#endif

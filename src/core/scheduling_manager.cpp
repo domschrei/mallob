@@ -123,7 +123,6 @@ RequestMatcher* SchedulingManager::createRequestMatcher() {
     auto cbReceiveRequest = [&](const JobRequest& req, int rank) {
         MessageHandle handle;
         handle.tag = MSG_REQUEST_NODE;
-        handle.finished = true;
         handle.receiveSelfMessage(req.serialize(), rank);
         handleIncomingJobRequest(handle, SchedulingManager::NORMAL);
     };
@@ -189,7 +188,6 @@ void SchedulingManager::checkActiveJob() {
         IntVec payload({id});
         MessageHandle handle;
         handle.tag = MSG_NOTIFY_JOB_ABORTING;
-        handle.finished = true;
         handle.receiveSelfMessage(payload.serialize(), MyMpi::rank(MPI_COMM_WORLD));
         handleJobInterruption(handle);
         if (_params.monoFilename.isSet()) {
