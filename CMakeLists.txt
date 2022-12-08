@@ -58,7 +58,7 @@ set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib CACHE INTERNAL "")
 
 # Base source files
 
-set(BASE_SOURCES ${BASE_SOURCES} src/app/job.cpp src/app/app_registry.cpp src/balancing/event_driven_balancer.cpp src/balancing/request_matcher.cpp src/balancing/routing_tree_request_matcher.cpp src/comm/message_queue.cpp src/comm/mpi_base.cpp src/comm/mympi.cpp src/comm/sysstate_unresponsive_crash.cpp src/core/scheduling_manager.cpp src/data/job_description.cpp src/data/job_result.cpp src/data/job_transfer.cpp src/interface/json_interface.cpp src/interface/api/api_connector.cpp src/scheduling/job_scheduling_update.cpp src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sys/atomics.cpp src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/shared_memory.cpp src/util/sys/terminator.cpp src/util/sys/threading.cpp src/util/sys/thread_pool.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp CACHE INTERNAL "")
+set(BASE_SOURCES ${BASE_SOURCES} src/app/job.cpp src/app/app_registry.cpp src/balancing/event_driven_balancer.cpp src/balancing/request_matcher.cpp src/balancing/routing_tree_request_matcher.cpp src/comm/message_queue.cpp src/comm/mpi_base.cpp src/comm/mympi.cpp src/comm/sysstate_unresponsive_crash.cpp src/core/scheduling_manager.cpp src/data/job_description.cpp src/data/job_result.cpp src/data/job_transfer.cpp src/interface/json_interface.cpp src/interface/api/api_connector.cpp src/scheduling/job_scheduling_update.cpp src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sys/atomics.cpp src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/process_dispatcher.cpp src/util/sys/shared_memory.cpp src/util/sys/terminator.cpp src/util/sys/threading.cpp src/util/sys/thread_pool.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp CACHE INTERNAL "")
 
 # Use to debug
 #message("mallob_commons sources pre application registration: ${BASE_SOURCES}")
@@ -138,7 +138,7 @@ target_include_directories(mallob PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob ${BASE_LIBS} mallob_commons)
 
-add_executable(mallob_process_dispatcher src/app/sat/process_dispatcher.cpp)
+add_executable(mallob_process_dispatcher src/app/sat/main_dispatch.cpp)
 target_include_directories(mallob_process_dispatcher PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_process_dispatcher PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_process_dispatcher ${BASE_LIBS} mallob_commons) 
