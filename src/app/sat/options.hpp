@@ -43,8 +43,8 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Only clauses with an LBD score up to this value will be shared")
 
 OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversification options")
- OPT_FLOAT(inputShuffleProbability,         "isp", "input-shuffle-probability",          0,        0,   1,              
-    "Probability for solver with exhausted diversification to shuffle all clauses and all literals of each clause in the input")
+ OPT_FLOAT(inputShuffleProbability,         "isp", "input-shuffle-probability",          1,        0,   1,
+    "Probability for a solver (never the 1st one of a kind) to shuffle the order of clauses in the input to some degree")
  OPT_BOOL(phaseDiversification,             "phasediv", "",                              true,
     "Diversify solvers based on phase in addition to native diversification")
  OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
