@@ -233,8 +233,8 @@ void SchedulingManager::checkActiveJob() {
     job.communicate();
 }
 
-void SchedulingManager::advanceBalancing(float time) {
-    _balancer.advance(time);
+void SchedulingManager::advanceBalancing() {
+    _balancer.advance();
 
     // Advance collective assignment of nodes
     if (_params.hopsUntilCollectiveAssignment() >= 0) {
@@ -1205,7 +1205,8 @@ SchedulingManager::~SchedulingManager() {
         setLoad(0, _job_registry.getActive().getId());
 
     // Setup a watchdog to get feedback on hanging destructors
-    Watchdog watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/200, Timer::elapsedSeconds());
+    Watchdog watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/200, 
+        Timer::elapsedSeconds());
     watchdog.setWarningPeriod(500);
     watchdog.setAbortPeriod(10*1000);
     

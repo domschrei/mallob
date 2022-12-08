@@ -167,7 +167,7 @@ public:
             _requests_in_prefix_sum.splice(_requests_in_prefix_sum.end(), _new_requests);
         }
 
-        _collective.advanceSparseOperations(Timer::elapsedSeconds());
+        _collective.advanceSparseOperations();
 
         if (!doneMatching()) tryMatch();
         if (!doneMatching()) return; // something still missing

@@ -97,6 +97,7 @@ public:
         while (true) {
 
             doSleep();
+            Timer::cacheElapsedSeconds();
 
             // Terminate
             if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true)) {
@@ -296,15 +297,7 @@ private:
     void doSleep() {
         // Wait until something happens
         // (can be interrupted by Fork::wakeUp(hsm->childPid))
-        float time = Timer::elapsedSeconds();
-
-        // busy waiting
-        //while (Timer::elapsedSeconds() - time < 0.001) {}
-
-        // sleeping
-        int sleepStatus = usleep(1000 /*1 millisecond*/);
-        time = Timer::elapsedSeconds() - time;
-        if (sleepStatus != 0) LOGGER(_log, V5_DEBG, "Woken up after %i us\n", (int) (1000*1000*time));
+        usleep(1000 /*1 millisecond*/);
     }
 
     void doTerminate() {

@@ -76,8 +76,8 @@ void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
 
 void Job::start() {
     assertState(INACTIVE);
-    if (_time_of_activation <= 0) _time_of_activation = Timer::elapsedSeconds();
-    _time_of_last_limit_check = Timer::elapsedSeconds();
+    if (_time_of_activation <= 0) _time_of_activation = Timer::elapsedSecondsCached();
+    _time_of_last_limit_check = Timer::elapsedSecondsCached();
     _volume = std::max(1, _volume);
     _state = ACTIVE;
     LOG(V4_VVER, "%s : new job node starting\n", toStr());
@@ -102,7 +102,7 @@ void Job::resume() {
     _state = ACTIVE;
     appl_resume();
     LOG(V4_VVER, "%s : resumed solving threads\n", toStr());
-    _time_of_last_limit_check = Timer::elapsedSeconds();
+    _time_of_last_limit_check = Timer::elapsedSecondsCached();
 }
 
 void Job::terminate() {
@@ -141,7 +141,7 @@ int Job::getDemand() const {
     } else {
         if (_time_of_activation <= 0) demand = 1;
         else {
-            float t = Timer::elapsedSeconds()-_time_of_activation;
+            float t = Timer::elapsedSecondsCached()-_time_of_activation;
             
             // Continuous growth
             float numPeriods = std::min(t/_growth_period, 28.f); // overflow protection
@@ -170,7 +170,7 @@ double Job::getTemperature() const {
     double baseTemp = 0.95;
     double decay = 0.99; // higher means slower convergence
 
-    int age = (int) (Timer::elapsedSeconds()-_time_of_activation);
+    int age = (int) (Timer::elapsedSecondsCached()-_time_of_activation);
     double eps = 2*std::numeric_limits<double>::epsilon();
 
     // Start with temperature 1.0, exponentially converge towards baseTemp 

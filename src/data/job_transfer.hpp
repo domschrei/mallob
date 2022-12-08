@@ -123,7 +123,7 @@ public:
             result.first.requestingNodeRank = requestingRank;
             result.first.numHops = 0;
             result.first.multiBegin = leftChildDest;
-            result.first.timeOfBirth = Timer::elapsedSecondsCached();
+            result.first.timeOfBirth = Timer::elapsedSeconds();
         }
 
         int rightChildTreeRank = 2*myTreeRank+2;
@@ -134,7 +134,7 @@ public:
             result.second.requestingNodeRank = requestingRank;
             result.second.numHops = 0;
             result.second.multiBegin = rightChildDest;
-            result.second.timeOfBirth = Timer::elapsedSecondsCached();
+            result.second.timeOfBirth = Timer::elapsedSeconds();
         }
 
         return result;

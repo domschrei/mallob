@@ -274,9 +274,9 @@ APIConnector& Client::getAPI() {
 }
 
 void Client::advance() {
-
-    float time = Timer::elapsedSeconds();
     
+    auto time = Timer::elapsedSecondsCached();
+
     // Send notification messages for recently done jobs
     if (_periodic_check_done_jobs.ready(time)) {
         robin_hood::unordered_flat_set<int, robin_hood::hash<int>> doneJobs;

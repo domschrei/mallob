@@ -462,7 +462,7 @@ void testSparsePrefixSum() {
         {
             auto lock = mtx.getLock();
             q.advance();
-            allRed.advanceSparseOperations(Timer::elapsedSeconds());
+            allRed.advanceSparseOperations();
         }
         if (req != MPI_REQUEST_NULL) {
             int flag; MPI_Test(&req, &flag, MPI_STATUS_IGNORE);
@@ -503,7 +503,7 @@ void testDifferentialSparsePrefixSum() {
     while (!Terminator::isTerminating() || q.hasOpenSends()) {
         
         q.advance();
-        allRed.advanceSparseOperations(Timer::elapsedSeconds());
+        allRed.advanceSparseOperations();
 
         if (Timer::elapsedSeconds() - time >= rank+1) {
             allRed.contributeToSparsePrefixSum(1, ReduceableInt{2*rank});

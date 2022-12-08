@@ -60,7 +60,7 @@ void AnytimeSatClauseCommunicator::communicate() {
 
     // root: initiate sharing
     if (_job->getJobTree().isRoot()) {
-        auto time = Timer::elapsedSeconds();
+        auto time = Timer::elapsedSecondsCached();
         bool nextEpochDue = time - _time_of_last_epoch_initiation >= _params.appCommPeriod();
         bool lastEpochDone = _time_of_last_epoch_conclusion > 0;
         if (nextEpochDue && !lastEpochDone) {
@@ -166,7 +166,7 @@ void AnytimeSatClauseCommunicator::communicate() {
         }
 
         // Conclude this sharing epoch
-        _time_of_last_epoch_conclusion = Timer::elapsedSeconds();
+        _time_of_last_epoch_conclusion = Timer::elapsedSecondsCached();
     }
 }
 

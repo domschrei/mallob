@@ -61,11 +61,11 @@ public:
     Worker(MPI_Comm comm, Parameters& params);
     ~Worker();
     void init();
-    void advance(float time = -1);
+    void advance();
     void setHostComm(HostComm& hostComm) {_host_comm = &hostComm;}
 
 private:
-    void checkStats(float time);
+    void checkStats();
     void checkJobs();
     void checkActiveJob();
     void publishAndResetSysState();

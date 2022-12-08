@@ -99,7 +99,7 @@ public:
     bool wantsToAggregate() {
         if (_ranklist_agg_period <= 0) return false;
         if (_job_tree.isLeaf() 
-            && Timer::elapsedSeconds() - _time_of_last_ranklist_agg >= _ranklist_agg_period) {
+            && Timer::elapsedSecondsCached() - _time_of_last_ranklist_agg >= _ranklist_agg_period) {
             _aggregate_ranklist = true;
             return true;
         }
@@ -123,7 +123,7 @@ public:
             //log(LOG_ADD_DESTRANK | V3_VERB, "send Ranklist size %i", getJobTree().getParentNodeRank(), msg.payload.size());
             MyMpi::isend(_job_tree.getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
         }
-        _time_of_last_ranklist_agg = Timer::elapsedSeconds();
+        _time_of_last_ranklist_agg = Timer::elapsedSecondsCached();
         _aggregate_ranklist = false;
     }
 

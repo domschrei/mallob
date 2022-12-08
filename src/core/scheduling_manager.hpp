@@ -51,9 +51,8 @@ public:
     RequestMatcher* createRequestMatcher();
 
     void checkActiveJob();
-    void advanceBalancing(float time);
+    void advanceBalancing();
     bool checkComputationLimits(int jobId);
-    //void advanceBalancing(float time) {_balancer->advance(time);}
     void forwardDeferredRequests() {_req_mgr.forwardDeferredRequests();}
     void tryAdoptPendingRootActivationRequest();
     void forgetOldJobs();

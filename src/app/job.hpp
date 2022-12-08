@@ -285,7 +285,7 @@ public:
 
         if (getState() == ACTIVE && _job_tree.isRoot()) {
             // Compute used CPU time within last time slice
-            float time = Timer::elapsedSeconds();
+            float time = Timer::elapsedSecondsCached();
             _used_cpu_seconds += (time - _time_of_last_limit_check) * _threads_per_job * _volume;
             _time_of_last_limit_check = time;
         }

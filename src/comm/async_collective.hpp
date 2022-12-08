@@ -38,8 +38,6 @@ private:
     // How many contributions to wait for until data is forwarded?
     int _num_desired_contribs;
 
-    float _last_time {0};
-
     // Internal distinction of operation modes
     enum Mode {
         ALLREDUCE, 
@@ -273,7 +271,9 @@ public:
     }
 
     // Must be called periodically to advance sparse operations.
-    void advanceSparseOperations(float time) {
+    void advanceSparseOperations() {
+
+        auto time = Timer::elapsedSecondsCached();
 
         // Look for an operation which can be advanced
         for (auto it = _sparse_states_by_id.begin(); it != _sparse_states_by_id.end(); ++it) {
@@ -320,8 +320,6 @@ public:
             state.contributionIdCounter++;
             state.lastForwardTime = time;
         }
-
-        _last_time = time;
     }
 
     int getNumReceivedResults() const {
@@ -399,7 +397,7 @@ private:
                 (fromLeftChild ? bundle.contribLeft : bundle.contribRight) = data.items.front();
                 (fromLeftChild ? bundle.contribIdLeft : bundle.contribIdRight) = data.contributionId;
                 // Perhaps the operation can be advanced now
-                advanceSparseOperations(_last_time);
+                advanceSparseOperations();
             }
 
             // Broadcast

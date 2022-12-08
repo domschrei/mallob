@@ -140,8 +140,8 @@ public:
         }()),
         _cls_history(_params, _job->getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job, _cdb) {
 
-        _time_of_last_epoch_initiation = Timer::elapsedSeconds();
-        _time_of_last_epoch_conclusion = Timer::elapsedSeconds();
+        _time_of_last_epoch_initiation = Timer::elapsedSecondsCached();
+        _time_of_last_epoch_conclusion = Timer::elapsedSecondsCached();
     }
 
     ~AnytimeSatClauseCommunicator() {

@@ -19,10 +19,8 @@ private:
 public:
     BackgroundWorker() {}
     void run(std::function<void()> runnable) {
-	    float time = Timer::elapsedSeconds();
         _terminate = false;
         _thread = std::thread(runnable);
-        time = Timer::elapsedSeconds() - time;
     }
     bool continueRunning() const {
         return !Terminator::isTerminating() && !_terminate;

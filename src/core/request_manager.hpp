@@ -106,8 +106,9 @@ public:
 
         LOG_ADD_DEST(V3_VERB, "%s growing: %s", dest, job.toStr(), req.toStr().c_str());
         _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
-        if (left) job.getJobTree().setDesireLeft(Timer::elapsedSeconds());
-        else job.getJobTree().setDesireRight(Timer::elapsedSeconds());
+        auto time = Timer::elapsedSeconds();
+        if (left) job.getJobTree().setDesireLeft(time);
+        else job.getJobTree().setDesireRight(time);
 
         if (tag == MSG_REQUEST_NODE && _params.prefixSumMatching() && _params.bulkRequests()) {
             _req_matcher->addJobRequest(req);
