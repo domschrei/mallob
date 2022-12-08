@@ -31,7 +31,7 @@ public:
     AdjustablePermutation() = default;
     AdjustablePermutation(int n, int seed);
 
-    int get(int x) const;
+    int get(int x, bool checkAdjusted = true) const;
     void adjust(int x, int new_x);
     void clear(int x);
     int operator[](int x) const { return get(x); };

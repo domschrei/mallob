@@ -80,12 +80,12 @@ bool SolverThread::readFormula() {
 
         // Shuffle next input
         if (_imported_lits_curr_revision == 0) {
-            // ... only if original diversifications are exhausted
-            bool shuffle = true; /*_solver.getDiversificationIndex() >= _solver.getNumOriginalDiversifications();
-            float random = 0.001f * (rand() % 1000); // random number in [0,1)
+            // ... not for the first solver
+            bool shuffle = _solver.getDiversificationIndex() >= 1;
+            float random = 0.0001f * (rand() % 10000); // random number in [0,1)
             assert(random >= 0); assert(random <= 1);
             // ... only if random throw hits user-defined probability
-            shuffle = shuffle && random < _params.inputShuffleProbability();*/
+            shuffle = shuffle && random < _params.inputShuffleProbability();
 
             if (shuffle) {
                 LOGGER(_logger, V4_VVER, "Shuffling input rev. %i\n", (int)_active_revision);
@@ -94,7 +94,7 @@ bool SolverThread::readFormula() {
                     assert(_active_revision < (int)_pending_formulae.size());
                     fParser = &_pending_formulae[_active_revision];
                 }
-                fParser->shuffle(_solver.getGlobalId(), /*shuffleClauses=*/true, /*shuffleLiterals=*/true);
+                fParser->shuffle(_solver.getGlobalId());
             }
         }
 
@@ -194,7 +194,7 @@ bool SolverThread::readFormula() {
 void SolverThread::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits) {
     {
         auto lock = _state_mutex.getLock();
-        _pending_formulae.emplace_back(fSize, fLits);
+        _pending_formulae.emplace_back(_logger, fSize, fLits);
         LOGGER(_logger, V4_VVER, "Received %i literals\n", fSize);
         _pending_assumptions.emplace_back(aSize, aLits);
         LOGGER(_logger, V4_VVER, "Received %i assumptions\n", aSize);

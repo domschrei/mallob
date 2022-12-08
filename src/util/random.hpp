@@ -54,4 +54,21 @@ public:
     }
 };
 
+class SplitMix64Rng {
+
+private:
+    uint64_t _state {0};
+
+public:
+    SplitMix64Rng() = default;
+    SplitMix64Rng(uint64_t seed) : _state(seed) {}
+
+    uint64_t operator()() {
+        uint64_t z = (_state += UINT64_C(0x9E3779B97F4A7C15));
+        z = (z ^ (z >> 30)) * UINT64_C(0xBF58476D1CE4E5B9);
+        z = (z ^ (z >> 27)) * UINT64_C(0x94D049BB133111EB);
+        return z ^ (z >> 31);
+    }
+};
+
 #endif

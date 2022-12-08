@@ -211,14 +211,14 @@ AdjustablePermutation::AdjustablePermutation(int n, int seed) {
     }
 }
 
-int AdjustablePermutation::get(int x) const {
+int AdjustablePermutation::get(int x, bool checkAdjusted) const {
     if (x < 0 || x >= _n) {
         LOG(V1_WARN, "[WARN] Invalid input for adj.perm. [0,%i) : %i\n", _n, x);
         while (x < 0) x += 100*_n;
         x = x % _n;
     }
 
-    if (_adjusted_values.count(x)) {
+    if (checkAdjusted && _adjusted_values.count(x)) {
         return _adjusted_values.at(x);
     }
 

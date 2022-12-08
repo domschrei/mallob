@@ -15,10 +15,19 @@ void shuffle(T* array, size_t n,
 {
     if (n <= 1) return; 
     for (size_t i = 0; i < n - 1; i++) {
-        size_t j = i + (int) (rng() * (n-i));
-        T t = array[j];
-        array[j] = array[i];
-        array[i] = t;
+        size_t j = i + (size_t) (rng() * (n-i));
+        std::swap(array[j], array[i]);
+    }
+}
+
+// https://stackoverflow.com/a/6127606
+template <typename T>
+void shuffle(T* array, size_t n, SplitMix64Rng& rng)
+{
+    if (n <= 1) return; 
+    for (size_t i = 0; i < n - 1; i++) {
+        size_t j = i + (size_t) (rng() % (n-i));
+        std::swap(array[j], array[i]);
     }
 }
 
