@@ -19,7 +19,7 @@
 #include "comm/job_comm.hpp"
 #include "scheduling/local_scheduler.hpp"
 
-typedef std::function<void(const JobRequest& req, int tag, bool left, int dest)> EmitDirectedJobRequestCallback;
+typedef std::function<void(JobRequest& req, int tag, bool left, int dest)> EmitDirectedJobRequestCallback;
 
 class Job {
 
@@ -181,6 +181,9 @@ private:
     mutable int _age_of_const_cooldown = -1;
     mutable int _last_demand = 0;
 
+    std::optional<JobRequest> _request_to_multiply_left;
+    std::optional<JobRequest> _request_to_multiply_right;
+
 // Public methods.
 public:
 
@@ -202,7 +205,7 @@ public:
     void commit(const JobRequest& req);
     // Unmark the job as being subject of a commitment to some job request.
     // Requires the job to be in a committed state.
-    void uncommit();
+    std::optional<JobRequest> uncommit();
     // Add the job description of the next (or the first/only) revision.
     void pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data);
     // Starts the execution of a new job.
@@ -318,13 +321,29 @@ public:
         return false;
     }
 
-    LocalScheduler constructScheduler(EmitDirectedJobRequestCallback cb);
-
     // Marks the job to be indestructible as long as pending is true.
     void addChildWaitingForRevision(int rank, int revision) {_waiting_rank_revision_pairs.insert(std::pair<int, int>(rank, revision));}
     void setDesiredRevision(int revision) {_desired_revision = revision;}
     bool isRevisionSolved(int revision) {return _last_solved_revision >= revision;}
     void setRevisionSolved(int revision) {_last_solved_revision = revision;}
+
+    void storeRequestToMultiply(JobRequest&& req, bool left) {
+        (left ? _request_to_multiply_left : _request_to_multiply_right) = std::move(req);
+    }
+    std::optional<JobRequest>& getRequestToMultiply(bool left) {
+        return left ? _request_to_multiply_left : _request_to_multiply_right;
+    }
+
+    JobRequest spawnJobRequest(bool left, int balancingEpoch) {
+        int index = left ? _job_tree.getLeftChildIndex() : _job_tree.getRightChildIndex();
+        if (_params.monoFilename.isSet()) _job_tree.updateJobNode(index, index);
+
+        JobRequest req(_id, _application_id, _job_tree.getRootNodeRank(), 
+                MyMpi::rank(MPI_COMM_WORLD), index, Timer::elapsedSeconds(), balancingEpoch, 
+                0, _incremental);
+        req.revision = std::max(0, getDesiredRevision());
+        return req;
+    }
 
     // toString methods
 

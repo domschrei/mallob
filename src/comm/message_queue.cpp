@@ -16,6 +16,7 @@
 MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize) {
     
     MPI_Comm_rank(MPI_COMM_WORLD, &_my_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &_comm_size);
     _recv_data = (uint8_t*) malloc(maxMsgSize+20);
 
     _current_recv_tag = &_default_tag_var;
@@ -77,21 +78,23 @@ int MessageQueue::send(DataPtr data, int dest, int tag) {
         int msglen = handle.data->size();
 
 #if LOGGER_STATIC_VERBOSITY >= 6
-        std::string msgContent;
-        size_t i = 0;
-        while (i + sizeof(int) <= msglen) {
-            msgContent += std::to_string(*(int*)(handle.data->data()+i)) + ",";
-            i += sizeof(int);
-        }
-        msgContent = msgContent.substr(0, msgContent.size()-1);
-        LOG(V5_DEBG, "MQ SEND n=%i d=[%i] t=%i c=(%s)\n", handle.data->size(), dest, tag, msgContent.c_str());
-#else
+        if (Logger::getMainInstance().getVerbosity() >= 6) {
+            std::string msgContent;
+            size_t i = 0;
+            while (i + sizeof(int) <= msglen) {
+                msgContent += std::to_string(*(int*)(handle.data->data()+i)) + ",";
+                i += sizeof(int);
+            }
+            msgContent = msgContent.substr(0, msgContent.size()-1);
+            LOG(V5_DEBG, "MQ SEND n=%i d=[%i] t=%i c=(%s)\n", handle.data->size(), dest, tag, msgContent.c_str());
+        } else
+#endif
         LOG(V5_DEBG, "MQ SEND n=%i d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", handle.data->size(), dest, tag, 
             msglen>=1*sizeof(int) ? *(int*)(handle.data->data()) : 0, 
             msglen>=3*sizeof(int) ? *(int*)(handle.data->data()+msglen - 3*sizeof(int)) : 0, 
             msglen>=2*sizeof(int) ? *(int*)(handle.data->data()+msglen - 2*sizeof(int)) : 0, 
             msglen>=1*sizeof(int) ? *(int*)(handle.data->data()+msglen - 1*sizeof(int)) : 0);
-#endif
+        assert(dest >= 0 && dest < _comm_size);
 
         if (dest == _my_rank) {
             // Self message

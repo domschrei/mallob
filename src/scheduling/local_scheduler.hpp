@@ -21,8 +21,7 @@ private:
     int _left_child_index;
     int _right_child_index;
 
-    std::function<void(int, int, int)> _cb_emit_directed_job_request;
-    std::function<void(int, int)> _cb_emit_undirected_job_request;
+    std::function<void(int epoch, bool left, int dest)> _cb_emit_request;
 
     std::vector<std::unique_ptr<ChildInterface>> _sessions;
     std::unique_ptr<ChildInterface> _empty_session;
@@ -36,17 +35,18 @@ private:
     bool _resuming = false;
 
 public:
-    LocalScheduler(int jobId, const Parameters& params, JobTree& jobTree) 
+    LocalScheduler(int jobId, const Parameters& params, JobTree& jobTree,
+            std::function<void(int epoch, bool left, int dest)> cbEmitRequest) 
         : _job_id(jobId), _params(params), _index(jobTree.getIndex()), 
             _parent_rank(jobTree.getParentNodeRank()), _parent_index(jobTree.getParentIndex()), 
-            _left_child_index(jobTree.getLeftChildIndex()), _right_child_index(jobTree.getRightChildIndex()) {
+            _left_child_index(jobTree.getLeftChildIndex()), _right_child_index(jobTree.getRightChildIndex()),
+            _cb_emit_request(cbEmitRequest) {
         _sessions.resize(2);
         LOG(V5_DEBG, "RBS OPEN #%i:%i\n", _job_id, _index);
     }
     LocalScheduler(LocalScheduler&& other) : 
         _job_id(other._job_id), _params(other._params),
-        _cb_emit_directed_job_request(other._cb_emit_directed_job_request), 
-        _cb_emit_undirected_job_request(other._cb_emit_undirected_job_request), 
+        _cb_emit_request(other._cb_emit_request),
         _sessions(std::move(other._sessions)), _empty_session(std::move(other._empty_session)),
         _epoch_of_last_suspension(other._epoch_of_last_suspension), 
         _last_update_epoch(other._last_update_epoch), _last_update_volume(other._last_update_volume), 
@@ -60,12 +60,6 @@ public:
     }
     ~LocalScheduler() {
         LOG(V5_DEBG, "RBS CLOSE #%i:%i\n", _job_id, _index);
-    }
-
-    void initCallbacks(std::function<void(int, int, int)> cbEmitDirectedJobRequest, 
-            std::function<void(int, int)> cbEmitUndirectedJobRequest) {
-        _cb_emit_directed_job_request = cbEmitDirectedJobRequest;
-        _cb_emit_undirected_job_request = cbEmitUndirectedJobRequest;
     }
 
     /*
@@ -298,10 +292,10 @@ public:
 private:
 
     void applyDirective(ChildInterface::MsgDirective directive, std::unique_ptr<ChildInterface>& session) {
-        if (directive == ChildInterface::EMIT_DIRECTED_REQUEST)
-            _cb_emit_directed_job_request(session->getEpoch(), session->getChildIndex(), session->getChildRank());
-        if (directive == ChildInterface::EMIT_UNDIRECTED_REQUEST) 
-            _cb_emit_undirected_job_request(session->getEpoch(), session->getChildIndex());
+        if (directive == ChildInterface::DO_NOTHING) return;
+        bool isDirected = directive == ChildInterface::EMIT_DIRECTED_REQUEST;
+        _cb_emit_request(session->getEpoch(), session->getChildIndex() == _left_child_index, 
+                        isDirected ? session->getChildRank() : -1);
     }
 
     std::unique_ptr<ChildInterface>& getSessionByChildIndex(int childIndex) {

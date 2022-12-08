@@ -59,24 +59,28 @@ public:
         _epoch = epoch;
     }
 
-    int getCurrentRoot() {
+    int getCurrentRoot() const {
         assert(_num_workers > 0);
         return robin_hood::hash<int>()(_epoch) % _num_workers;
     }
 
-    int getCurrentParent() {
-        return _neighbor_towards_rank[getCurrentRoot()];
+    int getCurrentParent() const  {
+        return _neighbor_towards_rank.at(getCurrentRoot());
     }
 
-    int getRandomNeighbor() {
+    int getRandomNeighbor() const {
         return Random::choice(_hop_destinations);
     }
 
-    int getNumNeighbors() {
+    int getNumNeighbors() const {
         return _hop_destinations.size();
     }
 
     const std::vector<int>& getNeighbors() const {
         return _hop_destinations;
+    }
+
+    int getNumWorkers() const {
+        return MyMpi::size(_comm);
     }
 };

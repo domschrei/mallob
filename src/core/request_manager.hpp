@@ -35,21 +35,66 @@ public:
     RequestManager(Parameters& params, WorkerSysState& sysstate, RandomizedRoutingTree& tree, RequestMatcher* reqMatcher) 
         : _params(params), _sys_state(sysstate), _routing_tree(tree), _req_matcher(reqMatcher) {}
 
+    void onNoRequestEmitted(Job& job, bool left) {
+        // trigger destruction mechanism of the job request to multiply
+        // such that message notifications are sent to awaiting ranks
+        auto& optReqToMultiply = job.getRequestToMultiply(left);
+        optReqToMultiply.reset();
+    }
+
+    enum DiscardCallbackExtent {LEFT, RIGHT, BOTH};
+    void installDiscardCallback(JobRequest& req, DiscardCallbackExtent extent) {
+        req.setMultiplicityDiscardCallback([&, extent](JobRequest& r) {
+            // send notification to direct child(ren)
+            auto [leftReq, rightReq] = r.getMultipliedChildRequests(-1);
+            if (extent != RIGHT && leftReq.jobId != -1) {
+                LOG(V4_VVER, "CANCEL %s\n", leftReq.toStr().c_str());
+                MyMpi::isend(leftReq.multiBegin % _routing_tree.getNumWorkers(), 
+                    MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION, leftReq);
+            }
+            if (extent != LEFT && rightReq.jobId != -1) {
+                LOG(V4_VVER, "CANCEL %s\n", rightReq.toStr().c_str());
+                MyMpi::isend(rightReq.multiBegin % _routing_tree.getNumWorkers(), 
+                    MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION, rightReq);
+            }
+        });
+    }
+
     void spawnJobRequest(Job& job, bool left, int balancingEpoch) {
-    
-        int index = left ? job.getJobTree().getLeftChildIndex() : job.getJobTree().getRightChildIndex();
-        if (_params.monoFilename.isSet()) job.getJobTree().updateJobNode(index, index);
-
-        JobRequest req(job.getId(), job.getApplicationId(), job.getJobTree().getRootNodeRank(), 
-                MyMpi::rank(MPI_COMM_WORLD), index, Timer::elapsedSeconds(), balancingEpoch, 0, job.isIncremental());
-        req.revision = job.getDesiredRevision();
-        int tag = MSG_REQUEST_NODE;    
-
+        auto req = job.spawnJobRequest(left, balancingEpoch);
+        int tag = MSG_REQUEST_NODE;
         emitJobRequest(job, req, tag, left, -1);
     }
 
-    void emitJobRequest(Job& job, const JobRequest& req, int tag, bool left, int dest) {
+    void emitJobRequest(Job& job, JobRequest& req, int tag, bool left, int dest) {
 
+        // undirected request?
+        if (tag == MSG_REQUEST_NODE || dest == -1) {
+            
+            // check if the job has a request which must be multiplied
+            auto& optReqToMultiply = job.getRequestToMultiply(left);
+            if (optReqToMultiply) {
+
+                // -- yes: replace input request with multiplied request
+                auto& reqToMultiply = optReqToMultiply.value();
+                tag = MSG_MATCHING_SEND_REQUEST;
+                auto [reqLeft, reqRight] = reqToMultiply.getMultipliedChildRequests(MyMpi::rank(MPI_COMM_WORLD));
+                req = left ? reqLeft : reqRight;
+                dest = req.multiBegin % _routing_tree.getNumWorkers();
+                LOG(V4_VVER, "multiplying request %s --\n", reqToMultiply.toStr().c_str());
+                LOG_ADD_DEST(V4_VVER, "-- becomes %s", dest, req.toStr().c_str());
+
+                reqToMultiply.dismissMultiplicityData(); // promise fulfilled
+                optReqToMultiply.reset();
+
+            } else if (_params.bulkRequests()) {
+                // Which transitive children *below* the requested index does this job desire?
+                // Perform a depth-first search as far as the job's volume allows.
+                addMultiplicityToRequest(req, job.getVolume());
+            }
+        }
+
+        // Find a proper destination rank if none was given
         if (dest == -1) {
             int nextNodeRank = job.getJobTree().getRankOfNextDormantChild(); 
             if (nextNodeRank < 0) {
@@ -60,15 +105,20 @@ public:
         }
 
         LOG_ADD_DEST(V3_VERB, "%s growing: %s", dest, job.toStr(), req.toStr().c_str());
-        
-        MyMpi::isend(dest, tag, req);
-        
         _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
         if (left) job.getJobTree().setDesireLeft(Timer::elapsedSeconds());
         else job.getJobTree().setDesireRight(Timer::elapsedSeconds());
+
+        if (tag == MSG_REQUEST_NODE && _params.prefixSumMatching() && _params.bulkRequests()) {
+            _req_matcher->addJobRequest(req);
+            return;
+        }
+        
+        MyMpi::isend(dest, tag, req);
     }
 
     void activateRootRequest(int jobId) {
+        LOG(V5_DEBG, "Try activate #%i\n", jobId);
         auto optReq = getRootRequest(jobId);
         if (!optReq.has_value()) return;
         LOG(V3_VERB, "Activate %s\n", optReq.value().toStr().c_str());
@@ -91,6 +141,22 @@ public:
         // and if either reactivation scheduling is employed or the requested node is non-root
         if (_req_matcher && (num >= _params.hopsUntilCollectiveAssignment())
             && (_params.reactivationScheduling() || request.requestedNodeIndex > 0)) {
+
+            request.triggerAndDestroyMultiplicityData();
+            if (_params.prefixSumMatching() && _params.bulkRequests()) {
+                // Reset multiplicity according to multiEnd-multiBegin. Example:
+                // 0.206 0 PRISMA contribute r.#3596:3 rev. 0 <- [0] born=0.203 hops=1 epoch=5 x4 [1,4]
+                // -- effectively looking for 4-1=3 workers
+                // ... prefix sum calculation ...
+                // 0.207 7 PRISMA received r.#3596:3 rev. 0 <- [0] born=0.203 hops=1 epoch=5 x4 [7,11]
+                // -- now requesting 11-7=4 workers!
+                // => Danger of increasing the desired interval!
+                if (request.multiplicity > 1 && request.multiBegin >= 0 && request.multiEnd >= 0) {
+                    request.multiplicity = request.multiEnd - request.multiBegin;
+                    request.multiBegin = -1;
+                    request.multiEnd = -1;
+                }
+            }
             _req_matcher->addJobRequest(request);
             return;
         }
@@ -109,9 +175,9 @@ public:
         MyMpi::isend(nextRank, MSG_REQUEST_NODE, request);
     }
 
-    void defer(const JobRequest& req, int sender) {
+    void defer(JobRequest&& req, int sender) {
         LOG(V3_VERB, "Defer %s\n", req.toStr().c_str());
-        _deferred_requests.emplace_back(Timer::elapsedSecondsCached(), sender, req);
+        _deferred_requests.emplace_back(Timer::elapsedSecondsCached(), sender, std::move(req));
     }
 
     void forwardDeferredRequests() {
@@ -172,6 +238,7 @@ public:
 
     void addRootRequest(const JobRequest& req) {
         _root_requests[req.jobId].push_back(req);
+        LOG(V5_DEBG, "added root request %s\n", _root_requests[req.jobId].back().toStr().c_str());
     }
 
     std::optional<JobRequest> getRootRequest(int jobId) {
@@ -195,6 +262,34 @@ public:
         handle.finished = true;
         handle.receiveSelfMessage(loadPendingRootReactivationRequest().serialize(), MyMpi::rank(MPI_COMM_WORLD));
         return handle;
+    }
+
+    void addMultiplicityToRequest(JobRequest& req, int jobVolume) {
+        req.multiplicity = getCurrentDesiredRequestMultiplicity(jobVolume, req.requestedNodeIndex);
+    }
+
+private:
+    int getCurrentDesiredRequestMultiplicity(int volume, int index) {
+
+        // Which transitive children *below* the requested index does this job desire?
+        // Perform a depth-first search as far as the job's volume allows.
+        std::vector<int> indexStack(1, index);
+        int multiplicity = 0;
+        while (!indexStack.empty()) {
+            multiplicity++;
+            
+            // Visit node
+            int index = indexStack.back();
+            indexStack.pop_back();
+
+            // Expand children
+            for (auto childIndex : {2*index+1, 2*index+2}) {
+                if (childIndex < volume) {
+                    indexStack.push_back(childIndex);
+                }
+            }
+        }
+        return multiplicity;
     }
 
 };

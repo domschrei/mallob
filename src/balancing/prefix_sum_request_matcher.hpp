@@ -5,6 +5,8 @@
 #include "comm/async_collective.hpp"
 #include "data/job_transfer.hpp"
 #include "comm/message_subscription.hpp"
+#include "util/hashing.hpp"
+#include "util/tsl/robin_map.h"
 
 class PrefixSumRequestMatcher : public RequestMatcher {
 
@@ -17,23 +19,34 @@ private:
     AsyncCollective<ReduceableInt> _collective;
     int _my_rank;
 
+    bool _last_contribution_idle {false};
     std::list<JobRequest> _new_requests;
     std::list<JobRequest> _requests_in_prefix_sum;
 
     int _requests_indexing_offset {0};
-    std::list<std::pair<int, JobRequest>> _indexed_requests;
+    std::list<std::pair<std::pair<int, int>, JobRequest>> _indexed_requests;
     int _last_requests_total {0};
     int _last_requests_matched {0};
 
-    //int _idles_indexing_offset {0};
-    int _last_idles_incl {0};
-    int _last_idles_excl {0};
+    int _idles_indexing_offset {0};
+    std::list<int> _idles_indexes;
     int _last_idles_total {0};
     int _last_idles_matched {0};
 
-    std::list<JobRequest> _requests_to_match;
-    std::list<int> _idles_to_match;
-    int _running_rank_to_perform_match {0};
+    struct Matching {
+        int idleRank {-1};
+        bool requestArrived {false};
+        JobRequest request;
+        std::string toStr() const {
+            return "{" + std::to_string(idleRank) + "} x {" + 
+                std::string(!requestArrived ? "-" : (request.jobId == -1 ? "X" : request.toStr())) 
+                + "}";
+        }
+    };
+    tsl::robin_map<int, Matching> _open_matchings;
+    int _running_matching_id {0};
+
+    float _time_of_last_change_in_matching {0};
 
     std::list<MessageSubscription> _subscriptions;
 
@@ -66,7 +79,7 @@ public:
             LOG(V5_DEBG, "PRISMA recv prefix sum X%i - requests (%i,%i,%i)\n", id, excl, incl, total);
             _events.insert(BroadcastEvent{CALL_ID_REQUESTS, id, excl, incl, total});
         });
-        _collective.initializeDifferentialSparsePrefixSum(CALL_ID_IDLES, 
+        _collective.initializeSparsePrefixSum(CALL_ID_IDLES, 
                 /*delaySeconds=*/0.001, [&](auto& results) {
             auto it = results.begin();
             int excl = it->content; ++it;
@@ -77,8 +90,11 @@ public:
             _events.insert(BroadcastEvent{CALL_ID_IDLES, id, excl, incl, total});
         });
 
-        _subscriptions.emplace_back(MSG_MATCHING_SEND_IDLE_TOKEN, [&](auto& h) {handle(h);});
-        _subscriptions.emplace_back(MSG_MATCHING_SEND_REQUEST, [&](auto& h) {handle(h);});
+        auto callback = [&](auto& h) {handle(h);};
+        for (int tag : {MSG_MATCHING_SEND_IDLE_TOKEN, MSG_MATCHING_SEND_REQUEST, 
+                MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION, MSG_MATCHING_REQUEST_CANCELLED}) {
+            _subscriptions.emplace_back(tag, callback);
+        }
         
         _my_rank = MyMpi::rank(comm);
     }
@@ -90,44 +106,63 @@ public:
     virtual void handle(MessageHandle& h) override {
 
         if (h.tag == MSG_MATCHING_SEND_IDLE_TOKEN) {
-            _idles_to_match.push_back(Serializable::get<IntVec>(h.getRecvData())[0]);
-            LOG(V4_VVER, "PRISMA received idle [%i]\n", _idles_to_match.back());
+            auto vec = Serializable::get<IntVec>(h.getRecvData());
+            int id = vec[0];
+            int idleRank = vec[1];
+            _open_matchings[id].idleRank = idleRank;
+            LOG(V4_VVER, "PRISMA id=%i received idle [%i]\n", id, idleRank);
+            tryResolve(id);
         }
         if (h.tag == MSG_MATCHING_SEND_REQUEST) {
-            _requests_to_match.push_back(Serializable::get<JobRequest>(h.getRecvData()));
-            LOG(V4_VVER, "PRISMA received %s\n", _requests_to_match.back().toStr().c_str());
+            auto req = Serializable::get<JobRequest>(h.getRecvData());
+            int id = req.getMatchingId();
+            _open_matchings[id].request = req;
+            _open_matchings[id].requestArrived = true;
+            LOG(V4_VVER, "PRISMA id=%i received %s\n", id, req.toStr().c_str());
+            tryResolve(id);
+        }
+        if (h.tag == MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION) {
+            // Absorb an idle token for this request, ignore the request
+            auto req = Serializable::get<JobRequest>(h.getRecvData());
+            int id = req.getMatchingId();
+            LOG(V4_VVER, "PRISMA id=%i received cancelled %s\n", id, req.toStr().c_str());
+            _open_matchings[id].requestArrived = true;
+            // Propagate multiplied child requests as well
+            auto [leftReq, rightReq] = req.getMultipliedChildRequests(-1);
+            for (auto& childReq : {leftReq, rightReq}) {
+                if (childReq.jobId == -1) continue;
+                LOG(V4_VVER, "PRISMA CANCEL %s\n", childReq.toStr().c_str());
+                MyMpi::isend(childReq.multiBegin % MyMpi::size(_comm), 
+                    MSG_MATCHING_SEND_REQUEST_OBSOLETE_NOTIFICATION, childReq);
+            }
+            tryResolve(id);
+        }
+        if (h.tag == MSG_MATCHING_REQUEST_CANCELLED) {
+            // A request which THIS IDLE NODE should have received
+            // has been cancelled. Re-participate in the idles prefix sum.
+            if (isIdle()) _status_dirty = true;
         }
 
-        while (!_idles_to_match.empty() && !_requests_to_match.empty()) {
-            int idleRank = _idles_to_match.front();
-            _idles_to_match.pop_front();
-            auto request = std::move(_requests_to_match.front()); 
-            _requests_to_match.pop_front();
-
-            MyMpi::isend(idleRank, MSG_REQUEST_NODE, request);
-        }
+        _time_of_last_change_in_matching = Timer::elapsedSecondsCached();
     }
 
     virtual void advance(int epoch) override {
 
         if (_job_registry == nullptr) return;
-        bool newEpoch = epoch > _epoch;
+        _epoch = std::max(_epoch, epoch);
 
-        if (newEpoch) {
-            _epoch = epoch;
-            _status_dirty = true;
-        }
-
-        if (_status_dirty) {
+        auto idle = isIdle();
+        // Report idle status only if your status was marked dirty 
+        if (idle && _status_dirty) {
             LOG(V5_DEBG, "PRISMA contribute idle status\n");
-            _collective.contributeToSparsePrefixSum(CALL_ID_IDLES, ReduceableInt(isIdle()?1:0));
+            _collective.contributeToSparsePrefixSum(CALL_ID_IDLES, ReduceableInt(1));
             _status_dirty = false;
         }
 
         if (!_new_requests.empty()) { // TODO wait until ready to contribute *again*
             for (auto& req : _new_requests) LOG(V4_VVER, "PRISMA contribute %s\n", req.toStr().c_str());
             // Contribute to the requests prefix sum
-            _collective.contributeToSparsePrefixSum(CALL_ID_REQUESTS, _new_requests.size());
+            _collective.contributeToSparsePrefixSum(CALL_ID_REQUESTS, getSumOfNewRequestsMultiplicities());
             // Move requests from "new" to "in prefix sum"
             _requests_in_prefix_sum.splice(_requests_in_prefix_sum.end(), _new_requests);
         }
@@ -154,82 +189,148 @@ public:
                 digestRequestsPrefixSumResult(event.exclusiveSum, event.inclusiveSum, event.totalSum);
             }
             if (event.callType == CALL_ID_IDLES) {
-                //_idles_indexing_offset += _last_idles_total;
-                _last_idles_excl = event.exclusiveSum;
-                _last_idles_incl = event.inclusiveSum;
-                _last_idles_total = event.totalSum;
-                _last_idles_matched = 0;
-                LOG(V5_DEBG, "PRISMA indexed %i idles - (%i,%i,%i)\n", _last_idles_total, 
+                LOG(V5_DEBG, "PRISMA indexed %i idles - (%i,%i,%i)\n", event.totalSum, 
                     event.exclusiveSum, event.inclusiveSum, event.totalSum);
+                digestIdlesPrefixSumResult(event.exclusiveSum, event.inclusiveSum, event.totalSum);
             }
             tryMatch();
 
             _last_event_id = event.id;
             it = _events.erase(it);
         }
+
+        // Output requests and/or idles which have not been matched for at least a second
+        if (Timer::elapsedSecondsCached() - _time_of_last_change_in_matching >= 1.0f) {
+            for (auto& [id, matching] : _open_matchings) {
+                LOG(V4_VVER, "PRISMA open matching id=%i %s\n", id, matching.toStr().c_str());
+            }
+            _time_of_last_change_in_matching = Timer::elapsedSecondsCached();
+        }
+    }
+
+    virtual void setStatusDirty(StatusDirtyReason reason) override {
+        if (!isIdle()) return;
+        switch (reason) {
+        case DISCARD_REQUEST:
+        case REJECT_REQUEST:
+        case STOP_WAIT_FOR_REACTIVATION:
+        case UNCOMMIT_JOB_LEAVING:
+        case BECOME_IDLE:
+            _status_dirty = true;
+        }
     }
 
 private:
 
+    int getSumOfNewRequestsMultiplicities() const {
+        int sum = 0;
+        for (auto& req : _new_requests) {
+            sum += req.multiplicity;
+        }
+        return sum;
+    }
+
+    void tryResolve(int id) {
+        auto& matching = _open_matchings[id];
+        if (matching.requestArrived && matching.idleRank != -1) {
+
+            if (matching.request.jobId == -1) {
+                // request cancelled
+                LOG(V3_VERB, "PRISMA EMIT [%i] <= (cancelled)\n", matching.idleRank);
+                MyMpi::isend(matching.idleRank, MSG_MATCHING_REQUEST_CANCELLED, IntVec{0});
+            } else {
+                LOG(V3_VERB, "PRISMA id=%i EMIT [%i] <= %s\n", id, matching.idleRank, 
+                    matching.request.toStr().c_str());
+                MyMpi::isend(matching.idleRank, MSG_REQUEST_NODE, matching.request);
+            }
+
+            _open_matchings.erase(id);
+        }
+    }
+
     void tryMatch() {
 
-        skipMatchingStepsWithoutLocalContribution();
+        //skipMatchingStepsWithoutLocalContribution();
 
         // Use the indexed requests and the most recent prefix sum result.
         while (!doneMatching()) {
 
             // A request and an idle rank can be matched!
-            int idlePrefixSumIndex = _last_idles_matched;
+            int idlePrefixSumIndex = _idles_indexing_offset + _last_idles_matched;
             int requestPrefixSumIndex = _requests_indexing_offset + _last_requests_matched;
-            int destinationRank = _running_rank_to_perform_match % MyMpi::size(_comm);
-
-            LOG(V4_VVER, "PRISMA matching idle I%i and request Q%i to rank %i\n", 
-                idlePrefixSumIndex, requestPrefixSumIndex, destinationRank);
+            int destinationRank = _running_matching_id % MyMpi::size(_comm);
 
             bool hadLocalContribution = false;
 
             if (!_indexed_requests.empty()) {
-                assert(_indexed_requests.front().first >= requestPrefixSumIndex);
-                if (_indexed_requests.front().first == requestPrefixSumIndex) {
+                auto& [indexStart, indexEnd] = _indexed_requests.front().first;
+                if (requestPrefixSumIndex >= indexStart && requestPrefixSumIndex < indexEnd) {
                     // THIS request is the one to be matched
-                    auto [index, req] = _indexed_requests.front();
-                    _indexed_requests.pop_front();
+                    auto& req = _indexed_requests.front().second;
 
-                    // send request
-                    MyMpi::isend(destinationRank, MSG_MATCHING_SEND_REQUEST, req);
+                    // Set correct multiplicity range for this request
+                    req.multiBegin = destinationRank;
+                    req.multiEnd = destinationRank + req.multiplicity;
+                    req.multiBaseId = _running_matching_id;
+
+                    // only send the first "incarnation" of a request with multiplicity > 1
+                    if (requestPrefixSumIndex == indexStart) {
+                        MyMpi::isend(destinationRank, MSG_MATCHING_SEND_REQUEST, req);
+                        LOG(V4_VVER, "PRISMA id=%i MATCH I%i =>[%i]<= Q%i (%s)\n", 
+                            _running_matching_id, idlePrefixSumIndex, destinationRank, 
+                            requestPrefixSumIndex, req.toStr().c_str());
+                    }
                     hadLocalContribution = true;
+
+                    // Pop this request from indexed request structure
+                    // if it is the last "incarnation"
+                    if (requestPrefixSumIndex+1 == indexEnd) {
+                        _indexed_requests.pop_front();
+                    }
                 }
             }
 
-            if (_last_idles_matched >= _last_idles_excl && _last_idles_matched < _last_idles_incl) {
-                // THIS rank is the idle rank that should be matched
+            if (!_idles_indexes.empty()) {
+                int idleIndex = _idles_indexes.front();
+                if (idleIndex == requestPrefixSumIndex) {
+                    // THIS idle rank is the one to be matched
+                    _idles_indexes.pop_front();
 
-                // send this rank
-                IntVec idleVec({_my_rank});
-                MyMpi::isend(destinationRank, MSG_MATCHING_SEND_IDLE_TOKEN, idleVec);
-                hadLocalContribution = true;
+                    // send this rank
+                    IntVec idleVec({_running_matching_id, _my_rank});
+                    MyMpi::isend(destinationRank, MSG_MATCHING_SEND_IDLE_TOKEN, idleVec);
+                    hadLocalContribution = true;
+                    LOG(V4_VVER, "PRISMA id=%i MATCH I%i [%i] =>[%i]<= Q%i\n", 
+                        _running_matching_id, idlePrefixSumIndex, _my_rank, 
+                        destinationRank, requestPrefixSumIndex);
+                }
             }
 
-            assert(hadLocalContribution);
+            //assert(hadLocalContribution);
 
             // Go to next step
             _last_idles_matched++;
             _last_requests_matched++;
-            _running_rank_to_perform_match++;
+            _running_matching_id++;
 
             // skip any non-local steps
-            skipMatchingStepsWithoutLocalContribution();
+            //skipMatchingStepsWithoutLocalContribution();
         }
     }
 
+    bool doneMatching() const {
+        return _last_idles_matched >= _last_idles_total || _last_requests_matched >= _last_requests_total;
+    }
+
+    /*
     void skipMatchingStepsWithoutLocalContribution() {
 
         // How many steps until there is a local relevant request?        
         bool hasRequestContribution = !_indexed_requests.empty();
         int skippableStepsForRequests = hasRequestContribution ? 
-            _indexed_requests.front().first - (_requests_indexing_offset + _last_requests_matched) 
+            _indexed_requests.front().first.first - (_requests_indexing_offset + _last_requests_matched) 
             : std::numeric_limits<int>::max();
-        assert(skippableStepsForRequests >= 0);
+        skippableStepsForRequests = std::max(0, skippableStepsForRequests);
         skippableStepsForRequests = std::min(skippableStepsForRequests, _last_requests_total-_last_requests_matched);
 
         // How many steps until there is a local relevant idle rank?
@@ -246,11 +347,30 @@ private:
         // Skip.
         _last_idles_matched += skippableSteps;
         _last_requests_matched += skippableSteps;
-        _running_rank_to_perform_match += skippableSteps;
+        _running_matching_id += skippableSteps;
     }
+    */
 
-    bool doneMatching() const {
-        return _last_idles_matched >= _last_idles_total || _last_requests_matched >= _last_requests_total;
+    void digestIdlesPrefixSumResult(int exclusiveSum, int inclusiveSum, int totalSum) {
+
+        // Integrate the remaining idles from the last prefix sum
+        // into these new idle ranks.
+        int numRemainingIdles = _last_idles_total - _last_idles_matched;
+        assert(numRemainingIdles >= 0);
+
+        _idles_indexing_offset += _last_idles_total;
+
+        if (inclusiveSum != exclusiveSum) {
+            // your own contribution is part of the prefix sum
+            assert(inclusiveSum - exclusiveSum == 1);
+            int index = _idles_indexing_offset + exclusiveSum;
+            LOG(V4_VVER, "PRISMA indexed I%i\n", index);
+            _idles_indexes.push_back(index);
+        }
+
+        _last_idles_total = totalSum;
+        // make sure to still match old remaining idles!
+        _last_idles_matched = - numRemainingIdles;
     }
 
     void digestRequestsPrefixSumResult(int exclusiveSum, int inclusiveSum, int totalSum) {
@@ -263,7 +383,8 @@ private:
         _requests_indexing_offset += _last_requests_total;
         
         auto reqIt = _requests_in_prefix_sum.begin();
-        for (int index = exclusiveSum; index < inclusiveSum; index++) {
+        int index = exclusiveSum;
+        while (index < inclusiveSum) {
             assert(reqIt != _requests_in_prefix_sum.end());
             
             // Extract job request
@@ -271,8 +392,11 @@ private:
             reqIt = _requests_in_prefix_sum.erase(reqIt);
 
             auto reqIndex = _requests_indexing_offset + index;
-            LOG(V4_VVER, "PRISMA indexed Q%i : %s\n", reqIndex, req.toStr().c_str());
-            _indexed_requests.emplace_back(reqIndex, std::move(req));
+            auto reqIndexEnd = reqIndex + req.multiplicity;
+            LOG(V4_VVER, "PRISMA indexed [Q%i..Q%i) : %s\n", reqIndex, reqIndexEnd, req.toStr().c_str());
+            _indexed_requests.emplace_back(std::pair<int, int>(reqIndex, reqIndexEnd), std::move(req));
+
+            index += req.multiplicity;
         }
 
         _last_requests_total = totalSum;

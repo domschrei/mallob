@@ -25,7 +25,7 @@ public:
     };
 
 private:
-    const Parameters& _params;
+    const Parameters _params;
     BaseSatJob* _job = NULL;
     bool _suspended = false;
 

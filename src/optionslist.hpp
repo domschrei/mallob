@@ -63,7 +63,6 @@ OPTION_GROUP(grpScheduling, "scheduling", "Scheduling")
  OPT_INT(jobCacheSize,                    "jc", "job-cache-size",                      4,    0, LARGE_INT,      "Size of job cache per PE for suspended yet unfinished job nodes")
  OPT_FLOAT(loadFactor,                    "l", "load-factor",                          1,    0, 1,              "The share of PEs which should be busy at any given time")
  OPT_INT(numBounceAlternatives,           "ba", "bounce-alternatives",                 4,    1, LARGE_INT,      "Number of bounce alternatives per PE")
- OPT_BOOL(prefixSumMatching,              "prisma", "prefix-sum-matching",             false,                   "Match requests and idle PEs using prefix sums instead of a routing tree")
 
 ///////////////////////////////////////////////////////////////////////
 
@@ -71,6 +70,8 @@ OPTION_GROUP(grpSchedulingMapping, "scheduling/mapping", "Options for mapping wo
  OPT_INT(hopsUntilCollectiveAssignment,   "huca", "hops-until-collective-assignment",  0,    -1, LARGE_INT,     "After a job request hopped this many times, add it to collective negotiation of requests and idle nodes (0: immediately, -1: never");
  OPT_BOOL(reactivationScheduling,         "rs", "use-reactivation-scheduling",         true,                    "Perform reactivation-based scheduling")
  OPT_BOOL(useDormantChildren,             "dc", "dormant-children",                    false,                   "Simple strategy of maintaining local set of dormant child job contexts which the parent tries to reactivate")
+ OPT_BOOL(prefixSumMatching,              "prisma", "prefix-sum-matching",             false,                   "Match requests and idle PEs using prefix sums instead of a routing tree")
+ OPT_BOOL(bulkRequests,                   "br", "bulk-requests",                       false,                   "Encode requests for an entire subtree as a single request")
 
 ///////////////////////////////////////////////////////////////////////
 

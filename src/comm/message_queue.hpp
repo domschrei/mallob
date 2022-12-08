@@ -247,6 +247,7 @@ private:
 
     size_t _max_msg_size;
     int _my_rank;
+    int _comm_size;
     unsigned long long _iteration = 0;
 
     // Basic receive stuff
