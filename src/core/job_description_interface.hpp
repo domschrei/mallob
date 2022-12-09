@@ -50,7 +50,7 @@ public:
 
         const auto& data = handle.getRecvData();
         outJobId = data.size() >= sizeof(int) ? Serializable::get<int>(data) : -1;
-        LOG_ADD_SRC(V4_VVER, "Got desc. of size %i for job #%i", handle.source, data.size(), outJobId);
+        LOG_ADD_SRC(V4_VVER, "Got desc. of size %lu for job #%i", handle.source, data.size(), outJobId);
 
         auto dataPtr = std::shared_ptr<std::vector<uint8_t>>(
             new std::vector<uint8_t>(handle.moveRecvData())
@@ -112,12 +112,12 @@ private:
         if (job.hasDescription()) {
             if (rev != job.getMaxConsecutiveRevision()+1) {
                 // Revision data would cause a "hole" in the list of job revision data
-                LOG(V1_WARN, "[WARN] #%i rev. %i inconsistent w/ max. consecutive rev. %i : discard desc. of size %i\n", 
+                LOG(V1_WARN, "[WARN] #%i rev. %i inconsistent w/ max. consecutive rev. %i : discard desc. of size %lu\n", 
                     jobId, rev, job.getMaxConsecutiveRevision(), description->size());
                 return false;
             }
         } else if (rev != 0) {
-            LOG(V1_WARN, "[WARN] #%i invalid \"first\" rev. %i : discard desc. of size %i\n", jobId, rev, description->size());
+            LOG(V1_WARN, "[WARN] #%i invalid \"first\" rev. %i : discard desc. of size %lu\n", jobId, rev, description->size());
                 return false;
         }
 

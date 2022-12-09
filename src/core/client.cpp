@@ -449,13 +449,13 @@ void Client::handleOfferAdoption(MessageHandle& handle) {
     assert(desc.getId() == req.jobId || LOG_RETURN_FALSE("%i != %i\n", desc.getId(), req.jobId));
 
     // Send job description
-    LOG_ADD_DEST(V4_VVER, "Sending job desc. of #%i rev. %i of size %i", handle.source, desc.getId(), 
+    LOG_ADD_DEST(V4_VVER, "Sending job desc. of #%i rev. %i of size %lu", handle.source, desc.getId(), 
         desc.getRevision(), desc.getTransferSize(desc.getRevision()));
     
     auto data = desc.getSerialization(desc.getRevision());
     desc.clearPayload(desc.getRevision());
     int msgId = MyMpi::isend(handle.source, MSG_SEND_JOB_DESCRIPTION, data);
-    LOG_ADD_DEST(V4_VVER, "Sent job desc. of #%i of size %i", 
+    LOG_ADD_DEST(V4_VVER, "Sent job desc. of #%i of size %lu", 
         handle.source, req.jobId, data->size());
     //LOG(V4_VVER, "%p : use count %i\n", data.get(), data.use_count());
     
