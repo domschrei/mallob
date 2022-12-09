@@ -4,7 +4,7 @@
 #include "util/shuffle.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
-#include "util/permutation.hpp"
+#include "util/random.hpp"
 
 class SerializedFormulaParser {
 
@@ -16,11 +16,11 @@ private:
 
     bool _shuffled {false};
 
-    AdjustablePermutation _permutation;
     std::vector<const int*> _clause_refs;
+    std::vector<int> _permuted_clause_indices;
 
     int _clause_index {0};
-    int _permuted_clause_index {-1};
+    int _permuted_clause_index {0};
 
     const int* _literal_ptr {nullptr};
     const int* _next_literal_ptr {nullptr};
@@ -61,11 +61,28 @@ public:
             _clause_refs.resize(128);
         }
 
-        // Generate permutation of clauses
-        _permutation = AdjustablePermutation(_clause_refs.size(), seed);
+        // Permute indices to clause references
+        _permuted_clause_indices.resize(_clause_refs.size());
+        for (size_t i = 0; i < _clause_refs.size(); i++) _permuted_clause_indices[i] = i;
+        auto rng = SplitMix64Rng(seed);
+        ::shuffle(_permuted_clause_indices.data(), _permuted_clause_indices.size(), rng);
 
+        // Create a little report string which shows some of the reordered indices
+        std::string report;
+        int maxNumPrefix = 3;
+        for (size_t i = 0; i < _permuted_clause_indices.size(); i++) {
+            if (i >= maxNumPrefix && i+1 < _permuted_clause_indices.size()) {
+                report += "...," + std::to_string(_permuted_clause_indices.back());
+                break;
+            }
+            int idx = _permuted_clause_indices[i];
+            report += std::to_string(idx);
+            if (i+1 == _permuted_clause_indices.size()) break;
+            else report += ",";
+        }
+        
         time = Timer::elapsedSeconds() - time;
-        LOGGER(_logger, V4_VVER, "Shuffling took %.4fs\n", time);
+        LOGGER(_logger, V4_VVER, "Shuffling cls indices (%s) took %.4fs\n", report.c_str(), time);
         
         _shuffled = true;
         _literal_ptr = nullptr;
@@ -82,7 +99,7 @@ public:
                 return false;
             }
             // Draw permuted clause index
-            _permuted_clause_index = _permutation.get(_clause_index, false);
+            _permuted_clause_index = _permuted_clause_indices[_clause_index];
             // Set pointers to the current clause and its end
             _literal_ptr = _clause_refs[_permuted_clause_index];
             _next_literal_ptr = _permuted_clause_index+1 == _clause_refs.size() ? 
