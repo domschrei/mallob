@@ -16,7 +16,7 @@ For debugging purposes, the following build switches are useful:
 To diagnose a Mallob run, `grep` in the log files for the following logging output (listed by descending priority):
 
 * Log lines containing `[ERROR]` **do** indicate undesired behavior, such as an internal crash, an unresponsive node, or a failed assertion. Usually, the output of such a line is accompanied by a thread trace file (see next section).
-* Log lines containing `[WARN]` _may_ indicate undesired behavior, such as the main thread getting stuck in a computation for some time or an unexpected message arriving at a process.
+* Log lines containing `[WARN]` _may_ indicate undesired behavior, such as the main thread getting stuck in a computation for some time or an unexpected message arriving at a process. Relevant warnings which should be investigated include watchdog barks (see below) and the rejection of an incoming job, perhaps because its JSON was malformed.
 * Log lines containing `sysstate` should be output each second and provide basic information on the system state, such as the number of entered/parsed/introduced/finished jobs, the global memory usage, and the ratio of busy processes. If this `busyratio` is less than 1.000 for multiple seconds in a row, this usually means one of two things: Either not enough demand for resources is present in the system to utilize all processes, or (this is the bad option) something went wrong with Mallob's scheduling leading to some remaining idle processes. The latter case needs to be debugged separately, and if you notice this behavior without changing anything about Mallob's scheduling, please contact <dominik.schreiber@kit.edu>.
 
 ### Thread Trace Files
@@ -39,7 +39,9 @@ A watchdog triggering a crash looks like this:
 
     10.020 0 [ERROR] Watchdog: TIMEOUT (last=0.015 activity=0 recvtag=0 sendtag=0)
 
-The value of `last` indicates the point in time where the watchdog was pet for the last time. In addition, a thread trace file is created which features the location in the code where the watched thread got stuck. 
+The value of `last` indicates the point in time where the watchdog was pet for the last time. In addition, a thread trace file is created which features the location in the code where the watched thread got stuck.
+
+There are many possible causes for a barking watchdog. For instance, if you decide to assign each MPI process to a single core or even a single hardware thread, or if you use even more MPI processes with ``--oversubscribe``, then the machine is likely to experience very busy process / thread scheduling and it becomes more likely that a crucial thread is not scheduled for several milliseconds. Likewise, limited I/O bandwidth can become a problem if many processes write to the same (network?) file system.
 
 ### Detection of Unresponsive MPI Processes
 
