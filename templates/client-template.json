@@ -1,10 +1,11 @@
 {
     "comment": [
-    "For each of the below five properties, a random distribution to draw the property from can be configured.",
-    "The type can be set as constant (just a constant value VAL), uniform (draw uniformly at random from an interval),",
-    "normal (simplified normal distribution where values are capped at provided interval borders), or",
-    "exponential (exponential distribution with lambda provided). The params describe the respective distribution.",
-    "constant: [VAL]; uniform: [MIN,MAX]; normal: [MEAN,STDDEV,MIN,MAX]; exponential: [LAMBDA]."
+        "For each of the below properties, a random distribution to draw the property from can be configured.",
+        "The 'type' can be set to 'constant' (just a constant value VAL), 'uniform' (draw uniformly at random from an interval),",
+        "'normal' (simplified normal distribution where values are capped at provided interval borders), or",
+        "'exponential' (exponential distribution with rate parameter lambda: higher lambda leads to smaller values, exp. value 1/lambda).",
+        "Depending on the type, the following 'params' are expected as a list of numbers:",
+        "constant: [VAL]; uniform: [MIN,MAX]; normal: [MEAN,STDDEV,MIN,MAX]; exponential: [LAMBDA]."
     ],
 
     "priority": {
@@ -23,7 +24,7 @@
         "params": [0]
     },
     "arrival": {
-        "comment": "The arrival of a job given in seconds after Mallob's upstart.",
+        "comment": "The arrival of a job, given in seconds since the previous job's arrival (or since system start).",
         "type": "constant",
         "params": [0]
     },
