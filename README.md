@@ -212,6 +212,12 @@ Instead of the "solution" field, the response may also contain the fields "solut
 
 <hr/>
 
+# Debugging
+
+Debugging of distributed applications can be difficult, especially in Mallob's case where message passing goes hand in hand with multithreading and inter-process communication. Please take a look at [docs/debugging.md](docs/debugging.md) for some notes on how Mallob runs can be diagnosed and debugged appropriately.
+
+<hr/>
+
 # Programming Interfaces
 
 Mallob can be extended in the following ways:
@@ -221,7 +227,7 @@ Mallob can be extended in the following ways:
 * To add a new SAT solver to be used in a SAT solver engine, do the following:
     - Add a subclass of `PortfolioSolverInterface`. (You can use the existing implementation for any of the existing solvers and adapt it to your solver.)
     - Add your solver to the portfolio initialization in `src/app/sat/execution/engine.cpp`.
-* To extend Mallob by adding another kind of application (like combinatorial search, planning, SMT, ...), please refer to the README in the `app/` directory.
+* To extend Mallob by adding another kind of application (like combinatorial search, planning, SMT, ...), please read [docs/application_engines.md](docs/application_engines.md).
 * To add a unit test, create a class `test_*.cpp` in `src/test` and then add the test case to the bottom of `CMakeLists.txt`.
 * To add a system test, consult the files `scripts/systest_commons.sh` and/or `scripts/systest.sh`.
 
