@@ -1,19 +1,31 @@
 
 # Debugging Mallob
 
+Debugging of distributed applications can be difficult, especially in Mallob's case where message passing goes hand in hand with multithreading and inter-process communication. Here are some notes on how Mallob runs can be diagnosed and debugged appropriately.
+
 ## Build Options
 
 For debugging purposes, the following build switches are useful:
 
 * `-DCMAKE_BUILD_TYPE=DEBUG`: Leads to a build with full debug information. Therefore, in thread trace files and in the output of valgrind tools, there will be more specific information on functions and line numbers. Assertions are always included in DEBUG builds.
 * `-DMALLOB_LOG_VERBOSITY=5`: This static verbosity level (together with run time option `-v=5`) logs every single message that is being sent or received, among many other things.
-* `-DMALLOB_USE_ASAN=1`: Build sources with AdressSanitizer. This can help find illegal states in the code, especially invalid memory accesses.
+* `-DMALLOB_USE_ASAN=1`: Build sources with AddressSanitizer. This can help find illegal states in the code, especially invalid memory accesses.
 
 ## In-built Debugging Features
 
-### Logging Output
+Get acquainted with the debugging features Mallob offers by itself.
 
-To diagnose a Mallob run, `grep` in the log files for the following logging output (listed by descending priority):
+### Consulting Logs
+
+In general, taking a quick look at the logs a run outputs is never wrong. For small to medium size runs, you can use this command to take a look at Mallob's entire output, sorted consistently, given a log directory LOG:
+
+    cat LOG/*/* | awk 'NF > 1' | sort -s -g | less
+
+If run Mallob with `-mono`, a `c ` is output at the beginning of each line, which you can ignore like this:
+
+    cat LOG/*/* | awk 'NF > 1' | sed 's/^c //g' | sort -s -g | less
+
+To further diagnose a Mallob run, `grep` in the log files for the following logging output (listed by descending priority):
 
 * Log lines containing `[ERROR]` **do** indicate undesired behavior, such as an internal crash, an unresponsive node, or a failed assertion. Usually, the output of such a line is accompanied by a thread trace file (see next section).
 * Log lines containing `[WARN]` _may_ indicate undesired behavior, such as the main thread getting stuck in a computation for some time or an unexpected message arriving at a process. Relevant warnings which should be investigated include watchdog barks (see below) and the rejection of an incoming job, perhaps because its JSON was malformed.
