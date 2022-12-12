@@ -4,6 +4,7 @@
 #include <vector>
 #include <list>
 #include <cstring>
+#include <memory>
 
 #include "util/assert.hpp"
 #include "util/logger.hpp"
@@ -14,7 +15,7 @@ struct ReceiveFragment {
     int id = -1;
     int tag = -1;
     int receivedFragments = 0;
-    std::vector<std::vector<uint8_t>> dataFragments;
+    std::vector<std::unique_ptr<std::vector<uint8_t>>> dataFragments;
     bool cancelled = false;
     
     ReceiveFragment() = default;
@@ -83,9 +84,8 @@ struct ReceiveFragment {
 
         //log(V5_DEBG, "MQ STORE alloc\n");
         auto& frag = dataFragments[sentBatch];
-        assert(frag.empty() || LOG_RETURN_FALSE("Batch %i/%i already present!\n", sentBatch, totalNumBatches));
-        frag.resize(msglen);
-        memcpy(frag.data(), data, msglen);
+        assert(!frag || LOG_RETURN_FALSE("Batch %i/%i already present!\n", sentBatch, totalNumBatches));
+        frag.reset(new std::vector<uint8_t>(data, data+msglen));
         
         //log(V5_DEBG, "MQ STORE produce\n");
         // All fragments of the message received?

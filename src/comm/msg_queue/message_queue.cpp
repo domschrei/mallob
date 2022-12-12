@@ -140,8 +140,8 @@ void MessageQueue::runFragmentedMessageAssembler() {
             // concurrently clean up any fragments already received
             auto lock = _garbage_mutex.getLock();
             int numFragments = 0;
-            for (auto& frag : data.dataFragments) if (!frag.empty()) {
-                _garbage_queue.emplace_back(new std::vector<uint8_t>(std::move(frag)));
+            for (auto& frag : data.dataFragments) if (frag) {
+                _garbage_queue.emplace_back(std::move(frag));
                 atomics::incrementRelaxed(_num_garbage);
                 numFragments++;
             }
@@ -156,13 +156,14 @@ void MessageQueue::runFragmentedMessageAssembler() {
         size_t sumOfSizes = 0;
         for (size_t i = 0; i < data.dataFragments.size(); i++) {
             const auto& frag = data.dataFragments[i];
-            sumOfSizes += frag.size();
+            assert(frag);
+            sumOfSizes += frag->size();
         }
         std::vector<uint8_t> outData(sumOfSizes);
         size_t offset = 0;
         for (const auto& frag : data.dataFragments) {
-            memcpy(outData.data()+offset, frag.data(), frag.size());
-            offset += frag.size();
+            memcpy(outData.data()+offset, frag->data(), frag->size());
+            offset += frag->size();
         }
         h.setReceive(std::move(outData));
         // Put into finished queue
