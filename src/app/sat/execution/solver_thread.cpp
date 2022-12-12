@@ -144,6 +144,8 @@ bool SolverThread::readFormula() {
         // Adjust _max_var according to assumptions as well
         for (size_t i = 0; i < aSize; i++) _max_var = std::max(_max_var, std::abs(aLits[i]));
 
+        fParser->verifyChecksum();
+
         {
             auto lock = _state_mutex.getLock();
             assert(_imported_lits_curr_revision == fParser->getPayloadSize());

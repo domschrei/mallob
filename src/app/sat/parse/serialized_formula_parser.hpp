@@ -24,6 +24,12 @@ private:
     const int* _literal_ptr {nullptr};
     const int* _next_literal_ptr {nullptr};
 
+    int _chksum {1337};
+    int _cls_chksum {0};
+
+    bool _has_true_chksum {false};
+    int _true_chksum {1337};
+
 public:
     SerializedFormulaParser(Logger& logger, size_t size, const int* literals) : 
         _logger(logger), _size(size), _payload(literals), 
@@ -36,6 +42,7 @@ public:
         // Build vector of clauses (size + pointer to data)
         size_t clauseStart = 0; // 1st clause always begins at position 0
         size_t sumOfSizes = 0;
+        int clsChksum = 0;
         for (size_t i = 0; i < _size; i++) { // for each literal
             if (_payload[i] == 0) {
                 // clause ends
@@ -44,9 +51,15 @@ public:
                 //_shuffled_clauses.emplace_back(thisClauseSize, _payload+clauseStart);
                 clauseStart = i+1; // next clause begins at subsequent position
                 sumOfSizes += thisClauseSize;
+
+                _true_chksum ^= clsChksum;
+                clsChksum = 0;
+            } else {
+                clsChksum ^= _payload[i];
             }
         }
         assert(sumOfSizes + _clause_refs.size() == _size);
+        _has_true_chksum = true;
 
         // Initialize RNG
         SplitMix64Rng rng(seed);
@@ -119,10 +132,24 @@ public:
             _literal_ptr = nullptr;
         }
 
+        if (lit == 0) {
+            _chksum ^= _cls_chksum;
+            _cls_chksum = 0;
+        } else {
+            _cls_chksum ^= lit;
+        }
+
         return true; // success
     }
 
     size_t getPayloadSize() const {
         return _size;
+    }
+
+    void verifyChecksum() const {
+        if (_has_true_chksum && _true_chksum != _chksum) {
+            LOGGER(_logger, V0_CRIT, "[ERROR] Checksum fail: expected %i, got %i\n", _true_chksum, _chksum);
+            abort();
+        }
     }
 };
