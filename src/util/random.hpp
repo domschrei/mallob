@@ -69,6 +69,72 @@ public:
         z = (z ^ (z >> 27)) * UINT64_C(0x94D049BB133111EB);
         return z ^ (z >> 31);
     }
+
+    uint64_t max() const {
+        return std::numeric_limits<uint64_t>::max();
+    }
 };
+
+// https://stackoverflow.com/a/6127606
+template <typename T>
+void random_shuffle(T* array, size_t n, 
+    std::function<float()> rng = [](){return Random::rand();})
+{
+    if (n <= 1) return; 
+    for (size_t i = 0; i < n - 1; i++) {
+        size_t j = i + (size_t) (rng() * (n-i));
+        std::swap(array[j], array[i]);
+    }
+}
+
+// https://stackoverflow.com/a/6127606
+template <typename T>
+void random_shuffle(T* array, size_t n, SplitMix64Rng& rng)
+{
+    if (n <= 1) return; 
+    for (size_t i = 0; i < n - 1; i++) {
+        size_t j = i + (size_t) (rng() % (n-i));
+        std::swap(array[j], array[i]);
+    }
+}
+
+/*
+choose k elements i.i.d. from sequence of n elements A[0..n), in a single linear pass
+
+P(A[0] picked)  = 1 - P(A[0] not picked)
+                = 1 - P(elem. not picked k times from urn with n elements without returning)
+                = 1 - ( (n-1)/n * (n-2)/(n-1) * ... * (n-k)/(n-k+1) )
+                = 1 - (n-k)/n       // all other terms are cancelled
+
+=> Pick first element with prob. 1 - (n-k)/n
+=> Picked: Continue with A[1] for k'=k-1, n'=n-1
+=> Not picked: Continue with A[1] for k'=k, n'=n-1
+*/
+template <typename T>
+std::vector<T> random_choice_k_from_n(const T* array, size_t arraySize, int k, 
+        std::function<float()> rngZeroToOne = [](){return Random::rand();}) {
+
+    int numRemainingElems = arraySize;
+    int numToSelect = k;
+
+    std::vector<T> selectedElems;
+
+    size_t pos = 0;
+    while (numToSelect > 0) {
+        assert(numRemainingElems >= numToSelect);
+        // select array[pos] or not?
+        auto probSelect = 1 - (numRemainingElems-numToSelect) / (double)numRemainingElems;
+        // robustness towards floating-point shenanigans
+        if (probSelect > 0 && (probSelect >= 1 || rngZeroToOne() < probSelect)) {
+            // array[pos] selected
+            numToSelect--;
+            selectedElems.push_back(array[pos]);
+        }
+        numRemainingElems--;
+        pos++;
+    }
+
+    return selectedElems;
+}
 
 #endif

@@ -11,7 +11,7 @@
 
 #include "sharing_manager.hpp"
 #include "util/sys/timer.hpp"
-#include "util/shuffle.hpp"
+#include "util/random.hpp"
 #include "buffer/buffer_reducer.hpp"
 
 SharingManager::SharingManager(

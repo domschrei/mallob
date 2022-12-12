@@ -1,7 +1,6 @@
 
 #pragma once
 
-#include "util/shuffle.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "util/random.hpp"
@@ -49,23 +48,24 @@ public:
         }
         assert(sumOfSizes + _clause_refs.size() == _size);
 
+        // Initialize RNG
+        SplitMix64Rng rng(seed);
+        auto rngLambda = [&]() {return ((double)rng()) / rng.max();};
+        
         if (_clause_refs.size() > 128) {
-            // Reduce the set of clause references for better performance
-            // -> shuffles blocks of clauses instead of individual clauses
-            for (size_t i = 0; i < 128; i++) {
-                float floatIndex = (i/128.0) * _clause_refs.size();
-                int index = std::min(_clause_refs.size()-1, (size_t)std::round(floatIndex));
-                auto ref = _clause_refs[index];
-                _clause_refs[i] = ref;
-            }
-            _clause_refs.resize(128);
+            // Reduce the set of clause references for better performance:
+            // Always select the first pointer, then randomly select 127 more pointers.
+            auto selectedRefs = random_choice_k_from_n(_clause_refs.data()+1, _clause_refs.size()-1, 127, rngLambda);
+            selectedRefs.insert(selectedRefs.begin(), _clause_refs.front());
+            _clause_refs = std::move(selectedRefs);
+            assert(_clause_refs.size() == 128);
         }
 
-        // Permute indices to clause references
+        // Permute indices to clause references. These references will be interpreted
+        // as blocks of clauses.
         _permuted_clause_indices.resize(_clause_refs.size());
         for (size_t i = 0; i < _clause_refs.size(); i++) _permuted_clause_indices[i] = i;
-        auto rng = SplitMix64Rng(seed);
-        ::shuffle(_permuted_clause_indices.data(), _permuted_clause_indices.size(), rng);
+        ::random_shuffle(_permuted_clause_indices.data(), _permuted_clause_indices.size(), rng);
 
         // Create a little report string which shows some of the reordered indices
         std::string report;

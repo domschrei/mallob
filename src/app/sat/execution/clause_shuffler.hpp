@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "util/shuffle.hpp"
+#include "util/random.hpp"
 
 class ClauseShuffler {
 
@@ -41,11 +41,11 @@ public:
 
         if (permuteClauses) {
             // Shuffle order of clauses
-            shuffle(_clauses.data(), _clauses.size(), _rng_func);
+            random_shuffle(_clauses.data(), _clauses.size(), _rng_func);
         }
         if (permuteLiterals) {
             // Shuffle order of literals within each clause
-            for (auto& [size, data] : _clauses) shuffle(data, size, _rng_func);
+            for (auto& [size, data] : _clauses) random_shuffle(data, size, _rng_func);
         }
 
         return std::pair<const int*, size_t>(_input.data(), _input.size());
