@@ -24,15 +24,18 @@ public:
         }
 
         if (_running_id == 0) {
-            _running_id = _client_rank+1;
-        } else {
-            // Ensure running ID to be different to all other client processes
-            // while also not reusing any job ID from a previous run
-            _running_id += _num_clients;
-            _running_id -= _running_id % _num_clients;
-            _running_id += _client_rank+1;
+            _running_id = _client_rank;
         }
-
+        
+        int nextId = _running_id;
+        // Ensure running ID to be different to all other client processes ...
+        if (nextId % _num_clients != _client_rank) {
+            nextId -= nextId % _num_clients;
+            nextId += _client_rank;
+        }
+        // ... while also not reusing any job ID from a previous run
+        while (nextId <= _running_id) nextId += _num_clients;
+        _running_id = nextId;
     }
 
     int getNext() {
