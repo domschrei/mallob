@@ -5,6 +5,8 @@
 #include "util/sys/timer.hpp"
 #include "util/random.hpp"
 
+#define SERIALIZED_FORMULA_PARSER_BASE_CLS_CHKSUM 17
+
 class SerializedFormulaParser {
 
 private:
@@ -25,7 +27,7 @@ private:
     const int* _next_literal_ptr {nullptr};
 
     int _chksum {1337};
-    int _cls_chksum {0};
+    int _cls_chksum {SERIALIZED_FORMULA_PARSER_BASE_CLS_CHKSUM};
 
     bool _has_true_chksum {false};
     int _true_chksum {1337};
@@ -42,7 +44,7 @@ public:
         // Build vector of clauses (size + pointer to data)
         size_t clauseStart = 0; // 1st clause always begins at position 0
         size_t sumOfSizes = 0;
-        int clsChksum = 0;
+        int clsChksum = SERIALIZED_FORMULA_PARSER_BASE_CLS_CHKSUM;
         for (size_t i = 0; i < _size; i++) { // for each literal
             if (_payload[i] == 0) {
                 // clause ends
@@ -53,7 +55,7 @@ public:
                 sumOfSizes += thisClauseSize;
 
                 _true_chksum ^= clsChksum;
-                clsChksum = 0;
+                clsChksum = SERIALIZED_FORMULA_PARSER_BASE_CLS_CHKSUM;
             } else {
                 clsChksum ^= _payload[i];
             }
@@ -134,7 +136,7 @@ public:
 
         if (lit == 0) {
             _chksum ^= _cls_chksum;
-            _cls_chksum = 0;
+            _cls_chksum = SERIALIZED_FORMULA_PARSER_BASE_CLS_CHKSUM;
         } else {
             _cls_chksum ^= lit;
         }
