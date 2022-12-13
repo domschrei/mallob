@@ -13,7 +13,7 @@ int main(int argc, char *argv[]) {
 
     Timer::init();
     Random::init(rand(), rand());
-    Logger::init(0, V5_DEBG, false, false, false, nullptr);
+    Logger::init(0, V5_DEBG);
 
     Parameters params;
     params.init(argc, argv);

@@ -1,3 +1,11 @@
+
+**Note D. Schreiber 2022-12-13**: This directory contains a project developed by Dawn Michaelson @ Amazon. It is MIT-licensed (see file `LICENSE` in this directory) and features tools for the production of proofs with Mallob.
+The original description of the repository follows.
+
+
+<hr/>
+
+
 # Composition of Distributed UNSAT Proofs
 When a distributed SAT solver produces a result, can we trust it?
 If the result is `SAT`, we can check the assignment produced to see if it is valid.

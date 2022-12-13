@@ -37,7 +37,8 @@ private:
     bool _traversing_assumptions = false;
     bool _empty_clause = true;
 
-    bool _valid_input = false;
+    bool _input_invalid {false};
+    bool _input_finished {false};
 
 public:
     SatReader(Parameters& params, const std::string& filename, ContentMode contentMode) : 
@@ -48,9 +49,9 @@ public:
         
         //std::cout << x << std::endl;
 
-        if (_valid_input) {
+        if (_input_finished) {
             // Already WAS valid input: additional numbers will make it invalid!
-            _valid_input = false;
+            _input_invalid = true;
             return;
         }
 
@@ -62,7 +63,7 @@ public:
                 _traversing_assumptions = true;
             } else if (_traversing_assumptions) {
                 // End of assumptions: done.
-                _valid_input = true;
+                _input_finished = true;
             }
             return;
         }
@@ -82,12 +83,16 @@ public:
         if (_comment && c != '\n') return;
 
         switch (c) {
+        case EOF:
+            _input_finished = true;
         case '\n':
         case '\r':
-        case EOF:
             _comment = false;
             if (_began_num) {
-                assert(_num == 0);
+                if (_num != 0) {
+                    _input_invalid = true;
+                    return;
+                }
                 if (!_assumption) {
                     desc.addLiteral(0);
                     _num_read_clauses++;
@@ -131,7 +136,7 @@ public:
     }
 
     bool isValidInput() const {
-        return _content_mode != RAW || _valid_input;
+        return _input_finished && !_input_invalid;
     }
 };
 

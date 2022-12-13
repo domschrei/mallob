@@ -11,15 +11,19 @@
 
 struct JobMetadata {
 
+    std::string jobName;
     std::unique_ptr<JobDescription> description;
     std::vector<std::string> files;
     SatReader::ContentMode contentMode;
     std::vector<int> dependencies;
     bool done = false;
     bool interrupt = false;
+    
+    mutable float lastDescriptionAvailabilityCheck = 0;
 
     JobMetadata() {}
-    JobMetadata(JobMetadata&& other) : 
+    JobMetadata(JobMetadata&& other) :
+        jobName(std::move(other.jobName)),
         description(std::move(other.description)), 
         files(std::move(other.files)), 
         contentMode(other.contentMode), 

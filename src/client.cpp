@@ -23,7 +23,8 @@
 #include "util/sys/watchdog.hpp"
 
 #include "interface/socket/socket_connector.hpp"
-#include "interface/filesystem/filesystem_connector.hpp"
+#include "interface/filesystem/naive_filesystem_connector.hpp"
+#include "interface/filesystem/inotify_filesystem_connector.hpp"
 #include "interface/api/api_connector.hpp"
 
 
@@ -34,6 +35,7 @@ void Client::readIncomingJobs() {
     LOGGER(log, V3_VERB, "Starting\n");
 
     std::vector<std::future<void>> taskFutures;
+    std::set<std::pair<int, int>> unreadyJobs;
 
     while (true) {
         // Wait for a nonempty incoming job queue
@@ -48,13 +50,24 @@ void Client::readIncomingJobs() {
         auto lock = _incoming_job_lock.getLock();
         float time = Timer::elapsedSeconds();
 
+        auto checkUnready = [&](const std::unique_ptr<JobDescription>& desc) {
+            auto pair = std::pair<int, int>(desc->getId(), desc->getRevision());
+            if (!unreadyJobs.count(pair)) {
+                LOGGER(log, V2_INFO, "Deferring #%i rev. %i\n", pair.first, pair.second);
+                unreadyJobs.insert(pair);
+            }
+        };
+
         // Find a single job eligible for parsing
         bool foundAJob = false;
         for (auto& data : _incoming_job_queue) {
             
             // Jobs are sorted by arrival:
             // If this job has not arrived yet, then none have arrived yet
-            if (time < data.description->getArrival()) break;
+            if (time < data.description->getArrival()) {
+                checkUnready(data.description);
+                continue;
+            }
 
             // Check job's dependencies
             bool dependenciesSatisfied = true;
@@ -77,10 +90,34 @@ void Client::readIncomingJobs() {
                     }
                 }
             }
-            if (!dependenciesSatisfied) continue;
+            if (!dependenciesSatisfied) {
+                checkUnready(data.description);
+                continue;
+            }
+
+            // Check if all job descriptions are already present
+            bool jobDescriptionsPresent = true;
+            for (auto& file : data.files) {
+                if (!FileUtils::isRegularFile(file)) {
+                    jobDescriptionsPresent = false;
+                    break;
+                }
+            }
+            if (!jobDescriptionsPresent) {
+                // Print out waiting message every second
+                if (time - data.lastDescriptionAvailabilityCheck >= 1) {
+                    LOGGER(log, V2_INFO, "Waiting for a job description of #%i rev. %i\n", 
+                        data.description->getId(),
+                        data.description->getRevision());
+                    data.lastDescriptionAvailabilityCheck = time;
+                }
+                continue;
+            }
 
             // Job can be read: Enqueue reader task into thread pool
             LOGGER(log, V4_VVER, "ENQUEUE #%i\n", data.description->getId());
+            unreadyJobs.erase(std::pair<int, int>(data.description->getId(), data.description->getRevision()));
+
             auto node = _incoming_job_queue.extract(data);
             auto future = ProcessWideThreadPool::get().addTask(
                 [this, &log, foundJobPtr = new JobMetadata(std::move(node.value()))]() mutable {
@@ -102,6 +139,9 @@ void Client::readIncomingJobs() {
                 }
                 if (!success) {
                     LOGGER(log, V1_WARN, "[T] [WARN] Unsuccessful read - skipping #%i\n", id);
+                    auto lock = _failed_job_lock.getLock();
+                    _failed_job_queue.push_back(foundJob.jobName);
+                    atomics::incrementRelaxed(_num_failed_jobs);
                 } else {
                     time = Timer::elapsedSeconds() - time;
                     LOGGER(log, V3_VERB, "[T] Initialized job #%i %s in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
@@ -171,11 +211,15 @@ void Client::handleNewJob(JobMetadata&& data) {
 
 void Client::init() {
 
+    // Get ID allocator this client should use
+    JobIdAllocator jobIdAllocator(getInternalRank(), getFilesystemInterfacePath());
+
     // Set up generic JSON interface to communicate with this client
     _json_interface = std::unique_ptr<JsonInterface>(
         new JsonInterface(getInternalRank(), _params, 
             Logger::getMainInstance().copy("I", ".i"),
-            [&](JobMetadata&& data) {handleNewJob(std::move(data));}
+            [&](JobMetadata&& data) {handleNewJob(std::move(data));},
+            std::move(jobIdAllocator)
         )
     );
 
@@ -184,8 +228,10 @@ void Client::init() {
         std::string path = getFilesystemInterfacePath();
         LOG(V2_INFO, "Set up filesystem interface at %s\n", path.c_str());
         auto logger = Logger::getMainInstance().copy("I-FS", ".i-fs");
-        auto conn = new FilesystemConnector(*_json_interface, _params, 
-            std::move(logger), path);
+        auto conn = _params.inotify() ? 
+            (Connector*) new InotifyFilesystemConnector(*_json_interface, _params, std::move(logger), path)
+            :
+            (Connector*) new NaiveFilesystemConnector(*_json_interface, _params, std::move(logger), path);
         _interface_connectors.push_back(conn);
     }
     if (_params.useIPCSocketInterface()) {
@@ -262,6 +308,14 @@ void Client::advance() {
             } else ++it;
         }
         _jobs_to_interrupt_lock.unlock();
+    }
+
+    if (_num_failed_jobs.load(std::memory_order_relaxed) > 0 && _failed_job_lock.tryLock()) {
+        for (auto& jobname : _failed_job_queue) {
+            LOG(V1_WARN, "[WARN] Rejecting submission %s - reason: Error while parsing description.\n", jobname.c_str());
+        }
+        _failed_job_queue.clear();
+        _failed_job_lock.unlock();
     }
 
     // Process arrival times chronologically; if at least one "happened", notify reader

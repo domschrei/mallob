@@ -11,6 +11,7 @@
 #include <filesystem>
 
 #include "cadical.hpp"
+#include "util/logger.hpp"
 
 Cadical::Cadical(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),
@@ -26,7 +27,12 @@ Cadical::Cadical(const SolverSetup& setup)
 
 	if (setup.certifiedUnsat) {
 		//solver->set("binary", false);
-		auto ok = solver->set("proofdelete", false); assert(ok);
+		auto ok = solver->set("proofdelete", false);
+		if (!ok) {
+			LOGGER(_logger, V0_CRIT, "[ERROR] Cannot configure CaDiCaL for certified UNSAT. "
+				"Did you link to the correct CaDiCaL?\n");
+			abort();
+		}
 		std::string logdir = setup.proofDir;
 		// length of the directory + space for filename
 		char *filename_alone = new char [20];

@@ -50,7 +50,7 @@ void testMinimal() {
     while (success && numAttempted < 10000) {
         std::vector<int> lits = {100+numAttempted, 200+numAttempted, 300+numAttempted, 400+numAttempted};
         LOG(V2_INFO, "%i\n", numAttempted);
-        Clause c{lits.data(), lits.size(), 2};
+        Clause c{lits.data(), (int)lits.size(), 2};
         success = cdb.addClause(c);
         numAttempted++;
         cdb.checkTotalLiterals();
@@ -180,7 +180,7 @@ void testReduce() {
         for (size_t i = 0; i < lits.size(); i++) {
             lits[i] = 100*nbClausesThisSlot + i + 1;
         }
-        Clause c{lits.data(), lits.size(), it.lbd};
+        Clause c{lits.data(), (int)lits.size(), it.lbd};
         success = cdb.addClause(c);
         nbClausesThisSlot++;
         if (nbClausesThisSlot == nbMaxClausesPerSlot) {
@@ -264,7 +264,7 @@ void testReduce() {
 int main() {
     Timer::init();
     Random::init(rand(), rand());
-    Logger::init(0, V5_DEBG, false, false, false, nullptr);
+    Logger::init(0, V5_DEBG);
     Process::init(0);
     ProcessWideThreadPool::init(1);
 

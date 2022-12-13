@@ -1,12 +1,13 @@
+[![status](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899/status.svg)](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899)
 
 # Introduction
 
 Mallob is a platform for massively parallel and distributed on-demand processing of malleable jobs, handling their scheduling and load balancing.
 Malleability means that the CPU resources allotted to a job may vary _during its execution_ depending on the system's overall load.
-Mallob was tested on configurations with up to 6144 cores as described in our publications: [SAT 2021](https://dominikschreiber.de/papers/2021-sat-scalable.pdf), Euro-Par 2022 (coming soon!).
+Mallob was tested on configurations with up to 6144 cores as described in our publications: [SAT 2021](https://dominikschreiber.de/papers/2021-sat-scalable.pdf), [Euro-Par 2022](https://publikationen.bibliothek.kit.edu/1000149349/149124221).
 
-Most notably, Mallob features an engine for distributed SAT solving. 
-According to the International SAT Competition [2020🥇](https://satcompetition.github.io/2020/downloads/satcomp20slides.pdf) and [2021🥇🥈🥈🥉](https://satcompetition.github.io/2021/slides/ISC2021.pdf), Mallob is currently the best approach for SAT solving on a large scale (800 physical cores) and one of the best approaches for SAT solving on a moderate scale (32 physical cores).
+Most notably, Mallob features an engine for distributed SAT solving.
+According to the [International SAT Competitions](https://satcompetition.github.io/) 2020-2022, the premier competitive events for state-of-the-art SAT solving, Mallob is consistently the strongest SAT solving system for massively parallel and distributed systems (800 physical cores) and also a highly competitive system for moderately parallel SAT solving (32 physical cores).
 
 ## Distributed UNSAT Proof Production
 
@@ -65,6 +66,20 @@ The final line of the output is the ID to run the container, e.g. by running `do
 
 <hr/>
 
+# Testing
+
+**Note:** In its current state, the test suite expects that Mallob is built and run with OpenMPI, i.e., that `mpicc` and `mpicxx` (for building) and `mpirun` (for execution) link to OpenMPI executables on your system. For other MPI implementations, you may still be able to run the tests by removing or replacing the option `--oversubscribe` from the function `run()` in `scripts/run/systest_commons.sh`.
+
+In order to test that the system has been built and set up correctly, run the following command.
+```
+bash scripts/run/systest.sh mono drysched sched osc
+```
+This will locally run a suite of automated tests which cover the basic functionality of Mallob as a scheduler and as a SAT solving engine. 
+To include Glucose in the tests, prepend the above command with "GLUCOSE=1".
+Running the tests takes a few minutes and in the end "All tests done." should be output.
+
+<hr/>
+
 # Usage
 
 ## General
@@ -72,15 +87,15 @@ The final line of the output is the ID to run the container, e.g. by running `do
 Given a single machine with two hardware threads per core, the following command executed in Mallob's base directory assigns one MPI process to each set of four physical cores (eight hardware threads) and then runs four solver threads on each MPI process.
 
 ```
-RDMAV_FORK_SAFE=1 NPROCS=$(($(nproc)/8)) mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=4 build/mallob -t=4 $MALLOB_OPTIONS
+RDMAV_FORK_SAFE=1 NPROCS="$(($(nproc)/8))" mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=4 build/mallob -t=4 $MALLOB_OPTIONS
 ```
+You can always stop Mallob via Ctrl+C (interrupt signal) or by executing `killall mpirun`. 
+Alternatively, you can specify the number of jobs to process (with `-J=$NUM_JOBS`) and/or the time to pass (with `-T=$TIME_LIMIT_SECS`) before Mallob terminates on its own.
 
-To "daemonize" Mallob, i.e., to let it run in the background as a server for your own application(s), you can prepend `mpirun` by `nohup` and append `2>&1 > OUT &` to the whole command, creating a text file `OUT` for Mallob's output. (If you do not want this kind of output, use the "quiet" option `-q`.)
-If running in the background, do not forget to `kill` Mallob (i.e., SIGTERM the `mpirun` process) after you are done.
-Alternatively you can specify the number of jobs to process (with `-J=$NUM_JOBS`) and/or the time to pass (with `-T=$TIME_LIMIT_SECS`) before Mallob should terminate on its own.
-
-For exact and clean logging, you should not rely on a textfile in which you piped Mallob's output (like `OUT` above).
-Instead, specify a logging directory with `-log=<log-dir>` where separate sub-directories and files will be created for each worker / thread. Verbosity of logging can be set with the `-v` option.
+For exact and clean logging, you should not rely on a textfile in which you piped Mallob's output.
+Instead, specify a logging directory with `-log=<log-dir>` where separate sub-directories and files will be created for each worker / thread. 
+This can be combined with the `-q` option to suppress Mallob's output to STDOUT. 
+Verbosity of logging can be set with the `-v` option (as long as Mallob was compiled with the respective verbosity or higher, see `-DMALLOB_LOG_VERBOSITY` above).
 All further options of Mallob can be seen by executing Mallob with the `-h` option. (This also works without the `mpirun` prefix.)
 
 For running Mallob on distributed clusters, please also consult [the scripts and documentation from our Euro-Par 2022 software artifact](https://doi.org/10.6084/m9.figshare.20000642) as well as the user documentation of your particular cluster.
@@ -124,7 +139,8 @@ You can manually set the number of worker processes (`-w`) and the number of cli
 
 To introduce a job to the system, drop a JSON file in `.api/jobs.`$i$`/in/` (e.g., `.api/jobs.0/in/`) on the filesystem of the according PE structured like this:  
 ```
-{ 
+{
+    "application": "SAT",
     "user": "admin", 
     "name": "test-job-1", 
     "files": ["/path/to/difficult/formula.cnf"], 
@@ -145,7 +161,7 @@ Here is a brief overview of all required and optional fields in the JSON API:
 | name              | **yes**   | String       | A user-unique name for this job (increment)                                                                    |
 | files             | **yes***  | String array | File paths of the input to solve. For SAT, this must be a single (text file or compressed file or named pipe). |
 | priority          | **yes***  | Float > 0    | Priority of the job (higher is more important)                                                                 |
-| application       | no        | String       | Which kind of problem is being solved; currently either of "SAT" or "DUMMY" (default: DUMMY)                   |
+| application       | **yes**   | String       | Which kind of problem is being solved; currently either of "SAT" or "DUMMY" (default: DUMMY)                   |
 | wallclock-limit   | no        | String       | Job wallclock limit: combination of a number and a unit (ms/s/m/h/d)                                           |
 | cpu-limit         | no        | String       | Job CPU time limit: combination of a number and a unit (ms/s/m/h/d)                                            |
 | arrival           | no        | Float >= 0   | Job's arrival time (seconds) since program start; ignore job until then                                        |
@@ -182,6 +198,7 @@ Upon completion of a job, Mallob writes a result JSON file under `.api/jobs.0/ou
 Such a file may look like this:
 ```
 {
+    "application": "SAT",
     "cpu-limit": "10h",
     "file": "/path/to/difficult/formula.cnf",
     "name": "test-job-1",
@@ -232,9 +249,10 @@ Mallob can be extended in the following ways:
 
 # Licensing and remarks
 
-Mallob can be used, changed and redistributed under the terms of the Lesser General Public License (LGPLv3)**or** under the terms of the MIT license, one exception being the Glucose interface which is excluded from compilation by default (see below).
+The source code of Mallob can be used, changed and redistributed under the terms of the **Lesser General Public License (LGPLv3)**, one exception being the Glucose interface which is excluded from compilation by default (see below).
 
-The used versions of Lingeling, YalSAT, CaDiCaL, and Kissat are MIT-licensed, as is HordeSat (the massively parallel solver system our SAT engine was based on).
+The used versions of Lingeling, YalSAT, CaDiCaL, and Kissat are MIT-licensed, as is HordeSat (the massively parallel solver system our SAT engine was based on) and the proof-related tools which are included and/or fetched in the `tools/` directory.
+
 The Glucose interface of Mallob, unfortunately, is non-free software due to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE). Notably, its usage in competitive events is restricted. So when compiling Mallob with `-DMALLOB_USE_GLUCOSE=1` make sure that you have read and understood these restrictions.
 
 Within our codebase we make thankful use of the following liberally licensed projects:
@@ -243,7 +261,6 @@ Within our codebase we make thankful use of the following liberally licensed pro
 * [robin_hood hashing](https://github.com/martinus/robin-hood-hashing) by Martin Ankerl, for efficient unordered maps and sets
 * [robin-map](https://github.com/Tessil/robin-map) by Thibaut Goetghebuer-Planchon, for efficient unordered maps and sets
 * [JSON for Modern C++](https://github.com/nlohmann/json) by Niels Lohmann, for reading and writing JSON files
-* [ringbuf](https://github.com/rmind/ringbuf) by Mindaugas Rasiukevicius, for lock-free ring buffers
 
 If you make use of Mallob in an academic setting, please cite the following two conference papers. If you can (or want to) cite only one of them, then please cite the SAT'21 paper when focusing on our SAT engine and the Euro-Par'22 paper when focusing on the scheduling aspects of our system.
 ```
@@ -260,9 +277,10 @@ If you make use of Mallob in an academic setting, please cite the following two 
   title={Decentralized Online Scheduling of Malleable {NP}-hard Jobs},
   author={Sanders, Peter and Schreiber, Dominik},
   booktitle={International European Conference on Parallel and Distributed Computing},
+  pages={119--135},
   year={2022},
   organization={Springer},
-  note={In press.}
+  doi={10.1007/978-3-031-12597-3_8}
 }
 ```
 

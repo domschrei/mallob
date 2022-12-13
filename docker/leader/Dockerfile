@@ -17,13 +17,13 @@ COPY /lib mallob/lib
 
 # Build Mallob
 WORKDIR mallob
-RUN cd lib && bash fetch_and_build_sat_solvers.sh ckly && cd ..
+RUN cd lib && bash fetch_and_build_sat_solvers.sh pkly && cd ..
 RUN mkdir build
 RUN cd build \
   && cmake -DCMAKE_BUILD_TYPE=RELEASE \
     -DMALLOB_SUBPROC_DISPATCH_PATH=\"./\" -DMALLOB_ASSERT=1 -DMALLOB_USE_GLUCOSE=0 \
     -DMALLOB_USE_ASAN=0 -DMALLOB_USE_JEMALLOC=1 -DMALLOB_JEMALLOC_DIR=/usr/lib/x86_64-linux-gnu \
-    -DMALLOB_LOG_VERBOSITY=3 .. \
+    -DMALLOB_LOG_VERBOSITY=3 -DMALLOB_CERTIFIED_UNSAT=1 .. \
   && VERBOSE=1 make -j4 \
   && cd ..
 
@@ -33,7 +33,11 @@ COPY /tools tools
 WORKDIR tools/composition
 # Just in case - causes problems later if you have built outside Docker.
 RUN rm -Rf build
-RUN make 
+RUN make
+
+# Build drat-trim
+WORKDIR /tools
+RUN bash fetch_and_build_drat_trim.sh
 
 # Also build Marijn's certified CNF preprocessor
 WORKDIR /tools/preprocess-simple
@@ -53,10 +57,10 @@ WORKDIR /
 COPY --from=builder /mallob/build/mallob mallob
 COPY --from=builder /mallob/build/mallob_sat_process mallob_sat_process
 COPY --from=builder /mallob/build/mallob_process_dispatcher mallob_process_dispatcher
-COPY --from=builder /mallob/lib/drat-trim/lrat-check lrat-check
-COPY --from=builder /mallob/lib/drat-trim/compress compress
-COPY --from=builder /mallob/lib/drat-trim/decompress decompress
-COPY --from=builder /mallob/lib/drat-trim/drat-trim drat-trim
+COPY --from=builder /tools/drat-trim/lrat-check lrat-check
+COPY --from=builder /tools/drat-trim/compress compress
+COPY --from=builder /tools/drat-trim/decompress decompress
+COPY --from=builder /tools/drat-trim/drat-trim drat-trim
 COPY --from=builder /tools/preprocess-simple/cleanup preprocess-cnf
 COPY --from=builder /tools/composition/build/compose-proofs compose-proofs 
 COPY --from=builder /tools/composition/build/renumber-proofs renumber-proofs

@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
     Process::init(rank);
 
     Random::init(rand(), rand());
-    Logger::init(rank, V5_DEBG, false, false, false, nullptr);
+    Logger::init(rank, V5_DEBG);
 
     Parameters params;
     params.init(argc, argv);

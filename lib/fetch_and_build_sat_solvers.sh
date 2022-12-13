@@ -11,12 +11,6 @@ fi
 
 bash fetch_solvers.sh $solvers
 
-echo "Making drat-trim"
-cd drat-trim
-sed -i 's/define MODE	1/define MODE	2/g' decompress.c
-make
-cd ..
-
 if echo $solvers|grep -q "m" && [ ! -f mergesat/libmergesat.a ]; then
     echo "Building MergeSAT"
 
@@ -77,9 +71,19 @@ if echo $solvers|grep -q "l" && [ ! -f lingeling/liblgl.a ]; then
 fi
 
 if echo $solvers|grep -q "c" && [ ! -f cadical/libcadical.a ]; then
-    echo "Building CaDiCaL ..."
+    echo "Building CaDiCaL (no LRAT support) ..."
 
     cd cadical
+    ./configure
+    make
+    cp build/libcadical.a .
+    cd ..
+fi
+
+if echo $solvers|grep -q "p" && [ ! -f lrat-cadical/libcadical.a ]; then
+    echo "Building CaDiCaL with LRAT support ..."
+
+    cd lrat-cadical
     ./configure
     make
     cp build/libcadical.a .

@@ -44,10 +44,16 @@ if(MALLOB_USE_JEMALLOC)
     set(BASE_LIBS jemalloc ${BASE_LIBS})
 endif()
 
+if(MALLOB_CERTIFIED_UNSAT)
+    link_directories(lib/lrat-cadical)
+else()
+    link_directories(lib/cadical)
+endif()
+
 # Libraries and includes
 
 # Add new default solvers here
-link_directories(lib/lingeling lib/yalsat lib/cadical lib/kissat)
+link_directories(lib/lingeling lib/yalsat lib/kissat)
 set(BASE_LIBS ${BASE_LIBS} ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} m z lgl yals pthread cadical kissat rt dl)
 set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib/lingeling lib)
 
@@ -88,7 +94,6 @@ set(BASE_SOURCES ${BASE_SOURCES}
     src/scheduling/job_scheduling_update.cpp
     src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sat_reader.cpp 
     src/util/sys/atomics.cpp src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/shared_memory.cpp src/util/sys/terminator.cpp src/util/sys/threading.cpp src/util/sys/thread_pool.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp
-    src/util/ringbuf/ringbuf.c
 )
 # src/util/sys/stxxl.cpp
 
@@ -143,7 +148,6 @@ endfunction()
 
 new_test(permutation)
 new_test(sat_reader)
-new_test(ringbuffer)
 new_test(clause_database)
 new_test(import_buffer)
 new_test(clause_filter)
