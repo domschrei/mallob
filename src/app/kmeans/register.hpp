@@ -9,7 +9,7 @@ void register_mallob_app_kmeans() {
     app_registry::registerApplication(
         "KMEANS",
         // Job reader
-        [](const std::vector<std::string>& files, JobDescription& desc) {
+        [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
             return KMeansReader::read(files.front(), desc);
         },
         // Job creator

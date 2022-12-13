@@ -9,8 +9,8 @@
 void register_mallob_app_sat() {
     app_registry::registerApplication("SAT",
         // Job reader
-        [](const std::vector<std::string>& files, JobDescription& desc) {
-            return SatReader(files.front()).read(desc);
+        [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
+            return SatReader(params, files.front()).read(desc);
         },
         // Job creator
         [](const Parameters& params, const Job::JobSetup& setup) -> Job* {

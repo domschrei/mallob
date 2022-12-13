@@ -41,6 +41,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Only clauses up to this length will be shared")
  OPT_INT(strictLbdLimit,                    "slbdl", "strict-lbd-limit",                 30,       0,   LARGE_INT,      
     "Only clauses with an LBD score up to this value will be shared")
+ OPT_BOOL(skipClauseSharingDiagonally,    "scsd", "skip-clause-sharing-diagonally",    true,                    "In the ith diversification round, disable clause sharing for the (i%%numDivs)th solver")
 
 OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversification options")
  OPT_FLOAT(inputShuffleProbability,         "isp", "input-shuffle-probability",          1,        0,   1,
@@ -57,3 +58,13 @@ OPTION_GROUP(grpAppSatHistory, "app/sat/history", "Clause history configuration 
     "Save this many \"full\" aggregated epochs until reducing them")
  OPT_BOOL(collectClauseHistory,           "ch", "collect-clause-history",                false,                   
     "Employ clause history collection mechanism")
+
+OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
+ OPT_BOOL(removeUnitsPreprocessing,       "rup", "remove-units-preprocessing",         false,                   "Perform preprocessing on input removing units (requires cadical executable in Mallob's executable directory)")
+ OPT_BOOL(certifiedUnsat,                 "cu", "certified-unsat",                     false,                   "Generate UNSAT proof (only supports mono mode + CaDiCaL solver)")
+ OPT_BOOL(distributedProofAssembly,  "dpa", "distributed-proof-assembly",              false,                   "Distributed UNSAT proof assembly into a single file")
+ OPT_BOOL(interleaveProofMerging,        "ipm", "interleave-proof-merging",            false,                   "Interleave filtering and merging of proof lines")
+ OPT_STRING(proofOutputFile,              "pof", "proof-output-file",                  "final-proof.lrat",      "Path and name of final LRAT proof file, output by rank zero")
+ OPT_STRING(extMemDiskDirectory,          "extmem-disk-dir", "",                       ".",                     "Directory where to create external memory files")
+ OPT_STRING(satPreprocessor,              "sat-preprocessor", "",                      "",                      "Executable which preprocesses CNF file")
+ OPT_FLOAT(satSolvingWallclockLimit,      "sswl", "sat-solving-wallclock-limit",       0,    0, LARGE_INT,      "Cancel job if not done solving after this many seconds (0: no limit)")

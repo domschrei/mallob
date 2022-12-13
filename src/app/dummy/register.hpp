@@ -8,7 +8,7 @@
 void register_mallob_app_dummy() {
     app_registry::registerApplication("DUMMY",
         // Job reader
-        [](const std::vector<std::string>& files, JobDescription& desc) {
+        [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
             return DummyReader::read(files, desc);
         },
         // Job creator

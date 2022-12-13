@@ -26,7 +26,8 @@ private:
     JobTreeAllReduction _allreduce_clauses;
     JobTreeAllReduction _allreduce_filter;
     bool _filtering = false;
-    bool _concluded = false;
+    bool _concluded_filtering = false;
+    bool _all_stages_done = false;
 
     float _compensation_decay {0.6};
 
@@ -50,7 +51,7 @@ public:
             // Base message
             JobMessage(_job->getId(), _job->getRevision(), epoch, MSG_ALLREDUCE_FILTER),
             // Neutral element
-            std::vector<int>(),
+            std::vector<int>(ClauseMetadata::numBytes(), 0),
             // Aggregator for local + incoming elements
             [&](std::list<std::vector<int>>& elems) {
                 return mergeFiltersDuringAggregation(elems);
@@ -139,11 +140,12 @@ public:
             }
 
             // Conclude this sharing epoch
-            _concluded = true;
+            _concluded_filtering = true;
+            setAllStagesDone();
         }
     }
 
-    bool isConcluded() const {return _concluded;}
+    bool hasConcludedFiltering() const {return _concluded_filtering;}
 
     bool advanceClauseAggregation(int source, int mpiTag, JobMessage& msg) {
         bool success = false;
@@ -163,6 +165,9 @@ public:
     }
 
     std::vector<int> applyGlobalFilter(const std::vector<int>& filter, std::vector<int>& clauses);
+
+    void setAllStagesDone() {_all_stages_done = true;}
+    bool allStagesDone() const {return _all_stages_done;}
 
     void cancel() {
         _allreduce_clauses.cancel();
@@ -198,13 +203,31 @@ private:
     std::vector<int> mergeFiltersDuringAggregation(std::list<std::vector<int>>& elems) {
         std::vector<int> filter = std::move(elems.front());
         elems.pop_front();
+
+        unsigned long maxMinEpochId;
+        if (ClauseMetadata::enabled()) {
+            assert(filter.size() >= 2);
+            maxMinEpochId = ClauseMetadata::readUnsignedLong(filter.data());
+        }
+
         for (auto& elem : elems) {
             if (filter.size() < elem.size()) 
                 filter.resize(elem.size());
-            for (size_t i = 0; i < elem.size(); i++) {
+            if (ClauseMetadata::enabled()) {
+                assert(elem.size() >= 2);
+                unsigned long minEpochId = ClauseMetadata::readUnsignedLong(elem.data());
+                maxMinEpochId = std::max(maxMinEpochId, minEpochId);
+            }
+
+            for (size_t i = ClauseMetadata::numBytes(); i < elem.size(); i++) {
                 filter[i] |= elem[i]; // bitwise OR
             }
         }
+
+        if (ClauseMetadata::enabled()) {
+            ClauseMetadata::writeUnsignedLong(maxMinEpochId, filter.data());
+        }
+
         return filter;
     }
 

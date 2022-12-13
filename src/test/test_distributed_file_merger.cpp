@@ -5,7 +5,7 @@
 #include <string>
 
 #include "util/random.hpp"
-#include "util/sat_reader.hpp"
+#include "app/sat/parse/sat_reader.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "comm/mympi.hpp"
