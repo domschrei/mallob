@@ -51,6 +51,9 @@ private:
 public:
     // Helper methods
 
+    float getCompensationFactor() const {
+        return _compensation_factor;
+    }
     void setSharingCompensationFactor(float compensationFactor) {
         _compensation_factor = compensationFactor;
     }

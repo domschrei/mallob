@@ -33,6 +33,8 @@ private:
     std::atomic_bool _done_locally = false;
     JobResult _internal_result;
 
+    bool _crash_pending {false};
+
 public:
 
     ForkedSatJob(const Parameters& params, const JobSetup& setup);
@@ -75,6 +77,7 @@ public:
 
 private:
     void doStartSolver();
+    void handleSolverCrash();
 
     bool checkClauseComm();
     void loadIncrements();
