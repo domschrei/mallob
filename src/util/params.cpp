@@ -12,11 +12,11 @@
 
 const char* BANNER = "\nMallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nDesigned by P. Sanders and D. Schreiber 2018-2022\nDeveloped by D. Schreiber 2019-2022\n";
 const char* BANNER_C_PREFIXED = "c \nc Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nc Designed by P. Sanders and D. Schreiber 2018-2022\nc Developed by D. Schreiber 2019-2022\nc ";
-const char* USAGE = "Usage: [RDMAV_FORK_SAFE=1] [PATH=path/to/mallob_sat_process:$PATH] [mpiexec -np <num-mpi-processes> [mpi-options]] mallob [options]";
+const char* USAGE = "Usage: [mpiexec -np <num-mpi-processes> [mpi-options]] mallob [options]\n";
 
 Parameters::Parameters(const Parameters& other) {
-    for (const auto& [id, opt] : other._map) {
-        _map.at(id)->copyValue(*opt);
+    for (const auto& [id, opt] : other._global_map) {
+        _global_map.at(id)->copyValue(*opt);
     }
 }
 
@@ -27,7 +27,7 @@ void Parameters::init(int argc, char** argv) {
 
     // Create dictionary mapping long option names to short option names
     robin_hood::unordered_node_map<std::string, std::string> longToShortOpt;
-    for (const auto& [id, opt] : _map) {
+    for (const auto& [id, opt] : _global_map) {
         if (opt->hasLongOption()) {
             longToShortOpt[opt->longid] = opt->id;
         }
@@ -51,8 +51,8 @@ void Parameters::init(int argc, char** argv) {
             // No equals sign in this argument: set arg to 1 implicitly
             const char* left = arg;
             if (longToShortOpt.count(left)) left = longToShortOpt[left].c_str();
-            if (_map.count(left)) {
-                _map.at(left)->setValAsString("1");
+            if (_global_map.count(left)) {
+                _global_map.at(left)->setValAsString("1");
             }
         } else {
             // Divide string at equals sign, set arg to given value
@@ -60,8 +60,8 @@ void Parameters::init(int argc, char** argv) {
             const char* left = arg;
             const char* right = eq+1;
             if (longToShortOpt.count(left)) left = longToShortOpt[left].c_str();
-            if (_map.count(left)) {
-                _map.at(left)->setValAsString(right);
+            if (_global_map.count(left)) {
+                _global_map.at(left)->setValAsString(right);
             }
         }
     }
@@ -99,25 +99,39 @@ void Parameters::printBanner() const {
 
 void Parameters::printUsage() const {
     LOG(V2_INFO, USAGE);
-    LOG(V2_INFO, "Each option must be given as \"-key=value\" or \"--key=value\" or (for boolean options only) just \"-[-]key\".");
+    LOG(V2_INFO, "Each option must be given as \"-key=value\" or \"--key=value\" or (for boolean options only) just \"-[-]key\".\n");
     
-    std::map<std::string, Option*> sortedMap;
-    for (const auto& [id, opt] : _map) {
-        sortedMap[id] = opt;
-    }
+    auto& groups = _grouped_list;
+    for (auto& group : groups) {
+ 
+        // Output group header, formatted based on num. levels in the group's ID
+        int numLevels = 0;
+        for (auto c : group->groupId) if (c == '/') numLevels++;
+        const char* secondLinebreak = group->map.empty() ? "" : "\n";
+        if (numLevels == 0) LOG_OMIT_PREFIX(V2_INFO, "\n=== %s ===%s\n", group->desc.c_str(), secondLinebreak);
+        else if (numLevels == 1) LOG_OMIT_PREFIX(V2_INFO, "\n* %s *%s\n", group->desc.c_str(), secondLinebreak);
+        else LOG_OMIT_PREFIX(V2_INFO, "\n%s:\n", group->desc.c_str());
 
-    for (const auto& [id, opt] : sortedMap) {
-        std::string defaultVal = opt->getValAsString();
-        if (!defaultVal.empty()) defaultVal = ", default: " + defaultVal;
-        
-        const char* typeStr = opt->getTypeString();
+        auto& map = group->map;
 
-        if (opt->hasLongOption()) {
-            LOG_OMIT_PREFIX(V2_INFO, "-%s , -%s (%s%s)\n\t\t%s\n", 
-                id.c_str(), opt->longid.c_str(), typeStr, defaultVal.c_str(), opt->desc.c_str());
-        } else {
-            LOG_OMIT_PREFIX(V2_INFO, "-%s (%s%s)\n\t\t%s\n", 
-                id.c_str(), typeStr, defaultVal.c_str(), opt->desc.c_str());
+        std::map<std::string, Option*> sortedMap;
+        for (const auto& [id, opt] : map) {
+            sortedMap[id] = opt;
+        }
+
+        for (const auto& [id, opt] : sortedMap) {
+            std::string defaultVal = opt->getValAsString();
+            if (!defaultVal.empty()) defaultVal = ", default: " + defaultVal;
+            
+            const char* typeStr = opt->getTypeString();
+
+            if (opt->hasLongOption()) {
+                LOG_OMIT_PREFIX(V2_INFO, "-%s , -%s (%s%s)\n\t%s\n", 
+                    id.c_str(), opt->longid.c_str(), typeStr, defaultVal.c_str(), opt->desc.c_str());
+            } else {
+                LOG_OMIT_PREFIX(V2_INFO, "-%s (%s%s)\n\t%s\n", 
+                    id.c_str(), typeStr, defaultVal.c_str(), opt->desc.c_str());
+            }
         }
     }
 }
@@ -125,7 +139,7 @@ void Parameters::printUsage() const {
 std::string Parameters::getParamsAsString() const {
     std::string out = "";
     std::map<std::string, std::string> sortedParams;
-    for (const auto& [id, opt] : _map) {
+    for (const auto& [id, opt] : _global_map) {
         sortedParams[id] = opt->getValAsString();
     }
     for (const auto& it : sortedParams) {
@@ -149,7 +163,7 @@ std::string Parameters::getSubprocCommandAsString(const char* execName) {
     // Executable name
     out += execName + std::string(" ");
     // Options
-    for (const auto& [id, opt] : _map) if (!opt->getValAsString().empty()) {
+    for (const auto& [id, opt] : _global_map) if (!opt->getValAsString().empty()) {
         out += ("-" + id + "=" + opt->getValAsString()) + " ";
     }
 
@@ -169,7 +183,7 @@ std::list<std::string>& Parameters::getArgList(const char* execName) {
     // Executable name
     _list_for_c_args.push_back(execName);
     // Options
-    for (const auto& [id, opt] : _map) if (!opt->getValAsString().empty()) {
+    for (const auto& [id, opt] : _global_map) if (!opt->getValAsString().empty()) {
         _list_for_c_args.push_back("-" + id + "=" + opt->getValAsString());
     }
 

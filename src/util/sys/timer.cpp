@@ -6,16 +6,15 @@
 
 timespec Timer::timespecStart;
 timespec Timer::timespecEnd;
+float Timer::lastTimeMeasured {0};
 
 void Timer::init() {
     clock_gettime(CLOCK_MONOTONIC_RAW, &timespecStart);
+    cacheElapsedSeconds();
 }
 void Timer::init(timespec start) {
     timespecStart = start;
-}
-
-bool Timer::globalTimelimReached(Parameters& params) {
-    return params.timeLimit() > 0 && elapsedSeconds() > params.timeLimit();
+    cacheElapsedSeconds();
 }
 
 timespec Timer::getStartTime() {

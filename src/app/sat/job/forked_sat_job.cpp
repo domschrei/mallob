@@ -14,8 +14,8 @@
 
 std::atomic_int ForkedSatJob::_static_subprocess_index = 1;
 
-ForkedSatJob::ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl) : 
-        BaseSatJob(params, commSize, worldRank, jobId, appl) {
+ForkedSatJob::ForkedSatJob(const Parameters& params, const JobSetup& setup) : 
+        BaseSatJob(params, setup) {
 }
 
 void ForkedSatJob::appl_start() {
@@ -113,6 +113,16 @@ int ForkedSatJob::appl_solved() {
         return result;
     }
 
+    // Is there still a crash to be handled?
+    if (_crash_pending) {
+        if (!checkClauseComm() || _solver->getClauseComm()->isDestructible()) {
+            // clause comm. can be cleaned up now: handle crash.
+            _crash_pending = false;
+            handleSolverCrash();
+        }
+        return result;
+    }
+
     // Did a solver find a result?
     auto status = _solver->check();
     if (status == SatProcessAdapter::FOUND_RESULT) {
@@ -145,21 +155,29 @@ int ForkedSatJob::appl_solved() {
 
     } else if (status == SatProcessAdapter::CRASHED) {
         // Subprocess crashed for whatever reason: try to recover
-
-        // Release "old" solver / clause comm from ownership, clean up concurrently
-        checkClauseComm(); // store clause comm in this job instance (if present)
-        _solver->releaseClauseComm(); // release clause comm from ownership of the solver
-        SatProcessAdapter* solver = _solver.release();
-        auto future = ProcessWideThreadPool::get().addTask([solver]() {
-            // clean up solver (without the clause comm)
-            delete solver;
-        });
-        _old_solver_destructions.push_back(std::move(future));
-
-        // Start new solver (with renamed shared memory segments)
-        doStartSolver();
+        if (checkClauseComm() && !_solver->getClauseComm()->isDestructible()) {
+            // Cannot clean up clause comm. right now: remember pending crash handling
+            _crash_pending = true;
+        } else {
+            handleSolverCrash();
+        }
     }
     return result;
+}
+
+void ForkedSatJob::handleSolverCrash() {
+
+    // Release "old" solver / clause comm from ownership, clean up concurrently
+    _solver->releaseClauseComm(); // release clause comm from ownership of the solver
+    SatProcessAdapter* solver = _solver.release();
+    auto future = ProcessWideThreadPool::get().addTask([solver]() {
+        // clean up solver (without the clause comm)
+        delete solver;
+    });
+    _old_solver_destructions.push_back(std::move(future));
+
+    // Start new solver (with renamed shared memory segments)
+    doStartSolver();
 }
 
 JobResult&& ForkedSatJob::appl_getResult() {

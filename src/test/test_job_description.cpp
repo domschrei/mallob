@@ -5,9 +5,10 @@
 #include <string>
 
 #include "util/random.hpp"
-#include "util/sat_reader.hpp"
+#include "app/sat/parse/sat_reader.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
+#include "app/app_registry.hpp"
 
 void testSatInstances(Parameters& params) {
 
@@ -19,7 +20,7 @@ void testSatInstances(Parameters& params) {
         auto f = std::string("instances/") + file;
         LOG(V2_INFO, "Reading test CNF %s ...\n", f.c_str());
         float time = Timer::elapsedSeconds();
-        SatReader r(params, f, SatReader::ContentMode::ASCII);
+        SatReader r(params, f);
         JobDescription d;
         bool success = r.read(d);
         assert(success);
@@ -41,9 +42,10 @@ void testSatInstances(Parameters& params) {
 
 void testIncrementalExample(Parameters& params) {
 
-    JobDescription desc(1, 1, JobDescription::Application::INCREMENTAL_SAT, true);
+    JobDescription desc(1, 1, app_registry::getAppId("SAT"), true);
+    desc.setIncremental(true);
     std::string f = "instances/incremental/entertainment08-0.cnf";
-    SatReader r(params, f, SatReader::ContentMode::ASCII);
+    SatReader r(params, f);
     r.read(desc);
     LOG(V2_INFO, "Base: %i lits, %i assumptions\n", desc.getNumFormulaLiterals(), desc.getNumAssumptionLiterals());
     assert(desc.getNumFormulaLiterals() == 6);
@@ -51,7 +53,8 @@ void testIncrementalExample(Parameters& params) {
 
     auto exported = desc.getSerialization(0);
 
-    JobDescription imported(1, 1, JobDescription::Application::INCREMENTAL_SAT, true);
+    JobDescription imported(1, 1, app_registry::getAppId("SAT"), true);
+    imported.setIncremental(true);
     imported.deserialize(exported);
     assert(imported.getNumFormulaLiterals() == 6);
     assert(imported.getNumAssumptionLiterals() == 1);
@@ -66,13 +69,15 @@ void testIncrementalExample(Parameters& params) {
     }
 
     f = "instances/incremental/entertainment08-1.cnf";
-    SatReader r2(params, f, SatReader::ContentMode::ASCII);
-    JobDescription update(1, 1, JobDescription::Application::INCREMENTAL_SAT, true);
+    SatReader r2(params, f);
+    JobDescription update(1, 1, app_registry::getAppId("SAT"), true);
+    update.setIncremental(true);
     update.setRevision(1);
     r2.read(update);
     LOG(V2_INFO, "Update: %i lits, %i assumptions\n", update.getNumFormulaLiterals(), update.getNumAssumptionLiterals());
     exported = update.getSerialization(1);
-    JobDescription imported1(1, 1, JobDescription::Application::INCREMENTAL_SAT, true);
+    JobDescription imported1(1, 1, app_registry::getAppId("SAT"), true);
+    imported1.setIncremental(true);
     imported1.deserialize(exported);
     
     assert(imported1.getNumAssumptionLiterals() == update.getNumAssumptionLiterals());

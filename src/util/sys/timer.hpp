@@ -11,6 +11,7 @@ class Timer {
 
 private:
     static timespec timespecStart, timespecEnd;
+    static float lastTimeMeasured;
 
 public:
     static void init();
@@ -21,11 +22,28 @@ public:
      */
     static inline float elapsedSeconds() {
         clock_gettime(CLOCK_MONOTONIC_RAW, &timespecEnd);
-        return timespecEnd.tv_sec - timespecStart.tv_sec  
+        float time = timespecEnd.tv_sec - timespecStart.tv_sec  
             + (0.001f * 0.001f * 0.001f) * (timespecEnd.tv_nsec - timespecStart.tv_nsec);
+        return time;
     }
 
-    static bool globalTimelimReached(Parameters& params);
+    /**
+     * Cache the current value of elapsedSeconds() to later be queried without
+     * any cost via "elapsedSecondsCached()". Call this method as well as
+     * "elapsedSecondsCached()" from the main thread ONLY.
+     */
+    static inline void cacheElapsedSeconds() {
+        lastTimeMeasured = elapsedSeconds();
+    }
+
+    /**
+     * Returns elapsed time since program start (since MyMpi::init) in seconds
+     * at the last time "cacheElapsedSeconds()" was called.
+     * NOT thread-safe; only call from the main thread.
+     */
+    static inline float elapsedSecondsCached() {
+        return lastTimeMeasured;
+    }
 
     static timespec getStartTime();
 };

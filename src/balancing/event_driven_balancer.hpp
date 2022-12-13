@@ -31,7 +31,7 @@ public:
     void onSuspend(const Job& job);
     void onTerminate(const Job& job);
 
-    void advance(float time = -1);
+    void advance();
     void handle(MessageHandle& handle);
 
     size_t getGlobalEpoch() const;

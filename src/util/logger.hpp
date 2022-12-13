@@ -86,6 +86,8 @@ public:
     void setQuiet();
     void setLinePrefix(const std::string& linePrefix);
 
+    int getVerbosity() const;
+
 private:
 
     void log(va_list& args, unsigned int options, const char* str) const;

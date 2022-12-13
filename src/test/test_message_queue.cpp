@@ -5,12 +5,12 @@
 #include <string>
 
 #include "util/random.hpp"
-#include "util/sat_reader.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "comm/mympi.hpp"
 #include "util/params.hpp"
 #include "data/job_transfer.hpp"
+#include "comm/msg_queue/message_subscription.hpp"
 
 const int TAG_INT_VEC = 111;
 const int TAG_ACK = 112;
@@ -22,11 +22,10 @@ void testSelfMessages() {
     Terminator::reset();
     int rank = MyMpi::rank(MPI_COMM_WORLD);
     auto& q = MyMpi::getMessageQueue();
-    q.clearCallbacks();
     
     int numReceived = 0;
     int sumReceived = 0;
-    q.registerCallback(TAG_INT_VEC, [&](MessageHandle& h) {
+    MessageSubscription sub(TAG_INT_VEC, [&](MessageHandle& h) {
         numReceived++;
         IntVec vec = Serializable::get<IntVec>(h.getRecvData());
         for (int x : vec.data) sumReceived += x; 
@@ -48,11 +47,10 @@ void testSimpleP2P() {
     Terminator::reset();
     int rank = MyMpi::rank(MPI_COMM_WORLD);
     auto& q = MyMpi::getMessageQueue();
-    q.clearCallbacks();
 
     int totalSum = 0;
     int numReceived = 0;
-    q.registerCallback(TAG_INT_VEC, [&](MessageHandle& h) {
+    MessageSubscription sub(TAG_INT_VEC, [&](MessageHandle& h) {
         LOG(V2_INFO, "received ...\n");
         auto vec = Serializable::get<IntVec>(h.getRecvData()).data;
         size_t sum = 0; for (int x : vec) sum += x;
@@ -105,7 +103,6 @@ void testBigP2P() {
 
     int rank = MyMpi::rank(MPI_COMM_WORLD);
     auto& q = MyMpi::getMessageQueue();
-    q.clearCallbacks();
     size_t msgIdx = 0;
 
     auto sendNextVec = [&]() {
@@ -113,7 +110,7 @@ void testBigP2P() {
         LOG(V2_INFO, "#%i sent (n=%i)\n", msgIdx, N[msgIdx]);
     };
 
-    q.registerCallback(TAG_INT_VEC, [&](MessageHandle& h) {
+    MessageSubscription sub1(TAG_INT_VEC, [&](MessageHandle& h) {
         LOG(V2_INFO, "#%i received\n", msgIdx);
         
         if (verifyData) {
@@ -130,7 +127,7 @@ void testBigP2P() {
         msgIdx++;
         MyMpi::isend(h.source, TAG_ACK, IntVec());
     });
-    q.registerCallback(TAG_ACK, [&](MessageHandle& h) {
+    MessageSubscription sub2(TAG_ACK, [&](MessageHandle& h) {
         msgIdx++;
         if (msgIdx == numTests) {
             MyMpi::isend(1-rank, TAG_EXIT, IntVec());
@@ -139,7 +136,7 @@ void testBigP2P() {
             sendNextVec();
         }
     });
-    q.registerCallback(TAG_EXIT, [&](MessageHandle& h) {
+    MessageSubscription sub3(TAG_EXIT, [&](MessageHandle& h) {
         Terminator::setTerminating();
     });
 
@@ -147,7 +144,7 @@ void testBigP2P() {
     
     float maxDelay = 0;
     float lastPing = Timer::elapsedSeconds();
-    q.registerCallback(TAG_PINGPONG, [&](MessageHandle& h) {
+    MessageSubscription sub4(TAG_PINGPONG, [&](MessageHandle& h) {
         MyMpi::isend(1-rank, TAG_PINGPONG, IntVec());
         float time = Timer::elapsedSeconds();
         if (time - lastPing > maxDelay) {

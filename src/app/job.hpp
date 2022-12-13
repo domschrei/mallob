@@ -19,6 +19,8 @@
 #include "comm/job_comm.hpp"
 #include "scheduling/local_scheduler.hpp"
 
+typedef std::function<void(JobRequest& req, int tag, bool left, int dest)> EmitDirectedJobRequestCallback;
+
 class Job {
 
 // Protected fields, may be accessed by your application code.
@@ -140,7 +142,8 @@ public:
 private:
     int _id;
     std::string _name;
-    JobDescription::Application _appl;
+    int _application_id;
+    bool _incremental;
 
     std::atomic_bool _has_description = false;
     JobDescription _description;
@@ -178,6 +181,9 @@ private:
     mutable int _age_of_const_cooldown = -1;
     mutable int _last_demand = 0;
 
+    std::optional<JobRequest> _request_to_multiply_left;
+    std::optional<JobRequest> _request_to_multiply_right;
+
 // Public methods.
 public:
 
@@ -185,14 +191,21 @@ public:
     // (NOT to be called by your application code implementing above methods!)
 
     // Constructor
-    Job(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl);
+    struct JobSetup {
+        int commSize;
+        int worldRank;
+        int jobId;
+        int applicationId;
+        bool incremental;
+    };
+    Job(const Parameters& params, const JobSetup& setup);
     
     // Mark the job as being subject of a commitment to the given job request.
     // Requires the job to be not active and not committed.
     void commit(const JobRequest& req);
     // Unmark the job as being subject of a commitment to some job request.
     // Requires the job to be in a committed state.
-    void uncommit();
+    std::optional<JobRequest> uncommit();
     // Add the job description of the next (or the first/only) revision.
     void pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data);
     // Starts the execution of a new job.
@@ -223,8 +236,8 @@ public:
     void assertState(JobState state) const {assert(_state == state || LOG_RETURN_FALSE("State of %s : %s\n", toStr(), jobStateToStr()));};
     int getVolume() const {return _volume;}
     float getPriority() const {return _priority;}
-    JobDescription::Application getApplication() const {return _appl;}
-    bool isIncremental() const {return JobDescription::isApplicationIncremental(_appl);}
+    int getApplicationId() const {return _application_id;}
+    bool isIncremental() const {return _incremental;}
     bool hasDescription() const {return _has_description;};
     const JobDescription& getDescription() const {assert(hasDescription()); return _description;};
     const std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription(int revision) {return _description.getSerialization(revision);};
@@ -272,7 +285,7 @@ public:
 
         if (getState() == ACTIVE && _job_tree.isRoot()) {
             // Compute used CPU time within last time slice
-            float time = Timer::elapsedSeconds();
+            float time = Timer::elapsedSecondsCached();
             _used_cpu_seconds += (time - _time_of_last_limit_check) * _threads_per_job * _volume;
             _time_of_last_limit_check = time;
         }
@@ -308,13 +321,29 @@ public:
         return false;
     }
 
-    LocalScheduler constructScheduler(std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq);
-
     // Marks the job to be indestructible as long as pending is true.
     void addChildWaitingForRevision(int rank, int revision) {_waiting_rank_revision_pairs.insert(std::pair<int, int>(rank, revision));}
     void setDesiredRevision(int revision) {_desired_revision = revision;}
     bool isRevisionSolved(int revision) {return _last_solved_revision >= revision;}
     void setRevisionSolved(int revision) {_last_solved_revision = revision;}
+
+    void storeRequestToMultiply(JobRequest&& req, bool left) {
+        (left ? _request_to_multiply_left : _request_to_multiply_right) = std::move(req);
+    }
+    std::optional<JobRequest>& getRequestToMultiply(bool left) {
+        return left ? _request_to_multiply_left : _request_to_multiply_right;
+    }
+
+    JobRequest spawnJobRequest(bool left, int balancingEpoch) {
+        int index = left ? _job_tree.getLeftChildIndex() : _job_tree.getRightChildIndex();
+        if (_params.monoFilename.isSet()) _job_tree.updateJobNode(index, index);
+
+        JobRequest req(_id, _application_id, _job_tree.getRootNodeRank(), 
+                MyMpi::rank(MPI_COMM_WORLD), index, Timer::elapsedSeconds(), balancingEpoch, 
+                0, _incremental);
+        req.revision = std::max(0, getDesiredRevision());
+        return req;
+    }
 
     // toString methods
 
@@ -322,6 +351,9 @@ public:
         return _name.c_str();
     };
     const char* jobStateToStr() const {return JOB_STATE_STRINGS[(int)_state];};
+    static std::string toStr(int jobId, int jobIndex) {
+        return "#" + std::to_string(jobId) + ":" + std::to_string(jobIndex);
+    }
 };
 
 #endif

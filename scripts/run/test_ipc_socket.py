@@ -35,7 +35,7 @@ named_pipe_path = "/tmp/myapp.pipe"
 
 json_introduce = '{"user": "admin", "name": "mono-job", "file": "' + formula_path + '", "priority": 1.0, "application": "SAT"}'
 #json_introduce_namedpipe = '{"user": "admin", "name": "mono-job", "file": "' + named_pipe_path + '", "priority": 1.0, "application": "SAT"}'
-json_introduce_namedpipe = '{"user": "admin", "name": "mono-job", "file": "' + named_pipe_path + '", "content-mode": "raw", "priority": 1.0, "application": "SAT"}'
+json_introduce_namedpipe = '{"user": "admin", "name": "mono-job", "file": "' + named_pipe_path + '", "configuration": {"content-mode": "raw"}, "priority": 1.0, "application": "SAT"}'
 json_interrupt = '{"interrupt": true, "user": "admin", "name": "mono-job", "application": "SAT"}'
 
 #formula = open(formula_path, "r").read()

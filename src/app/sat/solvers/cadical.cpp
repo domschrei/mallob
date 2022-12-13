@@ -12,6 +12,7 @@
 
 #include "cadical.hpp"
 #include "util/logger.hpp"
+#include "util/distribution.hpp"
 
 Cadical::Cadical(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),
@@ -53,9 +54,37 @@ void Cadical::diversify(int seed) {
 
 	if (seedSet) return;
 
-	// Options may only be set in the initialization phase, so the seed cannot be re-set
+	LOGGER(_logger, V3_VERB, "Diversifying %i\n", getDiversificationIndex());
 	bool okay = solver->set("seed", seed);
 	assert(okay);
+
+	seedSet = true;
+	setClauseSharing(getNumOriginalDiversifications());
+
+	// Randomize ("jitter") certain options around their default value
+    if (getDiversificationIndex() >= getNumOriginalDiversifications()) {
+        std::mt19937 rng(seed);
+        Distribution distribution(rng);
+
+        // Randomize restart frequency
+        double meanRestarts = solver->get("restartint");
+        double maxRestarts = std::min(2e9, 20*meanRestarts);
+        distribution.configure(Distribution::NORMAL, std::vector<double>{
+            /*mean=*/meanRestarts, /*stddev=*/10, /*min=*/1, /*max=*/maxRestarts
+        });
+        int restartFrequency = (int) std::round(distribution.sample());
+        okay = solver->set("restartint", restartFrequency); assert(okay);
+
+        // Randomize score decay
+        double meanDecay = solver->get("scorefactor");
+        distribution.configure(Distribution::NORMAL, std::vector<double>{
+            /*mean=*/meanDecay, /*stddev=*/3, /*min=*/500, /*max=*/1000
+        });
+        int decay = (int) std::round(distribution.sample());
+        okay = solver->set("scorefactor", decay); assert(okay);
+        
+        LOGGER(_logger, V3_VERB, "Sampled restartint=%i decay=%i\n", restartFrequency, decay);
+    }
 
 	// In certified UNSAT mode?
 	if (getSolverSetup().certifiedUnsat) {
@@ -80,37 +109,16 @@ void Cadical::diversify(int seed) {
 		
 		// Simple LRAT-safe portfolio (5/10 solvers are diversified)
 		switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-                case 1: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); assert(okay); break;
-                case 3: okay = solver->set("phase", 0); break;
-                case 5: okay = solver->set("walk", 0); break;
-                case 7: okay = solver->set("restartint", 100); break;
-                case 9: okay = solver->set("inprocessing", 0); break;
-                }
+		case 1: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); assert(okay); break;
+		case 3: okay = solver->set("phase", 0); break;
+		case 5: okay = solver->set("walk", 0); break;
+		case 7: okay = solver->set("restartint", 100); break;
+		case 9: okay = solver->set("inprocessing", 0); break;
+		}
 		return;
 	}
 
-	// Normal mode of execution
-	LOGGER(_logger, V3_VERB, "Diversifying %i\n", getDiversificationIndex());
-
 	switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-	/*
-	// original diversification
-	case 0: okay = solver->configure("default"); break;
-	case 1: okay = solver->configure("plain"); break;
-	case 2: okay = solver->configure("sat"); break;
-	case 3: okay = solver->configure("unsat"); break;
-	case 4: okay = solver->set("chronoalways", 1); break;
-	case 5: okay = solver->set("condition", 1); break;
-	case 6: okay = solver->set("cover", 1); break;
-	case 7: okay = solver->set("restartint", 100); break;
-	case 8: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
-	case 9: okay = solver->set("walk", 0); break;
-	case 10: okay = solver->set("inprocessing", 0); break;
-	case 11: okay = solver->set("phase", 0); break;
-	case 12: okay = solver->set("decompose", 0); break;
-	case 13: okay = solver->set("elim", 0); break;
-	case 14: okay = solver->set("minimize", 0); break;
-	*/
 	// Greedy 10-portfolio according to tests of the above configurations on SAT2020 instances
 	case 0: okay = solver->set("phase", 0); break;
 	case 1: okay = solver->configure("sat"); break;
@@ -124,8 +132,6 @@ void Cadical::diversify(int seed) {
 	case 9: okay = solver->set("inprocessing", 0); break;
 	}
 	assert(okay);
-	seedSet = true;
-	setClauseSharing(getNumOriginalDiversifications());
 }
 
 int Cadical::getNumOriginalDiversifications() {

@@ -9,7 +9,7 @@
 #include "interface/api/api_connector.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/background_worker.hpp"
-#include "util/shuffle.hpp"
+#include "util/random.hpp"
 #include "interface/api/client_template.hpp"
 
 class JobStreamer {
@@ -86,7 +86,7 @@ public:
             auto rng = std::mt19937(_params.seed() + _internal_rank); 
             auto dist = std::uniform_real_distribution<float>(0, 1); 
             auto rngFunc = [&]() {return dist(rng);};
-            shuffle(_job_descriptions.data(), _job_descriptions.size(), rngFunc);
+            random_shuffle(_job_descriptions.data(), _job_descriptions.size(), rngFunc);
         }
 
         // Run concurrent submission of jobs

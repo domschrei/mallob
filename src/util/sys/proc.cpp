@@ -5,7 +5,6 @@
 #include <sched.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
-#include <sys/sysinfo.h>
 #include <map>
 #include "util/assert.hpp"
 #include <ios>
@@ -94,12 +93,38 @@ Proc::RuntimeInfo Proc::getRuntimeInfo(pid_t pid, SubprocessMode mode) {
 
 std::pair<unsigned long, unsigned long> Proc::getMachineFreeAndTotalRamKbs() {
     std::pair<unsigned long, unsigned long> freeAndTotalRamKbs;
-    struct sysinfo info;
-    int result = sysinfo(&info);
-    if (result == 0) {
-        freeAndTotalRamKbs.first = (info.freeram * info.mem_unit) / 1024;
-        freeAndTotalRamKbs.second = (info.totalram * info.mem_unit) / 1024;
+
+    using std::ios_base;
+    using std::ifstream;
+    using std::string;
+
+    std::string statFile = "/proc/meminfo";
+    ifstream stat_stream(statFile.c_str(), ios_base::in);
+    if (!stat_stream.good()) return freeAndTotalRamKbs;
+
+    const std::string labelTotal = "MemTotal:";
+    const std::string labelAvailable = "MemAvailable:";
+    int numFound = 0;
+    const int numNeeded = 2;
+    while (numFound < numNeeded) {
+        std::string label; 
+        unsigned long value;
+        std::string unit;
+        stat_stream >> label >> value >> unit;
+        if (label == labelAvailable) {
+            assert(unit == "kB");
+            freeAndTotalRamKbs.first = value;
+            numFound++;
+            //LOG(V2_INFO, "Available RAM on this machine: %lu kB\n", value);
+        } else if (label == labelTotal) {
+            assert(unit == "kB");
+            freeAndTotalRamKbs.second = value;
+            numFound++;
+            //LOG(V2_INFO, "Total RAM on this machine: %lu kB\n", value);
+        }
     }
+
+    stat_stream.close();
     return freeAndTotalRamKbs;
 }
 

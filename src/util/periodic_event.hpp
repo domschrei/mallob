@@ -11,12 +11,12 @@ private:
     float _last_event_time;
 
 public:
-    PeriodicEvent(float time = -1) {
-        _last_event_time = time >= 0 ? time : Timer::elapsedSeconds();
+    PeriodicEvent() {
+        _last_event_time = Timer::elapsedSecondsCached();
     }
 
     bool ready(float time = -1) {
-        if (time < 0) time = Timer::elapsedSeconds();
+        if (time < 0) time = Timer::elapsedSecondsCached();
         if (time - _last_event_time >= 0.001f*PeriodMillis) {
             _last_event_time = time;
             return true;

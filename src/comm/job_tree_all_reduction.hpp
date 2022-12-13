@@ -35,6 +35,7 @@ private:
     bool _reduction_locally_done = false;
     bool _finished = false;
     bool _valid = true;
+    bool _broadcastEnabled = true;
 
 public:
     JobTreeAllReduction(JobTree& jobTree, JobMessage baseMsg, AllReduceElement&& neutralElem, 
@@ -59,6 +60,14 @@ public:
     void setTransformationOfElementAtRoot(std::function<AllReduceElement(const AllReduceElement&)> transformation) {
         _transformation_at_root = transformation;
         _has_transformation_at_root = true;
+    }
+
+    void enableBroadcast() {
+        _broadcastEnabled = true;
+    }
+
+    void disableBroadcast() {
+        _broadcastEnabled = false;
     }
 
     // Process an incoming message and advance the all-reduction accordingly. 
@@ -90,7 +99,7 @@ public:
             LOG_ADD_SRC(V5_DEBG, "CS got %i/%i elems", source, _child_elems.size(), _num_expected_child_elems);
             advance();
         }
-        if (tag == MSG_JOB_TREE_BROADCAST) {
+        if (tag == MSG_JOB_TREE_BROADCAST && _broadcastEnabled) {
             receiveAndForwardFinalElem(std::move(msg.payload));
         }
         return true;
@@ -103,7 +112,7 @@ public:
         if (_finished) return;
 
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
-             
+
             _child_elems.push_front(std::move(_local_elem.value()));
             _local_elem.reset();
 
@@ -125,8 +134,12 @@ public:
                 if (_has_transformation_at_root) {
                     _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));
                 }
-                // Begin broadcast
-                receiveAndForwardFinalElem(std::move(_aggregated_elem.value()));
+
+                if (_broadcastEnabled) {// receive final elem and begin broadcast
+                    receiveAndForwardFinalElem(std::move(_aggregated_elem.value()));
+                } else { // only receive final elem
+                    receiveFinalElem(std::move(_aggregated_elem.value()));
+                }
             } else {
                 // Send to parent
                 _base_msg.payload = std::move(_aggregated_elem.value());
@@ -179,9 +192,13 @@ public:
     }
 
 private:
-    void receiveAndForwardFinalElem(AllReduceElement&& elem) {
+    void receiveFinalElem(AllReduceElement&& elem) {
         _finished = true;
         _base_msg.payload = std::move(elem);
+    }
+
+    void receiveAndForwardFinalElem(AllReduceElement&& elem) {
+        receiveFinalElem(std::move(elem));
         if (_expected_child_ranks.first >= 0) 
             MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_BROADCAST, _base_msg);
         if (_expected_child_ranks.second >= 0) 

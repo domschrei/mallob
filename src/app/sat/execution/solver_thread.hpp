@@ -17,6 +17,7 @@
 #include "solving_state.hpp"
 #include "clause_shuffler.hpp"
 #include "variable_translator.hpp"
+#include "../parse/serialized_formula_parser.hpp"
 
 // Forward declarations
 class SatEngine;
@@ -30,11 +31,8 @@ private:
     Logger& _logger;
     std::thread _thread;
 
-    std::vector<std::pair<size_t, const int*>> _pending_formulae;
+    std::vector<SerializedFormulaParser> _pending_formulae;
     std::vector<std::pair<size_t, const int*>> _pending_assumptions;
-    
-    ClauseShuffler _shuffler;
-    bool _shuffle;
 
     int _local_id;
     std::string _name;

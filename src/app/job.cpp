@@ -9,43 +9,21 @@
 #include "util/permutation.hpp"
 
 
-Job::Job(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl) :
+Job::Job(const Parameters& params, const JobSetup& setup) :
             _params(params), 
-            _id(jobId),
-            _name("#" + std::to_string(jobId)),
-            _appl(appl),
+            _id(setup.jobId),
+            _name("#" + std::to_string(setup.jobId)),
+            _application_id(setup.applicationId),
+            _incremental(setup.incremental),
             _time_of_arrival(Timer::elapsedSeconds()), 
             _state(INACTIVE),
-            _job_tree(commSize, worldRank, jobId, params.useDormantChildren()), 
+            _job_tree(setup.commSize, setup.worldRank, setup.jobId, params.useDormantChildren()), 
             _comm(_id, _job_tree, params.jobCommUpdatePeriod()) {
     
     _growth_period = _params.growthPeriod();
     _continuous_growth = _params.continuousGrowth();
     _max_demand = _params.maxDemand();
     _threads_per_job = _params.numThreadsPerProcess();
-}
-
-LocalScheduler Job::constructScheduler(std::function<void(const JobRequest& req, int tag, bool left, int dest)> emitJobReq) {
-    LocalScheduler scheduler(_id, _params, _job_tree);
-    scheduler.initCallbacks(
-        // callback to emit a directed job request message to a specific PE
-        [this, emitJobReq](int epoch, int requestedIndex, int rank) {
-            JobRequest req(_id, _appl, _job_tree.getRootNodeRank(), 
-                _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, -2);
-            req.revision = std::max(0, getDesiredRevision());
-            LOG_ADD_DEST(V5_DEBG, "RBS EMIT_REQ %s", rank, req.toStr().c_str());
-            emitJobReq(req, MSG_REQUEST_NODE_ONESHOT, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), rank);
-        },
-        // callback to emit a certain, undirected job request message
-        [this, emitJobReq](int epoch, int requestedIndex) {
-            JobRequest req(_id, _appl, _job_tree.getRootNodeRank(), 
-                _job_tree.getRank(), requestedIndex, Timer::elapsedSeconds(), epoch, 0);
-            req.revision = std::max(0, getDesiredRevision());
-            LOG(V5_DEBG, "RBS EMIT_REQ %s\n", req.toStr().c_str());
-            emitJobReq(req, MSG_REQUEST_NODE, req.requestedNodeIndex == _job_tree.getLeftChildIndex(), -1);
-        }
-    );
-    return scheduler;
 }
 
 void Job::updateJobTree(int index, int rootRank, int parentRank) {
@@ -58,15 +36,17 @@ void Job::updateJobTree(int index, int rootRank, int parentRank) {
 void Job::commit(const JobRequest& req) {
     assert(getState() != ACTIVE);
     assert(getState() != PAST);
-    _commitment = req;
     _balancing_epoch_of_last_commitment = req.balancingEpoch;
     _job_tree.clearJobNodeUpdates();
     updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
+    _commitment = req;
 }
 
-void Job::uncommit() {
+std::optional<JobRequest> Job::uncommit() {
     assert(getState() != ACTIVE);
+    std::optional<JobRequest> optReq(std::move(_commitment));
     _commitment.reset();
+    return optReq;
 }
 
 void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
@@ -96,8 +76,8 @@ void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
 
 void Job::start() {
     assertState(INACTIVE);
-    if (_time_of_activation <= 0) _time_of_activation = Timer::elapsedSeconds();
-    _time_of_last_limit_check = Timer::elapsedSeconds();
+    if (_time_of_activation <= 0) _time_of_activation = Timer::elapsedSecondsCached();
+    _time_of_last_limit_check = Timer::elapsedSecondsCached();
     _volume = std::max(1, _volume);
     _state = ACTIVE;
     LOG(V4_VVER, "%s : new job node starting\n", toStr());
@@ -111,6 +91,8 @@ void Job::suspend() {
     _job_tree.unsetLeftChild();
     _job_tree.unsetRightChild();
     LOG(V4_VVER, "%s : suspended solver\n", toStr());
+    _request_to_multiply_left.reset();
+    _request_to_multiply_right.reset();
     updateVolumeAndUsedCpu(getVolume());
 }
 
@@ -120,7 +102,7 @@ void Job::resume() {
     _state = ACTIVE;
     appl_resume();
     LOG(V4_VVER, "%s : resumed solving threads\n", toStr());
-    _time_of_last_limit_check = Timer::elapsedSeconds();
+    _time_of_last_limit_check = Timer::elapsedSecondsCached();
 }
 
 void Job::terminate() {
@@ -133,6 +115,8 @@ void Job::terminate() {
 
     _job_tree.unsetLeftChild();
     _job_tree.unsetRightChild();
+    _request_to_multiply_left.reset();
+    _request_to_multiply_right.reset();
 
     _time_of_abort = Timer::elapsedSeconds();
     LOG(V4_VVER, "%s : terminated\n", toStr());
@@ -157,7 +141,7 @@ int Job::getDemand() const {
     } else {
         if (_time_of_activation <= 0) demand = 1;
         else {
-            float t = Timer::elapsedSeconds()-_time_of_activation;
+            float t = Timer::elapsedSecondsCached()-_time_of_activation;
             
             // Continuous growth
             float numPeriods = std::min(t/_growth_period, 28.f); // overflow protection
@@ -186,7 +170,7 @@ double Job::getTemperature() const {
     double baseTemp = 0.95;
     double decay = 0.99; // higher means slower convergence
 
-    int age = (int) (Timer::elapsedSeconds()-_time_of_activation);
+    int age = (int) (Timer::elapsedSecondsCached()-_time_of_activation);
     double eps = 2*std::numeric_limits<double>::epsilon();
 
     // Start with temperature 1.0, exponentially converge towards baseTemp 

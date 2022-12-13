@@ -70,7 +70,7 @@ public:
         }
         return *this;
     }
-    virtual void merge(const Reduceable& other) {
+    virtual void aggregate(const Reduceable& other) {
 
         EventMap& otherEventMap = (EventMap&) other;
         _global_epoch = std::max(_global_epoch, otherEventMap._global_epoch);
@@ -110,11 +110,6 @@ public:
             }
         }
         _map = newMap;
-    }
-    virtual std::unique_ptr<Reduceable> getDeserialized(const std::vector<uint8_t>& packed) const {
-        auto result = std::unique_ptr<Reduceable>(new EventMap());
-        result->deserialize(packed);
-        return result;
     }
     virtual bool isEmpty() const {
         return _map.empty();

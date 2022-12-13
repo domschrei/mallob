@@ -34,9 +34,11 @@ private:
     bool _assembling_proof = false;
     JobResult _internal_result;
 
+    bool _crash_pending {false};
+
 public:
 
-    ForkedSatJob(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl);
+    ForkedSatJob(const Parameters& params, const JobSetup& setup);
     virtual ~ForkedSatJob() override;
 
     void appl_start() override;
@@ -76,6 +78,7 @@ public:
 
 private:
     void doStartSolver();
+    void handleSolverCrash();
 
     bool checkClauseComm();
     void loadIncrements();

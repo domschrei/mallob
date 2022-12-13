@@ -1,6 +1,5 @@
 
-#ifndef DOMPASCH_JOB_TRANSFER
-#define DOMPASCH_JOB_TRANSFER
+#pragma once
 
 #include <vector>
 #include <cstring>
@@ -9,13 +8,14 @@
 #include "serializable.hpp"
 #include "data/checksum.hpp"
 #include "data/job_description.hpp"
+#include "util/sys/timer.hpp"
 
 /**
  * Sent around during the search of a node to adopt the job.
  */
 struct JobRequest : public Serializable {
 
-    int jobId;
+    int jobId {-1};
     int rootRank;
     int requestingNodeRank;
     int requestedNodeIndex;
@@ -23,14 +23,23 @@ struct JobRequest : public Serializable {
     float timeOfBirth;
     int numHops;
     int balancingEpoch;
-    JobDescription::Application application;
+    int applicationId;
+    bool incremental;
+
+    int multiBaseId {-1};
+    int multiplicity {1};
+    int multiBegin {-1};
+    int multiEnd {-1};
+
+    struct MultiplicityData {
+        std::function<void(JobRequest&)> discardCallback;
+    } *multiplicityData {nullptr};
 
 public:
     JobRequest() = default;
-
-    JobRequest(int jobId, JobDescription::Application application, int rootRank, 
+    JobRequest(int jobId, int applicationId, int rootRank, 
             int requestingNodeRank, int requestedNodeIndex, 
-            float timeOfBirth, int balancingEpoch, int numHops) :
+            float timeOfBirth, int balancingEpoch, int numHops, bool incremental) :
         jobId(jobId),
         rootRank(rootRank),
         requestingNodeRank(requestingNodeRank),
@@ -39,15 +48,115 @@ public:
         timeOfBirth(timeOfBirth),
         numHops(numHops),
         balancingEpoch(balancingEpoch),
-        application(application) {}
+        applicationId(applicationId),
+        incremental(incremental) {}
+    JobRequest& operator=(const JobRequest& other) {
+        jobId = other.jobId;
+        rootRank = other.rootRank;
+        requestingNodeRank = other.requestingNodeRank;
+        requestedNodeIndex = other.requestedNodeIndex;
+        revision = other.revision;
+        timeOfBirth = other.timeOfBirth;
+        numHops = other.numHops;
+        balancingEpoch = other.balancingEpoch;
+        applicationId = other.applicationId;
+        incremental = other.incremental;
+        multiBaseId = other.multiBaseId;
+        multiplicity = other.multiplicity;
+        multiBegin = other.multiBegin;
+        multiEnd = other.multiEnd;
+        multiplicityData = nullptr;
+        return *this;
+    }
+    JobRequest& operator=(JobRequest&& other) {
+        jobId = other.jobId;
+        rootRank = other.rootRank;
+        requestingNodeRank = other.requestingNodeRank;
+        requestedNodeIndex = other.requestedNodeIndex;
+        revision = other.revision;
+        timeOfBirth = other.timeOfBirth;
+        numHops = other.numHops;
+        balancingEpoch = other.balancingEpoch;
+        applicationId = other.applicationId;
+        incremental = other.incremental;
+        multiBaseId = other.multiBaseId;
+        multiplicity = other.multiplicity;
+        multiBegin = other.multiBegin;
+        multiEnd = other.multiEnd;
+        multiplicityData = other.multiplicityData;
+        other.multiplicityData = nullptr;
+        return *this;
+    }
+    JobRequest(const JobRequest& other) {
+        *this = other;
+    }
+    JobRequest(JobRequest&& other) {
+        *this = std::move(other);
+    }
 
-    static size_t getTransferSize();
+    static size_t getMaxTransferSize();
+    size_t getTransferSize() const;
     std::vector<uint8_t> serialize() const override;
     JobRequest& deserialize(const std::vector<uint8_t> &packed) override;
     std::string toStr() const;
     bool operator==(const JobRequest& other) const;
     bool operator!=(const JobRequest& other) const;
     bool operator<(const JobRequest& other) const;
+
+    int getMatchingId() const {
+        return multiBaseId + (multiplicity==1 ? 0 : 
+            (multiplicity - (multiEnd - multiBegin))
+        );
+    }
+    std::pair<JobRequest, JobRequest> getMultipliedChildRequests(int requestingRank) {
+        std::pair<JobRequest, JobRequest> result;
+        if (multiplicity == 1 || multiBegin == -1 || multiEnd == -1) return result;
+
+        int treeRankOffset = multiEnd - multiplicity;
+        int myTreeRank = multiBegin - treeRankOffset;
+        
+        int leftChildTreeRank = 2*myTreeRank+1;
+        int leftChildDest = leftChildTreeRank + treeRankOffset;
+        if (leftChildDest < multiEnd) {
+            result.first = *this;
+            result.first.requestedNodeIndex = 2*requestedNodeIndex+1;
+            result.first.requestingNodeRank = requestingRank;
+            result.first.numHops = 0;
+            result.first.multiBegin = leftChildDest;
+            result.first.timeOfBirth = Timer::elapsedSeconds();
+        }
+
+        int rightChildTreeRank = 2*myTreeRank+2;
+        int rightChildDest = rightChildTreeRank + treeRankOffset;
+        if (rightChildDest < multiEnd) {
+            result.second = *this;
+            result.second.requestedNodeIndex = 2*requestedNodeIndex+2;
+            result.second.requestingNodeRank = requestingRank;
+            result.second.numHops = 0;
+            result.second.multiBegin = rightChildDest;
+            result.second.timeOfBirth = Timer::elapsedSeconds();
+        }
+
+        return result;
+    }
+    void setMultiplicityDiscardCallback(std::function<void(JobRequest&)> cb) {
+        triggerAndDestroyMultiplicityData();
+        multiplicityData = new MultiplicityData{cb};
+    }
+    void triggerAndDestroyMultiplicityData() {
+        if (multiplicityData == nullptr) return;
+        multiplicityData->discardCallback(*this);
+        delete multiplicityData;
+        multiplicityData = nullptr;
+    }
+    void dismissMultiplicityData() {
+        if (multiplicityData == nullptr) return;
+        delete multiplicityData;
+        multiplicityData = nullptr;
+    }
+    ~JobRequest() {
+        triggerAndDestroyMultiplicityData();
+    }
 };
 
 struct OneshotJobRequestRejection : public Serializable {
@@ -167,5 +276,3 @@ public:
     std::vector<uint8_t> serialize() const override;
     JobStatistics& deserialize(const std::vector<uint8_t>& packed) override;
 };
-
-#endif

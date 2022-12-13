@@ -10,6 +10,8 @@ Most notably, Mallob features an engine for distributed SAT solving.
 According to the [International SAT Competitions](https://satcompetition.github.io/) 2020-2022, the premier competitive events for state-of-the-art SAT solving, Mallob is consistently the strongest SAT solving system for massively parallel and distributed systems (800 physical cores) and also a highly competitive system for moderately parallel SAT solving (32 physical cores).
 This version of Mallob also features the generation of UNSAT proofs due to a cooperation with researchers from Amazon Web Services (see [docs/certified-unsat.md](docs/certified-unsat.md)).
 
+Furthermore, Mallob features an engine for K-Means clustering, authored by [Michael Dörr](https://github.com/MichaelDoerr) in the scope of his Bachelor thesis.
+
 <hr/>
 
 # Setup
@@ -17,7 +19,7 @@ This version of Mallob also features the generation of UNSAT proofs due to a coo
 ## Prerequisites
 
 Note that we only support Linux as an operating system.
-(Some people have been successfully developing and experimenting with Mallob within the WSL.)
+(Some people have been developing and experimenting with Mallob within the WSL, but there seem to be issues related to inotify.)
 
 * CMake ≥ 3.11.4
 * Open MPI (or another MPI implementation)
@@ -27,15 +29,17 @@ Note that we only support Linux as an operating system.
 ## Building
 
 ```
+# This call is only necessary if building with MALLOB_APP_SAT (enabled by default).
+# For non-x86-64 architectures (ARM, POWER9, etc.), prepend `DISABLE_FPU=1` to "bash".
 ( cd lib && bash fetch_and_build_sat_solvers.sh )
 mkdir -p build
 cd build
-CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_USE_JEMALLOC=1 -DMALLOB_LOG_VERBOSITY=4 -DMALLOB_ASSERT=1 -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
+CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_APP_SAT=1 -DMALLOB_USE_JEMALLOC=1 -DMALLOB_LOG_VERBOSITY=4 -DMALLOB_ASSERT=1 -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
 make; cd ..
 ```
 
 Specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
-In addition, use the following Mallob-specific build options:
+You can use the following Mallob-specific build options:
 
 | Usage                                     | Description                                                                                                |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -46,6 +50,8 @@ In addition, use the following Mallob-specific build options:
 | -DMALLOB_USE_ASAN=<0/1>                   | Compile with Address Sanitizer for debugging purposes.                                                     |
 | -DMALLOB_USE_GLUCOSE=<0/1>                | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
 | -DMALLOB_USE_JEMALLOC=<0/1>               | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
+| -DMALLOB_APP_KMEANS=<0/1>                 | Compile with K-Means clustering engine.                                                                    |
+| -DMALLOB_APP_SAT=<0/1>                    | Compile with SAT solving engine.                                                                           |
 
 ## Docker
 
@@ -89,9 +95,11 @@ All further options of Mallob can be seen by executing Mallob with the `-h` opti
 
 For running Mallob on distributed clusters, please also consult [the scripts and documentation from our Euro-Par 2022 software artifact](https://doi.org/10.6084/m9.figshare.20000642) as well as the user documentation of your particular cluster.
 
-## Solve a single SAT instance
+## Solve a single problem
 
-Use Mallob option `-mono=$PATH_TO_CNF` where `$PATH_TO_CNF` is the path and file name of the formula to solve (DIMACS CNF format, possibly with .xz or .lzma compression). In this mode, all processes participate in solving, overhead is minimal, and Mallob terminates immediately after the job has been processed.
+Use Mallob option `-mono=$PROBLEM_FILE` where `$PROBLEM_FILE` is the path and file name of the problem to solve (DIMACS CNF format, possibly with .xz or .lzma compression, for SAT; whitespace-separated plain text file for K-Means). Specify the application of this instance with `-mono-app=sat` or `-mono-app=kmeans`. 
+
+In this mode, all processes participate in solving, overhead is minimal, and Mallob terminates immediately after the job has been processed.
 
 ### Options relevant for certified UNSAT
 
@@ -156,7 +164,6 @@ Here is a brief overview of all required and optional fields in the JSON API:
 | arrival           | no        | Float >= 0   | Job's arrival time (seconds) since program start; ignore job until then                                        |
 | max-demand        | no        | Int >= 0     | Override the max. number of MPI processes this job should receive at any point in time (0: no limit)           |
 | dependencies      | no        | String array | User-qualified job names (using "." as a separator) which must exit **before** this job is introduced          |
-| content-mode      | no        | String       | If "raw", the input file will be read as a binary file and not as a text file.                                 |
 | interrupt         | no        | Bool         | If `true`, the job given by "user" and "name" is interrupted (for incremental jobs, just the current revision).|
 | incremental       | no        | Bool         | Whether this job has multiple _increments_ / _revisions_ and should be treated as such                         |
 | literals          | no        | Int array    | You can specify the set of SAT literals (for this increment) directly in the JSON.                             |
@@ -211,9 +218,16 @@ Such a file may look like this:
     "wallclock-limit": "5m"
 }
 ```
-The result code is 0 is unknown, 10 if SAT, and 20 if UNSAT.
-In case of SAT, the solution field contains the found satisfying assignment; in case of UNSAT, the result for an incremental job contains the set of failed assumptions.
+The result code is 0 is unknown, 10 if SAT (solved successfully), and 20 if UNSAT (no solution exists).
+The `solution` field is application-dependent.
+For SAT solving, in case of SATISFIABLE, the solution field contains the found satisfying assignment; in case of UNSAT, the result for an incremental job contains the set of failed assumptions.
 Instead of the "solution" field, the response may also contain the fields "solution-size" and "solution-file" if the solution is large and if option `-pls` is set. In that case, your application has to read `solution-size` integers (as bytes) representing the solution from the named pipe located at `solution-file`.
+
+<hr/>
+
+# Debugging
+
+Debugging of distributed applications can be difficult, especially in Mallob's case where message passing goes hand in hand with multithreading and inter-process communication. Please take a look at [docs/debugging.md](docs/debugging.md) for some notes on how Mallob runs can be diagnosed and debugged appropriately.
 
 <hr/>
 
@@ -221,16 +235,12 @@ Instead of the "solution" field, the response may also contain the fields "solut
 
 Mallob can be extended in the following ways:
 
-* New options to the application (or a subsystem thereof) can be added in `src/optionslist.hpp`.
+* New options for Mallob can be added in `src/optionslist.hpp`.
+    - Options which are specific to a certain application can be found and edited in `src/app/$APPKEY/options.hpp`.
 * To add a new SAT solver to be used in a SAT solver engine, do the following:
     - Add a subclass of `PortfolioSolverInterface`. (You can use the existing implementation for any of the existing solvers and adapt it to your solver.)
     - Add your solver to the portfolio initialization in `src/app/sat/execution/engine.cpp`.
-* To extend Mallob by adding another kind of application (like combinatorial search, planning, SMT, ...), do the following:
-    - Extend the enumeration `JobDescription::Application` by a corresponding item.
-    - In `JobReader::read`, add a parser for your application.
-    - In `JobFileAdapter::handleNewJob`, add a new case for the `application` field in JSON files.
-    - Create a subclass of `Job` (see `src/app/job.hpp`) and implement all pure virtual methods. 
-    - Add an additional case to `JobDatabase::createJob`.
+* To extend Mallob by adding another kind of application (like combinatorial search, planning, SMT, ...), please read [docs/application_engines.md](docs/application_engines.md).
 * To add a unit test, create a class `test_*.cpp` in `src/test` and then add the test case to the bottom of `CMakeLists.txt`.
 * To add a system test, consult the files `scripts/systest_commons.sh` and/or `scripts/systest.sh`.
 
@@ -279,13 +289,19 @@ If you want to specifically cite Mallob in the scope of an International SAT Com
   title={Engineering HordeSat Towards Malleability: mallob-mono in the {SAT} 2020 Cloud Track},
   author={Schreiber, Dominik},
   journal={SAT Competition 2020},
-  pages={45}
+  pages={45--46}
 }
 @article{schreiber2021mallob,
   title={Mallob in the {SAT} Competition 2021},
   author={Schreiber, Dominik},
   journal={SAT Competition 2021},
-  pages={38}
+  pages={38--39}
+}
+@article{schreiber2022mallob,
+  title={Mallob in the {SAT} Competition 2022},
+  author={Schreiber, Dominik},
+  journal={SAT Competition 2022},
+  pages={46--47}
 }
 ```
 

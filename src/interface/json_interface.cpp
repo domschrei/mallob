@@ -12,6 +12,7 @@
 #include "util/sys/time_period.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "util/sys/thread_pool.hpp"
+#include "app/app_registry.hpp"
 
 JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson, 
     std::function<void(nlohmann::json&)> feedback) {
@@ -21,7 +22,8 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     std::string userFile, jobName;
     int id;
     float userPrio, arrival, priority;
-    JobDescription::Application appl;
+    int applicationId;
+    bool incremental;
     JobImage* img = nullptr;
 
     auto baseErrorMsg = "[WARN] Rejecting submission %s - reason: %s\n";
@@ -37,7 +39,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
         std::string user = inputJson["user"].get<std::string>();
         std::string name = inputJson["name"].get<std::string>();
         jobName = user + "." + name + ".json";
-        bool incremental = inputJson.contains("incremental") ? inputJson["incremental"].get<bool>() : false;
+        incremental = inputJson.contains("incremental") ? inputJson["incremental"].get<bool>() : false;
 
         // Check priority
         priority = inputJson.contains("priority") ? inputJson["priority"].get<float>() : 1.0f;
@@ -50,12 +52,14 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             return DISCARD;
         }
 
-        appl = JobDescription::Application::DUMMY;
+        applicationId = -1;
         if (inputJson.contains("application")) {
             auto appStr = inputJson["application"].get<std::string>();
-            appl = appStr == "SAT" ? 
-                (incremental ? JobDescription::Application::INCREMENTAL_SAT : JobDescription::Application::ONESHOT_SAT)
-                : JobDescription::Application::DUMMY;
+            applicationId = app_registry::getAppId(appStr);
+        }
+        if (applicationId == -1) {
+            LOGGER(_logger, V1_WARN, "[WARN] No valid application given. Ignoring this file.\n");
+            return DISCARD;
         }
 
         if (inputJson.contains("interrupt") && inputJson["interrupt"].get<bool>()) {
@@ -68,7 +72,8 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             // Interrupt a job which is already present
             JobMetadata data;
             data.jobName = jobName;
-            data.description = std::unique_ptr<JobDescription>(new JobDescription(id, 0, appl));
+            data.description = std::unique_ptr<JobDescription>(new JobDescription(id, 0, applicationId));
+            data.description->setIncremental(incremental);
             data.interrupt = true;
             _job_callback(std::move(data));
             return ACCEPT;
@@ -103,8 +108,9 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
 
                 // Notify client that this incremental job is done
                 JobMetadata data;
+                data.description = std::unique_ptr<JobDescription>(new JobDescription(id, 0, applicationId));
+                data.description->setIncremental(incremental);
                 data.jobName = jobName;
-                data.description = std::unique_ptr<JobDescription>(new JobDescription(id, 0, appl));
                 data.done = true;
                 _job_callback(std::move(data));
                 return ACCEPT_CONCLUDE;
@@ -150,7 +156,8 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     auto& json = img->baseJson;
 
     // Initialize new job
-    JobDescription* job = new JobDescription(id, priority, appl);
+    JobDescription* job = new JobDescription(id, priority, applicationId);
+    job->setIncremental(incremental);
     job->setRevision(_job_id_to_latest_rev[id]);
     if (json.contains("wallclock-limit")) {
         float limit = TimePeriod(json["wallclock-limit"].get<std::string>()).get(TimePeriod::Unit::SECONDS);
@@ -186,6 +193,10 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             config.map[it.key()] = it.value();
         }
     }
+    // legacy support for "content-mode" field at the JSON's top level
+    if (!config.map.count("content-mode") && json.contains("content-mode")) {
+        config.map["content-mode"] = json["content-mode"].get<std::string>();
+    }
     job->setAppConfiguration(std::move(config));
     
     // Translate dependencies (if any) to internal job IDs
@@ -208,22 +219,17 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     }
 
     // Callback to client: New job arrival.
-    SatReader::ContentMode contentMode = SatReader::ContentMode::ASCII;
-    if (json.contains("content-mode") && json["content-mode"] == "raw") {
-        contentMode = SatReader::ContentMode::RAW;
-    }
     JobMetadata metadata;
     metadata.jobName = jobName;
     metadata.description = std::unique_ptr<JobDescription>(job);
     metadata.files = std::move(files);
-    metadata.contentMode = contentMode;
     metadata.dependencies = std::move(idDependencies);
     _job_callback(std::move(metadata));
 
     return ACCEPT;
 }
 
-void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Statistics& stats) {
+void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Statistics& stats, int applicationId) {
 
     if (Terminator::isTerminating()) return;
 
@@ -237,16 +243,6 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
         + std::to_string(result.id) + "." 
         + std::to_string(result.revision) + ".pipe";
 
-    // Function to "reinterpret" integer vector as a float vector 
-    auto intVecToFloatVec = [](const std::vector<int>& intVec) {
-        static_assert(sizeof(int) == sizeof(float));
-        std::vector<float> floatVec(intVec.size());
-        for (size_t i = 0; i < intVec.size(); ++i) {
-            floatVec[i] = *reinterpret_cast<const float*>(intVec.data()+i);
-        }
-        return floatVec;
-    };
-
     // Pack job result into JSON
     j["internal_id"] = result.id;
     j["internal_revision"] = result.revision;
@@ -259,14 +255,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
         j["result"]["solution-size"] = result.getSolutionSize();
         mkfifo(solutionFile.c_str(), 0666);
     } else {
-        auto solution = result.extractSolution();
-        if (result.encodedType == JobResult::INT) {
-            j["result"]["solution"] = std::move(solution);
-        }
-        if (result.encodedType == JobResult::FLOAT) {
-            // Convert result from integers to floats
-            j["result"]["solution"] = intVecToFloatVec(solution);
-        }
+        j["result"]["solution"] = app_registry::getJobSolutionFormatter(applicationId)(result);
     }
     j["stats"] = {
         { "time", {

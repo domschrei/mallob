@@ -142,26 +142,24 @@ void EventDrivenBalancer::pushEvent(const Event& event, bool recordLatency) {
     bool inserted = _diffs.insertIfNovel(event);
     if (inserted) {
         if (_pending_entries.count(event.jobId)) {
-            // There is a pending event for this job that now becomes obsolete: 
+            // There is a pending event for this job that now becomes obsolete:
             // attribute max. latency
             _balancing_latencies[event.jobId].push_back(Timer::elapsedSeconds() - _pending_entries[event.jobId].second);
         }
         if (recordLatency) {
             _pending_entries[event.jobId] = std::pair<int, float>(event.epoch, Timer::elapsedSeconds());
         }
-        LOG(V1_WARN, "BLC insert (%i,%i,%.3f)\n", event.jobId, event.demand, event.priority);
+        LOG(V4_VVER, "BLC insert (%i,%i,%.3f)\n", event.jobId, event.demand, event.priority);
         advance();
     }
 }
 
-void EventDrivenBalancer::advance(float time) {
+void EventDrivenBalancer::advance() {
     // Have anything to reduce?
     if (_diffs.isEmpty()) return;
 
-    if (time < 0) time = Timer::elapsedSeconds();
-
     // Is ready to perform balancing again?
-    if (!_periodic_balancing.ready(time)) return;
+    if (!_periodic_balancing.ready(Timer::elapsedSecondsCached())) return;
 
     EventMap m = std::move(_diffs);
     _diffs.clear();
@@ -226,7 +224,6 @@ void EventDrivenBalancer::digest(const EventMap& data) {
 
 void EventDrivenBalancer::computeBalancingResult() {
 
-    float now = Timer::elapsedSeconds();
     int rank = MyMpi::rank(_comm);
     //int verb = rank == 0 ? V4_VVER : V6_DEBGV;
     _job_volumes.clear();

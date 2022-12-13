@@ -149,7 +149,7 @@ public:
         }
 
         if (machineMinTotalMem <= 0) return false;
-        if (machineMinFreeMem / machineMinTotalMem >= 0.1) return false;
+        if (machineMinFreeMem / machineMinTotalMem >= 0.0625) return false;
         
         // Panic necessary!
         LOG(V3_VERB, "Memory panic on this machine (%.4f/%.4fGB / %.3f%% free)\n", 
@@ -163,12 +163,13 @@ public:
         
         // Iterate over processes and make them panic until enough memory is freed
         i = 0;
-        while (i < processInfo.size() && machineMinFreeMem/machineMinTotalMem < 0.3) {
+        while (i < processInfo.size() && machineMinFreeMem/machineMinTotalMem < 0.125) {
             auto info = processInfo[i];
             if (info.utility <= 0) break;
             machineMinFreeMem += 0.5 * info.usedMem;
-            LOG(V3_VERB, "Enable memory panic for proc. %i on this machine (util=%.4f)\n", info.procIdx, info.utility);
             if (info.procIdx == MyMpi::rank(_comm)) {
+                LOG(V3_VERB, "Enable memory panic (idx=%lu,usedmem=%.3f,util=%.4f)\n", 
+                    info.procIdx, info.usedMem, info.utility);
                 // That's me!
                 return true;
             }

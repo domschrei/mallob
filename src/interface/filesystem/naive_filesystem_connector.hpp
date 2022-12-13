@@ -97,6 +97,11 @@ private:
             Proc::nameThisThread("DirWatcher");
 
             std::string watchDir = _base_path + "/in";
+            // create directory if it doesn't exist
+            if (!FileUtils::isDirectory(watchDir)) {
+                LOGGER(_watch_logger, V2_INFO, "Create watch directory %s\n", watchDir.c_str());
+                FileUtils::mkdir(watchDir);
+            }
             
             while (_watch_worker.continueRunning()) {
 

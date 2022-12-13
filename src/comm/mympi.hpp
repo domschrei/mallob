@@ -1,14 +1,13 @@
 
-#ifndef DOMPASCH_MALLOB_MYMPI_HPP
-#define DOMPASCH_MALLOB_MYMPI_HPP
+#pragma once
 
 #include <memory>
 #include <set>
 #include <map>
 
 #include "comm/mpi_base.hpp"
-#include "comm/message_handle.hpp"
-#include "comm/message_queue.hpp"
+#include "comm/msg_queue/message_handle.hpp"
+#include "comm/msg_queue/message_queue.hpp"
 #include "data/serializable.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/concurrent_allocator.hpp"
@@ -51,5 +50,3 @@ public:
 
     static MessageQueue& getMessageQueue();
 };
-
-#endif

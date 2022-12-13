@@ -7,14 +7,12 @@
 #include <memory>
 
 #include "data/job_description.hpp"
-#include "util/sat_reader.hpp"
 
 struct JobMetadata {
 
     std::string jobName;
     std::unique_ptr<JobDescription> description;
     std::vector<std::string> files;
-    SatReader::ContentMode contentMode;
     std::vector<int> dependencies;
     bool done = false;
     bool interrupt = false;
@@ -26,7 +24,6 @@ struct JobMetadata {
         jobName(std::move(other.jobName)),
         description(std::move(other.description)), 
         files(std::move(other.files)), 
-        contentMode(other.contentMode), 
         dependencies(std::move(other.dependencies)),
         done(other.done), interrupt(other.interrupt) {}
     

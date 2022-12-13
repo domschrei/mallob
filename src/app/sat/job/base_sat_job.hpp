@@ -8,8 +8,8 @@
 class BaseSatJob : public Job {
 
 public:
-    BaseSatJob(const Parameters& params, int commSize, int worldRank, int jobId, JobDescription::Application appl) : 
-        Job(params, commSize, worldRank, jobId, appl) {
+    BaseSatJob(const Parameters& params, const JobSetup& setup) : 
+        Job(params, setup) {
 
         // Launched in certified UNSAT mode?
         if (params.certifiedUnsat()) {
@@ -89,6 +89,9 @@ private:
 public:
     // Helper methods
 
+    float getCompensationFactor() const {
+        return _compensation_factor;
+    }
     void setSharingCompensationFactor(float compensationFactor) {
         _compensation_factor = compensationFactor;
     }

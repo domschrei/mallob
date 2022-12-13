@@ -3,6 +3,8 @@
 #include <set>
 #include <stdlib.h>
 #include <unistd.h>
+#include <algorithm> 
+#include <string>
 
 #include "comm/mympi.hpp"
 #include "util/sys/timer.hpp"
@@ -12,13 +14,15 @@
 #include "util/sys/shared_memory.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/proc.hpp"
-#include "worker.hpp"
-#include "client.hpp"
+#include "core/worker.hpp"
+#include "core/client.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "interface/api/job_streamer.hpp"
 #include "comm/host_comm.hpp"
 #include "data/job_transfer.hpp"
-//#include "util/sys/stxxl.hpp"
+#include "comm/msg_queue/message_subscription.hpp"
+
+#include "app/.register_includes.h"
 
 #ifndef MALLOB_VERSION
 #define MALLOB_VERSION "(dbg)"
@@ -31,13 +35,18 @@
 bool monoJobDone = false;
 void introduceMonoJob(Parameters& params, Client& client) {
 
+    // Parse application name
+    auto app = params.monoApplication();
+    std::transform(app.begin(), app.end(), app.begin(), ::toupper);
+    LOG(V2_INFO, "Assuming application \"%s\" for mono job\n", app.c_str());
+
     // Write a job JSON for the singular job to solve
     nlohmann::json json = {
         {"user", "admin"},
         {"name", "mono-job"},
         {"files", {params.monoFilename()}},
         {"priority", 1.000},
-        {"application", "SAT"}
+        {"application", app}
     };
     if (params.jobWallclockLimit() > 0)
         json["wallclock-limit"] = std::to_string(params.jobWallclockLimit()) + "s";
@@ -59,7 +68,7 @@ inline bool doTerminate(Parameters& params, int rank) {
     
     bool terminate = false;
     if (Terminator::isTerminating(/*fromMainThread=*/true)) terminate = true;
-    if (params.timeLimit() > 0 && Timer::elapsedSeconds() > params.timeLimit()) {
+    if (params.timeLimit() > 0 && Timer::elapsedSecondsCached() > params.timeLimit()) {
         terminate = true;
     }
     if (terminate) {
@@ -92,7 +101,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
     
     // Register global callback for exiting msg (not specific to worker nor client)
-    MyMpi::getMessageQueue().registerCallback(MSG_DO_EXIT, [myRank](MessageHandle& h) {
+    MessageSubscription exitSubscription(MSG_DO_EXIT, [myRank](MessageHandle& h) {
         LOG_ADD_SRC(V3_VERB, "Received exit signal", h.source);
 
         // Forward exit signal
@@ -127,7 +136,10 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     }
 
     // Main loop
-    while (!Terminator::isTerminating(/*fromMainthread*/true)) {
+    while (true) {
+
+        // update cached timing
+        Timer::cacheElapsedSeconds();
 
         // Advance worker and client logic
         if (isWorker) worker->advance();
@@ -200,8 +212,8 @@ int main(int argc, char *argv[]) {
 
     longStartupWarnMsg(rank, "Init'd message queue");
 
-    //mallob_stxxl::init(rank, params.stxxlDiskDirectory(), params.stxxlDiskSizeGbs());
-    //longStartupWarnMsg(rank, "Init'd STXXL");
+    // Register all applications which were compiled into Mallob
+    #include "app/.register_commands.h"
 
     if (rank == 0)
         LOG(V2_INFO, "Program options: %s\n", params.getParamsAsString().c_str());

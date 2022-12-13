@@ -41,16 +41,16 @@ void MyMpi::setOptions(const Parameters& params) {
 }
 
 int MyMpi::isend(int recvRank, int tag, const Serializable& object) {
-    return isend(recvRank, tag, object.serialize());
+    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(object.serialize())), recvRank, tag);
 }
 int MyMpi::isend(int recvRank, int tag, std::vector<uint8_t>&& object) {
-    return isend(recvRank, tag, DataPtr(new std::vector<uint8_t>(std::move(object))));
-}
-int MyMpi::isendCopy(int recvRank, int tag, const std::vector<uint8_t>& object) {
-    return isend(recvRank, tag, std::vector<uint8_t>(std::move(object)));
+    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(std::move(object))), recvRank, tag);
 }
 int MyMpi::isend(int recvRank, int tag, const DataPtr& object) {
     return _msg_queue->send(object, recvRank, tag);
+}
+int MyMpi::isendCopy(int recvRank, int tag, const std::vector<uint8_t>& object) {
+    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(object)), recvRank, tag);
 }
 
 MPI_Request MyMpi::iallreduce(MPI_Comm communicator, float* contribution, float* result, MPI_Op operation) {
