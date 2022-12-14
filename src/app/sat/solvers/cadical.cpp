@@ -35,9 +35,7 @@ Cadical::Cadical(const SolverSetup& setup)
 			abort();
 		}
 		std::string logdir = setup.proofDir;
-		// length of the directory + space for filename
-		char *filename_alone = new char [20];
-		sprintf(filename_alone, "proof.%d.lrat", setup.globalId + 1);
+		std::string filename_alone = "proof." + std::to_string(setup.globalId + 1) + ".lrat";
 		// handle the joining string already being at the end
 		std::filesystem::path dir(logdir);
 		std::filesystem::path file(filename_alone);

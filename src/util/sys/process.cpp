@@ -192,7 +192,7 @@ void Process::writeTrace(long tid) {
             + " && kill -18 " + std::to_string(tid);
     // Execute GDB in separate thread to avoid self-tracing
     std::thread thread([&]() {
-        system(command.c_str());
+        (void) system(command.c_str());
     });
     // Wait for completion
     thread.join();
