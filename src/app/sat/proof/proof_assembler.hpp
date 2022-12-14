@@ -2,6 +2,7 @@
 #include "proof_instance.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
+#include "util/sys/fileutils.hpp"
 
 #include <stdlib.h>
 
@@ -247,6 +248,10 @@ private:
             std::string proofFilenameBase = _params.logDirectory() + "/proof#" 
                 + std::to_string(_job_id) + "/proof." + std::to_string(instanceId+1);
 
+            // if necessary, create directory for external memory disk files 
+            FileUtils::mkdir(_params.extMemDiskDirectory());
+
+            // create proof instance
             _proof_instances.emplace_back(
                 instanceId, numInstances, _num_original_clauses, proofFilenameBase + ".lrat", 
                 _success_epoch, _winning_instance, globalIdStarts,
