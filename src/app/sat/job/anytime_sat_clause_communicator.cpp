@@ -5,7 +5,6 @@
 #include "comm/mympi.hpp"
 #include "../sharing/filter/clause_filter.hpp"
 #include "util/sys/thread_pool.hpp"
-#include "app/sat/proof/merging/proof_merge_file_input.hpp"
 #include "clause_sharing_session.hpp"
 
 void advanceCollective(BaseSatJob* job, JobMessage& msg, int broadcastTag) {
@@ -29,25 +28,7 @@ void advanceCollective(BaseSatJob* job, JobMessage& msg, int broadcastTag) {
 
 void AnytimeSatClauseCommunicator::communicate() {
 
-    if (_file_merger) {
-        if (_file_merger->readyToMerge() && (!_params.interleaveProofMerging() || _proof_assembler->initialized())) {
-            if (_params.interleaveProofMerging()) 
-                _file_merger->setNumOriginalClauses(_proof_assembler->getNumOriginalClauses());
-            _file_merger->beginMerge();
-        } 
-        
-        if (_file_merger->beganMerging()) {
-            _file_merger->advance();
-            if (_file_merger->allProcessesFinished()) {
-                // Proof merging done!
-                if (!_done_assembling_proof && _job->getJobTree().isRoot()) {
-                    _reconstruction_time = _job->getAgeSinceActivation() - _solving_time;
-                    LOG(V2_INFO, "TIMING assembly %.3f\n", _reconstruction_time);
-                }
-                _done_assembling_proof = true;
-            }
-        }
-    }
+    if (_proof_producer) _proof_producer->advanceFileMerger();
 
     // inactive?
     if (!_suspended && _job->getState() != ACTIVE) {
@@ -80,7 +61,7 @@ void AnytimeSatClauseCommunicator::communicate() {
                 MyMpi::isend(_job->getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
             } else {
                 LOG(V3_VERB, "sharing enabled\n");
-                if (!_proof_assembler.has_value() && !_msg_unsat_found.payload.empty()) {
+                if (!_proof_producer && !_msg_unsat_found.payload.empty()) {
                     // A solver has already found UNSAT which was deferred then.
                     // Now the message can be processed properly
                     LOG(V3_VERB, "Now processing deferred UNSAT notification\n");
@@ -106,42 +87,7 @@ void AnytimeSatClauseCommunicator::communicate() {
     tryActivateDeferredSharingInitiation();
 
     // Distributed proof assembly methods
-    if (_proof_assembler.has_value()) {
-        
-        if ((!_proof_all_reduction.has_value() || !_proof_all_reduction->hasProducer()) 
-                && _proof_assembler->canEmitClauseIds()) {
-            // Export clause IDs via JobTreeAllReduction instance
-            auto clauseIds = _proof_assembler->emitClauseIds();
-            std::vector<int> clauseIdsIntVec((int*)clauseIds.data(), ((int*)clauseIds.data())+clauseIds.size()*2);
-            _proof_all_reduction->produce([&]() {return clauseIdsIntVec;});
-            LOG(V5_DEBG, "Emitted %i proof-relevant clause IDs\n", clauseIds.size());
-        }
-
-        if (_proof_all_reduction.has_value()) {
-            _proof_all_reduction->advance();
-            if (_proof_all_reduction->hasResult()) {
-                _proof_all_reduction_result = _proof_all_reduction->extractResult();
-                LOG(V5_DEBG, "Importing proof-relevant clause IDs\n");
-                _proof_assembler->importClauseIds(
-                    (LratClauseId*) _proof_all_reduction_result.data(), 
-                    _proof_all_reduction_result.size()/2
-                );
-                _proof_all_reduction.reset();
-                createNewProofAllReduction();
-            }
-        }
-
-        if (_proof_assembler->finished()) {
-
-            if (!_params.interleaveProofMerging()) {
-                setUpProofMerger(-1);
-                _file_merger->setNumOriginalClauses(_proof_assembler->getNumOriginalClauses());
-            }
-
-            _proof_all_reduction.reset();
-            _proof_assembler.reset();
-        }
-    }
+    if (_proof_producer) _proof_producer->advanceProofAssembly();
 
     // root: initiate sharing
     if (_job->getJobTree().isRoot() && tryInitiateSharing()) return;
@@ -216,7 +162,7 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
             return;
         }
 
-        if (_proof_assembler.has_value()) {
+        if (_proof_producer) {
             // Obsolete message
             LOG(V2_INFO, "Obsolete UNSAT notification - already assembling a proof\n");
             return;
@@ -229,8 +175,8 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         // since proof instance IDs are assigned that way!
         msg.payload.push_back(_params.numThreadsPerProcess());
         //msg.payload.push_back(_job->getNumThreads());
-        // vvv Advances in the next branch vvv
         forwardedInitiateProofMessage = true;
+        // vvv Advances in the next branch vvv
     }
     if (msg.tag == MSG_INITIATE_PROOF_COMBINATION) {
 
@@ -254,32 +200,26 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         }
 
         // Create _proof_assembler
-        if (!_proof_assembler.has_value()) {
-            int finalEpoch = msg.epoch;
-            int winningInstance = msg.payload[0];
-            unsigned long globalStartOfSuccessEpoch;
-            memcpy(&globalStartOfSuccessEpoch, msg.payload.data()+1, 2*sizeof(int));
-            int numWorkers = msg.payload[3];
-            int threadsPerWorker = msg.payload[4];
-            int thisWorkerIndex = _job->getJobTree().getIndex();
-            _proof_assembler.emplace(_params, _job->getId(), numWorkers, threadsPerWorker, thisWorkerIndex, 
-                finalEpoch, winningInstance, globalStartOfSuccessEpoch);
-            createNewProofAllReduction();
+        if (!_proof_producer) {
 
-            if (_params.interleaveProofMerging()) {
-                // # local instances is the ACTUAL # threads, not the original one.
-                _merge_connectors = setUpProofMerger(_job->getNumThreads());
-                _proof_assembler->startWithInterleavedMerging(&_merge_connectors);
-            } else {
-                _proof_assembler->start();
-            }
+            ProofProducer::ProofSetup setup;
+            setup.jobId = _job->getId();
+            setup.revision = _job->getRevision();
+            setup.finalEpoch = msg.epoch;
+            setup.numWorkers = msg.payload[3];
+            setup.threadsPerWorker = msg.payload[4];
+            setup.thisJobNumThreads = _job->getNumThreads();
+            setup.thisWorkerIndex = _job->getJobTree().getIndex();
+            setup.winningInstance = msg.payload[0];
+            memcpy(&setup.globalStartOfSuccessEpoch, msg.payload.data()+1, 2*sizeof(int));
+            setup.solvingTime = _solving_time;
+            setup.jobAgeSinceActivation = _job->getAgeSinceActivation();
+
+            _proof_producer.reset(new ProofProducer(_params, setup, _job->getJobTree()));
         }
     }
     if (msg.tag == MSG_ALLREDUCE_PROOF_RELEVANT_CLAUSES) {
-        LOG(V5_DEBG, "Receiving %i proof-relevant clause IDs from epoch %i\n", msg.payload.size()/2, msg.epoch);
-        assert(_proof_all_reduction.has_value());
-        _proof_all_reduction->receive(source, mpiTag, msg);
-        _proof_all_reduction->advance();
+        _proof_producer->handle(source, mpiTag, msg);
     }
 
     // Initial signal to initiate a sharing epoch
@@ -342,31 +282,13 @@ void AnytimeSatClauseCommunicator::tryActivateDeferredSharingInitiation() {
     initiateClauseSharing(msg);
 }
 
-void AnytimeSatClauseCommunicator::createNewProofAllReduction() {
-    assert(!_proof_all_reduction.has_value());
-    JobMessage baseMsg(_job->getId(), _job->getRevision(), _proof_assembler->getEpoch(), MSG_ALLREDUCE_PROOF_RELEVANT_CLAUSES);
-    _proof_all_reduction.emplace(_job->getJobTree(), baseMsg, std::vector<int>(), [&](auto& list) {
-        
-        std::list<std::pair<LratClauseId*, size_t>> idArrays;
-        for (auto& vec : list) {
-            idArrays.emplace_back((LratClauseId*) vec.data(), vec.size() / 2);
-        }
-
-        auto longVecResult = _proof_assembler->mergeClauseIdVectors(idArrays);
-        int* intResultData = (int*) longVecResult.data();
-
-        std::vector<int> result(intResultData, intResultData + longVecResult.size()*2);
-        return result;
-    });
-}
-
 void AnytimeSatClauseCommunicator::feedHistoryIntoSolver() {
     if (_use_cls_history) _cls_history.feedHistoryIntoSolver();
 }
 
 bool AnytimeSatClauseCommunicator::tryInitiateSharing() {
 
-    if (_proof_assembler.has_value() || _file_merger || !_sent_ready_msg) return false;
+    if (_proof_producer || !_sent_ready_msg) return false;
 
     auto time = Timer::elapsedSecondsCached();
     bool nextEpochDue = time - _time_of_last_epoch_initiation >= _params.appCommPeriod();
@@ -396,45 +318,4 @@ bool AnytimeSatClauseCommunicator::tryInitiateSharing() {
 bool AnytimeSatClauseCommunicator::isDestructible() {
     for (auto& session : _sessions) if (!session.isDestructible()) return false;
     return true;
-}
-
-std::vector<ProofMergeConnector*> AnytimeSatClauseCommunicator::setUpProofMerger(int numLocalInstances) {
-    
-    std::vector<ProofMergeConnector*> connectors;
-
-    if (_params.interleaveProofMerging()) {
-
-        // Populate _local_merge_inputs with connectors
-        assert(numLocalInstances > 0);
-        for (size_t i = 0; i < numLocalInstances; i++) {
-            // Each of these will be connected to the output of a ProofInstance
-            connectors.push_back(new SPSCBlockingRingbuffer<SerializedLratLine>(32768));
-            _local_merge_inputs.emplace_back(connectors.back());
-        }
-        
-    } else {
-
-        // Populate _local_merge_inputs with local file inputs
-        auto proofFiles = _proof_assembler->getProofOutputFiles();
-        for (auto& proofFile : proofFiles) {
-            _local_merge_inputs.emplace_back(new ProofMergeFileInput(proofFile));
-        }
-    }
-
-    // Set up local merger: Merges together all local proof parts
-    std::vector<MergeSourceInterface<SerializedLratLine>*> ptrs;
-    for (auto& source : _local_merge_inputs) ptrs.push_back(source.get());
-    _local_merger.reset(new SmallMerger<SerializedLratLine>(ptrs));
-
-    // Set up distributed merge procedure
-    _file_merger.reset(new DistributedProofMerger(MPI_COMM_WORLD, /*branchingFactor=*/6, 
-        _local_merger.get(), _params.proofOutputFile()));
-
-    // Register callback for processing merge messages
-    MyMpi::getMessageQueue().registerCallback(MSG_ADVANCE_DISTRIBUTED_FILE_MERGE, [&](MessageHandle& h) {
-        MergeMessage msg; msg.deserialize(h.getRecvData());
-        _file_merger->handle(h.source, msg);
-    });
-
-    return connectors;
 }

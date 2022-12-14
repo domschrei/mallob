@@ -101,18 +101,6 @@ Use Mallob option `-mono=$PROBLEM_FILE` where `$PROBLEM_FILE` is the path and fi
 
 In this mode, all processes participate in solving, overhead is minimal, and Mallob terminates immediately after the job has been processed.
 
-### Options relevant for certified UNSAT
-
-* `-certified-unsat=1`: This option must be enabled to produce proofs.
-* `-distributed-proof-assembly=1`: Turn on distributed proof assembly. If turned off, the system will terminate after each solver has written its individual proof file.
-* `-log=<logdir>`: Important option since it also sets the base location for the proof files directory on each process.
-* `-mempanic=0`: Turn off memory panic. Essential for correct functionality of proof logging.
-* `-extmem-disk-dir=<disk-dir>`: Set the directory where virtual disk files should be placed. The disk where the specified directory lies is also the one which will be filled with the content of the external priority queues. Set this to a directory on the best performing disk which is available and still offers enough space.
-* `-proof-output-file=<proof-file>`: Specify the path and name of the final LRAT output file. This file is only output at rank zero.
-* `-remove-units-preprocessing=1`: Use CaDiCaL to preprocess the input, removing all units. This requires an executable of `cadical` in the subprocess dispatch path (see building options). **If this option is not enabled, the input must be an accordingly preprocessed file.**
-* `-interleave-proof-merging=1`: Interleave pruning and merging of proofs. This skips writing all the intermediate pruned proofs on disk and reading them after pruning again.
-* `-skip-clause-sharing-diagonally=0`: Disable the option which turns off clause sharing on some selected solvers. You can also leave it on (which corresponds to Mallob's competition configuration), but for testing it might be better if each proof is a distributed proof.
-
 ## Solve multiple instances in an orchestrated manner
 
 If you want to solve a fixed set of $n$ formulae or wish to evaluate Mallob's scheduling behavior with simulated jobs, follow these steps:

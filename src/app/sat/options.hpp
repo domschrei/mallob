@@ -60,7 +60,6 @@ OPTION_GROUP(grpAppSatHistory, "app/sat/history", "Clause history configuration 
     "Employ clause history collection mechanism")
 
 OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
- OPT_BOOL(removeUnitsPreprocessing,       "rup", "remove-units-preprocessing",         false,                   "Perform preprocessing on input removing units (requires cadical executable in Mallob's executable directory)")
  OPT_BOOL(certifiedUnsat,                 "cu", "certified-unsat",                     false,                   "Generate UNSAT proof (only supports mono mode + CaDiCaL solver)")
  OPT_BOOL(distributedProofAssembly,  "dpa", "distributed-proof-assembly",              false,                   "Distributed UNSAT proof assembly into a single file")
  OPT_BOOL(interleaveProofMerging,        "ipm", "interleave-proof-merging",            false,                   "Interleave filtering and merging of proof lines")

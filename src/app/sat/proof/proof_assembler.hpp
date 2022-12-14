@@ -1,6 +1,7 @@
 
 #include "proof_instance.hpp"
 #include "util/logger.hpp"
+#include "util/params.hpp"
 
 #include <stdlib.h>
 
