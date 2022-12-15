@@ -1,22 +1,36 @@
 #!/bin/bash
 
+if [ -z $1 ]; then
+    echo "Usage: $0 [--pipe|--force-proof-to-disk|--no-cleanup|--np <num-procs>] <cnf-input> [<mallob-options>]"
+fi
+
 # Parse arguments
 use_pipes=false
 force_proof_to_disk=false
+cleanup=true
+numprocs=2
+input_cnf=""
 fwd_args=""
-for arg in $@; do
+while [ x"$1" != x ]; do
+    arg="$1"
     if [ "$arg" == "--pipe" ]; then
         use_pipes=true
     elif [ "$arg" == "--force-proof-to-disk" ]; then
         force_proof_to_disk=true
+    elif [ "$arg" == "--no-cleanup" ]; then
+        cleanup=false
+    elif [ "$arg" == "--np" ]; then
+        shift 1
+        numprocs="$1"
+    elif [ -z "$input_cnf" ]; then
+        input_cnf="$arg"
     else
         echo "Forward arg $arg"
         fwd_args="${fwd_args} $arg"
     fi
+    shift 1
 done
 
-# Extract CNF input
-input_cnf=$(echo $fwd_args|awk '{print $1}')
 if [ -z "$input_cnf" ]; then
     echo "Provide a CNF file."
     exit 1
@@ -70,7 +84,7 @@ function preprocess() {
 # Inputs: p_preprocessor_output
 # Outputs: p_mallob_proof
 function run_mallob() {
-    exec_and_measure_time "mallob" mpirun -np 4 build/mallob -t=1 -mono=$p_preprocessor_output -log=test-$(date +%s) -mempanic=0 -v=3 -dpa -ipm -cu -pof=$p_mallob_proof -isp=0
+    exec_and_measure_time "mallob" mpirun -np 2 build/mallob -t=2 -mono=$p_preprocessor_output -log=certunsattest-$(date +%s) -mempanic=0 -v=3 -dpa -ipm -cu -pof=$p_mallob_proof $fwd_args
 }
 
 # Inputs: p_preprocess_proof
@@ -180,4 +194,7 @@ cat .timing.*
 echo "TIMING total $elapsed"
 
 # Clean up this run's temporary files
-#rm .*.pipe .mallob_result .timing.* 2>/dev/null
+if $cleanup; then 
+    rm .*.pipe .mallob_result .timing.* 2>/dev/null
+    rm -rf ./certunsattest-*/ 2>/dev/null
+fi

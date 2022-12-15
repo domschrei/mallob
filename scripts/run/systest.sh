@@ -99,6 +99,14 @@ function test_incremental_scheduling() {
     test 8 -t=1 -c=1 -satsolver=L${glucose}Ck -J=4 -incrementaltest $@
 }
 
+function test_certified_unsat() {
+    for pipearg in "" "--pipe"; do
+        test_cert_unsat 2 instances/r3sat_200.cnf $pipearg $@
+        test_cert_unsat 2 instances/r3unsat_200.cnf $pipearg $@
+        test_cert_unsat 2 instances/r3unsat_300.cnf $pipearg $@
+    done
+}
+
 
 if [ -z "$1" ]; then
     echo "No tests specified."
@@ -122,6 +130,7 @@ while [ ! -z "$1" ]; do
             test_incremental $progopts
             test_many_incremental $progopts
             test_incremental_scheduling $progopts
+            test_certified_unsat $progopts
             ;;
         mono)
             test_mono $progopts
@@ -143,6 +152,9 @@ while [ ! -z "$1" ]; do
             ;;
         manyinc)
             test_many_incremental $progopts
+            ;;
+        certunsat)
+            test_certified_unsat $progopts
             ;;
         -*)
             echo "Adding program option \"$arg\""

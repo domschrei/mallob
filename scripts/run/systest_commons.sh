@@ -3,6 +3,8 @@
 function cleanup() {
     set +e
     rm .api/jobs.0/*/*.json _systest _incremental_jobs-* /dev/shm/edu.kit.iti.mallob* 2> /dev/null
+    rm .*.pipe .mallob_result .timing.* 2>/dev/null
+    rm -rf ./certunsattest-*/ 2>/dev/null
     set -e
 }
 
@@ -68,6 +70,16 @@ function run() {
     fi
 }
 
+function run_cert_unsat() {
+    echo "[$testcount] certunsat -np $@"
+    np=$1
+    shift 1
+    bash scripts/run/run_certify_unsat.sh --no-cleanup --np $np $@ > _systest
+    if ! grep -q "s SATISFIABLE" _systest && ! grep -q "c VERIFIED" _systest; then
+        error "Not verified successfully!"
+    fi
+}
+
 function check() {
     echo "Checking ..."
     if grep -qi ERROR _systest ; then
@@ -106,6 +118,13 @@ function test() {
     echo "--------------------------------------------------------------------------------"
     run $@
     check $@
+    testcount=$((testcount+1))
+    if [ -z $nocleanup ]; then cleanup; fi
+}
+
+function test_cert_unsat() {
+    echo "--------------------------------------------------------------------------------"
+    run_cert_unsat $@
     testcount=$((testcount+1))
     if [ -z $nocleanup ]; then cleanup; fi
 }
