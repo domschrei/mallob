@@ -34,13 +34,8 @@ Cadical::Cadical(const SolverSetup& setup)
 				"Did you link to the correct CaDiCaL?\n");
 			abort();
 		}
-		std::string logdir = setup.proofDir;
-		std::string filename_alone = "proof." + std::to_string(setup.globalId + 1) + ".lrat";
-		// handle the joining string already being at the end
-		std::filesystem::path dir(logdir);
-		std::filesystem::path file(filename_alone);
-		std::filesystem::path full_path = dir / file;
-		solver->trace_proof(full_path.string().c_str());
+		proofFileString = setup.proofDir + "/proof." + std::to_string(setup.globalId + 1) + ".lrat";
+		solver->trace_proof(proofFileString.c_str());
 	}
 }
 
@@ -107,12 +102,13 @@ void Cadical::diversify(int seed) {
 		
 		// Simple LRAT-safe portfolio (5/10 solvers are diversified)
 		switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-		case 1: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); assert(okay); break;
+		case 1: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
 		case 3: okay = solver->set("phase", 0); break;
 		case 5: okay = solver->set("walk", 0); break;
 		case 7: okay = solver->set("restartint", 100); break;
 		case 9: okay = solver->set("inprocessing", 0); break;
 		}
+		assert(okay);
 		return;
 	}
 

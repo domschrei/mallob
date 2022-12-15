@@ -33,6 +33,8 @@ private:
 
 	bool seedSet = false;
 
+	std::string proofFileString;
+
 public:
 	Cadical(const SolverSetup& setup);
 	 ~Cadical();
