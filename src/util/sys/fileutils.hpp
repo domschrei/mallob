@@ -14,6 +14,7 @@ public:
     static int rm(const std::string& file);
     static int rmrf(const std::string& dir);
 
+    static bool exists(const std::string& file);
     static bool isRegularFile(const std::string& file);
     static bool isDirectory(const std::string& dirpath);
 

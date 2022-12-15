@@ -11,6 +11,11 @@
 
 #include "util/logger.hpp"
 
+bool FileUtils::exists(const std::string& file) {
+    struct stat sb;
+    return stat(file.c_str(), &sb) == 0;
+}
+
 bool FileUtils::isRegularFile(const std::string& file) {
     struct stat sb;
     return stat(file.c_str(), &sb) == 0 && S_ISREG(sb.st_mode);

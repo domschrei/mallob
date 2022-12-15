@@ -98,7 +98,7 @@ void Client::readIncomingJobs() {
             // Check if all job descriptions are already present
             bool jobDescriptionsPresent = true;
             for (auto& file : data.files) {
-                if (!FileUtils::isRegularFile(file)) {
+                if (!FileUtils::exists(file)) {
                     jobDescriptionsPresent = false;
                     break;
                 }
