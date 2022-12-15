@@ -108,6 +108,7 @@ int ForkedSatJob::appl_solved() {
     loadIncrements();
     if (_done_locally || _assembling_proof) {
         if (_assembling_proof && ((AnytimeSatClauseCommunicator*)_clause_comm)->isDoneAssemblingProof()) {
+            _assembling_proof = false;
             return _internal_result.result;
         }
         return result;
@@ -127,11 +128,13 @@ int ForkedSatJob::appl_solved() {
     auto status = _solver->check();
     if (status == SatProcessAdapter::FOUND_RESULT) {
         _internal_result = std::move(_solver->getSolution());
+        assert(_internal_result.hasSerialization());
         result = _internal_result.result;
         LOG_ADD_DEST(V2_INFO, "%s rev. %i : found result %s", getJobTree().getRootNodeRank(), toStr(), getRevision(), 
                             result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         _internal_result.id = getId();
         _internal_result.revision = getRevision();
+        _done_locally = true;
 
         if (ClauseMetadata::enabled() && result == RESULT_UNSAT
                 && _params.distributedProofAssembly()) {
@@ -150,8 +153,6 @@ int ForkedSatJob::appl_solved() {
             _assembling_proof = true;
             return -1;
         }
-
-        _done_locally = true;
 
     } else if (status == SatProcessAdapter::CRASHED) {
         // Subprocess crashed for whatever reason: try to recover
@@ -181,6 +182,7 @@ void ForkedSatJob::handleSolverCrash() {
 }
 
 JobResult&& ForkedSatJob::appl_getResult() {
+    assert(_internal_result.hasSerialization());
     return std::move(_internal_result);
 }
 

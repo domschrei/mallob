@@ -32,7 +32,7 @@ std::vector<uint8_t> JobResult::serialize() const {
 
 void JobResult::updateSerialization() {
     int i = 0, n;
-    assert(packedData.size() >= 3*sizeof(int) + sizeof(EncodedType));
+    assert(hasSerialization());
     n = sizeof(int); memcpy(packedData.data()+i, &id, n); i += n;
     n = sizeof(int); memcpy(packedData.data()+i, &result, n); i += n;
     n = sizeof(int); memcpy(packedData.data()+i, &revision, n); i += n;

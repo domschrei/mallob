@@ -26,7 +26,21 @@ public:
     JobResult() {}
     JobResult(std::vector<uint8_t>&& packedData);
 
-    int getTransferSize() const {return sizeof(int)*3 + sizeof(int)*solution.size();}
+    JobResult(JobResult&& other) {
+        *this = std::move(other);
+    }
+    JobResult& operator=(JobResult&& other) {
+        id = other.id;
+        revision = other.revision;
+        result = other.result;
+        encodedType = other.encodedType;
+        winningInstanceId = other.winningInstanceId;
+        globalStartOfSuccessEpoch = other.globalStartOfSuccessEpoch;
+        solution = std::move(other.solution);
+        packedData = std::move(other.packedData);
+        other.id = 0;
+        return *this;
+    }
 
     JobResult& deserialize(const std::vector<uint8_t>& packed) override;
 
@@ -37,6 +51,9 @@ public:
     void setSolution(std::vector<int>&& solution);
     void setSolutionToSerialize(const int* begin, size_t size);
 
+    bool hasSerialization() const {
+        return packedData.size() >= 3*sizeof(int) + sizeof(EncodedType);
+    }
     size_t getSolutionSize() const;
     inline int getSolution(size_t pos) const {
         assert(pos < getSolutionSize());

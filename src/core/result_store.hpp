@@ -14,6 +14,7 @@ public:
     void store(int jobId, int revision, JobResult&& result) {
         auto key = std::pair<int, int>(jobId, revision);
         _pending_results[key] = std::move(result);
+        assert(_pending_results[key].hasSerialization());
     }
 
     std::vector<uint8_t> retrieveSerialization(int jobId, int revision) {

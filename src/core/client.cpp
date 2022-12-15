@@ -540,13 +540,15 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     }
 
     if (_json_interface) {
+        JobResult* resultPtr = new JobResult(std::move(jobResult));
         auto fut = ProcessWideThreadPool::get().addTask(
             [interface = _json_interface.get(), 
-            result = std::move(jobResult), 
+            result = resultPtr, 
             stats = desc.getStatistics(),
             applicationId = desc.getApplicationId()]() mutable {
             
-            interface->handleJobDone(std::move(result), stats, applicationId);
+            interface->handleJobDone(std::move(*result), stats, applicationId);
+            delete result;
         });
         _done_job_futures.push_back(std::move(fut));
     }

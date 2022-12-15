@@ -195,6 +195,7 @@ JobResult& Job::getResult() {
     if (!_result.has_value()) _result = std::move(appl_getResult());
     JobResult& result = _result.value();
     assert(result.id >= 1);
+    assert(result.hasSerialization());
     return result;
 }
 
