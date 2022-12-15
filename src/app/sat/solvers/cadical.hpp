@@ -37,7 +37,6 @@ private:
 
 public:
 	Cadical(const SolverSetup& setup);
-	 ~Cadical();
 
 	// Add a (list of) permanent clause(s) to the formula
 	void addLiteral(int lit) override;

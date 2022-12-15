@@ -84,13 +84,14 @@ void Cadical::diversify(int seed) {
 
 		int solverRank = getSolverSetup().globalId;
 		int maxNumSolvers = getSolverSetup().maxNumSolvers;
-		LOGGER(_logger, V3_VERB, "Diversifying rank=%i size=%i DI=%i with certified UNSAT support\n", 
-			solverRank, maxNumSolvers, getDiversificationIndex());
 
-        	// Need to do +1 so we don't start at 0
+		// Need to do +1 so we don't start at 0
 		okay = solver->set("instance_num", solverRank + 1); assert(okay);
 		okay = solver->set("total_instances", maxNumSolvers); assert(okay);
-        	okay = solver->set("num_original_clauses", getSolverSetup().numOriginalClauses); assert(okay);
+		okay = solver->set("num_original_clauses", getSolverSetup().numOriginalClauses); assert(okay);
+
+		LOGGER(_logger, V3_VERB, "Diversifying rank=%i size=%i DI=%i #C=%ld with certified UNSAT support\n", 
+			solverRank, maxNumSolvers, getDiversificationIndex(), getSolverSetup().numOriginalClauses);
 
 		// Check that a version of CaDiCaL is used which has all the unsupported options switched off
 		auto requiredOptionsZero = {"elim", "decompose", "ternary", "vivify", "probe", "transred"};
@@ -234,8 +235,4 @@ void Cadical::writeStatistics(SolverStatistics& stats) {
 	stats.decisions = s.decisions;
 	stats.propagations = s.propagations;
 	stats.restarts = s.restarts;
-}
-
-Cadical::~Cadical() {
-	solver.release();
 }

@@ -2,6 +2,7 @@
 #include "engine.hpp"
 
 #include "../sharing/sharing_manager.hpp"
+#include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "data/app_configuration.hpp"
 #include "../solvers/cadical.hpp"
@@ -45,6 +46,11 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	// Launched in certified UNSAT mode?
     if (_params.certifiedUnsat()) {
 		
+		if (_params.inputShuffleProbability() > 0) {
+			LOG(V3_VERB, "Certified UNSAT mode: Disabling input shuffling\n");
+			_params.inputShuffleProbability.set(0);
+		}
+
 		// Override options
 		if (solverChoices != "c") {
 			LOG(V2_INFO, "Certified UNSAT mode: Overriding portfolio to non-incremental CaDiCaL only\n");
