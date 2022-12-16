@@ -74,7 +74,7 @@ function(new_test testname)
     add_executable(test_${testname} src/test/test_${testname}.cpp)
     target_include_directories(test_${testname} PRIVATE ${BASE_INCLUDES})
     target_compile_options(test_${testname} PRIVATE ${BASE_COMPILEFLAGS})
-    target_link_libraries(test_${testname} ${BASE_LIBS} mallob_commons)
+    target_link_libraries(test_${testname} mallob_commons)
     add_test(NAME test_${testname} COMMAND test_${testname})
 endfunction()
 
@@ -139,12 +139,12 @@ target_link_libraries(mallob_commons ${BASE_LIBS})
 add_executable(mallob src/core/client.cpp src/core/worker.cpp src/main.cpp)
 target_include_directories(mallob PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob PRIVATE ${BASE_COMPILEFLAGS})
-target_link_libraries(mallob ${BASE_LIBS} mallob_commons)
+target_link_libraries(mallob mallob_commons)
 
 add_executable(mallob_process_dispatcher src/app/sat/main_dispatch.cpp)
 target_include_directories(mallob_process_dispatcher PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_process_dispatcher PRIVATE ${BASE_COMPILEFLAGS})
-target_link_libraries(mallob_process_dispatcher ${BASE_LIBS} mallob_commons) 
+target_link_libraries(mallob_process_dispatcher mallob_commons)
 
 
 # Debug flags to find line numbers in stack traces etc.

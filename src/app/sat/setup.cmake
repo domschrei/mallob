@@ -39,7 +39,7 @@ endif()
 add_executable(mallob_sat_process ${SAT_SOURCES} src/app/sat/main.cpp)
 target_include_directories(mallob_sat_process PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_sat_process PRIVATE ${BASE_COMPILEFLAGS})
-target_link_libraries(mallob_sat_process ${BASE_LIBS} mallob_commons)
+target_link_libraries(mallob_sat_process mallob_commons)
 
 # Add unit tests
 new_test(sat_reader)
