@@ -166,7 +166,6 @@ public:
 
     std::vector<int> applyGlobalFilter(const std::vector<int>& filter, std::vector<int>& clauses);
 
-    void setAllStagesDone() {_all_stages_done = true;}
     bool allStagesDone() const {return _all_stages_done;}
 
     void cancel() {
@@ -183,6 +182,8 @@ public:
     }
 
 private:
+    void setAllStagesDone() {_all_stages_done = true;}
+
     std::vector<int> mergeClauseBuffersDuringAggregation(std::list<std::vector<int>>& elems) {
         int numAggregated = 0;
         for (auto& elem : elems) {

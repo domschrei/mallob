@@ -77,7 +77,9 @@ void AnytimeSatClauseCommunicator::communicate() {
     // clean up old sessions
     while (!_sessions.empty()) {
         auto& session = _sessions.front();
-        if (!session.allStagesDone() || !session.isDestructible()) break;
+        // session is in a deleteable state if it is finished or invalid
+        bool inDeleteableState = session.allStagesDone() || !session.isValid();
+        if (!inDeleteableState || !session.isDestructible()) break;
         // can be deleted
         _sessions.pop_front();
     }
