@@ -2,7 +2,7 @@
 
 function cleanup() {
     set +e
-    rm .api/jobs.0/*/*.json _systest _incremental_jobs-* /dev/shm/edu.kit.iti.mallob* 2> /dev/null
+    rm .api/jobs.0/*/*.json _systest .job-desc-template .client-template _incremental_jobs-* /dev/shm/edu.kit.iti.mallob* 2> /dev/null
     rm .*.pipe .mallob_result .timing.* 2>/dev/null
     rm -rf ./certunsattest-*/ 2>/dev/null
     set -e
@@ -11,6 +11,10 @@ function cleanup() {
 function error() {
     echo "ERROR: $@"
     exit 1
+}
+
+function print_separator() {
+    echo "--------------------------------------------------------------------------------"
 }
 
 function run_incremental() {
@@ -53,7 +57,7 @@ function run() {
     np=$1
     shift 1
     if echo "$@"|grep -q "incrementaltest"; then
-        RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob -pls=0 $@ 2>&1 > _systest &
+        RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob $@ 2>&1 > _systest &
         waitpids=$!
         for f in _incremental_jobs-* ; do
             run_incremental "$f" &
@@ -81,8 +85,7 @@ function run_cert_unsat() {
 }
 
 function check() {
-    echo "Checking ..."
-    if grep -qi ERROR _systest ; then
+    if grep -q ERROR _systest ; then
         error "An error occurred during the execution."
     fi
     if grep -q "assertresult=SAT" _systest && ! grep -q "found result SAT" _systest ; then
@@ -112,10 +115,15 @@ function check() {
     if [ '/dev/shm/edu.kit.iti.mallob*' != "$(echo /dev/shm/edu.kit.iti.mallob*)" ]; then
         error "Shared memory segment(s) not cleaned up: $(echo /dev/shm/edu.kit.iti.mallob*)"
     fi
+    # Report sysstate
+    grep -oE "sysstate busyratio=[0-9\.]+" _systest|grep -oE "[0-9\.]+" \
+    |awk 'BEGIN {nsubopt=0; nconssubopt=0; maxcons=0} $1 < 1 {nsubopt+=1; nconssubopt+=1} $1 >= 1 {maxcons=maxcons<nconssubopt?nconssubopt:maxcons; nconssubopt=0} {sum+=$1} END {printf("%i/%i subopt. loads (max. %i consecutively), avg. load %.3f; ", nsubopt, NR, maxcons, sum==0?1:sum/NR)}'
+    # Report solved jobs
+    grep -oE "(TIMEOUT|SOLUTION) #" _systest|awk '$1 == "TIMEOUT" {timeouts+=1} $1 == "SOLUTION" {solved+=1} END {printf("%i solved, %i timeouts\n", solved, timeouts)}'
 }
 
 function test() {
-    echo "--------------------------------------------------------------------------------"
+    print_separator
     run $@
     check $@
     testcount=$((testcount+1))
@@ -123,8 +131,9 @@ function test() {
 }
 
 function test_cert_unsat() {
-    echo "--------------------------------------------------------------------------------"
+    print_separator
     run_cert_unsat $@
+    check $@
     testcount=$((testcount+1))
     if [ -z $nocleanup ]; then cleanup; fi
 }
@@ -177,6 +186,7 @@ function introduce_incremental_job() {
 
 export -f cleanup
 export -f error
+export -f print_separator
 export -f run_incremental
 export -f run 
 export -f check
