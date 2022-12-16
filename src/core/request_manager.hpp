@@ -140,7 +140,8 @@ public:
 
         // If hopped enough for collective assignment to be enabled
         // and if either reactivation scheduling is employed or the requested node is non-root
-        if (_req_matcher && (num >= _params.hopsUntilCollectiveAssignment())
+        auto huca = _params.hopsUntilCollectiveAssignment();
+        if (_req_matcher && (huca < 0 || num >= huca)
             && (_params.reactivationScheduling() || request.requestedNodeIndex > 0)) {
 
             request.triggerAndDestroyMultiplicityData();

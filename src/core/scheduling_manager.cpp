@@ -118,8 +118,6 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
 
 RequestMatcher* SchedulingManager::createRequestMatcher() {
 
-    if (_params.hopsUntilCollectiveAssignment() < 0) 
-        return (RequestMatcher*) nullptr;
     auto cbReceiveRequest = [&](const JobRequest& req, int rank) {
         MessageHandle handle;
         handle.tag = MSG_REQUEST_NODE;
@@ -129,11 +127,12 @@ RequestMatcher* SchedulingManager::createRequestMatcher() {
     if (_params.prefixSumMatching()) {
         // Prefix sum based request matcher
         return new PrefixSumRequestMatcher(_job_registry, _comm, cbReceiveRequest);
-    } else {
+    } else if (_params.hopsUntilCollectiveAssignment() >= 0) {
         return new RoutingTreeRequestMatcher(
             _job_registry, _comm, _routing_tree, cbReceiveRequest
         );
     }
+    return (RequestMatcher*) nullptr;
 }
 
 void SchedulingManager::execute(Job& job, int source) {
@@ -235,7 +234,7 @@ void SchedulingManager::advanceBalancing() {
     _balancer.advance();
 
     // Advance collective assignment of nodes
-    if (_params.hopsUntilCollectiveAssignment() >= 0) {
+    if (_req_matcher) {
         _req_matcher->advance(getGlobalBalancingEpoch());
     }
 }
