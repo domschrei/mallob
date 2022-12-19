@@ -64,6 +64,6 @@ OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_BOOL(distributedProofAssembly,  "dpa", "distributed-proof-assembly",              false,                   "Distributed UNSAT proof assembly into a single file")
  OPT_BOOL(interleaveProofMerging,        "ipm", "interleave-proof-merging",            false,                   "Interleave filtering and merging of proof lines")
  OPT_STRING(proofOutputFile,              "pof", "proof-output-file",                  "final-proof.lrat",      "Path and name of final LRAT proof file, output by rank zero")
- OPT_STRING(extMemDiskDirectory,          "extmem-disk-dir", "",                       ".disk",                 "Directory where to create external memory files")
- OPT_STRING(satPreprocessor,              "sat-preprocessor", "",                      "",                      "Executable which preprocesses CNF file")
+ OPT_STRING(extMemDiskDirectory,          "extmem-disk-dir", "",                       ".disk",                 "Directory where to create external memory files") //[[AUTOCOMPLETE_DIRECTORY]]
+ OPT_STRING(satPreprocessor,              "sat-preprocessor", "",                      "",                      "Executable which preprocesses CNF file") //[[AUTOCOMPLETE_EXECUTABLE]]
  OPT_FLOAT(satSolvingWallclockLimit,      "sswl", "sat-solving-wallclock-limit",       0,    0, LARGE_INT,      "Cancel job if not done solving after this many seconds (0: no limit)")

@@ -18,7 +18,7 @@ GroupedOptionsList _grouped_list;
 
 OPTION_GROUP(grpGeneral, "general", "General")
  OPT_BOOL(help,                           "h", "help",                                 false,                   "Print help and exit")
- OPT_STRING(monoFilename,                 "mono", "",                                  "",                      "Mono instance: Solve the provided CNF instance with full power, then exit")
+ OPT_STRING(monoFilename,                 "mono", "",                                  "",                      "Mono instance: Solve the provided CNF instance with full power, then exit") //[[AUTOCOMPLETE_FILE]]
  OPT_STRING(monoApplication,              "mono-app", "mono-application",              "SAT",                   "Application assumed for mono mode")
  OPT_INT(numJobs,                         "J", "jobs",                                 0,    0, LARGE_INT,      "Exit as soon as this number of jobs has been processed (set to 1 if -mono is used)")
  OPT_INT(seed,                            "seed", "",                                  0,    0, MAX_INT,        "Random seed")
@@ -32,11 +32,11 @@ OPTION_GROUP(grpGeneral, "general", "General")
 
 OPTION_GROUP(grpInterface, "interface", "Interface")
  OPT_INT(activeJobsPerClient,             "ajpc", "active-jobs-per-client",            0,         0, LARGE_INT, "Make each client have up to this many active jobs at any given time")
- OPT_STRING(clientTemplate,               "client-template", "",                       "",                      "JSON template file which each client uses to decide on job parameters (with -job-template option)")
+ OPT_STRING(clientTemplate,               "client-template", "",                       "",                      "JSON template file which each client uses to decide on job parameters (with -job-template option)") //[[AUTOCOMPLETE_FILE]]
  OPT_INT(firstApiIndex,                   "fapii", "first-api-index",                  0,    0, LARGE_INT,      "1st API index: with c clients, uses .api/jobs.{<index>..<index>+c-1}/ as directories")
  OPT_BOOL(inotify,                        "inotify", "",                               true,                    "Use inotify for filesystem interface (otherwise, use naive directory polling)")
- OPT_STRING(jobDescriptionTemplate,       "job-desc-template", "",                     "",                      "Plain text file, one file path per line, to use as job descriptions (with -job-template option)")
- OPT_STRING(jobTemplate,                  "job-template", "",                          "",                      "JSON template file which each client uses to instantiate jobs indeterminately")
+ OPT_STRING(jobDescriptionTemplate,       "job-desc-template", "",                     "",                      "Plain text file, one file path per line, to use as job descriptions (with -job-template option)") //[[AUTOCOMPLETE_FILE]]
+ OPT_STRING(jobTemplate,                  "job-template", "",                          "",                      "JSON template file which each client uses to instantiate jobs indeterminately") //[[AUTOCOMPLETE_FILE]]
  OPT_INT(loadedJobsPerClient,             "ljpc", "loaded-jobs-per-client",            32,   0, LARGE_INT,      "Limit for how many job descriptions each client is allowed to have loaded at the same time")
  OPT_INT(maxJobsPerStreamer,              "mjps", "max-jobs-per-streamer",             0,    0, LARGE_INT,      "Maximum number of jobs to introduce per streamer")
  OPT_BOOL(shuffleJobDescriptions,         "sjd", "shuffle-job-descriptions",           false,                   "Shuffle job descriptions given via -job-desc-template option")
@@ -48,7 +48,7 @@ OPTION_GROUP(grpInterface, "interface", "Interface")
 OPTION_GROUP(grpOutput, "output", "Output")
  OPT_BOOL(coloredOutput,                  "colors", "",                                false,                   "Colored terminal output based on messages' verbosity")
  OPT_BOOL(immediateFileFlush,             "iff", "immediate-file-flush",               false,                   "Flush log files after each line instead of buffering")
- OPT_STRING(logDirectory,                 "log", "log-directory",                      "",                      "Directory to save logs in")
+ OPT_STRING(logDirectory,                 "log", "log-directory",                      "",                      "Directory to save logs in") //[[AUTOCOMPLETE_DIRECTORY]]
  OPT_BOOL(omitSolution,                   "os", "omit-solution",                       false,                   "Do not output solution in mono mode of operation")
  OPT_BOOL(pipeLargeSolutions,             "pls", "pipe-large-solutions",               false,                   "Provide large solutions over a named pipe instead of directly writing them into the response JSON")
  OPT_BOOL(quiet,                          "q", "quiet",                                false,                   "Do not log to stdout besides critical information")
@@ -116,7 +116,7 @@ OPTION_GROUP(grpDebug, "debug", "Debugging")
  OPT_BOOL(monitorMpi,                     "mmpi", "monitor-mpi",                       false,                   "Launch an additional thread per process checking when the main thread is inside an MPI call")
  OPT_STRING(subprocessPrefix,             "subproc-prefix", "",                        "",                      "Execute subprocesses with this prefix (e.g., \"valgrind\")")
  OPT_FLOAT(sysstatePeriod,                "y", "sysstate-period",                      1,    0.1, 50,           "Period for aggregating and logging global system state")
- OPT_STRING(traceDirectory,               "trace-dir", "",                             ".",                     "Directory to write thread trace files to")
+ OPT_STRING(traceDirectory,               "trace-dir", "",                             ".",                     "Directory to write thread trace files to") //[[AUTOCOMPLETE_DIRECTORY]]
  OPT_BOOL(useChecksums,                   "checksums", "",                             false,                   "Compute and verify checksum for every job description transfer")
  OPT_BOOL(watchdog,                       "watchdog", "",                              true,                    "Employ watchdog threads to detect unresponsive program flow")
  OPT_INT(watchdogAbortMillis,             "wam", "watchdog-abort-millis",              10000, 1, MAX_INT,       "Interval (in milliseconds) after which an un-reset watchdog in a worker's main thread will invoke a crash")

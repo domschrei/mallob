@@ -59,6 +59,14 @@ We also provide a minimalistic Dockerfile using an Ubuntu 20.04 setup.
 Run `docker build .` in the base directory after setting up Docker on your machine.
 The final line of the output is the ID to run the container, e.g. by running `docker run -i -t <id> bash` and then executing Mallob interactively inside with the options of your choosing.
 
+## Bash Autocompletion
+
+Mallob now features bash auto-completion by pressing TAB. To enable this, execute this command from Mallob's base directory:
+
+  source scripts/run/autocomplete.sh
+
+From this directory you can now autocomplete program options by pressing TAB once or twice.
+
 <hr/>
 
 # Testing
