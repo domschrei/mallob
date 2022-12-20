@@ -17,46 +17,46 @@ struct SatSharedMemory {
     int desiredRevision;
 
     // Instructions parent->child
-    bool doBegin;
-    bool doExport;
-    bool doFilterImport;
-    bool doDigestImportWithFilter;
-    bool doDigestImportWithoutFilter;
-    bool doReturnClauses;
-    bool doDumpStats;
-    bool doStartNextRevision;
-    bool doTerminate;
-    bool doCrash;
+    bool doBegin {false};
+    bool doExport {false};
+    bool doFilterImport {false};
+    bool doDigestImportWithFilter {false};
+    bool doDigestImportWithoutFilter {false};
+    bool doReturnClauses {false};
+    bool doDumpStats {false};
+    bool doStartNextRevision {false};
+    bool doTerminate {false};
+    bool doCrash {false};
 
     // Responses child->parent
-    bool didExport;
-    bool didFilterImport;
-    bool didDigestImport;
-    bool didReturnClauses;
-    bool didDumpStats;
-    bool didStartNextRevision;
-    bool didTerminate;
+    bool didExport {false};
+    bool didFilterImport {false};
+    bool didDigestImport {false};
+    bool didReturnClauses {false};
+    bool didDumpStats {false};
+    bool didStartNextRevision {false};
+    bool didTerminate {false};
 
     // State alerts child->parent
-    bool isInitialized;
-    bool hasSolution;
-    SatResult result;
-    int solutionRevision;
-    int winningInstance;
+    bool isInitialized {false};
+    bool hasSolution {false};
+    SatResult result {UNKNOWN};
+    int solutionRevision {-1};
+    int winningInstance {-1};
     unsigned long globalStartOfSuccessEpoch;
     
     // Clause buffers: parent->child
     int exportBufferAllocatedSize;
-    int exportBufferMaxSize;
+    int exportBufferMaxSize {0};
     int importBufferMaxSize;
-    int importBufferSize;
+    int importBufferSize {0};
     int importBufferRevision;
     int importBufferEpoch;
     int returnedBufferSize;
     Checksum importChecksum;
     
     // Clause buffers: child->parent
-    int exportBufferTrueSize;
+    int exportBufferTrueSize {0};
     Checksum exportChecksum;
     int filterSize;
     int lastNumClausesToImport;
