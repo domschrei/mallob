@@ -252,16 +252,15 @@ bool ForkedSatJob::isInitialized() {
 }
 
 void ForkedSatJob::prepareSharing(int maxSize) {
-    if (!_initialized) return;
+    if (!_initialized || getState() != ACTIVE) return;
     _solver->collectClauses(maxSize);
 }
 bool ForkedSatJob::hasPreparedSharing() {
-    if (!_initialized) return true;
+    if (!_initialized || getState() != ACTIVE) return true;
     return _solver->hasCollectedClauses();
 }
 std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum) {
-    if (!_initialized || !_solver->hasCollectedClauses()) 
-        return std::vector<int>();
+    if (!_initialized) return std::vector<int>();
     return _solver->getCollectedClauses();
 }
 std::pair<int, int> ForkedSatJob::getLastAdmittedClauseShare() {
@@ -269,21 +268,21 @@ std::pair<int, int> ForkedSatJob::getLastAdmittedClauseShare() {
     return _solver->getLastAdmittedClauseShare();
 }
 
-void ForkedSatJob::filterSharing(std::vector<int>& clauses) {
+void ForkedSatJob::filterSharing(int epoch, std::vector<int>& clauses) {
     if (!_initialized) return;
-    _solver->filterClauses(clauses);
+    _solver->filterClauses(epoch, clauses);
 }
-bool ForkedSatJob::hasFilteredSharing() {
-    if (!_initialized) return false;
-    return _solver->hasFilteredClauses();
+bool ForkedSatJob::hasFilteredSharing(int epoch) {
+    if (!_initialized || getState() != ACTIVE) return true;
+    return _solver->hasFilteredClauses(epoch);
 }
-std::vector<int> ForkedSatJob::getLocalFilter() {
+std::vector<int> ForkedSatJob::getLocalFilter(int epoch) {
     if (!_initialized) return std::vector<int>(ClauseMetadata::numBytes(), 0);
-    return _solver->getLocalFilter();
+    return _solver->getLocalFilter(epoch);
 }
-void ForkedSatJob::applyFilter(std::vector<int>& filter) {
+void ForkedSatJob::applyFilter(int epoch, std::vector<int>& filter) {
     if (!_initialized) return;
-    _solver->applyFilter(filter);
+    _solver->applyFilter(epoch, filter);
 }
 
 void ForkedSatJob::digestSharingWithoutFilter(std::vector<int>& clauses) {

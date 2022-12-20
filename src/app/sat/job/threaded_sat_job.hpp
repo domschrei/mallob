@@ -73,10 +73,10 @@ public:
     std::vector<int> getPreparedClauses(Checksum& checksum) override;
     std::pair<int, int> getLastAdmittedClauseShare() override;
     
-    virtual void filterSharing(std::vector<int>& clauses) override;
-    virtual bool hasFilteredSharing() override;
-    virtual std::vector<int> getLocalFilter() override;
-    virtual void applyFilter(std::vector<int>& filter) override;
+    virtual void filterSharing(int epoch, std::vector<int>& clauses) override;
+    virtual bool hasFilteredSharing(int epoch) override;
+    virtual std::vector<int> getLocalFilter(int epoch) override;
+    virtual void applyFilter(int epoch, std::vector<int>& filter) override;
 
     virtual void digestSharingWithoutFilter(std::vector<int>& clauses) override;
     void returnClauses(std::vector<int>& clauses) override;

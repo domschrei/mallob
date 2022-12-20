@@ -35,53 +35,28 @@ void AnytimeSatClauseCommunicator::communicate() {
         // suspended!
         _suspended = true;
         if (_use_cls_history) _cls_history.onSuspend();
-        // cancel any active sessions, sending neutral element upwards
-        for (auto& session : _sessions) {
-            session.cancel();
-        }
-        return;
     }
     if (_suspended) {
         if (_job->getState() == ACTIVE) _suspended = false;
         else return;
     }
 
-    if (!_sent_ready_msg && _job->isInitialized()) {
-        int numExpectedReadyMsgs = 0;
-        if (2*_job->getIndex()+1 < _job->getGlobalNumWorkers()) 
-            numExpectedReadyMsgs++;
-        if (2*_job->getIndex()+2 < _job->getGlobalNumWorkers()) 
-            numExpectedReadyMsgs++;
+    // if doing certified UNSAT, advance the establishing communication
+    checkCertifiedUnsatReadyMsg();
 
-        if (numExpectedReadyMsgs == _num_ready_msgs_from_children) {
-            _sent_ready_msg = true;
-            if (!_job->getJobTree().isRoot()) {
-                LOG(V3_VERB, "sending comm ready msg\n");
-                JobMessage msg(_job->getId(), _job->getRevision(), 0, MSG_NOTIFY_READY_FOR_PROOF_SAFE_SHARING);
-                MyMpi::isend(_job->getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
-            } else {
-                LOG(V3_VERB, "sharing enabled\n");
-                if (!_proof_producer && !_msg_unsat_found.payload.empty()) {
-                    // A solver has already found UNSAT which was deferred then.
-                    // Now the message can be processed properly
-                    LOG(V3_VERB, "Now processing deferred UNSAT notification\n");
-                    MyMpi::isend(_job->getMyMpiRank(), MSG_SEND_APPLICATION_MESSAGE, _msg_unsat_found);
-                }
-            }
+    // Advance and/or clean up current clause sharing session
+    if (_current_session) {
+        _current_session->advanceSharing();
+        if (_current_session->isDone()) {
+            _cancelled_sessions.emplace_back(_current_session.release());
         }
     }
 
-    // no communication at all?
-    if (_params.appCommPeriod() <= 0) return;
-
     // clean up old sessions
-    while (!_sessions.empty()) {
-        auto& session = _sessions.front();
-        // session is in a deleteable state if it is finished or invalid
-        bool inDeleteableState = session.allStagesDone() || !session.isValid();
-        if (!inDeleteableState || !session.isDestructible()) break;
-        // can be deleted
-        _sessions.pop_front();
+    while (!_cancelled_sessions.empty()) {
+        auto& session = *_cancelled_sessions.front();
+        if (!session.isDestructible()) break;
+        _cancelled_sessions.pop_front();
     }
 
     // If a previous sharing initiation message has been deferred,
@@ -93,81 +68,58 @@ void AnytimeSatClauseCommunicator::communicate() {
 
     // root: initiate sharing
     if (_job->getJobTree().isRoot() && tryInitiateSharing()) return;
-
-    // any active sessions?
-    if (_sessions.empty()) return;
-
-    // Advance current sharing session
-    auto& session = currentSession();
-    if (session.isValid()) session.advanceSharing();
 }
 
 void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& msg) {
 
-    if (msg.jobId != _job->getId()) {
-        LOG_ADD_SRC(V1_WARN, "[WARN] %s : stray job message meant for #%i\n", source, _job->toStr(), msg.jobId);
-        return;
-    }
+    assert(msg.jobId == _job->getId());
+    if (handleClauseHistoryMessage(source, mpiTag, msg)) return;
+    if (handleProofProductionMessage(source, mpiTag, msg)) return;
+    if (handleClauseSharingMessage(source, mpiTag, msg)) return;
+    assert(log_return_false("[ERROR] Unexpected job message!\n"));
+}
 
-    if (msg.tag == MSG_NOTIFY_READY_FOR_PROOF_SAFE_SHARING) {
-        _num_ready_msgs_from_children++;
-        LOG(V3_VERB, "got comm ready msg (total:%i)\n", _num_ready_msgs_from_children);
-        return;
-    }
-
-    if (_job->getState() != ACTIVE) {
-        // Not active any more: return message to sender
-        if (!msg.returnedToSender) {
-            msg.returnedToSender = true;
-            MyMpi::isend(source, mpiTag, msg);
-        }
-        return;
-    }
+bool AnytimeSatClauseCommunicator::handleClauseHistoryMessage(int source, int mpiTag, JobMessage& msg) {
 
     if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_SEND_CLAUSES) {
         _cls_history.addEpoch(msg.epoch, msg.payload, /*entireIndex=*/true);
         _cls_history.sendNextBatches();
+        return true;
     }
-    if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_SUBSCRIBE)
+    if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_SUBSCRIBE) {
         _cls_history.onSubscribe(source, msg.payload[0], msg.payload[1]);
-    if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_UNSUBSCRIBE)
+        return true;
+    }
+    if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_UNSUBSCRIBE) {
         _cls_history.onUnsubscribe(source);
+        return true;
+    }
+    return false;
+}
 
-    // Process unsuccessful, returned messages
-    if (msg.returnedToSender) {
-        msg.returnedToSender = false;
-        if (msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
-            // Initiation signal hit an inactive (?) child:
-            // Pretend that it sent an empty set of clauses
-            msg.tag = MSG_ALLREDUCE_CLAUSES;
-            mpiTag = MSG_JOB_TREE_REDUCTION;
-            msg.payload.resize(1);
-            msg.payload[0] = 1; // num aggregated nodes
-        } else if (msg.tag == MSG_ALLREDUCE_CLAUSES && mpiTag == MSG_JOB_TREE_BROADCAST) {
-            // Distribution of clauses hit an inactive (?) child:
-            // Pretend that it sent an empty filter
-            msg.tag = MSG_ALLREDUCE_FILTER;
-            mpiTag = MSG_JOB_TREE_REDUCTION;
-            msg.payload.resize(ClauseMetadata::numBytes());
-            for (int& num : msg.payload) num = 0;
-        } else return;
+bool AnytimeSatClauseCommunicator::handleProofProductionMessage(int source, int mpiTag, JobMessage& msg) {
+
+    if (msg.tag == MSG_NOTIFY_READY_FOR_PROOF_SAFE_SHARING) {
+        _num_ready_msgs_from_children++;
+        LOG(V3_VERB, "got comm ready msg (total:%i)\n", _num_ready_msgs_from_children);
+        return true;
     }
 
     bool forwardedInitiateProofMessage = false;
     if (msg.tag == MSG_NOTIFY_UNSAT_FOUND) {
         assert(_job->getJobTree().isRoot());
         
-        if (!_sent_ready_msg) {
+        if (!_sent_cert_unsat_ready_msg) {
             // Job is not ready yet to reconstruct proofs.
             LOG(V2_INFO, "Deferring UNSAT notification since job is not yet ready\n");
             _msg_unsat_found = std::move(msg);
-            return;
+            return true;
         }
 
         if (_proof_producer) {
             // Obsolete message
             LOG(V2_INFO, "Obsolete UNSAT notification - already assembling a proof\n");
-            return;
+            return true;
         }
 
         // Initiate proof assembly
@@ -180,10 +132,11 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         forwardedInitiateProofMessage = true;
         // vvv Advances in the next branch vvv
     }
+
     if (msg.tag == MSG_INITIATE_PROOF_COMBINATION) {
 
         // Guarantee that the proof combination is not initiated more than once
-        if (_initiated_proof_assembly) return;
+        if (_initiated_proof_assembly) return true;
         _initiated_proof_assembly = true;
         _job->setSolvingDone();
 
@@ -201,55 +154,38 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
             MyMpi::isend(_job->getMyMpiRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
         }
 
-        // Create _proof_assembler
-        if (!_proof_producer) {
-
-            ProofProducer::ProofSetup setup;
-            setup.jobId = _job->getId();
-            setup.revision = _job->getRevision();
-            setup.finalEpoch = msg.epoch;
-            setup.numWorkers = msg.payload[3];
-            setup.threadsPerWorker = msg.payload[4];
-            setup.thisJobNumThreads = _job->getNumThreads();
-            setup.thisWorkerIndex = _job->getJobTree().getIndex();
-            setup.winningInstance = msg.payload[0];
-            memcpy(&setup.globalStartOfSuccessEpoch, msg.payload.data()+1, 2*sizeof(int));
-            setup.solvingTime = _solving_time;
-            setup.jobAgeSinceActivation = _job->getAgeSinceActivation();
-
-            _proof_producer.reset(new ProofProducer(_params, setup, _job->getJobTree()));
-        }
+        if (!_proof_producer) setupProofProducer(msg);
+        return true;
     }
+
     if (msg.tag == MSG_ALLREDUCE_PROOF_RELEVANT_CLAUSES) {
         _proof_producer->handle(source, mpiTag, msg);
+        return true;
     }
+
+    return false;
+}
+
+bool AnytimeSatClauseCommunicator::handleClauseSharingMessage(int source, int mpiTag, JobMessage& msg) {
 
     // Initial signal to initiate a sharing epoch
     if (msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
         initiateClauseSharing(msg);
-        return;
+        return true;
     }
 
     // Advance all-reductions
     bool success = false;
-    if (!_sessions.empty()) {
-        success = currentSession().advanceClauseAggregation(source, mpiTag, msg)
-                || currentSession().advanceFilterAggregation(source, mpiTag, msg);
+    if (_current_session) {
+        success = _current_session->advanceClauseAggregation(source, mpiTag, msg)
+                || _current_session->advanceFilterAggregation(source, mpiTag, msg);
     }
-    if (!success) {
-        // Special case where clauses are broadcast but message was not processed:
-        // Return an empty filter to the sender such that the sharing epoch may continue
-        if (msg.tag == MSG_ALLREDUCE_CLAUSES && mpiTag == MSG_JOB_TREE_BROADCAST) {
-            msg.payload.resize(ClauseMetadata::numBytes());
-            for (int& num : msg.payload) num = 0;
-            msg.tag = MSG_ALLREDUCE_FILTER;
-            MyMpi::isend(source, MSG_JOB_TREE_REDUCTION, msg);
-        }
-    }
+    return success;
 }
 
 void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg) {
-    if (!_sessions.empty() || !_deferred_sharing_initiation_msgs.empty()) {
+
+    if (_current_session || !_deferred_sharing_initiation_msgs.empty()) {
         // defer message until all past sessions are done
         // and all earlier deferred initiation messages have been processed
         LOG(V3_VERB, "%s : deferring CS initiation\n", _job->toStr());
@@ -261,11 +197,7 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg) {
     _current_epoch = msg.epoch;
     LOG(V5_DEBG, "%s : INIT COMM e=%i nc=%i\n", _job->toStr(), _current_epoch, 
         _job->getJobTree().getNumChildren());
-    _sessions.emplace_back(_params, _job, _cdb, _cls_history, _current_epoch);
-    if (!_job->hasPreparedSharing()) {
-        int limit = _job->getBufferLimit(1, MyMpi::SELF);
-        _job->prepareSharing(limit);
-    }
+    _current_session.reset(new ClauseSharingSession(_params, _job, _cdb, _cls_history, _current_epoch));
     advanceCollective(_job, msg, MSG_INITIATE_CLAUSE_SHARING);
 }
 
@@ -275,7 +207,7 @@ void AnytimeSatClauseCommunicator::tryActivateDeferredSharingInitiation() {
     if (_deferred_sharing_initiation_msgs.empty()) return;
 
     // cannot start new sharing if a session is still present
-    if (!_sessions.empty()) return;
+    if (_current_session) return;
 
     // sessions are empty -> WILL succeed to initiate sharing
     // -> initiation message CAN be deleted afterwards.
@@ -290,34 +222,81 @@ void AnytimeSatClauseCommunicator::feedHistoryIntoSolver() {
 
 bool AnytimeSatClauseCommunicator::tryInitiateSharing() {
 
-    if (_proof_producer || !_sent_ready_msg) return false;
+    if (_proof_producer || !_sent_cert_unsat_ready_msg) return false;
 
     auto time = Timer::elapsedSecondsCached();
     bool nextEpochDue = time - _time_of_last_epoch_initiation >= _params.appCommPeriod();
-    bool lastEpochDone = _sessions.empty() || currentSession().hasConcludedFiltering();
-    if (nextEpochDue && !lastEpochDone) {
-        LOG(V1_WARN, "[WARN] %s : Next epoch over-due!\n", _job->toStr());
-    }
-    if (nextEpochDue && lastEpochDone) {
-        _current_epoch++;
-        JobMessage msg(_job->getId(), _job->getRevision(), _current_epoch, MSG_INITIATE_CLAUSE_SHARING);
+    bool lastEpochDone = !_current_session;
+    if (!nextEpochDue) return false;
 
-        // Advance initiation time exactly by the specified period 
-        // in order to lose no time for the subsequent epoch
-        _time_of_last_epoch_initiation += _params.appCommPeriod();
-        // If an epoch has already been skipped, just set the initiation to the current time
-        if (time - _time_of_last_epoch_initiation >= _params.appCommPeriod())
-            _time_of_last_epoch_initiation = time;
-        
-        // Self message to initiate clause sharing
-        MyMpi::isend(_job->getJobTree().getRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
-        LOG(V4_VVER, "%s CS init\n", _job->toStr());
-        return true;
+    if (!lastEpochDone) {
+        LOG(V1_WARN, "[WARN] %s : Next epoch over-due!\n", _job->toStr());
+        return false;
     }
-    return false;
+
+    _current_epoch++;
+    JobMessage msg(_job->getId(), _job->getRevision(), _current_epoch, MSG_INITIATE_CLAUSE_SHARING);
+
+    // Advance initiation time exactly by the specified period 
+    // in order to lose no time for the subsequent epoch
+    _time_of_last_epoch_initiation += _params.appCommPeriod();
+    // If an epoch has already been skipped, just set the initiation to the current time
+    if (time - _time_of_last_epoch_initiation >= _params.appCommPeriod())
+        _time_of_last_epoch_initiation = time;
+
+    // Self message to initiate clause sharing
+    MyMpi::isend(_job->getJobTree().getRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+    LOG(V4_VVER, "%s CS init\n", _job->toStr());
+    return true;
 }
 
 bool AnytimeSatClauseCommunicator::isDestructible() {
-    for (auto& session : _sessions) if (!session.isDestructible()) return false;
+    if (_current_session) return false;
+    for (auto& session : _cancelled_sessions) if (!session->isDestructible()) return false;
     return true;
+}
+
+void AnytimeSatClauseCommunicator::checkCertifiedUnsatReadyMsg() {
+
+    if (_sent_cert_unsat_ready_msg || !_job->isInitialized()) return;
+
+    int numExpectedReadyMsgs = 0;
+    if (2*_job->getIndex()+1 < _job->getGlobalNumWorkers())
+        numExpectedReadyMsgs++;
+    if (2*_job->getIndex()+2 < _job->getGlobalNumWorkers())
+        numExpectedReadyMsgs++;
+    if (numExpectedReadyMsgs < _num_ready_msgs_from_children) return;
+
+    _sent_cert_unsat_ready_msg = true;
+    if (!_job->getJobTree().isRoot()) {
+        LOG(V3_VERB, "sending comm ready msg\n");
+        JobMessage msg(_job->getId(), _job->getRevision(), 0, MSG_NOTIFY_READY_FOR_PROOF_SAFE_SHARING);
+        MyMpi::isend(_job->getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+    } else {
+        LOG(V3_VERB, "sharing enabled\n");
+        if (!_proof_producer && !_msg_unsat_found.payload.empty()) {
+            // A solver has already found UNSAT which was deferred then.
+            // Now the message can be processed properly
+            LOG(V3_VERB, "Now processing deferred UNSAT notification\n");
+            MyMpi::isend(_job->getMyMpiRank(), MSG_SEND_APPLICATION_MESSAGE, _msg_unsat_found);
+        }
+    }
+}
+
+void AnytimeSatClauseCommunicator::setupProofProducer(JobMessage& msg) {
+
+    ProofProducer::ProofSetup setup;
+    setup.jobId = _job->getId();
+    setup.revision = _job->getRevision();
+    setup.finalEpoch = msg.epoch;
+    setup.numWorkers = msg.payload[3];
+    setup.threadsPerWorker = msg.payload[4];
+    setup.thisJobNumThreads = _job->getNumThreads();
+    setup.thisWorkerIndex = _job->getJobTree().getIndex();
+    setup.winningInstance = msg.payload[0];
+    memcpy(&setup.globalStartOfSuccessEpoch, msg.payload.data()+1, 2*sizeof(int));
+    setup.solvingTime = _solving_time;
+    setup.jobAgeSinceActivation = _job->getAgeSinceActivation();
+
+    _proof_producer.reset(new ProofProducer(_params, setup, _job->getJobTree()));
 }

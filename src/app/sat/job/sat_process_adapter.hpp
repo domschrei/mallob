@@ -5,6 +5,7 @@
 #include <future>
 
 #include "util/logger.hpp"
+#include "util/robin_hood.hpp"
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
 #include "../execution/solving_state.hpp"
@@ -73,10 +74,14 @@ private:
     int* _import_buffer;
     int* _filter_buffer;
     int* _returned_buffer;
-    enum BufferTask {FILTER_CLAUSES, APPLY_FILTER, DIGEST_WITHOUT_FILTER};
-    std::list<std::pair<std::vector<int>, BufferTask>> _pending_tasks;
-    std::list<std::vector<int>> _temp_returned_clauses;
+    struct BufferTask {
+        enum Type {FILTER_CLAUSES, APPLY_FILTER, DIGEST_CLAUSES_WITHOUT_FILTER, RETURN_CLAUSES} type;
+        std::vector<int> payload;
+        int epoch;
+    };
+    std::list<BufferTask> _pending_tasks;
     std::pair<int, int> _last_admitted_clause_share;
+    robin_hood::unordered_flat_set<int> _epochs_to_filter;
 
     pid_t _child_pid = -1;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
@@ -118,11 +123,11 @@ public:
     std::vector<int> getCollectedClauses();
     std::pair<int, int> getLastAdmittedClauseShare();
 
-    void filterClauses(const std::vector<int>& clauses);
-    bool hasFilteredClauses();
-    std::vector<int> getLocalFilter();
+    void filterClauses(int epoch, const std::vector<int>& clauses);
+    bool hasFilteredClauses(int epoch);
+    std::vector<int> getLocalFilter(int epoch);
+    void applyFilter(int epoch, const std::vector<int>& filter);
 
-    void applyFilter(const std::vector<int>& filter);
     void digestClausesWithoutFilter(const std::vector<int>& clauses);
     void returnClauses(const std::vector<int>& clauses);
 
@@ -140,10 +145,10 @@ private:
     void doWriteRevisions();
     void doPrepareSolution();
 
-    bool process(const std::vector<int>& clauses, BufferTask task);
+    void tryProcessNextTasks();
+    bool process(BufferTask& task);
     
     void applySolvingState();
-    void doReturnClauses(const std::vector<int>& clauses);
     void initSharedMemory(SatProcessConfig&& config);
     void* createSharedMemoryBlock(std::string shmemSubId, size_t size, void* data);
 

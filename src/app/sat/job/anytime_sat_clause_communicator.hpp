@@ -30,14 +30,15 @@ private:
     AdaptiveClauseDatabase _cdb;
     ClauseHistory _cls_history;
 
-    std::list<ClauseSharingSession> _sessions;
+    std::unique_ptr<ClauseSharingSession> _current_session;
+    std::list<std::unique_ptr<ClauseSharingSession>> _cancelled_sessions;
 
     int _current_epoch = 0;
     float _time_of_last_epoch_initiation = 0;
 
     float _solving_time = 0;
 
-    bool _sent_ready_msg;
+    bool _sent_cert_unsat_ready_msg;
     int _num_ready_msgs_from_children = 0;
 
     JobMessage _msg_unsat_found;
@@ -60,13 +61,9 @@ public:
             return setup;
         }()),
         _cls_history(_params, _job->getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job, _cdb),
-        _sent_ready_msg(!ClauseMetadata::enabled()) {
+        _sent_cert_unsat_ready_msg(!ClauseMetadata::enabled()) {
 
         _time_of_last_epoch_initiation = Timer::elapsedSecondsCached();
-    }
-
-    ~AnytimeSatClauseCommunicator() {
-        _sessions.clear();
     }
 
     void communicate();
@@ -80,12 +77,16 @@ public:
     bool isDoneAssemblingProof() const {return _proof_producer && _proof_producer->isDoneAssemblingProof();}
 
 private:
+    bool handleClauseHistoryMessage(int source, int mpiTag, JobMessage& msg);
+    bool handleProofProductionMessage(int source, int mpiTag, JobMessage& msg);
+    bool handleClauseSharingMessage(int source, int mpiTag, JobMessage& msg);
 
     void addToClauseHistory(std::vector<int>& clauses, int epoch);
 
     void initiateClauseSharing(JobMessage& msg);
     void tryActivateDeferredSharingInitiation();
     
+    void checkCertifiedUnsatReadyMsg();
+    void setupProofProducer(JobMessage& msg);
     bool tryInitiateSharing();
-    inline ClauseSharingSession& currentSession() {return _sessions.back();}
 };

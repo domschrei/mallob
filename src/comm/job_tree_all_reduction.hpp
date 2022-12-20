@@ -22,6 +22,7 @@ private:
     int _num_expected_child_elems;
     IntPair _expected_child_ranks;
     std::pair<bool, bool> _received_child_elems;
+    int _parent_rank;
 
     bool _aggregating = false;
     std::future<void> _future_aggregate;
@@ -47,6 +48,7 @@ public:
         int rightRank = _tree.hasRightChild() ? _tree.getRightChildNodeRank() : -1;
         _expected_child_ranks = IntPair(leftRank, rightRank);
         _received_child_elems = std::pair<bool, bool>(false, false);
+        _parent_rank = _tree.getParentNodeRank();
     }
 
     // Set the function to compute the local contribution for the all-reduction.
@@ -107,9 +109,9 @@ public:
 
     // Advances the all-reduction, e.g., because the local producer finished
     // or the aggregation function finished. No-op if getResult() was already called.
-    void advance() {
+    JobTreeAllReduction& advance() {
 
-        if (_finished) return;
+        if (_finished) return *this;
 
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
 
@@ -143,9 +145,11 @@ public:
             } else {
                 // Send to parent
                 _base_msg.payload = std::move(_aggregated_elem.value());
-                MyMpi::isend(_tree.getParentNodeRank(), MSG_JOB_TREE_REDUCTION, _base_msg);
+                MyMpi::isend(_parent_rank, MSG_JOB_TREE_REDUCTION, _base_msg);
             }
         }
+
+        return *this;
     }
 
     void cancel() {
@@ -155,7 +159,7 @@ public:
         if (!_reduction_locally_done) {
             // Aggregation upwards was not performed yet: Send neutral element upwards
             _base_msg.payload = _neutral_elem;
-            MyMpi::isend(_tree.getParentNodeRank(), MSG_JOB_TREE_REDUCTION, _base_msg);
+            MyMpi::isend(_parent_rank, MSG_JOB_TREE_REDUCTION, _base_msg);
         }
         // finished but not valid
         _finished = true;

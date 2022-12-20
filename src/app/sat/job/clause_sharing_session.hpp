@@ -17,6 +17,14 @@ private:
     AdaptiveClauseDatabase& _cdb;
     ClauseHistory& _cls_history;
     int _epoch;
+    enum Stage {
+        PRODUCING_CLAUSES,
+        AGGREGATING_CLAUSES,
+        PRODUCING_FILTER,
+        AGGREGATING_FILTER,
+        DONE,
+        CANCELLED
+    } _stage {PRODUCING_CLAUSES};
 
     std::vector<int> _excess_clauses_from_merge;
     std::vector<int> _broadcast_clause_buffer;
@@ -25,9 +33,6 @@ private:
 
     JobTreeAllReduction _allreduce_clauses;
     JobTreeAllReduction _allreduce_filter;
-    bool _filtering = false;
-    bool _concluded_filtering = false;
-    bool _all_stages_done = false;
 
     float _compensation_decay {0.6};
 
@@ -56,16 +61,19 @@ public:
             [&](std::list<std::vector<int>>& elems) {
                 return mergeFiltersDuringAggregation(elems);
             }
-        ) { }
+        ) {
 
-    ~ClauseSharingSession() {
-        _allreduce_clauses.destroy();
-        _allreduce_filter.destroy();
+        if (!_job->hasPreparedSharing()) {
+            int limit = _job->getBufferLimit(1, MyMpi::SELF);
+            _job->prepareSharing(limit);
+        }
     }
 
     void advanceSharing() {
 
-        if (!_allreduce_clauses.hasProducer() && _job->hasPreparedSharing()) {
+        if (_stage == CANCELLED) return;
+
+        if (_stage == PRODUCING_CLAUSES && _job->hasPreparedSharing()) {
 
             // Produce contribution to all-reduction of clauses
             LOG(V4_VVER, "%s CS produce cls\n", _job->toStr());
@@ -77,29 +85,12 @@ public:
             });
         
             // Calculate new sharing compensation factor from last sharing statistics
-            auto [nbAdmitted, nbBroadcast] = _job->getLastAdmittedClauseShare();
-            float admittedRatio = nbBroadcast == 0 ? 1 : ((float)nbAdmitted) / nbBroadcast;
-            admittedRatio = std::max(0.01f, admittedRatio);
-            float newCompensationFactor = std::max(1.f, std::min(
-                (float)_params.clauseHistoryAggregationFactor(), 1.f/admittedRatio
-            ));
-            float compensationFactor = _job->getCompensationFactor();
-            compensationFactor = _compensation_decay * compensationFactor + (1-_compensation_decay) * newCompensationFactor;
-            _job->setSharingCompensationFactor(compensationFactor);
-            if (_job->getJobTree().isRoot()) {
-                LOG(V3_VERB, "%s CS last sharing: %i/%i globally passed ~> c=%.3f\n", _job->toStr(), 
-                    nbAdmitted, nbBroadcast, compensationFactor);       
-            }
-        
-        } else if (!_allreduce_clauses.hasProducer()) {
-            // No sharing prepared yet: Retry
-            _job->prepareSharing(_job->getBufferLimit(1, MyMpi::SELF));
+            updateSharingCompensationFactor();
+
+            _stage = AGGREGATING_CLAUSES;
         }
 
-        _allreduce_clauses.advance();
-
-        // All-reduction of clauses finished?
-        if (_allreduce_clauses.hasResult()) {
+        if (_stage == AGGREGATING_CLAUSES && _allreduce_clauses.advance().hasResult()) {
 
             LOG(V4_VVER, "%s CS filter\n", _job->toStr());
 
@@ -114,44 +105,39 @@ public:
             _broadcast_clause_buffer = _allreduce_clauses.extractResult();
 
             // Initiate production of local filter element for 2nd all-reduction 
-            _job->filterSharing(_broadcast_clause_buffer);
+            _job->filterSharing(_epoch, _broadcast_clause_buffer);
+            _stage = PRODUCING_FILTER;
         }
 
-        // Supply calculated local filter to the 2nd all-reduction
-        if (!_allreduce_filter.hasProducer() && _job->hasFilteredSharing()) {
+        if (_stage == PRODUCING_FILTER && _job->hasFilteredSharing(_epoch)) {
+
             LOG(V4_VVER, "%s CS produce filter\n", _job->toStr());
-            _allreduce_filter.produce([&]() {return _job->getLocalFilter();});
+            _allreduce_filter.produce([&]() {return _job->getLocalFilter(_epoch);});
+            _stage = AGGREGATING_FILTER;
         }
 
-        // Advance all-reduction of filter
-        _allreduce_filter.advance();
+        if (_stage == AGGREGATING_FILTER && _allreduce_filter.advance().hasResult()) {
 
-        // All-reduction of clause filter finished?
-        if (_allreduce_filter.hasResult()) {
-            
             LOG(V4_VVER, "%s CS apply filter\n", _job->toStr());
 
             // Extract and digest result
             auto filter = _allreduce_filter.extractResult();
-            _job->applyFilter(filter);
+            _job->applyFilter(_epoch, filter);
             if (_params.collectClauseHistory()) {
                 auto filteredClauses = applyGlobalFilter(filter, _broadcast_clause_buffer);
                 addToClauseHistory(filteredClauses, _epoch);
             }
 
             // Conclude this sharing epoch
-            _concluded_filtering = true;
-            setAllStagesDone();
+            _stage = DONE;
         }
     }
-
-    bool hasConcludedFiltering() const {return _concluded_filtering;}
 
     bool advanceClauseAggregation(int source, int mpiTag, JobMessage& msg) {
         bool success = false;
         if (msg.tag == MSG_ALLREDUCE_CLAUSES && _allreduce_clauses.isValid()) {
             success = _allreduce_clauses.receive(source, mpiTag, msg);
-            _allreduce_clauses.advance();
+            advanceSharing();
         }
         return success;
     }
@@ -159,31 +145,34 @@ public:
         bool success = false;
         if (msg.tag == MSG_ALLREDUCE_FILTER && _allreduce_filter.isValid()) {
             success = _allreduce_filter.receive(source, mpiTag, msg);
-            _allreduce_filter.advance();
+            advanceSharing();
         }
         return success;
     }
 
-    std::vector<int> applyGlobalFilter(const std::vector<int>& filter, std::vector<int>& clauses);
-
-    bool allStagesDone() const {return _all_stages_done;}
-
-    void cancel() {
-        _allreduce_clauses.cancel();
-        _allreduce_filter.cancel();
+    bool isDone() const {
+        return _stage == DONE;
     }
 
-    bool isValid() const {
-        return _allreduce_clauses.isValid() || _allreduce_filter.isValid();
+    void cancel() {
+        // If not done producing, will send empty clause buffer upwards
+        _allreduce_clauses.cancel();
+        // If not done producing, will send empty filter upwards
+        _allreduce_filter.cancel();
+        _stage = CANCELLED;
     }
 
     bool isDestructible() {
         return _allreduce_clauses.isDestructible() && _allreduce_filter.isDestructible();
     }
 
-private:
-    void setAllStagesDone() {_all_stages_done = true;}
+    ~ClauseSharingSession() {
+        cancel();
+    }
 
+private:
+    std::vector<int> applyGlobalFilter(const std::vector<int>& filter, std::vector<int>& clauses);
+    
     std::vector<int> mergeClauseBuffersDuringAggregation(std::list<std::vector<int>>& elems) {
         int numAggregated = 0;
         for (auto& elem : elems) {
@@ -242,4 +231,19 @@ private:
         _cls_history.sendNextBatches();
     }
 
+    void updateSharingCompensationFactor() {
+        auto [nbAdmitted, nbBroadcast] = _job->getLastAdmittedClauseShare();
+        float admittedRatio = nbBroadcast == 0 ? 1 : ((float)nbAdmitted) / nbBroadcast;
+        admittedRatio = std::max(0.01f, admittedRatio);
+        float newCompensationFactor = std::max(1.f, std::min(
+            (float)_params.clauseHistoryAggregationFactor(), 1.f/admittedRatio
+        ));
+        float compensationFactor = _job->getCompensationFactor();
+        compensationFactor = _compensation_decay * compensationFactor + (1-_compensation_decay) * newCompensationFactor;
+        _job->setSharingCompensationFactor(compensationFactor);
+        if (_job->getJobTree().isRoot()) {
+            LOG(V3_VERB, "%s CS last sharing: %i/%i globally passed ~> c=%.3f\n", _job->toStr(), 
+                nbAdmitted, nbBroadcast, compensationFactor);
+        }
+    }
 };

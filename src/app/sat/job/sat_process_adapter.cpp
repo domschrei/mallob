@@ -1,4 +1,5 @@
 
+#include "app/sat/execution/solving_state.hpp"
 #include "util/assert.hpp"
 #include <sys/types.h>
 #include <stdlib.h>
@@ -167,6 +168,7 @@ void SatProcessAdapter::doInitialize() {
         _initialized = true;
         _hsm->doBegin = true;
         _child_pid = res;
+        _state = SolvingStates::ACTIVE;
         applySolvingState();
     }
 }
@@ -206,6 +208,7 @@ void SatProcessAdapter::applySolvingState() {
     }
     if (_state == SolvingStates::SUSPENDED || _state == SolvingStates::STANDBY) {
         Process::suspend(_child_pid); // Stop (suspend) process.
+        _pending_tasks.clear(); // delete pending tasks
     }
     if (_state == SolvingStates::ACTIVE) {
         Process::resume(_child_pid); // Continue (resume) process.
@@ -223,7 +226,6 @@ bool SatProcessAdapter::hasCollectedClauses() {
     return !_initialized || (_hsm->doExport && _hsm->didExport);
 }
 std::vector<int> SatProcessAdapter::getCollectedClauses() {
-    if (!_initialized) return std::vector<int>();
     if (!hasCollectedClauses()) return std::vector<int>();
     assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
     std::vector<int> clauses(_export_buffer, _export_buffer+_hsm->exportBufferTrueSize);
@@ -235,24 +237,37 @@ std::pair<int, int> SatProcessAdapter::getLastAdmittedClauseShare() {
     return _last_admitted_clause_share;
 }
 
-bool SatProcessAdapter::process(const std::vector<int>& buffer, BufferTask task) {
+bool SatProcessAdapter::process(BufferTask& task) {
 
-    if (!_initialized || _hsm->doFilterImport || _hsm->doDigestImportWithFilter || _hsm->doDigestImportWithoutFilter) {
+    if (!_initialized || _hsm->doFilterImport || _hsm->doDigestImportWithFilter 
+            || _hsm->doReturnClauses || _hsm->doDigestImportWithoutFilter) {
         return false;
     }
 
-    if (task == FILTER_CLAUSES) {
+    auto& buffer = task.payload;
+    if (task.type == BufferTask::FILTER_CLAUSES) {
+        LOG(V2_INFO, "Do filter epoch=%i\n", task.epoch);
         _hsm->importBufferSize = buffer.size();
         _hsm->importBufferRevision = _desired_revision;
+        _hsm->importBufferEpoch = task.epoch;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
         memcpy(_import_buffer, buffer.data(), buffer.size()*sizeof(int));
         _hsm->doFilterImport = true;
+        _epochs_to_filter.erase(task.epoch);
 
-    } else if (task == APPLY_FILTER) {
-        memcpy(_filter_buffer, buffer.data(), buffer.size()*sizeof(int));
-        _hsm->doDigestImportWithFilter = true;
+    } else if (task.type == BufferTask::APPLY_FILTER) {
+        if (_hsm->importBufferEpoch == task.epoch) {
+            memcpy(_filter_buffer, buffer.data(), buffer.size()*sizeof(int));
+            _hsm->doDigestImportWithFilter = true;
+        } // else: discard this filter since the clauses are not present in any buffer
 
-    } else if (task == DIGEST_WITHOUT_FILTER) {
+    } else if (task.type == BufferTask::RETURN_CLAUSES) {
+        _hsm->returnedBufferSize = buffer.size();
+        memcpy(_returned_buffer, buffer.data(),
+            std::min((size_t)_hsm->importBufferMaxSize, buffer.size()) * sizeof(int));
+        _hsm->doReturnClauses = true;
+
+    } else if (task.type == BufferTask::DIGEST_CLAUSES_WITHOUT_FILTER) {
         _hsm->importBufferSize = buffer.size();
         _hsm->importBufferRevision = _desired_revision;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
@@ -264,50 +279,58 @@ bool SatProcessAdapter::process(const std::vector<int>& buffer, BufferTask task)
     return true;
 }
 
-void SatProcessAdapter::filterClauses(const std::vector<int>& clauses) {
-    if (!process(clauses, FILTER_CLAUSES)) _pending_tasks.emplace_back(clauses, FILTER_CLAUSES);
+void SatProcessAdapter::tryProcessNextTasks() {
+    while (!_pending_tasks.empty() && process(_pending_tasks.front())) {
+        _pending_tasks.pop_front();
+    }
 }
 
-void SatProcessAdapter::applyFilter(const std::vector<int>& filter) {
-    if (!process(filter, APPLY_FILTER)) _pending_tasks.emplace_back(filter, APPLY_FILTER);
+void SatProcessAdapter::filterClauses(int epoch, const std::vector<int>& clauses) {
+    getLocalFilter(-1); // fetch any previous, old result
+    _epochs_to_filter.insert(epoch);
+    _pending_tasks.emplace_back(BufferTask{BufferTask::FILTER_CLAUSES, clauses, epoch});
+    tryProcessNextTasks();
 }
 
-void SatProcessAdapter::digestClausesWithoutFilter(const std::vector<int>& clauses) {
-    if (!process(clauses, DIGEST_WITHOUT_FILTER)) _pending_tasks.emplace_back(clauses, DIGEST_WITHOUT_FILTER);
-}
-
-bool SatProcessAdapter::hasFilteredClauses() {
-    if (!_initialized) return true;
+bool SatProcessAdapter::hasFilteredClauses(int epoch) {
+    if (!_initialized) return true; // will return dummy
+    if (_state != SolvingStates::ACTIVE) return true; // may return dummy
+    if (_epochs_to_filter.count(epoch)) {
+        return false; // filtering task still in processing queue, job is active
+    }
     return _hsm->doFilterImport && _hsm->didFilterImport;
 }
-std::vector<int> SatProcessAdapter::getLocalFilter() {
-    if (!_initialized || !_hsm->doFilterImport || !_hsm->didFilterImport) 
-        return std::vector<int>(ClauseMetadata::numBytes(), 0);
+
+std::vector<int> SatProcessAdapter::getLocalFilter(int epoch) {
     std::vector<int> filter;
-    filter.resize(_hsm->filterSize);
-    memcpy(filter.data(), _filter_buffer, _hsm->filterSize*sizeof(int));
-    _hsm->doFilterImport = false;
-    assert(filter.size() >= ClauseMetadata::numBytes());
+    if (_initialized && _hsm->doFilterImport && _hsm->didFilterImport) {
+        filter.resize(_hsm->filterSize);
+        memcpy(filter.data(), _filter_buffer, _hsm->filterSize*sizeof(int));
+        _hsm->doFilterImport = false;
+        assert(filter.size() >= ClauseMetadata::numBytes());
+        if (_hsm->importBufferEpoch != epoch)
+            filter.resize(ClauseMetadata::numBytes()); // wrong epoch
+    } else {
+        filter = std::vector<int>(ClauseMetadata::numBytes(), 0);
+    }
     return filter;
 }
 
-void SatProcessAdapter::returnClauses(const std::vector<int>& clauses) {
-    if (!_initialized) return;
-    if (_hsm->doReturnClauses) {
-        // Cannot return right now: defer
-        _temp_returned_clauses.push_back(clauses);
-        return;
-    }
-    doReturnClauses(clauses);
+void SatProcessAdapter::applyFilter(int epoch, const std::vector<int>& filter) {
+    _pending_tasks.emplace_back(BufferTask{BufferTask::APPLY_FILTER, filter, epoch});
+    tryProcessNextTasks();
 }
 
-void SatProcessAdapter::doReturnClauses(const std::vector<int>& clauses) {
-    _hsm->returnedBufferSize = clauses.size();
-    memcpy(_returned_buffer, clauses.data(),
-        std::min((size_t)_hsm->importBufferMaxSize, clauses.size()) * sizeof(int));
-    _hsm->doReturnClauses = true;
-    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
+void SatProcessAdapter::returnClauses(const std::vector<int>& clauses) {
+    _pending_tasks.emplace_back(BufferTask{BufferTask::RETURN_CLAUSES, clauses, -1});
+    tryProcessNextTasks();
 }
+
+void SatProcessAdapter::digestClausesWithoutFilter(const std::vector<int>& clauses) {
+    _pending_tasks.emplace_back(BufferTask{BufferTask::DIGEST_CLAUSES_WITHOUT_FILTER, clauses, -1});
+    tryProcessNextTasks();
+}
+
 
 void SatProcessAdapter::dumpStats() {
     if (!_initialized) return;
@@ -354,15 +377,8 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         _hsm->doStartNextRevision = true;
     }
 
-    if (!_pending_tasks.empty() && process(_pending_tasks.front().first, _pending_tasks.front().second)) {
-        _pending_tasks.pop_front();
-    }
+    tryProcessNextTasks();
 
-    if (!_hsm->doReturnClauses && !_hsm->didReturnClauses && !_temp_returned_clauses.empty()) {
-        doReturnClauses(_temp_returned_clauses.front());
-        _temp_returned_clauses.pop_front();
-    }
-    
     // Solution preparation just ended?
     if (!_solution_in_preparation && _solution_prepare_future.valid()) {
         _solution_prepare_future.get();

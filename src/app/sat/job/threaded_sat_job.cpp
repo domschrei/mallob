@@ -183,7 +183,7 @@ std::pair<int, int> ThreadedSatJob::getLastAdmittedClauseShare() {
     return _solver->getLastAdmittedClauseShare();
 }
 
-void ThreadedSatJob::filterSharing(std::vector<int>& clauses) {
+void ThreadedSatJob::filterSharing(int epoch, std::vector<int>& clauses) {
     auto maxFilterSize = clauses.size()/(8*sizeof(int))+1;
     if (_filter.size() < maxFilterSize) _filter.resize(maxFilterSize);
     int filterSize = _solver->filterSharing(clauses.data(), clauses.size(), _filter.data());
@@ -191,16 +191,16 @@ void ThreadedSatJob::filterSharing(std::vector<int>& clauses) {
     _clauses_to_filter = clauses;
     _did_filter = true;
 }
-bool ThreadedSatJob::hasFilteredSharing() {
+bool ThreadedSatJob::hasFilteredSharing(int epoch) {
     return _did_filter;
 }
-std::vector<int> ThreadedSatJob::getLocalFilter() {
+std::vector<int> ThreadedSatJob::getLocalFilter(int epoch) {
     std::vector<int> filter = std::move(_filter);
     _filter.clear();
     _did_filter = false;
     return filter;
 }
-void ThreadedSatJob::applyFilter(std::vector<int>& filter) {
+void ThreadedSatJob::applyFilter(int epoch, std::vector<int>& filter) {
     _solver->digestSharingWithFilter(_clauses_to_filter.data(), _clauses_to_filter.size(), filter.data());
 }
 

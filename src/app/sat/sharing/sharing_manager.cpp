@@ -14,6 +14,7 @@
 #include "util/assert.hpp"
 
 #include "sharing_manager.hpp"
+#include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "util/random.hpp"
 #include "buffer/buffer_reducer.hpp"
@@ -84,7 +85,7 @@ SharingManager::SharingManager(
 }
 
 void SharingManager::onProduceClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero) {
-		
+
 	if (_solver_revisions[solverId] != solverRevision) return;
 
 	if (_params.crashMonkeyProbability() > 0) {
@@ -125,7 +126,6 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
         return;
     }
 
-	/*
 	if (clauseSize == 1 && clause.lbd != 1) {
 		_logger.log(V1_WARN, "Observed unit LBD of %i\n", clause.lbd);
 	}
@@ -136,12 +136,11 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 		_observed_nonunit_lbd_of_length_minus_one |= clause.lbd == clause.size-1;
 		_observed_nonunit_lbd_of_length |= clause.lbd == clause.size;
 	}
-	*/
 
 	if (clauseSize == 1) assert(clause.lbd == 1);
 	else {
 		assert(clause.lbd >= 1 || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", clause.size, clause.lbd));
-		assert(clause.lbd <= clause.size);
+		assert(clause.lbd <= clause.size || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", clause.size, clause.lbd));
 	}
 	int clauseLbd = clauseSize == 1 ? 1 : std::max(2, clause.lbd + (condVarOrZero == 0 ? 0 : 1));
 
@@ -483,14 +482,13 @@ void SharingManager::digestSharingWithoutFilter(int* begin, int buflen) {
 }
 
 SharingStatistics SharingManager::getStatistics() {
-	/*
+
 	_logger.log(V2_INFO, "Observed non-unit LBDs: 0:%i 1:%i 2:%i len-1:%i len:%i\n", 
 		_observed_nonunit_lbd_of_zero, 
 		_observed_nonunit_lbd_of_one, 
 		_observed_nonunit_lbd_of_two, 
 		_observed_nonunit_lbd_of_length_minus_one, 
 		_observed_nonunit_lbd_of_length);
-	*/
 	return _stats;
 }
 

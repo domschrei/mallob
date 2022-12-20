@@ -1,6 +1,9 @@
 
 #pragma once
 
+#include <fstream>
+
+#include "app/sat/data/clause_metadata.hpp"
 #include "util/assert.hpp"
 
 #include "cadical_interface.hpp"
@@ -18,6 +21,8 @@ private:
 	
 	int _glue_limit;
 	unsigned long _num_produced;
+
+	//std::ofstream _learnt_ofs;
 	
 public:
 	HordeLearner(const SolverSetup& setup) : _setup(setup), 
@@ -26,6 +31,8 @@ public:
 		
 		_current_clause.begin = _current_lits.data()+1;
 		_current_clause.size = 0;
+
+		//_learnt_ofs = std::ofstream("_learnt_literals");
 	}
 	~HordeLearner() override {}
 
@@ -35,7 +42,8 @@ public:
 
 	inline void learn(int lit) override {
 
-		//LOG(V5_DEBG, "LEARN %i\n", lit);
+		//_learnt_ofs << lit << " ";
+		//_learnt_ofs.flush();
 
 		if (_current_clause.size < ClauseMetadata::numBytes()+1 || lit != 0) {
 			// Received a literal
@@ -58,8 +66,8 @@ public:
 			// subtract LBD value which was added to the clause length as well
 			_current_clause.size--; 
 			// Non-unit clause: First integer is glue value.
-			// In CaDiCaL, LBD scores are represented from 1 to len-1. => Increment LBD.
-			_current_clause.lbd = _current_lits[0]+1;
+			_current_clause.lbd = _current_lits[0];
+			if (_current_clause.lbd == 1) ++_current_clause.lbd;
 			if (_current_clause.lbd > _glue_limit) eligible = false;
 
 			if (ClauseMetadata::enabled()) {

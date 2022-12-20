@@ -224,10 +224,10 @@ void SchedulingManager::checkActiveJob() {
         }
 
         _desc_interface.forwardDescriptionToWaitingChildren(job);
-    }
 
-    // Job communication (e.g. clause sharing)
-    job.communicate();
+        // Job communication (e.g. clause sharing)
+        job.communicate();
+    }
 }
 
 void SchedulingManager::advanceBalancing() {
