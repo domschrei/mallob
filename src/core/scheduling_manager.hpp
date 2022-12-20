@@ -51,6 +51,7 @@ public:
     RequestMatcher* createRequestMatcher();
 
     void checkActiveJob();
+    void checkSuspendedJobs();
     void advanceBalancing();
     bool checkComputationLimits(int jobId);
     void forwardDeferredRequests() {_req_mgr.forwardDeferredRequests();}

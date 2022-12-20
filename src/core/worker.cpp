@@ -164,6 +164,7 @@ void Worker::checkJobs() {
     } else {
         checkActiveJob();
     }
+    _sched_man.checkSuspendedJobs();
 }
 
 void Worker::checkActiveJob() {

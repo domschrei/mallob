@@ -1,6 +1,7 @@
 
 #include "scheduling_manager.hpp"
 
+#include "data/job_state.h"
 #include "util/assert.hpp"
 #include <algorithm>
 #include <queue>
@@ -227,6 +228,12 @@ void SchedulingManager::checkActiveJob() {
 
         // Job communication (e.g. clause sharing)
         job.communicate();
+    }
+}
+
+void SchedulingManager::checkSuspendedJobs() {
+    for (auto& [id, job] : _job_registry.getJobMap()) {
+        if (job->getState() == SUSPENDED) job->communicate();
     }
 }
 

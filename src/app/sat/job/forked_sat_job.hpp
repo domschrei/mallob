@@ -36,6 +36,8 @@ private:
 
     bool _crash_pending {false};
 
+    int _sharing_max_size {0};
+
 public:
 
     ForkedSatJob(const Parameters& params, const JobSetup& setup);

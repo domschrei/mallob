@@ -45,6 +45,10 @@ public:
         return *_jobs[jobId];
     }
 
+    const robin_hood::unordered_map<int, Job*>& getJobMap() const {
+        return _jobs;
+    }
+
     void setCommitted() {
         _has_commitment = true;
     }

@@ -50,20 +50,20 @@ public:
 
     // Methods common to all Job instances
 
-    virtual void appl_start() = 0;
-    virtual void appl_suspend() = 0;
-    virtual void appl_resume() = 0;
-    virtual void appl_terminate() = 0;
+    virtual void appl_start() override = 0;
+    virtual void appl_suspend() override = 0;
+    virtual void appl_resume() override = 0;
+    virtual void appl_terminate() override = 0;
 
-    virtual int appl_solved() = 0;
-    virtual JobResult&& appl_getResult() = 0;
+    virtual int appl_solved() override = 0;
+    virtual JobResult&& appl_getResult() override = 0;
     
-    virtual void appl_communicate() = 0;
-    virtual void appl_communicate(int source, int mpiTag, JobMessage& msg) = 0;
+    virtual void appl_communicate() override = 0;
+    virtual void appl_communicate(int source, int mpiTag, JobMessage& msg) override = 0;
     
-    virtual void appl_dumpStats() = 0;
-    virtual bool appl_isDestructible() = 0;
-    virtual void appl_memoryPanic() = 0;
+    virtual void appl_dumpStats() override = 0;
+    virtual bool appl_isDestructible() override = 0;
+    virtual void appl_memoryPanic() override = 0;
 
     virtual bool checkResourceLimit(float wcSecsPerInstance, float cpuSecsPerInstance) override {
         if (!_done_solving && _params.satSolvingWallclockLimit() > 0) {
@@ -81,6 +81,8 @@ public:
 
 private:
     float _compensation_factor = 1.0f;
+    const float _compensation_decay {0.6};
+
     bool _done_solving = false;
 
     struct DeferredJobMsg {int source; int mpiTag; JobMessage msg;};
@@ -89,11 +91,24 @@ private:
 public:
     // Helper methods
 
-    float getCompensationFactor() const {
+    float updateSharingCompensationFactor() {
+
+        auto [nbAdmitted, nbBroadcast] = getLastAdmittedClauseShare();
+        float admittedRatio = nbBroadcast == 0 ? 1 : ((float)nbAdmitted) / nbBroadcast;
+        admittedRatio = std::max(0.01f, admittedRatio);
+        float newCompensationFactor = std::max(1.f, std::min(
+            (float)_params.clauseHistoryAggregationFactor(), 1.f/admittedRatio
+        ));
+        _compensation_factor = _compensation_decay * _compensation_factor 
+            + (1-_compensation_decay) * newCompensationFactor;
+
+        LOG(V3_VERB, "%s CS last sharing: %i/%i globally passed ~> c=%.3f\n", toStr(), 
+            nbAdmitted, nbBroadcast, _compensation_factor);
+
         return _compensation_factor;
     }
-    void setSharingCompensationFactor(float compensationFactor) {
-        _compensation_factor = compensationFactor;
+    void setSharingCompensationFactor(float factor) {
+        _compensation_factor = factor;
     }
 
     size_t getBufferLimit(int numAggregatedNodes, MyMpi::BufferQueryMode mode) {

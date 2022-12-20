@@ -84,6 +84,7 @@ void SatProcessAdapter::doInitialize() {
     //log(V4_VVER, "Setup base shmem: %s\n", _shmem_id.c_str());
     void* mainShmem = SharedMemory::create(_shmem_id, sizeof(SatSharedMemory));
     _shmem.insert(ShmemObject{_shmem_id, mainShmem, sizeof(SatSharedMemory)});
+    // "placement new" operator: construct object not in the heap but in the provided chunk of memory
     _hsm = new ((char*)mainShmem) SatSharedMemory();
     _hsm->fSize = _f_size;
     _hsm->aSize = _a_size;
@@ -222,17 +223,16 @@ bool SatProcessAdapter::process(BufferTask& task) {
 
     auto& buffer = task.payload;
     if (task.type == BufferTask::FILTER_CLAUSES) {
-        LOG(V2_INFO, "Do filter epoch=%i\n", task.epoch);
         _hsm->importBufferSize = buffer.size();
         _hsm->importBufferRevision = _desired_revision;
-        _hsm->importBufferEpoch = task.epoch;
+        _epoch_of_export_buffer = task.epoch;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
         memcpy(_import_buffer, buffer.data(), buffer.size()*sizeof(int));
         _hsm->doFilterImport = true;
         _epochs_to_filter.erase(task.epoch);
 
     } else if (task.type == BufferTask::APPLY_FILTER) {
-        if (_hsm->importBufferEpoch == task.epoch) {
+        if (_epoch_of_export_buffer == task.epoch) {
             memcpy(_filter_buffer, buffer.data(), buffer.size()*sizeof(int));
             _hsm->doDigestImportWithFilter = true;
         } // else: discard this filter since the clauses are not present in any buffer
@@ -284,7 +284,7 @@ std::vector<int> SatProcessAdapter::getLocalFilter(int epoch) {
         memcpy(filter.data(), _filter_buffer, _hsm->filterSize*sizeof(int));
         _hsm->doFilterImport = false;
         assert(filter.size() >= ClauseMetadata::numBytes());
-        if (_hsm->importBufferEpoch != epoch)
+        if (_epoch_of_export_buffer != epoch)
             filter.resize(ClauseMetadata::numBytes()); // wrong epoch
     } else {
         filter = std::vector<int>(ClauseMetadata::numBytes(), 0);

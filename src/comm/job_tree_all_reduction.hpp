@@ -4,6 +4,7 @@
 #include <list>
 
 #include "app/job_tree.hpp"
+#include "util/logger.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "data/job_transfer.hpp"
 
@@ -128,6 +129,8 @@ public:
 
         if (!_aggregating && _future_aggregate.valid()) {
             // Aggregation done
+            LOG(V5_DEBG, "CS got aggregation\n");
+
             _future_aggregate.get();
             _reduction_locally_done = true;
             

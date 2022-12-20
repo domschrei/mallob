@@ -38,7 +38,6 @@ void AnytimeSatClauseCommunicator::communicate() {
     }
     if (_suspended) {
         if (_job->getState() == ACTIVE) _suspended = false;
-        else return;
     }
 
     // if doing certified UNSAT, advance the establishing communication
@@ -197,7 +196,16 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg) {
     _current_epoch = msg.epoch;
     LOG(V5_DEBG, "%s : INIT COMM e=%i nc=%i\n", _job->toStr(), _current_epoch, 
         _job->getJobTree().getNumChildren());
-    _current_session.reset(new ClauseSharingSession(_params, _job, _cdb, _cls_history, _current_epoch));
+
+    // extract compensation factor for this session from the message
+    float compensationFactor;
+    static_assert(sizeof(float) == sizeof(int));
+    memcpy(&compensationFactor, msg.payload.data(), sizeof(float));
+    assert(compensationFactor >= 0.1 && compensationFactor <= 10);
+
+    _current_session.reset(
+        new ClauseSharingSession(_params, _job, _cdb, _cls_history, _current_epoch, compensationFactor)
+    );
     advanceCollective(_job, msg, MSG_INITIATE_CLAUSE_SHARING);
 }
 
@@ -235,7 +243,13 @@ bool AnytimeSatClauseCommunicator::tryInitiateSharing() {
     }
 
     _current_epoch++;
+
+    // Assemble job message
     JobMessage msg(_job->getId(), _job->getRevision(), _current_epoch, MSG_INITIATE_CLAUSE_SHARING);
+    msg.payload.push_back(0);
+    float compensationFactor = _job->updateSharingCompensationFactor();
+    static_assert(sizeof(float) == sizeof(int));
+    memcpy(msg.payload.data(), &compensationFactor, sizeof(float));
 
     // Advance initiation time exactly by the specified period 
     // in order to lose no time for the subsequent epoch

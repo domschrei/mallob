@@ -200,8 +200,8 @@ JobResult& Job::getResult() {
 }
 
 void Job::communicate() {
-    if (_state != ACTIVE) return;
-    if (_comm.wantsToAggregate() && _comm.isAggregating()) _comm.beginAggregation();
+    if (_state == ACTIVE && _comm.wantsToAggregate() && _comm.isAggregating())
+        _comm.beginAggregation();
     appl_communicate();
 }
 

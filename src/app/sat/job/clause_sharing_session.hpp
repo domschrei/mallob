@@ -3,6 +3,7 @@
 
 #include "comm/msgtags.h"
 #include "data/job_transfer.hpp"
+#include "util/logger.hpp"
 #include "util/params.hpp"
 #include "base_sat_job.hpp"
 #include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
@@ -22,8 +23,7 @@ private:
         AGGREGATING_CLAUSES,
         PRODUCING_FILTER,
         AGGREGATING_FILTER,
-        DONE,
-        CANCELLED
+        DONE
     } _stage {PRODUCING_CLAUSES};
 
     std::vector<int> _excess_clauses_from_merge;
@@ -34,11 +34,9 @@ private:
     JobTreeAllReduction _allreduce_clauses;
     JobTreeAllReduction _allreduce_filter;
 
-    float _compensation_decay {0.6};
-
 public:
     ClauseSharingSession(const Parameters& params, BaseSatJob* job, AdaptiveClauseDatabase& cdb,
-            ClauseHistory& clsHistory, int epoch) : 
+            ClauseHistory& clsHistory, int epoch, float compensationFactor) : 
         _params(params), _job(job), _cdb(cdb), _cls_history(clsHistory), _epoch(epoch),
         _allreduce_clauses(
             job->getJobTree(),
@@ -63,6 +61,10 @@ public:
             }
         ) {
 
+        LOG(V4_VVER, "%s CS OPEN e=%i\n", _job->toStr(), _epoch);
+
+        _job->setSharingCompensationFactor(compensationFactor);
+
         if (!_job->hasPreparedSharing()) {
             int limit = _job->getBufferLimit(1, MyMpi::SELF);
             _job->prepareSharing(limit);
@@ -71,21 +73,16 @@ public:
 
     void advanceSharing() {
 
-        if (_stage == CANCELLED) return;
-
         if (_stage == PRODUCING_CLAUSES && _job->hasPreparedSharing()) {
 
             // Produce contribution to all-reduction of clauses
-            LOG(V4_VVER, "%s CS produce cls\n", _job->toStr());
+            LOG(V4_VVER, "%s CS produced cls\n", _job->toStr());
             _allreduce_clauses.produce([&]() {
                 Checksum checksum;
                 auto clauses = _job->getPreparedClauses(checksum);
                 clauses.push_back(1); // # aggregated workers
                 return clauses;
             });
-        
-            // Calculate new sharing compensation factor from last sharing statistics
-            updateSharingCompensationFactor();
 
             _stage = AGGREGATING_CLAUSES;
         }
@@ -111,7 +108,7 @@ public:
 
         if (_stage == PRODUCING_FILTER && _job->hasFilteredSharing(_epoch)) {
 
-            LOG(V4_VVER, "%s CS produce filter\n", _job->toStr());
+            LOG(V4_VVER, "%s CS produced filter\n", _job->toStr());
             _allreduce_filter.produce([&]() {return _job->getLocalFilter(_epoch);});
             _stage = AGGREGATING_FILTER;
         }
@@ -154,20 +151,16 @@ public:
         return _stage == DONE;
     }
 
-    void cancel() {
-        // If not done producing, will send empty clause buffer upwards
-        _allreduce_clauses.cancel();
-        // If not done producing, will send empty filter upwards
-        _allreduce_filter.cancel();
-        _stage = CANCELLED;
-    }
-
     bool isDestructible() {
         return _allreduce_clauses.isDestructible() && _allreduce_filter.isDestructible();
     }
 
     ~ClauseSharingSession() {
-        cancel();
+        LOG(V4_VVER, "%s CS CLOSE e=%i\n", _job->toStr(), _epoch);
+        // If not done producing, will send empty clause buffer upwards
+        _allreduce_clauses.cancel();
+        // If not done producing, will send empty filter upwards
+        _allreduce_filter.cancel();
     }
 
 private:
@@ -229,21 +222,5 @@ private:
 
         // Send next batches of historic clauses to subscribers as necessary
         _cls_history.sendNextBatches();
-    }
-
-    void updateSharingCompensationFactor() {
-        auto [nbAdmitted, nbBroadcast] = _job->getLastAdmittedClauseShare();
-        float admittedRatio = nbBroadcast == 0 ? 1 : ((float)nbAdmitted) / nbBroadcast;
-        admittedRatio = std::max(0.01f, admittedRatio);
-        float newCompensationFactor = std::max(1.f, std::min(
-            (float)_params.clauseHistoryAggregationFactor(), 1.f/admittedRatio
-        ));
-        float compensationFactor = _job->getCompensationFactor();
-        compensationFactor = _compensation_decay * compensationFactor + (1-_compensation_decay) * newCompensationFactor;
-        _job->setSharingCompensationFactor(compensationFactor);
-        if (_job->getJobTree().isRoot()) {
-            LOG(V3_VERB, "%s CS last sharing: %i/%i globally passed ~> c=%.3f\n", _job->toStr(), 
-                nbAdmitted, nbBroadcast, compensationFactor);
-        }
     }
 };

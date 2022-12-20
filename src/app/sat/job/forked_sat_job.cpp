@@ -253,11 +253,14 @@ bool ForkedSatJob::isInitialized() {
 
 void ForkedSatJob::prepareSharing(int maxSize) {
     if (!_initialized || getState() != ACTIVE) return;
+    _sharing_max_size = maxSize;
     _solver->collectClauses(maxSize);
 }
 bool ForkedSatJob::hasPreparedSharing() {
     if (!_initialized || getState() != ACTIVE) return true;
-    return _solver->hasCollectedClauses();
+    bool hasCollected = _solver->hasCollectedClauses();
+    if (!hasCollected) prepareSharing(_sharing_max_size);
+    return hasCollected;
 }
 std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum) {
     if (!_initialized) return std::vector<int>();
