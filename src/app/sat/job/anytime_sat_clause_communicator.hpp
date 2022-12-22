@@ -10,11 +10,12 @@
 #include "../sharing/buffer/adaptive_clause_database.hpp"
 #include "data/job_transfer.hpp"
 #include "app/job.hpp"
-#include "base_sat_job.hpp"
-#include "clause_history.hpp"
 #include "comm/job_tree_all_reduction.hpp"
 #include "clause_sharing_session.hpp"
 #include "app/sat/proof/proof_producer.hpp"
+
+class BaseSatJob; // fwd decl
+class ClauseHistory; // fwd decl
 
 class AnytimeSatClauseCommunicator {
 
@@ -25,10 +26,9 @@ private:
 
     const int _clause_buf_base_size;
     const float _clause_buf_discount_factor;
-    const bool _use_cls_history;
 
     AdaptiveClauseDatabase _cdb;
-    ClauseHistory _cls_history;
+    std::unique_ptr<ClauseHistory> _cls_history;
 
     std::unique_ptr<ClauseSharingSession> _current_session;
     std::list<std::unique_ptr<ClauseSharingSession>> _cancelled_sessions;
@@ -48,23 +48,7 @@ private:
     std::unique_ptr<ProofProducer> _proof_producer;
 
 public:
-    AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : _params(params), _job(job), 
-        _clause_buf_base_size(_params.clauseBufferBaseSize()), 
-        _clause_buf_discount_factor(_params.clauseBufferDiscountFactor()),
-        _use_cls_history(params.collectClauseHistory()),
-        _cdb([&]() {
-            AdaptiveClauseDatabase::Setup setup;
-            setup.maxClauseLength = _params.strictClauseLengthLimit();
-            setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
-            setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
-            setup.numLiterals = 0;
-            return setup;
-        }()),
-        _cls_history(_params, _job->getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job, _cdb),
-        _sent_cert_unsat_ready_msg(!ClauseMetadata::enabled()) {
-
-        _time_of_last_epoch_initiation = Timer::elapsedSecondsCached();
-    }
+    AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job);
 
     void communicate();
     void handle(int source, int mpiTag, JobMessage& msg);

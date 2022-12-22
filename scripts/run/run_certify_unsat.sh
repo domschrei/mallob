@@ -84,7 +84,7 @@ function preprocess() {
 # Inputs: p_preprocessor_output
 # Outputs: p_mallob_proof
 function run_mallob() {
-    exec_and_measure_time "mallob" mpirun -np 2 build/mallob -t=2 -mono=$p_preprocessor_output -log=certunsattest-$(date +%s) -mempanic=0 -v=3 -dpa -ipm -cu -pof=$p_mallob_proof $fwd_args
+    exec_and_measure_time "mallob" mpirun -np $numprocs --oversubscribe build/mallob -t=2 -mono=$p_preprocessor_output -log=certunsattest-$(date +%s) -mempanic=0 -v=3 -dpa -ipm -cu -pof=$p_mallob_proof $fwd_args
 }
 
 # Inputs: p_preprocess_proof

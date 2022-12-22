@@ -5,14 +5,15 @@
 #include <sstream>
 
 #include "data/job_description.hpp"
+#include "comm/mympi.hpp"
 
 /*static!*/ size_t JobRequest::getMaxTransferSize() {
-    return 8*sizeof(int)+sizeof(float)+sizeof(bool)
+    return 8*sizeof(int)+2*(sizeof(ctx_id_t))+sizeof(float)+sizeof(bool)
         +4*sizeof(int);
 }
 
 size_t JobRequest::getTransferSize() const {
-    return 8*sizeof(int)+sizeof(float)+sizeof(bool)
+    return 8*sizeof(int)+2*(sizeof(ctx_id_t))+sizeof(float)+sizeof(bool)
         +(multiplicity == 1 ? 2 : 4)*sizeof(int);
 }
 
@@ -23,7 +24,9 @@ std::vector<uint8_t> JobRequest::serialize() const {
     n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &applicationId, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &rootRank, n); i += n;
+    n = sizeof(ctx_id_t); memcpy(packed.data()+i, &rootContextId, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &requestingNodeRank, n); i += n;
+    n = sizeof(ctx_id_t); memcpy(packed.data()+i, &requestingNodeContextId, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &requestedNodeIndex, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &revision, n); i += n;
     n = sizeof(float); memcpy(packed.data()+i, &timeOfBirth, n); i += n;
@@ -43,7 +46,9 @@ JobRequest& JobRequest::deserialize(const std::vector<uint8_t> &packed) {
     n = sizeof(int); memcpy(&jobId, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&applicationId, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&rootRank, packed.data()+i, n); i += n;
+    n = sizeof(ctx_id_t); memcpy(&rootContextId, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&requestingNodeRank, packed.data()+i, n); i += n;
+    n = sizeof(ctx_id_t); memcpy(&requestingNodeContextId, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&requestedNodeIndex, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&revision, packed.data()+i, n); i += n;
     n = sizeof(float); memcpy(&timeOfBirth, packed.data()+i, n); i += n;
@@ -106,61 +111,37 @@ OneshotJobRequestRejection& OneshotJobRequestRejection::deserialize(const std::v
     memcpy(&isChildStillDormant, packed.data()+packed.size()-sizeof(bool), sizeof(bool));
     return *this;
 }
-
-std::vector<uint8_t> WorkRequest::serialize() const {
-    std::vector<uint8_t> packed(3*sizeof(int));
-    int i = 0, n;
-    n = sizeof(int); memcpy(packed.data()+i, &requestingRank, n); i += n;
-    n = sizeof(int); memcpy(packed.data()+i, &numHops, n); i += n;
-    n = sizeof(int); memcpy(packed.data()+i, &balancingEpoch, n); i += n;
+   
+std::vector<uint8_t> JobAdoptionOffer::serialize() const {
+    std::vector<uint8_t> packed = request.serialize();
+    size_t sizeBefore = packed.size();
+    packed.resize(packed.size()+sizeof(ctx_id_t));
+    memcpy(packed.data()+sizeBefore, &contextId, sizeof(ctx_id_t));
     return packed;
 }
 
-WorkRequest& WorkRequest::deserialize(const std::vector<uint8_t> &packed) {
-    int i = 0, n;
-    n = sizeof(int); memcpy(&requestingRank, packed.data()+i, n); i += n;
-    n = sizeof(int); memcpy(&numHops, packed.data()+i, n); i += n;
-    n = sizeof(int); memcpy(&balancingEpoch, packed.data()+i, n); i += n;
-    return *this;
-}
-
-bool WorkRequestComparator::operator()(const WorkRequest& lhs, const WorkRequest& rhs) const {
-    if (lhs.balancingEpoch != rhs.balancingEpoch) return lhs.balancingEpoch > rhs.balancingEpoch;
-    if (lhs.numHops != rhs.numHops) return lhs.numHops < rhs.numHops;
-    return std::hash<int>()(lhs.requestingRank) < std::hash<int>()(rhs.requestingRank);
-}
-
-int JobSignature::getTransferSize() const {
-    return transferSize;
-}
-
-std::vector<uint8_t> JobSignature::serialize() const {
-    int size = (3*sizeof(int) + sizeof(size_t));
-    std::vector<uint8_t> packed(size);
-
-    int i = 0, n;
-    n = sizeof(int);    memcpy(packed.data()+i, &jobId, n); i += n;
-    n = sizeof(int);    memcpy(packed.data()+i, &rootRank, n); i += n;
-    n = sizeof(int);    memcpy(packed.data()+i, &firstIncludedRevision, n); i += n;
-    n = sizeof(size_t); memcpy(packed.data()+i, &transferSize, n); i += n;
-    return packed;
-}
-
-JobSignature& JobSignature::deserialize(const std::vector<uint8_t>& packed) {
-    int i = 0, n;
-    n = sizeof(int);    memcpy(&jobId, packed.data()+i, n); i += n;
-    n = sizeof(int);    memcpy(&rootRank, packed.data()+i, n); i += n;
-    n = sizeof(int);    memcpy(&firstIncludedRevision, packed.data()+i, n); i += n;
-    n = sizeof(size_t); memcpy(&transferSize, packed.data()+i, n); i += n;
+JobAdoptionOffer& JobAdoptionOffer::deserialize(const std::vector<uint8_t> &packed) {
+    request.deserialize(packed);
+    memcpy(&contextId, packed.data()+packed.size()-sizeof(ctx_id_t), sizeof(ctx_id_t));
     return *this;
 }
 
 std::vector<uint8_t> JobMessage::serialize() const {
-    int size = 4*sizeof(int) + sizeof(bool) + payload.size()*sizeof(int) + sizeof(Checksum);
+    int size = 6*sizeof(int) + 2*sizeof(ctx_id_t) + sizeof(bool) 
+        + payload.size()*sizeof(int) + sizeof(Checksum);
     std::vector<uint8_t> packed(size);
+
+    assert(treeIndexOfSender >= 0);
+    assert(treeIndexOfDestination >= 0);
+    assert(contextIdOfSender != 0);
+    assert(contextIdOfDestination != 0);
 
     int i = 0, n;
     n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;
+    n = sizeof(int); memcpy(packed.data()+i, &treeIndexOfSender, n); i += n;
+    n = sizeof(int); memcpy(packed.data()+i, &treeIndexOfDestination, n); i += n;
+    n = sizeof(ctx_id_t); memcpy(packed.data()+i, &contextIdOfSender, n); i += n;
+    n = sizeof(ctx_id_t); memcpy(packed.data()+i, &contextIdOfDestination, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &revision, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &tag, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &epoch, n); i += n;
@@ -173,6 +154,10 @@ std::vector<uint8_t> JobMessage::serialize() const {
 JobMessage& JobMessage::deserialize(const std::vector<uint8_t>& packed) {
     int i = 0, n;
     n = sizeof(int); memcpy(&jobId, packed.data()+i, n); i += n;
+    n = sizeof(int); memcpy(&treeIndexOfSender, packed.data()+i, n); i += n;
+    n = sizeof(int); memcpy(&treeIndexOfDestination, packed.data()+i, n); i += n;    
+    n = sizeof(ctx_id_t); memcpy(&contextIdOfSender, packed.data()+i, n); i += n;
+    n = sizeof(ctx_id_t); memcpy(&contextIdOfDestination, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&revision, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&tag, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&epoch, packed.data()+i, n); i += n;
@@ -181,6 +166,14 @@ JobMessage& JobMessage::deserialize(const std::vector<uint8_t>& packed) {
     n = packed.size()-i; payload.resize(n/sizeof(int)); 
     memcpy(payload.data(), packed.data()+i, n); i += n;
     return *this;
+}
+
+void JobMessage::returnToSender(int senderRank, int mpiTag) {
+    if (returnedToSender) return;
+    returnedToSender = true;
+    std::swap(contextIdOfSender, contextIdOfDestination);
+    std::swap(treeIndexOfSender, treeIndexOfDestination);
+    MyMpi::isend(senderRank, mpiTag, *this);
 }
 
 std::vector<uint8_t> IntPair::serialize() const {

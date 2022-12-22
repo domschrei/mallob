@@ -3,6 +3,7 @@
 
 #include <queue>
 
+#include "app/app_message_subscription.hpp"
 #include "util/robin_hood.hpp"
 #include "app/job.hpp"
 #include "app/app_registry.hpp"
@@ -15,6 +16,8 @@ private:
     Parameters& _params;
     MPI_Comm& _comm;
     JobGarbageCollector _job_gc;
+
+    AppMessageTable _app_msg_table;
 
     robin_hood::unordered_map<int, Job*> _jobs;
     bool _has_commitment {false};
@@ -40,13 +43,31 @@ public:
         setup.applicationId = applicationId;
         setup.incremental = incremental;
 
-        _jobs[jobId] = app_registry::getJobCreator(applicationId)(_params, setup);
+        _jobs[jobId] = app_registry::getJobCreator(applicationId)(_params, setup, _app_msg_table);
         _job_gc.numStoredJobs()++;
         return *_jobs[jobId];
     }
 
     const robin_hood::unordered_map<int, Job*>& getJobMap() const {
         return _jobs;
+    }
+
+    void processAppMessage(int source, int mpiTag, JobMessage& msg) {
+
+        LOG(V2_INFO, "APPMSG RECV %lu <~ %lu [%i]\n", msg.contextIdOfDestination, msg.contextIdOfSender, source);
+
+        auto it = _app_msg_table.find({msg.jobId, msg.contextIdOfDestination});
+        if (it == _app_msg_table.end()) {
+            LOG(V1_WARN, "[WARN] Job message for unregistered job #%i\n", msg.jobId);
+            msg.returnToSender(source, mpiTag);
+            return;
+        }
+        Job& job = *it->second;
+        if (job.getIndex() != msg.treeIndexOfDestination) {
+            LOG(V1_WARN, "[WARN] Job message for #%i:%i ; local context is #%i:%i. Still delivering\n", 
+                msg.jobId, msg.treeIndexOfDestination, msg.jobId, job.getIndex());
+        }
+        it->second->communicate(source, mpiTag, msg);
     }
 
     void setCommitted() {
@@ -150,10 +171,13 @@ public:
         _memory_panic = panic;
     }
 
-    std::vector<int> findJobsToForget() {
-
-        // Find "forgotten" jobs in destruction queue which can now be destructed
+    void checkOldJobs() {
+        // Find "forgotten" jobs in destruction queue which can now be destructed.
+        // May also be required to advance the destructibility of a job.
         _job_gc.forgetOldJobs();
+    }
+
+    std::vector<int> findJobsToForget() {
 
         std::vector<int> jobsToForget;
         int jobCacheSize = _params.jobCacheSize();

@@ -113,7 +113,7 @@ class KMeansJob : public Job {
     int getPointsCount() { return pointsCount; };
     int getIterationsDone() { return iterationsDone; };
 
-    KMeansJob(const Parameters& params, const JobSetup& setup);
+    KMeansJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
     void appl_start() override;
     void appl_suspend() override;
     void appl_resume() override;

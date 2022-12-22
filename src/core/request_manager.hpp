@@ -46,7 +46,7 @@ public:
     void installDiscardCallback(JobRequest& req, DiscardCallbackExtent extent) {
         req.setMultiplicityDiscardCallback([&, extent](JobRequest& r) {
             // send notification to direct child(ren)
-            auto [leftReq, rightReq] = r.getMultipliedChildRequests(-1);
+            auto [leftReq, rightReq] = r.getMultipliedChildRequests();
             if (extent != RIGHT && leftReq.jobId != -1) {
                 LOG(V4_VVER, "CANCEL %s\n", leftReq.toStr().c_str());
                 MyMpi::isend(leftReq.multiBegin % _routing_tree.getNumWorkers(), 
@@ -78,7 +78,8 @@ public:
                 // -- yes: replace input request with multiplied request
                 auto& reqToMultiply = optReqToMultiply.value();
                 tag = MSG_MATCHING_SEND_REQUEST;
-                auto [reqLeft, reqRight] = reqToMultiply.getMultipliedChildRequests(MyMpi::rank(MPI_COMM_WORLD));
+                auto [reqLeft, reqRight] = reqToMultiply.getMultipliedChildRequests(
+                    MyMpi::rank(MPI_COMM_WORLD), job.getContextId());
                 req = left ? reqLeft : reqRight;
                 dest = req.multiBegin % _routing_tree.getNumWorkers();
                 LOG(V4_VVER, "multiplying request %s --\n", reqToMultiply.toStr().c_str());

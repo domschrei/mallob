@@ -20,10 +20,16 @@ private:
     
     std::optional<AllReduceElement> _local_elem;
     std::list<AllReduceElement> _child_elems;
+
     int _num_expected_child_elems;
     IntPair _expected_child_ranks;
+    IntPair _expected_child_indices;
+    std::pair<ctx_id_t, ctx_id_t> _expected_child_ctx_ids;
     std::pair<bool, bool> _received_child_elems;
+
     int _parent_rank;
+    int _parent_index;
+    ctx_id_t _parent_ctx_id;
 
     bool _aggregating = false;
     std::future<void> _future_aggregate;
@@ -48,8 +54,36 @@ public:
         int leftRank = _tree.hasLeftChild() ? _tree.getLeftChildNodeRank() : -1;
         int rightRank = _tree.hasRightChild() ? _tree.getRightChildNodeRank() : -1;
         _expected_child_ranks = IntPair(leftRank, rightRank);
+        _expected_child_indices = IntPair(
+            leftRank<0?-1: _tree.getLeftChildIndex(),
+            rightRank<0?-1: _tree.getRightChildIndex()
+        );
+        _expected_child_ctx_ids = std::pair<ctx_id_t, ctx_id_t>(
+            leftRank<0?0:_tree.getLeftChildContextId(), 
+            rightRank<0?0:_tree.getRightChildContextId()
+        );
         _received_child_elems = std::pair<bool, bool>(false, false);
+
         _parent_rank = _tree.getParentNodeRank();
+        _parent_index = _tree.getParentIndex();
+        _parent_ctx_id = _tree.getParentContextId();
+    
+        _base_msg.treeIndexOfSender = _tree.getIndex();
+        _base_msg.contextIdOfSender = _tree.getContextId();
+    }
+
+    void pruneChild(int rank) {
+        assert(rank >= 0);
+        bool left = rank == _expected_child_ranks.first;
+        bool right = rank == _expected_child_ranks.second;
+        if (left && !_received_child_elems.first) {
+            _expected_child_ranks.first = -1;
+            _num_expected_child_elems--;
+        }
+        if (right && !_received_child_elems.second) {
+            _expected_child_ranks.second = -1;
+            _num_expected_child_elems--;
+        }
     }
 
     // Set the function to compute the local contribution for the all-reduction.
@@ -148,6 +182,8 @@ public:
             } else {
                 // Send to parent
                 _base_msg.payload = std::move(_aggregated_elem.value());
+                _base_msg.treeIndexOfDestination = _parent_index;
+                _base_msg.contextIdOfDestination = _parent_ctx_id;
                 MyMpi::isend(_parent_rank, MSG_JOB_TREE_REDUCTION, _base_msg);
             }
         }
@@ -162,6 +198,8 @@ public:
         if (!_reduction_locally_done) {
             // Aggregation upwards was not performed yet: Send neutral element upwards
             _base_msg.payload = _neutral_elem;
+            _base_msg.treeIndexOfDestination = _parent_index;
+            _base_msg.contextIdOfDestination = _parent_ctx_id;
             MyMpi::isend(_parent_rank, MSG_JOB_TREE_REDUCTION, _base_msg);
         }
         // finished but not valid
@@ -206,10 +244,16 @@ private:
 
     void receiveAndForwardFinalElem(AllReduceElement&& elem) {
         receiveFinalElem(std::move(elem));
-        if (_expected_child_ranks.first >= 0) 
+        if (_expected_child_ranks.first >= 0) {
+            _base_msg.treeIndexOfDestination = _expected_child_indices.first;
+            _base_msg.contextIdOfDestination = _expected_child_ctx_ids.first;
             MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_BROADCAST, _base_msg);
-        if (_expected_child_ranks.second >= 0) 
+        }
+        if (_expected_child_ranks.second >= 0) {
+            _base_msg.treeIndexOfDestination = _expected_child_indices.second;
+            _base_msg.contextIdOfDestination = _expected_child_ctx_ids.second;
             MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_BROADCAST, _base_msg);
+        }
     }
 
 };

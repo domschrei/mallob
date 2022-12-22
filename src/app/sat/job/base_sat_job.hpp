@@ -1,15 +1,18 @@
 
 #pragma once
 
+#include "app/app_message_subscription.hpp"
 #include "app/job.hpp"
 #include "data/checksum.hpp"
 #include "app/sat/data/clause_metadata.hpp"
 
+class AnytimeSatClauseCommunicator; // fwd decl
+
 class BaseSatJob : public Job {
 
 public:
-    BaseSatJob(const Parameters& params, const JobSetup& setup) : 
-        Job(params, setup) {
+    BaseSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& appMsgTable) : 
+        Job(params, setup, appMsgTable) {
 
         // Launched in certified UNSAT mode?
         if (params.certifiedUnsat()) {
@@ -78,6 +81,9 @@ public:
     void setSolvingDone() {
         _done_solving = true;
     }
+
+protected:
+    std::shared_ptr<AnytimeSatClauseCommunicator> _clause_comm;
 
 private:
     float _compensation_factor = 1.0f;

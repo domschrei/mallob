@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "app/app_message_subscription.hpp"
 #include "app/app_registry.hpp"
 #include "job/forked_sat_job.hpp"
 #include "job/threaded_sat_job.hpp"
@@ -13,11 +14,11 @@ void register_mallob_app_sat() {
             return SatReader(params, files.front()).read(desc);
         },
         // Job creator
-        [](const Parameters& params, const Job::JobSetup& setup) -> Job* {
+        [](const Parameters& params, const Job::JobSetup& setup, AppMessageTable& table) -> Job* {
             if (params.applicationSpawnMode() == "fork") {
-                return new ForkedSatJob(params, setup);
+                return new ForkedSatJob(params, setup, table);
             } else {
-                return new ThreadedSatJob(params, setup);
+                return new ThreadedSatJob(params, setup, table);
             }
         },
         // Job solution formatter

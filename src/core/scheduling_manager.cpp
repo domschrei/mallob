@@ -2,6 +2,7 @@
 #include "scheduling_manager.hpp"
 
 #include "data/job_state.h"
+#include "data/job_transfer.hpp"
 #include "util/assert.hpp"
 #include <algorithm>
 #include <queue>
@@ -237,6 +238,10 @@ void SchedulingManager::checkSuspendedJobs() {
     }
 }
 
+void SchedulingManager::checkOldJobs() {
+    _job_registry.checkOldJobs();
+}
+
 void SchedulingManager::advanceBalancing() {
     _balancer.advance();
 
@@ -321,9 +326,12 @@ void SchedulingManager::handleIncomingJobRequest(MessageHandle& handle, JobReque
             _job_registry.create(req.jobId, req.applicationId, req.incremental);
         }
         Job& job = get(req.jobId);
-        MyMpi::isend(req.requestingNodeRank, 
-            req.requestedNodeIndex == 0 ? MSG_OFFER_ADOPTION_OF_ROOT : MSG_OFFER_ADOPTION,
-            req);
+        if (req.requestedNodeIndex == 0) {
+            MyMpi::isend(req.requestingNodeRank, MSG_OFFER_ADOPTION_OF_ROOT, req);
+        } else {
+            JobAdoptionOffer offer(req, job.getContextId());
+            MyMpi::isend(req.requestingNodeRank, MSG_OFFER_ADOPTION, offer);
+        }
         commit(job, req);
 
     } else if (adoptionResult == SchedulingManager::REJECT) {
@@ -350,7 +358,8 @@ void SchedulingManager::handleIncomingJobRequest(MessageHandle& handle, JobReque
 
 void SchedulingManager::handleAdoptionOffer(MessageHandle& handle) {
 
-    JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
+    JobAdoptionOffer offer = Serializable::get<JobAdoptionOffer>(handle.getRecvData());
+    auto& req = offer.request;
     LOG_ADD_SRC(V4_VVER, "Adoption offer for %s", handle.source, 
                     Job::toStr(req.jobId, req.requestedNodeIndex).c_str());
 
@@ -382,7 +391,7 @@ void SchedulingManager::handleAdoptionOffer(MessageHandle& handle) {
             // Adopt the job.
             // Child will start / resume its job solvers.
             // Mark new node as one of the node's children
-            auto relative = job.getJobTree().setChild(handle.source, req.requestedNodeIndex);
+            auto relative = job.getJobTree().setChild(handle.source, req.requestedNodeIndex, offer.contextId);
             if (relative == JobTree::TreeRelative::NONE) assert(req.requestedNodeIndex == 0);
         }
     }
@@ -620,20 +629,7 @@ void SchedulingManager::handleApplicationMessage(MessageHandle& handle) {
     
     // Deserialize job-specific message
     JobMessage msg = Serializable::get<JobMessage>(handle.getRecvData());
-
-    int jobId = msg.jobId;
-    if (!has(jobId)) {
-        LOG(V1_WARN, "[WARN] Job message from unknown job #%i\n", jobId);
-        if (!msg.returnedToSender) {
-            msg.returnedToSender = true;
-            MyMpi::isend(handle.source, handle.tag, msg);
-        }
-        return;
-    }
-
-    // Give message to corresponding job
-    Job& job = get(jobId);
-    job.communicate(handle.source, handle.tag, msg);
+    _job_registry.processAppMessage(handle.source, handle.tag, msg);
 }
 
 void SchedulingManager::handleJobResultFound(MessageHandle& handle) {
@@ -1092,7 +1088,8 @@ void SchedulingManager::resume(Job& job, const JobRequest& req, int source) {
     uncommit(job, /*leaving=*/false);
 
     // Already has job description: Directly resume job (if not terminated yet)
-    job.updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
+    job.updateJobTree(req.requestedNodeIndex, req.rootRank, req.rootContextId, 
+        req.requestingNodeRank, req.requestingNodeContextId);
     setLoad(1, req.jobId);
     LOG_ADD_SRC(V3_VERB, "RESUME %s", source, 
                 Job::toStr(req.jobId, req.requestedNodeIndex).c_str());
@@ -1222,6 +1219,8 @@ SchedulingManager::~SchedulingManager() {
 
     // Empty destruct queue into garbage for janitor to clean up
     while (_job_registry.hasJobsLeftToDelete()) {
+        MyMpi::getMessageQueue().advance();
+        checkOldJobs();
         forgetOldJobs();
         //_janitor_cond_var.notify(); // TODO needed?
         watchdog.reset();

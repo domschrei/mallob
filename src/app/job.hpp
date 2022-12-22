@@ -18,6 +18,7 @@
 #include "app/job_tree.hpp"
 #include "comm/job_comm.hpp"
 #include "scheduling/local_scheduler.hpp"
+#include "app/app_message_subscription.hpp"
 
 typedef std::function<void(JobRequest& req, int tag, bool left, int dest)> EmitDirectedJobRequestCallback;
 
@@ -172,6 +173,7 @@ private:
     std::optional<JobResult> _result;
     robin_hood::unordered_node_set<std::pair<int, int>, IntPairHasher> _waiting_rank_revision_pairs;
 
+    AppMessageSubscription _app_msg_subscription;
     JobTree _job_tree;
     JobComm _comm;
     
@@ -198,7 +200,7 @@ public:
         int applicationId;
         bool incremental;
     };
-    Job(const Parameters& params, const JobSetup& setup);
+    Job(const Parameters& params, const JobSetup& setup, AppMessageTable& appMsgTable);
     
     // Mark the job as being subject of a commitment to the given job request.
     // Requires the job to be not active and not committed.
@@ -227,7 +229,7 @@ public:
     // This method marks this job instance as the <index>th node working on it
     // and remembers the ranks of the root node of the job and of the parent
     // of this node.
-    void updateJobTree(int index, int rootRank, int parentRank);
+    void updateJobTree(int index, int rootRank, ctx_id_t rootContextId, int parentRank, ctx_id_t parentContextId);
 
 
     // Getter methods and simple queries
@@ -269,6 +271,7 @@ public:
     void clearJobDescription() {for (size_t i = 0; i < getRevision(); i++) _description.clearPayload(i);}
     void setTimeOfFirstVolumeUpdate(float time) {_time_of_first_volume_update = time;}
     
+    ctx_id_t getContextId() const {return _app_msg_subscription.getContextId();}
     int getGlobalNumWorkers() const {return _job_tree.getCommSize();}
     int getMyMpiRank() const {return _job_tree.getRank();}
     JobTree& getJobTree() {return _job_tree;}
@@ -338,9 +341,8 @@ public:
         int index = left ? _job_tree.getLeftChildIndex() : _job_tree.getRightChildIndex();
         if (_params.monoFilename.isSet()) _job_tree.updateJobNode(index, index);
 
-        JobRequest req(_id, _application_id, _job_tree.getRootNodeRank(), 
-                MyMpi::rank(MPI_COMM_WORLD), index, Timer::elapsedSeconds(), balancingEpoch, 
-                0, _incremental);
+        JobRequest req = _job_tree.getJobRequestFor(_id, left ? JobTree::LEFT_CHILD : JobTree::RIGHT_CHILD, 
+            balancingEpoch, _application_id, _incremental);
         req.revision = std::max(0, getDesiredRevision());
         return req;
     }
@@ -353,6 +355,14 @@ public:
     const char* jobStateToStr() const {return JOB_STATE_STRINGS[(int)_state];};
     static std::string toStr(int jobId, int jobIndex) {
         return "#" + std::to_string(jobId) + ":" + std::to_string(jobIndex);
+    }
+
+protected:
+
+    // Signal that this job should not receive any further messages until its destruction.
+    // Unregisters the job from app. communication table.
+    void finalizeCommunication() {
+        _app_msg_subscription.destroy();
     }
 };
 

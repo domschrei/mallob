@@ -100,7 +100,7 @@ function test_oscillating() {
     wclimit=60s arrival=15 application=$app priority=0.2 introduce_job sat-main-2 instances/r3sat_300.cnf
     wclimit=60s arrival=30 application=$app priority=0.3 introduce_job sat-main-3 instances/r3unsat_300.cnf
     wclimit=60s arrival=45 application=$app priority=0.4 introduce_job sat-main-4 instances/r3sat_300.cnf
-    nocleanup=1 test 16 -t=1 -c=1 -J=$((n+4)) -satsolver=l${glucose}ck -checkjsonresults $@
+    test 16 -t=1 -c=1 -J=$((n+4)) -satsolver=l${glucose}ck -checkjsonresults $@
 }
 
 function test_incremental_scheduling() {
@@ -112,15 +112,15 @@ function test_incremental_scheduling() {
 
 function test_certified_unsat() {
     for pipearg in "" "--pipe"; do
-        test_cert_unsat 2 instances/r3sat_200.cnf $pipearg -assertresult=SAT $@
         test_cert_unsat 2 instances/r3unsat_200.cnf $pipearg -assertresult=UNSAT $@
-        #test_cert_unsat 2 instances/r3unsat_300.cnf $pipearg -assertresult=UNSAT $@
+        test_cert_unsat 2 instances/r3sat_200.cnf $pipearg -assertresult=SAT $@
     done
+    test_cert_unsat 8 instances/r3unsat_250.cnf --pipe -assertresult=UNSAT -t=2 $@
 }
 
 
 if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
-    echo "Usage: $0 [<mallob-option-overrides>] <test case> [<more test cases> ...]"
+    echo "Usage: [nocleanup=1] $0 [<mallob-option-overrides>] <test case> [<more test cases> ...]"
     echo "Possible test cases: mono drysched sched osc stream inc manyinc incsched certunsat all"
     exit 0
 fi

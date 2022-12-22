@@ -12,8 +12,8 @@
 #include "sat_process_config.hpp"
 #include "util/sys/thread_pool.hpp"
 
-ThreadedSatJob::ThreadedSatJob(const Parameters& params, const JobSetup& setup) : 
-        BaseSatJob(params, setup), _done_locally(false) {}
+ThreadedSatJob::ThreadedSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table) : 
+        BaseSatJob(params, setup, table), _done_locally(false) {}
 
 void ThreadedSatJob::appl_start() {
 
@@ -26,7 +26,7 @@ void ThreadedSatJob::appl_start() {
     _solver = std::unique_ptr<SatEngine>(
         new SatEngine(hParams, config, Logger::getMainInstance())
     );
-    _clause_comm = (void*) new AnytimeSatClauseCommunicator(_params, this);
+    _clause_comm.reset(new AnytimeSatClauseCommunicator(_params, this));
 
     //log(V5_DEBG, "%s : beginning to solve\n", toStr());
     const JobDescription& desc = getDescription();
@@ -48,7 +48,7 @@ void ThreadedSatJob::appl_start() {
 void ThreadedSatJob::appl_suspend() {
     if (!_initialized) return;
     getSolver()->setPaused();
-    ((AnytimeSatClauseCommunicator*)_clause_comm)->communicate();
+    _clause_comm->communicate();
 }
 
 void ThreadedSatJob::appl_resume() {
@@ -58,13 +58,7 @@ void ThreadedSatJob::appl_resume() {
 
 void ThreadedSatJob::appl_terminate() {
     if (!_initialized) return;
-    if (_destroy_future.valid()) return; 
-    _destroy_future = ProcessWideThreadPool::get().addTask([this]() {
-        delete (AnytimeSatClauseCommunicator*)_clause_comm;
-        _clause_comm = NULL;
-        _solver->terminateSolvers();
-        _solver->cleanUp();
-    });
+    getSolver()->terminateSolvers();
 }
 
 JobResult&& ThreadedSatJob::appl_getResult() {
@@ -133,24 +127,31 @@ void ThreadedSatJob::appl_dumpStats() {
 
 bool ThreadedSatJob::appl_isDestructible() {
     if (!_initialized) return true;
-    return //((AnytimeSatClauseCommunicator*) _clause_comm)->isDestructible() && 
-        _solver->isCleanedUp();
+    if (!_clause_comm->isDestructible()) {
+        _clause_comm->communicate(); // may advance destructibility
+        return false;
+    }
+    // Destructible!
+    if (!_destroy_future.valid()) {
+        _destroy_future = ProcessWideThreadPool::get().addTask([this]() {
+            _solver->cleanUp();
+        });
+        return false;
+    }
+    return _destroy_future.valid() && _solver->isCleanedUp();
 }
 
 void ThreadedSatJob::appl_communicate() {
     if (!_initialized) return;
-    ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
+    _clause_comm->communicate();
 }
 
 void ThreadedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
     if (!_initialized) {
-        if (!msg.returnedToSender) {
-            msg.returnedToSender = true;
-            MyMpi::isend(source, mpiTag, msg);
-        }
+        msg.returnToSender(source, mpiTag);
         return;
     }
-    ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, mpiTag, msg);
+    _clause_comm->handle(source, mpiTag, msg);
 }
 
 void ThreadedSatJob::appl_memoryPanic() {
@@ -218,7 +219,6 @@ void ThreadedSatJob::returnClauses(std::vector<int>& clauses) {
 ThreadedSatJob::~ThreadedSatJob() {
     if (!_initialized) return;
     LOG(V5_DEBG, "%s : enter TSJ destructor\n", toStr());
-    if (!_destroy_future.valid()) appl_terminate();
     _destroy_future.get();
     LOG(V5_DEBG, "%s : destructed TSJ\n", toStr());
 }

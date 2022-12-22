@@ -4,6 +4,7 @@
 
 #include <set>
 #include <list>
+#include "comm/msgtags.h"
 #include "util/assert.hpp"
 
 #include "util/hashing.hpp"
@@ -18,10 +19,13 @@ class JobTree {
 private:
     const int _comm_size;
     const int _rank;
+    const int _ctx_id;
     int _index = -1;
     AdjustablePermutation _job_node_ranks;
-    bool _has_left_child = false;
-    bool _has_right_child = false;
+    ctx_id_t _root_ctx_id {0};
+    ctx_id_t _parent_ctx_id {0};
+    ctx_id_t _left_child_ctx_id {0};
+    ctx_id_t _right_child_ctx_id {0};
     int _client_rank;
     robin_hood::unordered_set<int> _past_children;
 
@@ -59,8 +63,9 @@ private:
     int _stop_wait_epoch = -1;
 
 public:
-    JobTree(int commSize, int rank, int seed, bool useDormantChildren) : 
-        _comm_size(commSize), _rank(rank), _job_node_ranks(commSize, seed), 
+    JobTree(int commSize, int rank, ctx_id_t contextId, int seed, bool useDormantChildren) : 
+        _comm_size(commSize), _rank(rank), _ctx_id(contextId), 
+        _job_node_ranks(commSize, seed), 
         _use_dormant_children(useDormantChildren) {
         
         if (_use_dormant_children) _it_dormant_children = _dormant_children.begin();
@@ -79,9 +84,7 @@ public:
         int index = getRightChildIndex();
         return index < _comm_size ? _job_node_ranks[index] : -1;
     }
-    bool isLeaf() const {return !_has_left_child && !_has_right_child;}
-    bool hasLeftChild() const {return _has_left_child;}
-    bool hasRightChild() const {return _has_right_child;}
+    bool isLeaf() const {return !hasLeftChild() && !hasRightChild();}
     int getLeftChildIndex() const {return 2*(_index+1)-1;}
     int getRightChildIndex() const {return 2*(_index+1);}
     int getParentNodeRank() const {return isRoot() ? _client_rank : _job_node_ranks[getParentIndex()];}
@@ -104,9 +107,12 @@ public:
 
     enum TreeRelative {LEFT_CHILD, RIGHT_CHILD, NONE};
     JobRequest getJobRequestFor(int jobId, TreeRelative rel, int balancingEpoch, int appId, bool incremental) {
-        return JobRequest(jobId, appId, getRootNodeRank(), _rank, 
+        JobRequest req(jobId, appId, getRootNodeRank(), _rank, 
                 rel == LEFT_CHILD ? getLeftChildIndex() : getRightChildIndex(), 
                 Timer::elapsedSeconds(), balancingEpoch, 0, incremental);
+        req.rootContextId = getRootContextId();
+        req.requestingNodeContextId = getContextId();
+        return req;
     }
     TreeRelative prune(int leavingRank, int leavingIndex) {
         if (hasLeftChild() && getLeftChildIndex() == leavingIndex && getLeftChildNodeRank() == leavingRank) {
@@ -120,27 +126,83 @@ public:
         return NONE;
     }
 
-    TreeRelative setChild(int rank, int index) {
+    TreeRelative setChild(int rank, int index, ctx_id_t contextId) {
         if (index == getLeftChildIndex()) {
-            setLeftChild(rank);
+            setLeftChild(rank, contextId);
             return LEFT_CHILD;
         }
         if (index == getRightChildIndex()) {
-            setRightChild(rank);
+            setRightChild(rank, contextId);
             return RIGHT_CHILD;
         }
         return NONE;
     }
-    void setLeftChild(int rank) {
-        _has_left_child = true;
+    void setLeftChild(int rank, int contextId) {
+        _left_child_ctx_id = contextId;
         updateJobNode(getLeftChildIndex(), rank);
         fulfilDesireLeft(Timer::elapsedSeconds());
     }
-    void setRightChild(int rank) {
-        _has_right_child = true;
+    void setRightChild(int rank, int contextId) {
+        _right_child_ctx_id = contextId;
         updateJobNode(getRightChildIndex(), rank);
         fulfilDesireRight(Timer::elapsedSeconds());
     }
+
+    bool hasLeftChild() const {
+        return _left_child_ctx_id != 0;
+    }
+    bool hasRightChild() const {
+        return _right_child_ctx_id != 0;
+    }
+
+    ctx_id_t getContextId() const {
+        return _ctx_id;
+    }
+    ctx_id_t getRootContextId() const {
+        return _root_ctx_id;
+    }
+    ctx_id_t getParentContextId() const {
+        return _parent_ctx_id;
+    }
+    ctx_id_t getLeftChildContextId() const {
+        return _left_child_ctx_id;
+    }
+    ctx_id_t getRightChildContextId() const {
+        return _right_child_ctx_id;
+    }
+
+    void sendToSelf(JobMessage& msg, int mpiTag = MSG_SEND_APPLICATION_MESSAGE) const {
+        msg.treeIndexOfDestination = getIndex();
+        msg.contextIdOfDestination = _ctx_id;
+        this->send(getRank(), mpiTag, msg);
+    }
+    void sendToRoot(JobMessage& msg, int mpiTag = MSG_SEND_APPLICATION_MESSAGE) const {
+        msg.treeIndexOfDestination = 0;
+        msg.contextIdOfDestination = getRootContextId();
+        this->send(getRootNodeRank(), mpiTag, msg);
+    }
+    void sendToParent(JobMessage& msg, int mpiTag = MSG_SEND_APPLICATION_MESSAGE) const {
+        msg.treeIndexOfDestination = getParentIndex();
+        msg.contextIdOfDestination = getParentContextId();
+        this->send(getParentNodeRank(), mpiTag, msg);
+    }
+    void sendToAnyChildren(JobMessage& msg, int mpiTag = MSG_SEND_APPLICATION_MESSAGE) const {
+        if (hasLeftChild()) sendToLeftChild(msg, mpiTag);
+        if (hasRightChild()) sendToRightChild(msg, mpiTag);
+    }
+    void sendToLeftChild(JobMessage& msg, int mpiTag = MSG_SEND_APPLICATION_MESSAGE) const {
+        assert(hasLeftChild());
+        msg.treeIndexOfDestination = getLeftChildIndex();
+        msg.contextIdOfDestination = getLeftChildContextId();
+        this->send(getLeftChildNodeRank(), mpiTag, msg);
+    }
+    void sendToRightChild(JobMessage& msg, int mpiTag = MSG_SEND_APPLICATION_MESSAGE) const {
+        assert(hasRightChild());
+        msg.treeIndexOfDestination = getRightChildIndex();
+        msg.contextIdOfDestination = getRightChildContextId();
+        this->send(getRightChildNodeRank(), mpiTag, msg);
+    }
+
     void addSendHandle(int dest, int sendId) {
         if (dest == getLeftChildNodeRank())
             _send_handles_left.push_back(sendId);
@@ -167,11 +229,11 @@ public:
         }
     }
     void unsetLeftChild() {
-        if (!_has_left_child) return; 
+        if (!hasLeftChild()) return; 
         int rank = getLeftChildNodeRank();
         _past_children.insert(rank);
         addDormantChild(rank);
-        _has_left_child = false;
+        _left_child_ctx_id = 0;
         for (int id : _send_handles_left) {
             MyMpi::getMessageQueue().cancelSend(id);
         }
@@ -179,23 +241,28 @@ public:
         _job_node_ranks.clear(getLeftChildIndex());
     }
     void unsetRightChild() {
-        if (!_has_right_child) return;
+        if (!hasRightChild()) return;
         int rank = getRightChildNodeRank();
         _past_children.insert(rank); 
         addDormantChild(rank);
-        _has_right_child = false;
+        _right_child_ctx_id = 0;
         for (int id : _send_handles_right) {
             MyMpi::getMessageQueue().cancelSend(id);
         }
         _send_handles_right.clear();
         _job_node_ranks.clear(getRightChildIndex());
     }
-    void update(int index, int rootRank, int parentRank) {    
+    void update(int index, int rootRank, ctx_id_t rootContextId, int parentRank, ctx_id_t parentContextId) {    
         _index = index;
         if (index == 0 || rootRank < 0) rootRank = _rank; // this is the root node
         updateJobNode(0, rootRank);
         updateJobNode(_index, _rank);
         updateParentNodeRank(parentRank);
+        if (index == 0) _root_ctx_id = getContextId();
+        else _root_ctx_id = rootContextId;
+        assert(_root_ctx_id != 0);
+        _parent_ctx_id = parentContextId;
+        assert(index == 0 || _parent_ctx_id != 0);
     }
     void updateJobNode(int index, int newRank) {
         _job_node_ranks.adjust(index, newRank);
@@ -278,6 +345,12 @@ public:
     }
 
 private:
+    void send(int dest, int mpiTag, JobMessage& msg) const {
+        msg.treeIndexOfSender = getIndex();
+        msg.contextIdOfSender = _ctx_id;
+        MyMpi::isend(dest, mpiTag, msg);
+    }
+
     void setDesire(float& member, float time) {
         if (member == -1) {
             // new desire

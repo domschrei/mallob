@@ -128,7 +128,7 @@ public:
             LOG(V4_VVER, "PRISMA id=%i received cancelled %s\n", id, req.toStr().c_str());
             _open_matchings[id].requestArrived = true;
             // Propagate multiplied child requests as well
-            auto [leftReq, rightReq] = req.getMultipliedChildRequests(-1);
+            auto [leftReq, rightReq] = req.getMultipliedChildRequests();
             for (auto& childReq : {leftReq, rightReq}) {
                 if (childReq.jobId == -1) continue;
                 LOG(V4_VVER, "PRISMA CANCEL %s\n", childReq.toStr().c_str());

@@ -16,7 +16,7 @@ private:
     const Parameters& _params;
     BaseSatJob* _job;
     AdaptiveClauseDatabase& _cdb;
-    ClauseHistory& _cls_history;
+    ClauseHistory* _cls_history;
     int _epoch;
     enum Stage {
         PRODUCING_CLAUSES,
@@ -36,12 +36,12 @@ private:
 
 public:
     ClauseSharingSession(const Parameters& params, BaseSatJob* job, AdaptiveClauseDatabase& cdb,
-            ClauseHistory& clsHistory, int epoch, float compensationFactor) : 
+            ClauseHistory* clsHistory, int epoch, float compensationFactor) : 
         _params(params), _job(job), _cdb(cdb), _cls_history(clsHistory), _epoch(epoch),
         _allreduce_clauses(
             job->getJobTree(),
             // Base message 
-            JobMessage(_job->getId(), _job->getRevision(), epoch, MSG_ALLREDUCE_CLAUSES),
+            JobMessage(_job->getId(), _job->getContextId(), _job->getRevision(), epoch, MSG_ALLREDUCE_CLAUSES),
             // Neutral element
             std::vector<int>(1, 1), // only integer: number of aggregated job tree nodes
             // Aggregator for local + incoming elements
@@ -52,7 +52,7 @@ public:
         _allreduce_filter(
             job->getJobTree(), 
             // Base message
-            JobMessage(_job->getId(), _job->getRevision(), epoch, MSG_ALLREDUCE_FILTER),
+            JobMessage(_job->getId(), _job->getContextId(), _job->getRevision(), epoch, MSG_ALLREDUCE_FILTER),
             // Neutral element
             std::vector<int>(ClauseMetadata::numBytes(), 0),
             // Aggregator for local + incoming elements
@@ -69,6 +69,11 @@ public:
             int limit = _job->getBufferLimit(1, MyMpi::SELF);
             _job->prepareSharing(limit);
         }
+    }
+
+    void pruneChild(int rank) {
+        _allreduce_clauses.pruneChild(rank);
+        _allreduce_filter.pruneChild(rank);
     }
 
     void advanceSharing() {
@@ -218,9 +223,9 @@ private:
         LOG(V4_VVER, "%s : learn s=%i\n", _job->toStr(), clauses.size());
         
         // Add clause batch to history
-        _cls_history.addEpoch(epoch, clauses, /*entireIndex=*/false);
+        _cls_history->addEpoch(epoch, clauses, /*entireIndex=*/false);
 
         // Send next batches of historic clauses to subscribers as necessary
-        _cls_history.sendNextBatches();
+        _cls_history->sendNextBatches();
     }
 };

@@ -14,8 +14,8 @@ private:
     JobResult _result;
 
 public:
-    DummyJob(const Parameters& params, const JobSetup& setup) 
-        : Job(params, setup) {}
+    DummyJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table) 
+        : Job(params, setup, table) {}
     void appl_start() override {}
     void appl_suspend() override {}
     void appl_resume() override {}

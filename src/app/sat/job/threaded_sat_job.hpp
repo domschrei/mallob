@@ -5,6 +5,7 @@
 #include <memory>
 #include <thread>
 #include <future>
+#include "app/app_message_subscription.hpp"
 #include "util/assert.hpp"
 
 #include "app/job.hpp"
@@ -23,7 +24,7 @@ private:
     std::atomic_bool _initialized = false;
 
     std::unique_ptr<SatEngine> _solver;
-    void* _clause_comm = NULL; // SatClauseCommunicator instance (avoiding fwd decl.)
+
     std::vector<int> _clause_buffer;
     Checksum _clause_checksum;
     bool _did_filter = false;
@@ -42,7 +43,7 @@ private:
 
 public:
 
-    ThreadedSatJob(const Parameters& params, const JobSetup& setup);
+    ThreadedSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& appMsgTable);
     virtual ~ThreadedSatJob() override;
 
     void appl_start() override;

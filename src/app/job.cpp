@@ -9,7 +9,7 @@
 #include "util/permutation.hpp"
 
 
-Job::Job(const Parameters& params, const JobSetup& setup) :
+Job::Job(const Parameters& params, const JobSetup& setup, AppMessageTable& appMsgTable) :
             _params(params), 
             _id(setup.jobId),
             _name("#" + std::to_string(setup.jobId)),
@@ -17,20 +17,21 @@ Job::Job(const Parameters& params, const JobSetup& setup) :
             _incremental(setup.incremental),
             _time_of_arrival(Timer::elapsedSeconds()), 
             _state(INACTIVE),
-            _job_tree(setup.commSize, setup.worldRank, setup.jobId, params.useDormantChildren()), 
+            _app_msg_subscription(appMsgTable, setup.jobId, this),
+            _job_tree(setup.commSize, setup.worldRank, _app_msg_subscription.getContextId(), 
+                setup.jobId, params.useDormantChildren()), 
             _comm(_id, _job_tree, params.jobCommUpdatePeriod()) {
-    
+
     _growth_period = _params.growthPeriod();
     _continuous_growth = _params.continuousGrowth();
     _max_demand = _params.maxDemand();
     _threads_per_job = _params.numThreadsPerProcess();
 }
 
-void Job::updateJobTree(int index, int rootRank, int parentRank) {
-
+void Job::updateJobTree(int index, int rootRank, ctx_id_t rootContextId, int parentRank, ctx_id_t parentContextId) {
     if (index == 0) rootRank = -1;
     _name = "#" + std::to_string(_id) + ":" + std::to_string(index);
-    _job_tree.update(index, rootRank, parentRank);
+    _job_tree.update(index, rootRank, rootContextId, parentRank, parentContextId);
 }
 
 void Job::commit(const JobRequest& req) {
@@ -38,7 +39,8 @@ void Job::commit(const JobRequest& req) {
     assert(getState() != PAST);
     _balancing_epoch_of_last_commitment = req.balancingEpoch;
     _job_tree.clearJobNodeUpdates();
-    updateJobTree(req.requestedNodeIndex, req.rootRank, req.requestingNodeRank);
+    updateJobTree(req.requestedNodeIndex, req.rootRank, req.rootContextId, 
+        req.requestingNodeRank, req.requestingNodeContextId);
     _commitment = req;
 }
 
@@ -123,8 +125,16 @@ void Job::terminate() {
 }
 
 bool Job::isDestructible() {
-    assert(getState() == PAST);
-    return appl_isDestructible();
+    bool destructible;
+    if (getState() != PAST) destructible = false;
+    else destructible = appl_isDestructible();
+
+    // The job signalling to be destructible means that it does not need to
+    // (and is not allowed to) process any further application messages.
+    // Therefore, we immediately unregister it from the app. message table.
+    if (destructible) finalizeCommunication();
+
+    return destructible;
 }
 
 int Job::getDemand() const {

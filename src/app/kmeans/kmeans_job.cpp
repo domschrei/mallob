@@ -7,6 +7,7 @@
 #include "app/job.hpp"
 #include "app/job_tree.hpp"
 #include "comm/job_tree_all_reduction.hpp"
+#include "comm/msgtags.h"
 #include "comm/mympi.hpp"
 #include "kmeans_utils.hpp"
 #include "util/assert.hpp"
@@ -15,8 +16,8 @@
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
-KMeansJob::KMeansJob(const Parameters& params, const JobSetup& setup)
-    : Job(params, setup) {
+KMeansJob::KMeansJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
+    : Job(params, setup, table) {
 }
 
 void KMeansJob::appl_start() {
@@ -35,7 +36,7 @@ void KMeansJob::appl_start() {
     data = getSerializedDescription(0)->data();
     pointsStart = (float*)(data + getDescription().getMetadataSize() + 3 * sizeof(int));
     LOG(V5_DEBG, "                           myIndex: %i getting ready\n", myIndex);
-    baseMsg = JobMessage(getId(),
+    baseMsg = JobMessage(getId(), getContextId(),
                          getRevision(),
                          epoch,
                          MSG_BROADCAST_DATA);
@@ -94,7 +95,7 @@ void KMeansJob::initReducer(JobMessage& msg) {
     // msg.payload.push_back(countCurrentWorkers);
 
     reducer.reset(new JobTreeAllReduction(tempJobTree,
-                                          JobMessage(getId(),
+                                          JobMessage(getId(), getContextId(),
                                                      getRevision(),
                                                      epoch,
                                                      MSG_ALLREDUCE_CLAUSES),
@@ -130,7 +131,7 @@ void KMeansJob::sendRootNotification() {
     baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
     baseMsg.payload.push_back(countCurrentWorkers);
     LOG(V5_DEBG, "                           myIndex: %i sendRootNotification0\n", myIndex);
-    MyMpi::isend(getJobTree().getRootNodeRank(), MSG_SEND_APPLICATION_MESSAGE, baseMsg);
+    getJobTree().sendToRoot(baseMsg);
 }
 void KMeansJob::doInitWork() {
     initMsgTask = ProcessWideThreadPool::get().addTask([&]() {
@@ -158,7 +159,7 @@ void KMeansJob::appl_suspend() {
         myIndex = getJobTree().getIndex();
     }
     baseMsg.payload.assign(1, myIndex);
-    MyMpi::isend(getJobTree().getParentNodeRank(), MSG_SEND_APPLICATION_MESSAGE, baseMsg);
+    getJobTree().sendToParent(baseMsg);
 }
 void KMeansJob::appl_resume() {
     LOG(V5_DEBG, "                           myIndex: %i i got RESUMED :D iter: %i\n", myIndex, iterationsDone);
@@ -270,7 +271,7 @@ void KMeansJob::appl_communicate() {
                 baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
                 baseMsg.payload.push_back(countCurrentWorkers);
                 LOG(V5_DEBG, "                           myIndex: %i sendRootNotification1\n", myIndex);
-                MyMpi::isend(getJobTree().getRootNodeRank(), MSG_SEND_APPLICATION_MESSAGE, baseMsg);
+                getJobTree().sendToRoot(baseMsg);
                 // only root...?
 
                 // continue broadcasting
@@ -291,7 +292,7 @@ void KMeansJob::appl_communicate() {
             baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
             baseMsg.payload.push_back(this->getVolume());
             LOG(V5_DEBG, "                           myIndex: %i sendRootNotification2\n", myIndex);
-            MyMpi::isend(getJobTree().getRootNodeRank(), MSG_SEND_APPLICATION_MESSAGE, baseMsg);
+            getJobTree().sendToRoot(baseMsg);
         }
     }
 }
@@ -414,11 +415,11 @@ void KMeansJob::advanceCollective(JobMessage& msg, JobTree& jobTree) {
 
     if (jobTree.hasLeftChild() && jobTree.getLeftChildIndex() < countCurrentWorkers) {
         LOG(V5_DEBG, "                           myIndex: %i sendTo %i type: %i\n", myIndex, jobTree.getLeftChildIndex(), MSG_SEND_APPLICATION_MESSAGE);
-        MyMpi::isend(jobTree.getLeftChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+        getJobTree().sendToLeftChild(baseMsg);
     }
     if (jobTree.hasRightChild() && jobTree.getRightChildIndex() < countCurrentWorkers) {
         LOG(V5_DEBG, "                           myIndex: %i sendTo %i type: %i\n", myIndex, jobTree.getRightChildIndex(), MSG_SEND_APPLICATION_MESSAGE);
-        MyMpi::isend(jobTree.getRightChildNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+        getJobTree().sendToRightChild(baseMsg);
     }
 }
 void KMeansJob::appl_dumpStats() {}

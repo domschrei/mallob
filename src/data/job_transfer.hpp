@@ -10,14 +10,23 @@
 #include "data/job_description.hpp"
 #include "util/sys/timer.hpp"
 
+// Context ID: unique to a particular worker for a particular job
+// on a particular MPI process. Used for unambiguous communication
+// among the workers of a job.
+typedef unsigned long ctx_id_t;
+
 /**
  * Sent around during the search of a node to adopt the job.
  */
 struct JobRequest : public Serializable {
 
     int jobId {-1};
+
     int rootRank;
+    ctx_id_t rootContextId {0};
     int requestingNodeRank;
+    ctx_id_t requestingNodeContextId {0};
+
     int requestedNodeIndex;
     int revision;
     float timeOfBirth;
@@ -54,6 +63,8 @@ public:
         jobId = other.jobId;
         rootRank = other.rootRank;
         requestingNodeRank = other.requestingNodeRank;
+        rootContextId = other.rootContextId;
+        requestingNodeContextId = other.requestingNodeContextId;
         requestedNodeIndex = other.requestedNodeIndex;
         revision = other.revision;
         timeOfBirth = other.timeOfBirth;
@@ -72,6 +83,8 @@ public:
         jobId = other.jobId;
         rootRank = other.rootRank;
         requestingNodeRank = other.requestingNodeRank;
+        rootContextId = other.rootContextId;
+        requestingNodeContextId = other.requestingNodeContextId;
         requestedNodeIndex = other.requestedNodeIndex;
         revision = other.revision;
         timeOfBirth = other.timeOfBirth;
@@ -108,7 +121,7 @@ public:
             (multiplicity - (multiEnd - multiBegin))
         );
     }
-    std::pair<JobRequest, JobRequest> getMultipliedChildRequests(int requestingRank) {
+    std::pair<JobRequest, JobRequest> getMultipliedChildRequests(int requestingRank = -1, ctx_id_t requestingContextId = 0) {
         std::pair<JobRequest, JobRequest> result;
         if (multiplicity == 1 || multiBegin == -1 || multiEnd == -1) return result;
 
@@ -121,6 +134,7 @@ public:
             result.first = *this;
             result.first.requestedNodeIndex = 2*requestedNodeIndex+1;
             result.first.requestingNodeRank = requestingRank;
+            result.first.requestingNodeContextId = requestingContextId;
             result.first.numHops = 0;
             result.first.multiBegin = leftChildDest;
             result.first.timeOfBirth = Timer::elapsedSeconds();
@@ -132,6 +146,7 @@ public:
             result.second = *this;
             result.second.requestedNodeIndex = 2*requestedNodeIndex+2;
             result.second.requestingNodeRank = requestingRank;
+            result.second.requestingNodeContextId = requestingContextId;
             result.second.numHops = 0;
             result.second.multiBegin = rightChildDest;
             result.second.timeOfBirth = Timer::elapsedSeconds();
@@ -159,6 +174,18 @@ public:
     }
 };
 
+struct JobAdoptionOffer : public Serializable {
+
+    JobRequest request;
+    ctx_id_t contextId;
+
+    JobAdoptionOffer() = default;
+    JobAdoptionOffer(const JobRequest& req, ctx_id_t contextId) : request(req), contextId(contextId) {}
+
+    std::vector<uint8_t> serialize() const override;
+    JobAdoptionOffer& deserialize(const std::vector<uint8_t> &packed) override;
+};
+
 struct OneshotJobRequestRejection : public Serializable {
 
     JobRequest request;
@@ -172,50 +199,13 @@ struct OneshotJobRequestRejection : public Serializable {
     OneshotJobRequestRejection& deserialize(const std::vector<uint8_t> &packed) override;
 };
 
-struct WorkRequest : public Serializable {
-    int requestingRank;
-    int numHops;
-    int balancingEpoch;
-
-    WorkRequest() = default;
-    WorkRequest(int rank, int balancingEpoch) : requestingRank(rank), numHops(0), balancingEpoch(balancingEpoch) {}
-
-    std::vector<uint8_t> serialize() const override;
-    WorkRequest& deserialize(const std::vector<uint8_t> &packed) override;
-};
-
-struct WorkRequestComparator {
-    bool operator()(const WorkRequest& lhs, const WorkRequest& rhs) const;
-};
-
-/**
- * Sent as pre-information on a job that will be transferred
- * based on a previous commitment.
- */
-struct JobSignature : public Serializable {
-
-    int jobId;
-    int rootRank;
-    int firstIncludedRevision;
-    size_t transferSize;
-
-public:
-    JobSignature() = default;
-
-    JobSignature(int jobId, int rootRank, int firstIncludedRevision, size_t transferSize) :
-        jobId(jobId),
-        rootRank(rootRank),
-        firstIncludedRevision(firstIncludedRevision),
-        transferSize(transferSize) {}
-
-    int getTransferSize() const;
-    std::vector<uint8_t> serialize() const override;
-    JobSignature& deserialize(const std::vector<uint8_t>& packed) override;
-};
-
 struct JobMessage : public Serializable {
 
     int jobId;
+    int treeIndexOfSender {-1};
+    int treeIndexOfDestination {-1};
+    ctx_id_t contextIdOfSender {0};
+    ctx_id_t contextIdOfDestination {0};
     int revision;
     int tag;
     int epoch;
@@ -225,13 +215,15 @@ struct JobMessage : public Serializable {
 
 public:
     JobMessage() {}
-    JobMessage(int jobId, int revision, int epoch, int tag) : 
-        jobId(jobId), revision(revision), tag(tag), epoch(epoch) {}
-    JobMessage(int jobId, int revision, int epoch, int tag, std::initializer_list<int> payload) : 
-        jobId(jobId), revision(revision), tag(tag), epoch(epoch), payload(payload) {}
+    JobMessage(int jobId, ctx_id_t contextIdOfDestination, int revision, int epoch, int tag) : 
+        jobId(jobId), contextIdOfDestination(contextIdOfDestination), revision(revision), tag(tag), epoch(epoch) {}
+    JobMessage(int jobId, ctx_id_t contextIdOfDestination, int revision, int epoch, int tag, std::initializer_list<int> payload) : 
+        jobId(jobId), contextIdOfDestination(contextIdOfDestination), revision(revision), tag(tag), epoch(epoch), payload(payload) {}
 
     std::vector<uint8_t> serialize() const override;
     JobMessage& deserialize(const std::vector<uint8_t>& packed) override;
+
+    void returnToSender(int senderRank, int mpiTag);
 };
 
 struct IntPair : public Serializable {

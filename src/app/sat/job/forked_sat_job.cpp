@@ -1,5 +1,6 @@
 
 #include <thread>
+#include "app/app_message_subscription.hpp"
 #include "util/assert.hpp"
 
 #include "util/logger.hpp"
@@ -14,8 +15,8 @@
 
 std::atomic_int ForkedSatJob::_static_subprocess_index = 1;
 
-ForkedSatJob::ForkedSatJob(const Parameters& params, const JobSetup& setup) : 
-        BaseSatJob(params, setup) {
+ForkedSatJob::ForkedSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table) : 
+        BaseSatJob(params, setup, table) {
 }
 
 void ForkedSatJob::appl_start() {
@@ -38,13 +39,17 @@ void ForkedSatJob::doStartSolver() {
     // do not copy the entire job description if the spawned job is an empty dummy
     bool dummyJob = config.threads == 0; 
 
+    if (!_initialized) {
+        _clause_comm.reset(new AnytimeSatClauseCommunicator(_params, this));
+    }
+
     _solver.reset(new SatProcessAdapter(
         std::move(hParams), std::move(config), this,
         dummyJob ? std::min(1ul, desc.getFormulaPayloadSize(0)) : desc.getFormulaPayloadSize(0), 
         desc.getFormulaPayload(0), 
         dummyJob ? std::min(1ul, desc.getAssumptionsSize(0)) : desc.getAssumptionsSize(0),
         desc.getAssumptionsPayload(0),
-        (AnytimeSatClauseCommunicator*)_clause_comm
+        _clause_comm
     ));
     loadIncrements();
 
@@ -54,7 +59,7 @@ void ForkedSatJob::doStartSolver() {
     if (_initialized) {
         // solver was already initialized before and was then restarted: 
         // Re-learn all historic clauses which the communicator still remembers
-        ((AnytimeSatClauseCommunicator*)_clause_comm)->feedHistoryIntoSolver();
+        _clause_comm->feedHistoryIntoSolver();
     }
 }
 
@@ -87,19 +92,18 @@ void ForkedSatJob::loadIncrements() {
 void ForkedSatJob::appl_suspend() {
     if (!_initialized) return;
     _solver->setSolvingState(SolvingStates::SUSPENDED);
-    if (checkClauseComm()) ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
+    _clause_comm->communicate();
 }
 
 void ForkedSatJob::appl_resume() {
     if (!_initialized) return;
     _solver->setSolvingState(SolvingStates::ACTIVE);
-    if (checkClauseComm()) ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
+    _clause_comm->communicate();
 }
 
 void ForkedSatJob::appl_terminate() {
     if (!_initialized) return;
     _solver->setSolvingState(SolvingStates::ABORTING);
-    startDestructThreadIfNecessary();
 }
 
 int ForkedSatJob::appl_solved() {
@@ -107,19 +111,9 @@ int ForkedSatJob::appl_solved() {
     if (!_initialized || getState() != ACTIVE) return result;
     loadIncrements();
     if (_done_locally || _assembling_proof) {
-        if (_assembling_proof && ((AnytimeSatClauseCommunicator*)_clause_comm)->isDoneAssemblingProof()) {
+        if (_assembling_proof && _clause_comm->isDoneAssemblingProof()) {
             _assembling_proof = false;
             return _internal_result.result;
-        }
-        return result;
-    }
-
-    // Is there still a crash to be handled?
-    if (_crash_pending) {
-        if (!checkClauseComm() || _solver->getClauseComm()->isDestructible()) {
-            // clause comm. can be cleaned up now: handle crash.
-            _crash_pending = false;
-            handleSolverCrash();
         }
         return result;
     }
@@ -139,40 +133,35 @@ int ForkedSatJob::appl_solved() {
         if (ClauseMetadata::enabled() && result == RESULT_UNSAT
                 && _params.distributedProofAssembly()) {
             // Unsatisfiability: handle separately.
-            int finalEpoch = ((AnytimeSatClauseCommunicator*)_clause_comm)->getCurrentEpoch();
+            int finalEpoch = _clause_comm->getCurrentEpoch();
             int winningInstance = _internal_result.winningInstanceId;
             unsigned long globalStartOfSuccessEpoch = _internal_result.globalStartOfSuccessEpoch;
             LOG(V2_INFO, "Query to begin distributed proof assembly with winning instance %i, gsofe=%lu\n", 
                 winningInstance, globalStartOfSuccessEpoch);
-            JobMessage msg(getId(), getRevision(), finalEpoch, MSG_NOTIFY_UNSAT_FOUND);
+            JobMessage msg(getId(), getJobTree().getRootContextId(), 
+                getRevision(), finalEpoch, MSG_NOTIFY_UNSAT_FOUND);
             msg.payload.push_back(winningInstance);
             int size = msg.payload.size();
             msg.payload.resize(msg.payload.size()+2);
             memcpy(msg.payload.data()+size, &globalStartOfSuccessEpoch, 2*sizeof(int));
-            MyMpi::isend(getJobTree().getRootNodeRank(), MSG_SEND_APPLICATION_MESSAGE, msg);
+            getJobTree().sendToRoot(msg);
             _assembling_proof = true;
             return -1;
         }
 
     } else if (status == SatProcessAdapter::CRASHED) {
         // Subprocess crashed for whatever reason: try to recover
-        if (checkClauseComm() && !_solver->getClauseComm()->isDestructible()) {
-            // Cannot clean up clause comm. right now: remember pending crash handling
-            _crash_pending = true;
-        } else {
-            handleSolverCrash();
-        }
+        handleSolverCrash();
     }
     return result;
 }
 
 void ForkedSatJob::handleSolverCrash() {
 
-    // Release "old" solver / clause comm from ownership, clean up concurrently
-    _solver->releaseClauseComm(); // release clause comm from ownership of the solver
+    // Release "old" solver from ownership, clean up concurrently
     SatProcessAdapter* solver = _solver.release();
     auto future = ProcessWideThreadPool::get().addTask([solver]() {
-        // clean up solver (without the clause comm)
+        // clean up solver
         delete solver;
     });
     _old_solver_destructions.push_back(std::move(future));
@@ -192,9 +181,16 @@ void ForkedSatJob::appl_dumpStats() {
 }
 
 bool ForkedSatJob::appl_isDestructible() {
-    assert(getState() == PAST);
+    // Wrong state?
+    if (getState() != PAST) return false;
     // Not initialized (yet)?
     if (!_initialized) return true;
+    // SAT comm. present which is not destructible (yet)?
+    if (!_clause_comm->isDestructible()) {
+        _clause_comm->communicate(); // may advance destructibility
+        return false;
+    }
+    // Destructible!
     // If shared memory needs to be cleaned up, start an according thread
     startDestructThreadIfNecessary();
     // Everything cleaned up?
@@ -210,41 +206,31 @@ void ForkedSatJob::appl_memoryPanic() {
     _solver->crash();
 }
 
-bool ForkedSatJob::checkClauseComm() {
-    if (!_initialized) return false;
-    if (_clause_comm == nullptr && _solver->hasClauseComm()) 
-        _clause_comm = (void*)_solver->getClauseComm();
-    return _clause_comm != nullptr;
-}
-
 void ForkedSatJob::appl_communicate() {
-    if (!checkClauseComm()) return;
-    ((AnytimeSatClauseCommunicator*) _clause_comm)->communicate();
+    if (!_clause_comm) return;
+    _clause_comm->communicate();
     while (hasDeferredMessage()) {
         auto deferredMsg = getDeferredMessage();
-        ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(
+        _clause_comm->handle(
             deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
     }
 }
 
 void ForkedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    if ((!isInitialized() || !checkClauseComm()) && ClauseMetadata::enabled() 
+    if (!_initialized && ClauseMetadata::enabled() 
             && msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
         deferMessage(source, mpiTag, msg);
         return;
     }
-    if (!_initialized || !checkClauseComm()) {
-        if (!msg.returnedToSender) {
-            msg.returnedToSender = true;
-            MyMpi::isend(source, mpiTag, msg);
-        }
+    if (!_initialized) {
+        msg.returnToSender(source, mpiTag);
         return;
     }
     if (msg.tag == MSG_INITIATE_PROOF_COMBINATION) {
         // shut down solver
         if (_solver) _solver->setSolvingState(SolvingStates::ABORTING);
     }
-    ((AnytimeSatClauseCommunicator*) _clause_comm)->handle(source, mpiTag, msg);
+    _clause_comm->handle(source, mpiTag, msg);
 }
 
 bool ForkedSatJob::isInitialized() {

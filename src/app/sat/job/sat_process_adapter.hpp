@@ -35,7 +35,7 @@ private:
     std::shared_ptr<Logger> _log;
 
     ForkedSatJob* _job;
-    AnytimeSatClauseCommunicator* _clause_comm = nullptr;
+    std::shared_ptr<AnytimeSatClauseCommunicator> _clause_comm;
 
     size_t _f_size;
     const int* _f_lits;
@@ -105,7 +105,7 @@ private:
 public:
     SatProcessAdapter(Parameters&& params, SatProcessConfig&& config, ForkedSatJob* job, 
         size_t fSize, const int* fLits, size_t aSize, const int* aLits,
-        AnytimeSatClauseCommunicator* comm = nullptr);
+        std::shared_ptr<AnytimeSatClauseCommunicator>& comm);
     ~SatProcessAdapter();
 
     void run();
@@ -115,9 +115,6 @@ public:
 
     void setSolvingState(SolvingStates::SolvingState state);
 
-    bool hasClauseComm();
-    AnytimeSatClauseCommunicator* getClauseComm() {return _clause_comm;}
-    void releaseClauseComm() {_clause_comm = nullptr;}
     int getStartedNumThreads() const {return _config.threads;}
 
     void collectClauses(int maxSize);

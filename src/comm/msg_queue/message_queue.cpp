@@ -76,10 +76,9 @@ int MessageQueue::send(const DataPtr& data, int dest, int tag) {
         SendHandle& h = _self_recv_queue.back();
         h.printSendMsg();
         return h.id;
-    } else {
-        _send_queue.emplace_back(_running_send_id++, dest, tag, data, _max_msg_size);
     }
 
+    _send_queue.emplace_back(_running_send_id++, dest, tag, data, _max_msg_size);
     SendHandle& h = _send_queue.back();
     h.printSendMsg();
     if (_num_concurrent_sends < _max_concurrent_sends) {

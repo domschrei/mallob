@@ -25,12 +25,14 @@
 #endif
 
 SatProcessAdapter::SatProcessAdapter(Parameters&& params, SatProcessConfig&& config, ForkedSatJob* job,
-    size_t fSize, const int* fLits, size_t aSize, const int* aLits, AnytimeSatClauseCommunicator* comm) :    
+    size_t fSize, const int* fLits, size_t aSize, const int* aLits, 
+    std::shared_ptr<AnytimeSatClauseCommunicator>& comm) :    
         _params(std::move(params)), _config(std::move(config)), _job(job), _clause_comm(comm),
         _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits) {
 
     _desired_revision = _config.firstrev;
     _shmem_id = _config.getSharedMemId(Proc::getPid());
+    assert(_clause_comm);
 }
 
 void SatProcessAdapter::doWriteRevisions() {
@@ -76,9 +78,6 @@ void SatProcessAdapter::run() {
 }
 
 void SatProcessAdapter::doInitialize() {
-
-    if (_clause_comm == nullptr)
-        _clause_comm = new AnytimeSatClauseCommunicator(_params, _job);
 
     // Initialize "management" shared memory
     //log(V4_VVER, "Setup base shmem: %s\n", _shmem_id.c_str());
@@ -150,10 +149,6 @@ void SatProcessAdapter::doInitialize() {
     }
 }
 
-bool SatProcessAdapter::hasClauseComm() {
-    return _initialized;
-}
-
 bool SatProcessAdapter::isFullyInitialized() {
     return _initialized && _hsm->isInitialized;
 }
@@ -203,7 +198,7 @@ bool SatProcessAdapter::hasCollectedClauses() {
     return !_initialized || (_hsm->doExport && _hsm->didExport);
 }
 std::vector<int> SatProcessAdapter::getCollectedClauses() {
-    if (!hasCollectedClauses()) return std::vector<int>();
+    if (!_initialized || !hasCollectedClauses()) return std::vector<int>();
     assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
     std::vector<int> clauses(_export_buffer, _export_buffer+_hsm->exportBufferTrueSize);
     _last_admitted_clause_share = std::pair<int, int>(_hsm->lastNumAdmittedClausesToImport, _hsm->lastNumClausesToImport);
@@ -256,6 +251,7 @@ bool SatProcessAdapter::process(BufferTask& task) {
 }
 
 void SatProcessAdapter::tryProcessNextTasks() {
+    if (!_initialized) return;
     while (!_pending_tasks.empty() && process(_pending_tasks.front())) {
         _pending_tasks.pop_front();
     }
@@ -437,7 +433,6 @@ void SatProcessAdapter::crash() {
 
 SatProcessAdapter::~SatProcessAdapter() {
     freeSharedMemory();
-    if (_clause_comm != nullptr) delete _clause_comm;
 }
 
 void SatProcessAdapter::freeSharedMemory() {

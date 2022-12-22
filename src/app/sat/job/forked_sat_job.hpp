@@ -7,11 +7,14 @@
 #include <atomic>
 #include <future>
 
+#include "app/app_message_subscription.hpp"
 #include "app/job.hpp"
 #include "util/params.hpp"
 #include "sat_process_adapter.hpp"
 #include "sat_constants.h"
 #include "base_sat_job.hpp"
+
+class AnytimeSatClauseCommunicator; // fwd decl
 
 class ForkedSatJob : public BaseSatJob {
 
@@ -21,7 +24,6 @@ private:
     std::atomic_bool _initialized = false;
 
     std::unique_ptr<SatProcessAdapter> _solver;
-    void* _clause_comm = nullptr; // SatClauseCommunicator instance (avoiding fwd decl.)
     int _last_imported_revision = 0;
 
     std::future<void> _destruction;
@@ -34,13 +36,11 @@ private:
     bool _assembling_proof = false;
     JobResult _internal_result;
 
-    bool _crash_pending {false};
-
     int _sharing_max_size {0};
 
 public:
 
-    ForkedSatJob(const Parameters& params, const JobSetup& setup);
+    ForkedSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
     virtual ~ForkedSatJob() override;
 
     void appl_start() override;
@@ -82,7 +82,6 @@ private:
     void doStartSolver();
     void handleSolverCrash();
 
-    bool checkClauseComm();
     void loadIncrements();
     void startDestructThreadIfNecessary();
 
