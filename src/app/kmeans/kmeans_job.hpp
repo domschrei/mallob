@@ -16,42 +16,45 @@
 class KMeansJob : public Job {
    private:
     typedef std::vector<float> Point;
-    std::vector<Point> clusterCenters;       // The centers of cluster 0..n
-    std::vector<Point> localClusterCenters;  // The centers of cluster 0..n
-    std::vector<Point> oldClusterCenters;
-    std::vector<int> clusterMembership;  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
-    
-    std::vector<int> localSumMembers;
-    int countClusters;
-    int dimension;
-    int pointsCount;
-    int allReduceElementSize;
-    int iterationsDone = 0;
-    const int epoch = 0;  // should count the message epoch, but does not do it currently
-    int maxDemand = -1;
-    bool maxDemandCalculated = false;
-    uint8_t* data;
-    const float* pointsStart;
-    std::future<void> calculatingTask;
-    std::future<void> initMsgTask;
-    bool finishedJob = false;
-    bool iAmRoot = false;
-    bool loaded = false;
-    bool initSend = false;
-    bool calculatingFinished = false;
-    bool hasReducer = false;
-    bool leftDone = false;
-    bool rightDone = false;
-    bool skipCurrentIter = false;
-    bool terminate = false;
-    std::vector<int> work;
-    std::vector<int> workDone;
-    int myRank;
-    int myIndex = -2;
-    int countCurrentWorkers;
-    JobMessage baseMsg;
-    JobResult internal_result;
-    std::unique_ptr<JobTreeAllReduction> reducer;
+
+    std::vector<Point> _cluster_centers;       // The centers of cluster 0..n
+    std::vector<Point> _local_cluster_centers;  // The centers of cluster 0..n
+    std::vector<Point> _old_cluster_centers;
+    std::vector<int> _cluster_membership;  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
+    std::vector<int> _local_sum_members;
+
+    int _num_clusters;
+    int _dimension;
+    int _num_points;
+    int _all_red_elem_size;
+
+    int _iterations_done = 0;
+
+    int _max_demand = -1;
+    bool _max_demand_calculated = false;
+    uint8_t* _data;
+    const float* _points_start;
+    std::future<void> _calculating_task;
+    std::future<void> _init_msg_task;
+    bool _finished_job = false;
+    bool _is_root = false;
+    bool _loaded = false;
+    bool _init_send = false;
+    bool _calculating_finished = false;
+    bool _has_reducer = false;
+    bool _left_done = false;
+    bool _right_done = false;
+    bool _skip_current_iter = false;
+    bool _terminate = false;
+    std::vector<int> _work;
+    std::vector<int> _work_done;
+    int _my_rank;
+    int _my_index = -2;
+    int _num_curr_workers;
+    JobMessage _base_msg;
+    JobResult _internal_result;
+    std::unique_ptr<JobTreeAllReduction> _reducer;
+
     const std::function<float(const float* p1, const float* p2, const size_t dim)> metric =
         [&](const float* p1, const float* p2, const size_t dim) {
             return KMeansUtils::eukild(p1, p2, dim);
@@ -62,56 +65,57 @@ class KMeansJob : public Job {
         };
     const std::function<std::vector<int>(const std::vector<int>&)> rootTransform =
         [&](const std::vector<int>& payload) {
-            LOG(V5_DEBG, "                           myIndex: %i start Roottransform\n", myIndex);
+            LOG(V5_DEBG, "KMDBG myIndex: %i start Roottransform\n", _my_index);
             auto data = reduceToclusterCenters(payload);
             const int* sumMembers;
 
-            clusterCenters = data.first;
+            _cluster_centers = data.first;
             sumMembers = data.second.data();
             int sum = 0;
-            for (int i = 0; i < countClusters; ++i) {
+            for (int i = 0; i < _num_clusters; ++i) {
                 sum += sumMembers[i];
             }
             
-            auto transformed = clusterCentersToBroadcast(clusterCenters);
+            auto transformed = clusterCentersToBroadcast(_cluster_centers);
             transformed.push_back(this->getVolume());  // will be countCurrentWorkers
-            LOG(V5_DEBG, "                           COMMSIZE: %i myIndex: %i \n",
-                this->getVolume(), myIndex);
-            LOG(V5_DEBG, "                           Children: %i\n",
+            LOG(V5_DEBG, "KMDBG COMMSIZE: %i myIndex: %i \n",
+                this->getVolume(), _my_index);
+            LOG(V5_DEBG, "KMDBG Children: %i\n",
                 this->getJobTree().getNumChildren());
 
             if (!centersChanged(0.001f)) {
-                LOG(V2_INFO, "%s : finished after %i iterations\n", toStr(), iterationsDone);
-                internal_result.result = RESULT_SAT;
-                internal_result.id = getId();
-                internal_result.revision = getRevision();
+                LOG(V2_INFO, "%s : finished after %i iterations\n", toStr(), _iterations_done);
+                _internal_result.result = RESULT_SAT;
+                _internal_result.id = getId();
+                _internal_result.revision = getRevision();
                 std::vector<int> transformSolution;
 
-                internal_result.encodedType = JobResult::EncodedType::FLOAT;
+                _internal_result.encodedType = JobResult::EncodedType::FLOAT;
                 auto solution = clusterCentersToSolution();
-                internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
-                finishedJob = true;
-                LOG(V5_DEBG, "%s : solution cluster centers: \n%s\n", toStr(), dataToString(clusterCenters).c_str());
-                return std::move(std::vector<int>(allReduceElementSize, 0));
+                _internal_result.setSolutionToSerialize((int*)(solution.data()), solution.size());
+                _finished_job = true;
+                LOG(V5_DEBG, "%s : solution cluster centers: \n%s\n", toStr(), dataToString(_cluster_centers).c_str());
+                return std::move(std::vector<int>(_all_red_elem_size, 0));
 
             } else {
-                if (iAmRoot && iterationsDone == 1) {
-                    LOG(V5_DEBG, "                           first iteration finished\n");
+                if (_is_root && _iterations_done == 1) {
+                    LOG(V5_DEBG, "KMDBG first iteration finished\n");
                 }
-                LOG(V3_VERB, "%s : Iteration %i - k:%i w:%i\n", toStr(), iterationsDone, countClusters, this->getVolume());
-                //LOG(V2_INFO, "                           Another iter %i    k:%i    w:%i   dem:%i\n", iterationsDone, countClusters, this->getVolume(), this->getDemand());
+                LOG(V3_VERB, "%s : Iteration %i - k:%i w:%i\n", toStr(), _iterations_done, _num_clusters, this->getVolume());
+                //LOG(V2_INFO, "KMDBG Another iter %i    k:%i    w:%i   dem:%i\n", iterationsDone, countClusters, this->getVolume(), this->getDemand());
                 return transformed;
             }
         };
 
+
    public:
-    std::vector<Point> getClusterCenters() { return clusterCenters; };      // The centers of cluster 0..n
-    std::vector<int> getClusterMembership() { return clusterMembership; };  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
+    std::vector<Point> getClusterCenters() { return _cluster_centers; };      // The centers of cluster 0..n
+    std::vector<int> getClusterMembership() { return _cluster_membership; };  // A point KMeansData[i] belongs to cluster ClusterMembership[i]
     //const int* getSumMembers() { return sumMembers; };
-    int getNumClusters() { return countClusters; };
-    int getDimension() { return dimension; };
-    int getPointsCount() { return pointsCount; };
-    int getIterationsDone() { return iterationsDone; };
+    int getNumClusters() { return _num_clusters; };
+    int getDimension() { return _dimension; };
+    int getPointsCount() { return _num_points; };
+    int getIterationsDone() { return _iterations_done; };
 
     KMeansJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
     void appl_start() override;
@@ -119,7 +123,7 @@ class KMeansJob : public Job {
     void appl_resume() override;
     void appl_terminate() override;
     ~KMeansJob();
-    int appl_solved() override { return finishedJob ? RESULT_SAT : -1; }  // atomic bool
+    int appl_solved() override { return _finished_job ? RESULT_SAT : -1; }  // atomic bool
     // int getDemand() const { return 1; }
     JobResult&& appl_getResult() override;
     void appl_communicate() override;
@@ -129,33 +133,33 @@ class KMeansJob : public Job {
     void appl_memoryPanic() override;
     int getDemand() const override {
         //return Job::getDemand();
-        if (!loaded) {
+        if (!_loaded) {
             return Job::getDemand();
         } else {
-            return maxDemand;
+            return _max_demand;
         }
     }
 
     void setMaxDemand() {
-        double problemSize = countClusters * dimension * pointsCount;
-                maxDemand = 0.00005410212640549420 * pow(problemSize, 0.68207843808596479995);  // evaluated with tests
-                maxDemandCalculated = true;
-                if (maxDemand <= 0) {
-                    maxDemand = 1;
+        double problemSize = _num_clusters * _dimension * _num_points;
+                _max_demand = 0.00005410212640549420 * pow(problemSize, 0.68207843808596479995);  // evaluated with tests
+                _max_demand_calculated = true;
+                if (_max_demand <= 0) {
+                    _max_demand = 1;
                 } else {
-                    uint32_t positiveDemand = maxDemand;
+                    uint32_t positiveDemand = _max_demand;
                     int lowerBound = 1;
                     while (positiveDemand >>= 1) {
                         lowerBound <<= 1;
                     }
                     int middle = lowerBound * 1.5;
-                    if (maxDemand > middle) {
-                        maxDemand = lowerBound * 2 - 1;
+                    if (_max_demand > middle) {
+                        _max_demand = lowerBound * 2 - 1;
                     } else {
-                        maxDemand = lowerBound - 1;
+                        _max_demand = lowerBound - 1;
                     }
                 }
-                maxDemand = std::min(maxDemand, Job::getGlobalNumWorkers());
+                _max_demand = std::min(_max_demand, Job::getGlobalNumWorkers());
     }
 
     void reset();
@@ -182,7 +186,7 @@ class KMeansJob : public Job {
     void initReducer(JobMessage& msg);
     int getIndex(int rank);
     const float* getKMeansData(int point) {
-        return (pointsStart + dimension * point);
+        return (_points_start + _dimension * point);
     }
     float getEntry(int entry);
 };

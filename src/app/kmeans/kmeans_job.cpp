@@ -21,122 +21,122 @@ KMeansJob::KMeansJob(const Parameters& params, const JobSetup& setup, AppMessage
 }
 
 void KMeansJob::appl_start() {
-    myRank = getJobTree().getRank();
-    myIndex = getJobTree().getIndex();
-    iAmRoot = getJobTree().isRoot();
+    _my_rank = getJobTree().getRank();
+    _my_index = getJobTree().getIndex();
+    _is_root = getJobTree().isRoot();
 
-    countCurrentWorkers = 1;
-    if (iAmRoot) {
+    _num_curr_workers = 1;
+    if (_is_root) {
         LOG(V2_INFO, "%s : kmeans instance loaded\n", toStr());
     }
     LOG(V5_DEBG, "COMMSIZE: %i myRank: %i myIndex: %i\n",
-        countCurrentWorkers, myRank, myIndex);
+        _num_curr_workers, _my_rank, _my_index);
     LOG(V5_DEBG, "Children: %i\n",
         this->getJobTree().getNumChildren());
-    data = getSerializedDescription(0)->data();
-    pointsStart = (float*)(data + getDescription().getMetadataSize() + 3 * sizeof(int));
-    LOG(V5_DEBG, "                           myIndex: %i getting ready\n", myIndex);
-    baseMsg = JobMessage(getId(), getContextId(),
+    _data = getSerializedDescription(0)->data();
+    _points_start = (float*)(_data + getDescription().getMetadataSize() + 3 * sizeof(int));
+    LOG(V5_DEBG, "KMDBG myIndex: %i getting ready\n", _my_index);
+    _base_msg = JobMessage(getId(), getContextId(),
                          getRevision(),
-                         epoch,
+                         1,
                          MSG_BROADCAST_DATA);
 
     loadInstance();
-    clusterMembership.assign(pointsCount, -1);
+    _cluster_membership.assign(_num_points, -1);
 
-    localClusterCenters.resize(countClusters);
-    clusterCenters.resize(countClusters);
-    for (int cluster = 0; cluster < countClusters; ++cluster) {
-        localClusterCenters[cluster].assign(dimension, 0);
-        clusterCenters[cluster].resize(dimension);
+    _local_cluster_centers.resize(_num_clusters);
+    _cluster_centers.resize(_num_clusters);
+    for (int cluster = 0; cluster < _num_clusters; ++cluster) {
+        _local_cluster_centers[cluster].assign(_dimension, 0);
+        _cluster_centers[cluster].resize(_dimension);
     }
-    LOG(V5_DEBG, "                           myIndex: %i Ready!\n", myIndex);
-    loaded = true;
-    if (iAmRoot) {
+    LOG(V5_DEBG, "KMDBG myIndex: %i Ready!\n", _my_index);
+    _loaded = true;
+    if (_is_root) {
         doInitWork();
     }
 }
 void KMeansJob::initReducer(JobMessage& msg) {
     JobTree& tempJobTree = getJobTree();
 
-    int lIndex = myIndex * 2 + 1;
+    int lIndex = _my_index * 2 + 1;
     int rIndex = lIndex + 1;
 
-    LOG(V5_DEBG, "                           myIndex: %i !tempJobTree.hasLeftChild() %i lIndex in %i\n", myIndex, !tempJobTree.hasLeftChild(), (lIndex < countCurrentWorkers));
-    LOG(V5_DEBG, "                           myIndex: %i !tempJobTree.hasRightChild() %i rIndex in %i\n", myIndex, !tempJobTree.hasRightChild(), (rIndex < countCurrentWorkers));
-    work.clear();
-    workDone.clear();
-    workDone.push_back(myIndex);
+    LOG(V5_DEBG, "KMDBG myIndex: %i !tempJobTree.hasLeftChild() %i lIndex in %i\n", _my_index, !tempJobTree.hasLeftChild(), (lIndex < _num_curr_workers));
+    LOG(V5_DEBG, "KMDBG myIndex: %i !tempJobTree.hasRightChild() %i rIndex in %i\n", _my_index, !tempJobTree.hasRightChild(), (rIndex < _num_curr_workers));
+    _work.clear();
+    _work_done.clear();
+    _work_done.push_back(_my_index);
     if (!tempJobTree.hasLeftChild()) {
-        leftDone = true;
-        if (lIndex < countCurrentWorkers) {
-            auto grandChilds = KMeansUtils::childIndexesOf(lIndex, countCurrentWorkers);
-            work.push_back(lIndex);
-            LOG(V5_DEBG, "                           myIndex: %i push in %i\n", myIndex, lIndex);
+        _left_done = true;
+        if (lIndex < _num_curr_workers) {
+            auto grandChilds = KMeansUtils::childIndexesOf(lIndex, _num_curr_workers);
+            _work.push_back(lIndex);
+            LOG(V5_DEBG, "KMDBG myIndex: %i push in %i\n", _my_index, lIndex);
             for (auto child : grandChilds) {
-                work.push_back(child);
-                LOG(V5_DEBG, "                           myIndex: %i push in %i\n", myIndex, child);
+                _work.push_back(child);
+                LOG(V5_DEBG, "KMDBG myIndex: %i push in %i\n", _my_index, child);
             }
         }
     }
     if (!tempJobTree.hasRightChild()) {
-        rightDone = true;
-        if ((rIndex < countCurrentWorkers)) {
-            auto grandChilds = KMeansUtils::childIndexesOf(rIndex, countCurrentWorkers);
-            work.push_back(rIndex);
-            LOG(V5_DEBG, "                           myIndex: %i push in %i\n", myIndex, rIndex);
+        _right_done = true;
+        if ((rIndex < _num_curr_workers)) {
+            auto grandChilds = KMeansUtils::childIndexesOf(rIndex, _num_curr_workers);
+            _work.push_back(rIndex);
+            LOG(V5_DEBG, "KMDBG myIndex: %i push in %i\n", _my_index, rIndex);
             for (auto child : grandChilds) {
-                work.push_back(child);
-                LOG(V5_DEBG, "                           myIndex: %i push in %i\n", myIndex, child);
+                _work.push_back(child);
+                LOG(V5_DEBG, "KMDBG myIndex: %i push in %i\n", _my_index, child);
             }
         }
     }
     // msg.payload = clusterCentersToBroadcast(clusterCenters);
     // msg.payload.push_back(countCurrentWorkers);
 
-    reducer.reset(new JobTreeAllReduction(tempJobTree,
+    _reducer.reset(new JobTreeAllReduction(tempJobTree,
                                           JobMessage(getId(), getContextId(),
                                                      getRevision(),
-                                                     epoch,
+                                                     1,
                                                      MSG_ALLREDUCE_CLAUSES),
-                                          std::vector<int>(allReduceElementSize, 0),
+                                          std::vector<int>(_all_red_elem_size, 0),
                                           folder));
 
-    reducer->setTransformationOfElementAtRoot(rootTransform);
-    reducer->disableBroadcast();
-    LOG(V5_DEBG, "                           myIndex: %i advanceCollective\n", myIndex);
+    _reducer->setTransformationOfElementAtRoot(rootTransform);
+    _reducer->disableBroadcast();
+    LOG(V5_DEBG, "KMDBG myIndex: %i advanceCollective\n", _my_index);
     advanceCollective(msg, tempJobTree);
-    if (tempJobTree.hasLeftChild() && !(lIndex < countCurrentWorkers)) {
-        leftDone = true;
-        baseMsg.tag = MSG_ALLREDUCE_CLAUSES;
-        baseMsg.payload = std::vector<int>(allReduceElementSize, 0);
+    if (tempJobTree.hasLeftChild() && !(lIndex < _num_curr_workers)) {
+        _left_done = true;
+        _base_msg.tag = MSG_ALLREDUCE_CLAUSES;
+        _base_msg.payload = std::vector<int>(_all_red_elem_size, 0);
 
-        LOG(V5_DEBG, "                           myIndex: %i send fill left\n", myIndex);
-        reducer->receive(tempJobTree.getLeftChildNodeRank(), MSG_JOB_TREE_REDUCTION, baseMsg);
+        LOG(V5_DEBG, "KMDBG myIndex: %i send fill left\n", _my_index);
+        _reducer->receive(tempJobTree.getLeftChildNodeRank(), MSG_JOB_TREE_REDUCTION, _base_msg);
     }
-    if (tempJobTree.hasRightChild() && !(rIndex < countCurrentWorkers)) {
-        rightDone = true;
-        baseMsg.tag = MSG_ALLREDUCE_CLAUSES;
-        baseMsg.payload = std::vector<int>(allReduceElementSize, 0);
-        LOG(V5_DEBG, "                           myIndex: %i send fill right\n", myIndex);
-        reducer->receive(tempJobTree.getRightChildNodeRank(), MSG_JOB_TREE_REDUCTION, baseMsg);
+    if (tempJobTree.hasRightChild() && !(rIndex < _num_curr_workers)) {
+        _right_done = true;
+        _base_msg.tag = MSG_ALLREDUCE_CLAUSES;
+        _base_msg.payload = std::vector<int>(_all_red_elem_size, 0);
+        LOG(V5_DEBG, "KMDBG myIndex: %i send fill right\n", _my_index);
+        _reducer->receive(tempJobTree.getRightChildNodeRank(), MSG_JOB_TREE_REDUCTION, _base_msg);
     }
 
-    hasReducer = true;
+    _has_reducer = true;
 }
 
 void KMeansJob::sendRootNotification() {
-    initSend = false;
-    baseMsg.tag = MSG_BROADCAST_DATA;
-    baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
-    baseMsg.payload.push_back(countCurrentWorkers);
-    LOG(V5_DEBG, "                           myIndex: %i sendRootNotification0\n", myIndex);
-    getJobTree().sendToRoot(baseMsg);
+    _init_send = false;
+    _base_msg.tag = MSG_BROADCAST_DATA;
+    _base_msg.payload = clusterCentersToBroadcast(_cluster_centers);
+    _base_msg.payload.push_back(_num_curr_workers);
+    LOG(V5_DEBG, "KMDBG myIndex: %i sendRootNotification0\n", _my_index);
+    getJobTree().sendToRoot(_base_msg);
 }
 void KMeansJob::doInitWork() {
-    initMsgTask = ProcessWideThreadPool::get().addTask([&]() {
+    _init_msg_task = ProcessWideThreadPool::get().addTask([&]() {
         setRandomStartCenters();
-        initSend = true;
+        _init_send = true;
     });
 
     /* Result
@@ -152,167 +152,167 @@ void KMeansJob::doInitWork() {
     */
 }
 void KMeansJob::appl_suspend() {
-    LOG(V5_DEBG, "                           myIndex: %i i got SUSPENDED :( iter: %i\n", myIndex, iterationsDone);
-    baseMsg.tag = MSG_ALLREDUCE_CLAUSES;
-    baseMsg.returnedToSender = true;
-    if (myIndex < 0) {
-        myIndex = getJobTree().getIndex();
+    LOG(V5_DEBG, "KMDBG myIndex: %i i got SUSPENDED :( iter: %i\n", _my_index, _iterations_done);
+    _base_msg.tag = MSG_ALLREDUCE_CLAUSES;
+    _base_msg.returnedToSender = true;
+    if (_my_index < 0) {
+        _my_index = getJobTree().getIndex();
     }
-    baseMsg.payload.assign(1, myIndex);
-    getJobTree().sendToParent(baseMsg);
+    _base_msg.payload.assign(1, _my_index);
+    getJobTree().sendToParent(_base_msg);
 }
 void KMeansJob::appl_resume() {
-    LOG(V5_DEBG, "                           myIndex: %i i got RESUMED :D iter: %i\n", myIndex, iterationsDone);
+    LOG(V5_DEBG, "KMDBG myIndex: %i i got RESUMED :D iter: %i\n", _my_index, _iterations_done);
 
     reset();
 }
 
 void KMeansJob::reset() {
-    iterationsDone = 0;
-    maxDemand = -1;
-    maxDemandCalculated = false;
-    finishedJob = false;
-    iAmRoot = false;
-    loaded = false;
-    initSend = false;
-    calculatingFinished = false;
-    hasReducer = false;
-    leftDone = false;
-    rightDone = false;
-    skipCurrentIter = false;
-    myIndex = -2;
-    work.clear();
-    workDone.clear();
-    terminate = true;
-    if (initMsgTask.valid()) initMsgTask.get();
-    if (calculatingTask.valid()) calculatingTask.get();
-    reducer.reset();
+    _iterations_done = 0;
+    _max_demand = -1;
+    _max_demand_calculated = false;
+    _finished_job = false;
+    _is_root = false;
+    _loaded = false;
+    _init_send = false;
+    _calculating_finished = false;
+    _has_reducer = false;
+    _left_done = false;
+    _right_done = false;
+    _skip_current_iter = false;
+    _my_index = -2;
+    _work.clear();
+    _work_done.clear();
+    _terminate = true;
+    if (_init_msg_task.valid()) _init_msg_task.get();
+    if (_calculating_task.valid()) _calculating_task.get();
+    _reducer.reset();
 
-    terminate = false;
+    _terminate = false;
     appl_start();
 }
 
 JobResult&& KMeansJob::appl_getResult() {
-    return std::move(internal_result);
+    return std::move(_internal_result);
 }
 void KMeansJob::appl_terminate() {
-    LOG(V5_DEBG, "                           start terminate\n");
-    terminate = true;
-    reducer.reset();
+    LOG(V5_DEBG, "KMDBG start terminate\n");
+    _terminate = true;
+    _reducer.reset();
 }
 
 KMeansJob::~KMeansJob() {
-    if (initMsgTask.valid()) initMsgTask.get();
-    if (calculatingTask.valid()) calculatingTask.get();
-    LOG(V5_DEBG, "                           end terminate\n");
+    if (_init_msg_task.valid()) _init_msg_task.get();
+    if (_calculating_task.valid()) _calculating_task.get();
+    LOG(V5_DEBG, "KMDBG end terminate\n");
 }
 
 void KMeansJob::appl_communicate() {
-    if (!loaded || finishedJob || terminate) return;
+    if (!_loaded || _finished_job || _terminate) return;
 
-    if (iAmRoot && initSend) {
+    if (_is_root && _init_send) {
         sendRootNotification();
-        LOG(V5_DEBG, "                           Send Init ONCE!!!\n");
+        LOG(V5_DEBG, "KMDBG Send Init ONCE!!!\n");
     }
-    if (!work.empty()) {
-        // LOG(V5_DEBG, "                           myIndex: %i !work.empty() TRUE\n", myIndex);
-        if (calculatingFinished) {
-            LOG(V5_DEBG, "                           myIndex: %i calculatingFinished TRUE\n", myIndex);
-            calculatingFinished = false;
-            calculatingTask.get();
-            const int currentIndex = work[work.size() - 1];
-            work.pop_back();
-            workDone.push_back(currentIndex);
-            calculatingTask = ProcessWideThreadPool::get().addTask([&, cI = currentIndex]() {
-                if (!leftDone) leftDone = (currentIndex == (myIndex * 2 + 1));
-                if (!rightDone) rightDone = (currentIndex == (myIndex * 2 + 2));
-                LOG(V5_DEBG, "                           myIndex: %i Start Calc\n", myIndex);
-                if (!skipCurrentIter) {
+    if (!_work.empty()) {
+        // LOG(V5_DEBG, "KMDBG myIndex: %i !work.empty() TRUE\n", myIndex);
+        if (_calculating_finished) {
+            LOG(V5_DEBG, "KMDBG myIndex: %i calculatingFinished TRUE\n", _my_index);
+            _calculating_finished = false;
+            _calculating_task.get();
+            const int currentIndex = _work[_work.size() - 1];
+            _work.pop_back();
+            _work_done.push_back(currentIndex);
+            _calculating_task = ProcessWideThreadPool::get().addTask([&, cI = currentIndex]() {
+                if (!_left_done) _left_done = (currentIndex == (_my_index * 2 + 1));
+                if (!_right_done) _right_done = (currentIndex == (_my_index * 2 + 2));
+                LOG(V5_DEBG, "KMDBG myIndex: %i Start Calc\n", _my_index);
+                if (!_skip_current_iter) {
                     calcNearestCenter(metric, cI);
                 }
-                LOG(V5_DEBG, "                           myIndex: %i End Calc childs\n", myIndex);
+                LOG(V5_DEBG, "KMDBG myIndex: %i End Calc childs\n", _my_index);
 
-                calculatingFinished = true;
-                LOG(V5_DEBG, "                           myIndex: %i work.empty() %i calculatingFinished %i leftDone %i rightDone %i \n", myIndex, work.empty(), calculatingFinished, leftDone, rightDone);
+                _calculating_finished = true;
+                LOG(V5_DEBG, "KMDBG myIndex: %i work.empty() %i calculatingFinished %i leftDone %i rightDone %i \n", _my_index, _work.empty(), _calculating_finished, _left_done, _right_done);
             });
         }
     }
 
-    // LOG(V5_DEBG, "                           myIndex: %i work.empty() %i calculatingFinished %i leftDone %i rightDone %i \n", myIndex, work.empty(), calculatingFinished, leftDone, rightDone);
-    if (work.empty() && calculatingFinished && leftDone && rightDone) {
-        LOG(V5_DEBG, "                           myIndex: %i all work Finished!!!\n", myIndex);
+    // LOG(V5_DEBG, "KMDBG myIndex: %i work.empty() %i calculatingFinished %i leftDone %i rightDone %i \n", myIndex, work.empty(), calculatingFinished, leftDone, rightDone);
+    if (_work.empty() && _calculating_finished && _left_done && _right_done) {
+        LOG(V5_DEBG, "KMDBG myIndex: %i all work Finished!!!\n", _my_index);
 
-        if (calculatingTask.valid()) calculatingTask.get();
+        if (_calculating_task.valid()) _calculating_task.get();
 
-        leftDone = false;
-        rightDone = false;
-        LOG(V5_DEBG, "                           myIndex: %i all work Finished2!!!\n", myIndex);
-        if (!skipCurrentIter) {
+        _left_done = false;
+        _right_done = false;
+        LOG(V5_DEBG, "KMDBG myIndex: %i all work Finished2!!!\n", _my_index);
+        if (!_skip_current_iter) {
             auto producer = [&]() {
                 calcCurrentClusterCenters();
 
                 // LOG(V5_DEBG, "clusterCenters: \n%s\n", dataToString(localClusterCenters).c_str());
-                return clusterCentersToReduce(localSumMembers, localClusterCenters);
+                return clusterCentersToReduce(_local_sum_members, _local_cluster_centers);
             };
-            (reducer)->produce(producer);
-            (reducer)->advance();
+            (_reducer)->produce(producer);
+            (_reducer)->advance();
         }
-        calculatingFinished = false;
-        LOG(V5_DEBG, "                           myIndex: %i all work Finished END!!!\n", myIndex);
+        _calculating_finished = false;
+        LOG(V5_DEBG, "KMDBG myIndex: %i all work Finished END!!!\n", _my_index);
     };
-    if (hasReducer) {
-        if (!skipCurrentIter) {
-            if (iAmRoot && (reducer)->hasResult()) {
-                LOG(V5_DEBG, "                           myIndex: %i received Result from Transform\n", myIndex);
-                setClusterCenters((reducer)->extractResult());
-                clusterMembership.assign(pointsCount, -1);
+    if (_has_reducer) {
+        if (!_skip_current_iter) {
+            if (_is_root && (_reducer)->hasResult()) {
+                LOG(V5_DEBG, "KMDBG myIndex: %i received Result from Transform\n", _my_index);
+                setClusterCenters((_reducer)->extractResult());
+                _cluster_membership.assign(_num_points, -1);
 
-                baseMsg.tag = MSG_BROADCAST_DATA;
-                baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
-                baseMsg.payload.push_back(countCurrentWorkers);
-                LOG(V5_DEBG, "                           myIndex: %i sendRootNotification1\n", myIndex);
-                getJobTree().sendToRoot(baseMsg);
+                _base_msg.tag = MSG_BROADCAST_DATA;
+                _base_msg.payload = clusterCentersToBroadcast(_cluster_centers);
+                _base_msg.payload.push_back(_num_curr_workers);
+                LOG(V5_DEBG, "KMDBG myIndex: %i sendRootNotification1\n", _my_index);
+                getJobTree().sendToRoot(_base_msg);
                 // only root...?
 
                 // continue broadcasting
 
-                // LOG(V5_DEBG, "                           myIndex: %i clusterCenters: \n%s\n", getJobTree().getIndex(),
+                // LOG(V5_DEBG, "KMDBG myIndex: %i clusterCenters: \n%s\n", getJobTree().getIndex(),
                 //     dataToString(clusterCenters).c_str());
             }
-            (reducer)->advance();
+            (_reducer)->advance();
         } else {
-            LOG(V5_DEBG, "                           Skip Iter\n");
-            skipCurrentIter = false;
-            hasReducer = false;
-            leftDone = false;
-            rightDone = false;
-            reducer.reset();
-            clusterMembership.assign(pointsCount, -1);
-            baseMsg.tag = MSG_BROADCAST_DATA;
-            baseMsg.payload = clusterCentersToBroadcast(clusterCenters);
-            baseMsg.payload.push_back(this->getVolume());
-            LOG(V5_DEBG, "                           myIndex: %i sendRootNotification2\n", myIndex);
-            getJobTree().sendToRoot(baseMsg);
+            LOG(V5_DEBG, "KMDBG Skip Iter\n");
+            _skip_current_iter = false;
+            _has_reducer = false;
+            _left_done = false;
+            _right_done = false;
+            _reducer.reset();
+            _cluster_membership.assign(_num_points, -1);
+            _base_msg.tag = MSG_BROADCAST_DATA;
+            _base_msg.payload = clusterCentersToBroadcast(_cluster_centers);
+            _base_msg.payload.push_back(this->getVolume());
+            LOG(V5_DEBG, "KMDBG myIndex: %i sendRootNotification2\n", _my_index);
+            getJobTree().sendToRoot(_base_msg);
         }
     }
 }
 
 int KMeansJob::getIndex(int rank) {
-    // LOG(V5_DEBG, "                           myIndex: %i rank in: %i\n", myIndex, rank);
+    // LOG(V5_DEBG, "KMDBG myIndex: %i rank in: %i\n", myIndex, rank);
     if (getJobTree().hasLeftChild() && rank == getJobTree().getLeftChildNodeRank()) {
-        // LOG(V5_DEBG, "                           out L : %i\n", getJobTree().getLeftChildIndex());
+        // LOG(V5_DEBG, "KMDBG out L : %i\n", getJobTree().getLeftChildIndex());
         return getJobTree().getLeftChildIndex();
     }
     if (getJobTree().hasRightChild() && rank == getJobTree().getRightChildNodeRank()) {
-        // LOG(V5_DEBG, "                           out R : %i\n", getJobTree().getRightChildIndex());
+        // LOG(V5_DEBG, "KMDBG out R : %i\n", getJobTree().getRightChildIndex());
         return getJobTree().getRightChildIndex();
     }
-    if (!iAmRoot && rank == getJobTree().getParentNodeRank()) {
-        // LOG(V5_DEBG, "                           out P : %i\n", getJobTree().getParentIndex());
+    if (!_is_root && rank == getJobTree().getParentNodeRank()) {
+        // LOG(V5_DEBG, "KMDBG out P : %i\n", getJobTree().getParentIndex());
         return getJobTree().getParentIndex();
     }
     if (rank == getJobTree().getRank()) {
-        // LOG(V5_DEBG, "                           out Me : %i\n", getJobTree().getIndex());
+        // LOG(V5_DEBG, "KMDBG out Me : %i\n", getJobTree().getIndex());
         return getJobTree().getIndex();
     }
     return -1;
@@ -320,92 +320,86 @@ int KMeansJob::getIndex(int rank) {
 
 void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
     int sourceIndex = getIndex(source);
-    LOG(V5_DEBG, "                           myIndex: %i source: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
-    if (!loaded || getState() != JobState::ACTIVE) {
-        LOG(V5_DEBG, "                           myIndex: %i not Ready: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
-
-        msg.returnedToSender = true;
-        if (myIndex < 0) {
-            myIndex = getJobTree().getIndex();
+    LOG(V5_DEBG, "KMDBG myIndex: %i source: %i mpiTag: %i payloadSize: %lu\n", _my_index, sourceIndex, mpiTag, msg.payload.size());
+    if (!_loaded) {
+        LOG(V5_DEBG, "KMDBG myIndex: %i not Ready: %i mpiTag: %i\n", _my_index, sourceIndex, mpiTag);
+        if (_my_index < 0) {
+            _my_index = getJobTree().getIndex();
         }
-        msg.payload.assign(1, myIndex);
-        MyMpi::isend(source, mpiTag, std::move(msg));
-
+        msg.payload.assign(1, _my_index);
+        msg.returnToSender(source, mpiTag);
         return;
     }
     if (msg.returnedToSender) {
         // I will do it
         std::vector<int> missingChilds;
-        LOG(V5_DEBG, "                           myIndex: %i returnFrom: %i mpiTag: %i\n", myIndex, sourceIndex, mpiTag);
-        LOG(V5_DEBG, "                           !leftDone %i !getJobTree().hasLeftChild() %i getJobTree().getLeftChildIndex() < countCurrentWorkers %i\n", !leftDone, !getJobTree().hasLeftChild(), getJobTree().getLeftChildIndex() < countCurrentWorkers);
-        LOG(V5_DEBG, "                           !leftDone %i\n", msg.payload[0]);
-        if (!leftDone && (msg.payload[0] == getJobTree().getLeftChildIndex() || !getJobTree().hasLeftChild()) && getJobTree().getLeftChildIndex() < countCurrentWorkers) {
+        LOG(V5_DEBG, "KMDBG myIndex: %i returnFrom: %i mpiTag: %i\n", _my_index, sourceIndex, mpiTag);
+        LOG(V5_DEBG, "KMDBG !leftDone %i !getJobTree().hasLeftChild() %i getJobTree().getLeftChildIndex() < countCurrentWorkers %i\n", !_left_done, !getJobTree().hasLeftChild(), getJobTree().getLeftChildIndex() < _num_curr_workers);
+        LOG(V5_DEBG, "KMDBG !leftDone %i\n", msg.payload[0]);
+        if (!_left_done && (msg.payload[0] == getJobTree().getLeftChildIndex() || !getJobTree().hasLeftChild()) && getJobTree().getLeftChildIndex() < _num_curr_workers) {
             // missing left child
-            leftDone = true;
+            _left_done = true;
             missingChilds.push_back(getJobTree().getLeftChildIndex());
-            LOG(V5_DEBG, "                           myIndex: %i LsourceIndex: %i\n", myIndex, sourceIndex);
+            LOG(V5_DEBG, "KMDBG myIndex: %i LsourceIndex: %i\n", _my_index, sourceIndex);
         }
-        if (!rightDone && (msg.payload[0] == getJobTree().getRightChildIndex() || !getJobTree().hasRightChild()) && getJobTree().getRightChildIndex() < countCurrentWorkers) {
+        if (!_right_done && (msg.payload[0] == getJobTree().getRightChildIndex() || !getJobTree().hasRightChild()) && getJobTree().getRightChildIndex() < _num_curr_workers) {
             // missing right child
-            rightDone = true;
+            _right_done = true;
             missingChilds.push_back(getJobTree().getRightChildIndex());
-            LOG(V5_DEBG, "                           myIndex: %i RsourceIndex: %i\n", myIndex, sourceIndex);
+            LOG(V5_DEBG, "KMDBG myIndex: %i RsourceIndex: %i\n", _my_index, sourceIndex);
         }
         for (auto child : missingChilds) {
-            auto grandChilds = KMeansUtils::childIndexesOf(child, countCurrentWorkers);
-            msg.payload = std::vector<int>(allReduceElementSize, 0);
+            auto grandChilds = KMeansUtils::childIndexesOf(child, _num_curr_workers);
+            msg.payload = std::vector<int>(_all_red_elem_size, 0);
             msg.tag = MSG_ALLREDUCE_CLAUSES;
-            (reducer)->receive(source, MSG_JOB_TREE_REDUCTION, msg);
-            work.push_back(child);
+            (_reducer)->receive(source, MSG_JOB_TREE_REDUCTION, msg);
+            _work.push_back(child);
             for (auto child : grandChilds) {
-                work.push_back(child);
+                _work.push_back(child);
             }
         }
         return;
     }
 
     if (mpiTag == MSG_JOB_TREE_REDUCTION) {
-        LOG(V5_DEBG, "                           myIndex: %i MSG_JOB_TREE_REDUCTION \n", myIndex);
-        LOG(V5_DEBG, "                           myIndex: %i sourceIndex: %i (myIndex * 2 + 1): %i \n", myIndex, sourceIndex, (myIndex * 2 + 1));
-        LOG(V5_DEBG, "                           myIndex: %i source: %i getJobTree().getLeftChildNodeRank(): %i \n", myIndex, source, getJobTree().getLeftChildNodeRank());
-        if (!leftDone) leftDone = (source == getJobTree().getLeftChildNodeRank());
-        if (!rightDone) rightDone = (source == getJobTree().getRightChildNodeRank());
-        if (hasReducer) {
-            LOG(V5_DEBG, "                           myIndex: %i I have Reducer\n", myIndex);
+        LOG(V5_DEBG, "KMDBG myIndex: %i MSG_JOB_TREE_REDUCTION \n", _my_index);
+        LOG(V5_DEBG, "KMDBG myIndex: %i sourceIndex: %i (myIndex * 2 + 1): %i \n", _my_index, sourceIndex, (_my_index * 2 + 1));
+        LOG(V5_DEBG, "KMDBG myIndex: %i source: %i getJobTree().getLeftChildNodeRank(): %i \n", _my_index, source, getJobTree().getLeftChildNodeRank());
+        if (!_left_done) _left_done = (source == getJobTree().getLeftChildNodeRank());
+        if (!_right_done) _right_done = (source == getJobTree().getRightChildNodeRank());
+        if (_has_reducer) {
+            LOG(V5_DEBG, "KMDBG myIndex: %i I have Reducer\n", _my_index);
 
-            bool answear = (reducer)->receive(source, mpiTag, msg);
-            LOG(V5_DEBG, "                           myIndex: %i bool:%i\n", myIndex, answear);
+            bool answear = (_reducer)->receive(source, mpiTag, msg);
+            LOG(V5_DEBG, "KMDBG myIndex: %i bool:%i\n", _my_index, answear);
         }
     }
 
     if (msg.tag == MSG_BROADCAST_DATA) {
-        LOG(V5_DEBG, "                           myIndex: %i MSG_BROADCAST_DATA \n", myIndex);
-        LOG(V5_DEBG, "                           myIndex: %i Workers: %i!\n", myIndex, countCurrentWorkers);
+        LOG(V5_DEBG, "KMDBG myIndex: %i MSG_BROADCAST_DATA \n", _my_index);
+        LOG(V5_DEBG, "KMDBG myIndex: %i Workers: %i!\n", _my_index, _num_curr_workers);
         setClusterCenters(msg.payload);
-        if (myIndex < countCurrentWorkers) {
+        if (_my_index < _num_curr_workers) {
             initReducer(msg);
-            clusterMembership.assign(pointsCount, -1);
+            _cluster_membership.assign(_num_points, -1);
 
             // continue broadcasting
 
-            // LOG(V5_DEBG, "                           myIndex: %i clusterCenters: \n%s\n", getJobTree().getIndex(),
+            // LOG(V5_DEBG, "KMDBG myIndex: %i clusterCenters: \n%s\n", getJobTree().getIndex(),
             //     dataToString(clusterCenters).c_str());
-            calculatingTask = ProcessWideThreadPool::get().addTask([&]() {
-                LOG(V5_DEBG, "                           myIndex: %i Start Calc\n", myIndex);
-                calcNearestCenter(metric, myIndex);
-                LOG(V5_DEBG, "                           myIndex: %i End Calc basic\n", myIndex);
-                calculatingFinished = true;
+            _calculating_task = ProcessWideThreadPool::get().addTask([&]() {
+                LOG(V5_DEBG, "KMDBG myIndex: %i Start Calc\n", _my_index);
+                calcNearestCenter(metric, _my_index);
+                LOG(V5_DEBG, "KMDBG myIndex: %i End Calc basic\n", _my_index);
+                _calculating_finished = true;
             });
         } else {
-            LOG(V5_DEBG, "                           myIndex: %i not in range\n", myIndex);
-
-            msg.returnedToSender = true;
-            msg.payload.assign(1, myIndex);
-            if (myIndex < 0) {
-                myIndex = getJobTree().getIndex();
+            LOG(V5_DEBG, "KMDBG myIndex: %i not in range\n", _my_index);
+            msg.payload.assign(1, _my_index);
+            if (_my_index < 0) {
+                _my_index = getJobTree().getIndex();
             }
-            MyMpi::isend(source, mpiTag, std::move(msg));
-
+            msg.returnToSender(source, mpiTag);
             return;
         }
     }
@@ -413,63 +407,47 @@ void KMeansJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 void KMeansJob::advanceCollective(JobMessage& msg, JobTree& jobTree) {
     // Broadcast to children
 
-    if (jobTree.hasLeftChild() && jobTree.getLeftChildIndex() < countCurrentWorkers) {
-        LOG(V5_DEBG, "                           myIndex: %i sendTo %i type: %i\n", myIndex, jobTree.getLeftChildIndex(), MSG_SEND_APPLICATION_MESSAGE);
-        getJobTree().sendToLeftChild(baseMsg);
+    if (jobTree.hasLeftChild() && jobTree.getLeftChildIndex() < _num_curr_workers) {
+        LOG(V5_DEBG, "KMDBG myIndex: %i sendTo %i type: %i\n", _my_index, jobTree.getLeftChildIndex(), MSG_SEND_APPLICATION_MESSAGE);
+        getJobTree().sendToLeftChild(msg);
     }
-    if (jobTree.hasRightChild() && jobTree.getRightChildIndex() < countCurrentWorkers) {
-        LOG(V5_DEBG, "                           myIndex: %i sendTo %i type: %i\n", myIndex, jobTree.getRightChildIndex(), MSG_SEND_APPLICATION_MESSAGE);
-        getJobTree().sendToRightChild(baseMsg);
+    if (jobTree.hasRightChild() && jobTree.getRightChildIndex() < _num_curr_workers) {
+        LOG(V5_DEBG, "KMDBG myIndex: %i sendTo %i type: %i\n", _my_index, jobTree.getRightChildIndex(), MSG_SEND_APPLICATION_MESSAGE);
+        getJobTree().sendToRightChild(msg);
     }
 }
 void KMeansJob::appl_dumpStats() {}
 void KMeansJob::appl_memoryPanic() {}
 void KMeansJob::loadInstance() {
-    int* metadata = (int*)(data + getDescription().getMetadataSize());
-    countClusters = metadata[0];
-    dimension = metadata[1];
-    pointsCount = metadata[2];
-    LOG(V5_DEBG, "                          countClusters: %i dimension %i pointsCount: %i\n", countClusters, dimension, pointsCount);
-
-    /*
-    kMeansData.reserve(pointsCount);
-    float* points = (float*) (data + getDescription().getMetadataSize() + 3*sizeof(int));
-    payload += 3;  // pointer start at first datapoint instead of metadata
-    for (int point = 0; point < pointsCount; ++point) {
-        Point p;
-        p.reserve(dimension);
-        for (int entry = 0; entry < dimension; ++entry) {
-            p.push_back(*(points + entry));
-        }
-        kMeansData.push_back(p);
-        points += dimension;
-        if (terminate) return;
-    }
-    */
-    allReduceElementSize = (dimension + 1) * countClusters;
+    int* metadata = (int*)(_data + getDescription().getMetadataSize());
+    _num_clusters = metadata[0];
+    _dimension = metadata[1];
+    _num_points = metadata[2];
+    LOG(V5_DEBG, "                          countClusters: %i dimension %i pointsCount: %i\n", _num_clusters, _dimension, _num_points);
+    _all_red_elem_size = (_dimension + 1) * _num_clusters;
     setMaxDemand();
 }
 
 void KMeansJob::setRandomStartCenters() {  // use RNG with seed
-    clusterCenters.clear();
-    clusterCenters.resize(countClusters);
+    _cluster_centers.clear();
+    _cluster_centers.resize(_num_clusters);
     std::vector<int> selectedPoints;
-    selectedPoints.reserve(countClusters);
+    selectedPoints.reserve(_num_clusters);
     int randomNumber;
     std::random_device rd;
     //std::mt19937 gen(42);  // seed 42 for testing
     std::mt19937 gen(rd());  
-    std::uniform_int_distribution<> distr(0, pointsCount - 1);
-    for (int i = 0; i < countClusters; ++i) {
+    std::uniform_int_distribution<> distr(0, _num_points - 1);
+    for (int i = 0; i < _num_clusters; ++i) {
         randomNumber = distr(gen);
         while (std::find(selectedPoints.begin(), selectedPoints.end(), randomNumber) != selectedPoints.end()) {
             randomNumber = distr(gen);
         }
         LOG(V5_DEBG, "                          randomNumber: %i\n", randomNumber);
         selectedPoints.push_back(randomNumber);
-        clusterCenters[i].reserve(dimension);
-        for (int d = 0; d < dimension; d++) {
-            clusterCenters[i].push_back(getKMeansData(randomNumber)[d]);
+        _cluster_centers[i].reserve(_dimension);
+        for (int d = 0; d < _dimension; d++) {
+            _cluster_centers[i].push_back(getKMeansData(randomNumber)[d]);
         }
     }
 }
@@ -479,67 +457,67 @@ void KMeansJob::calcNearestCenter(std::function<float(const float* p1, const flo
     float currentDistance;
     float distanceToCluster;
     // while own or child slices todo
-    int startIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(intervalId) / static_cast<float>(countCurrentWorkers)));
-    int endIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(intervalId + 1) / static_cast<float>(countCurrentWorkers)));
-    LOG(V5_DEBG, "                           MI: %i intervalId: %i PC: %i cW: %i start:%i end:%i!!      iter:%i k:%i \n", myIndex, intervalId, pointsCount, countCurrentWorkers, startIndex, endIndex, iterationsDone, countClusters);
+    int startIndex = static_cast<int>(static_cast<float>(_num_points) * (static_cast<float>(intervalId) / static_cast<float>(_num_curr_workers)));
+    int endIndex = static_cast<int>(static_cast<float>(_num_points) * (static_cast<float>(intervalId + 1) / static_cast<float>(_num_curr_workers)));
+    LOG(V5_DEBG, "KMDBG MI: %i intervalId: %i PC: %i cW: %i start:%i end:%i!!      iter:%i k:%i \n", _my_index, intervalId, _num_points, _num_curr_workers, startIndex, endIndex, _iterations_done, _num_clusters);
     for (int pointID = startIndex; pointID < endIndex; ++pointID) {
-        if (terminate) return;
+        if (_terminate) return;
         // LOG(V1_WARN, "(pointID / endIndex) < 0.25: %i iAmRoot: %i countCurrentWorkers == 1: %i std::find(work.begin(), work.end(), 1) != work.end() && std::find(work.begin(), work.end(), 2) != work.end()): %i leftDone && rightDone:%i this->getVolume() > 1:%i\n", (pointID / endIndex) < 0.25, iAmRoot, countCurrentWorkers == 1, std::find(work.begin(), work.end(), 1) != work.end() && std::find(work.begin(), work.end(), 2) != work.end(), leftDone && rightDone,  this->getVolume() > 1);
 
-        if ((pointID / endIndex) < 0.25 &&
-            iAmRoot &&
-            (countCurrentWorkers == 1 ||
-             (std::find(work.begin(), work.end(), 1) != work.end() && std::find(work.begin(), work.end(), 2) != work.end())) &&
-            (leftDone && rightDone) &&
+        if (((float)pointID / endIndex) < 0.25 &&
+            _is_root &&
+            (_num_curr_workers == 1 ||
+             (std::find(_work.begin(), _work.end(), 1) != _work.end() && std::find(_work.begin(), _work.end(), 2) != _work.end())) &&
+            (_left_done && _right_done) &&
             this->getVolume() > 1) {
             LOG(V3_VERB, "%s : will skip Iter\n", toStr());
-            skipCurrentIter = true;
-            work.clear();
-            workDone.clear();
+            _skip_current_iter = true;
+            _work.clear();
+            _work_done.clear();
             return;
         }
         currentCluster = -1;
         currentDistance = std::numeric_limits<float>::infinity();
-        for (int clusterID = 0; clusterID < countClusters; ++clusterID) {
-            distanceToCluster = metric(getKMeansData(pointID), clusterCenters[clusterID].data(), dimension);
+        for (int clusterID = 0; clusterID < _num_clusters; ++clusterID) {
+            distanceToCluster = metric(getKMeansData(pointID), _cluster_centers[clusterID].data(), _dimension);
             if (distanceToCluster < currentDistance) {
                 currentCluster = clusterID;
                 currentDistance = distanceToCluster;
             }
         }
 
-        clusterMembership[pointID] = currentCluster;
+        _cluster_membership[pointID] = currentCluster;
     }
-    LOG(V5_DEBG, "                           MI: %i intervalId: %i PC: %i cW: %i start:%i end:%i COMPLETED iter:%i \n", myIndex, intervalId, pointsCount, countCurrentWorkers, startIndex, endIndex, iterationsDone);
+    LOG(V5_DEBG, "KMDBG MI: %i intervalId: %i PC: %i cW: %i start:%i end:%i COMPLETED iter:%i \n", _my_index, intervalId, _num_points, _num_curr_workers, startIndex, endIndex, _iterations_done);
 }
 
 void KMeansJob::calcCurrentClusterCenters() {
-    oldClusterCenters = clusterCenters;
+    _old_cluster_centers = _cluster_centers;
 
     countMembers();
 
-    for (int cluster = 0; cluster < countClusters; ++cluster) {
-        auto currentCenter = localClusterCenters[cluster].data();
-        for (int d = 0; d < dimension; ++d) {
+    for (int cluster = 0; cluster < _num_clusters; ++cluster) {
+        auto currentCenter = _local_cluster_centers[cluster].data();
+        for (int d = 0; d < _dimension; ++d) {
             currentCenter[d] = 0;
         }
     }
-    for (auto workIndex : workDone) {
-        int startIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(workIndex) / static_cast<float>(countCurrentWorkers)));
+    for (auto workIndex : _work_done) {
+        int startIndex = static_cast<int>(static_cast<float>(_num_points) * (static_cast<float>(workIndex) / static_cast<float>(_num_curr_workers)));
 
-        int endIndex = static_cast<int>(static_cast<float>(pointsCount) * (static_cast<float>(workIndex + 1) / static_cast<float>(countCurrentWorkers)));
+        int endIndex = static_cast<int>(static_cast<float>(_num_points) * (static_cast<float>(workIndex + 1) / static_cast<float>(_num_curr_workers)));
         for (int pointID = startIndex; pointID < endIndex; ++pointID) {
             // if (clusterMembership[pointID] != -1) {
-            int clusterId = clusterMembership[pointID];
-            auto currentCenter = localClusterCenters[clusterId].data();
-            float divisor = static_cast<float>(localSumMembers[clusterId]);
+            int clusterId = _cluster_membership[pointID];
+            auto currentCenter = _local_cluster_centers[clusterId].data();
+            float divisor = static_cast<float>(_local_sum_members[clusterId]);
             auto currentDataPoint = getKMeansData(pointID);
-            for (int d = 0; d < dimension; ++d) {
+            for (int d = 0; d < _dimension; ++d) {
                 currentCenter[d] += currentDataPoint[d] / divisor;
             }
         }
     }
-    ++iterationsDone;
+    ++_iterations_done;
 }
 
 std::string KMeansJob::dataToString(std::vector<Point> data) {
@@ -564,39 +542,24 @@ std::string KMeansJob::dataToString(std::vector<int> data) {
 }
 
 void KMeansJob::countMembers() {
-    localSumMembers.assign(countClusters, 0);
-    for (int i = 0; i < pointsCount; ++i) {
-        int clusterID = clusterMembership[i];
+    _local_sum_members.assign(_num_clusters, 0);
+    for (int i = 0; i < _num_points; ++i) {
+        int clusterID = _cluster_membership[i];
         if (clusterID != -1) {
-            localSumMembers[clusterID] += 1;
+            _local_sum_members[clusterID] += 1;
         }
     }
-    LOG(V5_DEBG, "                           myIndex: %i sumMembers: %s\n",
-        myIndex, dataToString(localSumMembers).c_str());
+    LOG(V5_DEBG, "KMDBG myIndex: %i sumMembers: %s\n",
+        _my_index, dataToString(_local_sum_members).c_str());
 }
 
-// float KMeansJob::calculateDifference(std::function<float(const float*, Point&)> metric) {
-//     if (iterationsDone == 0) {
-//         return std::numeric_limits<float>::infinity();
-//     }
-//     float sumOldvec = 0.0;
-//     float sumDifference = 0.0;
-//     Point v0(dimension, 0);
-//     for (int k = 0; k < countClusters; ++k) {
-//         sumOldvec += metric(v0.data(), clusterCenters[k]);
-//
-//         sumDifference += metric(clusterCenters[k].data(), oldClusterCenters[k]);
-//     }
-//     return sumDifference / sumOldvec;
-// }
-
 bool KMeansJob::centersChanged() {
-    if (iterationsDone == 0) {
+    if (_iterations_done == 0) {
         return true;
     }
-    for (int k = 0; k < countClusters; ++k) {
-        for (int d = 0; d < dimension; ++d) {
-            if (clusterCenters[k][d] != oldClusterCenters[k][d]) {
+    for (int k = 0; k < _num_clusters; ++k) {
+        for (int d = 0; d < _dimension; ++d) {
+            if (_cluster_centers[k][d] != _old_cluster_centers[k][d]) {
                 return true;
             }
         }
@@ -605,15 +568,15 @@ bool KMeansJob::centersChanged() {
 }
 
 bool KMeansJob::centersChanged(float factor) {
-    if (iterationsDone == 0) {
+    if (_iterations_done == 0) {
         return true;
     }
-    for (int k = 0; k < countClusters; ++k) {
-        for (int d = 0; d < dimension; ++d) {
-            float distance = fabs(clusterCenters[k][d] - oldClusterCenters[k][d]);
-            float upperBoundDistance = factor * (fabs(clusterCenters[k][d] + oldClusterCenters[k][d]) / 2);
+    for (int k = 0; k < _num_clusters; ++k) {
+        for (int d = 0; d < _dimension; ++d) {
+            float distance = fabs(_cluster_centers[k][d] - _old_cluster_centers[k][d]);
+            float upperBoundDistance = factor * (fabs(_cluster_centers[k][d] + _old_cluster_centers[k][d]) / 2);
             if (distance > upperBoundDistance) {
-                LOG(V5_DEBG, "                           Dist: %f upperBoundDistance: %f\n", distance, upperBoundDistance);
+                LOG(V5_DEBG, "KMDBG Dist: %f upperBoundDistance: %f\n", distance, upperBoundDistance);
                 return true;
             }
         }
@@ -623,11 +586,11 @@ bool KMeansJob::centersChanged(float factor) {
 
 std::vector<float> KMeansJob::clusterCentersToSolution() {
     std::vector<float> result;
-    result.reserve(countClusters * dimension + 2);
-    result.push_back((float)countClusters);
-    result.push_back((float)dimension);
+    result.reserve(_num_clusters * _dimension + 2);
+    result.push_back((float)_num_clusters);
+    result.push_back((float)_dimension);
 
-    for (auto point : clusterCenters) {
+    for (auto point : _cluster_centers) {
         for (auto entry : point) {
             result.push_back(entry);
         }
@@ -637,32 +600,32 @@ std::vector<float> KMeansJob::clusterCentersToSolution() {
 
 std::vector<int> KMeansJob::clusterCentersToBroadcast(const std::vector<Point>& reduceClusterCenters) {
     std::vector<int> result;
-    result.resize(reduceClusterCenters.size() * dimension);
+    result.resize(reduceClusterCenters.size() * _dimension);
     int i = 0;
     for (auto point : reduceClusterCenters) {
         auto centerData = point.data();
-        for (int entry = 0; entry < dimension; ++entry) {
+        for (int entry = 0; entry < _dimension; ++entry) {
             result[i++] = (*((int*)(centerData + entry)));
         }
     }
-    // LOG(V5_DEBG, "                           reduce in clusterCentersToBroadcast: \n%s\n",
+    // LOG(V5_DEBG, "KMDBG reduce in clusterCentersToBroadcast: \n%s\n",
     //     dataToString(result).c_str());
     return result;
 }
 
 std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(const std::vector<int>& reduce) {
     std::vector<Point> localClusterCentersResult;
-    const int elementsCount = allReduceElementSize - countClusters;
+    const int elementsCount = _all_red_elem_size - _num_clusters;
     const int* reduceData = reduce.data();
 
-    reduceData += countClusters;
+    reduceData += _num_clusters;
 
-    localClusterCentersResult.resize(countClusters);
-    for (int k = 0; k < countClusters; ++k) {
-        localClusterCentersResult[k].resize(dimension);
+    localClusterCentersResult.resize(_num_clusters);
+    for (int k = 0; k < _num_clusters; ++k) {
+        localClusterCentersResult[k].resize(_dimension);
         auto currentCenter = localClusterCentersResult[k].data();
-        auto receivedCenter = reduceData + k * dimension;
-        for (int d = 0; d < dimension; ++d) {
+        auto receivedCenter = reduceData + k * _dimension;
+        for (int d = 0; d < _dimension; ++d) {
             currentCenter[d] = *((float*)(receivedCenter + d));
         }
     }
@@ -670,18 +633,18 @@ std::vector<KMeansJob::Point> KMeansJob::broadcastToClusterCenters(const std::ve
     return localClusterCentersResult;
 }
 void KMeansJob::setClusterCenters(const std::vector<int>& reduce) {
-    const int elementsCount = allReduceElementSize - countClusters;
-    const int* reduceData = reduce.data();
-    for (int k = 0; k < countClusters; ++k) {
-        auto currentCenter = clusterCenters[k].data();
-        auto receivedCenter = reduceData + k * dimension;
-        for (int d = 0; d < dimension; ++d) {
-            currentCenter[d] = *((float*)(receivedCenter + d));
+    const int elementsCount = _all_red_elem_size - _num_clusters;
+    for (int k = 0; k < _num_clusters; ++k) {
+        assert(k < _cluster_centers.size());
+        auto& currentCenter = _cluster_centers[k];
+        for (int d = 0; d < _dimension; ++d) {
+            assert(k*_dimension + d < reduce.size());
+            int val = reduce[k*_dimension + d];
+            currentCenter[d] = *((float*)(&val));
         }
     }
-
-    countCurrentWorkers = *(reduceData + elementsCount);
-    LOG(V5_DEBG, "                           myIndex: %i countCurrentWorkers: %i\n", myIndex, countCurrentWorkers);
+    _num_curr_workers = reduce[elementsCount];
+    LOG(V5_DEBG, "KMDBG myIndex: %i countCurrentWorkers: %i\n", _my_index, _num_curr_workers);
 }
 
 std::vector<int> KMeansJob::clusterCentersToReduce(const std::vector<int>& reduceSumMembers, const std::vector<Point>& reduceClusterCenters) {
@@ -703,12 +666,12 @@ std::pair<std::vector<std::vector<float>>, std::vector<int>>
 KMeansJob::reduceToclusterCenters(const std::vector<int>& reduce) {
     // auto [centers, counts] = reduceToclusterCenters(); //call example
     std::vector<int> localSumMembersResult;
-    const int elementsCount = allReduceElementSize - countClusters;
+    const int elementsCount = _all_red_elem_size - _num_clusters;
 
     const int* reduceData = reduce.data();
 
-    localSumMembersResult.assign(countClusters, 0);
-    for (int i = 0; i < countClusters; ++i) {
+    localSumMembersResult.assign(_num_clusters, 0);
+    for (int i = 0; i < _num_clusters; ++i) {
         // LOG(V5_DEBG, "i: %d\n", i);
         localSumMembersResult[i] = reduceData[i];
     }
@@ -723,7 +686,7 @@ std::vector<int> KMeansJob::aggregate(const std::list<std::vector<int>>& message
     std::vector<Point> tempClusterCenters;
     const int countMessages = messages.size();
     centers.resize(countMessages);
-    counts.reserve(countMessages * countClusters);
+    counts.reserve(countMessages * _num_clusters);
     auto message = messages.begin();
     // LOG(V5_DEBG, "                         myIndex: %i countMessages: %d\n", myIndex, countMessages);
     for (int i = 0; i < countMessages; ++i) {
@@ -736,19 +699,19 @@ std::vector<int> KMeansJob::aggregate(const std::list<std::vector<int>>& message
         //  LOG(V5_DEBG, "clusterCentersI: \n%s\n", dataToString(centers[i]).c_str());
     }
 
-    tempSumMembers.resize(countClusters);
+    tempSumMembers.resize(_num_clusters);
     for (int i = 0; i < countMessages; ++i) {
-        for (int j = 0; j < countClusters; ++j) {
-            tempSumMembers[j] = tempSumMembers[j] + counts[i * countClusters + j];
+        for (int j = 0; j < _num_clusters; ++j) {
+            tempSumMembers[j] = tempSumMembers[j] + counts[i * _num_clusters + j];
 
             // LOG(V5_DEBG, "tempSumMembers[%d] + counts[%d][%d] : \n%d\n",j,i,j, tempSumMembers[j] + counts[i][j]);
             // LOG(V5_DEBG, "tempSumMembers[%d] : \n%d\n",j, tempSumMembers[j]);
             // LOG(V5_DEBG, "KRITcounts[%d] : \n%s\n",i, dataToString(tempSumMembers).c_str());
         }
     }
-    tempClusterCenters.resize(countClusters);
-    for (int i = 0; i < countClusters; ++i) {
-        tempClusterCenters[i].assign(dimension, 0);
+    tempClusterCenters.resize(_num_clusters);
+    for (int i = 0; i < _num_clusters; ++i) {
+        tempClusterCenters[i].assign(_dimension, 0);
     }
 
     float ratio;
@@ -756,14 +719,14 @@ std::vector<int> KMeansJob::aggregate(const std::list<std::vector<int>>& message
 
     for (int i = 0; i < countMessages; ++i) {
         std::vector<KMeansJob::Point>& currentMsg = centers[i];
-        for (int j = 0; j < countClusters; ++j) {
+        for (int j = 0; j < _num_clusters; ++j) {
             currentSum = static_cast<float>(tempSumMembers[j]);
             if (currentSum != 0) {
                 KMeansJob::Point& currentCenter = tempClusterCenters[j];
                 KMeansJob::Point& currentMsgCenter = currentMsg[j];
-                ratio = static_cast<float>(counts[i * countClusters + j]) /
+                ratio = static_cast<float>(counts[i * _num_clusters + j]) /
                         currentSum;
-                for (int k = 0; k < dimension; ++k) {
+                for (int k = 0; k < _dimension; ++k) {
                     currentCenter[k] += currentMsgCenter[k] * ratio;
                 }
             }
