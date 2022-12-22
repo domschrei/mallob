@@ -492,7 +492,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
         {
             std::ofstream resultFile(".mallob_result");
             std::string resultCodeStr = std::to_string(resultCode);
-            resultFile.write(resultCodeStr.c_str(), resultCodeStr.size());
+            if (resultFile.is_open()) resultFile.write(resultCodeStr.c_str(), resultCodeStr.size());
         }
     }
 

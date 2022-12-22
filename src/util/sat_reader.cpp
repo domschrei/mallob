@@ -154,7 +154,7 @@ bool SatReader::read(JobDescription& desc) {
 	{
 		std::ofstream ofs(".preprocessed-header.pipe", std::ofstream::app);
 		std::string out = "p cnf 0 " + std::to_string(_num_read_clauses) + "\n";
-		ofs.write(out.c_str(), out.size());
+		if (ofs.is_open()) ofs.write(out.c_str(), out.size());
 	}
 
 	desc.endInitialization();
