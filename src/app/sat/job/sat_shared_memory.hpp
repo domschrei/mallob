@@ -23,6 +23,7 @@ struct SatSharedMemory {
     bool doDigestImportWithFilter {false};
     bool doDigestImportWithoutFilter {false};
     bool doReturnClauses {false};
+    bool doDigestHistoricClauses {false};
     bool doDumpStats {false};
     bool doStartNextRevision {false};
     bool doTerminate {false};
@@ -33,6 +34,7 @@ struct SatSharedMemory {
     bool didFilterImport {false};
     bool didDigestImport {false};
     bool didReturnClauses {false};
+    bool didDigestHistoricClauses {false};
     bool didDumpStats {false};
     bool didStartNextRevision {false};
     bool didTerminate {false};
@@ -53,7 +55,10 @@ struct SatSharedMemory {
     int importBufferRevision;
     int returnedBufferSize;
     Checksum importChecksum;
-    
+    int importEpoch;
+    int historicEpochBegin;
+    int historicEpochEnd;
+
     // Clause buffers: child->parent
     int exportBufferTrueSize {0};
     Checksum exportChecksum;

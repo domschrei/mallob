@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "app/sat/data/clause.hpp"
+#include "app/sat/job/historic_clause_storage.hpp"
 #include "util/params.hpp"
 #include "util/hashing.hpp"
 #include "../sharing/buffer/adaptive_clause_database.hpp"
@@ -15,7 +16,7 @@
 #include "app/sat/proof/proof_producer.hpp"
 
 class BaseSatJob; // fwd decl
-class ClauseHistory; // fwd decl
+class HistoricClauseStorage; // fwd decl
 
 class AnytimeSatClauseCommunicator {
 
@@ -28,7 +29,7 @@ private:
     const float _clause_buf_discount_factor;
 
     AdaptiveClauseDatabase _cdb;
-    std::unique_ptr<ClauseHistory> _cls_history;
+    std::unique_ptr<HistoricClauseStorage> _cls_history;
 
     std::unique_ptr<ClauseSharingSession> _current_session;
     std::list<std::unique_ptr<ClauseSharingSession>> _cancelled_sessions;
@@ -52,8 +53,6 @@ public:
 
     void communicate();
     void handle(int source, int mpiTag, JobMessage& msg);
-
-    void feedHistoryIntoSolver();
 
     bool isDestructible();
     int getCurrentEpoch() const {return _current_epoch;}

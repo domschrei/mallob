@@ -11,6 +11,8 @@
 #include "filter/produced_clause_filter.hpp"
 #include "export_buffer.hpp"
 #include "../data/sharing_statistics.hpp"
+#include "util/tsl/robin_map.h"
+#include "util/tsl/robin_set.h"
 
 #define CLAUSE_LEN_HIST_LENGTH 256
 
@@ -71,6 +73,7 @@ protected:
 	bool _observed_nonunit_lbd_of_length_minus_one = false;
 
 	int _internal_epoch = 0;
+	tsl::robin_set<int> _digested_epochs;
 
 public:
 	SharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
@@ -78,11 +81,13 @@ public:
 			int jobIndex);
 	~SharingManager();
 
+	void addSharingEpoch(int epoch) {_digested_epochs.insert(epoch);}
     int prepareSharing(int* begin, int totalLiteralLimit);
 	int filterSharing(int* begin, int buflen, int* filterOut);
 	void digestSharingWithFilter(int* begin, int buflen, const int* filter);
     void digestSharingWithoutFilter(int* begin, int buflen);
 	void returnClauses(int* begin, int buflen);
+	void digestHistoricClauses(int epochBegin, int epochEnd, int* begin, int buflen);
 
 	SharingStatistics getStatistics();
 

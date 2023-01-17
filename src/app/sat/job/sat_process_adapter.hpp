@@ -76,9 +76,12 @@ private:
     int* _returned_buffer;
 
     struct BufferTask {
-        enum Type {FILTER_CLAUSES, APPLY_FILTER, DIGEST_CLAUSES_WITHOUT_FILTER, RETURN_CLAUSES} type;
+        enum Type {
+            FILTER_CLAUSES, APPLY_FILTER, DIGEST_CLAUSES_WITHOUT_FILTER, RETURN_CLAUSES, DIGEST_HISTORIC_CLAUSES
+        } type;
         std::vector<int> payload;
         int epoch;
+        int epochEnd;
     };
     std::list<BufferTask> _pending_tasks;
     std::pair<int, int> _last_admitted_clause_share;
@@ -129,6 +132,7 @@ public:
 
     void digestClausesWithoutFilter(const std::vector<int>& clauses);
     void returnClauses(const std::vector<int>& clauses);
+    void digestHistoricClauses(int epochBegin, int epochEnd, const std::vector<int>& clauses);
 
     void dumpStats();
     

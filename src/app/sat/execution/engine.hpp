@@ -60,9 +60,11 @@ public:
 
     int prepareSharing(int* begin, int maxSize);
 	int filterSharing(int* begin, int size, int* filterOut);
+	void addSharingEpoch(int epoch);
 	void digestSharingWithFilter(int* begin, int size, const int* filter);
 	void digestSharingWithoutFilter(int* begin, int size);
 	void returnClauses(int* begin, int size);
+	void digestHistoricClauses(int epochBegin, int epochEnd, int* begin, int size);
 	std::pair<int, int> getLastAdmittedClauseShare();
 
     void setPaused();

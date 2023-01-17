@@ -23,6 +23,8 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Clause buffer discount factor: reduce buffer size per PE by <factor> each depth")
  OPT_FLOAT(clauseFilterClearInterval,       "cfci", "clause-filter-clear-interval",      20,       -1,  LARGE_INT,     
     "Set clear interval of clauses in solver filters (-1: never clear, 0: always clear")
+ OPT_BOOL(collectClauseHistory,           "ch", "collect-clause-history",                false,
+    "Employ clause history collection mechanism")
  OPT_BOOL(groupClausesByLengthLbdSum,       "gclls", "group-by-length-lbd-sum",          false,                   
     "Group and prioritize clauses in buffers by the sum of clause length and LBD score")
  OPT_INT(maxLbdPartitioningSize,            "mlbdps", "max-lbd-partition-size",          8,        1,   LARGE_INT,      
@@ -35,13 +37,15 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Clauses up to this length are considered \"high quality\"")
  OPT_INT(qualityLbdLimit,                   "qlbdl", "quality-lbd-limit",                2,        0,   LARGE_INT,      
     "Clauses with an LBD score up to this value are considered \"high quality\"")
- OPT_BOOL(reshareImprovedLbd,               "ril", "reshare-improved-lbd",               false,                   
+ OPT_BOOL(reshareImprovedLbd,               "ril", "reshare-improved-lbd",               false,
     "Reshare clauses (regardless of their last sharing epoch) if their LBD improved")
  OPT_INT(strictClauseLengthLimit,           "scll", "strict-clause-length-limit",        30,       0,   LARGE_INT,      
     "Only clauses up to this length will be shared")
  OPT_INT(strictLbdLimit,                    "slbdl", "strict-lbd-limit",                 30,       0,   LARGE_INT,      
     "Only clauses with an LBD score up to this value will be shared")
  OPT_BOOL(skipClauseSharingDiagonally,    "scsd", "skip-clause-sharing-diagonally",    true,                    "In the ith diversification round, disable clause sharing for the (i%%numDivs)th solver")
+ OPT_FLOAT(maxSharingCompensationFactor,    "mscf", "max-sharing-compensation-factor",   5,        1,   LARGE_INT,
+    "Max. relative increase in size of clause sharing buffers in case of many clauses being filtered")
 
 OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversification options")
  OPT_FLOAT(inputShuffleProbability,         "isp", "input-shuffle-probability",          1,        0,   1,
@@ -50,14 +54,6 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
     "Diversify solvers based on phase in addition to native diversification")
  OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
     "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
-
-OPTION_GROUP(grpAppSatHistory, "app/sat/history", "Clause history configuration [experimental]")
- OPT_INT(clauseHistoryAggregationFactor,  "chaf", "clause-history-aggregation",          5,        1,   LARGE_INT, 
-    "Aggregate historic clause batches by this factor")
- OPT_INT(clauseHistoryShortTermMemSize,   "chstms", "clause-history-shortterm-size",     10,       1,   LARGE_INT, 
-    "Save this many \"full\" aggregated epochs until reducing them")
- OPT_BOOL(collectClauseHistory,           "ch", "collect-clause-history",                false,                   
-    "Employ clause history collection mechanism")
 
 OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_BOOL(certifiedUnsat,                 "cu", "certified-unsat",                     false,                   "Generate UNSAT proof (only supports mono mode + CaDiCaL solver)")

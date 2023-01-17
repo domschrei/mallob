@@ -216,6 +216,10 @@ void ThreadedSatJob::returnClauses(std::vector<int>& clauses) {
     _solver->returnClauses(clauses.data(), clauses.size());
 }
 
+void ThreadedSatJob::digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauses) {
+    _solver->digestHistoricClauses(epochBegin, epochEnd, clauses.data(), clauses.size());
+}
+
 ThreadedSatJob::~ThreadedSatJob() {
     if (!_initialized) return;
     LOG(V5_DEBG, "%s : enter TSJ destructor\n", toStr());

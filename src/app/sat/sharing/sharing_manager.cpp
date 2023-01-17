@@ -474,11 +474,26 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	// Process-wide stats
 	time = Timer::elapsedSeconds() - time;
 	_logger.log(verb, "sharing time:%.4f adm:%i/%i %s\n", time, 
-		_last_num_admitted_cls_to_import, _last_num_cls_to_import, hist.getReport().c_str());
+		_last_num_admitted_cls_to_import, _last_num_cls_to_import, hist.getReport().c_str());	
 }
 
 void SharingManager::digestSharingWithoutFilter(int* begin, int buflen) {
 	digestSharingWithFilter(begin, buflen, nullptr);
+}
+
+void SharingManager::digestHistoricClauses(int epochBegin, int epochEnd, int *begin, int buflen) {
+	// decide whether to perform the import
+	int numUnknown = 0;
+	for (int e = epochBegin; e < epochEnd; e++) {
+		if (!_digested_epochs.count(e)) numUnknown++;
+	}
+	if (2*numUnknown >= epochEnd-epochBegin) {
+		// More than half of the historic epochs are missing: do import.
+		_logger.log(V2_INFO, "Import historic cls [%i,%i) (missing %i/%i)\n", 
+			epochBegin, epochEnd, numUnknown, epochEnd-epochBegin);
+		digestSharingWithoutFilter(begin, buflen);
+		for (int e = epochBegin; e < epochEnd; e++) addSharingEpoch(e);
+	}
 }
 
 SharingStatistics SharingManager::getStatistics() {

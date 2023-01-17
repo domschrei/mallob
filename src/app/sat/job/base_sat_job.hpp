@@ -50,6 +50,7 @@ public:
     
     virtual void digestSharingWithoutFilter(std::vector<int>& clauses) = 0;
     virtual void returnClauses(std::vector<int>& clauses) = 0;
+    virtual void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauses) = 0;
 
     // Methods common to all Job instances
 
@@ -103,7 +104,7 @@ public:
         float admittedRatio = nbBroadcast == 0 ? 1 : ((float)nbAdmitted) / nbBroadcast;
         admittedRatio = std::max(0.01f, admittedRatio);
         float newCompensationFactor = std::max(1.f, std::min(
-            (float)_params.clauseHistoryAggregationFactor(), 1.f/admittedRatio
+            (float)_params.maxSharingCompensationFactor(), 1.f/admittedRatio
         ));
         _compensation_factor = _compensation_decay * _compensation_factor 
             + (1-_compensation_decay) * newCompensationFactor;

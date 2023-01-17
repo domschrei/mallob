@@ -311,6 +311,11 @@ int SatEngine::filterSharing(int* begin, int size, int* filterOut) {
 	return _sharing_manager->filterSharing(begin, size, filterOut);
 }
 
+void SatEngine::addSharingEpoch(int epoch) {
+	if (isCleanedUp()) return;
+	_sharing_manager->addSharingEpoch(epoch);
+}
+
 void SatEngine::digestSharingWithFilter(int* begin, int size, const int* filter) {
 	if (isCleanedUp()) return;
 	_sharing_manager->digestSharingWithFilter(begin, size, filter);
@@ -324,6 +329,11 @@ void SatEngine::digestSharingWithoutFilter(int* begin, int size) {
 void SatEngine::returnClauses(int* begin, int size) {
 	if (isCleanedUp()) return;
 	_sharing_manager->returnClauses(begin, size);
+}
+
+void SatEngine::digestHistoricClauses(int epochBegin, int epochEnd, int* begin, int size) {
+	if (isCleanedUp()) return;
+	_sharing_manager->digestHistoricClauses(epochBegin, epochEnd, begin, size);
 }
 
 void SatEngine::dumpStats(bool final) {

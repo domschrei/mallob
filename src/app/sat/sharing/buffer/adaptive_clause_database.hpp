@@ -91,6 +91,9 @@ private:
 
     ClauseHistogram _hist_deleted_in_slots;
 
+    bool _has_cb_clause_deleted {false};
+    std::function<void(Mallob::Clause&)> _cb_clause_deleted;
+
 public:
     struct Setup {
         int numLiterals = 1000;
@@ -204,6 +207,9 @@ public:
             ExportMode mode = ANY, bool sortClauses = true, 
             std::function<void(int*)> clauseDataConverter = [](int*){});
 
+    std::vector<int> exportBufferWithoutDeletion(int sizeLimit, int& numExportedClauses,
+            ExportMode mode = ANY, bool sortClauses = true);
+
     bool popFrontWeak(ExportMode mode, Mallob::Clause& out);
 
     /*
@@ -252,6 +258,15 @@ public:
         return true;
     }
 
+    void setClauseDeletionCallback(std::function<void(Mallob::Clause&)> cb) {
+        _has_cb_clause_deleted = true;
+        _cb_clause_deleted = cb;
+    }
+
+    void clearClauseDeletionCallback() {
+        _has_cb_clause_deleted = false;
+    }
+
 private:
     template <typename T>
     bool checkNbLiterals(Slot<T>& slot, std::string additionalInfo = "") {
@@ -287,6 +302,9 @@ private:
     template <typename T>
     void flushClauses(Slot<T>& slot, bool sortClauses, BufferBuilder& builder, 
             std::function<void(int*)> clauseDataConverter = [](int*){});
+    
+    template <typename T>
+    void readClauses(Slot<T>& slot, bool sortClauses, BufferBuilder& builder);
     
     std::pair<int, ClauseSlotMode> getSlotIdxAndMode(int clauseSize, int lbd);
     BucketLabel getBucketIterator();

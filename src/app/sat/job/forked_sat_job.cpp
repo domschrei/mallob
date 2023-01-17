@@ -55,12 +55,6 @@ void ForkedSatJob::doStartSolver() {
 
     //log(V5_DEBG, "%s : beginning to solve\n", toStr());
     _solver->run();
-
-    if (_initialized) {
-        // solver was already initialized before and was then restarted: 
-        // Re-learn all historic clauses which the communicator still remembers
-        _clause_comm->feedHistoryIntoSolver();
-    }
 }
 
 void ForkedSatJob::loadIncrements() {
@@ -284,6 +278,11 @@ void ForkedSatJob::digestSharingWithoutFilter(std::vector<int>& clauses) {
 void ForkedSatJob::returnClauses(std::vector<int>& clauses) {
     if (!_initialized) return;
     _solver->returnClauses(clauses);
+}
+
+void ForkedSatJob::digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauses) {
+    if (!_initialized) return;
+    _solver->digestHistoricClauses(epochBegin, epochEnd, clauses);
 }
 
 void ForkedSatJob::startDestructThreadIfNecessary() {

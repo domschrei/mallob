@@ -80,7 +80,8 @@ public:
     virtual void applyFilter(int epoch, std::vector<int>& filter) override;
 
     virtual void digestSharingWithoutFilter(std::vector<int>& clauses) override;
-    void returnClauses(std::vector<int>& clauses) override;
+    virtual void returnClauses(std::vector<int>& clauses) override;
+    virtual void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauses) override;
 
     std::unique_ptr<SatEngine>& getSolver() {
         assert(_solver != NULL);

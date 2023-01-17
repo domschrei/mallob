@@ -10,7 +10,7 @@
 
 // Packed struct to get in all meta data within a 32 bit integer.
 struct ClauseInfo {
- 
+
     // Best LBD so far this clause was PRODUCED (+inserted into buffer) with
     uint8_t minProducedLbd:5;
     // Best LBD so far this clause was SHARED to all solvers with
@@ -155,9 +155,34 @@ public:
         }
     }
 
+    void erase(ProducedClauseCandidate& c) {
+
+        if (c.size == 1) {
+            ProducedUnitClause pc;
+            pc.literal = *c.begin;
+            _map_units.erase(pc);
+
+        } else if (c.size == 2) {
+            ProducedBinaryClause pc;
+            pc.literals[0] = std::min(c.begin[0], c.begin[1]);
+            pc.literals[1] = std::max(c.begin[0], c.begin[1]);
+            _map_binaries.erase(pc);
+
+        } else {
+            ProducedLargeClause pc;
+            pc.size = c.size;
+            pc.data = c.releaseData();
+            _map_large_clauses.erase(pc);
+        }
+    }
+
     inline bool tryAcquireLock() {return _map_mutex.tryLock();}
     inline void acquireLock() {_map_mutex.lock();}
     inline void releaseLock() {_map_mutex.unlock();}
+
+    size_t size() const {
+        return _map_units.size() + _map_binaries.size() + _map_large_clauses.size();
+    }
 
 private:
     void updateClauseInfo(const ProducedClauseCandidate& c, ClauseInfo& info, bool updateLbd) {

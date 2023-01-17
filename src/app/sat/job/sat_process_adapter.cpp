@@ -91,8 +91,8 @@ void SatProcessAdapter::doInitialize() {
     _hsm->config = _config;
 
     // Allocate import and export buffers
-    _hsm->exportBufferAllocatedSize = 2 * _params.clauseHistoryAggregationFactor() * _params.clauseBufferBaseSize() + 1024;
-    _hsm->importBufferMaxSize = 2 * _params.clauseHistoryAggregationFactor() * MyMpi::getBinaryTreeBufferLimit(
+    _hsm->exportBufferAllocatedSize = 2 * _params.maxSharingCompensationFactor() * _params.clauseBufferBaseSize() + 1024;
+    _hsm->importBufferMaxSize = 2 * _params.maxSharingCompensationFactor() * MyMpi::getBinaryTreeBufferLimit(
         _hsm->config.mpisize, _params.clauseBufferBaseSize(), _params.clauseBufferDiscountFactor(), 
         MyMpi::ALL
     ) + 1024;
@@ -212,7 +212,8 @@ std::pair<int, int> SatProcessAdapter::getLastAdmittedClauseShare() {
 bool SatProcessAdapter::process(BufferTask& task) {
 
     if (!_initialized || _hsm->doFilterImport || _hsm->doDigestImportWithFilter 
-            || _hsm->doReturnClauses || _hsm->doDigestImportWithoutFilter) {
+            || _hsm->doReturnClauses || _hsm->doDigestImportWithoutFilter 
+            || _hsm->doDigestHistoricClauses) {
         return false;
     }
 
@@ -229,6 +230,7 @@ bool SatProcessAdapter::process(BufferTask& task) {
     } else if (task.type == BufferTask::APPLY_FILTER) {
         if (_epoch_of_export_buffer == task.epoch) {
             memcpy(_filter_buffer, buffer.data(), buffer.size()*sizeof(int));
+            _hsm->importEpoch = task.epoch;
             _hsm->doDigestImportWithFilter = true;
         } // else: discard this filter since the clauses are not present in any buffer
 
@@ -241,9 +243,18 @@ bool SatProcessAdapter::process(BufferTask& task) {
     } else if (task.type == BufferTask::DIGEST_CLAUSES_WITHOUT_FILTER) {
         _hsm->importBufferSize = buffer.size();
         _hsm->importBufferRevision = _desired_revision;
+        _hsm->importEpoch = task.epoch;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
         memcpy(_import_buffer, buffer.data(), buffer.size()*sizeof(int));
         _hsm->doDigestImportWithoutFilter = true;
+
+    } else if (task.type == BufferTask::DIGEST_HISTORIC_CLAUSES) {
+        _hsm->historicEpochBegin = task.epoch;
+        _hsm->historicEpochEnd = task.epochEnd;
+        _hsm->importBufferSize = buffer.size();
+        assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
+        memcpy(_import_buffer, buffer.data(), buffer.size()*sizeof(int));
+        _hsm->doDigestHistoricClauses = true;
     }
 
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
@@ -298,6 +309,11 @@ void SatProcessAdapter::returnClauses(const std::vector<int>& clauses) {
     tryProcessNextTasks();
 }
 
+void SatProcessAdapter::digestHistoricClauses(int epochBegin, int epochEnd, const std::vector<int>& clauses) {
+    _pending_tasks.emplace_back(BufferTask{BufferTask::DIGEST_HISTORIC_CLAUSES, clauses, epochBegin, epochEnd});
+    tryProcessNextTasks();
+}
+
 void SatProcessAdapter::digestClausesWithoutFilter(const std::vector<int>& clauses) {
     _pending_tasks.emplace_back(BufferTask{BufferTask::DIGEST_CLAUSES_WITHOUT_FILTER, clauses, -1});
     tryProcessNextTasks();
@@ -333,9 +349,10 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
 
     doWriteRevisions();
 
-    if (_hsm->didReturnClauses)     _hsm->doReturnClauses     = false;
-    if (_hsm->didStartNextRevision) _hsm->doStartNextRevision = false;
-    if (_hsm->didDumpStats)         _hsm->doDumpStats         = false;
+    if (_hsm->didReturnClauses)         _hsm->doReturnClauses         = false;
+    if (_hsm->didDigestHistoricClauses) _hsm->doDigestHistoricClauses = false;
+    if (_hsm->didStartNextRevision)     _hsm->doStartNextRevision     = false;
+    if (_hsm->didDumpStats)             _hsm->doDumpStats             = false;
     if (_hsm->didDigestImport) {
         _hsm->doDigestImportWithFilter = false;
         _hsm->doDigestImportWithoutFilter = false;

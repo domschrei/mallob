@@ -8,7 +8,7 @@
 #include "base_sat_job.hpp"
 #include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
 #include "comm/job_tree_all_reduction.hpp"
-#include "clause_history.hpp"
+#include "historic_clause_storage.hpp"
 
 class ClauseSharingSession {
 
@@ -16,7 +16,7 @@ private:
     const Parameters& _params;
     BaseSatJob* _job;
     AdaptiveClauseDatabase& _cdb;
-    ClauseHistory* _cls_history;
+    HistoricClauseStorage* _cls_history;
     int _epoch;
     enum Stage {
         PRODUCING_CLAUSES,
@@ -36,7 +36,7 @@ private:
 
 public:
     ClauseSharingSession(const Parameters& params, BaseSatJob* job, AdaptiveClauseDatabase& cdb,
-            ClauseHistory* clsHistory, int epoch, float compensationFactor) : 
+            HistoricClauseStorage* clsHistory, int epoch, float compensationFactor) : 
         _params(params), _job(job), _cdb(cdb), _cls_history(clsHistory), _epoch(epoch),
         _allreduce_clauses(
             job->getJobTree(),
@@ -125,7 +125,7 @@ public:
             // Extract and digest result
             auto filter = _allreduce_filter.extractResult();
             _job->applyFilter(_epoch, filter);
-            if (_params.collectClauseHistory()) {
+            if (_params.collectClauseHistory() && _job->getJobTree().isRoot()) {
                 auto filteredClauses = applyGlobalFilter(filter, _broadcast_clause_buffer);
                 addToClauseHistory(filteredClauses, _epoch);
             }
@@ -220,12 +220,9 @@ private:
     }
 
     void addToClauseHistory(std::vector<int>& clauses, int epoch) {
-        LOG(V4_VVER, "%s : learn s=%i\n", _job->toStr(), clauses.size());
+        //LOG(V4_VVER, "%s : learn s=%i\n", _job->toStr(), clauses.size());
         
         // Add clause batch to history
-        _cls_history->addEpoch(epoch, clauses, /*entireIndex=*/false);
-
-        // Send next batches of historic clauses to subscribers as necessary
-        _cls_history->sendNextBatches();
+        _cls_history->addSharingAndPrepareResharing(epoch, clauses);
     }
 };

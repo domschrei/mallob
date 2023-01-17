@@ -1,6 +1,7 @@
 
 #include "anytime_sat_clause_communicator.hpp"
 
+#include "app/sat/job/historic_clause_storage.hpp"
 #include "comm/msgtags.h"
 #include "util/logger.hpp"
 #include "comm/mympi.hpp"
@@ -38,9 +39,14 @@ AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& par
         return setup;
     }()),
     _cls_history(!params.collectClauseHistory() ? nullptr :
-        new ClauseHistory(
-            _params, _job->getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job, _cdb
-        )
+        new HistoricClauseStorage([&]() {
+            AdaptiveClauseDatabase::Setup setup;
+            setup.maxClauseLength = _params.strictClauseLengthLimit();
+            setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
+            setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
+            setup.numLiterals = _job->getBufferLimit(MyMpi::size(MPI_COMM_WORLD), MyMpi::ALL);
+            return setup;
+        }())
     ),
     _sent_cert_unsat_ready_msg(!ClauseMetadata::enabled()) {
 
@@ -55,7 +61,6 @@ void AnytimeSatClauseCommunicator::communicate() {
     if (!_suspended && _job->getState() != ACTIVE) {
         // suspended!
         _suspended = true;
-        if (_cls_history) _cls_history->onSuspend();
     }
     if (_suspended) {
         if (_job->getState() == ACTIVE) _suspended = false;
@@ -88,6 +93,21 @@ void AnytimeSatClauseCommunicator::communicate() {
 
     // root: initiate sharing
     if (_job->getJobTree().isRoot() && tryInitiateSharing()) return;
+
+    // Fetch result of clause history preparing a re-sharing
+    if (_cls_history && _cls_history->hasPreparedResharing()) {
+
+        auto resharing = _cls_history->getResharing();
+        LOG(V4_VVER, "%s : reshare epochs [%i,%i)\n", _job->toStr(), resharing.epochBegin, resharing.epochEnd);
+        if (resharing.epochEnd == -1) return; // nothing to reshare
+
+        // Forward next batch of reshared clauses along the job tree
+        JobMessage msg(_job->getId(), _job->getContextId(), _job->getRevision(), 
+            resharing.epochBegin, MSG_BROADCAST_HISTORIC_CLAUSES);
+        msg.payload = std::move(resharing.clauses);
+        msg.payload.push_back(resharing.epochEnd);
+        _job->getJobTree().sendToAnyChildren(msg);
+    }
 }
 
 void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& msg) {
@@ -116,18 +136,12 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
 }
 
 bool AnytimeSatClauseCommunicator::handleClauseHistoryMessage(int source, int mpiTag, JobMessage& msg) {
-
-    if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_SEND_CLAUSES) {
-        _cls_history->addEpoch(msg.epoch, msg.payload, /*entireIndex=*/true);
-        _cls_history->sendNextBatches();
-        return true;
-    }
-    if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_SUBSCRIBE) {
-        _cls_history->onSubscribe(source, msg.payload[0], msg.payload[1]);
-        return true;
-    }
-    if (msg.tag == ClauseHistory::MSG_CLAUSE_HISTORY_UNSUBSCRIBE) {
-        _cls_history->onUnsubscribe(source);
+    if (msg.tag == MSG_BROADCAST_HISTORIC_CLAUSES) {
+        int epochEnd = msg.payload.back();
+        msg.payload.pop_back();
+        _job->digestHistoricClauses(msg.epoch, epochEnd, msg.payload);
+        msg.payload.push_back(epochEnd);
+        _job->getJobTree().sendToAnyChildren(msg); // forward
         return true;
     }
     return false;
@@ -259,10 +273,6 @@ void AnytimeSatClauseCommunicator::tryActivateDeferredSharingInitiation() {
     JobMessage msg = std::move(_deferred_sharing_initiation_msgs.front());
     _deferred_sharing_initiation_msgs.pop_front();
     initiateClauseSharing(msg);
-}
-
-void AnytimeSatClauseCommunicator::feedHistoryIntoSolver() {
-    if (_cls_history) _cls_history->feedHistoryIntoSolver();
 }
 
 bool AnytimeSatClauseCommunicator::tryInitiateSharing() {

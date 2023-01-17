@@ -42,6 +42,7 @@ private:
     int _stm_buffer_size;
     int _ltm_buffer_size;
     bool _use_checksums;
+
     std::vector<Entry> _history;
     std::list<std::pair<int, int>> _missing_epoch_ranges;
     int _latest_epoch = -1;
@@ -54,7 +55,7 @@ private:
 
 public:
     ClauseHistory(const Parameters& params, int stmBufferSizePerEpoch, BaseSatJob& job, AdaptiveClauseDatabase& cdb) : 
-        _aggregation_factor(params.clauseHistoryAggregationFactor()), 
+        _aggregation_factor(params.maxSharingCompensationFactor()), 
         _num_stm_slots(params.clauseHistoryShortTermMemSize()), 
         _stm_buffer_size(stmBufferSizePerEpoch), 
         _ltm_buffer_size(params.clauseBufferBaseSize()), 

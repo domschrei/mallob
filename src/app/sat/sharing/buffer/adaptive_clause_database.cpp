@@ -210,6 +210,38 @@ Mallob::Clause AdaptiveClauseDatabase::getMallobClause(T& elem, int implicitLbdO
 }
 
 template <typename T> 
+void AdaptiveClauseDatabase::readClauses(Slot<T>& slot, bool sortClauses, BufferBuilder& builder) {
+
+    auto lock = slot.mtx->getLock();
+
+    std::vector<Mallob::Clause> readClauses;
+    int remainingLits = builder.getMaxRemainingLits();
+    int collectedLits = 0;
+    for (auto& elem : slot.list) {
+        Mallob::Clause clause = getMallobClause(elem, slot.implicitLbdOrZero);
+        if (clause.size > remainingLits) break;
+
+        // insert clause to export buffer
+        remainingLits -= clause.size;
+        collectedLits += clause.size;
+        readClauses.push_back(clause);
+    }
+
+    bool differentLbdValues = slot.implicitLbdOrZero == 0;
+    if (differentLbdValues || sortClauses) {
+        // Sort
+        std::sort(readClauses.begin(), readClauses.end());
+    }
+
+    // Append clause to buffer builder
+    for (auto& c : readClauses) {
+        bool success = builder.append(c);
+        assert(success);
+        //log(V2_INFO, "%i : EXPORTED %s\n", producedClause.producers, c.toStr().c_str());
+    }
+}
+
+template <typename T> 
 void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, BufferBuilder& builder, 
     std::function<void(int*)> clauseDataConverter) {
     
@@ -327,6 +359,32 @@ std::vector<int> AdaptiveClauseDatabase::exportBuffer(int totalLiteralLimit, int
     return builder.extractBuffer();
 }
 
+std::vector<int> AdaptiveClauseDatabase::exportBufferWithoutDeletion(int totalLiteralLimit, 
+        int& numExportedClauses, ExportMode mode, bool sortClauses) {
+    
+    BufferBuilder builder(totalLiteralLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
+
+    if (mode != ExportMode::NONUNITS) {
+        // Export unit clauses.
+        readClauses(_unit_slot, sortClauses, builder);
+    }
+    if (mode != ExportMode::UNITS) {
+        // Export all other clauses.
+
+        // Binary clauses first.
+        readClauses(_binary_slot, sortClauses, builder);
+
+        // All other clauses.
+        for (int slotIdx = 0; slotIdx < _large_slots.size(); slotIdx++) {
+            auto& slot = _large_slots[slotIdx];
+            readClauses(slot, sortClauses, builder);
+        }
+    }
+
+    numExportedClauses = builder.getNumAddedClauses();
+    return builder.extractBuffer();
+}
+
 int AdaptiveClauseDatabase::tryAcquireBudget(int callingSlot, int numDesired, float freeingFactor) {
 
     int numFreed = 0;
@@ -388,15 +446,30 @@ int AdaptiveClauseDatabase::stealBudgetFromSlot(Slot<T>& slot, int desiredLitera
             if constexpr (std::is_same<int, T>::value) {
                 ++nbCollectedLits;
                 _hist_deleted_in_slots.increment(1);
+                if (_has_cb_clause_deleted) {
+                    Mallob::Clause c(&*it, 1, 1);
+                    _cb_clause_deleted(c);
+                }
             }
             if constexpr (std::is_same<std::pair<int, int>, T>::value) {
                 nbCollectedLits += 2;
                 _hist_deleted_in_slots.increment(2);
+                if (_has_cb_clause_deleted) {
+                    int lits[] = {it->first, it->second};
+                    Mallob::Clause c(lits, 2, 2);
+                    _cb_clause_deleted(c);
+                }
             }
             if constexpr (std::is_same<std::vector<int>, T>::value) {
                 int clslen = it->size() - (slot.implicitLbdOrZero==0 ? 1 : 0);
                 nbCollectedLits += clslen;
                 _hist_deleted_in_slots.increment(clslen);
+                if (_has_cb_clause_deleted) {
+                    bool lbdInClause = slot.implicitLbdOrZero == 0;
+                    Mallob::Clause c(it->data()+(lbdInClause ? 1 : 0), clslen, 
+                        lbdInClause ? (*it)[0] : slot.implicitLbdOrZero);
+                    _cb_clause_deleted(c);
+                }
             }
             nbCollectedClauses++;
             ++it;

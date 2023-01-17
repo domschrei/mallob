@@ -181,6 +181,7 @@ public:
                 } else {
                     _engine.digestSharingWithoutFilter(_import_buffer, _hsm->importBufferSize);
                 }
+                _engine.addSharingEpoch(_hsm->importEpoch);
                 _hsm->didDigestImport = true;
             }
             if (!_hsm->doDigestImportWithFilter && !_hsm->doDigestImportWithoutFilter) 
@@ -193,6 +194,14 @@ public:
                 _hsm->didReturnClauses = true;
             }
             if (!_hsm->doReturnClauses) _hsm->didReturnClauses = false;
+
+            if (_hsm->doDigestHistoricClauses && !_hsm->didDigestHistoricClauses) {
+                LOGGER(_log, V5_DEBG, "DO digest historic clauses\n");
+                _engine.digestHistoricClauses(_hsm->historicEpochBegin, _hsm->historicEpochEnd, 
+                    _import_buffer, _hsm->importBufferSize);
+                _hsm->didDigestHistoricClauses = true;
+            }
+            if (!_hsm->doDigestHistoricClauses) _hsm->didDigestHistoricClauses = false;
 
             // Check initialization state
             if (!_hsm->isInitialized && _engine.isFullyInitialized()) {
