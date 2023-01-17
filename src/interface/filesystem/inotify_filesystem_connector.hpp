@@ -71,8 +71,10 @@ public:
                 // Write JSON to "out" directory
                 auto intermediateOutput = _base_path + "/~" + jobName;
                 auto finalOutput = _base_path + "/out/" + jobName;
-                std::ofstream o(intermediateOutput);
-                o << std::setw(4) << result << std::endl;
+                {
+                    std::ofstream o(intermediateOutput);
+                    o << std::setw(4) << result << std::endl;
+                }
                 std::rename(intermediateOutput.c_str(), finalOutput.c_str());
             };
 
