@@ -280,7 +280,8 @@ bool AnytimeSatClauseCommunicator::tryInitiateSharing() {
     if (_proof_producer || !_sent_cert_unsat_ready_msg) return false;
 
     auto time = Timer::elapsedSecondsCached();
-    bool nextEpochDue = time - _time_of_last_epoch_initiation >= _params.appCommPeriod();
+    bool nextEpochDue = _params.appCommPeriod() > 0 &&
+        time - _time_of_last_epoch_initiation >= _params.appCommPeriod();
     bool lastEpochDone = !_current_session;
     if (!nextEpochDue) return false;
 
