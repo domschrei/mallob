@@ -82,4 +82,15 @@ float* SysState<N>::getLocal() {
     return _local_state;
 }
 
+template <int N>
+SysState<N>::~SysState() {
+    if (_aggregating) {
+        // It would be a violation to clean up the buffer while MPI is still accessing it
+        // and the collective operation cannot be cancelled easily. So we extract the buffer
+        // so that it won't be freed.
+        std::vector<float>* releasedData = new std::vector<float>(std::move(_global_state));
+        // TODO Move to some structure which gets cleaned up AFTER MPI messages ...
+    }
+}
+
 #endif

@@ -41,6 +41,7 @@ public:
     bool aggregate(float elapsedTime = -1);
     float* getLocal();
     const std::vector<float>& getGlobal();
+    ~SysState();
 };
 
 #include "sysstate_impl.hpp"
