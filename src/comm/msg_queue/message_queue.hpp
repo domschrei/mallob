@@ -30,7 +30,7 @@ private:
     unsigned long long _iteration = 0;
 
     // Basic receive stuff
-    MPI_Request _recv_request;
+    MPI_Request _recv_request {MPI_REQUEST_NULL};
     uint8_t* _recv_data;
     std::list<SendHandle> _self_recv_queue;
     int _base_num_receives_per_loop = 10;

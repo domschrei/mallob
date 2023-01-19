@@ -33,8 +33,20 @@ MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize) {
 }
 
 MessageQueue::~MessageQueue() {
+    // Cancel batched send messages
+    for (auto& h : _send_queue) {
+        h.cancel();
+    }
+    // Advance until all send handles have been processed
+    while (hasOpenSends()) advance();
+    // Stop background threads
     _batch_assembler.stop();
     _gc.stop();
+    // Cancel receive request to safely free buffer
+    if (_recv_request != MPI_REQUEST_NULL) {
+        MPI_Cancel(&_recv_request);
+    }
+    // Free receive buffer
     free(_recv_data);
 }
 
