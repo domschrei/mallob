@@ -63,7 +63,7 @@ AdaptiveClauseDatabase::AdaptiveClauseDatabase(Setup setup):
             // May be a no-op
             auto val = _size_lbd_to_slot_idx_mode[representantKey];
             _size_lbd_to_slot_idx_mode[lengthLbdPair] = val;
-            LOG(V2_INFO, "SLOT (%i,%i) ~> %i\n", lengthLbdPair.first, lengthLbdPair.second, _size_lbd_to_slot_idx_mode[representantKey].first);
+            //LOG(V2_INFO, "SLOT (%i,%i) ~> %i\n", lengthLbdPair.first, lengthLbdPair.second, _size_lbd_to_slot_idx_mode[representantKey].first);
         }
     }
 
