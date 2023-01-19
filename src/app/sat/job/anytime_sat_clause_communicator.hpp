@@ -5,7 +5,6 @@
 #include <memory>
 
 #include "app/sat/data/clause.hpp"
-#include "app/sat/job/historic_clause_storage.hpp"
 #include "util/params.hpp"
 #include "util/hashing.hpp"
 #include "../sharing/buffer/adaptive_clause_database.hpp"

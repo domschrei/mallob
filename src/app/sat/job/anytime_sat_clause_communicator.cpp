@@ -46,7 +46,7 @@ AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& par
             setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
             setup.numLiterals = _job->getBufferLimit(MyMpi::size(MPI_COMM_WORLD), MyMpi::ALL);
             return setup;
-        }())
+        }(), _job)
     ),
     _sent_cert_unsat_ready_msg(!ClauseMetadata::enabled()) {
 
@@ -95,18 +95,8 @@ void AnytimeSatClauseCommunicator::communicate() {
     if (_job->getJobTree().isRoot() && tryInitiateSharing()) return;
 
     // Fetch result of clause history preparing a re-sharing
-    if (_cls_history && _cls_history->hasPreparedResharing()) {
-
-        auto resharing = _cls_history->getResharing();
-        LOG(V4_VVER, "%s : reshare epochs [%i,%i)\n", _job->toStr(), resharing.epochBegin, resharing.epochEnd);
-        if (resharing.epochEnd == -1) return; // nothing to reshare
-
-        // Forward next batch of reshared clauses along the job tree
-        JobMessage msg(_job->getId(), _job->getContextId(), _job->getRevision(), 
-            resharing.epochBegin, MSG_BROADCAST_HISTORIC_CLAUSES);
-        msg.payload = std::move(resharing.clauses);
-        msg.payload.push_back(resharing.epochEnd);
-        _job->getJobTree().sendToAnyChildren(msg);
+    if (_cls_history) {
+        _cls_history->handleFinishedTasks();
     }
 }
 
@@ -136,12 +126,17 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
 }
 
 bool AnytimeSatClauseCommunicator::handleClauseHistoryMessage(int source, int mpiTag, JobMessage& msg) {
-    if (msg.tag == MSG_BROADCAST_HISTORIC_CLAUSES) {
+    if (msg.tag == MSG_FORWARD_HISTORIC_CLAUSES) {
         int epochEnd = msg.payload.back();
         msg.payload.pop_back();
-        _job->digestHistoricClauses(msg.epoch, epochEnd, msg.payload);
-        msg.payload.push_back(epochEnd);
-        _job->getJobTree().sendToAnyChildren(msg); // forward
+        _cls_history->handleIncomingMissingInterval(msg.epoch, epochEnd, msg.payload);
+        return true;
+    }
+    if (msg.tag == MSG_REQUEST_HISTORIC_CLAUSES) {
+        int epochBegin = msg.payload[0];
+        int epochEnd = msg.payload[1];
+        _cls_history->handleRequestMissingInterval(source == _job->getJobTree().getLeftChildNodeRank(), 
+            epochBegin, epochEnd);
         return true;
     }
     return false;

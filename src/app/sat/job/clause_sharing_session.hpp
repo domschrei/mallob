@@ -125,9 +125,10 @@ public:
             // Extract and digest result
             auto filter = _allreduce_filter.extractResult();
             _job->applyFilter(_epoch, filter);
-            if (_params.collectClauseHistory() && _job->getJobTree().isRoot()) {
+            if (_params.collectClauseHistory()) {
                 auto filteredClauses = applyGlobalFilter(filter, _broadcast_clause_buffer);
-                addToClauseHistory(filteredClauses, _epoch);
+                // Add clause batch to history
+                _cls_history->importSharing(_epoch, filteredClauses);
             }
 
             // Conclude this sharing epoch
@@ -217,12 +218,5 @@ private:
         }
 
         return filter;
-    }
-
-    void addToClauseHistory(std::vector<int>& clauses, int epoch) {
-        //LOG(V4_VVER, "%s : learn s=%i\n", _job->toStr(), clauses.size());
-        
-        // Add clause batch to history
-        _cls_history->addSharingAndPrepareResharing(epoch, clauses);
     }
 };
