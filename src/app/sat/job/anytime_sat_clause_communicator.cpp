@@ -272,6 +272,7 @@ void AnytimeSatClauseCommunicator::tryActivateDeferredSharingInitiation() {
 
 bool AnytimeSatClauseCommunicator::tryInitiateSharing() {
 
+    if (_job->getState() != ACTIVE) return false;
     if (_proof_producer || !_sent_cert_unsat_ready_msg) return false;
 
     auto time = Timer::elapsedSecondsCached();

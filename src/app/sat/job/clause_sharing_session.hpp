@@ -125,7 +125,7 @@ public:
             // Extract and digest result
             auto filter = _allreduce_filter.extractResult();
             _job->applyFilter(_epoch, filter);
-            if (_params.collectClauseHistory()) {
+            if (_cls_history) {
                 auto filteredClauses = applyGlobalFilter(filter, _broadcast_clause_buffer);
                 // Add clause batch to history
                 _cls_history->importSharing(_epoch, filteredClauses);

@@ -262,7 +262,7 @@ bool SatProcessAdapter::process(BufferTask& task) {
 }
 
 void SatProcessAdapter::tryProcessNextTasks() {
-    if (!_initialized) return;
+    if (!_initialized || _state == SolvingStates::ABORTING) return;
     while (!_pending_tasks.empty() && process(_pending_tasks.front())) {
         _pending_tasks.pop_front();
     }
