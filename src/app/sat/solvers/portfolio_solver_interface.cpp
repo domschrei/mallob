@@ -83,9 +83,8 @@ void PortfolioSolverInterface::addLearnedClause(const Mallob::Clause& c) {
 	_import_buffer.add(c);
 }
 
-int PortfolioSolverInterface::getClauseImportBudget(int clauseLength, int lbd) {
-	if (_clause_sharing_disabled) return 0;
-	return _import_buffer.getLiteralBudget(clauseLength, lbd);
+AdaptiveClauseDatabase::LinearBudgetCounter PortfolioSolverInterface::getImportBudgetCounter() {
+	return _import_buffer.getLinearBudgetCounter();
 }
 
 bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, AdaptiveClauseDatabase::ExportMode mode) {

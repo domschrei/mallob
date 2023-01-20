@@ -35,8 +35,8 @@ public:
             return cdbSetup;
         }()), _max_clause_length(setup.strictClauseLengthLimit) {}
 
-    int getLiteralBudget(int clauseLength, int lbd) {
-        return _cdb.reserveLiteralBudget(clauseLength, lbd);
+    AdaptiveClauseDatabase::LinearBudgetCounter getLinearBudgetCounter() {
+        return AdaptiveClauseDatabase::LinearBudgetCounter(_cdb);
     }
 
     template <typename T>

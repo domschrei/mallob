@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <forward_list>
 #include <memory>
 #include <numeric>
@@ -10,6 +11,7 @@
 #include "bucket_label.hpp"
 #include "buffer_reader.hpp"
 #include "buffer_merger.hpp"
+#include "util/logger.hpp"
 #include "util/periodic_event.hpp"
 #include "../../data/solver_statistics.hpp"
 
@@ -57,19 +59,16 @@ private:
     };
 
     int _total_literal_limit;
-    std::atomic_int _nb_used_literals {0};
 
     template <typename T>
     struct Slot {
         int implicitLbdOrZero;
         std::atomic_int nbLiterals {0};
-        std::atomic_int freeLocalBudget {0};
         std::shared_ptr<Mutex> mtx;
         std::forward_list<T> list;
         Slot() = default;
         Slot(Slot&& other) :
             implicitLbdOrZero(other.implicitLbdOrZero),
-            freeLocalBudget(other.freeLocalBudget.load(std::memory_order_relaxed)), 
             nbLiterals(other.nbLiterals.load(std::memory_order_relaxed)), 
             mtx(std::move(other.mtx)),
             list(other.list) {}
@@ -78,7 +77,8 @@ private:
     Slot<int> _unit_slot;
     Slot<std::pair<int, int>> _binary_slot;
     std::vector<Slot<std::vector<int>>> _large_slots;
-    
+    std::atomic_int _free_budget {0};
+
     enum ClauseSlotMode {SAME_SUM_OF_SIZE_AND_LBD, SAME_SIZE, SAME_SIZE_AND_LBD};
     robin_hood::unordered_flat_map<std::pair<int, int>, std::pair<int, ClauseSlotMode>, IntPairHasher> _size_lbd_to_slot_idx_mode;
 
@@ -103,6 +103,30 @@ public:
         bool slotsForSumOfLengthAndLbd = false;
     };
 
+    // Use to consecutively insert clauses into the database.
+    // For each size-LBD group, the available literal budget can be queried
+    // based on the state of the previous groups.
+    struct LinearBudgetCounter {
+        AdaptiveClauseDatabase* cdb {nullptr};
+        int intermediateBudget {0};
+        int lastCountedSlotIdx {-3};
+        LinearBudgetCounter() {}
+        LinearBudgetCounter(AdaptiveClauseDatabase& cdb) : cdb(&cdb), 
+            intermediateBudget(cdb.getTotalLiteralBudget()), lastCountedSlotIdx(-3) {}
+        int getNextBudget(int nbPrevUsed, int size, int lbd) {
+            intermediateBudget -= nbPrevUsed;
+            int slotIdx = cdb->getSlotIdxAndMode(size, lbd).first;
+            assert(slotIdx >= lastCountedSlotIdx);
+            while (lastCountedSlotIdx < slotIdx) {
+                lastCountedSlotIdx++;
+                if (lastCountedSlotIdx == -2) intermediateBudget -= cdb->_unit_slot.nbLiterals;
+                else if (lastCountedSlotIdx == -1) intermediateBudget -= cdb->_binary_slot.nbLiterals;
+                else intermediateBudget -= cdb->_large_slots[lastCountedSlotIdx].nbLiterals;
+            }
+            return intermediateBudget;
+        }
+    };
+
     AdaptiveClauseDatabase(Setup setup);
     ~AdaptiveClauseDatabase() {}
 
@@ -117,28 +141,20 @@ public:
     bool addClause(const Clause& c, bool sortLargeClause = false);
     bool addClause(int* cBegin, int cSize, int cLbd, bool sortLargeClause = false);
 
-    int reserveLiteralBudget(int cSize, int cLbd);
-
-    int getLocalBudget(int slotIdx) const {
-        if (slotIdx == -2) {
-            return _unit_slot.freeLocalBudget.load(std::memory_order_relaxed);
-        } else if (slotIdx == -1) {
-            return _binary_slot.freeLocalBudget.load(std::memory_order_relaxed);
-        } else {
-            return _large_slots[slotIdx].freeLocalBudget.load(std::memory_order_relaxed);
+    int fetchGlobalBudget(int numDesired) {
+        int globalBudget = _free_budget.load(std::memory_order_relaxed);
+        while (globalBudget > 0) {
+            int amountToFetch = std::min(globalBudget, numDesired);
+            if (_free_budget.compare_exchange_strong(globalBudget, globalBudget-amountToFetch, 
+                std::memory_order_relaxed)) {
+                // success
+                return amountToFetch;
+            }
         }
-    }
-    void storeLocalBudget(int slotIdx, int amount) {
-        if (slotIdx == -2) {
-            _unit_slot.freeLocalBudget.fetch_add(amount, std::memory_order_relaxed);
-        } else if (slotIdx == -1) {
-            _binary_slot.freeLocalBudget.fetch_add(amount, std::memory_order_relaxed);
-        } else {
-            _large_slots[slotIdx].freeLocalBudget.fetch_add(amount, std::memory_order_relaxed);
-        }
+        return 0;
     }
     void storeGlobalBudget(int amount) {
-        _large_slots.back().freeLocalBudget.fetch_add(amount, std::memory_order_relaxed);
+        _free_budget.fetch_add(amount, std::memory_order_relaxed);
     }
 
     template <typename T>
@@ -154,7 +170,6 @@ public:
         }
         timeFree = Timer::elapsedSeconds() - timeFree;
 
-        atomics::addRelaxed(_nb_used_literals, nbLiterals);
         float timeInsert = Timer::elapsedSeconds();
         T& clause = clauses.front();
 
@@ -223,13 +238,16 @@ public:
     BufferBuilder getBufferBuilder(std::vector<int>* out = nullptr);
 
     int getCurrentlyUsedLiterals() const {
-        return _nb_used_literals.load(std::memory_order_relaxed);
+        return _total_literal_limit - _free_budget.load(std::memory_order_relaxed);
     }
     int getNumLiterals(int clauseLength, int lbd) {
         if (clauseLength == 1) return _unit_slot.nbLiterals.load(std::memory_order_relaxed);
         if (clauseLength == 2) return _binary_slot.nbLiterals.load(std::memory_order_relaxed);
         auto [slotIdx, mode] = getSlotIdxAndMode(clauseLength, lbd);
         return _large_slots[slotIdx].nbLiterals.load(std::memory_order_relaxed);
+    }
+    int getTotalLiteralBudget() const {
+        return _total_literal_limit;
     }
 
     ClauseHistogram& getDeletedClausesHistogram();
@@ -239,21 +257,20 @@ public:
         assert(checkNbLiterals(_unit_slot));
         assert(checkNbLiterals(_binary_slot));
 
-        int nbUsedAdvertised = _nb_used_literals;
+        int nbUsedAdvertised = getCurrentlyUsedLiterals();
         
         int nbUsedActual = _unit_slot.nbLiterals + _binary_slot.nbLiterals;
-        int foundBudget = _unit_slot.freeLocalBudget + _binary_slot.freeLocalBudget;
+        int foundBudget = _free_budget.load(std::memory_order_relaxed);
         for (auto& slot : _large_slots) {
             assert(checkNbLiterals(slot));
             nbUsedActual += slot.nbLiterals;
-            foundBudget += slot.freeLocalBudget;
         }
         
         assert(nbUsedAdvertised == nbUsedActual || 
             log_return_false("Mismatch in used literals: %i advertised, %i actual\n", nbUsedAdvertised, nbUsedActual));
-        assert(_nb_used_literals + foundBudget == _total_literal_limit || 
+        assert(nbUsedAdvertised + foundBudget == _total_literal_limit || 
             log_return_false("Mismatch in literal budget: %i used, total local budget %i, total literal limit %i\n", 
-            _nb_used_literals.load(), foundBudget, _total_literal_limit)
+            nbUsedAdvertised, foundBudget, _total_literal_limit)
         );
         return true;
     }

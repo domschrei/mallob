@@ -62,41 +62,47 @@ void testConcurrentImport() {
 
         auto pushClauses = [&]() {
             LOG(V2_INFO, "Adding clauses to import buffer\n");
-            int budget, remaining, nbAdded = 0;
+            auto capacityCounter = importBuffer.getLinearBudgetCounter();
+            int budget, nbAddedLits = 0;
+            int nbAddedClausesTotal = 0;
             
-            budget = importBuffer.getLiteralBudget(1, 1); remaining = budget;
+            budget = capacityCounter.getNextBudget(nbAddedLits, 1, 1); nbAddedLits = 0;
             units.remove_if([&](int i) {
-                if (remaining == 0) return true;
-                remaining--;
-                nbAdded++;
+                if (budget == 0) return true;
+                budget--;
+                nbAddedLits++;
+                nbAddedClausesTotal++;
                 return false;
             });
-            importBuffer.performImport(1, 1, units, budget-remaining);
+            importBuffer.performImport(1, 1, units, std::min(nbAddedLits, budget));
 
-            budget = importBuffer.getLiteralBudget(2, 2); remaining = budget;
+            budget = capacityCounter.getNextBudget(nbAddedLits, 2, 2); nbAddedLits = 0;
             binaries.remove_if([&](const auto& pair) {
-                if (remaining < 2) return true;
-                remaining -= 2;
-                nbAdded++;
+                if (budget < 2) return true;
+                budget -= 2;
+                nbAddedLits += 2;
+                nbAddedClausesTotal++;
                 return false;
             });
-            importBuffer.performImport(2, 2, binaries, budget-remaining);
+            importBuffer.performImport(2, 2, binaries, std::min(nbAddedLits, budget));
 
             for (auto& entry : lenLbdToList) {
                 auto [len, lbd] = entry.first;
+                auto clslen = len;
                 auto& list = entry.second;
-                budget = importBuffer.getLiteralBudget(len, lbd); remaining = budget;
+                budget = capacityCounter.getNextBudget(nbAddedLits, len, lbd); nbAddedLits = 0;
                 list.remove_if([&](const auto& pair) {
-                    if (remaining < len) return true;
-                    remaining -= len;
-                    nbAdded++;
+                    if (budget < clslen) return true;
+                    budget -= clslen;
+                    nbAddedLits += clslen;
+                    nbAddedClausesTotal++;
                     return false;
                 });
-                importBuffer.performImport(len, lbd, list, budget-remaining);
+                importBuffer.performImport(len, lbd, list, nbAddedLits);
             }
 
             lastImport = Timer::elapsedSeconds();
-            LOG(V2_INFO, "Added %i clauses to import buffer\n", nbAdded);
+            LOG(V2_INFO, "Added %i clauses to import buffer\n", nbAddedClausesTotal);
         };
 
         while (Timer::elapsedSeconds() - startTime <= 60 && !Terminator::isTerminating()) {

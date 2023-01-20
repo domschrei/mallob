@@ -8,6 +8,7 @@
 #include <atomic>
 
 #include "../data/clause.hpp"
+#include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
 #include "util/logger.hpp"
 #include "../sharing/import_buffer.hpp"
 #include "../data/solver_statistics.hpp"
@@ -157,7 +158,7 @@ public:
 	// Add a learned clause to the formula
 	// The learned clauses might be added later or possibly never
 	void addLearnedClause(const Mallob::Clause& c);
-	int getClauseImportBudget(int clauseLength, int lbd);
+	AdaptiveClauseDatabase::LinearBudgetCounter getImportBudgetCounter();
 	template <typename T>
 	void addLearnedClauses(int clauseLength, int lbd, std::forward_list<T>& list, int numLiterals) {
 		_import_buffer.performImport<T>(clauseLength, lbd, list, numLiterals);

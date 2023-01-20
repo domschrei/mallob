@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <unistd.h>
 
+#include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
 #include "util/assert.hpp"
 
 #include "sharing_manager.hpp"
@@ -338,6 +339,10 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	std::vector<std::forward_list<int>> unitLists(importingSolvers.size());
 	std::vector<std::forward_list<std::pair<int, int>>> binaryLists(importingSolvers.size());
 	std::vector<std::forward_list<std::vector<int>>> largeLists(importingSolvers.size());
+
+	std::vector<AdaptiveClauseDatabase::LinearBudgetCounter> capacityCounters;
+	for (size_t i = 0; i < importingSolvers.size(); i++) 
+		capacityCounters.push_back(importingSolvers[i]->getImportBudgetCounter());
 	std::vector<int> currentCapacities(importingSolvers.size(), -1);
 	std::vector<int> currentAddedLiterals(importingSolvers.size(), 0);
 
@@ -395,7 +400,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 			}
 
 			for (size_t i = 0; i < importingSolvers.size(); i++) {
-				currentCapacities[i] = importingSolvers[i]->getClauseImportBudget(clause.size, clause.lbd);
+				currentCapacities[i] = capacityCounters[i].getNextBudget(currentAddedLiterals[i], clause.size, clause.lbd);
 				currentAddedLiterals[i] = 0;
 			}
 
