@@ -9,6 +9,7 @@
 #include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
 #include "comm/job_tree_all_reduction.hpp"
 #include "historic_clause_storage.hpp"
+#include "app/sat/sharing/filter/in_place_clause_filtering.hpp"
 
 class ClauseSharingSession {
 
@@ -126,9 +127,9 @@ public:
             auto filter = _allreduce_filter.extractResult();
             _job->applyFilter(_epoch, filter);
             if (_cls_history) {
-                auto filteredClauses = applyGlobalFilter(filter, _broadcast_clause_buffer);
+                applyGlobalFilter(filter, _broadcast_clause_buffer);
                 // Add clause batch to history
-                _cls_history->importSharing(_epoch, filteredClauses);
+                _cls_history->importSharing(_epoch, std::move(_broadcast_clause_buffer));
             }
 
             // Conclude this sharing epoch
@@ -170,7 +171,15 @@ public:
     }
 
 private:
-    std::vector<int> applyGlobalFilter(const std::vector<int>& filter, std::vector<int>& clauses);
+    void applyGlobalFilter(const std::vector<int>& filter, std::vector<int>& clauses) {
+        
+        InPlaceClauseFiltering filtering(_params, clauses, filter);
+        int newSize = filtering.applyAndGetNewSize();
+        clauses.resize(newSize);
+
+        _num_broadcast_clauses = filtering.getNumClauses();
+        _num_admitted_clauses = filtering.getNumAdmittedClauses();
+    }
     
     std::vector<int> mergeClauseBuffersDuringAggregation(std::list<std::vector<int>>& elems) {
         int numAggregated = 0;

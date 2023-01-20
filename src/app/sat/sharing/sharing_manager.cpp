@@ -17,7 +17,7 @@
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "util/random.hpp"
-#include "buffer/buffer_reducer.hpp"
+#include "filter/in_place_clause_filtering.hpp"
 
 SharingManager::SharingManager(
 		std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, 
@@ -328,20 +328,10 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 			}
 		}
 
-		BufferReducer reducer(begin, buflen, _params.strictClauseLengthLimit(), _params.groupClausesByLengthLbdSum());
-		buflen = reducer.reduce([&]() {
-			_last_num_cls_to_import++;
-			if (shift == bitsPerElem) {
-				filterPos++;
-				shift = 0;
-			}
-			bool admitted = ((filter[filterPos] & (1 << shift)) == 0);
-			if (admitted) {
-				_last_num_admitted_cls_to_import++;
-			}
-			shift++;
-			return admitted;
-		});
+		InPlaceClauseFiltering filtering(_params, begin, buflen, filter, buflen);
+		buflen = filtering.applyAndGetNewSize();
+		_last_num_cls_to_import += filtering.getNumClauses();
+		_last_num_admitted_cls_to_import += filtering.getNumAdmittedClauses();
 	}
 
 	// Prepare to traverse clauses not filtered yet

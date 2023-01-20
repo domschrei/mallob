@@ -39,6 +39,9 @@ private:
         BackgroundTask(Type type, int epochBegin, int epochEnd, const std::vector<int>& clauses, bool fromLeftChild) : 
             type(type), epochBegin(epochBegin), epochEnd(epochEnd), 
             fromLeftChild(fromLeftChild), clauses(clauses) {}
+        BackgroundTask(Type type, int epochBegin, int epochEnd, std::vector<int>&& clauses, bool fromLeftChild) : 
+            type(type), epochBegin(epochBegin), epochEnd(epochEnd), 
+            fromLeftChild(fromLeftChild), clauses(std::move(clauses)) {}
     };
 
     class Worker {
@@ -62,21 +65,25 @@ private:
         std::list<BackgroundTask> _bg_tasks;
         BackgroundWorker _bg_worker;
 
+        int _num_open_tasks {0};
+
     public:
         Worker(const AdaptiveClauseDatabase::Setup& setup) : _setup(setup), 
                 _filter(std::numeric_limits<int>::max(), false) {
             _bg_worker.run([this]() {runBackgroundWorker();});
         }
 
-        void addTask(BackgroundTask::Type type, int epochBegin, int epochEnd, const std::vector<int>& clauses, bool fromLeftChild) {
+        void addTask(BackgroundTask::Type type, int epochBegin, int epochEnd, std::vector<int>&& clauses, bool fromLeftChild) {
             {
                 auto lock = _mtx_bg_tasks.getLock();
-                _bg_tasks.emplace_back(type, epochBegin, epochEnd, clauses, fromLeftChild);
+                _bg_tasks.emplace_back(type, epochBegin, epochEnd, std::move(clauses), fromLeftChild);
             }
             _cond_var_bg_tasks.notify();
+            _num_open_tasks++;
         }
 
         bool hasFinishedTask() {
+            if (_num_open_tasks == 0) return false;
             auto lock = _mtx_bg_tasks.getLock();
             if (_bg_tasks.empty()) return false;
             return _bg_tasks.front().finished;
@@ -88,6 +95,7 @@ private:
             _bg_tasks.pop_front();
             lock.unlock();
             _cond_var_bg_tasks.notify();
+            _num_open_tasks--;
             return task;
         }
 
@@ -138,7 +146,8 @@ private:
                     task.epochEnd = slot.epochEnd;
                     // Read clauses from the slot into the task's clauses
                     int numExported;
-                    task.clauses = slot.cdb.exportBufferWithoutDeletion(-1, numExported);
+                    task.clauses = slot.cdb.exportBufferWithoutDeletion(-1, numExported,
+                        AdaptiveClauseDatabase::ANY, false);
                     return;
                 }
             }
@@ -246,7 +255,8 @@ private:
             
             // Flush clauses from "from"
             int numExported;
-            auto clauses = from.exportBufferWithoutDeletion(-1, numExported);
+            auto clauses = from.exportBufferWithoutDeletion(-1, numExported, 
+                AdaptiveClauseDatabase::ANY, false);
 
             // Insert clauses into "into"
             addClausesIntoDatabase(into, clauses, -1, ClauseAdditionMode::MERGE_OR_DROP);
@@ -327,7 +337,7 @@ public:
     HistoricClauseStorage(const AdaptiveClauseDatabase::Setup& setup, BaseSatJob* job) : 
         _job(job), _worker(setup)  {}
 
-    void importSharing(int epoch, std::vector<int>& clauses) {
+    void importSharing(int epoch, std::vector<int>&& clauses) {
         
         updateMissingIntervals(epoch, epoch+1);
 
@@ -340,7 +350,7 @@ public:
 
         // insert new set of clauses
         LOG(V4_VVER, "HCS insert [%i,%i) buflen=%i\n", epoch, epoch+1, clauses.size());
-        _worker.addTask(BackgroundTask::INSERT, epoch, epoch+1, clauses, false);
+        _worker.addTask(BackgroundTask::INSERT, epoch, epoch+1, std::move(clauses), false);
         _last_epoch = epoch;
 
         // request a missing interval yourself (if any are missing)
@@ -348,10 +358,10 @@ public:
         requestMissingInterval();
     }
 
-    void handleIncomingMissingInterval(int epochBegin, int epochEnd, std::vector<int>& clauses) {
+    void handleIncomingMissingInterval(int epochBegin, int epochEnd, std::vector<int>&& clauses) {
         updateMissingIntervals(epochBegin, epochEnd);
         LOG(V4_VVER, "HCS insert+import [%i,%i) buflen=%i\n", epochBegin, epochEnd, clauses.size());
-        _worker.addTask(BackgroundTask::INSERT_AND_IMPORT, epochBegin, epochEnd, clauses, false);        
+        _worker.addTask(BackgroundTask::INSERT_AND_IMPORT, epochBegin, epochEnd, std::move(clauses), false);        
     }
 
     void handleRequestMissingInterval(bool leftChild, int epochBegin, int epochEnd) {

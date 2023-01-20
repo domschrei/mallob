@@ -352,17 +352,19 @@ void MessageQueue::processAssembledReceived() {
 
 void MessageQueue::processSent() {
 
-    auto it = _send_queue.begin();
-    bool uninitiatedHandlesPresent = false;
-
     // Test each send handle
+    auto it = _send_queue.begin();
     while (it != _send_queue.end()) {
         
         SendHandle& h = *it;
 
         if (!h.isInitiated()) {
             // Message has not been sent yet
-            uninitiatedHandlesPresent = true;
+            if (_num_concurrent_sends < _max_concurrent_sends) {
+                // can initiate sending
+                h.sendNext(_max_msg_size);
+                _num_concurrent_sends++;
+            }
             ++it; // go to next handle
             continue;
         }
@@ -406,20 +408,6 @@ void MessageQueue::processSent() {
         } else {
             ++it; // go to next handle
         }
-    }
-
-    if (!uninitiatedHandlesPresent) return;
-
-    // Initiate sending messages which have not been initiated yet
-    // as long as there is a "send slot" available to do so
-    it = _send_queue.begin();
-    while (_num_concurrent_sends < _max_concurrent_sends && it != _send_queue.end()) {
-        SendHandle& h = *it;
-        if (!h.isInitiated()) {
-            h.sendNext(_max_msg_size);
-            _num_concurrent_sends++;
-        }
-        ++it;
     }
 }
 

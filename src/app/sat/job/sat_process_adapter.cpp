@@ -1,6 +1,7 @@
 
 #include "app/sat/execution/solving_state.hpp"
 #include "util/assert.hpp"
+#include <atomic>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <fstream>
@@ -37,7 +38,16 @@ SatProcessAdapter::SatProcessAdapter(Parameters&& params, SatProcessConfig&& con
 
 void SatProcessAdapter::doWriteRevisions() {
 
-    auto task = [this]() {
+    if (_num_revisions_to_write.load(std::memory_order_relaxed) == 0) return;
+    if (!_initialized || _hsm->doTerminate || !_revisions_mutex.tryLock()) return;
+
+    if (_bg_writer_running) {
+        _revisions_mutex.unlock();
+        return;
+    }
+    if (_bg_writer.valid()) _bg_writer.get();
+    
+    _bg_writer = ProcessWideThreadPool::get().addTask([this]() {
         while (!_terminate && _num_revisions_to_write > 0) {
             RevisionData revData;
             {
@@ -59,14 +69,9 @@ void SatProcessAdapter::doWriteRevisions() {
         }
         auto lock = _revisions_mutex.getLock();
         _bg_writer_running = false;
-    };
+    });
 
-    if (!_initialized || _hsm->doTerminate || !_revisions_mutex.tryLock()) return;
-    if (!_bg_writer_running) {
-        if (_bg_writer.valid()) _bg_writer.get();
-        _bg_writer = ProcessWideThreadPool::get().addTask(task);
-        _bg_writer_running = true;
-    }
+    _bg_writer_running = true;
     _revisions_mutex.unlock();
 }
 

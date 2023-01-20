@@ -129,7 +129,7 @@ bool AnytimeSatClauseCommunicator::handleClauseHistoryMessage(int source, int mp
     if (msg.tag == MSG_FORWARD_HISTORIC_CLAUSES) {
         int epochEnd = msg.payload.back();
         msg.payload.pop_back();
-        _cls_history->handleIncomingMissingInterval(msg.epoch, epochEnd, msg.payload);
+        _cls_history->handleIncomingMissingInterval(msg.epoch, epochEnd, std::move(msg.payload));
         return true;
     }
     if (msg.tag == MSG_REQUEST_HISTORIC_CLAUSES) {
