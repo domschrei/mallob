@@ -390,8 +390,8 @@ void SatEngine::unsetPaused() {
 
 void SatEngine::terminateSolvers() {
 	for (auto& solver : _solver_threads) {
-		solver->setSuspend(false);
 		solver->setTerminate();
+		solver->setSuspend(false);
 	}
 	dumpStats(/*final=*/true);
 }

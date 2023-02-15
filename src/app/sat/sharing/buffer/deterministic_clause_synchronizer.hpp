@@ -127,7 +127,7 @@ public:
                 if (_solvers[i]->getGlobalId() == globalWinningId) {
                     hasWinningSolver = true;
                 }
-                if (globalWinningId >= 0) _solvers[i]->setTerminate();
+                if (globalWinningId >= 0) _solvers[i]->suspend();
                 q.waiting = false;
             }
             _nb_waiting_for_sync = 0;
