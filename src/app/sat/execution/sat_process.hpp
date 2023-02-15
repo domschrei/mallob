@@ -153,7 +153,7 @@ public:
                 LOGGER(_log, V5_DEBG, "DO export clauses\n");
                 // Collect local clauses, put into shared memory
                 _hsm->exportChecksum = Checksum();
-                _hsm->exportBufferTrueSize = _engine.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize);
+                _hsm->exportBufferTrueSize = _engine.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize, _hsm->successfulSolverId);
                 auto [admitted, total] = _engine.getLastAdmittedClauseShare();
                 _hsm->lastNumAdmittedClausesToImport = admitted;
                 _hsm->lastNumClausesToImport = total;
@@ -165,8 +165,13 @@ public:
             // Check if clauses should be filtered
             if (_hsm->doFilterImport && !_hsm->didFilterImport) {
                 LOGGER(_log, V5_DEBG, "DO filter clauses\n");
+                int winningSolverId = _hsm->winningSolverId;
                 _hsm->filterSize = _engine.filterSharing(_import_buffer, _hsm->importBufferSize, _filter_buffer);
                 _hsm->didFilterImport = true;
+                if (winningSolverId >= 0) {
+                    LOGGER(_log, V4_VVER, "winning solver ID: %i", winningSolverId);
+                    _engine.setWinningSolverId(winningSolverId);
+                }
             }
             if (!_hsm->doFilterImport) _hsm->didFilterImport = false;
 
@@ -182,6 +187,7 @@ public:
                     _engine.digestSharingWithoutFilter(_import_buffer, _hsm->importBufferSize);
                 }
                 _engine.addSharingEpoch(_hsm->importEpoch);
+                _engine.syncDeterministicSolvingAndCheckForLocalWinner();
                 _hsm->didDigestImport = true;
             }
             if (!_hsm->doDigestImportWithFilter && !_hsm->doDigestImportWithoutFilter) 

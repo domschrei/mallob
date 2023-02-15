@@ -2,6 +2,7 @@
 #pragma once
 
 #include <list>
+#include <set>
 
 #include "app/job_tree.hpp"
 #include "util/logger.hpp"
@@ -19,8 +20,17 @@ private:
     AllReduceElement _neutral_elem;
     
     std::optional<AllReduceElement> _local_elem;
-    std::list<AllReduceElement> _child_elems;
 
+    // Sort arrived child elems by source rank
+    // in order to render aggregation deterministic
+    struct ChildElemPair {
+        int source;
+        AllReduceElement elem;
+        bool operator<(const ChildElemPair& other) const {
+            return source < other.source;
+        }
+    };
+    std::set<ChildElemPair> _child_elems;
     int _num_expected_child_elems;
     IntPair _expected_child_ranks;
     IntPair _expected_child_indices;
@@ -130,7 +140,7 @@ public:
             if (!accept) return false;
             
             // message accepted: store and check off
-            _child_elems.push_back(std::move(msg.payload));
+            _child_elems.insert({source, std::move(msg.payload)});
             if (fromLeftChild) _received_child_elems.first = true;
             if (fromRightChild) _received_child_elems.second = true;
             LOG_ADD_SRC(V5_DEBG, "CS got %i/%i elems", source, _child_elems.size(), _num_expected_child_elems);
@@ -149,14 +159,16 @@ public:
         if (_finished) return *this;
 
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
-
-            _child_elems.push_front(std::move(_local_elem.value()));
+             
+            _child_elems.insert({-1, std::move(_local_elem.value())});
             _local_elem.reset();
 
             assert(!_future_aggregate.valid());
             _aggregating = true;
             _future_aggregate = ProcessWideThreadPool::get().addTask([&]() {
-                _aggregated_elem = _aggregator(_child_elems);
+                std::list<AllReduceElement> elemsList;
+                for (auto& childElem : _child_elems) elemsList.push_back(std::move(childElem.elem));
+                _aggregated_elem = _aggregator(elemsList);
                 _aggregating = false;
             });
         }

@@ -48,7 +48,7 @@ AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& par
             return setup;
         }(), _job)
     ),
-    _sent_cert_unsat_ready_msg(!ClauseMetadata::enabled()) {
+    _sent_cert_unsat_ready_msg(!ClauseMetadata::enabled() && !params.deterministicSolving()) {
 
     _time_of_last_epoch_initiation = Timer::elapsedSecondsCached();
 }
@@ -73,6 +73,7 @@ void AnytimeSatClauseCommunicator::communicate() {
     if (_current_session) {
         _current_session->advanceSharing();
         if (_current_session->isDone()) {
+            _time_of_last_epoch_conclusion = Timer::elapsedSecondsCached();
             _cancelled_sessions.emplace_back(_current_session.release());
         }
     }
@@ -278,11 +279,16 @@ bool AnytimeSatClauseCommunicator::tryInitiateSharing() {
     auto time = Timer::elapsedSecondsCached();
     bool nextEpochDue = _params.appCommPeriod() > 0 &&
         time - _time_of_last_epoch_initiation >= _params.appCommPeriod();
-    bool lastEpochDone = !_current_session;
+    if (_params.deterministicSolving()) {
+        nextEpochDue &= _time_of_last_epoch_conclusion == 0 ||
+            time - _time_of_last_epoch_conclusion >= _params.appCommPeriod();
+    }
     if (!nextEpochDue) return false;
 
+    bool lastEpochDone = !_current_session;
     if (!lastEpochDone) {
-        LOG(V1_WARN, "[WARN] %s : Next epoch over-due!\n", _job->toStr());
+        if (!_params.deterministicSolving()) 
+            LOG(V1_WARN, "[WARN] %s : Next epoch over-due!\n", _job->toStr());
         return false;
     }
 

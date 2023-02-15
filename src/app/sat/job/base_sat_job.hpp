@@ -40,7 +40,7 @@ public:
     
     virtual void prepareSharing(int maxSize) = 0;
     virtual bool hasPreparedSharing() = 0;
-    virtual std::vector<int> getPreparedClauses(Checksum& checksum) = 0;
+    virtual std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId) = 0;
     virtual std::pair<int, int> getLastAdmittedClauseShare() = 0;
 
     virtual void filterSharing(int epoch, std::vector<int>& clauses) = 0;

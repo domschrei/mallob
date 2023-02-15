@@ -35,6 +35,7 @@ private:
 
     int _current_epoch = 0;
     float _time_of_last_epoch_initiation = 0;
+    float _time_of_last_epoch_conclusion = 0;
 
     float _solving_time = 0;
 

@@ -168,16 +168,17 @@ void ThreadedSatJob::prepareSharing(int maxSize) {
     
     _clause_buffer.resize(2*maxSize+100);
     _clause_checksum = Checksum();
-    int actualSize = _solver->prepareSharing(_clause_buffer.data(), maxSize);
+    int actualSize = _solver->prepareSharing(_clause_buffer.data(), maxSize, _successful_solver_id);
     _clause_buffer.resize(actualSize);
 }
 bool ThreadedSatJob::hasPreparedSharing() {
     return !_clause_buffer.empty();
 }
-std::vector<int> ThreadedSatJob::getPreparedClauses(Checksum& checksum) {
+std::vector<int> ThreadedSatJob::getPreparedClauses(Checksum& checksum, int& successfulSolverId) {
     std::vector<int> out = std::move(_clause_buffer);
     _clause_buffer.clear();
     checksum = _clause_checksum;
+    successfulSolverId = _successful_solver_id;
     return out;
 }
 std::pair<int, int> ThreadedSatJob::getLastAdmittedClauseShare() {

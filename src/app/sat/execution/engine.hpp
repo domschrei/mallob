@@ -45,6 +45,9 @@ private:
 	JobResult _result;
 	std::atomic_bool _cleaned_up = false;
 
+	bool _block_result {false};
+	int _winning_solver_id {-1};
+
 public:
 
     SatEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface);
@@ -58,7 +61,7 @@ public:
     int solveLoop();
 	JobResult& getResult() {return _result;}
 
-    int prepareSharing(int* begin, int maxSize);
+    int prepareSharing(int* begin, int maxSize, int& successfulSolverId);
 	int filterSharing(int* begin, int size, int* filterOut);
 	void addSharingEpoch(int epoch);
 	void digestSharingWithFilter(int* begin, int size, const int* filter);
@@ -66,6 +69,9 @@ public:
 	void returnClauses(int* begin, int size);
 	void digestHistoricClauses(int epochBegin, int epochEnd, int* begin, int size);
 	std::pair<int, int> getLastAdmittedClauseShare();
+
+	void setWinningSolverId(int globalId);
+	void syncDeterministicSolvingAndCheckForLocalWinner();
 
     void setPaused();
     void unsetPaused();

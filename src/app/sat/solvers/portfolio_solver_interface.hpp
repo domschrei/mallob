@@ -168,6 +168,11 @@ public:
 	bool fetchLearnedClause(Mallob::Clause& clauseOut, AdaptiveClauseDatabase::ExportMode mode = AdaptiveClauseDatabase::ANY);
 	std::vector<int> fetchLearnedUnitClauses();
 
+	std::function<void(int)> _cb_result_found;
+	void setCallbackResultFound(std::function<void(int)> cb) {_cb_result_found = cb;}
+	void setFoundResult() {
+		_cb_result_found(_local_id);
+	}
 
 private:
 	std::string _global_name;

@@ -123,4 +123,6 @@ OPTION_GROUP(grpDebug, "debug", "Debugging")
 
 ///////////////////////////////////////////////////////////////////////
 
+OPT_BOOL(deterministicSolving,           "ds", "deterministic-solving",                          false,                       "Perform deterministic solving (only with -mono) - considerably slower!")
+
 #endif

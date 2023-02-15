@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <random>
 #include <sys/types.h>
 #include <unistd.h>
 #include <utility>
@@ -34,6 +35,9 @@ private:
     std::vector<SerializedFormulaParser> _pending_formulae;
     std::vector<std::pair<size_t, const int*>> _pending_assumptions;
 
+    std::mt19937 _rng;
+    std::uniform_real_distribution<float> _dist;
+
     int _local_id;
     std::string _name;
     int _portfolio_rank;
@@ -59,7 +63,6 @@ private:
 
     bool _found_result = false;
     JobResult _result;
-
 
 public:
     SolverThread(const Parameters& params, const SatProcessConfig& config, std::shared_ptr<PortfolioSolverInterface> solver, 

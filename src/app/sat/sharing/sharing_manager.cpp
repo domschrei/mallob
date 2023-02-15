@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
+#include "app/sat/sharing/buffer/deterministic_clause_synchronizer.hpp"
 #include "util/assert.hpp"
 
 #include "sharing_manager.hpp"
@@ -59,6 +60,9 @@ SharingManager::SharingManager(
 
 	for (size_t i = 0; i < _solvers.size(); i++) {
 		_solvers[i]->setExtLearnedClauseCallback(callback);
+		_solvers[i]->setCallbackResultFound([&](int localId) {
+			if (_det_sync) _det_sync->notifySolverDone(localId);
+		});
 		_solver_revisions.push_back(_solvers[i]->getSolverSetup().solverRevision);
 		_solver_stats.push_back(&_solvers[i]->getSolverStatsRef());
 
@@ -83,9 +87,21 @@ SharingManager::SharingManager(
 		}
 	}
 	_global_epoch_ids.push_back(0);
+
+	if (_params.deterministicSolving()) {
+		_det_sync.reset(new DeterministicClauseSynchronizer(_solvers, [&](auto call) {
+			onProduceClause(call.solverId, call.solverRevision, call.clause, call.condVarOrZero, true);
+		}));
+	}
 }
 
-void SharingManager::onProduceClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero) {
+void SharingManager::onProduceClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero, bool recursiveCall) {
+
+	if (!recursiveCall && _det_sync) {
+		// Deterministic solving!
+		_det_sync->insertBlocking(solverId, solverRevision, clause, condVarOrZero);
+		return;
+	}
 
 	if (_solver_revisions[solverId] != solverRevision) return;
 
@@ -178,7 +194,16 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	if (tldClauseVec) delete tldClauseVec;
 }
 
-int SharingManager::prepareSharing(int* begin, int totalLiteralLimit) {
+int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& successfulSolverId) {
+
+	if (_det_sync) {
+		LOGGER(_logger, V5_DEBG, "Waiting for solvers to sync ...\n");
+		successfulSolverId = _det_sync->waitUntilSyncReadyAndReturnSolverIdWithResult();
+		LOGGER(_logger, V4_VVER, "All solvers synced\n");
+		if (successfulSolverId >= 0) {
+			LOGGER(_logger, V4_VVER, "Emit successful solver ID %i\n", successfulSolverId);
+		}
+	}
 
 	int numExportedClauses = 0;
 	auto buffer = _cdb.exportBuffer(totalLiteralLimit, numExportedClauses, 
@@ -489,6 +514,18 @@ void SharingManager::digestHistoricClauses(int epochBegin, int epochEnd, int *be
 		digestSharingWithoutFilter(begin, buflen);
 		for (int e = epochBegin; e < epochEnd; e++) addSharingEpoch(e);
 	}
+}
+
+void SharingManager::setWinningSolverId(int globalId) {
+	_global_solver_id_with_result = globalId;
+	_logger.log(V5_DEBG, "S%i is global winner\n", globalId);
+}
+
+bool SharingManager::syncDeterministicSolvingAndCheckForWinningSolver() {
+	if (!_det_sync) return false;
+
+	// Deterministic solving: resume solvers
+	return _det_sync->syncAndCheckForLocalWinner(_global_solver_id_with_result);
 }
 
 SharingStatistics SharingManager::getStatistics() {
