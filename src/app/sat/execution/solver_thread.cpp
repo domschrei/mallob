@@ -51,7 +51,8 @@ void* SolverThread::run() {
     // Shuffle input
     // ... only if original diversifications are exhausted
     _shuffle = _solver.getDiversificationIndex() >= _solver.getNumOriginalDiversifications();
-    float random = 0.001f * (rand() % 1000); // random number in [0,1)
+
+    float random = _dist(_rng); // random number in [0,1)
     assert(random >= 0); assert(random <= 1);
     // ... only if random throw hits user-defined probability
     _shuffle = _shuffle && random < _params.inputShuffleProbability();
@@ -225,12 +226,15 @@ void SolverThread::appendRevision(int revision, size_t fSize, const int* fLits, 
 void SolverThread::diversifyInitially() {
 
     // Random seed
-    size_t seed = 42;
-    hash_combine(seed, (unsigned int)_tid);
+    size_t seed = _solver.getGlobalId();
+    //hash_combine(seed, (unsigned int)_tid);
     hash_combine(seed, (unsigned int)_portfolio_size);
     hash_combine(seed, (unsigned int)_portfolio_rank);
-    srand(seed);
+    // Diversify solver based on seed
     _solver.diversify(seed);
+    // RNG
+    _rng = std::mt19937(seed);
+    _dist = std::uniform_real_distribution<float>(0, 1);
 }
 
 void SolverThread::diversifyAfterReading() {
@@ -240,8 +244,9 @@ void SolverThread::diversifyAfterReading() {
         int vars = _solver.getVariablesCount();
 
         for (int var = 1; var <= vars; var++) {
-            if (rand() % totalSolvers == 0) {
-                _solver.setPhase(var, rand() % 2 == 1);
+            float numSolversRand = totalSolvers * _dist(_rng);
+            if (numSolversRand < 1) {
+                _solver.setPhase(var, numSolversRand < 0.5);
             }
         }
     }
