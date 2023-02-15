@@ -198,7 +198,7 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& successfulSolverId) {
 
 	if (_det_sync) {
-		LOGGER(_logger, V5_DEBG, "Waiting for solvers to sync ...\n");
+		if (!_det_sync->areAllSolversSyncReady()) return -1;
 		successfulSolverId = _det_sync->waitUntilSyncReadyAndReturnSolverIdWithResult();
 		LOGGER(_logger, V4_VVER, "All solvers synced\n");
 		if (successfulSolverId >= 0) {
