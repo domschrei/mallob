@@ -196,7 +196,8 @@ bool SolverThread::readFormula() {
 void SolverThread::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits) {
     {
         auto lock = _state_mutex.getLock();
-        _pending_formulae.emplace_back(_logger, fSize, fLits);
+        _pending_formulae.emplace_back(_logger, fSize, fLits, 
+            revision == 0 ? _solver.getSolverSetup().numOriginalClauses : 0);
         LOGGER(_logger, V4_VVER, "Received %i literals\n", fSize);
         _pending_assumptions.emplace_back(aSize, aLits);
         LOGGER(_logger, V4_VVER, "Received %i assumptions\n", aSize);

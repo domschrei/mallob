@@ -98,6 +98,10 @@ void random_shuffle(T* array, size_t n, SplitMix64Rng& rng)
     }
 }
 
+// Given that you want to choose k elements i.i.d. from n elements,
+// decides randomly whether the first element should be selected.
+bool select_next_for_k_from_n(int k, int n, std::function<float()> rngZeroToOne);
+
 /*
 choose k elements i.i.d. from sequence of n elements A[0..n), in a single linear pass
 
@@ -106,7 +110,7 @@ P(A[0] picked)  = 1 - P(A[0] not picked)
                 = 1 - ( (n-1)/n * (n-2)/(n-1) * ... * (n-k)/(n-k+1) )
                 = 1 - (n-k)/n       // all other terms are cancelled
 
-=> Pick first element with prob. 1 - (n-k)/n
+=> Pick first element A[0] with prob. 1 - (n-k)/n
 => Picked: Continue with A[1] for k'=k-1, n'=n-1
 => Not picked: Continue with A[1] for k'=k, n'=n-1
 */

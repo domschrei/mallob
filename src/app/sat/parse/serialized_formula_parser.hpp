@@ -14,6 +14,7 @@ private:
 
     const size_t _size;
     const int* _payload;
+    const size_t _num_cls;
 
     bool _shuffled {false};
 
@@ -33,14 +34,20 @@ private:
     int _true_chksum {1337};
 
 public:
-    SerializedFormulaParser(Logger& logger, size_t size, const int* literals) : 
-        _logger(logger), _size(size), _payload(literals), 
+    SerializedFormulaParser(Logger& logger, size_t size, const int* literals, size_t numClauses=0) : 
+        _logger(logger), _size(size), _payload(literals), _num_cls(numClauses),
         _literal_ptr(_size==0 ? nullptr : _payload), _next_literal_ptr(_payload+_size) {}
 
     void shuffle(int seed) {
         
         auto time = Timer::elapsedSeconds();
 
+        const int numBlocks = 128;
+
+        // Initialize RNG
+        SplitMix64Rng rng(seed);
+        auto rngLambda = [&]() {return ((double)rng()) / rng.max();};
+        
         // Build vector of clauses (size + pointer to data)
         size_t clauseStart = 0; // 1st clause always begins at position 0
         size_t sumOfSizes = 0;
@@ -49,7 +56,10 @@ public:
             if (_payload[i] == 0) {
                 // clause ends
                 size_t thisClauseSize = i-clauseStart;
-                _clause_refs.push_back(_payload+clauseStart);
+                if (_num_cls == 0 || clauseStart == 0 || select_next_for_k_from_n(
+                        numBlocks - _clause_refs.size(), _num_cls, rngLambda)) {
+                    _clause_refs.push_back(_payload+clauseStart);
+                }
                 //_shuffled_clauses.emplace_back(thisClauseSize, _payload+clauseStart);
                 clauseStart = i+1; // next clause begins at subsequent position
                 sumOfSizes += thisClauseSize;
@@ -60,13 +70,9 @@ public:
                 clsChksum ^= _payload[i];
             }
         }
-        assert(sumOfSizes + _clause_refs.size() == _size);
+        assert(sumOfSizes + _clause_refs.size() == _size || _size - sumOfSizes == _num_cls);
         _has_true_chksum = true;
 
-        // Initialize RNG
-        SplitMix64Rng rng(seed);
-        auto rngLambda = [&]() {return ((double)rng()) / rng.max();};
-        
         if (_clause_refs.size() > 128) {
             // Reduce the set of clause references for better performance:
             // Always select the first pointer, then randomly select 127 more pointers.

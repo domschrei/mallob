@@ -82,6 +82,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	while (numClausesStr[numClausesStr.size()-1] == '.') 
 		numClausesStr.resize(numClausesStr.size()-1);
 	int numClauses = atoi(numClausesStr.c_str());
+	assert(numClauses > 0);
 
 	// Add solvers from full cycles on previous ranks
 	// and from the begun cycle on the previous rank
