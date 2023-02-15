@@ -105,6 +105,11 @@ public:
         _cond_var_sync.notify();
     }
 
+    bool areAllSolversSyncReady() {
+        auto lock = _mtx_sync.getLock();
+        return _nb_waiting_for_sync == _admission_queues.size();
+    }
+
     int waitUntilSyncReadyAndReturnSolverIdWithResult() {
         // Wait until all solvers are waiting for sync
         _cond_var_sync.wait(_mtx_sync, [&]() {return _nb_waiting_for_sync == _admission_queues.size();});

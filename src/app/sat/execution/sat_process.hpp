@@ -154,11 +154,13 @@ public:
                 // Collect local clauses, put into shared memory
                 _hsm->exportChecksum = Checksum();
                 _hsm->exportBufferTrueSize = _engine.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize, _hsm->successfulSolverId);
-                auto [admitted, total] = _engine.getLastAdmittedClauseShare();
-                _hsm->lastNumAdmittedClausesToImport = admitted;
-                _hsm->lastNumClausesToImport = total;
-                assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
-                _hsm->didExport = true;
+                if (_hsm->exportBufferTrueSize != -1) {
+                    auto [admitted, total] = _engine.getLastAdmittedClauseShare();
+                    _hsm->lastNumAdmittedClausesToImport = admitted;
+                    _hsm->lastNumClausesToImport = total;
+                    assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
+                    _hsm->didExport = true;
+                }
             }
             if (!_hsm->doExport) _hsm->didExport = false;
 
