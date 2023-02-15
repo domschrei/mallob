@@ -70,6 +70,14 @@ public:
         return z ^ (z >> 31);
     }
 
+    double randomInRange(double low, double high) {
+        uint64_t r = (*this)();
+        auto result = low + (high - low) * r / max();
+        assert(result >= low);
+        assert(result <= high);
+        return result;
+    }
+
     uint64_t max() const {
         return std::numeric_limits<uint64_t>::max();
     }

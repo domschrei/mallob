@@ -4,6 +4,7 @@
 
 #include "solver_thread.hpp"
 #include "engine.hpp"
+#include "util/random.hpp"
 #include "util/sys/proc.hpp"
 #include "util/hashing.hpp"
 
@@ -223,8 +224,7 @@ void SolverThread::diversifyInitially() {
     // Diversify solver based on seed
     _solver.diversify(seed);
     // RNG
-    _rng = std::mt19937(seed);
-    _dist = std::uniform_real_distribution<float>(0, 1);
+    _rng = SplitMix64Rng(seed);
 }
 
 void SolverThread::diversifyAfterReading() {
@@ -234,7 +234,7 @@ void SolverThread::diversifyAfterReading() {
         int vars = _solver.getVariablesCount();
 
         for (int var = 1; var <= vars; var++) {
-            float numSolversRand = totalSolvers * _dist(_rng);
+            float numSolversRand = _rng.randomInRange(0, totalSolvers);
             if (numSolversRand < 1) {
                 _solver.setPhase(var, numSolversRand < 0.5);
             }

@@ -10,6 +10,7 @@
 #include <list>
 
 #include "util/params.hpp"
+#include "util/random.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 #include "data/job_result.hpp"
@@ -35,8 +36,7 @@ private:
     std::vector<SerializedFormulaParser> _pending_formulae;
     std::vector<std::pair<size_t, const int*>> _pending_assumptions;
 
-    std::mt19937 _rng;
-    std::uniform_real_distribution<float> _dist;
+    SplitMix64Rng _rng;
 
     int _local_id;
     std::string _name;
