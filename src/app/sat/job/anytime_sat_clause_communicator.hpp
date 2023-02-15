@@ -67,11 +67,16 @@ private:
                 // Base message 
                 JobMessage(_job->getId(), _job->getRevision(), epoch, MSG_ALLREDUCE_CLAUSES),
                 // Neutral element
-                std::vector<int>(1, 1), // only integer: number of aggregated job tree nodes
+                {1, -1}, // two integers: number of aggregated job tree nodes, winning solver ID
                 // Aggregator for local + incoming elements
                 [&](std::list<std::vector<int>>& elems) {
                     int numAggregated = 0;
+                    int successfulSolverId = -1;
                     for (auto& elem : elems) {
+                        if (elem.back() != -1 && (successfulSolverId == -1 || successfulSolverId > elem.back())) {
+                            successfulSolverId = elem.back();
+                        }
+                        elem.pop_back();
                         numAggregated += elem.back();
                         elem.pop_back();
                     }
@@ -83,6 +88,7 @@ private:
                     LOG(V4_VVER, "%s : merged %i contribs ~> len=%i\n", 
                         _job->toStr(), numAggregated, merged.size());
                     merged.push_back(numAggregated);
+                    merged.push_back(successfulSolverId);
                     return merged;
                 }
             ),
@@ -153,7 +159,7 @@ private:
     float _solving_time = 0;
     float _reconstruction_time = 0;
 
-    bool _sent_ready_msg = !ClauseMetadata::enabled();
+    bool _sent_ready_msg;
     int _num_ready_msgs_from_children = 0;
 
     JobMessage _msg_unsat_found;
@@ -183,7 +189,7 @@ public:
             setup.numLiterals = 0;
             return setup;
         }()),
-        _cls_history(_params, _job->getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job, _cdb) {
+        _cls_history(_params, _job->getBufferLimit(_job->getJobTree().getCommSize(), MyMpi::ALL), *job, _cdb), _sent_ready_msg(!ClauseMetadata::enabled() && !_params.deterministicSolving()) {
 
         _time_of_last_epoch_initiation = Timer::elapsedSeconds();
         _time_of_last_epoch_conclusion = Timer::elapsedSeconds();

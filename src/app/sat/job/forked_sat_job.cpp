@@ -208,7 +208,8 @@ void ForkedSatJob::appl_communicate() {
 }
 
 void ForkedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    if ((!isInitialized() || !checkClauseComm()) && ClauseMetadata::enabled() 
+    if ((!isInitialized() || !checkClauseComm())
+            && (ClauseMetadata::enabled() || _params.deterministicSolving())
             && msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
         deferMessage(source, mpiTag, msg);
         return;
@@ -239,10 +240,10 @@ bool ForkedSatJob::hasPreparedSharing() {
     if (!_initialized) return true;
     return _solver->hasCollectedClauses();
 }
-std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum) {
+std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum, int& successfulSolverId) {
     if (!_initialized || !_solver->hasCollectedClauses()) 
         return std::vector<int>();
-    return _solver->getCollectedClauses();
+    return _solver->getCollectedClauses(successfulSolverId);
 }
 std::pair<int, int> ForkedSatJob::getLastAdmittedClauseShare() {
     if (!_initialized) return std::pair<int, int>();

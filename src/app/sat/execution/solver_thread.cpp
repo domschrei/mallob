@@ -226,7 +226,7 @@ void SolverThread::appendRevision(int revision, size_t fSize, const int* fLits, 
 void SolverThread::diversifyInitially() {
 
     // Random seed
-    size_t seed = _solver.getGlobalId();
+    size_t seed = _params.seed() + _solver.getGlobalId();
     //hash_combine(seed, (unsigned int)_tid);
     hash_combine(seed, (unsigned int)_portfolio_size);
     hash_combine(seed, (unsigned int)_portfolio_rank);
@@ -366,6 +366,7 @@ void SolverThread::reportResult(int res, int revision) {
     }
 
     _found_result = true;
+    _solver.setFoundResult();
 }
 
 SolverThread::~SolverThread() {

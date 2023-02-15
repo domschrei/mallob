@@ -11,6 +11,7 @@
 #include "filter/produced_clause_filter.hpp"
 #include "export_buffer.hpp"
 #include "../data/sharing_statistics.hpp"
+#include "buffer/deterministic_clause_synchronizer.hpp"
 
 #define CLAUSE_LEN_HIST_LENGTH 256
 
@@ -72,17 +73,23 @@ protected:
 
 	int _internal_epoch = 0;
 
+	std::unique_ptr<DeterministicClauseSynchronizer> _det_sync;
+	int _global_solver_id_with_result {-1};
+
 public:
 	SharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
 			const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver,
 			int jobIndex);
 	~SharingManager();
 
-    int prepareSharing(int* begin, int totalLiteralLimit);
+    int prepareSharing(int* begin, int totalLiteralLimit, int& successfulSolverId);
 	int filterSharing(int* begin, int buflen, int* filterOut);
 	void digestSharingWithFilter(int* begin, int buflen, const int* filter);
     void digestSharingWithoutFilter(int* begin, int buflen);
 	void returnClauses(int* begin, int buflen);
+
+	void setWinningSolverId(int globalId);
+	bool syncDeterministicSolvingAndCheckForWinningSolver();
 
 	SharingStatistics getStatistics();
 
@@ -162,7 +169,7 @@ private:
 	int getEpochOfUnalignedSelfClause(unsigned long id);
 	int getEpochOfAlignedSelfClause(unsigned long id);
 
-	void onProduceClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero);
+	void onProduceClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero, bool recursiveCall = false);
 
 	ExtLearnedClauseCallback getCallback() {
 		return [this](const Clause& c, int solverId, int solverRevision, int condVarOrZero) {

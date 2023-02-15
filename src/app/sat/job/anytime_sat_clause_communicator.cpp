@@ -151,8 +151,13 @@ void AnytimeSatClauseCommunicator::communicate() {
 
         auto time = Timer::elapsedSeconds();
         bool nextEpochDue = time - _time_of_last_epoch_initiation >= _params.appCommPeriod();
+        if (_params.deterministicSolving()) {
+            // Deterministic solving: comm. period specifies min. interval between
+            // end of last sharing and beginning of next sharing
+            nextEpochDue = time - _time_of_last_epoch_conclusion >= _params.appCommPeriod();
+        }
         bool lastEpochDone = _time_of_last_epoch_conclusion > 0;
-        if (nextEpochDue && !lastEpochDone) {
+        if (nextEpochDue && !lastEpochDone && !_params.deterministicSolving()) {
             LOG(V1_WARN, "[WARN] %s : Next epoch over-due!\n", _job->toStr());
         }
         if (nextEpochDue && lastEpochDone) {
@@ -186,8 +191,10 @@ void AnytimeSatClauseCommunicator::communicate() {
         LOG(V4_VVER, "%s CS produce cls\n", _job->toStr());
         session._allreduce_clauses.produce([&]() {
             Checksum checksum;
-            auto clauses = _job->getPreparedClauses(checksum);
+            int successfulSolverId;
+            auto clauses = _job->getPreparedClauses(checksum, successfulSolverId);
             clauses.push_back(1); // # aggregated workers
+            clauses.push_back(successfulSolverId); // # successful solver id (or -1)
             return clauses;
         });
     

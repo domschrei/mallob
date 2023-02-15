@@ -66,7 +66,6 @@ private:
     bool _found_result = false;
     JobResult _result;
 
-
 public:
     SolverThread(const Parameters& params, const SatProcessConfig& config, std::shared_ptr<PortfolioSolverInterface> solver, 
                 size_t fSize, const int* fLits, size_t aSize, const int* aLits, int localId);

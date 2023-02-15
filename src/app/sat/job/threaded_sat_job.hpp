@@ -29,6 +29,7 @@ private:
     bool _did_filter = false;
     std::vector<int> _filter;
     std::vector<int> _clauses_to_filter;
+    int _successful_solver_id {-1};
 
     std::atomic_bool _done_locally;
     int _result_code;
@@ -70,7 +71,7 @@ public:
     bool isInitialized() override;
     void prepareSharing(int maxSize) override;
     bool hasPreparedSharing() override;
-    std::vector<int> getPreparedClauses(Checksum& checksum) override;
+    std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId) override;
     std::pair<int, int> getLastAdmittedClauseShare() override;
     
     virtual void filterSharing(std::vector<int>& clauses) override;

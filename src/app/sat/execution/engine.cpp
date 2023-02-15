@@ -37,6 +37,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	int numOrigSolvers = params.numThreadsPerProcess();
 	_job_id = config.jobid;
 	
+	_block_result = _params.deterministicSolving();
+
 	// Retrieve the string defining the cycle of solver choices, one character per solver
 	// e.g. "llgc" => lingeling lingeling glucose cadical lingeling lingeling glucose ...
 	std::string solverChoices = params.satSolverSequence();
@@ -270,11 +272,16 @@ bool SatEngine::isFullyInitialized() {
 
 int SatEngine::solveLoop() {
 	if (isCleanedUp()) return -1;
+	if (_block_result) return -1;
 
     // Solving done?
 	bool done = false;
 	for (size_t i = 0; i < _solver_threads.size(); i++) {
 		if (_solver_threads[i]->hasFoundResult(_revision)) {
+
+			if (_params.deterministicSolving() && _solver_interfaces[i]->getGlobalId() != _winning_solver_id)
+				continue; // not the successful solver we're looking for
+
 			auto& result = _solver_threads[i]->getSatResult();
 			if (result.result > 0 && result.revision == _revision) {
 				done = true;
@@ -293,10 +300,10 @@ int SatEngine::solveLoop() {
     return -1; // no result yet
 }
 
-int SatEngine::prepareSharing(int* begin, int maxSize) {
+int SatEngine::prepareSharing(int* begin, int maxSize, int& successfulSolverId) {
 	if (isCleanedUp()) return sizeof(size_t) / sizeof(int); // checksum, nothing else
 	LOGGER(_logger, V5_DEBG, "collecting clauses on this node\n");
-	int size = _sharing_manager->prepareSharing(begin, maxSize);
+	int size = _sharing_manager->prepareSharing(begin, maxSize, successfulSolverId);
 	return size;
 }
 
@@ -318,6 +325,12 @@ void SatEngine::digestSharingWithoutFilter(int* begin, int size) {
 void SatEngine::returnClauses(int* begin, int size) {
 	if (isCleanedUp()) return;
 	_sharing_manager->returnClauses(begin, size);
+}
+
+void SatEngine::syncDeterministicSolvingAndCheckForLocalWinner() {
+	if (_block_result) {
+		_block_result = !_sharing_manager->syncDeterministicSolvingAndCheckForWinningSolver();
+	}
 }
 
 void SatEngine::dumpStats(bool final) {
@@ -358,6 +371,11 @@ void SatEngine::dumpStats(bool final) {
 		for (auto& solver : _solver_interfaces) solver->getLogger().flush();
 		_logger.flush();
 	}
+}
+
+void SatEngine::setWinningSolverId(int globalId) {
+	_sharing_manager->setWinningSolverId(globalId);
+	_winning_solver_id = globalId;
 }
 
 void SatEngine::setPaused() {

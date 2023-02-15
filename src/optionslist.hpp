@@ -117,4 +117,6 @@ OPT_STRING(subprocessPrefix,             "subproc-prefix", "",                  
 OPT_STRING(traceDirectory,               "trace-dir", "",                             ".",                     "Directory to write thread trace files to")
 OPT_STRING(satPreprocessor,              "sat-preprocessor", "",                      "",                      "Executable which preprocesses CNF file")
 
+OPT_BOOL(deterministicSolving,           "ds", "deterministic-solving",                          false,                       "Perform deterministic solving (only with -mono) - considerably slower!")
+
 #endif

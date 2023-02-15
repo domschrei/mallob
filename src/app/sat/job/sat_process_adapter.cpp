@@ -222,12 +222,13 @@ void SatProcessAdapter::collectClauses(int maxSize) {
 bool SatProcessAdapter::hasCollectedClauses() {
     return !_initialized || (_hsm->doExport && _hsm->didExport);
 }
-std::vector<int> SatProcessAdapter::getCollectedClauses() {
+std::vector<int> SatProcessAdapter::getCollectedClauses(int& successfulSolverId) {
     if (!_initialized) return std::vector<int>();
     if (!hasCollectedClauses()) return std::vector<int>();
     assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
     std::vector<int> clauses(_export_buffer, _export_buffer+_hsm->exportBufferTrueSize);
     _last_admitted_clause_share = std::pair<int, int>(_hsm->lastNumAdmittedClausesToImport, _hsm->lastNumClausesToImport);
+    successfulSolverId = _hsm->successfulSolverId;
     _hsm->doExport = false;
     return clauses;
 }
@@ -246,6 +247,8 @@ bool SatProcessAdapter::process(const std::vector<int>& buffer, BufferTask task)
         _hsm->importBufferRevision = _desired_revision;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
         memcpy(_import_buffer, buffer.data(), buffer.size()*sizeof(int));
+        _hsm->winningSolverId = buffer.back();
+        assert(_hsm->winningSolverId >= -1);
         _hsm->doFilterImport = true;
 
     } else if (task == APPLY_FILTER) {
