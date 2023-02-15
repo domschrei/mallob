@@ -238,7 +238,8 @@ void ForkedSatJob::prepareSharing(int maxSize) {
     _solver->collectClauses(maxSize);
 }
 bool ForkedSatJob::hasPreparedSharing() {
-    if (!_initialized || getState() != ACTIVE) return true;
+    if (!isInitialized() && _params.deterministicSolving()) return false;
+    if (!_initialized || getState() != ACTIVE) return !_params.deterministicSolving();
     bool hasCollected = _solver->hasCollectedClauses();
     if (!hasCollected) prepareSharing(_sharing_max_size);
     return hasCollected;

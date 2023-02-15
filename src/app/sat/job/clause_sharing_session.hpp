@@ -108,6 +108,8 @@ public:
 
             // Fetch initial clause buffer (result of all-reduction of clauses)
             _broadcast_clause_buffer = _allreduce_clauses.extractResult();
+            int winningSolverId = _broadcast_clause_buffer.back();
+            assert(winningSolverId >= -1 || log_return_false("Winning solver ID = %i\n", winningSolverId));
 
             // Initiate production of local filter element for 2nd all-reduction 
             _job->filterSharing(_epoch, _broadcast_clause_buffer);
@@ -187,6 +189,7 @@ private:
         int numAggregated = 0;
         int successfulSolverId = -1;
         for (auto& elem : elems) {
+            assert(elem.back() >= -1 || log_return_false("Successful solver ID %i\n", elem.back()));
             if (elem.back() != -1 && (successfulSolverId == -1 || successfulSolverId > elem.back())) {
                 successfulSolverId = elem.back();
             }
