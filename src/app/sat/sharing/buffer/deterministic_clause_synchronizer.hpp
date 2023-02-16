@@ -41,8 +41,10 @@ private:
     int _min_solver_id_with_result {-1};
 
 public:
-    DeterministicClauseSynchronizer(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, CbAdmitClause cb) : 
-        _cb_admit_clause(cb), _solvers(solvers), _admission_queues(_solvers.size()) {}
+    DeterministicClauseSynchronizer(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
+            size_t numOrigClauses, CbAdmitClause cb) :
+        _cb_admit_clause(cb), _solvers(solvers), _admission_queues(_solvers.size()),
+        _nb_insertions_until_sync(std::floor(0.1*approximateConflictsPerSecond(numOrigClauses))) {}
     ~DeterministicClauseSynchronizer() {
         if (isWaitingForSync()) syncAndCheckForLocalWinner(-1);
     }
@@ -139,6 +141,31 @@ public:
         }
         _cond_var_sync.notify();
         return hasWinningSolver;
+    }
+
+private:
+    double approximateConflictsPerSecond(size_t numOrigClauses) {
+
+        // limits
+        if (numOrigClauses < 1000) return 100'000;
+        if (numOrigClauses > 5e7) return 50;
+
+        // function maps milliclauses to kiloseconds per conflict
+        const double x = 0.001 * numOrigClauses;
+
+        const double a = 6.76629106e-14;
+        const double b = -1.44864905e-08;
+        const double c = 9.68449085e-04;
+        const double kSecsPerConflict = a * std::pow(x, 3) + b * std::pow(x, 2) + c * x + 0.01;
+
+        const double secsPerConflict = std::min(0.02, 0.001 * kSecsPerConflict);
+        const double conflictsPerSec = 1 / secsPerConflict;
+        LOG(V2_INFO, "Det. solving: approximated %ld clauses to result in %.3f conflicts per second\n", 
+            numOrigClauses, conflictsPerSec);
+
+        assert(conflictsPerSec >= 50);
+        assert(conflictsPerSec <= 100'000);
+        return conflictsPerSec;
     }
 
 private:
