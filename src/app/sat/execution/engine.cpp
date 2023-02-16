@@ -61,6 +61,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		create_directory(full_path);
 		proofDirectory = full_path.string();
     }
+
+	// Launched for deterministic solving?
+	if (_params.deterministicSolving()) {
+		if (_params.skipClauseSharingDiagonally()) {
+			LOG(V3_VERB, "Deterministic mode: Disabling -scsd\n");
+			_params.skipClauseSharingDiagonally.set(false);
+		}
+	}
 	
 	// These numbers become the diversifier indices of the solvers on this node
 	int numLgl = 0;
