@@ -5,9 +5,9 @@
 
 struct BufferIterator {
 
-const int maxClauseLength;
-const bool slotsForSumOfLengthAndLbd;
-const int maxSumOfLengthAndLbd;
+int maxClauseLength;
+bool slotsForSumOfLengthAndLbd;
+int maxSumOfLengthAndLbd;
 
 int clauseLength;
 int lbd;
@@ -21,9 +21,6 @@ BufferIterator(int maxClauseLength, bool slotsForSumOfLengthAndLbd) :
     lbd = 1;
 }
 BufferIterator(const BufferIterator& other) : maxClauseLength(other.maxClauseLength), 
-    slotsForSumOfLengthAndLbd(other.slotsForSumOfLengthAndLbd), 
-    maxSumOfLengthAndLbd(other.maxSumOfLengthAndLbd), clauseLength(other.clauseLength), lbd(other.lbd) {}
-BufferIterator(BufferIterator&& other) : maxClauseLength(other.maxClauseLength), 
     slotsForSumOfLengthAndLbd(other.slotsForSumOfLengthAndLbd), 
     maxSumOfLengthAndLbd(other.maxSumOfLengthAndLbd), clauseLength(other.clauseLength), lbd(other.lbd) {}
 
@@ -96,6 +93,10 @@ void nextLengthLbdGroup() {
     } else {
         lbd++;
     }
+}
+
+bool operator==(const BufferIterator& other) const {
+    return clauseLength == other.clauseLength && lbd == other.lbd;
 }
 
 };

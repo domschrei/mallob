@@ -14,3 +14,12 @@ bool select_next_for_k_from_n(int k, int n, std::function<float()> rngZeroToOne 
     }
     return false;
 }
+bool select_next_for_k_from_n(int k, int n, SplitMix64Rng& rng) {
+    auto probSelect = 1.0 - (n-k) / (double)n;
+    // robustness towards floating-point shenanigans
+    if (probSelect > 0 && (probSelect >= 1 || rng.randomInRange(0, 1) < probSelect)) {
+        // array[pos] selected
+        return true;
+    }
+    return false;
+}

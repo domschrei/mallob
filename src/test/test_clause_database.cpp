@@ -130,7 +130,7 @@ void testMerge() {
     auto merger = cdb.getBufferMerger(300000);
     for (auto& buffer : buffers) merger.add(cdb.getBufferReader(buffer.data(), buffer.size()));
     std::vector<int> excess;
-    auto merged = merger.merge(&excess);
+    auto merged = merger.mergePreservingExcess(excess);
     LOG(V2_INFO, "Merged into buffer of size %ld, excess buffer has size %ld\n", merged.size(), excess.size());
 
     auto mergedReader = cdb.getBufferReader(merged.data(), merged.size());

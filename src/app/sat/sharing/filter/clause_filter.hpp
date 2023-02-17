@@ -29,6 +29,7 @@ public:
 };
 
 struct AbstractClauseThreewayComparator {
+	virtual ~AbstractClauseThreewayComparator() {}
 	virtual int compare(const Clause& left, const Clause& right) const = 0;
 };
 struct LexicographicClauseThreewayComparator : public AbstractClauseThreewayComparator {

@@ -9,15 +9,14 @@ private:
     std::vector<int> _input;
     std::vector<std::pair<size_t, int*>> _clauses;
 
-    std::mt19937 _rng;
-    std::uniform_real_distribution<float> _dist;
+    SplitMix64Rng _rng;
     std::function<float()> _rng_func;
 
     size_t _it;
 
 public:
-    ClauseShuffler(int seed = 0) : _rng(std::mt19937(seed)), _dist(std::uniform_real_distribution<float>(0, 1)) {
-        _rng_func = [this]() {return _dist(_rng);};
+    ClauseShuffler(int seed = 0) : _rng(seed) {
+        _rng_func = [this]() {return _rng.randomInRange(0, 1);};
     }
 
     std::pair<const int*, size_t> doShuffle(const int* input, size_t inputSize, bool permuteClauses = true, bool permuteLiterals = true) {

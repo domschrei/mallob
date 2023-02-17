@@ -10,6 +10,7 @@
 #include "comm/job_tree_all_reduction.hpp"
 #include "historic_clause_storage.hpp"
 #include "app/sat/sharing/filter/in_place_clause_filtering.hpp"
+#include "util/random.hpp"
 
 class ClauseSharingSession {
 
@@ -34,6 +35,8 @@ private:
 
     JobTreeAllReduction _allreduce_clauses;
     JobTreeAllReduction _allreduce_filter;
+
+    SplitMix64Rng _rng;
 
 public:
     ClauseSharingSession(const Parameters& params, BaseSatJob* job, AdaptiveClauseDatabase& cdb,
@@ -60,7 +63,7 @@ public:
             [&](std::list<std::vector<int>>& elems) {
                 return mergeFiltersDuringAggregation(elems);
             }
-        ) {
+        ), _rng(_params.seed()+69) {
 
         LOG(V4_VVER, "%s CS OPEN e=%i\n", _job->toStr(), _epoch);
 
@@ -201,7 +204,7 @@ private:
         for (auto& elem : elems) {
             merger.add(_cdb.getBufferReader(elem.data(), elem.size()));
         }
-        std::vector<int> merged = merger.merge(&_excess_clauses_from_merge);
+        std::vector<int> merged = merger.mergePreservingExcessWithRandomTieBreaking(_excess_clauses_from_merge, _rng);
         LOG(V4_VVER, "%s : merged %i contribs ~> len=%i\n", 
             _job->toStr(), numAggregated, merged.size());
         merged.push_back(numAggregated);

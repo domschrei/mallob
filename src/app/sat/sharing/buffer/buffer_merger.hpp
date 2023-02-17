@@ -8,6 +8,7 @@
 #include "buffer_builder.hpp"
 #include "buffer_reader.hpp"
 #include "../filter/clause_filter.hpp" 
+#include "util/random.hpp"
 
 class BufferMerger {
     
@@ -38,8 +39,13 @@ private:
 public:
     BufferMerger(int sizeLimit, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);
     void add(BufferReader&& reader);
-    std::vector<int> merge(std::vector<int>* excessClauses = nullptr);
+
+    std::vector<int> mergeDiscardingExcess();
+    std::vector<int> mergePreservingExcess(std::vector<int>& excessOut);
+    std::vector<int> mergePreservingExcessWithRandomTieBreaking(std::vector<int>& excessOut, SplitMix64Rng& rng);
     
 private:
-    std::vector<int> fastMerge(int sizeLimit, std::vector<int>* excessClauses = nullptr);
+    std::vector<int> merge(std::vector<int>* excessClauses, SplitMix64Rng* rng);
+    void redistributeBorderBucketClausesRandomly(std::vector<int>& resultClauses, std::vector<int>& excessClauses, 
+        SplitMix64Rng& rng, const BufferBuilder::FailedInsertion& failedInfo, int excess1stCounterPos);
 };

@@ -9,6 +9,13 @@
 
 class BufferBuilder {
 
+public:
+    struct FailedInsertion {
+        int lastCounterPosition;
+        BufferIterator lastBucket;
+        BufferIterator failedBucket;
+    };
+
 private:
     std::vector<int>* _out;
     bool _owning_vector = false;
@@ -18,6 +25,8 @@ private:
     BufferIterator _it;
     int _num_added_clauses = 0;
     int _num_added_lits = 0;
+
+    FailedInsertion _failed_insertion;
 
 public:
     BufferBuilder(int totalLiteralLimit, int maxClauseLength, bool slotsForSumOfLengthAndLbd, std::vector<int>* out = nullptr) :
@@ -42,8 +51,18 @@ public:
 
     bool append(const Mallob::Clause& c) {
 
-        if (_total_literal_limit >= 0 && _num_added_lits + c.size > _total_literal_limit) 
+        if (_total_literal_limit >= 0 && _num_added_lits + c.size > _total_literal_limit) {
+            // Buffer is full!
+            // Assemble some information on the fail
+            _failed_insertion.lastCounterPosition = _counter_position;
+            _failed_insertion.lastBucket = _it;
+            _failed_insertion.failedBucket = _it;
+            while (c.size != _failed_insertion.failedBucket.clauseLength 
+                    || c.lbd != _failed_insertion.failedBucket.lbd) {
+                _failed_insertion.failedBucket.nextLengthLbdGroup();
+            }
             return false;
+        }
 
         //LOG(V2_INFO, "APPEND %s\n", c.toStr().c_str());
 
@@ -62,6 +81,14 @@ public:
         _num_added_lits += c.size;
         _num_added_clauses++;
         return true;
+    }
+
+    int getCurrentCounterPosition() const {
+        return _counter_position;
+    }
+
+    FailedInsertion getFailedInsertionInfo() const {
+        return _failed_insertion;
     }
 
     int getNumAddedClauses() const {

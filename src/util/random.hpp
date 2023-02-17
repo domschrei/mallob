@@ -71,10 +71,15 @@ public:
     }
 
     double randomInRange(double low, double high) {
-        uint64_t r = (*this)();
-        auto result = low + (high - low) * r / max();
+        static constexpr double maxNum = (double) std::numeric_limits<uint64_t>::max();
+        assert(low < high);
+        double result = high;
+        while (result >= high) {
+            uint64_t r = (*this)();
+            result = low + (high - low) * (r / maxNum);
+        }
         assert(result >= low);
-        assert(result <= high);
+        assert(result < high);
         return result;
     }
 
@@ -109,6 +114,7 @@ void random_shuffle(T* array, size_t n, SplitMix64Rng& rng)
 // Given that you want to choose k elements i.i.d. from n elements,
 // decides randomly whether the first element should be selected.
 bool select_next_for_k_from_n(int k, int n, std::function<float()> rngZeroToOne);
+bool select_next_for_k_from_n(int k, int n, SplitMix64Rng& rng);
 
 /*
 choose k elements i.i.d. from sequence of n elements A[0..n), in a single linear pass
