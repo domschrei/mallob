@@ -136,6 +136,17 @@ public:
         {
             auto lock = _mtx_sync.getLock();
             assert(_nb_waiting_for_sync == _admission_queues.size());
+
+            // Flush all admission queues
+            for (auto& q : _admission_queues) {
+                for (auto& call : q.queue) {
+                    _cb_admit_clause(call);
+                }
+                q.queue.clear();
+            }
+            _num_nonempty_queues = 0;
+
+            // Determine winning solver and resume solvers
             for (int i = 0; i < _admission_queues.size(); ++i) {
                 auto& q = _admission_queues[i];
                 assert(q.waiting);
