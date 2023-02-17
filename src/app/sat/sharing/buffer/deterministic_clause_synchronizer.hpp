@@ -33,7 +33,7 @@ private:
     };
     std::vector<AdmissionQueue> _admission_queues;
 
-    int _nb_insertions_until_sync {10'000};
+    unsigned long _nb_ops_until_sync;
     int _nb_waiting_for_sync {0};
     Mutex _mtx_sync;
     ConditionVariable _cond_var_sync;
@@ -44,7 +44,7 @@ public:
     DeterministicClauseSynchronizer(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
             size_t numOrigClauses, float performanceFactor, CbAdmitClause cb) :
         _cb_admit_clause(cb), _solvers(solvers), _admission_queues(_solvers.size()),
-        _nb_insertions_until_sync(std::floor(performanceFactor*approximateConflictsPerSecond(numOrigClauses))) {}
+        _nb_ops_until_sync(std::floor(performanceFactor*1'000'000)) {}
     ~DeterministicClauseSynchronizer() {
         if (isWaitingForSync()) syncAndCheckForLocalWinner(-1);
     }
@@ -77,8 +77,16 @@ public:
                 }
             }
 
-            if (q.numInserted % _nb_insertions_until_sync == 0) {
+            // We can get thread safe read+write access to a solver's performance counter
+            // since we ARE currently in the solver's thread.
+            auto& perfCount = _solvers.at(solverId)->getPerfCount();
+
+            // If a dummy perf. counter is used, increase it by a constant for each conflict.
+            if (!_solvers.at(solverId)->hasAutonomousPerfCounting()) perfCount += 1000;
+
+            if (perfCount >= _nb_ops_until_sync) {
                 // Sync! Sleep until clause exchange has been done.
+                perfCount = 0; // reset perf count
                 {
                     auto lock = _mtx_sync.getLock();
                     assert(!q.waiting);
@@ -172,8 +180,8 @@ private:
     void waitForSync(int solverId) {
         bool& waiting = _admission_queues.at(solverId).waiting;
         if (!waiting) return;
-        LOG(V5_DEBG, "%i : WAIT_FOR_SYNC\n", solverId);
+        LOG(V4_VVER, "%i : wait for sync\n", solverId);
         _cond_var_sync.wait(_mtx_sync, [&]() {return !waiting;});
-        LOG(V5_DEBG, "%i : END_WAIT_FOR_SYNC\n", solverId);
+        LOG(V4_VVER, "%i : synced\n", solverId);
     }
 };

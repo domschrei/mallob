@@ -29,6 +29,9 @@ typedef std::function<void(const Mallob::Clause&, int, int, int)> ExtLearnedClau
  */
 class PortfolioSolverInterface {
 
+private:
+	unsigned long _default_perf_count {0};
+
 protected:
 	Logger _logger;
 	SolverSetup _setup;
@@ -80,6 +83,9 @@ public:
 
 	virtual bool supportsIncrementalSat() = 0;
 	virtual bool exportsConditionalClauses() = 0;
+
+	virtual unsigned long& getPerfCount() {return _default_perf_count;}
+	virtual bool hasAutonomousPerfCounting() {return false;}
 
 protected:
 	// Interrupt the SAT solving, solving cannot continue until interrupt is unset.

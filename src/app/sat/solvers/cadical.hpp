@@ -70,4 +70,9 @@ public:
 
 	bool supportsIncrementalSat() override {return true;}
 	bool exportsConditionalClauses() override {return false;}
+
+	unsigned long& getPerfCount() override {
+		return solver->get_access_counter();
+	}
+	virtual bool hasAutonomousPerfCounting() override {return true;}
 };
