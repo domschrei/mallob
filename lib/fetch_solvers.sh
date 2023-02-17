@@ -10,7 +10,7 @@ if echo $solvers|grep -q "c" && [ ! -d cadical ]; then git clone git@github.com:
 if echo $solvers|grep -q "p" && [ ! -d lrat-cadical ]; then 
     git clone https://github.com/domschrei/cadical.git lrat-cadical
     cd lrat-cadical
-    git checkout raog
+    git checkout certified-integrated
     cd ..
 fi
 if echo $solvers|grep -q "k" && [ ! -d kissat ]; then wget -nc https://github.com/domschrei/kissat/archive/refs/heads/master.zip && mv master.zip kissat-isc22.zip ; fi
