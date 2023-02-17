@@ -118,5 +118,6 @@ OPT_STRING(traceDirectory,               "trace-dir", "",                       
 OPT_STRING(satPreprocessor,              "sat-preprocessor", "",                      "",                      "Executable which preprocesses CNF file")
 
 OPT_BOOL(deterministicSolving,           "ds", "deterministic-solving",                          false,                       "Perform deterministic solving (only with -mono) - considerably slower!")
+OPT_FLOAT(deterministicPerformanceFactor, "dpf", "det-perf-factor",                              1.f, 1e-10, LARGE_INT,       "Increase for faster machines, decrease for slower ones - until desired comm. period is achieved on average")
 
 #endif

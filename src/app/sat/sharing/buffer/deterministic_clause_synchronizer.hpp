@@ -42,9 +42,9 @@ private:
 
 public:
     DeterministicClauseSynchronizer(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
-            size_t numOrigClauses, CbAdmitClause cb) :
+            size_t numOrigClauses, float performanceFactor, CbAdmitClause cb) :
         _cb_admit_clause(cb), _solvers(solvers), _admission_queues(_solvers.size()),
-        _nb_insertions_until_sync(std::floor(0.1*approximateConflictsPerSecond(numOrigClauses))) {}
+        _nb_insertions_until_sync(std::floor(performanceFactor*approximateConflictsPerSecond(numOrigClauses))) {}
     ~DeterministicClauseSynchronizer() {
         if (isWaitingForSync()) syncAndCheckForLocalWinner(-1);
     }

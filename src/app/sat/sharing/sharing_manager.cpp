@@ -88,9 +88,12 @@ SharingManager::SharingManager(
 	_global_epoch_ids.push_back(0);
 
 	if (_params.deterministicSolving()) {
-		_det_sync.reset(new DeterministicClauseSynchronizer(_solvers, _num_original_clauses, [&](auto call) {
-			onProduceClause(call.solverId, call.solverRevision, call.clause, call.condVarOrZero, true);
-		}));
+		_det_sync.reset(new DeterministicClauseSynchronizer(_solvers, _num_original_clauses,
+			_params.deterministicPerformanceFactor() * _params.appCommPeriod(), 
+			[&](auto call) {
+				onProduceClause(call.solverId, call.solverRevision, call.clause, call.condVarOrZero, true);
+			}
+		));
 	}
 }
 
