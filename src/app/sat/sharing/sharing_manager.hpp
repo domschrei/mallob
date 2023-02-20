@@ -114,6 +114,8 @@ public:
 
 private:
 
+	void applyFilterToBuffer(int* begin, int& buflen, const int* filter);
+
 	bool isLocallyProducedClause(unsigned long clauseId) {
 		auto globalId = (clauseId-_num_original_clauses-1) % _solvers[0]->getSolverSetup().maxNumSolvers;
 		for (auto& solver : _solvers) if (solver->getGlobalId() == globalId) return true;

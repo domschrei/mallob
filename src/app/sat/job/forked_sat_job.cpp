@@ -232,19 +232,19 @@ bool ForkedSatJob::isInitialized() {
     return _initialized && _solver->isFullyInitialized();
 }
 
-void ForkedSatJob::prepareSharing(int maxSize) {
+void ForkedSatJob::prepareSharing() {
     if (!_initialized || getState() != ACTIVE) return;
-    _sharing_max_size = maxSize;
-    _solver->collectClauses(maxSize);
+    _solver->collectClauses(_clsbuf_export_limit);
 }
 bool ForkedSatJob::hasPreparedSharing() {
     if (!isInitialized() && _params.deterministicSolving()) return false;
     if (!_initialized || getState() != ACTIVE) return !_params.deterministicSolving();
     bool hasCollected = _solver->hasCollectedClauses();
-    if (!hasCollected) prepareSharing(_sharing_max_size);
+    if (!hasCollected) prepareSharing();
     return hasCollected;
 }
 std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum, int& successfulSolverId) {
+    successfulSolverId = -1;
     if (!_initialized) return std::vector<int>();
     return _solver->getCollectedClauses(successfulSolverId);
 }

@@ -38,7 +38,7 @@ public:
 
     virtual bool isInitialized() = 0;
     
-    virtual void prepareSharing(int maxSize) = 0;
+    virtual void prepareSharing() = 0;
     virtual bool hasPreparedSharing() = 0;
     virtual std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId) = 0;
     virtual std::pair<int, int> getLastAdmittedClauseShare() = 0;
@@ -85,6 +85,7 @@ public:
 
 protected:
     std::shared_ptr<AnytimeSatClauseCommunicator> _clause_comm;
+    int _clsbuf_export_limit {0};
 
 private:
     float _compensation_factor = 1.0f;
@@ -114,8 +115,9 @@ public:
 
         return _compensation_factor;
     }
-    void setSharingCompensationFactor(float factor) {
+    void setSharingCompensationFactorAndUpdateExportLimit(float factor) {
         _compensation_factor = factor;
+        _clsbuf_export_limit = getBufferLimit(1, MyMpi::SELF);
     }
 
     size_t getBufferLimit(int numAggregatedNodes, MyMpi::BufferQueryMode mode) {

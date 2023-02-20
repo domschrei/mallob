@@ -141,22 +141,6 @@ public:
     bool addClause(const Clause& c, bool sortLargeClause = false);
     bool addClause(int* cBegin, int cSize, int cLbd, bool sortLargeClause = false);
 
-    int fetchGlobalBudget(int numDesired) {
-        int globalBudget = _free_budget.load(std::memory_order_relaxed);
-        while (globalBudget > 0) {
-            int amountToFetch = std::min(globalBudget, numDesired);
-            if (_free_budget.compare_exchange_strong(globalBudget, globalBudget-amountToFetch, 
-                std::memory_order_relaxed)) {
-                // success
-                return amountToFetch;
-            }
-        }
-        return 0;
-    }
-    void storeGlobalBudget(int amount) {
-        _free_budget.fetch_add(amount, std::memory_order_relaxed);
-    }
-
     template <typename T>
     void addReservedUniformClauses(int cSize, int cLbd, std::forward_list<T>& clauses, int nbLiterals) {
         
@@ -285,6 +269,23 @@ public:
     }
 
 private:
+
+    int fetchGlobalBudget(int numDesired) {
+        int globalBudget = _free_budget.load(std::memory_order_relaxed);
+        while (globalBudget > 0) {
+            int amountToFetch = std::min(globalBudget, numDesired);
+            if (_free_budget.compare_exchange_strong(globalBudget, globalBudget-amountToFetch, 
+                std::memory_order_relaxed)) {
+                // success
+                return amountToFetch;
+            }
+        }
+        return 0;
+    }
+    void storeGlobalBudget(int amount) {
+        _free_budget.fetch_add(amount, std::memory_order_relaxed);
+    }
+
     template <typename T>
     bool checkNbLiterals(Slot<T>& slot, std::string additionalInfo = "") {
 

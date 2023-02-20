@@ -153,6 +153,7 @@ public:
                 LOGGER(_log, V5_DEBG, "DO export clauses\n");
                 // Collect local clauses, put into shared memory
                 _hsm->exportChecksum = Checksum();
+                _hsm->successfulSolverId = -1;
                 _hsm->exportBufferTrueSize = _engine.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize, _hsm->successfulSolverId);
                 if (_hsm->exportBufferTrueSize != -1) {
                     auto [admitted, total] = _engine.getLastAdmittedClauseShare();

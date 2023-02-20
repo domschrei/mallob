@@ -65,7 +65,7 @@ public:
     // Methods from BaseSatJob:
     bool isInitialized() override;
 
-    void prepareSharing(int maxSize) override;
+    void prepareSharing() override;
     bool hasPreparedSharing() override;
     std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId) override;
     std::pair<int, int> getLastAdmittedClauseShare() override;

@@ -106,7 +106,10 @@ bool AdaptiveClauseDatabase::addClause(int* cBegin, int cSize, int cLbd, bool so
         _unit_slot.mtx->unlock();
     } else if (cSize == 2) {
         _binary_slot.mtx->lock();
-        _binary_slot.list.emplace_front(cBegin[0], cBegin[1]);
+        _binary_slot.list.emplace_front(
+            std::min(cBegin[0], cBegin[1]),
+            std::max(cBegin[0], cBegin[1])
+        );
         atomics::addRelaxed(_binary_slot.nbLiterals, 2);
         assert_heavy(checkNbLiterals(_binary_slot));
         _binary_slot.mtx->unlock();

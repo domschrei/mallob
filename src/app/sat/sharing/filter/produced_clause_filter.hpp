@@ -63,7 +63,7 @@ public:
 
     enum ExportResult {ADMITTED, FILTERED, DROPPED};
     ExportResult tryRegisterAndInsert(ProducedClauseCandidate&& c, AdaptiveClauseDatabase& cdb) {
-        
+
         if (c.size == 1) {
             ProducedUnitClause pc;
             pc.literal = *c.begin;
@@ -81,38 +81,6 @@ public:
             pc.data = c.releaseData();
             return tryRegisterAndInsert(pc, c, _map_large_clauses, cdb);
         }
-    }
-
-    template<typename T>
-    ExportResult tryRegisterAndInsert(T& pc, ProducedClauseCandidate& c, ProducedMap<T>& map, AdaptiveClauseDatabase& cdb) {
-        
-        // Try to find clause
-        auto it = map.find(pc);
-                
-        // If clause is contained:
-        bool contained = it != map.end();
-        if (contained) {
-            int oldLbd = it.value().minProducedLbd;
-            // No improvement in LBD value? Filter clause.
-            if (oldLbd > 0 && c.lbd >= oldLbd) {
-                updateClauseInfo(c, it.value(), /*updateLbd=*/false);
-                return FILTERED;
-            }
-            // Clause can be accepted (again) due to improved LBD score
-        }
-
-        // Try to insert to sharing database
-        if (!cdb.addClause(prod_cls::data(pc), c.size, c.lbd, /*sortLargeClause=*/true)) {
-            // No space left in database: update meta data, drop clause
-            // (Do not update LBD value because the clause was not exported)
-            if (contained) updateClauseInfo(c, it.value(), /*updateLbd=*/false);
-            return DROPPED;
-        }
-
-        // Inserted: do register and set epoch to current epoch
-        if (contained) updateClauseInfo(c, it.value(), /*updateLbd=*/true);
-        else map.insert({std::move(pc), ClauseInfo(c)});
-        return ADMITTED;
     }
 
     uint8_t getProducers(Mallob::Clause& c, int epoch) {
@@ -185,6 +153,38 @@ public:
     }
 
 private:
+    template<typename T>
+    ExportResult tryRegisterAndInsert(T& pc, ProducedClauseCandidate& c, ProducedMap<T>& map, AdaptiveClauseDatabase& cdb) {
+
+        // Try to find clause
+        auto it = map.find(pc);
+
+        // If clause is contained:
+        bool contained = it != map.end();
+        if (contained) {
+            int oldLbd = it.value().minProducedLbd;
+            // No improvement in LBD value? Filter clause.
+            if (oldLbd > 0 && c.lbd >= oldLbd) {
+                updateClauseInfo(c, it.value(), /*updateLbd=*/false);
+                return FILTERED;
+            }
+            // Clause can be accepted (again) due to improved LBD score
+        }
+
+        // Try to insert to sharing database
+        if (!cdb.addClause(prod_cls::data(pc), c.size, c.lbd, /*sortLargeClause=*/true)) {
+            // No space left in database: update meta data, drop clause
+            // (Do not update LBD value because the clause was not exported)
+            if (contained) updateClauseInfo(c, it.value(), /*updateLbd=*/false);
+            return DROPPED;
+        }
+
+        // Inserted: do register and set epoch to current epoch
+        if (contained) updateClauseInfo(c, it.value(), /*updateLbd=*/true);
+        else map.insert({std::move(pc), ClauseInfo(c)});
+        return ADMITTED;
+    }
+
     void updateClauseInfo(const ProducedClauseCandidate& c, ClauseInfo& info, bool updateLbd) {
         assert(c.lbd > 0);
         if (updateLbd) {

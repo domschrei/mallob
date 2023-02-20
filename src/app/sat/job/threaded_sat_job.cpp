@@ -162,13 +162,14 @@ bool ThreadedSatJob::isInitialized() {
     if (!_initialized) return false;
     return _solver->isFullyInitialized();
 }
-void ThreadedSatJob::prepareSharing(int maxSize) {
+void ThreadedSatJob::prepareSharing() {
     // Already prepared sharing?
     if (!_clause_buffer.empty()) return;
     
-    _clause_buffer.resize(2*maxSize+100);
+    _clause_buffer.resize(2*_clsbuf_export_limit+100);
     _clause_checksum = Checksum();
-    int actualSize = _solver->prepareSharing(_clause_buffer.data(), maxSize, _successful_solver_id);
+    int actualSize = _solver->prepareSharing(_clause_buffer.data(), _clsbuf_export_limit, 
+        _successful_solver_id);
     _clause_buffer.resize(actualSize);
 }
 bool ThreadedSatJob::hasPreparedSharing() {

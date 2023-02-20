@@ -215,7 +215,8 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 	//assert(buffer.size() <= maxSize);
 	memcpy(begin, buffer.data(), buffer.size()*sizeof(int));
 
-	LOGGER(_logger, V5_DEBG, "prepared %i clauses, size %i\n", numExportedClauses, buffer.size());
+	LOGGER(_logger, V5_DEBG, "prepared %i clauses, size %i (%i in DB, limit %i)\n", numExportedClauses, buffer.size(), 
+		_cdb.getCurrentlyUsedLiterals(), totalLiteralLimit);
 	_stats.exportedClauses += numExportedClauses;
 	_internal_epoch++;
 
@@ -306,8 +307,8 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 }
 
 void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* filter) {
-
 	int verb = _job_index == 0 ? V3_VERB : V5_DEBG;
+
 	float time = Timer::elapsedSeconds();
 	ClauseHistogram hist(_params.strictClauseLengthLimit());
 
@@ -323,42 +324,8 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	_last_num_cls_to_import = 0;
 	_last_num_admitted_cls_to_import = 0;
 
-	if (ClauseMetadata::enabled()) assert(filter != nullptr);
-
 	// Apply provided global filter to buffer (in-place operation)
-	if (filter != nullptr) {
-		_logger.log(verb+2, "DG apply global filter\n");
-		const int bitsPerElem = sizeof(int)*8;
-		int shift = bitsPerElem;
-		int filterPos = -1 + ClauseMetadata::numBytes();
-		
-		if (ClauseMetadata::enabled() && _params.distributedProofAssembly()) {
-			// extract global min. epoch ID and compute the next ID offset
-			// for each solver from it
-
-			auto numSolvers = _solvers[0]->getSolverSetup().maxNumSolvers;
-			unsigned long globalMinEpochId = ClauseMetadata::readUnsignedLong(filter);
-			globalMinEpochId = std::max(globalMinEpochId, _global_epoch_ids.back() + numSolvers);
-			LOG(V2_INFO, "EPOCH %i GLOBAL_MAX_OF_1ST_ID %lu\n", _min_epoch_ids_per_solver[0].size()-1, globalMinEpochId);
-			assert(globalMinEpochId > _num_original_clauses);
-			_global_epoch_ids.push_back(globalMinEpochId);
-
-			for (size_t i = 0; i < _solvers.size(); i++) {
-
-				auto offset = globalMinEpochId - _min_epoch_ids_per_solver[i].back();
-				offset = offset - (offset % numSolvers) + numSolvers;
-				_id_offsets_per_solver[i].push_back(offset);
-				
-				LOG(V2_INFO, "EPOCH %i instance=%i newoffset=%lu\n", 
-					_min_epoch_ids_per_solver[i].size()-1, _solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back());
-			}
-		}
-
-		InPlaceClauseFiltering filtering(_params, begin, buflen, filter, buflen);
-		buflen = filtering.applyAndGetNewSize();
-		_last_num_cls_to_import += filtering.getNumClauses();
-		_last_num_admitted_cls_to_import += filtering.getNumAdmittedClauses();
-	}
+	applyFilterToBuffer(begin, buflen, filter);
 
 	// Prepare to traverse clauses not filtered yet
 	std::vector<std::forward_list<int>> unitLists(importingSolvers.size());
@@ -410,20 +377,24 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 	_logger.log(verb+2, "DG import\n");
 
+	// For each incoming clause (which was not filtered out)
 	while (clause.begin != nullptr) {
 		
+		// new (or first) bucket reached?
 		if (!initialized || clause.size != it.clauseLength || clause.lbd != it.lbd) {
 			initialized = true;
 			float publishTime = Timer::elapsedSeconds();
 			_filter.releaseLock();
 
+			// publish prior lists of clauses
 			doPublishClauseLists();
 
+			// go to new length-LBD bucket
 			while (clause.size != it.clauseLength || clause.lbd != it.lbd) {
 				it.nextLengthLbdGroup();
 				explicitLbds = it.storeWithExplicitLbd(/*maxLbdPartitioningSize=*/2);
 			}
-
+			// update literal budgets of solvers
 			for (size_t i = 0; i < importingSolvers.size(); i++) {
 				currentCapacities[i] = capacityCounters[i].getNextBudget(currentAddedLiterals[i], clause.size, clause.lbd);
 				currentAddedLiterals[i] = 0;
@@ -435,8 +406,10 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		}
 
 		hist.increment(clause.size);
+		// bitset of producing solvers
 		uint8_t producers = _filter.getProducers(clause, _internal_epoch);
 
+		// Decide for each solver whether it should receive the clause
 		for (size_t i = 0; i < importingSolvers.size(); i++) {
 			auto& solver = *importingSolvers[i];
 			int sid = solver.getLocalId();
@@ -452,38 +425,37 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 				// filtered by solver filter
 				solverStats->receivedClausesFiltered++;
 				continue;
-			} else {
-				if (ClauseMetadata::enabled() && _params.distributedProofAssembly() && clause.size >= 2) {
-					// check via clause ID whether this solver produced this clause
-					unsigned long clauseId = ClauseMetadata::readUnsignedLong(clause.begin);
-					if (getProducingInstanceId(clauseId) == solver.getGlobalId()) {
-						// This solver produced this clause! Do not import.
-						solverStats->receivedClausesFiltered++;
-						continue;
-					}
-					// Important invariant: incoming clauses must be from EARLIER epochs
-					// than your current epoch.
-					int epoch = _min_epoch_ids_per_solver[i].size()-1;
-					int clauseEpoch = ClauseMetadata::getEpoch(clauseId, _global_epoch_ids);
-					if (clauseEpoch >= epoch) {
-						LOG(V0_CRIT, "[ERROR] Importing clause ID=%lu from epoch %i while I am in epoch %i myself!\n", 
-							clauseId, clauseEpoch, epoch);
-						abort();
-					}
-				}
-				// admitted by solver filter
-				if (clause.size == 1) unitLists[i].push_front(clause.begin[0]);
-				else if (clause.size == 2) binaryLists[i].emplace_front(clause.begin[0], clause.begin[1]);
-				else {
-					std::vector<int> clauseVec((explicitLbds ? 1 : 0) + clause.size);
-					size_t idx = 0;
-					if (explicitLbds) clauseVec[idx++] = clause.lbd;
-					for (size_t k = 0; k < clause.size; k++) clauseVec[idx++] = clause.begin[k];
-					largeLists[i].emplace_front(std::move(clauseVec));
-				}
-				currentCapacities[i] -= clause.size;
-				currentAddedLiterals[i] += clause.size;
 			}
+			if (ClauseMetadata::enabled() && _params.distributedProofAssembly() && clause.size >= 2) {
+				// check via clause ID whether this solver produced this clause
+				unsigned long clauseId = ClauseMetadata::readUnsignedLong(clause.begin);
+				if (getProducingInstanceId(clauseId) == solver.getGlobalId()) {
+					// This solver produced this clause! Do not import.
+					solverStats->receivedClausesFiltered++;
+					continue;
+				}
+				// Important invariant: incoming clauses must be from EARLIER epochs
+				// than your current epoch.
+				int epoch = _min_epoch_ids_per_solver[i].size()-1;
+				int clauseEpoch = ClauseMetadata::getEpoch(clauseId, _global_epoch_ids);
+				if (clauseEpoch >= epoch) {
+					LOG(V0_CRIT, "[ERROR] Importing clause ID=%lu from epoch %i while I am in epoch %i myself!\n", 
+						clauseId, clauseEpoch, epoch);
+					abort();
+				}
+			}
+			// admitted by solver filter
+			if (clause.size == 1) unitLists[i].push_front(clause.begin[0]);
+			else if (clause.size == 2) binaryLists[i].emplace_front(clause.begin[0], clause.begin[1]);
+			else {
+				std::vector<int> clauseVec((explicitLbds ? 1 : 0) + clause.size);
+				size_t idx = 0;
+				if (explicitLbds) clauseVec[idx++] = clause.lbd;
+				for (size_t k = 0; k < clause.size; k++) clauseVec[idx++] = clause.begin[k];
+				largeLists[i].emplace_front(std::move(clauseVec));
+			}
+			currentCapacities[i] -= clause.size;
+			currentAddedLiterals[i] += clause.size;
 		}
 
 		clause = reader.getNextIncomingClause();
@@ -495,6 +467,45 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	time = Timer::elapsedSeconds() - time;
 	_logger.log(verb, "sharing time:%.4f adm:%i/%i %s\n", time, 
 		_last_num_admitted_cls_to_import, _last_num_cls_to_import, hist.getReport().c_str());	
+}
+
+void SharingManager::applyFilterToBuffer(int* begin, int& buflen, const int* filter) {
+
+	int verb = _job_index == 0 ? V3_VERB : V5_DEBG;
+	if (ClauseMetadata::enabled()) assert(filter != nullptr);
+	if (filter == nullptr) return;
+
+	_logger.log(verb+2, "DG apply global filter\n");
+	const int bitsPerElem = sizeof(int)*8;
+	int shift = bitsPerElem;
+	int filterPos = -1 + ClauseMetadata::numBytes();
+
+	if (ClauseMetadata::enabled() && _params.distributedProofAssembly()) {
+		// extract global min. epoch ID and compute the next ID offset
+		// for each solver from it
+
+		auto numSolvers = _solvers[0]->getSolverSetup().maxNumSolvers;
+		unsigned long globalMinEpochId = ClauseMetadata::readUnsignedLong(filter);
+		globalMinEpochId = std::max(globalMinEpochId, _global_epoch_ids.back() + numSolvers);
+		LOG(V2_INFO, "EPOCH %i GLOBAL_MAX_OF_1ST_ID %lu\n", _min_epoch_ids_per_solver[0].size()-1, globalMinEpochId);
+		assert(globalMinEpochId > _num_original_clauses);
+		_global_epoch_ids.push_back(globalMinEpochId);
+
+		for (size_t i = 0; i < _solvers.size(); i++) {
+
+			auto offset = globalMinEpochId - _min_epoch_ids_per_solver[i].back();
+			offset = offset - (offset % numSolvers) + numSolvers;
+			_id_offsets_per_solver[i].push_back(offset);
+
+			LOG(V2_INFO, "EPOCH %i instance=%i newoffset=%lu\n", 
+				_min_epoch_ids_per_solver[i].size()-1, _solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back());
+		}
+	}
+
+	InPlaceClauseFiltering filtering(_params, begin, buflen, filter, buflen);
+	buflen = filtering.applyAndGetNewSize();
+	_last_num_cls_to_import += filtering.getNumClauses();
+	_last_num_admitted_cls_to_import += filtering.getNumAdmittedClauses();
 }
 
 void SharingManager::digestSharingWithoutFilter(int* begin, int buflen) {

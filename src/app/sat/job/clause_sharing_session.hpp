@@ -66,13 +66,8 @@ public:
         ), _rng(_params.seed()+69) {
 
         LOG(V4_VVER, "%s CS OPEN e=%i\n", _job->toStr(), _epoch);
-
-        _job->setSharingCompensationFactor(compensationFactor);
-
-        if (!_job->hasPreparedSharing()) {
-            int limit = _job->getBufferLimit(1, MyMpi::SELF);
-            _job->prepareSharing(limit);
-        }
+        _job->setSharingCompensationFactorAndUpdateExportLimit(compensationFactor);
+        if (!_job->hasPreparedSharing()) _job->prepareSharing();
     }
 
     void pruneChild(int rank) {
@@ -192,7 +187,8 @@ private:
         int numAggregated = 0;
         int successfulSolverId = -1;
         for (auto& elem : elems) {
-            assert(elem.back() >= -1 || log_return_false("Successful solver ID %i\n", elem.back()));
+            assert(elem.size() >= 2 || log_return_false("[ERROR] Clause buffer has size %ld!\n", elem.size()));
+            assert(elem.back() >= -1 || log_return_false("[ERROR] Invalid successful solver ID %i\n", elem.back()));
             if (elem.back() != -1 && (successfulSolverId == -1 || successfulSolverId > elem.back())) {
                 successfulSolverId = elem.back();
             }
