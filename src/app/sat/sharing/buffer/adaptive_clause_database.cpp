@@ -46,16 +46,16 @@ AdaptiveClauseDatabase::AdaptiveClauseDatabase(Setup setup):
                 if (clauseLength == 1) {
                     slotIdx = -2;
                     _unit_slot.implicitLbdOrZero = 1;
-                    _unit_slot.mtx.reset(new Mutex());
+                    if (setup.threadSafe) _unit_slot.mtx.reset(new Mutex());
                 } else if (clauseLength == 2) {
                     slotIdx = -1;
                     _binary_slot.implicitLbdOrZero = 2;
-                    _binary_slot.mtx.reset(new Mutex());
+                    if (setup.threadSafe) _binary_slot.mtx.reset(new Mutex());
                 } else {
                     slotIdx = _large_slots.size();
                     _large_slots.emplace_back();
                     _large_slots.back().implicitLbdOrZero = (opMode == SAME_SIZE_AND_LBD ? lbd : 0);
-                    _large_slots.back().mtx.reset(new Mutex());
+                    if (setup.threadSafe) _large_slots.back().mtx.reset(new Mutex());
                 }
                 _size_lbd_to_slot_idx_mode[representantKey] = std::pair<int, ClauseSlotMode>(slotIdx, opMode);
             }
@@ -99,20 +99,20 @@ bool AdaptiveClauseDatabase::addClause(int* cBegin, int cSize, int cLbd, bool so
     // Budget has been acquired successfully
     
     if (cSize == 1) {
-        _unit_slot.mtx->lock();
+        _unit_slot.lock();
         _unit_slot.list.push_front(*cBegin);
         atomics::incrementRelaxed(_unit_slot.nbLiterals);
         assert_heavy(checkNbLiterals(_unit_slot));
-        _unit_slot.mtx->unlock();
+        _unit_slot.unlock();
     } else if (cSize == 2) {
-        _binary_slot.mtx->lock();
+        _binary_slot.lock();
         _binary_slot.list.emplace_front(
             std::min(cBegin[0], cBegin[1]),
             std::max(cBegin[0], cBegin[1])
         );
         atomics::addRelaxed(_binary_slot.nbLiterals, 2);
         assert_heavy(checkNbLiterals(_binary_slot));
-        _binary_slot.mtx->unlock();
+        _binary_slot.unlock();
     } else {
         // Sort clause if necessary
         if (sortLargeClause) std::sort(cBegin+ClauseMetadata::numBytes(), cBegin+cSize);
@@ -123,11 +123,11 @@ bool AdaptiveClauseDatabase::addClause(int* cBegin, int cSize, int cLbd, bool so
         size_t i = 0;
         if (explicitLbd) vec[i++] = cLbd;
         for (size_t j = 0; j < len; j++) vec[i++] = cBegin[j];
-        slot.mtx->lock();
+        slot.lock();
         slot.list.push_front(std::move(vec));
         atomics::addRelaxed(slot.nbLiterals, cSize);
         assert_heavy(checkNbLiterals(slot));
-        slot.mtx->unlock();
+        slot.unlock();
     }
 
     return true;
@@ -154,12 +154,12 @@ template <typename T>
 bool AdaptiveClauseDatabase::popMallobClause(Slot<T>& slot, bool giveUpOnLock, Mallob::Clause& out) {
     if (slot.nbLiterals.load(std::memory_order_relaxed) == 0) return false;
     if (giveUpOnLock) {
-        if (!slot.mtx->tryLock()) return false;
+        if (!slot.tryLock()) return false;
     } else {
-        slot.mtx->lock();
+        slot.lock();
     }
     if (slot.nbLiterals.load(std::memory_order_relaxed) == 0) {
-        slot.mtx->unlock();
+        slot.unlock();
         return false;
     }
     assert(!slot.list.empty());
@@ -172,7 +172,7 @@ bool AdaptiveClauseDatabase::popMallobClause(Slot<T>& slot, bool giveUpOnLock, M
     atomics::subRelaxed(slot.nbLiterals, mc.size);
 
     assert_heavy(checkNbLiterals(slot, "popMallobClause(): " + mc.toStr() + "; " + std::to_string(nbLiteralsBefore) + " lits before"));
-    slot.mtx->unlock();
+    slot.unlock();
     out = mc.copy(); // copy
     return true;
 }
@@ -198,7 +198,7 @@ Mallob::Clause AdaptiveClauseDatabase::getMallobClause(T& elem, int implicitLbdO
 template <typename T> 
 void AdaptiveClauseDatabase::readClauses(Slot<T>& slot, bool sortClauses, BufferBuilder& builder) {
 
-    auto lock = slot.mtx->getLock();
+    slot.lock();
 
     std::vector<Mallob::Clause> readClauses;
     int remainingLits = builder.getMaxRemainingLits();
@@ -225,6 +225,8 @@ void AdaptiveClauseDatabase::readClauses(Slot<T>& slot, bool sortClauses, Buffer
         assert(success);
         //log(V2_INFO, "%i : EXPORTED %s\n", producedClause.producers, c.toStr().c_str());
     }
+
+    slot.unlock();
 }
 
 template <typename T> 
@@ -238,15 +240,19 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, Buffe
     std::forward_list<T> swappedSlot;
     int nbSwappedLits;
     {
-        auto lock = slot.mtx->getLock();
+        slot.lock();
 
         // Nothing to extract?
         nbSwappedLits = slot.nbLiterals.load(std::memory_order_relaxed);
-        if (nbSwappedLits == 0) return;
+        if (nbSwappedLits == 0) {
+            slot.unlock();
+            return;
+        }
         
         // Extract clauses
         swappedSlot.swap(slot.list);
         slot.nbLiterals.store(0, std::memory_order_relaxed);
+        slot.unlock();
     }
 
     // Create clauses one by one
@@ -272,10 +278,11 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, Buffe
 
     if (it != swappedSlot.end()) {
         // Re-insert swapped clauses which remained unused
-        auto lock = slot.mtx->getLock();
+        slot.lock();
         slot.list.splice_after(slot.list.before_begin(), swappedSlot, itBefore, swappedSlot.end());
         atomics::addRelaxed(slot.nbLiterals, nbSwappedLits - collectedLits);
         assert_heavy(checkNbLiterals(slot));
+        slot.unlock();
     } else {
         assert(nbSwappedLits == collectedLits || 
             log_return_false("[ERROR] slot advertised %i lits, collected %i lits\n", 
@@ -399,7 +406,7 @@ int AdaptiveClauseDatabase::stealBudgetFromSlot(Slot<T>& slot, int desiredLitera
     if (slot.nbLiterals.load(std::memory_order_relaxed) == 0) 
         return 0;
 
-    auto lock = slot.mtx->getLock();
+    slot.lock();
     assert_heavy(checkNbLiterals(slot, "before dropClauses()"));
     int nbLiteralsBefore = slot.nbLiterals.load(std::memory_order_relaxed);
 
@@ -443,6 +450,7 @@ int AdaptiveClauseDatabase::stealBudgetFromSlot(Slot<T>& slot, int desiredLitera
     }
 
     if (nbCollectedLits == 0) {
+        slot.unlock();
         return 0;
     }
 
@@ -456,6 +464,8 @@ int AdaptiveClauseDatabase::stealBudgetFromSlot(Slot<T>& slot, int desiredLitera
         + std::to_string(nbCollectedLits) + " literals from " 
         + std::to_string(nbCollectedClauses) + " clauses; " 
         + std::to_string(nbLiteralsBefore) + " lits before"));
+    
+    slot.unlock();
     
     // Elements are cleaned up automatically
     return nbCollectedLits;

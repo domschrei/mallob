@@ -3,6 +3,7 @@
 
 #include <list>
 
+#include "app/sat/data/produced_clause_candidate.hpp"
 #include "util/sys/threading.hpp"
 #include "filter/produced_clause_filter.hpp"
 #include "buffer/adaptive_clause_database.hpp"
@@ -35,37 +36,29 @@ public:
         if (_filter.tryAcquireLock()) {
 
             // Insert clause directly
-            auto result = _filter.tryRegisterAndInsert(
-                ProducedClauseCandidate(begin, size, lbd, producerId, epoch), 
-                _cdb
-            );
-            handleResult(producerId, result, size);
+            ProducedClauseCandidate pcc(begin, size, lbd, producerId, epoch);
+            processClause(pcc);
 
-            // Also decrease backlog size by some amount
+            // Also process the backlog of clauses which couldn't be processed before
+            // since the lock couldn't be obtained
             std::list<ProducedClauseCandidate> backlogSplice;
             {
+                // Extract the entire backlog to your local structure (O(1))
                 auto lock = _backlog_mutex.getLock();
-                if (!_export_backlog.empty()) {
-                    backlogSplice.splice(backlogSplice.begin(), _export_backlog, 
-                        _export_backlog.begin(),
-                        std::next(_export_backlog.begin(), std::min(16ul, _export_backlog.size()))
-                    );
-                }
+                backlogSplice = std::move(_export_backlog);
             }
+            // Process each clause from the extracted backlog
             for (auto& pcc : backlogSplice) {
-                int clauseLength = pcc.size;
-                int producerId = pcc.producerId;
-                result = _filter.tryRegisterAndInsert(std::move(pcc), _cdb);
-                handleResult(producerId, result, clauseLength);
+                processClause(pcc);
             }
 
             _filter.releaseLock();
 
         } else {
 
-            // Filter busy: Append clause to backlog
+            // Filter busy: Append clause to backlog (mutex only guards O(1) ops)
             auto lock = _backlog_mutex.getLock();
-            _export_backlog.emplace_back(begin, size, lbd, producerId, epoch);        
+            _export_backlog.emplace_back(begin, size, lbd, producerId, epoch);
         }
     }
 
@@ -74,6 +67,13 @@ public:
 	ClauseHistogram& getDroppedHistogram() {return _hist_dropped_before_db;}
 
 private:
+    void processClause(ProducedClauseCandidate& pcc) {
+        int clauseLength = pcc.size;
+        int producerId = pcc.producerId;
+        auto result = _filter.tryRegisterAndInsert(std::move(pcc), _cdb);
+        handleResult(producerId, result, clauseLength);
+    }
+
     void handleResult(int producerId, ProducedClauseFilter::ExportResult result, int clauseLength) {
         auto solverStats = _solver_stats.at(producerId);
         if (result == ProducedClauseFilter::ADMITTED) {

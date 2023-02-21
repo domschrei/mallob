@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <forward_list>
+#include <limits>
 #include <memory>
 #include <numeric>
 
@@ -18,48 +19,12 @@
 /*
 Buffering structure for clauses which sorts and prioritizes clauses 
 by length (primary) and LBD score (secondary). The structure is adaptive
-because memory chunks of fixed size are allocated on demand and
-can be moved freely from one length-LBD slot to another as necessary.
+because memory budget can be transferred freely from one length-LBD slot
+to another as necessary.
 */
 class AdaptiveClauseDatabase {
 
 private:
-    // Compares two clauses alphanumerically.
-    // The clauses are given as pointers to the raw literals, possibly
-    // both with an LBD score at the front.
-    // The effective size of the clauses must be equal to the member
-    // supplied in the construction of the comparator.
-    struct InplaceClauseComparatorUniformSize {
-        int clauseSizeIncludingLbd;
-        InplaceClauseComparatorUniformSize(int clauseSizeIncludingLbd) 
-            : clauseSizeIncludingLbd(clauseSizeIncludingLbd) {}
-        bool operator()(const int* left, const int* right) const {
-            if (left == right) return false;
-            for (size_t i = 0; i < clauseSizeIncludingLbd; i++) {
-                if (left[i] != right[i]) return left[i] < right[i];
-            }
-            return false;
-        }
-    };
-
-    struct InplaceClauseComparatorUniformSizeLbdSum {
-        int sumOfLengthAndLbd;
-        InplaceClauseComparatorUniformSizeLbdSum(int sumOfLengthAndLbd) 
-            : sumOfLengthAndLbd(sumOfLengthAndLbd) {}
-        bool operator()(const int* left, const int* right) const {
-            if (left == right) return false;
-            int sizeLeft = sumOfLengthAndLbd - left[0] + 1;
-            int sizeRight = sumOfLengthAndLbd - right[0] + 1;
-            if (sizeLeft != sizeRight) return sizeLeft < sizeRight;
-            for (size_t i = 0; i < sizeLeft; i++) {
-                if (left[i] != right[i]) return left[i] < right[i];
-            }
-            return false;
-        }
-    };
-
-    int _total_literal_limit;
-
     template <typename T>
     struct Slot {
         int implicitLbdOrZero;
@@ -72,12 +37,24 @@ private:
             nbLiterals(other.nbLiterals.load(std::memory_order_relaxed)), 
             mtx(std::move(other.mtx)),
             list(other.list) {}
+        void lock() {
+            if (mtx) mtx->lock();
+        }
+        bool tryLock() {
+            if (!mtx) return true;
+            return mtx->tryLock();
+        }
+        void unlock() {
+            if (mtx) mtx->unlock();
+        }
     };
 
+    int _total_literal_limit;
     Slot<int> _unit_slot;
     Slot<std::pair<int, int>> _binary_slot;
     std::vector<Slot<std::vector<int>>> _large_slots;
     std::atomic_int _free_budget {0};
+    std::atomic_int _max_admissible_cls_size {std::numeric_limits<int>::max()};
 
     enum ClauseSlotMode {SAME_SUM_OF_SIZE_AND_LBD, SAME_SIZE, SAME_SIZE_AND_LBD};
     robin_hood::unordered_flat_map<std::pair<int, int>, std::pair<int, ClauseSlotMode>, IntPairHasher> _size_lbd_to_slot_idx_mode;
@@ -101,6 +78,7 @@ public:
         int maxLbdPartitionedSize = 2;
         bool useChecksums = false;
         bool slotsForSumOfLengthAndLbd = false;
+        bool threadSafe = true;
     };
 
     // Use to consecutively insert clauses into the database.
@@ -158,15 +136,17 @@ public:
         T& clause = clauses.front();
 
         if constexpr (std::is_same<T, int>::value) {
-            auto lock = _unit_slot.mtx->getLock();
+            _unit_slot.lock();
             _unit_slot.list.splice_after(_unit_slot.list.before_begin(), clauses);
             atomics::addRelaxed(_unit_slot.nbLiterals, nbLiterals);
             assert_heavy(checkNbLiterals(_unit_slot));
+            _unit_slot.unlock();
         } else if constexpr (std::is_same<T, std::pair<int, int>>::value) {
-            auto lock = _binary_slot.mtx->getLock();
+            _binary_slot.lock();
             _binary_slot.list.splice_after(_binary_slot.list.before_begin(), clauses);
             atomics::addRelaxed(_binary_slot.nbLiterals, nbLiterals);
             assert_heavy(checkNbLiterals(_binary_slot));
+            _binary_slot.unlock();
         } else if constexpr (std::is_same<T, std::vector<int>>::value) {
             auto& slot = _large_slots[slotIdx];
             if (slot.implicitLbdOrZero == 0) {
@@ -177,10 +157,11 @@ public:
                 // Implicit LBD
                 assert(clause.size() == cSize);
             }
-            auto lock = slot.mtx->getLock();
+            slot.lock();
             slot.list.splice_after(slot.list.before_begin(), clauses);
             atomics::addRelaxed(slot.nbLiterals, nbLiterals);
             assert_heavy(checkNbLiterals(slot));
+            slot.unlock();
         }
         timeInsert = Timer::elapsedSeconds() - timeInsert;
 

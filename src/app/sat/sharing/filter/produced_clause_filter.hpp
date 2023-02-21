@@ -7,6 +7,7 @@
 #include "../../data/produced_clause.hpp"
 #include "../../data/produced_clause_candidate.hpp"
 #include "util/sys/threading.hpp"
+#include "../buffer/adaptive_clause_database.hpp"
 
 // Packed struct to get in all meta data within a 32 bit integer.
 struct ClauseInfo {
@@ -163,8 +164,9 @@ private:
         bool contained = it != map.end();
         if (contained) {
             int oldLbd = it.value().minProducedLbd;
-            // No improvement in LBD value? Filter clause.
-            if (oldLbd > 0 && c.lbd >= oldLbd) {
+            // No resharing upon improved LBD, or LBD not improved?
+            // => Filter clause.
+            if (!_reshare_improved_lbd || (oldLbd > 0 && c.lbd >= oldLbd)) {
                 updateClauseInfo(c, it.value(), /*updateLbd=*/false);
                 return FILTERED;
             }

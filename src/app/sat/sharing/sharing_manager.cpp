@@ -172,25 +172,6 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	_export_buffer.produce(clauseBegin, clauseSize, clauseLbd, solverId, _internal_epoch);
 	//log(V6_DEBGV, "%i : PRODUCED %s\n", solverId, tldClause.toStr().c_str());
 
-	/*
-	auto result = _cdb.addClause(solverId, tldClause);
-
-	if (result == SUCCESS) {
-		_hist_admitted_to_db.increment(clauseSize);
-		if (solverStats) solverStats->producedClausesAdmitted++;
-	} else if (result == NO_BUDGET) {
-		// completely dropping the clause
-		_hist_dropped_before_db.increment(clauseSize);
-		_stats.clausesDroppedAtExport++;
-		if (solverStats) solverStats->producedClausesDropped++;
-	} else {
-		// duplicate
-		_hist_failed_filter.increment(clauseSize);
-		_stats.clausesProcessFilteredAtExport++;
-		if (solverStats) solverStats->producedClausesSolverFiltered++;
-	}
-	*/
-
 	if (tldClauseVec) delete tldClauseVec;
 }
 
