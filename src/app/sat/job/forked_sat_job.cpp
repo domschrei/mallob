@@ -233,19 +233,20 @@ bool ForkedSatJob::isInitialized() {
 }
 
 void ForkedSatJob::prepareSharing() {
-    if (!_initialized || getState() != ACTIVE) return;
+    if (!isInitialized() || getState() != ACTIVE) return;
     _solver->collectClauses(_clsbuf_export_limit);
 }
 bool ForkedSatJob::hasPreparedSharing() {
-    if (!isInitialized() && _params.deterministicSolving()) return false;
-    if (!_initialized || getState() != ACTIVE) return !_params.deterministicSolving();
+    if (!isInitialized() || getState() != ACTIVE) {
+        // wait for prepared clauses in case of deterministic solving
+        return !_params.deterministicSolving();
+    }
     bool hasCollected = _solver->hasCollectedClauses();
     if (!hasCollected) prepareSharing();
     return hasCollected;
 }
 std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum, int& successfulSolverId) {
     successfulSolverId = -1;
-    if (!_initialized) return std::vector<int>();
     return _solver->getCollectedClauses(successfulSolverId);
 }
 std::pair<int, int> ForkedSatJob::getLastAdmittedClauseShare() {
@@ -254,34 +255,33 @@ std::pair<int, int> ForkedSatJob::getLastAdmittedClauseShare() {
 }
 
 void ForkedSatJob::filterSharing(int epoch, std::vector<int>& clauses) {
-    if (!_initialized) return;
+    if (!isInitialized()) return;
     _solver->filterClauses(epoch, clauses);
 }
 bool ForkedSatJob::hasFilteredSharing(int epoch) {
-    if (!_initialized || getState() != ACTIVE) return true;
+    if (!isInitialized() || getState() != ACTIVE) return true;
     return _solver->hasFilteredClauses(epoch);
 }
 std::vector<int> ForkedSatJob::getLocalFilter(int epoch) {
-    if (!_initialized) return std::vector<int>(ClauseMetadata::numBytes(), 0);
+    if (!isInitialized()) return std::vector<int>(ClauseMetadata::numBytes(), 0);
     return _solver->getLocalFilter(epoch);
 }
 void ForkedSatJob::applyFilter(int epoch, std::vector<int>& filter) {
-    if (!_initialized) return;
+    if (!isInitialized()) return;
     _solver->applyFilter(epoch, filter);
 }
-
 void ForkedSatJob::digestSharingWithoutFilter(std::vector<int>& clauses) {
-    if (!_initialized) return;
+    if (!isInitialized()) return;
     _solver->digestClausesWithoutFilter(clauses);
     if (getJobTree().isRoot()) {
         LOG(V3_VERB, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
     }
 }
+
 void ForkedSatJob::returnClauses(std::vector<int>& clauses) {
     if (!_initialized) return;
     _solver->returnClauses(clauses);
 }
-
 void ForkedSatJob::digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauses) {
     if (!_initialized) return;
     _solver->digestHistoricClauses(epochBegin, epochEnd, clauses);
