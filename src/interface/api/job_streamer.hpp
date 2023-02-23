@@ -2,6 +2,7 @@
 #pragma once
 
 #include <fstream>
+#include <ios>
 
 #include "util/logger.hpp"
 #include "util/params.hpp"
@@ -36,6 +37,8 @@ private:
     Mutex _delete_mutex;
     ConditionVariable _delete_cond_var;
     std::vector<nlohmann::json> _jsons_to_delete;
+
+    std::ofstream _ofs_results;
 
 public:
     JobStreamer(const Parameters& params, APIConnector& api, int internalRank) : 
@@ -158,6 +161,13 @@ public:
 
         _bg_deleter.run([&]() {
             Proc::nameThisThread("JobDeleter");
+
+            bool writeResultsToFile = false;
+            if (_params.streamerResultOutput.isSet()) {
+                writeResultsToFile = true;
+                _ofs_results.open(_params.streamerResultOutput());
+            }
+
             while (_bg_deleter.continueRunning()) {
 
                 _delete_cond_var.wait(_delete_mutex, [&]() {
@@ -174,8 +184,12 @@ public:
                         jsonToDelete = std::move(_jsons_to_delete.back());
                         _jsons_to_delete.pop_back();
                     }
+                    if (writeResultsToFile) {
+                        jsonToDelete["result"].erase("solution"); // potentially expensive call!
+                        _ofs_results << jsonToDelete << std::endl;
+                    }
                     _num_jsons_to_delete--;
-                    // expensive JSON destructor is called here (out of mutex)
+                    // JSON destructor is called here
                 }
             }
         });

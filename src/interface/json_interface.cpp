@@ -87,7 +87,8 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             // This is a new increment of a former job - assign SAME internal ID
             auto precursorName = inputJson["precursor"].get<std::string>() + ".json";
             if (!_job_name_to_id_rev.count(precursorName)) {
-                LOGGER(_logger, V1_WARN, baseErrorMsg, jobName.c_str(), "Unknown precursor job \"" + precursorName + "\".");
+                auto warningMsg = "Unknown precursor job \"" + precursorName + "\".";
+                LOGGER(_logger, V1_WARN, baseErrorMsg, jobName.c_str(), warningMsg.c_str());
                 return DISCARD;
             }
             auto [jobId, rev] = _job_name_to_id_rev[precursorName];

@@ -42,6 +42,7 @@ OPTION_GROUP(grpInterface, "interface", "Interface")
  OPT_BOOL(shuffleJobDescriptions,         "sjd", "shuffle-job-descriptions",           false,                   "Shuffle job descriptions given via -job-desc-template option")
  OPT_BOOL(useFilesystemInterface,         "interface-fs", "",                          true,                    "Use filesystem interface (.api/{in,out}/*.json)")
  OPT_BOOL(useIPCSocketInterface,          "interface-ipc", "",                         false,                   "Use IPC socket interface (.mallob.<pid>.sk)")
+ OPT_STRING(streamerResultOutput,         "sro", "streamer-result-output",             "",                      "Path for streamer to write result metadata to")
 
 ///////////////////////////////////////////////////////////////////////
 
