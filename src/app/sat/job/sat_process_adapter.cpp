@@ -178,10 +178,7 @@ void SatProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
 void SatProcessAdapter::applySolvingState() {
     assert(_initialized && _child_pid != -1);
     if (_state == SolvingStates::ABORTING && _hsm != nullptr) {
-        //Fork::terminate(_child_pid); // Terminate child process by signal.
-        _hsm->doTerminate = true; // Kindly ask child process to terminate.
-        _hsm->doBegin = true; // Let child process know termination even if it waits for first revision
-        Process::resume(_child_pid); // Continue (resume) process.
+        doTerminateInitializedProcess();
     }
     if (_state == SolvingStates::SUSPENDED || _state == SolvingStates::STANDBY) {
         Process::suspend(_child_pid); // Stop (suspend) process.
@@ -190,6 +187,13 @@ void SatProcessAdapter::applySolvingState() {
     if (_state == SolvingStates::ACTIVE) {
         Process::resume(_child_pid); // Continue (resume) process.
     }
+}
+
+void SatProcessAdapter::doTerminateInitializedProcess() {
+    //Fork::terminate(_child_pid); // Terminate child process by signal.
+    _hsm->doTerminate = true; // Kindly ask child process to terminate.
+    _hsm->doBegin = true; // Let child process know termination even if it waits for first revision
+    Process::resume(_child_pid); // Continue (resume) process.
 }
 
 void SatProcessAdapter::collectClauses(int maxSize) {
@@ -427,14 +431,16 @@ JobResult& SatProcessAdapter::getSolution() {
 
 void SatProcessAdapter::waitUntilChildExited() {
     if (!_running) return;
+    // Wait until initialized
+    while (!_initialized) {
+        usleep(100*1000); // 0.1s
+    }
+    doTerminateInitializedProcess(); // make sure that the process receives a terminate signal
     while (true) {
-        // Wait until initialized
-        if (_initialized) {
-            // Check if child exited
-            auto lock = _state_mutex.getLock();
-            if (_child_pid == -1 || Process::didChildExit(_child_pid)) 
-                return;
-        }
+        // Check if child exited
+        auto lock = _state_mutex.getLock();
+        if (_child_pid == -1 || Process::didChildExit(_child_pid)) 
+            return;
         usleep(100*1000); // 0.1s
     }
 }

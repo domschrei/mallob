@@ -147,6 +147,7 @@ private:
     void doInitialize();
     void doWriteRevisions();
     void doPrepareSolution();
+    void doTerminateInitializedProcess();
 
     void tryProcessNextTasks();
     bool process(BufferTask& task);
