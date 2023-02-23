@@ -13,6 +13,7 @@ private:
     SolverStatistics& _stats;
     AdaptiveClauseDatabase _cdb;
     int _max_clause_length;
+    bool _reset_lbd;
 
     std::vector<int> _plain_units_out;
     Mallob::Clause _clause_out;
@@ -33,7 +34,8 @@ public:
             cdbSetup.slotsForSumOfLengthAndLbd = false;
             cdbSetup.useChecksums = false;
             return cdbSetup;
-        }()), _max_clause_length(setup.strictClauseLengthLimit) {}
+        }()), _max_clause_length(setup.strictClauseLengthLimit),
+        _reset_lbd(setup.resetLbdBeforeImport) {}
 
     AdaptiveClauseDatabase::LinearBudgetCounter getLinearBudgetCounter() {
         return AdaptiveClauseDatabase::LinearBudgetCounter(_cdb);
@@ -96,6 +98,7 @@ public:
         if (_cdb.popFrontWeak(mode, _clause_out)) {
             _stats.receivedClausesDigested++;
             _stats.histDigested->increment(_clause_out.size);
+            if (_reset_lbd) _clause_out.lbd = _clause_out.size;
             assert(_clause_out.size > 0);
             assert(_clause_out.lbd > 0);
             //assert(_clause_out.begin[0] != 0);

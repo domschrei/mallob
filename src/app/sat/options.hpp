@@ -39,6 +39,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Clauses with an LBD score up to this value are considered \"high quality\"")
  OPT_BOOL(reshareImprovedLbd,               "ril", "reshare-improved-lbd",               false,
     "Reshare clauses (regardless of their last sharing epoch) if their LBD improved")
+ OPT_BOOL(resetLbdBeforeImport,             "rlbd", "reset-lbd-before-import",           false, "Reset each clause's LBD to its length before importing it")
  OPT_INT(strictClauseLengthLimit,           "scll", "strict-clause-length-limit",        20,       0,   LARGE_INT,
     "Only clauses up to this length will be shared")
  OPT_INT(strictLbdLimit,                    "slbdl", "strict-lbd-limit",                 20,       0,   LARGE_INT,

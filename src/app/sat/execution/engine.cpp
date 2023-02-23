@@ -124,6 +124,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.qualityLbdLimit = params.qualityLbdLimit();
 	setup.clauseBaseBufferSize = params.clauseBufferBaseSize();
 	setup.anticipatedLitsToImportPerCycle = config.maxBroadcastedLitsPerCycle;
+	setup.resetLbdBeforeImport = params.resetLbdBeforeImport();
 	setup.hasPseudoincrementalSolvers = setup.isJobIncremental && hasPseudoincrementalSolvers;
 	setup.solverRevision = 0;
 	setup.minNumChunksPerSolver = params.minNumChunksForImportPerSolver();
