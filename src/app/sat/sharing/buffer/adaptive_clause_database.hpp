@@ -91,6 +91,9 @@ public:
         LinearBudgetCounter() {}
         LinearBudgetCounter(AdaptiveClauseDatabase& cdb) : cdb(&cdb), 
             intermediateBudget(cdb.getTotalLiteralBudget()), lastCountedSlotIdx(-3) {}
+        int getInitialBudget() {
+            return intermediateBudget;
+        }
         int getNextBudget(int nbPrevUsed, int size, int lbd) {
             intermediateBudget -= nbPrevUsed;
             int slotIdx = cdb->getSlotIdxAndMode(size, lbd).first;

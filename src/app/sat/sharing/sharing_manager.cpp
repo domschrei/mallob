@@ -298,9 +298,9 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 	std::vector<PortfolioSolverInterface*> importingSolvers;
 	for (auto& solver : _solvers) {
-		if (solver->getCurrentRevision() == _current_revision) {
-			importingSolvers.push_back(solver.get());
-		}
+		if (!solver->isClauseSharingEnabled()) continue;
+		if (solver->getCurrentRevision() != _current_revision) continue;
+		importingSolvers.push_back(solver.get());
 	}
 
 	_last_num_cls_to_import = 0;
@@ -315,9 +315,11 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	std::vector<std::forward_list<std::vector<int>>> largeLists(importingSolvers.size());
 
 	std::vector<AdaptiveClauseDatabase::LinearBudgetCounter> capacityCounters;
-	for (size_t i = 0; i < importingSolvers.size(); i++) 
+	std::vector<int> currentCapacities;
+	for (size_t i = 0; i < importingSolvers.size(); i++) {
 		capacityCounters.push_back(importingSolvers[i]->getImportBudgetCounter());
-	std::vector<int> currentCapacities(importingSolvers.size(), -1);
+		currentCapacities.push_back(capacityCounters[i].getInitialBudget());
+	}
 	std::vector<int> currentAddedLiterals(importingSolvers.size(), 0);
 
 	auto reader = _cdb.getBufferReader(begin, buflen);
@@ -364,27 +366,33 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		
 		// new (or first) bucket reached?
 		if (!initialized || clause.size != it.clauseLength || clause.lbd != it.lbd) {
-			initialized = true;
-			float publishTime = Timer::elapsedSeconds();
-			_filter.releaseLock();
 
-			// publish prior lists of clauses
-			doPublishClauseLists();
+			// publish admitted clause lists (not when initializing)
+			if (initialized) {
+				float publishTime = Timer::elapsedSeconds();
+				_filter.releaseLock();
+
+				// publish prior lists of clauses
+				doPublishClauseLists();
+
+				// update literal budgets of solvers
+				for (size_t i = 0; i < importingSolvers.size(); i++) {
+					currentCapacities[i] = capacityCounters[i].getNextBudget(currentAddedLiterals[i], clause.size, clause.lbd);
+					currentAddedLiterals[i] = 0;
+				}
+
+				_filter.acquireLock();
+				publishTime = Timer::elapsedSeconds() - publishTime;
+				_logger.log(verb+2, "DG published clause lists (%.4f s)\n", publishTime);
+			}
 
 			// go to new length-LBD bucket
 			while (clause.size != it.clauseLength || clause.lbd != it.lbd) {
 				it.nextLengthLbdGroup();
 				explicitLbds = it.storeWithExplicitLbd(/*maxLbdPartitioningSize=*/2);
 			}
-			// update literal budgets of solvers
-			for (size_t i = 0; i < importingSolvers.size(); i++) {
-				currentCapacities[i] = capacityCounters[i].getNextBudget(currentAddedLiterals[i], clause.size, clause.lbd);
-				currentAddedLiterals[i] = 0;
-			}
 
-			_filter.acquireLock();
-			publishTime = Timer::elapsedSeconds() - publishTime;
-			_logger.log(verb+2, "DG published clause lists (%.4f s)\n", publishTime);
+			initialized = true;
 		}
 
 		hist.increment(clause.size);

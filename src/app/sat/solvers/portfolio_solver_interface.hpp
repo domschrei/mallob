@@ -130,6 +130,9 @@ public:
 			}
 		}
 	}
+	bool isClauseSharingEnabled() const {
+		return !_clause_sharing_disabled;
+	}
 
 	void setCurrentCondVarOrZero(int condVarOrZero) {_current_cond_var_or_zero = condVarOrZero;}
 	void setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback);
@@ -161,6 +164,7 @@ public:
 	AdaptiveClauseDatabase::LinearBudgetCounter getImportBudgetCounter();
 	template <typename T>
 	void addLearnedClauses(int clauseLength, int lbd, std::forward_list<T>& list, int numLiterals) {
+		if (_clause_sharing_disabled) return;
 		_import_buffer.performImport<T>(clauseLength, lbd, list, numLiterals);
 	}
 
