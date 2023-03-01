@@ -41,17 +41,18 @@ make; cd ..
 Specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
 You can use the following Mallob-specific build options:
 
-| Usage                                     | Description                                                                                                |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| -DMALLOB_ASSERT=<0/1>                     | Turn on assertions (even on release builds). Setting to 0 limits assertions to debug builds.               |
-| -DMALLOB_JEMALLOC_DIR=path                | If necessary, provide a path to a local installation of `jemalloc` where `libjemalloc.*` is located.       |
-| -DMALLOB_LOG_VERBOSITY=<0..6>             | Only compile logging messages of the provided maximum verbosity and discard more verbose log calls.        |
-| -DMALLOB_SUBPROC_DISPATCH_PATH=\\"path\\" | Subprocess executables must be located under <path> for Mallob to find. (Use `\"build/\"` by default.)     |
-| -DMALLOB_USE_ASAN=<0/1>                   | Compile with Address Sanitizer for debugging purposes.                                                     |
-| -DMALLOB_USE_GLUCOSE=<0/1>                | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
-| -DMALLOB_USE_JEMALLOC=<0/1>               | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
-| -DMALLOB_APP_KMEANS=<0/1>                 | Compile with K-Means clustering engine.                                                                    |
-| -DMALLOB_APP_SAT=<0/1>                    | Compile with SAT solving engine.                                                                           |
+| Usage                                       | Description                                                                                                |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| -DMALLOB_ASSERT=<0/1>                       | Turn on assertions (even on release builds). Setting to 0 limits assertions to debug builds.               |
+| -DMALLOB_JEMALLOC_DIR=path                  | If necessary, provide a path to a local installation of `jemalloc` where `libjemalloc.*` is located.       |
+| -DMALLOB_LOG_VERBOSITY=<0..6>               | Only compile logging messages of the provided maximum verbosity and discard more verbose log calls.        |
+| -DMALLOB_SUBPROC_DISPATCH_PATH=\\"path\\"   | Subprocess executables must be located under <path> for Mallob to find. (Use `\"build/\"` by default.)     |
+| -DMALLOB_USE_ASAN=<0/1>                     | Compile with Address Sanitizer for debugging purposes.                                                     |
+| -DMALLOB_USE_GLUCOSE=<0/1>                  | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
+| -DMALLOB_USE_JEMALLOC=<0/1>                 | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
+| -DMALLOB_APP_KMEANS=<0/1>                   | Compile with K-Means clustering engine.                                                                    |
+| -DMALLOB_APP_SAT=<0/1>                      | Compile with SAT solving engine.                                                                           |
+| -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS=<0/1> | Max. number of application threads (solver threads for SAT) per process to support. (max: 128)             |
 
 ## Docker
 
@@ -90,10 +91,20 @@ Running the tests takes a few minutes and in the end "All tests done." should be
 Given a single machine with two hardware threads per core, the following command executed in Mallob's base directory assigns one MPI process to each set of four physical cores (eight hardware threads) and then runs four solver threads on each MPI process.
 
 ```
-RDMAV_FORK_SAFE=1 NPROCS="$(($(nproc)/8))" mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=4 build/mallob -t=4 $MALLOB_OPTIONS
+RDMAV_FORK_SAFE=1; NPROCS="$(($(nproc)/8))"; mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=4 build/mallob -t=4 $MALLOB_OPTIONS
 ```
-You can always stop Mallob via Ctrl+C (interrupt signal) or by executing `killall mpirun`. 
-Alternatively, you can specify the number of jobs to process (with `-J=$NUM_JOBS`) and/or the time to pass (with `-T=$TIME_LIMIT_SECS`) before Mallob terminates on its own.
+
+Given a machine with `$nthreads` cores (and twice the number of hardware threads), the following command spawns a single process with one solver thread per core (per hardware thread):
+
+```
+RDMAV_FORK_SAFE=1; mpirun -np 1 --bind-to core --map-by ppr:1:node:pe=$nthreads build/mallob -t=$nthreads $MALLOB_OPTIONS
+RDMAV_FORK_SAFE=1; mpirun -np 1 --bind-to hwthread --map-by ppr:1:node:pe=$((2*$nthreads)) build/mallob -t=$((2*$nthreads)) $MALLOB_OPTIONS
+```
+
+Alternatively, only executing `build/mallob -t=$nthreads $MALLOB_OPTIONS` works as well in this case but does not pin threads to cores.
+
+You can always stop Mallob via Ctrl+C (interrupt signal) or by executing `killall mpirun` (or `killall build/mallob`). 
+You can also specify the number of jobs to process (with `-J=$NUM_JOBS`) and/or the time to pass (with `-T=$TIME_LIMIT_SECS`) before Mallob terminates on its own.
 
 For exact and clean logging, you should not rely on a textfile in which you piped Mallob's output.
 Instead, specify a logging directory with `-log=<log-dir>` where separate sub-directories and files will be created for each worker / thread. 
@@ -101,7 +112,7 @@ This can be combined with the `-q` option to suppress Mallob's output to STDOUT.
 Verbosity of logging can be set with the `-v` option (as long as Mallob was compiled with the respective verbosity or higher, see `-DMALLOB_LOG_VERBOSITY` above).
 All further options of Mallob can be seen by executing Mallob with the `-h` option. (This also works without the `mpirun` prefix.)
 
-For running Mallob on distributed clusters, please also consult [the scripts and documentation from our Euro-Par 2022 software artifact](https://doi.org/10.6084/m9.figshare.20000642) as well as the user documentation of your particular cluster.
+For running Mallob on distributed clusters, please also consult [the scripts and documentation from our Euro-Par 2022 software artifact](https://doi.org/10.6084/m9.figshare.20000642), [our more recent quickstart guide for clusters](docs/clusters.md) and/or the user documentation of your particular cluster.
 
 ## Solve a single problem
 
