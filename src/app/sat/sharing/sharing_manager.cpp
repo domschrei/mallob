@@ -13,6 +13,7 @@
 
 #include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
 #include "app/sat/sharing/buffer/deterministic_clause_synchronizer.hpp"
+#include "app/sat/sharing/filter/produced_clause_filter.hpp"
 #include "util/assert.hpp"
 
 #include "sharing_manager.hpp"
@@ -388,7 +389,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 		hist.increment(clause.size);
 		// bitset of producing solvers
-		uint8_t producers = _filter.getProducers(clause, _internal_epoch);
+		auto producers = _filter.getProducers(clause, _internal_epoch);
 
 		// Decide for each solver whether it should receive the clause
 		for (size_t i = 0; i < importingSolvers.size(); i++) {
@@ -401,8 +402,8 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 				solverStats->receivedClausesDropped++;
 				continue;
 			}
-			uint8_t producerFlag = 1 << sid;
-			if ((producers & (1 << sid)) != 0) {
+			cls_producers_bitset producerFlag = 1 << sid;
+			if ((producers & producerFlag) != 0) {
 				// filtered by solver filter
 				solverStats->receivedClausesFiltered++;
 				continue;

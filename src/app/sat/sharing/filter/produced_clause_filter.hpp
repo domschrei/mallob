@@ -8,18 +8,32 @@
 #include "../../data/produced_clause_candidate.hpp"
 #include "util/sys/threading.hpp"
 #include "../buffer/adaptive_clause_database.hpp"
+#include "util/params.hpp"
 
-// Packed struct to get in all meta data within a 32 bit integer.
-struct ClauseInfo {
+#if MALLOB_MAX_N_APPTHREADS_PER_PROCESS <= 8
+typedef uint8_t cls_producers_bitset;
+#elif MALLOB_MAX_N_APPTHREADS_PER_PROCESS <= 16
+typedef uint16_t cls_producers_bitset;
+#elif MALLOB_MAX_N_APPTHREADS_PER_PROCESS <= 32
+typedef uint32_t cls_producers_bitset;
+#elif MALLOB_MAX_N_APPTHREADS_PER_PROCESS <= 64
+typedef uint64_t cls_producers_bitset;
+#elif MALLOB_MAX_N_APPTHREADS_PER_PROCESS <= 128
+typedef uint128_t cls_producers_bitset;
+#endif
+
+// Packed struct to get in all meta data for a produced clause.
+struct __attribute__ ((packed)) ClauseInfo {
 
     // Best LBD so far this clause was PRODUCED (+inserted into buffer) with
-    uint8_t minProducedLbd:5;
+    uint32_t minProducedLbd:5;
     // Best LBD so far this clause was SHARED to all solvers with
-    uint8_t minSharedLbd:5;
-    // Bitset of which local solver(s) exported the clause 
-    uint8_t producers:6;
+    uint32_t minSharedLbd:5;
     // Epoch of last modification (production, or sharing:=true)
-    uint16_t lastSharedEpoch:16;
+    uint32_t lastSharedEpoch:22;
+
+    // Bitset of which local solver(s) exported the clause
+    cls_producers_bitset producers:MALLOB_MAX_N_APPTHREADS_PER_PROCESS;
 
     ClauseInfo() {
         minProducedLbd = 0;
@@ -30,6 +44,7 @@ struct ClauseInfo {
     ClauseInfo(const ProducedClauseCandidate& c) {
         minProducedLbd = c.lbd;
         minSharedLbd = 0;
+        assert(c.producerId < MALLOB_MAX_N_APPTHREADS_PER_PROCESS);
         producers = 1 << c.producerId;
         lastSharedEpoch = 0;
     }
@@ -84,7 +99,7 @@ public:
         }
     }
 
-    uint8_t getProducers(Mallob::Clause& c, int epoch) {
+    cls_producers_bitset getProducers(Mallob::Clause& c, int epoch) {
 
         if (c.size == 1) {
             ProducedUnitClause pc(c);
@@ -196,6 +211,7 @@ private:
             }
         }
         // Add producing solver as a producer
+        assert(c.producerId < MALLOB_MAX_N_APPTHREADS_PER_PROCESS);
         info.producers |= (1 << c.producerId);
     }
 
@@ -229,7 +245,7 @@ private:
     }
 
     template <typename T>
-    inline uint8_t getProducers(const T& pc, ProducedMap<T>& map, int epoch) {
+    inline cls_producers_bitset getProducers(const T& pc, ProducedMap<T>& map, int epoch) {
         auto it = map.find(pc);
         if (it == map.end()) return 0;
         ClauseInfo& info = it.value();

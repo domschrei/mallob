@@ -4,6 +4,10 @@
 
 #include "util/option.hpp"
 
+#ifndef MALLOB_MAX_N_APPTHREADS_PER_PROCESS
+#define MALLOB_MAX_N_APPTHREADS_PER_PROCESS 32
+#endif
+
 // All declared options will be stored in this member of the Parameters class.
 OptMap _global_map;
 GroupedOptionsList _grouped_list;
@@ -88,7 +92,7 @@ OPTION_GROUP(grpJob, "job", "Global configuration of jobs")
  OPT_FLOAT(jobCpuLimit,                   "jcl", "job-cpu-limit",                      0,    0, LARGE_INT,      "Timeout an instance after x cpu seconds")
  OPT_FLOAT(jobWallclockLimit,             "jwl", "job-wallclock-limit",                0,    0, LARGE_INT,      "Timeout an instance after x seconds wall clock time")
  OPT_INT(maxDemand,                       "md", "max-demand",                          0,    0, LARGE_INT,      "Limit any job's demand to this value")
- OPT_INT(numThreadsPerProcess,            "t", "threads-per-process",                  1,    0, LARGE_INT,      "Number of worker threads per node")
+ OPT_INT(numThreadsPerProcess,            "t", "threads-per-process",                  1,    1, MALLOB_MAX_N_APPTHREADS_PER_PROCESS,      "Number of application worker threads per MPI process")
 
 ///////////////////////////////////////////////////////////////////////
 
