@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <fstream>
 #include <ios>
 
@@ -168,13 +169,12 @@ public:
                 _ofs_results.open(_params.streamerResultOutput());
             }
 
-            while (_bg_deleter.continueRunning()) {
+            while (_bg_deleter.continueRunning() || _num_jsons_to_delete.load(std::memory_order_relaxed) > 0) {
 
                 _delete_cond_var.wait(_delete_mutex, [&]() {
                     return !_bg_deleter.continueRunning() ||
                         _num_jsons_to_delete > 0;
                 });
-                if (!_bg_deleter.continueRunning()) break;
 
                 // Delete a garbage JSON
                 while (_num_jsons_to_delete > 0) {
@@ -183,12 +183,12 @@ public:
                         auto lock = _delete_mutex.getLock();
                         jsonToDelete = std::move(_jsons_to_delete.back());
                         _jsons_to_delete.pop_back();
+                        _num_jsons_to_delete--;
                     }
                     if (writeResultsToFile) {
                         jsonToDelete["result"].erase("solution"); // potentially expensive call!
                         _ofs_results << jsonToDelete << std::endl;
                     }
-                    _num_jsons_to_delete--;
                     // JSON destructor is called here
                 }
             }
