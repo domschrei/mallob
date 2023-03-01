@@ -91,8 +91,9 @@ public:
         LinearBudgetCounter() {}
         LinearBudgetCounter(AdaptiveClauseDatabase& cdb) : cdb(&cdb), 
             intermediateBudget(cdb.getTotalLiteralBudget()), lastCountedSlotIdx(-3) {}
-        int getInitialBudget() {
-            return intermediateBudget;
+        bool beginNextBudget(int size, int lbd) {
+            int slotIdx = cdb->getSlotIdxAndMode(size, lbd).first;
+            return slotIdx > lastCountedSlotIdx;
         }
         int getNextBudget(int nbPrevUsed, int size, int lbd) {
             intermediateBudget -= nbPrevUsed;
@@ -128,7 +129,8 @@ public:
         float timeFree = Timer::elapsedSeconds();
         auto [slotIdx, mode] = getSlotIdxAndMode(cSize, cLbd);
         int freed = tryAcquireBudget(slotIdx, nbLiterals);
-        assert(freed >= nbLiterals);
+        assert(freed >= nbLiterals || log_return_false("[ERROR] (%i,%i): Expected to acquire at least %i literals -- only got %i!\n", 
+            cSize, cLbd, nbLiterals, freed));
         if (freed > nbLiterals) {
             // return excess
             storeGlobalBudget(freed-nbLiterals);

@@ -306,6 +306,11 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	_last_num_cls_to_import = 0;
 	_last_num_admitted_cls_to_import = 0;
 
+	if (importingSolvers.empty()) {
+		_logger.log(verb, "no local solvers accepting clauses - ignoring sharing\n");
+		return;
+	}
+
 	// Apply provided global filter to buffer (in-place operation)
 	applyFilterToBuffer(begin, buflen, filter);
 
@@ -318,7 +323,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	std::vector<int> currentCapacities;
 	for (size_t i = 0; i < importingSolvers.size(); i++) {
 		capacityCounters.push_back(importingSolvers[i]->getImportBudgetCounter());
-		currentCapacities.push_back(capacityCounters[i].getInitialBudget());
+		currentCapacities.push_back(capacityCounters[i].getNextBudget(0, 1, 1));
 	}
 	std::vector<int> currentAddedLiterals(importingSolvers.size(), 0);
 
@@ -369,21 +374,26 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 			// publish admitted clause lists (not when initializing)
 			if (initialized) {
-				float publishTime = Timer::elapsedSeconds();
-				_filter.releaseLock();
 
-				// publish prior lists of clauses
-				doPublishClauseLists();
+				// actual new slot in the import DBs reached?
+				if (capacityCounters[0].beginNextBudget(clause.size, clause.lbd)) {
 
-				// update literal budgets of solvers
-				for (size_t i = 0; i < importingSolvers.size(); i++) {
-					currentCapacities[i] = capacityCounters[i].getNextBudget(currentAddedLiterals[i], clause.size, clause.lbd);
-					currentAddedLiterals[i] = 0;
+					float publishTime = Timer::elapsedSeconds();
+					_filter.releaseLock();
+
+					// publish prior lists of clauses
+					doPublishClauseLists();
+
+					// update literal budgets of solvers
+					for (size_t i = 0; i < importingSolvers.size(); i++) {
+						currentCapacities[i] = capacityCounters[i].getNextBudget(currentAddedLiterals[i], clause.size, clause.lbd);
+						currentAddedLiterals[i] = 0;
+					}
+
+					_filter.acquireLock();
+					publishTime = Timer::elapsedSeconds() - publishTime;
+					_logger.log(verb+2, "DG published clause lists (%.4f s)\n", publishTime);
 				}
-
-				_filter.acquireLock();
-				publishTime = Timer::elapsedSeconds() - publishTime;
-				_logger.log(verb+2, "DG published clause lists (%.4f s)\n", publishTime);
 			}
 
 			// go to new length-LBD bucket
