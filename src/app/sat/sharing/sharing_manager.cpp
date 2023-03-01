@@ -323,7 +323,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	std::vector<int> currentCapacities;
 	for (size_t i = 0; i < importingSolvers.size(); i++) {
 		capacityCounters.push_back(importingSolvers[i]->getImportBudgetCounter());
-		currentCapacities.push_back(capacityCounters[i].getNextBudget(0, 1, 1));
+		currentCapacities.push_back(capacityCounters[i].getTotalBudget() - capacityCounters[i].getNextOccupiedBudget(1, 1));
 	}
 	std::vector<int> currentAddedLiterals(importingSolvers.size(), 0);
 
@@ -375,25 +375,21 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 			// publish admitted clause lists (not when initializing)
 			if (initialized) {
 
-				// actual new slot in the import DBs reached?
-				if (capacityCounters[0].beginNextBudget(clause.size, clause.lbd)) {
+				float publishTime = Timer::elapsedSeconds();
+				_filter.releaseLock();
 
-					float publishTime = Timer::elapsedSeconds();
-					_filter.releaseLock();
+				// publish prior lists of clauses
+				doPublishClauseLists();
 
-					// publish prior lists of clauses
-					doPublishClauseLists();
-
-					// update literal budgets of solvers
-					for (size_t i = 0; i < importingSolvers.size(); i++) {
-						currentCapacities[i] = capacityCounters[i].getNextBudget(currentAddedLiterals[i], clause.size, clause.lbd);
-						currentAddedLiterals[i] = 0;
-					}
-
-					_filter.acquireLock();
-					publishTime = Timer::elapsedSeconds() - publishTime;
-					_logger.log(verb+2, "DG published clause lists (%.4f s)\n", publishTime);
+				// update literal budgets of solvers
+				for (size_t i = 0; i < importingSolvers.size(); i++) {
+					currentCapacities[i] -= capacityCounters[i].getNextOccupiedBudget(clause.size, clause.lbd);
+					currentAddedLiterals[i] = 0;
 				}
+
+				_filter.acquireLock();
+				publishTime = Timer::elapsedSeconds() - publishTime;
+				_logger.log(verb+2, "DG published clause lists (%.4f s)\n", publishTime);
 			}
 
 			// go to new length-LBD bucket

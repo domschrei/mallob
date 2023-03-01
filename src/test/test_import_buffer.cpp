@@ -63,10 +63,12 @@ void testConcurrentImport() {
         auto pushClauses = [&]() {
             LOG(V2_INFO, "Adding clauses to import buffer\n");
             auto capacityCounter = importBuffer.getLinearBudgetCounter();
-            int budget, nbAddedLits = 0;
+            int budget = capacityCounter.getTotalBudget();
+            int nbAddedLits = 0;
             int nbAddedClausesTotal = 0;
             
-            budget = capacityCounter.getNextBudget(nbAddedLits, 1, 1); nbAddedLits = 0;
+            budget -= capacityCounter.getNextOccupiedBudget(1, 1); 
+            nbAddedLits = 0;
             units.remove_if([&](int i) {
                 if (budget == 0) return true;
                 budget--;
@@ -76,7 +78,8 @@ void testConcurrentImport() {
             });
             importBuffer.performImport(1, 1, units, std::min(nbAddedLits, budget));
 
-            budget = capacityCounter.getNextBudget(nbAddedLits, 2, 2); nbAddedLits = 0;
+            budget -= capacityCounter.getNextOccupiedBudget(2, 2); 
+            nbAddedLits = 0;
             binaries.remove_if([&](const auto& pair) {
                 if (budget < 2) return true;
                 budget -= 2;
@@ -90,7 +93,8 @@ void testConcurrentImport() {
                 auto [len, lbd] = entry.first;
                 auto clslen = len;
                 auto& list = entry.second;
-                budget = capacityCounter.getNextBudget(nbAddedLits, len, lbd); nbAddedLits = 0;
+                budget -= capacityCounter.getNextOccupiedBudget(len, lbd); 
+                nbAddedLits = 0;
                 list.remove_if([&](const auto& pair) {
                     if (budget < clslen) return true;
                     budget -= clslen;

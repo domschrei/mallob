@@ -86,26 +86,24 @@ public:
     // based on the state of the previous groups.
     struct LinearBudgetCounter {
         AdaptiveClauseDatabase* cdb {nullptr};
-        int intermediateBudget {0};
         int lastCountedSlotIdx {-3};
         LinearBudgetCounter() {}
-        LinearBudgetCounter(AdaptiveClauseDatabase& cdb) : cdb(&cdb), 
-            intermediateBudget(cdb.getTotalLiteralBudget()), lastCountedSlotIdx(-3) {}
-        bool beginNextBudget(int size, int lbd) {
-            int slotIdx = cdb->getSlotIdxAndMode(size, lbd).first;
-            return slotIdx > lastCountedSlotIdx;
+        LinearBudgetCounter(AdaptiveClauseDatabase& cdb) : cdb(&cdb), lastCountedSlotIdx(-3) {}
+
+        int getTotalBudget() {
+            return cdb->getTotalLiteralBudget();
         }
-        int getNextBudget(int nbPrevUsed, int size, int lbd) {
-            intermediateBudget -= nbPrevUsed;
+        int getNextOccupiedBudget(int size, int lbd) {
             int slotIdx = cdb->getSlotIdxAndMode(size, lbd).first;
             assert(slotIdx >= lastCountedSlotIdx);
+            int occupied = 0;
             while (lastCountedSlotIdx < slotIdx) {
                 lastCountedSlotIdx++;
-                if (lastCountedSlotIdx == -2) intermediateBudget -= cdb->_unit_slot.nbLiterals;
-                else if (lastCountedSlotIdx == -1) intermediateBudget -= cdb->_binary_slot.nbLiterals;
-                else intermediateBudget -= cdb->_large_slots[lastCountedSlotIdx].nbLiterals;
+                if (lastCountedSlotIdx == -2) occupied += cdb->_unit_slot.nbLiterals;
+                else if (lastCountedSlotIdx == -1) occupied += cdb->_binary_slot.nbLiterals;
+                else occupied -= cdb->_large_slots[lastCountedSlotIdx].nbLiterals;
             }
-            return intermediateBudget;
+            return occupied;
         }
     };
 
