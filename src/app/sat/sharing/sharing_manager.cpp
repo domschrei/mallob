@@ -301,7 +301,6 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 				// update budgets
 				for (auto& slv : importingSolvers) {
 					slv.publishPreparedLists(it);
-					slv.initializeNextSlot(clause.size, clause.lbd);
 				}
 
 				_filter.acquireLock();
@@ -313,6 +312,9 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 			while (clause.size != it.clauseLength || clause.lbd != it.lbd) {
 				it.nextLengthLbdGroup();
 				explicitLbds = it.storeWithExplicitLbd(/*maxLbdPartitioningSize=*/2);
+				for (auto& slv : importingSolvers) {
+					slv.initializeNextSlot(it.clauseLength, it.lbd);
+				}
 			}
 
 			initialized = true;

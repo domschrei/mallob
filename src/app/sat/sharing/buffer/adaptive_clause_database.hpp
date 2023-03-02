@@ -101,7 +101,7 @@ public:
                 lastCountedSlotIdx++;
                 if (lastCountedSlotIdx == -2) occupied += cdb->_unit_slot.nbLiterals;
                 else if (lastCountedSlotIdx == -1) occupied += cdb->_binary_slot.nbLiterals;
-                else occupied -= cdb->_large_slots[lastCountedSlotIdx].nbLiterals;
+                else occupied += cdb->_large_slots[lastCountedSlotIdx].nbLiterals;
             }
             return occupied;
         }

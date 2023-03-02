@@ -252,41 +252,51 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, Buffe
         // Extract clauses
         swappedSlot.swap(slot.list);
         slot.nbLiterals.store(0, std::memory_order_relaxed);
+        storeGlobalBudget(nbSwappedLits);
+
         slot.unlock();
     }
 
     // Create clauses one by one
     std::vector<Mallob::Clause> flushedClauses;
-    int remainingLits = builder.getMaxRemainingLits();
-    int collectedLits = 0;
+    int nbRemainingLits = builder.getMaxRemainingLits();
+    int nbCollectedLits = 0;
     auto itBefore = swappedSlot.before_begin();
     auto it = swappedSlot.begin();
     for (; it != swappedSlot.end(); ++it, ++itBefore) {
         T& elem = *it;
         Mallob::Clause clause = getMallobClause(elem, slot.implicitLbdOrZero);
-        if (clause.size > remainingLits) break;
+        if (clause.size > nbRemainingLits) break;
 
         // insert clause to export buffer
         clauseDataConverter(clause.begin);
-        remainingLits -= clause.size;
-        collectedLits += clause.size;
+        nbRemainingLits -= clause.size;
+        nbCollectedLits += clause.size;
         flushedClauses.push_back(std::move(clause));
     }
 
-    // Return budget of extracted literals
-    storeGlobalBudget(collectedLits);
+    // Global budget according to nbSwappedLits was stored when the list was extracted.
+    // Now the literals which won't be flushed will be re-inserted,
+    // so the according share of the global budget must be extracted again.
+    int nbLitsToReinsert = nbSwappedLits - nbCollectedLits;
+    assert(nbLitsToReinsert >= 0);
+    if (nbLitsToReinsert > 0) {
+        int freed = tryAcquireBudget(-2, nbLitsToReinsert);
+        assert(freed >= nbLitsToReinsert);
+        if (freed > nbLitsToReinsert) storeGlobalBudget(freed-nbLitsToReinsert);
+    }
 
     if (it != swappedSlot.end()) {
         // Re-insert swapped clauses which remained unused
         slot.lock();
         slot.list.splice_after(slot.list.before_begin(), swappedSlot, itBefore, swappedSlot.end());
-        atomics::addRelaxed(slot.nbLiterals, nbSwappedLits - collectedLits);
+        atomics::addRelaxed(slot.nbLiterals, nbSwappedLits - nbCollectedLits);
         assert_heavy(checkNbLiterals(slot));
         slot.unlock();
     } else {
-        assert(nbSwappedLits == collectedLits || 
+        assert(nbSwappedLits == nbCollectedLits ||
             log_return_false("[ERROR] slot advertised %i lits, collected %i lits\n", 
-            nbSwappedLits, collectedLits));
+            nbSwappedLits, nbCollectedLits));
     }
 
     bool differentLbdValues = slot.implicitLbdOrZero == 0;
