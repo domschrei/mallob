@@ -11,11 +11,15 @@
 #include <cstdio>
 #include <unistd.h>
 
+#include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/data/solver_statistics.hpp"
 #include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
 #include "app/sat/sharing/buffer/deterministic_clause_synchronizer.hpp"
+#include "app/sat/sharing/clause_id_alignment.hpp"
 #include "app/sat/sharing/filter/produced_clause_filter.hpp"
+#include "app/sat/sharing/filter/importing_solver.hpp"
+#include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/assert.hpp"
-
 #include "sharing_manager.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
@@ -51,13 +55,12 @@ SharingManager::SharingManager(
 	auto callback = getCallback();
 	
 	assert(!solvers.empty());
-	_max_num_threads = _params.numThreadsPerProcess();
 	_num_original_clauses = solvers[0]->getSolverSetup().numOriginalClauses;
 	int maxNumGlobalSolvers = solvers[0]->getSolverSetup().maxNumSolvers;
 
-	_id_offsets_per_solver.resize(_solvers.size());
-	_min_epoch_ids_per_solver.resize(_solvers.size());
-	_last_exported_clause_id.resize(_solvers.size());
+	if (ClauseMetadata::enabled() && _params.distributedProofAssembly()) {
+		_id_alignment.reset(new ClauseIdAlignment(_logger, _solvers, _num_original_clauses, _params.numThreadsPerProcess()));
+	}
 
 	for (size_t i = 0; i < _solvers.size(); i++) {
 		_solvers[i]->setExtLearnedClauseCallback(callback);
@@ -66,28 +69,7 @@ SharingManager::SharingManager(
 		});
 		_solver_revisions.push_back(_solvers[i]->getSolverSetup().solverRevision);
 		_solver_stats.push_back(&_solvers[i]->getSolverStatsRef());
-
-		if (_params.distributedProofAssembly()) {
-
-			_id_offsets_per_solver[i].push_back(0);
-			_min_epoch_ids_per_solver[i].push_back(0);
-			_last_exported_clause_id[i] = new std::atomic_ulong(_num_original_clauses+1);
-			/*
-			auto firstIdToBeLearnt = _num_original_clauses + 1 + _solvers[i]->getGlobalId();
-			_last_exported_clause_id[i] = new std::atomic_ulong(
-				maxNumGlobalSolvers > firstIdToBeLearnt ? 
-					0 : 
-					firstIdToBeLearnt - maxNumGlobalSolvers
-			);
-			assert(getProducingLocalSolverIndex(_last_exported_clause_id[i]->load(std::memory_order_relaxed)) == i);
-			*/
-
-			LOG(V2_INFO, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
-					_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), _last_exported_clause_id[i]->load(std::memory_order_relaxed), 
-					_min_epoch_ids_per_solver[i].back());
-		}
 	}
-	_global_epoch_ids.push_back(0);
 
 	if (_params.deterministicSolving()) {
 		_det_sync.reset(new DeterministicClauseSynchronizer(_solvers, _num_original_clauses, [&](auto call) {
@@ -114,13 +96,7 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 		}
 	}
 
-	if (ClauseMetadata::enabled()) {
-		unsigned long clauseId = ClauseMetadata::readUnsignedLong(clause.begin);
-		assert(getProducingLocalSolverIndex(clauseId) == solverId);
-		if (_params.distributedProofAssembly()) {
-			_last_exported_clause_id[solverId]->store(clauseId, std::memory_order_relaxed);
-		}
-	}
+	if (_id_alignment) _id_alignment->onProduceClause(clause, solverId);
 
 	auto clauseBegin = clause.begin;
 	auto clauseSize = clause.size;
@@ -192,7 +168,7 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 			AdaptiveClauseDatabase::ANY, /*sortClauses=*/true, [&](int* data) {
 
 		// Shift clause ID from a local solver according to the solver's offset
-		if (ClauseMetadata::enabled()) alignClauseId(data);
+		if (_id_alignment) _id_alignment->alignClauseId(data);
 	});
 	//assert(buffer.size() <= maxSize);
 	memcpy(begin, buffer.data(), buffer.size()*sizeof(int));
@@ -214,11 +190,11 @@ void SharingManager::returnClauses(int* begin, int buflen) {
 		// For certified UNSAT we need to drop returned clauses which do not
 		// originate from this solver, since we can not un-align them to
 		// correctly insert them into the database.
-		if (!ClauseMetadata::enabled() || isLocallyProducedClause(ClauseMetadata::readUnsignedLong(c.begin))) {
+		if (!_id_alignment || _id_alignment->isLocallyProducedClause(ClauseMetadata::readUnsignedLong(c.begin))) {
 
 			// Returned clauses would be aligned *again* when re-exported.
 			// => subtract the offsets again here ...
-			if (ClauseMetadata::enabled()) unalignClauseId(c.begin);
+			if (_id_alignment) _id_alignment->unalignClauseId(c.begin);
 
 			bool success = _cdb.addClause(c);
 			if (success) _hist_returned_to_db.increment(c.size);
@@ -239,27 +215,8 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 	int nbFiltered = 0;
 	int nbTotal = 0;
 
-	if (ClauseMetadata::enabled() && _params.distributedProofAssembly()) {
-		// Proceed with the next epoch.
-		// Find max. first clause ID
-		unsigned long maxFirstIdOfEpoch = 0;
-		int maxNumSolvers = _solvers[0]->getSolverSetup().maxNumSolvers;
-		for (size_t i = 0; i < _solvers.size(); i++) {
-
-			auto clauseIdCounter = _last_exported_clause_id[i]->load(std::memory_order_relaxed);
-			_min_epoch_ids_per_solver[i].push_back(clauseIdCounter);
-			
-			auto firstIdOfEpoch = _id_offsets_per_solver[i].back() 
-				+ clauseIdCounter
-				+ maxNumSolvers;
-			firstIdOfEpoch = firstIdOfEpoch - (firstIdOfEpoch % maxNumSolvers) + maxNumSolvers;
-			maxFirstIdOfEpoch = std::max(maxFirstIdOfEpoch, firstIdOfEpoch);
-
-			LOG(V2_INFO, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
-				_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), clauseIdCounter, _min_epoch_ids_per_solver[i].back());
-		}
-
-		ClauseMetadata::writeUnsignedLong(maxFirstIdOfEpoch, filterOut);
+	if (_id_alignment) {
+		_id_alignment->contributeFirstClauseIdOfEpoch(filterOut);
 	}
 
 	_filter.acquireLock();
@@ -296,11 +253,12 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 	_logger.log(verb, "digesting len=%ld\n", buflen);
 
-	std::vector<PortfolioSolverInterface*> importingSolvers;
-	for (auto& solver : _solvers) {
+	std::vector<ImportingSolver> importingSolvers;
+	for (size_t i = 0; i < _solvers.size(); i++) {
+		auto& solver = _solvers[i];
 		if (!solver->isClauseSharingEnabled()) continue;
 		if (solver->getCurrentRevision() != _current_revision) continue;
-		importingSolvers.push_back(solver.get());
+		importingSolvers.emplace_back(solver.get(), _solver_stats[i], _id_alignment.get());
 	}
 
 	_last_num_cls_to_import = 0;
@@ -314,49 +272,10 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	// Apply provided global filter to buffer (in-place operation)
 	applyFilterToBuffer(begin, buflen, filter);
 
-	// Prepare to traverse clauses not filtered yet
-	std::vector<std::forward_list<int>> unitLists(importingSolvers.size());
-	std::vector<std::forward_list<std::pair<int, int>>> binaryLists(importingSolvers.size());
-	std::vector<std::forward_list<std::vector<int>>> largeLists(importingSolvers.size());
-
-	std::vector<AdaptiveClauseDatabase::LinearBudgetCounter> capacityCounters;
-	std::vector<int> currentCapacities;
-	for (size_t i = 0; i < importingSolvers.size(); i++) {
-		capacityCounters.push_back(importingSolvers[i]->getImportBudgetCounter());
-		currentCapacities.push_back(capacityCounters[i].getTotalBudget() - capacityCounters[i].getNextOccupiedBudget(1, 1));
-	}
-	std::vector<int> currentAddedLiterals(importingSolvers.size(), 0);
-
 	auto reader = _cdb.getBufferReader(begin, buflen);
 	BufferIterator it(_params.strictClauseLengthLimit(), /*slotsForSumOfLengthAndLbd=*/false);
 	auto clause = reader.getNextIncomingClause();
 	bool explicitLbds = false;
-
-	// Method to publish completed clause lists
-	auto doPublishClauseLists = [&]() {
-		if (it.clauseLength == 1) {
-			// Publish unit lists
-			for (size_t i = 0; i < importingSolvers.size(); i++) {
-				if (!unitLists[i].empty()) {
-					importingSolvers[i]->addLearnedClauses(it.clauseLength, it.lbd, unitLists[i], currentAddedLiterals[i]);
-				}
-			}
-		} else if (it.clauseLength == 2) {
-			// Publish binary lists
-			for (size_t i = 0; i < importingSolvers.size(); i++) {
-				if (!binaryLists[i].empty()) {
-					importingSolvers[i]->addLearnedClauses(it.clauseLength, it.lbd, binaryLists[i], currentAddedLiterals[i]);
-				}
-			}
-		} else {
-			// Publish large lists
-			for (size_t i = 0; i < importingSolvers.size(); i++) {
-				if (!largeLists[i].empty()) {
-					importingSolvers[i]->addLearnedClauses(it.clauseLength, it.lbd, largeLists[i], currentAddedLiterals[i]);
-				}
-			}
-		}
-	};
 
 	_logger.log(verb+2, "DG prepare import\n");
 
@@ -372,19 +291,17 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		// new (or first) bucket reached?
 		if (!initialized || clause.size != it.clauseLength || clause.lbd != it.lbd) {
 
-			// publish admitted clause lists (not when initializing)
+			// publish admitted clause lists (if already initialized)
 			if (initialized) {
 
 				float publishTime = Timer::elapsedSeconds();
 				_filter.releaseLock();
 
 				// publish prior lists of clauses
-				doPublishClauseLists();
-
-				// update literal budgets of solvers
-				for (size_t i = 0; i < importingSolvers.size(); i++) {
-					currentCapacities[i] -= capacityCounters[i].getNextOccupiedBudget(clause.size, clause.lbd);
-					currentAddedLiterals[i] = 0;
+				// update budgets
+				for (auto& slv : importingSolvers) {
+					slv.publishPreparedLists(it);
+					slv.initializeNextSlot(clause.size, clause.lbd);
 				}
 
 				_filter.acquireLock();
@@ -407,57 +324,16 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 		// Decide for each solver whether it should receive the clause
 		for (size_t i = 0; i < importingSolvers.size(); i++) {
-			auto& solver = *importingSolvers[i];
-			int sid = solver.getLocalId();
-			auto& solverStats = _solver_stats[sid];
-			solverStats->receivedClauses++;
-			if (currentCapacities[i] < clause.size) {
-				// No import budget left
-				solverStats->receivedClausesDropped++;
-				continue;
-			}
-			cls_producers_bitset producerFlag = 1 << sid;
-			if ((producers & producerFlag) != 0) {
-				// filtered by solver filter
-				solverStats->receivedClausesFiltered++;
-				continue;
-			}
-			if (ClauseMetadata::enabled() && _params.distributedProofAssembly() && clause.size >= 2) {
-				// check via clause ID whether this solver produced this clause
-				unsigned long clauseId = ClauseMetadata::readUnsignedLong(clause.begin);
-				if (getProducingInstanceId(clauseId) == solver.getGlobalId()) {
-					// This solver produced this clause! Do not import.
-					solverStats->receivedClausesFiltered++;
-					continue;
-				}
-				// Important invariant: incoming clauses must be from EARLIER epochs
-				// than your current epoch.
-				int epoch = _min_epoch_ids_per_solver[i].size()-1;
-				int clauseEpoch = ClauseMetadata::getEpoch(clauseId, _global_epoch_ids);
-				if (clauseEpoch >= epoch) {
-					LOG(V0_CRIT, "[ERROR] Importing clause ID=%lu from epoch %i while I am in epoch %i myself!\n", 
-						clauseId, clauseEpoch, epoch);
-					abort();
-				}
-			}
-			// admitted by solver filter
-			if (clause.size == 1) unitLists[i].push_front(clause.begin[0]);
-			else if (clause.size == 2) binaryLists[i].emplace_front(clause.begin[0], clause.begin[1]);
-			else {
-				std::vector<int> clauseVec((explicitLbds ? 1 : 0) + clause.size);
-				size_t idx = 0;
-				if (explicitLbds) clauseVec[idx++] = clause.lbd;
-				for (size_t k = 0; k < clause.size; k++) clauseVec[idx++] = clause.begin[k];
-				largeLists[i].emplace_front(std::move(clauseVec));
-			}
-			currentCapacities[i] -= clause.size;
-			currentAddedLiterals[i] += clause.size;
+			importingSolvers[i].tryImport(clause, producers, explicitLbds);
 		}
 
 		clause = reader.getNextIncomingClause();
 	}
 	_filter.releaseLock();
-	doPublishClauseLists();
+	
+	for (auto& slv : importingSolvers) {
+		slv.publishPreparedLists(it);
+	}
 	
 	// Process-wide stats
 	time = Timer::elapsedSeconds() - time;
@@ -476,26 +352,8 @@ void SharingManager::applyFilterToBuffer(int* begin, int& buflen, const int* fil
 	int shift = bitsPerElem;
 	int filterPos = -1 + ClauseMetadata::numBytes();
 
-	if (ClauseMetadata::enabled() && _params.distributedProofAssembly()) {
-		// extract global min. epoch ID and compute the next ID offset
-		// for each solver from it
-
-		auto numSolvers = _solvers[0]->getSolverSetup().maxNumSolvers;
-		unsigned long globalMinEpochId = ClauseMetadata::readUnsignedLong(filter);
-		globalMinEpochId = std::max(globalMinEpochId, _global_epoch_ids.back() + numSolvers);
-		LOG(V2_INFO, "EPOCH %i GLOBAL_MAX_OF_1ST_ID %lu\n", _min_epoch_ids_per_solver[0].size()-1, globalMinEpochId);
-		assert(globalMinEpochId > _num_original_clauses);
-		_global_epoch_ids.push_back(globalMinEpochId);
-
-		for (size_t i = 0; i < _solvers.size(); i++) {
-
-			auto offset = globalMinEpochId - _min_epoch_ids_per_solver[i].back();
-			offset = offset - (offset % numSolvers) + numSolvers;
-			_id_offsets_per_solver[i].push_back(offset);
-
-			LOG(V2_INFO, "EPOCH %i instance=%i newoffset=%lu\n", 
-				_min_epoch_ids_per_solver[i].size()-1, _solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back());
-		}
+	if (_id_alignment) {
+		_id_alignment->beginNextEpoch(filter);
 	}
 
 	InPlaceClauseFiltering filtering(_params, begin, buflen, filter, buflen);
@@ -557,65 +415,6 @@ void SharingManager::continueClauseImport(int solverId) {
 	_solver_revisions[solverId] = _solvers[solverId]->getSolverSetup().solverRevision;
 	_solvers[solverId]->setExtLearnedClauseCallback(getCallback());
 	_solver_stats[solverId] = &_solvers[solverId]->getSolverStatsRef();
-}
-
-int SharingManager::getEpochOfUnalignedSelfClause(unsigned long id) {
-	auto producingSolver = getProducingLocalSolverIndex(id);
-	auto& epochList = _min_epoch_ids_per_solver[producingSolver];
-	// will point to 1st element >= id (or end)
-	auto it = std::lower_bound(epochList.begin(), epochList.end(), id);
-	assert(it != epochList.begin());
-	//if (it == epochList.end() || *it > id) {
-		// point to last element < id
-		--it;
-	//}
-	return std::distance(epochList.begin(), it);
-}
-int SharingManager::getEpochOfAlignedSelfClause(unsigned long id) {
-	auto& epochList = _global_epoch_ids;
-	// will point to 1st element >= id (or end)
-	auto it = std::lower_bound(epochList.begin(), epochList.end(), id);
-	assert(it != epochList.begin());
-	//if (it == epochList.end() || *it > id) {
-		// point to last element < id
-		--it;
-	//}
-	return std::distance(epochList.begin(), it);
-}
-
-void SharingManager::writeClauseEpochs(/*const std::string& proofDir, int firstGlobalId, */
-		const std::string& outputFilename) {
-	
-	// Only write clause epochs if distributed proof assembly is done
-	if (!_params.distributedProofAssembly()) return;
-
-	std::string tempFilename = outputFilename + "~";
-	{
-		std::ofstream ofs(tempFilename);
-		ofs << _num_original_clauses << "\n";
-
-		for (int epoch = 0; epoch < _global_epoch_ids.size(); epoch++) {
-
-			// Check if all necessary entries for this epoch are present
-			if ([&]() {
-				for (size_t i = 0; i < _id_offsets_per_solver.size(); i++)
-					if (epoch >= _min_epoch_ids_per_solver[i].size() || epoch >= _id_offsets_per_solver[i].size())
-						return true; // cancel writing
-				return false; // continue writing
-			}()) break;
-
-			ofs << epoch << " " << _global_epoch_ids[epoch];
-			for (size_t i = 0; i < _id_offsets_per_solver.size(); i++) {
-				ofs << " " << _min_epoch_ids_per_solver[i][epoch];
-				ofs << " " << _id_offsets_per_solver[i][epoch];
-			}
-			ofs << "\n";
-		}
-	}
-
-	LOG(V2_INFO, "renaming clause epochs file ...\n");
-	std::rename(tempFilename.c_str(), outputFilename.c_str());
-	LOG(V2_INFO, "wrote clause epochs file for distributed proof assembly\n");
 }
 
 SharingManager::~SharingManager() {}
