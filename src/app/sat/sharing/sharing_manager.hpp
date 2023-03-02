@@ -6,11 +6,11 @@
 #include <list>
 
 #include "app/sat/sharing/clause_id_alignment.hpp"
+#include "app/sat/sharing/concurrent_export_buffer.hpp"
 #include "buffer/adaptive_clause_database.hpp"
 #include "../solvers/portfolio_solver_interface.hpp"
 #include "util/params.hpp"
-#include "filter/produced_clause_filter.hpp"
-#include "export_buffer.hpp"
+#include "filter/concurrent_produced_clause_filter.hpp"
 #include "../data/sharing_statistics.hpp"
 #include "util/tsl/robin_map.h"
 #include "util/tsl/robin_set.h"
@@ -45,9 +45,9 @@ protected:
 	const Logger& _logger;
 	int _job_index;
 
-	ProducedClauseFilter _filter;
 	AdaptiveClauseDatabase _cdb;
-	ExportBuffer _export_buffer;
+	ConcurrentProducedClauseFilter _filter;
+	ConcurrentExportBuffer _export_buffer;
 	
 	int _last_num_cls_to_import = 0;
 	int _last_num_admitted_cls_to_import = 0;

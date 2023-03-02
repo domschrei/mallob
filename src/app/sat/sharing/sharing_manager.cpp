@@ -11,16 +11,15 @@
 #include <cstdio>
 #include <unistd.h>
 
+#include "sharing_manager.hpp"
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/data/solver_statistics.hpp"
 #include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
 #include "app/sat/sharing/buffer/deterministic_clause_synchronizer.hpp"
 #include "app/sat/sharing/clause_id_alignment.hpp"
-#include "app/sat/sharing/filter/produced_clause_filter.hpp"
 #include "app/sat/sharing/filter/importing_solver.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/assert.hpp"
-#include "sharing_manager.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "util/random.hpp"
@@ -32,7 +31,6 @@ SharingManager::SharingManager(
 	: _solvers(solvers),
 	_max_deferred_lits_per_solver(maxDeferredLitsPerSolver), 
 	_params(params), _logger(logger), _job_index(jobIndex),
-	_filter(params.clauseFilterClearInterval(), params.reshareImprovedLbd()),
 	_cdb([&]() {
 		AdaptiveClauseDatabase::Setup setup;
 		setup.maxClauseLength = _params.strictClauseLengthLimit();
@@ -40,7 +38,8 @@ SharingManager::SharingManager(
 		setup.numLiterals = _params.clauseBufferBaseSize()*_params.numChunksForExport();
 		setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
 		return setup;
-	}()), 
+	}()),
+	_filter(_cdb, params.clauseFilterClearInterval(), params.reshareImprovedLbd()),
 	_export_buffer(_filter, _cdb, _solver_stats, params.strictClauseLengthLimit()),
 	_hist_produced(params.strictClauseLengthLimit()), 
 	_hist_returned_to_db(params.strictClauseLengthLimit()) {
@@ -177,6 +176,7 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 		_cdb.getCurrentlyUsedLiterals(), totalLiteralLimit);
 	_stats.exportedClauses += numExportedClauses;
 	_internal_epoch++;
+	_filter.updateEpoch(_internal_epoch);
 
 	return buffer.size();
 }
@@ -219,7 +219,6 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 		_id_alignment->contributeFirstClauseIdOfEpoch(filterOut);
 	}
 
-	_filter.acquireLock();
 	while (clause.begin != nullptr) {
 		++nbTotal;
 
@@ -239,7 +238,6 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 		++shift;
 		clause = reader.getNextIncomingClause();
 	}
-	_filter.releaseLock();
 
 	_logger.log(V4_VVER, "filtered %i/%i\n", nbFiltered, nbTotal);
 	return filterPos+1;
@@ -281,7 +279,6 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 	// Traverse clauses
 	bool initialized = false;
-	_filter.acquireLock();
 
 	_logger.log(verb+2, "DG import\n");
 
@@ -295,7 +292,6 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 			if (initialized) {
 
 				float publishTime = Timer::elapsedSeconds();
-				_filter.releaseLock();
 
 				// publish prior lists of clauses
 				// update budgets
@@ -303,7 +299,6 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 					slv.publishPreparedLists(it);
 				}
 
-				_filter.acquireLock();
 				publishTime = Timer::elapsedSeconds() - publishTime;
 				_logger.log(verb+2, "DG published clause lists (%.4f s)\n", publishTime);
 			}
@@ -331,7 +326,6 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 		clause = reader.getNextIncomingClause();
 	}
-	_filter.releaseLock();
 	
 	for (auto& slv : importingSolvers) {
 		slv.publishPreparedLists(it);

@@ -2,7 +2,7 @@
 #pragma once
 
 #include "app/sat/sharing/clause_id_alignment.hpp"
-#include "app/sat/sharing/filter/produced_clause_filter.hpp"
+#include "app/sat/sharing/filter/concurrent_produced_clause_filter.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 
 struct ImportingSolver {
