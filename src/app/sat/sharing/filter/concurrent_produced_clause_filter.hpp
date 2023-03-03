@@ -6,6 +6,7 @@
 #include <variant>
 #include <shared_mutex>
 
+#include "app/sat/data/clause.hpp"
 #include "util/libcuckoo/cuckoohash_map.hh"
 #include "util/libcuckoo/cuckoohash_util.hh"
 #include "util/logger.hpp"
@@ -25,14 +26,14 @@ struct AnyProducedClauseHasher {
     std::size_t inline operator()(const AnyProducedClause& anyPC) const {
         switch (anyPC.index()) {
         case 0:
-            return Mallob::commutativeHash(prod_cls::data(std::get<0>(anyPC)), 
+            return Mallob::nonCommutativeHash(prod_cls::data(std::get<0>(anyPC)),
                 prod_cls::size(std::get<0>(anyPC)), 1);
         case 1:
-            return Mallob::commutativeHash(prod_cls::data(std::get<1>(anyPC)), 
+            return Mallob::nonCommutativeHash(prod_cls::data(std::get<1>(anyPC)),
                 prod_cls::size(std::get<1>(anyPC)), 2);
         case 2:
         default:
-            return Mallob::commutativeHash(prod_cls::data(std::get<2>(anyPC)), 
+            return Mallob::nonCommutativeHash(prod_cls::data(std::get<2>(anyPC)),
                 prod_cls::size(std::get<2>(anyPC)), 3);
         }
     }
@@ -154,7 +155,7 @@ public:
             }
 
             // Try to insert to sharing database
-            if (_cdb.addClause(data, c.size, c.lbd, /*sortLargeClause=*/true)) {
+            if (_cdb.addClause(data, c.size, c.lbd)) {
                 // Success!
                 result = ADMITTED;
                 if (!contained) return false; // nothing to do, info was newly constructed 

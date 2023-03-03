@@ -71,11 +71,11 @@ AdaptiveClauseDatabase::AdaptiveClauseDatabase(Setup setup):
     storeGlobalBudget(_total_literal_limit);
 }
 
-bool AdaptiveClauseDatabase::addClause(const Clause& c, bool sortLargeClause) {
-    return addClause(c.begin, c.size, c.lbd, sortLargeClause);
+bool AdaptiveClauseDatabase::addClause(const Clause& c) {
+    return addClause(c.begin, c.size, c.lbd);
 }
 
-bool AdaptiveClauseDatabase::addClause(int* cBegin, int cSize, int cLbd, bool sortLargeClause) {
+bool AdaptiveClauseDatabase::addClause(int* cBegin, int cSize, int cLbd) {
 
     int len = cSize;
     auto [slotIdx, mode] = getSlotIdxAndMode(len, cLbd);
@@ -114,8 +114,6 @@ bool AdaptiveClauseDatabase::addClause(int* cBegin, int cSize, int cLbd, bool so
         assert_heavy(checkNbLiterals(_binary_slot));
         _binary_slot.unlock();
     } else {
-        // Sort clause if necessary
-        if (sortLargeClause) std::sort(cBegin+ClauseMetadata::numBytes(), cBegin+cSize);
         // Insert clause
         auto& slot = _large_slots.at(slotIdx);
         bool explicitLbd = slot.implicitLbdOrZero == 0;

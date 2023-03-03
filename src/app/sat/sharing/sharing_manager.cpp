@@ -145,6 +145,9 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 		solverStats->histProduced->increment(clause.size);
 	}
 
+	// Sort literals in clause
+	std::sort(clauseBegin+ClauseMetadata::numBytes(), clauseBegin+clauseSize);
+
 	_export_buffer.produce(clauseBegin, clauseSize, clauseLbd, solverId, _internal_epoch);
 	//log(V6_DEBGV, "%i : PRODUCED %s\n", solverId, tldClause.toStr().c_str());
 

@@ -150,7 +150,7 @@ private:
         }
 
         // Try to insert to sharing database
-        if (!cdb.addClause(prod_cls::data(pc), c.size, c.lbd, /*sortLargeClause=*/true)) {
+        if (!cdb.addClause(prod_cls::data(pc), c.size, c.lbd)) {
             // No space left in database: update meta data, drop clause
             // (Do not update LBD value because the clause was not exported)
             if (contained) updateClauseInfo(c, it.value(), /*updateLbd=*/false);

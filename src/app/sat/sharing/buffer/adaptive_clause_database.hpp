@@ -118,8 +118,8 @@ public:
     be possible to insert it later).
     In both cases, c can be freed or reused after calling this method.
     */
-    bool addClause(const Clause& c, bool sortLargeClause = false);
-    bool addClause(int* cBegin, int cSize, int cLbd, bool sortLargeClause = false);
+    bool addClause(const Clause& c);
+    bool addClause(int* cBegin, int cSize, int cLbd);
 
     template <typename T>
     void addReservedUniformClauses(int cSize, int cLbd, std::list<T>& clauses, int nbLiterals) {
