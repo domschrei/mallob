@@ -18,7 +18,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
  OPT_INT(bufferedImportedClsGenerations,    "bicg", "buffered-imported-cls-generations", 4,        1,   LARGE_INT, 
     "Number of subsequent full clause sharings to fit in each solver's import buffer")
  OPT_INT(clauseBufferBaseSize,              "cbbs", "clause-buffer-base-size",           1500,     0,   MAX_INT,   
-    "Clause buffer base size in integers")
+    "Clause buffer base size in literals per process")
  OPT_FLOAT(clauseBufferDiscountFactor,      "cbdf", "clause-buffer-discount",            0.9,      0.5, 1,            
     "Clause buffer discount factor: reduce buffer size per PE by <factor> each depth")
  OPT_FLOAT(clauseFilterClearInterval,       "cfci", "clause-filter-clear-interval",      20,       -1,  LARGE_INT,     
@@ -27,11 +27,11 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Employ clause history collection mechanism")
  OPT_BOOL(groupClausesByLengthLbdSum,       "gclls", "group-by-length-lbd-sum",          false,                   
     "Group and prioritize clauses in buffers by the sum of clause length and LBD score")
- OPT_INT(maxLbdPartitioningSize,            "mlbdps", "max-lbd-partition-size",          8,        1,   LARGE_INT,      
+ OPT_INT(maxLbdPartitioningSize,            "mlbdps", "max-lbd-partition-size",          2,        1,   LARGE_INT,
     "Store clauses with up to this LBD in separate buckets")
  OPT_INT(minNumChunksForImportPerSolver,    "mcips", "min-import-chunks-per-solver",     10,       1,   LARGE_INT,      
     "Min. number of cbbs-sized chunks for buffering incoming clauses for import per solver")
- OPT_INT(numChunksForExport,                "nce", "export-chunks",                      20,       1,   LARGE_INT,      
+ OPT_INT(numChunksForExport,                "nce", "export-chunks",                      10,       1,   LARGE_INT,
     "Number of cbbs-sized chunks for buffering produced clauses for export")
  OPT_INT(qualityClauseLengthLimit,          "qcll", "quality-clause-length-limit",       8,        0,   LARGE_INT,      
     "Clauses up to this length are considered \"high quality\"")
@@ -39,10 +39,10 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Clauses with an LBD score up to this value are considered \"high quality\"")
  OPT_BOOL(reshareImprovedLbd,               "ril", "reshare-improved-lbd",               false,
     "Reshare clauses (regardless of their last sharing epoch) if their LBD improved")
- OPT_BOOL(resetLbdBeforeImport,             "rlbd", "reset-lbd-before-import",           false, "Reset each clause's LBD to its length before importing it")
- OPT_INT(strictClauseLengthLimit,           "scll", "strict-clause-length-limit",        20,       0,   LARGE_INT,
+ OPT_BOOL(resetLbdBeforeImport,             "rlbd", "reset-lbd-before-import",           true, "Reset each clause's LBD to its length before importing it")
+ OPT_INT(strictClauseLengthLimit,           "scll", "strict-clause-length-limit",        16,       0,   LARGE_INT,
     "Only clauses up to this length will be shared")
- OPT_INT(strictLbdLimit,                    "slbdl", "strict-lbd-limit",                 20,       0,   LARGE_INT,
+ OPT_INT(strictLbdLimit,                    "slbdl", "strict-lbd-limit",                 16,       0,   LARGE_INT,
     "Only clauses with an LBD score up to this value will be shared")
  OPT_BOOL(skipClauseSharingDiagonally,    "scsd", "skip-clause-sharing-diagonally",    true,                    "In the ith diversification round, disable clause sharing for the (i%%numDivs)th solver")
  OPT_FLOAT(maxSharingCompensationFactor,    "mscf", "max-sharing-compensation-factor",   5,        1,   LARGE_INT,
