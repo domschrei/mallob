@@ -4,6 +4,7 @@
 #include <list>
 
 #include "app/sat/data/produced_clause_candidate.hpp"
+#include "util/logger.hpp"
 #include "util/sys/threading.hpp"
 #include "filter/concurrent_produced_clause_filter.hpp"
 #include "buffer/adaptive_clause_database.hpp"
@@ -17,8 +18,11 @@ private:
     std::vector<SolverStatistics*>& _solver_stats;
 
     ClauseHistogram _hist_failed_filter;
-	ClauseHistogram _hist_admitted_to_db;
-	ClauseHistogram _hist_dropped_before_db;
+    ClauseHistogram _hist_admitted_to_db;
+    ClauseHistogram _hist_dropped_before_db;
+
+    Mutex _mtx_backlog;
+    std::list<ProducedClauseCandidate> _backlog;
 
 public:
     ConcurrentExportBuffer(ConcurrentProducedClauseFilter& filter, AdaptiveClauseDatabase& cdb, 
@@ -30,9 +34,37 @@ public:
 
     void produce(int* begin, int size, int lbd, int producerId, int epoch) {
 
-        // Insert clause directly
         ProducedClauseCandidate pcc(begin, size, lbd, producerId, epoch);
-        processClause(pcc);
+
+        // Can I expect to quickly obtain the map's internal locks?
+        if (_filter.tryGetSharedLock()) {
+            // -- yes!
+
+            // Insert clause directly
+            processClause(pcc);
+
+            // Reduce backlog size
+            {
+                auto lock = _mtx_backlog.getLock();
+                int nbProcessed = 0;
+                while (!_backlog.empty() && nbProcessed < 10) {
+                    processClause(_backlog.front());
+                    _backlog.pop_front();
+                    nbProcessed++;
+                }
+                if (nbProcessed > 0) {
+                    LOG(V2_INFO, "Reduced backlog size from %i to %i\n", 
+                        _backlog.size()+nbProcessed, _backlog.size());
+                }
+            }
+
+            _filter.returnSharedLock();
+
+        } else {
+            // -- no: Insert into backlog
+            auto lock = _mtx_backlog.getLock();
+            _backlog.push_back(std::move(pcc));
+        }
     }
 
     ClauseHistogram& getFailedFilterHistogram() {return _hist_failed_filter;}

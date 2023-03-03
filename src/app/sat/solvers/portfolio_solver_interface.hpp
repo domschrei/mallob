@@ -163,7 +163,7 @@ public:
 	void addLearnedClause(const Mallob::Clause& c);
 	AdaptiveClauseDatabase::LinearBudgetCounter getImportBudgetCounter();
 	template <typename T>
-	void addLearnedClauses(int clauseLength, int lbd, std::forward_list<T>& list, int numLiterals) {
+	void addLearnedClauses(int clauseLength, int lbd, std::list<T>& list, int numLiterals) {
 		if (_clause_sharing_disabled) return;
 		_import_buffer.performImport<T>(clauseLength, lbd, list, numLiterals);
 	}

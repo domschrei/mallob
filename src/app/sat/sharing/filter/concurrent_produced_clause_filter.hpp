@@ -4,6 +4,7 @@
 #include <array>
 #include <atomic>
 #include <variant>
+#include <shared_mutex>
 
 #include "util/libcuckoo/cuckoohash_map.hh"
 #include "util/libcuckoo/cuckoohash_util.hh"
@@ -66,6 +67,7 @@ using ProducedMap = libcuckoo::cuckoohash_map<AnyProducedClause, ClauseInfo, Any
 
 private:
     AdaptiveClauseDatabase& _cdb;
+    std::shared_mutex _mtx_map;
     ProducedMap _map;
 
     const int _epoch_horizon;
@@ -76,6 +78,7 @@ private:
 
     std::atomic_int _epoch {0};
     BackgroundWorker _gc;
+
 
 public:
     ConcurrentProducedClauseFilter(AdaptiveClauseDatabase& cdb, int epochHorizon, bool reshareImprovedLbd) : 
@@ -100,6 +103,11 @@ public:
                 if (epoch - lastCheckEpoch < _epoch_horizon) continue;
                 lastCheckEpoch = epoch;
 
+                // Signal that the sweep operation is ongoing
+                // to inserting threads calling tryGetSharedLock()
+                _mtx_map.lock();
+
+                // Remove all old clauses
                 int nbRemoved = 0;
                 auto lockedMap = _map.lock_table();
                 for (auto it = lockedMap.begin(); it != lockedMap.end();) {
@@ -109,9 +117,12 @@ public:
                         nbRemoved++;
                     } else ++it;
                 }
-                LOG(V2_INFO, "SWEEPED OVER FILTER horizon=%i epoch=%i removed=%i\n", 
-                    _epoch_horizon, epoch, nbRemoved);
+                //LOG(V2_INFO, "SWEEPED OVER FILTER horizon=%i epoch=%i removed=%i\n", 
+                //    _epoch_horizon, epoch, nbRemoved);
                 lockedMap.unlock();
+
+                // Allow inserting threads to successfully tryGetSharedLock() again
+                _mtx_map.unlock();
             }
         });
     }
@@ -159,7 +170,7 @@ public:
             return false; // do not delete
         }, defaultInfo);
 
-        LOG(V2_INFO, "FILTER_SIZE %lu/%lu\n", _map.size(), _map.capacity());
+        //LOG(V2_INFO, "FILTER_SIZE %lu/%lu\n", _map.size(), _map.capacity());
 
         if (result == ADMITTED) {
             // Remove up to two clauses which are marked for deletion from the filter
@@ -211,6 +222,13 @@ public:
 
     size_t size() const {
         return _map.size();
+    }
+
+    bool tryGetSharedLock() {
+        return _mtx_map.try_lock_shared();
+    }
+    void returnSharedLock() {
+        _mtx_map.unlock_shared();
     }
 
 private:

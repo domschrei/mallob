@@ -230,14 +230,14 @@ void AdaptiveClauseDatabase::readClauses(Slot<T>& slot, bool sortClauses, Buffer
 }
 
 template <typename T> 
-void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, BufferBuilder& builder, 
-    std::function<void(int*)> clauseDataConverter) {
+void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, int slotIdx, bool sortClauses, 
+    BufferBuilder& builder, std::function<void(int*)> clauseDataConverter) {
     
     if (slot.nbLiterals.load(std::memory_order_relaxed) == 0) 
         return;
     
     // Swap current clause information in the slot to another list
-    std::forward_list<T> swappedSlot;
+    std::list<T> swappedSlot;
     int nbSwappedLits;
     {
         slot.lock();
@@ -261,9 +261,8 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, Buffe
     std::vector<Mallob::Clause> flushedClauses;
     int nbRemainingLits = builder.getMaxRemainingLits();
     int nbCollectedLits = 0;
-    auto itBefore = swappedSlot.before_begin();
     auto it = swappedSlot.begin();
-    for (; it != swappedSlot.end(); ++it, ++itBefore) {
+    while (it != swappedSlot.end()) {
         T& elem = *it;
         Mallob::Clause clause = getMallobClause(elem, slot.implicitLbdOrZero);
         if (clause.size > nbRemainingLits) break;
@@ -273,30 +272,41 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, bool sortClauses, Buffe
         nbRemainingLits -= clause.size;
         nbCollectedLits += clause.size;
         flushedClauses.push_back(std::move(clause));
+        ++it;
     }
 
     // Global budget according to nbSwappedLits was stored when the list was extracted.
-    // Now the literals which won't be flushed will be re-inserted,
-    // so the according share of the global budget must be extracted again.
+    // Now the literals which won't be flushed will be re-inserted.
+    // The according share of the global budget must be acquired again.
+    // If this is (partially) unsuccessful, then (some of) the excess clauses
+    // must be discarded.
     int nbLitsToReinsert = nbSwappedLits - nbCollectedLits;
     assert(nbLitsToReinsert >= 0);
     if (nbLitsToReinsert > 0) {
-        int freed = tryAcquireBudget(-2, nbLitsToReinsert);
-        assert(freed >= nbLitsToReinsert);
-        if (freed > nbLitsToReinsert) storeGlobalBudget(freed-nbLitsToReinsert);
-    }
 
-    if (it != swappedSlot.end()) {
-        // Re-insert swapped clauses which remained unused
-        slot.lock();
-        slot.list.splice_after(slot.list.before_begin(), swappedSlot, itBefore, swappedSlot.end());
-        atomics::addRelaxed(slot.nbLiterals, nbSwappedLits - nbCollectedLits);
-        assert_heavy(checkNbLiterals(slot));
-        slot.unlock();
-    } else {
-        assert(nbSwappedLits == nbCollectedLits ||
-            log_return_false("[ERROR] slot advertised %i lits, collected %i lits\n", 
-            nbSwappedLits, nbCollectedLits));
+        int freed = tryAcquireBudget(slotIdx, nbLitsToReinsert);
+        // Full budget not available any more?
+        while (freed < nbLitsToReinsert) {
+            // Discard clauses (local data, no mutex held)
+            assert(!swappedSlot.empty());
+            auto& elem = swappedSlot.back();
+            auto droppedClause = getMallobClause(elem, slot.implicitLbdOrZero);
+            nbLitsToReinsert -= droppedClause.size;
+            if (_has_cb_clause_deleted) _cb_clause_deleted(droppedClause);
+            swappedSlot.pop_back();
+        }
+        assert(freed >= nbLitsToReinsert);
+        // Return excess acquired budget
+        if (freed > nbLitsToReinsert) storeGlobalBudget(freed-nbLitsToReinsert);
+
+        if (nbLitsToReinsert > 0) {
+            // Re-insert swapped clauses which remained unused
+            slot.lock();
+            slot.list.splice(slot.list.begin(), std::move(swappedSlot), it, swappedSlot.end());
+            atomics::addRelaxed(slot.nbLiterals, nbLitsToReinsert);
+            assert_heavy(checkNbLiterals(slot));
+            slot.unlock();
+        }
     }
 
     bool differentLbdValues = slot.implicitLbdOrZero == 0;
@@ -329,18 +339,18 @@ std::vector<int> AdaptiveClauseDatabase::exportBuffer(int totalLiteralLimit, int
 
     if (mode != ExportMode::NONUNITS) {
         // Export unit clauses.
-        flushClauses(_unit_slot, sortClauses, builder, clauseDataConverter);
+        flushClauses(_unit_slot, -2, sortClauses, builder, clauseDataConverter);
     }
     if (mode != ExportMode::UNITS) {
         // Export all other clauses.
 
         // Binary clauses first.
-        flushClauses(_binary_slot, sortClauses, builder, clauseDataConverter);
+        flushClauses(_binary_slot, -1, sortClauses, builder, clauseDataConverter);
 
         // All other clauses.
         for (int slotIdx = 0; slotIdx < _large_slots.size(); slotIdx++) {
             auto& slot = _large_slots[slotIdx];
-            flushClauses(slot, sortClauses, builder, clauseDataConverter);
+            flushClauses(slot, slotIdx, sortClauses, builder, clauseDataConverter);
         }
     }
 
@@ -465,8 +475,8 @@ int AdaptiveClauseDatabase::stealBudgetFromSlot(Slot<T>& slot, int desiredLitera
     }
 
     // Extract part of the list
-    std::forward_list<T> swappedList;
-    swappedList.splice_after(swappedList.before_begin(), slot.list, slot.list.before_begin(), it);
+    std::list<T> swappedList;
+    swappedList.splice(swappedList.begin(), slot.list, slot.list.begin(), it);
     
     atomics::subRelaxed(slot.nbLiterals, nbCollectedLits);
 

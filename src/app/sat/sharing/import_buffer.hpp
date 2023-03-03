@@ -42,7 +42,7 @@ public:
     }
 
     template <typename T>
-    void performImport(int clauseLength, int lbd, std::forward_list<T>& clauses, int nbLiterals) {
+    void performImport(int clauseLength, int lbd, std::list<T>& clauses, int nbLiterals) {
         if (clauses.empty()) return;
         _cdb.addReservedUniformClauses(clauseLength, lbd, clauses, nbLiterals);
     }

@@ -2,7 +2,7 @@
 #pragma once
 
 #include <atomic>
-#include <forward_list>
+#include <list>
 #include <limits>
 #include <memory>
 #include <numeric>
@@ -30,7 +30,7 @@ private:
         int implicitLbdOrZero;
         std::atomic_int nbLiterals {0};
         std::shared_ptr<Mutex> mtx;
-        std::forward_list<T> list;
+        std::list<T> list;
         Slot() = default;
         Slot(Slot&& other) :
             implicitLbdOrZero(other.implicitLbdOrZero),
@@ -122,7 +122,7 @@ public:
     bool addClause(int* cBegin, int cSize, int cLbd, bool sortLargeClause = false);
 
     template <typename T>
-    void addReservedUniformClauses(int cSize, int cLbd, std::forward_list<T>& clauses, int nbLiterals) {
+    void addReservedUniformClauses(int cSize, int cLbd, std::list<T>& clauses, int nbLiterals) {
         
         float timeFree = Timer::elapsedSeconds();
         auto [slotIdx, mode] = getSlotIdxAndMode(cSize, cLbd);
@@ -140,13 +140,13 @@ public:
 
         if constexpr (std::is_same<T, int>::value) {
             _unit_slot.lock();
-            _unit_slot.list.splice_after(_unit_slot.list.before_begin(), clauses);
+            _unit_slot.list.splice(_unit_slot.list.end(), std::move(clauses));
             atomics::addRelaxed(_unit_slot.nbLiterals, nbLiterals);
             assert_heavy(checkNbLiterals(_unit_slot));
             _unit_slot.unlock();
         } else if constexpr (std::is_same<T, std::pair<int, int>>::value) {
             _binary_slot.lock();
-            _binary_slot.list.splice_after(_binary_slot.list.before_begin(), clauses);
+            _binary_slot.list.splice(_binary_slot.list.end(), std::move(clauses));
             atomics::addRelaxed(_binary_slot.nbLiterals, nbLiterals);
             assert_heavy(checkNbLiterals(_binary_slot));
             _binary_slot.unlock();
@@ -161,7 +161,7 @@ public:
                 assert(clause.size() == cSize);
             }
             slot.lock();
-            slot.list.splice_after(slot.list.before_begin(), clauses);
+            slot.list.splice(slot.list.end(), std::move(clauses));
             atomics::addRelaxed(slot.nbLiterals, nbLiterals);
             assert_heavy(checkNbLiterals(slot));
             slot.unlock();
@@ -302,7 +302,7 @@ private:
     int stealBudgetFromSlot(Slot<T>& slot, int desiredLiterals, bool dropClauses);
 
     template <typename T>
-    void flushClauses(Slot<T>& slot, bool sortClauses, BufferBuilder& builder, 
+    void flushClauses(Slot<T>& slot, int slotIdx, bool sortClauses, BufferBuilder& builder,
             std::function<void(int*)> clauseDataConverter = [](int*){});
     
     template <typename T>

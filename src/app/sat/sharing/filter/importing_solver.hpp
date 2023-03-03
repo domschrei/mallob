@@ -9,9 +9,9 @@ struct ImportingSolver {
 
     PortfolioSolverInterface* solver;
     SolverStatistics* solverStats;
-    std::forward_list<int> unitList;
-    std::forward_list<std::pair<int, int>> binaryList;
-    std::forward_list<std::vector<int>> largeList;
+    std::list<int> unitList;
+    std::list<std::pair<int, int>> binaryList;
+    std::list<std::vector<int>> largeList;
     AdaptiveClauseDatabase::LinearBudgetCounter budgetCounter;
     int remainingBudget;
     int currentAddedLiterals {0};

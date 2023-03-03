@@ -53,9 +53,9 @@ void testConcurrentImport() {
 
     // Producer
     auto futureProd = ProcessWideThreadPool::get().addTask([&]() {
-        std::forward_list<int> units;
-        std::forward_list<std::pair<int, int>> binaries;
-        std::map<std::pair<int, int>, std::forward_list<std::vector<int>>> lenLbdToList;
+        std::list<int> units;
+        std::list<std::pair<int, int>> binaries;
+        std::map<std::pair<int, int>, std::list<std::vector<int>>> lenLbdToList;
 
         float startTime = Timer::elapsedSeconds();
         float lastImport = startTime;
