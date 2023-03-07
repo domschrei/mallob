@@ -7,6 +7,7 @@
 #include <shared_mutex>
 
 #include "app/sat/data/clause.hpp"
+#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "util/libcuckoo/cuckoohash_map.hh"
 #include "util/libcuckoo/cuckoohash_util.hh"
 #include "util/logger.hpp"
@@ -60,14 +61,12 @@ struct AnyProducedClauseEquals {
 // For each incoming clause, the structure can then be used to decide (a) if the clause should 
 // be discarded ("filtered") because it was shared before (or too recently) and (b) which
 // subset of solvers should receive the clauses (because they did not export it themselves).
-// The structure takes space linear in the number of clauses successfully added to the
-// AdaptiveClauseDatabase instance which is used for tryRegisterAndInsert. 
 class ConcurrentProducedClauseFilter {
 
 using ProducedMap = libcuckoo::cuckoohash_map<AnyProducedClause, ClauseInfo, AnyProducedClauseHasher, AnyProducedClauseEquals>;
 
 private:
-    AdaptiveClauseDatabase& _cdb;
+    PriorityClauseBuffer& _pcb;
     std::shared_mutex _mtx_map;
     ProducedMap _map;
 
@@ -75,56 +74,20 @@ private:
     const bool _reshare_improved_lbd;
 
     Mutex _mtx_deletion_list;
+    std::atomic_int _deletion_list_size {0};
     std::list<Mallob::Clause> _deletion_list;
 
     std::atomic_int _epoch {0};
-    BackgroundWorker _gc;
-
+    int _last_gc_epoch {0};
 
 public:
-    ConcurrentProducedClauseFilter(AdaptiveClauseDatabase& cdb, int epochHorizon, bool reshareImprovedLbd) : 
-        _cdb(cdb), _epoch_horizon(epochHorizon), _reshare_improved_lbd(reshareImprovedLbd) {
+    ConcurrentProducedClauseFilter(PriorityClauseBuffer& pcb, int epochHorizon, bool reshareImprovedLbd) :
+        _pcb(pcb), _map(32'768), _epoch_horizon(epochHorizon), _reshare_improved_lbd(reshareImprovedLbd) {
 
-        _cdb.setClauseDeletionCallback([&](Mallob::Clause& clause) {
+        _pcb.setClauseDeletionCallback([&](Mallob::Clause& clause) {
             auto lock = _mtx_deletion_list.getLock();
+            _deletion_list_size.fetch_add(1, std::memory_order_relaxed);
             _deletion_list.push_back(std::move(clause));
-        });
-
-        // Garbage collector for old clauses in the map 
-        if (_epoch_horizon < 0) return;
-        _gc.run([&]() {
-
-            int lastCheckEpoch = 0;
-
-            while (_gc.continueRunning()) {
-
-                usleep(1000 * 1000 * 1); // 1 second
-
-                int epoch = _epoch.load(std::memory_order_relaxed);
-                if (epoch - lastCheckEpoch < _epoch_horizon) continue;
-                lastCheckEpoch = epoch;
-
-                // Signal that the sweep operation is ongoing
-                // to inserting threads calling tryGetSharedLock()
-                _mtx_map.lock();
-
-                // Remove all old clauses
-                int nbRemoved = 0;
-                auto lockedMap = _map.lock_table();
-                for (auto it = lockedMap.begin(); it != lockedMap.end();) {
-                    auto& [apc, info] = *it;
-                    if (epoch - info.lastSharedEpoch > _epoch_horizon) {
-                        it = lockedMap.erase(it);
-                        nbRemoved++;
-                    } else ++it;
-                }
-                //LOG(V2_INFO, "SWEEPED OVER FILTER horizon=%i epoch=%i removed=%i\n", 
-                //    _epoch_horizon, epoch, nbRemoved);
-                lockedMap.unlock();
-
-                // Allow inserting threads to successfully tryGetSharedLock() again
-                _mtx_map.unlock();
-            }
         });
     }
 
@@ -155,7 +118,7 @@ public:
             }
 
             // Try to insert to sharing database
-            if (_cdb.addClause(data, c.size, c.lbd)) {
+            if (_pcb.addClause(data, c.size, c.lbd)) {
                 // Success!
                 result = ADMITTED;
                 if (!contained) return false; // nothing to do, info was newly constructed 
@@ -173,7 +136,7 @@ public:
 
         //LOG(V2_INFO, "FILTER_SIZE %lu/%lu\n", _map.size(), _map.capacity());
 
-        if (result == ADMITTED) {
+        if (result == ADMITTED && _deletion_list_size.load(std::memory_order_relaxed) >= 2) {
             // Remove up to two clauses which are marked for deletion from the filter
             Mallob::Clause c1, c2;
             {
@@ -181,10 +144,12 @@ public:
                 if (!_deletion_list.empty()) {
                     c1 = std::move(_deletion_list.front());
                     _deletion_list.pop_front();
+                    _deletion_list_size.fetch_sub(1, std::memory_order_relaxed);
                 }
                 if (!_deletion_list.empty()) {
                     c2 = std::move(_deletion_list.front());
                     _deletion_list.pop_front();
+                    _deletion_list_size.fetch_sub(1, std::memory_order_relaxed);
                 }
             }
             if (c1.begin != nullptr) erase(c1);
@@ -192,6 +157,37 @@ public:
         }
 
         return result;
+    }
+
+    void collectGarbage() {
+
+        // Garbage collector for old clauses in the map
+        if (_epoch_horizon < 0) return;
+
+        int epoch = _epoch.load(std::memory_order_relaxed);
+        if (epoch - _last_gc_epoch < _epoch_horizon) return;
+        _last_gc_epoch = epoch;
+
+        // Signal that the sweep operation is ongoing
+        // to inserting threads calling tryGetSharedLock()
+        _mtx_map.lock();
+
+        // Remove all old clauses
+        int nbRemoved = 0;
+        auto lockedMap = _map.lock_table();
+        for (auto it = lockedMap.begin(); it != lockedMap.end();) {
+            auto& [apc, info] = *it;
+            if (epoch - info.lastSharedEpoch > _epoch_horizon) {
+                it = lockedMap.erase(it);
+                nbRemoved++;
+            } else ++it;
+        }
+        //LOG(V2_INFO, "SWEEPED OVER FILTER horizon=%i epoch=%i removed=%i\n",
+        //    _epoch_horizon, epoch, nbRemoved);
+        lockedMap.unlock();
+
+        // Allow inserting threads to successfully tryGetSharedLock() again
+        _mtx_map.unlock();
     }
 
     void updateEpoch(int epoch) {
@@ -212,15 +208,6 @@ public:
         return admitted;
     }
 
-    void erase(ProducedClauseCandidate& c) {
-        _map.erase(getAnyProducedClause(c));
-    }
-    void erase(Mallob::Clause& c) {
-        auto apc = getAnyProducedClause(c);
-        _map.erase(apc);
-        if (apc.index() == 2) std::get<2>(apc).data = nullptr;
-    }
-
     size_t size() const {
         return _map.size();
     }
@@ -233,6 +220,15 @@ public:
     }
 
 private:
+    void erase(ProducedClauseCandidate& c) {
+        _map.erase(getAnyProducedClause(c));
+    }
+    void erase(Mallob::Clause& c) {
+        auto apc = getAnyProducedClause(c);
+        _map.erase(apc);
+        if (apc.index() == 2) std::get<2>(apc).data = nullptr;
+    }
+
     AnyProducedClause getAnyProducedClause(ProducedClauseCandidate& c) {
         AnyProducedClause apc;
         if (c.size == 1) {

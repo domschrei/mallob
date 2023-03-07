@@ -4,6 +4,7 @@
 #include <list>
 
 #include "app/sat/data/produced_clause_candidate.hpp"
+#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "util/logger.hpp"
 #include "util/sys/threading.hpp"
 #include "filter/concurrent_produced_clause_filter.hpp"
@@ -13,58 +14,87 @@
 class ConcurrentExportBuffer {
 
 private:
-    ConcurrentProducedClauseFilter& _filter;
-    AdaptiveClauseDatabase& _cdb;
+    struct Slot {
+        int clauseLength;
+        ConcurrentProducedClauseFilter filter;
+        Mutex mtxBacklog;
+        std::list<ProducedClauseCandidate> backlog;
+
+        Slot(PriorityClauseBuffer& pcb, int epochHorizon, bool reshareImprovedLbd, int clauseLength) :
+            clauseLength(clauseLength), filter(pcb, epochHorizon, reshareImprovedLbd) {}
+    };
+
+    std::vector<std::unique_ptr<Slot>> _slots;
+    PriorityClauseBuffer& _pcb;
     std::vector<SolverStatistics*>& _solver_stats;
 
     ClauseHistogram _hist_failed_filter;
     ClauseHistogram _hist_admitted_to_db;
     ClauseHistogram _hist_dropped_before_db;
 
-    Mutex _mtx_backlog;
-    std::list<ProducedClauseCandidate> _backlog;
-
 public:
-    ConcurrentExportBuffer(ConcurrentProducedClauseFilter& filter, AdaptiveClauseDatabase& cdb, 
+    ConcurrentExportBuffer(PriorityClauseBuffer& pcb, int epochHorizon, bool reshareImprovedLbd,
             std::vector<SolverStatistics*>& solverStats, int maxClauseLength) : 
-        _filter(filter), _cdb(cdb), _solver_stats(solverStats),
+        _pcb(pcb), _solver_stats(solverStats),
         _hist_failed_filter(maxClauseLength), 
         _hist_admitted_to_db(maxClauseLength), 
-        _hist_dropped_before_db(maxClauseLength) {}
+        _hist_dropped_before_db(maxClauseLength) {
+
+        _slots.resize(maxClauseLength+1);
+        for (size_t i = 0; i < _slots.size(); i++)
+            _slots[i].reset(new Slot(pcb, epochHorizon, reshareImprovedLbd, i+1));
+    }
 
     void produce(int* begin, int size, int lbd, int producerId, int epoch) {
 
         ProducedClauseCandidate pcc(begin, size, lbd, producerId, epoch);
 
+        auto& slot = getSlot(size);
+        auto& filter = slot.filter;
+        auto& mtxBacklog = slot.mtxBacklog;
+        auto& backlog = slot.backlog;
+
         // Can I expect to quickly obtain the map's internal locks?
-        if (_filter.tryGetSharedLock()) {
+        if (filter.tryGetSharedLock()) {
             // -- yes!
 
             // Insert clause directly
-            processClause(pcc);
+            processClause(pcc, filter);
 
             // Reduce backlog size
             {
-                auto lock = _mtx_backlog.getLock();
+                auto lock = mtxBacklog.getLock();
                 int nbProcessed = 0;
-                while (!_backlog.empty() && nbProcessed < 10) {
-                    processClause(_backlog.front());
-                    _backlog.pop_front();
+                while (!backlog.empty() && nbProcessed < 10) {
+                    processClause(backlog.front(), filter);
+                    backlog.pop_front();
                     nbProcessed++;
                 }
                 if (nbProcessed > 0) {
                     LOG(V2_INFO, "Reduced backlog size from %i to %i\n", 
-                        _backlog.size()+nbProcessed, _backlog.size());
+                        backlog.size()+nbProcessed, backlog.size());
                 }
             }
 
-            _filter.returnSharedLock();
+            filter.returnSharedLock();
 
         } else {
             // -- no: Insert into backlog
-            auto lock = _mtx_backlog.getLock();
-            _backlog.push_back(std::move(pcc));
+            auto lock = mtxBacklog.getLock();
+            backlog.push_back(std::move(pcc));
         }
+    }
+
+    ConcurrentProducedClauseFilter& getFilter(int clauseLength) {
+        return getSlot(clauseLength).filter;
+    }
+
+    void updateEpoch(int epoch) {
+        for (auto& slot : _slots) slot->filter.updateEpoch(epoch);
+    }
+
+    void collectGarbage() {
+        for (auto& slot : _slots) slot->filter.collectGarbage();
     }
 
     ClauseHistogram& getFailedFilterHistogram() {return _hist_failed_filter;}
@@ -72,10 +102,12 @@ public:
 	ClauseHistogram& getDroppedHistogram() {return _hist_dropped_before_db;}
 
 private:
-    void processClause(ProducedClauseCandidate& pcc) {
+    Slot& getSlot(int clauseLength) {return *_slots.at(clauseLength-1);}
+
+    void processClause(ProducedClauseCandidate& pcc, ConcurrentProducedClauseFilter& filter) {
         int clauseLength = pcc.size;
         int producerId = pcc.producerId;
-        auto result = _filter.tryRegisterAndInsert(std::move(pcc));
+        auto result = filter.tryRegisterAndInsert(std::move(pcc));
         handleResult(producerId, result, clauseLength);
     }
 
@@ -92,5 +124,4 @@ private:
             if (solverStats) solverStats->producedClausesDropped++;
         }
     }
-
 };

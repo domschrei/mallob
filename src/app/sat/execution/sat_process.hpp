@@ -105,11 +105,11 @@ public:
             // Terminate
             if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/false)) {
                 LOGGER(_log, V5_DEBG, "DO terminate\n");
+                _engine.dumpStats(/*final=*/true);
                 if (ClauseMetadata::enabled()) {
                     // clean up everything super gracefully to allow finishing all proofs
                     _engine.cleanUp();
                     _engine.terminateSolvers();
-                    //_engine.dumpStats(/*final=*/true);
                 }
                 break;
             }

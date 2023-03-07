@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <unistd.h>
 
+#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "sharing_manager.hpp"
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/data/solver_statistics.hpp"
@@ -31,16 +32,15 @@ SharingManager::SharingManager(
 	: _solvers(solvers),
 	_max_deferred_lits_per_solver(maxDeferredLitsPerSolver), 
 	_params(params), _logger(logger), _job_index(jobIndex),
-	_cdb([&]() {
-		AdaptiveClauseDatabase::Setup setup;
+	_pcb([&]() {
+		PriorityClauseBuffer::Setup setup;
 		setup.maxClauseLength = _params.strictClauseLengthLimit();
 		setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
 		setup.numLiterals = _params.clauseBufferBaseSize()*_params.numChunksForExport();
 		setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
 		return setup;
 	}()),
-	_filter(_cdb, params.clauseFilterClearInterval(), params.reshareImprovedLbd()),
-	_export_buffer(_filter, _cdb, _solver_stats, params.strictClauseLengthLimit()),
+	_export_buffer(_pcb, params.clauseFilterClearInterval(), params.reshareImprovedLbd(), _solver_stats, params.strictClauseLengthLimit()),
 	_hist_produced(params.strictClauseLengthLimit()), 
 	_hist_returned_to_db(params.strictClauseLengthLimit()) {
 
@@ -48,7 +48,7 @@ SharingManager::SharingManager(
 	_stats.histFailedFilter = &_export_buffer.getFailedFilterHistogram();
 	_stats.histAdmittedToDb = &_export_buffer.getAdmittedHistogram();
 	_stats.histDroppedBeforeDb = &_export_buffer.getDroppedHistogram();
-	_stats.histDeletedInSlots = &_cdb.getDeletedClausesHistogram();
+	_stats.histDeletedInSlots = &_pcb.getDeletedClausesHistogram();
 	_stats.histReturnedToDb = &_hist_returned_to_db;
 
 	auto callback = getCallback();
@@ -166,8 +166,8 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 	}
 
 	int numExportedClauses = 0;
-	auto buffer = _cdb.exportBuffer(totalLiteralLimit, numExportedClauses, 
-			AdaptiveClauseDatabase::ANY, /*sortClauses=*/true, [&](int* data) {
+	auto buffer = _pcb.exportBuffer(totalLiteralLimit, numExportedClauses, 
+			PriorityClauseBuffer::ANY, /*sortClauses=*/true, [&](int* data) {
 
 		// Shift clause ID from a local solver according to the solver's offset
 		if (_id_alignment) _id_alignment->alignClauseId(data);
@@ -176,17 +176,17 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 	memcpy(begin, buffer.data(), buffer.size()*sizeof(int));
 
 	LOGGER(_logger, V5_DEBG, "prepared %i clauses, size %i (%i in DB, limit %i)\n", numExportedClauses, buffer.size(), 
-		_cdb.getCurrentlyUsedLiterals(), totalLiteralLimit);
+		_pcb.getCurrentlyUsedLiterals(), totalLiteralLimit);
 	_stats.exportedClauses += numExportedClauses;
 	_internal_epoch++;
-	_filter.updateEpoch(_internal_epoch);
+	_export_buffer.updateEpoch(_internal_epoch);
 
 	return buffer.size();
 }
 
 void SharingManager::returnClauses(int* begin, int buflen) {
 
-	auto reader = _cdb.getBufferReader(begin, buflen);
+	auto reader = _pcb.getBufferReader(begin, buflen);
 	auto c = reader.getNextIncomingClause();
 	while (c.begin != nullptr) {
 
@@ -199,7 +199,7 @@ void SharingManager::returnClauses(int* begin, int buflen) {
 			// => subtract the offsets again here ...
 			if (_id_alignment) _id_alignment->unalignClauseId(c.begin);
 
-			bool success = _cdb.addClause(c);
+			bool success = _pcb.addClause(c);
 			if (success) _hist_returned_to_db.increment(c.size);
 		}
 
@@ -209,7 +209,7 @@ void SharingManager::returnClauses(int* begin, int buflen) {
 
 int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 
-	auto reader = _cdb.getBufferReader(begin, buflen);
+	auto reader = _pcb.getBufferReader(begin, buflen);
 	
 	constexpr auto bitsPerElem = 8*sizeof(int);
 	int shift = bitsPerElem;
@@ -231,7 +231,7 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 			shift = 0;
 		}
 		
-		if (!_filter.admitSharing(clause, _internal_epoch)) {
+		if (!_export_buffer.getFilter(clause.size).admitSharing(clause, _internal_epoch)) {
 			// filtered!
 			auto bitFiltered = 1 << shift;
 			filterOut[filterPos] |= bitFiltered;
@@ -273,7 +273,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	// Apply provided global filter to buffer (in-place operation)
 	applyFilterToBuffer(begin, buflen, filter);
 
-	auto reader = _cdb.getBufferReader(begin, buflen);
+	auto reader = _pcb.getBufferReader(begin, buflen);
 	BufferIterator it(_params.strictClauseLengthLimit(), /*slotsForSumOfLengthAndLbd=*/false);
 	auto clause = reader.getNextIncomingClause();
 	bool explicitLbds = false;
@@ -320,7 +320,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 		hist.increment(clause.size);
 		// bitset of producing solvers
-		auto producers = _filter.getProducers(clause, _internal_epoch);
+		auto producers = _export_buffer.getFilter(clause.size).getProducers(clause, _internal_epoch);
 
 		// Decide for each solver whether it should receive the clause
 		for (size_t i = 0; i < importingSolvers.size(); i++) {
@@ -337,7 +337,10 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	// Process-wide stats
 	time = Timer::elapsedSeconds() - time;
 	_logger.log(verb, "sharing time:%.4f adm:%i/%i %s\n", time, 
-		_last_num_admitted_cls_to_import, _last_num_cls_to_import, hist.getReport().c_str());	
+		_last_num_admitted_cls_to_import, _last_num_cls_to_import, hist.getReport().c_str());
+
+	// Signal next garbage collection
+	_gc_pending = true;
 }
 
 void SharingManager::applyFilterToBuffer(int* begin, int& buflen, const int* filter) {
@@ -378,6 +381,12 @@ void SharingManager::digestHistoricClauses(int epochBegin, int epochEnd, int *be
 		digestSharingWithoutFilter(begin, buflen);
 		for (int e = epochBegin; e < epochEnd; e++) addSharingEpoch(e);
 	}
+}
+
+void SharingManager::collectGarbageInFilter() {
+	if (!_gc_pending) return;
+	_export_buffer.collectGarbage();
+	_gc_pending = false;
 }
 
 void SharingManager::setWinningSolverId(int globalId) {

@@ -5,6 +5,7 @@
 #include <memory>
 #include <list>
 
+#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "app/sat/sharing/clause_id_alignment.hpp"
 #include "app/sat/sharing/concurrent_export_buffer.hpp"
 #include "buffer/adaptive_clause_database.hpp"
@@ -45,9 +46,9 @@ protected:
 	const Logger& _logger;
 	int _job_index;
 
-	AdaptiveClauseDatabase _cdb;
-	ConcurrentProducedClauseFilter _filter;
+	PriorityClauseBuffer _pcb;
 	ConcurrentExportBuffer _export_buffer;
+	bool _gc_pending {false};
 	
 	int _last_num_cls_to_import = 0;
 	int _last_num_admitted_cls_to_import = 0;
@@ -89,6 +90,7 @@ public:
     void digestSharingWithoutFilter(int* begin, int buflen);
 	void returnClauses(int* begin, int buflen);
 	void digestHistoricClauses(int epochBegin, int epochEnd, int* begin, int buflen);
+	void collectGarbageInFilter();
 
 	void setWinningSolverId(int globalId);
 	bool syncDeterministicSolvingAndCheckForWinningSolver();

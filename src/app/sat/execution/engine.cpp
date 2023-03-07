@@ -290,6 +290,9 @@ int SatEngine::solveLoop() {
 	if (isCleanedUp()) return -1;
 	if (_block_result) return -1;
 
+	// perform GC in export filter whenever necessary
+	if (_sharing_manager) _sharing_manager->collectGarbageInFilter();
+
     // Solving done?
 	bool done = false;
 	for (size_t i = 0; i < _solver_threads.size(); i++) {
