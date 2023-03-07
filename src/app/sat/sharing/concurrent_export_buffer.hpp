@@ -71,7 +71,7 @@ public:
             }
             while (!extracted.empty()) {
                 processClause(extracted.front(), filter);
-                backlog.pop_front();
+                extracted.pop_front();
             }
 
             filter.returnExclusiveLock();
