@@ -17,7 +17,7 @@ private:
     const Logger& _logger;
     std::vector<std::shared_ptr<PortfolioSolverInterface>>& _solvers;
     const int _num_original_clauses;
-    const int _max_num_threads;
+    const int _max_nb_threads_per_process;
 
 	std::vector<std::atomic_ulong*> _last_exported_clause_id; 
 	typedef std::vector<unsigned long> EpochIdList;
@@ -26,8 +26,8 @@ private:
 	EpochIdList _global_epoch_ids;
 
 public:
-    ClauseIdAlignment(const Logger& logger, std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, int nbOrigClauses, int maxNumThreads) :
-            _logger(logger), _solvers(solvers), _num_original_clauses(nbOrigClauses), _max_num_threads(maxNumThreads) {
+    ClauseIdAlignment(const Logger& logger, std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, int nbOrigClauses, int maxNbThreadsPerProcess) :
+            _logger(logger), _solvers(solvers), _num_original_clauses(nbOrigClauses), _max_nb_threads_per_process(maxNbThreadsPerProcess) {
 
         _id_offsets_per_solver.resize(_solvers.size());
         _min_epoch_ids_per_solver.resize(_solvers.size());
@@ -37,7 +37,7 @@ public:
 
             _id_offsets_per_solver[i].push_back(0);
             _min_epoch_ids_per_solver[i].push_back(0);
-            _last_exported_clause_id[i] = new std::atomic_ulong(nbOrigClauses+1);
+            _last_exported_clause_id[i] = new std::atomic_ulong(_num_original_clauses+1);
 
             LOGGER(_logger, V3_VERB, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
                     _solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), _last_exported_clause_id[i]->load(std::memory_order_relaxed), 
@@ -117,13 +117,13 @@ public:
     }
 
 	bool isLocallyProducedClause(unsigned long clauseId) {
-		auto globalId = (clauseId-_num_original_clauses-1) % _solvers[0]->getSolverSetup().maxNumSolvers;
+		auto globalId = getProducingInstanceId(clauseId);
 		for (auto& solver : _solvers) if (solver->getGlobalId() == globalId) return true;
 		return false;
 	}
 
 	int getProducingLocalSolverIndex(unsigned long clauseId) {
-		return (clauseId-_num_original_clauses-1) % _max_num_threads;
+		return (clauseId-_num_original_clauses-1) % _max_nb_threads_per_process;
 	}
 	int getProducingInstanceId(unsigned long clauseId) {
 		return (clauseId-_num_original_clauses-1) % _solvers[0]->getSolverSetup().maxNumSolvers;

@@ -129,11 +129,11 @@ public:
         
         BufferBuilder builder(sizeLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
         if (mode == ANY) {
-            for (auto& slot : _slots) slot->flushAndShrink(builder);
+            for (auto& slot : _slots) slot->flushAndShrink(builder, clauseDataConverter);
         }
         if (mode == UNITS) {
             auto [unitSlotIdx, _] = getSlotIdxAndMode(1, 1);
-            _slots[unitSlotIdx]->flushAndShrink(builder);
+            _slots[unitSlotIdx]->flushAndShrink(builder, clauseDataConverter);
         }
         numExportedClauses = builder.getNumAddedClauses();
         return builder.extractBuffer();

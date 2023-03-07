@@ -107,7 +107,7 @@ public:
         return pop(clause, true);
     }
 
-    void flushAndShrink(BufferBuilder& buf) {
+    void flushAndShrink(BufferBuilder& buf, std::function<void(int*)> clauseDataConverter) {
 
         // Acquire lock
         auto lock = _mtx.getLock();
@@ -126,6 +126,7 @@ public:
         while (nbFreedLits >= _clause_length) {
             // Clause freed - read, append to buffer, pop
             readClause(dataIdx, _tmp_clause);
+            clauseDataConverter(_tmp_clause.begin);
             flushedClauses.push_back(_tmp_clause);
             nbFreedLits -= _clause_length;
             dataIdx -= _effective_clause_length;
