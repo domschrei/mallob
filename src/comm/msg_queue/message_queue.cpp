@@ -15,7 +15,8 @@ MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize) {
     
     MPI_Comm_rank(MPI_COMM_WORLD, &_my_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &_comm_size);
-    _recv_data = (uint8_t*) malloc(maxMsgSize+20);
+    _recv_data_1 = (uint8_t*) malloc(maxMsgSize+20);
+    _recv_data_2 = (uint8_t*) malloc(maxMsgSize+20);
 
     _current_recv_tag = &_default_tag_var;
     _current_send_tag = &_default_tag_var;
@@ -46,8 +47,9 @@ MessageQueue::~MessageQueue() {
     if (_recv_request != MPI_REQUEST_NULL) {
         MPI_Cancel(&_recv_request);
     }
-    // Free receive buffer
-    free(_recv_data);
+    // Free receive buffers
+    free(_recv_data_1);
+    free(_recv_data_2);
 }
 
 MessageQueue::CallbackRef MessageQueue::registerCallback(int tag, const MsgCallback& cb) {
@@ -225,21 +227,24 @@ void MessageQueue::processReceived() {
         }
 
         // Message finished
+        auto recvData = _active_recv_data;
         const int source = status.MPI_SOURCE;
         int tag = status.MPI_TAG;
         int msglen;
         MPI_Get_count(&status, MPI_BYTE, &msglen);
         LOG(V5_DEBG, "MQ RECV n=%i s=[%i] t=%i c=(%i,...,%i,%i,%i)\n", msglen, source, tag, 
-                msglen>=1*sizeof(int) ? *(int*)(_recv_data) : 0, 
-                msglen>=3*sizeof(int) ? *(int*)(_recv_data+msglen - 3*sizeof(int)) : 0, 
-                msglen>=2*sizeof(int) ? *(int*)(_recv_data+msglen - 2*sizeof(int)) : 0, 
-                msglen>=1*sizeof(int) ? *(int*)(_recv_data+msglen - 1*sizeof(int)) : 0);
+                msglen>=1*sizeof(int) ? *(int*)(recvData) : 0,
+                msglen>=3*sizeof(int) ? *(int*)(recvData+msglen - 3*sizeof(int)) : 0,
+                msglen>=2*sizeof(int) ? *(int*)(recvData+msglen - 2*sizeof(int)) : 0,
+                msglen>=1*sizeof(int) ? *(int*)(recvData+msglen - 1*sizeof(int)) : 0);
+
+        resetReceiveHandle();
 
         if (tag >= MSG_OFFSET_BATCHED) {
             // Fragment of a message
 
             tag -= MSG_OFFSET_BATCHED;
-            int id = ReceiveFragment::readId(_recv_data, msglen);
+            int id = ReceiveFragment::readId(recvData, msglen);
             auto key = std::pair<int, int>(source, id);
             
             if (!_fragmented_messages.count(key)) {
@@ -247,9 +252,7 @@ void MessageQueue::processReceived() {
             }
             auto& fragment = _fragmented_messages[key];
 
-            fragment.receiveNext(source, tag, _recv_data, msglen);
-
-            resetReceiveHandle();
+            fragment.receiveNext(source, tag, recvData, msglen);
 
             if (fragment.isCancelled() || fragment.isFinished()) {
                 {
@@ -265,11 +268,9 @@ void MessageQueue::processReceived() {
         }
 
         // Single message
-        _received_handle.setReceive(msglen, _recv_data);
+        _received_handle.setReceive(msglen, recvData);
         _received_handle.tag = tag;
         _received_handle.source = source;
-
-        resetReceiveHandle();
 
         // Process message according to its tag-specific callback
         *_current_recv_tag = _received_handle.tag;
@@ -286,7 +287,8 @@ void MessageQueue::processReceived() {
 void MessageQueue::resetReceiveHandle() {
     // Reset recv handle
     //log(V5_DEBG, "MQ MPI_Irecv\n");
-    MPI_Irecv(_recv_data, _max_msg_size+20, MPI_BYTE, MPI_ANY_SOURCE, 
+    _active_recv_data = (_active_recv_data == _recv_data_1) ? _recv_data_2 : _recv_data_1;
+    MPI_Irecv(_active_recv_data, _max_msg_size+20, MPI_BYTE, MPI_ANY_SOURCE,
         MPI_ANY_TAG, MPI_COMM_WORLD, &_recv_request);
 }
 

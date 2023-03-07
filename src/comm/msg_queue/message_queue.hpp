@@ -31,7 +31,10 @@ private:
 
     // Basic receive stuff
     MPI_Request _recv_request {MPI_REQUEST_NULL};
-    uint8_t* _recv_data;
+    // Double buffer
+    uint8_t* _recv_data_1;
+    uint8_t* _recv_data_2;
+    uint8_t* _active_recv_data {nullptr};
     std::list<SendHandle> _self_recv_queue;
     int _base_num_receives_per_loop = 10;
     int _num_receives_per_loop = _base_num_receives_per_loop;
