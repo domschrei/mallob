@@ -219,6 +219,13 @@ public:
         _mtx_map.unlock_shared();
     }
 
+    bool tryGetExclusiveLock() {
+        return _mtx_map.try_lock();
+    }
+    void returnExclusiveLock() {
+        _mtx_map.unlock();
+    }
+
 private:
     void erase(ProducedClauseCandidate& c) {
         _map.erase(getAnyProducedClause(c));

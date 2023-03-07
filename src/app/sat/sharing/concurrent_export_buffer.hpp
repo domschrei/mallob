@@ -55,7 +55,7 @@ public:
         auto& backlog = slot.backlog;
 
         // Can I expect to quickly obtain the map's internal locks?
-        if (filter.tryGetSharedLock()) {
+        if (filter.tryGetExclusiveLock()) {
             // -- yes!
 
             // Insert clause directly
@@ -74,7 +74,7 @@ public:
                 backlog.pop_front();
             }
 
-            filter.returnSharedLock();
+            filter.returnExclusiveLock();
 
         } else {
             // -- no: Insert into backlog
