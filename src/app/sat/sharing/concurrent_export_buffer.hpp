@@ -62,18 +62,16 @@ public:
             processClause(pcc, filter);
 
             // Reduce backlog size
+            std::list<ProducedClauseCandidate> extracted;
             {
                 auto lock = mtxBacklog.getLock();
-                int nbProcessed = 0;
-                while (!backlog.empty() && nbProcessed < 10) {
-                    processClause(backlog.front(), filter);
-                    backlog.pop_front();
-                    nbProcessed++;
-                }
-                if (nbProcessed > 0) {
-                    LOG(V2_INFO, "Reduced backlog size from %i to %i\n", 
-                        backlog.size()+nbProcessed, backlog.size());
-                }
+                auto endIt = backlog.begin();
+                std::advance(endIt, std::min(32UL, backlog.size()));
+                extracted.splice(extracted.end(), backlog, backlog.begin(), endIt);
+            }
+            while (!extracted.empty()) {
+                processClause(extracted.front(), filter);
+                backlog.pop_front();
             }
 
             filter.returnSharedLock();

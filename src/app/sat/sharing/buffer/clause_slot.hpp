@@ -121,6 +121,7 @@ public:
         int nbRemainingLits = buf.getMaxRemainingLits();
         nbRemainingLits -= (nbRemainingLits % _clause_length);
         int nbFreedLits = tryFreeStoredLiterals(nbRemainingLits, true);
+        storeBudget(nbFreedLits);
         int dataIdx = _data_size - _effective_clause_length;
         while (nbFreedLits >= _clause_length) {
             // Clause freed - read, append to buffer, pop
