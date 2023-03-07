@@ -23,6 +23,8 @@ private:
     int _total_literal_limit;
     std::vector<std::unique_ptr<ClauseSlot>> _slots;
     std::atomic_int _free_budget {0};
+    const int UNIT_SLOT_MAX_BUDGET {std::numeric_limits<int>::max() - 1024};
+    std::atomic_int _unit_slot_budget {UNIT_SLOT_MAX_BUDGET};
     std::atomic_int _max_admissible_cls_size {std::numeric_limits<int>::max()};
 
     enum ClauseSlotMode {SAME_SUM_OF_SIZE_AND_LBD, SAME_SIZE, SAME_SIZE_AND_LBD};
@@ -91,7 +93,8 @@ public:
                 if (!_size_lbd_to_slot_idx_mode.count(representantKey)) {
                     // Create new slot
                     int slotIdx = _slots.size();
-                    _slots.emplace_back(new ClauseSlot(_free_budget, slotIdx, clauseLength, opMode == SAME_SIZE_AND_LBD ? lbd : 0));
+                    _slots.emplace_back(new ClauseSlot(clauseLength == 1 ? _unit_slot_budget : _free_budget, 
+                        slotIdx, clauseLength, opMode == SAME_SIZE_AND_LBD ? lbd : 0));
                     if (_slots.size() > 1) _slots.back()->setLeftNeighbor(_slots[_slots.size()-2].get());
                     _size_lbd_to_slot_idx_mode[representantKey] = std::pair<int, ClauseSlotMode>(slotIdx, opMode);
                 }
@@ -152,14 +155,12 @@ public:
     }
 
     int getCurrentlyUsedLiterals() const {
-        return _total_literal_limit - _free_budget.load(std::memory_order_relaxed);
+        return (_total_literal_limit - _free_budget.load(std::memory_order_relaxed))
+            + (UNIT_SLOT_MAX_BUDGET - _unit_slot_budget.load(std::memory_order_relaxed));
     }
     int getNumLiterals(int clauseLength, int lbd) {
         auto [slotIdx, mode] = getSlotIdxAndMode(clauseLength, lbd);
         return _slots[slotIdx]->getNbStoredLiterals();
-    }
-    int getTotalLiteralBudget() const {
-        return _total_literal_limit;
     }
 
     ClauseHistogram& getDeletedClausesHistogram() {
