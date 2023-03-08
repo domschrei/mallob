@@ -148,7 +148,7 @@ struct SendHandle {
     void printSendMsg() const {
 
         auto& data = *dataPtr;
-        int msglen = data.size();
+        unsigned long msglen = data.size();
 
 #if LOGGER_STATIC_VERBOSITY >= 6
         if (Logger::getMainInstance().getVerbosity() >= 6) {
@@ -162,7 +162,7 @@ struct SendHandle {
             LOG(V5_DEBG, "MQ SEND n=%i d=[%i] t=%i c=(%s)\n", data.size(), dest, tag, msgContent.c_str());
         } else
 #endif
-        LOG(V5_DEBG, "MQ SEND n=%i d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", data.size(), dest, tag, 
+        LOG(V5_DEBG, "MQ SEND n=%lu d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", data.size(), dest, tag,
             msglen>=1*sizeof(int) ? *(int*)(data.data()) : 0, 
             msglen>=3*sizeof(int) ? *(int*)(data.data()+msglen - 3*sizeof(int)) : 0, 
             msglen>=2*sizeof(int) ? *(int*)(data.data()+msglen - 2*sizeof(int)) : 0, 
@@ -171,7 +171,7 @@ struct SendHandle {
     }
 
     void printBatchArrived() const {
-        LOG(V5_DEBG, "MQ SENT id=%i %i/%i n=%i d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", id, sentBatches, 
+        LOG(V5_DEBG, "MQ SENT id=%i %i/%i n=%lu d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", id, sentBatches,
                 totalNumBatches, dataPtr->size(), dest, tag, 
                 *(int*)(tempStorage.data()), 
                 *(int*)(tempStorage.data()+tempStorage.size()-3*sizeof(int)), 
