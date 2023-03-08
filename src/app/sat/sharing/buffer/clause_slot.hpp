@@ -67,36 +67,46 @@ public:
         return true;
     }
 
-    void insert(BufferReader& inputBuffer, ClauseSlot* maxNeighbor) {
+    int insert(BufferReader& inputBuffer, ClauseSlot* maxNeighbor) {
 
         // fast-forward buffer reader to the first applicable slot
-        auto clause = inputBuffer.getNextIncomingClause();
+        auto& clause = *inputBuffer.getCurrentClausePointer();
         while (clause.begin != nullptr && !fitsThisSlot(clause)) {
-            clause = inputBuffer.getNextIncomingClause();
+            inputBuffer.getNextIncomingClause(); // modifies "clause"
         }
 
         // There might be multiple slots in the buffer which are applicable for this slot.
         // Iterate over all of them.
         int budget = 0;
+        int nbInserted = 0;
+        int nbDiscarded = 0;
         while (clause.begin != nullptr && fitsThisSlot(clause)) {
 
             // Fetch number of clauses in the buffer slot, try and fetch budget accordingly
-            int nbInputClauses = inputBuffer.getNumRemainingClausesInBucket();
+            int nbInputClauses = inputBuffer.getNumRemainingClausesInBucket()+1;
             budget += tryFetchBudget(nbInputClauses, maxNeighbor, true);
 
             // Insert clauses one by one
             auto lock = _mtx.getLock();
-            while (nbInputClauses > 0 && budget >= _clause_length) {
-                pushClauseToBack(clause);
-                budget -= _clause_length;
+            while (nbInputClauses > 0) {
+                assert(fitsThisSlot(clause));
+                if (budget >= _clause_length) {
+                    pushClauseToBack(clause);
+                    budget -= _clause_length;
+                    nbInserted++;
+                } else {
+                    nbDiscarded++;
+                }
                 nbInputClauses--;
-                clause = inputBuffer.getNextIncomingClause();
+                inputBuffer.getNextIncomingClause(); // modifies "clause"
             }
-            if (budget < _clause_length) break;
         }
 
         // return excess budget
         if (budget > 0) storeBudget(budget);
+
+        _hist_discarded_cls->increase(_clause_length, nbDiscarded);
+        return nbInserted;
     }
 
     bool pop(Mallob::Clause& clause) {
@@ -167,11 +177,17 @@ public:
         return _nb_stored_clauses.load(std::memory_order_relaxed) * _clause_length;
     }
 
+    int getClauseLength() const {
+        return _clause_length;
+    }
+
 private:
 
     void shrink() {
-        _data.resize(_data_size);
-        _data.shrink_to_fit();
+        if (_data.capacity() > 2*_data_size) {
+            _data.resize(_data_size);
+            _data.shrink_to_fit();
+        }
     }
 
     // While the used budget count and the actual data_size are incoherent,
@@ -214,8 +230,12 @@ private:
 
     void pushClauseToBack(const Mallob::Clause& clause) {
         _nb_stored_clauses.fetch_add(1);
-        if (_data.size() < _data_size + _effective_clause_length)
-            _data.resize(_data_size + _effective_clause_length);
+        if (_data.size() < _data_size + _effective_clause_length) {
+            _data.resize(std::max(
+                (int) (_data_size+_effective_clause_length),
+                (int) std::ceil(1.5 * _data.capacity())
+            ));
+        }
         auto pos = _data_size;
         _data_size += _effective_clause_length;
 

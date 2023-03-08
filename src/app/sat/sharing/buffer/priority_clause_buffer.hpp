@@ -9,6 +9,7 @@
 
 
 #include "../../data/produced_clause.hpp"
+#include "app/sat/data/clause_histogram.hpp"
 #include "bucket_label.hpp"
 #include "buffer_reader.hpp"
 #include "buffer_merger.hpp"
@@ -120,9 +121,12 @@ public:
         return addClause(Mallob::Clause(cBegin, cSize, cLbd));
     }
 
-    template <typename T>
-    void addClauses(BufferReader& inputBuffer) {
-        for (auto& slot : _slots) slot->insert(inputBuffer, _slots.back().get());
+    void addClauses(BufferReader& inputBuffer, ClauseHistogram* hist) {
+        inputBuffer.getNextIncomingClause(); // prepare first clause in reader
+        for (auto& slot : _slots) {
+            int nbInsertedCls = slot->insert(inputBuffer, _slots.back().get());
+            if (hist) hist->increase(slot->getClauseLength(), nbInsertedCls);
+        }
     }
     
     enum ExportMode {UNITS, ANY};

@@ -222,6 +222,9 @@ public:
     bool tryGetExclusiveLock() {
         return _mtx_map.try_lock();
     }
+    void acquireExclusiveLock() {
+        _mtx_map.lock();
+    }
     void returnExclusiveLock() {
         _mtx_map.unlock();
     }

@@ -87,6 +87,13 @@ public:
         return getSlot(clauseLength).filter;
     }
 
+    void lockAllFilters() {
+        for (auto& slot : _slots) slot->filter.acquireExclusiveLock();
+    }
+    void unlockAllFilters() {
+        for (auto& slot : _slots) slot->filter.returnExclusiveLock();
+    }
+
     void updateEpoch(int epoch) {
         for (auto& slot : _slots) slot->filter.updateEpoch(epoch);
     }

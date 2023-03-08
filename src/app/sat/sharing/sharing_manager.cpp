@@ -165,6 +165,14 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 		}
 	}
 
+	// Flushing the priority clause buffer results in owning locks
+	// for an extended period, which may block solver threads.
+	// Lock all filters such that solvers write to backlogs instead.
+	float time = Timer::elapsedSeconds();
+	_export_buffer.lockAllFilters();
+	time = Timer::elapsedSeconds() - time;
+	LOGGER(_logger, V4_VVER, "acquired all clause locks after %.6fs\n", time);
+
 	int numExportedClauses = 0;
 	auto buffer = _pcb.exportBuffer(totalLiteralLimit, numExportedClauses, 
 			PriorityClauseBuffer::ANY, /*sortClauses=*/true, [&](int* data) {
@@ -172,6 +180,9 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 		// Shift clause ID from a local solver according to the solver's offset
 		if (_id_alignment) _id_alignment->alignClauseId(data);
 	});
+
+	_export_buffer.unlockAllFilters();
+
 	//assert(buffer.size() <= maxSize);
 	memcpy(begin, buffer.data(), buffer.size()*sizeof(int));
 
@@ -187,17 +198,24 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 void SharingManager::returnClauses(int* begin, int buflen) {
 
 	auto reader = _pcb.getBufferReader(begin, buflen);
+
+	// No clause ID alignments: Can just reinsert all clauses, no questions asked
+	if (!_id_alignment) {
+		_pcb.addClauses(reader, &_hist_returned_to_db);
+		return;
+	}
+
 	auto c = reader.getNextIncomingClause();
 	while (c.begin != nullptr) {
 
 		// For certified UNSAT we need to drop returned clauses which do not
 		// originate from this solver, since we can not un-align them to
 		// correctly insert them into the database.
-		if (!_id_alignment || _id_alignment->isLocallyProducedClause(ClauseMetadata::readUnsignedLong(c.begin))) {
+		if (_id_alignment->isLocallyProducedClause(ClauseMetadata::readUnsignedLong(c.begin))) {
 
 			// Returned clauses would be aligned *again* when re-exported.
 			// => subtract the offsets again here ...
-			if (_id_alignment) _id_alignment->unalignClauseId(c.begin);
+			_id_alignment->unalignClauseId(c.begin);
 
 			bool success = _pcb.addClause(c);
 			if (success) _hist_returned_to_db.increment(c.size);
