@@ -159,10 +159,10 @@ struct SendHandle {
                 i += sizeof(int);
             }
             msgContent = msgContent.substr(0, msgContent.size()-1);
-            LOG(V5_DEBG, "MQ SEND n=%i d=[%i] t=%i c=(%s)\n", data.size(), dest, tag, msgContent.c_str());
+            LOG(V5_DEBG, "MQ SEND n=%lu d=[%i] t=%i c=(%s)\n", msglen, dest, tag, msgContent.c_str());
         } else
 #endif
-        LOG(V5_DEBG, "MQ SEND n=%lu d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", data.size(), dest, tag,
+        LOG(V5_DEBG, "MQ SEND n=%lu d=[%i] t=%i c=(%i,...,%i,%i,%i)\n", msglen, dest, tag,
             msglen>=1*sizeof(int) ? *(int*)(data.data()) : 0, 
             msglen>=3*sizeof(int) ? *(int*)(data.data()+msglen - 3*sizeof(int)) : 0, 
             msglen>=2*sizeof(int) ? *(int*)(data.data()+msglen - 2*sizeof(int)) : 0, 
