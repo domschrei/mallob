@@ -72,7 +72,7 @@ struct SendHandle {
     }
 
     bool isInitiated() {
-        return request != MPI_REQUEST_NULL;
+        return sentBatches > 0;
     }
 
     bool test() {
@@ -116,7 +116,7 @@ struct SendHandle {
         size_t end = std::min(data.size(), ((size_t)(sentBatches+1))*sizePerBatch);
         assert(end>begin || LOG_RETURN_FALSE("%ld <= %ld\n", end, begin));
         size_t msglen = (end-begin)+3*sizeof(int);
-        if (msglen > tempStorage.size()) tempStorage.resize(msglen);
+        tempStorage.resize(msglen);
 
         // Copy actual data
         memcpy(tempStorage.data(), data.data()+begin, end-begin);
