@@ -42,7 +42,7 @@ public:
     const std::vector<uint8_t>& getRecvData() const { return data;}
     std::vector<uint8_t>&& moveRecvData() { return std::move(data);}
 
-    void setReceive(size_t msgSize, uint8_t* recvData) {
+    void setReceive(size_t msgSize, const uint8_t* recvData) {
         data.resize(msgSize);
         memcpy(data.data(), recvData, msgSize);
     }

@@ -227,7 +227,7 @@ void MessageQueue::processReceived() {
         }
 
         // Message finished
-        auto recvData = _active_recv_data;
+        const uint8_t* recvData = _active_recv_data;
         const int source = status.MPI_SOURCE;
         int tag = status.MPI_TAG;
         int msglen;

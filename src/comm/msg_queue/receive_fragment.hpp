@@ -44,11 +44,11 @@ struct ReceiveFragment {
     bool valid() const {return id != -1;}
     bool isCancelled() const {return cancelled;}
 
-    static int readId(uint8_t* data, int msglen) {
+    static int readId(const uint8_t* data, int msglen) {
         return * (int*) (data+msglen - 3*sizeof(int));
     }
 
-    void receiveNext(int source, int tag, uint8_t* data, int msglen) {
+    void receiveNext(int source, int tag, const uint8_t* data, int msglen) {
         assert(this->source >= 0);
         assert(valid());
 
