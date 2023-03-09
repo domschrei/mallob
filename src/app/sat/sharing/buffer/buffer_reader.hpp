@@ -23,19 +23,57 @@ private:
     size_t _hash;
     size_t _true_hash = 1;
 
+    std::vector<bool>* _filter_bitset {nullptr};
+    size_t _filter_pos {0};
+
 public:
     BufferReader() = default;
     BufferReader(int* buffer, int size, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);
 
     void releaseBuffer() {_buffer = nullptr;}
+
+    void setFilterBitset(std::vector<bool>& filter) {
+        _filter_bitset = &filter;
+    }
     
     Mallob::Clause* getCurrentClausePointer() {return &_current_clause;}
     size_t getCurrentBufferPosition() const {return _current_pos;} 
     size_t getRemainingSize() const {return _size - _current_pos;}
-    size_t getNumRemainingClausesInBucket() const {return _remaining_cls_of_bucket;}
     const BufferIterator& getCurrentBufferIterator() const {return _it;} 
     
+    size_t getNumRemainingClausesInBucket() const {
+        if (_filter_bitset) return getNumRemainingClausesInBucketAfterFilter();
+        return getNumRemainingClausesInBucketWithoutFilter();
+    }
+
     inline const Mallob::Clause& getNextIncomingClause() {
+        if (_filter_bitset) return getNextIncomingClauseWithFilter();
+        return getNextIncomingClauseWithoutFilter();
+    }
+
+private:
+    size_t getNumRemainingClausesInBucketWithoutFilter() const {return _remaining_cls_of_bucket;}
+
+    size_t getNumRemainingClausesInBucketAfterFilter() const {
+        int nbRemaining = _remaining_cls_of_bucket;
+        for (size_t pos = _filter_pos; pos < _filter_pos+_remaining_cls_of_bucket; pos++) {
+            if (_filter_bitset->at(pos)) nbRemaining--;
+        }
+        return nbRemaining;
+    }
+
+    inline const Mallob::Clause& getNextIncomingClauseWithFilter() {
+        getNextIncomingClauseWithoutFilter();
+        if (!_filter_bitset) return _current_clause;
+        while (_current_clause.begin != nullptr && (*_filter_bitset)[_filter_pos]) {
+            ++_filter_pos;
+            getNextIncomingClauseWithoutFilter();
+        }
+        ++_filter_pos;
+        return _current_clause;
+    }
+
+    inline const Mallob::Clause& getNextIncomingClauseWithoutFilter() {
         // No buffer?
         if (_buffer == nullptr) return _current_clause;
 
@@ -87,6 +125,5 @@ public:
         return _current_clause;
     }
 
-private:
     const Mallob::Clause& endReading();
 };

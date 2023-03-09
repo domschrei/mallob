@@ -9,6 +9,8 @@
 
 #include "../data/clause.hpp"
 #include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
+#include "app/sat/sharing/buffer/buffer_reader.hpp"
+#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "util/logger.hpp"
 #include "../sharing/import_buffer.hpp"
 #include "../data/solver_statistics.hpp"
@@ -161,15 +163,13 @@ public:
 	// Add a learned clause to the formula
 	// The learned clauses might be added later or possibly never
 	void addLearnedClause(const Mallob::Clause& c);
-	AdaptiveClauseDatabase::LinearBudgetCounter getImportBudgetCounter();
-	template <typename T>
-	void addLearnedClauses(int clauseLength, int lbd, std::list<T>& list, int numLiterals) {
+	void addLearnedClauses(BufferReader& reader) {
 		if (_clause_sharing_disabled) return;
-		_import_buffer.performImport<T>(clauseLength, lbd, list, numLiterals);
+		_import_buffer.performImport(reader);
 	}
 
 	// Within the solver, fetch a clause that was previously added as a learned clause.
-	bool fetchLearnedClause(Mallob::Clause& clauseOut, AdaptiveClauseDatabase::ExportMode mode = AdaptiveClauseDatabase::ANY);
+	bool fetchLearnedClause(Mallob::Clause& clauseOut, PriorityClauseBuffer::ExportMode mode = PriorityClauseBuffer::ANY);
 	std::vector<int> fetchLearnedUnitClauses();
 
 	std::function<void(int)> _cb_result_found;

@@ -88,7 +88,24 @@ public:
     }
 
     void lockAllFilters() {
-        for (auto& slot : _slots) slot->filter.acquireExclusiveLock();
+        std::vector<bool> slotLocked(_slots.size(), false);
+        int nbLocked = 0;
+        // Repeatedly cycle over the slots, acquiring locks where possible,
+        // until all locks are held
+        while (nbLocked < _slots.size()) {
+            for (size_t i = 0; i < _slots.size(); i++) {
+                if (slotLocked[i]) continue;
+                if (nbLocked+1 == _slots.size()) {
+                    // Last slot: acquire lock directly
+                    _slots[i]->filter.acquireExclusiveLock();
+                    nbLocked++;
+                    slotLocked[i] = true;
+                } else if (_slots[i]->filter.tryGetExclusiveLock()) {
+                    nbLocked++;
+                    slotLocked[i] = true;
+                }
+            }
+        }
     }
     void unlockAllFilters() {
         for (auto& slot : _slots) slot->filter.returnExclusiveLock();

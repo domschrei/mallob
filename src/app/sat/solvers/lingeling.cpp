@@ -11,6 +11,7 @@
 #include <string.h>
 #include <cmath>
 
+#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "lingeling.hpp"
 #include "util/sys/timer.hpp"
 #include "util/distribution.hpp"
@@ -268,7 +269,7 @@ void Lingeling::doConsume(int** clause, int* glue) {
 	*clause = nullptr;
 
 	Mallob::Clause c;
-	bool success = fetchLearnedClause(c, AdaptiveClauseDatabase::NONUNITS);
+	bool success = fetchLearnedClause(c, PriorityClauseBuffer::NONUNITS);
 	if (!success) return;
 
 	// Assemble a zero-terminated array of all the literals

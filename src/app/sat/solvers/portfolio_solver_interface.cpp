@@ -2,6 +2,7 @@
 #include <map>
 #include <chrono>
 #include <atomic>
+#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "util/assert.hpp"
 
 #include "util/sys/threading.hpp"
@@ -83,11 +84,7 @@ void PortfolioSolverInterface::addLearnedClause(const Mallob::Clause& c) {
 	_import_buffer.add(c);
 }
 
-AdaptiveClauseDatabase::LinearBudgetCounter PortfolioSolverInterface::getImportBudgetCounter() {
-	return _import_buffer.getLinearBudgetCounter();
-}
-
-bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, AdaptiveClauseDatabase::ExportMode mode) {
+bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, PriorityClauseBuffer::ExportMode mode) {
 	if (_clause_sharing_disabled) return false;
 	clauseOut = _import_buffer.get(mode);
 	return clauseOut.begin != nullptr && clauseOut.size >= 1;

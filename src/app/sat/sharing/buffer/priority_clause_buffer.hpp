@@ -43,6 +43,10 @@ private:
     bool _has_cb_clause_deleted {false};
     std::function<void(Mallob::Clause&)> _cb_clause_deleted;
 
+    unsigned long _op_count {1};
+    unsigned long _cached_op_count {0};
+    int _cached_pop_slot {0};
+
 public:
     struct Setup {
         int numLiterals = 1000;
@@ -113,6 +117,7 @@ public:
     ~PriorityClauseBuffer() {}
 
     bool addClause(const Clause& c) {
+        ++_op_count;
         auto [slotIdx, mode] = getSlotIdxAndMode(c.size, c.lbd);
         return _slots[slotIdx]->insert(c, _slots.back().get());
     }
@@ -122,18 +127,41 @@ public:
     }
 
     void addClauses(BufferReader& inputBuffer, ClauseHistogram* hist) {
-        inputBuffer.getNextIncomingClause(); // prepare first clause in reader
+        ++_op_count;
+        auto& clause = inputBuffer.getNextIncomingClause(); // prepare first clause in reader
         for (auto& slot : _slots) {
+            if (!slot->fitsThisSlot(clause)) continue;
             int nbInsertedCls = slot->insert(inputBuffer, _slots.back().get());
+            //LOG(V2_INFO, "DBG -- (%i,?) : %i clauses inserted\n", slot->getClauseLength(), nbInsertedCls);
             if (hist) hist->increase(slot->getClauseLength(), nbInsertedCls);
         }
     }
     
-    enum ExportMode {UNITS, ANY};
+    enum ExportMode {UNITS, NONUNITS, ANY};
+    bool popClauseWeak(ExportMode mode, Mallob::Clause& clause) {
+        int slotIdx = mode == NONUNITS ? 1 : 0;
+        if (_op_count == _cached_op_count) {
+            // No changes since last operation! Can use cached slot index.
+            slotIdx = std::max(slotIdx, _cached_pop_slot);
+        }
+        ++_op_count;
+        for (; slotIdx < _slots.size(); slotIdx++) {
+            if (mode == UNITS && slotIdx > 0) return false;
+            if (_slots[slotIdx]->popWeak(clause)) {
+                // Remember this slot for the next pop operation
+                _cached_op_count = _op_count;
+                _cached_pop_slot = slotIdx;
+                return true;
+            }
+        }
+        return false;
+    }
+
     std::vector<int> exportBuffer(int sizeLimit, int& numExportedClauses, 
             ExportMode mode = ANY, bool sortClauses = true, 
             std::function<void(int*)> clauseDataConverter = [](int*){}) {
         
+        ++_op_count;
         BufferBuilder builder(sizeLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
         if (mode == ANY) {
             for (auto& slot : _slots) slot->flushAndShrink(builder, clauseDataConverter);
@@ -146,15 +174,15 @@ public:
         return builder.extractBuffer();
     }
 
-    BufferReader getBufferReader(int* begin, size_t size, bool useChecksums = false) {
+    BufferReader getBufferReader(int* begin, size_t size, bool useChecksums = false) const {
         return BufferReader(begin, size, _max_clause_length, _slots_for_sum_of_length_and_lbd, useChecksums);
     }
 
-    BufferMerger getBufferMerger(int sizeLimit) {
+    BufferMerger getBufferMerger(int sizeLimit) const {
         return BufferMerger(sizeLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd, _use_checksum);
     }
 
-    BufferBuilder getBufferBuilder(std::vector<int>* out) {
+    BufferBuilder getBufferBuilder(std::vector<int>* out) const {
         return BufferBuilder(-1, _max_clause_length, _slots_for_sum_of_length_and_lbd, out);
     }
 
@@ -162,7 +190,7 @@ public:
         return (_total_literal_limit - _free_budget.load(std::memory_order_relaxed))
             + (UNIT_SLOT_MAX_BUDGET - _unit_slot_budget.load(std::memory_order_relaxed));
     }
-    int getNumLiterals(int clauseLength, int lbd) {
+    int getNumLiterals(int clauseLength, int lbd) const {
         auto [slotIdx, mode] = getSlotIdxAndMode(clauseLength, lbd);
         return _slots[slotIdx]->getNbStoredLiterals();
     }
@@ -187,7 +215,7 @@ public:
     }
 
 private:
-    std::pair<int, ClauseSlotMode> getSlotIdxAndMode(int clauseSize, int lbd) {
+    std::pair<int, ClauseSlotMode> getSlotIdxAndMode(int clauseSize, int lbd) const {
         assert(lbd >= 1);
         assert(clauseSize == 1 || lbd >= 2 || log_return_false("(%i,%i) invalid length-clause combination!\n", clauseSize, lbd));
         assert(lbd <= clauseSize);

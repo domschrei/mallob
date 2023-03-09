@@ -4,47 +4,48 @@
 #include <vector>
 #include <list>
 
-#include "buffer/adaptive_clause_database.hpp"
+#include "app/sat/sharing/buffer/buffer_reader.hpp"
+#include "buffer/priority_clause_buffer.hpp"
 #include "../execution/solver_setup.hpp"
+#include "util/logger.hpp"
 
 class ImportBuffer {
 
 private:
     SolverStatistics& _stats;
-    AdaptiveClauseDatabase _cdb;
+    PriorityClauseBuffer _pcb;
     int _max_clause_length;
     bool _reset_lbd;
 
     std::vector<int> _plain_units_out;
+    std::vector<int> _clause_out_data;
     Mallob::Clause _clause_out;
 
 public:
     ImportBuffer(const SolverSetup& setup, SolverStatistics& stats) : _stats(stats), 
-        _cdb([&]() {
-            AdaptiveClauseDatabase::Setup cdbSetup;
-            cdbSetup.maxClauseLength = setup.strictClauseLengthLimit;
-            cdbSetup.maxLbdPartitionedSize = 2;
-            cdbSetup.numLiterals = setup.clauseBaseBufferSize * std::max(
+        _pcb([&]() {
+            PriorityClauseBuffer::Setup pcbSetup;
+            pcbSetup.maxClauseLength = setup.strictClauseLengthLimit;
+            pcbSetup.maxLbdPartitionedSize = 2;
+            pcbSetup.numLiterals = setup.clauseBaseBufferSize * std::max(
                 setup.minNumChunksPerSolver, 
                 (int) (
                     ((float) setup.numBufferedClsGenerations) * 
                     setup.anticipatedLitsToImportPerCycle / setup.clauseBaseBufferSize
                 )
             );
-            cdbSetup.slotsForSumOfLengthAndLbd = false;
-            cdbSetup.useChecksums = false;
-            return cdbSetup;
+            pcbSetup.slotsForSumOfLengthAndLbd = false;
+            pcbSetup.useChecksums = false;
+            return pcbSetup;
         }()), _max_clause_length(setup.strictClauseLengthLimit),
-        _reset_lbd(setup.resetLbdBeforeImport) {}
+        _reset_lbd(setup.resetLbdBeforeImport),
+        _clause_out_data(setup.strictClauseLengthLimit),
+        _clause_out(_clause_out_data.data(), 0, 0) {}
 
-    AdaptiveClauseDatabase::LinearBudgetCounter getLinearBudgetCounter() {
-        return AdaptiveClauseDatabase::LinearBudgetCounter(_cdb);
-    }
-
-    template <typename T>
-    void performImport(int clauseLength, int lbd, std::list<T>& clauses, int nbLiterals) {
-        if (clauses.empty()) return;
-        _cdb.addReservedUniformClauses(clauseLength, lbd, clauses, nbLiterals);
+    void performImport(BufferReader& reader) {
+        LOG(V2_INFO, "DBG perform import of size %i\n", reader.getRemainingSize());
+        _pcb.addClauses(reader, nullptr);
+        LOG(V2_INFO, "DBG %lu lits in import buffer\n", size());
     }
 
     void add(const Mallob::Clause& c) {
@@ -63,20 +64,20 @@ public:
                     c.begin[i]));
             */
         }
-        bool success = _cdb.addClause(c);
+        bool success = _pcb.addClause(c);
         if (!success) _stats.receivedClausesDropped++;
     }
 
     const std::vector<int>& getUnitsBuffer() {
 
-        if (_cdb.getNumLiterals(1, 1) == 0) {
+        if (_pcb.getNumLiterals(1, 1) == 0) {
             _plain_units_out.clear();
             return _plain_units_out;
         }
 
         int numUnits = 0;
         std::vector<int> buf;
-        buf = _cdb.exportBuffer(-1, numUnits, AdaptiveClauseDatabase::UNITS, /*sortClauses=*/false);
+        buf = _pcb.exportBuffer(-1, numUnits, PriorityClauseBuffer::UNITS, /*sortClauses=*/false);
 
         _plain_units_out = std::vector<int>(buf.data()+(buf.size()-numUnits), buf.data()+buf.size());
         assert(_plain_units_out.size() == numUnits);
@@ -86,32 +87,36 @@ public:
         return _plain_units_out;
     }
 
-    Mallob::Clause& get(AdaptiveClauseDatabase::ExportMode mode) {
+    Mallob::Clause& get(PriorityClauseBuffer::ExportMode mode) {
 
-        if (_clause_out.begin != nullptr) {
-            free(_clause_out.begin);
+        if (_pcb.getCurrentlyUsedLiterals() == 0) {
             _clause_out.begin = nullptr;
+            return _clause_out;
         }
 
-        if (_cdb.getCurrentlyUsedLiterals() == 0) return _clause_out;
-
-        if (_cdb.popFrontWeak(mode, _clause_out)) {
+        _clause_out.begin = _clause_out_data.data();
+        if (_pcb.popClauseWeak(mode, _clause_out)) {
             _stats.receivedClausesDigested++;
             _stats.histDigested->increment(_clause_out.size);
             if (_reset_lbd) _clause_out.lbd = _clause_out.size;
             assert(_clause_out.size > 0);
             assert(_clause_out.lbd > 0);
             //assert(_clause_out.begin[0] != 0);
+        } else {
+            _clause_out.begin = nullptr;
         }
 
         return _clause_out;
     }
 
     bool empty() const {
-        int litsInUse = _cdb.getCurrentlyUsedLiterals();
+        return size() == 0;
+    }
+
+    size_t size() const {
+        int litsInUse = _pcb.getCurrentlyUsedLiterals();
         assert(litsInUse >= 0);
-        if (litsInUse > 0) return false;
-        return true;
+        return litsInUse;
     }
 
     ~ImportBuffer() {

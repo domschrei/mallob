@@ -8,7 +8,7 @@
 #include "util/random.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
-#include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
+#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "app/sat/sharing/buffer/buffer_merger.hpp"
 #include "app/sat/sharing/buffer/buffer_reducer.hpp"
 #include "util/sys/terminator.hpp"
@@ -32,13 +32,19 @@ Mallob::Clause generateClause(int minLength, int maxLength) {
     return c;
 }
 
-void testConcurrentImport() {
+int getProducer(const Mallob::Clause& clause, int nbProducers) {
+    int sum = 0;
+    for (int i = 0; i < clause.size; i++) sum += std::abs(clause.begin[i]);
+    return sum % nbProducers;
+}
+
+void testImport() {
 
     SolverSetup setup;
     setup.strictClauseLengthLimit = 20;
 	setup.strictLbdLimit = 20;
 	setup.clauseBaseBufferSize = 1500;
-	setup.anticipatedLitsToImportPerCycle = 20000;
+	setup.anticipatedLitsToImportPerCycle = 200'000;
 	setup.solverRevision = 0;
 	setup.minNumChunksPerSolver = 100;
 	setup.numBufferedClsGenerations = 4;
@@ -46,113 +52,99 @@ void testConcurrentImport() {
     stats.histProduced = new ClauseHistogram(20);
     stats.histDigested = new ClauseHistogram(20);
     ImportBuffer importBuffer(setup, stats);
-    LOG(V2_INFO, "setup\n");
-    
-    int nbTotalAdded = 0;
-    int nbTotalDigested = 0;
 
-    // Producer
-    auto futureProd = ProcessWideThreadPool::get().addTask([&]() {
-        std::list<int> units;
-        std::list<std::pair<int, int>> binaries;
-        std::map<std::pair<int, int>, std::list<std::vector<int>>> lenLbdToList;
+    // Generate some number of clauses
+    std::vector<Mallob::Clause> clauses;
+    for (int i = 0; i < 1000; i++) {
+        clauses.push_back(generateClause(1, setup.strictClauseLengthLimit));
+    }
+    std::sort(clauses.begin(), clauses.end());
 
-        float startTime = Timer::elapsedSeconds();
-        float lastImport = startTime;
-
-        auto pushClauses = [&]() {
-            LOG(V2_INFO, "Adding clauses to import buffer\n");
-            auto capacityCounter = importBuffer.getLinearBudgetCounter();
-            int budget = capacityCounter.getTotalBudget();
-            int nbAddedLits = 0;
-            int nbAddedClausesTotal = 0;
-            
-            budget -= capacityCounter.getNextOccupiedBudget(1, 1); 
-            nbAddedLits = 0;
-            units.remove_if([&](int i) {
-                if (budget == 0) return true;
-                budget--;
-                nbAddedLits++;
-                nbAddedClausesTotal++;
-                return false;
-            });
-            importBuffer.performImport(1, 1, units, std::min(nbAddedLits, budget));
-
-            budget -= capacityCounter.getNextOccupiedBudget(2, 2); 
-            nbAddedLits = 0;
-            binaries.remove_if([&](const auto& pair) {
-                if (budget < 2) return true;
-                budget -= 2;
-                nbAddedLits += 2;
-                nbAddedClausesTotal++;
-                return false;
-            });
-            importBuffer.performImport(2, 2, binaries, std::min(nbAddedLits, budget));
-
-            for (auto& entry : lenLbdToList) {
-                auto [len, lbd] = entry.first;
-                auto clslen = len;
-                auto& list = entry.second;
-                budget -= capacityCounter.getNextOccupiedBudget(len, lbd); 
-                nbAddedLits = 0;
-                list.remove_if([&](const auto& pair) {
-                    if (budget < clslen) return true;
-                    budget -= clslen;
-                    nbAddedLits += clslen;
-                    nbAddedClausesTotal++;
-                    return false;
-                });
-                importBuffer.performImport(len, lbd, list, nbAddedLits);
-            }
-
-            lastImport = Timer::elapsedSeconds();
-            LOG(V2_INFO, "Added %i clauses to import buffer\n", nbAddedClausesTotal);
-        };
-
-        while (Timer::elapsedSeconds() - startTime <= 60 && !Terminator::isTerminating()) {
-
-            auto cls = generateClause(1, setup.strictClauseLengthLimit);
-            if (cls.size == 1) {
-                units.push_front(cls.begin[0]);
-            } else if (cls.size == 2) {
-                binaries.emplace_front(cls.begin[0], cls.begin[1]);
-            } else {
-                std::vector<int> clauseVec(1+cls.size);
-                clauseVec[0] = cls.lbd;
-                for (size_t k = 0; k < cls.size; k++) clauseVec[k+1] = cls.begin[k];
-                lenLbdToList[std::pair<int, int>(cls.size, cls.lbd)].emplace_front(std::move(clauseVec));
-            }
-            nbTotalAdded++;
-            usleep(1000 * 1); // 1 millis
-
-            if (Timer::elapsedSeconds() - lastImport >= 1) {
-                pushClauses();
-            }
+    // Write sorted clauses into flat buffer
+    // and filter the (pretended) self-produced clauses
+    // for each solver
+    BufferBuilder builder(setup.anticipatedLitsToImportPerCycle, setup.strictClauseLengthLimit, false);
+    int nbSolvers = 4;
+    std::vector<std::vector<bool>> filters(nbSolvers);
+    for (auto& clause : clauses) {
+        builder.append(clause);
+        int producer = getProducer(clause, filters.size());
+        LOG(V2_INFO, "%s : produced by %i\n", clause.toStr().c_str(), producer);
+        for (int solverId = 0; solverId < filters.size(); solverId++) {
+            filters[solverId].push_back(producer == solverId);
         }
-        pushClauses();
-    });
+    }
+    std::vector<int> flatBuffer = builder.extractBuffer();
 
-    auto futureCons = ProcessWideThreadPool::get().addTask([&]() {
-        float startTime = Timer::elapsedSeconds();
-        while ((Timer::elapsedSeconds() - startTime <= 60 && !Terminator::isTerminating()) || !importBuffer.empty()) {
+    // Perform filtered import for each solver
+    for (int solverId = 0; solverId < filters.size(); solverId++) {
+        int nbAdmittedLits = 0;
+        int nbAdmittedCls = 0;
+        std::set<Mallob::Clause> admittedClauses;
+        // Verify output of buffer reader with respective filter set
+        {
+            BufferReader reader(flatBuffer.data(), flatBuffer.size(), setup.strictClauseLengthLimit, false);
+            reader.setFilterBitset(filters[solverId]);
+            auto clause = reader.getNextIncomingClause();
+            while (clause.begin != nullptr) {
+                assert(getProducer(clause, filters.size()) != solverId);
+                nbAdmittedCls++;
+                nbAdmittedLits += clause.size;
+                admittedClauses.insert(clause);
+                clause = reader.getNextIncomingClause();
+            }
+            LOG(V2_INFO, "solver #%i : %i/%i admitted (%i lits)\n", solverId, nbAdmittedCls, clauses.size(), nbAdmittedLits);
+        }
+        // Import
+        {
+            BufferReader reader(flatBuffer.data(), flatBuffer.size(), setup.strictClauseLengthLimit, false);
+            reader.setFilterBitset(filters[solverId]);
+            importBuffer.performImport(reader);
+            LOG(V2_INFO, "import buffer now has size %i\n", importBuffer.size());
+            assert(importBuffer.size() == nbAdmittedLits);
+        }
+        // Retrieval of unit clauses
+        int nbRetrievedCls = 0;
+        {
             auto units = importBuffer.getUnitsBuffer();
-            if (!units.empty()) LOG(V2_INFO, "Received %i units\n", units.size());
-            nbTotalDigested += units.size();
-            auto cls = importBuffer.get(AdaptiveClauseDatabase::NONUNITS);
-            while (cls.begin != nullptr) {
-                LOG(V2_INFO, "Received %s\n", cls.toStr().c_str());
-                nbTotalDigested++;
-                cls = importBuffer.get(AdaptiveClauseDatabase::NONUNITS);
+            for (int unit : units) {
+                Mallob::Clause clause(&unit, 1, 1);
+                assert(getProducer(clause, filters.size()) != solverId);
+                assert(admittedClauses.count(clause));
+                admittedClauses.erase(clause);
+                nbRetrievedCls++;
             }
-            usleep(1000 * 10); // 10 millis
+            LOG(V2_INFO, "Retrieved %i units\n", units.size());
         }
-    });
-
-    futureProd.get();
-    futureCons.get();
-
-    LOG(V2_INFO, "%i produced, %i digested\n", nbTotalAdded, nbTotalDigested);
+        // Retrieval of non-unit clauses
+        {
+            auto clause = importBuffer.get(PriorityClauseBuffer::NONUNITS);
+            int nbRetrievedNonunits = 0;
+            while (!importBuffer.empty() || clause.begin != nullptr) {
+                if (clause.begin != nullptr) {
+                    assert(getProducer(clause, filters.size()) != solverId);
+                    assert(admittedClauses.count(clause));
+                    admittedClauses.erase(clause);
+                    nbRetrievedCls++;
+                    nbRetrievedNonunits++;
+                }
+                //LOG(V2_INFO, "%lu lits remaining; pop result: %s\n", importBuffer.size(), clause.begin==nullptr ? "(null)" : clause.toStr().c_str());
+                clause = importBuffer.get(PriorityClauseBuffer::NONUNITS);
+            }
+            LOG(V2_INFO, "Retrieved %i non-units\n", nbRetrievedNonunits);
+        }
+        assert(importBuffer.empty());
+        if (!admittedClauses.empty()) {
+            for (auto& clause : admittedClauses) {
+                log_return_false("[ERROR] Admitted clause could not be retrieved: %s\n", clause.toStr().c_str());
+            }
+            assert(false);
+        }
+        assert(nbRetrievedCls == nbAdmittedCls || 
+            log_return_false("[ERROR] Mismatch in admitted vs. retrieved clauses (%i vs. %i)\n", nbAdmittedCls, nbRetrievedCls));
+    }        
 }
+
 
 int main() {
     Timer::init();
@@ -161,5 +153,5 @@ int main() {
     Process::init(0);
     ProcessWideThreadPool::init(4);
     
-    testConcurrentImport();
+    testImport();
 }

@@ -292,48 +292,18 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	applyFilterToBuffer(begin, buflen, filter);
 
 	auto reader = _pcb.getBufferReader(begin, buflen);
-	BufferIterator it(_params.strictClauseLengthLimit(), /*slotsForSumOfLengthAndLbd=*/false);
-	auto clause = reader.getNextIncomingClause();
-	bool explicitLbds = false;
-
-	_logger.log(verb+2, "DG prepare import\n");
-
-	// Traverse clauses
-	bool initialized = false;
 
 	_logger.log(verb+2, "DG import\n");
 
 	// For each incoming clause (which was not filtered out)
+	int filterSizeBeingLocked = -1;
+	auto clause = reader.getNextIncomingClause();
 	while (clause.begin != nullptr) {
-		
-		// new (or first) bucket reached?
-		if (!initialized || clause.size != it.clauseLength || clause.lbd != it.lbd) {
 
-			// publish admitted clause lists (if already initialized)
-			if (initialized) {
-
-				float publishTime = Timer::elapsedSeconds();
-
-				// publish prior lists of clauses
-				// update budgets
-				for (auto& slv : importingSolvers) {
-					slv.publishPreparedLists(it);
-				}
-
-				publishTime = Timer::elapsedSeconds() - publishTime;
-				_logger.log(verb+2, "DG published clause lists (%.4f s)\n", publishTime);
-			}
-
-			// go to new length-LBD bucket
-			while (clause.size != it.clauseLength || clause.lbd != it.lbd) {
-				it.nextLengthLbdGroup();
-				explicitLbds = it.storeWithExplicitLbd(/*maxLbdPartitioningSize=*/2);
-				for (auto& slv : importingSolvers) {
-					slv.initializeNextSlot(it.clauseLength, it.lbd);
-				}
-			}
-
-			initialized = true;
+		if (filterSizeBeingLocked != clause.size) {
+			if (filterSizeBeingLocked != -1) _export_buffer.getFilter(filterSizeBeingLocked).returnExclusiveLock();
+			filterSizeBeingLocked = clause.size;
+			_export_buffer.getFilter(filterSizeBeingLocked).acquireExclusiveLock();
 		}
 
 		hist.increment(clause.size);
@@ -342,14 +312,17 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 		// Decide for each solver whether it should receive the clause
 		for (size_t i = 0; i < importingSolvers.size(); i++) {
-			importingSolvers[i].tryImport(clause, producers, explicitLbds);
+			importingSolvers[i].appendCandidate(clause, producers);
 		}
 
 		clause = reader.getNextIncomingClause();
 	}
+	if (filterSizeBeingLocked != -1) _export_buffer.getFilter(filterSizeBeingLocked).returnExclusiveLock();
 	
 	for (auto& slv : importingSolvers) {
-		slv.publishPreparedLists(it);
+		BufferReader reader = _pcb.getBufferReader(begin, buflen);
+		reader.setFilterBitset(slv.filter);
+		slv.solver->addLearnedClauses(reader);
 	}
 	
 	// Process-wide stats

@@ -10,6 +10,7 @@
 #include <chrono>
 #include <filesystem>
 
+#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "cadical.hpp"
 #include "util/logger.hpp"
 #include "util/distribution.hpp"
@@ -19,7 +20,7 @@ Cadical::Cadical(const SolverSetup& setup)
 	  solver(new CaDiCaL::Solver), terminator(*setup.logger), 
 	  learner(_setup), learnSource(_setup, [this]() {
 		  Mallob::Clause c;
-		  fetchLearnedClause(c, AdaptiveClauseDatabase::ANY);
+		  fetchLearnedClause(c, PriorityClauseBuffer::ANY);
 		  return c;
 	  }) {
 	

@@ -105,7 +105,7 @@ public:
         // return excess budget
         if (budget > 0) storeBudget(budget);
 
-        _hist_discarded_cls->increase(_clause_length, nbDiscarded);
+        if (_hist_discarded_cls) _hist_discarded_cls->increase(_clause_length, nbDiscarded);
         return nbInserted;
     }
 
@@ -130,7 +130,11 @@ public:
         std::vector<Mallob::Clause> flushedClauses;
         int nbRemainingLits = buf.getMaxRemainingLits();
         nbRemainingLits -= (nbRemainingLits % _clause_length);
+        const int nbStoredLits = getNbStoredLiterals();
         int nbFreedLits = tryFreeStoredLiterals(nbRemainingLits, true);
+        assert(nbFreedLits >= 0);
+        assert(nbFreedLits % _clause_length == 0);
+        //LOG(V2_INFO, "  %i/%i lits freed\n", nbFreedLits, nbStoredLits);
         storeBudget(nbFreedLits);
         int dataIdx = _data_size - _effective_clause_length;
         while (nbFreedLits >= _clause_length) {
@@ -141,7 +145,8 @@ public:
             nbFreedLits -= _clause_length;
             dataIdx -= _effective_clause_length;
         }
-        assert(nbFreedLits == 0);
+        assert(nbFreedLits == 0 || log_return_false("[ERROR] Slot (%i,%i): %i stray free lits left\n",
+            _clause_length, _common_lbd_or_zero, nbFreedLits));
         std::sort(flushedClauses.begin(), flushedClauses.end());
         for (auto& cls : flushedClauses) {
             popFreedClauseAtBack();
@@ -160,7 +165,7 @@ public:
     // by the slot itself in the call "flushAndShrink".
     int tryFreeStoredLiterals(int nbDesiredLits, bool freePartially) {
         int nbClauses = _nb_stored_clauses.load(std::memory_order_relaxed);
-        int nbDesiredCls = std::ceil(nbDesiredLits / (float)_clause_length);
+        int nbDesiredCls = (int) std::ceil(nbDesiredLits / (double)_clause_length);
         while (nbClauses > 0 &&
             !_nb_stored_clauses.compare_exchange_strong(nbClauses, std::max(0, nbClauses-nbDesiredCls), std::memory_order_relaxed)) {}
         
@@ -181,6 +186,11 @@ public:
         return _clause_length;
     }
 
+    bool fitsThisSlot(const Mallob::Clause& clause) {
+        return clause.size == _clause_length && 
+            (hasIndividualLbds() || clause.lbd == _common_lbd_or_zero);
+    }
+
 private:
 
     void shrink() {
@@ -195,8 +205,10 @@ private:
     void discardFreedClauses() {
         while (_data_size / _effective_clause_length > _nb_stored_clauses.load(std::memory_order_relaxed)) {
             readClauseAtBack(_tmp_clause);
-            _cb_discard_cls(_tmp_clause);
-            _hist_discarded_cls->increment(_clause_length);
+            if (_hist_discarded_cls) {
+                _hist_discarded_cls->increment(_clause_length);
+                _cb_discard_cls(_tmp_clause);
+            }
             popFreedClauseAtBack();
         }
     }
@@ -217,8 +229,11 @@ private:
         }
         
         // Success! At least one clause is here and can be popped.
-        readClauseAtBack(clause);
+        readClauseAtBackCopying(clause);
         popFreedClauseAtBack();
+
+        // Return budget which the clause took
+        storeBudget(_clause_length);
 
         // Now that you are owning the lock, also discard clauses
         // which were marked to be discarded.
@@ -247,12 +262,25 @@ private:
         return readClause(_data_size - _effective_clause_length, clause);
     }
 
+    void readClauseAtBackCopying(Mallob::Clause& clause) {
+        return readClauseCopying(_data_size - _effective_clause_length, clause);
+    }
+
     void readClause(int dataIdx, Mallob::Clause& clause) {
         clause.size = _clause_length;
         int* clsData = _data.data() + dataIdx;
         if (hasIndividualLbds()) clause.lbd = *(clsData++);
         else clause.lbd = _common_lbd_or_zero;
         clause.begin = clsData;
+    }
+
+    void readClauseCopying(int dataIdx, Mallob::Clause& clause) {
+        clause.size = _clause_length;
+        int* clsData = _data.data() + dataIdx;
+        if (hasIndividualLbds()) clause.lbd = *(clsData++);
+        else clause.lbd = _common_lbd_or_zero;
+        assert(clause.begin != nullptr);
+        memcpy(clause.begin, clsData, sizeof(int) * _clause_length);
     }
 
     void popFreedClauseAtBack() {
@@ -266,6 +294,7 @@ private:
 
         // Fetch budget from global budget
         int budget = fetchBudget(nbDesiredLits);
+        //LOG(V2_INFO, "(%i,%i) fetched %i/%i\n", _clause_length, _common_lbd_or_zero, budget, nbDesiredLits);
         // Insufficient?
         if (budget < nbDesiredLits) {
             // Try fetch budget from other slots
@@ -287,7 +316,7 @@ private:
         if (budget > nbDesiredLits) {
             storeBudget(budget-nbDesiredLits);
         }
-        return true;
+        return budget;
     }
 
     int fetchBudget(int numDesired) {
@@ -305,11 +334,6 @@ private:
 
     void storeBudget(int amount) {
         _global_budget.fetch_add(amount, std::memory_order_relaxed);
-    }
-
-    bool fitsThisSlot(Mallob::Clause& clause) {
-        return clause.size == _clause_length && 
-            (hasIndividualLbds() || clause.lbd == _common_lbd_or_zero);
     }
 
     bool hasIndividualLbds() const {

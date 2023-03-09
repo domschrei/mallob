@@ -1,4 +1,5 @@
 
+#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 extern "C" {
 #include "kissat/src/kissat.h"
 }
@@ -188,7 +189,7 @@ void Kissat::produceClause(int size, int lbd) {
 
 void Kissat::consumeClause(int** clause, int* size, int* lbd) {
     Clause c;
-    bool success = fetchLearnedClause(c, AdaptiveClauseDatabase::ANY);
+    bool success = fetchLearnedClause(c, PriorityClauseBuffer::ANY);
     if (success) {
         assert(c.begin != nullptr);
         assert(c.size >= 1);
