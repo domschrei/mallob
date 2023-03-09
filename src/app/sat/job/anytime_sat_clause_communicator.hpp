@@ -48,6 +48,8 @@ private:
     bool _initiated_proof_assembly = false;
     std::unique_ptr<ProofProducer> _proof_producer;
 
+    int _last_skipped_epochs_warning {0};
+
 public:
     AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job);
 

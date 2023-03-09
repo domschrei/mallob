@@ -287,12 +287,19 @@ bool AnytimeSatClauseCommunicator::tryInitiateSharing() {
 
     bool lastEpochDone = !_current_session;
     if (!lastEpochDone) {
-        if (!_params.deterministicSolving()) 
-            LOG(V1_WARN, "[WARN] %s : Next epoch over-due!\n", _job->toStr());
+        if (!_params.deterministicSolving()) {
+            // Warn that a new epoch is over-due, but only once for each skipped epoch ...
+            int nbSkippedEpochs = (int) std::floor((time - _time_of_last_epoch_initiation) / _params.appCommPeriod()) - 1;
+            if (nbSkippedEpochs > _last_skipped_epochs_warning) {
+                LOG(V1_WARN, "[WARN] %s : Next epoch over-due -- %i periods skipped\n", _job->toStr(), nbSkippedEpochs);
+                _last_skipped_epochs_warning = nbSkippedEpochs;
+            }
+        }
         return false;
     }
 
     _current_epoch++;
+    _last_skipped_epochs_warning = 0;
 
     // Assemble job message
     JobMessage msg(_job->getId(), _job->getContextId(), _job->getRevision(), 
