@@ -43,9 +43,9 @@ public:
         _clause_out(_clause_out_data.data(), 0, 0) {}
 
     void performImport(BufferReader& reader) {
-        LOG(V2_INFO, "DBG perform import of size %i\n", reader.getRemainingSize());
+        //LOG(V2_INFO, "DBG perform import of size %i\n", reader.getRemainingSize());
         _pcb.addClauses(reader, nullptr);
-        LOG(V2_INFO, "DBG %lu lits in import buffer\n", size());
+        //LOG(V2_INFO, "DBG %lu lits in import buffer\n", size());
     }
 
     void add(const Mallob::Clause& c) {
